@@ -77,6 +77,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
+import { MAX_CRITIQUE_BYTES, criticaTroppoLunga } from './lib/tetto-critica.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, perimetroNote } from './lib/verifier-scope.mjs';
 import {
@@ -209,10 +210,7 @@ export function stateFile(root = ROOT) {
   return resolve(root, '.claude', 'verify-local.json');
 }
 
-// Tetto di una critica: lo stesso del server (12000 caratteri). Oltre, la
-// registrazione è respinta con la spiegazione, mai tagliata in silenzio
-// (CLAUDE.md § Limiti).
-export const MAX_CRITIQUE_CHARS = 12000;
+export { MAX_CRITIQUE_BYTES };
 // E un pavimento: una verifica di due parole non è una verifica. Vale anche
 // per il pass, che è la promozione (feedback #565).
 export const MIN_CRITIQUE_CHARS = 80;
@@ -435,9 +433,8 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
   // Tetto abbondante e niente taglio silenzioso: tagliata, una critica perdeva
   // proprio i rilievi, che stanno in coda (giro 8 su #561).
   const testo = ROUND.normalizeCritique(critique);
-  if (testo.length > MAX_CRITIQUE_CHARS) {
-    return { ok: false, state: s, reason: `critica troppo lunga: ${testo.length} caratteri, il massimo è ${MAX_CRITIQUE_CHARS}. Accorcia il riassunto, non i rilievi.` };
-  }
+  const troppo = criticaTroppoLunga(testo);
+  if (troppo) return { ok: false, state: s, reason: troppo };
   const parsed = ROUND.parseFindings(critique);
   const decision = ROUND.decideRound({ findings: parsed.findings, caps, counts: prev.counts || {} });
   for (const k of ['fix', 'derived', 'external']) decision[k] = numeraRilievi(parsed.findings, decision[k]);
@@ -564,7 +561,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
   const base = {
     ...prev,
     pending: null,
-    fixedReport: String(report || '').slice(0, MAX_CRITIQUE_CHARS),
+    fixedReport: String(report || '').slice(0, MAX_CRITIQUE_BYTES),
     fixedSha: sha || '',
     fixedServer: coppiaServer(server),
     fixedAt: when,
@@ -1346,8 +1343,8 @@ if (isMain) {
     if (state[b].feedbackId) {
       const { annotaPratica } = await import('./owner-feedback.mjs');
       const nota = notaDelGiro(state[b], { branch: b, sha: state[b].requestedSha || headSha() });
-      const a = await annotaPratica(state[b].feedbackId, nota).catch((e) => ({ ok: false, motivo: String((e && e.message) || e) }));
       const chi = state[b].feedbackNum ? `#${state[b].feedbackNum}` : state[b].feedbackId;
+      const a = await annotaPratica(state[b].feedbackId, nota, { rif: chi }).catch((e) => ({ ok: false, motivo: String((e && e.message) || e) }));
       console.error(a.ok
         ? `Pratica ${chi}: ${a.from === a.to ? 'giro annotato' : 'presa in carico («In lavorazione») e giro annotato'}.`
         : `Pratica ${chi} non aggiornata (${a.motivo}): in Gestione questo giro non compare.`);

@@ -14,6 +14,7 @@
 // rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // PNG 2×2 opaco (data URI): un'immagine che carica senza rete.
 const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEklEQVR4nGP8z8Dwn4EIwDiqEAAlWQMEXtHc5AAAAABJRU5ErkJggg==';
@@ -50,14 +51,14 @@ function pageHtml() {
 
 async function openMenuOn(page, selector) {
   await page.locator(selector).click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
 }
 
 async function closeMenu(page) {
   await page.keyboard.press('Escape');
-  await expect(page.locator('.sn-menu')).toBeHidden();
+  await expect(menuDi(page).locator('.sn-menu')).toBeHidden();
 }
 
 test('link dentro uno shadow root: il menu offre le azioni sul link, come in light DOM', async ({ openTab, testServer }) => {

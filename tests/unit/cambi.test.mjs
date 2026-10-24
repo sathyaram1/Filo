@@ -163,6 +163,30 @@ test('criterio 4: i passi di un cursore si fondono in UN evento, e tornare all\'
   assert.equal(K.fondibile(ev(0, 1, 2), { ...ev(1, 2, 3), ts: new Date(t0 + K.FINESTRA_FUSIONE_MS + 1000).toISOString() }), false);
 });
 
+test('#1490: lo zoom ritoccato tre volte a secondi di distanza è UN cambio, «125% → 100%», e si annulla fino a 125%', () => {
+  const t0 = Date.parse('2026-10-21T09:50:00Z');
+  const zoom = (s, prima, dopo, extra = {}) => ({
+    id: `z${s}`, ts: new Date(t0 + s * 1000).toISOString(), tipo: 'zoom', via: 'interfaccia', dove: 'zoom',
+    cambi: [{ chiave: 'zoom:youtube.com', prima, dopo }], ...extra,
+  });
+  let ultimo = zoom(0, 125, 114);
+  for (const [s, prima, dopo] of [[12, 114, 87], [40, 87, 100]]) {
+    const n = zoom(s, prima, dopo);
+    assert.ok(K.fondibile(ultimo, n), `il ritocco dopo ${s} s non si fonde`);
+    ultimo = K.fondi(ultimo, n);
+  }
+  assert.equal(ultimo.id, 'z0');
+  assert.equal(ultimo.ts, zoom(0, 0, 0).ts, 'la riga resta all’ora del primo ritocco');
+  assert.equal(ultimo.agg, zoom(40, 0, 0).ts);
+  assert.equal(K.frase(ultimo), 'zoom di youtube.com: 125% → 100%');
+  assert.deepEqual(ultimo.cambi, [{ chiave: 'zoom:youtube.com', prima: 125, dopo: 100 }]);
+  // Un altro sito, un'altra strada o un annullo in mezzo sono un cambio a parte.
+  assert.equal(K.fondibile(ultimo, { ...zoom(50, 100, 90), cambi: [{ chiave: 'zoom:example.org', prima: 100, dopo: 90 }] }), false);
+  assert.equal(K.fondibile(ultimo, zoom(50, 100, 90, { via: 'chat' })), false);
+  assert.equal(K.fondibile(ultimo, zoom(50, 100, 125, { annulla: 'z0' })), false);
+  assert.equal(K.fondibile(ultimo, zoom(40 + K.FINESTRA_FUSIONE_MS / 1000 + 1, 100, 90)), false, 'dopo una pausa lunga è un cambio nuovo');
+});
+
 test('annullare rimette i valori di prima, anche dentro le mappe sostituite intere', () => {
   const evento = { cambi: [
     { chiave: 'theme', prima: 'light', dopo: 'dark' },
@@ -239,4 +263,25 @@ test('per il modello: righe con id, provenienza e stato, e il conto di quelle la
   assert.match(righe[0], /dalle Preferenze/);
   assert.match(righe[1], /annulla c1/);
   assert.equal(K.righePerModello(lista, { adesso, max: 1 }).tolti, 1);
+});
+
+test('la ricerca della chat fra i cambi si allarga come quella fra le conversazioni: una parola in più non fa sparire il cambio (#868.1)', () => {
+  require('../../src/shared/chatArchive.js');
+  const adesso = Date.parse('2026-10-01T10:00:00Z');
+  const lista = [
+    { id: 'c1', ts: new Date(adesso - 86400000).toISOString(), tipo: 'impostazioni', via: 'chat', cambi: [{ chiave: 'theme', prima: 'light', dopo: 'dark' }] },
+    { id: 'c2', ts: new Date(adesso - 3600000).toISOString(), tipo: 'impostazioni', via: 'chat', cambi: [{ chiave: 'cursorBlinkMs', prima: 500, dopo: 900 }] },
+  ];
+  const stretta = K.cercaPerChat(lista, 'tema scuro');
+  assert.deepEqual(stretta.cambi.map((c) => c.id), ['c1']);
+  assert.equal(stretta.allargata, false);
+  for (const q of ['cambio tema scuro', 'rimetti il tema scuro di ieri?', 'il «tema» scuro!']) {
+    const r = K.cercaPerChat(lista, q);
+    assert.deepEqual(r.cambi.map((c) => c.id), ['c1'], q);
+    assert.equal(r.cambi[0].frase, 'tema: chiaro → scuro');
+  }
+  assert.equal(K.cercaPerChat(lista, 'cambio tema scuro').allargata, true, 'il modello deve sapere che ha trovato con meno parole');
+  // Senza una parola che distingue non si tira fuori mezzo registro.
+  assert.deepEqual(K.cercaPerChat(lista, 'di ieri').cambi, []);
+  assert.deepEqual(K.cercaPerChat(lista, 'sveglia').cambi, []);
 });

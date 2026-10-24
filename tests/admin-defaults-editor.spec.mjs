@@ -1,4 +1,4 @@
-// Editor admin "Modelli predefiniti": il "Prova" di una riga e il combobox
+// Editor admin "Modelli predefiniti" (Gestione → Impostazioni predefinite, #1414): il "Prova" di una riga e il combobox
 // della stringa modello.
 //
 // Bug coperto: il "Prova" inviava SOLO il nickname, che il main cercava nel
@@ -13,12 +13,14 @@
 // inviati per asserire COSA la pagina chiede al main.
 
 import { test, expect } from './fixtures/electron.mjs';
-
-const ADMIN_URL = 'filo://admin-defaults/admin-defaults.html';
+import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 
 async function openStubbedEditor(openTab, overrides = {}) {
-  const page = await openTab(ADMIN_URL);
+  const page = await openTab(GESTIONE);
   await page.addInitScript((over) => {
+    // Un salvataggio vero è un giro di rete: `ritardoSalvataggioMs` lo imita,
+    // per provare cosa succede a chi continua a lavorare mentre viaggia.
+    const { ritardoSalvataggioMs, ...cfgOver } = over || {};
     const fakeConfig = {
       apiKeysPresent: { openrouter: true, tavily: false },
       safeBrowsingKeyPresent: false,
@@ -27,7 +29,7 @@ async function openStubbedEditor(openTab, overrides = {}) {
       // Senza override: la lista di esclusione EFFETTIVA coincide con quella del
       // codice (nessun override remoto), che è il caso normale.
       excludedProviders: null,
-      ...over,
+      ...cfgOver,
     };
     // `__defaultsMinus`: la lista del codice tranne quelle voci, letta dal codice e
     // non ricopiata, così una voce di serie nuova non sposta l'avviso del test.
@@ -76,6 +78,7 @@ async function openStubbedEditor(openTab, overrides = {}) {
           if (!msg.model) return { ok: false, error: `Modello "${msg.nickname}" non trovato` };
           return { ok: true, ttftMs: 123, tokensPerSec: 45.6, provider: msg.provider, model: msg.model };
         case 'defaults_update':
+          if (ritardoSalvataggioMs) await new Promise((r) => setTimeout(r, ritardoSalvataggioMs));
           // Come il main: risponde con la config effettiva DOPO la scrittura.
           return {
             ok: true,
@@ -97,7 +100,7 @@ async function openStubbedEditor(openTab, overrides = {}) {
     if (window.chrome && window.chrome.runtime) window.chrome.runtime.sendMessage = stub;
     else window.chrome = { runtime: { sendMessage: stub } };
   }, overrides);
-  await page.reload();
+  await ricaricaSu(page, 'predefiniti');
   await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
   return page;
 }
@@ -387,8 +390,8 @@ test('il menu del catalogo resta sceglibile se il campo torna a fuoco subito, e 
 });
 
 test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza stub)', async ({ openTab }) => {
-  const page = await openTab(ADMIN_URL);
-  await page.waitForSelector('#title', { timeout: 8_000 });
+  const page = await openTab(GESTIONE);
+  await page.waitForSelector('#panel-predefiniti', { state: 'attached', timeout: 8_000 });
 
   const testRes = await page.evaluate(() => window.filo.message({
     type: 'test_default_model', provider: 'openrouter', model: 'qualsiasi/modello',
@@ -515,4 +518,107 @@ test('pesi aperti: senza nessun modello scelto la riga non compare (#833)', asyn
   const page = await openStubbedEditor(openTab);
   await expect(page.locator('#modelsGrid .sn-chain').first()).toBeVisible();
   await expect(page.locator('#openWeightsImpact')).toBeHidden();
+});
+
+test('la conferma del salvataggio non sopravvive alla modifica dopo: lo schermo dice che non è ancora propagato', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  const stato = page.locator('#saveStatus');
+
+  await page.click('#saveBtn');
+  await expect(stato).toHaveText('Salvato e propagato a tutti gli utenti.', { timeout: 8_000 });
+
+  // Un campo qualunque: la regola è una sola per tutta la pagina.
+  const row = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+  await row.locator('.sn-model-sort').selectOption('latency');
+  await expect(stato).toHaveText('Modifiche non ancora propagate.');
+
+  await page.selectOption('#providerSort', 'price');
+  await expect(stato).toHaveText('Modifiche non ancora propagate.');
+
+  await page.click('#addModelRow');
+  await expect(stato).toHaveText('Modifiche non ancora propagate.');
+});
+
+test('il Prova di una riga su Automatico parte con la scelta generale che si vede, anche prima di salvare', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { providerSort: 'price' });
+
+  await page.selectOption('#providerSort', 'throughput');
+  const row = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+  await row.getByRole('button', { name: 'Prova' }).click();
+  await expect(row.locator('.sn-model-row-status')).toContainText('123', { timeout: 8_000 });
+
+  const sent = await page.evaluate(() => window.__sent.filter((m) => m.type === 'test_default_model'));
+  expect(sent[sent.length - 1].sort).toBe('throughput');
+});
+
+test('scegliere il modello dalla tendina rimette in discussione la misura, come riscriverlo a mano', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  const row = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+  const stato = row.locator('.sn-model-row-status');
+
+  await row.getByRole('button', { name: 'Prova' }).click();
+  await expect(stato).toContainText('123', { timeout: 8_000 });
+
+  await row.locator('.sn-model-id').click();
+  await page.locator('.sn-select-pop [data-value="meta-llama/llama-4-maverick:free"]').first().click();
+
+  await expect(row.locator('.sn-model-id')).toHaveValue('meta-llama/llama-4-maverick:free');
+  await expect(stato, 'la misura del modello di prima resta sotto un modello mai provato').not.toContainText('123');
+});
+
+// Quello che sta sullo schermo e quello che è partito agli utenti non sono la
+// stessa cosa: la pagina non deve annunciare un salvataggio che non contiene
+// ciò che si vede, né far sparire una riga senza dire perché.
+test('una riga senza nickname non si perde in silenzio: viene segnalata e il salvataggio non si dichiara intero', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  const stato = page.locator('#saveStatus');
+
+  await page.click('#addModelRow');
+  const nuova = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').last();
+  await nuova.locator('.sn-model-id').fill('vendor/dimenticato');
+  await nuova.locator('.sn-model-sort').selectOption('latency');
+  await page.click('#saveBtn');
+
+  await expect(stato).toHaveText('Salvato — una riga evidenziata sotto non è stata propagata.', { timeout: 8_000 });
+  await expect(nuova).toHaveClass(/sn-row-invalid/);
+  await expect(nuova.locator('.sn-model-row-msg')).toHaveText('Il nickname è obbligatorio');
+  await expect(nuova.locator('.sn-model-id'), 'la riga scartata sparisce dallo schermo').toHaveValue('vendor/dimenticato');
+});
+
+test('una riga con un nickname già usato viene segnalata e resta sullo schermo', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  const stato = page.locator('#saveStatus');
+
+  await page.click('#addModelRow');
+  const nuova = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').last();
+  await nuova.locator('.sn-model-nick').fill('esistente');
+  await nuova.locator('.sn-model-id').fill('vendor/doppio');
+  await page.click('#saveBtn');
+
+  await expect(stato).toHaveText('Salvato — una riga evidenziata sotto non è stata propagata.', { timeout: 8_000 });
+  await expect(nuova.locator('.sn-model-row-msg')).toHaveText('Nickname duplicato: esistente');
+  await expect(nuova.locator('.sn-model-id')).toHaveValue('vendor/doppio');
+});
+
+test('il criterio degli host scelto mentre il salvataggio viaggia resta, e la conferma non lo dà per propagato', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { ritardoSalvataggioMs: 900 });
+  const stato = page.locator('#saveStatus');
+  const row = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+
+  await page.click('#saveBtn');
+  await row.locator('.sn-model-sort').selectOption('price');
+
+  await expect(stato).toHaveText('Modifiche non ancora propagate.', { timeout: 8_000 });
+  await expect(row.locator('.sn-model-sort')).toHaveValue('price');
+});
+
+test('la scelta generale cambiata mentre il salvataggio viaggia resta, e la conferma non la dà per propagata', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { ritardoSalvataggioMs: 900 });
+  const stato = page.locator('#saveStatus');
+
+  await page.click('#saveBtn');
+  await page.selectOption('#providerSort', 'throughput');
+
+  await expect(stato).toHaveText('Modifiche non ancora propagate.', { timeout: 8_000 });
+  await expect(page.locator('#providerSort')).toHaveValue('throughput');
 });

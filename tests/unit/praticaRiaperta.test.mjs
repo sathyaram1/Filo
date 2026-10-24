@@ -9,11 +9,14 @@ import { esegui } from '../../scripts/server-fondi-pratica.mjs';
 import { riapriPerIlServer } from '../../scripts/finish-local.mjs';
 import { partiDaCampi } from '../../scripts/lib/parti-lavoro.mjs';
 import { FIRESTORE_BASE } from '../../scripts/lib/firestore-auth.mjs';
+import { PULITO } from '../helpers/bigliettoFinto.mjs';
 
 const FB = globalThis.SN_FEEDBACK;
 const ORA = Date.parse('2026-10-03T10:00:00Z');
 const ORE = 3600 * 1000;
 const OPTS = { bearer: 'finto' };
+// Una sessione col biglietto pulito: la nota su un fidato da una sessione sporca ha le sue prove in notaTogliFiducia.test.mjs.
+of.sessione.biglietto = async () => PULITO;
 
 const valore = (v) => (typeof v === 'string' ? { stringValue: v } : { integerValue: String(v) });
 

@@ -19,6 +19,7 @@
 // finale sarebbe diverso e l'assert diventa rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -52,9 +53,9 @@ test('Dettatura: il testo trascritto atterra dove il cursore si trova ORA, non d
   //     campo e la posizione del cursore (qui: inizio campo, offset 0).
   await page.locator('#input').focus();
   await page.locator('#input').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 
   // (2) Mentre la registrazione sarebbe aperta, l'utente scrive nel campo e
   //     sposta il cursore alla FINE (posizione diversa da quella catturata).

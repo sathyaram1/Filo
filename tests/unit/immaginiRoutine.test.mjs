@@ -157,7 +157,7 @@ test('se i file non si scrivono, i byte non finiscono in stampa: la voce porta i
   assert.deepEqual(p.immagini[2], fascicolo().immagini[2]);
 });
 
-test('dispatch porta «immagini» a chi vede il feedback, mai a secaudit né al prober', () => {
+test('dispatch porta «immagini» a chi vede il feedback, mai a secaudit', () => {
   const server = { payload: fascicolo() };
   const ruoli = [
     ['new-work', {}], ['verifier', {}], ['fixer', { ripresa: { domanda: 'd', risposta: 'r' } }], ['fixer', {}],
@@ -168,7 +168,6 @@ test('dispatch porta «immagini» a chi vede il feedback, mai a secaudit né al 
     assert.deepEqual(p.immagini, server.payload.immagini, `${role} ${p.case || ''}`);
   }
   assert.equal(buildPayload({ role: 'secaudit', branch: 'b' }, serverCtx({ role: 'secaudit' }, server, 'diff')).immagini, undefined);
-  assert.equal(buildPayload({ role: 'prober' }, serverCtx({ role: 'prober' }, server)).immagini, undefined);
   const senza = buildPayload({ role: 'new-work', id: 'a' }, serverCtx({ role: 'new-work' }, { payload: { feedback: { text: 'x' } } }));
   assert.equal('immagini' in senza, false, 'nessuna immagine: nessun campo');
 });

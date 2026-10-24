@@ -16,6 +16,7 @@
 // il resto — spezzatura, WAV, richiesta, inserimento — è il codice di produzione.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -88,7 +89,7 @@ test('Dettatura: le frasi arrivano nel campo mentre si parla, nell\'ordine detto
     '<textarea id="campoDetta" style="position:fixed;top:60px;left:20px;width:320px;height:60px;z-index:9"></textarea>'));
   await page.locator('#campoDetta').focus();
   await page.locator('#campoDetta').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
   await page.keyboard.press('Escape');
 
   await page.evaluate(() => window.SN_TTS.startDictation());

@@ -228,7 +228,7 @@ test('gesto: paga solo la cosa che ha toccato; il rilascio del mouse tocca anche
 
 test('tetto: le azioni contate sono quelle automatiche di SN_CONST', () => {
   const A = SN_CONST.ACTIONS;
-  assert.deepEqual(Object.keys(Tetto.GRUPPI).sort(), [A.EXPLAIN, A.SPELLCHECK_SEMANTIC, A.SPELLCHECK_WORD].sort());
+  assert.deepEqual(Object.keys(Tetto.GRUPPI).sort(), [A.EXPLAIN, A.SPELLCHECK_SEMANTIC, A.SPELLCHECK_CONTEXT].sort());
   for (const g of Object.values(Tetto.GRUPPI)) assert.ok(Tetto.TETTI[g] > 0, `il gruppo ${g} ha un tetto`);
 });
 
@@ -250,7 +250,7 @@ test('tetto: oltre il tetto per scheda si ferma, avvisa una volta per pausa, e r
 
   // Un'altra scheda e un altro gruppo hanno il loro conto.
   assert.equal(t.passa(spiega, wcFinto(8)), null);
-  assert.equal(t.passa({ action: SN_CONST.ACTIONS.SPELLCHECK_WORD }, wc), null);
+  assert.equal(t.passa({ action: SN_CONST.ACTIONS.SPELLCHECK_SEMANTIC }, wc), null);
   // Il tasto destro e le azioni non automatiche non si fermano e non si contano.
   assert.equal(t.passa({ ...spiega, suRichiesta: true }, wc), null);
   assert.equal(t.passa({ action: SN_CONST.ACTIONS.EXPLAIN_DEEP }, wc), null);
@@ -261,13 +261,13 @@ test('tetto: oltre il tetto per scheda si ferma, avvisa una volta per pausa, e r
   assert.equal(t.passa(spiega, wc).primo, true, 'una pausa nuova avvisa di nuovo');
 });
 
-test('tetto: correttore, parola e controllo del testo stanno nello stesso conto', () => {
+test('tetto: i due controlli del correttore, rapido e ragionato, stanno nello stesso conto', () => {
   const c = orologio();
   const t = Tetto.crea({ ora: c.ora });
   const wc = wcFinto(9);
   const tetto = Tetto.TETTI.correttore;
   for (let i = 0; i < tetto; i += 1) {
-    const action = i % 2 ? SN_CONST.ACTIONS.SPELLCHECK_WORD : SN_CONST.ACTIONS.SPELLCHECK_SEMANTIC;
+    const action = i % 2 ? SN_CONST.ACTIONS.SPELLCHECK_CONTEXT : SN_CONST.ACTIONS.SPELLCHECK_SEMANTIC;
     assert.equal(t.passa({ action }, wc), null);
   }
   assert.equal(t.passa({ action: SN_CONST.ACTIONS.SPELLCHECK_SEMANTIC }, wc).gruppo, 'correttore');

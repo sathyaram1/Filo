@@ -14,6 +14,10 @@ let serverDown = false;
 let saldo = 4321.5;
 let quota = 100;
 let grants = [];
+let tetto = 5;
+// #1353 — un server dei crediti lento (avvio a freddo) e quante letture del saldo gli arrivano.
+let ritardoMs = 0;
+let lettureSaldo = 0;
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -35,13 +39,17 @@ test.beforeAll(async () => {
       if (serverDown) { res.destroy(); return; }
       if ((req.headers.authorization || '') !== 'Bearer anon-id-token') return json(res, 401, { error: { message: 'no auth' } });
       if (url === '/walletState') {
-        return json(res, 200, {
+        lettureSaldo += 1;
+        // Le cifre sono quelle di quando la domanda è arrivata, come sul server vero.
+        const risposta = {
           result: {
             hasWallet: true, pseudonym: 'abcdef0123456789',
             balance: { credits: saldo, creditsGranted: 5000, eurUsd: 1.2, eurPerCredit: 0.0007 },
-            stale: false, dailyCredits: quota, grants, invites: [],
+            stale: false, dailyCredits: quota, sentRewardsPerDay: tetto, grants, invites: [],
           },
-        });
+        };
+        setTimeout(() => json(res, 200, risposta), ritardoMs);
+        return;
       }
       if (url === '/walletRedeem') {
         return json(res, 200, {
@@ -62,6 +70,9 @@ test.beforeEach(() => {
   serverDown = false;
   saldo = 4321.5;
   quota = 100;
+  tetto = 5;
+  ritardoMs = 0;
+  lettureSaldo = 0;
   grants = [{ at: '2026-09-20T10:00:00.000Z', credits: 5000, why: 'entry' }];
 });
 
@@ -127,20 +138,76 @@ test('la chat dice il saldo e la quota del portafoglio, e a server muto l\'ultim
   expect(testo).not.toContain('mezzanotte');
   expect(testo).not.toContain(`Saldo: ${Math.round(locale)} crediti`);
 
-  // La quota cambia sul server: dopo un minuto la chat la rilegge.
+  // La quota cambia sul server: dopo un minuto il turno dice subito l'ultimo saldo noto (#1353) e lo fa rileggere.
   quota = 250;
   saldo = 4300;
   await passaUnMinuto(app);
   testo = await statoChat(app);
-  expect(testo).toMatch(/Saldo: 4\.?300 crediti/);
-  expect(testo).toContain('Ogni giorno ne arrivano altri 250');
+  expect(testo).toMatch(/Saldo: 4\.?321,5 crediti \(lo tiene il server; letto il .+\)\. È l'ultimo saldo noto/);
+  await expect.poll(() => statoChat(app)).toMatch(/Saldo: 4\.?300 crediti \(lo tiene il server: è il numero della pagina Crediti\)/);
+  expect(await statoChat(app)).toContain('Ogni giorno ne arrivano altri 250');
 
-  // Server muto: l'ultimo saldo letto, dichiarato tale.
+  // Server muto: il turno dopo ha l'ultimo saldo noto, e quando la lettura fallisce davvero lo dice.
   serverDown = true;
   await passaUnMinuto(app);
   testo = await statoChat(app);
-  expect(testo).toMatch(/Saldo: 4\.?300 crediti\. È l'ultimo saldo noto/);
-  expect(testo).toContain('il server dei crediti non risponde');
+  expect(testo).toMatch(/Saldo: 4\.?300 crediti \(lo tiene il server; letto il .+\)\. È l'ultimo saldo noto/);
+  await expect.poll(() => statoChat(app)).toContain('il server dei crediti non risponde');
+  expect(await statoChat(app)).toMatch(/Saldo: 4\.?300 crediti\. È l'ultimo saldo noto/);
+});
+
+// #1353 — un server dei crediti lento (avvio a freddo) non fa aspettare il turno e non diventa «non risponde»;
+// chi scrive nella chat fa rileggere il saldo prima dell'invio.
+test('server dei crediti lento: il turno parte subito con l\'ultimo saldo, e scrivere nella chat lo fa rileggere', async ({ app }) => {
+  const home = await homeDiAvvio(app);
+  await riscatta(app);
+  ritardoMs = 4_000;
+  saldo = 4000;
+  await passaUnMinuto(app);
+
+  const t0 = Date.now();
+  const testo = await statoChat(app);
+  expect(Date.now() - t0, 'il turno non aspetta il server dei crediti').toBeLessThan(1_000);
+  expect(testo).toMatch(/Saldo: 4\.?321,5 crediti \(lo tiene il server; letto il .+\)\. È l'ultimo saldo noto/);
+  expect(testo).not.toContain('non risponde');
+  // Mentre il server ci pensa, un altro turno non chiede una seconda lettura e non accusa il server.
+  const letture = lettureSaldo;
+  expect(await statoChat(app)).not.toContain('non risponde');
+  expect(lettureSaldo).toBe(letture);
+  await expect.poll(() => statoChat(app), { timeout: 10_000 }).toMatch(/Saldo: 4\.?000 crediti \(lo tiene il server: è il numero/);
+
+  // Un minuto dopo l'utente torna nella chat e scrive: la lettura parte mentre scrive, e all'invio il saldo è fresco.
+  saldo = 3900;
+  ritardoMs = 1_500;
+  await passaUnMinuto(app);
+  const prima = lettureSaldo;
+  await home.reload();
+  await home.waitForLoadState('domcontentloaded');
+  await home.locator('#input').click();
+  await home.locator('#input').pressSequentially('quanti crediti ho?', { delay: 20 });
+  await expect.poll(() => lettureSaldo, { message: 'scrivere fa rileggere il saldo' }).toBeGreaterThan(prima);
+  await expect.poll(() => statoChat(app), { timeout: 10_000 }).toMatch(/Saldo: 3\.?900 crediti \(lo tiene il server: è il numero/);
+});
+
+// #1353 — vale la lettura del saldo partita per ultima: una lenta partita prima (avvio a freddo, la lettura
+// dell'avvio, la pagina Crediti) che finisce dopo non riporta in chat il saldo vecchio come appena letto.
+test('una lettura del saldo partita prima e finita dopo non prende il posto di quella nuova', async ({ app }) => {
+  await homeDiAvvio(app);
+  await riscatta(app);
+  // La lettura che Filo fa da solo quattro secondi dopo l'avvio è già passata.
+  await new Promise((r) => setTimeout(r, 5_000));
+  const prima = lettureSaldo;
+  saldo = 4000;
+  ritardoMs = 3_000;
+  await app.evaluate(() => { globalThis.SN_WALLET_MAIN.readState().catch(() => {}); });
+  await expect.poll(() => lettureSaldo).toBeGreaterThan(prima);
+  saldo = 3900;
+  ritardoMs = 200;
+  await app.evaluate(() => globalThis.SN_WALLET_MAIN.readState());
+  expect(await statoChat(app)).toMatch(/Saldo: 3\.?900 crediti \(lo tiene il server: è il numero/);
+  await new Promise((r) => setTimeout(r, 3_500));
+  expect(await statoChat(app), 'la lettura lenta, partita prima, non sostituisce quella nuova').toMatch(/Saldo: 3\.?900 crediti/);
+  expect(await app.evaluate(() => globalThis.SN_WALLET_MAIN.ultimaLettura().state.server.balance.credits)).toBe(3900);
 });
 
 test('invio di una segnalazione col portafoglio: niente +5, il conteggio locale fermo, il premio lo mostra la pagina Crediti', async ({ app, openTab }) => {
@@ -171,6 +238,38 @@ test('invio di una segnalazione col portafoglio: niente +5, il conteggio locale 
   const primo = crediti.locator('#moves li').first();
   await expect(primo).toContainText('+10', { timeout: 15_000 });
   await expect(primo).toContainText('Segnalazione inviata');
+});
+
+// #1077 — il server paga al più N premi d'invio al giorno per portafoglio: oltre, il messaggio d'invio non
+// promette un premio che non arriverà. Contano quelli già arrivati oggi e gli invii fatti dopo la lettura.
+test('invio oltre il tetto giornaliero dei premi: il messaggio dice che questo arriva senza premio', async ({ app }) => {
+  const page = await homeDiAvvio(app);
+  tetto = 2;
+  grants = [{ at: new Date().toISOString(), credits: 10, why: 'feedback_sent:fbStamattina' }, ...grants];
+  await riscatta(app);
+  await app.evaluate(async () => {
+    globalThis.SN_FEEDBACK.submit = async () => ({ id: `fb${Date.now()}`, failed: [] });
+    globalThis.SN_FEEDBACK_OUTBOX._setAuto(false);
+    await globalThis.SN_WALLET_MAIN.readState();
+  });
+  const invia = async (testo) => {
+    await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+    await expect(page.locator('.sn-fb-modal')).toBeVisible();
+    await page.locator('.sn-fb-text').fill(testo);
+    await page.locator('.sn-fb-send').click();
+    await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 4_000 });
+    return page.locator('.sn-toast').filter({ hasText: 'Feedback inviato' }).last();
+  };
+
+  // Uno già pagato stamattina, tetto a due: questo ha ancora il premio.
+  let toast = await invia('Il tasto indietro non torna alla pagina di prima');
+  await expect(toast).toContainText('Il premio arriva sul tuo saldo dopo i controlli.');
+  // Il premio di quello appena mandato non è ancora arrivato, ma conta: il tetto è pieno.
+  toast = await invia('La barra delle schede sparisce a schermo intero');
+  await expect(toast).toContainText('Il premio vale per i primi 2 feedback del giorno. Questo non ne riceve.');
+  await expect(toast).not.toContainText('Il premio arriva sul tuo saldo');
+  await expect(toast).not.toContainText('+');
+  await page.screenshot({ path: 'tests/.shots/1077-tetto-premi-invio.png' });
 });
 
 // Le schede pubbliche di QUESTA installazione, senza rete (come in

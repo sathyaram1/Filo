@@ -50,6 +50,7 @@ const {
   writeState,
   clearState,
   fixedPayload,
+  leggiOpzioniRegistrazione,
   fermaSenzaSegnalazione,
   fixedReplyText,
   FERMA_NOTE,
@@ -244,10 +245,6 @@ test('buildPayload new-work: feedback completo', () => {
   assert.equal(p.id, 'F1');
 });
 
-test('buildPayload prober: payload vuoto', () => {
-  assert.deepEqual(buildPayload({ role: 'prober' }), {});
-});
-
 // ─── Le decisioni dell'owner: dalla busta del server al compito del lavoratore ─
 
 test('le decisioni dell\'owner arrivano a chi verifica, risolve, riprende e riallinea; non al controllo di sicurezza', () => {
@@ -363,8 +360,8 @@ function silently(fn) {
 }
 
 test('emit: consegnare un ruolo lo registra per chi accoderà feedback', () => {
-  silently(() => emit({ role: 'prober' }, {}));
-  assert.equal(readRole(TMP), 'prober');
+  silently(() => emit({ role: 'secaudit', id: 's', branch: 'worker/s' }, {}));
+  assert.equal(readRole(TMP), 'secaudit');
   // Il giro successivo sovrascrive: un worker alla volta, un ruolo alla volta.
   silently(() => emit({ role: 'verifier', id: 'x', branch: 'worker/x' }, {}));
   assert.equal(readRole(TMP), 'verifier');
@@ -449,15 +446,13 @@ test('resolveRoutinesEnabled: l\'override d\'ambiente batte il remoto', () => {
   assert.equal(resolveRoutinesEnabled({ envRaw: 'sì?', remote: false }), false); // valore ignoto → decide il remoto
 });
 
-test('parseRoutineConfig: legge interruttore ed esplorazione', () => {
+test('parseRoutineConfig: legge l\'interruttore e nient\'altro', () => {
   assert.deepEqual(parseRoutineConfig({
     enabled: { booleanValue: false },
-    proberWhenIdle: { booleanValue: false },
-  }), { enabled: false, proberWhenIdle: false });
+    altroCampo: { booleanValue: false },
+  }), { enabled: false });
   // Documento vuoto (mai scritto) = nessuna decisione presa.
   assert.deepEqual(parseRoutineConfig({}), {});
-  // proberWhenIdle: solo il false esplicito compare (true = storico).
-  assert.deepEqual(parseRoutineConfig({ proberWhenIdle: { booleanValue: true } }), {});
 });
 
 test('preflight: routine spente → non pronto, con esito `off` (non un guasto)', async () => {
@@ -509,6 +504,16 @@ test('fixedPayload: stop viaggia solo se chiesto, e mai come valore falso', () =
   assert.equal(fixedPayload({ report: 'r', ferma: true, segnalazione: 's' }).stop, true);
   assert.ok(!('stop' in fixedPayload({ report: 'r' })), 'una consegna normale non porta il campo');
   assert.ok(!('stop' in fixedPayload({ report: 'r', ferma: 'sì' })), 'solo il true vero ferma un lavoro');
+});
+
+test('fixedPayload e le opzioni dei --record-*: la domanda (#1358) viaggia come oggetto, accanto alla segnalazione', () => {
+  const d = { titolo: 'Quale?', priorita: 'importante' };
+  assert.deepEqual(fixedPayload({ report: 'r', domanda: d }).domanda, d);
+  assert.ok(!('domanda' in fixedPayload({ report: 'r', domanda: 'percorso.json' })), 'un percorso non è una domanda');
+  const o = leggiOpzioniRegistrazione(['--record-fixed', 'id1', 'report lungo', '--domanda', 'd.json']);
+  assert.equal(o.error, '');
+  assert.equal(o.valori['--domanda'], 'd.json');
+  assert.match(leggiOpzioniRegistrazione(['--record-secaudit', 'id1', 'pass', '--domanda', 'd.json']).error, /--domanda non vale con --record-secaudit/);
 });
 
 test('--ferma senza segnalazione non parte: è la segnalazione che ferma, e senza chi decide non saprebbe cosa decidere', () => {
@@ -741,7 +746,7 @@ test('emit: un ruolo che col payload già fuori passa ancora la soglia esce inte
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
   for (const f of readdirSync(vere)) {
-    if (f === 'verifier.md' || f === 'prober.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+    if (f === 'verifier.md' || f === 'resolver.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
   }
   const stampa = (bucket, ctx) => {
     let out = '';
@@ -773,7 +778,7 @@ test('emit: un ruolo che col payload già fuori passa ancora la soglia esce inte
   });
 
   // Il ruolo dopo non eredita il file di quello prima, e un ruolo che sta in stampa non porta il rimando.
-  const dopo = JSON.parse(stampa({ role: 'prober' }, {}));
+  const dopo = JSON.parse(stampa({ role: 'new-work', id: 'n', num: '#5' }, { feedback: { text: 'Un difetto.' } }));
   assert.ok(!existsSync(j.istruzioniFile), 'il file del ruolo di prima è sparito');
   assert.equal(dopo.istruzioniFile, undefined);
   assert.match(dopo.instructions, /Contratto comune dei worker/);
@@ -995,7 +1000,7 @@ test('i file-ruolo del repo esistono e non sono stub (orchestrator compreso)', (
   // Il preflight consegna orchestrator.md, dispatch consegna gli altri: un file
   // spostato o svuotato è un ruolo che parte senza istruzioni.
   const realDir = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
-  for (const f of ['orchestrator.md', 'resolver.md', 'resolver-rebase.md', '_criteri-verifica.md', '_segnala.md', 'verifier.md', 'secaudit.md', 'prober.md', 'halt.md', '_contratto-worker.md']) {
+  for (const f of ['orchestrator.md', 'resolver.md', 'resolver-rebase.md', '_criteri-verifica.md', '_segnala.md', 'verifier.md', 'secaudit.md', 'halt.md', '_contratto-worker.md']) {
     const p = resolve(realDir, f);
     assert.ok(existsSync(p), `${f} deve esistere`);
     assert.ok(readFileSync(p, 'utf8').length > 300, `${f} non deve essere uno stub`);
@@ -1014,13 +1019,30 @@ test('secaudit: sul fail la ricetta non chiede una consegna di design, che il se
   assert.ok(!/accoda|deliver status/.test(fail[0]), `sul fail niente consegne a mano: «${fail[0]}»`);
 });
 
-test('secaudit: la richiesta di fusione fa girare gli unit sulla fusione per minuti, e la ricetta la manda in sottofondo (#929)', () => {
-  // Una chiamata da due minuti la taglia a metà: nessuna richiesta parte e resta la cartella di prova.
-  const t = readFileSync(fileURLToPath(new URL('../../routines/roles/secaudit.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
-  const i = t.indexOf('merge-gate.mjs');
-  assert.ok(i > -1);
-  assert.match(t.slice(i, i + 1200), /sottofondo/);
-  assert.ok(!/Qui non gira nessun git/.test(t), 'qui adesso girano git e gli unit');
+test('secaudit: il ruolo consegnato registra il verdetto e rilascia, la fusione non la chiede più (#1207)', () => {
+  // Gli unit sulla fusione li lancia un'azione di GitHub accesa dal server, che porta lui il lavoro al cancello:
+  // dal prompt escono la richiesta di fusione e i suoi esiti.
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) {
+    if (f === 'secaudit.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  }
+  const bucket = { role: 'secaudit', id: 's', num: '#3', branch: 'worker/s' };
+  let out = '';
+  const real = process.stdout.write;
+  process.stdout.write = (s) => { out += s; return true; };
+  try { emit(bucket, serverCtx(bucket, null, { diff: 'diff --git a/x b/x\n+riga\n', base: { ref: 'origin/main', sha: 'a'.repeat(40) }, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
+  const istruzioni = JSON.parse(out).instructions;
+  const t = istruzioni.replace(/\s+/g, ' ');
+  assert.match(t, /Ruolo: secaudit/);
+  assert.match(t, /dispatch\.mjs"? --record-secaudit <id> <pass\|fail> --nota <file\.md>/);
+  assert.match(t, /La fusione non la chiedi tu, e non consegni nessuno stato/);
+  assert.match(t, /Su \*\*pass\*\* il seguito è del server: fa girare gli unit sul risultato della fusione/);
+  assert.match(t, /rilascio del biglietto/);
+  for (const vietato of [/merge-gate/, /--status done/, /--reason l5/, /--clear-state/, /\bexit (?:0|10|20|30)\b/i, /chiedi la fusione:/]) {
+    assert.doesNotMatch(t, vietato, `nel ruolo resta un passo del cancello: ${vietato}`);
+  }
 });
 
 // ─── Il biglietto perso non deve più poter succedere (incidente #444) ─────────
@@ -1289,7 +1311,7 @@ test('emit secaudit di un lavoro server: anche il diff del server, intero in un 
   try { emit(bucket, serverCtx(bucket, busta, { diff: 'diff --git a/x b/x\n+app', base: { ref: 'origin/main', sha: '2'.repeat(40) }, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
   const j = JSON.parse(out);
   assert.match(j.instructions, /diffServerFile/, 'il testo del ruolo dice del diff del server');
-  assert.match(j.instructions.replace(/\s+/g, ' '), /`30` → lavoro server: la parte del server la segue il server[^`]*Non fare niente/, 'e cosa fare con l’uscita 30 del gate');
+  assert.match(j.instructions.replace(/\s+/g, ' '), /Col pass, anche qui il seguito è del server: prima la parte dell'app su main di Filo, poi il ramo del server/, 'e chi porta su main le due parti');
   assert.equal(j.payload.diffServer, undefined);
   assert.ok(isAbsolute(j.payload.diffServerFile));
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -1303,6 +1325,38 @@ test('emit secaudit di un lavoro server: anche il diff del server, intero in un 
   const app = buildPayload(bucket, serverCtx(bucket, { payload: {} }, 'DIFF'));
   assert.equal(app.diffServer, undefined);
   assert.equal(app.diffServerHead, undefined);
+});
+
+test('secaudit di un lavoro solo server: il diff dell’app vuoto non dice «nessuna modifica» accanto al diff del server (#1418)', () => {
+  const bucket = { role: 'secaudit', id: 's', num: '#1418', branch: 'worker/s' };
+  const base = { ref: 'origin/main', sha: '2'.repeat(40) };
+  const busta = (diff) => ({ payload: { diffServer: { diff, base: { ref: 'main di filo-security', sha: '1'.repeat(40) }, head: 'a'.repeat(40) } } });
+  const vuotoApp = (commitPropri) => ({ diff: '', base, head: 'b'.repeat(40), vuoto: { commitPropri } });
+  const testo = (fromServer, commitPropri) => buildPayload(bucket, serverCtx(bucket, fromServer, vuotoApp(commitPropri))).diffVuoto;
+  const server = busta('diff --git a/functions/index.js b/functions/index.js\n+una riga del server\n');
+  for (const commitPropri of [0, 2, null]) {
+    const t = testo(server, commitPropri);
+    assert.doesNotMatch(t, /non porta nessuna modifica|Il diff è vuoto davvero/, `«${t}»`);
+    assert.match(t, /vuoto solo lui/, `dice di quale diff parla: «${t}»`);
+    assert.match(t, /diff del server \(diffServerFile\)[^]*resta da giudicare intero/, `e che quello del server resta da giudicare: «${t}»`);
+    assert.match(t, /non fa passare il controllo/, `«${t}»`);
+  }
+  assert.match(testo(server, 2), /2 commit propri/, 'il perché del diff dell’app vuoto resta');
+  // Vuoti tutti e due, o lavoro dell'app: il testo di sempre.
+  for (const fromServer of [busta(''), null]) {
+    assert.equal(testo(fromServer, 0), 'Il diff è vuoto davvero: il ramo non ha commit propri rispetto a main, quindi non porta nessuna modifica.');
+    assert.equal(testo(fromServer, 2), 'Il diff è vuoto davvero: il ramo ha 2 commit propri, ma ha lo stesso contenuto della sua base comune con main (modifiche che si annullano a vicenda).');
+  }
+});
+
+test('secaudit.md: «il controllo passa» col diff vuoto vale solo senza un diff del server da giudicare, nella stessa frase (#1418)', () => {
+  // Un modello piccolo si ferma alla prima regola che lo autorizza: la condizione sta lì, non in un paragrafo più sotto.
+  const t = readFileSync(fileURLToPath(new URL('../../routines/roles/secaudit.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  const frasi = t.split(/(?<=\.)\s+/).filter((f) => /il controllo passa/i.test(f));
+  assert.ok(frasi.length, 'la regola del diff vuoto deve dire quando il controllo passa');
+  for (const f of frasi) assert.match(f, /Senza un `diffServerFile` con del contenuto[^]*il controllo passa/, `la frase lega il via libera all'assenza del diff del server: «${f}»`);
+  const lavoroServer = t.match(/\*\*Lavoro server\.\*\*[^]*?## Passi/);
+  assert.ok(lavoroServer && /anche quando quello dell'app è vuoto/.test(lavoroServer[0]), 'il paragrafo del server vale anche col diff dell’app vuoto');
 });
 
 test('cleanup STATE_DIR temporanea', () => {

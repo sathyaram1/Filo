@@ -1,7 +1,5 @@
-// Tassi di cambio EUR -> altre valute. Fetch lazy da frankfurter.dev (BCE,
-// gratuito, niente API key). Cache in chrome.storage.local con TTL 24h.
-// Usato dai prompt explain/explainDeep per far convertire valute al modello
-// tramite il marker [[calc: ...]] (vedi popup.js).
+// Tassi di cambio EUR → altre valute da frankfurter.dev (BCE, senza API key), cache 24h.
+// Usati dai prompt explain per le conversioni col marker [[calc: ...]] (vedi popup.js).
 
 (function (global) {
   'use strict';
@@ -23,8 +21,7 @@
   // trentina, cento è fuori da qualunque caso vero.
   const MAX_SIGLE = 100;
 
-  // Fallback statico se la fetch fallisce al primo uso e non c'è cache.
-  // Valori indicativi ~2026, usati solo come ultima spiaggia.
+  // Ultima spiaggia se la fetch fallisce e non c'è cache: valori solo indicativi.
   const FALLBACK = {
     base: 'EUR',
     date: '2026-01-01',

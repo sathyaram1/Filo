@@ -18,7 +18,7 @@ const opzioni = (app) => app.evaluate(({ BrowserWindow }) => {
   return { ...w._filoTabs.barra.opzioni };
 });
 
-test('tasto destro su Cronologia, sull\'ora e su Impostazioni: le loro scelte, e fanno quello che dicono', async ({ app, openTab, testServer }) => {
+test('tasto destro su Memorie, sull\'ora e su Impostazioni: le loro scelte, e fanno quello che dicono', async ({ app, openTab, testServer }) => {
   await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
   await comandaBarra(app, 'clic');
@@ -26,8 +26,8 @@ test('tasto destro su Cronologia, sull\'ora e su Impostazioni: le loro scelte, e
 
   await barra.locator('#fisse .ico[data-comando="history"]').click({ button: 'right' });
   let menu = await menuAperto(app);
-  expect(menu, 'il menu della Cronologia non si è aperto').toBeTruthy();
-  expect(await vociDelMenu(menu)).toEqual(['Apri la Cronologia', 'Cronologia AI']);
+  expect(menu, 'il menu di Memorie non si è aperto').toBeTruthy();
+  expect(await vociDelMenu(menu)).toEqual(['Apri il quaderno delle memorie', 'Cronologia AI']);
   await scegliNelMenu(menu, 'Cronologia AI');
   await expect.poll(() => urlDelleSchede(app)).toContain('filo://history/history.html');
 

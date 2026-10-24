@@ -52,29 +52,31 @@ html, body {
    `display: inline-flex` lo sovrascrivono: qui gli si ridà la priorità. */
 [hidden] { display: none !important; }
 
-/* Alta esattamente la finestra in tutti e due gli stati: scorrono le colonne e il filo, mai la pagina. */
+/* Alta esattamente la finestra in tutti e due gli stati: scorrono le colonne e il filo, mai la pagina.
+   La prima riga esiste solo a destra, per Impostazioni e Profilo: sinistra e filo partono dall'alto (#1491). */
 .dash {
+  --dash-gap: 24px;
   position: relative;
   height: calc(100vh / var(--sn-zoom, 1));
   display: grid;
   grid-template-columns: 260px 1fr 260px;
-  grid-template-rows: 1fr auto;
-  gap: 24px;
-  padding: 40px 40px 28px;
+  grid-template-rows: auto 1fr auto;
+  column-gap: var(--dash-gap);
+  padding: 12px 40px 28px;
   box-sizing: border-box;
 }
 
 @media (max-width: 980px) {
-  .dash { grid-template-columns: 200px 1fr 200px; padding: 28px 20px 20px; gap: 16px; }
+  .dash { --dash-gap: 16px; grid-template-columns: 200px 1fr 200px; padding: 12px 20px 20px; }
 }
 /* Le colonne non si nascondono: le carte (un timer che suona) servono anche nella finestra più stretta. */
 @media (max-width: 720px) {
-  .dash { grid-template-columns: 170px 1fr 170px; padding: 24px 12px 16px; gap: 12px; }
+  .dash { --dash-gap: 12px; grid-template-columns: 170px 1fr 170px; padding: 12px 12px 16px; }
 }
 
 .dash-left {
   grid-column: 1;
-  grid-row: 1 / span 2;
+  grid-row: 1 / -1;
   padding-top: 14px;
   display: flex;
   flex-direction: column;
@@ -426,24 +428,15 @@ html, body {
 
 .dash-center {
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 1 / span 2;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  justify-content: center;
   min-width: 0;
   min-height: 0;
 }
-.dash-home {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 22px;
-  height: 100%;
-  padding: 40px 0;
-}
-/* Riga sopra il messaggio della home dopo un'accoglienza chiusa a metà: il segno «già accolto» è
+/* Riga in fondo al filo dopo un'accoglienza chiusa a metà: il segno «già accolto» è
    definitivo, e questa riga è l'unico posto in cui l'utente può accorgersene e tornare indietro. */
 .dash-onb-notice {
   display: flex;
@@ -477,33 +470,171 @@ html, body {
   transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-onb-notice button:hover { background: var(--dash-ink); color: var(--dash-paper); text-decoration: none; }
-.dash-home-msg {
-  font-size: 28px;
-  font-weight: 400;
-  line-height: 1.35;
-  text-align: center;
+/* Senza un modello Filo non può scrivere: la frase che dice perché sta in fondo al filo, con la sua voce. */
+.dash-senza-modello {
+  align-self: flex-start;
+  max-width: 86%;
+  margin: 6px 8px 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--dash-line);
+  border-radius: 16px;
+  background: var(--dash-card);
   color: var(--dash-ink);
-  max-width: 640px;
-  margin: 0;
-  letter-spacing: -0.01em;
+  font-size: 14.5px;
+  line-height: 1.5;
 }
-.dash-home-msg.dash-home-msg-loading { color: var(--dash-ink-mute); font-style: italic; }
+.dash-thread > .dash-onb-notice { align-self: center; margin: 6px 0; }
+/* L'intervista rifatta rimasta aperta altrove si ricorda sulla home, non in fondo a un'altra conversazione. */
+body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; }
+
+/* ── La coda del filo (#869) ── */
+/* Cercare nel filo: un campo discreto in cima al centro, i risultati sopra il filo. */
+.dash-cerca { flex: none; display: flex; justify-content: center; padding: 10px 8px 0; position: relative; z-index: 6; }
+.dash-cerca-campo {
+  display: flex; align-items: center; gap: 8px; width: min(320px, 100%);
+  padding: 5px 12px; border: 1px solid transparent; border-radius: var(--dash-radius-pill);
+  color: var(--dash-ink-mute); cursor: text;
+  transition: border-color calc(0.16s * var(--sn-motion, 1)) ease, background calc(0.16s * var(--sn-motion, 1)) ease, width calc(0.2s * var(--sn-motion, 1)) ease;
+}
+.dash-cerca-campo:hover { background: var(--dash-line); }
+.dash-cerca-campo:focus-within { width: min(460px, 100%); background: var(--dash-card); border-color: var(--dash-line-strong); color: var(--dash-ink-soft); }
+.dash-cerca-lente { display: inline-flex; flex: none; }
+.dash-cerca-input {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  font: inherit; font-size: 13px; color: var(--dash-ink);
+}
+.dash-cerca-input::placeholder { color: var(--dash-ink-mute); }
+.dash-cerca-input::-webkit-search-cancel-button { display: none; }
+.dash-cerca-risultati {
+  position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+  width: min(560px, calc(100% - 16px)); max-height: min(60vh, 520px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px; padding: 6px;
+  background: var(--dash-card); border: 1px solid var(--dash-line-strong); border-radius: 14px;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--dash-ink) min(100%, 16% * var(--sn-ombra, 1)), transparent);
+  scrollbar-width: thin;
+}
+.dash-cerca-voce {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 7px 10px; border: none; border-radius: 10px; background: transparent; color: var(--dash-ink);
+  font: inherit; cursor: pointer;
+  transition: background calc(0.14s * var(--sn-motion, 1)) ease, padding-left calc(0.14s * var(--sn-motion, 1)) ease;
+}
+.dash-cerca-voce:hover, .dash-cerca-voce.scelta, .dash-cerca-voce:focus-visible { background: var(--dash-line); padding-left: 14px; outline: none; }
+.dash-cerca-ico { display: inline-flex; flex: none; color: var(--dash-accent); }
+.dash-cerca-corpo { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.dash-cerca-titolo { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-cerca-sotto { font-size: 11.5px; color: var(--dash-ink-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-cerca-quando { flex: none; font-size: 11px; color: var(--dash-ink-mute); font-variant-numeric: tabular-nums; }
+.dash-cerca-niente { padding: 8px 10px; font-size: 12.5px; font-style: italic; color: var(--dash-ink-mute); }
+.dash-cerca-gruppo { border-top: 1px solid var(--dash-line); margin-top: 4px; }
+.dash-cerca-gruppo:first-child { border-top: none; margin-top: 0; }
+/* La ricerca per significato fra le schede chiuse parte a richiesta: la sua riga resta più quieta dei risultati. */
+.dash-cerca-significato .dash-cerca-titolo { color: var(--dash-ink-soft); }
+.dash-cerca-significato:disabled { cursor: progress; opacity: 0.7; }
+
+/* Risalire il filo: carica il pezzo prima; all'inizio lo dice e si spegne. */
+.dash-risali { display: flex; justify-content: center; padding: 0 0 4px; }
+.dash-risali-btn {
+  font: inherit; font-size: 11.5px; color: var(--dash-ink-mute); background: transparent;
+  border: 1px solid transparent; border-radius: var(--dash-radius-pill); padding: 4px 14px; cursor: pointer;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease, border-color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-risali-btn:hover { background: var(--dash-line); color: var(--dash-ink); border-color: var(--dash-line-strong); }
+.dash-risali-btn:disabled { cursor: default; opacity: 0.55; }
+.dash-risali-btn:disabled:hover { background: transparent; border-color: transparent; color: var(--dash-ink-mute); }
+
+/* Il segno del giorno, e i giorni prima di oggi sbiaditi: tornano pieni sotto il mouse. */
+.dash-giorno {
+  display: flex; align-items: center; gap: 10px; margin: 6px 0 0;
+  font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dash-ink-mute);
+}
+.dash-giorno::before, .dash-giorno::after { content: ""; flex: 1; height: 1px; background: var(--dash-line); }
+.dash-vecchio { opacity: var(--dash-vecchio-opacita, 0.52); transition: opacity calc(0.3s * var(--sn-motion, 1)) ease; }
+.dash-vecchio:hover, .dash-vecchio:focus-within { opacity: 1; }
+.dash-giorno.dash-vecchio { opacity: 1; }
+
+/* Il dispositivo d'origine quando non è questo. */
+.dash-altrove { font-size: 11px; color: var(--dash-ink-mute); margin-top: -10px; padding: 0 12px; }
+.dash-altrove-user { align-self: flex-end; }
+.dash-altrove-filo { align-self: flex-start; }
+
+/* Le righe sottili: un cambio fatto dall'interfaccia, le pagine visitate ripiegate. */
+.dash-cambio, .dash-pagine-testa {
+  display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%;
+  font-size: 12px; color: var(--dash-ink-mute); padding: 4px 10px; border-radius: 10px;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-cambio { align-self: stretch; }
+/* Le righe sottili di fila stanno strette come le righe di un registro (#1490): lo spazio pieno resta intorno alle bolle. */
+:is(.dash-cambio, .dash-pagine) + :is(.dash-cambio, .dash-pagine) { margin-top: calc(2px - var(--dash-filo-gap, 14px)); }
+.dash-cambio:hover, .dash-pagine-testa:hover, .dash-pagine-testa:focus-visible { background: var(--dash-line); color: var(--dash-ink-soft); outline: none; }
+.dash-cambio-ora, .dash-pagine-ora { flex: none; font-variant-numeric: tabular-nums; opacity: 0.75; }
+.dash-cambio-ico, .dash-pagine-ico { display: inline-flex; flex: none; }
+.dash-cambio-testo, .dash-pagine-testo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-cambio-stato { flex: none; font-style: italic; }
+.dash-cambio.dash-cambi-annullato .dash-cambio-testo { text-decoration: line-through; text-decoration-color: var(--dash-line-strong); }
+.dash-cambio-annulla {
+  margin-left: auto; flex: none; font: inherit; font-size: 11.5px; color: var(--dash-ink-soft);
+  background: transparent; border: 1px solid var(--dash-line-strong); border-radius: 13px; padding: 0 9px; cursor: pointer;
+  opacity: 0; transition: opacity calc(0.16s * var(--sn-motion, 1)) ease, background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-cambio:hover .dash-cambio-annulla, .dash-cambio-annulla:focus-visible { opacity: 1; }
+.dash-cambio-annulla:hover { background: var(--dash-ink); color: var(--dash-paper); border-color: var(--dash-ink); }
+/* Da tastiera il filo si percorre bolla per bolla (#1295): si vede quale ha il fuoco. */
+.dash-bubble[data-chat]:focus { outline: none; }
+.dash-bubble[data-chat]:focus-visible { outline: 2px solid rgba(var(--sn-accent-rgb), 0.55); outline-offset: 2px; }
+/* Al posto di una conversazione appena nascosta (#1295): una riga sottile che la rimette. */
+.dash-nascosta {
+  display: flex; align-items: center; gap: 8px; align-self: stretch; min-width: 0;
+  font-size: 12px; color: var(--dash-ink-mute); padding: 4px 10px; border-radius: 10px;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-nascosta[hidden] { display: none; }
+.dash-nascosta:hover, .dash-nascosta:focus-within { background: var(--dash-line); }
+.dash-nascosta-ico { display: inline-flex; flex: none; }
+.dash-nascosta-rimetti {
+  margin-left: auto; flex: none; font: inherit; font-size: 11.5px; color: var(--dash-ink-soft);
+  background: transparent; border: 1px solid var(--dash-line-strong); border-radius: 13px; padding: 0 9px; cursor: pointer;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-nascosta-rimetti:hover, .dash-nascosta-rimetti:focus-visible { background: var(--dash-ink); color: var(--dash-paper); border-color: var(--dash-ink); }
+.dash-pagine { align-self: stretch; display: flex; flex-direction: column; }
+.dash-pagine-testa { border: none; background: transparent; font-family: inherit; cursor: pointer; text-align: left; }
+.dash-pagine-aperte .dash-pagine-testa { color: var(--dash-ink-soft); }
+.dash-pagine-elenco { display: flex; flex-direction: column; gap: 1px; padding: 2px 0 4px 30px; }
+.dash-pagina {
+  display: flex; align-items: baseline; gap: 8px; min-width: 0; padding: 3px 8px; border-radius: 8px;
+  font-size: 12px; color: var(--dash-ink-soft); text-decoration: none;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-pagina:hover, .dash-pagina:focus-visible { background: var(--dash-line); color: var(--dash-ink); outline: none; }
+.dash-pagina-titolo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-pagina-sito { flex: none; font-size: 11px; color: var(--dash-ink-mute); }
+
+/* Il punto del filo dove porta una ricerca o una carta: un attimo di luce, poi niente. */
+.dash-trovato { animation: dash-trovato calc(1.6s * var(--sn-motion, 1)) ease; }
+@keyframes dash-trovato {
+  0%, 30% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent) 45%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
 
 
 .dash-thread {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 .dash-bubbles {
+  --dash-filo-gap: 14px;
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 40px 8px 8px;
+  gap: var(--dash-filo-gap);
+  /* Il vuoto sotto l'ultimo messaggio di una home appena aperta (#1487): lo misura dashboard-coda.js. */
+  padding: 40px 8px calc(8px + var(--dash-vuoto, 0px));
 }
 
 .dash-bubble {
@@ -520,6 +651,15 @@ html, body {
   background: var(--dash-ink);
   color: var(--dash-paper);
   border-bottom-right-radius: 6px;
+  transition: background calc(0.25s * var(--sn-motion, 1)) ease, color calc(0.25s * var(--sn-motion, 1)) ease;
+}
+/* #1296 — il seguito scritto mentre Filo lavora, in attesa: un foglietto tratteggiato non ancora consegnato, che si
+   riempie d'inchiostro quando Filo lo legge. */
+.dash-bubble-user.dash-bubble-attesa {
+  background: transparent;
+  color: var(--dash-ink-soft);
+  outline: 1.5px dashed var(--dash-ink-mute);
+  outline-offset: -1.5px;
 }
 /* #867 — il segno di un cambio sulla bolla dell'utente, come la conferma di lettura: passandoci sopra
    (sul segno, non sulla bolla che si attraversa leggendo) la frase e «annulla» in una pastiglia. */
@@ -843,6 +983,10 @@ html, body {
 .dash-file-btn-nome { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-file-btn-dove { opacity: 0.65; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-file-btn-dove[hidden] { display: none; }
+/* Il nome dato da Filo: più piano del nome vero, e senza spazio cede tutto lui. Il fattore è enorme
+   perché con uno piccolo al nome vero tocca una frazione di pixel, e già i puntini. */
+.dash-file-btn-etichetta { opacity: 0.8; min-width: 0; flex-shrink: 100000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-file-btn-etichetta[hidden] { display: none; }
 /* L'uscita dall'accoglienza: discreta, perché l'intervista è la strada principale, ma deve essere
    lì anche quando il modello non risponde. */
 .dash-skip-row {
@@ -1036,6 +1180,7 @@ html, body {
   border-radius: 8px;
 }
 /* Riga intera delle azioni e mai oltre: i titoli lunghi si accorciano coi puntini invece di allargare la bolla. */
+.dash-cmd-blocked-btn { margin-top: 8px; }
 .dash-delete-panel {
   flex: 1 1 100%;
   min-width: 0;
@@ -1047,6 +1192,19 @@ html, body {
   background: color-mix(in srgb, #c0392b 6%, transparent);
 }
 .dash-delete-note { font-size: 13px; margin-bottom: 6px; overflow-wrap: anywhere; }
+/* La richiesta scritta dal modello, su un foglietto suo come il testo altrui nei popup di conferma (#592.7):
+   il filo a sinistra è per metà colore del testo, così un accento spento non lo spegne. */
+.dash-delete-query {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 50%, currentColor);
+  border-radius: 6px;
+}
 /* Il modello sta giudicando le schede: niente avanzamento da stimare, una rotella. */
 .dash-delete-note[data-cerco="1"]::before {
   content: '';
@@ -1204,7 +1362,7 @@ html, body {
 
 .dash-right {
   grid-column: 3;
-  grid-row: 1 / span 2;
+  grid-row: 2 / span 2;
   padding-top: 14px;
   display: flex;
   flex-direction: column;
@@ -1232,6 +1390,25 @@ html, body {
   min-width: 0;
   padding: 8px 0 4px 14px;
   background: var(--dash-paper);
+}
+/* Su una finestra bassa la colonna scorre sotto l'orologio: quello che resta sotto sfuma invece di uscire tagliato a
+   metà, e la sfumatura c'è solo finché sotto c'è altro (senza scorrimento la timeline è spenta e l'opacità resta 0). */
+.dash-sistema::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 32px;
+  background: linear-gradient(to bottom, transparent, var(--dash-paper) 85%);
+  pointer-events: none;
+  opacity: 0;
+  animation: dash-sotto-c-e-altro linear both;
+  animation-timeline: scroll(nearest block);
+}
+@keyframes dash-sotto-c-e-altro {
+  0%, 92% { opacity: 1; }
+  100% { opacity: 0; }
 }
 .dash-sis-icone {
   display: flex;
@@ -1391,20 +1568,28 @@ html, body {
 
 .dash-input-wrap {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 8px;
-  padding: 6px;
+  /* Padding uguale sui quattro lati e una riga del campo alta quanto i tasti (36px): i tasti stanno al centro
+     della pastiglia, concentrici al suo bordo tondo, e con più righe restano sull'ultima (#1489). */
+  padding: 8px;
   background: var(--dash-card);
   border: 1px solid var(--dash-line-strong);
   border-radius: var(--dash-radius-pill);
   box-shadow: 0 1px 0 rgba(0, 0, 0, calc(0.02 * var(--sn-ombra, 1)));
-  margin: 0 auto;
+  margin: var(--dash-gap) auto 0;
   width: 100%;
   max-width: 720px;
   box-sizing: border-box;
+}
+/* Un file trascinato sopra la home (#1623): il campo si accende, è lì che andrà a finire. */
+.dash-input-wrap { transition: border-color calc(0.15s * var(--sn-motion, 1)) ease, box-shadow calc(0.15s * var(--sn-motion, 1)) ease; }
+.dash-input-wrap.dash-input-bersaglio {
+  border-color: var(--sn-accent);
+  box-shadow: 0 0 0 4px rgba(var(--sn-accent-rgb), 0.18);
 }
 .dash-input {
   flex: 1;
@@ -1412,7 +1597,7 @@ html, body {
   border: none;
   background: transparent;
   outline: none;
-  padding: 10px 14px;
+  padding: 7.5px 12px;
   font-size: 15px;
   line-height: 1.4;
   color: var(--dash-ink);
@@ -1445,6 +1630,11 @@ html, body {
 /* Il quadrato che ferma: stesso posto dell'invio, nel colore d'accento perché è urgente per natura. */
 .dash-send.dash-stop { background: var(--dash-accent); color: #fff; transition: transform calc(160ms * var(--sn-motion, 1)) ease, opacity calc(160ms * var(--sn-motion, 1)) ease; }
 .dash-send.dash-stop:hover { opacity: 1; transform: scale(1.07); }
+/* Appena comparso sotto il dito che ha mandato, il quadrato ignora i clic per mezzo secondo: si accende in quel tempo
+   vero, che la pagina gli scrive in --dash-pausa-quadrato (PAUSA_QUADRATO). Non è un token estetico. */
+.dash-send.dash-stop:not([disabled]) { animation: dash-stop-arma var(--dash-pausa-quadrato, 500ms) ease-in; }
+@keyframes dash-stop-arma { from { opacity: 0.45; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dash-send.dash-stop:not([disabled]) { animation-timing-function: step-end; } }
 
 .dash-img-preview {
   position: relative;
@@ -1489,7 +1679,7 @@ html, body {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 6px 10px 2px;
+  padding: 4px 8px 2px;
 }
 .dash-img-previews .dash-img-preview { position: relative; padding: 0; }
 .dash-img-previews .dash-img-preview img {
@@ -1530,6 +1720,9 @@ html, body {
 /* La scelta dell'autonomia nell'intervista (#1188): i livelli come pillole con le tacche di una carica, piene fino
    al livello; sotto, la frase del livello su cui si passa (o di quello scelto). */
 .dash-autonomia-scelta { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
+/* La scelta dei contatori nell'intervista (#1461): Sì e No, con le pillole dell'autonomia. */
+.dash-contatori-scelta { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
+.dash-contatori-voci { display: flex; flex-wrap: wrap; gap: 8px; }
 .dash-autonomia-livelli { display: flex; flex-wrap: wrap; gap: 8px; }
 .dash-autonomia-livello {
   display: inline-flex;
@@ -1564,7 +1757,7 @@ html, body {
 
 .dash-dir {
   flex-basis: 100%;
-  padding: 2px 14px 0;
+  padding: 2px 12px 0;
   font-size: 11.5px;
   color: var(--dash-ink-mute);
   font-family: 'Cascadia Code', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
@@ -1669,12 +1862,13 @@ html, body {
 }
 
 /* Controlli del browser dentro la home: in tinta con la "carta calda", così sembrano parte della
-   pagina e non una barra a sé. */
+   pagina e non una barra a sé. Stanno in cima alla colonna destra e non le scorrono via. */
 .dash-controls {
-  position: fixed;
-  top: 10px;
-  right: 16px;
-  z-index: 50;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  /* In riga con «Cerca nel filo»: il disegno parte all'altezza delle carte di sinistra. */
+  margin-top: 8px;
   display: flex;
   align-items: center;
   gap: 2px;

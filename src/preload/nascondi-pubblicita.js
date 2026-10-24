@@ -82,9 +82,9 @@ function chiudiBloccati({ ipcRenderer, webFrame }) {
   const cercaDentro = (root, livello) => {
     let frames = [];
     try { frames = root.querySelectorAll('iframe,frame'); } catch (_) {}
+    // Uno che carica ancora il suo indirizzo ha un preload suo che chiude da sé, se nessuno lo tocca prima (#1560).
     for (const f of frames) {
-      let doc = null;
-      try { doc = f.contentDocument; } catch (_) {}
+      const doc = globalThis.SN_RIQUADRI_IN_ARRIVO?.documento(f);
       if (doc && doc.documentElement) giroDentro(f, doc, livello);
     }
   };
@@ -114,9 +114,8 @@ function chiudiBloccati({ ipcRenderer, webFrame }) {
   // Chi manda il segnale può chiudere solo il proprio riquadro.
   window.addEventListener('message', (e) => {
     if (e.data !== RIQUADRO_FERMATO || !e.source) return;
-    let frames = [];
-    try { frames = document.querySelectorAll('iframe,frame'); } catch (_) {}
-    for (const f of frames) if (f.contentWindow === e.source) chiudi(f);
+    const f = globalThis.SN_RIQUADRI_IN_ARRIVO?.riquadroDi(e.source, document);
+    if (f) chiudi(f);
   });
   // L'errore di un'immagine arriva prima o dopo l'avviso del main: chi arriva secondo chiude.
   window.addEventListener('error', (e) => { if (bloccati.size) segna(e.target); }, true);

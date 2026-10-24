@@ -1,7 +1,8 @@
 // I LAVORI SERVER IN GESTIONE (#1159, SPEC-DOMANDE.md §6–7).
 //
 // COSA DEVE ESSERE VERO
-//   1. La sezione dei lavori col segno `localOnly` si chiama «Lavori server», qui e nella pagina gemella dei feedback.
+//   1. I lavori col segno `localOnly` non hanno una scheda loro (#1575): stanno nella scheda del loro stato, con
+//      l'etichetta «server».
 //   2. Automazioni: l'interruttore «Lavori server alle routine» nasce spento (campo assente), si accende e si spegne,
 //      e ogni gesto arriva al main come `lavoriServer` vero/falso; un salvataggio fallito torna indietro e lo dice.
 //   3. Una pratica passata in cloud che aspetta il PC lo dice sulla scheda («Pronto: aspetta il PC»); rimessa in coda no.
@@ -11,7 +12,6 @@ import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
-const FEEDBACK = 'filo://feedback/feedback.html';
 const SEGNO = { by: 'owner@esempio', at: Date.parse('2026-10-10T08:00:00Z') };
 
 function fb(over = {}) {
@@ -25,7 +25,7 @@ function fb(over = {}) {
 
 async function stubAutomazioni(page, { lavoriServer, rompi = false } = {}) {
   await page.evaluate((cfg) => {
-    window.__auto = { enabled: false, autoApprove: {}, proberWhenIdle: true, routinesEnabled: true };
+    window.__auto = { enabled: false, autoApprove: {}, routinesEnabled: true };
     if (cfg.lavoriServer !== undefined) window.__auto.lavoriServer = cfg.lavoriServer;
     window.__autoSets = [];
     const orig = window.filo.message.bind(window.filo);
@@ -58,14 +58,16 @@ const cambia = (page, acceso) => page.evaluate((v) => {
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }, acceso);
 
-test('la sezione si chiama «Lavori server», in Gestione e nella pagina dei feedback', async ({ openTab }) => {
+test('nessuna scheda «Lavori server»: il lavoro col segno sta nella scheda del suo stato, con l’etichetta', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('.mg-tab[data-tab="local"]')).toContainText('Lavori server');
-  await expect(page.locator('.mg-tab[data-tab="local"]')).not.toContainText('locali');
-  const gemella = await openTab(FEEDBACK);
-  await gemella.waitForLoadState('domcontentloaded');
-  await expect(gemella.locator('#tabs [data-tab="local"]')).toContainText('Lavori server');
+  await page.waitForFunction(() => window.__mgTest && window.filo);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveCount(0);
+  await expect(page.locator('.mg-tab', { hasText: /Lavori (server|locali)/ })).toHaveCount(0);
+  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, [fb()]);
+  await apriScheda(page, 'queue');
+  await expect(page.locator('.mg-item[data-id="srv-1"] .mg-local-badge')).toHaveText('server');
 });
 
 test('Automazioni: «Lavori server alle routine» nasce spento, si accende e si spegne, e arriva al main', async ({ openTab }) => {
@@ -118,7 +120,7 @@ test('una pratica passata che aspetta il PC lo dice sulla scheda; rimessa in cod
   const pronta = fb({ status: 'revision_security', attesa: 'fusione_server', branch: 'worker/srv-1-20261012T090000Z' });
   const rimessa = fb({ _id: 'srv-2', seq: 1201, status: 'todo', attesa: 'fusione_server' });
   await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, [pronta, rimessa]);
-  await page.evaluate(() => window.__mgTest.setTab('local'));
+  await page.evaluate(() => window.__mgTest.setTab('queue'));
   const riga = page.locator('.mg-item[data-id="srv-1"] .mg-attesa-server');
   await expect(riga).toHaveText('Pronto: aspetta il PC');
   await expect(riga).toHaveAttribute('title', /aspetta il tuo PC.*fusioni-server/);
@@ -137,7 +139,7 @@ test('#1222: la scheda dice quando il server aspetta la suite; un segno di attes
   const deploy = fb({ _id: 'srv-4', seq: 1203, status: 'revision_security', attesa: 'deploy_server', branch: 'worker/srv-4-20261014T090000Z' });
   const altro = fb({ _id: 'srv-5', seq: 1204, status: 'revision_security', attesa: 'boh', branch: 'worker/srv-5-20261014T090000Z' });
   await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, [suite, deploy, altro]);
-  await page.evaluate(() => window.__mgTest.setTab('local'));
+  await page.evaluate(() => window.__mgTest.setTab('queue'));
   const s = page.locator('.mg-item[data-id="srv-3"] .mg-attesa-server');
   await expect(s).toHaveText('Aspetta le prove del server');
   await expect(s).toHaveAttribute('title', /suite di GitHub è verde su quel commit/);

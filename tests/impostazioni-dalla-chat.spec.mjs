@@ -38,12 +38,14 @@ async function modelloFinto(app, giri) {
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.__imp_restore = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
     globalThis.__imp_tool = [];
+    globalThis.__imp_esiti = {};
     let n = 0;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
       const giro = g[Math.min(n, g.length - 1)];
       n += 1;
       const ultimo = [...messages].reverse().find((m) => m.role === 'tool');
       if (ultimo) globalThis.__imp_tool.push(String(ultimo.content || ''));
+      for (const m of messages) if (m.role === 'tool') globalThis.__imp_esiti[m.tool_call_id] = String(m.content || '');
       let text = giro.text || '';
       if (giro.rispondiDa) {
         const riga = String((ultimo && ultimo.content) || '').split('\n').find((r) => r.startsWith(`- ${giro.rispondiDa}:`));
@@ -60,6 +62,8 @@ async function modelloFinto(app, giri) {
   }, giri);
 }
 const ripristina = (app) => app.evaluate(() => { try { globalThis.__imp_restore?.(); } catch (_) {} });
+// Un'impostazione riuscita chiude il turno (#1130): la frase va scritta insieme. Ferma sulla conferma, col testo il modello riparte.
+const impostaDicendo = (testo, ...arg) => ({ ...imposta(...arg), text: testo });
 const impostazioni = (app) => app.evaluate(async () => globalThis.SN_STORAGE.getSettings());
 const imposta = (chiave, valore, id = 'i1') => ({
   toolCalls: [{ id, name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave, valore }) }],
@@ -79,7 +83,7 @@ test('A — «spegni il blocco della pubblicità»: conferma, interruttore spent
   const sec = await openTab('filo://security/security.html');
   await expect(sec.locator('#sec-adblock')).toBeChecked({ timeout: 8_000 });
 
-  await modelloFinto(app, [imposta('blocco_pubblicita', false), { text: 'Ti chiedo conferma.' }]);
+  await modelloFinto(app, [impostaDicendo('Ti chiedo conferma.', 'blocco_pubblicita', false), { text: 'Ti chiedo conferma.' }]);
   await scrivi(chat, 'spegni il blocco della pubblicità');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' })).toBeVisible({ timeout: 10_000 });
   // Il popup dice cosa cambia e cosa rischia; finché non c'è l'OK non cambia niente.
@@ -209,11 +213,15 @@ test('D — una voce avanzata delle Preferenze dalla chat: un valore del colore 
   const prefs = await openTab('filo://preferences/preferences.html');
   await expect(prefs.locator('#tabcol-saturazione_tab')).toBeVisible({ timeout: 8_000 });
 
-  await modelloFinto(app, [imposta('saturazione_tab', '0,4'), { text: 'Fatto.' }]);
+  // Una lettura nel giro rimanda l'esito al modello: l'impostazione da sola chiuderebbe il turno.
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'c1', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' }, ...imposta('saturazione_tab', '0,4').toolCalls] },
+    { text: 'Fatto.' },
+  ]);
   await scrivi(chat, 'abbassa la saturazione delle tab a 0,4');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 10_000 });
   await expect.poll(async () => (await impostazioni(app)).tabColor.saturazione_tab, { timeout: 5_000 }).toBe(0.4);
-  const esito = (await app.evaluate(() => globalThis.__imp_tool)).pop();
+  const esito = await app.evaluate(() => globalThis.__imp_esiti.i1);
   expect(esito).toMatch(/^Eseguita: Impostazione applicata: Colore delle tab, saturazione tab → 0,4\. .*«annulla»/);
   await prefs.bringToFront();
   await expect(prefs.locator('#tabcol-saturazione_tab')).toHaveValue('0.4', { timeout: 3_000 });
@@ -228,8 +236,7 @@ test('D — una voce avanzata delle Preferenze dalla chat: un valore del colore 
   // Il ↺ di un token, chiesto a parole: torna al valore di serie, e la riga della pagina lo mostra.
   await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ themeTokens: { accent: '#cc2200', radius: '9px' } }));
   await modelloFinto(app, [
-    { toolCalls: [{ id: 'e1', name: 'IMPOSTA_ESTETICA', arguments: JSON.stringify({ token: 'accent', valore: 'predefinito' }) }] },
-    { text: 'Rimesso.' },
+    { text: 'Rimesso.', toolCalls: [{ id: 'e1', name: 'IMPOSTA_ESTETICA', arguments: JSON.stringify({ token: 'accent', valore: 'predefinito' }) }] },
   ]);
   await scrivi(chat, 'rimetti il colore d\'accento di serie');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Rimesso.' })).toBeVisible({ timeout: 10_000 });
@@ -285,13 +292,13 @@ test('G — annullare «blocca a.it» dal segno lascia bloccato b.it, aggiunto d
   await configura(app);
   const blacklist = async () => (await impostazioni(app)).security.siteBlock.blacklist;
 
-  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi a.it'), { text: 'Bloccato a.it.' }]);
+  await modelloFinto(app, [impostaDicendo('Bloccato a.it.', 'siti_bloccati', 'aggiungi a.it'), { text: 'Bloccato a.it.' }]);
   await scrivi(chat, 'blocca a.it');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it']);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato a.it.' })).toBeVisible({ timeout: 10_000 });
 
-  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi b.it', 'i2'), { text: 'Bloccato b.it.' }]);
+  await modelloFinto(app, [impostaDicendo('Bloccato b.it.', 'siti_bloccati', 'aggiungi b.it', 'i2'), { text: 'Bloccato b.it.' }]);
   await scrivi(chat, 'blocca b.it');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it', 'b.it']);
@@ -330,5 +337,101 @@ test('H — un valore che non si applica non chiede un OK a vuoto, e il perché 
   const esito = (await app.evaluate(() => globalThis.__imp_tool)).pop();
   expect(esito).toContain('salta_pubblicita, blocco_pubblicita');
   expect(esito).not.toContain('stia nel limite');
+  await ripristina(app);
+});
+
+// #835 — la Sicurezza si stringe a parole. A Conservativo accendere una protezione chiede un OK e Annulla non cambia
+// niente; bloccare un sito lo aggiunge agli altri; allentare (sbloccare, spegnere il giudizio AI) senza «conferma» non
+// cambia niente; togliere un sito fidato lascia gli altri.
+test('I — «accendi il blocco della pubblicità», «blocca example.org», «sblocca» e «spegni il giudizio AI» annullati, «non fidarti più dei download da»', async ({ app, shell, openTab }) => {
+  await livelloAutonomia(app, 'conservativo');
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await homeDi(app);
+  await configura(app);
+  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ security: {
+    adblock: { enabled: false },
+    siteBlock: { blacklist: ['tiktok.com', 'facebook.com'] },
+    downloads: { trustedSites: ['example.org', 'github.com'] },
+  } }));
+  const sec = await openTab('filo://security/security.html');
+  await expect(sec.locator('#sec-adblock')).not.toBeChecked({ timeout: 8_000 });
+  const sicurezza = async () => (await impostazioni(app)).security;
+  const chiuso = () => expect.poll(async () => confirmState(chat), { timeout: 5_000 }).toBeNull();
+  const domanda = async (testo) => {
+    await expect.poll(async () => (await confirmState(chat))?.text || '', { timeout: 10_000 }).toContain(testo);
+    return confirmState(chat);
+  };
+
+  await modelloFinto(app, [imposta('blocco_pubblicita', 'accendi', 'a1'), { text: 'Ti chiedo un OK.' }]);
+  await scrivi(chat, 'accendi il blocco della pubblicità');
+  expect((await domanda('Blocco di pubblicità e tracker → attivo')).hasInput, 'accendere una protezione non chiede la parola').toBeFalsy();
+  await clickConfirm(chat, 'cancel');
+  await chiuso();
+  expect((await sicurezza()).adblock.enabled).toBe(false);
+  await expect(sec.locator('#sec-adblock')).not.toBeChecked();
+
+  await modelloFinto(app, [imposta('blocco_pubblicita', 'accendi', 'a2'), { text: 'Ti chiedo un OK.' }]);
+  await scrivi(chat, 'accendi il blocco della pubblicità');
+  await domanda('Blocco di pubblicità e tracker → attivo');
+  await clickConfirm(chat, 'ok');
+  await expect.poll(async () => (await sicurezza()).adblock.enabled, { timeout: 5_000 }).toBe(true);
+  await sec.bringToFront();
+  await expect(sec.locator('#sec-adblock')).toBeChecked({ timeout: 3_000 });
+
+  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi example.org', 'a3'), { text: 'Ti chiedo un OK.' }]);
+  await scrivi(chat, 'blocca example.org');
+  await domanda('Siti bloccati → aggiungi example.org');
+  await clickConfirm(chat, 'ok');
+  await expect.poll(async () => (await sicurezza()).siteBlock.blacklist, { timeout: 5_000 }).toEqual(['tiktok.com', 'facebook.com', 'example.org']);
+  await sec.bringToFront();
+  await expect(sec.locator('#sec-siteblock-blacklist')).toHaveValue('tiktok.com\nfacebook.com\nexample.org', { timeout: 3_000 });
+
+  // Allentare vuole la parola «conferma» (#530): senza, niente cambia.
+  await modelloFinto(app, [imposta('siti_bloccati', 'togli example.org', 'a4'), { text: 'Ti chiedo conferma.' }]);
+  await scrivi(chat, 'sblocca example.org');
+  expect((await domanda('Siti bloccati → togli example.org')).hasInput, 'sbloccare un sito vuole la parola').toBe(true);
+  await clickConfirm(chat, 'cancel');
+  await chiuso();
+  expect((await sicurezza()).siteBlock.blacklist).toEqual(['tiktok.com', 'facebook.com', 'example.org']);
+
+  await modelloFinto(app, [imposta('giudizio_ai_siti', 'spegni', 'a5'), { text: 'Ti chiedo conferma.' }]);
+  await scrivi(chat, 'spegni il giudizio AI');
+  const giudizio = await domanda('Giudizio AI sui siti sospetti → disattivato');
+  expect(giudizio.hasInput, 'spegnere una protezione vuole la parola').toBe(true);
+  expect(giudizio.text, 'il riquadro dice cosa esce dal computer').toMatch(/modello AI.*mai il testo della pagina/s);
+  await chat.screenshot({ path: 'tests/.shots/835-spegni-giudizio-ai.png' });
+  await clickConfirm(chat, 'cancel');
+  await chiuso();
+  expect((await sicurezza()).safeBrowse.llmJudge).toBe(true);
+
+  await modelloFinto(app, [imposta('siti_fidati_programmi', 'togli example.org', 'a6'), { text: 'Ti chiedo un OK.' }]);
+  await scrivi(chat, 'non fidarti più dei download da example.org');
+  expect((await domanda('Siti fidati per i programmi → togli example.org')).hasInput).toBeFalsy();
+  await clickConfirm(chat, 'ok');
+  await expect.poll(async () => (await sicurezza()).downloads.trustedSites, { timeout: 5_000 }).toEqual(['github.com']);
+  await sec.bringToFront();
+  await expect(sec.locator('#sec-dl-trusted')).toHaveValue('github.com', { timeout: 3_000 });
+  await ripristina(app);
+});
+
+// #835 — «blocca example.org» col blocco dei siti spento: il sito entra in elenco, e l'esito fa dire al modello che
+// finché il blocco non si riaccende si apre lo stesso. Il blocco non si riaccende da solo: riaprirebbe anche gli altri.
+test('J — «blocca example.org» col blocco dei siti spento: l\'esito dice che il blocco è spento e come riaccenderlo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await homeDi(app);
+  await configura(app);
+  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ security: { siteBlock: { enabled: false, blacklist: [] } } }));
+  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi example.org', 'j1'), { text: 'Il blocco dei siti è spento.' }]);
+  await scrivi(chat, 'blocca example.org');
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Il blocco dei siti è spento.' })).toBeVisible({ timeout: 10_000 });
+  const sec = (await impostazioni(app)).security.siteBlock;
+  expect(sec.blacklist).toEqual(['example.org']);
+  expect(sec.enabled).toBe(false);
+  const esito = (await app.evaluate(() => globalThis.__imp_tool)).pop();
+  expect(esito).toContain('Siti bloccati → aggiungi example.org');
+  expect(esito).toContain('il blocco dei siti in blacklist è spento');
+  expect(esito).toContain('blocco_siti');
   await ripristina(app);
 });

@@ -17,6 +17,8 @@ const app = {
   aggiornaRegoleProxy: () => {},
   zoomSu: null,
   annuncia: () => {},
+  // Un annullo riuscito, con l'id chiesto e quello dell'evento trovato: lo contano i contatori (#1461).
+  annullato: () => {},
 };
 function collega(f) { Object.assign(app, f || {}); }
 
@@ -152,6 +154,18 @@ async function leggi(ids) {
   return lista.filter((e) => voluti.has(e.id)).map((e) => vista(e, lista));
 }
 
+// Tutti, con lo stato di adesso, per la home (#869): vista() rilegge gli annulli una volta per tutti.
+// `ts` è il primo ritocco, `agg` l'ultimo: la riga resta dov'è nata e si riscrive.
+async function tutti() {
+  await attesa();
+  const lista = await leggiLista();
+  const chiusi = K().annullati(lista);
+  return lista.map((e) => ({
+    id: e.id, ts: e.ts, ...(e.agg && e.agg !== e.ts ? { agg: e.agg } : {}), tipo: e.tipo, via: e.via || 'filo', frase: K().frase(e), provenienza: K().provenienza(e),
+    annulla: e.annulla || null, annullatoDa: chiusi.get(e.id) || null, annullabile: K().annullabile(daRimettere(e, lista)),
+  }));
+}
+
 async function ultimi({ max = 40 } = {}) {
   await attesa();
   const lista = await leggiLista();
@@ -223,8 +237,9 @@ async function annullaOra(id, prov = {}) {
     if (riuscito && !raccolti.length) registra({ tipo: e.tipo, cambi: [] }, { vuoto: true });
   });
   if (!riuscito) return { ok: false, motivo: 'la pagina di quel sito non è aperta', id: e.id };
+  try { app.annullato([...new Set([String(id || ''), String(trovato.id), String(e.id)])].filter(Boolean)); } catch (_) {}
   return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati };
 }
 
-module.exports = { avvia, con, corrente, registra, registraZoom, leggi, ultimi, livelloDi, annulla, collega, attesa };
+module.exports = { avvia, con, corrente, registra, registraZoom, leggi, tutti, ultimi, livelloDi, annulla, collega, attesa };
 globalThis.SN_REGISTRO_CAMBI = module.exports;

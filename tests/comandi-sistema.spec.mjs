@@ -223,7 +223,7 @@ test('in chat: una rete detta a metà si trova, e cambiare rete chiede conferma 
     { text: 'Ti chiedo conferma.' },
   ]);
   await chiedi(page, 'collegati alla rete dell\'ufficio');
-  await expect.poll(() => confirmText(page)).toContain('Collegare il computer alla rete Wi-Fi «Ufficio 5G»');
+  await expect.poll(() => confirmText(page)).toContain('Collegare il computer alla rete Wi-Fi\nUfficio 5G\n');
   expect((await chiamate(app)).some((c) => c[0] === 'wifiCollega')).toBe(false);
   await clickConfirm(page, 'ok');
   await expect.poll(async () => (await computer(app)).rete.nome).toBe('Ufficio 5G');
@@ -239,7 +239,7 @@ test('in chat: la conferma nomina la rete che partirà anche trovata per somigli
     { text: 'Ti chiedo conferma.' },
   ]);
   await chiedi(page, 'collegati a Casa');
-  await expect.poll(() => confirmText(page)).toContain('alla rete Wi-Fi «Cava»');
+  await expect.poll(() => confirmText(page)).toContain('alla rete Wi-Fi\nCava\n');
   await clickConfirm(page, 'ok');
   await expect.poll(async () => (await computer(app)).rete.nome).toBe('Cava');
   await ripristina(app);
@@ -279,7 +279,7 @@ test('in chat, le parole dell\'utente bastano: «le cuffie Sony» collega le Cuf
     { text: 'Ti chiedo conferma.' },
   ]);
   await chiedi(page, 'collegati alla rete di casa');
-  await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('alla rete Wi-Fi «Casa»');
+  await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('alla rete Wi-Fi\nCasa\n');
   await clickConfirm(page, 'ok');
   await expect.poll(async () => (await computer(app)).rete.nome).toBe('Casa');
 });
@@ -292,16 +292,19 @@ test('in chat, quello che è già com\'è chiesto non chiede conferma: rete già
   });
   const page = await home(app);
   await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth spento', { timeout: 8_000 });
+  // Un acceso/spento riuscito chiude il turno da sé (#1130): una chiamata sola. Gli altri esiti tornano al modello.
   const casi = [
-    ['collegati a Casa', 'WIFI', { rete: 'Casa' }],
-    ['scollega le cuffie', 'BLUETOOTH', { dispositivo: 'Cuffie', collega: false }],
-    ['spegni il Bluetooth', 'BLUETOOTH', { acceso: false }],
+    ['collegati a Casa', 'WIFI', { rete: 'Casa' }, 2],
+    ['scollega le cuffie', 'BLUETOOTH', { dispositivo: 'Cuffie', collega: false }, 2],
+    ['spegni il Bluetooth', 'BLUETOOTH', { acceso: false }, 1],
   ];
-  for (const [i, [frase, nome, args]] of casi.entries()) {
+  for (const [i, [frase, nome, args, giri]] of casi.entries()) {
     await modelloFinto(app, [{ toolCalls: [{ id: `g${i}`, name: nome, arguments: JSON.stringify(args) }] }, { text: 'Era già così.' }]);
     await chiedi(page, frase);
-    // L'esito torna al modello senza che un popup lo fermi: non c'era niente che cadesse.
-    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 8_000 }).toBeGreaterThan(1);
+    // Il turno arriva in fondo senza che un popup lo fermi: non c'era niente che cadesse.
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 8_000 }).toBeGreaterThan(0);
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 8_000 });
+    expect((await chiamateAlModello(app)).length, frase).toBe(giri);
     await page.waitForTimeout(500);
     expect(await confirmText(page).catch(() => ''), frase).toBe('');
     await ripristina(app);

@@ -9,6 +9,10 @@
 
   // Le chiamate che fanno lavorare un modello, e quindi costano.
   const PAID = new Set(['complete', 'streamComplete', 'synthesizeSpeech', 'transcribe', 'embed', 'decisions']);
+  // Gli argomenti di `call` che portano testo al fornitore: passano tutti dall'oscuramento, non solo i messaggi (la voce
+  // legge `text`, l'indicizzazione manda `texts`, #1507). Gli altri sono numeri, audio o funzioni: sentinella in
+  // tests/unit/usciteSegreti.test.mjs.
+  const CAMPI_TESTO = Object.freeze(['messages', 'text', 'texts', 'input', 'prompt']);
 
   // Cosa fare di un errore di un classificatore che gira su tanti lavori insieme (decideAll). `risposto`: il modello
   // ha già risposto almeno una volta, quindi un 400 è colpa di quella richiesta e non del modello. Prima della prima
@@ -62,10 +66,10 @@
   }
 
   // Chi servirebbe il modello è tutto ammesso? Non spende: legge solo l'elenco degli host (#1141).
-  async function hostVerdict({ provider = 'openrouter', apiKey, model, providerRouting } = {}) {
+  async function hostVerdict({ provider = 'openrouter', apiKey, model, providerRouting, filoPays } = {}) {
     const P = providerOf(provider);
     if (!P || typeof P.hostVerdict !== 'function') return { ok: true };
-    return P.hostVerdict({ apiKey, model, providerRouting });
+    return P.hostVerdict({ apiKey, model, providerRouting, filoPays });
   }
 
   function limitError() {
@@ -100,7 +104,61 @@
       ricordaEsterni = () => {},
       funzioneDi = () => '',
       rimedioDi = () => '',
+      contatore = () => null,
+      // La durata della cache della parte fissa della chat, dalle impostazioni ('5m' o '1h'); null = quella di serie.
+      durataCache = () => null,
     } = deps;
+
+    // I contatori giornalieri (#969): ogni chiamata è un uso della sua funzione, con l'attesa fino alla prima cosa
+    // visibile e il guasto di ogni tentativo fallito; il tentativo che ha servito porta i suoi numeri (#1464), e il
+    // costo chiesto dopo arriva da sé. Un contatore rotto non ferma mai una risposta.
+    const MUTO = { visto() {}, errore() {}, fine() {}, chiamata() {}, tardiva() {} };
+    function misura(action) {
+      let m = null;
+      try { const c = contatore(); m = c && typeof c.apri === 'function' ? c.apri(action) : null; } catch (_) { m = null; }
+      if (!m) return MUTO;
+      const quieto = (fn) => (...a) => { try { fn.apply(m, a); } catch (_) {} };
+      return { visto: quieto(m.visto), errore: quieto(m.errore), fine: quieto(m.fine), chiamata: quieto(m.chiamata), tardiva: quieto(m.tardiva) };
+    }
+
+    // Quello che i contatori leggono di una risposta servita: numeri e nome del modello, mai il testo. Senza token
+    // detti la risposta non dice niente del contesto; ragionamento e fine ci sono solo nelle risposte di testo.
+    function chiamataDi(res, modello, { tentativo, spesa } = {}) {
+      const r = res || {};
+      const u = r.usage || {};
+      const n = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : 0);
+      const detto = n(u.promptTokens) > 0 || n(u.completionTokens) > 0;
+      const testo = r.finishReason !== undefined;
+      return {
+        modello,
+        ingresso: detto ? n(u.promptTokens) : null,
+        cacheLetti: n(u.cachedPromptTokens),
+        cacheDetta: u.cacheDetta === undefined ? undefined : Boolean(u.cacheDetta),
+        ragionamento: testo && detto && u.reasoningTokens !== undefined ? u.reasoningTokens : undefined,
+        uscita: testo && detto ? n(u.completionTokens) : null,
+        fine: testo ? r.finishReason : undefined,
+        tentativo,
+        ricominciata: Boolean(r.ricominciata),
+        ragionamentoTolto: Boolean(r.ragionamentoTolto),
+        spesa,
+      };
+    }
+
+    // Il costo in dollari di una risposta: quello detto dal router, o la stima dal listino delle Opzioni.
+    function spesaDi(s, model, usage) {
+      const u = usage || {};
+      const usd = Number(u.costUsd);
+      if (Number.isFinite(usd) && usd > 0) return { usd, origine: 'router' };
+      const pricing = (s && s.pricing && s.pricing[model]) || null;
+      if (!pricing || !costs || typeof costs.estimateCostEur !== 'function') return null;
+      let stima = 0;
+      // Con un cambio di 1 la stima del listino resta in dollari.
+      try { stima = Number(costs.estimateCostEur({ usage: u, pricing, usdToEur: 1 })); } catch (_) { stima = 0; }
+      return stima > 0 ? { usd: stima, origine: 'stima' } : null;
+    }
+    function vedendo(m, fn) {
+      return typeof fn === 'function' ? (...a) => { m.visto(); return fn(...a); } : fn;
+    }
 
     // Il «nessun host ammesso» del router (#828) lo legge chi usa una funzione: la frase dice quale, e dove si sceglie
     // un altro modello. Voce, dettatura e classificatori hanno la loro frase, scritta prima di chiamare.
@@ -111,10 +169,14 @@
       let rimedio = '';
       try { funzione = funzioneDi(action) || ''; } catch (_) {}
       try { rimedio = rimedioDi(s, action, err) || ''; } catch (_) {}
-      err.message = CE.fraseNessunHost({ modello: err.model, funzione, motivo: CE.motivoHostEsclusi(err.hosts), rimedio });
+      err.message = CE.fraseNessunHost({ modello: err.model, funzione, motivo: err.motivo || CE.motivoNessunHost(err), rimedio });
       return err;
     }
     const DAL_ROUTER = new Set(['complete', 'streamComplete', 'embed']);
+    // La ritenzione zero (#831) e la regola dei crediti (#830) hanno la frase condivisa su ogni strada; le altre frasi
+    // di voce e dettatura restano loro.
+    const condivisa = (err) => Boolean(err && /^(zdr|crediti$)/.test(String(err.reason || '')));
+    const conLaFrase = (err, s, action, method) => (DAL_ROUTER.has(method) || condivisa(err) ? conLaFunzione(err, s, action) : err);
 
     // Nessun segreto custodito da Filo entra nel contesto di un modello (#810): quello che non
     // ha, il modello non lo può far uscire. Sentinella: tests/unit/usciteSegreti.test.mjs.
@@ -127,6 +189,14 @@
       let lista = [];
       try { lista = await segreti(); } catch (_) { lista = []; }
       return G.oscuraSegreti(messages, lista);
+    }
+
+    // Il piano si fa sui messaggi già oscurati: sono quelli che partono, e un taglio a caratteri deve cadere su di loro.
+    function pianoCache(action, messages, s) {
+      const FC = global.SN_FILO_CONTESTO;
+      let durata = null;
+      try { durata = durataCache(s); } catch (_) { durata = null; }
+      try { return FC && typeof FC.pianoDellaCache === 'function' ? FC.pianoDellaCache(action, messages, { durata }) : null; } catch (_) { return null; }
     }
 
     async function ensureUnderLimit(settings) {
@@ -154,47 +224,72 @@
       return { s, chain };
     }
 
-    async function settleChain(s, action, chain, r) {
+    async function settleChain(s, action, chain, r, m = MUTO) {
       const res = r || {};
       const provider = res.provider || (chain[0] && chain[0].provider);
       const model = res.model || (chain[0] && chain[0].model);
       const { servedBy, violation } = noteServed(s, action, { ...res, model });
       const costEur = await recordCost(s, action, provider, model, res.usage);
+      m.chiamata(chiamataDi(res, model, { tentativo: res.tentativo, spesa: spesaDi(s, model, res.usage) }));
       return { ...res, provider, model, servedBy, violation, costEur };
     }
 
-    async function complete({ action, settings, attempts, messages, tools, toolChoice, signal, onFallback } = {}) {
+    async function complete(opts = {}) {
+      const m = misura(opts.action);
+      try {
+        const r = await completeMisurato(opts, m);
+        m.fine(true);
+        return r;
+      } catch (e) { m.fine(false); throw e; }
+    }
+
+    async function completeMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onFallback } = {}, m) {
       const { s, chain } = await chainFor({ action, settings, attempts });
       let r;
       try {
-        r = await providers().completeWithFallback({ attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal, onFallback });
+        const daMandare = await senzaSegreti(messages);
+        r = await providers().completeWithFallback({
+          attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare, s), tools, toolChoice, signal, onFallback, onTentativoFallito: m.errore,
+        });
       } catch (e) {
         throw conLaFunzione(e, s, action);
       }
-      return settleChain(s, action, chain, r);
+      return settleChain(s, action, chain, r, m);
     }
 
     // Un tentativo rotto a metà si è già pagato: il suo costo il router lo dice solo dopo, e lo si chiede come per la voce.
-    function auditBroken(s, action, list) {
+    function auditBroken(s, action, list, m) {
       for (const b of list || []) {
-        auditLater({ s, action, provider: b.provider, model: b.model, apiKey: b.apiKey, generationId: b.generationId, withCost: true, keySource: b.keySource });
+        auditLater({ s, action, provider: b.provider, model: b.model, apiKey: b.apiKey, generationId: b.generationId, withCost: true, keySource: b.keySource, m });
       }
     }
 
-    async function stream({ action, settings, attempts, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset } = {}) {
+    async function stream(opts = {}) {
+      const m = misura(opts.action);
+      try {
+        const r = await streamMisurato(opts, m);
+        m.fine(true);
+        return r;
+      } catch (e) { m.fine(false); throw e; }
+    }
+
+    async function streamMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset } = {}, m) {
       const { s, chain } = await chainFor({ action, settings, attempts });
       let r;
       try {
+        const daMandare = await senzaSegreti(messages);
         r = await providers().streamCompleteWithFallback({
-          attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset,
+          attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare, s), tools, toolChoice, signal,
+          onDelta: vedendo(m, onDelta), onReasoning: vedendo(m, onReasoning), onToolCall: vedendo(m, onToolCall),
+          onFallback, onReset, onTentativoFallito: m.errore,
         });
       } catch (e) {
-        auditBroken(s, action, e && e.brokenAttempts);
+        auditBroken(s, action, e && e.brokenAttempts, m);
         throw conLaFunzione(e, s, action);
       }
       const { brokenAttempts, ...rest } = r || {};
-      auditBroken(s, action, brokenAttempts);
-      return settleChain(s, action, chain, rest);
+      auditBroken(s, action, brokenAttempts, m);
+      return settleChain(s, action, chain, rest, m);
     }
 
     // Chi chiede solo il testo lo legge come dati (un'etichetta, un giudizio, un JSON): un pezzo tagliato è un errore.
@@ -206,7 +301,7 @@
     }
 
     // Chi ha servito e quanto è costato, chiesti a posteriori: best-effort e fuori dal cammino della risposta.
-    function auditLater({ s, action, provider, model, apiKey, generationId, withCost, keySource, onServedBy }) {
+    function auditLater({ s, action, provider, model, apiKey, generationId, withCost, keySource, onServedBy, m = MUTO }) {
       const P = providerOf(provider);
       if (!P || typeof P.lookupServedBy !== 'function') return;
       let i = 0;
@@ -222,6 +317,7 @@
         if (r && !costDone && Number.isFinite(r.costUsd) && r.costUsd > 0) {
           costDone = true;
           await recordCost(s, action, provider, model, { costUsd: r.costUsd, keySource: keySource || '' });
+          m.tardiva(model, r.costUsd);
         }
         if (!r || !r.servedBy) { schedule(); return; }
         const seen = noteServed(s, action, { servedBy: r.servedBy, model, keySource: keySource || '' });
@@ -234,7 +330,16 @@
 
     // Un tentativo solo, per i mestieri senza ripiego a catena (voce, dettatura, indicizzazione) e per le prove delle Opzioni.
     // `onLateServedBy` riceve { servedBy, violation } quando chi ha servito si sa solo dopo.
-    async function call({ action, settings, attempt, method, args, onLateServedBy } = {}) {
+    async function call(opts = {}) {
+      const m = misura(opts.action);
+      try {
+        const r = await callMisurato(opts, m);
+        m.fine(true);
+        return r;
+      } catch (e) { m.fine(false); throw e; }
+    }
+
+    async function callMisurato({ action, settings, attempt, method, args, onLateServedBy } = {}, m) {
       if (!PAID.has(method)) throw codeError(`Chiamata non prevista dal cancello: ${method}`, 'GATE_METHOD');
       const a = attempt || {};
       const s = settings || await getSettings();
@@ -243,14 +348,16 @@
       if (!P || typeof P[method] !== 'function') {
         throw codeError(`Il fornitore ${a.provider || '—'} non sa fare questa chiamata (${method})`, 'PROVIDER_METHOD_MISSING');
       }
-      const conMessaggi = args && Array.isArray(args.messages) ? { messages: await senzaSegreti(args.messages) } : {};
+      const testi = {};
+      for (const k of CAMPI_TESTO) if (args && args[k] != null) testi[k] = args[k];
+      const oscurati = Object.keys(testi).length ? await senzaSegreti(testi) : {};
       const input = {
         ...(args || {}),
-        ...conMessaggi,
+        ...oscurati,
         apiKey: a.apiKey,
         model: a.model,
         ...(a.reasoning !== undefined ? { reasoning: a.reasoning } : {}),
-        providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s),
+        providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s, a),
       };
       // Il testo passa dal router, che per complete e streamComplete ha già il suo smistamento per nome.
       const router = providers();
@@ -259,13 +366,15 @@
       try {
         r = (await (viaRouter ? router[method]({ ...input, provider: a.provider }) : P[method](input))) || {};
       } catch (e) {
-        throw DAL_ROUTER.has(method) ? conLaFunzione(e, s, action) : e;
+        m.errore(e, { modello: a.model, host: e && e.hostFallito });
+        throw conLaFrase(e, s, action, method);
       }
       const usage = r.usage;
       const { servedBy, violation } = noteServed(s, action, { ...r, model: r.model || a.model });
       const later = !servedBy && Boolean(r.generationId);
       const costNow = carriesCost(usage) || (!later && Boolean(usage));
       const costEur = costNow ? await recordCost(s, action, a.provider, a.model, usage) : 0;
+      m.chiamata(chiamataDi(r, r.model || a.model, { spesa: costNow ? spesaDi(s, a.model, usage) : null }));
       if (later) {
         auditLater({
           s, action, provider: a.provider, model: a.model,
@@ -275,6 +384,7 @@
           withCost: !costNow,
           keySource: r.keySource || (usage && usage.keySource) || '',
           onServedBy: onLateServedBy,
+          m,
         });
       }
       return { ...r, servedBy, violation, costEur };
@@ -291,7 +401,16 @@
     // Un classificatore su tante richieste in parallelo (#1118): limite di spesa e segreti come ogni chiamata, ma UN
     // conto per giro invece di uno per richiesta. Il tentativo dopo nella catena parte solo se quello prima non ha
     // mai risposto. `onAnswer(indice, answers)` arriva appena una richiesta ha risposto.
-    async function decideAll({ action, settings, attempts, requests, parallel, onAnswer, signal } = {}) {
+    async function decideAll(opts = {}) {
+      const m = misura(opts.action);
+      try {
+        const r = await decideAllMisurato(opts, m);
+        m.fine(true);
+        return r;
+      } catch (e) { m.fine(false); throw e; }
+    }
+
+    async function decideAllMisurato({ action, settings, attempts, requests, parallel, onAnswer, signal } = {}, m) {
       const { s, chain } = await chainFor({ action, settings, attempts });
       const usable = chain.filter((a) => supports(a.provider, 'decisions') && a.model);
       if (!usable.length) throw codeError('Nessun fornitore della catena sa classificare', 'PROVIDER_METHOD_MISSING');
@@ -305,22 +424,25 @@
         state: oscura(r && r.state), questions: oscura(r && r.questions),
       }));
       let ultimo = null;
-      for (const a of usable) {
+      for (const [indice, a] of usable.entries()) {
         const P = providerOf(a.provider);
         const somma = { promptTokens: 0, completionTokens: 0, costUsd: 0, keySource: '' };
         let risposte = 0;
         let inVolo = 0;
         let servedBy = null;
+        // I numeri di ogni richiesta servita, per i contatori: partono insieme alla fine del giro.
+        const servite = [];
         const fai = async (req) => {
           inVolo++;
           let r;
           try {
             r = (await P.decisions({
               apiKey: a.apiKey, model: a.model, state: req.state, questions: req.questions,
-              providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s), signal,
+              providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s, a), signal,
             })) || {};
           } finally { inVolo--; }
           risposte++;
+          servite.push(chiamataDi(r, r.model || a.model, { tentativo: indice + 1, spesa: spesaDi(s, a.model, r.usage) }));
           const u = r.usage || {};
           somma.promptTokens += Number(u.promptTokens) || 0;
           somma.completionTokens += Number(u.completionTokens) || 0;
@@ -338,12 +460,15 @@
           },
           suEsito: (r, _req, i) => { if (onAnswer) onAnswer(i, (r && r.answers) || {}); },
         });
+        if (servite.length) m.chiamata(servite);
+        if (esito.fermo) m.errore(esito.fermo, { modello: a.model, host: servedBy || (esito.fermo && esito.fermo.hostFallito) });
         let seen = { servedBy: null, violation: false };
         let costEur = 0;
         if (risposte) {
           seen = noteServed(s, action, { servedBy, model: a.model, keySource: somma.keySource });
           costEur = await recordCost(s, action, a.provider, a.model, somma);
         }
+        if (esito.fermo) conLaFrase(esito.fermo, s, action, 'decisions');
         if (esito.fermo && fineCrediti(esito.fermo) && !risposte) throw esito.fermo;
         if (esito.fermo && !risposte && !esito.interrotto) {
           ultimo = esito.fermo;
@@ -361,5 +486,5 @@
     return { complete, stream, text, call, decideAll, ensureUnderLimit, supports, hasProvider, keyInfo, hostVerdict };
   }
 
-  global.SN_MODEL_GATE = { create, hasProvider, supports, keyInfo, hostVerdict, limitError, PAID };
+  global.SN_MODEL_GATE = { create, hasProvider, supports, keyInfo, hostVerdict, limitError, PAID, CAMPI_TESTO };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

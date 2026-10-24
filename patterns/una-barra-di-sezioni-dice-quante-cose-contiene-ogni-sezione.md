@@ -101,8 +101,12 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   i Ricevuti a filtro spento (il filtro per livello è una vista della scheda,
   non della sezione); Routine = fusioni senza segnalazione che aspettano, e lo
   zero non si scrive perché la sezione non è vuota. Una sezione senza una scheda
-  sua non c'è: Impostazioni predefinite torna quando ne avrà una (i Modelli di
-  supporto stanno in Automazioni, #1110).
+  sua non c'è. Utenti (Inviti e utenti) e Impostazioni predefinite (Modelli
+  predefiniti) sono le pagine dell'owner entrate in Gestione (#1414) e non hanno
+  un numero: non elencano lavoro da fare. I Modelli di supporto stanno in
+  Automazioni (#1110). Una pagina che entra in Gestione si porta i suoi vecchi
+  indirizzi: li rigira il protocollo (`INDIRIZZI_SPOSTATI`), e un indirizzo
+  `manage.html#<scheda o sezione>` apre quella scheda come un clic.
 - **Una scheda si carica quando si mostra, non quando si clicca (#1150).** Con
   le sezioni una scheda si apre anche dalla sua sezione, all'apertura della
   pagina e da un salto (avviso, statistiche, lente), e nessuna di queste strade

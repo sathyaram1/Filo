@@ -247,9 +247,9 @@ async function finestraLarga(app, px) {
 }
 
 test('anche con quattro azioni i tasti restano su una riga sola', async ({ app, openTab }) => {
-  // Un file sospetto offre il massimo dei pulsanti: "In coda", "Lavoro locale" (#913), "Conferma
-  // attacco", "Conferma spam", "Archivia" — più preferito, frase, «Senza chiedere» (#1034) e «Aspetta» (#903). Prima gli
-  // ultimi finivano su una seconda riga.
+  // Un file sospetto offre il massimo dei pulsanti: "In coda", "Conferma attacco", "Conferma spam", "Archivia" — più
+  // preferito, frase, «Segna fidato» (#1034) e «Aspetta» (#903). Prima gli ultimi finivano su una seconda riga.
+  // «💻 Lavoro server» c'è solo sul rombo azzurro (#1575).
   await finestraLarga(app, LARGHEZZA_FISSA);
   const page = await openTab(URL);
   await prepara(page, [{ ...BASE, _id: 'fb-sosp', seq: 912, status: 'suspicious_file', statusPublic: 'open' }], 'inbox', 'fb-sosp');
@@ -257,7 +257,7 @@ test('anche con quattro azioni i tasti restano su una riga sola', async ({ app, 
     const bs = [...document.querySelectorAll('#mgOwnerBar .mg-owner-row button')].filter((b) => b.offsetParent !== null);
     return { quanti: bs.length, righe: window.__righeDeiTasti(bs) };
   });
-  expect(misure.quanti).toBe(9);
+  expect(misure.quanti).toBe(8);
   expect(misure.righe).toBe(1);
 });
 

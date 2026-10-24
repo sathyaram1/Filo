@@ -7,7 +7,10 @@ const { collegaScorciatoie } = require('./shortcuts');
 const { VuotoDellaVista } = require('./vuotoDellaVista');
 const Layout = require('./services/layoutIcone');
 const RedteamGate = require('./services/redteamGate');
+const AzioniContate = require('./services/azioniContate');
 const { tastoPremuto } = require('./tastoDelMouse');
+const RisposteInAttesa = require('./risposteInAttesa');
+const RilascioNellaChat = require('./rilascioNellaChat');
 
 const STRISCIA = 4;
 const PANNELLO = 56;
@@ -32,13 +35,16 @@ const PAGINE_NEL_MENU = 15;
 const FISSE = new Set(['history', 'apps', 'redteam', 'settings', 'account']);
 const MENU_DELLA_SHELL = new Set(['apps', 'settings', 'account']);
 const PAGINE_FISSE = {
-  history: 'filo://archive/archive.html',
+  // Il quaderno delle memorie ha preso il posto della Cronologia (#872): il comando tiene il suo nome per le disposizioni salvate.
+  history: 'filo://quaderno/quaderno.html',
   redteam: 'filo://redteam/redteam.html',
 };
 const FASI_FUORI = new Set(['muovi', 'rilascia', 'annulla']);
 const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
 // Le icone che un'azione della pagina può cambiare (lo stesso bottone traduce o riporta all'originale).
 const ICONE_DELLA_PAGINA = { translate: new Set(['translate', 'showOriginal']) };
+// Perché l'icona Aiuto è spenta, nel suggerimento: chiavi i18n per i motivi che la pagina riferisce.
+const MOTIVI_AIUTO_SPENTO = { aiuto: 'aiuto_spento_barra', sito: 'aiuto_spento_sito', pagina: 'aiuto_spento_pagina' };
 const PAGINE_DAL_MENU = {
   ai: 'filo://history/history.html',
   preferenze: 'filo://preferences/preferences.html',
@@ -125,6 +131,7 @@ class BarraLaterale {
     this._segnaBordo(false);
     const giaAperta = this.aperta;
     this.aperta = true;
+    if (!giaAperta) this._apertaRicerca();
     if (!giaAperta || motivo === 'tasto') this.motivo = motivo;
     if (!giaAperta) this.dentro = false;
     this.posa();
@@ -141,6 +148,8 @@ class BarraLaterale {
     if (!this.aperta) return;
     // Da tastiera il fuoco l'ha preso lei: torna alla scheda anche se il sistema non lo dice ancora.
     const avevaFuoco = this._haFuoco() || this.motivo === 'tasto';
+    if (this.ricerca && !this.ricerca.scelta) this._contaRicerca({ esito: 'vuota' });
+    this.ricerca = null;
     this.aperta = false;
     this.motivo = null;
     this.dentro = false;
@@ -156,9 +165,31 @@ class BarraLaterale {
     this._guarda();
   }
 
+  // La barra come pannello in cui si cerca una voce (#1461): dall'apertura alla prima scelta, a che posto era la voce
+  // scelta fra quelle in vista, o chiusa senza scegliere. Solo esiti e numeri.
+  _contaRicerca(evento) {
+    try { globalThis.SN_CONTATORI_MAIN?.ricerca('barra-laterale', evento, { incognito: this._incognito() }); } catch (_) {}
+  }
+  _apertaRicerca() {
+    this.ricerca = { t0: Date.now(), scelta: false };
+    this._contaRicerca({ esito: 'aperta' });
+  }
+  _sceltaRicerca(posizione) {
+    if (!this.ricerca || this.ricerca.scelta) return;
+    this.ricerca.scelta = true;
+    this._contaRicerca({ esito: 'scelta', attesaMs: Date.now() - this.ricerca.t0, posizione: posizione > 0 ? posizione : null });
+  }
+  // Le voci fisse stanno sotto le icone, in quest'ordine (src/renderer/barra.js); il red-team solo se si vede.
+  _posizioneFissa(comando) {
+    const fisse = ['history', 'apps', 'redteam', 'account', 'settings'].filter((c) => c !== 'redteam' || RedteamGate.visibile());
+    const i = fisse.indexOf(comando);
+    return i < 0 ? 0 : this._icone().length + i + 1;
+  }
+
   commuta(motivo = 'clic') {
-    if (this.aperta) this.chiudi();
-    else this.apri(motivo);
+    if (this.aperta) { this.chiudi(); return; }
+    // Aperta da un gesto (tasto, clic, barra dei menu): un'azione contata (#1461). Lo spunto dal bordo no.
+    AzioniContate.azione('sidebar', () => this.apri(motivo), { incognito: !!(this.win && this.win._filoIncognito) });
   }
 
   // Tasto della barra ed Esc, da qualunque vista della finestra abbia il fuoco. true = preso.
@@ -386,6 +417,9 @@ class BarraLaterale {
     if (sito) daCoprire.add(sito);
     const conferme = this.tabs.conferme;
     try { if (conferme && conferme.vista && conferme.vista.getBounds().width > 0) daCoprire.add(conferme.vista); } catch (_) {}
+    // La barra aperta copre l'email proposta sotto un campo che le sta accanto: è un gesto dell'utente, la proposta no.
+    const proposta = this.tabs.propostaEmail;
+    if (proposta && proposta.mostrata && proposta.vista) daCoprire.add(proposta.vista);
     const mia = figli().indexOf(this.vista);
     if (mia >= 0 && !figli().slice(mia + 1).some((v) => daCoprire.has(v))) return;
     if (mia >= 0) cv.removeChildView(this.vista);
@@ -426,7 +460,21 @@ class BarraLaterale {
       indietro: !!(t && t.canBack),
       avanti: !!(t && t.canFwd),
       schermoIntero: !!this.tabs.contentFullscreen,
+      aiuto: this._aiuto(t),
+      risposta: !!t && RisposteInAttesa.inAttesa(t),
     };
+  }
+
+  // L'icona Aiuto (#1432) da quello che la scheda davanti riferisce del suo pannello. `spenta` dove la voce «Aiuto» del
+  // tasto destro non c'è; sotto l'avviso del sito il clic è la domanda a Filo su quel sito, come dalla scorciatoia.
+  _aiuto(t) {
+    if (!t) return { spenta: 'pagina' };
+    const a = t.aiuto;
+    if (this.tabs.vistaSottoIlVuoto() !== t.view) return { pannello: 'chiuso', spenta: a && a.spento === 'aiuto' ? 'aiuto' : '' };
+    // Nessuna notizia dalla pagina: si sta ancora caricando, o Filo lì dentro non c'è (il visore PDF).
+    if (!a) return t.loading ? { pannello: 'chiuso' } : { spenta: 'pagina' };
+    if (a.spento) return { spenta: a.spento };
+    return { pannello: a.pannello, voce: a.voce, risposta: RisposteInAttesa.inAttesa(t, 'aiuto') };
   }
 
   _attiva() {
@@ -463,6 +511,7 @@ class BarraLaterale {
     for (const id of this.layout.bar) {
       const d = D.ICONE[id];
       if (!d || (d.soloOwner && !owner)) continue;
+      if (d.tipo === 'aiuto') { out.push(this._iconaAiuto(id, nav.aiuto)); continue; }
       let icona = d.icona;
       let chiave = d.etichetta;
       if (id === 'fullscreen' && nav.schermoIntero) { icona = 'shrink'; chiave = 'menu_exit_fullscreen'; }
@@ -475,6 +524,21 @@ class BarraLaterale {
       out.push({ id, icona, etichetta, tasto, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' });
     }
     return out;
+  }
+
+  _iconaAiuto(id, a) {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    const I18n = globalThis.SN_I18N;
+    const t = (k) => (I18n ? I18n.t(k) : k);
+    const aspetto = D.aspettoAiuto(a);
+    const spenta = !!a.spenta;
+    const T = globalThis.SN_TASTI;
+    const tasto = !spenta && aspetto.icona === 'help' && T ? T.etichettaFilo(T.scorciatoiaFilo('open-help-sidebar')) : '';
+    return {
+      id, icona: aspetto.icona, etichetta: t(aspetto.etichetta), tasto, spenta,
+      motivo: spenta ? t(MOTIVI_AIUTO_SPENTO[a.spenta] || MOTIVI_AIUTO_SPENTO.pagina) : '',
+      accesa: !spenta && aspetto.ascolta, ascolta: !spenta && aspetto.ascolta, risposta: !spenta && !!a.risposta, pagina: false,
+    };
   }
 
   // ── le azioni della pagina, col nome che hanno sulla pagina ──────────────
@@ -530,6 +594,8 @@ class BarraLaterale {
       trascinamento: !!this.trascinamento,
       tasto: T ? T.etichettaBarra() : 'Ctrl+Shift+B',
       bordo: this.bordo,
+      // Una risposta di Filo da leggere nella scheda davanti (#1432).
+      risposta: this._nav().risposta,
       strisciaPx: this.strisciaPx || STRISCIA,
       opzioni: { spinta: this.opzioni.spinta, attesaMs: this.opzioni.attesaMs, striscia: this.opzioni.striscia },
     };
@@ -547,8 +613,10 @@ class BarraLaterale {
     const d = D && D.noto(id) ? D.ICONE[id] : null;
     if (!d || !this.layout || !this.layout.bar.includes(id)) return;
     if (d.soloOwner && !this._owner()) return;
+    this._sceltaRicerca(this._icone().findIndex((i) => i.id === id) + 1);
     const tabs = this.tabs;
     const attiva = this._attiva();
+    if (d.tipo === 'aiuto') { this._passoAiuto(attiva); return; }
     if (d.tipo === 'pagina') {
       if (!attiva || !this._nav().pagina) return;
       this.chiudi();
@@ -558,31 +626,56 @@ class BarraLaterale {
       return;
     }
     const daTastiera = this.motivo === 'tasto';
-    switch (id) {
-      case 'back': tabs.navigaCronologia('indietro'); break;
-      case 'forward': tabs.navigaCronologia('avanti'); break;
-      case 'reload': if (attiva) tabs.reload(attiva.id); break;
-      case 'home':
-        if (attiva) tabs.navigate(attiva.id, 'filo://newtab/');
-        else tabs.openTab('filo://newtab/');
-        break;
-      case 'newTab': tabs.openTab('filo://newtab/'); break;
-      case 'closeTab': if (attiva) tabs.closeTab(attiva.id); break;
-      case 'fullscreen': tabs.toggleContentFullscreen(); break;
-      case 'incognito': try { require('./window').createIncognitoWindow(); } catch (_) {} break;
-      case 'openOptions': tabs.openTab('filo://options/options.html'); break;
-      case 'editorApp': tabs.openTab('filo://editor/editor.html'); break;
-      case 'feedbackApp': tabs.openTab('filo://feedback/feedback.html'); break;
-      default: return;
-    }
+    const fai = () => {
+      switch (id) {
+        case 'back': tabs.navigaCronologia('indietro'); break;
+        case 'forward': tabs.navigaCronologia('avanti'); break;
+        case 'reload': if (attiva) tabs.reload(attiva.id); break;
+        case 'home':
+          if (attiva) tabs.navigate(attiva.id, 'filo://newtab/');
+          else tabs.openTab('filo://newtab/');
+          break;
+        case 'newTab': tabs.openTab('filo://newtab/'); break;
+        case 'closeTab': if (attiva) tabs.closeTab(attiva.id, { via: 'barra' }); break;
+        case 'fullscreen': tabs.toggleContentFullscreen(); break;
+        case 'incognito': try { require('./window').createIncognitoWindow(); } catch (_) {} break;
+        case 'openOptions': tabs.openTab('filo://options/options.html'); break;
+        case 'editorApp': tabs.openTab('filo://editor/editor.html'); break;
+        case 'feedbackApp': tabs.openTab('filo://feedback/feedback.html'); break;
+        default: return false;
+      }
+      return true;
+    };
+    const azione = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.AZIONE_DI_ICONA[id];
+    const fatto = azione ? AzioniContate.azione(azione, fai, { incognito: !!this.win._filoIncognito }) : fai();
+    if (!fatto) return;
     // Da tastiera si torna a chi scriveva; col mouse la barra resta finché il puntatore ci sta sopra.
+    if (daTastiera) this.chiudi();
+  }
+
+  // Col mouse la barra resta aperta: il secondo clic, senza spostarsi, detta. La pagina decide dal suo stato vero, e
+  // la consegna aspetta i suoi pezzi di Filo se si sta ancora caricando.
+  _passoAiuto(attiva) {
+    if (!attiva) return;
+    const a = this._aiuto(attiva);
+    if (a.spenta) return;
+    const daTastiera = this.motivo === 'tasto';
+    if (this.tabs.vistaSottoIlVuoto() !== attiva.view) {
+      require('./services/interruttoreAiuto').seAcceso(this.win, () => this.tabs._sbScelta(attiva, 'chiedi'));
+      if (daTastiera) this.chiudi();
+      return;
+    }
+    this._restituisciTastiera();
+    try { attiva.view.webContents.send('shortcut:triggered', { command: 'aiuto-dalla-barra' }); } catch (_) {}
     if (daTastiera) this.chiudi();
   }
 
   sistema(comando, dati) {
     if (!FISSE.has(comando)) return;
     if (comando === 'redteam' && !RedteamGate.visibile()) return;
+    this._sceltaRicerca(this._posizioneFissa(comando));
     if (PAGINE_FISSE[comando]) {
+      // L'azione della pagina la conta l'apertura della scheda (src/main/tabs.js).
       this.tabs.openTab(PAGINE_FISSE[comando]);
       if (this.motivo === 'tasto') this.chiudi();
       return;
@@ -624,6 +717,7 @@ class BarraLaterale {
       }
       if (pagine.length) voci.push({ type: 'separator' });
       else if (!icona.spenta) voci.push({ label: icona.etichetta, action: 'barra:esegui' });
+      else if (icona.motivo) voci.push({ label: icona.motivo, disabled: true });
       voci.push({ label: 'Rimetti nel menu del tasto destro', action: 'barra:al-menu' });
       scegli = (a) => {
         if (a === 'barra:esegui') this.esegui(id);
@@ -696,7 +790,7 @@ class BarraLaterale {
     const apriQui = { label: '', action: 'barra:sistema' };
     const voci = [];
     if (comando === 'history') {
-      voci.push({ ...apriQui, label: 'Apri la Cronologia' }, { label: 'Cronologia AI', action: 'barra:pagina:ai' });
+      voci.push({ ...apriQui, label: 'Apri il quaderno delle memorie' }, { label: 'Cronologia AI', action: 'barra:pagina:ai' });
     } else if (comando === 'redteam') {
       voci.push({ ...apriQui, label: 'Apri Red-team' });
     } else if (comando === 'apps') {
@@ -722,10 +816,12 @@ class BarraLaterale {
     try { this.tabs.openTab(url); } catch (_) {}
   }
 
+  // Un gesto della persona (via `interfaccia`), e in incognito resta all'incognito, come dalle Preferenze aperte lì.
   _scriviOpzioni(parziale) {
     try {
       const { applySettingsUpdate } = require('./services/handlers');
-      Promise.resolve(applySettingsUpdate({ barraLaterale: parziale })).catch(() => {});
+      const scrivi = () => require('./services/registroCambi').con({ via: 'interfaccia', dove: 'barra' }, () => applySettingsUpdate({ barraLaterale: parziale }));
+      Promise.resolve(this._incognito() ? require('./shim/storage').runIncognito(scrivi) : scrivi()).catch(() => {});
     } catch (_) {}
   }
 
@@ -749,13 +845,14 @@ class BarraLaterale {
 
   // Da una scheda: il menu del tasto destro trascina un'icona verso la barra. La scheda ha il
   // puntatore per tutto il trascinamento, quindi le coordinate arrivano da lei (px della pagina).
-  dallaScheda(msg, tabId) {
+  // `zoom`: dallo strato del menu sopra la scheda (#1054) i px sono già della vista, non della pagina.
+  dallaScheda(msg, tabId, { zoom: zoomDato = null } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const fase = testo(msg.fase);
     const attiva = this._attiva();
     if (!attiva || attiva.id !== tabId) return { ok: false };
     let zoom = 1;
-    try { zoom = attiva.view.webContents.getZoomFactor() || 1; } catch (_) { zoom = 1; }
+    try { zoom = zoomDato || attiva.view.webContents.getZoomFactor() || 1; } catch (_) { zoom = 1; }
     const yLocale = (y) => {
       const tb = attiva.view.getBounds();
       const vb = this.vista ? this.vista.getBounds() : { y: tb.y };
@@ -838,6 +935,8 @@ class BarraLaterale {
     const x = (vb.x + numero(dati.x) - tb.x) / zoom;
     const y = (vb.y + numero(dati.y) - tb.y) / zoom;
     const tipo = globalThis.SN_MSG?.MSG?.BARRA_FUORI || 'barra_fuori';
+    // Col menu nello strato (#1054) la posa è una voce dello strato: vale per il gesto fatto qui.
+    try { this.tabs.strato?.gestoDallaBarra?.(); } catch (_) {}
     try { attiva.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, fase, id, x, y }); } catch (_) {}
   }
 
@@ -880,6 +979,8 @@ class BarraLaterale {
       }
       case 'barra:trascina-fuori': this._fuori(d); break;
       case 'barra:inoltra': this.vuoto.inoltra(d); break;
+      // #1623 — un'immagine lasciata sulla barra va alla chat della scheda davanti.
+      case 'barra:rilascio': RilascioNellaChat.consegna(this.win, d.voci).catch(() => {}); break;
       case 'barra:chiedi': this._chiediEtichette(); break;
       default: break;
     }

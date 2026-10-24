@@ -29,6 +29,7 @@
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmText } from './helpers/confirm.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const T_CAMPO = 'nel campo va bene il link intero, e gli inviti si danno come link';
 const T_PRIMO_AVVIO = 'al primo avvio l\'invito che aspettava si riscatta da solo, e lo dicono home e Crediti';
@@ -344,7 +345,7 @@ const CHAT = `<!doctype html><html><head><meta charset="utf-8"><title>chat</titl
 
 async function vociDelMenu(pagina, sel) {
   await pagina.locator(sel).click({ button: 'right' });
-  const menu = pagina.locator('.sn-menu');
+  const menu = menuDi(pagina).locator('.sn-menu');
   await expect(menu).toBeVisible({ timeout: 20000 });
   const voci = (await menu.locator('.sn-menu-item').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
   return { menu, voci };
@@ -449,7 +450,7 @@ test(T_ALTRE_PORTE, async ({ app, shell, openTab, testServer }) => {
   const indirizzo = pagina.url();
 
   await pagina.locator('#apri').click({ button: 'right' });
-  const menu = pagina.locator('.sn-menu');
+  const menu = menuDi(pagina).locator('.sn-menu');
   await expect(menu).toBeVisible({ timeout: 20000 });
   await menu.locator('.sn-menu-item', { hasText: 'nuova tab' }).first().click({ noWaitAfter: true });
   await riscattaEApreCrediti(app);

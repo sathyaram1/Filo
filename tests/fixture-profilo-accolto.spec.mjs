@@ -27,7 +27,8 @@ test('un modello messo a home aperta e una domanda subito: risponde la chat, lâ€
     const nuova = app.windows().find((w) => w.url().startsWith('filo://newtab') && w !== page);
     await expect(nuova.locator('#input')).toBeVisible({ timeout: 8_000 });
     await chiedi(nuova, 'E dopodomani?');
-    await expect(nuova.locator('.dash-bubble-filo', { hasText: RISPOSTA })).toBeVisible({ timeout: 15_000 });
+    // La scheda nuova ha davanti lo scambio di prima (#869): la risposta nuova Ã¨ la seconda.
+    await expect(nuova.locator('.dash-bubble-filo', { hasText: RISPOSTA })).toHaveCount(2, { timeout: 15_000 });
     await expect(nuova.locator('.dash-bubble-filo', { hasText: benvenuto })).toHaveCount(0);
     const stato = await statoAccoglienza(app);
     expect(stato.done).toBe(true);

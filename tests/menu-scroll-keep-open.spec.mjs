@@ -7,6 +7,7 @@ import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { apriCronologia, statoCronologia } from './helpers/cronologiaAppunti.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Feedback alpha: "lo scroll non funziona — quando uso la rotella si chiude il
 // box invece di mostrare gli appunti più vecchi". La cronologia incolla è
@@ -62,7 +63,7 @@ test('rotella sulla cronologia incolla: scorre e NON chiude il menu', async ({ t
     // "compare separato dal box principale": la cronologia deve apparire
     // ATTACCATA al menu, non come un riquadro fluttuante staccato. Il bordo
     // sinistro del sotto-menu deve combaciare col bordo destro del menu padre.
-    const m = await page.locator('.sn-menu:not(.sn-menu-sub)').boundingBox();
+    const m = await menuDi(page).locator('.sn-menu:not(.sn-menu-sub)').boundingBox();
     const gap = Math.abs(stato.riquadro.left - (m.x + m.width));
     expect(gap, 'il sotto-menu deve toccare il box principale').toBeLessThanOrEqual(6);
     expect(stato.voci[0]?.testo).toBe('appunto numero 1');
@@ -77,7 +78,7 @@ test('rotella sulla cronologia incolla: scorre e NON chiude il menu', async ({ t
     await page.waitForTimeout(150);
 
     // Il menu è ANCORA aperto (prima del fix qui veniva chiuso).
-    await expect(page.locator('.sn-menu:not(.sn-menu-sub)')).toBeVisible();
+    await expect(menuDi(page).locator('.sn-menu:not(.sn-menu-sub)')).toBeVisible();
     const dopo = await statoCronologia(app, page);
     expect(dopo, 'la cronologia resta aperta').not.toBeNull();
 

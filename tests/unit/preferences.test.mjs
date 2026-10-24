@@ -467,3 +467,54 @@ test('#843 — i siti dove Filo è spento: costo 1 nei due versi, un sito alla v
   assert.deepEqual(P.applicaElenco(riaccendi.elenco, { blocklist: ['banca.it', 'docs.google.com'] }).partial, { blocklist: ['banca.it'] });
   assert.match(build('siti_filo_spento', 'aggiungi localhost').rifiuto, /localhost/);
 });
+
+// #876 — dalla chat i siti fidati si salvano come dalla pagina Sicurezza: al sito che coprono, e fra i programmi fidati
+// una piattaforma che ospita i siti di chiunque è un rifiuto col perché.
+test('#876 — i siti fidati dalla chat: il sito che la voce copre, e nessuna piattaforma fra i programmi', () => {
+  const cookie = build('siti_fidati_cookie', 'aggiungi https://mail.google.com/mail/u/0/, news.bbc.co.uk');
+  assert.deepEqual(cookie.elenco.voci, ['google.com', 'bbc.co.uk']);
+  assert.match(cookie.label, /google\.com, bbc\.co\.uk/);
+  const programmi = build('siti_fidati_programmi', 'aggiungi https://alice.github.io/x.exe download.mozilla.org');
+  assert.deepEqual(programmi.elenco.voci, ['alice.github.io', 'download.mozilla.org']);
+  const no = build('siti_fidati_programmi', 'aggiungi github.io');
+  assert.ok(no.rifiuto && !no.partial);
+  assert.match(no.rifiuto, /«github\.io» raccoglie i siti di chiunque.*nome\.github\.io/);
+  assert.ok(build('siti_fidati_programmi', 'solo vercel.app, mozilla.org').rifiuto);
+  // Fra i siti dove resti connesso una piattaforma non entra nemmeno: come nella pagina Sicurezza.
+  for (const p of ['github.io', 'co.uk']) {
+    const c = build('siti_fidati_cookie', `aggiungi ${p}`);
+    assert.ok(c.rifiuto && !c.partial, p);
+    assert.match(c.rifiuto, /raccoglie i siti di chiunque/);
+  }
+  assert.deepEqual(build('siti_fidati_cookie', 'aggiungi wordpress.com, alice.github.io').elenco.voci, ['wordpress.com', 'alice.github.io']);
+  assert.deepEqual(P.applicaElenco(build('siti_fidati_cookie', 'togli github.io').elenco,
+    { security: { cookies: { trustedSites: ['github.io', 'libero.it'] } } }).partial,
+  { security: { cookies: { trustedSites: ['libero.it'] } } }, 'una piattaforma salvata prima si toglie');
+
+  // Una voce salvata prima della riduzione si toglie col suo sito, e non si raddoppia aggiungendolo.
+  const prima = { security: { cookies: { trustedSites: ['mail.google.com', 'libero.it'] }, downloads: { trustedSites: ['github.io', 'download.mozilla.org'] } } };
+  assert.deepEqual(P.applicaElenco(build('siti_fidati_cookie', 'togli google.com').elenco, prima).partial,
+    { security: { cookies: { trustedSites: ['libero.it'] } } });
+  assert.ok(P.applicaElenco(build('siti_fidati_cookie', 'aggiungi gmail.mail.google.com').elenco, prima).invariato);
+  assert.deepEqual(P.applicaElenco(build('siti_fidati_programmi', 'togli github.io').elenco, prima).partial,
+    { security: { downloads: { trustedSites: ['download.mozilla.org'] } } }, 'una piattaforma salvata prima si toglie');
+  assert.deepEqual(P.applicaElenco(build('siti_fidati_programmi', 'togli https://download.mozilla.org/firefox').elenco, prima).partial,
+    { security: { downloads: { trustedSites: ['github.io'] } } });
+
+  // gmail.com e youtube.com valgono google.com: una voce sola, che si toglie con qualunque dei loro nomi.
+  assert.deepEqual(build('siti_fidati_cookie', 'aggiungi gmail.com, youtube.com').elenco.voci, ['google.com']);
+  const gmail = { security: { cookies: { trustedSites: ['gmail.com', 'libero.it'] } } };
+  assert.ok(P.applicaElenco(build('siti_fidati_cookie', 'aggiungi google.com').elenco, gmail).invariato);
+  assert.deepEqual(P.applicaElenco(build('siti_fidati_cookie', 'togli google.com').elenco, gmail).partial,
+    { security: { cookies: { trustedSites: ['libero.it'] } } });
+
+  // #759 — in Automatico «non restare connesso su X» toglie anche il sito dove Filo ti ha visto entrare, come il menu
+  // della scheda; con la privacy massima quell'elenco non c'entra e resta com'è.
+  const entrato = (mode) => ({ security: { cookies: { mode, trustedSites: ['libero.it'], loggedSites: ['esempio.it', 'libero.it'] } } });
+  assert.deepEqual(P.applicaElenco(build('non restare connesso', 'togli www.esempio.it').elenco, entrato('default')).partial,
+    { security: { cookies: { trustedSites: ['libero.it'], loggedSites: ['libero.it'] } } });
+  assert.deepEqual(P.applicaElenco(build('siti connessi', 'togli libero.it').elenco, entrato(undefined)).partial,
+    { security: { cookies: { trustedSites: [], loggedSites: ['esempio.it'] } } });
+  assert.ok(P.applicaElenco(build('non restare connesso', 'togli esempio.it').elenco, entrato('privacy')).invariato);
+  assert.ok(P.applicaElenco(build('non restare connesso', 'togli altro.it').elenco, entrato('default')).invariato);
+});

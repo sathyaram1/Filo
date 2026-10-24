@@ -90,7 +90,16 @@ di 1,5 s. Il movimento del mouse non conta: passarci sopra non è chiedere.
    davvero, non si raggiunge per caso, e quando ferma avvisa una volta nella
    scheda con il numero. Il tasto destro porta `suRichiesta: true` e non si
    ferma mai.
-10. **Il costo si riduce senza tagliare in silenzio**: una selezione oltre i 2000
+10. **Un giro di passi che il modello fa da solo ha un tetto di fila**: i passi
+   dell'Aiuto che partono senza chiedere (aprire una sezione o un menu, un'azione
+   di pagina, un comando di Filo, le ricerche) si fermano dopo 20 consecutivi,
+   con una riga che dice il numero e «Continua» (#1049: una pagina che chiede
+   sempre la sezione dopo lo teneva in giro finché si chiudeva il pannello). Il
+   cancello sta all'ingresso del turno, non su ogni ramo, così un passo da solo
+   nuovo ci passa senza saperlo; lo azzera solo un gesto vero (scrivere, una
+   scelta, il clic sul passo indicato, «Continua»). Si conta nel giro, non nel
+   main: vive e muore col documento, e il sito non tocca il contatore.
+11. **Il costo si riduce senza tagliare in silenzio**: una selezione oltre i 2000
    caratteri non si prepara in anticipo e al tasto destro parte intera; la frase
    di contesto è al massimo 600 caratteri per lato, perché senza un punto vicino
    (codice, tabelle) diventava il blocco intero.
@@ -100,4 +109,5 @@ autocompletamento) senza un tasto premuto, l'anticipo. Il calcolo al tasto
 destro resta.
 
 Prove: `tests/chiamate-automatiche-solo-da-gesto.spec.mjs` (la pagina vera),
+`tests/aiuto-passi-da-solo.spec.mjs` (il giro dell'Aiuto),
 `tests/unit/chiamateAutomatiche.test.mjs` (cosa conta come gesto, il tetto).

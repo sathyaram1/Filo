@@ -806,6 +806,31 @@ test('l’esito del salto non diventa mai un «fatto» generico', async ({ openT
   await expect(page.locator('#mgSideBody .mg-liv-esito')).toHaveAttribute('data-kind', 'err');
 });
 
+test('un lavoro anche sul server: ogni seguito del cancello del server detto in italiano (#1230)', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_BOCCIATO]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_BOCCIATO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]').click();
+  const esito = page.locator('#mgSideBody .mg-liv-esito');
+  const casi = [
+    ['attesa_server', /suite di filo-security è verde, prima l’app e poi il server/, 'ok'],
+    ['server_al_pc', /il tuo PC: npm run orchestra -- fusioni-server/, 'ok'],
+    ['rimandato', /torna alle routine/, 'err'],
+    ['all_owner', /torna a te/, 'err'],
+  ];
+  for (const [nome, testo, kind] of casi) {
+    await stub(page, { saltaReply: { ok: true, esito: nome } });
+    await page.locator('#mgSaltaL4Btn').click();
+    await page.locator('#mgSaltaL4Btn').click();
+    await expect(esito).toContainText(testo, { timeout: 8_000 });
+    await expect(esito).toHaveAttribute('data-kind', kind);
+    await expect(esito).not.toContainText('Il server ha risposto');
+    await expect(page.locator('#mgSaltaL4Btn')).toBeEnabled();
+    // La pagina rilegge tutto 800 ms dopo l'esito: il caso dopo parte a rilettura finita.
+    await page.waitForTimeout(1_000);
+  }
+});
+
 test('GitHub giù: il salto è registrato e lo si può ripremere', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [FB_BOCCIATO], { saltaReply: { ok: true, esito: 'guasto' } });

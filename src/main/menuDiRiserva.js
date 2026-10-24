@@ -78,7 +78,12 @@ function esegui(azione, params, wc, schede, tab, { win = null, frame = '', incog
   if (azione === 'link-copia') { clipboard.writeText(params.linkURL); return; }
   if (azione === 'immagine-copia') { wc.copyImageAt(params.x, params.y); return; }
   if (azione === 'immagine-url') { clipboard.writeText(params.srcURL); return; }
-  if (azione === 'link-apri') { if (schede) schede.apriDaCollegamento(params.linkURL); return; }
+  if (azione === 'link-apri') {
+    let da = '';
+    try { da = wc.getURL(); } catch (_) {}
+    if (schede) schede.apriDaCollegamento(params.linkURL, { daScheda: tab, fromUrl: da, gesto: true });
+    return;
+  }
   const metodo = { indietro: 'goBack', avanti: 'goForward', ricarica: 'reload' }[azione];
   if (!metodo) return;
   // Le schede passano dalle loro porte (pagina d'errore, siti bloccati); una finestra d'accesso no.

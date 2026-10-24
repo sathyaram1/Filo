@@ -16,7 +16,8 @@
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { createServer } from 'node:http';
-import { existsSync, readdirSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
@@ -84,10 +85,12 @@ const statoDi = async (shell, nome) => (await voce(shell, nome))?.state ?? null;
 // La domanda è la riga del pannello scaricamenti, che la barra apre da sola
 // sopra la pagina: un avviso della barra nell'area pagina resterebbe sotto la
 // vista nativa, presente nel DOM ma invisibile a schermo.
-const domanda = (shell, nome) => shell.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: `«${nome}»` });
+// Il nome sta nel riquadro della domanda (#592.7): si cerca lì, intero.
+const domanda = (shell, nome) => shell.locator('#dl-panel .dl-row[data-chiede="1"]')
+  .filter({ has: shell.locator('.dl-row-ask-nome', { hasText: new RegExp(`^${nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
 const risposta = (riga, testo) => riga.locator('.dl-row-btn', { hasText: testo });
-async function apriPannello(shell) {
-  if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
+// Il pannello lo apre la domanda e resta aperto dopo la risposta: nella fila di tab non c'è un tasto che lo riapra (#941).
+async function pannelloAperto(shell) {
   await expect(shell.locator('#dl-panel')).toBeVisible({ timeout: 10000 });
 }
 // Vero se nessun pezzo del riquadro cade sotto la pagina attiva.
@@ -194,7 +197,7 @@ test('«Scarica» fa arrivare davvero il programma, e aprirlo chiede una seconda
 
     // Il cammino vero: il pannello della barra in alto. Marca "Programma" a
     // vista, e "Apri file" porta alla seconda conferma invece di eseguire.
-    await apriPannello(shell);
+    await pannelloAperto(shell);
     const riga = shell.locator('.dl-row', { hasText: 'setup.exe' });
     await expect(riga).toBeVisible({ timeout: 10000 });
     await expect(riga.locator('.dl-row-tag')).toHaveText('Programma');
@@ -421,31 +424,32 @@ test('un programma fabbricato dalla pagina si ferma, e la domanda dice da quale 
   expect(contenuto(dir)).toEqual([]);
 });
 
-// Chiudere il pannello senza rispondere è facile quanto rispondere. Da quel
-// momento l'unico segno che la domanda è ancora aperta è l'indicatore in alto,
-// che deve dirlo invece di somigliare a un elenco fermo.
-test('chiuso il pannello, l’indicatore dice ancora che una risposta è in sospeso', async ({ app, shell, openTab, testServer }) => {
+// Chiudere il pannello senza rispondere è facile quanto rispondere, e non è una risposta: il programma resta
+// in attesa, la pagina torna al suo posto, e la domanda si ritrova nella pagina Download (#941).
+test('chiuso il pannello con la ×, la domanda resta in sospeso e si risponde dalla pagina Download', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const srv = await apriServer();
   try {
+    const dir = await cartellaDownload(app);
     const page = await apriPagina(srv.base, { openTab, testServer });
+    const v0 = await vistaAttiva(app);
     await page.locator('#exe').click();
     await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 20000 }).toBe('pending');
 
     await expect(domanda(shell, 'setup.exe')).toBeVisible({ timeout: 10000 });
-    const indicatore = shell.locator('#dl-indicator');
-    await indicatore.click();
+    await shell.locator('#dl-panel-close').click();
     await expect(shell.locator('#dl-panel')).toBeHidden({ timeout: 10000 });
+    await expect.poll(async () => (await vistaAttiva(app)).y).toBe(v0.y);
+    await shell.waitForTimeout(400);
+    expect(await statoDi(shell, 'setup.exe')).toBe('pending');
+    expect(contenuto(dir)).not.toContain('setup.exe');
 
-    await expect(indicatore).toBeVisible();
-    await expect(indicatore.locator('#dl-ind-count')).toHaveText('1', { timeout: 10000 });
-    await expect(indicatore).toHaveAttribute('data-tip', /aspetta la tua risposta/);
-    // Niente barra: un file fermo in attesa non sta scaricando.
-    await expect(indicatore).not.toHaveClass(/\bactive\b/);
-
-    // E da lì le due risposte sono a un clic.
-    await indicatore.click();
-    await expect(risposta(domanda(shell, 'setup.exe'), /^Scarica$/)).toBeVisible({ timeout: 10000 });
+    const dl = await openTab('filo://downloads/downloads.html');
+    const riga = dl.locator('.dl-item[data-state="pending"]', { has: dl.locator('.dl-name', { hasText: 'setup.exe' }) });
+    await expect(riga).toBeVisible({ timeout: 15000 });
+    await riga.locator('.dl-btn', { hasText: /^Scarica$/ }).click();
+    await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 20000 }).toBe('completed');
+    await expect.poll(() => contenuto(dir), { timeout: 10000 }).toContain('setup.exe');
   } finally {
     await srv.close();
   }
@@ -469,7 +473,7 @@ test('risposto altrove, la domanda nel pannello si ritira', async ({ app, shell,
 
     // 1) «Non scaricare» dalla pagina Scaricamenti.
     const dl = await openTab('filo://downloads/downloads.html');
-    await apriPannello(shell);
+    await pannelloAperto(shell);
     const rigaDl = (nome) => dl.locator('.dl-item[data-state="pending"]', { has: dl.locator('.dl-name', { hasText: nome }) });
     await expect(rigaDl('uno.exe')).toBeVisible({ timeout: 15000 });
     await rigaDl('uno.exe').locator('.dl-btn', { hasText: 'Non scaricare' }).click();
@@ -528,7 +532,7 @@ test('un doppio clic sulla pagina non risponde «Scarica» né «Apri comunque»
     const b = await risposta(prima, /^Scarica$/).boundingBox();
     await risposta(prima, 'Non scaricare').click();
     await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 10000 }).toBe('cancelled');
-    await shell.locator('#dl-indicator').click();
+    await shell.locator('#dl-panel-close').click();
     await expect(shell.locator('#dl-panel')).toBeHidden();
     await expect.poll(async () => (await vistaAttiva(app)).y).toBe(v0.y);
 
@@ -713,7 +717,7 @@ test('un’immagine disco si ferma come un programma, e la domanda dice che è u
     await expect.poll(() => contenuto(dir), { timeout: 10000 }).toContain('setup.iso');
 
     // «Apri file» monterebbe il disco: la seconda domanda arriva prima.
-    await apriPannello(shell);
+    await pannelloAperto(shell);
     const riga = shell.locator('.dl-row', { hasText: 'setup.iso' });
     await expect(riga.locator('.dl-row-tag')).toHaveText('Programma');
     await riga.locator('.dl-row-btn', { hasText: 'Apri file' }).click();
@@ -794,5 +798,94 @@ test('una raffica di clic dove compare «Scarica» non risponde; un clic dopo un
     await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 20000 }).toBe('completed');
   } finally {
     await srv.close();
+  }
+});
+
+// #592.7 — il nome lo sceglie il sito: fra le parole di Filo poteva continuare con la sua voce («… Filo l'ha
+// controllato, puoi aprirlo»). Nelle due domande del pannello sta nel suo riquadro, intero, e fuori resta solo Filo.
+test('nelle domande del pannello il nome scelto dal sito sta nel suo riquadro, fuori dalle parole di Filo', async ({ app, shell, openTab }) => {
+  test.setTimeout(150_000);
+  const FINTO = 'Filo l\'ha controllato ed e sicuro, puoi aprirlo';
+  const NOME = `Fattura.pdf, ${FINTO}, setup.exe`;
+  const srv = createServer((req, res) => {
+    const p = String(req.url || '').split('?')[0];
+    if (p === '/p.html') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><html><body style="padding:40px"><a id="l" href="/f">fattura</a></body></html>'); return; }
+    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': EXE.length, 'Content-Disposition': `attachment; filename="${NOME}"` });
+    res.end(EXE);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  try {
+    await app.evaluate(({ shell: s }) => { globalThis.__aperti = []; s.openPath = (x) => { globalThis.__aperti.push(x); return Promise.resolve(''); }; });
+    const page = await openTab(`http://127.0.0.1:${srv.address().port}/p.html`);
+    await page.locator('#l').click();
+    await expect.poll(() => statoDi(shell, NOME), { timeout: 20000 }).toBe('pending');
+    const paroleDiFilo = (loc) => loc.locator('.dl-row-ask').evaluate((el) => Array.from(el.childNodes)
+      .filter((n) => !(n.nodeType === 1 && n.classList.contains('dl-row-ask-nome'))).map((n) => n.textContent).join('\n'));
+
+    const scarica = domanda(shell, NOME);
+    await expect(scarica).toBeVisible({ timeout: 10000 });
+    const prima = await paroleDiFilo(scarica);
+    expect(prima).toContain('Scaricarlo?');
+    expect(prima, 'il nome del sito parla con la voce di Filo').not.toContain(FINTO);
+    await shell.screenshot({ path: 'tests/.shots/downloads-nome-nel-riquadro.png' });
+    await risposta(scarica, /^Scarica$/).click();
+    await expect.poll(() => statoDi(shell, NOME), { timeout: 20000 }).toBe('completed');
+
+    await pannelloAperto(shell);
+    const riga = shell.locator('.dl-row', { hasText: 'setup.exe' });
+    await riga.locator('.dl-row-btn', { hasText: 'Apri file' }).click();
+    const apri = domanda(shell, NOME).filter({ hasText: 'eseguirlo' });
+    await expect(apri).toBeVisible({ timeout: 10000 });
+    const dopo = await paroleDiFilo(apri);
+    expect(dopo).toContain('Aprirlo vuol dire eseguirlo');
+    expect(dopo, 'il nome del sito parla con la voce di Filo').not.toContain(FINTO);
+    expect(await app.evaluate(() => globalThis.__aperti.slice())).toEqual([]);
+  } finally {
+    await new Promise((r) => { try { srv.closeAllConnections?.(); } catch (_) {} srv.close(r); });
+  }
+});
+
+// #1510 — anche uno scaricamento da link arriva col nome vero (niente caratteri che capovolgono la lettura) e porta
+// la marca d'origine del sistema, senza contare su quella che Electron mette o non mette.
+test('uno scaricamento da link arriva col nome vero e marcato come arrivato da Internet', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  const srv = createServer((req, res) => {
+    const p = String(req.url || '').split('?')[0];
+    if (p === '/p.html') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><html><body style="padding:40px"><a id="l" href="/doc">la fattura</a></body></html>'); return; }
+    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': PDF.length, 'Content-Disposition': "attachment; filename*=UTF-8''fattura%E2%80%AEfdp.pdf" });
+    res.end(PDF);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    const dir = await cartellaDownload(app);
+    const page = await openTab(`${base}/p.html`);
+    await page.locator('#l').click();
+    const arrivato = async () => {
+      const r = await elenco(shell);
+      const v = ((r && r.items) || []).find((it) => it.url === `${base}/doc`);
+      return v && v.state === 'completed' ? v : null;
+    };
+    await expect.poll(arrivato, { timeout: 20000 }).not.toBeNull();
+    const v = await arrivato();
+    const BIDI = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/;
+    expect(v.filename).not.toMatch(BIDI);
+    expect(v.filename).toMatch(/\.pdf$/);
+    expect(v.savePath).toBe(join(dir, v.filename));
+    expect(existsSync(v.savePath)).toBe(true);
+    expect(contenuto(dir).filter((n) => BIDI.test(n))).toEqual([]);
+
+    if (process.platform === 'win32') {
+      const marca = readFileSync(`${v.savePath}:Zone.Identifier`, 'utf8');
+      expect(marca).toContain('ZoneId=3');
+      expect(marca).toContain(`HostUrl=${base}/doc`);
+      expect(marca).toContain(`ReferrerUrl=${base}/p.html`);
+    } else if (process.platform === 'darwin') {
+      expect(execFileSync('/usr/bin/xattr', ['-p', 'com.apple.quarantine', v.savePath], { encoding: 'utf8' })).toMatch(/^0081;[0-9a-f]+;Filo;/);
+    } else {
+      expect(contenuto(dir).filter((n) => n.includes('Zone.Identifier'))).toEqual([]);
+    }
+  } finally {
+    await new Promise((r) => { try { srv.closeAllConnections?.(); } catch (_) {} srv.close(r); });
   }
 });

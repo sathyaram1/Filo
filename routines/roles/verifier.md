@@ -25,7 +25,6 @@ un **livello**.
 <!-- includi: _immagini.md -->
 
 <!-- includi: _cornice-feedback.md -->
-Se è l'ultimo caso, dillo nella critica.
 
 ## Passi
 

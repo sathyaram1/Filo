@@ -9,8 +9,11 @@
 // l'assenza di un errore. Togliendo nodeIntegrationInSubFrames (o il
 // montaggio pigro nel page-preload) tornano tutti rossi.
 
+import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 import { statoDi, conta } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
+import { riquadriInRitardo, apriConRiquadriInRitardo } from './helpers/riquadriInRitardo.mjs';
 
 const INNER = `<!doctype html><html><body style="margin:0;padding:16px;font:16px sans-serif">
   <p id="inner-text">Testo dentro il riquadro incorporato, lungo abbastanza da poterlo selezionare e spiegare.</p>
@@ -30,10 +33,77 @@ test('tasto destro DENTRO il riquadro incorporato: compare il menu di Filo', asy
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER)));
   const frame = page.frameLocator('#embed');
   await frame.locator('#inner-text').click({ button: 'right' });
-  const menu = frame.locator('.sn-menu');
+  const menu = menuDi(frame).locator('.sn-menu');
   await expect(menu).toBeVisible();
   // Non un menu vuoto: dentro il riquadro ci sono le stesse voci di sempre.
   await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+});
+
+// #1568 — toccato prima del suo load dal Filo della pagina, il riquadro dello stesso sito perdeva il preload.
+test('tasto destro nel riquadro dello stesso sito arrivato dopo la pagina: compare il menu di Filo', async ({ openTab }) => {
+  const sito = await riquadriInRitardo(outer('/riquadro/1'), INNER);
+  try {
+    const page = await apriConRiquadriInRitardo(openTab, sito, 1);
+    const frame = page.frameLocator('#embed');
+    await frame.locator('#inner-text').click({ button: 'right' });
+    const menu = menuDi(frame).locator('.sn-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+// #775.2 — stessa causa, l'altra porta: il riquadro senza preload non riceveva Alt+E. Selezione col mouse e tasto vero.
+test('Alt+E sul testo selezionato nel riquadro dello stesso sito arrivato dopo la pagina: la spiegazione si apre lì', async ({ app, openTab }) => {
+  const sito = await riquadriInRitardo(outer('/riquadro/1'), INNER);
+  try {
+    const page = await apriConRiquadriInRitardo(openTab, sito, 1);
+    const frame = page.frames().find((f) => f.url().includes('/riquadro'));
+    await page.frameLocator('#embed').locator('#inner-text').click({ clickCount: 3 });
+    expect(await frame.evaluate(() => String(getSelection()).trim())).toContain('Testo dentro il riquadro');
+    await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      const wc = w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents;
+      for (const type of ['keyDown', 'keyUp']) wc.sendInputEvent({ type, keyCode: 'E', modifiers: ['alt'] });
+    });
+    await expect.poll(async () => (await statoDi(app, page, '.sn-popup .sn-popup-title', frame))?.testo, { timeout: 8000 })
+      .toBe('Approfondimento');
+    expect(await conta(app, page, '.sn-popup')).toBe(0);
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+// Gli altri pezzi di Filo che toccano i riquadri: il puntatore che si muove sulla pagina, una pubblicità bloccata.
+const toccatiMentreArriva = {
+  'il puntatore si muove sulla pagina mentre il riquadro arriva: il tasto destro lì dentro apre il menu di Filo':
+    'for (const [x, y] of [[5, 5], [100, 20], [200, 22]]) wc.sendInputEvent({ type: \'mouseMove\', x, y });',
+  'una pubblicità bloccata nella pagina mentre il riquadro arriva: il tasto destro lì dentro apre il menu di Filo':
+    'wc.send(\'filo:adblock-chiudi\', [\'http://127.0.0.1:9/ad.png\']);',
+};
+for (const [nome, gesto] of Object.entries(toccatiMentreArriva)) test(nome, async ({ app, openTab }) => {
+  const sito = await riquadriInRitardo(outer('/riquadro/1'), INNER);
+  try {
+    const page = await openTab(sito.url);
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 15_000 });
+    expect(sito.serviti()).toBe(0);
+    await app.evaluate(({ webContents }, { u, gesto }) => {
+      const fai = new Function('wc', gesto);
+      for (const wc of webContents.getAllWebContents()) if (wc.getURL() === u) fai(wc);
+    }, { u: sito.url, gesto });
+    await page.waitForTimeout(500);
+    sito.apri();
+    await expect.poll(() => page.frames().find((f) => f.url().includes('/riquadro'))?.evaluate(() => document.readyState).catch(() => ''),
+      { timeout: 10_000 }).toBe('complete');
+    const frame = page.frameLocator('#embed');
+    await frame.locator('#inner-text').click({ button: 'right' });
+    const menu = menuDi(frame).locator('.sn-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+  } finally {
+    await sito.chiudi();
+  }
 });
 
 test('il riquadro di un ALTRO sito (origine diversa) ha comunque il menu', async ({ openTab, testServer }) => {
@@ -43,7 +113,53 @@ test('il riquadro di un ALTRO sito (origine diversa) ha comunque il menu', async
   const page = await testServer.openReady(openTab, outer(innerUrl));
   const frame = page.frameLocator('#embed');
   await frame.locator('#inner-text').click({ button: 'right' });
-  await expect(frame.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(frame).locator('.sn-menu')).toBeVisible();
+});
+
+// #1429: chi tocca un riquadro della stessa origine prima che arrivi (Filo all'avvio della pagina, il puntatore che ci
+// passa sopra) gli toglieva il preload, e lì Filo non c'era: una volta su dieci, sempre se il riquadro arriva lento.
+test('un riquadro della stessa origine che arriva lento, col puntatore che gli passa sopra, ha il menu di Filo', async ({ openTab }) => {
+  const server = createServer((req, res) => {
+    const html = (b) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(b); };
+    if (req.url === '/dentro') setTimeout(() => html(INNER), 2500);
+    else html(outer('/dentro'));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    const page = await openTab(`http://127.0.0.1:${server.address().port}/fuori`);
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+    for (const [x, y] of [[40, 20], [200, 200], [300, 300], [40, 20], [250, 150]]) await page.mouse.move(x, y, { steps: 3 });
+    const frame = page.frameLocator('#embed');
+    await expect(frame.locator('#inner-text')).toBeVisible({ timeout: 10_000 });
+    await frame.locator('#inner-text').click({ button: 'right' });
+    await expect(menuDi(frame).locator('.sn-menu')).toBeVisible();
+  } finally {
+    server.closeAllConnections?.();
+    await new Promise((r) => server.close(r));
+  }
+});
+
+// Un riquadro spostato dalla pagina si ricarica da capo: per Filo torna in arrivo, o toccato perde il preload (#1429).
+test('un riquadro della stessa origine che la pagina sposta, e che quindi si ricarica, ha ancora il menu di Filo', async ({ openTab }) => {
+  const server = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(req.url === '/dentro' ? INNER : `${outer('/dentro')}<div id="altrove"></div>`);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    const page = await openTab(`http://127.0.0.1:${server.address().port}/fuori`);
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+    const frame = page.frameLocator('#embed');
+    await expect(frame.locator('#inner-text')).toBeVisible({ timeout: 10_000 });
+    await page.evaluate(() => document.getElementById('altrove').appendChild(document.getElementById('embed')));
+    for (const [x, y] of [[40, 20], [200, 200], [300, 300]]) await page.mouse.move(x, y, { steps: 3 });
+    await expect(frame.locator('#inner-text')).toBeVisible({ timeout: 10_000 });
+    await frame.locator('#inner-text').click({ button: 'right' });
+    await expect(menuDi(frame).locator('.sn-menu')).toBeVisible();
+  } finally {
+    server.closeAllConnections?.();
+    await new Promise((r) => server.close(r));
+  }
 });
 
 test('nel riquadro il menu porta le azioni sul testo selezionato (Copia, Cerca, Spiegazione)', async ({ openTab, testServer }) => {
@@ -60,7 +176,7 @@ test('nel riquadro il menu porta le azioni sul testo selezionato (Copia, Cerca, 
     sel.addRange(range);
   });
   await frameLoc.locator('#inner-text').click({ button: 'right' });
-  const menu = frameLoc.locator('.sn-menu');
+  const menu = menuDi(frameLoc).locator('.sn-menu');
   await expect(menu).toBeVisible();
   // La zona contestuale del testo selezionato: Copia + Cerca + la spiegazione
   // inline (la sezione AI). Senza content script nel riquadro non esisteva
@@ -74,7 +190,7 @@ test('nel riquadro il menu sul collegamento porta le azioni del collegamento', a
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER)));
   const frame = page.frameLocator('#embed');
   await frame.locator('#inner-link').click({ button: 'right' });
-  const menu = frame.locator('.sn-menu');
+  const menu = menuDi(frame).locator('.sn-menu');
   await expect(menu).toBeVisible();
   const txt = (await menu.textContent()) || '';
   expect(txt).toContain('Copia URL');
@@ -86,7 +202,7 @@ test('in un riquadro basso il menu resta tutto raggiungibile (scorre, non viene 
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER), { width: 420, height: 180 }));
   const frame = page.frameLocator('#embed');
   await frame.locator('#inner-text').click({ button: 'right' });
-  const menu = frame.locator('.sn-menu');
+  const menu = menuDi(frame).locator('.sn-menu');
   await expect(menu).toBeVisible();
   const fits = await menu.evaluate((el) => {
     const r = el.getBoundingClientRect();
@@ -100,7 +216,7 @@ test('in un riquadro basso il menu resta tutto raggiungibile (scorre, non viene 
 test('la pagina attorno al riquadro continua a funzionare come prima', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER)));
   await page.locator('#outer-text').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
 });
 
 test('un riquadro mai toccato non carica nulla (il costo si paga solo all\'uso)', async ({ openTab, testServer }) => {
@@ -111,7 +227,7 @@ test('un riquadro mai toccato non carica nulla (il costo si paga solo all\'uso)'
   expect(readyBefore).toBe('');
   // …ma appena lo si tocca, Filo c'è.
   await page.frameLocator('#embed').locator('#inner-text').click({ button: 'right' });
-  await expect(page.frameLocator('#embed').locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page.frameLocator('#embed')).locator('.sn-menu')).toBeVisible();
   const readyAfter = await frame.evaluate(() => document.documentElement.dataset.filoReady || '');
   expect(readyAfter).toBe('1');
 });
@@ -145,8 +261,8 @@ test('Alt+E sul testo selezionato DENTRO il riquadro arriva al riquadro', async 
 test('un solo menu alla volta: aprirlo nel riquadro chiude quello della pagina', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER)));
   await page.locator('#outer-text').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
   await page.frameLocator('#embed').locator('#inner-text').click({ button: 'right' });
-  await expect(page.frameLocator('#embed').locator('.sn-menu')).toBeVisible();
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page.frameLocator('#embed')).locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 });

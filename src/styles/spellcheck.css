@@ -1,7 +1,6 @@
-/* Correttore AI — overlay esterno con zigzag blu + popup correzione */
+/* Il correttore (#1446): lo strato dei segni sopra il campo e il popup di correzione */
 
-/* L'overlay sta in document.body sopra l'editabile e ne ripete il testo in trasparente: si vede solo
-   lo zigzag blu, mentre il testo vero e il rosso del browser restano sull'editabile sotto. */
+/* Lo strato sta sopra il campo e ne ripete il testo in trasparente: si vedono solo i segni, il testo vero resta sotto. */
 .sn-spell-overlay {
   /* le proprietà dimensionali e di posizione sono settate inline da JS */
   pointer-events: none;
@@ -19,19 +18,98 @@
   box-sizing: border-box;
 }
 
-/* Lo zigzag sta un filo più in basso del rosso nativo del browser: se una parola è marcata sia rossa
-   sia blu i due tratti convivono affiancati invece di sovrapporsi. */
-.sn-spell-overlay .sn-semantic-error {
-  background-repeat: repeat-x;
-  background-position: 0 calc(100% + 2px);
-  background-size: 8px 3px;
-  padding-bottom: 3px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpolyline points='0,3 2,0 4,3 6,0 8,3' fill='none' stroke='%233b82f6' stroke-width='1.2'/%3E%3C/svg%3E");
+/* Il testo dello specchio e dei riquadri dei segni serve solo a misurare: un foglio di stile della pagina che colori
+   div o span non deve renderlo visibile. */
+.sn-spell-overlay *,
+.sn-spell-overlay *::before,
+.sn-spell-overlay *::after,
+.sn-spell-overlay *::marker {
+  color: transparent !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
 }
 
-/* Dark mode: blu più vivido per restare leggibile */
-.sn-spell-overlay[data-sn-theme="dark"] .sn-semantic-error {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpolyline points='0,3 2,0 4,3 6,0 8,3' fill='none' stroke='%2360a5fa' stroke-width='1.2'/%3E%3C/svg%3E");
+/* Lo zigzag del browser si spegne dove i segni li disegna Filo; con «Errori» spento anche nelle caselle di una riga.
+   Resta dove il sito chiede di non correggere a Filo e a Grammarly: lì il browser fa da sé. */
+html[data-sn-correttore] textarea:not([data-gramm="false"], [data-gramm="false"] *, [data-enable-grammarly="false"], [data-enable-grammarly="false"] *)::spelling-error,
+html[data-sn-correttore] [contenteditable]:not([data-gramm="false"], [data-gramm="false"] *, [data-enable-grammarly="false"], [data-enable-grammarly="false"] *)::spelling-error,
+html[data-sn-correttore] [contenteditable]:not([data-gramm="false"], [data-gramm="false"] *, [data-enable-grammarly="false"], [data-enable-grammarly="false"] *) *::spelling-error,
+html[data-sn-correttore="senza-errori"] *::spelling-error {
+  text-decoration: none;
+}
+
+/* ERRORE, Filo è sicuro: un'onda sottile color mattone. SUGGERIMENTO, decide l'utente: i puntini ocra. I letterali sono i
+   predefiniti dei token correttore.* (themeTokens.js), che la scelta dell'utente scavalca. */
+.sn-spell-overlay .sn-errore {
+  --sn-segno: var(--sn-spell-errore, #b4472c);
+  text-decoration-line: underline;
+  text-decoration-style: var(--sn-spell-errore-stile, wavy);
+  text-decoration-color: var(--sn-segno);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+}
+.sn-spell-overlay[data-sn-theme="dark"] .sn-errore {
+  --sn-segno: var(--sn-spell-errore, #ea8a6b);
+}
+.sn-spell-overlay .sn-suggerimento {
+  --sn-segno: var(--sn-spell-suggerimento, #b07a14);
+  text-decoration-line: underline;
+  text-decoration-style: var(--sn-spell-suggerimento-stile, dotted);
+  text-decoration-color: var(--sn-segno);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+  text-decoration-skip-ink: none;
+}
+.sn-spell-overlay[data-sn-theme="dark"] .sn-suggerimento {
+  --sn-segno: var(--sn-spell-suggerimento, #e2ad4d);
+}
+/* Sulla stessa parola i puntini scendono sotto l'onda. */
+.sn-spell-overlay .sn-suggerimento:has(> .sn-errore) {
+  text-underline-offset: 8px;
+}
+
+/* Il dubbio (un candidato che nessun controllo ha ancora giudicato) è lo stesso segno, sbiadito. */
+.sn-spell-overlay .sn-dubbio {
+  text-decoration-color: color-mix(in srgb, var(--sn-segno) calc(var(--sn-spell-dubbio, 0.4) * 100%), transparent);
+}
+/* Confermato si riempie, scartato sfuma via: un passaggio breve, che segue la durata delle animazioni. */
+.sn-spell-overlay .sn-conferma {
+  animation: sn-segno-conferma calc(320ms * var(--sn-motion, 1)) ease-out both;
+}
+.sn-spell-overlay .sn-svanisce {
+  animation: sn-segno-svanisce calc(320ms * var(--sn-motion, 1)) ease-in both;
+}
+@keyframes sn-segno-conferma {
+  from { text-decoration-color: color-mix(in srgb, var(--sn-segno) calc(var(--sn-spell-dubbio, 0.4) * 100%), transparent); }
+  to { text-decoration-color: var(--sn-segno); }
+}
+@keyframes sn-segno-svanisce {
+  to { text-decoration-color: transparent; }
+}
+
+/* La parola corretta da sé (#1447): un lampo caldo che sfuma in circa un secondo, sopra la parola e fuori dallo
+   specchio (lì ogni sfondo è spento). Colore e durata sono i token correttore.lampo.*. */
+.sn-spell-lampo {
+  position: fixed;
+  z-index: 2147483646;
+  pointer-events: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--sn-spell-lampo, #f0b05a66);
+  animation: sn-spell-lampo calc(var(--sn-spell-lampo-durata, 1000ms) * var(--sn-motion, 1)) ease-out both;
+}
+.sn-spell-lampo[data-sn-theme="dark"] {
+  background: var(--sn-spell-lampo, #e2ad4d4d);
+}
+@keyframes sn-spell-lampo {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 /* Popup di correzione: sostituisce il menu nativo del tasto destro sugli errori. */
@@ -149,4 +227,97 @@
 
 .sn-spell-popup-btn-secondary:hover {
   background: var(--sn-hover, rgba(0, 0, 0, 0.05));
+}
+
+/* I segnaposti (#1448): il valore trovato sta in piccolo SOPRA le x, così si legge senza tasto destro e il testo del
+   campo non si sposta; un clic lo mette. Ha lo strato suo, che riceve il mouse: lo specchio no, e taglia ai bordi. */
+.sn-spell-valori {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  z-index: 2147483646;
+  pointer-events: none;
+}
+.sn-spell-valori .sn-spell-valore {
+  all: initial;
+  --sn-segno: var(--sn-spell-suggerimento, #b07a14);
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 1px));
+  box-sizing: border-box;
+  padding: 0 4px;
+  min-width: 1.6em;
+  text-align: center;
+  font-family: var(--sn-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  font-size: max(10px, calc(var(--sn-valore-corpo, 16px) * var(--sn-spell-valore-scala, 0.62)));
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  color: var(--sn-segno);
+  background: #fffaf1;
+  border: 1px solid color-mix(in srgb, var(--sn-segno) 40%, transparent);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(60, 40, 10, calc(0.14 * var(--sn-ombra, 1)));
+  cursor: pointer;
+  user-select: none;
+  pointer-events: auto;
+  animation: sn-valore-arriva calc(160ms * var(--sn-motion, 1)) ease-out;
+  transition: background-color calc(120ms * var(--sn-motion, 1)), transform calc(120ms * var(--sn-motion, 1));
+}
+.sn-spell-valori[data-sn-theme="dark"] .sn-spell-valore {
+  --sn-segno: var(--sn-spell-suggerimento, #e2ad4d);
+  background: #2b2520;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, calc(0.4 * var(--sn-ombra, 1)));
+}
+.sn-spell-valori .sn-spell-valore:hover {
+  background: color-mix(in srgb, var(--sn-segno) 20%, #fffaf1);
+  transform: translate(-50%, calc(-100% - 3px));
+}
+.sn-spell-valori[data-sn-theme="dark"] .sn-spell-valore:hover {
+  background: color-mix(in srgb, var(--sn-segno) 24%, #2b2520);
+}
+.sn-spell-valori .sn-spell-valore:active {
+  transform: translate(-50%, calc(-100% - 1px)) scale(0.96);
+}
+/* Sopra le parole della riga prima il valore è velato e lascia il clic al testo; il puntatore sulle x lo sveglia. */
+.sn-spell-valori .sn-spell-valore.sn-sopra-testo:not(.sn-sveglio) {
+  pointer-events: none;
+  opacity: var(--sn-spell-valore-velato, 0.45);
+  box-shadow: none;
+  transition: opacity calc(120ms * var(--sn-motion, 1));
+}
+/* Mentre Filo cerca il dato: tre puntini che respirano al posto del valore. */
+.sn-spell-valori .sn-spell-valore.sn-cercando {
+  cursor: progress;
+}
+.sn-spell-valori .sn-spell-valore.sn-cercando::after {
+  content: '•••';
+  letter-spacing: 1px;
+  animation: sn-valore-cerca calc(1100ms * var(--sn-motion, 1)) ease-in-out infinite;
+}
+@keyframes sn-valore-arriva {
+  from { opacity: 0; transform: translate(-50%, calc(-100% + 2px)); }
+  to { opacity: 1; transform: translate(-50%, calc(-100% - 1px)); }
+}
+@keyframes sn-valore-cerca {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+/* Il lampo sul valore appena messo: dice dove il testo è cambiato, e sfuma. */
+.sn-spell-valori .sn-spell-lampo {
+  all: initial;
+  position: fixed;
+  border-radius: 3px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--sn-spell-suggerimento, #b07a14) 42%, transparent);
+  animation: sn-spell-lampo calc(900ms * var(--sn-motion, 1)) ease-out forwards;
+}
+.sn-spell-valori[data-sn-theme="dark"] .sn-spell-lampo {
+  background: color-mix(in srgb, var(--sn-spell-suggerimento, #e2ad4d) 45%, transparent);
+}
+@keyframes sn-spell-lampo {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }

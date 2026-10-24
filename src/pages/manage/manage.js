@@ -9,38 +9,25 @@
 (function () {
   'use strict';
 
-  // ── Elementi DOM ──────────────────────────────────────────────────────────
+  // Elementi DOM
   const mgTabs       = document.getElementById('mgTabs');
   const mgBanner     = document.getElementById('mgBanner');
   const mgSignInBtn  = document.getElementById('mgSignIn');
 
-  // Tab "Automazioni" (owner-only): switch modalità automatica + parametri.
   const mgAutoSwitch = document.getElementById('mgAutoSwitch');
   const mgAutoToggle = document.getElementById('mgAutoToggle');
   const mgAutoState  = document.getElementById('mgAutoState');
   const mgAutoMsg    = document.getElementById('mgAutoMsg');
-  // Un interruttore per categoria di mittente (#446): la chiave è il gruppo
-  // definito in SN_FEEDBACK_THREAD.AUTO_APPROVE_GROUPS.
-  // Un interruttore per ogni categoria d'autore che la lista mostra come icona
-  // (AUTHOR_META più sotto): chi si vede separato si regola separato.
+  // Un interruttore per livello di fiducia (SPEC-DOMANDE.md §10: il mittente non dà permessi): la chiave è il gruppo
+  // di SN_FEEDBACK_THREAD.AUTO_APPROVE_GROUPS.
   const mgAutoApprove = {
-    owner:    document.getElementById('mgAutoApproveOwner'),
-    user:     document.getElementById('mgAutoApproveUser'),
-    local:    document.getElementById('mgAutoApproveLocal'),
-    worker:   document.getElementById('mgAutoApproveWorker'),
-    verifier: document.getElementById('mgAutoApproveVerifier'),
-    residuo:  document.getElementById('mgAutoApproveResiduo'),
-    prober:   document.getElementById('mgAutoApproveProber'),
-    claude:   document.getElementById('mgAutoApproveClaude'),
-    filo:     document.getElementById('mgAutoApproveFilo'),
+    fidato:     document.getElementById('mgAutoApproveFidato'),
+    non_fidato: document.getElementById('mgAutoApproveNonFidato'),
   };
-  // Interruttore master delle routine autonome (config/routines).
   const mgRoutinesSwitch = document.getElementById('mgRoutinesSwitch');
   const mgRoutinesToggle = document.getElementById('mgRoutinesToggle');
   const mgRoutinesState  = document.getElementById('mgRoutinesState');
   const mgRoutinesMsg    = document.getElementById('mgRoutinesMsg');
-  const mgProberIdle      = document.getElementById('mgProberIdle');
-  const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
   const mgLavoriServer       = document.getElementById('mgLavoriServer');
   const mgLavoriServerSwitch = document.getElementById('mgLavoriServerSwitch');
   const mgLavoriServerMsg    = document.getElementById('mgLavoriServerMsg');
@@ -85,7 +72,6 @@
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
 
-  // Tab "Log" (owner-only): elenco dei worker spawnati dalle routine.
   const mgLogLoading = document.getElementById('mgLogLoading');
   const mgLogDenied  = document.getElementById('mgLogDenied');
   const mgLogEmpty   = document.getElementById('mgLogEmpty');
@@ -94,7 +80,6 @@
   const mgChannelEmpty   = document.getElementById('mgChannelEmpty');
   const mgChannelList    = document.getElementById('mgChannelList');
 
-  // Lista (tab corrente)
   const mgNoSections   = document.getElementById('mgNoSections');
   const mgListHead     = document.getElementById('mgListHead');
   const mgListLoading  = document.getElementById('mgListLoading');
@@ -110,7 +95,6 @@
   const mgAlignedBtn    = document.getElementById('mgAlignedBtn');
   const mgAlignedMsg    = document.getElementById('mgAlignedMsg');
 
-  // Revisione — dettaglio
   const mgDetailEmpty = document.getElementById('mgDetailEmpty');
   const mgDetail      = document.getElementById('mgDetail');
   const mgDetailHead  = document.getElementById('mgDetailHead');
@@ -119,25 +103,20 @@
   const mgWorkState   = document.getElementById('mgWorkState');
   const mgThread      = document.getElementById('mgThread');
 
-  // Revisione — pannello laterale
   const mgSideEmpty  = document.getElementById('mgSideEmpty');
   const mgSide       = document.getElementById('mgSide');
   const mgSideTitle  = document.getElementById('mgSideTitle');
   const mgSideClose  = document.getElementById('mgSideClose');
   const mgSideBody   = document.getElementById('mgSideBody');
 
-  // La barra dell'owner: contiene TUTTI i tasti su una riga sola (azioni di
-  // stato + preferito + frase per chi ha segnalato) e, sotto, i moduli che si
-  // aprono da quei tasti (riapertura, frase).
+  // La barra dell'owner: tutti i tasti su una riga sola e, sotto, i moduli che aprono.
   const mgOwnerBar      = document.getElementById('mgOwnerBar');
 
-  // Azioni di stato (owner-only): i pulsanti li genera renderActions() leggendo
-  // MR.ownerActions — la stessa tabella della pagina dei feedback.
+  // I pulsanti li genera renderActions() da MR.ownerActions, la tabella della gemella.
   const mgActions       = document.getElementById('mgActions');
   const mgAcceptComment = document.getElementById('mgAcceptComment');
   const mgActionsRow    = document.getElementById('mgActionsRow');
   const mgActionMsg     = document.getElementById('mgActionMsg');
-  // La riga degli esiti (azione di stato + preferito), sotto i tasti.
   const mgOwnerMsgs     = document.getElementById('mgOwnerMsgs');
   const mgReopen        = document.getElementById('mgReopen');
   const mgReopenText    = document.getElementById('mgReopenText');
@@ -168,7 +147,6 @@
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
   const mgFiduciaBtn = document.getElementById('mgFiduciaBtn');
-  const mgLocalBtn   = document.getElementById('mgLocalBtn');
   const mgAtteseToggle = document.getElementById('mgAtteseToggle');
   const mgAttese       = document.getElementById('mgAttese');
   const mgAtteseLista  = document.getElementById('mgAtteseLista');
@@ -179,7 +157,6 @@
   const mgStarBtn    = document.getElementById('mgStarBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
-  // Ricerca "a senso" (semantica)
   const mgSearchToggle = document.getElementById('mgSearchToggle');
   const mgSearchBar    = document.getElementById('mgSearchBar');
   const mgSearchIco    = document.getElementById('mgSearchIco');
@@ -187,13 +164,11 @@
   const mgSearchMsg    = document.getElementById('mgSearchMsg');
   const mgSearchClose  = document.getElementById('mgSearchClose');
 
-  // Lightbox
   const mgLightbox    = document.getElementById('mgLightbox');
   const mgLightboxImg = document.getElementById('mgLightboxImg');
 
-  // ── Stato ─────────────────────────────────────────────────────────────────
   let isAdmin       = false;
-  let allFeedbacks  = [];       // tutti i feedback caricati
+  let allFeedbacks  = [];
   let dataLoaded    = false;    // i feedback sono arrivati davvero (vs. in corso/fallito)
   let loadFailed    = false;    // l'ultimo caricamento è fallito (≠ non ancora finito)
   let currentTab    = 'inbox';  // tab lista attiva (inbox/queue/resolved/archived)
@@ -219,17 +194,16 @@
 
   // Etichette/testi vuoto per le tab-lista (DB1).
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori server', waiting: 'Aspettano', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', waiting: 'Aspettano', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox:    'Nessun feedback ricevuto.',
     queue:    'Nessun feedback in coda.',
-    local:    'Nessun lavoro server.',
     waiting:  'Nessun feedback aspetta un altro.',
     resolved: 'Nessun feedback risolto.',
     archived: 'Nessun feedback archiviato.',
   };
-  const LIST_TABS = ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived'];
+  const LIST_TABS = ['inbox', 'queue', 'waiting', 'resolved', 'archived'];
   // Come si chiama la lista quando le sezioni non ci sono: nessun nome di
   // sezione, perché nessuna sezione è stata scelta.
   const SENZA_SEZIONI_LABEL = 'Segnalazioni';
@@ -259,18 +233,18 @@
   }
   // Il filtro per livello non si ricorda: un L4 lasciato acceso nasconderebbe un L1 arrivato dopo.
   let livelliScelti = [];
+  // «Solo non fidate» (#1575) vale per le schede dei feedback e per le Domande; non si ricorda, per lo stesso motivo.
+  let soloNonFidate = false;
+  const mgFiduciaFiltro = document.getElementById('mgFiduciaFiltro');
+  const mgDomandeFiduciaFiltro = document.getElementById('mgDomandeFiduciaFiltro');
   const DOMANDE_TABS = (MR.SEZIONI.find((s) => s.id === 'domande') || { schede: [] }).schede;
   const AUTO_MODE_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTO_MODE) || 'filo_auto_mode';
   const SORT_MODE_KEY = 'filo_manage_sort';
   const AUTOMATION_GET = (window.SN_MSG?.MSG?.AUTOMATION_GET) || 'automation_get';
   const AUTOMATION_SET = (window.SN_MSG?.MSG?.AUTOMATION_SET) || 'automation_set';
 
-  // ── Icona d'autore su ogni card (chi ha scritto il feedback) ──────────────
-  // La CLASSIFICAZIONE (prefissi → categoria) è pura e condivisa in
-  // SN_FEEDBACK_THREAD.authorKind; qui vive solo la resa visiva (icona+etichetta).
-  // Le tre automazioni sono separate (#443): quello che conta, leggendo la coda,
-  // è se un ritrovamento nasce esplorando l'app, implementando una modifica o
-  // verificando il lavoro di qualcun altro.
+  // Icona d'autore: qui solo la resa visiva, la classificazione sta in TH.authorKind. Le tre
+  // automazioni restano separate: conta se un ritrovamento nasce esplorando o verificando.
   const AUTHOR_META = {
     owner:    { icon: '👑', label: 'Owner' },
     user:     { icon: '👤', label: 'Utente' },
@@ -288,25 +262,33 @@
     // "computer" perché è l'unica delle istanze che lavora DAVANTI a lui: le
     // altre girano da sole, questa nasce da una conversazione.
     local:    { icon: '💻', label: 'Claude (sessione locale)' },
+    // Lo apre il server quando una versione non si costruisce (#1002): non è Claude, ed è lavoro che ferma le uscite.
+    costruzione: { icon: '🏗️', label: 'Allarme della pubblicazione' },
     claude:   { icon: '🤖', label: 'Claude (ruolo non indicato)' },
   };
   // Dal feedback, non dal clientId: un nome riservato senza prova è un utente come gli altri (#912).
   function authorKindOf(fb) {
     return (TH && TH.authorKind) ? TH.authorKind(fb || {}) : 'user';
   }
+  // Quello che Filo manda dalla copia dell'owner porta la sua prova (#953): l'etichetta lo dice, la categoria no.
+  const PER_CONTO_OWNER = {
+    owner: { icon: AUTHOR_META.owner.icon, label: 'Owner (scritto da Filo)' },
+    filo:  { icon: AUTHOR_META.filo.icon, label: 'Filo (per conto dell\'owner)' },
+  };
   function authorMetaOf(fb) {
-    return AUTHOR_META[authorKindOf(fb)] || AUTHOR_META.user;
+    const kind = authorKindOf(fb);
+    if (PER_CONTO_OWNER[kind] && TH && TH.filoPerConto && TH.filoPerConto(fb || {}) === 'owner') return PER_CONTO_OWNER[kind];
+    return AUTHOR_META[kind] || AUTHOR_META.user;
   }
   function authorIconHtml(fb) {
     const m = authorMetaOf(fb);
     return `<span class="mg-item-author" title="Scritto da: ${esc(m.label)}" aria-label="Scritto da ${esc(m.label)}">${m.icon}</span>`;
   }
-  // Etichetta del mittente per l'intestazione del dettaglio. Fra utenti diversi
-  // l'identificativo è l'unica cosa che li distingue, quindi per loro (e solo per
-  // loro) se ne mostra un pezzo: per owner/Filo/automazioni sarebbe rumore.
+  // Etichetta del mittente. Solo per gli utenti si mostra un pezzo di identificativo: è l'unica
+  // cosa che li distingue; altrove sarebbe rumore.
   function senderLabel(fb) {
     const kind = authorKindOf(fb);
-    const m = AUTHOR_META[kind] || AUTHOR_META.user;
+    const m = authorMetaOf(fb);
     if (kind !== 'user') return `${m.icon} ${m.label}`;
     // Senza il nome riservato che si era dato: ne mostrerebbe la firma.
     const id = String((fb && fb.clientId) || '').trim().replace(/^(non-provato:)?(owner|routine|agent|local):/i, '');
@@ -314,9 +296,7 @@
     return short ? `${m.icon} ${m.label} · ${short}…` : `${m.icon} ${m.label}`;
   }
 
-  // ── Ordinamento della lista (menu tasto destro sull'intestazione) ─────────
-  // 'smart' = ordine predefinito per-tab (severità/priorità/recenza, come prima).
-  // Gli altri sono override globali richiesti dall'owner dal menu contestuale.
+  // 'smart' = ordine predefinito per-tab; gli altri sono override globali dal tasto destro.
   const SORT_MODES = {
     smart:    'Ordine predefinito',
     num:      'Per numero (recenti prima)',
@@ -325,8 +305,7 @@
   };
   let sortMode = 'smart';
 
-  // Chiave numerica di un feedback per l'ordinamento "per numero": seq.subSeq
-  // (#12.3 → 12003). Senza numero → in fondo (con l'ordine decrescente).
+  // Chiave per l'ordinamento per numero: seq.subSeq (#12.3 → 12003). Senza numero → in fondo.
   function seqKey(fb) {
     const s = Number(fb && fb.seq);
     if (!Number.isFinite(s)) return -Infinity;
@@ -340,7 +319,7 @@
   // Ordine "per creatore": prima le persone (owner, utenti), poi le istanze di
   // Claude — la sessione locale in testa, perché è quella che lavora insieme
   // all'owner — e in fondo Filo che scrive per conto di un utente.
-  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, claude: 7, filo: 8 };
+  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, costruzione: 7, claude: 8, filo: 9 };
   // Applica l'override di ordinamento scelto dall'owner. `list` arriva GIÀ
   // ordinata col criterio predefinito della tab: in 'smart' la lasciamo intatta.
   // `sort` è stabile → a parità di chiave si conserva l'ordine predefinito.
@@ -366,25 +345,18 @@
   const CAP1_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP1) || 'filo_automation_cap1';
   const CAP0_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP0) || 'filo_automation_cap0';
   const AUTOMATION = window.SN_CONST?.AUTOMATION || { CAP_MIN: 0, CAP_MAX: 10 };
-  // Nessun default dei bilanci nel codice (decisione dell'owner del
-  // 2026-09-16): i numeri stanno solo nel documento del server. Un campo che
-  // lì non c'è si mostra vuoto, e lo si dice.
+  // Nessun default dei bilanci nel codice: i numeri stanno solo nel documento del server; un
+  // campo che lì non c'è si mostra vuoto, e lo si dice.
 
-  // ── Canale main process ───────────────────────────────────────────────────
+  // Canale main process
   function sendToMain(msg) {
     if (window.filo?.message)               return window.filo.message(msg);
     if (window.chrome?.runtime?.sendMessage) return window.chrome.runtime.sendMessage(msg);
     return Promise.reject(new Error('canale main non disponibile'));
   }
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  // Chi guarda cambia: unica porta, e unico posto dove si buttano via le
-  // risposte tenute da parte. Un allegato si chiede una volta per indirizzo e
-  // la risposta resta in memoria anche quando è un no — ma quel no dipende da
-  // CHI sta guardando, e il pulsante per farsi riconoscere è in questa pagina.
-  // Senza svuotare, chi lo premeva continuava a vedere segnaposti al posto
-  // degli allegati finché non riapriva Gestione (#582, giro 3: stesso danno,
-  // stessa cura, l'altra superficie).
+  // Auth — chi guarda cambia: unica porta, e unico posto dove si svuotano le risposte tenute
+  // da parte. Un «no» su un allegato dipende da CHI guarda, o restano segnaposti.
   function setIsAdmin(v) {
     const nuovo = !!v;
     if (nuovo === isAdmin) return;
@@ -406,6 +378,8 @@
   // Vero da quando l'avvio ha chiesto le impostazioni: un accesso arrivato dopo le richiede di nuovo.
   let impostazioniAvviate = false;
   function caricaImpostazioni() {
+    // Le pause non trattengono gli altri controlli «in lettura»: sono una riga in più, non un valore da scegliere.
+    loadPause();
     return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals()])
       .finally(fineLetturaAutomazioni);
   }
@@ -437,8 +411,8 @@
   }
 
   mgSignInBtn.addEventListener('click', () => {
-    // Finito l'accesso si richiede lo stato: è quello che toglie l'avviso di
-    // sola lettura e svuota le risposte di quando non eravamo nessuno.
+    // Finito l'accesso si richiede lo stato: toglie l'avviso di sola lettura e svuota le risposte
+    // di quando non eravamo nessuno.
     sendToMain({ type: 'auth_signin' }).then(() => refreshAuth()).catch(() => {});
   });
 
@@ -453,8 +427,8 @@
 
   // Interruttori dell'automazione: una lettura vale per un interruttore solo se
   // nessun suo salvataggio era per strada né è partito o arrivato nel frattempo.
-  const mosseAuto = { enabled: 0, routinesEnabled: 0, proberWhenIdle: 0, autoApprove: 0, lavoriServer: 0 };
-  const inVoloAuto = { enabled: 0, routinesEnabled: 0, proberWhenIdle: 0, autoApprove: 0, lavoriServer: 0 };
+  const mosseAuto = { enabled: 0, routinesEnabled: 0, autoApprove: 0, lavoriServer: 0 };
+  const inVoloAuto = { enabled: 0, routinesEnabled: 0, autoApprove: 0, lavoriServer: 0 };
   function salvaAuto(chiave, fn) {
     mosseAuto[chiave] += 1;
     inVoloAuto[chiave] += 1;
@@ -514,14 +488,8 @@
     });
   }
 
-  // ── Switch "Modalità automatica" ──────────────────────────────────────────
-  // La fonte di verità è il doc Firestore config/automation (campo `enabled`),
-  // perché è QUELLO che il backend dei giudici legge per decidere se un feedback
-  // sicuro entra in coda da solo. chrome.storage.local resta solo una cache
-  // locale: mostra subito un valore all'apertura e regge se l'IPC non risponde.
-  //
-  // Fino al 2026-08-12 lo switch scriveva SOLO la cache locale: nessuno la
-  // leggeva, quindi accenderlo non produceva alcun effetto (feedback #446).
+  // Switch «Modalità automatica». Fonte di verità: config/automation (`enabled`), letto dal
+  // backend dei giudici; chrome.storage.local è solo cache e ripiego se l'IPC tace.
   function reflectAutoMode(on) {
     mgAutoToggle.checked = !!on;
     mgAutoState.textContent = on ? 'On' : 'Off';
@@ -535,15 +503,12 @@
   }
 
   async function loadAutoMode() {
-    // 1. Cache locale: valore immediato, niente attesa davanti allo switch.
     try {
       const data = await chrome.storage.local.get(AUTO_MODE_KEY);
       reflectAutoMode(!!data[AUTO_MODE_KEY]);
     } catch (_) {
       reflectAutoMode(false);
     }
-    // 2. Valore vero da Firestore (owner-gated). Se non siamo admin o siamo
-    //    offline resta quello della cache.
     try {
       const foto = fotoAuto();
       const r = await sendToMain({ type: AUTOMATION_GET });
@@ -554,7 +519,6 @@
         }
         if (ancoraVera(foto, 'autoApprove')) reflectAutoApprove(r.autoApprove);
         if (ancoraVera(foto, 'routinesEnabled')) reflectRoutines(r.routinesEnabled !== false);
-        if (mgProberIdle && ancoraVera(foto, 'proberWhenIdle')) mgProberIdle.checked = r.proberWhenIdle !== false;
         if (mgLavoriServer && ancoraVera(foto, 'lavoriServer') && mgLavoriServer.checked !== (r.lavoriServer === true)) {
           mgLavoriServer.checked = r.lavoriServer === true;
           renderList();
@@ -582,7 +546,7 @@
         // giudizio, quindi i feedback già in attesa restano dove sono. Senza
         // dirlo, accendere lo switch sembra di nuovo non fare niente — e i già in
         // attesa hanno il loro pulsante, due righe più in là.
-        const pending = r.enabled ? alignedFeedbacks().length : 0;
+        const pending = r.enabled ? alignedFeedbacks(true).length : 0;
         setAutoModeMsg(
           pending
             ? `Salvato. I ${pending} già in attesa restano nei Ricevuti: usa «Approva tutti gli allineati».`
@@ -600,19 +564,18 @@
     });
   });
 
-  // ── Auto-approvazione per mittente (#446) ─────────────────────────────────
-  // Con l'automatica accesa, questi decidono DI CHI ci si fida abbastanza da
-  // farlo entrare in coda senza passare dall'owner. Spenta non contano, ma si
-  // possono preparare: valgono solo al giudizio, scriverli non muove niente.
+  // ── Auto-approvazione per fiducia (#446, §10) ─────────────────────────────
+  // Con l'automatica accesa, questi decidono quale fiducia basta per entrare in
+  // coda senza passare dall'owner. Spenta non contano, ma si possono preparare:
+  // valgono solo al giudizio, scriverli non muove niente.
   // Il main rilegge e riscrive la mappa intera: i salvataggi stanno in una fila
   // sola, e le scelte ancora in fila stanno sopra ogni mappa che arriva prima.
   let autoApproveServer = null;
   const autoApproveInAttesa = [];
   function reflectAutoApprove(map) {
     if (map !== undefined) autoApproveServer = map;
-    // Il ripiego sul vecchio interruttore unico di Claude vive nel modulo
-    // condiviso: una mappa salvata prima che si sdoppiassero non deve mostrare
-    // acceso ciò che l'owner aveva spento.
+    // Il ripiego sulla mappa per mittente vive nel modulo condiviso: una mappa
+    // salvata prima non deve mostrare acceso ciò che l'owner aveva spento.
     const base = autoApproveServer;
     const resolved = (TH && TH.resolveAutoApprove) ? TH.resolveAutoApprove(base) : null;
     const m = Object.assign({}, resolved || ((base && typeof base === 'object') ? base : {}));
@@ -639,34 +602,6 @@
         else if (!autoApproveInAttesa.some((s) => s.group === group)) el.checked = !scelta.want;
         setAutoModeMsg('Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
         console.error('[manage] salvataggio auto-approvazione fallito:', errore || r?.error);
-      });
-    });
-  }
-
-  // ── Esplorazione automatica a coda vuota (#448) ───────────────────────────
-  // Indipendente dall'automatica: riguarda cosa fanno le routine quando NON c'è
-  // più niente in coda, non chi entra in coda.
-  let proberScelte = 0;
-  if (mgProberIdle) {
-    mgProberIdle.addEventListener('change', () => {
-      const want = mgProberIdle.checked;
-      const mia = ++proberScelte;
-      if (mgProberIdleMsg) mgProberIdleMsg.textContent = '';
-      return salvaAuto('proberWhenIdle', async () => {
-        try {
-          const r = await sendToMain({ type: AUTOMATION_SET, proberWhenIdle: want });
-          if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
-          if (mia !== proberScelte) return;
-          mgProberIdle.checked = r.proberWhenIdle !== false;
-        } catch (err) {
-          console.error('[manage] salvataggio esplorazione automatica fallito:', err);
-          if (mia !== proberScelte) return;
-          mgProberIdle.checked = !want;
-          if (mgProberIdleMsg) {
-            mgProberIdleMsg.textContent = 'Salvataggio fallito: l\'impostazione NON è cambiata.';
-            mgProberIdleMsg.classList.add('mg-err');
-          }
-        }
       });
     });
   }
@@ -710,7 +645,7 @@
     if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
-      mgFixInstructions, mgFixInstructionsSave, mgProberIdle, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
+      mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
       mgAccountA, mgAccountB, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove)]) {
       if (el) el.disabled = !isAdmin;
     }
@@ -759,9 +694,8 @@
 
   async function loadCaps() {
     const remote = {};
-    // Sorgente autorevole: Firestore via main (owner-gated). Se la lettura
-    // riesce, quello che dice il server vale anche quando un campo MANCA: la
-    // cache locale serve solo a chi non ha potuto leggere.
+    // Sorgente autorevole: Firestore via main. Se la lettura riesce vale quello che dice il
+    // server anche quando un campo MANCA; la cache serve solo a chi non ha potuto leggere.
     let lettoDalServer = false;
     let giroStrettoRemoto = false;
     try {
@@ -815,8 +749,8 @@
     }
     f.input.value = String(val); // normalizza eventuali fuori-range
     try {
-      // Scrive su Firestore (la config che il server della critica legge); il
-      // main applica il gate admin e ri-clampa. Usa il valore confermato.
+      // Scrive su Firestore (la config che il server della critica legge); il main applica il gate
+      // admin e ri-clampa, quindi si usa il valore confermato.
       const r = await sendToMain({ type: CAPS_SET, [field]: val });
       if (!r || !r.ok) {
         setCapMsg(field, 'Salvataggio fallito.', 'err');
@@ -837,8 +771,8 @@
   async function saveFixInstructions() {
     if (!mgFixInstructions) return;
     const text = String(mgFixInstructions.value || '');
-    // Oltre il tetto il server taglia: meglio dirlo che salvare un testo
-    // mozzato con un «Salvato.» sopra.
+    // Oltre il tetto il server taglia: meglio dirlo che salvare un testo mozzato con un
+    // «Salvato.».
     const max = Number(AUTOMATION.FIX_INSTRUCTIONS_MAX) || 8000;
     if (text.length > max) {
       setCapMsg('fixInstructions', `Troppo lungo: ${text.length.toLocaleString('it-IT', { useGrouping: true })} caratteri, il massimo è ${max.toLocaleString('it-IT', { useGrouping: true })}. Non salvato.`, 'err');
@@ -861,8 +795,7 @@
 
   for (const [field, f] of Object.entries(CAP_FIELDS)) {
     if (f.save) f.save.addEventListener('click', () => saveCap(field));
-    // Digitando si azzera il messaggio di esito precedente; Invio salva, come
-    // il pulsante (due strade, una cosa sola).
+    // Digitando si azzera l'esito precedente; Invio salva come il pulsante.
     if (f.input) {
       f.input.addEventListener('input', () => setCapMsg(field, '', null));
       f.input.addEventListener('keydown', (e) => {
@@ -1114,6 +1047,90 @@
     });
   }
 
+  // ── Le pause in corso (#996) ───────────────────────────────────────────────
+  // Sola lettura dal server: A, B o la routine server fermi dopo un'accensione rifiutata, col motivo. Nessun tetto
+  // giornaliero: è la pausa a fermare un account, quindi si vede qui, accanto a chi la subisce.
+  const PAUSE_GET = (window.SN_MSG?.MSG?.AUTOMATION_PAUSE_GET) || 'automation_pause_get';
+  const mgAccountsPausa = document.getElementById('mgAccountsPausa');
+  const mgServerPausa = document.getElementById('mgServerPausa');
+  // null = non chiesto o non per te; { errore } = non letto; { pause, scartoMs } = letto (scarto: orologio locale − server).
+  let pauseLette = null;
+  let pauseTick = 0;
+  let pauseTimer = null;
+
+  function rigaPausa(classe, testo, dettaglio) {
+    const p = document.createElement('p');
+    p.className = classe;
+    p.textContent = testo;
+    if (dettaglio) p.title = dettaglio;
+    return p;
+  }
+
+  function reflectPause() {
+    if (!RS) return;
+    clearTimeout(pauseTimer);
+    const ora = Date.now();
+    const righe = [];
+    const righeServer = [];
+    let prossima = Infinity;
+    const leggi = (chi, voce) => {
+      if (!voce || typeof voce !== 'object') return null;
+      const v = Object.assign({}, voce, { finoMs: Number(voce.finoMs) + pauseLette.scartoMs });
+      const p = RS.pausaInParole(chi, v, ora);
+      if (p) prossima = Math.min(prossima, v.finoMs);
+      return p;
+    };
+    if (pauseLette && pauseLette.errore) {
+      righe.push(rigaPausa('mg-auto-block-desc', 'Non ho potuto leggere dal server se un account è in pausa.'));
+    } else if (pauseLette) {
+      for (const k of ['A', 'B']) {
+        const p = leggi(`Account ${k}`, pauseLette.pause[k]);
+        if (p) righe.push(rigaPausa('mg-auto-warn', p.testo, p.dettaglio));
+      }
+      // Una routine server per account (#1426): ognuna ha la sua pausa.
+      for (const k of ['A', 'B']) {
+        const p = leggi(`La routine server dell'account ${k}`, pauseLette.pause[`server${k}`]);
+        if (p) righeServer.push(rigaPausa('mg-auto-warn', p.testo, p.dettaglio));
+      }
+    }
+    if (mgAccountsPausa) {
+      mgAccountsPausa.replaceChildren(...righe);
+      mgAccountsPausa.hidden = righe.length === 0;
+    }
+    if (mgServerPausa) {
+      mgServerPausa.replaceChildren(...righeServer);
+      mgServerPausa.hidden = righeServer.length === 0;
+    }
+    // Una pausa che scade sparisce da sola, senza ricaricare la pagina.
+    if (prossima < Infinity) pauseTimer = setTimeout(reflectPause, Math.min(Math.max(0, prossima - ora) + 1000, 2 ** 31 - 1));
+  }
+
+  function loadPause() {
+    const nato = ++pauseTick;
+    return (async () => {
+      let r = null;
+      try { r = await sendToMain({ type: PAUSE_GET }); } catch (_) { /* come una lettura fallita */ }
+      if (nato !== pauseTick) return;
+      if (r && (r.code === 'forbidden' || r.code === 'not_admin')) pauseLette = null;
+      else if (!r || !r.ok) {
+        pauseLette = { errore: true };
+        if (r && r.error) console.error('[manage] pause delle routine:', r.error);
+      } else {
+        const oraServer = Number(r.oraMs);
+        pauseLette = {
+          pause: r.pause && typeof r.pause === 'object' ? r.pause : {},
+          scartoMs: Number.isFinite(oraServer) && oraServer > 0 ? Date.now() - oraServer : 0,
+        };
+      }
+      reflectPause();
+    })();
+  }
+
+  // A ogni apertura di Automazioni: una pausa nasce e scade mentre la pagina resta aperta.
+  document.addEventListener('mg-scheda', (e) => {
+    if (e.detail.tab === 'automation') loadPause();
+  });
+
   // ── Modello e sforzo per fase (config/routines.roleModels, #1193) ──────────
   // Ogni tendina salva la sua sola foglia appena cambia. Stesse regole delle sessioni qui sopra: mai un valore
   // non letto sullo schermo, e una risposta partita prima non riscrive una scelta confermata dopo (#675).
@@ -1272,16 +1289,13 @@
   buildRoleModels();
 
 
-  // ── Timeout dei giudici ────────────────────────────────────────────────────
-  // Fonte di verità: config/supportModels (campo `judgeTimeoutMs`, in MS), che il
-  // backend dei giudici legge per ogni chiamata. La UI lavora in SECONDI; salva e
-  // legge via i messaggi support_models_* (PATCH per-campo: non tocca i modelli).
+  // Timeout dei giudici. Fonte: config/supportModels (`judgeTimeoutMs`, in MS), letto dal
+  // backend a ogni chiamata; la UI lavora in SECONDI (PATCH per-campo: non tocca i modelli).
   const JT_DEF = AUTOMATION.JUDGE_TIMEOUT_DEFAULT_S || 60;
   const JT_MIN = AUTOMATION.JUDGE_TIMEOUT_MIN_S || 10;
   const JT_MAX = AUTOMATION.JUDGE_TIMEOUT_MAX_S || 300;
-  // I limiti del campo vengono dal registro, non dall'HTML: erano scritti in due
-  // posti e alzare il tetto in uno solo lasciava il campo a rifiutare il valore
-  // nuovo (o ad accettarne uno che il backend non rispetta).
+  // I limiti del campo vengono dal registro, non dall'HTML: scritti in due posti, alzare il tetto
+  // in uno solo lascia il campo a rifiutare il valore nuovo.
   if (mgJudgeTimeout) {
     mgJudgeTimeout.min = String(JT_MIN);
     mgJudgeTimeout.max = String(JT_MAX);
@@ -1332,10 +1346,8 @@
   if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.addEventListener('click', saveJudgeTimeout);
   if (mgJudgeTimeout) mgJudgeTimeout.addEventListener('input', () => setJudgeTimeoutMsg('', null));
 
-  // ── Tab "Log" (worker delle routine) ──────────────────────────────────────
-  // Elenco degli ultimi worker spawnati (ruolo + istante d'avvio). Fonte:
-  // config/automation.workerLog, scritto dal server al rilascio di ogni
-  // biglietto; qui è di sola lettura via il canale main (owner-gated).
+  // Tab «Log»: gli ultimi worker spawnati. Fonte config/automation.workerLog, scritto dal
+  // server al rilascio di ogni biglietto; sola lettura via main (owner-gated).
   const WORKER_LOG_GET = (window.SN_MSG?.MSG?.WORKER_LOG_GET) || 'worker_log_get';
   // Etichette amichevoli per i ruoli del dispatcher (mai l'id grezzo).
   const ROLE_LABELS = {
@@ -1354,8 +1366,7 @@
   let logLoaded  = false;   // true dopo il primo caricamento riuscito
   let logLoading = false;
 
-  // Tempo trascorso "umano" (adesso / N min / N ore / N giorni fa). Più fine di
-  // daysAgo: uno spawn recente si misura in minuti, non in "oggi".
+  // Tempo trascorso «umano»: uno spawn recente si misura in minuti, non in «oggi».
   function timeAgo(iso) {
     if (!iso) return '—';
     const t = new Date(iso).getTime();
@@ -1369,7 +1380,6 @@
     const d = Math.round(h / 24);
     return d === 1 ? 'ieri' : `${d} giorni fa`;
   }
-  // Data+ora assolute (per il sottotono a destra e il title di ogni riga).
   function formatDateTime(iso) {
     if (!iso) return '';
     const d = new Date(iso);
@@ -1427,11 +1437,8 @@
     logLoading = false;
   }
 
-  // ── Canale autenticato delle routine (stessa scheda, secondo blocco) ──────
-  // Rifiuti e confronti vivono in collezioni che nessun client può leggere: il
-  // main passa dalla callable owner-only del backend di sicurezza. Se il canale
-  // non è ancora in uso i due registri sono vuoti e il blocco resta nascosto —
-  // una sezione vuota che non spiega perché è peggio di nessuna sezione.
+  // Canale autenticato delle routine: rifiuti e confronti vivono in collezioni che nessun
+  // client legge, si passa dalla callable owner-only. Registri vuoti → blocco nascosto.
   const ROUTINE_LOG_GET = (window.SN_MSG?.MSG?.ROUTINE_LOG_GET) || 'routine_log_get';
   const MERGE_APPROVALS_GET = (window.SN_MSG?.MSG?.MERGE_APPROVALS_GET) || 'merge_approvals_get';
   const FIDUCIA_SEGNA = (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna';
@@ -1561,10 +1568,8 @@
     mgFusioniEmpty.hidden = !vuota;
   }
 
-  // Gli elenchi del server, così come sono arrivati: il quadrato di ogni scheda
-  // e il bordo delle card in lista li leggono da qui. Restano in memoria fra un
-  // avviso e l'altro — una scheda aperta deve poter ridisegnare il suo quadrato
-  // senza rileggere niente.
+  // Gli elenchi del server come sono arrivati: quadrati e bordi li leggono da qui, così una
+  // scheda aperta ridisegna senza rileggere.
   let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
   let fusioniLette = false;
   let fusioniOk = false;      // l'ultima lettura delle fusioni è riuscita: senza, Routine non dice numeri
@@ -1603,7 +1608,7 @@
     return esito && (esito.kind === 'ok' || esito.reload) ? 'decisa' : null;
   }
   function opzioniLivelli(fb) {
-    return { fusioni, dettaglioLetto: !FB.soloLista(fb), statoRichiesta };
+    return { fusioni, fusioniLette: fusioniOk, dettaglioLetto: !FB.soloLista(fb), statoRichiesta };
   }
   // Una richiesta che parte, arriva o viene decisa cambia le frasi della lista e del quadrato.
   function statoFusioniCambiato() {
@@ -1611,10 +1616,8 @@
     aggiornaTestoQuadrato();
   }
 
-  // Dal numero della segnalazione (l'etichetta "automazione · feedback #N"
-  // sulla scheda) al feedback vero: la scheda sta già dentro la dashboard dei
-  // feedback, quindi "guarda cosa era stato chiesto" deve essere un click, non
-  // una ricerca a mano. Se il feedback non è (più) nella lista non si fa nulla.
+  // Dal numero sull'etichetta al feedback vero: la scheda è già in questa dashboard, quindi
+  // «guarda cosa era stato chiesto» è un click, non una ricerca. Se non è in lista, nulla.
   function openFeedbackByNum(num) {
     const cerca = String(num || '').trim();
     if (!cerca || !FB || typeof FB.formatNum !== 'function') return;
@@ -1630,12 +1633,8 @@
     openDetail(fb._id);
   }
 
-  // `already` è l'elenco già pronto, quando ad avvisare è stato il main
-  // (MERGE_APPROVALS_CHANGED): una pagina già aperta deve accorgersi di una
-  // richiesta nuova, altrimenti l'avviso lo vede solo chi riapre la pagina.
-  // Le opzioni che il modulo condiviso vuole per disegnare le card: gli stessi
-  // tasti, lo stesso "chiedi conferma", lo stesso esito, ovunque le card
-  // compaiano — nel pannello del quadrato e in Automazioni.
+  // `already` è l'elenco già pronto quando ad avvisare è il main: una pagina aperta deve
+  // accorgersi di una richiesta nuova. Le opzioni sono del modulo condiviso: stesso esito.
   function opzioniFusioni(extra) {
     const UI = window.SN_MERGE_APPROVALS;
     return Object.assign({
@@ -1735,8 +1734,7 @@
     const vive = new Set(fusioni.pending.concat(fusioni.failed).map((req) => req.id));
     for (const id of Array.from(esitiTentati.keys())) if (!vive.has(id)) esitiTentati.delete(id);
     const n = renderFusioniOrfane();
-    // Il quadrato della scheda aperta e il bordo delle card in lista vengono da
-    // questi elenchi: una richiesta nuova deve vedersi subito, senza riaprire.
+    // Una richiesta nuova deve vedersi subito, senza riaprire la pagina.
     riflettiFusioni();
     updateSezioniCounts();
     UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
@@ -1753,9 +1751,8 @@
     return n;
   }
 
-  // Un cambiamento nelle fusioni si vede in due posti: il quadrato della scheda
-  // aperta e le card della lista (una fusione ferma le colora come un blocco e
-  // le porta fra le cose da decidere). Tutti e due, sempre insieme.
+  // Un cambiamento nelle fusioni si vede in due posti insieme: il quadrato della scheda aperta e
+  // le card della lista (una fusione ferma le colora come un blocco).
   function riflettiFusioni() {
     if (selectedId && allFeedbacks.some((f) => f._id === selectedId)) {
       const fb = allFeedbacks.find((f) => f._id === selectedId);
@@ -1814,11 +1811,10 @@
     });
     if (isList) {
       currentTab = tab;
-      // La frase scritta e non ancora partita se ne va con la selezione: si
-      // salva finché `selectedId` dice ancora a chi appartiene.
+      // La frase scritta e non ancora partita se ne va con la selezione: si salva finché
+      // `selectedId` dice a chi appartiene.
       salvaFraseAutomatico();
-      // Cambiando tab si azzera la selezione: il feedback aperto potrebbe non
-      // appartenere alla nuova lista.
+      // Cambiando tab si azzera la selezione: il feedback aperto può non essere nella nuova lista.
       selectedId = null;
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
@@ -1844,6 +1840,8 @@
     DOMANDE.collega({
       apriFeedback: (num) => openFeedbackByNum(String(num || '').replace(/^#/, '')),
       apriScheda: (tab) => selectTab(tab),
+      soloNonFidate: () => soloNonFidate,
+      impostaSoloNonFidate: (v) => impostaSoloNonFidate(v),
     });
   }
 
@@ -1928,10 +1926,37 @@
     });
   }
 
-  // Aprire una pratica precisa (avviso, statistiche, ricerca) la deve far vedere anche col filtro acceso.
+  // Aprire una pratica precisa (avviso, statistiche, ricerca, una domanda) la deve far vedere anche coi filtri accesi.
   function mostraNelFiltro(fb) {
-    if (!fb || !livelliScelti.length || MR.manageTabFor(fb, { releasedVersion, fusioni }) !== 'inbox') return;
+    if (!fb) return;
+    if (soloNonFidate && MR.isFidato(fb)) impostaSoloNonFidate(false);
+    if (!livelliScelti.length || MR.manageTabFor(fb, { releasedVersion, fusioni }) !== 'inbox') return;
     if (!MR.filtraLivelli([fb], livelliScelti, { releasedVersion, fusioni }).length) livelliScelti = [];
+  }
+
+  // ── «Solo non fidate» (#1575): un tasto nella testa della lista e uno in quella delle Domande, uno stato ─────
+  function impostaSoloNonFidate(valore) {
+    const v = !!valore;
+    if (v === soloNonFidate) return;
+    soloNonFidate = v;
+    renderList();
+    if (DOMANDE && typeof DOMANDE.ridisegna === 'function') DOMANDE.ridisegna();
+  }
+  for (const b of [mgFiduciaFiltro, mgDomandeFiduciaFiltro]) {
+    if (!b) continue;
+    b.insertAdjacentHTML('afterbegin', `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${MR.FORME_SVG.scudo}"/></svg>`);
+    b.addEventListener('click', () => impostaSoloNonFidate(!soloNonFidate));
+  }
+  // `base` è la lista che la scheda mostrerebbe a filtro spento: il numero dice quante ne resterebbero accendendolo.
+  function aggiornaFiltroFiducia(base) {
+    if (!mgFiduciaFiltro) return;
+    const show = !searchMode && sezioniAttendibili() && LIST_TABS.includes(currentTab);
+    mgFiduciaFiltro.hidden = !show;
+    if (!show) return;
+    mgFiduciaFiltro.setAttribute('aria-pressed', soloNonFidate ? 'true' : 'false');
+    mgFiduciaFiltro.title = soloNonFidate ? 'Mostra anche le pratiche fidate' : 'Mostra solo le pratiche non fidate';
+    const c = mgFiduciaFiltro.querySelector('.mg-livello-count');
+    if (c) c.textContent = dataLoaded && Array.isArray(base) ? ` ${countText(MR.contaNonFidate(base))}` : '';
   }
 
   function updateLivelliFiltro() {
@@ -1939,7 +1964,7 @@
     const show = currentTab === 'inbox' && !searchMode && sezioniAttendibili();
     mgLivelliFiltro.hidden = !show;
     if (!show) return;
-    const n = dataLoaded ? MR.contaLivelliRicevuti(allFeedbacks, { releasedVersion, fusioni }) : null;
+    const n = dataLoaded ? MR.contaLivelliRicevuti(allFeedbacks, { releasedVersion, fusioni, soloNonFidate }) : null;
     mgLivelliFiltro.querySelectorAll('.mg-livello-btn').forEach((b) => {
       const l = b.dataset.livello;
       b.setAttribute('aria-pressed', livelliScelti.includes(l) ? 'true' : 'false');
@@ -1956,8 +1981,8 @@
     });
   }
 
-  // Filtro "Bloccati confermati" (Archiviati): mostra solo gli attacchi/spam
-  // confermati dall'owner — fuori dai Ricevuti, ispezionabili qui come storico.
+  // Filtro «Bloccati confermati»: attacchi e spam confermati, fuori dai Ricevuti ma ispezionabili
+  // come storico.
   if (mgConfirmedFilter) {
     mgConfirmedFilter.addEventListener('change', () => {
       confirmedOnly = mgConfirmedFilter.checked;
@@ -1965,26 +1990,8 @@
     });
   }
 
-  // ── Allegati immagine cifrati (S1.2) ──────────────────────────────────────
-  // Le immagini dei feedback sono cifrate come byte opachi su Storage: un
-  // <img src=URL> diretto mostra un allegato rotto. Il main le scarica, decifra
-  // (la chiave privata non esce da lì) e torna un data URL mostrabile. Cache
-  // per non ri-decifrare la stessa immagine riaprendo il feedback (mappa
-  // url → dataUrl | null; null = fallita, non si ritenta).
-  // Cache url → { dataUrl, error }: `dataUrl` valorizzato = immagine mostrabile;
-  // altrimenti `error` porta il MOTIVO preciso del fallimento (dal main) così il
-  // segnaposto può spiegare all'owner perché non la vede (chiave non
-  // configurata, decifratura fallita, download non riuscito…) invece di un muto
-  // "non disponibile". null = fallita, non si ritenta.
-  //
-  // `soloDestinatario` viene dal main e NON si butta via: è la differenza fra
-  // «qualcosa si è rotto» e «questo allegato è di qualcun altro». Gestione sta
-  // nell'elenco delle app accanto a Editor e Feedback, senza nessun filtro,
-  // quindi ci arriva qualunque tester e vede le segnalazioni di tutti. Il
-  // riquadro dei feedback questa risposta la usa già; qui la si buttava, e la
-  // stessa segnalazione, con lo stesso allegato e lo stesso utente, diceva due
-  // cose diverse a seconda della pagina da cui la si guardava (#582, giro 6).
-  // Il canale è uno solo apposta: la frase la decide lui.
+  // Allegati immagine cifrati: byte opachi, un <img src=URL> diretto è un allegato rotto; il
+  // main decifra. `error` porta il MOTIVO, `soloDestinatario` = è di un altro, non è rotto.
   const imgCache = new Map();
   async function resolveImageSrc(url) {
     if (!url) return { dataUrl: null, error: '', soloDestinatario: false };
@@ -2006,12 +2013,8 @@
     return res;
   }
 
-  // Sostituisce il segnaposto di ogni <img> di una bolla con l'immagine
-  // decifrata (o lo stato "non disponibile"). Il click apre il lightbox con
-  // l'immagine GIÀ decifrata (`data-full`), mai con l'URL cifrato. Se la
-  // decifratura fallisce, il MOTIVO preciso finisce nel `title` (hover) del
-  // segnaposto: un'immagine muta che non si apre non dice all'owner se manca
-  // la chiave privata o se il file è corrotto.
+  // Il click apre il lightbox su `data-full`, mai sull'URL cifrato. Il motivo del fallimento
+  // va nel `title`: un'immagine muta non dice se manca la chiave o se il file è corrotto.
   function resolveBubbleImages(bubble) {
     bubble.querySelectorAll('.mg-bubble-imgs img').forEach((img) => {
       const url = img.dataset.url || '';
@@ -2026,11 +2029,8 @@
           img.dataset.full = dataUrl;
         } else {
           img.classList.add('mg-img-failed');
-          // «Non disponibile» fa sembrare un guasto quello che è solo roba di
-          // qualcun altro: la stessa frase che il riquadro ha smesso di dire.
-          // E non «consegnato»: se quell'allegato sia mai arrivato, da qui Filo
-          // non l'ha guardato. Resta l'unica cosa vera in ogni caso, cioè chi
-          // lo apre.
+          // «Non disponibile» fa sembrare un guasto quello che è roba di qualcun altro. E non
+          // «consegnato»: da qui non sappiamo se sia mai arrivato. Resta vero solo chi lo può aprire.
           img.alt = soloDestinatario ? '(allegato riservato)' : 'immagine non disponibile';
           if (error) img.title = error;
         }
@@ -2038,12 +2038,8 @@
     });
   }
 
-  // Perché una pillola non si apre, DETTO PRIMA del clic e non dopo.
-  // Lo stesso canale che serve le immagini risponde anche qui, e a chi non
-  // riceve le segnalazioni risponde subito, senza toccare la rete: chiederglielo
-  // costa una domanda già scritta. Senza, la pillola di un allegato che non è
-  // suo arriva identica a una che si apre, e il tester lo scopre cliccando.
-  // Cache url → { error, soloDestinatario } | null (null = si apre).
+  // Perché una pillola non si apre, DETTO PRIMA del clic: senza, quella di un allegato altrui
+  // arriva identica a una che si apre. Cache url → { error, soloDestinatario } | null.
   const fileWhyCache = new Map();
   async function fileClosedReason(url) {
     if (!url) return null;
@@ -2073,9 +2069,8 @@
     nota.textContent = soloDestinatario ? ' (riservato)' : ' (non disponibile)';
   }
 
-  // I documenti allegati: al click si scaricano decifrati (stesso canale delle
-  // immagini, col tipo dichiarato) e si salvano col nome originale. Se la
-  // decifratura fallisce, il motivo finisce nel `title` del link.
+  // I documenti allegati si scaricano decifrati (stesso canale delle immagini) e si salvano
+  // col nome originale; il motivo di un fallimento va nel `title`.
   function resolveBubbleFiles(bubble) {
     bubble.querySelectorAll('.mg-file-link').forEach((a) => {
       if (!isAdmin) {
@@ -2108,12 +2103,8 @@
     });
   }
 
-  // ── Lightbox ──────────────────────────────────────────────────────────────
-  // L'immagine a tutta pagina si chiude con Esc, e a schermo intero quel tasto
-  // serve anche a uscire. Chi dei due lo prende lo decide una regola sola, in
-  // src/content/content.js: qui basta DICHIARARE che il tasto ce lo siamo preso
-  // noi (preventDefault + stop), come fa qualunque riquadro sulle pagine di
-  // Filo (#514).
+  // Esc chiude l'immagine a tutta pagina, e a schermo intero serve anche a uscire: chi dei
+  // due lo prende lo decide src/content/content.js, qui si DICHIARA di averlo preso.
   function openLightbox(src) {
     mgLightboxImg.src = src;
     mgLightbox.classList.add('open');
@@ -2125,10 +2116,8 @@
     return true;
   }
   mgLightbox.addEventListener('click', closeLightbox);
-  // Esc chiude l'immagine aperta a tutta pagina, come ovunque altro in Filo
-  // (la home, la pagina dei feedback, il riquadro di segnalazione nei siti).
-  // In capture: il visore è l'ultima cosa aperta e sta sopra tutto, quindi
-  // l'Esc è suo prima che lo prendano la ricerca o un menu rimasto aperto.
+  // Esc chiude l'immagine, come ovunque in Filo. In capture: il visore è l'ultima cosa aperta
+  // e sta sopra tutto, quindi l'Esc è suo prima della ricerca o di un menu aperto.
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (!closeLightbox()) return;
@@ -2136,7 +2125,7 @@
     e.stopImmediatePropagation();
   }, true);
 
-  // ── Utilità date ──────────────────────────────────────────────────────────
+  // Utilità date
   function formatDate(isoOrTs) {
     if (!isoOrTs) return '—';
     const d = new Date(isoOrTs);
@@ -2157,12 +2146,10 @@
     return `${diff} giorni fa`;
   }
 
-  // ── Priorità (1-3 pallini) sulle card ─────────────────────────────────────
-  // Visibile a colpo d'occhio in "In coda" e "Ricevuti"; modificabile solo
-  // dall'owner. Più pallini pieni = priorità più alta → le routine di Claude la
-  // affrontano prima. Non mostrata su Risolti/Archiviati (lì non serve agire).
+  // Priorità (1-3 pallini), solo per l'owner e solo dove serve agire: più pallini pieni = le
+  // routine la affrontano prima.
   function priorityHasDots() {
-    return currentTab === 'queue' || currentTab === 'local' || currentTab === 'waiting' || currentTab === 'inbox';
+    return currentTab === 'queue' || currentTab === 'waiting' || currentTab === 'inbox';
   }
   function priorityDotsHtml(fb) {
     if (!priorityHasDots()) return '';
@@ -2176,9 +2163,8 @@
     return `<span class="mg-priority" title="Priorità: ${p || '—'}">${dots}</span>`;
   }
 
-  // Click su un pallino: imposta la priorità = N; ri-clic sul pallino già attivo
-  // (== priorità corrente) la azzera. `priorityManual:true` dice al backend che è
-  // una scelta dell'owner → il giudice di priorità automatico non la sovrascrive.
+  // Ri-clic sul pallino già attivo azzera la priorità. `priorityManual:true` dice al
+  // backend che è una scelta dell'owner → il giudice automatico non la sovrascrive.
   async function setPriorityFromDot(id, n) {
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb) return;
@@ -2197,8 +2183,7 @@
     }
   }
 
-  // Delegazione: un solo listener per tutta la lista. Il click sul pallino NON
-  // deve aprire il dettaglio della card → stopPropagation.
+  // Un solo listener per tutta la lista; il click sul pallino non deve aprire il dettaglio.
   mgList.addEventListener('click', (e) => {
     const dot = e.target.closest('.mg-dot[data-prio-id]');
     if (!dot) return;
@@ -2206,12 +2191,8 @@
     setPriorityFromDot(dot.dataset.prioId, Number(dot.dataset.prioN));
   });
 
-  // ── Menu di ordinamento della lista (tasto destro sull'intestazione) ──────
-  // "il tasto destro è centrale" (filo_filosofia): il tasto destro sull'header
-  // della colonna apre un box per riordinare i feedback (numero/priorità/
-  // creatore). Il glifo ⇅ accanto al titolo è la scorciatoia GUI (click) allo
-  // stesso menu, così l'azione è scopribile senza dover indovinare il tasto
-  // destro. Riusa le classi .sn-select-pop/.sn-select-option (PATTERNS.md).
+  // Tasto destro sull'intestazione, col glifo ⇅ come scorciatoia GUI allo stesso menu:
+  // l'azione resta scopribile senza indovinare il tasto destro. Classi in PATTERNS.md.
   const mgSortBtn = document.getElementById('mgSortBtn');
   const mgListHeadRow = document.getElementById('mgListHeadRow');
   let sortMenu = null;
@@ -2245,9 +2226,8 @@
     renderList();
     chrome.storage.local.set({ [SORT_MODE_KEY]: mode }).catch(() => {});
   }
-  // Riflette l'ordinamento attivo sul glifo dell'intestazione (tooltip + stato
-  // "non predefinito" evidenziato), così l'owner vede a colpo d'occhio se la
-  // lista è riordinata.
+  // Il glifo riflette l'ordinamento attivo (tooltip + stato «non predefinito»): a colpo d'occhio
+  // si vede se la lista è riordinata.
   function reflectSortBtn() {
     if (!mgSortBtn) return;
     const active = sortMode !== 'smart';
@@ -2295,12 +2275,7 @@
   }
   // Lo stesso menu per le schede che vivono in un file loro (manageRedteam.js).
   window.SN_MANAGE_MENU = { apri: apriMenu };
-  // L'esito si legge nel dettaglio: dal menu la pratica si apre, così il messaggio ha dove stare.
-  function segnoDalMenu(fb, valore) {
-    if (selectedId !== fb._id) openDetail(fb._id);
-    setLocalSign(fb._id, valore);
-  }
-  // Lo stesso cammino del tasto nel dettaglio (applyAction), che scrive solo la pratica aperta.
+  // Lo stesso cammino del tasto nel dettaglio (applyAction), che scrive solo la pratica aperta: l'esito si legge lì.
   function approvaDalMenu(fb, azione) {
     if (selectedId !== fb._id) openDetail(fb._id);
     applyAction(azione, null);
@@ -2314,20 +2289,9 @@
     e.preventDefault();
     const num = FB.formatNum(fb.seq, fb.subSeq);
     const voci = [{ testo: 'Apri', azione: () => openDetail(fb._id) }];
-    const segnabile = isAdmin && !MR.isLocalOnly(fb) ? MR.localSignCheck(fb, true) : { ok: false };
-    if (isAdmin && MR.isLocalOnly(fb)) {
-      const chiusa = MR.praticaChiusa(fb, { releasedVersion, fusioni });
-      voci.push({
-        testo: chiusa ? '💻 Non era un lavoro server' : '💻 Non è un lavoro server',
-        titolo: chiusa ? `${localSignText(fb)} ${titoloTogliChiusa(fb)}` : localSignText(fb),
-        azione: () => segnoDalMenu(fb, false),
-      });
-    } else if (segnabile.ok) {
-      voci.push({
-        testo: segnabile.chiusa ? '💻 Era un lavoro server' : '💻 Lavoro server',
-        titolo: segnabile.chiusa ? titoloLocaleChiusa(fb) : 'Passa nei Lavori server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione locale.',
-        azione: () => segnoDalMenu(fb, true),
-      });
+    const domandaId = MR.aspettaDomanda(fb);
+    if (domandaId) {
+      voci.push({ testo: `Rispondi alla domanda ${domandaId}`, titolo: 'Si risponde in un posto solo: la domanda, con le sue opzioni.', azione: () => apriDomandaDelFeedback(domandaId, fb._id) });
     }
     if (isAdmin && ATT) {
       if (!MR.praticaChiusa(fb, opzSezioni())) {
@@ -2340,9 +2304,10 @@
         });
       }
     }
+    // Solo sul rombo azzurro, come nel dettaglio: lì è l'unica uscita (#1575).
     const lavoroLocale = isAdmin ? MR.ownerActionFor(fb, 'accept_local', { releasedVersion }) : null;
     if (lavoroLocale) {
-      voci.push({ testo: '💻 Approva come lavoro server', titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
+      voci.push({ testo: lavoroLocale.label, titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
     }
     if (isAdmin && MR.fiduciaCheck(fb).ok) {
       voci.push({ testo: '🤝 Segna fidato', titolo: titoloFiducia(fb), azione: () => { if (selectedId !== fb._id) openDetail(fb._id); impostaFiducia(fb._id, true); } });
@@ -2367,7 +2332,6 @@
       openSortMenu(e.clientX, e.clientY);
     });
   }
-  // Click (o Invio/Spazio) sul glifo ⇅ → stesso menu, ancorato al glifo.
   if (mgSortBtn) {
     mgSortBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2391,71 +2355,38 @@
     reflectSortBtn();
   }
 
-  // ── Quanti feedback ci sono in ogni scheda (#495) ─────────────────────────
-  // Le quattro schede che ELENCANO feedback (Ricevuti, In coda, Risolti,
-  // Archiviati) portano il loro numero accanto al nome, come la pagina gemella
-  // dei feedback. Le altre quattro (Statistiche, Modelli, Automazioni, Log) non
-  // elencano niente: lì un numero non vorrebbe dire nulla e non si scrive.
-  // Il conteggio degli Archiviati segue i filtri della colonna (⭐ e "Bloccati
-  // confermati"), altrimenti direbbe un numero diverso da quello che si vede.
-  // Finché i feedback non sono arrivati (caricamento in corso, o fallito) non
-  // si scrive nessun numero: uno "(0)" là dove il dato manca è un numero falso.
-  // Il caricamento si ferma ai 500 più recenti: quando li tocca tutti, i numeri
-  // diventano "(24+)" — sono minimi, non totali — e l'hover dice perché.
+  // Solo le quattro schede che ELENCANO: altrove un numero non direbbe nulla. Dato non
+  // arrivato → nessun numero; al tetto diventano «(24+)», minimi e non totali.
   function loadHitCap() {
     return caricoIncompleto;
   }
 
-  // ── Quando lo stato non si legge, le sezioni non si disegnano ─────────────
-  // La regola sta nel modulo condiviso (MR.sectionsReliable), la stessa che usa
-  // la pagina dei feedback: due copie della stessa regola divergono, ed è
-  // proprio così che questa pagina è rimasta indietro (#509).
-  //
-  // Qui non si chiude "la barra" e basta: tutto ciò che questa pagina afferma
-  // partendo dallo status — i numeri delle sezioni, il nome della sezione in
-  // cima alla colonna, il colore del bordo della scheda ("Non filtrato" è
-  // un'affermazione), le barre "Ri-valuta i non filtrati" / "Approva tutti gli
-  // allineati", i pulsanti di decisione del dettaglio, la frase accanto ai
-  // giudici, la bolla del parere di Filo — passa da una delle due funzioni qui
-  // sotto, a seconda che l'affermazione riguardi la lista o una segnalazione.
+  // Quando lo stato non si legge, le sezioni non si disegnano: la regola sta in
+  // MR.sectionsReliable, condivisa con la gemella — due copie divergono.
   function sezioniAttendibili() {
     return MR.sectionsReliable(allFeedbacks);
   }
 
-  // Le due domande sono DIVERSE e vanno tenute separate, altrimenti il difetto
-  // rientra dalla porta della coda MISTA:
-  //   · sezioniAttendibili() è una domanda sulla LISTA — si può disegnare la
-  //     barra delle sezioni? Un solo documento storto non la toglie a tutti.
-  //   · statoLeggibile(fb) è una domanda su QUESTA segnalazione — posso
-  //     affermare qualcosa sul suo stato? Vale ovunque si parli di UNA
-  //     segnalazione: bordo e classe della scheda, riga dell'iter, sottotesto
-  //     del motivo, pallini dei giudici, pulsanti del dettaglio, la bolla del
-  //     parere di Filo, e i mucchi su cui agiscono le barre in cima ai Ricevuti.
-  // È la stessa regola della gemella, che se la fa per ogni segnalazione: farla
-  // una volta sola per l'intera lista è ciò che ha fatto divergere le due
-  // pagine appena una cifrata capitava in mezzo a tante leggibili (#509).
+  // Due domande separate: sezioniAttendibili() riguarda la LISTA (un documento storto non
+  // toglie la barra a tutti), statoLeggibile(fb) UNA segnalazione (bordo, iter, pulsanti).
   function statoLeggibile(fb) {
     return !MR.statusUnreadable(fb);
   }
 
-  // Mostra o nasconde le SEZIONI (le quattro schede-lista) e l'avviso che ne
-  // spiega l'assenza. Le altre schede della barra non sono sezioni — Statistiche,
-  // Modelli, Automazioni, Log non dipendono dallo stato delle segnalazioni e
-  // restano raggiungibili. Ritorna true se le sezioni si possono disegnare.
+  // Mostra o nasconde le quattro schede-lista e l'avviso che ne spiega l'assenza; le altre
+  // quattro non dipendono dallo stato e restano raggiungibili. True se si possono disegnare.
   function mostraSezioni() {
     const ok = sezioniAttendibili();
     if (mgNoSections && !ok) mgNoSections.textContent = SENZA_SEZIONI_AVVISO;
     aggiornaSchedeVisibili();
     return ok;
   }
-  // "(24)" o "(24+)" secondo il tetto: una sola regola per la barra, per
-  // l'intestazione della colonna e per la ricerca.
+  // «(24)» o «(24+)» secondo il tetto: una sola regola per barra, intestazione e ricerca.
   function countText(n) {
     return FB.countLabel(n, loadHitCap());
   }
 
-  // Intestazione della colonna: nome + quante ne sta mostrando. `n === null`
-  // (dato non ancora arrivato, o ricerca non ancora fatta) → solo il nome.
+  // `n === null` (dato non ancora arrivato, o ricerca non ancora fatta) → solo il nome.
   function setListHead(label, n) {
     if (!mgListHead) return;
     mgListHead.textContent = (n === null || n === undefined)
@@ -2484,7 +2415,7 @@
     updateLivelliFiltro();
     if (!sezioniAttendibili()) return;
     const counts = dataLoaded
-      ? MR.manageTabCounts(allFeedbacks, opzSezioni({ starredOnly, confirmedOnly, livelli: livelliScelti }))
+      ? MR.manageTabCounts(allFeedbacks, opzSezioni({ starredOnly, confirmedOnly, livelli: livelliScelti, soloNonFidate }))
       : null;
     const capped = counts ? loadHitCap() : false;
     // Una sezione che ha ricevuto schede mentre si guardava altro lo dice.
@@ -2524,6 +2455,8 @@
     const bd = scrivi('domande', nd ? `(${nd.domande})` : '',
       nd ? `${nd.domande} da rispondere${d.aggiornamento ? ' · l’ultimo aggiornamento non è riuscito' : ''}` : '');
     if (bd) bd.classList.toggle('mg-sezione--urgente', !!(nd && MR.bloccanteAperta(d.domande)));
+    // Le schede contano quello che mostrano, col filtro della fiducia; la sezione, come Feedback, a filtro spento.
+    const nt = nd && soloNonFidate ? MR.contaDomande(MR.filtraFiducia(d.domande, true)) : nd;
     for (const tab of DOMANDE_TABS) {
       const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
       if (!btn) continue;
@@ -2532,7 +2465,7 @@
       const badge = document.createElement('span');
       badge.className = 'mg-tab-count';
       // Oltre il tetto dell'elenco l'archivio ha solo le più recenti: il numero è un minimo.
-      badge.textContent = `(${nd[tab]}${d.altre && tab === 'domande-archivio' ? '+' : ''})`;
+      badge.textContent = `(${nt[tab]}${d.altre && tab === 'domande-archivio' ? '+' : ''})`;
       btn.appendChild(badge);
     }
 
@@ -2555,12 +2488,12 @@
     mgListLoading.hidden = true;
     mgListEmpty.textContent = TAB_EMPTY[currentTab] || 'Nessun feedback.';
 
-    // Stato illeggibile → niente sezioni: un elenco solo, i più recenti in cima,
-    // come la gemella. Nessun nome di sezione in cima alla colonna e nessun
-    // filtro di sezione: sono tutti criteri che qui non si possono applicare.
+    // Stato illeggibile → niente sezioni: un elenco solo, i più recenti in cima, come la gemella.
+    // Nome e filtri di sezione qui non si possono applicare.
     const sezioni = mostraSezioni();
     if (!sezioni) {
       if (mgArchiveFilter) mgArchiveFilter.hidden = true;
+      aggiornaFiltroFiducia(null);
       currentList = applySortMode(allFeedbacks.slice().sort((a, b) =>
         new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
       mgListEmpty.textContent = TAB_EMPTY.inbox;
@@ -2575,13 +2508,15 @@
     const isArchived = currentTab === 'archived';
     if (mgArchiveFilter) mgArchiveFilter.hidden = !isArchived;
 
-    // Sottoinsieme della tab corrente, ordinato (logica pura condivisa).
+    // Sottoinsieme della tab corrente, ordinato (logica pura condivisa). La fiducia si filtra dopo con la stessa
+    // funzione che conta le schede: la lista di prima serve al numero sul suo tasto.
+    let base;
     if (isArchived) {
       // OFF = solo i feedback `archived`; ON = tutti i preferiti ⭐ (ogni stato).
       // Il filtro "Bloccati confermati" (solo attacchi/spam confermati) è dentro
       // listArchiveTab: la stessa funzione conta la scheda, così il numero non
       // può discostarsi dalla lista.
-      currentList = MR.listArchiveTab(allFeedbacks, { starredOnly, confirmedOnly });
+      base = MR.listArchiveTab(allFeedbacks, { starredOnly, confirmedOnly });
       mgListEmpty.textContent = confirmedOnly
         ? 'Nessun attacco o spam confermato.'
         : starredOnly
@@ -2592,11 +2527,14 @@
       // davvero in produzione; i done-ma-non-ancora-spediti restano in "In coda".
       // Macchina a stati: la tab deriva SOLO dallo status (la modalità
       // automatica non è più una lente sulle liste).
-      currentList = MR.listForManageTab(allFeedbacks, currentTab, opzSezioni({ livelli: livelliScelti }));
+      base = MR.listForManageTab(allFeedbacks, currentTab, opzSezioni({ livelli: livelliScelti }));
       if (currentTab === 'inbox' && livelliScelti.length) {
         mgListEmpty.textContent = `Nessun feedback fermo a ${livelliScelti.slice().sort().map((l) => l.toUpperCase()).join(' o ')}.`;
       }
     }
+    currentList = MR.filtraFiducia(base, soloNonFidate);
+    if (soloNonFidate && base.length && !currentList.length) mgListEmpty.textContent = 'Qui sono tutte fidate.';
+    aggiornaFiltroFiducia(base);
 
     // Override di ordinamento scelto dall'owner dal menu contestuale (tasto
     // destro sull'intestazione). In 'smart' resta l'ordine predefinito sopra.
@@ -2612,10 +2550,8 @@
     updateTabCounts();
     setListHead(TAB_LABELS[currentTab] || '', dataLoaded ? currentList.length : null);
     renderListBody();
-    // Chi è "senza feedback" dipende da quali feedback ci sono: quando la lista
-    // cambia, l'elenco in Automazioni si rifà — altrimenti una richiesta
-    // resterebbe lì anche dopo che la sua scheda è arrivata, e si leggerebbe
-    // due volte.
+    // Chi è «senza feedback» dipende da quali feedback ci sono: quando la lista cambia,
+    // l'elenco in Automazioni si rifà, o una richiesta si leggerebbe due volte.
     renderFusioniOrfane();
     caricaAttesiFuori();
   }
@@ -2626,41 +2562,37 @@
     ferma: { etichetta: 'fusione ferma', titolo: 'Una fusione aspetta il tuo via libera', tooltip: 'una fusione aspetta il tuo via libera' },
     volo: { etichetta: 'in fusione', titolo: 'Approvata: il server sta fondendo il ramo', tooltip: 'il server sta fondendo il ramo' },
     decisa: { etichetta: 'fusione decisa', titolo: 'Hai già deciso: esce da qui alla prossima rilettura', tooltip: 'fusione già decisa' },
+    senza: { etichetta: 'fusione ferma', titolo: 'Ferma al cancello senza una richiesta aperta. Decidi tu se rifarla o archiviarla', tooltip: 'ferma al cancello, nessuna richiesta aperta' },
   };
   function fusioneFerma(fb) {
     return MR.fusioneInAttesa(fb, { fusioni });
   }
 
-  // Le segnalazioni con una fusione ferma davanti a tutte, conservando fra loro
-  // l'ordine che avevano (`sort` è stabile).
+  // Le segnalazioni con una fusione ferma davanti a tutte, conservando fra loro l'ordine
+  // (`sort` è stabile).
   function pinFusioniFerme(lista) {
     return MR.fusioniFermeInCima(lista, { fusioni });
   }
 
-  // Disegna la colonna a partire da `currentList`: è la parte che NON dipende
-  // da quale sezione si sta guardando, e la condivide anche l'elenco unico di
+  // La parte che NON dipende da quale sezione si guarda: la condivide anche l'elenco unico di
   // quando le sezioni non ci sono.
   function renderListBody() {
-    // Col caricamento al tetto una sezione "vuota" può non esserlo davvero: i
-    // feedback più vecchi non sono qui. Il vuoto lo dice, invece di negarli.
+    // Il vuoto lo dice invece di negarli: come in src/pages/feedback/feedback.js.
     if (loadHitCap() && dataLoaded) {
       mgListEmpty.textContent = `${mgListEmpty.textContent} ${FB.COUNT_INCOMPLETE_HINT}`;
     }
 
-    // Barra "Ri-valuta i non filtrati": compare solo nei Ricevuti quando c'è
-    // almeno un feedback bianco (panel parziale) da ri-valutare.
+    // Solo nei Ricevuti, quando c'è almeno un feedback bianco (panel parziale) da ri-valutare.
     updateReevalBar();
-    // Barra "Approva tutti gli allineati": è QUI che l'owner mette in coda in
-    // blocco i blu (scrive `todo` su ciascuno).
+    // È QUI che l'owner mette in coda in blocco i blu (scrive `todo` su ciascuno).
     updateAlignedBar();
 
-    // Svuota SEMPRE: se la lista torna vuota (es. dopo uno sblocco) non deve
-    // restare la card vecchia in un contenitore nascosto.
+    // Svuota SEMPRE: se la lista torna vuota non deve restare la card vecchia in un contenitore
+    // nascosto.
     mgList.innerHTML = '';
 
-    // Dato non arrivato (caricamento in corso, o fallito): il riquadro vuoto non
-    // può dire "qui non c'è niente", perché non lo sappiamo. È la stessa cautela
-    // dei numeri sulle schede (#495), applicata alle parole.
+    // Dato non arrivato: il riquadro vuoto non può dire «qui non c'è niente», perché non lo
+    // sappiamo. È la cautela dei numeri (#495) applicata alle parole.
     if (!dataLoaded) {
       mgListEmpty.textContent = loadFailed
         ? 'Errore nel caricamento dei feedback.'
@@ -2675,17 +2607,13 @@
     mgListEmpty.hidden = true;
     mgList.hidden = false;
 
-    // Stato illeggibile: il bordo colorato, la riga dell'iter e il sottotesto
-    // del motivo sono tutte AFFERMAZIONI sullo stato. Su una segnalazione
-    // cifrata la macchina le ricava da un `unlabeled` finto: ogni scheda
-    // diventerebbe bianca ("Non filtrato") anche se è già chiusa.
+    // Bordo, riga dell'iter e motivo sono AFFERMAZIONI sullo stato: su una cifrata la macchina
+    // le ricava da un `unlabeled` finto, e ogni scheda si direbbe «Non filtrato».
     const sezioni = sezioniAttendibili();
 
     for (const fb of currentList) {
-      // La domanda "questo stato si legge?" è di QUESTA scheda, non della lista
-      // (vedi statoLeggibile): in una coda mista basta un documento cifrato in
-      // mezzo a mille leggibili perché le sezioni restino — ed è proprio lì che
-      // la scheda cifrata tornava a dirsi "Non filtrato".
+      // La domanda è di QUESTA scheda, non della lista: in una coda mista basta un documento
+      // cifrato fra mille leggibili perché le sezioni restino, ed è lì che tornava il difetto.
       const leggibile = sezioni && statoLeggibile(fb);
       const cl = leggibile ? MR.classifyBlock(fb) : null;
       const num = FB.formatNum(fb.seq, fb.subSeq);
@@ -2699,16 +2627,17 @@
       // In lavorazione (working/revision_*): la card mostra una seconda riga con
       // il passaggio corrente dell'iter e se un'istanza ci lavora ORA. Solo
       // nella tab "In coda" (dove queste card sono pinnate in cima).
-      const progress = (leggibile && (currentTab === 'queue' || currentTab === 'local' || currentTab === 'waiting')) ? MR.workProgress(fb) : null;
+      const progress = (leggibile && (currentTab === 'queue' || currentTab === 'waiting')) ? MR.workProgress(fb) : null;
       item.className = 'mg-item'
         + (fb._id === selectedId ? ' mg-item--selected' : '')
         + unfilteredCls
         + alignedCls
         + (progress ? ' mg-item--staged' : '')
-        + (progress && progress.active ? ' mg-item--active-work' : '');
+        + (progress && progress.active ? ' mg-item--active-work' : '')
+        + ` mg-fiducia--${MR.segnoFiducia(fb).classe}`;
       item.dataset.id = fb._id;
-      // Una fusione ferma aspetta l'owner quanto un blocco: stessa tinta rossa
-      // e stesso peso, così si riconosce scorrendo la lista.
+      // Una fusione ferma aspetta l'owner quanto un blocco: stessa tinta rossa, così si riconosce
+      // scorrendo la lista.
       const ferma = fusioneFerma(fb);
       if (ferma) item.classList.add('mg-item--fusione');
       const fusioneTesti = TESTI_FUSIONE_LISTA[(ferma && MR.livelloL5(fb, opzioniLivelli(fb)).fusione) || 'ferma'];
@@ -2719,13 +2648,8 @@
         : (cl ? cl.color : (aligned ? MR.ALIGNED_COLOR : 'transparent'));
       // Una riga sola: #N · segno · titolo (ellissi). Il bordo è la famiglia del motivo, il segno chi l'ha fermata.
       const norm = leggibile ? MR.normalizeStatus(fb) : { status: null, statusReason: null };
-      // Quante volte questo lavoro si è arenato ed è rientrato in coda da solo.
-      // Senza scriverlo da qualche parte, un feedback che si impianta sempre
-      // sullo stesso scoglio sembra semplicemente lento.
-      // `stalls` è il totale che non si azzera mai; `workingResets` è il
-      // contatore operativo del freno, che una consegna vera riporta a zero —
-      // leggere quello faceva sparire il numero proprio quando la pratica esce
-      // dal giro automatico, cioè quando all'owner serve.
+      // Quante volte questo lavoro si è arenato: si legge `stalls`, che non si azzera, e non
+      // `workingResets`, che una consegna vera azzera — facendo sparire il numero quando serve.
       const ripartenze = Math.max(0, Math.round(
         Number(fb.stalls) || Number(fb.workingResets) || 0
       ));
@@ -2743,24 +2667,44 @@
         ${leggibile ? '' : statePublicHtml(fb)}
         ${localBadgeHtml(fb)}
         ${attesaBadgeHtml(fb)}
+        ${leggibile ? domandaBadgeHtml(fb) : ''}
         ${priorityDotsHtml(fb)}
+        ${fiduciaSegnoHtml(fb)}
       `;
       item.innerHTML = progress
         ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress, fb)}`
         : rowHtml;
       item.addEventListener('click', (e) => {
-        // Il click su un pallino priorità non apre il dettaglio (lo gestisce il
-        // listener delegato di mgList).
+        // Il click su un pallino priorità non apre il dettaglio (lo gestisce il listener delegato).
         if (e.target.closest('.mg-dot')) return;
+        const dom = e.target.closest('.mg-domanda-badge[data-domanda]');
+        if (dom) { apriDomandaDelFeedback(dom.dataset.domanda, fb._id); return; }
         openDetail(fb._id);
       });
       mgList.appendChild(item);
     }
   }
 
+  // «Aspetta una domanda» (SPEC-DOMANDE §3.8): il lavoro fermo sta In coda, e il segno porta dove si risponde.
+  function domandaBadgeHtml(fb) {
+    const id = MR.aspettaDomanda(fb);
+    if (!id) return '';
+    const motivo = MR.reasonText(MR.normalizeStatus(fb).statusReason);
+    const titolo = `Aspetta la tua risposta alla domanda ${id}${motivo ? ` (${motivo})` : ''}: aprila`;
+    return `<button type="button" class="mg-domanda-badge" data-domanda="${esc(id)}" title="${esc(titolo)}" aria-label="${esc(titolo)}">aspetta ${esc(id)}</button>`;
+  }
+
+  // La domanda si apre nella sua sezione; se non si trova si apre il feedback, che lo dice, invece di non fare niente.
+  async function apriDomandaDelFeedback(id, feedbackId) {
+    const ok = !!DOMANDE && typeof DOMANDE.apriDomanda === 'function' && await DOMANDE.apriDomanda(id);
+    if (ok) return;
+    if (feedbackId && selectedId !== feedbackId) openDetail(feedbackId);
+    setManageMsg(`La domanda ${id} non si apre adesso: riprova fra poco, o cercala nella sezione Domande.`, 'err');
+  }
+
   // Il segno dei Ricevuti (D93): la forma del livello che ha fermato la pratica, il motivo sotto il puntatore.
   function segnoFermataHtml(fb) {
-    const s = MR.segnoFermata(fb, { fusioni });
+    const s = MR.segnoFermata(fb, { fusioni, fusioniLette: fusioniOk });
     if (!s || !FORME_SVG[s.forma]) return '';
     const cls = 'mg-segno-fermata' + (s.classe ? ` mg-forma--${s.classe}` : ' mg-segno-fermata--vuoto');
     return `<span class="${cls}" data-forma="${esc(s.forma)}" data-livello="${esc(s.livello)}" title="${esc(s.testo)}" aria-label="${esc(s.testo)}" role="img">`
@@ -2778,14 +2722,20 @@
     return `<span class="mg-state" title="${esc(`Stato: ${label} — ${MR.PUBLIC_STATE_HINT}`)}">${esc(label)}</span>`;
   }
 
-  // Nei Lavori locali il segno lo dice la sezione; altrove (una pratica che aspetta
-  // l'owner nei Ricevuti, una chiusa) la scheda lo porta, o sembrerebbe una delle routine.
+  // Il segno non sposta di scheda (#1575): l'etichetta lo dice in ogni scheda, o sembrerebbe un lavoro delle routine.
   function localBadgeHtml(fb) {
-    if (!MR.isLocalOnly(fb) || currentTab === 'local') return '';
+    if (!MR.isLocalOnly(fb)) return '';
     return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">server</span>`;
   }
-  // Un lavoro server passato e le sue attese (#1159): la suite di filo-security, il PC.
+  // Lo scudo della fiducia (#1575): pieno se fidata, vuoto e tratteggiato se no; il colore lo ripete il bordo destro.
+  function fiduciaSegnoHtml(x) {
+    const s = MR.segnoFiducia(x);
+    return `<span class="mg-fiducia-segno mg-fiducia-segno--${s.classe}" title="${esc(s.testo)}" aria-label="${esc(s.parola)}" role="img">`
+      + `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${FORME_SVG.scudo}"/></svg></span>`;
+  }
+  // Le attese che segue il server: gli unit sulla fusione (#1207); per un lavoro server la suite di filo-security, il PC (#1159).
   const ATTESE_SERVER = Object.freeze({
+    unit: ['Unit sulla fusione', 'Verifica e controllo di sicurezza sono passati: il server fa girare in GitHub gli unit test sul ramo fuso con main di adesso, e con l’esito verde lo porta al cancello e su main. Ricontrolla da solo ogni cinque minuti.'],
     pc: ['Pronto: aspetta il PC', 'Il cancello non può portare il ramo su main di filo-security: il lavoro aspetta il tuo PC. Lo porta su main npm run orchestra -- fusioni-server, che parte anche con avvia, prima la parte dell’app e poi quella del server.'],
     suite: ['Aspetta le prove del server', 'Il cancello porta su main la parte dell’app e poi il ramo di filo-security quando la suite di GitHub è verde su quel commit. Riprova da solo ogni dieci minuti.'],
   });
@@ -2797,7 +2747,7 @@
       : MR.isPrivateLocalWork(fb) ? 'Era un lavoro server: per questo non sta nella bacheca pubblica.'
         : 'Era un lavoro server: la sua scheda resta nella bacheca pubblica, per chi l’ha mandato.';
     const a = MR.isLocalApproved(fb) ? fb.localApproval : null;
-    const si = a ? ` Approvato come lavoro server da ${chiHaMessoIlSegno(a.by)}${Number(a.at) > 0 ? ` il ${formatDateTime(new Date(Number(a.at)).toISOString())}` : ''}. Se togli il segno l'approvazione resta, e il segno si rimette con un clic.` : '';
+    const si = a ? ` Approvato come lavoro server da ${chiHaMessoIlSegno(a.by)}${Number(a.at) > 0 ? ` il ${formatDateTime(new Date(Number(a.at)).toISOString())}` : ''}.` : '';
     return `${cosa} Segno messo da ${chiHaMessoIlSegno(m.by)}${quando}.${si}`;
   }
   // Una sessione firma il segno col suo mittente (`local:claude`), l'owner con l'email: il mittente si legge come in testata.
@@ -2858,20 +2808,18 @@
     return `<div class="mg-item-state">${steps}${who}</div>`;
   }
 
-  // ── Ri-valutazione dei feedback "non filtrati" (panel parziale) ───────────
-  // Un feedback è "non filtrato" (bianco) quando il panel dei giudici è rimasto
-  // parziale. Il bottone ne ri-prova SOLO i giudici mancanti (lato backend).
+  // Un feedback è «non filtrato» (bianco) quando il panel dei giudici è rimasto parziale; il
+  // bottone ne ri-prova solo i giudici mancanti.
   function isUnfiltered(fb) {
-    // "Non filtrato" è una lettura dello status: su una cifrata la macchina la
-    // inventa (unlabeled finto) e la segnalazione finiva nel mucchio da
-    // rimandare ai giudici — crediti spesi per ri-giudicare una pratica che
-    // potrebbe essere già chiusa.
+    // Su una cifrata «non filtrato» la macchina se lo inventa: la segnalazione finirebbe fra
+    // quelle da rimandare ai giudici, crediti spesi su una pratica forse già chiusa.
     if (!statoLeggibile(fb)) return false;
     const cl = MR.classifyBlock(fb);
     return !!(cl && cl.reason === 'unfiltered');
   }
+  // Le due barre agiscono solo su quello che si vede: col filtro della fiducia acceso, sulle non fidate.
   function unfilteredFeedbacks() {
-    return allFeedbacks.filter(isUnfiltered);
+    return MR.filtraFiducia(allFeedbacks, soloNonFidate).filter(isUnfiltered);
   }
   function setReevalMsg(text, kind) {
     if (!mgReevalMsg) return;
@@ -2885,8 +2833,8 @@
 
   function updateReevalBar() {
     if (!mgReevalBar) return;
-    // Senza il criterio non c'è nessun "bianco": ogni segnalazione cifrata
-    // ricadrebbe lì, e la barra offrirebbe di ri-giudicare anche i chiusi.
+    // Senza il criterio ogni segnalazione cifrata ricadrebbe fra i bianchi, e la barra offrirebbe
+    // di ri-giudicare anche i chiusi.
     const whites = sezioniAttendibili() ? unfilteredFeedbacks() : [];
     // Solo l'owner, solo nei Ricevuti (dove vivono i bianchi), solo se ce n'è.
     const show = isAdmin && currentTab === 'inbox' && l2Visibili() && whites.length > 0;
@@ -2898,12 +2846,13 @@
   // L'approvazione È scrivere `todo`: la modalità automatica di oggi non sposta
   // più nulla nelle liste, quindi i blu si mettono in coda da qui (o uno a uno
   // dal dettaglio).
-  function alignedFeedbacks() {
+  // `tutti`: anche quelli che il filtro della fiducia nasconde, per chi li conta fuori dalla lista (Automazioni).
+  function alignedFeedbacks(tutti) {
     // Stesso motivo dei bianchi: "allineato" è una lettura dello status, e
     // approvare in blocco quello che non si è potuto leggere è la scrittura
     // più pesante della pagina.
     if (!sezioniAttendibili()) return [];
-    return allFeedbacks.filter((f) => statoLeggibile(f) && MR.isAligned(f));
+    return MR.filtraFiducia(allFeedbacks, soloNonFidate && !tutti).filter((f) => statoLeggibile(f) && MR.isAligned(f));
   }
   function updateAlignedBar() {
     if (!mgAlignedBar) return;
@@ -2911,10 +2860,7 @@
     const show = isAdmin && currentTab === 'inbox' && l2Visibili() && blues.length > 0;
     mgAlignedBar.hidden = !show;
     if (!show || !mgAlignedBtn) return;
-    // Quelli col segno locale approvati vanno nei Lavori locali (#908): la freccia dice dove.
-    const locali = blues.filter((f) => MR.isLocalOnly(f)).length;
-    const dove = !locali ? 'In coda' : (locali === blues.length ? 'Lavori server' : 'In coda e Lavori server');
-    mgAlignedBtn.textContent = `Approva tutti gli allineati (${blues.length}) → ${dove}`;
+    mgAlignedBtn.textContent = `Approva tutti gli allineati (${blues.length}) → In coda`;
   }
   async function approveAllAligned() {
     const blues = alignedFeedbacks();
@@ -2938,8 +2884,6 @@
     renderList();
   }
   if (mgAlignedBtn) mgAlignedBtn.addEventListener('click', approveAllAligned);
-  // Evidenzia la card di un feedback come "in valutazione" (animazione giudici)
-  // e la porta in vista; ritorna l'elemento card (o null se non è nella lista).
   function startCardEvaluating(id) {
     const card = mgList.querySelector(`.mg-item[data-id="${cssSel(id)}"]`);
     if (!card) return null;
@@ -2961,10 +2905,8 @@
     if (dots) dots.remove();
   }
 
-  // Ri-valuta i "non filtrati" UNO ALLA VOLTA: scorre i bianchi in sequenza,
-  // accende l'animazione sulla card di turno, invia il singolo id ai giudici,
-  // attende l'esito e passa al successivo. Così l'owner vede esattamente quale
-  // feedback i giudici stanno valutando in questo momento.
+  // Ri-valuta i bianchi UNO ALLA VOLTA: animazione sulla card di turno, un solo id ai giudici,
+  // attesa dell'esito, poi il successivo. Così si vede quale stanno valutando ora.
   async function reevaluateUnfiltered() {
     const ids = unfilteredFeedbacks().map((f) => f._id).filter(Boolean);
     if (!ids.length) return;
@@ -2997,10 +2939,8 @@
         valued += recovered ? 1 : 0;
         wasteStreak = 0;
       } else if (outcome === 'wasted') {
-        // Giudici ri-eseguiti ma nessuno recuperato: crediti spesi, feedback
-        // ancora bianco. `errorKind` dice PERCHÉ (es. credito esaurito). Se càpita
-        // più volte di fila è quasi certo un problema strutturale: fermati per non
-        // bruciare crediti/tempo sul resto della lista.
+        // Giudici rieseguiti ma nessuno recuperato: crediti spesi a vuoto. Più volte di fila è un
+        // problema strutturale: fermarsi per non bruciare crediti sul resto della lista.
         if (errorKind) lastErrorKind = errorKind;
         wasteStreak += 1;
         if (wasteStreak >= MR.REEVAL_WASTE_LIMIT) { stopped = 'nofix'; break; }
@@ -3008,8 +2948,8 @@
       // 'noop' (niente da fare): non spende crediti, prosegui.
     }
 
-    // Causa specifica (credito/chiave/modelli/timeout) se i giudici non hanno
-    // recuperato nulla: vince sul generico, così l'owner sa cosa sistemare.
+    // Causa specifica (credito/chiave/modelli/timeout): vince sul generico, così l'owner sa cosa
+    // sistemare.
     const hint = MR.reevalErrorHint(lastErrorKind);
     if (stopped === 'budget') {
       setReevalMsg(`Recuperati ${valued} feedback. Limite raggiunto: riprova più tardi.`, 'ok');
@@ -3036,15 +2976,8 @@
   }
   if (mgReevalBtn) mgReevalBtn.addEventListener('click', reevaluateUnfiltered);
 
-  // ── Ricerca "a senso" (semantica) ─────────────────────────────────────────
-  // La lente in fondo alla barra delle schede apre un campo dove descrivere, con
-  // parole proprie (anche un ricordo vago), il feedback da ritrovare. Un modello
-  // legge titolo+testo di TUTTI i feedback (qualunque scheda) e li ordina per
-  // pertinenza al significato della richiesta. I risultati rimpiazzano la lista a
-  // sinistra; il dettaglio al centro si apre come al solito. Se il modello non è
-  // disponibile o risponde male, si RIPIEGA su una ricerca per parole (la ricerca
-  // non si rompe mai). La logica pura (candidati, prompt, parsing, ripiego) vive
-  // in SN_MANAGE_SEARCH per essere testabile senza aprire Electron.
+  // Ricerca «a senso»: un modello ordina i feedback per pertinenza; se manca o risponde male
+  // si ripiega sulle parole, la ricerca non si rompe mai. Logica pura in SN_MANAGE_SEARCH.
   function toggleSearchIcon(on) {
     if (!mgSearchToggle) return;
     mgSearchToggle.classList.toggle('mg-search-toggle--active', on);
@@ -3058,11 +2991,12 @@
     mgSearchMsg.classList.toggle('mg-count', kind === 'count');
   }
 
-  // Nasconde le barre specifiche della scheda (filtro archivio, ri-valuta,
-  // approva allineati): durante la ricerca la lista è "trasversale" alle schede.
+  // Durante la ricerca la lista è trasversale alle schede: le barre della scheda spariscono.
   function hideTabBars() {
     if (mgArchiveFilter) mgArchiveFilter.hidden = true;
     if (mgLivelliFiltro) mgLivelliFiltro.hidden = true;
+    // La ricerca cerca fra tutte: il filtro della fiducia non la tocca, quindi non si offre.
+    if (mgFiduciaFiltro) mgFiduciaFiltro.hidden = true;
     if (mgReevalBar)     mgReevalBar.hidden = true;
     if (mgAlignedBar)    mgAlignedBar.hidden = true;
   }
@@ -3072,8 +3006,7 @@
     if (mgSearchBar) mgSearchBar.hidden = false;
     toggleSearchIcon(true);
     setSearchMsg('', null);
-    // La lista mostra un invito finché non si cerca davvero: nessun numero,
-    // perché non c'è ancora niente da contare (#495).
+    // Un invito finché non si cerca davvero: nessun numero, non c'è niente da contare (#495).
     setListHead('Ricerca', null);
     hideTabBars();
     mgListLoading.hidden = true;
@@ -3084,8 +3017,7 @@
     if (mgSearchInput) { try { mgSearchInput.focus(); } catch (_) {} }
   }
 
-  // keepList=true quando è il chiamante a ridisegnare subito la lista (es. il
-  // cambio scheda): evita un doppio renderList.
+  // keepList=true quando è il chiamante a ridisegnare subito: evita un doppio renderList.
   function closeSearch(opts) {
     const keepList = !!(opts && opts.keepList);
     searchSeq++;               // invalida ricerche eventualmente in volo
@@ -3196,6 +3128,7 @@
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
+        ${fiduciaSegnoHtml(fb)}
       `;
       item.addEventListener('click', () => openDetail(fb._id));
       resultCards.set(fb._id, item);
@@ -3207,6 +3140,12 @@
       || (Number.isFinite(p) ? `pertinenza ${Math.round(p * 100)}%` : '');
     item.title = (num ? `#${num} · ` : '') + title + (reason ? ` — ${reason}` : '');
     item.classList.toggle('mg-item--selected', fb._id === selectedId);
+    // La card resta, la fiducia può cambiare mentre la si guarda: il segno si riscrive al suo posto.
+    const classe = MR.segnoFiducia(fb).classe;
+    item.classList.toggle('mg-fiducia--fidata', classe === 'fidata');
+    item.classList.toggle('mg-fiducia--nonfidata', classe !== 'fidata');
+    const scudo = item.querySelector('.mg-fiducia-segno');
+    if (scudo && !scudo.classList.contains(`mg-fiducia-segno--${classe}`)) scudo.outerHTML = fiduciaSegnoHtml(fb);
     return item;
   }
 
@@ -3281,8 +3220,7 @@
       return;
     }
 
-    // Stato "sto cercando": via il numero della ricerca precedente, che qui
-    // sarebbe già falso.
+    // Via il numero della ricerca precedente, che qui sarebbe già falso.
     setListHead('Ricerca', null);
     hideTabBars();
     mgListLoading.hidden = true;
@@ -3310,11 +3248,8 @@
     try {
       const r = await sendToMain({
         type: (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.AI_REQUEST) || 'ai_request',
-        // Funzione propria: prima questa ricerca prendeva in prestito il modello
-        // di «Categorizza», quindi cambiarne uno cambiava anche l'altra senza
-        // che si vedesse. Come quella, non è "style-aware" (il prompt JSON non
-        // viene inquinato dallo stile di scrittura) e resta fuori dalla
-        // cronologia.
+        // Funzione propria e non quella di «Categorizza»: in prestito, cambiarne uno cambiava
+        // l'altra. Non style-aware (il prompt JSON non va inquinato) e fuori dalla cronologia.
         action: (window.SN_CONST && window.SN_CONST.ACTIONS && window.SN_CONST.ACTIONS.MANAGE_SEARCH) || 'manage_search',
         payload: { messages: SRCH.buildMessages(query, candidates) },
       });
@@ -3360,8 +3295,7 @@
       else if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
     });
   }
-  // Esc chiude la ricerca anche quando il focus non è nel campo (es. dopo aver
-  // cliccato un risultato). Idempotente: se la ricerca è già chiusa non fa nulla.
+  // Esc chiude la ricerca anche col focus fuori dal campo. Idempotente.
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && searchMode && (!mgSearchInput || document.activeElement !== mgSearchInput)) {
       closeSearch();
@@ -3472,18 +3406,16 @@
   // deve richiudersi da sé mentre lui la sta guardando.
   function openDetail(id, opts) {
     const ridisegno = !!(opts && opts.ridisegno && id === selectedId);
-    // Quello che c'è nella casella della frase e non è ancora partito parte
-    // ADESSO, finché `selectedId` è ancora quello di prima: un istante dopo
-    // andrebbe a finire sul feedback sbagliato, o in nessun posto.
+    // La frase nella casella e non ancora partita parte ADESSO, finché `selectedId` è quello di
+    // prima: un istante dopo finirebbe sul feedback sbagliato.
     if (!ridisegno) salvaFraseAutomatico();
-    // Cambiando segnalazione il pannello di destra riparte da zero: la forma
-    // scelta era di un'altra pratica. Su un ridisegno resta dov'era.
+    // Cambiando segnalazione il pannello di destra riparte da zero: la forma scelta era di un'altra
+    // pratica. Su un ridisegno resta dov'era.
     if (!ridisegno) livelloAperto = null;
     selectedId = id;
     // Aperta dall'owner: l'arrivo l'ha visto.
     const eraArrivata = !ridisegno && arrivate.delete(String(id));
 
-    // Aggiorna selezione visiva nella lista
     document.querySelectorAll('.mg-item').forEach((el) => {
       el.classList.toggle('mg-item--selected', el.dataset.id === id);
       if (el.dataset.id === id) el.classList.remove('mg-item--arrivata');
@@ -3508,12 +3440,10 @@
     mgDetailEmpty.hidden = true;
     mgDetail.hidden = false;
 
-    // Lo stato di QUESTA segnalazione si legge? Tutto ciò che il pannello dice
-    // e offre a partire dallo stato passa da qui — la stessa regola della barra
-    // delle sezioni, un gradino più in dentro.
+    // Tutto ciò che il pannello dice partendo dallo stato passa da qui: la regola della barra delle
+    // sezioni, un gradino più in dentro.
     const leggibile = statoLeggibile(fb);
 
-    // Intestazione
     const clientId = fb.clientId || 'anonimo';
     const dateStr  = formatDate(fb.createdAt);
     // Chi ha scritto, in chiaro (#443): l'identificativo grezzo diceva
@@ -3526,19 +3456,15 @@
     });
     leggiSegno(fb);
 
-    // La fila dei cinque livelli: triangolo, cerchi, rombo, pentagono,
-    // quadrato. Ogni forma cliccata si apre nel pannello di destra.
     renderLivelliRow(fb);
 
-    // Striscia "a che punto è la lavorazione" (solo per i feedback nell'iter
-    // working/revision_*): stessi contenuti della card pinnata in lista.
+    // Solo per i feedback nell'iter; stessi contenuti della card pinnata in lista.
     if (mgWorkState) {
       const progress = leggibile ? MR.workProgress(fb) : null;
       mgWorkState.hidden = !progress;
       mgWorkState.innerHTML = progress ? workStateHtml(progress, fb) : '';
     }
 
-    // Bolle chat
     renderThread(fb);
 
     // Azioni di stato (owner-only). QUALI sono NON lo decide più questa pagina:
@@ -3554,21 +3480,12 @@
     disegnaSegnoTestata(fb);
     if (!ridisegno) setClarifyMsg('', '');
 
-    // Gestione (⭐ + archivia/ripristina): visibile per l'owner su QUALUNQUE
-    // feedback selezionato, accanto alle azioni contestuali.
-    // La frase per chi ha segnalato: su qualunque feedback, anche già chiuso.
-    // E' in chiaro, quindi si legge e si scrive anche su una macchina senza
-    // la chiave privata — al contrario del resto della conversazione.
-    // La barra sta in piedi per l'owner e per nessun altro: dentro ci sono
-    // solo cose sue. Le azioni di stato che ci vivono spariscono da sole
-    // quando lo stato non si legge (renderActions); preferito e frase no.
+    // La barra dell'owner sta in piedi per lui e per nessun altro. La frase per chi ha segnalato
+    // è in chiaro: si legge e si scrive anche senza la chiave privata.
     if (mgOwnerBar) mgOwnerBar.hidden = !isAdmin;
 
-    // La frase parte CHIUSA su ogni segnalazione (#497): si scrive una volta
-    // sola, e da aperta si mangiava una fetta di dettaglio a ogni feedback
-    // aperto. Il tasto della barra la apre, e dice se una frase c'è già.
-    // Su un ridisegno però la sezione resta com'era: se l'owner l'aveva
-    // aperta, un aggiornamento arrivato da remoto non gliela chiude in faccia.
+    // La frase parte CHIUSA su ogni segnalazione: si scrive una volta sola, e da aperta mangia
+    // una fetta di dettaglio. Su un ridisegno resta com'era.
     if (mgUserNote) {
       const restaAperta = ridisegno && !mgUserNote.hidden;
       if (!restaAperta) collassaFrase();
@@ -3577,9 +3494,8 @@
       // Il valore con cui la riga è stata riempita: una bozza è ciò che differisce.
       mgUserNoteText.dataset.saved = mgUserNoteText.value;
       userNoteToccata = false;
-      // Il salvataggio di un ALTRO feedback può essere ancora in volo: il
-      // bottone è uno solo, e lasciarlo spento qui bloccherebbe una scrittura
-      // che con quell'attesa non c'entra niente.
+      // Il salvataggio di un ALTRO feedback può essere in volo: il bottone è uno solo, e spegnerlo
+      // qui bloccherebbe una scrittura che non c'entra.
       mgUserNoteBtn.disabled = false;
       setUserNoteMsg('', '');
     }
@@ -3605,7 +3521,6 @@
     else closeSidebar();
   }
 
-  // Riapre il pannello sulla forma già scelta, tenendo il punto di scorrimento.
   function riapriPannelloLivello(fb) {
     const scrolls = [mgSideBody, mgSide].map((el) => (el ? el.scrollTop : 0));
     if (livelloAperto === 'l2' && giudiceAperto != null) openSidebarJudge(fb, giudiceAperto);
@@ -3613,58 +3528,25 @@
     [mgSideBody, mgSide].forEach((el, i) => { if (el) el.scrollTop = scrolls[i]; });
   }
 
-  // Riflette lo stato corrente del feedback sul bottone ⭐. Il preferito è un
-  // flag in chiaro, indipendente dallo stato: resta anche su una segnalazione
-  // che questa macchina non riesce a leggere. Archivia/Ripristina invece è
-  // un'AZIONE DI STATO e vive nella riga generata da renderActions.
+  // Il preferito è un flag in chiaro, indipendente dallo stato: resta anche su una
+  // segnalazione illeggibile. Archivia/Ripristina invece è un'azione di stato.
   function reflectManage(fb) {
     mgStarBtn.disabled = false;
     const starred = MR.isStarred(fb);
     mgStarBtn.setAttribute('aria-pressed', starred ? 'true' : 'false');
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
-    reflectLocal(fb);
     reflectAttese(fb);
     reflectFiducia(fb);
   }
 
-  // ── «Solo in locale» (#908) ───────────────────────────────────────────────
-  // Il tasto c'è dove il segno si può mettere (feedback fidato; su una pratica chiusa
-  // dice che era un lavoro locale e la toglie dalla bacheca) o togliere; sui feedback degli utenti solo col sì dell'owner (#913).
-  function localToggleOffered(fb) {
-    return MR.isLocalOnly(fb) || MR.isFidato(fb) || MR.isLocalApproved(fb);
-  }
-  // #913: il feedback di un utente o di una routine diventa lavoro locale col sì dell'owner, che ne ha letto il testo.
-  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione. La fusione non aspetta il tuo sì.';
-  // Stesso avviso di «Segna fidato»: il sì vale anche alla fusione, quindi un segnalato si guarda prima.
+  // ── «💻 Lavoro server» sul rombo azzurro (#913, #1575) ────────────────────
+  // Il segno a mano non c'è più: lo mette il server quando chi lavora lo chiede (#1358). Resta l'uscita dei rombi
+  // azzurri nati prima, dove il sì dell'owner vale anche alla fusione: un segnalato si guarda prima.
+  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server e torna In coda. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione. La fusione non aspetta il tuo sì.';
   function titoloLavoroLocale(fb) {
     const c = MR.localApprovalCheck(fb, { releasedVersion, fusioni });
     return c.segnalato ? `${TITOLO_LAVORO_LOCALE} Attenzione: ${c.segnalato}, guardalo prima.` : TITOLO_LAVORO_LOCALE;
-  }
-  const TITOLO_LOCALE_CHIUSA = 'Era un lavoro server: la segna così, e la sua scheda esce dalla bacheca pubblica.';
-  // Una pratica chiusa le routine non la prendono più: togliere il segno la rimette solo nella bacheca.
-  const TITOLO_TOGLI_CHIUSA = 'Un clic toglie il segno, e la sua scheda torna nella bacheca pubblica.';
-  // Il feedback di un utente approvato la scheda la tiene (#913): è da lì che chi l'ha mandato vede la risoluzione.
-  function titoloLocaleChiusa(fb) {
-    return MR.isLocalApproved(fb) ? 'Era un lavoro server: la segna così, e la sua scheda resta nella bacheca pubblica.' : TITOLO_LOCALE_CHIUSA;
-  }
-  function titoloTogliChiusa(fb) {
-    return MR.isPrivateLocalWork(fb) ? TITOLO_TOGLI_CHIUSA : 'Un clic toglie il segno.';
-  }
-  function reflectLocal(fb) {
-    if (!mgLocalBtn) return;
-    const on = MR.isLocalOnly(fb);
-    mgLocalBtn.hidden = !isAdmin || !localToggleOffered(fb);
-    mgLocalBtn.disabled = false;
-    mgLocalBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    mgLocalBtn.textContent = on ? '💻 Lavoro server' : '💻 Server';
-    const perche = on ? null : MR.localSignCheck(fb, true);
-    const chiusa = on && MR.praticaChiusa(fb, { releasedVersion, fusioni });
-    mgLocalBtn.title = on
-      ? `${localSignText(fb)} ${chiusa ? titoloTogliChiusa(fb) : 'Un clic la toglie dai lavori server.'}`
-      : (perche.ok
-        ? (perche.chiusa ? titoloLocaleChiusa(fb) : 'Passa nei Lavori server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione locale.')
-        : `Adesso non si può: ${perche.motivo}.`);
   }
 
   // ── «Segna fidato» (#1148) ────────────────────────────────────────────────
@@ -3704,9 +3586,14 @@
       const ora = allFeedbacks.find((f) => f._id === id) || fb;
       ora.fiducia = valore ? 'fidato' : 'non_fidato';
       ora.fiduciaDa = { by: 'owner', at: Date.now() };
-      if (selectedId === id) reflectManage(ora);
+      // Chi aspettava la fiducia per il server è ripartito nello stesso gesto, come lavoro server (#1358).
+      if (r.rimessoInCoda) Object.assign(ora, { status: 'todo', statusReason: '', localOnly: { by: 'owner', at: Date.now() } });
+      if (selectedId === id) { if (r.rimessoInCoda) openDetail(id, { ridisegno: true }); else reflectManage(ora); }
       renderList();
-      setManageMsg(valore ? `Da ora${chi} è fidato.` : `Da ora${chi} non è più fidato: quello che nasce da qui passa dai giudici, e la fusione chiede il tuo sì.`, 'ok');
+      updateTabCounts();
+      setManageMsg(valore
+        ? (r.rimessoInCoda ? `Da ora${chi} è fidato, ed è ripartito In coda come lavoro server.` : `Da ora${chi} è fidato.`)
+        : `Da ora${chi} non è più fidato: quello che nasce da qui passa dai giudici, e la fusione chiede il tuo sì.`, 'ok');
     } catch (e) {
       setManageMsg(`${valore ? 'Non segnato fidato' : 'Fiducia non tolta'}${chi}: ${e.message || 'Errore'}`, 'err');
     } finally {
@@ -3716,40 +3603,6 @@
   if (mgFiduciaBtn) {
     mgFiduciaBtn.addEventListener('click', () => {
       if (selectedId) impostaFiducia(selectedId, mgFiduciaBtn.getAttribute('aria-pressed') !== 'true');
-    });
-  }
-
-  async function setLocalSign(id, valore) {
-    const fb = allFeedbacks.find((f) => f._id === id);
-    if (!fb) return;
-    const check = MR.localSignCheck(fb, valore);
-    const num = FB.formatNum(fb.seq, fb.subSeq);
-    const chi = num ? ` (#${num})` : '';
-    if (!check.ok) { setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${check.motivo}.`, 'err'); return; }
-    if (selectedId === id && mgLocalBtn) mgLocalBtn.disabled = true;
-    setManageMsg(valore ? 'Segno la pratica come lavoro server…' : (check.chiusa ? 'Tolgo il segno…' : 'La tolgo dai lavori server…'), '');
-    try {
-      const r = await sendToMain({ type: 'feedback_update', id, localOnly: valore });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-      fb.localOnly = valore ? { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() } : undefined;
-      if (selectedId === id) reflectLocal(fb);
-      renderList();
-      const dove = MR.manageTabFor(fb, opzSezioni());
-      const fatto = !valore
-        ? (check.chiusa ? `Da ora${chi} non è più un lavoro server${MR.isLocalApproved(fb) ? '' : ': la sua scheda torna nella bacheca pubblica'}.` : `Da ora${chi} è un lavoro come gli altri.`)
-        : check.chiusa ? `Segnata${chi} come lavoro server${MR.isLocalApproved(fb) ? '' : ': fuori dalla bacheca pubblica'}.`
-          : `Da ora${chi} è un lavoro server${dove === 'local' ? ': la trovi nei Lavori server' : ''}.`;
-      setManageMsg(fatto, 'ok');
-    } catch (e) {
-      setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${e.message || 'Errore'}`, 'err');
-    } finally {
-      if (mgLocalBtn) mgLocalBtn.disabled = false;
-    }
-  }
-  if (mgLocalBtn) {
-    mgLocalBtn.addEventListener('click', () => {
-      const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
-      if (fb) setLocalSign(fb._id, !MR.isLocalOnly(fb));
     });
   }
 
@@ -3965,17 +3818,11 @@
     }, { passive: false });
   }
 
-  // L'etichetta di stato NON si scrive più nel dettaglio (scelta owner
-  // 2026-09-13): lo stato lo dicono il colore della scheda in lista e le
-  // forme, e la decisione già presa — attacco confermato, bocciatura della
-  // sicurezza — si legge nel pannello del triangolo (MR.righeStato).
+  // L'etichetta di stato non si scrive nel dettaglio (scelta dell'owner): lo dicono il colore
+  // della scheda e le forme, e la decisione presa si legge nel pannello del triangolo.
 
-  // ── Le azioni di stato: una riga GENERATA dalla tabella condivisa ─────────
-  // Ogni azione ha un id stabile, così resta indirizzabile da fuori. Archivia e
-  // Ripristina condividono l'id perché sono i due versi della STESSA azione, e
-  // non compaiono mai insieme: nella sezione Archiviati esiste solo il
-  // ripristino — così non c'è più un cammino che riscrive uno stato terminale
-  // (attacco/spam confermato) con "archiviato", cancellando la conferma.
+  // Ogni azione ha un id stabile, così resta indirizzabile da fuori. Archivia e Ripristina
+  // condividono l'id: sono i due versi della stessa azione e non compaiono mai insieme.
   const ACTION_BTN_ID = {
     accept: 'mgAcceptBtn',
     accept_local: 'mgAcceptLocalBtn',
@@ -3998,7 +3845,7 @@
   };
   const ACTION_PROGRESS = {
     accept: 'Metto in coda…',
-    accept_local: 'Lo passo nei Lavori server…',
+    accept_local: 'Lo passo ai lavori server…',
     confirm_attack: 'Conferma in corso…',
     confirm_spam: 'Conferma in corso…',
     archive: 'Archivio…',
@@ -4014,14 +3861,26 @@
     setActionMsg('', '');
     mgActionsRow.querySelectorAll('button').forEach((b) => b.remove());
     const azioni = (isAdmin && fb) ? MR.ownerActions(fb, { releasedVersion }) : [];
-    mgActions.hidden = !azioni.length;
+    // Chi aspetta una domanda si sblocca rispondendo lì: è la prima azione, e la sola strada per farlo ripartire.
+    const domandaId = (isAdmin && fb) ? MR.aspettaDomanda(fb) : '';
+    mgActions.hidden = !azioni.length && !domandaId;
+    if (domandaId) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sn-btn';
+      b.id = 'mgDomandaBtn';
+      b.dataset.domanda = domandaId;
+      b.textContent = `Rispondi alla domanda ${domandaId}`;
+      b.title = 'Si risponde in un posto solo: la domanda, con le sue opzioni. La risposta fa ripartire il lavoro.';
+      b.addEventListener('click', () => apriDomandaDelFeedback(domandaId));
+      mgActionsRow.appendChild(b);
+    }
     if (!azioni.length) {
       if (mgAcceptComment) mgAcceptComment.hidden = true;
       return;
     }
-    // Il commento di revisione accompagna le decisioni sui Ricevuti (è ciò che
-    // l'owner scrive quando approva o conferma un blocco). Altrove non c'è
-    // niente da commentare e la casella sarebbe solo rumore.
+    // Il commento di revisione accompagna le decisioni sui Ricevuti; altrove non c'è niente da
+    // commentare e la casella sarebbe rumore.
     if (mgAcceptComment) {
       const conCommento = azioni.some((a) => a.kind === 'accept' || a.kind === 'reject');
       mgAcceptComment.hidden = !conCommento;
@@ -4040,7 +3899,6 @@
       b.textContent = a.label;
       b.title = a.key === 'accept_local' ? titoloLavoroLocale(fb) : (ACTION_TITLE[a.key] || a.label);
       b.addEventListener('click', () => {
-        // "Riapri" non scrive subito: chiede prima cosa manca ancora.
         if (a.kind === 'reopen') { apriRiapertura(); return; }
         applyAction(a, null);
       });
@@ -4052,8 +3910,11 @@
   // Una scrittura in volo spegne TUTTA la riga, non solo il bottone premuto:
   // «Archivia» premuto mentre «→ In coda» è ancora in volo scriverebbe due
   // decisioni sulla stessa segnalazione.
+  let azioniInVolo = false;
   function setActionsBusy(busy) {
+    azioniInVolo = !!busy;
     if (mgActionsRow) mgActionsRow.querySelectorAll('button').forEach((b) => { b.disabled = !!busy; });
+    if (mgSideBody) mgSideBody.querySelectorAll('[data-strada]').forEach((b) => { b.disabled = !!busy; });
     if (mgReopenConfirm) mgReopenConfirm.disabled = !!busy;
     if (mgReopenCancel) mgReopenCancel.disabled = !!busy;
   }
@@ -4064,11 +3925,8 @@
     const id = selectedId;
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb) return;
-    // Il guardiano sta SOTTO ai pulsanti, non accanto: si scrive solo uno stato
-    // che la segnalazione offre in questo momento. Un pannello rimasto aperto
-    // mentre lo stato cambiava scriverebbe altrimenti una decisione che la
-    // pagina non offre più — ed è esattamente così che un attacco confermato si
-    // ritrovava riscritto ad "archiviato", senza avviso.
+    // Il guardiano sta SOTTO ai pulsanti: si scrive solo uno stato che la segnalazione offre
+    // adesso, o un pannello rimasto aperto riscrive un attacco confermato ad «archiviato».
     if (!MR.ownerActionAllowsStatus(fb, action.to, { releasedVersion })) {
       renderActions(fb);
       setActionMsg('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile.', 'err');
@@ -4090,8 +3948,7 @@
       mostraFrase(true);
       return;
     }
-    // Nell'attesa l'owner può essere passato a un'altra segnalazione: l'azione
-    // era per questa, e qui si ferma.
+    // Nell'attesa l'owner può essere passato a un'altra segnalazione: l'azione era per questa.
     if (selectedId !== id) { setActionsBusy(false); return; }
     const payload = { type: 'feedback_update', id, status: action.to };
     const locale = { status: action.to };
@@ -4104,13 +3961,14 @@
       locale.reviewComment = comment;
       locale.reviewedAt = payload.reviewedAt;
     }
-    // Archiviazione/ripristino a mano = scelta esplicita: vince per sempre
-    // sull'auto-archiviazione a punteggio (DC3), in un verso e nell'altro.
+    // Archiviazione a mano = scelta esplicita: vince per sempre sull'auto-archiviazione a punteggio
+    // (DC3), in un verso e nell'altro.
     if (action.kind === 'archive') { payload.archiveOverride = 'archived'; locale.archiveOverride = 'archived'; }
     if (action.kind === 'restore') { payload.archiveOverride = 'keep_open'; locale.archiveOverride = 'keep_open'; }
     if (extra && typeof extra.notes === 'string') { payload.notes = extra.notes; locale.notes = extra.notes; }
-    // #913: il segno e il sì dell'owner nella stessa scrittura dell'approvazione. Il CHI lo mette il main.
-    if (action.locale) { payload.localOnly = true; payload.localApproval = true; }
+    // #913: il segno, e il sì dell'owner a chi ne ha bisogno, nella stessa scrittura dell'approvazione. Il CHI lo
+    // mette il main.
+    if (action.locale) { payload.localOnly = true; if (action.approva) payload.localApproval = true; }
 
     setActionsBusy(true);
     setActionMsg(ACTION_PROGRESS[action.key] || 'Salvo…', '');
@@ -4119,7 +3977,8 @@
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       if (action.locale) {
         const segno = { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() };
-        Object.assign(locale, { localOnly: segno, localApproval: { ...segno } });
+        locale.localOnly = segno;
+        if (action.approva) locale.localApproval = { ...segno };
       }
       Object.assign(fb, locale);
       updateTabCounts();
@@ -4132,7 +3991,7 @@
           const f = await sendToMain({ type: FIDUCIA_SEGNA, feedbackId: id }).catch((err) => ({ ok: false, error: err.message }));
           if (f && f.ok) { fb.fiducia = 'fidato'; fb.fiduciaDa = { by: 'owner', at: Date.now() }; } else fiducia = ` Non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}.`;
         }
-        toast(`${num ? `#${num}` : 'Il feedback'} è nei Lavori server.${fiducia}`, fiducia ? 'err' : 'ok');
+        toast(`${num ? `#${num}` : 'Il feedback'} è In coda come lavoro server.${fiducia}`, fiducia ? 'err' : 'ok');
       }
       // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
@@ -4158,17 +4017,14 @@
     }
   }
 
-  // ── Riapertura di un fix già uscito ───────────────────────────────────────
-  // Come la gemella: non scrive subito, chiede COSA manca ancora e lo appende
-  // alla conversazione come turno dell'utente, così il report di chi ci ha
-  // lavorato resta leggibile.
+  // Riapertura di un fix già uscito. Come la gemella: chiede COSA manca e lo appende alla
+  // conversazione come turno dell'utente, così il report di chi ci ha lavorato resta leggibile.
   function chiudiRiapertura() {
     if (!mgReopen) return;
     mgReopen.hidden = true;
     if (mgReopenText) mgReopenText.value = '';
-    // I due bottoni del modulo vivono nell'HTML, non li rigenera nessuno: senza
-    // riaccenderli qui, una riapertura andata a buon fine li lascerebbe spenti
-    // per sempre (setActionsBusy li aveva spenti insieme alla riga).
+    // I due bottoni del modulo vivono nell'HTML: senza riaccenderli qui, una riapertura riuscita li
+    // lascerebbe spenti per sempre.
     if (mgReopenConfirm) mgReopenConfirm.disabled = false;
     if (mgReopenCancel) mgReopenCancel.disabled = false;
   }
@@ -4192,8 +4048,7 @@
     if (!mgReopen) return;
     const fb = allFeedbacks.find((f) => f._id === selectedId);
     if (!fb) return;
-    // Stessa regola della risposta ai chiarimenti: non si riscrive una
-    // conversazione che non si è potuta leggere.
+    // Come per la risposta ai chiarimenti: non si riscrive una conversazione che non si è letta.
     if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
     setActionMsg('', '');
     mgReopen.hidden = false;
@@ -4249,7 +4104,7 @@
   function chiaveSegno(fb) {
     const c = String((fb && fb.clientId) || '').trim();
     if (!c || MR.valueUnreadable(c)) return 'fb:' + String((fb && fb._id) || '');
-    return 'm:' + senderKeyOf(fb);
+    return 'm:' + chiaveServerMittente(fb);
   }
   function segnoDi(fb) { return fb ? segniMittente.get(chiaveSegno(fb)) || null : null; }
   function segnoAttivo(fb) { const s = segnoDi(fb); return !!(s && s.flagged); }
@@ -4495,9 +4350,8 @@
     riflettiMessaggiOwner();
   }
 
-  // ── Azione: preferito ⭐ (toggle) ───────────────────────────────────────────
-  // Il flag `starred` è indipendente dallo stato: l'owner può "parcheggiare"
-  // qualunque feedback per il futuro. Compare nel filtro ⭐ della tab Archiviati.
+  // `starred` è indipendente dallo stato: l'owner può parcheggiare qualunque feedback. Compare
+  // nel filtro ⭐ degli Archiviati.
   async function toggleStarred() {
     if (!selectedId) return;
     const id = selectedId;
@@ -4511,20 +4365,19 @@
       const r = await sendToMain({ type: 'feedback_update', id, starred: next });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.starred = next;
-      // Col filtro ⭐ acceso gli Archiviati elencano i preferiti: cambiarne uno
-      // cambia quel numero anche da un'altra scheda, dove la lista non si
-      // ridisegna. Il conteggio si aggiorna comunque.
+      // Col filtro ⭐ acceso gli Archiviati elencano i preferiti: cambiarne uno cambia quel numero
+      // anche da un'altra scheda, dove la lista non si ridisegna.
       updateTabCounts();
-      // Nell'attesa il pannello può essere passato a un altro feedback:
-      // ridipingerlo con lo stato di questo direbbe il falso su quello aperto.
+      // Nell'attesa il pannello può essere passato a un altro feedback: ridipingerlo direbbe il
+      // falso su quello aperto.
       if (selectedId !== id) { if (currentTab === 'archived' && starredOnly) renderList(); return; }
       reflectManage(fb);
       setManageMsg(next ? 'Aggiunto ai preferiti.' : 'Rimosso dai preferiti.', 'ok');
       // Se il filtro ⭐ è attivo, un feedback de-preferito deve sparire dalla lista.
       if (currentTab === 'archived' && starredOnly) renderList();
     } catch (e) {
-      // Come il ramo di successo: se il pannello è passato a un altro feedback,
-      // l'errore di questo non va scritto sopra quello.
+      // Come il ramo di successo: se il pannello è passato a un altro feedback, l'errore di questo
+      // non ci va scritto sopra.
       if (selectedId !== id) return;
       setManageMsg(e.message || 'Errore', 'err');
     } finally {
@@ -4581,8 +4434,8 @@
         + 'rispondere adesso la sostituirebbe. Configura la chiave e riprova.', 'err');
       return;
     }
-    // Lo stesso guardiano delle azioni di stato: rispondere rimette in coda, e
-    // in coda ci si rimette solo da dove la tabella condivisa lo prevede.
+    // Lo stesso guardiano delle azioni di stato: in coda ci si rimette solo da dove la tabella
+    // condivisa lo prevede.
     if (fb && !MR.ownerActionAllowsStatus(fb, 'todo', { releasedVersion })) {
       setClarifyMsg('Lo stato di questa segnalazione è cambiato: aggiorna e riprova.', 'err');
       return;
@@ -4658,32 +4511,21 @@
     return box;
   }
 
-  // La casella della frase ha due cose da ricordare: se l'owner ci ha messo
-  // mano dopo l'ultimo invio (allora comanda quello che ha scritto lui), e
-  // quale invio e' l'ultimo partito (le risposte possono tornare in ordine
-  // diverso, e una vecchia non deve rimettere in campo un testo superato).
+  // La casella ricorda se l'owner ci ha messo mano dopo l'ultimo invio (allora comanda lui) e
+  // quale invio è l'ultimo partito: le risposte tornano in ordine diverso.
   let userNoteToccata = false;
-  // Uno per feedback: due salvataggi su feedback diversi sono indipendenti,
-  // due sullo stesso si scavalcano e comanda il più recente SPEDITO — non
-  // quello che per caso risponde per ultimo.
+  // Uno per feedback: due salvataggi su feedback diversi sono indipendenti, due sullo stesso
+  // si scavalcano e comanda il più recente SPEDITO, non quello che risponde per ultimo.
   const userNoteInvii = new Map();
-  // E l'ultimo testo SPEDITO, sempre per feedback. Serve alla domanda “è
-  // cambiato qualcosa?”: farla sul valore memorizzato la sbaglia finché la
-  // risposta non torna — l'owner che ci ripensa e rimette la frase di prima
-  // si sentiva dire "Nessuna modifica", non partiva niente, e a destinazione
-  // restava quella che aveva appena ritirato.
+  // L'ultimo testo SPEDITO, per feedback: «è cambiato qualcosa?» fatta sul valore memorizzato
+  // risponde «Nessuna modifica» a chi rimette la riga di prima, che resta ritirata.
   const userNoteSpedito = new Map();
-  // Quando una scrittura fallisce non si torna a fidarsi del valore
-  // memorizzato: se una scrittura precedente era andata a buon fine, quello
-  // che c’è a destinazione non lo sa più nessuno. Si marca IGNOTO, che non
-  // combacia con niente, così il salvataggio dopo riparte comunque.
+  // Dopo una scrittura fallita non si sa cosa ci sia a destinazione: si marca IGNOTO, che non
+  // combacia con niente, così il salvataggio dopo riparte.
   const FRASE_IGNOTA = Symbol('frase ignota');
 
-  // ── Aprire e chiudere la frase ────────────────────────────────────────────
-  // Il modulo della frase sta CHIUSO finché non lo si chiede: è un testo che si
-  // scrive una volta sola, mentre il dettaglio — la conversazione — si legge
-  // sempre. Aprendolo il cursore ci finisce dentro: chi ha premuto quel tasto
-  // vuole scrivere, non cercare la casella.
+  // Il modulo della frase sta chiuso finché non lo si chiede: è un testo che si scrive una
+  // volta sola. Aprendolo il cursore ci finisce dentro: chi preme quel tasto vuole scrivere.
   function mostraFrase(aperta) {
     if (!mgUserNote) return;
     mgUserNote.hidden = !aperta;
@@ -4692,9 +4534,8 @@
   }
   function collassaFrase() { mostraFrase(false); }
 
-  // Da chiusa, la sezione non direbbe da nessuna parte che una frase c'è già:
-  // il tasto se lo tiene addosso (pallino + bordo acceso) e la mostra intera
-  // nell'hover, così l'owner sa se sta scrivendo o riscrivendo.
+  // Da chiusa, la sezione non direbbe che una frase c'è già: il tasto se lo tiene addosso
+  // (pallino + bordo) e la mostra intera nell'hover.
   function riflettiFrase(frase) {
     if (!mgUserNoteToggle) return;
     const t = MR.tastoFrase(frase);
@@ -4712,17 +4553,12 @@
     if (!mgUserNoteMsg) return;
     mgUserNoteMsg.textContent = text || '';
     mgUserNoteMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
-    // Un errore dentro una sezione chiusa non lo legge nessuno: il salvataggio
-    // può fallire mentre la sezione è già stata richiusa. Si riapre da sola.
+    // Il salvataggio può fallire a sezione già richiusa, e un errore lì non lo legge nessuno.
     if (kind === 'err') mostraFrase(true);
   }
 
-  // Salva SOLO la frase: non tocca la conversazione, quindi si può scrivere
-  // anche quando il report non è leggibile su questo computer.
-  // Ritorna true quando a destinazione c'è quello che l'owner ha scritto: sia
-  // che l'abbia appena spedito, sia che non ci fosse niente da spedire. False
-  // solo se la scrittura è fallita. Il valore lo guarda chi deve decidere se
-  // proseguire (un'azione di stato non parte se la frase non si è salvata).
+  // Salva SOLO la frase: non tocca la conversazione, quindi si scrive anche col report
+  // illeggibile. True = a destinazione c'è quello che l'owner ha scritto; false = fallita.
   async function saveUserNote(opts) {
     const muto = !!(opts && opts.muto);
     if (!selectedId) return true;
@@ -4732,8 +4568,8 @@
     const gia = userNoteSpedito.has(id) ? userNoteSpedito.get(id) : String((fb && fb.userNote) || '');
     if (gia === frase) { if (!muto) setUserNoteMsg('Nessuna modifica', ''); return true; }
 
-    // Da qui in poi quello che c'è nella casella è "partito": se l'owner ci
-    // rimette mano, quello che scrive lui vince sulla risposta che arriverà.
+    // Da qui la casella è «partita»: se l'owner ci rimette mano, quello che scrive vince sulla
+    // risposta che arriverà.
     userNoteToccata = false;
     const mio = (userNoteInvii.get(id) || 0) + 1;
     userNoteInvii.set(id, mio);
@@ -4744,54 +4580,35 @@
     try {
       const r = await sendToMain({ type: 'feedback_update', id, userNote: frase });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-      // L’ORDINE DI QUESTE TRE GUARDIE È IL PUNTO.
-      //
-      // 1) Una risposta superata da un salvataggio più recente non tocca
-      //    niente, né la schermata né il dato: il pannello ridipinge dal dato,
-      //    quindi lasciarcela scrivere faceva ricomparire, rientrando nel
-      //    feedback, parole già sostituite — e da lì la pagina rispondeva
-      //    "Nessuna modifica" su un testo che a destinazione non c'era mai
-      //    arrivato.
+      // L'ORDINE DI QUESTE TRE GUARDIE È IL PUNTO. 1) Una risposta superata da un salvataggio più
+      // recente non tocca niente, o farebbe ricomparire parole già sostituite.
       if (mio !== userNoteInvii.get(id)) return true;
-      // 2) Il dato si aggiorna SEMPRE, anche se intanto l’owner è passato a un
-      //    altro feedback: la scrittura è andata a buon fine davvero, e
-      //    rientrando deve trovare quello che ha salvato.
+      // 2) Il dato si aggiorna SEMPRE, anche se intanto l'owner è passato a un altro feedback:
+      // la scrittura è riuscita davvero, e rientrando deve trovare quello che ha salvato.
       if (fb) fb.userNote = frase;
       userNoteSpedito.delete(id);
-      // 3) La SCHERMATA invece si tocca solo se è ancora quella di questo
-      //    feedback: altrimenti ci finirebbe dentro la frase di un altro, e il
-      //    salvataggio dopo manderebbe il messaggio di uno al mittente
-      //    dell’altro.
+      // 3) La SCHERMATA si tocca solo se è ancora quella di questo feedback, o il salvataggio
+      // dopo manderebbe il messaggio di uno al mittente dell'altro.
       if (selectedId !== id) return true;
-      // La casella si riallinea solo se l’owner non ci ha messo mano dopo
-      // l’invio, altrimenti gli cancellerebbe la correzione sotto le dita. Non
-      // basta confrontare il testo con quello inviato: uscendo dal feedback e
-      // rientrandoci il pannello lo ha già ridipinto col valore VECCHIO, e il
-      // confronto lo scambierebbe per una correzione.
+      // La casella si riallinea solo se l'owner non ci ha messo mano dopo l'invio, o gli cancella
+      // la correzione sotto le dita. Confrontare col testo inviato non basta: è già ridipinta.
       if (!userNoteToccata) {
         mgUserNoteText.value = frase;
-        // Quello che c'è a destinazione È quello che si vede: senza questa
-        // riga la casella restava "in bozza" per sempre agli occhi del
-        // pannello (il confronto con dataset.saved), e ogni aggiornamento in
-        // arrivo su questa segnalazione veniva trattenuto per una bozza che
-        // non c'era più.
+        // Quello che c'è a destinazione È quello che si vede: senza, la casella resta «in bozza»
+        // per sempre e ogni aggiornamento su questa segnalazione viene trattenuto.
         mgUserNoteText.dataset.saved = frase;
       }
-      // Il tasto della barra porta il segno di quello che c'è a destinazione:
-      // da chiuso è l'unico posto dove si vede che una frase esiste.
+      // Il tasto porta il segno di quello che c'è a destinazione: da chiuso è l'unico posto dove si
+      // vede che una frase esiste.
       riflettiFrase(frase);
       setUserNoteMsg(frase ? 'Salvata' : 'Frase rimossa', 'ok');
       renderThread(fb);
       return true;
     } catch (e) {
-      // Superata da un invio più recente: comanda quello, qui non si tocca
-      // niente.
-      // ed è quello a dire se a destinazione la frase è arrivata.
+      // Superata da un invio più recente: comanda quello, ed è quello a dire se è arrivata.
       if (mio !== userNoteInvii.get(id)) return true;
-      // Non è arrivato a destinazione, e una scrittura precedente potrebbe
-      // esserci arrivata: da qui in poi non sappiamo cosa ci sia. Va marcato
-      // SEMPRE, anche se intanto si sta guardando un altro feedback, o il
-      // salvataggio successivo verrebbe di nuovo inghiottito.
+      // Non è arrivato, e una precedente potrebbe esserci: da qui non sappiamo cosa ci sia. Va
+      // marcato SEMPRE, anche guardando un altro feedback, o il salvataggio dopo si perde.
       userNoteSpedito.set(id, FRASE_IGNOTA);
       if (selectedId === id) setUserNoteMsg(e.message || 'Errore nel salvataggio', 'err');
       return false;
@@ -4800,16 +4617,9 @@
     }
   }
 
-  // ── La frase non si perde per strada ──────────────────────────────────────
-  // Il tasto "Salva la frase" era l'UNICA strada: tutto il resto (premere
-  // "Risolto", ricliccare la stessa segnalazione, cambiare sezione) ridipinge
-  // il pannello e riporta la casella al valore salvato, buttando via la riga
-  // appena scritta senza dire niente — e quella riga è l'unica cosa che chi ha
-  // segnalato leggerà. Adesso si salva da sola: mentre scrivi, dopo una pausa,
-  // e appena il cursore lascia la casella. È lo stesso comportamento della
-  // gemella, che così faceva già.
+  // La frase si salva da sola: mentre si scrive, dopo una pausa, e al blur. Col solo tasto,
+  // ridipingere il pannello buttava via senza dirlo l'unica riga che il mittente leggerà.
   const FRASE_PAUSA_MS = 1500;
-  let userNoteTimer = null;
   // L'ultimo salvataggio partito, e COSA portava: chi deve sapere se la frase è
   // a destinazione (un'azione di stato, il tasto premuto un istante dopo che la
   // casella ha perso il fuoco) aspetta questo invece di spedirlo una seconda
@@ -4820,10 +4630,8 @@
   function fraseInCasella() {
     return mgUserNoteText ? (mgUserNoteText.value || '').trim().slice(0, 500) : '';
   }
-  // C'è qualcosa da spedire? La domanda si fa su quello che è PARTITO, non su
-  // quello che la pagina si ricorda: finché la risposta non torna, il valore
-  // memorizzato è ancora quello di prima, e un ripensamento scritto in quella
-  // finestra verrebbe inghiottito. È lo stesso confronto che fa il salvataggio.
+  // C'è qualcosa da spedire? La domanda si fa su quello che è PARTITO, non su quello che la
+  // pagina ricorda: finché la risposta non torna, un ripensamento verrebbe inghiottito.
   function bozzaFrase() {
     if (!mgUserNoteText || !selectedId) return false;
     const fb = allFeedbacks.find((f) => f._id === selectedId);
@@ -4832,21 +4640,18 @@
       : String((fb && fb.userNote) || '');
     return gia !== fraseInCasella();
   }
+  // Pausa, Ctrl da solo, cambio e chiusura della scheda: le uscite le ascolta la regola condivisa delle caselle.
+  const caselleFrase = window.SN_CASELLE.crea();
+  caselleFrase.registra('frase', () => { salvaFraseAutomatico(); });
   function annullaSalvataggioProgrammato() {
-    if (userNoteTimer) { clearTimeout(userNoteTimer); userNoteTimer = null; }
+    caselleFrase.spedita('frase');
   }
-  function programmaSalvataggioFrase() {
-    annullaSalvataggioProgrammato();
-    userNoteTimer = setTimeout(() => { userNoteTimer = null; salvaFraseAutomatico(); }, FRASE_PAUSA_MS);
-  }
-  // Salva ORA quello che c'è nella casella, se non è già a destinazione.
-  // Ritorna la promessa dell'esito (true = a destinazione c'è quello che
-  // l'owner ha scritto), così chi deve proseguire può aspettarla.
+  // Salva ORA, se non è già a destinazione. Ritorna la promessa dell'esito, così chi deve
+  // proseguire può aspettarla.
   function salvaFraseSubito(opts) {
     annullaSalvataggioProgrammato();
     const testo = fraseInCasella();
-    // Già partito con ESATTAMENTE questo testo: si aspetta quello, non se ne
-    // manda un altro uguale.
+    // Già partito con ESATTAMENTE questo testo: si aspetta quello, non se ne manda un altro.
     if (userNoteInVolo && userNoteInVoloTesto === testo) return userNoteInVolo;
     if (!bozzaFrase()) return userNoteInVolo || Promise.resolve(true);
     const mia = saveUserNote(opts);
@@ -4858,21 +4663,16 @@
     });
     return mia;
   }
-  // Il salvataggio che parte DA SOLO tocca solo quello che l'owner ha scritto
-  // lui: senza questa guardia, aprire due segnalazioni di fila riscriverebbe
-  // una frase che nessuno ha toccato (ripulita degli spazi, tagliata a 500) e
-  // il mittente si vedrebbe cambiare la riga sotto il naso.
+  // Il salvataggio automatico tocca solo quello che l'owner ha scritto lui: senza la guardia,
+  // aprire due segnalazioni di fila riscriverebbe una frase che nessuno ha toccato.
   function salvaFraseAutomatico() {
-    // Una scrittura fallita lascia la frase IGNOTA: lì si riprova comunque,
-    // anche se da allora nessuno ha più toccato la casella. Altrimenti "la
-    // frase è al sicuro?" risponderebbe di sì su una riga che non è mai
-    // arrivata.
+    // Una scrittura fallita lascia la frase IGNOTA: lì si riprova comunque, o «la frase è al
+    // sicuro?» risponderebbe di sì su una riga mai arrivata.
     const ignota = !!selectedId && userNoteSpedito.get(selectedId) === FRASE_IGNOTA;
     if (!userNoteToccata && !ignota) return userNoteInVolo || Promise.resolve(true);
     return salvaFraseSubito({ muto: true });
   }
-  // Quello che l'owner ha scritto è a destinazione? Aspetta sia il salvataggio
-  // già partito sia quello che parte adesso.
+  // Aspetta sia il salvataggio già partito sia quello che parte adesso.
   async function fraseAlSicuro() {
     const giaPartito = userNoteInVolo;                 // preso PRIMA: salvaFraseSubito lo sostituisce
     const nuovo = salvaFraseAutomatico();
@@ -4883,12 +4683,11 @@
   // Il tasto e Invio restano la strada esplicita, e rispondono sempre.
   function salvaFraseAMano() {
     annullaSalvataggioProgrammato();
-    // Premuto un istante dopo che la casella ha perso il fuoco: quel
-    // salvataggio è già in volo con questo stesso testo, e l'esito lo scrive lui.
+    // Premuto un istante dopo la perdita di fuoco: quel salvataggio è già in volo con lo stesso
+    // testo, e l'esito lo scrive lui.
     if (userNoteInVolo && userNoteInVoloTesto === fraseInCasella()) return;
     if (!bozzaFrase()) {
-      // Niente da spedire perché a destinazione c'è già questa riga (di solito
-      // ce l'ha portata il salvataggio automatico). È quello che l'owner vuole
+      // Niente da spedire perché a destinazione c'è già questa riga: è quello che l'owner vuole
       // sapere premendo il tasto.
       const testo = fraseInCasella();
       setUserNoteMsg(testo ? 'Salvata' : 'Nessuna frase', 'ok');
@@ -4898,7 +4697,10 @@
   }
   if (mgUserNoteBtn) mgUserNoteBtn.addEventListener('click', salvaFraseAMano);
   if (mgUserNoteText) {
-    mgUserNoteText.addEventListener('input', () => { userNoteToccata = true; programmaSalvataggioFrase(); });
+    mgUserNoteText.addEventListener('input', (e) => {
+      userNoteToccata = true;
+      caselleFrase.cambiato('frase', e, { pausa: FRASE_PAUSA_MS });
+    });
     mgUserNoteText.addEventListener('blur', () => { salvaFraseAutomatico(); });
     mgUserNoteText.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); salvaFraseAMano(); }
@@ -4912,15 +4714,20 @@
     });
   }
 
-  // Il messaggio d'esito della riga delle azioni di stato.
   function setActionMsg(text, kind) {
     mgActionMsg.textContent = text || '';
     mgActionMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+    // Chi ha premuto nel quadrato guarda il pannello, non la riga in fondo.
+    const specchio = document.getElementById('mgL5StradeEsito');
+    if (specchio) {
+      specchio.textContent = text || '';
+      specchio.dataset.kind = kind === 'err' || kind === 'ok' ? kind : (text ? 'wait' : '');
+    }
     riflettiMessaggiOwner();
   }
 
-  // La riga degli esiti esiste solo quando ha qualcosa da dire: vuota
-  // lascerebbe uno spazio sotto i tasti che non significa niente.
+  // La riga degli esiti esiste solo quando ha qualcosa da dire: vuota lascerebbe uno spazio che
+  // non significa niente.
   function riflettiMessaggiOwner() {
     if (!mgOwnerMsgs) return;
     const vuoto = !(mgActionMsg && mgActionMsg.textContent.trim())
@@ -4930,12 +4737,10 @@
 
   // ── La fila dei cinque livelli ────────────────────────────────────────────
 
-  // Quale forma sta guardando il pannello di destra: serve a ridisegnarlo
-  // quando arriva un aggiornamento (una fusione approvata altrove) e a
-  // segnare la forma scelta.
+  // Quale forma guarda il pannello: serve a ridisegnarlo a ogni aggiornamento e a segnarla.
   let livelloAperto = null;
-  // Quale cerchio dei giudici sta aperto (posizione), quando livelloAperto è
-  // 'l2': serve a riaprire lo stesso giudice su un ridisegno.
+  // Quale cerchio dei giudici è aperto, quando livelloAperto è 'l2': serve a riaprire lo stesso
+  // giudice su un ridisegno.
   let giudiceAperto = null;
 
   function formaEl(liv, fb) {
@@ -4946,7 +4751,6 @@
       + (livelloAperto === liv.key ? ' mg-forma--scelta' : '');
     b.dataset.livello = liv.key;
     b.dataset.esito = liv.esito;
-    // Una o due parole sotto il puntatore, come su ogni icona della pagina.
     b.title = liv.titolo;
     b.setAttribute('aria-label', liv.titolo);
     b.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${FORME_SVG[liv.forma]}"/></svg>`;
@@ -4958,10 +4762,8 @@
     if (!mgLivelliRow || !mgForme) return;
     mgForme.replaceChildren();
 
-    // Stato illeggibile: le forme nascerebbero da uno stato che la macchina si
-    // inventa (`unlabeled`), e direbbero "in attesa del giudizio" su una
-    // segnalazione già chiusa. Al loro posto l'unica cosa che si sa: aperta o
-    // chiusa, con le stesse parole della gemella.
+    // Stato illeggibile: le forme nascerebbero da un `unlabeled` inventato e direbbero «in
+    // attesa del giudizio» su una chiusa. Al loro posto si dice solo: aperta o chiusa.
     if (!statoLeggibile(fb)) {
       const pubblico = MR.publicStateLabel(fb);
       if (!pubblico) { mgLivelliRow.hidden = true; return; }
@@ -4977,9 +4779,8 @@
     mgLivelliRow.hidden = false;
     for (const liv of MR.livelli(fb, opzioniLivelli(fb))) {
       if (liv.key !== 'l2') { mgForme.appendChild(formaEl(liv, fb)); continue; }
-      // I giudici: un cerchio per giudice ATTESO, non per verdetto. Un panel
-      // parziale mostra i mancanti tratteggiati, non un panel accorciato — e
-      // anche un tratteggiato si clicca: dice PERCHÉ è vuoto.
+      // Un cerchio per giudice ATTESO, non per verdetto: un panel parziale mostra i mancanti
+      // tratteggiati, e anche un tratteggiato si clicca perché dice PERCHÉ è vuoto.
       const gruppo = document.createElement('span');
       gruppo.className = 'mg-forme-gruppo';
       gruppo.title = liv.titolo;
@@ -5004,10 +4805,8 @@
     return v.find((x) => x && x.judge === name) || null;
   }
 
-  // Crea e appende una bolla della conversazione. `side` decide il lato
-  // ('user' = destra, 'model' = sinistra), `who` è l'etichetta sopra il testo,
-  // `bodyHtml` è GIÀ escapato dal chiamante. Gli allegati (immagini + file) si
-  // aggiungono sotto il corpo; le immagini aprono il lightbox.
+  // `side` decide il lato, `who` è l'etichetta sopra il testo, `bodyHtml` è GIÀ escapato dal
+  // chiamante.
   function appendBubble(side, who, bodyHtml, attachments) {
     const b = document.createElement('div');
     b.className = `mg-bubble mg-bubble--${side}`;
@@ -5019,15 +4818,15 @@
     if (imgs.length) {
       html += `<div class="mg-bubble-imgs">`;
       for (const a of imgs) {
-        // Nessun src iniziale: l'URL punta a byte CIFRATI (allegato rotto). Il
-        // main lo decifra e resolveBubbleImages riempie src col data URL.
+        // Nessun src iniziale: l'URL punta a byte CIFRATI. Il main lo decifra e resolveBubbleImages
+        // riempie src col data URL.
         html += `<img class="mg-img-loading" alt="allegato" data-url="${esc(a.url)}" loading="lazy">`;
       }
       html += `</div>`;
     }
     for (const f of files) {
-      // Niente href diretto: l'URL punta a byte CIFRATI (un file rotto). Il
-      // click chiede al main di scaricare e decifrare, e salva col nome vero.
+      // Niente href diretto: l'URL punta a byte CIFRATI. Il click chiede al main di scaricare e
+      // decifrare, e salva col nome vero.
       html += `<div class="mg-bubble-file"><a href="#" class="mg-file-link" data-url="${esc(f.url)}" data-name="${esc(f.name || 'allegato')}" data-type="${esc(f.type || '')}">📎 ${esc(f.name || 'allegato')}</a></div>`;
     }
     b.innerHTML = html;
@@ -5037,38 +4836,66 @@
     return b;
   }
 
-  // Un riassunto è "completo" se finisce con una punteggiatura di chiusura
-  // frase. Il backend che giudica i feedback sintetizza il parere di Filo
-  // (filoSummary) con un limite di lunghezza che a volte lo TRONCA a metà
-  // frase (è il "la frase si interrompe" segnalato): l'ultima parola resta
-  // appesa senza punto. In quel caso non mostriamo il frammento spezzato ma
-  // ripieghiamo sul parere COMPLETO ricostruito dai verdetti dei giudici, che
-  // sono sempre archiviati per intero.
+  // Un riassunto è «completo» se finisce con una punteggiatura di chiusura: il backend tronca
+  // filoSummary a metà frase, e lì si ripiega sul parere ricostruito dai verdetti.
   function isCompleteSummary(s) {
     const t = String(s || '').trim();
     if (!t) return false;
     return /[.!?…»)\]"'’”:]$/.test(t);
   }
 
-  // Parere di Filo ricostruito dai verdetti completi dei giudici. Fallback per
-  // quando il riassunto sintetico manca o è troncato: ogni giudice contribuisce
-  // classe + ragionamento (entrambi archiviati per intero). Ritorna '' se non
-  // c'è nessun verdetto con ragionamento da mostrare.
+  // Ricostruito dai verdetti completi: ogni giudice porta classe + ragionamento. '' se non c'è
+  // nessun verdetto con ragionamento.
   function filoOpinionFromVerdicts(fb) {
     const p = (fb && fb.pipeline) || {};
     const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
     const withReason = verdicts.filter((v) => v && String(v.reasoning || '').trim());
     if (!withReason.length) return '';
     const letters = ['A', 'B', 'C', 'D', 'E'];
-    // All'owner mostriamo il modello reale (come il pannello destro); ai
-    // non-owner l'etichetta posizionale anonima. La pagina è comunque
-    // owner-only, ma teniamo la stessa regola di anonimizzazione dei pallini.
+    // All'owner il modello reale, ai non-owner l'etichetta posizionale anonima: la pagina è
+    // owner-only, ma la regola di anonimizzazione dei pallini resta la stessa.
     return withReason.map((v, i) => {
       const model = v.model || v.judgeModel;
       const who = (isAdmin && model) ? String(model) : `Giudice ${letters[i] || i + 1}`;
       const cls = v.class ? ` — ${v.class}` : '';
       return `<strong>${esc(who)}${esc(cls)}</strong>\n${esc(String(v.reasoning).trim())}`;
     }).join('\n\n');
+  }
+
+  // Le note lunghe della lavorazione si mostrano ripiegate, l'inizio visibile e un tocco per aprirle (#559):
+  // una critica di duecento righe non deve nascondere il turno dopo. Aperte e chiuse sopravvivono ai ridisegni.
+  const NOTA_RIGHE_MAX = 24;
+  let noteAperte = { id: null, chiavi: new Set() };
+
+  function righeStimate(testo) {
+    return String(testo || '').split('\n').reduce((n, riga) => n + Math.max(1, Math.ceil(riga.length / 100)), 0);
+  }
+
+  function ripiegaNota(bolla, chiave) {
+    const corpo = bolla.querySelector('.mg-bubble-body');
+    const tasto = document.createElement('button');
+    tasto.type = 'button';
+    tasto.className = 'mg-bubble-apri';
+    corpo.after(tasto);
+    const mostra = (aperta) => {
+      bolla.classList.toggle('mg-bubble--ripiegata', !aperta);
+      tasto.setAttribute('aria-expanded', String(aperta));
+      tasto.textContent = aperta ? 'Riduci' : 'Mostra tutto';
+      if (aperta) noteAperte.chiavi.add(chiave);
+      else noteAperte.chiavi.delete(chiave);
+    };
+    tasto.addEventListener('click', () => {
+      const apri = bolla.classList.contains('mg-bubble--ripiegata');
+      mostra(apri);
+      // Richiusa dal fondo di una nota lunga, la bolla tornerebbe fuori vista: la si riporta sotto gli occhi.
+      if (!apri) bolla.scrollIntoView({ block: 'nearest' });
+    });
+    corpo.addEventListener('click', (e) => {
+      if (!bolla.classList.contains('mg-bubble--ripiegata')) return;
+      if (e.target.closest('a') || String(window.getSelection() || '')) return;
+      mostra(true);
+    });
+    mostra(noteAperte.chiavi.has(chiave));
   }
 
   // La conversazione COMPLETA del feedback, un turno per bolla: segnalazione
@@ -5092,11 +4919,8 @@
     // L'autore dalla stessa regola della testata, o le due righe dello stesso dettaglio si contraddicono.
     appendBubble(fromModel ? 'model' : 'user', authorMetaOf(fb).label, esc(fb.text || ''), imgs.concat(files));
 
-    // Bolla 2: parere di Filo. Il riassunto sintetico (filoSummary) può
-    // arrivare troncato a metà frase dal backend; se manca o è troncato,
-    // ripieghiamo sul parere completo ricostruito dai verdetti dei giudici,
-    // così Filo non mostra mai una frase spezzata a metà né un falso "non ha
-    // ancora un parere" quando in realtà ha già giudicato.
+    // filoSummary può arrivare troncato: si ripiega sul parere dai verdetti (vedi
+    // isCompleteSummary), per non mostrare né una frase spezzata né un falso «nessun parere».
     const summary = (fb.pipeline && fb.pipeline.filoSummary)
       ? String(fb.pipeline.filoSummary).trim() : '';
     let opinionHtml;
@@ -5122,12 +4946,8 @@
     }
     appendBubble('model', 'Filo', opinionHtml);
 
-    // Bolla 3: LA DECISIONE dell'owner in revisione, col suo commento se c'è.
-    // Prima compariva solo quando c'era un commento: una conferma presa senza
-    // commentarla non lasciava traccia nella conversazione, che continuava a
-    // dire "Filo non ha ancora un parere" su una segnalazione già decisa.
-    // I campi della revisione viaggiano cifrati insieme allo status: senza la
-    // chiave non si scrive un blob, si tace.
+    // LA DECISIONE dell'owner in revisione, col commento se c'è: senza, una conferma non
+    // commentata non lascia traccia. I campi viaggiano cifrati: senza chiave si tace.
     const decisione = MR.valueUnreadable(fb.reviewDecision) ? '' : String(fb.reviewDecision || '').trim();
     const commento = MR.valueUnreadable(fb.reviewComment) ? '' : String(fb.reviewComment || '').trim();
     const DECISION_TEXT = {
@@ -5192,12 +5012,19 @@
       if (fb._dettaglioMancato) appendRiprovaDettaglio();
       return;
     }
-    for (const seg of TH.splitNotes(notes)) {
+    if (noteAperte.id !== fb._id) noteAperte = { id: fb._id, chiavi: new Set() };
+    const turni = TH.splitNotes(notes);
+    turni.forEach((seg, i) => {
       const when = seg.ts ? ` — ${seg.ts}` : '';
       const who = seg.role === 'user' ? `Tu${when}` : `Filo (lavorazione${when})`;
       const corpo = seg.role === 'user' ? esc(seg.body) : markdownHtml(seg.body);
-      appendBubble(seg.role === 'user' ? 'user' : 'model', who, corpo, seg.attachments);
-    }
+      const b = appendBubble(seg.role === 'user' ? 'user' : 'model', who, corpo, seg.attachments);
+      const chiave = `${i}:${seg.body.length}`;
+      // L'ultima nota è quella che si legge: resta aperta, e resta aperta anche quando un turno nuovo
+      // arriva mentre la si legge (niente che si richiude da solo).
+      if (i === turni.length - 1) noteAperte.chiavi.add(chiave);
+      else if (righeStimate(seg.body) > NOTA_RIGHE_MAX) ripiegaNota(b, chiave);
+    });
     appendFraseBubble(fb);
     // La copia che si sta leggendo è rimasta indietro e il tentativo di
     // rileggerla non è tornato: si dice in coda alla conversazione, dove
@@ -5205,19 +5032,15 @@
     if (fb._dettaglioMancato) appendRiprovaDettaglio();
   }
 
-  // La riga che leggerà chi ha segnalato è l'ULTIMO turno della conversazione:
-  // è l'unica cosa che il mittente vede quando la segnalazione si chiude, ed è
-  // in chiaro anche quando il resto non si legge. Prima compariva solo sul
-  // report cifrato: da quando la sezione parte chiusa, nel caso normale la
-  // frase non era scritta da nessuna parte e si scopriva solo passando col
-  // mouse sul tasto.
+  // La riga che leggerà chi ha segnalato è l'ULTIMO turno: l'unica cosa che il mittente vede
+  // alla chiusura, in chiaro anche quando il resto non si legge.
   function appendFraseBubble(fb) {
     const frase = String((fb && fb.userNote) || '').trim();
     if (!frase) return;
     appendBubble('model', 'Filo (per chi ha segnalato)', esc(frase));
   }
 
-  // ── Pannello laterale ─────────────────────────────────────────────────────
+  // Pannello laterale
   function openSidebar(title, html) {
     mittenteAperto = null;
     mgSideEmpty.hidden = true;
@@ -5238,8 +5061,8 @@
       .forEach((el) => el.classList.remove('mg-forma--scelta'));
   }
 
-  // Segna quale forma sta guardando il pannello: senza, con cinque forme in
-  // fila e un pannello che cambia, non si sa più quale si era premuta.
+  // Segna quale forma guarda il pannello: con cinque forme in fila non si saprebbe più quale si
+  // era premuta.
   function segnaForma(key) {
     livelloAperto = key || null;
     if (!mgForme) return;
@@ -5288,9 +5111,9 @@
   // ── Il pannello di un livello ─────────────────────────────────────────────
   //
   // Il contenuto (titolo, righe, testo, azioni) arriva già pronto dal modulo
-  // condiviso: qui c'è solo il markup, e i due pezzi che il markup non può
-  // avere — i tasti Approva/Scarta della fusione (li costruisce il modulo delle
-  // fusioni) e «Salta il controllo» dell'audit.
+  // condiviso: qui c'è solo il markup, e i pezzi che il markup non può avere —
+  // i tasti Approva/Scarta della fusione (li costruisce il modulo delle fusioni),
+  // le strade di una fusione ferma senza richiesta e «Salta il controllo» dell'audit.
   function openSidebarLivello(fb, key) {
     if (!fb) return;
     const liv = MR.livelloPer(fb, key, opzioniLivelli(fb));
@@ -5298,8 +5121,8 @@
     segnaForma(key);
     giudiceAperto = null;
 
-    // I giudici non hanno un pannello loro: la fila di cerchi apre il singolo
-    // giudice. Cliccare il gruppo quando nessuno ha votato dice perché.
+    // I giudici non hanno un pannello loro: la fila di cerchi apre il singolo giudice, e cliccare
+    // il gruppo quando nessuno ha votato dice perché.
     const p = liv.pannello;
     const body = document.createElement('div');
 
@@ -5331,6 +5154,8 @@
     if (Array.isArray(p.parti) && p.parti.length) body.appendChild(partiLeggibili(p.parti));
     if (liv.key === 'l1' && isAdmin && p.azioni.includes('rigiudica')) body.appendChild(pannelloRigiudica(fb));
     if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
+    const strade = liv.key === 'l5' ? pannelloStradeFusione(fb, liv) : null;
+    if (strade) body.appendChild(strade);
     if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb));
     if (liv.key === 'l3' && rispostaOfferta(fb)) body.appendChild(pannelloRisposta(fb));
 
@@ -5371,8 +5196,7 @@
     if (liv && liv.pannello && liv.pannello.testo) riempiTestoLivello(t, liv.pannello);
   }
 
-  // Le card della fusione dentro il pannello del quadrato: stesso disegno e
-  // stessi tasti dell'elenco in Automazioni, perché è la stessa cosa.
+  // Stesso disegno e stessi tasti dell'elenco in Automazioni, perché è la stessa cosa.
   function pannelloFusione(fb, liv) {
     const UI = window.SN_MERGE_APPROVALS;
     const host = document.createElement('div');
@@ -5384,6 +5208,46 @@
     }));
     host.hidden = false;
     return host;
+  }
+
+  // Ferma al cancello senza richiesta (#1556): le due strade sono le azioni di stato della riga dell'owner, per lo
+  // stesso cammino, così guardiano, commento di revisione ed esiti sono quelli di là.
+  const STRADE_FUSIONE = {
+    rimanda: { key: 'accept', id: 'mgL5RimandaBtn', label: 'Rimanda in lavorazione', primary: true },
+    archivia: { key: 'archive', id: 'mgL5ArchiviaBtn', label: 'Archivia', primary: false },
+  };
+  function titoloStrada(fb, key) {
+    if (key !== 'accept') return ACTION_TITLE[key] || '';
+    return MR.isLocalOnly(fb) ? 'Torna In coda come lavoro server e il lavoro si rifà' : 'Torna in coda e le routine rifanno il lavoro';
+  }
+  function pannelloStradeFusione(fb, liv) {
+    if (!isAdmin) return null;
+    const strade = (liv.pannello.azioni || []).map((k) => STRADE_FUSIONE[k]).filter(Boolean)
+      .map((s) => ({ ...s, azione: MR.ownerActionFor(fb, s.key, { releasedVersion }) }))
+      .filter((s) => s.azione);
+    if (!strade.length) return null;
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const fila = document.createElement('div');
+    fila.className = 'mg-liv-strade';
+    for (const s of strade) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sn-btn' + (s.primary ? '' : ' sn-btn-secondary');
+      b.id = s.id;
+      b.dataset.strada = s.key;
+      b.textContent = s.label;
+      b.title = titoloStrada(fb, s.key);
+      b.disabled = azioniInVolo;
+      b.addEventListener('click', () => applyAction(s.azione, null));
+      fila.appendChild(b);
+    }
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.id = 'mgL5StradeEsito';
+    esito.setAttribute('role', 'status');
+    box.append(fila, esito);
+    return box;
   }
 
   // «Salta il controllo» si offre su una bocciatura dell'audit — e anche sulle
@@ -5398,9 +5262,8 @@
     return n.status === 'design' && n.statusReason === 'secaudit';
   }
 
-  // Ogni esito del server detto in italiano. Un esito che questo client non
-  // conosce si scrive lo stesso: meglio grezzo che muto, e mai un «fatto» al
-  // posto di un guasto.
+  // Ogni esito del server detto in italiano. Uno che questo client non conosce si scrive
+  // grezzo: meglio grezzo che muto, e mai un «fatto» al posto di un guasto.
   const SALTA_ESITI = {
     fuso: { kind: 'ok', text: 'Saltato: il lavoro è entrato in main.' },
     bloccato: { kind: 'ok', text: 'Saltato. Il cancello di fusione ha fermato il ramo: ora aspetta il tuo via libera sul quadrato.' },
@@ -5410,6 +5273,11 @@
     non_saltabile: { kind: 'err', text: 'Qui non c’è un controllo da saltare: l’audit non ha bocciato niente.' },
     non_owner: { kind: 'err', text: 'Questo lo può fare solo il proprietario.' },
     guasto: { kind: 'err', text: 'GitHub non risponde. Il salto è registrato: ripremi quando torna su.' },
+    // Un lavoro anche sul server passa dal cancello del server: prima l'app, poi il server.
+    attesa_server: { kind: 'ok', text: 'Saltato. Il lavoro tocca anche il server: entra in main quando la suite di filo-security è verde, prima l’app e poi il server.' },
+    server_al_pc: { kind: 'ok', text: 'Saltato. La parte del server la porta su main il tuo PC: npm run orchestra -- fusioni-server.' },
+    rimandato: { kind: 'err', text: 'Saltato, ma il lavoro torna alle routine per un altro giro prima di entrare in main.' },
+    all_owner: { kind: 'err', text: 'Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.' },
   };
 
   function pannelloSaltaAudit(fb) {
@@ -5425,8 +5293,7 @@
     esito.className = 'mg-liv-esito';
     esito.setAttribute('role', 'status');
 
-    // Un secondo clic per confermare, come l'approvazione di una fusione:
-    // scavalcare un controllo di sicurezza non è un gesto da un click solo.
+    // Un secondo clic per confermare: scavalcare un controllo di sicurezza non è da un click solo.
     let armato = false;
     let timer = null;
     const disarma = () => {
@@ -5544,15 +5411,11 @@
 
   mgSideClose.addEventListener('click', closeSidebar);
 
-  // Click su un pallino giudice → apre QUEL giudice nel pannello destro.
-  // Titolo: per l'OWNER è il MODELLO reale che ha emesso il verdetto (così l'owner
-  // vede subito quale modello ha votato cosa); per i non-owner è anonimizzato e
-  // posizionale ("Giudice A/B/C/D" — mai l'id interno del giudice né il modello).
+  // Titolo: per l'OWNER il MODELLO reale che ha emesso il verdetto; per i non-owner
+  // un'etichetta posizionale anonima («Giudice A/B/C/D»), mai l'id interno né il modello.
   function openSidebarJudge(fb, i) {
-    // `i` è la posizione del pallino. Con la pipeline NUOVA (expectedJudges) il
-    // pallino mappa per nome alla posizione del panel; con lo STORICO è l'indice
-    // posizionale nei verdetti presenti. In entrambi i casi i pallini tratteggiati
-    // (giudici mancanti) non aprono nulla.
+    // `i` è la posizione del pallino: con expectedJudges mappa per nome alla posizione del
+    // panel, con lo storico è l'indice nei verdetti presenti. I tratteggiati non aprono nulla.
     const p = (fb && fb.pipeline) || {};
     const expected = (Array.isArray(p.expectedJudges) && p.expectedJudges.length) ? p.expectedJudges : null;
     const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
@@ -5566,6 +5429,7 @@
     // Giudice che non ha votato in quella run: il cerchio è tratteggiato e
     // cliccarlo dice PERCHÉ, invece di non fare niente. È la stessa regola dei
     // livelli grigi: un buco si spiega, non si tace.
+    const nonVisteRow = MR.immaginiNonViste(fb).map((t) => `<div class="mg-judge-model mg-judge-nonviste">${esc(t)}</div>`).join('');
     if (!v) {
       const nota = MR.judgesNote ? MR.judgesNote(fb) : null;
       const saltati = MR.judgesSkippedText(fb);
@@ -5573,6 +5437,7 @@
         <div class="mg-judge-detail">
           <div class="mg-liv-testo">${saltati ? esc(saltati) : 'Nessun verdetto in questa valutazione: il giudice non ha risposto — scaduto il tempo, credito esaurito o modello non configurato.'}</div>
           ${nota && nota.text && !saltati ? `<div class="mg-judge-model">${esc(nota.text)}</div>` : ''}
+          ${nonVisteRow}
         </div>
       `);
       return;
@@ -5580,15 +5445,12 @@
     const cls     = v.class || '';
     const badgeClass = cls ? `mg-class-badge--${cls}` : '';
 
-    // Modello reale del verdetto (campo `model` del backend). All'owner lo
-    // mostriamo come TITOLO del pannello; se non è registrato (verdetti di
-    // pipeline vecchie, precedenti all'aggiunta del campo) ripieghiamo
-    // sull'etichetta anonima e lo dichiariamo nel corpo.
+    // Modello reale del verdetto. Se non è registrato (pipeline vecchie) si ripiega sull'etichetta
+    // anonima e lo si dichiara nel corpo.
     const model = v && (v.model || v.judgeModel);
     const title = (isAdmin && model) ? String(model) : anonLabel;
 
-    // Corpo: la riga "Modello" serve solo quando il modello NON è nel titolo, cioè
-    // all'owner quando il modello manca (lo dichiara invece di sparire).
+    // La riga «Modello» serve solo quando non è nel titolo: lo dichiara invece di sparire.
     const modelRow = (isAdmin && !model)
       ? `<div class="mg-judge-model"><em>Modello non registrato</em></div>`
       : '';
@@ -5597,6 +5459,7 @@
       <div class="mg-judge-detail">
         <span class="mg-class-badge ${badgeClass}">${esc(cls || '—')}</span>
         ${modelRow}
+        ${nonVisteRow}
         <div class="mg-reasoning">${
           v.reasoning ? esc(v.reasoning) : '<em>Nessun ragionamento disponibile.</em>'
         }</div>
@@ -5608,6 +5471,7 @@
   function openSidebarSender(clientId) {
     const group = allByClient[clientId] || [];
     const total = group.length;
+    const mittente = group[0] ? chiaveServerMittente(group[0]) : mittenteDaChiave(clientId);
 
     // Età account: createdAt più vecchio
     let oldest = null;
@@ -5623,25 +5487,26 @@
 
     let listHtml = '';
     for (const fb of group) {
-      // Stesso criterio della lista: un bordo colorato è un'affermazione sullo
-      // stato, e su una segnalazione cifrata la macchina lo inventa.
+      // Stesso criterio della lista: un bordo colorato è un'affermazione sullo stato, che su una
+      // cifrata la macchina inventa.
       const cl  = statoLeggibile(fb) ? MR.classifyBlock(fb) : null;
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
       const color = cl ? cl.color : 'var(--sn-border)';
       listHtml += `
-        <div class="mg-sender-item" data-id="${esc(fb._id)}" style="border-left-color:${color}">
+        <div class="mg-sender-item mg-fiducia--${MR.segnoFiducia(fb).classe}" data-id="${esc(fb._id)}" style="border-left-color:${color}">
           ${num ? `<span class="mg-sender-item-num">#${esc(num)}</span>` : ''}
           ${statoLeggibile(fb) ? segnoFermataHtml(fb) : ''}
           <span class="mg-sender-item-title">${esc(title)}</span>
+          ${fiduciaSegnoHtml(fb)}
         </div>
       `;
     }
 
     const html = `
       <div class="mg-sender-info">
-        <div class="mg-sender-stat"><strong>${esc(senderLabel(group[0] || { clientId }))}</strong></div>
-        <div class="mg-sender-stat">${esc(clientId === '__anon__' ? 'anonimo' : clientId)}</div>
+        <div class="mg-sender-stat"><strong>${esc(senderLabel(group[0] || { clientId: mittente }))}</strong></div>
+        <div class="mg-sender-stat">${esc(mittente === '__anon__' ? 'anonimo' : mittente)}</div>
         <div class="mg-sender-stat">${esc(oldestStr)}</div>
         <div class="mg-sender-stat">Feedback totali: <strong>${total}</strong></div>
         <div class="mg-sender-segno" id="mgSideSegno" hidden></div>
@@ -5658,7 +5523,6 @@
       disegnaSegnoMittente();
     }
 
-    // Click su un feedback del mittente → carica nel pannello centrale
     const listEl = document.getElementById('senderFbList');
     if (listEl) {
       listEl.querySelectorAll('.mg-sender-item[data-id]').forEach((el) => {
@@ -5667,14 +5531,12 @@
     }
   }
 
-  // Escape di un id per usarlo dentro un selettore CSS (`[data-id="…"]`).
   // Gli id Firestore sono alfanumerici, ma CSS.escape copre ogni evenienza.
   function cssSel(s) {
     const str = String(s ?? '');
     return (window.CSS && CSS.escape) ? CSS.escape(str) : str.replace(/["\\]/g, '\\$&');
   }
 
-  // ── Escape HTML ───────────────────────────────────────────────────────────
   function esc(s) {
     return String(s ?? '')
       .replace(/&/g, '&amp;')
@@ -5696,9 +5558,8 @@
     mgList.hidden = true;
     mgListEmpty.hidden = true;
 
-    // DB3: la versione dell'app in esecuzione è, per definizione, l'ultima
-    // rilasciata (l'owner gira una build pubblicata). La leggiamo dal recap
-    // aggiornamento, che il main calcola con app.getVersion().
+    // DB3: la versione in esecuzione è per definizione l'ultima rilasciata (l'owner gira una
+    // build pubblicata). Si legge dal recap aggiornamento, che il main calcola.
     if (!releasedVersion) {
       try {
         const r = await sendToMain({ type: 'get_update_recap' });
@@ -5725,15 +5586,13 @@
       loadFailed = false;
     } catch (err) {
       if (testDataInjected) return;
-      // Il guasto va RICORDATO, non solo scritto una volta: il primo click su
-      // una scheda rirende il riquadro, e senza questo flag ci scriverebbe
-      // "Nessun feedback in coda." — cioè una risposta al posto di un guasto.
+      // Il guasto va RICORDATO, non scritto una volta sola: il primo click su una scheda rirende
+      // il riquadro, e senza il flag ci scriverebbe «Nessun feedback» al posto di un guasto.
       loadFailed = true;
       mgListLoading.hidden = true;
       mgListEmpty.hidden = false;
-      // #583: un permesso che manca non è un guasto. Chiamarlo "errore" manda a
-      // controllare la rete e a premere Aggiorna, e nessuna delle due cose
-      // cambierà qualcosa: i feedback li legge solo chi li gestisce.
+      // Un permesso che manca non è un guasto (#583): chiamarlo «errore» manda a controllare la
+      // rete e a premere Aggiorna, e nessuna delle due cambia qualcosa.
       mgListEmpty.textContent = (err && err.code === 'FEEDBACK_READ_DENIED')
         ? 'I feedback li vede chi li gestisce: accedi con un account amministratore.'
         : 'Errore nel caricamento dei feedback.';
@@ -5741,9 +5600,8 @@
       return;
     }
 
-    // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista.
-    // Se l'utente non è admin (o il modulo non è disponibile) i valori restano
-    // invariati (graceful fallback: la dashboard non si rompe, mostra il ciphertext).
+    // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista. Non admin o
+    // modulo assente → valori invariati: la dashboard non si rompe, mostra il ciphertext.
     if (isAdmin && allFeedbacks.length > 0) {
       try {
         const r = await sendToMain({ type: 'feedback_decrypt_fields', list: allFeedbacks });
@@ -5762,8 +5620,18 @@
   // Indice per mittente (il pannello laterale lo usa). Si rifà a ogni
   // caricamento e a ogni giro di aggiornamento.
   // Chiave del mittente = la stessa del server: chi copia il clientId dell'owner senza prova sta in un gruppo suo.
-  function senderKeyOf(fb) {
+  function chiaveServerMittente(fb) {
     return (MR.effectiveClientId ? MR.effectiveClientId(fb) : String((fb && fb.clientId) || '')) || '__anon__';
+  }
+  // Il pannello tiene a parte anche ciò che Filo manda con la prova dell'owner, non con gli estranei dello stesso
+  // nome (#953). Il prefisso è su ogni chiave: nessun clientId scelto apposta entra in quel gruppo.
+  function senderKeyOf(fb) {
+    const perOwner = authorKindOf(fb) === 'filo' && !!(TH && TH.filoPerConto) && TH.filoPerConto(fb || {}) === 'owner';
+    return (perOwner ? 'owner|' : 'm|') + chiaveServerMittente(fb);
+  }
+  function mittenteDaChiave(key) {
+    const s = String(key || '');
+    return s.slice(s.indexOf('|') + 1);
   }
   function reindexByClient() {
     allByClient = {};
@@ -5853,9 +5721,8 @@
       : '');
   }
 
-  // L'owner sta scrivendo nel pannello (commento, risposta, nota)? Allora il
-  // pannello non si ridisegna sotto le sue dita: i dati si fondono lo stesso e
-  // il pannello si aggiorna al giro dopo, o quando riapre la scheda.
+  // L'owner sta scrivendo nel pannello? Allora non si ridisegna sotto le sue dita: i dati si
+  // fondono lo stesso e il pannello si aggiorna al giro dopo.
   function detailBeingEdited() {
     if (!mgDetail) return false;
     const el = document.activeElement;
@@ -5863,15 +5730,13 @@
       const tag = String(el.tagName || '').toLowerCase();
       if (tag === 'textarea' || tag === 'input' || tag === 'select' || el.isContentEditable) return true;
     }
-    // Una bozza lasciata in una casella (cursore altrove, non ancora inviata)
-    // vale quanto il cursore dentro: ridisegnare la butterebbe via.
+    // Una bozza lasciata in una casella vale quanto il cursore dentro: ridisegnare la butterebbe
+    // via.
     for (const box of mgDetail.querySelectorAll('textarea')) {
       if (!box.hidden && box.offsetParent !== null && String(box.value || '').trim()) return true;
     }
-    // La riga "frase per chi ha segnalato" parte già piena col valore salvato:
-    // è una bozza solo se differisce da quello. Vale anche a sezione CHIUSA:
-    // richiuderla non butta via quello che l'owner ha scritto, e un ridisegno
-    // che passasse di qui glielo cancellerebbe senza che lui veda niente.
+    // La riga della frase parte già piena col valore salvato: è una bozza solo se differisce.
+    // Vale anche a sezione CHIUSA, o un ridisegno cancellerebbe quello che l'owner ha scritto.
     if (mgUserNote && mgUserNoteText) {
       if (String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '')) return true;
     }
@@ -5967,8 +5832,7 @@
     }
     if (!selectedId || closeDetailIfGone()) return false;
     if (touched.has(selectedId) && !detailBeingEdited()) {
-      // Ridisegno, non una nuova apertura: la sezione della frase resta come
-      // l'owner l'ha lasciata.
+      // Ridisegno, non una nuova apertura: la sezione della frase resta come l'ha lasciata l'owner.
       openDetail(selectedId, { ridisegno: true });
       return true;
     }
@@ -5993,10 +5857,8 @@
     return live.seguiti();
   }
 
-  // ── Hook di test ────────────────────────────────────────────────────────
-  // Solo per gli spec Playwright: inietta feedback e apre il dettaglio
-  // esercitando il VERO codice di rendering, senza duplicarne la logica nel
-  // test (vedi CLAUDE.md → "Test che servono davvero"). Inerte in produzione.
+  // Hook di test: gli spec iniettano feedback e aprono il dettaglio esercitando il VERO codice di
+  // rendering. Inerte in produzione.
   window.__mgTest = {
     setData(fbs, opts) {
       // Dati finti al posto di quelli veri: l'aggiornamento continuo si ferma,
@@ -6077,12 +5939,14 @@
     loadCaps,
     // Ri-legge le scelte sulle sessioni delle routine (IPC) — per i test.
     loadSessions,
+    // Ri-legge le pause in corso degli account e della routine server (IPC) — per i test.
+    loadPause,
     // Ri-legge modello e sforzo per fase (IPC) — per i test.
     loadRoleModels,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
     loadJudgeTimeout,
     // Ri-legge la config dell'automatica (IPC): interruttore master, mappa dei
-    // mittenti auto-approvati, esplorazione a coda vuota — usato dai test.
+    // mittenti auto-approvati, lavori server — usato dai test.
     loadAutoMode,
     setTab(tab) { selectTab(tab); },
     setSezione(sezione) { if (schedaPerSezione[sezione]) selectTab(schedaPerSezione[sezione]); },
@@ -6100,6 +5964,11 @@
       if (Array.isArray(livelli)) { livelliScelti = livelli.filter((l) => MR.LIVELLI_RICEVUTI.includes(l)); renderList(); }
       return livelliScelti.slice();
     },
+    // «Solo non fidate»: con un booleano lo imposta, sempre ritorna com'è.
+    fiduciaFiltro(v) {
+      if (typeof v === 'boolean') impostaSoloNonFidate(v);
+      return soloNonFidate;
+    },
     // Ordinamento della lista (menu tasto destro): impostalo e rirender.
     setSortMode(mode) { if (SORT_MODES[mode]) { sortMode = mode; reflectSortBtn(); renderList(); } },
     getSortMode() { return sortMode; },
@@ -6108,8 +5977,7 @@
     // DB3: imposta la "versione rilasciata" usata dal gate "Risolti" e rirende.
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
     openDetail,
-    // Ricerca "a senso": stato e trigger per gli spec (che comunque possono
-    // esercitare il codice reale cliccando la lente e digitando nel campo).
+    // Ricerca «a senso»: stato e trigger per gli spec.
     isSearchMode() { return searchMode; },
     runSearch(q) { return runSearch(q); },
   };
@@ -6154,10 +6022,8 @@
   const mgSmRegistryList = document.getElementById('mgSmRegistryList');
   const mgSmRegistryAdd  = document.getElementById('mgSmRegistryAdd');
 
-  // Popola la <datalist id="nicknames-list"> (l'id letto da SN_MODEL_CHAIN) coi
-  // nickname che i giudici possono usare: quelli definiti nel registro giudici
-  // (righe correnti) uniti ai predefiniti condivisi, così i selettori per-giudice
-  // li propongono. Va richiamata dopo ogni modifica al registro.
+  // I nickname che i giudici possono usare: registro giudici + predefiniti condivisi. Va
+  // richiamata dopo ogni modifica al registro.
   function populateSmNicknames() {
     const dl = document.getElementById('nicknames-list');
     if (!dl) return;
@@ -6172,7 +6038,7 @@
       if (label) opt.label = label;
       dl.appendChild(opt);
     };
-    // 1. Registro dedicato ai giudici (priorità: compaiono per primi).
+    // Registro dedicato ai giudici: compaiono per primi.
     const judgeReg = collectJudgeRegistry();
     for (const nick of Object.keys(judgeReg)) addNick(nick, judgeReg[nick].label);
     // 2. Registro condiviso (Modelli predefiniti).
@@ -6253,15 +6119,35 @@
     del.textContent = 'Rimuovi';
     del.addEventListener('click', () => { row.remove(); populateSmNicknames(); });
 
+    const warn = document.createElement('div');
+    warn.className = 'sn-model-row-warn';
+    warn.setAttribute('role', 'status');
+    warn.hidden = true;
+
     // Aggiornare nickname o modello ridisegna i suggerimenti dei selettori
     // (un nickname compare tra i suggerimenti solo quando ha anche un modello).
     nickIn.addEventListener('input', () => populateSmNicknames());
-    modelIn.addEventListener('input', () => populateSmNicknames());
+    modelIn.addEventListener('input', () => { populateSmNicknames(); avvisaProduttoreGiudice(row); });
 
     row.appendChild(nickIn);
     row.appendChild(modelWrap);
     row.appendChild(del);
+    row.appendChild(warn);
+    avvisaProduttoreGiudice(row);
     return row;
+  }
+
+  // I giudici girano sul server con la lista di esclusione del codice, la stessa di build qui (un test del server le
+  // confronta): un modello il cui produttore resta fra gli host lo si dice sulla riga (#1059).
+  function avvisaProduttoreGiudice(row) {
+    const warn = row.querySelector('.sn-model-row-warn');
+    const C = window.SN_CONST;
+    if (!warn || !C || typeof C.unexcludedProducer !== 'function') return;
+    const nome = C.unexcludedProducer(row.querySelector('.sn-model-id').value.trim(), C.DEFAULT_EXCLUDED_PROVIDERS);
+    warn.textContent = nome
+      ? `${nome} produce questo modello e i giudici non lo escludono come fornitore: le richieste possono arrivare a lui.`
+      : '';
+    warn.hidden = !nome;
   }
 
   function renderJudgeRegistry(registry) {
@@ -6341,8 +6227,6 @@
     for (const slot of SM_SLOTS) {
       const host = document.getElementById(`mgSmChain-${slot}`);
       if (!host) continue;
-      // Allinea la <label> dello slot all'etichetta amichevole (la mappa è la
-      // sorgente di verità: HTML e JS non possono divergere).
       const slotEl = host.closest('.mg-sm-slot');
       const labelEl = slotEl && slotEl.querySelector('label');
       if (labelEl && SM_SLOT_LABELS[slot]) labelEl.textContent = SM_SLOT_LABELS[slot];
@@ -6362,8 +6246,7 @@
     mgSmStatus.className = 'mg-sm-status' + (kind ? ` mg-${kind}` : '');
   }
 
-  // Mostra "configurata/non configurata" accanto al campo chiave (la chiave vera
-  // non lascia mai il main: dal GET arriva solo il booleano).
+  // La chiave vera non lascia mai il main: dal GET arriva solo il booleano.
   function applyJudgeKeyState(models) {
     if (!mgSmKeyState) return;
     const present = !!(models && models.openrouterKeyPresent);
@@ -6623,6 +6506,7 @@
     ]);
 
     fsFeedbacks = Array.isArray(lista.rows) ? lista.rows : [];
+    fsChiesteIntere = new Set();
     fsCompleto  = lista.complete;
     fsRipiego   = lista.ripiego;
     if (lista.ripiego && lista.err && lista.err.code === 'FEEDBACK_READ_DENIED') {
@@ -6650,7 +6534,7 @@
   // scheda non seguiva quel giro, chi la lasciava aperta guardava i numeri di
   // quando l'aveva aperta: proprio mentre le routine lavorano, che è quando li
   // si guarda. I documenti freschi li ha già letti il giro della pagina, quindi
-  // qui non si ricarica niente dalla rete: si applicano.
+  // si applicano; dalla rete si legge solo una segnalazione nuova, intera.
   async function fsSegueLive(fresh, removed) {
     if (!fsCaricato || !Array.isArray(fsFeedbacks)) return;
     const via = new Set(Array.isArray(removed) ? removed : []);
@@ -6658,10 +6542,10 @@
     const aperto = fsPannelloAperto();
     if (!nuovi.length && !via.size && !aperto) return;
     if (nuovi.length || via.size) {
-      const perId = new Map();
-      for (const f of fsFeedbacks) if (f && f._id && !via.has(f._id)) perId.set(f._id, f);
-      for (const f of nuovi) if (f && f._id) perId.set(f._id, f);
-      fsFeedbacks = Array.from(perId.values());
+      // Il giro rilegge una PROIEZIONE: sostituita al documento intero si
+      // portava via l'esito del controllo di sicurezza (#677.5). Si fonde come
+      // fa la lista.
+      fsFeedbacks = LIVE.applyChanges(fsFeedbacks, { fresh: nuovi, removed: Array.from(via) });
     }
     // Il registro delle esecuzioni è l'ALTRA sorgente, e cammina per conto
     // suo: un'esplorazione che non trova niente lo fa crescere senza toccare
@@ -6677,6 +6561,33 @@
       } catch (_) { /* il registro resta quello di prima: la nota lo dice già */ }
     }
     renderFs();
+    if (aperto && !fsRipiego) fsCompletaRighe().then((fatto) => { if (fatto) renderFs(); }).catch(() => {});
+  }
+
+  // Una segnalazione NUOVA arrivata col giro è una riga d'elenco: senza i campi
+  // di dettaglio il suo controllo di sicurezza risulterebbe «non letto» (#997).
+  // A scheda davanti la si legge intera, una volta per caricamento.
+  let fsChiesteIntere = new Set();
+  async function fsCompletaRighe() {
+    const ids = (fsFeedbacks || [])
+      .filter((f) => f && f._proiezione && f._id && !fsChiesteIntere.has(f._id))
+      .map((f) => f._id);
+    if (!ids.length) return false;
+    for (const id of ids) fsChiesteIntere.add(id);
+    let interi;
+    try {
+      interi = await liveSources.getDettagli(ids);
+    } catch (_) {
+      return false;   // resta la riga, e il riquadro dice che l'esito non è letto
+    }
+    interi = (Array.isArray(interi) ? interi : []).filter((f) => f && f._id && !f._proiezione);
+    if (!interi.length) return false;
+    try {
+      const r = await sendToMain({ type: 'feedback_decrypt_fields', list: interi });
+      if (r && r.ok && Array.isArray(r.list)) interi = r.list;
+    } catch (_) { /* come al caricamento: senza chiave lo dice la voce «non leggibile» */ }
+    fsFeedbacks = LIVE.applyChanges(fsFeedbacks, { fresh: interi });
+    return true;
   }
 
   function fsPannelloAperto() {
@@ -6720,7 +6631,7 @@
       const r = stat ? stat.range : FS.rangeOf(fsRangeKey, Date.now(), fsCustom);
       const rovescio = !!(fsCustom.da && fsCustom.a && fsCustom.da > fsCustom.a);
       let testo = '';
-      if (r.da == null && r.a == null) testo = 'Scegli le due date, o lascia vuota una delle due.';
+      if (r.da == null && r.a == null) testo = 'Guardi tutto, senza limiti di data: nessuna delle due date è scelta.';
       else if (r.da == null) testo = `Guardi tutto fino al ${FS.dataBreve(r.a)}.`;
       else if (r.a == null) testo = `Guardi dal ${FS.dataBreve(r.da)} in poi.`;
       else testo = `Guardi dal ${FS.dataBreve(r.da)} al ${FS.dataBreve(r.a)}.`;
@@ -6748,7 +6659,7 @@
         + `${esc(gr.label)}<span class="mg-chip-n">${esc(fsNum(n))}</span></button>`;
     }).join('');
     const voci = gruppi + FS.CREATORI.map((kind) => {
-      const meta = AUTHOR_META[kind] || AUTHOR_META.user;
+      const meta = FS.CLASSI_META[kind] || { icon: '', label: kind };
       const on = fsCreators.indexOf(kind) >= 0;
       const n = conti[kind] || 0;
       return `<button type="button" class="mg-chip${on ? ' mg-chip--on' : ''}" data-fs-creator="${esc(kind)}"`
@@ -6766,35 +6677,43 @@
       + `<span class="mg-chip-n">${esc(fsNum(tuttiN))}</span></button>` + voci;
   }
 
+  // Un conto scritto dentro una frase: resta parte della frase, ma si apre su
+  // ciò che ha contato come ogni altro numero della scheda.
+  function fsContoInFrase(chiave, n, testo) {
+    return `<button type="button" class="mg-fs-quanti" data-fs-esito="${esc(chiave)}"`
+      + ` title="${esc(`Mostra ${n === 1 ? 'la segnalazione contata' : 'le segnalazioni contate'}`)}">${esc(testo)}</button>`;
+  }
+
   // ── Da dove partono davvero i numeri ─────────────────────────────────────
   // Un conteggio che afferma un totale che non conosce è peggio di nessun
   // conteggio (CLAUDE.md § Limiti). Qui si dice, in una riga, fin dove
-  // arrivano le due sorgenti.
+  // arrivano le due sorgenti. `righe` porta HTML: il testo passa da `esc`.
   function renderFsNota(stat) {
     const righe = [];
+    const testo = (t) => righe.push(esc(t));
     if (fsRipiego) {
-      righe.push(fsErrore
+      testo(fsErrore
         ? fsErrore
         : `Non è riuscita la lettura di tutte le segnalazioni: i numeri vengono dalla lista già in pagina${caricoIncompleto ? ", che è incompleta: sono minimi, non totali" : ", senza i campi di dettaglio"}.`);
     } else if (!fsCompleto) {
-      righe.push('La lettura delle segnalazioni si è fermata prima della fine: i numeri sulle segnalazioni sono minimi, non totali.');
+      testo('La lettura delle segnalazioni si è fermata prima della fine: i numeri sulle segnalazioni sono minimi, non totali.');
     }
     const cop = stat.copertura;
     if (!fsLogOk) {
-      righe.push('Il registro delle esecuzioni delle routine non si è letto: esplorazioni, lavorati, lanci e giri di verifica non si sanno finché non torna, e al loro posto c\'è un trattino.');
+      testo('Il registro delle esecuzioni delle routine non si è letto: esplorazioni, lavorati, lanci e giri di verifica non si sanno finché non torna, e al loro posto c\'è un trattino.');
     } else if (cop.logVuoto) {
-      righe.push('Il registro delle esecuzioni delle routine è vuoto: esplorazioni, lavorati e giri di verifica non hanno ancora niente da contare.');
+      testo('Il registro delle esecuzioni delle routine è vuoto: esplorazioni, lavorati e giri di verifica non hanno ancora niente da contare.');
     } else if (cop.logCorto) {
-      righe.push(`Il registro delle esecuzioni tiene le ultime: parte dal ${FS.dataBreve(cop.logDa)}. Esplorazioni, lavorati e giri di verifica contano da lì, non dall'inizio della finestra.`);
+      testo(`Il registro delle esecuzioni tiene le ultime: parte dal ${FS.dataBreve(cop.logDa)}. Esplorazioni, lavorati e giri di verifica contano da lì, non dall'inizio della finestra.`);
     }
     // Una segnalazione con la data d'arrivo mancante o illeggibile non cade in
-    // nessuna finestra, «Tutto» compreso. Sparire in silenzio da un totale è la
-    // cosa che non deve succedere: qui si dice quante sono.
+    // nessuna finestra, «Tutto» compreso: qui si dice quante sono, e il numero
+    // è l'unica strada per vederle.
     const sd = stat.ricevuti.senzaData;
     if (sd > 0) {
       righe.push(sd === 1
-        ? 'Una segnalazione non ha una data d\'arrivo leggibile: resta fuori da ogni finestra, «Tutto» compreso.'
-        : `${fsNum(sd)} segnalazioni non hanno una data d'arrivo leggibile: restano fuori da ogni finestra, «Tutto» compreso.`);
+        ? `${fsContoInFrase('senzaData', 1, 'Una segnalazione')} ${esc('non ha una data d\'arrivo leggibile: resta fuori da ogni finestra, «Tutto» compreso.')}`
+        : `${fsContoInFrase('senzaData', sd, fsNum(sd))} ${esc('segnalazioni non hanno una data d\'arrivo leggibile: restano fuori da ogni finestra, «Tutto» compreso.')}`);
     }
     // Il mittente viaggia cifrato come lo stato. Senza la chiave privata non si
     // legge, e la ripartizione per mittente (una delle cose chieste) non può
@@ -6802,10 +6721,10 @@
     const mi = stat.ricevuti.mittentiIgnoti;
     if (mi > 0) {
       righe.push(mi === 1
-        ? 'Di una segnalazione non si è potuto leggere il mittente: serve la chiave dell\'owner su questo computer. Nel filtro per creatore non c\'è.'
-        : `Di ${fsNum(mi)} segnalazioni non si è potuto leggere il mittente: serve la chiave dell'owner su questo computer. Nel filtro per creatore non ci sono.`);
+        ? `Di ${fsContoInFrase('mittentiIgnoti', 1, 'una segnalazione')} ${esc('non si è potuto leggere il mittente: serve la chiave dell\'owner su questo computer. Nel filtro per creatore non c\'è.')}`
+        : `Di ${fsContoInFrase('mittentiIgnoti', mi, fsNum(mi))} ${esc('segnalazioni non si è potuto leggere il mittente: serve la chiave dell\'owner su questo computer. Nel filtro per creatore non ci sono.')}`);
     }
-    mgFsNota.textContent = righe.join(' ');
+    mgFsNota.innerHTML = righe.join(' ');
     mgFsNota.hidden = righe.length === 0;
   }
 
@@ -6832,7 +6751,12 @@
     if (kind === FS.CREATORE_ILLEGGIBILE) return FS.ETICHETTA_ILLEGGIBILE;
     const gr = FS.GRUPPI_CREATORI.find((x) => x.key === kind);
     if (gr) return gr.label;
-    return (AUTHOR_META[kind] || AUTHOR_META.user).label;
+    return (FS.CLASSI_META[kind] || { label: kind }).label;
+  }
+  // Il ruolo di una routine che ha scritto il feedback (`mittenteRuolo`), coi nomi del registro dei lanci.
+  const FS_RUOLI_MITTENTE = { residuo: 'Rilievi residui', ignoto: 'Ruolo non indicato' };
+  function fsEtichettaRuolo(ruolo) {
+    return FS_RUOLI_MITTENTE[ruolo] || roleLabel(ruolo);
   }
 
   // Un gruppo è acceso quando il filtro è ESATTAMENTE quel gruppo: se ci si
@@ -6868,6 +6792,7 @@
   // «Nome: conto», per ogni etichetta che porta un numero, compresi i
   // suggerimenti col mouse: lì il conto si leggeva «1200» e la legenda «1.200».
   function fsRigaConto(label, n) { return `${label}: ${fsNum(n)}`; }
+  function fsRigaCritiche(n) { return n === 1 ? '1 critica' : `${fsNum(n)} critiche`; }
 
   /**
    * `sottoId`: il sottotitolo conta delle segnalazioni SUE, diverse da quelle
@@ -6943,7 +6868,11 @@
         + '<h4 style="margin-top:14px">…e per chi li ha mandati</h4>'
         + fsBars(stat.ricevuti.creatori.map((c) => ({
           key: c.kind, n: c.n, ids: c.ids, label: fsEtichettaCreatore(c.kind),
-        })), 'creatori') };
+        })), 'creatori')
+        + ((stat.ricevuti.ruoliRoutine || []).length
+          ? '<h4 style="margin-top:14px">…e le routine, per ruolo</h4>'
+            + fsBars(stat.ricevuti.ruoliRoutine.map((r) => ({ key: r.key, n: r.n, ids: r.ids, label: fsEtichettaRuolo(r.key) })), 'ruoliRoutine')
+          : '') };
     }
     if (fsAperto === 'lavorati') {
       return { titolo: 'Dove sono arrivati, oggi', html: fsBars(stat.lavorati.stati, 'stati') };
@@ -6972,8 +6901,23 @@
   // ripartizione compariva in mezzo ai riquadri sbagliati.
   const FS_DETTAGLI_TILES = ['ricevuti', 'lavorati', 'lanci'];
 
+  // Quali riquadri si aprono qui sotto, sul conto di ADESSO. La leggono chi
+  // disegna e chi tiene aperto il pannello: un riquadro che non si apre più
+  // perde anche «chiudi», e il suo pannello restava lì senza uscita (#997).
+  function fsEspandibili(stat) {
+    const ko = stat.copertura.registroLetto === false;
+    const a = stat.audit;
+    return {
+      ricevuti: stat.copertura.feedbackLetti !== false,
+      lavorati: !ko,
+      lanci: !ko,
+      audit: ((a.pass || 0) + (a.fail || 0) + (a.saltato || 0)) > 0,
+    };
+  }
+
   function renderFsTiles(stat) {
     const det = FS_DETTAGLI_TILES.includes(fsAperto) ? fsDettaglio(stat) : null;
+    const esp = fsEspandibili(stat);
     // Col registro non letto i tre riquadri che ne vivono non hanno un numero.
     // Il trattino da solo non basta: lo dicono anche sul riquadro, perché la
     // riga sopra sta in dodici pixel e il numero grande ne ha trenta.
@@ -6982,7 +6926,7 @@
     const fbKo = stat.copertura.feedbackLetti === false;
     mgFsTiles.innerHTML = [
       fsTile('ricevuti', stat.ricevuti.totale, 'Feedback ricevuti',
-        fbKo ? 'segnalazioni non lette' : '', fbKo ? false : 'espandi'),
+        fbKo ? 'segnalazioni non lette' : '', esp.ricevuti ? 'espandi' : false),
       // «in tutto» prometteva un totale che questo numero non ha: conta le
       // verifiche partite DENTRO la finestra, mentre la torta qui sotto conta
       // le critiche di un lavoro su tutto il registro. Con una finestra
@@ -6991,7 +6935,7 @@
       fsTile('lavorati', stat.lavorati.totale, 'Feedback lavorati',
         ko ? noto : (stat.lavorati.verifiche
           ? `${fsNum(stat.lavorati.verifiche)} ${stat.lavorati.verifiche === 1 ? 'verifica partita' : 'verifiche partite'} in questa finestra`
-          : ''), ko ? false : 'espandi'),
+          : ''), esp.lavorati ? 'espandi' : false),
       // Il numero grande conta PARTENZE dell'esplorazione: non sono
       // segnalazioni e non si aprono su niente, quindi il riquadro non promette
       // di aprirsi. A portare alle segnalazioni è la riga piccola, che è
@@ -7004,7 +6948,7 @@
             : `${fsNum(stat.prober.ritrovamenti)} ${stat.prober.ritrovamenti === 1 ? 'segnalazione' : 'segnalazioni'} dall'esploratore`),
         false,
         stat.prober.ritrovamentiIds.length ? 'proberTrovate' : ''),
-      fsTile('lanci', stat.lanci.totale, 'Lanci delle routine', ko ? noto : '', ko ? false : 'espandi'),
+      fsTile('lanci', stat.lanci.totale, 'Lanci delle routine', ko ? noto : '', esp.lanci ? 'espandi' : false),
     ].join('') + (det
       ? `<div class="mg-fs-detail"><h4>${esc(det.titolo)}</h4>${det.html}</div>`
       : '');
@@ -7033,9 +6977,7 @@
     // che ha contato: erano gli ultimi rimasti muti, e il caso più comune —
     // il registro conserva solo le ultime esecuzioni — finisce proprio qui.
     const coda = [];
-    const numeroApribile = (chiave, n) =>
-      `<button type="button" class="mg-fs-quanti" data-fs-esito="${esc(chiave)}"`
-      + ` title="${esc(`Mostra ${n === 1 ? 'la segnalazione contata' : 'le segnalazioni contate'}`)}">${esc(fsNum(n))}</button>`;
+    const numeroApribile = (chiave, n) => fsContoInFrase(chiave, n, fsNum(n));
     if (aperti) coda.push(`${numeroApribile('aperti', aperti)} ${aperti === 1 ? 'lavoro è ancora in mezzo al giro e non entra' : 'lavori sono ancora in mezzo al giro e non entrano'} nel conto.`);
     // Senza la chiave dell'owner lo stato non si legge, e dove sia arrivato
     // quel lavoro è proprio la domanda a cui la torta risponde: si dichiara,
@@ -7060,6 +7002,14 @@
       mgFsPieHint.textContent = 'Quanto è costato ogni lavoro si conta sul registro delle esecuzioni delle routine, '
         + 'e quel registro non si è letto: finché non torna, qui non c\'è niente da contare.';
       fsTortaVuota('Il registro delle esecuzioni non si è letto, quindi quanto è costato ogni lavoro non si sa.');
+      return;
+    }
+    // La porta gemella: dove sia arrivato ogni lavoro sta sulla sua
+    // segnalazione, e le segnalazioni non si sono lette.
+    if (stat.copertura.feedbackLetti === false) {
+      mgFsPieHint.textContent = 'Dove è arrivato ogni lavoro si legge sulla sua segnalazione, '
+        + 'e le segnalazioni non si sono lette: finché non tornano, qui non c\'è niente da contare.';
+      fsTortaVuota('Le segnalazioni non si sono lette, quindi quanto è costato ogni lavoro non si sa.');
       return;
     }
     const soloRegistro = stat.copertura.logCorto
@@ -7240,7 +7190,14 @@
     // quelle: erano gli ultimi quattro rimasti muti.
     const ko = stat.copertura.registroLetto === false;
     const noto = 'registro delle routine non letto';
-    const auditN = ko ? 0 : stat.audit.pass + stat.audit.fail + stat.audit.saltato;
+    // Senza segnalazioni lette, l'esito del controllo e gli arenamenti (che
+    // stanno sui documenti dei lavori) non si sanno: trattino e motivo.
+    const fbKo = stat.copertura.feedbackLetti === false;
+    const nonLetti = stat.audit.nonLetti || 0;
+    let auditSotto = `${fsNum(stat.audit.fail)} bocciati · ${fsNum(stat.audit.saltato)} saltati da te`;
+    if (ko) auditSotto = noto;
+    else if (fbKo) auditSotto = 'segnalazioni non lette';
+    else if (nonLetti) auditSotto = `esito non letto su ${fsNum(nonLetti)} ${nonLetti === 1 ? 'lavoro' : 'lavori'}`;
     const det = fsAperto === 'audit' ? fsDettaglio(stat) : null;
     mgFsAltro.innerHTML = [
       fsTile('attesa', FS.durata(t.presaInCarico.mediana), 'Attesa prima che tu lo prendessi in mano',
@@ -7253,14 +7210,15 @@
         t.lavorazione.ids.length ? 'apri' : false),
       // Il controllo di sicurezza e gli arenamenti si leggono sulle lavorazioni
       // della finestra, e quali siano lo dice il registro: senza, non sono zero.
-      fsTile('audit', stat.audit.pass, 'Controlli di sicurezza passati',
-        ko ? noto : `${fsNum(stat.audit.fail)} bocciati · ${fsNum(stat.audit.saltato)} saltati da te`,
-        auditN ? 'espandi' : false),
+      // La riga piccola dei lavori senza esito letto si apre su quelli.
+      fsTile('audit', stat.audit.pass, 'Controlli di sicurezza passati', auditSotto,
+        fsEspandibili(stat).audit ? 'espandi' : false,
+        !ko && !fbKo && nonLetti ? 'auditNonLetti' : ''),
       // Il numero grande conta ARENAMENTI: una segnalazione arenata due volte
       // ne vale due, quindi non è un conto di segnalazioni e non si apre.
       // Ad aprirle è la riga piccola, come nel riquadro delle esplorazioni.
       fsTile('arenati', stat.arenati.lavorazioni, 'Lavorazioni arenate e rimesse in coda',
-        ko ? noto : (stat.arenati.feedback
+        ko ? noto : fbKo ? 'segnalazioni non lette' : (stat.arenati.feedback
           ? `su ${fsNum(stat.arenati.feedback)} ${stat.arenati.feedback === 1 ? 'segnalazione' : 'segnalazioni'}`
           : 'nessuna'),
         false,
@@ -7320,6 +7278,10 @@
       let v = null;
       if (desc.gruppo === 'categorie') v = trova(fsStat.ricevuti.categorie, chiave);
       else if (desc.gruppo === 'creatori') v = trova(fsStat.ricevuti.creatori, chiave);
+      else if (desc.gruppo === 'ruoliRoutine') {
+        const r = trova(fsStat.ricevuti.ruoliRoutine, chiave);
+        v = r ? { ...r, label: `Routine: ${fsEtichettaRuolo(chiave)}` } : null;
+      }
       else if (desc.gruppo === 'stati') v = trova(fsStat.lavorati.stati, chiave);
       else if (desc.gruppo === 'audit') {
         const ids = (fsStat.auditIds && fsStat.auditIds[chiave]) || [];
@@ -7337,7 +7299,8 @@
     if (desc.tipo === 'fetta') {
       const f = trova(fsStat.giri.fette, chiave);
       if (!f || !f.ids || !f.ids.length) return null;
-      return { ...desc, titolo: f.label, ids: f.ids };
+      // Le altre fette dicono già il loro numero di critiche nel nome.
+      return { ...desc, titolo: f.label, ids: f.ids, critiche: f.key === 'g3' ? f.critiche : null };
     }
 
     if (desc.tipo === 'punto') {
@@ -7356,6 +7319,9 @@
         statoIgnoto: { titolo: 'Stato cifrato: non leggibile con questa chiave', ids: fsStat.giri.statoIgnotoIds },
         senzaGiri:   { titolo: 'Passati, ma le loro verifiche sono più vecchie del registro', ids: fsStat.giri.senzaGiriIds },
         ignoti:      { titolo: 'Lavorati, ma non fra le segnalazioni caricate', ids: [], mancanti: fsStat.giri.ignotiNumeri },
+        // I due conti della riga sotto i filtri.
+        senzaData:      { titolo: 'Senza una data d\'arrivo leggibile', ids: fsStat.ricevuti.senzaDataIds || [] },
+        mittentiIgnoti: { titolo: 'Mittente non leggibile con questa chiave', ids: fsStat.ricevuti.mittentiIgnotiIds || [] },
       };
       const v = mappa[chiave];
       if (!v) return null;
@@ -7394,6 +7360,7 @@
         attesa:   ['Segnalazioni che hai preso in mano', fsStat.tempi.presaInCarico.ids],
         durata:   ['Lavorazioni misurate in questa finestra', fsStat.tempi.lavorazione.ids, fsStat.tempi.lavorazione.mancanti],
         audit:    ['Controllo di sicurezza passato', (fsStat.auditIds || {}).pass],
+        auditNonLetti: ['Lavori con l\'esito del controllo di sicurezza non letto', (fsStat.auditIds || {}).nonLetti],
         arenatiFeedback: ['Segnalazioni la cui lavorazione si è arenata', fsStat.arenati.ids],
       }[chiave];
       if (!dietro) return null;
@@ -7456,11 +7423,16 @@
       // le più recenti: una che sta qui e non lì non si può aprire, e la riga
       // lo dice invece di non fare niente al clic.
       const apribile = allFeedbacks.some((f) => f._id === id);
+      const critiche = src.critiche ? src.critiche[id] : null;
       return `<li><button type="button" class="mg-fs-drill-row" data-fs-open="${esc(id)}"${apribile ? '' : ' disabled'}`
         + ` title="${esc(apribile ? 'Apri la segnalazione' : 'Non è fra le segnalazioni caricate nella lista: aprila dalla colonna di sinistra')}">`
         + `<span class="mg-fs-drill-num">${num ? '#' + esc(num) : '—'}</span>`
         + `<span class="mg-fs-drill-t">${esc(titolo)}</span>`
-        + `<span class="mg-fs-drill-cat">${esc(cat.label)}</span></button></li>`;
+        + `<span class="mg-fs-drill-cat">${esc(cat.label)}</span>`
+        + (typeof critiche === 'number'
+          ? `<span class="mg-fs-drill-giri">${esc(fsRigaCritiche(critiche))}</span>`
+          : '')
+        + '</button></li>';
     }).join('') + righeMancanti;
   }
 
@@ -7775,6 +7747,7 @@
       return;
     }
     fsStat = stat;
+    if (fsAperto && !fsEspandibili(stat)[fsAperto]) fsAperto = '';
     // L'elenco aperto su un conto vecchio non vale più: cambiata la finestra o
     // il filtro, quei numeri non sono più quelli. Si richiude da solo invece di
     // restare lì a dire una cosa che la scheda sopra non dice più.
@@ -7907,30 +7880,25 @@
     if (e.detail.tab === 'fbstats') loadFsData();
   });
 
-  // …e anche a pagina ferma: il main avvisa quando l'elenco cambia (una
-  // fusione bloccata da `npm run finish`, o una decisa da un'altra finestra).
-  // Senza questo, una pagina di Gestione lasciata aperta continuerebbe a
-  // mostrare lo stato di quando è stata aperta.
+  // …e a pagina ferma: il main avvisa quando l'elenco cambia (una fusione bloccata da
+  // `npm run finish`, o decisa da un'altra finestra).
   if (window.filo?.onBroadcast) {
     window.filo.onBroadcast((m) => {
       if (m && m.type === MERGE_APPROVALS_CHANGED) loadMergeApprovals(m);
     });
   }
 
-  // Esponi per gli spec Playwright (hook di test).
   window.__mgTest.loadSupportModels = loadSupportModels;
   window.__mgTest.getSmChains = () => smChains;
   window.__mgTest.getSmSlots = () => SM_SLOTS;
-  // Render diretto dell'editor con dati finti (bypassa il canale main: i test
-  // non hanno una sessione admin né Firestore).
+  // Render diretto con dati finti: i test non hanno né sessione admin né Firestore.
   window.__mgTest.renderSupportModelsEditor = (models) => { renderSupportModelsEditor(models); smLoaded = true; };
   window.__mgTest.collectJudgeRegistry = collectJudgeRegistry;
-  // L'immagine a tutta pagina: gli spec la aprono e la chiudono dalla stessa
-  // porta dell'utente, così passano anche dall'avviso al main (#514).
+  // Gli spec aprono e chiudono l'immagine dalla porta dell'utente, così passano anche dall'avviso
+  // al main (#514).
   window.__mgTest.openLightbox = openLightbox;
   window.__mgTest.closeLightbox = closeLightbox;
-  // Tab "Log": render diretto con voci finte (bypassa il canale main), e
-  // ri-lettura via IPC per gli spec che stubbano la risposta.
+  // Render diretto con voci finte, e ri-lettura via IPC per gli spec che stubbano la risposta.
   window.__mgTest.renderWorkerLog = (entries) => { renderWorkerLog(entries); logLoaded = true; };
   window.__mgTest.loadWorkerLog = loadWorkerLog;
   // Tab "Statistiche feedback": dati finti al posto delle due letture vere
@@ -7939,6 +7907,7 @@
   window.__mgTest.setFsData = (dati) => {
     const d = dati || {};
     fsFeedbacks = Array.isArray(d.feedbacks) ? d.feedbacks : [];
+    fsChiesteIntere = new Set();
     fsLog       = Array.isArray(d.workerLog) ? d.workerLog : [];
     fsCompleto  = d.complete !== false;
     fsRipiego   = d.ripiego === true;
@@ -7955,17 +7924,15 @@
   window.__mgTest.getFsState = () => ({ rangeKey: fsRangeKey, creatori: fsCreators.slice(), aperto: fsAperto });
   window.__mgTest.loadFsData = loadFsData;
   window.__mgTest.renderChannelLog = renderChannelLog;
-  // Fusioni in attesa: rilettura via IPC dopo lo stub (in test non c'è né una
-  // sessione da proprietario né il server di sicurezza).
+  // Rilettura via IPC dopo lo stub (in test non c'è né sessione proprietario né server).
   window.__mgTest.loadMergeApprovals = loadMergeApprovals;
-  // Le forme dei cinque livelli: quale forma sta aperta nel pannello e le
-  // richieste di fusione che la pagina ha in mano (per gli spec).
+  // Quale forma è aperta e quali richieste di fusione la pagina ha in mano (per gli spec).
   window.__mgTest.openSidebarLivello = openSidebarLivello;
   window.__mgTest.livelloAperto = () => livelloAperto;
   window.__mgTest.getFusioni = () => fusioni;
 
-  // Icone della ricerca (lente): iniettate da JS così restano nel tema di Filo
-  // (SVG outline, currentColor) invece di un glifo emoji.
+  // Icone iniettate da JS così restano nel tema di Filo (SVG outline, currentColor) invece di un
+  // glifo emoji.
   function injectSearchIcons() {
     const ICONS = window.SN_ICONS;
     if (!ICONS || !ICONS.search) return;
@@ -7973,12 +7940,8 @@
     if (mgSearchIco)    mgSearchIco.innerHTML = ICONS.search(16);
   }
 
-  // ── Larghezza delle colonne (divisori trascinabili) ───────────────────────
-  // Le tre colonne del pannello lista sono ridimensionabili a mano: le due
-  // esterne hanno larghezza fissa scelta dall'utente, il dettaglio al centro
-  // assorbe il resto. Nessun ridimensionamento automatico: l'unica cosa che
-  // muove le colonne è il trascinamento dei divisori (o la finestra che si
-  // stringe troppo, e in quel caso le preferenze salvate restano intatte).
+  // Larghezza delle colonne: le due esterne fisse a scelta dell'utente, il dettaglio assorbe
+  // il resto. Le muovono solo il trascinamento e la finestra che si stringe; le preferenze no.
   const mgReviewGrid   = document.getElementById('mgReviewGrid');
   const mgDividerLeft  = document.getElementById('mgDividerLeft');
   const mgDividerRight = document.getElementById('mgDividerRight');
@@ -7991,8 +7954,8 @@
   const KEY_STEP   = 16;    // px per pressione delle frecce sul divisore
   let layout = { ...LAYOUT_DEFAULT };
 
-  // Larghezze EFFETTIVE: partono dalle preferenze salvate ma vengono ristrette
-  // allo spazio davvero disponibile (logica pura condivisa col deck builder).
+  // Larghezze EFFETTIVE: dalle preferenze salvate, ristrette allo spazio disponibile (logica pura
+  // condivisa col deck builder).
   function effectiveWidths() {
     const avail = (mgReviewGrid && mgReviewGrid.clientWidth) || 0;
     const PL = window.SN_PANE_LAYOUT;
@@ -8027,8 +7990,7 @@
     try { chrome.storage.local.set({ [LAYOUT_KEY]: { ...layout } })?.catch?.(() => {}); } catch (_) {}
   }
 
-  // Imposta una larghezza clampata al minimo della colonna e a quanto resta
-  // lasciando al dettaglio centrale il suo minimo. Ritorna true se è cambiata.
+  // Clampata al minimo della colonna e a quanto resta lasciando al dettaglio il suo minimo.
   function setColWidth(prop, w) {
     const rect = mgReviewGrid.getBoundingClientRect();
     const other = prop === 'leftW' ? layout.rightW : layout.leftW;
@@ -8040,9 +8002,8 @@
     return true;
   }
 
-  // Trascinamento: aggiorna live, persiste al rilascio. Doppio clic: torna alla
-  // misura iniziale (se si può allargare, si deve poter tornare indietro).
-  // Frecce ←/→ con il divisore a fuoco: stessa cosa da tastiera.
+  // Doppio clic: torna alla misura iniziale (se si può allargare, si deve poter tornare
+  // indietro). Frecce ←/→ col divisore a fuoco: stessa cosa da tastiera.
   function wireDivider(el, prop, computeW) {
     if (!el || !mgReviewGrid) return;
     el.addEventListener('mousedown', (e) => {
@@ -8078,17 +8039,13 @@
     });
   }
 
-  // Sinistra (lista): dal bordo sinistro del riquadro al centro della presa.
   wireDivider(mgDividerLeft, 'leftW', (ev, rect) => ev.clientX - rect.left - DIVIDER_W / 2);
-  // Destra (pannello laterale): dal centro della presa al bordo destro.
   wireDivider(mgDividerRight, 'rightW', (ev, rect) => rect.right - ev.clientX - DIVIDER_W / 2);
 
-  // La finestra che si rimpicciolisce deve ri-adattare le larghezze: senza,
-  // con misure salvate più grandi dello spazio disponibile il dettaglio
-  // centrale collasserebbe. Le preferenze salvate NON vengono toccate.
+  // La finestra che si rimpicciolisce ri-adatta le larghezze, o il dettaglio collasserebbe
+  // sotto misure salvate più grandi dello spazio. Le preferenze NON si toccano.
   window.addEventListener('resize', applyLayout);
 
-  // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
     // La lista è la cosa più lenta (secondi di rete): parte SUBITO, e le altre
     // letture di avvio girano mentre viaggia, invece di metterlesi davanti in
@@ -8107,8 +8064,29 @@
     await loadData();
     await domandePronte;
     sceltaApertura();
+    apriDomandaDallIndirizzo();
     startLive();
   }
+
+  // `#domanda=D-12`: arriva dal segno «aspetta D-12» della pagina dei feedback, che porta dove si risponde.
+  function apriDomandaDallIndirizzo() {
+    const m = /^#domanda=(D-[1-9]\d{0,8})$/.exec(String(location.hash || ''));
+    if (!m) return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+    apriDomandaDelFeedback(m[1]);
+  }
+  window.addEventListener('hashchange', apriDomandaDallIndirizzo);
+
+  // Un indirizzo che nomina una scheda o una sezione la apre, come un clic (#1414: è così che arrivano i vecchi indirizzi
+  // delle pagine dell'owner). Poi torna pulito: riaprendo la scheda scavalcherebbe ogni volta la scelta d'apertura.
+  function apriDaIndirizzo() {
+    const tab = MR.schedaDaIndirizzo(location.hash);
+    if (!tab) return;
+    selectTab(tab);
+    try { history.replaceState(history.state, '', location.pathname + location.search); } catch (_) {}
+  }
+  window.addEventListener('hashchange', apriDaIndirizzo);
+  apriDaIndirizzo();
 
   // Un avvio rotto prima della lettura non deve lasciare le automazioni senza valori per sempre.
   const bootDone = init().catch((e) => { console.error('[manage] init:', e); }).finally(fineLetturaAutomazioni);

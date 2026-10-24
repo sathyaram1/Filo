@@ -36,11 +36,8 @@
     });
   }
 
-  // Tronca a `max` unità visibili senza spezzare un carattere a metà.
-  // `String.slice` conta unità UTF-16: tagliare in mezzo a un'emoji (coppia
-  // surrogata) lascerebbe un surrogato solitario, mostrato come glifo rotto in
-  // un'etichetta di timer/sveglia. Contiamo per grafema (Intl.Segmenter, quando
-  // c'è, tiene insieme anche emoji composte) con ripiego a code point.
+  // Tronca senza spezzare un carattere: `slice` conta unità UTF-16 e taglierebbe un'emoji
+  // a metà, cioè un glifo rotto nell'etichetta di un timer. Ripiego a code point.
   function truncateSafe(str, max) {
     const s = String(str == null ? '' : str);
     let units;
@@ -64,7 +61,7 @@
   }
   async function setRaw(key, value) {
     await chrome.storage.local.set({ [key]: value });
-    if ((key === KEYS.FILO_MEMORY || key === KEYS.FILO_LESSONS_BUFFER || key === KEYS.FILO_KEEP_OPEN) && onMemoriaCambiata) {
+    if ((key === KEYS.FILO_MEMORY || key === KEYS.FILO_LESSONS_BUFFER || key === KEYS.FILO_KEEP_OPEN || key === KEYS.FILO_MEMORY_FONTI) && onMemoriaCambiata) {
       try { onMemoriaCambiata(); } catch (_) {}
     }
   }
@@ -79,11 +76,263 @@
     return getRaw(KEYS.FILO_LESSONS_BUFFER, []);
   }
 
-  async function appendLesson(lesson) {
+  const Q = () => global.SN_QUADERNO;
+
+  // Lezioni, righe e fonti si rileggono e riscrivono intere: le scritture vanno in fila, o la lezione arrivata mentre
+  // l'utente toglie una riga se la mangia (patterns/chi-rilegge-tutto-e-riscrive-tutto-mette-le-scritture-in-fila.md).
+  let codaMemoria = Promise.resolve();
+  function inCodaMemoria(fn) {
+    const r = codaMemoria.then(fn, fn);
+    codaMemoria = r.then(() => {}, () => {});
+    return r;
+  }
+  const inFila = (fn) => (...a) => inCodaMemoria(() => fn(...a));
+
+  // `fonti`: gli eventi del filo da cui la lezione è nata (#872). Una lezione che ridice una riga tolta dall'utente,
+  // dallo stesso tratto del filo, non entra.
+  async function appendLesson(lesson, { fonti = [] } = {}) {
     const buf = await getLessonsBuffer();
-    buf.push({ ts: new Date().toISOString(), text: String(lesson || '').trim() });
+    const text = String(lesson || '').trim();
+    const f = Q() ? Q().unisci(fonti) : [];
+    if (f.length && Q() && Q().tornaDaTolta(text, f, (await getFonti()).nascoste)) return buf;
+    buf.push({ ts: new Date().toISOString(), text, ...(f.length ? { fonti: f } : {}) });
     await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
     return buf;
+  }
+
+  // ===== Quaderno delle memorie (#872) =====
+
+  async function getFonti() {
+    const m = await getRaw(KEYS.FILO_MEMORY_FONTI, null);
+    return Q() ? Q().normaMeta(m) : { righe: {}, nascoste: [] };
+  }
+
+  async function setFonti(meta) {
+    await setRaw(KEYS.FILO_MEMORY_FONTI, meta);
+  }
+
+  // Ogni cambio dell'utente (correggere, togliere, rimettere, svuotare) sale di versione: un compattatore partito prima
+  // non scrive sopra quello che l'utente ha fatto mentre il modello lavorava (applicaCompattazione).
+  function toccata(meta) {
+    meta.versione = (Number.isFinite(meta.versione) ? meta.versione : 0) + 1;
+    return meta;
+  }
+
+  // Le lezioni ancora da riordinare che ridicono una riga appena tolta o corretta, dallo stesso tratto, se ne vanno con
+  // lei: il compattatore la riscriverebbe com'era.
+  async function togliLezioniSimili(testo, fonti) {
+    if (!Q() || !Array.isArray(fonti) || !fonti.length) return;
+    const buf = await getLessonsBuffer();
+    const resta = buf.filter((l) => !(l && Q().tornaDaTolta(l.text, Q().unisci(l.fonti), [{ testo, fonti }])));
+    if (resta.length !== buf.length) await setRaw(KEYS.FILO_LESSONS_BUFFER, resta);
+  }
+
+  // Toglie una riga dalla memoria senza buttarla: finisce fra le nascoste del quaderno, con le sue fonti, e da lì si
+  // rimette o si cancella per sempre. Il prompt non la vede più dal messaggio dopo. Torna l'id della nascosta, o null.
+  // `fonti`: come per editLine, per ritrovare la riga sotto un campo rimasto aperto mentre il compattatore la riordinava.
+  async function hideLine(via, { fonti = [] } = {}) {
+    const ora = new Date().toISOString();
+    if (via && via.lezione && typeof via.lezione === 'object') {
+      const buf = await getLessonsBuffer();
+      const i = buf.findIndex((l) => l && l.ts === via.lezione.ts && l.text === via.lezione.text);
+      if (i < 0) {
+        const e = await erede(via.lezione.text, fonti);
+        return e ? hideLine(e) : null;
+      }
+      const [l] = buf.splice(i, 1);
+      await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
+      const meta = await getFonti();
+      const n = { id: uuid(), testo: l.text, lezione: true, fonti: Q() ? Q().unisci(l.fonti) : [], nata: l.ts || null, tolta: ora };
+      meta.nascoste.push(n);
+      await setFonti(toccata(meta));
+      await togliLezioniSimili(n.testo, n.fonti);
+      return n.id;
+    }
+    if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') {
+      const mem = await getMemory();
+      const testo = typeof mem[via.modulo] === 'string' ? mem[via.modulo] : null;
+      if (!via.riga.trim()) return null;
+      const righe = testo == null ? [] : testo.split(/\r?\n/);
+      const i = righe.findIndex((r) => r.trim() === via.riga.trim());
+      if (i < 0) {
+        const e = await erede(via.riga, fonti);
+        return e ? hideLine(e) : null;
+      }
+      const [tolta] = righe.splice(i, 1);
+      await setMemory({ ...mem, [via.modulo]: righe.join('\n').trim() });
+      const meta = await getFonti();
+      const m = Q() ? Q().metaDi(meta, via.modulo, tolta) : null;
+      if (m) meta.righe[via.modulo] = meta.righe[via.modulo].filter((x) => x !== m);
+      const n = { id: uuid(), testo: tolta.trim(), modulo: via.modulo, fonti: m ? m.fonti : [], nata: m ? m.nata : null, tolta: ora };
+      meta.nascoste.push(n);
+      await setFonti(toccata(meta));
+      await togliLezioniSimili(n.testo, n.fonti);
+      return n.id;
+    }
+    return null;
+  }
+
+  // Una nascosta torna dov'era: nel suo modulo, o fra le lezioni da riordinare.
+  async function restoreHidden(id) {
+    const meta = await getFonti();
+    const n = meta.nascoste.find((x) => x.id === id);
+    if (!n || !n.testo) return false;
+    meta.nascoste = meta.nascoste.filter((x) => x !== n);
+    if (n.lezione) {
+      const buf = await getLessonsBuffer();
+      buf.push({ ts: n.nata || new Date().toISOString(), text: n.testo, ...(n.fonti.length ? { fonti: n.fonti } : {}) });
+      await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
+    } else {
+      const nome = n.modulo || 'PREFERENZE';
+      const mem = await getMemory();
+      const prima = typeof mem[nome] === 'string' ? mem[nome].trim() : '';
+      await setMemory({ ...mem, [nome]: prima ? `${prima}\n${n.testo}` : n.testo });
+      meta.righe[nome] = [...(meta.righe[nome] || []), { testo: n.testo, fonti: n.fonti, nata: n.nata || null }];
+    }
+    await setFonti(toccata(meta));
+    return true;
+  }
+
+  // Per sempre: il testo se ne va dal disco. Restano solo gli id del tratto da cui era nata, perché da lì non ritorni.
+  async function forgetHiddenForever(id) {
+    const meta = await getFonti();
+    const n = meta.nascoste.find((x) => x.id === id);
+    if (!n) return false;
+    meta.nascoste = n.fonti.length
+      ? meta.nascoste.map((x) => (x === n ? { id: n.id, fonti: n.fonti, tolta: n.tolta, perSempre: true } : x))
+      : meta.nascoste.filter((x) => x !== n);
+    await setFonti(meta);
+    return true;
+  }
+
+  // La riga che il compattatore ha appena fatto da una lezione o da una riga sotto un campo ancora aperto: stesse fonti
+  // e stesso senso, e una sola. Senza fonti non si indovina.
+  async function erede(vecchio, fonti) {
+    const f = Q() ? Q().unisci(fonti) : [];
+    if (!f.length || !vecchio) return null;
+    const mem = await getMemory();
+    const meta = await getFonti();
+    const trovate = [];
+    for (const [nome, v] of Object.entries(mem || {})) {
+      if (typeof v !== 'string') continue;
+      for (const riga of Q().righeDi(v)) {
+        const m = Q().metaDi(meta, nome, riga);
+        if (m && Q().contenute(f, m.fonti) && Q().stessoSenso(riga, vecchio)) trovate.push({ modulo: nome, riga });
+      }
+    }
+    return trovate.length === 1 ? trovate[0] : null;
+  }
+
+  // La correzione dell'utente prende il posto della riga e tiene le sue fonti: vale dal messaggio dopo, e il
+  // compattatore la riporta com'è. `testo` arriva già controllato (tetto e caratteri, SN_PREF.lezioneDaAzione).
+  // `fonti`: gli eventi che il quaderno mostrava per la riga, per ritrovarla se nel frattempo è stata riordinata.
+  async function editLine(via, testo, { fonti = [] } = {}) {
+    const nuovo = String(testo || '').trim();
+    if (!nuovo || /[\r\n]/.test(nuovo)) return false;
+    const ora = new Date().toISOString();
+    if (via && via.lezione && typeof via.lezione === 'object') {
+      const buf = await getLessonsBuffer();
+      const i = buf.findIndex((l) => l && l.ts === via.lezione.ts && l.text === via.lezione.text);
+      if (i < 0) {
+        const e = await erede(via.lezione.text, fonti);
+        return e ? editLine(e, nuovo) : false;
+      }
+      const vecchia = buf[i];
+      buf[i] = { ...vecchia, text: nuovo, corretta: ora };
+      await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
+      await setFonti(toccata(await getFonti()));
+      return true;
+    }
+    if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') {
+      const mem = await getMemory();
+      const testoMod = typeof mem[via.modulo] === 'string' ? mem[via.modulo] : null;
+      if (testoMod == null) return false;
+      const righe = testoMod.split(/\r?\n/);
+      const i = righe.findIndex((r) => r.trim() === via.riga.trim());
+      if (i < 0) {
+        const e = await erede(via.riga, fonti);
+        return e ? editLine(e, nuovo) : false;
+      }
+      const meta = await getFonti();
+      const m = Q() ? Q().metaDi(meta, via.modulo, via.riga) : null;
+      const lista = (meta.righe[via.modulo] || []).filter((x) => x !== m);
+      // Corretta in una riga che c'è già: ne resta una, con le fonti di tutte e due (due righe uguali il quaderno non
+      // le sa distinguere).
+      const doppia = righe.findIndex((r, j) => j !== i && Q().norma(r) && Q().norma(r) === Q().norma(nuovo));
+      let riga;
+      if (doppia >= 0) {
+        const altra = Q().metaDi(meta, via.modulo, righe[doppia]);
+        const nate = [altra && altra.nata, m && m.nata].filter(Boolean).sort();
+        riga = { testo: righe[doppia].trim(), fonti: Q().unisci(altra ? altra.fonti : [], m ? m.fonti : []), nata: nate[0] || null, corretta: ora };
+        righe.splice(i, 1);
+        meta.righe[via.modulo] = [...lista.filter((x) => x !== altra), riga];
+      } else {
+        righe[i] = nuovo;
+        riga = { testo: nuovo, fonti: m ? m.fonti : [], nata: m ? m.nata : null, corretta: ora };
+        meta.righe[via.modulo] = [...lista, riga];
+      }
+      await setMemory({ ...mem, [via.modulo]: righe.join('\n').trim() });
+      await setFonti(toccata(meta));
+      await togliLezioniSimili(via.riga, riga.fonti);
+      return true;
+    }
+    return false;
+  }
+
+  // Il quaderno come lo legge l'utente: ogni riga col suo `via`, la data in cui è nata e gli eventi del filo da cui
+  // viene; le nascoste a parte (quelle cancellate per sempre non hanno più niente da mostrare).
+  async function quaderno() {
+    const mem = await getMemory();
+    const meta = await getFonti();
+    const moduli = Object.entries(mem || {}).filter(([, v]) => typeof v === 'string').map(([nome, v]) => ({
+      nome,
+      righe: v.split(/\r?\n/).map((r) => r.trim()).filter(Boolean).map((riga) => {
+        const m = Q() ? Q().metaDi(meta, nome, riga) : null;
+        return { testo: riga, via: { modulo: nome, riga }, nata: m ? m.nata : null, fonti: m ? m.fonti : [], corretta: (m && m.corretta) || null };
+      }),
+    }));
+    const lezioni = (await getLessonsBuffer()).filter((l) => l && typeof l.text === 'string' && l.text.trim())
+      .map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } }, nata: l.ts || null, fonti: Q() ? Q().unisci(l.fonti) : [], corretta: l.corretta || null }));
+    const keep = await listKeepOpen();
+    const sempreAperte = Object.keys(keep).sort().map((host) => ({ host, ts: keep[host] && keep[host].ts ? keep[host].ts : null }));
+    const nascoste = meta.nascoste.filter((n) => n.testo).map((n) => ({
+      id: n.id, testo: n.testo, modulo: n.modulo || null, lezione: !!n.lezione, nata: n.nata || null, tolta: n.tolta || null, fonti: n.fonti,
+    }));
+    return { moduli, lezioni, sempreAperte, nascoste };
+  }
+
+  async function svuotaQuaderno() {
+    const { versione } = await getFonti();
+    await setFonti(toccata({ righe: {}, nascoste: [], versione }));
+  }
+
+  // Quello che il compattatore deve sapere delle righe tolte: testo (se c'è ancora) e fonti.
+  async function righeTolte() {
+    return (await getFonti()).nascoste.map((n) => ({ testo: n.testo || '', fonti: n.fonti }));
+  }
+
+  // Dopo il compattatore: i moduli toccati prendono testo e righe del quaderno insieme, e dal buffer escono solo le
+  // lezioni che ha letto (quelle arrivate mentre lavorava aspettano il giro dopo). Se mentre il modello scriveva
+  // l'utente ha corretto, tolto o rimesso una riga (`versione` letta all'inizio), l'uscita non si applica: memoria e
+  // lezioni restano come le ha lasciate lui, e il giro dopo riparte da lì. Torna se l'ha applicata.
+  async function applicaCompattazione({ patch, righe, usate = [], versione }) {
+    const meta = await getFonti();
+    if (Number.isFinite(versione) && (meta.versione || 0) !== versione) return false;
+    if (patch && Object.keys(patch).length) {
+      const testi = {};
+      for (const [nome, testo] of Object.entries(patch)) {
+        const l = (righe && righe[nome]) || Q().righeDi(testo).map((t) => ({ testo: t, fonti: [], nata: null }));
+        testi[nome] = l.map((r) => r.testo).join('\n');
+        meta.righe[nome] = l;
+      }
+      await patchMemory(testi);
+      await setFonti(meta);
+    }
+    const via = new Set((Array.isArray(usate) ? usate : []).map((l) => `${l && l.ts}|${l && l.text}`));
+    const buf = await getLessonsBuffer();
+    const resta = buf.filter((l) => !via.has(`${l && l.ts}|${l && l.text}`));
+    if (resta.length !== buf.length) await setRaw(KEYS.FILO_LESSONS_BUFFER, resta);
+    return true;
   }
 
   async function lessonsBufferShouldCompact() {
@@ -116,8 +365,23 @@
     return { PROFILO: '', PREFERENZE: '' };
   }
 
+  // Una riga detta due volte nello stesso modulo è una riga sola: il quaderno riconosce le righe dal testo.
+  function senzaDoppie(testo) {
+    const viste = new Set();
+    return testo.split(/\r?\n/).filter((r) => {
+      const k = Q() ? Q().norma(r) : r.trim();
+      if (!k) return true;
+      if (viste.has(k)) return false;
+      viste.add(k);
+      return true;
+    }).join('\n');
+  }
+
   async function setMemory(memory) {
-    await setRaw(KEYS.FILO_MEMORY, memory);
+    const pulita = memory && typeof memory === 'object'
+      ? Object.fromEntries(Object.entries(memory).map(([k, v]) => [k, typeof v === 'string' ? senzaDoppie(v) : v]))
+      : memory;
+    await setRaw(KEYS.FILO_MEMORY, pulita);
   }
 
   // Toglie UNA riga da un modulo, riconosciuta dal testo esatto. Torna se c'era.
@@ -177,14 +441,14 @@
     return (await tutteLeRighe()).filter((r) => visti.has(r.testo));
   }
 
+  // Dimenticare una riga la nasconde (decisione dell'owner, #872): esce dal prompt e resta nel quaderno, da dove si
+  // rimette o si cancella per sempre. Un sito tenuto aperto è una regola, non un ricordo: si toglie e basta.
   async function forgetLine(via) {
-    if (via && via.lezione && typeof via.lezione === 'object') return forgetLesson(via.lezione);
     if (via && typeof via.sempreAperta === 'string') return (await removeKeepOpen(via.sempreAperta)).length > 0;
-    if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') return forgetModuleLine(via.modulo, via.riga);
-    return false;
+    return !!(await hideLine(via));
   }
 
-  // Aggiorna alcuni moduli senza toccare gli altri (semantica patch).
+  // Semantica patch: aggiorna alcuni moduli senza toccare gli altri.
   async function patchMemory(patch) {
     const cur = await getMemory();
     const next = { ...cur, ...patch };
@@ -192,9 +456,8 @@
     return next;
   }
 
-  // Parsing dell'output del Compattatore: blocchi "NOME:\ncontenuto multilinea"
-  // separati da una riga vuota. Tollerante: il primo elemento prima del primo
-  // header viene scartato.
+  // Output del Compattatore: blocchi «NOME:\ncontenuto» separati da una riga vuota.
+  // Tollerante: quello che precede il primo header si scarta.
   function parseCompactorOutput(text) {
     if (!text) return {};
     const trimmed = String(text).trim();
@@ -223,7 +486,6 @@
     return out;
   }
 
-  // Rendering dei moduli memoria per inserirli nei prompt.
   function renderMemoryForPrompt(memory) {
     if (!memory || typeof memory !== 'object') return { profilo: '', preferenze: '', espansioni: '' };
     const profilo = memory.PROFILO || '';
@@ -238,22 +500,15 @@
     return { profilo, preferenze, espansioni };
   }
 
-  // ===== Onboarding (#524) =====
-  //
-  // Lo stato della micro-intervista di benvenuto sta in UNA chiave e passa
-  // sempre da `SN_ONBOARDING.normalize`: qualunque cosa ci sia in storage
-  // (assente, vecchia, manomessa) torna una forma usabile, perché queste
-  // letture stanno sul cammino di apertura della home.
+  // Onboarding (#524): lo stato sta in UNA chiave e passa sempre da `SN_ONBOARDING.normalize`,
+  // perché queste letture stanno sul cammino di apertura della home.
 
   function Onb() {
     return global.SN_ONBOARDING;
   }
 
-  // Il segno "già accolto" è UNO: `done` qui dentro, scritto quando
-  // l'intervista FINISCE. La vecchia chiave FILO_WELCOMED sopravvive solo come
-  // segnale di migrazione — chi era già stato accolto dalla versione precedente
-  // non si ritrova l'intervista addosso a un aggiornamento — e non viene più
-  // scritta da nessuno: appena esiste lo stato qui, comanda lui.
+  // Il segno «già accolto» è UNO: `done`, scritto quando l'intervista FINISCE.
+  // FILO_WELCOMED resta solo come segnale di migrazione: chi era accolto non la rivede.
   async function getOnboarding() {
     const raw = await getRaw(KEYS.FILO_ONBOARDING, null);
     const O = Onb();
@@ -270,15 +525,6 @@
     await setRaw(KEYS.FILO_ONBOARDING, next);
     return next;
   }
-
-  // ===== Notes / appunti =====
-  //
-  // Non esistono più qui: gli appunti sono file dell'editor (ci scrive Filo
-  // stesso), non un elenco a parte. Il vecchio archivio è già stato svuotato
-  // dalla migrazione una-tantum in src/main/services/editorFiles.js — l'unico
-  // punto rimasto che conosce quella chiave.
-
-  // ===== Timer =====
 
   async function listTimers() {
     return getRaw(KEYS.FILO_TIMERS, []);
@@ -317,12 +563,8 @@
     return filtered;
   }
 
-  // Mette in pausa un countdown: congela il tempo rimanente in `remainingMs` e
-  // marca `paused: true`. Da quel momento `endsAt` non è più affidabile per il
-  // rendering (il "now" avanza mentre il timer è fermo) — chi mostra un timer in
-  // pausa DEVE usare `remainingMs`. Le sveglie (kind:'alarm') hanno un orario
-  // assoluto: metterle in pausa non ha senso, quindi le ignoriamo. Un timer che
-  // sta già suonando (`ringing`) o già in pausa resta invariato.
+  // In pausa il tempo si congela in `remainingMs` e `endsAt` non è più affidabile:
+  // chi mostra un timer in pausa DEVE usare `remainingMs`. Le sveglie non si mettono in pausa.
   async function pauseTimer(id) {
     const list = await listTimers();
     const idx = list.findIndex((t) => t.id === id);
@@ -336,9 +578,7 @@
     return list;
   }
 
-  // Riprende un timer in pausa: ricalcola `endsAt = adesso + remainingMs` così il
-  // conto alla rovescia riparte esattamente da dove era stato fermato, e rimuove
-  // il campo temporaneo. No-op su un timer non in pausa.
+  // Riprende da `adesso + remainingMs`: il conto riparte da dov'era. No-op se non in pausa.
   async function resumeTimer(id) {
     const list = await listTimers();
     const idx = list.findIndex((t) => t.id === id);
@@ -356,21 +596,11 @@
     return list;
   }
 
-  // ===== Sveglie (#322) =====
-  //
-  // Una sveglia è un timer con scadenza ASSOLUTA: vive nella STESSA lista dei
-  // timer (kind: 'alarm') così eredita gratis tutto il flusso già rodato —
-  // gcTimers → ringing → suoneria + card "Ferma" nella dashboard. Prima
-  // l'azione SVEGLIA creava solo una notifica statica che non suonava mai.
+  // Una sveglia (#322) è un timer con scadenza ASSOLUTA e vive nella STESSA lista,
+  // così eredita gratis il flusso già rodato: gcTimers → ringing → suoneria.
 
-  // Converte l'orario richiesto in un timestamp assoluto (ms). Regole:
-  //   - "HH:MM" / "H:MM" / "H" (anche col punto: "7.30"): la PROSSIMA
-  //     occorrenza — oggi se ancora futura, altrimenti domani (chi chiede
-  //     "sveglia alle 7" alle 23 intende domattina).
-  //   - stringa ISO / data completa: quel momento esatto; se è già passato
-  //     → null (non ha senso una sveglia nel passato).
-  // Ritorna null se non interpretabile: meglio "non ho capito l'orario" che
-  // fingere di aver programmato qualcosa.
+  // «HH:MM» o «H»: la PROSSIMA occorrenza, oggi se futura, altrimenti domani.
+  // Null se non interpretabile: meglio «non ho capito» che fingere di aver programmato.
   function resolveAlarmTime(raw, nowMs = Date.now()) {
     const s = String(raw ?? '').trim();
     if (!s) return null;
@@ -390,22 +620,15 @@
     return null;
   }
 
-  // ===== Ricorrenza settimanale delle sveglie =====
-  //
-  // Una sveglia può ripetersi nei giorni della settimana ("il lunedì e il
-  // mercoledì"). Il dato canonico è un array di token brevi in `repeat`
-  // (['lun','mer']) più l'orario in `atTime` ("07:55"): `endsAt` resta la
-  // PROSSIMA occorrenza — così tutto il flusso esistente (gcTimers → ringing →
-  // suoneria + notifica) continua a funzionare senza saperne nulla. Al suono la
-  // sveglia NON si consuma: si ricalcola l'occorrenza successiva.
+  // Il dato canonico è `repeat` più `atTime`; `endsAt` resta la PROSSIMA occorrenza,
+  // così il flusso esistente funziona senza saperne nulla. Al suono non si consuma.
 
   const DOW_TOKENS = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab']; // indice = Date#getDay()
   const DOW_ORDER = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];  // ordine di lettura
   const WEEKDAYS = ['lun', 'mar', 'mer', 'gio', 'ven'];
   const WEEKEND = ['sab', 'dom'];
 
-  // Chiave di confronto: minuscolo, senza accenti, senza spazi/punteggiatura.
-  // "fine settimana" → "finesettimana", "lunedì" → "lunedi".
+  // Chiave di confronto: minuscolo, senza accenti, spazi e punteggiatura.
   function normKey(s) {
     return String(s == null ? '' : s)
       .toLowerCase()
@@ -434,11 +657,8 @@
     tuttiigg: DOW_ORDER,
   };
 
-  // Interpreta la ricorrenza chiesta e la riduce ai token canonici, ordinati da
-  // lunedì a domenica. Accetta un array (['lun','mercoledì']), una stringa con
-  // separatori ("lun, mer", "lunedì e mercoledì") o una scorciatoia ("feriali",
-  // "weekend", "ogni giorno"). Quello che non si riconosce viene ignorato:
-  // ritorna [] = sveglia a occorrenza singola (il comportamento di sempre).
+  // Accetta array, stringa con separatori o scorciatoie («feriali», «weekend»).
+  // Quello che non si riconosce si ignora: [] = occorrenza singola, come sempre.
   function normalizeRepeat(raw) {
     const found = new Set();
     const eat = (value) => {
@@ -461,9 +681,7 @@
     return DOW_ORDER.filter((d) => found.has(d));
   }
 
-  // Orario "puro" (ore/minuti locali) da "HH:MM", "H", "7.30" o da una data-ora
-  // ISO. Serve per una sveglia ricorrente: il giorno lo decide la ricorrenza,
-  // dell'input ci interessa solo l'ora.
+  // Per una sveglia ricorrente il giorno lo decide la ricorrenza: dell'input serve solo l'ora.
   function parseClock(raw) {
     const s = String(raw ?? '').trim();
     if (!s) return null;
@@ -485,10 +703,8 @@
     return `${String(clock.h).padStart(2, '0')}:${String(clock.m).padStart(2, '0')}`;
   }
 
-  // Prossima occorrenza STRETTAMENTE futura di `clock` in uno dei `days`.
-  // Guarda da oggi (i=0) a fra sette giorni compresi: così una sveglia del solo
-  // lunedì chiesta lunedì dopo l'orario finisce al lunedì successivo, e una
-  // chiesta prima dell'orario suona oggi.
+  // Occorrenza STRETTAMENTE futura, da oggi a fra sette giorni compresi:
+  // la sveglia del solo lunedì, chiesta lunedì dopo l'orario, va al lunedì dopo.
   function nextRecurrence(clock, days, nowMs = Date.now()) {
     const wanted = normalizeRepeat(days);
     if (!clock || !wanted.length) return null;
@@ -552,13 +768,8 @@
     return entry;
   }
 
-  // ===== Trovare "quale sveglia intende" =====
-  //
-  // L'utente non dice mai un id: dice "la sveglia della palestra", "quella
-  // delle 7", "tutte le sveglie". Questa è la parte pura che, data la lista e
-  // il riferimento, decide su quali entry agire. Ritorna sempre un array (vuoto
-  // = non ho capito a cosa ti riferisci): chi la chiama non cancella nulla
-  // quando è vuoto, invece di indovinare.
+  // L'utente non dice mai un id: dice «la sveglia della palestra», «quella delle 7», «tutte».
+  // Array vuoto = «non ho capito»: chi chiama non cancella niente invece di indovinare.
 
   function normText(s) {
     return String(s == null ? '' : s)
@@ -574,12 +785,10 @@
     return clock ? fmtClock(clock) : '';
   }
 
-  // `ref`: { id?, label?, all?, kind? }. `kind` filtra 'alarm' (sveglie) o
-  // 'timer' (countdown); assente = entrambi.
+  // `kind` filtra 'alarm' o 'timer'; assente = entrambi.
   function resolveTimerRefs(list, ref = {}) {
     const all = Array.isArray(list) ? list : [];
-    // Riferimento già risolto altrove (il main lo risolve prima del popup di
-    // conferma e poi agisce su QUESTI, non su una nuova ricerca).
+    // Riferimento già risolto altrove: il main lo risolve prima del popup di conferma.
     if (Array.isArray(ref.ids)) {
       const set = new Set(ref.ids);
       return all.filter((t) => set.has(t.id));
@@ -611,9 +820,7 @@
       });
       if (byWord.length) return byWord;
     }
-    // 4) riferimento all'ORARIO ("quella delle 7", "la sveglia delle 07:30").
-    // Sul testo GREZZO: la normalizzazione toglie i due punti e "06:30"
-    // diventerebbe "06 30", cioè le 6 in punto.
+    // Sul testo GREZZO: normalizzando, «06:30» diventerebbe «06 30», cioè le 6 in punto.
     const hm = /(\d{1,2})(?:[:.](\d{2}))?/.exec(String(ref.label || ''));
     if (hm) {
       const want = fmtClock({ h: Number(hm[1]), m: Number(hm[2] || 0) });
@@ -636,10 +843,8 @@
     return { removed: targets, list: kept };
   }
 
-  // Sposta una sveglia (nuovo orario e/o nuova ricorrenza) o rimette in moto un
-  // countdown con una durata nuova. Ritorna { updated, list }: `updated` vuoto
-  // significa "non ho capito quale, o il nuovo orario non è interpretabile" —
-  // e allora non si tocca niente.
+  // `updated` vuoto = non ho capito quale, o l'orario non è interpretabile:
+  // in quel caso non si tocca niente.
   async function updateTimersByRef(ref = {}, { time, repeat, seconds, nowMs } = {}) {
     const now = Number.isFinite(nowMs) ? nowMs : Date.now();
     const list = await listTimers();
@@ -650,8 +855,7 @@
     const next = list.map((t) => {
       if (!ids.has(t.id)) return t;
       if (t.kind === 'alarm') {
-        // Ricorrenza: quella chiesta ora, se assente quella che la sveglia ha
-        // già (spostare l'orario non deve far perdere "il lunedì e il mercoledì").
+        // Spostare l'orario non deve far perdere «il lunedì e il mercoledì».
         const asked = normalizeRepeat(repeat);
         const days = asked.length ? asked : normalizeRepeat(t.repeat);
         const clock = parseClock(time) || parseClock(t.atTime) || parseClock(t.endsAt);
@@ -679,12 +883,8 @@
     return { updated, list: next };
   }
 
-  // Pulizia: i timer scaduti (endsAt <= now) e non in pausa vengono marcati
-  // `ringing: true` invece di essere eliminati, così la UI può far suonare la
-  // suoneria e mostrare un controllo "Ferma". I timer in stato `ringing` restano
-  // finché l'utente li ferma esplicitamente (via stopTimerAlarm) oppure fino
-  // alla prossima apertura di Filo (in quel caso vengono rimossi silenziosamente
-  // perché la suoneria non avrebbe senso senza la UI aperta).
+  // I timer scaduti si marcano `ringing` invece di sparire, così la UI suona e mostra «Ferma».
+  // Alla prossima apertura si tolgono in silenzio: senza UI la suoneria non avrebbe senso.
   async function gcTimers() {
     const list = await listTimers();
     const now = Date.now();
@@ -695,15 +895,11 @@
       const expired = new Date(t.endsAt).getTime() <= now;
       if (!expired) { result.push(t); continue; }
       if (t.ringing) {
-        // Già marcato ringing: teniamolo in lista (l'utente non ha ancora
-        // premuto Ferma). Non invalidiamo la cache ogni secondo.
+        // Già ringing: resta in lista, e la cache non si invalida ogni secondo.
         result.push(t);
       } else if (isRecurring(t)) {
-        // Sveglia RICORRENTE: suona, ma non si consuma. Insieme a `ringing`
-        // spostiamo già `endsAt` sull'occorrenza successiva, così il tick dopo
-        // non la vede più scaduta e la settimana prossima suona di nuovo. Se
-        // per qualche motivo la prossima non è calcolabile, si comporta come
-        // una sveglia normale (suona una volta e la si ferma).
+        // Sveglia RICORRENTE: suona e non si consuma, `endsAt` va già all'occorrenza dopo.
+        // Se non è calcolabile si comporta come una sveglia normale.
         const next = nextAlarmOccurrence(t, now);
         result.push(next ? { ...t, ringing: true, endsAt: new Date(next).toISOString() } : { ...t, ringing: true });
         changed = true;
@@ -715,18 +911,14 @@
     }
     if (changed) {
       await setRaw(KEYS.FILO_TIMERS, result);
-      // Invalida la cache della dashboard affinché eventuali suggerimenti
-      // "il timer sta per suonare" vengano rigenerati.
+      // I suggerimenti «il timer sta per suonare» vanno rigenerati.
       await setRaw(KEYS.FILO_DASHBOARD_CACHE, null);
     }
     return result;
   }
 
-  // Silenzia un timer in stato ringing rimuovendolo dalla lista.
-  // ECCEZIONE: una sveglia RICORRENTE non si cancella premendo "Ferma" — fermare
-  // la sveglia di stamattina non vuol dire disdire quella di mercoledì. Resta in
-  // lista, muta, già puntata sull'occorrenza successiva. Per toglierla davvero
-  // c'è la × (deleteTimer), come per tutte le altre.
+  // ECCEZIONE: una sveglia RICORRENTE non si cancella con «Ferma» — fermare quella di
+  // stamattina non disdice quella di mercoledì. Per toglierla davvero c'è la ×.
   async function stopTimerAlarm(id) {
     const list = await listTimers();
     const idx = list.findIndex((t) => t.id === id);
@@ -748,8 +940,6 @@
     return filtered;
   }
 
-  // ===== Notifications =====
-
   async function listNotifications({ includeDismissed = false } = {}) {
     const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
     return includeDismissed ? list : list.filter((n) => !n.dismissed);
@@ -769,6 +959,8 @@
     list.unshift(entry);
     if (list.length > NOTIFICATIONS_CAP) list.length = NOTIFICATIONS_CAP;
     await setRaw(KEYS.FILO_NOTIFICATIONS, list);
+    // Nel main un avviso nuovo è una cosa successa: Filo lo scrive nel filo (#869).
+    try { global.SN_FILO_PARLA?.segnala({ tipo: 'avviso', testo: entry.text }); } catch (_) {}
     return entry;
   }
 
@@ -794,8 +986,6 @@
     return list;
   }
 
-  // ===== Dashboard cache =====
-
   async function getDashboardCache() {
     return getRaw(KEYS.FILO_DASHBOARD_CACHE, null);
   }
@@ -805,22 +995,15 @@
       ts: new Date().toISOString(),
       message: payload?.message || '',
       suggestions: Array.isArray(payload?.suggestions) ? payload.suggestions : [],
-      // #155 — firma degli input con cui è stato generato questo messaggio:
-      // serve a capire se la home andrebbe ricalcolata (input cambiati).
+      // Firma degli input del messaggio: dice se la home va ricalcolata (#155).
       signature: payload?.signature || '',
       // Scritto senza chiave: manda a riscattare l'invito, e con la chiave non va più servito.
       senzaChiave: payload?.senzaChiave === true,
     });
   }
 
-  // ===== Proxy: regole persistenti per dominio (#152) =====
-  //
-  // "questo sito sempre dagli USA" → la regola vive qui (memoria a lungo
-  // termine di Filo, stessa persistenza di profilo/preferenze: storage.local
-  // → storage.json), quindi SOPRAVVIVE al riavvio. Alla navigazione verso il
-  // dominio la tab nasce già instradata (TabManager._maybeApplyDomainRule).
-  // La chiave è il dominio registrabile (eTLD+1) calcolato dal chiamante (che
-  // ha l'estrazione PSL); qui solo una normalizzazione difensiva.
+  // Le regole proxy per dominio (#152) vivono nella memoria a lungo termine, così la tab
+  // nasce già instradata. La chiave è l'eTLD+1 calcolato dal chiamante, che ha la PSL.
   function normProxyDomain(domain) {
     return String(domain || '').trim().toLowerCase().replace(/^www\./, '');
   }
@@ -907,8 +1090,7 @@
     await setRaw(KEYS.FILO_SESSION, session);
   }
 
-  // Aggiorna la sessione registrando una nuova interazione. Reset dopo 30 min
-  // di inattività (vedi spec sezione 5.1).
+  // Reset dopo 30 minuti di inattività (spec §5.1).
   async function touchSession() {
     const s = await getSession();
     const now = new Date();
@@ -927,23 +1109,23 @@
   global.SN_FILO_MEMORY = {
     // raw log
     // lessons
-    getLessonsBuffer, appendLesson, lessonsBufferShouldCompact, clearLessonsBuffer, forgetLesson,
+    getLessonsBuffer, appendLesson: inFila(appendLesson), lessonsBufferShouldCompact, clearLessonsBuffer, forgetLesson,
     LESSONS_BUFFER_TRIGGER_CHARS,
     // moduli
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt, forgetModuleLine,
-    setOnMemoryChange, viewForUser, findLines, linesWithText, forgetLine,
+    setOnMemoryChange, viewForUser, findLines, linesWithText, forgetLine: inFila(forgetLine),
+    // quaderno delle memorie (#872)
+    getFonti, quaderno, righeTolte, svuotaQuaderno: inFila(svuotaQuaderno), hideLine: inFila(hideLine), restoreHidden: inFila(restoreHidden),
+    forgetHiddenForever: inFila(forgetHiddenForever), editLine: inFila(editLine), applicaCompattazione: inFila(applicaCompattazione),
     // onboarding (#524)
     getOnboarding, setOnboarding,
-    // timer + sveglie (#322)
     listTimers, addTimer, addAlarm, resolveAlarmTime, deleteTimer, pauseTimer, resumeTimer, gcTimers, stopTimerAlarm,
-    // ricorrenza + gestione dalla chat
     normalizeRepeat, parseClock, nextRecurrence, nextAlarmOccurrence, formatRepeat, isRecurring,
     resolveTimerRefs, removeTimersByRef, updateTimersByRef,
     // notifications
     listNotifications, addNotification, dismissNotification, setNotificationText,
     // dashboard cache
     getDashboardCache, setDashboardCache,
-    // proxy: regole persistenti per dominio (#152)
     listProxyRules, setProxyRule, removeProxyRule, getProxyRule,
     // siti sempre aperti (#823)
     listKeepOpen, addKeepOpen, removeKeepOpen, fraseSempreAperta,

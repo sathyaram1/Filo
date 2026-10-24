@@ -29,15 +29,15 @@ async function barraAperta(app, openTab, testServer) {
   return barra;
 }
 
-// Un punto del pannello accanto alla prima icona: è ancora barra, non è più l'icona.
+// Un punto del pannello accanto a Indietro: è ancora barra, non è più l'icona.
 const accanto = (barra) => barra.evaluate(() => {
-  const b = document.querySelector('#nav .ico').getBoundingClientRect();
+  const b = document.querySelector('#nav .ico[data-id="back"]').getBoundingClientRect();
   return { x: Math.round(b.left - 2), y: Math.round(b.top + b.height / 2) };
 });
 
 test('lasciata l’icona per il margine del pannello, la sua etichetta se ne va; tornandoci ricompare', async ({ app, openTab, testServer }) => {
   const barra = await barraAperta(app, openTab, testServer);
-  const ico = barra.locator('#nav .ico').first();
+  const ico = barra.locator('#nav .ico[data-id="back"]');
   const nome = await ico.getAttribute('aria-label');
   await ico.hover();
   await expect.poll(() => etichetta(app), { timeout: 4000 }).toBe(nome);
@@ -53,7 +53,7 @@ test('lasciata l’icona per il margine del pannello, la sua etichetta se ne va;
 
 test('premuta l’icona, la sua etichetta se ne va', async ({ app, openTab, testServer }) => {
   const barra = await barraAperta(app, openTab, testServer);
-  const ico = barra.locator('#nav .ico').first();
+  const ico = barra.locator('#nav .ico[data-id="back"]');
   const nome = await ico.getAttribute('aria-label');
   await ico.hover();
   await expect.poll(() => etichetta(app), { timeout: 4000 }).toBe(nome);
@@ -64,7 +64,7 @@ test('premuta l’icona, la sua etichetta se ne va', async ({ app, openTab, test
 
 test('un’etichetta chiesta a barra chiusa non compare', async ({ app, openTab, testServer }) => {
   const barra = await barraAperta(app, openTab, testServer);
-  const ico = barra.locator('#nav .ico').first();
+  const ico = barra.locator('#nav .ico[data-id="back"]');
   const nome = await ico.getAttribute('aria-label');
   await ico.hover();
   await expect.poll(() => etichetta(app), { timeout: 4000 }).toBe(nome);
@@ -81,7 +81,7 @@ test('un’etichetta chiesta a barra chiusa non compare', async ({ app, openTab,
 
 test('un’etichetta tolta nell’istante in cui compariva non resta appesa', async ({ app, openTab, testServer }) => {
   const barra = await barraAperta(app, openTab, testServer);
-  const ico = barra.locator('#nav .ico').first();
+  const ico = barra.locator('#nav .ico[data-id="back"]');
   const nome = await ico.getAttribute('aria-label');
   // La finestra del suggerimento già nata e pronta, come dopo il primo passaggio.
   await ico.hover();

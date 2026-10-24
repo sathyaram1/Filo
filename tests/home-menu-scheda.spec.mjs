@@ -3,6 +3,7 @@
 // Rimuovi con «Annulla» che la rimette dov'era. Lo stesso menu si apre e si percorre da tastiera.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HOME = 'filo://home/home.html';
 const ORA = Date.parse('2026-10-10T10:00:00Z');
@@ -45,9 +46,9 @@ test('tasto destro con le categorie: copia link, sposta, nuova categoria, rimuov
 
   // Fuori da una scheda il tasto destro resta quello di Filo: è la prova che sulla scheda non lo è.
   await home.locator('#title').click({ button: 'right' });
-  await expect(home.locator('.sn-menu').first()).toBeVisible();
+  await expect(menuDi(home).locator('.sn-menu').first()).toBeVisible();
   await home.keyboard.press('Escape');
-  await expect(home.locator('.sn-menu:visible')).toHaveCount(0);
+  await expect(menuDi(home).locator('.sn-menu:visible')).toHaveCount(0);
 
   await riquadro(home, 'Da vedere').click();
   await expect(home.locator('#grid .sn-card')).toHaveCount(3);
@@ -55,7 +56,7 @@ test('tasto destro con le categorie: copia link, sposta, nuova categoria, rimuov
   await scheda(home, 'a').click({ button: 'right' });
   await expect(home.locator('.home-ctxmenu')).toBeVisible();
   expect(await vociMenu(home)).toEqual(['Apri', 'Apri e tienila in lista', 'Copia link', 'Sposta in…', 'Rimuovi']);
-  await expect(home.locator('.sn-menu:visible')).toHaveCount(0);
+  await expect(menuDi(home).locator('.sn-menu:visible')).toHaveCount(0);
   await home.screenshot({ path: 'tests/.shots/home-menu-scheda.png' }).catch(() => {});
 
   // Copia link → negli appunti c'è l'indirizzo.

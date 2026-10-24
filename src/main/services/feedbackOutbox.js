@@ -30,7 +30,7 @@
 //     onAttesaOwner(item, perche) -> boolean: la voce dell'owner aspetta il suo accesso (#912: mai da anonima);
 //     perche 'assente' | 'rifiutato'; `false` = non detto. Un tokenOwner che lancia è la rete: si riprova zitti.
 //     onScaduta(item): la voce esce dopo MAX_AGE_MS di soli fallimenti (#986).
-//   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito
+//   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito (payload.name = titolo già scelto)
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
 //   accessoCambiato()                                       — l'owner è rientrato: riprova subito tutte le voci
 //   size()                                                  — voci in coda
@@ -119,8 +119,7 @@
     if (typeof opts.log === 'function') logFn = opts.log;
     if (Number.isFinite(opts.backoffMin)) { backoffMin = opts.backoffMin; backoff = opts.backoffMin; }
     if (Number.isFinite(opts.backoffMax)) backoffMax = opts.backoffMax;
-    // Recupera i feedback accodati e non ancora inviati (es. app riavviata mentre
-    // era offline) e prova subito a smaltirli.
+    // Un feedback accodato offline riparte al prossimo avvio.
     load().then(() => { if (queue.length) scheduleFlush(0); }).catch(() => {});
   }
 
@@ -136,9 +135,11 @@
       ? String(payload.submissionId)
       : `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const dallOwner = !!(opts && opts.dallOwner);
+    // Un titolo già scritto (quello che Filo propone in chat e l'utente conferma) non si rigenera.
+    const titolo = payload && typeof payload.name === 'string' && payload.name.trim() ? payload.name : null;
     // Dedup su submissionId: due invii della stessa bozza non accodano due voci.
     if (!queue.some((it) => it.id === id)) {
-      queue.push({ id, payload, name: null, prepared: false, queuedAt: Date.now(), attempts: 0, dallOwner });
+      queue.push({ id, payload, name: titolo, prepared: !!titolo, queuedAt: Date.now(), attempts: 0, dallOwner });
       if (queue.length > MAX_ITEMS) queue = queue.slice(-MAX_ITEMS);
       await persist();
     }
@@ -219,8 +220,7 @@
         const fb = feedback();
         if (!fb || typeof fb.submit !== 'function') { anyFail = true; break; }
         try {
-          // Titolo breve generato al momento dell'invio (offline ripiega sul
-          // fallback), calcolato UNA volta e riusato dai ritentativi.
+          // Titolo calcolato UNA volta all'invio e riusato dai ritentativi (offline: ripiego).
           if (!it.prepared) {
             let name = '';
             if (prepareFn) {
@@ -294,7 +294,7 @@
     flush,
     accessoCambiato,
     size: () => queue.length,
-    // ---- helper per i test (logica pura, nessun effetto in produzione) ----
+    // helper per i test (logica pura, nessun effetto in produzione)
     _peek: () => queue.map(serialize),
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _reset: () => {

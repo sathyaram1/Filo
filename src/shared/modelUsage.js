@@ -42,7 +42,7 @@
 
   const A = (global.SN_CONST && global.SN_CONST.ACTIONS) || {};
 
-  // Dove si imposta, in parole. Testo per l'utente: niente percorsi di file.
+  // Testo per l'utente: niente percorsi di file.
   const WHERE_USER = 'Opzioni → Modelli';
   const WHERE_OWNER = 'Gestione → Automazioni → Modelli di supporto (riservato a chi gestisce Filo)';
 
@@ -58,10 +58,8 @@
     return { id, label, area, from: 'none', ref: '', where: '', note: note || '' };
   }
 
-  // ── L'elenco ────────────────────────────────────────────────────────────────
   // Ordinato per area, così si legge come un indice.
   const ENTRIES = [
-    // Testo selezionato e pagine web
     user('explain', 'Spiega la selezione', 'Pagine web', A.EXPLAIN),
     user('explain-deep', 'Approfondisci la selezione', 'Pagine web', A.EXPLAIN_DEEP),
     user('explain-link', 'Spiega un link', 'Pagine web', A.EXPLAIN_LINK),
@@ -72,17 +70,15 @@
     user('describe-image', 'Descrivi un\'immagine', 'Pagine web', A.DESCRIBE_IMAGE,
       'Lo stesso modello legge le finestre che Filo guarda quando glielo chiedi in chat.'),
     user('transcribe-image', 'Leggi il testo di un\'immagine', 'Pagine web', A.TRANSCRIBE_IMAGE),
-    user('spellcheck-word', 'Correttore ortografico — parola', 'Scrittura', A.SPELLCHECK_WORD),
-    user('spellcheck-semantic', 'Correttore ortografico — frase', 'Scrittura', A.SPELLCHECK_SEMANTIC),
+    user('spellcheck-semantic', 'Errori del correttore (controllo rapido)', 'Scrittura', A.SPELLCHECK_SEMANTIC),
+    user('spellcheck-context', 'Suggerimenti del correttore (controllo ragionato)', 'Scrittura', A.SPELLCHECK_CONTEXT),
     user('transcribe-audio', 'Dettatura dal microfono', 'Scrittura', A.TRANSCRIBE_AUDIO),
     user('tts', 'Lettura ad alta voce', 'Scrittura', A.TTS),
 
-    // Aiuto
     user('help', 'Sidebar Aiuto', 'Aiuto', A.HELP),
     user('help-intent-guess', 'Aiuto — sintesi dell\'intento', 'Aiuto', A.HELP_INTENT_GUESS),
     user('help-intent-judge', 'Aiuto — controllo dell\'intento', 'Aiuto', A.HELP_INTENT_JUDGE),
 
-    // Home e memoria
     user('filo-chat', 'Chat con Filo', 'Home', A.FILO_CHAT),
     user('filo-dashboard', 'Generazione della home', 'Home', A.FILO_DASHBOARD),
     user('filo-lesson', 'Cosa vale la pena ricordare dopo una conversazione', 'Memoria', A.FILO_LESSON),
@@ -90,14 +86,12 @@
     user('filo-chat-triage', 'Titolo e tipo di una chat finita', 'Home', A.FILO_CHAT_TRIAGE,
       'Alla chiusura di una chat le dà un titolo breve e decide se era una conversazione da rileggere o solo un comando. Senza, le chat restano in archivio col primo messaggio come titolo, tutte fra le conversazioni.'),
 
-    // Schede
     user('tab-triage', 'Riordino automatico delle schede', 'Schede', A.FILO_TAB_TRIAGE),
     user('tab-summary', 'Riassunto di una scheda alla chiusura', 'Schede', A.FILO_TAB_SUMMARY),
     user('archive-embed', 'Indicizzazione delle schede archiviate', 'Schede', A.ARCHIVE_EMBED,
       'Modello di indicizzazione (produce vettori, non parole): senza, la ricerca fra le schede archiviate resta quella per parole.'),
     user('tab-search', 'Ricerca fra le schede archiviate', 'Schede', A.FILO_TAB_SEARCH),
 
-    // Editor
     user('editor-title', 'Editor — titolo del documento', 'Editor', A.EDITOR_TITLE),
     user('editor-summary', 'Editor — riassunto del documento', 'Editor', A.EDITOR_SUMMARY),
     user('editor-chat', 'Editor — chat col documento', 'Editor', A.EDITOR_CHAT),
@@ -112,13 +106,11 @@
     user('decks-autotag', 'Mazzi — etichette automatiche', 'Mazzi', A.DECKS_AUTOTAG),
     user('decks-search-filter', 'Mazzi — filtro dei risultati di ricerca', 'Mazzi', A.DECKS_SEARCH_FILTER),
 
-    // Sicurezza e navigazione
     user('safebrowse-judge', 'Giudizio sui siti pericolosi', 'Sicurezza', A.SAFEBROWSE_JUDGE),
     user('geoblock-classify', 'Riconoscimento dei blocchi geografici', 'Sicurezza', A.GEOBLOCK_CLASSIFY),
     user('embed-cookie-check', 'Contenuti incorporati rotti dai cookie', 'Sicurezza', A.EMBED_COOKIE_CHECK,
       'Guarda l\'immagine di un riquadro di un altro sito che resta vuoto o chiede di entrare, solo quando le regole non lo riconoscono, e dice se è rotto per i cookie. Serve un modello che veda le immagini.'),
 
-    // Feedback
     user('feedback-title', 'Titolo automatico di un feedback', 'Feedback', A.FEEDBACK_TITLE),
     owner('manage-search', 'Ricerca fra i feedback', 'Feedback', 'manageSearch',
       'Gira sul computer di chi gestisce Filo, con la chiave che usa nel resto di Filo.', A.MANAGE_SEARCH),
@@ -126,10 +118,8 @@
       'Legge i feedback in parallelo e dice quali corrispondono alla ricerca; se manca o non risponde, li ordina il modello della ricerca.',
       A.MANAGE_SEARCH_CLASSIFY),
 
-    // Diagnostica
     user('provider-test', 'Prova di un fornitore («Prova» accanto alla chiave)', 'Diagnostica', A.PROVIDER_TEST),
 
-    // ── Punti che girano sui server di Filo (li imposta chi gestisce Filo) ────
     owner('sanitizer', 'Sanificatore dei feedback', 'Feedback (server)', 'sanitizer'),
     owner('judge1', 'Giudice 1 dei feedback', 'Feedback (server)', 'judge1'),
     owner('judge2', 'Giudice 2 dei feedback', 'Feedback (server)', 'judge2'),
@@ -138,9 +128,8 @@
     owner('judge-redteam', 'Giudice degli attacchi (red-team)', 'Feedback (server)', 'judgeRedTeam'),
     owner('judge-priority', 'Giudice della priorità dei feedback', 'Feedback (server)', 'judgePriority'),
 
-    // ── Punti che sembrano usare un modello e non lo usano ───────────────────
-    // Stanno nell'elenco apposta: senza, si continuerebbe a cercare dove si
-    // imposta un modello che non c'è.
+    // Stanno nell'elenco apposta: senza, si continuerebbe a cercare dove si imposta un modello
+    // che non c'è.
     none('cmd-classify', 'Livello di sicurezza di un comando da terminale', 'Sicurezza',
       'Deciso da regole fisse, mai da un modello: un modello convinto a sbagliare eseguirebbe comandi pericolosi.'),
     none('tab-duplicates', 'Riconoscimento delle schede doppie', 'Schede',
@@ -153,20 +142,16 @@
       'È un motore di ricerca, non un modello; i risultati vengono poi letti dal modello dell\'Aiuto.'),
   ];
 
-  // ── Interrogazioni ──────────────────────────────────────────────────────────
-
   function list() {
     return ENTRIES.map((e) => ({ ...e }));
   }
 
-  // Le funzioni impostabili da chi usa Filo, nell'ordine dell'elenco. È la lista
-  // che genera la griglia di Opzioni → Modelli: elenco e griglia non possono
+  // È la lista che genera la griglia di Opzioni → Modelli: elenco e griglia non possono
   // divergere perché sono la stessa cosa.
   function userActions() {
     return ENTRIES.filter((e) => e.from === 'user' && e.ref).map((e) => e.ref);
   }
 
-  // Gli slot impostabili da chi gestisce Filo.
   function ownerSlots() {
     return ENTRIES.filter((e) => e.from === 'owner' && e.ref).map((e) => e.ref);
   }
@@ -189,7 +174,6 @@
     return ENTRIES.filter((e) => e.from === 'code').map((e) => e.id);
   }
 
-  // L'elenco raggruppato per area, nell'ordine di prima apparizione.
   function byArea() {
     const out = [];
     const index = new Map();

@@ -212,6 +212,13 @@
     return out;
   }
 
+  // Le parole di una richiesta senza la punteggiatura ai bordi: «Lisbona?» cerca «lisbona» (#868.8). Quella dentro la
+  // parola resta («node.js», «dell'albergo»), e così i segni che fanno il nome («c++», «c#»).
+  const PUNTEGGIATURA_AI_BORDI = /^[.,;:!?¿¡…"'`“”‘’«»()[\]{}<>*_]+|[.,;:!?¿¡…"'`“”‘’«»()[\]{}<>*_]+$/g;
+  function paroleDi(s) {
+    return normalizeForSearch(s).split(/\s+/).map((w) => w.replace(PUNTEGGIATURA_AI_BORDI, '')).filter(Boolean);
+  }
+
   function haystackOf(chat) {
     const messages = Array.isArray(chat && chat.messages) ? chat.messages : [];
     return normalizeForSearch([
@@ -224,7 +231,7 @@
   // «coscienza filosofia» trova la chat che parla di entrambe, non quella che
   // nomina solo la prima.
   function matches(chat, query) {
-    const terms = normalizeForSearch(query).split(/\s+/).filter(Boolean);
+    const terms = paroleDi(query);
     if (!terms.length) return true;
     const hay = haystackOf(chat);
     return terms.every((t) => hay.includes(t));
@@ -258,24 +265,71 @@
   // buttano mai a priori: si tolgono solo quando pretenderle tutte non ha
   // trovato niente, e chi chiama SA che la ricerca si è allargata (lo dice a
   // chi guarda, invece di far finta che la richiesta fosse quella).
+  // Una parola corta che non è qui conta (Zen, SQL, IVA): l'elenco è l'unico filtro (#1295).
   const PAROLE_CHE_NON_DISTINGUONO = new Set([
-    'di', 'a', 'da', 'in', 'con', 'su', 'per', 'tra', 'fra', 'il', 'lo', 'la', 'i', 'gli', 'le',
+    'di', 'a', 'da', 'in', 'con', 'su', 'per', 'tra', 'fra', 'il', 'lo', 'la', 'i', 'gli', 'le', 'li',
     'un', 'uno', 'una', 'del', 'dello', 'della', 'dei', 'degli', 'delle', 'al', 'allo', 'alla',
-    'ai', 'agli', 'alle', 'dal', 'dalla', 'nel', 'nella', 'sul', 'sulla', 'sullo', 'sui', 'sulle',
-    'che', 'chi', 'cosa', 'come', 'quando', 'dove', 'perche', 'non', 'piu', 'mi', 'ti', 'si',
-    'ci', 'vi', 'ne', 'e', 'ed', 'o', 'ma', 'se', 'ho', 'hai', 'ha', 'era', 'erano', 'sono',
+    'ai', 'agli', 'alle', 'dal', 'dallo', 'dalla', 'dai', 'dagli', 'dalle', 'nel', 'nello', 'nella',
+    'nei', 'negli', 'nelle', 'sul', 'sulla', 'sullo', 'sui', 'sugli', 'sulle', 'col', 'coi',
+    'dell', 'all', 'dall', 'nell', 'sull', 'quell', 'quest', 'po',
+    'che', 'chi', 'cui', 'cosa', 'come', 'quando', 'dove', 'perche', 'non', 'piu', 'mi', 'ti', 'si',
+    'ci', 'vi', 'ne', 'me', 'te', 'se', 'io', 'tu', 'lui', 'lei', 'noi', 'voi', 'loro',
+    'e', 'ed', 'o', 'od', 'ma', 'pure', 'anche', 'poi', 'gia', 'qui', 'qua', 'ora', 'mai',
+    'no', 'ok', 'eh', 'ah', 'oh', 'boh', 'ben', 'tal',
+    'ho', 'hai', 'ha', 'abbiamo', 'avete', 'hanno', 'era', 'erano', 'ero', 'sono', 'sei', 'siamo',
+    'sia', 'fu', 'fa', 'fai', 'fare', 'va', 'vai', 'so', 'sa', 'sai', 'sto', 'sta', 'stai', 'puo', 'do', 'dai',
     'ieri', 'oggi', 'altro', 'altra', 'volta', 'quella', 'quello', 'questa', 'questo', 'mio',
-    'mia', 'tuo', 'tua', 'chat', 'discussione', 'discussioni', 'conversazione', 'conversazioni',
+    'mia', 'tuo', 'tua', 'suo', 'sua', 'chat', 'discussione', 'discussioni', 'conversazione', 'conversazioni',
     'parlato', 'parlare', 'parlavamo', 'detto', 'dire', 'riprendi', 'riprendere', 'ricordi',
-    'avevamo', 'avevo', 'avevi', 'scorsa', 'scorso', 'settimana', 'fa',
+    'avevamo', 'avevo', 'avevi', 'scorsa', 'scorso', 'settimana',
+    'the', 'of', 'and', 'or', 'to', 'on', 'at', 'by', 'for', 'is', 'my', 'an',
   ]);
 
-  // Le parole della richiesta che davvero restringono il campo: le altre le
-  // scrive chiunque, in qualunque chat.
-  function terminiCheDistinguono(terms) {
-    return (Array.isArray(terms) ? terms : [])
-      .filter((t) => t.length > 3 && !PAROLE_CHE_NON_DISTINGUONO.has(t));
+  // Una sigla scritta in maiuscolo («AI», «PO») conta anche quando si scrive come una parola vuota («ai», «po»); non
+  // quando è maiuscola tutta la frase, che dice il tasto bloccato e non la sigla.
+  function sigleDi(originale) {
+    const s = String(originale == null ? '' : originale);
+    if (!/\p{Ll}/u.test(s)) return new Set();
+    return new Set((s.match(/[\p{L}\p{N}]+/gu) || [])
+      .filter((w) => w.length > 1 && /\p{Lu}/u.test(w) && !/\p{Ll}/u.test(w))
+      .map(normalizeForSearch));
   }
+
+  // Le parole della richiesta che davvero restringono il campo: le altre le
+  // scrive chiunque, in qualunque chat. «sull'IVA» porta «iva»: l'apostrofo e la punteggiatura dividono.
+  // `originale`: la richiesta com'era scritta, per riconoscerne le sigle.
+  function terminiCheDistinguono(terms, originale) {
+    const sigle = sigleDi(originale);
+    const out = [];
+    for (const t of Array.isArray(terms) ? terms : []) {
+      for (const w of String(t == null ? '' : t).split(/[^\p{L}\p{N}]+/u)) {
+        if (w.length > 1 && (sigle.has(w) || !PAROLE_CHE_NON_DISTINGUONO.has(w)) && !out.includes(w)) out.push(w);
+      }
+    }
+    return out;
+  }
+
+  // «Le chat che ho nascosto», «la conversazione che avevo tolto»: chi le chiede così le vuole vedere tutte (#1295).
+  function chiedeLeNascoste(query) {
+    return /(?:^|[^\p{L}])(?:nascost|nascond|tolt|cancellat|eliminat)\p{L}*/u.test(normalizeForSearch(query));
+  }
+
+  // Una parola corta vale dall'inizio di una parola: «iva» trova «IVA» e non «arrivano», «mac» non «tomaccio».
+  const CORTA = 3;
+  const inizi = new Map();
+  function posizioneTermine(hay, t) {
+    const s = String(hay || '');
+    const w = String(t || '');
+    if (w.length > CORTA) return s.indexOf(w);
+    let re = inizi.get(w);
+    if (!re) {
+      re = new RegExp(`(?:^|[^\\p{L}\\p{N}])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'u');
+      inizi.set(w, re);
+    }
+    const m = re.exec(s);
+    return m ? m.index + m[0].length - w.length : -1;
+  }
+  const contieneTermine = (hay, t) => posizioneTermine(hay, t) >= 0;
 
   function filtraPerTipo(chats, o) {
     const kind = normalizeKindOrNull(o.kind);
@@ -300,7 +354,7 @@
     const limit = Number(o.limit) > 0 ? Number(o.limit) : 0;
     const taglia = (list) => (limit ? list.slice(0, limit) : list);
     const candidate = filtraPerTipo(chats, o);
-    const tutte = normalizeForSearch(query).split(/\s+/).filter(Boolean);
+    const tutte = paroleDi(query);
     if (!tutte.length) return { results: taglia(candidate), termini: [], allargata: false };
 
     // `o.testo(c)`: dove cercare quando i candidati non sono chat (le pagine del filo), con gli stessi tre passi.
@@ -309,21 +363,19 @@
     const conTutte = candidate.filter((c) => tutte.every((t) => hays.get(c.id).includes(t)));
     if (conTutte.length) return { results: taglia(conTutte), termini: tutte, allargata: false };
 
-    const forti = terminiCheDistinguono(tutte);
+    const forti = terminiCheDistinguono(tutte, query);
     // Nessuna parola restringe il campo (l'utente ha cercato «di ieri»):
     // allargare vorrebbe dire tirare fuori mezzo archivio spacciandolo per una
     // risposta. Meglio dire che non si è trovato niente.
     if (!forti.length) return { results: [], termini: tutte, allargata: false };
 
-    if (forti.length < tutte.length) {
-      const conForti = candidate.filter((c) => forti.every((t) => hays.get(c.id).includes(t)));
-      if (conForti.length) return { results: taglia(conForti), termini: forti, allargata: true };
-    }
+    const conForti = candidate.filter((c) => forti.every((t) => contieneTermine(hays.get(c.id), t)));
+    if (conForti.length) return { results: taglia(conForti), termini: forti, allargata: true };
 
     // Ultimo passo: almeno una parola che distingue. Ordinate per quante ne
     // combaciano, così la chat più pertinente resta in cima.
     const punteggi = candidate
-      .map((c) => ({ c, n: forti.filter((t) => hays.get(c.id).includes(t)).length }))
+      .map((c) => ({ c, n: forti.filter((t) => contieneTermine(hays.get(c.id), t)).length }))
       .filter((x) => x.n > 0)
       .sort((a, b) => b.n - a.n);
     if (!punteggi.length) return { results: [], termini: forti, allargata: true };
@@ -336,7 +388,7 @@
   function snippetFor(chat, query, radius) {
     const r = Number(radius) > 0 ? Number(radius) : 90;
     const messages = Array.isArray(chat && chat.messages) ? chat.messages : [];
-    const terms = normalizeForSearch(query).split(/\s+/).filter(Boolean);
+    const terms = paroleDi(query);
     if (!terms.length) return excerptOf(messages);
     // La parola da mostrare è la prima della richiesta che COMPARE davvero, non
     // la prima scritta: cercando «la coscienza», un frammento costruito attorno
@@ -348,7 +400,7 @@
       let termine = '';
       let at = -1;
       for (const t of terms) {
-        const i = hay.indexOf(t);
+        const i = posizioneTermine(hay, t);
         if (i >= 0 && (at < 0 || t.length > termine.length)) { at = i; termine = t; }
       }
       if (at < 0) continue;
@@ -373,9 +425,14 @@
     const out = { role, text, ts: turn.ts || new Date().toISOString() };
     if (Array.isArray(turn.actions) && turn.actions.length) {
       // Un'azione fermata perché portava fuori un segreto resta fermata (#810): riaperta, la chat non la dà per fatta.
-      out.actions = turn.actions
-        .map((a) => (a && a.type ? (a._output && a._output.blocked === 'segreto' ? 'FERMATA' : String(a.type)) : ''))
-        .filter(Boolean);
+      // Un ricordo ripescato da Filo resta un ricordo, non una ricerca chiesta (#1301); i titoli no: una chat cancellata
+      // non deve sopravvivere nel nome dentro le altre.
+      const nome = (a) => {
+        if (a._output && a._output.blocked === 'segreto') return 'FERMATA';
+        if (a._auto && String(a.type).toUpperCase() === 'CERCA_CHAT') return 'RICORDO_FILO';
+        return String(a.type);
+      };
+      out.actions = turn.actions.map((a) => (a && a.type ? nome(a) : '')).filter(Boolean);
     }
     if (turn.images) out.images = Number(turn.images) || 0;
     // Un messaggio partito da un suggerimento della home l'ha scritto un modello: riaperta, non è voce dell'utente (#810).
@@ -389,6 +446,18 @@
         .map((x) => ({ valore: x.valore.slice(0, 200), regola: String(x.regola || 'codice'), fonte: String(x.fonte || 'da fuori').slice(0, 120) }));
       if (letti.length) out.letti = letti;
       if (typeof turn.esterno === 'string' && turn.esterno.trim()) out.esterno = turn.esterno.trim().slice(0, 120);
+      // Arrivata quando la scheda aveva già lasciato la conversazione: nel filo si posa dopo la sua chat (filoCoda).
+      if (turn.tardiva === true) out.tardiva = true;
+      // Un messaggio che Filo ha scritto di sua iniziativa (#869), e le cose successe che l'hanno fatto nascere.
+      if (turn.spontaneo) {
+        out.spontaneo = true;
+        const motivi = (Array.isArray(turn.motivi) ? turn.motivi : [])
+          .filter((m) => m && typeof m.tipo === 'string')
+          .map((m) => ({ tipo: m.tipo.slice(0, 20), testo: String(m.testo == null ? '' : m.testo).slice(0, 300) }));
+        if (motivi.length) out.motivi = motivi.slice(-50);
+        // Riscrive il messaggio spontaneo che lo precede invece di aggiungersi (src/shared/filoCoda.js, siFonde).
+        if (turn.fonde) out.fonde = true;
+      }
       // Di una finestra guardata resta il nome (#778): l'immagine e quello che c'era non entrano nell'archivio.
       const guardate = [
         ...(Array.isArray(turn.guardate) ? turn.guardate : []),
@@ -400,12 +469,16 @@
       // I cambi di stato chiesti con quel messaggio (#867): riaperta, la bolla dell'utente ritrova il suo segno.
       const cambi = (Array.isArray(turn.cambi) ? turn.cambi : []).filter((id) => typeof id === 'string' && /^c[0-9a-f]+$/.test(id));
       if (cambi.length) out.cambi = cambi;
-      // I collegamenti che al clic chiedono l'OK (#868.6): riaperta, la chat lo chiede ancora.
-      const linkDaConfermare = (Array.isArray(turn.linkDaConfermare) ? turn.linkDaConfermare : [])
-        .filter((x) => x && typeof x.url === 'string' && x.url)
-        .slice(0, 200)
+      // I collegamenti che al clic chiedono l'OK (#868.6): riaperta, la chat lo chiede ancora. Tutti quelli che il
+      // registro tiene: oltre il tetto del giudizio sono quelli che chiedono l'OK senza essere stati guardati (#1505).
+      const daConfermare = (Array.isArray(turn.linkDaConfermare) ? turn.linkDaConfermare : [])
+        .filter((x) => x && typeof x.url === 'string' && x.url);
+      const linkDaConfermare = daConfermare.slice(0, 5000)
         .map((x) => ({ url: x.url, motivo: String(x.motivo || '').slice(0, 200) }));
       if (linkDaConfermare.length) out.linkDaConfermare = linkDaConfermare;
+      // Mai passata dal giudizio dei collegamenti (risposta interrotta, riga scritta dalla pagina), o con più collegamenti
+      // da confermare di quanti se ne tengano: riaperta, quelli che mancano non passano per controllati.
+      if (turn.senzaVerdetto === true || daConfermare.length > linkDaConfermare.length) out.senzaVerdetto = true;
     }
     return out;
   }
@@ -553,14 +626,19 @@
     parseTriage,
     transcriptForTriage,
     transcriptForReading,
+    PEZZO_RILETTURA,
     toIndexEntry,
     excerptOf,
     isVisibleByDefault,
     normalizeForSearch,
+    paroleDi,
     matches,
     search,
     searchWide,
     terminiCheDistinguono,
+    chiedeLeNascoste,
+    contieneTermine,
+    posizioneTermine,
     snippetFor,
     toStoredMessage,
   };

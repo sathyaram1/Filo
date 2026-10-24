@@ -169,6 +169,12 @@ is_spedibile() {
   [ -n "$1" ] && [ "$1" != "HEAD" ] && ! is_main_line "$1"
 }
 
+# Il biglietto della cartella e' finito (rilasciato, o il battito ha risposto che e' morto): il ramo puo' gia' essere
+# di un altro worker, e spedirci sopra gli cambia la storia sotto i piedi (#1480, D-90). Lo segna routine-ticket.mjs.
+biglietto_finito() {
+  [ -f "$1/.claude/routine-ticket.json" ] && grep -q '"morto"' "$1/.claude/routine-ticket.json" 2>/dev/null
+}
+
 # ─── Chi sta lavorando? (spec ROUTINE-BRANCH-INTEGRITY.md §Via 1) ────────────
 #
 # Fino al 2026-08-07 questo hook distingueva "lavoro di una routine, da
@@ -181,8 +187,8 @@ is_spedibile() {
 #
 # Ora la sessione si DICHIARA. `FILO_ROUTINE=1` (lo esporta l'orchestratore, e
 # lo eredita ogni worker) significa: nessuna pubblicazione automatica, mai,
-# qualunque sia il nome del ramo. Si arriva al ramo principale solo attraverso
-# scripts/merge-gate.mjs.
+# qualunque sia il nome del ramo. Al ramo principale le porta solo il server,
+# dopo verifica e controllo di sicurezza.
 #
 # È anche la risposta alla domanda "questo commit da dove è arrivato?": senza
 # marcatura, nella storia il lavoro di una routine e quello di una sessione
@@ -264,11 +270,12 @@ controllo_copie() {
   [ -f "$controllo" ] && command -v node >/dev/null 2>&1 && printf '%s' "$controllo"
 }
 # Vero se fra i nomi letti (separati da NUL) c'e' qualcosa che non e' codice o immagine: solo allora si paga node.
+# Un .md si legge: una copia incollata in una nota e' una copia (#1360).
 forse_dati() {
   local f
   while IFS= read -r -d '' f; do
     case "$f" in
-      ''|*.js|*.mjs|*.cjs|*.ts|*.css|*.html|*.md|*.sh|*.ps1|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.ico) ;;
+      ''|*.js|*.mjs|*.cjs|*.ts|*.css|*.html|*.sh|*.ps1|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.ico) ;;
       *) return 0 ;;
     esac
   done
@@ -385,7 +392,7 @@ salva_cartella() {
   # Il salvataggio continuo resta — e' cio' che salva il lavoro quando una
   # sessione viene interrotta di colpo — ma al ramo principale ci si arriva UNA
   # VOLTA, a lavoro finito: `npm run finish` in locale (controlli + fusione),
-  # scripts/merge-gate.mjs per le routine.
+  # il server stesso per le routine, dopo verifica e controllo di sicurezza.
   #
   # Perche': una versione viene costruita e distribuita agli utenti ogni 6 ore
   # prendendo il ramo principale COSI' COM'E'. Pubblicando a ogni modifica, quella
@@ -409,7 +416,9 @@ salva_cartella() {
   #
   # Una HEAD staccata non ha un ramo da spedire: il commit qui sopra resta come
   # paracadute locale e basta. Il ramo principale non arriva nemmeno qui.
-  if is_spedibile "$BRANCH"; then
+  if is_spedibile "$BRANCH" && biglietto_finito "$wt"; then
+    segnala_avviso "$wt" "il biglietto di questo lavoro e' finito (rilasciato, o morto per il battito): ho committato in locale ma NON spedisco '$BRANCH', che adesso puo' essere di un altro worker. Se stai ancora lavorando fermati: questo lavoro non si consegna piu'."
+  elif is_spedibile "$BRANCH"; then
     if COPIE_NEL_RAMO=$(copie_da_spedire "$wt" "$BRANCH"); then
       [ -n "$COPIE_NEL_RAMO" ] && segnala_avviso "$wt" "$COPIE_NEL_RAMO"
       spedisci_ramo "$BRANCH" "$wt" || true
@@ -427,7 +436,7 @@ salva_cartella "$CARTELLA"
 # principale. Ci si arriva solo da:
 #
 #   - `npm run finish`            (locale: controlli, poi si chiede la fusione)
-#   - `scripts/merge-gate.mjs`    (routine: dopo verifica e controlli di sicurezza)
+#   - il server                   (routine: dopo verifica, controllo di sicurezza e unit sulla fusione)
 #
 # La regola non dipende da FILO_ROUTINE: quella marcatura distingue le
 # provenienze nella storia, ma appenderci la sicurezza rimetterebbe la
@@ -455,7 +464,7 @@ salva_cartella "$CARTELLA"
 # consumo del battito (#1156).
 TICKET_FILE="$CARTELLA/.claude/routine-ticket.json"
 BEAT_STAMP="$CARTELLA/.claude/routine-beat-hook.stamp"
-if [ -f "$TICKET_FILE" ] && command -v node >/dev/null 2>&1; then
+if [ -f "$TICKET_FILE" ] && ! biglietto_finito "$CARTELLA" && command -v node >/dev/null 2>&1; then
   now_s=$(date +%s)
   last_s=$(date -r "$BEAT_STAMP" +%s 2>/dev/null || echo 0)
   if [ $((now_s - last_s)) -ge 300 ]; then

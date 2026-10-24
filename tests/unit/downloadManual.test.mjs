@@ -113,3 +113,88 @@ test('«Salva come…» dopo un rimando nomina anche chi ha servito il file (#58
     DL.remove(g.id);
   }
 });
+
+// #1311 — «Salva immagine come» su un nome da programma passa dalla stessa domanda dei download da link.
+const aspetta = () => new Promise((r) => setImmediate(r));
+
+test('un programma salvato dal tasto destro aspetta il sì prima di proseguire, e il sì vale per la voce', async () => {
+  require(join(ROOT, 'src', 'shared', 'eseguibili.js'));
+  DL.configureFromSettings({});
+  const h = DL.beginManual({ url: 'https://sito.test/foto', filename: 'setup.exe', servedFrom: 'https://sito.test/foto' });
+  try {
+    let esito = null;
+    const p = h.permesso('setup.exe').then((v) => { esito = v; });
+    assert.equal(find(h.id).state, 'pending');
+    assert.equal(find(h.id).exe, true);
+    assert.equal(find(h.id).site, 'sito.test');
+    await aspetta();
+    assert.equal(esito, null, 'senza risposta il file non deve proseguire');
+    assert.equal(DL.confirmDownload(h.id, true).ok, true);
+    await p;
+    assert.equal(esito, true);
+    assert.equal(find(h.id).state, 'progressing');
+    assert.equal(await h.permesso('setup (2).exe'), true, 'cambiato il nome nel dialogo, il sì resta');
+  } finally {
+    DL.remove(h.id);
+  }
+});
+
+test('«Non scaricare», togliere la voce o un trasferimento caduto dicono no a chi aspettava', async () => {
+  require(join(ROOT, 'src', 'shared', 'eseguibili.js'));
+  DL.configureFromSettings({});
+  const no = DL.beginManual({ url: 'https://sito.test/a', filename: 'a.rdp' });
+  const via = DL.beginManual({ url: 'https://sito.test/b', filename: 'b.exe' });
+  const caduto = DL.beginManual({ url: 'https://sito.test/c', filename: 'c.msi' });
+  try {
+    const pNo = no.permesso('a.rdp');
+    DL.confirmDownload(no.id, false);
+    assert.equal(await pNo, false);
+    assert.equal(find(no.id).state, 'cancelled');
+    assert.equal(no.cancelled(), true, 'i byte devono fermarsi');
+
+    const pVia = via.permesso('b.exe');
+    DL.remove(via.id);
+    assert.equal(await pVia, false);
+
+    const pCaduto = caduto.permesso('c.msi');
+    caduto.fail();
+    assert.equal(await pCaduto, false);
+    assert.equal(find(caduto.id).state, 'interrupted');
+    assert.equal(await caduto.permesso('c.msi'), false, 'una voce chiusa non riapre la domanda');
+  } finally {
+    DL.remove(no.id);
+    DL.remove(caduto.id);
+  }
+});
+
+test('una foto non chiede; un nome da programma scelto nel dialogo sì; sito fidato e domanda spenta no', async () => {
+  require(join(ROOT, 'src', 'shared', 'eseguibili.js'));
+  DL.configureFromSettings({});
+  const foto = DL.beginManual({ url: 'https://sito.test/gatto.png', filename: 'gatto.png' });
+  const fidato = DL.beginManual({ url: 'https://dl.fidato.test/x', filename: 'setup.exe' });
+  const spenta = DL.beginManual({ url: 'https://sito.test/y', filename: 'setup.exe' });
+  try {
+    assert.equal(await foto.permesso('gatto.png'), true);
+    assert.equal(find(foto.id).state, 'progressing');
+    let esito = null;
+    const p = foto.permesso('gatto.exe').then((v) => { esito = v; });
+    assert.equal(find(foto.id).state, 'pending');
+    assert.equal(find(foto.id).filename, 'gatto.exe', 'la domanda nomina il file che arriverebbe');
+    await aspetta();
+    assert.equal(esito, null);
+    DL.confirmDownload(foto.id, true);
+    await p;
+    assert.equal(esito, true);
+
+    DL.configureFromSettings({ security: { downloads: { trustedSites: ['fidato.test'] } } });
+    assert.equal(await fidato.permesso('setup.exe'), true);
+    assert.equal(find(fidato.id).state, 'progressing');
+    DL.configureFromSettings({ security: { downloads: { confirmExecutables: false } } });
+    assert.equal(await spenta.permesso('setup.exe'), true);
+  } finally {
+    DL.configureFromSettings({});
+    DL.remove(foto.id);
+    DL.remove(fidato.id);
+    DL.remove(spenta.id);
+  }
+});

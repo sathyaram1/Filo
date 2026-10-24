@@ -3,12 +3,19 @@
 Guasto è ciò che da qui dovrebbe funzionare e non va, e ti ferma. «Non posso
 perché è rotto» è un guasto; «dalla cloud non si fa, per regola»
 (segreti, deploy, automazioni GitHub del server, prove sulla macchina
-dell'owner) è il rimando in locale.
+dell'owner) non lo è: è un passo dell'owner, che si chiede con una domanda.
 Un rifiuto di una tua consegna (exit 4) o il canale giù (exit 3) non lo sono.
 
-1. La domanda, coi campi di SPEC-DOMANDE § 3.1 in un JSON fuori dal repo:
-   `priorita` `bloccante`; nel `contesto` cosa hai provato e il messaggio
-   esatto; il feedback che ferma (`payload.id`) nei `collegamenti`. Il `gruppo`
+**Il controllo di sicurezza salta il passo 1**: il server prende domande solo
+da chi risolve, corregge o verifica, e a lui risponderebbe sempre di no. Per lui
+basta il rilascio del passo 3, con `--guasto "<gruppo>: <messaggio>"` e il
+gruppo scritto come al passo 1.
+
+1. La domanda, coi campi di SPEC-DOMANDE § 3.1 in un JSON fuori dal repo,
+   scritta come dice la sezione «Una domanda per l'owner si scrive per lui»:
+   `priorita` `bloccante`; nel `contesto` cosa hai provato e cosa vuol dire
+   l'errore, in parole tue; il messaggio esatto in `notePerAgenti`; il feedback
+   che ferma (`payload.id`) nei `collegamenti`. Il `gruppo`
    è un nome fisso, così chi cade sullo stesso guasto finisce nello stesso:
    `guasto: filo-security` (clone o token), `guasto: github`, `guasto: npm`,
    `guasto: electron` (anche lo schermo virtuale); per gli altri `guasto:
@@ -24,3 +31,5 @@ Un rifiuto di una tua consegna (exit 4) o il canale giù (exit 3) non lo sono.
    <biglietto> --role <il tuo ruolo> --guasto "<gruppo>, D-<n>: <messaggio>"`.
 
 <!-- includi: _dopo-un-guasto.md -->
+
+<!-- includi: _domanda-per-owner.md -->

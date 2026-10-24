@@ -14,6 +14,7 @@
     RICORDO_FILO: ['Ricordato dal filo', (k) => `Ricordati ${n(k)} pezzi del filo`, 'ricordo'],
     LEGGI_FILE: ['Letto un file', (k) => `Letti ${n(k)} file`, 'file'],
     LEGGI_DOCUMENTO: ['Letto un documento', (k) => `Letti ${n(k)} documenti`, 'documento'],
+    LEGGI_PAGINA: ['Letta una pagina', (k) => `Lette ${n(k)} pagine`, 'pagina web'],
     VEDI_SCHERMO: ['Guardato lo schermo', (k) => `Guardato lo schermo ${n(k)} volte`, 'schermo'],
     CERCA_DOCUMENTI: ['Cercato fra i documenti', (k) => `Fatte ${n(k)} ricerche fra i documenti`, 'documenti'],
     CERCA_SALVATE: ['Cercato fra le pagine salvate', (k) => `Fatte ${n(k)} ricerche fra le pagine salvate`, 'pagine salvate'],
@@ -32,6 +33,9 @@
     SALVA_APPUNTO: ['Scritto un appunto', (k) => `Scritti ${n(k)} appunti`, 'appunto'],
     SALVA_LEZIONE: ['Memorizzata una cosa', (k) => `Memorizzate ${n(k)} cose`, 'memoria'],
     DIMENTICA: ['Dimenticata una cosa', (k) => `Dimenticate ${n(k)} cose`, 'memoria'],
+    TOGLI_CHAT: ['Tolta una conversazione', (k) => `Tolte ${n(k)} conversazioni`, 'conversazione'],
+    RIMETTI_CHAT: ['Rimessa una conversazione', (k) => `Rimesse ${n(k)} conversazioni`, 'conversazione'],
+    CORREGGI_MEMORIA: ['Corretta una cosa', (k) => `Corrette ${n(k)} cose`, 'memoria'],
     CANCELLA_MEMORIA: ['Cancellata la memoria', (k) => `Cancellata la memoria ${n(k)} volte`, 'memoria'],
     CANCELLA_PAGINE: ['Cancellate pagine visitate', (k) => `Cancellate pagine visitate ${n(k)} volte`, 'pagine visitate'],
     IMPOSTA_PREFERENZA: ['Cambiata un\'impostazione', (k) => `Cambiate ${n(k)} impostazioni`, 'impostazione'],
@@ -274,7 +278,9 @@
         if (t >= 1) avv.m = avv.a;
       }
 
-      const fondo = fondoVivo();
+      // Fermo (tagliato o chiuso) il filo resta dentro il blocco: senza righe sotto, la sua lunghezza d'attesa lo portava
+      // sopra la riga che segue (#1296).
+      const fondo = finito ? Math.max(0, Math.min(fondoVivo(), wrap.clientHeight - onda.coda)) : fondoVivo();
       const alto = Math.max(fondo + onda.coda + 6, 30);
       piano.setAttribute('height', String(alto));
       piano.style.height = `${alto}px`;
@@ -338,7 +344,8 @@
       requestAnimationFrame(disegna);
     }
     let osserva = null;
-    try { osserva = new ResizeObserver(() => sveglia()); osserva.observe(body); } catch (_) {}
+    // Anche il blocco: la riga in testa che si apre sposta le righe senza cambiarne la misura.
+    try { osserva = new ResizeObserver(() => sveglia()); osserva.observe(body); osserva.observe(wrap); } catch (_) {}
     sveglia();
 
     return {

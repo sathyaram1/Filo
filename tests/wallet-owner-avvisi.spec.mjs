@@ -11,6 +11,7 @@ import { _electron as electron } from '@playwright/test';
 import { test, expect, aspettaFinestra, chiudiApp } from './fixtures/electron.mjs';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 import { argomentiScala } from './helpers/scala.mjs';
+import { GESTIONE } from './helpers/gestione.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = join(APP_ROOT, 'tests', '.shots');
@@ -152,7 +153,9 @@ test('all’85% del tetto l’owner trova l’avviso nella home e il pulsante ap
       expect(primo.caso).toBe('tetto');
 
       await carta.locator('.dash-carta-az.principale').click();
-      const owner = await aspettaFinestra(app, (w) => w.url().startsWith('filo://credits/owner.html'), 'la pagina dell’owner non si è aperta');
+      // «Inviti e utenti» sta in Gestione (#1414): l'avviso apre quella scheda.
+      const owner = await aspettaFinestra(app, (w) => w.url().startsWith(GESTIONE), 'Gestione non si è aperta');
+      await expect(owner.locator('.mg-tab--active[data-tab="utenti"]')).toBeVisible({ timeout: 15_000 });
       await owner.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
     } finally { await chiudiApp(app); }
 
@@ -232,7 +235,8 @@ test('i quattro casi insieme: una carta ciascuno col numero, «Apri Inviti e ute
   // Il tasto destro apre la stessa pagina del pulsante.
   await carte(home).filter({ hasText: 'del tetto' }).click({ button: 'right', position: { x: 30, y: 12 } });
   await voci.filter({ hasText: 'Apri Inviti e utenti' }).click();
-  await aspettaFinestra(app, (w) => w.url().startsWith('filo://credits/owner.html'), 'il tasto destro non apre la pagina dell’owner');
+  const owner = await aspettaFinestra(app, (w) => w.url().startsWith(GESTIONE), 'il tasto destro non apre Gestione');
+  await expect(owner.locator('.mg-tab--active[data-tab="utenti"]')).toBeVisible({ timeout: 15_000 });
 });
 
 test('chi non è owner non fa partire nessuna lettura: né la home, né il controllo dell’avvio, né quello delle sei ore', async ({ app }) => {

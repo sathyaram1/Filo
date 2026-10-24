@@ -1,10 +1,6 @@
-// Pagina d'errore di rete (filo://error/error.html?url=…&code=…&desc=…).
-// Caricata dal main (tabs.js) quando una navigazione fallisce o il renderer
-// della scheda muore. Tutta la logica di parsing/traduzione vive in
-// src/shared/netError.js (SN_NET_ERROR); qui solo il rendering e il "Riprova".
-//
-// NB: questa pagina gira anche in una view "esterna" (preload di pagina,
-// contextIsolation attiva): niente chrome.* qui dentro — solo DOM standard.
+// Pagina d'errore di rete: la mostra il main quando una navigazione fallisce.
+// Parsing e traduzione dei codici vivono in SN_NET_ERROR; qui solo rendering e «Riprova».
+// Gira in una view esterna (contextIsolation): niente chrome.*, solo DOM standard.
 
 (function () {
   'use strict';
@@ -25,16 +21,14 @@
   document.getElementById('err-host').textContent = host ? host : '';
   document.getElementById('err-hint').textContent = msg.hint || '';
 
-  // Dettaglio tecnico in piccolo (es. "ERR_NAME_NOT_RESOLVED (-105)"): utile a
-  // chi cerca aiuto o segnala il problema, invisibile come rumore per gli altri.
+  // Dettaglio tecnico in piccolo: utile a chi cerca aiuto o segnala, rumore per gli altri.
   const detailBits = [];
   if (desc) detailBits.push(desc);
   if (code && String(code) !== (NE && NE.CRASH_CODE)) detailBits.push(`(${code})`);
   document.getElementById('err-detail').textContent = msg.blocked ? '' : detailBits.join(' ');
   if (msg.blocked) document.getElementById('page').classList.add('err-blocked');
 
-  // Il titolo del documento diventa il titolo della scheda (via
-  // page-title-updated): il sito fallito, non più "Nuova scheda".
+  // Il titolo del documento è quello della scheda: il sito fallito, non «Nuova scheda».
   document.title = host || msg.title;
 
   const retryBtn = document.getElementById('err-retry');
@@ -44,8 +38,8 @@
   if (msg.blocked) document.getElementById('err-lista').hidden = false;
   function retry() {
     if (!target) return;
-    // replace(): il tentativo non aggiunge un'ulteriore voce di cronologia
-    // sopra la pagina d'errore. target è già validato (solo http/https/filo).
+    // replace(): il tentativo non lascia una voce di cronologia sopra la pagina d'errore.
+    // `target` è già validato altrove: solo http/https/filo.
     try { window.location.replace(target); } catch (_) {}
   }
   if (target) {

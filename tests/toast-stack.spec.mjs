@@ -15,6 +15,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGE = `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif;height:100vh">
   <h1>Pagina con un collegamento</h1>
@@ -52,7 +53,7 @@ function firstOverlap(boxes) {
 // menu precedente un click destro può cadere a vuoto: si riprova finché la voce
 // cercata non è davvero sullo schermo.
 async function runLinkAction(page, label, { exclude = null, settle = 300 } = {}) {
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   let item = null;
   for (let i = 0; i < 6 && !item; i++) {
     await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
@@ -137,7 +138,7 @@ test('la conferma cliccabile di "Salva per dopo" sta nella pila con gli avvisi',
   // "Salva per dopo" mostra una conferma cliccabile ancorata allo STESSO angolo
   // dei toast: prima si sovrapponeva a qualunque avviso arrivasse nel frattempo.
   await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
-  const saveBtn = page.locator('.sn-menu [data-sn-icon-id="saveForLater"]');
+  const saveBtn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
   await expect(saveBtn).toBeVisible();
   await saveBtn.click();
   await expect(page.locator('.sn-save-confirm')).toBeVisible({ timeout: 5000 });

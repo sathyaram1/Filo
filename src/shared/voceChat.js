@@ -86,8 +86,9 @@
   }
 
   // `campo`: la casella; `invia()`: quello che fa la chat col tasto d'invio; `contenitore`/`prima`: dove va il tasto;
-  // `occupato()`: la chat sta ancora rispondendo (l'invio aspetta); `ambito`: dove vale la scorciatoia (di serie la casella).
-  function collega({ campo, invia, contenitore, prima = null, occupato = null, ambito = null } = {}) {
+  // `occupato()`: la chat sta ancora rispondendo (l'invio aspetta); `ambito`: dove vale la scorciatoia (di serie la casella);
+  // `suStato(stato)`: chi mostra il microfono anche altrove (l'icona Aiuto della barra laterale).
+  function collega({ campo, invia, contenitore, prima = null, occupato = null, ambito = null, suStato = null } = {}) {
     if (!campo || !contenitore || typeof invia !== 'function') return null;
     const gia = perCampo(campo);
     if (gia) return gia.api;
@@ -120,6 +121,7 @@
       b.setAttribute('aria-label', nome);
       b.setAttribute('aria-pressed', stato === 'ascolta' ? 'true' : 'false');
       if (stato !== 'ascolta') b.style.removeProperty('--sn-voce-livello');
+      if (typeof suStato === 'function') { try { suStato(stato); } catch (e) { console.error('[Filo voce]', e); } }
     }
     imposta('pronto');
 
@@ -221,6 +223,8 @@
 
     function premi() {
       if (c.stato === 'pronto') { ascolta(); return; }
+      // Ripremuto mentre il microfono si accende: non parte (ascolta() vede il giro cambiato e chiude la sessione).
+      if (c.stato === 'avvio') { c.giro++; imposta('pronto'); return; }
       if (c.stato === 'ascolta' && c.sessione) { c.sessione.ferma('utente'); return; }
       if (c.stato === 'attesa') annullaInvio();
     }
@@ -280,6 +284,14 @@
     const doveTasti = ambito || campo;
     doveTasti.addEventListener('keydown', suTasto);
 
+    // La chat sparisce dalla vista senza andarsene (l'Aiuto chiuso mentre Filo risponde): il microfono non resta acceso.
+    function ferma() {
+      c.giro++;
+      smetti();
+      if (c.sessione) { c.sessione.ferma('annulla'); c.sessione = null; }
+      if (c.stato !== 'pronto') imposta('pronto');
+    }
+
     function scollega() {
       c.giro++;
       smetti();
@@ -291,7 +303,7 @@
     }
 
     c.premi = premi;
-    c.api = { bottone: b, premi, scollega, stato: () => c.stato };
+    c.api = { bottone: b, premi, ferma, scollega, stato: () => c.stato };
     controlli.add(c);
     return c.api;
   }

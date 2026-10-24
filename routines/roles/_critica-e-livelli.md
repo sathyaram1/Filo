@@ -60,6 +60,12 @@ classe che la segnalazione non nominava; un difetto in qualcosa che il ramo ha
 aggiunto oltre il chiesto (l'aggiunta resta, il suo difetto va in un feedback
 suo: non si disfa il lavoro fatto).
 
+«C'era già su `main`» si prova su `origin/main` appena scaricato
+(`git fetch origin main`), non sulla base del ramo: main può averlo corretto
+dopo che il ramo è partito, e allora non è un rilievo. Ci rientra un test di
+logica rosso sul ramo che il controllo di fine lavoro trova verde sulla fusione
+con main: il suo messaggio nomina la base del ramo e il main su cui riprovarlo.
+
 La sede non cambia il livello che scrivi: un 3 esterno resta un 3, un 3 vicino
 resta un 3. Il giro continua per i rilievi interni; un vicino può essere
 corretto insieme a loro, perché il suo file è già aperto, ma non ferma questo
@@ -88,7 +94,8 @@ prodotto o di gusto. Un difetto non chiede decisioni.
 Appena cominci lancia `npm run finish:check` **in sottofondo** (unit test più
 gli spec delle aree toccate dal ramo: da quindici a quarantacinque minuti) e
 lavora mentre gira: aspettarlo alla fine vorrebbe dire ripagare tutto il
-contesto. L'esito lo leggi prima di registrare. La suite intera (`npm test`)
+contesto. L'esito lo leggi prima di registrare, e il rilascio aspetta che
+sia finito. La suite intera (`npm test`)
 non la lancia nessuno: gira in GitHub a ogni fusione su main.
 
 - Un rosso **fuori dai rossi noti** è un rilievo di livello 2, interno se
@@ -179,19 +186,20 @@ Registra col testo intero, **in un pezzo solo** dentro le stesse virgolette:
 ```bash
 node scripts/dispatch.mjs --record-verifier <id> "Provato: …
 [2i] …
-[0e] …" [--segnala <file.md>]
+[0e] …" [--domanda <file.json>]
 ```
 
 <!-- includi: _segnala.md -->
 
-Qui il file accompagna un rilievo col `?`: la riga nella critica resta una
-riga, le scelte e i loro costi stanno nel file. Un difetto non va lì: è un
+Qui la domanda accompagna un rilievo col `?`: la riga nella critica resta una
+riga, le scelte e i loro costi stanno nella domanda. Un difetto non va lì: è un
 rilievo col suo livello. Sulla critica fermano il lavoro un rilievo interno
-di livello 2 o 3 col `?` e la segnalazione allegata, anche senza rilievi: con
-`--segnala` il lavoro aspetta l'owner in ogni esito, e i rilievi da correggere
-restano davanti a chi riprende dopo la sua risposta. Un 1 col `?`, o un
-esterno di qualunque livello, va avanti in un feedback derivato che l'owner
-decide a parte. Se poi il server ti manda a correggere, una segnalazione a
+di livello 2 o 3 col `?` e la domanda allegata, anche senza rilievi: con
+`--domanda` il lavoro aspetta l'owner in ogni esito, e i rilievi da correggere
+restano davanti a chi riprende dopo la sua risposta. Un rilievo col `?` senza
+domanda allegata la fa nascere dal server, coi rilievi come problema. Un 1 col
+`?`, o un esterno di qualunque livello, va avanti in un feedback derivato che
+l'owner decide a parte. Se poi il server ti manda a correggere, una domanda a
 QUELLA consegna ferma il lavoro come per chi risolve.
 
 La critica registrata non si modifica più.

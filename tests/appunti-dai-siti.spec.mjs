@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { testiCronologia } from './helpers/cronologiaAppunti.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PASSWORD = 'Pw-segreta-5894!';
 const MONDO_CONTENT_SCRIPT = 999;
@@ -26,8 +27,8 @@ async function copiaPassword(shell) {
 
 async function cronologiaDelMenu(dove) {
   await dove.locator('#ta').click({ button: 'right' });
-  await expect(dove.locator('.sn-menu')).toBeVisible();
-  await dove.locator('.sn-menu-paste-arrow').click();
+  await expect(menuDi(dove).locator('.sn-menu')).toBeVisible();
+  await menuDi(dove).locator('.sn-menu-paste-arrow').click();
 }
 
 // La cronologia sta in uno shadow root chiuso e i suoi testi non sono nodi di testo (#589.8): in un riquadro di un
@@ -115,6 +116,7 @@ test('un clic qualunque sulla pagina non apre la cronologia: serve il menu, aper
   const frame = ospite.frames().find((f) => f.url().includes('blocked.test'));
   await frame.waitForFunction(() => document.getElementById('ta'));
   await ospite.locator('#ospite').click();
+  // menu-dal-sito: è lo script del riquadro a cercare il menu e a premerlo.
   const letto = await frame.evaluate(async () => {
     const ta = document.getElementById('ta');
     const r = ta.getBoundingClientRect();
@@ -157,8 +159,8 @@ test('su un sito che annulla il tasto destro il menu aperto da tastiera con Shif
   const page = await testServer.openReady(openTab, CAMPO.replace('</body>', "<script>window.addEventListener('contextmenu', (e) => e.preventDefault(), true);</script></body>"), { pubblico: true });
   await page.locator('#ta').click();
   await page.keyboard.press('Shift+F10');
-  await expect(page.locator('.sn-menu[role=menu]')).toBeVisible();
-  await page.locator('.sn-menu-paste-arrow').click();
+  await expect(menuDi(page).locator('.sn-menu[role=menu]')).toBeVisible();
+  await menuDi(page).locator('.sn-menu-paste-arrow').click();
   await expect.poll(() => testiCronologia(app, page)).toContain(PASSWORD);
 });
 
@@ -178,7 +180,7 @@ test('il tasto destro nel riquadro di un altro sito non apre la cronologia alla 
   const page = await testServer.openReady(openTab,
     `<!doctype html><html><body style="margin:0;padding:12px"><iframe id="embed" src="${dentro}" width="640" height="460"></iframe></body></html>`, { pubblico: true });
   await page.frameLocator('#embed').locator('#ta').click({ button: 'right' });
-  await expect(page.frameLocator('#embed').locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page.frameLocator('#embed')).locator('.sn-menu')).toBeVisible();
   const r = await dalSito(app, 'sito-pubblico.test')({ type: 'get_clipboard_history' });
   expect(JSON.stringify(r), 'la pagina ospite ha avuto la cronologia col menu aperto nel riquadro').not.toContain(PASSWORD);
 });

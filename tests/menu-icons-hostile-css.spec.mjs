@@ -11,6 +11,7 @@
 // computata sarebbe rossa → test rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Pagina "ostile": forza fill/stroke rossi su tutti gli svg, come fanno molti
 // framework di icone. Simula la condizione di magnific.com.
@@ -25,7 +26,7 @@ const HOSTILE = `<!doctype html><html><head><style>
 test('le icone del menu restano outline anche se il sito forza svg{fill:red}', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HOSTILE);
   await page.locator('p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
 
   // Prendo un'icona outline del menu (un bottone della riga icone con SVG).
@@ -44,7 +45,7 @@ test('le icone del menu restano outline anche se il sito forza svg{fill:red}', a
 test('i puntini pieni (fill=currentColor) di un\'icona restano pieni', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HOSTILE);
   await page.locator('p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
 
   // Cerco un elemento interno con fill="currentColor" (es. i puntini dell'icona

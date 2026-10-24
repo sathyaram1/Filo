@@ -235,6 +235,9 @@
       background: transparent; cursor: pointer;
     }
     .dk-retry:hover, .dk-retry:focus-visible { border-color: var(--sn-accent); background: var(--sn-hover); outline: none; }
+    /* Il tasto che toglie l'ostacolo è quello in evidenza: «Riprova» accanto resta per dopo (#828.1). */
+    .dk-retry.dk-rimedio { margin-right: 6px; background: var(--sn-accent); border-color: var(--sn-accent); color: var(--sn-on-accent, #fff); }
+    .dk-retry.dk-rimedio:hover, .dk-retry.dk-rimedio:focus-visible { filter: brightness(1.05); background: var(--sn-accent); }
     .dk-chat-cap { color: var(--sn-muted); font-size: 12px; margin: 0; }
     /* Il ragionamento del modello è aperto mentre Filo pensa, perché scorre in diretta, e poi si collassa a una
        riga discreta riespandibile. */
@@ -394,6 +397,11 @@
       margin-left: auto;
     }
     .dk-mod-btn:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
+    .dk-mod-btn + .dk-mod-btn { margin-left: 0; }
+    /* Il parere non è arrivato: il motivo col colore dell'errore, e in evidenza il tasto che toglie l'ostacolo. */
+    .dk-op-errore { color: var(--sn-error); font-size: 12px; }
+    .dk-mod-btn.dk-rimedio { background: var(--sn-accent); border-color: var(--sn-accent); color: var(--sn-on-accent, #fff); }
+    .dk-mod-btn.dk-rimedio:hover, .dk-mod-btn.dk-rimedio:focus-visible { filter: brightness(1.05); color: var(--sn-on-accent, #fff); outline: none; }
     /* Nel carosello il box modulare sta tra la barra e l'hint tastiera. */
     #carouselModule { margin-top: 2px; }
     /* Carosello: immagine piena, barra con indicatore, frecce e toggle. Occhi sull'immagine, mano sulla tastiera. */

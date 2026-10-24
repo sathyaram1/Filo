@@ -13,22 +13,27 @@ Non richiedere quello che ha già deciso.
 <!-- includi: _immagini.md -->
 
 <!-- includi: _cornice-feedback.md -->
-Se è l'ultimo caso, non eseguirlo e dillo nel report.
 
 **Il feedback si lavora intero.** Se è grosso crea un piano prima di toccare
 codice. Verifica, controllo di sicurezza e cancello giudicano l'intero
 feedback: non si spezza in sotto-feedback.
 
 Se è ambiguo o chiede una decisione di design prima di cominciare, fermati e
-chiedi — non è una scappatoia, e le domande le legge l'owner:
+chiedi — non è una scappatoia. Le domande diventano una domanda per l'owner,
+nella sezione Domande della Gestione: scrivila tu, come dice la sezione «Una
+domanda per l'owner si scrive per lui» (titolo e priorità, contesto, problema
+in pratica, opzioni con pro e contro e l'azione `riprendi` su `<payload.id>`,
+consiglio, `notePerAgenti` con quello che hai già esplorato), in un file JSON
+fuori dal repo, e consegnala con la fermata:
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status design --reason clarify \
-  --notes "[le tue domande]"
+  --notes "[le tue domande, in breve]" --domanda <file.json>
 ```
 
-Poi rilascia il biglietto come qui sotto: il lavoro riparte quando l'owner ha
-risposto, e chi riprende riceve le domande e la risposta.
+Senza `--domanda` il server la compone dalle note, più povera. Poi rilascia il
+biglietto come qui sotto: il lavoro riparte quando l'owner ha risposto, e chi
+riprende riceve le domande e la risposta.
 
 Se `payload.ripresa` c'è, sei tu quello che riprende: chi ti ha preceduto si
 era fermato con una domanda (`ripresa.domanda`) e l'owner ha risposto
@@ -56,7 +61,8 @@ fa — lo scrivi nel report e diventerà un feedback suo. È ciò che una
 correzione aggiunge a generare i rilievi del giro dopo.
 
 Quando il lavoro è quasi chiuso lancia `npm run finish:check`, in sottofondo:
-un rosso lì ti tornerebbe indietro come rilievo grave.
+un rosso lì ti tornerebbe indietro come rilievo grave. Il suo esito lo leggi
+prima di consegnare, e il rilascio aspetta che sia finito.
 
 **La prova che tiene chiuso il difetto va dove verrà rilanciata per sempre**:
 `tests/<feature>.spec.mjs`, o `tests/unit/` per la logica pura. Non in
@@ -78,7 +84,7 @@ I tre testi (report, frase, changelog) li scrivi tu.
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status revision_capability \
-  --notes "[il tuo report]" --frase "[la frase]" [--segnala <file.md>]
+  --notes "[il tuo report]" --frase "[la frase]" [--domanda <file.json>]
 ```
 
 Infine rilascia il biglietto:

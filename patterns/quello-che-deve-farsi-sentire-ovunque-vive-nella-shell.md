@@ -33,8 +33,13 @@ sempre, finché c'è la finestra.
   della shell **mai coperta** dalla WebContentsView della pagina (vedi
   [Animazioni che coprono la pagina](animazioni-che-coprono-la-pagina-vivono-nel-content-overlay.md)):
   un pulsante disegnato dalla shell nell'area pagina non si vede e non si
-  clicca. Il chip `#ring-indicator` sta accanto a quello degli scaricamenti,
-  per lo stesso motivo.
+  clicca. Il chip `#ring-indicator` sta lì per questo.
+- **La fila di tab non è un parcheggio di indicatori.** Ci sta solo quello che
+  deve farsi sentire su ogni scheda e non ha un altro posto. Gli scaricamenti un
+  altro posto ce l'hanno (carte della home, pagina Download, l'icona di Filo
+  nella barra delle applicazioni per l'avanzamento, il pannello che si apre da
+  solo per una domanda): il loro tasto accanto ai comandi della finestra è
+  stato tolto su richiesta (#941).
 - **«Mai coperta» ha un'eccezione: il tutto schermo.** Lì la view della pagina
   parte da y=0 e prende anche la fila di tab, quindi il pulsante c'è ma nessuno
   lo vede né lo clicca, e nessun tasto zittisce. Il main fa rientrare la finestra

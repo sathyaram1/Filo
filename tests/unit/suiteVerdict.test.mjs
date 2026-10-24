@@ -17,11 +17,12 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
   normalizzaSpec,
   statoFinale,
@@ -33,6 +34,11 @@ import {
   primaRiga,
   classificaErroriGlobali,
   chiaviDelVerdetto,
+  eTettoDellaCorsa,
+  nomeEsitoParte,
+  partiSenzaEsito,
+  rossiDellePartiMancanti,
+  rigaRosso,
   FUORI_DAI_CASI,
 } from '../../scripts/suite-verdict.mjs';
 
@@ -151,7 +157,14 @@ describe('le funzioni pure', () => {
 
   test('gli argomenti: file, --out, --rossi; un\'opzione ignota è un errore', () => {
     assert.deepEqual(leggiArgomenti(['r.json', '--out', 'n.txt', '--rossi', 'k.json', '--chiavi', 'c.txt']),
-      { file: 'r.json', out: 'n.txt', rossi: 'k.json', chiavi: 'c.txt' });
+      { file: 'r.json', out: 'n.txt', rossi: 'k.json', chiavi: 'c.txt', parti: 0, esiti: '' });
+    assert.deepEqual(leggiArgomenti(['r.json', '--parti', '4', '--esiti', 'blob-report']),
+      { file: 'r.json', out: '', rossi: '', chiavi: '', parti: 4, esiti: 'blob-report' });
+    for (const n of ['0', '-1', '2.5', 'tre', undefined]) {
+      assert.throws(() => leggiArgomenti(['r.json', '--parti', n, '--esiti', 'b'].filter((x) => x !== undefined)), /--parti/, String(n));
+    }
+    assert.throws(() => leggiArgomenti(['r.json', '--parti', '4']), /vanno insieme/, 'senza la cartella le parti non si possono contare');
+    assert.throws(() => leggiArgomenti(['r.json', '--esiti', 'b']), /vanno insieme/);
     assert.equal(leggiArgomenti(['r.json']).chiavi, '');
     assert.throws(() => leggiArgomenti(['r.json', '--chiavi']), /vuole un percorso/);
     assert.throws(() => leggiArgomenti(['r.json', '--boh']), /non capita/);
@@ -170,6 +183,45 @@ describe('le funzioni pure', () => {
     assert.deepEqual(chiaviDelVerdetto(due), ['suite:tests/delta.spec.mjs', 'suite:tests/wallet-credits.spec.mjs', 'suite:fuori-dai-casi']);
     assert.deepEqual(chiaviDelVerdetto(verdetto(jsonSintetico({ conNuovo: false }), NOTI.contenitore.specs)), []);
     assert.deepEqual(chiaviDelVerdetto(undefined), []);
+  });
+});
+
+// #1485: la suite in fila ha passato il tetto del passo e il JSON non c'era; ora gira in parti, e ognuna lascia il suo
+// esito. Una parte che non lo lascia, o il tetto di Playwright scaduto, non deve mai sembrare un verde.
+describe('le parti della suite e il tetto di tempo', () => {
+  test('il tetto della corsa si riconosce nei testi di Playwright, vecchi e nuovi; un caso scaduto no', () => {
+    assert.ok(eTettoDellaCorsa('Timed out waiting 8400s for the test suite to run'));
+    assert.ok(eTettoDellaCorsa('Timed out waiting 2.5s for the teardown for test suite to run'));
+    assert.ok(eTettoDellaCorsa('Timed out waiting 3600s for the entire test run'));
+    assert.ok(eTettoDellaCorsa(primaRiga({ message: '\u001b[31mTimed out waiting 8400s for the test suite to run\u001b[39m' })), 'coi colori, come nel JSON');
+    assert.ok(!eTettoDellaCorsa('Test timeout of 60000ms exceeded.'), 'un caso scaduto è un rosso suo, non il tetto della suite');
+    assert.ok(!eTettoDellaCorsa('Worker teardown timeout of 60000ms exceeded.'));
+    assert.ok(!eTettoDellaCorsa(''));
+  });
+
+  test('il tetto scaduto è UN rosso `suite:tetto` col numero dei casi mai girati, anche con soli rossi noti', () => {
+    const j = jsonSintetico({ conNuovo: false });
+    j.suites.push({ title: 'eps.spec.mjs', file: 'eps.spec.mjs', specs: [{ title: 'mai girato', tests: [{ status: 'skipped', results: [] }] },
+      { title: 'neanche questo', tests: [{ status: 'skipped', results: [] }] }] });
+    j.errors = [{ message: '\u001b[31mTimed out waiting 8400s for the test suite to run\u001b[39m' },
+      { message: 'Timed out waiting 8400s for the teardown for test suite to run' }];
+    const v = verdetto(j, NOTI.contenitore.specs);
+    assert.equal(v.nuovi.length, 1, 'i due testi dello stesso tetto sono un rosso solo');
+    assert.match(rigaRosso(v.nuovi[0]), /^la suite ha passato il suo tetto di tempo \(Timed out waiting 8400s for the test suite to run\): 2 casi non sono girati/);
+    assert.deepEqual(chiaviDelVerdetto(v), ['suite:tetto']);
+    const conTeardown = verdetto({ ...j, errors: [...j.errors, { message: 'Worker teardown timeout of 60000ms exceeded.' }] }, NOTI.contenitore.specs);
+    assert.equal(conTeardown.avvisi.length, 0, 'con la suite fermata a metà un teardown scaduto non è più un avviso: la corsa è rossa');
+  });
+
+  test('una parte è senza esito se il suo file non c\'è; ognuna diventa un rosso `suite:non-partita`', () => {
+    assert.equal(nomeEsitoParte(3), 'parte-3.zip');
+    assert.deepEqual(partiSenzaEsito(4, ['parte-1.zip', 'parte-3.zip', 'report-2.zip', 'parte-4.zip.tmp']), [2, 4]);
+    assert.deepEqual(partiSenzaEsito(2, ['parte-1.zip', 'parte-2.zip']), []);
+    assert.deepEqual(partiSenzaEsito(3, undefined), [1, 2, 3]);
+    assert.deepEqual(partiSenzaEsito(0, []), []);
+    const rossi = rossiDellePartiMancanti([2, 4], 4);
+    assert.deepEqual(rossi.map(rigaRosso).map((r) => r.split(':')[0]), ['parte 2 di 4 della suite senza esito', 'parte 4 di 4 della suite senza esito']);
+    assert.deepEqual(chiaviDelVerdetto({ nuovi: [...rossi, { spec: 'delta', titolo: 'x' }] }), ['suite:non-partita', 'suite:tests/delta.spec.mjs']);
   });
 });
 
@@ -304,6 +356,86 @@ describe('lo script da riga di comando', () => {
     writeFileSync(vuoto, JSON.stringify({ suites: [], errors: [] }), 'utf8');
     assert.equal(conChiavi(vuoto, join(dir, 'k5.txt')).status, 2);
     assert.equal(readFileSync(join(dir, 'k5.txt'), 'utf8'), 'suite:non-partita\n');
+  });
+
+  const conParti = (jsonFile, esiti, n, suffisso) => spawnSync(process.execPath, [CLI, jsonFile, '--out', join(dir, `n-${suffisso}.txt`),
+    '--rossi', fileNoti, '--chiavi', join(dir, `k-${suffisso}.txt`), '--parti', String(n), '--esiti', esiti], { encoding: 'utf8' });
+  const esiti = (nome, parti) => {
+    const d = join(dir, nome);
+    mkdirSync(d, { recursive: true });
+    for (const k of parti) writeFileSync(join(d, nomeEsitoParte(k)), 'zip', 'utf8');
+    return d;
+  };
+
+  test('--parti: una parte senza esito → uscita 2, e i rossi delle altre si elencano lo stesso', () => {
+    const jsonFile = join(dir, 'parti-una-manca.json');
+    writeFileSync(jsonFile, JSON.stringify(jsonSintetico()), 'utf8');
+    const r = conParti(jsonFile, esiti('esiti-1-3', [1, 3]), 3, 'p1');
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stdout, /Rossi NUOVI: 2/);
+    const nuovi = readFileSync(join(dir, 'n-p1.txt'), 'utf8');
+    assert.match(nuovi, /^parte 2 di 3 della suite senza esito/m);
+    assert.match(nuovi, /tests\/delta\.spec\.mjs › questo è nuovo/, 'i rossi delle parti arrivate servono al feedback');
+    assert.equal(readFileSync(join(dir, 'k-p1.txt'), 'utf8'), 'suite:non-partita\nsuite:tests/delta.spec.mjs\n');
+  });
+
+  test('--parti: anche senza rossi nuovi, una parte mancante non è un verde', () => {
+    const jsonFile = join(dir, 'parti-verde.json');
+    writeFileSync(jsonFile, JSON.stringify(jsonSintetico({ conNuovo: false })), 'utf8');
+    assert.equal(conParti(jsonFile, esiti('esiti-1', [1]), 2, 'p2').status, 2);
+    assert.equal(readFileSync(join(dir, 'k-p2.txt'), 'utf8'), 'suite:non-partita\n');
+    assert.equal(conParti(jsonFile, esiti('esiti-1-2', [1, 2]), 2, 'p3').status, 0, 'con tutte le parti è il verdetto di sempre');
+    assert.equal(readFileSync(join(dir, 'n-p3.txt'), 'utf8'), '');
+  });
+
+  test('--parti: nessuna parte e nessun JSON → uscita 2, e il file dei nuovi elenca le parti', () => {
+    const r = conParti(join(dir, 'non-esiste.json'), join(dir, 'cartella-che-non-c-e'), 2, 'p4');
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /Nessuna delle 2 parti/);
+    assert.equal(readFileSync(join(dir, 'n-p4.txt'), 'utf8').split('\n').filter(Boolean).length, 2);
+    assert.equal(readFileSync(join(dir, 'k-p4.txt'), 'utf8'), 'suite:non-partita\n');
+  });
+
+  test.after(() => { try { togliCartella(dir); } catch (_) { /* best effort */ } });
+});
+
+// La strada di suite.yml fatta girare con Playwright vero: parti con --shard, l'esito di ognuna col nome che il
+// verdetto cerca, una parte fermata dal suo tetto, l'unione in un JSON solo. Se un aggiornamento di Playwright
+// cambiasse uno di questi pezzi, la suite in GitHub direbbe «senza esito» a ogni corsa.
+describe('le parti con Playwright vero, come in suite.yml', () => {
+  const ROOT = resolve(__dirname, '..', '..');
+  const CLI_PW = resolve(ROOT, 'node_modules', '@playwright', 'test', 'cli.js');
+  // Dentro tests/.smoke (ignorata da git): gli spec di prova trovano @playwright/test risalendo ai node_modules.
+  const dir = resolve(ROOT, 'tests', '.smoke', 'suite-verdict-parti');
+  const pulito = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(PLAYWRIGHT_|PW_|TEST_WORKER_INDEX|TEST_PARALLEL_INDEX)/.test(k)));
+  const pw = (args, env = {}) => spawnSync(process.execPath, [CLI_PW, ...args], { cwd: dir, encoding: 'utf8', env: { ...pulito(), ...env }, timeout: TETTO_ATTESA_MS });
+
+  test('una parte fermata dal tetto lascia l\'esito, e il verdetto unito dice il tetto e il rosso dell\'altra', { skip: !existsSync(CLI_PW) && 'manca @playwright/test' }, () => {
+    togliCartella(dir);
+    mkdirSync(join(dir, 'prove'), { recursive: true });
+    writeFileSync(join(dir, 'playwright.config.mjs'), "export default { testDir: './prove', workers: 1, fullyParallel: false, retries: 0 };\n", 'utf8');
+    writeFileSync(join(dir, 'prove', 'a.spec.mjs'), "import { test } from '@playwright/test';\ntest('lento', async () => { await new Promise(() => {}); });\ntest('dopo il lento', () => {});\n", 'utf8');
+    writeFileSync(join(dir, 'prove', 'b.spec.mjs'), "import { test, expect } from '@playwright/test';\ntest('rosso', () => { expect(1).toBe(2); });\ntest('verde', () => {});\n", 'utf8');
+    const tutti = join(dir, 'blob-tutti');
+    mkdirSync(tutti, { recursive: true });
+    for (const [k, extra] of [[1, ['--global-timeout=1500']], [2, []]]) {
+      // Senza la cartella l'esito andrebbe accanto al package.json del repo, come in GitHub: qui resta nella prova.
+      const r = pw(['test', '--config', 'playwright.config.mjs', `--shard=${k}/2`, ...extra, '--reporter=blob'],
+        { PLAYWRIGHT_BLOB_OUTPUT_NAME: nomeEsitoParte(k), PLAYWRIGHT_BLOB_OUTPUT_DIR: join(dir, 'blob-report') });
+      const fatti = existsSync(join(dir, 'blob-report')) ? readdirSync(join(dir, 'blob-report')) : [];
+      assert.ok(fatti.includes(nomeEsitoParte(k)), `parte ${k}: nessun ${nomeEsitoParte(k)} (${fatti.join(', ')})\n${r.stdout}${r.stderr}`);
+      copyFileSync(join(dir, 'blob-report', nomeEsitoParte(k)), join(tutti, nomeEsitoParte(k)));
+    }
+    const unito = pw(['merge-reports', '--reporter=json', tutti], { PLAYWRIGHT_JSON_OUTPUT_NAME: 'suite-risultati.json' });
+    assert.ok(existsSync(join(dir, 'suite-risultati.json')), `l'unione non ha scritto il JSON\n${unito.stdout}${unito.stderr}`);
+    writeFileSync(join(dir, 'noti.json'), JSON.stringify({ contenitore: { specs: [] } }), 'utf8');
+    const v = spawnSync(process.execPath, [CLI, join(dir, 'suite-risultati.json'), '--rossi', join(dir, 'noti.json'),
+      '--out', join(dir, 'nuovi.txt'), '--chiavi', join(dir, 'chiavi.txt'), '--parti', '2', '--esiti', tutti], { encoding: 'utf8' });
+    assert.equal(v.status, 1, v.stdout + v.stderr);
+    const nuovi = readFileSync(join(dir, 'nuovi.txt'), 'utf8');
+    assert.match(nuovi, /^tests\/b\.spec\.mjs › rosso$/m, 'il rosso della parte arrivata in fondo');
+    assert.match(nuovi, /^la suite ha passato il suo tetto di tempo .*: [12] casi non sono girati/m, 'a macchina carica il tetto può scadere prima del caso lento');
+    assert.deepEqual(readFileSync(join(dir, 'chiavi.txt'), 'utf8').split('\n').filter(Boolean).sort(), ['suite:tests/b.spec.mjs', 'suite:tetto']);
   });
 
   test.after(() => { try { togliCartella(dir); } catch (_) { /* best effort */ } });

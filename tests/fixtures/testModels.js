@@ -137,7 +137,7 @@
     [A.TRANSCRIBE_IMAGE]: 'gemma, glm',
     [A.TRANSCRIBE_AUDIO]: 'whisper, nemotron-asr',
     [A.SPELLCHECK_SEMANTIC]: 'deepseek-flash, gemma-lite',
-    [A.SPELLCHECK_WORD]: 'deepseek-flash, gemma-lite',
+    [A.SPELLCHECK_CONTEXT]: 'deepseek-flash, gemma-lite',
     [A.EDIT_TEXT]: 'claude, deepseek',
     [A.EXPLAIN_LINK]: 'deepseek-flash, gemma-lite',
     [A.HELP_INTENT_GUESS]: 'deepseek-flash, gemma-lite',

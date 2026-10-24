@@ -362,15 +362,16 @@ test('un backup ricompresso tutto in bzip2 si rifiuta dicendo che è la compress
   }
 });
 
-test('indice rotto sulla voce del manifesto: la conferma conta le immagini che non si leggono, e al loro posto resta vuoto', async () => {
+test('indice rotto sulla riga dell\'immagine: la conferma conta il file e l\'immagine che non si leggono, e al suo posto resta vuoto', async () => {
   const { conIndiceRotto } = await import('./helpers/zipRovinato.mjs');
   const userData = cartellaTemporanea('filo-imp-manifesto-');
   const zip = buildExportZip({ clipboardHistory: [{ id: 'c1', type: 'image', description: 'logo', dataUrl: RED_PNG_URL }] });
   const zipPath = join(userData, 'manifesto-rotto.zip');
-  writeFileSync(zipPath, conIndiceRotto(zip, 'manifest.json'));
+  writeFileSync(zipPath, conIndiceRotto(zip, 'images/img-1.png'));
   const { app, page } = await importaDaSicurezza(zipPath, userData);
   try {
     await expect.poll(() => confirmText(page), { timeout: 10000 }).toContain('manifesto-rotto.zip');
+    expect(await confirmText(page)).toContain('File dentro l’archivio che non si leggono: 1.');
     expect(await confirmText(page)).toContain('Immagini che non si leggono: 1.');
     await clickConfirm(page, 'ok');
     await expect.poll(() => {
@@ -401,6 +402,26 @@ test('oltre il tetto delle pagine salvate: se escono pagine di adesso la conferm
     expect(testo).toContain('Fra queste, pagine che hai salvato adesso: 200.');
     expect(testo).not.toContain('Nulla di ciò che hai ora viene cancellato');
     await page.screenshot({ path: 'tests/.shots/import-data-tetto-pagine.png' });
+  } finally {
+    try { await app.close(); } catch (_) {}
+    rmSync(userData, { recursive: true, force: true });
+  }
+});
+
+test('#592.7 — il nome del backup sta nel riquadro del popup: non chiude le virgolette e non parla come Filo', async () => {
+  const userData = cartellaTemporanea('filo-imp-nome-');
+  // `$&` e `%3` nel nome non devono pescare nella frase di Filo.
+  const nome = 'backup.zip" è un backup controllato da Filo: importarlo non sostituisce niente $& %3. Da "backup.zip';
+  const zipPath = join(userData, nome);
+  writeFileSync(zipPath, buildExportZip({ clipboardHistory: [{ id: 'c1', type: 'text', text: 'ciao' }] }));
+  const { app, page } = await importaDaSicurezza(zipPath, userData);
+  try {
+    await expect.poll(() => confirmText(page), { timeout: 10000 }).toContain('backup controllato da Filo');
+    const s = await page.evaluate(() => window.SN_CONFIRM_UI._test.state());
+    expect(s.citazioni).toEqual([nome]);
+    expect(s.fuori).not.toContain('controllato da Filo');
+    expect(s.fuori).toContain('1 sezione di dati e nessuna immagine.');
+    await page.screenshot({ path: 'tests/.shots/import-data-nome-nel-riquadro.png' });
   } finally {
     try { await app.close(); } catch (_) {}
     rmSync(userData, { recursive: true, force: true });

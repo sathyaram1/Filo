@@ -95,6 +95,9 @@ test('in Gestione chi aspetta un non fuso sta fra quelli che aspettano; fusi tut
   assert.equal(counts.queue, 1);
   assert.deepEqual(MR.listForManageTab([a, b], 'waiting', { trovaAtteso: trova([a, b]) }).map((f) => f._id), ['a']);
   assert.deepEqual(MR.ownerActions(a, { trovaAtteso: trova([a, b]) }).map((x) => x.key), ['resolve', 'archive']);
+  // Il segno dei lavori server non ha più una scheda sua (#1575): chi aspetta sta fra quelli che aspettano anche col segno.
+  const server = { ...a, localOnly: { by: 'routine', at: 1790000000000 } };
+  assert.equal(MR.manageTabFor(server, { trovaAtteso: trova([server, b]) }), 'waiting');
 });
 
 test('le regole ammettono il campo solo come elenco da 1 a 20, nel ramo admin e alla creazione admin', () => {

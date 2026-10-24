@@ -9,12 +9,54 @@
   const pila = document.getElementById('pila');
   const carte = new Map();
   const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
+  // Quello che della vista è dell'utente (una carta, i comandi della pila); il resto è vuoto, della pagina sotto.
+  const SOPRA = '.shell-notif.show, .avvisi-testa.show';
+  const SOPRA_HOVER = '.shell-notif.show:hover, .avvisi-testa.show:hover';
   let ultimaMisura = '';
   // Le azioni di un avviso che la pagina fa comparire (e spostare) sotto il cursore si armano quando
   // la pila è ferma da ARMA_MS; la X resta sempre viva. patterns/una-conferma-non-e-un-avviso-sopra-un-fatto-gia-compiuto.md
   const ARMA_MS = 1000;
   let firmaPila = '';
   let timerArma = null;
+  // «Chiudi tutti» porta via anche quello che non si è letto: si arma come le azioni delle carte.
+  const ARMABILI = '.shell-notif-action, .avvisi-testa [data-pila="chiudi-tutti"]';
+
+  // In cima alla pila i comandi della pila intera: «+N» per quelle che aspettano oltre il tetto (le tiene la shell),
+  // aperto Riduci e Chiudi tutti.
+  const testa = document.createElement('div');
+  testa.className = 'avvisi-testa';
+  testa.hidden = true;
+  const comando = (nome, etichetta) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.pila = nome;
+    b.textContent = etichetta;
+    testa.appendChild(b);
+    return b;
+  };
+  const tastoTutte = comando('chiudi-tutti', 'Chiudi tutti');
+  const tastoAltre = comando('apri', '');
+  tastoAltre.dataset.tip = 'Mostra tutti';
+  const tastoRiduci = comando('riduci', 'Riduci');
+  pila.appendChild(testa);
+  let aperta = false;
+  // Appena aperto il «+N» in vista restano le più vecchie e i comandi; un avviso nuovo riporta giù.
+  let cima = false;
+  let ultimaVista = '';
+
+  function disegnaTesta(altre, ora) {
+    testa.hidden = !(altre > 0 || ora);
+    tastoAltre.hidden = ora || !(altre > 0);
+    tastoRiduci.hidden = !ora;
+    tastoTutte.hidden = !ora;
+    const scritta = `+${altre} ${altre === 1 ? 'avviso' : 'avvisi'}`;
+    if (!tastoAltre.hidden && tastoAltre.textContent !== scritta) tastoAltre.textContent = scritta;
+    if (!testa.hidden && !testa.classList.contains('show')) {
+      // eslint-disable-next-line no-unused-expressions
+      testa.offsetHeight;
+      testa.classList.add('show');
+    } else if (testa.hidden) testa.classList.remove('show');
+  }
 
   function applicaTema(tema) {
     const vars = tema && typeof tema.vars === 'object' && tema.vars ? tema.vars : {};
@@ -89,10 +131,10 @@
   function arma(firma) {
     if (firma === firmaPila) return;
     firmaPila = firma;
-    for (const b of pila.querySelectorAll('.shell-notif-action')) b.disabled = true;
+    for (const b of pila.querySelectorAll(ARMABILI)) b.disabled = true;
     clearTimeout(timerArma);
     timerArma = setTimeout(() => {
-      for (const b of pila.querySelectorAll('.shell-notif-action')) b.disabled = false;
+      for (const b of pila.querySelectorAll(ARMABILI)) b.disabled = false;
     }, ARMA_MS);
   }
 
@@ -107,7 +149,7 @@
     lista.forEach((c, i) => {
       let el = carte.get(c.id);
       if (!el) { el = costruisci(c); carte.set(c.id, el); if (!c.chiusa) nuove.push(el); }
-      if (pila.children[i] !== el) pila.insertBefore(el, pila.children[i] || null);
+      if (pila.children[i + 1] !== el) pila.insertBefore(el, pila.children[i + 1] || null);
       aggiorna(el, c);
       if (c.chiusa) el.classList.remove('show');
     });
@@ -116,12 +158,23 @@
       pila.offsetHeight;
       for (const el of nuove) el.classList.add('show');
     }
+    const ora = !!(stato && stato.aperta) && lista.length > 0;
+    const altre = Math.max(0, Number(stato && stato.altre) || 0);
+    const vive = lista.filter((c) => !c.chiusa);
+    const ultima = vive.length ? vive[vive.length - 1].id : '';
+    const arrivata = !!ultima && ultima !== ultimaVista;
+    ultimaVista = ultima;
+    const appenaAperta = ora && !aperta;
+    if (appenaAperta) cima = true;
+    if (!ora || arrivata) cima = false;
+    aperta = ora;
+    disegnaTesta(lista.length ? altre : 0, ora);
     arma(JSON.stringify(lista));
     misura();
-    if (nuove.length) inFondo();
-    if (tipSu && (!tipSu.isConnected || !tipSu.closest('.shell-notif.show'))) nascondiTip();
+    if (nuove.length || appenaAperta) inVista();
+    if (tipSu && (!tipSu.isConnected || tipSu.hidden || !tipSu.closest(SOPRA))) nascondiTip();
     // La carta sotto il puntatore se n'è andata (o la pila si è svuotata, e la vista sparisce senza un mouseout).
-    if (!pila.querySelector('.shell-notif.show:hover')) segnaSopra(false);
+    if (!pila.querySelector(SOPRA_HOVER)) segnaSopra(false);
   });
 
   // Il suggerimento di Filo sulle icone, come nella barra (shell.js, data-tip): lo disegna il main.
@@ -153,15 +206,21 @@
   document.documentElement.addEventListener('mouseleave', nascondiTip);
   window.addEventListener('blur', nascondiTip);
 
-  // Finestra bassa: la vista è più corta della pila e scorre; in vista resta la più recente.
-  function inFondo() {
+  // Finestra bassa: la vista è più corta della pila e scorre; in vista resta la più recente, o la cima appena aperto «+N».
+  function inVista() {
     const fondo = vassoio.scrollHeight - vassoio.clientHeight;
-    if (fondo > 0 && vassoio.scrollTop !== fondo) vassoio.scrollTop = fondo;
+    const dove = cima ? 0 : fondo;
+    if (fondo > 0 && vassoio.scrollTop !== dove) vassoio.scrollTop = dove;
   }
   try { new ResizeObserver(misura).observe(pila); } catch (_) {}
-  window.addEventListener('resize', inFondo);
+  window.addEventListener('resize', inVista);
 
   pila.addEventListener('click', (e) => {
+    const p = e.target.closest('.avvisi-testa button[data-pila]');
+    if (p) {
+      if (!p.disabled && !p.hidden && !testa.hidden) { nascondiTip(); api.pila(p.dataset.pila); }
+      return;
+    }
     const b = e.target.closest('button[data-azione]');
     const card = b && b.closest('.shell-notif');
     if (!card || b.disabled || !card.classList.contains('show')) return;
@@ -171,7 +230,7 @@
   // Il vuoto della vista (margine, spazio accanto a una carta più stretta) è della pagina sotto: i gesti che
   // ci cadono tornano alla scheda. Un gesto partito dal vuoto resta della pagina fino al rilascio (trascinare
   // la barra di scorrimento, selezionare del testo), anche se passa sopra una carta.
-  const cartaSotto = (e) => e.target && e.target.closest && e.target.closest('.shell-notif.show');
+  const cartaSotto = (e) => e.target && e.target.closest && e.target.closest(SOPRA);
   // Col puntatore sopra una carta i tempi della pila aspettano: li tiene la shell, qui si dice solo entra/esce.
   let sopra = false;
   function segnaSopra(ora) {
@@ -182,7 +241,7 @@
   pila.addEventListener('mouseover', (e) => { if (cartaSotto(e)) segnaSopra(true); });
   document.addEventListener('mouseout', (e) => {
     const r = e.relatedTarget;
-    if (!(r && r.closest && r.closest('.shell-notif.show'))) segnaSopra(false);
+    if (!(r && r.closest && r.closest(SOPRA))) segnaSopra(false);
   }, true);
   root.addEventListener('mouseleave', () => segnaSopra(false));
   // La barra con cui scorre la pila stessa (finestra bassa) resta sua.
@@ -204,6 +263,7 @@
     const card = cartaSotto(e);
     if (!card || vuoto.gestoDellaPagina()) return;
     nascondiTip();
-    api.menu(card.dataset.nid, e.clientX, e.clientY);
+    if (card === testa) api.menuPila(e.clientX, e.clientY);
+    else api.menu(card.dataset.nid, e.clientX, e.clientY);
   }, true);
 })();

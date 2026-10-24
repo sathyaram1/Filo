@@ -13,6 +13,7 @@ import { pngFirmato, pngSpoglio, pngConTesto, pngConTestoCompresso, pngConXmp, c
 import { readFileSync } from 'node:fs';
 import zlib from 'node:zlib';
 import { join } from 'node:path';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const RIGA = '.sn-menu-origine';
 
@@ -42,7 +43,7 @@ function pagina(src, { dentroUnLink = false } = {}) {
 
 async function apriMenuSullaFoto(page) {
   await page.locator('#foto').click({ button: 'right', position: { x: 20, y: 20 } });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
 }
@@ -127,7 +128,7 @@ test('la riga compare anche quando l’immagine sta sotto un velo trasparente', 
     </div>
   </body></html>`);
   await page.locator('#velo').click({ button: 'right', position: { x: 20, y: 20 } });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await expect(menu.locator(RIGA)).toHaveAttribute('aria-label', 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.', { timeout: 10000 });
 });
@@ -155,6 +156,37 @@ test('un’etichetta senza firma si presenta come dichiarazione del file, non co
   await expect(riga).toBeVisible({ timeout: 10000 });
   await expect(riga).toHaveAttribute('aria-label', /senza firma che lo confermi/);
   await expect(riga).toHaveClass(/sn-menu-origine-debole/);
+});
+
+// #946.1 — le immagini di ChatGPT, Firefly e Bing di prima del programma ufficiale arrivano a un'autorità che sta
+// solo nell'elenco provvisorio del C2PA: Filo lo scarica col resto e dice chi le ha fatte, e da quale elenco.
+const RADICE_PROVV = certificato({ organizzazione: 'Truepic', nomeComune: 'RootCA', ca: true, da: new Date('2021-12-09'), a: new Date('2036-12-05') });
+const INTERMEDIA_PROVV = certificato({ organizzazione: 'Truepic', nomeComune: 'WebClaimSigningCA', ca: true, emittente: RADICE_PROVV, da: new Date('2022-01-01'), a: new Date('2032-01-01') });
+const daChatGpt = () => pngFirmato({
+  cert: certificato({ organizzazione: 'OpenAI', nomeComune: 'Truepic Lens CLI in DALL·E', emittente: INTERMEDIA_PROVV, da: new Date('2025-06-01') }),
+  catena: [INTERMEDIA_PROVV],
+});
+const FRASE_PROVV = 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate. Il firmatario è riconosciuto dall’elenco provvisorio del C2PA.';
+
+async function scaricaConProvvisorio(app, testServer) {
+  const url = testServer.asset(elencoPem(RADICE), 'text/plain');
+  const urlProvvisorio = testServer.asset(elencoPem(RADICE_PROVV), 'text/plain');
+  const esito = await app.evaluate((_e, a) => globalThis.__filoFirmatariC2pa.aggiorna({ forza: true, ...a }), { url, urlProvvisorio });
+  expect(esito.ok).toBe(true);
+}
+
+test('un’immagine di ChatGPT firmata prima del congelamento dice che la dichiara OpenAI, e da quale elenco', async ({ app, openTab, testServer }) => {
+  await scaricaConProvvisorio(app, testServer);
+  const src = testServer.asset(daChatGpt(), 'image/png');
+  const page = await testServer.openReady(openTab, pagina(src));
+  const menu = await apriMenuSullaFoto(page);
+
+  const riga = menu.locator(RIGA);
+  await expect(riga).toHaveAttribute('aria-label', FRASE_PROVV, { timeout: 10000 });
+  await expect(riga).toHaveAttribute('title', /elenco provvisorio, poi congelato/);
+  await expect(riga).toBeVisible();
+  await expect(riga).not.toHaveClass(/sn-menu-origine-debole/);
+  await page.screenshot({ path: 'tests/.shots/provenienza-immagine-provvisorio.png' }).catch(() => {});
 });
 
 // ── La stessa domanda fatta in chat (o a voce) ──────────────────────────────
@@ -204,6 +236,13 @@ test('in chat, un’immagine con credenziali firmate porta al modello lo stesso 
   // Dentro la recinzione: il nome lo scrive il file, non Filo.
   const dentro = prompt.split('<<<ETICHETTA_FILE>>>')[1] || '';
   expect(dentro.split('<<<FINE_ETICHETTA_FILE>>>')[0]).toContain('OpenAI');
+});
+
+test('in chat, l’immagine di ChatGPT riconosciuta dall’elenco provvisorio porta al modello la stessa frase del menu', async ({ app, testServer }) => {
+  await configuraModello(app);
+  await scaricaConProvvisorio(app, testServer);
+  const prompt = await promptConImmagine(app, 'questa foto è fatta con l’AI?', dataUrl(daChatGpt()));
+  expect(prompt).toContain(FRASE_PROVV);
 });
 
 test('in chat, senza elenco la risposta dice lo stesso «non verificato» del menu', async ({ app }) => {
@@ -280,6 +319,16 @@ test('generata con l’AI e poi ritagliata con le credenziali: la riga lo dice a
   await expect(riga).toHaveAttribute('aria-label', /Generata con l’AI/, { timeout: 10000 });
 });
 
+// #946.1: un file vero di ChatGPT del 2025, con la radice Truepic dell'elenco provvisorio vero: generata, non modificata.
+test('un’immagine vera di ChatGPT si dice generata con l’AI da OpenAI, riconosciuta dall’elenco provvisorio', async ({ app, openTab, testServer }) => {
+  const url = testServer.asset(elencoPem(RADICE), 'text/plain');
+  const urlProvvisorio = testServer.asset(fixture('elenco-provvisorio-truepic.pem'), 'text/plain');
+  const esito = await app.evaluate((_e, a) => globalThis.__filoFirmatariC2pa.aggiorna({ forza: true, ...a }), { url, urlProvvisorio });
+  expect(esito.ok).toBe(true);
+  const { riga } = await rigaSu(testServer, openTab, fixture('chatgpt-2025-vera.png'), 'image/png');
+  await expect(riga).toHaveAttribute('aria-label', /^Generata con l’AI secondo OpenAI.*elenco provvisorio del C2PA\.$/, { timeout: 15000 });
+});
+
 // La prova di #946: la STESSA immagine firmata, ricompressa come fa un salvataggio
 // qualsiasi, perde le credenziali — e allora il menu non dice niente sull'origine.
 test('la stessa immagine firmata, ricompressa senza metadati, non fa comparire nessuna frase sull’origine', async ({ app, openTab, testServer }) => {
@@ -294,7 +343,7 @@ test('la stessa immagine firmata, ricompressa senza metadati, non fa comparire n
     <img id="firmata" src="${testServer.asset(firmata, 'image/jpeg')}" width="160" height="160">
     <img id="ricompressa" src="${testServer.asset(ricompressa, 'image/jpeg')}" width="160" height="160">
   </body></html>`);
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await page.locator('#firmata').click({ button: 'right', position: { x: 20, y: 20 } });
   await expect(menu.locator(RIGA)).toHaveAttribute('aria-label', /Generata con l’AI/, { timeout: 10000 });
   await page.keyboard.press('Escape');
@@ -335,8 +384,8 @@ test('un’immagine servita da un altro dominio fa comparire la riga e la descri
   // Quei byte il sito non li poteva leggere: non deve ritrovare con la sua ricerca quello che Filo ne dice.
   expect(await page.evaluate(() => [window.find('quadrato arancione'), window.find('Signing Cert')])).toEqual([false, false]);
   // Il testo si vede lo stesso: la riga e la descrizione occupano spazio.
-  for (const sel of [RIGA, '.sn-menu-link-body']) {
-    expect((await menu.locator(sel).boundingBox()).height).toBeGreaterThan(8);
+  for (const pezzo of [menu.locator(RIGA), menu.locator('.sn-menu-link-body')]) {
+    expect((await pezzo.boundingBox()).height).toBeGreaterThan(8);
   }
 });
 
@@ -362,7 +411,7 @@ async function modelloFinto(app) {
 }
 
 async function chiediAllAiuto(app, page, domanda) {
-  await page.locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
+  await menuDi(page).locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
   await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
   await page.fill('.sn-sidebar-input textarea', domanda);
   await page.press('.sn-sidebar-input textarea', 'Enter');
@@ -544,7 +593,7 @@ test('tasto destro su un’immagine con un XMP enorme e ripetitivo: Filo resta r
   await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
   await page.locator('#foto').click({ button: 'right', position: { x: 20, y: 20 } });
   expect(await rispostaPiuLenta(app)).toBeLessThan(1000);
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
 });
 
 test('tasto destro su un’immagine con testi compressi enormi: Filo non si chiude, e la chiave basta per la riga', async ({ app, openTab, testServer }) => {
@@ -566,7 +615,7 @@ test('una domanda qualsiasi all’Aiuto, con l’immagine ripetitiva visibile: F
     <p id="testo" style="margin-top:200px">Un paragrafo qualsiasi.</p></body></html>`);
   await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
   await page.locator('#testo').click({ button: 'right' });
-  await page.locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
+  await menuDi(page).locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
   await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
   await page.fill('.sn-sidebar-input textarea', 'riassumi la pagina');
   await page.press('.sn-sidebar-input textarea', 'Enter');
@@ -603,7 +652,7 @@ test('un’immagine finta che punta a un documento di un altro sito non viene sc
   // Un SVG vero di un altro dominio si scarica e si descrive come prima.
   await page.waitForFunction(() => document.getElementById('disegno').naturalWidth > 0);
   await page.locator('#disegno').click({ button: 'right', position: { x: 20, y: 20 } });
-  await expect(page.locator('.sn-menu .sn-menu-link-body')).toHaveAttribute('aria-label', 'descritta', { timeout: 10000 });
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-link-body')).toHaveAttribute('aria-label', 'descritta', { timeout: 10000 });
   const descritte = await app.evaluate(() => globalThis.__descritte);
   expect(descritte).toHaveLength(1);
   expect(descritte.join('')).not.toContain('saldo');
@@ -634,7 +683,7 @@ test('la stessa immagine senza marchio non fa comparire nessuna frase sull’ori
     <img id="marcata" src="${testServer.asset(marchio('marchio-sdxl.png'), 'image/png')}" width="160" height="128">
     <img id="spoglia" src="${testServer.asset(marchio('senza-marchio.png'), 'image/png')}" width="160" height="128">
   </body></html>`);
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   // Prima quella marcata: quando la sua riga c'è, il lettore dei pixel è già partito e risponde in fretta.
   await page.locator('#marcata').click({ button: 'right', position: { x: 20, y: 20 } });
   await expect(menu.locator(RIGA)).toHaveAttribute('aria-label', FRASE_SDXL, { timeout: 10000 });

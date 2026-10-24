@@ -1,5 +1,5 @@
 // Permessi delle pagine web (#591.1): quello che Chrome chiede lo decide l'utente nella cornice, quello che Chrome concede
-// di fabbrica passa. Filo stesso (filo://, la cornice) resta com'era; Detta e Incolla hanno un lasciapassare breve.
+// di fabbrica passa. Filo stesso (filo://, la cornice) resta com'era; Detta e Incolla non passano da qui (#586).
 // Senza gestore Electron concede tutto: ogni sessione che mostra pagine web passa da `installa` o da `negaTutto`.
 
 'use strict';
@@ -21,6 +21,8 @@ const TIPI = {
   notifications: 'notifiche',
   'window-management': 'schermi',
   'idle-detection': 'presenza',
+  // Chrome chiede anche il MIDI senza sysex; Electron 44 ne manda la richiesta come midiSysex, il controllo come midi.
+  midi: 'strumenti',
   midiSysex: 'strumenti',
   'local-network-access': 'rete',
   'local-network': 'rete',
@@ -35,16 +37,18 @@ const SALVATAGGIO_MS = 60_000;
 // Ciò che Chrome concede di fabbrica passa senza domanda.
 const INNOCUI = new Set([
   'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'keyboardLock', 'mediaKeySystem',
-  'speaker-selection', 'storage-access', 'top-level-storage-access', 'midi',
+  'storage-access', 'top-level-storage-access',
   'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler', 'persistent-storage',
 ]);
-// Ciò che Filo non sa dare è no, senza domanda: condividere lo schermo e i dispositivi collegati vogliono una scelta
-// (quale finestra, quale dispositivo) che Filo non ha; realtà virtuale, NFC, stampa diretta e app web installate Filo non
+// Ciò che Filo non sa dare è no, senza domanda: i dispositivi collegati vogliono una scelta (quale dispositivo) che Filo
+// non ha (lo schermo si condivide da `chiediLoSchermo`, non da questo nome); realtà virtuale, NFC, stampa diretta e app web installate Filo non
 // le ha; e quello che Chrome lascia solo alle app installate (schermo intero senza gesto, sincronia periodica) qui non c'è.
+// L'uscita audio e i font del computer arrivano solo dal controllo, senza domanda: un sì darebbe a ogni sito i nomi delle
+// uscite (che seguono il sì al microfono) e l'elenco dei font installati, un'impronta uguale in ogni sito (#1524).
 const NON_DISPONIBILI = new Set([
   'display-capture', 'captured-surface-control', 'unknown', 'hid', 'serial', 'usb', 'smart-card', 'nfc', 'ar', 'vr',
   'hand-tracking', 'web-printing', 'web-app-installation', 'automatic-fullscreen', 'periodic-background-sync',
-  'system-wake-lock',
+  'system-wake-lock', 'speaker-selection', 'local-fonts',
 ]);
 // Il controllo dice sì solo dopo un sì vero: la lettura sincrona degli appunti non sa chiedere, le notifiche Electron le
 // mostra a chi il controllo dà per concesse, chi sa che sei al computer lo saprebbe senza domanda, e un file o una
@@ -53,9 +57,6 @@ const CONTROLLO_SOLO_COL_SI = new Set(['deprecated-sync-clipboard-read', 'notifi
 const SOLO_CONTROLLO = new Set(['deprecated-sync-clipboard-read']);
 // Notifiche: si chiedono solo subito dopo un gesto dell'utente sulla pagina.
 const DOPO_UN_GESTO = new Set(['notifications']);
-// I font del computer Electron non li fa chiedere (arriva solo il controllo): passano subito dopo un gesto sulla pagina,
-// che è anche quello che la pagina deve avere per leggerli.
-const COL_GESTO_SENZA_DOMANDA = new Set(['local-fonts']);
 const GESTO_MS = 5000;
 const GESTI = new Set(['mouseDown', 'mouseUp', 'rawKeyDown', 'keyDown', 'char', 'touchStart', 'touchEnd', 'gestureTap']);
 // Come in Chrome una finestra la apre l'inizio di un gesto: il rilascio dello stesso clic o il carattere dello stesso
@@ -67,9 +68,6 @@ const STESSO_GESTO_MS = 50;
 const CLIC_DI_FILO_MS = 1500;
 const APERTURA_SCELTA_MS = 2000;
 const TASTI_SENZA_GESTO = new Set(['Escape', 'Control', 'Shift', 'Alt', 'AltGraph', 'Meta', 'OS', 'Super', 'Hyper', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Symbol', 'SymbolLock']);
-const LASCIAPASSARE_MS = 5000;
-// Il lasciapassare di Detta copre il microfono e basta: con la fotocamera la pagina avrebbe un sì mai dato (#591, giro 18).
-const PARTI_LASCIAPASSARE = { media: new Set(['audio']), appunti: new Set(['appunti']) };
 // Solo le pagine di Filo sono Filo: ogni altro documento è una pagina web, anche un blob, un data: o un about:.
 const DI_FILO = new Set(['filo:', 'devtools:']);
 // Le risposte date nelle sessioni che restano su disco restano anche loro, come in Chrome; incognito e siti usa-e-getta no.
@@ -77,7 +75,6 @@ const CHIAVE_DISCO = 'sitePermissions';
 const sceltePersistenti = new Map();
 let disco = () => require('../shim/storage');
 
-const lasciapassari = new Map();
 const inAttesa = new Map();
 
 // Chi è un documento: Filo, o una pagina web con la sua origine. Un blob porta l'origine del sito che l'ha creato; una pagina
@@ -103,9 +100,25 @@ function urlDi(wc) {
 function origineDi(wc, altro) {
   const cima = urlDi(wc);
   const c = classifica(cima || altro);
+  // La finestra vuota che il sito apre (window.open) è del sito: l'indirizzo non lo dice, l'origine del suo frame sì.
+  if (!c.filo && !c.origine && (!cima || /^about:/i.test(cima))) {
+    let ereditata = null;
+    try { ereditata = origineWeb(wc.mainFrame.origin); } catch (_) {}
+    if (ereditata) return { origine: ereditata };
+  }
   if (!c.filo || !cima) return c;
   const r = classifica(altro);
   return r.origine ? r : c;
+}
+
+// Come in Chrome un riquadro di un altro sito non ha notifiche: non le chiede col nome del sito che lo ospita e non ne
+// eredita il sì (#586).
+const SOLO_DALLA_PAGINA = new Set(['notifications']);
+function riquadroDiAltri(wc, details, altro) {
+  const d = details || {};
+  if (d.isMainFrame !== false) return false;
+  const chi = origineWeb(d.requestingUrl || altro);
+  return !chi || chi !== origineWeb(urlDi(wc));
 }
 
 function tipoDi(permission, details) {
@@ -180,20 +193,6 @@ async function carica() {
   } catch (_) {}
 }
 
-function lasciapassareValido(wc, tipo, parti) {
-  const p = wc && lasciapassari.get(wc.id);
-  if (p && p.fino <= Date.now()) { lasciapassari.delete(wc.id); return false; }
-  if (!p || p.tipo !== tipo) return false;
-  const coperte = PARTI_LASCIAPASSARE[tipo];
-  return Boolean(coperte && parti.every((x) => coperte.has(x)));
-}
-
-function lasciapassare(wc, tipo) {
-  if (!wc || !PARTI_LASCIAPASSARE[tipo]) return false;
-  lasciapassari.set(wc.id, { tipo, fino: Date.now() + LASCIAPASSARE_MS });
-  return true;
-}
-
 function tastoDelMenu(input) {
   const type = input.type;
   if (type === 'mouseDown') return tastoPremuto(input) === 'right';
@@ -266,8 +265,23 @@ function seguiGesti(wc) {
 }
 
 function gestoRecente(wc) {
+  return gestoEntro(wc, GESTO_MS);
+}
+
+// Un clic o un tasto vero sulla pagina negli ultimi `ms`: il conto riparte a ogni navigazione della pagina intera.
+function gestoEntro(wc, ms) {
   const t = wc && wc._filoGestoAlle;
-  return Boolean(t && Date.now() - t < GESTO_MS);
+  return Boolean(t && Date.now() - t < ms);
+}
+
+// Il gesto di chi chiede: un clic dentro il riquadro di un altro sito non passa da `input-event` e lo riferisce il
+// preload di quel frame; vale per il riquadro toccato e i suoi antenati, come in Chromium (#586, il widget incorporato).
+function gestoPer(wc, chiede) {
+  if (gestoRecente(wc)) return true;
+  const t = gestoSullaScheda(wc);
+  if (!t || t <= (wc._filoGestoUsatoAlle || 0)) return false;
+  const chi = origineWeb(chiede) || origineWeb(urlDi(wc));
+  return Boolean(chi && wc._filoGestoOrigini && wc._filoGestoOrigini.has(chi));
 }
 
 // Il gesto per le finestre lo dice solo il preload del frame toccato, prima della pagina: il main vede
@@ -277,9 +291,10 @@ function gestoDellaPagina(wc, frame, tasto) {
   try {
     const daTastiera = Boolean(tasto && typeof tasto === 'object');
     // Il clic di Filo arriva al preload come quello del mouse; un tasto premuto intanto è dell'utente.
-    if (!wc || (!daTastiera && clicDiFiloInCorso(wc)) || (daTastiera && !tastoPerLaPagina(tasto))) return;
+    if (!wc || (!daTastiera && clicDiFiloInCorso(wc)) || (daTastiera && !tastoPerLaPagina(tasto))) return false;
     segnaGestoPerFinestra(wc, originiDelFrame(frame || wc.mainFrame, wc));
-  } catch (_) {}
+    return true;
+  } catch (_) { return false; }
 }
 
 // Come in Chromium il gesto attiva il frame che l'ha ricevuto e i suoi antenati, non i riquadri di altri siti che
@@ -344,12 +359,27 @@ function gestoDiFilo(wc) {
 // Ciò che l'utente ha scelto di aprire (il collegamento che ha cliccato, la voce del menu di Filo) si apre anche se la
 // pagina ha già speso il gesto per la sua pubblicità (#737.1 giro 6). Lo segna il preload su un input vero, prima
 // che la pagina apra: vale per quell'indirizzo, una volta, subito.
-function aperturaScelta(wc, url) {
+function aperturaScelta(wc, url, azione = null) {
   const u = indirizzoPieno(url);
   if (!wc || !u) return;
   const ora = Date.now();
   wc._filoAperture = (wc._filoAperture || []).filter((x) => x.fino > ora && x.url !== u).slice(-7);
-  wc._filoAperture.push({ url: u, fino: ora + APERTURA_SCELTA_MS });
+  // L'azione del menu che apre (#1461): solo un nome breve e un istante del minuto appena passato.
+  const t0 = azione && Number(azione.t0);
+  const a = azione && /^[a-z0-9][a-z0-9-]{0,59}$/.test(String(azione.id || '')) && Number.isFinite(t0) && t0 <= ora && ora - t0 < 60000
+    ? { id: String(azione.id), t0 } : null;
+  wc._filoAperture.push({ url: u, fino: ora + APERTURA_SCELTA_MS, azione: a });
+}
+
+// L'azione che l'apertura scelta porta con sé, una volta: chi apre la scheda la misura fino alla pagina caricata.
+function azioneDellApertura(wc, url) {
+  const u = indirizzoPieno(url);
+  const ora = Date.now();
+  const x = u && wc ? (wc._filoAperture || []).find((v) => v.url === u && v.fino > ora && v.azione) : null;
+  if (!x) return null;
+  const a = x.azione;
+  x.azione = null;
+  return a;
 }
 
 // La finestra che la pagina chiede passa se l'utente l'ha scelta o se arriva col gesto; la scelta spende anche il gesto,
@@ -363,6 +393,14 @@ function perUnaFinestra(wc, url, referrer) {
   const t = gestoSullaScheda(wc);
   if (t) wc._filoGestoUsatoAlle = Math.max(wc._filoGestoUsatoAlle || 0, t);
   return true;
+}
+
+// L'apertura che l'utente ha scelto dall'interfaccia di Filo sulla pagina (il tasto destro «Apri in nuova tab»), col suo
+// clic vero: per il rilevatore dei siti pericolosi vale come il clic sul link (#814).
+function sceltaDallUtente(wc, url) {
+  const u = indirizzoPieno(url);
+  const ora = Date.now();
+  return Boolean(u && wc && (wc._filoAperture || []).some((x) => x.url === u && x.fino > ora) && gestoDellUtente(wc));
 }
 
 function indirizzoPieno(url) {
@@ -380,6 +418,13 @@ function origineDelReferrer(referrer) {
   const u = referrer && typeof referrer === 'object' ? referrer.url : referrer;
   if (!u) return '';
   try { const o = new URL(String(u)).origin; return o && o !== 'null' ? o : ''; } catch (_) { return ''; }
+}
+
+// Un clic o un tasto vero sulla scheda, anche sull'interfaccia di Filo disegnata sopra la pagina: vale per ciò che Filo
+// apre su richiesta dell'utente (il rilevatore dei siti pericolosi, #814), mai per i permessi della pagina.
+function gestoDellUtente(wc) {
+  const t = wc && Math.max(wc._filoGestoAlle || 0, wc._filoGestoUiAlle || 0);
+  return Boolean(t && Date.now() - t < GESTO_MS);
 }
 
 // Il gesto vale anche per la navigazione che ha fatto partire, finché non arriva: un rinvio del sito resta del clic.
@@ -403,23 +448,26 @@ function nomeDaMostrare(origine) {
   return { sotto, dominio: registrabile + porta };
 }
 
-function chiudi(id, si, { ricorda }) {
+function chiudi(id, si, { ricorda, utente = false, fonte } = {}) {
   const p = inAttesa.get(id);
   if (!p) return false;
   inAttesa.delete(id);
+  if (utente && !si) segnaNegati(p.wc, p.origine, p.parti);
+  // Lo schermo si sceglie ogni volta: né il sì né il no restano.
+  if (p.tipo === 'schermo') ricorda = false;
   if (ricorda) {
     const scelte = sceltePer(p.ses);
     for (const parte of p.parti) scelte.set(`${p.origine}|${parte}`, Boolean(si));
     if (scelte === sceltePersistenti) salva();
   }
-  for (const cb of p.callbacks) { try { cb(Boolean(si)); } catch (_) {} }
+  for (const cb of p.callbacks) { try { cb(Boolean(si), fonte); } catch (_) {} }
   try { p.avvisa('fine', { id }); } catch (_) {}
   if (ricorda) {
     for (const [altro, q] of [...inAttesa]) {
-      if (q.ses !== p.ses || q.origine !== p.origine) continue;
+      if (q.ses !== p.ses || q.origine !== p.origine || q.tipo === 'schermo') continue;
       const decise = q.parti.map((parte) => sceltePer(q.ses).get(`${q.origine}|${parte}`));
       if (decise.every((x) => x === true)) chiudi(altro, true, { ricorda: false });
-      else if (decise.some((x) => x === false)) chiudi(altro, false, { ricorda: false });
+      else if (decise.some((x) => x === false)) chiudi(altro, false, { ricorda: false, utente: true });
     }
   }
   return true;
@@ -443,7 +491,7 @@ function seguiPagina(wc) {
 }
 
 // La domanda resta finché l'utente risponde o la pagina se ne va: una scadenza toglieva il sì a chi rispondeva con calma.
-function chiedi({ ses, wc, origine, tipo, parti, oggetto, callback, schedaDi }) {
+function chiedi({ ses, wc, origine, tipo, parti, oggetto, fonti, callback, schedaDi }) {
   const dove = schedaDi(wc);
   if (!dove || typeof dove.avvisa !== 'function') { callback(false); return; }
   for (const p of inAttesa.values()) {
@@ -455,19 +503,26 @@ function chiedi({ ses, wc, origine, tipo, parti, oggetto, callback, schedaDi }) 
   const { sotto, dominio } = nomeDaMostrare(origine);
   let host = origine;
   try { host = new URL(origine).host; } catch (_) {}
-  dove.avvisa('chiedi', { id, tabId: dove.tabId, host, sotto, dominio, tipo, parti, ...(oggetto ? { oggetto } : {}) });
+  dove.avvisa('chiedi', { id, tabId: dove.tabId, host, sotto, dominio, tipo, parti, ...(oggetto ? { oggetto } : {}), ...(fonti ? { fonti } : {}) });
 }
 
 // `schedaDi(wc)` → { tabId, avvisa(evento, dati) } della finestra che mostra la pagina, o null.
 // `esterno(url)` → true per gli indirizzi di altre applicazioni che una pagina può aprire (la stessa lista delle schede).
-function installa(ses, { schedaDi, prima, esterno } = {}) {
+function installa(ses, { schedaDi, prima, esterno, aggiorna } = {}) {
   if (!ses || ses._filoPermessi) return;
   ses._filoPermessi = true;
+  if (typeof aggiorna === 'function') aggiornaScheda = aggiorna;
+  try {
+    if (typeof ses.setDisplayMediaRequestHandler === 'function') {
+      ses.setDisplayMediaRequestHandler((_req, cb) => gestoreSchermo(ses, cb));
+    }
+  } catch (_) {}
   try {
     ses.setPermissionRequestHandler(ses._filoRichiesta = (wc, permission, callback, details) => {
       if (typeof prima === 'function' && prima(wc, permission, callback, details)) return;
       const chi = origineDi(wc, details && details.requestingUrl);
       if (chi.filo) { callback(true); return; }
+      if (SOLO_DALLA_PAGINA.has(permission) && riquadroDiAltri(wc, details)) { callback(false); return; }
       const origine = chi.origine;
       if (!origine) { callback(false); return; }
       if (permission === 'openExternal') {
@@ -477,35 +532,198 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
       }
       const tipo = tipoDi(permission, details);
       if (!tipo) { callback(senzaTipoPassa(permission)); return; }
-      // Una richiesta di media senza microfono né fotocamera è la condivisione dello schermo, che Filo non sa dare.
-      if (tipo === 'media' && !partiNote(details).length) { callback(false); return; }
+      // Una richiesta di media senza microfono né fotocamera è lo schermo.
+      if (tipo === 'media' && !partiNote(details).length) {
+        chiediLoSchermo({ ses, wc, origine, chiede: details && details.requestingUrl, callback, schedaDi: schedaDi || (() => null) });
+        return;
+      }
       const parti = partiDi(tipo, details);
-      if (lasciapassareValido(wc, tipo, parti)) { callback(true); return; }
       const decise = parti.map((parte) => sceltePer(ses).get(`${origine}|${parte}`));
-      if (decise.every((x) => x === true)) { callback(true); return; }
-      if (decise.some((x) => x === false) || SOLO_CONTROLLO.has(permission)) { callback(false); return; }
-      if (DOPO_UN_GESTO.has(permission) && !gestoRecente(wc)) { callback(false); return; }
-      chiedi({ ses, wc, origine, tipo, parti, oggetto: oggettoDi(tipo, details), callback, schedaDi: schedaDi || (() => null) });
+      if (decise.every((x) => x === true)) { segnaUsati(wc, origine, parti); callback(true); return; }
+      if (decise.some((x) => x === false)) { segnaNegati(wc, origine, parti.filter((_, i) => decise[i] === false)); callback(false); return; }
+      if (SOLO_CONTROLLO.has(permission)) { callback(false); return; }
+      if (DOPO_UN_GESTO.has(permission) && !gestoPer(wc, details && details.requestingUrl)) { callback(false); return; }
+      const risposta = (si) => { if (si) segnaUsati(wc, origine, parti); callback(si); };
+      chiedi({ ses, wc, origine, tipo, parti, oggetto: oggettoDi(tipo, details), callback: risposta, schedaDi: schedaDi || (() => null) });
     });
   } catch (_) {}
   try {
-    // «Posso?» risponde sì finché l'utente non ha detto no: un «negato» qui farebbe credere al sito che non valga la pena chiedere.
+    // «Posso?» risponde sì finché l'utente non ha detto no: un «negato» qui farebbe credere al sito che non valga la pena
+    // chiedere. Nella pagina quel sì senza risposta si legge «da chiedere» (`siDato`).
     ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
-      const chi = origineDi(wc, (details && details.requestingUrl) || requestingOrigin);
+      const d = details || {};
+      // securityOrigin lo porta solo l'elenco dei dispositivi, ed è il frame che lo legge: requestingUrl lì è la pagina.
+      const chi = origineDi(wc, d.securityOrigin || d.requestingUrl || requestingOrigin);
       if (chi.filo) return true;
+      if (SOLO_DALLA_PAGINA.has(permission) && riquadroDiAltri(wc, details, requestingOrigin)) return false;
       const origine = chi.origine;
       if (!origine) return false;
-      if (COL_GESTO_SENZA_DOMANDA.has(permission)) return gestoRecente(wc);
+      // Col sì qui Chromium mette nell'elenco dei dispositivi i nomi veri di microfoni, fotocamere e uscite audio, uguali in
+      // ogni sito (#1524): come in Chrome solo dopo un sì vero a quella parte. permissions.query arriva senza securityOrigin.
+      if (permission === 'media' && d.securityOrigin) {
+        const noti = partiNote(d);
+        return noti.length > 0 && noti.every((parte) => sceltePer(ses).get(`${origine}|${parte}`) === true);
+      }
       const tipo = tipoDi(permission, details);
       if (!tipo) return senzaTipoPassa(permission);
       if (tipo === 'file') segnaFile(ses, origine, details);
       const parti = partiDi(tipo, details);
-      if (lasciapassareValido(wc, tipo, parti)) return true;
       const decise = parti.map((parte) => sceltePer(ses).get(`${origine}|${parte}`));
       if (CONTROLLO_SOLO_COL_SI.has(permission)) return decise.every((x) => x === true) || (tipo === 'file' && salvataggio(ses, origine, details));
       return !decise.some((x) => x === false);
     });
   } catch (_) {}
+}
+
+// ── Lo schermo (#586): ogni volta l'utente sceglie cosa mostrare, e la scelta non si ricorda ──
+// Prima si sceglie, poi si dice sì: Chromium chiama il gestore dello schermo DENTRO il sì a getDisplayMedia, e lì
+// consegna la scelta. La strada vecchia (getUserMedia con chromeMediaSource) arriva con gli stessi dati ma non passa
+// dal gestore e prenderebbe schermo intero e audio senza scelta. Di solito la pagina la gira su getDisplayMedia e avvisa
+// (preload/schermo-vecchio.js, anche nei riquadri vuoti: riquadri-vuoti.js): dopo la scelta riceve no. Chi lo aggira si
+// ferma prima di riceverli.
+const ANTEPRIMA_SCHERMO = { width: 240, height: 135 };
+
+// Il frame avvisa che la sua prossima domanda dello schermo viene dalla strada vecchia: dopo la scelta la risposta è no.
+// L'avviso vale per l'origine che lo manda: un riquadro di un altro sito non fa negare la domanda della pagina (#586).
+function schermoVecchio(wc, frame) {
+  if (!wc) return;
+  let chi = null;
+  try { chi = frame && (origineWeb(frame.url) || origineWeb(frame.origin)); } catch (_) {}
+  chi = chi || origineWeb(urlDi(wc));
+  if (!chi) return;
+  const ora = Date.now();
+  wc._filoSchermoVecchio = (wc._filoSchermoVecchio || []).filter((v) => ora - v.alle < GESTO_MS && v.origine !== chi).slice(-15);
+  wc._filoSchermoVecchio.push({ origine: chi, alle: ora });
+}
+
+function avvisoVecchio(wc, chiede, origine) {
+  const chi = origineWeb(chiede) || origine;
+  const ora = Date.now();
+  const tutti = (wc && wc._filoSchermoVecchio) || [];
+  const mio = tutti.find((v) => v.origine === chi && ora - v.alle < GESTO_MS);
+  if (wc) wc._filoSchermoVecchio = tutti.filter((v) => v !== mio && ora - v.alle < GESTO_MS);
+  return Boolean(mio);
+}
+
+function chiediLoSchermo({ ses, wc, origine, chiede, callback, schedaDi }) {
+  const vecchia = avvisoVecchio(wc, chiede, origine);
+  if (!gestoPer(wc, chiede) || [...inAttesa.values()].some((p) => p.wc === wc && p.tipo === 'schermo')) { callback(false); return; }
+  Promise.resolve(fontiDelloSchermo(ses)).then((fonti) => {
+    if (!fonti.length || !wc || wc.isDestroyed()) { callback(false); return; }
+    const pubbliche = fonti.map(({ id, tipo, nome, anteprima, scheda }) => ({ id, tipo, nome, anteprima, ...(scheda === wc ? { questa: true } : {}) }));
+    chiedi({
+      ses, wc, origine, tipo: 'schermo', parti: ['schermo'], fonti: pubbliche, schedaDi,
+      callback: (si, id) => {
+        const f = si && !vecchia ? fonti.find((x) => x.id === id) : null;
+        const video = !f ? null : f.scheda ? (f.scheda.isDestroyed() ? null : f.scheda.mainFrame) : f.sorgente;
+        if (!video) { callback(false); return; }
+        const atteso = { video, preso: false };
+        ses._filoSchermoAtteso = atteso;
+        try { callback(true); } finally { ses._filoSchermoAtteso = null; }
+        if (!atteso.preso) { fermaLaStradaVecchia(wc); return; }
+        segnaUsati(wc, origine, ['schermo']);
+      },
+    });
+  }, () => callback(false));
+}
+
+function fermaLaStradaVecchia(wc) {
+  try { if (wc && !wc.isDestroyed()) wc.forcefullyCrashRenderer(); } catch (_) {}
+}
+
+function gestoreSchermo(ses, cb) {
+  const atteso = ses._filoSchermoAtteso;
+  ses._filoSchermoAtteso = null;
+  try {
+    if (!atteso) { cb({}); return; }
+    atteso.preso = true;
+    cb({ video: atteso.video });
+  } catch (_) {}
+}
+
+// Schermi, schede di Filo della stessa sessione (l'incognito non si mostra fuori) e finestre delle altre applicazioni.
+let fontiDelloSchermo = async (ses) => {
+  const { desktopCapturer, BrowserWindow } = require('electron');
+  // Schermi e finestre si chiedono a parte: su Linux, a richiesta in corso, la lista insieme tornava vuota.
+  const elenco = (tipo) => Promise.resolve(desktopCapturer.getSources({ types: [tipo], thumbnailSize: ANTEPRIMA_SCHERMO })).catch(() => []);
+  const lista = (await Promise.all([elenco('screen'), elenco('window')])).flat();
+  const anteprima = (img) => { try { return img && !img.isEmpty() ? img.toDataURL() : ''; } catch (_) { return ''; } };
+  const out = [];
+  const schermi = lista.filter((f) => String(f.id).startsWith('screen:'));
+  schermi.forEach((f, i) => out.push({
+    id: f.id, tipo: 'schermo', nome: schermi.length > 1 ? `Schermo ${i + 1}` : 'Schermo intero', anteprima: anteprima(f.thumbnail), sorgente: f,
+  }));
+  const proprie = new Set();
+  for (const w of BrowserWindow.getAllWindows()) {
+    try { proprie.add(w.getMediaSourceId()); } catch (_) {}
+    const tm = w._filoTabs;
+    if (!tm || !Array.isArray(tm.tabs)) continue;
+    for (const t of tm.tabs) {
+      const c = t && t.view && t.view.webContents;
+      if (!c || c.isDestroyed() || c.session !== ses || !origineWeb(urlDi(c))) continue;
+      let nome = String(t.title || '').trim();
+      if (!nome) { try { nome = new URL(urlDi(c)).host; } catch (_) { nome = 'Scheda'; } }
+      out.push({ id: `scheda:${t.id}`, tipo: 'scheda', nome, anteprima: '', scheda: c });
+    }
+  }
+  for (const f of lista) {
+    if (!String(f.id).startsWith('window:') || proprie.has(f.id) || !String(f.name || '').trim()) continue;
+    out.push({ id: f.id, tipo: 'finestra', nome: String(f.name), anteprima: anteprima(f.thumbnail), sorgente: f });
+  }
+  return out;
+};
+
+// ── Il segno sulla scheda (#586): cosa il sito della pagina ha avuto o si è visto negare, finché resta quella pagina ──
+// Lo stato vero di una traccia vive nella pagina: qui si sa cosa le è stato consegnato. Una pagina nuova riparte da zero.
+const IN_USO = new Set(['audio', 'video', 'posizione', 'schermo']);
+let aggiornaScheda = () => {};
+
+function segniPer(wc, origine) {
+  if (!wc || wc.isDestroyed()) return null;
+  if (!wc._filoSegni || wc._filoSegni.origine !== origine) {
+    wc._filoSegni = { origine, usati: new Set(), negati: new Set() };
+    if (!wc._filoSegniSeguiti) {
+      wc._filoSegniSeguiti = true;
+      try {
+        wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
+          const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
+          const stessa = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
+          if (!principale || stessa || !wc._filoSegni) return;
+          wc._filoSegni = null;
+          try { aggiornaScheda(wc); } catch (_) {}
+        });
+      } catch (_) {}
+    }
+  }
+  return wc._filoSegni;
+}
+
+function segnaUsati(wc, origine, parti) {
+  const s = origine && origineWeb(urlDi(wc)) === origine ? segniPer(wc, origine) : null;
+  if (!s) return;
+  let cambiato = false;
+  for (const p of parti) {
+    if (s.negati.delete(p)) cambiato = true;
+    if (IN_USO.has(p) && !s.usati.has(p)) { s.usati.add(p); cambiato = true; }
+  }
+  if (cambiato) { try { aggiornaScheda(wc); } catch (_) {} }
+}
+
+function segnaNegati(wc, origine, parti) {
+  const s = origine && origineWeb(urlDi(wc)) === origine ? segniPer(wc, origine) : null;
+  if (!s) return;
+  let cambiato = false;
+  for (const p of parti) if (!s.negati.has(p) && !s.usati.has(p)) { s.negati.add(p); cambiato = true; }
+  if (cambiato) { try { aggiornaScheda(wc); } catch (_) {} }
+}
+
+// Per la riga della scheda: null quando non c'è niente da dire.
+function segniDi(wc) {
+  try {
+    const s = wc && !wc.isDestroyed() && wc._filoSegni;
+    if (!s || s.origine !== origineWeb(urlDi(wc)) || (!s.usati.size && !s.negati.size)) return null;
+    return { usati: [...s.usati], negati: [...s.negati] };
+  } catch (_) { return null; }
 }
 
 // Per la finestra nascosta del controllo profondo: nessuno può rispondere, quindi no a tutto.
@@ -514,6 +732,7 @@ function negaTutto(ses) {
   try {
     if (typeof ses.setPermissionRequestHandler === 'function') ses.setPermissionRequestHandler((_wc, _p, callback) => callback(false));
     if (typeof ses.setPermissionCheckHandler === 'function') ses.setPermissionCheckHandler(() => false);
+    if (typeof ses.setDisplayMediaRequestHandler === 'function') ses.setDisplayMediaRequestHandler((_req, cb) => cb({}));
     ses._filoPermessiNegati = true;
   } catch (_) {}
 }
@@ -532,8 +751,8 @@ function chiediScrittura(wc) {
   });
 }
 
-function rispondi(id, si) {
-  return chiudi(id, si, { ricorda: true });
+function rispondi(id, si, fonte) {
+  return chiudi(id, si, { ricorda: true, utente: true, fonte: typeof fonte === 'string' ? fonte : undefined });
 }
 
 // Quello che l'utente ha deciso per il sito di una pagina: si vede e si toglie dal menu della scheda.
@@ -556,6 +775,7 @@ function dimentica(wc) {
   const mappa = sceltePer(wc.session);
   for (const s of scelte) mappa.delete(`${origine}|${s.parte}`);
   if (mappa === sceltePersistenti) salva();
+  if (wc._filoSegni && wc._filoSegni.negati.size) { wc._filoSegni.negati.clear(); try { aggiornaScheda(wc); } catch (_) {} }
   return { tolte: scelte.length, ricarica: scelte.some((s) => s.si || s.parte === 'notifiche') };
 }
 
@@ -635,10 +855,19 @@ function statoNotifiche(ses, url) {
   return scelta === true ? 'granted' : scelta === false ? 'denied' : 'default';
 }
 
+// Il controllo di Chromium dice concessi fotocamera, microfono, posizione e strumenti musicali anche a chi nessuno ha
+// risposto: la pagina li legge «da chiedere» finché qui non c'è un sì (preload/stato-permessi.js, #1057).
+const PARTI_CON_SI = new Set(['audio', 'video', 'posizione', 'strumenti']);
+function siDato(ses, url, parte) {
+  const origine = origineWeb(url);
+  return Boolean(origine && ses && PARTI_CON_SI.has(parte) && sceltePer(ses).get(`${origine}|${parte}`) === true);
+}
+
 module.exports = {
-  installa, negaTutto, rispondi, lasciapassare, seguiGesti, gestoRecente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche,
-  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
-  gestoDiFilo, aperturaScelta, perUnaFinestra, chiediScrittura,
-  TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
+  installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
+  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
+  gestoDiFilo, aperturaScelta, azioneDellApertura, perUnaFinestra, sceltaDallUtente, chiediScrittura,
+  TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
+  _usaFontiSchermo: (f) => { fontiDelloSchermo = f; },
 };

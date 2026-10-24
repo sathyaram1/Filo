@@ -1,29 +1,12 @@
-// Macchina a stati dei feedback — le TABELLE, promosse a DATI.
-//
-// FONTE DI VERITÀ SINGOLA (SPEC-RIDISEGNO-MAX.md §7): queste tabelle vivevano
-// in DUE copie a mano — la dashboard qui, il server in filo-security — e due
-// copie che divergono sono peggio di una sola permissiva: la dashboard mostra
-// una regola e il server ne applica un'altra. Da qui in avanti:
-//   - la dashboard le LEGGE da questo file (via src/shared/feedbackStatus.js,
-//     che espone l'API canTransition/canReach/… e resta identico per i
-//     chiamanti);
-//   - il server le INCORPORA AL DEPLOY: filo-security/functions/tools/
-//     bake-shared.js legge questo file dal checkout pubblico e genera
-//     functions/src/routine/stateMachine.data.js. Il comportamento del server
-//     cambia solo al rideploy, che è lo stesso livello di fiducia di prima.
-//
-// SOLO DATI: niente funzioni, niente stato. Le funzioni stanno in
-// feedbackStatus.js (dashboard) e stateMachine.js (server).
-//
-// Pattern IIFE su globalThis: vedi CLAUDE.md → convenzione dei moduli shared.
+// Macchina a stati dei feedback: le TABELLE come DATI, fonte di verità singola.
+// La dashboard le legge via feedbackStatus.js; il server le INCORPORA al deploy,
+// quindi cambia comportamento solo al rideploy. SOLO DATI: le funzioni stanno altrove.
 
 (function (global) {
   'use strict';
 
-  // ── Stati canonici (lista CHIUSA — FEEDBACK-STATES.md §2) ──────────────────
-  // L'ordine è quello storico della tabella; la presentazione (tab, colori,
-  // etichette) resta in feedbackStatus.js, che verifica di coprire ESATTAMENTE
-  // questa lista.
+  // Stati canonici, lista CHIUSA (FEEDBACK-STATES.md §2).
+  // La presentazione sta in feedbackStatus.js, che verifica di coprire ESATTAMENTE questa.
   const STATUSES = [
     'unlabeled', 'suspicious_file', 'attack', 'spam', 'design', 'aligned',
     'todo', 'working', 'revision_capability', 'revision_security', 'done',
@@ -85,6 +68,9 @@
       working:  ['routine'], // presa in carico (il semaforo lo tiene il server)
       design:   ['routine'], // la routine ha domande → chat + statusReason clarify
       archived: ['owner'],   // un doppione, o una cosa che non si farà più
+      // Il worker che l'ha letto da vicino lo giudica attacco o spam (statusReason worker): Ricevuti L3 (#1358).
+      attack:   ['routine'],
+      spam:     ['routine'],
       // NB: il passo diretto todo→done (attore routine) è stato RITIRATO col
       // ridisegno (SPEC-RIDISEGNO-MAX.md §1): esisteva per il pianificatore che
       // spezzava le spec in sotto-feedback, che non esiste più. Le chiusure
@@ -94,15 +80,19 @@
     working: {
       revision_capability: ['routine'], // fix pronto su branch
       design:              ['routine'], // domande a metà lavorazione
-      // Arenato: il ramo non avanza da un'ora → il pacemaker lo rimette in coda
-      // da solo (FEEDBACK-STATES.md §6a). Alla terza volta va in `design`.
+      // Arenato: il ramo fermo da un'ora torna in coda da solo (FEEDBACK-STATES.md §6a).
+      // Alla terza volta va in `design`.
       todo:                ['routine'],
       archived:            ['owner'],
+      attack:              ['routine'],
+      spam:                ['routine'],
     },
     revision_capability: {
       revision_security: ['routine'], // PASS verifica comportamentale
       design:            ['routine'], // fail cap raggiunto → statusReason loop
       archived:          ['owner'],
+      attack:            ['routine'],
+      spam:              ['routine'],
     },
     revision_security: {
       done:     ['routine'], // PASS secaudit + merge-gate fonde su main
@@ -115,6 +105,8 @@
       // sul contenuto nuovo. Senza questa riga il giro di riallineamento
       // moriva alla consegna: la macchina rifiutava il rientro.
       revision_capability: ['routine'],
+      attack:              ['routine'],
+      spam:                ['routine'],
     },
     done: {
       archived: ['owner'],  // verifica umana ok
@@ -131,26 +123,8 @@
     },
   };
 
-  // ── statusPublic (S1.F2.1): enum grossolano IN CHIARO ──────────────────────
-  // Sta accanto allo status fine (eventualmente cifrato).
-  // ⚠️ SICUREZZA: tutti gli stati "beccati" (attack/spam/suspicious_file e i
-  // confermati) DEVONO collassare sugli stessi valori dei feedback normali —
-  // mai un valore distinto, o chi legge Firestore senza chiave riconosce un
-  // attacco intercettato e fa hill-climbing.
-  //
-  // MA NON BASTA COLLASSARE: conta SU QUALE valore (#476). I confermati stavano
-  // su 'closed', lo stesso dei risolti — che di per sé non dice niente, se non
-  // fosse che 'closed' non è un'etichetta passiva: è il grilletto di due cose
-  // che l'attaccante VEDE.
-  //   1. il popup delle ricompense premia i feedback 'closed' → chi manda un
-  //      attacco riceve 50 crediti e la notifica "risolto";
-  //   2. la sanificazione per la bacheca pubblica lavora i feedback 'closed' →
-  //      il feedback dell'attaccante finisce in vetrina (a pagamento).
-  // Cioè gli confermavamo il colpo, e lo pagavamo pure.
-  //
-  // I confermati stanno quindi su 'open': per chi li ha mandati restano per
-  // sempre "in lavorazione", che è il silenzio. Nessun valore nuovo — quello
-  // sarebbe di nuovo un segnale, solo con un altro nome.
+  // SICUREZZA: gli stati «beccati» DEVONO collassare sui valori dei feedback normali, o chi
+  // legge senza chiave fa hill-climbing. Su 'open', mai 'closed' (premia) né un valore nuovo.
   const PUBLIC_MAP = {
     unlabeled: 'open', suspicious_file: 'open', attack: 'open', spam: 'open',
     design: 'open', aligned: 'open', todo: 'open', working: 'open',
@@ -159,12 +133,8 @@
     attack_confirmed: 'open', spam_confirmed: 'open',
   };
 
-  // ── Lunghezza fissa dello status cifrato (#476) ────────────────────────────
-  // La cifratura non imbottisce: contare i caratteri del campo cifrato equivale
-  // a leggerlo. Prima di cifrare, lo status va portato a questa lunghezza fissa
-  // con spazi in coda (padForCipher in feedbackStatus.js / stateMachine.js).
-  // La misura è larga: tiene i canonici (il più lungo è 19), i legacy ritirati
-  // e spazio per stati futuri. Cambiarla NON rompe i documenti già scritti.
+  // Lunghezza fissa dello status cifrato (#476): la cifratura non imbottisce, e contare i
+  // caratteri equivale a leggerlo. La misura è larga apposta e cambiarla non rompe i vecchi.
   const CIPHER_PAD = 32;
 
   // ── I quattro bilanci dei giri di correzione (feedback #561, §4) ────────

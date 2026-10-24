@@ -363,6 +363,8 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-chat-msg { font-size: 12px; padding: 6px 9px; border-radius: 10px; max-width: 92%; white-space: pre-wrap; }
 .ed-chat-msg.user { align-self: flex-end; background: var(--sn-accent); color: #fff; }
 .ed-chat-msg.assistant { align-self: flex-start; background: var(--sn-bg); border: 1px solid var(--sn-border); }
+/* La risposta non è arrivata: la frase dice perché, e si distingue da una risposta (#663). */
+.ed-chat-msg.assistant.errore { color: var(--sn-error); }
 /* Risposta pagata coi crediti di Filo (chiave dell'utente rifiutata): non è un errore, è una nota. */
 .ed-chat-note { align-self: flex-start; font-size: 11px; font-style: italic; color: var(--sn-muted); padding: 0 9px; }
 .ed-chat-continua {
@@ -372,10 +374,11 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-chat-continua:hover { background: var(--sn-hover); }
 .ed-chat-input { display: flex; gap: 4px; align-items: flex-end; --sn-voce-size: 30px; --sn-voce-ink: var(--sn-muted); }
 .ed-chat-input .sn-voce-btn { margin-bottom: 2px; }
-/* Cresce col testo (anche il suggerimento, a capo col microfono accanto) fino allo spazio del modulo meno
-   qualche riga di conversazione: un tetto fisso, con un font largo, scorreva sopra un registro vuoto. */
+/* Cresce col testo: quattro righe finché sopra resta una riga di conversazione, in una chat alta tutto meno qualche
+   riga; oltre scorre. Tasti messi sotto contati: in una chat bassa vincono microfono e invio interi (owner, #256.4). */
 .ed-chat-input textarea {
-  flex: 1 1 auto; resize: none; field-sizing: content; min-height: 34px; max-height: max(84px, calc(100cqh - 72px));
+  flex: 1 1 auto; resize: none; field-sizing: content; min-height: 34px;
+  max-height: max(34px, min(84px, calc(100cqh - 28px - var(--ed-chat-tasti, 0px))), calc(100cqh - 72px - var(--ed-chat-tasti, 0px)));
   overflow-y: auto; scrollbar-width: thin; padding: 7px 8px; line-height: 1.4;
   border: 1px solid var(--sn-border); border-radius: 8px;
   background: var(--sn-bg); color: var(--sn-fg); font-size: 12px;
@@ -385,6 +388,14 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-chat-input button[data-chat="send"] {
   flex: 0 0 auto; height: 34px; padding: 0 10px; border: none; border-radius: 8px;
   background: var(--sn-accent); color: #fff; cursor: pointer; font-size: 12px;
+}
+/* Tasti sotto, a destra, e la casella su tutta la riga: sempre in una chat stretta (accanto teneva due parole spezzate
+   a metà), e quando sotto la richiesta si legge intera e accanto no (la regola sta nel modulo chat dell'editor). */
+.ed-chat-input.ed-chat-sotto { flex-wrap: wrap; justify-content: flex-end; --ed-chat-tasti: 38px; }
+.ed-chat-input.ed-chat-sotto textarea { flex-basis: 100%; }
+@container (max-width: 180px) {
+  .ed-chat-input { flex-wrap: wrap; justify-content: flex-end; --ed-chat-tasti: 38px; }
+  .ed-chat-input textarea { flex-basis: 100%; }
 }
 
 .ed-settings-mod {

@@ -15,6 +15,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGE = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Sito con CSP (tipo YouTube/Reddit)</h1>
@@ -54,7 +55,7 @@ async function findPageByPort(app, port) {
 
 async function assertStyledMenu(page) {
   await page.locator('#p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   // Il punto chiave: lo stile DEVE essere applicato anche con la CSP attiva.
   const style = await menu.evaluate((el) => {

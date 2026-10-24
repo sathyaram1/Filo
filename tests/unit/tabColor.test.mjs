@@ -314,10 +314,10 @@ test('ordine: con saturazione_tab a 0 una scheda rossa e una blu restano rosso, 
   assert.deepEqual(ordina([{ n: 'blu', c: blu }, { n: 'rosso', c: rosso }]), ['rosso', 'blu']);
 });
 
-test('la barra e la Cronologia ordinano con la stessa funzione, senza una copia propria', async () => {
+test('la barra ordina con la funzione condivisa, senza una copia propria', async () => {
   const { readFile } = await import('node:fs/promises');
   const radice = join(__dirname, '..', '..', 'src');
-  for (const f of [join(radice, 'main', 'tabs.js'), join(radice, 'pages', 'archive', 'archive.js')]) {
+  for (const f of [join(radice, 'main', 'tabs.js')]) {
     const src = await readFile(f, 'utf8');
     assert.match(src, /compareRainbow\(/, f);
     assert.doesNotMatch(src, /function hueOf\b/, f);

@@ -129,12 +129,12 @@
   function piuStretta(a, b) { return PESO[a] >= PESO[b] ? a : b; }
 
   // Ingressi: livello, stato ('pulito'|'contaminato'), costo 0-3, dentroPerimetro, origine ('chat'|'automazione'),
-  // campo, manopole; più elenco (id dell'elenco fisso colpito) e difesa (l'azione abbassa una difesa), che
-  // dichiara chi conosce l'azione. `guardiano` dice se il guardiano di uscita c'è.
+  // campo, manopole; più elenco (id dell'elenco fisso colpito), difesa (l'azione abbassa una difesa) e parola
+  // (l'azione vuole «conferma» a ogni livello), che dichiara chi conosce l'azione. `guardiano` dice se il guardiano di uscita c'è.
   // Esce { risposta, digita, regola, cella }: risposta fra RISPOSTE, digita = va scritta la parola «conferma».
   function decideDettaglio({
     livello, stato: st, costo, dentroPerimetro = true, origine = 'chat', campo = null,
-    manopole = null, elenco = '', difesa = false, guardiano = false,
+    manopole = null, elenco = '', difesa = false, parola = false, guardiano = false,
   } = {}) {
     const lv = livelloDa(livello);
     if (!costoValido(costo)) return { risposta: 'no', digita: false, regola: 'costo', cella: 'no' };
@@ -151,6 +151,7 @@
       else cella = TABELLA[lv].contaminato[c] === 'si' ? 'si+G' : TABELLA[lv].contaminato[c];
     }
     if (difesa && PESO[cella] < PESO.conferma) { cella = 'conferma'; regola = 'difesa'; }
+    if (parola && PESO[cella] < PESO.conferma) { cella = 'conferma'; regola = 'parola'; }
     let risposta = cella;
     if (risposta === 'si+G') risposta = guardiano ? 'si' : 'chiede';
     let digita = risposta === 'conferma';
@@ -281,6 +282,7 @@
     password: 'una password',
     codice: 'un codice usa e getta o di recupero',
     banca: 'delle coordinate bancarie che non mi hai chiesto di mandare',
+    dati: 'dati tuoi dentro un indirizzo che ho scritto io e che non compare da nessuna parte',
   });
 
   // La frase che il popup aggiunge quando a farlo chiedere è ciò che il compito ha letto.

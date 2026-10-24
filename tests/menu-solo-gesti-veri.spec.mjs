@@ -5,10 +5,11 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { statoCronologia, testiCronologia } from './helpers/cronologiaAppunti.mjs';
 import { conta } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SEGRETO = 'pw-Segreta-589-otto';
 
-// Lo script del sito: tutto ciò che fa lo fa da sé, dentro il clic dell'utente su un suo pulsante.
+// Lo script del sito: tutto ciò che fa lo fa da sé, dentro il clic dell'utente su un suo pulsante. menu-dal-sito
 const ATTACCO = `
   window.__visti = [];
   new MutationObserver((ms) => {
@@ -85,7 +86,7 @@ test('il clic su un pulsante del sito non gli basta per aprire il menu e leggere
 
   // Il tasto destro dell'utente, sulla stessa pagina, apre il menu come sempre.
   await page.locator('#campo').click({ button: 'right' });
-  await expect(page.locator('.sn-menu').first()).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible();
 });
 
 test('a menu aperto dall\'utente il sito non preme Incolla né la freccia; la cronologia la vede e la incolla solo l\'utente', async ({ app, shell, openTab, testServer }) => {
@@ -95,7 +96,7 @@ test('a menu aperto dall\'utente il sito non preme Incolla né la freccia; la cr
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
 
   await page.locator('#campo').click({ button: 'right' });
-  await expect(page.locator('.sn-menu-paste-arrow')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu-paste-arrow')).toBeVisible();
   expect(await page.evaluate(() => window.freccia())).toBe(true);
   expect(await page.evaluate(() => window.incolla())).toBe(true);
   await page.waitForTimeout(800);
@@ -103,8 +104,8 @@ test('a menu aperto dall\'utente il sito non preme Incolla né la freccia; la cr
   expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
 
   // L'utente passa sulla freccia: la cronologia c'è, e il sito non la legge da nessuna parte.
-  if (!(await page.locator('.sn-menu-paste-arrow').isVisible())) await page.locator('#campo').click({ button: 'right' });
-  await page.locator('.sn-menu-paste-arrow').hover();
+  if (!(await menuDi(page).locator('.sn-menu-paste-arrow').isVisible())) await page.locator('#campo').click({ button: 'right' });
+  await menuDi(page).locator('.sn-menu-paste-arrow').hover();
   await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
   expect(await page.evaluate(() => window.cosaVede())).not.toContain(SEGRETO);
   expect(await page.evaluate(() => [...document.querySelectorAll('[data-sn-ui]')].some((el) => el.shadowRoot))).toBe(false);
@@ -122,23 +123,23 @@ test('il sito non preme Incolla, la freccia o Detta spostandoli fuori dal menu c
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
   const apri = async (sel) => {
     await page.locator('#campo').click({ button: 'right' });
-    await expect(page.locator(sel).first()).toBeVisible();
+    await expect(menuDi(page).locator(sel).first()).toBeVisible();
   };
 
   await apri('.sn-menu-paste-main');
-  expect(await page.evaluate(() => window.sposta('.sn-menu-paste-main'))).toBe(true);
+  expect(await page.evaluate(() => window.sposta('.sn-menu-paste-main'))).toBe(true); // menu-dal-sito
   await page.waitForTimeout(800);
   expect(await page.locator('#campo').inputValue(), 'il sito non si incolla gli appunti da solo').not.toContain(SEGRETO);
 
   await page.keyboard.press('Escape');
   await apri('.sn-menu-paste-arrow');
-  expect(await page.evaluate(() => window.sposta('.sn-menu-paste-arrow'))).toBe(true);
+  expect(await page.evaluate(() => window.sposta('.sn-menu-paste-arrow'))).toBe(true); // menu-dal-sito
   await page.waitForTimeout(800);
   expect(await statoCronologia(app, page), 'la freccia premuta dal sito non apre la cronologia').toBeNull();
 
   await page.keyboard.press('Escape');
   await apri('.sn-menu-split-main');
-  expect(await page.evaluate(() => window.sposta('.sn-menu-split-main'))).toBe(true);
+  expect(await page.evaluate(() => window.sposta('.sn-menu-split-main'))).toBe(true); // menu-dal-sito
   await page.waitForTimeout(800);
   const visto = await page.evaluate(() => document.documentElement.innerText);
   expect(visto, 'il sito non accende il microfono da solo').not.toMatch(/Ti ascolto|Microfono/);
@@ -147,7 +148,7 @@ test('il sito non preme Incolla, la freccia o Detta spostandoli fuori dal menu c
   await page.keyboard.press('Escape');
   await page.locator('#campo').fill('');
   await apri('.sn-menu-paste-main');
-  await page.locator('.sn-menu .sn-menu-paste-main').first().click();
+  await menuDi(page).locator('.sn-menu .sn-menu-paste-main').first().click();
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
 });
 
@@ -155,7 +156,7 @@ test('il sito non preme Incolla nemmeno nell\'istante in cui il menu entra nella
   await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
   const page = await testServer.openReady(openTab, PAGINA);
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
-  // Un osservatore del sito creato prima di quelli di Filo viene avvisato per primo.
+  // Un osservatore del sito creato prima di quelli di Filo viene avvisato per primo. menu-dal-sito
   await page.evaluate(() => {
     new MutationObserver(() => {
       const b = document.querySelector('.sn-menu .sn-menu-paste-main');
@@ -169,6 +170,7 @@ test('il sito non preme Incolla nemmeno nell\'istante in cui il menu entra nella
 
 test('un riquadro di un altro sito dentro la pagina non apre il menu con un tasto destro fabbricato', async ({ app, shell, openTab, testServer }) => {
   await conCronologia(shell);
+  // menu-dal-sito: lo script del riquadro fabbrica il tasto destro e cerca il menu.
   const riquadro = testServer.html(`<!doctype html><html><body>
     <input id="campo" style="width:200px">
     <script>${ATTACCO}
@@ -198,7 +200,7 @@ test('un riquadro di un altro sito dentro la pagina non apre il menu con un tast
 
 const IBAN = 'IT60X0542811101000000123456';
 
-// #592.13: la pagina fa tutto da sola appena si apre, senza nessun gesto dell'utente.
+// #592.13: la pagina fa tutto da sola appena si apre, senza nessun gesto dell'utente. menu-dal-sito
 const PAGINA_DA_SOLA = `<!doctype html><html><body style="padding:40px">
   <input id="campo" style="width:320px;font-size:16px">
   <script>${ATTACCO}
@@ -241,14 +243,15 @@ test('una pagina appena aperta non apre da sola il menu e non legge appunti né 
 
   // Il tasto destro dell'utente apre il menu, e la cronologia mostra a lui le due voci.
   await page.locator('#campo').click({ button: 'right' });
-  await page.locator('.sn-menu-paste-arrow').hover();
+  await menuDi(page).locator('.sn-menu-paste-arrow').hover();
   await expect.poll(() => testiCronologia(app, page)).toEqual(expect.arrayContaining([SEGRETO, IBAN]));
 });
 
 test('a menu aperto dall\'utente il sito non preme Invia feedback né Aiuto; l\'utente sì', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGINA);
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
-  const voce = (testo) => page.locator('.sn-menu button').filter({ hasText: testo }).first();
+  const voce = (testo) => menuDi(page).locator('.sn-menu button').filter({ hasText: testo }).first();
+  // menu-dal-sito: è il sito a cercare la voce e a premerla.
   const preme = (testo, fuori) => page.evaluate(({ t, f }) => {
     const b = [...document.querySelectorAll('.sn-menu button')].find((x) => (x.textContent || '').trim().startsWith(t));
     if (!b) return false;
@@ -292,7 +295,7 @@ test('la cronologia aperta dall\'utente non si fa leggere dal sito con la ricerc
 
   // L'utente apre lui la cronologia per incollare.
   await page.locator('#campo').click({ button: 'right' });
-  await page.locator('.sn-menu-paste-arrow').hover();
+  await menuDi(page).locator('.sn-menu-paste-arrow').hover();
   await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
 
   // Il sito prova a ricostruire il testo interrogando window.find lettera per lettera: non ci riesce
@@ -324,6 +327,7 @@ test('la cronologia aperta dall\'utente non si fa leggere dal sito con la ricerc
 // disegnato. Il sito lo dichiara col nome di ogni famiglia che il pannello potrebbe chiedere, generiche comprese.
 const FAMIGLIE_SPIA = ['Spia', 'Segoe UI', 'Roboto', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'];
 const ALFABETO = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_';
+// menu-dal-sito: il foglio di stile del sito prende il menu per nome.
 const PAGINA_FONT = `<!doctype html><html><head><style>
 ${FAMIGLIE_SPIA.flatMap((fam) => [...ALFABETO].map((c) => {
     const cp = c.codePointAt(0).toString(16);
@@ -346,7 +350,7 @@ test('la cronologia aperta dall\'utente non dice al sito quali caratteri contien
   expect(await page.evaluate(() => window.caratteriVisti())).toBe('');
 
   await page.locator('#campo').click({ button: 'right' });
-  await page.locator('.sn-menu-paste-arrow').hover();
+  await menuDi(page).locator('.sn-menu-paste-arrow').hover();
   await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
   await page.waitForTimeout(800);
 

@@ -27,7 +27,8 @@ test('«Altro…» non ha più le voci globali: stanno nella barra', () => {
     assert.ok(!D.DEFAULT.secondary.includes(id), `${id} è ancora in «Altro…»`);
     assert.ok(!D.DEFAULT.primary.includes(id), `${id} è nella riga del tasto destro`);
   }
-  assert.deepEqual(D.DEFAULT.bar.slice(0, 4), ['back', 'forward', 'reload', 'home']);
+  // In cima l'Aiuto (#1432), poi le globali.
+  assert.deepEqual(D.DEFAULT.bar.slice(0, 5), ['help', 'back', 'forward', 'reload', 'home']);
 });
 
 test('chi aveva la disposizione di prima ritrova le globali nella barra e il resto dov\'era', () => {
@@ -35,7 +36,7 @@ test('chi aveva la disposizione di prima ritrova le globali nella barra e il res
   assert.equal(r.scrivi, true);
   assert.deepEqual(r.layout.primary, VECCHIO_DEFAULT.primary);
   assert.deepEqual(r.layout.secondary, ['openOptions', 'editorApp', 'feedbackApp', 'screenshotCrop', 'transcribe', 'colorPicker']);
-  assert.deepEqual(r.layout.bar, ['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
+  assert.deepEqual(r.layout.bar, ['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
 });
 
 test('chi aveva portato una globale nella riga la ritrova nella riga, e non perde niente', () => {
@@ -45,7 +46,7 @@ test('chi aveva portato una globale nella riga la ritrova nella riga, e non perd
   };
   const { layout } = D.migra(salvato, { qrPromosso: true });
   assert.deepEqual(layout.primary, ['back', 'translate', 'reload']);
-  assert.deepEqual(layout.bar, ['forward', 'home', 'incognito', 'fullscreen', 'closeTab']);
+  assert.deepEqual(layout.bar, ['help', 'forward', 'home', 'incognito', 'fullscreen', 'closeTab']);
   const prima = new Set([...salvato.primary, ...salvato.secondary]);
   const dopo = [...layout.primary, ...layout.secondary, ...layout.bar];
   assert.equal(dopo.length, new Set(dopo).size, 'un\'icona in due posti');
@@ -59,7 +60,8 @@ test('una disposizione che ha già la barra non si tocca, e la migrazione è ide
   assert.deepEqual(r2.layout, r1.layout);
   const scelta = { primary: ['translate'], secondary: ['back'], bar: ['screenshot', 'forward'] };
   const r3 = D.migra(scelta, { qrPromosso: true });
-  assert.deepEqual(r3.layout.bar.slice(0, 2), ['screenshot', 'forward']);
+  // L'Aiuto, nato dopo, arriva in cima una volta; l'ordine scelto resta sotto di lui.
+  assert.deepEqual(r3.layout.bar.slice(0, 3), ['help', 'screenshot', 'forward']);
   assert.ok(r3.layout.secondary.includes('back'), 'indietro rimesso nel menu dall\'utente torna nella barra');
 });
 
@@ -97,7 +99,7 @@ test('le icone della barra si chiamano e si disegnano come nel menu del tasto de
   for (const [id, d] of Object.entries(D.ICONE)) {
     const riga = src.split('\n').find((l) => new RegExp(`\\bid:\\s*'${id}'`).test(l));
     assert.ok(riga, `${id} non è nel registro del menu`);
-    if (id === 'translate' || id === 'fullscreen') continue; // etichetta e icona cambiano con lo stato
+    if (id === 'translate' || id === 'fullscreen' || id === 'help') continue; // etichetta e icona cambiano con lo stato
     assert.ok(riga.includes(`I18n.t('${d.etichetta}')`), `${id}: nel menu l'etichetta non è ${d.etichetta}`);
     assert.ok(riga.includes(`I('${d.icona}')`), `${id}: nel menu l'icona non è ${d.icona}`);
   }
@@ -172,4 +174,67 @@ test('SPOSTA_ICONA: lo strumento elenca le icone vere col nome del menu, e dice 
   const L = globalThis.SN_ACTION_LEVELS;
   assert.equal(L.costoFor({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra' }), 1);
   assert.match(L.describeDone({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra' }), /nella barra laterale/);
+});
+
+// ── l'icona Aiuto (#1432) ──
+test('l\'Aiuto arriva in cima alla barra anche a chi aveva già la sua, e chi lo toglie non se lo ritrova', () => {
+  const mia = { primary: ['translate'], secondary: ['screenshot'], bar: ['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab'] };
+  const r = D.migra(mia, { qrPromosso: true });
+  assert.equal(r.scrivi, true);
+  assert.deepEqual(r.layout.bar, ['help', ...mia.bar]);
+  assert.equal(D.migra(r.layout, { qrPromosso: true }).scrivi, false, 'la seconda volta non cambia niente');
+  // Rimesso nel menu col tasto destro: lì resta, e la migrazione non lo riporta su.
+  const tolto = D.applicaPosa(r.layout, { id: 'help', target: 'secondary', beforeId: null });
+  assert.ok(!tolto.bar.includes('help') && tolto.secondary.includes('help'));
+  const dopo = D.migra(tolto, { qrPromosso: true });
+  assert.ok(!dopo.layout.bar.includes('help'));
+  assert.equal(dopo.scrivi, false);
+  // E si rimette dove lo si trascina.
+  const rimesso = D.applicaPosa(tolto, { id: 'help', target: 'bar', beforeId: 'reload' });
+  assert.equal(rimesso.bar.indexOf('help'), rimesso.bar.indexOf('reload') - 1);
+  assert.ok(!rimesso.secondary.includes('help'));
+});
+
+test('l\'icona Aiuto dice cosa farà il clic: apre, detta, ferma', () => {
+  assert.deepEqual(D.aspettoAiuto({ pannello: 'chiuso' }), { icona: 'help', etichetta: 'menu_help', ascolta: false });
+  assert.equal(D.aspettoAiuto({ pannello: 'ridotto', voce: 'pronto' }).icona, 'help', 'ridotto, il clic lo riapre');
+  assert.deepEqual(D.aspettoAiuto({ pannello: 'aperto', voce: 'pronto' }), { icona: 'mic', etichetta: 'voce_parla', ascolta: false });
+  for (const voce of ['avvio', 'ascolta']) {
+    assert.deepEqual(D.aspettoAiuto({ pannello: 'aperto', voce }), { icona: 'mic', etichetta: 'voce_ferma', ascolta: true }, voce);
+  }
+  assert.equal(D.aspettoAiuto({ pannello: 'aperto', voce: 'attesa' }).etichetta, 'voce_annulla_invio');
+  // Ridotto mentre detta: il clic ferma, come il microfono.
+  assert.equal(D.aspettoAiuto({ pannello: 'ridotto', voce: 'ascolta' }).etichetta, 'voce_ferma');
+  assert.equal(D.aspettoAiuto({ pannello: 'chiuso', risposta: true }).etichetta, 'aiuto_leggi_risposta');
+  // Uno stato che non conosce vale chiuso: il clic apre, non detta.
+  assert.equal(D.aspettoAiuto({ pannello: 'boh', voce: '__proto__' }).icona, 'help');
+  assert.equal(D.aspettoAiuto(undefined).icona, 'help');
+  // Le chiavi esistono, e il menu del tasto destro disegna l'icona con la stessa funzione.
+  require(join(ROOT, 'src', 'shared', 'i18n.js'));
+  for (const k of ['menu_help', 'voce_parla', 'voce_ferma', 'voce_trascrivo', 'voce_annulla_invio', 'aiuto_leggi_risposta',
+    'aiuto_spento_barra', 'aiuto_spento_sito', 'aiuto_spento_pagina']) {
+    assert.notEqual(globalThis.SN_I18N.t(k), k, k);
+  }
+  const menu = readFileSync(join(ROOT, 'src', 'content', 'menuIcons.js'), 'utf8');
+  assert.match(menu, /Disp\.aspettoAiuto\(/);
+  require(join(ROOT, 'src', 'shared', 'icons.js'));
+  for (const n of ['help', 'mic']) assert.equal(typeof globalThis.SN_ICONS[n], 'function', n);
+});
+
+test('una risposta da leggere: per scheda e per fonte, solo dalle fonti note, e il documento nuovo la porta via', () => {
+  const R = require(join(ROOT, 'src', 'main', 'risposteInAttesa.js'));
+  const tab = {};
+  assert.equal(R.inAttesa(tab), false);
+  assert.equal(R.segna(tab, 'aiuto', true), true);
+  assert.equal(R.segna(tab, 'aiuto', true), false, 'già segnata: niente da ridire');
+  assert.equal(R.inAttesa(tab), true);
+  assert.equal(R.inAttesa(tab, 'app'), false);
+  assert.equal(R.segna(tab, 'sconosciuta', true), false);
+  assert.equal(R.segna(tab, '__proto__', true), false);
+  assert.equal(R.segna(tab, 'app', true), true);
+  assert.equal(R.segna(tab, 'aiuto', false), true);
+  assert.equal(R.inAttesa(tab), true, 'resta quella dell\'app');
+  assert.equal(R.dimentica(tab), true);
+  assert.equal(R.inAttesa(tab), false);
+  assert.equal(R.segna(null, 'aiuto', true), false);
 });

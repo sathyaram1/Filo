@@ -1,5 +1,5 @@
 // I cambi di stato come eventi del filo (#867): il nome di ogni impostazione, il confronto fra due
-// scritture, la frase in parole, la fusione dei passi di un cursore e cosa scrivere per annullare.
+// scritture, la frase in parole, la fusione dei ritocchi ripetuti e cosa scrivere per annullare.
 // Logica pura: chi osserva le scritture è src/main/services/registroCambi.js; regole in tests/unit/cambi.test.mjs.
 
 (function (global) {
@@ -12,6 +12,7 @@
   const ATTIVO = sino('attivo', 'spento');
   const ATTIVA = sino('attiva', 'spenta');
   const ATTIVE = sino('attive', 'spente');
+  const ATTIVI = sino('accesi', 'spenti');
   // I decimali restano quelli che il valore ha davvero; la parte intera prende il punto delle migliaia (1.500 ms).
   const intero = (n) => n.toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 0 });
   const numero = (v) => {
@@ -53,7 +54,7 @@
   const VOCI = {
     theme: { nome: 'tema', valori: { light: 'chiaro', dark: 'scuro', system: 'come il sistema' }, livello: 1 },
     textScale: { nome: 'dimensione del testo', valore: percento, livello: 1 },
-    showHomeMessage: { nome: 'commento nella home', valore: sino('mostrato', 'nascosto'), livello: 1 },
+    showHomeMessage: { nome: 'Filo scrive per primo nella home', valore: sino('sì', 'no'), livello: 1 },
     'homeSistema.*': { nome: (k) => `voce «${k === 'bluetooth' ? 'Bluetooth' : k}» nella home`, valore: sino('mostrata', 'nascosta'), livello: 1 },
     'tabPreview.enabled': { nome: 'anteprima delle schede', valore: ATTIVA, livello: 1 },
     'tabPreview.size': { nome: 'dimensione dell\'anteprima delle schede', livello: 1 },
@@ -66,6 +67,8 @@
     'schermo.guarda': { nome: 'guardare lo schermo', valore: sino('acceso', 'spento'), livello: 2 },
     'nomiSensati.scaricamenti': { nome: 'nome sensato ai file scaricati', valore: ATTIVO, livello: 2 },
     'aggiornamenti.automatici': { nome: 'installazione automatica degli aggiornamenti', valore: ATTIVA, livello: 2 },
+    'propostaEmail.attiva': { nome: 'email del tuo account proposta nei siti', valore: ATTIVA, livello: 1 },
+    'propostaEmail.incognito': { nome: 'email proposta anche in incognito', valore: ATTIVA, livello: 1 },
     'aggiornamenti.installa': {
       nome: 'installazione degli aggiornamenti', valori: { avvio: 'all\'apertura, con la barra', chiusura: 'in silenzio alla chiusura' }, livello: 1,
     },
@@ -87,6 +90,11 @@
       valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
       livello: 2,
     },
+    'contestoFilo.cache': {
+      nome: 'durata della cache della chat',
+      valore: (v) => (v === '1h' ? 'un\'ora' : (v === '5m' ? '5 minuti' : 'come i predefiniti')),
+      livello: 2,
+    },
     ...Object.fromEntries([
       ['conversazioni', 'della chat e delle conversazioni'],
       ['testi', 'di traduzioni, riscritture e riassunti'],
@@ -104,8 +112,11 @@
     'barraLaterale.striscia': { nome: 'striscia della barra laterale', valore: sino('visibile', 'nascosta'), livello: 1 },
     'barraLaterale.attesaMs': { nome: 'attesa sul bordo prima che la barra laterale si apra', valore: millisecondi, livello: 1 },
     'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },
+    'avvisoSchermoPieno.durataMs': { nome: 'durata dell\'avviso del sito a schermo intero', valore: millisecondi, livello: 1 },
     'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
     'spiegaAnticipata.enabled': { nome: 'spiegazione preparata alla selezione', valore: ATTIVA, livello: 1 },
+    'descriviImmagini.enabled': { nome: 'descrizione di screenshot e immagini copiate', valore: ATTIVA, livello: 1 },
+    'contatori.attivi': { nome: 'contatori anonimi d\'uso', valore: ATTIVI, livello: 2 },
     'avvisoCrediti.attivo': { nome: 'avviso prima che i crediti finiscano', valore: ATTIVO, livello: 1 },
     'avvisoCrediti.giorni': { nome: 'giorni dell\'avviso dei crediti', valore: numero, livello: 1 },
     'avvisoCrediti.percento': { nome: 'percentuale dell\'avviso dei crediti', valore: (v) => `${numero(v)}%`, livello: 1 },
@@ -113,7 +124,19 @@
     'notifications.soundEnabled': { nome: 'suono delle notifiche', valore: ATTIVO, livello: 1 },
     'notifications.sound': { nome: 'suono scelto per le notifiche', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
     'notifications.soundVolume': { nome: 'volume del suono delle notifiche', valore: (v) => `${numero(v)}%`, livello: 1 },
-    'featureFlags.spellcheck': { nome: 'correttore ortografico', valore: ATTIVO, livello: 1 },
+    'featureFlags.spellcheck': { nome: 'errori del correttore', valore: ATTIVI, livello: 1 },
+    'featureFlags.spellcheckContext': { nome: 'suggerimenti del correttore', valore: ATTIVI, livello: 1 },
+    'correttore.modelloErrori': { nome: 'controllo degli errori col modello', valore: ATTIVO, livello: 1 },
+    'correttore.ripetizioni': { nome: 'parole ripetute segnate dal correttore', valore: sino('segnate', 'non segnate'), livello: 1 },
+    'correttore.pausaRapidoMs': { nome: 'pausa prima del controllo degli errori', valore: millisecondi, livello: 1 },
+    'correttore.ogniRapidoMs': { nome: 'controllo degli errori mentre si scrive senza pause', valore: millisecondi, livello: 1 },
+    'correttore.pausaRagionatoMs': { nome: 'pausa prima del controllo dei suggerimenti', valore: millisecondi, livello: 1 },
+    'correttore.automatica': { nome: 'correzione automatica a fine parola', valore: ATTIVA, livello: 1 },
+    'correttore.accettiPerImparare': { nome: 'volte che una correzione scelta serve per diventare automatica', valore: numero, livello: 1 },
+    'correttore.annulliPerImparare': { nome: 'volte che una correzione annullata serve per non tornare più', valore: numero, livello: 1 },
+    'correttore.riscrittePerImparare': { nome: 'volte che una parola scritta uguale serve per non essere più segnata', valore: numero, livello: 1 },
+    'correttore.segnaposti': { nome: 'segnaposto del correttore', valore: ATTIVI, livello: 1 },
+    'correttore.segnapostiWeb': { nome: 'ricerca sul web per i segnaposto', valore: ATTIVA, livello: 1 },
     'featureFlags.help': { nome: 'Aiuto nelle pagine', valore: ATTIVO, livello: 1 },
     'featureFlags.categorize': { nome: 'categorie automatiche in «Aperti per dopo»', valore: ATTIVE, livello: 1 },
     blocklist: { nome: 'siti dove Filo è spento', elenco: true, livello: 1 },
@@ -123,6 +146,7 @@
     useDefaultModels: { nome: 'modelli predefiniti', valore: sino('in uso', 'spenti'), livello: 2 },
     openWeightsOnly: { nome: 'solo modelli a pesi aperti', valore: sino('sì', 'no'), livello: 2 },
     ownKeyAllProviders: { nome: 'fornitori esclusi con la tua chiave', valore: sino('usati', 'esclusi'), livello: 2 },
+    ordineHost: { nome: 'host dei modelli', valori: { '': 'scelti da Filo', throughput: 'più veloci', latency: 'risposta più pronta', price: 'più economici' }, livello: 2 },
     'apiKeys.*': { nome: (k) => `chiave ${NOMI_CHIAVI[k] || 'di un servizio'}`, segreto: true },
     'models.*': { nome: (k) => `modello per «${etichettaFunzione(k)}»`, valore: (v) => v || 'nessuno', livello: 2 },
     'scorciatoie.*': { nome: (k) => `scorciatoia di «${nomeAzioneFilo(k)}»`, valore: scorciatoiaLeggibile, livello: 1 },
@@ -435,6 +459,7 @@
     dashboard: 'dalla home',
     shell: 'dalla barra delle schede',
     'menu-scheda': 'dal menu della scheda',
+    'proposta-accesso': 'dalla proposta dopo un accesso',
     zoom: 'con un gesto sulla pagina',
   };
   function provenienza(evento) {
@@ -450,8 +475,10 @@
     }
   }
 
-  // ── Fusione: un cursore trascinato è UN cambio ─────────────────────────────
-  const FINESTRA_FUSIONE_MS = 4000;
+  // ── Fusione: ritocchi ripetuti della stessa cosa sono UN cambio ────────────
+  // Non solo i passi di un cursore: anche chi cerca il valore giusto a più riprese (lo zoom 125 → 114 → 87 → 100) ha
+  // fatto un cambio solo, «125% → 100%» (#1490). La finestra si misura dall'ultimo ritocco.
+  const FINESTRA_FUSIONE_MS = 2 * 60 * 1000;
   const FONDIBILI = new Set(['interfaccia', 'pagina', 'filo']);
   function fondibile(ultimo, nuovo) {
     if (!ultimo || !nuovo || ultimo.annulla || nuovo.annulla) return false;
@@ -611,7 +638,24 @@
     return { righe, tolti: lista.length - scelti.length };
   }
 
+  // I cambi che combaciano con una ricerca della chat (CERCA_CHAT), dal più recente, coi tre passi delle conversazioni
+  // (src/shared/chatArchive.js): «cambio tema scuro» trova il tema messo ieri come «tema scuro» (#868.1).
+  function cercaPerChat(eventi, query, { max = 6 } = {}) {
+    const CA = global.SN_CHAT_ARCHIVE;
+    if (!CA || !CA.terminiCheDistinguono(CA.paroleDi(query), query).length) return { cambi: [], termini: [], allargata: false };
+    const lista = Array.isArray(eventi) ? eventi : [];
+    const candidati = [];
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const e = lista[i];
+      const f = e && e.id ? frase(e) : '';
+      if (f) candidati.push({ id: e.id, frase: f, date: e.agg || e.ts, testo: `${f} ${frasi(e).join(' ')}` });
+    }
+    const { results, termini, allargata } = CA.searchWide(candidati, query, { testo: (c) => c.testo, limit: max });
+    return { cambi: results.map((c) => ({ id: c.id, frase: c.frase, date: c.date })), termini, allargata };
+  }
+
   global.SN_CAMBI = {
+    cercaPerChat,
     VOCI,
     ESCLUSIONI,
     FINESTRA_FUSIONE_MS,

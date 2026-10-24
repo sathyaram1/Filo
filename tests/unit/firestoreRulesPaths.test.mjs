@@ -44,6 +44,16 @@ const SCRITTURE_ANONIME_DICHIARATE = {
     'di un altro; il caso peggiore è un numero saltato, che è un’etichetta e non una ' +
     'chiave. Anonimo perché l’invio di un feedback lo è per scelta: chiedere un account ' +
     'per il numero varrebbe chiederlo per la segnalazione.',
+  'contatori-giornalieri':
+    'i contatori giornalieri (#969): solo numeri e chiavi da elenchi chiusi, a sola creazione, letti solo ' +
+    'dall’admin e mai rimessi nel prompt di nessuno. Anonimi per scelta: legarli a un account toglierebbe lo ' +
+    'pseudonimo mensile, che è il punto. Il caso peggiore è un numero falso (firestoreRulesContatori.test.mjs).',
+  'contatori-chiamate':
+    'le chiamate ai modelli di un’ora dei contatori (#1464), accanto all’ora e con lo stesso id: stesse ragioni e ' +
+    'stessa forma chiusa (numeri, fasce e nomi di modello), a sola creazione e letti solo dall’admin.',
+  'contatori-finestra':
+    'la finestra di un’ora dei contatori (#1470), con lo stesso id: stesse ragioni, solo conti con chiavi da elenchi ' +
+    'chiusi (mai titoli, indirizzi o nomi di file), a sola creazione e letti solo dall’admin.',
 };
 
 const VERBI_SCRITTURA = ['write', 'create', 'update', 'delete'];

@@ -42,6 +42,17 @@ describe('quali file si rifanno', () => {
     assert.equal(corsaIncompleta(`${gruppi}# fail 0\n`), '', 'ogni gruppo col suo riepilogo');
   });
 
+  // #1457: il titolo di un test verde che citava una frase del lanciatore toglieva la riprova a un flaky di Windows.
+  test('le frasi del lanciatore contano solo quando le dice lui, non nel titolo di un test', () => {
+    const titoli = ['un gruppo rosso senza un test rosso registrato non sparisce dal riepilogo',
+      'interrotto al gruppo 2 di 3: i gruppi dopo non partono', 'un file appeso e la corsa è stata chiusa col suo nome',
+      'se non sono riuscito a lanciare node lo dico'];
+    const verdi = titoli.map((t, i) => `# Subtest: ${t}\nok ${i + 2} - ${t}\n  ---\n  duration_ms: 1\n  ...\n`).join('');
+    assert.equal(corsaIncompleta(`${verdi}${rosso(A)}# fail 1\n`), '', 'un rosso normale si riprova anche accanto a quei titoli');
+    const aMetaRiga = `${rosso(A)}# fail 1\n  duration_ms: 12.3${testoFermo([join(ROOT, B)], 4000)}\n`;
+    assert.notEqual(corsaIncompleta(aMetaRiga), '', 'il messaggio del lanciatore caduto a metà di una riga conta');
+  });
+
   test('ripassato è chi era rosso e alla riprova non lo è più; una riprova rotta non scagiona nessuno', () => {
     assert.deepEqual(ripassati([A, B], { codice: 0, rossiRiprova: [] }), [A, B]);
     assert.deepEqual(ripassati([A, B], { codice: 1, rossiRiprova: [A] }), [B]);

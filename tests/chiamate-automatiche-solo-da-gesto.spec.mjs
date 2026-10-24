@@ -3,6 +3,7 @@
 // il correttore non lavora a scheda nascosta, e il main ha un tetto per scheda sulle chiamate automatiche.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="font:20px sans-serif;padding:30px;margin:0">
@@ -28,23 +29,24 @@ async function fornitoreFinto(app) {
       models: {
         [C.ACTIONS.EXPLAIN]: 'deepseek-flash',
         [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash',
-        [C.ACTIONS.SPELLCHECK_WORD]: 'deepseek-flash',
+        [C.ACTIONS.SPELLCHECK_CONTEXT]: 'deepseek-flash',
       },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
-    globalThis.__conti = { spiega: 0, scan: 0, parola: 0, altro: 0 };
+    // `scan` è il controllo rapido del correttore (#1446), `coerenza` quello ragionato.
+    globalThis.__conti = { spiega: 0, scan: 0, coerenza: 0, altro: 0 };
     const finto = async ({ messages }) => {
       const t = JSON.stringify(messages);
       let tipo = 'altro';
       let text = 'ok';
       if (t.includes('ha selezionato un testo')) { tipo = 'spiega'; text = 'Spiegazione di prova'; globalThis.__ultimaSpiega = t; }
-      else if (t.includes('Analizza il testo qui sotto')) {
+      else if (t.includes('Sei il controllo rapido')) {
         tipo = 'scan';
-        // Con `__segnaXq` lo scan segna come errore ogni parola «xq…», come un modello vero coi refusi.
+        // Con `__segnaXq` il controllo segna come errore ogni parola «xq…», come un modello vero coi refusi.
         const parole = globalThis.__segnaXq ? [...new Set(t.match(/xq[a-z]+\d+/g) || [])] : [];
-        text = JSON.stringify({ annotated: parole.map((w) => `**${w}**`).join(' '), issues: parole.map(() => ({ type: 'grammar', explanation: 'x', correction: 'y' })) });
+        text = parole.map((w) => `[${w}][y][x][errore]`).join('\n') || '[][][][nessuno]';
       }
-      else if (t.includes('col tasto destro su una parola')) { tipo = 'parola'; text = '{"misspelled":false,"correction":""}'; }
+      else if (t.includes('proponi SUGGERIMENTI')) { tipo = 'coerenza'; text = '[][][][nessuno]'; }
       globalThis.__conti[tipo] += 1;
       return { text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
     };
@@ -59,6 +61,8 @@ async function apri(app, openTab, testServer, html = PAGINA) {
   await fornitoreFinto(app);
   const page = await testServer.openReady(openTab, html, { pubblico: true });
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  // Le parole «xq…» sono candidati solo col dizionario del browser caricato.
+  await expect.poll(() => app.evaluate(() => globalThis.__filoDizionari.stato().inizializzati), { timeout: 20_000 }).toContain('it-IT');
   return page;
 }
 
@@ -138,7 +142,7 @@ test('selezione lunga: niente anticipo, al tasto destro intera; la frase intorno
 
   // Al tasto destro la spiegazione si chiede davvero, con tutta la selezione.
   await page.mouse.click(p.x, p.y, { button: 'right' });
-  const sezione = page.locator('.sn-menu .sn-menu-inline-explain');
+  const sezione = menuDi(page).locator('.sn-menu .sn-menu-inline-explain');
   await expect(sezione).toContainText('Spiegazione di prova', { timeout: 10_000 });
   expect((await conti(app)).spiega).toBe(2);
   expect(await ultima()).toContain('parolafine');
@@ -156,23 +160,23 @@ test('il correttore non parte da execCommand, input finti o focus() di script; s
     while (Date.now() < fine) {
       ta.blur();
       ta.focus();
-      document.execCommand('insertText', false, ` parola${i} scrita male, `);
+      document.execCommand('insertText', false, ` frase numero ${i} scritta bene, `);
       ta.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: 'x' }));
       i += 1;
       await new Promise((ok) => setTimeout(ok, 400));
     }
   });
-  // Lo scan parte 1,5 s dopo l'ultimo input: si aspetta di più.
-  await pausa(2500);
+  // Il ragionato parte dopo 3,5 s di pausa: si aspetta di più.
+  await pausa(4500);
   const prima = await conti(app);
   expect(prima.scan).toBe(0);
-  expect(prima.parola).toBe(0);
+  expect(prima.coerenza).toBe(0);
 
   await page.locator('#ta').click();
   await page.keyboard.press('End');
   await page.keyboard.type(' ciao come stai oggi ');
   await expect.poll(async () => (await conti(app)).scan, { timeout: 6000 }).toBe(1);
-  expect((await conti(app)).parola).toBeGreaterThan(0);
+  await expect.poll(async () => (await conti(app)).coerenza, { timeout: 8000 }).toBe(1);
 });
 
 test('un gesto vero paga al più un controllo del correttore: lo script che dopo un clic scrive quaranta parole ne ottiene uno', async ({ app, openTab, testServer }) => {
@@ -190,15 +194,16 @@ test('un gesto vero paga al più un controllo del correttore: lo script che dopo
     }, { once: true });
   });
   await page.mouse.click(700, 20);
-  await pausa(3000);
-  expect((await conti(app)).parola).toBeLessThanOrEqual(1);
+  await pausa(4500);
+  expect((await conti(app)).scan).toBeLessThanOrEqual(1);
+  expect((await conti(app)).coerenza).toBeLessThanOrEqual(1);
 
-  // Chi scrive davvero, parola per parola, ha il suo controllo per ognuna.
-  const prima = (await conti(app)).parola;
+  // Chi scrive davvero, parola per parola, ha un controllo a ogni parola sbagliata che chiude.
+  const prima = (await conti(app)).scan;
   await page.locator('#ta').click();
   await page.keyboard.press('End');
-  await page.keyboard.type(' qwzuno qwzdue qwztre ');
-  await expect.poll(async () => (await conti(app)).parola - prima, { timeout: 6000 }).toBeGreaterThanOrEqual(3);
+  await page.keyboard.type(' qwzuno qwzdue qwztre ', { delay: 60 });
+  await expect.poll(async () => (await conti(app)).scan - prima, { timeout: 6000 }).toBeGreaterThanOrEqual(3);
 });
 
 test('un tasto tenuto premuto è un gesto solo: le ripetizioni non pagano altri controlli né altre spiegazioni', async ({ app, openTab, testServer }) => {
@@ -229,22 +234,23 @@ test('un tasto tenuto premuto è un gesto solo: le ripetizioni non pagano altri 
   for (let i = 0; i < 100; i++) { await page.keyboard.down('ArrowDown'); await pausa(30); }
   await page.keyboard.up('ArrowDown');
   await pausa(2500);
+  await pausa(2000);
   const c = await conti(app);
-  expect(c.parola).toBeLessThanOrEqual(1);
   expect(c.spiega).toBeLessThanOrEqual(1);
   expect(c.scan).toBeLessThanOrEqual(1);
+  expect(c.coerenza).toBeLessThanOrEqual(1);
 });
 
 test('chi tiene premuto un tasto dentro la casella ha lo scan sul testo finale, una volta', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer);
   await page.locator('#ta').click();
-  await page.keyboard.type('oggi ho scrito una frase ');
+  await page.keyboard.type('oggi ho scritto una frase ');
   await expect.poll(async () => (await conti(app)).scan, { timeout: 6000 }).toBe(1);
   // Due secondi di Backspace tenuto: lo scan non parte a metà, parte dopo, sul testo che resta.
   for (let i = 0; i < 60; i++) { await page.keyboard.down('Backspace'); await pausa(33); }
   await page.keyboard.up('Backspace');
-  await page.keyboard.type('oggi ho scrito ');
+  await page.keyboard.type('oggi ho scritto ');
   await expect.poll(async () => (await conti(app)).scan, { timeout: 6000 }).toBe(2);
   await pausa(2000);
   expect((await conti(app)).scan).toBe(2);
@@ -294,14 +300,15 @@ test('a scheda nascosta il correttore aspetta: riparte quando si torna', async (
   });
 
   await page.locator('#sn-test-ta').click();
-  await page.keyboard.type('oggi ho scrito una frase');
+  await page.keyboard.type('oggi ho scritto una frase');
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await pausa(2500);
+  await pausa(4500);
   expect((await conti(app)).scan).toBe(0);
+  expect((await conti(app)).coerenza).toBe(0);
 
   await page.evaluate(() => {
     delete document.hidden;
@@ -403,13 +410,14 @@ test('il controllo della parola lo paga il tasto che chiude una parola, non ogni
   });
   await page.click('#ta');
   await pausa(300);
-  const prima = (await conti(app)).parola;
+  const prima = (await conti(app)).scan;
   await page.keyboard.type('ciao come stai oggi', { delay: 150 });
   await pausa(2500);
-  // Tre parole chiuse dall'utente (tre spazi): un controllo ciascuna, non uno per ognuna delle 19 lettere.
-  const fatti = (await conti(app)).parola - prima;
+  // Ogni tasto scrive una parola sbagliata: senza aspettare la pausa la paga solo chi chiude una parola (tre spazi), più
+  // la pausa finale, non uno per ognuna delle 19 lettere.
+  const fatti = (await conti(app)).scan - prima;
   expect(fatti).toBeGreaterThanOrEqual(1);
-  expect(fatti).toBeLessThanOrEqual(3);
+  expect(fatti).toBeLessThanOrEqual(4);
 });
 
 test('un gesto paga solo la cosa che ha toccato: scrivere nella ricerca non paga la casella della pagina, un pulsante non paga la selezione lontana', async ({ app, openTab, testServer }) => {
@@ -442,7 +450,7 @@ test('un gesto paga solo la cosa che ha toccato: scrivere nella ricerca non paga
   await page.keyboard.type('ricetta della pasta al forno con le melanzane', { delay: 130 });
   for (let i = 0; i < 4; i++) { await page.locator('#bt').click(); await pausa(900); }
   await pausa(2500);
-  expect(await conti(app)).toMatchObject({ scan: 0, parola: 0, spiega: 0 });
+  expect(await conti(app)).toMatchObject({ scan: 0, coerenza: 0, spiega: 0 });
 
   // Il doppio clic sulla parola resta la strada vera: paga la sua spiegazione.
   const p = await puntoDellaParola(page, 'p2', 'Pitagora');
@@ -538,13 +546,13 @@ test('chi esce dalla casella e ci rientra, anche col fuoco dato dalla pagina, ri
   await app.evaluate(() => { globalThis.__segnaXq = true; });
   await page.locator('#ta').click();
   await page.keyboard.type('oggi xqprima1 frase ');
-  await expect(page.locator('.sn-spell-overlay .sn-semantic-error')).toHaveText(['xqprima1'], { timeout: 6000 });
+  await expect(page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['xqprima1'], { timeout: 6000 });
   await page.locator('#cerca').click();
   await pausa(500);
   // Rientra col fuoco dato dalla pagina (come dopo un «Rispondi»): scrivere deve bastare.
   await page.evaluate(() => { const ta = document.getElementById('ta'); ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length; });
   await page.keyboard.type(' poi xqseconda2 ');
-  await expect(page.locator('.sn-spell-overlay .sn-semantic-error')).toHaveText(['xqprima1', 'xqseconda2'], { timeout: 6000 });
+  await expect(page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['xqprima1', 'xqseconda2'], { timeout: 6000 });
 });
 
 test('spenta la spiegazione preparata (#818), il doppio clic non la paga; il tasto destro sì', async ({ app, openTab, testServer }) => {
@@ -556,6 +564,6 @@ test('spenta la spiegazione preparata (#818), il doppio clic non la paga; il tas
   await pausa(1500);
   expect((await conti(app)).spiega).toBe(0);
   await page.mouse.click(p.x, p.y, { button: 'right' });
-  await expect(page.locator('.sn-menu .sn-menu-inline-explain')).toContainText('Spiegazione di prova', { timeout: 10_000 });
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-inline-explain')).toContainText('Spiegazione di prova', { timeout: 10_000 });
   expect((await conti(app)).spiega).toBe(1);
 });

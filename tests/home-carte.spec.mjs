@@ -72,9 +72,9 @@ async function modelloFinto(app, risposte, ritardoMs = 0) {
 test('il timer chiesto in chat ha la sua carta a sinistra: conta, scade e il clic riapre lo scambio', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
+  // Un timer riuscito chiude il turno (#1130): la frase va scritta insieme.
   await modelloFinto(app, [
-    { strumenti: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":4,"etichetta":"Pasta"}' }] },
-    { testo: 'Fatto, timer della pasta avviato.' },
+    { testo: 'Fatto, timer della pasta avviato.', strumenti: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":4,"etichetta":"Pasta"}' }] },
   ]);
   await page.locator('#input').fill('metti un timer di 4 secondi per la pasta');
   await page.locator('#sendBtn').click();
@@ -84,10 +84,9 @@ test('il timer chiesto in chat ha la sua carta a sinistra: conta, scade e il cli
   await expect(carta).toBeVisible();
   await expect(carta.locator('.dash-carta-stato')).toHaveText(/^0:0\d$/);
 
-  // Torno alla home: la conversazione si chiude, la carta resta.
+  // Torno alla home: la carta resta.
   await page.reload();
   await home(app);
-  await expect(page.locator('#threadView')).toBeHidden();
   const scaduta = page.locator('#accade .dash-carta[data-tipo="timer"][data-suona="1"]', { hasText: 'Pasta' });
   await expect(scaduta).toBeVisible({ timeout: 10_000 });
   await expect(scaduta.locator('.dash-carta-stato')).toHaveText('scaduto');
@@ -369,7 +368,7 @@ test('un lavoro lungo in un’altra scheda compare a sinistra; «Vai» porta lì
   await carta.locator('.dash-carta-az.principale').click();
   // «Vai» riporta alla scheda della conversazione, non ne apre una copia qui.
   await expect.poll(() => shell.evaluate(() => [...document.querySelectorAll('.tab')].findIndex((t) => t.classList.contains('active')))).toBe(0);
-  await expect(b.locator('#threadView')).toBeHidden();
+  await expect(b.locator('body')).toHaveAttribute('data-state', 'home');
   await expect(a.locator('.dash-bubble-filo', { hasText: 'confronto fra i tre preventivi' })).toBeVisible({ timeout: 15_000 });
   await expect(b.locator('#accade .dash-carta[data-tipo="lavoro"]')).toHaveCount(0);
 });

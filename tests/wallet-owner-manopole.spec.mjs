@@ -20,6 +20,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 
 const OWNER_EMAIL = 'owner@prova.test';
 const OWNER_REFRESH = 'rt-owner';
@@ -72,11 +73,25 @@ function configDiPartenza() {
     invitesMaxUses: 3,
     maxGrantCredits: 70000,
     rewardFeedbackSent: 10,
+    rewardSentPerDay: 5,
     rewardFeedbackClosed: 50,
     invitesRemaining: 9,
+    redeemsPerNetwork: 3,
+    redeemsPerNetworkHours: 24,
     eurUsd: 1.17,
     totalLimitUsd: 4.2,
   };
+}
+
+// Le persone che la vista elenca: una prova le cambia per vedere cosa fa la pagina quando la vista si rilegge.
+let persone = [];
+function personeDiPartenza() {
+  return [{
+    pseudonym: PSEUDONIMO,
+    balance: { credits: 4890.5, creditsGranted: 5128, usageUsd: 0.21, limitUsd: 4.2 },
+    invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z',
+    reconcile: { flagged: false }, usage: { rows: 2, byAction: { chat: 0.2 }, byDay: { '2026-09-17': 0.2 } },
+  }];
 }
 
 test.beforeAll(async () => {
@@ -133,23 +148,19 @@ test.beforeAll(async () => {
               { code: 'AAAA2222', max: 3, used: 1, uses: [{ pseudonym: 'fedebb00', at: '2026-09-17T10:00:00.000Z' }], createdAt: '2026-09-11T09:00:00.000Z' },
               { code: 'CCCC4444', max: 3, used: 3, uses: [], createdAt: '2026-09-11T09:00:00.000Z' },
             ],
-            users: [{
-              pseudonym: PSEUDONIMO,
-              balance: { credits: 4890.5, creditsGranted: 5128, usageUsd: 0.21, limitUsd: 4.2 },
-              invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z',
-              reconcile: { flagged: false }, usage: { rows: 2, byAction: { chat: 0.2 }, byDay: { '2026-09-17': 0.2 } },
-            }],
+            users: persone,
           },
         });
       }
       if (url === '/walletUserDetail') {
         detailChiesti.push(body.data);
-        if (!body.data || body.data.pseudonym !== PSEUDONIMO) return json(res, 200, { result: { found: false } });
+        const lei = persone.find((p) => body.data && p.pseudonym === body.data.pseudonym);
+        if (!lei || lei.pseudonym !== PSEUDONIMO) return json(res, 200, { result: { found: false } });
         return json(res, 200, {
           result: {
             found: true,
             pseudonym: PSEUDONIMO,
-            balance: { credits: 4890.5, creditsGranted: 5128, usageUsd: 0.21, limitUsd: 4.2 },
+            balance: lei.balance,
             createdAt: '2026-09-10T08:00:00.000Z',
             invitedBy: 'owner',
             reconcile: { flagged: false },
@@ -188,6 +199,7 @@ test.afterAll(async () => {
 
 test.beforeEach(() => {
   configDoc = configDiPartenza();
+  persone = personeDiPartenza();
   patch.length = 0;
   rifiutaPatch = false;
   detailChiesti.length = 0;
@@ -221,12 +233,11 @@ async function dirottaFirestore(app, b) {
   }, b);
 }
 
-// La pagina dell'owner NON si apre con openTab: quello sceglie la finestra per
-// host, e owner.html ha lo stesso host di credits.html.
+// «Inviti e utenti» sta in Gestione (#1414): l'indirizzo ne apre la scheda, poi torna pulito.
 async function apriOwner(app) {
-  const url = 'filo://credits/owner.html';
+  const url = GESTIONE;
   const shell = await primaFinestra(app);
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), `${url}#utenti`);
   const deadline = Date.now() + 15_000;
   let page = null;
   while (Date.now() < deadline && !page) {
@@ -248,10 +259,14 @@ test('le manopole si salvano davvero, un numero storto non arriva al server e «
   const page = await apriOwner(app);
 
   // Ci sono tutte, col valore che ha il server adesso.
-  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(8, { timeout: 15_000 });
+  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(11, { timeout: 15_000 });
   await expect(page.locator('#knob-dailyCredits')).toHaveValue('100');
   await expect(page.locator('#knob-entryCredits')).toHaveValue('5000');
   await expect(page.locator('#knob-rewardFeedbackClosed')).toHaveValue('50');
+  // #1120 — il tetto degli ingressi dalla stessa connessione e la sua finestra.
+  await expect(page.locator('#knob-redeemsPerNetwork')).toHaveValue('3');
+  await expect(page.locator('#knob-redeemsPerNetworkHours')).toHaveValue('24');
+  await expect(page.locator('#knob-rewardSentPerDay')).toHaveValue('5');
 
   const msg = page.locator('#knob-dailyCredits-msg');
 
@@ -398,7 +413,7 @@ test('gli ingressi con invito rimasti si cambiano dalla pagina, come le altre ma
   await page.click('#knob-invitesRemaining-salva');
   await expect(msg).toHaveText('Salvato.', { timeout: 15_000 });
   expect(configDoc.invitesRemaining).toBe(20);
-  await page.reload();
+  await ricaricaSu(page, 'utenti');
   await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
   await expect(page.locator('#knob-invitesRemaining')).toHaveValue('20', { timeout: 15_000 });
   expect(patch.length).toBe(3);
@@ -539,7 +554,7 @@ test('un numero lasciato a metà parte da solo, si vede finché non è partito, 
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 11, null, { timeout: 15_000 });
 
   const scatola = page.locator('.sn-manopola[data-chiave="dailyCredits"]');
   const msg = page.locator('#knob-dailyCredits-msg');
@@ -583,12 +598,12 @@ test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 11, null, { timeout: 15_000 });
 
   await page.fill('#knob-dailyCredits', '500');
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-dailyCredits');
   expect(patch.length).toBe(0);
-  await page.reload();
+  await ricaricaSu(page, 'utenti');
   await expect.poll(() => configDoc.dailyCredits, { timeout: 10_000 }).toBe(500);
   expect(patch.map((p) => p.valori)).toEqual([{ dailyCredits: 500 }]);
   // La pagina ricaricata mostra il numero che il server ha adesso.
@@ -599,7 +614,7 @@ test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-entryCredits');
   const shell = await primaFinestra(app);
   const chiusa = await shell.evaluate(async () => {
-    const t = (await window.filoShell.tabs.snapshot()).tabs.find((x) => String(x.url || '').includes('owner.html'));
+    const t = (await window.filoShell.tabs.snapshot()).tabs.find((x) => String(x.url || '').includes('manage/manage.html'));
     if (!t) return false;
     await window.filoShell.tabs.close(t.id);
     return true;
@@ -608,7 +623,7 @@ test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda
   await expect.poll(() => configDoc.entryCredits, { timeout: 10_000 }).toBe(4200);
   // Spedito il numero, la pagina chiusa se ne va davvero.
   await expect.poll(() => app.evaluate(({ webContents }) => webContents.getAllWebContents()
-    .some((w) => !w.isDestroyed() && w.getURL().includes('owner.html'))), { timeout: 5000 }).toBe(false);
+    .some((w) => !w.isDestroyed() && w.getURL().includes('manage/manage.html'))), { timeout: 5000 }).toBe(false);
 });
 
 // Il tasto destro è centrale in Filo: su una riga della tabella deve offrire
@@ -644,6 +659,67 @@ test('il tasto destro su una persona apre un menu suo: scheda, pseudonimo, regal
   await expect(page.locator('.sn-wallet-ctxmenu')).toHaveCount(0);
 });
 
+// #1087.4 — la vista si rilegge a ogni movimento di crediti, anche di un'altra scheda, e rifaceva da capo la tabella:
+// sotto le mani dell'owner sparivano il menu del tasto destro e la scheda aperta, e il fuoco cadeva dalla riga.
+test('una rilettura della vista lascia aperti il menu e la scheda di una persona, col fuoco sulla sua riga', async ({ app }) => {
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+  const righe = page.locator('#ownerUsers tr.sn-wallet-user');
+  const lei = righe.filter({ hasText: PSEUDONIMO });
+  const scheda = page.locator('#ownerUsers .sn-wallet-scheda');
+  const menu = page.locator('.sn-wallet-ctxmenu');
+  const fuocoSu = () => page.evaluate(() => {
+    const a = document.activeElement;
+    return a && a.classList.contains('sn-wallet-user') ? a.cells[0].textContent : null;
+  });
+  const rileggi = () => app.evaluate(() => globalThis.SN_BROADCAST_FILO({ type: globalThis.SN_MSG.MSG.CREDITS_CHANGED }));
+
+  await expect(righe).toHaveCount(1, { timeout: 15_000 });
+  await lei.click();
+  await expect(scheda).toContainText('4.890,5', { timeout: 15_000 });
+  await lei.click({ button: 'right' });
+  await expect(menu).toBeVisible();
+  expect(await fuocoSu()).toBe(PSEUDONIMO);
+
+  // Le arrivano crediti: la riga e la scheda aperta prendono il numero nuovo, e niente si chiude.
+  persone[0] = { ...persone[0], balance: { ...persone[0].balance, credits: 5890.5, creditsGranted: 6128 } };
+  await rileggi();
+  await expect(lei.locator('td').nth(1)).toHaveText('5.890,5', { timeout: 15_000 });
+  await expect(scheda).toContainText('5.890,5', { timeout: 15_000 });
+  expect(detailChiesti.length).toBe(2);
+  await expect(menu).toHaveCount(1);
+  await expect(menu).toBeVisible();
+  expect(await fuocoSu()).toBe(PSEUDONIMO);
+
+  // Entra una persona nuova, in cima: la riga col fuoco non si sposta e non lo perde.
+  persone.unshift({
+    pseudonym: 'f00dfeed00000001', balance: { credits: 5000, creditsGranted: 5000, usageUsd: 0, limitUsd: 3.5 },
+    invitedBy: 'owner', createdAt: '2026-10-01T08:00:00.000Z', reconcile: null, usage: { rows: 0, byAction: {}, byDay: {} },
+  });
+  await rileggi();
+  await expect(righe).toHaveCount(2, { timeout: 15_000 });
+  await expect(righe.first()).toContainText('f00dfeed00000001');
+  await expect(menu).toBeVisible();
+  await expect(scheda).toBeVisible();
+  expect(await fuocoSu()).toBe(PSEUDONIMO);
+
+  // Esc chiude il menu, e il fuoco è ancora sulla riga: Invio richiude la scheda.
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await page.keyboard.press('Enter');
+  await expect(scheda).toBeHidden();
+
+  // Una persona che il server non elenca più porta via la sua riga e il menu aperto su di lei.
+  await lei.click({ button: 'right' });
+  await expect(menu).toBeVisible();
+  persone = persone.filter((p) => p.pseudonym !== PSEUDONIMO);
+  await rileggi();
+  await expect(righe).toHaveCount(1, { timeout: 15_000 });
+  await expect(lei).toHaveCount(0);
+  await expect(menu).toHaveCount(0);
+});
+
 // Tema chiaro e tema scuro: le manopole e i riquadri dei numeri sono roba
 // nuova sulla pagina, e devono leggersi in tutti e due. Gli screenshot
 // finiscono in tests/.shots/ (non tracciati) e li guarda chi lavora.
@@ -661,10 +737,10 @@ test('manopole e numeri si leggono in tema chiaro e in tema scuro', async ({ app
       const s = (await globalThis.__filoStorage.get('settings')).settings || {};
       await globalThis.__filoStorage.set({ settings: { ...s, theme: t } });
     }, tema);
-    await page.reload();
+    await ricaricaSu(page, 'utenti');
     await page.waitForFunction(() => {
       const s = document.getElementById('ownerSection');
-      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8;
+      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 11;
     }, null, { timeout: 15_000 });
     // La pagina prende davvero il tema chiesto.
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-sn-theme'))).toBe(tema);

@@ -21,6 +21,8 @@ const FILE_ESCLUSI = {
   'src/shared/serviziEsterni.js': 'l’elenco stesso: i suoi indirizzi non provano che il codice li usi',
   'src/shared/transparency.js': 'testi e fonti dei documenti di trasparenza',
   'src/shared/patchNotes.js': 'testo del changelog',
+  'src/vendor/public-suffix-list/privata.js': 'dati della Public Suffix List: l’indirizzo è la fonte che scripts/aggiorna-psl.mjs clona',
+  'src/shared/sitiComuni.js': 'gli indirizzi che il modello può scrivere a memoria: li contatta solo la lettura o l’apertura di una pagina (voce «pagine-lette»)',
 };
 const DATI_DI_TERZI = { cartella: 'src/vendor/', perche: 'regole e licenze impacchettate: i loro indirizzi sono selettori di pagina' };
 
@@ -35,6 +37,7 @@ const NON_DI_RETE = [
 // Esempi e identificatori: indirizzi scritti nel codice che nessuno contatta.
 const ESEMPI = [
   { file: 'src/shared/actionTools.js', url: 'https://…', perche: 'esempio nel testo per il modello' },
+  { file: 'src/main/services/handlers.js', url: 'https://…', perche: 'esempio nel testo per il modello' },
   { file: 'src/main/services/providers/openrouter.js', url: 'https://filo.local', perche: 'intestazione HTTP-Referer' },
   { file: 'src/main/services/scryfall.js', url: 'https://singolarita.com', perche: 'recapito nello User-Agent' },
   { file: 'src/main/services/accessoGoogle.js', url: 'https://accounts.google.com/', perche: 'sceglie la sessione delle schede in cui vivono i cookie di Google' },
@@ -44,6 +47,7 @@ const ESEMPI = [
 // Ognuno si riconosce dal file e da un pezzo della sua riga; uno nuovo fa rosso finché non è qui.
 const COMPOSTI = [
   { file: 'src/main/services/llmsTxt.js', testo: '`https://${domain}/llms.txt`', servizio: 'llms-txt' },
+  { file: 'src/main/services/fontiSegnaposto.js', testo: '`https://${lingua}.wikipedia.org`', servizio: 'fonti-segnaposti' },
   { file: 'src/main/services/geoBlockClassifier.js', testo: 'SB.ownerOf(url || `https://${host}/`', perche: 'chiave del conto dei giudizi per sito' },
   { file: 'src/main/services/handlers.js', testo: 'url : `https://${url}`', perche: 'chiede al blocco dei siti di un indirizzo scritto senza schema' },
   { file: 'src/main/services/handlers.js', testo: 'sito ? `https://${sito}/`', perche: 'l’indirizzo mostrato al posto di una pagina delicata' },
@@ -53,12 +57,16 @@ const COMPOSTI = [
   { file: 'src/main/services/siteBlock.js', testo: 'new URL(`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/main/tabs.js', testo: '? src : `https://${src}`', perche: 'il nome del sito delle regole del proxy' },
   { file: 'src/pages/dashboard/dashboard-comandi.js', testo: 'raw : `https://${raw}`', perche: 'il sito scritto dall’utente, che si apre in una scheda' },
-  { file: 'src/shared/eseguibili.js', testo: 's : `https://${s}`', perche: 'ne estrae il nome del sito' },
+  { file: 'src/shared/stessoSito.js', testo: '`http://${s}`', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/nomiSito.js', testo: '`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/tabTriage.js', testo: 's = `https://${s}`', perche: 'ne estrae il nome del sito da tenere sempre aperto' },
   { file: 'src/shared/urlExfil.js', testo: "new URL('https://' + url)", perche: 'analizza un indirizzo che potrebbe portare fuori dati' },
   { file: 'src/shared/urlExfil.js', testo: 'new URL(`https://${url}`)', perche: 'analizza un indirizzo che potrebbe portare fuori dati' },
   { file: 'src/shared/urlExfil.js', testo: 'l : `https://${l}`', perche: 'la chiave di confronto di un link scritto in chat' },
+  { file: 'src/main/services/pageRead.js', testo: 's = `http://${s}`', servizio: 'pagine-lette' },
+  { file: 'src/main/services/pageRead.js', testo: 's = `https://${s}`', servizio: 'pagine-lette' },
+  { file: 'src/main/services/pageRead.js', testo: 'trovati.push(`https://${m[1]}`)', perche: 'la chiave di confronto di un link scritto senza schema' },
+  { file: 'src/main/services/pageRead.js', testo: '`https://${m[1]}`;', perche: 'la chiave di un indirizzo scritto dal modello, solo da confrontare' },
 ];
 
 // Chiamate di rete che non contattano un servizio.

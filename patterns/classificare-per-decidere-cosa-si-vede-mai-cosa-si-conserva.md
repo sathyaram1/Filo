@@ -38,7 +38,7 @@ L'archivio delle chat con Filo (#525) è il caso di riferimento:
   che non è riconoscibile come «comando», e `isVisibleByDefault` tratta il tipo
   mancante come visibile;
 - `setTriage` distingue «tipo ignoto» (null, si riproverà: `listUntriaged`) da
-  «tipo deciso», e `filo://archive` mostra in vista tutto ciò che non è un
+  «tipo deciso», e chi elenca le chat mette in vista tutto ciò che non è un
   comando.
 
 Il gemello con il verso opposto è il livello di sicurezza delle azioni

@@ -76,7 +76,7 @@ test('motivo e interruttore del suono delle notifiche si chiedono a parole', () 
 const MANOPOLE = {
   theme: 'tema',
   textScale: 'dimensione_testo',
-  showHomeMessage: 'commento_home',
+  showHomeMessage: 'scrive_per_primo',
   agentStyleText: 'stile_agente',
   autoArchiveEnabled: 'archiviazione_automatica',
   autoArchiveOnClose: 'archivia_alla_riapertura',
@@ -96,7 +96,7 @@ const MANOPOLE = {
 };
 
 const VALORI_DI_PROVA = {
-  tema: 'scuro', dimensione_testo: 'grande', commento_home: 'si', stile_agente: 'pacato',
+  tema: 'scuro', dimensione_testo: 'grande', scrive_per_primo: 'si', stile_agente: 'pacato',
   archiviazione_automatica: 'si', archivia_alla_riapertura: 'si', ore_inattivita: 6,
   modalita_terminale: 'si', shell_terminale: 'bash', voce: 'Alice', velocita_voce: 1.2,
   tono_voce: 1, voce_modello: 'Sara', durata_notifiche: 10, suono_notifiche: 'si',

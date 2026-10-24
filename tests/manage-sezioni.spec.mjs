@@ -1,4 +1,4 @@
-// #1150 (SPEC-DOMANDE §2.1): Gestione a sezioni. Le schede di oggi si spostano senza cambiare, ogni sezione ha
+// #1150 (SPEC-DOMANDE §2.1), #1414 (Utenti, Impostazioni predefinite): Gestione a sezioni. Le schede di oggi si spostano senza cambiare, ogni sezione ha
 // un numero solo quando lo sa, e l'ultima sezione torna intera alla riapertura, con la sua scheda caricata.
 import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
@@ -36,19 +36,24 @@ test('la barra mostra le sezioni e ogni scheda si apre dalla sua', async ({ open
   await apri(page);
 
   const sezioni = page.locator('.mg-sezione');
-  await expect(sezioni).toHaveCount(3);
+  await expect(sezioni).toHaveCount(5);
   expect((await sezioni.allInnerTexts()).map((t) => t.replace(/\s*\(.*\)$/, '').trim()))
-    .toEqual(['Domande', 'Feedback', 'Routine']);
+    .toEqual(['Domande', 'Feedback', 'Routine', 'Utenti', 'Impostazioni predefinite']);
   // Si parte da Feedback: le sue schede si vedono, quelle delle altre sezioni no.
   await expect(page.locator('.mg-sezione[data-sezione="feedback"]')).toHaveClass(/mg-sezione--active/);
-  for (const t of ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived', 'fbstats', 'stats']) {
+  for (const t of ['inbox', 'queue', 'waiting', 'resolved', 'archived', 'fbstats', 'stats']) {
     await expect(page.locator(`.mg-tab[data-tab="${t}"]`), t).toBeVisible();
   }
-  for (const t of ['automation', 'log', 'domande', 'domande-lavoro', 'domande-archivio']) {
+  // I lavori server stanno nella scheda del loro stato (#1575): la loro scheda non c'è più.
+  await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveCount(0);
+  for (const t of ['automation', 'log', 'domande', 'domande-lavoro', 'domande-archivio', 'utenti', 'contatori', 'predefiniti']) {
     await expect(page.locator(`.mg-tab[data-tab="${t}"]`), t).toBeHidden();
   }
 
-  const panelDi = { automation: 'panel-automation', log: 'panel-log', fbstats: 'panel-fbstats', stats: 'panel-stats', queue: 'panel-list', domande: 'panel-domande' };
+  const panelDi = {
+    automation: 'panel-automation', log: 'panel-log', fbstats: 'panel-fbstats', stats: 'panel-stats', queue: 'panel-list', domande: 'panel-domande',
+    utenti: 'panel-utenti', contatori: 'panel-contatori', predefiniti: 'panel-predefiniti',
+  };
   for (const [tab, panel] of Object.entries(panelDi)) {
     await apriScheda(page, tab);
     await expect(page.locator(`#${panel}`), tab).toHaveClass(/mg-panel--active/);
@@ -97,6 +102,9 @@ test('i numeri delle sezioni: solo quando il dato c’è', async ({ openTab }) =
   await expect(numero('feedback')).toHaveText('(2)');
   // Routine senza fusioni in attesa non ha niente da dire.
   await expect(numero('routine')).toHaveText('');
+  // Utenti e Impostazioni predefinite non elencano lavoro: nessun numero (#1414).
+  await expect(numero('utenti')).toHaveText('');
+  await expect(numero('predefinite')).toHaveText('');
   // Domande: senza l'account dell'owner il main le rifiuta, quindi nessun numero e lo si dice nel pannello.
   await expect(numero('domande')).toHaveText('');
   await apriScheda(page, 'domande');

@@ -1,5 +1,5 @@
 // Permessi delle pagine web (#591.1): microfono, fotocamera, appunti e posizione passano da un sì dell'utente;
-// Filo stesso e i suoi lasciapassare no; la finestra nascosta del controllo profondo dice no a tutto.
+// Filo stesso no; lo schermo si sceglie ogni volta; la finestra nascosta del controllo profondo dice no a tutto.
 
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
@@ -83,22 +83,18 @@ test('Filo stesso non si chiede niente: pagine filo:// e la cornice', () => {
   assert.equal(ses.avvisi.length, 0);
 });
 
-test('Detta e Incolla di Filo sulla pagina passano col lasciapassare, per pochi secondi e solo per quello chiesto', () => {
-  mock.timers.enable({ apis: ['Date'], now: 1_000_000 });
-  try {
-    const ses = sessioneFinta();
-    const wc = wcFinto('https://posta.example/');
-    assert.equal(Permessi.lasciapassare(wc, 'media'), true);
-    assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['audio'] }), [true]);
-    assert.deepEqual(chiedi(ses, wc, 'clipboard-read'), [], 'il lasciapassare del microfono non apre gli appunti');
-    assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['video'] }), [], 'né la fotocamera');
-    assert.equal(ses.controllo(wc, 'media', 'https://posta.example', { mediaType: 'video' }), true, 'finché nessuno ha detto no');
-    mock.timers.tick(6000);
-    assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['audio'] }), [], 'scaduto: si torna a chiedere');
-    assert.equal(Permessi.lasciapassare(wc, 'posizione'), false, 'la posizione non ha lasciapassare');
-  } finally {
-    mock.timers.reset();
-  }
+test('Detta e Incolla non aprono niente al sito: nessun lasciapassare, e un no salvato resta no (#586)', () => {
+  assert.equal(Permessi.lasciapassare, undefined, 'il microfono di Detta lo apre la cornice, gli appunti di Incolla il main');
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://posta.example/');
+  const esiti = chiedi(ses, wc, 'media', { mediaTypes: ['audio'] });
+  Permessi.rispondi(ses.avvisi.find((a) => a.evento === 'chiedi').dati.id, false);
+  assert.deepEqual(esiti, [false]);
+  assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['audio'] }), [false]);
+  const ascolto = readFileSync(new URL('../../src/shared/ascolto.js', import.meta.url), 'utf8');
+  assert.match(ascolto, /SN_MICROFONO_CORNICE \? await microfonoDellaCornice/, 'sulle pagine web Detta ascolta dalla cornice');
+  const azioni = readFileSync(new URL('../../src/content/actions.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(azioni, /navigator\.clipboard\.read/, 'Incolla non legge gli appunti col permesso della pagina');
 });
 
 test('una pagina che non sta in una scheda (nessuno a cui chiedere) riceve no', () => {
@@ -157,7 +153,7 @@ test('quello che Chrome concede passa, quello che chiede si chiede, quello che F
     assert.equal(ses.controllo(wc, p, 'https://video.example', {}), true, p);
   }
   const tipi = {
-    midiSysex: 'strumenti', 'idle-detection': 'presenza', 'window-management': 'schermi',
+    midi: 'strumenti', midiSysex: 'strumenti', 'idle-detection': 'presenza', 'window-management': 'schermi',
     'geolocation-approximate': 'posizione', 'local-network-access': 'rete', 'local-network': 'rete', 'loopback-network': 'rete',
   };
   for (const [p, tipo] of Object.entries(tipi)) {
@@ -166,20 +162,53 @@ test('quello che Chrome concede passa, quello che chiede si chiede, quello che F
   }
   assert.equal(ses.controllo(wc, 'idle-detection', 'https://video.example', {}), false, 'chi sa che sei al computer lo sa solo col sì');
   for (const p of ['display-capture', 'unknown', 'hid', 'serial', 'usb', 'captured-surface-control', 'smart-card', 'nfc', 'ar', 'vr',
-    'hand-tracking', 'web-printing', 'web-app-installation', 'automatic-fullscreen', 'periodic-background-sync', 'system-wake-lock']) {
+    'hand-tracking', 'web-printing', 'web-app-installation', 'automatic-fullscreen', 'periodic-background-sync', 'system-wake-lock',
+    'speaker-selection', 'local-fonts']) {
     assert.deepEqual(chiedi(ses, wc, p), [false], p);
     assert.equal(ses.controllo(wc, p, 'https://video.example', {}), false, p);
   }
-  assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: [] }), [false], 'condividere lo schermo: niente domanda su microfono e fotocamera');
+  assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: [] }), [false], 'lo schermo senza un gesto sulla pagina: no, senza domanda');
 });
 
-test('i font del computer, che Electron non fa chiedere, passano solo subito dopo un gesto sulla pagina', () => {
+// L'elenco dei font installati è uguale in ogni sito e in ogni sessione: un clic su un banner non lo consegna (#1524).
+test('i font del computer, che Electron non fa chiedere, non passano nemmeno dopo un gesto sulla pagina', () => {
   const ses = sessioneFinta();
   const wc = wcFinto('https://grafica.example/');
   Permessi.seguiGesti(wc);
   assert.equal(ses.controllo(wc, 'local-fonts', 'https://grafica.example', {}), false);
   wc.emetti('input-event', {}, { type: 'mouseDown' });
-  assert.equal(ses.controllo(wc, 'local-fonts', 'https://grafica.example', {}), true);
+  assert.equal(ses.controllo(wc, 'local-fonts', 'https://grafica.example', { requestingUrl: 'https://grafica.example/' }), false);
+});
+
+// I nomi di microfoni, fotocamere e uscite audio Chromium li dà a chi il controllo con securityOrigin dice sì; il controllo
+// senza securityOrigin è permissions.query, che resta «da chiedere» (#1524).
+test('l\'elenco dei dispositivi ha i nomi solo dopo un sì vero, parte per parte; permissions.query resta com\'era', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://riunione.example/stanza');
+  const elenco = (mediaType, o = 'https://riunione.example/') => ({ isMainFrame: true, mediaType, requestingUrl: 'https://riunione.example/stanza', securityOrigin: o });
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('audio')), false, 'mai deciso: niente nomi');
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('video')), false);
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('unknown')), false);
+  assert.equal(ses.controllo(wc, 'speaker-selection', 'https://riunione.example/stanza', {}), false, 'le uscite non passano da sé');
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', { mediaType: 'audio', requestingUrl: 'https://riunione.example/stanza' }), true,
+    'permissions.query: «posso chiedere?»');
+  chiedi(ses, wc, 'media', { mediaTypes: ['audio'], securityOrigin: 'https://riunione.example/' });
+  Permessi.rispondi(ses.avvisi.at(-1).dati.id, true);
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('audio')), true, 'dopo Consenti');
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('video')), false, 'la fotocamera resta senza nomi');
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('audio', 'https://incorporato.example/')), true,
+    'il riquadro a cui la pagina delega il microfono ha il sì della pagina, come in Chrome');
+  const altro = wcFinto('https://altro.example/');
+  assert.equal(ses.controllo(altro, 'media', 'https://altro.example/', { mediaType: 'audio', securityOrigin: 'https://altro.example/' }), false, 'un altro sito');
+  const home = wcFinto('filo://newtab/');
+  assert.equal(ses.controllo(home, 'media', 'filo://newtab/', { mediaType: 'audio', requestingUrl: 'filo://newtab/', securityOrigin: 'https://mappa.example/' }), false,
+    'un riquadro web in una pagina di Filo risponde per sé');
+  assert.equal(ses.controllo(home, 'media', 'filo://newtab/', { mediaType: 'audio', requestingUrl: 'filo://newtab/', securityOrigin: 'filo://newtab/' }), true, 'Filo stesso');
+
+  chiedi(ses, wc, 'media', { mediaTypes: ['video'] });
+  Permessi.rispondi(ses.avvisi.at(-1).dati.id, false);
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('video')), false, 'dopo il no');
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', { mediaType: 'video' }), false, 'e permissions.query lo dice');
 });
 
 // Filo sono solo le sue pagine: un blob porta l'origine del sito che l'ha creato (#591, giro 20).
@@ -233,6 +262,26 @@ test('nelle sessioni su disco le risposte si condividono, si salvano, si elencan
   Permessi.togliScelta('https://riunione.example', 'audio');
 });
 
+// Il controllo dice sì anche a chi nessuno ha risposto: la pagina legge «da chiedere» finché `siDato` non vede un sì vero,
+// del suo sito e solo per fotocamera, microfono e posizione (#1057).
+test('siDato: sì solo dopo Consenti, per quel sito e per quella parte', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://riunione.example/stanza');
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example', { mediaType: 'audio' }), true);
+  assert.equal(Permessi.siDato(ses, 'https://riunione.example/stanza', 'audio'), false, 'mai deciso');
+  chiedi(ses, wc, 'media', { mediaTypes: ['audio'] });
+  Permessi.rispondi(ses.avvisi.at(-1).dati.id, true);
+  assert.equal(Permessi.siDato(ses, 'https://riunione.example/altra', 'audio'), true);
+  assert.equal(Permessi.siDato(ses, 'https://riunione.example/', 'video'), false, 'la fotocamera resta da chiedere');
+  assert.equal(Permessi.siDato(ses, 'https://altro.example/', 'audio'), false, 'un altro sito');
+  assert.equal(Permessi.siDato(ses, 'about:blank', 'audio'), false);
+  assert.equal(Permessi.siDato(ses, 'https://riunione.example/', 'appunti'), false, 'solo le parti lette dalla pagina');
+  assert.equal(Permessi.siDato(ses, 'https://riunione.example/', 'strumenti'), false, 'il MIDI resta da chiedere');
+  chiedi(ses, wc, 'midiSysex');
+  Permessi.rispondi(ses.avvisi.at(-1).dati.id, true);
+  assert.equal(Permessi.siDato(ses, 'https://riunione.example/', 'strumenti'), true, 'dopo Consenti agli strumenti');
+});
+
 // Ogni nome che Electron può mandare ai gestori ha una regola: un nome nuovo, qui, è un rosso e non un no silenzioso.
 test('ogni permesso che Electron dichiara è chiesto, concesso o negato per una ragione scritta', () => {
   // Risolto come un pacchetto: nella prova degli unit sulla fusione node_modules sta una cartella più su (#929).
@@ -247,7 +296,7 @@ test('ogni permesso che Electron dichiara è chiesto, concesso o negato per una 
   }
   assert.ok(nomi.size > 15);
   const regole = new Set([...Object.keys(Permessi.TIPI), ...Object.keys(Permessi.SECONDO_L_ACCESSO), ...Permessi.INNOCUI,
-    ...Permessi.NON_DISPONIBILI, ...Permessi.COL_GESTO_SENZA_DOMANDA, 'openExternal']);
+    ...Permessi.NON_DISPONIBILI, 'openExternal']);
   assert.deepEqual([...nomi].filter((n) => !regole.has(n)), []);
 });
 
@@ -306,9 +355,8 @@ test('la domanda nomina il dominio registrato: la parte davanti la sceglie chi h
 
 // Quello che Chrome concede di fabbrica, senza domanda: una pagina che lo chiede non deve leggere «bloccato» (#591, giro 19).
 test('passa senza domanda tutto quello che Chrome concede di fabbrica', () => {
-  const chrome = ['fullscreen', 'pointerLock', 'keyboardLock', 'clipboard-sanitized-write', 'mediaKeySystem', 'midi',
-    'speaker-selection', 'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler',
-    'persistent-storage'];
+  const chrome = ['fullscreen', 'pointerLock', 'keyboardLock', 'clipboard-sanitized-write', 'mediaKeySystem',
+    'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler', 'persistent-storage'];
   for (const p of chrome) assert.equal(Permessi.INNOCUI.has(p), true, p);
 });
 
@@ -644,4 +692,156 @@ test('il file scelto in «Salva con nome» si scrive senza domanda, anche dopo u
   assert.equal(controlla(pieno), false);
   assert.equal(controlla(vecchio), false);
   assert.equal(ses.controllo(null, 'fileSystem', 'https://editor.example/', cartella('writable', dir, true)), false, 'una cartella non è un salvataggio');
+});
+
+// ── #586: lo schermo, i riquadri di altri siti, il segno sulla scheda ──
+
+function sessioneConSchermo() {
+  const ses = sessioneFinta();
+  ses.setDisplayMediaRequestHandler = (fn) => { ses.schermo = fn; };
+  delete ses._filoPermessi;
+  Permessi.installa(ses, { schedaDi: () => ({ tabId: 't1', avvisa: (evento, dati) => ses.avvisi.push({ evento, dati }) }) });
+  return ses;
+}
+
+function fontiFinte(ses) {
+  const sorgente = { id: 'screen:1:0', name: 'Schermo' };
+  Permessi._usaFontiSchermo(async () => [
+    { id: 'screen:1:0', tipo: 'schermo', nome: 'Schermo intero', anteprima: '', sorgente },
+    { id: 'window:7:0', tipo: 'finestra', nome: 'Note', anteprima: '', sorgente: { id: 'window:7:0' } },
+  ]);
+  return sorgente;
+}
+
+const attendi = () => new Promise((r) => setImmediate(r));
+
+// Come Chromium: il gestore dello schermo lo chiama solo getDisplayMedia, dentro il sì al permesso.
+const getDisplayMedia = (ses, consegne) => (si) => { if (si) ses.schermo({ frame: null }, (f) => consegne.push(f)); };
+
+test('lo schermo: dopo un clic la cornice chiede cosa mostrare, la scelta arriva alla pagina e la volta dopo si richiede', async () => {
+  const ses = sessioneConSchermo();
+  const sorgente = fontiFinte(ses);
+  const wc = wcFinto('https://riunione.example/');
+  wc.forcefullyCrashRenderer = () => { wc.fermata = true; };
+  Permessi.seguiGesti(wc);
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  const consegne = [];
+  const esiti = [];
+  const gdm = getDisplayMedia(ses, consegne);
+  ses.richiesta(wc, 'media', (si) => { esiti.push(si); gdm(si); }, { mediaTypes: [] });
+  await attendi();
+  const domanda = ses.avvisi.find((a) => a.evento === 'chiedi' && a.dati.tipo === 'schermo');
+  assert.ok(domanda, 'la cornice chiede');
+  assert.deepEqual(domanda.dati.fonti.map((f) => f.id), ['screen:1:0', 'window:7:0']);
+  assert.equal(domanda.dati.fonti.some((f) => 'sorgente' in f), false, 'alla cornice vanno nomi e anteprime, non gli oggetti');
+  assert.deepEqual(esiti, [], 'niente prima della scelta');
+  assert.equal(Permessi.rispondi(domanda.dati.id, true, 'screen:1:0'), true);
+  assert.deepEqual(esiti, [true]);
+  assert.deepEqual(consegne, [{ video: sorgente }]);
+  assert.equal(wc.fermata, undefined, 'getDisplayMedia non ferma la pagina');
+  assert.deepEqual(Permessi.segniDi(wc), { usati: ['schermo'], negati: [] }, 'il segno sulla scheda dice che vede lo schermo');
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  ses.richiesta(wc, 'media', gdm, { mediaTypes: [] });
+  await attendi();
+  assert.equal(ses.avvisi.filter((a) => a.evento === 'chiedi' && a.dati.tipo === 'schermo').length, 2, 'si chiede ogni volta');
+});
+
+test('lo schermo: Non consentire è un no alla pagina, e una fonte inventata non consegna niente', async () => {
+  const ses = sessioneConSchermo();
+  fontiFinte(ses);
+  const wc = wcFinto('https://riunione.example/');
+  wc.forcefullyCrashRenderer = () => {};
+  Permessi.seguiGesti(wc);
+  for (const [si, fonte] of [[false, undefined], [true, 'screen:99:0']]) {
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    const consegne = [];
+    const esiti = [];
+    const gdm = getDisplayMedia(ses, consegne);
+    ses.richiesta(wc, 'media', (ok) => { esiti.push(ok); gdm(ok); }, { mediaTypes: [] });
+    await attendi();
+    const domanda = ses.avvisi.filter((a) => a.evento === 'chiedi' && a.dati.tipo === 'schermo').at(-1);
+    Permessi.rispondi(domanda.dati.id, si, fonte);
+    assert.deepEqual(esiti, [false], `${si} ${fonte}`);
+    assert.deepEqual(consegne, [], `${si} ${fonte}`);
+  }
+  assert.deepEqual(Permessi.segniDi(wc), { usati: [], negati: ['schermo'] });
+});
+
+test('la strada vecchia per lo schermo (getUserMedia con chromeMediaSource) non arriva al sito: la pagina si ferma', async () => {
+  const ses = sessioneConSchermo();
+  fontiFinte(ses);
+  const wc = wcFinto('https://spia.example/');
+  wc.forcefullyCrashRenderer = () => { wc.fermata = true; };
+  Permessi.seguiGesti(wc);
+  assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: [] }), [false], 'senza un gesto: no, senza domanda né pagina fermata');
+  assert.equal(wc.fermata, undefined);
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  const esiti = chiedi(ses, wc, 'media', { mediaTypes: [] });
+  await attendi();
+  const domanda = ses.avvisi.find((a) => a.evento === 'chiedi' && a.dati.tipo === 'schermo');
+  Permessi.rispondi(domanda.dati.id, true, 'screen:1:0');
+  assert.deepEqual(esiti, [true]);
+  assert.equal(wc.fermata, true, 'senza il gestore dello schermo il sì non resta alla pagina');
+  assert.equal(Permessi.segniDi(wc), null, 'e non si dice che la usa');
+});
+
+test('l\'avviso della strada vecchia fa negare dopo la scelta solo la domanda dell\'origine che lo manda', async () => {
+  const ses = sessioneConSchermo();
+  const sorgente = fontiFinte(ses);
+  const wc = wcFinto('https://riunione.example/');
+  wc.forcefullyCrashRenderer = () => { wc.fermata = true; };
+  Permessi.seguiGesti(wc);
+  const presenta = async (avviso) => {
+    if (avviso) Permessi.schermoVecchio(wc, { url: avviso, origin: new URL(avviso).origin });
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    const consegne = [];
+    const esiti = [];
+    const gdm = getDisplayMedia(ses, consegne);
+    ses.richiesta(wc, 'media', (si) => { esiti.push(si); gdm(si); }, { mediaTypes: [], requestingUrl: 'https://riunione.example/' });
+    await attendi();
+    const domanda = ses.avvisi.filter((a) => a.evento === 'chiedi' && a.dati.tipo === 'schermo').at(-1);
+    Permessi.rispondi(domanda.dati.id, true, 'screen:1:0');
+    return { esiti, consegne };
+  };
+  assert.deepEqual(await presenta('https://pubblicita.example/riquadro'), { esiti: [true], consegne: [{ video: sorgente }] },
+    'l\'avviso di un riquadro di un altro sito non tocca la presentazione della pagina');
+  assert.deepEqual(await presenta('https://riunione.example/'), { esiti: [false], consegne: [] }, 'quello della pagina stessa sì');
+  assert.equal(wc.fermata, undefined, 'e la pagina resta viva');
+  assert.deepEqual(await presenta(null), { esiti: [true], consegne: [{ video: sorgente }] }, 'l\'avviso vale una domanda sola');
+});
+
+test('un riquadro di un altro sito non chiede le notifiche col nome di chi lo ospita e non ne eredita il sì', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://giornale.example/articolo');
+  Permessi.seguiGesti(wc);
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  const esiti = chiedi(ses, wc, 'notifications');
+  Permessi.rispondi(ses.avvisi.find((a) => a.evento === 'chiedi').dati.id, true);
+  assert.deepEqual(esiti, [true]);
+  const riquadro = { isMainFrame: false, requestingUrl: 'https://pubblicita.example/banner' };
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  assert.deepEqual(chiedi(ses, wc, 'notifications', riquadro), [false], 'nessuna domanda col nome del giornale');
+  assert.equal(ses.avvisi.filter((a) => a.evento === 'chiedi').length, 1);
+  assert.equal(ses.controllo(wc, 'notifications', 'https://pubblicita.example', riquadro), false, 'il sì del giornale non vale per il riquadro');
+  const stesso = { isMainFrame: false, requestingUrl: 'https://giornale.example/commenti' };
+  assert.equal(ses.controllo(wc, 'notifications', 'https://giornale.example', stesso), true, 'un riquadro del sito stesso sì');
+});
+
+test('il segno sulla scheda: cosa la pagina usa, cosa si è vista negare, e una pagina nuova riparte da zero', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://riunione.example/');
+  assert.equal(Permessi.segniDi(wc), null);
+  const esiti = chiedi(ses, wc, 'media', { mediaTypes: ['audio', 'video'] });
+  Permessi.rispondi(ses.avvisi.find((a) => a.evento === 'chiedi').dati.id, true);
+  assert.deepEqual(esiti, [true]);
+  assert.deepEqual(Permessi.segniDi(wc), { usati: ['audio', 'video'], negati: [] });
+  const altro = wcFinto('https://mappe.example/');
+  const e2 = chiedi(ses, altro, 'geolocation');
+  Permessi.rispondi(ses.avvisi.filter((a) => a.evento === 'chiedi').at(-1).dati.id, false);
+  assert.deepEqual(e2, [false]);
+  assert.deepEqual(Permessi.segniDi(altro), { usati: [], negati: ['posizione'] });
+  assert.deepEqual(chiedi(ses, altro, 'geolocation'), [false], 'il no salvato resta, e il segno lo dice ancora');
+  assert.deepEqual(Permessi.segniDi(altro), { usati: [], negati: ['posizione'] });
+  wc.emetti('did-start-navigation', { isMainFrame: true, isSameDocument: false });
+  assert.equal(Permessi.segniDi(wc), null, 'la pagina nuova non ha ancora niente');
 });

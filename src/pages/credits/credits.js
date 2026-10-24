@@ -1,12 +1,6 @@
-// Pagina Crediti del profilo: saldo corrente, grafico a torta del consumo per
-// TIPO D'USO (non per modello) e movimenti recenti. Il costo in € non viene MAI
-// mostrato — la vista pubblica del motore crediti (publicView) lo elimina già a
-// monte. Vedi src/main/services/creditStore.js + handlers/credits.js.
-//
-// Crediti sul server (#598): se questa installazione ha un portafoglio, il
-// saldo grande è quello che dice il server (tetto della chiave OpenRouter
-// personale meno consumo), non il conteggio locale. Se non lo ha, in cima c'è
-// il campo per riscattare un codice d'invito. Sotto, i propri codici da dare.
+// Pagina Crediti: saldo, torta del consumo per tipo d'uso e movimenti recenti.
+// Il costo in € non si mostra MAI: la vista pubblica del motore crediti lo toglie a monte.
+// Col portafoglio sul server (#598) il saldo grande è quello del server, non il locale.
 
 (function () {
   'use strict';
@@ -17,9 +11,8 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // Palette delle fette: scelta a mano per restare distinguibile su tema chiaro
-  // e scuro. Le fette ciclano su questi colori nell'ordine (decrescente) della
-  // legenda, così colore↔etichetta combaciano tra torta e legenda.
+  // Palette scelta a mano per restare distinguibile su chiaro e scuro; le fette seguono
+  // l'ordine della legenda, così colore ed etichetta combaciano.
   const PALETTE = ['#c45a3b', '#3b82c4', '#3bbf7a', '#c9a13b',
     '#8a4fc4', '#c43b87', '#3bbdc4', '#7d8a3b'];
 
@@ -34,10 +27,7 @@
     // lo legge dal valore in vigore invece di scriverlo a mano, così se l'importo
     // cambia (o l'owner lo configura) il testo resta veritiero. Stessa simmetria
     // già applicata al costo di riapertura in bacheca.
-    const refill = window.SN_CONST?.CREDIT?.DAILY_REFILL;
-    if (refill != null) {
-      $('refillHint').textContent = `Ricevi +${formatInt(refill)} crediti ogni giorno a mezzanotte.`;
-    }
+    if (window.SN_CONST?.CREDIT?.DAILY_REFILL != null) $('refillHint').textContent = rigaSottoIlSaldo(ultimoStato);
 
     // Le due letture non dipendono l'una dall'altra: partono insieme. L'avviso viene dopo, dal saldo appena letto.
     const [r, w] = await Promise.all([
@@ -47,6 +37,26 @@
     render(r || {}, w || null);
     renderAvviso(await chrome.runtime.sendMessage({ type: MSG.CREDITS_WARNING_STATE }).catch(() => null));
     seguiAncora();
+  }
+
+  // La riga sotto il conteggio locale. Con la chiave propria quel numero non paga niente, e lo dice prima (#1353).
+  function rigaRicarica(chiavePropria = false) {
+    const refill = window.SN_CONST?.CREDIT?.DAILY_REFILL;
+    const ricarica = `Ricevi ${refill != null ? `+${formatInt(refill)}` : 'altri'} crediti ogni giorno a mezzanotte.`;
+    return chiavePropria
+      ? `Le richieste le paga la tua chiave OpenRouter. Questi sono crediti di prova che Filo tiene su questo computer, non soldi che spendi. ${ricarica}`
+      : ricarica;
+  }
+
+  // La riga per l'ultimo stato letto: mentre la pagina rilegge resta quella, non torna per un attimo a quella di serie.
+  let ultimoStato = null;
+  function rigaSottoIlSaldo(w) {
+    const server = w && w.ok ? w.server : null;
+    if (server && server.hasWallet) {
+      const daily = Number(server.dailyCredits) || 0;
+      return daily > 0 ? `Ricevi +${formatInt(daily)} crediti ogni giorno, e si accumulano.` : 'I crediti li tiene il server.';
+    }
+    return rigaRicarica(Boolean(w && w.ok && w.keySource === 'own'));
   }
 
   // ── L'avviso prima che i crediti finiscano (#818) ──────────────────────────
@@ -95,25 +105,20 @@
 
   function render(r, w) {
     const credits = r.credits || {};
-    // Saldo con precisione fino a 1 decimale: un uso leggero consuma frazioni di
-    // credito, e arrotondare all'intero le nasconderebbe (il saldo resterebbe
-    // fermo a 1000 pur avendo l'utente usato Filo). balanceExact conserva la
-    // frazione; ripiego su balance per retrocompatibilità.
+    // Saldo a un decimale: un uso leggero consuma frazioni di credito e l'intero le
+    // nasconderebbe. balanceExact conserva la frazione, `balance` è il ripiego.
     const bal = credits.balanceExact != null ? credits.balanceExact : (credits.balance || 0);
     $('balance').textContent = formatCredits(bal);
     $('offlineHint').hidden = !!r.signedIn;
+    accessoGoogle = !!r.signedIn;
 
     renderWallet(w);
     renderUsage(credits.byUsage || {});
     renderMoves(credits.rewards || [], w);
   }
 
-  // ── Crediti sul server (#598) ──────────────────────────────────────────────
-  // Una conferma (riscatto riuscito, nuova chiave) deve restare leggibile: nello
-  // stesso istante arriva l'avviso di saldo cambiato e la pagina si ridisegna da
-  // sola, e un ridisegno che nasconde la nota cancellava la frase prima che
-  // l'utente la leggesse (primo giro di verifica del ramo -b). La conferma vive
-  // qui e vince su ogni ridisegno finché l'utente non fa un'altra azione.
+  // Una conferma deve restare leggibile: l'avviso di saldo cambiato arriva nello stesso
+  // istante e il ridisegno cancellava la frase. La conferma vince finché non si fa altro.
   let confirmation = null;
   function showConfirmation(text) {
     confirmation = text || null;
@@ -264,9 +269,13 @@
     // Quello del server vince: è il nome con cui la persona compare all'owner.
     renderPseudonym(has ? String(server.pseudonym || w.pseudonym || '') : '');
     if (!w || !w.ok) { box.hidden = true; return; }
+    ultimoStato = w;
     box.hidden = false;
     const note = $('walletNote');
     note.hidden = true;
+    const registro = W.registroScartateTesto(w.usageLog && w.usageLog.discardedBy);
+    $('usageLogNote').textContent = registro;
+    $('usageLogNote').hidden = !registro;
     // Senza nessuna chiave (né personale, né propria, né di fabbrica) il
     // conteggio locale non compra niente: saldo, ricarica a mezzanotte e
     // invito al login sono promesse vuote, e si tolgono. Restano per chi ha
@@ -275,10 +284,11 @@
     // sul server: quella chiave non compra più niente. E con la personale e il
     // server non letto: il saldo è del server, e il conteggio locale al suo
     // posto sarebbe un numero che sparisce alla lettura dopo (#1138).
-    const noKey = !has && (w.keySource === 'none' || w.keySource === 'personal' || Boolean(w.identity && w.identity.lost));
+    const noKey = !has && !W.conteggioLocaleInVista({ keySource: w.keySource, identityLost: Boolean(w.identity && w.identity.lost) });
     $('hero').hidden = noKey;
     $('refillHint').hidden = noKey;
     if (noKey) $('offlineHint').hidden = true;
+    if (!noKey) $('refillHint').textContent = rigaSottoIlSaldo(w);
 
     // La gestione (codici, regali, utenti) è una pagina a parte: qui solo il rimando.
     $('ownerLink').hidden = !w.isOwner;
@@ -289,12 +299,13 @@
       const b = server.balance || {};
       $('balance').textContent = b.credits != null ? formatCredits(b.credits) : '—';
       $('offlineHint').hidden = true;
-      const daily = Number(server.dailyCredits) || 0;
-      $('refillHint').textContent = daily > 0
-        ? `Ricevi +${formatInt(daily)} crediti ogni giorno, e si accumulano.`
-        : 'I crediti li tiene il server.';
       $('redeemForm').hidden = true;
-      if (w.usingOwnKey) {
+      if (w.chiaveStaccata === 'altro_pseudonimo') {
+        // Una chiave nuova è di questo portafoglio: da lì i consumi tornano a registrarsi.
+        note.textContent = 'La chiave personale salvata qui non è quella del tuo portafoglio, e quello che consumi non si registra. Chiedine una nuova.';
+        note.hidden = false;
+        reissue.hidden = false;
+      } else if (w.usingOwnKey) {
         note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo servono solo se OpenRouter la rifiuta.';
         note.hidden = false;
       } else if (server.cached) {
@@ -310,7 +321,7 @@
         note.hidden = false;
         reissue.hidden = false;
       }
-      renderInvites(server.invites || []);
+      renderInvites(server);
       return;
     }
 
@@ -336,9 +347,13 @@
           : `Non riesco a preparare l\'identità di questa installazione: ${w.identity.error || 'errore sconosciuto'}.`;
       note.hidden = false;
     } else if (w.error === 'not_reachable') {
-      note.textContent = noKey
+      // Con la chiave propria il numero qui sopra non è un saldo (#1353).
+      note.textContent = noKey || w.keySource === 'own'
         ? 'Il server dei crediti non risponde adesso: riprova fra poco.'
         : 'Il server dei crediti non risponde adesso: il saldo qui sopra è quello locale.';
+      note.hidden = false;
+    } else if (w.chiaveStaccata === 'senza_portafoglio') {
+      note.textContent = 'La chiave personale salvata qui non è di nessun portafoglio sul server, e quello che consumi non si registra. Con un invito ne ricevi una tua.';
       note.hidden = false;
     } else if (server && server.invitesOpen === false) {
       note.textContent = 'Per ora i posti sono finiti: il tuo codice resta valido, riprova fra qualche giorno.';
@@ -454,11 +469,66 @@
     });
   }
 
-  function renderInvites(invites) {
+  // Dà inviti solo chi ha collegato Google (#1120): finché il server dice need_google, al posto dei codici c'è
+  // l'accesso. Chi è già dentro con Google e resta scollegato ha l'account legato a un'altra identità di Filo.
+  let accessoGoogle = false;
+  let collegaInCorso = false;
+  let esitoCollega = null;
+
+  function renderCollega() {
+    const btn = $('linkGoogleBtn');
+    const note = $('invitesLockedNote');
+    btn.hidden = false;
+    btn.disabled = collegaInCorso;
+    btn.textContent = collegaInCorso
+      ? 'Continua nella scheda di Google…'
+      : (accessoGoogle ? 'Riprova a collegare Google' : 'Collega Google per dare i tuoi inviti');
+    const frase = esitoCollega || (accessoGoogle && !collegaInCorso
+      ? 'Sei dentro con Google, ma il tuo account è già legato a un’altra copia di Filo, per esempio su un altro computer. Gli inviti si danno da quella.'
+      : '');
+    note.textContent = frase;
+    note.hidden = !frase;
+  }
+
+  async function collegaGoogle() {
+    if (collegaInCorso) return;
+    collegaInCorso = true;
+    esitoCollega = null;
+    renderCollega();
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) { r = null; }
+    collegaInCorso = false;
+    if (!r || !r.ok) esitoCollega = (r && r.error) || 'L’accesso a Google non è riuscito: riprova.';
+    else accessoGoogle = true;
+    renderCollega();
+    // I codici li dà il server alla prima lettura dopo il collegamento.
+    if (r && r.ok) await load();
+  }
+
+  // Un account Google dà un giro di codici solo: spostato qui da un'altra copia di Filo non ne apre un altro, e collegarsi
+  // di nuovo non cambierebbe niente.
+  function renderGiaUsato() {
+    $('linkGoogleBtn').hidden = true;
+    const note = $('invitesLockedNote');
+    note.textContent = 'Il tuo account Google ha già dato i suoi inviti da un’altra copia di Filo: si danno da quella.';
+    note.hidden = false;
+  }
+
+  function renderInvites(server) {
     const section = $('invitesSection');
     const list = $('invites');
     list.innerHTML = '';
-    const views = (invites || []).map((inv) => W.inviteView(inv));
+    const motivo = server && server.invitesLocked;
+    const locked = motivo === 'need_google' || motivo === 'google_used';
+    $('invitesLocked').hidden = !locked;
+    if (locked) {
+      section.hidden = false;
+      if (motivo === 'google_used') renderGiaUsato();
+      else renderCollega();
+      return;
+    }
+    esitoCollega = null;
+    const views = ((server && server.invites) || []).map((inv) => W.inviteView(inv));
     section.hidden = views.length === 0;
     for (const inv of views) {
       const spento = inv.exhausted || inv.revoked;
@@ -575,8 +645,7 @@
       // Il modulo dell'invito sparisce col portafoglio: la frase (coi crediti
       // d'ingresso) resta nella nota, fuori dal modulo.
       showConfirmation(r.message || 'Fatto.');
-      // Il saldo grande e i codici arrivano dallo stato nuovo. La vista owner
-      // sta in un'altra pagina e si rilegge da sé all'avviso di saldo cambiato.
+      // La vista owner sta in un'altra pagina e si rilegge da sé all'avviso di saldo cambiato.
       render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
       return;
     }
@@ -587,12 +656,8 @@
   }
 
   function renderUsage(byUsage) {
-    // Solo i gruppi con consumo > 0, in ordine decrescente. NON arrotondare
-    // all'intero: il motore fornisce già i crediti per gruppo con precisione al
-    // decimo (round1 in publicView), apposta per non perdere il consumo sotto
-    // il credito. Arrotondando qui, un uso leggero (frazioni di credito per
-    // gruppo) sparirebbe dalla torta e la pagina direbbe "non hai ancora
-    // consumato crediti" pur avendo l'utente usato Filo.
+    // Solo i gruppi con consumo > 0, e NON arrotondati all'intero: il motore dà i crediti al
+    // decimo, e un uso leggero sparirebbe dalla torta come «non hai consumato».
     const groups = Object.entries(byUsage)
       .map(([label, v]) => ({ label, credits: (v && v.credits) || 0, calls: (v && v.calls) || 0 }))
       .filter((g) => g.credits > 0)
@@ -608,9 +673,8 @@
     drawLegend(groups);
   }
 
-  // Disegna la torta come un <path> per fetta (data-group = nome del gruppo) così
-  // un test può asserire le fette attese. Con un solo gruppo disegna un cerchio
-  // pieno (l'arco da 0 a 2π collasserebbe).
+  // Un <path> per fetta (data-group) così un test può asserirle. Con un solo gruppo un
+  // cerchio pieno: l'arco da 0 a 2π collasserebbe.
   function drawChart(groups, total) {
     const chart = $('chart');
     chart.innerHTML = '';
@@ -776,9 +840,13 @@
     resetIdentity().catch(() => {});
   });
 
-  // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa).
+  $('linkGoogleBtn').addEventListener('click', () => { collegaGoogle().catch(() => {}); });
+
+  // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa) e quando cambia l'accesso a
+  // Google da un'altra porta (menu dell'account): collegarsi è ciò che sblocca gli inviti.
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.AUTH_CHANGED) { load().catch(() => {}); return; }
       if (!msg || msg.type !== MSG.CREDITS_CHANGED) return;
       load().catch(() => {});
       // Una chiamata pagata con la chiave propria (o il suo rifiuto superato):

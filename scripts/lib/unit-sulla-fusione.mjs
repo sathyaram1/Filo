@@ -1,6 +1,6 @@
-// Gli unit test sul RISULTATO della fusione del ramo con origin/main, prima di chiederla al server (#929).
+// Gli unit test sul RISULTATO della fusione del ramo con main, prima della fusione (#929, #1207).
 // Non fonde e non spinge niente: lavora in cartelle temporanee e le toglie senza mai attraversare il collegamento
-// a node_modules. La usano scripts/merge-gate.mjs e scripts/finish-local.mjs; sentinella: tests/unit/unitSullaFusione.test.mjs.
+// a node_modules. La usano scripts/unit-fusione-azione.mjs e scripts/finish-local.mjs; sentinella: tests/unit/unitSullaFusione.test.mjs.
 
 import { spawnSync, execFileSync } from 'node:child_process';
 import {
@@ -189,6 +189,36 @@ function apriAlbero(git, base, nome, sha) {
   return { dir };
 }
 
+// I nomi dei worktree che una prova apre nella sua base: `ramo` è quello dei controlli di finish (#1480).
+const ALBERI = ['fusione', 'main', 'ramo'];
+
+/**
+ * Un worktree staccato su `sha`, con node_modules collegato nella base: chi prova lì non vede la cartella cambiare ramo
+ * sotto i piedi (#1480, D-91). { dir, base, moduli, chiudi } | { errore }. `chiudi` è sincrona e si può chiamare due volte.
+ */
+export function apriProvaSulCommit({ root, sha, git = gitIn(root) } = {}) {
+  const base = realpathSync.native(mkdtempSync(join(tmpdir(), 'filo-fusione-')));
+  try { writeFileSync(join(base, FILE_PID), String(process.pid)); } catch (_) { /* senza pid la cartella vale viva per età */ }
+  const moduli = cartellaModuli(root);
+  if (moduli) {
+    try { symlinkSync(moduli, join(base, 'node_modules'), 'junction'); } catch (e) {
+      togliBase(base);
+      return { errore: `non riesco a collegare node_modules nella cartella di prova (${e.message})` };
+    }
+  }
+  const a = apriAlbero(git, base, 'ramo', sha);
+  let chiusa = false;
+  const chiudi = () => {
+    if (chiusa) return { ok: true };
+    chiusa = true;
+    const rimasti = [...(a.dir ? [chiudiAlbero(git, a.dir)] : []), togliCollegamento(join(base, 'node_modules'))].filter((r) => !r.ok);
+    if (rimasti.length) return rimasti[0];
+    return togliBase(base);
+  };
+  if (a.errore) { chiudi(); return { errore: a.errore }; }
+  return { dir: a.dir, base, moduli: moduli ? join(base, 'node_modules') : '', chiudi };
+}
+
 /** La cartella base di una prova, senza mai attraversare il collegamento: prima lui, poi il resto. */
 function togliBase(base) {
   const c = togliCollegamento(join(base, 'node_modules'));
@@ -206,7 +236,8 @@ function pidVivo(pid) {
 function provaViva(base, { vivo = pidVivo, oraMs = Date.now() } = {}) {
   let pid = NaN;
   try { pid = Number.parseInt(readFileSync(join(base, FILE_PID), 'utf8'), 10); } catch (_) { /* senza pid: decide l'età */ }
-  if (Number.isInteger(pid) && pid > 0) return pid !== process.pid && vivo(pid);
+  // La propria è in uso: la cartella dei controlli di finish vive mentre la prova sulla fusione pulisce (#1480).
+  if (Number.isInteger(pid) && pid > 0) return pid === process.pid || vivo(pid);
   try { return oraMs - statSync(base).mtimeMs < VIVA_SENZA_PID_MS; } catch (_) { return false; }
 }
 
@@ -229,7 +260,7 @@ export function pulisciResti({ git, tmp = tmpdir(), vivo = pidVivo, oraMs = Date
     for (const r of l.out.split(/\r?\n/)) {
       if (!r.startsWith('worktree ')) continue;
       const dir = r.slice(9).trim();
-      if (['fusione', 'main'].includes(basename(dir))) aggiungi(dirname(dir), dir);
+      if (ALBERI.includes(basename(dir))) aggiungi(dirname(dir), dir);
     }
   }
   try {
@@ -238,10 +269,10 @@ export function pulisciResti({ git, tmp = tmpdir(), vivo = pidVivo, oraMs = Date
   const tolte = [];
   for (const [base, dirs] of basi) {
     if (existsSync(base) && provaViva(base, { vivo, oraMs })) continue;
-    for (const nome of ['fusione', 'main']) dirs.add(join(base, nome));
+    for (const nome of ALBERI) dirs.add(join(base, nome));
     const chiusi = [...dirs].map((d) => (existsSync(d) ? chiudiAlbero(git, d) : (git(['worktree', 'unlock', d]), { ok: true })));
     // La base si toglie solo se nessun collegamento è rimasto dentro: rmSync non li segue, ma non si rischia.
-    if (chiusi.every((c) => c.ok) && !['fusione', 'main'].some((n) => { try { lstatSync(join(base, n, 'node_modules')); return true; } catch (_) { return false; } })) {
+    if (chiusi.every((c) => c.ok) && !ALBERI.some((n) => { try { lstatSync(join(base, n, 'node_modules')); return true; } catch (_) { return false; } })) {
       if (togliBase(base).ok) tolte.push(base);
     }
   }
@@ -294,11 +325,12 @@ export function lanciaUnit(dir, base, nome, { file = null } = {}) {
 /**
  * La prova. { esito, mainSha, rossi?, rossiMain?, file?, coda?, contenuto? } | { saltata, motivo } | { errore, mainSha? }.
  * `ancheContenuto`: con main già dentro il ramo si prova il ramo stesso invece di rispondere `main_contenuto`
- * (serve a giudicare un unit rosso sul ramo, #1009). `lancia` è iniettabile solo per i test.
+ * (serve a giudicare un unit rosso sul ramo, #1009). `mainSha`: il main da provare lo sceglie chi chiede (l'azione del
+ * server, #1207), non la punta di origin di adesso. `lancia` è iniettabile solo per i test.
  */
 export function provaUnitSullaFusione({
   root, punta, git = gitIn(root), gitStoria = gitIn(root, TETTO_STORIA_MS), lancia = lanciaUnit, scrivi = (s) => console.log(s),
-  ancheContenuto = false,
+  ancheContenuto = false, mainSha: mainDato = '',
 } = {}) {
   const remoti = git(['remote']);
   if (!remoti.ok) return { errore: `git non risponde (${primaRiga(remoti.out)})` };
@@ -309,16 +341,34 @@ export function provaUnitSullaFusione({
   // fallisce la misura del clone arriva lo stesso al registro.
   const tagliato = git(['rev-parse', '--is-shallow-repository']);
   const misura = tagliato.ok && tagliato.out.trim() === 'true' ? { storia: { superficiale: true, approfondito: 0, intera: false } } : {};
-  const f = gitStoria(['fetch', '--quiet', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
-  if (!f.ok) return { errore: `non riesco a scaricare main da origin (${primaRiga(f.out)})`, ...misura };
-  const m = git(['rev-parse', '--verify', `refs/remotes/origin/${MAIN}^{commit}`]);
-  const mainSha = m.ok ? m.out.trim() : '';
-  if (!/^[0-9a-f]{40}$/i.test(mainSha)) return { errore: 'non riesco a leggere lo sha di main' };
+  const m = mainDato ? mainScelto({ git, gitStoria, mainSha: mainDato }) : mainDiOrigin({ git, gitStoria });
+  if (m.errore) return { errore: m.errore, ...misura };
+  const { mainSha } = m;
   if (!/^[0-9a-f]{40}$/i.test(String(punta || ''))) return { errore: 'punta del ramo non valida', mainSha };
   const storia = assicuraStoria({ git: gitStoria, mainSha, punta });
   if (storia.errore) return { errore: storia.errore, mainSha, storia: storia.storia };
   if (storia.storia.superficiale) scrivi(testoStoria(storia.storia));
   return { ...provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheContenuto }), storia: storia.storia };
+}
+
+function mainDiOrigin({ git, gitStoria }) {
+  const f = gitStoria(['fetch', '--quiet', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
+  if (!f.ok) return { errore: `non riesco a scaricare main da origin (${primaRiga(f.out)})` };
+  const m = git(['rev-parse', '--verify', `refs/remotes/origin/${MAIN}^{commit}`]);
+  const mainSha = m.ok ? m.out.trim() : '';
+  return /^[0-9a-f]{40}$/i.test(mainSha) ? { mainSha } : { errore: 'non riesco a leggere lo sha di main' };
+}
+
+/** Il main nominato da chi chiede: dev'essere un commit, e se qui non c'è si scarica per sha. */
+function mainScelto({ git, gitStoria, mainSha }) {
+  const sha = String(mainSha || '').toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(sha)) return { errore: 'sha di main non valido' };
+  if (git(['cat-file', '-e', `${sha}^{commit}`]).ok) return { mainSha: sha };
+  const f = gitStoria(['fetch', '--quiet', 'origin', sha]);
+  if (!f.ok || !git(['cat-file', '-e', `${sha}^{commit}`]).ok) {
+    return { errore: `non riesco a scaricare main ${sha.slice(0, 12)} da origin (${primaRiga(f.out) || 'commit assente'})` };
+  }
+  return { mainSha: sha };
 }
 
 /** Quanta storia scaricare a ogni passo prima di prenderla tutta. */
@@ -368,7 +418,10 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
   // Con main già dentro, il risultato della fusione è il ramo stesso: si prova lui.
   const contenuto = git(['merge-base', '--is-ancestor', mainSha, punta]).ok;
   if (contenuto && !ancheContenuto) return { esito: 'main_contenuto', mainSha };
-  const segno = contenuto ? { contenuto: true } : {};
+  // La base del ramo va detta: chi riprova un rosso «su main da solo» partendo da lì vede main di prima (#1580.1).
+  const comune = contenuto ? null : git(['merge-base', mainSha, punta]);
+  const baseRamo = comune && comune.ok ? String(comune.out || '').trim() : '';
+  const segno = contenuto ? { contenuto: true } : (/^[0-9a-f]{40}$/i.test(baseRamo) ? { baseRamo } : {});
   const sulla = contenuto ? 'sul ramo' : 'sulla fusione';
 
   const base = realpathSync.native(mkdtempSync(join(tmpdir(), 'filo-fusione-')));

@@ -237,7 +237,7 @@ test('applica il consiglio sulla scelta: prima l’elenco delle etichette, le un
   await expect(box).toContainText('Applico il consiglio a una domanda:');
   await expect(box.locator('li').first()).toContainText('D-1');
   await expect(box.locator('li').first()).toContainText('Archivia #902');
-  await expect(box).toContainText('una per una: Approva come lavoro locale #903');
+  await expect(box).toContainText('una per una: Affida #903 ai lavori server');
   await expect(box).toContainText('nessun consiglio');
   // Niente è partito prima del sì.
   expect(await page.evaluate(() => window.__domande)).toEqual([]);

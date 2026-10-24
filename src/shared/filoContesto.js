@@ -7,8 +7,14 @@
 
   const ORA_MS = 60 * 60 * 1000;
   const GIORNO_MS = 24 * ORA_MS;
-  const TETTI_DI_SERIE = Object.freeze({ giorni: 3, token: 100000 });
+  const TETTI_DI_SERIE = Object.freeze({ giorni: 3, token: 100000, cache: '1h' });
   const LIMITI = Object.freeze({ giorni: Object.freeze([0.5, 365]), token: Object.freeze([2000, 2000000]) });
+  // Quanto vive la cache della parte fissa della chat (SPEC-CONTESTO § Le costanti): le sole due durate di Anthropic.
+  const DURATE_CACHE = Object.freeze(['5m', '1h']);
+  function durataIn(v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    return DURATE_CACHE.includes(s) ? s : null;
+  }
   // Quanto vive nel contesto l'esito di una lettura (pagina, documento, comando) e il ragionamento di una risposta,
   // finché l'owner non decide (#553.2): nella sua conversazione gli ultimi venti messaggi di quella, come prima del filo
   // unico; nelle altre schede al più gli ultimi venti del filo, così una conversazione ferma non lo tiene per giorni.
@@ -25,6 +31,9 @@
   const TOKEN_PER_IMMAGINE = 1500;
   const MAX_IMMAGINI_RIMANDATE = 16;
   const MAX_CARATTERI_IMMAGINI = 24 * 1024 * 1024;
+  // Il primo messaggio del tratto che al turno dopo perde esito, ragionamento o foto: da lì la storia già mandata
+  // cambia, e un punto di cache più avanti non verrebbe mai riletto (pianoDellaCache). Per identità: al modello non va.
+  const CAMBIANO_AL_TURNO_DOPO = new WeakSet();
 
   function numeroIn(v, [min, max]) {
     if (v === null || v === undefined || v === '' || typeof v === 'boolean') return null;
@@ -45,6 +54,10 @@
       out.da[k] = vu != null ? 'utente' : (vo != null ? 'predefiniti' : 'codice');
     }
     if (out.token % 1) out.token = Math.round(out.token);
+    const cu = durataIn(u.cache);
+    const co = durataIn(o.cache);
+    out.cache = cu ?? co ?? TETTI_DI_SERIE.cache;
+    out.da.cache = cu != null ? 'utente' : (co != null ? 'predefiniti' : 'codice');
     return out;
   }
 
@@ -196,7 +209,8 @@
     }
     const out = { role: 'assistant', content: parti.join('\n\n') || '(nessun testo)' };
     // Il ragionamento vive quanto gli esiti, su ogni risposta e in ogni scheda: tolto solo all'ultima cambierebbe a
-    // ogni turno un messaggio che la cache aveva già.
+    // ogni turno un messaggio che la cache aveva già. Verso Claude parte solo col prefisso con cui è nato
+    // (src/main/services/providers/ragionamentoRimandato.js).
     const rd = esito && Array.isArray(esito.reasoningDetails) && esito.reasoningDetails.length ? esito.reasoningDetails : null;
     if (rd) out.reasoning_details = rd;
     return out;
@@ -214,11 +228,15 @@
     let inizio = 0;
     while (inizio < n && Date.parse(lista[inizio].ts) < da) inizio++;
     const recente = new Array(n).fill(false);
+    // Recente adesso e non più al turno dopo, che aggiunge domanda e risposta in questa scheda.
+    const scade = new Array(n).fill(false);
     const contati = new Map();
+    const vive = (c, i, quanti) => c <= MESSAGGI_CON_ESITI && (lista[i].chat === chatCorrente || quanti - i <= MESSAGGI_CON_ESITI);
     for (let i = n - 1; i >= 0; i--) {
       const c = (contati.get(lista[i].chat) || 0) + 1;
       contati.set(lista[i].chat, c);
-      recente[i] = c <= MESSAGGI_CON_ESITI && (lista[i].chat === chatCorrente || n - i <= MESSAGGI_CON_ESITI);
+      recente[i] = vive(c, i, n);
+      scade[i] = recente[i] && !vive(c + (chatCorrente && lista[i].chat === chatCorrente ? 2 : 0), i, n + 2);
     }
     // Il comando di un esito scritto in chat è l'ultima riga «/…» dell'utente nella sua conversazione.
     const comandi = new Array(n).fill('');
@@ -295,10 +313,16 @@
     const azioni = [];
     const visti = [];
     let prima = null;
+    let cambiaGia = false;
     for (const i of indici) {
       const m = lista[i];
       const e = esitoDi(i);
-      out.push(rendiIl(i, prima));
+      const reso = rendiIl(i, prima);
+      if (!cambiaGia && scade[i] && JSON.stringify(reso) !== JSON.stringify(rendi(m, prima, { tetto: token, esito: null, osserva, foto: null }))) {
+        CAMBIANO_AL_TURNO_DOPO.add(reso);
+        cambiaGia = true;
+      }
+      out.push(reso);
       if (e && Array.isArray(e.azioni)) azioni.push(...e.azioni);
       visti.push(m);
       prima = m;
@@ -357,8 +381,9 @@
   }
 
   // Senza vettori il ricordo va per parole, che è una prova debole: servono almeno due parole rare nelle conversazioni
-  // vecchie, tutte nello stesso scambio. Una parola che compare in molte conversazioni («grazie», «perfetto») non
-  // distingue niente; una che torna in tutta una conversazione sola (il suo argomento) sì.
+  // vecchie nello stesso scambio, e vincono gli scambi che ne hanno di più. Una parola che compare in molte
+  // conversazioni («grazie», «perfetto») non distingue niente; una che torna in tutta una conversazione sola (il suo
+  // argomento) sì. Pretenderle tutte no (#868.8): «chiamava», detta una volta in un'altra chat, bloccava il ricordo.
   // Le parole di cortesia non sono mai l'argomento: rare finché sono state dette una volta sola, ripescherebbero quello
   // scambio a ogni «grazie mille». Fuori le parole che possono esserlo («chiaro» del tema, «accordo», «fine»).
   const MIN_PAROLE_RICORDO = 2;
@@ -379,11 +404,15 @@
     const pagliai = lista.map((t) => CA.normalizeForSearch(`${t.titolo || ''} ${t.testo || ''}`));
     const chat = new Set(lista.map((t) => t.chat)).size;
     const comune = Math.max(1, Math.floor(chat * QUOTA_PAROLA_COMUNE));
-    const inQuante = (p) => new Set(lista.filter((_t, i) => pagliai[i].includes(p)).map((t) => t.chat)).size;
-    const parole = [...new Set(CA.terminiCheDistinguono(CA.normalizeForSearch(domanda).split(/\s+/).filter(Boolean)))]
-      .filter((p) => !diCortesia(p) && inQuante(p) <= comune);
+    const inQuante = (p) => new Set(lista.filter((_t, i) => CA.contieneTermine(pagliai[i], p)).map((t) => t.chat)).size;
+    const parole = [...new Set(CA.terminiCheDistinguono(CA.paroleDi(domanda), domanda))]
+      .filter((p) => !diCortesia(p))
+      .filter((p) => { const n = inQuante(p); return n >= 1 && n <= comune; });
     if (parole.length < MIN_PAROLE_RICORDO) return [];
-    const presi = lista.filter((_t, i) => parole.every((p) => pagliai[i].includes(p)));
+    const quante = pagliai.map((s) => parole.filter((p) => CA.contieneTermine(s, p)).length);
+    const migliore = quante.reduce((m, n) => Math.max(m, n), 0);
+    if (migliore < MIN_PAROLE_RICORDO) return [];
+    const presi = lista.filter((_t, i) => quante[i] === migliore);
     return scegliRicordi(presi.slice(-MAX_RICORDI).map((t) => ({ tratto: t, score: 1 })));
   }
 
@@ -431,10 +460,94 @@
     return Math.max(0, Math.floor(Math.max(0, restano) / CARATTERI_PER_TOKEN));
   }
 
+  // Una rilettura (CERCA_CHAT con l'id) sta nella finestra fin dal primo tentativo (#868.7), con la richiesta già fatta
+  // (`occupati`) e il tetto della risposta, che il fornitore conta dentro. Mai sotto il minimo: il resto si legge a pezzi.
+  const RILETTURA_MIN = 8000;
+  function capRilettura({ tetto = TETTI_DI_SERIE.token, finestra = null, occupati = 0, risposta = 0 } = {}) {
+    let token = Number(tetto) > 0 ? Number(tetto) : TETTI_DI_SERIE.token;
+    const f = Number(finestra);
+    if (Number.isFinite(f) && f > 0) {
+      const riserva = Math.min(Math.max(0, Number(risposta) || 0), f / 2);
+      token = Math.min(token, f * MARGINE_FINESTRA - Math.max(0, Number(occupati) || 0) - riserva);
+    }
+    return Math.max(RILETTURA_MIN, Math.floor(token * CARATTERI_PER_TOKEN));
+  }
+
+  // Dopo un rifiuto per finestra, i caratteri che restano alle riletture del turno (null se già al minimo). Con la finestra
+  // detta dal rifiuto vale la misura del primo tentativo: il turno dopo, che se le ritrova davanti, ci sta ancora.
+  function rilettureDopoRifiuto({ max = null, chiesti = null, caratteri = 0, caratteriRiletture = 0, n = 1, risposta = 0, fuori = 0 } = {}) {
+    const minimo = RILETTURA_MIN * Math.max(1, n);
+    const cr = Math.max(0, Number(caratteriRiletture) || 0);
+    if (cr <= minimo) return null;
+    let resta = Math.floor((tettoDopoRifiuto({ max, chiesti, caratteri, caratteriTratto: cr }) || 0) * CARATTERI_PER_TOKEN);
+    if (max) {
+      const occupati = Math.ceil((Math.max(0, caratteri - cr) + Math.max(0, Number(fuori) || 0)) / CARATTERI_PER_TOKEN);
+      resta = Math.min(resta, capRilettura({ tetto: Infinity, finestra: max, occupati, risposta }));
+    }
+    return Math.max(minimo, resta);
+  }
+
+  // Quello che il modello ha già davanti dall'archivio: i pezzi ripescati nei turni prima e le conversazioni rilette
+  // per intero. Non si ripescano di nuovo (#868.1): le copie si accumulavano a ogni messaggio sullo stesso argomento.
+  function giaDavanti(azioni) {
+    const chiavi = new Set();
+    const intere = new Set();
+    for (const a of Array.isArray(azioni) ? azioni : []) {
+      const o = a && String(a.type || '').toUpperCase() === 'CERCA_CHAT' ? a._output : null;
+      if (!o || typeof o !== 'object') continue;
+      if (o.automatica) {
+        for (const r of Array.isArray(o.results) ? o.results : []) if (r && r.id && r.date) chiavi.add(`${r.id}|${r.date}`);
+      }
+      if (o.chatRead && o.found && o.intera) intere.add(String(o.chatRead));
+    }
+    return { chiavi, chat: intere };
+  }
+
+  // Ciò che l'utente ha cancellato non torna al modello dalle copie che ricerche e ricordi avevano messo nelle risposte
+  // di altre conversazioni (#868.1): `chat(id)` e `pagina(p)` dicono se esiste ancora. Il resto dell'azione resta.
+  function senzaCancellati(azioni, { chat = null, pagina = null } = {}) {
+    if (!Array.isArray(azioni)) return azioni;
+    let cambiate = 0;
+    const out = azioni.map((a) => {
+      const o = a && String(a.type || '').toUpperCase() === 'CERCA_CHAT' ? a._output : null;
+      if (!o || typeof o !== 'object') return a;
+      if ('chatRead' in o) {
+        if (!o.found || typeof chat !== 'function' || chat(String(o.chatRead))) return a;
+        cambiate++;
+        return { ...a, _output: { chatRead: o.chatRead, found: false, cancellata: true } };
+      }
+      const results = Array.isArray(o.results) ? o.results : [];
+      const pagine = Array.isArray(o.pagine) ? o.pagine : [];
+      const restano = typeof chat === 'function' ? results.filter((r) => !r || !r.id || chat(String(r.id))) : results;
+      const pagineRestano = typeof pagina === 'function' ? pagine.filter((p) => !p || pagina(p)) : pagine;
+      const tolti = (results.length - restano.length) + (pagine.length - pagineRestano.length);
+      if (!tolti) return a;
+      cambiate++;
+      return {
+        ...a,
+        _output: { ...o, results: restano, ...('pagine' in o ? { pagine: pagineRestano } : {}), cancellati: (Number(o.cancellati) || 0) + tolti },
+      };
+    });
+    return cambiate ? out : azioni;
+  }
+
   function testoRicordo(t) {
     const s = String(t.testo || '');
     if (s.length <= CARATTERI_RICORDO) return s;
     return `${s.slice(0, Math.floor(CARATTERI_RICORDO * 0.7))}\n…(il resto si rilegge con CERCA_CHAT e l'id ${t.chat})…\n${s.slice(-Math.floor(CARATTERI_RICORDO * 0.3))}`;
+  }
+
+  // I pezzi vecchi ripescati da soli hanno la forma di una ricerca fra le chat: il blocco di attività li racconta, le
+  // uscite li contano fra le cose lette (#587), la chat riaperta li ritrova, e `giaDavanti` li riconosce al turno dopo.
+  function ricordoComeAzione(ricordi, ora = Date.now()) {
+    const lista = Array.isArray(ricordi) ? ricordi : [];
+    // Lo stesso testo che il modello ha davanti (testa e coda), così le uscite contano tutto quello che ha letto.
+    const results = lista.map((r) => ({ id: r.tratto.chat, title: r.tratto.titolo || '', date: r.tratto.ts, snippet: testoRicordo(r.tratto) }));
+    const daFuori = lista.flatMap((r) => (Array.isArray(r.tratto.daFuori) ? r.tratto.daFuori : []));
+    return {
+      type: 'CERCA_CHAT', _auto: true, _callId: `ricordo_${Number(ora).toString(36)}`, _executed: true,
+      _output: { automatica: true, results, ...(daFuori.length ? { daFuori } : {}) },
+    };
   }
 
   // I pezzi vecchi vengono dall'archivio: dentro la busta, come i risultati di CERCA_CHAT.
@@ -453,13 +566,15 @@
       + blocchi.join('\n\n');
   }
 
+  const INTESTAZIONE_CODA = '═══ CONTESTO DI ADESSO (lo scrive Filo, non l\'utente: vale per il messaggio qui sotto) ═══';
+
   // Il blocco subito prima della domanda: tutto ciò che cambia a ogni turno, così il filo davanti resta identico.
   function coda({ contesto = '', ricordi = '', chatCorrente = null, nuova = false } = {}) {
     const dove = chatCorrente
       ? (nuova ? `Questa scheda ha appena aperto la chat ${etichettaChat(chatCorrente)}.` : `Questa scheda è la chat ${etichettaChat(chatCorrente)}.`)
       : '';
     return [
-      '═══ CONTESTO DI ADESSO (lo scrive Filo, non l\'utente: vale per il messaggio qui sotto) ═══',
+      INTESTAZIONE_CODA,
       dove,
       contesto,
       ricordi,
@@ -475,11 +590,56 @@
     return out;
   }
 
+  // Anthropic rifiuta un punto di cache su un testo vuoto o di soli spazi.
+  function haTesto(m) {
+    if (!m) return false;
+    if (typeof m.content === 'string') return m.content.trim() !== '';
+    return Array.isArray(m.content) && m.content.some((p) => p && p.type === 'text' && String(p.text || '').trim());
+  }
+
+  // Dove la richiesta della chat smette di ripetersi (SPEC-CONTESTO § La richiesta): fine della parte fissa del system,
+  // fine del tratto, ultimo messaggio. Solo la chat e il correttore: un prompt che cambia a ogni chiamata pagherebbe
+  // scritture mai rilette. `caratteri` divide il testo del messaggio e il punto va sulla prima parte. Sentinella:
+  // tests/unit/puntiDiCache.test.mjs. `durata`: quella della parte fissa della chat ('5m' o '1h', da tetti().cache);
+  // assente o non valida vale quella di serie.
+  function pianoDellaCache(action, messages, { durata } = {}) {
+    const C = global.SN_CONST;
+    if (!C || !C.ACTIONS || !Array.isArray(messages) || !messages.length) return null;
+    // Il correttore (#1580): le regole nel system, uguali a ogni chiamata; il testo che cambia sta dopo. Cinque minuti
+    // bastano a chi scrive, e la durata della chat è una scelta sulla chat.
+    if (action === C.ACTIONS.SPELLCHECK_SEMANTIC || action === C.ACTIONS.SPELLCHECK_CONTEXT) {
+      const sys = messages[0];
+      return sys && sys.role === 'system' && haTesto(sys) && messages.length > 1 ? { punti: [{ indice: 0 }] } : null;
+    }
+    if (action !== C.ACTIONS.FILO_CHAT) return null;
+    const punti = [];
+    const sys = messages[0];
+    const lunga = (durataIn(durata) || TETTI_DI_SERIE.cache) === '1h' ? { durata: '1h' } : {};
+    if (sys && sys.role === 'system' && typeof sys.content === 'string') {
+      const inizi = (C.INIZI_VARIABILI_CHAT || []).map((s) => sys.content.indexOf(s)).filter((i) => i > 0);
+      const taglio = inizi.length ? Math.min(...inizi) : sys.content.length;
+      if (sys.content.slice(0, taglio).trim()) {
+        punti.push(taglio < sys.content.length ? { indice: 0, caratteri: taglio, ...lunga } : { indice: 0, ...lunga });
+      }
+    }
+    const indiceCoda = messages.findIndex((m) => m && m.role === 'user' && typeof m.content === 'string' && m.content.startsWith(INTESTAZIONE_CODA));
+    // La storia regge fino al primo messaggio che il turno dopo cambia: il punto va prima, dove verrà riletto.
+    const cambia = messages.findIndex((m, i) => i > 0 && i < indiceCoda && CAMBIANO_AL_TURNO_DOPO.has(m));
+    let fine = cambia > 0 ? cambia - 1 : indiceCoda - 1;
+    while (fine > 0 && !haTesto(messages[fine])) fine--;
+    if (fine > 0) punti.push({ indice: fine });
+    let ultimo = messages.length - 1;
+    while (ultimo > 0 && !haTesto(messages[ultimo])) ultimo--;
+    if (ultimo > 0 && !punti.some((p) => p.indice === ultimo)) punti.push({ indice: ultimo });
+    return punti.length ? { punti } : null;
+  }
+
   global.SN_FILO_CONTESTO = {
-    TETTI_DI_SERIE, LIMITI, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
+    TETTI_DI_SERIE, LIMITI, DURATE_CACHE, durataIn, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
     TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini,
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     ESTERNO_COMANDO, letturaDaFuori, daFuoriDi, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
-    coda, assembla, troppoLungo, tettoDopoRifiuto, rifiutaImmagini,
+    coda, assembla, troppoLungo, tettoDopoRifiuto, rifiutaImmagini, INTESTAZIONE_CODA, pianoDellaCache,
+    RILETTURA_MIN, capRilettura, rilettureDopoRifiuto, giaDavanti, senzaCancellati, ricordoComeAzione,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

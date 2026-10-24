@@ -23,6 +23,12 @@ try { require('./mondo-esente.js')(webFrame); } catch (e) { console.error('[Filo
 let riscrittura = null;
 try { riscrittura = require('./riscrittura.js')(); } catch (e) { console.error('[Filo CS] riscrittura', e); }
 
+// Prima che nasca un riquadro: chi lo tocca mentre carica il suo indirizzo gli toglie il preload (#1560).
+try {
+  require(path.join(__dirname, '..', 'shared', 'riquadriInArrivo.js'));
+  globalThis.SN_RIQUADRI_IN_ARRIVO.osserva(window);
+} catch (e) { console.error('[Filo CS] riquadri in arrivo', e); }
+
 // ─── #405 — riquadri incorporati (iframe) ───────────────────────────────────
 //
 // Da quando la scheda usa nodeIntegrationInSubFrames, questo preload gira in
@@ -46,16 +52,8 @@ const IS_SUBFRAME = (() => {
   try { return window.top !== window.self; } catch (_) { return true; }
 })();
 
-// ─── #145 — blocco autoplay sulle schede RIPRISTINATE al boot ───────────────
-//
-// Le schede riaperte all'avvio di Filo nascono con il flag
-// '--filo-suppress-autoplay' (passato via additionalArguments dal main): i loro
-// media non devono partire da soli (i video YouTube ripartivano tutti insieme).
-// Installiamo SUBITO — prima ancora del caricamento della pagina — un listener
-// 'play' in fase di cattura che rimette in pausa qualunque media tenti di
-// autopartire. Si disattiva alla PRIMA interazione dell'utente con la scheda:
-// da lì in poi i media partono normalmente (è l'utente a comandarli). Il
-// listener vive nel mondo isolato del preload ma ascolta il DOM condiviso.
+// #145 — le schede riaperte all'avvio non fanno partire i media da sole, o ripartono tutte
+// insieme: il listener si installa prima della pagina e cade alla prima interazione.
 if (process.argv.includes('--filo-suppress-autoplay')) {
   try {
     let active = true;
@@ -79,20 +77,8 @@ if (process.argv.includes('--filo-suppress-autoplay')) {
   } catch (_) { /* il blocco non deve MAI impedire il caricamento della pagina */ }
 }
 
-// ─── Bridge contextmenu installato a document_start ─────────────────────────
-//
-// Alcuni siti (YouTube, Reddit, …) registrano il PROPRIO listener `contextmenu`
-// in fase di CATTURA su window al primo script di pagina e lo bloccano con
-// stopImmediatePropagation() per mostrare il loro menu. Se il nostro content
-// script si registrasse solo a DOMContentLoaded arriverebbe DOPO il loro
-// listener window+capture: a parità di target/fase vince chi si registra prima,
-// quindi il loro stopImmediatePropagation impediva al nostro handler di partire
-// e il menu Filo non compariva (feedback alpha: «tasto destro non funziona su
-// YouTube»). Il preload gira PRIMA di qualunque script di pagina: registrando
-// qui — subito, a document_start — il listener window+capture, siamo sempre i
-// primi a ricevere l'evento, su ogni sito. Il vero handler (in content.js, che
-// ha bisogno di settings/spellcheck/Menu) si installa più tardi via
-// __snSetContextMenuHandler; fino ad allora il bridge non fa nulla.
+// Va registrato prima degli script di pagina: certi siti fermano il contextmenu in capture,
+// e a parità di fase vince chi si è registrato prima.
 let contextMenuHandler = null;
 // I siti col menu proprio (#975): la sonda va nel mondo della pagina prima dei suoi script. content.js dice, coi siti
 // scelti nelle impostazioni, se qui il tasto destro va prima alla pagina; Shift allora porta al menu di Filo.
@@ -251,26 +237,47 @@ if (!IS_SUBFRAME) try {
         try { for (const k of Object.keys(st)) if (re.test(k) || extra.has(k)) st.removeItem(k); } catch (_) {}
       }
     }
+    // «Resta connesso»: la scheda è passata in un altro jar e la memoria della pagina la segue.
+    for (const [chiave, st] of [['semina', 'localStorage'], ['seminaSessione', 'sessionStorage']]) {
+      if (!w || !Array.isArray(w[chiave])) continue;
+      for (const voce of w[chiave]) {
+        try { if (Array.isArray(voce)) window[st].setItem(String(voce[0]), String(voce[1])); } catch (_) {}
+      }
+    }
+    if (w && Array.isArray(w.seminaDb) && w.seminaDb.length) require('./semina-database.js').semina(window.indexedDB, w.seminaDb);
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
-// Le notifiche si leggono «da chiedere» finché l'utente non ha deciso (#591): regole in preload/stato-permessi.js.
-if (!IS_SUBFRAME) try {
+// Nel mondo della pagina, e nei riquadri vuoti che lei si crea (#1057, regole in preload/riquadri-vuoti.js): lo schermo
+// alla maniera vecchia fa la domanda di sempre e poi riceve un no, senza far morire la scheda (#586, preload/
+// schermo-vecchio.js; un avviso finto della pagina fa negare solo la sua prossima domanda), e nel frame principale i
+// permessi mai decisi si leggono «da chiedere» (#591, preload/stato-permessi.js).
+try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
-  if (/^(https?|blob):/i.test(loc)) {
-    const { buildStatoPermessiSource, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE } = require('./stato-permessi.js');
-    // Senza gesto: con `true` la pagina riceverebbe un clic mai fatto.
-    webFrame.executeJavaScript(buildStatoPermessiSource(ipcRenderer.sendSync('filo:permessi-stato', loc)), false).catch(() => {});
-    // La pagina chiede di scrivere su un file che ha già; a risposta data rilegge il permesso da Chromium (#1069).
-    const scrittura = () => {
-      ipcRenderer.invoke('filo:permessi-scrittura').catch(() => null)
-        .then((r) => window.dispatchEvent(new Event(r === null ? SCRITTURA_NIENTE : SCRITTURA_FINE)));
-    };
+  if (!/^(filo|devtools):/i.test(loc)) {
+    const { buildSchermoVecchioCorpo, EVENTO_SCHERMO_VECCHIO } = require('./schermo-vecchio.js');
+    const { buildRiquadriVuotiSource } = require('./riquadri-vuoti.js');
+    const corpi = [buildSchermoVecchioCorpo()];
+    const ascolti = [[EVENTO_SCHERMO_VECCHIO, () => { try { ipcRenderer.sendSync('filo:schermo-vecchio'); } catch (_) {} }]];
+    // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
+    if (!IS_SUBFRAME && /^(https?|blob):/i.test(loc)) try {
+      const { buildStatoPermessiCorpo, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE, SI_DATO, PARTI_LETTE } = require('./stato-permessi.js');
+      corpi.push(buildStatoPermessiCorpo(ipcRenderer.sendSync('filo:permessi-stato', loc)));
+      // La pagina chiede di scrivere su un file che ha già; a risposta data rilegge il permesso da Chromium (#1069).
+      ascolti.push([SCRITTURA, () => {
+        ipcRenderer.invoke('filo:permessi-scrittura').catch(() => null)
+          .then((r) => window.dispatchEvent(new Event(r === null ? SCRITTURA_NIENTE : SCRITTURA_FINE)));
+      }]);
+      for (const parte of new Set(Object.values(PARTI_LETTE))) {
+        ascolti.push([SI_DATO + parte, (e) => { try { if (ipcRenderer.sendSync('filo:permessi-si', parte) === true) e.preventDefault(); } catch (_) {} }]);
+      }
+    } catch (_) {}
     // La riscrittura da capo (document.open) toglie gli ascolti della finestra: si rimettono.
-    const ascoltaScrittura = () => window.addEventListener(SCRITTURA, scrittura, true);
-    ascoltaScrittura();
-    new MutationObserver(ascoltaScrittura).observe(document, { childList: true });
+    const ascolta = () => { for (const [tipo, f] of ascolti) window.addEventListener(tipo, f, true); };
+    ascolta();
+    new MutationObserver(ascolta).observe(document, { childList: true });
+    // Senza gesto: con `true` la pagina riceverebbe un clic mai fatto.
+    webFrame.executeJavaScript(buildRiquadriVuotiSource(corpi), false).catch(() => {});
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
@@ -322,13 +329,8 @@ try {
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
 const broadcastListeners = new Set();
-// #407 — messaggi che devono SVEGLIARE un riquadro incorporato. Dentro un
-// riquadro i content script si montano solo quando l'utente lo tocca; ma
-// «Traduci la pagina» arriva dalla pagina che lo ospita, non da un clic lì
-// dentro, e un riquadro addormentato lascerebbe il suo testo in lingua
-// originale sotto un avviso che dichiara finito. La costante di SN_MSG qui non
-// c'è ancora (i moduli condivisi si caricano dopo): il valore letterale è
-// l'unico modo, ed è lo stesso trucco della consegna delle scorciatoie.
+// #407 — messaggi che devono SVEGLIARE un riquadro: senza, resterebbe in lingua originale
+// sotto un avviso che dice «fatto». Valore letterale: qui SN_MSG non è ancora caricato.
 const WAKE_BROADCASTS = new Set(['frame_translate']);
 
 // #503 — il giudizio di chi ospita il riquadro, arrivato per lettera dalla finestra madre (translatePage.js lo
@@ -345,7 +347,12 @@ function riquadriFigli() {
     try { lista = Array.from(docs.pop().querySelectorAll('iframe, frame')); } catch (_) {}
     for (const f of lista) {
       out.push(f);
-      try { if (f.contentWindow.location.protocol === 'about:' && f.contentDocument) docs.push(f.contentDocument); } catch (_) {}
+      const R = globalThis.SN_RIQUADRI_IN_ARRIVO;
+      try {
+        const w = R && R.finestra(f);
+        const d = w && w.location.protocol === 'about:' ? R.documento(f) : null;
+        if (d) docs.push(d);
+      } catch (_) {}
     }
   }
   return out;
@@ -375,7 +382,7 @@ if (IS_SUBFRAME) try {
     // Nascosto io, nascosti quelli dentro di me: nessuno qui dentro può farsi vedere.
     if (!visto) {
       for (const f of riquadriFigli()) {
-        try { f.contentWindow.postMessage({ filoFrameVerdict: 1, runId, visible: false }, '*'); } catch (_) {}
+        try { globalThis.SN_RIQUADRI_IN_ARRIVO?.finestra(f)?.postMessage({ filoFrameVerdict: 1, runId, visible: false }, '*'); } catch (_) {}
       }
     }
     for (const fn of inAttesaDiVerdetto) fn();
@@ -413,9 +420,7 @@ function consegnaBroadcast(msg) {
     }
   };
   const type = msg && msg.type;
-  // Il ritorno all'originale non sveglia nessuno: un riquadro che dorme non ha
-  // mai tradotto niente, e montarci Filo dentro per non fare nulla sarebbe
-  // lavoro pagato per niente.
+  // Il ritorno all'originale non sveglia: un riquadro che dorme non ha tradotto.
   const wakes = WAKE_BROADCASTS.has(type) && msg.mode !== 'restore';
   if (IS_SUBFRAME && !contentScriptsStarted && wakes) {
     ensureContentScripts();
@@ -453,8 +458,7 @@ const chromeShim = {
           const requestId = `s${Date.now()}_${++streamCounter}`;
           const offMeta = (_e, data) => onMessage && onMessage({ type: 'meta', ...data });
           const offDelta = (_e, data) => onMessage && onMessage({ type: 'delta', delta: data.delta });
-          // reset = provider caduto a metà stream, il main riparte col fallback:
-          // il consumer deve buttare i delta accumulati finora (#273).
+          // #273 — reset: provider caduto a metà, i delta accumulati si buttano.
           const offReset = () => onMessage && onMessage({ type: 'reset' });
           const offDone = (_e, data) => {
             cleanup();
@@ -551,6 +555,33 @@ try {
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
+// Prima degli script della pagina: un'immagine lasciata dove la pagina non la vuole va all'Aiuto (#1623). Il pannello
+// vive nel frame principale: da un riquadro, che Filo forse non l'ha ancora montato, le immagini lette passano dal main.
+try {
+  const leggi = (f) => new Promise((ok) => {
+    const r = new FileReader();
+    r.onload = () => ok(typeof r.result === 'string' ? r.result : '');
+    r.onerror = () => ok('');
+    r.readAsDataURL(f);
+  });
+  require('./rilascio-file.js')(window, IS_SUBFRAME ? {
+    pronta: () => true,
+    consegna: async (files) => {
+      const voci = [];
+      for (const f of files) {
+        if (!/^image\//i.test(f.type || '')) { voci.push({ nome: f.name || '', altro: true }); continue; }
+        const dataUrl = await leggi(f);
+        if (dataUrl) voci.push({ nome: f.name || '', dataUrl });
+      }
+      if (voci.length) { try { ipcRenderer.send('filo:rilascio-riquadro', voci); } catch (_) {} }
+    },
+  } : {
+    pronta: () => globalThis.SN_SIDEBAR?.accoglieRilascio?.() === true,
+    consegna: (files) => globalThis.SN_SIDEBAR.allega(files),
+    pannello: (t) => globalThis.SN_SIDEBAR?.contiene?.(t) === true,
+  });
+} catch (e) { console.error('[Filo CS] rilascio', e); }
+
 // Il gesto che vale per finestre e schermo pieno lo dice solo questo ascolto, in ogni frame, prima della pagina: è
 // l'unico a sapere se l'input è caduto sull'interfaccia di Filo (#737.1 giri 6 e 7). Solo l'input vero: la pagina non
 // lo fabbrica. Il collegamento cliccato si apre anche se la pagina ha speso il gesto per sé. Regole: services/permessiPagine.js.
@@ -620,6 +651,35 @@ try {
     if (!a || !/^file:/i.test(String(a.href))) return;
     try { ipcRenderer.send('filo:indirizzo-rifiutato', String(a.href)); } catch (_) {}
   };
+  // #965 — un link «scarica» verso un file da avviso non parte: l'avviso compare sulla pagina, come per un link che apre.
+  // Dopo la pagina, che può gestire il clic da sé; confermato, il main lo riclicca da qui (SN_RISCARICA).
+  let scaricaDaRifare = null;
+  const scaricaScelto = (e) => {
+    if (!e.isTrusted || e.defaultPrevented || e.button !== 0) return;
+    const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+    const a = percorso.find((n) => n && (n.localName === 'a' || n.localName === 'area') && n.href && n.hasAttribute('download'));
+    if (!a || !/^https?:/i.test(String(a.href))) return;
+    let fermo = false;
+    try { fermo = ipcRenderer.sendSync('filo:scaricamento-scelto', String(a.href), String(a.getAttribute('download') || '')) === true; } catch (_) {}
+    if (!fermo) return;
+    e.preventDefault();
+    scaricaDaRifare = a;
+  };
+  // `nome`: un file che la pagina ha costruito da sé (blob:, data:) e scaricato senza un link cliccato, rifatto col suo nome.
+  globalThis.SN_RISCARICA = (url, nome) => {
+    const a = scaricaDaRifare;
+    scaricaDaRifare = null;
+    if (a && a.isConnected && String(a.href) === String(url)) { a.click(); return true; }
+    if (!nome || !/^(blob|data|filesystem):/i.test(String(url))) return false;
+    const b = document.createElement('a');
+    b.href = String(url);
+    b.download = String(nome);
+    b.style.display = 'none';
+    (document.body || document.documentElement).appendChild(b);
+    b.click();
+    b.remove();
+    return true;
+  };
   const ascolta = (win) => {
     // Solo l'inizio di un gesto, come nella pagina: il rilascio dello stesso clic non è un gesto nuovo (il tocco finisce).
     for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
@@ -631,6 +691,7 @@ try {
       win.addEventListener(ev, scelto, { passive: true });
       win.addEventListener(ev, rifiutato, { passive: true });
     }
+    win.addEventListener('click', scaricaScelto);
     win.addEventListener('pointerover', confine, { capture: true, passive: true });
   };
   // I documenti che la pagina si scrive da sé non hanno un preload loro (il riquadro vuoto riempito dallo script), o
@@ -638,10 +699,11 @@ try {
   // Il segno lo mette solo il preload di un frame per sé; lo vedono i preload degli altri frame dello stesso sito.
   const PRELOAD_PROPRIO = Symbol.for('filo:gesto-preload-proprio');
   const seguiti = new WeakSet();
-  const inArrivo = (f) => (f.hasAttribute('src') && !/^(about:blank)?$/i.test(f.getAttribute('src').trim())) || f.hasAttribute('srcdoc');
+  // Visto per la prima volta con un indirizzo, si presume in arrivo: in una radice ombra il conto dei load non c'è.
+  const conIndirizzo = (f) => (f.hasAttribute('src') && !/^(about:blank)?$/i.test(f.getAttribute('src').trim())) || f.hasAttribute('srcdoc');
   const senzaPreload = (f, caricato) => {
-    if (!caricato && inArrivo(f)) return null;
-    try { const w = f.contentWindow; return w && w.document && !w[PRELOAD_PROPRIO] ? w : null; } catch (_) { return null; }
+    if (!caricato && conIndirizzo(f)) return null;
+    try { const w = globalThis.SN_RIQUADRI_IN_ARRIVO?.finestra(f); return w && w.document && !w[PRELOAD_PROPRIO] ? w : null; } catch (_) { return null; }
   };
   // Riquadri che aspettano il primo load: finché c'è, nessuna finestra si tocca alla cieca.
   const inAttesa = new Set();
@@ -650,7 +712,7 @@ try {
     if (seguiti.has(f)) return;
     seguiti.add(f);
     f.addEventListener('load', () => { inAttesa.delete(f); const w = senzaPreload(f, true); if (w) segui(w); }, true);
-    if (inArrivo(f)) inAttesa.add(f);
+    if (conIndirizzo(f)) inAttesa.add(f);
     const w = senzaPreload(f, false);
     if (w) segui(w);
   };
@@ -701,7 +763,7 @@ try {
     if (figli.length > visti) {
       for (const f of inAttesa) if (!f.isConnected) inAttesa.delete(f);
       // Toccato prima del suo load un riquadro perde il preload: alla cieca solo quando nessuno è in arrivo.
-      if (inAttesa.size) return;
+      if (inAttesa.size || globalThis.SN_RIQUADRI_IN_ARRIVO?.qualcunoInArrivo()) return;
       for (const c of figli) { try { c.executeJavaScriptInIsolatedWorld(MONDO_DEL_PRELOAD, [{ code: PRESENTATI }], false).catch(() => {}); } catch (_) {} }
     }
     figliContati = figli.length;
@@ -711,8 +773,18 @@ try {
   } catch (_) {}
   try { Object.defineProperty(window, PRELOAD_PROPRIO, { value: true }); } catch (_) {}
   segui(window);
+  // Il menu del tasto destro si disegna nello strato sopra la scheda (#1054)? Lo dice il main, una volta per riquadro.
+  let stratoMenu = null;
+  globalThis.SN_STRATO_MENU_ACCESO = () => {
+    if (stratoMenu === null) { try { stratoMenu = ipcRenderer.sendSync('filo:strato-menu') === true; } catch (_) { stratoMenu = false; } }
+    return stratoMenu;
+  };
   // Le voci del menu di Filo che aprono un indirizzo lo dichiarano qui prima di aprirlo.
-  globalThis.SN_APERTURA_SCELTA = (url) => { try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || '')); } catch (_) {} };
+  // `azione`: l'azione del menu che apre (#1461), misurata dal main fino alla pagina caricata.
+  globalThis.SN_APERTURA_SCELTA = (url, azione) => {
+    const a = azione && typeof azione === 'object' ? { id: String(azione.id || ''), t0: Number(azione.t0) } : null;
+    try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || ''), a); } catch (_) {}
+  };
 } catch (_) {}
 
 // Electron fa di window.close() la chiusura dell'intera finestra di Filo, da ogni pagina e riquadro: qui la pagina chiede
@@ -731,6 +803,31 @@ try {
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
+// Il microfono di Filo su una pagina web lo apre la cornice (#586): qui arrivano i campioni a 16 kHz per SN_ASCOLTO,
+// solo nel mondo di Filo. La pagina non riceve il permesso, nemmeno durante una dettatura. Main: services/microfonoDiFilo.js.
+const microfoniAperti = new Map();
+ipcRenderer.on('microfono:dati', (_event, d) => {
+  const m = d && microfoniAperti.get(d.id);
+  if (!m) return;
+  if (d.fine) { microfoniAperti.delete(d.id); try { m.suFine(); } catch (_) {} return; }
+  if (d.dati) { try { m.suDati(d.dati instanceof Float32Array ? d.dati : Float32Array.from(d.dati)); } catch (_) {} }
+});
+globalThis.SN_MICROFONO_CORNICE = {
+  async apri({ suDati, suFine } = {}) {
+    let r = null;
+    try { r = await ipcRenderer.invoke('microfono:apri'); } catch (_) { r = null; }
+    if (!r || !r.ok || !r.id) throw Object.assign(new Error('microfono'), { name: (r && r.errore) || 'NotAllowedError' });
+    microfoniAperti.set(r.id, { suDati: suDati || (() => {}), suFine: suFine || (() => {}) });
+    return {
+      rate: r.rate,
+      chiudi: () => {
+        if (!microfoniAperti.delete(r.id)) return;
+        ipcRenderer.invoke('microfono:chiudi', { id: r.id }).catch(() => {});
+      },
+    };
+  },
+};
+
 // Adattatore: ascolto shortcut:triggered e ribroadcast come filo:broadcast.
 // `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
 // tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
@@ -750,17 +847,6 @@ ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => {
   deliver();
 });
 
-// ─── inject CSS condivisi + carica content script ──────────────────────────
-//
-// Equivalente a quanto faceva il manifest dell'estensione:
-//   "css": [theme.css, menu.css, popup.css, sidebar.css, highlight.css,
-//           spellcheck.css, feedback.css]
-//   "js":  [constants, i18n, messages, icons, extractContext, popup, menu,
-//           highlight, sidebar, spellcheck, feedback shared, feedback content,
-//           content]
-// Il timing è document_idle nell'estensione; qui caricamento subito dopo
-// DOMContentLoaded della pagina ospite.
-
 const STYLES = [
   'theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'voce.css',
   'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
@@ -768,7 +854,7 @@ const STYLES = [
 
 let stiliMessi = false;
 function injectStyles() {
-  // Skip se il documento non è una pagina (es. about:blank, data:, view-source).
+  // Non è una pagina: about:blank, data:, view-source.
   if (!document.head) return;
   stiliMessi = true;
   for (const f of STYLES) {
@@ -794,15 +880,11 @@ const CONTENT_DIR = path.join(__dirname, '..', 'content');
 // Stesso elenco di loadContentScripts() in internal-preload.js: le differenze
 // ammesse stanno in tests/unit/contentScriptPreload.test.mjs.
 function loadScripts() {
-  // Ordine identico a quello del manifest dell'estensione legacy.
-  // `PAGE_ONLY` marca i moduli che descrivono o modificano la SCHEDA nel suo
-  // insieme (banner del sito pericoloso, proposta geografica, banner cookie,
-  // colore della tab): dentro un riquadro incorporato parlerebbero del
-  // rettangolo sbagliato — un avviso "sito pericoloso" disegnato dentro un
-  // video, il colore della scheda preso da una pubblicità — quindi lì non si
-  // caricano affatto (#405).
+  // #405 — `PAGE_ONLY` marca i moduli che parlano della SCHEDA intera (banner, colore della
+  // tab): in un riquadro descriverebbero il rettangolo sbagliato e lì non si caricano.
   const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
+  try { require(path.join(SHARED_DIR, 'immaginiChat.js')); } catch (e) { console.error('[Filo CS] immaginiChat', e); } // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
   try { require(path.join(SHARED_DIR, 'contenutoEsterno.js')); } catch (e) { console.error('[Filo CS] contenutoEsterno', e); } // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js e spellcheck.js
   // Per primo fra i moduli che toccano il DOM: chi disegna un pezzo di UI di
   // Filo dentro la pagina lo marca alla nascita, e chi cammina sulla pagina
@@ -826,13 +908,22 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'qr.js')); } catch (e) { console.error('[Filo CS] qr', e); }
   try { require(path.join(SHARED_DIR, 'calcMarkers.js')); } catch (e) { console.error('[Filo CS] calcMarkers', e); } // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   try { require(path.join(SHARED_DIR, 'overlayPlacement.js')); } catch (e) { console.error('[Filo CS] overlayPlacement', e); } // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
+  try { require(path.join(SHARED_DIR, 'guardianoStatico.js')); } catch (e) { console.error('[Filo CS] guardianoStatico', e); } // #810.7 — la forma di un numero di carta: PRIMA di extractContext
+  try { require(path.join(SHARED_DIR, 'campiSegreti.js')); } catch (e) { console.error('[Filo CS] campiSegreti', e); } // #810.7 — campi che non vanno al modello: PRIMA di extractContext
   try { require(path.join(CONTENT_DIR, 'extractContext.js')); } catch (e) { console.error('[Filo CS] extractContext', e); }
   try { require(path.join(CONTENT_DIR, 'gesto.js')); } catch (e) { console.error('[Filo CS] gesto', e); } // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
   try { require(path.join(SHARED_DIR, 'avvisiTempo.js')); } catch (e) { console.error('[Filo CS] avvisiTempo', e); } // tempi della pila degli avvisi: PRIMA di popup.js
   try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo CS] popup', e); }
+  try { require(path.join(CONTENT_DIR, 'vistoDavvero.js')); } catch (e) { console.error('[Filo CS] vistoDavvero', e); } // #589.11 — un clic sul menu conta solo se la voce si vedeva: PRIMA di menu.js
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo CS] menu', e); }
+  try { require(path.join(SHARED_DIR, 'menuDescritto.js')); } catch (e) { console.error('[Filo CS] menuDescritto', e); } // #1054 — il menu come dati per lo strato
+  try { require(path.join(CONTENT_DIR, 'menuNelloStrato.js')); } catch (e) { console.error('[Filo CS] menuNelloStrato', e); } // #1054 — DOPO menu.js, PRIMA di chi lo usa
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo CS] sidebar', e); }
+  try { require(path.join(CONTENT_DIR, 'coerenza.js')); } catch (e) { console.error('[Filo CS] coerenza', e); } // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
+  try { require(path.join(CONTENT_DIR, 'correttoreRegole.js')); } catch (e) { console.error('[Filo CS] correttoreRegole', e); } // #1446 — PRIMA di spellcheck.js
+  try { require(path.join(CONTENT_DIR, 'correttoreAutomatica.js')); } catch (e) { console.error('[Filo CS] correttoreAutomatica', e); } // #1447 — DOPO correttoreRegole.js, PRIMA di spellcheck.js
+  try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(ipcRenderer, webFrame); } catch (e) { console.error('[Filo CS] dizionario', e); } // #1446 — PRIMA di spellcheck.js
   try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo CS] spellcheck', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
@@ -841,8 +932,10 @@ function loadScripts() {
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'riquadroRotto.js')); } catch (e) { console.error('[Filo CS] riquadroRotto', e); } // #760 — la proposta sopra il riquadro
   try { require(path.join(CONTENT_DIR, 'adSkip.js')); } catch (e) { console.error('[Filo CS] adSkip', e); } // #737 — nei riquadri è già partito da solo
+  try { require(path.join(SHARED_DIR, 'campoAccesso.js')); } catch (e) { console.error('[Filo CS] campoAccesso', e); } // #1124 — quali campi chiedono l'email
+  try { require(path.join(CONTENT_DIR, 'propostaEmail.js')); } catch (e) { console.error('[Filo CS] propostaEmail', e); } // #1124 — anche nei riquadri: il campo può stare lì
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
-  try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
+  try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); }
   try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo CS] feedbackAttachTypes', e); }
   try { require(path.join(CONTENT_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback content', e); }
   try { require(path.join(CONTENT_DIR, 'redteamAttack.js')); } catch (e) { console.error('[Filo CS] redteamAttack content', e); }
@@ -865,9 +958,8 @@ function loadScripts() {
 function start() {
   injectStyles();
   loadScripts();
-  // Marker DOM-visibile per i test: i moduli SN_* girano nel mondo isolato
-  // del preload, ma il DOM è condiviso. Annoto sul documentElement quali
-  // moduli si sono caricati con successo così smoke/Playwright può verificare.
+  // I moduli girano nel mondo isolato: il DOM è l'unico posto da cui i test
+  // possono vedere che si sono caricati.
   try {
     const loaded = ['SN_CONST', 'SN_MSG', 'SN_I18N', 'SN_ICONS', 'SN_EXTRACT',
       'SN_POPUP', 'SN_MENU', 'SN_HIGHLIGHT', 'SN_SIDEBAR', 'SN_SPELLCHECK',
@@ -944,6 +1036,7 @@ function vediCampiDelicati() {
 function startSafebrowse() {
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
+  try { require(path.join(CONTENT_DIR, 'safebrowseLinks.js')); } catch (e) { console.error('[Filo CS] safebrowseLinks', e); } // #965
 }
 
 if (!IS_SUBFRAME) {
@@ -966,5 +1059,15 @@ if (!IS_SUBFRAME) {
       window.addEventListener(ev, ensureContentScripts, { capture: true, passive: true, once: true });
     } catch (_) {}
   }
+  // #1124 — un campo email in un riquadro qui dentro chiede dove sta: il gesto è stato là, ma la misura tocca a noi.
+  try {
+    window.addEventListener('message', (e) => {
+      const segno = e.data && typeof e.data === 'object' ? e.data.filoPropostaEmail : null;
+      if (contentScriptsStarted || typeof segno !== 'string' || !e.source) return;
+      const sorgente = e.source;
+      ensureContentScripts();
+      waitForContentScripts(() => { try { globalThis.SN_PROPOSTA_EMAIL?.segno?.(segno, sorgente); } catch (_) {} });
+    });
+  } catch (_) {}
 }
 

@@ -104,20 +104,40 @@
     return valido(s) ? s : '';
   }
 
+  // Una riga coi siti incollati di fila («a.it, b.com», «a.it b.com»): un pezzo per sito, e quello che sta fra due siti
+  // in un pezzo solo com'era scritto, perché l'avviso lo ridica intero («studio rossi», non «studio» e «rossi»).
+  // Un indirizzo con virgole nei parametri, solo sulla riga, resta uno; con un altro sito accanto
+  // («https://mail.google.com/x, bbc.co.uk») si divide, o il secondo sparirebbe. Le parole di `salta` (le «e» della
+  // chat) separano due pezzi e non ne fanno parte.
+  function pezziDi(riga, salta) {
+    const intera = String(riga == null ? '' : riga).trim();
+    if (!intera) return [];
+    const out = [];
+    let siti = 0;
+    let da = -1;
+    let a = -1;
+    const chiudi = () => { if (da >= 0) out.push(intera.slice(da, a)); da = -1; };
+    for (const m of intera.matchAll(/[^\s,;]+/g)) {
+      if (daScritto(m[0])) { chiudi(); out.push(m[0]); siti++; continue; }
+      if (salta && salta.has(m[0].toLowerCase())) { chiudi(); continue; }
+      if (da < 0) da = m.index;
+      a = m.index + m[0].length;
+    }
+    chiudi();
+    return siti <= 1 && daScritto(intera) ? [intera] : out;
+  }
+
   // Un elenco scritto a righe: i siti validi (ridotti, senza doppioni) e le righe scartate così com'erano, per dirle;
   // `scartate` le tiene col posto (quanti siti validi le precedevano), per ridarle dove l'utente le aveva scritte.
-  function elencoDaTesto(raw) {
+  // `riduci`, se c'è, dà a ogni sito la voce che l'elenco salva ('' la scarta): così fa la casella dei fidati.
+  function elencoDaTesto(raw, riduci) {
     const valid = [];
     const invalid = [];
     const scartate = [];
     for (const line of String(raw == null ? '' : raw).split('\n')) {
-      const intera = line.trim();
-      if (!intera) continue;
-      // Più siti incollati su una riga («a.it, b.com», «a.it b.com») valgono uno per uno, come in chat;
-      // una riga che è già un sito intero (un indirizzo con virgole nei parametri) resta una.
-      const pezzi = daScritto(intera) ? [intera] : intera.split(/[\s,;]+/).filter(Boolean);
-      for (const riga of pezzi) {
-        const sito = daScritto(riga);
+      for (const riga of pezziDi(line)) {
+        const scritto = daScritto(riga);
+        const sito = scritto && typeof riduci === 'function' ? riduci(scritto) : scritto;
         if (!sito) { invalid.push(riga); scartate.push({ riga, dopo: valid.length }); continue; }
         if (!valid.includes(sito)) valid.push(sito);
       }
@@ -159,7 +179,7 @@
     return typeof voce === 'string' && !!voce && !!h && (h === voce || h.endsWith(`.${voce}`));
   }
 
-  const api = { valido, leggibile, sitoDi, daScritto, elencoDaTesto, testoDaElenco, ripulisciElenco, copre };
+  const api = { valido, leggibile, sitoDi, daScritto, pezziDi, elencoDaTesto, testoDaElenco, ripulisciElenco, copre };
   global.SN_NOMI_SITO = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

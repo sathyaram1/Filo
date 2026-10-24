@@ -1,0 +1,572 @@
+// Un clic vero su una voce del menu conta solo se l'utente la vedeva: un velo del sito che lascia passare il mouse
+// non ferma un gesto vero (#589.11). Lo dice il browser (IntersectionObserver v2), interrogato su una sonda
+// trasparente sopra ogni voce. Regole: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md
+
+(function (global) {
+  'use strict';
+
+  const DOC = global.document;
+  const PAGINA_DI_FILO = (() => { try { return global.location.protocol === 'filo:'; } catch (_) { return false; } })();
+  const ATTIVO = !!DOC && !PAGINA_DI_FILO && typeof global.IntersectionObserver === 'function'
+    && typeof global.IntersectionObserverEntry === 'function'
+    && 'isVisible' in global.IntersectionObserverEntry.prototype;
+
+  const VOCI = 'button, a[href]';
+  // Una voce appena scoperta aspetta mezzo secondo: un velo tolto mentre la mano parte non lascia il tempo di
+  // vedere cosa c'è sotto (la stessa misura del popup di conferma).
+  const RITARDO_MS = 500;
+  // Scoperta da un pezzo nostro che se ne va (una conferma): niente attesa, se il browser lo dice entro questo
+  // tempo; oltre, a coprire era qualcun altro.
+  const SCARTO_NOSTRO_MS = 300;
+  // Sonde allo stesso piano del menu e DOPO di lui: le copre tutto ciò che copre il menu, mai i pezzi del menu.
+  const Z = '2147483646';
+  // Lo zoom del foglio di stile sul contenitore (html { zoom: 2 }) moltiplica le misure: le sonde, posate con quelle
+  // dello schermo, guarderebbero altrove. L'host lo annulla.
+  const stileOspiteCon = (zoom) => 'all:initial!important;display:block!important;position:fixed!important;top:0!important;'
+    + 'left:0!important;width:0!important;height:0!important;z-index:' + Z + '!important;pointer-events:none!important;'
+    + (zoom === 1 ? '' : 'zoom:' + (1 / zoom) + '!important;');
+  const zoomDi = (el) => { const z = Number(el && el.currentCSSZoom); return z > 0 && Number.isFinite(z) ? z : 1; };
+  const STILE_SONDA = 'position:fixed;display:block;margin:0;padding:0;border:0;background:transparent;pointer-events:none;';
+  // Una voce nascosta porta la sua sonda fuori dallo schermo, mai a display:none: nascoderebbe la catena sotto.
+  const FUORI = 'left:-99999px;top:-99999px;width:1px;height:1px;';
+
+  // 'ok' | 'attesa' (il browser non ha ancora risposto) | 'coperta' | 'presto' (scoperta da meno di RITARDO_MS).
+  function giudica(rec, t) {
+    if (!rec || rec.stato === 'attesa') return 'attesa';
+    if (rec.stato !== 'visibile') return 'coperta';
+    return t - rec.da >= RITARDO_MS ? 'ok' : 'presto';
+  }
+
+  // Una risposta del browser su una sonda. `interseca` falso = voce non a schermo (nascosta, fuori dalla lista):
+  // quando ricompare è una comparsa, non una scoperta.
+  function aggiorna(rec, { interseca, visibile, tempo, nostra }) {
+    if (!interseca) {
+      rec.stato = 'attesa'; rec.da = -Infinity; rec.nostra = false;
+      return rec;
+    }
+    if (!visibile) {
+      if (rec.stato !== 'coperta') { rec.nostra = !!nostra; if (nostra) rec.ultimaNostra = tempo; }
+      rec.stato = 'coperta';
+      return rec;
+    }
+    if (rec.stato !== 'visibile') {
+      const libera = rec.stato === 'attesa' || (rec.nostra && tempo - rec.ultimaNostra <= SCARTO_NOSTRO_MS);
+      rec.da = libera ? -Infinity : tempo;
+      rec.stato = 'visibile';
+      rec.nostra = false;
+    }
+    return rec;
+  }
+
+  function nuovoStato() {
+    return { stato: 'attesa', da: -Infinity, nostra: false, ultimaNostra: -Infinity };
+  }
+
+  const voci = new Map();
+  const perSonda = new WeakMap();
+  const pannelli = new Map();
+  // I nostri pezzi montati prima delle sonde (menu, sotto-menu, etichette, anteprima del trascinamento).
+  const sotto = new WeakSet();
+  let ospite = null;
+  let ombra = null;
+  let metronomo = null;
+  let stileOspite = '';
+  let zoomOspite = 1;
+  let genitore = null;
+  let moGenitore = null;
+  let io = null;
+  let raf = 0;
+  let battito = 0;
+
+  function osservatore() {
+    if (!io) io = new global.IntersectionObserver(risposte, { trackVisibility: true, delay: 100 });
+    return io;
+  }
+
+  function creaOspite() {
+    ospite = DOC.createElement('div');
+    ospite.setAttribute('aria-hidden', 'true');
+    fissaOspite();
+    ombra = ospite.attachShadow({ mode: 'closed' });
+    // Il browser ricalcola le coperture solo se qualcosa cambia forma: uno z-index alzato da solo passerebbe
+    // inosservato. Un pixel che va e viene a ogni fotogramma lo costringe a guardare.
+    metronomo = DOC.createElement('div');
+    metronomo.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;';
+    ombra.appendChild(metronomo);
+    // Uno script del sito che alza le sonde sopra il suo velo (stile, o il livello più alto con popover) le
+    // rende cieche: si rimettono a posto prima del disegno.
+    new MutationObserver(() => {
+      if (ospite.hasAttribute('popover')) ospite.removeAttribute('popover');
+      if (ospite.getAttribute('style') !== stileOspite) fissaOspite();
+    }).observe(ospite, { attributes: true, attributeFilter: ['style', 'popover'] });
+  }
+  function fissaOspite() {
+    ospite.style.cssText = stileOspiteCon(zoomOspite);
+    stileOspite = ospite.getAttribute('style');
+  }
+  // A ogni fotogramma: uno zoom cambiato dal sito a menu aperto sposterebbe le sonde.
+  function seguiZoom() {
+    const z = genitore ? zoomDi(genitore) : 1;
+    if (z !== zoomOspite) { zoomOspite = z; fissaOspite(); }
+  }
+
+  // Un filtro sul contenitore del menu (la pagina in scala di grigi) per il browser nasconde anche le sonde: vale per
+  // menu e velo insieme, quindi non nasconde il menu più del sito, e si sospende finché il menu è aperto. Il filtro
+  // torna sulla pagina da un nostro fondo sotto il menu (backdrop-filter): la pagina non cambia aspetto.
+  const EFFETTI = [['filter', 'none'], ['opacity', '1'], ['transform', 'none'], ['mix-blend-mode', 'normal']];
+  let sospesi = null;
+  function sospendiEffetti(el) {
+    if (sospesi?.el === el) return;
+    rimettiEffetti();
+    let cs;
+    try { cs = global.getComputedStyle(el); } catch (_) { return; }
+    const vecchi = [];
+    let filtro = '';
+    for (const [p, neutro] of EFFETTI) {
+      const v = cs.getPropertyValue(p);
+      if (!v || v === neutro || (p === 'transform' && /^matrix\(1, 0, 0, 1, [^,]+, [^,]+\)$/.test(v))) continue;
+      if (p === 'filter') filtro = v;
+      vecchi.push([p, el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]);
+      el.style.setProperty(p, neutro, 'important');
+    }
+    sospesi = { el, vecchi, fondo: null };
+    if (filtro && el === genitore) sospesi.fondo = fondoFiltrato(filtro);
+  }
+  function fondoFiltrato(filtro) {
+    const f = DOC.createElement('div');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'all:initial!important;display:block!important;position:fixed!important;inset:0!important;'
+      + 'z-index:' + Z + '!important;pointer-events:none!important;backdrop-filter:' + filtro + '!important;';
+    let primo = null;
+    for (const n of genitore.children) if (sotto.has(n)) { primo = n; break; }
+    sotto.add(f);
+    genitore.insertBefore(f, primo || ospite);
+    // Ciò che il sito tiene sopra il menu sta anche sopra il fondo: il filtro lo riceve da sé, dopo il suo.
+    for (const el of sopraIlMenu(genitore)) {
+      let proprio = 'none';
+      try { proprio = global.getComputedStyle(el).filter; } catch (_) {}
+      sospesi.vecchi.push([el, 'filter', el.style.getPropertyValue('filter'), el.style.getPropertyPriority('filter')]);
+      el.style.setProperty('filter', (proprio && proprio !== 'none' ? proprio + ' ' : '') + filtro, 'important');
+    }
+    return f;
+  }
+  // Gli elementi del sito al piano del menu o più su: solo quelli il cui piano conta per la radice, cioè senza un
+  // antenato che faccia da contesto di sovrapposizione (lì dentro nessun piano supera quello dell'antenato).
+  function sopraIlMenu(radice) {
+    const out = [];
+    const visita = (padre) => {
+      for (const c of padre.children) {
+        if (sotto.has(c) || c === ospite) continue;
+        let cs;
+        try { cs = global.getComputedStyle(c); } catch (_) { continue; }
+        const z = cs.zIndex === 'auto' ? null : Number(cs.zIndex);
+        if (z !== null && z >= Number(Z) && cs.position !== 'static') { out.push(c); continue; }
+        const contesto = z !== null || cs.position === 'fixed' || cs.position === 'sticky' || cs.opacity !== '1'
+          || cs.transform !== 'none' || cs.filter !== 'none' || cs.isolation === 'isolate' || cs.mixBlendMode !== 'normal';
+        if (!contesto) visita(c);
+      }
+    };
+    visita(radice);
+    return out;
+  }
+  function rimettiEffetti() {
+    if (!sospesi) return;
+    const { el, vecchi, fondo } = sospesi;
+    sospesi = null;
+    try { fondo?.remove(); } catch (_) {}
+    for (const v of vecchi) rimetti(v.length === 4 ? v : [el, ...v]);
+  }
+  function rimetti([el, p, v, pr]) {
+    try { if (v) el.style.setProperty(p, v, pr); else el.style.removeProperty(p); } catch (_) {}
+  }
+
+  // In un riquadro gli effetti della pagina sopra accecano le sonde e da qui non si toccano: li sospende lei, a
+  // richiesta. Le sonde si guardano dopo la sua risposta, o la prima voce aspetterebbe come dopo un velo.
+  // La pagina crede solo a una richiesta che Filo le conferma (stessa chiave, dal main): un riquadro senza un
+  // nostro menu aperto, una pubblicità nascosta, non le fa togliere niente.
+  const CHIAVE_RIQUADRO = '__snVistoSospendi';
+  const CHIAVE_PRONTO = '__snVistoSospesi';
+  const RINNOVO_MS = 1000;
+  const SCADENZA_MS = 2500;
+  const ATTESA_GENITORE_MS = 250;
+  const TETTO_ATTESE = 64;
+  const IN_RIQUADRO = (() => { try { return global.top !== global; } catch (_) { return true; } })();
+  let rinvio = 0;
+  let inCoda = [];
+  function nuovaChiave() {
+    const a = new Uint32Array(4);
+    global.crypto.getRandomValues(a);
+    return Array.from(a, (x) => x.toString(36)).join('-');
+  }
+  // `proprio`: il menu di questo documento; `inoltro`: la richiesta di un riquadro figlio, passata alla pagina sopra.
+  const proprio = { chiave: '', al: -Infinity };
+  const inoltro = { chiave: '', al: -Infinity };
+  // Vero alla prima richiesta di un giro.
+  function chiedi(r, si) {
+    if (!IN_RIQUADRO) return false;
+    const ora = global.performance.now();
+    if (si && ora - r.al < RINNOVO_MS) return false;
+    if (!si && !r.chiave) return false;
+    const primo = si && !r.chiave;
+    if (primo) r.chiave = nuovaChiave();
+    const n = r.chiave;
+    r.al = si ? ora : -Infinity;
+    if (!si) r.chiave = '';
+    const T = global.SN_MSG?.MSG?.VISTO_SOSPENDI;
+    try { if (T) Promise.resolve(global.chrome.runtime.sendMessage({ type: T, n, si: si ? 1 : 0 })).catch(() => {}); } catch (_) {}
+    try { global.parent.postMessage({ [CHIAVE_RIQUADRO]: si ? 1 : 0, n }, '*'); } catch (_) {}
+    return primo;
+  }
+  function chiediAlGenitore(si) {
+    if (chiedi(proprio, si) && !rinvio) rinvio = setTimeout(guardaLeSonde, ATTESA_GENITORE_MS);
+  }
+  // Una conferma finta fa solo guardare prima, come senza riquadro.
+  function guardaLeSonde() {
+    clearTimeout(rinvio);
+    rinvio = 0;
+    const coda = inCoda;
+    inCoda = [];
+    for (const rec of coda) if (voci.get(rec.voce) === rec) osservatore().observe(rec.sonda);
+  }
+  const perRiquadro = new Map();
+  function sospendiPerRiquadro(fr) {
+    let reg = perRiquadro.get(fr);
+    if (!reg) {
+      reg = { vecchi: [], timer: 0 };
+      for (let el = fr; el && el.nodeType === 1; el = el.parentElement || el.getRootNode?.().host || null) {
+        let cs;
+        try { cs = global.getComputedStyle(el); } catch (_) { continue; }
+        for (const [p, neutro] of EFFETTI) {
+          const v = cs.getPropertyValue(p);
+          if (!v || v === neutro || (p === 'transform' && /^matrix\(1, 0, 0, 1, [^,]+, [^,]+\)$/.test(v))) continue;
+          reg.vecchi.push([el, p, el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]);
+          el.style.setProperty(p, neutro, 'important');
+        }
+      }
+      perRiquadro.set(fr, reg);
+    }
+    clearTimeout(reg.timer);
+    reg.timer = setTimeout(() => rimettiPerRiquadro(fr), SCADENZA_MS);
+  }
+  function rimettiPerRiquadro(fr) {
+    const reg = perRiquadro.get(fr);
+    if (!reg) return;
+    perRiquadro.delete(fr);
+    clearTimeout(reg.timer);
+    for (const v of reg.vecchi) rimetti(v);
+  }
+  // Chiave → scadenza, dette dal main; chiave → richiesta del riquadro arrivata prima della conferma.
+  const permessi = new Map();
+  const inAttesa = new Map();
+  function pota(ora) {
+    for (const [n, t] of permessi) if (t <= ora) permessi.delete(n);
+    for (const [n, r] of inAttesa) if (ora - r.t > SCADENZA_MS) inAttesa.delete(n);
+    while (inAttesa.size > TETTO_ATTESE) inAttesa.delete(inAttesa.keys().next().value);
+  }
+  function accogli(fr, fonte) {
+    sospendiPerRiquadro(fr);
+    // Dopo il prossimo disegno, quando il riquadro sa già di essere scoperto.
+    global.requestAnimationFrame(() => global.requestAnimationFrame(() => {
+      try { fonte.postMessage({ [CHIAVE_PRONTO]: 1 }, '*'); } catch (_) {}
+    }));
+    // Un riquadro dentro un riquadro: anche la pagina sopra di questo ha i suoi effetti.
+    chiedi(inoltro, true);
+  }
+  function permesso(msg) {
+    const n = typeof msg.n === 'string' ? msg.n.slice(0, 64) : '';
+    if (!n) return;
+    const ora = global.performance.now();
+    pota(ora);
+    if (!msg.si) { permessi.delete(n); inAttesa.delete(n); return; }
+    permessi.set(n, ora + SCADENZA_MS);
+    const r = inAttesa.get(n);
+    if (r) { inAttesa.delete(n); if (r.fr.isConnected) accogli(r.fr, r.fonte); }
+  }
+  if (DOC) {
+    try {
+      global.chrome?.runtime?.onMessage?.addListener((msg) => {
+        if (msg && msg.type && msg.type === global.SN_MSG?.MSG?.VISTO_PERMESSO) permesso(msg);
+      });
+    } catch (_) {}
+    global.addEventListener('message', (e) => {
+      const d = e.data;
+      if (!d || typeof d !== 'object' || !e.source) return;
+      if (CHIAVE_PRONTO in d) { if (e.source === global.parent && rinvio) guardaLeSonde(); return; }
+      if (!(CHIAVE_RIQUADRO in d)) return;
+      const fr = global.SN_RIQUADRI_IN_ARRIVO?.riquadroDi(e.source, DOC);
+      if (!fr) return;
+      if (!d[CHIAVE_RIQUADRO]) {
+        rimettiPerRiquadro(fr);
+        chiedi(inoltro, false);
+        return;
+      }
+      const n = typeof d.n === 'string' ? d.n.slice(0, 64) : '';
+      if (!n) return;
+      const ora = global.performance.now();
+      pota(ora);
+      if (permessi.has(n)) accogli(fr, e.source);
+      else inAttesa.set(n, { fr, fonte: e.source, t: ora });
+    });
+  }
+
+  // Il nodo prima del quale montare un pezzo del menu in `parent` (null se la guardia è spenta).
+  function prima(parent, el) {
+    if (!ATTIVO || !parent) return null;
+    if (!ospite) creaOspite();
+    if (genitore !== parent) {
+      genitore = parent;
+      try { moGenitore?.disconnect(); } catch (_) {}
+      moGenitore = new MutationObserver(riordina);
+      moGenitore.observe(parent, { childList: true });
+    }
+    if (ospite.parentNode !== parent) parent.appendChild(ospite);
+    seguiZoom();
+    if (el) sotto.add(el);
+    return ospite;
+  }
+
+  // Fra il primo pezzo nostro e le sonde non sta niente del sito: un suo velo infilato lì coprirebbe il menu
+  // restando sotto le sonde. I nostri pezzi tornano contigui, subito prima delle sonde.
+  function riordina() {
+    if (!ospite || !genitore || !pannelli.size) return;
+    if (ospite.parentNode !== genitore) genitore.appendChild(ospite);
+    let primo = null;
+    for (const n of genitore.children) if (sotto.has(n)) { primo = n; break; }
+    if (!primo) return;
+    let fuoriPosto = false;
+    for (let n = primo.nextElementSibling; n && n !== ospite; n = n.nextElementSibling) {
+      if (!sotto.has(n)) { fuoriPosto = true; break; }
+    }
+    for (let n = ospite.nextElementSibling; n && !fuoriPosto; n = n.nextElementSibling) if (sotto.has(n)) fuoriPosto = true;
+    if (!fuoriPosto) return;
+    for (const n of [...genitore.children]) if (sotto.has(n)) genitore.insertBefore(n, ospite);
+  }
+
+  // Posizione e piano del pannello li decide Filo: un foglio del sito che lo abbassa sotto un suo velo, o lo
+  // toglie dal piano, lascerebbe il velo fra il menu e le sonde.
+  function blindaPiano(el) {
+    let display = 'block';
+    try {
+      const d = global.getComputedStyle(el).display;
+      if (d && !['none', 'contents', 'inline'].includes(d)) display = d;
+    } catch (_) {}
+    const voluti = [['position', 'fixed'], ['z-index', Z], ['display', display]];
+    const fissa = () => {
+      for (const [p, v] of voluti) {
+        if (el.style.getPropertyValue(p) !== v || el.style.getPropertyPriority(p) !== 'important') el.style.setProperty(p, v, 'important');
+      }
+    };
+    fissa();
+    const mo = new MutationObserver(fissa);
+    mo.observe(el, { attributes: true, attributeFilter: ['style'] });
+    return mo;
+  }
+
+  // `radice`: il nodo del pannello che sta nel documento del sito, quando il pannello vive in uno shadow root.
+  function sorveglia(pannello, opts = {}) {
+    if (!ATTIVO || !pannello || pannelli.has(pannello) || !ospite) return;
+    const reg = { bloccato: opts.bloccato, premuta: null, detto: false, mo: null, moPiano: null };
+    pannelli.set(pannello, reg);
+    if (genitore) sospendiEffetti(genitore);
+    chiediAlGenitore(true);
+    for (const tipo of ['pointerdown', 'mousedown', 'click', 'auxclick']) {
+      pannello.addEventListener(tipo, (e) => filtra(e, pannello, reg), true);
+    }
+    reg.mo = new MutationObserver(() => rileggi(pannello));
+    reg.mo.observe(pannello, { childList: true, subtree: true });
+    if (!opts.radice) reg.moPiano = blindaPiano(pannello);
+    rileggi(pannello);
+    riordina();
+    avvia();
+  }
+
+  function rileggi(pannello) {
+    if (!pannelli.has(pannello)) return;
+    const presenti = new Set(pannello.querySelectorAll(VOCI));
+    const morte = [];
+    for (const [v, rec] of voci) {
+      if (rec.pannello === pannello && !presenti.has(v)) { voci.delete(v); morte.push(rec); }
+    }
+    const nuove = [];
+    for (const v of presenti) {
+      if (voci.has(v)) continue;
+      const rec = Object.assign(nuovoStato(), {
+        voce: v, pannello, sonda: DOC.createElement('div'), clip: ritagli(v, pannello), chiave: null, r: null,
+      });
+      rec.sonda.style.cssText = STILE_SONDA + FUORI;
+      voci.set(v, rec);
+      perSonda.set(rec.sonda, rec);
+      nuove.push(rec);
+    }
+    incatena();
+    for (const rec of morte) {
+      try { io?.unobserve(rec.sonda); } catch (_) {}
+      rec.sonda.remove();
+    }
+    for (const rec of nuove) { posa(rec); if (rinvio) inCoda.push(rec); else osservatore().observe(rec.sonda); }
+  }
+
+  // Le sonde si sovrappongono dove i pannelli si toccano, e una sonda sopra l'altra la farebbe sembrare coperta.
+  // In catena, ognuna dentro la precedente, nessuna copre l'altra: il browser non conta i discendenti.
+  function incatena() {
+    let padre = ombra;
+    for (const rec of voci.values()) {
+      if (rec.sonda.parentNode !== padre) padre.appendChild(rec.sonda);
+      padre = rec.sonda;
+    }
+  }
+
+  // Gli antenati che tagliano la voce (la lista che scorre, il pannello): la sonda copre solo la parte a schermo.
+  function ritagli(v, pannello) {
+    const out = [];
+    for (let n = v.parentElement; n; n = n.parentElement) {
+      if (n === pannello) { out.push(n); break; }
+      try {
+        const cs = global.getComputedStyle(n);
+        if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') out.push(n);
+      } catch (_) {}
+    }
+    return out;
+  }
+
+  function posa(rec) {
+    let r = rec.voce.getBoundingClientRect();
+    let l = r.left, t = r.top, d = r.right, b = r.bottom;
+    for (const c of rec.clip) {
+      r = c.getBoundingClientRect();
+      l = Math.max(l, r.left); t = Math.max(t, r.top); d = Math.min(d, r.right); b = Math.min(b, r.bottom);
+    }
+    const vuota = !rec.voce.isConnected || d - l < 1 || b - t < 1;
+    const chiave = vuota ? '' : `${l},${t},${d},${b}`;
+    if (chiave === rec.chiave) return;
+    rec.chiave = chiave;
+    const s = rec.sonda.style;
+    if (vuota) { rec.r = null; s.cssText = STILE_SONDA + FUORI; return; }
+    rec.r = { left: l, top: t, right: d, bottom: b };
+    s.left = l + 'px'; s.top = t + 'px'; s.width = (d - l) + 'px'; s.height = (b - t) + 'px';
+  }
+
+  // Un nostro pezzo sopra il menu (una conferma; la pila degli avvisi scende sotto): copre anche lui, ma non è il sito.
+  function coperturaNostra(r) {
+    const Ui = global.SN_FILO_UI;
+    if (!r || !Ui || typeof Ui.aperti !== 'function') return false;
+    for (const el of Ui.aperti()) {
+      if (sotto.has(el)) continue;
+      let q, z;
+      try { q = el.getBoundingClientRect(); z = Number(global.getComputedStyle(el).zIndex); } catch (_) { continue; }
+      if (!(z > Number(Z)) || !q.width || !q.height) continue;
+      if (q.left < r.right && r.left < q.right && q.top < r.bottom && r.top < q.bottom) return true;
+    }
+    return false;
+  }
+
+  function risposte(entries) {
+    for (const en of entries) {
+      const rec = perSonda.get(en.target);
+      if (!rec || voci.get(rec.voce) !== rec) continue;
+      const coperta = en.isIntersecting && !en.isVisible;
+      aggiorna(rec, {
+        interseca: en.isIntersecting, visibile: en.isVisible, tempo: en.time,
+        nostra: coperta && coperturaNostra(en.boundingClientRect),
+      });
+    }
+  }
+
+  function avvia() {
+    if (!raf) raf = global.requestAnimationFrame(giro);
+  }
+
+  function giro() {
+    raf = 0;
+    for (const p of [...pannelli.keys()]) if (!p.isConnected) congeda(p);
+    if (!pannelli.size) { smonta(); return; }
+    if (ospite.parentNode !== genitore) genitore.appendChild(ospite);
+    riordina();
+    seguiZoom();
+    const ora = global.performance.now();
+    for (const rec of voci.values()) {
+      posa(rec);
+      if (rec.stato === 'coperta' && rec.nostra && coperturaNostra(rec.r)) rec.ultimaNostra = ora;
+    }
+    battito ^= 1;
+    metronomo.style.width = battito + 'px';
+    chiediAlGenitore(true);
+    raf = global.requestAnimationFrame(giro);
+  }
+
+  function congeda(p) {
+    const reg = pannelli.get(p);
+    pannelli.delete(p);
+    try { reg?.mo?.disconnect(); reg?.moPiano?.disconnect(); } catch (_) {}
+    const morte = [];
+    for (const [v, rec] of voci) if (rec.pannello === p) { voci.delete(v); morte.push(rec); }
+    incatena();
+    for (const rec of morte) {
+      try { io?.unobserve(rec.sonda); } catch (_) {}
+      rec.sonda.remove();
+    }
+  }
+
+  function smonta() {
+    try { moGenitore?.disconnect(); } catch (_) {}
+    moGenitore = null;
+    genitore = null;
+    rimettiEffetti();
+    clearTimeout(rinvio);
+    rinvio = 0;
+    inCoda = [];
+    chiediAlGenitore(false);
+    try { ospite?.remove(); } catch (_) {}
+  }
+
+  function vocePer(target, pannello) {
+    let el = target;
+    if (el && el.nodeType !== 1) el = el.parentElement;
+    const v = el && el.closest ? el.closest(VOCI) : null;
+    return v && pannello.contains(v) ? v : null;
+  }
+
+  // Si giudica alla pressione, quando l'utente decide; il rilascio passa solo se la voce è rimasta scoperta.
+  // Un clic da tastiera (Invio, Spazio) non ha pressione e si giudica lì.
+  function filtra(e, pannello, reg) {
+    if (!e.isTrusted) return;
+    const voce = vocePer(e.target, pannello);
+    if (!voce) return;
+    const rec = voci.get(voce);
+    const ora = global.performance.now();
+    const p = reg.premuta;
+    const stessa = !!p && p.voce === voce && ora - p.t < 5000;
+    let esito;
+    if (e.type === 'pointerdown') {
+      esito = giudica(rec, ora);
+      reg.premuta = { voce, esito, t: ora };
+    } else if (e.type === 'mousedown') {
+      esito = stessa ? p.esito : giudica(rec, ora);
+    } else {
+      if (!stessa) esito = giudica(rec, ora);
+      else if (p.esito !== 'ok') esito = p.esito;
+      else esito = rec && rec.stato === 'visibile' ? 'ok' : 'coperta';
+      if (e.type === 'click') reg.premuta = null;
+    }
+    if (esito === 'ok') return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (esito === 'attesa' || reg.detto) return;
+    reg.detto = true;
+    try { reg.bloccato?.(esito); } catch (_) {}
+  }
+
+  global.SN_VISTO = {
+    ATTIVO, RITARDO_MS, SCARTO_NOSTRO_MS,
+    prima, sorveglia, giudica, aggiorna, nuovoStato,
+    // Per gli spec: la voce conterebbe un clic adesso?
+    _test: {
+      stato: (el) => voci.get(el)?.stato ?? null,
+      pronta: (el) => !ATTIVO || giudica(voci.get(el), global.performance.now()) === 'ok',
+      // A schermo per la guardia: la sonda ha un'area. Una riga tagliata dal bordo della lista sotto il pixel no.
+      aSchermo: (el) => !!voci.get(el)?.r,
+      // Scoperta senza attesa: comparsa così, o liberata da un pezzo nostro.
+      libera: (el) => { const r = voci.get(el); return !!r && r.stato === 'visibile' && r.da === -Infinity; },
+    },
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : self);

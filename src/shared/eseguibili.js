@@ -16,6 +16,8 @@
     'ps1', 'ps1xml', 'ps2', 'psc1', 'psc2', 'psm1', 'psd1',
     'reg', 'lnk', 'inf', 'scf', 'url', 'chm', 'gadget', 'application', 'jnlp',
     'appref-ms', 'xll', 'library-ms', 'settingcontent-ms', 'diagcab',
+    // Al doppio clic connettono il computer a quello di un altro, installano dalla rete o eseguono codice (#588.6).
+    'rdp', 'appinstaller', 'vsto', 'search-ms', 'searchconnector-ms', 'accde', 'mde', 'msu', 'website',
     // Immagini disco che Windows monta al doppio clic: il programma sta dentro,
     // e il disco montato non porta la marca di file scaricato (#588.1).
     'iso', 'img', 'vhd', 'vhdx',
@@ -26,7 +28,7 @@
     'sh', 'bash', 'zsh', 'csh', 'ksh', 'run', 'appimage', 'deb', 'rpm',
     'desktop', 'out', 'elf',
     // Interpretati ovunque ci sia l'interprete (su Windows basta il doppio clic).
-    'jar', 'js', 'py', 'pyw',
+    'jar', 'js', 'py', 'pyw', 'pyc', 'pyo', 'pyz', 'pyzw',
   ];
 
   const SET = new Set(ESTENSIONI);
@@ -95,42 +97,105 @@
   function nomiSito() {
     return global.SN_NOMI_SITO || require('./nomiSito.js');
   }
+  // La regola di «stesso sito» (#876). Nella barra e nella pagina Download non c'è: lì i nomi arrivano già decisi dal main.
+  function stessoSito() {
+    return global.SN_STESSO_SITO || (typeof require === 'function' ? require('./stessoSito.js') : null);
+  }
+  // Per fidarsi di un programma anche un blog su wordpress.com o un sito su sharepoint.com è di qualcuno: lo stesso
+  // giudizio di safebrowse, più severo di quello dei cookie.
+  const OSPITI = { tutteLePiattaforme: true };
 
-  // Righe scritte a mano nelle impostazioni → elenco di domini confrontabili.
-  // Tollera l'indirizzo intero incollato (`https://sito.it/percorso` → `sito.it`).
+  // Una voce scritta per i siti fidati: { sito } com'è scritta (`download.mozilla.org` resta lei), { piattaforma } se è
+  // un suffisso o una piattaforma che ospita i siti di chiunque (github.io, co.uk), null se non è un sito.
+  // Non si allarga al dominio: dl.google.com non vale www.google.com/url, produttore.b-cdn.net non vale gli altri clienti (#876).
+  function sitoFidabile(raw) {
+    const d = nomiSito().daScritto(raw);
+    if (!d) return null;
+    if (stessoSito().piattaforma(d, OSPITI)) return { piattaforma: d };
+    return { sito: d };
+  }
+
+  // Righe scritte a mano nelle impostazioni → i siti che coprono. Tollera l'indirizzo intero incollato; una
+  // piattaforma non copre nessuno, nemmeno se è stata salvata prima che la si rifiutasse.
   function normalizzaSiti(righe) {
     const fonte = Array.isArray(righe) ? righe : String(righe || '').split(/[\n,]/);
     const out = [];
     for (const raw of fonte) {
-      let s = String(raw || '').trim().toLowerCase();
-      if (!s) continue;
-      if (s.includes('/') || s.includes(':')) s = sito(s.includes('://') ? s : `https://${s}`);
-      s = s.replace(/^www\./, '').replace(/^\.+|\.+$/g, '');
-      if (!s || !nomiSito().valido(s)) continue;
-      if (!out.includes(s)) out.push(s);
+      const v = sitoFidabile(raw);
+      if (v && v.sito && !out.includes(v.sito)) out.push(v.sito);
     }
     return out;
   }
 
-  // Un dominio in elenco vale anche per i suoi sottodomini (`sito.it` copre
-  // `cdn.sito.it`), mai al contrario: `sito.it` non deve coprire `sito.it.evil.com`.
+  // La casella dei siti fidati: come nomiSito.elencoDaTesto, coi siti ridotti a quello che coprono e le piattaforme
+  // fra le righe scartate; `piattaforme` le nomina, per dire perché.
+  function elencoFidati(testo) {
+    const piattaforme = [];
+    const out = nomiSito().elencoDaTesto(testo, (d) => {
+      const v = sitoFidabile(d);
+      if (v && v.piattaforma && !piattaforme.includes(v.piattaforma)) piattaforme.push(v.piattaforma);
+      return v && v.sito ? v.sito : '';
+    });
+    return { ...out, piattaforme };
+  }
+
+  // Una voce copre sé e i nomi sotto di lei dello stesso sito: né `sito.it.evil.com`, né `bob.github.io` per chi ha
+  // scritto `alice.github.io`, né un cliente di una piattaforma sotto la voce (`x.s3.<regione>.backblazeb2.com` per
+  // `backblazeb2.com`). Un indirizzo che consegna i file di chiunque (Google Drive) non lo copre nessuna voce.
   function fidato(url, elenco) {
     const host = comeSito(url);
     if (!host) return false;
-    for (const d of normalizzaSiti(elenco)) {
-      if (host === d || host.endsWith('.' + d)) return true;
-    }
-    return false;
+    const S = stessoSito();
+    if (S.piattaforma(host, OSPITI)) return false;
+    const s = S.sitoDi(host, OSPITI);
+    return !!s && normalizzaSiti(elenco).some((v) => (host === v || host.endsWith(`.${v}`)) && S.sitoDi(v, OSPITI) === s);
   }
 
   // Chi ha servito il file, se non è il sito del primo indirizzo cliccato: la
   // fiducia vale per l'uno o per l'altro (#588.3), e chi decide deve vedere
-  // anche dove il rimando l'ha portato. Un sottodominio è lo stesso sito.
+  // anche dove il rimando l'ha portato. Un sottodominio è lo stesso sito, come per la fiducia.
   function servitoDa(primo, ultimo) {
     const a = comeSito(primo);
     const b = comeSito(ultimo);
-    if (!a || !b || b === a || b.endsWith('.' + a)) return '';
-    return b;
+    if (!a || !b || b === a) return '';
+    const S = stessoSito();
+    return S && S.stessoSito(a, b, OSPITI) ? '' : b;
+  }
+
+  // Il sito della pagina dice da dove arriva un file solo se ogni suo riquadro è dello stesso sito: con un riquadro
+  // di altri (una pubblicità) il file può venire da lui (#588). `pagina` e `origini` come le dà il browser.
+  function riquadriDiAltri(pagina, origini) {
+    const p = comeSito(pagina);
+    if (!p) return true;
+    const S = stessoSito();
+    return (Array.isArray(origini) ? origini : []).some((o) => {
+      const h = comeSito(o);
+      return !(h && (h === p || S.stessoSito(h, p, OSPITI)));
+    });
+  }
+
+  // Perché una piattaforma non entra fra i fidati, e il sito preciso da scrivere: uno di `esempi` (i siti da cui sono
+  // scesi programmi) se ce n'è uno sotto di lei, se no la forma.
+  function testoPiattaforma(p, esempi) {
+    const N = nomiSito();
+    const S = stessoSito();
+    const perche = `«${N.leggibile(p)}» raccoglie i siti di chiunque, quindi fidarsi di lui vorrebbe dire fidarsi di tutti.`;
+    // Sotto un indirizzo che serve i file di tutti non c'è un sito preciso da proporre.
+    if (S.condiviso(p)) return perche;
+    const sotto = [];
+    let soloCondivisi = false;
+    for (const e of Array.isArray(esempi) ? esempi : []) {
+      const h = comeSito(e);
+      if (!h || !h.endsWith(`.${p}`)) continue;
+      // Da un indirizzo che consegna i file di chiunque non si ricava un sito: s3.eu-west-1.amazonaws.com darebbe la regione.
+      if (S.piattaforma(h, OSPITI)) { soloCondivisi = true; continue; }
+      const s = S.sitoDi(h, OSPITI);
+      if (s && !S.piattaforma(s, OSPITI) && !sotto.includes(s)) sotto.push(s);
+    }
+    // Un programma arrivato da storage.googleapis.com/<secchio>/… non ha un sito preciso: «nome.googleapis.com» porterebbe lì.
+    if (!sotto.length && soloCondivisi) return perche;
+    const preciso = sotto.length ? sotto.slice(0, 3).map((s) => N.leggibile(s)).join(' o ') : `nome.${N.leggibile(p)}`;
+    return `${perche} Scrivi il sito preciso, come ${preciso}.`;
   }
 
   // Le frasi vivono qui perché le dicono tre superfici diverse (l'avviso della
@@ -171,6 +236,24 @@
     return `«${nomeVisibile(nome)}» è un programma scaricato${da}. Aprirlo vuol dire eseguirlo. Fallo solo se sai da chi arriva.`;
   }
 
+  // Lo stesso testo a pezzi per il popup: il nome lo sceglie il sito, e sta nel suo riquadro (#592.7).
+  function partiApri(nome, url, incerto, servito) {
+    const da = daSito(url, incerto, servito, nome);
+    const cosa = eImmagineDisco(nome)
+      ? `è un'immagine disco scaricata${da}. Aperta diventa un disco, e i programmi che contiene partono con un doppio clic. Fallo solo se sai da chi arriva.`
+      : `è un programma scaricato${da}. Aprirlo vuol dire eseguirlo. Fallo solo se sai da chi arriva.`;
+    return ['Il file', { citazione: nomeVisibile(nome) }, cosa];
+  }
+
+  // La domanda prima dello scaricamento, a pezzi come quella dell'apertura: il nome nel suo riquadro.
+  function partiScarica(nome, url, incerto, servito) {
+    const da = daSito(url, incerto, servito, nome);
+    const cosa = eImmagineDisco(nome)
+      ? `è un'immagine disco${da}. Aperta diventa un disco, e i programmi che contiene partono con un doppio clic. Scaricarla?`
+      : `è un programma${da}. Se lo apri può cambiare il computer. Scaricarlo?`;
+    return ['Il file', { citazione: nomeVisibile(nome) }, cosa];
+  }
+
   const TITOLO_APRI = 'Aprire un programma?';
 
   function titoloApri(nome) {
@@ -185,13 +268,19 @@
     eImmagineDisco,
     sito,
     comeSito,
+    sitoFidabile,
     normalizzaSiti,
+    elencoFidati,
     fidato,
     servitoDa,
+    riquadriDiAltri,
+    testoPiattaforma,
     ETICHETTA,
     provenienza,
     testoScarica,
     testoApri,
+    partiApri,
+    partiScarica,
     TITOLO_APRI,
     titoloApri,
   };

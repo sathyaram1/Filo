@@ -9,6 +9,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { confermaSopraPagina, aspettaConfermaPronta, mouseClickConfirm, confirmState } from './helpers/confirm.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const LARGO = 420;
 const ALTO = 300;
@@ -255,7 +256,7 @@ test('«No» chiude la proposta e non la ripropone; il tasto destro sul riquadro
     // Dal tasto destro dentro il riquadro si riattiva lo stesso.
     const ri = page.frameLocator('#ri');
     await ri.locator('html').click({ button: 'right', position: { x: 60, y: 60 } });
-    await ri.locator('.sn-menu').getByText('Attiva i cookie di Fotogrammi qui', { exact: true }).click();
+    await menuDi(ri).locator('.sn-menu').getByText('Attiva i cookie di Fotogrammi qui', { exact: true }).click();
     await expect(ri.locator('#ok')).toHaveText('Il post: tramonto sul mare', { timeout: 10_000 });
     expect(await impostazioni(app)).toEqual(['b.localhost']);
 
@@ -270,12 +271,12 @@ test('«No» chiude la proposta e non la ripropone; il tasto destro sul riquadro
 
     // Riattivato di nuovo dal tasto destro, si toglie anche da lì.
     await ri.locator('html').click({ button: 'right', position: { x: 60, y: 60 } });
-    await ri.locator('.sn-menu').getByText('Attiva i cookie di Fotogrammi qui', { exact: true }).click();
+    await menuDi(ri).locator('.sn-menu').getByText('Attiva i cookie di Fotogrammi qui', { exact: true }).click();
     await expect.poll(() => impostazioni(app), { timeout: 5_000 }).toEqual(['b.localhost']);
     await expect.poll(() => sec.locator('#cookie-riquadri-list li').count(), { timeout: 5_000 }).toBe(1);
     await expect(ri.locator('#ok')).toBeVisible({ timeout: 10_000 });
     await ri.locator('html').click({ button: 'right', position: { x: 60, y: 60 } });
-    await ri.locator('.sn-menu').getByText('Togli i cookie riattivati di Fotogrammi', { exact: true }).click();
+    await menuDi(ri).locator('.sn-menu').getByText('Togli i cookie riattivati di Fotogrammi', { exact: true }).click();
     await expect.poll(() => impostazioni(app), { timeout: 5_000 }).toEqual([]);
     await expect(sec.locator('#sec-cookies-riquadri')).toBeHidden();
   } finally {
@@ -349,7 +350,7 @@ test('sconosciuto rimandato all\'accesso: il modello guarda il solo riquadro, e 
 
     const ri = page.frameLocator('#ri');
     await ri.locator('html').click({ button: 'right', position: { x: 60, y: 60 } });
-    await ri.locator('.sn-menu').getByText('Attiva i cookie di cosmo.localhost qui', { exact: true }).click();
+    await menuDi(ri).locator('.sn-menu').getByText('Attiva i cookie di cosmo.localhost qui', { exact: true }).click();
     await expect(ri.locator('#ok')).toHaveText('Il contenuto dopo l\'accesso', { timeout: 10_000 });
     expect(await impostazioni(app)).toEqual(['cosmo.localhost']);
   } finally {
@@ -464,7 +465,7 @@ test('spento in Sicurezza: il riquadro sconosciuto non va al modello, il servizi
     expect(await proposte(app, 'a.localhost')).toEqual([]);
     const ri = page.frameLocator('#ri');
     await ri.locator('html').click({ button: 'right', position: { x: 60, y: 60 } });
-    await ri.locator('.sn-menu').getByText('Attiva i cookie di cosmo.localhost qui', { exact: true }).click();
+    await menuDi(ri).locator('.sn-menu').getByText('Attiva i cookie di cosmo.localhost qui', { exact: true }).click();
     await expect(ri.locator('#ok')).toHaveText('La mappa del quartiere', { timeout: 10_000 });
 
     const noto = await openTab(srv.artSu('e', 'b', 'post'));

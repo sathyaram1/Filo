@@ -14,6 +14,8 @@
   const GIORNI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
   const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
   const VAI = Object.freeze({ editor: "Apri nell'Editor", mazzi: 'Apri nei Mazzi', aiuto: 'Apri la pagina' });
+  // Il Deck builder in pausa (#1592) non si apre da qui: la conversazione resta, la strada per l'app no.
+  const vai = (app) => (app === 'mazzi' && !(global.SN_DASH_CARTE && global.SN_DASH_CARTE.aperta('mazzi')) ? '' : VAI[app] || '');
 
   function icona(nome, size = 14) {
     const I = global.SN_ICONS;
@@ -120,14 +122,14 @@
     }
     const parti = (chat.messages || []).filter((m) => m && String(m.text || '').trim()).map(messaggio);
     const v = r.vista;
-    if (v.dove && VAI[v.app]) {
-      const vai = document.createElement('button');
-      vai.type = 'button';
-      vai.className = 'dash-riga-app-vai';
-      vai.textContent = VAI[v.app];
-      vai.title = v.app === 'aiuto' ? v.dove : VAI[v.app];
-      vai.addEventListener('click', (e) => { e.stopPropagation(); apri(r); });
-      parti.push(vai);
+    if (v.dove && vai(v.app)) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dash-riga-app-vai';
+      b.textContent = vai(v.app);
+      b.title = v.app === 'aiuto' ? v.dove : vai(v.app);
+      b.addEventListener('click', (e) => { e.stopPropagation(); apri(r); });
+      parti.push(b);
     }
     r.corpo.replaceChildren(...parti);
   }
@@ -164,7 +166,9 @@
     // L'Aiuto non tiene la sua conversazione: il filo è l'unica copia. Editor e Mazzi la tengono.
     const resta = a && r.vista.app !== 'aiuto' ? ` ${a.nel[0].toUpperCase()}${a.nel.slice(1)} la conversazione resta.` : '';
     const testo = `«${r.vista.testo}» sparisce dal filo, e Filo non la ritrova più cercando.${resta}`;
-    const ok = C ? await C.confirm({ title: 'Togliere la conversazione dal filo?', text: testo, okLabel: 'Togli' }) : false;
+    // Il soggetto lo scrive chi ha dato il nome alla conversazione (per l'Aiuto, il sito): nel suo riquadro (#592.7).
+    const parti = ['La conversazione', { citazione: String(r.vista.testo || '') }, `sparisce dal filo, e Filo non la ritrova più cercando.${resta}`];
+    const ok = C ? await C.confirm({ title: 'Togliere la conversazione dal filo?', text: testo, parti, okLabel: 'Togli' }) : false;
     if (!ok) return;
     await d.send({ type: MSG.FILO_CHAT_DELETE, id: r.vista.id });
     r.el.remove();
@@ -186,9 +190,13 @@
     const voci = [
       { type: 'item', icon: icona('caretDown', 16), label: r.aperta ? 'Chiudi lo scambio' : 'Mostra lo scambio', onClick: () => alterna(r).catch(() => {}) },
     ];
-    if (r.vista.dove && VAI[r.vista.app]) voci.push({ type: 'item', icon: icona(r.vista.icona, 16), label: VAI[r.vista.app], onClick: () => apri(r) });
+    if (r.vista.dove && vai(r.vista.app)) voci.push({ type: 'item', icon: icona(r.vista.icona, 16), label: vai(r.vista.app), onClick: () => apri(r) });
     voci.push({ type: 'item', icon: icona('copy', 16), label: 'Copia lo scambio', onClick: () => copia(r).catch(() => {}) });
-    voci.push({ type: 'item', icon: icona('trash', 16), label: 'Togli dal filo', onClick: () => togli(r).catch(() => {}) });
+    // #1295 — come una conversazione della home: nascosta si rimette, «Togli dal filo» la cancella.
+    if (global.SN_DASH_CODA && global.SN_DASH_CODA.nascondi) {
+      voci.push({ type: 'item', icon: icona('eyeOff', 16), label: 'Nascondi la conversazione', azione: 'chat-archive', onClick: () => { global.SN_DASH_CODA.nascondi(r.vista.id, { vicino: r.el }).catch(() => {}); } });
+    }
+    voci.push({ type: 'item', icon: icona('trash', 16), label: 'Togli dal filo', azione: 'chat-archive', onClick: () => togli(r).catch(() => {}) });
     return voci;
   }
 
@@ -238,6 +246,19 @@
     return true;
   }
 
+  // Una riga che arriva con la coda del filo (#869): resta finché la coda la mostra, anche fuori dalle righe del momento.
+  function daCoda(v) {
+    let r = righe.get(v.id);
+    if (!r) { r = crea(v); righe.set(v.id, r); } else disegna(r, v);
+    fisse.add(v.id);
+    return r.el;
+  }
+
+  function apriRiga(el) {
+    const r = [...righe.values()].find((x) => x.el === el);
+    if (r && !r.aperta) alterna(r, true).catch(() => {});
+  }
+
   function init(deps) {
     d = deps;
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
@@ -246,14 +267,18 @@
       global.chrome.runtime.onMessage.addListener((m) => {
         if (!m) return;
         if (m.type === MSG.FILO_RIGHE_APP_CAMBIATE) presto();
-        else if (m.type === MSG.FILO_CHATS_UPDATED && m.cancellata && righe.has(m.cancellata)) {
-          righe.get(m.cancellata).el.remove();
-          righe.delete(m.cancellata);
+        else if (m.type === MSG.FILO_CHATS_UPDATED && m.rimessa) presto();
+        else if (m.type === MSG.FILO_CHATS_UPDATED && (m.cancellata || m.nascosta) && righe.has(m.cancellata || m.nascosta)) {
+          const via = m.cancellata || m.nascosta;
+          // Nascosta altrove: al suo posto resta «Rimetti», come col tasto destro (#1295).
+          if (m.nascosta && global.SN_DASH_CODA && global.SN_DASH_CODA.nascostaAltrove) global.SN_DASH_CODA.nascostaAltrove(via);
+          righe.get(via).el.remove();
+          righe.delete(via);
           vuoto();
         }
       });
     } catch (_) {}
   }
 
-  global.SN_DASH_RIGHE = { init, aggiorna, mostraSola, quando };
+  global.SN_DASH_RIGHE = { init, aggiorna, mostraSola, quando, daCoda, apri: apriRiga };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

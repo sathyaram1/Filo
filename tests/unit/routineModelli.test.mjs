@@ -21,7 +21,7 @@ async function conFetch(finto, fn) {
 }
 
 test('le fasi e le scelte sono quelle che il server legge', () => {
-  assert.deepEqual(RM.RUOLI.map((r) => r.id), ['new-work', 'verifier', 'fixer', 'secaudit', 'prober']);
+  assert.deepEqual(RM.RUOLI.map((r) => r.id), ['new-work', 'verifier', 'fixer', 'secaudit']);
   assert.deepEqual(RM.SCELTE.model.map((s) => s.id), ['opus', 'sonnet', 'haiku', 'fable']);
   assert.deepEqual(RM.SCELTE.effort.map((s) => s.id), ['low', 'medium', 'high', 'xhigh', 'max']);
   assert.equal(RM.CAMPO, 'roleModels');
@@ -41,7 +41,7 @@ test('il documento si legge com\'è, e un valore scritto a mano non diventa «de
   assert.deepEqual(t.verifier, { model: 'opus', effort: 'low' });
   assert.deepEqual(t.fixer, { model: '', effort: '' });
   // Fuori elenco: il server potrebbe usarlo, quindi la pagina deve vederlo.
-  assert.equal(RM.leggiDoc({ roleModels: { prober: { model: 'claude-opus-4' } } }).prober.model, 'claude-opus-4');
+  assert.equal(RM.leggiDoc({ roleModels: { secaudit: { model: 'claude-opus-4' } } }).secaudit.model, 'claude-opus-4');
   assert.equal(RM.inElenco('model', 'claude-opus-4'), false);
   // Una fase sconosciuta e le chiavi ereditate non entrano nella tabella.
   const strana = RM.leggiDoc(JSON.parse('{"roleModels":{"orchestrator":{"model":"opus"},"__proto__":{"model":"opus"}}}'));
@@ -51,7 +51,7 @@ test('il documento si legge com\'è, e un valore scritto a mano non diventa «de
 
 test('si valida una scelta sola, e una storta si rifiuta dicendo cosa vale', () => {
   assert.deepEqual(RM.valida({ ruolo: 'fixer', campo: 'effort', valore: 'max' }), { ok: true, ruolo: 'fixer', campo: 'effort', valore: 'max' });
-  assert.equal(RM.valida({ ruolo: 'prober', campo: 'model', valore: '' }).ok, true, 'vuoto = torna alla definizione dell\'agente');
+  assert.equal(RM.valida({ ruolo: 'secaudit', campo: 'model', valore: '' }).ok, true, 'vuoto = torna alla definizione dell\'agente');
   for (const storto of [
     { ruolo: 'orchestrator', campo: 'model', valore: 'opus' },
     { ruolo: '__proto__', campo: 'model', valore: 'opus' },

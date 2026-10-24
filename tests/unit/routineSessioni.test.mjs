@@ -103,3 +103,44 @@ test('escluso il prioritario, si sa quale account resta (verifica giro 1)', () =
   // Esclusi tutti e due non «resta» nessuno: lo dice l'altro avviso.
   assert.equal(RS.prioritarioIgnorato({ priorityAccount: 'A', accountAOff: true, accountBOff: true }), '');
 });
+
+// ── Le pause in corso, a parole (#996) ─────────────────────────────────────
+const ORA = new Date(2026, 9, 17, 10, 0).getTime();
+const ORE = 60 * 60 * 1000;
+
+test('una pausa per un rifiuto dice fino a quando e perché, col messaggio di claude.ai', () => {
+  const p = RS.pausaInParole('Account B', { finoMs: ORA + 3 * ORE, perche: 'http_429', dettaglio: 'Daily routine run limit reached', strikes: 1, oggi: 16 }, ORA);
+  assert.equal(p.testo, 'Account B in pausa fino alle 13:00: troppe accensioni per claude.ai (HTTP 429). «Daily routine run limit reached»');
+  assert.match(p.dettaglio, /raddoppia a ogni rifiuto di fila, fino a un giorno/);
+  assert.match(p.dettaglio, /Accensioni di oggi su quell'account: 16\./);
+});
+
+test('il motivo per ogni esito: crediti, token, rete, giro nato morto, codici sconosciuti', () => {
+  assert.equal(RS.motivoPausa('http_402'), 'crediti finiti (HTTP 402)');
+  assert.equal(RS.motivoPausa('http_401'), 'claude.ai rifiuta il token di accensione (HTTP 401)');
+  assert.equal(RS.motivoPausa('network'), 'claude.ai non raggiungibile');
+  assert.equal(RS.motivoPausa('dead_round'), 'accesa, ma la sessione non è partita');
+  assert.equal(RS.motivoPausa('http_418'), 'claude.ai ha rifiutato l\'accensione (HTTP 418)');
+  assert.equal(RS.motivoPausa('http_503'), 'claude.ai in errore (HTTP 503)');
+  assert.equal(RS.motivoPausa(undefined), 'accensione non riuscita');
+  assert.equal(RS.motivoPausa('<b>x</b>'), 'accensione non riuscita', 'un esito sconosciuto non arriva sullo schermo');
+});
+
+test('pause lunghe: domani, o la data; scadute o sporche non diventano una riga', () => {
+  const sera = new Date(2026, 9, 17, 22, 0).getTime();
+  assert.match(RS.pausaInParole('Account A', { finoMs: sera + 12 * ORE, perche: 'dead_round', strikes: 3 }, sera).testo,
+    /^Account A in pausa fino a domani alle 10:00: accesa, ma la sessione non è partita\.$/);
+  assert.match(RS.pausaInParole('Account A', { finoMs: ORA + 50 * ORE, perche: 'network' }, ORA).testo, /fino al 19 ottobre alle 12:00/);
+  // Giri nati morti: claude.ai non ha rifiutato niente, e l'hover non lo dice.
+  const morti = RS.pausaInParole('Account A', { finoMs: ORA + ORE, perche: 'dead_round', strikes: 3 }, ORA).dettaglio;
+  assert.match(morti, /^3 accensioni di fila senza sessione/);
+  assert.doesNotMatch(morti, /rifiut/i);
+  assert.doesNotMatch(RS.pausaInParole('Account A', { finoMs: ORA + ORE, perche: 'dead_round', strikes: 1 }, ORA).dettaglio, /rifiut/i);
+  assert.match(RS.pausaInParole('Account A', { finoMs: ORA + ORE, perche: 'http_429', strikes: 3 }, ORA).dettaglio, /^3 rifiuti di fila/);
+  assert.equal(RS.pausaInParole('Account A', { finoMs: ORA - 1, perche: 'http_429' }, ORA), null);
+  assert.equal(RS.pausaInParole('Account A', null, ORA), null);
+  assert.equal(RS.pausaInParole('Account A', { finoMs: 'domani' }, ORA), null);
+  // La routine server senza account noto non inventa un conto del giorno.
+  assert.doesNotMatch(RS.pausaInParole('La routine server', { finoMs: ORA + ORE, perche: 'http_429', account: '', oggi: 0 }, ORA).dettaglio, /Accensioni di oggi/);
+  assert.match(RS.pausaInParole('La routine server (account B)', { finoMs: ORA + ORE, perche: 'http_429', account: 'B', oggi: 4 }, ORA).dettaglio, /oggi su quell'account: 4/);
+});

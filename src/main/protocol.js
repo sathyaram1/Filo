@@ -1,15 +1,6 @@
-// Protocollo filo:// — serve pagine interne e asset.
-//
-// URL schema:
-//   filo://shell/<file>          → src/renderer/<file>   (chrome del browser)
-//   filo://newtab/                → src/pages/dashboard/dashboard.html
-//   filo://<page>/<file?>         → src/pages/<page>/<file or page.html>
-//   filo://asset/<path>           → assets/<path>
-//   filo://style/<file>           → src/styles/<file>
-//   filo://shared/<file>          → src/shared/<file>
-//
-// Privilegi: il protocollo è registrato come "standard, secure, supportsFetchAPI"
-// così la fetch() funziona e le politiche CORS sono ragionevoli.
+// Protocollo filo://: serve pagine interne e asset dal disco (la tabella
+// host → cartella sta in filoHandler). Registrato standard+secure+fetch, quindi
+// non deve MAI servire un file fuori dalla root del progetto.
 
 const { protocol, net } = require('electron');
 const path = require('node:path');
@@ -55,20 +46,40 @@ function registerProtocolSchemes() {
 // parser normalizza i `..` NON codificati, ma i `..` percent-encoded (%2e%2e)
 // sopravvivono e ridiventano `..` solo dopo decodeURIComponent — finendo in
 // path.join. Esportato per i test.
-// Il Red Team in pausa (#896): a chi non lo vede, ogni indirizzo della sua cartella risponde con la sola frase.
-// Si decide dalla cartella, non dal nome: Windows porta allo stesso file anche con altri nomi (`::$DATA`, nome corto).
-const REDTEAM_DIR = path.join(SRC, 'pages', 'redteam') + path.sep;
-const REDTEAM_PAUSA = path.join(SRC, 'pages', 'redteam', 'pausa.html');
+// Le pagine in pausa, Red Team (#896) e Deck builder (#1592): a chi non le vede, ogni indirizzo della loro cartella
+// risponde con la sola frase. Si decide dalla cartella, non dal nome: Windows porta allo stesso file anche con altri
+// nomi (`::$DATA`, nome corto). La Bacheca no: in pausa resta la parte con le segnalazioni dell'utente.
+const CARTELLE_IN_PAUSA = [
+  ['redteam', () => require('./services/redteamGate')],
+  ['decks', () => require('./services/inPausa').cancello('mazzi')],
+].map(([cartella, cancello]) => ({
+  dir: path.join(SRC, 'pages', cartella) + path.sep,
+  pausa: path.join(SRC, 'pages', cartella, 'pausa.html'),
+  cancello,
+}));
 
-async function paginaRedteamChiusa(resolved) {
+/** La pagina della pausa da servire al posto di `resolved`, o null. */
+async function paginaInPausa(resolved) {
   const p = resolved.toLowerCase();
-  if (!(p + path.sep).startsWith(REDTEAM_DIR.toLowerCase()) || p === REDTEAM_PAUSA.toLowerCase()) return false;
-  const Gate = require('./services/redteamGate');
-  return !(await Gate.assicura()).visible;
+  for (const c of CARTELLE_IN_PAUSA) {
+    if (!(p + path.sep).startsWith(c.dir.toLowerCase()) || p === c.pausa.toLowerCase()) continue;
+    return (await c.cancello().assicura()).visible ? null : c.pausa;
+  }
+  return null;
 }
 
 function relIsUnsafe(rel) {
   return /(^|[\\/])\.\.([\\/]|$)/.test(String(rel || ''));
+}
+
+// Le pagine dell'owner entrate in Gestione (#1414): l'indirizzo di prima, da un link, un avviso salvato o una scheda
+// riaperta, porta alla sezione. Qui e non nelle pagine: è l'unico punto da cui passano tutte le strade.
+const INDIRIZZI_SPOSTATI = Object.freeze({
+  'admin-defaults/admin-defaults.html': 'filo://manage/manage.html#predefiniti',
+  'credits/owner.html': 'filo://manage/manage.html#utenti',
+});
+function indirizzoSpostato(host, rel) {
+  return INDIRIZZI_SPOSTATI[`${host}/${rel || `${host}.html`}`.toLowerCase()] || null;
 }
 
 // Risolutore della richiesta filo:// → Response. Estratto come funzione pura
@@ -84,11 +95,17 @@ async function filoHandler(request) {
       return new Response('Forbidden', { status: 403 });
     }
 
+    const spostato = indirizzoSpostato(host, rel);
+    if (spostato) return new Response(null, { status: 302, headers: { Location: spostato } });
+
     let fsPath;
     if (host === 'shell') {
       fsPath = path.join(SRC, 'renderer', rel || 'shell.html');
     } else if (host === 'newtab') {
-      fsPath = path.join(SRC, 'pages', 'dashboard', rel || 'dashboard.html');
+      // La home sta nella cartella dashboard: «newtab.html» è il nome che la regola <host>/<host>.html delle altre
+      // pagine fa scrivere, e deve aprire la home invece di un file che non c'è (#830.4).
+      const home = !rel || rel.toLowerCase() === 'newtab.html';
+      fsPath = path.join(SRC, 'pages', 'dashboard', home ? 'dashboard.html' : rel);
     } else if (host === 'asset') {
       fsPath = path.join(ASSETS, rel);
     } else if (host === 'style') {
@@ -96,25 +113,22 @@ async function filoHandler(request) {
     } else if (host === 'shared') {
       fsPath = path.join(SRC, 'shared', rel);
     } else if (host === 'src') {
-      // Passthrough per i casi legacy in cui il codice estensione
-      // chiama chrome.runtime.getURL('src/pages/X/Y.html'): lo shim
-      // costruisce filo://src/pages/X/Y.html e atterriamo qui.
+      // Il codice portato chiama chrome.runtime.getURL('src/...') e lo shim
+      // costruisce filo://src/..., che atterra qui.
       fsPath = path.join(SRC, rel);
     } else {
       // filo://<page>/<file?> → src/pages/<page>/<file or page.html>
       fsPath = path.join(SRC, 'pages', host, rel || `${host}.html`);
     }
 
-    // Sicurezza: non lasciare uscire dalla root del progetto. Il confine deve
-    // includere il separatore: senza, una cartella sorella il cui path inizia
-    // con la stringa ROOT (es. "Filo-altro" accanto a "Filo") passerebbe il
-    // check. Consentiamo ROOT esatta o un percorso sotto ROOT + separatore.
+    // Il confine include il separatore: senza, una cartella sorella che inizia
+    // con la stessa stringa ("Filo-altro" accanto a "Filo") passerebbe.
     const resolved = path.resolve(fsPath);
     if (resolved !== ROOT && !resolved.startsWith(ROOT + path.sep)) {
       return new Response('Forbidden', { status: 403 });
     }
 
-    const servito = (await paginaRedteamChiusa(resolved)) ? REDTEAM_PAUSA : resolved;
+    const servito = (await paginaInPausa(resolved)) || resolved;
     const res = await net.fetch(pathToFileURL(servito).href);
     // CSP solo per i documenti HTML (le pagine privilegiate filo://): rete di
     // sicurezza contro un eventuale XSS futuro su una pagina che ha accesso a
@@ -144,21 +158,18 @@ async function registerFiloProtocol() {
   protocol.handle('filo', filoHandler);
 }
 
-// Registra filo:// su una sessione specifica. protocol.handle() globale copre
-// solo la sessione di default; le finestre incognito usano una partizione
-// effimera propria (session.fromPartition senza 'persist:'), e senza questa
-// registrazione le pagine interne filo:// non caricherebbero lì.
+// protocol.handle() globale copre solo la sessione di default: senza questa,
+// nella partizione effimera dell'incognito le pagine filo:// non caricano.
 function registerFiloProtocolForSession(sess) {
   try {
     sess.protocol.handle('filo', filoHandler);
   } catch (err) {
-    // handle() lancia se 'filo' è già registrato su quella sessione: ok,
-    // significa che è già servito (es. doppia init).
+    // Lancia se 'filo' è già registrato su quella sessione: allora è già servito.
     console.warn('[Filo protocol] per-session register:', err.message || err);
   }
 }
 
 module.exports = {
   registerProtocolSchemes, registerFiloProtocol, registerFiloProtocolForSession,
-  filoHandler, relIsUnsafe, FILO_PAGE_CSP, ROOT,
+  filoHandler, relIsUnsafe, FILO_PAGE_CSP, ROOT, INDIRIZZI_SPOSTATI,
 };

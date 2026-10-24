@@ -18,7 +18,7 @@ test('ogni tipo attivo ha la sua etichetta, fatta di numero e parametri', () => 
   assert.equal(D.etichettaAzione({ tipo: 'riprendi', feedbackId: 'f1' }, RIF), 'Riprendi #813 con questa scelta');
   assert.equal(D.etichettaAzione({ tipo: 'priorita', feedbackId: 'f1', valore: 3 }, RIF), 'Priorità di #813: 1 → 3');
   assert.equal(D.etichettaAzione({ tipo: 'archivia', feedbackId: 'f2' }, RIF), 'Archivia #902.3');
-  assert.equal(D.etichettaAzione({ tipo: 'approva_locale', feedbackId: 'f1' }, RIF), 'Approva come lavoro locale #813');
+  assert.equal(D.etichettaAzione({ tipo: 'approva_locale', feedbackId: 'f1' }, RIF), 'Affida #813 ai lavori server');
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.enabled', valore: false }, {}), 'Routine: spegni');
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.enabled', valore: true }, {}), 'Routine: accendi');
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.accountBOff', valore: true }, {}), 'Routine dell’account B: spegni');
@@ -26,7 +26,7 @@ test('ogni tipo attivo ha la sua etichetta, fatta di numero e parametri', () => 
   assert.equal(D.etichettaAzione({ tipo: 'compito' }, {}), 'Affida a un agente');
   for (const [nome, spec] of Object.entries(D.TIPI)) {
     if (!spec.attivo) continue;
-    const esempio = { riprendi: { feedbackId: 'f1' }, priorita: { feedbackId: 'f1', valore: 2 }, archivia: { feedbackId: 'f1' }, approva_locale: { feedbackId: 'f1' }, automazione: { chiave: 'routine.proberWhenIdle', valore: true }, compito: {} }[nome];
+    const esempio = { riprendi: { feedbackId: 'f1' }, priorita: { feedbackId: 'f1', valore: 2 }, archivia: { feedbackId: 'f1' }, approva_locale: { feedbackId: 'f1' }, automazione: { chiave: 'routine.enabled', valore: true }, compito: {} }[nome];
     assert.ok(esempio, `il tipo attivo «${nome}» non ha un esempio in questo test`);
     assert.equal(typeof D.etichettaAzione({ tipo: nome, ...esempio }, RIF), 'string', nome);
   }

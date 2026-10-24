@@ -129,6 +129,22 @@
 .sn-wallet-invite-uses { list-style: none; margin: 0; padding: 0 0 0 4px; display: flex; flex-direction: column; gap: 2px; }
 .sn-wallet-invite-uses li { display: flex; align-items: baseline; gap: 10px; font-size: 12px; color: var(--sn-muted); }
 .sn-wallet-invite-who { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+/* Senza Google collegato (#1120) i codici non ci sono: al loro posto, tratteggiato come un posto da riempire, l'accesso. */
+.sn-wallet-invites-locked { margin-top: 10px; }
+.sn-wallet-link-google {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 14px;
+  border: 1px dashed var(--sn-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--sn-fg);
+  cursor: pointer;
+  transition: background-color calc(.15s * var(--sn-motion, 1)) ease, border-color calc(.15s * var(--sn-motion, 1)) ease, transform calc(.15s * var(--sn-motion, 1)) ease;
+}
+.sn-wallet-link-google:hover:not(:disabled) { background: var(--sn-hover, rgba(0,0,0,.05)); border-color: var(--sn-accent); color: var(--sn-accent); }
+.sn-wallet-link-google:active:not(:disabled) { transform: scale(.97); }
+.sn-wallet-link-google:disabled { opacity: .6; cursor: progress; }
 
 /* I numeri che il server calcola (#652): si guardano, non si toccano. Valore
    grande, nome sotto, nessun bordo che li faccia sembrare campi. */
@@ -145,6 +161,7 @@
 }
 .sn-wallet-numero-barra > span { display: block; height: 100%; background: var(--sn-accent); }
 .sn-wallet-numero-nota { font-size: 12px; color: var(--sn-muted); }
+.sn-wallet-installazioni { margin-top: 14px; }
 .sn-wallet-numero.is-allarme .sn-wallet-numero-valore,
 .sn-wallet-numero.is-allarme .sn-wallet-numero-nome { color: var(--sn-error); }
 /* Un numero che apre le persone contate (#820): si capisce dal puntatore e dal fondo al passaggio, e resta acceso

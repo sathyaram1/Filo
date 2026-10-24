@@ -1,17 +1,9 @@
-// Handler di dominio: bacheca utente — voto funziona/non-funziona (DC2).
-//
-// Persiste il voto su Firestore (votes.<uid>, DB4) con l'ID token del votante
-// (mai esposto al renderer) e premia +10 crediti UNA SOLA VOLTA per feedback
-// per utente (anti-doppio-premio in creditStore.js — rewardedVotes, namespace
-// separato dal premio di risoluzione C5). Niente timeout, niente penalità: il
-// premio resta accreditato anche se l'utente ritira o cambia voto in seguito.
-//
-// Il renderer (src/pages/board/board.js) NON parla direttamente con FB.castVote:
-// passa sempre da qui, perché il voto richiede l'uid Firebase REALE (claim
-// dell'ID token: request.auth.uid nelle Firestore rules) — non l'email, che è
-// quanto il renderer vede di sé via AUTH_STATUS.
+// Bacheca utente: voto funziona/non-funziona e riapertura a pagamento.
+// Il voto premia una sola volta per feedback per utente; ritirarlo non toglie il premio.
+// Passa dal main perché il voto vuole l'uid Firebase reale, che il renderer non conosce.
 
 const auth = require('../../auth/google-auth');
+const Mittente = require('../feedbackMittente');
 // #583 — queste tre porte non sono del proprietario: valgono per chiunque
 // abbia fatto l'accesso, e su una macchina con una sessione aperta «hai una
 // sessione?» è sempre sì. Senza guardare da dove arriva la richiesta, una
@@ -20,6 +12,7 @@ const auth = require('../../auth/google-auth');
 // segnalazione col testo che voleva. Il voto e la riapertura sono gesti che si
 // fanno in bacheca, che è una pagina di Filo.
 const { soloFilo } = require('./origine');
+const InPausa = require('../inPausa');
 
 module.exports = function register(on, ctx) {
   const { MSG } = ctx;
@@ -88,7 +81,15 @@ module.exports = function register(on, ctx) {
     return MR.listBoardTab([card], { releasedVersion: versioneRilasciata() }).length > 0;
   }
 
+  // La Bacheca in pausa (#1592): voti e «Ancora rotto?» non partono per chi non la vede, nemmeno da una pagina vecchia.
+  const bachecaChiusa = async () => {
+    if ((await InPausa.cancello('bacheca').assicura()).visible) return null;
+    return { ok: false, code: 'paused', error: InPausa.FRASI_PAUSA.bacheca };
+  };
+
   on(MSG.BOARD_CAST_VOTE, soloFilo(async (msg) => {
+    const chiusa = await bachecaChiusa();
+    if (chiusa) return chiusa;
     const id = String(msg?.id || '').trim();
     try {
       if (!auth.isSignedIn()) {
@@ -107,16 +108,11 @@ module.exports = function register(on, ctx) {
 
       await FB.castVote(id, { uid, vote, credibilitySnapshot: 1 }, { idToken });
 
-      // Premio: +10 crediti, una sola volta per feedback per questo utente
-      // (idempotente — vedi creditStore.awardVoteOnce). Cambiare idea
-      // works↔broken o rivotare lo stesso valore NON ripaga.
+      // Una sola volta per feedback per utente: cambiare voto o rivotare lo stesso NON ripaga.
       const amount = SN_CONST.CREDIT.BOARD_VOTE;
       const reward = await Credits.awardVoteOnce(id, amount);
 
-      // Rilegge il documento per tornare il tally REALE (altri voti compresi),
-      // così la UI non deve fidarsi solo dell'aggiornamento ottimistico locale.
-      // FB.list non filtra per id: leggiamo il singolo documento via REST diretto
-      // (fetchVotes sotto, stesso plumbing esposto da SN_FEEDBACK).
+      // Rilegge il documento per il conteggio vero, non solo l'aggiornamento ottimistico.
       const votes = await fetchVotes(id);
 
       return {
@@ -132,30 +128,11 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // Riapertura a pagamento (DC4): l'utente loggato segnala che un fix
-  // "Risolti" è ancora rotto. Passi atomici-quanto-possibile:
-  //   1. verifica idoneità (è davvero in Risolti, nessuno l'ha già riaperto);
-  //   2. scala CREDIT.BOARD_REOPEN (anti-spam — rifiuta senza scrivere nulla
-  //      se il saldo non basta, applyConsumptionIfAffordable in creditStore.js);
-  //   3. marca `reopenRequests.<uid>` sull'originale (il GUARD anti-doppia-
-  //      riapertura — segnale per il triage: un utente normale non può scrivere
-  //      `status`, quindi il flip fuori da "Risolti" resta al percorso fidato —
-  //      vedi nota in messages.js);
-  //   4. crea il feedback collegato (parentId).
-  //
-  // ORDINE DELIBERATO (guard PRIMA del feedback): i passi 3 e 4 sono due
-  // scritture REST Firestore separate e NON atomiche. Se creassimo il feedback
-  // (4) prima di marcare il guard (3) e la rete cadesse fra le due, resteremmo
-  // con un feedback figlio orfano E il guard MAI marcato: canReopen()
-  // continuerebbe a dire "riapribile" e l'utente potrebbe ripetere all'infinito,
-  // creando ogni volta un nuovo feedback duplicato (crediti sempre rimborsati) —
-  // la coda si riempirebbe di segnalazioni gratis, bypassando l'anti-spam.
-  // Marcando il guard PER PRIMO: se (3) fallisce, non abbiamo ancora creato
-  // nulla (retry pulito, nessun orfano); se (3) riesce ma (4) fallisce, il guard
-  // blocca comunque ogni tentativo successivo → al più UN feedback figlio per
-  // utente, mai duplicati. In entrambi i rami di fallimento dopo aver scalato,
-  // restituiamo i crediti (compensazione best-effort).
+  // ORDINE DELIBERATO, guard PRIMA del feedback: le due scritture non sono atomiche, e col
+  // feedback per primo una caduta di rete lasciava duplicati gratis. Crediti resi se fallisce.
   on(MSG.BOARD_REOPEN, soloFilo(async (msg) => {
+    const chiusa = await bachecaChiusa();
+    if (chiusa) return chiusa;
     const id = String(msg?.id || '').trim();
     try {
       if (!auth.isSignedIn()) {
@@ -187,8 +164,7 @@ module.exports = function register(on, ctx) {
           : TORNATO_IN_LAVORAZIONE;
       }
 
-      // Anti-spam: scala i crediti SOLO se il saldo basta (nessun saldo
-      // negativo, nessun tentativo "gratis" se insufficiente).
+      // Anti-spam: si scala solo se il saldo basta, niente saldo negativo né tentativi gratis.
       const amount = SN_CONST.CREDIT.BOARD_REOPEN;
       const spend = await Credits.spendIfAffordable(amount, { kind: 'board_reopen', ref: id });
       if (!spend.ok) {
@@ -197,10 +173,10 @@ module.exports = function register(on, ctx) {
 
       let created;
       try {
-        // Guard PRIMA (vedi nota d'ordine sopra): marcare reopenRequests.<uid>
-        // chiude la porta a duplicati anche se la creazione del feedback qui
-        // sotto fallisce a metà.
+        // Guard prima (vedi sopra): chiude ai duplicati anche se la creazione qui sotto fallisce.
         await FB.castReopenRequest(id, uid, { idToken });
+        // Dall'owner parte con la sua prova come dal riquadro (#953), mai col ripiego anonimo.
+        const firmato = Mittente.firma(`uid:${uid}`);
         created = await FB.submit({
           // Un id d'invio STABILE per questa coppia (fix, persona): se la
           // risposta si perde per strada ma il documento è nato lo stesso, un
@@ -210,17 +186,15 @@ module.exports = function register(on, ctx) {
           // per chi deve riprovare, e resta chiusa ai duplicati.
           submissionId: `reopen-${id}-${uid}`,
           text: `[Riapertura #${original.seq || id}] ${text}`,
-          // #583: l'URL e il titolo della pagina del feedback originale non
-          // arrivano più fin qui — sono di chi l'aveva mandato, e la scheda
-          // pubblica non li porta. Il collegamento all'originale resta
-          // `parentId` (più il numero nel testo), che è ciò che serve al triage.
+          // URL e titolo dell'originale sono di chi l'ha mandato e non arrivano qui (#583):
+          // al triage bastano `parentId` e il numero nel testo.
           url: '',
           title: '',
           userAgent: '',
-          clientId: `uid:${uid}`,
+          clientId: firmato.clientId,
           parentId: id,
           name: '',
-        });
+        }, firmato.dallOwner ? { idToken, soloAdmin: true } : undefined);
         // #678 — la riapertura è una segnalazione di questa installazione:
         // entra nel registro, e la prossima apertura della home va a vedere
         // subito se c'è una ricompensa da dare (l'attesa si azzera).
@@ -233,9 +207,7 @@ module.exports = function register(on, ctx) {
           });
         } catch (_) {}
       } catch (e) {
-        // Compensazione best-effort: il segnale/feedback non è andato a buon
-        // fine dopo aver già scalato — restituiamo i crediti invece di
-        // lasciare l'utente scalato senza nulla in cambio.
+        // Best-effort: i crediti tornano invece di lasciare l'utente scalato senza nulla in cambio.
         try { await Credits.award({ kind: 'board_reopen_refund', credits: amount, ref: id }); } catch (_) {}
         // E torna indietro anche il SEGNALE di riapertura. Lo scriviamo per
         // primo apposta, perché chiude la porta ai duplicati (#269); ma se la
@@ -264,6 +236,8 @@ module.exports = function register(on, ctx) {
   on(MSG.SEGNALAZIONI_MIE_TOGLI, soloFilo(async (msg) => ({ ok: true, voci: await Mie().togli(msg?.id) })));
 
   on(MSG.BOARD_CLEAR_VOTE, soloFilo(async (msg) => {
+    const chiusa = await bachecaChiusa();
+    if (chiusa) return chiusa;
     const id = String(msg?.id || '').trim();
     try {
       if (!auth.isSignedIn()) {
@@ -277,8 +251,7 @@ module.exports = function register(on, ctx) {
       if (!FB?.clearVote) throw new Error('SN_FEEDBACK non caricato nel main process');
 
       await FB.clearVote(id, uid, { idToken });
-      // NB: nessuna revoca del premio (non è una penalità, è solo ritiro del
-      // voto) — rewardedVotes resta marcato: un voto successivo non ripaga.
+      // Il ritiro del voto non è una penalità: il premio resta, e un voto successivo non ripaga.
       const votes = await fetchVotes(id);
       return { ok: true, uid, votes };
     } catch (e) {

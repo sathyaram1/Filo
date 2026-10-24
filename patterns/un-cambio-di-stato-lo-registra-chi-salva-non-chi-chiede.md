@@ -35,9 +35,12 @@ porte divergono, e la prossima porta si dimentica di registrare.
   `tests/unit/cambi.test.mjs`.
 - I segreti (chiavi, indirizzi dei proxy) entrano come «cambiata», senza
   valori, e quindi non si annullano.
-- Un cursore trascinato è un evento solo: i passi della stessa pagina sulle
-  stesse chiavi, entro pochi secondi, si fondono; tornare al valore di partenza
-  non lascia niente.
+- Ritocchi ripetuti sono un evento solo: i passi della stessa strada sulle
+  stesse chiavi, senza altri cambi in mezzo e a meno di due minuti dall'ultimo,
+  si fondono (un cursore trascinato, lo zoom 125 → 114 → 87 → 100 che il filo
+  dice «125% → 100%», #1490); tornare al valore di partenza non lascia niente.
+  L'evento tiene l'ora del primo passo e quella dell'ultimo (`agg`): la riga
+  della home resta dov'è nata, e chi la mostra la riscrive o la toglie.
 - Anche annullare è un evento, scritto dallo stesso salvataggio. Annullare un
   annullo rifà il cambio.
 - Lo zoom non passa dallo storage (lo tiene Chromium per sito): il suo

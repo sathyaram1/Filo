@@ -335,7 +335,6 @@ test('chiudiAlbero toglie prima il collegamento: con un collegamento che non si 
 
 const { askServerMerge, classifyOwnerMerge, exitCodeForOwnerMerge, messageForOwnerMerge } = await import('../../scripts/lib/owner-merge.mjs');
 const { erroreDiSocket } = await import('../../scripts/lib/rete.mjs');
-const { exitCodeFor } = await import('../../scripts/merge-gate.mjs');
 const { fermoDopoLaProva } = await import('../../scripts/finish-local.mjs');
 
 test('finish: la prova viaggia con la richiesta, e «main mosso»/«unit rossi» hanno un nome e un\'uscita', async () => {
@@ -374,11 +373,6 @@ test('finish: la prova viaggia con la richiesta, e «main mosso»/«unit rossi»
   assert.match(messageForOwnerMerge({ outcome: 'main_moved', mainSha: 'b'.repeat(40) }), /Main si è mosso a ogni prova/);
   assert.match(fermoDopoLaProva({ esito: 'rosso_sulla_fusione' }), /non ho chiesto la fusione/);
   assert.match(fermoDopoLaProva({ errore: 'git giù' }), /git giù/);
-});
-
-test('cancello delle routine: unit rossi sulla fusione escono 20, come un conflitto (il server ha già riallineato)', () => {
-  assert.equal(exitCodeFor({ ok: true, result: 'unit_rossi' }), 20);
-  assert.equal(exitCodeFor({ ok: true, result: 'main_moved' }), 1);
 });
 
 test('prova vera: un rosso instabile si riprova da solo e non ferma la fusione', () => {

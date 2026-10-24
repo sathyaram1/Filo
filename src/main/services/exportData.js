@@ -16,7 +16,7 @@
 
 'use strict';
 
-// --- CRC32 (tabella standard, polinomio 0xEDB88320) -------------------------
+// CRC32, tabella standard (polinomio 0xEDB88320).
 let CRC_TABLE = null;
 function crcTable() {
   if (CRC_TABLE) return CRC_TABLE;
@@ -36,8 +36,7 @@ function crc32(buf) {
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
 
-// --- ZIP writer (STORE) -----------------------------------------------------
-// entries: [{ name: string, buffer: Buffer }]
+// entries: [{ name: string, buffer: Buffer }].
 function zipStore(entries) {
   const chunks = [];
   const central = [];
@@ -100,11 +99,8 @@ function zipStore(entries) {
   return Buffer.concat([...chunks, centralBuf, end]);
 }
 
-// --- estrazione immagini dai data-URL ---------------------------------------
 const DATA_URL_RE = /^data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/i;
 
-// Cammina ricorsivamente l'oggetto e sostituisce ogni stringa data-URL immagine
-// con un percorso relativo, raccogliendo i buffer delle immagini.
 function extractImages(node, images) {
   const replaceStr = (s) => {
     const m = DATA_URL_RE.exec(s);
@@ -223,31 +219,39 @@ function buildExportZip(storageData, { filo: filoDato = null, chiavi = false } =
   return zipStore(entries);
 }
 
-// ============================================================================
-// IMPORTAZIONE — l'inverso esatto di buildExportZip.
-//
-// Un backup che non si può ripristinare non è un backup: qui viviamo la metà
-// mancante. Leggiamo lo zip prodotto da buildExportZip (o una sua versione
-// ri-compressa da un qualsiasi gestore di archivi: accettiamo anche DEFLATE, e
-// il file dentro una cartella, perché l'utente ha tutto il diritto di
-// scompattare, guardare e ri-comprimere), rimettiamo le immagini al loro posto
-// come data-URL e fondiamo il risultato con i dati già presenti.
-// ============================================================================
+// IMPORTAZIONE, l'inverso esatto dell'export: un backup che non si può ripristinare non è
+// un backup. Si accetta anche DEFLATE e data.json in una cartella: l'utente ricomprime.
 
 const zlib = require('node:zlib');
 
 // --- ZIP reader (STORE + DEFLATE) -------------------------------------------
+const FIRMA_FINE = 0x06054b50;
+const FIRMA_INDICE = 0x02014b50;
+
+// Il record finale: quello la cui posizione torna con l'indice che dichiara (inizio + dimensione), con o senza la sua
+// firma, perché una firma rovinata non fa di un archivio intatto «non è di Filo» (#1088); se nessuno torna, la firma.
+function recordFinale(buf) {
+  const minStart = Math.max(0, buf.length - 22 - 0xFFFF);
+  let firmato = -1;
+  for (let i = buf.length - 22; i >= minStart; i--) {
+    const inizio = buf.readUInt32LE(i + 16);
+    const dimensione = buf.readUInt32LE(i + 12);
+    const torna = inizio + dimensione === i
+      && (dimensione === 0 || (inizio + 4 <= buf.length && buf.readUInt32LE(inizio) === FIRMA_INDICE));
+    if (torna) return i;
+    if (firmato < 0 && buf.readUInt32LE(i) === FIRMA_FINE) firmato = i;
+  }
+  return firmato;
+}
+
 // Ritorna { voci: Map nome → Buffer, saltate: [{ nome, motivo }], mancanti }: una voce che non si legge si dice, perché chi
 // importa deve sapere cosa manca (#1088). Legge la central directory: i local header possono avere size a 0.
+// L'indice si legge per tutta la sua lunghezza, non per il numero di voci che dichiara: un numero rovinato non nasconde
+// voci, e una riga rovinata si salta e si conta. Sentinella: tests/unit/importData.test.mjs.
 function unzip(buf) {
   if (!Buffer.isBuffer(buf) || buf.length < 22) throw new Error('not_a_zip');
 
-  // EOCD: cerca la firma dalla fine (il commento finale può essere fino a 64KB).
-  let eocd = -1;
-  const minStart = Math.max(0, buf.length - 22 - 0xFFFF);
-  for (let i = buf.length - 22; i >= minStart; i--) {
-    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
-  }
+  const eocd = recordFinale(buf);
   if (eocd < 0) throw new Error('not_a_zip');
 
   const count = buf.readUInt16LE(eocd + 10);
@@ -255,12 +259,26 @@ function unzip(buf) {
   const cdOffset = buf.readUInt32LE(eocd + 16);
   if (cdOffset === 0xFFFFFFFF || cdSize === 0xFFFFFFFF) throw new Error('zip64_unsupported');
 
+  const firmaIndice = (q) => q >= 0 && q + 46 <= eocd && buf.readUInt32LE(q) === FIRMA_INDICE;
+  // Se l'inizio dichiarato è rovinato, lo dice la dimensione contata a ritroso dal record finale.
+  const inizio = firmaIndice(cdOffset) ? cdOffset : (firmaIndice(eocd - cdSize) ? eocd - cdSize : eocd);
+  const fine = Math.min(inizio + cdSize, eocd);
   const voci = new Map();
   const saltate = [];
-  let p = cdOffset;
+  let p = inizio;
   let lette = 0;
-  for (; lette < count; lette++) {
-    if (p + 46 > buf.length || buf.readUInt32LE(p) !== 0x02014b50) break;
+  let buchi = 0;
+  while (p + 46 <= eocd) {
+    if (buf.readUInt32LE(p) !== FIRMA_INDICE) {
+      // Oltre la dimensione dichiarata l'indice è finito (lì possono stare i record zip64); dentro, è una riga rovinata:
+      // si conta e si riprende dalla prossima, che comincia con la sua firma.
+      if (p >= fine) break;
+      buchi++;
+      do p++; while (p + 46 <= fine && buf.readUInt32LE(p) !== FIRMA_INDICE);
+      if (p + 46 > fine) p = Math.max(p, fine);
+      continue;
+    }
+    lette++;
     const flags = buf.readUInt16LE(p + 8);
     const method = buf.readUInt16LE(p + 10);
     const crc = buf.readUInt32LE(p + 16);
@@ -299,14 +317,15 @@ function unzip(buf) {
     if (crc32(data) !== crc) { salta('crc'); continue; }
     voci.set(name, data);
   }
-  // L'indice che si interrompe prima del numero di voci che dichiara: quelle dopo non hanno nome, ma si contano (#1088).
-  const mancanti = count - lette;
+  // Un indice letto fino in fondo senza buchi è intero, qualunque numero dichiari; altrimenti le righe che non si
+  // raggiungono non hanno nome, ma si contano (#1088).
+  const intero = buchi === 0 && p >= fine && p <= eocd && (inizio < eocd || cdSize === 0);
+  const mancanti = intero ? 0 : Math.max(count - lette, buchi, 1);
   return { voci, saltate, mancanti };
 }
 
-// Estensione file → mime. buildExportZip deriva l'estensione dal mime
-// togliendo i caratteri non alfanumerici (image/svg+xml → "svgxml"), quindi qui
-// facciamo il cammino inverso sui casi reali e ricadiamo su image/<ext>.
+// L'export deriva l'estensione dal mime togliendo i non alfanumerici (image/svg+xml →
+// «svgxml»): qui il cammino inverso sui casi reali, con ripiego su image/<ext>.
 const EXT_TO_MIME = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
   webp: 'image/webp', bmp: 'image/bmp', avif: 'image/avif', tiff: 'image/tiff',
@@ -352,13 +371,12 @@ function inlineImages(node, files, prefix, stats, perse) {
   }
 }
 
-// Legge un archivio esportato e ritorna { data, imageCount, immaginiPerse, filoPerso, saltate, exportedAt, … }.
+// Legge un archivio esportato e ritorna { data, imageCount, immaginiPerse, filoPerso, saltate, vociPerse, exportedAt, … }.
 // Lancia con un codice parlante se il file non è un export di Filo (o se il suo data.json non si legge).
 function readExportZip(zipBuffer) {
   const { voci: files, saltate, mancanti } = unzip(zipBuffer);
 
-  // data.json può stare in radice o dentro una cartella (utente che ha
-  // scompattato e ri-compresso): prendiamo quello meno profondo.
+  // data.json può stare in radice o in una cartella (zip rifatto): vince il meno profondo.
   let dataName = null;
   for (const name of [...files.keys(), ...saltate.map((s) => s.nome)]) {
     if (!/(^|\/)data\.json$/.test(name)) continue;
@@ -407,16 +425,13 @@ function readExportZip(zipBuffer) {
   const filoPerso = !filo && (saltate.some((s) => s.nome === prefix + VOCE_FILO)
     || filoDichiarato === true || (mancanti > 0 && filoDichiarato !== false));
   return {
-    data, imageCount: stats.images, immaginiPerse: stats.perse, filoPerso, saltate,
+    data, imageCount: stats.images, immaginiPerse: stats.perse, filoPerso, saltate, vociPerse: mancanti,
     exportedAt, sectionCount: Object.keys(data).length, filo, proxySenzaCredenziali: proxyTolti,
   };
 }
 
-// --- fusione con i dati già presenti ----------------------------------------
-// Identità di un elemento di lista: l'id quando c'è (le liste di Filo — pagine
-// salvate, cronologia, schede archiviate — sono tutte oggetti con id), altrimenti
-// il contenuto serializzato. Serve a non duplicare le voci già presenti quando si
-// ripristina un backup sopra dati vivi.
+// Identità di una voce: l'id se c'è, altrimenti il contenuto serializzato. Serve a non
+// duplicare ciò che c'è già quando si ripristina un backup sopra dati vivi.
 function itemKey(item) {
   if (item && typeof item === 'object' && !Array.isArray(item)) {
     for (const k of ['id', 'uuid', 'key']) {
@@ -430,8 +445,7 @@ function isPlainObject(v) {
   return !!v && typeof v === 'object' && !Array.isArray(v);
 }
 
-// Unione di due liste: si tengono TUTTE le voci locali (non si perde nulla di
-// ciò che c'è ora) e si accodano quelle del backup non ancora presenti.
+// Nulla di ciò che c'è ora va perso: si accodano solo le voci del backup non presenti.
 function mergeLists(local, imported) {
   const seen = new Set(local.map(itemKey));
   const out = local.slice();
@@ -447,18 +461,49 @@ function mergeLists(local, imported) {
 // La cronologia appunti ha un'identità sua (testo a spazi compattati, dato
 // dell'immagine): la stessa cosa copiata in due momenti è una voce sola, come
 // quando la si copia. Con l'identità generica il backup lasciava due gemelle.
+function chiaveAppunto(item) {
+  if (!globalThis.SN_CLIPBOARD) require('../../shared/clipboardHistory.js');
+  return globalThis.SN_CLIPBOARD.chiave(item) || itemKey(item);
+}
 function mergeClipboardHistory(local, imported) {
-  require('../../shared/clipboardHistory.js');
-  const chiave = globalThis.SN_CLIPBOARD.chiave;
   const seen = new Set();
   const out = [];
   for (const item of [...local, ...imported]) {
-    const k = chiave(item) || itemKey(item);
+    const k = chiaveAppunto(item);
     if (seen.has(k)) continue;
     seen.add(k);
     out.push(item);
   }
   return out;
+}
+
+// Una lista col suo tetto lo rispetta già nell'unione, le più recenti prima: il primo salvataggio dopo l'importazione
+// taglierebbe in fondo, proprio dove arriva il backup (#1256). Chi resta fuori, anche di qui, lo conta la conferma.
+function entroIlTetto(tutte, local, { quando, chiave, tetto }) {
+  const ordinate = tutte.slice().sort((a, b) => quando(b) - quando(a));
+  const fuori = tetto > 0 && ordinate.length > tetto ? ordinate.length - tetto : 0;
+  const lista = fuori ? ordinate.slice(0, tetto) : ordinate;
+  const restano = fuori ? new Set(lista.map(chiave)) : null;
+  const mieFuori = fuori ? local.filter((x) => !restano.has(chiave(x))).length : 0;
+  return { lista, fuori, mieFuori };
+}
+
+const istante = (v) => {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? t : 0;
+};
+
+function unisciAppunti(local, imported, tetto) {
+  const qui = Array.isArray(local) ? local : [];
+  const tutte = mergeClipboardHistory(qui, Array.isArray(imported) ? imported : []);
+  return entroIlTetto(tutte, qui, { quando: (x) => istante(x && x.ts), chiave: chiaveAppunto, tetto });
+}
+
+function unisciDownload(local, imported, tetto) {
+  const qui = Array.isArray(local) ? local : [];
+  const tutte = mergeLists(qui, Array.isArray(imported) ? imported : []);
+  return entroIlTetto(tutte, qui, { quando: (r) => istante(r && r.startedAt), chiave: itemKey, tetto });
 }
 
 function mergeValue(local, imported) {
@@ -470,8 +515,7 @@ function mergeValue(local, imported) {
     }
     return out;
   }
-  // Tipi diversi o valori semplici: vince il backup — è ciò che l'utente ha
-  // chiesto di ripristinare.
+  // Valori semplici: vince il backup, salvo le regole per chiave di REGOLE_IMPORT e il tetto di spesa (tettoSpesa).
   return imported;
 }
 
@@ -482,7 +526,7 @@ const REGOLE_IMPORT = {
   SETTINGS: 'contenuto',
   SAVED_PAGES: 'pagine',
   HISTORY: 'contenuto',
-  DOWNLOADS: 'contenuto',
+  DOWNLOADS: 'download',
   ARCHIVED_TABS: 'contenuto',
   DECKS: 'contenuto',
   DECKS_UI: 'contenuto',
@@ -504,15 +548,19 @@ const REGOLE_IMPORT = {
   // Dice cosa ricordano i cookie di QUESTO profilo, e i cookie non sono nel backup.
   COOKIE_SITES: 'stato',
   AI_CACHE: 'contenuto',
-  CLIPBOARD_HISTORY: 'contenuto',
+  CLIPBOARD_HISTORY: 'appunti',
   PERSONAL_DICT: 'contenuto',
   AUTOCORRECT: 'contenuto',
+  CORRETTORE_IMPARATO: 'contenuto',
+  // Un elenco di siti con un conto: dice dove si è scritto, come i cookie.
+  CORRETTORE_STILI: 'stato',
   ICON_LAYOUT: 'contenuto',
   OPEN_TABS: 'stato',
   FILO_RAW_LOG: 'stato',
   FILO_LESSONS_BUFFER: 'contenuto',
   FILO_CHATS: 'contenuto',
   FILO_MEMORY: 'contenuto',
+  FILO_MEMORY_FONTI: 'contenuto',
   FILO_DASHBOARD_CACHE: 'stato',
   FILO_NOTES: 'contenuto',
   FILO_TIMERS: 'sveglie',
@@ -524,6 +572,8 @@ const REGOLE_IMPORT = {
   FILO_TERMINAL_CWD: 'stato',
   FILO_TERMINALE_SPIEGATO: 'stato',
   SITI_CON_CAMPI: 'contenuto',
+  // Viaggia con la cronologia appunti, che porta le immagini stesse.
+  IMMAGINI_DELICATE: 'contenuto',
   AGGIORNAMENTO_CHIESTO: 'stato',
   LAST_SEEN_VERSION: 'stato',
   LAST_SEEN_NOTES: 'stato',
@@ -544,10 +594,16 @@ const REGOLE_ALTRE_CHIAVI = {
   walletNotice: 'stato',
   walletPendingInvite: 'stato',
   walletUsageQueue: 'stato',
+  walletUsageLog: 'stato',
+  // I contatori di questa copia di Filo (#969): portati su un'altra, la stessa copia conterebbe due volte.
+  contatoriGiornalieri: 'stato',
+  // Il diario dei crediti spesi su questa copia: lo tiene in memoria chi avvisa, e il backup non lo riavvolge.
+  walletConsumo: 'stato',
   avvisoChiaviInChiaro: 'stato',
   'filo.editor.notesMigrated': 'stato',
   sn_qr_in_primary_migrated: 'stato',
   sn_aiuto_di_serie_migrated: 'stato',
+  sn_correttore_due_segni_migrated: 'stato',
 };
 
 let regolePerChiave = null;
@@ -578,7 +634,8 @@ function quando(p) {
 }
 
 function unisciPagine(local, imported, tetto) {
-  const tutte = mergeLists(Array.isArray(local) ? local : [], Array.isArray(imported) ? imported : []);
+  const qui = Array.isArray(local) ? local : [];
+  const tutte = mergeLists(qui, Array.isArray(imported) ? imported : []);
   const perIndirizzo = new Map();
   const senza = [];
   for (const p of tutte) {
@@ -587,13 +644,7 @@ function unisciPagine(local, imported, tetto) {
     const gia = perIndirizzo.get(url);
     if (!gia || quando(p) > quando(gia)) perIndirizzo.set(url, p);
   }
-  const ordinate = [...perIndirizzo.values(), ...senza].sort((a, b) => quando(b) - quando(a));
-  const fuori = tetto > 0 && ordinate.length > tetto ? ordinate.length - tetto : 0;
-  const lista = fuori ? ordinate.slice(0, tetto) : ordinate;
-  // Il tetto può far uscire pagine salvate qui: la conferma lo dice col numero, non promette che nulla si perde.
-  const restano = new Set(lista.map((p) => (p && p.url) || itemKey(p)));
-  const mieFuori = fuori ? (Array.isArray(local) ? local : []).filter((p) => !restano.has((p && p.url) || itemKey(p))).length : 0;
-  return { lista, fuori, mieFuori };
+  return entroIlTetto([...perIndirizzo.values(), ...senza], qui, { quando, chiave: (p) => (p && p.url) || itemKey(p), tetto });
 }
 
 // Dal backup esce solo ciò che è già scaduto, che suonerebbe appena importato: una sveglia singola di domani,
@@ -623,8 +674,8 @@ function unisciSveglie(local, imported, prossima, adesso) {
   return out;
 }
 
-// `opzioni`: { tettoPagine, prossimaSveglia(t, adesso) → ms, adesso }. Le statistiche contano le sezioni di primo
-// livello; `restano` sono quelle del backup che non si importano perché sono stato.
+// `opzioni`: { tettoPagine, tettoAppunti, tettoDownload, prossimaSveglia(t, adesso) → ms, adesso }. Le statistiche
+// contano le sezioni di primo livello; `restano` sono quelle del backup che non si importano perché sono stato.
 // Una chiave vuota nel backup (chi esportava non l'aveva) non cancella quella che c'è qui (#905); un proxy arrivato
 // senza utente e password non prende il posto di quello di qui che li ha.
 function senzaSegretiVuoti(dati, cur) {
@@ -645,12 +696,37 @@ function senzaSegretiVuoti(dati, cur) {
   return { ...dati, settings };
 }
 
+// Il tetto di spesa mensile non sale con un backup: alzarlo toglie un freno e vuole un sì (#1050). Resta il più stretto
+// fra qui e il backup (0 è nessun tetto); quello del backup, se più largo, lo offre la conferma e lo mette solo il suo bottone.
+// Se è più stretto entra, e la conferma lo dice coi due numeri (`prima`): un tetto sceso ferma i modelli a metà mese.
+function tettoSpesa(qui, backup) {
+  const valido = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+  const q = valido(qui) ? qui : costanti().DEFAULT_SETTINGS.monthlyLimitEur;
+  if (!valido(backup)) return { tenuto: q, offerto: null, prima: null };
+  const largo = (v) => (v > 0 ? v : Infinity);
+  if (largo(backup) > largo(q)) return { tenuto: q, offerto: backup, prima: null };
+  if (largo(backup) < largo(q)) return { tenuto: backup, offerto: null, prima: q };
+  return { tenuto: q, offerto: null, prima: null };
+}
+
 function mergeImportedData(current, imported, opzioni = {}) {
   const cur = current && typeof current === 'object' ? current : {};
-  const imp = senzaSegretiVuoti(require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {}), cur);
+  const prima = require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {});
+  const imp = senzaSegretiVuoti(require('./correttoreMigrazione').perImportazione(prima), cur);
   const adesso = Number.isFinite(opzioni.adesso) ? opzioni.adesso : Date.now();
   const merged = { ...cur };
-  const stats = { added: 0, updated: 0, unchanged: 0, restano: 0, pagineFuori: 0, pagineMieFuori: 0 };
+  const stats = {
+    added: 0, updated: 0, unchanged: 0, restano: 0,
+    pagineFuori: 0, pagineMieFuori: 0, appuntiFuori: 0, appuntiMieFuori: 0, downloadFuori: 0, downloadMieFuori: 0,
+    tettoSpesa: null, tettoSceso: null,
+  };
+  const tetti = {
+    pagine: opzioni.tettoPagine,
+    appunti: Number.isFinite(opzioni.tettoAppunti) ? opzioni.tettoAppunti : costanti().CLIPBOARD_HISTORY_MAX,
+    download: opzioni.tettoDownload,
+  };
+  const unisci = { pagine: unisciPagine, appunti: unisciAppunti, download: unisciDownload };
+  const IMPOSTAZIONI = costanti().STORAGE_KEYS.SETTINGS;
 
   for (const k of Object.keys(imp)) {
     const regola = regolaImport(k);
@@ -658,14 +734,19 @@ function mergeImportedData(current, imported, opzioni = {}) {
     let next;
     if (regola === 'spesa') next = piuAlto(cur[k], imp[k]);
     else if (regola === 'sveglie') next = unisciSveglie(cur[k], imp[k], opzioni.prossimaSveglia, adesso);
-    else if (regola === 'pagine') {
-      const r = unisciPagine(cur[k], imp[k], opzioni.tettoPagine);
+    else if (unisci[regola]) {
+      if (!Array.isArray(imp[k])) { stats.unchanged++; continue; }
+      const r = unisci[regola](cur[k], imp[k], tetti[regola]);
       next = r.lista;
-      stats.pagineFuori = r.fuori;
-      stats.pagineMieFuori = r.mieFuori;
-    } else if (k === 'clipboardHistory' && Array.isArray(cur[k]) && Array.isArray(imp[k])) {
-      next = mergeClipboardHistory(cur[k], imp[k]);
+      stats[`${regola}Fuori`] = r.fuori;
+      stats[`${regola}MieFuori`] = r.mieFuori;
     } else next = k in cur ? mergeValue(cur[k], imp[k]) : imp[k];
+    if (k === IMPOSTAZIONI && isPlainObject(next) && isPlainObject(imp[k]) && 'monthlyLimitEur' in imp[k]) {
+      const t = tettoSpesa(isPlainObject(cur[k]) ? cur[k].monthlyLimitEur : undefined, imp[k].monthlyLimitEur);
+      next = { ...next, monthlyLimitEur: t.tenuto };
+      if (t.offerto !== null) stats.tettoSpesa = { tenuto: t.tenuto, backup: t.offerto };
+      if (t.prima !== null) stats.tettoSceso = { prima: t.prima, dopo: t.tenuto };
+    }
 
     if (!(k in cur)) {
       if (Array.isArray(next) && !next.length && !(Array.isArray(imp[k]) && !imp[k].length)) { stats.unchanged++; continue; }

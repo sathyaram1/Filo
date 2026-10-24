@@ -126,6 +126,10 @@
   transition: background calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-msg-rimedio:hover { background: var(--sn-hover); }
+/* Nell'avviso e nel menu --sn-hover è già il fondo sotto il puntatore: il tasto prende l'accento, come le voci. */
+.sn-toast .sn-msg-rimedio:hover,
+.sn-menu .sn-msg-rimedio:hover { background: rgba(var(--sn-accent-rgb), 0.35); }
+.sn-toast .sn-msg-rimedio { margin-top: 8px; }
 /* Sotto una risposta fermata dal tetto di lunghezza la riga è in corsivo, il tasto no. */
 .sn-risposta-interrotta .sn-msg-rimedio { font-style: normal; }
 
@@ -271,13 +275,18 @@
   /* Un textarea ha una larghezza naturale tutta sua: senza questo, in un riquadro stretto spinge
      fuori il tasto di invio, che è proprio quello che deve restare. */
   min-width: 0;
+  /* Detto qui perché sulle pagine di Filo la casella sta nel loro documento, che dice border-box a tutto: senza,
+     cambiava altezza da una pagina all'altra e una riga non ci stava (#853.1). Alta quanto l'invio: 18 + 2×5 + 2×1. */
+  box-sizing: border-box;
   resize: none;
   border: 1px solid var(--sn-border);
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   font-family: var(--sn-font);
   font-size: 13px;
-  line-height: 1.4;
+  /* In px interi: l'altezza che la casella si dà scrivendo nasce da scrollHeight, che arrotonda, e con 18,2px
+     la riga usciva di un soffio e accendeva la barra. */
+  line-height: 18px;
   color: var(--sn-fg);
   background: var(--sn-bg);
   outline: none !important;
@@ -285,7 +294,14 @@
   max-height: 120px;
   min-height: 30px;
 }
-.sn-popup-input::placeholder { color: var(--sn-muted); opacity: 1; }
+/* Il suggerimento sta su una riga: a capo dentro una casella alta una riga si taglia e accende la barra. */
+.sn-popup-input::placeholder {
+  color: var(--sn-muted);
+  opacity: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* Alcune pagine ospite applicano un focus ring blu a tutti gli elementi, e i nostri input sono veri
    nodi del DOM ospite: lo ereditavano. Da qui l'!important. */
 .sn-popup-input:focus {
@@ -333,6 +349,8 @@
 /* Con `pointer-events: none` la scrollbar non si potrebbe afferrare: li
    riattiviamo solo quando lo stack scorre davvero. */
 .sn-toasts.scrolling { pointer-events: auto; padding-right: 4px; }
+/* Col menu del tasto destro aperto la pila scende sotto il suo piano (2147483646). */
+.sn-toasts.sn-toasts-sotto-menu { z-index: 2147483645; }
 .sn-toasts::-webkit-scrollbar { width: 6px; }
 .sn-toasts::-webkit-scrollbar-track { background: transparent; }
 .sn-toasts::-webkit-scrollbar-thumb { background: var(--sn-border); border-radius: 3px; }

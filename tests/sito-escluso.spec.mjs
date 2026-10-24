@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SITO = 'filo-843.test';
 const DOCS = 'docs.filo-843.test';
@@ -42,7 +43,7 @@ test('dal menu del tasto destro: Filo si spegne sul sito, la scheda aperta segue
   await page.evaluate(() => { window.__nonRicaricata = 843; });
 
   await tastoDestro(page);
-  const voce = page.locator('.sn-menu .sn-menu-item', { hasText: 'Spegni Filo su questo sito' });
+  const voce = menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Spegni Filo su questo sito' });
   await expect(voce).toBeVisible({ timeout: 5000 });
   await voce.click();
   await expect.poll(() => esclusi(app), { timeout: 5000 }).toEqual(['banca-843.test', SITO]);
@@ -54,28 +55,28 @@ test('dal menu del tasto destro: Filo si spegne sul sito, la scheda aperta segue
   await tastoDestro(page);
   await expect.poll(() => finestraDiRiserva(app), { timeout: 5000 }).toContain('Riaccendi Filo su questo sito');
   expect((await finestraDiRiserva(app))[0]).toBe('Riaccendi Filo su questo sito');
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 
   await scegliDiRiserva(app, 'Riaccendi Filo su questo sito');
   await expect.poll(() => esclusi(app), { timeout: 5000 }).toEqual(['banca-843.test']);
   await expect(vista.locator('.shell-notif.show', { hasText: `Filo è di nuovo acceso su ${SITO}` })).toBeVisible({ timeout: 5000 });
   await page.waitForTimeout(300);
   await tastoDestro(page);
-  await expect(page.locator('.sn-menu .sn-menu-item', { hasText: 'Spegni Filo su questo sito' })).toBeVisible({ timeout: 5000 });
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Spegni Filo su questo sito' })).toBeVisible({ timeout: 5000 });
   expect(await page.evaluate(() => window.__nonRicaricata), 'la scheda si è ricaricata').toBe(843);
 });
 
 test('«Annulla» nell\'avviso rimette Filo com\'era', async ({ app, openTab, testServer, avvisi }) => {
   const page = await apriSu(openTab, testServer, SITO);
   await tastoDestro(page);
-  await page.locator('.sn-menu .sn-menu-item', { hasText: 'Spegni Filo su questo sito' }).click();
+  await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Spegni Filo su questo sito' }).click();
   await expect.poll(() => esclusi(app), { timeout: 5000 }).toEqual([SITO]);
   const vista = await avvisi();
   await vista.locator('.shell-notif.show', { hasText: `Filo è spento su ${SITO}` }).locator('button', { hasText: 'Annulla' }).click();
   await expect.poll(() => esclusi(app), { timeout: 5000 }).toEqual([]);
   await page.waitForTimeout(300);
   await tastoDestro(page);
-  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 5000 });
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 5000 });
 });
 
 test('la pagina Altro accetta un indirizzo incollato, lo mostra ridotto al sito, e il sito coi sottodomini resta senza menu di Filo', async ({ app, openTab, testServer }) => {
@@ -104,7 +105,7 @@ test('la pagina Altro accetta un indirizzo incollato, lo mostra ridotto al sito,
     await page.waitForTimeout(300);
     await tastoDestro(page);
     await expect.poll(() => finestraDiRiserva(app), { timeout: 5000 }).toContain('Riaccendi Filo su questo sito');
-    await expect(page.locator('.sn-menu'), `menu di Filo su ${host}`).toHaveCount(0);
+    await expect(menuDi(page).locator('.sn-menu'), `menu di Filo su ${host}`).toHaveCount(0);
   }
 });
 
@@ -130,8 +131,9 @@ test('dalla home: «spegni Filo su …» lo aggiunge senza togliere gli altri e 
   const casella = altro.locator('#blocklist');
   await expect(casella).toHaveValue('banca-843.test', { timeout: 8000 });
 
-  const imposta = (valore, id) => ({ toolCalls: [{ id, name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'siti_filo_spento', valore }) }] });
-  await modelloFinto(app, [imposta(`aggiungi ${DOCS}`, 'i1'), { text: 'Spento.' }]);
+  // Un'impostazione riuscita chiude il turno (#1130): la frase va scritta insieme.
+  const imposta = (valore, id, text) => ({ text, toolCalls: [{ id, name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'siti_filo_spento', valore }) }] });
+  await modelloFinto(app, [imposta(`aggiungi ${DOCS}`, 'i1', 'Spento.')]);
   await chiedi(chat, `spegni Filo su ${DOCS}`);
   await expect.poll(() => esclusi(app), { timeout: 10_000 }).toEqual(['banca-843.test', DOCS]);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Spento.' })).toBeVisible({ timeout: 10_000 });
@@ -143,7 +145,7 @@ test('dalla home: «spegni Filo su …» lo aggiunge senza togliere gli altri e 
   await altro.keyboard.type(`\n${ALTRO}`);
   await expect.poll(() => esclusi(app), { timeout: 5000 }).toEqual(['banca-843.test', DOCS, ALTRO]);
 
-  await modelloFinto(app, [imposta(`togli ${DOCS}`, 'i2'), { text: 'Riacceso.' }]);
+  await modelloFinto(app, [imposta(`togli ${DOCS}`, 'i2', 'Riacceso.')]);
   await chiedi(chat, `riaccendi Filo su ${DOCS}`);
   await expect.poll(() => esclusi(app), { timeout: 10_000 }).toEqual(['banca-843.test', ALTRO]);
   await expect(casella).toHaveValue(`banca-843.test\n${ALTRO}`, { timeout: 5000 });
@@ -208,7 +210,7 @@ test('all\'Aiuto della pagina: «spegni Filo su questo sito» lo spegne lì, sen
   await expect(page.locator('.sn-sidebar-log', { hasText: `Filo spento su ${DOCS}` })).toBeVisible({ timeout: 5000 });
   await page.locator('#testo').click({ button: 'right' });
   await expect.poll(() => finestraDiRiserva(app), { timeout: 5000 }).toContain('Riaccendi Filo su questo sito');
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
   await page.keyboard.press('Escape');
 
   await casella.fill('riaccendilo');

@@ -24,6 +24,8 @@
     menu_origin_hint: 'Filo legge solo le etichette che il file si porta dietro. Uno screenshot le cancella, un social pure, e molti generatori non le scrivono affatto.',
     menu_image_unreadable: 'Filo non è riuscito a scaricare questa immagine.',
     menu_origin_hint_unverified: 'Filo non ha ancora scaricato l’elenco ufficiale dei firmatari riconosciuti, quindi per ora sa solo che la firma è valida. Appena lo scarica, lo verifica.',
+    // #946.1 — chi ha firmato sta solo nell'elenco provvisorio, che vale per le firme di prima del suo congelamento.
+    menu_origin_hint_interim: 'Prima dell’elenco ufficiale il C2PA usava un elenco provvisorio, poi congelato. Filo lo usa solo per le firme fatte prima del congelamento.',
     // #889 — la riga viene da un marchio nei pixel, non da un'etichetta del file.
     menu_origin_hint_mark: 'Il programma che ha generato l’immagine ha scritto questo marchio nei pixel. Un ritaglio o un ridimensionamento lo cancellano, e molti generatori non lo mettono.',
     menu_explain_deep: 'Approfondisci',
@@ -36,6 +38,8 @@
     menu_paste_clear_confirm_n: 'Vuoi svuotare la cronologia degli appunti? Spariscono tutte e %d le voci copiate finora, e non si possono riavere.',
     menu_paste_clear_confirm_hidden: 'La ricerca che hai scritto ne mostra %d: spariscono anche le altre.',
     menu_paste_removed: 'Rimossa',
+    // #589.11 — il clic su una voce che il sito copriva non parte.
+    menu_click_covered: 'Il menu era coperto: clic ignorato',
     menu_explain_loading: 'Spiegazione…',
 
     // Menu — pagina
@@ -110,11 +114,23 @@
     // Lo stesso verdetto mentre si sceglie il modello (Opzioni, «Detta» dal tasto destro). %s = modello, funzione, host.
     audio_host_fn_tts: 'la lettura ad alta voce',
     audio_host_fn_stt: 'la dettatura',
+    audio_host_warn_crediti: 'Con «%s» %s non parte coi crediti di Filo: per usarlo metti una tua chiave OpenRouter nella pagina Crediti.',
     audio_host_warn_excluded: 'Con «%s» %s non parte: lo serve solo %s, che Filo esclude.',
     audio_host_warn_excluded_many: 'Con «%s» %s non parte: lo servono solo %s, che Filo esclude.',
     audio_host_warn_mixed: 'Con «%s» %s non parte: lo serve anche %s, che Filo esclude.',
     audio_host_warn_mixed_many: 'Con «%s» %s non parte: lo servono anche %s, che Filo esclude.',
-    audio_host_warn_unknown: 'Con «%s» %s non parte finché non so chi lo serve, e ora non riesco a saperlo.',
+    // Coi crediti di Filo l'audio parte solo se tutti gli host dichiarano la ritenzione zero (#831).
+    err_audio_zdr_host: 'Il modello «%s» lo serve solo %s, che non si impegna a non conservare quello che gli mandi, e coi crediti di Filo è una condizione. Non ho mandato niente: scegli un altro modello.',
+    err_audio_zdr_host_many: 'Il modello «%s» lo servono solo %s, che non si impegnano a non conservare quello che gli mandi, e coi crediti di Filo è una condizione. Non ho mandato niente: scegli un altro modello.',
+    err_audio_zdr_mixed: 'Il modello «%s» lo serve anche %s, che non si impegna a non conservare quello che gli mandi, e con l\'audio non posso impedire che tocchi a lui. Coi crediti di Filo è una condizione: non ho mandato niente, scegli un altro modello.',
+    err_audio_zdr_mixed_many: 'Il modello «%s» lo servono anche %s, che non si impegnano a non conservare quello che gli mandi, e con l\'audio non posso impedire che tocchi a loro. Coi crediti di Filo è una condizione: non ho mandato niente, scegli un altro modello.',
+    err_audio_zdr_unknown: 'Non so quali fornitori del modello «%s» si impegnano a non conservare quello che gli mandi, e coi crediti di Filo è una condizione. Non ho mandato niente: riprova fra poco o scegli un altro modello.',
+    audio_host_warn_zdr: 'Con «%s» %s non parte coi crediti di Filo: lo serve solo %s, che non si impegna a non conservare i dati.',
+    audio_host_warn_zdr_many: 'Con «%s» %s non parte coi crediti di Filo: lo servono solo %s, che non si impegnano a non conservare i dati.',
+    audio_host_warn_zdrmixed: 'Con «%s» %s non parte coi crediti di Filo: lo serve anche %s, che non si impegna a non conservare i dati.',
+    audio_host_warn_zdrmixed_many: 'Con «%s» %s non parte coi crediti di Filo: lo servono anche %s, che non si impegnano a non conservare i dati.',
+    audio_host_warn_zdrunknown: 'Con «%s» %s non parte coi crediti di Filo finché non so quali fornitori non conservano i dati, e ora non riesco a saperlo.',
+    audio_host_warn_unknown:'Con «%s» %s non parte finché non so chi lo serve, e ora non riesco a saperlo.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',
@@ -170,8 +186,10 @@
     voce_err_muto: 'Non ho sentito niente: premi il microfono e parla, o controlla che sia acceso quello giusto.',
     menu_overflow_soon: 'Pannello completo in arrivo',
     menu_link_loading: 'Analizzo il link…',
+    // #1307 — al posto della spiegazione, per un sito che Filo non contatta.
+    menu_link_blocked: 'Porta a %s, che è nella tua lista dei siti bloccati. Filo non l’ha contattato.',
+    menu_link_blocked_lists: 'Porta a %s, uno dei siti di pubblicità e tracciamento che Filo blocca. Filo non l’ha contattato.',
 
-    // Edit box
     edit_box_title: 'Modifica testo',
     edit_box_original: 'Originale',
     edit_box_proposed: 'Proposta',
@@ -187,7 +205,6 @@
     edit_box_loading: 'Sto pensando…',
     edit_box_replaced: 'Testo sostituito',
 
-    // Coming soon
     coming_soon: 'Prossimamente',
     feature_off_help: 'Attiva "Aiuto" nelle Opzioni → Funzionalità sperimentali',
 
@@ -202,7 +219,7 @@
     popup_estimated_cost: 'Costo stimato',
     popup_calc_local: 'Calcolatrice locale (nessun costo)',
     popup_calc_result: 'Risultato',
-    popup_followup_placeholder: 'Domanda di follow-up… (Invio per inviare, Shift+Invio nuova riga)',
+    popup_followup_placeholder: 'Chiedi altro…',
     popup_send: 'Invia',
     popup_copy: 'Copia',
     popup_copied: 'Copiato',
@@ -214,7 +231,13 @@
     err_limit_reached: 'Limite di spesa mensile raggiunto. Alza il limite nelle opzioni o aspetta il prossimo mese.',
     err_blocked_domain: 'Filo è spento su questo sito.',
     err_no_selection: 'Nessuna selezione di testo.',
+    err_secret_selection: 'Filo non manda al modello password e dati della carta.',
     help_disabled: 'L\'Aiuto è spento. Lo riaccendi in Preferenze, o chiedendolo a Filo.',
+    // L'icona Aiuto della barra laterale (#1432): la risposta da leggere, e perché è spenta.
+    aiuto_leggi_risposta: 'Leggi la risposta',
+    aiuto_spento_barra: 'Aiuto spento in Preferenze',
+    aiuto_spento_sito: 'Filo è spento su questo sito',
+    aiuto_spento_pagina: 'Qui l\'Aiuto non c\'è',
     // Configurazione dei modelli: una funzione senza modello NON parte e lo dice
     // (niente ripieghi silenziosi su modelli scritti nel codice). %s = nome della
     // funzione, poi dove si imposta.
@@ -233,52 +256,48 @@
     err_model_where_default: 'Stai usando i modelli predefiniti: apri Opzioni, togli «Usa modelli predefiniti» e scegli il modello per questa funzione.',
     err_model_where_owner: 'Lo imposti in Gestione → Automazioni, fra i Modelli di supporto.',
 
-    // Toast
     toast_saved: 'Salvata in: %s',
     toast_saved_open: 'Apri la lista',
     toast_save_failed: 'Salvataggio non riuscito',
     toast_link_saved: 'Link salvato',
     toast_copied: 'Copiato negli appunti',
-    // #437 — la sorgente di un'immagine/filmato o l'href di un link possono
-    // essere qualsiasi cosa il sito ci abbia messo (un frammento di codice, un
-    // data: lunghissimo, niente). Dirlo è meglio che riempire gli appunti con
-    // una stringa che altrove non apre nulla.
+    // #437 — src di un'immagine o href di un link possono essere qualsiasi cosa: dirlo è meglio
+    // che riempire gli appunti con una stringa che altrove non apre niente.
     toast_not_an_address: 'Questo non è un indirizzo: non c\'è niente da copiare',
     toast_copied_saving: 'Copiato negli appunti, salvataggio in corso…',
     toast_translating_page: 'Traduzione pagina in corso…',
     toast_translating_page_progress: 'Traduzione pagina… %s/%s',
     toast_page_translated: 'Pagina tradotta',
-    // Il sito ha continuato ad aggiungere testo anche mentre traducevamo, e a
-    // un certo punto smettiamo di rincorrerlo: "Pagina tradotta" sarebbe di
-    // nuovo falso, con le righe nuove in inglese sotto gli occhi.
+    // Il sito aggiunge testo mentre traduciamo, e a un certo punto si smette di rincorrerlo.
+    // Qui sotto si dice sempre cosa è rimasto in inglese: «Pagina tradotta» sarebbe falso.
     toast_page_translated_new_arrived: 'Pagina tradotta. Il sito ne ha aggiunta dell\'altra mentre lavoravo: dal tasto destro trovi «Traduci il testo nuovo».',
-    // #439 — parti della pagina che NESSUNO script può leggere (i siti moderni
-    // possono chiudere a chiave i propri componenti). Non si traducono, e dirlo
-    // è l'unica cosa onesta: "Pagina tradotta" sarebbe falso.
+    // #439 — parti della pagina che nessuno script può leggere (componenti chiusi a chiave).
     toast_page_translated_partial: 'Pagina tradotta solo in parte: alcuni componenti di questo sito sono chiusi e restano nella lingua originale.',
     toast_only_closed_components: 'Il testo di questa pagina vive dentro componenti chiusi del sito: non riesco a leggerlo, e resta nella lingua originale.',
-    // #407 — un riquadro incorporato (post incorporato, blocco commenti, modulo
-    // di iscrizione) che nessuno script può toccare: il sito lo chiude a chiave
-    // con l'attributo `sandbox`. È un rettangolo intero che resta in inglese in
-    // mezzo a una pagina italiana: dirlo è l'unica cosa onesta.
+    // #407 — un riquadro incorporato che il sito chiude con `sandbox`: un rettangolo intero
+    // che resta in inglese in mezzo a una pagina italiana.
     toast_page_translated_partial_frame: 'Pagina tradotta, tranne un riquadro incorporato. Il sito non lascia leggere il testo lì dentro, e resta nella lingua originale.',
-    // Traduzione interrotta a metà (#408): mai "Pagina tradotta" quando non lo
-    // è. Dice quanto ne manca, perché si è fermata e come riprendere.
+    // Traduzione interrotta a metà (#408): quanto manca, perché si è fermata, come riprendere.
     toast_page_translate_stopped: 'Traduzione interrotta dopo %s blocchi su %s. %s Puoi riprenderla dal tasto destro senza rifare la parte già tradotta.',
-    // Pagina più lunga di quanta ne entri in un giro solo: non è un guasto, è
-    // un lavoro a tratti. Dire "Pagina tradotta" con la coda ancora in inglese
-    // sarebbe la stessa bugia di una traduzione interrotta.
+    // Più lunga di quanta ne entri in un giro solo: non è un guasto, è un lavoro a tratti.
     toast_page_translate_batch: 'Pagina molto lunga: tradotti %s blocchi su %s. Riprendi dal tasto destro per continuare.',
     toast_page_translate_failed: 'Non sono riuscito a tradurre la pagina. %s',
     reason_translate_incomplete: 'Alcuni blocchi sono tornati vuoti dal modello.',
     toast_nothing_to_translate: 'Non ho trovato testo da tradurre in questa pagina',
     toast_original_restored: 'Originale ripristinato',
-    // Fermata prima che cambiasse qualcosa sullo schermo: "Originale
-    // ripristinato" parlerebbe di un ritorno che non c'è stato.
+    // Fermata prima che cambiasse qualcosa sullo schermo: «Originale ripristinato» parlerebbe
+    // di un ritorno che non c'è stato.
     toast_translation_cancelled: 'Traduzione annullata',
     toast_clipboard_empty: 'Cronologia appunti vuota',
     toast_open_weights_violated:
-      'Hai scelto solo modelli a pesi aperti, ma questa risposta è arrivata da «%s», che è escluso. Segnalalo: la lista di esclusione va aggiornata.',
+      'Hai scelto solo modelli a pesi aperti, ma questa risposta è arrivata da «%s», che Filo esclude. Segnalalo, così lo teniamo fuori.',
+    toast_served_excluded:
+      'Questa risposta è arrivata da «%s», un fornitore che Filo esclude. Segnalalo, così lo teniamo fuori.',
+    toast_served_not_producer:
+      'Questa risposta è arrivata da «%s», ma Filo questo modello lo prende solo da %s. Segnalalo, così lo teniamo fuori.',
+    toast_segnala: 'Segnala',
+    // La segnalazione già scritta che il tasto «Segnala» dell'avviso apre in «Invia feedback»: funzione, modello, host.
+    segnala_fuori_politica: 'Una risposta di «%s» col modello %s è arrivata da «%s», che Filo non ammette per questa richiesta.',
     // Il tetto per scheda sulle chiamate automatiche (#1070): il numero è quello del tetto.
     toast_tetto_spiegazioni:
       'Da questa pagina sono partite più di %s spiegazioni automatiche in un minuto. Le fermo per un minuto, col tasto destro funzionano sempre.',
@@ -297,6 +316,8 @@
     clipboard_empty_entry: 'Voce vuota',
     clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
     clipboard_image_delicata: 'Immagine da una pagina delicata',
+    clipboard_image_senza_descrizione: 'Immagine',
+    clipboard_image_non_descritta: 'Immagine (descrizione non arrivata)',
 
     // Categorie default
     category_default: 'Da vedere',
@@ -435,8 +456,7 @@
     options_category_pages: '%s schede',
     options_category_name_taken: 'C\'è già «%s»: Rinomina le unisce',
 
-    // Pagina admin "Modelli predefiniti" (config condivisa via Firestore)
-    admin_defaults_title: 'Modelli predefiniti',
+    // Gestione → Impostazioni predefinite → "Modelli predefiniti" (config condivisa via Firestore)
     admin_defaults_intro:
       'Questa configurazione è condivisa con TUTTI gli utenti di Filo: provider, modelli e chiavi predefiniti che vengono usati quando l\'utente lascia attivo "Usa modelli predefiniti". Provider e modelli arrivano subito a tutte le installazioni. Le chiavi no. Nessuna installazione le legge da qui: le incastona la prossima versione pubblicata, e l\'aggiornamento le consegna.',
     admin_defaults_denied: 'Sezione riservata agli amministratori. Accedi con un account autorizzato dall\'icona account in alto.',
@@ -458,6 +478,21 @@
     reasoning_low: 'Basso',
     reasoning_medium: 'Medio',
     reasoning_high: 'Alto',
+    admin_defaults_sort: 'host',
+    admin_defaults_sort_desc:
+      'Come OpenRouter sceglie l\'host di questo modello. «Automatico» segue la scelta generale qui sotto. I fornitori esclusi restano esclusi.',
+    admin_defaults_sort_general: 'Scelta generale degli host',
+    admin_defaults_sort_general_desc:
+      'Vale per i modelli lasciati su «Automatico». Di serie Filo non chiede nessun ordine e l\'host lo sceglie OpenRouter.',
+    provider_sort_general_auto: 'Lo sceglie OpenRouter',
+    options_host_order: 'Host dei modelli',
+    options_host_order_desc:
+      'Lo stesso modello lo servono più host: i più veloci rispondono prima, i più economici costano meno. Vale per tutti i modelli, anche per quelli predefiniti. I fornitori esclusi restano esclusi.',
+    options_host_order_filo: 'Li sceglie Filo',
+    provider_sort_auto: 'Automatico',
+    provider_sort_throughput: 'Più veloce',
+    provider_sort_latency: 'Risposta più pronta',
+    provider_sort_price: 'Più economico',
     // Fornitori esclusi (politica sui modelli, #421 / #518)
     admin_defaults_excluded: 'Fornitori esclusi',
     admin_defaults_excluded_desc:
@@ -473,16 +508,22 @@
     // Pagine delicate (#1004)
     admin_defaults_delicate: 'Pagine delicate',
     admin_defaults_delicate_desc:
-      'I siti di posta, banche e sanità di cui il riassunto delle schede chiuse e la pulizia automatica non mandano il testo ai modelli. Uno per riga; un dominio vale anche per i suoi sottodomini. Vale per tutti gli utenti: una categoria salvata qui sostituisce quella scritta nel codice, una lasciata com\'è segue il codice.',
+      'I siti di posta, banche, sanità e pubblica amministrazione da cui le funzioni automatiche non mandano niente ai modelli. Uno per riga; un dominio vale anche per i suoi sottodomini. Vale per tutti gli utenti: una categoria salvata qui sostituisce quella scritta nel codice, una lasciata com\'è segue il codice.',
     admin_defaults_delicate_posta: 'Posta',
     admin_defaults_delicate_banche: 'Banche',
     admin_defaults_delicate_sanita: 'Sanità',
+    admin_defaults_delicate_pa: 'Pubblica amministrazione',
     // Quanto filo ha davanti la chat (#868)
     admin_defaults_contesto: 'Quanto ricorda la chat',
     admin_defaults_contesto_desc:
       'Gli ultimi giorni di conversazioni, di tutte le schede, entrano in ogni messaggio fino al minore dei due tetti. Vale per chi non li ha cambiati in Preferenze; un campo vuoto segue il codice.',
     admin_defaults_contesto_giorni: 'Giorni',
     admin_defaults_contesto_token: 'Tetto in token',
+    admin_defaults_contesto_cache: 'Durata della cache',
+    admin_defaults_contesto_cache_5m: '5 minuti',
+    admin_defaults_contesto_cache_1h: 'un\'ora',
+    admin_defaults_contesto_cache_serie: 'Come il codice (%s)',
+    admin_defaults_contesto_cache_codice: 'Come il codice',
     // Quanto può essere lunga una risposta dei modelli (#1097.3)
     admin_defaults_lunghezza: 'Quanto può essere lunga una risposta',
     admin_defaults_lunghezza_desc:
@@ -495,6 +536,8 @@
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
     admin_defaults_excluded_drift: 'Questa lista sostituisce quella scritta nel codice, e queste esclusioni non ci sono: %s. Finché mancano, quei fornitori possono servire le richieste.',
     admin_defaults_excluded_drift_fix: 'Rimettili nella lista',
+    admin_defaults_producer_not_excluded: '%s produce questo modello e non è fra i fornitori esclusi: le richieste possono arrivare a lui.',
+    admin_defaults_producer_exclude: 'Escludi %s',
     admin_defaults_open_weights_title: 'Per chi accende «Solo modelli a pesi aperti»',
     admin_defaults_open_weights_to: 'Passano a %s: %s',
     admin_defaults_open_weights_none_stop: 'Nessuna funzione si ferma.',
@@ -503,6 +546,9 @@
     admin_defaults_save: 'Salva e propaga',
     admin_defaults_saving: 'Salvataggio…',
     admin_defaults_saved: 'Salvato e propagato a tutti gli utenti.',
+    admin_defaults_saved_partial:
+      'Salvato — una riga evidenziata sotto non è stata propagata.',
+    admin_defaults_unsaved: 'Modifiche non ancora propagate.',
     admin_defaults_save_fail: 'Salvataggio fallito: %s',
 
     // Sicurezza (pagina dedicata in filo://security/)
@@ -596,10 +642,15 @@
       'a cui somiglia, l\'età, il certificato, se la pagina chiede una password), mai il contenuto della ' +
       'pagina. Può solo renderlo sospetto, mai dichiararlo sicuro o pericoloso, e in incognito non parte. ' +
       'Usa il modello scelto in Modelli alla voce «Rilevamento siti pericolosi — giudizio».',
-    options_security_safebrowse_sandbox: 'Prova i link sospetti in una finestra isolata',
+    options_security_safebrowse_sandbox: 'Scopri in una finestra isolata dove portano i link accorciati',
     options_security_safebrowse_sandbox_desc:
-      'La finestra nascosta e senza i tuoi dati in cui Filo proverebbe un link sospetto prima che tu lo ' +
-      'apra. Oggi nessuna funzione la usa, e una pagina che hai già aperto non ci torna mai.',
+      'Quando tieni fermo il puntatore per mezzo secondo su un link accorciato (bit.ly e simili) o su un ' +
+      'rimando noto, o ci arrivi col tasto Tab, Filo controlla dove porta prima che tu clicchi. Cerca il ' +
+      'link e la sua destinazione nella lista nera di Google e, se la destinazione non è scritta nel link, ' +
+      'lo apre in una finestra nascosta e senza i tuoi dati. La finestra si chiude appena il rimando rivela ' +
+      'la destinazione, così il sito d\'arrivo non riceve visite prima del tuo clic. Una finestra alla ' +
+      'volta, mai in incognito, mai su una pagina che hai già aperto. Spento, resta solo la lista nera. ' +
+      'Sugli altri link, e col dito su uno schermo touch, prima del clic non parte niente.',
     options_security_safebrowse_key_managed:
       'Per la lista nera di Google (phishing e malware) Filo usa una chiave che arriva col programma. ' +
       'Funziona per tutti, anche senza aver fatto l\'accesso, e non devi configurare niente. A Google ' +
@@ -607,8 +658,11 @@
     // #1004 — pagine delicate
     options_security_delicate: 'Non mandare ai modelli le pagine delicate',
     options_security_delicate_desc:
-      'Posta, banca, sanità e le pagine dove hai visto un campo password o carta. Quando chiudi queste ' +
-      'schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a nessun modello.',
+      'Posta, banca, sanità, pubblica amministrazione e le pagine dove hai visto un campo password o carta. ' +
+      'Quando chiudi queste schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a ' +
+      'nessun modello. La chat ne vede solo il nome del sito, i loro screenshot e le immagini copiate da lì non ' +
+      'vanno al modello delle immagini, nemmeno incollati altrove, e la spiegazione di quello che selezioni parte ' +
+      'solo dal tasto destro. Il correttore resta acceso: manda al modello quello che scrivi, non la pagina.',
     options_security_delicate_sites_label:
       'Altri siti delicati, uno per riga',
     options_security_delicate_sites_invalid:
@@ -649,13 +703,14 @@
     options_cookies_whitelist_desc:
       'I siti che aggiungi qui restano connessi: in "Privacy massima" vivono in uno spazio isolato ma persistente, ' +
       'e in "Automatico" tengono i loro cookie anche quando un loro contenuto compare dentro un\'altra pagina. ' +
-      'Aggiungi il sito (es. gmail.com) e premi Invio; se poi lo togli, in "Privacy massima" Filo butta via ' +
+      'Scrivi il sito o incolla l\'indirizzo di una sua pagina (es. google.com per Gmail) e premi Invio; se poi ' +
+      'lo togli, in "Privacy massima" Filo butta via ' +
       'quello che aveva salvato.',
-    options_cookies_whitelist_placeholder: 'es. gmail.com',
+    options_cookies_whitelist_placeholder: 'es. google.com',
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
     options_cookies_whitelist_empty: 'Nessun sito fidato. In "Privacy massima" rifai l\'accesso ogni volta che torni su un sito che avevi chiuso.',
-    options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. gmail.com (niente IP o nomi senza punto).',
+    options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. google.com (niente IP o nomi senza punto).',
     options_cookies_whitelist_dup: '"%s" è già nell\'elenco dei siti fidati.',
     options_cookies_trusted_note_other:
       'In "Automatico" i tuoi accessi restano salvati comunque. Qui serve aggiungere un sito solo se ne vedi i ' +
@@ -774,11 +829,11 @@
     security_export_fail: 'Esportazione non riuscita',
     security_import_title: 'Importa dati Filo',
     security_import_btn: 'Importa dati (.zip)',
+    // Non promette quello che la fusione non mantiene: il dettaglio lo dice la conferma, col file davanti (#1256).
     security_import_desc:
       'Ricarica un .zip esportato da Filo: rimette al loro posto memorie, chat con ' +
-      'Filo, pagine visitate, pagine salvate, cronologia, immagini e impostazioni. ' +
-      'Quello che hai già non viene ' +
-      'cancellato — le liste si uniscono e, dove c\'è un conflitto, vince il backup.',
+      'Filo, pagine visitate, pagine salvate, cronologia, immagini e impostazioni, ' +
+      'unendoli a quello che hai. Prima di importare Filo ti dice cosa entra e cosa cambia.',
     security_visite_title: 'Pagine visitate',
     security_visite_desc: 'Filo ricorda le pagine che apri nelle schede, sul tuo computer. Quelle aperte in incognito no.',
     security_visite_ora: 'Cancella l’ultima ora',
@@ -791,26 +846,44 @@
     security_visite_nessuna: 'Nessuna pagina da cancellare',
     security_visite_fail: 'Cancellazione non riuscita',
     security_import_confirm_title: 'Importa dati da backup',
-    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto,
-    // %6 = security_import_nulla_perso o security_import_escono_mie
+    // %1 = nome file (nel popup va nel suo riquadro: la riga sta da sola), %2 = " (del …)" o vuoto,
+    // %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto, %6 = security_import_nulla_perso o _escono_mie
     security_import_confirm_text:
-      'Da "%1"%2: %3 e %4%5.\n\n' +
+      'Dal file%2:\n"%1"\n%3 e %4%5.\n\n' +
       '%6le liste (chat, pagine visitate, pagine salvate, ' +
-      'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
+      'cronologia, appunti, download) si uniscono senza duplicati e le sezioni che qui non ' +
       'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
-      'quello del backup. Le impostazioni del backup diventano attive subito. ' +
+      'quello del backup. Le impostazioni del backup diventano attive subito, ma il ' +
+      'limite di spesa mensile non si allarga e resta il più stretto dei due. ' +
       'Della spesa resta, mese per mese, la più alta fra adesso e il backup. ' +
       'I crediti e le schede aperte restano quelli di adesso.',
     // Righe in fondo alla conferma, solo quando servono. %1 = numero
     security_import_images_lost: 'Immagini che non si leggono: %1. Al loro posto non ci sarà niente.',
     security_import_filo_lost: 'Le chat e le pagine visitate del backup non si leggono.',
+    security_import_voci_perse: 'File dentro l’archivio che non si leggono: %1. Quello che contengono non arriva.',
     // %1 = quante restano fuori, %2 = il tetto
     security_import_pages_out: 'Pagine salvate che non entrano: %1. L’elenco ne tiene %2, le più recenti.',
     security_import_pages_out_mine: 'Fra queste, pagine che hai salvato adesso: %1. Dopo l’importazione non ci saranno più.',
+    security_import_appunti_out: 'Appunti copiati che non entrano: %1. L’elenco ne tiene %2, i più recenti.',
+    security_import_appunti_out_mine: 'Fra questi, appunti che hai adesso: %1. Dopo l’importazione non ci saranno più.',
+    security_import_download_out: 'Download che non entrano nell’elenco: %1. L’elenco ne tiene %2, i più recenti.',
+    security_import_download_out_mine: 'Fra questi, download che hai adesso nell’elenco: %1. Escono dall’elenco, ma i file restano sul computer.',
+    // %1 = il limite di adesso, %2 = quello del backup, %3 = il bottone che lo mette
+    security_import_tetto_backup: 'Il limite di spesa mensile resta %1. Nel backup era %2. Per usare quello, scegli «%3».',
+    security_import_tetto_senza: 'Il limite di spesa mensile resta %1. Nel backup non c’era un limite. Per toglierlo, scegli «%3».',
+    // %1 = il limite di adesso, %2 = quello del backup, più stretto, che entra
+    security_import_tetto_sceso: 'Il limite di spesa mensile scende da %1 a %2, quello del backup.',
+    security_import_tetto_sceso_senza: 'Il limite di spesa mensile diventa %2, quello del backup: adesso non hai un limite.',
+    security_import_tetto_btn: 'Importa col limite del backup',
+    security_import_tetto_btn_senza: 'Importa e togli il limite',
     security_import_senza_chiavi: 'Le chiavi API non sono nell’archivio. Quelle salvate qui restano come sono.',
     security_import_proxy_senza_credenziali: 'Il proxy arriva senza utente e password: per usarlo, scrivi di nuovo a Filo il suo indirizzo intero.',
     security_import_nulla_perso: 'Nulla di ciò che hai ora viene cancellato: ',
-    security_import_escono_mie: 'Di ciò che hai ora escono solo le pagine salvate più vecchie, contate qui sotto: ',
+    // %1 = "le pagine salvate più vecchie", "gli appunti copiati più vecchi"… già uniti
+    security_import_escono_mie: 'Di ciò che hai ora escono solo %1, coi numeri qui sotto: ',
+    security_import_escono_pagine: 'le pagine salvate più vecchie',
+    security_import_escono_appunti: 'gli appunti copiati più vecchi',
+    security_import_escono_download: 'le voci più vecchie dell’elenco dei download',
     security_import_confirm_ok: 'Importa',
     security_import_done: 'Dati importati',
     security_import_invalid: 'Non è un archivio esportato da Filo',
@@ -844,7 +917,6 @@
     security_wipe_in_corso: 'Cancello e riavvio Filo…',
     security_wipe_fail: 'Non sono riuscito a cominciare, e non ho cancellato niente. Riprova.',
 
-    // Home
     home_title: 'Aperti per dopo',
     home_search_placeholder: 'Cerca per titolo o URL…',
     home_empty: 'Nessuna scheda salvata. Click destro su una pagina → "Salva per dopo".',
@@ -863,7 +935,6 @@
     home_moved: 'Spostata in «%s»',
     home_move_failed: 'Non si è spostata: nel frattempo l’elenco è cambiato. Riprova da qui.',
 
-    // History
     history_title: 'Cronologia AI',
     history_search_placeholder: 'Cerca…',
     history_filter_all: 'Tutte',
@@ -875,7 +946,9 @@
     history_reuse: 'riuso %s%',
     history_reuse_title: '%s token su %s riusati da una richiesta precedente invece di essere rielaborati: costano meno e la risposta arriva prima.',
     history_reuse_none_title: 'Nessuna parte di questa richiesta (%s token) è stata riusata da una richiesta precedente: è stata rielaborata tutta.',
+    history_cache_written: '%s token messi da parte per le richieste che seguono.',
     history_policy_violation: '⚠ fornitore non ammesso',
+    history_policy_violation_title: 'Filo non ammette questo fornitore per questa richiesta. La risposta non doveva arrivare da lì.',
     // Tempi del turno (idee «Latenza della chat»): quando è arrivato il primo
     // pezzo di ragionamento, la prima parola, e quando è finito.
     history_timing: 'ragiona %s · scrive %s · fine %s',
@@ -887,28 +960,62 @@
     history_no_results: 'Nessun risultato per la ricerca.',
     history_no_results_filter: 'Nessuna interazione per il filtro selezionato.',
 
-    // Spellcheck
-    spell_correct: 'Correggi',
+    // Il correttore (#1446)
     spell_add_dict: 'Aggiungi al dizionario',
     spell_autocorrect: 'Correggi automaticamente',
     spell_manage: 'Gestisci correttore',
-    spell_resolve: 'Risolvi',
-    spell_semantic_issue: 'Possibile errore',
-    spell_loading: 'Cerco una correzione…',
-    spell_no_suggestion: 'Nessuna correzione disponibile.',
-    spell_action_semantic_label: 'Correttore contestuale (zigzag blu)',
-    spell_action_word_label: 'Suggerimento ortografico (zigzag rosso, on demand)',
-    spell_feature_label: 'Correttore AI (zigzag blu per errori contestuali)',
+    spell_annulla_correzione: 'Annulla correzione',
+    spell_action_semantic_label: 'Errori del correttore (controllo rapido)',
+    spell_action_coerenza_label: 'Suggerimenti del correttore (controllo ragionato)',
+    spell_switch_errori: 'Errori',
+    spell_switch_errori_desc: 'Quello che Filo sa sbagliato: parole che non esistono, una parola al posto di un\'altra, grammatica, fatti sbagliati. Spento, sparisce anche la sottolineatura del browser.',
+    spell_switch_suggerimenti: 'Suggerimenti',
+    spell_switch_suggerimenti_desc: 'Quello che decidi tu: frasi poco chiare, date e giorni che non tornano, cose diverse da quelle già dette nella pagina.',
+    spell_switch_automatica: 'Correzione automatica',
+    spell_switch_automatica_desc: 'Quando finisci una parola: «perchè» diventa «perché», «marco» diventa «Marco». La scorciatoia di annulla subito dopo, o il tasto destro sulla parola, la riportano com\'era.',
+    spell_ripetuta: '«%s» ripetuto',
+    spell_fisso: 'Si scrive «%s».',
+    spell_perche_dizionario: 'non è nel dizionario',
+    spell_perche_chiesta: 'chiesta col tasto destro',
+    spell_errore_forse: 'Il dizionario non conosce questa parola.',
+    spell_errore_generico: 'Da correggere.',
+    spell_togli: 'Togli «%s»',
+    spell_correggi_tutti: 'Correggi tutti gli errori (%s)',
+    spell_ocra_ignora: 'Ignora',
+    spell_ocra_prima: 'prima: «%s»',
+    spell_ocra_controlla: 'Controlla qui',
+    spell_ocra_data: '%s è %s.',
+    spell_ocra_relativa: '%s è %s.',
+    spell_ocra_inesistente: '%s non esiste: %s ha %s giorni.',
+    // I segnaposti (#1448)
+    spell_switch_segnaposti: 'Segnaposto',
+    spell_switch_segnaposti_desc: 'Scrivi delle x al posto di un dato che non ricordi («nel 14xx», «un p/e di xx») e Filo lo trova: il valore compare sopra le x, un clic lo mette.',
+    spell_segnaposto_forse: 'Forse un dato da trovare.',
+    spell_segnaposto_cerco: 'Cerco il dato…',
+    spell_segnaposto_nessuno: 'Non ho trovato questo dato.',
+    spell_segnaposto_errore: 'La ricerca non è riuscita.',
+    spell_segnaposto_riprova: 'Cerca di nuovo',
+    spell_segnaposto_delicata: 'Su questa pagina non cerco da solo.',
+    spell_segnaposto_cerca: 'Cerca il dato',
+    spell_segnaposto_bloccata: 'Non cerco: la ricerca porterebbe fuori un dato riservato.',
+    spell_segnaposto_apri_fonte: 'Apri la fonte',
+    spell_segnaposto_fonte: 'Fonte: %s',
+    spell_segnaposto_metti: 'Metti %s',
 
     // Pagina Gestisci correttore
     spell_page_title: 'Filo — Correttore',
     spell_page_heading: 'Correttore',
     spell_page_autocorrect_h: 'Correzioni automatiche',
-    spell_page_autocorrect_desc: 'Quando scrivi una di queste parole seguita da uno spazio, viene sostituita con la correzione.',
+    spell_page_autocorrect_desc: 'Quando finisci di scrivere una di queste parole, Filo la sostituisce con la correzione. Qui arrivano anche le correzioni che scegli più volte per la stessa parola.',
     spell_page_autocorrect_empty: 'Nessuna correzione automatica.',
-    spell_page_dict_h: 'Dizionario personale',
-    spell_page_dict_desc: 'Parole aggiunte al dizionario: il correttore non le segnalerà più come errori.',
-    spell_page_dict_empty: 'Dizionario vuoto.',
+    spell_page_dict_h: 'Parole imparate',
+    spell_page_dict_desc: 'Il correttore non le segna: quelle che aggiungi, che ignori o che scrivi più volte uguali. Se una ha la maiuscola, Filo gliela mette anche quando la scrivi minuscola.',
+    spell_page_dict_empty: 'Nessuna parola imparata.',
+    spell_page_rifiutate_h: 'Da non correggere da sé',
+    spell_page_rifiutate_desc: 'Parole di cui hai annullato la correzione automatica: Filo le lascia come le scrivi.',
+    spell_page_rifiutate_empty: 'Nessuna parola.',
+    spell_page_una_parola: 'Una parola sola, senza spazi.',
+    spell_page_word_empty: 'Una parola vuota non si salva. Per toglierla usa «Rimuovi».',
     spell_page_col_word: 'Parola scritta',
     spell_page_col_correction: 'Correzione',
     spell_page_col_actions: '',
@@ -920,9 +1027,20 @@
     spell_page_back: '← Opzioni',
     spell_page_conflict: '"%s" esiste già — modifica annullata.',
     spell_page_empty: 'Un campo vuoto non salva la correzione. Per toglierla usa «Rimuovi».',
-    spell_page_dict_conflict: '"%s" è già nel dizionario.',
+    spell_page_dict_conflict: '"%s" c\'è già.',
     toast_added_to_dict: 'Aggiunta al dizionario',
     toast_autocorrect_saved: 'Correzione automatica attiva',
+
+    // La pillola sopra una pagina che si è presa lo schermo pieno (#1526): %s è l'host, mai il titolo della pagina.
+    schermo_pieno_sito: '%s è a schermo intero',
+    schermo_pieno_riquadro: '%s, dentro %s, è a schermo intero',
+    schermo_pieno_esci: '%s per uscire',
+    // Al posto dell'host quando l'indirizzo non ne ha uno.
+    schermo_pieno_file: 'un file del computer',
+    schermo_pieno_senza_indirizzo: 'una pagina senza indirizzo',
+    schermo_pieno_filo: 'una pagina di Filo',
+    schermo_pieno_menu_esci: 'Esci dallo schermo intero',
+    schermo_pieno_menu_regola: 'Quanto resta questo avviso…',
   };
 
   function t(key, ...args) {

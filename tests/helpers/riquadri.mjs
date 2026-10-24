@@ -25,8 +25,19 @@ export async function nelMondoDiFilo(app, page, fn, arg = null, frame = null) {
 // Il mondo isolato di un riquadro incorporato lo raggiunge solo il protocollo di debug: si cerca il contesto
 // isolato del frame che ha Filo dentro, e lo si tiene finché il frame non cambia pagina.
 const sessioni = new WeakMap();
+const ATTESA_MONDO_MS = 10_000;
 async function nelRiquadro(page, frame, code) {
+  // I content script di un riquadro arrivano dopo il suo load: il mondo si aspetta qualche secondo prima di dirlo assente.
   const scelta = async () => {
+    const fine = Date.now() + 5000;
+    for (;;) {
+      const m = await cerca();
+      if (m) return m;
+      if (Date.now() > fine) throw new Error(`nelMondoDiFilo: nessun mondo di Filo nel riquadro ${frame.url()}`);
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  };
+  const cerca = async () => {
     for (const da of [frame, page]) {
       let s = null;
       try { s = await page.context().newCDPSession(da); } catch (_) { continue; }
@@ -42,10 +53,18 @@ async function nelRiquadro(page, frame, code) {
       }
       await s.detach().catch(() => {});
     }
-    throw new Error(`nelMondoDiFilo: nessun mondo di Filo nel riquadro ${frame.url()}`);
+    return null;
   };
   let m = sessioni.get(frame);
-  if (!m) { m = await scelta(); sessioni.set(frame, m); }
+  // Nel riquadro Filo si monta al primo tocco, dopo il frame, e expect.poll non riprova una funzione che lancia:
+  // l'attesa sta qui (#1429).
+  for (const fine = Date.now() + ATTESA_MONDO_MS; !m;) {
+    try { m = await scelta(); } catch (e) {
+      if (Date.now() > fine || frame.isDetached()) throw e;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  }
+  sessioni.set(frame, m);
   const { result, exceptionDetails } = await m.s.send('Runtime.evaluate', {
     contextId: m.id, expression: code, awaitPromise: true, returnByValue: true,
   });

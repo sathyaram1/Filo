@@ -7,6 +7,7 @@ import { CONFIRM_HOST, confermaSopraPagina, confirmText } from './helpers/confir
 import { apriCronologia, statoCronologia, testiCronologia } from './helpers/cronologiaAppunti.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Feedback #256: nella cronologia degli appunti (freccia accanto a "Incolla")
 // l'utente poteva solo incollare le voci, non rimuoverne una singola né svuotare
@@ -93,7 +94,7 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
     // (3) Persistenza: chiudi il menu e riaprilo — la cronologia riletta dallo
     // storage NON contiene più la voce sensibile (la rimozione è stata salvata).
     await page.keyboard.press('Escape');
-    await expect(page.locator('.sn-menu')).toHaveCount(0);
+    await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
     expect(await statoCronologia(app, page)).toBeNull();
     stato = await apriCronologia(app, page, '#ta');
     expect(stato.voci.map((v) => v.testo)).toEqual(['secondo testo generico', 'terzo testo normale']);
@@ -150,8 +151,8 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     // Apri il menu e la cronologia passando col mouse sulla freccetta (senza
     // click: è così che il sotto-menu resta libero di richiudersi da solo).
     await page.locator('#ta').click({ button: 'right' });
-    await expect(page.locator('.sn-menu')).toBeVisible();
-    const arrow = page.locator('.sn-menu-paste-arrow');
+    await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
+    const arrow = menuDi(page).locator('.sn-menu-paste-arrow');
     await arrow.hover();
     await expect.poll(() => testiCronologia(app, page)).toHaveLength(3);
 
@@ -171,7 +172,7 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     // "non si chiude" parlando del test, non di Filo. E ci si arriva muovendosi,
     // non teletrasportandosi: è quello che fa una mano.
     const pannello = (await statoCronologia(app, page)).riquadro;
-    const lontano = await page.evaluate((p) => {
+    const lontano = await menuDi(page).valuta((p) => {
       const rects = Array.from(document.querySelectorAll('.sn-menu'))
         .map((el) => el.getBoundingClientRect()).concat([p]);
       const dentro = (x, y) => rects.some((r) => x >= r.left - 4 && x <= r.right + 4 && y >= r.top - 4 && y <= r.bottom + 4);
@@ -185,7 +186,7 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     expect(lontano, 'nessun angolo della pagina è fuori dal menu').toBeTruthy();
     await page.mouse.move(lontano.x, lontano.y, { steps: 12 });
     await expect.poll(() => statoCronologia(app, page), { timeout: 5000 }).toBeNull();
-    await expect(page.locator('.sn-menu')).toBeVisible();
+    await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
 
     // Riapri la cronologia dalla stessa freccetta: la voce rimossa NON torna.
     await arrow.hover();

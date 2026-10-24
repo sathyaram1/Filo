@@ -1,5 +1,4 @@
-// Logica pagina Sicurezza: due toggle (proteggi IP via WebRTC + blocca popup)
-// + box informativo sui servizi P2P. Le impostazioni sono in settings.security.
+// Pagina Sicurezza: proteggi IP via WebRTC e blocca popup; impostazioni in settings.security.
 
 (function () {
   'use strict';
@@ -10,6 +9,10 @@
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   // Si salva la forma «xn--…», si mostra il nome come l'utente l'ha scritto (münchen.de).
   const leggibile = window.SN_NOMI_SITO.leggibile;
+  // #876 — i siti fidati si salvano come li usa Filo: la regola di «stesso sito» del main.
+  const Sito = window.SN_STESSO_SITO;
+  const Eseguibili = window.SN_ESEGUIBILI;
+  const Google = window.SN_DOMINI_GOOGLE;
 
   function $(id) { return document.getElementById(id); }
 
@@ -240,12 +243,18 @@
     mostraEsitoCancella(I18n.t('security_wipe_fail'), true);
   }
 
-  // La chat porta qui con #cancella-tutto: sul tasto, che non cancella da solo.
+  // La chat porta qui con #cancella-tutto, l'avviso del filo pesante con #cancella-pagine (#1525): sul tasto, che
+  // non cancella da solo.
+  const TASTI_DA_INDIRIZZO = {
+    '#cancella-tutto': { tasto: 'sec-wipe-btn', riga: 'sec-wipe-row' },
+    '#cancella-pagine': { tasto: 'sec-visite-ora', riga: 'sec-visite' },
+  };
   function portaAlTasto() {
-    if (location.hash !== '#cancella-tutto') return;
+    const dove = TASTI_DA_INDIRIZZO[location.hash];
+    if (!dove) return;
     try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
-    const btn = $('sec-wipe-btn');
-    const centra = () => $('sec-wipe-row').scrollIntoView({ block: 'center' });
+    const btn = $(dove.tasto);
+    const centra = () => $(dove.riga).scrollIntoView({ block: 'center' });
     centra();
     btn.focus({ preventScroll: true });
     btn.classList.remove('sn-card-highlight');
@@ -296,10 +305,8 @@
     }
   }
 
-  // Metà mancante dell'esportazione: ricarica un .zip esportato da Filo.
-  // Due passi voluti — prima leggiamo il file e diciamo COSA contiene, poi
-  // chiediamo conferma: l'utente sa cosa sta per rimettere dentro prima di
-  // dire sì. Il popup è quello di Filo (SN_CONFIRM_UI), mai il confirm nativo.
+  // Due passi voluti: prima si legge il file e si dice COSA contiene, poi si chiede conferma,
+  // così l'utente sa cosa sta per rimettere dentro. Popup di Filo, mai il confirm nativo.
   function showImportHint(text, isError) {
     const hint = $('sec-import-hint');
     hint.textContent = text;
@@ -341,31 +348,64 @@
         prev.chats ? conta(prev.chats, 'chat con Filo', 'chat con Filo') : '',
         prev.pagine ? conta(prev.pagine, 'pagina visitata', 'pagine visitate') : '',
       ].filter(Boolean).join(' e ');
-      // Quello che del file non entra si dice prima del sì, col numero (#1088).
+      // Quello che del file non entra si dice prima del sì, col numero (#1088), lista per lista col suo tetto (#1256).
+      const fuori = (n, tetto, mie, chiave) => (n ? I18n.t(`security_import_${chiave}_out`)
+        .replace('%1', String(n))
+        .replace('%2', String(tetto || ''))
+        + (mie ? ' ' + I18n.t(`security_import_${chiave}_out_mine`).replace('%1', String(mie)) : '') : '');
+      // Il tetto di spesa del backup, più largo, si offre e lo mette solo il suo bottone (#1050).
+      const tetto = prev.tettoSpesa && typeof prev.tettoSpesa.backup === 'number' ? prev.tettoSpesa : null;
+      const euro = (n) => (Number(n) > 0
+        ? `${Number(n).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: Number.isInteger(Number(n)) ? 0 : 2, maximumFractionDigits: 2 })} €`
+        : 'senza limite');
+      const bottoneTetto = tetto ? I18n.t(tetto.backup > 0 ? 'security_import_tetto_btn' : 'security_import_tetto_btn_senza') : '';
       const manca = [
+        prev.vociPerse ? I18n.t('security_import_voci_perse').replace('%1', String(prev.vociPerse)) : '',
         prev.immaginiPerse ? I18n.t('security_import_images_lost').replace('%1', String(prev.immaginiPerse)) : '',
         prev.filoPerso ? I18n.t('security_import_filo_lost') : '',
-        prev.pagineFuori ? I18n.t('security_import_pages_out')
-          .replace('%1', String(prev.pagineFuori))
-          .replace('%2', String(prev.tettoPagine || ''))
-          + (prev.pagineMieFuori ? ' ' + I18n.t('security_import_pages_out_mine').replace('%1', String(prev.pagineMieFuori)) : '') : '',
+        fuori(prev.pagineFuori, prev.tettoPagine, prev.pagineMieFuori, 'pages'),
+        fuori(prev.appuntiFuori, prev.tettoAppunti, prev.appuntiMieFuori, 'appunti'),
+        fuori(prev.downloadFuori, prev.tettoDownload, prev.downloadMieFuori, 'download'),
+        tetto ? I18n.t(tetto.backup > 0 ? 'security_import_tetto_backup' : 'security_import_tetto_senza')
+          .replace('%1', () => euro(tetto.tenuto))
+          .replace('%2', () => euro(tetto.backup))
+          .replace('%3', () => bottoneTetto) : '',
+        prev.tettoSceso && typeof prev.tettoSceso.dopo === 'number'
+          ? I18n.t(Number(prev.tettoSceso.prima) > 0 ? 'security_import_tetto_sceso' : 'security_import_tetto_sceso_senza')
+            .replace('%1', () => euro(prev.tettoSceso.prima))
+            .replace('%2', () => euro(prev.tettoSceso.dopo)) : '',
         prev.chiavi === false ? I18n.t('security_import_senza_chiavi') : '',
         prev.proxySenzaCredenziali ? I18n.t('security_import_proxy_senza_credenziali') : '',
       ].filter(Boolean);
-      const text = I18n.t('security_import_confirm_text')
-        .replace('%6', I18n.t(prev.pagineMieFuori ? 'security_import_escono_mie' : 'security_import_nulla_perso'))
-        .replace('%1', prev.fileName || '')
-        .replace('%2', when)
-        .replace('%3', sezioni)
-        .replace('%4', immagini)
-        .replace('%5', delFilo ? `, più ${delFilo}` : '')
+      const escono = [
+        prev.pagineMieFuori ? I18n.t('security_import_escono_pagine') : '',
+        prev.appuntiMieFuori ? I18n.t('security_import_escono_appunti') : '',
+        prev.downloadMieFuori ? I18n.t('security_import_escono_download') : '',
+      ].filter(Boolean);
+      const elencoEscono = escono.length > 1 ? `${escono.slice(0, -1).join(', ')} e ${escono[escono.length - 1]}` : escono[0] || '';
+      // Sostituzioni a funzione: un `$&` o un `%2` nel nome del file non pescano nella frase di Filo.
+      const testo = I18n.t('security_import_confirm_text')
+        .replace('%6', () => (elencoEscono
+          ? I18n.t('security_import_escono_mie').replace('%1', () => elencoEscono)
+          : I18n.t('security_import_nulla_perso')))
+        .replace('%2', () => when)
+        .replace('%3', () => sezioni)
+        .replace('%4', () => immagini)
+        .replace('%5', () => (delFilo ? `, più ${delFilo}` : ''))
         + (manca.length ? `\n\n${manca.join('\n')}` : '');
+      // Il nome lo sceglie chi ha dato il file: nel suo riquadro, fuori dalle parole di Filo (#592.7).
+      const nome = String(prev.fileName || '');
+      const [prima, dopo = ''] = testo.split('"%1"');
+      const text = `${prima}"${nome}"${dopo}`;
+      const parti = nome ? [prima, { citazione: nome }, dopo] : null;
 
       const ok = window.SN_CONFIRM_UI
         ? await window.SN_CONFIRM_UI.confirm({
           title: I18n.t('security_import_confirm_title'),
           text,
+          parti,
           okLabel: I18n.t('security_import_confirm_ok'),
+          altroLabel: bottoneTetto,
         })
         : true;
       if (!ok) return;
@@ -373,11 +413,11 @@
       const res = await chrome.runtime.sendMessage({
         type: MSG.IMPORT_DATA_APPLY,
         token: prev.token,
+        tettoDelBackup: ok === 'altro',
       });
       if (res && res.ok) {
         showImportHint(I18n.t('security_import_done'), false);
-        // I dati appena rimessi dentro devono comparire: la pagina si ricarica
-        // per mostrare le impostazioni importate invece di quelle vecchie.
+        // La pagina si ricarica: i dati appena rimessi dentro devono comparire al posto dei vecchi.
         setTimeout(() => location.reload(), 1200);
       } else {
         showImportHint(I18n.t('security_import_fail'), true);
@@ -863,7 +903,7 @@
     const dl = sec.downloads || {};
     $('sec-dl-exe').checked = dl.confirmExecutables !== false;
     $('sec-dl-trusted').value = righe(dl.trustedSites, dl.righeScartate);
-    setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+    setTrustedError(parseFidati($('sec-dl-trusted').value).invalid);
     syncDownloadsEnabled();
     const del = sec.pagineDelicate || {};
     $('sec-delicate').checked = del.enabled !== false;
@@ -871,6 +911,7 @@
     setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
     syncDelicateEnabled();
     loadDelicateCampi();
+    caricaSitiScaricati();
     const sb = sec.safeBrowse || {};
     $('sec-safebrowse').checked = sb.enabled !== false;
     $('sec-safebrowse-network').checked = sb.networkSignals !== false;
@@ -883,7 +924,7 @@
     const radio = document.querySelector(`input[name="cookie-mode"][value="${mode}"]`);
     if (radio) radio.checked = true;
     const trusted = cookies.trustedSites || cookies.loginWhitelist;
-    cookieWhitelist = Array.isArray(trusted) ? trusted.slice() : [];
+    cookieWhitelist = Array.isArray(trusted) ? Google.sitiDeiFidati(trusted) : [];
     cookieBannerSites = Array.isArray(cookies.bannerSites) ? cookies.bannerSites.slice() : [];
     cookieLoggedSites = Array.isArray(cookies.loggedSites) ? cookies.loggedSites.slice() : [];
     cookieEmbedSites = Array.isArray(cookies.embedSites) ? cookies.embedSites.slice() : [];
@@ -895,7 +936,7 @@
     // Il testo lasciato nella casella dei fidati torna lì: un sito valido è già nell'elenco, il resto con l'avviso.
     const bozza = typeof cookies.bozza === 'string' ? cookies.bozza : '';
     $('cookie-wl-input').value = bozza;
-    setWhitelistError(bozza.trim() && !cleanDomain(bozza) ? I18n.t('options_cookies_whitelist_invalid') : '');
+    setWhitelistError(bozza.trim() && !sitoFidato(bozza) ? avvisoFidato(bozza) : '');
     loadCookieDone();
     syncCookieMode();
 
@@ -908,8 +949,6 @@
     $('sec-auto-feedback').checked = sec.autoFeedback === undefined ? true : !!sec.autoFeedback;
     mostrata = leggiSicurezza();
   }
-
-  // ─── protezione fingerprinting ─────────────────────────────────────────────
 
   function currentFpMode() {
     const checked = document.querySelector('input[name="fp-mode"]:checked');
@@ -924,8 +963,6 @@
     clearTimeout(saveFingerprint._t);
     saveFingerprint._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
-
-  // ─── gestione cookie ──────────────────────────────────────────────────────
 
   let cookieWhitelist = [];
   // #754 — siti dove l'utente ha chiesto di rivedere i banner (dal menu della scheda): qui si vedono e si tolgono.
@@ -956,8 +993,18 @@
     $('sec-riquadri-modello').disabled = !conta;
   }
 
-  // "https://www.Gmail.com/x" → "gmail.com", '' se non è un sito: la riduzione di tutti gli elenchi di siti (#843).
+  // "https://www.Mail.Google.com/x" → "mail.google.com", '' se non è un sito: la riduzione di tutti gli elenchi (#843).
   const cleanDomain = window.SN_NOMI_SITO.daScritto;
+  // Il sito che la voce tiene connesso: «https://mail.google.com/mail/u/0/» e gmail.com sono google.com, come li usa il main (#876).
+  // Una piattaforma (github.io, co.uk) non è il sito di nessuno: non entra, come fra i programmi fidati.
+  function sitoFidato(raw) {
+    const d = cleanDomain(raw);
+    return d && !Sito.piattaforma(d) ? Google.sitiDeiFidati([d])[0] || '' : '';
+  }
+  function avvisoFidato(raw) {
+    const d = cleanDomain(raw);
+    return d ? Eseguibili.testoPiattaforma(d) : I18n.t('options_cookies_whitelist_invalid');
+  }
 
   function renderWhitelist() {
     const list = $('cookie-wl-list');
@@ -972,8 +1019,17 @@
     }
     for (const domain of cookieWhitelist) {
       const li = document.createElement('li');
+      const voce = document.createElement('div');
       const span = document.createElement('span');
       span.textContent = leggibile(domain);
+      voce.appendChild(span);
+      // Una piattaforma salvata prima che la si rifiutasse non tiene connessi i siti ospitati: lo si dice, come fra i programmi.
+      if (Sito.piattaforma(domain) && Sito.voceSalvata(`x.${domain}`, [domain]) !== domain) {
+        const nota = document.createElement('small');
+        nota.className = 'sn-cookie-wl-nota';
+        nota.textContent = Eseguibili.testoPiattaforma(domain);
+        voce.appendChild(nota);
+      }
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'sn-btn-secondary';
@@ -983,7 +1039,7 @@
         renderWhitelist();
         saveCookies();
       });
-      li.appendChild(span);
+      li.appendChild(voce);
       li.appendChild(btn);
       list.appendChild(li);
     }
@@ -1114,8 +1170,7 @@
     }
   }
 
-  // Mostra (o nasconde, con msg vuoto) un avviso inline sotto il campo "siti
-  // fidati". Senza questo, un input rifiutato spariva senza spiegazione.
+  // Un input rifiutato senza avviso sparirebbe senza spiegazione.
   function setWhitelistError(msg) {
     const el = $('cookie-wl-error');
     if (!el) return;
@@ -1127,11 +1182,11 @@
     const input = $('cookie-wl-input');
     const raw = String(input.value || '').trim();
     if (!raw) { setWhitelistError(''); return; }
-    const domain = cleanDomain(raw);
+    const domain = sitoFidato(raw);
     if (!domain) {
-      // Input non vuoto ma non è un dominio valido: avvisa invece di svuotare
+      // Input non vuoto ma non è un sito: avvisa invece di svuotare
       // in silenzio. Lascia il testo nel campo così l'utente può correggerlo.
-      setWhitelistError(I18n.t('options_cookies_whitelist_invalid'));
+      setWhitelistError(avvisoFidato(raw));
       if (!(opts && opts.fuoco === false)) input.focus();
       return;
     }
@@ -1153,7 +1208,7 @@
   async function saveCookies() {
     caselle.spedita('fidato');
     const bozza = String($('cookie-wl-input').value || '').trim();
-    const dominio = cleanDomain(bozza);
+    const dominio = sitoFidato(bozza);
     const fidati = dominio && !cookieWhitelist.includes(dominio) ? [...cookieWhitelist, dominio].sort() : cookieWhitelist.slice();
     const partial = {
       security: {
@@ -1174,8 +1229,7 @@
     saveCookies._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
-  // I sotto-controlli del rilevamento siti pericolosi sono attivi solo quando il
-  // controllo principale è acceso.
+  // I sotto-controlli valgono solo quando il controllo principale è acceso.
   function syncSafebrowseEnabled() {
     const on = $('sec-safebrowse').checked;
     const sub = $('sec-safebrowse-sub');
@@ -1185,7 +1239,6 @@
     }
   }
 
-  // Disabilita i sotto-controlli del blocco siti quando il blocco è spento.
   function syncSiteBlockEnabled() {
     const on = !!$('sec-siteblock').checked;
     const sub = $('sec-siteblock-sub');
@@ -1273,16 +1326,34 @@
 
   // Le righe scartate si dicono, come per la blacklist: un dominio scritto male
   // qui non allenta nessuna difesa, ma chi l'ha scritto crede di sì.
+  // Una piattaforma che ospita i siti di chiunque (github.io) è scartata anche lei, ma col suo perché e il sito preciso
+  // da scrivere al suo posto (#876).
   function setTrustedError(invalidRows) {
     const el = $('sec-dl-trusted-error');
     if (!el) return;
-    if (invalidRows && invalidRows.length) {
-      el.textContent = I18n.t('options_security_downloads_trusted_invalid', invalidRows.join(', '));
-      el.style.display = 'block';
-    } else {
-      el.textContent = '';
-      el.style.display = 'none';
+    const piattaforme = [];
+    const altre = [];
+    for (const r of invalidRows || []) {
+      const v = Eseguibili.sitoFidabile(r);
+      if (!(v && v.piattaforma)) altre.push(r);
+      else if (!piattaforme.includes(v.piattaforma)) piattaforme.push(v.piattaforma);
     }
+    const frasi = piattaforme.map((p) => Eseguibili.testoPiattaforma(p, sitiScaricati));
+    if (altre.length) frasi.push(I18n.t('options_security_downloads_trusted_invalid', altre.join(', ')));
+    el.textContent = frasi.join('\n');
+    el.style.display = frasi.length ? 'block' : 'none';
+  }
+
+  // I siti da cui sono scesi programmi, dal più recente: il sito preciso da proporre a chi scrive la loro piattaforma.
+  // Solo quello cliccato: chi serve i byte dopo un rimando è di solito un deposito di tutti (il secchio di Bitbucket).
+  let sitiScaricati = [];
+  async function caricaSitiScaricati() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.DOWNLOADS_LIST });
+      const items = (r && Array.isArray(r.items) ? r.items : []).filter((x) => x && x.exe);
+      sitiScaricati = items.map((x) => x.site).filter((s) => typeof s === 'string' && s);
+    } catch (_) { sitiScaricati = []; }
+    if ($('sec-dl-trusted-error').style.display === 'block') setTrustedError(parseFidati($('sec-dl-trusted').value).invalid);
   }
 
   // Mostra (o nasconde, con lista vuota) un avviso inline sotto la blacklist
@@ -1303,6 +1374,8 @@
   // Ogni riga ridotta come i siti fidati (niente IP né nomi senza estensione): i validi e le righe scartate col loro posto.
   const parseBlacklist = window.SN_NOMI_SITO.elencoDaTesto;
   const righe = window.SN_NOMI_SITO.testoDaElenco;
+  // I programmi fidati: ogni riga al sito che copre, le piattaforme fra le scartate.
+  const parseFidati = Eseguibili.elencoFidati;
 
   // Le caselle di testo della pagina non hanno un «Salva» (#590.2): ognuna si iscrive qui e ne eredita pausa e uscite.
   // L'uscita vera accende gli avvisi anche se il testo è già partito col Ctrl di Ctrl+Tab, e il sito lasciato
@@ -1310,23 +1383,24 @@
   const caselle = window.SN_CASELLE.crea({
     uscita() {
       setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
-      setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+      setTrustedError(parseFidati($('sec-dl-trusted').value).invalid);
       setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
       if (String($('cookie-wl-input').value || '').trim()) addWhitelistDomain({ fuoco: false });
     },
+    spegni: () => $('savedHint').classList.remove('sn-show'),
   });
   caselle.registra('liste', (avvisi) => save({ avvisi }));
   caselle.registra('fidato', (avvisi) => spedisciFidato(avvisi));
   function spedisciFidato(avvisi) {
     const raw = String($('cookie-wl-input').value || '').trim();
-    if (avvisi && raw && !cleanDomain(raw)) setWhitelistError(I18n.t('options_cookies_whitelist_invalid'));
+    if (avvisi && raw && !sitoFidato(raw)) setWhitelistError(avvisoFidato(raw));
     saveCookies();
   }
 
   // La sezione Sicurezza come la mostra la pagina adesso.
   function leggiSicurezza() {
     const blocco = parseBlacklist($('sec-siteblock-blacklist').value);
-    const fidati = parseBlacklist($('sec-dl-trusted').value);
+    const fidati = parseFidati($('sec-dl-trusted').value);
     const delicati = parseBlacklist($('sec-delicate-sites').value);
     return {
       protectIpLeak: !!$('sec-protect-ip').checked,
@@ -1384,9 +1458,9 @@
 
   // Con `avvisi: false` (mentre si scrive) le righe scartate non si dicono ancora: «faceb» è una riga a metà.
   async function save(opts) {
-    caselle.spedita('liste');
+    const biglietto = caselle.spedita('liste');
     if (!(opts && opts.avvisi === false)) {
-      setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+      setTrustedError(parseFidati($('sec-dl-trusted').value).invalid);
       setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
       setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
     }
@@ -1396,6 +1470,7 @@
     if (Object.keys(cambi).length) {
       await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security: cambi }, mentreScrive: !!(opts && opts.avvisi === false) });
     }
+    if (!caselle.aggiornata('liste', biglietto)) return;
     const hint = $('savedHint');
     hint.classList.add('sn-show');
     clearTimeout(save._t);
@@ -1441,16 +1516,17 @@
       // perderebbe l'a capo appena battuto. Quello che non è ancora partito sta in `inSospeso`.
       salta: (id, percorso, el) => id === 'cookie-wl-input' || inSospeso.has(percorso.replace(/^security\./, ''))
         || (el.tagName === 'TEXTAREA'
-          && JSON.stringify(parseBlacklist(el.value).valid) === JSON.stringify(Voci.leggi(settings, percorso))),
+          && JSON.stringify((id === 'sec-dl-trusted' ? parseFidati : parseBlacklist)(el.value).valid)
+            === JSON.stringify(Voci.leggi(settings, percorso))),
       elenco: (id, lista) => righe(lista, scartate[id]),
     });
     const fidati = Voci.leggi(settings, 'security.cookies.trustedSites');
-    if (Array.isArray(fidati) && fidati.join('\n') !== cookieWhitelist.join('\n')) {
-      cookieWhitelist = fidati.slice();
+    if (Array.isArray(fidati) && Google.sitiDeiFidati(fidati).join('\n') !== cookieWhitelist.join('\n')) {
+      cookieWhitelist = Google.sitiDeiFidati(fidati);
       renderWhitelist();
     }
     if (toccati.includes('sec-siteblock-blacklist')) setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
-    if (toccati.includes('sec-dl-trusted')) setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+    if (toccati.includes('sec-dl-trusted')) setTrustedError(parseFidati($('sec-dl-trusted').value).invalid);
     if (toccati.includes('sec-delicate-sites')) setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
     syncSiteBlockEnabled();
     syncDownloadsEnabled();
@@ -1496,11 +1572,11 @@
   // In una scheda di Filo il cambio di scheda non passa da `visibilitychange` (resta per il
   // ricaricamento): lo annuncia il main con TAB_IN_VISTA. L'uscita la ascolta SN_CASELLE.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') { loadCookieDone(); loadDelicateCampi(); }
+    if (document.visibilityState === 'visible') { loadCookieDone(); loadDelicateCampi(); caricaSitiScaricati(); }
   });
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) { loadCookieDone(); loadDelicateCampi(); }
+      if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) { loadCookieDone(); loadDelicateCampi(); caricaSitiScaricati(); }
       if (msg && msg.type === MSG.PERMESSI_SITI_CAMBIATI) renderSitePerms();
     });
   }

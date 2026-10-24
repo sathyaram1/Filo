@@ -4,42 +4,38 @@
 
 Quando nasce una provenienza nuova di feedback (un prefisso di `clientId`: l'agente
 esploratore, i ruoli delle routine, i rilievi residui, la sessione locale di Claude),
-ci sono **due domande diverse** e vanno risposte separatamente:
+ci sono **due domande diverse**, e dal §10 di SPEC-DOMANDE.md (#1162) le risponde chi
+le deve rispondere, senza che una tocchi l'altra:
 
-- **Chi l'ha scritto** — serve a LEGGERE la coda: un ritrovamento nato esplorando l'app,
-  uno nato scrivendo il codice, uno nato verificando il lavoro di un altro e uno nato in
-  chat con l'owner vanno letti in contesti diversi. Qui ogni provenienza è una categoria
-  **propria** (`authorKind` in `src/shared/feedbackThread.js` + `AUTHOR_META`/`AUTHOR_RANK`
-  in `manage.js`): farla collassare su un'altra cancella l'unica informazione che il
-  mittente serve a dare.
-- **Quanto ci si fida** — serve a DECIDERE se entra in coda da sola
-  (`autoApproveGroup`, specchiato in `filo-security/functions/src/autoApprove.js`) e se è
-  un'identità fidata che non va mai flaggata come attacco/spam (`identities.js`). Dal
-  2026-08-22 i due assi COINCIDONO per l'ingresso in coda: un interruttore per ogni
-  categoria d'autore, sessione locale e istanze cloud comprese. Prima ne bastava uno per
-  tutte le istanze di Claude, e non ci si poteva fidare di una senza fidarsi delle altre.
+- **Chi l'ha scritto**: serve a LEGGERE la coda e a CONTARE. Due tabelle:
+  - la **classe** del mittente (`mittenteClasse`, più `mittenteRuolo` per le routine), per le
+    statistiche: la mappatura delle etichette sta in un posto solo, `src/shared/mittenti.js`,
+    che il server incorpora (bake-shared) e stampa sul documento alla nascita;
+  - la **categoria d'autore** per l'icona della coda (`authorKind` in
+    `src/shared/feedbackThread.js` + `AUTHOR_META`/`AUTHOR_RANK` in `manage.js`), più fine:
+    un ritrovamento nato esplorando, scrivendo codice o verificando si legge in contesti diversi.
+- **Quanto ci si fida**: serve a DECIDERE (giudici alla nascita, automatica, verdetto,
+  raffiche e segno, L5). La decide solo `fiducia`, che scrive il server. Il mittente non dà
+  nessun permesso: l'unico punto in cui diventa fiducia è l'owner dall'app, alla nascita
+  (`fiduciaDiNascita`). Gli interruttori dell'automatica sono due, `fidato` e `non_fidato`.
 
-**Regola operativa:** una provenienza nuova aggiunge una categoria d'autore E il suo
-interruttore di fiducia — con un test che lo inchioda su entrambi i repo, e ricordando
-che costa: voce in `manage.html`, copia sul server, rideploy delle functions. Se per una
-volta si sceglie di NON dargliene uno proprio, la motivazione va scritta accanto al
-codice e l'etichetta dell'interruttore che la copre deve dire onestamente cosa copre.
-Una mappa salvata prima non deve mai riaccendere da sola ciò che l'owner aveva spento:
-chi sdoppia un interruttore scrive anche il ripiego sul vecchio.
+**Regola operativa:** una provenienza nuova si aggiunge a `mittenti.js` (con un caso nel
+campione di `tests/unit/mittenti.test.mjs`) e, se serve un'icona sua, ad `authorKind`. Non
+si aggiunge un interruttore né una regola di permesso: se un mittente nuovo deve entrare in
+coda da solo, la strada è la fiducia (nasce da un biglietto pulito, o l'owner lo segna fidato).
+Un ruolo nuovo delle routine va nell'elenco `RUOLI` di `mittenti.js`, o la statistica lo conta
+come `ignoto` (la sentinella del server confronta i ruoli dei biglietti con l'elenco).
 
-**Perché il test:** senza, la scelta la fa il `return` in fondo alla funzione — e "è
-finita lì da sola" e "l'abbiamo deciso" diventano indistinguibili il giorno dopo.
-Precedenti: `routine:residuo` (SPEC-RIDISEGNO-MAX.md §13), `local:` (la sessione locale,
-2026-08-22).
+**L'eccezione già decisa:** chi nasce senza origine con la prova del server (l'allarme
+della pubblicazione `agent:costruzione`, i ritrovamenti dell'esplorazione) va in coda
+comunque (#1035): categoria d'autore sì, e nessun interruttore lo ferma.
 
-**Completezza da non dimenticare:** un mittente che è un processo dell'owner va aggiunto
-**anche** alla lista delle identità fidate del backend di sicurezza
-(`TRUSTED_CLIENT_RE` in `filo-security/functions/src/data/identities.js`, elencata in
-`FEEDBACK-STATES.md` §3). Lasciarlo fuori non dà un errore: dà un rate-limit da spam
-nelle giornate di lavoro fitto, e un'identità marcata pericolosa alla prima segnalazione
-tecnica letta male — dopo di che tutti i feedback di quel mittente saltano i giudici.
+**Perché:** finché il prefisso dava permessi, ogni provenienza nuova era anche una porta
+nuova da ricordarsi di chiudere su due repo, e una routine dal biglietto sporco (che ha letto
+testo di utenti) entrava in coda col lasciapassare del suo nome.
 
-**Dove:** `src/shared/feedbackThread.js` (classificazione pura + gruppi), `manage.js`
-(icona, etichetta, ordinamento) e `manage.html` (interruttori). Test:
-`tests/unit/feedbackThread.test.mjs`, `tests/unit/autoApprove.test.mjs`,
-`tests/manage-author-sort.spec.mjs`, e i gemelli in `filo-security/functions/test/`.
+**Dove:** `src/shared/mittenti.js` (classi), `src/shared/feedbackThread.js` (categorie
+d'autore e automatica per fiducia), `src/shared/feedbackStats.js` (statistiche per classe).
+Sentinelle: `tests/unit/mittenti.test.mjs`, `tests/unit/autoApprove.test.mjs` e, in
+filo-security, `functions/test/mittenti-solo-statistica.test.js` (il prefisso lo legge solo
+`src/mittente.js`, e chi usa la classe sta in un elenco col suo perché).

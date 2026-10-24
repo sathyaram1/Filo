@@ -46,7 +46,7 @@ per qualunque interruttore che prometta "questa cosa non succederà":
 - **Test:** `tests/unit/openWeightsOnly.test.mjs` (parte pura),
   `tests/unit/testDefaultModel.test.mjs` (i pulsanti «Prova»),
   `tests/open-weights-only.spec.mjs` (catena reale costruita dall'app),
-  `tests/options-open-weights.spec.mjs` (l'interruttore, cosa dichiara e quali
+  `tests/options.spec.mjs`, gruppo `options-open-weights` (l'interruttore, cosa dichiara e quali
   «Prova» resta possibile premere).
 
 La stessa politica vale per gli strumenti che testano Filo

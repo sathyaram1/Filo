@@ -21,8 +21,7 @@
 //   (`bigliettoLocale`, #1148): la fiducia la decide il server da lì, e senza biglietto nasce non fidato. Chi lo
 //   lavora si sceglie ogni volta: `--locale` mette il segno `localOnly` (il
 //   lavoro di questa sessione: nessuna routine lo prende), `--non-locale` lo apre per le routine. Fidati,
-//   tutti e due saltano i giudici: il primo va nei Lavori locali, il
-//   secondo In coda. Una routine non lo usa. Senza scelta
+//   tutti e due saltano i giudici e vanno In coda, il primo con l'etichetta «server». Una routine non lo usa. Senza scelta
 //   non parte niente. Senza token (o col token rifiutato) non parte niente:
 //   da anonimo sarebbe un feedback d'utente. `--priorita` nasce col documento.
 //
@@ -66,6 +65,7 @@ import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedbackClientIdHash.js';
 import '../src/shared/feedback.js';
+import '../src/shared/feedbackAttachTypes.js';
 import '../src/shared/feedbackStatus.js';
 import '../src/shared/feedbackAttese.js';
 import './lib/freno-letture.mjs';
@@ -78,9 +78,9 @@ const FB = globalThis.SN_FEEDBACK;
 /** Il mittente con cui si firma una sessione locale. Fonte unica: shared. */
 export const CLIENT_ID = (THREAD && THREAD.LOCAL_CLIENT_ID) || 'local:claude';
 
-// Tipo dichiarato per estensione: la stessa allowlist del gate deterministico
-// sugli allegati (filo-security, cancelloAllegati.js) e delle storage.rules. Fuori da
-// qui il feedback diventerebbe `suspicious_file`: meglio fermarsi prima.
+// Tipo dichiarato per estensione; se ammetterlo lo decide `SN_FEEDBACK_ATTACH.classify`, l'elenco
+// unico del riquadro e della pagina dei feedback, a cui resta allineato il cancello degli allegati del server
+// (filo-security, cancelloAllegati). Fuori da lì il feedback diventerebbe `suspicious_file`.
 // ⚠️ Tabella SENZA eredità, per lo stesso motivo di `PREFISSI_ALLEGATO` in
 // src/shared/feedback.js (#582, giro 7): la chiave è l'estensione di un nome di
 // file, e una tabella normale contiene già `__proto__` e `constructor` senza che
@@ -103,7 +103,9 @@ export function mimeDiAllegato(nome) {
   // `typeof === 'string'` e non `|| ''`: da qui esce il tipo che finisce nel
   // `data:` dell'allegato e poi nella richiesta al deposito. Quello che non è
   // una stringa non è un tipo, ed è un allegato da rifiutare.
-  return typeof tipo === 'string' ? tipo : '';
+  if (typeof tipo !== 'string') return '';
+  const ATTACH = globalThis.SN_FEEDBACK_ATTACH;
+  return ATTACH && ATTACH.classify({ name: String(nome || ''), type: tipo }) ? tipo : '';
 }
 
 /**
@@ -282,7 +284,7 @@ const SENZA_SCELTA = [
 const IN_ROUTINE = [
   'RIFIUTATO: sei una routine, e da qui non apro niente: un feedback nato qui salterebbe i giudici come uno dell\'owner.',
   '  Un ritrovamento: node scripts/routine-channel.mjs deliver feedback --name "…" --text "…"',
-  '  Un lavoro che si fa solo in locale: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché"',
+  '  Un lavoro che chiede il server: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché"',
 ].join('\n');
 
 /** Siamo dentro una routine? Oggetto e non funzione, come `credenziale`, perché i test lo sostituiscono. */
@@ -309,7 +311,7 @@ export async function main(argvIn) {
   // controllo sta in un posto solo, scripts/lib/argomenti.mjs. Le opzioni che
   // npm si è mangiato le riprendiamo dall'ambiente invece di rifiutare una
   // riga che chi l'ha scritta considera giusta.
-  const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
+  const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata, avvisoTrattinoDaNpm } = await import('./lib/argomenti.mjs');
   const OPZ = {
     opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--aspetta', '--dry-run'],
     conValore: ['--priorita', '--url', '--allega', '--aspetta'],
@@ -357,7 +359,8 @@ export async function main(argvIn) {
   const posizionali = [];
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a.startsWith('--')) { if (CON_VALORE.has(a)) i += 1; continue; }
+    // Per nome esatto: «-- vedi sotto» passa il controllo come testo, e qui non deve sparire (#878).
+    if (OPZ.opzioni.includes(a)) { if (CON_VALORE.has(a)) i += 1; continue; }
     posizionali.push(a);
   }
   const titolo = posizionali[0];
@@ -401,6 +404,8 @@ export async function main(argvIn) {
   const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken, locale, attese: listaAttese });
   if (!r.ok) {
     console.error(`${r.uso ? 'USO' : 'RIFIUTATO'}: ${r.motivo}`);
+    const daNpmSparito = r.uso && /mancante$/.test(r.motivo) ? avvisoTrattinoDaNpm(process.env) : '';
+    if (daNpmSparito) console.error(daNpmSparito);
     if (r.uso) uso();
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }

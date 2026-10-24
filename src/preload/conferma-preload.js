@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld('conferma', {
   onMostra: (fn) => {
     ipcRenderer.on('conferma:mostra', (_event, richiesta) => { try { fn(richiesta); } catch (_) {} });
   },
+  onTema: (fn) => {
+    ipcRenderer.on('conferma:tema', (_event, tema) => { try { fn(tema); } catch (_) {} });
+  },
   onVia: (fn) => {
     ipcRenderer.on('conferma:via', () => { try { fn(); } catch (_) {} });
   },

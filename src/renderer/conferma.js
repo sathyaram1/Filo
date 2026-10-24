@@ -18,6 +18,7 @@
   try {
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applicaTema({ theme: tema }));
   } catch (_) {}
+  api.onTema(applicaTema);
 
   api.onMostra((r) => {
     if (!r || !r.id) return;
@@ -30,6 +31,7 @@
     const opts = {};
     for (const k of ['title', 'text', 'okLabel', 'cancelLabel', 'word', 'avviso']) if (typeof r[k] === 'string') opts[k] = r[k];
     for (const k of ['coprePagina', 'reversibile']) if (r[k] === true) opts[k] = true;
+    if (Array.isArray(r.parti)) opts.parti = r.parti;
     const ospite = { scriveva: r.scriveva === true, campo: r.campo === true, tasto: (t) => api.tasto(id, t) };
     const apri = r.tipo === 'typed' ? Ui.confirmTyped : r.tipo === 'notify' ? Ui.notify : Ui.confirm;
     apri(opts, ospite).then((ok) => {

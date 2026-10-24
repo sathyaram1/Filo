@@ -81,14 +81,19 @@ test('"Apri file" su un file cancellato risponde che non c\'è più (e l\'avviso
 
     // (l'avviso vero di fine scaricamento può essere ancora a schermo: prendiamo
     // il più recente, quello appena rigiocato)
-    // 3. Anche il pannello degli scaricamenti in alto smette di offrire
-    //    "Apri file" per quella voce e la mostra attenuata.
-    await shell.locator('#dl-indicator').click();
+    // 3. Anche il pannello degli scaricamenti smette di offrire "Apri file" per
+    //    quella voce e la mostra attenuata. Il pannello si apre solo quando il main
+    //    chiede qualcosa su una voce (#941): si rigioca quel messaggio, come l'avviso.
+    await app.evaluate(({ BrowserWindow }, item) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs) || BrowserWindow.getAllWindows()[0];
+      win.webContents.send('shell:download', { kind: 'ask', item });
+    }, rec);
     const riga = shell.locator('.dl-row', { hasText: 'sparito.pdf' });
     await expect(riga).toHaveAttribute('data-missing', '1', { timeout: 10000 });
     await expect(riga.locator('.dl-row-btn', { hasText: 'Apri file' })).toHaveCount(0);
     await expect(riga.locator('.dl-row-meta')).toContainText('Non più sul disco');
-    await shell.locator('#dl-indicator').click();   // richiudi il pannello
+    await shell.locator('#dl-panel-close').click();
+    await expect(shell.locator('#dl-panel')).toBeHidden();
 
     await expect(shell.locator('.shell-notif-action', { hasText: 'Apri file' })).not.toHaveCount(0, { timeout: 10000 });
     const vista = await avvisi();

@@ -51,7 +51,10 @@ passati sopra, vedi
 [animazioni che coprono la pagina](animazioni-che-coprono-la-pagina-vivono-nel-content-overlay.md)).
 Essere una riga la lega allo stato della voce: la domanda c'è finché la voce
 aspetta, e sparisce da sola quando qualcuno risponde altrove. Mai dentro la
-pagina stessa: il sito potrebbe toccarla o imitarla.
+pagina stessa: il sito potrebbe toccarla o imitarla. Il pannello si chiude
+con la sua ×, e chiudere non è rispondere: la voce resta in attesa nella
+pagina Download e nella carta della home (nella fila di tab non c'è un tasto
+che lo riapra, #941).
 
 ## Il sì non lo dà il clic che ha fatto comparire la domanda
 
@@ -82,6 +85,16 @@ eseguibile; punti e spazi in coda su Windows non contano (`setup.exe.` apre lo
 stesso programma), quindi si tolgono prima di guardare l'estensione. Regole e
 frasi in `src/shared/eseguibili.js`, casi limite in
 `tests/unit/eseguibili.test.mjs`.
+
+## Anche un «Annulla» è un no
+
+Feedback #784.6. La segnalazione automatica partiva subito e «Annulla» la
+segnava ignorata: una scrittura che solo l'owner ha il permesso di fare, quindi
+per tutti gli altri il no non fermava niente. Ora la segnalazione aspetta che il
+suo avviso si chiuda (lo dice la shell con `alChiudere`, per qualunque uscita
+dell'avviso) e «Annulla» la ferma prima che esista. Se un no arriva tardi, chi
+lo ha dato lo legge. Codice in `src/main/services/autoFeedbackAttesa.js`, prove
+in `tests/auto-feedback-annulla.spec.mjs`.
 
 ## Dove vive
 

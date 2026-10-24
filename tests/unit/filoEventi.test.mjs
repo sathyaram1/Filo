@@ -114,6 +114,36 @@ test('cancellare una chat la toglie dal file e lascia ogni altra riga identica e
   assert.equal((await Chats.get('resta')).messages.length, 1);
 });
 
+test('nascondere una chat (#1295) la toglie da ciò che si vede, la tiene intera nel filo e si rimette', async () => {
+  magazzino = {};
+  const { f, file } = nuovo();
+  await Chats.append('resta', { role: 'user', text: 'questa resta' });
+  await Chats.append('zen', { role: 'user', text: 'Parliamo di Zen' });
+  await Chats.close('zen');
+  const prima = leggi(file);
+  await Chats.nascondi('zen', true);
+  assert.ok(leggi(file).startsWith(prima), 'nascondere riscrive il file invece di aggiungere in coda');
+  assert.deepEqual((await Chats.list()).map((c) => c.id), ['resta']);
+  assert.deepEqual((await f.perLaCoda()).chats.map((c) => c.id), ['resta'], 'la home non la disegna');
+  assert.deepEqual((await Chats.list({ nascoste: 'solo' })).map((c) => c.id), ['zen']);
+  assert.equal((await Chats.list({ nascoste: true })).length, 2);
+  const nascosta = await Chats.get('zen');
+  assert.equal(nascosta.nascosta, true);
+  assert.equal(nascosta.messages[0].text, 'Parliamo di Zen', 'nascosta, non cancellata');
+  const n = righe(file).length;
+  await Chats.nascondi('zen', true);
+  assert.equal(righe(file).length, n, 'nasconderla due volte non scrive un secondo evento');
+  await Chats.nascondi('zen', false);
+  assert.deepEqual((await Chats.list()).map((c) => c.id).sort(), ['resta', 'zen']);
+  assert.equal((await Chats.get('zen')).nascosta, undefined);
+  assert.equal(await Chats.nascondi('non-c-e', true), null);
+  // Rilette dal disco, le chat restano come le ha lasciate l'ultimo evento.
+  await Chats.nascondi('zen', true);
+  const { f: f2 } = nuovo(dirname(file));
+  assert.deepEqual((await f2.chats()).map((c) => c.id), ['resta']);
+  assert.deepEqual((await f2.chats({ nascoste: 'solo' })).map((c) => c.id), ['zen']);
+});
+
 test('«cancella le pagine dell’ultima ora» toglie quelle pagine e nessun’altra', async () => {
   magazzino = {};
   const { f, file } = nuovo();
@@ -463,4 +493,21 @@ test('ciò che una chat ha letto (#530) resta suo riaprendo il filo, senza doppi
   assert.equal(await Chats.segnaFonti('mai-vista', [ricerca]), null);
   await Chats.remove('letta');
   assert.ok(!leggi(file).includes('web:ricerca'), 'le fonti di una chat cancellata restano su disco');
+});
+
+test('chiusa apposta, una chat lo resta riaprendo il filo; una scheda che se ne va non la segna; la riapre solo l’utente', async () => {
+  magazzino = {};
+  const { cartella } = nuovo();
+  await Chats.append('apposta', { role: 'user', text: 'portami alla home' });
+  await Chats.append('apposta', { role: 'filo', text: 'Sei già qui.' });
+  await Chats.close('apposta');
+  assert.ok(!(await Chats.get('apposta')).finita, 'la chiusura di una scheda che se ne va non è una fine voluta');
+  await Chats.close('apposta', { fine: true });
+  assert.equal((await Chats.get('apposta')).finita, true, 'chiusa già da una scheda, la fine voluta si scrive lo stesso');
+  nuovo(cartella);
+  assert.equal((await Chats.get('apposta')).finita, true, 'riaperto il filo, la fine voluta resta');
+  await Chats.append('apposta', { role: 'filo', text: 'risposta in ritardo' });
+  assert.equal((await Chats.get('apposta')).finita, true, 'una risposta arrivata dopo non la riapre');
+  await Chats.append('apposta', { role: 'user', text: 'riprendiamo' });
+  assert.ok(!(await Chats.get('apposta')).finita, 'l’utente che ci riscrive la riapre');
 });

@@ -10,11 +10,13 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
 
+// Il reset ricarica la pagina da solo: una lettura che cade proprio lì dentro
+// torna vuota e la ripete il poll, invece di far fallire la prova.
 const storedSettings = (page) =>
   page.evaluate(async () => {
     const r = await chrome.storage.local.get('settings');
     return (r && r.settings) || {};
-  });
+  }).catch(() => ({}));
 
 test('un solo bottone riporta token, colore tab, tema e testo ai predefiniti', async ({ openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');

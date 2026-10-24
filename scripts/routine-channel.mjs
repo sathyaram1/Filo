@@ -59,7 +59,10 @@
 //         deve succedere sempre non si chiede a chi lavora. Senza biglietto fra
 //         gli argomenti lo ritrova da solo, come le consegne.
 //
-//   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"]
+//   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--forza]
+//       → exit 5, e niente rilasciato, se nella cartella lavora ancora qualcuno (#1480): per l'orchestratore un
+//         battito, un salvataggio recente o un processo (`--forza` solo per il worker morto davvero), per un worker
+//         i suoi processi.
 //       → fine lavoro: il biglietto muore e il semaforo si libera. Con
 //         `--guasto` DICHIARI un guasto al server (SPEC-RIDISEGNO-MAX.md §12):
 //         è così che il server smette di dare lavoro per il giro — le
@@ -76,14 +79,18 @@
 //
 //   node scripts/routine-channel.mjs deliver <biglietto> <intento> [--campo valore …]
 //       → consegna una decisione. Intenti: verdict, fixed, secaudit, status,
-//         note, feedback. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
+//         note, feedback, domanda. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
 //         ripiegare: il server ha guardato e ha detto no), 3 = guasto.
 //         `--notes "…"` è il report per l'owner (il server lo cifra: nessuno
 //         tranne lui lo rilegge). `--frase "…"` è la riga in chiaro per chi ha
 //         mandato il feedback, che la vede nella sua bacheca. `--segnala
 //         <file.md>` (su status, fixed e verdict) è la segnalazione per
 //         l'owner — un trade-off vero, che decide lui — letta intera dal file
-//         e scritta dal server nel livello L3 del feedback.
+//         e scritta dal server nel livello L3 del feedback. `--domanda
+//         <file.json>` (su status, fixed e verdict, #1358) è la domanda per
+//         l'owner già nel formato di SPEC-DOMANDE §3.1: ferma il lavoro come la
+//         segnalazione, e il feedback aspetta lei. `--status attack|spam` col
+//         perché nelle note: il giudizio di chi l'ha letto (Ricevuti L3).
 //         Revisione, correzione, critica e verdetto partono solo dal ramo assegnato (uscita 1 altrimenti): il ramo
 //         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo.
 //
@@ -109,10 +116,9 @@
 //   node scripts/routine-channel.mjs risposta <parola-d-ordine> <id> | risposta --biglietto <biglietto>   (testo da stdin)
 //       → registra la risposta. Exit come sopra; `answer_too_big` stampa i byte e il massimo.
 //
-//   La FUSIONE su main non ha un sottocomando qui: passa da
-//   `scripts/merge-gate.mjs <branch>`, che usa merge() di questo modulo. Il
-//   merge lo fa il SERVER (SPEC-RIDISEGNO-MAX.md §10): verdetti registrati,
-//   L5 sul diff che scarica lui, fusione via API con la sua identità.
+//   La FUSIONE su main non ha un sottocomando qui: la porta il SERVER da sé
+//   dopo il pass del controllo di sicurezza (#1207): unit sulla fusione in
+//   un'azione di GitHub, L5 sul diff che scarica lui, fusione con la sua identità.
 
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -121,10 +127,14 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
-import { isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT } from './lib/branch-integrity.mjs';
+import {
+  isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT, lavoroVivo, testoLavoroVivo,
+  USCITA_LAVORO_VIVO,
+} from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
-import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
+import { bigliettoFinito, haFormaDiBigliettoVero, leggiBigliettoAMano, leggiMarcatoreBiglietto, looksLikeTicket, segnaBigliettoFinito } from './lib/routine-ticket.mjs';
+import { apreUnElenco } from './lib/argomenti.mjs';
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
@@ -481,7 +491,8 @@ export async function release(t, fault = '', opts, report = null) {
  * Rilascio col rapporto allegato, e le due ritentate che il server prevede:
  *   - 413 `report_too_big` → una volta senza `tools.byName` e `notes`; se è
  *     ancora troppo, senza rapporto, e lo si dice;
- *   - 400 `report_malformed` → senza rapporto, e lo si dice.
+ *   - 400 `report_malformed` → senza `listino`, se c'era (la versione passa
+ *     nelle note); poi senza rapporto, e lo si dice.
  * Il rilascio è idempotente: riprovare è sicuro. `esito.rapporto` dice cosa è
  * arrivato al server: 'allegato', 'ridotto', 'scartato' o 'assente';
  * `esito.avviso` è la riga da stampare quando qualcosa è andato perso.
@@ -489,27 +500,45 @@ export async function release(t, fault = '', opts, report = null) {
 export async function releaseConRapporto(t, fault, report, opts) {
   const tenta = (rep) => release(t, fault, opts, rep);
   if (!report || typeof report !== 'object') return { ...(await tenta(null)), rapporto: 'assente' };
-  let r = await tenta(report);
+  const malformato = (r) => r.status === 400 && r.reason === 'report_malformed';
+  // Il dettaglio è nella PRIMA risposta (quella che ha rifiutato il
+  // rapporto), non nella seconda: letto dopo la ritentata si perdeva.
+  const dettaglioDi = (r) => (r.body && r.body.detail ? `: ${r.body.detail}` : '');
+  const avvisi = [];
+  // Un server che non conosce ancora `listino` (#882) non deve costare il rapporto intero a ogni rilascio.
+  const tentaRapporto = async (rep) => {
+    const r = await tenta(rep);
+    if (!malformato(r) || !Object.prototype.hasOwnProperty.call(rep, 'listino')) return r;
+    const { listino, ...senza } = rep;
+    if (Array.isArray(rep.notes)) senza.notes = [...rep.notes, `listino ${listino}`];
+    const r2 = await tenta(senza);
+    if (malformato(r2)) return r;
+    if (r2.ok) avvisi.push(`il server non accetta il campo listino (report_malformed${dettaglioDi(r)}): ${senza.notes ? 'la versione è nelle note' : 'allegato senza la versione del listino'}.`);
+    return r2;
+  };
+  const conAvvisi = (r, rapporto, avviso) => {
+    const righe = [...avvisi, ...(avviso ? [avviso] : [])];
+    return { ...r, rapporto: rapporto === 'allegato' && avvisi.length ? 'ridotto' : rapporto, ...(righe.length ? { avviso: righe.join(' ') } : {}) };
+  };
+  let r = await tentaRapporto(report);
   if (r.status === 413 && r.reason === 'report_too_big') {
     const misura = `${r.body && r.body.bytes ? r.body.bytes : '?'} byte, massimo ${r.body && r.body.max ? r.body.max : '?'}`;
     const snello = { ...report, tools: { ...(report.tools || {}) } };
     delete snello.tools.byName;
     delete snello.notes;
-    r = await tenta(snello);
+    r = await tentaRapporto(snello);
     if (r.status === 413 && r.reason === 'report_too_big') {
       r = await tenta(null);
-      return { ...r, rapporto: 'scartato', avviso: `rapporto troppo grande anche senza l'elenco degli strumenti (${misura}): rilasciato SENZA rapporto.` };
+      return conAvvisi(r, 'scartato', `rapporto troppo grande anche senza l'elenco degli strumenti (${misura}): rilasciato SENZA rapporto.`);
     }
-    return { ...r, rapporto: 'ridotto', avviso: `rapporto troppo grande (${misura}): allegato senza l'elenco degli strumenti e le note.` };
+    if (!malformato(r)) return conAvvisi(r, 'ridotto', `rapporto troppo grande (${misura}): allegato senza l'elenco degli strumenti e le note.`);
   }
-  if (r.status === 400 && r.reason === 'report_malformed') {
-    // Il dettaglio è nella PRIMA risposta (quella che ha rifiutato il
-    // rapporto), non nella seconda: letto dopo la ritentata si perdeva.
-    const dettaglio = r.body && r.body.detail ? `: ${r.body.detail}` : '';
+  if (malformato(r)) {
+    const dettaglio = dettaglioDi(r);
     r = await tenta(null);
-    return { ...r, rapporto: 'scartato', avviso: `il server non ha capito il rapporto (report_malformed${dettaglio}): rilasciato SENZA rapporto.` };
+    return conAvvisi(r, 'scartato', `il server non ha capito il rapporto (report_malformed${dettaglio}): rilasciato SENZA rapporto.`);
   }
-  return { ...r, rapporto: 'allegato' };
+  return conAvvisi(r, 'allegato');
 }
 
 // ─── Domanda di fine sessione (endpoint routineClosing) ─────────────────────
@@ -889,59 +918,6 @@ export async function eseguiGitServer({
   return 0;
 }
 
-/**
- * Chiede al SERVER di fondere il ramo su main (SPEC-RIDISEGNO-MAX.md §10).
- *
- * Qui non si decide niente: il server verifica dallo stato VERO (verdetti di
- * verifica e sicurezza REGISTRATI), fa girare L5 sul diff che scarica lui da
- * GitHub, e fonde con la SUA identità. Il ramo passato può solo CONFERMARE
- * quello legato al biglietto: nominarne un altro è un rifiuto registrato, non
- * una correzione silenziosa. Nessun verdetto viaggia nel corpo — il vecchio
- * FILO_L4_VERDICT per il server non esiste.
- *
- * Stessi ritentativi di call(): i guasti transienti (rete, 5xx) si ritentano,
- * un rifiuto no.
- *
- * `approval` c'è solo sui blocchi: è la richiesta che il server ha aperto per
- * l'owner. Va portata fin qui, o chi legge il registro crede che il ramo sia
- * perduto proprio nel caso in cui invece basta un via libera.
- *
- * `opts.sha` è il CONTENUTO su cui i due esiti ragionati erano stati dati:
- * viaggia con la richiesta come già fa il cammino locale (`ownerMerge`), dove
- * il server pretende che combaci con la punta vera e altrimenti risponde
- * `stale`. Senza, l'ultimo passo del giro continua a parlare del nome del ramo
- * mentre tutti i passi prima parlano di un commit, e il via libera resta buono
- * anche dopo che il foglio è stato sostituito (feedback #485). La sicurezza
- * non dipende dal fatto che il chiamante lo dichiari: la punta vera il server
- * se la chiede comunque. Questo è il controllo in più, e il posto dove
- * l'informazione arriva.
- *
- * `opts.provaUnit` è l'esito degli unit sul risultato della fusione (#929, scripts/lib/unit-sulla-fusione.mjs):
- * il server fonde solo se main è ancora lo sha provato, e altrimenti risponde `main_moved`.
- *
- * @returns {{ ok:true, result:'merged'|'blocked'|'conflict'|'main_moved'|'unit_rossi', reason?, sha?, approval?, mainSha? }
- *           | { ok:false, reason }}
- */
-export async function merge(t, branch, opts) {
-  const { sha = '', provaUnit = null, ...rest } = opts && typeof opts === 'object' ? opts : {};
-  const payload = { ticket: t, branch: String(branch || '') };
-  if (String(sha || '')) payload.sha = String(sha);
-  if (provaUnit && typeof provaUnit === 'object') payload.provaUnit = provaUnit;
-  const { status, body } = await call('routineMerge', payload, rest);
-  if (status === 200 && body && body.ok && body.result) {
-    return {
-      ok: true,
-      result: String(body.result),
-      reason: String(body.reason || ''),
-      sha: String(body.sha || ''),
-      approval: String(body.approval || ''),
-      ...(body.mainSha ? { mainSha: String(body.mainSha) } : {}),
-      ...(body.esito ? { esito: String(body.esito) } : {}),
-    };
-  }
-  return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
-}
-
 // ─── L'impronta dichiarata a mano ────────────────────────────────────────────
 //
 // L'impronta del contenuto la timbra lo strumento. Una dichiarata sulla riga di
@@ -1025,6 +1001,14 @@ export function testoConsegnaFuoriRamo(quale, g, sospesa = null) {
     if (x.escalated) return sospeso(testa);
     return `${testa}Porta lì i commit del lavoro (\`git -C "${x.radice}" cherry-pick <i tuoi commit>\`), poi rilancia lo stesso comando da "${x.radice}".${conta()}`;
   }
+  if (x.motivo === 'altrove') {
+    const a = x.altrove || {};
+    const n = (a.commit || []).length;
+    const ramo = a.ramo ? ` (ramo "${a.ramo}")` : '';
+    const testa = `${quale}: la cartella "${a.cartella}"${ramo} ha ${n === 1 ? 'un commit fatto' : `${n} commit fatti`} dopo l'inizio di questo lavoro che il ramo assegnato "${x.assigned}" non contiene: il lavoro sta lì, e la verifica non lo troverebbe. ${nulla}\n`;
+    if (x.escalated) return sospeso(testa);
+    return `${testa}Portali sul ramo assegnato (\`git -C "${a.radice}" cherry-pick ${(a.commit || []).map((c) => c.slice(0, 12)).join(' ')}\`), poi rilancia lo stesso comando. Se quei commit non sono di questo lavoro, togli quella cartella (\`git worktree remove "${a.cartella}"\`: il suo ramo resta) e rilancia.${conta()}`;
+  }
   if (x.motivo === 'dichiarato') {
     return `${quale}: hai dichiarato il ramo "${x.declared}", ma la cartella è sul ramo "${x.current}". ${nulla} Il ramo lo legge lo strumento dalla cartella: uno dichiarato può solo confermarlo.\n`
       + (x.assigned && x.assigned === x.current
@@ -1065,6 +1049,8 @@ export function testoIntentoNonCapito(parola) {
 export function bigliettoAMano(cmd, args, dato) {
   const b = String(dato || '').trim();
   const lista = Array.isArray(args) ? [...args] : [];
+  // Il biglietto davanti si ripulisce come quello a mano: uno spazio o un a capo copiati col codice il server li rifiuterebbe (#878).
+  if (POSIZIONALI_DOPO_BIGLIETTO[cmd] !== undefined && typeof lista[0] === 'string') lista[0] = lista[0].trim();
   if (!b) return { args: lista };
   if (cmd === 'probe' || cmd === 'ticket') {
     return { errore: `--ticket non vale con «${cmd}»: lì serve la parola d'ordine. Non ho fatto niente.` };
@@ -1108,7 +1094,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda',
+    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -1122,7 +1108,7 @@ if (isMain) {
     // una parola libera e buttato via, e il giro si chiudeva senza dichiarare
     // il guasto, rispondendo «OK» (feedback #565). Un numero negativo resta un
     // valore.
-    if (TRATTINI.includes(t[0])) return !/^[0-9]/.test(t.replace(/^[-‐‑‒–—−]+/, ''));
+    if (TRATTINI.includes(t[0])) return !apreUnElenco(t) && !/^[0-9]/.test(t.replace(/^[-‐‑‒–—−]+/, ''));
     // La conchiglia di Git riscrive `/guasto` come percorso: si guarda l'ultimo
     // pezzo, e solo per i nomi che conosciamo — un percorso vero è un valore.
     if (t.includes('/')) return CAMPI.has(t.split('/').pop().split('=')[0]);
@@ -1140,14 +1126,14 @@ if (isMain) {
   // posizionali, e chi lo cercava lì non lo trovava: il ruolo usciva vuoto,
   // chi guida leggeva «server vecchio» e lanciava sempre il worker generico —
   // col biglietto ormai ritirato, che è la cosa che non si annulla (#565).
-  const CAMPI_BANDIERA = new Set(['json', 'senza-push', 'senza-rapporto', 'stop']);
+  const CAMPI_BANDIERA = new Set(['json', 'senza-push', 'senza-rapporto', 'stop', 'forza']);
   const args = [];
   const flags = [];
   const data = {};
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     // Un biglietto vero davanti è un posizionale anche col trattino (o due): nessuna opzione ha la sua forma.
-    if (haFormaDiBigliettoVero(a)) { args.push(a); continue; }
+    if (haFormaDiBigliettoVero(a.trim())) { args.push(a.trim()); continue; }
     // Un'opzione scritta storta non è un posizionale: presa per tale, il
     // biglietto veniva rilasciato e il guasto NON dichiarato, con la risposta
     // che diceva «OK» (feedback #565).
@@ -1183,7 +1169,8 @@ if (isMain) {
     // parola d'ordine se la prendeva per valore, e restavano zero posizionali.
     if (CAMPI_BANDIERA.has(key)) { data[key] = true; continue; }
     const next = rest[i + 1];
-    if (next === undefined || next.startsWith('--')) {
+    // «-- vedi sotto» è testo: un campo che segue è scritto attaccato ai suoi trattini (#878).
+    if (next === undefined || (next.startsWith('--') && !apreUnElenco(next))) {
       // Un campo di TESTO senza il suo testo non è un sì: è un report che
       // parte vuoto mentre la risposta dice OK (feedback #565).
       if (CAMPI_TESTO.has(key)) {
@@ -1240,13 +1227,34 @@ if (isMain) {
   }
   delete data.segnala;
 
+  // `--domanda <file.json>` accanto a una fermata (#1358): la domanda per l'owner, controllata qui come la controlla il
+  // server. L'intento `domanda` la legge più sotto, da sola; su note, secaudit e feedback non fermerebbe niente.
+  if (typeof data.domanda === 'string' && cmd === 'deliver') {
+    const intentoDom = [args[0], args[1]].find((a) => ['status', 'fixed', 'verdict', 'domanda'].includes(a));
+    if (!intentoDom) {
+      console.error('--domanda vale solo su deliver domanda, status, fixed e verdict: non ho consegnato niente.');
+      process.exit(1);
+    }
+    if (intentoDom !== 'domanda') {
+      let testo = '';
+      try { testo = readFileSync(resolve(data.domanda), 'utf8'); } catch (e) {
+        console.error(`Non leggo ${data.domanda} (${e.code || e.message}): non ho consegnato niente.`);
+        process.exit(1);
+      }
+      const { leggiDomandaJson } = await import('./domanda.mjs');
+      const letta = leggiDomandaJson(testo, { conOrigine: false });
+      if (letta.errore) { console.error(letta.errore); process.exit(1); }
+      data.domanda = letta.domanda;
+    }
+  }
+
   // `--stop` resta accettato per chi lo scrive ancora, ma non serve: è la
   // segnalazione che ferma il lavoro, e senza l'owner non saprebbe cosa
   // decidere. Stessa regola di dispatch --record-fixed --ferma.
   if (data.stop !== undefined) {
     const suFixed = cmd === 'deliver' && [args[0], args[1]].includes('fixed');
-    if (data.stop !== true || !suFixed || !data.segnalazione) {
-      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md> (che da sola ferma già il lavoro): non ho consegnato niente.');
+    if (data.stop !== true || !suFixed || !(data.segnalazione || (data.domanda && typeof data.domanda === 'object'))) {
+      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md> o --domanda <file.json> (che da sole fermano già il lavoro): non ho consegnato niente.');
       process.exit(1);
     }
   }
@@ -1360,6 +1368,7 @@ if (isMain) {
     }
     if (!flags.includes('--loop')) {
       const r = await heartbeat(biglietto);
+      if (!r.ok && r.final) segnaBigliettoFinito(ROOT, biglietto, r.reason);
       if (!r.ok) { console.error(`guasto ${r.reason}`); process.exit(3); }
       console.log(`OK: semaforo vivo fino a ${r.expiresAt}`);
       for (const a of r.avvisi) console.error(`misura scartata dal server (${a.campo}: ${a.reason}): ${a.detail || ''}`);
@@ -1380,7 +1389,7 @@ if (isMain) {
           for (const a of r.avvisi) console.error(`misura scartata dal server (${a.campo}: ${a.reason}): ${a.detail || ''}`);
           primoGuastoMs = 0; await defaultSleep(attesaBattito(r.expiresAt)); continue;
         }
-        if (r.final) { console.error(`battito finito: ${r.reason}`); process.exit(0); }
+        if (r.final) { segnaBigliettoFinito(ROOT, biglietto, r.reason); console.error(`battito finito: ${r.reason}`); process.exit(0); }
         const ora = Date.now();
         if (!primoGuastoMs) primoGuastoMs = ora;
         if (ora - primoGuastoMs >= LEASE_TTL_MS) {
@@ -1402,12 +1411,35 @@ if (isMain) {
       process.exit(1);
     }
     const guasto = typeof data.guasto === 'string' ? data.guasto : '';
+    // Chi lavora ancora qui non perde biglietto né cartella (#1480): l'orchestratore rilascia solo senza lavoro vivo
+    // (`--forza` per il worker morto davvero), un worker solo quando i suoi processi sono finiti.
+    const marcatore = leggiMarcatoreBiglietto(ROOT);
+    const cartellaSua = !marcatore || !marcatore.ticket || String(marcatore.ticket) === String(args[0]);
+    const chiRilascia = typeof data.role === 'string' ? data.role : '';
+    if (chiRilascia === 'orchestrator' ? data.forza !== true : cartellaSua && !!marcatore) {
+      const vivo = lavoroVivo(ROOT, chiRilascia === 'orchestrator' ? {} : { cosa: ['processi'] });
+      if (vivo.vivo) {
+        console.error(`LAVORO VIVO: ${testoLavoroVivo(vivo, 'rilasciato il biglietto')}`);
+        console.error(chiRilascia === 'orchestrator'
+          ? 'Chiudi il giro senza rilasciare: chi lavora qui consegna e rilascia da sé, e un biglietto abbandonato scade da solo. --forza solo per un worker morto davvero (il gancio ti ha detto «Worker finito», o il canale dice che il suo battito è scaduto).'
+          : 'Aspetta che finiscano (un comando in sottofondo si aspetta, non si abbandona), o fermali se non servono più, poi rilancia lo stesso comando.');
+        process.exit(USCITA_LAVORO_VIVO);
+      }
+    }
+    // Un biglietto già finito non spedisce più (lo prenderebbe chi ha il ramo adesso); la cartella di un altro biglietto
+    // non si committa, non si spedisce e non si sigilla.
+    const finito = cartellaSua && bigliettoFinito(marcatore);
+    if (!cartellaSua || finito) {
+      console.error(!cartellaSua
+        ? `la cartella è del biglietto ${String(marcatore.ticket).slice(0, 8)}…, non di questo: non committo, non spedisco e non sigillo niente.`
+        : 'questo biglietto è già finito (rilasciato, o morto per il battito): non committo e non spedisco niente.');
+    }
     // PRIMA del server: il ramo corrente va su origin. Un commit fatto a mano
     // dal worker non passa dall'hook, e senza questo push moriva col
     // contenitore. Se il push non riesce NON si rilascia: si stampa la causa e
     // si esce diverso da zero, il worker sistema e rilancia (il biglietto scade
     // da solo dopo 60 minuti se muore). `--senza-push` dove non c'è un repo.
-    if (data['senza-push'] !== true) {
+    if (data['senza-push'] !== true && cartellaSua && !finito) {
       // Prima quello che è rimasto fuori dai commit (un file nato da una
       // shell non passa dall'hook): si committa qui, e si dice.
       const c = commitRestante(ROOT);
@@ -1461,17 +1493,25 @@ if (isMain) {
     if (r.ok) {
       const { stopBeat } = await import('./lib/routine-beat.mjs');
       stopBeat(ROOT, { ticket: args[0] });
+      segnaBigliettoFinito(ROOT, args[0], 'rilasciato');
       // Fine giro LEGITTIMA: il punto fermo si sigilla sul contenuto attuale
       // (#507). Senza, i commit fatti dopo l'ultima consegna — la pulizia del
       // verificatore, per esempio — al posizionamento successivo nello stesso
       // clone verrebbero scartati come moncone di un'istanza morta.
-      try {
+      if (cartellaSua) try {
         const { sealCurrentWork } = await import('./lib/branch-integrity.mjs');
         const { readRole } = await import('./lib/routine-role.mjs');
         // Il ruolo nel sigillo: dopo un «pass» vale come pulizia solo quello del verificatore (#880).
         const chi = readRole(ROOT);
         sealCurrentWork(ROOT, { by: chi ? `release:${chi}` : 'release' });
       } catch (_) { /* best-effort: il rilascio è già andato */ }
+    }
+    // Un biglietto che il server dice morto non ha più niente da tenere vivo: il battito si spegne e la fine si segna,
+    // o il suo battito ancora acceso varrebbe come lavoro vivo per chi viene dopo (#1480).
+    if (!r.ok && BATTITO_FINITO.has(r.reason)) {
+      const { stopBeat } = await import('./lib/routine-beat.mjs');
+      stopBeat(ROOT, { ticket: args[0] });
+      segnaBigliettoFinito(ROOT, args[0], r.reason);
     }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');
     else console.log(`rilascio non riuscito (${r.reason})`);
@@ -1663,9 +1703,13 @@ if (isMain) {
       // Una consegna con segnalazione ferma il lavoro: chi consegna deve saperlo
       // adesso, o crede di averlo mandato in verifica.
       const fermo = r.reply && r.reply.outcome === 'stop';
-      const conSegnalazione = typeof data.segnalazione === 'string' && data.segnalazione.trim();
-      if (fermo) console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: il lavoro è FERMO e aspetta l'owner (la segnalazione è consegnata). Rilascia il biglietto.`);
-      else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la consegna portava una segnalazione ma il server non ha fermato il lavoro (server vecchio?).`);
+      const conDomanda = !!data.domanda && typeof data.domanda === 'object' && intento !== 'domanda';
+      const conSegnalazione = (typeof data.segnalazione === 'string' && data.segnalazione.trim()) || conDomanda;
+      const cosa = conDomanda ? 'la domanda' : (typeof data.segnalazione === 'string' && data.segnalazione.trim()) ? 'la segnalazione' : 'la fermata';
+      const dom = r.reply && typeof r.reply.domanda === 'string' && r.reply.domanda ? `, domanda ${r.reply.domanda}` : '';
+      if (fermo) console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: il lavoro è FERMO e aspetta l'owner (${cosa} è consegnata${dom}). Rilascia il biglietto.`);
+      else if (r.reply && r.reply.outcome === 'server') console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: passato ai lavori server, che lo riprendono dal ramo. Rilascia il biglietto.`);
+      else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la consegna portava ${cosa} ma il server non ha fermato il lavoro (server vecchio?).`);
       else console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.');
       process.exit(0);
     }
@@ -1702,6 +1746,11 @@ if (isMain) {
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'compare') {
+    // Senza biglietto il ruolo scalava al suo posto e partiva verso il server come biglietto (#878).
+    if (!looksLikeTicket(args[0])) {
+      console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Uso: compare <biglietto> <ruolo> <numero>, oppure aggiungi --ticket <codice> (il codice è nelle istruzioni con cui sei partito).');
+      process.exit(1);
+    }
     const r = await compare(args[0], { role: args[1] || '', num: args[2] || '' });
     if (!r.ok) { console.error('confronto non registrato'); process.exit(0); }
     console.log(r.same ? 'confronto: stessa scelta' : 'confronto: scelte diverse (registrato per l\'owner)');

@@ -1,27 +1,19 @@
-// Crediti sul server e chiave personale — la logica PURA condivisa fra main e
-// pagine (feedback #598). Niente rete, niente Electron: gli unit test la
-// caricano così com'è.
-//
-// - riconoscere «crediti finiti» in un errore del provider (402), che NON si
-//   ritenta: OpenRouter rifiuta finché il tetto non sale;
-// - la riga del registro d'uso, con i soli campi che le regole Firestore
-//   accettano (hasOnly): una riga con un campo in più viene rifiutata, e un
-//   registro che non si scrive è un abuso agli occhi della riconciliazione;
-// - il testo che spiega all'utente cosa fare, in base a come sta usando Filo.
+// Crediti sul server e chiave personale, logica PURA condivisa fra main e pagine (#598).
+// Un 402 del provider è «crediti finiti» e NON si ritenta; la riga del registro d'uso porta
+// SOLO i campi che le regole Firestore accettano: uno in più la fa rifiutare.
 
 (function (global) {
   'use strict';
 
-  // I campi di una riga del registro, nell'ordine. Sono gli stessi elencati
-  // nelle regole Firestore (wallet-usage): cambiarli qui senza cambiarli lì
-  // fa rifiutare ogni riga.
+  // Gli stessi campi elencati nelle regole Firestore (wallet-usage): cambiarli qui senza
+  // cambiarli lì fa rifiutare ogni riga.
   const USAGE_FIELDS = Object.freeze([
     'pseudonym', 'at', 'action', 'model', 'servedBy',
     'promptTokens', 'completionTokens', 'costUsd', 'credits',
   ]);
 
-  // 402 dal servizio AI = il tetto della chiave è esaurito (o l'account non ha
-  // credito). Con la chiave personale vuol dire «crediti finiti».
+  // 402 dal servizio AI = tetto della chiave esaurito; con la chiave personale vuol dire
+  // «crediti finiti».
   function isOutOfCredits(err) {
     if (!err) return false;
     const st = Number(err.status);
@@ -46,23 +38,80 @@
     return Math.ceil(usd * creditsPerUsd(params) * 10 - 1e-6) / 10;
   }
 
-  // Costruisce la riga, scartando tutto ciò che non è nel contratto. `at` è
-  // ISO UTC: il server confronta per intervallo di tempo.
+  // I tetti di lunghezza della stessa regola: un nome di modello più lungo farebbe rifiutare la
+  // riga intera, accorciato arriva. Sentinella in tests/unit/wallet.test.mjs.
+  const USAGE_LIMITS = Object.freeze({ at: 40, action: 80, model: 200, servedBy: 100 });
+
+  // Scarta tutto ciò che non è nel contratto. `at` è ISO UTC: il server confronta per
+  // intervallo di tempo.
   function usageRow({ pseudonym, at, action, model, servedBy, usage, costUsd, credits } = {}) {
     if (!pseudonym) return null;
     const u = usage || {};
     const usd = Number(costUsd != null ? costUsd : u.costUsd);
+    const L = USAGE_LIMITS;
     return {
       pseudonym: String(pseudonym),
-      at: at || new Date().toISOString(),
-      action: String(action || ''),
-      model: String(model || ''),
-      servedBy: String(servedBy || ''),
+      at: String(at || new Date().toISOString()).slice(0, L.at),
+      action: String(action || '').slice(0, L.action),
+      model: String(model || '').slice(0, L.model),
+      servedBy: String(servedBy || '').slice(0, L.servedBy),
       promptTokens: Math.max(0, Math.floor(Number(u.promptTokens) || 0)),
       completionTokens: Math.max(0, Math.floor(Number(u.completionTokens) || 0)),
       costUsd: Number.isFinite(usd) && usd > 0 ? usd : 0,
       credits: Math.max(0, Number(credits) || 0),
     };
+  }
+
+  // La regola o il contenuto rifiutano la riga, e ritentarla non la fa mai passare (#1601). Una chiave API
+  // ruotata o bloccata risponde con gli stessi codici ma vale per tutte le righe: è un guasto, si ritenta.
+  function rifiutoDellaRigaUso(status, testo) {
+    const t = String(testo || '');
+    return (status === 403 && /insufficient permissions/i.test(t)) || (status === 400 && !/api.?key/i.test(t));
+  }
+
+  // Il commit di Firestore è atomico: una riga che la regola rifiuta respinge tutto il lotto (#1601).
+  // Al rifiuto il lotto si divide a metà finché la riga cattiva resta sola, e le buone passano.
+  // `commit(righe)` dà { ok: true } o { ok: false, motivo } per un rifiuto, e lancia per un guasto
+  // passeggero: allora ci si ferma, e ciò che non è stato né scritto né rifiutato sta in `rimaste`.
+  async function scriviIsolando(righe, commit) {
+    const esito = { scritte: [], rifiutate: [], rimaste: [], errore: null };
+    const daFare = righe && righe.length ? [righe.slice()] : [];
+    while (daFare.length) {
+      const lotto = daFare.shift();
+      let r;
+      try { r = await commit(lotto); } catch (e) {
+        esito.errore = e;
+        esito.rimaste = [lotto, ...daFare].flat();
+        return esito;
+      }
+      if (r && r.ok) esito.scritte.push(...lotto);
+      else if (lotto.length === 1) esito.rifiutate.push({ riga: lotto[0], motivo: String((r && r.motivo) || '') });
+      else {
+        const meta = Math.ceil(lotto.length / 2);
+        daFare.unshift(lotto.slice(0, meta), lotto.slice(meta));
+      }
+    }
+    return esito;
+  }
+
+  // Le righe del registro uscite dalla coda senza arrivare al server, dette alla pagina Crediti.
+  // `perMotivo`: { rifiutata, altra_identita, ricomincia, coda_piena } → quante. '' se nessuna.
+  const SCARTATE_MOTIVI = Object.freeze({
+    rifiutata: ['rifiutato dal server', 'rifiutati dal server'],
+    altra_identita: ['di un portafoglio di prima', 'di un portafoglio di prima'],
+    ricomincia: ['tolto ricominciando con un nuovo invito', 'tolti ricominciando con un nuovo invito'],
+    coda_piena: ['perso perché ce n\'erano troppi in attesa', 'persi perché ce n\'erano troppi in attesa'],
+  });
+  function registroScartateTesto(perMotivo) {
+    const voci = Object.keys(SCARTATE_MOTIVI)
+      .map((m) => [m, Math.max(0, Math.floor(Number(perMotivo && perMotivo[m]) || 0))])
+      .filter(([, n]) => n > 0);
+    const tot = voci.reduce((s, [, n]) => s + n, 0);
+    if (!tot) return '';
+    const testa = tot === 1 ? 'Un consumo non è stato registrato' : `${tot} consumi non sono stati registrati`;
+    const frase = (m, n) => SCARTATE_MOTIVI[m][n === 1 ? 0 : 1];
+    if (voci.length === 1) return `${testa}: ${frase(voci[0][0], tot)}.`;
+    return `${testa}: ${voci.map(([m, n]) => `${n} ${frase(m, n)}`).join(', ')}.`;
   }
 
   // Il messaggio per l'utente quando la chiamata è stata rifiutata per crediti.
@@ -218,10 +267,37 @@
     provider_error: 'Il servizio dei modelli non ha risposto: riprova fra poco.',
     internal: 'Qualcosa è andato storto sul server: riprova.',
     not_reachable: 'Non riesco a raggiungere il server: controlla la connessione.',
+    // Dà inviti solo chi ha collegato Google (#1120): il codice resta suo, e torna buono quando si collega.
+    inviter_not_linked: 'Chi ti ha mandato questo invito non ha ancora collegato il suo account Google a Filo, e finché non lo fa il suo codice non fa entrare nessuno. Diglielo, o fatti mandare un invito da qualcun altro.',
+    network_cap: 'Da questa connessione sono già entrate troppe persone di recente. Il tuo codice resta valido, riprova più tardi.',
   });
 
-  function redeemMessage(status) {
+  // `info` è la risposta intera del server: il tetto per rete porta l'ora in cui riaprire.
+  function redeemMessage(status, info) {
+    if (status === 'network_cap' && info && info.reopensAt) return networkCapMessage(info);
     return REDEEM_MESSAGES[status] || REDEEM_MESSAGES.internal;
+  }
+
+  // Il tetto dei riscatti dalla stessa rete (#1120), coi numeri del server e l'ora locale in cui si libera un posto.
+  // Un'ora che non si legge non diventa «adesso»: resta la frase senza ora.
+  function networkCapMessage({ reopensAt, cap, hours } = {}, nowMs = Date.now()) {
+    const t = Date.parse(String(reopensAt || ''));
+    if (!Number.isFinite(t)) return REDEEM_MESSAGES.network_cap;
+    const n = Math.floor(Number(cap) || 0);
+    const h = Number(hours) || 0;
+    const chi = n === 1 ? 'è già entrata una persona' : (n > 1 ? `sono già entrate ${fmtInt(n)} persone` : 'sono già entrate troppe persone');
+    const finestra = h === 1 ? ' nell’ultima ora' : (h > 0 ? ` nelle ultime ${Number.isInteger(h) ? fmtInt(h) : String(h).replace('.', ',')} ore` : ' di recente');
+    return `Da questa connessione ${chi}${finestra}. Il tuo codice resta valido, riprova ${quandoRiapre(t, nowMs)}.`;
+  }
+
+  function quandoRiapre(t, nowMs) {
+    const d = new Date(t);
+    const ora = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    const giorno = (x) => { const g = new Date(x); g.setHours(0, 0, 0, 0); return g.getTime(); };
+    const giorni = Math.round((giorno(t) - giorno(nowMs)) / 86400000);
+    if (giorni <= 0) return `dopo le ${ora}`;
+    if (giorni === 1) return `domani dopo le ${ora}`;
+    return `da ${d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} alle ${ora}`;
   }
 
   function fmtInt(n) {
@@ -229,18 +305,15 @@
   }
   // La frase del riscatto riuscito dice solo i crediti d'ingresso: il conteggio
   // locale non passa (#1138), e «nessuno dei 1.000 che avevi» si leggeva come un furto.
-  function redeemOkMessage({ entryCredits } = {}) {
+  // `conteggioLocale`: era a schermo come saldo, e la frase dice dove va, senza contarlo (#1353).
+  function redeemOkMessage({ entryCredits, conteggioLocale = false } = {}) {
     const entry = Math.max(0, Math.floor(Number(entryCredits) || 0));
-    return entry ? `Invito riscattato: hai ${fmtInt(entry)} crediti d’ingresso.` : REDEEM_MESSAGES.ok;
+    const frase = entry ? `Invito riscattato: hai ${fmtInt(entry)} crediti d’ingresso.` : REDEEM_MESSAGES.ok;
+    return conteggioLocale ? `${frase} ${CONTEGGIO_LOCALE_LASCIA}` : frase;
   }
 
-  // Il codice dentro quello che l'utente incolla. Il codice arriva per
-  // messaggio e si ricopia com'è, spesso con la riga intorno («Codice:
-  // ABCD-EFGH», «il tuo invito è abcd efgh»): se il testo, ripulito, non è un
-  // codice, si cerca dentro un blocco di otto caratteri (anche quattro più
-  // quattro) staccato dal resto. Se non c'è, torna il testo com'era: sarà il
-  // server a dire «non esiste». Un testo che è già un codice passa com'è (il
-  // server tollera trattini, spazi e minuscole).
+  // Il codice si ricopia con la riga intorno («Codice: ABCD-EFGH»): se il testo ripulito non
+  // è un codice si cerca un blocco di otto caratteri staccato; se non c'è, torna com'era.
   function extractCode(raw) {
     const s = String(raw || '').trim();
     const norm = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -463,7 +536,11 @@
     { chiave: 'invitesRemaining', etichetta: 'Ingressi con invito rimasti', min: 0, max: 10000000, aiuto: 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.' },
     { chiave: 'maxGrantCredits', etichetta: 'Tetto dei crediti elargibili', min: 0, max: 1000000000, aiuto: 'Il massimo che Filo può regalare, sommando tutte le persone.' },
     { chiave: 'rewardFeedbackSent', etichetta: 'Premio per un feedback inviato', min: 0, max: 1000000, aiuto: 'Arriva quando la segnalazione passa i controlli.' },
+    { chiave: 'rewardSentPerDay', etichetta: 'Feedback inviati premiati al giorno', min: 0, max: 100000, aiuto: 'Quanti feedback inviati ricevono il premio, per persona e per giorno. Gli altri arrivano senza premio.' },
     { chiave: 'rewardFeedbackClosed', etichetta: 'Premio per un feedback risolto', min: 0, max: 1000000, aiuto: 'Arriva solo se la segnalazione viene risolta.' },
+    // Il tetto per rete (#1120): una famiglia che condivide la connessione entra, una persona sola che apre portafogli a catena no.
+    { chiave: 'redeemsPerNetwork', etichetta: 'Ingressi dalla stessa connessione', min: 0, max: 1000, aiuto: 'Quante persone possono entrare con un invito dalla stessa connessione, nelle ore scritte sotto. Vale anche per i tuoi codici. A zero nessun limite.' },
+    { chiave: 'redeemsPerNetworkHours', etichetta: 'Ore in cui si contano', min: 1, max: 8760, aiuto: 'La finestra in cui si contano gli ingressi dalla stessa connessione: passata, chi era entrato non conta più.' },
   ]);
   const OWNER_KNOB_KEYS = Object.freeze(OWNER_KNOBS.map((k) => k.chiave));
   function knobOf(chiave) { return OWNER_KNOBS.find((k) => k.chiave === chiave) || null; }
@@ -495,6 +572,67 @@
     return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(v);
   }
 
+  // ── Il saldo che dice la chat (#816, #1353) ───────────────────────────────
+  // Il turno non aspetta mai il server: vale l'ultima lettura finita, e una più vecchia di un minuto si rifà in
+  // sottofondo. «Il server non risponde» solo se quella lettura è fallita: un server lento non lo diventa.
+  const SALDO_CHAT_VALIDO_MS = 60 * 1000;
+
+  // `lettura`: l'ultima finita, { at, state } (lo stato della pagina Crediti), o null; `disco`: l'ultimo stato del
+  // server salvato qui. null = nessun portafoglio, e vale il conteggio locale.
+  function saldoPerChat({ lettura = null, disco = null, now = Date.now() } = {}) {
+    const st = lettura && lettura.state ? lettura.state : null;
+    let lettaIl = st ? Number(lettura.at) || null : null;
+    if (st && st.identity && st.identity.lost) return null;
+    if (st && st.server && st.server.hasWallet === false) return null;
+    let server = st && st.server && st.server.hasWallet ? st.server : null;
+    if (!server) {
+      // Una lettura finita senza lo stato del server è fallita; senza nessuna lettura il disco è solo vecchio.
+      if (!disco || !disco.hasWallet) return { balance: null, nonRisponde: Boolean(st) };
+      server = { ...disco, cached: Boolean(st) };
+      lettaIl = Date.parse(String(disco.readAt || '')) || null;
+    }
+    const b = server.balance || {};
+    // Perché non è il saldo di adesso: la lettura fallita, il servizio dei modelli che non ha detto il consumo (come
+    // la pagina), o una lettura solo vecchia.
+    const lastKnown = server.cached ? 'server'
+      : server.stale ? 'models'
+        : !lettaIl || now - lettaIl > SALDO_CHAT_VALIDO_MS ? 'old' : '';
+    const readAt = server.cached ? server.readAt
+      : server.stale ? server.usageReadAt
+        : lastKnown && lettaIl ? new Date(lettaIl).toISOString() : null;
+    const numero = (v) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+    return {
+      balance: numero(b.credits),
+      dailyCredits: numero(server.dailyCredits),
+      lastKnown, readAt: readAt || null,
+      usingOwnKey: Boolean(st && st.usingOwnKey),
+      keyMissing: Boolean(st && st.hasPersonalKey === false),
+    };
+  }
+
+  // Le riletture per la chat: una alla volta, solo se l'ultima finita (`ultima()`, { at } o null) ha più di un
+  // minuto, e chi le chiede non le aspetta. `leggi` è la lettura vera, che aggiorna l'ultima da sé.
+  function rilettoreSaldo({ leggi, ultima, now = () => Date.now(), validoMs = SALDO_CHAT_VALIDO_MS } = {}) {
+    let inVolo = null;
+    function rileggi() {
+      const u = ultima();
+      if (u && now() - Number(u.at) <= validoMs) return null;
+      if (inVolo) return inVolo;
+      let p;
+      try { p = Promise.resolve(leggi()); } catch (_) { p = Promise.resolve(null); }
+      inVolo = p.catch(() => null).finally(() => { inVolo = null; });
+      return inVolo;
+    }
+    return { rileggi };
+  }
+
+  // Il conteggio locale sta a schermo come saldo solo senza portafoglio e con una chiave che parte davvero, la
+  // propria o quella di fabbrica (#1138). Chi lo vedeva, al riscatto sente dire dove va (#1353).
+  function conteggioLocaleInVista({ hasWallet = false, keySource = '', identityLost = false } = {}) {
+    return !hasWallet && !identityLost && (keySource === 'own' || keySource === 'factory');
+  }
+  const CONTEGGIO_LOCALE_LASCIA = 'Prendono il posto dei crediti di prova che Filo teneva su questo computer.';
+
   // ── Il premio di una segnalazione chiusa, con un portafoglio (#816) ───────
   // Il premio vero lo accredita il server, e solo a una segnalazione RISOLTA
   // (`done`) mandata col portafoglio. Il riquadro annuncia la cifra del
@@ -524,14 +662,42 @@
     return { announce: false, credits: 0 };
   }
 
+  // ── Il tetto giornaliero dei premi d'invio (#1077) ────────────────────────
+  // Il server paga al più `perDay` invii per portafoglio e giorno UTC. Prima di
+  // promettere un premio si contano i premi d'invio già arrivati oggi più gli
+  // invii di oggi il cui premio non è ancora arrivato (`feedback_sent:<id>`
+  // assente). Senza tetto noto (server vecchio, stato mai letto) non si nega.
+  // { grants, perDay, invii: [{ id, at }], now } → { esaurito, perDay }.
+  function premioInvio({ grants, perDay, invii = [], now = Date.now() } = {}) {
+    const tetto = Number.isInteger(perDay) && perDay >= 0 ? perDay : null;
+    if (tetto === null) return { esaurito: false, perDay: null };
+    const giorno = new Date(now).toISOString().slice(0, 10);
+    const diOggi = (iso) => String(iso || '').slice(0, 10) === giorno;
+    const pagati = new Set((Array.isArray(grants) ? grants : [])
+      .filter((g) => g && String(g.why || '').startsWith('feedback_sent:') && diOggi(g.at))
+      .map((g) => String(g.why)));
+    const inAttesa = (Array.isArray(invii) ? invii : []).filter((x) => x && Number.isFinite(x.at)
+      && diOggi(new Date(x.at).toISOString()) && !(x.id && pagati.has(`feedback_sent:${x.id}`))).length;
+    return { esaurito: pagati.size + inAttesa >= tetto, perDay: tetto };
+  }
+
+  // La frase del messaggio d'invio quando il tetto di oggi è pieno.
+  function premioInvioEsauritoTesto(perDay) {
+    const n = Math.max(0, Math.floor(Number(perDay) || 0));
+    if (n === 0) return 'Per ora i feedback inviati non ricevono premi.';
+    const primi = n === 1 ? 'solo per il primo feedback' : `per i primi ${n} feedback`;
+    return `Il premio vale ${primi} del giorno. Questo non ne riceve.`;
+  }
+
   // Si è appena entrati con un invito: la frase che lo dice, in home e nella
   // pagina Crediti. Chi ha invitato non si può nominare — il server non manda
   // il suo pseudonimo con lo stato del portafoglio.
-  function entryNoticeText({ credits } = {}) {
+  function entryNoticeText({ credits, conteggioLocale = false } = {}) {
     const n = Math.max(0, Math.floor(Number(credits) || 0));
-    return n > 0
+    const frase = n > 0
       ? `Sei entrato con un invito: hai ${fmtInt(n)} crediti.`
       : 'Sei entrato con un invito: i tuoi crediti sono pronti.';
+    return conteggioLocale ? `${frase} ${CONTEGGIO_LOCALE_LASCIA}` : frase;
   }
 
   // ── Chi usa Filo e se il conto OpenRouter regge (#820) ───────────────────
@@ -640,11 +806,11 @@
   // Un caso per ogni cosa che ferma gli utenti, un marcatore per ogni soglia superata. Un caso che la vista non dice
   // (campo assente) non è rientrato: non compare nell'elenco, e la sua carta resta com'era.
   const AVVISO_OWNER = 'crediti-owner';
-  const PAGINA_OWNER = 'filo://credits/owner.html';
+  const PAGINA_OWNER = 'filo://manage/manage.html#utenti';
   const SOGLIE_TETTO = Object.freeze([80, 95]);
   const INVITI_POCHI = 2;
   const PSEUDONIMI_DETTI = 3;
-  const DOVE = 'nella pagina Inviti e utenti';
+  const DOVE = 'in Gestione, sezione Utenti';
   const TITOLI_OWNER = Object.freeze({
     tetto: 'Tetto dei regali', giornaliera: 'Quota del giorno', inviti: 'Ingressi con invito', scarto: 'Registro d’uso',
   });
@@ -766,7 +932,7 @@
   }
 
   global.SN_WALLET = {
-    USAGE_FIELDS, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
+    USAGE_FIELDS, USAGE_LIMITS, rifiutoDellaRigaUso, scriviIsolando, registroScartateTesto, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, networkCapMessage, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
     // Inviti e link d'invito (#651)
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
@@ -776,7 +942,9 @@
     // Manopole e movimenti della pagina dell'owner (#652)
     OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
     // Le cifre dette fuori dalla pagina Crediti (#816)
-    formatCredits, PREMIO_ATTESA_MS, resolutionReward,
+    formatCredits, PREMIO_ATTESA_MS, resolutionReward, premioInvio, premioInvioEsauritoTesto,
+    // Il saldo della chat senza attese, e il conteggio locale che il riscatto sostituisce (#1353)
+    SALDO_CHAT_VALIDO_MS, saldoPerChat, rilettoreSaldo, conteggioLocaleInVista,
     // Chi usa Filo e se il conto OpenRouter regge (#820)
     creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
     // Gli avvisi all'owner nella home (#855)

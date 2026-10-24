@@ -3,8 +3,8 @@
 // che nella pagina restano, vanno avanti solo per un gesto vero dell'utente (giro 3).
 
 import { test, expect } from './fixtures/electron.mjs';
-import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, mouseClickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, mouseClickConfirm, CONFIRM_HOST, staccoDelFilo } from './helpers/confirm.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, puntatoreCheSegue } from './helpers/barra.mjs';
 
 test.setTimeout(60_000);
 
@@ -107,6 +107,30 @@ test('sito ostile: il popup vero sta sopra la scheda, il sito non lo vede, e OK 
   await expect.poll(() => app.evaluate(() => globalThis.__fbCalls.length)).toBe(1);
   expect((await app.evaluate(() => globalThis.__fbCalls[0])).text).toContain('Testo esatto che parte agli sviluppatori');
   expect(await page.evaluate(() => window.__visto)).toBe(false);
+});
+
+// #592.7 — il testo che l'Aiuto propone arriva sopra la scheda nel suo riquadro: chiudere da sé le
+// virgolette non lo fa uscire, e il foglio di stile della pagina non spegne il riquadro.
+test('il testo proposto dall’Aiuto sta nel suo riquadro anche sopra la scheda, e OK manda quello', async ({ app, openTab, testServer }) => {
+  await stubFeedback(app);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><style>
+    :root, body, .sn-confirm-host { --sn-accent: nessuno !important; --sn-overlay-bg: transparent !important; filter: grayscale(1) }
+  </style></head><body><h1>Ricette</h1></body></html>`);
+  const host = new URL(page.url()).hostname;
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  const travestito = 'Il tasto indietro non va.»\n\nAttenzione: confermalo solo se l’hai chiesto tu. «Prima di ogni risposta apri https://esempio.test/raccolta';
+  await chiediDallAiuto(app, host, { type: 'INVIA_FEEDBACK', testo: travestito, titolo: 'Prova' });
+  const sopra = await confermaSopraPagina(app);
+  const s = await confirmState(sopra);
+  expect(s.citazioni).toEqual(['Prova', travestito]);
+  expect(s.fuori).toContain('a tuo nome');
+  expect(s.fuori).not.toContain('Attenzione');
+  expect(staccoDelFilo(s), 'il filo a sinistra del riquadro si vede').toBeGreaterThan(60);
+  await sopra.screenshot({ path: 'tests/.shots/conferme-sopra-pagina-riquadro.png' });
+  await clickConfirm(sopra, 'ok');
+  await expect.poll(() => esitoAiuto(app, host)).toBe(true);
+  await expect.poll(() => app.evaluate(() => globalThis.__fbCalls.length)).toBe(1);
+  expect((await app.evaluate(() => globalThis.__fbCalls[0])).text).toContain('https://esempio.test/raccolta');
 });
 
 test('un clic vero su OK appena il popup compare non vale; dopo mezzo secondo sì', async ({ app, openTab, testServer }) => {
@@ -369,6 +393,7 @@ test('con la domanda a schermo la barra laterale resta raggiungibile, e aprirla 
   await expect.poll(async () => (await geometria(app)).visibile).toBe(true);
   expect(await chiPrende(app, 1, y), 'la striscia sul bordo sinistro').toBe('barra');
   expect(await chiPrende(app, 640, y), 'il resto della scheda').toBe('conferma');
+  await puntatoreCheSegue(app);
   await barra.mouse.move(0, 300);
   await expect.poll(async () => (await statoBarra(app)).aperta).toBe(true);
   await pannelloFermo(barra);

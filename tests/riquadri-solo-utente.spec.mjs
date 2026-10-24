@@ -7,6 +7,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { nelMondoDiFilo, statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SEGRETO = 'bozza-segreta-1071 del mio conto';
 const PNG_1X1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -130,8 +131,8 @@ test('nel riquadro del feedback su un sito: Ctrl+Z annulla invece di tornare ind
   await app.evaluate(({ clipboard }) => clipboard.writeText('dagli appunti 1071'));
   const campo = await statoDi(app, page, '.sn-fb-text');
   await page.mouse.click(campo.x + 20, campo.y + 15, { button: 'right' });
-  await expect(page.locator('.sn-menu .sn-menu-paste-main').first()).toBeVisible({ timeout: 8000 });
-  await page.locator('.sn-menu .sn-menu-paste-main').first().click();
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-paste-main').first()).toBeVisible({ timeout: 8000 });
+  await menuDi(page).locator('.sn-menu .sn-menu-paste-main').first().click();
   await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.valore).toContain('dagli appunti 1071');
   // L'Incolla di Filo lo sente anche il riquadro, chiuso ai gesti finti: la bozza lo salva.
   await expect.poll(() => bozzaSalvata(app, chiaveBozza(testServer.origin))).toContain('dagli appunti 1071');
@@ -193,8 +194,8 @@ test('Modifica su un sito: lo script del sito non fa riscrivere né sostituire, 
   await page.locator('#campo').click();
   await page.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.select(); });
   await page.locator('#campo').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
-  await page.locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
+  await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
   await expect.poll(() => statoDi(app, page, '.sn-editbox')).not.toBeNull();
   // Il tasto destro sulla selezione prepara già la sua spiegazione: si contano le chiamate da qui.
   await page.waitForTimeout(1500);
@@ -291,8 +292,8 @@ test('Modifica dentro la casella del feedback su un sito: Sostituisci arriva all
   await scrivi(app, page, '.sn-fb-text', 'testo con erore');
   await page.keyboard.press('Control+A');
   await page.mouse.click(campo.x + 30, campo.y + 12, { button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
-  await page.locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
+  await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
   await expect.poll(() => statoDi(app, page, '.sn-editbox')).not.toBeNull();
   const segnaposto = await nelMondoDiFilo(app, page, () => globalThis.SN_FILO_UI._test.trova('.sn-editbox-instruction').placeholder);
   expect(segnaposto).toContain('"rendi più formale"');
@@ -358,8 +359,8 @@ test('nei riquadri su un sito con scorciatoie da tastiera quello che l\'utente s
   await page.evaluate(() => document.body.insertAdjacentHTML('beforeend', '<textarea id="campo">Un testo con un erore.</textarea>'));
   await page.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.select(); });
   await page.locator('#campo').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
-  await page.locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
+  await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
   await expect.poll(() => statoDi(app, page, '.sn-editbox-instruction')).not.toBeNull();
   await clicca(app, page, '.sn-editbox-instruction');
   await page.keyboard.type('ok kiwi / poi', { delay: 20 });
@@ -459,8 +460,8 @@ test('la pagina che scrive e preme di continuo nei riquadri aperti dall\'utente 
   await page.locator('#campo').click();
   await page.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.select(); });
   await page.locator('#campo').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
-  await page.locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
+  await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
   await expect.poll(() => statoDi(app, page, '.sn-editbox')).not.toBeNull();
   await page.waitForTimeout(1500);
   const prima = await chiamate(app);

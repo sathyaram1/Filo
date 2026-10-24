@@ -38,9 +38,11 @@ test('la chat che riceve «Filo mi protegge dal phishing?» ha la voce nell\'ind
     ['cosa esce verso Google', /verso Google solo un pezzo dell'impronta dell'indirizzo, mai l'indirizzo/],
     ['cosa esce verso il modello', /verso il modello AI[^.]*mai la pagina/],
     ['dove si spegne', /filo:\/\/security\/security\.html/],
+    ['che un link da avviso si ferma prima di aprirsi (#965)', /il sito non si apre finché non confermi/],
   ]) assert.match(d, re, `il dettaglio dice ${cosa}`);
   for (const [cosa, re] of [
-    ['che la pagina carica', /Non impedisce il caricamento/],
+    ['che una pagina aperta senza un clic su un link carica sotto l\'avviso', /carica sotto l'avviso/],
+    ['che prima del clic su un link qualunque non esce niente', /Prima del clic su un link qualunque non chiede niente alla rete/],
     ['che la conferma vale per la scheda', /La conferma vale solo per quella scheda/],
     ['che il testo della pagina non si legge', /non legge il testo della pagina: guarda solo se ci sono campi password o carta/],
   ]) assert.match(v.doesNot, re, `i limiti dicono ${cosa}`);
@@ -55,8 +57,10 @@ test('le parole e i pulsanti promessi sono quelli dell\'avviso e della pagina Si
   const [, avanti, continua] = /avanti\.textContent = pericoloso \? '([^']+)' : '([^']+)'/.exec(avviso);
   assert.ok(testo.includes(`«${avanti}»`) && testo.includes(`«${continua}»`), `i pulsanti sono «${avanti}» e «${continua}»`);
   assert.match(leggi('src/renderer/avviso-sito.html'), /Torna indietro/);
+  const [, nonAprire] = /indietro\.textContent = s\.prima \? '([^']+)'/.exec(avviso);
+  assert.ok(testo.includes(`«${nonAprire}»`), `sull'avviso di un link il pulsante è «${nonAprire}»`);
   for (const k of ['options_security_safebrowse', 'options_security_safebrowse_network', 'options_security_safebrowse_llm',
-    'options_action_safebrowse_judge']) {
+    'options_security_safebrowse_sandbox', 'options_action_safebrowse_judge']) {
     assert.ok(testo.includes(`«${T(k)}»`), `la voce nomina l'interruttore com'è scritto: «${T(k)}»`);
   }
   const eta = globalThis.SN_SERVIZI_ESTERNI.SERVIZI.find((s) => s.id === 'eta-dominio');
@@ -87,11 +91,24 @@ test('le descrizioni della pagina Sicurezza non promettono quello che il codice 
   assert.doesNotMatch(chiave, /amministratore|account/);
   assert.match(leggi('src/main/config/default-keys.js'), /SAFEBROWSING/i, 'la chiave arriva davvero col programma');
 
+  // #966 — la frase dei link accorciati racconta quello che fanno il puntatore e la finestra nascosta.
   const prova = T('options_security_safebrowse_sandbox_desc');
-  assert.doesNotMatch(prova, /li apre prima|segue prima|segue dove portano/);
-  assert.match(prova, /Oggi nessuna funzione la usa/);
-  assert.match(leggi('src/main/services/safebrowse/index.js'), /ctx\.daAprire === true/,
-    'la finestra nascosta parte solo per un link da aprire: se cambia, cambia anche la frase');
+  assert.doesNotMatch(prova, /nessuna funzione|li apre prima/);
+  const scheda = leggi('src/main/tabs/tabSafebrowse.js');
+  assert.match(prova, /mezzo secondo/);
+  assert.match(scheda, /const SOSTA_MS = 500;/, 'mezzo secondo fermo sul link');
+  assert.match(prova, /tasto Tab/);
+  assert.match(scheda, /const TASTI_GESTO = new Set\(\['Tab'/);
+  assert.match(prova, /lista nera di Google/);
+  assert.match(prova, /mai in incognito/);
+  const index = leggi('src/main/services/safebrowse/index.js');
+  assert.match(index, /if \(ctx\.incognito \|\| !providers\.destinazione\) \{ voce\.senzaFinestra = true; return null; \}/,
+    'in incognito la finestra non parte');
+  assert.match(prova, /Una finestra alla volta/);
+  assert.equal(require(join(ROOT, 'src/main/services/safebrowse/sandbox.js')).MAX_CONCURRENT, 1);
+  assert.match(prova, /Spento, resta solo la lista nera/);
+  assert.match(index, /destinazione: enableSandbox \?/, 'l\'interruttore spegne solo la finestra');
+  assert.match(prova, /col dito su uno schermo touch, prima del clic non parte niente/);
 
   const giudizio = T('options_security_safebrowse_llm_desc');
   assert.doesNotMatch(giudizio, /chiavi che hai già configurato/);

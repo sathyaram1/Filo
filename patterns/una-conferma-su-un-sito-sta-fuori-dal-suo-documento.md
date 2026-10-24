@@ -117,3 +117,47 @@ La strada che regge:
   «leggo i documenti nuovi» con «Ferma».
 - Prove: `tests/aiuto-cerca-documenti.spec.mjs`,
   `tests/unit/aiutoDocumenti.test.mjs`.
+
+## Quando Filo propone un dato dell'utente a un sito: l'email nei campi di accesso (#1124)
+
+La regola: un dato dell'utente da inserire in un sito (l'email dell'account oggi, password e indirizzi domani) lo
+propone il main in una vista sopra la scheda, e arriva al frame del campo solo quando l'utente l'ha scelto. Prima di
+quel momento nessun pezzo di Filo nel documento lo conosce.
+
+Filo non ha l'autocompilazione di Chrome (Electron non la include), e sulla pagina di accesso di Google l'owner non
+trovava la sua email. La porta che dice chi è entrato (`MSG.AUTH_STATUS`) è chiusa ai siti di proposito, e quello che
+un content script scrive nel documento il sito lo legge, anche da uno shadow root chiuso (`window.find`, la
+selezione).
+
+- **Il content script porta solo il campo**: dov'è (px CSS della scheda, risalendo i riquadri della stessa origine),
+  cosa contiene e se quel valore l'ha scritto l'utente. La risposta dice solo «seguilo» o no.
+- **Il main decide e disegna**: interruttore, account, incognito, pagina di Filo. La vista è grande quanto il
+  riquadro e non tiene la tastiera (un clic gliela dà, torna al campo al giro dopo); frecce, Invio ed Esc li prende
+  dal `before-input-event` della scheda, prima del documento e della modalità a schermo intero.
+- **Il dato parte alla scelta e solo verso quel frame**, ricontrollati frame vivo, origine e account; il content
+  script lo scrive con `execCommand('insertText')`, così la pagina riceve un `input` vero, poi `change`.
+- **Un valore messo dalla pagina non conta**: si propone a campo vuoto o con l'inizio scritto dall'utente. Se no la
+  pagina proverebbe un prefisso alla volta, e dai tasti che non le arrivano saprebbe quando c'è una proposta.
+- **Un clic vale dopo mezzo secondo di proposta ferma sotto il campo**: la pagina può farla comparire sotto il
+  cursore, come la conferma.
+- **Sotto l'avviso del sito sospetto non compare**: la scheda coperta non è quella che l'utente vede.
+- **Né sotto un campo che l'utente non vede**: quasi trasparente (anche per un antenato o un riquadro), più piccolo
+  di 20×10, fuori schermo, senza niente di suo da disegnare (fondo, bordo, contorno, ombra, testo, segnaposto,
+  cursore), o sotto un velo opaco che lascia passare i clic (`pointer-events: none`: la ricerca per punti non lo
+  vede, si cerca fra i nodi; conta anche dopo un clic vero, che l'ha attraversato). Coperto da un nodo che prende i
+  clic conta quando il fuoco l'ha dato la pagina, non un clic vero sul campo o sulla sua etichetta. Il controllo si
+  ripete mentre è a schermo. Se no la pagina mette a fuoco un campo invisibile sopra il suo «Accetta» e il clic
+  dell'utente sceglie l'email (#1124 giri 2 e 5). Il campo alla Google (niente fondo né bordo suoi, contorno ed
+  etichetta disegnati sopra da nodi trasparenti) si vede dal cursore e la riceve. È già un elenco di modi di
+  nascondere: alla prossima porta si cambia meccanismo o decide l'owner, non si aggiunge una voce.
+- **Dopo Esc torna come in Chrome**: rientrando nel campo, cliccandoci (ha ancora il fuoco) o scrivendo l'utente.
+
+Dove vive: `src/main/propostaEmail.js` (vista, tasti, scelta), `src/content/propostaEmail.js` (il campo),
+`src/shared/campoAccesso.js` (quali campi, quando proporre), `src/renderer/proposta-email.*`. Prove:
+`tests/proposta-email.spec.mjs` (prima della scelta la pagina non trova l'email, dopo la riceve con un `input` vero),
+`tests/unit/campoAccesso.test.mjs`.
+
+- **Un riquadro di un'altra origine non sa dove sta**: il suo content script manda un segno a caso alla finestra
+  sopra (`postMessage`), e il documento sopra riconosce il riquadro dalla finestra che lo spedisce, non dal segno; ne
+  dà al main la posizione finché il riquadro ha il fuoco. Il main somma gli anelli e accetta la posizione solo da un
+  frame che contiene quello del campo. Un riquadro intermedio ancora senza Filo si monta al segno.

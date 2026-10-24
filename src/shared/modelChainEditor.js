@@ -1,14 +1,6 @@
-// Editor "a segmenti" per la catena di modelli di un'azione.
-//
-// Ogni azione può usare PIÙ modelli in ordine di priorità: il primo è il
-// modello principale, gli altri sono fallback provati in ordine se quello
-// prima fallisce. Internamente la catena resta una stringa di nickname
-// separati da virgola (es. "flash, flash-or"), così lo storage e la
-// risoluzione lato main (parseModelRefs) non cambiano. Questo modulo fornisce
-// solo l'editor visuale: una "pillola" con un segmento per modello, separati
-// da un divisore, con un pulsante per aggiungerne e uno per rimuoverli.
-//
-// Convenzione IIFE su globalThis come gli altri moduli shared/*.
+// Editor «a segmenti» per la catena di modelli di un'azione: il primo è il principale, gli
+// altri i fallback provati in ordine se quello prima fallisce. La catena resta una stringa
+// di nickname separati da virgola, così storage e risoluzione lato main non cambiano.
 
 (function (global) {
   'use strict';
@@ -17,16 +9,8 @@
     return global.SN_I18N ? global.SN_I18N.t(key, ...args) : key;
   }
 
-  // Etichetta (chiave i18n) per ogni funzione mostrata nell'editor.
-  //
-  // L'ELENCO delle funzioni NON si decide qui: viene dal censimento
-  // (`modelUsage.js`), che è la sorgente di verità di "dove Filo usa un
-  // modello". Prima le due liste erano scritte a mano una accanto all'altra e
-  // potevano divergere: una funzione dimenticata qui restava senza un posto
-  // dove impostarla, cioè esattamente il problema che il censimento risolve.
-  // Qui restano solo le etichette; l'ordine e la completezza li dà il
-  // censimento, e una funzione senza etichetta ricade sul nome del censimento
-  // invece di sparire.
+  // Qui SOLO le etichette: l'ELENCO delle funzioni viene dal censimento (modelUsage.js), che
+  // è la sorgente di verità. Una funzione senza etichetta ricade sul nome del censimento.
   function labelKeys() {
     const A = global.SN_CONST.ACTIONS;
     return [
@@ -41,7 +25,7 @@
       [A.TRANSCRIBE_AUDIO, 'options_action_transcribe_audio'],
       [A.TTS, 'options_action_tts'],
       [A.SPELLCHECK_SEMANTIC, 'spell_action_semantic_label'],
-      [A.SPELLCHECK_WORD, 'spell_action_word_label'],
+      [A.SPELLCHECK_CONTEXT, 'spell_action_coerenza_label'],
       [A.HELP_INTENT_GUESS, 'options_action_help_intent_guess'],
       [A.HELP_INTENT_JUDGE, 'options_action_help_intent_judge'],
       [A.FILO_TAB_TRIAGE, 'options_action_tab_triage'],
@@ -54,9 +38,7 @@
       [A.DECKS_OPINION, 'options_action_decks_opinion'],
       [A.DECKS_AUTOTAG, 'options_action_decks_autotag'],
       [A.DECKS_SEARCH_FILTER, 'options_action_decks_search_filter'],
-      // Funzioni che prima non comparivano qui: giravano su un modello scelto
-      // dal codice e nessuno poteva vederlo né cambiarlo. Ora una funzione senza
-      // modello si ferma e lo dice, quindi DEVE esistere il posto dove
+      // Una funzione senza modello si ferma e lo dice, quindi DEVE esistere il posto dove
       // impostarlo: questo elenco è quel posto e va tenuto completo.
       [A.EDIT_TEXT, 'options_action_edit_text'],
       [A.EXPLAIN_LINK, 'options_action_explain_link'],
@@ -75,10 +57,8 @@
     ];
   }
 
-  // Le funzioni esposte nell'editor, nell'ordine del censimento, ciascuna con la
-  // chiave i18n della sua etichetta. Se il censimento non fosse caricato (test
-  // isolati, pagine che non lo includono) si ricade sulle etichette scritte qui,
-  // così l'editor funziona comunque.
+  // Se il censimento non fosse caricato (test isolati, pagine che non lo includono) si ricade
+  // sulle etichette scritte qui, così l'editor funziona comunque.
   function actionLabels() {
     const keys = new Map(labelKeys());
     const Usage = global.SN_MODEL_USAGE;
@@ -87,9 +67,8 @@
       : [...keys.keys()];
     const labelOf = (action) => {
       if (keys.has(action)) return keys.get(action);
-      // Nessuna chiave i18n: usiamo il nome del censimento come testo. `t()` su
-      // una stringa non tradotta la restituisce identica, quindi la cella mostra
-      // il nome giusto invece del codice interno.
+      // Senza chiave i18n vale il nome del censimento: `t()` su una stringa non tradotta la
+      // restituisce identica, quindi la cella mostra il nome giusto invece del codice interno.
       const entry = Usage && typeof Usage.list === 'function'
         ? Usage.list().find((e) => e.ref === action && e.from === 'user')
         : null;
@@ -116,33 +95,28 @@
     inp.size = Math.max((inp.value || '').length + 1, 6);
   }
 
-  // Validatore per una funzione: dato un nickname del registry, verifica che il
-  // suo modello soddisfi i requisiti dell'azione (es. un'azione di testo non può
-  // ricevere un modello di sola sintesi vocale). Nickname sconosciuti (non nel
-  // registry) NON vengono bloccati: potrebbero essere id grezzi legacy.
+  // Verifica che il modello soddisfi i requisiti dell'azione (un'azione di testo non può avere
+  // un modello di sola sintesi vocale). I nickname sconosciuti non si bloccano: forse legacy.
   function makeValidator(action, getRegistry) {
     return function (ref) {
       const Caps = global.SN_MODEL_CAPS;
       if (!Caps) return { ok: true };
       const nick = String(ref == null ? '' : ref).trim();
       if (!nick) return { ok: true };
-      // Solo il registry CONFIGURATO: quello scritto nel codice non deve
-      // decidere niente qui, o l'editor validerebbe contro modelli che a runtime
-      // non esistono.
+      // Solo il registry CONFIGURATO: quello scritto nel codice validerebbe contro modelli che a
+      // runtime non esistono.
       const reg = (getRegistry && getRegistry()) || {};
       const entry = reg[nick];
       if (!entry || !entry.provider || !entry.model) return { ok: true };
-      // Le modalità dichiarate dalla voce (o note per il nickname) valgono
-      // più del nome: così un modello di testo dal nome muto resta fuori
-      // dalla lettura ad alta voce, e uno che ascolta va sulla dettatura.
+      // Le modalità dichiarate dalla voce valgono più del nome: un modello di testo dal nome muto
+      // resta fuori dalla lettura ad alta voce, e uno che ascolta va sulla dettatura.
       const C = global.SN_CONST;
       const meta = (C && C.entryModalities) ? C.entryModalities(entry, nick) : null;
       return Caps.modelMatchesAction(entry.provider, entry.model, action, meta || undefined);
     };
   }
 
-  // Il nickname citato esiste davvero fra i modelli configurati? Gli id grezzi
-  // stile provider (con '/' o ':') restano ammessi per retro-compatibilità.
+  // Gli id grezzi stile provider (con '/' o ':') restano ammessi per retro-compatibilità.
   function makeKnownCheck(getRegistry) {
     return function (ref) {
       const nick = String(ref == null ? '' : ref).trim();
@@ -150,14 +124,13 @@
       const C = global.SN_CONST;
       if (C && C.isRawModelId && C.isRawModelId(nick)) return true;
       const reg = (getRegistry && getRegistry()) || {};
-      // Registry non ancora disponibile: non sappiamo nulla, quindi non
-      // accusiamo nessun nickname di non esistere.
+      // Registry non ancora disponibile: non sappiamo nulla, quindi non accusiamo nessun nickname
+      // di non esistere.
       if (!Object.keys(reg).length) return true;
       return Boolean(reg[nick]);
     };
   }
 
-  // Mostra/azzera il messaggio di blocco sotto un segmento (modello non adatto).
   function showSegMsg(seg, reason) {
     let m = seg.querySelector('.sn-chain-msg');
     if (!m) {
@@ -174,9 +147,9 @@
   }
 
   // Sorgente delle opzioni per il dropdown: i nickname del registry, esposti
-  // nella <datalist id="nicknames-list"> da entrambe le pagine (Opzioni e
-  // Modelli predefiniti). Restano l'unica sorgente di verità: il dropdown
-  // custom la legge, non la duplica.
+  // nella <datalist id="nicknames-list"> della pagina (Gestione ne ha due: i
+  // Modelli predefiniti passano la loro con `readOptions`). Restano l'unica
+  // sorgente di verità: il dropdown custom la legge, non la duplica.
   function readNicknameOptions() {
     const dl = document.getElementById('nicknames-list');
     if (!dl) return [];
@@ -311,9 +284,8 @@
         const inp = document.createElement('input');
         inp.type = 'text';
         inp.className = 'sn-chain-input';
-        // Niente più `list="nicknames-list"`: il popup nativo della datalist usa
-        // i colori di sistema, fuori palette. Lo sostituiamo con un dropdown
-        // custom .sn-select-* coerente con gli altri menu a tendina di Filo.
+        // Niente `list="nicknames-list"`: il popup nativo della datalist usa i colori di sistema,
+        // fuori palette.
         inp.setAttribute('autocomplete', 'off');
         inp.value = ref;
         inp.placeholder = i === 0 ? t('options_chain_primary') : t('options_chain_fallback');
@@ -372,8 +344,7 @@
           if (v.ok) accept(value); else reject(v.reason);
         }, validate, opzioniColCosto);
 
-        // Il pulsante di rimozione c'è solo se ci sono più segmenti: l'ultimo
-        // rimasto non si può rimuovere (resterebbe l'azione senza modello).
+        // L'ultimo segmento rimasto non si può rimuovere: resterebbe l'azione senza modello.
         if (refs.length > 1) {
           const rm = document.createElement('button');
           rm.type = 'button';
@@ -425,8 +396,7 @@
     return { el, avviso, costoAvviso, getValue, conferma, ricontrolla, aggiornaCosti, imposta };
   }
 
-  // Popola un host (.sn-grid-2) con una cella per azione: etichetta + editor a
-  // segmenti. Ritorna una mappa { action: chain } per leggere i valori dopo.
+  // Ritorna una mappa { action: chain } per leggere i valori dopo.
   function renderGrid(host, opts) {
     const o = opts || {};
     const models = o.models || {};
@@ -442,6 +412,8 @@
         isKnown: makeKnownCheck(getRegistry),
         avvisoDi: typeof o.avvisoDi === 'function' ? (ref) => o.avvisoDi(action, ref) : null,
         costoDi: typeof o.costoDi === 'function' ? (ref) => o.costoDi(action, ref) : null,
+        // Una pagina con due liste di soprannomi (Gestione) dice quale è la sua.
+        readOptions: typeof o.readOptions === 'function' ? o.readOptions : null,
       });
       cell.appendChild(label);
       cell.appendChild(chain.el);

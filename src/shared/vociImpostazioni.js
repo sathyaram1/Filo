@@ -52,10 +52,14 @@
         barraStriscia: 'barraLaterale.striscia',
         barraAttesa: 'barraLaterale.attesaMs',
         barraUscita: 'barraLaterale.uscitaMs',
+        avvisoSchermoPienoDurata: 'avvisoSchermoPieno.durataMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
         aggiornamentiInstalla: 'aggiornamenti.installa',
+        propostaEmailAttiva: 'propostaEmail.attiva',
+        propostaEmailIncognito: 'propostaEmail.incognito',
         contestoGiorni: 'contestoFilo.giorni',
         contestoToken: 'contestoFilo.token',
+        contestoCache: 'contestoFilo.cache',
         lunghezzaConversazioni: 'lunghezzaRisposte.conversazioni',
         lunghezzaTesti: 'lunghezzaRisposte.testi',
         lunghezzaBrevi: 'lunghezzaRisposte.brevi',
@@ -63,8 +67,22 @@
         avvisoCreditiGiorni: 'avvisoCrediti.giorni',
         avvisoCreditiPercento: 'avvisoCrediti.percento',
         spiegaAnticipata: 'spiegaAnticipata.enabled',
+        descriviImmagini: 'descriviImmagini.enabled',
+        contatoriAttivi: 'contatori.attivi',
         aiutoAcceso: 'featureFlags.help',
         correttoreAcceso: 'featureFlags.spellcheck',
+        correttoreSuggerimenti: 'featureFlags.spellcheckContext',
+        correttoreModello: 'correttore.modelloErrori',
+        correttoreRipetizioni: 'correttore.ripetizioni',
+        correttoreSegnaposti: 'correttore.segnaposti',
+        correttoreSegnapostiWeb: 'correttore.segnapostiWeb',
+        correttorePausaRapido: 'correttore.pausaRapidoMs',
+        correttoreOgniRapido: 'correttore.ogniRapidoMs',
+        correttorePausaRagionato: 'correttore.pausaRagionatoMs',
+        correttoreAutomatica: 'correttore.automatica',
+        correttoreAccetti: 'correttore.accettiPerImparare',
+        correttoreAnnulli: 'correttore.annulliPerImparare',
+        correttoreRiscritte: 'correttore.riscrittePerImparare',
         categorieAutomatiche: 'featureFlags.categorize',
       },
       gruppi: {
@@ -77,11 +95,10 @@
         DOCUMENTI_STATO: 'CERCA_DOCUMENTI',
         DOCUMENTI_DIMENTICA: 'IMPOSTA_PREFERENZA',
         DOCUMENTI_SCEGLI_CARTELLA: 'apre la finestra del sistema per scegliere una cartella: dalla chat la cartella si dice col suo percorso (cartelle_documenti)',
-        FILO_MEMORY_VIEW: 'DIMENTICA',
-        FILO_MEMORY_FORGET: 'DIMENTICA',
         FILO_GET_ONBOARDING: 'rilegge le interviste di benvenuto passate per mostrarle: non è un valore da cambiare',
         DEFAULT_MODELS_PUBLIC: 'legge i valori predefiniti dei tetti della chat e delle risposte per mostrarli accanto ai campi: non salva niente',
         FILO_RESTART_ONBOARDING: 'pulsante che fa un’azione (rifà l’intervista di benvenuto): resta nella pagina',
+        FILO_ONBOARDING_TOGLI: 'toglie un’intervista conservata dall’elenco qui sotto: dalla chat si cancellano tutte insieme chiedendo di dimenticare tutto',
         RESET_SETTINGS: 'pulsante che fa un’azione (ripristina tutte le impostazioni): resta nella pagina',
         TTS_SYNTH: 'prova d’ascolto della voce scelta: non salva niente',
         TTS_VOICES: 'legge le voci installate per riempire il menu: non salva niente',
@@ -134,6 +151,7 @@
         COOKIES_SITES: 'mostra i siti dove Filo ha già rifiutato i banner, da passare all’elenco dei banner visibili',
         PAGINE_DELICATE_CAMPI: 'mostra i siti dove Filo ha visto un campo password o carta; toglierne uno è l’elenco siti_non_delicati',
         PROXY_STATUS: 'mostra se la connessione da un altro paese è configurata: non è un valore da cambiare qui',
+        DOWNLOADS_LIST: 'legge i siti da cui sono scesi programmi, per proporre il sito preciso a chi scrive una piattaforma fra i programmi fidati: non è un valore da cambiare',
         EXPORT_DATA: 'pulsante che fa un’azione (esporta i dati in un file, le chiavi solo con la spunta): resta nella pagina',
         IMPORT_DATA_PREVIEW: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
         IMPORT_DATA_APPLY: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
@@ -150,6 +168,7 @@
         useDefaultModels: 'useDefaultModels',
         openWeightsOnly: 'openWeightsOnly',
         ownKeyAllProviders: 'ownKeyAllProviders',
+        ordineHost: 'ordineHost',
         apiKey: 'apiKeys.openrouter',
         apiKeyTavily: 'apiKeys.tavily',
         monthlyLimit: 'monthlyLimitEur',
@@ -167,7 +186,13 @@
     },
     altro: {
       titolo: 'Altro',
-      campi: { blocklist: 'blocklist' },
+      campi: {
+        blocklist: 'blocklist',
+        spellcheckErrori: 'featureFlags.spellcheck',
+        spellcheckSuggerimenti: 'featureFlags.spellcheckContext',
+        spellcheckAutomatica: 'correttore.automatica',
+        spellcheckSegnaposti: 'correttore.segnaposti',
+      },
       gruppi: {},
       fuori: {},
       messaggi: {
@@ -194,9 +219,6 @@
       parole: 'cartelle cartella documenti ricerca cercato cercata indice archivio letti dimentica',
     },
   };
-
-  // Quando la chiave manca: il valore che la pagina mostra e che il main applica. Il resto viene dai default.
-  const ASSENTE = { 'security.autoFeedback': true };
 
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   function dentro(o, percorso) {
@@ -232,7 +254,6 @@
   function leggi(settings, percorso) {
     const v = dentro(settings, percorso);
     if (v !== undefined && v !== null) return v;
-    if (has(ASSENTE, percorso)) return ASSENTE[percorso];
     const C = global.SN_CONST;
     const d = C && C.DEFAULT_SETTINGS ? dentro(C.DEFAULT_SETTINGS, percorso) : undefined;
     return d === undefined ? v : d;

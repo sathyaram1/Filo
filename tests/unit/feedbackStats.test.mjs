@@ -127,24 +127,24 @@ test('i ricevuti si contano sulla data d\'invio e si dividono per categoria', ()
 
 test('il filtro per creatore tiene solo i mittenti scelti', () => {
   const lista = [
-    fb({ seq: 1, clientId: 'agent:prober' }),
-    fb({ seq: 2, clientId: 'agent:prober' }),
+    fb({ seq: 1, clientId: 'routine:prober' }),
+    fb({ seq: 2, clientId: 'routine:prober' }),
     fb({ seq: 3, clientId: 'utente-abc' }),
     fb({ seq: 4, clientId: 'owner:me' }),
   ];
   const tutti = S.compute({ range: S.rangeOf('7g', ORA), feedbacks: lista, workerLog: [] });
   assert.equal(tutti.ricevuti.totale, 4);
   const soloProber = S.compute({
-    range: S.rangeOf('7g', ORA), feedbacks: lista, workerLog: [], creatori: ['prober'],
+    range: S.rangeOf('7g', ORA), feedbacks: lista, workerLog: [], creatori: ['routine'],
   });
   assert.equal(soloProber.ricevuti.totale, 2);
-  assert.deepEqual(soloProber.ricevuti.creatori.map((c) => [c.kind, c.n]), [['prober', 2]]);
+  assert.deepEqual(soloProber.ricevuti.creatori.map((c) => [c.kind, c.n]), [['routine', 2]]);
   // …ma il conto di OGNI mittente resta quello vero: è il numero scritto nella
   // pasticca, e serve a decidere quale accendere dopo. Col filtro acceso le
   // pasticche spente andavano tutte a zero.
   assert.deepEqual(
     soloProber.ricevuti.creatoriTutti.map((c) => [c.kind, c.n]).sort(),
-    [['owner', 1], ['prober', 2], ['user', 1]].sort(),
+    [['owner', 1], ['routine', 2], ['utente', 1]].sort(),
   );
 });
 
@@ -218,9 +218,9 @@ test('le esplorazioni si contano per lancio, e i ritrovamenti per feedback', () 
   const r = S.compute({
     range: S.rangeOf('7g', ORA),
     feedbacks: [
-      fb({ seq: 10, clientId: 'agent:prober', createdAt: g(1) }),
-      fb({ seq: 11, clientId: 'agent:prober', createdAt: g(2) }),
-      fb({ seq: 12, clientId: 'agent:prober', createdAt: g(30) }), // fuori finestra
+      fb({ seq: 10, clientId: 'routine:prober', createdAt: g(1) }),
+      fb({ seq: 11, clientId: 'routine:prober', createdAt: g(2) }),
+      fb({ seq: 12, clientId: 'routine:prober', createdAt: g(30) }), // fuori finestra
     ],
     workerLog: [
       { role: 'prober', startedAt: g(1), num: '' },
@@ -458,7 +458,7 @@ test('un mittente che non si è potuto leggere non diventa «Utente»', () => {
   assert.equal(S.creatoreDi({ clientId: cifrato }), S.CREATORE_ILLEGGIBILE);
   assert.equal(r.ricevuti.mittentiIgnoti, 2);
   const perKind = Object.fromEntries(r.ricevuti.creatori.map((c) => [c.kind, c.n]));
-  assert.equal(perKind.user, 1, 'solo la segnalazione con un mittente leggibile è un utente');
+  assert.equal(perKind.utente, 1, 'solo la segnalazione con un mittente leggibile è un utente');
   assert.equal(perKind[S.CREATORE_ILLEGGIBILE], 2);
   // E non entra fra le categorie filtrabili: non si filtra per «non lo so».
   assert.equal(S.CREATORI.includes(S.CREATORE_ILLEGGIBILE), false);
@@ -467,7 +467,7 @@ test('un mittente che non si è potuto leggere non diventa «Utente»', () => {
 // ── Ogni numero che ha contato segnalazioni porta i suoi id ─────────────────
 
 test('i numeri della fila in fondo portano gli id delle segnalazioni che hanno contato', () => {
-  const trovato = fb({ seq: 1, clientId: 'agent:prober', _id: 'p1' });
+  const trovato = fb({ seq: 1, clientId: 'routine:prober', _id: 'p1' });
   const lavorato = fb({
     seq: 2, _id: 'w1', status: 'done', createdAt: g(4), reviewedAt: g(3),
     stalls: 2, livelli: { l4: { esito: 'pass' } },
@@ -501,7 +501,7 @@ test('un lavoro senza nessuna verifica non entra nella torta', () => {
 
 test('il filtro per creatore vale anche sui numeri che arrivano dal registro', () => {
   const lista = [
-    fb({ seq: 1, clientId: 'agent:prober', status: 'done' }),
+    fb({ seq: 1, clientId: 'routine:prober', status: 'done' }),
     fb({ seq: 2, clientId: 'utente-abc', status: 'done' }),
   ];
   const log = [
@@ -509,13 +509,13 @@ test('il filtro per creatore vale anche sui numeri che arrivano dal registro', (
     { role: 'verifier', startedAt: g(2), num: '2' },
   ];
   const soloProber = S.compute({
-    range: S.rangeOf('30g', ORA), feedbacks: lista, workerLog: log, creatori: ['prober'],
+    range: S.rangeOf('30g', ORA), feedbacks: lista, workerLog: log, creatori: ['routine'],
   });
   assert.equal(soloProber.lavorati.totale, 1);
   // Un numero che il registro cita ma che la lista non ha: col filtro attivo
   // resta fuori (non si sa di chi è), senza filtro si conta.
   const orfano = [{ role: 'verifier', startedAt: g(2), num: '999' }];
-  assert.equal(S.compute({ range: S.rangeOf('30g', ORA), feedbacks: lista, workerLog: orfano, creatori: ['prober'] }).lavorati.totale, 0);
+  assert.equal(S.compute({ range: S.rangeOf('30g', ORA), feedbacks: lista, workerLog: orfano, creatori: ['routine'] }).lavorati.totale, 0);
   assert.equal(S.compute({ range: S.rangeOf('30g', ORA), feedbacks: lista, workerLog: orfano }).lavorati.totale, 1);
 });
 
@@ -599,14 +599,41 @@ test('la serie temporale raggruppa quando la finestra è lunga', () => {
 });
 
 test('senza i moduli condivisi il conto si ferma dicendo cosa manca', () => {
-  const salvato = globalThis.SN_FEEDBACK_THREAD;
-  globalThis.SN_FEEDBACK_THREAD = null;
+  const salvato = globalThis.SN_MITTENTI;
+  globalThis.SN_MITTENTI = null;
   try {
     assert.throws(() => S.compute({ range: S.rangeOf('7g', ORA), feedbacks: [fb()], workerLog: [] }),
-      /SN_FEEDBACK_THREAD/);
+      /SN_MITTENTI/);
   } finally {
-    globalThis.SN_FEEDBACK_THREAD = salvato;
+    globalThis.SN_MITTENTI = salvato;
   }
+});
+
+// ── Per classe di mittente (SPEC-DOMANDE.md §10) ────────────────────────────
+
+test('le statistiche contano per classe: quella scritta dal server, o calcolata sui documenti di prima', () => {
+  const r = S.compute({
+    range: S.rangeOf('30g', ORA),
+    feedbacks: [
+      fb({ seq: 1, clientId: 'owner:me' }),
+      fb({ seq: 2, clientId: 'anon-k3j9' }),
+      fb({ seq: 3, clientId: 'filo:chat' }),
+      fb({ seq: 4, clientId: 'local:claude' }),
+      fb({ seq: 5, clientId: 'routine:residuo' }),
+      fb({ seq: 6, clientId: 'agent:costruzione', senderProof: 'server' }),
+      fb({ seq: 7, clientId: 'test:canale' }),
+      // Il mittente cifrato non si legge, ma la classe scritta dal server sì.
+      fb({ seq: 8, clientId: '[cifrato — chiave privata non configurata]', mittenteClasse: 'routine', mittenteRuolo: 'fixer' }),
+      fb({ seq: 9, clientId: 'routine:routine:nice-wozniak' }),
+    ],
+    workerLog: [],
+  });
+  const perClasse = Object.fromEntries(r.ricevuti.creatori.map((c) => [c.kind, c.n]));
+  assert.deepEqual(perClasse, { owner: 1, utente: 1, filo_per_utente: 1, sessione_locale: 1, routine: 3, server: 1, test: 1 });
+  assert.equal(r.ricevuti.mittentiIgnoti, 0);
+  assert.deepEqual(r.ricevuti.ruoliRoutine.map((x) => [x.key, x.n]), [['fixer', 1], ['residuo', 1], ['ignoto', 1]]);
+  assert.deepEqual(S.CREATORI, ['owner', 'utente', 'filo_per_utente', 'sessione_locale', 'routine', 'server', 'test']);
+  for (const k of S.CREATORI) assert.ok(S.CLASSI_META[k] && S.CLASSI_META[k].label, `${k} ha un nome`);
 });
 
 // ── Il conto della sezione della torta torna sempre (giro 18) ───────────────
@@ -686,14 +713,14 @@ test('con l\'esploratore fuori dal filtro, le sue segnalazioni non si contano pi
   assert.equal(tutti.prober.ritrovamenti, 2);
   assert.equal(tutti.prober.ritrovamentiIds.length, 2);
 
-  const solePersone = S.compute(Object.assign({ range: S.rangeOf('30g', ORA), creatori: ['user'] }, dati));
+  const solePersone = S.compute(Object.assign({ range: S.rangeOf('30g', ORA), creatori: ['utente'] }, dati));
   assert.equal(solePersone.prober.ritrovamenti, 0);
   assert.equal(solePersone.prober.ritrovamentiIds.length, 0);
   // Il NUMERO GRANDE del riquadro resta: una partenza dell'esploratore non ha
   // un mittente, e il filtro non la tocca.
   assert.equal(solePersone.prober.lanciati, 1);
 
-  const soloEsploratore = S.compute(Object.assign({ range: S.rangeOf('30g', ORA), creatori: ['prober'] }, dati));
+  const soloEsploratore = S.compute(Object.assign({ range: S.rangeOf('30g', ORA), creatori: ['routine'] }, dati));
   assert.equal(soloEsploratore.prober.ritrovamenti, 2);
 });
 
@@ -907,4 +934,85 @@ test('anche col passo al giorno un anno sotto il cento resta quello scritto', ()
     serie.punti.every((p) => /\/42$/.test(p.label)),
     `le colonne non sono dell'anno 42: ${serie.punti.map((p) => p.label).join(', ')}`,
   );
+});
+
+// ── #997: ogni conto porta i suoi id, e un esito non letto non è zero ───────
+
+test('i due conti della riga sotto i filtri portano gli id di ciò che hanno contato', () => {
+  const cifrato = '[cifrato — chiave privata non configurata]';
+  const r = S.compute({
+    range: S.rangeOf('30g', ORA),
+    feedbacks: [
+      fb({ _id: 'sd1', seq: 1, createdAt: 'non-una-data' }),
+      fb({ _id: 'sd2', seq: 2, createdAt: null }),
+      fb({ _id: 'mi1', seq: 3, clientId: cifrato }),
+      fb({ _id: 'ok1', seq: 4 }),
+    ],
+    workerLog: [],
+  });
+  assert.deepEqual(r.ricevuti.senzaDataIds.sort(), ['sd1', 'sd2']);
+  assert.equal(r.ricevuti.senzaData, r.ricevuti.senzaDataIds.length);
+  assert.deepEqual(r.ricevuti.mittentiIgnotiIds, ['mi1']);
+  assert.equal(r.ricevuti.mittentiIgnoti, r.ricevuti.mittentiIgnotiIds.length);
+});
+
+test('la fetta «3 o più» sa quante critiche ha avuto ogni lavoro', () => {
+  const verifiche = (num, n) => Array.from({ length: n }, () => ({ role: 'verifier', startedAt: g(2), num }));
+  const r = S.compute({
+    range: S.rangeOf('30g', ORA),
+    feedbacks: [
+      fb({ _id: 'w4', seq: 4, status: 'done' }),
+      fb({ _id: 'w7', seq: 7, status: 'done' }),
+    ],
+    // 4 lanci del verificatore = 3 critiche; 7 lanci = 6 critiche.
+    workerLog: [...verifiche('4', 4), ...verifiche('7', 7)],
+  });
+  const g3 = r.giri.fette.find((f) => f.key === 'g3');
+  assert.ok(g3, 'la fetta «3 o più» c\'è');
+  assert.deepEqual(g3.critiche, { w4: 3, w7: 6 });
+});
+
+test('una riga d\'elenco non porta l\'esito del controllo: il conto non è zero ma ignoto', () => {
+  const registro = [
+    { role: 'new-work', startedAt: g(3), num: '2' },
+    { role: 'secaudit', startedAt: g(2), num: '2' },
+  ];
+  const intero = S.compute({
+    range: S.rangeOf('7g', ORA),
+    feedbacks: [fb({ _id: 'p2', seq: 2, status: 'done', livelli: { l4: { esito: 'pass' } } })],
+    workerLog: registro,
+  });
+  assert.equal(intero.audit.pass, 1);
+  assert.equal(intero.audit.nonLetti, 0);
+
+  const proiettato = S.compute({
+    range: S.rangeOf('7g', ORA),
+    feedbacks: [fb({ _id: 'p2', seq: 2, status: 'done', _proiezione: true })],
+    workerLog: registro,
+  });
+  assert.equal(proiettato.audit.pass, null);
+  assert.equal(proiettato.audit.fail, null);
+  assert.equal(proiettato.audit.saltato, null);
+  assert.equal(proiettato.audit.nonLetti, 1);
+  assert.deepEqual(proiettato.auditIds.nonLetti, ['p2']);
+  assert.deepEqual(proiettato.auditIds.pass, []);
+});
+
+test('senza segnalazioni lette, anche i conti fatti sui documenti dei lavori sono null', () => {
+  const r = S.compute({
+    range: S.rangeOf('30g', ORA),
+    feedbacks: [],
+    feedbackLetti: false,
+    workerLog: [
+      { role: 'new-work', startedAt: g(3), num: '5' },
+      { role: 'verifier', startedAt: g(2), num: '5' },
+    ],
+  });
+  assert.equal(r.lavorati.totale, 1, 'il registro ha risposto: quanti lavori si sa');
+  for (const [nome, v] of Object.entries({
+    'audit.pass': r.audit.pass, 'audit.fail': r.audit.fail, 'audit.saltato': r.audit.saltato,
+    'arenati.lavorazioni': r.arenati.lavorazioni, 'arenati.feedback': r.arenati.feedback,
+    'giri.fermati': r.giri.fermati, 'giri.rimandati': r.giri.rimandati, 'giri.aperti': r.giri.aperti,
+    'giri.ignoti': r.giri.ignoti, 'giri.senzaGiri': r.giri.senzaGiri, 'giri.statoIgnoto': r.giri.statoIgnoto,
+  })) assert.equal(v, null, `${nome} vale ${v}: senza segnalazioni non si sa`);
 });

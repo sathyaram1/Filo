@@ -11,14 +11,10 @@ const stati = new WeakMap();
 // Un menu solo in tutta l'app: aprirne uno in un'altra finestra chiude questo.
 let inVista = null;
 
-// ── SVG icon paths (viewBox 0 0 24 24, stroke-based) ──────────────────────
+// Icone del menu: il popup è una finestra a sé e non carica src/shared/icons.js, quindi
+// queste ne sono una COPIA — una voce che sta in tutte e due deve disegnare lo stesso.
 const ICON_PATHS = {
-  // Editor = foglio con l'angolo piegato e due righe di testo: è la stessa
-  // icona degli appunti (`note` in src/shared/icons.js). Da quando gli appunti
-  // vivono dentro l'editor e non hanno più un pannello a parte, l'editor È il
-  // posto degli appunti: le due icone devono coincidere ovunque. Questo
-  // registro è una COPIA (il popup è una BrowserWindow a parte e non carica
-  // shared/icons.js): se cambi l'una, cambia anche l'altra.
+  // `note` in src/shared/icons.js: gli appunti vivono nell'editor, stessa icona.
   editor:
     '<path d="M6 3.5h8l4 4v13H6z"/>' +
     '<path d="M14 3.5v4h4"/>' +
@@ -39,9 +35,6 @@ const ICON_PATHS = {
     '<rect x="5" y="11" width="14" height="9" rx="1.5"/>' +
     '<path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
 
-  // Libro aperto — voce "Trasparenza". COPIA di `transparency` in
-  // src/shared/icons.js: se cambi l'una cambia anche l'altra, o le due
-  // superfici disegnano icone diverse per la stessa voce.
   transparency:
     '<path d="M12 6.6C10.4 5.1 8.3 4.6 4 4.6v12.6c4.3 0 6.4.5 8 2 1.6-1.5 3.7-2 8-2V4.6c-4.3 0-6.4.5-8 2z"/>' +
     '<path d="M12 6.6v14.6"/>',
@@ -59,6 +52,11 @@ const ICON_PATHS = {
     '<path d="M12 3a9 9 0 1 0 9 9 3 3 0 0 1-3.6-3.4A3 3 0 0 1 14.4 5 3 3 0 0 1 12 3z"/>' +
     '<path d="M8.5 9.5h.01"/><path d="M15.5 15h.01"/><path d="M9.5 15.5h.01"/><path d="M12.5 12h.01"/>',
 
+  // Chiave — «Resta connesso qui» / «Non restare connesso» (#759).
+  key:
+    '<circle cx="8" cy="15" r="4"/>' +
+    '<path d="M10.8 12.2L20 3"/><path d="M16.5 6.5l2.5 2.5"/><path d="M14 9l2 2"/>',
+
   // Occhio — «Mostra il banner dei cookie».
   eye:
     '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>' +
@@ -68,18 +66,15 @@ const ICON_PATHS = {
     '<rect x="9" y="9" width="11" height="11" rx="2"/>' +
     '<path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
 
-  // Altoparlante con onde sonore (audio attivo) — voce "Muta".
   sound:
     '<path d="M4 9v6h4l5 4V5L8 9z"/>' +
     '<path d="M16.5 8.5a5 5 0 0 1 0 7"/>' +
     '<path d="M19 6a8 8 0 0 1 0 12"/>',
 
-  // Altoparlante barrato (audio mutato) — voce "Riattiva audio".
   mute:
     '<path d="M4 9v6h4l5 4V5L8 9z"/>' +
     '<path d="M17 9l4 6"/><path d="M21 9l-4 6"/>',
 
-  // Punto interrogativo in un fumetto — voce "Aiuto" (apre la chat con Filo).
   help:
     '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>' +
     '<path d="M9.2 9.3a2.8 2.8 0 0 1 5.4 1c0 1.8-2.6 2.4-2.6 2.4"/>' +
@@ -110,41 +105,32 @@ const ICON_PATHS = {
     '<path d="M13 6.7L17.5 16.3"/>' +
     '<path d="M7.5 18L16.5 18"/>',
 
-  // Globo con meridiani — voce "Apri da un altro paese" / "Torna in Italia"
-  // (mai un lucchetto da security tool: il tono è "viaggio", non "sicurezza").
+  // "Apri da un altro paese": un globo, mai un lucchetto — il tono è viaggio.
   globe:
     '<circle cx="12" cy="12" r="9"/>' +
     '<path d="M3 12h18"/>' +
     '<path d="M12 3a13.5 13.5 0 0 1 0 18"/>' +
     '<path d="M12 3a13.5 13.5 0 0 0 0 18"/>',
 
-  // Mazzi (deck builder Commander): due carte a ventaglio, quella davanti
-  // dritta e quella dietro ruotata. Stesso disegno di src/shared/icons.js
-  // (le due famiglie di icone — barra e menu popup — vanno tenute allineate).
   decks:
     '<rect x="8" y="5" width="10" height="14" rx="1.5"/>' +
     '<path d="M6.5 7.2l-2.9.8 3.1 11 3.4-.9"/>',
 
-  // Bacheca: una lavagna a colonne (kanban) — i miglioramenti affissi che si
-  // votano. Distinta dall'aeroplanino di "condividi", che qui era fuori tema.
   board:
     '<rect x="3.5" y="5" width="17" height="14" rx="1.5"/>' +
     '<path d="M9 5v14"/>' +
     '<path d="M15 5v14"/>',
 
-  // Scaricamenti: freccia verso il basso che entra in un vassoio. Stesso
-  // disegno di src/shared/icons.js (`download`): la voce "Scaricamenti" del
-  // menu App restava senza icona perché qui mancava il glifo.
   download:
     '<path d="M12 3v11"/>' +
     '<path d="M8 10.5l4 4 4-4"/>' +
     '<path d="M4 19h16"/>',
 
-  // Salva/Aperti per dopo: segnalibro. Stesso disegno di src/shared/icons.js
-  // (`saveForLater`), così la lista "Aperti per dopo" nel menu App porta la
-  // stessa icona con cui la si riempie dal menu del tasto destro.
   saveForLater:
     '<path d="M7 4h10a1 1 0 0 1 1 1v15.2l-6-3.8-6 3.8V5a1 1 0 0 1 1-1z"/>',
+  memory:
+    '<path d="M9.5 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 1.5 5A3 3 0 0 0 9.5 20c1.3 0 2.5-.8 2.5-2V6a2.5 2.5 0 0 0-2.5-2z"/>' +
+    '<path d="M14.5 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-1.5 5A3 3 0 0 1 14.5 20c-1.3 0-2.5-.8-2.5-2V6a2.5 2.5 0 0 1 2.5-2z"/>',
 };
 
 function iconSvg(name, size) {
@@ -155,11 +141,8 @@ function iconSvg(name, size) {
     `stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 }
 
-// Larghezza del menu adattata al contenuto. Con una larghezza fissa (200px) le
-// voci lunghe — tipicamente l'email dell'account loggato — venivano troncate/
-// ellissate e sembravano "non centrate" e schiacciate contro il bordo (feedback
-// alpha). Stimiamo la larghezza del testo più lungo e allarghiamo il menu fino a
-// un massimo ragionevole, mantenendo un minimo così i menu corti restano uguali.
+// A larghezza fissa le voci lunghe (l'email dell'account) venivano ellissate:
+// si stima il testo più lungo, fra un minimo e un massimo.
 const MENU_MIN_W = 200;
 const MENU_MAX_W = 340;
 function computeMenuWidth(entries) {
@@ -169,12 +152,10 @@ function computeMenuWidth(entries) {
   for (const e of entries || []) {
     if (!e || e.type === 'separator') continue;
     const label = String(e.label || '');
-    // L'email (voce disabled senza icona) usa font 12px, le altre 13px. Stima
-    // generosa (~0.6 * font-size per carattere) per non troncare mai.
+    // Stima generosa (~0.6 * font-size per carattere): meglio larghi che troncati.
     const fontPx = e.disabled ? 12 : 13;
     const charW = fontPx * 0.6;
     const hasIcon = !!e.icon && ICON_PATHS[e.icon];
-    // La freccia del submenu (subAction) occupa una colonna extra a destra.
     const SUB_COL = e.subAction ? 30 : 0;
     const w = H_PADDING + (hasIcon ? ICON_COL : 0) + SUB_COL + Math.ceil(label.length * charW);
     if (w > needed) needed = w;
@@ -278,13 +259,16 @@ function finestraDi(parent) {
   wc.on('render-process-gone', () => {
     if (s.win !== win) return;
     const r = s.aperto && !win.isVisible() && s.richiesta && !s.richiesta.ripresa ? s.richiesta : null;
+    // Il menu che si riapre da solo è la stessa ricerca: né una chiusura a vuoto né una seconda apertura.
+    const ricerca = r ? s.ricerca : null;
+    if (r) s.ricerca = null;
     clearTimeout(s.tetto);
     s.win = null;
     s.pronta = false;
     s.attesa = null;
     chiudi(s);
     if (!win.isDestroyed()) win.destroy();
-    if (r && !parent.isDestroyed()) apri(parent, { ...r, ripresa: true });
+    if (r && !parent.isDestroyed()) apri(parent, { ...r, ripresa: true, ricerca });
   });
   win.on('blur', () => sfocato(s, win));
   win.on('closed', () => {
@@ -308,6 +292,11 @@ function dalMenu(s, canale, a, b) {
     // Una voce del menu di prima (cliccata mentre arrivava quello nuovo) non sceglie per lui.
     if (!s.aperto || b !== s.giro) return;
     const scelta = s.scelta;
+    const ric = s.ricerca;
+    if (ric && !ric.fatta) {
+      ric.fatta = true;
+      contaRicerca(s, 'scelta', { attesaMs: Date.now() - ric.t0, posizione: ric.posti.get(typeof a === 'string' ? a : '') || null });
+    }
     // Prima si chiude: chi sceglie può riaprire subito il menu (il secondo livello di una voce a due zone).
     chiudi(s);
     if (scelta) { try { scelta(typeof a === 'string' ? a : ''); } catch (_) {} }
@@ -336,6 +325,9 @@ function chiudi(s) {
   if (!s.aperto) return;
   s.aperto = false;
   s.scelta = null;
+  const ric = s.ricerca;
+  s.ricerca = null;
+  if (ric && !ric.fatta) contaRicerca(s, 'vuota');
   const n = ++s.giro;
   if (inVista === s) inVista = null;
   const win = s.win;
@@ -360,6 +352,29 @@ function sfocato(s, win) {
   }, resta);
 }
 
+// Ogni menu a comparsa è un pannello dove si cerca una voce (#1461): apertura, scelta con l'attesa e il posto della
+// voce fra quelle che si possono scegliere, chiusura senza scelta. Una regola sola qui, per tutti i menu che ci passano.
+function contaRicerca(s, esito, extra = {}) {
+  try {
+    const C = globalThis.SN_CONTATORI_MAIN;
+    if (C && typeof C.ricerca === 'function') C.ricerca('menu', { esito, ...extra }, { incognito: !!(s.parent && s.parent._filoIncognito) });
+  } catch (_) {}
+}
+
+// Il valore che ogni voce manda (lo stesso di vociHTML) e il suo posto, da 1; la freccia di una voce a due zone vale la voce.
+function postiDelleVoci(entries) {
+  const posti = new Map();
+  let n = 0;
+  for (const e of entries || []) {
+    if (!e || e.type === 'separator' || e.disabled) continue;
+    n += 1;
+    const valore = e.action ? '@action:' + String(e.action) : String(e.url || '');
+    if (!posti.has(valore)) posti.set(valore, n);
+    if (e.subAction && !posti.has('@action:' + String(e.subAction))) posti.set('@action:' + String(e.subAction), n);
+  }
+  return posti;
+}
+
 // ── Mostra il menu ────────────────────────────────────────────────────────
 function showPopupMenu(parentWin, entries, x, y, onSelect) {
   if (!parentWin || parentWin.isDestroyed()) return;
@@ -382,6 +397,11 @@ function apri(parentWin, r) {
   s.scelta = r.scelta;
   s.mostratoAlle = Date.now();
   inVista = s;
+  if (r.ripresa && r.ricerca) s.ricerca = r.ricerca;
+  else {
+    s.ricerca = { t0: Date.now(), posti: postiDelleVoci(voci), fatta: false };
+    contaRicerca(s, 'aperta');
+  }
   // La finestra compare quando la pagina conferma le voci nuove (popup-menu:pronto), mai con quelle di prima.
   invia(s, { n: s.giro, html: vociHTML(voci), scuro: !!nativeTheme.shouldUseDarkColors, vars: require('./movimento').variabili() });
 }

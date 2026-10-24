@@ -1,53 +1,23 @@
-// Registro centralizzato dei token estetici di Filo (#146.1).
-//
-// Ogni variabile estetica dell'app è un token con nome stabile, tipo, valore
-// predefinito e (per i token specifici) una CATEGORIA da cui eredita. La
-// gerarchia è a due livelli: i token di categoria (es. `accent`) danno il
-// default ai token specifici (es. `selection.color`), così l'utente può
-// cambiare sia il singolo elemento sia l'intera categoria con una modifica
-// sola. Un override sul token specifico vince sull'eredità di categoria.
-//
-// Gli override dell'utente vivono in `settings.themeTokens` (storage.json),
-// come mappa { nomeToken: valore }. La chiave è in REPLACE_KEYS dello storage:
-// ogni salvataggio sostituisce l'intera mappa, quindi rimuovere una chiave
-// equivale a tornare al predefinito.
-//
-// L'eredità categoria→specifico è implementata DUE volte, di proposito:
-// - nel CSS (theme.css definisce p.es. `--sn-selection-color: var(--sn-accent)`),
-//   così il rendering segue la catena senza JS;
-// - qui in JS (`effectiveValue`), così la UI delle preferenze e i test possono
-//   calcolare il valore effettivo di ogni token senza interrogare il DOM.
-//
-// SICUREZZA: i valori degli override finiscono dentro <style> iniettati in
-// TUTTE le superfici (incluse pagine web esterne). `validate` è quindi una
-// whitelist severa per tipo: niente ';', '}', 'url(' o altro che permetta di
-// uscire dalla dichiarazione CSS.
+// Registro dei token estetici (#146.1): i token specifici ereditano da una CATEGORIA e
+// l'override specifico vince. L'eredità è scritta due volte: nel CSS e qui in JS.
+// SICUREZZA: finiscono in <style> su TUTTE le superfici, quindi `validate` è una whitelist.
 
 (function (global) {
   'use strict';
 
   const FONT_DEFAULT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
-  // name → { label, type, css, shellCss?, dashCss?, default | category }
-  // - `css` è la variabile applicata alle superfici --sn-* (shell esclusa).
-  // - `shellCss` sono le variabili gemelle della shell (src/renderer/shell.css),
-  //   che ha una palette propria: vengono emesse SOLO nella shell.
-  // - `dashCss` sono le gemelle della dashboard/newtab (--dash-*, palette propria
-  //   in dashboard.css): emesse nelle superfici --sn-* (pagine filo://) così una
-  //   modifica estetica si vede anche sulla dashboard. Innocue dove non servono.
-  // - `default` può essere un valore unico o { light, dark }.
-  // - i token con `category` ereditano il default dal token di categoria.
+  // `css`: variabile --sn-* delle superfici; `shellCss`: le gemelle della shell, solo lì;
+  // `dashCss`: le gemelle --dash-* della dashboard. `default` può essere { light, dark }.
   const TOKENS = {
-    // ── categorie ──────────────────────────────────────────────────────────
+    // categorie
     accent: {
       label: "Colore d'accento",
       type: 'color',
       css: '--sn-accent',
       shellCss: ['--accent'],
-      // La dashboard (newtab) ha una palette propria (--dash-*) slegata dai
-      // token: senza `dashCss` un "rendi l'accento verde" non si vedeva lì
-      // (feedback #164). Emettiamo le gemelle --dash-* SOLO per i token che
-      // l'utente sovrascrive davvero, così l'estetica "carta" di default resta.
+      // La dashboard ha una palette propria (--dash-*): senza `dashCss` un «rendi l'accento verde»
+      // non si vedeva lì (#164). Solo per i token davvero sovrascritti, così i default restano.
       dashCss: ['--dash-accent'],
       // Emette anche la tripletta r,g,b usata dalle tinte rgba(…)
       rgbCss: '--sn-accent-rgb',
@@ -70,15 +40,8 @@
       dashCss: ['--dash-ink'],
       default: { light: '#1a1918', dark: '#e5e3dc' },
     },
-    // Barra in alto del browser (la fascia dietro le schede + le schede non
-    // attive). È una superficie della SOLA shell — le pagine non ce l'hanno —
-    // quindi nessun `css`/`dashCss`, solo `shellCss`. Mappa `--bg-deep` (la
-    // striscia) e `--tab-bg` (le tab inattive) insieme, così "rendi la barra in
-    // alto verde scuro" colora l'intera fascia in modo coerente. Senza questo
-    // token non c'era modo di cambiare SOLO la barra: `background` tingeva tutte
-    // le superfici e `colore_tab` agiva sulla tinta-identità delle singole tab,
-    // non sulla fascia (feedback #184). Il default combacia con `--bg-deep` di
-    // shell.css; finché non lo si sovrascrive, `--tab-bg` resta il suo neutro.
+    // Barra in alto: superficie della SOLA shell, quindi solo `shellCss`. Mappa insieme
+    // `--bg-deep` e `--tab-bg` così «rendi la barra verde scuro» colora l'intera fascia (#184).
     topbar: {
       label: 'Barra in alto',
       type: 'color',
@@ -131,11 +94,8 @@
       css: '--sn-hover',
       default: { light: '#ffffff', dark: '#282725' },
     },
-    // Sfondo di menu, popup, barra laterale e dropdown custom (theme.css
-    // `--sn-overlay-bg`). È una variante quasi-opaca dello sfondo (alpha 0.98 di
-    // default, col blur dietro): distinta da `background` perché tinge SOLO le
-    // superfici sovrapposte. Accetta anche rgba(...) per mantenere la
-    // trasparenza se l'utente vuole. Superficie di sola pagina → solo `css`.
+    // Sfondo di menu, popup, sidebar e dropdown: tinge SOLO le superfici sovrapposte, perciò
+    // è distinto da `background`. Accetta rgba(...) per tenere la trasparenza.
     overlay: {
       label: 'Sfondo di menu e popup',
       type: 'color',
@@ -174,7 +134,7 @@
       default: '0.18',
     },
 
-    // ── token specifici (ereditano dalla categoria) ────────────────────────
+    // token specifici (ereditano dalla categoria)
     'button.bg': {
       label: 'Sfondo dei bottoni primari',
       type: 'color',
@@ -236,17 +196,87 @@
       dashCss: ['--dash-filo-gomitolo'],
       default: '850ms',
     },
+    // I due segni del correttore (#1446): l'errore, di cui Filo è sicuro, e il suggerimento, che decide l'utente; il
+    // dubbio è lo stesso segno sbiadito. Le gemelle letterali stanno in spellcheck.css e menu.css (tests/unit/correttoreSegni.test.mjs).
+    'correttore.errori.color': {
+      label: 'Colore degli errori del correttore',
+      type: 'color',
+      css: '--sn-spell-errore',
+      default: { light: '#b4472c', dark: '#ea8a6b' },
+    },
+    'correttore.errori.stile': {
+      label: 'Forma della sottolineatura degli errori del correttore',
+      type: 'linea',
+      css: '--sn-spell-errore-stile',
+      default: 'wavy',
+    },
+    'correttore.suggerimenti.color': {
+      label: 'Colore dei suggerimenti del correttore',
+      type: 'color',
+      css: '--sn-spell-suggerimento',
+      default: { light: '#b07a14', dark: '#e2ad4d' },
+    },
+    'correttore.suggerimenti.stile': {
+      label: 'Forma della sottolineatura dei suggerimenti del correttore',
+      type: 'linea',
+      css: '--sn-spell-suggerimento-stile',
+      default: 'dotted',
+    },
+    'correttore.dubbio.opacita': {
+      label: 'Quanto si vede un segno del correttore ancora in dubbio',
+      type: 'opacity',
+      css: '--sn-spell-dubbio',
+      default: '0.4',
+    },
+    // Il tetto di ogni scheda nella fila in alto, attiva compresa (#1493): lo legge shell.js, nessuna variabile CSS.
+    // Il minimo è quello della scheda attiva (tests/unit/tabLarghezzaMassima.test.mjs).
+    'tab.larghezza': {
+      label: 'Larghezza massima delle schede',
+      type: 'pixel',
+      min: 110,
+      max: 1000,
+      default: '240px',
+    },
+    // #1448 — il valore trovato per un segnaposto, sopra le x: la sua grandezza rispetto al testo del campo.
+    'correttore.segnaposti.scala': {
+      label: 'Grandezza del valore che il correttore propone sopra un segnaposto, rispetto al testo',
+      type: 'factor',
+      css: '--sn-spell-valore-scala',
+      default: '0.62',
+    },
+    'correttore.segnaposti.velato': {
+      label: 'Quanto si vede il valore di un segnaposto quando copre le parole della riga sopra',
+      type: 'opacity',
+      css: '--sn-spell-valore-velato',
+      default: '0.45',
+    },
+    // Il lampo sulla parola che il correttore ha corretto da sé (#1447): uno sfondo caldo che sfuma. Gemelle in spellcheck.css.
+    'correttore.lampo.color': {
+      label: 'Colore del lampo sulla parola corretta da sé',
+      type: 'color',
+      css: '--sn-spell-lampo',
+      default: { light: '#f0b05a66', dark: '#e2ad4d4d' },
+    },
+    'correttore.lampo.durata': {
+      label: 'Durata del lampo sulla parola corretta da sé',
+      type: 'time',
+      css: '--sn-spell-lampo-durata',
+      default: '1000ms',
+    },
   };
+
+  // I valori di un token `linea`: quelli di text-decoration-style, nient'altro.
+  const STILI_LINEA = Object.freeze(['dotted', 'dashed', 'wavy', 'solid', 'double']);
 
   function names() { return Object.keys(TOKENS); }
   function get(name) { return TOKENS[name] || null; }
 
-  // ── validazione (whitelist per tipo) ─────────────────────────────────────
+  // validazione (whitelist per tipo)
   const RE_HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
   const RE_RGB = /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)$/i;
   const RE_SIZE = /^\d{1,4}(?:\.\d+)?(?:px|em|rem|%)$/;
-  // Font: lista di famiglie, solo caratteri "da nome font" (lettere, numeri,
-  // spazi, trattini, virgole, apici). Niente ';', '}', '(' ecc.
+  // Font: solo caratteri «da nome font» (lettere, numeri, spazi, trattini, virgole, apici).
+  // Niente ';', '}', '(' ecc.
   const RE_FONT = /^[\w\s,'"-]{1,200}$/;
   // Durate: millisecondi interi o secondi, fino a dieci secondi. Zero spegne l'animazione.
   const RE_TIME = /^(\d{1,5})ms$|^(\d{1,2}(?:\.\d{1,3})?)s$/;
@@ -259,6 +289,12 @@
   const NUMERICI = new Set(['opacity', 'factor']);
   function normalize(name, value) {
     const t = TOKENS[name];
+    // «300», «300 px» o il numero della chat: la forma salvata è «300px».
+    if (t && t.type === 'pixel') {
+      const s = typeof value === 'number' ? String(value) : typeof value === 'string' ? value.trim().toLowerCase() : value;
+      const m = typeof s === 'string' && s.match(/^(\d{1,4})\s*(?:px)?$/);
+      return m ? `${Number(m[1])}px` : s;
+    }
     if (t && NUMERICI.has(t.type)) {
       if (typeof value === 'number') return Number.isFinite(value) ? String(value) : value;
       if (typeof value === 'string') return value.trim().replace(/^(\d*),(\d+)$/, '$1.$2');
@@ -280,6 +316,7 @@
       }
       case 'size': return RE_SIZE.test(v);
       case 'font': return RE_FONT.test(v);
+      case 'linea': return STILI_LINEA.includes(v);
       case 'time': {
         const m = v.match(RE_TIME);
         if (!m) return false;
@@ -287,6 +324,10 @@
         return ms >= 0 && ms <= 10000;
       }
       case 'factor': return RE_FACTOR.test(v) && Number(v) <= FACTOR_MAX;
+      case 'pixel': {
+        const m = v.match(/^(\d{1,4})px$/);
+        return Boolean(m) && Number(m[1]) >= t.min && Number(m[1]) <= t.max;
+      }
       default: return false;
     }
   }
@@ -300,7 +341,9 @@
       case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
       case 'time': return 'Durata non valida: millisecondi o secondi fino a 10 s, es. 450ms o 0.8s.';
       case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
+      case 'linea': return 'Stile non valido: dotted, dashed, wavy, solid o double.';
       case 'factor': return `Valore non valido: un numero fra 0 e ${FACTOR_MAX}, es. 0 (nessuna animazione), 1 (normale) o 1,5.`;
+      case 'pixel': return `Misura non valida: pixel interi fra ${t.min} e ${t.max}, es. ${t.default}.`;
       default: return t ? 'Valore non valido.' : 'Token sconosciuto.';
     }
   }
@@ -335,7 +378,18 @@
     return { clean, rejected };
   }
 
-  // ── risoluzione gerarchia (per UI preferenze e unit test) ────────────────
+  // Chi ha toccato pochi token manda solo quelli e si posano sulla mappa salvata adesso: la sua copia intera
+  // cancellerebbe quelli cambiati altrove nel frattempo (#1343.1).
+  function conModifica(salvati, modifica) {
+    const out = { ...(salvati && typeof salvati === 'object' ? salvati : {}) };
+    for (const [name, value] of Object.entries(modifica && typeof modifica === 'object' ? modifica : {})) {
+      if (value == null || value === '') delete out[name];
+      else out[name] = value;
+    }
+    return out;
+  }
+
+  // risoluzione della gerarchia (per la UI delle preferenze e gli unit test)
   function defaultValue(name, theme) {
     const t = TOKENS[name];
     if (!t) return undefined;
@@ -356,7 +410,6 @@
     return defaultValue(name, theme);
   }
 
-  // ── conversione colore → tripletta "r, g, b" (per le tinte rgba) ─────────
   function toRgbTriplet(color) {
     const v = String(color || '').trim();
     let m = v.match(/^#([0-9a-f]{3,8})$/i);
@@ -378,12 +431,8 @@
     return null;
   }
 
-  // ── leggibilità (testo vs sfondo) ────────────────────────────────────────
-  // Serve al gate dei livelli (#146.2/#146.4): se Filo, su richiesta in chat,
-  // rende il testo praticamente uguale allo sfondo, la modifica diventa
-  // un'azione di livello 2 (conferma prima di applicare) invece di livello 1.
-  // Usiamo la luminanza relativa e il rapporto di contrasto WCAG: due colori
-  // identici danno rapporto 1.0, nero su bianco ~21.
+  // Leggibilità testo/sfondo per il gate dei livelli (#146.2): se il testo diventa quasi
+  // uguale allo sfondo la modifica sale a livello 2. Rapporto WCAG: identici 1.0, max ~21.
   function _rgbArray(color) {
     const t = toRgbTriplet(color);
     if (!t) return null;
@@ -413,11 +462,8 @@
     return (hi + 0.05) / (lo + 0.05);
   }
 
-  // Soglia di "illeggibilità estrema": sotto questo rapporto di contrasto il
-  // testo è di fatto indistinguibile dallo sfondo. Tenuta bassa (vicino a 1)
-  // di proposito: vogliamo intercettare SOLO i casi gravi (testo ≈ sfondo),
-  // non ogni scelta a basso contrasto ma ancora leggibile — un popup di
-  // conferma a ogni ritocco sarebbe più fastidioso che utile.
+  // Soglia vicina a 1 di proposito: solo i casi gravi (testo ≈ sfondo), non ogni basso
+  // contrasto ancora leggibile — un popup a ogni ritocco sarebbe più fastidioso che utile.
   const LEGIBILITY_MIN_RATIO = 1.6;
 
   // Le coppie testo-su-superficie che contano per la leggibilità: il testo
@@ -427,10 +473,8 @@
     ['button.fg', 'button.bg'],
   ];
 
-  // Vero se applicare l'override {name: value} sopra `overrides` rende una delle
-  // coppie testo/sfondo illeggibile (contrasto sotto la soglia). Calcolato sul
-  // valore EFFETTIVO risultante, così cattura sia "rendi il testo bianco" su
-  // sfondo chiaro sia "rendi lo sfondo nero" con testo già scuro.
+  // Vero se l'override rende illeggibile una coppia testo/sfondo. Calcolato sul valore
+  // EFFETTIVO, così prende sia «rendi il testo bianco» sia «rendi lo sfondo nero».
   function illegibleAfter(name, value, overrides, theme) {
     const next = { ...(overrides || {}) };
     if (validate(name, value)) next[name] = normalize(name, value);
@@ -445,11 +489,8 @@
     return false;
   }
 
-  // ── emissione CSS ─────────────────────────────────────────────────────────
-  // Emette SOLO le variabili sovrascritte: i default restano in theme.css e
-  // l'eredità categoria→specifico la fa la catena var() nativa. Il selettore
-  // html[data-sn-theme] (0,1,1) vince sui blocchi di theme.css (0,1,0) a
-  // prescindere dall'ordine dei fogli.
+  // Emette SOLO le variabili sovrascritte: i default restano in theme.css e l'eredità la fa
+  // la catena var(). html[data-sn-theme] (0,1,1) vince a prescindere dall'ordine dei fogli.
   function declsFor(overrides, { shell = false } = {}) {
     const { clean } = sanitize(overrides);
     const decls = [];
@@ -462,18 +503,14 @@
           if (rgb) decls.push(`${t.shellRgbCss}: ${rgb};`);
         }
       } else {
-        // Token di sola shell (es. `topbar`): nessuna variabile di pagina da
-        // emettere sulle superfici --sn-*/--dash-*. Si salta qui.
+        // Token di sola shell (es. `topbar`): niente da emettere sulle superfici --sn-*/--dash-*.
         if (!t.css) continue;
         decls.push(`${t.css}: ${value};`);
         if (t.rgbCss) {
           const rgb = toRgbTriplet(value);
           if (rgb) decls.push(`${t.rgbCss}: ${rgb};`);
         }
-        // Gemelle --dash-* della dashboard (newtab): emesse solo per i token
-        // sovrascritti, così la modifica estetica chiesta in chat si VEDE anche
-        // sulla dashboard (dove vive la chat di Filo), non solo sulle altre
-        // superfici --sn-* (feedback #164). Innocue sulle pagine che non le usano.
+        // Gemelle --dash-* solo per i token sovrascritti: vedi sopra, `dashCss`.
         for (const v of t.dashCss || []) decls.push(`${v}: ${value};`);
       }
     }
@@ -494,9 +531,8 @@
     return decls.length ? `html:root {\n  ${decls.join('\n  ')}\n}` : '';
   }
 
-  // Applica (upsert) lo style degli override a un Document. Idempotente: la
-  // stessa funzione serve pageBootstrap (pagine filo://), content script
-  // (pagine esterne) e — con shell:true — la shell.
+  // Idempotente: la stessa funzione serve pageBootstrap, i content script e — con
+  // shell:true — la shell.
   const STYLE_ID = 'sn-theme-tokens';
   function applyToDocument(doc, overrides, { shell = false } = {}) {
     try {
@@ -514,6 +550,7 @@
 
   global.SN_THEME_TOKENS = {
     TOKENS,
+    STILI_LINEA,
     names,
     get,
     validate,
@@ -524,6 +561,7 @@
     scrollBehavior,
     FACTOR_MAX,
     sanitize,
+    conModifica,
     defaultValue,
     effectiveValue,
     toRgbTriplet,

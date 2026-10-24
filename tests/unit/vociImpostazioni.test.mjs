@@ -173,6 +173,58 @@ test('sentinella: ogni voce delle pagine si cambia dalla chat, e la chiave la sc
   assert.ok(contate > 60, `troppe poche voci (${contate}): la sentinella non sta guardando`);
 });
 
+// #835 — Filo cambia QUALSIASI impostazione: una foglia di DEFAULT_SETTINGS senza una chiave di IMPOSTA_PREFERENZA che
+// la scriva sta qui col suo perché. Un oggetto vuoto (themeTokens, modelRegistry) è una foglia; «x.» vale per tutto x.
+const FUORI_DALLA_CHAT = {
+  'autonomia.': 'elenco fisso «regole» (#530): livello di autonomia, manopole e fiducia nelle fonti li sceglie solo l\'utente in Preferenze',
+  'models.': 'il modello di ogni funzione si sceglie nella pagina Modelli: cambiarlo dalla chat aspetta una decisione dell\'owner',
+  modelRegistry: 'il registro dei modelli si cura nella pagina Modelli: cambiarlo dalla chat aspetta una decisione dell\'owner',
+  defaultModelTests: 'sono le misure del pulsante «Prova» (latenza, velocità), non una scelta: le scrive la prova',
+  modelliScelti: 'il modello scelto per una funzione sola (#818) si cambia nella pagina Modelli: dalla chat aspetta una decisione dell\'owner',
+  'pricing.': 'i prezzi dei modelli servono ai conti e nessuna pagina li scrive',
+  usdToEur: 'il cambio dollaro-euro serve ai conti e nessuna pagina lo scrive',
+  themeTokens: 'i token dell\'aspetto li scrive IMPOSTA_ESTETICA, con la sua descrizione e la sua sentinella',
+  'security.safeBrowse.safeBrowsingKey': 'la chiave di Google Safe Browsing arriva con la configurazione di Filo e nessuna pagina la mostra',
+  'security.cookies.bozza': 'è il testo a metà nella casella dei siti fidati: diventa una scelta quando entra nell\'elenco',
+  'security.siteBlock.righeScartate': 'le righe scartate dalla blacklist sono un avviso sulla casella, non una scelta',
+  'security.downloads.righeScartate': 'le righe scartate dai siti fidati sono un avviso sulla casella, non una scelta',
+  'security.pagineDelicate.righeScartate': 'le righe scartate dai siti delicati sono un avviso sulla casella, non una scelta',
+  'proxy.': 'il proxy si usa dalla chat con le sue azioni (PROXY_TAB, REGOLA_PROXY_DOMINIO); indirizzi con le credenziali e paese vengono dalla configurazione e dalla scheda',
+};
+function foglieDiSerie(o, base = '', out = []) {
+  for (const k of Object.keys(o || {})) {
+    const p = base ? `${base}.${k}` : k;
+    const v = o[k];
+    if (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length) foglieDiSerie(v, p, out);
+    else out.push(p);
+  }
+  return out;
+}
+const esclusioneDi = (p) => Object.keys(FUORI_DALLA_CHAT).find((k) => p === k || p.startsWith(k.endsWith('.') ? k : `${k}.`));
+// Una mappa vuota di serie (scorciatoie) è coperta da chi ne scrive le voci.
+const scriveDentro = (p) => P.PREF_SETTERS.some((s) => (s.scrive || []).some((x) => x.startsWith(`${p}.`)));
+const senzaChiave = (defaults) => foglieDiSerie(defaults).filter((p) => !P.setterDi(p) && !scriveDentro(p) && !esclusioneDi(p));
+
+test('sentinella #835: ogni impostazione di serie si cambia dalla chat, o l\'elenco delle esclusioni dice perché no', () => {
+  const foglie = foglieDiSerie(C.DEFAULT_SETTINGS);
+  assert.ok(foglie.length > 100, `troppe poche foglie (${foglie.length}): la sentinella non sta guardando`);
+  assert.deepEqual(senzaChiave(C.DEFAULT_SETTINGS), [],
+    'impostazioni di serie che la chat non sa cambiare: dai loro un setter con `scrive` in src/shared/preferences.js, o mettile in FUORI_DALLA_CHAT col perché');
+  for (const [k, motivo] of Object.entries(FUORI_DALLA_CHAT)) {
+    assert.ok(String(motivo).trim().length > 30, `${k}: un'esclusione dice perché`);
+    const coperte = foglie.filter((p) => esclusioneDi(p) === k);
+    assert.ok(coperte.length, `${k}: l'esclusione non copre più nessuna impostazione di serie, toglila`);
+    for (const p of coperte) assert.equal(P.setterDi(p), null, `${p} ha una chiave della chat: togli l'esclusione ${k}`);
+  }
+  // Una voce nuova senza setter la vede.
+  const finta = { ...JSON.parse(JSON.stringify(C.DEFAULT_SETTINGS)), finta: { voce: true }, security: { ...C.DEFAULT_SETTINGS.security, nuovaProtezione: { enabled: true } } };
+  assert.deepEqual(senzaChiave(finta), ['security.nuovaProtezione.enabled', 'finta.voce']);
+});
+
+test('la segnalazione automatica è fra le impostazioni di serie, accesa', () => {
+  assert.equal(C.DEFAULT_SETTINGS.security.autoFeedback, true);
+});
+
 test('ogni chiave scrive quello che dichiara, ha la sua riga nella descrizione e lo stesso livello dell\'annullo', () => {
   const descr = Tools.definitions({ sistema: 'darwin' }).find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
   for (const s of P.PREF_SETTERS) {
@@ -402,4 +454,26 @@ test('le ore di inattività capiscono l\'unità detta: «2 giorni» sono 48 ore,
   assert.equal(ore('12 ore'), 12);
   assert.equal(ore(3), 3);
   assert.equal(ore('mai'), null);
+});
+
+// #835 — una voce che vale solo con l'interruttore principale acceso, chiesta con quello spento: l'esito lo dice.
+test('bloccare un sito o accendere una voce sotto un interruttore spento porta l\'avviso, acceso no', () => {
+  const spento = { security: { siteBlock: { enabled: false, blacklist: [] }, safeBrowse: { enabled: false } } };
+  const acceso = { security: { siteBlock: { enabled: true, blacklist: [] }, safeBrowse: { enabled: true } } };
+  for (const [k, v, chiave] of [
+    ['siti_bloccati', 'aggiungi example.org', 'blocco_siti'],
+    ['siti_bloccati', 'solo example.org', 'blocco_siti'],
+    ['liste_pubbliche_blocco', 'sì', 'blocco_siti'],
+    ['giudizio_ai_siti', 'sì', 'navigazione_sicura'],
+    ['controlli_rete_siti', 'sì', 'navigazione_sicura'],
+  ]) {
+    const r = P.buildPreferencePartial(k, v, { attuali: spento });
+    assert.match(r.avviso || '', /spento/, `${k} ${v}: l'avviso manca`);
+    assert.ok(r.avviso.includes(chiave), `${k}: l'avviso nomina la chiave per riaccenderlo`);
+    assert.ok(P.setterDellaChiave(chiave), `${chiave} è una chiave vera`);
+    assert.equal(P.buildPreferencePartial(k, v, { attuali: acceso }).avviso, undefined, `${k} ${v}: niente avviso a interruttore acceso`);
+    assert.equal(P.buildPreferencePartial(k, v).avviso, undefined, `${k} ${v}: senza le impostazioni non si inventa`);
+  }
+  assert.equal(P.buildPreferencePartial('siti_bloccati', 'togli example.org', { attuali: spento }).avviso, undefined);
+  assert.equal(P.buildPreferencePartial('giudizio_ai_siti', 'no', { attuali: spento }).avviso, undefined);
 });

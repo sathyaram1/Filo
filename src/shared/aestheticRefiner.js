@@ -4,7 +4,7 @@
 // verdi"), applica SUBITO un valore ragionevole; poi la bolla mostra un bottone
 // che apre QUESTO box in sovrimpressione per scegliere il valore esatto, con
 // anteprima LIVE. Il tipo di controllo deriva dal tipo del token nel registro
-// (themeTokens.js): colore → color picker, opacità, raggio, durata e
+// (themeTokens.js): colore → color picker, opacità, raggio, larghezza, durata e
 // moltiplicatore → slider, font → menu di famiglie.
 //
 // È un modulo condiviso (IIFE su globalThis) ma puramente DOM: lo usa la
@@ -30,11 +30,10 @@
     return (deps && deps.doc) || (typeof document !== 'undefined' ? document : null);
   }
 
-  // Tipo di controllo per un token: deriva dal tipo nel registro.
   function controlTypeFor(name, Tokens) {
     const t = Tokens && Tokens.get && Tokens.get(name);
     const type = t && t.type;
-    if (type === 'color' || type === 'opacity' || type === 'size' || type === 'font' || type === 'time' || type === 'factor') return type;
+    if (type === 'color' || type === 'opacity' || type === 'size' || type === 'font' || type === 'time' || type === 'factor' || type === 'linea' || type === 'pixel') return type;
     return 'color';
   }
 
@@ -46,8 +45,11 @@
     font: 'Cambia il font',
     time: 'Regola la durata',
     factor: 'Regola col cursore',
+    linea: 'Cambia lo stile della linea',
+    pixel: 'Regola la larghezza',
     color: 'Scegli il colore esatto',
   };
+  const NOMI_LINEA = { dotted: 'Puntini', dashed: 'Trattini', wavy: 'Onda', solid: 'Linea', double: 'Doppia' };
   function triggerHint(name, Tokens) {
     return HINTS[controlTypeFor(name, Tokens)] || HINTS.color;
   }
@@ -60,9 +62,7 @@
     return (t && t.label) || triggerHint(name, Tokens);
   }
 
-  // Converte un valore colore valido (#rgb, #rrggbb, rgb()/rgba()) nel formato
-  // #rrggbb richiesto da <input type="color">. Ritorna '#000000' se non
-  // interpretabile (non dovrebbe capitare per i token colore).
+  // '#000000' se il valore non è interpretabile: per un token colore non dovrebbe capitare.
   function toHexColor(value, Tokens) {
     const triplet = Tokens && Tokens.toRgbTriplet ? Tokens.toRgbTriplet(value) : null;
     if (!triplet) return '#000000';
@@ -71,7 +71,7 @@
     return `#${h(r)}${h(g)}${h(b)}`;
   }
 
-  // Famiglie di font proposte (tutte passano la whitelist di themeTokens.validate).
+  // Tutte passano la whitelist di themeTokens.validate.
   const FONT_CHOICES = [
     { label: 'Sistema (predefinito)', value: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" },
     { label: 'Serif (Georgia)', value: "Georgia, 'Times New Roman', serif" },
@@ -97,8 +97,7 @@
     openEl = null;
   }
 
-  // Apre il box di raffinamento per l'azione IMPOSTA_ESTETICA. Ritorna
-  // l'elemento overlay (utile ai test) o null se manca il contesto.
+  // Ritorna l'overlay (utile ai test) o null se manca il contesto.
   function openOverlay(action, deps) {
     const doc = deepGetDoc(deps);
     const Tokens = deps && deps.Tokens;
@@ -111,8 +110,8 @@
 
     const theme = deps.theme === 'dark' ? 'dark' : 'light';
     const type = controlTypeFor(name, Tokens);
-    // Stato di partenza = override correnti (includono il valore già messo da
-    // Filo). "Annulla" ci ritorna; ogni modifica parte da una copia di lavoro.
+    // Si parte dagli override correnti, che includono il valore già messo da Filo: «Annulla» ci
+    // ritorna, e ogni modifica lavora su una copia.
     const startOverrides = { ...(deps.overrides || {}) };
     const working = { ...startOverrides };
 
@@ -131,7 +130,6 @@
       save();
     }
 
-    // ── overlay + pannello ──────────────────────────────────────────────────
     const overlay = doc.createElement('div');
     overlay.className = 'sn-refine-overlay';
     overlay.setAttribute('role', 'dialog');
@@ -146,8 +144,7 @@
     title.textContent = `Regola: ${t.label || name}`;
     panel.appendChild(title);
 
-    // Anteprima: riflette il valore di lavoro (oltre alle superfici dietro, che
-    // applyLive aggiorna comunque).
+    // L'anteprima riflette il valore di lavoro; le superfici dietro le aggiorna applyLive.
     const sample = doc.createElement('div');
     sample.className = 'sn-refine-sample';
     panel.appendChild(sample);
@@ -166,8 +163,7 @@
         sample.appendChild(sw);
         const btn = doc.createElement('span');
         btn.className = 'sn-refine-sample-btn';
-        // Mostra il colore scelto come sfondo del "bottone" se è un token bottone,
-        // altrimenti come testo/accento.
+        // Sullo sfondo se il token è del bottone, altrimenti su testo e accento.
         if (name === 'button.bg' || name === 'background') { btn.style.background = eff; btn.style.color = Tokens.effectiveValue('button.fg', working, theme); }
         else if (name === 'button.fg' || name === 'text') { btn.style.color = eff; }
         else { btn.style.background = Tokens.effectiveValue('button.bg', working, theme); btn.style.color = eff; }
@@ -205,7 +201,7 @@
         lbl.className = 'sn-refine-sample-text';
         lbl.textContent = eff;
         sample.appendChild(lbl);
-      } else if (type === 'time') {
+      } else if (type === 'time' || type === 'pixel') {
         const txt = doc.createElement('span');
         txt.className = 'sn-refine-sample-text';
         txt.textContent = eff;
@@ -222,6 +218,13 @@
         lbl.className = 'sn-refine-sample-text';
         lbl.textContent = factorLabel(eff);
         sample.appendChild(lbl);
+      } else if (type === 'linea') {
+        const txt = doc.createElement('span');
+        txt.className = 'sn-refine-sample-text';
+        txt.style.textDecoration = `underline ${eff}`;
+        txt.style.textUnderlineOffset = '4px';
+        txt.textContent = 'Testo di esempio';
+        sample.appendChild(txt);
       } else if (type === 'font') {
         const txt = doc.createElement('span');
         txt.className = 'sn-refine-sample-text';
@@ -237,7 +240,6 @@
       }
     }
 
-    // ── controllo per tipo ────────────────────────────────────────────────────
     const controlWrap = doc.createElement('div');
     controlWrap.className = 'sn-refine-control';
     panel.appendChild(controlWrap);
@@ -270,6 +272,14 @@
       control.value = String(parseInt(startEff, 10) || 0);
       control.setAttribute('aria-label', t.label || name);
       control.addEventListener('input', () => setValue(`${parseInt(control.value, 10) || 0}px`));
+    } else if (type === 'pixel') {
+      control = doc.createElement('input');
+      control.type = 'range';
+      control.className = 'sn-refine-input sn-refine-range';
+      control.min = String(t.min); control.max = String(t.max); control.step = '10';
+      control.value = String(parseInt(startEff, 10) || t.min);
+      control.setAttribute('aria-label', t.label || name);
+      control.addEventListener('input', () => setValue(`${parseInt(control.value, 10) || t.min}px`));
     } else if (type === 'time') {
       control = doc.createElement('input');
       control.type = 'range';
@@ -291,6 +301,17 @@
         const n = Math.min(max, Math.max(0, Math.round((parseFloat(control.value) || 0) * 4) / 4));
         setValue(String(n));
       });
+    } else if (type === 'linea') {
+      control = doc.createElement('select');
+      control.className = 'sn-refine-input sn-refine-select';
+      control.setAttribute('aria-label', t.label || name);
+      for (const v of Tokens.STILI_LINEA || []) {
+        const o = doc.createElement('option');
+        o.value = v; o.textContent = NOMI_LINEA[v] || v;
+        if (v === startEff) o.selected = true;
+        control.appendChild(o);
+      }
+      control.addEventListener('change', () => setValue(control.value));
     } else { // font
       control = doc.createElement('select');
       control.className = 'sn-refine-input sn-refine-select';
@@ -311,7 +332,6 @@
     }
     controlWrap.appendChild(control);
 
-    // ── footer ────────────────────────────────────────────────────────────────
     const footer = doc.createElement('div');
     footer.className = 'sn-refine-footer';
 
@@ -320,7 +340,7 @@
     cancel.className = 'sn-refine-btn sn-refine-cancel';
     cancel.textContent = 'Annulla';
     cancel.addEventListener('click', () => {
-      // Ripristina lo stato di apertura (= valore messo da Filo) e persiste.
+      // Ripristina lo stato di apertura (il valore messo da Filo) e persiste.
       try { deps.applyLive && deps.applyLive({ ...startOverrides }); } catch (_) {}
       try { deps.persist && deps.persist({ ...startOverrides }, name); } catch (_) {}
       close();
@@ -336,9 +356,8 @@
 
     panel.appendChild(footer);
 
-    // Click fuori dal pannello = chiudi tenendo il valore (già persistito).
+    // Click fuori dal pannello o Esc: si chiude tenendo il valore, già persistito.
     overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) { save(); close(); } });
-    // Esc = chiudi tenendo il valore.
     const onKey = (e) => { if (e.key === 'Escape') { save(); close(); } };
     global.addEventListener('keydown', onKey, true);
     overlay._onKey = onKey;
@@ -350,7 +369,6 @@
     return overlay;
   }
 
-  // Bottone "trigger" da inserire nella bolla: apre il box al click.
   function buildButton(action, deps) {
     const doc = deepGetDoc(deps);
     const Tokens = deps && deps.Tokens;
@@ -381,8 +399,8 @@
     text.textContent = triggerLabel(name, Tokens);
     btn.appendChild(text);
     btn.addEventListener('click', () => {
-      // Le dipendenze possono essere risolte pigramente (deps.resolve) per
-      // leggere gli override più freschi al momento del click.
+      // Le dipendenze si possono risolvere pigramente (deps.resolve), per leggere gli override
+      // più freschi al momento del click.
       const resolved = typeof deps.resolve === 'function' ? deps.resolve() : deps;
       Promise.resolve(resolved).then((d) => {
         const dd = { ...(d || deps) };

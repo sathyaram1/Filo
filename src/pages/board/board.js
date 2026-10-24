@@ -1,26 +1,6 @@
-// Bacheca utente di Filo (filo://board/, DC1 + DC2).
-//
-// DA DOVE VENGONO I DATI (#583): dalla vista pubblica `feedback-public`, una
-// scheda per fix chiuso con i soli campi pubblici (titolo, numero, versione,
-// voti). La collezione dei feedback non si legge senza credenziali: qui non ne
-// arriva più niente, nemmeno per essere scartato.
-//
-// Superficie a PERMESSI RIDOTTI, NON owner-gated: gli anonimi leggono, per
-// votare serve il login. Mostra SOLO i miglioramenti già IN PRODUZIONE (fix
-// chiusi e usciti in una versione rilasciata, DB3) in chiave POSITIVA. Il
-// red-team resta invisibile: ZERO info di sicurezza (niente stato, priorità,
-// verdetti dei giudici, pipeline, mittente, orario, testo grezzo). L'unico
-// contenuto mostrato è il TITOLO breve già generato (`name`) — mai il testo
-// libero (che è cifrato e può contenere dettagli tecnici/personali) né nulla
-// che provenga dal pipeline di sicurezza.
-//
-// La struttura dati dei voti (works/broken per uid) è DB4; il filtro "in
-// produzione + niente blocchi" è la pura `SN_MANAGE_REVIEW.listBoardTab`.
-// Il voto (DC2) persiste su Firestore tramite l'handler IPC BOARD_CAST_VOTE/
-// BOARD_CLEAR_VOTE: il main allega l'ID token del votante (mai esposto qui) e
-// premia +10 crediti una sola volta per feedback per utente (anti-doppio-
-// premio nel credit store). Il conteggio mostrato è il tally REALE ritornato
-// dal main dopo la scrittura, non solo l'aggiornamento ottimistico locale.
+// Bacheca utente (filo://board/): superficie a PERMESSI RIDOTTI, non owner-gated — gli
+// anonimi leggono, per votare serve il login.
+// Mostra SOLO i fix già usciti in una versione, col solo titolo breve: mai il testo grezzo.
 
 (function () {
   'use strict';
@@ -39,10 +19,8 @@
   const bdRetry   = document.getElementById('bdRetry');
   const bdList    = document.getElementById('bdList');
 
-  // Timeout della fetch dei miglioramenti: senza limite, offline la richiesta
-  // resta muta ~13 s prima che il sistema la lasci cadere. Arrendersi prima e
-  // mostrare l'errore è meno attrito che aspettare al buio (filo_design: l'attesa
-  // muta è attrito).
+  // Timeout della fetch: offline la richiesta resta muta ~13 s prima che il sistema la lasci
+  // cadere, e aspettare al buio è più attrito di un errore subito.
   const LOAD_TIMEOUT_MS = 8000;
 
   // Quante schede per pagina, quali campi, e quanto vale una copia su disco.
@@ -257,7 +235,6 @@
     return num ? `Miglioramento #${num}` : 'Miglioramento';
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────
   function renderList() {
     // Caricamento fallito e mai riuscito: la lista è vuota perché non l'abbiamo,
     // non perché non ci sia niente. Resta l'errore, con la via d'uscita.
@@ -388,13 +365,8 @@
     return card;
   }
 
-  // ── Riapertura a pagamento (DC4) ────────────────────────────────────────
-  // Link discreto "Ancora rotto?" sotto i voti: apre un piccolo form inline
-  // (textarea + invia) invece di un prompt nativo, per restare nel tema di
-  // Filo (vedi PATTERNS.md — niente window.prompt). Non mostrato se l'utente
-  // ha già chiesto la riapertura di QUESTO fix (reopenRequests non vuoto):
-  // l'eventuale ❌ è già stata raccolta nei voti, e la riapertura è UNA volta
-  // sola per fix (vedi guard SN_MANAGE_REVIEW.canReopen), non per voto.
+  // «Ancora rotto?» apre un form inline, non un prompt nativo (PATTERNS.md). Nascosto se la
+  // riapertura di QUESTO fix è già stata chiesta: è una volta sola per fix, non per voto.
   function renderReopen(fb) {
     if (riaperteOra.has(fb._id)) {
       const { saldo } = riaperteOra.get(fb._id) || {};
@@ -499,11 +471,8 @@
     return wrap;
   }
 
-  // Invio della riapertura: scala crediti + crea il feedback collegato lato
-  // main (BOARD_REOPEN). Bottone disabilitato durante l'invio; errore mostrato
-  // inline (testo vuoto, saldo insufficiente, fix già riaperto, sessione
-  // scaduta…). A successo il link/form scompare e compare la conferma — niente
-  // duplicati possibili senza ricaricare la pagina.
+  // Invio della riapertura: scala crediti e crea il feedback collegato lato main. Errore
+  // inline, e a successo il form scompare — niente duplicati senza ricaricare.
   function onReopen(fb, textarea, sendBtn, errEl) {
     const text = textarea.value.trim();
     errEl.hidden = true;
@@ -624,8 +593,7 @@
     sendToMain(msg)
       .then((r) => {
         if (r && r.ok) {
-          // Tally autorevole dal server: sostituisce l'ottimistico (può
-          // includere voti di altri utenti arrivati nel frattempo).
+          // Tally autorevole dal server: può includere voti di altri arrivati nel frattempo.
           fb.votes = (r.votes && typeof r.votes === 'object') ? r.votes : fb.votes;
           if (r.uid) uid = r.uid;
           if (r.awarded && r.credits) flyCreditsFromButton(originRect, r.credits);
@@ -945,10 +913,8 @@
       lastLoadError = null;
       salvaCache();
     } catch (err) {
-      // Il caricamento è FALLITO: non fingere "lista vuota". Mostra l'errore con
-      // il tasto Riprova e fermati qui (renderList mostrerebbe #bdEmpty).
-      // Il guasto resta in `lastLoadError`: i ridisegni successivi lo rileggono
-      // invece di ripiegare sul vuoto.
+      // Caricamento FALLITO: non fingere «lista vuota». Il guasto resta in `lastLoadError` così i
+      // ridisegni successivi lo rileggono invece di ripiegare sul vuoto.
       console.error('[board] errore caricamento:', err);
       if (schedeImposteDaFuori) return;
       // Un guasto del GIRO DI AGGIORNAMENTO non porta via le schede già sotto
@@ -961,8 +927,7 @@
       showLoadError(err);
       return;
     }
-    // renderList nasconde sempre il loader (anche a lista vuota), così la pagina
-    // raggiunge uno stato stabile a fine caricamento.
+    // Il loader si nasconde anche a lista vuota: la pagina si ferma in uno stato stabile.
     renderList();
   }
 
@@ -1004,9 +969,32 @@
     });
   }
 
+  // La Bacheca in pausa (#1592): la pagina parte con le sole segnalazioni dell'utente e mostra il resto a chi la vede
+  // (l'owner, o tutti se l'ha aperta). Niente voti, niente «Ancora rotto?», niente letture dei miglioramenti.
+  const MSG_PAUSA = (window.SN_MSG && window.SN_MSG.MSG) || {};
+  async function bachecaAperta() {
+    try {
+      const r = await sendToMain({ type: MSG_PAUSA.IN_PAUSA_STATO || 'in_pausa_stato', attendi: true });
+      return !!(r && r.ok && r.bacheca && r.bacheca.visible);
+    } catch (_) { return false; }
+  }
+  let aperta = false;
+  if (window.chrome?.runtime?.onMessage?.addListener) {
+    // Aperta o rimessa in pausa mentre la pagina è aperta: si rifà da capo, come all'apertura.
+    window.chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === (MSG_PAUSA.IN_PAUSA_CAMBIATO || 'in_pausa_cambiato') && msg.nome === 'bacheca'
+        && (msg.visible === true) !== aperta) location.reload();
+    });
+  }
+
   async function init() {
     // «Le tue segnalazioni» (#986) vive in board-segnalazioni.js e non aspetta la rete dei miglioramenti.
     try { window.SN_BOARD_SEGNALAZIONI?.init(); } catch (e) { console.warn('[bacheca] segnalazioni:', e); }
+    aperta = await bachecaAperta();
+    if (!aperta) return;
+    delete document.body.dataset.bachecaPausa;
+    document.title = 'Filo — Bacheca';
+    try { window.SN_BOARD_SEGNALAZIONI?.rinfresca(); } catch (_) {}
     await refreshAuth();
     await loadData();
   }
@@ -1024,8 +1012,7 @@
     },
     setSignedIn(email) { signedIn = !!email; uid = email || null; reflectAuth(); renderList(); },
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
-    // Rilancia il caricamento reale (loadData): usato dai test per esercitare il
-    // cammino d'errore (FB.list che rigetta → stato d'errore) e il retry, senza
+    // Rilancia il caricamento reale: i test esercitano il cammino d'errore e il retry senza
     // dover simulare la rete davvero assente.
     // La lettura della vista pubblica ha una MEMORIA BREVE (trenta secondi):
     // senza buttarla via, un ricaricamento chiesto da una prova risponderebbe

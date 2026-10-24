@@ -6,15 +6,17 @@
 // discussione di ieri non era recuperabile da nessuna parte.
 //
 // Qui si prova il cammino dell'utente per intero: si fa una chat, la si
-// chiude, la si ritrova in Cronologia, la si cerca per una parola detta a metà
-// conversazione, la si riapre e ci si continua a scrivere dentro.
+// chiude, la si ritrova nel filo della home (#872: la Cronologia non c'è più),
+// la si cerca per una parola detta a metà conversazione, la si riapre e ci si
+// continua a scrivere dentro.
 //
 // Senza la cura ogni assert di questo file è rosso: prima del #525 non c'era
 // nessun posto in cui una chat finita potesse esistere.
 
 import { test, expect } from './fixtures/electron.mjs';
 
-const ARCHIVE = 'filo://archive/archive.html';
+const HOME = 'filo://newtab/';
+const risultati = (page) => page.locator('#cercaRisultati .dash-cerca-msg');
 
 // Modelli di prova + chiave finta: senza, la chat non parte nemmeno.
 async function configura(app) {
@@ -106,7 +108,7 @@ async function preparaDueChat(app) {
   await chiudi(app, 'chat-comando');
 }
 
-test('una chat finita si salva per intero e si ritrova in Cronologia', async ({ app, openTab }) => {
+test('una chat finita si salva per intero e si ritrova nel filo', async ({ app, openTab }) => {
   await preparaDueChat(app);
 
   // Su disco c'è TUTTA la conversazione, non i primi 200 caratteri.
@@ -124,29 +126,11 @@ test('una chat finita si salva per intero e si ritrova in Cronologia', async ({ 
   // cosa si VEDE, mai cosa si conserva.
   expect(cmd.messages.length).toBe(2);
 
-  // In pagina: la conversazione si vede, il comando no (ma esiste).
-  const page = await openTab(ARCHIVE);
-  const righe = page.locator('.arc-chat');
-  await expect(righe).toHaveCount(1);
-  await expect(righe.first()).toContainText('La coscienza è emergente?');
-  await expect(page.locator('#chatsSection')).toBeVisible();
-});
-
-test('i comandi ci sono sempre: stanno sotto l’interruttore, non nel cestino', async ({ app, openTab }) => {
-  await preparaDueChat(app);
-  const page = await openTab(ARCHIVE);
-
-  await expect(page.locator('.arc-chat')).toHaveCount(1);
-  await expect(page.locator('#showCommandsLabel')).toBeVisible();
-  await expect(page.locator('#showCommandsText')).toContainText('Mostra anche i comandi (1)');
-
-  await page.locator('#showCommands').check();
-  await expect(page.locator('.arc-chat')).toHaveCount(2);
-  await expect(page.locator('.arc-chat[data-kind="comando"]')).toContainText('Sveglia alle sette');
-
-  // E si richiude: nascondere e mostrare sono la stessa strada nei due versi.
-  await page.locator('#showCommands').uncheck();
-  await expect(page.locator('.arc-chat')).toHaveCount(1);
+  // Nella home la conversazione sta nel filo, e la ricerca la ritrova.
+  const page = await openTab(HOME);
+  await expect(page.locator('.dash-bubble[data-chat="chat-discussione"]').first()).toContainText('Secondo te la coscienza è emergente?');
+  await page.locator('#cercaInput').fill('coscienza');
+  await expect(risultati(page).first()).toContainText('coscienza');
 });
 
 test('la ricerca trova una parola detta a metà conversazione, non solo nel titolo', async ({ app, openTab }) => {
@@ -160,42 +144,37 @@ test('la ricerca trova una parola detta a metà conversazione, non solo nel tito
   await chiudi(app, 'c-marte');
   await chiudi(app, 'c-torta');
 
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('.arc-chat')).toHaveCount(2);
-
+  const page = await openTab(HOME);
   // "Marte" non compare in nessun titolo: sta dentro il messaggio.
-  await page.locator('#search').fill('marte');
-  await expect(page.locator('.arc-chat')).toHaveCount(1);
-  await expect(page.locator('.arc-chat').first()).toContainText('Due chiacchiere');
+  await page.locator('#cercaInput').fill('marte');
+  await expect(risultati(page)).toHaveCount(1);
+  await expect(risultati(page).first()).toContainText('Parlami della gravità su Marte');
 
   // Senza accenti e senza maiuscole, come si scrive di fretta.
-  await page.locator('#search').fill('GRAVITA');
-  await expect(page.locator('.arc-chat')).toHaveCount(1);
+  await page.locator('#cercaInput').fill('GRAVITA');
+  await expect(risultati(page)).toHaveCount(1);
 
   // Nessun risultato: lo dice, invece di sembrare un archivio cancellato.
-  await page.locator('#search').fill('astronomia siderale');
-  await expect(page.locator('.arc-chat')).toHaveCount(0);
-  await expect(page.locator('#chatEmpty')).toContainText('Nessuna chat per');
-
-  await page.locator('#search').fill('');
-  await expect(page.locator('.arc-chat')).toHaveCount(2);
+  await page.locator('#cercaInput').fill('astronomia siderale');
+  await expect(risultati(page)).toHaveCount(0);
+  await expect(page.locator('#cercaRisultati .dash-cerca-niente').first()).toContainText('Niente nel filo per');
 });
 
 test('una chat si riapre per intero e ci si continua a scrivere dentro', async ({ app, openTab }) => {
   await preparaDueChat(app);
 
   const dash = await openTab('filo://dashboard/dashboard.html?chat=chat-discussione');
-  const bolle = dash.locator('.dash-bubble');
+  // La conversazione riaperta sta nel filo con le altre (#869), e il filo va al suo punto.
+  const bolle = dash.locator('.dash-bubble[data-chat="chat-discussione"]');
   await expect(bolle).toHaveCount(2);
   await expect(bolle.nth(0)).toContainText('Secondo te la coscienza è emergente?');
   await expect(bolle.nth(1)).toContainText('Va bene, ci penso.');
-  // La conversazione riaperta è in primo piano, non la home.
-  await expect(dash.locator('body')).toHaveAttribute('data-state', 'thread');
+  await expect(bolle.nth(0)).toBeInViewport();
 
   // Si scrive ancora: il messaggio nuovo va nella STESSA chat, non in una gemella.
   await dash.locator('#input').fill('E il libero arbitrio?');
   await dash.locator('#input').press('Enter');
-  await expect(bolle).toHaveCount(4);
+  await expect(dash.locator('.dash-bubble-user', { hasText: 'E il libero arbitrio?' })).toBeVisible();
 
   await expect.poll(async () => {
     const chats = await leggiArchivio(app);
@@ -244,45 +223,52 @@ test('input limite: messaggi enormi, soli spazi e caratteri strani non rompono n
   expect(lunga.messages[0].text.length).toBe(lungo.length);
   expect(lunga.title.length).toBeLessThanOrEqual(81);
 
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('.arc-chat')).toHaveCount(3);
-  // Il titolo è TESTO, non HTML: uno script scritto in chat resta scritto.
-  await expect(page.locator('.arc-chat', { hasText: 'alert(1)' })).toHaveCount(1);
-  expect(await page.evaluate(() => document.querySelectorAll('#chatList script').length)).toBe(0);
+  const page = await openTab(HOME);
+  // Il testo è TESTO, non HTML: uno script scritto in chat resta scritto, nel filo e nella ricerca.
+  await expect(page.locator('.dash-bubble', { hasText: '<script>alert(1)</script>' }).first()).toBeVisible();
+  await page.locator('#cercaInput').fill('alert');
+  await expect(risultati(page).first()).toContainText('<script>alert(1)</script>');
+  expect(await page.evaluate(() => document.querySelectorAll('#bubbles script, #cercaRisultati script').length)).toBe(0);
 
-  // Una ricerca di soli spazi non nasconde niente.
-  await page.locator('#search').fill('   ');
-  await expect(page.locator('.arc-chat')).toHaveCount(3);
+  // Una ricerca di soli spazi non apre un elenco vuoto.
+  await page.locator('#cercaInput').fill('   ');
+  await expect(page.locator('#cercaRisultati')).toBeHidden();
 });
+
+// Il tasto destro su una bolla del filo, dal #872 (prima stava nella Cronologia).
+async function togliDalFilo(page, chat) {
+  await page.locator(`.dash-bubble[data-chat="${chat}"]`).first().evaluate((el) => {
+    const v = (window.SN_VOCI_PAGINA || []).flatMap((f) => f(el) || []).find((x) => x.label === 'Togli la conversazione dal filo');
+    v.onClick();
+  });
+}
 
 test('una chat si cancella a mano, con la conferma delle cose irreversibili', async ({ app, openTab }) => {
   await preparaDueChat(app);
-  const page = await openTab(ARCHIVE);
-
-  await page.locator('.arc-chat').first().click({ button: 'right' });
-  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Elimina la chat' }).click();
+  const page = await openTab(HOME);
+  await expect(page.locator('.dash-bubble[data-chat="chat-discussione"]').first()).toBeVisible();
+  await togliDalFilo(page, 'chat-discussione');
 
   // La conferma di Filo (non quella del browser): vive in uno shadow root
   // chiuso, quindi si ispeziona dagli hook del modulo. Finché non si accetta,
   // niente si cancella.
   await expect.poll(
     () => page.evaluate(() => window.SN_CONFIRM_UI._test.state()?.title || null),
-  ).toBe('Elimina la chat');
+  ).toBe('Togliere la conversazione dal filo?');
   expect((await leggiArchivio(app)).length).toBe(2);
 
   // Prima si prova a rinunciare: annullare NON deve cancellare niente.
   expect(await page.evaluate(() => window.SN_CONFIRM_UI._test.click('cancel'))).toBe(true);
-  await expect(page.locator('.arc-chat')).toHaveCount(1);
+  await expect(page.locator('.dash-bubble[data-chat="chat-discussione"]')).toHaveCount(2);
   expect((await leggiArchivio(app)).length).toBe(2);
 
   // E adesso davvero.
-  await page.locator('.arc-chat').first().click({ button: 'right' });
-  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Elimina la chat' }).click();
+  await togliDalFilo(page, 'chat-discussione');
   await expect.poll(
     () => page.evaluate(() => window.SN_CONFIRM_UI._test.state()?.title || null),
-  ).toBe('Elimina la chat');
+  ).toBe('Togliere la conversazione dal filo?');
   expect(await page.evaluate(() => window.SN_CONFIRM_UI._test.click('danger') || window.SN_CONFIRM_UI._test.click('ok'))).toBe(true);
-  await expect(page.locator('.arc-chat')).toHaveCount(0);
+  await expect(page.locator('.dash-bubble[data-chat="chat-discussione"]')).toHaveCount(0);
   await expect.poll(async () => (await leggiArchivio(app)).length).toBe(1);
 });
 
@@ -335,10 +321,10 @@ test('senza modello la chat non si perde: prende il primo messaggio come titolo 
   expect(chats[0].title).toBe('Quanto dista la Luna?');
   expect(chats[0].kind).toBe(null);
 
-  // E in pagina si vede lo stesso: nel dubbio si mostra.
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('.arc-chat')).toHaveCount(1);
-  await expect(page.locator('.arc-chat').first()).toContainText('Quanto dista la Luna?');
+  // E la ricerca del filo la trova lo stesso: nel dubbio si mostra.
+  const page = await openTab(HOME);
+  await page.locator('#cercaInput').fill('Luna');
+  await expect(risultati(page).first()).toContainText('Quanto dista la Luna?');
 });
 
 test('Filo ritrova una conversazione di prima e la rilegge', async ({ app }) => {
@@ -386,16 +372,14 @@ test('la chat in corso non torna fra i risultati: non è un ricordo, è adesso; 
   expect(daAltrove.output.results.map((x) => x.id)).toEqual(['c-aperta']);
 });
 
-test('una chat vuota non lascia un guscio senza titolo in Cronologia', async ({ app, openTab }) => {
+test('una chat vuota non lascia un guscio senza titolo', async ({ app }) => {
   await preparaDueChat(app);
   // Una home aperta e mai usata: la targa c'è, i messaggi no.
   await chiudi(app, 'chat-mai-usata');
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('.arc-chat')).toHaveCount(1);
   expect((await leggiArchivio(app)).length).toBe(2);
 });
 
-test('l’intervista di benvenuto resta una conversazione anche se il modello dice "comando"', async ({ app, openTab }) => {
+test('l’intervista di benvenuto resta una conversazione anche se il modello dice "comando"', async ({ app }) => {
   // Niente `configura`: l'intervista è aperta col benvenuto, come la trova chi apre Filo la prima volta, e la prima
   // chat È l'intervista. Il classificatore qui risponde sempre "comando": deve perdere.
   await app.evaluate(async () => {
@@ -414,16 +398,14 @@ test('l’intervista di benvenuto resta una conversazione anche se il modello di
   });
   await stubProvider(app, { Utente: { tipo: 'comando', titolo: 'Due parole' } });
 
-  await turno(app, 'c-accoglienza', 'Ciao, mi chiamo Ada');
-  await chiudi(app, 'c-accoglienza');
+  // La targa è quella dell'intervista, come la manda la home: un'altra chat aperta intanto resta sua (#1297).
+  const id = await app.evaluate(async () => globalThis.SN_ONBOARDING.chatId(await globalThis.SN_FILO_MEMORY.getOnboarding()));
+  await turno(app, id, 'Ciao, mi chiamo Ada');
+  await chiudi(app, id);
 
   const chats = await leggiArchivio(app);
   expect(chats[0].onboarding).toBe(true);
   expect(chats[0].kind).toBe('conversazione');
-
-  // E quindi si vede senza toccare l'interruttore dei comandi.
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('.arc-chat')).toHaveCount(1);
 });
 
 test.describe(() => {
@@ -522,13 +504,6 @@ test('la trascrizione arriva al classificatore imbustata, e non può chiudersi l
   expect(prompt.indexOf('<<<FINE_CONVERSAZIONE_ARCHIVIATA>>>', chiude + 1)).toBe(-1);
 });
 
-test('la sezione delle chat non compare quando non c’è ancora nessuna chat', async ({ app, openTab }) => {
-  await configura(app);
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('#chatsSection')).toBeHidden();
-  await expect(page.locator('#tabsSection')).toBeHidden();
-});
-
 // Verifica #525, giro 1 — le tre cose che l'archivio si lasciava sfuggire.
 
 test('l’intervista di benvenuto si archivia con la domanda di apertura e col congedo', async ({ app }) => {
@@ -575,7 +550,7 @@ test('l’intervista di benvenuto si archivia con la domanda di apertura e col c
   expect(chat.onboarding).toBe(true);
 });
 
-test('un’accoglienza aperta e mai risposta non lascia una chat con dentro la sola domanda', async ({ app, openTab }) => {
+test('un’accoglienza aperta e mai risposta non lascia una chat con dentro la sola domanda', async ({ app }) => {
   await app.evaluate(async () => {
     const O = globalThis.SN_ONBOARDING;
     await globalThis.SN_FILO_MEMORY.setOnboarding(
@@ -583,8 +558,6 @@ test('un’accoglienza aperta e mai risposta non lascia una chat con dentro la s
     );
   });
   expect((await leggiArchivio(app)).length).toBe(0);
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('#chatsSection')).toBeHidden();
 });
 
 // A Filo ancora aperto l'immagine è in memoria (#1166) e torna nella bolla; il conto «non conservata» vale dopo un riavvio.
@@ -603,28 +576,6 @@ test('un’immagine incollata: la chat riaperta a Filo ancora aperto la rimostra
   await expect(bolla).toContainText('Cosa vedi in questo grafico?');
   await expect(bolla.locator('img.dash-bubble-img')).toHaveAttribute('src', png);
   await expect(dash.locator('.dash-thread')).not.toContainText('non conservata');
-});
-
-test('la Cronologia aperta si accorge di una chat finita in un’altra scheda', async ({ app, openTab }) => {
-  test.setTimeout(90_000);
-  await configura(app);
-  await stubProvider(app, { vulcani: { tipo: 'conversazione', titolo: 'I vulcani' } });
-  // La pagina si apre quando di chat non ce n'è ancora nessuna.
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('#chatsSection')).toBeHidden();
-
-  // Intanto, altrove, una chat comincia e finisce.
-  await turno(app, 'c-altrove', 'Parliamo di vulcani');
-  // La chiusura vera passa dal messaggio che manda la home, perché è quello
-  // che annuncia il cambiamento alle altre schede.
-  await page.evaluate(async () => {
-    await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_CHAT_CLOSE, id: 'c-altrove' });
-  });
-
-  // Senza ricaricare niente, la sezione compare con la chat appena finita.
-  await expect(page.locator('#chatsSection')).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator('.arc-chat')).toHaveCount(1, { timeout: 15_000 });
-  await expect(page.locator('.arc-chat').first()).toContainText('I vulcani');
 });
 
 // ── Una chat finisce anche quando la pagina se ne va senza dirlo ────────────
@@ -705,25 +656,6 @@ test('la risposta che arriva a chat già chiusa non lascia la chat aperta per se
   expect((trovate.output.results || []).map((r) => r.id)).toContain('chat-tardi');
 });
 
-test('la ricerca dice dov’è finita la chat, invece di dire che non c’è', async ({ app, openTab }) => {
-  test.setTimeout(90_000);
-  await preparaDueChat(app);
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('.arc-chat')).toHaveCount(1);
-
-  // «sveglia» sta solo nella chat classificata come comando, che è nascosta
-  // sotto l'interruttore ma esiste: dire che non c'è niente è falso, e falso
-  // proprio nel caso per cui i comandi si conservano.
-  await page.locator('#search').fill('sveglia');
-  await expect(page.locator('#chatEmpty')).toContainText(/chat di comando/i, { timeout: 10_000 });
-  await expect(page.locator('#chatEmpty')).not.toContainText('Nessuna chat per');
-
-  // E accendendo l'interruttore la chat compare davvero.
-  await page.locator('#showCommands').check();
-  await expect(page.locator('.arc-chat')).toHaveCount(1);
-  await expect(page.locator('.arc-chat').first()).toContainText('Sveglia alle sette');
-});
-
 // ── Giro 3 di verifica: le porte trovate e chiuse ───────────────────────────
 
 test('una conversazione ripescata dall’archivio entra nel prompt imbustata', async ({ app, openTab }) => {
@@ -787,47 +719,6 @@ test('una conversazione ripescata dall’archivio entra nel prompt imbustata', a
   }
 });
 
-test('senza nemmeno una chat di comando l’interruttore non si vede', async ({ app, openTab }) => {
-  // La pagina glielo dice (mette l'attributo), ma uno `display` scritto in una
-  // classe batteva il nascondere del browser: «Mostra anche i comandi (0)»
-  // restava a schermo per chiunque avesse salvato la sua prima chat.
-  await configura(app);
-  await stubProvider(app, { Epicuro: { tipo: 'conversazione', titolo: 'Epicuro' } });
-  await turno(app, 'c-sola', 'Discutiamo di Epicuro');
-  await chiudi(app, 'c-sola');
-
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('.arc-chat').first()).toBeVisible();
-  await expect(page.locator('#showCommandsLabel')).toBeHidden();
-});
-
-test('una chat senza titolo generato non ripete la stessa frase due volte', async ({ app, openTab }) => {
-  // Titolo di ripiego = primo messaggio dell'utente. L'anteprima accanto
-  // mostrava lo stesso messaggio: la riga diceva due volte la stessa cosa.
-  await configura(app);
-  await app.evaluate(() => {
-    const rispondi = async ({ attempts, messages }) => {
-      const joined = messages.map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n');
-      if (joined.includes('Classifichi le conversazioni')) throw new Error('niente modello');
-      return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text: JSON.stringify({ text: 'Va bene.', actions: [] }) };
-    };
-    globalThis.SN_PROVIDERS.completeWithFallback = rispondi;
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = rispondi;
-  });
-  await turno(app, 'c-senza-titolo', 'Discutiamo di Epicuro e del piacere');
-  await chiudi(app, 'c-senza-titolo');
-
-  const page = await openTab(ARCHIVE);
-  const riga = page.locator('.arc-chat').first();
-  await expect(riga).toBeVisible();
-  const parti = await riga.evaluate((el) => ({
-    titolo: el.querySelector('.arc-chat-title').textContent,
-    estratto: el.querySelector('.arc-chat-excerpt').textContent,
-  }));
-  expect(parti.titolo).toContain('Epicuro');
-  expect(parti.estratto).not.toBe(parti.titolo);
-});
-
 test('una chat cancellata non rinasce al messaggio dopo', async ({ app, openTab }) => {
   // La conversazione è ancora a schermo in un'altra scheda: senza un avviso
   // quella scheda continuava a scrivere sulla stessa targa e la chat tornava
@@ -842,54 +733,25 @@ test('una chat cancellata non rinasce al messaggio dopo', async ({ app, openTab 
   await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 20_000 });
 
   const cancellata = await app.evaluate(() => globalThis.SN_FILO_CHATS.list().then((l) => l[0].id));
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('.arc-chat').first()).toBeVisible();
-  await page.locator('.arc-chat').first().click({ button: 'right' });
-  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Elimina la chat' }).click();
-  await expect.poll(() => page.evaluate(() => window.SN_CONFIRM_UI._test.state()?.title || null)).toBe('Elimina la chat');
+  // Tolta dal filo da un'altra scheda della home.
+  const page = await openTab(HOME);
+  await expect(page.locator(`.dash-bubble[data-chat="${cancellata}"]`).first()).toBeVisible();
+  await togliDalFilo(page, cancellata);
+  await expect.poll(() => page.evaluate(() => window.SN_CONFIRM_UI._test.state()?.title || null)).toBe('Togliere la conversazione dal filo?');
   await page.evaluate(() => window.SN_CONFIRM_UI._test.click('danger') || window.SN_CONFIRM_UI._test.click('ok'));
   await expect.poll(async () => (await leggiArchivio(app)).length).toBe(0);
 
+  // Cancellata altrove, la conversazione se ne va anche dal filo a schermo (#869).
+  await expect(dash.locator('.dash-bubble-user', { hasText: 'Barocco' })).toHaveCount(0);
   await dash.locator('#input').fill('E del Rococò?');
   await dash.locator('#input').press('Enter');
-  await expect(dash.locator('.dash-bubble-filo').nth(1)).toBeVisible({ timeout: 20_000 });
+  await expect(dash.locator('.dash-bubble-user', { hasText: 'E del Rococò?' })).toBeVisible();
+  await expect.poll(async () => (await leggiArchivio(app)).length, { timeout: 20_000 }).toBe(1);
 
   const dopo = await leggiArchivio(app);
   expect(dopo.map((c) => c.id)).not.toContain(cancellata);
   expect(JSON.stringify(dopo)).not.toContain('Barocco');
-  await expect(dash.locator('.dash-bubble-note', { hasText: 'cancellata dalla Cronologia' })).toBeVisible();
-});
-
-test('la chat ancora in corso si vede per quello che è, e cliccarla riporta dov’è aperta', async ({ app, openTab, shell }) => {
-  test.setTimeout(90_000);
-  await configura(app);
-  await stubProvider(app, {});
-  const dash = await openTab('filo://dashboard/dashboard.html');
-  await dash.locator('#input').fill('Discutiamo di Epicuro');
-  await dash.locator('#input').press('Enter');
-  await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 20_000 });
-
-  const page = await openTab(ARCHIVE);
-  const riga = page.locator('.arc-chat').first();
-  await expect(riga).toBeVisible();
-  await expect(riga).toContainText('In corso');
-
-  const prima = await shell.evaluate(async () => {
-    const snap = await window.filoShell.tabs.snapshot();
-    return (snap.tabs || snap).map((t) => String(t.url || ''));
-  });
-  await riga.click();
-  await page.waitForTimeout(1200);
-  const dopo = await shell.evaluate(async () => {
-    const snap = await window.filoShell.tabs.snapshot();
-    const lista = snap.tabs || snap;
-    return {
-      urls: lista.map((t) => String(t.url || '')),
-      attiva: String((lista.find((t) => t.id === snap.activeId) || {}).url || ''),
-    };
-  });
-  expect(dopo.urls).toEqual(prima);            // nessuna seconda copia
-  expect(dopo.attiva).toContain('dashboard');  // si torna dov'è aperta
+  await expect(dash.locator('.dash-bubble-note', { hasText: 'tolta dal filo' })).toBeVisible();
 });
 
 test('la risposta a un comando con lo slash si ritrova rileggendo la chat', async ({ app, openTab }) => {
@@ -911,20 +773,6 @@ test('la risposta a un comando con lo slash si ritrova rileggendo la chat', asyn
     const c = (await leggiArchivio(app))[0];
     return c ? c.messages.map((m) => m.text).join('\n') : '';
   }, { timeout: 20_000 }).toContain('lista comandi');
-});
-
-test('«Svuota archivio» senza schede chiuse dice perché non succede niente', async ({ app, openTab }) => {
-  await configura(app);
-  await stubProvider(app, {});
-  await turno(app, 'c-sola', 'Una chat e nessuna scheda chiusa');
-  await chiudi(app, 'c-sola');
-
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('.arc-chat').first()).toBeVisible();
-  await page.locator('#clear').click();
-  await expect(page.locator('#searchNote')).toContainText(/nessuna scheda chiusa/i);
-  // E le chat restano: quel tasto non le ha mai riguardate.
-  await expect(page.locator('.arc-chat')).toHaveCount(1);
 });
 
 // ── Il terminale scrive dentro la chat, e nell'archivio deve arrivarci ───────
@@ -954,7 +802,8 @@ test('un comando di terminale e il suo esito restano nella chat che li conteneva
     { timeout: 40_000 },
   ).toContain('ciao-dal-terminale');
 
-  await dash.locator('#input').fill('/home');
+  // Tornare alla home non chiude la conversazione (#869): la chiude «/clear».
+  await dash.locator('#input').fill('/clear');
   await dash.locator('#input').press('Enter');
   await expect.poll(async () => {
     const c = (await leggiArchivio(app))[0];
@@ -969,76 +818,15 @@ test('un comando di terminale e il suo esito restano nella chat che li conteneva
 
 // ── Il titolo e il tipo li sceglie un modello: l'utente deve poterli cambiare ─
 
-test('una chat si rinomina e si sposta fra conversazioni e comandi, e ci resta', async ({ app, openTab }) => {
-  test.setTimeout(120_000);
-  await configura(app);
-  await stubProvider(app, { Spinoza: { tipo: 'comando', titolo: 'Sveglia impostata' } });
-
-  // Il classificatore sbaglia: una discussione finisce fra i comandi.
-  await turno(app, 'chat-sbagliata', 'Discutiamo a lungo di Spinoza e della sostanza');
-  await chiudi(app, 'chat-sbagliata');
-  await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).kind || '', { timeout: 30_000 }).toBe('comando');
-
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('#showCommandsLabel')).toBeVisible({ timeout: 20_000 });
-  await page.locator('#showCommands').check();
-  const riga = page.locator('.arc-chat').first();
-  await expect(riga).toBeVisible({ timeout: 20_000 });
-
-  await riga.click({ button: 'right' });
-  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Sposta fra le conversazioni' }).click();
-  await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).kind || '', { timeout: 20_000 }).toBe('conversazione');
-
-  await riga.click({ button: 'right' });
-  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Rinomina' }).click();
-  const campo = page.locator('.arc-chat-rename');
-  await expect(campo).toBeVisible({ timeout: 10_000 });
-  await campo.fill('Spinoza e la sostanza');
-  await campo.press('Enter');
-  await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).title || '', { timeout: 20_000 })
-    .toBe('Spinoza e la sostanza');
-
-  // La conversazione va avanti e viene riclassificata: quello che ha scelto
-  // l'utente non si riscrive.
-  await turno(app, 'chat-sbagliata', 'Un altro pezzo di discussione');
-  await chiudi(app, 'chat-sbagliata');
-  await page.waitForTimeout(2500);
-  const dopo = (await leggiArchivio(app)).find((c) => c.id === 'chat-sbagliata');
-  expect(dopo.title).toBe('Spinoza e la sostanza');
-  expect(dopo.kind).toBe('conversazione');
-});
-
-test('rinominare con un campo vuoto non lascia una riga senza niente da leggere', async ({ app, openTab }) => {
+test('cercare una frase intera trova la chat, e la ricerca dice con quali parole', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   await preparaDueChat(app);
-  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.title).length, { timeout: 30_000 }).toBe(2);
-
-  const page = await openTab(ARCHIVE);
-  const riga = page.locator('.arc-chat').first();
-  await expect(riga).toBeVisible({ timeout: 20_000 });
-  const primaTitolo = await riga.locator('.arc-chat-title').textContent();
-
-  await riga.click({ button: 'right' });
-  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Rinomina' }).click();
-  const campo = page.locator('.arc-chat-rename');
-  await expect(campo).toBeVisible({ timeout: 10_000 });
-  await campo.fill('   ');
-  await campo.press('Enter');
-  await expect(page.locator('.arc-chat-title').first()).toHaveText(primaTitolo, { timeout: 10_000 });
-});
-
-test('cercare una frase intera trova la chat, e la pagina dice con quali parole', async ({ app, openTab }) => {
-  test.setTimeout(120_000);
-  await preparaDueChat(app);
-  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.kind).length, { timeout: 30_000 }).toBe(2);
-
-  const page = await openTab(ARCHIVE);
-  await expect(page.locator('.arc-chat').first()).toBeVisible({ timeout: 20_000 });
-  await page.locator('#search').fill('la discussione di ieri sulla coscienza');
-  await expect(page.locator('.arc-chat')).toHaveCount(1, { timeout: 15_000 });
-  await expect(page.locator('.arc-chat-title').first()).toContainText('coscienza');
+  const page = await openTab(HOME);
+  await page.locator('#cercaInput').fill('la discussione di ieri sulla coscienza');
+  await expect(risultati(page)).toHaveCount(1, { timeout: 15_000 });
+  await expect(risultati(page).first()).toContainText('coscienza');
   // E lo dice: i risultati rispondono a meno parole di quelle scritte.
-  await expect(page.locator('#chatsCount')).toContainText('coscienza', { timeout: 10_000 });
+  await expect(page.locator('#cercaRisultati .dash-cerca-niente').first()).toContainText('coscienza', { timeout: 10_000 });
 });
 
 // ── Una riga che arriva tardi appartiene alla chat che l'ha chiesta ──────────
@@ -1066,10 +854,8 @@ test('l’esito di un comando lento resta nella chat in cui il comando è stato 
   await dash.locator('#input').fill("/sleep 4; echo ESIT''O-TARDIVO");
   await dash.locator('#input').press('Enter');
   await dash.waitForTimeout(700);
-  await dash.locator('#input').fill('/home');
+  await dash.locator('#input').fill('/clear');
   await dash.locator('#input').press('Enter');
-  await expect.poll(async () => dash.evaluate(() => document.body.dataset.state), { timeout: 10_000 })
-    .toBe('home');
 
   await expect.poll(async () => {
     const c = (await leggiArchivio(app))[0];
@@ -1081,8 +867,6 @@ test('l’esito di un comando lento resta nella chat in cui il comando è stato 
   expect(chats.length).toBe(1);
   const testi = chats[0].messages.map((m) => m.text).join('\n');
   expect(testi).toContain('sleep 4');
-  // E non ti riporta dentro la chat che avevi chiuso.
-  expect(await dash.evaluate(() => document.body.dataset.state)).toBe('home');
 });
 
 test('il resoconto di un comando con lo slash non riapre la chat che hai chiuso', async ({ app, openTab }) => {
@@ -1115,46 +899,106 @@ test('il resoconto di un comando con lo slash non riapre la chat che hai chiuso'
   await expect.poll(async () => dash.evaluate(() => document.body.innerText), { timeout: 20_000 })
     .toContain('Riordino in corso');
 
-  await dash.locator('#input').fill('/home');
+  await dash.locator('#input').fill('/clear');
   await dash.locator('#input').press('Enter');
-  await expect.poll(async () => dash.evaluate(() => document.body.dataset.state), { timeout: 10_000 })
-    .toBe('home');
 
   await expect.poll(async () => {
     const c = (await leggiArchivio(app))[0];
     return c ? c.messages.map((m) => m.text).join('\n') : '';
   }, { timeout: 40_000 }).toContain('Archiviate 2');
 
-  // La home resta la home, e la conversazione è una sola.
-  expect(await dash.evaluate(() => document.body.dataset.state)).toBe('home');
+  // La conversazione è una sola: il resoconto è tornato in quella dove il comando era stato dato.
   expect((await leggiArchivio(app)).length).toBe(1);
 });
 
-test('il menu di una chat si percorre e si sceglie da tastiera', async ({ app, openTab }) => {
+
+// ── #1295 — una parola corta che non è vuota conta ───────────────────────────
+//
+// «Riprendi la discussione di ieri sullo Zen»: quando nessuna chat ha tutte le parole la ricerca riprova con quelle
+// che distinguono, e una di tre lettere (Zen, SQL, IVA) ne restava fuori. Vale per Filo e per il campo della home.
+
+async function treChatCorte(app) {
+  await configura(app);
+  await stubProvider(app, {
+    Zen: { tipo: 'conversazione', titolo: 'Meditazione Zen e respiro' },
+    SQL: { tipo: 'conversazione', titolo: 'Indici SQL e prestazioni' },
+    pacchi: { tipo: 'conversazione', titolo: 'Pacchi in ritardo' },
+  });
+  for (const [id, testo] of [
+    ['c-zen', 'Parliamo di Zen: come si imposta la meditazione sul respiro?'],
+    ['c-sql', 'Spiegami gli indici SQL e quando conviene metterli'],
+    ['c-pacchi', 'Quando arrivano i pacchi? Voglio la motivazione del ritardo'],
+  ]) {
+    await turno(app, id, testo);
+    await chiudi(app, id);
+  }
+  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.kind).length, { timeout: 30_000 }).toBe(3);
+}
+
+// Un avviso del pannello si legge intero: niente gli sta sopra, né al centro né ai bordi.
+const scoperto = (loc) => loc.evaluate((n) => {
+  const r = n.getBoundingClientRect();
+  const punti = [[r.left + 4, r.top + 3], [r.left + r.width / 2, r.top + r.height / 2], [r.right - 4, r.bottom - 3]];
+  return r.width > 0 && r.height > 0 && r.bottom <= innerHeight && punti.every(([x, y]) => {
+    const e = document.elementFromPoint(x, y);
+    return !!e && (e === n || n.contains(e));
+  });
+});
+
+test('una parola corta che non è vuota conta: lo Zen e SQL si ritrovano a parole e nel campo del filo', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  await treChatCorte(app);
+  for (const [q, atteso] of [
+    ['riprendi la discussione di ieri sullo Zen', 'c-zen'],
+    ['la chat su SQL', 'c-sql'],
+  ]) {
+    const r = await app.evaluate((_e, query) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CERCA_CHAT', query }), q);
+    expect(((r.output || {}).results || []).map((x) => x.id), q).toEqual([atteso]);
+  }
+
+  const page = await openTab(HOME);
+  await page.locator('#cercaInput').fill('la chat sullo Zen');
+  await expect(risultati(page)).toHaveCount(1, { timeout: 15_000 });
+  await expect(risultati(page).first()).toContainText('Zen');
+  const nota = page.locator('#cercaRisultati .dash-cerca-niente').first();
+  await expect(nota).toContainText('«zen»');
+  expect(await scoperto(nota), 'l’avviso sopra i risultati si legge intero').toBe(true);
+  await page.screenshot({ path: 'tests/.shots/1295-parola-corta.png' });
+
+  // Una parola corta vale da inizio parola: «IVA» non trova la chat dove i pacchi «arrivano».
+  await page.locator('#cercaInput').fill('la chat sull’IVA');
+  await expect(page.locator('#cercaRisultati .dash-cerca-niente').first()).toContainText('Niente nel filo per «la chat sull’IVA»', { timeout: 10_000 });
+  await expect(risultati(page)).toHaveCount(0);
+});
+
+test('una ricerca senza risultati dice che sono zero, e la riga si legge intera', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   await preparaDueChat(app);
-  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.title).length, { timeout: 30_000 }).toBe(2);
+  const page = await openTab(HOME);
+  await page.locator('#cercaInput').fill('zabaione');
+  const nota = page.locator('#cercaRisultati .dash-cerca-niente').first();
+  await expect(nota).toHaveText('Niente nel filo per «zabaione»', { timeout: 10_000 });
+  await expect(risultati(page)).toHaveCount(0);
+  expect(await scoperto(nota)).toBe(true);
+  await page.screenshot({ path: 'tests/.shots/1295-ricerca-vuota.png' });
+  // Svuotando la ricerca il filo resta com'era.
+  await page.locator('#cercaInput').fill('');
+  await expect(page.locator('.dash-bubble[data-chat="chat-discussione"]').first()).toBeVisible();
+});
 
-  const page = await openTab(ARCHIVE);
-  const riga = page.locator('.arc-chat').first();
-  await expect(riga).toBeVisible({ timeout: 20_000 });
-
-  await riga.focus();
-  await page.keyboard.press('Shift+F10');
-  await expect(page.locator('.arc-ctxmenu')).toBeVisible({ timeout: 10_000 });
-  // Riapri la chat, Rinomina, Sposta, Elimina: la seconda voce è Rinomina.
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Enter');
-  await expect(page.locator('.arc-chat-rename')).toBeVisible({ timeout: 10_000 });
-
-  // Rinunciare e riprovare con la prima lettera porta sulla stessa voce.
-  await page.locator('.arc-chat-rename').press('Escape');
-  await riga.focus();
-  await page.keyboard.press('Shift+F10');
-  await page.keyboard.press('e');
-  const scelta = await page.evaluate(() => (document.activeElement || {}).textContent || '');
-  expect(scelta.trim()).toContain('Elimina');
-  await page.keyboard.press('Escape');
-  await expect(page.locator('.arc-ctxmenu')).toHaveCount(0, { timeout: 10_000 });
+test('una sigla in maiuscolo conta anche se si scrive come una parola vuota: «la chat sull’AI»', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  await configura(app);
+  await stubProvider(app, { generativa: { tipo: 'conversazione', titolo: 'AI a scuola' }, goroutine: { tipo: 'conversazione', titolo: 'Server in Go' } });
+  for (const [id, testo] of [['c-ai', 'Cosa pensi dell’AI generativa nelle scuole?'], ['c-go', 'Come si scrive un server in Go con le goroutine?']]) {
+    await turno(app, id, testo);
+    await chiudi(app, id);
+  }
+  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.kind).length, { timeout: 30_000 }).toBe(2);
+  const r = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CERCA_CHAT', query: 'riprendi la chat sull’AI' }));
+  expect(((r.output || {}).results || []).map((x) => x.id)).toEqual(['c-ai']);
+  const page = await openTab(HOME);
+  await page.locator('#cercaInput').fill('la chat sull’AI');
+  await expect(risultati(page)).toHaveCount(1, { timeout: 15_000 });
+  await expect(risultati(page).first()).toContainText('AI');
 });

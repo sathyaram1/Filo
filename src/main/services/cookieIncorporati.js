@@ -6,8 +6,8 @@
 
 const { session } = require('electron');
 const R = require('./cookieIncorporatiRegole');
-const Sito = require('./stessoSito');
-const Google = require('./dominiGoogle');
+const Sito = require('../../shared/stessoSito');
+const Google = require('../../shared/dominiGoogle');
 require('../../shared/authPopup');
 
 // «Qualche minuto» dopo l'ultima scheda che ospitava il riquadro: chi riapre l'articolo un attimo dopo non perde

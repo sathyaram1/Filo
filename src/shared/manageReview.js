@@ -1,38 +1,21 @@
-// Logica pura per la sezione "Revisione" della dashboard di gestione.
-// Espone SN_MANAGE_REVIEW = { classifyBlock, sortReview } su globalThis.
-//
-// Testabile via `npm run test:unit` (niente Electron, niente rete).
-// Pattern IIFE su globalThis: vedi CLAUDE.md → "Convenzione di porting".
+// Logica PURA della sezione «Revisione» della dashboard di gestione (niente Electron,
+// niente rete): tutto quello che sta qui si prova con `npm run test:unit`.
 
 (function (global) {
   'use strict';
 
-  // Motivi di blocco, in ordine di severità discendente.
-  // color: usato come --mg-item-color nei CSS (border-left + badge).
-  // `loop` è il blocco "duro" introdotto dal redesign delle routine: un fix che
-  // fallisce la verifica avversariale 3 volte di fila (verifier→fixer) viene
-  // messo in `blocked` con `blockReason: 'loop'` perché decida l'owner. Bordo
-  // NERO, severità massima: è l'unico blocco che non viene dal pipeline di
-  // sicurezza (attacco/spam/design), ma dall'iter di lavorazione bloccato.
+  // Motivi di blocco in ordine di severità; `color` diventa --mg-item-color nel CSS.
+  // `loop` (fix che fallisce la verifica tre volte) è il più severo: lo decide l'owner.
   const REASONS = {
     loop:       { label: 'Loop',         color: '#111111', severity: 5 },
-    // "Non filtrato": il panel dei giudici non si è completato (almeno un giudice
-    // non ha votato). BIANCO per distinguerlo — non è una classe di rischio, è
-    // "filtraggio incompleto" — ma per coerenza è trattato come il caso più severo
-    // ai fini dell'instradamento (mai in coda: resta nei Ricevuti finché l'owner
-    // non lo risolve o ri-valuta i giudici mancanti).
+    // «Non filtrato»: il panel dei giudici non si è completato, non è una classe di rischio.
+    // Per instradamento vale come il più severo: mai in coda, resta nei Ricevuti.
     unfiltered: { label: 'Non filtrato', color: '#ffffff', severity: 4 },
-    // Bocciatura di SICUREZZA sul fix (statusReason `secaudit`): il feedback era
-    // approvato e lavorato, ma l'audit di sicurezza (o il cancello di fusione)
-    // ha detto no e la pratica è tornata all'owner. ROSSO come l'attacco: il
-    // verde di `design` faceva sembrare "questione di gusto" un allarme di
-    // sicurezza — scelta dell'owner, 2026-08-29.
+    // Bocciatura di SICUREZZA sul fix: torna all'owner, ma col rosso dell'attacco, non col
+    // verde di `design`: un allarme di sicurezza non è una questione di gusto.
     secaudit:   { label: 'Bloccato dalla sicurezza', color: '#c0392b', severity: 3 },
-    // Fermata al CANCELLO DI FUSIONE (statusReason `l5`): il fix è scritto e
-    // l'audit l'ha passato, ma i controlli deterministici del server non
-    // lasciano entrare il ramo in main senza il via libera dell'owner. Rosso
-    // come la bocciatura di sicurezza, e per lo stesso motivo: è un allarme di
-    // sicurezza che aspetta una persona, non una questione di gusto.
+    // Fermata al cancello di fusione: fix e audit ok, ma il ramo non entra in main senza
+    // l'owner. Rosso: è un allarme che aspetta una persona.
     l5:         { label: 'Fusione ferma', color: '#c0392b', severity: 3 },
     // Il lavoro di una routine fermo perché il feedback d'utente da cui nasce è stato bloccato (#914): rosso come lui.
     origine_bloccata: { label: 'Bloccato con l’origine', color: '#c0392b', severity: 3 },
@@ -41,10 +24,8 @@
     design:     { label: 'Design',       color: '#2e9e5b', severity: 1 },
   };
 
-  // Dimensione attesa del panel dei giudici per i feedback: 3 fissi + 1 dinamico.
-  // Per la pipeline NUOVA il numero esatto è in `pipeline.expectedJudges`; per lo
-  // STORICO (senza quel campo) usiamo questo default per dedurre se un panel è
-  // parziale (meno verdetti del previsto = un giudice è saltato).
+  // Panel atteso: 3 fissi + 1 dinamico; il numero esatto sta in `pipeline.expectedJudges`.
+  // Per lo storico vale questo default: meno verdetti del previsto = un giudice è saltato.
   const DEFAULT_PANEL_SIZE = 4;
   function panelSize(p) {
     if (p && Array.isArray(p.expectedJudges) && p.expectedJudges.length) {
@@ -62,15 +43,16 @@
     return !!fb && fb.fiducia === 'fidato';
   }
 
-  // Mittente provato = prefisso riservato E prova (#595): resta per le statistiche e le icone, non dà permessi.
-  // Speculare a isTrustedIdentity nel backend (filo-security).
-  const SENDER_PROOFS = ['admin', 'server'];
-  const RESERVED_CLIENT_RE = /^(owner|routine|agent|local):/i;
-  function isTrustedClient(clientId, senderProof) {
-    return RESERVED_CLIENT_RE.test(String(clientId || '')) && SENDER_PROOFS.includes(senderProof);
+  // La classe del mittente (SPEC-DOMANDE.md §10): solo per leggere e contare, i permessi seguono `fiducia`. Nelle
+  // pagine filo:// shared/mittenti.js va incluso prima di questo file; in Node si carica da sé.
+  function MT() {
+    if (!global.SN_MITTENTI && typeof require === 'function') require('./mittenti.js');
+    const m = global.SN_MITTENTI;
+    if (!m) throw new Error('SN_MITTENTI mancante: carica shared/mittenti.js prima di manageReview.js');
+    return m;
   }
   function isUnprovenSender(fb) {
-    return !!fb && RESERVED_CLIENT_RE.test(String(fb.clientId || '')) && !SENDER_PROOFS.includes(fb.senderProof);
+    return !!fb && MT().nomeRiservato(fb.clientId) && !MT().PROVE.includes(fb.senderProof);
   }
   // Il mittente con cui decidere autore e gruppo: senza prova il prefisso riservato non lo riconosce nessuno,
   // cioè vale come un utente. Stessa chiave di effectiveClientId sul server.
@@ -79,18 +61,18 @@
     return isUnprovenSender(fb) ? 'non-provato:' + c : c;
   }
 
-  // ── Lavori locali (#908) ─────────────────────────────────────────────────
-  // `localOnly { by, at }`: la pratica la lavora solo una sessione locale. Il segno da solo la toglie alle routine;
-  // si mette su un feedback fidato (#1148) o approvato dall'owner come lavoro locale (`localApproval { by, at }`,
-  // #913: lo scrive solo l'admin). Saltare L5 lo decide il server con la fiducia del ramo (fiduciaRamo.js).
-  const LOCAL_SENDER_RE = /^(owner|local):/i;
+  // ── Lavori server (#908, #1358) ──────────────────────────────────────────
+  // `localOnly { by, at }` toglie la pratica alla coda normale delle routine; in lista resta nella scheda del suo stato
+  // con l'etichetta «server» (#1575). Lo mette il server quando chi lavora lo chiede, o «💻 Lavoro server» su un rombo
+  // azzurro (`localApproval { by, at }`, #913: lo scrive solo l'admin). Saltare L5 lo decide il server (fiduciaRamo.js).
   function isLocalOnly(fb) {
     const m = fb && fb.localOnly;
     return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
   }
-  // Le attese di un lavoro server passato (#1159): il PC dell'owner, la suite di filo-security. Gemello di select.ATTESA
-  // nel server; fuori dalla revisione il segno vecchio non conta.
-  const ATTESE_SERVER = Object.freeze({ fusione_server: 'pc', suite_server: 'suite' });
+  // Le attese che segue il server, non le routine: gli unit sulla fusione lanciati da GitHub (#1207) e, per un lavoro
+  // server (#1159), il PC dell'owner e la suite di filo-security. Gemello di select.ATTESA nel server; fuori dalla
+  // revisione il segno vecchio non conta.
+  const ATTESE_SERVER = Object.freeze({ fusione_server: 'pc', suite_server: 'suite', unit_fusione: 'unit' });
   function attesaServer(fb) {
     if (!fb || normalizeStatus(fb).status !== 'revision_security') return '';
     return Object.prototype.hasOwnProperty.call(ATTESE_SERVER, fb.attesa) ? ATTESE_SERVER[fb.attesa] : '';
@@ -98,8 +80,10 @@
   function inAttesaFusioneServer(fb) {
     return attesaServer(fb) === 'pc';
   }
+  // Owner o sessione locale con la prova dell'admin: conta solo per le pratiche nate prima della migrazione (§1.7).
   function isProvenLocalSender(fb) {
-    return !!fb && LOCAL_SENDER_RE.test(String(fb.clientId || '')) && fb.senderProof === 'admin';
+    const m = fb && fb.senderProof === 'admin' ? MT().classifica(fb) : null;
+    return !!m && (m.classe === 'owner' || m.classe === 'sessione_locale');
   }
   function isLocalApproved(fb) {
     const m = fb && fb.localApproval;
@@ -108,11 +92,12 @@
   // Senza scheda pubblica solo il lavoro dell'owner e delle sessioni: il feedback di un utente approvato come lavoro
   // locale (#913) la tiene, è da lì che chi l'ha mandato vede la risoluzione. Gemello: isPrivateLocalWork sul server.
   function isPrivateLocalWork(fb) {
-    return isLocalOnly(fb) && !isLocalApproved(fb);
+    // Il segno messo da una routine (#1358, il lavoro passato ai lavori server) non toglie la scheda a chi l'aveva.
+    return isLocalOnly(fb) && !isLocalApproved(fb) && String(fb.localOnly.by || '') !== 'routine';
   }
   // Un utente approvato (#913) vede la risoluzione con la sola frase per lui: la chiusura locale non la porta, la scrive la sessione.
   function fraseAttesa(fb) {
-    return isLocalApproved(fb) && !isTrustedClient(fb.clientId, fb.senderProof) && !String(fb.userNote || '').trim();
+    return isLocalApproved(fb) && !MT().diProcesso(fb) && !String(fb.userNote || '').trim();
   }
   // Giudici saltati alla nascita: `pipeline.skipped` lo scrive solo il server, e solo per un feedback fidato
   // (functions/src/nascita.js). Senza fiducia non vale, e la pratica resta da giudicare.
@@ -129,11 +114,24 @@
     const num = o && typeof o === 'object' ? String(o.num || '').trim() : '';
     return num ? `il feedback da cui nasce (${num})` : 'il feedback da cui nasce';
   }
+  // L'allarme della pubblicazione (#1002) non nasce da un lavoro: lo apre il server.
+  const ALLARME_COSTRUZIONE = 'agent:costruzione';
   function judgesSkippedText(fb) {
     const p = fb && fb.pipeline;
     const k = p && typeof p === 'object' ? String(p.skipped || '') : '';
     if (!Object.prototype.hasOwnProperty.call(GIUDICI_SALTATI, k)) return '';
-    return isFidato(fb) ? GIUDICI_SALTATI[k] : '';
+    if (!isFidato(fb)) return '';
+    if (k === 'routine_proven' && effectiveClientId(fb).toLowerCase() === ALLARME_COSTRUZIONE) {
+      return 'Allarme aperto dal server: i giudici non servono.';
+    }
+    return GIUDICI_SALTATI[k];
+  }
+  // Le immagini che i giudici non hanno visto, col motivo scritto dal server (#597): un buco si spiega, non si tace.
+  function immaginiNonViste(fb) {
+    const p = fb && fb.pipeline;
+    const l = p && typeof p === 'object' && Array.isArray(p.immaginiNonAperte) ? p.immaginiNonAperte : [];
+    return l.filter((x) => x && Number.isInteger(x.n) && x.n > 0)
+      .map((x) => `Immagine ${x.n} non vista dai giudici: ${String(x.motivo || '').trim() || 'motivo non registrato'}.`);
   }
   // Un lavoro di routine che aspetta la fusione del feedback d'utente da cui nasce (#914): non è un «non filtrato»,
   // il server non lo ri-giudica; entra in coda da solo. Il motivo lo scrive solo il server, fidato o già giudicato.
@@ -142,78 +140,63 @@
     return status === 'unlabeled' && statusReason === 'attesa_origine';
   }
 
-  // Vocabolario unico della macchina a stati (src/shared/feedbackStatus.js).
-  // Letto pigramente: nelle pagine filo:// va incluso PRIMA di questo file,
-  // nei test unit va require-ato prima. Se manca, errore chiaro subito.
+  // Vocabolario unico della macchina a stati (feedbackStatus.js), letto pigramente: va
+  // incluso PRIMA di questo file. Se manca, errore chiaro subito.
   function FS() {
     const m = global.SN_FB_STATUS;
     if (!m) throw new Error('SN_FB_STATUS mancante: carica shared/feedbackStatus.js prima di manageReview.js');
     return m;
   }
 
-  /**
-   * Classificazione LEGACY dai campi grezzi (`pipeline.*`, `blockReason`,
-   * `reviewDecision`). Serve SOLO a normalizeStatus per sciogliere gli stati
-   * ritirati (`new`, `blocked`) dello storico: i feedback nuovi arrivano già
-   * con uno status canonico scritto dalla pipeline (filo-security). NON è più
-   * il criterio delle tab: nessun consumer deve ricalcolare lo stato dai grezzi.
-   */
+  // Classificazione LEGACY dai campi grezzi: serve SOLO a normalizeStatus per sciogliere gli
+  // stati ritirati (`new`, `blocked`) dello storico. Nessun consumer ricalcola lo stato.
   function classifyLegacyBlock(fb) {
-    // Override dell'owner: un feedback "accettato" (sbloccato a mano dalla
-    // dashboard di revisione) NON è più un blocco — esce dalla colonna Bloccati
-    // e rientra nel flusso normale. Vince su qualsiasi verdetto del pipeline.
+    // Override dell'owner: un feedback sbloccato a mano non è più un blocco e rientra nel
+    // flusso normale. Vince su qualsiasi verdetto del pipeline.
     if (fb && fb.reviewDecision === 'accepted') return null;
 
-    // Loop (redesign routine): un fix bloccato dopo 3 verifiche fallite di fila.
-    // NON viene dal pipeline di sicurezza — è uno stato `blocked` con
-    // `blockReason: 'loop'` scritto da dispatch/triage. Vince su tutto (severità
-    // massima) perché è il blocco che richiede una decisione manuale dell'owner.
+    // Vince su tutto: il blocco `loop` richiede una decisione dell'owner (vedi REASONS).
     if (fb && fb.status === 'blocked' && fb.blockReason === 'loop') {
       return { reason: 'loop', ...REASONS.loop };
     }
 
     const p = fb && fb.pipeline;
     const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
-    // Lo stato lo decide statusForDecision sul server, che fino al §10 esenta da attacco/spam il mittente provato.
-    const trusted = isTrustedClient(fb && fb.clientId, fb && fb.senderProof);
+    // Lo stato lo decide statusForDecision sul server, che esenta da attacco/spam il feedback fidato (mai il mittente, §10).
+    const trusted = isFidato(fb);
     const status = (fb && fb.status) || 'new';
-    // "Da giudicare": feedback aperto e in attesa di giudizio. Esclude i chiusi
-    // (done/verified/archived/ignored) e i `clarify` (sono un dialogo con l'owner,
-    // non in attesa dei giudici).
+    // «Da giudicare»: aperto e in attesa. Esclude i chiusi e i `clarify`, che sono un dialogo
+    // con l'owner, non un'attesa dei giudici.
     const judgeable = !CLOSED_STATUSES.includes(status) && status !== 'clarify';
 
-    // SENZA verdetti: fidato coi giudici saltati alla nascita → nessun colore; mittente provato flaggato per errore
+    // SENZA verdetti: fidato coi giudici saltati alla nascita → nessun colore; fidato flaggato per errore
     // → "da ri-giudicare" (bianco), non un blocco. Va prima dei controlli di blocco identità.
     if (p && verdicts.length === 0 && judgeable) {
       if (judgesSkippedText(fb)) return null;
       if (trusted) return { reason: 'unfiltered', ...REASONS.unfiltered };
     }
 
-    // Nessun pipeline: un feedback APERTO non ancora giudicato → bianco ("non
-    // filtrato", da giudicare). Chiusi e `clarify` → nessun colore.
+    // Nessun pipeline: un feedback APERTO non ancora giudicato → bianco. Chiusi e `clarify` →
+    // nessun colore.
     if (!p) {
       return judgeable ? { reason: 'unfiltered', ...REASONS.unfiltered } : null;
     }
 
-    // Blocchi di IDENTITÀ (L1) o panel COMPLETO che ha deciso "attacco/spam":
-    // NON sono "non filtrati", sono decisioni vere → tengono il loro colore.
-    // (Con un panel parziale l'instradamento forza `human_review`, quindi
-    // `action: block_attack/block_spam` implica panel completo.)
+    // Blocchi di IDENTITÀ (L1) o panel COMPLETO che ha deciso attacco/spam: non sono «non
+    // filtrati», sono decisioni vere e tengono il loro colore.
     if (p.action === 'block_attack' || p.l1Category === 'dangerous') {
       return { reason: 'attack', ...REASONS.attack };
     }
     if (p.action === 'block_spam' || p.l1Category === 'spam') {
       return { reason: 'spam', ...REASONS.spam };
     }
+    // Un segno di giudici saltati che non vale (senza fiducia): i giudici non hanno mai girato, si ri-giudica.
+    if (verdicts.length === 0 && judgeable && p.skipped) {
+      return { reason: 'unfiltered', ...REASONS.unfiltered };
+    }
 
-    // Panel parziale ("non filtrato"): vince su attacco/spam/design perché
-    // segnala che il filtraggio NON è affidabile (un giudice è saltato). Bianco.
-    // Tre modi di rilevarlo:
-    //   - `l2Unfiltered` (pipeline nuova: lo dichiara esplicitamente);
-    //   - `l2Degraded` (panel a zero verdetti: tutti i giudici mancanti);
-    //   - DEDOTTO (storico): alcuni verdetti ma MENO del panel atteso. Avere
-    //     almeno un verdetto implica che L2 è girato (L1 era pulito), quindi
-    //     verdetti < panel = un giudice è saltato.
+    // Panel parziale vince su attacco/spam/design: dice che il filtraggio NON è affidabile.
+    // Per lo storico si DEDUCE: verdetti sotto il panel atteso = un giudice è saltato.
     if (
       p.l2Unfiltered === true ||
       p.l2Degraded === true ||
@@ -230,7 +213,6 @@
       return { reason: 'spam', ...REASONS.spam };
     }
 
-    // Design.
     if (p.l2Class === 'design') {
       return { reason: 'design', ...REASONS.design };
     }
@@ -239,13 +221,8 @@
     return null;
   }
 
-  /**
-   * Ordina un array di feedback per la colonna Revisione:
-   *   severità DESC (attack > spam > design), poi createdAt DESC.
-   * I feedback senza blocco vengono esclusi automaticamente (restano nell'array
-   * originale e non dovrebbero essere passati qui, ma per sicurezza vengono
-   * trattati come severità 0).
-   */
+  // Ordina per la colonna Revisione: severità DESC (attack > spam > design), poi createdAt
+  // DESC. I feedback senza blocco non dovrebbero arrivare qui e valgono severità 0.
   function sortReview(feedbacks) {
     return feedbacks.slice().sort((a, b) => {
       const ca = classifyBlock(a);
@@ -253,16 +230,14 @@
       const sa = ca ? ca.severity : 0;
       const sb = cb ? cb.severity : 0;
       if (sb !== sa) return sb - sa;
-      // A parità di severità: più recenti prima.
       const ta = new Date(a.createdAt || 0).getTime();
       const tb = new Date(b.createdAt || 0).getTime();
       return tb - ta;
     });
   }
 
-  // ── DB3: "In produzione" = fix uscito in una versione RILASCIATA ──────────
-  // Confronto versioni stile semver leggero ('0.2.9' < '0.2.10'). Self-contained
-  // così manageReview non dipende dal caricamento di patchNotes nei test.
+  // DB3: «In produzione» = fix uscito in una versione RILASCIATA. Confronto semver leggero,
+  // self-contained così i test non devono caricare patchNotes.
   function cmpVersion(a, b) {
     const pa = String(a || '0').split('.').map((n) => parseInt(n, 10) || 0);
     const pb = String(b || '0').split('.').map((n) => parseInt(n, 10) || 0);
@@ -274,22 +249,8 @@
     return 0;
   }
 
-  // Un feedback chiuso (`done`/`verified`) è "in produzione" SOLO se il suo fix
-  // è davvero uscito in una versione rilasciata.
-  //
-  // - `releasedVersion` = "ultima versione rilasciata". La sorgente è la versione
-  //   dell'APP IN ESECUZIONE (`app.getVersion()`), che il chiamante passa: l'owner
-  //   gira sempre una build rilasciata, quindi la sua versione è, per definizione,
-  //   l'ultima che gli utenti hanno. Senza `releasedVersion` non possiamo gattare
-  //   → trattiamo il feedback come spedito (preserva il comportamento storico
-  //   done→Risolti per chi non passa la versione: nessuna regressione).
-  // - `resolvedInVersion` viene stampato sul feedback al momento del `done`
-  //   (chi consegna il `done` lo timbra = versione corrente di `package.json`,
-  //   cioè quella in cui il fix è confluito). Un `done` con `resolvedInVersion` futura
-  //   (non ancora rilasciata) NON è in produzione: resta in "In coda" finché
-  //   quella versione esce. Un `done` storico SENZA `resolvedInVersion` è
-  //   considerato già spedito (i fix chiusi prima di DB3 sono quasi certamente
-  //   già usciti).
+  // «In produzione» solo se il fix è uscito: `releasedVersion` è la versione in esecuzione
+  // (l'owner gira una build rilasciata); `resolvedInVersion` futura = resta «In coda».
   function isShipped(fb, releasedVersion) {
     if (!releasedVersion) return true;
     const v = fb && fb.resolvedInVersion;
@@ -297,8 +258,8 @@
     return cmpVersion(v, releasedVersion) <= 0;
   }
 
-  // ── "Allineato" LEGACY: panel completo con tutti i giudici d'accordo ──────
-  // Usata SOLO da normalizeStatus per lo storico. Colore BLU (--mg-dot--aligned).
+  // «Allineato» LEGACY (panel completo, giudici d'accordo): usata SOLO da normalizeStatus
+  // per lo storico.
   const ALIGNED = { color: '#5b6ee0', label: 'Allineato' };
   // Rimandato all'owner perché si finisce solo sulla sua macchina (#1060): l'azzurro dello schermo di 💻, l'icona
   // che nella pagina vuol già dire «sessione locale». Le regole CSS lo ripetono: tests/unit/segnoFermata.test.mjs.
@@ -311,21 +272,13 @@
     // Decisione esplicita del pipeline: auto-approvato o classe L2 aligned.
     if (p.action === 'candidate_change') return true;
     if (p.l2Class === 'aligned') return true;
-    // Storico senza l2Class: panel COMPLETO (classifyLegacyBlock già escluderebbe
-    // i parziali) i cui verdetti presenti sono tutti 'aligned'.
+    // Storico senza l2Class: panel COMPLETO i cui verdetti presenti sono tutti 'aligned'.
     const verdicts = Array.isArray(p.verdicts) ? p.verdicts.filter((v) => v && v.class) : [];
     return verdicts.length > 0 && verdicts.every((v) => v.class === 'aligned');
   }
 
-  // ── normalizeStatus: la SOLA porta d'ingresso allo stato di un feedback ───
-  // Ritorna sempre uno status CANONICO (spec FEEDBACK-STATES.md §2) + il
-  // sottotesto statusReason. Tre casi:
-  //   1. status già canonico → passa invariato (la fonte di verità è lui);
-  //   2. legacy "semplice" (clarify/review/verified/ignored/draft) → mappa fissa;
-  //   3. legacy new/blocked/assente → deriva UNA VOLTA dai campi grezzi con la
-  //      stessa logica storica (reviewDecision, blockReason, pipeline). È il
-  //      ponte per lo storico non ancora migrato: quando la migrazione (F5)
-  //      riscrive i documenti, il ramo 3 non scatta più.
+  // normalizeStatus: la SOLA porta d'ingresso allo stato, torna sempre uno status CANONICO
+  // (FEEDBACK-STATES.md §2) più statusReason. new/blocked/assente si derivano dai grezzi.
   function normalizeStatus(fb) {
     const fs = FS();
     const s = fb && fb.status;
@@ -345,9 +298,8 @@
       return { status: 'unlabeled', statusReason: null }; // unfiltered
     }
     if (isAlignedLegacy(fb)) {
-      // Auto-approvazione incisa al giudizio (automatica ON allora) → in coda;
-      // altrimenti aspetta l'approvazione manuale. La modalità automatica di
-      // OGGI non c'entra: agisce una volta sola, al momento del giudizio.
+      // Auto-approvazione incisa al giudizio (automatica accesa allora) → in coda; altrimenti
+      // aspetta l'approvazione manuale. La modalità di OGGI non c'entra: agisce una volta sola.
       const p = fb.pipeline;
       if (p && p.action === 'candidate_change') return { status: 'todo', statusReason: null };
       return { status: 'aligned', statusReason: null };
@@ -355,65 +307,35 @@
     return { status: 'unlabeled', statusReason: null };
   }
 
-  // ── Quando lo stato non si LEGGE, il criterio delle sezioni non esiste ─────
-  // Lo `status` fine viaggia CIFRATO (#476): senza la chiave privata dell'owner
-  // resta un blob, e `normalizeStatus` non ha niente da sciogliere — ogni
-  // feedback ricade in `unlabeled`, cioè nei Ricevuti. Le pagine disegnavano lo
-  // stesso le quattro sezioni, "In coda (0) · Risolti (0) · Archiviati (0)",
-  // con dentro anche i feedback già chiusi: tre numeri che DICHIARANO IL VUOTO
-  // dove la verità è che non lo sappiamo.
-  //
-  // La regola vive QUI, non dentro una pagina. Quando stava dentro la pagina
-  // dei feedback, la dashboard di gestione ha continuato a mentire e nessuno se
-  // n'è accorto finché non si sono guardate affiancate (#509, secondo giro):
-  // due copie della stessa regola divergono, una sola no.
+  // Lo status fine viaggia CIFRATO: senza chiave ogni feedback ricade in `unlabeled`, e le
+  // sezioni «(0)» dichiarerebbero il vuoto dove la verità è che non lo sappiamo.
   const CIPHER_PREFIXES = ['FENC', '[cifrato'];
   function looksEncrypted(value) {
     const raw = String(value == null ? '' : value).trim();
     return CIPHER_PREFIXES.some((p) => raw.startsWith(p));
   }
 
-  /**
-   * Lo status di QUESTO feedback è illeggibile (ciphertext)? Riconoscimento
-   * STRETTO apposta: solo il testo cifrato. Uno status assente, vuoto o
-   * inventato la macchina lo scioglie davvero (→ `unlabeled`), e lì le pagine
-   * restano allineate come devono.
-   */
+  // Lo status di QUESTO feedback è illeggibile? Riconoscimento STRETTO: uno status assente o
+  // inventato la macchina lo scioglie davvero (→ `unlabeled`) e le pagine restano allineate.
   function statusUnreadable(fb) {
     return looksEncrypted(fb && fb.status);
   }
 
-  /**
-   * Questo VALORE è arrivato cifrato (chiave assente)? Stesso riconoscimento
-   * stretto di statusUnreadable, per gli altri campi che viaggiano cifrati
-   * insieme allo status — la revisione dell'owner (decisione, commento, data)
-   * e la conversazione. Mostrare un blob al posto di un testo è la stessa
-   * bugia delle sezioni, in piccolo.
-   */
+  // Questo VALORE è arrivato cifrato? Stesso riconoscimento stretto per gli altri campi
+  // cifrati: mostrare un blob al posto di un testo è la stessa bugia, in piccolo.
   function valueUnreadable(value) {
     return looksEncrypted(value);
   }
 
-  /**
-   * Si possono disegnare le sezioni per QUESTA lista? No solo quando la pagina
-   * non legge NESSUNO stato: è il caso vero (o hai la chiave e li leggi tutti,
-   * o non ce l'hai e non ne leggi uno). Un documento storto in mezzo a mille
-   * leggibili lascia la barra al suo posto: toglierla a tutti sarebbe
-   * sproporzionato, e farebbe divergere le due superfici.
-   * Lista vuota → non c'è niente che dica il contrario: sezioni sì (e "(0)"
-   * lì è la verità).
-   */
+  // Sezioni disegnabili solo se la pagina non legge NESSUNO stato: o hai la chiave e li leggi
+  // tutti, o nessuno. Un documento storto fra mille leggibili lascia la barra al suo posto.
   function sectionsReliable(feedbacks) {
     const list = feedbacks || [];
     return !list.length || !list.every(statusUnreadable);
   }
 
-  /**
-   * L'unica cosa vera che resta in mano a chi non ha la chiave: l'enum
-   * grossolano in chiaro (`statusPublic`), lo stesso che guarda la ricompensa.
-   * 'Aperta' | 'Chiusa' | '' (non si sa nemmeno quello). Le due pagine lo
-   * scrivono con QUESTE parole, non con due sinonimi.
-   */
+  // Senza chiave l'unica cosa vera è l'enum grossolano in chiaro (`statusPublic`), e va
+  // detto con QUESTE parole in ogni pagina.
   function publicStateLabel(fb) {
     const pub = String((fb && fb.statusPublic) || '');
     if (pub === 'closed') return 'Chiusa';
@@ -422,25 +344,16 @@
   }
   const PUBLIC_STATE_HINT = 'il dettaglio si legge solo con la chiave dell’owner';
 
-  // Come si presenta lo status in "Ricevuti": reason per lo storico dei consumer
-  // (unfiltered/attack/spam/design/loop) + colore/label/severity dal vocabolario.
+  // Come si presenta lo status in «Ricevuti»: reason per lo storico dei consumer, più
+  // colore/label/severity dal vocabolario.
   function reasonOf(status, statusReason) {
     if (status === 'unlabeled') return 'unfiltered';
     if (status === 'design' && statusReason === 'loop') return 'loop';
     return status; // attack | spam | design | suspicious_file
   }
 
-  // ── Sicurezza-conservativa: la categoria PIÙ ALTA, non la maggioritaria ────
-  // I giudici possono dissentire: alcuni vedono un attacco, la maggioranza no.
-  // La dashboard NON deve seguire la maggioranza — deve far emergere la categoria
-  // di sicurezza più alta segnalata anche da UN SOLO giudice, perché un falso
-  // negativo (attacco mostrato come allineato/design) è molto più costoso di un
-  // falso positivo (che finisce comunque in revisione umana, non blocca nessuno).
-  // Stesso spirito del guard red-team di listBoardTab, che legge APPOSTA i
-  // verdetti grezzi (non lo status) per non dare mai visibilità a materiale
-  // segnalato. Solo attack/spam/design sono categorie di verdetto di rischio:
-  // `unfiltered`/`loop`/`suspicious_file` vengono dallo status/gate-file, non da
-  // un singolo giudice, e restano più severi (severità 4-5 > attack 3).
+  // Sicurezza-conservativa: vale la categoria PIÙ ALTA, non la maggioritaria — un falso
+  // negativo costa più di un falso positivo, che finisce comunque in revisione umana.
   const VERDICT_RISK = { attack: 'attack', spam: 'spam', design: 'design' };
   function worstVerdictBlock(fb) {
     const p = fb && fb.pipeline;
@@ -455,29 +368,17 @@
     return worst;
   }
 
-  /**
-   * Classifica un feedback per la colonna Revisione/Ricevuti. Deriva dallo status
-   * normalizzato (lookup sul vocabolario), poi applica l'escalation
-   * sicurezza-conservativa: se un singolo giudice ha votato una categoria di
-   * rischio PIÙ ALTA dell'aggregato, la dashboard mostra QUELLA. Torna
-   * { reason, color, severity, label } per gli stati di revisione umana, null per
-   * tutto il resto. `aligned` di per sé non è una segnalazione (badge blu), MA se
-   * un giudice ha segnalato un rischio va mostrato con quella categoria: un
-   * "allineato" con un voto di attacco resta da guardare, non è approvabile in blocco.
-   *
-   * L'escalation vale SOLO per gli stati "Ricevuti" (in revisione umana): un
-   * feedback già accettato dall'owner (todo/…) o chiuso non si ri-segnala — la
-   * decisione umana/di lavorazione ha superato i verdetti dei giudici.
-   */
+  // Classifica per Revisione/Ricevuti: dallo status normalizzato più l'escalation più alta
+  // votata da un giudice. Solo nei «Ricevuti»: dopo, la decisione umana vince sui verdetti.
   function classifyBlock(fb) {
     const fs = FS();
     const { status, statusReason } = normalizeStatus(fb);
+    if (aspettaDomanda(fb)) return null;
     if (status === 'aligned') return worstVerdictBlock(fb);
     if (inAttesaOrigine(fb)) return null;
     const info = fs.STATUSES[status];
     if (!info || info.tab !== 'inbox') return null;
-    // Bocciatura di sicurezza sul fix: lo stato è `design` (torna all'owner),
-    // ma NON è una questione di design — è un blocco di sicurezza. Rosso.
+    // Lo stato è `design` ma la ragione è la sicurezza: il colore lo dice REASONS.secaudit.
     if (status === 'design' && statusReason === 'secaudit') {
       return { reason: 'secaudit', ...REASONS.secaudit };
     }
@@ -504,9 +405,8 @@
     return base;
   }
 
-  // Panel dei giudici COMPLETO: tutti i verdetti attesi ci sono e la pipeline
-  // non lo dichiara parziale/degradato. È il discrimine fra "non filtrato" vero
-  // (manca un giudice: ha senso ri-valutare) e "giudicato per intero".
+  // Panel COMPLETO: ci sono tutti i verdetti attesi e la pipeline non lo dice parziale.
+  // È il discrimine fra «manca un giudice, ri-valuta» e «giudicato per intero».
   function panelComplete(fb) {
     const p = fb && fb.pipeline;
     if (!p || typeof p !== 'object') return false;
@@ -515,19 +415,12 @@
     return verdicts.length > 0 && verdicts.length >= panelSize(p);
   }
 
-  // ── Frase accanto ai pallini dei giudici (dettaglio dashboard) ────────────
-  // I pallini dicono COSA hanno votato i giudici; la frase dice PERCHÉ il
-  // feedback è nello stato in cui è — che non sempre coincide (#462: giudici
-  // tutti allineati, ma il fix è stato poi bocciato dalla sicurezza). Ritorna
-  // { text, color } (color null = colore neutro), o null se non c'è niente da
-  // spiegare (feedback in coda/chiusi: i pallini sono solo storia).
+  // I pallini dicono COSA hanno votato i giudici, questa frase PERCHÉ il feedback è in quello
+  // stato: non sempre coincidono. → { text, color } o null se non c'è niente da spiegare.
   function judgesNote(fb) {
     const fs = FS();
     const S = fs.STATUSES;
-    // Stato illeggibile: qui non c'è niente da spiegare. La macchina lo
-    // ridurrebbe a `unlabeled` e la frase direbbe "In attesa del giudizio."
-    // anche su una segnalazione già chiusa — la stessa bugia delle sezioni, in
-    // piccolo. Chi disegna mette al suo posto l'enum grossolano in chiaro.
+    // Stato illeggibile: niente da spiegare (vedi looksEncrypted e publicStateLabel).
     if (statusUnreadable(fb)) return null;
     const { status, statusReason } = normalizeStatus(fb);
     if (status === 'design') {
@@ -535,7 +428,7 @@
         return { text: 'Il controllo di sicurezza ha bocciato il fix: decidi tu.', color: REASONS.secaudit.color };
       }
       if (statusReason === 'l5') {
-        return { text: 'Il ramo è fermo al cancello di fusione: aspetta il tuo via libera.', color: REASONS.l5.color };
+        return { text: 'Il ramo è fermo al cancello di fusione. Decidi tu nel quadrato.', color: REASONS.l5.color };
       }
       if (statusReason === 'origine_bloccata') {
         return { text: `Fermo perché ${origineText(fb)} è stato bloccato: decidi tu.`, color: REASONS.origine_bloccata.color };
@@ -560,8 +453,8 @@
       if (statusReason === 'locale') {
         // Fidato o già approvato: basta il segno. Gli altri passano dal sì dell'owner (#913), che li segna anche fidati.
         const text = localSenderCheck(fb).ok
-          ? 'Richiede lavoro locale: con «💻 Lavoro server» passa nei Lavori server.'
-          : 'Richiede lavoro locale: decidi tu. Con «💻 Lavoro server» passa nei Lavori server.';
+          ? 'Richiede lavoro locale: con «💻 Lavoro server» torna In coda come lavoro server.'
+          : 'Richiede lavoro locale: decidi tu. Con «💻 Lavoro server» torna In coda come lavoro server.';
         return { text, color: LOCALE.color };
       }
       return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
@@ -593,7 +486,7 @@
         const worst = worstVerdictBlock(fb);
         if (worst) {
           const chi = isFidato(fb) ? 'Fidato, ma segnalato'
-            : isTrustedClient(fb.clientId, fb.senderProof) ? 'Mittente provato, segnalato' : 'Segnalato';
+            : MT().diProcesso(fb) ? 'Mittente provato, segnalato' : 'Segnalato';
           return { text: `${chi} come ${worst.label.toLowerCase()}: decidi tu.`, color: worst.color };
         }
         return null;
@@ -610,9 +503,8 @@
     return null;
   }
 
-  // Motivo dello stato (statusReason) in parole: per tooltip e sottotesti. I
-  // codici grezzi ('secaudit', 'clarify'…) non dicono niente a chi legge la
-  // lista; un motivo sconosciuto passa invariato (meglio grezzo che muto).
+  // Motivo dello stato in parole, per tooltip e sottotesti: i codici grezzi non dicono niente.
+  // Un motivo sconosciuto passa invariato: meglio grezzo che muto.
   const REASON_TEXTS = {
     secaudit: 'bloccato dalla sicurezza',
     l5: 'fermo al cancello di fusione',
@@ -624,6 +516,8 @@
     loop: 'difetto non più correggibile da soli',
     decisione: 'fermo: aspetta una tua scelta',
     locale: 'richiede lavoro locale',
+    fidato: 'chiede di renderlo fidato: il lavoro tocca il server',
+    worker: 'segnalato da chi ci lavorava',
     attesa_chiusa: 'un feedback che aspettava si è chiuso senza fusione',
     arenato: 'lavorazione arenata',
     guasto: 'fermo per un guasto',
@@ -635,19 +529,17 @@
     return REASON_TEXTS[k] || k;
   }
 
-  // "Allineato" = status normalizzato `aligned` (badge blu, aspetta approvazione).
-  // Ma se anche un solo giudice ha segnalato un rischio (attack/spam/design), NON
-  // è allineato: non deve finire nell'approvazione in blocco degli allineati —
-  // resta da esaminare (classifyBlock lo mostra con la sua categoria di rischio).
+  // «Allineato» = status `aligned` (badge blu, aspetta approvazione). Ma se anche un solo
+  // giudice ha segnalato un rischio NON lo è: non deve finire nell'approvazione in blocco.
   function isAligned(fb) {
     if (normalizeStatus(fb).status !== 'aligned') return false;
+    // Con la domanda aperta non si approva in blocco: si risponde a lei (SPEC-DOMANDE §3.8).
+    if (aspettaDomanda(fb)) return false;
     return !worstVerdictBlock(fb);
   }
 
-  // ── Approvazione: cosa può stare "In coda" ────────────────────────────────
-  // APPROVATO = lo status è già nell'iter di lavorazione (todo e successivi).
-  // Non si ricalcola più da reviewDecision/pipeline/autoMode: chi approva SCRIVE
-  // `todo` (owner dalla dashboard, o la pipeline al giudizio con automatica ON).
+  // Approvazione: APPROVATO = lo status è già nell'iter di lavorazione (todo e successivi).
+  // Non si ricalcola da reviewDecision/pipeline/autoMode: chi approva SCRIVE `todo`.
   function isApproved(fb) {
     const { status } = normalizeStatus(fb);
     return ['todo', 'working', 'revision_capability', 'revision_security', 'done'].includes(status);
@@ -665,12 +557,29 @@
     // Una richiesta di fusione che aspetta l'owner è una sua decisione: Ricevuti anche se lo stato
     // non è arrivato al cancello. Solo `pending`: una fallita per conflitto la riallinea la routine.
     if (tab && tab !== 'archived' && richiestaInAttesa(fb, opts)) return 'inbox';
-    // Col segno locale la coda delle routine non la vede: mostrarla «In coda» direbbe il falso.
-    // Negli stati dei Ricevuti resta lì, perché aspetta comunque una decisione dell'owner.
-    if (tab === 'queue' && isLocalOnly(fb)) return 'local';
+    // Un'attesa con la sua domanda (SPEC-DOMANDE §3.8): si risponde nella domanda, il lavoro sta in coda col segno.
+    if (tab === 'inbox' && aspettaDomanda(fb)) return 'queue';
+    // Il segno dei lavori server non sposta di scheda (#1575): lo dice l'etichetta «server» sulla riga.
     // Chi aspetta un feedback non ancora fuso la coda non lo dà a nessuno (#903): sta fra quelli che aspettano.
     if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && aspettaAncora(fb, opts)) return 'waiting';
     return tab;
+  }
+
+  // Le attese che aprono una domanda (functions/src/domande/attese.js): mai i blocchi di sicurezza né `fidato`.
+  const ATTESE_CON_DOMANDA = {
+    design: ['clarify', 'decisione', 'loop', 'arenato', 'locale', 'attesa_chiusa'],
+    aligned: ['origine_chiusa', 'origine_mancante'],
+  };
+  const DOMANDA_ID_RE = /^D-[1-9]\d{0,8}$/;
+
+  /** L'id della domanda che questo feedback aspetta (`D-12`), o ''. PURA. */
+  function aspettaDomanda(fb) {
+    if (!fb || statusUnreadable(fb)) return '';
+    const id = String(fb.domandaId || '');
+    if (!DOMANDA_ID_RE.test(id)) return '';
+    const { status, statusReason } = normalizeStatus(fb);
+    const motivi = ATTESE_CON_DOMANDA[status];
+    return motivi && motivi.includes(String(statusReason || '')) ? id : '';
   }
 
   // Gli stati in cui la coda delle routine darebbe lavoro: lì le attese contano (functions/src/routine/waits.js).
@@ -687,7 +596,7 @@
     return !!info && info.tab === 'inbox';
   }
 
-  /** Cosa hanno segnalato filtro e giudici (`pipeline` decifrato). PURA. Fonte unica per lettore e ripasso. */
+  /** Cosa hanno segnalato filtro e giudici (`pipeline` decifrato). PURA. Fonte unica: chi guarda i giudizi la chiede qui. */
   function segnaliDeiGiudici(pipeline) {
     const p = pipeline && typeof pipeline === 'object' ? pipeline : null;
     if (!p) return { attacco: false, spam: false };
@@ -767,11 +676,10 @@
       if (fb.fiducia === undefined || fb.fiducia === null) return { ok: true, primaDellaMigrazione: true };
       return { ok: false, nonFidato: true, motivo: 'è tuo o di una tua sessione, ma non è fidato: segnalo fidato, o approvalo come lavoro server' };
     }
-    const cid = String(fb.clientId || '');
-    if (LOCAL_SENDER_RE.test(cid)) {
+    if (isUnprovenSender(fb)) {
       return { ok: false, utente: true, senzaProva: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale si lavora solo se l’owner lo approva come lavoro server' };
     }
-    if (RESERVED_CLIENT_RE.test(cid) && SENDER_PROOFS.includes(fb.senderProof)) {
+    if (MT().diProcesso(fb)) {
       return { ok: false, routine: true, motivo: 'l’ha aperto una routine: in locale si lavora solo se l’owner lo approva come lavoro server' };
     }
     return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale si lavora solo se l’owner lo approva come lavoro server' };
@@ -841,55 +749,21 @@
     return pending.some((r) => richiestaDiQuesto(r, fb));
   }
 
-  // ── Le AZIONI dell'owner: UNA tabella per tutte le superfici ──────────────
-  //
-  // Stessa storia delle sezioni (#509), un gradino più in dentro. Le due pagine
-  // avevano finito per disegnare le stesse sezioni con la stessa regola, ma i
-  // pulsanti sopra quelle sezioni se li costruiva ognuna per conto suo — e sulla
-  // STESSA segnalazione offrivano azioni diverse:
-  //   · un archiviato: «↩ Ripristina» sulla pagina dei feedback, «Archivia»
-  //     sulla dashboard di gestione. Su un attacco confermato quel bottone non
-  //     era un doppione innocuo: scriveva `archived` SOPRA la conferma, cioè
-  //     cancellava in silenzio una decisione di sicurezza, e da lì l'attacco era
-  //     indistinguibile da una segnalazione archiviata qualsiasi;
-  //   · un file sospetto: due conferme di là (attacco e spam), una sola di qua;
-  //   · un fix uscito: riapribile di là, non di qua.
-  //
-  // Da qui in avanti le azioni si LEGGONO, non si riscrivono in ogni pagina: la
-  // sezione (manageTabFor) e lo status canonico (normalizeStatus) decidono
-  // QUALI sono, con quale etichetta, e verso quale stato scrivono. Chi vuole
-  // un'azione in più la aggiunge QUI, e la gemella ce l'ha nello stesso commit.
-  //
-  // Invariante che la tabella incarna: se puoi archiviare, puoi togliere
-  // dall'archivio — e mai il contrario nello stesso posto. La sezione
-  // "Archiviati" offre SOLO il ripristino, così non esiste più un cammino che
-  // riscrive uno stato terminale (attack_confirmed / spam_confirmed) con
-  // `archived`.
-  //
-  // `kind` dice cosa scrive il pulsante oltre allo status:
-  //   'accept'  override di revisione dell'owner (reviewDecision 'accepted');
-  //   'reject'  conferma di un blocco (reviewDecision 'rejected');
-  //   'archive' archiviazione manuale (archiveOverride 'archived');
-  //   'restore' uscita dall'archivio (archiveOverride 'keep_open');
-  //   'resolve' chiusura a mano;
-  //   'reopen'  chiede PRIMA cosa manca ancora, poi rimette in coda.
-  //
-  // Stato ILLEGGIBILE → nessuna azione: i pulsanti nascono dalla sezione, e la
-  // sezione qui non si sa. È la stessa regola della barra delle sezioni, e vale
-  // per tutt'e due le pagine perché vive qui.
+  // UNA tabella delle azioni dell'owner per tutte le superfici: sezione e status decidono
+  // quali sono. «Archiviati» offre SOLO il ripristino: nessun `archived` su stato terminale.
   function ownerActions(fb, opts) {
     if (statusUnreadable(fb)) return [];
-    const { status } = normalizeStatus(fb);
+    const { status, statusReason } = normalizeStatus(fb);
     const tab = manageTabFor(fb, opts);
     if (tab === 'inbox') {
-      // Aspetta una decisione: approvare È scrivere `todo`. Col segno locale `todo` porta nei Lavori locali.
-      const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: isLocalOnly(fb) ? '→ Lavori server' : '→ In coda', primary: true }];
-      // #913: approvarlo come lavoro locale. `locale` dice a chi scrive di aggiungere il segno e il sì dell'owner.
-      // Rimandato nei Ricevuti perché richiede lavoro locale (--serve-locale): la decisione attesa è questa.
-      if (!isLocalOnly(fb) && localApprovalCheck(fb, opts).ok) {
-        const attesa = String((fb && fb.statusReason) || '') === 'locale';
-        if (attesa) acts[0].primary = false;
-        acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro server', primary: attesa, locale: true });
+      // Aspetta una decisione: approvare È scrivere `todo`.
+      const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: '→ In coda', primary: true }];
+      // Il rombo azzurro nato prima di #1358 (`design`/`locale` senza domanda) esce solo come lavoro server: il segno
+      // lo mette ormai il server, e altrove il tasto non c'è (#1575). `approva`: il sì dell'owner (#913) a chi non è
+      // fidato né già approvato.
+      if (status === 'design' && statusReason === 'locale' && !isLocalOnly(fb)) {
+        acts[0].primary = false;
+        acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro server', primary: true, locale: true, approva: localApprovalCheck(fb, opts).ok });
       }
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
       // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
@@ -903,7 +777,9 @@
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
       return acts;
     }
-    if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
+    if (tab === 'queue' || tab === 'waiting') {
+      // Chi aspetta una domanda non è risolto: si risponde alla domanda, o si archivia.
+      if (aspettaDomanda(fb)) return [{ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false }];
       // Nell'iter di lavorazione: l'owner può chiuderlo a mano o archiviarlo.
       const acts = [];
       if (status !== 'done') acts.push({ key: 'resolve', kind: 'resolve', to: 'done', label: '✓ Risolto', primary: true });
@@ -919,8 +795,8 @@
       ];
     }
     if (tab === 'archived') {
-      // Il ripristino rimette in coda (`todo`) — anche un attacco/spam
-      // confermato, che è la strada dichiarata del "era legittimo".
+      // Il ripristino rimette in coda (`todo`) anche un attacco/spam confermato: è la strada
+      // dichiarata del «era legittimo».
       return [{ key: 'restore', kind: 'restore', to: 'todo', label: '↩ Ripristina', primary: false }];
     }
     return [];
@@ -931,33 +807,18 @@
     return ownerActions(fb, opts).find((a) => a.key === String(key)) || null;
   }
 
-  /**
-   * Questa scrittura di stato è UNA DELLE AZIONI che la segnalazione offre in
-   * questo momento? È il guardiano che sta sotto ai pulsanti, non accanto: un
-   * pannello rimasto aperto mentre lo stato cambiava, un doppio cammino, una
-   * pagina non aggiornata, e la scrittura sarebbe di nuovo quella che cancella
-   * una conferma. Chiudere la porta nella tabella e lasciare libero il writer
-   * significa richiuderla una volta per giro.
-   */
+  // Guardiano SOTTO ai pulsanti, non accanto: un pannello rimasto aperto mentre lo stato
+  // cambiava riscriverebbe di nuovo sopra una conferma.
   function ownerActionAllowsStatus(fb, to, opts) {
     const t = String(to == null ? '' : to);
     return ownerActions(fb, opts).some((a) => a.to === t);
   }
 
-  /**
-   * L'etichetta di stato di una segnalazione, in DATI: le due pagine la
-   * disegnano col loro markup ma dicono le STESSE parole. Serve anche a non
-   * lasciare muta una superficie — la dashboard di gestione non scriveva da
-   * nessuna parte che una segnalazione era un attacco confermato, e nel
-   * dettaglio la conversazione continuava a dire che Filo "non ha ancora un
-   * parere".
-   * Ritorna { label, color, hint, reason, reasonText, showReason, encrypted },
-   * o null quando non c'è niente di vero da scrivere.
-   */
+  // L'etichetta di stato in DATI: ogni pagina col suo markup, ma le STESSE parole.
+  // → { label, color, hint, reason, reasonText, showReason, encrypted } o null.
   function stateBadge(fb) {
     const fs = FS();
-    // Stato cifrato: la macchina lo ridurrebbe a "Non filtrato" anche su una
-    // segnalazione già chiusa. L'unica cosa vera è l'enum grossolano in chiaro.
+    // Stato cifrato: vedi publicStateLabel.
     if (statusUnreadable(fb)) {
       const label = publicStateLabel(fb);
       if (!label) return null;
@@ -986,20 +847,15 @@
     };
   }
 
-  // Priorità di un feedback, normalizzata: 1-3 (più alta = affrontata prima dalle
-  // routine di Claude), 0 = nessuna. Robusta a valori cifrati/non numerici (NaN→0).
+  // Priorità normalizzata: 1-3 (più alta = affrontata prima dalle routine), 0 = nessuna.
+  // Robusta a valori cifrati o non numerici (NaN→0).
   function priorityOf(fb) {
     const p = Math.round(Number(fb && fb.priority) || 0);
     return p >= 1 && p <= 3 ? p : 0;
   }
 
-  // ── Avanzamento della lavorazione (card pinnata in "In coda") ─────────────
-  // L'iter di un fix ha tre passaggi, nell'ordine: implementazione (working),
-  // controllo funzionalità (revision_capability = aspetta il verifier),
-  // controllo sicurezza (revision_security = aspetta l'audit). Lo status dice
-  // QUAL È il passaggio corrente; i campi claim* (specchiati su Firestore dalla
-  // riconciliazione dei claim git) e workingSince dicono se un'istanza ci sta
-  // lavorando ORA.
+  // L'iter ha tre passaggi in ordine: implementazione, controllo funzionalità, controllo
+  // sicurezza. Lo status dice quale; claim*/workingSince dicono se qualcuno ci lavora ORA.
   const WORK_STAGES = ['working', 'revision_capability', 'revision_security'];
   const WORK_STEPS = [
     { key: 'impl',     label: 'Implementazione' },
@@ -1042,19 +898,19 @@
   //                sotto, il resto per priorità DESC (Claude affronta prima le
   //                alte), poi severità del blocco, poi recenza.
   //   altre      → createdAt DESC.
-  // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti".
+  // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti"; `opts.soloNonFidate` è il filtro
+  // della fiducia, `opts.livelli` quello dei Ricevuti.
   function listForManageTab(feedbacks, tab, opts) {
-    const items = (feedbacks || []).filter((f) => manageTabFor(f, opts) === tab);
+    const items = filtraFiducia((feedbacks || []).filter((f) => manageTabFor(f, opts) === tab), opts && opts.soloNonFidate);
     if (tab === 'inbox') return sortReview(filtraLivelli(items, opts && opts.livelli, opts));
     // In coda: priorità DESC come criterio primario tra i non-in-lavorazione.
     // `sort` è stabile, quindi a parità di priorità si conserva l'ordine di
     // sortReview (severità poi recenza), e il pinning finale conserva a sua
-    // volta l'ordine per priorità dentro ogni gruppo. I Lavori locali sono la
-    // stessa coda, lavorata da un'altra parte; chi aspetta (#903) la stessa coda, più tardi.
-    if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
+    // volta l'ordine per priorità dentro ogni gruppo. Chi aspetta (#903) è la stessa coda, più tardi.
+    if (tab === 'queue' || tab === 'waiting') {
       const now = (opts && opts.now) != null ? opts.now : Date.now();
-      // Rango di pinning: istanza attiva ora > fase più avanzata > non in
-      // lavorazione (-1). Il +10 separa nettamente gli attivi dagli inattivi.
+      // Rango di pinning: istanza attiva ora > fase più avanzata > non in lavorazione (-1).
+      // Il +10 separa nettamente gli attivi dagli inattivi.
       const rank = (f) => {
         const p = workProgress(f, { now });
         if (!p) return -1;
@@ -1071,27 +927,19 @@
     });
   }
 
-  // ── Preferiti ⭐ (DB2) ─────────────────────────────────────────────────────
-  // Il flag `starred` è un "parcheggio per il futuro": l'owner lo mette su un
-  // feedback qualsiasi, a prescindere dallo status. La tab Archiviati ha un
-  // filtro ⭐ che, quando attivo, mostra TUTTI i preferiti (di ogni status),
-  // non solo gli `archived`.
+  // `starred` è un parcheggio, si mette su un feedback qualsiasi a prescindere dallo status:
+  // il filtro ⭐ degli Archiviati mostra TUTTI i preferiti, non solo gli `archived`.
   function isStarred(fb) {
     return !!(fb && fb.starred === true);
   }
 
-  // Lista per la tab Archiviati:
-  //   starredOnly=false → i feedback in stato `archived` (recenti prima);
-  //   starredOnly=true  → tutti i preferiti ⭐, di qualunque status (recenti prima).
-  //   confirmedOnly=true → di quelli, solo gli attacchi/spam CONFERMATI.
-  // I due filtri della colonna vivono qui, non nella pagina: il conteggio della
-  // scheda deve poter contare esattamente ciò che la lista mostra (un contatore
-  // che non segue i filtri sembra mentire).
+  // Filtri della tab Archiviati (starredOnly, confirmedOnly). Vivono qui e non nella pagina:
+  // il conteggio della scheda deve contare esattamente ciò che la lista mostra.
   function listArchiveTab(feedbacks, opts) {
     const starredOnly = !!(opts && opts.starredOnly);
     const confirmedOnly = !!(opts && opts.confirmedOnly);
-    let items = (feedbacks || []).filter((f) =>
-      starredOnly ? isStarred(f) : manageTabFor(f) === 'archived');
+    let items = filtraFiducia((feedbacks || []).filter((f) =>
+      starredOnly ? isStarred(f) : manageTabFor(f) === 'archived'), opts && opts.soloNonFidate);
     if (confirmedOnly) {
       items = items.filter((f) => String(normalizeStatus(f).status).endsWith('_confirmed'));
     }
@@ -1109,59 +957,35 @@
   // In coda / Risolti l'ordinamento non cambia la lunghezza, quindi basta
   // l'appartenenza (manageTabFor, lo stesso filtro di listForManageTab);
   // Archiviati passa da listArchiveTab perché ha regole e filtri suoi.
-  // `opts`: { releasedVersion, starredOnly, confirmedOnly, livelli }. PURA.
+  // `opts`: { releasedVersion, starredOnly, confirmedOnly, livelli, soloNonFidate }. PURA.
   function manageTabCounts(feedbacks, opts) {
     const list = feedbacks || [];
-    const counts = { inbox: 0, queue: 0, local: 0, waiting: 0, resolved: 0, archived: 0 };
+    const counts = { inbox: 0, queue: 0, waiting: 0, resolved: 0, archived: 0 };
     const inbox = [];
-    for (const f of list) {
+    for (const f of filtraFiducia(list, opts && opts.soloNonFidate)) {
       const tab = manageTabFor(f, opts);
       if (tab === 'inbox') inbox.push(f);
-      else if (tab === 'queue' || tab === 'local' || tab === 'waiting' || tab === 'resolved') counts[tab]++;
+      else if (tab === 'queue' || tab === 'waiting' || tab === 'resolved') counts[tab]++;
     }
     counts.inbox = filtraLivelli(inbox, opts && opts.livelli, opts).length;
     counts.archived = listArchiveTab(list, opts).length;
     return counts;
   }
 
-  // ── DC1: la board utente (filo://board/) ─────────────────────────────────
-  // Superficie POSITIVA a permessi ridotti: mostra SOLO i fix già in produzione
-  // (done/verified + spediti in una versione rilasciata, DB3) e MAI nulla del
-  // red-team. Riusa il gate "Risolti" (listForManageTab → 'resolved'), poi
-  // esclude per sicurezza qualunque feedback con un blocco nel pipeline
-  // (attacco/spam/design): la board non deve mai dare visibilità a materiale
-  // segnalato dalla sicurezza, nemmeno se per qualche motivo è finito in `done`.
-  // Un fix con una riapertura in sospeso (DC4) ESCE dalla board: l'utente l'ha
-  // segnalato come ancora rotto e il fix è tornato nell'iter normale, quindi non
-  // va più mostrato come "risolto, conferma se funziona" (criterio DC4
-  // "l'originale esce da Risolti", lato vista — il flip di `status` lo applica
-  // poi il percorso fidato/triage). `hasReopenRequest` è dichiarata sotto
-  // (hoisting): riusarla qui tiene una sola definizione del guard.
-  // PURA: niente rete, niente Electron — unit-testabile.
+  // Board utente: superficie a permessi ridotti — solo fix già in produzione e MAI niente del
+  // red-team. Un fix con una riapertura in sospeso esce dalla board: è tornato nell'iter.
   function listBoardTab(feedbacks, opts) {
     const releasedVersion = opts && opts.releasedVersion;
     return listForManageTab(feedbacks, 'resolved', { releasedVersion })
-      // Guard red-team: qui si guardano APPOSTA i verdetti grezzi del pipeline
-      // (non lo status): un feedback segnalato dalla sicurezza non va mai in
-      // board nemmeno se per qualche motivo è arrivato a `done`.
+      // Guard red-team: si guardano APPOSTA i verdetti grezzi e non lo status, così un feedback
+      // segnalato dalla sicurezza non va in board nemmeno se è arrivato a `done`.
       .filter((fb) => !classifyLegacyBlock(fb))
       .filter((fb) => !isLocalOnly(fb))
       .filter((fb) => !hasReopenRequest(fb));
   }
 
-  // ── DC4: riapertura a pagamento dalla board ──────────────────────────────
-  // PURA: un fix è riapribile solo se è OGGI visibile nella board (stessa
-  // identica regola di "Risolti senza red-team" di listBoardTab, applicata al
-  // singolo feedback) E nessuno l'ha già riaperto. Riusa `reopenRequests`
-  // (map uid → { at }) scritta da SN_FEEDBACK.castReopenRequest — stesso
-  // pattern non-admin di `votes` — per il guard anti-doppia-riapertura: NON è
-  // "un utente riapre una volta sola", è "una volta riaperto da chiunque, il
-  // fix è già nell'iter normale" (evita N feedback collegati duplicati per lo
-  // stesso fix rotto). Se il fix esce da "Risolti" il guard si auto-risolve:
-  // quando rientra eventualmente in produzione, riparte da `reopenRequests`
-  // vuoto solo se chi applica il done successivo lo azzera (vedi notes nel
-  // task) — finché non viene azzerato, resta bloccato: meglio prudente che
-  // permettere riaperture a raffica sullo stesso fix.
+  // Riapribile solo se OGGI è visibile in board e nessuno l'ha già riaperto: una volta
+  // riaperto da chiunque il fix è nell'iter normale, e N feedback collegati non servono.
   function hasReopenRequest(fb) {
     const r = fb && fb.reopenRequests;
     return !!(r && typeof r === 'object' && Object.keys(r).length > 0);
@@ -1173,24 +997,8 @@
     return listBoardTab([fb], opts).length > 0;
   }
 
-  // ── Ri-valutazione "non filtrati": esito onesto di UN feedback ────────────
-  // La dashboard ri-valuta i bianchi uno alla volta (un id per chiamata). Il
-  // backend, per ogni id, ri-esegue SOLO i giudici mancanti e torna un dettaglio
-  // con `recovered` (quanti giudici prima assenti hanno finalmente votato) e
-  // `attempted` (quanti ne ha ri-eseguiti = quanti hanno potenzialmente speso
-  // crediti). Questa funzione PURA traduce quel dettaglio nell'esito che conta
-  // per l'owner, così la UI dice la verità invece di contare come "valutato" un
-  // feedback rimasto bianco:
-  //   'recovered' almeno un giudice mancante ha votato → progresso reale;
-  //   'wasted'    giudici ri-eseguiti (crediti spesi) ma NESSUNO recuperato →
-  //               il feedback è ancora non filtrato e i crediti sono andati a
-  //               vuoto (tipico di modelli mal configurati o credito esaurito);
-  //   'budget'    il backend si è fermato per tempo/budget: riprovare più tardi;
-  //   'noop'      niente da ri-valutare (già completo / non più non-filtrato) →
-  //               nessun credito speso;
-  //   'error'     la chiamata è fallita.
-  // `r` è la risposta completa del canale (con `results[0]` = dettaglio del
-  // singolo id, `remaining` = budget lato server). Ritorna { outcome, recovered }.
+  // Ri-valutazione dei «non filtrati», un id per chiamata: `recovered` (un giudice mancante ha
+  // votato), `wasted` (crediti spesi a vuoto), `budget` (riprovare), `noop`, `error`.
   function classifyReevalResult(r) {
     if (!r || r.ok === false) return { outcome: 'error', recovered: 0 };
     if (r.remaining) return { outcome: 'budget', recovered: 0 };
@@ -1198,12 +1006,12 @@
     if (det && det.ok === false) return { outcome: 'error', recovered: 0 };
     const recovered = Math.max(0, Number(det && det.recovered) || 0);
     const errorKind = (det && det.errorKind) || null;
-    // Run completa (feedback mai giudicato / L1 sbloccato): produce un pipeline
-    // nuovo, non ha il concetto di "recuperati" → è sempre progresso reale.
+    // Run completa (mai giudicato / L1 sbloccato): produce un pipeline nuovo, non ha il
+    // concetto di «recuperati» → è sempre progresso reale.
     if (det && det.fullRun) return { outcome: 'recovered', recovered: recovered || 1, errorKind };
     if (recovered > 0) return { outcome: 'recovered', recovered, errorKind };
-    // Ha provato a ri-eseguire dei giudici ma non ne ha recuperato nessuno:
-    // crediti spesi, feedback ancora bianco. `errorKind` dice PERCHÉ.
+    // Ha ritentato dei giudici senza recuperarne nessuno: crediti spesi, feedback ancora
+    // bianco. `errorKind` dice PERCHÉ.
     if (Number(det && det.attempted) > 0) return { outcome: 'wasted', recovered: 0, errorKind };
     return { outcome: 'noop', recovered: 0, errorKind };
   }
@@ -1229,34 +1037,15 @@
     }
   }
 
-  // Quanti esiti 'wasted' consecutivi tollerare prima di fermare l'intera
-  // ri-valutazione: se i giudici falliscono a vuoto più volte di fila è quasi
-  // certo un problema di configurazione/credito, inutile bruciare crediti sul
-  // resto della lista. Basso di proposito (il segnale arriva subito).
+  // Quanti 'wasted' di fila tollerare prima di fermare tutto: se i giudici falliscono a vuoto
+  // è quasi certo un problema di configurazione o di credito, e bruciare crediti non serve.
   const REEVAL_WASTE_LIMIT = 3;
 
-  // ══ I cinque livelli di sicurezza, come una fila di forme ═════════════════
-  //
-  // Una segnalazione attraversa cinque controlli, e finora la dashboard ne
-  // mostrava due: il filtro d'ingresso spariva dentro una parola ("Attacco"),
-  // quello che Claude aveva segnalato lavorando finiva in mezzo alla
-  // conversazione, l'audit di sicurezza lasciava traccia solo quando bocciava e
-  // il cancello di fusione viveva in un riquadro a parte, sopra la lista.
-  //
-  // Qui i cinque livelli diventano cinque forme in fila, sempre le stesse e
-  // sempre nello stesso posto: triangolo (filtro d'ingresso), cerchi (giudici),
-  // rombo (segnalazione di Claude), pentagono (audit di sicurezza), quadrato
-  // (fusione). Un livello che non ha dato un parere è GRIGIO e resta al suo
-  // posto: la fila ha sempre la stessa lunghezza, e un buco si vede.
-  //
-  // Questa funzione è PURA e non disegna niente: dice, per ciascun livello,
-  // l'esito, il colore, il titolo sotto il puntatore e cosa scrivere nel
-  // pannello di destra. Chi disegna (src/pages/manage/manage.js) ci mette solo
-  // il markup — così l'intera tabella si prova senza aprire Filo.
+  // I cinque livelli come una fila di forme sempre uguale e sempre nello stesso posto: un
+  // livello senza parere è GRIGIO ma resta, così un buco si vede. Qui dati, niente disegno.
 
-  // I quattro colori sono quelli che i pallini dei giudici usano già
-  // (src/pages/manage/manage.html, .mg-dot--*): stessa scala di severità in
-  // tutta la pagina, così il rosso vuol dire la stessa cosa ovunque.
+  // I quattro colori sono quelli dei pallini dei giudici: stessa scala di severità in tutta
+  // la pagina, così il rosso vuol dire la stessa cosa ovunque.
   const LIVELLO_COLORI = {
     attack:  REASONS.attack.color,   // rosso  — bloccato / bocciato
     spam:    REASONS.spam.color,     // giallo — in sospeso, o scavalcato dall'owner
@@ -1265,10 +1054,9 @@
     locale:  LOCALE.color,           // azzurro — chiede lavoro locale
   };
 
-  // I motivi delle pratiche che il server ha fermato prima di comporre lui le
-  // righe del triangolo (pipeline.ingresso): solo codici che manda davvero, il
-  // resto lo dice il server (la sentinella sta nel repo del server). Uno che
-  // la tabella non conosce si scrive coi trattini bassi sciolti in spazi.
+  // I motivi delle pratiche fermate prima che il server componesse lui le righe del triangolo
+  // (pipeline.ingresso): solo codici che manda davvero. Uno che la tabella non conosce si scrive
+  // lo stesso, coi trattini bassi sciolti: un motivo grezzo dice più di uno nascosto.
   const L1_MOTIVI = {
     linked_prior_attack: 'collegato a un attacco precedente',
     origine_bloccata: 'il feedback da cui nasce è stato bloccato',
@@ -1333,15 +1121,8 @@
     return { etichetta: String(etichetta || ''), valore: String(valore == null ? '' : valore) };
   }
 
-  /**
-   * Dove è arrivata la pratica e perché, in righe. PURA.
-   *
-   * La fila delle forme racconta i cinque controlli; questo racconta la
-   * DECISIONE — «attacco confermato», «bloccato dalla sicurezza», «aspetta la
-   * tua approvazione» — che nessuna delle cinque forme esprime, perché non
-   * viene da un controllo ma dall'owner o dalla macchina a stati. Vive nel
-   * pannello del triangolo, il primo della fila e l'unico che c'è sempre.
-   */
+  // Dove è arrivata la pratica e perché: non viene da un controllo ma dall'owner o dalla
+  // macchina a stati. Vive nel pannello del triangolo, l'unico della fila che c'è sempre.
   function righeStato(fb) {
     const righe = [];
     const b = stateBadge(fb);
@@ -1405,8 +1186,8 @@
       });
     }
     const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
-    // Senza categoria ma coi verdetti dei giudici: L2 gira solo se L1 ha fatto
-    // passare, quindi "pulito" è un fatto dedotto, non un'ipotesi.
+    // Senza categoria ma coi verdetti dei giudici: L2 gira solo se L1 ha fatto passare, quindi
+    // «pulito» è un fatto dedotto, non un'ipotesi.
     const raw = String((p && p.l1Category) || '').trim();
     const cat = L1_CATEGORIE[raw] || (p && verdicts.length ? L1_CATEGORIE.clean : null);
     if (!cat) {
@@ -1429,7 +1210,7 @@
     });
   }
 
-  /** Livello 2: i giudici. Un cerchio per giudice atteso, come da sempre. PURA. */
+  // Livello 2: i giudici, un cerchio per giudice atteso.
   function livelloL2(fb) {
     const titolo = 'Giudici';
     const p = (fb && fb.pipeline && typeof fb.pipeline === 'object') ? fb.pipeline : {};
@@ -1488,6 +1269,8 @@
    */
   function aspettaRisposta(fb) {
     if (!fb || statusUnreadable(fb)) return false;
+    // Con la domanda si risponde lì, in un posto solo.
+    if (aspettaDomanda(fb)) return false;
     const norm = normalizeStatus(fb);
     if (norm.status !== 'design') return false;
     return MOTIVI_RISPOSTA.includes(String(norm.statusReason || '')) || String(fb.status || '') === 'clarify';
@@ -1528,9 +1311,18 @@
   }
 
   const L3_LOCALE = 'Richiede lavoro locale';
+  const L3_FIDATO = 'Chiede di renderlo fidato: il lavoro tocca il server';
+
+  /** Un worker chiede di renderlo fidato perché il lavoro tocca il server (#1358, SPEC-DOMANDE §2.2). PURA. */
+  function chiedeFiducia(fb) {
+    if (!fb || statusUnreadable(fb)) return false;
+    const norm = normalizeStatus(fb);
+    return norm.status === 'design' && String(norm.statusReason || '') === 'fidato';
+  }
 
   // Il rombo azzurro (#1060): lo stato basta a dirlo, quindi si colora anche prima che arrivi il documento intero.
-  function livelloL3Locale(fb, l, letto) {
+  function livelloL3Locale(fb, l, letto, titoloL3 = L3_LOCALE) {
+    const L3_LOCALE = titoloL3;
     const nota = judgesNote(fb);
     const righe = (nota && nota.text) ? [riga('In breve', nota.text)] : [];
     if (!letto) {
@@ -1562,7 +1354,22 @@
     const letto = !(opts && opts.dettaglioLetto === false);
     const l = livelliOf(fb).l3;
     const segnalato = !!(l && String(l.esito || '').trim());
+    // Con la domanda (SPEC-DOMANDE §3.8) il rombo rimanda lì: è il posto dove si risponde.
+    const dom = aspettaDomanda(fb);
+    if (dom) {
+      const t = `Aspetta la tua risposta alla domanda ${dom}`;
+      if (!letto) return nonLetto('l3', 'rombo', t);
+      const testoL = segnalato ? String(l.testo || '').trim() : '';
+      return forma('l3', 'rombo', t, 'design', segnalato ? 'segnalato' : 'domande', {
+        titolo: t,
+        righe: [],
+        testo: testoL || `Si risponde nella sezione Domande: la domanda ${dom} ha le opzioni, il consiglio e lo spazio per scrivere.`,
+        illeggibile: !!testoL && valueUnreadable(l.testo),
+        azioni: [],
+      });
+    }
     if (chiedeLavoroLocale(fb)) return livelloL3Locale(fb, segnalato ? l : null, letto);
+    if (chiedeFiducia(fb)) return livelloL3Locale(fb, segnalato ? l : null, letto, L3_FIDATO);
     // Fermo al livello 3 senza una scelta da fare qui (guasto, arenato, loop): il rombo dice quello che dice il segno in
     // lista, con l'ultima nota; verde solo se una domanda aperta aspetta l'owner (il guasto), grigio per gli altri.
     const fermo = !attesa && !segnalato ? fermoAlLivello3(fb) : null;
@@ -1630,6 +1437,12 @@
         azioni: [],
       });
     }
+    // Il worker che l'ha giudicata attacco o spam: il rombo prende la tinta del blocco, il titolo dice il giudizio.
+    const norm = normalizeStatus(fb);
+    if ((norm.status === 'attack' || norm.status === 'spam') && String(norm.statusReason || '') === 'worker') {
+      const t = `Segnalata come ${norm.status === 'attack' ? 'attacco' : 'spam'} da chi ci lavorava`;
+      return forma('l3', 'rombo', t, norm.status, 'segnalato', { titolo: t, righe, testo, illeggibile: valueUnreadable(l.testo), azioni: [] });
+    }
     return forma('l3', 'rombo', titolo, 'design', 'segnalato', {
       titolo,
       righe,
@@ -1669,19 +1482,19 @@
       righe,
       testo: testo || 'L’audit non ha lasciato un resoconto.',
       illeggibile: valueUnreadable(l.testo),
-      // Bocciato: l'owner legge e può decidere di andare avanti lo stesso.
-      // Il cancello di fusione (L5) resta, quindi non è un via libera cieco.
+      // Bocciato: l'owner legge e può andare avanti lo stesso. Il cancello di fusione (L5) resta,
+      // quindi non è un via libera cieco.
       azioni: esito === 'fail' ? ['salta_l4'] : [],
     });
   }
 
-  /** La mappa `livelli` del documento, sempre un oggetto. PURA. */
+  // La mappa `livelli` del documento, sempre un oggetto.
   function livelliOf(fb) {
     const l = fb && fb.livelli;
     return (l && typeof l === 'object') ? l : {};
   }
 
-  /** Il numero della segnalazione, senza cancelletto. PURA. */
+  // Il numero della segnalazione, senza cancelletto.
   function numeroOf(fb) {
     const s = Number(fb && fb.seq);
     if (!Number.isInteger(s) || s <= 0) return '';
@@ -1689,7 +1502,6 @@
     return Number.isInteger(sub) && sub > 0 ? `${s}.${sub}` : String(s);
   }
 
-  /** Questa richiesta di fusione nasce da QUESTA segnalazione? PURA. */
   function richiestaDiQuesto(req, fb) {
     if (!req || !fb) return false;
     const id = String(req.feedbackId || '').trim();
@@ -1698,10 +1510,45 @@
     return !!num && num === numeroOf(fb);
   }
 
+  // Fermata al cancello senza una richiesta da approvare (#1556): il motivo è la nota con cui il server l'ha fermata,
+  // e le strade sono le due azioni di stato che la pratica offre. Mai «aspetta»: lì non arriva nessun via libera.
+  const L5_SENZA_RICHIESTA = 'Nessuna richiesta di fusione è aperta, quindi non c’è un via libera da dare.';
+  const L5_ELENCHI_ASSENTI = 'I controlli del server l’hanno fermata. Le richieste di fusione non sono ancora arrivate a questa pagina.';
+  const L5_NOTA_CIFRATA = 'Il perché sta nella conversazione, che è cifrata e su questo computer non si legge.';
+  // La nota è del cancello solo se è nata dopo l'audit, che viene subito prima: un report o una domanda di un giro
+  // passato non passa per il motivo della fermata. Al minuto, perché i marcatori portano solo i minuti. Il marcatore
+  // è nell'ora di chi scrive, senza fuso: il server scrive in UTC, gli strumenti dell'owner nella sua ora, e l'audit
+  // ha il fuso. Vale quindi la lettura più tarda delle due, o in Italia la nota del server sembra nata prima.
+  function notaDelCancello(fb) {
+    const nota = ultimaDomanda(fb);
+    const l4 = livelliOf(fb).l4;
+    const audit = Date.parse(String((l4 && l4.at) || ''));
+    const locale = nota && Date.parse(istanteDelTurno(nota.ts) || '');
+    if (!nota || !Number.isFinite(audit) || !Number.isFinite(locale)) return null;
+    const scritta = Math.max(locale, locale - new Date(locale).getTimezoneOffset() * 60000);
+    const minuto = (t) => Math.floor(t / 60000);
+    return minuto(scritta) >= minuto(audit) ? nota : null;
+  }
+  function l5SenzaRichiesta(fb, opts) {
+    const letto = !(opts && opts.dettaglioLetto === false);
+    const cifrata = letto && valueUnreadable(fb && fb.notes);
+    const nota = letto && !cifrata ? notaDelCancello(fb) : null;
+    // Senza gli elenchi letti «nessuna richiesta» sarebbe un'ipotesi: la frase lo dice, e la lista resta generica.
+    const lette = !!(opts && opts.fusioniLette);
+    const righe = nota && nota.ts ? [riga('Quando', istanteDelTurno(nota.ts))] : [];
+    const generica = lette ? L5_SENZA_RICHIESTA : L5_ELENCHI_ASSENTI;
+    return forma('l5', 'quadrato', 'Fusione', 'attack', 'bloccato', {
+      titolo: 'Fusione',
+      righe,
+      testo: (nota && nota.body) || (cifrata ? `${generica} ${L5_NOTA_CIFRATA}` : generica),
+      azioni: ['rimanda', 'archivia'],
+    }, { richiesta: null, richieste: [], conflitto: false, fusione: lette ? 'senza' : null });
+  }
+
   /**
    * Livello 5: il cancello di fusione. Le richieste arrivano dal server
    * (`MERGE_APPROVALS_GET`) e si legano alla segnalazione per id o per numero.
-   * `opts.fusioni` = { pending, failed, preapproved, recent }. PURA.
+   * `opts.fusioni` = { pending, failed, preapproved, recent }; `opts.fusioniLette` = l'ultima lettura è riuscita. PURA.
    */
   function livelloL5(fb, opts) {
     const titolo = 'Fusione';
@@ -1712,23 +1559,13 @@
     const preapproved = lista('preapproved');
     const { status, statusReason } = normalizeStatus(fb);
 
-    // Il server segna sul documento che la pratica è ferma al cancello
-    // (`design` / `l5`). Vale da solo: gli elenchi delle richieste possono non
-    // essere ancora arrivati, o essere vuoti perché questo computer non è
-    // quello dell'owner — e un quadrato grigio direbbe il falso.
+    // Il documento dice da solo che la pratica è ferma al cancello: gli elenchi delle richieste
+    // possono non essere arrivati, o essere vuoti su un altro computer, e il grigio mentirebbe.
     const fermaDaStato = status === 'design' && statusReason === 'l5';
 
-    // Una fusione approvata che non è avvenuta (conflitto) pesa quanto una
-    // richiesta ferma: è un sì già dato che non ha prodotto niente.
+    // Una fusione approvata e mai avvenuta pesa quanto una richiesta ferma (vedi mergeApprovals).
     const ferme = failed.concat(pending);
-    if (!ferme.length && fermaDaStato) {
-      return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {
-        titolo,
-        righe: [],
-        testo: 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera. La richiesta non è (ancora) arrivata a questa pagina.',
-        azioni: [],
-      }, { richiesta: null, richieste: [], conflitto: false });
-    }
+    if (!ferme.length && fermaDaStato) return l5SenzaRichiesta(fb, opts);
     if (ferme.length) {
       const req = ferme[0];
       const inConflitto = failed.length > 0;
@@ -1779,24 +1616,19 @@
     }, { richiesta: null, richieste: [], conflitto: false });
   }
 
-  /**
-   * La fila intera, sempre cinque voci nello stesso ordine. PURA.
-   * `opts.fusioni` = gli elenchi del server (vedi livelloL5).
-   */
+  // La fila intera, sempre cinque voci nello stesso ordine. `opts.fusioni` = gli elenchi del
+  // server.
   function livelli(fb, opts) {
     return [livelloL1(fb), livelloL2(fb), livelloL3(fb, opts), livelloL4(fb, opts), livelloL5(fb, opts)];
   }
 
-  /** La voce di un livello per chiave ('l1'…'l5'), o null. PURA. */
+  // La voce di un livello per chiave ('l1'…'l5'), o null.
   function livelloPer(fb, key, opts) {
     return livelli(fb, opts).find((l) => l.key === String(key)) || null;
   }
 
-  /**
-   * Questa segnalazione ha una fusione ferma che aspetta l'owner? PURA.
-   * È quello che fa diventare rossa la scheda in lista e la porta in cima
-   * alle cose da decidere: una fusione ferma È una decisione dell'owner.
-   */
+  // Questa segnalazione ha una fusione ferma che aspetta l'owner? È quello che fa diventare
+  // rossa la scheda in lista e la porta in cima alle cose da decidere.
   function fusioneInAttesa(fb, opts) {
     const l5 = livelloL5(fb, opts);
     return l5.esito === 'bloccato' || l5.esito === 'conflitto';
@@ -1815,6 +1647,8 @@
     pentagono: 'M8 1.4 L14.6 6.3 L12.1 14.2 L3.9 14.2 L1.4 6.3 Z',
     quadrato:  'M2.6 2.6 H13.4 V13.4 H2.6 Z',
     cerchio:   'M8 2.2 A5.8 5.8 0 1 1 7.99 2.2 Z',
+    // Non è un livello: è il segno della fiducia in lista (#1575), una forma che nessun livello usa.
+    scudo:     'M8 1.6 L13.4 3.6 V7.6 C13.4 10.8 11.2 13.3 8 14.5 C4.8 13.3 2.6 10.8 2.6 7.6 V3.6 Z',
   };
 
   // Il motivo di design → il livello che ha fermato la pratica (D93). Il rombo è Claude che chiede.
@@ -1827,6 +1661,7 @@
     arenato:  { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La lavorazione si è arenata troppe volte' },
     guasto:   { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo per un guasto: la domanda dice cosa fare', domanda: true },
     locale:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_LOCALE },
+    fidato:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_FIDATO },
   };
 
   /** Il segno di un design fermo al livello 3 che non aspetta né una risposta né il lavoro locale, o null. PURA. */
@@ -1850,8 +1685,11 @@
       const l5 = livelloL5(fb, opts);
       return out('quadrato', 'l5', 'attack', l5.esito === 'conflitto'
         ? 'Fusione non avvenuta: avevi detto sì, ma il ramo non è entrato in main'
-        : 'Fermo al cancello di fusione: aspetta il tuo via libera');
+        : l5.fusione === 'senza' ? 'Fermo al cancello senza una richiesta aperta. Decidi tu se rifarlo o archiviarlo'
+          : 'Fermo al cancello di fusione: aspetta il tuo via libera');
     }
+    // Chi aspetta una domanda sta In coda col suo segno: non è un fermo dei Ricevuti.
+    if (aspettaDomanda(fb)) return null;
     const { status, statusReason } = normalizeStatus(fb);
     if (!isRicevutiStatus(status)) return null;
     if (status === 'design') {
@@ -1864,6 +1702,8 @@
     if (status === 'suspicious_file') return out('triangolo', 'l1', 'attack', 'Il filtro d’ingresso ha trovato un file sospetto');
     if (status === 'attack' || status === 'spam') {
       const parola = status === 'attack' ? 'attacco' : 'spam';
+      // Il giudizio di chi ci lavorava (SPEC-DOMANDE §2.2): L3, accanto alle sue altre segnalazioni.
+      if (String(statusReason || '') === 'worker') return out('rombo', 'l3', status, `Chi ci lavorava l’ha segnalata come ${parola}`);
       const dalFiltro = status === 'attack'
         ? (p.action === 'block_attack' || p.l1Category === 'dangerous')
         : (p.action === 'block_spam' || p.l1Category === 'spam');
@@ -1902,12 +1742,15 @@
 
   // ── Sezioni di Gestione (SPEC-DOMANDE §2.1) ───────────────────────────────
   // Le sezioni raggruppano SCHEDE, non stati: lo stato → scheda resta in feedbackStatus.js.
-  // Una scheda o sezione nuova (Risposte automatiche, Crediti, Impostazioni predefinite…) entra qui quando esiste la
-  // cosa che mostra: un pulsante che non apre niente sembra rotto. I Modelli di supporto stanno in Automazioni (#1110).
+  // Una scheda o sezione nuova (Risposte automatiche…) entra qui quando esiste la cosa che mostra: un pulsante che non
+  // apre niente sembra rotto. I Modelli di supporto stanno in Automazioni (#1110). Utenti e Impostazioni predefinite sono
+  // le pagine dell'owner che avevano un ingresso loro (#1414): i loro vecchi indirizzi li rigira il protocollo.
   const SEZIONI = Object.freeze([
     { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-lavoro', 'domande-archivio'] },
-    { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived', 'fbstats', 'stats'] },
-    { id: 'routine', nome: 'Routine', schede: ['automation', 'log'] },
+    { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'waiting', 'resolved', 'archived', 'fbstats', 'stats'] },
+    { id: 'routine', nome: 'Routine', schede: ['automation', 'crediti', 'log'] },
+    { id: 'utenti', nome: 'Utenti', schede: ['utenti', 'contatori'] },
+    { id: 'predefinite', nome: 'Impostazioni predefinite', schede: ['predefiniti'] },
   ]);
 
   function sezioneDiScheda(tab) {
@@ -1918,6 +1761,13 @@
   function schedaPredefinita(sezione) {
     const s = SEZIONI.find((x) => x.id === sezione);
     return s ? s.schede[0] : null;
+  }
+
+  /** La scheda che chiede un indirizzo di Gestione (`#utenti`, `#routine`…): una scheda, o la prima di una sezione. PURA. */
+  function schedaDaIndirizzo(hash) {
+    const chiave = String(hash || '').replace(/^#/, '').trim().toLowerCase();
+    if (!chiave) return null;
+    return sezioneDiScheda(chiave) ? chiave : schedaPredefinita(chiave);
   }
 
   /**
@@ -1990,15 +1840,38 @@
     return items.filter((fb) => scelti.includes(livelloRicevuti(fb, opts)));
   }
 
-  /** Quante pratiche dei Ricevuti sono ferme a ogni livello, a filtro spento; `senza` = nessun livello. PURA. */
+  /** Quante pratiche dei Ricevuti sono ferme a ogni livello, coi livelli spenti e la fiducia di `opts`; `senza` = nessun livello. PURA. */
   function contaLivelliRicevuti(feedbacks, opts) {
     const n = { l1: 0, l2: 0, l3: 0, l4: 0, l5: 0, senza: 0 };
-    for (const fb of (feedbacks || [])) {
+    for (const fb of filtraFiducia(feedbacks, opts && opts.soloNonFidate)) {
       if (manageTabFor(fb, opts) !== 'inbox') continue;
       const l = livelloRicevuti(fb, opts);
       n[l || 'senza']++;
     }
     return n;
+  }
+
+  // ── La fiducia in lista (#1575) ───────────────────────────────────────────
+  // Un filtro solo per pratiche e domande (le due portano `fiducia`), così lista e numeri non divergono: quello che
+  // nasconde non si conta (patterns/contenuto-nascosto-sezioni-chiuse-filtri-collassi-rivelalo.md).
+  /** Con `soloNonFidate` le sole non fidate, altrimenti tutte. PURA. */
+  function filtraFiducia(lista, soloNonFidate) {
+    const items = Array.isArray(lista) ? lista : [];
+    return soloNonFidate ? items.filter((x) => !isFidato(x)) : items.slice();
+  }
+  function contaNonFidate(lista) {
+    return filtraFiducia(lista, true).length;
+  }
+  // Il cancello guarda anche il registro del ramo, che la pagina non legge (#1554, #1555): l'hover non promette di più.
+  const SEGNI_FIDUCIA = Object.freeze({
+    fidata: Object.freeze({ classe: 'fidata', parola: 'Fidata',
+      testo: 'Fidata. È la fiducia del feedback. Il cancello guarda anche il registro del ramo, che questa pagina non legge, e se il registro è rotto ferma la fusione lo stesso.' }),
+    nonfidata: Object.freeze({ classe: 'nonfidata', parola: 'Non fidata',
+      testo: 'Non fidata. È la fiducia del feedback. Se il cancello ferma il lavoro, la fusione aspetta il tuo sì.' }),
+  });
+  /** Il segno della fiducia su una riga: la classe del colore, la parola e l'hover. Senza campo vale non fidata. PURA. */
+  function segnoFiducia(x) {
+    return isFidato(x) ? SEGNI_FIDUCIA.fidata : SEGNI_FIDUCIA.nonfidata;
   }
 
   /** Il tasto «Frase» da chiuso, uguale in Gestione e nella pagina Feedback (#857): acceso se una
@@ -2024,8 +1897,8 @@
     workProgress, WORK_STAGES,
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
-    panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isTrustedClient, isUnprovenSender, effectiveClientId,
-    isLocalOnly, inAttesaFusioneServer, attesaServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText,
+    panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isUnprovenSender, effectiveClientId,
+    isLocalOnly, inAttesaFusioneServer, attesaServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
     isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco,
     panelComplete, judgesNote, reasonText,
@@ -2035,11 +1908,12 @@
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
     fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, schedaIngresso, rigiudicabile,
-    aspettaRisposta, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
+    aspettaRisposta, aspettaDomanda, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
-    SEZIONI, sezioneDiScheda, schedaPredefinita, leggiSceltaSezione, sezioneDiApertura,
+    SEZIONI, sezioneDiScheda, schedaPredefinita, schedaDaIndirizzo, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,
     LIVELLI_RICEVUTI, FORMA_DI_LIVELLO, livelloRicevuti, filtraLivelli, contaLivelliRicevuti,
+    filtraFiducia, contaNonFidate, segnoFiducia,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

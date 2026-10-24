@@ -1,6 +1,6 @@
-# La suite Playwright completa e gli unit test su Windows, a ogni fusione su main: il lavoro di pubblicazione (release.yml)
-# pubblica solo un commit la cui corsa qui e' verde. Avviata a mano su un ramo prova quel ramo e non apre feedback.
-# Garanzie: tests/unit/releaseSuite.test.mjs.
+# La suite Playwright completa (in parti, poi un verdetto solo) e gli unit test su Windows, a ogni fusione su main: la
+# pubblicazione (release.yml) prende solo un commit la cui corsa qui e' verde. A mano su un ramo prova quel ramo, senza feedback.
+# Garanzie: tests/unit/releaseSuite.test.mjs e, per i segreti, tests/unit/catenaPubblicazione.test.mjs.
 
 name: Suite Playwright completa
 
@@ -21,16 +21,18 @@ permissions:
   actions: read
 
 jobs:
-  # Linux senza schermo come il contenitore delle routine; il verdetto non è «tutto verde»: i rossi
-  # d'ambiente di tests/rossi-noti.json (contenitore.specs) non contano, e nemmeno un flaky ripassato.
+  # Linux senza schermo come il contenitore delle routine, in quattro parti su macchine diverse: in fila la suite
+  # passava il tetto del passo (200 minuti, #1485) e cresceva ancora. Una parte in più si aggiunge alla matrice,
+  # a `--shard` e a `--parti` del verdetto insieme (tests/unit/releaseSuite.test.mjs li confronta).
   suite:
     runs-on: ubuntu-latest
-    # Il segreto dell'avviso sta nell'ambiente `rilascio`, aperto al solo main: un ramo, che l'avviso non lo
-    # apre, dichiarandolo verrebbe respinto prima di partire (#1073).
-    environment: ${{ github.ref == 'refs/heads/main' && 'rilascio' || '' }}
-    timeout-minutes: 240
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: [1, 2, 3, 4]
     steps:
-      - name: Checkout del commit da provare (con la storia, per l'elenco dei commit dell'avviso)
+      - name: Checkout del commit da provare (con la storia)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
@@ -56,26 +58,92 @@ jobs:
             sudo apt-get install -y xvfb
           fi
 
-      # Il verdetto lo dà lo script dopo, non Playwright, rosso anche per i soli rossi noti. Tetto SUO, sotto
-      # quello del job: col solo tetto del job un Electron appeso annullava il job prima del verdetto, muto.
-      - name: Suite Playwright completa
+      # Il verdetto lo dà il lavoro dopo, non Playwright, rosso anche per i soli rossi noti. Tre tetti: quello di
+      # Playwright (140 minuti) chiude la parte lasciando l'esito dei casi girati; quello del passo ferma un Electron
+      # che non si chiude; quello del lavoro, più largo, lascia caricare l'esito.
+      - name: Suite Playwright completa (una parte)
         id: suite
         continue-on-error: true
-        timeout-minutes: 200
+        timeout-minutes: 150
         shell: bash
-        run: ELECTRON_DISABLE_SANDBOX=1 PLAYWRIGHT_JSON_OUTPUT_NAME=suite-risultati.json xvfb-run -a npx playwright test --reporter=list,json
+        run: ELECTRON_DISABLE_SANDBOX=1 PLAYWRIGHT_BLOB_OUTPUT_NAME=parte-${{ matrix.parte }}.zip xvfb-run -a npx playwright test --shard=${{ matrix.parte }}/4 --global-timeout=8400000 --reporter=list,blob
 
-      # Uscita 0 nessun rosso nuovo, 1 rossi nuovi, 2 suite non partita (che NON è un verde).
+      # Un esito che non si carica non fa verde niente: il verdetto conta la parte come senza esito.
+      - name: Conserva l'esito della parte
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-esito-${{ matrix.parte }}
+          path: blob-report/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Conserva le tracce della parte (7 giorni)
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-tracce-${{ matrix.parte }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Il verdetto non è «tutto verde»: i rossi d'ambiente di tests/rossi-noti.json (contenitore.specs) non contano, e
+  # nemmeno un flaky ripassato. Gira anche con una parte rossa: è proprio allora che serve.
+  verdetto:
+    needs: suite
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout del commit provato
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dipendenze
+        run: node scripts/npm-ci-ritenta.mjs
+
+      - name: Gli esiti delle parti
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: suite-esito-*
+          path: blob-report
+          merge-multiple: true
+
+      - name: Unisci gli esiti in un JSON solo
+        continue-on-error: true
+        shell: bash
+        run: PLAYWRIGHT_JSON_OUTPUT_NAME=suite-risultati.json npx playwright merge-reports --reporter=json blob-report
+
+      # Uscita 0 nessun rosso nuovo, 1 rossi nuovi, 2 suite (o una sua parte) non arrivata in fondo: NON è un verde.
       - name: Verdetto (rossi nuovi fuori dai rossi noti del contenitore)
         id: verdetto
         continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
-          node scripts/suite-verdict.mjs suite-risultati.json --out rossi-nuovi.txt --chiavi chiavi-allarme.txt 2>&1 | tee verdetto.log
+          node scripts/suite-verdict.mjs suite-risultati.json --out rossi-nuovi.txt --chiavi chiavi-allarme.txt --parti 4 --esiti blob-report 2>&1 | tee verdetto.log
+
+      # Dalla cloud registro e allegati non si scaricano: l'elenco si legge dalle annotazioni, con l'API.
+      - name: Rossi nuovi come annotazioni
+        if: always() && steps.verdetto.outcome == 'failure'
+        continue-on-error: true
+        shell: bash
+        run: |
+          if [ -s rossi-nuovi.txt ]; then node scripts/annotazioni-github.mjs rossi-nuovi.txt "Rossi nuovi della suite"
+          else node scripts/annotazioni-github.mjs verdetto.log "Suite senza esito"; fi
 
       # Un allegato che non si carica non dice niente del commit: rosso, farebbe di una suite verde una «non partita».
-      - name: Conserva esito e tracce (7 giorni)
+      # Su main lo legge `avviso`, che apre il feedback su un'altra macchina: anche le chiavi dell'allarme viaggiano qui.
+      - name: Conserva esito e verdetto (7 giorni)
         if: always()
         continue-on-error: true
         uses: actions/upload-artifact@v4
@@ -85,78 +153,18 @@ jobs:
             suite-risultati.json
             rossi-nuovi.txt
             verdetto.log
-            test-results/
+            chiavi-allarme.txt
           if-no-files-found: warn
           retention-days: 7
 
-      # Solo main: un ramo non ferma nessuna pubblicazione. `failure()`: anche un passo rosso PRIMA della suite
-      # deve diventare un feedback, o la pubblicazione si ferma in silenzio.
-      - name: Rosso nuovo su main - apri un feedback
-        if: always() && !cancelled() && github.ref == 'refs/heads/main' && (steps.verdetto.outcome == 'failure' || failure())
-        env:
-          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
-          GH_TOKEN: ${{ github.token }}
-          SUITE_OUTCOME: ${{ steps.suite.outcome }}
-          ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      # Il colore della corsa E' il verdetto, su main e sui rami: la pubblicazione sceglie solo commit con una corsa
+      # riuscita, e su main `avviso` apre il feedback leggendo questo rosso. `failure()`: anche un passo rosso prima
+      # del verdetto.
+      - name: Rossi nuovi - la corsa resta rossa
+        if: always() && !cancelled() && (steps.verdetto.outcome == 'failure' || failure())
         shell: bash
         run: |
-          echo "::error::Suite Playwright con rossi nuovi (o non partita): questo commit non verra pubblicato."
-          PREMESSA="La suite Playwright completa, che gira a ogni fusione sul ramo principale, ha trovato dei rossi NUOVI su questo commit (fuori dai rossi noti del contenitore in tests/rossi-noti.json): questo commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala; se invece e un rosso d ambiente del contenitore senza schermo, aggiungilo a tests/rossi-noti.json (contenitore.specs) col titolo esatto del test, il motivo e questo feedback. Il JSON dei risultati e le tracce dei rossi (screenshot, trace) stanno nell artifact di questa esecuzione, per sette giorni: ${ESECUZIONE}"
-          # L'elenco intero sta in rossi-nuovi.txt (allegato): qui un tetto, e il taglio si DICE col numero.
-          ROSSI_TUTTE=$(cat rossi-nuovi.txt 2>/dev/null || true)
-          ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
-          N_TUTTE=$(printf '%s\n' "$ROSSI_TUTTE" | grep -c . || true)
-          if [ "${N_TUTTE:-0}" -gt 80 ]; then
-            ROSSI="${ROSSI}
-          … elenco tagliato: altri $((N_TUTTE - 80)) casi rossi stanno in rossi-nuovi.txt, nell'artifact di questa esecuzione (Actions)"
-          fi
-          # I sospetti: i commit entrati su main dopo l'ultima suite verde.
-          VERDE=$(node scripts/ultima-suite-verde.mjs --stampa 2>/dev/null || true)
-          if [ -n "$VERDE" ]; then
-            COMMIT_TUTTI=$(git log --first-parent --format='%h %s' "${VERDE}..HEAD" 2>/dev/null || true)
-            COMMIT=$(printf '%s\n' "$COMMIT_TUTTI" | head -40)
-            N_COMMIT=$(printf '%s\n' "$COMMIT_TUTTI" | grep -c . || true)
-            if [ "${N_COMMIT:-0}" -gt 40 ]; then
-              COMMIT="${COMMIT}
-          … elenco tagliato: altri $((N_COMMIT - 40)) commit, git log --first-parent ${VERDE}..HEAD"
-            fi
-            DOPO_VERDE="Commit entrati su main dopo l ultima suite verde (${VERDE}), ${N_COMMIT:-0}:
-          ${COMMIT}"
-          else
-            DOPO_VERDE="Nessuna suite verde su main fra le ultime cento corse riuscite: da quale commit parta il guasto non si sa da qui."
-          fi
-          VERDETTO=$(tail -c 2500 verdetto.log 2>/dev/null || echo "(nessun verdetto: la suite non e partita)")
-          if [ "$SUITE_OUTCOME" != "success" ] && [ "$SUITE_OUTCOME" != "failure" ]; then
-            # La suite non e' nemmeno partita: e' rosso un passo prima di lei.
-            VERDETTO="La suite NON e partita: e rosso uno dei passi che la preparano (l installazione delle dipendenze con npm ci, che ritenta gia da sola per qualche minuto, il binario di Electron, lo schermo virtuale xvfb). Non e un rosso del codice di Filo: guarda il registro di questa esecuzione (Actions), sistema quel passo (un lockfile fuori sincrono, un download giu da piu di qualche minuto) e la prossima corsa riprova.
-          ${VERDETTO}"
-          elif [ ! -f suite-risultati.json ]; then
-            VERDETTO="La suite non ha lasciato il JSON dei risultati: o non e partita, oppure ha superato il tetto del passo (200 minuti, di norma un Electron rimasto appeso) ed e stata interrotta prima della fine. Guarda il registro del passo Suite Playwright completa in questa esecuzione (Actions).
-          ${VERDETTO}"
-          fi
-          TESTO="${PREMESSA}
-
-          Rossi nuovi (${N_TUTTE:-0}):
-          ${ROSSI:-(nessun caso elencato: la suite non e partita o non ha lasciato un esito leggibile; guarda il verdetto)}
-
-
-          ${DOPO_VERDE}
-
-
-          Verdetto:
-          ${VERDETTO}"
-          # Senza il file delle chiavi (verdetto mai partito) il guasto e' la suite che non parte.
-          if [ -s chiavi-allarme.txt ]; then CHIAVI=(--chiavi-da chiavi-allarme.txt); else CHIAVI=(--chiave suite:non-partita); fi
-          node scripts/build-alarm.mjs "Suite Playwright rossa su main: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" || echo "::warning::allarme non consegnato"
-          exit 1
-
-      # Il colore della corsa E' il verdetto: il lavoro di pubblicazione sceglie
-      # solo commit con una corsa riuscita, quindi un rosso non deve mai finire verde.
-      - name: Rosso nuovo su un ramo - la corsa resta rossa
-        if: always() && !cancelled() && github.ref != 'refs/heads/main' && (steps.verdetto.outcome == 'failure' || failure())
-        shell: bash
-        run: |
-          echo "::error::Suite Playwright con rossi nuovi (o non partita) su ${GITHUB_REF}: nessun feedback, l'elenco sta nel verdetto qui sopra e nell'artifact."
+          echo "::error::Suite Playwright con rossi nuovi (o non arrivata in fondo) su ${GITHUB_REF}: l'elenco sta nel verdetto qui sopra e nell'artifact. Su main il commit non verra pubblicato, e il feedback lo apre il lavoro avviso."
           exit 1
 
   # Il cancello di pubblicazione (release.yml) rifà gli unit test su Windows: un commit rosso lì non uscirà mai, quindi
@@ -164,11 +172,9 @@ jobs:
   # Niente `if:` né `continue-on-error` sul lavoro: saltato o tollerato, la corsa sarebbe verde senza averlo passato.
   unit-windows:
     runs-on: windows-latest
-    # Come `suite`: il segreto dell'avviso sta nell'ambiente `rilascio`, aperto al solo main (#1073).
-    environment: ${{ github.ref == 'refs/heads/main' && 'rilascio' || '' }}
     timeout-minutes: 60
     steps:
-      - name: Checkout del commit da provare (con la storia, per l'elenco dei commit dell'avviso)
+      - name: Checkout del commit da provare (con la storia, come il cancello di pubblicazione)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
@@ -191,18 +197,150 @@ jobs:
         shell: bash
         run: node scripts/unit-con-riprova.mjs --registro unit.log
 
+      # Come per la suite: dalla cloud il registro non si scarica, le annotazioni sì.
+      - name: Unit rossi come annotazioni
+        if: always() && steps.unit.outcome == 'failure'
+        continue-on-error: true
+        shell: bash
+        run: |
+          grep -E '^[[:space:]]*(not ok|location:)' unit.log > unit-rossi.txt 2>/dev/null || true
+          if [ -s unit-rossi.txt ]; then node scripts/annotazioni-github.mjs unit-rossi.txt "Unit rossi su Windows"
+          else
+            # Nessun caso rosso: la corsa si è fermata prima (lanciatore caduto, tetto). Il perché sta in coda al registro.
+            tail -n 60 unit.log > unit-coda.txt 2>/dev/null || true
+            [ -s unit-coda.txt ] || echo "Nessun registro degli unit: il lanciatore non e partito." > unit-coda.txt
+            node scripts/annotazioni-github.mjs unit-coda.txt "Unit senza esito su Windows (coda del registro)"
+          fi
+
+      # Su main lo legge `avviso`, che apre il feedback su un'altra macchina.
+      - name: Conserva il registro degli unit (7 giorni)
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-windows-registro
+          path: unit.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      # Rosso su main e sui rami, come il verdetto: su main il feedback lo apre `avviso`. I rossi in coda al registro:
+      # in mezzo a trentamila righe non li trova nessuno.
+      - name: Unit rossi su Windows - la corsa resta rossa
+        if: always() && !cancelled() && (steps.unit.outcome == 'failure' || failure())
+        shell: bash
+        run: |
+          echo "::error::Unit test rossi su Windows (o non partiti) su ${GITHUB_REF}. Su main il commit non verra pubblicato, e il feedback lo apre il lavoro avviso."
+          grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null | head -80 || echo "(nessuna riga not ok: gli unit non sono partiti, guarda i passi sopra)"
+          exit 1
+
+  # I feedback dei rossi su main, in un lavoro a parte: la parola della costruzione sta solo qui, nell'ambiente fisso,
+  # lontano da npm ci e dalle prove (gli strumenti dell'avviso usano solo moduli di Node). Su un ramo il lavoro si salta
+  # prima di arrivare all'ambiente, che lo respingerebbe (#1504).
+  avviso:
+    needs: [suite, verdetto, unit-windows]
+    if: always() && !cancelled() && github.ref == 'refs/heads/main' && (needs.suite.result != 'success' || needs.verdetto.result != 'success' || needs.unit-windows.result != 'success')
+    runs-on: ubuntu-latest
+    environment: rilascio
+    timeout-minutes: 20
+    steps:
+      - name: Checkout del commit provato (con la storia, per l'elenco dei commit dell'avviso)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Un allegato che manca non ferma l'avviso: senza chiavi vale `suite:non-partita`.
+      - name: Esito e verdetto della suite
+        if: always() && !cancelled() && (needs.suite.result != 'success' || needs.verdetto.result != 'success')
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: suite-playwright-${{ github.run_id }}
+          path: esiti-suite
+
+      # `PARTI_ESITO`: anche una parte rossa PRIMA della suite (npm ci, Electron, xvfb) diventa un feedback.
+      - name: Suite rossa su main - apri un feedback
+        if: always() && !cancelled() && (needs.suite.result != 'success' || needs.verdetto.result != 'success')
+        env:
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          GH_TOKEN: ${{ github.token }}
+          PARTI_ESITO: ${{ needs.suite.result }}
+          ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          PREMESSA="La suite Playwright completa, che gira a ogni fusione sul ramo principale, ha trovato dei rossi NUOVI su questo commit (fuori dai rossi noti del contenitore in tests/rossi-noti.json): questo commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala; se invece e un rosso d ambiente del contenitore senza schermo, aggiungilo a tests/rossi-noti.json (contenitore.specs) col titolo esatto del test, il motivo e questo feedback. Il JSON dei risultati e le tracce dei rossi (screenshot, trace, una cartella per parte della suite) stanno negli artifact di questa esecuzione, per sette giorni: ${ESECUZIONE}"
+          # L'elenco intero sta in rossi-nuovi.txt (allegato): qui un tetto, e il taglio si DICE col numero.
+          ROSSI_TUTTE=$(cat esiti-suite/rossi-nuovi.txt 2>/dev/null || true)
+          ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
+          N_TUTTE=$(printf '%s\n' "$ROSSI_TUTTE" | grep -c . || true)
+          if [ "${N_TUTTE:-0}" -gt 80 ]; then
+            ROSSI="${ROSSI}
+          … elenco tagliato: altri $((N_TUTTE - 80)) casi rossi stanno in rossi-nuovi.txt, nell'artifact di questa esecuzione (Actions)"
+          fi
+          # I sospetti: i commit entrati su main dopo l'ultima suite verde.
+          VERDE=$(node scripts/ultima-suite-verde.mjs --stampa 2>/dev/null || true)
+          if [ -n "$VERDE" ]; then
+            COMMIT_TUTTI=$(git log --first-parent --format='%h %s' "${VERDE}..HEAD" 2>/dev/null || true)
+            COMMIT=$(printf '%s\n' "$COMMIT_TUTTI" | head -40)
+            N_COMMIT=$(printf '%s\n' "$COMMIT_TUTTI" | grep -c . || true)
+            if [ "${N_COMMIT:-0}" -gt 40 ]; then
+              COMMIT="${COMMIT}
+          … elenco tagliato: altri $((N_COMMIT - 40)) commit, git log --first-parent ${VERDE}..HEAD"
+            fi
+            DOPO_VERDE="Commit entrati su main dopo l ultima suite verde (${VERDE}), ${N_COMMIT:-0}:
+          ${COMMIT}"
+          else
+            DOPO_VERDE="Nessuna suite verde su main fra le ultime cento corse riuscite: da quale commit parta il guasto non si sa da qui."
+          fi
+          VERDETTO=$(tail -c 2500 esiti-suite/verdetto.log 2>/dev/null || echo "(nessun verdetto: la suite non e partita)")
+          if [ "$PARTI_ESITO" != "success" ]; then
+            # Una parte e' rossa fuori dalla suite: un passo che la prepara, o il tetto del suo lavoro.
+            VERDETTO="Una parte della suite NON e partita o non e arrivata in fondo: e rosso uno dei passi che la preparano (l installazione delle dipendenze con npm ci, che ritenta gia da sola per qualche minuto, il binario di Electron, lo schermo virtuale xvfb), o la parte ha passato il tetto del suo lavoro. Non e un rosso del codice di Filo: guarda il registro della parte rossa in questa esecuzione (Actions), sistema quel passo (un lockfile fuori sincrono, un download giu da piu di qualche minuto) e la prossima corsa riprova.
+          ${VERDETTO}"
+          elif [ ! -f esiti-suite/suite-risultati.json ]; then
+            VERDETTO="La suite non ha lasciato il JSON dei risultati: nessuna parte ha lasciato il suo esito, o la loro unione e fallita. Guarda i registri dei passi Suite Playwright completa (una parte) e Unisci gli esiti in questa esecuzione (Actions).
+          ${VERDETTO}"
+          fi
+          TESTO="${PREMESSA}
+
+          Rossi nuovi (${N_TUTTE:-0}):
+          ${ROSSI:-(nessun caso elencato: la suite non e partita o non ha lasciato un esito leggibile; guarda il verdetto)}
+
+
+          ${DOPO_VERDE}
+
+
+          Verdetto:
+          ${VERDETTO}"
+          # Senza il file delle chiavi (verdetto mai partito) il guasto e' la suite che non parte.
+          if [ -s esiti-suite/chiavi-allarme.txt ]; then CHIAVI=(--chiavi-da esiti-suite/chiavi-allarme.txt); else CHIAVI=(--chiave suite:non-partita); fi
+          # Rosso solo se il feedback non parte: il rosso della corsa lo tengono già i lavori provati.
+          node scripts/build-alarm.mjs "Suite Playwright rossa su main: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" || { echo "::error::Allarme della suite non consegnato: nessun feedback per questo rosso."; exit 1; }
+
+      - name: Registro degli unit su Windows
+        if: always() && !cancelled() && needs.unit-windows.result != 'success'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-windows-registro
+          path: esiti-unit
+
       # Le chiavi sono quelle del cancello (`unit:<file>`): lo stesso rosso visto qui e là apre un feedback solo.
       - name: Unit rossi su Windows in main - apri un feedback
-        if: always() && !cancelled() && github.ref == 'refs/heads/main' && (steps.unit.outcome == 'failure' || failure())
+        if: always() && !cancelled() && needs.unit-windows.result != 'success'
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
           GH_TOKEN: ${{ github.token }}
           ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
         run: |
-          echo "::error::Unit test rossi su Windows (o non partiti): questo commit non verra pubblicato."
           PREMESSA="Gli unit test, rifatti su Windows a ogni fusione sul ramo principale come li rifa il cancello di pubblicazione, sono rossi su questo commit anche rifatti una volta: il commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Su Linux (contenitore delle routine, cancello di fusione) gli stessi test possono essere verdi: il rosso e di Windows (percorsi, fine riga, piattaforma presunta invece che iniettata, tempi). Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala. Registro: ${ESECUZIONE}"
-          ROSSI_TUTTE=$(grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null || true)
+          ROSSI_TUTTE=$(grep -E '^[[:space:]]*(not ok|location:)' esiti-unit/unit.log 2>/dev/null || true)
           ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
           N_TUTTE=$(printf '%s\n' "$ROSSI_TUTTE" | grep -c . || true)
           if [ "${N_TUTTE:-0}" -gt 80 ]; then
@@ -223,9 +361,9 @@ jobs:
           else
             DOPO_VERDE="Nessuna suite verde su main fra le ultime cento corse riuscite: da quale commit parta il guasto non si sa da qui."
           fi
-          if [ -s unit.log ]; then
-            CODA=$(tail -c 2500 unit.log)
-            CHIAVI=(--chiavi-unit unit.log)
+          if [ -s esiti-unit/unit.log ]; then
+            CODA=$(tail -c 2500 esiti-unit/unit.log)
+            CHIAVI=(--chiavi-unit esiti-unit/unit.log)
           else
             CODA="Gli unit test NON sono partiti: e rosso un passo prima di loro (di norma l installazione delle dipendenze con npm ci, che ritenta gia da sola per qualche minuto). Guarda il registro di questa esecuzione."
             CHIAVI=(--chiave unit-windows:non-partiti)
@@ -240,15 +378,4 @@ jobs:
 
 
           ${CODA}"
-          printf '%s\n' "${ROSSI:-(nessuna riga not ok)}"
-          node scripts/build-alarm.mjs "Unit test rossi su Windows: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" || echo "::warning::allarme non consegnato"
-          exit 1
-
-      - name: Unit rossi su Windows su un ramo - la corsa resta rossa
-        if: always() && !cancelled() && github.ref != 'refs/heads/main' && (steps.unit.outcome == 'failure' || failure())
-        shell: bash
-        run: |
-          echo "::error::Unit test rossi su Windows (o non partiti) su ${GITHUB_REF}: nessun feedback."
-          # In coda al registro: in mezzo a trentamila righe i rossi non li trova nessuno.
-          grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null | head -80 || echo "(nessuna riga not ok: gli unit non sono partiti, guarda i passi sopra)"
-          exit 1
+          node scripts/build-alarm.mjs "Unit test rossi su Windows: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" || { echo "::error::Allarme degli unit su Windows non consegnato: nessun feedback per questo rosso."; exit 1; }

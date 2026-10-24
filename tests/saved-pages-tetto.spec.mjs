@@ -2,6 +2,7 @@
 // finestra dice quale. Prima usciva senza che nessuno lo dicesse.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 test('a 1000 pagine salvate, salvarne un\'altra dice quale esce', async ({ app, openTab, testServer, avvisi }) => {
   const tetto = await app.evaluate(async () => {
@@ -20,7 +21,7 @@ test('a 1000 pagine salvate, salvarne un\'altra dice quale esce', async ({ app, 
   const page = await openTab(url);
   await page.waitForLoadState('domcontentloaded');
   await page.click('body', { button: 'right' });
-  const btn = page.locator('.sn-menu [data-sn-icon-id="saveForLater"]');
+  const btn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
   await expect(btn).toBeVisible();
   await btn.click();
 

@@ -175,4 +175,4 @@ function perFilo() {
   return diFilo;
 }
 
-module.exports = { crea, perFilo };
+module.exports = { crea, perFilo, immagineNegliAppunti: immagineElectron };

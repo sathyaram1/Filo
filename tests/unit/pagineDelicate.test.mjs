@@ -21,6 +21,21 @@ test('un dominio degli elenchi di serie è delicato, anche nei sottodomini, col 
   assert.equal(PD.nome('banche'), 'banca');
 });
 
+// #1274 — ci si entra con SPID o CIE: la password si scrive sul sito del fornitore, e qui il campo non compare mai.
+test('le aree riservate della pubblica amministrazione sono delicate di serie', () => {
+  assert.equal(PD.classifica('https://serviziweb2.inps.it/PassiWeb/jsp/AreaRiservata/home.jsp'), 'pa');
+  assert.equal(PD.classifica('https://www.inps.it/it/it/dati-e-bilanci.html'), 'pa');
+  assert.equal(PD.classifica('https://portale.agenziaentrate.gov.it/PortaleWeb/servizi/cassetto-fiscale'), 'pa');
+  assert.equal(PD.classifica('https://telematici.agenziaentrate.gov.it/Servizi/CassettoFiscale.jsp'), 'pa');
+  assert.equal(PD.classifica('https://checkout.pagopa.it/'), 'pa');
+  assert.equal(PD.classifica('https://www.inail.it/portale/it.html'), 'pa');
+  assert.equal(PD.nome('pa'), 'pubblica amministrazione');
+  assert.equal(PD.classifica('https://inps.it.truffa.example/'), null);
+  // L'elenco remoto la cambia sostituendola per intero, come le altre categorie: Gestione la mostra intera.
+  assert.equal(PD.classifica('https://www.comune.esempio.it/', { elenco: PD.elenco({ pa: ['comune.esempio.it'] }) }), 'pa');
+  assert.equal(PD.classifica('https://www.inps.it/', { attivo: false }), null);
+});
+
 test('un nome che contiene quello di una banca non è la banca, e una pagina qualunque non è delicata', () => {
   assert.equal(PD.classifica('https://notpaypal.com/'), null);
   assert.equal(PD.classifica('https://paypal.com.truffa.example/'), null);
@@ -98,9 +113,26 @@ test('a parole: si spegne il riassunto, si spegne la protezione con conferma, si
   assert.equal(p.costo, 2);
   assert.equal(p.allenta, true, 'spegnere la protezione abbassa una difesa (#530)');
   assert.match(p.risk, /saldi, movimenti, mail e referti/);
+  // #1274 — chi lo spegne sa tutto quello che torna ai modelli, non solo il riassunto.
+  for (const cosa of [/titoli delle schede di banca e posta/, /screenshot/, /spiegazione si prepara/]) assert.match(p.risk, cosa);
+  require('../../src/shared/i18n.js');
+  const desc = globalThis.SN_I18N.t('options_security_delicate_desc');
+  for (const cosa of [/pubblica amministrazione/, /chat/, /screenshot/, /spiegazione/]) assert.match(desc, cosa);
+  // #1004.1 — l'owner tiene il correttore acceso anche qui: la protezione non deve promettere che non parte niente.
+  assert.match(desc, /correttore resta acceso/);
+  require('../../src/shared/capabilities.js');
+  const cap = globalThis.SN_CAPABILITIES.CAPABILITIES.find((c) => c.id === 'pagine-delicate');
+  assert.match(cap.desc, /tranne il correttore/);
+  assert.match(cap.doesNot, /Non ferma il correttore/);
+  const d = P.buildPreferencePartial('descrizione automatica delle immagini', 'no');
+  assert.deepEqual(d.partial, { descriviImmagini: { enabled: false } });
   const s = P.buildPreferencePartial('siti_delicati', 'aggiungi https://www.studiorossi.it/area-clienti');
   assert.deepEqual(s.elenco.voci, ['studiorossi.it']);
   assert.match(P.buildPreferencePartial('siti_delicati', 'aggiungi commercialista').rifiuto, /«commercialista» non è un dominio/);
+  // Un nome con lo spazio si ridice intero, come nell'avviso della pagina Sicurezza (#718.3).
+  assert.match(P.buildPreferencePartial('siti_delicati', 'aggiungi il sito studio rossi e banca.it').rifiuto,
+    /^«studio rossi» non è un dominio/);
+  assert.match(P.buildPreferencePartial('siti_delicati', 'aggiungi faceb e youtub').rifiuto, /^«faceb», «youtub» non sono domini/);
 });
 
 test('main: il campo password visto resta dopo un riavvio, e dall\'incognito non si scrive', async () => {

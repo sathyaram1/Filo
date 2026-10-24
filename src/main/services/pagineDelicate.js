@@ -3,7 +3,7 @@
 // La regola sta in src/shared/pagineDelicate.js; dall'incognito non si scrive niente su disco.
 
 const { getDomainInfo } = require('./safebrowse/psl');
-const { ElencoSiti } = require('./stessoSito');
+const { ElencoSiti } = require('../../shared/stessoSito');
 
 const PD = globalThis.SN_PAGINE_DELICATE || require('../../shared/pagineDelicate.js');
 
@@ -108,6 +108,12 @@ async function elencoCampi() {
   return [...salvati].sort();
 }
 
-globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, carica, dimentica, elencoCampi };
+// Dopo un'importazione (#1256): i siti del backup si aggiungono a quelli in memoria, così la prossima scrittura li tiene.
+function rileggi() {
+  caricati = null;
+  return carica();
+}
+
+globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, carica, rileggi, dimentica, elencoCampi };
 
 module.exports = globalThis.SN_DELICATE;

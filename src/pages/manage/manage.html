@@ -14,6 +14,7 @@
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/caselleAlSicuro.js"></script>
   <script src="filo://shared/i18n.js"></script>
   <script src="filo://shared/modelCaps.js"></script>
   <script src="filo://shared/modelUsage.js"></script>
@@ -27,9 +28,11 @@
   <script src="filo://shared/feedbackTransitions.js"></script>
   <script src="filo://shared/feedbackStatus.js"></script>
   <script src="filo://shared/feedbackThread.js"></script>
+  <script src="filo://shared/feedbackAttachTypes.js"></script>
   <script src="filo://shared/feedbackAttese.js"></script>
   <script src="filo://shared/tasti.js"></script>
   <script src="filo://shared/domande.js"></script>
+  <script src="filo://shared/mittenti.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/filoMarkdown.js"></script>
   <!-- #496 — va DOPO feedbackThread e manageReview: da lì prende la categoria d'autore e lo stato
@@ -39,7 +42,14 @@
   <script src="filo://shared/boardArchive.js"></script>
   <script src="filo://shared/mergeApprovals.js"></script>
   <script src="filo://shared/routineSessioni.js"></script>
+  <script src="filo://shared/routineCrediti.js"></script>
   <script src="filo://shared/routineModelli.js"></script>
+  <!-- Per Utenti e Impostazioni predefinite (#1414): gli stessi moduli e lo stesso foglio delle pagine da cui vengono. -->
+  <script src="filo://shared/storage.js"></script>
+  <script src="filo://shared/stimaCosto.js"></script>
+  <script src="filo://shared/wallet.js"></script>
+  <script src="filo://shared/campoNumero.js"></script>
+  <link rel="stylesheet" href="filo://credits/credits.css" />
   <style>
     /* Le misure verticali della testata stanno qui, una volta sola, perché più
        di un pezzo le usa e una copia rimasta indietro si vede (#498). */
@@ -49,6 +59,14 @@
       --mg-search-gap: 8px;
       /* Il minimo delle tre aree: 300 pixel su una finestra normale, meno su una bassa, invece di uscire dal fondo. */
       --mg-aree-min: min(300px, 60vh);
+      /* La fiducia (#1575): muschio fidata, prugna non fidata, lontani dai colori che dicono già una decisione (rosso,
+         arancio, verde, blu, azzurro). Sul chiaro più scuri per stare sulla carta, sullo scuro più accesi. */
+      --mg-fidata-color: #6f8f2e;
+      --mg-nonfidata-color: #a8418a;
+    }
+    :root[data-sn-theme="dark"] {
+      --mg-fidata-color: #a6bb68;
+      --mg-nonfidata-color: #d070b4;
     }
 
     /* La dashboard sfrutta tutta la larghezza e tutta l'altezza: override locale del `.sn-page { max-width: 960px }`
@@ -100,12 +118,13 @@
       min-width: 22px; text-align: left;
     }
     .mg-switch.mg-switch--disabled { cursor: not-allowed; opacity: 0.5; }
-    /* Il Red Team (#896): la levetta risponde al passaggio del puntatore e, mentre salva, pulsa. */
-    #mgRtRoot label.mg-switch:not(.mg-switch--disabled):hover .mg-switch-track {
+    /* Le funzioni in pausa, Red Team (#896), Bacheca e Deck builder (#1592): la levetta risponde al passaggio del
+       puntatore e, mentre salva, pulsa. */
+    :is(#mgRtRoot, #mgIpRoot) label.mg-switch:not(.mg-switch--disabled):hover .mg-switch-track {
       box-shadow: 0 0 0 4px color-mix(in srgb, var(--sn-accent) 22%, transparent);
     }
-    #mgRtRoot .mg-switch-track { transition: background calc(0.15s * var(--sn-motion, 1)), box-shadow calc(0.15s * var(--sn-motion, 1)); }
-    #mgRtRoot label.mg-switch.mg-rt-salva .mg-switch-track { animation: mg-rt-pulsa calc(0.9s * var(--sn-motion, 1)) ease-in-out infinite; }
+    :is(#mgRtRoot, #mgIpRoot) .mg-switch-track { transition: background calc(0.15s * var(--sn-motion, 1)), box-shadow calc(0.15s * var(--sn-motion, 1)); }
+    :is(#mgRtRoot, #mgIpRoot) label.mg-switch.mg-rt-salva .mg-switch-track { animation: mg-rt-pulsa calc(0.9s * var(--sn-motion, 1)) ease-in-out infinite; }
     @keyframes mg-rt-pulsa { 50% { opacity: 0.55; } }
     .mg-rt-stato:empty { display: none; }
     .mg-rt-stato.mg-err { color: #c0392b; }
@@ -165,6 +184,7 @@
     .mg-auto-warn {
       margin: 12px 0 0; font-size: 12px; font-weight: 600; color: #c0392b;
     }
+    .mg-auto-pause .mg-auto-warn + .mg-auto-warn { margin-top: 4px; }
 
     /* Prima fila: le sezioni. Più grandi delle schede sotto, perché sono il primo livello della scelta. */
     .mg-sezioni {
@@ -215,6 +235,20 @@
     .mg-livello-btn svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
     .mg-livello-count { opacity: 0.8; }
     .mg-livello-count:empty { display: none; }
+    /* «Solo non fidate» sta nelle teste delle colonne, che scrivono in maiuscolo: la pasticca resta come le altre. Lo
+       scudo è quello vuoto delle righe non fidate, nel loro colore. */
+    .mg-fiducia-filtro[hidden] { display: none; }
+    .mg-fiducia-filtro { text-transform: none; letter-spacing: 0; font-weight: 400; flex: 0 0 auto; }
+    .mg-fiducia-filtro svg path { stroke: var(--mg-nonfidata-color); stroke-dasharray: 3 2; }
+    .mg-fiducia-filtro[aria-pressed="true"] {
+      border-color: var(--mg-nonfidata-color);
+      background: color-mix(in srgb, var(--mg-nonfidata-color) 14%, transparent);
+    }
+    .mg-head-tasti[hidden] { display: none; }
+    .mg-head-tasti { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-left: auto; }
+    /* In una colonna stretta va a capo la pasticca, non il nome della scheda col suo numero. */
+    .mg-list-head-row { flex-wrap: wrap; row-gap: 4px; }
+    #mgListHead { white-space: nowrap; }
 
     /* Domande: elenco a sinistra, la domanda (o il gruppo intero) a destra; tutta l'altezza come la lista dei feedback. */
     #panel-domande.mg-panel--active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
@@ -222,8 +256,9 @@
       display: grid; grid-template-columns: minmax(220px, 26%) minmax(0, 1fr); gap: 12px;
       flex: 1 1 auto; min-height: var(--mg-aree-min);
     }
-    .mg-dom-head { display: flex; align-items: center; gap: 8px; min-height: 22px; }
-    .mg-dom-head-nome { flex: 1 1 auto; min-width: 0; }
+    /* Come la lista dei feedback: in una colonna stretta vanno a capo i tasti, mai il nome della scheda sotto di loro. */
+    .mg-dom-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 22px; }
+    .mg-dom-head-nome { flex: 1 1 auto; white-space: nowrap; }
     .mg-dom-head [hidden] { display: none; }
     .mg-dom-sel { margin: 0; flex: 0 0 auto; cursor: pointer; accent-color: var(--sn-accent); }
     .mg-dom-consiglio {
@@ -248,6 +283,7 @@
       border-left: 3px solid transparent;
       transition: background calc(0.1s * var(--sn-motion, 1));
     }
+    .mg-domanda { border-right: 3px solid transparent; }
     .mg-domanda:hover, .mg-domande-gruppo:hover { background: var(--sn-hover); }
     .mg-domanda:focus-visible, .mg-domande-gruppo:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: -2px; }
     .mg-domanda--aperta, .mg-domande-gruppo--aperto { background: var(--sn-hover); border-left-color: var(--sn-accent); }
@@ -281,8 +317,10 @@
     .mg-dq-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font-size: 12px; color: var(--sn-muted); }
     .mg-dq-num { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--sn-fg); }
     .mg-dq-prio[data-priorita="bloccante"] { color: var(--mg-urgente-color, #c0392b); font-weight: 600; }
-    .mg-dq-fiducia { padding: 0 6px; border-radius: 999px; border: 1px solid var(--sn-border); cursor: help; }
-    .mg-dq-fiducia--no { color: #b9770e; border-color: color-mix(in srgb, #e08e0b 55%, transparent); }
+    /* Gli stessi colori del segno in lista (#1575): la fiducia si legge uguale nell'elenco e nella domanda aperta. */
+    .mg-dq-fiducia { padding: 0 6px; border-radius: 999px; cursor: help;
+      color: var(--mg-fidata-color); border: 1px solid color-mix(in srgb, var(--mg-fidata-color) 55%, transparent); }
+    .mg-dq-fiducia--no { color: var(--mg-nonfidata-color); border-color: color-mix(in srgb, var(--mg-nonfidata-color) 55%, transparent); }
     .mg-dq-legami { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
     .mg-dq-legami-pre { margin-right: 2px; }
     .mg-dq-legame { all: unset; cursor: pointer; color: var(--sn-accent); font-variant-numeric: tabular-nums; }
@@ -331,6 +369,19 @@
     }
     .mg-dq-testo:focus { outline: none; border-color: var(--sn-accent); }
     .mg-dq-tasti { display: flex; flex-wrap: wrap; gap: 8px; }
+    /* Gli allegati della risposta: i nomi in pillole, la × per toglierli, il tasto per aggiungerne. */
+    .mg-dq-allegati { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .mg-dq-allegato {
+      display: inline-flex; align-items: center; gap: 4px; max-width: 220px;
+      font-size: 11.5px; padding: 2px 8px; border-radius: 9px; border: 1px solid var(--sn-border);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .mg-dq-allegato-x {
+      border: 0; background: transparent; color: var(--sn-muted); cursor: pointer; font: inherit; padding: 0 2px;
+      transition: color calc(0.12s * var(--sn-motion, 1));
+    }
+    .mg-dq-allegato-x:hover, .mg-dq-allegato-x:focus-visible { color: var(--sn-accent); }
+    .mg-dq-allega { font-size: 12px; padding: 3px 10px; }
     .mg-dq-msg { margin: 0; min-height: 1.4em; font-size: 12.5px; color: var(--sn-muted); }
     .mg-dq-msg--ok { color: #2e9e5b; }
     .mg-dq-msg--err { color: #c0392b; }
@@ -393,6 +444,9 @@
       display: flex; flex-direction: column;
       flex: 1 1 auto; min-height: 0;
     }
+    /* Le pagine spostate dentro Gestione (#1414) tengono la misura che avevano da sole: campi larghi tutta la
+       finestra non si leggono. Allineate a sinistra, sotto le sezioni da cui si aprono. */
+    .mg-pagina { max-width: 960px; }
 
     /* La lente vive in fondo alla barra delle schede e apre la barra di ricerca sotto: i risultati, da QUALUNQUE
        scheda, rimpiazzano la lista a sinistra, mentre il dettaglio al centro resta il solito. */
@@ -667,6 +721,7 @@
     .mg-fs-drill-num { font-variant-numeric: tabular-nums; color: var(--sn-muted); flex: 0 0 auto; min-width: 56px; }
     .mg-fs-drill-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mg-fs-drill-cat { margin-left: auto; color: var(--sn-muted); font-size: 11.5px; flex: 0 0 auto; padding-left: 10px; }
+    .mg-fs-drill-giri { font-size: 11.5px; flex: 0 0 auto; font-variant-numeric: tabular-nums; min-width: 68px; text-align: right; }
 
     /* Le superfici che si aprono su cosa hanno contato lo dicono col puntatore. */
     .mg-fs-legend li[data-group] { cursor: pointer; padding: 3px 6px; margin: 0 -6px; border-radius: 6px; }
@@ -681,6 +736,7 @@
       cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
     }
     .mg-fs-quanti:hover { color: var(--sn-accent); }
+    .mg-fs-quanti:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; border-radius: 3px; }
 
     /* Le sezioni sotto i riquadri. */
     .mg-fs-sec { margin-bottom: 30px; }
@@ -818,6 +874,28 @@
     /* Le etichette vanno a capo invece di uscire dalla scheda: «fusione ferma» e «locale»
        insieme non ci stanno, e tagliate a metà parola non dicono più niente. */
     .mg-item:not(.mg-item--staged) { flex-wrap: wrap; }
+    /* La fiducia (#1575) sta sul bordo destro, perché il sinistro dice già che decisione serve (attacco, spam…), e
+       nello scudo in fondo alla riga: pieno se fidata, vuoto e tratteggiato se no, così non la dice il solo colore. */
+    :is(.mg-item, .mg-sender-item, .mg-domanda).mg-fiducia--fidata { border-right: 3px solid var(--mg-fidata-color); }
+    :is(.mg-item, .mg-sender-item, .mg-domanda).mg-fiducia--nonfidata { border-right: 3px solid var(--mg-nonfidata-color); }
+    .mg-fiducia-segno[hidden] { display: none; }
+    .mg-fiducia-segno {
+      flex: 0 0 auto; align-self: center; display: inline-flex; margin-left: auto;
+      width: var(--mg-scudo-size, 11px); height: var(--mg-scudo-size, 11px); cursor: help;
+      transition: transform calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-fiducia-segno:hover { transform: scale(1.25); }
+    /* Subito dopo il titolo (Risolti, Archiviati, ricerca) lo scudo resta sulla sua riga: il titolo gli cede il posto
+       invece di mandarlo a capo da solo. */
+    .mg-item-title:has(+ .mg-fiducia-segno) { min-width: min(calc(var(--mg-title-min, 8em) - 20px), 100%); }
+    /* Quello che sta già a destra (priorità, data) tiene lo spazio libero: lo scudo gli si mette accanto. */
+    :is(.mg-priority, .mg-domanda-data, .mg-domanda-prio) ~ .mg-fiducia-segno { margin-left: 0; }
+    .mg-fiducia-segno svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .mg-fiducia-segno svg path { stroke-width: 1.5; stroke-linejoin: round; }
+    .mg-fiducia-segno--fidata { color: var(--mg-fidata-color); }
+    .mg-fiducia-segno--fidata svg path { fill: currentColor; stroke: currentColor; }
+    .mg-fiducia-segno--nonfidata { color: var(--mg-nonfidata-color); }
+    .mg-fiducia-segno--nonfidata svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-dasharray: 3 2; }
     .mg-item:hover { background: var(--sn-hover); }
     .mg-item--selected { background: var(--sn-hover); }
     /* Arrivata a pagina aperta: un punto caldo in testa finché non la si apre (con un ordinamento a scelta può
@@ -1076,6 +1154,28 @@
       font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
     }
     .mg-bubble-body > em { color: var(--sn-muted); font-style: italic; }
+    /* Nota lunga ripiegata (#559): otto righe e una sfumatura che dice «continua»; un tocco la apre. */
+    .mg-bubble--ripiegata .mg-bubble-body {
+      max-height: calc(8 * 1.55em); overflow: hidden; cursor: pointer;
+      -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+      mask-image: linear-gradient(to bottom, #000 55%, transparent);
+    }
+    .mg-bubble--ripiegata .mg-bubble-body:hover {
+      -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent);
+      mask-image: linear-gradient(to bottom, #000 75%, transparent);
+    }
+    .mg-bubble-apri {
+      display: inline-flex; align-items: center; gap: 4px;
+      margin: 6px 0 0 -8px; padding: 2px 8px; border: 0; border-radius: 6px;
+      background: transparent; color: var(--sn-muted); font: inherit; font-size: 12px; cursor: pointer;
+      transition: background calc(0.12s * var(--sn-motion, 1)), color calc(0.12s * var(--sn-motion, 1));
+    }
+    .mg-bubble-apri:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-bubble-apri::after {
+      content: '▾'; font-size: 11px;
+      transition: transform calc(0.12s * var(--sn-motion, 1));
+    }
+    .mg-bubble-apri[aria-expanded="true"]::after { transform: rotate(180deg); }
     .mg-bubble-imgs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .mg-bubble-imgs img {
       max-width: 200px; max-height: 200px; border-radius: 6px;
@@ -1160,6 +1260,8 @@
       word-break: break-all;
     }
     .mg-judge-model em { font-style: italic; }
+    /* Una frase, non un nome di modello: va a capo fra le parole. */
+    .mg-judge-nonviste { word-break: normal; overflow-wrap: anywhere; }
     .mg-judge-detail { display: flex; flex-direction: column; align-items: flex-start; }
 
     .mg-liv-righe { display: flex; flex-direction: column; gap: 6px; margin: 0 0 10px; }
@@ -1175,6 +1277,7 @@
     /* Il tasto che scavalca l'audit è un'eccezione, non un'azione di tutti i giorni: si arma con un secondo clic,
        come l'approvazione di una fusione, perché il primo non basti. */
     .mg-liv-azioni { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+    .mg-liv-strade { display: flex; flex-wrap: wrap; gap: 8px; }
     /* Il testo reso leggibile dal filtro d'ingresso: monospazio perché i segnaposto e le codifiche si contano a
        caratteri; i punti segnati sono evidenziati col colore d'accento, il loro perché sta sotto il puntatore. */
     .mg-liv-leggibile { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
@@ -1317,12 +1420,7 @@
       background: color-mix(in srgb, var(--sn-accent) 22%, var(--sn-bg, transparent));
     }
 
-    /* «Solo in locale»: la tinta del muted, perché non è un allarme né una delega, dice solo dove si lavora. */
-    .mg-local-btn[hidden] { display: none; }
-    .mg-local-btn[aria-pressed="true"] {
-      border-color: var(--sn-fg); color: var(--sn-fg);
-      background: color-mix(in srgb, var(--sn-fg) 8%, var(--sn-bg, transparent));
-    }
+    /* «server»: la tinta del muted, perché non è un allarme né una delega, dice solo dove si lavora. */
     .mg-local-badge {
       flex: none;
       font-size: 10.5px; line-height: 1;
@@ -1343,6 +1441,20 @@
       border: 1px solid color-mix(in srgb, var(--sn-accent, #c8763c) 45%, transparent);
       color: var(--sn-accent, #c8763c);
       white-space: normal; overflow-wrap: anywhere;
+    }
+    /* «Aspetta D-12» (SPEC-DOMANDE §3.8): la forma dell'attesa, ma è un tasto che porta alla domanda. */
+    .mg-domanda-badge {
+      flex: none; cursor: pointer; font: inherit;
+      font-size: 10.5px; line-height: 1.25;
+      padding: 2px 6px; border-radius: 9px;
+      border: 1px solid color-mix(in srgb, var(--sn-accent, #c8763c) 45%, transparent);
+      background: transparent; color: var(--sn-accent, #c8763c);
+      white-space: nowrap;
+      transition: background calc(0.12s * var(--sn-motion, 1)), border-color calc(0.12s * var(--sn-motion, 1));
+    }
+    .mg-domanda-badge:hover, .mg-domanda-badge:focus-visible {
+      background: color-mix(in srgb, var(--sn-accent, #c8763c) 14%, transparent);
+      border-color: var(--sn-accent, #c8763c);
     }
     .mg-attese-toggle[hidden] { display: none; }
     .mg-attese-toggle.mg-attese-piena { border-color: var(--sn-accent, #c8763c); color: var(--sn-accent, #c8763c); }
@@ -1444,8 +1556,32 @@
       /* Nella terza colonna i modelli tornano uno sotto l'altro. */
       .mg-sm-cols { grid-template-columns: minmax(0, 1fr); }
     }
-    /* Il Red Team ha un riquadro solo: la griglia di Automazioni lo stirerebbe a due terzi della finestra. */
-    #mgRtRoot { display: block; max-width: 640px; }
+    /* Un riquadro per levetta, uno sotto l'altro: la griglia di Automazioni li stirerebbe a due terzi della finestra. */
+    #mgRtRoot, #mgIpRoot { display: block; max-width: 640px; }
+    /* Le levette di Bacheca e Deck builder seguono quella del Red Team come un elenco solo. */
+    #mgRtRoot { padding-bottom: 0; }
+    #mgIpRoot { padding-top: 0; }
+    /* Crediti: un riquadro per account più la taratura, affiancati finché c'è posto. */
+    .mg-crediti {
+      padding: 24px 0 32px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 20px; align-items: start;
+    }
+    .mg-crediti > .mg-cr-avviso { grid-column: 1 / -1; margin: 0; }
+    .mg-cr-riga { font-size: 12px; color: var(--sn-muted); margin: 0 0 14px; min-height: 1.4em; }
+    .mg-cr-campo + .mg-cr-campo { margin-top: 16px; }
+    .mg-cr-account .mg-auto-field-label { font-size: 13px; }
+    .mg-crediti .mg-auto-field-row { flex-wrap: wrap; }
+    .mg-cr-account .mg-cr-campo .mg-auto-field-row { margin-top: 6px; }
+    .mg-cr-unita { font-size: 13px; color: var(--sn-muted); margin-left: -4px; }
+    .sn-page .mg-crediti input.mg-auto-number { width: 96px; }
+    .sn-page input.mg-cr-data {
+      font: inherit; padding: 6px 8px; border-radius: 8px;
+      border: 1px solid var(--sn-border); background: var(--sn-bg, transparent); color: var(--sn-fg);
+    }
+    :root[data-sn-theme="dark"] .mg-cr-data { color-scheme: dark; }
+    :root[data-sn-theme="light"] .mg-cr-data { color-scheme: light; }
+    .mg-crediti h2 { font-size: 15px; font-weight: 700; margin: 0 0 6px; color: var(--sn-fg); }
+    .mg-cr-data:disabled, .mg-crediti .mg-auto-number:disabled { opacity: 0.5; cursor: not-allowed; }
     .mg-automation h2 {
       font-size: 15px; font-weight: 700; margin: 0 0 12px; color: var(--sn-fg);
     }
@@ -1562,6 +1698,89 @@
     /* nicknames-list la legge modelChainEditor per il dropdown; qui la popola il main via SUPPORT_MODELS_GET,
        nascosta come nelle altre pagine che usano modelChainEditor. */
     #mgSmNicknamesList { display: none; }
+
+    /* Scheda Contatori (#1462): una colonna sola come le Statistiche feedback. «Meno di 5» è un dato, non un guasto:
+       si scrive piano, in grigio, e nei grafici è una tacca a righe che non dice quanto. */
+    .mg-ct { padding-bottom: 40px; }
+    .mg-ct-negato { font-size: 13px; color: var(--sn-muted); padding: 24px 0; }
+    .mg-ct-corpo[hidden], .mg-ct-dati[hidden], .mg-ct-guasto[hidden], .mg-ct-negato[hidden] { display: none; }
+    .mg-ct-filtri { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 20px; }
+    .mg-ct-filtri .sn-select-wrap { width: auto; min-width: 190px; }
+    .mg-ct-stato { font-size: 12px; color: var(--sn-muted); }
+    .mg-ct-guasto { font-size: 13px; color: var(--sn-error); margin: 0 0 18px; max-width: 760px; line-height: 1.5; }
+    .mg-ct-dati { transition: opacity calc(0.2s * var(--sn-motion, 1)); }
+    .mg-ct-dati[aria-busy="true"] { opacity: 0.5; }
+    .mg-ct-sez { margin: 0 0 34px; }
+    .mg-ct-sez h3 { font-size: 15px; margin: 0 0 10px; }
+    .mg-ct-ore-titolo { font-size: 12.5px; font-weight: 600; color: var(--sn-muted); margin: 18px 0 6px; }
+    .mg-ct-totale { margin: 0 0 12px; font-size: 12.5px; color: var(--sn-muted); }
+    .mg-ct-totale b { font-size: 26px; font-weight: 650; color: var(--sn-fg); font-variant-numeric: tabular-nums; margin-right: 6px; }
+    .mg-ct-sotto { color: var(--sn-muted); font-style: italic; white-space: nowrap; }
+
+    /* Le colonne dei grafici: come «Quando sono arrivati», con il tetto di larghezza quando sono poche. */
+    .mg-ct-grafico {
+      display: flex; align-items: flex-end; gap: 2px; height: 96px; padding-top: 4px;
+      border-bottom: 1px solid var(--sn-border); overflow-x: auto;
+    }
+    .mg-ct-grafico--ore { height: 64px; }
+    .mg-ct-grafico--poche .mg-ct-col { max-width: 48px; }
+    .mg-ct-col {
+      flex: 1 1 0; min-width: 3px; align-self: flex-end;
+      background: var(--sn-accent); border-radius: 3px 3px 0 0; opacity: 0.78;
+      appearance: none; border: 0; padding: 0; cursor: pointer;
+      transition: opacity calc(0.14s * var(--sn-motion, 1));
+    }
+    .mg-ct-col:hover, .mg-ct-col--scelta { opacity: 1; }
+    .mg-ct-col--scelta { box-shadow: 0 0 0 2px var(--sn-fg); }
+    .mg-ct-col:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+    .mg-ct-col--sotto, .mg-ct-fascia.mg-ct-fascia--sotto {
+      height: 8px; opacity: 1; border-radius: 1px;
+      background: repeating-linear-gradient(135deg, var(--sn-muted) 0 1px, transparent 1px 4px);
+    }
+    .mg-ct-col--muta { cursor: default; }
+    .mg-ct-asse { display: flex; justify-content: space-between; font-size: 11px; color: var(--sn-muted); margin-top: 5px; }
+
+    /* Le tabelle dei blocchi: la prima colonna è la voce, le altre numeri allineati. */
+    .mg-ct-tabwrap { overflow-x: auto; }
+    .mg-ct-tab { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .mg-ct-tab th {
+      text-align: right; font-weight: 600; color: var(--sn-muted); font-size: 11.5px;
+      padding: 6px 8px; border-bottom: 1px solid var(--sn-border); vertical-align: bottom;
+    }
+    .mg-ct-tab th:first-child, .mg-ct-tab td:first-child { text-align: left; }
+    .mg-ct-tab th small { display: block; font-weight: 400; font-size: 10.5px; white-space: nowrap; }
+    .mg-ct-tab td {
+      text-align: right; padding: 6px 8px; border-bottom: 1px solid color-mix(in srgb, var(--sn-border) 60%, transparent);
+      font-variant-numeric: tabular-nums; vertical-align: middle;
+    }
+    .mg-ct-tab tbody tr { transition: background calc(0.1s * var(--sn-motion, 1)); }
+    .mg-ct-tab tbody tr:hover { background: var(--sn-hover); }
+    .mg-ct-riga--apribile { cursor: pointer; }
+    .mg-ct-riga--apribile:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: -2px; }
+    .mg-ct-riga--aperta { background: var(--sn-hover); }
+    .mg-ct-riga--sub td:first-child { padding-left: 24px; color: var(--sn-muted); }
+    .mg-ct-riga[hidden], .mg-ct-andamento[hidden] { display: none; }
+    .mg-ct-andamento td { padding: 10px 8px 14px; text-align: left; }
+    .mg-ct-andamento .mg-ct-grafico { height: 56px; }
+    .mg-ct-altre td { text-align: left; }
+    .mg-ct-altre button {
+      appearance: none; background: none; border: 0; padding: 0; font: inherit; color: var(--sn-muted);
+      cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px;
+    }
+    .mg-ct-altre button:hover { color: var(--sn-fg); }
+    .mg-ct-altre button:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; border-radius: 4px; }
+    .mg-ct-vuoto { font-size: 12.5px; color: var(--sn-muted); margin: 0; }
+
+    /* Le fasce di un'attesa dentro una cella: sette colonnine, la più alta è la fascia più piena della riga. */
+    .mg-ct-fasce { display: inline-flex; align-items: flex-end; gap: 2px; height: 22px; vertical-align: middle; }
+    .mg-ct-fascia { width: 7px; background: var(--sn-accent); opacity: 0.8; border-radius: 1px 1px 0 0; }
+    .mg-ct-fascia.mg-ct-fascia--sotto { height: 4px; }
+    .mg-ct-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+    .mg-ct-chip {
+      font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--sn-border);
+      white-space: nowrap; color: var(--sn-fg);
+    }
+    .mg-ct-chip b { font-weight: 600; font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
@@ -1577,6 +1796,8 @@
       <button type="button" class="mg-sezione" data-sezione="domande" role="tab">Domande<span class="mg-sezione-count"></span></button>
       <button type="button" class="mg-sezione mg-sezione--active" data-sezione="feedback" role="tab">Feedback<span class="mg-sezione-count"></span></button>
       <button type="button" class="mg-sezione" data-sezione="routine" role="tab">Routine<span class="mg-sezione-count"></span></button>
+      <button type="button" class="mg-sezione" data-sezione="utenti" role="tab">Utenti<span class="mg-sezione-count"></span></button>
+      <button type="button" class="mg-sezione" data-sezione="predefinite" role="tab">Impostazioni predefinite<span class="mg-sezione-count"></span></button>
       <!-- Lente di ricerca "a senso": cerca un feedback per SIGNIFICATO fra TUTTE le schede. -->
       <button type="button" class="mg-search-toggle" id="mgSearchToggle"
         title="Cerca un feedback a senso" aria-label="Cerca un feedback" aria-expanded="false"></button>
@@ -1588,14 +1809,19 @@
       <button type="button" class="mg-tab" data-tab="domande-archivio" role="tab" hidden>Archivio</button>
       <button type="button" class="mg-tab mg-tab--active" data-tab="inbox" role="tab">Ricevuti</button>
       <button type="button" class="mg-tab" data-tab="queue" role="tab">In coda</button>
-      <button type="button" class="mg-tab" data-tab="local" role="tab">Lavori server</button>
       <button type="button" class="mg-tab" data-tab="waiting" role="tab">Aspettano</button>
       <button type="button" class="mg-tab" data-tab="resolved" role="tab">Risolti</button>
       <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
       <button type="button" class="mg-tab" data-tab="fbstats" role="tab">Statistiche feedback</button>
-      <button type="button" class="mg-tab" data-tab="stats" role="tab">Red Team</button>
+      <button type="button" class="mg-tab" data-tab="stats" role="tab"
+        title="Red Team, Bacheca e Deck builder: chi li vede oltre a te">In pausa</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab" hidden>Automazioni</button>
+      <button type="button" class="mg-tab" data-tab="crediti" role="tab" hidden>Crediti</button>
       <button type="button" class="mg-tab" data-tab="log" role="tab" hidden>Log</button>
+      <button type="button" class="mg-tab" data-tab="utenti" role="tab" hidden>Inviti e utenti</button>
+      <button type="button" class="mg-tab" data-tab="contatori" role="tab" hidden
+        title="Come si usa Filo: le somme dei contatori anonimi, mai una copia sola">Contatori</button>
+      <button type="button" class="mg-tab" data-tab="predefiniti" role="tab" hidden>Modelli predefiniti</button>
     </nav>
 
     <!-- Lo stato viaggia cifrato: senza la chiave dell'owner non si legge, e allora le quattro sezioni non si
@@ -1625,8 +1851,13 @@
           <!-- Il tasto destro, o il glifo ⇅, apre il menu di riordino (numero / priorità / creatore). -->
           <div class="mg-col-head mg-list-head-row" id="mgListHeadRow">
             <div id="mgListHead">Ricevuti</div>
-            <button type="button" class="mg-sort-btn" id="mgSortBtn"
-              title="Riordina i feedback — clic o tasto destro" aria-label="Riordina i feedback">⇅</button>
+            <span class="mg-head-tasti">
+              <!-- «Solo non fidate» (#1575): vale per tutte le schede dei feedback e per le Domande. Non si ricorda. -->
+              <button type="button" class="mg-livello-btn mg-fiducia-filtro" id="mgFiduciaFiltro" aria-pressed="false"
+                title="Mostra solo le pratiche non fidate" hidden>Solo non fidate<span class="mg-livello-count"></span></button>
+              <button type="button" class="mg-sort-btn" id="mgSortBtn"
+                title="Riordina i feedback — clic o tasto destro" aria-label="Riordina i feedback">⇅</button>
+            </span>
           </div>
           <!-- Ricevuti per livello (SPEC-DOMANDE §2.2): nessuno acceso = tutto, più accesi = unione. Non si ricorda. -->
           <div class="mg-livelli-filtro" id="mgLivelliFiltro" role="group" aria-label="Filtra i Ricevuti per livello" hidden>
@@ -1716,8 +1947,6 @@
                     <!-- «Aspetta #N» (#903): testo, hover e casella dal JS; acceso quando ci sono attese. -->
                     <button type="button" class="mg-star-btn mg-attese-toggle" id="mgAtteseToggle"
                       aria-expanded="false" aria-controls="mgAttese" hidden>⏳ Aspetta</button>
-                    <!-- «Solo in locale» (#908): c'è solo sui feedback dell'owner o di una sessione con la prova; testo e hover dal JS. -->
-                    <button type="button" class="mg-star-btn mg-local-btn" id="mgLocalBtn" aria-pressed="false" hidden>Locale</button>
                     <!-- «Segna fidato» (#1148): al posto di «Fondi senza chiedermelo» e di «È mio». Lo scrive il server;
                        premuto = fidato, e un clic la toglie. Testi e visibilità dal JS. -->
                     <button type="button" class="mg-star-btn mg-fiducia-btn" id="mgFiduciaBtn" aria-pressed="false" hidden>🤝 Segna fidato</button>
@@ -1804,6 +2033,9 @@
           <div class="mg-col-head mg-dom-head">
             <input type="checkbox" class="mg-dom-sel" id="mgDomandeTutte" aria-label="Scegli tutte" title="Scegli tutte" hidden>
             <span class="mg-dom-head-nome" id="mgDomandeTitolo">Da rispondere</span>
+            <!-- Lo stesso «Solo non fidate» della lista dei feedback (#1575): uno stato solo, lo tiene manage.js. -->
+            <button type="button" class="mg-livello-btn mg-fiducia-filtro" id="mgDomandeFiduciaFiltro" aria-pressed="false"
+              title="Mostra solo le domande non fidate" hidden>Solo non fidate<span class="mg-livello-count"></span></button>
             <button type="button" class="mg-dom-consiglio" id="mgDomandeConsiglioSel" hidden>Applica il consiglio</button>
           </div>
           <div class="mg-col-body">
@@ -1894,7 +2126,8 @@
       </div>
     </section>
 
-    <!-- Il Red Team in pausa (#896): l'interruttore lo legge e lo scrive manageRedteam.js. -->
+    <!-- Le funzioni in pausa: il Red Team (#896) lo legge e lo scrive manageRedteam.js, Bacheca e Deck builder (#1592)
+         manageInPausa.js. -->
     <section class="mg-panel" id="panel-stats" data-panel="stats">
       <div class="mg-automation" id="mgRtRoot">
         <section class="mg-auto-block">
@@ -1907,6 +2140,95 @@
           </label>
           <p class="mg-auto-block-desc mg-rt-stato" id="mgRtOpenMsg" role="status"></p>
         </section>
+      </div>
+      <div class="mg-automation" id="mgIpRoot">
+        <section class="mg-auto-block" data-in-pausa="bacheca">
+          <label class="mg-switch mg-switch--disabled" id="mgIpSwitch-bacheca"
+            title="Spenta, la Bacheca la vedi solo tu: gli altri trovano solo le loro segnalazioni. Accesa, torna a tutti senza una versione nuova.">
+            <span class="mg-switch-text">Bacheca aperta a tutti</span>
+            <input type="checkbox" id="mgIpToggle-bacheca" disabled />
+            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            <span class="mg-switch-state" id="mgIpState-bacheca">Off</span>
+          </label>
+          <p class="mg-auto-block-desc mg-rt-stato" id="mgIpMsg-bacheca" role="status"></p>
+        </section>
+        <section class="mg-auto-block" data-in-pausa="mazzi">
+          <label class="mg-switch mg-switch--disabled" id="mgIpSwitch-mazzi"
+            title="Spento, il Deck builder dei Mazzi lo vedi solo tu. Acceso, torna a tutti senza una versione nuova.">
+            <span class="mg-switch-text">Deck builder aperto a tutti</span>
+            <input type="checkbox" id="mgIpToggle-mazzi" disabled />
+            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            <span class="mg-switch-state" id="mgIpState-mazzi">Off</span>
+          </label>
+          <p class="mg-auto-block-desc mg-rt-stato" id="mgIpMsg-mazzi" role="status"></p>
+        </section>
+      </div>
+    </section>
+
+    <!-- I crediti delle routine (#1356, SPEC-DOMANDE.md §8.2): i numeri dell'owner li legge e li scrive manageCrediti.js. -->
+    <section class="mg-panel" id="panel-crediti" data-panel="crediti">
+      <div class="mg-crediti" id="mgCrRoot">
+        <section class="mg-auto-block mg-cr-account" data-account="A">
+          <h2>Account A</h2>
+          <p class="mg-cr-riga" id="mgCrRigaA" role="status"></p>
+          <div class="mg-cr-campo" data-campo="riservaA">
+            <label class="mg-auto-field-label" for="mgCrRiservaA"
+              title="La parte della settimana di A che resta alle tue sessioni: le routine si fermano prima. Vuoto: nessuna riserva.">Riserva</label>
+            <div class="mg-auto-field-row">
+              <input type="text" id="mgCrRiservaA" class="mg-auto-number" inputmode="decimal" autocomplete="off"
+                placeholder="nessuna" aria-describedby="mgCrRiservaAMsg" />
+              <span class="mg-cr-unita">%</span>
+              <button type="button" class="sn-btn" id="mgCrRiservaASave">Salva</button>
+              <span class="mg-action-msg" id="mgCrRiservaAMsg" role="status"></span>
+            </div>
+          </div>
+          <div class="mg-cr-campo" data-campo="rinnovoA">
+            <label class="mg-auto-field-label" for="mgCrRinnovoA"
+              title="Un rinnovo qualsiasi della settimana di A, se è cambiato: vale ogni sette giorni da lì. Vuoto: martedì alle 19 (ora di Roma).">Rinnovo</label>
+            <div class="mg-auto-field-row">
+              <input type="datetime-local" id="mgCrRinnovoA" class="mg-cr-data" aria-describedby="mgCrRinnovoAMsg" />
+              <button type="button" class="sn-btn" id="mgCrRinnovoASave">Salva</button>
+              <span class="mg-action-msg" id="mgCrRinnovoAMsg" role="status"></span>
+            </div>
+          </div>
+        </section>
+        <section class="mg-auto-block mg-cr-account" data-account="B">
+          <h2>Account B</h2>
+          <p class="mg-cr-riga" id="mgCrRigaB" role="status"></p>
+          <div class="mg-cr-campo" data-campo="tettoB">
+            <label class="mg-auto-field-label" for="mgCrTettoB"
+              title="Fin dove le routine possono usare la settimana di B. Vuoto: nessun tetto.">Tetto</label>
+            <div class="mg-auto-field-row">
+              <input type="text" id="mgCrTettoB" class="mg-auto-number" inputmode="decimal" autocomplete="off"
+                placeholder="nessuno" aria-describedby="mgCrTettoBMsg" />
+              <span class="mg-cr-unita">%</span>
+              <button type="button" class="sn-btn" id="mgCrTettoBSave">Salva</button>
+              <span class="mg-action-msg" id="mgCrTettoBMsg" role="status"></span>
+            </div>
+          </div>
+          <div class="mg-cr-campo" data-campo="rinnovoB">
+            <label class="mg-auto-field-label" for="mgCrRinnovoB"
+              title="Un rinnovo qualsiasi della settimana di B, se è cambiato: vale ogni sette giorni da lì. Vuoto: mercoledì alle 9 (ora di Roma).">Rinnovo</label>
+            <div class="mg-auto-field-row">
+              <input type="datetime-local" id="mgCrRinnovoB" class="mg-cr-data" aria-describedby="mgCrRinnovoBMsg" />
+              <button type="button" class="sn-btn" id="mgCrRinnovoBSave">Salva</button>
+              <span class="mg-action-msg" id="mgCrRinnovoBMsg" role="status"></span>
+            </div>
+          </div>
+        </section>
+        <section class="mg-auto-block mg-cr-campo" data-campo="usdPer100">
+          <h2 id="mgCrTaraturaTitolo"
+            title="Quanti dollari di listino valgono una settimana intera di un account: senza una lettura della barra di stato la percentuale si stima così. Vuoto: 2.150 $.">Taratura</h2>
+          <p class="mg-cr-riga">Dollari per una settimana intera, su A e su B.</p>
+          <div class="mg-auto-field-row">
+            <input type="text" id="mgCrTaratura" class="mg-auto-number" inputmode="decimal" autocomplete="off"
+              placeholder="2150" aria-labelledby="mgCrTaraturaTitolo" aria-describedby="mgCrTaraturaMsg" />
+            <span class="mg-cr-unita">$</span>
+            <button type="button" class="sn-btn" id="mgCrTaraturaSave">Salva</button>
+            <span class="mg-action-msg" id="mgCrTaraturaMsg" role="status"></span>
+          </div>
+        </section>
+        <p class="mg-action-msg mg-cr-avviso" id="mgCrAvviso" role="status" hidden></p>
       </div>
     </section>
 
@@ -1932,8 +2254,8 @@
                 </label>
                 <p class="mg-auto-block-desc">
                   Spente, le sessioni automatiche partono ma non fanno niente: nessun
-                  lavoro sul codice, nessuna verifica, nessuna esplorazione. I feedback
-                  restano in coda e ti aspettano.
+                  lavoro sul codice, nessuna verifica. I feedback restano in coda e ti
+                  aspettano.
                   <span class="mg-action-msg" id="mgRoutinesMsg" role="status"></span>
                 </p>
               </section>
@@ -1948,72 +2270,24 @@
                 <p class="mg-auto-block-desc">
                   Quando è attiva, i feedback giudicati sicuri entrano in coda da soli.
                   Spenta, li approvi tu uno per uno.
+                  Gli allarmi della pubblicazione e i ritrovamenti dell'esplorazione entrano in coda comunque.
                   <span class="mg-action-msg" id="mgAutoMsg" role="status"></span>
                 </p>
 
-                <!-- Chi può entrare in coda da solo, per categoria di mittente: conta solo con l'automatica accesa. -->
+                <!-- Chi entra in coda da solo, per fiducia (mai per mittente): conta solo con l'automatica accesa. -->
                 <div class="mg-auto-sub" id="mgAutoApproveBlock">
                   <p class="mg-auto-sub-title">Entrano in coda da soli</p>
-                  <label class="mg-switch mg-switch--sm" title="I feedback che scrivi tu">
-                    <span class="mg-switch-text">👑 I tuoi</span>
-                    <input type="checkbox" id="mgAutoApproveOwner" checked />
+                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti delle routine e allarmi nati da un lavoro rimasto pulito. I tuoi feedback e quelli delle tue sessioni pulite entrano comunque">
+                    <span class="mg-switch-text">🤝 Fidati</span>
+                    <input type="checkbox" id="mgAutoApproveFidato" checked />
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
-                  <label class="mg-switch mg-switch--sm" title="Feedback inviati dagli alpha tester">
-                    <span class="mg-switch-text">👤 Altri utenti</span>
-                    <input type="checkbox" id="mgAutoApproveUser" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di Claude mentre lavora con te sul tuo computer">
-                    <span class="mg-switch-text">💻 Claude (sessione locale)</span>
-                    <input type="checkbox" id="mgAutoApproveLocal" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti nati mentre un'automazione scriveva codice">
-                    <span class="mg-switch-text">🔧 Claude (sviluppo)</span>
-                    <input type="checkbox" id="mgAutoApproveWorker" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi verifica il lavoro di un'altra istanza">
-                    <span class="mg-switch-text">🧪 Claude (verifica)</span>
-                    <input type="checkbox" id="mgAutoApproveVerifier" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="I rilievi rimasti fuori dal giro di correzione, raccolti dal server in un feedback figlio del lavoro">
-                    <span class="mg-switch-text">🧹 Claude (rilievi residui)</span>
-                    <input type="checkbox" id="mgAutoApproveResiduo" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi esplora l'app in cerca di problemi che nessuno ha segnalato">
-                    <span class="mg-switch-text">🔍 Claude (esplorazione)</span>
-                    <input type="checkbox" id="mgAutoApproveProber" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Automazioni che non dichiarano il proprio ruolo (feedback storici)">
-                    <span class="mg-switch-text">🤖 Claude (ruolo non indicato)</span>
-                    <input type="checkbox" id="mgAutoApproveClaude" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Segnalazioni che Filo scrive per conto di un utente">
-                    <span class="mg-switch-text">🧵 Filo (per conto di un utente)</span>
-                    <input type="checkbox" id="mgAutoApproveFilo" checked />
+                  <label class="mg-switch mg-switch--sm" title="Utenti, Filo per conto di un utente, e quello che scrive un lavoro che ha letto testo di utenti">
+                    <span class="mg-switch-text">👤 Non fidati</span>
+                    <input type="checkbox" id="mgAutoApproveNonFidato" checked />
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
                 </div>
-              </section>
-
-              <!-- Esplorazione automatica a coda vuota: riguarda solo le routine. -->
-              <section class="mg-auto-block" id="mgProberIdleBlock">
-                <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
-                  <span class="mg-switch-text">Esplora quando la coda è vuota</span>
-                  <input type="checkbox" id="mgProberIdle" checked />
-                  <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                </label>
-                <p class="mg-auto-block-desc">
-                  Finiti i feedback da lavorare, Filo va a cercare da solo problemi che
-                  nessuno ha segnalato. Spento, quando la coda è vuota si ferma.
-                  <span class="mg-action-msg" id="mgProberIdleMsg" role="status"></span>
-                </p>
               </section>
 
               <!-- I lavori server alle routine (#1159): spento, restano alle sessioni locali. -->
@@ -2024,6 +2298,8 @@
                   <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                 </label>
                 <span class="mg-action-msg" id="mgLavoriServerMsg" role="status"></span>
+                <!-- Le routine server ferme dopo un rifiuto, una per account, col motivo (#996): le scrive manage.js. -->
+                <div class="mg-auto-pause" id="mgServerPausa" role="status" hidden></div>
               </section>
 
               <!-- Le tre scelte su COME partono le sessioni. Restano manovrabili anche a routine spente: escludere un
@@ -2086,6 +2362,8 @@
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
                 </div>
+                <!-- Gli account fermi dopo un'accensione rifiutata, col motivo (#996): le righe le scrive manage.js. -->
+                <div class="mg-auto-pause" id="mgAccountsPausa" role="status" hidden></div>
                 <p class="mg-auto-warn" id="mgAccountsWarn" hidden>Nessun account in uso: non parte nessuna sessione.</p>
               </section>
 
@@ -2397,6 +2675,200 @@
       </div>
     </section>
 
+    <!-- Utenti → Inviti e utenti (#1414): la pagina che stava in credits/owner.html, spostata intera. Script: manageUtenti.js. -->
+    <section class="mg-panel mg-pagina" id="panel-utenti" data-panel="utenti">
+      <p class="sn-muted" id="ownerDenied" hidden>Questa pagina è del proprietario di Filo.</p>
+      <section id="ownerSection" class="sn-wallet-owner" hidden>
+        <!-- Il conto OpenRouter che non regge (#820): in cima, prima di ogni numero. -->
+        <p class="sn-wallet-allarme" id="ownerAllarme" role="alert" hidden></p>
+        <!-- I numeri che il server calcola: non si toccano, si guardano. -->
+        <ul class="sn-wallet-numeri" id="ownerNumeri"></ul>
+        <!-- Le copie di Filo che hanno spedito i contatori giornalieri (#969): non dal server dei crediti, da Firestore. -->
+        <ul class="sn-wallet-numeri sn-wallet-installazioni" id="ownerInstallazioni" aria-label="Installazioni attive"></ul>
+        <h3 class="sn-wallet-sub" id="ownerContoTitle" hidden>Conto OpenRouter</h3>
+        <ul class="sn-wallet-numeri" id="ownerConto" hidden></ul>
+        <p class="sn-muted sn-wallet-conto-nota" id="ownerContoNota" hidden></p>
+        <p class="sn-muted" id="ownerTotals"></p>
+
+        <!-- Le manopole (#652): i campi li disegna il JS dalla tabella in
+             src/shared/wallet.js, così nome e limiti stanno in un posto solo. -->
+        <h3 class="sn-wallet-sub" id="ownerKnobsTitle">Quanto vale cosa</h3>
+        <div class="sn-manopole" id="ownerKnobs"></div>
+
+        <div class="sn-wallet-owner-row">
+          <!-- novalidate: i controlli sui numeri li fa la pagina, con una frase di Filo, non la bolla del browser. -->
+          <form id="ownerInvitesForm" class="sn-wallet-inline" autocomplete="off" novalidate>
+            <label for="ownerInviteCount">Nuovi codici</label>
+            <input type="number" id="ownerInviteCount" min="1" max="200" value="5" />
+            <button type="submit" class="sn-btn" id="ownerInvitesBtn">Genera</button>
+          </form>
+          <form id="ownerGrantForm" class="sn-wallet-inline" autocomplete="off" novalidate>
+            <label for="ownerGrantPseudonym">Regala crediti a</label>
+            <input type="text" id="ownerGrantPseudonym" placeholder="pseudonimo" maxlength="16" spellcheck="false" />
+            <input type="number" id="ownerGrantCredits" min="1" placeholder="crediti" />
+            <button type="submit" class="sn-btn" id="ownerGrantBtn">Regala</button>
+          </form>
+        </div>
+        <p class="sn-wallet-msg" id="ownerMsg" role="status" hidden></p>
+        <h3 class="sn-wallet-sub" id="ownerCodesTitle" hidden>I tuoi codici</h3>
+        <ul id="ownerCodes" class="sn-wallet-invites"></ul>
+        <p class="sn-muted sn-wallet-filtro" id="ownerFiltro" role="status" hidden></p>
+        <div class="sn-wallet-table-wrap">
+          <table class="sn-wallet-table" id="ownerUsers" hidden>
+            <thead><tr><th>Pseudonimo</th><th>Saldo</th><th>Ricevuti</th><th>Speso ($)</th><th>Registro</th><th>Invitato da</th><th>Dal</th><th>Ultimo uso</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="sn-muted" id="ownerRuns"></p>
+      </section>
+    </section>
+
+    <!-- Utenti → Contatori (#1462): le somme dei contatori anonimi. Script: manageContatori.js. -->
+    <section class="mg-panel" id="panel-contatori" data-panel="contatori">
+      <div class="mg-ct" id="mgCtRoot">
+        <p class="mg-ct-negato" id="mgCtNegato" hidden>Questa scheda è dell’owner.</p>
+        <div class="mg-ct-corpo" id="mgCtCorpo" hidden>
+          <div class="mg-fs-bar" id="mgCtFinestra" role="group" aria-label="Intervallo"></div>
+          <div class="mg-fs-custom" id="mgCtDate" hidden>
+            <label for="mgCtDal">Dal</label>
+            <input type="date" id="mgCtDal" />
+            <label for="mgCtAl">al</label>
+            <input type="date" id="mgCtAl" />
+          </div>
+          <div class="mg-ct-filtri">
+            <select id="mgCtVersione" aria-label="Versione di Filo" title="Versione di Filo"></select>
+            <select id="mgCtSistema" aria-label="Sistema operativo" title="Sistema operativo"></select>
+            <button type="button" class="sn-btn sn-btn-secondary" id="mgCtRileggi" title="Rilegge dal server, senza aspettare">Rileggi</button>
+            <span class="mg-ct-stato" id="mgCtStato" role="status"></span>
+          </div>
+          <p class="mg-ct-guasto" id="mgCtGuasto" role="alert" hidden></p>
+          <div class="mg-ct-dati" id="mgCtDati" hidden>
+            <section class="mg-ct-sez" id="mgCtCopie" data-blocco="copie">
+              <h3>Copie di Filo attive</h3>
+              <div class="mg-ct-totale" id="mgCtTotale"></div>
+              <div class="mg-ct-grafico" id="mgCtPeriodi" role="group" aria-label="Copie attive per periodo"></div>
+              <div class="mg-ct-asse" id="mgCtPeriodiAsse"></div>
+              <h4 class="mg-ct-ore-titolo" id="mgCtOreTitolo"></h4>
+              <div class="mg-ct-grafico mg-ct-grafico--ore" id="mgCtOre" role="group" aria-label="Copie attive per ora"></div>
+              <div class="mg-ct-asse" id="mgCtOreAsse"></div>
+            </section>
+            <div id="mgCtBlocchi"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Impostazioni predefinite → Modelli predefiniti (#1414): la pagina che stava in admin-defaults/, spostata intera.
+       Script: managePredefiniti.js. -->
+    <section class="mg-panel mg-pagina" id="panel-predefiniti" data-panel="predefiniti">
+      <!-- Mostrato se l'utente non è admin (DEFAULTS_GET ritorna !ok). -->
+      <section id="sec-denied" hidden>
+        <p class="sn-muted" id="denied-msg"></p>
+      </section>
+
+      <div id="editor" hidden>
+        <p class="sn-muted" id="intro"></p>
+
+        <section id="sec-keys">
+          <h2 id="h-keys"></h2>
+          <p class="sn-muted" id="keys-desc"></p>
+
+          <label for="apiKey">OpenRouter API key <span class="sn-muted" id="apiKey-state"></span></label>
+          <input type="password" id="apiKey" placeholder="sk-or-v1-..." autocomplete="off" />
+
+
+          <label for="apiKeyTavily" style="margin-top: 12px;">Tavily API key <span class="sn-muted" id="apiKeyTavily-state"></span></label>
+          <input type="password" id="apiKeyTavily" placeholder="tvly-..." autocomplete="off" />
+
+          <label for="apiKeySafebrowse" style="margin-top: 12px;" id="apiKeySafebrowse-label">Google Safe Browsing API key <span class="sn-muted" id="apiKeySafebrowse-state"></span></label>
+          <input type="password" id="apiKeySafebrowse" placeholder="AIza..." autocomplete="off" />
+          <p class="sn-muted" id="apiKeySafebrowse-desc" style="margin-top: 4px;"></p>
+        </section>
+
+        <section id="sec-model-registry">
+          <h2 id="h-model-registry"></h2>
+          <p class="sn-muted" id="model-registry-desc"></p>
+          <div id="modelRegistryList"></div>
+          <div class="sn-row" style="margin-top: 10px;">
+            <button class="sn-btn sn-btn-secondary" id="addModelRow" type="button"></button>
+          </div>
+          <label for="providerSort" id="providerSortLabel"></label>
+          <div style="max-width: 280px;"><select id="providerSort"></select></div>
+          <p class="sn-muted" id="providerSortDesc"></p>
+          <!-- Combobox per la "stringa modello": una datalist per provider,
+               popolata dal main con le chiavi predefinite (la pagina non le vede). -->
+          <datalist id="models-list-openrouter"></datalist>
+        </section>
+
+        <section id="sec-models">
+          <h2 id="h-models"></h2>
+          <p class="sn-muted" id="models-desc"></p>
+          <div class="sn-grid-2" id="modelsGrid"></div>
+          <!-- Sotto la griglia e non sopra: cresce e cala mentre si cambiano le catene, e sopra sposterebbe i campi sotto il cursore. -->
+          <div id="openWeightsImpact" role="status" hidden></div>
+          <!-- Non `nicknames-list`: quella è dei Modelli di supporto in Automazioni, e gli id di una pagina sono uno. -->
+          <datalist id="nicknames-list-predefiniti"></datalist>
+        </section>
+
+        <section id="sec-excluded">
+          <h2 id="h-excluded"></h2>
+          <p class="sn-muted" id="excluded-desc"></p>
+          <div id="excludedList"></div>
+          <div class="sn-row" style="margin-top: 10px;">
+            <button class="sn-btn sn-btn-secondary" id="addExcludedRow" type="button"></button>
+          </div>
+          <!-- Compare solo se questa lista NON copre voci escluse dal codice: la lista salvata qui sostituisce quella
+             di build, e senza avviso un'esclusione aggiunta col codice resterebbe lettera morta. -->
+          <div class="sn-info-box" id="excludedDrift" hidden>
+            <div class="sn-info-box-title" id="excludedDriftTitle"></div>
+            <p id="excludedDriftText" style="margin: 0 0 8px;"></p>
+            <button class="sn-btn sn-btn-secondary" id="excludedDriftFix" type="button"></button>
+          </div>
+        </section>
+
+        <section id="sec-delicate">
+          <h2 id="h-delicate"></h2>
+          <p class="sn-muted" id="delicate-desc"></p>
+          <div id="delicateLists"></div>
+        </section>
+
+        <section id="sec-contesto">
+          <h2 id="h-contesto"></h2>
+          <p class="sn-muted" id="contesto-desc"></p>
+          <div class="sn-row" style="gap:16px;flex-wrap:wrap;">
+            <label for="contestoGiorni" id="l-contesto-giorni"></label>
+            <input type="number" id="contestoGiorni" min="0.5" max="365" step="0.5" style="width:120px;" />
+            <label for="contestoToken" id="l-contesto-token"></label>
+            <input type="number" id="contestoToken" min="2000" max="2000000" step="1000" style="width:160px;" />
+            <label for="contestoCache" id="l-contesto-cache"></label>
+            <select id="contestoCache" style="width:240px;">
+              <option value="" id="contestoCacheDiSerie"></option>
+              <option value="5m" id="contestoCache5m"></option>
+              <option value="1h" id="contestoCache1h"></option>
+            </select>
+          </div>
+        </section>
+
+        <section id="sec-lunghezza">
+          <h2 id="h-lunghezza"></h2>
+          <p class="sn-muted" id="lunghezza-desc"></p>
+          <div class="sn-row" style="gap:16px;flex-wrap:wrap;">
+            <label for="lunghezzaConversazioni" id="l-lunghezza-conversazioni"></label>
+            <input type="number" id="lunghezzaConversazioni" min="1024" max="262144" step="1024" style="width:140px;" />
+            <label for="lunghezzaTesti" id="l-lunghezza-testi"></label>
+            <input type="number" id="lunghezzaTesti" min="1024" max="262144" step="1024" style="width:140px;" />
+            <label for="lunghezzaBrevi" id="l-lunghezza-brevi"></label>
+            <input type="number" id="lunghezzaBrevi" min="1024" max="262144" step="1024" style="width:140px;" />
+          </div>
+        </section>
+
+        <div class="sn-toolbar" style="margin-top: 24px;">
+          <button class="sn-btn" id="saveBtn" type="button"></button>
+          <span id="saveStatus" class="sn-muted"></span>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <div class="mg-lightbox" id="mgLightbox"><img id="mgLightboxImg" alt=""></div>
@@ -2404,5 +2876,10 @@
   <script src="manageDomande.js"></script>
   <script src="manage.js"></script>
   <script src="manageRedteam.js"></script>
+  <script src="manageInPausa.js"></script>
+  <script src="manageCrediti.js"></script>
+  <script src="manageUtenti.js"></script>
+  <script src="manageContatori.js"></script>
+  <script src="managePredefiniti.js"></script>
 </body>
 </html>

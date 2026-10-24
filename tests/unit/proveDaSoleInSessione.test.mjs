@@ -32,8 +32,9 @@ async function daSoli(file, sessione, { casa, tetto = TETTO_ATTESA_MS }) {
   const r = await lanciaSorvegliato(['--test', ...flagsConAvanzamento(['--test-reporter=tap'], avanzamento), ...fileArgs(file, ROOT)], {
     env: { ...ambiente, ...sessione }, avanzamento, tetto, raccogli: true,
   });
-  // Un file fermo lo chiude da solo il tetto per file (#1231): è lo stesso rosso col suo nome.
-  return { ...r, fermo: r.fermo ? testoFermo(r.fermo, tetto) : r.chiusi?.length ? testoFileChiusi(r.chiusi, tetto) : null };
+  // Gli avvisi del lanciatore, tutti: un file fermo lo chiude da solo il tetto per file (#1231), la corsa ferma dice chi.
+  const avvisi = [r.chiusi?.length && testoFileChiusi(r.chiusi, tetto), r.fermo && testoFermo(r.fermo, tetto)].filter(Boolean);
+  return { ...r, fermo: avvisi.length ? avvisi.join('\n') : null };
 }
 
 test('lanciati da soli in una sessione con tutta la sua identità accesa, i file che la leggono sono verdi (#1109.1)', async () => {
@@ -47,7 +48,7 @@ test('lanciati da soli in una sessione con tutta la sua identità accesa, i file
     const uso = { input_tokens: 12, output_tokens: 34, cache_read_input_tokens: 5600, cache_creation_input_tokens: 78 };
     writeFileSync(transcript, `${JSON.stringify({ type: 'assistant', message: { id: 'msg_1', model: 'claude-opus-4-8', usage: uso } })}\n`, 'utf8');
     const sessione = {
-      FILO_ROUTINE: '1', FILO_ROUTINE_ROLE: 'prober', FILO_ROUTINE_TICKET: 'biglietto-della-sessione-vera',
+      FILO_ROUTINE: '1', FILO_ROUTINE_ROLE: 'verifier', FILO_ROUTINE_TICKET: 'biglietto-della-sessione-vera',
       FILO_TRANSCRIPT: transcript, FILO_SESSION_ID: sid,
     };
     assert.deepEqual(Object.keys(sessione).sort(), [...IDENTITA_SESSIONE].sort(), 'ogni voce dell\'identità della sessione è accesa');

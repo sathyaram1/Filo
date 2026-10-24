@@ -223,7 +223,7 @@ test('la chat porta al tasto che c\'è: stesso indirizzo nel prompt, nel manifes
   const url = 'filo://security/security.html#cancella-tutto';
   assert.ok(prompt.includes(`NAVIGA con {url: "${url}"`));
   assert.ok(caps.includes(url));
-  assert.ok(js.includes("location.hash !== '#cancella-tutto'"));
+  assert.ok(js.includes("'#cancella-tutto': { tasto: 'sec-wipe-btn', riga: 'sec-wipe-row' }"));
   assert.ok(html.includes('id="sec-wipe-btn"') && html.includes('id="sec-wipe-row"'));
   // Nessuno strumento della chat la fa al posto dell'utente: il canale lo usa solo la pagina Sicurezza.
   const usi = [];

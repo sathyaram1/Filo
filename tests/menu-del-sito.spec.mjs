@@ -3,6 +3,7 @@
 // e accettato il menu di Filo resta a Shift. Una pagina senza menu suo non ha la voce.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const MENU_SUO = `<!doctype html><html><head><meta charset="utf-8">
 <meta property="og:site_name" content="Sito di prova"><title>Menu proprio</title>
@@ -60,7 +61,7 @@ const riservaAperta = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow
 const sitiScelti = (app) => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).menuDelSito.siti);
 
 async function primaVoce(page) {
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   return (await menu.locator('button .sn-menu-label').first().innerText()).trim();
 }
@@ -71,13 +72,13 @@ async function tastoDestroApre(page, atteso) {
     await page.keyboard.press('Escape');
     await page.mouse.click(600, 500);
     await page.locator('#area').click({ button: 'right', position: { x: 30, y: 30 } });
-    await expect(page.locator(atteso)).toBeVisible({ timeout: 1000 });
+    await expect(atteso).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 10_000 });
 }
 
 async function scegliMenuDelSito(page, dove = '#area') {
   await page.locator(dove).click({ button: 'right', position: { x: 60, y: 50 } });
-  const voce = page.locator('.sn-menu .sn-menu-split-main', { hasText: 'Menu di Sito di prova' });
+  const voce = menuDi(page).locator('.sn-menu .sn-menu-split-main', { hasText: 'Menu di Sito di prova' });
   await expect(voce).toBeVisible();
   await voce.click();
 }
@@ -89,9 +90,9 @@ test('«Menu di <sito>» in cima apre il menu della pagina nello stesso punto, e
   // Il sito non ha visto il tasto destro che ha aperto il menu di Filo.
   expect(await page.evaluate(() => window.aperture)).toBe(0);
 
-  await page.locator('.sn-menu .sn-menu-split-main', { hasText: 'Menu di Sito di prova' }).click();
+  await menuDi(page).locator('.sn-menu .sn-menu-split-main', { hasText: 'Menu di Sito di prova' }).click();
   await expect(page.locator('#menu-suo')).toBeVisible();
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
   const posto = await page.evaluate(() => {
     const r = document.getElementById('menu-suo').getBoundingClientRect();
     const a = document.getElementById('area').getBoundingClientRect();
@@ -102,7 +103,7 @@ test('«Menu di <sito>» in cima apre il menu della pagina nello stesso punto, e
   expect(await riservaAperta(app)).toBe(false);
 });
 
-const vociDelSito = (page) => page.locator('.sn-menu .sn-menu-split-main', { hasText: /^Menu di/ });
+const vociDelSito = (page) => menuDi(page).locator('.sn-menu .sn-menu-split-main', { hasText: /^Menu di/ });
 
 // L'altra porta standard per ascoltare il tasto destro: il gestore oncontextmenu, da script o come attributo.
 const COL_GESTORE = (registra, attributo) => MENU_SUO
@@ -129,13 +130,13 @@ for (const [nome, registra, attributo] of [
 test('una pagina senza menu suo, o un\'app React senza onContextMenu, non ha la voce; con onContextMenu sì', async ({ openTab, testServer }) => {
   const semplice = await testServer.openReady(openTab, SENZA_MENU);
   await semplice.locator('#testo').click({ button: 'right' });
-  await expect(semplice.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(semplice).locator('.sn-menu')).toBeVisible();
   await expect(vociDelSito(semplice)).toHaveCount(0);
 
   // Un altro host: le schede si ritrovano per host.
   const react = await testServer.openReady(openTab, COME_REACT, { pubblico: true });
   await react.locator('#senza').click({ button: 'right' });
-  await expect(react.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(react).locator('.sn-menu')).toBeVisible();
   await expect(vociDelSito(react)).toHaveCount(0);
   await react.keyboard.press('Escape');
   await react.locator('#con').click({ button: 'right' });
@@ -150,7 +151,7 @@ test('su un sito che blocca il tasto destro senza un menu suo, la voce apre quel
   await expect.poll(() => riservaAperta(app), { timeout: 5000 }).toBe(true);
   await page.keyboard.press('Escape');
   await page.locator('#testo').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
   await expect(vociDelSito(page)).toHaveCount(0);
 });
 
@@ -171,14 +172,14 @@ test('scelto tre volte, Filo propone una volta il menu del sito; accettato, il t
   await expect(vista.locator('.shell-notif.show', { hasText: 'Annulla' })).toBeVisible();
 
   // Il tasto destro adesso va al sito.
-  await tastoDestroApre(page, '#menu-suo');
+  await tastoDestroApre(page, page.locator('#menu-suo'));
   await page.waitForTimeout(300);
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
   await page.mouse.click(600, 500);
 
   // Dove il sito non annulla, il tasto destro apre comunque il menu di Filo.
   await page.locator('#libero').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
   await page.keyboard.press('Escape');
 
   // Shift porta al menu di Filo, che dalla freccia della voce rimette le cose com'erano.
@@ -188,10 +189,10 @@ test('scelto tre volte, Filo propone una volta il menu del sito; accettato, il t
   await page.keyboard.up('Shift');
   expect(await primaVoce(page)).toBe('Menu di Sito di prova');
   expect(await page.evaluate(() => window.aperture)).toBe(prima);
-  await page.locator('.sn-menu .sn-menu-split-arrow').first().hover();
-  await page.locator('.sn-menu-sub .sn-menu-item', { hasText: 'Col tasto destro apri il menu di Filo' }).click();
+  await menuDi(page).locator('.sn-menu .sn-menu-split-arrow').first().hover();
+  await menuDi(page).locator('.sn-menu-sub .sn-menu-item', { hasText: 'Col tasto destro apri il menu di Filo' }).click();
   await expect.poll(() => sitiScelti(app)).toEqual([]);
-  await tastoDestroApre(page, '.sn-menu');
+  await tastoDestroApre(page, menuDi(page).locator('.sn-menu'));
   expect(await page.evaluate(() => window.aperture)).toBe(prima);
 
   // La proposta non torna: una volta per sito.
@@ -204,10 +205,10 @@ test('scelto tre volte, Filo propone una volta il menu del sito; accettato, il t
 test('la scelta si fa anche dalla freccia della voce, e si toglie dalle Preferenze', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, MENU_SUO, { pubblico: true });
   await page.locator('#area').click({ button: 'right' });
-  await page.locator('.sn-menu .sn-menu-split-arrow').first().hover();
-  await page.locator('.sn-menu-sub .sn-menu-item', { hasText: 'Aprilo subito col tasto destro' }).click();
+  await menuDi(page).locator('.sn-menu .sn-menu-split-arrow').first().hover();
+  await menuDi(page).locator('.sn-menu-sub .sn-menu-item', { hasText: 'Aprilo subito col tasto destro' }).click();
   await expect.poll(() => sitiScelti(app)).toEqual(['sito-pubblico.test']);
-  await tastoDestroApre(page, '#menu-suo');
+  await tastoDestroApre(page, page.locator('#menu-suo'));
 
   const pref = await openTab('filo://preferences/preferences.html');
   const riga = pref.locator('#menuDelSitoSiti .mem-riga', { hasText: 'sito-pubblico.test' });

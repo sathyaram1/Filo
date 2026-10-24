@@ -4,6 +4,8 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, confirmText, CONFIRM_HOST } from './helpers/confirm.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
+import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 
 const SEGRETO = 'Saldo disponibile 12.345,67 euro bonifico a Mario Rossi';
 
@@ -31,6 +33,12 @@ async function modelliFinti(app) {
 }
 
 const mandato = (app) => app.evaluate(() => globalThis.__mandato.slice());
+// Nel mondo dei content script della scheda (quello del preload): come lo chiama Filo dopo uno screenshot o una copia.
+const nelContenutoDi = (app, titolo, codice) => app.evaluate(async ({ BrowserWindow }, { titolo, codice }) => {
+  const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+  const tab = tm.tabs.find((t) => t.title === titolo);
+  return tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: codice }], true);
+}, { titolo, codice });
 const voceDi = (app, titolo) => app.evaluate(async ({}, t) => {
   const e = (await globalThis.SN_ARCHIVED_TABS.list()).find((x) => x.title === t);
   return e ? { delicata: e.delicata || null, summary: e.summary || '', snippet: e.snippet || '', embedding: Array.isArray(e.embedding) } : null;
@@ -142,11 +150,12 @@ test('in Sicurezza un sito aggiunto all\'elenco diventa delicato, e l\'interrutt
   const sinistra = (sel) => sicurezza.locator(sel).evaluate((e) => Math.round(e.getBoundingClientRect().left));
   expect(await sinistra('#sec-delicate-sites')).toBe(await sinistra('#sec-delicate-desc'));
   expect(await sinistra('#sec-delicate-sites')).toBeGreaterThan(await sinistra('#sec-delicate'));
-  await sicurezza.locator('#sec-delicate-sites').fill('sito-pubblico.test\nstudio rossi');
+  // Un nome con lo spazio si ridice intero anche accanto a un sito sulla stessa riga (#718.3).
+  await sicurezza.locator('#sec-delicate-sites').fill('sito-pubblico.test\nstudio rossi\nmario bianchi, altro-studio.test');
   await sicurezza.locator('#sec-delicate-sites').blur();
   await expect.poll(async () => (await impostazioni(shell)).security.pagineDelicate.siti, { timeout: 4000 })
-    .toEqual(['sito-pubblico.test']);
-  await expect(sicurezza.locator('#sec-delicate-sites-error')).toContainText('studio rossi');
+    .toEqual(['sito-pubblico.test', 'altro-studio.test']);
+  await expect(sicurezza.locator('#sec-delicate-sites-error')).toContainText('studio rossi, mario bianchi');
 
   const t = await apriEChiudi({ app, shell, openTab, testServer }, 'Area clienti dello studio', `<p>${SEGRETO}</p>`);
   await t.chiudi();
@@ -240,7 +249,7 @@ test('dalla chat della home una scheda aperta diventa delicata col suo titolo, s
 test('in Gestione l\'owner vede e cambia gli elenchi di posta, banche e sanità, e salva solo quello che ha toccato', async ({ app, openTab }) => {
   const [elenco, diSerie] = await app.evaluate(() => [
     globalThis.SN_PAGINE_DELICATE.elenco(null), globalThis.SN_PAGINE_DELICATE.elenco(null)]);
-  const page = await openTab('filo://admin-defaults/admin-defaults.html');
+  const page = await openTab(GESTIONE);
   // La pagina vuole un owner loggato, che qui non c'è: le risposte del main sono finte, i messaggi si registrano.
   await page.addInitScript(({ elenco: el, diSerie: ds }) => {
     window.__sent = [];
@@ -255,11 +264,13 @@ test('in Gestione l\'owner vede e cambia gli elenchi di posta, banche e sanità,
     if (window.chrome && window.chrome.runtime) window.chrome.runtime.sendMessage = stub;
     else window.chrome = { runtime: { sendMessage: stub } };
   }, { elenco, diSerie });
-  await page.reload();
+  await ricaricaSu(page, 'predefiniti');
   await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
   await expect(page.locator('#h-delicate')).toHaveText('Pagine delicate');
   await expect(page.locator('#delicate-banche')).toHaveValue(/intesasanpaolo\.com/);
   await expect(page.locator('label[for="delicate-sanita"]')).toHaveText('Sanità');
+  await expect(page.locator('label[for="delicate-pa"]')).toHaveText('Pubblica amministrazione');
+  await expect(page.locator('#delicate-pa')).toHaveValue(/agenziaentrate\.gov\.it/);
 
   await page.locator('#saveBtn').click();
   await expect.poll(() => page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').length)).toBe(1);
@@ -400,12 +411,7 @@ test('in incognito la selezione non parte da sola verso un modello; in una fines
 test('screenshot e immagini copiate da una pagina delicata non vanno al modello delle immagini; chiesta col tasto destro sì', async ({ app, openTab, testServer }) => {
   await modelliFinti(app);
   const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-  // Nel mondo dei content script della scheda (quello del preload): come la chiama Filo dopo uno screenshot o una copia.
-  const nelContenuto = (titolo, codice) => app.evaluate(async ({ BrowserWindow }, { titolo, codice }) => {
-    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
-    const tab = tm.tabs.find((t) => t.title === titolo);
-    return tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: codice }], true);
-  }, { titolo, codice });
+  const nelContenuto = (titolo, codice) => nelContenutoDi(app, titolo, codice);
   // La voce entra negli appunti prima della descrizione; un sito non legge né scrive gli appunti, lo fa il main.
   const voce = (u) => app.evaluate(async ({}, { u }) => {
     const l = await globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
@@ -435,4 +441,148 @@ test('screenshot e immagini copiate da una pagina delicata non vanno al modello 
     action: SN_CONST.ACTIONS.DESCRIBE_IMAGE, payload: { dataUrl: ${JSON.stringify(`${PNG}#c`)} } })`);
   expect(chiesta.ok).toBe(true);
   expect((await immagini()).length).toBe(2);
+});
+
+const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
+const cronologiaAppunti = (app) => app.evaluate(() => globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []));
+// Lo screenshot del tasto destro, senza il file nella cartella Download: il nome che gli darebbe resta nella pagina.
+// Il clic è il gesto che la voce del menu darebbe; la foto di una scheda appena aperta può tornare vuota, e si riprova.
+async function screenshotDi(app, page, titolo) {
+  const primaImmagine = async () => (await cronologiaAppunti(app)).find((v) => v.type === 'image') || null;
+  await app.evaluate(({ clipboard }) => clipboard.clear());
+  const prima = await primaImmagine();
+  let nome = null;
+  await expect.poll(async () => {
+    await page.mouse.click(5, 5);
+    nome = await nelContenutoDi(app, titolo, `(async () => {
+      HTMLAnchorElement.prototype.click = function () { window.__nomeFile = this.download; };
+      window.__nomeFile = null;
+      await SN_ACTIONS.takeScreenshot();
+      return window.__nomeFile;
+    })()`);
+    return Boolean(nome);
+  }, { timeout: 20_000 }).toBe(true);
+  // La voce entra negli appunti di Filo subito dopo, senza che lo screenshot l'aspetti.
+  let voce = null;
+  await expect.poll(async () => {
+    voce = await primaImmagine();
+    return Boolean(voce && (!prima || voce.dataUrl !== prima.dataUrl));
+  }, { timeout: 8_000 }).toBe(true);
+  return { nome, dataUrl: voce.dataUrl, descrizione: voce.description };
+}
+// Il centro di un pezzo di testo nella pagina, per un doppio clic e un tasto destro veri.
+const puntoDi = (page, id, pezzo) => page.evaluate(([i, w]) => {
+  const nodo = document.getElementById(i).firstChild;
+  const da = nodo.textContent.indexOf(w);
+  const r = document.createRange();
+  r.setStart(nodo, da);
+  r.setEnd(nodo, da + w.length);
+  const b = r.getBoundingClientRect();
+  return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+}, [id, pezzo]);
+
+// #1274 — copiare un IBAN è il gesto più comune su una banca: la spiegazione non si prepara, quella chiesta resta.
+test('su una pagina delicata la selezione non prepara la spiegazione; il tasto destro la chiede una volta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await modelliFinti(app);
+  const IBAN = 'IT60X0542811101000000123456';
+  const spiegazioni = async () => (await mandato(app)).filter((m) => m.testo.includes(IBAN));
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Il mio conto</title></head>
+    <body style="font:20px sans-serif;padding:30px"><p id="p">Il mio IBAN è ${IBAN} per il bonifico.</p>${CON_PASSWORD}</body></html>`,
+  { pubblico: true });
+  await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8_000 });
+  const p = await puntoDi(page, 'p', IBAN);
+  await page.mouse.dblclick(p.x, p.y);
+  expect(await page.evaluate(() => getSelection().toString().trim())).toBe(IBAN);
+  // La preparazione parte 400 ms dopo la selezione: oltre il secondo e mezzo non è partita.
+  await pausa(1500);
+  expect(await spiegazioni()).toEqual([]);
+
+  await page.mouse.click(p.x, p.y, { button: 'right' });
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-inline-explain')).toContainText('Riassunto finto della pagina', { timeout: 10_000 });
+  expect((await spiegazioni()).length).toBe(1);
+
+  // La stessa selezione su una pagina qualunque la prepara: è la pagina delicata a fermarla.
+  const altra = await testServer.openReady(openTab, `<!doctype html><title>Appunti</title>
+    <body style="font:20px sans-serif;padding:30px"><p id="p">Il codice di prova è ${IBAN.replace('IT', 'XX')} per il modulo.</p></body>`);
+  await altra.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8_000 });
+  const q = await puntoDi(altra, 'p', IBAN.replace('IT', 'XX'));
+  await altra.mouse.dblclick(q.x, q.y);
+  await expect.poll(async () => (await mandato(app)).filter((m) => m.testo.includes(IBAN.replace('IT', 'XX'))).length, { timeout: 8_000 }).toBe(1);
+});
+
+// #1274 — conta la pagina da cui viene l'immagine, non quella dove la incolli.
+test('uno screenshot della banca incollato col menu su un altro sito non va al modello delle immagini; uno di una pagina qualunque sì', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await modelliFinti(app);
+  const immagini = async () => (await mandato(app)).filter((m) => m.testo.includes('image_url'));
+  const cronologia = () => cronologiaAppunti(app);
+
+  const ricetta = await testServer.openReady(openTab, '<!doctype html><title>Ricetta</title><body style="background:#2a7;font:30px sans-serif"><p>Pane</p></body>');
+  const normale = await screenshotDi(app, ricetta, 'Ricetta');
+  expect((await immagini()).length).toBe(1);
+  expect(normale.nome).not.toMatch(/^screenshot-/);
+
+  const conto = await testServer.openReady(openTab,
+    `<!doctype html><html><head><title>Il mio conto</title></head><body style="background:#c33">${CON_PASSWORD}</body></html>`, { pubblico: true });
+  await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
+  const banca = await screenshotDi(app, conto, 'Il mio conto');
+  expect(banca.nome).toMatch(/^screenshot-/);
+  expect(banca.descrizione).toBe('Immagine da una pagina delicata');
+  expect((await immagini()).length, 'lo screenshot della banca non va al modello').toBe(1);
+
+  // Un altro sito con un campo dove si scrive; negli appunti di sistema c'è lo screenshot della banca, ricodificato.
+  const chat = await testServer.openReady(openTab, `<!doctype html><title>Chat</title><body style="font:16px sans-serif">
+    <style>#ce img { width: 40px; height: 30px; }</style>
+    <div id="ce" contenteditable="true" style="position:absolute;left:40px;top:40px;width:400px;height:200px;border:1px solid #888"></div></body>`);
+  await chat.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8_000 });
+  const incolla = async (dataUrl) => {
+    await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }, u) => {
+      const png = nativeImage.createFromDataURL(u).toPNG();
+      await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+    }, dataUrl);
+    // Sotto le immagini già incollate: il tasto destro su un'immagine apre il suo menu, senza Incolla.
+    await chat.locator('#ce').click({ button: 'right', position: { x: 300, y: 170 } });
+    // Lo strato del menu nasce al primo tasto destro: si cerca di nuovo finché c'è.
+    await expect.poll(() => menuDi(chat).locator('.sn-menu-paste-main').count(), { timeout: 10_000 }).toBeGreaterThan(0);
+    await menuDi(chat).locator('.sn-menu-paste-main').click();
+  };
+  await incolla(banca.dataUrl);
+  await expect(chat.locator('#ce img')).toHaveCount(1, { timeout: 10_000 });
+  await expect.poll(async () => (await cronologia())[0].description, { timeout: 8_000 }).toBe('Immagine da una pagina delicata');
+  await pausa(1000);
+  expect((await immagini()).length, 'incollato altrove, lo screenshot della banca resta fuori').toBe(1);
+
+  // Lo screenshot della pagina qualunque, incollato allo stesso modo, va al modello: una richiesta.
+  await app.evaluate(() => globalThis.SN_AI_CACHE.clear());
+  await incolla(normale.dataUrl);
+  await expect(chat.locator('#ce img')).toHaveCount(2, { timeout: 10_000 });
+  await expect.poll(async () => (await immagini()).length, { timeout: 8_000 }).toBe(2);
+});
+
+// #1274 — la descrizione che parte da sola per ogni screenshot si spegne come la spiegazione preparata.
+test('spenta in Preferenze la descrizione di screenshot e immagini, lo screenshot resta qui e si chiama con data e ora', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await modelliFinti(app);
+  const pref = await openTab('filo://preferences/preferences.html');
+  await expect(pref.locator('#descriviImmagini')).toBeChecked({ timeout: 8000 });
+  await pref.locator('#descriviImmagini').uncheck();
+  await expect.poll(async () => (await impostazioni(shell)).descriviImmagini.enabled, { timeout: 4000 }).toBe(false);
+  await pref.locator('#sec-nomi-file').screenshot({ path: 'tests/.shots/pagine-delicate-preferenze-immagini.png' });
+
+  const ricetta = await testServer.openReady(openTab, '<!doctype html><title>Ricetta</title><body style="background:#27a;font:30px sans-serif"><p>Pane</p></body>');
+  const spento = await screenshotDi(app, ricetta, 'Ricetta');
+  expect(spento.nome).toMatch(/^screenshot-/);
+  expect(spento.descrizione).toBe('Immagine');
+  expect((await mandato(app)).filter((m) => m.testo.includes('image_url'))).toEqual([]);
+
+  // Dalla chat si riaccende con le stesse parole delle Preferenze, e lo screenshot dopo torna ad avere un nome.
+  const r = await app.evaluate(() => globalThis.SN_PREF.buildPreferencePartial('descrizione automatica delle immagini', 'sì'));
+  expect(r.partial).toEqual({ descriviImmagini: { enabled: true } });
+  await app.evaluate(async ({}, p) => globalThis.SN_STORAGE.updateSettings(p), r.partial);
+  await ricetta.evaluate(() => { document.body.style.background = '#a72'; });
+  const acceso = await screenshotDi(app, ricetta, 'Ricetta');
+  expect(acceso.nome).not.toMatch(/^screenshot-/);
+  expect((await mandato(app)).filter((m) => m.testo.includes('image_url')).length).toBe(1);
 });

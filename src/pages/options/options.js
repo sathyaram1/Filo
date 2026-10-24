@@ -13,26 +13,19 @@
     return !!(B && B.staUsandoAdesso && B.staUsandoAdesso(el));
   };
 
-  // Mappa azione → editor a segmenti della sua catena di modelli (popolata in load()).
   let modelChains = {};
 
-  // Cache delle liste modelli per provider, usate dal combobox della "stringa
-  // modello" di ogni riga del registry. Riempite on-demand: al focus del campo,
-  // al cambio provider, o col pulsante "Aggiorna lista modelli". `null` = non
-  // ancora caricata (provo a caricarla); `[]` = caricata ma vuota/errore.
+  // Cache delle liste modelli per provider, riempita on-demand (focus, cambio provider,
+  // «Aggiorna lista»). `null` = non ancora caricata; `[]` = caricata ma vuota o in errore.
   const providerModelCache = { openrouter: null };
 
   function $(id) { return document.getElementById(id); }
 
-  // Id della datalist (combobox) associata a un provider.
   function datalistIdFor(provider) {
     return `models-list-${provider}`;
   }
 
-  // Sorgente delle opzioni per il dropdown custom del campo "stringa modello":
-  // le <datalist> per-provider (popolate da populateDatalist) restano l'unica
-  // sorgente di verità, il combobox le legge senza duplicarle. value = id del
-  // modello, label = categoria (Testo / Immagini / …).
+  // Le <datalist> per-provider sono l'unica sorgente di verità: value = id, label = categoria.
   function readProviderOptions(provider) {
     const dl = $(datalistIdFor(provider));
     if (!dl) return [];
@@ -56,6 +49,9 @@
     $('openWeightsOnly-desc').textContent = I18n.t('options_open_weights_only_desc');
     $('ownKeyAllProviders-label').textContent = I18n.t('options_own_key_all_providers');
     $('ownKeyAllProviders-desc').textContent = I18n.t('options_own_key_all_providers_desc');
+    $('ordineHost-label').textContent = I18n.t('options_host_order');
+    $('ordineHost-desc').textContent = I18n.t('options_host_order_desc');
+    riempiOrdineHost();
     $('h-provider').textContent = I18n.t('options_keys');
     $('h-models').textContent = I18n.t('options_models');
     $('h-costs').textContent = I18n.t('options_costs');
@@ -78,11 +74,8 @@
     renderModelUsage();
   }
 
-  // Elenco (sola lettura) degli ALTRI punti in cui Filo usa un modello: quelli
-  // che girano sui suoi server (li imposta chi gestisce Filo) e quelli che un
-  // modello non lo usano affatto. Le funzioni impostabili da qui sono già la
-  // griglia qui sopra — ripeterle renderebbe la pagina più piena, non più
-  // chiara. Sorgente: il censimento condiviso, lo stesso da cui esce la griglia.
+  // Gli ALTRI punti in cui Filo usa un modello, in sola lettura: le funzioni impostabili da qui
+  // sono già la griglia sopra. Fonte: il censimento condiviso.
   function renderModelUsage() {
     const host = $('modelUsageList');
     const Usage = window.SN_MODEL_USAGE;
@@ -126,10 +119,6 @@
     }
   }
 
-  // Quando "usa modelli predefiniti" è ON, nasconde le sezioni di config
-  // avanzata (provider/chiavi, registry, modelli per azione): l'utente usa i
-  // default condivisi senza dover toccare nulla. OFF = mostra tutto.
-  // Mostra/nasconde anche la lista read-only dei modelli predefiniti.
   function applyDefaultModelsVisibility() {
     const useDefault = $('useDefaultModels').checked;
     for (const el of document.querySelectorAll('.sn-advanced-models')) {
@@ -138,14 +127,8 @@
     $('defaultModelsList').hidden = !useDefault;
   }
 
-  // ── "Solo modelli a pesi aperti": cosa cambia davvero ─────────────────────
-  // Un interruttore che promette e basta non si può verificare. Appena acceso
-  // qui sotto compare quante funzioni cambiano modello (e su quali finiscono) e
-  // QUALI si fermano perché un equivalente a pesi aperti non esiste — spegnerlo
-  // rimette tutto com'era, quindi la conseguenza si legge sul posto invece di
-  // scoprirla usando l'app.
-  // Sorgente: la configurazione che l'app userà DAVVERO (quella condivisa se
-  // "usa modelli predefiniti" è attivo, la personale altrimenti).
+  // Un interruttore che promette e basta non si può verificare: acceso, qui sotto compare
+  // quante funzioni cambiano modello, su quali finiscono e quali si fermano.
 
   // Ultima configurazione predefinita letta dal main ({ models, modelRegistry }).
   let defaultModelsPublic = null;
@@ -170,15 +153,14 @@
   // centimetri più su.
   function markTestBlocked(btn, blocked) {
     if (!btn) return;
-    btn.disabled = blocked;
+    // Una prova in corso resta spenta: il cancello gira a ogni modifica della pagina e la riaccendeva a metà.
+    btn.disabled = blocked || btn.dataset.inCorso === '1';
     if (blocked) btn.title = I18n.t('options_open_weights_test_blocked');
     else btn.removeAttribute('title');
   }
 
-  // `entry` è la voce intera quando c'è (la lista dei predefiniti la conosce),
-  // altrimenti fornitore + stringa del modello: è tutto ciò che una riga scritta
-  // a mano contiene. Stessa classificazione del main, così il bottone spento e
-  // la richiesta rifiutata dicono la stessa cosa.
+  // `entry` è la voce intera quando c'è, altrimenti fornitore più stringa: tutto ciò che una
+  // riga scritta a mano contiene. Stessa classificazione del main, o i due direbbero cose diverse.
   function openWeightsBlocks(entry) {
     if (!$('openWeightsOnly').checked) return false;
     const C = window.SN_CONST;
@@ -186,12 +168,8 @@
     return C.openWeightsBlockKind(true, entry) !== '';
   }
 
-  // Tutti i pulsanti "Prova" della pagina, in un posto solo: le chiavi dei
-  // fornitori, le righe dei modelli predefiniti e le righe del registry
-  // personale. Sono cammini diversi verso la stessa cosa (una chiamata al
-  // modello), quindi la regola dev'essere una sola.
-  // Stato dell'interruttore all'ultimo giro, per riconoscere la transizione
-  // acceso→spento (vedi in fondo a applyOpenWeightsTestGates).
+  // Tutti i «Prova» della pagina in un posto solo: sono cammini diversi verso la stessa
+  // chiamata, quindi la regola dev'essere una sola.
   let openWeightsWasOn = null;
 
   function applyOpenWeightsTestGates() {
@@ -210,11 +188,8 @@
       markTestBlocked(btn, openWeightsBlocks({ provider: prov.value, model: id.value.trim() }));
     }
 
-    // Spegnendo l'interruttore il catalogo che era stato saltato torna a
-    // caricarsi da solo: se accenderlo lo ferma, spegnerlo deve rimetterlo, o
-    // resterebbe muto fino a un ricaricamento della pagina. Solo sulla
-    // TRANSIZIONE acceso→spento: questa funzione gira a ogni `change` della
-    // pagina, e un catalogo che non risponde verrebbe richiesto all'infinito.
+    // Spegnendo l'interruttore il catalogo saltato torna a caricarsi da solo, o resterebbe muto
+    // fino a un ricaricamento. Solo sulla TRANSIZIONE, o verrebbe richiesto all'infinito.
     const eraAcceso = openWeightsWasOn;
     openWeightsWasOn = on;
     if (eraAcceso === true && !on) ensureProviderModels('openrouter');
@@ -237,10 +212,8 @@
     const impact = C.openWeightsImpact(models, modelRegistry);
     const lines = [];
     if (impact.substituted.length) {
-      // Le funzioni che cambiano modello sono decine: elencarle una per una
-      // sarebbe un muro di testo che nessuno legge. Quello che serve sapere è
-      // quante sono e su quali modelli finiscono; l'elenco per funzione è già
-      // la griglia dei modelli qui sotto.
+      // Le funzioni sono decine: serve quante sono e su quali finiscono, l'elenco per funzione è
+      // già la griglia qui sotto.
       const modelli = [...new Set(impact.substituted.map((s) => s.to))];
       lines.push(I18n.t('options_open_weights_switched', String(impact.substituted.length), modelli.join(', ')));
     }
@@ -258,10 +231,23 @@
     host.hidden = false;
   }
 
-  // ── Lista read-only dei modelli predefiniti con tasto "Prova" ─────────────
-  // Quando useDefaultModels è ON, mostra i modelli del registry predefinito
-  // (costanti o override Firestore) con un pulsante "Prova" che testa il
-  // modello usando le chiavi effettive (le predefinite, non quelle dell'utente).
+  // Lista read-only dei predefiniti quando useDefaultModels è ON: il «Prova» testa il modello
+  // con le chiavi effettive, quelle predefinite e non quelle dell'utente.
+
+  // Le misure dei modelli predefiniti si salvano da sole: la lista è in sola
+  // lettura e non passa dal salvataggio della pagina, che le azzererebbe quando
+  // la lista non è renderizzata.
+  let defaultModelTests = {};
+
+  async function saveDefaultModelTest(nickname, esito) {
+    defaultModelTests = { ...defaultModelTests, [nickname]: esito };
+    try {
+      await chrome.runtime.sendMessage({
+        type: MSG.UPDATE_SETTINGS,
+        settings: { defaultModelTests },
+      });
+    } catch (_) {}
+  }
 
   async function loadDefaultModels() {
     let registry = {};
@@ -270,12 +256,37 @@
       if (r && r.ok && r.modelRegistry) {
         registry = r.modelRegistry;
         defaultModelsPublic = { models: r.models || {}, modelRegistry: registry };
+        sceltaGeneraleHost = r.providerSort || '';
       }
     } catch (_) {}
     renderDefaultModels(registry);
-    // L'effetto dell'interruttore si calcola sulla config VERA: ora che è
-    // arrivata, ricalcolalo.
+    // L'effetto si calcola sulla config VERA: ora che è arrivata, ricalcolalo.
     renderOpenWeightsImpact();
+    // La scelta generale è arrivata adesso: le righe disegnate prima hanno
+    // giudicato la loro misura senza sapere a cosa rimandava «Automatico».
+    rinfrescaMisure();
+  }
+
+  // «Lo sceglie Filo» al posto di «Automatico»: qui non c'è una scelta generale più in alto a cui rimandare.
+  function riempiOrdineHost() {
+    const sel = $('ordineHost');
+    sel.innerHTML = '';
+    for (const val of window.SN_CONST.PROVIDER_SORTS) {
+      const opt = document.createElement('option');
+      opt.value = val === 'auto' ? '' : val;
+      opt.textContent = I18n.t(val === 'auto' ? 'options_host_order_filo' : 'provider_sort_' + val);
+      sel.appendChild(opt);
+    }
+  }
+
+  // Una riga chiama con l'ordinamento suo, o con quello generale se resta su
+  // «Automatico»: è quello a cui una misura deve corrispondere per valere.
+  let sceltaGeneraleHost = '';
+
+  function rinfrescaMisure() {
+    for (const row of document.querySelectorAll('.sn-model-row')) {
+      if (row.querySelector('.sn-model-row-status')) renderRowTest(row);
+    }
   }
 
   function renderDefaultModels(registry) {
@@ -305,9 +316,8 @@
     const row = document.createElement('div');
     row.className = 'sn-model-row sn-default-model-row';
     const single = entryToSingle(entry);
-    // La voce INTERA sulla riga (non solo fornitore e stringa): il cancello dei
-    // "Prova" la classifica come fa il main, dove una `weights` scritta a mano
-    // dall'owner conta.
+    // La voce INTERA sulla riga, non solo fornitore e stringa: il cancello dei «Prova» la
+    // classifica come fa il main, dove una `weights` scritta a mano dall'owner conta.
     row._entry = { ...(entry || {}), provider: single.provider, model: single.model };
 
     const nickEl = document.createElement('div');
@@ -336,6 +346,8 @@
     row.appendChild(modelEl);
     row.appendChild(testBtn);
     row.appendChild(status);
+    row._test = defaultModelTests[nick] || null;
+    renderRowTest(row);
     return row;
   }
 
@@ -343,22 +355,32 @@
     const statusEl = row.querySelector('.sn-model-row-status');
     statusEl.textContent = I18n.t('options_test_running');
     btn.disabled = true;
+    btn.dataset.inCorso = '1';
+    // Fissata al clic e mandata con la richiesta: la tendina cambiata mentre la prova gira non si prende i suoi numeri.
+    const conf = configurazioneRiga(row);
     try {
       const res = await chrome.runtime.sendMessage({
         type: MSG.TEST_DEFAULT_MODEL,
         nickname,
+        sort: conf.sort || '',
       });
       if (!res?.ok) {
         statusEl.textContent = I18n.t('options_test_failed', res?.error || '—');
       } else {
-        statusEl.textContent = I18n.t('options_test_result', res.ttftMs ?? '—', res.tokensPerSec ?? '—');
+        row._test = {
+          ttftMs: res.ttftMs ?? null,
+          tokensPerSec: res.tokensPerSec ?? null,
+          at: new Date().toISOString(),
+          ...conf,
+        };
+        renderRowTest(row);
+        saveDefaultModelTest(nickname, row._test);
       }
     } catch (e) {
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
+      delete btn.dataset.inCorso;
       btn.disabled = false;
-      // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
-      // rimetterebbe premibile un "Prova" che la politica tiene spento.
       applyOpenWeightsTestGates();
     }
   }
@@ -374,12 +396,14 @@
     $('openWeightsOnly').checked = settings.openWeightsOnly === true;
     $('ownKeyAllProviders').checked = settings.ownKeyAllProviders === true;
     mostraChiavePropria(settings);
+    $('ordineHost').value = window.SN_CONST.normalizeProviderSort(settings.ordineHost) || '';
     // Lista read-only dei modelli predefiniti. Deve mostrare i modelli che l'app
     // userà DAVVERO: li chiediamo al main (config condivisa + eventuali
     // modifiche dell'owner). Se la richiesta non riesce la lista resta vuota
     // invece di mostrare i modelli scritti nel codice: un elenco inventato è
     // peggio di nessun elenco, perché non corrisponde a ciò che gira.
     applyDefaultModelsVisibility();
+    defaultModelTests = settings.defaultModelTests || {};
     loadDefaultModels();
     $('apiKey').value = settings.apiKeys?.openrouter || '';
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';
@@ -388,14 +412,10 @@
     chiaveDelleStime = settings.apiKeys?.openrouter || '';
     caricaStime();
 
-    // Registry modelli PRIMA dell'editor a segmenti: le righe del registry sono
-    // la sorgente dei nickname, e l'editor le legge già al primo render per
-    // segnalare i modelli citati ma inesistenti. Renderizzarlo dopo avrebbe
-    // fatto apparire l'avviso su TUTTI i segmenti (registry ancora vuoto).
-    // Popola anche la datalist dei nickname usata dai segmenti.
+    // Registry PRIMA dell'editor a segmenti: le righe sono la sorgente dei nickname, e senza
+    // l'avviso «modello inesistente» apparirebbe su TUTTI i segmenti.
     renderModelRegistry(settings.modelRegistry || {});
 
-    // Editor a segmenti "Modelli per azione": una catena di fallback per azione.
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: settings.models || {},
       // Mentre si scrive in un segmento basta l'`input` che sale alla pagina; una scelta dalla tendina, un segmento
@@ -408,30 +428,22 @@
       costoDi: costoModello,
     });
 
-    // Costi
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.GET_COSTS });
       const eur = r?.monthly?.totalEur || 0;
       $('spentBox').textContent = `€${eur.toFixed(4)}`;
     } catch (_) {}
 
-    // Combobox modelli: prima semina con gli id già nel registry (così il valore
-    // corrente compare subito), poi prova a caricare il catalogo completo di
-    // ciascun provider in background (non blocca il render).
+    // Il valore corrente compare subito; i cataloghi completi arrivano in background.
     seedDatalistsFromRegistry(settings.modelRegistry || {});
     ensureProviderModels('openrouter');
 
-    // Con la config personale l'effetto è calcolabile subito (griglia e registry
-    // sono già renderizzati); con quella condivisa lo ricalcola loadDefaultModels
-    // appena il main risponde.
+    // Con la config condivisa l'effetto lo ricalcola loadDefaultModels quando il main risponde.
     renderOpenWeightsImpact();
   }
 
-  // Normalizza una entry del registry (nuovo schema o vecchio duale) in
-  // { provider, model }. Per le vecchie entry duali sceglie un solo provider
-  // (OpenRouter): al primo salvataggio diventerà
-  // single-provider e l'utente potrà aggiungere il gemello sull'altro provider
-  // come riga separata se vuole il fallback.
+  // Entry duali: si tiene un solo provider e al primo salvataggio diventano single-provider;
+  // il gemello si aggiunge come riga separata se serve il fallback.
   function entryToSingle(entry) {
     const e = entry || {};
     if (e.provider && e.model) return { provider: e.provider, model: e.model };
@@ -439,9 +451,7 @@
     return { provider: 'openrouter', model: '' };
   }
 
-  // Normalizza i risultati di test (nuovo schema flat { ttftMs, tokensPerSec }
-  // o vecchio per-provider { openrouter:{...}, gemini:{...} }) nel formato flat,
-  // scegliendo il sotto-oggetto del provider attivo per le vecchie entry.
+  // Normalizza i risultati di test (flat o per-provider) in flat, col provider attivo.
   function normalizeTest(entry, single) {
     const t = entry && entry.test;
     if (!t || typeof t !== 'object') return null;
@@ -463,7 +473,6 @@
     }
   }
 
-  // Formatta un risultato di test salvato (latenza + token/sec) per la riga.
   function formatTestResult(t) {
     if (!t) return '';
     const ttft = t.ttftMs != null ? t.ttftMs : '—';
@@ -471,13 +480,45 @@
     return I18n.t('options_test_result', ttft, tps);
   }
 
+  // Con che modello, ragionamento e ordinamento degli host la riga chiamerebbe
+  // adesso: è la configurazione a cui una misura deve corrispondere per valere.
+  // La scelta personale vince sull'ordinamento delle voci predefinite, non su quello che l'utente dà alle sue.
+  function sortDellaRiga(row, entrySort) {
+    const C = window.SN_CONST;
+    const personale = $('ordineHost') ? $('ordineHost').value : '';
+    return row.classList.contains('sn-default-model-row')
+      ? C.ordinamentoPerUtente(personale, entrySort, sceltaGeneraleHost)
+      : C.ordinamentoEffettivo(entrySort, C.normalizeProviderSort(personale) || sceltaGeneraleHost);
+  }
+
+  function configurazioneRiga(row) {
+    const campo = row.querySelector('.sn-model-id');
+    const e = row._entry || {};
+    return {
+      model: campo ? campo.value.trim() : (e.model || ''),
+      reasoning: e.reasoning,
+      sort: sortDellaRiga(row, e.sort),
+    };
+  }
+
+  // Giorno della misura, ma solo se non è oggi: numeri di settimane fa messi
+  // accanto a quelli appena presi si leggerebbero allo stesso modo.
+  function giornoMisura(at) {
+    const d = at ? new Date(at) : null;
+    if (!d || Number.isNaN(d.getTime())) return '';
+    if (d.toDateString() === new Date().toDateString()) return '';
+    return ` · ${d.toLocaleDateString()}`;
+  }
+
   // Mostra nel div di stato della riga il risultato di test memorizzato
   // (latenza + token/sec), così la misura resta visibile tra le sessioni.
   function renderRowTest(row) {
     const statusEl = row.querySelector('.sn-model-row-status');
     if (!statusEl) return;
-    const hasResult = row._test && (row._test.ttftMs != null || row._test.tokensPerSec != null);
-    statusEl.textContent = hasResult ? formatTestResult(row._test) : I18n.t('options_model_untested');
+    const vale = window.SN_CONST.misuraValePer(row._test, configurazioneRiga(row));
+    statusEl.textContent = vale
+      ? formatTestResult(row._test) + giornoMisura(row._test.at)
+      : I18n.t('options_model_untested');
   }
 
   function makeModelRow(nick, entry) {
@@ -485,11 +526,9 @@
     row.className = 'sn-model-row';
     row.dataset.originalNick = nick || '';
     const single = entryToSingle(entry);
-    // Etichetta descrittiva preservata "in silenzio" (non ha più una colonna
-    // dedicata, ma serve come hint nella datalist dei nickname per-azione).
+    // L'etichetta non ha una colonna, ma serve come hint nella datalist: si preserva.
     row.dataset.label = (entry && entry.label) || '';
-    // La voce intera resta appesa alla riga: ciò che la riga non modifica
-    // (pesi aperti, cosa sa masticare, esito della prova) sopravvive al salvataggio.
+    // Ciò che la riga non modifica sopravvive al salvataggio: la voce intera resta appesa.
     row._entry = { ...(entry || {}) };
     // Risultato di test persistito (flat): { ttftMs, tokensPerSec, at }.
     row._test = normalizeTest(entry, single);
@@ -510,11 +549,8 @@
     });
     provSel.value = single.provider;
 
-    // Stringa concreta per chiamare il modello presso il provider scelto.
-    // Il campo è un combobox custom (stile Filo, non il popup nativo della
-    // datalist): elenca i modelli del provider scelto, si filtra digitando, e
-    // resta libero di accettare un id non in lista. Il wrapper è position:relative
-    // perché il popup .sn-select-pop si ancora lì sotto.
+    // Combobox custom (non il popup nativo): filtra digitando e accetta un id fuori lista.
+    // Il wrapper è position:relative perché .sn-select-pop si ancora lì.
     const idWrap = document.createElement('div');
     idWrap.className = 'sn-model-id-wrap';
     const idIn = document.createElement('input');
@@ -524,8 +560,10 @@
     idIn.value = single.model;
     idIn.className = 'sn-model-id';
     idWrap.appendChild(idIn);
-    // Carica la lista del provider la prima volta che l'utente apre il campo.
     idIn.addEventListener('focus', () => ensureProviderModels(provSel.value));
+    // Riscritto il modello, la misura di prima non riguarda più questa riga:
+    // sparisce mentre si scrive, non al ricaricamento.
+    idIn.addEventListener('input', () => renderRowTest(row));
     if (window.SN_COMBOBOX) {
       window.SN_COMBOBOX.attach(idWrap, idIn, {
         readOptions: () => readProviderOptions(provSel.value),
@@ -533,7 +571,6 @@
       });
     }
 
-    // Cambiando provider, il combobox legge l'altra lista (e la carica).
     provSel.addEventListener('change', () => {
       ensureProviderModels(provSel.value);
     });
@@ -541,9 +578,8 @@
     const status = document.createElement('div');
     status.className = 'sn-model-row-status';
 
-    // Messaggio non bloccante per righe scartate dal salvataggio (nickname
-    // mancante o duplicato, #216): a tutta larghezza sotto la riga, popolato/
-    // svuotato da markRegistryRowIssues() dopo ogni save().
+    // Righe scartate dal salvataggio (nickname mancante o duplicato, #216): messaggio non
+    // bloccante, popolato da markRegistryRowIssues() dopo ogni save().
     const msg = document.createElement('div');
     msg.className = 'sn-model-row-msg';
 
@@ -559,8 +595,6 @@
     del.textContent = I18n.t('options_model_remove');
     del.addEventListener('click', () => { row.remove(); save(); });
 
-    // Ordine richiesto: nickname · provider · stringa · Rimuovi · Prova, con i
-    // dati del test (latenza/token-sec) nella riga a tutta larghezza sotto.
     row.appendChild(nickIn);
     row.appendChild(provSel);
     row.appendChild(idWrap);
@@ -590,7 +624,6 @@
 
     const entries = Object.entries(registry || {});
     if (!entries.length) {
-      // Editor vuoto: una riga vuota per iniziare.
       host.appendChild(makeModelRow('', {}));
     } else {
       for (const [nick, e] of entries) {
@@ -657,11 +690,12 @@
       if (label) entry.label = label;
       // Preserva il risultato di test misurato (latenza/token-sec) tra i salvataggi.
       if (row._test && Object.keys(row._test).length) entry.test = row._test;
-      // E ciò che la riga non modifica ma la voce dichiara (pesi aperti,
-      // cosa sa masticare): senza, un salvataggio dalle Opzioni lo perderebbe.
-      for (const k of ['weights', 'inputs', 'outputs']) {
+      // E ciò che la riga non modifica: ordinamento e ragionamento sempre, ciò che la voce dichiara del modello (pesi
+      // aperti, cosa sa masticare) solo se il modello è ancora quello.
+      for (const k of ['reasoning', 'sort']) {
         if (row._entry && row._entry[k] != null) entry[k] = row._entry[k];
       }
+      Object.assign(entry, window.SN_CONST.dichiarazioniPerModello(row._entry, model));
       out[nick] = entry;
     }
     return { registry: out, dups, missingNick, missingNickRows, dupRows };
@@ -704,27 +738,38 @@
       statusEl.textContent = I18n.t('options_model_no_id');
       return;
     }
+    // Senza una chiave scritta qui la prova usa quella con cui la funzione pagherebbe, i crediti di Filo (#830).
     const apiKey = providerKey(providerId);
-    if (!apiKey) { statusEl.textContent = I18n.t('options_test_no_key'); return; }
     statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
+    btn.dataset.inCorso = '1';
+    // Come per le righe predefinite: la prova chiama, e la misura si attribuisce, con la configurazione del clic.
+    const conf = configurazioneRiga(row);
     try {
       // L'id del registry va passato così com'è: stesso percorso dell'uso reale.
       const res = await chrome.runtime.sendMessage({
         type: MSG.TEST_PROVIDER,
         provider: providerId,
         apiKey,
+        ...(apiKey ? {} : { chiaveDellUso: true }),
         model: modelId,
+        sort: conf.sort || '',
+        reasoning: conf.reasoning || '',
       });
-      if (!res?.ok) {
+      if (!res?.ok && res?.code === 'NO_API_KEY') {
+        statusEl.textContent = I18n.t('options_test_no_key');
+      } else if (!res?.ok) {
         statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
       } else {
         // Salva il risultato (latenza + token/sec) nella riga e persistilo nel
         // registry, così resta visibile e confrontabile tra le sessioni.
+        // Con la misura si scrive su COSA è stata presa: senza, cambiando
+        // modello quei numeri resterebbero a parlare di un altro.
         row._test = {
           ttftMs: res.ttftMs ?? null,
           tokensPerSec: res.tokensPerSec ?? null,
           at: new Date().toISOString(),
+          ...conf,
         };
         renderRowTest(row);
         save();
@@ -732,17 +777,14 @@
     } catch (e) {
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
+      delete btn.dataset.inCorso;
       btn.disabled = false;
-      // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
-      // rimetterebbe premibile un "Prova" che la politica tiene spento.
       applyOpenWeightsTestGates();
     }
   }
 
-  // Popola la datalist di un provider. `items` può essere una lista di stringhe
-  // (solo id) o di { id, meta } (meta = oggetto grezzo dell'API, per categoria e
-  // data). I modelli sono ordinati col più recente in cima ed etichettati per
-  // categoria (Testo / Sintesi vocale / Immagini / Embedding…) via option.label.
+  // `items`: lista di id o di { id, meta } (meta = oggetto grezzo dell'API), già ordinati col
+  // più recente in cima ed etichettati per categoria.
   function populateDatalist(provider, items) {
     const dl = $(datalistIdFor(provider));
     if (!dl) return;
@@ -764,10 +806,7 @@
     if (window.SN_COMBOBOX) window.SN_COMBOBOX.opzioniArrivate();
   }
 
-  // Semina i combobox con gli id già presenti nel registry (divisi per provider)
-  // così, anche prima di interrogare l'API, il valore corrente di ogni riga
-  // compare nella tendina. L'eventuale fetch successivo lo rimpiazza col catalogo
-  // completo del provider.
+  // Il valore corrente compare anche prima di interrogare l'API; il fetch lo rimpiazza.
   function seedDatalistsFromRegistry(registry) {
     const byProv = { openrouter: [] };
     for (const nick of Object.keys(registry || {})) {
@@ -777,12 +816,8 @@
     populateDatalist('openrouter', byProv.openrouter);
   }
 
-  // Il catalogo OpenRouter è PUBBLICO: la chiave non serve per elencarlo (è
-  // solo metadati, niente inferenza → gratis). La passiamo se c'è, ma funziona
-  // anche senza, così le categorie sono precise da subito.
-  // Il catalogo "semplice" del router elenca solo i modelli di testo: voce,
-  // dettatura e indicizzazione stanno in liste a parte, per modalità. Si
-  // chiedono tutte, così la tendina ha anche quei mestieri con le etichette giuste.
+  // Il catalogo OpenRouter è PUBBLICO: la chiave non serve (metadati, niente inferenza). Il
+  // catalogo «semplice» elenca i soli modelli di testo: le altre modalità si chiedono a parte.
   const OR_CATALOG_QUERIES = ['', '?output_modalities=speech', '?output_modalities=transcription', '?output_modalities=embeddings'];
   async function fetchOpenRouterModels(key) {
     const headers = key ? { Authorization: `Bearer ${key}` } : {};
@@ -792,12 +827,13 @@
       const data = await res.json();
       return (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
     }));
+    // Gli avvisi di questa pagina riconoscono i pesi aperti come il main, che legge lo stesso catalogo.
+    try { window.SN_CONST.registraCatalogoPesi(lists.flat().map((it) => it.meta)); } catch (_) {}
     return lists.flat();
   }
 
-  // Gli id del registro che il catalogo non conosce (modelli nuovi, o scritti a
-  // mano) restano nella tendina: toglierli farebbe sparire dalla lista proprio
-  // il modello che la riga usa.
+  // Gli id che il catalogo non conosce restano in tendina: toglierli farebbe sparire quello
+  // in uso.
   function withRegistryIds(provider, catalog) {
     const known = new Set(catalog.map((it) => it.id));
     const extra = [];
@@ -818,12 +854,8 @@
     return provider === 'openrouter' ? $('apiKey').value.trim() : '';
   }
 
-  // Il catalogo è "solo metadati", ma resta una richiesta MANDATA al fornitore
-  // con la tua chiave — e questa pagina la faceva da sola al caricamento. Con
-  // «Solo modelli a pesi aperti» acceso l'API diretta di chi produce i modelli
-  // era l'ultima cosa che partiva verso un escluso da qui: sta spenta come il
-  // suo «Prova», altrimenti la pagina dove si accende l'interruttore sarebbe
-  // anche l'unica che continua a parlarci.
+  // Il catalogo è «solo metadati», ma resta una richiesta mandata al fornitore con la tua
+  // chiave: con «Solo modelli a pesi aperti» acceso sta spenta come il suo «Prova».
   function catalogBlocked(provider) {
     if (!$('openWeightsOnly').checked) return false;
     const C = window.SN_CONST;
@@ -831,10 +863,7 @@
     return diretti.includes(provider);
   }
 
-  // Carica (una sola volta) il catalogo di un provider nel suo combobox, così
-  // ogni modello è subito etichettato per categoria. È solo metadati (gratis):
-  //  - OpenRouter: catalogo pubblico → si carica SEMPRE, anche senza chiave.
-  // Silenzioso: in caso di errore il campo resta un input libero.
+  // Una volta sola, e senza chiave per OpenRouter; in errore il campo resta un input libero.
   async function ensureProviderModels(provider) {
     if (providerModelCache[provider]) return;
     if (catalogBlocked(provider)) return;
@@ -866,24 +895,20 @@
 
   // Con `avvisi: false` (mentre si scrive) le righe scartate non si dicono ancora.
   async function save(opts) {
-    caselle.spedita('pagina');
+    const biglietto = caselle.spedita('pagina');
     const avvisi = !(opts && opts.avvisi === false);
     const apiKey = $('apiKey').value.trim();
     const apiKeyTavily = $('apiKeyTavily').value.trim();
 
-    // Auto-save: persistiamo solo le righe valide. Le righe incomplete
-    // (nickname mancante) o duplicate vengono ignorate finché non sono
-    // complete — niente alert bloccanti che interromperebbero la digitazione,
-    // dato che non c'è più un pulsante "Salva" esplicito. Vengono però
-    // evidenziate sul posto e la conferma sotto NON dice più "Salvato" senza
-    // qualificarlo, altrimenti l'utente crede (a torto, #216) che sia stato
-    // salvato tutto.
+    // Si salvano le sole righe valide: le incomplete restano ignorate — niente alert mentre si
+    // digita — ma evidenziate, e la conferma non dice «Salvato» secco.
     const { registry, missingNickRows, dupRows } = collectModelRegistry();
 
     const partial = {
       useDefaultModels: $('useDefaultModels').checked,
       openWeightsOnly: $('openWeightsOnly').checked,
       ownKeyAllProviders: $('ownKeyAllProviders').checked,
+      ordineHost: $('ordineHost').value,
       apiKeys: { openrouter: apiKey, tavily: apiKeyTavily },
       modelRegistry: registry,
       models: ModelChain.collect(modelChains),
@@ -899,9 +924,11 @@
     // La chiave messa o tolta qui decide crediti o dollari accanto ai modelli.
     if (apiKey !== chiaveDelleStime) { chiaveDelleStime = apiKey; caricaStime(); }
 
-    // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);
     markRegistryRowIssues(missingNickRows, dupRows, !avvisi);
+
+    // Arrivata un'altra modifica mentre questa viaggiava, la conferma la scrive il salvataggio che chiude la fila.
+    if (!caselle.aggiornata('pagina', biglietto)) return;
 
     const hasDiscarded = (missingNickRows && missingNickRows.length) || (dupRows && dupRows.length);
     if (hasDiscarded && !avvisi) return;
@@ -932,8 +959,6 @@
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
       btn.disabled = false;
-      // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
-      // rimetterebbe premibile un "Prova" che la politica tiene spento.
       applyOpenWeightsTestGates();
     }
   }
@@ -946,6 +971,7 @@
       const { missingNickRows, dupRows } = collectModelRegistry();
       markRegistryRowIssues(missingNickRows, dupRows);
     },
+    spegni: () => $('savedHint').classList.remove('sn-show'),
   });
   caselle.registra('pagina', (avvisi) => save({ avvisi }));
   const CASELLA = /^(text|password|number|search|url|email)$/;
@@ -971,6 +997,7 @@
       // Una chiave messa o tolta cambia crediti e dollari; la soglia cambia gli avvisi.
       if (toccati.includes('apiKey') || toccati.includes('useDefaultModels')) caricaStime();
       else if (toccati.includes('costWarnRatio')) ModelChain.aggiornaCosti(modelChains || {});
+      if (toccati.includes('ordineHost')) rinfrescaMisure();
       // Il modello di un'azione si sceglie anche dal tasto destro di una pagina (la dettatura): senza riallineare
       // la griglia il salvataggio dopo lo rimanderebbe indietro. Si riscrive solo la catena cambiata, e non quella
       // in cui si sta scrivendo: ridisegnare tutto portava via la spiegazione del modello appena respinto (#667.7).
@@ -1010,6 +1037,8 @@
     // cambiare l'effetto di "solo pesi aperti": lo ricalcoliamo sempre.
     $('page').addEventListener('change', renderOpenWeightsImpact);
     $('useDefaultModels').addEventListener('change', applyDefaultModelsVisibility);
+    // Le misure prese con un altro ordinamento non parlano più di come chiamerebbero le righe.
+    $('ordineHost').addEventListener('change', rinfrescaMisure);
     $('loadModels').addEventListener('click', () => { loadModelsFromProvider(); caricaStime({ forza: true }); });
     $('costWarnRatio').addEventListener('input', () => ModelChain.aggiornaCosti(modelChains || {}));
     $('testOpenrouter').addEventListener('click', () => testProvider('openrouter', $('testOpenrouterStatus'), $('testOpenrouter')));
@@ -1018,7 +1047,6 @@
       // Riga nuova = "Prova" nuovo: passa dallo stesso cancello degli altri.
       applyOpenWeightsTestGates();
     });
-    // L'input dentro le righe del registry e i segmenti dei modelli (creati
-    // dinamicamente) fanno bubbling del `change` fino a #page → già coperti.
+    // Gli input creati dinamicamente fanno bubbling del `change` fino a #page: già coperti.
   });
 })();

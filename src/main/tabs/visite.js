@@ -10,6 +10,9 @@ const ATTESA_TITOLO_IN_PAGINA = 4_000;
 // attimo: nel primo mezzo minuto si scrive subito, dopo all'uscita, così un titolo che cambia di continuo non riempie il filo.
 const ASSESTAMENTO_TITOLO = 1_500;
 const FINESTRA_TITOLO = 30_000;
+// Una pagina che cambia indirizzo da sola non riempie il filo (#1525): senza un gesto dell'utente o di Filo, un cambio
+// a ridosso del precedente resta la stessa visita, e dopo una fila lunga ogni cambio fino al prossimo tocco.
+const FRENO = Object.freeze({ gesto: 5_000, raffica: 5_000, fila: 30 });
 
 const registrabile = (url) => /^(https?|file):/i.test(String(url || ''));
 const senzaFrammento = (url) => String(url || '').split('#')[0];
@@ -37,10 +40,13 @@ class VisiteSchede {
     this.scritte = new WeakMap();
     this.ultime = new WeakMap();
     this.voci = new WeakMap();
+    this.freni = new WeakMap();
   }
 
-  // Ricaricare, o cambiare solo il frammento (#sezione), non è una pagina nuova.
-  navigata(wc, scheda, url, { inPagina = false } = {}) {
+  // Ricaricare, o cambiare solo il frammento (#sezione), non è una pagina nuova. `gesto`: l'ultimo input vero sulla
+  // scheda o l'ultima navigazione chiesta a Filo (barra, indietro, preferiti), in ms. `chiave`: l'oggetto della scheda,
+  // che resta quando la sua vista si ricrea (privacy fra siti): il freno vale per la scheda, non per la vista.
+  navigata(wc, scheda, url, { inPagina = false, gesto = 0, chiave = null } = {}) {
     const voce = voceAttiva(wc);
     const vocePrima = this.voci.get(wc);
     if (voce) this.voci.set(wc, voce); else this.voci.delete(wc);
@@ -53,16 +59,50 @@ class VisiteSchede {
       if (v) v.url = url;
       return;
     }
+    const freno = this.freno(wc, gesto, inPagina, chiave);
+    // Frenata, la pagina resta quella della visita aperta: in attesa segue l'indirizzo, già scritta lo assorbe.
+    if (freno.frena) {
+      if (!registrabile(url)) return;
+      this.ultime.set(wc, url);
+      const v = this.inAttesa.get(wc);
+      if (v) v.url = url;
+      return;
+    }
     this.scrivi(wc, { titoloAttuale: false });
-    if (!registrabile(url)) { this.lascia(wc); return; }
+    if (!registrabile(url)) { this.lascia(wc); freno.f.aperta = false; return; }
     const prima = this.ultime.get(wc);
     if (prima && senzaFrammento(prima) === senzaFrammento(url)) return;
     this.lascia(wc);
     this.ultime.set(wc, url);
+    freno.f.aperta = true;
+    if (!freno.conGesto) freno.f.fila += 1;
     const v = { wc, url, scheda, ts: new Date().toISOString(), titolo: '', inPagina };
     v.timer = setTimeout(() => this.scrivi(wc), inPagina ? ATTESA_TITOLO_IN_PAGINA : TETTO_CARICAMENTO);
     if (v.timer && v.timer.unref) v.timer.unref();
     this.inAttesa.set(wc, v);
+  }
+
+  // Senza gesto frena un cambio a ridosso del precedente, o arrivato dopo `fila` visite senza gesto, purché la scheda
+  // abbia una visita aperta. Un gesto vale per la navigazione che lo segue, non per quelle che la pagina fa dopo da
+  // sola; un gesto nuovo (anche senza navigazione dietro) rimette la fila a zero. Una pagina intera a ridosso di una
+  // visita già scritta (un rinvio fatto dal sito, un accesso che passa da tre indirizzi) è una visita sua, dentro la fila:
+  // assorbita, il filo perderebbe l'indirizzo dove l'utente è arrivato.
+  freno(wc, gesto, inPagina, chiave) {
+    const ora = Date.now();
+    const k = chiave && typeof chiave === 'object' ? chiave : wc;
+    let f = this.freni.get(k);
+    if (!f) { f = { ultima: -Infinity, fila: 0, gesto: 0, aperta: false }; this.freni.set(k, f); }
+    const g = Number(gesto) || 0;
+    if (g > f.gesto) { f.gesto = g; f.fila = 0; }
+    const conGesto = g > 0 && ora - g <= FRENO.gesto && g >= f.ultima;
+    const prima = f.ultima;
+    f.ultima = ora;
+    const inAttesa = this.inAttesa.has(wc);
+    // La visita della vista di prima resta aperta per la scheda: una vista ricreata non riapre il conto.
+    const aperta = inAttesa || this.scritte.has(wc) || f.aperta;
+    const raffica = ora - prima < FRENO.raffica && (inPagina || inAttesa);
+    const frena = !conGesto && aperta && (raffica || f.fila >= FRENO.fila);
+    return { frena, conGesto, f };
   }
 
   // Una scheda ripristinata dalla sessione di prima non è una visita: la sua pagina il filo l'ha già.

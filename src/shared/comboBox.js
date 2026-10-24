@@ -1,16 +1,6 @@
-// Combobox custom in stile Filo: input editabile + dropdown tematizzato, al
-// posto del popup NATIVO della <datalist> (che usa i colori di sistema, fuori
-// palette). Riusa le classi .sn-select-pop / .sn-select-option (theme.css) così
-// ogni menu a tendina di Filo si vede e si comporta allo stesso modo.
-//
-// PERCHÉ ESISTE
-//   Nasce estraendo la logica che viveva in modelChainEditor.js (dropdown dei
-//   nickname per-azione): lo stesso comportamento serviva anche al campo
-//   "stringa modello" del registry (Opzioni), che invece usava ancora la
-//   <datalist> nativa — incoerente con il resto. Un'unica sorgente evita due
-//   dropdown che divergono.
-//
-// Convenzione IIFE su globalThis come gli altri moduli shared/*.
+// Combobox in stile Filo al posto del popup nativo della <datalist>, che usa i colori di
+// sistema e cade fuori palette.
+// Riusa .sn-select-pop di theme.css: una sorgente sola invece di due tendine che divergono.
 
 (function (global) {
   'use strict';
@@ -47,8 +37,7 @@
 
     let optionEls = [];
     let hoverEl = null;
-    // Filtro applicato alla lista: vuoto = mostra tutto. Si popola solo quando
-    // l'utente DIGITA (non al semplice focus), così aprendo un campo già
+    // Il filtro si popola solo quando l'utente DIGITA, non al focus: aprendo un campo già
     // compilato si vedono comunque tutte le opzioni per cambiarlo.
     let filterText = '';
 
@@ -127,10 +116,35 @@
       return optionEls.length;
     }
 
+    // La ricerca fra i modelli, per i contatori (#1461): conta da quando si scrive o si sceglie, mai il testo scritto.
+    let ricerca = null;
+    const contaRicerca = (ev) => {
+      try {
+        const M = global.SN_MSG && global.SN_MSG.MSG;
+        const r = M && global.chrome && global.chrome.runtime
+          ? global.chrome.runtime.sendMessage({ type: M.CONTATORI_EVENTO, misura: 'ricerca', pannello: 'modello', ...ev }) : null;
+        if (r && typeof r.catch === 'function') r.catch(() => {});
+      } catch (_) {}
+    };
+    const iniziaRicerca = () => {
+      if (!ricerca || ricerca.iniziata) return;
+      ricerca.iniziata = true;
+      contaRicerca({ esito: 'aperta' });
+    };
+
     function pick(value) {
       if (validate) { const v = validate(value); if (!v.ok) return; }
+      if (ricerca) {
+        iniziaRicerca();
+        const i = optionEls.findIndex((el) => el.dataset.value === value);
+        contaRicerca({ esito: 'scelta', attesaMs: Date.now() - ricerca.t0, posizione: i >= 0 ? i + 1 : null });
+        ricerca.scelto = true;
+      }
       input.value = value;
       fit();
+      // Scegliere dalla tendina è scrivere: senza questo evento chi ascolta il
+      // campo (una misura che vale per quel modello) non si accorge del cambio.
+      try { input.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
       onPick(value);
       close();
       input.focus();
@@ -154,9 +168,12 @@
       host.classList.add('sn-combo-open');
       const sel = optionEls.find((el) => el.classList.contains('sn-selected'));
       setHover(sel || optionEls[0] || null);
+      if (!ricerca) ricerca = { t0: Date.now(), iniziata: false, scelto: false };
     }
     function close() {
       if (pop.hidden) return;
+      if (ricerca && ricerca.iniziata && !ricerca.scelto) contaRicerca({ esito: 'vuota' });
+      ricerca = null;
       pop.hidden = true;
       host.classList.remove('sn-combo-open');
       if (hoverEl) hoverEl.classList.remove('sn-hover');
@@ -177,6 +194,7 @@
     input.addEventListener('input', () => {
       filterText = input.value || '';
       if (pop.hidden) open(); else build();
+      iniziaRicerca();
     });
     input.addEventListener('keydown', (e) => {
       if (pop.hidden) {

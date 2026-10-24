@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { nelMondoDiFilo } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>Pagina ostile</title></head>
 <body style="margin:0;height:100vh;font:16px sans-serif"><p id="t" style="margin:120px 40px;font-size:28px">Un testo da trascrivere</p></body></html>`;
@@ -20,11 +21,11 @@ const premeDaSola = (page, sel) => page.evaluate((s) => {
 
 async function voceDelMenu(page, id) {
   await page.locator('#t').click({ button: 'right', position: { x: 5, y: 5 } });
-  await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
-  const voce = page.locator(`[data-sn-icon-id="${id}"]`);
+  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
+  const voce = menuDi(page).locator(`[data-sn-icon-id="${id}"]`);
   if (await voce.count() === 0) {
-    await page.locator('.sn-menu-row-overflow').first().hover();
-    await page.locator('.sn-menu-row-overflow').first().click().catch(() => {});
+    await menuDi(page).locator('.sn-menu-row-overflow').first().hover();
+    await menuDi(page).locator('.sn-menu-row-overflow').first().click().catch(() => {});
   }
   return voce.first();
 }

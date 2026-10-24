@@ -11,6 +11,8 @@
 (function (global) {
   'use strict';
 
+  const Ragionamento = require('./ragionamentoRimandato');
+
   const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
   const MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models';
   const SPEECH_ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
@@ -26,7 +28,7 @@
     return {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
-      // OpenRouter raccomanda questi header (opzionali ma utili per rate limit fairness)
+      // Header raccomandati da OpenRouter: opzionali, utili per la fairness dei rate limit.
       'HTTP-Referer': 'https://filo.local',
       'X-Title': 'Filo',
     };
@@ -55,8 +57,11 @@
   // (#962) il corpo cambia lista di esclusione, e il ripiego sui crediti riparte con l'intera. `ripiegoAmmesso`, se
   // c'è, decide prima del ripiego se i crediti ammettono la chiamata: dove il router non applica la lista (voce,
   // dettatura) la si controlla qui, e se non la ammettono il rifiuto della chiave propria risale com'è.
-  async function fetchWithKey(url, apiKey, makeInit, { ripiegoAmmesso = null } = {}) {
+  // `model` e `providerRouting` servono alla regola dei crediti (#830): coi crediti la richiesta di un modello fuori
+  // politica non parte, e la chiave propria rifiutata non ripiega su di loro.
+  async function fetchWithKey(url, apiKey, makeInit, { ripiegoAmmesso = null, model = '', providerRouting = null } = {}) {
     const startSource = await keySourceOf(apiKey);
+    if (PAGA_FILO.has(startSource) && !(await ammessoCoiCrediti(model, providerRouting))) throw erroreCrediti(model);
     let res = await fetch(url, makeInit(apiKey, { own: startSource === 'own' }));
     let keyUsed = apiKey;
     let keyFallback = null;
@@ -71,6 +76,10 @@
       let alt = null;
       if (W.isKeyRefusal(res.status, detail)) {
         try { alt = await K.alternativeKeyFor(apiKey); } catch (_) { alt = null; }
+      }
+      if (alt && alt.key && !(await ammessoCoiCrediti(model, providerRouting))) {
+        try { await K.noteOwnKeyRefusal({ status: res.status, detail, served: false }); } catch (_) {}
+        throw erroreCrediti(model, { chiaveRifiutata: res.status });
       }
       if (alt && alt.key && typeof ripiegoAmmesso === 'function') {
         let ammesso = false;
@@ -107,6 +116,31 @@
     // (e ha fallito), e chi lo racconta all'utente può dirlo per esteso.
     try { res.keySource = keySource; res.keyFallback = keyFallback; } catch (_) {}
     return { res, keyUsed, keySource, keyFallback };
+  }
+
+  // Chiavi che spendono i crediti di Filo. Una chiave di provenienza ignota ('') è quella dei test senza portafoglio.
+  const PAGA_FILO = new Set(['personal', 'factory']);
+  async function ammessoCoiCrediti(model, routing) {
+    const C = global.SN_CONST;
+    if (!model || !C || typeof C.creditsAllowModelLetto !== 'function') return true;
+    return C.creditsAllowModelLetto(model, routing && routing.weights);
+  }
+  // Il codice e la frase del «nessun host ammesso» (#828); chi conosce la funzione la ricompone (modelGate).
+  function erroreCrediti(model, { chiaveRifiutata = 0 } = {}) {
+    const CE = global.SN_CHAT_ERRORS;
+    const err = new Error(`NO_ALLOWED_HOST ${model}`);
+    err.code = 'NO_ALLOWED_HOST';
+    err.reason = 'crediti';
+    err.provider = 'openrouter';
+    err.model = model;
+    err.hosts = [];
+    if (chiaveRifiutata) err.chiaveRifiutata = chiaveRifiutata;
+    if (CE && typeof CE.motivoCrediti === 'function') {
+      err.motivo = CE.motivoCrediti(!!chiaveRifiutata);
+      err.message = CE.fraseNessunHost({ modello: model, motivo: err.motivo, rimedio: CE.rimedioCrediti('opzioni', !!chiaveRifiutata) });
+    }
+    console.warn(`[Filo policy] "${model}" non è fra i modelli dei crediti di Filo: ${chiaveRifiutata ? 'niente ripiego dalla chiave propria' : 'richiesta non partita'}`);
+    return err;
   }
 
   // Da dove viene una chiave ('own' | 'personal' | 'factory'), per chi tiene le chiavi; '' se non c'è chi lo sa.
@@ -153,7 +187,8 @@
   // provider: la richiesta FALLISCE in modo evidente invece di passare da un host
   // escluso. `sort` sceglie l'ordine fra gli ammessi (latency/throughput) invece
   // del prezzo. `allow_fallbacks` resta acceso: fra gli host AMMESSI il ripiego
-  // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`.
+  // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`, e
+  // nessun ripiego: se il produttore non risponde l'errore deve vedersi (#1059).
   // `ownKey`: la chiamata è pagata con la chiave propria (la lista la sceglie excludedFor).
   function providerBlock(routing, model, { tools = false, ownKey = false } = {}) {
     const p = {};
@@ -169,8 +204,20 @@
     if (tools) p.require_parameters = true;
     const C = global.SN_CONST;
     const rule = C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
-    if (rule) p.only = rule.only.slice();
+    if (rule) {
+      p.only = rule.only.slice();
+      p.allow_fallbacks = false;
+    }
+    if (zdrApplies(model, ownKey)) p.zdr = true;
     return Object.keys(p).length ? p : null;
+  }
+
+  // Ritenzione zero (#831): quando paga Filo, cioè con ogni chiave che non è la propria, solo host che non conservano
+  // domanda e risposta. I modelli da comprare solo dal produttore hanno già `only` (#904) e restano fuori.
+  function zdrApplies(model, ownKey) {
+    if (ownKey) return false;
+    const C = global.SN_CONST;
+    return !(C && typeof C.producerOnlyRule === 'function' && C.producerOnlyRule(model));
   }
 
   // Il corpo serializzato per la chiave con cui parte, col suo blocco `provider`.
@@ -216,7 +263,7 @@
     const tools = !!body.tools;
     const send = (b, key) => fetchWithKey(ENDPOINT, key, (k, { own } = {}) => ({
       method: 'POST', headers: buildHeaders(k), body: payloadFor(b, routing, b.model, own, { tools }), signal,
-    }));
+    }), { model: b.model, providerRouting: routing });
     const { reasoning: _omesso, ...senzaRagionamento } = body;
     const refusalKey = tools && body.reasoning
       ? JSON.stringify([body.model, providerBlock(routing, body.model, { tools }), providerBlock(routing, body.model, { tools, ownKey: true })])
@@ -230,6 +277,8 @@
     const detail = await first.res.clone().text().catch(() => '');
     if (!isParamsRefusal(detail)) return first;
     const second = await send(senzaRagionamento, first.keyUsed);
+    // I contatori (#1464) la contano: una richiesta in più, e una risposta senza ragionamento.
+    second.ragionamentoTolto = true;
     if (second.res.ok) reasoningRefused.set(refusalKey, Date.now() + REASONING_REFUSED_MS);
     if (!second.keyFallback && first.keyFallback) {
       second.keyFallback = first.keyFallback;
@@ -253,11 +302,8 @@
     return out;
   }
 
-  // In streaming le chiamate arrivano a pezzi: un delta porta l'indice, i
-  // primi anche id e nome, gli altri frammenti degli argomenti da accodare.
-  // `onStart(call)` avvisa appena si conosce il NOME di una chiamata nuova: la
-  // chat lo usa per dire subito «Cerco sul web…», prima che gli argomenti
-  // siano finiti di arrivare.
+  // In streaming le chiamate arrivano a pezzi: indice, poi id e nome, poi i frammenti da
+  // accodare. `onStart` avvisa appena si conosce il NOME, per dire subito «Cerco sul web…».
   function createToolCallAccumulator(onStart) {
     const calls = [];
     const byIndex = new Map();
@@ -288,12 +334,8 @@
     };
   }
 
-  // Il ragionamento arriva anche come blocchi strutturati (`reasoning_details`:
-  // testo, riassunto o blocchi cifrati con firma), a frammenti indicizzati. Li
-  // ricomponiamo per indice concatenando i campi testuali, così da poterli
-  // RIMANDARE tali e quali nel messaggio dell'assistente al giro dopo: il
-  // fornitore li reinserisce e il modello riprende da dove aveva lasciato
-  // invece di ripensare tutto.
+  // I `reasoning_details` si ricompongono per indice per RIMANDARLI tali e quali al giro dopo:
+  // il fornitore li reinserisce e il modello riprende invece di ripensare tutto.
   function createReasoningDetailsAccumulator() {
     const items = [];
     const byIndex = new Map();
@@ -320,18 +362,49 @@
     };
   }
 
-  // Marcatura esplicita della parte riusabile: NON serve per i modelli che Filo
-  // usa davvero (#422). I modelli Gemini — sia via questo router sia via l'API
-  // diretta — riconoscono da soli il prefisso identico a una richiesta
-  // precedente, e lo stesso vale per OpenAI/DeepSeek/Grok/Moonshot. Fanno
-  // eccezione i modelli Anthropic, che vogliono un marcatore esplicito nel corpo
-  // della richiesta: oggi qui sono configurati solo su funzioni dal prompt corto
-  // (spiegazione approfondita, riscrittura di un testo), dove non ci sarebbe
-  // comunque nulla da riusare. Se un domani si mettesse un modello Anthropic
-  // sulla chat o sull'assistente di pagina, il riordino da solo non basterebbe:
-  // andrebbe aggiunto il marcatore in fondo alla parte immutabile — e si
-  // vedrebbe subito, perché il riuso resterebbe a zero nella cronologia.
-  //
+  function daAnthropic(model) {
+    return String(model == null ? '' : model).trim().toLowerCase().replace(/^~/, '').startsWith('anthropic/');
+  }
+
+  // I punti di cache del piano (SN_FILO_CONTESTO.pianoDellaCache) li vogliono espliciti solo i modelli Anthropic: gli
+  // altri riconoscono da soli il prefisso ripetuto e ricevono i messaggi tali e quali. Anthropic ne accetta al più 4.
+  const MAX_PUNTI_CACHE = 4;
+  const vuoleCacheEsplicita = daAnthropic;
+
+  // I messaggi che partono: punti di cache e, per Claude, solo il ragionamento col prefisso intatto (ragionamentoRimandato.js).
+  function messaggiDaMandare(model, messages, cache, tools) {
+    return Ragionamento.daRimandare(conPuntiDiCache(model, messages, cache), { strumenti: tools, controlla: daAnthropic(model) });
+  }
+
+  function partiConPunto(content, caratteri, cacheControl) {
+    if (typeof content === 'string') {
+      const n = Number.isInteger(caratteri) && caratteri > 0 && caratteri < content.length ? caratteri : content.length;
+      if (!content.slice(0, n).trim()) return null;
+      const parti = [{ type: 'text', text: content.slice(0, n), cache_control: cacheControl }];
+      if (n < content.length) parti.push({ type: 'text', text: content.slice(n) });
+      return parti;
+    }
+    if (!Array.isArray(content)) return null;
+    let k = -1;
+    content.forEach((p, i) => { if (p && p.type === 'text' && String(p.text || '').trim()) k = i; });
+    return k < 0 ? null : content.map((p, i) => (i === k ? { ...p, cache_control: cacheControl } : p));
+  }
+
+  // Il testo resta lo stesso, carattere per carattere: cambia solo la forma (parti di testo) dei messaggi col punto.
+  function conPuntiDiCache(model, messages, piano) {
+    const punti = piano && Array.isArray(piano.punti) ? piano.punti : [];
+    if (!punti.length || !Array.isArray(messages) || !vuoleCacheEsplicita(model)) return messages;
+    const out = messages.slice();
+    for (const p of punti.slice(0, MAX_PUNTI_CACHE)) {
+      const m = out[p && p.indice];
+      if (!m || typeof m !== 'object') continue;
+      const cc = p.durata === '1h' ? { type: 'ephemeral', ttl: '1h' } : { type: 'ephemeral' };
+      const parti = partiConPunto(m.content, p.caratteri, cc);
+      if (parti) out[p.indice] = { ...m, content: parti };
+    }
+    return out;
+  }
+
   // Quanta parte del testo in ingresso è stata RIUSATA invece che ricalcolata
   // (#422). OpenRouter riporta i token letti dalla cache del fornitore in
   // `usage.prompt_tokens_details.cached_tokens` (0 o campo assente = nessun
@@ -355,6 +428,29 @@
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
+  // L'host dice quanta parte del contesto ha letto dalla cache? Uno zero detto e un campo assente sono due cose (#1464).
+  function cacheDetta(usage) {
+    if (!usage || typeof usage !== 'object') return false;
+    const d = usage.prompt_tokens_details || usage.promptTokensDetails || null;
+    return Boolean(d && (d.cached_tokens != null || d.cachedTokens != null)) || usage.cached_tokens != null;
+  }
+
+  // I token di ragionamento della risposta; null se l'host non li dice (#1464).
+  function reasoningTokensOf(usage) {
+    const d = usage && typeof usage === 'object' ? (usage.completion_tokens_details || usage.completionTokensDetails || null) : null;
+    const v = d ? (d.reasoning_tokens != null ? d.reasoning_tokens : d.reasoningTokens) : null;
+    const n = v == null ? NaN : Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  }
+
+  // I token SCRITTI in cache (i modelli coi punti espliciti): con le letture dicono se la cache scatta davvero.
+  function cacheWriteTokens(usage) {
+    if (!usage || typeof usage !== 'object') return 0;
+    const d = usage.prompt_tokens_details || usage.promptTokensDetails || {};
+    const n = Number(d.cache_write_tokens != null ? d.cache_write_tokens : d.cacheWriteTokens);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
   // Chi ha DAVVERO servito la risposta (#421). OpenRouter lo riporta a livello di
   // risposta come `provider`; per robustezza guardiamo anche dentro la choice.
   function extractServedBy(obj) {
@@ -373,7 +469,7 @@
       id: m.id,
       name: m.name,
       pricing: m.pricing && {
-        // OpenRouter espone i prezzi in USD per token. Riconvertiamo in USD per 1M.
+        // OpenRouter espone i prezzi in USD per token: si riconverte in USD per 1M.
         input: parseFloat(m.pricing.prompt) * 1_000_000,
         output: parseFloat(m.pricing.completion) * 1_000_000,
       },
@@ -386,14 +482,15 @@
     return Number.isFinite(n) && n > 0 ? { max_tokens: n } : {};
   }
 
-  async function complete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
+  async function complete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
     // usage.include: OpenRouter aggiunge alla risposta il costo in dollari
     // della chiamata (`usage.cost`), quello che conta sul tetto della chiave
     // personale (#598). Senza, il costo si stima dal listino.
-    const body = { model, messages, stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
+    const inviati = messaggiDaMandare(model, messages, cache, tools);
+    const body = { model, messages: inviati.messaggi, stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
-    const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal, providerRouting);
+    const { res, keyUsed, keySource, keyFallback, ragionamentoTolto } = await postChat(body, apiKey, signal, providerRouting);
     // status/provider strutturati sull'errore: chi lo mostra all'utente può
     // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
     if (!res.ok) throw await httpError(res, { tools: !!body.tools, maxTokens: body.max_tokens, apiKey, model, providerRouting });
@@ -404,14 +501,18 @@
     return {
       text,
       toolCalls: flatToolCalls(message.tool_calls),
-      reasoningDetails: Array.isArray(message.reasoning_details) ? message.reasoning_details : [],
+      reasoningDetails: Ragionamento.conImpronta(message.reasoning_details, inviati.impronta),
       finishReason: data.choices?.[0]?.finish_reason || null,
       servedBy: extractServedBy(data),
       keyUsed, keyFallback,
+      ...(ragionamentoTolto ? { ragionamentoTolto: true } : {}),
       usage: {
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: usage.completion_tokens || 0,
         cachedPromptTokens: cachedPromptTokens(usage),
+        cacheDetta: cacheDetta(usage),
+        reasoningTokens: reasoningTokensOf(usage),
+        cacheWriteTokens: cacheWriteTokens(usage),
         costUsd: costUsdOf(usage),
         servedBy: extractServedBy(data),
         keySource, keyFallback,
@@ -423,8 +524,9 @@
   // onReasoning(chunk) per il ragionamento, onToolCall({ id, name }) appena si
   // conosce il nome di una chiamata a uno strumento. Ritorna
   // { text, toolCalls, reasoningDetails, finishReason, servedBy, usage }.
-  async function streamComplete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
-    const reqBody = { model, messages, stream: true, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
+  async function streamComplete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
+    const inviati = messaggiDaMandare(model, messages, cache, tools);
+    const reqBody = { model, messages: inviati.messaggi, stream: true, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     // Reasoning: unisce il livello scelto dall'owner (#369) e la richiesta del
     // caller di STREAMARE i token di ragionamento (onReasoning). I modelli che
     // non ragionano semplicemente non ne emettono — best-effort.
@@ -432,7 +534,7 @@
     if (r) reqBody.reasoning = r;
     // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
     // il ripiego qui non ha ancora niente da azzerare nel chiamante.
-    const { res, keyUsed, keySource, keyFallback } = await postChat(reqBody, apiKey, signal, providerRouting);
+    const { res, keyUsed, keySource, keyFallback, ragionamentoTolto } = await postChat(reqBody, apiKey, signal, providerRouting);
     if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools, maxTokens: reqBody.max_tokens, apiKey, model, providerRouting });
 
     const reader = res.body.getReader();
@@ -443,7 +545,7 @@
     let finishReason = null;
     const calls = createToolCallAccumulator(onToolCall);
     const details = createReasoningDetailsAccumulator();
-    let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0 };
+    let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0, cacheWriteTokens: 0, cacheDetta: false, reasoningTokens: null };
     let generationId = null;
 
     // Una risposta rotta a metà si paga per quanto il modello aveva scritto: l'errore porta con sé l'id per chiederne il costo.
@@ -493,12 +595,14 @@
               promptTokens: obj.usage.prompt_tokens || 0,
               completionTokens: obj.usage.completion_tokens || 0,
               cachedPromptTokens: cachedPromptTokens(obj.usage),
+              cacheDetta: cacheDetta(obj.usage),
+              reasoningTokens: reasoningTokensOf(obj.usage),
+              cacheWriteTokens: cacheWriteTokens(obj.usage),
               costUsd: costUsdOf(obj.usage),
               servedBy: servedBy || extractServedBy(obj),
             };
           }
         } catch (_) {
-          // riga malformata, ignora
         }
       }
     }
@@ -507,11 +611,14 @@
       const err = new Error('OpenRouter 502: il fornitore si è fermato a metà flusso');
       err.status = 502;
       err.provider = 'openrouter';
+      if (servedBy) err.hostFallito = servedBy;
+      produttoreNonRisponde(err, model);
       throw err;
     }
     return {
-      text: fullText, toolCalls: calls.list(), reasoningDetails: details.list(), finishReason, servedBy,
+      text: fullText, toolCalls: calls.list(), reasoningDetails: Ragionamento.conImpronta(details.list(), inviati.impronta), finishReason, servedBy,
       keyUsed, keyFallback, usage: { ...usage, keySource, keyFallback },
+      ...(ragionamentoTolto ? { ragionamentoTolto: true } : {}),
     };
   }
 
@@ -580,11 +687,22 @@
     return utili.every((h) => h.maxOut < maxTokens) ? true : (tools ? null : false);
   }
 
+  // L'host che ha dato l'errore, quando il router lo dice (`error.metadata.provider_name`): lo contano i contatori (#969).
+  function hostDelGuasto(errText) {
+    try {
+      const j = JSON.parse(String(errText || ''));
+      const n = j && j.error && j.error.metadata && j.error.metadata.provider_name;
+      return typeof n === 'string' ? n.trim().slice(0, 60) : '';
+    } catch (_) { return ''; }
+  }
+
   async function httpError(res, { tools = false, maxTokens = null, apiKey = '', model = '', providerRouting = null } = {}) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
     err.status = res.status;
     err.provider = 'openrouter';
+    const host = hostDelGuasto(errText);
+    if (host) err.hostFallito = host;
     const attesa = attesaChiesta(res);
     if (attesa != null) err.retryAfterMs = attesa;
     if (res.keySource) err.keySource = res.keySource;
@@ -592,6 +710,7 @@
     // Gli host si giudicano con la lista con cui è partita la risposta arrivata (#962).
     const ownKey = res.keySource === 'own';
     if (res.status === 404 && model && await nessunHostAmmesso(err, { apiKey, model, providerRouting, ownKey })) return err;
+    if (res.status === 404 && model && await nessunHostZdr(err, { apiKey, model, providerRouting, ownKey, errText })) return err;
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
@@ -608,14 +727,38 @@
       else if (maxTokens && colpa !== false) err.code = 'TETTO_RISPOSTA';
       if (maxTokens && colpa !== false) err.maxTokens = maxTokens;
     } else if (refusal) err.code = refusal;
+    produttoreNonRisponde(err, model, errText);
     return err;
+  }
+
+  // Un modello da comprare solo dal produttore (#904) non ripiega su altri host: se il produttore non risponde, a catena
+  // finita la richiesta fallisce con la frase del #828 e questo motivo (#829). Il 500 è del router, non dell'host.
+  const PRODUTTORE_GIU = new Set([408, 502, 503, 504, 529]);
+  const NESSUN_AMMESSO = /no allowed providers|provider restrictions/i;
+  function produttoreNonRisponde(err, model, errText = '') {
+    const C = global.SN_CONST;
+    const rule = model && C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
+    if (!rule || (err.code && err.code !== 'NO_PROVIDER_ALLOWED' && err.code !== 'DATA_POLICY')) return false;
+    const filtrati = err.status === 404 && NESSUN_AMMESSO.test(errText) && !/settings\/privacy/i.test(errText);
+    if (!PRODUTTORE_GIU.has(err.status) && !filtrati) return false;
+    const CE = global.SN_CHAT_ERRORS;
+    const motivo = CE && typeof CE.motivoProduttoreGiu === 'function' ? CE.motivoProduttoreGiu(rule.nome) : '';
+    console.warn(`[Filo policy] "${model}" lo serve solo ${rule.nome || rule.only.join(', ')}, che non risponde: ${err.message}`);
+    err.dettaglio = err.message;
+    err.message = CE ? CE.fraseNessunHost({ modello: model, motivo }) : `NO_ALLOWED_HOST ${model}`;
+    err.code = 'NO_ALLOWED_HOST';
+    err.reason = 'produttore';
+    err.motivo = motivo;
+    err.model = model;
+    err.hosts = [];
+    return true;
   }
 
   // Un 404 del router su un modello che servono solo host esclusi (#828). Lo dicono gli host dichiarati, non il testo
   // dell'errore, che il router può cambiare; e vince sugli altri motivi del 404, perché strumenti e tetto non contano più.
   async function nessunHostAmmesso(err, { apiKey, model, providerRouting, ownKey }) {
     let v = null;
-    try { v = await hostVerdict({ apiKey, model, providerRouting, ownKey }); } catch (_) { v = null; }
+    try { v = await hostVerdict({ apiKey, model, providerRouting, ownKey, filoPays: false }); } catch (_) { v = null; }
     if (!v || v.ok || v.reason !== 'excluded') return false;
     console.warn(`[Filo policy] "${model}" lo servono solo host esclusi (${v.excluded.join(', ')}): ${err.message}`);
     const CE = global.SN_CHAT_ERRORS;
@@ -625,6 +768,31 @@
     err.reason = 'excluded';
     err.model = model;
     err.hosts = v.excluded;
+    return true;
+  }
+
+  // Lo stesso 404 quando a svuotare la lista è la ritenzione zero (#831): nessun host che la dichiara è fra gli ammessi.
+  // Lo dice il catalogo; senza, solo un rifiuto che la nomina. Il codice è quello di #828: la frase ha un punto solo.
+  const RIFIUTI_SENZA_HOST = ['DATA_POLICY', 'NO_PROVIDER_ALLOWED', 'PARAMS'];
+  async function nessunHostZdr(err, { apiKey, model, providerRouting, ownKey, errText }) {
+    if (!zdrApplies(model, ownKey)) return false;
+    const nomina = /zero data retention|\bzdr\b/i.test(String(errText || ''));
+    if (!nomina && !RIFIUTI_SENZA_HOST.includes(routerRefusal(errText))) return false;
+    let zdr = null;
+    try { zdr = await zdrHostsOf({ apiKey, model }); } catch (_) { zdr = null; }
+    const C = global.SN_CONST;
+    const excluded = excludedFor(providerRouting, ownKey);
+    const colpa = Array.isArray(zdr) && C && typeof C.hostPolicyViolation === 'function'
+      ? !zdr.some((z) => !C.hostPolicyViolation(z, model, excluded)) : nomina;
+    if (!colpa) return false;
+    console.warn(`[Filo policy] "${model}": nessun host ammesso a ritenzione zero: ${err.message}`);
+    const CE = global.SN_CHAT_ERRORS;
+    err.dettaglio = err.message;
+    err.code = 'NO_ALLOWED_HOST';
+    err.reason = 'zdr';
+    err.model = model;
+    err.hosts = [];
+    err.message = CE ? CE.fraseNessunHost({ modello: model, motivo: CE.motivoNessunHost(err) }) : `NO_ALLOWED_HOST ${model}`;
     return true;
   }
 
@@ -697,7 +865,50 @@
     return entry.hosts || entry.pending;
   }
 
-  function forgetModelHosts() { hostsCache.clear(); }
+  // Gli host che dichiarano la ritenzione zero, dal catalogo del router: Map(id → [{ name, tag }]) o null se non si sa.
+  // Serve dove il corpo non basta: l'audio, che ignora il blocco `provider`, e il perché di un «nessun host».
+  const ZDR_ENDPOINT = `${MODELS_ENDPOINT.replace(/\/models$/, '')}/endpoints/zdr`;
+  let zdrCache = { until: 0, map: null, pending: null };
+
+  function zdrCatalog({ apiKey } = {}) {
+    if (zdrCache.pending) return zdrCache.map || zdrCache.pending;
+    if (Date.now() < zdrCache.until) return Promise.resolve(zdrCache.map);
+    const entry = zdrCache;
+    const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+    entry.pending = fetch(ZDR_ENDPOINT, { headers, signal: AbortSignal.timeout(HOSTS_TIMEOUT_MS) })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`OpenRouter zdr ${res.status}`);
+        const C = global.SN_CONST;
+        return C && typeof C.zdrCatalogFrom === 'function' ? C.zdrCatalogFrom(await res.json()) : null;
+      })
+      .then((map) => {
+        entry.map = map || entry.map;
+        entry.until = Date.now() + (map ? HOSTS_FRESH_MS : HOSTS_RETRY_MS);
+        return entry.map;
+      })
+      .catch((e) => {
+        console.warn('[Filo policy] host a ritenzione zero non letti:', (e && e.message) || e);
+        entry.until = Date.now() + HOSTS_RETRY_MS;
+        return entry.map;
+      })
+      .finally(() => { entry.pending = null; });
+    return entry.map || entry.pending;
+  }
+
+  async function zdrHostsOf({ apiKey, model } = {}) {
+    const map = await zdrCatalog({ apiKey });
+    if (!map) return null;
+    return map.get(String(model == null ? '' : model).trim().toLowerCase().replace(/^~/, '')) || [];
+  }
+
+  // Lo stesso endpoint di un host: per etichetta quando ce l'hanno tutti e due (un fornitore può averne uno a
+  // ritenzione zero e uno no), altrimenti per nome.
+  function isZdrHost(h, zdr) {
+    const low = (s) => String(s || '').trim().toLowerCase();
+    return zdr.some((z) => (h.tag && z.tag ? low(h.tag) === low(z.tag) : !!low(h.name) && low(h.name) === low(z.name)));
+  }
+
+  function forgetModelHosts() { hostsCache.clear(); zdrCache = { until: 0, map: null, pending: null }; }
 
   function joinNames(names) {
     if (names.length < 2) return names.join('');
@@ -717,27 +928,39 @@
   // router sceglie per prezzo e può dare l'audio proprio a quello escluso.
   // { ok: true } | { ok: false, reason: 'unknown' | 'mixed' | 'excluded', excluded: [nomi] }
   // Senza `ownKey` la lista la sceglie la chiave data (#962).
-  async function hostVerdict({ apiKey, model, providerRouting, ownKey }) {
+  // Quando paga Filo (`filoPays`; senza, lo dice la chiave data) vale anche la ritenzione zero (#831), con la stessa
+  // regola: TUTTI gli host ammessi la dichiarano, perché anche qui la scelta fra loro la fa il router.
+  async function hostVerdict({ apiKey, model, providerRouting, ownKey, filoPays }) {
     const C = global.SN_CONST;
     if (!C || typeof C.hostPolicyViolation !== 'function') return { ok: true };
     const own = ownKey === undefined ? await startsOwn(apiKey, providerRouting) : ownKey;
     const excluded = excludedFor(providerRouting, own);
-    if (!excluded.length && !C.producerOnlyRule(model)) return { ok: true };
+    const paga = filoPays === undefined ? (own ? false : (await keySourceOf(apiKey)) !== 'own') : filoPays;
+    const zdr = paga && zdrApplies(model, false);
+    if (!excluded.length && !C.producerOnlyRule(model) && !zdr) return { ok: true };
     const hosts = await modelHosts({ apiKey, model });
     if (!Array.isArray(hosts) || !hosts.length) return { ok: false, reason: 'unknown', excluded: [] };
     const bad = hosts.filter((h) => C.hostPolicyViolation(h, model, excluded));
-    if (!bad.length) return { ok: true };
-    return { ok: false, reason: bad.length === hosts.length ? 'excluded' : 'mixed', excluded: uniqueNames(bad) };
+    if (bad.length) return { ok: false, reason: bad.length === hosts.length ? 'excluded' : 'mixed', excluded: uniqueNames(bad) };
+    if (!zdr) return { ok: true };
+    const dichiarati = await zdrHostsOf({ apiKey, model });
+    if (!Array.isArray(dichiarati)) return { ok: false, reason: 'zdrunknown', excluded: [] };
+    const senza = hosts.filter((h) => !isZdrHost(h, dichiarati));
+    if (!senza.length) return { ok: true };
+    return { ok: false, reason: senza.length === hosts.length ? 'zdr' : 'zdrmixed', excluded: uniqueNames(senza) };
   }
 
   const NO_HOST_KEYS = {
     unknown: ['err_audio_hosts_unknown', 'err_audio_hosts_unknown'],
     mixed: ['err_audio_mixed_host', 'err_audio_mixed_host_many'],
     excluded: ['err_audio_no_allowed_host', 'err_audio_no_allowed_host_many'],
+    zdrunknown: ['err_audio_zdr_unknown', 'err_audio_zdr_unknown'],
+    zdr: ['err_audio_zdr_host', 'err_audio_zdr_host_many'],
+    zdrmixed: ['err_audio_zdr_mixed', 'err_audio_zdr_mixed_many'],
   };
 
-  async function ensureAllowedHost({ apiKey, model, providerRouting, ownKey }) {
-    const v = await hostVerdict({ apiKey, model, providerRouting, ownKey });
+  async function ensureAllowedHost({ apiKey, model, providerRouting, ownKey, filoPays }) {
+    const v = await hostVerdict({ apiKey, model, providerRouting, ownKey, filoPays });
     if (v.ok) return;
     const I18n = global.SN_I18N;
     const [one, many] = NO_HOST_KEYS[v.reason];
@@ -754,14 +977,18 @@
   // Voce, dettatura e classificatori: il controllo degli host con la lista della chiave di partenza, e il ripiego sui
   // crediti solo se chi serve il modello lo ammette anche la loro (#962).
   async function hostCheckedFetch(url, { apiKey, model, providerRouting, body, signal }) {
-    const own = await startsOwn(apiKey, providerRouting);
-    await ensureAllowedHost({ apiKey, model, providerRouting, ownKey: own });
-    const ripiegoAmmesso = own
-      ? async () => (await hostVerdict({ apiKey, model, providerRouting, ownKey: false })).ok
+    const source = await keySourceOf(apiKey);
+    // Prima degli host: un modello che i crediti non pagano non arriva a chiedere chi lo serve.
+    if (PAGA_FILO.has(source) && !(await ammessoCoiCrediti(model, providerRouting))) throw erroreCrediti(model);
+    const own = source === 'own' && !!providerRouting && Array.isArray(providerRouting.ownKeyIgnore);
+    await ensureAllowedHost({ apiKey, model, providerRouting, ownKey: own, filoPays: source !== 'own' });
+    // Il ripiego sui crediti cambia chi paga: lista intera e ritenzione zero.
+    const ripiegoAmmesso = source === 'own'
+      ? async () => (await hostVerdict({ apiKey, model, providerRouting, ownKey: false, filoPays: true })).ok
       : null;
     return fetchWithKey(url, apiKey, (key, { own: o } = {}) => ({
       method: 'POST', headers: buildHeaders(key), body: payloadFor(body, providerRouting, model, o), signal,
-    }), { ripiegoAmmesso });
+    }), { ripiegoAmmesso, model, providerRouting });
   }
 
   // ─── Lettura ad alta voce ──────────────────────────────────────────────────
@@ -792,10 +1019,8 @@
     };
   }
 
-  // ─── Dettatura ────────────────────────────────────────────────────────────
-  // `audioBase64` sono i byte grezzi del file (niente data URI); `format` è
-  // l'estensione ('wav', 'mp3', 'webm', …). `language` è un codice ISO-639-1
-  // ('it'): se manca, il modello la riconosce da sé.
+  // `audioBase64` sono i byte grezzi, niente data URI; senza `language` il modello riconosce
+  // la lingua da sé.
   async function transcribe({ apiKey, model, audioBase64, format, language, providerRouting, signal }) {
     const body = { model, input_audio: { data: audioBase64, format: format || 'wav' } };
     if (language) body.language = language;
@@ -813,20 +1038,15 @@
         completionTokens: 0,
         cachedPromptTokens: 0,
         seconds: Number(usage.seconds) || 0,
-        // Il router riporta il costo in dollari: per l'audio è l'unico numero
-        // che abbia senso (non ci sono token), e va registrato tale e quale.
+        // Per l'audio non ci sono token: l'unico numero sensato è il costo in dollari del router.
         costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
         keySource, keyFallback,
       },
     };
   }
 
-  // ─── Indicizzazione (embedding) ───────────────────────────────────────────
-  // Ritorna i vettori nell'ordine dei testi. `dim` chiede vettori accorciati
-  // (i modelli addestrati "a matrioska" lo permettono); se il fornitore ignora
-  // la richiesta e ne manda di più lunghi, si tagliano qui: le prime `dim`
-  // componenti sono comunque quelle che contano, e la ricerca lavora su
-  // vettori tutti della stessa lunghezza.
+  // `dim` chiede vettori accorciati; se ne arrivano di più lunghi si tagliano qui: contano le
+  // prime componenti, e la ricerca vuole vettori tutti della stessa lunghezza.
   async function embed({ apiKey, model, texts, dim, providerRouting, signal }) {
     const input = (texts || []).map((t) => String(t == null ? '' : t));
     const body = { model, input };
@@ -834,7 +1054,7 @@
     if (Number.isInteger(d) && d > 0) body.dimensions = d;
     const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(EMBEDDINGS_ENDPOINT, apiKey, (key, { own } = {}) => ({
       method: 'POST', headers: buildHeaders(key), body: payloadFor(body, providerRouting, model, own), signal,
-    }));
+    }), { model, providerRouting });
     if (!res.ok) throw await httpError(res, { apiKey, model, providerRouting });
     const data = await res.json();
     const rows = Array.isArray(data.data) ? data.data.slice() : [];
@@ -883,18 +1103,16 @@
       usage: {
         promptTokens: num(usage.input_tokens != null ? usage.input_tokens : usage.prompt_tokens),
         completionTokens: num(usage.output_tokens != null ? usage.output_tokens : usage.completion_tokens),
-        cachedPromptTokens: 0,
+        cachedPromptTokens: cachedPromptTokens(usage),
+        cacheDetta: cacheDetta(usage),
         costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
         keySource, keyFallback,
       },
     };
   }
 
-  // ─── Chi ha servito, a posteriori ─────────────────────────────────────────
-  // Per voce e dettatura il router non mette il fornitore nella risposta: lo
-  // si chiede con l'id della generazione, che diventa consultabile qualche
-  // secondo dopo (finché non lo è risponde 404). Ritorna
-  // { servedBy, costUsd } oppure null se ancora non c'è.
+  // Per voce e dettatura il fornitore non è nella risposta: si chiede con l'id della
+  // generazione, consultabile qualche secondo dopo. Torna { servedBy, costUsd } o null.
   async function lookupServedBy({ apiKey, generationId, signal }) {
     if (!generationId) return null;
     const res = await fetch(`${GENERATION_ENDPOINT}?id=${encodeURIComponent(generationId)}`, {
@@ -951,10 +1169,10 @@
 
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
-    cachedPromptTokens, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
-    modelHosts, forgetModelHosts, hostVerdict, forgetReasoningRefusals,
+    cachedPromptTokens, cacheDetta, reasoningTokensOf, cacheWriteTokens, conPuntiDiCache, vuoleCacheEsplicita, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
+    modelHosts, forgetModelHosts, hostVerdict, forgetReasoningRefusals, zdrApplies, zdrHostsOf,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields, maxTokensField, attesaChiesta, httpError,
     ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,
-    GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
+    GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT, ZDR_ENDPOINT,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

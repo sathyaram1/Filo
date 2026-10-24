@@ -10,6 +10,8 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
+import { menuDi } from './helpers/menuContestuale.mjs';
+import { riquadriInRitardo, apriConRiquadriInRitardo } from './helpers/riquadriInRitardo.mjs';
 
 const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>sito</title></head>
 <body style="height:4000px"><h1>un sito qualunque</h1><p>testo</p></body></html>`;
@@ -221,7 +223,7 @@ test('col fuoco nel riquadro, il tasto destro sul contenuto offre la dimensione 
   await expect.poll(async () => percentOf(app, page)).toBe(150);
 
   await frame.locator('#c').click({ button: 'right' });
-  const voce = frame.locator('.sn-menu').first().getByText(/Dimensione reale \(ora 150%\)/);
+  const voce = menuDi(frame).locator('.sn-menu').first().getByText(/Dimensione reale \(ora 150%\)/);
   await expect(voce).toBeVisible({ timeout: 8000 });
   await voce.click();
   await expect.poll(async () => percentOf(app, page)).toBe(100);
@@ -371,17 +373,29 @@ async function battiNelCampo(page, testo) {
   await page.keyboard.press('Enter');
 }
 
-test('pagina a frame: la rotella premuta su un frame mostra il riquadro, e il numero battuto vale', async ({ app, openTab, testServer }) => {
-  const a = testServer.html('<!doctype html><html><body style="margin:0;height:3000px"><h2>indice</h2></body></html>');
-  const b = testServer.html('<!doctype html><html><body style="margin:0;height:3000px"><h2>contenuto</h2></body></html>');
-  const page = await openTab(testServer.html(`<html><frameset cols="70%,*"><frame src="${a}"><frame src="${b}"></frameset></html>`));
-  await page.waitForTimeout(1500);
-  await manda(app, page, clicIn(300, 300));
-  await manda(app, page, clicIn(300, 300, 'middle'));
-  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
-  await battiNelCampo(page, '130');
-  await expect.poll(async () => percentOf(app, page)).toBe(130);
-});
+// I riquadri dello stesso sito arrivano solo quando il Filo della pagina è già montato: toccati
+// prima del loro load perdevano il preload, e il gesto lì dentro non arrivava a nessuno (#1568).
+const casiRiquadri = {
+  'pagina a frame: la rotella premuta su un frame mostra il riquadro, e il numero battuto vale':
+    { cornice: '<html><frameset cols="70%,*"><frame src="/riquadro/1"><frame src="/riquadro/2"></frameset></html>', quanti: 2 },
+  'riquadro dello stesso sito arrivato dopo la pagina: la rotella premuta lì mostra il riquadro, e il numero battuto vale':
+    { cornice: '<!doctype html><html><body style="margin:0"><iframe src="/riquadro/1" style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>', quanti: 1 },
+};
+for (const [nome, { cornice, quanti }] of Object.entries(casiRiquadri)) {
+  test(nome, async ({ app, openTab }) => {
+    const sito = await riquadriInRitardo(cornice);
+    try {
+      const page = await apriConRiquadriInRitardo(openTab, sito, quanti);
+      await manda(app, page, clicIn(300, 300));
+      await manda(app, page, clicIn(300, 300, 'middle'));
+      await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+      await battiNelCampo(page, '130');
+      await expect.poll(async () => percentOf(app, page)).toBe(130);
+    } finally {
+      await sito.chiudi();
+    }
+  });
+}
 
 test('immagine SVG aperta da sola: la rotella premuta mostra il riquadro, e il numero battuto vale', async ({ app, openTab }) => {
   const server = createServer((_req, res) => {

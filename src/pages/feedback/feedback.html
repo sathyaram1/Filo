@@ -22,11 +22,14 @@
      rifiutano le stesse cose con le stesse parole. -->
   <script src="filo://shared/feedbackAttachTypes.js"></script>
   <script src="filo://shared/feedbackAttese.js"></script>
+  <script src="filo://shared/mittenti.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/feedbackLive.js"></script>
   <script src="filo://shared/feedbackLivePagina.js"></script>
   <script src="filo://shared/filoMarkdown.js"></script>
   <script src="filo://shared/chatErrors.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/caselleAlSicuro.js"></script>
   <style>
     .fb-list { display: flex; flex-direction: column; gap: 16px; }
     .fb-card {
@@ -274,6 +277,15 @@
       display: inline-block; max-width: 100%; box-sizing: border-box;
       font-size: 10.5px; line-height: 1.25; padding: 2px 6px; border-radius: 9px; white-space: normal; overflow-wrap: anywhere;
       border: 1px solid color-mix(in srgb, var(--sn-accent, #c8763c) 45%, transparent); color: var(--sn-accent, #c8763c);
+    }
+    /* «Aspetta D-12» è un tasto: la forma del chip, il fondo che si accende al passaggio. */
+    button.fb-domanda {
+      background: transparent; font: inherit; font-size: 10.5px; cursor: pointer;
+      transition: background calc(0.12s * var(--sn-motion, 1)), border-color calc(0.12s * var(--sn-motion, 1));
+    }
+    button.fb-domanda:hover, button.fb-domanda:focus-visible {
+      background: color-mix(in srgb, var(--sn-accent, #c8763c) 14%, transparent);
+      border-color: var(--sn-accent, #c8763c);
     }
     .fb-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
     .fb-num { color: var(--sn-muted); font-weight: 600; }

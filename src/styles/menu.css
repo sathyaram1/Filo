@@ -38,8 +38,14 @@
   line-height: 1.2;
 }
 
-.sn-menu-item:hover:not(.sn-disabled) {
+.sn-menu-item:hover:not(.sn-disabled),
+.sn-menu-item:focus-visible:not(.sn-disabled) {
   background: rgba(var(--sn-accent-rgb), 0.35);
+}
+/* Da tastiera (#1295) si vede dove si è: le voci piene come all'hover, gli altri tasti del menu con l'anello. */
+.sn-menu button:not(.sn-menu-item):focus-visible {
+  outline: 2px solid rgba(var(--sn-accent-rgb), 0.7);
+  outline-offset: -2px;
 }
 
 .sn-menu-item.sn-disabled {
@@ -66,7 +72,8 @@
   height: 18px;
   color: var(--sn-muted);
 }
-.sn-menu-item:hover:not(.sn-disabled) .sn-menu-item-icon { color: var(--sn-fg); }
+.sn-menu-item:hover:not(.sn-disabled) .sn-menu-item-icon,
+.sn-menu-item:focus-visible:not(.sn-disabled) .sn-menu-item-icon { color: var(--sn-fg); }
 .sn-menu-item-icon svg { display: block; }
 
 .sn-menu-shortcut {
@@ -193,6 +200,27 @@
   color: var(--sn-muted);
 }
 .sn-menu-origine[hidden] { display: none; }
+
+/* Il perché di un segno del correttore (#1446): il bordo ha il colore del segno, la citazione è la prova di un
+   suggerimento. I letterali sono i predefiniti dei token correttore.* (themeTokens.js). */
+.sn-menu-inline.sn-menu-segno {
+  border-left: 3px solid var(--sn-spell-suggerimento, #b07a14);
+  padding-left: 10px;
+}
+.sn-menu[data-sn-theme="dark"] .sn-menu-inline.sn-menu-segno {
+  border-left-color: var(--sn-spell-suggerimento, #e2ad4d);
+}
+.sn-menu-inline.sn-menu-segno.sn-menu-segno-errore {
+  border-left-color: var(--sn-spell-errore, #b4472c);
+}
+.sn-menu[data-sn-theme="dark"] .sn-menu-inline.sn-menu-segno.sn-menu-segno-errore {
+  border-left-color: var(--sn-spell-errore, #ea8a6b);
+}
+.sn-menu-segno-citazione {
+  margin-top: 4px;
+  color: var(--sn-muted);
+  font-style: italic;
+}
 
 .sn-menu-inline.sn-menu-inline-loading,
 .sn-menu-inline.sn-menu-inline-muted {
@@ -504,6 +532,14 @@
   word-break: break-word;
   margin-bottom: 4px;
 }
+/* La notizia del sito in lista sopra la descrizione di un'immagine-link: un fatto, non un pericolo. */
+.sn-menu-link-nota {
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 1.35;
+  word-break: break-word;
+  margin-bottom: 4px;
+}
 .sn-menu-link-body {
   white-space: pre-wrap;
   word-break: break-word;
@@ -609,6 +645,10 @@
   color: var(--sn-muted);
   font-style: italic;
 }
+/* Il motivo per cui la proposta non è arrivata: col colore dell'errore, mai con quello dell'attesa (#663). */
+.sn-editbox-proposed.sn-editbox-errore {
+  color: var(--sn-error);
+}
 .sn-editbox-footer {
   display: flex;
   justify-content: flex-end;
@@ -706,10 +746,11 @@
   outline-offset: -2px;
   border-radius: 6px;
 }
+/* Stesso piano del menu e montata dopo: sopra i pannelli, sotto le sonde che vedono i veli del sito (#589.11). */
 .sn-drag-preview {
   position: fixed;
   pointer-events: none;
-  z-index: 2147483647;
+  z-index: 2147483646;
   opacity: 0.92;
   background: var(--sn-bg);
   color: var(--sn-fg);
@@ -727,7 +768,7 @@
 
 .sn-tooltip {
   position: fixed;
-  z-index: 2147483647;
+  z-index: 2147483646;
   pointer-events: none;
   background: var(--sn-overlay-bg);
   color: var(--sn-fg);

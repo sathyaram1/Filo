@@ -98,14 +98,18 @@ test('un’impostazione applicata subito torna al modello come applicata, non co
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
   await installScript(app, [
-    { toolCalls: [{ id: 'p1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
+    // Una lettura nel giro: l'impostazione da sola chiuderebbe il turno senza rimandare l'esito al modello (#1130).
+    { toolCalls: [
+      { id: 'p1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' },
+      { id: 'p2', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' },
+    ] },
     { text: 'Tema scuro attivo.' },
   ]);
   await page.locator('#input').fill('metti il tema scuro');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Tema scuro attivo.' })).toBeVisible({ timeout: 20_000 });
-  const tool = await app.evaluate(() => globalThis.__captured[1].messages.filter((m) => m.role === 'tool').pop());
-  expect(tool.tool_call_id).toBe('p1');
+  const tool = await app.evaluate(() => globalThis.__captured[1].messages.find((m) => m.role === 'tool' && m.tool_call_id === 'p1'));
+  expect(tool).toBeTruthy();
   // Dopo il fatto, come si torna indietro (#949).
   expect(tool.content).toMatch(/^Eseguita: Impostazione applicata: Tema → Scuro\. .*«annulla»/);
   expect(tool.content).not.toMatch(/vuole/);

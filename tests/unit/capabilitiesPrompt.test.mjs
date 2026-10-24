@@ -28,7 +28,7 @@ const LEVELS = globalThis.SN_ACTION_LEVELS;
 const C = globalThis.SN_CONST;
 
 test('renderIndexForPrompt: una riga per capacità (titolo + id) sotto la sua categoria', () => {
-  const idx = CAP.renderIndexForPrompt({ redteam: true });
+  const idx = CAP.renderIndexForPrompt({ redteam: true, bacheca: true, mazzi: true });
   // Ogni capacità del manifesto compare con titolo e id stabile (tutti i cancelli aperti).
   for (const c of CAP.CAPABILITIES) {
     assert.ok(idx.includes(`${c.title} [${c.id}]`), `manca dall'indice: ${c.id}`);

@@ -336,11 +336,15 @@ html, body {
   margin-top: 16px;
 }
 
+/* Le voci fuori schermo non si impaginano: ogni lettera della ricerca e ogni lotto disegnato scorrendo impaginavano
+   cento risposte lunghe per mostrarne otto. L'altezza stimata vale finché la voce non è stata vista. */
 .sn-history-item {
   border: 1px solid var(--sn-border);
   border-radius: var(--sn-radius);
   padding: 12px;
   background: var(--sn-bg);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
 }
 
 .sn-history-meta {
@@ -364,6 +368,8 @@ html, body {
   margin-left: 8px;
   color: var(--sn-error);
   font-weight: 600;
+  white-space: nowrap;
+  cursor: help;
 }
 
 /* Quota di testo in ingresso riusata da una richiesta precedente: dato di servizio, discreto accanto
@@ -571,13 +577,16 @@ html, body {
   margin-top: 12px;
 }
 .sn-spell-add-row:has(#newDictWord),
-section:has(#dictList) .sn-spell-add-row {
+section:has(#dictList) .sn-spell-add-row,
+section:has(#rifiutateList) .sn-spell-add-row {
   grid-template-columns: 1fr auto;
 }
 
+/* Ogni riga è una griglia a sé, intestazione compresa: una colonna `auto` vuota nell'intestazione
+   si stringe a zero e le scritte scivolano sopra i controlli sbagliati. Da qui i pulsanti a misura fissa. */
 .sn-model-row {
   display: grid;
-  grid-template-columns: 120px 150px 1fr auto auto;
+  grid-template-columns: 120px 150px minmax(0, 1fr) 76px 68px;
   gap: 6px;
   align-items: center;
   padding: 6px 8px;
@@ -588,10 +597,12 @@ section:has(#dictList) .sn-spell-add-row {
 }
 .sn-model-row input[type="text"],
 .sn-model-row select { width: 100%; font-size: 12px; }
-/* La colonna in più per il livello di reasoning vale solo nei Modelli predefiniti dell'owner:
-   le righe del registry nelle Opzioni utente restano a cinque colonne. */
+/* Reasoning e ordinamento host valgono solo nei Modelli predefiniti dell'owner. A misura fissa le sette
+   colonne non entravano in una finestra stretta: si stringono tutte, e la stringa del modello ha un minimo. */
 .sn-model-row.sn-model-row-reason {
-  grid-template-columns: 110px 130px 1fr 92px auto auto;
+  grid-template-columns:
+    minmax(84px, 110px) minmax(94px, 130px) minmax(120px, 1fr)
+    minmax(70px, 92px) minmax(108px, 184px) minmax(68px, 76px) minmax(58px, 68px);
 }
 /* Campo "stringa modello": wrapper position:relative perché il popup custom
    (.sn-select-pop) si ancora lì sotto, al posto della datalist nativa. */
@@ -606,15 +617,24 @@ section:has(#dictList) .sn-spell-add-row {
   min-height: 14px;
   margin-top: 2px;
 }
+/* Il bordo resta, trasparente: senza, l'intestazione sarebbe larga due pixel più
+   delle righe e le colonne non cadrebbero nello stesso punto. */
 .sn-model-row-head {
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--sn-muted);
   padding: 0 8px;
   margin-bottom: 2px;
+}
+/* Una scritta più larga della sua colonna si stampava sopra quella accanto: chi legge
+   non capiva più quale controllo descrivesse. */
+.sn-model-row-head > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Riga scartata dal salvataggio (nickname mancante o duplicato): messaggio inline, niente alert bloccante. */
@@ -626,6 +646,13 @@ section:has(#dictList) .sn-spell-add-row {
   color: var(--sn-error);
 }
 .sn-model-row-msg:empty { display: none; }
+/* Il produttore del modello può servirlo (#1059): non blocca il salvataggio, ma è la politica che salta. */
+.sn-model-row-warn {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--sn-error);
+}
+.sn-model-row-warn[hidden] { display: none; }
 /* Quando una riga è stata scartata l'indicatore prende il colore d'allerta: un "Salvato" verde
    affermerebbe un salvataggio totale che non c'è stato. */
 .sn-page .sn-saved-indicator.sn-hint-warn { color: var(--sn-error); }
@@ -644,7 +671,7 @@ section:has(#dictList) .sn-spell-add-row {
 .sn-page .sn-saved-indicator.sn-wipe-hint { display: block; margin: 8px 0 0; }
 
 .sn-default-model-row {
-  grid-template-columns: 120px 110px 1fr auto;
+  grid-template-columns: 120px 110px minmax(0, 1fr) 68px;
 }
 .sn-default-model-cell {
   font-size: 12px;
@@ -822,6 +849,7 @@ section:has(#dictList) .sn-spell-add-row {
   margin-bottom: 6px;
   font-size: 13px;
 }
+.sn-page #cookie-wl-list .sn-cookie-wl-nota { display: block; margin-top: 2px; color: var(--sn-error); font-size: 12px; line-height: 1.4; }
 .sn-page #cookie-wl-list li button,
 .sn-page #cookie-banners-list li button,
 .sn-page #cookie-done-list li button,

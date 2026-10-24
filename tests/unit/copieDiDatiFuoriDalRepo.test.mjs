@@ -9,9 +9,14 @@ import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inspect } from 'node:util';
+import { Console } from 'node:console';
+import { Writable } from 'node:stream';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { scene, togliScene, runHookRaw, stdinEdit, git as gitScena } from '../helpers/scenaHook.mjs';
-import { copieNelRepo, motivoCopia, motivoCopiaTesto, CARTELLA_FINTI, installaControlloSpedizione } from '../../scripts/lib/copie-di-dati.mjs';
+import {
+  copieNelRepo, motivoCopia, motivoCopiaTesto, motivoContenuto, CARTELLA_FINTI, installaControlloSpedizione,
+} from '../../scripts/lib/copie-di-dati.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -272,5 +277,187 @@ describe('copie di dati del server fuori dal repo', () => {
     writeFileSync(dove, '#!/bin/sh\nexit 0\n');
     assert.equal(installaControlloSpedizione(s.work), 'altrui');
     assert.equal(readFileSync(dove, 'utf8'), '#!/bin/sh\nexit 0\n');
+  });
+});
+
+// La copia si riconosce dal contenuto, i campi di un feedback insieme, in qualunque forma sia scritta (#1360).
+describe('una copia dei feedback si ferma in qualunque forma, intera o tagliata', () => {
+  after(togliScene);
+
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Filo/0.9.3 Electron/33.0.0';
+  const FB = [
+    { id: 'abc123', text: 'il tasto non va, l\'ho detto "due" volte\nseconda riga', clientId: 'c-1', userAgent: UA, seq: 3 },
+    { id: 'def456', text: 'grazie', clientId: 'c-2', userAgent: 'Mozilla/5.0' },
+  ];
+  const nelFormatoDelServer = (f) => Object.fromEntries(Object.entries(f)
+    .map(([k, v]) => [k, typeof v === 'number' ? { integerValue: String(v) } : { stringValue: v }]));
+  const pyStr = (s) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n')}'`;
+  const py = (v) => (Array.isArray(v) ? `[${v.map(py).join(', ')}]`
+    : typeof v === 'object' ? `{${Object.entries(v).map(([k, x]) => `${pyStr(k)}: ${py(x)}`).join(', ')}}`
+      : typeof v === 'string' ? pyStr(v) : String(v));
+  const csv = (s) => (/[",\n]/.test(String(s)) ? `"${String(s).replace(/"/g, '""')}"` : String(s));
+  const unaRiga = (s) => s.replace(/\n/g, ' ');
+  const documento = (f) => ({ name: `projects/filo/databases/(default)/documents/feedback/${f.id}`, fields: nelFormatoDelServer(f) });
+  // Come la stampa di un DataFrame: colonne allineate a destra, due spazi fra l'una e l'altra, l'indice senza nome.
+  const tabellaDiPandas = (righe, nomi) => {
+    const tutte = [['', ...nomi], ...righe.map((r, i) => [String(i), ...r])];
+    const larghe = tutte[0].map((_, k) => Math.max(...tutte.map((r) => r[k].length)));
+    return tutte.map((r) => r.map((c, k) => c.padStart(larghe[k])).join('  ')).join('\n');
+  };
+  const tabellaDiNode = (righe) => {
+    let fuori = '';
+    const stdout = new Writable({ write(pezzo, _, fatto) { fuori += pezzo; fatto(); } });
+    new Console({ stdout, colorMode: false }).table(righe);
+    return fuori;
+  };
+
+  const FORME = {
+    // #1108.2: le forme che non sono JSON.
+    'la stampa normale di node': inspect(FB),
+    'la stampa di node con un titolo davanti': `Trovati ${FB.length} feedback:\n${inspect(FB)}\n`,
+    'la stampa di node di una risposta di Firestore': inspect({ documents: FB.map(documento) }),
+    'la stampa di node a colori': inspect(FB, { colors: true }),
+    'console.table di node': tabellaDiNode(FB.map(({ id, text, clientId, userAgent }) => ({ id, text, clientId, userAgent }))),
+    'una tabella di pandas': tabellaDiPandas(FB.map((f) => [f.id, unaRiga(f.text), f.clientId, f.userAgent]), ['id', 'text', 'clientId', 'userAgent']),
+    'una risposta salvata con le intestazioni HTTP': `HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=UTF-8\r\nVary: Origin\r\n\r\n${JSON.stringify({ documents: FB.map(documento) }, null, 2)}`,
+    'una risposta HTTP in chiaro': `HTTP/2 200\ncontent-type: application/json\n\n${JSON.stringify(FB)}`,
+    'un CSV con testo, identificativo e user agent': ['id,text,clientId,userAgent', ...FB.map((f) => [f.id, f.text, f.clientId, f.userAgent].map(csv).join(','))].join('\n'),
+    'un CSV col punto e virgola, senza virgolette': ['id;text;clientId;userAgent', ...FB.map((f) => [f.id, unaRiga(f.text), f.clientId, f.userAgent].join(';'))].join('\r\n'),
+    'un TSV': ['text\tclientId\tuserAgent', ...FB.map((f) => [unaRiga(f.text), f.clientId, f.userAgent].join('\t'))].join('\n'),
+    'una tabella markdown': ['| text | clientId | userAgent |', '|---|---|---|', ...FB.map((f) => `| ${unaRiga(f.text)} | ${f.clientId} | ${f.userAgent} |`)].join('\n'),
+    'un elenco nella sintassi di Python': py(FB),
+    'oggetti di Python': `[${FB.map((f) => `Feedback(text=${pyStr(f.text)}, clientId='${f.clientId}', userAgent='${f.userAgent}')`).join(', ')}]`,
+    'YAML': FB.map((f) => `- id: ${f.id}\n  text: "${unaRiga(f.text)}"\n  clientId: ${f.clientId}\n  userAgent: ${f.userAgent}`).join('\n'),
+    'righe «chiave: valore», a capo di Windows': FB.map((f) => `text: ${unaRiga(f.text)}\r\nclientId: ${f.clientId}\r\nuserAgent: ${f.userAgent}\r\n`).join('\r\n'),
+    'righe di log chiave=valore': FB.map((f) => `2026-10-19T10:00:00Z INFO text="${unaRiga(f.text).replace(/"/g, '\\"')}" clientId=${f.clientId} userAgent="${f.userAgent}"`).join('\n'),
+    'un JSON dentro una stringa': JSON.stringify(JSON.stringify(FB)),
+    // #1108.3: i soli campi dei documenti, nel formato del server, senza il percorso.
+    'i campi dei documenti nel formato del server': JSON.stringify(FB.map(nelFormatoDelServer), null, 2),
+    'una mappa identificativo → campi': JSON.stringify(Object.fromEntries(FB.map((f) => [f.id, nelFormatoDelServer(f)])), null, 2),
+    'una mappa identificativo → campi, stampata da node': inspect(Object.fromEntries(FB.map((f) => [f.id, nelFormatoDelServer(f)]))),
+  };
+
+  test('ogni forma è una copia', () => {
+    for (const [forma, testo] of Object.entries(FORME)) assert.notEqual(motivoCopiaTesto(testo), '', `${forma}: è una copia\n${testo}`);
+  });
+
+  // Senza i nomi esatti del server (jq @csv, la coda di un file, colonne rinominate) i dati sono gli stessi.
+  test('una copia senza i nomi dei campi, o con altri nomi, o di cui resta solo la coda, è una copia', () => {
+    const UA_VERO = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Filo/0.9.3 Chrome/130.0 Safari/537.36';
+    const tanti = Array.from({ length: 30 }, (_, i) => ({
+      id: `fbId${i}abcdefghijklmn`, text: `il tasto ${i} non risponde quando apro la scheda`, userAgent: UA_VERO, clientIdHash: String(i).padStart(32, 'a'),
+    }));
+    const righe = (elenco, d = ',') => elenco.map((f) => Object.values(f).map((v) => (d === ',' ? `"${v}"` : v)).join(d)).join('\n');
+    const senzaIntestazione = righe(tanti);
+    const conIntestazione = `id,text,userAgent,clientIdHash\n${senzaIntestazione}\n`;
+    const forme = {
+      'un CSV senza intestazione (jq @csv)': senzaIntestazione,
+      'la coda di un CSV': conIntestazione.split('\n').slice(-20).join('\n'),
+      'la coda di un TSV, senza virgolette': righe(tanti.slice(-5), '\t'),
+      'un elenco di soli valori (jq -c)': tanti.slice(0, 3).map((f) => JSON.stringify(Object.values(f))).join('\n'),
+      'colonne user_agent e client_id_hash': `id,text,user_agent,client_id_hash\n${righe(tanti.slice(0, 3))}`,
+      'una colonna «User Agent»': `id,text,User Agent,clientIdHash\n${righe(tanti.slice(0, 3))}`,
+      'una colonna useragent': `id,text,useragent,clientIdHash\n${righe(tanti.slice(0, 3))}`,
+      'chiavi user_agent in JSON': JSON.stringify(tanti.slice(0, 3).map((f) => ({ id: f.id, text: f.text, user_agent: f.userAgent }))),
+      'righe «User Agent: …»': `text: ${tanti[0].text}\nUser Agent: ${UA_VERO}\n`,
+      'la coda di un elenco nel formato del server': JSON.stringify(tanti.map(nelFormatoDelServer), null, 2).split('\n').slice(-12).join('\n'),
+      'la coda di una risposta di Firestore': JSON.stringify({ documents: tanti.map(documento) }, null, 2).split('\n').slice(-10).join('\n'),
+      'la coda di una stampa di node in una riga': JSON.stringify(tanti.slice(0, 2)).slice(JSON.stringify(tanti.slice(0, 2)).lastIndexOf('"id"')),
+    };
+    for (const [forma, testo] of Object.entries(forme)) assert.notEqual(motivoCopiaTesto(testo), '', `${forma}: è una copia\n${testo}`);
+    const non = {
+      'una configurazione di dispositivi': JSON.stringify({ 'Desktop Chrome': { userAgent: UA_VERO, defaultBrowserType: 'chromium', viewport: { width: 1280, height: 720 } } }, null, 2),
+      'un log di accessi': `1.2.3.4 - - [19/Oct/2026:10:00:00] "GET / HTTP/1.1" 200 512 "-" "${UA_VERO}"\n`,
+      'un user agent da solo in un CSV': `"${UA_VERO}",200,ok\n`,
+      'un elenco di regole che nomina i campi': "        ['text', 'url', 'title', 'userAgent', 'clientId',\n         'files', 'createdAt', 'seq']\n",
+      'la coda di un documento senza chi scrive': '    "titolo": "tasto"\n  },\n  "text": "il tasto non va"\n}\n',
+    };
+    for (const [caso, testo] of Object.entries(non)) assert.equal(motivoCopiaTesto(testo), '', `${caso}: non è una copia\n${testo}`);
+  });
+
+  test('lettura intera e interrotta seguono la stessa regola', () => {
+    for (const [forma, testo] of Object.entries(FORME)) {
+      // Da quando c'è il primo identificativo, o il percorso del primo documento, ogni taglio è una copia.
+      const da = Math.min(...['c-1', '/feedback/abc123'].map((s) => testo.indexOf(s)).filter((i) => i >= 0)) + 3;
+      for (let n = da; n <= testo.length; n++) {
+        assert.notEqual(motivoCopiaTesto(testo.slice(0, n)), '', `${forma}, tagliata a ${n} caratteri: è ancora una copia\n${testo.slice(0, n)}`);
+      }
+    }
+    // E il contrario: una lettura a metà non vede niente che l'intera non veda.
+    const innocui = ['{"text": "x", "titolo": "y", "fine": 1}', "[{ text: 'x', autore: 'y' }]", 'text,titolo\nx,y\n'];
+    for (const testo of innocui) {
+      assert.equal(motivoCopiaTesto(testo), '');
+      for (let n = 0; n < testo.length; n++) assert.equal(motivoCopiaTesto(testo.slice(0, n)), '', `${testo.slice(0, n)}`);
+    }
+  });
+
+  test('il formato del file non conta: UTF-16 di PowerShell, estensioni qualunque, un .md', () => {
+    const stampa = inspect(FB);
+    const utf16 = Buffer.concat([Buffer.from([0xFF, 0xFE]), Buffer.from(stampa, 'utf16le')]);
+    for (const [f, byte] of [['scripts/fb-console.txt', utf16], ['fb.log', Buffer.from(stampa)], ['note/fb.md', Buffer.from(`# feedback\n\n${stampa}`)],
+      ['scripts/fb-campi', Buffer.from(FORME['i campi dei documenti nel formato del server'])]]) {
+      assert.notEqual(motivoContenuto(f, byte), '', `${f}: è una copia`);
+    }
+    assert.equal(motivoContenuto('tests/fixtures/fb.txt', Buffer.from(stampa)), '', 'i dati finti delle prove stanno lì');
+    assert.equal(motivoContenuto('img.png', Buffer.from([0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0x0D, ...Buffer.from(stampa)])), '', 'un file binario non si legge');
+    // Il codice del repo scrive feedback finti come oggetti JS: lì conta solo un file che è tutto un JSON.
+    assert.equal(motivoContenuto('tests/x.spec.mjs', Buffer.from(`const FB = ${inspect(FB)};\n`)), '');
+    assert.notEqual(motivoContenuto('dump.js', Buffer.from(JSON.stringify(FB))), '');
+  });
+
+  test('quello che copia non è resta fuori, in ogni forma', () => {
+    const non = {
+      'prosa sui campi': 'I campi di un feedback sono text, clientId e userAgent: il testo e chi l\'ha scritto.\n',
+      'un elenco di nomi di campo': 'text, clientId, userAgent\n\nPoi, a parte, il resto: una frase, con virgole.\n',
+      'intestazione CSV senza righe': 'id,text,clientId,userAgent\n',
+      'tabella che descrive i campi': '| campo | cosa |\n|---|---|\n| text | il testo |\n| clientId | chi scrive |\n| userAgent | il browser |\n',
+      'una richiesta di curl': '> GET /v1/x HTTP/2\n> User-Agent: curl/8.4.0\n> Accept: */*\n< HTTP/2 200\n< content-type: application/json\n\n{"ok": true, "n": 3}\n',
+      'la stampa di node di una configurazione': inspect({ name: 'filo', scripts: { test: 'node --test' }, text: 'ciao' }),
+      'uno schema stampato da node': inspect({ text: { type: 'string' }, clientId: { type: 'string' } }),
+      'righe chiave: valore senza chi scrive': 'text: il tasto non va\ntitolo: tasto\n',
+      'un elenco di Python di numeri': '[1, 2, 3, (4, 5)]',
+      'testo italiano con apostrofi e parentesi': "L'utente [vedi nota] ha scritto {qualcosa}: l'ho letto (due volte) e clientId non c'era.\n",
+      'un documento qualunque col nome': inspect({ name: 'modulo', fields: ['a', 'b'] }),
+      'console.table senza chi scrive': tabellaDiNode([{ text: 'il tasto', titolo: 'tasto' }, { text: 'grazie', titolo: 'ok' }]),
+      'colonne allineate senza righe': '       id   text   clientId\n',
+    };
+    for (const [caso, testo] of Object.entries(non)) assert.equal(motivoCopiaTesto(testo), '', `${caso}: non è una copia\n${testo}`);
+    // Mille parentesi aperte in fila non fanno saltare il controllo (che senza esito lascerebbe passare tutto).
+    assert.notEqual(motivoCopiaTesto(`${'['.repeat(100000)}${JSON.stringify(FB)}`), '');
+  });
+
+  // I passi della segnalazione: la stampa di node rediretta in un file, i campi salvati come JSON, e il salvataggio dopo.
+  test('il salvataggio non spedisce la stampa di node né i soli campi nel formato del server; il resto parte', () => {
+    const { origin, work } = scene();
+    gitScena(work, ['checkout', '-q', '-b', 'claude/prova']);
+    mkdirSync(join(work, 'scripts', 'lib'), { recursive: true });
+    for (const f of ['scripts/copie-in-scena.mjs', 'scripts/lib/copie-di-dati.mjs']) copyFileSync(join(ROOT, f), join(work, f));
+    writeFileSync(join(work, 'scripts', 'fb-console.txt'), `${inspect(FB)}\n`);
+    writeFileSync(join(work, 'scripts', 'fb-campi.json'), FORME['i campi dei documenti nel formato del server']);
+    writeFileSync(join(work, 'note.md'), `# appunti\n\n${FORME['un CSV con testo, identificativo e user agent']}\n`);
+    writeFileSync(join(work, 'README.md'), 'lavoro\n');
+    const r = runHookRaw(work, stdinEdit(join(work, 'README.md')), { FILO_ROUTINE: '1' });
+    assert.equal(r.status, 0);
+    const su = gitScena(origin, ['ls-tree', '-r', '--name-only', 'claude/prova']).split('\n');
+    assert.ok(su.includes('README.md') && su.includes('scripts/copie-in-scena.mjs'), `il resto del lavoro parte: ${su}`);
+    for (const f of ['scripts/fb-console.txt', 'scripts/fb-campi.json', 'note.md']) assert.ok(!su.includes(f), `${f} è arrivato su origin: ${su}`);
+    assert.match(r.stdout, /fb-console\.txt/, 'la sessione sa cosa non è partito');
+  });
+
+  test('col controllo di git una copia in un .md o in un .txt non parte nemmeno con un push a mano', () => {
+    const s = scene();
+    gitScena(s.work, ['checkout', '-q', '-b', 'claude/prova']);
+    mkdirSync(join(s.work, 'scripts', 'lib'), { recursive: true });
+    for (const f of ['scripts/copie-in-scena.mjs', 'scripts/lib/copie-di-dati.mjs']) copyFileSync(join(ROOT, f), join(s.work, f));
+    gitScena(s.work, ['add', '-A']);
+    gitScena(s.work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'strumenti']);
+    assert.equal(installaControlloSpedizione(s.work), 'installato');
+    for (const [f, testo] of [['fb.md', `# copia\n\n${inspect(FB)}\n`], ['scripts/fb-console.txt', py(FB)]]) {
+      writeFileSync(join(s.work, f), testo);
+      gitScena(s.work, ['add', '-A']);
+      gitScena(s.work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'copia']);
+      assert.throws(() => gitScena(s.work, ['push', '-q', 'origin', 'claude/prova']), /copia dei dati del server/, f);
+      gitScena(s.work, ['reset', '-q', '--hard', 'HEAD~1']);
+    }
   });
 });

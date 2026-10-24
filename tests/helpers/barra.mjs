@@ -36,6 +36,21 @@ export function statoBarra(app) {
   });
 }
 
+// Aperta dal bordo, la barra si chiude se il puntatore del sistema è lontano e il pannello non ha ancora detto «dentro»;
+// il mouse di Playwright muove solo quello di una vista. Da qui il main lo legge dove lo muove la prova (#1216.2).
+export function puntatoreCheSegue(app) {
+  return app.evaluate(({ app: a, screen, webContents }) => {
+    if (screen.__veroPuntatore) return;
+    screen.__veroPuntatore = screen.getCursorScreenPoint;
+    screen.getCursorScreenPoint = () => globalThis.__puntoFinto || screen.__veroPuntatore();
+    const segui = (wc) => wc.on('input-event', (_e, i) => {
+      if (/^mouse(Move|Down|Up)$/.test(i && i.type) && Number.isFinite(i.globalX)) globalThis.__puntoFinto = { x: i.globalX, y: i.globalY };
+    });
+    for (const wc of webContents.getAllWebContents()) segui(wc);
+    a.on('web-contents-created', (_e, wc) => segui(wc));
+  });
+}
+
 export function comandaBarra(app, cosa) {
   return app.evaluate(({ BrowserWindow }, c) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);

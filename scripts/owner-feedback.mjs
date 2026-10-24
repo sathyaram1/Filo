@@ -48,7 +48,7 @@
 //   Un segno locale su una pratica chiusa ne toglie la scheda dalla bacheca pubblica: era un lavoro locale.
 //
 //   `--solo-locale`: la pratica la lavora solo una sessione locale, nessuna
-//   routine la prende, e in Gestione sta nei Lavori locali. Solo sui feedback
+//   routine la prende, e in Gestione porta l'etichetta «server». Solo sui feedback
 //   dell'owner o di una sessione con la prova del mittente (#595).
 //   `--non-locale` lo toglie. Su un feedback di un utente il segno si rifiuta:
 //   se richiede lavoro locale, `--serve-locale` lo riporta nei Ricevuti
@@ -57,6 +57,7 @@
 //   tasto «💻 Lavoro server» dei Ricevuti in Gestione (#957). Salta L5, e una sessione ingannata da un testo
 //   d'utente, con le credenziali dell'owner, se lo darebbe da sola. `--approva-locale` si rifiuta. Per la
 //   stessa ragione la fiducia (#1148): «Segna fidato» lo dà solo l'owner, in Gestione, dopo aver letto il testo.
+//   E una nota nuova su un feedback fidato, da una sessione senza biglietto pulito, gliela toglie prima (#1428).
 //   `--riconosci`, `--preapprova` e `--chiedi-prima` non ci sono più e si rifiutano col perché.
 //
 //   `--come-routine`: la macchina a stati distingue chi scrive. L'owner decide
@@ -493,7 +494,7 @@ export async function registraParte(id, parte, opts = {}) {
 
 /**
  * Il rifiuto di una pratica come lo legge la sessione. PURA. Propone solo le strade che su QUESTA pratica
- * funzionano: niente ripasso né prova su parola a un segnalato, niente rimando nei Ricevuti a chi c'è già.
+ * funzionano: niente prova su parola a un segnalato, niente rimando nei Ricevuti a chi c'è già.
  */
 export function rifiutoPratica(id, r) {
   const righe = [`RIFIUTATO: ${String((r && r.motivo) || 'pratica non lavorabile in locale').replace(/\.$/, '')}.`];
@@ -507,7 +508,6 @@ export function rifiutoPratica(id, r) {
   } else if (r && r.nonFidato) {
     righe.push(SOLO_DA_GESTIONE_MIO);
   } else if (r && r.senzaProva) {
-    // #912: il ripasso non dà più la prova al solo nome.
     righe.push(SOLO_DA_GESTIONE_MIO);
     righe.push('Altrimenti vale come un utente.');
   }
@@ -697,6 +697,39 @@ async function notePrecedentiInChiaro(doc) {
   } catch (_) { return ''; }
 }
 
+/** Il biglietto di chi scrive e la fiducia tolta: oggetto, perché le prove li sostituiscono (i veri vanno in rete). */
+export const sessione = {
+  async biglietto() {
+    const { trovaBiglietto } = await import('./lib/biglietto-locale.mjs');
+    return trovaBiglietto();
+  },
+  async togliFiducia(id) {
+    const { togliFiducia } = await import('./lib/togli-fiducia.mjs');
+    return togliFiducia(id);
+  },
+};
+
+/** Perché il biglietto di chi scrive non è pulito; '' se lo è. Assente, sporco, in attesa o illeggibile non lo sono. PURA. */
+export function bigliettoNonPulito(b) {
+  if (b && b.inAttesa) return 'il biglietto ha una lettura esterna che il server non ha ancora ricevuto';
+  if (b && b.errore) return `il biglietto non si legge (${b.errore})`;
+  if (!b || !b.fp) return 'questa sessione non ha un biglietto';
+  if (b.fiducia !== 'fidato') return 'il biglietto della sessione è sporco';
+  return '';
+}
+
+/** Cosa dice il terminale quando una nota toglie la fiducia (#1428). PURA. */
+export function avvisoFiduciaTolta(rif, motivo, { dryRun = false } = {}) {
+  const chi = String(rif ?? '').trim();
+  const prima = dryRun ? `(prova a vuoto) Toglierei la fiducia a ${chi}` : `Ho tolto la fiducia a ${chi}`;
+  return `${prima} prima di scrivere la nota, perché ${motivo} e chi lavora un feedback legge le note come decisioni dell’owner. `
+    + 'La rimette solo l’owner, in Gestione, col tasto «🤝 Segna fidato» dopo aver letto la nota.';
+}
+
+async function bigliettoDiChiScrive() {
+  try { return await sessione.biglietto(); } catch (e) { return { errore: String((e && e.message) || e) }; }
+}
+
 export async function scrivi(id, to, nota, opts = {}) {
   if (!ALLOWED.includes(to)) return { ok: false, motivo: `stato non valido: "${to}"` };
   if (typeof opts.frase === 'string') {
@@ -714,7 +747,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   const bearer = opts.bearer || await acquireBearer();
   // La pratica coi campi di ogni altro passaggio (CAMPI_PRATICA: senza il sì dell'owner un approvato
   // sembra un utente, #913) più le note da fondere. La lettura va nel conto di chi ci ha mandato qui (#680).
-  const doc = await getDoc(id, bearer, [...CAMPI_PRATICA, 'notes']);
+  const doc = await getDoc(id, bearer, [...CAMPI_PRATICA, 'notes', 'seq', 'subSeq']);
   if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
 
@@ -752,10 +785,12 @@ export async function scrivi(id, to, nota, opts = {}) {
   // I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8): il report per te viaggia
   // cifrato, la frase per chi ha mandato il feedback resta in chiaro — la legge
   // sulla sua macchina, che la chiave non ce l'ha.
+  let notaNuova = false;
   if (typeof nota === 'string' && nota.trim()) {
     // Si fonde e si taglia sul testo IN CHIARO, poi si cifra.
     const esistenti = await notePrecedentiInChiaro(doc);
     const fuse = THREAD ? THREAD.mergeModelReport(esistenti, nota) : nota;
+    notaNuova = fuse !== esistenti;
     const capped = THREAD?.capNotes ? THREAD.capNotes(fuse) : fuse;
     if (CRYPTO?.isEnabled?.()) {
       try { set('notes', await CRYPTO.encryptForOwner(capped)); }
@@ -784,16 +819,65 @@ export async function scrivi(id, to, nota, opts = {}) {
   mask.push('updatedAt');
   fields.updatedAt = firmaOra();
 
-  if (opts.dryRun) return { ok: true, from, to, dryRun: true, campi: mask };
+  // #1428: chi lavora legge le note come decisioni dell'owner, e un fidato salta giudici e L5. Da una sessione senza
+  // biglietto pulito la nota non si distingue da una falsa: il feedback perde prima la fiducia, e senza questo niente nota.
+  let fiduciaTolta = '';
+  if (notaNuova && MR.isFidato({ fiducia: doc.fields?.fiducia?.stringValue })) {
+    fiduciaTolta = bigliettoNonPulito(await bigliettoDiChiScrive());
+  }
+  // Il server toglie la fiducia solo a una pratica aperta (MR.fiduciaTogliCheck): chi la riapre la riapre prima e scrive
+  // la nota dopo; chi la lascia chiusa non ha modo di toglierla, quindi la nota non parte.
+  const chiusa = (s) => (statusToPublic ? statusToPublic(s) : 'open') === 'closed';
+  const chiusaPrima = fiduciaTolta && (chiusa(from) || doc.fields?.statusPublic?.stringValue === 'closed');
+  if (chiusaPrima && chiusa(to)) {
+    return { ok: false, motivo: `la pratica è chiusa e fidata, e da chiusa la fiducia non si toglie: senza toglierla la nota non la scrivo, perché ${fiduciaTolta}. Non ho toccato niente. La scrive una sessione col biglietto pulito; oppure riaprila con la stessa nota, e la fiducia cade prima della nota`, from };
+  }
+  // La prova a vuoto lo dice solo a chi l'ha chiesta (la riga di comando): server:fondi la usa come controllo prima di scrivere.
+  if (opts.dryRun) return { ok: true, from, to, dryRun: true, campi: mask, ...(fiduciaTolta ? { fiduciaTolta } : {}) };
+  const scriviCampi = async (m) => {
+    const q = m.map((k) => `updateMask.fieldPaths=${k}`).join('&');
+    const corpo = Object.fromEntries(Object.entries(fields).filter(([k]) => m.includes(k)));
+    const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+      body: JSON.stringify({ fields: corpo }),
+    }, { fetchImpl: fetchRitentato });
+    return res.ok ? '' : `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}`;
+  };
+  let daScrivere = mask;
+  let riaperta = false;
+  if (fiduciaTolta) {
+    if (chiusaPrima) {
+      const errore = await scriviCampi(mask.filter((k) => k !== 'notes'));
+      if (errore) return { ok: false, motivo: `${errore}. Non ho toccato niente`, from };
+      riaperta = true;
+      daScrivere = ['notes', 'updatedAt'];
+    }
+    const giaRiaperta = riaperta ? ` Ho già riaperto la pratica («${from}» → «${to}»): rilancia lo stesso comando, da aperta la fiducia si toglie prima della nota.` : ' Non ho toccato niente.';
+    const t = await sessione.togliFiducia(id).catch((e) => ({ ok: false, motivo: String((e && e.message) || e) }));
+    if (!t || !t.ok) {
+      return { ok: false, motivo: `non ho potuto togliere la fiducia (${(t && t.motivo) || 'senza motivo'}). Senza, su un feedback fidato la nota non la scrivo, perché ${fiduciaTolta}.${giaRiaperta}`, from };
+    }
+    // Ogni porta (riga di comando, giri di verifica, server:fondi, finish) lo dice sul terminale senza doverlo ripetere.
+    (typeof opts.avviso === 'function' ? opts.avviso : console.error)(avvisoFiduciaTolta(opts.rif || numeroDelDoc(doc) || id, fiduciaTolta));
+    // Il passaggio è stato controllato sullo stato letto prima: se il server ha spostato la pratica, quel controllo non vale più.
+    const atteso = riaperta ? to : from;
+    const dopo = await getDoc(id, bearer, ['status']).then((d) => (d ? statoAttuale(d) : { leggibile: false })).catch(() => ({ leggibile: false }));
+    if (!dopo.leggibile || dopo.from !== atteso) {
+      return { ok: false, motivo: `ho tolto la fiducia, ma la pratica ${dopo.leggibile ? `è passata da «${atteso}» a «${dopo.from}»` : 'non si rilegge'}: la nota non l'ho scritta, rilancia il comando`, from };
+    }
+  }
 
-  const q = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
-  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-    body: JSON.stringify({ fields }),
-  }, { fetchImpl: fetchRitentato });
-  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}) };
+  const errore = await scriviCampi(daScrivere);
+  if (errore) return { ok: false, motivo: `${errore}${fiduciaTolta ? `. La fiducia l’ho già tolta${riaperta ? ' e la pratica è riaperta, senza la nota' : ''}` : ''}`, from };
+  return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}), ...(fiduciaTolta ? { fiduciaTolta } : {}) };
+}
+
+/** «#553» dai campi del documento, '' senza numero: l'avviso deve nominare la pratica come la mostra la Gestione. */
+function numeroDelDoc(doc) {
+  const f = doc?.fields || {};
+  const n = globalThis.SN_FEEDBACK?.formatNum?.(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)) || '';
+  return n ? `#${n}` : '';
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
@@ -869,7 +953,8 @@ if (isMain) {
   const posizionali = [];
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a.startsWith('--')) { if (CON_VALORE.has(a)) i += 1; continue; }
+    // Per nome esatto: «-- vedi sotto» passa il controllo come testo, e qui non deve sparire (#878).
+    if (OPZ.opzioni.includes(a)) { if (CON_VALORE.has(a)) i += 1; continue; }
     posizionali.push(a);
   }
   const [riferimento, status, ...nota] = posizionali;
@@ -906,7 +991,7 @@ if (isMain) {
 
   // #914: le routine non aprono lavoro locale; quello che si fa solo in locale lo rimandano dal canale.
   if (argv.includes('--solo-locale') && isRoutineInstance(ROOT)) {
-    console.error('RIFIUTATO: una routine non segna lavoro locale. Rimandalo nei Ricevuti: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché" — non ho toccato niente.');
+    console.error('RIFIUTATO: una routine non segna lavoro locale. Se serve il server, passalo ai lavori server: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché" — non ho toccato niente.');
     process.exit(3);
   }
 
@@ -997,7 +1082,7 @@ if (isMain) {
     process.exit(1);
   }
 
-  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, priorita, dryRun, attore, bearer });
+  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, priorita, dryRun, attore, bearer, rif: riferimento });
   if (!r.ok) {
     console.error(r.utente || r.senzaSegno ? rifiutoPratica(riferimento, r) : `RIFIUTATO: ${r.motivo}`);
     if (attore === 'owner' && /non è un passaggio permesso/.test(r.motivo || '')) {
@@ -1011,6 +1096,7 @@ if (isMain) {
   console.log(r.dryRun
     ? `(prova a vuoto) ${r.from} → ${r.to}; campi che scriverei: ${campiLeggibili(r.campi, priorita)}`
     : `OK: ${riferimento} da "${r.from}" a "${r.to}"${priorita !== undefined ? `, priorità ${priorita} decisa a mano` : ''}${r.partiAzzerate ? '; le parti del lavoro già su main ripartono da zero' : ''}.`);
+  if (r.dryRun && r.fiduciaTolta) console.log(avvisoFiduciaTolta(riferimento, r.fiduciaTolta, { dryRun: true }));
   // Come la chiusura di finish e di server:fondi (#913): la chiusura a mano è quella di un lavoro senza fusione.
   if (!r.dryRun && r.to === 'done' && !(typeof frase === 'string' && frase.trim())) {
     const promemoria = await fraseDaScrivere(id, riferimento, { bearer });

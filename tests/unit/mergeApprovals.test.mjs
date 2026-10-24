@@ -182,6 +182,38 @@ describe('i motivi del blocco', () => {
     assert.deepEqual(UI.blockItems({ items: ['a.js'], more: 4 }), ['a.js', '… e altri 4']);
     assert.deepEqual(UI.blockItems({}), []);
   });
+
+  // #1404: ogni riga dice dove sta, e i blocchi si leggono divisi per tipo.
+  test('dove sta una voce: file e riga, o il solo file', () => {
+    assert.equal(UI.doveVoce({ file: 'src/a.js', riga: 12 }), 'src/a.js:12');
+    assert.equal(UI.doveVoce({ file: 'firestore.rules' }), 'firestore.rules');
+    assert.equal(UI.doveVoce({ file: 'x.js', riga: 'dodici' }), 'x.js');
+    assert.equal(UI.doveVoce({ testo: 'eval(x)' }), '');
+  });
+
+  test('si apre solo un collegamento a GitHub in https', () => {
+    assert.equal(UI.linkGitHub('https://github.com/o/r/compare/a...b#diff-1R2'), 'https://github.com/o/r/compare/a...b#diff-1R2');
+    for (const no of ['javascript:alert(1)', 'http://github.com/o/r', 'https://github.com.sito.com/x', 'https://sito.com/?u=https://github.com/', 'https://github.com/a"onmouseover="x', '']) {
+      assert.equal(UI.linkGitHub(no), '', no);
+    }
+  });
+
+  test('i blocchi si dividono in guardie, capacità e diff, in quest’ordine; un gruppo ignoto non sparisce', () => {
+    const g = UI.gruppiDiBlocchi([
+      { gate: 'eval', gruppo: 'capacita' }, { gate: 'nuovo', gruppo: 'futuro' }, { gate: 'guard', gruppo: 'guardie' }, { gate: 'int', gruppo: 'contenuto' },
+    ]);
+    assert.deepEqual(g.map((x) => [x.gruppo, x.titolo, x.blocchi.map((b) => b.gate)]), [
+      ['guardie', 'Guardie toccate', ['guard']], ['capacita', 'Capacità nuove', ['eval']], ['contenuto', 'Diff da guardare a mano', ['int']], ['altro', 'Altri controlli', ['nuovo']],
+    ]);
+    // Un server di prima non manda i gruppi: un elenco solo, come allora.
+    assert.deepEqual(UI.gruppiDiBlocchi([{ gate: 'a' }, { gate: 'b' }]).map((x) => [x.titolo, x.blocchi.length]), [['', 2]]);
+    assert.deepEqual(UI.gruppiDiBlocchi([]), []);
+  });
+
+  test('le voci di un blocco: quelle del server nuovo, nessuna da uno di prima', () => {
+    assert.deepEqual(UI.blockVoci({ voci: [{ file: 'a.js', riga: 1, testo: 'x' }, null, {}] }), [{ file: 'a.js', riga: 1, testo: 'x' }]);
+    assert.deepEqual(UI.blockVoci({ items: ['a.js'] }), []);
+  });
 });
 
 describe('l’esito di un’approvazione', () => {

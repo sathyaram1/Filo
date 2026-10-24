@@ -78,6 +78,27 @@ test('elencoDaTesto: più siti incollati sulla stessa riga valgono uno per uno, 
   assert.deepEqual(r.invalid, ['faceb']);
   assert.equal(N.testoDaElenco(r.valid, r.scartate), 'faceb\nfigma.com');
   assert.deepEqual(N.elencoDaTesto('https://www.esempio.it/cerca?q=a,b c').valid, ['esempio.it']);
+  // Una riga dove nessun pezzo è un sito resta una riga: scartata, si dice e si rimette com'era scritta.
+  const s = N.elencoDaTesto('studio rossi\nfigma.com');
+  assert.deepEqual(s.invalid, ['studio rossi']);
+  assert.equal(N.testoDaElenco(s.valid, s.scartate), 'studio rossi\nfigma.com');
+  // Anche accanto a un sito: quello che non è un sito si dice intero, com'era scritto, e torna al suo posto (#718.3).
+  const m = N.elencoDaTesto('banca.it studio rossi, poste.it\nstudio, rossi; figma.com');
+  assert.deepEqual(m.valid, ['banca.it', 'poste.it', 'figma.com']);
+  assert.deepEqual(m.invalid, ['studio rossi', 'studio, rossi']);
+  assert.equal(N.testoDaElenco(m.valid, m.scartate), 'banca.it\nstudio rossi\nposte.it\nstudio, rossi\nfigma.com');
+});
+
+test('pezziDi: un sito per pezzo, il resto fra due siti in un pezzo solo; le parole da saltare separano', () => {
+  assert.deepEqual(N.pezziDi('  studio   rossi  '), ['studio   rossi']);
+  assert.deepEqual(N.pezziDi('studio rossi banca.it'), ['studio rossi', 'banca.it']);
+  assert.deepEqual(N.pezziDi('https://x.it/?a=1,2'), ['https://x.it/?a=1,2']);
+  assert.deepEqual(N.elencoDaTesto('https://mail.google.com/mail/u/0/, news.bbc.co.uk').valid, ['mail.google.com', 'news.bbc.co.uk']);
+  const salta = new Set(['e', 'il', 'sito']);
+  assert.deepEqual(N.pezziDi('il sito studio rossi e faceb e banca.it', salta), ['studio rossi', 'faceb', 'banca.it']);
+  assert.deepEqual(N.pezziDi('il sito e', salta), []);
+  assert.deepEqual(N.pezziDi(''), []);
+  assert.deepEqual(N.pezziDi(null), []);
 });
 
 test('ripulisciElenco: un elenco salvato prima della riduzione torna ai nomi; quello che non è un sito resta com\'era', () => {

@@ -39,7 +39,8 @@
 
   const SLASH_COMMANDS = {
     '/home': () => { goHome(); },
-    '/clear': () => { goHome(); },
+    // Il filo è uno (#869): «pulisci» chiude la conversazione in corso, e il messaggio dopo ne comincia un'altra.
+    '/clear': () => { goHome({ nuova: true }); },
     '/clear all': () => { send({ type: MSG.CLOSE_ALL_TABS }); },
     '/kill': () => { send({ type: MSG.QUIT_APP }); },
     '/newtab': () => { send({ type: MSG.OPEN_URL, url: 'filo://newtab/' }); },
@@ -55,7 +56,7 @@
     '/feedback': (text, chat) => {
       if (!isOwner) {
         // #986 — chi cerca le sue segnalazioni ci arriva, non legge solo dove sono.
-        showFiloLine('I feedback li vede chi li gestisce: ti apro quelli che hai mandato tu, in Bacheca. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
+        showFiloLine('I feedback li vede chi li gestisce: ti apro quelli che hai mandato tu. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
         send({ type: MSG.OPEN_URL, url: 'filo://board/board.html#segnalazioni' });
         return;
       }
@@ -73,7 +74,8 @@
     '/help': (text, chat) => {
       if (document.body.dataset.state !== 'thread') goThread();
       const lines = [
-        '/home, /clear — ricarica la dashboard',
+        '/home — torna in fondo al filo',
+        '/clear — chiudi la conversazione in corso: il messaggio dopo ne apre un\'altra',
         '/clear all — chiudi tutte le schede',
         '/kill — chiudi Filo',
         '/newtab — apri una nuova scheda',
@@ -275,7 +277,7 @@
     if (!res || !res.ok) {
       const rifiuto = {
         no_wallet: 'nessuna persona con questo pseudonimo',
-        global_cap: 'si supererebbe il tetto di tutti i regali, alzalo nella pagina «Inviti e utenti» o carica OpenRouter',
+        global_cap: 'si supererebbe il tetto di tutti i regali, alzalo in Gestione, sezione Utenti, o carica OpenRouter',
         missing_exchange_rate: 'manca il cambio del giorno',
         provider_error: 'OpenRouter non ha accettato il tetto nuovo, niente è cambiato',
       }[res && res.reason];
@@ -329,13 +331,9 @@
   // "/pulisci" (o "/pulizia"): il riordino delle schede con la stessa regola e lo stesso popup della chat (#530).
   async function runTabCleanup(chat) {
     showFiloLine('🧹 Riordino in corso…', chat);
-    const r = await global.SN_DASH_ATTIVITA.riordinaSchede();
-    if (r.annullato) { showFiloLine('Riordino annullato.', chat); return; }
-    if (r.errore) { showFiloLine(`Riordino non riuscito: ${r.errore}.`, chat); return; }
-    const n = r.archived;
-    showFiloLine(n > 0
-      ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}.`
-      : '✓ Nessuna scheda da archiviare.', chat);
+    const e = await global.SN_DASH_ATTIVITA.riordinaSchede();
+    if (e.annullato) { showFiloLine('Riordino annullato.', chat); return; }
+    showFiloLine(e.ok ? `✓ ${e.testo}.` : `✗ ${e.testo}: ${e.motivo}`, chat);
   }
 
   // "/riordina": riordina la striscia delle schede per colore, esattamente come

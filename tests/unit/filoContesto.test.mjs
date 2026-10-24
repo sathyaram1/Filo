@@ -160,7 +160,10 @@ test('un messaggio enorme resta testa e coda, e dice dove si rilegge intero', ()
 });
 
 test('i tetti: vince l\'utente, poi l\'owner, poi il codice; fuori scala si riportano dentro', () => {
-  assert.deepEqual(FC.tetti(null, null), { giorni: 3, token: 100000, da: { giorni: 'codice', token: 'codice' } });
+  assert.deepEqual(FC.tetti(null, null), { giorni: 3, token: 100000, cache: '1h', da: { giorni: 'codice', token: 'codice', cache: 'codice' } });
+  assert.equal(FC.tetti({}, { cache: '5m' }).cache, '5m');
+  assert.equal(FC.tetti({ cache: '1h' }, { cache: '5m' }).cache, '1h');
+  assert.equal(FC.tetti({ cache: '3 giorni' }, { cache: 'mai' }).cache, '1h');
   assert.equal(FC.tetti({}, { giorni: 5 }).giorni, 5);
   assert.equal(FC.tetti({ giorni: 1 }, { giorni: 5 }).giorni, 1);
   assert.equal(FC.tetti({ giorni: '' }, { giorni: 5 }).giorni, 5);
@@ -296,6 +299,32 @@ test('senza vettori il ricordo per parole vuole due parole rare nello stesso sca
   assert.equal(FC.ricordiPerParole('grazie per il ristorante di Lisbona', tratti)[0].tratto.chat, 'lisbona');
 });
 
+test('senza vettori il ricordo per parole ripesca davanti a una domanda scritta normalmente: punteggiatura e parole assenti (#868.8)', () => {
+  require(join(ROOT, 'src', 'shared', 'chatArchive.js'));
+  const vecchi = [
+    ...scambio('lisbona', 24 * 10, 'consigliami un ristorante di pesce a Lisbona', 'La Taberna da Rua das Flores.'),
+    ...scambio('mutuo', 24 * 8, 'quanto pago di rata del mutuo?', 'La rata è di 640 euro al mese.'),
+    ...scambio('medico', 24 * 9, 'ho la visita dal dermatologo martedì', 'Te lo ricordo.'),
+  ];
+  const tratti = FC.tratti(vecchi);
+  for (const q of ['il ristorante di Lisbona?', 'il ristorante di «Lisbona»!', 'Lisbona, il ristorante...', 'come si chiamava il ristorante di Lisbona?']) {
+    const presi = FC.ricordiPerParole(q, tratti);
+    assert.equal(presi.length, 1, q);
+    assert.equal(presi[0].tratto.chat, 'lisbona', q);
+  }
+  // Le parole che non compaiono da nessuna parte non si pretendono, ma una sola parola rara resta troppo poco.
+  assert.deepEqual(FC.ricordiPerParole('come si chiamava quel tizio di Lisbona?', tratti), []);
+  assert.deepEqual(FC.ricordiPerParole('zanzibar? kilimangiaro!', tratti), []);
+  // Una parola rara che sta solo in un'altra conversazione non blocca lo scambio giusto: vince chi ne ha di più.
+  const conFilm = FC.tratti([
+    ...scambio('film', 24 * 15, 'come si chiamava quel film con De Niro sul taxi?', 'Taxi Driver, del 1976.'),
+    ...vecchi,
+  ]);
+  const presi = FC.ricordiPerParole('come si chiamava il ristorante di Lisbona?', conFilm);
+  assert.deepEqual(presi.map((r) => r.tratto.chat), ['lisbona']);
+  assert.deepEqual(FC.ricordiPerParole('come si chiamava il film di De Niro?', conFilm).map((r) => r.tratto.chat), ['film']);
+});
+
 test('una frase di cortesia detta una volta sola in una conversazione vecchia non la ripesca a ogni ripetizione', () => {
   require(join(ROOT, 'src', 'shared', 'chatArchive.js'));
   const vecchi = [
@@ -330,6 +359,29 @@ test('il rifiuto per finestra del modello si riconosce, e il tratto si stringe q
   // Senza misure il tratto si dimezza; senza tratto non c'è niente da stringere.
   assert.equal(FC.tettoDopoRifiuto({ caratteriTratto: 70000 }), Math.floor(35000 / FC.CARATTERI_PER_TOKEN));
   assert.equal(FC.tettoDopoRifiuto({ max: 1000, chiesti: 2000, caratteri: 100, caratteriTratto: 0 }), null);
+});
+
+test('una rilettura sta nella finestra nota del modello insieme al resto della richiesta, fin dal primo tentativo (#868.7)', () => {
+  const finestra = 32768;
+  const occupati = 6000;
+  const risposta = 4096;
+  const cap = FC.capRilettura({ tetto: 100000, finestra, occupati, risposta });
+  // Richiesta intera (quello che c'era, la rilettura, il tetto della risposta) sotto la finestra.
+  assert.ok(occupati + cap / FC.CARATTERI_PER_TOKEN + risposta <= finestra, `${cap}`);
+  assert.ok(cap > 50000, 'con la finestra quasi vuota la rilettura la usa');
+  // Senza finestra nota vale il tetto in token; con una finestra grande vince il tetto.
+  assert.equal(FC.capRilettura({ tetto: 100000 }), 100000 * FC.CARATTERI_PER_TOKEN);
+  assert.equal(FC.capRilettura({ tetto: 100000, finestra: 1000000, occupati, risposta }), 100000 * FC.CARATTERI_PER_TOKEN);
+  // Una finestra già piena lascia il minimo: il resto si legge a pezzi.
+  assert.equal(FC.capRilettura({ tetto: 100000, finestra, occupati: 30000, risposta }), FC.RILETTURA_MIN);
+  // Dopo un rifiuto la rilettura si accorcia quanto dicono le misure, mai sotto il minimo; al minimo non si stringe più.
+  const caratteri = 160000;
+  const caratteriRiletture = 150000;
+  const resta = FC.rilettureDopoRifiuto({ max: 32768, chiesti: 46000, caratteri, caratteriRiletture, n: 1 });
+  assert.ok((caratteri - caratteriRiletture) + resta <= caratteri * (32768 / 46000), `${resta}`);
+  assert.ok(resta >= FC.RILETTURA_MIN);
+  assert.ok(Math.abs(FC.rilettureDopoRifiuto({ caratteriRiletture: 100000 }) - 50000) < 5, 'senza misure si dimezza');
+  assert.equal(FC.rilettureDopoRifiuto({ caratteriRiletture: FC.RILETTURA_MIN }), null);
 });
 
 // #1166 — le immagini mandate in chat tornano col loro messaggio finché vive come una lettura; poi, o se non sono più

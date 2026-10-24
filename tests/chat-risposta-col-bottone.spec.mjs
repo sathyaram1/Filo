@@ -19,6 +19,9 @@ async function bollettaTari(app) {
 }
 
 const apriFile = (file, id = 'f1') => ({ id, name: 'APRI_FILE', arguments: JSON.stringify({ percorso: file }) });
+// Il primo giro con azioni, se fatto solo di bottoni o comandi secchi, chiude il turno (#1130): qui il modello prima
+// legge, come quando cerca la bolletta, e il giro dei bottoni è il secondo, quello che ha un giro dopo.
+const primaUnaLettura = { text: '', toolCalls: [{ id: 'c0', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' }] };
 const ultimaChat = (app) => app.evaluate(() => globalThis.SN_FILO_CHATS.list().then((l) => l[0]));
 
 test('la segnalazione: la risposta scritta col bottone del file resta nella bolla, e la frase del giro dopo la segue', async ({ app }) => {
@@ -26,6 +29,7 @@ test('la segnalazione: la risposta scritta col bottone del file resta nella boll
   const { dir, file } = await bollettaTari(app);
   try {
     await modelloFinto(app, [
+      primaUnaLettura,
       { text: RISPOSTA, toolCalls: [apriFile(file)] },
       { text: DOPO, ritardoMs: 2500 },
     ]);
@@ -34,7 +38,7 @@ test('la segnalazione: la risposta scritta col bottone del file resta nella boll
     const bolla = page.locator('.dash-bubble-filo');
 
     // Mentre il modello scrive il giro dopo, la risposta è già nella bolla e non è passata nel blocco.
-    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBe(2);
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBe(3);
     await page.waitForTimeout(500);
     await expect(bolla).toHaveCount(1);
     await expect(bolla).toContainText('Hai pagato 305,40 €');
@@ -54,7 +58,7 @@ test('la segnalazione: la risposta scritta col bottone del file resta nella boll
 
     // Al modello l'esito del bottone dice che la risposta l'utente la sta già leggendo.
     const chiamate = await chiamateAlModello(app);
-    const esito = chiamate[1].find((m) => m.role === 'tool' && m.tool_call_id === 'f1');
+    const esito = chiamate[2].find((m) => m.role === 'tool' && m.tool_call_id === 'f1');
     expect(esito.content).toContain('non ripeterlo');
 
     // L'archivio ha la risposta intera: la chat riaperta dice lo stesso.
@@ -100,6 +104,7 @@ test('dopo la risposta col bottone il modello lavora ancora: la frase di lavoro 
   const { dir, file } = await bollettaTari(app);
   try {
     await modelloFinto(app, [
+      primaUnaLettura,
       { text: RISPOSTA, toolCalls: [apriFile(file)] },
       { text: 'Ti metto anche un promemoria.', toolCalls: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":300,"etichetta":"TARI"}' }] },
       { text: 'Fatto: il promemoria suona tra 5 minuti.' },
@@ -130,6 +135,7 @@ test('bottone del file e un\'altra azione nello stesso giro: il modello sa che i
   try {
     // Il secondo giro fa quello che l'esito gli chiede: riscrive la risposta per intero.
     await modelloFinto(app, [
+      primaUnaLettura,
       { text: RISPOSTA, toolCalls: [apriFile(file), { id: 't1', name: 'TIMER', arguments: '{"secondi":300,"etichetta":"TARI"}' }] },
       { text: `${RISPOSTA} Il promemoria suona tra 5 minuti.` },
     ]);
@@ -137,7 +143,7 @@ test('bottone del file e un\'altra azione nello stesso giro: il modello sa che i
     await chiedi(page, 'quanto ho pagato di tari? e ricordamelo tra 5 minuti');
     const bolla = page.locator('.dash-bubble-filo');
     await expect(bolla).toContainText('Il promemoria suona', { timeout: 15_000 });
-    const esiti = (await chiamateAlModello(app))[1].filter((m) => m.role === 'tool').map((m) => m.content).join('\n');
+    const esiti = (await chiamateAlModello(app))[2].filter((m) => m.role === 'tool').map((m) => m.content).join('\n');
     expect(esiti).not.toContain('non ripeterlo');
     expect(esiti.split('riscrivila per intero').length - 1).toBe(1);
     await expect(bolla).toHaveCount(1);
@@ -149,10 +155,11 @@ test('bottone del file e un\'altra azione nello stesso giro: il modello sa che i
   }
 });
 
-test('risposta scritta insieme al solo promemoria: il modello sa che è fra le note e la riscrive, e arriva nella bolla', async ({ app }) => {
+test('risposta scritta insieme al solo promemoria dopo una lettura: il modello sa che è fra le note e la riscrive, e arriva nella bolla', async ({ app }) => {
   test.setTimeout(60_000);
   try {
     await modelloFinto(app, [
+      primaUnaLettura,
       { text: RISPOSTA, toolCalls: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":300,"etichetta":"TARI"}' }] },
       { text: `${RISPOSTA} Il promemoria suona tra 5 minuti.` },
     ]);
@@ -160,7 +167,7 @@ test('risposta scritta insieme al solo promemoria: il modello sa che è fra le n
     await chiedi(page, 'quanto ho pagato di tari? e ricordamelo tra 5 minuti');
     const bolla = page.locator('.dash-bubble-filo');
     await expect(bolla).toContainText('Il promemoria suona', { timeout: 15_000 });
-    const esito = (await chiamateAlModello(app))[1].find((m) => m.role === 'tool' && m.tool_call_id === 't1');
+    const esito = (await chiamateAlModello(app))[2].find((m) => m.role === 'tool' && m.tool_call_id === 't1');
     expect(esito.content).toContain('riscrivila per intero');
     await expect(bolla).toHaveCount(1);
     expect((await bolla.evaluate((el) => el.textContent)).split('305,40').length - 1).toBe(1);
@@ -221,6 +228,7 @@ test('anche il bottone dell\'evento di calendario: la risposta scritta con lui r
   const VISITA = 'La visita è martedì 14 ottobre alle 10:30, dal dottor Rossi.';
   try {
     await modelloFinto(app, [
+      primaUnaLettura,
       { text: VISITA, toolCalls: [{ id: 'e1', name: 'EVENTO_CALENDARIO', arguments: JSON.stringify({ data: '2026-10-14', ora: '10:30', titolo: 'Visita dottor Rossi' }) }] },
       { text: 'Ti ho messo il bottone per aggiungerla al calendario.' },
     ]);
@@ -233,7 +241,7 @@ test('anche il bottone dell\'evento di calendario: la risposta scritta con lui r
     expect(testo).toContain(VISITA);
     expect(testo.indexOf(VISITA)).toBeLessThan(testo.indexOf('Ti ho messo il bottone'));
     await expect(page.locator('.dash-activity-note')).toHaveCount(0);
-    const esito = (await chiamateAlModello(app))[1].find((m) => m.role === 'tool' && m.tool_call_id === 'e1');
+    const esito = (await chiamateAlModello(app))[2].find((m) => m.role === 'tool' && m.tool_call_id === 'e1');
     expect(esito.content).toContain('non ripeterlo');
   } finally {
     await ripristina(app);
@@ -244,11 +252,11 @@ test('il giro dopo il bottone fallisce: la risposta già scritta resta nella bol
   test.setTimeout(60_000);
   const { dir, file } = await bollettaTari(app);
   try {
-    await modelloFinto(app, [{ text: RISPOSTA, toolCalls: [apriFile(file)] }]);
+    await modelloFinto(app, [primaUnaLettura, { text: RISPOSTA, toolCalls: [apriFile(file)] }]);
     await app.evaluate(() => {
       const primo = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
       globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (opts) => {
-        if (globalThis.__chatFinta_calls.length === 0) return primo(opts);
+        if (globalThis.__chatFinta_calls.length < 2) return primo(opts);
         globalThis.__chatFinta_calls.push(JSON.parse(JSON.stringify(opts.messages)));
         const e = new Error('Il fornitore non risponde.');
         e.status = 503;
@@ -280,11 +288,11 @@ test('fermato mentre il modello scrive il giro dopo: la risposta col bottone res
   const { dir, file } = await bollettaTari(app);
   try {
     // Come modelloFinto, ma il secondo giro aspetta finché lo stop non lo interrompe.
-    await modelloFinto(app, [{ text: RISPOSTA, toolCalls: [apriFile(file)] }]);
+    await modelloFinto(app, [primaUnaLettura, { text: RISPOSTA, toolCalls: [apriFile(file)] }]);
     await app.evaluate(() => {
       const primo = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
       globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (opts) => {
-        if (globalThis.__chatFinta_calls.length === 0) return primo(opts);
+        if (globalThis.__chatFinta_calls.length < 2) return primo(opts);
         globalThis.__chatFinta_calls.push(JSON.parse(JSON.stringify(opts.messages)));
         return new Promise((_ok, ko) => {
           const fine = () => { const e = new Error('aborted'); e.name = 'AbortError'; ko(e); };
@@ -295,7 +303,7 @@ test('fermato mentre il modello scrive il giro dopo: la risposta col bottone res
     });
     const page = await home(app);
     await chiedi(page, 'quanto ho pagato di tari?');
-    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBe(2);
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBe(3);
     await expect(page.locator('.dash-bubble-filo')).toContainText('Hai pagato 305,40 €');
     await page.locator('#stopBtn').click();
     await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato a metà della risposta.', { timeout: 5_000 });

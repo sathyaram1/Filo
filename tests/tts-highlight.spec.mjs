@@ -13,6 +13,7 @@
 // Highlight registrato).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:18px sans-serif">
   <h1>Pagina di prova</h1>
@@ -39,7 +40,7 @@ test('avviando "Leggi", la prima parola viene evidenziata sulla pagina', async (
 
   // Apre il menu Filo e clicca "Leggi".
   await page.locator('#target').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   const readItem = menu.locator('.sn-menu-label', { hasText: 'Leggi' }).first();
   await expect(readItem).toBeVisible();

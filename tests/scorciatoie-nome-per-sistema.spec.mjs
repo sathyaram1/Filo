@@ -21,6 +21,7 @@
 // un Mac.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGINA = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <p id="testo">Tasto destro qui.</p>
@@ -43,7 +44,7 @@ test('il menu del tasto destro nomina i tasti di CHI legge', async ({ app, openT
 
   const page = await testServer.openReady(openTab, PAGINA);
   await page.locator('#campo').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
 
   // Le voci del menu chiedono il nome alla regola invece di scriverlo: se la

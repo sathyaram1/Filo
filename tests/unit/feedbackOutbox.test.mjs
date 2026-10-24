@@ -413,3 +413,17 @@ test('#1212 un feedback accodato mentre un altro sta partendo parte anche lui', 
     assert.deepEqual(state.calls, ['a', 'b']);
   } finally { OB._setAuto(false); }
 });
+
+// #953 — la chat dell'owner accoda la segnalazione che l'utente ha confermato: il titolo che ha letto parte com'è.
+test('#953 un titolo già scelto parte com’è, senza rigenerarlo', async () => {
+  const { OB, state } = setup();
+  let generati = 0;
+  OB.init({ prepare: () => { generati += 1; return 'titolo generato'; } });
+  state.online = true;
+  await OB.enqueue({ submissionId: 'chat-1', text: 'La barra in alto resta a schermo intero', name: 'Schermo intero' });
+  await OB.enqueue({ submissionId: 'box-1', text: 'Dal riquadro, senza titolo' });
+  await OB.flush();
+  assert.equal(state.calls.find((c) => c.submissionId === 'chat-1').name, 'Schermo intero');
+  assert.equal(state.calls.find((c) => c.submissionId === 'box-1').name, 'titolo generato');
+  assert.equal(generati, 1, 'il titolo si genera solo per chi non ne aveva uno');
+});

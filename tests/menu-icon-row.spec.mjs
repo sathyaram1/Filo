@@ -4,6 +4,7 @@
 // Verifica anche che il logo Filo (newTab) apra una nuova tab.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Filo test page</h1>
@@ -13,14 +14,14 @@ const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-seri
 test('il sotto-menu icon-grid resta aperto quando il cursore entra dentro', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   await page.locator('p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
 
   // Hover sull'overflow ("Altro…") — apre il sotto-menu grid.
   const overflow = menu.locator('.sn-menu-row-overflow').first();
   await expect(overflow).toBeVisible();
   await overflow.hover();
-  const grid = page.locator('.sn-menu-icon-grid');
+  const grid = menuDi(page).locator('.sn-menu-icon-grid');
   await expect(grid).toBeVisible({ timeout: 2000 });
 
   // Sposto il cursore dentro la griglia: il sotto-menu deve restare aperto
@@ -34,7 +35,7 @@ test('click sul logo Filo (newTab) apre una nuova tab', async ({ openTab, testSe
   const startCount = app.windows().length;
   const page = await testServer.openReady(openTab, HTML);
   await page.locator('p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   // Il newTab è nella riga primaria di default. data-sn-icon-id='newTab'.
   const newTabBtn = menu.locator('.sn-menu-row-btn[data-sn-icon-id="newTab"]');

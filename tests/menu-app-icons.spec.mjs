@@ -8,6 +8,7 @@
 // una strada di tutti, ed è la voce «Invia feedback» dello stesso menu.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Filo test page</h1>
@@ -16,12 +17,12 @@ const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-seri
 
 async function openOverflowGrid(page) {
   await page.locator('p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   const overflow = menu.locator('.sn-menu-row-overflow').first();
   await expect(overflow).toBeVisible();
   await overflow.hover();
-  const grid = page.locator('.sn-menu-icon-grid');
+  const grid = menuDi(page).locator('.sn-menu-icon-grid');
   await expect(grid).toBeVisible({ timeout: 2000 });
   return grid;
 }
@@ -50,7 +51,7 @@ test('#583 chi non gestisce i feedback non trova l\'icona che porta alla loro po
 test('#583 mandare un feedback resta nel menu, per chiunque', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   await page.locator('p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
 });

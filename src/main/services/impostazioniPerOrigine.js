@@ -18,7 +18,13 @@ const CAMPI_WEB = Object.freeze({
   // I siti dove il tasto destro apre il loro menu (#975): come i siti esclusi, arriva solo la voce del frame che chiede.
   menuDelSito: Object.freeze({ siti: true }),
   // L'Aiuto spento (#841) toglie la sua voce dal tasto destro anche sui siti.
-  featureFlags: Object.freeze({ spellcheck: true, help: true }),
+  featureFlags: Object.freeze({ spellcheck: true, spellcheckContext: true, help: true }),
+  // Il correttore (#1446): la parte del modello, le ripetizioni e i tempi dei due controlli; la correzione automatica e
+  // quante volte serve per imparare (#1447); i segnaposti (#1448).
+  correttore: Object.freeze({
+    modelloErrori: true, ripetizioni: true, pausaRapidoMs: true, ogniRapidoMs: true, pausaRagionatoMs: true, segnaposti: true,
+    automatica: true, accettiPerImparare: true, annulliPerImparare: true, riscrittePerImparare: true,
+  }),
   // La spiegazione che parte da sola alla selezione (#818): spenta, la pagina aspetta il tasto destro.
   spiegaAnticipata: true,
   // I tasti di Spiega e Aiuto scelti dall'utente (#842): il menu del tasto destro li scrive accanto alle voci.
@@ -54,7 +60,11 @@ const SPINTE_WEB = Object.freeze(new Set([
   'tts_global_reading',
   'tts_stop',
   'fullscreen_changed',
+  'form_recheck',
+  'form_sent',
   'icon_layout_changed',
+  // Dizionario, correzioni e parole da non correggere del correttore (#1447): correttoreSpinte.js.
+  'correttore_memorie',
 ]));
 
 // Quelli che si mostrano una volta sola, nella pagina in vista: a un sito vanno
@@ -210,19 +220,21 @@ function messaggioPerDestinazione(message, url, pagina, dove = {}) {
 // Una spinta a una scheda, frame per frame (#405: i content script girano anche nei
 // riquadri), ognuno col messaggio ritagliato sul suo indirizzo e su `inVista` (la
 // scheda in primo piano della finestra). Ogni spinta a più schede passa da qui.
-function spingiAllaScheda(wc, message, { inVista = false } = {}) {
+// `soloFrame(url)` restringe la spinta ai frame che lo meritano (un dato di un sito solo ai suoi).
+function spingiAllaScheda(wc, message, { inVista = false, soloFrame = null } = {}) {
   if (!wc || wc.isDestroyed?.()) return;
   let pagina = '';
   try { pagina = String(wc.getURL() || ''); } catch (_) { pagina = ''; }
   let frames = null;
   try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
   if (!frames || !frames.length) {
+    if (soloFrame && !soloFrame(pagina)) return;
     try { const m = messaggioPerDestinazione(message, pagina, undefined, { inVista }); if (m) wc.send('filo:broadcast', m); } catch (_) {}
     return;
   }
   for (const f of frames) {
     try {
-      if (f.detached) continue;
+      if (f.detached || (soloFrame && !soloFrame(f.url))) continue;
       const m = messaggioPerDestinazione(message, f.url, pagina, { inVista, riquadro: Boolean(f.parent) });
       if (m) f.send('filo:broadcast', m);
     } catch (_) {}

@@ -1,20 +1,11 @@
-// Esecuzione di comandi shell per Filo (#146.6).
-//
-// Il main process esegue il comando EFFETTIVO deciso dall'utente, con:
-//   • la shell scelta nelle preferenze (powershell | cmd | bash);
-//   • un timeout, oltre il quale il processo viene ucciso;
-//   • cattura di stdout/stderr, troncati se enormi (la chat non deve esplodere).
-//
-// La classificazione di sicurezza NON avviene qui: la fa il gate dei livelli
-// (src/shared/cmdClassify.js + actionLevels.js) PRIMA di chiamare runCommand.
-// Qui ci limitiamo a eseguire ciò che è già stato autorizzato.
+// Esecuzione di comandi shell (#146.6): shell dalle preferenze, timeout che uccide il
+// processo, stdout/stderr troncati se enormi perché la chat non esploda.
+// La classificazione di sicurezza la fa prima il gate dei livelli, non questo file.
 
 const { spawn, execFile } = require('node:child_process');
 
-// Uccide l'INTERO albero del processo. Su Windows `child.kill()` non termina i
-// figli (es. una shell che ne lancia un'altra): le pipe restano aperte e la
-// `close` non scatta → il timeout non libererebbe mai. taskkill /T /F chiude
-// l'albero. Su POSIX SIGKILL sul processo basta nei casi comuni.
+// Su Windows `child.kill()` lascia vivi i figli: le pipe restano aperte, `close` non scatta
+// e il timeout non libererebbe mai. Su POSIX basta SIGKILL sul processo.
 function killTree(child) {
   if (!child || child.killed) return;
   if (process.platform === 'win32') {
@@ -25,6 +16,15 @@ function killTree(child) {
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_CHARS = 12_000;
+
+// Le variabili segrete di Filo (chiave dei feedback, chiavi di fabbrica) non arrivano ai comandi: un `env` le
+// stamperebbe davanti al modello (#1507). Restano quelle che i comandi di sistema leggono (FILO_SIS_*) e quelle dell'utente.
+const VARIABILE_SEGRETA = /^FILO_(?!SIS_)\w*(?:KEY|SECRET|TOKEN|PASSWORD)/i;
+function ambienteComandi(base = process.env) {
+  const out = {};
+  for (const [k, v] of Object.entries(base || {})) if (!VARIABILE_SEGRETA.test(k)) out[k] = v;
+  return out;
+}
 
 // Shell di default per piattaforma quando la preferenza non è impostata.
 //
@@ -38,13 +38,8 @@ function defaultShell() {
   return process.platform === 'win32' ? 'powershell' : 'sh';
 }
 
-// Risolve la shell RICHIESTA in quella EFFETTIVAMENTE disponibile sulla
-// piattaforma. Fuori da Windows, 'powershell'/'cmd' non esistono (pwsh è
-// raramente installato) → ricadiamo su /bin/sh, ESATTAMENTE come fa la shell
-// persistente della modalità terminale (src/main/services/shell.js, che fuori
-// da Windows usa sempre /bin/sh). Così i comandi dell'assistente girano davvero
-// anche su Linux/macOS invece di fallire con ENOENT, e le due shell restano
-// coerenti. 'bash' resta bash se esplicitamente preferito.
+// Fuori da Windows 'powershell'/'cmd' non esistono: si ricade su /bin/sh, o i comandi
+// dell'assistente fallirebbero con ENOENT. 'bash' resta bash se preferito apposta.
 function resolveShell(shell) {
   const s = String(shell || '').toLowerCase();
   if (process.platform === 'win32') {
@@ -199,9 +194,10 @@ function nuovoMarcatore() {
     + Date.now().toString(36).slice(-5);
 }
 
-// L'esito di un comando PowerShell, con $__filo_ok = il $? preso subito dopo. $LASTEXITCODE lo scrivono solo
-// i programmi esterni: un cmdlet fallito lo lascia a 0, e a dirlo resta $? (#714). Vale anche per shell.js.
-const ESITO_POWERSHELL = 'if ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } '
+// L'esito di un comando PowerShell (#718, scelta dell'owner): un programma esterno uscito con errore in un punto
+// qualunque lo fa fallito col suo codice ($__filo_x), anche se dopo c'è un comando riuscito. Altrimenti decide il
+// $? dell'ultimo ($__filo_ok): $LASTEXITCODE lo scrivono solo i programmi, un cmdlet fallito lo lascia a 0 (#714).
+const ESITO_POWERSHELL = 'if ($__filo_x) { $__filo_x } elseif ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } '
   // $__filo_ok ancora $null = il comando è uscito prima della riga che lo scrive. A dire come basta il $? della riga
   // che lo ha eseguito ($__filo_riga): falso dopo un errore che ferma, vero dopo un return o un break, anche se prima
   // un errore era stato zittito o gestito (in $Error ci finiscono pure quelli, quindi da lì non si può dedurre).
@@ -233,17 +229,44 @@ function testoPowerShell(testo) {
   return `(-join @(${pezzi.join(',')}))`;
 }
 
+// Dopo ogni istruzione di primo livello: il primo codice d'errore di un programma resta in $__filo_x, perché quello
+// riuscito dopo lo azzera. Poi $? torna com'era (Write-Error ignorato lo spegne senza lasciare traccia).
+const SONDA_ISTRUZIONE_POWERSHELL = '$__filo_p=$?;if($global:LASTEXITCODE -and -not $__filo_x)'
+  + '{$__filo_x=$global:LASTEXITCODE};if(-not $__filo_p){Write-Error -Message x -ErrorAction Ignore}';
+
+// Le sonde entrano nell'albero del comando, non nel testo: così un errore mostra la riga e il testo che l'utente ha
+// scritto. Il costruttore a quattro argomenti è l'unico senza ambiguità con $null, anche nella 5.1. Con param, begin,
+// process o using la sonda va in fondo al testo e basta.
+const AST_POWERSHELL = 'Management.Automation.Language';
+function bloccoConSonde(conCoda, coda) {
+  const istruzioni = (testo) => `[${AST_POWERSHELL}.Parser]::ParseInput('${testo}', [ref]$null, [ref]$null).EndBlock.Statements`;
+  const copia = (da, verso) => `foreach ($__filo_z in @(${da})) { if ($__filo_z) { ${verso}.Add($__filo_z.Copy()) } }; `;
+  return '$__filo_b=$null; if ($__filo_a -and $__filo_a.EndBlock -and -not ($__filo_a.ParamBlock -or $__filo_a.BeginBlock '
+    + '-or $__filo_a.ProcessBlock -or $__filo_a.DynamicParamBlock -or @($__filo_a.UsingStatements).Count)) { try { '
+    + `$__filo_q=@(${istruzioni(SONDA_ISTRUZIONE_POWERSHELL)}); `
+    + `$__filo_l=[Collections.Generic.List[${AST_POWERSHELL}.StatementAst]]::new(); `
+    + 'foreach ($__filo_s in $__filo_a.EndBlock.Statements) { $__filo_l.Add($__filo_s.Copy()); '
+    + 'foreach ($__filo_z in $__filo_q) { $__filo_l.Add($__filo_z.Copy()) } }; '
+    + (coda ? copia(istruzioni(coda), '$__filo_l') : '')
+    + `$__filo_r=[Collections.Generic.List[${AST_POWERSHELL}.TrapStatementAst]]::new(); `
+    + copia('$__filo_a.EndBlock.Traps', '$__filo_r')
+    + `$__filo_b=[${AST_POWERSHELL}.ScriptBlockAst]::new($__filo_a.Extent, $null, `
+    + `[${AST_POWERSHELL}.StatementBlockAst]::new($__filo_a.EndBlock.Extent, $__filo_l, $__filo_r), $false).GetScriptBlock() `
+    + '} catch { $__filo_b=$null } }; '
+    + `if (-not $__filo_b) { $__filo_b=[ScriptBlock]::Create($__filo_t + [char]10 + '${SONDA_ISTRUZIONE_POWERSHELL}'${conCoda}) }; `;
+}
+
 // Si esegue con `. scriptblock`, nello scope di chi chiama: con Invoke-Expression gli errori che fermano (e quelli
 // di sintassi) mostravano questa riga invece del comando. La sintassi si controlla prima, sul solo testo; `coda`
 // gira dopo ma resta fuori. In modalità ristretta (PC aziendali bloccati) quei metodi sono vietati: resta
-// Invoke-Expression, l'unica strada che lì il comando lo esegue.
+// Invoke-Expression, l'unica strada che lì il comando lo esegue, senza le sonde (#718): lì decide l'ultimo comando.
 function invocaCodificato(testo, coda = '') {
   const conCoda = coda ? ` + [char]10 + '${coda}'` : '';
   return `$__filo_t=${testoPowerShell(testo)}; $__filo_pe=$null; `
     + `if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') { Invoke-Expression ($__filo_t${conCoda}) } else { `
-    + 'try { $null=[Management.Automation.Language.Parser]::ParseInput($__filo_t, [ref]$null, [ref]$__filo_pe) } catch {}; '
+    + 'try { $__filo_a=[Management.Automation.Language.Parser]::ParseInput($__filo_t, [ref]$null, [ref]$__filo_pe) } catch { $__filo_a=$null }; '
     + 'if ($__filo_pe) { [Console]::Error.WriteLine((New-Object Management.Automation.ParseException (,$__filo_pe)).Message); $__filo_ok=$false } '
-    + `else { . ([ScriptBlock]::Create($__filo_t${conCoda})) } }`;
+    + `else { ${bloccoConSonde(conCoda, coda)}. $__filo_b } }`;
 }
 
 const SEGNA_ESITO = '$__filo_ok=$?';
@@ -252,7 +275,7 @@ const SEGNA_ESITO = '$__filo_ok=$?';
 // usano dashboard e assistente. Niente try attorno al comando: dentro un try un comando sconosciuto ferma tutto il
 // resto (#722). La riga del segno è una pipeline a parte: gira anche dopo un throw, non dopo un `exit`.
 function righePowerShell(command, segno, codifica = invocaCodificato) {
-  return `$global:LASTEXITCODE=0\n$__filo_ok=$null\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
+  return `$global:LASTEXITCODE=0\n$__filo_x=0\n$__filo_ok=$null\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
     + `${codifica(command, SEGNA_ESITO)}\n$__filo_riga=$?\n`
     + `"${segno}:$(${ESITO_POWERSHELL}):$((Get-Location).Path)"\n`;
 }
@@ -291,11 +314,11 @@ function extractCwdMark(rawStdout, mark) {
   };
 }
 
-// Esegue `command` e risolve con { command, stdout, stderr, code, signal,
-// truncated, timedOut, durationMs }. Non rigetta mai: gli errori di spawn
-// finiscono in stderr/code così il chiamante può sempre mostrare un esito.
-function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, trackCwd = false } = {}) {
+// Non rigetta mai: gli errori di spawn finiscono in stderr/code, così il chiamante ha sempre un
+// esito da mostrare.
+function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: chiesto, trackCwd = false } = {}) {
   const cmd = String(command || '').trim();
+  const env = ambienteComandi(chiesto || process.env);
   const startedAt = Date.now();
   const usedShell = shell || defaultShell();
   return new Promise((resolve) => {
@@ -340,7 +363,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     try {
       child = spawn(file, args, {
         cwd: cartella,
-        env: env || process.env,
+        env,
         windowsHide: true,
         shell: false,
       });
@@ -505,7 +528,7 @@ function eseguiInSessione(cmd, { shell, cwd, env, timeoutMs = DEFAULT_TIMEOUT_MS
 }
 
 module.exports = {
-  runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS,
+  runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS, ambienteComandi,
   // esportati per gli unit test (il preludio UTF-8 e la sonda sono la parte
   // che si può verificare senza avviare una shell su ogni piattaforma).
   encodingPrelude, withCwdProbe, invocazione, PRELUDI_CODIFICA,
@@ -516,5 +539,5 @@ module.exports = {
   // il marcatore della sonda: il prefisso è fisso, il resto è a caso a ogni
   // comando, ed è quello che impedisce all'uscita di scriverselo (#551, ottavo
   // giro di verifica).
-  CWD_MARK_PREFIX, nuovoMarcatore,
+  CWD_MARK_PREFIX, nuovoMarcatore, extractCwdMark,
 };

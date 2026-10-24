@@ -10,6 +10,7 @@
 // del sistema: ciò che conta è che l'azione "Leggi" parta sul testo corretto.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:18px sans-serif">
   <h1>Pagina di prova</h1>
@@ -40,7 +41,7 @@ test('selezionando testo, il menu mostra "Leggi" e cliccarlo avvia la lettura de
 
   // Apre il menu Filo con il tasto destro sulla selezione.
   await page.locator('#target').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
 
   // La voce "Leggi" è presente.

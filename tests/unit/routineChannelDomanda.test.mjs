@@ -83,3 +83,21 @@ test('deliver domanda: JSON storto, tipo non attivo o campi in più si fermano p
   assert.match(conNote.stderr, /vuole solo --domanda/);
   assert.equal(arrivate.length, 0, 'il server non è stato chiamato');
 });
+
+test('deliver status --domanda (#1358): la domanda viaggia controllata accanto alla fermata; su note no', async () => {
+  arrivate = [];
+  const p = file('ferma.json', JSON.stringify(DOMANDA));
+  const r = await lancia(['deliver', BIGLIETTO, 'status', '--status', 'design', '--reason', 'clarify', '--notes', 'Quale?', '--domanda', p]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(arrivate.length, 1);
+  assert.equal(arrivate[0].body.intent, 'status');
+  assert.equal(arrivate[0].body.data.domanda.titolo, 'Quale strada?', 'un oggetto, non il percorso');
+  assert.equal(arrivate[0].body.data.reason, 'clarify');
+  const storta = await lancia(['deliver', BIGLIETTO, 'status', '--status', 'design', '--reason', 'clarify', '--domanda', file('storta.json', '{"titolo":')]);
+  assert.equal(storta.code, 1);
+  assert.match(storta.stderr, /JSON malformato/);
+  const suNota = await lancia(['deliver', BIGLIETTO, 'note', '--notes', 'x', '--domanda', p]);
+  assert.equal(suNota.code, 1);
+  assert.match(suNota.stderr, /--domanda vale solo su deliver domanda, status, fixed e verdict/);
+  assert.equal(arrivate.length, 1, 'gli errori non chiamano il server');
+});

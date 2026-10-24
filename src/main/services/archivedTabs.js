@@ -7,6 +7,7 @@
 
   const path = require('node:path');
   const { creaDeposito } = require('./depositoAggiunte');
+  const { MISURA, taglia } = require('./misurePagine');
   const Disco = require('../shim/storage');
 
   // La chiave dove l'archivio stava in storage.json: serve solo a migrarlo.
@@ -84,14 +85,24 @@
   // Archivia una tab chiusa. `meta` contiene i campi catturati al momento della
   // chiusura (vedi tabs.js _archiveClosedTab). Ritorna l'entry creata, o null se
   // la tab non è archiviabile (manca l'URL, o la chiamata arriva dall'incognito).
+  // Indirizzi e titolo li sceglie il sito: oltre la misura si tagliano e la voce lo segna (un indirizzo a metà non si riapre).
   async function archive(meta) {
     if (!meta || typeof meta.url !== 'string' || !meta.url || Disco.inIncognito()) return null;
+    const u = taglia(meta.url, MISURA.url);
+    const t = taglia(meta.title || meta.url, MISURA.titolo);
+    const insieme = (Array.isArray(meta.coOpenUrls) ? meta.coOpenUrls.slice(0, 30) : []).map((x) => taglia(x, MISURA.url));
+    const insiemeTagliati = insieme.map((x, i) => (x.tagliato ? i : -1)).filter((i) => i >= 0);
+    const prova = { url: u.testo, openedAt: meta.openedAt || null, closedAt: meta.closedAt || new Date().toISOString() };
+    if (dimenticate.some((r) => coperta(prova, r))) return null;
     const d = await apri();
     const entry = {
       id: uuid(),
-      url: meta.url,
-      title: meta.title || meta.url,
-      favicon: meta.favicon || '',
+      url: u.testo,
+      title: t.testo,
+      ...(u.tagliato ? { urlTagliato: true } : {}),
+      ...(t.tagliato ? { titleTagliato: true } : {}),
+      // Anche l'icona la sceglie il sito (un data: lungo un mega): oltre la misura non si tiene, a metà non si disegna.
+      favicon: typeof meta.favicon === 'string' && meta.favicon.length <= MISURA.url ? meta.favicon : '',
       // Colore identità del sito (§1.2): serve all'ordine cromatico in archivio.
       identityColor: meta.identityColor || null,
       openedAt: meta.openedAt || null,
@@ -99,11 +110,10 @@
       // 'manual' per la chiusura dell'utente, altri valori dall'auto-archiviazione (§2.1).
       reason: meta.reason || 'manual',
       // URL delle altre tab aperte nello stesso momento (contesto di lavoro).
-      coOpenUrls: Array.isArray(meta.coOpenUrls) ? meta.coOpenUrls.slice(0, 30) : [],
+      coOpenUrls: insieme.map((x) => x.testo),
+      ...(insiemeTagliati.length ? { coOpenUrlsTagliati: insiemeTagliati } : {}),
       scrollPosition: typeof meta.scrollPosition === 'number' ? meta.scrollPosition : null,
-      // Location proxy ("Apri da un altro paese"): { country, tier } se la tab
-      // era proxata alla chiusura, null altrimenti. Riaprendo dalla cronologia
-      // la tab rinasce proxata sulla stessa location.
+      // Proxy alla chiusura: riaprendo dalla cronologia la tab rinasce sulla stessa location.
       proxy: meta.proxy && meta.proxy.country
         ? { country: String(meta.proxy.country), tier: meta.proxy.tier || null }
         : null,
@@ -134,7 +144,11 @@
     for (const t of d.tutti()) if (!via.has(t.id) && urlVia.has(t.url)) urlVia.delete(t.url);
     return d.togli([...via], (t) => {
       if (!urlVia.size || !Array.isArray(t.coOpenUrls) || !t.coOpenUrls.some((u) => urlVia.has(u))) return t;
-      return { ...t, coOpenUrls: t.coOpenUrls.filter((u) => !urlVia.has(u)) };
+      const tagliati = new Set(Array.isArray(t.coOpenUrlsTagliati) ? t.coOpenUrlsTagliati : []);
+      const resta = t.coOpenUrls.map((u, i) => ({ u, tagliato: tagliati.has(i) })).filter((x) => !urlVia.has(x.u));
+      const { coOpenUrlsTagliati: _prima, ...senza } = t;
+      const segni = resta.map((x, i) => (x.tagliato ? i : -1)).filter((i) => i >= 0);
+      return { ...senza, coOpenUrls: resta.map((x) => x.u), ...(segni.length ? { coOpenUrlsTagliati: segni } : {}) };
     });
   }
 
@@ -145,12 +159,42 @@
     return d.tutti();
   }
 
-  // Cancellazione multipla (§5 pulizia retroattiva). Ritorna { removed, remaining }.
+  // Cancellazione multipla (§5 pulizia retroattiva).
   async function removeMany(ids) {
     if (Disco.inIncognito()) return { removed: 0, remaining: 0 };
     const d = await apri();
     const removed = togli(d, Array.isArray(ids) ? ids : []);
     return { removed, remaining: d.numero() };
+  }
+
+  // Le pagine tolte dal filo se ne vanno anche da qui, o la ricerca nel filo le ritroverebbe (#869): conta una scheda
+  // aperta nel periodo, sul sito detto, e con quell'indirizzo se ne è dato uno (una visita tolta da sola).
+  function regolaDimenticate({ da = null, a = null, sito = null, url = null } = {}, { finoA = Infinity } = {}) {
+    const t0 = da != null ? Date.parse(da) : -Infinity;
+    const t1 = Math.min(a != null ? Date.parse(a) : Infinity, finoA);
+    return { t0, t1, sito, url };
+  }
+  function coperta(t, r) {
+    const E = global.SN_FILO_EVENTI;
+    if (!t || !t.url || (r.url && t.url !== r.url)) return false;
+    if (r.sito && !(E && E.delSito(t.url, r.sito))) return false;
+    const chiusa = Date.parse(t.closedAt);
+    const aperta = Date.parse(t.openedAt);
+    const fine = Number.isFinite(chiusa) ? chiusa : Infinity;
+    const inizio = Number.isFinite(aperta) ? aperta : (r.url ? -Infinity : fine);
+    return inizio <= r.t1 && fine >= r.t0;
+  }
+  // Una scheda ancora aperta quando le sue pagine si tolgono entra qui solo alla chiusura: la regola resta per lei, ma
+  // solo per le schede aperte prima di adesso (una visita di dopo non è stata tolta). Vale finché Filo resta aperto.
+  const dimenticate = [];
+
+  async function dimenticaPagine(periodo = {}) {
+    if (Disco.inIncognito()) return 0;
+    dimenticate.push(regolaDimenticate(periodo, { finoA: Date.now() }));
+    const r = regolaDimenticate(periodo);
+    const d = await apri();
+    const ids = d.tutti().filter((t) => coperta(t, r)).map((t) => t.id);
+    return ids.length ? togli(d, ids) : 0;
   }
 
   async function clear() {
@@ -171,7 +215,7 @@
   }
 
   global.SN_ARCHIVED_TABS = {
-    list, listMeta, archive, update, remove, removeMany, clear, importa,
+    list, listMeta, archive, update, remove, removeMany, dimenticaPagine, clear, importa,
     suEntrate, cartella,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

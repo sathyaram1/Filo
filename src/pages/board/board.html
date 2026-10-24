@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <title>Filo — Bacheca</title>
+  <title>Filo — Le tue segnalazioni</title>
   <link rel="icon" href="filo://asset/icons/icon-32.png" />
   <link rel="stylesheet" href="filo://style/theme.css" />
   <link rel="stylesheet" href="filo://style/pages.css" />
@@ -16,6 +16,7 @@
   <script src="filo://shared/feedbackTransitions.js"></script>
   <script src="filo://shared/feedbackStatus.js"></script>
   <script src="filo://shared/chatErrors.js"></script>
+  <script src="filo://shared/mittenti.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <style>
     /* La bacheca è la superficie utente (NON owner): mostra solo i fix già in
@@ -207,9 +208,15 @@
       color: var(--sn-muted); background: none; border: none; padding: 2px 0; text-decoration: underline;
     }
     .bd-mie-altre:hover { color: var(--sn-fg); }
+    /* La Bacheca in pausa (#1592), anche finché non si sa: resta la sola parte dell'utente, e il suo titolo fa da
+       titolo della pagina. board.js toglie l'attributo a chi la vede. */
+    body[data-bacheca-pausa] .bd-head, body[data-bacheca-pausa] .bd-auth, body[data-bacheca-pausa] #bdLoading,
+    body[data-bacheca-pausa] #bdEmpty, body[data-bacheca-pausa] #bdError, body[data-bacheca-pausa] #bdList,
+    body[data-bacheca-pausa] #bdMiglioramentiTitolo { display: none; }
+    .sn-page h2.bd-h2.bd-h2-pagina { font-size: 22px; margin-top: 0; }
   </style>
 </head>
-<body>
+<body data-bacheca-pausa="1">
   <main class="sn-page">
     <header class="bd-head">
       <h1>Bacheca</h1>

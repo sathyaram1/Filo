@@ -59,6 +59,9 @@ const PORTE_784 = {
   redteamRevocaCodice: ['REDTEAM_REVOKE_CODE', { code: 'ABCD-EFGH' }],
   redteamApertoLettura: ['REDTEAM_OPEN_GET', {}],
   redteamApertoScrittura: ['REDTEAM_OPEN_SET', { openToAll: true }],
+  // #1592 — gli interruttori di Bacheca e Deck builder: aprirli da un sito li mostrerebbe a tutti.
+  inPausaLettura: ['IN_PAUSA_GET', { nome: 'bacheca' }],
+  inPausaScrittura: ['IN_PAUSA_SET', { nome: 'mazzi', openToAll: true }],
   provaModelloScelto: ['TEST_DEFAULT_MODEL', { provider: 'openrouter', model: 'qualsiasi/modello' }],
   catalogoModelli: ['DEFAULT_MODELS_LIST', { provider: 'openrouter' }],
   elencoFornitori: ['DEFAULT_PROVIDERS_LIST', {}],
@@ -79,8 +82,10 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
       // Iscriversi al giro è farsi mandare i feedback dell'owner a ogni
       // cambiamento: la porta più golosa di tutte per un sito visitato.
       giroIscrizione: { type: MSG.FEEDBACK_LIVE_SUBSCRIBE },
-      // L'«Annulla» del toast della segnalazione automatica: scrive `ignored` col token di chi è dentro (#784.3).
+      // L'avviso della segnalazione automatica: Annulla scrive `ignored` col token di chi è dentro (#784.3), la
+      // chiusura la fa partire (#784.6).
       annullaSegnalazioneAutomatica: { type: MSG.CANCEL_AUTO_FEEDBACK, id: 'fb-uno' },
+      partenzaSegnalazioneAutomatica: { type: MSG.AUTO_FEEDBACK_PARTI, id: 'fb-uno' },
       _mittente: mittente,
     });
     const esegui = async (mittente) => {
@@ -132,7 +137,7 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
       continue;
     }
     // L'annullo lo usa chiunque abbia visto il toast, ma solo per la segnalazione partita da qui: «fb-uno» no.
-    if (porta === 'annullaSegnalazioneAutomatica') {
+    if (porta === 'annullaSegnalazioneAutomatica' || porta === 'partenzaSegnalazioneAutomatica') {
       expect(String(r.code || ''), `filo/${porta}: non è la provenienza a mancare`).not.toBe('forbidden');
       expect(String(r.error || ''), `filo/${porta}`).toContain('partita da qui');
       continue;
@@ -472,7 +477,7 @@ test('l\'archivio delle schede chiuse si legge, si cerca e si cancella solo dall
       for (const [nome, msg] of Object.entries(porte())) res[prov][nome] = await globalThis.SN_HANDLE_MESSAGE(msg, mittente);
     }
     const rimaste = (await A.list()).map((x) => x.title);
-    const daFilo = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_ARCHIVED_TABS }, { url: 'filo://archive/archive.html' });
+    const daFilo = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_ARCHIVED_TABS }, { url: 'filo://quaderno/quaderno.html' });
     return { res, rimaste, daFilo };
   }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA });
 

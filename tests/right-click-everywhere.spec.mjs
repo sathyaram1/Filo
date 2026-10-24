@@ -12,6 +12,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -45,6 +46,6 @@ for (const [name, url, clickSelector] of [
     const page = await openTab(url);
     await waitForCSReady(page);
     await page.locator(clickSelector).first().click({ button: 'right' });
-    await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 3_000 });
+    await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 3_000 });
   });
 }

@@ -23,6 +23,30 @@ Valgono insieme queste regole:
   in cui niente si disegna, non quella senza caratteri: una riga di soli spazi a
   larghezza zero o giuntori a schermo è bianca. Anche toglierlo passa dal popup:
   si perde il testo dell'utente.
+- **Il testo proposto sta in un riquadro suo, non fra virgolette.** Fra
+  virgolette il modello le chiudeva da sé e continuava con un finto avviso di
+  Filo (#592.7); cambiarle non basta, perché restano quelle che si somigliano.
+  La descrizione del popup è a pezzi: stringhe per le parole di Filo e
+  `{ citazione }` / `{ elenco }` per il testo del modello o salvato, che il
+  popup disegna su un foglietto tinto d'accento. Vale per ogni popup che mostra
+  un testo non di Filo, da costo 1 in su perché un livello prudente chiede anche
+  lì (feedback a suo nome, righe da dimenticare, comando, link, ricerca, sveglie,
+  timer, documento, la ricerca fra i documenti dell'Aiuto, titoli di chat e
+  mazzi). Un elenco di casi non regge: al giro 4 ne mancavano dieci (cartella
+  della ricerca, titolo di una finestra, nomi di reti e file, la frase del
+  cambio da annullare). La sentinella non nomina più i campi: ogni campo che
+  `describe` legge diventa testo del modello, e un campo che è davvero parola
+  di Filo (una bandiera, un numero del main) si dichiara lì. Fuori dal registro
+  vale lo stesso per i popup che mostrano un nome scelto da altri (un file
+  scaricato, un backup da importare, una conversazione, una categoria): `parti`
+  anche lì; e per i pannelli dove si decide senza popup (la richiesta del
+  modello sopra «Elimina definitivamente» dell'archivio), un elemento suo. Il segno del riquadro non può dipendere da un colore che cambia chi
+  scrive il testo: l'accento il modello lo cambia senza chiedere nello stesso
+  turno. Per questo il filo a sinistra è per metà colore del testo: chi lo
+  spegne spegne anche le parole. Su un sito la pagina riscriveva le variabili,
+  il filtro e i caratteri del popup: lì il popup sta sopra la scheda (vedi
+  [la conferma su un sito](una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md)),
+  e le parti gli arrivano dal canale come dati, ripulite di nuovo dal main.
 - **Si conferma quello che si è visto.** La pulizia dei caratteri non basta da
   sola: tre giri di verifica di fila hanno spinto l'istruzione sotto il bordo
   con righe vuote, poi di spazi a larghezza zero, poi di righe innocue o di un
@@ -63,7 +87,8 @@ pagina che le mostra. La memoria sta nella parte variabile del prompt, dopo le
 regole anti-inganno, per non rompere il prefisso comune (#422): le regole la
 nominano, e il recinto le toglie l'autorità di un ordine.
 
-Dove: `stile_agente` e `lezioneDaAzione` in `src/shared/preferences.js`,
+Dove: `describeParts` in `src/shared/actionLevels.js` e i riquadri in
+`src/shared/confirmUi.js`, `stile_agente` e `lezioneDaAzione` in `src/shared/preferences.js`,
 `memoriaImbustata` e `MEMORIA_FILO` accanto allo stile, `testoLeggibile`,
 `injectAgentStyle` e `INIZIO_ANTI_INGANNO` in `src/shared/constants.js`,
 `STILE_UTENTE` in `src/shared/contenutoEsterno.js`, `bersagliMostrati` in
@@ -71,4 +96,5 @@ Dove: `stile_agente` e `lezioneDaAzione` in `src/shared/preferences.js`,
 `tests/unit/preferences.test.mjs` (ogni setter a testo libero è confermato e
 con tetto, o dichiara di non finire in un prompt) e
 `tests/unit/stileAgentePrompt.test.mjs` (nessuna frase anti-inganno prima dello
-stile, in nessun prompt che lo riceve).
+stile, in nessun prompt che lo riceve) e `tests/unit/actionLevels.test.mjs`
+(in nessun popup il testo del modello sta fra le parole di Filo).

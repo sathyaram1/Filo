@@ -19,9 +19,24 @@ function pulisci(r) {
   };
   for (const k of CAMPI) if (r && typeof r[k] === 'string') out[k] = r[k];
   for (const k of BANDIERE) if (r && r[k] === true) out[k] = true;
+  const parti = partiPulite(r && r.parti);
+  if (parti) out.parti = parti;
   // Un avviso sulla pagina non rimanda tasti alla pagina, qualunque cosa dica chi chiede.
   if (out.coprePagina) { out.scriveva = false; out.campo = false; }
   return out;
+}
+
+// Le parole di Filo (stringhe) e i riquadri col testo che non è suo (#592.7): la vista li disegna in un elemento
+// che nessun carattere del testo può chiudere. Altre forme si scartano, i testi restano interi.
+function partiPulite(parti) {
+  if (!Array.isArray(parti)) return null;
+  const out = [];
+  for (const x of parti) {
+    if (typeof x === 'string') out.push(x);
+    else if (x && typeof x === 'object' && Array.isArray(x.elenco)) out.push({ elenco: x.elenco.map((v) => (typeof v === 'string' ? v : String(v ?? ''))) });
+    else if (x && typeof x === 'object' && typeof x.citazione === 'string') out.push(x.nuda === true ? { citazione: x.citazione, nuda: true } : { citazione: x.citazione });
+  }
+  return out.some((x) => typeof x !== 'string') ? out : null;
 }
 
 // Le finestre che apre un sito (i popup di accesso) stanno sopra quella di Filo: con una domanda a schermo il sito ci
@@ -220,11 +235,12 @@ class ConfermeSopraPagina {
     let s = {};
     try { s = (await globalThis.SN_STORAGE?.getSettings?.()) || {}; } catch (_) { s = {}; }
     if (this.mostrata !== voce.id || !this.vista || this.vista.webContents.isDestroyed()) return;
-    const tema = {
-      theme: typeof s.theme === 'string' ? s.theme : 'system',
-      tokens: s.themeTokens && typeof s.themeTokens === 'object' ? s.themeTokens : {},
-    };
-    try { this.vista.webContents.send('conferma:mostra', { ...voce.richiesta, id: voce.id, tema }); } catch (_) {}
+    try { this.vista.webContents.send('conferma:mostra', { ...voce.richiesta, id: voce.id, tema: temaDi(s) }); } catch (_) {}
+  }
+
+  _tema(s) {
+    if (!this.mostrata || !this.vista || this.vista.webContents.isDestroyed()) return;
+    try { this.vista.webContents.send('conferma:tema', temaDi(s)); } catch (_) {}
   }
 
   _vista() {
@@ -273,6 +289,18 @@ class ConfermeSopraPagina {
     try { if (this.win && !this.win.isDestroyed()) this.win.contentView.removeChildView(vista); } catch (_) {}
     try { if (!vista.webContents.isDestroyed()) vista.webContents.close(); } catch (_) {}
   }
+}
+
+function temaDi(s) {
+  return {
+    theme: s && typeof s.theme === 'string' ? s.theme : 'system',
+    tokens: s && s.themeTokens && typeof s.themeTokens === 'object' ? s.themeTokens : {},
+  };
+}
+
+// Tema e colori cambiati con una domanda a schermo: la domanda resta com'è (campo, scorrimento), cambiano i colori.
+function seguiTema(s) {
+  for (const c of aSchermo) c._tema(s);
 }
 
 const perPopup = new WeakMap();
@@ -344,4 +372,4 @@ function chiediDalMain(wc, richiesta) {
   return c ? c.chiedi(wc, null, { ...richiesta, scriveva: false, campo: false }) : Promise.resolve(false);
 }
 
-module.exports = { ConfermeSopraPagina, chiediConferma, ritiraConferma, chiediDalMain, registraFinestraDelSito, pulisci };
+module.exports = { ConfermeSopraPagina, chiediConferma, ritiraConferma, chiediDalMain, registraFinestraDelSito, pulisci, seguiTema, temaDi };

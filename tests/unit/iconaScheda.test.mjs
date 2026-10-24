@@ -51,6 +51,23 @@ test('scarica con la sessione data e consegna un data: URL in base64', async () 
   assert.equal(ses.chiesti.length, 1);
 });
 
+// #1272.4: un'icona dichiarata dalla pagina su un altro sito non porta i cookie che quel sito riserva a sé.
+test('i cookie vanno solo all\'icona del sito della pagina; a un altro sito, o a chi non ha la pagina aperta, nessuno', async () => {
+  const ses = sessione({});
+  const credenziali = async (url, opz) => {
+    ses.chiesti.length = 0;
+    await iconaPer(ses, [url], opz);
+    return ses.chiesti[0].init.credentials;
+  };
+  const pagina = 'https://www.sito.test/articolo?id=3';
+  assert.equal(await credenziali('https://sito.test/favicon.ico', { pagina }), 'include');
+  assert.equal(await credenziali('https://cdn.sito.test/i.png', { pagina }), 'include');
+  assert.equal(await credenziali('https://banca.test/esci?subito=1', { pagina }), 'omit');
+  assert.equal(await credenziali('http://www.sito.test/favicon.ico', { pagina }), 'omit', 'da https a http è un altro sito');
+  assert.equal(await credenziali('https://sito.test/favicon.ico', { pagina, cookie: false }), 'omit');
+  assert.equal(await credenziali('https://sito.test/favicon.ico', {}), 'omit');
+});
+
 test('se la prima icona non è un\'immagine passa alla seguente, nell\'ordine della pagina', async () => {
   const ses = sessione({
     'https://sito.test/rotta.png': { body: '<html>404</html>' },

@@ -11,6 +11,7 @@
 // corretto e diventa rosso se la dedupe regredisce.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HOME = 'filo://home/home.html';
 
@@ -26,7 +27,7 @@ test('salvare due volte la stessa pagina non crea doppioni', async ({ openTab, t
     const page = await openTab(url);
     await page.waitForLoadState('domcontentloaded');
     await page.click('body', { button: 'right' });
-    const btn = page.locator('.sn-menu [data-sn-icon-id="saveForLater"]');
+    const btn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
     await expect(btn).toBeVisible();
     await btn.click();
     // Toast di conferma + auto-chiusura della tab (che invalida `page`:

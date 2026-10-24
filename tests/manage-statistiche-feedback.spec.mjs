@@ -91,7 +91,8 @@ test('#496 — la scheda «Statistiche feedback» sta accanto a quella del Red T
   const nuova = page.locator('.mg-tab[data-tab="fbstats"]');
   const redteam = page.locator('.mg-tab[data-tab="stats"]');
   await expect(nuova).toHaveText('Statistiche feedback');
-  await expect(redteam).toHaveText('Red Team');
+  // #1592 — la scheda del Red Team tiene anche Bacheca e Deck builder: si chiama «In pausa».
+  await expect(redteam).toHaveText('In pausa');
   // Una accanto all'altra, nell'ordine: prima i feedback, poi il red team.
   const xNuova = (await nuova.boundingBox()).x;
   const xRed = (await redteam.boundingBox()).x;
@@ -180,8 +181,8 @@ test('#496 — il filtro per creatore mostra i soli dati di chi si è scelto', a
   const page = await openTab(URL);
   await apri(page, {
     feedbacks: [
-      fb({ seq: 1, clientId: 'agent:prober', createdAt: g(1) }),
-      fb({ seq: 2, clientId: 'agent:prober', createdAt: g(2) }),
+      fb({ seq: 1, clientId: 'routine:prober', createdAt: g(1) }),
+      fb({ seq: 2, clientId: 'routine:prober', createdAt: g(2) }),
       fb({ seq: 3, clientId: 'routine:verifier', createdAt: g(2) }),
       fb({ seq: 4, clientId: 'utente-vero', createdAt: g(2) }),
     ],
@@ -190,19 +191,50 @@ test('#496 — il filtro per creatore mostra i soli dati di chi si è scelto', a
   await page.locator('[data-fs-range="30g"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('4');
 
-  // Solo l'esploratore.
-  await page.locator('[data-fs-creator="prober"]').click();
-  await expect(tile(page, 'ricevuti')).toHaveText('2');
-  // …più la verifica: il filtro somma, non sostituisce.
-  await page.locator('[data-fs-creator="verifier"]').click();
+  // Una pasticca per classe di mittente (§10), non per mestiere.
+  await expect(page.locator('[data-fs-creator="prober"]')).toHaveCount(0);
+  // Solo le routine.
+  await page.locator('[data-fs-creator="routine"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('3');
+  // …più gli utenti: il filtro somma, non sostituisce.
+  await page.locator('[data-fs-creator="utente"]').click();
+  await expect(tile(page, 'ricevuti')).toHaveText('4');
   // «Tutti» rimette tutto com'era: si può togliere ciò che si è messo.
   await page.locator('[data-fs-creator="__tutti"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('4');
   await expect(page.locator('[data-fs-creator="__tutti"]')).toHaveClass(/mg-chip--on/);
 
   // Ogni pasticca dice quanto contiene, come la barra delle sezioni.
-  await expect(page.locator('[data-fs-creator="prober"] .mg-chip-n')).toHaveText('2');
+  await expect(page.locator('[data-fs-creator="routine"] .mg-chip-n')).toHaveText('3');
+  await expect(page.locator('[data-fs-creator="utente"] .mg-chip-n')).toHaveText('1');
+});
+
+test('§10 — la classe scritta dal server conta anche quando il mittente non si legge con questa chiave', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const cifrato = '[cifrato — chiave privata non configurata]';
+  await apri(page, {
+    feedbacks: [
+      fb({ seq: 1, clientId: cifrato, mittenteClasse: 'utente' }),
+      fb({ seq: 2, clientId: cifrato, mittenteClasse: 'routine', mittenteRuolo: 'residuo' }),
+      fb({ seq: 3, clientId: cifrato, mittenteClasse: 'server' }),
+      fb({ seq: 4, clientId: cifrato }),
+    ],
+    workerLog: [],
+  });
+  await page.locator('[data-fs-range="30g"]').click();
+  await expect(page.locator('[data-fs-creator="utente"] .mg-chip-n')).toHaveText('1');
+  await expect(page.locator('[data-fs-creator="routine"] .mg-chip-n')).toHaveText('1');
+  await expect(page.locator('[data-fs-creator="server"] .mg-chip-n')).toHaveText('1');
+  await expect(page.locator('[data-fs-creator="server"]')).toContainText('Allarmi del server');
+  // Solo quello senza classe e senza chiave resta «non leggibile»: non diventa un utente.
+  await page.locator('[data-fs-tile="ricevuti"]').click();
+  const det = page.locator('.mg-fs-detail');
+  await expect(det.locator('[data-fs-bargroup="creatori"][data-fs-bar="__illeggibile"] .mg-bar-n')).toHaveText('1');
+  await expect(det.locator('[data-fs-bargroup="ruoliRoutine"][data-fs-bar="residuo"]')).toContainText('Rilievi residui');
+  // Una riga per ruolo apre le segnalazioni che ha contato.
+  await det.locator('[data-fs-bargroup="ruoliRoutine"][data-fs-bar="residuo"]').click();
+  await expect(page.locator('#mgFsDrillTitle')).toContainText('Routine: Rilievi residui');
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
 });
 
 // ── 4. I riquadri e il dettaglio per categoria ──────────────────────────────
@@ -213,7 +245,7 @@ test('#496 — «Feedback ricevuti» si apre e mostra la divisione per categoria
     feedbacks: [
       fb({ seq: 1, status: 'todo', clientId: 'utente-a', createdAt: g(1) }),
       fb({ seq: 2, status: 'todo', clientId: 'utente-b', createdAt: g(1) }),
-      fb({ seq: 3, status: 'spam', clientId: 'agent:prober', createdAt: g(1) }),
+      fb({ seq: 3, status: 'spam', clientId: 'routine:prober', createdAt: g(1) }),
     ],
     workerLog: [],
   });
@@ -226,9 +258,11 @@ test('#496 — «Feedback ricevuti» si apre e mostra la divisione per categoria
   await expect(det).toBeVisible();
   await expect(det.locator('[data-fs-bar="todo"] .mg-bar-n')).toHaveText('2');
   await expect(det.locator('[data-fs-bar="spam"] .mg-bar-n')).toHaveText('1');
-  // …e la seconda metà: chi li ha mandati.
-  await expect(det.locator('[data-fs-bar="user"] .mg-bar-n')).toHaveText('2');
-  await expect(det.locator('[data-fs-bar="prober"] .mg-bar-n')).toHaveText('1');
+  // …e la seconda metà: chi li ha mandati, per classe, e le routine per ruolo.
+  await expect(det.locator('[data-fs-bargroup="creatori"][data-fs-bar="utente"] .mg-bar-n')).toHaveText('2');
+  await expect(det.locator('[data-fs-bargroup="creatori"][data-fs-bar="routine"] .mg-bar-n')).toHaveText('1');
+  await expect(det.locator('[data-fs-bargroup="ruoliRoutine"][data-fs-bar="prober"] .mg-bar-n')).toHaveText('1');
+  await expect(det.locator('[data-fs-bargroup="ruoliRoutine"][data-fs-bar="prober"]')).toContainText('Esplorazione');
 
   // Si può aprire, quindi si può chiudere.
   await page.locator('[data-fs-tile="ricevuti"]').click();
@@ -238,7 +272,7 @@ test('#496 — «Feedback ricevuti» si apre e mostra la divisione per categoria
 test('#496 — esplorazioni lanciate e lanci per mestiere vengono dal registro delle esecuzioni', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page, {
-    feedbacks: [fb({ seq: 5, clientId: 'agent:prober', createdAt: g(1) })],
+    feedbacks: [fb({ seq: 5, clientId: 'routine:prober', createdAt: g(1) })],
     workerLog: [
       { role: 'prober', startedAt: g(1), num: '' },
       { role: 'prober', startedAt: g(2), num: '' },
@@ -445,16 +479,16 @@ test('#496 — col filtro acceso le pasticche degli altri mittenti dicono ancora
   const page = await openTab(URL);
   await apri(page, {
     feedbacks: [
-      fb({ seq: 1, clientId: 'agent:prober' }), fb({ seq: 2, clientId: 'agent:prober' }),
+      fb({ seq: 1, clientId: 'routine:prober' }), fb({ seq: 2, clientId: 'routine:prober' }),
       fb({ seq: 3, clientId: 'utente-a' }), fb({ seq: 4, clientId: 'utente-b' }), fb({ seq: 5, clientId: 'utente-c' }),
     ],
     workerLog: [],
   });
   await page.locator('[data-fs-range="30g"]').click();
-  await expect(page.locator('[data-fs-creator="user"] .mg-chip-n')).toHaveText('3');
-  await page.locator('[data-fs-creator="prober"]').click();
+  await expect(page.locator('[data-fs-creator="utente"] .mg-chip-n')).toHaveText('3');
+  await page.locator('[data-fs-creator="routine"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('2');
-  await expect(page.locator('[data-fs-creator="user"] .mg-chip-n')).toHaveText('3');
+  await expect(page.locator('[data-fs-creator="utente"] .mg-chip-n')).toHaveText('3');
 });
 
 test('#496 — un lavoro ancora in mezzo al giro non è «passato subito»', async ({ openTab }) => {
@@ -755,7 +789,7 @@ test('#496 il grafico degli arrivi disegna anche i periodi vuoti, e riempie il s
 
 test('#496 anche i numeri della fila in fondo portano alle segnalazioni che hanno contato', async ({ openTab }) => {
   const page = await openTab(URL);
-  const trovato = fb({ seq: 1, clientId: 'agent:prober', createdAt: g(2) });
+  const trovato = fb({ seq: 1, clientId: 'routine:prober', createdAt: g(2) });
   const lavorato = fb({
     seq: 2, status: 'done', createdAt: g(4), reviewedAt: g(3),
     stalls: 2, livelli: { l4: { esito: 'pass' } },
@@ -797,11 +831,11 @@ test('#496 il tasto destro sulle pasticche della finestra e del mittente offre l
   await expect(page.locator('.mg-ctxmenu')).toContainText('Copia la finestra');
   await page.keyboard.press('Escape');
 
-  await page.locator('[data-fs-creator="user"]').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu')).toContainText('Solo Utente');
+  await page.locator('[data-fs-creator="utente"]').click({ button: 'right' });
+  await expect(page.locator('.mg-ctxmenu')).toContainText('Solo Utenti');
   // E la voce funziona: sceglie quel mittente e basta.
   await page.locator('.mg-ctxmenu .sn-select-option').first().click();
-  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['user']);
+  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['utente']);
 });
 
 // ══ La finestra scritta a mano dice quale periodo stai guardando ═══════════
@@ -882,7 +916,7 @@ test('#496 ogni lavorazione contata esce da una porta della sezione della torta'
 // quell'esempio costava sei clic e la conoscenza di quale delle nove voci è
 // una routine.
 
-test('#496 «Routine» accende in un clic tutti i mittenti automatici', async ({ openTab }) => {
+test('#496 «Automazioni» accende in un clic tutti i mittenti automatici', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page, {
     feedbacks: [
@@ -895,6 +929,7 @@ test('#496 «Routine» accende in un clic tutti i mittenti automatici', async ({
   });
   await page.locator('[data-fs-range="30g"]').click();
 
+  await expect(page.locator('[data-fs-creator="__routine"]')).toContainText('Automazioni');
   await page.locator('[data-fs-creator="__routine"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('2');
   await expect(page.locator('[data-fs-creator="__routine"]')).toHaveAttribute('aria-pressed', 'true');
@@ -933,7 +968,7 @@ test('#496 la finestra scritta a mano e il filtro tornano interi alla riapertura
   await page.locator('#mgFsFrom').dispatchEvent('change');
   await page.locator('#mgFsTo').fill(giorno(0));
   await page.locator('#mgFsTo').dispatchEvent('change');
-  await page.locator('[data-fs-creator="user"]').click();
+  await page.locator('[data-fs-creator="utente"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('1');
 
   await page.reload();
@@ -942,7 +977,7 @@ test('#496 la finestra scritta a mano e il filtro tornano interi alla riapertura
   await expect(page.locator('.mg-chip--on[data-fs-range]')).toHaveText('Scegli tu');
   await expect(page.locator('#mgFsFrom')).toHaveValue(giorno(2));
   await expect(page.locator('#mgFsTo')).toHaveValue(giorno(0));
-  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['user']);
+  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['utente']);
   await expect(tile(page, 'ricevuti'), 'i numeri dopo la riapertura non sono quelli della finestra salvata').toHaveText('1');
 });
 
@@ -1454,19 +1489,19 @@ test('#496 la pasticca di un mittente apre le segnalazioni che il suo numero con
   await apri(page, {
     feedbacks: [
       fb({ seq: 41, createdAt: g(1), name: 'di una persona' }),
-      fb({ seq: 42, createdAt: g(1), name: 'dall\'esploratore', clientId: 'agent:prober' }),
+      fb({ seq: 42, createdAt: g(1), name: 'dall\'esploratore', clientId: 'routine:prober' }),
     ],
     workerLog: [],
   });
   await page.locator('[data-fs-range="tutto"]').click();
 
-  await page.locator('[data-fs-creator="prober"]').click({ button: 'right' });
+  await page.locator('[data-fs-creator="routine"]').click({ button: 'right' });
   await expect(page.locator('.mg-ctxmenu')).toContainText('Mostra la segnalazione contata');
   await page.locator('.mg-ctxmenu .sn-select-option').filter({ hasText: 'Mostra' }).click();
   await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
   // Il clic sulla pasticca resta il filtro: le due cose non si pestano.
-  await page.locator('[data-fs-creator="prober"]').click();
-  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['prober']);
+  await page.locator('[data-fs-creator="routine"]').click();
+  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['routine']);
 });
 
 // Un conto si scrive allo stesso modo ovunque compaia, anche dove si vede solo
@@ -1518,4 +1553,321 @@ for (const [come, chiudi] of [
     await expect(page.locator('#mgFsDrill')).toBeHidden();
     expect(await page.evaluate(() => !!(document.activeElement && document.activeElement.closest('#mgFsLegend')))).toBe(true);
   });
+}
+
+// ══ #997 — l'ultimo lavoro sui difetti ══════════════════════════════════════
+
+// ── 1. Un pannello aperto segue la finestra e il filtro ────────────────────
+// Un riquadro che smette di potersi aprire perde anche «chiudi»: il pannello
+// aperto sotto deve chiudersi con lui, da qualunque strada si cambi il conto.
+
+const lavoroControllato = (over = {}) => fb({ _id: 'au1', seq: 1, createdAt: g(20), status: 'done', name: 'controllato', livelli: { l4: { esito: 'pass' } }, ...over });
+const registroControllato = (quando) => [
+  { role: 'fixer', startedAt: g(quando), num: '1' },
+  { role: 'verifier', startedAt: g(quando), num: '1' },
+];
+
+test('#997 cambiando finestra il dettaglio del controllo di sicurezza si chiude invece di restare senza uscita', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page, { feedbacks: [lavoroControllato()], workerLog: registroControllato(20) });
+  await page.locator('[data-fs-range="tutto"]').click();
+  await page.locator('[data-fs-tile="audit"]').click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toBeVisible();
+
+  // «Oggi» non ha controlli: il riquadro non si apre più, e il pannello va via.
+  await page.locator('[data-fs-range="oggi"]').click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toHaveCount(0);
+  expect((await page.evaluate(() => window.__mgTest.getFsState())).aperto).toBe('');
+
+  // Tornando a «Tutto» il riquadro si riapre normalmente.
+  await page.locator('[data-fs-range="tutto"]').click();
+  await page.locator('[data-fs-tile="audit"]').click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toContainText('Passati');
+});
+
+test('#997 lo stesso dal filtro per creatore e dal tasto destro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page, { feedbacks: [lavoroControllato({ createdAt: g(2) })], workerLog: registroControllato(2) });
+  await page.locator('[data-fs-range="tutto"]').click();
+  await page.locator('[data-fs-tile="audit"]').click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toBeVisible();
+  await page.locator('[data-fs-creator="__routine"]').click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toHaveCount(0);
+
+  await page.locator('[data-fs-creator="__tutti"]').click();
+  await page.locator('[data-fs-tile="audit"]').click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toBeVisible();
+  await page.locator('[data-fs-range="oggi"]').click({ button: 'right' });
+  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Guarda questa finestra' }).click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toHaveCount(0);
+});
+
+test('#997 col registro che smette di rispondere, il dettaglio dei lavorati si chiude', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const feedbacks = [fb({ _id: 'lv1', seq: 1, createdAt: g(2), status: 'done' })];
+  await apri(page, { feedbacks, workerLog: registroControllato(2) });
+  await page.locator('[data-fs-range="tutto"]').click();
+  await page.locator('[data-fs-tile="lavorati"]').click();
+  await expect(page.locator('#mgFsTiles .mg-fs-detail')).toBeVisible();
+  await page.evaluate((f) => window.__mgTest.setFsData({ feedbacks: f, workerLog: [], logOk: false }), feedbacks);
+  await expect(page.locator('[data-fs-id="lavorati"] .mg-tile-n')).toHaveText('—');
+  await expect(page.locator('#mgFsTiles .mg-fs-detail')).toHaveCount(0);
+});
+
+test('#997 un dettaglio che si può ancora aprire si aggiorna sul conto nuovo', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page, {
+    feedbacks: [
+      fb({ _id: 'ag1', seq: 1, createdAt: g(1), status: 'todo' }),
+      fb({ _id: 'ag2', seq: 2, createdAt: g(20), status: 'done' }),
+    ],
+    workerLog: [],
+  });
+  await page.locator('[data-fs-range="tutto"]').click();
+  await page.locator('[data-fs-tile="ricevuti"]').click();
+  const categorie = page.locator('#mgFsTiles [data-fs-bargroup="categorie"]');
+  await expect(categorie).toHaveCount(2);
+  await page.locator('[data-fs-range="7g"]').click();
+  await expect(page.locator('#mgFsTiles .mg-fs-detail')).toBeVisible();
+  await expect(categorie).toHaveCount(1);
+  await expect(page.locator('[data-fs-tile="ricevuti"]')).toHaveAttribute('aria-expanded', 'true');
+});
+
+// ── 2. I due numeri sotto i filtri si aprono come gli altri ─────────────────
+
+const cifrato = '[cifrato — chiave privata non configurata]';
+async function schedaConNota(openTab) {
+  const page = await openTab(URL);
+  await apri(page, {
+    feedbacks: [
+      fb({ _id: 'ok1', seq: 1, createdAt: g(2) }),
+      fb({ _id: 'sd1', seq: 2, createdAt: 'non è una data', name: 'la prima senza data' }),
+      fb({ _id: 'sd2', seq: 3, createdAt: null, name: 'la seconda senza data' }),
+      fb({ _id: 'mi1', seq: 4, createdAt: g(3), clientId: cifrato, name: 'mittente cifrato' }),
+    ],
+    workerLog: [],
+  });
+  await page.locator('[data-fs-range="tutto"]').click();
+  return page;
+}
+
+test('#997 il conto delle segnalazioni senza data si apre su quelle, col clic e da tastiera', async ({ openTab }) => {
+  const page = await schedaConNota(openTab);
+  const numero = page.locator('#mgFsNota [data-fs-esito="senzaData"]');
+  await expect(numero).toHaveText('2');
+  await page.locator('#mgFsRoot').screenshot({ path: 'tests/.shots/997-riga-sotto-i-filtri.png' });
+  await numero.click();
+  await expect(page.locator('#mgFsDrill')).toBeVisible();
+  await expect(page.locator('#mgFsDrillTitle')).toContainText('data d\'arrivo');
+  await expect(page.locator('#mgFsDrillList')).toContainText('la prima senza data');
+  await expect(page.locator('#mgFsDrillList')).toContainText('la seconda senza data');
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(2);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#mgFsDrill')).toBeHidden();
+
+  await numero.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(2);
+});
+
+test('#997 il conto dei mittenti illeggibili si apre su quelle segnalazioni', async ({ openTab }) => {
+  const page = await schedaConNota(openTab);
+  await page.locator('#mgFsNota [data-fs-esito="mittentiIgnoti"]').click();
+  await expect(page.locator('#mgFsDrillTitle')).toContainText('Mittente non leggibile');
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
+  await expect(page.locator('#mgFsDrillList')).toContainText('mittente cifrato');
+});
+
+test('#997 il tasto destro sulla riga sotto i filtri offre i suoi due conti', async ({ openTab }) => {
+  const page = await schedaConNota(openTab);
+  await page.locator('#mgFsNota').click({ button: 'right', position: { x: 2, y: 2 } });
+  const voci = page.locator('.mg-ctxmenu .sn-select-option');
+  await expect(voci.filter({ hasText: 'data d\'arrivo' })).toHaveCount(1);
+  await expect(voci.filter({ hasText: 'Mittente non leggibile' })).toHaveCount(1);
+  await voci.filter({ hasText: 'data d\'arrivo' }).click();
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(2);
+});
+
+// ── 3. «Scegli tu» senza date dice che sta mostrando tutto ──────────────────
+
+test('#997 con «Scegli tu» a campi vuoti la scheda dice che sta guardando tutto', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const feedbacks = [];
+  for (let i = 0; i < 6; i++) feedbacks.push(fb({ _id: 'st' + i, seq: 10 + i, createdAt: g(i * 15) }));
+  await apri(page, { feedbacks, workerLog: [] });
+  await page.locator('[data-fs-range="tutto"]').click();
+  const tutto = await tile(page, 'ricevuti').innerText();
+  await page.locator('[data-fs-range="7g"]').click();
+  expect(await tile(page, 'ricevuti').innerText()).not.toBe(tutto);
+
+  await page.locator('[data-fs-range="custom"]').click();
+  await expect(tile(page, 'ricevuti')).toHaveText(tutto);
+  await expect(page.locator('#mgFsFinestra')).toBeVisible();
+  await expect(page.locator('#mgFsFinestra')).toContainText('Guardi tutto');
+  await expect(page.locator('#mgFsFinestra')).toContainText('senza limiti di data');
+
+  // Scritta una data, la frase passa a dire la finestra vera.
+  await page.locator('#mgFsFrom').fill(new Date(Date.now() - 20 * GIORNO).toISOString().slice(0, 10));
+  await page.locator('#mgFsFrom').dispatchEvent('change');
+  await expect(page.locator('#mgFsFinestra')).toContainText('in poi');
+});
+
+// ── 4. Se la lettura completa non riesce, trattino e motivo, mai zero ───────
+
+test('#997 ripiego sulla lista in pagina: il controllo di sicurezza scrive un trattino e il motivo', async ({ openTab }) => {
+  const page = await openTab(URL);
+  // Com'è in pagina: la riga d'elenco non porta l'esito del controllo.
+  const proiettato = fb({ _id: 'rp2', seq: 2, status: 'done', createdAt: g(4), reviewedAt: g(3), name: 'riga d\'elenco', _proiezione: true });
+  await apri(page, {
+    feedbacks: [proiettato],
+    workerLog: [{ role: 'new-work', startedAt: g(3), num: '2' }, { role: 'secaudit', startedAt: g(2), num: '2' }],
+    ripiego: true,
+  });
+  await page.locator('[data-fs-range="7g"]').click();
+  await expect(tile(page, 'audit')).toHaveText('—');
+  const sotto = page.locator('[data-fs-id="audit"] .mg-tile-sub');
+  await expect(sotto).toContainText('esito non letto su 1 lavoro');
+  await expect(sotto).not.toContainText('0 bocciati');
+  await page.locator('#mgFsAltro').screenshot({ path: 'tests/.shots/997-ripiego-audit.png' });
+  // La riga piccola conta un lavoro e si apre su quello.
+  await sotto.click();
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
+  await expect(page.locator('#mgFsDrillList')).toContainText('riga d\'elenco');
+});
+
+test('#997 lettura fallita e nessun ripiego: i riquadri dei lavori non scrivono zero', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page, {
+    feedbacks: [],
+    workerLog: [{ role: 'new-work', startedAt: g(3), num: '5' }, { role: 'verifier', startedAt: g(2), num: '5' }],
+    ripiego: true,
+  });
+  await page.locator('[data-fs-range="tutto"]').click();
+  // Il registro ha risposto: quanti lavori si sa.
+  await expect(tile(page, 'lavorati')).toHaveText('1');
+  for (const id of ['ricevuti', 'audit', 'arenati']) {
+    await expect(tile(page, id), `«${id}» scrive un numero che nessuno ha letto`).toHaveText('—');
+    await expect(page.locator(`[data-fs-id="${id}"] .mg-tile-sub`)).toContainText('non lette');
+  }
+  const esiti = await page.locator('#mgFsEsiti').innerText();
+  expect(/(^|\s)0(\s|$)/.test(esiti), `le righe di esito scrivono uno zero: «${esiti}»`).toBe(false);
+  await expect(page.locator('#mgFsPieVuoto')).toContainText('non si sono lette');
+  await expect(page.locator('#mgFsPieVuoto')).not.toContainText('Nessun lavoro verificato');
+});
+
+test('#997 il giro di aggiornamento non porta via l\'esito del controllo già letto', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const intero = fb({ _id: 'lv-a', seq: 7, status: 'done', createdAt: g(4), livelli: { l4: { esito: 'pass' } }, _updateTime: 't1' });
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.filo);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate((a) => window.__mgTest.setData([a]), intero);
+  await apriScheda(page, 'fbstats');
+  await page.evaluate((a) => window.__mgTest.setFsData({
+    feedbacks: [a],
+    workerLog: [{ role: 'fixer', startedAt: new Date(Date.now() - 3 * 864e5).toISOString(), num: '7' }],
+  }), intero);
+  await page.locator('[data-fs-range="tutto"]').click();
+  await expect(tile(page, 'audit')).toHaveText('1');
+
+  // Il giro rilegge la RIGA: senza esito, marcata come proiezione.
+  const riga = { ...intero, name: 'titolo cambiato', _updateTime: 't2', _proiezione: true };
+  delete riga.livelli;
+  await page.evaluate((r) => {
+    window.__liveState = { versions: [{ _id: r._id, _updateTime: 't2' }], docs: { [r._id]: r } };
+    window.__mgTest.setLiveSources({
+      listVersions: async () => window.__liveState.versions,
+      getMany: async (ids) => ids.map((id) => window.__liveState.docs[id]).filter(Boolean),
+    });
+  }, riga);
+  await page.evaluate(() => window.__mgTest.pollNow());
+  // Il giro è arrivato (il titolo nuovo è nell'elenco), e l'esito è rimasto.
+  await page.locator('[data-fs-id="audit"]').click({ button: 'right' });
+  await page.locator('.mg-ctxmenu .sn-select-option').first().click();
+  await expect(page.locator('#mgFsDrillList')).toContainText('titolo cambiato');
+  await expect(tile(page, 'audit')).toHaveText('1');
+});
+
+// Una segnalazione NUOVA arriva col giro come riga d'elenco, senza esito: a
+// scheda aperta la si legge intera, o il riquadro dice che l'esito non è letto.
+for (const [come, dettagli, atteso, sotto] of [
+  ['letta intera', 'ok', '1', '0 bocciati'],
+  ['lettura intera fallita', 'ko', '—', 'esito non letto su 1 lavoro'],
+]) {
+  test(`#997 una segnalazione arrivata col giro, ${come}: il controllo di sicurezza non diventa zero`, async ({ openTab }) => {
+    const page = await openTab(URL);
+    const nuova = fb({ _id: 'lv-n', seq: 8, status: 'done', createdAt: g(1), livelli: { l4: { esito: 'pass' } }, _updateTime: 't1' });
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.filo);
+    await page.evaluate(() => window.__mgTest.whenReady());
+    await page.evaluate(() => window.__mgTest.setAdmin(true));
+    await page.evaluate(() => window.__mgTest.setData([]));
+    await apriScheda(page, 'fbstats');
+    // Il registro la nomina già: la lista la porterà il giro.
+    await page.evaluate(() => window.__mgTest.setFsData({
+      feedbacks: [],
+      workerLog: [{ role: 'secaudit', startedAt: new Date(Date.now() - 864e5).toISOString(), num: '8' }],
+    }));
+    await page.locator('[data-fs-range="tutto"]').click();
+
+    const riga = { ...nuova, _proiezione: true };
+    delete riga.livelli;
+    await page.evaluate(({ riga, intera, dettagli }) => {
+      window.__mgTest.setLiveSources({
+        listVersions: async () => [{ _id: riga._id, _updateTime: 't1' }],
+        getMany: async () => [riga],
+        getDettagli: async () => {
+          if (dettagli === 'ko') throw new Error('rete giù');
+          return [intera];
+        },
+      });
+    }, { riga, intera: nuova, dettagli });
+    await page.evaluate(() => window.__mgTest.pollNow());
+    await expect(page.locator('[data-fs-id="audit"] .mg-tile-sub')).toContainText(sotto);
+    await expect(tile(page, 'audit')).toHaveText(atteso);
+  });
+}
+
+// ── 5. La fetta «3 o più» dice quante critiche ha avuto ogni lavoro ─────────
+
+test('#997 aperta la fetta «3 o più», ogni lavoro dice quante critiche ha avuto', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const verifiche = (num, n) => Array.from({ length: n }, () => ({ role: 'verifier', startedAt: g(2), num }));
+  await apri(page, {
+    feedbacks: [
+      fb({ _id: 'c3', seq: 30, status: 'done', createdAt: g(5), name: 'tre critiche' }),
+      fb({ _id: 'c5', seq: 50, status: 'done', createdAt: g(5), name: 'cinque critiche' }),
+      fb({ _id: 'c1', seq: 10, status: 'done', createdAt: g(5), name: 'una critica' }),
+    ],
+    workerLog: [...verifiche('30', 4), ...verifiche('50', 6), ...verifiche('10', 2)],
+  });
+  await page.locator('[data-fs-range="tutto"]').click();
+  await setData(page, [
+    fb({ _id: 'c3', seq: 30, status: 'done', createdAt: g(5), name: 'tre critiche' }),
+    fb({ _id: 'c5', seq: 50, status: 'done', createdAt: g(5), name: 'cinque critiche' }),
+  ]);
+
+  await cliccaFetta(page, 'g3');
+  await expect(page.locator('#mgFsDrillTitle')).toContainText('3 o più critiche');
+  const riga = (id) => page.locator(`#mgFsDrillList [data-fs-open="${id}"]`);
+  await expect(riga('c3').locator('.mg-fs-drill-giri')).toHaveText('3 critiche');
+  await expect(riga('c5').locator('.mg-fs-drill-giri')).toHaveText('5 critiche');
+  for (const tema of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.locator('#mgFsDrill').screenshot({ path: `tests/.shots/997-fetta-g3-${tema}.png` });
+  }
+  await page.locator('#mgFsDrillClose').click();
+
+  // Dalla legenda, la stessa cosa.
+  await page.locator('#mgFsLegend li[data-group="g3"]').click();
+  await expect(riga('c5').locator('.mg-fs-drill-giri')).toHaveText('5 critiche');
+
+  // Le altre fette dicono già il numero nel nome: lì la colonna non serve.
+  await page.locator('#mgFsLegend li[data-group="g1"]').click();
+  await expect(page.locator('#mgFsDrillList .mg-fs-drill-giri')).toHaveCount(0);
+});
+
+async function setData(page, righe) {
+  await page.evaluate((r) => window.__mgTest.setData(r), righe);
 }

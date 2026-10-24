@@ -42,9 +42,14 @@ npm start                       # avvia Filo (apre la finestra)
 npm run test:smoke              # smoke headless (verifica che la newtab carichi)
 ```
 
-Prima di aprire la finestra, `npm start` prova ad allineare il ramo in cui sei
-a `origin/main` (`git pull --rebase --autostash`). Se non ci riesce, per
-esempio offline o con un conflitto, annulla e apre Filo comunque.
+Prima di aprire la finestra, `npm start` (e `npm run dev`) prova ad allineare
+il ramo in cui sei a `origin/main` (`git pull --rebase --autostash`). Se non ci
+riesce, per esempio offline o con un conflitto, annulla e apre Filo comunque.
+Poi installa i pacchetti che `package-lock.json` chiede e `node_modules` non
+ha. Se va aggiornato Electron mentre un Filo è acceso, aspetta il prossimo
+avvio: su Windows un Electron acceso non si sostituisce. Le prove
+(`npm run test:unit`, gli spec Playwright, `npm run finish`) fanno lo stesso
+controllo prima di partire, nella cartella da cui arrivano i pacchetti.
 
 Il binario di Electron non lo scarica `npm install`: lo scarica il primo
 `npm start`, o il primo lancio dei test. Per scaricarlo subito:
@@ -148,13 +153,14 @@ Un messaggio IPC nuovo:
 ```bash
 npm run test:smoke     # smoke headless con screenshot (tests/.smoke/)
 npm run test:unit      # unit test Node (veloci)
-npm test               # suite Playwright completa (~530 spec, ~1.450 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
+npm test               # suite Playwright completa (~590 spec, ~1.450 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
 npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
 ```
 
 La suite completa non la lancia più nessuno a mano (decisione owner
 2026-09-15): gira in GitHub a ogni fusione su main, in
-`.github/workflows/suite.yml` (Linux senza schermo; `scripts/suite-verdict.mjs`
+`.github/workflows/suite.yml` (Linux senza schermo, divisa in quattro parti che
+girano insieme su macchine diverse; sugli esiti uniti `scripts/suite-verdict.mjs`
 toglie dal conto i rossi noti del contenitore, `tests/rossi-noti.json`), insieme
 agli unit test su Windows che rifà anche il cancello di pubblicazione, e un
 rosso nuovo diventa un feedback. Ogni sei ore `release.yml` pubblica il commit

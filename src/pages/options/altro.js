@@ -16,6 +16,11 @@
     document.title = I18n.t('options_title') + ' — ' + I18n.t('options_other');
     $('title').textContent = I18n.t('options_other');
     $('backToModels').textContent = I18n.t('options_back_to_models');
+    $('h-correttore').textContent = 'Correttore';
+    for (const [id, chiave] of [['spellcheckErrori', 'spell_switch_errori'], ['spellcheckSuggerimenti', 'spell_switch_suggerimenti'], ['spellcheckAutomatica', 'spell_switch_automatica'], ['spellcheckSegnaposti', 'spell_switch_segnaposti']]) {
+      $(`${id}-label`).textContent = I18n.t(chiave);
+      $(`${id}-desc`).textContent = I18n.t(`${chiave}_desc`);
+    }
     $('h-blocklist').textContent = I18n.t('options_blocklist');
     $('blocklistDesc').textContent = I18n.t('options_blocklist_desc');
     $('h-categories').textContent = I18n.t('options_categories');
@@ -36,6 +41,8 @@
     const righe = [
       ...T.scorciatoieFilo().map((s) => [s.etichetta, s.nome]),
       [T.etichettaSaltoScheda(), T.descrizioneSaltoScheda()],
+      [T.etichettaSchedaVicina('dopo'), 'Vai alla scheda successiva'],
+      [T.etichettaSchedaVicina('prima'), 'Vai alla scheda precedente'],
       [T.etichettaIndietro(), 'Torna alla pagina precedente'],
       [T.etichettaAvanti(), 'Vai alla pagina successiva'],
       [T.etichettaBarra(), 'Apri e chiudi la barra laterale'],
@@ -56,6 +63,8 @@
     disegnaScorciatoie(settings);
     $('blocklist').value = Siti.testoDaElenco(settings.blocklist);
     mostrato = $('blocklist').value;
+    for (const [id, percorso] of INTERRUTTORI) $(id).checked = valoreDi(settings, percorso) !== false;
+    $('spellcheckAutomatica').checked = settings.correttore?.automatica !== false;
     await renderCategories();
   }
 
@@ -127,7 +136,8 @@
     deleteBtn.addEventListener('click', async () => {
       const text = I18n.t('options_category_delete_confirm', cat.name);
       const ok = window.SN_CONFIRM_UI
-        ? await window.SN_CONFIRM_UI.confirm({ title: I18n.t('options_category_delete'), text, okLabel: I18n.t('options_category_delete') })
+        // Il nome della categoria può averlo scritto il modello che le crea: nel suo riquadro (#592.7).
+        ? await window.SN_CONFIRM_UI.confirm({ title: I18n.t('options_category_delete'), text, parti: ['Eliminare la categoria', { citazione: String(cat.name || '') }, 'Le schede diventeranno non categorizzate.'], okLabel: I18n.t('options_category_delete') })
         : window.confirm(text); // fallback se il modulo non è caricato
       if (!ok) return;
       await chrome.runtime.sendMessage({ type: MSG.DELETE_CATEGORY, id: cat.id });
@@ -188,6 +198,16 @@
     mostraSalvato._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
+  // I due segni del correttore e i segnaposti (#1448) stanno insieme qui e nella chat (#1115): ognuno si spegne da solo.
+  const INTERRUTTORI = [['spellcheckErrori', 'featureFlags.spellcheck'], ['spellcheckSuggerimenti', 'featureFlags.spellcheckContext'],
+    ['spellcheckSegnaposti', 'correttore.segnaposti']];
+  const valoreDi = (s, percorso) => percorso.split('.').reduce((o, k) => (o && typeof o === 'object' ? o[k] : undefined), s);
+  async function salvaInterruttore(id, percorso) {
+    const [sezione, voce] = percorso.split('.');
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { [sezione]: { [voce]: $(id).checked } } });
+    mostraSalvato();
+  }
+
   // L'elenco come la pagina l'ha letto o scritto l'ultima volta: un cambio arrivato da altrove (la chat, il tasto
   // destro) si mostra solo se qui non si sta scrivendo (#949). Le righe che non sono siti restano al loro posto.
   let mostrato = null;
@@ -202,7 +222,7 @@
   // `riscrivi`: a gesto finito (uscita, incolla) la casella mostra i siti ridotti e dice le righe scartate; mentre
   // si scrive no, perché «faceb» è una riga a metà e il cursore non deve saltare.
   async function save({ riscrivi = false } = {}) {
-    caselle.spedita('blocklist');
+    const biglietto = caselle.spedita('blocklist');
     const el = $('blocklist');
     const letto = Siti.elencoDaTesto(el.value);
     scartate = letto.scartate;
@@ -219,7 +239,7 @@
     }
     mostrato = el.value;
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { blocklist: letto.valid }, mentreScrive: !riscrivi });
-    mostraSalvato();
+    if (caselle.aggiornata('blocklist', biglietto)) mostraSalvato();
   }
 
   // Domini esclusi e nomi delle categorie non hanno un «Salva», e chiudere la scheda non avvisa la pagina (#590.5).
@@ -229,6 +249,7 @@
     uscita() {
       for (const [input, cat] of caselleCategorie) if (!input.value.trim()) input.value = cat.name;
     },
+    spegni: () => $('savedHint').classList.remove('sn-show'),
   });
   caselle.registra('blocklist', (avvisi) => save({ riscrivi: avvisi === true }));
 
@@ -239,11 +260,12 @@
       const el = $('blocklist');
       const scritti = Siti.elencoDaTesto(el.value).valid;
       // Uno stesso elenco con altre righe vuote non si riscrive: chi scrive perderebbe l'a capo appena battuto.
-      if (el.value !== mostrato || JSON.stringify(scritti) === JSON.stringify(msg.settings.blocklist || [])) return;
+      const tieniElenco = el.value !== mostrato || JSON.stringify(scritti) === JSON.stringify(msg.settings.blocklist || []);
       const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('altro', msg.settings, {
+        salta: (id) => id === 'blocklist' && tieniElenco,
         elenco: (_id, lista) => Siti.testoDaElenco(lista, scartate),
       });
-      if (toccati.length) mostrato = el.value;
+      if (toccati.includes('blocklist')) mostrato = el.value;
     });
   }
 
@@ -255,6 +277,12 @@
       caselle.cambiato('blocklist', e);
     });
     $('blocklist').addEventListener('change', () => save({ riscrivi: true }));
+    for (const [id, percorso] of INTERRUTTORI) $(id).addEventListener('change', () => salvaInterruttore(id, percorso));
+    // La correzione automatica a fine parola (#1447): accesa di serie, si spegne da sola.
+    $('spellcheckAutomatica').addEventListener('change', async () => {
+      await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { correttore: { automatica: $('spellcheckAutomatica').checked } } });
+      mostraSalvato();
+    });
     // #252 — indirizzo canonico filo://<page>/<file> (non la forma legacy
     // filo://src/pages/…): un solo URL per pagina, e la scheda già aperta viene
     // riportata a fuoco invece di duplicarla.
@@ -265,7 +293,7 @@
       chrome.tabs.create({ url: 'filo://history/history.html' });
     });
     $('openArchive').addEventListener('click', () => {
-      chrome.tabs.create({ url: 'filo://archive/archive.html' });
+      chrome.tabs.create({ url: 'filo://quaderno/quaderno.html' });
     });
     $('openSpellcheck').addEventListener('click', () => {
       chrome.tabs.create({ url: 'filo://spellcheck/spellcheck.html' });

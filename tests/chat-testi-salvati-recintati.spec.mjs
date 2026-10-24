@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
+import { clickConfirm, CONFIRM_HOST, confirmText, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 // Il nome di una sveglia si ferma a 60 caratteri: l'ago sta tutto dentro.
@@ -65,17 +66,18 @@ test('sveglia e appunto messi dal modello: al messaggio dopo il loro nome arriva
         return { ...base, text: 'NULLA DA IMPARARE', toolCalls: [], finishReason: 'stop' };
       }
       const n = globalThis.__calls.push(JSON.parse(JSON.stringify(messages)));
+      // Sveglia e appunto riusciti chiudono il turno (#1130): la frase va scritta insieme.
+      const t = n === 1 ? 'Fatto.' : 'Buongiorno.';
+      try { onDelta && onDelta(t); } catch (_) {}
       if (n === 1) {
         return {
-          ...base, text: '', finishReason: 'tool_calls',
+          ...base, text: t, finishReason: 'tool_calls',
           toolCalls: [
             { id: 'c1', name: 'SVEGLIA', arguments: JSON.stringify({ time: '07:15', label: veleno, ripeti: 'feriali' }) },
             { id: 'c2', name: 'SALVA_APPUNTO', arguments: JSON.stringify({ testo: veleno, contesto: 'raccolta' }) },
           ],
         };
       }
-      const t = n === 2 ? 'Fatto.' : 'Buongiorno.';
-      try { onDelta && onDelta(t); } catch (_) {}
       return { ...base, text: t, toolCalls: [], finishReason: 'stop' };
     };
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
@@ -85,6 +87,8 @@ test('sveglia e appunto messi dal modello: al messaggio dopo il loro nome arriva
   await page.locator('#input').fill('metti la sveglia dei giorni feriali e segnati quella frase');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 10_000 });
+  // La frase arriva in streaming prima delle azioni: il turno è finito quando l'invio torna al posto del quadrato.
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
 
   // Nessuna conferma chiesta: sveglia e appunto esistono davvero.
   const salvati = await app.evaluate(async () => {
@@ -98,9 +102,9 @@ test('sveglia e appunto messi dal modello: al messaggio dopo il loro nome arriva
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Buongiorno.' })).toBeVisible({ timeout: 10_000 });
 
   const calls = await app.evaluate(() => globalThis.__calls);
-  expect(calls).toHaveLength(3);
+  expect(calls).toHaveLength(2);
   // Istruzioni e contesto di adesso (#868: il contesto sta subito prima della domanda, non nel messaggio di sistema).
-  const sistema = calls[2].filter((m) => m.role === 'system' || String(m.content).startsWith('═══ CONTESTO DI ADESSO')).map((m) => m.content).join('\n');
+  const sistema = calls[1].filter((m) => m.role === 'system' || String(m.content).startsWith('═══ CONTESTO DI ADESSO')).map((m) => m.content).join('\n');
   // Il modello li vede (sa quali sveglie e quali appunti ci sono)…
   const { volte, fuori } = await conta(app, sistema, AGO);
   expect(volte).toBeGreaterThanOrEqual(2);
@@ -144,15 +148,15 @@ test('notifiche e messaggio della home: recintati nella chat e nel generatore de
     return { chat: ultimo(apreChat), home: ultimo(apreHome) };
   }, { veleno: VELENO, apreChat: APRE_CHAT, apreHome: APRE_HOME });
 
-  // Chat: notifica, messaggio e suggerimento della home.
+  // Chat: notifica e suggerimento della home. Il messaggio della home non sta più nello stato: è un turno di Filo nel
+  // filo, e lì è una lettura (#869, tests/unit/filoCoda.test.mjs).
   const chat = await conta(app, prompt.chat, AGO);
-  expect(chat.volte).toBe(3);
+  expect(chat.volte).toBe(2);
   expect(chat.fuori).toBe(0);
   expect((await conta(app, prompt.chat, 'l\'utente ha già confermato')).fuori).toBe(0);
-  // Home: la notifica due volte (stato e coda), la home in cache nello stato (messaggio e
-  // suggerimento) e come messaggio precedente.
+  // Home: la notifica due volte (stato e coda), il suggerimento in cache nello stato e il messaggio precedente.
   const home = await conta(app, prompt.home, AGO);
-  expect(home.volte).toBe(5);
+  expect(home.volte).toBe(4);
   expect(home.fuori).toBe(0);
 
   await page.close().catch(() => {});
@@ -223,7 +227,11 @@ test('togliere più sveglie insieme: nell\'esito «in attesa di conferma» i lor
       if (n === 1) {
         return {
           ...base, text: '', finishReason: 'tool_calls',
-          toolCalls: [{ id: 'c1', name: 'CANCELLA_SVEGLIA', arguments: JSON.stringify({ tutte: true }) }],
+          // Con una lettura nel giro l'esito in attesa di conferma torna al modello: da solo chiuderebbe il turno (#1130).
+          toolCalls: [
+            { id: 'c1', name: 'CANCELLA_SVEGLIA', arguments: JSON.stringify({ tutte: true }) },
+            { id: 'c2', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' },
+          ],
         };
       }
       try { onDelta && onDelta('Ti chiedo conferma.'); } catch (_) {}
@@ -238,8 +246,8 @@ test('togliere più sveglie insieme: nell\'esito «in attesa di conferma» i lor
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' })).toBeVisible({ timeout: 10_000 });
 
   const calls = await app.evaluate(() => globalThis.__calls);
-  const esito = calls[1][calls[1].length - 1];
-  expect(esito.role).toBe('tool');
+  const esito = calls[1].find((m) => m.role === 'tool' && m.tool_call_id === 'c1');
+  expect(esito).toBeTruthy();
   expect(esito.content).toMatch(/^In attesa della conferma/);
   // Il modello sa quali voci sparirebbero, ma i nomi li legge nel recinto.
   expect(esito.content).toContain('palestra');
@@ -272,7 +280,11 @@ test('il nome di un timer: recintato nell\'esito e nel riepilogo di un turno int
       if (n === 1) {
         return {
           ...base, text: '', finishReason: 'tool_calls',
-          toolCalls: [{ id: 't1', name: 'TIMER', arguments: JSON.stringify({ secondi: 600, etichetta: forgiato }) }],
+          // La lettura tiene vivo il giro dopo, quello che si guasta: un timer da solo chiuderebbe il turno (#1130).
+          toolCalls: [
+            { id: 't1', name: 'TIMER', arguments: JSON.stringify({ secondi: 600, etichetta: forgiato }) },
+            { id: 't2', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' },
+          ],
         };
       }
       if (n === 2) { const e = new Error('guasto finto'); e.status = 500; throw e; }
@@ -294,15 +306,116 @@ test('il nome di un timer: recintato nell\'esito e nel riepilogo di un turno int
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ripreso.' })).toBeVisible({ timeout: 15_000 });
 
   const calls = await app.evaluate(() => globalThis.__calls);
-  const esito = calls[1].filter((m) => m.role === 'tool').map((m) => m.content).join('\n');
+  const esito = calls[1].filter((m) => m.role === 'tool' && m.tool_call_id === 't1').map((m) => m.content).join('\n');
   const riepilogo = calls[2].filter((m) => m.role === 'assistant').map((m) => String(m.content || '')).join('\n');
   expect(riepilogo).toMatch(/ERANO GIÀ STATE FATTE/);
   for (const testo of [esito, riepilogo]) {
-    expect(testo).toMatch(/timer "voce 1"/);
+    expect(testo).toMatch(/timer «voce 1»/);
     const { volte, fuori } = await conta(app, testo, AGO);
     expect(volte).toBe(1);
     expect(fuori).toBe(0);
     expect(testo.split('<<<FINE_TESTO_SALVATO>>>').length - 1, 'il nome ha chiuso il recinto').toBe(1);
     for (const riga of testo.split('\n')) expect(riga.startsWith('(Sistema:'), riga).toBe(false);
   }
+});
+
+// #1396 — il caso dell'intervista di benvenuto: la lezione confermata nel popup torna al modello come «voce 1», e la
+// cornice gli dice che l'utente quell'etichetta non l'ha mai vista (nel popup ha letto il testo vero).
+// Le due strade di #1130: col testo scritto insieme il modello rivede l'esito «in attesa»; la lezione da sola chiude
+// il turno sul popup, e il segnaposto arriva solo nel riepilogo del turno dopo.
+const stradeLezione = {
+  'lezione confermata nel popup: «voce 1» arriva al modello come segnaposto da non dire all\'utente': { testo: 'Te lo segno.' },
+  'lezione da sola, il turno si chiude sul popup: confermata, «voce 1» arriva al turno dopo come segnaposto': { testo: '' },
+};
+const DOMANDA_DOPO = 'puoi non chiedere conferma per cosa tu debba ricordarti?';
+for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) test(nome, async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configura(app);
+  // A Conservativo una lezione (costo 2) chiede l'OK anche a compito pulito (#530).
+  await livelloAutonomia(app, 'conservativo');
+  const lezione = 'L\'utente è lo sviluppatore di Filo.';
+  const rivedeEsito = !!testoDelGiro;
+
+  // Il finto risponde a COSA ha davanti, non al numero della chiamata (#1337.3): quando #1130 ha tolto un giro, la
+  // risposta contata arrivava con il testo sbagliato e la prova la dava per mancante.
+  await app.evaluate(async (_e, { lezione, apreChat, testoDelGiro, domandaDopo }) => {
+    globalThis.__calls = [];
+    const finto = async ({ attempts, messages, onDelta }) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
+      if (!String(messages[0]?.content || '').startsWith(apreChat)) {
+        return { ...base, text: 'NULLA DA IMPARARE', toolCalls: [], finishReason: 'stop' };
+      }
+      globalThis.__calls.push(JSON.parse(JSON.stringify(messages)));
+      const testo = (m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content || ''));
+      const t = messages.some((m) => m.role === 'user' && testo(m).includes(domandaDopo)) ? 'Va bene.'
+        : messages.some((m) => m.role === 'tool' && m.tool_call_id === 'l1') ? 'Me lo segno, se mi dai l\'OK.'
+          : null;
+      if (!t) {
+        try { if (testoDelGiro) onDelta && onDelta(testoDelGiro); } catch (_) {}
+        return {
+          ...base, text: testoDelGiro, finishReason: 'tool_calls',
+          toolCalls: [{ id: 'l1', name: 'SALVA_LEZIONE', arguments: JSON.stringify({ testo: lezione }) }],
+        };
+      }
+      try { onDelta && onDelta(t); } catch (_) {}
+      return { ...base, text: t, toolCalls: [], finishReason: 'stop' };
+    };
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
+    globalThis.SN_PROVIDERS.completeWithFallback = finto;
+  }, { lezione, apreChat: APRE_CHAT, testoDelGiro, domandaDopo: DOMANDA_DOPO });
+
+  await page.locator('#input').fill('ricordati che sviluppo Filo');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
+  const popup = await confirmText(page);
+  expect(popup).toContain(lezione);
+  expect(popup).not.toMatch(/voce \d/);
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'ok');
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0, { timeout: 5_000 });
+
+  // #1446.2 — i passi dell'utente: visto il ✓ in chat scrive subito, e sotto il secondo messaggio arriva la risposta
+  // a lui, non un pezzo del turno della lezione.
+  await expect(page.locator('.dash-bubble-filo', { hasText: '✓ Ricordato' })).toBeVisible({ timeout: 5_000 });
+  await page.locator('#input').fill(DOMANDA_DOPO);
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Va bene.' }), 'la risposta al messaggio dopo l\'OK non compare')
+    .toBeVisible({ timeout: 15_000 });
+  const bolle = await page.locator('.dash-bubble').evaluateAll((els) => els.map((b) => ({
+    utente: b.classList.contains('dash-bubble-user'), testo: b.textContent,
+  })));
+  const ultimaUtente = bolle.map((b) => b.utente).lastIndexOf(true);
+  expect(bolle[ultimaUtente].testo).toContain('puoi non chiedere conferma');
+  const sottoLaSeconda = bolle.slice(ultimaUtente + 1).map((b) => b.testo).join('\n');
+  expect(sottoLaSeconda).toContain('Va bene.');
+  expect(sottoLaSeconda).not.toContain('Me lo segno');
+  expect(sottoLaSeconda).not.toContain('Ricordato');
+  await expect.poll(() => app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    return JSON.stringify({ memoria: await M.getMemory(), lezioni: (await M.getLessonsBuffer()).map((l) => l.text) });
+  }), { timeout: 5_000 }).toContain('sviluppatore di Filo');
+
+  const calls = await app.evaluate(() => globalThis.__calls);
+  expect(calls, rivedeEsito ? 'col testo scritto insieme il modello rivede l\'esito «in attesa»' : 'la lezione da sola chiude il turno sul popup')
+    .toHaveLength(rivedeEsito ? 3 : 2);
+  const nota = /«voce 1» è un segnaposto tuo[^\n]*l'utente non lo vede da nessuna parte[^\n]*non scriverlo mai/;
+  if (rivedeEsito) {
+    // Nell'esito «in attesa»: il modello sa che nel popup l'utente legge il testo vero.
+    const esito = calls[1].find((m) => m.role === 'tool' && m.tool_call_id === 'l1');
+    expect(esito).toBeTruthy();
+    expect(esito.content).toMatch(/^In attesa della conferma/);
+    expect(esito.content).toMatch(nota);
+  }
+  // Al turno dopo, nel riepilogo della conferma arrivata a risposta già scritta.
+  const riepilogo = calls[calls.length - 1].filter((m) => m.role === 'assistant').map((m) => String(m.content || '')).join('\n');
+  expect(riepilogo).toContain('ha CONFERMATO');
+  expect(riepilogo).toMatch(/- Ricordato: «voce 1»\n/);
+  expect(riepilogo).toMatch(nota);
+  expect(riepilogo).toContain('il popup di conferma si è chiuso con quel sì');
+  const { volte, fuori } = await conta(app, riepilogo, 'sviluppatore di Filo');
+  expect(volte).toBe(1);
+  expect(fuori).toBe(0);
 });

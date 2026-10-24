@@ -44,6 +44,10 @@ function conversation(turns, bodyLen) {
   return parts.join('\n\n');
 }
 
+// Abbastanza turni da 5000 da passare il tetto di un quarto, qualunque sia il tetto.
+const OLTRE = Math.ceil((TH.NOTES_MAX * 1.25) / 5000);
+const ULTIMO = `risposta ${OLTRE - 1}`;
+
 test('note sotto il tetto: restituite identiche (nessun taglio inutile)', () => {
   const notes = conversation(3, 100);
   assert.equal(TH.capNotes(notes), notes);
@@ -52,16 +56,16 @@ test('note sotto il tetto: restituite identiche (nessun taglio inutile)', () => 
 });
 
 test('note oltre il tetto: rientrano nel limite delle regole', () => {
-  const notes = conversation(20, 5000); // ~100k, ben oltre NOTES_MAX
+  const notes = conversation(OLTRE, 5000);
   assert.ok(notes.length > TH.NOTES_MAX, 'il caso di test deve partire oltre il tetto');
   const capped = TH.capNotes(notes);
   assert.ok(capped.length <= TH.NOTES_MAX, `capNotes deve rientrare: ${capped.length}`);
 });
 
 test('il taglio parte dai turni PIÙ VECCHI e conserva l’ultimo', () => {
-  const notes = conversation(20, 5000);
+  const notes = conversation(OLTRE, 5000);
   const capped = TH.capNotes(notes);
-  assert.ok(capped.includes('risposta 19'), 'l’ultimo turno deve restare');
+  assert.ok(capped.includes(ULTIMO), 'l’ultimo turno deve restare');
   assert.ok(!capped.includes('report iniziale della routine'), 'il turno più vecchio va tagliato');
   assert.ok(capped.startsWith(TH.TRIM_MARK), 'il taglio deve essere dichiarato in cima');
 });
@@ -108,7 +112,7 @@ test('il salvataggio dalla dashboard non spedisce mai note oltre il tetto', asyn
     return { ok: true, status: 200, text: async () => '', json: async () => ({}) };
   };
   try {
-    await FB.updateStatus('doc-1', { notes: conversation(20, 5000) }, { idToken: 'x' });
+    await FB.updateStatus('doc-1', { notes: conversation(OLTRE, 5000) }, { idToken: 'x' });
   } finally {
     globalThis.fetch = realFetch;
     globalThis.SN_FEEDBACK_PUBKEY = pubSalvata;
@@ -118,7 +122,7 @@ test('il salvataggio dalla dashboard non spedisce mai note oltre il tetto', asyn
   assert.match(spedite, /^FENC1:/, 'le note non devono mai partire in chiaro');
   const notes = await CRYPTO.decrypt(spedite, priv);
   assert.ok(notes.length <= TH.NOTES_MAX, `spedite ${notes.length} char, tetto ${TH.NOTES_MAX}`);
-  assert.ok(notes.includes('risposta 19'), 'l’ultimo turno deve arrivare a destinazione');
+  assert.ok(notes.includes(ULTIMO), 'l’ultimo turno deve arrivare a destinazione');
 });
 
 /** Il tetto dichiarato nelle regole Firestore (i due rami devono concordare). */
@@ -143,7 +147,7 @@ test('il tetto in chiaro lascia spazio all’espansione del cifrato', async () =
   const CRYPTO = globalThis.SN_FEEDBACK_CRYPTO;
 
   const limite = await tettoDelleRegole();
-  const alTetto = TH.capNotes(conversation(40, 3000));
+  const alTetto = TH.capNotes(conversation(Math.ceil((TH.NOTES_MAX * 1.2) / 3000), 3000));
   assert.ok(alTetto.length > TH.NOTES_MAX * 0.9, 'il caso di prova deve arrivare vicino al tetto');
 
   const cifrato = await CRYPTO.encryptForOwner(alTetto);
@@ -156,7 +160,7 @@ test('il tetto in chiaro lascia spazio all’espansione del cifrato', async () =
 test('il tetto tiene anche se il feedback NON è scritto in italiano', async () => {
   // Il tetto contato in CARATTERI regge finché il testo è quasi tutto ASCII, e
   // cade in silenzio appena qualcuno scrive con accenti fitti, in cirillico o
-  // in giapponese: le stesse 40.000 lettere lì sono il doppio o il triplo dei
+  // in giapponese: le stesse lettere lì sono il doppio o il triplo dei
   // byte, e il cifrato cresce sui BYTE. Il feedback passava il taglio e da quel
   // momento la dashboard non poteva più scriverci nulla.
   require(join(ROOT, 'src', 'shared', 'feedbackPublicKey.js'));
@@ -165,7 +169,7 @@ test('il tetto tiene anche se il feedback NON è scritto in italiano', async () 
   const limite = await tettoDelleRegole();
 
   for (const [lingua, lettera] of [['cirillico', 'я'], ['giapponese', 'あ'], ['accentato', 'è'], ['emoji', '😀']]) {
-    const tagliato = TH.capNotes(lettera.repeat(60000));
+    const tagliato = TH.capNotes(lettera.repeat(TH.NOTES_MAX));
     const cifrato = await CRYPTO.encryptForOwner(tagliato);
     assert.ok(cifrato.length <= limite,
       `${lingua}: dopo il taglio il cifrato occupa ${cifrato.length}, oltre il tetto delle regole (${limite})`);

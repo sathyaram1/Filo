@@ -74,9 +74,49 @@ tasto destro di Filo restava sotto la modale, inerte.
   falso allarme — si fa in una scheda di Filo che se lo prende all'apertura
   (`CASA_RICHIESTA`, una volta sola): un pannello nella pagina starebbe sotto
   l'avviso, e se fosse sopra la pagina sentirebbe quello che ci si scrive.
+- **Un link da avviso si ferma prima di aprirsi** (#965). I link della pagina
+  passano dai soli controlli locali appena compaiono (`SAFEBROWSE_LINKS`, a
+  lotti e a fette; il verdetto resta nel main, per scheda), e al clic lo stesso
+  avviso copre la pagina da cui il link parte, con `prima` nello stato. Tutte le
+  porte di un clic passano da `_sbPrimaDelClic`: stessa scheda (`will-navigate`),
+  scheda nuova o Ctrl+clic (`setWindowOpenHandler`), menu di riserva; un link
+  mai esaminato si giudica lì. «Non aprire» lo toglie e basta; la conferma fa
+  l'apertura chiesta e segna la scelta sulla scheda dove il sito si apre, così
+  non si ripete a pagina aperta. Il verdetto della pagina che risulta pulita non
+  lo toglie, un documento nuovo sì; l'avviso della pagina stessa ha la
+  precedenza. Prima del clic nessuna rete.
+- **Un file travestito si giudica dal nome, non da dove viene** (#965): uno
+  scaricamento passa da `_sbPrimaDelClic` col nome del file anche quando la
+  pagina lo costruisce da sé (blob:, data:: vale il sito della pagina, e
+  confermato la pagina lo riscarica col suo nome) e anche su un sito
+  dell'elenco dei fidati, che certifica chi è il sito, non i suoi file.
 - **Il «Continua» del sospetto si arma dopo un secondo**: l'avviso compare
   mentre l'utente scrive o clicca nella pagina, e quell'Invio non è per lui
   ([Una conferma non è un avviso sopra un fatto già compiuto](una-conferma-non-e-un-avviso-sopra-un-fatto-gia-compiuto.md)).
+
+## Lo schermo pieno chiesto da una pagina (#1526)
+
+Una pagina che a un clic si prende lo schermo pieno copre schede e barra delle
+applicazioni, e può disegnarci una finta finestra di Filo o un finto dialogo del
+sistema. L'avviso è una pillola in alto al centro, «<sito> è a schermo intero ·
+Esc per uscire», in `src/main/avvisoSchermoPieno.js`: stessa regola della vista
+sopra la scheda, con tre differenze, perché qui la pagina non è da fermare ma
+da nominare.
+
+- **Copre solo sé stessa** (più il margine dell'ombra, che rigira i gesti alla
+  pagina): il video sotto resta della pagina.
+- **Non tiene la tastiera**: l'Esc deve arrivare alla guardia della scheda
+  (#514, #648). Un clic le dà il fuoco e lei lo rende al giro dopo; un Esc
+  premuto in quel momento vale quello della barra ed esce.
+- **Il nome è l'host del frame che ha chiesto**, letto nel main dal gestore dei
+  permessi (`requestingUrl`), mai il titolo: un riquadro di un altro sito si
+  nomina accanto alla pagina, e un indirizzo senza host dice il tipo di pagina.
+  Compare solo per lo schermo pieno chiesto dalla pagina, non per quello di
+  Filo; va via dopo la durata delle Preferenze, all'uscita e cambiando scheda,
+  torna tornando sulla scheda o col puntatore sul bordo alto. Non si spegne: è
+  l'unico segno che quello che si vede non è più Filo.
+
+`tests/avviso-schermo-pieno.spec.mjs`.
 
 Vicini: [La shell non disegna sopra la pagina](la-shell-non-disegna-sopra-la-pagina.md)
 (la vista in cima), [Un pezzo di Filo dentro un sito ubbidisce solo

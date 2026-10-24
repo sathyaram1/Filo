@@ -8,6 +8,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { menuAperto, barraPage } from './helpers/barra.mjs';
 import { home as homeChat, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = join(dirname(fileURLToPath(import.meta.url)), '.shots');
 
@@ -90,8 +91,8 @@ test('«togli le animazioni»: menu del tasto destro, schede e pagine di Filo no
   await expect.poll(() => stile(home, '.dash-carta', 'transitionDuration')).toMatch(/^0s(, 0s)*$/);
   // Il menu del tasto destro sulla pagina...
   await sito.locator('#frase').click({ button: 'right' });
-  await expect(sito.locator('.sn-menu').first()).toBeVisible();
-  expect(await sito.locator('.sn-menu').first().evaluate((m) => getComputedStyle(m).animationDuration)).toBe('0s');
+  await expect(menuDi(sito).locator('.sn-menu').first()).toBeVisible();
+  expect(await menuDi(sito).locator('.sn-menu').first().evaluate((m) => getComputedStyle(m).animationDuration)).toBe('0s');
   await sito.keyboard.press('Escape');
   // ...e quello della scheda, che vive in una finestra sua.
   await shell.evaluate(() => {
@@ -122,14 +123,14 @@ test('«togli le animazioni»: menu del tasto destro, schede e pagine di Filo no
   await expect.poll(() => stile(shell, '.tab', 'transitionDuration')).toBe('0.1s');
   await expect.poll(() => stile(home, '.dash-carta', 'transitionDuration')).toMatch(/^0\.18s/);
   await sito.locator('#frase').click({ button: 'right' });
-  await expect(sito.locator('.sn-menu').first()).toBeVisible();
-  expect(await sito.locator('.sn-menu').first().evaluate((m) => getComputedStyle(m).animationDuration)).toBe('0.1s');
+  await expect(menuDi(sito).locator('.sn-menu').first()).toBeVisible();
+  expect(await menuDi(sito).locator('.sn-menu').first().evaluate((m) => getComputedStyle(m).animationDuration)).toBe('0.1s');
 });
 
 test('«ombre più leggere»: menu, schede e pagine schiariscono l\'ombra in proporzione', async ({ app, shell, openTab, testServer }) => {
   const sito = await testServer.openReady(openTab, SITO);
   await sito.locator('#frase').click({ button: 'right' });
-  const menuSito = sito.locator('.sn-menu').first();
+  const menuSito = menuDi(sito).locator('.sn-menu').first();
   await expect(menuSito).toBeVisible();
   const prima = alfa(await menuSito.evaluate((m) => getComputedStyle(m).boxShadow));
   expect(prima).toBeCloseTo(0.18, 2);
@@ -208,9 +209,9 @@ test('Preferenze: «1,5» nella velocità delle animazioni e «0,1» nelle ombre
 
 test('chat: «togli le animazioni» col valore passato come numero dal modello le toglie', async ({ app }) => {
   const page = await homeChat(app);
+  // Un cambio estetico riuscito chiude il turno (#1130): la frase va scritta insieme.
   await modelloFinto(app, [
-    { toolCalls: [{ id: 't1', name: 'IMPOSTA_ESTETICA', arguments: '{"token":"motion","valore":0}' }] },
-    { text: 'Fatto, animazioni tolte.' },
+    { text: 'Fatto, animazioni tolte.', toolCalls: [{ id: 't1', name: 'IMPOSTA_ESTETICA', arguments: '{"token":"motion","valore":0}' }] },
   ]);
   await chiedi(page, 'togli le animazioni');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'animazioni tolte' })).toBeVisible({ timeout: 10_000 });

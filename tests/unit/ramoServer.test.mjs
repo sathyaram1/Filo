@@ -14,6 +14,11 @@ import {
   checkoutDelRamo, confrontaServer, soloFusioniPulite, statoRamoServer, testoServerMossoDallAvvio,
 } from '../../scripts/lib/ramo-server.mjs';
 import { perimetroNote } from '../../scripts/lib/verifier-scope.mjs';
+import { sessione } from '../../scripts/owner-feedback.mjs';
+import { PULITO } from '../helpers/bigliettoFinto.mjs';
+
+// Una sessione col biglietto pulito: la nota su un fidato da una sessione sporca ha le sue prove in notaTogliFiducia.test.mjs.
+sessione.biglietto = async () => PULITO;
 
 const VL = await import('../../scripts/verify-local.mjs');
 const CAPS = { cap3: 5, cap2: 5, cap1: 2, cap0: 0 };

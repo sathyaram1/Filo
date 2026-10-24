@@ -319,11 +319,14 @@ test('domanda doppia, giro finale muto: la risposta all\'altra metà non sparisc
   await expect(fissa).toHaveCount(1, { timeout: 15_000 });
   await expect(fissa).toContainText('SOLE_A_ROMA');
 
-  // Risposta in un giro prima, instradamento in un giro senza testo.
+  // Risposta, apertura e instradamento nello stesso giro: un'apertura da sola chiuderebbe il turno (#1130), qui
+  // l'instradamento che non si può lo tiene aperto fino al giro muto.
   const meteo = testServer.html('<title>Meteo</title><p>pioggia</p>');
   await copioneGiri(app, [
-    { text: 'PIOGGIA_A_PARIGI: a Parigi piove, 14 gradi.', toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: meteo, etichetta: 'Meteo' }) }] },
-    { text: '', toolCalls: [{ id: 'p2', name: 'PROXY_TAB', arguments: '{"country":"fr"}' }] },
+    { text: 'PIOGGIA_A_PARIGI: a Parigi piove, 14 gradi.', toolCalls: [
+      { id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: meteo, etichetta: 'Meteo' }) },
+      { id: 'p2', name: 'PROXY_TAB', arguments: '{"country":"fr"}' },
+    ] },
     { text: '' },
   ]);
   await page.locator('#input').fill('che tempo fa a Parigi? poi apri la scheda dalla Francia');

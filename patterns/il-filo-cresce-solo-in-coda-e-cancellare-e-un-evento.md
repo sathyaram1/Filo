@@ -6,7 +6,8 @@ La linea del tempo di Filo (chat della home, pagine visitate, e ciò che entrer�
 **solo in coda** e **da un modulo solo** (`src/main/services/ilFilo.js`). Ogni riga è un evento intero con id,
 ora, dispositivo, autore e tipo. Una cancellazione è anche lei una riga in coda, e subito dopo il file si
 riscrive **senza le righe che copre e con tutte le altre identiche**. Dall'incognito niente arriva su disco.
-Nessun tetto e nessun taglio.
+Nessun tetto e nessun taglio su messaggi e numero di eventi: l'unica misura tocca indirizzo e titolo che scrive una
+pagina, ed è segnata accanto.
 
 ## Perché
 
@@ -37,8 +38,29 @@ Nessun tetto e nessun taglio.
   riempie il filo. Se ne va con la sua pagina.
 - **Una chat cancellata sparisce anche dalle sue copie**: registro grezzo, cache delle risposte e richieste ai
   modelli (che restano coi costi, senza il testo), anche dove il testo è riscritto su una riga o tagliato in testa o in coda. Sentinella `tests/unit/chatCopieCancellate.test.mjs`.
+- **Nascondere una chat è un evento, non una cancellazione** (`chat.nascosta`, #1295): «cancella questa chat» a
+  parole la nasconde e si rimette; il testo resta. `chats()` e la coda della home non la danno a chi non la chiede
+  (`{ nascoste: true }` tutte, `'solo'` quelle), così esce dalla home, dal contesto di Filo e dai ricordi in un posto
+  solo. Cancellarla per sempre resta la `cancellazione` di sopra.
 - **Un tetto è una cancellazione automatica.** Il vecchio registro grezzo (5000 voci, testi a 200 caratteri)
   è esattamente il taglio silenzioso che le regole del repo vietano.
+- **Una pagina non scrive il filo da sola** (#1525). Una visita nuova chiede un gesto: un input vero sulla scheda
+  negli ultimi 5 s, o una navigazione chiesta a Filo (barra, indietro e avanti, preferiti, agente). Il gesto vale per
+  la navigazione che lo segue, non per i cambi che la pagina fa dopo. Senza gesto un cambio entro 5 s dal precedente
+  resta la visita aperta: in attesa ne segue l'indirizzo, già scritta assorbe un cambio dentro la pagina. Una pagina
+  intera dopo una visita già scritta (un rinvio del sito, un accesso che passa da tre indirizzi) resta una visita sua,
+  o il filo perderebbe dove l'utente è arrivato. Dopo 30 visite di fila senza gesto tutto resta una visita finché
+  l'utente non tocca la scheda, per i cambi dentro la pagina e per le pagine intere. Sentinella
+  `tests/unit/visiteSchede.test.mjs`.
+- **Indirizzo e titolo hanno una misura**: 8192 e 1024 caratteri (`src/main/services/misurePagine.js`, la stessa
+  per l'archivio delle schede chiuse). Li sceglie il sito, e una riga da megabyte a ogni visita farebbe un file che
+  non si legge più. Il taglio si segna (`urlTagliato`, `titoloTagliato`), e un indirizzo tagliato non si offre da
+  riaprire come intero: si apre il suo sito (`SN_FILO_CODA.daAprire`, e al modello va il sito detto come tale).
+- **Il file si legge a righe, mai intero in una stringa** (`src/main/services/leggiARighe.js`), anche nella
+  compattazione, che scrive il temporaneo a pezzi: oltre il tetto di una stringa di V8 il filo non si aprirebbe più.
+  Se il file non si legge, chi scrive riceve un rifiuto e l'utente un toast con la causa; chi legge soltanto vede il
+  filo vuoto, e la richiesta dopo riprova. Sopra 256 MB un avviso per avvio porta alla Sicurezza, dove le pagine si
+  cancellano per periodo: non è un tetto.
 
 ## Come si usa
 
@@ -92,4 +114,5 @@ CERCA_CHAT e l'id. Una chat nuova lo eredita con una voce in `APP` di `src/share
 Prove: `tests/unit/filoApp.test.mjs`, `tests/chat-app-nel-filo.spec.mjs`.
 
 Sentinella: `tests/unit/filoEventi.test.mjs` (formato, sola aggiunta, cancellazione byte per byte, incognito,
-migrazione, nessun tetto, velocità con 50.000 eventi). Prove dell'app: `tests/filo-linea-del-tempo.spec.mjs`.
+migrazione, nessun tetto, velocità con 50.000 eventi) e `tests/unit/filoMisureELettura.test.mjs` (misura segnata,
+lettura a righe, filo illeggibile, avviso sopra 256 MB). Prove dell'app: `tests/filo-linea-del-tempo.spec.mjs`.

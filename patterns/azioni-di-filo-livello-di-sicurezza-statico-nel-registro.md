@@ -18,8 +18,9 @@ e non per la scheda. La chat lo tiene per targa, anche nel suo archivio; per
 l'Aiuto ogni apertura del pannello, o pagina nuova, è una conversazione nuova), il costo,
 il perimetro e l'origine. Sopra la tabella
 stanno l'elenco fisso (no a ogni livello: segreti, molti destinatari,
-credenziali, regole, cancellazioni definitive) e la difesa abbassata («conferma»
-a ogni livello). Il dispatch (`executeFiloAction` nel main) **rifiuta le azioni
+credenziali, regole, cancellazioni definitive), la difesa abbassata («conferma»
+a ogni livello) e `parola`, per un'azione che vuole «conferma» a ogni livello
+senza abbassare difese (il «per sempre» di TOGLI_CHAT, #1295). Il dispatch (`executeFiloAction` nel main) **rifiuta le azioni
 non registrate o senza costo**, e nessuna superficie decide da sé: nemmeno le
 azioni che l'agente sulla pagina fa nel content script, che dichiarano il costo
 e chiedono la risposta al main (`MSG.FILO_DECIDI_PAGINA`), né i pannelli propri
@@ -67,7 +68,7 @@ della chat (riordino delle schede, svuota archivio), che chiedono come dice la
   conferma data nel popup (livello 2 e 3) e le azioni già eseguite in un
   tentativo interrotto da un guasto non stanno in nessun messaggio: rientrano
   nel contesto del turno successivo come righe di sistema
-  (`confirmedActionsForPrompt`, `interruptedActionsForPrompt`). Senza, a «l'hai
+  (`SN_AZIONI_PER_MODELLO.confermate` e `.interrotte`, in `src/shared/azioniPerModello.js`). Senza, a «l'hai
   attivato?» il modello tirava a indovinare, e un «Riprova» rifaceva il timer
   che aveva appena messo. Per le preferenze il costo è per-setter in `preferences.js`
   (`costo`, più `allenta` sui valori che spengono una difesa). La sospensione e la conferma

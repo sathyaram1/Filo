@@ -6,6 +6,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi, mettiNelMenu } from './helpers/barra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -165,12 +166,12 @@ test('rimessa nel menu del tasto destro, l\'icona dello schermo intero nomina il
   await mettiNelMenu(app, ['fullscreen']);
   const page = await testServer.openReady(openTab, '<!doctype html><title>Sito</title><body style="margin:0"><p id="t">parola dentro una frase</p></body>');
   await page.locator('#t').click({ button: 'right' });
-  await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
-  const voce = page.locator('[data-sn-icon-id="fullscreen"]').first();
-  if (await voce.count() === 0) await page.locator('.sn-menu-row-overflow').first().click();
+  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
+  const voce = menuDi(page).locator('[data-sn-icon-id="fullscreen"]').first();
+  if (await voce.count() === 0) await menuDi(page).locator('.sn-menu-row-overflow').first().click();
   await expect(voce).toBeVisible({ timeout: 8000 });
   await expect(voce).toHaveAttribute('aria-label', 'Schermo intero');
   await voce.hover();
-  await expect(page.locator('.sn-tooltip')).toHaveText('Schermo intero (F11)', { timeout: 4000 });
+  await expect(menuDi(page).etichetta).toHaveText('Schermo intero (F11)', { timeout: 4000 });
   await page.screenshot({ path: 'tests/.shots/858-menu-schermo-intero.png' });
 });

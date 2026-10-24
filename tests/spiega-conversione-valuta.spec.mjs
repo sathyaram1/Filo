@@ -10,6 +10,7 @@
 // secondo perché nel riquadro arrivano dodici cifre dopo la virgola.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Il modello finto risponde come risponde quello vero: il conto lo lascia al
 // marker. I pezzi sono spezzati apposta col «€» staccato dal marker, che è la
@@ -224,8 +225,8 @@ test('la conversione resta anche quando non c\'è niente da spiegare', async ({ 
   });
   await page.locator('#p').click({ button: 'right' });
   // SUCCESSO: chi ha selezionato legge quanto fanno in euro.
-  await expect(page.locator('.sn-menu')).toContainText('32,61 €', { timeout: 30_000 });
-  await expect(page.locator('.sn-menu')).not.toContainText('NESSUNA SPIEGAZIONE');
+  await expect(menuDi(page).locator('.sn-menu')).toContainText('32,61 €', { timeout: 30_000 });
+  await expect(menuDi(page).locator('.sn-menu')).not.toContainText('NESSUNA SPIEGAZIONE');
 
   await ripristinaModello(app);
 });

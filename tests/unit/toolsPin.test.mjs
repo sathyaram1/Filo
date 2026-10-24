@@ -339,7 +339,7 @@ test('ogni strumento che le ricette nominano passa le sue stampe dal filtro', ()
   for (const f of readdirSync(ruoli).filter((n) => n.endsWith('.md'))) {
     for (const m of readFileSync(resolve(ruoli, f), 'utf8').matchAll(/\bnode\s+scripts\/([A-Za-z0-9._-]+\.mjs)/g)) nomi.add(m[1]);
   }
-  assert.ok(nomi.has('dispatch.mjs') && nomi.has('routine-channel.mjs') && nomi.has('merge-gate.mjs'), [...nomi].join(', '));
+  assert.ok(nomi.has('dispatch.mjs') && nomi.has('routine-channel.mjs'), [...nomi].join(', '));
   for (const n of nomi) {
     assert.match(readFileSync(resolve(REPO_VERO, 'scripts', n), 'utf8'), /\babsolutizeOutput\(/,
       `${n} stampa comandi che dalla cartella di lavoro portano agli strumenti del ramo`);
@@ -355,7 +355,6 @@ test('dalla copia, i testi che gli strumenti stampano portano alla copia', () =>
     const env = { ...process.env, FILO_REPO_ROOT: casa, FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'), FILO_NO_BEAT: '1', FILO_ROUTINE_TICKET: '' };
     const casi = [
       ['dispatch.mjs', ['--record-secaudit', 'X', 'pass'], 'dispatch.mjs" --record-secaudit'],
-      ['merge-gate.mjs', [], 'merge-gate.mjs" <ramo>'],
       ['routine-channel.mjs', ['deliver', 'b-prova-con-la-forma-vera-di-un-biglietto', 'domanda', '--notes', 'x'], 'domanda.mjs" chiedi'],
       ['lancia-electron.mjs', [], 'lancia-electron.mjs" <comando>'],
     ];
@@ -446,7 +445,7 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
     req.on('end', () => {
       res.setHeader('Content-Type', 'application/json');
       if (req.url.endsWith('/routineWork')) {
-        res.end(JSON.stringify({ ok: true, role: 'prober', id: '', num: '', branch: '', payload: { role: 'prober' } }));
+        res.end(JSON.stringify({ ok: true, role: 'new-work', id: '', num: '', branch: '', payload: {} }));
       } else if (req.url.includes('config')) {
         res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
       } else res.end(JSON.stringify({ ok: true }));
@@ -460,7 +459,8 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
   try {
     // Il progetto: strumenti veri (servono a farlo girare) e ricetta AGGIORNATA.
     cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
-    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'),
+    // La busta del server finto non ha il feedback: dispatch consegna la ricetta del guasto, senza toccare git.
+    writeFileSync(resolve(casa, 'routines', 'roles', 'halt.md'),
       'RICETTA AGGIORNATA\nRilascia con node scripts/routine-channel.mjs release <biglietto>\n', 'utf8');
 
     // Il giro fissa gli strumenti finché la cartella è ancora aggiornata.
@@ -468,7 +468,7 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
     assert.equal(pin.ok, true, pin.why);
 
     // Poi si apre il ramo vecchio: da qui il progetto dice un'altra cosa.
-    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'), 'RICETTA DI DUE GIORNI FA\n', 'utf8');
+    writeFileSync(resolve(casa, 'routines', 'roles', 'halt.md'), 'RICETTA DI DUE GIORNI FA\n', 'utf8');
 
     const out = await new Promise((fine) => {
       const p = spawn(process.execPath, [resolve(dove, 'scripts', 'dispatch.mjs'), '--ticket', 'b-prova-con-la-forma-vera-di-un-biglietto'], {
@@ -640,7 +640,7 @@ test('dalla copia, i marcatori del giro finiscono nel PROGETTO', async () => {
     req.on('end', () => {
       res.setHeader('Content-Type', 'application/json');
       if (req.url.endsWith('/routineWork')) {
-        res.end(JSON.stringify({ ok: true, role: 'prober', id: '', num: '', branch: '', payload: { role: 'prober' } }));
+        res.end(JSON.stringify({ ok: true, role: 'new-work', id: '', num: '', branch: '', payload: {} }));
       } else if (req.url.includes('config')) {
         res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
       } else res.end(JSON.stringify({ ok: true }));
@@ -654,7 +654,7 @@ test('dalla copia, i marcatori del giro finiscono nel PROGETTO', async () => {
   try {
     cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
     cpSync(resolve(REPO, 'src', 'main', 'auth'), resolve(casa, 'src', 'main', 'auth'), { recursive: true });
-    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'), 'ricetta\n', 'utf8');
+    writeFileSync(resolve(casa, 'routines', 'roles', 'halt.md'), 'ricetta\n', 'utf8');
     const pin = pinTools(casa, { dest: dove });
     assert.equal(pin.ok, true, pin.why);
 

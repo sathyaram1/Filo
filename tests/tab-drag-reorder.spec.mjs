@@ -13,7 +13,7 @@ import { test, expect } from './fixtures/electron.mjs';
 async function setup(openTab, shell) {
   await openTab('filo://options/options.html');
   await openTab('filo://history/history.html');
-  await openTab('filo://archive/archive.html');
+  await openTab('filo://quaderno/quaderno.html');
   // Aspetta che la barra abbia almeno 3 tab disegnate.
   await expect.poll(async () => shell.locator('.tab').count(), { timeout: 8_000 })
     .toBeGreaterThanOrEqual(3);

@@ -112,6 +112,16 @@ test('sanitize separa override validi e rifiutati', () => {
   assert.deepEqual(rejected.sort(), ['boh', 'radius']);
 });
 
+// #1343.1: le Preferenze mandano solo i token toccati; quelli cambiati altrove (la chat) restano.
+test('conModifica posa i token toccati sulla mappa salvata e lascia gli altri', () => {
+  const salvati = { accent: '#00cc44', radius: '4px' };
+  assert.deepEqual(TT.conModifica(salvati, { bg: '#ffffff', radius: null }), { accent: '#00cc44', bg: '#ffffff' });
+  assert.deepEqual(TT.conModifica(salvati, { accent: '' }), { radius: '4px' });
+  assert.deepEqual(salvati, { accent: '#00cc44', radius: '4px' }, 'la mappa salvata non si tocca');
+  assert.deepEqual(TT.conModifica(undefined, { accent: '#1a7d3a' }), { accent: '#1a7d3a' });
+  assert.deepEqual(TT.conModifica(salvati, null), salvati);
+});
+
 test('effectiveValue ignora gli override non validi', () => {
   assert.equal(TT.effectiveValue('accent', { accent: 'evil;}' }, 'light'), '#c45a3b');
 });
@@ -328,4 +338,22 @@ test('motionFactor legge --sn-motion dal documento, con 1 se manca e un tetto', 
     globalThis.getComputedStyle = prima;
   }
   assert.equal(TT.motionFactor(null), 1);
+});
+
+test('#1493 — tab.larghezza: pixel interi fra 110 e 1000, scritti anche senza unità, rifiutati col numero', () => {
+  assert.equal(TT.get('tab.larghezza').type, 'pixel');
+  assert.equal(TT.defaultValue('tab.larghezza', 'dark'), '240px');
+  for (const [dato, salvato] of [['300px', '300px'], ['300', '300px'], [' 300 PX ', '300px'], [300, '300px'], ['110px', '110px'], ['1000', '1000px'], ['0240', '240px']]) {
+    assert.ok(TT.validate('tab.larghezza', dato), String(dato));
+    assert.equal(TT.normalize('tab.larghezza', dato), salvato);
+  }
+  for (const no of ['109px', '1001px', '20em', '50%', '300.5px', '300,5', '-300px', '1e3', 'calc(300px)', '300px;}', '', ' ', 300.5, NaN, null, true]) {
+    assert.ok(!TT.validate('tab.larghezza', no), String(no));
+  }
+  assert.match(TT.errorMessage('tab.larghezza'), /fra 110 e 1000/);
+  assert.equal(TT.effectiveValue('tab.larghezza', { 'tab.larghezza': '320' }, 'light'), '320px');
+  assert.equal(TT.effectiveValue('tab.larghezza', { 'tab.larghezza': '20' }, 'light'), '240px');
+  // Lo legge la barra in JS: nessuna variabile CSS esce sulle pagine né sulla shell.
+  assert.equal(TT.pageCss({ 'tab.larghezza': '320px' }), '');
+  assert.equal(TT.shellCss({ 'tab.larghezza': '320px' }), '');
 });

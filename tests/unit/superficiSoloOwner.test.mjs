@@ -36,9 +36,11 @@ test('il menu App mostra Feedback e Gestione solo all\'owner', () => {
     assert.ok(!new RegExp(`label: '${riservata}'`).test(perTutti),
       `«${riservata}» apre una pagina che solo l'owner può leggere: non va nel ramo visibile a tutti`);
   }
-  // E la bacheca, che invece è di tutti, deve restarci.
-  assert.match(perTutti, /label: 'Bacheca'/,
-    'la bacheca è la superficie pubblica dei miglioramenti: non va nascosta');
+  // La Bacheca segue il suo interruttore (#1592); in pausa, al suo posto, le segnalazioni che l'utente ha mandato.
+  assert.match(perTutti, /inPausaVisibili\.bacheca\s*\?\s*\{ label: 'Bacheca'[^}]*\}\s*:\s*\{ label: 'Le tue segnalazioni'[^}]*#segnalazioni/,
+    'con la Bacheca in pausa le segnalazioni mandate devono restare raggiungibili dal menu App');
+  assert.match(perTutti, /inPausaVisibili\.mazzi\s*\?\s*\[\{ label: 'Deck builder MTG'/,
+    'il Deck builder segue il suo interruttore');
 });
 
 test('l\'icona «Feedback» del menu del tasto destro esiste solo per l\'owner', () => {
@@ -85,4 +87,18 @@ test('mandare un feedback resta una strada di tutti', () => {
     'il manifesto deve indicare la strada che funziona per un utente qualunque');
   assert.ok(!voce.includes('filo://feedback/feedback.html'),
     'il manifesto mandava l\'utente alla posta dell\'owner, che lui non può aprire');
+});
+
+// #1414: le pagine dell'owner si raggiungono da Gestione e basta. Un'altra voce di menu che porta lì è un secondo
+// ingresso, e il vecchio indirizzo scritto in un menu è una strada che passa dal rimando invece di dire dov'è la cosa.
+test('Modelli predefiniti e Inviti e utenti non hanno ingressi fuori da Gestione', () => {
+  const shell = leggi('src', 'renderer', 'shell.js');
+  const impostazioni = shell.match(/function buildSettings\(\)\s*\{([\s\S]*?)\n  \}/)?.[1];
+  assert.ok(impostazioni, 'non trovo buildSettings() in shell.js');
+  assert.ok(!/isAdmin/.test(impostazioni), 'il menu Impostazioni torna a distinguere l\'owner: le sue voci stanno in Gestione');
+  const vecchi = /filo:\/\/admin-defaults\/|filo:\/\/credits\/owner\.html/;
+  for (const file of [['src', 'renderer', 'shell.js'], ['src', 'main', 'menu.js'], ['src', 'main', 'barraLaterale.js'],
+    ['src', 'pages', 'dashboard', 'dashboard.js'], ['src', 'shared', 'wallet.js'], ['src', 'pages', 'credits', 'credits.html']]) {
+    assert.ok(!vecchi.test(leggi(...file)), `${file.join('/')} porta ancora al vecchio indirizzo di una pagina dell'owner`);
+  }
 });

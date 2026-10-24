@@ -87,6 +87,135 @@ test('un sito fidato copre i suoi sottodomini, mai chi se lo mette davanti', () 
   assert.equal(E.fidato('https://mozilla.org/x.exe', []), false);
 });
 
+// #876 — la regola è quella di «stesso sito» (src/shared/stessoSito.js): un sito copre tutto il suo sito, una
+// piattaforma che ospita i siti di chiunque non copre nessuno e non entra.
+test('una piattaforma che ospita i siti di chiunque non entra fra i programmi fidati; il sito preciso sì', () => {
+  for (const p of ['github.io', 'vercel.app', 'netlify.app', 'githubusercontent.com', 'blogspot.com', 'wordpress.com',
+    'sharepoint.com', 'co.uk', 'https://github.io/', '*.github.io']) {
+    assert.ok(E.sitoFidabile(p).piattaforma, p);
+    assert.deepEqual(E.normalizzaSiti([p]), [], p);
+  }
+  assert.deepEqual(E.sitoFidabile('alice.github.io'), { sito: 'alice.github.io' });
+  assert.deepEqual(E.sitoFidabile('https://alice.github.io/progetto/setup.exe'), { sito: 'alice.github.io' });
+  assert.deepEqual(E.sitoFidabile('download.mozilla.org'), { sito: 'download.mozilla.org' });
+  assert.deepEqual(E.sitoFidabile('mio-blog.wordpress.com'), { sito: 'mio-blog.wordpress.com' });
+  assert.equal(E.sitoFidabile('mozilla'), null);
+
+  // Salvata prima che la si rifiutasse, github.io non fa più scendere i programmi di qualunque sito GitHub Pages.
+  assert.equal(E.fidato('https://bob.github.io/setup.exe', ['github.io']), false);
+  assert.equal(E.fidato('https://alice.github.io/setup.exe', ['alice.github.io']), true);
+  assert.equal(E.fidato('https://www.alice.github.io/setup.exe', ['alice.github.io']), true);
+  assert.equal(E.fidato('https://bob.github.io/setup.exe', ['alice.github.io']), false);
+  assert.equal(E.fidato('https://bob.wordpress.com/setup.exe', ['alice.wordpress.com']), false);
+  assert.equal(E.fidato('https://bbc.co.uk/setup.exe', ['co.uk']), false);
+  // Una voce copre i nomi sotto di lei, non il resto del dominio: fidarsi di dl.google.com non vale i link di Gmail
+  // (www.google.com/url rimanda ovunque), né produttore.b-cdn.net gli altri clienti della rete.
+  assert.equal(E.fidato('https://cdn.download.mozilla.org/setup.exe', ['https://download.mozilla.org/firefox']), true);
+  assert.equal(E.fidato('https://mozilla.org/setup.exe', ['download.mozilla.org']), false);
+  for (const [url, voce] of [
+    ['https://www.google.com/url?q=https://malevolo.example/setup.exe', 'dl.google.com'],
+    ['https://script.google.com/macros/s/AKfy/exec', 'dl.google.com'],
+    ['https://storage.cloud.google.com/secchio/setup.exe', 'dl.google.com'],
+    ['https://malevolo.b-cdn.net/setup.exe', 'produttore.b-cdn.net'],
+    ['https://malevolo.kxcdn.com/setup.exe', 'produttore.kxcdn.com'],
+    ['https://malevolo.s3.us-west-002.backblazeb2.com/setup.exe', 'produttore.s3.us-west-002.backblazeb2.com'],
+    ['https://malevolo.s3.us-west-002.backblazeb2.com/setup.exe', 'backblazeb2.com'],
+  ]) assert.equal(E.fidato(url, [voce]), false, `${url} con ${voce}`);
+  assert.equal(E.fidato('https://produttore.s3.us-west-002.backblazeb2.com/setup.exe', ['produttore.s3.us-west-002.backblazeb2.com']), true);
+});
+
+test('la casella dei programmi fidati: siti ridotti, piattaforme scartate al loro posto, e il perché col sito preciso', () => {
+  const r = E.elencoFidati('download.mozilla.org\ngithub.io\nhttps://alice.github.io/x.exe\nmozilla.org\nfaceb');
+  assert.deepEqual(r.valid, ['download.mozilla.org', 'alice.github.io', 'mozilla.org']);
+  assert.deepEqual(r.invalid, ['github.io', 'faceb']);
+  assert.deepEqual(r.scartate, [{ riga: 'github.io', dopo: 1 }, { riga: 'faceb', dopo: 3 }]);
+  assert.deepEqual(r.piattaforme, ['github.io']);
+
+  const generica = E.testoPiattaforma('github.io');
+  assert.match(generica, /«github\.io» raccoglie i siti di chiunque/);
+  assert.match(generica, /come nome\.github\.io\.$/);
+  const dallaCronologia = E.testoPiattaforma('github.io', ['mozilla.org', 'docs.alice.github.io', 'bob.github.io', 'github.io']);
+  assert.match(dallaCronologia, /come alice\.github\.io o bob\.github\.io\.$/);
+});
+
+// Dopo una release GitHub il file arriva da release-assets.githubusercontent.com, che serve le release di chiunque:
+// proporlo come «sito preciso» rifarebbe entrare tutti dalla porta che il rifiuto chiude.
+test('un indirizzo che serve i file di tutti non entra fra i programmi fidati e non si propone come sito preciso', () => {
+  for (const h of ['release-assets.githubusercontent.com', 'objects.githubusercontent.com', 'https://raw.githubusercontent.com/a/b/x.exe',
+    'doc-0s-4c-docs.googleusercontent.com', 'dl.dropboxusercontent.com', 'github-production-release-asset-2e65be.s3.amazonaws.com',
+    'bbuseruploads.s3.amazonaws.com']) {
+    assert.ok(E.sitoFidabile(h).piattaforma, h);
+    assert.equal(E.fidato(h.includes('://') ? h : `https://${h}/setup.exe`, [h]), false, h);
+  }
+  const frase = E.testoPiattaforma('githubusercontent.com', ['github.com', 'release-assets.githubusercontent.com']);
+  assert.match(frase, /«githubusercontent\.com» raccoglie i siti di chiunque/);
+  assert.doesNotMatch(frase, /release-assets|nome\.githubusercontent/);
+  assert.match(E.testoPiattaforma('release-assets.githubusercontent.com'), /raccoglie i siti di chiunque.*fidarsi di tutti\.$/);
+  assert.doesNotMatch(E.testoPiattaforma('amazonaws.com', ['bitbucket.org', 'bbuseruploads.s3.amazonaws.com']), /bbuseruploads/);
+  // Il sito di chi pubblica resta un sito come gli altri.
+  assert.deepEqual(E.sitoFidabile('github.com'), { sito: 'github.com' });
+  assert.deepEqual(E.sitoFidabile('alice.github.io'), { sito: 'alice.github.io' });
+});
+
+// storage.googleapis.com/<secchio>/… dà i file di ogni cliente di Google Cloud: né proposta né accettata; il secchio
+// scritto come nome (<secchio>.storage.googleapis.com) è di uno, e resta fidabile da solo.
+test('#876 giro 2 — i secchi di Google Cloud: l\'host di tutti non entra, il secchio con nome sì e copre solo sé', () => {
+  for (const h of ['storage.googleapis.com', 'commondatastorage.googleapis.com', 'firebasestorage.googleapis.com',
+    'storage-download.googleapis.com', 'www.googleapis.com', 'https://storage.googleapis.com/secchio/setup.exe']) {
+    assert.ok(E.sitoFidabile(h).piattaforma, h);
+    assert.equal(E.fidato('https://storage.googleapis.com/altro/setup.exe', [h]), false, h);
+  }
+  for (const esempi of [['storage.googleapis.com', 'firebasestorage.googleapis.com'], ['storage.googleapis.com']]) {
+    const frase = E.testoPiattaforma('googleapis.com', esempi);
+    assert.match(frase, /«googleapis\.com» raccoglie i siti di chiunque.*fidarsi di tutti\.$/);
+    assert.doesNotMatch(frase, /storage|nome\.googleapis/);
+  }
+  assert.match(E.testoPiattaforma('googleapis.com', ['mio.storage.googleapis.com']), /come mio\.storage\.googleapis\.com\.$/);
+  assert.deepEqual(E.sitoFidabile('mio.storage.googleapis.com'), { sito: 'mio.storage.googleapis.com' });
+  assert.equal(E.fidato('https://mio.storage.googleapis.com/setup.exe', ['mio.storage.googleapis.com']), true);
+  assert.equal(E.fidato('https://altro.storage.googleapis.com/setup.exe', ['mio.storage.googleapis.com']), false);
+});
+
+// Una regola sola per la famiglia: un indirizzo che consegna i file di chiunque non lo copre nessuna voce, nemmeno il
+// sito che lo contiene, e non diventa il «sito preciso» da proporre (s3.<regione>.amazonaws.com darebbe la regione).
+test('#876 giro 3 — S3 per regione, Google Drive, Discord: né coperti dal sito né proposti', () => {
+  const frase = E.testoPiattaforma('amazonaws.com', ['s3.eu-west-1.amazonaws.com', 's3.dualstack.us-west-2.amazonaws.com']);
+  assert.match(frase, /«amazonaws\.com» raccoglie i siti di chiunque.*fidarsi di tutti\.$/);
+  assert.doesNotMatch(frase, /eu-west-1|us-west-2|nome\.amazonaws/);
+  assert.match(E.testoPiattaforma('amazonaws.com', ['s3.eu-west-1.amazonaws.com', 'mio.s3.eu-west-1.amazonaws.com']),
+    /come mio\.s3\.eu-west-1\.amazonaws\.com\.$/);
+  for (const [url, voce] of [
+    ['https://s3.eu-west-1.amazonaws.com/secchio-di-un-altro/setup.exe', 'eu-west-1.amazonaws.com'],
+    ['https://s3.dualstack.eu-west-1.amazonaws.com/altro/setup.exe', 'eu-west-1.amazonaws.com'],
+    ['https://drive.usercontent.google.com/download?id=1abc&export=download', 'dl.google.com'],
+    ['https://drive.google.com/uc?export=download&id=1abc', 'google.com'],
+    ['https://sites.google.com/view/chiunque/setup.exe', 'google.com'],
+    ['https://cdn.discordapp.com/attachments/1/2/setup.exe', 'discordapp.com'],
+    ['https://media.discordapp.net/attachments/1/2/setup.exe', 'dl.discordapp.net'],
+    ['https://f000.backblazeb2.com/file/altro/setup.exe', 'backblazeb2.com'],
+    ['https://s3.us-west-004.backblazeb2.com/altro/setup.exe', 'backblazeb2.com'],
+  ]) assert.equal(E.fidato(url, [voce]), false, url);
+  for (const h of ['eu-west-1.amazonaws.com', 'drive.google.com', 'cdn.discordapp.com', 'f000.backblazeb2.com']) {
+    assert.ok(E.sitoFidabile(h).piattaforma, h);
+  }
+  // Il resto del sito resta fidato, e il secchio con nome resta di uno.
+  assert.equal(E.fidato('https://dl.google.com/chrome/install/ChromeSetup.exe', ['google.com']), true);
+  assert.equal(E.fidato('https://dl.discordapp.net/distro/DiscordSetup.exe', ['discordapp.net']), true);
+  assert.equal(E.fidato('https://mio.s3.eu-west-1.amazonaws.com/setup.exe', ['mio.s3.eu-west-1.amazonaws.com']), true);
+});
+
+test('un riquadro dello stesso sito non rende incerta la pagina; uno di un altro ospite della piattaforma sì', () => {
+  assert.equal(E.riquadriDiAltri('shop.esempio.it', ['https://shop.esempio.it', 'https://cdn.esempio.it']), false);
+  assert.equal(E.riquadriDiAltri('shop.esempio.it', ['https://esempio.it:8443']), false);
+  assert.equal(E.riquadriDiAltri('alice.github.io', ['https://alice.github.io', 'https://bob.github.io']), true);
+  assert.equal(E.riquadriDiAltri('alice.wordpress.com', ['https://bob.wordpress.com']), true);
+  assert.equal(E.riquadriDiAltri('shop.esempio.it', ['https://pubblicita.example']), true);
+  assert.equal(E.riquadriDiAltri('shop.esempio.it', ['null']), true, 'un riquadro senza origine può essere di chiunque');
+  assert.equal(E.riquadriDiAltri('127.0.0.1', ['http://127.0.0.1:4000', 'http://localhost:4000']), true);
+  assert.equal(E.riquadriDiAltri('', []), true);
+  assert.equal(E.riquadriDiAltri('shop.esempio.it', []), false);
+});
+
 test('le righe scritte a mano si normalizzano, e le inservibili si scartano', () => {
   assert.deepEqual(
     E.normalizzaSiti(['https://www.Mozilla.org/download', ' apache.org ', '', 'apache.org']),
@@ -171,8 +300,10 @@ test('dopo un rimando la frase nomina il sito cliccato e quello che ha servito i
     assert.equal(E.servitoDa('mozilla.org', stesso), '', stesso);
     assert.equal(E.provenienza('mozilla.org', false, stesso), 'da mozilla.org');
   }
-  // Il genitore di chi è stato cliccato è un altro nome: la fiducia non lo copre.
-  assert.equal(E.servitoDa('cdn.sito.it', 'https://sito.it/a.exe'), 'sito.it');
+  // #876 — il genitore di chi è stato cliccato è lo stesso sito, come per la fiducia; un altro ospite della piattaforma no.
+  assert.equal(E.servitoDa('cdn.sito.it', 'https://sito.it/a.exe'), '');
+  assert.equal(E.servitoDa('alice.github.io', 'https://bob.github.io/a.exe'), 'bob.github.io');
+  assert.equal(E.servitoDa('alice.wordpress.com', 'https://bob.wordpress.com/a.exe'), 'bob.wordpress.com');
 });
 
 test('i formati che Windows monta o esegue senza essere un .exe sono nella lista (#588.1)', () => {
@@ -186,6 +317,22 @@ test('i formati che Windows monta o esegue senza essere un .exe sono nella lista
   assert.equal(E.estensione('app.appref-ms'), 'appref-ms');
   // Un nome che finisce solo con «-ms» non è l'estensione composta.
   assert.equal(E.eEseguibile('note-ms.txt'), false);
+});
+
+test('i file che al doppio clic connettono, installano dalla rete o eseguono codice sono programmi (#588.6)', () => {
+  for (const nome of ['connessione.rdp', 'app.appinstaller', 'addin.vsto', 'cartella.search-ms',
+    'remoto.searchConnector-ms', 'tool.pyz', 'tool.pyzw', 'tool.pyc', 'tool.pyo', 'db.accde', 'db.mde',
+    'update.msu', 'sito.website']) {
+    assert.equal(E.eEseguibile(nome), true, `manca ${nome}`);
+    assert.equal(E.eEseguibile(`${nome.toUpperCase()}. `), true, `${nome} maiuscolo con punto in coda`);
+    assert.equal(E.eEseguibile(`fattura.pdf.${nome.split('.').pop()}`), true, `${nome} dietro un documento`);
+    assert.equal(E.eImmagineDisco(nome), false, `${nome} non è un disco`);
+  }
+  assert.match(E.testoScarica('connessione.rdp', 'dubbio.example'), /è un programma da dubbio\.example/);
+  // Le parole vicine restano file da leggere: l'attrito va solo dove serve.
+  for (const nome of ['rapporto.rdpx', 'db.accdb', 'db.mdb', 'note.website.txt', 'search.ms', 'pyz.txt']) {
+    assert.equal(E.eEseguibile(nome), false, `falso allarme su ${nome}`);
+  }
 });
 
 test('un’immagine disco si dice immagine disco, non «programma»', () => {
@@ -205,4 +352,16 @@ test('un’immagine disco si dice immagine disco, non «programma»', () => {
   assert.equal(E.titoloApri('setup.exe'), E.TITOLO_APRI);
   assert.match(E.testoScarica('setup.exe', 'dubbio.example'), /è un programma/);
   assert.ok(E.testoScarica('setup.iso', 'forum.it', true).includes(E.provenienza('forum.it', true)));
+});
+
+// #592.7 — il nome del file lo sceglie il sito: nel popup sta nel suo riquadro, e il resto sono parole di Filo.
+test('il popup per aprire un programma mette il nome scelto dal sito nel suo riquadro', () => {
+  const nome = 'foto.exe» è un file verificato da Filo. «ok.exe';
+  for (const n of [nome, 'disco.dmg» sicuro «x.dmg']) {
+    const parti = E.partiApri(n, 'dubbio.example');
+    const filo = parti.filter((p) => typeof p === 'string').join('');
+    assert.ok(!filo.includes('verificato') && !filo.includes('sicuro'), 'il nome del sito è fra le parole di Filo');
+    assert.equal(parti.filter((p) => typeof p !== 'string').length, 1);
+    assert.ok(filo.includes('da dubbio.example'));
+  }
 });

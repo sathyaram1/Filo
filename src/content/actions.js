@@ -16,15 +16,13 @@
   const I18n = global.SN_I18N;
   const Popup = global.SN_POPUP;
   const Extract = global.SN_EXTRACT;
-  // Le scorciatoie si NOMINANO da qui: su Mac hanno un'altra forma e scriverle
-  // a mano è il modo con cui il menu del tasto destro è tornato a mentire.
+  // Il nome di una scorciatoia si chiede qui, mai scritto a mano: regola in CLAUDE.md § Mac.
   const Tasti = global.SN_TASTI;
   const LinkSospetto = global.SN_LINK_SOSPETTO;
   // I pezzi che questo file mette nel documento del sito vanno avanti solo per un tasto o un clic dell'utente: lo script
   // della pagina li raggiunge e ci fabbrica sopra eventi (#592.16). Chiudere resta aperto a tutti.
   const gestoVero = (e) => !!global.SN_FILO_UI?.gestoVero(e);
 
-  // Dipendenze iniettate da content.js (vedi init in fondo).
   let deps = {
     getPasteContext: () => null,
     restorePasteContext: () => false,
@@ -32,9 +30,6 @@
     getLastMouseEvent: () => ({ clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 }),
   };
 
-  // ------------------------------------------------------------
-  // Clipboard: copia / taglia
-  // ------------------------------------------------------------
   function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(
       () => {
@@ -45,23 +40,18 @@
     );
   }
 
-  // #437 — "Copia URL" (del link, dell'immagine, del filmato) copia un
-  // INDIRIZZO: se quello che il sito ha messo lì non lo è — un frammento di
-  // codice `javascript:`, un `data:` lungo un chilometro, un `blob:` che muore
-  // con la pagina, o niente affatto — negli appunti finirebbe una stringa che
-  // non apre nulla da nessuna parte, senza che niente lo dica. Meglio dirlo,
-  // come già succede per i filmati trasmessi a pezzi.
+  // Negli appunti deve finire un indirizzo apribile: un javascript:, un data: o un
+  // blob: copiato da «Copia URL» non aprirebbe niente da nessuna parte (#437).
   function isAddress(url) {
     const raw = String(url || '').trim();
-    // Senza il modulo condiviso non peggioriamo il comportamento storico.
+    // Senza il modulo condiviso non si rifiuta niente: meglio permissivi che bloccare tutto.
     if (!global.SN_URL_NAV) return !!raw;
     return global.SN_URL_NAV.isShareableAddress(raw);
   }
 
-  // Ritorna true se ha davvero copiato.
   function copyUrlToClipboard(url) {
     if (!isAddress(url)) {
-      Popup.showToast(I18n.t('toast_not_an_address'));
+      Popup.toastErrore('toast_not_an_address');
       return false;
     }
     copyToClipboard(String(url).trim());
@@ -69,8 +59,7 @@
   }
 
   function cutSelection() {
-    // window.getSelection() non vede la selezione dentro <input>/<textarea>:
-    // recuperiamo il testo direttamente dal nodo attivo se serve.
+    // La selezione dentro <input>/<textarea> si recupera dal nodo attivo: regola in src/content/content.js.
     const sel = window.getSelection();
     let text = sel?.toString() || '';
     const activeEl = document.activeElement;
@@ -104,6 +93,18 @@
     });
   }
 
+  // Senza fetch: la CSP di un sito può chiudere anche i data:.
+  function blobDaDataUrl(dataUrl) {
+    try {
+      const m = /^data:([^;,]+);base64,(.*)$/.exec(String(dataUrl || ''));
+      if (!m) return null;
+      const bin = atob(m[2]);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], { type: m[1] });
+    } catch (_) { return null; }
+  }
+
   // Descrizione provvisoria per un'immagine prima che arrivi quella generata
   // dall'AI (o il perché non arriverà: vedi imagePlaceholderLabel).
   async function describeImage(_blob) {
@@ -117,91 +118,73 @@
   const nostro = (ev) => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
 
   // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
-  async function pasteFromClipboard() {
+  // Gli appunti li legge il main per Filo: la pagina non riceve nessun permesso, nemmeno per un attimo (#586).
+  // `letti`: gli appunti già letti dal main, quando «Incolla» l'ha scelto l'utente nello strato sopra la scheda (#1054).
+  async function pasteFromClipboard(letti = null) {
     deps.restorePasteContext();
-    // Gli appunti li legge Filo per l'utente che ha scelto Incolla, non il sito: vale pochi secondi, solo qui.
-    try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_FILO, tipo: 'appunti' }); } catch (_) {}
-    // Tenta lettura strutturata (testo + immagini)
-    try {
-      if (navigator.clipboard.read) {
-        const items = await navigator.clipboard.read();
-        for (const it of items) {
-          // Cerca un'immagine
-          const imgType = it.types.find((t) => t.startsWith('image/'));
-          if (imgType) {
-            const blob = await it.getType(imgType);
-            const dataUrl = await blobToDataUrl(blob);
-            deps.restorePasteContext();
-            const ctx = deps.getPasteContext();
-            const targetKind = ctx?.kind;
-            if (targetKind === 'input') {
-              // input/textarea non supportano immagini: prova a delegare ad
-              // un handler custom (es. il modal feedback) via evento bubbling.
-              const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
-                bubbles: true, cancelable: true, detail: { blob },
-              }));
-              if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) {
-                return;
-              }
-              // Nessun handler ha accettato: ricadi sul testo se presente
-              const textType = it.types.find((t) => t === 'text/plain');
-              if (textType) {
-                const text = await (await it.getType(textType)).text();
-                insertTextAtSelection(text);
-                pushClipboardEntry({ type: 'text', text }, 'paste');
-              } else {
-                Popup.showToast(I18n.t('toast_cannot_paste_image'));
-              }
-              return;
-            }
-            if (targetKind !== 'ce') {
-              // Nessun target editabile valido per un'immagine.
-              Popup.showToast(I18n.t('toast_cannot_paste_image'));
-              return;
-            }
-            const ok = insertImageInEditable(blob, dataUrl);
-            if (!ok) {
-              Popup.showToast(I18n.t('toast_paste_failed'));
-              return;
-            }
-            const description = await describeImage(blob);
-            pushClipboardEntry({ type: 'image', dataUrl, description }, 'paste');
-            Popup.showToast(I18n.t('toast_pasted_image'));
-            return;
-          }
-        }
-      }
-    } catch (_) {
-      // Permessi negati o API non disponibile: ricadi sul testo
-    }
-    // Fallback: solo testo
-    try {
-      const text = await navigator.clipboard.readText();
-      if (!text) return;
+    let appunti = null;
+    if (letti && typeof letti === 'object') appunti = { ok: true, testo: letti.testo, immagine: letti.immagine };
+    else try { appunti = await chrome.runtime.sendMessage({ type: MSG.APPUNTI_DI_FILO }); } catch (_) { appunti = null; }
+    if (!appunti || !appunti.ok) { Popup.toastErrore('toast_paste_failed'); return; }
+    const text = typeof appunti.testo === 'string' ? appunti.testo : '';
+    let blob = null;
+    if (appunti.immagine) blob = blobDaDataUrl(appunti.immagine);
+    if (blob) {
+      const dataUrl = appunti.immagine;
       deps.restorePasteContext();
-      insertTextAtSelection(text);
-      pushClipboardEntry({ type: 'text', text }, 'paste');
-    } catch (_) {}
+      const ctx = deps.getPasteContext();
+      const targetKind = ctx?.kind;
+      if (targetKind === 'input') {
+        // input/textarea non supportano immagini: prova a delegare ad
+        // un handler custom (es. il modal feedback) via evento bubbling.
+        const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
+          bubbles: true, cancelable: true, detail: { blob },
+        }));
+        if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) return;
+        if (text) {
+          insertTextAtSelection(text);
+          pushClipboardEntry({ type: 'text', text }, 'paste');
+        } else {
+          Popup.toastErrore('toast_cannot_paste_image');
+        }
+        return;
+      }
+      if (targetKind !== 'ce') {
+        // Nessun target editabile valido per un'immagine.
+        Popup.toastErrore('toast_cannot_paste_image');
+        return;
+      }
+      if (!insertImageInEditable(blob, dataUrl)) {
+        Popup.toastErrore('toast_paste_failed');
+        return;
+      }
+      const description = await describeImage(blob);
+      pushClipboardEntry({ type: 'image', dataUrl, description }, 'paste');
+      Popup.showToast(I18n.t('toast_pasted_image'));
+      return;
+    }
+    if (!text) return;
+    deps.restorePasteContext();
+    insertTextAtSelection(text);
+    pushClipboardEntry({ type: 'text', text }, 'paste');
   }
 
-  async function pasteHistoryEntry(entry) {
+  // `giaInCima`: scelta nello strato, il main l'ha già riportata in cima (#1054).
+  async function pasteHistoryEntry(entry, { giaInCima = false } = {}) {
     if (!entry) return;
     // Riporta in cima alla cronologia: il background fa dedup e promuove.
     // Non passiamo per pushClipboardEntry() per evitare di ri-richiedere
     // all'AI la descrizione di un'immagine già descritta.
-    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
+    if (!giaInCima) chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
     deps.restorePasteContext();
     const ctx = deps.getPasteContext();
     if (entry.type === 'image') {
-      // Ricostruisci un Blob a partire dal data URL: serve a tutti i rami sotto.
       // Le immagini in cronologia sono offline (dataUrl in storage): niente provider.
       let blob = null;
       try { blob = await (await fetch(entry.dataUrl)).blob(); } catch (_) {}
 
-      // input/textarea non accettano <img> nativamente: come fa pasteFromClipboard
-      // delega via evento custom 'filo:paste-image' così handler dedicati (modal
-      // feedback, barra input dashboard, ecc.) possono allegarla. Senza questa
-      // delega l'Incolla→cronologia falliva ovunque Ctrl+V su immagine funziona.
+      // input e textarea non accettano <img>: si delega con l'evento 'filo:paste-image' a chi
+      // ha un handler dedicato, o l'incolla dalla cronologia fallisce su ogni immagine.
       if (ctx?.kind === 'input' && blob) {
         const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
           bubbles: true, cancelable: true, detail: { blob },
@@ -210,27 +193,23 @@
           Popup.showToast(I18n.t('toast_pasted_image'));
           return;
         }
-        Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        Popup.toastErrore('toast_cannot_paste_image');
         return;
       }
       if (ctx?.kind !== 'ce') {
-        Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        Popup.toastErrore('toast_cannot_paste_image');
         return;
       }
       const ok = insertImageInEditable(blob, entry.dataUrl, descriptionToFilename(entry.description));
       if (ok) Popup.showToast(I18n.t('toast_pasted_image'));
-      else Popup.showToast(I18n.t('toast_paste_failed'));
+      else Popup.toastErrore('toast_paste_failed');
       return;
     }
-    // testo: incolla in input/textarea/contenteditable
     insertTextAtSelection(entry.text || '');
   }
 
-  // Inserisce un'immagine in un contenteditable provando tre strategie in
-  // sequenza: (1) paste event sintetico — necessario per editor moderni
-  // (Gmail, Slate, Lexical, ProseMirror) che hanno un handler paste e
-  // ignorerebbero execCommand o modifiche dirette al DOM; (2) execCommand
-  // 'insertImage'; (3) inserimento manuale via Range API.
+  // Tre strategie: evento paste sintetico (gli editor moderni hanno un handler paste e
+  // ignorano il resto), poi execCommand insertImage, infine inserimento via Range.
   function insertImageInEditable(blob, dataUrl, fileName) {
     const ctx = deps.getPasteContext();
     if (!ctx || ctx.kind !== 'ce') return false;
@@ -245,7 +224,6 @@
       } catch (_) {}
     }
 
-    // (1) Paste event sintetico con DataTransfer
     if (blob) {
       try {
         const dt = new DataTransfer();
@@ -257,17 +235,14 @@
           cancelable: true,
         });
         const notCancelled = el.dispatchEvent(evt);
-        // Se l'evento è stato cancellato (preventDefault), la pagina lo ha gestito.
         if (!notCancelled) return true;
       } catch (_) {}
     }
 
-    // (2) execCommand classico
     try {
       if (document.execCommand('insertImage', false, dataUrl)) return true;
     } catch (_) {}
 
-    // (3) Inserimento manuale via Range
     try {
       let range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
       if (!range || !el.contains(range.startContainer)) {
@@ -310,10 +285,8 @@
       el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: text })));
     } else if (kind === 'ce') {
       el.focus();
-      // Ripristina la selezione salvata all'apertura del menu PRIMA di inserire:
-      // il click sul bottone del menu sposta il focus, e su editor moderni
-      // (ProseMirror di claude.ai, Lexical, Slate) execCommand inseriva a fine
-      // testo invece che dove era il caret (feedback alpha).
+      // La selezione va ripristinata PRIMA di inserire: il click sul bottone sposta il fuoco,
+      // e sugli editor moderni execCommand inseriva a fine testo invece che al caret.
       const sel = window.getSelection();
       if (ctx.range && el.contains(ctx.range.startContainer)) {
         try {
@@ -321,9 +294,8 @@
           sel.addRange(ctx.range);
         } catch (_) {}
       }
-      // (1) paste event sintetico: gli editor "controllati" leggono la loro
-      // selezione interna (mantenuta anche dopo il blur) e inseriscono nel
-      // punto giusto. execCommand su quegli editor finiva in coda.
+      // Gli editor controllati tengono la loro selezione anche dopo il blur e inseriscono nel
+      // punto giusto; execCommand lì finiva in coda.
       let handled = false;
       try {
         const dt = new DataTransfer();
@@ -335,19 +307,14 @@
         });
         handled = !el.dispatchEvent(evt);
       } catch (_) {}
-      // (2) fallback: execCommand insertText (editor "non controllati").
       if (!handled) {
         try { document.execCommand('insertText', false, text); } catch (_) {}
       }
     }
   }
 
-  // Riallinea il contesto di incolla salvato all'apertura del menu alla
-  // posizione CORRENTE del cursore nello stesso campo. Serve alla dettatura:
-  // la registrazione può durare a lungo (fino a ~60s + trascrizione) e nel
-  // frattempo l'utente continua a scrivere o sposta il cursore nello stesso
-  // campo. Senza questo, il testo trascritto atterrerebbe dove il menu era
-  // stato aperto, spaccando in due ciò che l'utente ha digitato nel frattempo.
+  // Riallinea il punto d'incolla a dov'è il cursore ADESSO: la dettatura dura a lungo, e
+  // il testo atterrerebbe dove si era aperto il menu, spaccando quanto digitato.
   function refreshPasteContextLive() {
     const ctx = deps.getPasteContext();
     if (!ctx) return;
@@ -370,20 +337,17 @@
     }
   }
 
-  // Inserimento del testo dettato: a differenza di "Incolla" (che avviene
-  // subito dopo il click, quando la posizione catturata è ancora attuale), la
-  // dettatura arriva molto dopo. Prima di inserire riallineiamo la posizione
-  // a dove il cursore si trova ADESSO, poi inseriamo.
+  // La dettatura arriva molto dopo il click: vedi refreshPasteContextLive.
   function insertDictatedText(text) {
     refreshPasteContextLive();
     deps.restorePasteContext();
     insertTextAtSelection(text);
   }
 
-  // Costruisce l'item del menu "Incolla" con freccetta cronologia.
   function buildPasteItem(clipboardHistory) {
     return {
       type: 'paste',
+      azione: 'paste-clipboard',
       label: I18n.t('menu_paste'),
       shortcut: Tasti.etichetta('Ctrl+V'),
       history: clipboardHistory,
@@ -402,19 +366,17 @@
     chrome.runtime.sendMessage({ type: MSG.CLEAR_CLIPBOARD_HISTORY }).catch(() => {});
   }
 
-  // ------------------------------------------------------------
-  // Cronologia clipboard + stato navigazione (dati per il menu)
-  // ------------------------------------------------------------
   async function getClipboardHistory() {
+    // Col menu nello strato la cronologia la legge lo strato dal main: nella scheda non arriva (#1054).
+    try { if (global.SN_STRATO_MENU_ACCESO?.() === true) return []; } catch (_) {}
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY });
       return r?.items || [];
     } catch (_) { return []; }
   }
 
-  // Stato di navigazione (canBack/canFwd) del tab corrente: serve per
-  // mostrare le icone avanti/indietro del menu in grigio quando la cronologia
-  // non lo consente, come già accade per i tasti analoghi nella barra in alto.
+  // Serve a mostrare in grigio avanti e indietro nel menu quando la cronologia non lo
+  // consente, come i tasti nella barra in alto.
   async function getNavState() {
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.NAV_STATE });
@@ -432,28 +394,29 @@
     }
   }
 
-  // Avviso "questa funzione non ha un modello": lo mostriamo una volta sola per
-  // messaggio finché la pagina resta aperta. La descrizione dell'immagine parte
-  // da sola (incolla, copia, screenshot): ripetere lo stesso toast a ogni
-  // immagine sarebbe rumore, tacere del tutto sarebbe il ripiego muto di prima.
+  // L'avviso «manca il modello» si dà una volta per pagina: la descrizione parte a ogni
+  // immagine e ripetere il toast sarebbe rumore.
+  // La frase dice dove si sceglie il modello: l'avviso porta il tasto per andarci (#663, #1344.1).
   const modelConfigWarned = new Set();
-  function warnModelConfigOnce(message) {
+  function warnModelConfigOnce(message, res) {
     if (!message || modelConfigWarned.has(message)) return;
     modelConfigWarned.add(message);
-    try { Popup.showToast(message, { duration: 7000 }); } catch (_) {}
+    try { Popup.showToast(message, { duration: 7000, rimedio: res || null }); } catch (_) {}
   }
 
-  // Etichetta provvisoria delle immagini in cronologia incolla: «Descrizione…»
-  // finché una descrizione può davvero arrivare, altrimenti dice che manca il
-  // modello (un'attesa che non finirà mai è una bugia).
+  // «Descrizione…» solo finché può davvero arrivare: un'attesa che non finirà mai è una
+  // bugia, meglio dire che manca il modello.
   let imageDescNoModel = false;
-  let ultimaDaDelicata = null;
+  // L'ultima immagine che non avrà descrizione, e perché: pagina delicata o descrizione spenta (#1004, #1274).
+  let ultimaSenza = { dataUrl: null, etichetta: '' };
+  const SENZA_DESCRIZIONE = { PAGINA_DELICATA: 'clipboard_image_delicata', DESCRIZIONE_SPENTA: 'clipboard_image_senza_descrizione' };
   function imagePlaceholderLabel(dataUrl) {
-    if (dataUrl && dataUrl === ultimaDaDelicata) return I18n.t('clipboard_image_delicata');
+    if (dataUrl && dataUrl === ultimaSenza.dataUrl) return I18n.t(ultimaSenza.etichetta);
     return I18n.t(imageDescNoModel ? 'clipboard_image_no_model' : 'clipboard_image_pending');
   }
 
-  async function requestImageDescription(dataUrl) {
+  // `originale`: la foto che l'utente tiene, quando al modello va una copia coperta.
+  async function requestImageDescription(dataUrl, originale = null) {
     // NIENTE modello di ripiego scritto qui: gli unici modelli ammessi sono
     // quelli configurati per questa funzione (il ripiego VOLUTO fra i modelli
     // della catena vive nel main, dentro la catena). Se la funzione non ha un
@@ -465,40 +428,48 @@
       res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.DESCRIBE_IMAGE,
-        payload: { dataUrl, automatica: true },
+        payload: { dataUrl, automatica: true, ...(originale && originale !== dataUrl ? { originale } : {}) },
       });
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
     }
-    // Da una pagina delicata l'immagine non va al modello: lo screenshot prende data e ora (#1004).
-    if (res?.code === 'PAGINA_DELICATA') {
-      ultimaDaDelicata = dataUrl;
+    // Nata su una pagina delicata, o con la descrizione spenta, l'immagine non va al modello: lo screenshot prende data e ora.
+    const senza = res && SENZA_DESCRIZIONE[res.code];
+    if (senza) {
+      ultimaSenza = { dataUrl, etichetta: senza };
       chrome.runtime.sendMessage({
         type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
         dataUrl,
-        description: I18n.t('clipboard_image_delicata'),
+        description: I18n.t(senza),
       }).catch(() => {});
       return null;
     }
+    // La descrizione si chiede una volta sola: una richiesta andata male lascerebbe la voce in cronologia su
+    // «Descrizione…» per sempre (crediti finiti, rete, risposta vuota: #1344.1). Le si dice la verità.
+    const nonArrivera = (chiave) => {
+      chrome.runtime.sendMessage({
+        type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
+        dataUrl,
+        description: I18n.t(chiave),
+      }).catch(() => {});
+    };
     if (!res?.ok) {
       // Un modello che nessun host ammesso serve (#828) è un modello che manca: la descrizione non arriverà.
       if ((res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_ALLOWED_HOST') && res.error) {
         imageDescNoModel = true;
-        warnModelConfigOnce(res.error);
-        // La voce in cronologia incolla resterebbe su «Descrizione…» per
-        // sempre: dille la verità invece di far finta che stia arrivando.
-        chrome.runtime.sendMessage({
-          type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
-          dataUrl,
-          description: I18n.t('clipboard_image_no_model'),
-        }).catch(() => {});
+        if (!modelConfigWarned.has(res.error)) Popup.conta({ misura: 'errore-modello', code: String(res.code || ''), status: 0 });
+        warnModelConfigOnce(res.error, res);
+        nonArrivera('clipboard_image_no_model');
+      } else {
+        nonArrivera('clipboard_image_non_descritta');
       }
       console.warn('[SN] descrizione immagine non eseguita:', res?.error || 'errore sconosciuto');
       return null;
     }
     imageDescNoModel = false;
-    if (!res.text) {
+    if (!res.text || !res.text.replace(/\s+/g, ' ').trim()) {
       console.warn('[SN] descrizione immagine: risposta vuota');
+      nonArrivera('clipboard_image_non_descritta');
       return null;
     }
     const description = res.text.replace(/\s+/g, ' ').trim().slice(0, 80);
@@ -522,17 +493,8 @@
     return `${name}.${ext}`;
   }
 
-  // ------------------------------------------------------------
-  // Spiega / Traduci (popup streaming)
-  // ------------------------------------------------------------
-  // Il riquadro si stacca dalla PAROLA, non da un punto. Una parola ha
-  // un'altezza, e il riquadro posato sopra deve appoggiarsi sopra la sua cima:
-  // ancorato al solo punto di partenza copriva la metà bassa delle lettere, e
-  // la parola diventava illeggibile proprio mentre l'utente leggeva cosa vuol
-  // dire. Il rettangolo lo prendiamo dalla selezione — è la stessa parola per
-  // tutte e due le strade, la scorciatoia e la freccetta del tasto destro, che
-  // così si comportano uguale. Senza selezione misurabile restano il punto del
-  // puntatore e il vecchio comportamento.
+  // Il riquadro si stacca dalla PAROLA, non dal punto: ancorato al solo punto di partenza
+  // copriva la metà bassa delle lettere. Senza selezione misurabile resta il puntatore.
   function ancoraSelezione(anchorEvent) {
     const x = Number.isFinite(anchorEvent?.clientX) ? anchorEvent.clientX : 0;
     const y = Number.isFinite(anchorEvent?.clientY) ? anchorEvent.clientY : 0;
@@ -549,7 +511,11 @@
 
   function triggerExplainOrTranslate(action, selInfo, anchorEvent) {
     if (!selInfo) {
-      Popup.showToast(I18n.t('err_no_selection'));
+      Popup.toastErrore('err_no_selection');
+      return;
+    }
+    if (selInfo.segreto) {
+      Popup.showToast(I18n.t('err_secret_selection'));
       return;
     }
     let title;
@@ -586,7 +552,7 @@
   // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta o troppo lunga.
   // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
   // - Parte solo dietro un gesto vero che seleziona (#1070): una selezione fatta da uno script spenderebbe i crediti dell'utente.
-  let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
+  let prefetchedExplain = null; // { key, sentence, promise<{text}|{errore: risposta dell'IPC}> }
   let prefetchTimer = null;
   // Oltre, una spiegazione «in anticipo» non vale il costo: si calcola intera al tasto destro.
   const PREFETCH_MAX_CHARS = 2000;
@@ -608,7 +574,7 @@
     const Gesto = global.SN_GESTO;
     if (!Gesto || !Gesto.recente(Gesto.SELEZIONA)) return;
     const sel = Extract.getSelectionWithSentence();
-    if (!sel) return;
+    if (!sel || sel.segreto) return;
     if (sel.selection.length > PREFETCH_MAX_CHARS) return;
     const key = explainKey(sel.selection);
     if (key.length < 3) return;
@@ -630,17 +596,24 @@
       action: ACTIONS.EXPLAIN,
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
       diceRipiego: true,
-      ...(suRichiesta ? { suRichiesta: true } : {}),
+      // Preparata prima che la persona la chieda: l'uso lo conta l'apertura di Spiega, non questa chiamata (#969).
+      ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true, anticipo: true }),
     }).then(
       (res) => {
-        if (res && res.code === 'TROPPE_AUTOMATICHE') entry.fermata = true;
+        // Fermata dal tetto o da una pagina delicata (#1274): al tasto destro si chiede davvero.
+        if (res && (res.code === 'TROPPE_AUTOMATICHE' || res.code === 'PAGINA_DELICATA')) entry.fermata = true;
+        // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
         return (res?.ok && typeof res.text === 'string')
           ? { text: res.text, keyFallback: res.keyFallback || null }
-          : { error: Popup.frasePerLUtente(res) };
+          : { errore: res || {} };
       },
-      (e) => ({ error: Popup.frasePerLUtente({ message: e?.message }) }),
+      (e) => ({ errore: { message: e?.message } }),
     );
     return entry;
+  }
+
+  function contaUso(action, attesaMs, anticipata = false) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs, anticipata })).catch(() => {}); } catch (_) {}
   }
 
   // Restituisce la Promise per la spiegazione di questa selezione.
@@ -649,20 +622,32 @@
   function getExplainPromise(selInfo) {
     const key = explainKey(selInfo.selection);
     const chiedi = () => {
+      // Con la spiegazione in anticipo spenta la chiede la persona: è il gesto che quella scelta le costa (#1461).
+      if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
       const entry = startExplainRequest(selInfo, { suRichiesta: true });
       prefetchedExplain = entry;
       return entry.promise;
     };
     const pre = prefetchedExplain;
     if (pre && pre.key === key && !pre.fermata) {
-      // Preparata e aperta: per i crediti non è una chiamata sprecata (#818).
-      if (pre.anticipata && !pre.usata) {
-        pre.usata = true;
-        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
-      }
-      return pre.promise.then((res) => (pre.fermata ? chiedi() : res));
+      return pre.promise.then((res) => {
+        if (pre.fermata) return chiedi();
+        // Preparata e aperta: per i crediti non è una chiamata sprecata (#818). Una fermata non è partita.
+        const primaVolta = !!pre.anticipata && !pre.usata;
+        if (primaVolta) {
+          pre.usata = true;
+          Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
+        }
+        // Per i contatori un anticipo è aperto una volta sola, e solo se era pronto: riaperto o fallito non conta (#1461).
+        return { ...res, giaChiesta: true, anticipata: primaVolta && !!res && !res.errore && !!res.text };
+      });
     }
     return chiedi();
+  }
+
+  // Il tasto del rimedio sotto una spiegazione del menu apre un'altra scheda: il menu non resta aperto sopra il sito.
+  function chiudiMenu() {
+    try { global.SN_MENU?.close?.(); } catch (_) {}
   }
 
   function buildInlineExplain(selInfo, opts = {}) {
@@ -694,13 +679,16 @@
         }
 
         let cancelled = false;
+        const apertaIl = Date.now();
         getExplainPromise(selInfo).then((res) => {
+          // Una risposta già chiesta prima (l'anticipo alla selezione) non passa dal conto delle chiamate: l'uso lo
+          // conta chi la mostra, con l'attesa da quando la persona ha aperto Spiega (#969).
+          if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null, res.anticipata);
           if (cancelled) return;
           el.classList.remove('sn-menu-inline-loading');
-          if (!res || res.error || !res.text) {
+          if (!res || res.errore || !res.text) {
             el.classList.add('sn-menu-inline-error');
-            // Già tradotto da startExplainRequest: qui si mostra, non si ritraduce.
-            body.textContent = (res && res.error) || I18n.t('err_provider_failed');
+            Popup.scriviErrore(body, (res && res.errore) || {}, { dopo: chiudiMenu });
             return;
           }
           const daMostrare = spiegazioneDaMostrare(Popup.resolveCalcMarkers(res.text));
@@ -717,6 +705,27 @@
         return () => { cancelled = true; };
       },
     };
+  }
+
+  // Un collegamento è anche la zona di una mappa d'immagine e l'<a> di un disegno SVG, anche con l'xlink:href dei disegni
+  // vecchi (#725.6, #725.7). Lì `href` è un oggetto, non l'indirizzo: chi vuole l'indirizzo lo chiede qui.
+  const SELETTORE_COLLEGAMENTO = 'a[href], a[*|href], area[href]';
+  const XLINK = 'http://www.w3.org/1999/xlink';
+  function indirizzoDelLink(el) {
+    if (!el) return '';
+    let h;
+    try { h = el.href; } catch (_) { return ''; }
+    if (typeof h === 'string') return h;
+    const scritto = String((h && h.animVal) || el.getAttribute?.('href') || el.getAttributeNS?.(XLINK, 'href') || '').trim();
+    if (!scritto) return '';
+    try { return new URL(scritto, el.baseURI || location.href).href; } catch (_) { return scritto; }
+  }
+
+  // Il nome con cui il collegamento si presenta: una zona di mappa non ha testo, solo il suo `alt`.
+  function nomeDelLink(el) {
+    if (!el) return '';
+    const testo = el.tagName === 'AREA' ? '' : (el.textContent || '').trim();
+    return testo || String(el.getAttribute?.('alt') || el.getAttribute?.('aria-label') || el.getAttribute?.('title') || '').trim();
   }
 
   // L'avviso sull'indirizzo lo calcola Filo, non il modello: si mostra SUBITO e
@@ -743,16 +752,23 @@
     return chrome.runtime.sendMessage({ type: MSG.IMAGE_PROVENANCE, dataUrl });
   }
 
+  // Il Referer che la pagina concede (<meta name="referrer">, l'attributo dell'elemento) vale anche per i byte che il
+  // main scarica per lei; la politica dell'intestazione HTTP la vede il main da sé.
+  function politicheReferrer(el) {
+    const meta = Array.from(document.querySelectorAll('meta[name="referrer" i]'), (m) => m.getAttribute('content') || '');
+    return [meta.join(','), String((el && el.referrerPolicy) || '')].filter(Boolean);
+  }
+
   // I byte originali di un'immagine della pagina, come data URL. Quella di un'altra
   // origine (quasi sempre: le foto stanno su un CDN) lo script non la può leggere,
   // e la scarica il main (#946): senza, descrizione e origine tacevano sulla maggior parte dei siti.
-  async function scaricaImmagine(src) {
+  async function scaricaImmagine(src, el) {
     try {
       const r = await fetch(src);
       if (r.ok) return await blobToDataUrl(await r.blob());
     } catch (_) {}
     if (!/^https?:/i.test(String(src || ''))) throw new Error('immagine non leggibile');
-    const res = await chrome.runtime.sendMessage({ type: MSG.IMAGE_BYTES, url: src });
+    const res = await chrome.runtime.sendMessage({ type: MSG.IMAGE_BYTES, url: src, politiche: politicheReferrer(el) });
     if (!res || !res.ok || !res.dataUrl) throw new Error((res && res.error) || 'immagine non leggibile');
     return res.dataUrl;
   }
@@ -773,7 +789,8 @@
         origine.className = 'sn-menu-origine';
         origine.hidden = true;
         el.appendChild(origine);
-        if (linkEl && linkEl.href) mostraAvvisoLink(el, linkEl.href);
+        const indirizzo = indirizzoDelLink(linkEl);
+        if (indirizzo) mostraAvvisoLink(el, indirizzo);
         const body = document.createElement('div');
         body.className = 'sn-menu-link-body';
         body.textContent = I18n.t('menu_explain_loading');
@@ -786,10 +803,20 @@
           return () => {};
         }
         let cancelled = false;
+        // Il sito in lista lo dice anche l'immagine che fa da link, come il link di testo; la domanda non contatta il sito.
+        if (indirizzo) {
+          chrome.runtime.sendMessage({ type: MSG.LINK_FERMATO, url: indirizzo }).then((r) => {
+            if (cancelled || !r?.bloccato) return;
+            const nota = document.createElement('div');
+            nota.className = 'sn-menu-link-nota';
+            nota.textContent = I18n.t(r.bloccato === 'lists' ? 'menu_link_blocked_lists' : 'menu_link_blocked', r.host || '');
+            el.insertBefore(nota, body);
+          }).catch(() => {});
+        }
         (async () => {
           let dataUrl;
           try {
-            dataUrl = await scaricaImmagine(src);
+            dataUrl = await scaricaImmagine(src, imgEl);
           } catch (_) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
@@ -804,7 +831,8 @@
             if (cancelled || !p || !p.ok || !p.frase) return;
             testoChiuso(origine, p.frase);
             origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified'
-              : p.prova === 'marchio' ? 'menu_origin_hint_mark' : 'menu_origin_hint');
+              : p.firmatario === 'provvisorio' ? 'menu_origin_hint_interim'
+                : p.prova === 'marchio' ? 'menu_origin_hint_mark' : 'menu_origin_hint');
             origine.classList.toggle('sn-menu-origine-debole', !p.forte);
             origine.hidden = false;
           }).catch(() => {});
@@ -820,7 +848,7 @@
             el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
               el.classList.add('sn-menu-inline-error');
-              body.textContent = Popup.frasePerLUtente(res);
+              Popup.scriviErrore(body, res, { dopo: chiudiMenu });
               return;
             }
             testoChiuso(body, res.text);
@@ -838,7 +866,7 @@
     };
   }
 
-  // Sezione inline "Spiega link": niente apertura del link, solo metadati OG e dominio.
+  // Sezione inline "Spiega link": il link non si apre in una scheda; titolo e descrizione li legge il main.
   function buildInlineExplainLink(linkEl) {
     return {
       type: 'inline',
@@ -848,8 +876,8 @@
         el.classList.add('sn-menu-inline-loading');
         let cancelled = false;
         (async () => {
-          const url = linkEl.href;
-          const anchorText = (linkEl.textContent || '').trim().slice(0, 200);
+          const url = indirizzoDelLink(linkEl);
+          const anchorText = nomeDelLink(linkEl).slice(0, 200);
           const flags = LinkSospetto.analizza(url);
           el.textContent = '';
           mostraAvvisoLink(el, url);
@@ -858,17 +886,22 @@
           body.textContent = I18n.t('menu_link_loading');
           el.appendChild(body);
 
-          // Fetch leggero dei metadati OG via background (CORS-safe). Saltato se url sospetto in modo grave.
-          let ogTitle = '', ogDescription = '';
-          if (!flags.includes('side_effect')) {
-            try {
-              const r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url });
-              if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
-            } catch (_) {}
-          }
+          // Quando il sito non si contatta lo decide il main (#1307). Un sito bloccato non si spiega: si dice che è in lista.
+          let ogTitle = '', ogDescription = '', r = null;
+          // Scritto da un modello: mai giudicato, o con un dato che al clic chiede l'OK, non si contatta prima (#1505).
+          // `delSito`: il collegamento è della pagina, che sa già dove porta.
+          const proposta = global.SN_MARKDOWN?.scrittoDaUnModello
+            ? global.SN_MARKDOWN.scrittoDaUnModello(linkEl)
+            : !!(linkEl.closest && linkEl.closest('a.filo-md-link, [data-filo-verdetti]'));
+          try { r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url, proposta, delSito: !proposta }); } catch (_) {}
           if (cancelled) return;
+          if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
+          else if (r?.bloccato) {
+            el.classList.remove('sn-menu-inline-loading');
+            body.textContent = I18n.t(r.bloccato === 'lists' ? 'menu_link_blocked_lists' : 'menu_link_blocked', r.host || '');
+            return;
+          }
 
-          // Streaming spiegazione via AI
           let port;
           try {
             port = chrome.runtime.connect({ name: global.SN_MSG.PORTS.AI_STREAM });
@@ -900,7 +933,7 @@
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
-              body.textContent = Popup.frasePerLUtente(m);
+              Popup.scriviErrore(body, m, { dopo: chiudiMenu });
             }
           });
           port.postMessage({
@@ -935,9 +968,23 @@
     });
   }
 
+  // La foto resta com'è per l'utente; `campi` sono i campi segreti da coprire nella copia che va a un modello (#810.7),
+  // null se non si sono potuti trovare tutti: quella copia allora non parte.
   async function captureVisibleTab() {
     await attendiCompositor();
-    return chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+    const prima = Extract.campiSegretiInVista();
+    const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, campiSegreti: true, campiNellaPagina: prima.length });
+    if (r?.ok) return { ...r, campi: prima.concat(Array.isArray(r.campi) ? r.campi : [], Extract.campiSegretiInVista()) };
+    if (r?.code !== 'segreti') return r;
+    const pura = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+    return pura?.ok ? { ...pura, campi: null } : pura;
+  }
+
+  // Il nome del file lo sceglie un modello guardando la foto: gli arriva coi campi segreti coperti, o non gli arriva.
+  async function descrizioneCoperta(dataUrl, campi, ritaglio = null) {
+    if (!Array.isArray(campi)) return null;
+    const perModello = campi.length ? await Extract.fotoCoperta(dataUrl, campi, { ritaglio }) : dataUrl;
+    return requestImageDescription(perModello, dataUrl);
   }
 
   function buildSavePayload() {
@@ -990,7 +1037,7 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.SAVE_PAGE, page: base });
       if (!res?.ok) {
-        Popup.showToast(I18n.t('toast_save_failed'));
+        Popup.toastErrore('toast_save_failed');
         return null;
       }
       entry = res.entry;
@@ -998,7 +1045,7 @@
       // Contesto distrutto da un redirect immediato o errore IPC: avvisa
       // invece di fallire in silenzio.
       console.error('[SN] savePage', e);
-      Popup.showToast(I18n.t('toast_save_failed'));
+      Popup.toastErrore('toast_save_failed');
       return null;
     }
 
@@ -1014,8 +1061,7 @@
     } catch (_) { /* miniatura opzionale */ }
     rimetti();
 
-    // Conferma CLICCABILE che porta alla lista (#252): rimpiazza il vecchio
-    // toast muto + chiusura a 600ms (troppo rapida per farci qualcosa).
+    // Conferma CLICCABILE: porta alla lista dove la pagina è finita (#252).
     showSaveConfirm(entry);
     return entry;
   }
@@ -1069,7 +1115,7 @@
       if (openList && entry && entry.id) {
         chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
       }
-      if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
+      if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB, via: 'salva_per_dopo' }).catch(() => {});
     };
 
     pill.addEventListener('click', (e) => { if (gestoVero(e)) finish(true); });
@@ -1083,8 +1129,8 @@
   async function saveLink(linkEl) {
     const res = await chrome.runtime.sendMessage({
       type: MSG.SAVE_LINK,
-      url: linkEl.href,
-      title: linkEl.textContent?.trim() || linkEl.href,
+      url: indirizzoDelLink(linkEl),
+      title: nomeDelLink(linkEl) || indirizzoDelLink(linkEl),
     });
     if (res?.ok) Popup.showToast(I18n.t('toast_link_saved'));
   }
@@ -1100,10 +1146,9 @@
 
   async function copyImage(imgEl) {
     try {
-      const originale = await scaricaImmagine(imgEl.currentSrc || imgEl.src);
+      const originale = await scaricaImmagine(imgEl.currentSrc || imgEl.src, imgEl);
       const blob = dataUrlToBlob(originale);
       let pngBlob = blob;
-      // Clipboard API supporta image/png; converte se serve
       if (blob.type !== 'image/png') {
         const url = URL.createObjectURL(blob);
         const img = new Image();
@@ -1128,9 +1173,8 @@
   async function downloadImage(imgEl) {
     const src = imgEl.currentSrc || imgEl.src;
     if (!src) return;
-    // data:/blob: nascono nella pagina stessa (canvas, object URL): lì
-    // l'attributo download di un <a> è onorato da Chromium e il main non
-    // saprebbe risolverli — restano sul cammino anchor.
+    // data: e blob: vivono solo nella pagina: lì Chromium onora l'attributo download e il
+    // main non saprebbe risolverli, quindi restano sul cammino anchor.
     if (/^(data:|blob:)/i.test(src)) {
       const a = document.createElement('a');
       a.href = src;
@@ -1139,39 +1183,26 @@
       document.body.appendChild(a); a.click(); a.remove();
       return;
     }
-    // Immagini http(s) — quasi sempre su un ALTRO dominio rispetto alla pagina:
-    // Chromium ignora l'attributo download cross-origin e la scheda NAVIGAVA
-    // sull'URL dell'immagine senza scaricare nulla (#274). Il salvataggio passa
-    // dal main process, che scarica a prescindere dall'origine. La risposta
-    // arriva a download concluso: toast di conferma (o di errore; nessun toast
-    // se l'utente annulla il dialogo di salvataggio).
+    // Sulle immagini http(s) cross-origin Chromium ignora l'attributo download e la scheda
+    // NAVIGAVA sull'immagine (#274): scarica il main, che risponde a download concluso.
     try {
-      const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_IMAGE, url: src });
+      const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_IMAGE, url: src, politiche: politicheReferrer(imgEl) });
       if (res?.ok) Popup.showToast(I18n.t('toast_image_saved'));
-      else if (!res?.cancelled) Popup.showToast(I18n.t('toast_image_save_failed'));
+      else if (!res?.cancelled) Popup.toastErrore('toast_image_save_failed');
     } catch (_) {
-      Popup.showToast(I18n.t('toast_image_save_failed'));
+      Popup.toastErrore('toast_image_save_failed');
     }
   }
 
-  // Un link "a un file" (PDF, ZIP, allegato) merita "Salva file"; un link a
-  // un'altra pagina no (scaricherebbe l'HTML). Non possiamo interrogare il
-  // server — una HEAD a ogni apertura del menu sarebbe attrito e latenza —
-  // quindi decidiamo dagli indizi locali:
-  //  - l'attributo `download` sull'<a> dichiara esplicitamente un file da salvare;
-  //  - altrimenti l'ultimo segmento del percorso ha un'estensione che NON è
-  //    quella di una pagina navigabile (html, php, asp…). Le pagine di solito non
-  //    hanno estensione o ne hanno una "web"; un file scaricabile sì
-  //    (.pdf, .zip, .csv, .docx…).
-  // Solo http/https: data:/blob:/mailto: e altri schemi non offrono la voce.
+  // «Salva file» solo per i link a un file: su una pagina scaricherebbe l'HTML. Si decide
+  // dagli indizi locali (attributo download, estensione non navigabile), senza una HEAD.
   const PAGE_EXTS = new Set([
     'html', 'htm', 'xhtml', 'shtml', 'php', 'php3', 'php4', 'php5', 'phtml',
     'asp', 'aspx', 'jsp', 'jspx', 'cgi', 'pl', 'do', 'action', 'cfm',
   ]);
   function isDownloadableLink(linkEl) {
     if (!linkEl) return false;
-    let href = '';
-    try { href = linkEl.href || ''; } catch (_) { return false; }
+    const href = indirizzoDelLink(linkEl);
     if (!/^https?:/i.test(href)) return false;
     try { if (linkEl.hasAttribute && linkEl.hasAttribute('download')) return true; } catch (_) {}
     let pathname = '';
@@ -1182,21 +1213,12 @@
     return !PAGE_EXTS.has(m[1].toLowerCase());
   }
 
-  // "Salva file" (#410.2). A differenza di downloadImage (byte scaricati a mano
-  // nel main con un dialogo "Salva come…"), instradiamo il download NATIVO della
-  // scheda: il main chiama webContents.downloadURL, che passa per
-  // l'intercettazione will-download di #410.1. Così scaricare dal menu e cliccare
-  // il link producono lo STESSO risultato visibile — avanzamento nella barra,
-  // salvataggio in cartella Download, avviso finale, cronologia (parità dei
-  // cammini). Nessun toast qui: la conferma è quella condivisa col clic (barra +
-  // toast finale dalla shell); avvisiamo solo se il download non parte proprio.
+  // Instrada il download NATIVO della scheda, così il menu e il clic sul link danno lo
+  // stesso risultato visibile: barra, cartella Download, cronologia (#410.2).
   async function downloadLink(linkEl) {
-    let href = '';
-    try { href = linkEl.href || ''; } catch (_) {}
+    const href = indirizzoDelLink(linkEl);
     if (!href) return;
-    // data:/blob: nascono nella pagina stessa: lì Chromium onora l'attributo
-    // `download` di un <a> e il main non saprebbe risolverli — restano sul
-    // cammino anchor (stessa scelta di downloadImage).
+    // Vedi downloadImage: data: e blob: restano sul cammino anchor.
     if (/^(data:|blob:)/i.test(href)) {
       const a = document.createElement('a');
       a.href = href;
@@ -1206,9 +1228,9 @@
     }
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_LINK, url: href });
-      if (res && res.ok === false) Popup.showToast(I18n.t('toast_file_save_failed'));
+      if (res && res.ok === false) Popup.toastErrore('toast_file_save_failed');
     } catch (_) {
-      Popup.showToast(I18n.t('toast_file_save_failed'));
+      Popup.toastErrore('toast_file_save_failed');
     }
   }
 
@@ -1226,16 +1248,15 @@
     copyToClipboard(location.href);
   }
 
-  // Condividere un link finisce, senza sistema di condivisione nativo, in una
-  // copia negli appunti: vale lo stesso discorso di "Copia URL" (#437) — un
-  // href che non è un indirizzo non si può né mandare a qualcuno né copiare.
+  // Senza condivisione nativa si copia negli appunti: vale il discorso di «Copia URL»
+  // (#437), l'indirizzo deve essere apribile.
   async function shareLink(linkEl) {
-    const href = linkEl?.href || '';
+    const href = indirizzoDelLink(linkEl);
     if (!isAddress(href)) {
-      Popup.showToast(I18n.t('toast_not_an_address'));
+      Popup.toastErrore('toast_not_an_address');
       return;
     }
-    const data = { title: linkEl.textContent?.trim() || href, url: href };
+    const data = { title: nomeDelLink(linkEl) || href, url: href };
     if (navigator.share) {
       try { await navigator.share(data); return; } catch (_) {}
     }
@@ -1254,7 +1275,13 @@
       chrome.runtime.sendMessage({ type: MSG.OPEN_NEW_TAB, url: String(url) }).catch(() => {});
       return;
     }
-    try { if (typeof global.SN_APERTURA_SCELTA === 'function') global.SN_APERTURA_SCELTA(url); } catch (_) {}
+    try {
+      if (typeof global.SN_APERTURA_SCELTA === 'function') {
+        const voce = global.SN_MENU && typeof global.SN_MENU.azioneInCorso === 'function' ? global.SN_MENU.azioneInCorso() : null;
+        if (voce) voce.apre = true;
+        global.SN_APERTURA_SCELTA(url, voce ? { id: voce.id, t0: voce.t0 } : null);
+      }
+    } catch (_) {}
     window.open(url, '_blank', 'noopener');
   }
 
@@ -1262,14 +1289,8 @@
     apriInSchedaNuova(searchUrlFor(text));
   }
 
-  // ------------------------------------------------------------
-  // Video e audio (#400)
-  // ------------------------------------------------------------
-  // Il menu di Filo prende il posto di quello di Chromium su TUTTE le pagine:
-  // finché qui non c'era nulla, il tasto destro su un filmato toglieva all'utente
-  // ogni azione (salva, copia indirizzo, finestra mobile, ripeti, velocità) senza
-  // rimpiazzarla. Queste sono le azioni sull'elemento media, usate dalla zona
-  // contestuale del menu.
+  // Il menu di Filo prende il posto di quello di Chromium ovunque: senza queste voci il
+  // tasto destro su un filmato non offrirebbe nulla (#400).
 
   const MEDIA_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -1277,9 +1298,8 @@
     return !!el && el.tagName === 'AUDIO';
   }
 
-  // Sorgente effettiva: `currentSrc` è quella che il browser sta davvero
-  // riproducendo (risolve i <source> multipli); se il media non ha ancora
-  // caricato nulla ripieghiamo sull'attributo e sul primo <source>.
+  // `currentSrc` è la sorgente che il browser sta davvero riproducendo (risolve i <source>
+  // multipli); prima del caricamento si ripiega sull'attributo e sul primo <source>.
   function mediaSrc(el) {
     if (!el) return '';
     const direct = el.currentSrc || el.src || '';
@@ -1308,9 +1328,8 @@
     try { el.muted = !el.muted; } catch (_) {}
   }
 
-  // Ripetizione e controlli non hanno un riscontro immediato a schermo (il
-  // filmato continua identico): il toast è l'unica conferma che l'azione ha
-  // avuto effetto.
+  // Ripetizione e controlli non danno riscontro a schermo (il filmato continua identico):
+  // il toast è l'unica conferma che l'azione ha avuto effetto.
   function toggleMediaLoop(el) {
     if (!el) return;
     try {
@@ -1357,20 +1376,16 @@
       if (isMediaInPip(el)) { await document.exitPictureInPicture(); return; }
       await el.requestPictureInPicture();
     } catch (_) {
-      Popup.showToast(I18n.t('toast_pip_failed'));
+      Popup.toastErrore('toast_pip_failed');
     }
   }
 
-  // "Copia URL video/audio": un blob: (stream MSE, o Blob creata dalla pagina)
-  // non è un indirizzo utilizzabile fuori dalla scheda — dirlo è meglio che
-  // copiare una stringa che altrove non apre nulla. Un blob: assente o vuoto
-  // resta il caso "streaming a pezzi", che ha il suo messaggio; ogni altra
-  // sorgente che non è un indirizzo (data:, javascript:, testo qualsiasi)
-  // passa dal messaggio generico (#437).
+  // Un blob: non è un indirizzo utilizzabile fuori dalla scheda: dirlo è meglio che
+  // copiare una stringa che altrove non apre nulla (#437).
   function copyMediaUrl(el) {
     const src = mediaSrc(el);
     if (!src || /^blob:/i.test(src)) {
-      Popup.showToast(I18n.t('toast_media_stream_only'));
+      Popup.toastErrore('toast_media_stream_only');
       return;
     }
     copyUrlToClipboard(src);
@@ -1380,12 +1395,10 @@
     const audio = isAudioEl(el);
     const failToast = audio ? 'toast_audio_save_failed' : 'toast_video_save_failed';
     const src = mediaSrc(el);
-    if (!src) { Popup.showToast(I18n.t(failToast)); return; }
+    if (!src) { Popup.toastErrore(failToast); return; }
 
-    // blob:/data: nascono nella pagina stessa: l'attributo download di un <a> è
-    // onorato da Chromium e il main non saprebbe risolverli. Attenzione: un
-    // blob: di MediaSource (lo streaming adattivo dei player) NON è leggibile —
-    // fetch fallisce, e in quel caso non esiste alcun file da salvare.
+    // Come in downloadImage, blob: e data: restano sul cammino anchor. Un blob: di
+    // MediaSource non è leggibile: lì non esiste nessun file da salvare.
     if (/^(blob:|data:)/i.test(src)) {
       try {
         const r = await fetch(src);
@@ -1400,84 +1413,91 @@
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => { try { URL.revokeObjectURL(objUrl); } catch (_) {} }, 20000);
       } catch (_) {
-        Popup.showToast(I18n.t('toast_media_stream_only'));
+        Popup.toastErrore('toast_media_stream_only');
       }
       return;
     }
 
-    // http(s): stesso cammino del salvataggio immagini (#274) — scarica il main
-    // presentando Referer e cookie della scheda, così funziona anche cross-origin
-    // e sui server con protezione hotlink.
+    // Come per le immagini (#274) scarica il main, con Referer e cookie della scheda: così
+    // regge il cross-origin e la protezione hotlink.
     try {
       const res = await chrome.runtime.sendMessage({
         type: MSG.DOWNLOAD_MEDIA,
         url: src,
         kind: audio ? 'audio' : 'video',
+        politiche: politicheReferrer(el),
       });
       if (res?.ok) Popup.showToast(I18n.t(audio ? 'toast_audio_saved' : 'toast_video_saved'));
-      else if (!res?.cancelled) Popup.showToast(I18n.t(failToast));
+      else if (!res?.cancelled) Popup.toastErrore(failToast);
     } catch (_) {
-      Popup.showToast(I18n.t(failToast));
+      Popup.toastErrore(failToast);
     }
   }
 
-  // Voce "Velocità": il corpo accelera di uno scatto (e dopo 2× torna a 1×),
-  // la freccetta apre l'elenco completo, rallentamenti compresi. L'etichetta
-  // porta con sé la velocità corrente, così il menu dice anche in che stato è.
+  // Il corpo accelera di uno scatto, la freccetta apre l'elenco completo. L'etichetta
+  // porta la velocità corrente, così il menu dice anche in che stato è il filmato.
   function buildMediaSpeedItem(el) {
     const rate = Number(el.playbackRate) || 1;
     return {
       type: 'split',
+      azione: 'video-audio-controls',
       label: `${I18n.t('menu_media_speed')} ${formatSpeed(rate)}`,
       arrowTitle: I18n.t('menu_media_speed_pick'),
       onClick: () => setMediaSpeed(el, nextMediaSpeed(rate)),
       subItems: MEDIA_SPEEDS.map((s) => ({
+        azione: 'video-audio-controls',
         label: `${Math.abs(s - rate) < 0.001 ? '✓ ' : ''}${formatSpeed(s)}${s === 1 ? ` (${I18n.t('menu_media_speed_normal')})` : ''}`,
         onClick: () => setMediaSpeed(el, s),
       })),
     };
   }
 
-  // Zona contestuale del menu per un <video>/<audio>.
   function buildMediaItems(el) {
     const audio = isAudioEl(el);
     const items = [];
     items.push({
       type: 'item',
+      azione: 'video-audio-controls',
       label: I18n.t(el.paused ? 'menu_media_play' : 'menu_media_pause'),
       onClick: () => toggleMediaPlay(el),
     });
     items.push({
       type: 'item',
+      azione: 'video-audio-controls',
       label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute'),
       onClick: () => toggleMediaMute(el),
     });
     items.push(buildMediaSpeedItem(el));
     items.push({
       type: 'item',
+      azione: 'video-audio-controls',
       label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop'),
       onClick: () => toggleMediaLoop(el),
     });
     if (mediaPipAvailable(el)) {
       items.push({
         type: 'item',
+        azione: 'video-pip',
         label: I18n.t(isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip'),
         onClick: () => toggleMediaPip(el),
       });
     }
     items.push({
       type: 'item',
+      azione: 'video-audio-controls',
       label: I18n.t(el.controls ? 'menu_media_hide_controls' : 'menu_media_show_controls'),
       onClick: () => toggleMediaControls(el),
     });
     items.push({ type: 'separator' });
     items.push({
       type: 'item',
+      azione: 'copy-download-video',
       label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link'),
       onClick: () => copyMediaUrl(el),
     });
     items.push({
       type: 'item',
+      azione: 'copy-download-video',
       label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'),
       onClick: () => downloadMedia(el),
     });
@@ -1495,14 +1515,11 @@
     apriInSchedaNuova(url);
   }
 
-  // ------------------------------------------------------------
-  // Screenshot (pieno e a regione) + trascrizione OCR
-  // ------------------------------------------------------------
   async function takeScreenshot() {
     try {
       const cap = await captureVisibleTab();
       if (!cap?.dataUrl) {
-        Popup.showToast(I18n.t('err_provider_failed'));
+        Popup.toastErrore('err_provider_failed');
         return;
       }
       let copied = false;
@@ -1515,7 +1532,7 @@
       } catch (_) {}
       // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
-      const desc = await requestImageDescription(cap.dataUrl).catch(() => null);
+      const desc = await descrizioneCoperta(cap.dataUrl, cap.campi).catch(() => null);
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
@@ -1530,18 +1547,14 @@
     } catch (_) {}
   }
 
-  // Mostra un overlay fullscreen sopra la pagina e fa selezionare all'utente
-  // un rettangolo trascinando. Risolve con { dataUrl, rect } dove dataUrl è
-  // il ritaglio PNG della porzione di tab catturata, rect è in CSS pixel.
-  // Risolve con null se l'utente annulla (Esc / clic senza drag / rettangolo
-  // troppo piccolo). Non logga eccezioni: gli errori bubble-up come reject.
+  // Risolve con { dataUrl, rect } — ritaglio PNG e rettangolo in pixel CSS — o null se
+  // l'utente annulla. Gli errori escono come reject, non loggati.
   async function selectScreenRegion() {
     const cap = await captureVisibleTab();
     if (!cap?.dataUrl) throw new Error('capture failed');
 
-    // L'immagine catturata è in pixel del device; l'overlay è in pixel CSS.
-    // Conserviamo la dimensione del viewport CSS qui per calcolare la scala
-    // dopo aver caricato l'immagine sorgente.
+    // L'immagine catturata è in pixel del device, l'overlay in pixel CSS: il viewport CSS si
+    // conserva qui per calcolare la scala a immagine caricata.
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
@@ -1553,10 +1566,8 @@
     });
 
     return new Promise((resolve) => {
-      // Cursore custom: il crosshair OS può risultare invisibile su sfondo
-      // scuro/chiaro variabile (feedback alpha). Disegnamo un crosshair SVG
-      // bianco con outline nero, abbastanza grande da essere sempre visibile
-      // sopra la maschera semitrasparente. Hotspot al centro (16,16).
+      // Crosshair disegnato da noi: quello di sistema su sfondo variabile può risultare
+      // invisibile sopra la maschera semitrasparente. Hotspot al centro (16,16).
       const crosshairSvg =
         `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">` +
         `<line x1="16" y1="2" x2="16" y2="30" stroke="black" stroke-width="3"/>` +
@@ -1569,26 +1580,21 @@
       const overlay = document.createElement('div');
       overlay.className = 'sn-region-overlay';
       global.SN_FILO_UI?.mark(overlay);
-      // Stili inline per evitare di dipendere da CSS esterni: l'overlay deve
-      // funzionare in qualsiasi pagina, anche con CSP/style restrittivo.
+      // Stili inline per non dipendere da CSS esterni: l'overlay deve funzionare in qualsiasi
+      // pagina, anche con CSP o stili restrittivi.
       Object.assign(overlay.style, {
         position: 'fixed', inset: '0', zIndex: '2147483647',
         cursor: cursorRule, userSelect: 'none', pointerEvents: 'auto',
       });
       overlay.setAttribute('data-sn-theme', document.documentElement.dataset.snTheme || '');
 
-      // 4 quadranti scuri intorno alla selezione (top/left/right/bottom).
-      // Si aggiornano via .style.top/left/width/height durante il drag.
-      // Il cursore va impostato esplicitamente sui figli: la regola CSS
-      // `cursor` è ereditata, ma alcuni runtime Electron non la propagano in
-      // modo affidabile durante il drag, lasciando l'utente senza riferimento
-      // visivo (feedback alpha).
+      // Il cursore va impostato sui figli: `cursor` si eredita, ma alcuni runtime Electron non
+      // lo propagano durante il drag e l'utente resta senza riferimento visivo.
       const mask = ['t', 'r', 'b', 'l'].map(() => {
         const d = document.createElement('div');
         Object.assign(d.style, { position: 'absolute', background: 'rgba(0,0,0,0.45)', cursor: cursorRule });
         return d;
       });
-      // All'inizio (nessun drag) tutto il viewport è coperto.
       Object.assign(mask[0].style, { left: '0', top: '0', right: '0', bottom: '0' });
       mask.forEach((d) => overlay.appendChild(d));
 
@@ -1619,13 +1625,9 @@
         rectBox.style.top = minY + 'px';
         rectBox.style.width = (maxX - minX) + 'px';
         rectBox.style.height = (maxY - minY) + 'px';
-        // top
         Object.assign(mask[0].style, { left: '0', top: '0', width: '100%', height: minY + 'px', right: 'auto', bottom: 'auto' });
-        // bottom
         Object.assign(mask[2].style, { left: '0', top: maxY + 'px', width: '100%', bottom: '0', height: 'auto', right: 'auto' });
-        // left
         Object.assign(mask[3].style, { left: '0', top: minY + 'px', width: minX + 'px', height: (maxY - minY) + 'px', right: 'auto', bottom: 'auto' });
-        // right
         Object.assign(mask[1].style, { left: maxX + 'px', top: minY + 'px', right: '0', height: (maxY - minY) + 'px', width: 'auto', bottom: 'auto' });
       }
 
@@ -1643,7 +1645,6 @@
         const w = maxX - minX, h = maxY - minY;
         cleanup();
         if (w < 4 || h < 4) { resolve(null); return; }
-        // Scala da CSS px a pixel della cattura.
         const sx = img.naturalWidth / vw;
         const sy = img.naturalHeight / vh;
         const cx = Math.round(minX * sx), cy = Math.round(minY * sy);
@@ -1654,7 +1655,7 @@
         canvas.toBlob((blob) => {
           if (!blob) { resolve(null); return; }
           const r = new FileReader();
-          r.onload = () => resolve({ dataUrl: r.result, blob, rect: { x: minX, y: minY, w, h } });
+          r.onload = () => resolve({ dataUrl: r.result, blob, rect: { x: minX, y: minY, w, h }, campi: cap.campi });
           r.onerror = () => resolve(null);
           r.readAsDataURL(blob);
         }, 'image/png');
@@ -1691,8 +1692,7 @@
     });
   }
 
-  // Screenshot di una regione selezionata dall'utente. Stessi side-effect del
-  // takeScreenshot pieno (download + clipboard + history clipboard).
+  // Stessi effetti dello screenshot pieno: download, appunti, cronologia.
   async function takePartialScreenshot() {
     try {
       const region = await selectScreenRegion();
@@ -1705,9 +1705,8 @@
           copied = true;
         }
       } catch (_) {}
-      // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
-      const desc = await requestImageDescription(dataUrl).catch(() => null);
+      const desc = await descrizioneCoperta(dataUrl, region.campi, region.rect).catch(() => null);
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
@@ -1720,12 +1719,10 @@
       a.download = descriptionToFilename(desc) || `screenshot-${stamp}.png`;
       document.body.appendChild(a); a.click(); a.remove();
     } catch (_) {
-      Popup.showToast(I18n.t('err_provider_failed'));
+      Popup.toastErrore('err_provider_failed');
     }
   }
 
-  // OCR: l'utente seleziona una regione dello schermo, il modello vision
-  // trascrive il testo letteralmente e finisce nella clipboard come testo.
   async function transcribeRegion() {
     try {
       const region = await selectScreenRegion();
@@ -1736,11 +1733,10 @@
         action: ACTIONS.TRANSCRIBE_IMAGE,
         payload: { dataUrl: region.dataUrl },
       });
-      if (!res?.ok) { Popup.showToast(Popup.frasePerLUtente(res), { duration: 9000 }); return; }
+      if (!res?.ok) { Popup.avvisoErrore(res); return; }
       const text = (res.text || '').trim();
-      if (!text) { Popup.showToast(I18n.t('toast_transcribe_empty')); return; }
+      if (!text) { Popup.toastErrore('toast_transcribe_empty'); return; }
       try { await navigator.clipboard.writeText(text); } catch (_) {
-        // Fallback DOM se la Clipboard API è bloccata.
         const ta = document.createElement('textarea');
         ta.value = text;
         ta.style.position = 'fixed'; ta.style.left = '-9999px';
@@ -1753,12 +1749,11 @@
       const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
       Popup.showToast(interrotta ? `${I18n.t('toast_transcribed')} ${interrotta}` : I18n.t('toast_transcribed'), interrotta ? { duration: 9000 } : undefined);
     } catch (_) {
-      Popup.showToast(I18n.t('err_provider_failed'));
+      Popup.toastErrore('err_provider_failed');
     }
   }
 
-  // Converte un data URL (di solito JPEG) in un Blob PNG via canvas: serve per
-  // la Clipboard API che accetta solo image/png.
+  // La Clipboard API accetta solo image/png: il data URL (di solito JPEG) passa da canvas.
   function dataUrlToPngBlob(dataUrl) {
     return new Promise((resolve) => {
       try {
@@ -1785,20 +1780,20 @@
   // click sull'icona il cursore cambia (gestito dal browser/SO) e la prossima
   // pressione del tasto sinistro su un pixel qualsiasi della pagina copia il
   // colore in formato hex nella clipboard. Esc annulla.
-  async function pickColor() {
-    if (typeof window.EyeDropper !== 'function') {
-      Popup.showToast(I18n.t('err_color_picker_unsupported'), { duration: 3000 });
+  // `scelto`: il colore l'ha già preso lo strato del menu sopra la scheda, che ha il gesto dell'utente (#1054).
+  async function pickColor(scelto) {
+    const giaScelto = typeof scelto === 'string' && /^#[0-9a-f]{6}$/i.test(scelto);
+    if (!giaScelto && typeof window.EyeDropper !== 'function') {
+      Popup.toastErrore('err_color_picker_unsupported', { duration: 3000 });
       return;
     }
     try {
-      const ep = new window.EyeDropper();
-      const result = await ep.open();
+      const result = giaScelto ? { sRGBHex: scelto } : await new window.EyeDropper().open();
       const hex = (result?.sRGBHex || '').toUpperCase();
       if (!hex) return;
       try {
         await navigator.clipboard.writeText(hex);
       } catch (_) {
-        // Fallback: textarea + execCommand se la clipboard API è bloccata.
         const ta = document.createElement('textarea');
         ta.value = hex;
         ta.style.position = 'fixed'; ta.style.left = '-9999px';
@@ -1808,26 +1803,23 @@
       }
       Popup.showToast(I18n.t('toast_color_copied') + hex, { duration: 2500 });
     } catch (_) {
-      // L'utente ha annullato (Esc) — nessun toast.
     }
   }
 
-  // Genera e mostra il QR code della pagina corrente in un overlay. La codifica
-  // è 100% locale (src/shared/qr.js): l'URL non viene mai inviato a servizi
-  // esterni. Il QR è sempre nero su bianco (a prescindere dal tema) per
-  // garantire il contrasto richiesto dagli scanner.
+  // La codifica del QR è locale (src/shared/qr.js): l'URL non va mai a servizi esterni.
+  // Resta nero su bianco a prescindere dal tema: il contrasto che gli scanner pretendono.
   function showPageQrCode() {
     const QR = global.SN_QR;
     const url = String(location.href || '');
     if (!QR || typeof QR.toMatrix !== 'function') {
-      Popup.showToast(I18n.t('qr_error'), { duration: 3000 });
+      Popup.toastErrore('qr_error', { duration: 3000 });
       return;
     }
     let matrix;
     try {
       matrix = QR.toMatrix(url, { ecc: 'M' });
     } catch (e) {
-      Popup.showToast(I18n.t('qr_error'), { duration: 3500 });
+      Popup.toastErrore('qr_error', { duration: 3500 });
       return;
     }
 
@@ -1837,7 +1829,6 @@
     const cell = 8;             // px per modulo nel PNG/SVG sorgente
     const dim = total * cell;
 
-    // Costruisce l'SVG del QR (nero su bianco) con quiet zone.
     const rects = [];
     for (let r = 0; r < n; r++) {
       for (let c = 0; c < n; c++) {
@@ -1855,13 +1846,8 @@
       `</svg>`;
     const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 
-    // --- Overlay ---
-    // L'overlay è figlio di documentElement, che porta data-sn-theme + le
-    // variabili della palette Filo (theme.css è iniettato anche sulle pagine
-    // esterne). Usiamo quindi le stesse variabili del resto della UI (sfondo,
-    // bordo, accento) con dei fallback hard-coded per i rari casi in cui il
-    // tema non fosse ancora applicato. Il QR in sé resta nero su bianco (vedi
-    // sotto): è l'unica parte che NON segue il tema, per restare scansionabile.
+    // documentElement porta data-sn-theme e le variabili della palette anche sulle pagine
+    // esterne: si usano quelle, col fallback se il tema non è ancora applicato.
     const overlay = document.createElement('div');
     overlay.className = 'sn-qr-overlay';
     global.SN_FILO_UI?.mark(overlay);
@@ -1890,9 +1876,8 @@
     subtitle.textContent = I18n.t('qr_subtitle');
     subtitle.style.cssText = 'font-size:12px;color:var(--sn-muted,#6e6b63);margin-bottom:14px;';
 
-    // Tile bianca attorno al QR: in tema scuro lo stacca dallo sfondo e — cosa
-    // più importante — garantisce la quiet zone bianca che gli scanner si
-    // aspettano, a prescindere dal colore della card.
+    // Tile bianca: stacca il QR dal tema scuro e garantisce la quiet zone che gli scanner
+    // pretendono, qualunque sia il colore della card.
     const qrTile = document.createElement('div');
     qrTile.style.cssText = 'background:#fff;border-radius:10px;padding:10px;display:inline-block;margin:0 auto;box-shadow:0 1px 4px rgba(0,0,0,.12);';
 
@@ -1923,8 +1908,6 @@
         base.push('border:1px solid var(--sn-border,#e0dcd4)', 'background:transparent', 'color:var(--sn-fg,#1a1918)');
       }
       b.style.cssText = base.join(';');
-      // Hover coerente con il resto della UI Filo (l'accento sul bordo dei
-      // secondari, leggero scurimento sui primari).
       b.addEventListener('mouseenter', () => {
         if (primary) b.style.filter = 'brightness(1.08)';
         else b.style.borderColor = 'var(--sn-accent,#c45a3b)';
@@ -1974,8 +1957,6 @@
     document.documentElement.appendChild(overlay);
   }
 
-  // Converte la matrice QR in un PNG e lo scarica. Usa un canvas off-DOM:
-  // disegna i moduli neri su sfondo bianco con quiet zone.
   function downloadQrPng(matrix, quiet, url) {
     try {
       const n = matrix.length;
@@ -2014,7 +1995,7 @@
         finish(canvas.toDataURL('image/png'));
       }
     } catch (e) {
-      Popup.showToast(I18n.t('qr_error'), { duration: 2500 });
+      Popup.toastErrore('qr_error', { duration: 2500 });
     }
   }
 
@@ -2022,7 +2003,6 @@
 
   global.SN_ACTIONS = {
     init,
-    // clipboard
     copyToClipboard,
     copyUrlToClipboard,
     isAddress,
@@ -2038,7 +2018,6 @@
     pushClipboardEntry,
     requestImageDescription,
     descriptionToFilename,
-    // spiega / traduci
     triggerExplainOrTranslate,
     triggerExplainDeep,
     schedulePrefetchExplain,
@@ -2047,6 +2026,8 @@
     leggiOrigine,
     scaricaImmagine,
     buildInlineExplainLink,
+    SELETTORE_COLLEGAMENTO,
+    indirizzoDelLink,
     // salva / condividi / cerca / immagini
     buildSavePayload,
     savePage,
@@ -2076,11 +2057,9 @@
     toggleMediaControls,
     toggleMediaPip,
     setMediaSpeed,
-    // screenshot / OCR
     takeScreenshot,
     takePartialScreenshot,
     transcribeRegion,
-    // color picker + QR
     pickColor,
     showPageQrCode,
   };

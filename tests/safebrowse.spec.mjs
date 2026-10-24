@@ -17,6 +17,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createRequire } from 'node:module';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { vistaAvviso, copertura, scriviDallaTastiera, COPERTA } from './helpers/avvisoSito.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -136,57 +137,6 @@ test('chiave GSB condivisa: quando è impostata raggiunge il motore per TUTTI (s
   expect(active.on).toBe(true);
 });
 
-// L'avviso sta in una vista sopra la scheda (#813.5), non nella pagina: qui la si trova, si guarda cosa copre e si
-// scrive come scrive la tastiera vera, nel webContents che ha il fuoco.
-async function vistaAvviso(app, ms = 8000) {
-  const fine = Date.now() + ms;
-  while (Date.now() < fine) {
-    const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/avviso-sito.html'); } catch (_) { return false; } });
-    if (p) return p;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('la vista dell\'avviso non è nata');
-}
-
-function copertura(app) {
-  return app.evaluate(({ BrowserWindow, webContents }) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      const tm = w._filoTabs;
-      if (!tm) continue;
-      const tab = tm.tabs.find((t) => t.id === tm.activeId);
-      const v = tm.avvisoSito.vista;
-      const figli = w.contentView.children;
-      const vb = v ? v.getBounds() : null;
-      const tb = tab.view.getBounds();
-      const col = webContents.getFocusedWebContents();
-      let tastiera = 'altro';
-      if (v && col === v.webContents) tastiera = 'avviso';
-      else if (col === tab.view.webContents) tastiera = 'pagina';
-      return {
-        coperta: tm.avvisoSito.coperta() === tab,
-        sopra: !!v && figli.indexOf(v) > figli.indexOf(tab.view),
-        stessiBordi: !!vb && vb.x === tb.x && vb.y === tb.y && vb.width === tb.width && vb.height === tb.height && tb.width > 0,
-        tastiera,
-      };
-    }
-    return null;
-  });
-}
-
-async function scriviDallaTastiera(app, testo) {
-  await app.evaluate(({ webContents }, t) => {
-    const wc = webContents.getFocusedWebContents();
-    if (!wc) throw new Error('nessun webContents ha la tastiera');
-    for (const ch of t) {
-      const tasto = ch === '\r' ? 'Return' : ch;
-      wc.sendInputEvent({ type: 'keyDown', keyCode: tasto });
-      wc.sendInputEvent({ type: 'char', keyCode: ch });
-      wc.sendInputEvent({ type: 'keyUp', keyCode: tasto });
-    }
-  }, testo);
-}
-
-const COPERTA = { coperta: true, sopra: true, stessiBordi: true, tastiera: 'avviso' };
 const SEGNALATO = 'Sito segnalato come pericoloso';
 
 test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo" → Procedi', async ({ app, shell }) => {

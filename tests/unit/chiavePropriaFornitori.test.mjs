@@ -44,6 +44,11 @@ beforeEach(() => {
   };
   globalThis.fetch = async (url, init = {}) => {
     const key = String((init.headers && init.headers.Authorization) || '').replace('Bearer ', '');
+    // Il catalogo a ritenzione zero (#831): qui ogni host elencato la dichiara, la prova è sulla lista di esclusione.
+    if (String(url) === P.ZDR_ENDPOINT) {
+      const data = Object.entries(hostsOf).flatMap(([id, names]) => names.map((n) => ({ model_id: id, provider_name: n, tag: n.toLowerCase() })));
+      return new Response(JSON.stringify({ data }), { status: 200 });
+    }
     if (String(url).endsWith('/endpoints')) {
       const id = String(url).replace(`${P.MODELS_ENDPOINT}/`, '').replace('/endpoints', '');
       const endpoints = (hostsOf[id] || []).map((n) => ({ provider_name: n, tag: n.toLowerCase() }));
@@ -87,18 +92,18 @@ test('routing: `ownKeyIgnore` accanto alla lista intera, solo quando c’è', ()
 });
 
 test('chiave propria e interruttore acceso: niente provider.ignore; spento: la lista c’è', async () => {
-  await P.complete({ apiKey: OWN, model: 'google/gemini-x', messages: [], providerRouting: C.providerRoutingFor(effettive({ toggle: true })) });
+  await P.complete({ apiKey: OWN, model: 'google/gemma-x', messages: [], providerRouting: C.providerRoutingFor(effettive({ toggle: true })) });
   assert.equal(ignoreOf(calls[0]), null, JSON.stringify(calls[0].body));
   calls = [];
-  await P.complete({ apiKey: OWN, model: 'google/gemini-x', messages: [], providerRouting: C.providerRoutingFor(effettive({ toggle: false })) });
+  await P.complete({ apiKey: OWN, model: 'google/gemma-x', messages: [], providerRouting: C.providerRoutingFor(effettive({ toggle: false })) });
   assert.deepEqual(ignoreOf(calls[0]), BASE);
 });
 
 test('crediti di Filo con l’interruttore acceso: la lista c’è sempre', async () => {
   const routing = C.providerRoutingFor(effettive({ toggle: true }));
-  await P.complete({ apiKey: PERSONAL, model: 'google/gemini-x', messages: [], providerRouting: routing });
-  await P.streamComplete({ apiKey: PERSONAL, model: 'google/gemini-x', messages: [], providerRouting: routing });
-  await P.embed({ apiKey: PERSONAL, model: 'x/emb', texts: ['a'], providerRouting: routing });
+  await P.complete({ apiKey: PERSONAL, model: 'google/gemma-x', messages: [], providerRouting: routing });
+  await P.streamComplete({ apiKey: PERSONAL, model: 'google/gemma-x', messages: [], providerRouting: routing });
+  await P.embed({ apiKey: PERSONAL, model: 'qwen/qwen-emb', texts: ['a'], providerRouting: routing });
   assert.equal(calls.length, 3);
   for (const c of calls) assert.deepEqual(ignoreOf(c), BASE, c.url);
 });
@@ -106,11 +111,11 @@ test('crediti di Filo con l’interruttore acceso: la lista c’è sempre', asyn
 test('chiave propria rifiutata: il ripiego sui crediti riparte con la lista (chat, streaming, vettori)', async () => {
   const routing = C.providerRoutingFor(effettive({ toggle: true }));
   statusFor = { [OWN]: 401 };
-  const r = await P.complete({ apiKey: OWN, model: 'm/x', messages: [], providerRouting: routing });
+  const r = await P.complete({ apiKey: OWN, model: 'qwen/qwen-x', messages: [], providerRouting: routing });
   assert.equal(r.usage.keySource, 'personal');
-  const s = await P.streamComplete({ apiKey: OWN, model: 'm/x', messages: [], providerRouting: routing, onDelta: () => {} });
+  const s = await P.streamComplete({ apiKey: OWN, model: 'qwen/qwen-x', messages: [], providerRouting: routing, onDelta: () => {} });
   assert.equal(s.usage.keySource, 'personal');
-  const e = await P.embed({ apiKey: OWN, model: 'm/x', texts: ['a'], providerRouting: routing });
+  const e = await P.embed({ apiKey: OWN, model: 'qwen/qwen-x', texts: ['a'], providerRouting: routing });
   assert.equal(e.usage.keySource, 'personal');
   assert.deepEqual(calls.map((c) => c.key), [OWN, PERSONAL, OWN, PERSONAL, OWN, PERSONAL]);
   for (const c of calls) {
@@ -131,7 +136,7 @@ test('con gli strumenti e il ragionamento rifiutato il secondo invio dopo il rip
     return vero(url, init);
   };
   const tools = [{ type: 'function', function: { name: 't', parameters: { type: 'object' } } }];
-  await P.complete({ apiKey: OWN, model: 'm/y', messages: [], tools, reasoning: 'low', providerRouting: routing });
+  await P.complete({ apiKey: OWN, model: 'qwen/qwen-y', messages: [], tools, reasoning: 'low', providerRouting: routing });
   assert.equal(calls.length, 3);
   assert.equal(ignoreOf(calls[0]), null);
   assert.deepEqual(ignoreOf(calls[1]), BASE);
@@ -141,24 +146,24 @@ test('con gli strumenti e il ragionamento rifiutato il secondo invio dopo il rip
 });
 
 test('dettatura: con la chiave propria parte anche se la servono solo esclusi; coi crediti no', async () => {
-  hostsOf['google/gemini-audio'] = ['Google Vertex'];
+  hostsOf['google/gemma-audio'] = ['Google Vertex'];
   const routing = C.providerRoutingFor(effettive({ toggle: true }));
-  const t = await P.transcribe({ apiKey: OWN, model: 'google/gemini-audio', audioBase64: 'AA==', providerRouting: routing });
+  const t = await P.transcribe({ apiKey: OWN, model: 'google/gemma-audio', audioBase64: 'AA==', providerRouting: routing });
   assert.equal(t.text, 'ciao');
   assert.equal(ignoreOf(calls[0]), null);
   await assert.rejects(
-    P.transcribe({ apiKey: PERSONAL, model: 'google/gemini-audio', audioBase64: 'AA==', providerRouting: routing }),
+    P.transcribe({ apiKey: PERSONAL, model: 'google/gemma-audio', audioBase64: 'AA==', providerRouting: routing }),
     (e) => e.code === 'NO_ALLOWED_HOST',
   );
   assert.equal(calls.length, 1, 'coi crediti la dettatura non parte');
 });
 
 test('dettatura con la chiave propria rifiutata: se i crediti non ammettono chi la serve, niente ripiego', async () => {
-  hostsOf['google/gemini-audio'] = ['Google Vertex'];
+  hostsOf['google/gemma-audio'] = ['Google Vertex'];
   const routing = C.providerRoutingFor(effettive({ toggle: true }));
   statusFor = { [OWN]: 401 };
   await assert.rejects(
-    P.transcribe({ apiKey: OWN, model: 'google/gemini-audio', audioBase64: 'AA==', providerRouting: routing }),
+    P.transcribe({ apiKey: OWN, model: 'google/gemma-audio', audioBase64: 'AA==', providerRouting: routing }),
     (e) => e.status === 401 && e.keySource === 'own' && !e.keyFallback,
   );
   assert.deepEqual(calls.map((c) => c.key), [OWN], 'la personale non parte');
@@ -166,8 +171,8 @@ test('dettatura con la chiave propria rifiutata: se i crediti non ammettono chi 
   assert.equal(refusals[0].served, false);
   // Un modello che i crediti ammettono ripiega come sempre, con la lista.
   calls = []; refusals = [];
-  hostsOf['m/stt'] = ['Groq'];
-  const t = await P.transcribe({ apiKey: OWN, model: 'm/stt', audioBase64: 'AA==', providerRouting: routing });
+  hostsOf['qwen/qwen-stt'] = ['Groq'];
+  const t = await P.transcribe({ apiKey: OWN, model: 'qwen/qwen-stt', audioBase64: 'AA==', providerRouting: routing });
   assert.equal(t.usage.keySource, 'personal');
   assert.deepEqual(calls.map((c) => c.key), [OWN, PERSONAL]);
   assert.deepEqual(ignoreOf(calls[1]), BASE);
@@ -175,9 +180,9 @@ test('dettatura con la chiave propria rifiutata: se i crediti non ammettono chi 
 
 test('chi ha servito: con la chiave propria a interruttore acceso non è una violazione; coi crediti sì', () => {
   const on = effettive({ toggle: true });
-  assert.equal(C.servedViolationOf(on, { servedBy: 'Google Vertex', model: 'google/gemini-x', usage: { keySource: 'own' } }), '');
-  assert.equal(C.servedViolationOf(on, { servedBy: 'Google Vertex', model: 'google/gemini-x', keySource: 'own' }), '', 'voce: keySource in cima');
-  assert.equal(C.servedViolationOf(on, { servedBy: 'Google Vertex', model: 'google/gemini-x', usage: { keySource: 'personal' } }), 'excluded', 'dopo il ripiego');
+  assert.equal(C.servedViolationOf(on, { servedBy: 'Google Vertex', model: 'google/gemma-x', usage: { keySource: 'own' } }), '');
+  assert.equal(C.servedViolationOf(on, { servedBy: 'Google Vertex', model: 'google/gemma-x', keySource: 'own' }), '', 'voce: keySource in cima');
+  assert.equal(C.servedViolationOf(on, { servedBy: 'Google Vertex', model: 'google/gemma-x', usage: { keySource: 'personal' } }), 'excluded', 'dopo il ripiego');
   assert.equal(C.servedViolationOf(effettive({ toggle: false }), { servedBy: 'Google', model: 'g', usage: { keySource: 'own' } }), 'excluded', 'spento');
   // «Solo pesi aperti» vale comunque: Anthropic resta fuori anche con la chiave propria.
   const ow = effettive({ toggle: true, openWeightsOnly: true });

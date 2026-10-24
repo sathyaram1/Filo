@@ -38,24 +38,28 @@ const pulisci = (app) => app.evaluate(async ({ BrowserWindow }) => {
   return win._filoTabs.runAutoTriage({ trigger: 'manual' });
 });
 
+// Il testo arriva in streaming prima che l'azione sia fatta: la fine del turno la dice l'invio che torna al posto del
+// quadrato.
+const turnoFinito = (chat) => expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 15_000 });
+
 const urlAperte = (shell) => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.url));
 
 test('«tienimi sempre aperta example.org»: la chat salva la regola, la pulizia archivia le altre e lei resta', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
+  // Una regola salvata chiude il turno (#1130): la frase va scritta insieme, e l'esito resta nel diario.
   await modelloFinto(app, [
-    { toolCalls: [{ id: 't1', name: 'TIENI_APERTA', arguments: JSON.stringify({ dominio: 'example.org' }) }] },
-    { text: 'Fatto: example.org resta sempre aperto.' },
+    { text: 'Fatto: example.org resta sempre aperto.', toolCalls: [{ id: 't1', name: 'TIENI_APERTA', arguments: JSON.stringify({ dominio: 'example.org' }) }] },
   ]);
   await puliziaCheArchiviaTutto(app);
   const chat = await home(app);
   await chiedi(chat, 'tienimi sempre aperta example.org');
   await expect(chat.locator('.dash-bubble-filo')).toContainText('example.org resta sempre aperto', { timeout: 15_000 });
+  await turnoFinito(chat);
   await chat.locator('.dash-activity-head').click();
   await expect(chat.locator('.dash-activity-row', { hasText: 'Sempre aperto · example.org' })).toHaveCount(1);
   await chat.screenshot({ path: 'tests/.shots/sempre-aperte-chat.png' });
   expect(Object.keys(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listKeepOpen()))).toEqual(['example.org']);
-  const esito = (await chiamateAlModello(app))[1].find((m) => m.role === 'tool' && m.tool_call_id === 't1');
-  expect(esito.content).toContain('non archivia example.org');
+  expect(await chiamateAlModello(app)).toHaveLength(1);
   await ripristina(app);
 
   const tenuta = testServer.html(pagina('Tenuta')).replace('127.0.0.1', 'example.org');
@@ -102,14 +106,12 @@ test('«tienimi sempre aperta questa scheda» davanti a un sito locale (localhos
   test.setTimeout(90_000);
   await openTab(testServer.html(pagina('Locale')).replace('127.0.0.1', 'localhost'));
   await expect.poll(async () => (await urlAperte(shell)).some((u) => u.startsWith('http://localhost:'))).toBe(true);
-  await modelloFinto(app, [
-    { toolCalls: [{ id: 'l1', name: 'TIENI_APERTA', arguments: JSON.stringify({}) }] },
-    { text: 'Fatto.' },
-  ]);
+  await modelloFinto(app, [{ text: 'Fatto.', toolCalls: [{ id: 'l1', name: 'TIENI_APERTA', arguments: JSON.stringify({}) }] }]);
   await puliziaCheArchiviaTutto(app);
   const chat = await home(app);
   await chiedi(chat, 'tienimi sempre aperta questa scheda');
   await expect(chat.locator('.dash-bubble-filo')).toContainText('Fatto.', { timeout: 15_000 });
+  await turnoFinito(chat);
   await ripristina(app);
   expect(Object.keys(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listKeepOpen()))).toEqual(['localhost']);
 
@@ -121,16 +123,16 @@ test('«tienimi sempre aperta questa scheda» davanti a un sito locale (localhos
   expect(dopo.some((u) => u.startsWith('http://sito-pubblico.test:'))).toBe(false);
 });
 
-test('le regole si vedono nella memoria delle Preferenze, la × le toglie, e «non tenerla più aperta» pure',async ({ app, openTab }) => {
+test('le regole si vedono nel quaderno delle memorie, la × le toglie, e «non tenerla più aperta» pure',async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await app.evaluate(async () => {
     await globalThis.SN_FILO_MEMORY.addKeepOpen('example.org');
     await globalThis.SN_FILO_MEMORY.addKeepOpen('web.whatsapp.com');
   });
-  const pref = await openTab('filo://preferences/preferences.html');
-  const gruppo = pref.locator('#memoria .mem-gruppo', { hasText: 'Siti sempre aperti' });
+  const pref = await openTab('filo://quaderno/quaderno.html');
+  const gruppo = pref.locator('.qd-gruppo', { hasText: 'Siti sempre aperti' });
   await expect(gruppo).toHaveCount(1, { timeout: 10_000 });
-  const riga = (host) => pref.locator('#memoria .mem-riga', { hasText: host });
+  const riga = (host) => pref.locator('.qd-riga', { hasText: host });
   await expect(riga('example.org')).toHaveCount(1);
   await expect(riga('web.whatsapp.com')).toHaveCount(1);
   await riga('example.org').scrollIntoViewIfNeeded();
@@ -145,24 +147,23 @@ test('le regole si vedono nella memoria delle Preferenze, la × le toglie, e «n
     await pref.screenshot({ path: `tests/.shots/sempre-aperte-preferenze-${tema}.png` });
   }
 
-  await riga('example.org').locator('.mem-via').click();
+  await riga('example.org').hover();
+  await riga('example.org').locator('.qd-tasto[title="Non tenerlo più aperto"]').click();
   await expect(riga('example.org')).toHaveCount(0);
-  await expect(pref.locator('#memoriaHint')).toHaveText('Dimenticato');
+  await expect(pref.locator('#esito')).toHaveText('example.org non resta più aperto');
   expect(Object.keys(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listKeepOpen()))).toEqual(['web.whatsapp.com']);
 
   // Detto in chat: «non tenere più aperto WhatsApp» col dominio largo toglie la regola più precisa salvata.
-  await modelloFinto(app, [
-    { toolCalls: [{ id: 'n1', name: 'NON_TENERE_APERTA', arguments: JSON.stringify({ dominio: 'whatsapp.com' }) }] },
-    { text: 'Fatto.' },
-  ]);
+  await modelloFinto(app, [{ text: 'Fatto.', toolCalls: [{ id: 'n1', name: 'NON_TENERE_APERTA', arguments: JSON.stringify({ dominio: 'whatsapp.com' }) }] }]);
   const chat = await home(app);
   await chiedi(chat, 'non tenere più aperto whatsapp');
   await expect(chat.locator('.dash-bubble-filo')).toContainText('Fatto.', { timeout: 15_000 });
+  await turnoFinito(chat);
   await chat.locator('.dash-activity-head').click();
   await expect(chat.locator('.dash-activity-row', { hasText: 'Non più tenuto aperto · web.whatsapp.com' })).toHaveCount(1);
   await ripristina(app);
   expect(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listKeepOpen())).toEqual({});
-  // Le Preferenze aperte si aggiornano da sole: niente gruppo, e nessuna riga rimasta indietro.
+  // Il quaderno aperto si aggiorna da solo: niente gruppo, e nessuna riga rimasta indietro.
   await expect(gruppo).toHaveCount(0);
 });
 

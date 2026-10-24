@@ -43,10 +43,11 @@ test('si registra su globalThis con la sua API', () => {
 
 test("l'elenco copre le cose da scoprire E quelle da dire", () => {
   const ids = O.ITEMS.map((i) => i.id);
-  for (const id of ['profilo', 'stile', 'autonomia', 'estetica', 'privacy', 'modelli', 'crediti']) {
+  for (const id of ['profilo', 'stile', 'autonomia', 'estetica', 'privacy', 'contatori', 'modelli', 'crediti']) {
     assert.ok(ids.includes(id), `manca la voce "${id}"`);
   }
-  assert.deepEqual(O.ITEMS.filter((i) => i.kind === 'scoprire').map((i) => i.id), ['profilo', 'stile', 'autonomia']);
+  // I contatori anonimi sono una scelta da fare, non una cosa da dire (#1461).
+  assert.deepEqual(O.ITEMS.filter((i) => i.kind === 'scoprire').map((i) => i.id), ['profilo', 'stile', 'autonomia', 'contatori']);
   assert.equal(new Set(ids).size, ids.length, 'id duplicati');
   for (const i of O.ITEMS) {
     assert.ok(i.label && i.detail, `voce ${i.id} senza etichetta o dettaglio`);
@@ -481,4 +482,124 @@ test('con la scelta dell’autonomia a schermo l’intervista non si chiude da s
   for (let i = 0; i < O.HARD_MAX_EXCHANGES; i++) lunga = O.mostraSceltaAutonomia(O.appendTurn(lunga, { role: 'user', text: `m${i}` }));
   assert.equal(O.shouldForceClose(lunga), true);
   assert.equal(O.autonomiaInSospeso(O.restart(mostrata)), false, 'rifarla riparte senza scelte in sospeso');
+});
+
+// #1297 — «Riprendiamola» riprende dalla domanda in sospeso, non dalla prima.
+function chiusaAMeta({ conParola = true } = {}) {
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.appendTurn(s, { role: 'user', text: 'sono Anna, insegno lettere alle medie; scrivimi breve' });
+  s = O.tick(s, ['profilo', 'stile']).state;
+  s = O.appendTurn(s, { role: 'filo', text: 'Quanto vuoi che faccia da solo?' });
+  if (conParola) s = O.appendTurn(s, { role: 'user', text: 'basta così' });
+  return O.close(O.appendTurn(s, { role: 'filo', text: O.CLOSING_MESSAGE, congedo: true }));
+}
+
+test('riprendi(): l’intervista chiusa dall’app riparte dalla domanda in sospeso, con le spunte di prima (#1297)', () => {
+  for (const conParola of [true, false]) {
+    const chiusa = chiusaAMeta({ conParola });
+    assert.equal(chiusa.notice, 'early');
+    const r = O.riprendi(chiusa);
+    assert.equal(r.done, false);
+    assert.equal(r.notice, '');
+    assert.equal(r.closedAt, null);
+    assert.equal(r.startedAt, chiusa.startedAt, 'stessa intervista, stessa targa');
+    assert.deepEqual(r.ticked, ['profilo', 'stile']);
+    const ultimo = r.thread[r.thread.length - 1];
+    assert.equal(ultimo.role, 'filo');
+    assert.equal(ultimo.text, 'Quanto vuoi che faccia da solo?');
+    assert.ok(!r.thread.some((m) => m.text === O.CLOSING_MESSAGE || m.text === 'basta così'));
+    assert.equal(O.hasPendingTurn(r), false, 'niente da chiedere al modello: la domanda è già lì');
+  }
+});
+
+test('riprendi(): chiusa dal modello, il clic diventa la risposta e il turno riparte (#1297)', () => {
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.appendTurn(s, { role: 'user', text: 'sono Anna' });
+  s = O.close(O.appendTurn(O.tick(s, 'profilo').state, { role: 'filo', text: 'Va bene, ci fermiamo qui. A presto!' }));
+  const r = O.riprendi(s);
+  assert.equal(r.thread[r.thread.length - 1].text, O.RESUME_REPLY);
+  assert.equal(r.thread[r.thread.length - 2].text, 'Va bene, ci fermiamo qui. A presto!', 'il congedo del modello resta');
+  assert.equal(O.hasPendingTurn(r), true);
+});
+
+test('riprendi(): il tetto degli scambi riparte dalla ripresa, e su un’intervista aperta non cambia niente (#1297)', () => {
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  for (let i = 0; i < O.HARD_MAX_EXCHANGES; i++) {
+    s = O.appendTurn(s, { role: 'user', text: `risposta ${i}` });
+    s = O.appendTurn(s, { role: 'filo', text: `domanda ${i}` });
+  }
+  assert.equal(O.shouldForceClose(s), true);
+  const r = O.riprendi(O.close(s));
+  assert.equal(O.userTurns(r), 1, 'il clic su «Riprendiamola»');
+  assert.equal(O.shouldForceClose(r), false);
+  assert.equal(O.userTurns(O.normalize(JSON.parse(JSON.stringify(r)))), 1, 'il conto sopravvive al salvataggio');
+  const aperta = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  assert.deepEqual(O.riprendi(aperta), O.normalize(aperta));
+});
+
+test('togliConversazione(): la × toglie solo quella scelta, mai quella in corso (#1297)', () => {
+  let s = chiusaAMeta();
+  s = O.appendTurn(O.restart(s), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.close(O.appendTurn(s, { role: 'user', text: 'sono Bruno' }));
+  s = O.appendTurn(O.restart(s), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.appendTurn(s, { role: 'user', text: 'sono Carla' });
+  const lista = O.conversations(s);
+  assert.equal(lista.length, 3);
+  const inCorso = O.togliConversazione(s, O.chiaveConversazione(lista[0]));
+  assert.equal(inCorso.tolta, false, 'quella aperta non si toglie da Preferenze');
+  const { state, tolta } = O.togliConversazione(s, O.chiaveConversazione(lista[2]));
+  assert.equal(tolta, true);
+  const testi = O.conversations(state).flatMap((c) => c.thread.map((m) => m.text));
+  assert.ok(!testi.some((t) => t.includes('Anna')));
+  assert.ok(testi.some((t) => t.includes('Bruno')) && testi.some((t) => t.includes('Carla')));
+  const chiusa = O.close(state);
+  const via = O.togliConversazione(chiusa, O.chiaveConversazione(O.conversations(chiusa)[0]));
+  assert.equal(via.tolta, true);
+  assert.equal(via.state.thread.length, 0);
+  assert.equal(via.state.notice, '', 'senza conversazione la riga «chiusa a metà» non ha più niente da riprendere');
+  assert.equal(via.state.done, true);
+});
+
+test('dimentica(): via ogni intervista conservata, resta solo il segno «già accolto» (#1297)', () => {
+  let s = chiusaAMeta();
+  s = O.close(O.appendTurn(O.appendTurn(O.restart(s), { role: 'filo', text: O.WELCOME_MESSAGE }), { role: 'user', text: 'sono Bruno' }));
+  const d = O.dimentica(s);
+  assert.equal(d.done, true);
+  assert.equal(O.conversations(d).length, 0);
+  assert.equal(d.notice, '');
+  assert.equal(O.dimentica(O.emptyState()).done, false);
+});
+
+// Rossa senza il fix: l'intervista rifatta prendeva ogni home che si apriva, anche ricaricata o chiesta per una chat.
+test('rifatta o ripresa, l’intervista porta il segno che la lega alle pagine che l’hanno chiesta; il primo avvio no (#1297)', () => {
+  assert.equal(O.emptyState().rifatta, undefined, 'il primo benvenuto prende ogni home');
+  const rifatta = O.restart(chiusaAMeta());
+  assert.equal(rifatta.rifatta, true);
+  assert.equal(O.normalize(O.appendTurn(rifatta, { role: 'user', text: 'sono Anna' })).rifatta, true, 'resta a ogni turno');
+  assert.equal(O.close(rifatta).rifatta, true);
+  assert.equal(O.riprendi(chiusaAMeta()).rifatta, true, 'ripresa dopo il primo avvio: anche lei');
+  assert.equal(O.dimentica(rifatta).rifatta, true, 'dimenticata a metà resta della sua pagina');
+  assert.equal(O.normalize({ rifatta: 'si' }).rifatta, undefined);
+});
+
+test('#1592 — l’intervista di benvenuto non lega l’accesso Google al voto né nomina la Bacheca', () => {
+  // La Bacheca è in pausa per chi non è owner: l'intervista non può promettere una cosa che il nuovo utente non vede.
+  for (const i of O.ITEMS) {
+    const testo = `${i.label} ${i.detail || ''} ${i.applica || ''}`;
+    assert.doesNotMatch(testo, /\bvot|bacheca|ancora rotto/i, `la voce «${i.id}» nomina il voto o la Bacheca`);
+  }
+  assert.match(O.ITEMS.find((i) => i.id === 'crediti').detail, /L’accesso Google serve per dare inviti ad altri/);
+});
+
+// #1461 — chi risponde a parole alla domanda sui contatori deve ottenere quello che ha detto: l'istruzione nomina lo
+// strumento e la chiave della chat che li accendono e li spengono davvero, e non dice al modello che non può farlo.
+test('la voce dei contatori dice come applicare una risposta data a parole, con una chiave che esiste', () => {
+  for (const m of ['tabColor', 'constants', 'contenutoEsterno', 'preferences']) require(join(ROOT, 'src', 'shared', `${m}.js`));
+  const voce = O.ITEMS.find((i) => i.id === 'contatori');
+  assert.match(voce.applica, /a parole/);
+  assert.doesNotMatch(voce.applica, /non hai un.azione/i);
+  const m = /IMPOSTA_PREFERENZA, chiave "([^"]+)"/.exec(voce.applica);
+  assert.ok(m, 'l’istruzione nomina IMPOSTA_PREFERENZA e la sua chiave');
+  assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial(m[1], false).partial, { contatori: { attivi: false } });
+  assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial(m[1], true).partial, { contatori: { attivi: true } });
 });

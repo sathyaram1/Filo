@@ -1,7 +1,6 @@
-// Bootstrap comune per le pagine interne di Filo (dashboard/options/history/…).
-// Imposta tema e dimensione del testo su <html> prima del rendering per evitare
-// flash. La dimensione testo è un moltiplicatore di zoom salvato nelle
-// impostazioni (vedi pagina Preferenze).
+// Bootstrap comune delle pagine interne di Filo: tema e dimensione del testo su <html>
+// PRIMA del rendering, per evitare il flash. La dimensione è un moltiplicatore di zoom
+// salvato nelle impostazioni (pagina Preferenze).
 
 (function () {
   'use strict';
@@ -14,24 +13,19 @@
     document.documentElement.dataset.snTheme = resolved;
   }
 
-  // Scala la UI di Filo. Usiamo `zoom` (Chromium) perché ridimensiona testo e
-  // layout in modo uniforme indipendentemente dal fatto che i font siano in
-  // px o rem. `scale` è un moltiplicatore (1 = 100%), clampato a un range sano.
+  // `zoom` di Chromium e non `scale`: ridimensiona testo e layout in modo uniforme che i font
+  // siano in px o in rem. Il moltiplicatore è clampato a un range sano.
   function applyTextScale(scale) {
     const n = Number(scale);
     const clamped = Number.isFinite(n) ? Math.min(2, Math.max(0.8, n)) : 1;
     document.documentElement.style.zoom = clamped === 1 ? '' : String(clamped);
-    // Esponiamo il fattore di zoom come variabile CSS così le pagine che
-    // riempiono la viewport (es. la home/newtab) possono compensare le altezze
-    // basate su `vh`: senza, `zoom > 1` magnifica un layout `100vh` oltre la
-    // viewport e fa comparire uno scrollbar che sposta gli elementi
-    // (feedback alpha). Vedi `calc(100vh / var(--sn-zoom))` in dashboard.css.
+    // Il fattore esce anche come variabile CSS: con `zoom > 1` un layout `100vh` sfora e fa
+    // comparire una barra che sposta gli elementi (`calc(100vh / var(--sn-zoom))`).
     document.documentElement.style.setProperty('--sn-zoom', String(clamped));
   }
 
-  // Override dei token estetici (#146.1): inietta/aggiorna lo <style> con le
-  // variabili sovrascritte dall'utente. Il registro (themeTokens.js) è caricato
-  // via <script> prima di questo file; guardia se una pagina non lo include.
+  // Override dei token estetici (#146.1). Il registro (themeTokens.js) è caricato prima di
+  // questo file: guardia se una pagina non lo include.
   function applyThemeTokens(tokens) {
     const reg = window.SN_THEME_TOKENS;
     if (reg) reg.applyToDocument(document, tokens || {});
@@ -43,8 +37,7 @@
   // Tema/scala iniziali "best effort" prima che le impostazioni siano caricate.
   applyTheme('system');
 
-  // Carica le impostazioni reali appena possibile (lo shim chrome.storage è già
-  // disponibile via preload) e applica tema + dimensione testo.
+  // Le impostazioni reali appena possibile (lo shim chrome.storage arriva dal preload).
   (async function loadAndApply() {
     try {
       const r = await chrome.storage.local.get('settings');
@@ -56,7 +49,6 @@
     } catch (_) {}
   })();
 
-  // Aggiorna su preferenza sistema cambiata
   if (window.matchMedia) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     mq.addEventListener?.('change', () => {
@@ -65,12 +57,8 @@
     });
   }
 
-  // Riapplica live se le impostazioni cambiano (es. salvataggio dalla pagina
-  // Preferenze in un altro tab). Il canale affidabile cross-tab è il broadcast
-  // `settings_updated` (vedi handlers.js → broadcastToTabs): `chrome.storage.
-  // onChanged` NON viene propagato fra i WebContentsView, quindi da solo non
-  // aggiornava le tab già aperte (feedback alpha: il cambio dimensione testo
-  // non si applicava alle schede aperte).
+  // Il canale fra schede è il broadcast `settings_updated`: `chrome.storage.onChanged` NON
+  // si propaga fra i WebContentsView, e da solo non aggiornava le tab già aperte.
   function applyFromSettings(s) {
     if (!s) return;
     if (s.theme) { window.SN_PAGE_THEME = s.theme; applyTheme(s.theme); }
@@ -83,8 +71,7 @@
       if (msg && msg.type === 'settings_updated') applyFromSettings(msg.settings);
     });
   } catch (_) {}
-  // Manteniamo anche il listener storage.onChanged per compatibilità con
-  // eventuali futuri bridge che lo propaghino: oggi è un no-op innocuo.
+  // storage.onChanged resta per un eventuale bridge futuro che lo propaghi: oggi è un no-op.
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local' || !changes.settings) return;
@@ -204,8 +191,7 @@
     }
 
     function pick(value) {
-      // Passa dal setter nativo (l'override più sotto risincronizza la UI) e
-      // notifica i listener esistenti del <select>.
+      // Dal setter nativo (l'override più sotto risincronizza la UI), e si notificano i listener.
       select.value = value;
       select.dispatchEvent(new Event('input', { bubbles: true }));
       select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -267,10 +253,8 @@
       }
     });
 
-    // Override del setter `value`/`selectedIndex` di QUESTA istanza così che i
-    // set programmatici fatti dal codice di pagina (es. preferences.js applica
-    // il tema salvato) risincronizzino la UI custom. I cambi via `selectOption`
-    // di Playwright o via UI nativa passano invece dall'evento `change`.
+    // Override di `value`/`selectedIndex` su QUESTA istanza, così i set programmatici
+    // risincronizzano la UI custom; i cambi dalla UI passano invece dall'evento `change`.
     const sproto = Object.getPrototypeOf(select);
     for (const prop of ['value', 'selectedIndex']) {
       const d = Object.getOwnPropertyDescriptor(sproto, prop);
@@ -283,9 +267,8 @@
     }
     select.addEventListener('change', syncFromSelect);
 
-    // Se le <option> cambiano dopo l'enhancement (es. preset popolati a runtime),
-    // ricostruiamo il popup. Debounce su microtask per non rifare il lavoro a
-    // ogni singola <option> aggiunta in loop.
+    // Se le <option> cambiano dopo l'enhancement (preset popolati a runtime) si ricostruisce il
+    // popup. Debounce su microtask per non rifare il lavoro a ogni <option> aggiunta in loop.
     let rebuildQueued = false;
     const mo = new MutationObserver(() => {
       if (rebuildQueued) return;
@@ -293,11 +276,12 @@
       queueMicrotask(() => {
         rebuildQueued = false;
         if (pop.hidden) syncFromSelect(); else buildOptions();
-        // syncFromSelect legge le option correnti per l'etichetta; se il popup è
-        // chiuso non serve ricostruire i div finché non si riapre.
+        // A popup chiuso non serve ricostruire i div finché non si riapre.
       });
     });
-    mo.observe(select, { childList: true });
+    // Anche la scritta di un'opzione cambiata dopo (la scelta di serie che si completa col valore letto): senza, la
+    // tendina chiusa mostrava quella di prima (#1412).
+    mo.observe(select, { childList: true, subtree: true, characterData: true });
 
     buildOptions();
   }
@@ -310,15 +294,13 @@
     list.forEach(enhanceSelect);
   }
 
-  // L'editor ha select speciali (font picker con preservazione della selezione
-  // del documento, config moduli): lo escludiamo per intero. Nelle URL filo://
-  // la pagina è l'hostname (es. filo://editor/editor.html → host "editor").
+  // L'editor ha select speciali (font picker, config moduli): escluso per intero. Nelle URL
+  // filo:// la pagina è l'hostname (filo://editor/editor.html → host «editor»).
   const IS_EDITOR = (location.hostname || '') === 'editor';
 
   if (!IS_EDITOR) {
     const start = () => {
       enhanceSelects(document);
-      // Osserva i <select> aggiunti dinamicamente dopo il primo render.
       const obs = new MutationObserver((records) => {
         for (const rec of records) {
           for (const node of rec.addedNodes) {

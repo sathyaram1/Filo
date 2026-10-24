@@ -14,6 +14,7 @@ const SRC = join(ROOT, 'src');
 // Animazioni che misurano un tempo vero (un'attesa che scade comunque): scalarle mentirebbe.
 const ECCEZIONI = [
   { file: 'src/styles/voce.css', contiene: 'var(--sn-voce-attesa', perche: "l'anello si svuota nel tempo vero per annullare la richiesta a voce" },
+  { file: 'src/pages/dashboard/dashboard.css', contiene: 'var(--dash-pausa-quadrato', perche: 'il quadrato si accende nel tempo vero in cui ignora i clic (#1296)' },
 ];
 
 const DECL = /(?:^|[\s;{])((?:-webkit-)?(?:transition|animation)(?:-duration|-delay)?)\s*:\s*([^;{}]*)/g;

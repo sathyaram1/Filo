@@ -35,6 +35,22 @@ ha funzionato e cosa fare**.
   può cambiare), e la frase la compone solo `fraseNessunHost`: chi ha un altro
   motivo o un altro rimedio li passa, senza scriverne una seconda (#828,
   `tests/unit/nessunHostAmmesso.test.mjs`).
+- **Una frase che nomina una pagina di Filo porta il tasto per andarci**, su ogni
+  superficie: chi la legge da un sito qualunque a Crediti o alle Opzioni non sa
+  arrivare. Dove si rimedia lo dice `SN_CHAT_ERRORS.rimedioPagina`; sulle pagine
+  web frase e tasto viaggiano insieme da `SN_POPUP.scriviErrore` (riquadri, menu,
+  «Modifica») e `SN_POPUP.avvisoErrore` o `showToast(…, { rimedio })` (avvisi, che
+  col tasto durano di più e lo offrono anche dal tasto destro). Il tasto in
+  evidenza è quello che toglie l'ostacolo; «Riprova» resta, secondario, per
+  dopo (#663, #828.1); le chat delle pagine di Filo (home, Editor, mazzi) fanno
+  lo stesso coi loro tasti. Sentinella: `tests/unit/rimedioOvunque.test.mjs`,
+  prove per superficie in `tests/rimedio-ovunque.spec.mjs`.
+- **Una risposta che non arriva non si richiede da sola.** Un riquadro che chiede
+  quando si disegna (il «Parere di Filo» dei mazzi) ricorda l'esito mancato col suo
+  perché e lo mostra col tasto del rimedio e «Riprova»; senza, ogni ridisegno
+  rifaceva la richiesta, centinaia al secondo coi crediti finiti (#1344.1). Anche
+  una risposta riuscita ma senza la parte chiesta è un esito mancato, e «Riprova»
+  salta la cache, che ridarebbe la stessa risposta.
 - **Dove:** chat della home (`src/pages/dashboard/dashboard.js` +
   `src/main/services/handlers/filo.js`), chat dei mazzi
   (`src/main/services/handlers/scryfall.js`), assistente laterale

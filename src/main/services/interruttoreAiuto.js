@@ -70,7 +70,7 @@ function seAcceso(win, fn) {
     if (si) { fn(); return; }
     try {
       const testo = globalThis.SN_I18N && globalThis.SN_I18N.t('help_disabled');
-      if (testo && win && !win.isDestroyed()) win.webContents.send('shell:toast', { text: testo, opts: { unica: 'aiuto-spento' } });
+      if (testo && win && !win.isDestroyed()) win.webContents.send('shell:toast', { text: testo, opts: { unica: 'aiuto-spento', tipo: 'aiuto_spento' } });
     } catch (_) {}
   }, () => {});
 }

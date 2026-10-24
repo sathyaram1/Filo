@@ -174,9 +174,11 @@ test('ogni documento che dichiara quanto è grande la suite dice il numero vero'
     }
     for (const m of testo.matchAll(/~\s*([\d.]+)\s+casi/g)) casi.add(m[1]);
   }
+  // Il rosso arriva anche al ramo che aggiunge lo spec che sfora (#1448.5): il messaggio dà il rimedio intero.
   assert.deepEqual(sbagliati, [],
-    `la suite raccoglie ${vero} file di prove: un documento che ne dichiara molti di più nasconde il`
-    + ' tempo che la pulizia ha restituito, e il prossimo che deve decidere parte da un numero vecchio');
+    `la suite raccoglie ${vero} file di prove, oltre il 5% da quanto dichiarato: scrivi ~${Math.round(vero / 10) * 10}`
+    + ' spec in CLAUDE.md e in README.md, tutti e due. Chi decide se ripulire ancora parte da quel numero, e uno'
+    + ' vecchio lo fa decidere su una suite che non esiste più');
   assert.ok(casi.size <= 1,
     `i documenti non dicono lo stesso numero di casi (${[...casi].join(', ')}): correggerne uno solo è`
     + ' come non correggerne nessuno');

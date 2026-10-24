@@ -315,3 +315,101 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
   flex-direction: column;
   gap: 1px;
 }
+
+/* #1404: i blocchi divisi per tipo, ogni voce col suo file e la sua riga (che apre il diff su GitHub), e l'intorno
+   a richiesta. Il commit in testa porta al diff intero. */
+a.sn-mac-sha {
+  text-decoration: none;
+  color: var(--sn-fg);
+  transition: background calc(120ms * var(--sn-motion, 1)) ease;
+}
+a.sn-mac-sha::after { content: ' ↗'; color: var(--sn-muted); }
+a.sn-mac-sha:hover { background: color-mix(in srgb, var(--sn-accent) 22%, transparent); }
+a.sn-mac-sha:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+.sn-mac-gruppi {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sn-mac-gruppo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sn-mac-gruppo-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--sn-muted);
+}
+.sn-mac-gruppo[data-gruppo='guardie'] .sn-mac-gruppo-title { color: color-mix(in srgb, var(--sn-accent) 70%, var(--sn-fg)); }
+.sn-mac-voce {
+  font-size: 11.5px;
+  line-height: 1.4;
+  min-width: 0;
+}
+.sn-mac-voce-testa {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
+}
+.sn-mac-voce-dove {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--sn-fg);
+  overflow-wrap: anywhere;
+}
+a.sn-mac-voce-dove {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--sn-accent) 45%, transparent);
+  text-underline-offset: 2px;
+  border-radius: 3px;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, text-decoration-color calc(120ms * var(--sn-motion, 1)) ease;
+}
+a.sn-mac-voce-dove:hover { background: color-mix(in srgb, var(--sn-accent) 16%, transparent); text-decoration-color: var(--sn-accent); }
+a.sn-mac-voce-dove:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+.sn-mac-voce-testo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--sn-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sn-mac-voce-sum {
+  cursor: pointer;
+  list-style-position: inside;
+  border-radius: 3px;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-mac-voce-sum:hover { background: color-mix(in srgb, var(--sn-fg) 5%, transparent); }
+.sn-mac-voce-sum:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+.sn-mac-voce-sum::marker { color: var(--sn-muted); font-size: 9px; }
+.sn-mac-intorno {
+  margin: 4px 0 2px;
+  padding: 6px 8px;
+  max-width: 100%;
+  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  background: color-mix(in srgb, var(--sn-fg) 4%, var(--sn-bg));
+  border: 1px solid var(--sn-border);
+  border-radius: 4px;
+  color: var(--sn-muted);
+}
+.sn-mac-intorno-riga { white-space: pre; }
+.sn-mac-intorno-riga[data-segno='piu'] { color: var(--sn-fg); }
+.sn-mac-intorno-riga[data-segno='meno'] { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--sn-muted) 60%, transparent); }
+.sn-mac-intorno-riga.is-voce {
+  color: var(--sn-fg);
+  background: color-mix(in srgb, var(--sn-accent) 16%, transparent);
+  border-left: 2px solid var(--sn-accent);
+  margin-left: -8px;
+  padding-left: 6px;
+}

@@ -169,15 +169,18 @@ test('la categorizzazione imbusta i dati della pagina e tiene fuori le categorie
     'le categorie dell’utente sono roba sua: restano fuori dalla busta');
 });
 
-test('il correttore semantico imbusta il testo senza alterarlo', () => {
+test('i due controlli del correttore imbustano il testo senza alterarlo', () => {
   const testo = 'Sonno andato al mare con 2 << 3 amici e una «frase» già scritta.';
-  const prompt = PROMPTS.spellcheckSemantic({ text: testo, context: { prev: 'Prima.', next: 'Dopo.' } });
-  const { inizio, fine } = E.marcature('TESTO_IN_PAGINA');
-  assert.ok(prompt.includes(inizio) && prompt.includes(fine));
-  // Il client ritrova nel testo ORIGINALE le porzioni che il modello segna con
-  // **…**: se la busta lo alterasse, le correzioni finirebbero sul punto
-  // sbagliato o si perderebbero.
-  assert.ok(prompt.includes(testo), `la busta ha alterato il testo dell’utente:\n${prompt}`);
+  for (const prompt of [
+    PROMPTS.spellcheckErrori({ prima: 'Prima.', nuovo: testo, dopo: 'Dopo.', luogo: { sito: 'x.example' } }),
+    PROMPTS.spellcheckSuggerimenti({ prima: 'Prima.', nuovo: testo, dopo: 'Dopo.', contesto: { prima: 'pagina' } }),
+  ]) {
+    const { inizio, fine } = E.marcature('TESTO_IN_PAGINA');
+    assert.ok(prompt.includes(inizio) && prompt.includes(fine));
+    // Il client ritrova nel testo di ADESSO i pezzi che il modello cita: se la busta lo alterasse, le correzioni
+    // finirebbero sul punto sbagliato o si perderebbero.
+    assert.ok(prompt.includes(testo), `la busta ha alterato il testo dell’utente:\n${prompt}`);
+  }
 });
 
 test('spiegazione di una selezione e di un link imbustano quello che scrive il sito', () => {
@@ -234,8 +237,8 @@ test('la busta non sparisce quando il contenuto è vuoto', () => {
   const casi = {
     explain: PROMPTS.explain({ selection: '', sentence: '' }),
     explainDeep: PROMPTS.explainDeep({ selection: '', sentence: '' }),
-    spellcheckWord: PROMPTS.spellcheckWord({ word: '', sentence: '' }),
-    spellcheckSemantic: PROMPTS.spellcheckSemantic({ text: '' }),
+    spellcheckErrori: PROMPTS.spellcheckErrori({}),
+    spellcheckSuggerimenti: PROMPTS.spellcheckSuggerimenti({}),
     categorize: PROMPTS.categorize({ url: '', title: '', description: '', excerpt: '', existing: [] }),
     explainLink: PROMPTS.explainLink({ url: '' }),
     turno: PROMPTS.turnoAutomaticoAiuto({ nota: 'ho fatto', dati: { elementoPagina: {} } }),
@@ -432,7 +435,7 @@ test('le quattro strade che rimandano all’utente il suo testo non lo cambiano'
   assert.ok(PROMPTS.explain({ selection: CPP, sentence: `In C++ si scrive ${CPP}` }).includes(CPP),
     '«Spiega» riceve una selezione diversa da quella che l’utente ha selezionato');
   const testo = `Ho scritto questo:\n${PYTHON}\nsonno sicuro che funzioni.`;
-  assert.ok(PROMPTS.spellcheckSemantic({ text: testo, context: {} }).includes(testo),
+  assert.ok(PROMPTS.spellcheckErrori({ nuovo: testo }).includes(testo),
     'il correttore non ritroverà nel testo originale le porzioni segnate dal modello');
 });
 
@@ -496,7 +499,7 @@ test('una fila lunga di parentesi aperte non ferma Filo, da nessuna porta', () =
     'Traduci la pagina': () => PROMPTS.translatePageChunk({ chunk: aperte }),
     'Spiega': () => PROMPTS.explain({ selection: aperte, sentence: aperte }),
     'Modifica testo': () => PROMPTS.editText({ original: aperte, instruction: 'più corto' }),
-    'correttore': () => PROMPTS.spellcheckSemantic({ text: aperte, context: {} }),
+    'correttore': () => PROMPTS.spellcheckErrori({ nuovo: aperte, prima: spezzate }),
     'memoria': () => globalThis.SN_CONST.memoriaImbustata({ profilo: aperte, preferenze: spezzate }),
     'campo su una riga': () => E.neutralizza(spezzate, { unaRiga: true }),
   };

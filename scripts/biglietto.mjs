@@ -1,6 +1,6 @@
 // biglietto.mjs — il biglietto della sessione locale (SPEC-DOMANDE.md §1.2). Lo prende l'hook di avvio; da qui ci si
 // dichiara sporchi, si legge lo stato, si chiude. Nessuna strada per tornare puliti né per «segna fidato» (§1.4).
-// Le op e il file stanno in scripts/lib/biglietto-locale.mjs; `gancio` e `consegna` sono del gancio delle letture esterne.
+// Le op stanno in scripts/lib/biglietto-locale.mjs; `gancio`/`consegna`, `fine`/`chiusura` e `scadenze` sono dei ganci.
 
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -14,8 +14,9 @@ export const USO = 'Uso: node scripts/biglietto.mjs prendi [--sporco "<motivo>"]
 export function leggiArgomenti(argv) {
   const a = (Array.isArray(argv) ? argv : []).map(String);
   const cmd = a[0] || '';
-  if (cmd === 'stato' || cmd === 'chiudi' || cmd === 'avvio' || cmd === 'gancio') return a.length === 1 ? { cmd } : { errore: `${cmd} non vuole altro. ${USO}` };
+  if (['stato', 'chiudi', 'avvio', 'gancio', 'fine', 'scadenze'].includes(cmd)) return a.length === 1 ? { cmd } : { errore: `${cmd} non vuole altro. ${USO}` };
   if (cmd === 'consegna') return { cmd, motivo: a.slice(1).join(' ').trim() };
+  if (cmd === 'chiusura') return a.length === 2 && a[1].trim() ? { cmd, sessione: a[1].trim() } : { errore: `chiusura vuole il nome della sessione. ${USO}` };
   if (cmd === 'sporca') {
     const motivo = a.slice(1).join(' ').trim();
     return motivo ? { cmd, motivo } : { errore: `sporca vuole il motivo: cosa hai letto che il server non vede. ${USO}` };
@@ -54,9 +55,20 @@ async function main() {
     return 0;
   }
   if (args.cmd === 'avvio') {
-    // L'hook di avvio: una riga, sempre uscita 0, anche col server giù.
+    // L'hook di avvio: una riga, sempre uscita 0, anche col server giù. Poi, senza aspettarla, la scadenza dei rimasti.
     const r = await B.avvio({ input: await leggiStdin() });
     if (r.riga) console.log(r.riga);
+    if (r.path) B.avviaInSottofondo(['scadenze'], { env: { ...process.env, [B.ENV_FILE]: r.path } });
+    return 0;
+  }
+  if (args.cmd === 'fine') {
+    B.avviaFine({ input: await leggiStdin() });
+    return 0;
+  }
+  if (args.cmd === 'chiusura' || args.cmd === 'scadenze') {
+    setTimeout(() => process.exit(0), B.TETTO_SOTTOFONDO_MS).unref();
+    if (args.cmd === 'chiusura') await B.fineSessione({ input: { session_id: args.sessione } });
+    else await B.chiudiScaduti();
     return 0;
   }
   if (args.cmd === 'prendi') {
@@ -105,6 +117,6 @@ const lanciato = (() => { try { return realpathSync(process.argv[1]); } catch (_
 if (process.argv[1] && lanciato === fileURLToPath(import.meta.url)) {
   main().then((code) => { process.exitCode = code; }, (e) => {
     console.error(`biglietto: ${String((e && e.message) || e)}`);
-    process.exitCode = ['avvio', 'gancio', 'consegna'].includes(process.argv[2]) ? 0 : 1;
+    process.exitCode = ['avvio', 'gancio', 'consegna', 'fine', 'chiusura', 'scadenze'].includes(process.argv[2]) ? 0 : 1;
   });
 }

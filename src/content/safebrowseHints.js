@@ -120,6 +120,7 @@ function pageHints(doc, opz) {
   let hasPayment = almenoUno(PAGAMENTO);
   let shownPassword = hasPassword && tutti('input[type="password"]').some(mostrato('pw'));
   let shownPayment = hasPayment && tutti(PAGAMENTO).some(mostrato('carta'));
+  const delicati = hasPassword || hasPayment ? tutti('input[type="password"]').concat(tutti(PAGAMENTO)) : [];
   if (!shownPassword || !shownPayment) {
     try {
       for (const el of tutti(CAMPI)) {
@@ -128,6 +129,7 @@ function pageHints(doc, opz) {
         const carta = CARTA.test(testo);
         if (pw) hasPassword = true;
         if (carta) hasPayment = true;
+        if (pw || carta) delicati.push(el);
         if ((pw && !shownPassword) || (carta && !shownPayment)) {
           const si = mostrato(pw ? 'pw' : 'carta')(el);
           if (pw && si) shownPassword = true;
@@ -137,7 +139,22 @@ function pageHints(doc, opz) {
       }
     } catch (_) {}
   }
-  return { hasPassword, hasPayment, shownPassword, shownPayment };
+  // Da una pagina https, un modulo con password o carta che invia a un indirizzo http: i dati viaggiano in chiaro. Gli
+  // attributi si leggono con getAttribute: `form.action` lo copre un campo che si chiama «action».
+  let insecureForm = false;
+  let https = false;
+  try { https = doc.location.protocol === 'https:'; } catch (_) {}
+  const http = (u) => { try { return new URL(u, doc.baseURI).protocol === 'http:'; } catch (_) { return false; } };
+  const invii = https && delicati.length ? tutti('[formaction]') : [];
+  for (const el of https ? delicati : []) {
+    const f = el && el.form;
+    if (!f) continue;
+    if (http(f.getAttribute('action') || '') || invii.some((b) => b.form === f && http(b.getAttribute('formaction') || ''))) {
+      insecureForm = true;
+      break;
+    }
+  }
+  return { hasPassword, hasPayment, shownPassword, shownPayment, insecureForm };
 }
 
 module.exports = { pageHints };

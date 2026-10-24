@@ -5,6 +5,7 @@
 import http from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 import { statoDi } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Accedi</h1>
@@ -43,7 +44,7 @@ for (const [caso, csp] of Object.entries(CSP)) {
   test(`Trusted Types (${caso}): il tasto destro apre il menu di Filo, e la sua voce apre il riquadro`, async ({ app, openTab, testServer }) => {
     const page = await apri(openTab, testServer, csp);
     await page.locator('#paragraph').click({ button: 'right' });
-    const menu = page.locator('.sn-menu');
+    const menu = menuDi(page).locator('.sn-menu');
     await menuCompleto(menu);
     await menu.getByText('Invia feedback', { exact: true }).click();
     await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.visibile ?? false).toBe(true);
@@ -60,7 +61,7 @@ for (const [caso, csp] of Object.entries(CSP)) {
     }, figlio);
     await page.waitForTimeout(1200);
     await page.locator('#paragraph').click({ button: 'right' });
-    await menuCompleto(page.locator('.sn-menu'));
+    await menuCompleto(menuDi(page).locator('.sn-menu'));
   });
 }
 
@@ -70,7 +71,7 @@ test('Trusted Types: il tasto destro dentro un riquadro della pagina apre il men
   const page = await apri(openTab, testServer, csp, HTML.replace('</body>', `<iframe id="embed" src="${figlio}" width="500" height="200"></iframe></body>`));
   const frame = page.frameLocator('#embed');
   await frame.locator('#inner').click({ button: 'right' });
-  await menuCompleto(frame.locator('.sn-menu'));
+  await menuCompleto(menuDi(frame).locator('.sn-menu'));
 });
 
 test('Trusted Types: la spiegazione di una parola si apre e mostra la risposta formattata', async ({ app, openTab, testServer }) => {
@@ -126,7 +127,7 @@ test('se il menu di Filo non si costruisce compare quello di riserva, e le sue v
 
   await page.locator('#email').click({ button: 'right' });
   await expect.poll(() => vociDiRiserva(app), { timeout: 5000 }).toEqual(expect.arrayContaining(['Seleziona tutto', 'Ricarica']));
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 
   await scegliDiRiserva(app, 'Seleziona tutto');
   await expect.poll(() => page.evaluate(() => {
@@ -158,7 +159,7 @@ const riservaAperta = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow
 test('col menu di Filo che si apre, quello di riserva non compare', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   await page.locator('#paragraph').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
   await page.waitForTimeout(1200);
   expect(await riservaAperta(app)).toBe(false);
 });
@@ -197,7 +198,7 @@ test('Shift + tasto destro: compare il menu di riserva, ma non sopra il menu del
   await page.locator('#email').click({ button: 'right' });
   await page.keyboard.up('Shift');
   await expect.poll(() => vociDiRiserva(app), { timeout: 5000 }).toContain('Seleziona tutto');
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 });
 
 test('su un sito dove Filo è spento il tasto destro apre il menu di riserva', async ({ app, openTab, testServer }) => {
@@ -207,5 +208,5 @@ test('su un sito dove Filo è spento il tasto destro apre il menu di riserva', a
   await page.waitForTimeout(500);
   await page.locator('#paragraph').click({ button: 'right' });
   await expect.poll(() => vociDiRiserva(app), { timeout: 5000 }).toContain('Ricarica');
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 });

@@ -21,6 +21,7 @@ const { parentPort } = require('node:worker_threads');
 let versione = null;
 let ancore = null;
 let ancoreTsa = null;
+let provvisorio = null;
 parentPort.on('message', ({ id, byte, elenco, marchi }) => {
   try {
     if (marchi) {
@@ -34,8 +35,11 @@ parentPort.on('message', ({ id, byte, elenco, marchi }) => {
       const t = P.ancoreDaPem(elenco.pemTsa);
       ancore = a.length ? a : null;
       ancoreTsa = t.length ? t : null;
+      const pa = P.ancoreDaPem(elenco.pemProvvisorio);
+      const pm = P.ammessiDaPem(elenco.pemAmmessi);
+      provvisorio = pa.length || pm.length ? { ancore: pa, ammessi: pm } : null;
     }
-    parentPort.postMessage({ id, res: P.analizza(byte, { ancore, ancoreTsa }) });
+    parentPort.postMessage({ id, res: P.analizza(byte, { ancore, ancoreTsa, provvisorio }) });
   } catch (e) {
     parentPort.postMessage({ id, errore: String((e && e.message) || e) });
   }
@@ -90,7 +94,7 @@ function avvia() {
   return w;
 }
 
-// `elenco`: { versione, pem, pemTsa }. Il thread riconverte l'elenco solo quando cambia versione.
+// `elenco`: { versione, pem, pemTsa, pemProvvisorio, pemAmmessi }. Il thread riconverte l'elenco solo quando cambia versione.
 function analizza(byte, elenco) {
   return chiedi(byte, elenco, false);
 }

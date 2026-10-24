@@ -1,6 +1,6 @@
-// Le pagine delicate (#1004): posta, banche, sanità, i siti che aggiunge l'utente e quelli che hanno mostrato un campo
-// password o carta. Di queste i lavori automatici non mandano testo a nessun modello. Logica pura: la memoria dei
-// campi visti la tiene src/main/services/pagineDelicate.js; prove in tests/unit/pagineDelicate.test.mjs.
+// Le pagine delicate (#1004): posta, banche, sanità, pubblica amministrazione, i siti dell'utente e quelli che hanno
+// mostrato un campo password o carta. Di queste i lavori automatici non mandano niente a un modello. Logica pura: i campi
+// visti li ricorda src/main/services/pagineDelicate.js; prove in tests/unit/pagineDelicate.test.mjs.
 
 (function (global) {
   'use strict';
@@ -36,10 +36,20 @@
       'miodottore.it', 'idoctors.it', 'doctolib.it', 'doctolib.fr', 'doctolib.de', 'mychart.com',
       'nhsapp.service.nhs.uk', 'patientaccess.com', 'unisalute.it',
     ],
+    // Ci si entra con SPID, CIE o l'accesso di un altro sito: la password si scrive altrove, e il campo qui non si vede.
+    pa: [
+      'inps.it', 'inail.it', 'agenziaentrate.gov.it', 'agenziaentrate.it', 'agenziaentrateriscossione.gov.it',
+      'pagopa.gov.it', 'pagopa.it', 'noipa.mef.gov.it', 'anagrafenazionale.interno.it', 'servizicie.interno.gov.it',
+      'portaleautomobilista.gov.it', 'pst.giustizia.it', 'irs.gov', 'ssa.gov', 'tax.service.gov.uk', 'impots.gouv.fr',
+      'ameli.fr', 'elster.de', 'agenciatributaria.gob.es', 'sede.seg-social.gob.es',
+    ],
   };
 
   // Come si chiama il motivo in una riga per un modello o per l'utente.
-  const NOMI = { posta: 'posta', banche: 'banca', sanita: 'sanità', campi: 'password o carta', utente: 'scelta da te' };
+  const NOMI = {
+    posta: 'posta', banche: 'banca', sanita: 'sanità', pa: 'pubblica amministrazione', campi: 'password o carta',
+    utente: 'scelta da te',
+  };
 
   // L'host di un indirizzo web, come si confronta con gli elenchi: minuscolo, senza «www.» e senza punto finale.
   function host(url) {

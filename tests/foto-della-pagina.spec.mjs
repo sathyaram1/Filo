@@ -3,6 +3,7 @@
 // l'immagine del sito che l'utente sta guardando. Regola: src/main/services/fotoDellaPagina.js.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const MONDO_CONTENT_SCRIPT = 999;
 const pagina = (colore, testo) => `<style>html,body{background:${colore};height:100%;margin:0}</style><h1>${testo}</h1>`;
@@ -105,8 +106,8 @@ async function immagineNegliAppunti(shell) {
 
 async function screenshotDalMenu(dove) {
   await dove.locator('h1').click({ button: 'right' });
-  await expect(dove.locator('.sn-menu')).toBeVisible();
-  await dove.locator('.sn-menu [data-sn-icon-id="screenshot"]').click();
+  await expect(menuDi(dove).locator('.sn-menu')).toBeVisible();
+  await menuDi(dove).locator('.sn-menu [data-sn-icon-id="screenshot"]').click();
 }
 
 test('un popup di accesso fotografa sé stesso, anche dopo che l\'utente è passato a un\'altra scheda', async ({ app, openTab, testServer }) => {

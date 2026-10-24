@@ -9,7 +9,7 @@ const FRESCO_MS = 6 * 60 * 60 * 1000;
 const RIPROVA_MS = 60 * 1000;
 const ATTESA_MS = 15 * 1000;
 
-let ultimo = null; // { listino, at }
+let ultimo = null; // { listino, finestre, at }
 let fallitoAt = 0;
 let inVolo = null;
 
@@ -24,7 +24,30 @@ async function scarica() {
   // Senza la lista principale (quella dei modelli di testo) il listino non c'è: le altre da sole sarebbero un buco.
   if (liste[0].status !== 'fulfilled') throw liste[0].reason;
   const voci = liste.flatMap((l) => (l.status === 'fulfilled' ? l.value : []));
-  return S.listinoDaCatalogo(voci);
+  try { globalThis.SN_CONST.registraCatalogoPesi(voci); } catch (_) {}
+  return { listino: S.listinoDaCatalogo(voci), finestre: finestreDaCatalogo(voci) };
+}
+
+// La finestra di ogni modello (token in entrata e in uscita insieme), dallo stesso catalogo: misura le riletture
+// della chat prima che un rifiuto la insegni (#868.7).
+function finestreDaCatalogo(voci) {
+  const out = Object.create(null);
+  for (const m of Array.isArray(voci) ? voci : []) {
+    const n = Number(m && m.context_length);
+    if (m && typeof m.id === 'string' && Number.isFinite(n) && n > 0) out[m.id] = n;
+  }
+  return out;
+}
+
+// La finestra dell'ultimo listino letto, o null: non scarica niente (chi la vuole fresca chiede prima `listino()`).
+// Le scorciatoie di smistamento valgono il modello base, come per i prezzi.
+function finestra(model) {
+  const f = ultimo && ultimo.finestre;
+  const id = String(model || '').trim();
+  if (!f || !id) return null;
+  if (Object.prototype.hasOwnProperty.call(f, id)) return f[id];
+  const base = id.replace(/:(nitro|floor|online)$/i, '');
+  return base !== id && Object.prototype.hasOwnProperty.call(f, base) ? f[base] : null;
 }
 
 // Il listino in memoria, rifatto ogni sei ore. OpenRouter muto: vale l'ultimo letto, se c'è; altrimenti null, e si
@@ -33,9 +56,9 @@ async function listino({ forza = false } = {}) {
   if (!forza && ultimo && Date.now() - ultimo.at < FRESCO_MS) return ultimo.listino;
   if (!forza && !ultimo && Date.now() - fallitoAt < RIPROVA_MS) return null;
   if (!inVolo) {
-    inVolo = scarica().then((l) => {
-      ultimo = { listino: l, at: Date.now() };
-      return l;
+    inVolo = scarica().then((x) => {
+      ultimo = { listino: x.listino, finestre: x.finestre, at: Date.now() };
+      return x.listino;
     }, (e) => {
       fallitoAt = Date.now();
       console.warn('[Filo] listino dei modelli non letto:', (e && e.message) || e);
@@ -159,4 +182,4 @@ function fraseCosto(action, refs, registry, ctx) {
   return [cifre, ...avvisi].join(' ');
 }
 
-module.exports = { contesto, listino, verificaCambio, fraseCosto };
+module.exports = { contesto, listino, finestra, verificaCambio, fraseCosto };

@@ -10,8 +10,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync, cpSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, cpSync, mkdirSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 import { dirname, resolve, join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
@@ -188,6 +189,19 @@ test('privacy e sicurezza hanno il loro documento, sulla pagina e per l\'agente'
   assert.match(T.asText('security'), /SHA-256/, 'il documento sulla sicurezza non dice come controllare il file scaricato');
 });
 
+// #1407: la sezione diceva solo dove gira il codice, e chi leggeva credeva in Europa anche i dati.
+test('la privacy dice dove sta ogni parte del server', () => {
+  const { T } = loadModules();
+  const t = T.get('privacy').text;
+  const sezione = t.slice(t.indexOf('\nIl server di Filo\n'), t.indexOf('\nI feedback\n'));
+  const dove = { 'Il codice': /Belgio/, 'Il database': /Stati Uniti|Europa/, 'Gli allegati dei feedback': /Stati Uniti.*Carolina del Sud.*us-east1/, 'Le identità': /Stati Uniti/ };
+  for (const [parte, posto] of Object.entries(dove)) {
+    const voce = sezione.split('\n').find((r) => r.startsWith(`- ${parte} `));
+    assert.ok(voce, `la sezione sul server non ha la voce «${parte}»`);
+    assert.match(voce, posto, `«${parte}»: la voce non dice dove sta`);
+  }
+});
+
 test('un comando fra apici inversi si legge come codice sulla pagina e senza segni per l\'agente', () => {
   const { tmp, leggi } = generaCopia({
     'zz-codice.md': [
@@ -229,35 +243,85 @@ test('la barra si deriva dai documenti: uno nuovo e non previsto ci finisce da s
   togliCartella(tmp);
 });
 
-// #515 — Terza copia dello stesso elenco: il manifesto che l'assistente
-// consulta quando gli si chiede cosa sa fare. Scritto a mano, comincerebbe a
-// mentire il giorno in cui una di quelle sezioni viene scritta.
-test('il manifesto delle capacità dice in arrivo esattamente le aree che mancano', () => {
-  const { T } = loadModules();
+// #515 — Terza copia dello stesso elenco: il manifesto che l'assistente consulta quando gli si chiede
+// cosa sa fare è scritto a mano, quindi si confronta coi documenti scritti e con le aree annunciate.
+function voceManifesto() {
   delete globalThis.SN_CAPABILITIES;
   // eslint-disable-next-line no-new-func
   new Function(readFileSync(join(ROOT, 'src', 'shared', 'capabilities.js'), 'utf8')).call(globalThis);
   const voce = globalThis.SN_CAPABILITIES.all().find((c) => c.id === 'transparency-docs');
   assert.ok(voce, 'il manifesto non parla più dei documenti di trasparenza: aggiorna questo test');
-  const frase = /([^.]*\bin arrivo\b[^.]*)\./.exec(voce.desc);
-  const scritti = T.ids();
-  const mancanti = T.NAV.filter((n) => !scritti.includes(n.id));
-  if (!mancanti.length) {
-    assert.equal(frase, null, 'tutte le aree sono scritte, ma il manifesto ne annuncia ancora di "in arrivo"');
-    return;
+  return voce;
+}
+
+// La parola più lunga dell'etichetta riconosce l'area senza imporre come è scritta la frase.
+const parolaDi = (label) => label.split(/\s+/).sort((a, b) => b.length - a.length)[0].toLowerCase();
+
+// Vuoto se il manifesto dice il vero: dopo l'indirizzo della pagina le sezioni scritte, nell'ordine
+// della barra; la frase «in arrivo» nomina tutte e sole le mancanti; le citazioni sono le note di oggi.
+function divergenzeManifesto(T, voce) {
+  const problemi = [];
+  const scritte = T.NAV.filter((n) => T.ids().includes(n.id));
+  const mancanti = T.NAV.filter((n) => !T.ids().includes(n.id));
+  const elenco = /transparency\.html \(([^)]*)\)/.exec(voce.invoke);
+  const dichiarate = elenco ? elenco[1].split(/,\s*|\s+e\s+/).map((s) => s.trim()).filter(Boolean) : [];
+  const attese = scritte.map((n) => n.label);
+  if (dichiarate.join('|') !== attese.join('|')) {
+    problemi.push(`«invoke» elenca le sezioni (${dichiarate.join(', ')}), quelle scritte sono (${attese.join(', ')})`);
   }
-  assert.ok(frase, 'ci sono aree non ancora scritte e il manifesto non le dichiara');
-  // Una parola sola per area, la più caratteristica dell'etichetta: basta a
-  // beccare la divergenza senza imporre come è scritta la frase.
+  const frase = ((/([^.]*\bin arrivo\b[^.]*)\./.exec(voce.desc) || [])[1] || '').toLowerCase();
   for (const n of mancanti) {
-    const parola = n.label.split(/\s+/).sort((a, b) => b.length - a.length)[0].toLowerCase();
-    assert.ok(frase[1].toLowerCase().includes(parola),
-      `il manifesto non dice che "${n.label}" è ancora da scrivere`);
+    if (!frase.includes(parolaDi(n.label))) problemi.push(`«desc» non dice che "${n.label}" è in arrivo`);
   }
-  for (const n of T.NAV.filter((v) => scritti.includes(v.id))) {
-    const parola = n.label.split(/\s+/).sort((a, b) => b.length - a.length)[0].toLowerCase();
-    assert.ok(!frase[1].toLowerCase().includes(parola),
-      `il manifesto annuncia come "in arrivo" la sezione "${n.label}", che è scritta`);
+  for (const n of scritte) {
+    if (frase.includes(parolaDi(n.label))) problemi.push(`«desc» annuncia in arrivo "${n.label}", che è scritta`);
+  }
+  if (frase && !mancanti.length) problemi.push('«desc» annuncia sezioni in arrivo, e sono tutte scritte');
+  const note = T.conNota().map((n) => n.nota);
+  for (const nota of note) {
+    if (!voce.desc.includes(`«${nota}»`)) problemi.push(`«desc» non riporta la nota com'è: «${nota}»`);
+  }
+  for (const [, c] of voce.desc.matchAll(/«([^»]+)»/g)) {
+    if (!note.includes(c)) problemi.push(`«desc» cita «${c}», che non è più la nota di nessuna sezione`);
+  }
+  return problemi;
+}
+
+test('il manifesto delle capacità nomina le sezioni scritte e annuncia le mancanti', () => {
+  const { T } = loadModules();
+  const problemi = divergenzeManifesto(T, voceManifesto());
+  assert.deepEqual(problemi, [], 'la voce transparency-docs del manifesto non segue i documenti: '
+    + 'aggiorna l\'elenco delle sezioni e il racconto di cosa c\'è in ognuna');
+});
+
+// Il manifesto fermo e i documenti che cambiano: il confronto deve accorgersene in ogni verso.
+test('il confronto col manifesto si accorge di un documento scritto o tolto', () => {
+  const { T } = loadModules();
+  const voce = voceManifesto();
+  const doc = (id, titolo, ...meta) => ['---', `id: ${id}`, `title: ${titolo}`, ...meta, 'updated: 2026-12-01', '---',
+    '', 'Testo.', '', '## Una sezione', '', 'Altro testo.', ''];
+  const ultimo = T.all()[T.all().length - 1];
+  const fileDi = (id) => readdirSync(join(ROOT, 'transparency')).filter((f) => f.endsWith('.md'))
+    .find((f) => (/^id:\s*(\S+)/m.exec(readFileSync(join(ROOT, 'transparency', f), 'utf8')) || [])[1] === id);
+  const casi = [
+    { cosa: 'scritto un documento che nessuno aveva annunciato', etichetta: 'Dati',
+      extra: { 'zz-dati.md': doc('zz-dati', 'I tuoi dati', 'nav: Dati', 'order: 50') } },
+    { cosa: `tolto il documento "${ultimo.id}"`, etichetta: T.NAV.find((n) => n.id === ultimo.id).label,
+      togli: [fileDi(ultimo.id)] },
+  ];
+  const annunciata = T.NAV.find((n) => !T.ids().includes(n.id));
+  if (annunciata) {
+    casi.push({ cosa: `scritta la sezione annunciata "${annunciata.label}"`, etichetta: annunciata.label,
+      extra: { [`zz-${annunciata.id}.md`]: doc(annunciata.id, annunciata.label) } });
+  }
+  for (const c of casi) {
+    const { tmp, leggi } = generaCopia(c.extra || {}, c.togli);
+    const ctx = {};
+    vm.runInNewContext(leggi('src', 'shared', 'transparency.js'), ctx);
+    togliCartella(tmp);
+    const problemi = divergenzeManifesto(ctx.SN_TRANSPARENCY, voce);
+    assert.ok(problemi.some((p) => p.includes(c.etichetta)),
+      `${c.cosa} e il manifesto è rimasto com'era, ma il confronto non se ne accorge: ${problemi.join('; ') || 'nessuna divergenza'}`);
   }
 });
 
@@ -375,22 +439,6 @@ test('la nota sul sito: al posto di «non ancora scritta», escapata, e privacy 
   }
 });
 
-// Il manifesto riporta la nota parola per parola: la frase che l'assistente
-// legge su cosa sa fare Filo non può dire una cosa diversa dalla pagina. E nei
-// due versi: una citazione che non è più una nota (il documento è arrivato, o
-// l'owner l'ha riscritta) è una promessa vecchia.
-test('il manifesto e la nota dicono la stessa cosa', () => {
-  const { T } = loadModules();
-  delete globalThis.SN_CAPABILITIES;
-  // eslint-disable-next-line no-new-func
-  new Function(readFileSync(join(ROOT, 'src', 'shared', 'capabilities.js'), 'utf8')).call(globalThis);
-  const voce = globalThis.SN_CAPABILITIES.all().find((c) => c.id === 'transparency-docs');
-  const note = T.conNota().map((n) => n.nota);
-  for (const nota of note) assert.ok(voce.desc.includes(`«${nota}»`), `il manifesto non riporta la nota com'è: «${nota}»`);
-  const citate = [...voce.desc.matchAll(/«([^»]+)»/g)].map((m) => m[1]);
-  for (const c of citate) assert.ok(note.includes(c), `il manifesto cita «${c}», che non è più la nota di nessuna sezione`);
-});
-
 test('quando il documento arriva, la nota sparisce da sola', () => {
   const { tmp, leggi } = generaCopia({
     'business.md': [
@@ -420,8 +468,8 @@ test('i documenti citati per nome nel prompt di accoglienza esistono', () => {
   }
 });
 
-// Genera su una COPIA del repo, coi markdown in più che la prova vuole.
-function generaCopia(extra) {
+// Genera su una COPIA del repo, coi markdown in più (e senza quelli tolti) che la prova vuole.
+function generaCopia(extra, togli = []) {
   const tmp = cartellaTemporanea('filo-trasparenza-');
   mkdirSync(join(tmp, 'scripts'), { recursive: true });
   cpSync(join(ROOT, 'scripts', 'build-transparency.mjs'), join(tmp, 'scripts', 'build-transparency.mjs'));
@@ -431,6 +479,7 @@ function generaCopia(extra) {
   for (const [nome, righe] of Object.entries(extra)) {
     writeFileSync(join(tmp, 'transparency', nome), righe.join('\n'), 'utf8');
   }
+  for (const nome of togli) rmSync(join(tmp, 'transparency', nome));
   execFileSync(process.execPath, [join(tmp, 'scripts', 'build-transparency.mjs')], { encoding: 'utf8' });
   const leggi = (...p) => readFileSync(join(tmp, ...p), 'utf8');
   return { tmp, leggi };

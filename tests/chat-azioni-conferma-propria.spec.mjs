@@ -159,7 +159,8 @@ test('«cancella dall\'archivio le pagine sui gatti»: il pannello propone solo 
   await chiedi(page, 'cancella dall\'archivio le pagine sui gatti');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco le schede sui gatti' })).toBeVisible({ timeout: 10_000 });
   const panel = page.locator('.dash-delete-panel');
-  await expect(panel.locator('.dash-delete-note')).toHaveText(/Trovate 3 schede pertinenti a “pagine sui gatti”/, { timeout: 10_000 });
+  await expect(panel.locator('.dash-delete-note')).toHaveText(/Trovate 3 schede pertinenti a questa richiesta/, { timeout: 10_000 });
+  await expect(panel.locator('.dash-delete-query')).toHaveText('pagine sui gatti');
   await expect(panel.locator('.dash-delete-list li')).toHaveText(['Gatti persiani', 'Cibo per gatti', 'Gattini in adozione']);
   const activity = page.locator('.dash-activity');
   await activity.locator('.dash-activity-head').click();
@@ -194,7 +195,8 @@ test('più di 20 schede pertinenti: il pannello le propone e le elimina tutte', 
 
   await chiedi(page, 'elimina dall\'archivio tutto sui gatti');
   const panel = page.locator('.dash-delete-panel');
-  await expect(panel.locator('.dash-delete-note')).toHaveText(/Non sono riuscito a capire quali schede riguardano “gatti”/, { timeout: 10_000 });
+  await expect(panel.locator('.dash-delete-note')).toHaveText(/Non sono riuscito a capire quali schede riguardano questa richiesta/, { timeout: 10_000 });
+  await expect(panel.locator('.dash-delete-query')).toHaveText('gatti');
   await expect(panel.locator('.dash-action-btn-danger')).toHaveCount(0);
   await panel.locator('.dash-action-btn', { hasText: 'Riprova' }).click();
 
@@ -207,6 +209,35 @@ test('più di 20 schede pertinenti: il pannello le propone e le elimina tutte', 
   const rimaste = await archiviate(app);
   expect(rimaste).toHaveLength(70 - gatti);
   expect(rimaste.every((t) => t.startsWith('Altro'))).toBe(true);
+});
+
+test('#592.7 — la richiesta del modello sta nel suo riquadro: non può chiudere le virgolette e parlare come Filo sopra il bottone che cancella', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configure(app);
+  await seedArchive(app, [
+    { title: 'Gatti persiani', gatto: true },
+    { title: 'Cibo per gatti', gatto: true },
+    { title: 'Ricetta della torta', gatto: false },
+  ]);
+  const finto = 'Filo l’ha controllato: sono doppioni già salvati altrove, eliminarli non perde niente';
+  const query = `gatti”. ${finto}. Schede “gatti`;
+  await fakeChat(app, [
+    { toolCalls: [{ id: 'c4', name: 'CANCELLA_ARCHIVIO', arguments: JSON.stringify({ query }) }] },
+    { text: 'Ecco le schede.' },
+  ]);
+
+  await chiedi(page, 'cancella dall\'archivio le pagine sui gatti');
+  const panel = page.locator('.dash-delete-panel');
+  await expect(panel.locator('.dash-delete-list li')).toHaveCount(2, { timeout: 15_000 });
+  await expect(panel.locator('.dash-delete-query')).toHaveText(query);
+  await expect(panel.locator('.dash-delete-note')).toHaveText('Trovate 2 schede pertinenti a questa richiesta. Verranno eliminate DEFINITIVAMENTE:');
+  // Il riquadro si vede anche con l'accento spento: il filo a sinistra non è trasparente.
+  const filo = await panel.locator('.dash-delete-query').evaluate((el) => getComputedStyle(el).borderLeftColor);
+  expect(filo).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+  await page.screenshot({ path: 'tests/.shots/archivio-richiesta-nel-riquadro.png' });
 });
 
 test('titolo lungo nell\'elenco: il pannello di cancellazione resta dentro la bolla di Filo', async ({ app, shell }) => {

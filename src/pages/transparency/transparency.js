@@ -1,13 +1,6 @@
-// Pagina dei documenti di trasparenza dentro Filo.
-//
-// Il contenuto NON vive qui: arriva da src/shared/transparency.js, generato dai
-// markdown in transparency/ (vedi scripts/build-transparency.mjs). Questa pagina
-// si limita a scegliere quale documento mostrare e a montare le glosse.
-//
-// Il documento sta nella QUERY (?doc=models), non in un pannello a schede: così
-// l'indirizzo dice sempre cosa stai leggendo e un link a una sezione precisa
-// (?doc=models#i-punti-deboli) porta davvero lì. È l'uso principale di queste
-// pagine — vengono citate e linkate, non sfogliate.
+// Documenti di trasparenza, generati dai markdown in transparency/.
+// Il documento sta nella QUERY (?doc=…): l'indirizzo dice cosa stai leggendo e un link a
+// una sezione precisa porta davvero lì.
 
 (function () {
   'use strict';

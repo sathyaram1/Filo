@@ -21,7 +21,6 @@
   let bubblesEl = null;
   let threadView = null;
   let inputEl = null;
-  let homeMessageEl = null;
   let makeBubble = null;
   let stepTrace = null;
   let goHome = null;
@@ -33,7 +32,9 @@
   let giaAschermo = null;
   let beginSending = null;
   let runTurnAndContinue = null;
-  let isHomeMessageVisible = null;
+  let nienteInCorso = null;
+  let chatInCorso = null;
+  let allApertura = null;
   let soloRisposteSenzaCrediti = null;
   let setSuggestions = null;
   let loadDashboard = null;
@@ -44,14 +45,33 @@
   // Niente flag scritto qui: il segno "già accolto" lo scrive la CHIUSURA.
   let onboardingActive = false;
 
+  // Rifatta o ripresa, l'intervista sta solo nelle pagine che l'hanno chiesta (Preferenze, «Riprendiamola»): le altre,
+  // ricaricate o aperte da un collegamento, restano il filo dell'utente (#1297). Il segno sta nell'indirizzo.
+  const SEGNO = 'accoglienza';
+  function paginaDellIntervista() {
+    if (onboardingActive) return true;
+    try { return new URLSearchParams(global.location.search).has(SEGNO); } catch (_) { return false; }
+  }
+  function segnaPagina(si) {
+    try {
+      const u = new URL(global.location.href);
+      if (u.searchParams.has(SEGNO) === si) return;
+      if (si) u.searchParams.set(SEGNO, '1');
+      else u.searchParams.delete(SEGNO);
+      global.history.replaceState(global.history.state, '', u.href);
+    } catch (_) {}
+  }
+
   async function fetchOnboarding() {
     try {
-      const r = await send({ type: MSG.FILO_GET_ONBOARDING });
+      const fuori = !paginaDellIntervista();
+      const r = await send({ type: MSG.FILO_GET_ONBOARDING, ...(fuori ? { fuori: true } : {}) });
       // `ready: false` = nessun modello disponibile ancora (niente accesso,
       // niente chiave): l'intervista aspetta e la home spiega come attivare
       // Filo, invece di accoglierlo con una chat che non può rispondere.
       if (!r?.ok || !r.onboarding || !r.ready) return null;
       if (r.onboarding.done) return null;
+      if (r.onboarding.rifatta && fuori) return null;
       // `resume` lo decide il main: di schede nuove se ne aprono due insieme, e
       // il turno rimasto a metà lo deve riprendere UNA sola.
       return { ...r.onboarding, resume: !!r.resume };
@@ -77,7 +97,8 @@
       pushHistory({ role, text: m.text });
       const bolla = makeBubble({ role, text: m.text, markdown: role === 'filo' });
       bubblesEl.appendChild(bolla);
-      const scelta = role === 'filo' && m.autonomia ? sceltaAutonomia() : null;
+      const scelta = role === 'filo' && m.autonomia ? sceltaAutonomia()
+        : (role === 'filo' && m.contatori ? sceltaContatori() : null);
       if (scelta) {
         const wrap = document.createElement('div');
         wrap.className = 'dash-bubble-actions';
@@ -97,6 +118,8 @@
   async function openOnboarding(state) {
     onboardingActive = true;
     hideOnboardingNotice(); // l'intervista è di nuovo qui: la riga non serve più
+    segnaPagina(!!state.rifatta);
+    if (allApertura) allApertura();
     goThread();
     renderOnboardingThread(state);
     showSkipOnboarding();
@@ -112,10 +135,10 @@
   // di restare ferma alla conversazione com'era quando l'ha letta. Mai mentre
   // stiamo scrivendo noi — le bolle in corso sono già la verità.
   function onboardingUpdated(state) {
-    if (!state || state.done) return;
-    // Qui l'intervista non è a schermo, ma da qualche parte è di nuovo aperta:
-    // se questa home mostrava la riga «abbiamo chiuso a metà», adesso mente.
-    if (!onboardingActive) { hideOnboardingNotice(); return; }
+    if (!state) return;
+    // Qui l'intervista non è a schermo: la riga segue l'intervista com'è adesso, anche tolta o letta altrove.
+    if (!onboardingActive) { if (!closingShownAt) aggiornaRiga(state); return; }
+    if (state.done) return;
     if (isSending()) return;
     // L'annuncio del turno appena finito QUI arriva anche dopo la risposta: ridisegnare la stessa conversazione
     // butterebbe via il blocco di attività e i bottoni delle azioni.
@@ -243,6 +266,74 @@
     return box;
   }
 
+  // ── La scelta dei contatori anonimi (#1461) ───────────────────────────────
+  // Sì o No sotto la domanda di Filo, come l'autonomia: scrive l'interruttore delle Preferenze e, se la domanda è
+  // ancora in sospeso, diventa la risposta. Il No spegne e butta quello che c'era: non parte niente, nemmeno questa.
+  async function contatoriSalvati() {
+    try {
+      const s = await global.SN_STORAGE.getSettings();
+      return !(s && s.contatori && s.contatori.attivi === false);
+    } catch (_) { return true; }
+  }
+
+  function segnaContatori(box, attivi) {
+    box.dataset.attivi = attivi ? '1' : '0';
+    for (const b of box.querySelectorAll('.dash-contatori-voce')) {
+      const scelto = (b.dataset.attivi === '1') === attivi;
+      b.classList.toggle('scelto', scelto);
+      b.setAttribute('aria-pressed', scelto ? 'true' : 'false');
+    }
+  }
+
+  function aggiornaSceltaContatori(attivi) {
+    for (const box of document.querySelectorAll('.dash-contatori-scelta')) segnaContatori(box, attivi !== false);
+  }
+
+  async function scegliContatori(box, attivi) {
+    if (box.dataset.occupato === '1') return;
+    box.dataset.occupato = '1';
+    try {
+      const r = await send({ type: MSG.UPDATE_SETTINGS, settings: { contatori: { attivi } } });
+      if (!r || r.ok === false) return;
+      aggiornaSceltaContatori(attivi);
+      if (!onboardingActive || isSending() || box.dataset.risposto === '1' || !rispondi) return;
+      const dopo = [...bubblesEl.querySelectorAll('.dash-bubble-user')]
+        .some((u) => box.compareDocumentPosition(u) & Node.DOCUMENT_POSITION_FOLLOWING);
+      if (dopo) return;
+      if (rispondi(attivi ? 'Sì, manda i numeri.' : 'No, non mandare niente.')) box.dataset.risposto = '1';
+    } catch (_) {
+    } finally {
+      delete box.dataset.occupato;
+    }
+  }
+
+  function sceltaContatori(attivi) {
+    const box = document.createElement('div');
+    box.className = 'dash-contatori-scelta';
+    const gruppo = document.createElement('div');
+    gruppo.className = 'dash-contatori-voci';
+    gruppo.setAttribute('role', 'group');
+    gruppo.setAttribute('aria-label', 'Filo manda numeri senza contenuto per migliorare');
+    for (const [si, nome, titolo] of [
+      [true, 'Sì', 'Manda i contatori anonimi: solo numeri, mai testi'],
+      [false, 'No', 'Non mandare niente'],
+    ]) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dash-autonomia-livello dash-contatori-voce';
+      b.dataset.attivi = si ? '1' : '0';
+      b.textContent = nome;
+      b.title = titolo;
+      b.addEventListener('click', () => { scegliContatori(box, si); });
+      gruppo.appendChild(b);
+    }
+    box.appendChild(gruppo);
+    segnaContatori(box, attivi !== false);
+    // Quello dell'azione può essere di qualche istante fa: vale quello salvato.
+    contatoriSalvati().then((a) => segnaContatori(box, a));
+    return box;
+  }
+
   // ── La via d'uscita che non passa dal modello ─────────────────────────────
   //
   // Il benvenuto promette «scrivi "basta così" e chiudiamo»: la parola la
@@ -321,7 +412,7 @@
   // Una chat in cui Filo ha solo risposto «servono i crediti» non è una conversazione in corso: chi ha scritto
   // prima di averli deve vedere Filo presentarsi, non la stessa risposta ferma.
   function nienteDaInterrompere() {
-    if (document.body.dataset.state === 'home') return true;
+    if (nienteInCorso && nienteInCorso()) return true;
     return Boolean(soloRisposteSenzaCrediti && soloRisposteSenzaCrediti());
   }
 
@@ -353,7 +444,13 @@
   let closingShownAt = 0;
   let closingDwellTimer = null;
 
+  // L'annuncio arriva a tutte le schede, ma torna alla home solo quella che mostrava l'intervista: nelle altre c'è la
+  // conversazione dell'utente, e rilanciare l'accoglienza non la tocca (#1297).
   function onboardingDone(msg) {
+    if (!onboardingActive && !closingShownAt) {
+      refreshOnboardingNotice().catch(() => {});
+      return;
+    }
     onboardingActive = false;
     clearTimeout(onboardingHomeFallback);
     const atteso = closingShownAt ? Date.now() - closingShownAt : CLOSING_DWELL_MS;
@@ -373,15 +470,12 @@
     closingShownAt = 0;
     clearTimeout(onboardingHomeFallback);
     hideSkipOnboarding();
-    goHome(); // svuota bolle e storico: l'intervista è finita
-    if (isHomeMessageVisible()) {
-      homeMessageEl.classList.remove('dash-home-msg-loading');
-      homeMessageEl.textContent = msg?.message || 'Filo è in ascolto.';
-    }
+    segnaPagina(false);
+    // Il filo si rilegge da capo: l'intervista ne è il primo tratto, e il primo messaggio di Filo sta in coda (#869).
+    goHome();
     setSuggestions(Array.isArray(msg?.suggestions) ? msg.suggestions : []);
-    // La home appena generata È la risposta finale. Se non è arrivata (chiave
-    // assente, provider giù) la si carica per la strada normale.
-    if (!msg?.message) loadDashboard().catch(() => {});
+    // I suggerimenti nati con quel messaggio; se non sono arrivati (chiave assente, provider giù) quelli di sempre.
+    if (!msg?.suggestions?.length) loadDashboard().catch(() => {});
     // Chiusa prima della fine? Il congedo era in chat, e la chat è appena
     // sparita: la riga qui sotto è quello che ne resta.
     refreshOnboardingNotice().catch(() => {});
@@ -400,7 +494,16 @@
       const r = await send({ type: MSG.FILO_GET_ONBOARDING, peek: true });
       st = r?.ok ? r.onboarding : null;
     } catch (_) { return; }
-    if (st && st.done && st.notice === 'early') showOnboardingNotice();
+    aggiornaRiga(st);
+  }
+
+  // 'chiusa': finita prima della fine. 'aperta': rifatta e lasciata a metà in un'altra scheda, che magari non c'è più;
+  // da qui si riprende come una chiusa.
+  function aggiornaRiga(st) {
+    if (onboardingActive || !st) { hideOnboardingNotice(); return; }
+    const risposto = Array.isArray(st.thread) && st.thread.some((m) => m && m.role === 'user');
+    if (st.done && st.notice === 'early') showOnboardingNotice('chiusa');
+    else if (!st.done && st.rifatta && risposto) showOnboardingNotice('aperta');
     else hideOnboardingNotice();
   }
 
@@ -409,21 +512,23 @@
     if (!box) return;
     box.innerHTML = '';
     box.hidden = true;
+    delete box.dataset.tipo;
   }
 
-  function showOnboardingNotice() {
+  function showOnboardingNotice(tipo = 'chiusa') {
     const box = $('onbNotice');
-    if (!box || !box.hidden) return; // già a schermo: non la ricostruiamo
+    if (!box || (!box.hidden && box.dataset.tipo === tipo)) return; // già a schermo: non la ricostruiamo
     box.innerHTML = '';
+    box.dataset.tipo = tipo;
     const text = document.createElement('span');
     text.className = 'dash-onb-notice-text';
-    text.textContent = 'Abbiamo chiuso la presentazione a metà.';
+    text.textContent = tipo === 'aperta' ? 'La presentazione è rimasta a metà.' : 'Abbiamo chiuso la presentazione a metà.';
     const redo = document.createElement('button');
     redo.type = 'button';
     redo.id = 'onbNoticeRedo';
     redo.textContent = 'Riprendiamola';
-    redo.title = 'Riapre l’intervista di benvenuto qui, da capo. La trovi anche in Preferenze.';
-    redo.addEventListener('click', restartOnboardingHere);
+    redo.title = 'Riapre l’intervista da dove l’avevamo lasciata. Per rifarla da capo c’è Preferenze.';
+    redo.addEventListener('click', riprendiQui);
     const ok = document.createElement('button');
     ok.type = 'button';
     ok.id = 'onbNoticeDismiss';
@@ -436,18 +541,27 @@
     box.hidden = false;
   }
 
+  // Su un'intervista rimasta aperta «No, va bene così» la chiude, come «Salta l'accoglienza» nella sua scheda.
   async function dismissOnboardingNotice() {
-    hideOnboardingNotice();
-    try { await send({ type: MSG.FILO_ONBOARDING_NOTICE_SEEN }); } catch (_) {}
-  }
-
-  // Rifarla da qui: la stessa cosa del pulsante in Preferenze, ma senza mandare
-  // l'utente a cercarlo — l'intervista riparte nella scheda che ha davanti.
-  async function restartOnboardingHere() {
+    const box = $('onbNotice');
+    const aperta = !!box && box.dataset.tipo === 'aperta';
     hideOnboardingNotice();
     try {
-      const r = await send({ type: MSG.FILO_RESTART_ONBOARDING });
-      if (r?.ok && r.onboarding) await openOnboarding({ ...r.onboarding, resume: false });
+      await send(aperta ? { type: MSG.FILO_CLOSE_ONBOARDING, senzaRiga: true } : { type: MSG.FILO_ONBOARDING_NOTICE_SEEN });
+    } catch (_) {}
+  }
+
+  // Riprenderla da qui, nella scheda che l'utente ha davanti: la stessa intervista, dalla domanda rimasta in sospeso e
+  // con quello che Filo ha già imparato (#1297). Da capo la si rifà da Preferenze. Una scheda con una conversazione
+  // sua la tiene: l'intervista riparte in una scheda nuova, come da Preferenze, e il turno in sospeso lo prende lei.
+  async function riprendiQui() {
+    hideOnboardingNotice();
+    const altrove = !!(chatInCorso && chatInCorso());
+    try {
+      const r = await send({ type: MSG.FILO_RESTART_ONBOARDING, riprendi: true, ...(altrove ? { altrove: true } : {}) });
+      if (!r?.ok || !r.onboarding || r.onboarding.done) return;
+      if (altrove) await send({ type: MSG.OPEN_URL, url: `filo://newtab/?${SEGNO}=1` });
+      else await openOnboarding({ ...r.onboarding, resume: !!r.resume });
     } catch (_) {}
   }
 
@@ -457,7 +571,6 @@
     bubblesEl = deps.bubblesEl;
     threadView = deps.threadView;
     inputEl = deps.inputEl;
-    homeMessageEl = deps.homeMessageEl;
     makeBubble = deps.makeBubble;
     stepTrace = deps.stepTrace;
     goHome = deps.goHome;
@@ -469,7 +582,9 @@
     giaAschermo = deps.giaAschermo || null;
     beginSending = deps.beginSending;
     runTurnAndContinue = deps.runTurnAndContinue;
-    isHomeMessageVisible = deps.isHomeMessageVisible;
+    nienteInCorso = deps.nienteInCorso;
+    chatInCorso = deps.chatInCorso || null;
+    allApertura = deps.allApertura;
     soloRisposteSenzaCrediti = deps.soloRisposteSenzaCrediti;
     setSuggestions = deps.setSuggestions;
     loadDashboard = deps.loadDashboard;
@@ -491,5 +606,7 @@
     makeSkipOnboardingBtn,
     sceltaAutonomia,
     aggiornaSceltaAutonomia,
+    sceltaContatori,
+    aggiornaSceltaContatori,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -1,10 +1,6 @@
-// Pagina elenco scaricamenti (#410.3). Legge la cronologia persistita dal
-// gestore download del main (#410.1) e la mostra dal più recente. Ogni voce ha
-// azioni puntuali (clic sinistro = azione primaria, tasto destro = menu con
-// tutte le azioni). Gli scaricamenti in corso mostrano barra + percentuale live,
-// aggiornate da un segnale broadcast del main (contentless: la pagina ri-legge
-// la lista dal canale interno, così nessun percorso su disco viaggia verso le
-// schede di siti esterni).
+// Elenco scaricamenti: cronologia persistita dal main, dal più recente.
+// Clic sinistro = azione primaria, tasto destro = menu completo.
+// Gli aggiornamenti live non portano contenuto: nessun percorso su disco va alle schede.
 
 (function () {
   'use strict';
@@ -53,8 +49,12 @@
     } catch (_) { return ''; }
   }
 
-  // ─── feedback effimero (ogni azione riceve conferma, filo_design) ──────────
   let flashTimer = null;
+  // Un errore letto qui si conta come nella barra delle schede, per chiave dell'elenco chiuso (#1461): mai il testo.
+  function flashErrore(text, chiave) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave })).catch(() => {}); } catch (_) {}
+    flash(text);
+  }
   function flash(text) {
     let el = $('dl-flash');
     if (!el) {
@@ -72,7 +72,7 @@
     flashTimer = setTimeout(() => { el.style.opacity = '0'; }, 1800);
   }
 
-  // ─── azioni (una sola implementazione, condivisa da bottoni e menu) ────────
+  // Una sola implementazione delle azioni, condivisa da bottoni e menu.
   async function reload() {
     const r = await chrome.runtime.sendMessage({ type: MSG.DOWNLOADS_LIST });
     items = (r && r.items) || [];
@@ -90,12 +90,12 @@
     // popup lo chiede qui, con le parole che il main ha scritto per l'utente.
     if (res.needsConfirm) {
       const ok = window.SN_CONFIRM_UI
-        ? await window.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, okLabel: 'Apri comunque' })
+        ? await window.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, parti: res.parti, okLabel: 'Apri comunque' })
         : window.confirm(res.text);
       if (ok) await openFile(r, true);
       return;
     }
-    flash(res.error || 'Impossibile aprire il file');
+    flashErrore(res.error || 'Impossibile aprire il file', 'file_non_aperto');
     if (res.missing) reload();
   }
 
@@ -113,9 +113,9 @@
   async function openFolder(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id });
     if (!res) return;
-    if (res.ok === false) { flash(res.error || 'Cartella non disponibile'); if (res.missing) reload(); return; }
+    if (res.ok === false) { flashErrore(res.error || 'Cartella non disponibile', 'cartella_non_aperta'); if (res.missing) reload(); return; }
     // Cartella aperta ma senza il file dentro: dillo, invece di lasciarlo cercare.
-    if (res.missing) { flash('Il file non c’è più: ho aperto la cartella dov’era'); reload(); }
+    if (res.missing) { flashErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto'); reload(); }
   }
   async function copyPath(r) {
     const p = r.savePath || '';
@@ -195,9 +195,8 @@
   function onMenuKeydown(e) { if (e.key === 'Escape') closeCtxMenu(); }
 
   function menuActionsFor(r) {
-    // Ogni voce dichiara label + handler; la lista dipende dallo stato così ogni
-    // azione compare solo quando ha senso (niente "Apri file" su un download mai
-    // completato). Invariante UX: si può sempre RIMUOVERE ciò che è in lista.
+    // Ogni azione compare solo quando ha senso (niente «Apri file» su un download mai finito).
+    // Invariante UX: si può sempre RIMUOVERE ciò che è in lista.
     const acts = [];
     if (r.state === 'pending') {
       acts.push(['Scarica', () => confirmExe(r, true)]);
@@ -212,8 +211,7 @@
       }
       acts.push(['Annulla', () => cancel(r)]);
     } else if (r.state === 'completed') {
-      // Se il file non è più sul disco "Apri file" non ha niente da aprire:
-      // resta la cartella (e più sotto "Ri-scarica", che è la via per riaverlo).
+      // Senza il file «Apri file» non ha niente da aprire: restano la cartella e «Ri-scarica».
       if (!r.missing) acts.push(['Apri file', () => openFile(r)]);
       acts.push(['Apri cartella', () => openFolder(r)]);
       if (!r.missing && !r.exe && nomiDisponibili && Rinomina && Rinomina.tipoSupportato(r.filename)) {
@@ -221,8 +219,7 @@
       }
       if (!r.missing && r.nomeOriginale) acts.push(['Rimetti il nome di prima', () => rimettiNome(r)]);
     } else {
-      // interrupted / cancelled: il file completo non c'è, ma la cartella e la
-      // sorgente restano utili.
+      // interrupted/cancelled: il file completo non c'è, ma cartella e sorgente restano utili.
       acts.push(['Apri cartella', () => openFolder(r)]);
     }
     if (r.savePath) acts.push(['Copia percorso', () => copyPath(r)]);
@@ -263,13 +260,11 @@
     }, 0);
   }
 
-  // ─── rendering ─────────────────────────────────────────────────────────────
   function renderItem(r) {
     const row = document.createElement('div');
     row.className = 'dl-item';
     row.dataset.state = r.state;
-    // Il file scaricato non è più al suo posto: la voce si attenua e perde
-    // "Apri file" — l'utente lo vede prima ancora di cliccare.
+    // File non più al suo posto: la voce si attenua e perde «Apri file», prima ancora del clic.
     if (r.missing) row.dataset.missing = '1';
     row.dataset.id = r.id;
     row.tabIndex = 0;
@@ -314,7 +309,6 @@
     }
     row.appendChild(meta);
 
-    // Riga 3: barra viva per gli attivi, altrimenti il percorso su disco.
     if (isActive(r)) {
       const bar = document.createElement('div');
       bar.className = 'dl-bar';
@@ -332,8 +326,7 @@
       row.appendChild(path);
     }
 
-    // Bottoni rapidi inline (parità col menu contestuale, discoverabili senza
-    // tasto destro). Il menu resta l'elenco completo.
+    // Bottoni inline per scoprire le azioni senza tasto destro; il menu resta l'elenco completo.
     const actions = document.createElement('div');
     actions.className = 'dl-actions';
     const addBtn = (label, fn) => {
@@ -357,8 +350,7 @@
       addBtn('Apri file', () => openFile(r));
       addBtn('Apri cartella', () => openFolder(r));
     } else if (r.missing) {
-      // Senza il file, la cosa utile è riaverlo: la cartella resta a portata
-      // dal menu del tasto destro.
+      // Senza il file la cosa utile è riaverlo; la cartella resta a portata dal tasto destro.
       if (isHttp(r.url)) addBtn('Ri-scarica', () => redownload(r));
     } else if (isHttp(r.url)) {
       addBtn('Ri-scarica', () => redownload(r));
@@ -366,8 +358,7 @@
     addBtn('Rimuovi', () => removeItem(r));
     row.appendChild(actions);
 
-    // Clic sinistro sulla riga = azione primaria: apri il file se completato (e
-    // se il file c'è ancora: su una voce svuotata il clic non prometterebbe nulla).
+    // Clic sinistro = azione primaria: apre solo se completato e il file c'è ancora.
     if (r.state === 'completed' && !r.missing) {
       row.addEventListener('click', () => openFile(r));
     }
@@ -404,7 +395,6 @@
       });
     }
 
-    // Conteggio (scaricamenti attivi evidenziati).
     const active = items.filter(isActive).length;
     $('count').textContent = items.length
       ? (active ? `${items.length} in elenco · ${active} in corso` : `${items.length} in elenco`)
@@ -425,7 +415,6 @@
     else list.replaceChildren(...filtered.map(renderItem));
   }
 
-  // ─── live: il main segnala "qualcosa è cambiato" (senza dati) → ri-leggiamo ─
   let liveTimer = null;
   function scheduleReload() {
     clearTimeout(liveTimer);
@@ -465,17 +454,14 @@
       render();
     });
 
-    // Tornando su questa scheda dopo essere andati a spostare/cancellare i file
-    // nel gestore di sistema, la lista va riletta: nessun evento annuncia una
-    // cartella svuotata da fuori, e senza rilettura le voci resterebbero
-    // "aperibili" pur non avendo più un file dietro.
+    // Tornando qui dopo aver spostato o cancellato i file da fuori la lista va riletta: nessun
+    // evento annuncia una cartella svuotata, e le voci resterebbero «aperibili».
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) { scheduleReload(); aggiornaDisponibilita(); }
     });
     window.addEventListener('focus', () => { scheduleReload(); aggiornaDisponibilita(); });
 
-    // Aggiornamenti live: il main pusha un segnale contentless quando parte/
-    // avanza/finisce uno scaricamento. Ri-leggiamo la lista dal canale interno.
+    // Il main segnala ogni cambiamento senza contenuto: la lista si rilegge dal canale interno.
     if (chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
       chrome.runtime.onMessage.addListener((msg) => {
         if (msg && msg.type === MSG.DOWNLOADS_UPDATED) scheduleReload();

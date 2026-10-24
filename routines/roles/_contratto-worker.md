@@ -11,20 +11,21 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
   file-ruolo;
 - i testi per l'owner e per chi ha segnalato → nelle `notes` via canale;
 - un trade-off vero o una domanda di design (CLAUDE.md § Iniziativa: non lo
-  decidi tu) → `--segnala <file.md>` sulla consegna (`--record-fixed`,
+  decidi tu) → `--domanda <file.json>` sulla consegna (`--record-fixed`,
   `--record-verifier`). Nel report da solo si perde;
 - l'esito del controllo di sicurezza → sempre con la sua nota
   (`--record-secaudit … --nota <file.md>`), anche quando passa. I file di
-  `--segnala` e `--nota` si scrivono FUORI dal repo, nella cartella temporanea
-  del sistema (per esempio `../segnala-<numero>.md`): la consegna rifiuta una
+  `--domanda` e `--nota` si scrivono FUORI dal repo, nella cartella temporanea
+  del sistema (per esempio `../domanda-<numero>.json`): la consegna rifiuta una
   directory con file non committati;
 <!-- includi: _domanda-fine-sessione.md -->
 - il claim → il rilascio, quando hai finito (`node scripts/routine-channel.mjs
   release <biglietto> --role <il tuo ruolo>`): il ruolo firma il rapporto di
   fine sessione che il rilascio allega da solo; senza, il rapporto esce anonimo;
 - un guasto che ti impedisce di lavorare → una domanda e il rilascio con
-  `--guasto`, come nella sezione qui sotto: è così che il server smette di dare
-  lavoro per questo giro. Non "riportarlo" a parole: registralo.
+  `--guasto` (il controllo di sicurezza: il solo rilascio), come nella sezione
+  qui sotto: è così che il server smette di dare lavoro per questo giro. Non
+  "riportarlo" a parole: registralo.
 
 Se hai registrato tutto, la tua ultima frase non conta niente. Se non l'hai
 registrato, non esiste.
@@ -74,6 +75,11 @@ tetto 240 s), mai da dieci. Il timeout della chiamata si dimensiona sulla
 capo. Lunghi di sicuro: le prove di un feedback (otto minuti e mezzo),
 `npm run finish:check` (da quindici a quarantacinque minuti), l'installazione
 di Electron.
+
+Un comando in sottofondo **si aspetta prima del rilascio**: finché un tuo
+processo lavora nella cartella il rilascio rifiuta (exit 5, coi pid e i
+comandi), perché dopo il rilascio cartella e ramo passano al prossimo worker.
+Aspettalo, o fermalo se non serve più, e rilancia lo stesso comando.
 
 ## Se il server RIFIUTA una consegna (exit 4) o NON RISPONDE (exit 3)
 

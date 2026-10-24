@@ -70,6 +70,8 @@
   flex-direction: column;
   gap: 10px;
 }
+/* Pieno il diario, le righe con overflow nascosto si schiacciavano a zero e sparivano: scorre lui, loro restano intere. */
+.sn-sidebar-conv > * { flex-shrink: 0; }
 
 .sn-sidebar-msg {
   max-width: 92%;
@@ -92,6 +94,13 @@
   color: var(--sn-fg);
 }
 
+/* Le immagini date all'Aiuto (#1623): sopra la casella prima dell'invio, in cima alla bolla dopo. Il contenuto sta in
+   un'ombra chiusa (sidebar.js), qui solo il posto. */
+.sn-sidebar-allegati { flex-shrink: 0; border-top: 1px solid var(--sn-border); }
+.sn-sidebar-allegati[hidden] { display: none; }
+.sn-sidebar-allegati:not([hidden]) + .sn-sidebar-input,
+.sn-sidebar.sn-sidebar-collapsed .sn-sidebar-allegati { border-top: 0; }
+.sn-sidebar-msg-immagini { display: block; }
 .sn-sidebar-msg-loading { color: var(--sn-muted); font-style: italic; }
 .sn-sidebar-msg-error   { color: var(--sn-error); }
 
@@ -254,6 +263,10 @@ html:has(> .sn-sidebar:not([data-spostata])) > .sn-toasts {
 }
 .sn-sidebar.sn-sidebar-collapsed .sn-sidebar-input {
   border-top: 0;
+}
+/* Chiuso mentre Filo risponde: la conversazione aspetta di essere riaperta (#1432). */
+.sn-sidebar.sn-sidebar-nascosta {
+  display: none !important;
 }
 
 .sn-sidebar-meta {

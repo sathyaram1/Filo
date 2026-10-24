@@ -49,7 +49,7 @@ test('gli id sono unici e stabili (kebab-case)', () => {
 });
 
 test('index() è compatto, get()/byCategory()/all() coerenti', () => {
-  const tutti = { redteam: true };
+  const tutti = { redteam: true, bacheca: true, mazzi: true };
   const idx = CAP.index(tutti);
   assert.equal(idx.length, CAP.CAPABILITIES.length);
   for (const e of idx) {
@@ -61,6 +61,17 @@ test('index() è compatto, get()/byCategory()/all() coerenti', () => {
   // all() torna una copia: mutarla non tocca l'originale.
   CAP.all(tutti).pop();
   assert.equal(CAP.all(tutti).length, CAP.CAPABILITIES.length);
+});
+
+test('#1295 — il manifesto non promette che le chat non escono: a ogni messaggio e a fine chat le legge un modello', () => {
+  for (const c of CAP.all()) {
+    const testo = `${c.desc} ${c.invoke} ${c.doesNot || ''}`;
+    if (!/\bchat\b|conversazion/i.test(testo)) continue;
+    assert.doesNotMatch(testo, /nessuna chat esce|le chat non escono|niente di quello che scrivi finisce altrove/i,
+      `la voce "${c.id}" promette il contrario di quello che succede`);
+  }
+  assert.match(CAP.get('chat-archive').doesNot, /restano salvate sul tuo computer/);
+  assert.match(CAP.get('chat-archive').doesNot, /modello/);
 });
 
 test('#896 — il Red Team in pausa non esiste per l’agente: né voce, né accenno nelle altre', () => {
@@ -83,6 +94,33 @@ test('#896 — il Red Team in pausa non esiste per l’agente: né voce, né acc
   assert.ok(CAP.get('red-team', aperto));
   assert.match(CAP.renderIndexForPrompt(aperto), /Red Team \[red-team\]/);
   assert.match(CAP.renderDetailForPrompt(['red-team'], aperto), /filo:\/\/redteam\/redteam\.html/);
+});
+
+test('#1592 — Bacheca e Deck builder in pausa non esistono per l’agente: né voce, né accenno nelle altre', () => {
+  const pause = { bacheca: /bacheca|filo:\/\/board\/board\.html(?!#segnalazioni)|filo:\/\/board\/(?!board)|ancora rotto|votand|votare/i,
+    mazzi: /\bmazz|deck|filo:\/\/decks/i };
+  const voce = { bacheca: 'board', mazzi: 'deck-builder' };
+  for (const aperti of [undefined, { bacheca: false, mazzi: false }]) {
+    for (const nome of Object.keys(pause)) {
+      assert.equal(CAP.get(voce[nome], aperti), undefined, `${voce[nome]} esiste per chi non la vede`);
+      assert.match(CAP.renderDetailForPrompt([voce[nome]], aperti), /nessuna capacità con questo id/i);
+    }
+    assert.doesNotMatch(CAP.renderIndexForPrompt(aperti), /bacheca|deck/i, 'l’indice per il prompt le nomina ancora');
+    for (const c of CAP.all(aperti)) {
+      const testo = `${c.title} ${c.desc} ${c.invoke} ${c.doesNot || ''}`;
+      assert.doesNotMatch(testo, /\{se:|\{altrimenti\}|\{\/se\}/, `nella voce "${c.id}" è rimasto un segnaposto`);
+      for (const [nome, re] of Object.entries(pause)) {
+        assert.doesNotMatch(testo, re, `la voce "${c.id}" nomina ${nome} anche a chi non la vede`);
+      }
+    }
+  }
+  // Le segnalazioni mandate restano raccontate a tutti, con la strada che c'è a Bacheca chiusa.
+  assert.match(CAP.get('segnalazioni-mie').invoke, /Menu App → "Le tue segnalazioni"/);
+  const aperte = { bacheca: true, mazzi: true };
+  assert.ok(CAP.get('board', aperte) && CAP.get('deck-builder', aperte));
+  assert.match(CAP.get('segnalazioni-mie', aperte).invoke, /Menu App → "Bacheca"/);
+  assert.match(CAP.get('home-cards', aperte).desc, /i Mazzi coi mazzi \(filo:\/\/decks\/decks\.html\)/);
+  assert.match(CAP.get('home-cards', aperte).desc, /la Bacheca \(filo:\/\/board\/board\.html\)/);
 });
 
 // ── Anti-stale: incrocio col codice reale ────────────────────────────────────
@@ -148,18 +186,27 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
   const FILO_MSG_TO_CAP = {
     FILO_CHAT: 'filo-assistant',
     FILO_CHAT_STOP: 'filo-assistant',
+    // #1296 — il seguito scritto mentre Filo lavora.
+    FILO_CHAT_SEGUITO: 'filo-assistant',
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
     // #530 — l'agente sulla pagina chiede se una sua azione parte, chiede o no.
     FILO_DECIDI_PAGINA: 'autonomy-levels',
     FILO_AIUTO_NUOVO: 'autonomy-levels',
     FILO_CONFIRM_ACTION: 'agent-actions',
+    FILO_CONFIRM_RIFIUTATA: 'agent-actions',
     // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
     FILO_APRI_PROPOSTA: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
-    // #592 — la memoria riga per riga nelle Preferenze: rileggerla e toglierne una.
+    // #592 — la memoria riga per riga: rileggerla e toglierne una. #872 — il quaderno: correggere, rimettere,
+    // cancellare per sempre, e il salto della home al punto del filo da cui una riga è nata.
     FILO_MEMORY_VIEW: 'filo-memory',
     FILO_MEMORY_FORGET: 'filo-memory',
+    FILO_QUADERNO: 'filo-memory',
+    FILO_MEMORY_EDIT: 'filo-memory',
+    FILO_MEMORY_RESTORE: 'filo-memory',
+    FILO_MEMORY_FOREVER: 'filo-memory',
+    FILO_DOVE: 'filo-memory',
     // #525 — l'archivio delle chat: lo consulta la pagina Cronologia
     // (capacità "chat-archive"). La ricerca che fa FILO stesso passa dalle
     // azioni (FILO_RUN_ACTION → CERCA_CHAT) ed è la capacità gemella
@@ -168,6 +215,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CHAT_GET: 'chat-archive',
     FILO_CHAT_CLOSE: 'chat-archive',
     FILO_CHAT_DELETE: 'chat-archive',
+    FILO_CHAT_NASCONDI: 'chat-archive',
     FILO_CHATS_SEARCH: 'chat-archive',
     // La riga che Filo scrive rispondendo a un comando con lo slash finisce
     // nella stessa chat, e «torna dov'è aperta» è il clic su una chat ancora in
@@ -183,6 +231,10 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CONVERSAZIONE_APP_DIMENTICA: 'app-chats-in-filo',
     FILO_CONVERSAZIONE_APP_RINOMINA: 'app-chats-in-filo',
     FILO_RIGHE_APP: 'app-chats-in-filo',
+    // #869 — la home è la coda del filo: a pezzi, la ricerca nel campo, le pagine tolte dal tasto destro.
+    FILO_CODA: 'home-filo',
+    FILO_CERCA: 'home-filo',
+    FILO_CODA_TOGLI_PAGINE: 'home-filo',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
     // dall'azione SALVA_APPUNTO (FILO_RUN_ACTION), che scrive nei file dell'editor.
     FILO_GET_TIMERS: 'filo-timers',
@@ -198,6 +250,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_RESTART_ONBOARDING: 'onboarding',
     FILO_CLOSE_ONBOARDING: 'onboarding',
     FILO_ONBOARDING_NOTICE_SEEN: 'onboarding',
+    FILO_ONBOARDING_TOGLI: 'onboarding',
   };
 
   for (const h of handlers) {
@@ -278,8 +331,8 @@ test('ogni icona fissa della home che apre una pagina filo:// è coperta dal man
   // manifesto dice a un utente qualunque cosa sa fare Filo, e la posta delle
   // segnalazioni lui non la può aprire (#583). Dalla home ci si arriva solo da
   // admin, per questo l'indirizzo compare ancora nel file.
-  // «Inviti e utenti» si apre dall'allarme del conto che arriva solo all'owner (#820).
-  const SOLO_OWNER = new Set(['filo://feedback/feedback.html', 'filo://manage/manage.html', 'filo://credits/owner.html']);
+  // «Inviti e utenti» (in Gestione dal #1414) si apre dall'allarme del conto che arriva solo all'owner (#820).
+  const SOLO_OWNER = new Set(['filo://feedback/feedback.html', 'filo://manage/manage.html']);
   // Le icone che stavano in alto a destra nella home sono nella barra laterale (#871): stessa regola.
   const barra = readFileSync(join(ROOT, 'src', 'main', 'barraLaterale.js'), 'utf8');
   const pagineBarra = barra.match(/const PAGINE_FISSE = \{([\s\S]*?)\};/)?.[1] || '';
@@ -410,9 +463,10 @@ test('nessuna capacità cita la barra in alto / degli indirizzi, rimossa dalla s
     { re: /barra in alto/i, why: 'la barra in alto (indirizzi/navigazione) è stata rimossa' },
     { re: /barra\s+(degli\s+)?indirizzi/i, why: 'la barra degli indirizzi è sempre nascosta' },
     // "nella barra" generico, TRANNE la barra delle schede (le linguette, che
-    // esiste) o la barra in basso (chat del deck builder): intercetta formule
-    // come "Pulsante Home nella barra" che rimandano alla barra sparita.
-    { re: /nella barra(?!\s+(delle schede|in basso|laterale))/i, why: 'l\'unica barra sopra le schede è quella delle linguette (a sinistra c\'è la barra laterale)' },
+    // esiste), la barra in basso (chat del deck builder) o quella delle
+    // applicazioni del sistema (l'avanzamento dei download, #941): intercetta
+    // formule come "Pulsante Home nella barra" che rimandano alla barra sparita.
+    { re: /nella barra(?!\s+(delle schede|in basso|laterale|delle applicazioni))/i, why: 'l\'unica barra sopra le schede è quella delle linguette (a sinistra c\'è la barra laterale)' },
   ];
   for (const c of CAP.CAPABILITIES) {
     const text = `${c.invoke} ${c.desc}${c.doesNot ? ' ' + c.doesNot : ''}`;
@@ -540,5 +594,24 @@ test('il manifesto nomina ogni modulo dell\'Editor che prende una scorciatoia, e
   const tutti = [...src.matchAll(/^\s+'?([a-z-]+)'?:\s*\{\s*label: '([^']+)'/gm)].map((m) => m[2]);
   for (const altro of tutti.filter((l) => !tipi.map(etichetta).includes(l))) {
     assert.ok(!frase[0].includes(altro), `il manifesto promette una scorciatoia a «${altro}», che non la prende`);
+  }
+});
+
+// #1295 — il manifesto non dice insieme «la cancella per sempre» e «non cancella mai per sempre»: dove promette di
+// non cancellare dati in modo definitivo, nella stessa voce dice che una cosa sola la cancella se la chiedi tu.
+test('dove il manifesto promette di non cancellare mai per sempre, nomina la cancellazione che chiedi tu', () => {
+  const tutto = JSON.stringify(CAP);
+  assert.ok(tutto.includes('cancellala per sempre'), 'la voce delle chat dice che si cancellano per sempre');
+  const testi = [];
+  const giro = (x) => {
+    if (typeof x === 'string') testi.push(x);
+    else if (x && typeof x === 'object') for (const v of Object.values(x)) giro(v);
+  };
+  giro(CAP);
+  assert.ok(!tutto.includes('cancellare dati in modo definitivo'), 'nessuna voce promette di non cancellare mai per sempre');
+  const promesse = testi.filter((t) => /non le fa (mai|a nessun livello)/.test(t) && /per sempre i tuoi dati in blocco/.test(t));
+  assert.ok(promesse.length >= 2, 'le voci dell’elenco fisso dicono che il no vale per le cancellazioni in blocco');
+  for (const t of promesse) {
+    assert.match(t, /per sempre solo se glielo chiedi tu e scrivi «conferma»/, `e nomina l'eccezione: ${t.slice(0, 120)}`);
   }
 });

@@ -347,6 +347,80 @@ test('una richiesta fatta di sole parole che non distinguono resta stretta', () 
   assert.deepEqual(r.results, []);
 });
 
+// #1295 — un argomento che si chiama con una parola corta (Zen, SQL, IVA) conta come gli altri.
+const CHAT_ZEN = {
+  id: 'cz', title: 'Meditazione', kind: 'conversazione', closedAt: '2026-09-20T10:00:00.000Z',
+  messages: [{ role: 'user', text: 'Parliamo di Zen: come si imposta la meditazione sul respiro?' }],
+};
+const CHAT_SQL = {
+  id: 'cs', title: 'Indici', kind: 'conversazione', closedAt: '2026-09-20T11:00:00.000Z',
+  messages: [{ role: 'user', text: 'Spiegami gli indici SQL e quando conviene metterli' }],
+};
+const CHAT_ARRIVI = {
+  id: 'ca', title: 'Pacchi', kind: 'conversazione', closedAt: '2026-09-20T12:00:00.000Z',
+  messages: [{ role: 'user', text: 'Quando arrivano i pacchi? Motivazione del ritardo' }],
+};
+
+test('una parola corta che non è vuota distingue: la frase intera trova la chat sullo Zen e su SQL', () => {
+  const tutte = [CHAT_COSCIENZA, CHAT_ZEN, CHAT_SQL, CHAT_ARRIVI];
+  for (const [q, atteso] of [
+    ['riprendi la discussione di ieri sullo Zen', 'cz'],
+    ['la chat sullo Zen', 'cz'],
+    ['la chat su SQL', 'cs'],
+    ['riprendi la discussione sugli indici SQL', 'cs'],
+  ]) {
+    const r = CA.searchWide(tutte, q);
+    assert.deepEqual(r.results.map((c) => c.id), [atteso], `query: ${q}`);
+    assert.equal(r.allargata, true);
+  }
+  assert.deepEqual(CA.searchWide(tutte, 'la chat su SQL').termini, ['sql']);
+});
+
+test('l’apostrofo divide: «sull’IVA» cerca «iva»', () => {
+  const iva = { ...CHAT_SQL, id: 'ci', messages: [{ role: 'user', text: 'Quanto è l’IVA sui libri?' }] };
+  const r = CA.searchWide([iva, CHAT_ARRIVI], 'la chat sull’IVA');
+  assert.deepEqual(r.results.map((c) => c.id), ['ci']);
+  assert.deepEqual(CA.terminiCheDistinguono(["sull'iva", 'dell’orca']), ['iva', 'orca']);
+});
+
+test('nei passi allargati una parola corta vale da inizio parola: «iva» non trova «arrivano» né «motivazione»', () => {
+  const r = CA.searchWide([CHAT_ARRIVI], 'la chat sulla IVA');
+  assert.deepEqual(r.results, []);
+  assert.equal(CA.contieneTermine('quando arrivano i pacchi', 'iva'), false);
+  assert.equal(CA.contieneTermine('l’iva sui libri', 'iva'), true);
+  assert.equal(CA.contieneTermine('sqlite e postgres', 'sql'), true);
+  assert.equal(CA.contieneTermine('la coscienza emergente', 'coscienz'), true, 'una parola lunga resta un pezzo qualunque');
+});
+
+test('le parole vuote corte restano fuori, anche quelle che prima toglieva solo la lunghezza', () => {
+  assert.deepEqual(CA.terminiCheDistinguono(['la', 'chat', 'di', 'ieri', 'col', 'dai', 'poi', 'un', 'po', 'zen']), ['zen']);
+  // Una frase di sole parole vuote non tira fuori mezzo archivio.
+  assert.deepEqual(CA.searchWide([CHAT_ZEN, CHAT_SQL], 'poi dai un po di ieri').results, []);
+  // Le lettere sole non distinguono niente.
+  assert.deepEqual(CA.terminiCheDistinguono(['l', 'd', 'c']), []);
+});
+
+test('una sigla scritta in maiuscolo conta anche se si scrive come una parola vuota: l’AI non è «ai»', () => {
+  const CHAT_AI = { ...CHAT_ZEN, id: 'cai', title: '', messages: [{ role: 'user', text: 'Cosa pensi dell’AI generativa nelle scuole?' }] };
+  assert.deepEqual(CA.searchWide([CHAT_ZEN, CHAT_AI], 'riprendi la chat sull’AI').results.map((c) => c.id), ['cai']);
+  assert.deepEqual(CA.terminiCheDistinguono(['la', 'chat', 'sull', 'ai'], 'la chat sull’AI'), ['ai']);
+  // Scritta minuscola resta la preposizione; tutta la frase in maiuscolo è il tasto bloccato, non una fila di sigle.
+  assert.deepEqual(CA.terminiCheDistinguono(['ai', 'zen'], 'ai zen'), ['zen']);
+  assert.deepEqual(CA.terminiCheDistinguono(['la', 'chat', 'sullo', 'zen'], 'LA CHAT SULLO ZEN'), ['zen']);
+});
+
+test('chi chiede delle conversazioni nascoste o tolte le vuole tutte', () => {
+  for (const q of ['quali chat ho nascosto?', 'la conversazione che avevo tolto', 'le chat nascoste', 'la chat che avevo cancellato']) {
+    assert.equal(CA.chiedeLeNascoste(q), true, q);
+  }
+  for (const q of ['la chat sullo Zen', 'riprendi la discussione di ieri', '']) assert.equal(CA.chiedeLeNascoste(q), false, q);
+});
+
+test('il frammento attorno a una parola corta parte dalla parola, non da dentro un’altra', () => {
+  const c = { ...CHAT_ZEN, messages: [{ role: 'user', text: `Senza fretta, ${'x '.repeat(80)}parliamo di Zen e respiro` }] };
+  assert.match(CA.snippetFor(c, 'zen'), /Zen e respiro/);
+});
+
 test('il frammento si costruisce attorno alla parola che c’è davvero', () => {
   const s = CA.snippetFor(CHAT_COSCIENZA, 'la coscienza');
   assert.ok(s.includes('coscienza'), `frammento: ${s}`);

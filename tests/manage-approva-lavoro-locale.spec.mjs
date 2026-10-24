@@ -1,13 +1,13 @@
-// IL FEEDBACK DI UN UTENTE APPROVATO COME LAVORO LOCALE (#913).
+// IL ROMBO AZZURRO APPROVATO COME LAVORO SERVER (#913, #1575).
 //
 // COSA DEVE ESSERE VERO
-//   1. Nei Ricevuti, sul feedback di un utente (o di una routine) c'è «💻 Lavoro locale»: un clic lo porta nei
-//      Lavori locali, e al main arriva in una scrittura sola l'approvazione, il segno e il sì dell'owner.
-//   2. Rimandato perché richiede lavoro locale, è il tasto principale; sugli altri è secondario.
-//   3. La stessa cosa dal tasto destro sulla scheda.
-//   4. Lo stesso clic segna fidato il feedback (#1148, richiesta al server); nei Lavori locali il dettaglio lo
-//      dice, e dice che l'ha approvato l'owner; togliere il segno lascia il sì. Se il server non lo segna, il
-//      messaggio lo dice.
+//   1. Nei Ricevuti, sul rombo azzurro (`design`/`locale` senza domanda, nato prima del #1358) c'è «💻 Lavoro
+//      server», tasto principale: un clic lo porta «In coda» con l'etichetta «server», e al main arriva in una
+//      scrittura sola l'approvazione, il segno e il sì dell'owner.
+//   2. Su ogni altra pratica dei Ricevuti il tasto non c'è; sul rombo di un fidato c'è e scrive il solo segno.
+//   3. La stessa cosa dal tasto destro sulla scheda, con lo stesso nome.
+//   4. Lo stesso clic segna fidato il feedback (#1148, richiesta al server); In coda il dettaglio lo dice, e
+//      l'etichetta dice che l'ha approvato l'owner. Se il server non lo segna, il messaggio lo dice.
 //   5. La pagina gemella dei feedback offre la stessa azione e scrive gli stessi campi.
 
 import { test, expect } from './fixtures/electron.mjs';
@@ -58,7 +58,7 @@ async function apri(page, lista, tab = 'inbox', fiduciaErr = '') {
 const tabBtn = (page, tab) => page.locator(`.mg-tab[data-tab="${tab}"]`);
 const scrittura = (u) => ({ status: u.status, reviewDecision: u.reviewDecision, localOnly: u.localOnly, localApproval: u.localApproval });
 
-test('dai Ricevuti: «💻 Lavoro locale» lo porta nei Lavori locali col sì dell’owner, in una scrittura', async ({ openTab }) => {
+test('dai Ricevuti: «💻 Lavoro server» lo porta «In coda» col segno e il sì dell’owner, in una scrittura', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [fb()]);
   await expect(tabBtn(page, 'inbox')).toHaveText('Ricevuti (1)');
@@ -73,82 +73,97 @@ test('dai Ricevuti: «💻 Lavoro locale» lo porta nei Lavori locali col sì de
   await expect(page.locator('#mgAcceptBtn')).toHaveClass(/sn-btn-secondary/);
 
   await btn.click();
-  await expect(tabBtn(page, 'local')).toHaveText('Lavori server (1)');
+  await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
   await expect(tabBtn(page, 'inbox')).toHaveText('Ricevuti (0)');
-  await expect(page.locator('#mgToast')).toContainText('Lavori server');
+  await expect(page.locator('#mgToast')).toContainText('#913 è In coda come lavoro server.');
   const updates = await page.evaluate(() => window.__updates);
   expect(updates).toHaveLength(1);
   expect(scrittura(updates[0])).toEqual({ status: 'todo', reviewDecision: 'accepted', localOnly: true, localApproval: true });
   expect(await page.evaluate(() => window.__fiducia)).toEqual([{ type: 'fiducia_segna', feedbackId: 'u-913' }]);
 
-  // Nei Lavori locali: è fidato, e l'hover del segno dice chi l'ha approvato.
-  await apriScheda(page, 'local');
-  await page.locator('.mg-item').click();
+  // In coda: è fidato, la riga lo dice col suo scudo, e l'etichetta dice chi l'ha approvato.
+  await apriScheda(page, 'queue');
+  const riga = page.locator('.mg-item[data-id="u-913"]');
+  await expect(riga.locator('.mg-local-badge')).toHaveText('server');
+  await expect(riga.locator('.mg-local-badge')).toHaveAttribute('title', /Approvato come lavoro server da /);
+  await expect(riga.locator('.mg-fiducia-segno')).toHaveAttribute('aria-label', 'Fidata');
+  await riga.click();
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('title', /^Fidato: l’hai segnato tu/);
-  const segno = page.locator('#mgLocalBtn');
-  await expect(segno).toBeVisible();
-  await expect(segno).toHaveAttribute('title', /Approvato come lavoro server da .*l'approvazione resta/);
-
-  // Se si può mettere si può togliere, e rimettere: il sì resta, e il segno torna senza passare dai Ricevuti.
-  await segno.click();
-  await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
-  const dopo = await page.evaluate(() => window.__updates);
-  expect(dopo[1]).toEqual({ type: 'feedback_update', id: 'u-913', localOnly: false });
-  await expect(segno).toBeVisible();
-  await expect(segno).toHaveAttribute('aria-pressed', 'false');
-  await segno.click();
-  await expect(tabBtn(page, 'local')).toHaveText('Lavori server (1)');
-  const ancora = await page.evaluate(() => window.__updates);
-  expect(ancora[2]).toEqual({ type: 'feedback_update', id: 'u-913', localOnly: true });
+  // Il segno a mano non c'è più: nessun tasto per toglierlo.
+  await expect(page.locator('#mgLocalBtn')).toHaveCount(0);
+  await expect(page.locator('#mgOwnerBar')).not.toContainText(/💻/);
 });
 
-test('su un feedback qualunque dei Ricevuti il tasto c’è, ma secondario; sui fidati no', async ({ openTab }) => {
+test('sul rombo azzurro di un fidato «💻 Lavoro server» c’è lo stesso, e scrive il solo segno', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  const qualunque = fb({ _id: 'u-1', seq: 801, status: 'aligned', statusReason: '' });
-  const tuo = fb({ _id: 'o-1', seq: 802, clientId: 'owner:me', senderProof: 'admin', fiducia: 'fidato', status: 'aligned', statusReason: '' });
-  await apri(page, [qualunque, tuo]);
-  await page.evaluate(() => window.__mgTest.openDetail('u-1'));
-  await expect(page.locator('#mgAcceptLocalBtn')).toHaveClass(/sn-btn-secondary/);
-  await expect(page.locator('#mgAcceptBtn')).not.toHaveClass(/sn-btn-secondary/);
-  await page.evaluate(() => window.__mgTest.openDetail('o-1'));
-  await expect(page.locator('#mgAcceptBtn')).toBeVisible();
-  await expect(page.locator('#mgAcceptLocalBtn')).toHaveCount(0);
+  await apri(page, [fb({ clientId: 'owner:me', senderProof: 'admin', fiducia: 'fidato' })]);
+  await page.locator('.mg-item').click();
+  const btn = page.locator('#mgAcceptLocalBtn');
+  await expect(btn).toHaveText('💻 Lavoro server');
+  await expect(btn).not.toHaveClass(/sn-btn-secondary/);
+  await btn.click();
+  await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
+  const updates = await page.evaluate(() => window.__updates);
+  expect(scrittura(updates[0])).toEqual({ status: 'todo', reviewDecision: 'accepted', localOnly: true, localApproval: undefined });
+  expect(await page.evaluate(() => window.__fiducia)).toEqual([]);
 });
 
-test('tasto destro sulla scheda nei Ricevuti: «Approva come lavoro locale», e la pratica passa nei Lavori locali', async ({ openTab }) => {
+test('su ogni altra pratica dei Ricevuti il tasto non c’è, né nel dettaglio né col tasto destro', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const altre = [
+    fb({ _id: 'u-1', seq: 801, status: 'aligned', statusReason: '' }),
+    fb({ _id: 'o-1', seq: 802, clientId: 'owner:me', senderProof: 'admin', fiducia: 'fidato', status: 'aligned', statusReason: '' }),
+    fb({ _id: 'a-1', seq: 803, status: 'attack', statusReason: '' }),
+    fb({ _id: 'd-1', seq: 804, statusReason: 'fidato' }),
+    fb({ _id: 'n-1', seq: 805, status: 'unlabeled', statusReason: '' }),
+  ];
+  await apri(page, altre);
+  for (const p of altre) {
+    await page.evaluate((id) => window.__mgTest.openDetail(id), p._id);
+    await expect(page.locator('#mgAcceptBtn'), p._id).toBeVisible();
+    await expect(page.locator('#mgAcceptBtn'), p._id).not.toHaveClass(/sn-btn-secondary/);
+    await expect(page.locator('#mgAcceptLocalBtn'), p._id).toHaveCount(0);
+    await page.locator(`.mg-item[data-id="${p._id}"]`).click({ button: 'right' });
+    await expect(page.locator('.mg-ctxmenu')).toBeVisible();
+    await expect(page.locator('.mg-ctxmenu'), p._id).not.toContainText(/💻|[Ll]avoro server/);
+    await page.keyboard.press('Escape');
+  }
+});
+
+test('tasto destro sul rombo azzurro: «💻 Lavoro server», e la pratica passa «In coda»', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [fb({ clientId: 'routine:worker', senderProof: 'server' })]);
   await page.locator('.mg-item').click({ button: 'right' });
-  const voce = page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Approva come lavoro server' });
+  const voce = page.locator('.mg-ctxmenu .sn-select-option', { hasText: '💻 Lavoro server' });
   await expect(voce).toBeVisible();
   await expect(voce).toHaveAttribute('title', /Diventa un lavoro server/);
   await voce.click();
   await expect(page.locator('.mg-ctxmenu')).toHaveCount(0);
-  await expect(tabBtn(page, 'local')).toHaveText('Lavori server (1)');
+  await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
   const updates = await page.evaluate(() => window.__updates);
   expect(scrittura(updates[0])).toEqual({ status: 'todo', reviewDecision: 'accepted', localOnly: true, localApproval: true });
   expect(await page.evaluate(() => window.__fiducia)).toEqual([{ type: 'fiducia_segna', feedbackId: 'u-913' }]);
 });
 
-test('se il server non lo segna fidato, il lavoro locale resta e il messaggio lo dice', async ({ openTab }) => {
+test('se il server non lo segna fidato, il lavoro server resta e il messaggio lo dice', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [fb()], 'inbox', 'feedback inesistente');
   await page.locator('.mg-item').click();
   await page.locator('#mgAcceptLocalBtn').click();
-  await expect(tabBtn(page, 'local')).toHaveText('Lavori server (1)');
+  await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
   await expect(page.locator('#mgToast')).toContainText('Non segnato fidato: feedback inesistente');
-  await tabBtn(page, 'local').click();
+  await tabBtn(page, 'queue').click();
   await page.locator('.mg-item').click();
   await expect(page.locator('#mgFiduciaBtn')).toBeVisible();
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'false');
 });
 
-test('segnalato dai giudici: il tasto c’è e l’hover dice di guardarlo prima', async ({ openTab }) => {
+test('segnalato dai giudici: sul rombo il tasto c’è e l’hover dice di guardarlo prima', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await apri(page, [fb({ status: 'attack', statusReason: '' })]);
+  await apri(page, [fb({ pipeline: { verdicts: [{ judge: 'A', class: 'attack' }], expectedJudges: ['A'] } })]);
   await page.locator('.mg-item').click();
-  await expect(page.locator('#mgAcceptLocalBtn')).toHaveAttribute('title', /Attenzione: è segnalato come attacco, guardalo prima/);
+  await expect(page.locator('#mgAcceptLocalBtn')).toHaveAttribute('title', /Attenzione: .*attacco.*guardalo prima/);
 });
 
 test('la pagina gemella dei feedback offre la stessa azione e scrive gli stessi campi', async ({ openTab }) => {

@@ -6,6 +6,7 @@
   'use strict';
 
   const api = window.barra;
+  window.SN_RILASCIO_VISTA?.ascolta(document, { percorsoDi: api.percorsoDelFile, manda: (voci) => api.rilascio({ voci }) });
   const ICONS = window.SN_ICONS || {};
   const $ = (id) => document.getElementById(id);
   const root = document.documentElement;
@@ -129,12 +130,26 @@
   }
 
   function aggiornaIcona(b, it) {
+    const detto = b.dataset.sugg || b.getAttribute('aria-label') || '';
+    aspettoIcona(b, it);
+    // Il clic ha cambiato cosa fa l'icona (Aiuto → Parla): il puntatore ancora sopra lo legge subito.
+    const ora = b.dataset.sugg || b.getAttribute('aria-label') || '';
+    if (detto && ora !== detto && b.isConnected && b.matches(':hover') && !trascina) programmaSuggerimento(b);
+  }
+
+  function aspettoIcona(b, it) {
     b.dataset.id = it.id;
     b.setAttribute('aria-label', it.etichetta);
-    if (it.tasto) b.dataset.sugg = `${it.etichetta} (${it.tasto})`;
+    // Spenta, il suggerimento dice perché.
+    if (it.spenta && it.motivo) b.dataset.sugg = it.motivo;
+    else if (it.tasto) b.dataset.sugg = `${it.etichetta} (${it.tasto})`;
     else delete b.dataset.sugg;
     b.setAttribute('aria-disabled', it.spenta ? 'true' : 'false');
     b.classList.toggle('accesa', !!it.accesa);
+    b.classList.toggle('ascolta', !!it.ascolta);
+    b.classList.toggle('risposta', !!it.risposta);
+    if (it.ascolta) b.setAttribute('aria-pressed', 'true');
+    else b.removeAttribute('aria-pressed');
     if (b.dataset.icona !== it.icona) {
       b.dataset.icona = it.icona;
       b.innerHTML = svg(it.icona, 18);
@@ -200,7 +215,7 @@
 
   // ── il sistema: ora e voci fisse ─────────────────────────────────────────
   const FISSE = [
-    { comando: 'history', icona: 'history', etichetta: 'Cronologia' },
+    { comando: 'history', icona: 'memory', etichetta: 'Memorie' },
     { comando: 'apps', icona: 'apps', etichetta: 'App' },
     { comando: 'redteam', icona: 'redteam', etichetta: 'Red-team' },
     { comando: 'account', icona: 'user', etichetta: 'Profilo' },
@@ -384,6 +399,7 @@
     root.classList.toggle('senza-striscia', opzioni().striscia === false);
     // Il puntatore fermo nella fascia del bordo che la vista non vede: la sorveglia il main, e la striscia lo mostra.
     striscia.classList.toggle('bordo', !stato.aperta && !!stato.bordo);
+    striscia.classList.toggle('risposta', !!stato.risposta);
     if (stato.aperta) annullaSpinta();
     else nascondiSuggerimento();
     striscia.setAttribute('aria-label', `Barra laterale (${stato.tasto || ''})`);

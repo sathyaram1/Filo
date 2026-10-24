@@ -185,7 +185,7 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
         w = w.parent;
       }
       if (!w || w.parent !== window) return null;
-      return [...document.querySelectorAll('iframe, frame')].find((f) => f.contentWindow === w) || null;
+      return global.SN_RIQUADRI_IN_ARRIVO?.riquadroDi(w, document) || null;
     } catch (_) { return null; }
   }
 

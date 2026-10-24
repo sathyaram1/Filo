@@ -65,18 +65,20 @@ test('i rifiuti dicono perché e la strada: utente, routine, e il proprio non fi
   assert.equal(MR.localSignCheck({ clientId: 'utente-7', status: 'todo' }, true).ok, false);
 });
 
-test('il tasto dei Ricevuti: c’è su chi non è fidato, non su un fidato, non fuori dai Ricevuti', () => {
+test('il tasto dei Ricevuti: c’è sul rombo azzurro, di chiunque, e da nessun’altra parte (#1575)', () => {
   const ricevuto = { clientId: 'utente-7', status: 'design', statusReason: 'locale', statusPublic: 'open' };
   const az = MR.ownerActionFor(ricevuto, 'accept_local');
   assert.ok(az, 'utente nei Ricevuti');
-  assert.deepEqual([az.kind, az.to, az.locale, az.primary], ['accept', 'todo', true, true], 'rimandato per lavoro locale: è la scelta attesa');
+  assert.deepEqual([az.kind, az.to, az.locale, az.primary, az.approva], ['accept', 'todo', true, true, true], 'rimandato per lavoro locale: è la scelta attesa');
   const qualunque = MR.ownerActions({ ...ricevuto, statusReason: '' });
-  assert.deepEqual(qualunque.filter((a) => a.primary).map((a) => a.key), ['accept'], 'altrimenti resta secondario');
+  assert.deepEqual(qualunque.map((a) => a.key), ['accept', 'archive'], 'su ogni altra pratica dei Ricevuti il tasto non c’è');
+  assert.deepEqual(qualunque.filter((a) => a.primary).map((a) => a.key), ['accept']);
   assert.ok(MR.ownerActionAllowsStatus(ricevuto, 'todo'));
   assert.ok(MR.ownerActionFor({ ...ricevuto, clientId: 'routine:worker', senderProof: 'server' }, 'accept_local'), 'routine (#914)');
   assert.ok(MR.ownerActionFor({ ...ricevuto, clientId: 'local:claude' }, 'accept_local'), 'prefisso senza prova = utente');
   assert.ok(MR.ownerActionFor({ ...ricevuto, clientId: 'owner:me', senderProof: 'admin' }, 'accept_local'), 'il proprio non fidato: il clic lo segna fidato');
-  assert.equal(MR.ownerActionFor({ ...ricevuto, clientId: 'owner:me', senderProof: 'admin', fiducia: 'fidato' }, 'accept_local'), null, 'a un fidato basta il segno');
+  const fidato = MR.ownerActionFor({ ...ricevuto, clientId: 'owner:me', senderProof: 'admin', fiducia: 'fidato' }, 'accept_local');
+  assert.deepEqual([!!fidato, fidato && fidato.approva], [true, false], 'a un fidato è l’unica uscita, e scrive il solo segno');
   assert.equal(MR.ownerActionFor({ ...ricevuto, localOnly: SEGNO, localApproval: SI }, 'accept_local'), null, 'già approvato');
   assert.equal(MR.ownerActionFor({ ...ricevuto, status: 'todo' }, 'accept_local'), null, 'in coda');
   assert.equal(MR.ownerActionFor({ ...ricevuto, status: 'archived' }, 'accept_local'), null);
@@ -90,7 +92,7 @@ test('il tasto dei Ricevuti: c’è su chi non è fidato, non su un fidato, non 
 
 test('l’avviso della sessione segue la fiducia: approvato e fidato in lavorazione → niente avviso su L5', () => {
   const approvato = { clientId: 'utente-7', status: 'working', statusPublic: 'open', localOnly: SEGNO, localApproval: SI, fiducia: 'fidato' };
-  assert.equal(MR.manageTabFor(approvato), 'local');
+  assert.equal(MR.manageTabFor(approvato), 'queue');
   assert.equal(MR.localSenderCheck(approvato).ok, true);
   assert.equal(avvisoDaCampi({ fiducia: { stringValue: 'fidato' }, localOnly: { mapValue: {} }, localApproval: { mapValue: {} }, statusPublic: { stringValue: 'open' } }), '');
   // Senza il campo (prima della migrazione) il sì dell'owner basta come prima; un non_fidato scritto no.
@@ -151,10 +153,11 @@ test('--approva-locale e --riconosci non ci sono più: la riga di comando rifiut
   }
 });
 
-// La prova del mittente la scrive solo il ripasso, che la deduce da segni che un falso non ha (regole: ripassoMittenti.test.mjs).
-const SCRIVE_LA_PROVA = new Set(['ripasso-mittenti.mjs']);
+// La prova del mittente nasce col documento: dopo non la scrive nessuno strumento (le regole: firestoreRulesSenderProof.test.mjs).
 // La migrazione chiede al server la sua regola fissa sui feedback senza fiducia: non sceglie chi diventa fidato.
 const SOLO_MIGRAZIONE = new Set(['fiducia-migra.mjs']);
+// Toglierla sì (#1428): la chiede una nota scritta senza biglietto pulito. Darla resta dell'owner.
+const SOLO_TOGLIE = new Set(['togli-fiducia.mjs']);
 test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la prova del mittente su un feedback esistente', () => {
   const file = [];
   const giro = (dir) => {
@@ -167,11 +170,15 @@ test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la 
   for (const f of file) {
     const testo = readFileSync(f, 'utf8');
     assert.doesNotMatch(testo, /fieldPaths=localApproval|set\(\s*['"`]localApproval['"`]|localApproval\s*:\s*(\{\s*mapValue|toFsValue|segno)/, `${f} scrive localApproval`);
-    if (!SCRIVE_LA_PROVA.has(f.split(/[\\/]/).pop())) assert.doesNotMatch(testo, /fieldPaths=senderProof/, `${f} scrive senderProof su un feedback esistente`);
+    assert.doesNotMatch(testo, /fieldPaths=senderProof/, `${f} scrive senderProof su un feedback esistente`);
     // #1148: «Segna fidato» solo dalla finestra di Filo.
-    if (SOLO_MIGRAZIONE.has(f.split(/[\\/]/).pop())) {
+    const nome = f.split(/[\\/]/).pop();
+    if (SOLO_MIGRAZIONE.has(nome)) {
       assert.doesNotMatch(testo, /['"`](segna|togli)['"`]|fiducia_segna|fieldPaths=fiducia/, `${f} deve chiedere solo la migrazione`);
       assert.deepEqual([...new Set([...testo.matchAll(/\bop:\s*['"`](\w+)['"`]/g)].map((m) => m[1]))], ['migra'], `${f}: l'unica op è «migra»`);
+    } else if (SOLO_TOGLIE.has(nome)) {
+      assert.doesNotMatch(testo, /['"`](segna|migra)['"`]|fiducia_segna|fieldPaths=fiducia/, `${f} deve poter solo togliere la fiducia`);
+      assert.deepEqual([...new Set([...testo.matchAll(/\bop:\s*['"`](\w+)['"`]/g)].map((m) => m[1]))], ['togli'], `${f}: l'unica op è «togli»`);
     } else {
       assert.doesNotMatch(testo, /ownerFiducia|fiducia_segna|fieldPaths=fiducia/, `${f} apre una strada alla fiducia`);
     }

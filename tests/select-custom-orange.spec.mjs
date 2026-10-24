@@ -94,3 +94,21 @@ test('scegliere un\'opzione aggiorna il <select> e applica il tema', async ({ op
   // preferences.js applica il tema su <html> al change.
   await expect(page.locator('html')).toHaveAttribute('data-sn-theme', 'dark');
 });
+
+// #1412 — una pagina che completa la scritta di un'opzione dopo l'apertura (la scelta di serie col valore letto):
+// la tendina chiusa mostra la scritta nuova, non quella copiata prima.
+test('la tendina chiusa segue la scritta di un\'opzione cambiata dopo l\'apertura', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await page.waitForSelector('#theme', { timeout: 8_000 });
+  const valore = page.locator('.sn-select-wrap', { has: page.locator('#theme') }).locator('.sn-select-value');
+  await page.evaluate(() => {
+    const s = document.getElementById('theme');
+    s.options[s.selectedIndex].textContent = 'Scritta cambiata dopo';
+  });
+  await expect(valore).toHaveText('Scritta cambiata dopo');
+  await page.evaluate(() => {
+    const s = document.getElementById('theme');
+    s.options[s.selectedIndex].firstChild.data = 'Cambiata di nuovo';
+  });
+  await expect(valore).toHaveText('Cambiata di nuovo');
+});

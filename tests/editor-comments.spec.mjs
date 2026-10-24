@@ -62,9 +62,9 @@ async function openTab(url) {
 
 // Stato pulito prima di ogni test: il doc vive in localStorage (condiviso fra
 // le tab della stessa origine), va azzerato; poi chiudi le tab residue.
-test.beforeEach(async () => {
-  const page = await openTab(EDITOR);
-  await page.evaluate(() => { try { localStorage.removeItem('filo.editor.doc'); localStorage.removeItem('filo.editor.collection'); } catch (_) {} });
+// Chiudere un editor con modifiche le salva (src/main/tabs/chiusuraConCaselle.js): prima si chiude e si aspetta che
+// le pagine dell'editor spariscano, poi si azzera, e la scheda usata per azzerare si chiude a sua volta.
+async function chiudiTutteLeSchede() {
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     if (!w || !w._filoTabs) return;
@@ -72,10 +72,21 @@ test.beforeEach(async () => {
       try { w._filoTabs.closeTab(t.id); } catch (_) {}
     }
   });
-  await expect.poll(async () => app.evaluate(({ BrowserWindow }) => {
+  await expect.poll(async () => app.evaluate(({ BrowserWindow, webContents }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    return w && w._filoTabs ? w._filoTabs.tabs.length : 0;
-  }), { timeout: 8_000 }).toBe(1);
+    const schede = w && w._filoTabs ? w._filoTabs.tabs.length : 0;
+    const editor = webContents.getAllWebContents().filter((wc) => {
+      try { return !wc.isDestroyed() && wc.getURL().startsWith('filo://editor'); } catch (_) { return false; }
+    }).length;
+    return schede === 1 && editor === 0;
+  }), { timeout: 8_000 }).toBe(true);
+}
+
+test.beforeEach(async () => {
+  await chiudiTutteLeSchede();
+  const page = await openTab(EDITOR);
+  await page.evaluate(() => { try { localStorage.removeItem('filo.editor.doc'); localStorage.removeItem('filo.editor.collection'); } catch (_) {} });
+  await chiudiTutteLeSchede();
 });
 
 // Scrive il contenuto del documento e passa alla pagina "Revisione" (dove vive

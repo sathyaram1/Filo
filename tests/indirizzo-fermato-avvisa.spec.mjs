@@ -2,6 +2,7 @@
 // una notifica di solo testo, da ogni porta che lo ferma; e la posta va al programma di posta anche rinavigando una scheda.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const schede = (app) => app.evaluate(({ BrowserWindow }) => {
   const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
@@ -133,7 +134,7 @@ test('«Apri in nuova tab» del menu di Filo su un collegamento a un file di una
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif">
     <a id="f" href="file:///C:/Condivisa/listino.pdf" style="display:block;width:300px;padding:20px">listino</a></body></html>`);
   await page.locator('#f').click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await menu.getByText('Apri in nuova tab', { exact: false }).click();
   await expect(await carta(avvisi, 'File del computer bloccato per sicurezza: C:/Condivisa/listino.pdf')).toBeVisible({ timeout: 8000 });

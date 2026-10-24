@@ -1,23 +1,11 @@
-// Router multi-provider con fallback in catena.
-//
-// Concetto: il chiamante passa una lista di "attempts" — ciascuno con
-// { provider, apiKey } — e il router prova in ordine, catturando l'errore di
-// quelli che falliscono e ripiegando sul successivo. Il primo che risponde OK
-// vince e ritorna il risultato (con info su quale provider è stato usato).
-//
-// Se nessuno funziona, viene rilanciato l'ultimo errore con prefisso.
+// Router multi-provider con fallback in catena: si provano gli attempts in ordine, vince il
+// primo che risponde OK; se nessuno funziona si rilancia l'ultimo errore.
 
 (function (global) {
   'use strict';
 
-  // Un solo fornitore: il router (OpenRouter), che smista verso host
-  // indipendenti secondo la lista di esclusione. L'API diretta di Google, che
-  // qui c'era, è stata tolta: era l'API del produttore, e la politica sui
-  // modelli non la ammette. Lettura ad alta voce, dettatura e indicizzazione,
-  // che erano le tre funzioni rimaste solo lì, passano ora dal router.
-  // Un fornitore si trova per nome su globalThis (SN_PROVIDER_<NOME>): oggi
-  // c'è solo 'openrouter'; un fornitore nuovo (es. modelli in locale) si
-  // aggiunge registrando il suo modulo, senza toccare questo elenco.
+  // Un solo fornitore, il router: l'API diretta di un produttore non è ammessa dalla politica
+  // sui modelli. Un fornitore nuovo si registra su globalThis, senza toccare questo elenco.
   function getProvider(name) {
     const key = 'SN_PROVIDER_' + String(name || '').toUpperCase().replace(/[^A-Z0-9]/g, '_');
     const p = name && global[key];
@@ -25,11 +13,8 @@
     throw new Error(`Provider non supportato: ${name}`);
   }
 
-  // #360 — un buco di rete di un istante (WiFi che salta, DNS lento) non deve
-  // diventare un errore in faccia all'utente: prima di ripiegare sul provider
-  // successivo ritentiamo LO STESSO tentativo dopo una breve pausa. Solo per i
-  // guasti PASSEGGERI (nessuna risposta HTTP arrivata): un 400 o un 401
-  // ritornerebbero identici, ritentarli sarebbe solo attesa buttata.
+  // Un buco di rete di un istante non deve diventare un errore per l'utente: si ritenta
+  // LO STESSO tentativo. Solo sui guasti passeggeri: un 400 o un 401 tornerebbero identici.
   const RETRY_NETWORK_MAX = 1;      // ritentativi extra per tentativo
   const RETRY_NETWORK_DELAY_MS = 700;
 
@@ -86,9 +71,8 @@
     }
   }
 
-  // Crediti finiti (#598): OpenRouter risponde 402 finché il tetto della
-  // chiave non sale. Non si ritenta e non si passa al tentativo successivo
-  // (userebbe la stessa chiave): si avvisa una volta e si esce subito.
+  // Crediti finiti: il router risponde 402 finché il tetto non sale. Non si ritenta e non si
+  // passa al tentativo dopo, che userebbe la stessa chiave: si avvisa una volta e si esce.
   function stopOnOutOfCredits(err) {
     const W = global.SN_WALLET;
     if (!W || !W.isOutOfCredits(err)) return false;
@@ -99,12 +83,13 @@
   // `tools` / `toolChoice` (tool calling nativo, vedi src/shared/actionTools.js)
   // e `onToolCall` (una chiamata appena il modello ne pronuncia il nome, in
   // streaming) passano tali e quali al provider.
-  async function complete({ provider, apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
-    return getProvider(provider).complete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, signal });
+  // `cache`: il piano dei punti di cache (SN_FILO_CONTESTO.pianoDellaCache); ogni fornitore lo scrive nel suo formato.
+  async function complete({ provider, apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
+    return getProvider(provider).complete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal });
   }
 
-  async function streamComplete({ provider, apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
-    return getProvider(provider).streamComplete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal });
+  async function streamComplete({ provider, apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
+    return getProvider(provider).streamComplete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal });
   }
 
   async function listModels({ provider, apiKey }) {
@@ -115,7 +100,14 @@
   // usato) al risultato. Ogni attempt può portare il proprio `model` (id
   // provider-specifico risolto dal nickname): se assente si usa il `model`
   // globale per retro-compatibilità.
-  async function completeWithFallback({ attempts, model, messages, tools, toolChoice, signal, onFallback }) {
+  // `onTentativoFallito(err, { modello, host })` arriva per OGNI tentativo fallito, anche l'ultimo: lo leggono i
+  // contatori giornalieri (#969), che contano i guasti per modello e host.
+  function tentativoFallito(fn, err, aModel) {
+    if (typeof fn !== 'function') return;
+    try { fn(err, { modello: aModel, host: (err && err.hostFallito) || '' }); } catch (_) {}
+  }
+
+  async function completeWithFallback({ attempts, model, messages, cache, tools, toolChoice, signal, onFallback, onTentativoFallito }) {
     let lastErr = null;
     for (let i = 0; i < attempts.length; i++) {
       const a = attempts[i];
@@ -123,13 +115,15 @@
       try {
         const r = await withNetworkRetry(() => getProvider(a.provider).complete({
           apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, maxTokens: a.maxTokens,
-          providerRouting: a.providerRouting, messages, tools, toolChoice, signal,
+          providerRouting: a.providerRouting, messages, cache, tools, toolChoice, signal,
         }), null, signal);
         // `...r` porta con sé `servedBy` (chi ha davvero servito, se il provider
         // lo riporta): il chiamante lo usa per registrare e verificare la politica.
-        return { ...r, provider: a.provider, model: aModel };
+        // `tentativo` (da 1): quale della catena ha risposto, per i contatori (#1464).
+        return { ...r, provider: a.provider, model: aModel, tentativo: i + 1 };
       } catch (err) {
         lastErr = err;
+        tentativoFallito(onTentativoFallito, err, aModel);
         if (stopOnOutOfCredits(err)) throw err;
         console.warn(`[SN] provider ${a.provider} fallito (${i + 1}/${attempts.length}):`, err.message || err);
         if (onFallback && i + 1 < attempts.length) {
@@ -146,10 +140,12 @@
   // provider successivo emettiamo `onReset` così il chiamante butta il buffer
   // parziale e riparte pulito (#273). onReset viene chiamato SOLO se l'attempt
   // fallito aveva già emesso qualcosa (delta o reasoning) e c'è un attempt dopo.
-  async function streamCompleteWithFallback({ attempts, model, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset }) {
+  async function streamCompleteWithFallback({ attempts, model, messages, cache, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset, onTentativoFallito }) {
     let lastErr = null;
     // I tentativi rotti dopo che il modello aveva già scritto: il fornitore li fa pagare, chi tiene il conto li deve vedere.
     const broken = [];
+    // La risposta ricominciata a metà: un tentativo aveva già scritto, o si è rotto dopo essere partito (#1464).
+    let ricominciata = false;
     const noteBroken = (err, a, aModel) => {
       if (err && err.generationId) {
         broken.push({ provider: a.provider, model: aModel, generationId: err.generationId, apiKey: err.keyUsed || a.apiKey, keySource: err.keySource || '' });
@@ -160,14 +156,12 @@
       const aModel = a.model || model;
       let emitted = false;
       try {
-        // Ritentativo sui guasti di rete passeggeri (#360). Se lo stream era già
-        // partito (delta o reasoning usciti) il buffer del chiamante va azzerato
-        // prima di ricominciare, esattamente come nel ripiego su un altro
-        // provider (#273): se non sa farlo, non ritentiamo.
+        // Ritentativo sui guasti di rete passeggeri: se lo stream era partito il buffer va azzerato
+        // prima di ricominciare. Se il chiamante non sa farlo, non si ritenta.
         const r = await withNetworkRetry(
           () => Promise.resolve(getProvider(a.provider).streamComplete({
             apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, maxTokens: a.maxTokens,
-            providerRouting: a.providerRouting, messages, tools, toolChoice, signal,
+            providerRouting: a.providerRouting, messages, cache, tools, toolChoice, signal,
             onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
             onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
             onToolCall: onToolCall ? (c) => { emitted = true; onToolCall(c); } : onToolCall,
@@ -177,15 +171,21 @@
             if (tipo !== 'rete' || !onReset) return false;
             try { onReset({ failed: a.provider, next: a.provider }); } catch (_) {}
             emitted = false;
+            ricominciata = true;
             return true;
           },
           signal,
         );
-        return { ...r, provider: a.provider, model: aModel, ...(broken.length ? { brokenAttempts: broken } : {}) };
+        return {
+          ...r, provider: a.provider, model: aModel, tentativo: i + 1, ricominciata: ricominciata || broken.length > 0,
+          ...(broken.length ? { brokenAttempts: broken } : {}),
+        };
       } catch (err) {
         lastErr = err;
+        if (emitted) ricominciata = true;
         // Porta le chiavi usate: non enumerabile, un errore si stampa e si serializza.
         if (broken.length && err && typeof err === 'object') Object.defineProperty(err, 'brokenAttempts', { value: broken, enumerable: false, configurable: true });
+        tentativoFallito(onTentativoFallito, err, aModel);
         if (stopOnOutOfCredits(err)) throw err;
         console.warn(`[SN] provider ${a.provider} streaming fallito (${i + 1}/${attempts.length}):`, err.message || err);
         const hasNext = i + 1 < attempts.length;

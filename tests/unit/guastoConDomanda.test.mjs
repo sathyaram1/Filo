@@ -33,7 +33,7 @@ const piatto = (s) => s.replace(/\s+/g, ' ');
 // I testi come li consegna dispatch: ruolo, pezzi condivisi e contratto dei worker.
 const CHI_RISOLVE = [['new-work', {}], ['fixer', {}], ['fixer', { caso: 'ripresa' }], ['fixer', { caso: 'riallineamento' }]];
 const GLI_ALTRI = [['verifier', { scope: 'pieno' }], ['verifier', { scope: 'chiusura' }], ['verifier', { scope: 'riallineamento' }],
-  ['secaudit', {}], ['prober', {}]];
+  ['secaudit', {}]];
 
 test('ogni ruolo che lavora riceve la domanda di guasto; chi risolve o corregge anche l’attesa col motivo guasto', () => {
   for (const [ruolo, opts] of [...CHI_RISOLVE, ...GLI_ALTRI]) {
@@ -64,10 +64,10 @@ test('il gruppo di un guasto non dipende dalle parole di chi cade', () => {
   assert.ok(server.includes('`guasto: filo-security`'), 'il lavoro server usa lo stesso nome della lista');
 });
 
-test('le istruzioni separano «è rotto» (domanda) da «per regola» (rimando in locale), e il rimando non vieta più il server', () => {
+test('le istruzioni separano «è rotto» (guasto) da «per regola» (un passo dell’owner o il lavoro server), e niente torna al PC', () => {
   const pezzo = readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8');
   assert.match(piatto(pezzo), /«Non posso perché è rotto» è un guasto/);
-  assert.match(piatto(pezzo), /«dalla cloud non si fa, per regola» \([^)]*segreti[^)]*automazioni GitHub del server[^)]*macchina dell'owner\) è il rimando in locale/);
+  assert.match(piatto(pezzo), /«dalla cloud non si fa, per regola» \([^)]*segreti[^)]*automazioni GitHub del server[^)]*macchina dell'owner\) non lo è: è un passo dell'owner, che si chiede con una domanda/);
   for (const [ruolo, opts] of CHI_RISOLVE) {
     const t = piatto(readRoleInstructions(ruolo, opts));
     const locale = t.slice(t.indexOf('## Se il lavoro si fa solo in locale'), t.indexOf(ATTESA));
@@ -75,7 +75,10 @@ test('le istruzioni separano «è rotto» (domanda) da «per regola» (rimando i
     assert.doesNotMatch(locale, /non puoi[^.]*codice del server/i, `${ruolo}: il codice del server si tocca nei lavori server`);
     assert.match(locale, /per regola/);
     assert.ok(locale.includes('«Un guasto dell\'ambiente si dice con una domanda»'), `${ruolo}: un guasto rimanda alla sua sezione`);
-    assert.match(locale, /--reason locale \\ --notes "Lavoro locale per regola:/, `${ruolo}: la nota dice che è lavoro locale davvero`);
+    assert.match(locale, /--reason locale \\ --notes "Per regola:/, `${ruolo}: la nota dice che è per regola, non un guasto`);
+    // #1226.1: dal 14/10 sul PC dell'owner non lavora nessuno, e nessun ruolo glielo rimanda.
+    assert.doesNotMatch(locale, /approva come lavoro locale|riparte da lì|sessione sulla sua macchina|nei Ricevuti/, `${ruolo}: niente lavoro rimandato al PC`);
+    assert.match(locale, /--domanda <file\.json>/, `${ruolo}: il passo dell'owner si chiede con una domanda`);
   }
 });
 
@@ -86,16 +89,17 @@ function domandaDelModello() {
   assert.ok(m, 'il pezzo ha il modello JSON della domanda');
   const d = JSON.parse(m[1].split('<payload.id>').join(FEEDBACK_ID));
   d.gruppo = 'guasto: filo-security';
-  d.contesto = 'Clonavo il server per il lavoro. Il messaggio: «fatal: unable to access: 403».';
+  d.contesto = 'Clonavo il server per il lavoro: GitHub ha risposto che a questa sessione manca il permesso di leggerlo.';
+  d.notePerAgenti = 'git-server clone: «fatal: unable to access: 403». Respinto da GitHub, non dal proxy.';
   return d;
 }
 
-test('il modello della domanda passa i controlli del server, con le tre strade e il feedback legato', () => {
+test('il modello della domanda passa i controlli del server, con le strade, la riparazione e il feedback legato', () => {
   const v = D.validaDomanda(domandaDelModello(), { conOrigine: false });
   assert.ok(v.ok, `${v.errore}: ${v.dettaglio}`);
   assert.deepEqual(v.domanda.opzioni.map((o) => o.azione), [
     { tipo: 'riprendi', feedbackId: FEEDBACK_ID },
-    { tipo: 'approva_locale', feedbackId: FEEDBACK_ID },
+    { tipo: 'compito' },
     { tipo: 'archivia', feedbackId: FEEDBACK_ID },
   ]);
   assert.deepEqual(v.domanda.collegamenti, [{ tipo: 'feedback', id: FEEDBACK_ID }]);
@@ -148,8 +152,34 @@ test('col biglietto della routine la domanda arriva al canale col gruppo del gua
   assert.equal(a.body.ticket, BIGLIETTO);
   assert.equal(a.body.data.domanda.gruppo, 'guasto: filo-security');
   assert.deepEqual(a.body.data.domanda.collegamenti, [{ tipo: 'feedback', id: FEEDBACK_ID }]);
-  assert.ok(a.body.data.domanda.opzioni.every((o) => o.azione.feedbackId === FEEDBACK_ID));
+  assert.ok(a.body.data.domanda.opzioni.every((o) => o.azione.tipo === 'compito' || o.azione.feedbackId === FEEDBACK_ID));
   assert.ok(!('origine' in a.body.data.domanda), 'l’origine la mette il server dal biglietto');
+});
+
+// #1455: com'era D-89, col nome di file e la lineetta nel contesto. Si ferma prima del canale, e chi chiede sa dove.
+test('un nome di file o una lineetta nel testo per l’owner: rifiutata prima del canale, col campo; la pulita parte', async () => {
+  for (const [contesto, segno] of [
+    ['Il clone fallisce in scripts/routine-channel.mjs.', /«contesto» nomina routine-channel\.mjs/],
+    ['Il clone fallisce — GitHub risponde di no.', /«contesto» ha una lineetta/],
+  ]) {
+    arrivate = [];
+    const file = join(CARTELLA, 'guasto-sporca.json');
+    writeFileSync(file, JSON.stringify({ ...domandaDelModello(), contesto }), 'utf8');
+    const r = await chiedi(file);
+    assert.equal(r.code, 1, r.stdout);
+    assert.match(r.stderr, /RIFIUTATO: testo_non_per_owner: /);
+    assert.match(r.stderr, segno);
+    assert.match(r.stderr, /Non ho mandato niente/);
+    assert.equal(arrivate.length, 0, 'il canale non è stato chiamato');
+  }
+  arrivate = [];
+  risposta = { status: 200, body: { ok: true, id: 'D-10', num: 'D-10', numero: 10 } };
+  const file = join(CARTELLA, 'guasto-pulita.json');
+  writeFileSync(file, JSON.stringify(domandaDelModello()), 'utf8');
+  const r = await chiedi(file);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /OK: domanda D-10 aperta\./);
+  assert.match(arrivate[0].body.data.domanda.notePerAgenti, /fatal: unable to access: 403/, 'il messaggio esatto arriva nelle note');
 });
 
 test('se il server rifiuta la domanda, chi chiede legge il motivo esatto: è quello che le istruzioni fanno ricopiare', async () => {
@@ -163,4 +193,21 @@ test('se il server rifiuta la domanda, chi chiede legge il motivo esatto: è que
   assert.equal(arrivate.length, 1);
   const pezzo = piatto(readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8'));
   assert.match(pezzo, /con `RIFIUTATO dal server: …`, al posto del numero va quel messaggio esatto/);
+});
+
+// #1241.1: il server prende domande solo da chi risolve, corregge o verifica; il controllo di sicurezza riceverebbe
+// un no certo, e il guasto lo dice nel solo rilascio.
+test('il controllo di sicurezza salta la domanda di guasto e rilascia col guasto; chi la può aprire non la salta', () => {
+  const sec = piatto(readRoleInstructions('secaudit', {}));
+  const sezione = sec.slice(sec.indexOf(SEZIONE));
+  assert.match(sezione, /Il controllo di sicurezza salta il passo 1\*\*: il server prende domande solo da chi risolve, corregge o verifica/);
+  assert.match(sezione, /basta il rilascio del passo 3, con `--guasto "<gruppo>: <messaggio>"`/);
+  const ruolo = piatto(readFileSync(join(RUOLI, 'secaudit.md'), 'utf8'));
+  assert.doesNotMatch(ruolo, /guasto, con la sua domanda/, 'il testo del ruolo non lo manda alla domanda');
+  assert.match(ruolo, /tu la domanda non la apri/);
+  assert.match(piatto(readFileSync(join(RUOLI, '_contratto-worker.md'), 'utf8')), /il controllo di sicurezza: il solo rilascio/);
+  for (const [ruolo2, opts] of [...CHI_RISOLVE, ['verifier', { scope: 'pieno' }]]) {
+    const t = piatto(readRoleInstructions(ruolo2, opts));
+    assert.match(t, /1\. La domanda, coi campi di SPEC-DOMANDE/, `${ruolo2}: la domanda resta il primo passo`);
+  }
 });

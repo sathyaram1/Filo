@@ -92,7 +92,10 @@ function dimentica(chat) {
 
 // Tutto il filo in messaggi, in ordine di tempo. A parità d'ora decide la conversazione: lo stesso ordine a ogni turno.
 async function messaggiDelFilo(opts) {
-  const chats = await F().chats(opts);
+  return messaggiDi(await F().chats(opts));
+}
+
+function messaggiDi(chats) {
   const out = [];
   for (const c of chats) {
     // Una conversazione dell'Editor, dei Mazzi o dell'Aiuto (#974) entra come una riga all'ora in cui è cominciata:
@@ -174,12 +177,31 @@ function esitiDellaScheda(storia, chatMsgs) {
     let k = j;
     while (k >= 0 && !stesso(m, chatMsgs[k])) k--;
     if (k < 0) continue;
-    const conEsiti = Array.isArray(m.actions) && m.actions.some((a) => a && a._output);
+    // Un sì dato nel popup è un esito anche senza `_output` (una lezione fissata non ne ha): senza, il modello non sapeva
+    // che l'utente aveva confermato (#1396).
+    const conEsiti = Array.isArray(m.actions) && m.actions.some((a) => a && (a._output || a._confirmed));
     const rd = Array.isArray(m.reasoningDetails) && m.reasoningDetails.length ? m.reasoningDetails : null;
     if (conEsiti || rd) out.set(FC().chiave(chatMsgs[k]), { azioni: conEsiti ? m.actions : [], ...(rd ? { reasoningDetails: rd } : {}) });
     j = k - 1;
   }
   return out;
+}
+
+// Le pagine che il filo ha ancora, lette solo se un esito davanti al modello ne porta: una visita cancellata dalla
+// Sicurezza o una scheda chiusa tolta dall'archivio non tornano dalla ricerca che le aveva trovate (#868.1).
+const conPagine = (azioni) => (Array.isArray(azioni) ? azioni : [])
+  .some((a) => a && a._output && Array.isArray(a._output.pagine) && a._output.pagine.length);
+async function pagineCheCiSono(incognito) {
+  const urls = new Set();
+  const siti = new Set();
+  const chiave = (u) => String(u || '').replace(/#.*$/, '');
+  const sito = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (_) { return ''; } };
+  const segna = (u) => { if (!u) return; urls.add(chiave(u)); const s = sito(u); if (s) siti.add(s); };
+  for (const v of await F().pagine(null, { incognito })) segna(v && v.url);
+  const A = globalThis.SN_ARCHIVED_TABS;
+  if (A && typeof A.list === 'function') for (const it of await A.list()) segna(it && it.url);
+  // Di una pagina delicata il risultato porta solo il sito: c'è finché il filo ha ancora una pagina di quel sito.
+  return (p) => (p && p.delicata ? siti.has(sito(p.url)) : urls.has(chiave(p && p.url)));
 }
 
 const ancore = { normale: null, incognito: null };
@@ -190,11 +212,24 @@ const ancore = { normale: null, incognito: null };
 async function componi({ chatId = null, userMessage = '', storia = [], incognito = null, tetti, osserva, ora = Date.now(), immagini = true } = {}) {
   // Deciso alla richiesta, come fa il filo: dall'incognito si legge il filo in memoria, mai quello sul disco.
   if (incognito == null) incognito = require('../shim/storage').inIncognito();
-  const tutti = senzaDomanda(await messaggiDelFilo({ incognito }), chatId, userMessage);
+  const chats = await F().chats({ incognito });
+  const tutti = senzaDomanda(messaggiDi(chats), chatId, userMessage);
   potaFoto(tutti);
   const chatMsgs = chatId ? tutti.filter((m) => m.chat === chatId) : [];
   const dallaScheda = esitiDellaScheda(storia, chatMsgs);
   const lato = incognito ? 'incognito' : 'normale';
+  // Quello che è stato cancellato esce anche dalle copie, dal messaggio dopo e in ogni scheda (#868.1). Senza la lista
+  // delle pagine non si rischia: le pagine trovate prima restano fuori.
+  const ci = new Set(chats.map((c) => c && c.id));
+  const codaGrezza = codaDellaScheda(storia, chatMsgs);
+  const candidati = [...esiti.values(), ...dallaScheda.values()].flatMap((e) => (e && e.azioni) || [])
+    .concat(codaGrezza.flatMap((m) => (Array.isArray(m.actions) ? m.actions : [])));
+  let pagina = null;
+  if (conPagine(candidati)) {
+    try { pagina = await pagineCheCiSono(incognito); } catch (_) { pagina = () => false; }
+  }
+  const vivi = { chat: (id) => ci.has(id), pagina };
+  const senzaTolti = (azioni) => FC().senzaCancellati(azioni, vivi);
   const f = FC().finestra(tutti, {
     ora,
     giorni: tetti.giorni,
@@ -205,8 +240,8 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
       const k = FC().chiave(m);
       const s = dallaScheda.get(k);
       const e = esiti.get(k) || null;
-      if (!s) return e;
-      return { azioni: s.azioni.length ? s.azioni : ((e && e.azioni) || []), reasoningDetails: (e && e.reasoningDetails) || s.reasoningDetails };
+      if (!s) return e && { ...e, azioni: senzaTolti(e.azioni) };
+      return { azioni: senzaTolti(s.azioni.length ? s.azioni : ((e && e.azioni) || [])), reasoningDetails: (e && e.reasoningDetails) || s.reasoningDetails };
     },
     osserva,
     immagini: immagini ? (m) => foto.get(FC().chiave(m)) || null : null,
@@ -217,7 +252,10 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     visti: f.visti,
     azioni: f.azioni,
     vecchi: f.vecchi,
-    coda: codaDellaScheda(storia, chatMsgs),
+    coda: codaGrezza.map((m) => {
+      const azioni = Array.isArray(m.actions) ? senzaTolti(m.actions) : m.actions;
+      return azioni === m.actions ? m : { ...m, actions: azioni };
+    }),
     nuova: !chatMsgs.length,
     tutti,
     token: f.token,
@@ -229,5 +267,5 @@ function azzeraAncore() {
   ancore.incognito = null;
 }
 
-module.exports = { ricordaEsiti, ricordaImmagini, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, componi, senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore };
+module.exports = { ricordaEsiti, ricordaImmagini, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, messaggiDi, componi, senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore };
 globalThis.SN_CONTESTO_FILO = module.exports;

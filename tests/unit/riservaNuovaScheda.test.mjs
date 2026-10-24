@@ -58,7 +58,8 @@ test('nelle prove la riserva parte spenta e si riaccende a richiesta', () => {
 // Un giro su `.tabs` che spinge messaggi alle pagine lascerebbe la riserva indietro: alla consegna mostrerebbe carte,
 // tema o impostazioni di prima. Le eccezioni dicono cosa mandano e perché alla riserva non serve.
 const ECCEZIONI = new Map([
-  ['src/main/tabs.js', /tab_in_vista/], // lo stato della singola scheda: la riserva lo riceve alla consegna
+  // Lo stato della singola scheda (la riserva lo riceve alla consegna); i campi da ricontrollare per la pulizia, che la riserva non tocca.
+  ['src/main/tabs.js', /tab_in_vista|FORM_RECHECK/],
   ['src/main/services/riquadriRotti.js', /RIQUADRO_COOKIE_AGGIORNA/], // solo ai riquadri dei siti
 ]);
 

@@ -23,6 +23,8 @@
     editor: null,
     mazzi: null,
     impostazioni: null,
+    // Bacheca e Deck builder in pausa (#1592): finché il main non risponde, in pausa come per chi non li vede.
+    aperte: { bacheca: false, mazzi: false },
   };
 
   const VOCI_IN_CARTA = 5;
@@ -69,6 +71,11 @@
   }
   function plurale(n, uno, tanti) { return n === 1 ? `1 ${uno}` : `${n} ${tanti}`; }
   let avvisoTimer = null;
+  // Un errore letto sulle carte si conta come nella barra delle schede, per chiave dell'elenco chiuso (#1461).
+  function avvisoErrore(testo, chiave) {
+    try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave })).catch(() => {}); } catch (_) {}
+    avviso(testo);
+  }
   function avviso(testo) {
     let n = document.getElementById('dashFlash');
     if (!n) {
@@ -157,13 +164,13 @@
     // Un programma si apre solo col sì dell'utente (#588): le parole le scrive il main.
     if (res.needsConfirm) {
       const ok = global.SN_CONFIRM_UI
-        ? await global.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, okLabel: 'Apri comunque' })
+        ? await global.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, parti: res.parti, okLabel: 'Apri comunque' })
         : global.confirm(res.text);
       if (ok) await apriDownload(r, true);
       return;
     }
     if (res.missing) caricaDownloads();
-    avviso(res.error || 'Il file non si apre');
+    avvisoErrore(res.error || 'Il file non si apre', 'file_non_aperto');
   }
   const cmdDownload = (type, r) => () => d.send({ type, id: r.id }).then(caricaDownloads);
 
@@ -203,7 +210,7 @@
     const cartella = {
       etichetta: 'Cartella',
       fai: () => d.send({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id }).then((res) => {
-        if (res && res.ok === false) avviso(res.error || 'La cartella non si apre');
+        if (res && res.ok === false) avvisoErrore(res.error || 'La cartella non si apre', 'cartella_non_aperta');
         caricaDownloads();
       }),
     };
@@ -259,7 +266,7 @@
       const r = await d.send({ type: MSG.FILO_INSTALLA_AGGIORNAMENTO });
       if (!r || r.ok === false) {
         if (b) b.disabled = false;
-        avviso((r && r.error) || 'L’aggiornamento non parte');
+        avvisoErrore((r && r.error) || 'L’aggiornamento non parte', 'aggiornamento_non_avviato');
       }
       d.refreshLive();
     };
@@ -449,7 +456,9 @@
     img.alt = '';
     img.onerror = () => { img.remove(); generica(); };
     ico.appendChild(img);
-    d.iconaDelSito(s.action.url, { soloCopie: !!s.chiedeOk }).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
+    // Un suggerimento scritto da un modello che ha letto testo di altri prende l'icona solo dalle copie, mai dal sito,
+    // che saprebbe dell'indirizzo prima di ogni clic (#1505). Una pagina salvata dall'utente (home senza modello) no.
+    d.iconaDelSito(s.action.url, { soloCopie: s.daSalvate !== true }).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
     return ico;
   }
 
@@ -503,8 +512,14 @@
 
   const COSTRUTTORI = { editor: cartaEditor, mazzi: cartaMazzi, suggerimenti: cartaSuggerimenti, rapide: cartaRapide };
 
+  // La carta di una funzione in pausa non c'è, né a destra né fra le tolte: la disposizione salvata resta com'è.
+  const inPausa = (id) => id === 'mazzi' && !dati.aperte.mazzi;
+  // Con la Bacheca in pausa l'app porta alle sole segnalazioni dell'utente, che restano sue. Il nome corto sta nella cella.
+  const SEGNALAZIONI = { id: 'bacheca', titolo: 'Segnalazioni', icona: 'feedback', url: 'filo://board/board.html#segnalazioni' };
+  const appVisibili = () => C.APP.map((a) => (a.id === 'bacheca' && !dati.aperte.bacheca ? SEGNALAZIONI : a));
+
   function carteDestra() {
-    return ((layout && layout.destra) || []).map((id) => {
+    return ((layout && layout.destra) || []).filter((id) => !inPausa(id)).map((id) => {
       const def = C.carta(id);
       const corpo = COSTRUTTORI[id]();
       return {
@@ -665,12 +680,12 @@
   const ICONA_SINISTRA = { crediti: 'credits', download: 'download', lavoro: 'sparkles', timer: 'timer', sveglia: 'alarm', avviso: 'bell' };
   let formaAltro = '';
   function disegnaAltro() {
-    const tolte = ((layout && layout.tolte) || []).map((id) => ({ ...C.carta(id), tolta: true }));
+    const tolte = ((layout && layout.tolte) || []).filter((id) => !inPausa(id)).map((id) => ({ ...C.carta(id), tolta: true }));
     const sinistre = C.nascosteSinistra(datiSinistra(), layout).map((v) => ({
       id: v.chiave, titolo: v.tipo === 'crediti' ? 'Crediti' : v.titolo, icona: ICONA_SINISTRA[v.tipo] || 'bell',
       url: v.tipo === 'crediti' ? URL_CREDITI : null, tolta: true, sinistra: true,
     }));
-    const voci = [...sinistre, ...tolte, ...C.APP];
+    const voci = [...sinistre, ...tolte, ...appVisibili()];
     const f = voci.map((v) => `${v.id}:${v.tolta ? 1 : 0}:${v.titolo}`).join(',');
     if (f === formaAltro && altroEl.childElementCount) return;
     formaAltro = f;
@@ -982,6 +997,12 @@
     dati.lavori = r && r.ok && Array.isArray(r.lavori) ? r.lavori : [];
     disegna();
   }
+  async function caricaAperte(attendi = false) {
+    const r = await d.send({ type: MSG.IN_PAUSA_STATO, attendi });
+    if (!r || !r.ok) return;
+    dati.aperte = { bacheca: !!(r.bacheca && r.bacheca.visible), mazzi: !!(r.mazzi && r.mazzi.visible) };
+    disegna();
+  }
   async function caricaImpostazioni() {
     try { dati.impostazioni = await global.SN_STORAGE.getSettings(); } catch (_) { dati.impostazioni = {}; }
     disegna();
@@ -1008,19 +1029,27 @@
       else if (msg.type === MSG.DOWNLOADS_UPDATED) ricaricaDownloadsPresto();
       else if (msg.type === MSG.LAVORI_CAMBIATI && Array.isArray(msg.lavori)) { dati.lavori = msg.lavori; disegna(); }
       else if (msg.type === MSG.FILO_LIVE_UPDATED) caricaEditor().catch(() => {});
+      else if (msg.type === MSG.DATI_IMPORTATI) caricaMazzi().catch(() => {});
       else if (msg.type === MSG.SETTINGS_UPDATED && msg.settings) { dati.impostazioni = msg.settings; disegna(); }
+      else if (msg.type === MSG.IN_PAUSA_CAMBIATO && Object.prototype.hasOwnProperty.call(dati.aperte, msg.nome)) {
+        dati.aperte = { ...dati.aperte, [msg.nome]: msg.visible === true };
+        disegna();
+      } else if (msg.type === MSG.AUTH_CHANGED) caricaAperte(true).catch(() => {});
       else if (msg.type === MSG.TAB_IN_VISTA && msg.inVista) {
         caricaEditor().catch(() => {});
         caricaMazzi().catch(() => {});
         caricaDownloads().catch(() => {});
         caricaLavori().catch(() => {});
+        caricaAperte().catch(() => {});
       }
     });
-    return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori()]).catch(() => {});
+    return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori(),
+      caricaAperte(true)]).catch(() => {});
   }
 
   global.SN_DASH_CARTE = {
     init,
+    aperta: (nome) => dati.aperte[nome] === true,
     setVive({ timers, notifiche }) {
       dati.timers = Array.isArray(timers) ? timers : [];
       dati.notifiche = Array.isArray(notifiche) ? notifiche : [];

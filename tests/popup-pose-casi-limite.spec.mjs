@@ -18,6 +18,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { nelMondoDiFilo, statoDi, conta, scrivi } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 async function preparaProvider(app, attesaMs = 300, opts = {}) {
   await app.evaluate(async (_electron, o) => {
@@ -194,7 +195,7 @@ test('freccetta del tasto destro su una parola in basso: stessa posa della scorc
   // Tasto destro sulla parola: il menu contestuale di Filo con la sezione
   // "Spiega" e la freccetta dell'approfondimento.
   await page.locator('#bersaglio').click({ button: 'right' });
-  const freccia = page.locator('.sn-menu-inline-arrow');
+  const freccia = menuDi(page).locator('.sn-menu-inline-arrow');
   await expect(freccia).toBeVisible({ timeout: 10_000 });
   await freccia.click();
 

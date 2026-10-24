@@ -12,6 +12,7 @@ import { writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SEC_URL = 'filo://security/security.html';
@@ -140,7 +141,7 @@ test('tolta dalla Sicurezza, la password non torna in cronologia al primo «Inco
     const web = await c.web();
     await c.app.evaluate(({ clipboard }) => clipboard.writeText('password-segretissima'));
     await web.locator('#ta').click({ button: 'right' });
-    await web.locator('.sn-menu-paste-main').first().click();
+    await menuDi(web).locator('.sn-menu-paste-main').first().click();
     await expect.poll(() => c.disco()).toContain('password-segretissima');
 
     const sec = await c.sec();
@@ -151,7 +152,7 @@ test('tolta dalla Sicurezza, la password non torna in cronologia al primo «Inco
     await c.mostraWeb();
     await web.locator('#ta').fill('');
     await web.locator('#ta').click({ button: 'right' });
-    await web.locator('.sn-menu-paste-main').first().click();
+    await menuDi(web).locator('.sn-menu-paste-main').first().click();
     await expect(web.locator('#ta')).toHaveValue('password-segretissima');
     await web.waitForTimeout(1000);
     expect(c.disco(), 'la voce tolta è rientrata da sola').not.toContain('password-segretissima');
@@ -166,7 +167,7 @@ test('svuotata dal menu, la cosa ancora negli appunti non rientra al primo «Inc
       await c.app.evaluate(({ clipboard }, t) => clipboard.writeText(t), testo);
       await web.locator('#ta').fill('');
       await web.locator('#ta').click({ button: 'right' });
-      await web.locator('.sn-menu-paste-main').first().click();
+      await menuDi(web).locator('.sn-menu-paste-main').first().click();
       await expect(web.locator('#ta')).toHaveValue(testo);
       await web.waitForTimeout(800);
     };
@@ -193,7 +194,7 @@ async function incolla(web, dove) {
   if (dove === '#ta') await web.locator('#ta').fill('');
   else await web.locator(dove).evaluate((el) => { el.innerHTML = ''; });
   await web.locator(dove).click({ button: 'right' });
-  await web.locator('.sn-menu-paste-main').first().click();
+  await menuDi(web).locator('.sn-menu-paste-main').first().click();
 }
 
 test('la segnalazione, riapertura: tolta dalla Sicurezza, chiusa e riaperta Filo, la password ancora negli appunti non rientra', async () => {

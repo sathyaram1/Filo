@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { statoDi } from './helpers/riquadri.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = join(APP_ROOT, 'tests', '.shots');
@@ -118,7 +119,7 @@ test('in Preferenze Traduci si cambia premendo i tasti; un tasto preso o di un\'
 
   // Tasto destro sulla riga: cambiarla e rimetterla, come i tasti della riga.
   await tastiDellaRiga(page, 'translate-selection').click({ button: 'right' });
-  const voci = page.locator('.sn-menu .sn-menu-item');
+  const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
   await expect(voci.filter({ hasText: 'Cambia la scorciatoia di «Traduci»' })).toHaveCount(1);
   await voci.filter({ hasText: 'Rimetti Alt+T' }).click();
   await expect(tastiDellaRiga(page, 'translate-selection')).toHaveText('Alt+T');
@@ -176,7 +177,7 @@ test('il menu del tasto destro e Altro dicono il tasto scelto; un tasto preso ch
 
   const page = await testServer.openReady(openTab, TESTO);
   await page.locator('#testo').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   await expect(menu.locator('.sn-menu-shortcut', { hasText: 'Alt+Shift+K' })).toHaveCount(1);
   await expect(menu.locator('.sn-menu-shortcut', { hasText: /^Alt\+H$/ })).toHaveCount(0);

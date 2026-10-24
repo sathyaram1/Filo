@@ -231,7 +231,9 @@
       { id: 'spiegaAnticipata', percorso: 'spiegaAnticipata.enabled', chiavi: [chiaveAzione(a.EXPLAIN || 'explain', ANTICIPATA)], nome: 'la spiegazione preparata quando selezioni un testo' },
       { id: 'riassuntoSchede', percorso: 'riassuntoSchede.enabled', chiavi: [a.FILO_TAB_SUMMARY || 'filo_tab_summary'], nome: 'il riassunto delle schede che chiudi' },
       { id: 'riordinoSchede', percorso: 'autoArchive.enabled', chiavi: [a.FILO_TAB_TRIAGE || 'filo_tab_triage'], nome: 'il riordino automatico delle schede' },
-      { id: 'correttore', percorso: 'featureFlags.spellcheck', chiavi: [a.SPELLCHECK_SEMANTIC || 'spellcheck_semantic', a.SPELLCHECK_WORD || 'spellcheck_word'], nome: 'il correttore ortografico' },
+      // Il correttore (#1446): spenta la parte del modello, gli errori restano quelli che Filo trova da sé.
+      { id: 'correttore', percorso: 'correttore.modelloErrori', chiavi: [a.SPELLCHECK_SEMANTIC || 'spellcheck_semantic', 'spellcheck_word'], nome: 'il controllo degli errori col modello, nel correttore' },
+      { id: 'suggerimenti', percorso: 'featureFlags.spellcheckContext', chiavi: [a.SPELLCHECK_CONTEXT || 'spellcheck_context'], nome: 'i suggerimenti del correttore' },
       { id: 'categorie', percorso: 'featureFlags.categorize', chiavi: [a.CATEGORIZE || 'categorize'], nome: 'la categoria delle pagine' },
       { id: 'nomiFile', percorso: 'nomiSensati.scaricamenti', chiavi: [a.FILE_NAME || 'file_name'], nome: 'il nome sensato dei file scaricati' },
     ];

@@ -24,10 +24,13 @@ export function fileRossi(registro, radice) {
  */
 export function corsaIncompleta(registro) {
   const testo = String(registro || '');
-  if (/la corsa è stata chiusa/.test(testo)) return 'un file non è andato avanti e la corsa è stata chiusa';
-  if (/interrotto al gruppo/.test(testo)) return 'la corsa è stata interrotta a metà';
-  if (/ross[oi] senza un test rosso registrato/.test(testo)) return 'un gruppo è uscito rosso senza un test rosso registrato';
-  if (/non sono riuscito a lanciare node/.test(testo)) return 'node non è partito';
+  // Solo nei messaggi del lanciatore: il titolo di un test che cita la frase toglieva la riprova a tutta la corsa
+  // (#1457). Niente ancora a inizio riga: stdout e stderr arrivano mischiati, e un messaggio può cadere a metà riga.
+  const dice = (frase) => new RegExp(`\\[test:unit\\] [^\\n]*${frase}`).test(testo);
+  if (dice('la corsa è stata chiusa')) return 'un file non è andato avanti e la corsa è stata chiusa';
+  if (dice('interrotto al gruppo')) return 'la corsa è stata interrotta a metà';
+  if (dice('ross[oi] senza un test rosso registrato')) return 'un gruppo è uscito rosso senza un test rosso registrato';
+  if (dice('non sono riuscito a lanciare node')) return 'node non è partito';
   const gruppi = testo.match(/^\[test:unit\] gruppo \d+ di \d+/gm)?.length || 1;
   const riepiloghi = testo.match(/^# fail \d+/gm)?.length || 0;
   return riepiloghi < gruppi ? 'manca il riepilogo di node: la corsa non è arrivata in fondo' : '';

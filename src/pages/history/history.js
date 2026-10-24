@@ -23,11 +23,32 @@
     $('clear').textContent = I18n.t('history_clear');
     $('empty').textContent = I18n.t('history_empty');
 
+    await leggi();
+  }
+
+  async function leggi() {
     const r = await chrome.runtime.sendMessage({ type: MSG.GET_HISTORY });
     items = r?.items || [];
     buildFilterOptions();
     render();
+    preparaRicerca();
   }
+
+  // La prima lettera della ricerca non deve comporre il testo di migliaia di voci: lo si fa mentre la pagina è ferma.
+  function preparaRicerca() {
+    if (typeof requestIdleCallback !== 'function') return;
+    const lista = items;
+    let i = 0;
+    const passo = (scadenza) => {
+      while (i < lista.length && scadenza.timeRemaining() > 1) { if (lista[i]) haystackOf(lista[i]); i++; }
+      if (i < lista.length && lista === items) requestIdleCallback(passo);
+    };
+    requestIdleCallback(passo);
+  }
+  // Un backup importato in un'altra scheda porta voci sue: compaiono senza riaprire la pagina (#1256).
+  try {
+    chrome.runtime.onMessage.addListener((msg) => { if (msg && msg.type === MSG.DATI_IMPORTATI) leggi().catch(() => {}); });
+  } catch (_) {}
 
   // Il menu "filtra per tipo" elenca solo i tipi presenti, e per ETICHETTA, non
   // per codice: più codici interni portano lo stesso nome (#481), e la voce deve
@@ -132,6 +153,9 @@
         it.output || '',
         it.origin || '',
         it.model || '',
+        // Quello che la riga mostra si deve poter cercare: l'host che ha servito e il segno di fornitore non ammesso.
+        it.servedBy || '',
+        it.policyViolation ? I18n.t('history_policy_violation') : '',
       ].join(' ').toLowerCase();
       haystacks.set(it, h);
     }
@@ -145,9 +169,7 @@
     const meta = document.createElement('div');
     meta.className = 'sn-history-meta';
     const left = document.createElement('span');
-    // Chi ha davvero servito la risposta (host upstream via OpenRouter, #421):
-    // mostrato quando disponibile, così la politica sui fornitori è verificabile
-    // a colpo d'occhio dalla cronologia.
+    // Chi ha davvero servito la risposta: rende verificabile la politica sui fornitori.
     const via = it.servedBy ? ` • via ${it.servedBy}` : '';
     left.textContent = `${formatActionLabel(it.action)} • ${it.model || ''}${via} • ${formatDate(it.timestamp)}`;
     meta.appendChild(left);
@@ -156,15 +178,13 @@
       const warn = document.createElement('span');
       warn.className = 'sn-history-policy-warn';
       warn.textContent = I18n.t('history_policy_violation');
+      warn.title = I18n.t('history_policy_violation_title');
       left.appendChild(warn);
     }
     const right = document.createElement('span');
     right.className = 'sn-history-meta-right';
-    // Riuso del testo in ingresso (#422): quanta parte del prompt il fornitore
-    // ha riusato da una richiesta precedente invece di rielaborarla. È il modo
-    // per vedere se tenere le istruzioni fisse in testa sta funzionando davvero:
-    // se resta a zero, non sta funzionando. Mostrato solo quando conosciamo i
-    // token in ingresso (chiamate servite dalla cache locale non ne hanno).
+    // Quanta parte del prompt il fornitore ha riusato: è il modo di vedere se tenere le
+    // istruzioni fisse in testa funziona — se resta a zero, non funziona.
     const inTok = Number(it.usage?.promptTokens) || 0;
     if (inTok > 0) {
       const reused = Number(it.usage?.cachedPromptTokens) || 0;
@@ -172,14 +192,16 @@
       const chip = document.createElement('span');
       chip.className = 'sn-history-reuse';
       chip.textContent = I18n.t('history_reuse', String(pct));
-      chip.title = reused > 0
+      // Le scritture le riportano i modelli coi punti di cache espliciti: dicono che la richiesta dopo potrà riusare.
+      const written = Number(it.usage?.cacheWriteTokens) || 0;
+      chip.title = (reused > 0
         ? I18n.t('history_reuse_title', formatTokens(reused), formatTokens(inTok))
-        : I18n.t('history_reuse_none_title', formatTokens(inTok));
+        : I18n.t('history_reuse_none_title', formatTokens(inTok)))
+        + (written > 0 ? ` ${I18n.t('history_cache_written', formatTokens(written))}` : '');
       right.appendChild(chip);
     }
-    // Tempi del turno: quando ha cominciato a ragionare, quando ha scritto la
-    // prima parola (o nominato la prima azione), quando ha finito. Solo per le
-    // richieste in diretta che li hanno misurati.
+    // Tempi del turno: inizio del ragionamento, prima parola (o prima azione nominata), fine.
+    // Solo per le richieste in diretta che li hanno misurati.
     const tm = it.timing;
     if (tm && Number(tm.totalMs) > 0) {
       const fmt = (ms) => (ms == null ? '—' : `${(Number(ms) / 1000).toFixed(1)} s`);
@@ -199,9 +221,7 @@
     cost.textContent = it.costEur ? `€${it.costEur.toFixed(4)}` : '—';
     right.appendChild(cost);
 
-    // Rimozione puntuale della singola voce: simmetrica alle altre liste di Filo
-    // ("Aperti per dopo", cronologia appunti) che hanno il tasto Rimuovi per
-    // elemento. Compare all'hover sulla voce per non appesantire la lista.
+    // Compare all'hover per non appesantire la lista.
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'sn-history-remove';
@@ -211,6 +231,7 @@
       e.stopPropagation();
       const r = await chrome.runtime.sendMessage({ type: MSG.REMOVE_HISTORY_ENTRY, id: it.id });
       items = r?.items || items.filter((x) => x.id !== it.id);
+      preparaRicerca();
       // Un tipo d'azione può essere scomparso del tutto: riallinea il filtro.
       const prima = $('filter').value;
       buildFilterOptions();
@@ -270,8 +291,6 @@
     return new Date(iso).toLocaleString('it-IT');
   }
 
-  // Conteggi di token nel formato dei numeri italiano (1.234), per il
-  // suggerimento del riuso.
   function formatTokens(n) {
     return Number(n || 0).toLocaleString('it-IT', { useGrouping: true });
   }
@@ -294,14 +313,13 @@
       if (!ok) return;
       await chrome.runtime.sendMessage({ type: MSG.CLEAR_HISTORY });
       items = [];
-      // Svuotando la cronologia spariscono tutti i tipi: riallinea il menu
-      // "filtra per tipo" come fa la rimozione della singola voce, altrimenti
-      // resterebbero opzioni per dati che non esistono più.
+      // Svuotando la cronologia spariscono tutti i tipi: riallinea il menu, o resterebbero
+      // opzioni per dati che non esistono più.
       buildFilterOptions();
       render();
     });
     $('openArchive').addEventListener('click', () => {
-      chrome.tabs.create({ url: 'filo://archive/archive.html' });
+      chrome.tabs.create({ url: 'filo://quaderno/quaderno.html' });
     });
     $('openHome').addEventListener('click', () => {
       // #252 — indirizzo canonico: una sola scheda per "Aperti per dopo".

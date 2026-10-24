@@ -157,6 +157,32 @@ test('il testo di un no: «a nessun livello» solo per l\'elenco fisso; quello d
   assert.match(A.fraseNo({ regola: 'elenco', elenco: 'segreto', segreto: 'password' }).breve, /una password/);
 });
 
+test('#1295 — «parola»: un\'azione che la dichiara vuole «conferma» a ogni livello, senza dire che abbassa una difesa', () => {
+  for (const livello of Object.keys(A.TABELLA)) {
+    for (const stato of ['pulito', 'contaminato']) {
+      const d = A.decideDettaglio({ livello, stato, costo: 3, parola: true, guardiano: true });
+      if (d.risposta === 'no') continue;
+      assert.equal(d.risposta, 'conferma', `${livello}/${stato}`);
+      assert.equal(d.digita, true);
+      assert.notEqual(d.regola, 'difesa');
+    }
+  }
+  const auto = A.decideDettaglio({ livello: 'yolo', stato: 'pulito', costo: 3, parola: true, origine: 'automazione' });
+  assert.deepEqual([auto.risposta, auto.digita], ['propone', true]);
+});
+
+test('#1295 — TOGLI_CHAT: nascondere parte da sé a Normale (costo 1), il «per sempre» vuole la parola anche a compito pulito', () => {
+  assert.equal(AL.costoFor({ type: 'TOGLI_CHAT', id: 'c1' }), 1);
+  assert.equal(AL.costoFor({ type: 'TOGLI_CHAT', id: 'c1', per_sempre: true }), 3);
+  assert.equal(AL.costoFor({ type: 'RIMETTI_CHAT', id: 'c1' }), 1);
+  assert.equal(risposta({ type: 'TOGLI_CHAT', id: 'c1' }), 'si');
+  assert.equal(risposta({ type: 'RIMETTI_CHAT', id: 'c1' }), 'si');
+  for (const livello of ['conservativo', 'default', 'automatico']) {
+    assert.equal(risposta({ type: 'TOGLI_CHAT', id: 'c1', per_sempre: true }, { livello }), 'conferma', livello);
+  }
+  assert.equal(AL.ingressi({ type: 'TOGLI_CHAT', id: 'c1' }, {}).parola, false);
+});
+
 test('sopra la tabella (d): abbassare una difesa vuole «conferma» a ogni livello', () => {
   for (const livello of Object.keys(A.TABELLA)) {
     for (const stato of ['pulito', 'contaminato']) {
@@ -275,7 +301,7 @@ test('i nomi delle reti Wi-Fi e dei dispositivi Bluetooth elencati sono di altri
 test('la ricerca dell\'Aiuto passa da NAVIGA col testo cercato: costo 2 lì, una domanda sola', () => {
   assert.equal(AL.costoFor({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), 2);
   assert.equal(AL.costoFor({ type: 'NAVIGA', url: 'https://esempio.it/' }), 1);
-  assert.match(AL.describe({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), /Cercare sul web:\n“gatti”/);
+  assert.match(AL.describe({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), /Cercare sul web:\n«gatti»/);
   const side = readFileSync(join(ROOT, 'src', 'content', 'sidebar.js'), 'utf8');
   for (const op of ['search_text', 'search_image']) {
     assert.match(side, new RegExp(`${op}:\\s*\\{[^}]*viaFilo: true`), `${op} non chiede anche lui prima del dispatch`);
@@ -290,7 +316,7 @@ function risposta(action, { azioni = [], livello = 'default', richiesta = '', im
   const extra = paginaWeb ? [{ classe: 5, campo: 'web', motivo: 'ho letto una pagina web' }] : [];
   const st = A.stato({ fonti: daAzioni(azioni, extra), livello });
   return A.decide({
-    livello, stato: st.stato, costo: ing.costo, campo: ing.campo, elenco: ing.elenco, difesa: ing.difesa, dentroPerimetro: ing.dentroPerimetro,
+    livello, stato: st.stato, costo: ing.costo, campo: ing.campo, elenco: ing.elenco, difesa: ing.difesa, parola: ing.parola, dentroPerimetro: ing.dentroPerimetro,
   });
 }
 const ricercaFatta = { type: 'CERCA_WEB', query: 'meteo', _output: { results: [{ url: 'https://x.it' }] } };
@@ -324,7 +350,7 @@ test('elenco fisso nel registro: cancellare la memoria, cambiare il livello, far
   assert.equal(risposta({ type: 'CANCELLA_MEMORIA' }, { livello: 'automatico' }), 'no');
   assert.equal(risposta({ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }), 'no');
   assert.equal(AL.ingressi({ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }).elenco, 'regole');
-  assert.match(AL.ingressi({ type: 'CANCELLA_MEMORIA' }).dove, /Memoria di Filo/);
+  assert.match(AL.ingressi({ type: 'CANCELLA_MEMORIA' }).dove, /quaderno delle memorie/);
   assert.equal(risposta({ type: 'NAVIGA', url: 'https://x.example/?password=Gatto2024!' }), 'no');
   assert.equal(risposta({ type: 'CERCA_WEB', query: 'il mio codice di verifica è 482913' }), 'no');
   assert.equal(risposta({ type: 'INVIA_FEEDBACK', testo: 'la mia chiave è sk-or-v1-0123456789abcdef0123456789abcdef' }), 'no');
@@ -414,7 +440,7 @@ test('sentinella: ogni superficie che fa agire Filo chiede la risposta al modulo
   }
   // Le lezioni che Filo si scrive da solo dopo la chat passano dalla stessa regola di SALVA_LEZIONE.
   const chat = h.slice(h.indexOf('async function handleFiloChat('));
-  const chiamata = chat.indexOf('maybeRunLessonAgent({ userMessage, filoReply: textReply');
+  const chiamata = chat.indexOf('maybeRunLessonAgent({ userMessage');
   assert.ok(chiamata > 0 && chat.lastIndexOf('lezioniAutomaticheConsentite(', chiamata) > 0, 'le lezioni automatiche chiedono al modulo');
   assert.match(h, /async function lezioniAutomaticheConsentite[\s\S]*?decisioneAutonomia\(/);
 });

@@ -59,36 +59,16 @@ const path = require('node:path');
 const DIR_NAME = 'filo-merge-approvals';
 const FILE_NAME = 'signal';
 
-// `fs.watch` emette più eventi per una scrittura sola (creazione + contenuto):
-// si aspetta un attimo e si legge una volta.
+// `fs.watch` emette più eventi per una scrittura sola: si aspetta un attimo e si legge una
+// volta.
 const DEBOUNCE_MS = 300;
 
-// Rientro in finestra: al massimo una rilettura ogni cinque minuti.
-//
-// Perché così larga: il caso VERO — la richiesta appena aperta da
-// `npm run finish` — lo copre il campanello, che arriva in un istante e non
-// aspetta nessun intervallo. Questo è solo la rete di sicurezza, e una rete non
-// deve costare: cinque minuti bastano a raccogliere ciò che il campanello ha
-// mancato (Filo era chiuso, cartella ripulita) senza che una giornata di lavoro
-// dentro Filo — dove ogni rientro nella finestra è un'occasione di rilettura —
-// si trasformi in una fila di chiamate per dire ogni volta "non c'è niente".
-//
-// E resta comunque diverso da un controllo periodico: senza una persona che
-// torna sulla finestra non scatta MAI. Chi tiene la home aperta per ore non
-// genera una sola chiamata.
+// Rientro in finestra: al massimo una rilettura ogni cinque minuti. È la rete di sicurezza:
+// senza qualcuno che torni sulla finestra non scatta MAI.
 const FOCUS_MIN_MS = 5 * 60 * 1000;
 
-/**
- * DOVE VIVE IL CAMPANELLO. PURA (a parte l'ambiente).
- *
- * `FILO_USER_DATA` prima di tutto: nei test ogni run ne ha uno suo, quindi due
- * suite in parallelo non si suonano il campanello a vicenda. Fuori dai test è
- * la cartella temporanea dell'utente — la SOLA che il main di Electron e uno
- * script Node lanciato dal terminale calcolano allo stesso identico modo, senza
- * doversi accordare sul nome dell'applicazione. Se i due calcolassero percorsi
- * diversi il campanello non suonerebbe e nessuno se ne accorgerebbe: è
- * esattamente il tipo di guasto silenzioso da non introdurre.
- */
+// `FILO_USER_DATA` prima di tutto: nei test ogni run ha il suo campanello. Fuori, la
+// cartella temporanea è la sola che main ed script calcolano uguale: se diverge, è muto.
 function baseDir(base) {
   return String(base || process.env.FILO_USER_DATA || os.tmpdir());
 }
@@ -99,16 +79,8 @@ function signalFile(base) {
   return path.join(signalDir(base), FILE_NAME);
 }
 
-/**
- * Suona: "c'è una richiesta nuova, vai a rileggere".
- *
- * Non lancia mai. Il campanello è una comodità: se non si scrive, l'avviso si
- * vedrà comunque al prossimo rientro in finestra o alla prossima apertura. Far
- * fallire `npm run finish` perché una cartella temporanea non è scrivibile
- * sarebbe sproporzionato.
- *
- * @returns {boolean} true se il campanello è stato scritto
- */
+// Non lancia mai: se non si scrive l'avviso arriva al prossimo rientro in finestra, e far
+// fallire `npm run finish` per una cartella non scrivibile sarebbe sproporzionato.
 function note(id, base) {
   try {
     fs.mkdirSync(signalDir(base), { recursive: true });
@@ -132,16 +104,8 @@ function readNote(base) {
   }
 }
 
-/**
- * Ascolta il campanello.
- *
- * Si guarda la CARTELLA, non il file: il file può ancora non esistere, e una
- * cartella dedicata garantisce che l'unica cosa che ci succede sia il nostro
- * campanello (guardare la cartella temporanea intera vorrebbe dire svegliarsi
- * a ogni file temporaneo del sistema).
- *
- * @returns {function} come smettere
- */
+// Guarda la CARTELLA, non il file: il file può ancora non esistere, e una cartella dedicata
+// evita di svegliarsi a ogni file temporaneo del sistema.
 function watchSignal(onRing, { base, debounceMs = DEBOUNCE_MS } = {}) {
   let watcher = null;
   let timer = null;
@@ -164,9 +128,8 @@ function watchSignal(onRing, { base, debounceMs = DEBOUNCE_MS } = {}) {
       });
       // Un orecchio teso non deve tenere in vita il processo per conto suo.
       if (typeof watcher.unref === 'function') watcher.unref();
-      // Una cartella temporanea può sparire sotto i piedi (pulizia del sistema):
-      // il watcher muore e da lì in poi non suonerebbe più niente, in silenzio.
-      // Si riarma, con calma.
+      // La cartella temporanea può sparire (pulizia del sistema) e il watcher muore in silenzio:
+      // si riarma, con calma.
       watcher.on('error', () => {
         try { watcher.close(); } catch (_) {}
         watcher = null;
@@ -191,36 +154,21 @@ function watchSignal(onRing, { base, debounceMs = DEBOUNCE_MS } = {}) {
   };
 }
 
-/**
- * L'impronta di un elenco. PURA.
- *
- * Serve a NON riavvisare le pagine quando non è cambiato niente: un avviso che
- * si ridisegna da solo mentre l'owner lo sta leggendo (e magari mentre ha già
- * armato "Confermi?") è rumore, non aggiornamento.
- */
+// Serve a NON riavvisare le pagine quando non è cambiato niente: un avviso che si ridisegna
+// mentre l'owner lo legge, magari con «Confermi?» armato, è rumore.
 function signature(reply) {
   const r = reply || {};
   const pend = (Array.isArray(r.pending) ? r.pending : []).map((x) => String(x && x.id));
-  // Le approvate-mai-avvenute contano quanto le pendenti: una che compare o
-  // sparisce È un cambiamento da mostrare.
+  // Le approvate-mai-avvenute contano quanto le pendenti: se compaiono o spariscono, è un
+  // cambiamento.
   const fail = (Array.isArray(r.failed) ? r.failed : []).map((x) => String(x && x.id));
   const rec = (Array.isArray(r.recent) ? r.recent : [])
     .map((x) => `${String(x && x.id)}:${String((x && x.outcome) || '')}:${x && x.discarded ? 'd' : ''}`);
   return `${pend.join(',')}|${fail.join(',')}|${rec.join(',')}`;
 }
 
-/**
- * LA DECISIONE, con l'I/O iniettato: (perché mi svegli, chi sei) → cosa faccio.
- *
- * Tutto ciò che conta si verifica da qui, senza Electron e senza rete:
- *   · se non sei il proprietario NON si legge e NON si avvisa nessuno — per
- *     chiunque altro questa parte dell'app non esiste, nemmeno come chiamata;
- *   · una raffica di colpi di campanello diventa UNA lettura;
- *   · il rientro in finestra non rilegge più di una volta al minuto;
- *   · se l'elenco è identico a quello di prima, le pagine non vengono toccate.
- *
- * @param {object} deps { isAdmin(), read() → Promise<reply>, broadcast(msg), now() }
- */
+// LA DECISIONE con l'I/O iniettato: tutto ciò che conta si verifica senza Electron e senza
+// rete. Non owner: niente lettura e niente avviso; una raffica diventa una lettura sola.
 function makePoker({ isAdmin, read, broadcast, type = 'merge_approvals_changed', now = () => Date.now(), focusMinMs = FOCUS_MIN_MS } = {}) {
   let lastReadAt = 0;
   let lastSig = null;
@@ -229,8 +177,7 @@ function makePoker({ isAdmin, read, broadcast, type = 'merge_approvals_changed',
 
   async function run(reason) {
     if (reason === 'focus' && lastReadAt && (now() - lastReadAt) < focusMinMs) return 'skipped';
-    // Il cancello che tiene la promessa "per chi non è l'owner non cambia
-    // niente": prima di qualunque chiamata, non dopo.
+    // Il cancello sta PRIMA di qualunque chiamata: per chi non è l'owner non cambia niente.
     if (!isAdmin()) return 'not_owner';
     lastReadAt = now();
     let reply;
@@ -267,26 +214,16 @@ function makePoker({ isAdmin, read, broadcast, type = 'merge_approvals_changed',
   return { poke, _signature: signature };
 }
 
-/**
- * Aggancia il campanello al processo main. Si chiama una volta, al boot.
- *
- * `electron` si richiede QUI DENTRO e non in cima al file: `npm run finish`
- * importa questo modulo solo per `note()`, e fuori da Electron un require in
- * cima lo farebbe morire.
- *
- * @param {object} deps { isAdmin(), read(), broadcast(msg), type }
- * @returns {function} come smettere
- */
+// `electron` si richiede QUI DENTRO: `npm run finish` importa il modulo per `note()` e fuori
+// da Electron un require in cima lo farebbe morire.
 function start(deps) {
   const poker = makePoker(deps);
   const stopWatch = watchSignal(() => { poker.poke('signal'); }, {});
   let offFocus = null;
   try {
     const { app } = require('electron');
-    // Solo la finestra vera del browser (`_filoTabs`): il popup dei menu è una
-    // BrowserWindow sua, e ogni menu aperto e richiuso conterebbe come un
-    // rientro. Qui "rientro" vuol dire "l'owner è tornato su Filo", non "ha
-    // cliccato su qualcosa dentro Filo".
+    // Solo la finestra vera del browser: il popup dei menu è una BrowserWindow sua, e ogni menu
+    // aperto conterebbe come un rientro.
     const onFocus = (_e, win) => { if (win && win._filoTabs) poker.poke('focus'); };
     app.on('browser-window-focus', onFocus);
     offFocus = () => { try { app.off('browser-window-focus', onFocus); } catch (_) {} };

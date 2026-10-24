@@ -31,11 +31,13 @@
 #   · GITHUB_TOKEN effimero di Actions: crea la bozza e allega i file. I
 #     permessi li dichiara questo file: le impostazioni del repo possono
 #     restare su sola lettura.
-#   · L'app di pubblicazione, se `vars.FILO_RILASCIO_APP_ID` c'e': rende
-#     pubblica la bozza, il passo che crea il tag v*, e la regola su TUTTI i
-#     tag lascia passare solo lei: il download del sito prende la release piu'
-#     recente qualunque tag abbia (l'app rifiuta un tag che non sia
-#     v<versione>, il sito no). Senza variabile resta il GITHUB_TOKEN.
+#   · L'app di pubblicazione, se nell'ambiente c'e' la variabile
+#     `FILO_PUBLISH_APP_ID` (chiave privata nel segreto `FILO_PUBLISH_APP_KEY`):
+#     i nomi che la guida fa creare all'owner, li segue il codice (#1406).
+#     Rende pubblica la bozza, il passo che crea il tag v*, e la regola su
+#     TUTTI i tag lascia passare solo lei: il download del sito prende la
+#     release piu' recente qualunque tag abbia (l'app rifiuta un tag che non
+#     sia v<versione>, il sito no). Senza variabile resta il GITHUB_TOKEN.
 #   · FILO_BUILD_PASSPHRASE: la parola d'ordine di scopo `build`, la stessa che
 #     apre le chiavi di default e l'allarme. Apre SOLO quelle tre cose, e
 #     l'aumento di versione non accetta da qui nessun numero e nessun
@@ -299,11 +301,11 @@ jobs:
       # creare tag: a loro basta il GITHUB_TOKEN.
       - name: Token dell'app di pubblicazione (se configurata)
         id: app
-        if: steps.check.outputs.should_release == 'true' && vars.FILO_RILASCIO_APP_ID != ''
+        if: steps.check.outputs.should_release == 'true' && vars.FILO_PUBLISH_APP_ID != ''
         uses: actions/create-github-app-token@v1
         with:
-          app-id: ${{ vars.FILO_RILASCIO_APP_ID }}
-          private-key: ${{ secrets.FILO_RILASCIO_APP_KEY }}
+          app-id: ${{ vars.FILO_PUBLISH_APP_ID }}
+          private-key: ${{ secrets.FILO_PUBLISH_APP_KEY }}
           permission-contents: write
 
       # ─── IL NUMERO DI VERSIONE LO SCRIVE IL SERVER ───────────────────────
@@ -494,6 +496,7 @@ jobs:
     continue-on-error: true
     outputs:
       allarme: ${{ steps.allarme.outputs.esito }}
+      finito: ${{ steps.riepilogo.outputs.finito }}
     steps:
       # ─── L'AVVISO DEVE POTER PARLARE PRIMA DI TUTTO IL RESTO ─────────────
       #   Lo strumento che apre il feedback vive nel codice del progetto, e la
@@ -514,7 +517,7 @@ jobs:
         run: |
           set -e
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
-          cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
+          cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs scripts/release-impronte.mjs "${{ runner.temp }}/allarme/scripts/"
           cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
@@ -687,6 +690,8 @@ jobs:
           PIATTAFORMA: Mac
           VERSIONE: ${{ steps.bersaglio.outputs.versione }}
           REPO: ${{ github.repository }}
+          # L'avviso legge le release: la pagina di questa versione dice cosa manca, l'ultima uscita per Mac fa la chiave.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           # Quale passo si e' fermato lo dicono gli esiti dei passi con un id.
           ESITI: ${{ toJSON(steps) }}
@@ -717,8 +722,15 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
+      # Arriva qui solo un lavoro finito bene: `finito=si` e' l'unica prova che l'ultima rete accetta.
       - name: Riepilogo
-        run: echo "Aggiunto il pacchetto Mac a ${{ steps.bersaglio.outputs.versione }}"
+        id: riepilogo
+        shell: bash
+        env:
+          VERSIONE: ${{ steps.bersaglio.outputs.versione }}
+        run: |
+          echo "finito=si" >> "$GITHUB_OUTPUT"
+          echo "Aggiunto il pacchetto Mac a $VERSIONE"
 
   # ─── TERZA META': LA VERSIONE PER LINUX ──────────────────────────────────
   # Stessa forma del lavoro per Mac, e per gli stessi motivi: parte DOPO che la
@@ -748,6 +760,7 @@ jobs:
     continue-on-error: true
     outputs:
       allarme: ${{ steps.allarme.outputs.esito }}
+      finito: ${{ steps.riepilogo.outputs.finito }}
     steps:
       # Stesso motivo della meta' Mac: lo strumento che apre il feedback deve
       # essere qui prima che la copia di lavoro diventi quella della versione a
@@ -762,7 +775,7 @@ jobs:
         run: |
           set -e
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
-          cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
+          cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs scripts/release-impronte.mjs "${{ runner.temp }}/allarme/scripts/"
           cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
@@ -954,6 +967,8 @@ jobs:
           PIATTAFORMA: Linux
           VERSIONE: ${{ steps.bersaglio.outputs.versione }}
           REPO: ${{ github.repository }}
+          # L'avviso legge le release: la pagina di questa versione dice cosa manca, l'ultima uscita per Linux fa la chiave.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           # Quale passo si e' fermato lo dicono gli esiti dei passi con un id.
           ESITI: ${{ toJSON(steps) }}
@@ -984,23 +999,56 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
+      # Arriva qui solo un lavoro finito bene: `finito=si` e' l'unica prova che l'ultima rete accetta.
       - name: Riepilogo
-        run: echo "Aggiunto il pacchetto Linux a ${{ steps.bersaglio.outputs.versione }}"
+        id: riepilogo
+        shell: bash
+        env:
+          VERSIONE: ${{ steps.bersaglio.outputs.versione }}
+        run: |
+          echo "finito=si" >> "$GITHUB_OUTPUT"
+          echo "Aggiunto il pacchetto Linux a $VERSIONE"
 
-  # ─── L'ULTIMA RETE: UN AVVISO CHE NON E' PARTITO ─────────────────────────
+  # ─── L'ULTIMA RETE: UNA META' NON FINITA SENZA FEEDBACK ───────────────────
   # Le due meta' di piattaforma sono `continue-on-error`, quindi un loro guasto
   # lascia la corsa verde. E' giusto finche' il guasto diventa un feedback: e'
-  # quello, non il colore della corsa, a farlo sapere a qualcuno. Se pero'
-  # l'avviso NON e' partito, la corsa verde e' l'ultimo posto in cui il guasto
-  # poteva ancora vedersi, ed e' esattamente il silenzio del #733. Qui la corsa
-  # diventa rossa: e' l'unico segnale rimasto.
+  # quello, non il colore della corsa, a farlo sapere a qualcuno. Qui la corsa
+  # diventa rossa quando una meta' che doveva girare non ha detto `finito=si` e
+  # non ha detto `aperto`: fallita con l'avviso muto, ma anche stroncata dal
+  # tetto di tempo o da una macchina persa, dove il passo dell'avviso non gira
+  # affatto (#733.4). `always()` perche' quei lavori non finiscono in successo.
   avviso-mancato:
     needs: [release-mac, release-linux]
-    if: ${{ !cancelled() && (needs.release-mac.outputs.allarme == 'muto' || needs.release-linux.outputs.allarme == 'muto') }}
+    if: ${{ always() && ((needs.release-mac.result != 'skipped' && needs.release-mac.outputs.finito != 'si' && needs.release-mac.outputs.allarme != 'aperto') || (needs.release-linux.result != 'skipped' && needs.release-linux.outputs.finito != 'si' && needs.release-linux.outputs.allarme != 'aperto')) }}
     runs-on: ubuntu-latest
     steps:
       - name: La corsa resta rossa perche' il guasto non e' diventato un feedback
         shell: bash
+        env:
+          MAC_LAVORO: ${{ needs.release-mac.result }}
+          MAC_FINITO: ${{ needs.release-mac.outputs.finito }}
+          MAC_AVVISO: ${{ needs.release-mac.outputs.allarme }}
+          LINUX_LAVORO: ${{ needs.release-linux.result }}
+          LINUX_FINITO: ${{ needs.release-linux.outputs.finito }}
+          LINUX_AVVISO: ${{ needs.release-linux.outputs.allarme }}
         run: |
-          echo "::error::una meta' di piattaforma e' fallita e il feedback non si e' aperto: apri i lavori Mac e Linux di questa esecuzione."
+          stato() {
+            if [ "$2" = "skipped" ]; then echo "$1: non doveva girare"
+            elif [ "$3" = "si" ]; then echo "$1: finito"
+            elif [ "$4" = "aperto" ]; then echo "$1: fallito, feedback aperto"
+            elif [ "$4" = "muto" ]; then echo "$1: fallito, e il feedback NON si e' aperto"
+            else echo "$1: non e' arrivato in fondo (tetto di tempo, macchina persa o corsa annullata) e non ha potuto avvisare"
+            fi
+          }
+          MAC=$(stato Mac "$MAC_LAVORO" "$MAC_FINITO" "$MAC_AVVISO")
+          LINUX=$(stato Linux "$LINUX_LAVORO" "$LINUX_FINITO" "$LINUX_AVVISO")
+          echo "::error::una meta' di piattaforma non e' finita bene e nessun feedback lo dice. ${MAC}. ${LINUX}."
+          {
+            echo "## Una meta' di piattaforma non e' finita e il guasto non e' diventato un feedback"
+            echo ""
+            echo "- ${MAC}"
+            echo "- ${LINUX}"
+            echo ""
+            echo "Apri il suo lavoro qui sopra. Se nella release manca un file, si rimette avviando a mano la pubblicazione con la casella della piattaforma e il numero della versione."
+          } >> "$GITHUB_STEP_SUMMARY"
           exit 1

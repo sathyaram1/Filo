@@ -34,7 +34,6 @@
   // Le chiavi che un'azione `automazione` può scrivere: solo booleani già in Automazioni. `spegne`: il vero spegne.
   const CHIAVI_AUTOMAZIONE = Object.freeze({
     'routine.enabled': Object.freeze({ nome: 'Routine', spegne: false }),
-    'routine.proberWhenIdle': Object.freeze({ nome: 'Esplorazione a coda vuota', spegne: false }),
     'routine.accountAOff': Object.freeze({ nome: 'Routine dell’account A', spegne: true }),
     'routine.accountBOff': Object.freeze({ nome: 'Routine dell’account B', spegne: true }),
   });
@@ -131,6 +130,64 @@
     return { ok: true, collegamento: { tipo: c.tipo, id } };
   }
 
+  // Testo per l'owner (§3.1): lui non legge il codice. Un sito (filo.red, claude.ai) o un prodotto (Node.js) passa.
+  const FILE_CODICE_RE = /^[A-Za-z0-9_][\w.-]*\.(?:mjs|cjs|jsx?|tsx?|json|md|sh|ps1|html?|css|ya?ml)$/i;
+  const PRODOTTO_RE = /^[A-Z][a-z]+\.js$/;
+  const LINEETTE_RE = /[–—―]/g;
+  const PRO_VUOTO_RE = /^(?:nessuno|nessuna|nessun pro|niente|nulla|n\/a|-+)\.?$/i;
+  const MOSTRATI = 6;
+
+  // Spezzare prima e controllare ogni pezzo con un'ancora tiene il costo lineare anche su 6000 caratteri ostili.
+  function fileNominati(testo) {
+    const visti = [];
+    for (const parola of String(testo).split(/[\s«»"'‘’“”`()[\]{}<>,;!?|*…]+/)) {
+      const senzaSito = parola.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i, '');
+      for (const pezzo of senzaSito.split(/[/\\:#?=&@]+/)) {
+        const nome = pezzo.replace(/\.+$/, '');
+        if (FILE_CODICE_RE.test(nome) && !PRODOTTO_RE.test(nome) && !visti.includes(nome)) visti.push(nome);
+      }
+    }
+    return visti;
+  }
+
+  /** I campi per l'owner con nomi di file, lineette o un pro vuoto; null se sono puliti. `notePerAgenti` resta libero. */
+  function controllaTestoOwner(domanda) {
+    const campi = [['titolo', domanda.titolo], ['contesto', domanda.contesto], ['problema', domanda.problema]];
+    (domanda.opzioni || []).forEach((o, i) => {
+      campi.push([`opzioni[${i}].testo`, o.testo], [`opzioni[${i}].pro`, o.pro], [`opzioni[${i}].contro`, o.contro]);
+    });
+    if (domanda.consiglio) campi.push(['consiglio.perche', domanda.consiglio.perche]);
+    const problemi = [];
+    const tipi = new Set();
+    for (const [campo, valore] of campi) {
+      if (typeof valore !== 'string' || !valore) continue;
+      const cosa = [];
+      const file = fileNominati(valore);
+      if (file.length) {
+        const altri = file.length > MOSTRATI ? ` e altri ${file.length - MOSTRATI}` : '';
+        cosa.push(`nomina ${file.slice(0, MOSTRATI).join(', ')}${altri}`);
+        tipi.add('file');
+      }
+      const lineette = (valore.match(LINEETTE_RE) || []).length;
+      if (lineette) {
+        cosa.push(lineette === 1 ? 'ha una lineetta (— o –)' : `ha ${lineette} lineette (— o –)`);
+        tipi.add('lineette');
+      }
+      if (/\.pro$/.test(campo) && PRO_VUOTO_RE.test(valore.trim())) {
+        cosa.push(`ha come pro «${valore.trim()}»`);
+        tipi.add('pro');
+      }
+      if (cosa.length) problemi.push({ campo, testo: `«${campo}» ${cosa.join(' e ')}` });
+    }
+    if (!problemi.length) return null;
+    const rimedi = [];
+    if (tipi.has('file')) rimedi.push('sposta i nomi di file in notePerAgenti, con gli altri dettagli tecnici (lì il testo è libero)');
+    if (tipi.has('lineette')) rimedi.push('al posto delle lineette metti un punto o una virgola');
+    if (tipi.has('pro')) rimedi.push('un\'opzione senza un pro vero si toglie, o si scrive il pro vero');
+    return no('testo_non_per_owner', `nel testo per l'owner ${problemi.map((p) => p.testo).join('; ')}. Cosa fare: ${rimedi.join('; ')}`,
+      { campo: problemi[0].campo, campi: problemi.map((p) => p.campo) });
+  }
+
   /**
    * Una domanda in ingresso, controllata e normalizzata. `conOrigine` false: l'origine la mette il server (biglietto).
    * @returns {{ ok:true, domanda:object } | { ok:false, errore:string, dettaglio:string }}
@@ -198,6 +255,8 @@
       }
       domanda.origine = { tipo: o.tipo, id };
     }
+    const sporco = controllaTestoOwner(domanda);
+    if (sporco) return sporco;
     return { ok: true, domanda };
   }
 
@@ -220,7 +279,7 @@
     if (!r) return null;
     if (a.tipo === 'riprendi') return `Riprendi ${r.num} con questa scelta`;
     if (a.tipo === 'archivia') return `Archivia ${r.num}`;
-    if (a.tipo === 'approva_locale') return `Approva come lavoro locale ${r.num}`;
+    if (a.tipo === 'approva_locale') return `Affida ${r.num} ai lavori server`;
     if (a.tipo === 'priorita') return Number.isInteger(r.priorita) ? `Priorità di ${r.num}: ${r.priorita} → ${a.valore}` : null;
     return null;
   }
@@ -285,7 +344,7 @@
 
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
-    validaAzione, validaDomanda, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi,
+    validaAzione, validaDomanda, controllaTestoOwner, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

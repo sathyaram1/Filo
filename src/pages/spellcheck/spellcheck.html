@@ -13,6 +13,7 @@
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/i18n.js"></script>
   <script src="filo://shared/storage.js"></script>
+  <script src="filo://shared/caselleAlSicuro.js"></script>
 </head>
 <body>
   <main class="sn-page">
@@ -42,8 +43,21 @@
       <p class="sn-muted" id="dictEmpty" hidden></p>
 
       <div class="sn-spell-add-row">
-        <input type="text" id="newDictWord" />
+        <input type="text" id="newDictWord" spellcheck="false" />
         <button class="sn-btn" id="addDict"></button>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="h-rifiutate"></h2>
+      <p class="sn-muted" id="desc-rifiutate"></p>
+
+      <div class="sn-spell-table" id="rifiutateList"></div>
+      <p class="sn-muted" id="rifiutateEmpty" hidden></p>
+
+      <div class="sn-spell-add-row">
+        <input type="text" id="newRifiutata" spellcheck="false" />
+        <button class="sn-btn" id="addRifiutata"></button>
       </div>
     </section>
   </main>
