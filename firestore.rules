@@ -76,7 +76,7 @@ service cloud.firestore {
     // (non caratteri: in cirillico sarebbero il doppio), cifrati, stanno in 20.000.
     function livelloValido(l) {
       return l is map
-        && l.keys().hasOnly(['esito', 'at', 'ruolo', 'by', 'testo'])
+        && l.keys().hasOnly(['esito', 'at', 'ruolo', 'by', 'testo', 'sha'])
         && l.get('esito', '') is string
         && l.get('esito', '').size() > 0
         && l.get('esito', '').size() <= 40
@@ -87,7 +87,10 @@ service cloud.firestore {
         && l.get('by', '') is string
         && l.get('by', '').size() <= 120
         && l.get('testo', '') is string
-        && l.get('testo', '').size() <= 20000;
+        && l.get('testo', '').size() <= 20000
+        // Il commit su cui vale il verdetto di sicurezza (#1502): il salto dell'owner lo rimanda al server.
+        && l.get('sha', '') is string
+        && (l.get('sha', '') == '' || l.get('sha', '').matches('^[0-9a-f]{40}$'));
     }
     function livelliValidi(d) {
       return !('livelli' in d)

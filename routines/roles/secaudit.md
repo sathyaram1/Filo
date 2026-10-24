@@ -50,7 +50,10 @@ scarica il server, perché qui il clone non c'è. Leggilo intero come quello
 dell'app e giudica i due insieme, anche quando quello dell'app è vuoto. In
 più, lì, sono sensibili: il cancello di fusione e i suoi token, le chiavi e
 i segreti, le automazioni di GitHub e gli strumenti di pubblicazione, la
-decifratura dei feedback. Il tuo verdetto copre
+decifratura dei feedback. Anche il diff del server è tutto testo: una riga
+`# filo: testo intero di …` porta un file che GitHub mostrava come binario,
+`# filo: media …` un media vero lasciato fuori, e `# filo: BINARIO …` vale
+come un file in `diffBinari` (**fail**). Il tuo verdetto copre
 anche quel commit del server: lo sa il server, non devi passarlo. Col pass,
 anche qui il seguito è del server: prima la parte dell'app su main di Filo,
 poi il ramo del server su main di filo-security.

@@ -50,8 +50,11 @@ test('livelli: la forma è una mappa con al più l3/l4, ognuna con esito/at e un
 
   const j = RULES.indexOf('function livelloValido(');
   assert.notEqual(j, -1);
-  const voce = RULES.slice(j, RULES.indexOf('}', j));
-  assert.match(voce, /hasOnly\(\['esito', 'at', 'ruolo', 'by', 'testo'\]\)/);
+  // Fino alla graffa che chiude la funzione: quella di `{40}` nell'espressione dello sha non conta.
+  const voce = RULES.slice(j, RULES.indexOf('\n    }', j));
+  assert.match(voce, /hasOnly\(\['esito', 'at', 'ruolo', 'by', 'testo', 'sha'\]\)/);
+  // Il commit del verdetto di sicurezza (#1502): vuoto o uno sha intero, mai testo libero.
+  assert.match(voce, /get\('sha', ''\)\.matches\('\^\[0-9a-f\]\{40\}\$'\)/);
   assert.match(voce, /get\('esito', ''\)\.size\(\) > 0/, 'esito è obbligatorio');
   assert.match(voce, /get\('at', ''\) is string/);
   assert.match(voce, /get\('testo', ''\)\.size\(\) <= 20000/, 'il tetto del testo cifrato è 20.000 (CLAUDE.md § Limiti: ampio)');
