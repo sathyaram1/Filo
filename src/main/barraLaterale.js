@@ -7,8 +7,10 @@ const { collegaScorciatoie } = require('./shortcuts');
 const { VuotoDellaVista } = require('./vuotoDellaVista');
 const Layout = require('./services/layoutIcone');
 const RedteamGate = require('./services/redteamGate');
+const AzioniContate = require('./services/azioniContate');
 const { tastoPremuto } = require('./tastoDelMouse');
 const RisposteInAttesa = require('./risposteInAttesa');
+const RilascioNellaChat = require('./rilascioNellaChat');
 
 const STRISCIA = 4;
 const PANNELLO = 56;
@@ -129,6 +131,7 @@ class BarraLaterale {
     this._segnaBordo(false);
     const giaAperta = this.aperta;
     this.aperta = true;
+    if (!giaAperta) this._apertaRicerca();
     if (!giaAperta || motivo === 'tasto') this.motivo = motivo;
     if (!giaAperta) this.dentro = false;
     this.posa();
@@ -145,6 +148,8 @@ class BarraLaterale {
     if (!this.aperta) return;
     // Da tastiera il fuoco l'ha preso lei: torna alla scheda anche se il sistema non lo dice ancora.
     const avevaFuoco = this._haFuoco() || this.motivo === 'tasto';
+    if (this.ricerca && !this.ricerca.scelta) this._contaRicerca({ esito: 'vuota' });
+    this.ricerca = null;
     this.aperta = false;
     this.motivo = null;
     this.dentro = false;
@@ -160,9 +165,31 @@ class BarraLaterale {
     this._guarda();
   }
 
+  // La barra come pannello in cui si cerca una voce (#1461): dall'apertura alla prima scelta, a che posto era la voce
+  // scelta fra quelle in vista, o chiusa senza scegliere. Solo esiti e numeri.
+  _contaRicerca(evento) {
+    try { globalThis.SN_CONTATORI_MAIN?.ricerca('barra-laterale', evento, { incognito: this._incognito() }); } catch (_) {}
+  }
+  _apertaRicerca() {
+    this.ricerca = { t0: Date.now(), scelta: false };
+    this._contaRicerca({ esito: 'aperta' });
+  }
+  _sceltaRicerca(posizione) {
+    if (!this.ricerca || this.ricerca.scelta) return;
+    this.ricerca.scelta = true;
+    this._contaRicerca({ esito: 'scelta', attesaMs: Date.now() - this.ricerca.t0, posizione: posizione > 0 ? posizione : null });
+  }
+  // Le voci fisse stanno sotto le icone, in quest'ordine (src/renderer/barra.js); il red-team solo se si vede.
+  _posizioneFissa(comando) {
+    const fisse = ['history', 'apps', 'redteam', 'account', 'settings'].filter((c) => c !== 'redteam' || RedteamGate.visibile());
+    const i = fisse.indexOf(comando);
+    return i < 0 ? 0 : this._icone().length + i + 1;
+  }
+
   commuta(motivo = 'clic') {
-    if (this.aperta) this.chiudi();
-    else this.apri(motivo);
+    if (this.aperta) { this.chiudi(); return; }
+    // Aperta da un gesto (tasto, clic, barra dei menu): un'azione contata (#1461). Lo spunto dal bordo no.
+    AzioniContate.azione('sidebar', () => this.apri(motivo), { incognito: !!(this.win && this.win._filoIncognito) });
   }
 
   // Tasto della barra ed Esc, da qualunque vista della finestra abbia il fuoco. true = preso.
@@ -586,6 +613,7 @@ class BarraLaterale {
     const d = D && D.noto(id) ? D.ICONE[id] : null;
     if (!d || !this.layout || !this.layout.bar.includes(id)) return;
     if (d.soloOwner && !this._owner()) return;
+    this._sceltaRicerca(this._icone().findIndex((i) => i.id === id) + 1);
     const tabs = this.tabs;
     const attiva = this._attiva();
     if (d.tipo === 'aiuto') { this._passoAiuto(attiva); return; }
@@ -598,23 +626,29 @@ class BarraLaterale {
       return;
     }
     const daTastiera = this.motivo === 'tasto';
-    switch (id) {
-      case 'back': tabs.navigaCronologia('indietro'); break;
-      case 'forward': tabs.navigaCronologia('avanti'); break;
-      case 'reload': if (attiva) tabs.reload(attiva.id); break;
-      case 'home':
-        if (attiva) tabs.navigate(attiva.id, 'filo://newtab/');
-        else tabs.openTab('filo://newtab/');
-        break;
-      case 'newTab': tabs.openTab('filo://newtab/'); break;
-      case 'closeTab': if (attiva) tabs.closeTab(attiva.id); break;
-      case 'fullscreen': tabs.toggleContentFullscreen(); break;
-      case 'incognito': try { require('./window').createIncognitoWindow(); } catch (_) {} break;
-      case 'openOptions': tabs.openTab('filo://options/options.html'); break;
-      case 'editorApp': tabs.openTab('filo://editor/editor.html'); break;
-      case 'feedbackApp': tabs.openTab('filo://feedback/feedback.html'); break;
-      default: return;
-    }
+    const fai = () => {
+      switch (id) {
+        case 'back': tabs.navigaCronologia('indietro'); break;
+        case 'forward': tabs.navigaCronologia('avanti'); break;
+        case 'reload': if (attiva) tabs.reload(attiva.id); break;
+        case 'home':
+          if (attiva) tabs.navigate(attiva.id, 'filo://newtab/');
+          else tabs.openTab('filo://newtab/');
+          break;
+        case 'newTab': tabs.openTab('filo://newtab/'); break;
+        case 'closeTab': if (attiva) tabs.closeTab(attiva.id, { via: 'barra' }); break;
+        case 'fullscreen': tabs.toggleContentFullscreen(); break;
+        case 'incognito': try { require('./window').createIncognitoWindow(); } catch (_) {} break;
+        case 'openOptions': tabs.openTab('filo://options/options.html'); break;
+        case 'editorApp': tabs.openTab('filo://editor/editor.html'); break;
+        case 'feedbackApp': tabs.openTab('filo://feedback/feedback.html'); break;
+        default: return false;
+      }
+      return true;
+    };
+    const azione = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.AZIONE_DI_ICONA[id];
+    const fatto = azione ? AzioniContate.azione(azione, fai, { incognito: !!this.win._filoIncognito }) : fai();
+    if (!fatto) return;
     // Da tastiera si torna a chi scriveva; col mouse la barra resta finché il puntatore ci sta sopra.
     if (daTastiera) this.chiudi();
   }
@@ -639,7 +673,9 @@ class BarraLaterale {
   sistema(comando, dati) {
     if (!FISSE.has(comando)) return;
     if (comando === 'redteam' && !RedteamGate.visibile()) return;
+    this._sceltaRicerca(this._posizioneFissa(comando));
     if (PAGINE_FISSE[comando]) {
+      // L'azione della pagina la conta l'apertura della scheda (src/main/tabs.js).
       this.tabs.openTab(PAGINE_FISSE[comando]);
       if (this.motivo === 'tasto') this.chiudi();
       return;
@@ -780,10 +816,12 @@ class BarraLaterale {
     try { this.tabs.openTab(url); } catch (_) {}
   }
 
+  // Un gesto della persona (via `interfaccia`), e in incognito resta all'incognito, come dalle Preferenze aperte lì.
   _scriviOpzioni(parziale) {
     try {
       const { applySettingsUpdate } = require('./services/handlers');
-      Promise.resolve(applySettingsUpdate({ barraLaterale: parziale })).catch(() => {});
+      const scrivi = () => require('./services/registroCambi').con({ via: 'interfaccia', dove: 'barra' }, () => applySettingsUpdate({ barraLaterale: parziale }));
+      Promise.resolve(this._incognito() ? require('./shim/storage').runIncognito(scrivi) : scrivi()).catch(() => {});
     } catch (_) {}
   }
 
@@ -941,6 +979,8 @@ class BarraLaterale {
       }
       case 'barra:trascina-fuori': this._fuori(d); break;
       case 'barra:inoltra': this.vuoto.inoltra(d); break;
+      // #1623 — un'immagine lasciata sulla barra va alla chat della scheda davanti.
+      case 'barra:rilascio': RilascioNellaChat.consegna(this.win, d.voci).catch(() => {}); break;
       case 'barra:chiedi': this._chiediEtichette(); break;
       default: break;
     }

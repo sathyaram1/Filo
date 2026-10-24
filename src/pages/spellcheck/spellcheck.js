@@ -1,6 +1,5 @@
-// Pagina "Gestisci correttore": gestione autocorrect e dizionario personale.
-// Lettura/scrittura diretta su chrome.storage.local; il content script reagisce
-// in tempo reale via chrome.storage.onChanged.
+// Pagina "Gestisci correttore": le correzioni automatiche dell'utente, le parole imparate (il dizionario personale) e
+// quelle da non correggere più da sé (#1447). Scrive in chrome.storage.local; i content script seguono da onChanged.
 
 (function () {
   'use strict';
@@ -18,9 +17,15 @@
 
     fillStaticText();
 
-    const data = await chrome.storage.local.get([STORAGE_KEYS.AUTOCORRECT, STORAGE_KEYS.PERSONAL_DICT]);
-    renderAutocorrect(data[STORAGE_KEYS.AUTOCORRECT] || {});
-    renderDict(data[STORAGE_KEYS.PERSONAL_DICT] || []);
+    await rileggi();
+  }
+
+  // Una lista dove si sta scrivendo non si ridisegna.
+  async function rileggi() {
+    const data = await chrome.storage.local.get([STORAGE_KEYS.AUTOCORRECT, STORAGE_KEYS.PERSONAL_DICT, STORAGE_KEYS.CORRETTORE_IMPARATO]);
+    if (!siScriveIn('autocorrectList')) renderAutocorrect(data[STORAGE_KEYS.AUTOCORRECT] || {});
+    if (!siScriveIn('dictList')) renderDict(data[STORAGE_KEYS.PERSONAL_DICT] || []);
+    if (!siScriveIn('rifiutateList')) renderRifiutate(data[STORAGE_KEYS.CORRETTORE_IMPARATO]);
   }
 
   function fillStaticText() {
@@ -40,13 +45,15 @@
     $('dictEmpty').textContent = I18n.t('spell_page_dict_empty');
     $('newDictWord').placeholder = I18n.t('spell_page_placeholder_dict_word');
     $('addDict').textContent = I18n.t('spell_page_add');
+
+    $('h-rifiutate').textContent = I18n.t('spell_page_rifiutate_h');
+    $('desc-rifiutate').textContent = I18n.t('spell_page_rifiutate_desc');
+    $('rifiutateEmpty').textContent = I18n.t('spell_page_rifiutate_empty');
+    $('newRifiutata').placeholder = I18n.t('spell_page_placeholder_dict_word');
+    $('addRifiutata').textContent = I18n.t('spell_page_add');
   }
 
-  // ----------------------------------------------------------------------
-  // Avvisi inline (conflitto autocorrect, duplicato dizionario, ecc.)
-  // ----------------------------------------------------------------------
   const inlineTimers = Object.create(null);
-  // Mostra un avviso inline (rosso) sopra una lista, auto-nascosto dopo 3.5s.
   function showInlineMessage(id, anchorId, text) {
     let el = $(id);
     if (!el) {
@@ -54,7 +61,6 @@
       el.id = id;
       el.className = 'sn-muted';
       el.style.cssText = 'color:var(--sn-danger,#c0392b);margin:4px 0 0';
-      // Inserisce dopo l'header h2 e la descrizione, prima della tabella/lista.
       const anchor = $(anchorId);
       anchor.parentElement.insertBefore(el, anchor);
     }
@@ -68,14 +74,62 @@
     showInlineMessage('autocorrectConflict', 'autocorrectList', I18n.t('spell_page_conflict', conflictKey));
   }
 
-  // Svuotare il campo parola o correzione non è un salvataggio valido: riusa lo
-  // stesso slot d'avviso del conflitto e indirizza l'utente al bottone «Rimuovi».
+  // Svuotare parola o correzione non è un salvataggio valido: stesso slot d'avviso del
+  // conflitto, e si indirizza l'utente al bottone «Rimuovi».
   function showEmptyFieldMessage() {
     showInlineMessage('autocorrectConflict', 'autocorrectList', I18n.t('spell_page_empty'));
   }
 
   function showDictConflictMessage(word) {
     showInlineMessage('dictConflict', 'dictList', I18n.t('spell_page_dict_conflict', word));
+  }
+
+  // ----------------------------------------------------------------------
+  // Quello che il correttore impara (#1447): tolta o cambiata una parola, Filo ricomincia da zero su di lei.
+  // ----------------------------------------------------------------------
+  // Si scrive dalla fila del main, la stessa delle schede che imparano (src/main/services/correttoreImpara.js).
+  const passo = (q) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.CORRETTORE_IMPARA, ...q });
+
+  // Una riga con una parola sola, che si cambia scrivendoci e si toglie con «Rimuovi». `rinomina(vecchia, nuova)` dice
+  // se il cambio è valido; uno scartato rimette la parola com'era.
+  function rigaParola(word, { rinomina, togli, avviso }) {
+    const row = document.createElement('div');
+    row.className = 'sn-spell-row sn-spell-row-dict';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'sn-spell-word';
+    input.spellcheck = false;
+    input.value = word;
+    row.appendChild(input);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'sn-btn sn-btn-secondary';
+    removeBtn.type = 'button';
+    removeBtn.textContent = I18n.t('spell_page_remove');
+    removeBtn.addEventListener('click', () => togli(word));
+    row.appendChild(removeBtn);
+
+    const commit = async () => {
+      const nuova = input.value.trim();
+      if (nuova === word) return;
+      if (!nuova || /\s/.test(nuova)) {
+        input.value = word;
+        avviso(I18n.t(nuova ? 'spell_page_una_parola' : 'spell_page_word_empty'));
+        return;
+      }
+      if (await rinomina(word, nuova)) word = nuova;
+      else input.value = word;
+    };
+    input.addEventListener('input', () => campoAlVolo.scrivendo(commit));
+    input.addEventListener('change', () => { campoAlVolo.confermato(); commit(); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+    return row;
+  }
+
+  // Una lista non si ridisegna mentre ci si scrive dentro: butterebbe via quello che si sta scrivendo.
+  function siScriveIn(listId) {
+    const a = document.activeElement;
+    return !!(a && a.closest && a.closest(`#${listId}`));
   }
 
   // ----------------------------------------------------------------------
@@ -88,16 +142,8 @@
   // anche se la scheda si chiude prima.
   const campoAlVolo = window.SN_CASELLE.alVolo();
 
-  // Una correzione si aggiunge anche dal tasto destro su una parola: se l'elenco
-  // cambia da fuori ci si riallinea, ma non mentre il cursore è in una riga,
-  // dove ridisegnare butterebbe via quello che si sta scrivendo.
-  chrome.storage.onChanged.addListener((changes) => {
-    const c = changes && changes[STORAGE_KEYS.AUTOCORRECT];
-    if (!c) return;
-    const a = document.activeElement;
-    if (a && a.closest && a.closest('.sn-spell-row')) return;
-    renderAutocorrect(c.newValue || {});
-  });
+  // Una correzione arriva anche dal tasto destro, o imparata scrivendo: la spinta del main (in fondo) ridisegna
+  // l'elenco, ma non mentre il cursore è in una riga, dove butterebbe via quello che si sta scrivendo.
 
   function renderAutocorrect(map) {
     mappaMostrata = { ...(map || {}) };
@@ -110,7 +156,6 @@
     }
     $('autocorrectEmpty').hidden = true;
 
-    // Header
     const header = document.createElement('div');
     header.className = 'sn-spell-row sn-spell-row-head';
     header.innerHTML =
@@ -157,11 +202,8 @@
       const newKey = wIn.value.trim().toLowerCase();
       const newVal = cIn.value.trim();
       if (!newKey || !newVal) {
-        // Campo svuotato: NON è né un salvataggio valido né una rimozione
-        // implicita. In simmetria col ramo conflitto, ripristina i valori reali
-        // (così la UI torna coerente con ciò che è salvato e continua ad agire)
-        // e spiega come rimuovere davvero la regola. Senza questo, il campo
-        // restava vuoto a video mentre la regola era ancora attiva.
+        // Campo svuotato: non è un salvataggio né una rimozione implicita. Si ripristina il valore
+        // reale e si spiega come rimuovere, o la regola resterebbe attiva col campo vuoto.
         wIn.value = wIn.dataset.original || oldKey;
         cIn.value = correction;
         showEmptyFieldMessage();
@@ -170,13 +212,11 @@
       if (oldKey === newKey && correction === newVal) return;
       const ok = await updateAutocorrect(oldKey, newKey, newVal, {
         onConflict: (conflictKey) => {
-          // Ripristina il valore precedente nel campo e avvisa l'utente.
           wIn.value = wIn.dataset.original || oldKey;
           showConflictMessage(conflictKey);
         },
       });
       if (ok) {
-        // Aggiorna il dataset.original per le prossime modifiche.
         wIn.dataset.original = newKey;
       }
     };
@@ -227,13 +267,10 @@
     }
   }
 
-  // ----------------------------------------------------------------------
-  // Dizionario personale
-  // ----------------------------------------------------------------------
   function renderDict(words) {
     const list = $('dictList');
     list.innerHTML = '';
-    // Dedup case-insensitive: tenere la prima occorrenza trovata (preserva il casing originale).
+    // Dedup case-insensitive tenendo la prima occorrenza: preserva il casing originale.
     const seen = new Set();
     const deduped = [];
     for (const w of (words || [])) {
@@ -249,78 +286,107 @@
     $('dictEmpty').hidden = true;
 
     for (const w of sorted) {
-      list.appendChild(dictRow(w));
+      list.appendChild(rigaParola(w, {
+        rinomina: renameDictWord,
+        togli: removeDictWord,
+        avviso: (t) => showInlineMessage('dictConflict', 'dictList', t),
+      }));
     }
   }
 
-  function dictRow(word) {
-    const row = document.createElement('div');
-    row.className = 'sn-spell-row sn-spell-row-dict';
-
-    const span = document.createElement('span');
-    span.className = 'sn-spell-word';
-    span.textContent = word;
-    row.appendChild(span);
-
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'sn-btn sn-btn-secondary';
-    removeBtn.type = 'button';
-    removeBtn.textContent = I18n.t('spell_page_remove');
-    removeBtn.addEventListener('click', () => removeDictWord(word));
-    row.appendChild(removeBtn);
-
-    return row;
+  // Tolta o cambiata una parola, Filo ricomincia da zero su di lei (lo fa la fila del main).
+  async function removeDictWord(word) {
+    const r = await passo({ passo: 'togliParola', parola: word });
+    if (r && r.ok) renderDict(r.parole);
   }
 
-  async function removeDictWord(word) {
-    const key = String(word || '').toLowerCase();
-    const data = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
-    const arr = (data[STORAGE_KEYS.PERSONAL_DICT] || []).filter(
-      (w) => String(w).toLowerCase() !== key
-    );
-    await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: arr });
-    renderDict(arr);
+  // La forma nuova prende il posto della vecchia; se la parola c'è già in un'altra riga il cambio non vale.
+  async function renameDictWord(vecchia, nuova) {
+    const r = await passo({ passo: 'rinominaParola', parola: vecchia, nuova });
+    if (!r || !r.ok) return false;
+    if (r.gia) {
+      showDictConflictMessage(nuova);
+      return false;
+    }
+    return true;
+  }
+
+  // ----------------------------------------------------------------------
+  // Parole da non correggere da sé: quelle di cui l'utente ha annullato la correzione automatica (#1447)
+  // ----------------------------------------------------------------------
+  function renderRifiutate(memoria) {
+    const list = $('rifiutateList');
+    list.innerHTML = '';
+    const parole = (Array.isArray(memoria && memoria.rifiutate) ? memoria.rifiutate.map(String) : []).sort((a, b) => a.localeCompare(b));
+    $('rifiutateEmpty').hidden = parole.length > 0;
+    for (const w of parole) {
+      list.appendChild(rigaParola(w, {
+        rinomina: renameRifiutata,
+        togli: removeRifiutata,
+        avviso: (t) => showInlineMessage('rifiutateConflict', 'rifiutateList', t),
+      }));
+    }
+  }
+
+  async function removeRifiutata(word) {
+    const r = await passo({ passo: 'togliRifiutata', parola: word });
+    if (r && r.ok) renderRifiutate({ rifiutate: r.rifiutate });
+  }
+
+  async function renameRifiutata(vecchia, nuova) {
+    const r = await passo({ passo: 'rinominaRifiutata', parola: vecchia, nuova });
+    if (!r || !r.ok) return false;
+    if (r.gia) {
+      showInlineMessage('rifiutateConflict', 'rifiutateList', I18n.t('spell_page_dict_conflict', nuova));
+      return false;
+    }
+    return true;
+  }
+
+  async function addRifiutataFromInput() {
+    const raw = $('newRifiutata').value.trim();
+    if (!raw) return;
+    if (/\s/.test(raw)) { showInlineMessage('rifiutateConflict', 'rifiutateList', I18n.t('spell_page_una_parola')); return; }
+    const r = await passo({ passo: 'rifiuta', parola: raw });
+    if (!r || !r.ok) return;
+    if (r.gia) {
+      showInlineMessage('rifiutateConflict', 'rifiutateList', I18n.t('spell_page_dict_conflict', raw));
+      $('newRifiutata').select();
+      return;
+    }
+    renderRifiutate({ rifiutate: r.rifiutate });
+    $('newRifiutata').value = '';
+    $('newRifiutata').focus();
   }
 
   async function addDictFromInput() {
     const raw = $('newDictWord').value.trim();
     if (!raw) return;
-    // Il dizionario è confrontato PAROLA PER PAROLA con il testo: una voce con
-    // spazi dentro ("New York") non verrebbe mai confrontata con un singolo token
-    // e resterebbe inerte. Se l'utente scrive più parole le aggiungiamo come voci
-    // separate — così l'input fa davvero qualcosa — invece di salvare una stringa
-    // multi-parola che non scatterebbe mai.
+    // Il dizionario si confronta parola per parola: una voce con spazi non incontrerebbe mai
+    // un token e resterebbe inerte, quindi si spezza in voci separate.
     const words = raw.split(/\s+/).filter(Boolean);
     if (!words.length) return;
-    const data = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
-    const existing = data[STORAGE_KEYS.PERSONAL_DICT] || [];
-    // Dedup case-insensitive: non aggiungere parole già presenti (anche con casing diverso).
-    const present = new Set(existing.map((x) => String(x).toLowerCase()));
+    // Una alla volta dalla fila del main, che non aggiunge le già presenti (anche con le maiuscole diverse).
     const added = [];
+    let parole = null;
     for (const w of words) {
-      const key = w.toLowerCase();
-      if (present.has(key)) continue;
-      present.add(key);
-      existing.push(w); // preserva il casing originale
-      added.push(w);
+      const r = await passo({ passo: 'aggiungiParola', parola: w });
+      if (!r || !r.ok) continue;
+      parole = r.parole;
+      if (!r.gia) added.push(w);
     }
     if (!added.length) {
-      // Tutte già presenti: avvisa invece di ingoiare l'input in silenzio
-      // (simmetria con la sezione autocorrect). Non svuotiamo il campo così
-      // l'utente vede cosa aveva digitato.
+      // Tutte già presenti: avvisa invece di ingoiare l'input. Il campo non si svuota, così si
+      // vede cosa si era digitato.
       showDictConflictMessage(raw);
       $('newDictWord').select();
       return;
     }
-    await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: existing });
-    renderDict(existing);
+    renderDict(parole);
     $('newDictWord').value = '';
     $('newDictWord').focus();
   }
 
-  // ----------------------------------------------------------------------
-  // Boot
-  // ----------------------------------------------------------------------
   document.addEventListener('DOMContentLoaded', () => {
     loadAll();
     $('addAutocorrect').addEventListener('click', addAutocorrectFromInputs);
@@ -334,6 +400,10 @@
     $('newDictWord').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') addDictFromInput();
     });
+    $('addRifiutata').addEventListener('click', addRifiutataFromInput);
+    $('newRifiutata').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addRifiutataFromInput();
+    });
     $('back').addEventListener('click', () => {
       chrome.runtime.openOptionsPage();
     });
@@ -341,21 +411,13 @@
     // Un backup importato in un'altra scheda porta parole sue: compaiono senza riaprire la pagina (#1256).
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== window.SN_MSG.MSG.DATI_IMPORTATI) return;
-      chrome.storage.local.get([STORAGE_KEYS.AUTOCORRECT, STORAGE_KEYS.PERSONAL_DICT]).then((data) => {
-        renderAutocorrect(data[STORAGE_KEYS.AUTOCORRECT] || {});
-        renderDict(data[STORAGE_KEYS.PERSONAL_DICT] || []);
-      }).catch(() => {});
+      rileggi().catch(() => {});
     });
 
-    // Aggiornamento live se cambia da un altro tab.
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local') return;
-      if (changes[STORAGE_KEYS.AUTOCORRECT]) {
-        renderAutocorrect(changes[STORAGE_KEYS.AUTOCORRECT].newValue || {});
-      }
-      if (changes[STORAGE_KEYS.PERSONAL_DICT]) {
-        renderDict(changes[STORAGE_KEYS.PERSONAL_DICT].newValue || []);
-      }
+    // Quello che Filo impara scrivendo in un'altra scheda arriva spinto dal main (#1447), e si rilegge tornando qui.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) rileggi().catch(() => {}); });
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === window.SN_MSG.MSG.CORRETTORE_MEMORIE) rileggi().catch(() => {});
     });
   });
 })();

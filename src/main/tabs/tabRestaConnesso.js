@@ -154,7 +154,7 @@ function testoRientro(nome, fidato) {
 
 function avvisaRientro(tm, sito, fidato) {
   try {
-    tm.win.webContents.send('shell:toast', { text: testoRientro(nomeLeggibile(sito), fidato), opts: { durationSec: 10, key: `resta-connesso-rientro:${sito}` } });
+    tm.win.webContents.send('shell:toast', { text: testoRientro(nomeLeggibile(sito), fidato), opts: { durationSec: 10, key: `resta-connesso-rientro:${sito}`, tipo: 'resta_connesso_rientro' } });
   } catch (_) {}
 }
 Cookies.setTrustChangeHandler(onTrustChange);
@@ -314,6 +314,7 @@ const restaConnessoMethods = {
           durationSec: 15,
           sound: false,
           key: `resta-connesso:${sito}`,
+          tipo: 'resta_connesso_proposta',
           actions: [{ label: 'Resta connesso', restaConnesso: sito }],
         },
       });

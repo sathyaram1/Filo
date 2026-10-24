@@ -6,6 +6,7 @@
   'use strict';
 
   const api = window.barra;
+  window.SN_RILASCIO_VISTA?.ascolta(document, { percorsoDi: api.percorsoDelFile, manda: (voci) => api.rilascio({ voci }) });
   const ICONS = window.SN_ICONS || {};
   const $ = (id) => document.getElementById(id);
   const root = document.documentElement;

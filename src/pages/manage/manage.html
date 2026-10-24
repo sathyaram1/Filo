@@ -1682,6 +1682,89 @@
     /* nicknames-list la legge modelChainEditor per il dropdown; qui la popola il main via SUPPORT_MODELS_GET,
        nascosta come nelle altre pagine che usano modelChainEditor. */
     #mgSmNicknamesList { display: none; }
+
+    /* Scheda Contatori (#1462): una colonna sola come le Statistiche feedback. «Meno di 5» è un dato, non un guasto:
+       si scrive piano, in grigio, e nei grafici è una tacca a righe che non dice quanto. */
+    .mg-ct { padding-bottom: 40px; }
+    .mg-ct-negato { font-size: 13px; color: var(--sn-muted); padding: 24px 0; }
+    .mg-ct-corpo[hidden], .mg-ct-dati[hidden], .mg-ct-guasto[hidden], .mg-ct-negato[hidden] { display: none; }
+    .mg-ct-filtri { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 20px; }
+    .mg-ct-filtri .sn-select-wrap { width: auto; min-width: 190px; }
+    .mg-ct-stato { font-size: 12px; color: var(--sn-muted); }
+    .mg-ct-guasto { font-size: 13px; color: var(--sn-error); margin: 0 0 18px; max-width: 760px; line-height: 1.5; }
+    .mg-ct-dati { transition: opacity calc(0.2s * var(--sn-motion, 1)); }
+    .mg-ct-dati[aria-busy="true"] { opacity: 0.5; }
+    .mg-ct-sez { margin: 0 0 34px; }
+    .mg-ct-sez h3 { font-size: 15px; margin: 0 0 10px; }
+    .mg-ct-ore-titolo { font-size: 12.5px; font-weight: 600; color: var(--sn-muted); margin: 18px 0 6px; }
+    .mg-ct-totale { margin: 0 0 12px; font-size: 12.5px; color: var(--sn-muted); }
+    .mg-ct-totale b { font-size: 26px; font-weight: 650; color: var(--sn-fg); font-variant-numeric: tabular-nums; margin-right: 6px; }
+    .mg-ct-sotto { color: var(--sn-muted); font-style: italic; white-space: nowrap; }
+
+    /* Le colonne dei grafici: come «Quando sono arrivati», con il tetto di larghezza quando sono poche. */
+    .mg-ct-grafico {
+      display: flex; align-items: flex-end; gap: 2px; height: 96px; padding-top: 4px;
+      border-bottom: 1px solid var(--sn-border); overflow-x: auto;
+    }
+    .mg-ct-grafico--ore { height: 64px; }
+    .mg-ct-grafico--poche .mg-ct-col { max-width: 48px; }
+    .mg-ct-col {
+      flex: 1 1 0; min-width: 3px; align-self: flex-end;
+      background: var(--sn-accent); border-radius: 3px 3px 0 0; opacity: 0.78;
+      appearance: none; border: 0; padding: 0; cursor: pointer;
+      transition: opacity calc(0.14s * var(--sn-motion, 1));
+    }
+    .mg-ct-col:hover, .mg-ct-col--scelta { opacity: 1; }
+    .mg-ct-col--scelta { box-shadow: 0 0 0 2px var(--sn-fg); }
+    .mg-ct-col:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+    .mg-ct-col--sotto, .mg-ct-fascia.mg-ct-fascia--sotto {
+      height: 8px; opacity: 1; border-radius: 1px;
+      background: repeating-linear-gradient(135deg, var(--sn-muted) 0 1px, transparent 1px 4px);
+    }
+    .mg-ct-col--muta { cursor: default; }
+    .mg-ct-asse { display: flex; justify-content: space-between; font-size: 11px; color: var(--sn-muted); margin-top: 5px; }
+
+    /* Le tabelle dei blocchi: la prima colonna è la voce, le altre numeri allineati. */
+    .mg-ct-tabwrap { overflow-x: auto; }
+    .mg-ct-tab { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .mg-ct-tab th {
+      text-align: right; font-weight: 600; color: var(--sn-muted); font-size: 11.5px;
+      padding: 6px 8px; border-bottom: 1px solid var(--sn-border); vertical-align: bottom;
+    }
+    .mg-ct-tab th:first-child, .mg-ct-tab td:first-child { text-align: left; }
+    .mg-ct-tab th small { display: block; font-weight: 400; font-size: 10.5px; white-space: nowrap; }
+    .mg-ct-tab td {
+      text-align: right; padding: 6px 8px; border-bottom: 1px solid color-mix(in srgb, var(--sn-border) 60%, transparent);
+      font-variant-numeric: tabular-nums; vertical-align: middle;
+    }
+    .mg-ct-tab tbody tr { transition: background calc(0.1s * var(--sn-motion, 1)); }
+    .mg-ct-tab tbody tr:hover { background: var(--sn-hover); }
+    .mg-ct-riga--apribile { cursor: pointer; }
+    .mg-ct-riga--apribile:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: -2px; }
+    .mg-ct-riga--aperta { background: var(--sn-hover); }
+    .mg-ct-riga--sub td:first-child { padding-left: 24px; color: var(--sn-muted); }
+    .mg-ct-riga[hidden], .mg-ct-andamento[hidden] { display: none; }
+    .mg-ct-andamento td { padding: 10px 8px 14px; text-align: left; }
+    .mg-ct-andamento .mg-ct-grafico { height: 56px; }
+    .mg-ct-altre td { text-align: left; }
+    .mg-ct-altre button {
+      appearance: none; background: none; border: 0; padding: 0; font: inherit; color: var(--sn-muted);
+      cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px;
+    }
+    .mg-ct-altre button:hover { color: var(--sn-fg); }
+    .mg-ct-altre button:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; border-radius: 4px; }
+    .mg-ct-vuoto { font-size: 12.5px; color: var(--sn-muted); margin: 0; }
+
+    /* Le fasce di un'attesa dentro una cella: sette colonnine, la più alta è la fascia più piena della riga. */
+    .mg-ct-fasce { display: inline-flex; align-items: flex-end; gap: 2px; height: 22px; vertical-align: middle; }
+    .mg-ct-fascia { width: 7px; background: var(--sn-accent); opacity: 0.8; border-radius: 1px 1px 0 0; }
+    .mg-ct-fascia.mg-ct-fascia--sotto { height: 4px; }
+    .mg-ct-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+    .mg-ct-chip {
+      font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--sn-border);
+      white-space: nowrap; color: var(--sn-fg);
+    }
+    .mg-ct-chip b { font-weight: 600; font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
@@ -1720,6 +1803,8 @@
       <button type="button" class="mg-tab" data-tab="crediti" role="tab" hidden>Crediti</button>
       <button type="button" class="mg-tab" data-tab="log" role="tab" hidden>Log</button>
       <button type="button" class="mg-tab" data-tab="utenti" role="tab" hidden>Inviti e utenti</button>
+      <button type="button" class="mg-tab" data-tab="contatori" role="tab" hidden
+        title="Come si usa Filo: le somme dei contatori anonimi, mai una copia sola">Contatori</button>
       <button type="button" class="mg-tab" data-tab="predefiniti" role="tab" hidden>Modelli predefiniti</button>
     </nav>
 
@@ -2622,6 +2707,41 @@
       </section>
     </section>
 
+    <!-- Utenti → Contatori (#1462): le somme dei contatori anonimi. Script: manageContatori.js. -->
+    <section class="mg-panel" id="panel-contatori" data-panel="contatori">
+      <div class="mg-ct" id="mgCtRoot">
+        <p class="mg-ct-negato" id="mgCtNegato" hidden>Questa scheda è dell’owner.</p>
+        <div class="mg-ct-corpo" id="mgCtCorpo" hidden>
+          <div class="mg-fs-bar" id="mgCtFinestra" role="group" aria-label="Intervallo"></div>
+          <div class="mg-fs-custom" id="mgCtDate" hidden>
+            <label for="mgCtDal">Dal</label>
+            <input type="date" id="mgCtDal" />
+            <label for="mgCtAl">al</label>
+            <input type="date" id="mgCtAl" />
+          </div>
+          <div class="mg-ct-filtri">
+            <select id="mgCtVersione" aria-label="Versione di Filo" title="Versione di Filo"></select>
+            <select id="mgCtSistema" aria-label="Sistema operativo" title="Sistema operativo"></select>
+            <button type="button" class="sn-btn sn-btn-secondary" id="mgCtRileggi" title="Rilegge dal server, senza aspettare">Rileggi</button>
+            <span class="mg-ct-stato" id="mgCtStato" role="status"></span>
+          </div>
+          <p class="mg-ct-guasto" id="mgCtGuasto" role="alert" hidden></p>
+          <div class="mg-ct-dati" id="mgCtDati" hidden>
+            <section class="mg-ct-sez" id="mgCtCopie" data-blocco="copie">
+              <h3>Copie di Filo attive</h3>
+              <div class="mg-ct-totale" id="mgCtTotale"></div>
+              <div class="mg-ct-grafico" id="mgCtPeriodi" role="group" aria-label="Copie attive per periodo"></div>
+              <div class="mg-ct-asse" id="mgCtPeriodiAsse"></div>
+              <h4 class="mg-ct-ore-titolo" id="mgCtOreTitolo"></h4>
+              <div class="mg-ct-grafico mg-ct-grafico--ore" id="mgCtOre" role="group" aria-label="Copie attive per ora"></div>
+              <div class="mg-ct-asse" id="mgCtOreAsse"></div>
+            </section>
+            <div id="mgCtBlocchi"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Impostazioni predefinite → Modelli predefiniti (#1414): la pagina che stava in admin-defaults/, spostata intera.
        Script: managePredefiniti.js. -->
     <section class="mg-panel mg-pagina" id="panel-predefiniti" data-panel="predefiniti">
@@ -2743,6 +2863,7 @@
   <script src="manageInPausa.js"></script>
   <script src="manageCrediti.js"></script>
   <script src="manageUtenti.js"></script>
+  <script src="manageContatori.js"></script>
   <script src="managePredefiniti.js"></script>
 </body>
 </html>

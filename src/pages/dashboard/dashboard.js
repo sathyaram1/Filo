@@ -7,7 +7,6 @@
 
   const { MSG } = self.SN_MSG;
 
-  // ===== DOM =====
   const $ = (id) => document.getElementById(id);
   const body = document.body;
   const homeMessageEl = $('homeMessage');
@@ -31,7 +30,7 @@
     + 'tetto. Riprendi esattamente da dove si è fermata, senza ripetere quello che hai già scritto.]';
   const dashDir = $('dashDir');
 
-  // ===== Stato locale =====
+  // Stato locale
   let suggestions = [];
   let threadHistory = []; // [{role: 'user'|'filo', text, actions?}]
   // #525 — la targa della chat in corso. Viaggia con ogni messaggio: è il main
@@ -116,6 +115,7 @@
     paroleUtente: () => paroleUtente(),
     apriProposta: (url, vicino) => apriProposta(url, vicino),
     sceltaAutonomia: (a) => Accoglienza.sceltaAutonomia(a._output && a._output.livello),
+    sceltaContatori: (a) => Accoglienza.sceltaContatori(!(a._output && a._output.attivi === false)),
     // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
     allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
     archiviaAzione: (type, cambi, a) => {
@@ -645,7 +645,8 @@
     return '';
   }
   async function apriProposta(url, vicino = null, chiedi = '') {
-    const msg = { type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente(), chiedi: chiedi || motivoDaConfermare(url) };
+    const proposta = self.SN_MARKDOWN ? self.SN_MARKDOWN.scrittoDaUnModello(vicino) : !!(vicino && vicino.closest && vicino.closest('[data-filo-verdetti]'));
+    const msg = { type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente(), chiedi: chiedi || motivoDaConfermare(url), proposta };
     let r = null;
     try { r = await send(msg); } catch (_) {}
     if (r && r.conferma) {
@@ -818,6 +819,8 @@
   function makeBubble({ role, text, pending = false, markdown = false }) {
     const div = document.createElement('div');
     div.className = `dash-bubble dash-bubble-${role === 'user' ? 'user' : 'filo'}`;
+    // I collegamenti di una frase di Filo hanno il verdetto della porta: senza, il clic e il tasto destro chiedono l'OK (#1505).
+    if (role !== 'user') div.dataset.filoVerdetti = '1';
     if (pending) div.classList.add('dash-bubble-pending');
     // L'ora la usa chi mette al loro posto nel tempo le righe delle altre app (dashboard-righe.js).
     div.dataset.ts = new Date().toISOString();
@@ -829,11 +832,8 @@
     return div;
   }
 
-  // #418 — scrive il testo in una bolla. Per le risposte di Filo (markdown=true)
-  // rende la formattazione leggera condivisa (grassetto, corsivo, codice,
-  // elenchi, LINK). Per tutto il resto (testo utente, righe di sistema) resta
-  // testo letterale. I link aperti sono già filtrati da SN_MARKDOWN: nessuno
-  // punta alle pagine interne dell'app.
+  // #418 — per le risposte di Filo la formattazione leggera condivisa, per il resto testo
+  // letterale. I link sono già filtrati da SN_MARKDOWN: nessuno punta alle pagine interne.
   function setBubbleText(el, text, markdown) {
     if (markdown && text && self.SN_MARKDOWN) {
       el.innerHTML = self.SN_MARKDOWN.render(text);
@@ -846,8 +846,8 @@
     }
   }
 
-  // Un solo listener delegato: i link renderizzati da Filo aprono una NUOVA
-  // SCHEDA (come qualsiasi altro link) invece di navigare via la pagina interna.
+  // Un solo listener delegato: i link di Filo aprono una NUOVA SCHEDA invece di navigare via la
+  // pagina interna.
   bubblesEl.addEventListener('click', (e) => {
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
     if (!a || !bubblesEl.contains(a)) return;
@@ -940,10 +940,8 @@
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
     const pending = activity || Att.create(bubblesEl);
     const ownsActivity = !activity;
-    // Canale per il reasoning VERO in diretta: apriamo una sottoscrizione
-    // filtrata per reqId e la passiamo al main, che ci pusha i thought summary
-    // del modello mentre genera. Se il modello non ragiona, non arriva nulla e
-    // il blocco resta in attesa finché non parte il testo.
+    // Reasoning VERO in diretta: sottoscrizione filtrata per reqId che il main usa per pushare i
+    // thought summary. Se il modello non ragiona non arriva nulla.
     const reasoningReqId = `r${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const turno = { reqId: reasoningReqId, fermato: false, attivita: pending };
     turno.fermata = new Promise((ok) => { turno.ferma = ok; });
@@ -955,13 +953,8 @@
         if (data && data.reqId === reasoningReqId && data.text) pending.pushReasoning(data.text);
       });
     }
-    // #420 — RISPOSTA in diretta: la bolla di Filo si riempie mentre il modello
-    // scrive, invece di comparire tutta insieme a fine turno. Il main estrae il
-    // campo "text" dal JSON di risposta e ci pusha i delta (o un reset dopo un
-    // fallback provider). La bolla NON si crea finché non arriva il PRIMO
-    // carattere: una risposta di sola azione (apri un link, testo vuoto) non
-    // lascia una bolla vuota che poi si riempie. Quando il testo inizia, il
-    // ragionamento si richiude da solo (resta apribile): i due non si accavallano.
+    // #420 — la bolla si riempie mentre il modello scrive e NON nasce prima del primo carattere:
+    // una risposta di sola azione non lascia una bolla vuota. Il ragionamento si richiude da sé.
     let streamBubble = null;
     let streamedText = '';
     // La risposta scritta nei giri di soli bottoni (#1167) resta in testa alla bolla: i giri dopo scrivono sotto.
@@ -975,6 +968,7 @@
       if (!streamBubble) {
         streamBubble = document.createElement('div');
         streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
+        streamBubble.dataset.filoVerdetti = '1';
         bubblesEl.appendChild(streamBubble);
       }
       return streamBubble;
@@ -1005,12 +999,8 @@
         followBottomIfNear();
       });
     }
-    // Le AZIONI in diretta (tool calling nativo): il modello ne nomina una →
-    // la riga in testa lo dice subito; il main la esegue → la riga vera entra
-    // nel blocco con l'esito; un giro con azioni si chiude → il testo scritto
-    // in quel giro era una nota di lavoro, non la risposta: finisce nel blocco
-    // e la bolla riparte vuota per il giro dopo. Gli id delle chiamate già
-    // raccontate qui non si ripetono a fine turno (renderActions).
+    // Azioni in diretta: il modello ne nomina una → la riga in testa lo dice; il main la esegue
+    // → la riga vera con l'esito. Gli id già raccontati qui non si ripetono a fine turno.
     const shown = new Set();
     // Il testo di un giro di soli bottoni resta nella bolla; quello degli altri giri va nel blocco.
     const chiudiGiro = (data) => {
@@ -1065,10 +1055,8 @@
     const msg = {
       type: MSG.FILO_CHAT,
       userMessage,
-      // Tutta la conversazione TRANNE il messaggio che stiamo mandando adesso
-      // (viaggia a parte, in `userMessage`). Non «l'ultima voce e basta»: dopo
-      // un turno interrotto in fondo c'è quello che Filo aveva già fatto, e
-      // buttarlo via faceva ripartire il «Riprova» senza saperlo.
+      // Tutta la conversazione TRANNE il messaggio che parte adesso, non «l'ultima voce e basta»:
+      // dopo un turno interrotto in fondo c'è quello che Filo aveva già fatto, e buttarlo si paga.
       threadHistory: historyWithout(userMessage),
       reasoningReqId,
       internal,
@@ -1127,8 +1115,7 @@
       if (rispostaPrima || (Array.isArray(r?.actions) && r.actions.length)) {
         threadHistory.push({ role: 'filo', text: rispostaPrima, actions: Array.isArray(r?.actions) ? r.actions : [], interrotto: true });
       }
-      // Un turno fallito non deve lasciare a schermo il testo parziale di un
-      // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
+      // Un turno fallito non lascia a schermo il testo parziale del tentativo.
       if (streamBubble) { streamBubble.remove(); streamBubble = null; }
       // Chi non ha crediti scrive alla chat l'invito che ha ricevuto: lo riscatta lei, invece di mandarlo a ricopiarlo (#664).
       const invito = r?.code === 'NO_API_KEY' && !internal && !daModello ? await riscattaDallaChat(userMessage) : null;
@@ -1185,18 +1172,15 @@
       err.appendChild(row);
       bubblesEl.appendChild(err);
     } else {
-      // La risposta finale (r.text) è autorevole: riconcilia la bolla in
-      // streaming con essa (recupera l'eventuale coda non ancora emessa). Se non
-      // c'è testo ma ci sono azioni, la bolla in streaming non esiste (non è mai
-      // arrivato un delta) e cadiamo nel ramo "solo azioni" come prima.
+      // La risposta finale (r.text) è autorevole: riconcilia la bolla in streaming. Senza testo ma
+      // con azioni la bolla non esiste e si cade nel ramo «solo azioni».
       let filoBubble;
       // La nota che il main ha fatto diventare risposta esce dal blocco: la frase sta nella bolla e basta.
       if (r.notaRisposta) pending.dropNote(r.notaRisposta);
       if (streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
         if (r.text) {
-          // #418 — a fine turno il testo grezzo dello streaming diventa la
-          // risposta formattata (grassetto, corsivo, elenchi, link cliccabili).
+          // #418 — a fine turno il testo grezzo dello streaming diventa la risposta formattata.
           setBubbleText(streamBubble, r.text, true);
           filoBubble = streamBubble;
         } else {
@@ -1325,9 +1309,7 @@
     await runTurnAndContinue({ userMessage: domanda, images: c.immagini, daModello, daFuori: c.daFuori });
   }
 
-  // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra
-  // di invio. Condiviso tra il primo invio e il "Riprova" della bolla d'errore:
-  // riprovare deve comportarsi ESATTAMENTE come inviare.
+  // Condiviso fra il primo invio e il «Riprova»: riprovare deve comportarsi come inviare.
   async function runTurnAndContinue(args) {
     // Un blocco di attività per tutta la sequenza (#521): i turni automatici
     // sono passi dello stesso lavoro, non risposte diverse.
@@ -1370,9 +1352,8 @@
     return r;
   }
 
-  // #360 — "Riprova" dalla bolla d'errore: rimanda lo stesso messaggio senza
-  // farlo riscrivere. La bolla d'errore sparisce (il tentativo è ricominciato) e
-  // lo storico è già a posto: un turno fallito non ci ha lasciato niente dentro.
+  // #360 — «Riprova»: rimanda lo stesso messaggio senza farlo riscrivere. La bolla d'errore
+  // sparisce e lo storico è già a posto: un turno fallito non ci ha lasciato niente.
   async function retryTurn(errBubble, args) {
     if (sending) return;
     sending = true;
@@ -1663,8 +1644,7 @@
     pendingImages.forEach((dataUrl, idx) => {
       const wrap = document.createElement('div');
       wrap.className = 'dash-img-preview';
-      // Retrocompatibilità: la prima anteprima conserva l'id storico #imgPreview
-      // (usato dall'implementazione mono-immagine precedente e dai test esistenti).
+      // La prima anteprima conserva l'id #imgPreview: lo usano i test.
       if (idx === 0) wrap.id = 'imgPreview';
       const img = document.createElement('img');
       img.src = dataUrl;
@@ -1733,12 +1713,38 @@
     percorsiImmagini.clear();
     renderImagePreviews();
   }
+  // Quello che non entra lo si dice, in un avviso per gesto (#1298).
+  const nonEntrate = { grandi: 0, rotte: 0 };
+  let avvisoInArrivo = false;
+  function avvisaNonEntrate(tipo, n = 1) {
+    nonEntrate[tipo] += n;
+    if (avvisoInArrivo) return;
+    avvisoInArrivo = true;
+    setTimeout(() => {
+      const A = self.SN_CONST.ALLEGATI_CHAT;
+      const frasi = [];
+      if (nonEntrate.grandi) frasi.push(A.fraseTroppoGrandi(nonEntrate.grandi));
+      if (nonEntrate.rotte) frasi.push(A.fraseIlleggibili(nonEntrate.rotte));
+      nonEntrate.grandi = 0;
+      nonEntrate.rotte = 0;
+      avvisoInArrivo = false;
+      try { window.SN_POPUP?.showToast?.(frasi.join(' ')); } catch (_) {}
+    }, 250);
+  }
+  // Oltre il tetto un'immagine dal disco entra come file col suo percorso; senza percorso, o in un formato che il
+  // modello non legge, si ridisegna come nell'Aiuto (#1623). In fila, così le anteprime tengono l'ordine del gesto.
+  let immaginiInFila = Promise.resolve();
   function handleImageFile(file, percorso = '') {
-    if (!file || !file.type.startsWith('image/')) return;
-    if (file.size > 4 * 1024 * 1024) { if (percorso) addPendingFile(percorso); return; }
-    const reader = new FileReader();
-    reader.onload = () => addPendingImage(reader.result, percorso);
-    reader.readAsDataURL(file);
+    if (!file || !String(file.type || '').startsWith('image/')) return;
+    const A = self.SN_CONST.ALLEGATI_CHAT;
+    if (file.size > A.tettoImmagineByte && percorso) { addPendingFile(percorso); return; }
+    if (file.size > A.tettoLetturaByte) { avvisaNonEntrate('grandi'); return; }
+    const pronta = Promise.resolve(window.SN_IMMAGINI_CHAT?.perLaChat(file)).catch(() => '');
+    immaginiInFila = immaginiInFila.then(() => pronta).then((url) => {
+      if (url) addPendingImage(url, percorso);
+      else if (percorso) addPendingFile(percorso);
+      else avvisaNonEntrate('rotte');
+    });
   }
   // Un file dal disco: le immagini si vedono (e il modello le guarda), gli altri entrano col loro percorso.
   function handleDroppedFile(file) {
@@ -1761,14 +1767,42 @@
     }
     if (found) e.preventDefault();
   });
-  // Accetta immagini incollate da "Incolla → cronologia" del menu Filo
-  // (Ctrl+V passa dal listener 'paste' qui sopra; il menu invece dispatcha
-  // questo evento custom — vedi pasteHistoryEntry in content.js).
+  // Immagini da «Incolla → cronologia» del menu Filo: Ctrl+V passa dal listener 'paste' qui
+  // sopra, il menu dispatcha invece questo evento custom.
   inputForm.addEventListener('filo:paste-image', (e) => {
     if (e.detail?.blob) {
       e.preventDefault();
       handleImageFile(e.detail.blob);
     }
+  });
+  // Un file lasciato sul campo o in qualunque altro punto della home: un file trovato da Filo in chat entra come quelli
+  // dal disco. Torna se c'erano file.
+  function fileNelCampo(dt) {
+    const daChat = dt?.getData('application/x-filo-file') || '';
+    if (daChat) addPendingFile(daChat);
+    else if (dt?.files && dt.files.length) for (const f of dt.files) handleDroppedFile(f);
+    else return false;
+    inputEl.focus();
+    return true;
+  }
+  // Fuori dal campo il rilascio va alla chat se nessun altro lo vuole (#1623), e finché si trascina il campo si accende:
+  // si vede dove andrà a finire.
+  const portaFile = (dt) => { const t = Array.from(dt?.types || []); return t.includes('Files') || t.includes('application/x-filo-file'); };
+  const spegniBersaglio = () => inputForm.classList.remove('dash-input-bersaglio');
+  document.addEventListener('dragover', (e) => {
+    if (!portaFile(e.dataTransfer)) return;
+    inputForm.classList.add('dash-input-bersaglio');
+    if (e.defaultPrevented) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) spegniBersaglio(); });
+  document.addEventListener('dragend', spegniBersaglio);
+  document.addEventListener('drop', (e) => {
+    spegniBersaglio();
+    if (e.defaultPrevented || !portaFile(e.dataTransfer)) return;
+    e.preventDefault();
+    fileNelCampo(e.dataTransfer);
   });
   inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
   // Un file diventa un allegato; un testo trascinato (una voce della colonna destra, una frase da
@@ -1776,14 +1810,7 @@
   // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
-    // Un file trovato da Filo in chat, trascinato qui: entra come quelli trascinati dal disco.
-    const daChat = e.dataTransfer?.getData('application/x-filo-file') || '';
-    if (daChat) { addPendingFile(daChat); inputEl.focus(); return; }
-    const files = e.dataTransfer?.files;
-    if (files && files.length) {
-      for (const f of files) handleDroppedFile(f);
-      return;
-    }
+    if (fileNelCampo(e.dataTransfer)) return;
     const testo = e.dataTransfer?.getData('text/plain') || '';
     if (!testo) return;
     testoDaFuori = true;
@@ -1798,7 +1825,7 @@
     Term.virgoletteSuInserito(testo, inputEl.selectionEnd - spazioDopo.length);
   });
 
-  // ===== Lightbox: click su un'immagine per ingrandirla =====
+  // Lightbox: click su un'immagine per ingrandirla
   let lightboxEl = null;
   function ensureLightbox() {
     if (lightboxEl) return lightboxEl;
@@ -1864,9 +1891,8 @@
     return Comandi.handleSlashCommand(text);
   }
 
-  // Invio = manda il messaggio; Shift+Invio = a capo. Il campo è una textarea
-  // (non più un <input>), quindi Invio di suo andrebbe a capo: lo intercettiamo.
-  // `isComposing` evita di mandare a metà di una composizione IME.
+  // Invio manda, Shift+Invio va a capo: il campo è una textarea, quindi Invio di suo andrebbe a
+  // capo. `isComposing` evita di mandare a metà di una composizione IME.
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
@@ -1882,8 +1908,8 @@
     }
   });
 
-  // La textarea parte a una riga e cresce mentre si va a capo (fino al max-height
-  // del CSS, poi scrolla). Va richiamata anche quando svuotiamo il campo da codice.
+  // La textarea parte a una riga e cresce (fino al max-height del CSS). Va richiamata anche
+  // quando si svuota il campo da codice.
   function autoGrowInput() {
     inputEl.style.height = 'auto';
     inputEl.style.height = `${inputEl.scrollHeight}px`;
@@ -1989,6 +2015,16 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.CREDITS_WARNING && msg.id) {
       avvisoCrediti(String(msg.id)).catch(() => {});
+    } else if (msg?.type === MSG.CHAT_ALLEGA && msg.dove === 'casa') {
+      // Le immagini lasciate sulla fila delle schede o sulla barra (#1623), già lette dal main.
+      for (const im of Array.isArray(msg.immagini) ? msg.immagini : []) {
+        if (im && /^data:image\//i.test(String(im.dataUrl || ''))) {
+          handleImageFile(window.SN_IMMAGINI_CHAT?.blobDa(im.dataUrl), typeof im.percorso === 'string' ? im.percorso : '');
+        }
+      }
+      for (const p of Array.isArray(msg.file) ? msg.file : []) if (typeof p === 'string') addPendingFile(p);
+      if (Number(msg.grandi) > 0) avvisaNonEntrate('grandi', Math.floor(Number(msg.grandi)));
+      inputEl.focus();
     } else if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
       const vicino = ultimoTastoDestro && ultimoTastoDestro.isConnected ? ultimoTastoDestro : null;
       notaFermata(String(msg.frase), vicino);
@@ -2058,6 +2094,7 @@
       if (msg.settings) Sistema.applicaImpostazioni(msg.settings);
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
       if (msg.settings && msg.settings.autonomia) Accoglienza.aggiornaSceltaAutonomia(msg.settings.autonomia.livello);
+      if (msg.settings && msg.settings.contatori) Accoglienza.aggiornaSceltaContatori(msg.settings.contatori.attivi !== false);
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       Comandi.setOwner(msg.signedIn && msg.isAdmin);
@@ -2129,10 +2166,8 @@
     refreshAccountControl();
   }
 
-  // L'icona profilo mostra la foto Google quando sei loggato (come faceva la
-  // vecchia barra in alto), con fallback all'icona utente se la foto non carica
-  // o se sei sloggato. Lo stato auth vive nel main: lo interroghiamo e ci
-  // iscriviamo a `auth_changed` per aggiornarla dal vivo a login/logout.
+  // L'icona profilo mostra la foto Google quando sei loggato, con fallback all'icona utente. Lo
+  // stato auth vive nel main: ci si iscrive a `auth_changed` per aggiornarla dal vivo.
   function applyAccountProfile(profile) {
     if (!accountCtrlBtn) return;
     const ICONS = self.SN_ICONS || {};
@@ -2182,14 +2217,12 @@
     let recap;
     try { recap = await send({ type: MSG.GET_UPDATE_RECAP }); } catch (_) { return false; }
     if (!recap || !recap.ok) return false;
-    // Nessuna versione vista prima (il main l'ha appena marcata: primo avvio) o
-    // nessuna nota da mostrare → niente popup.
+    // Nessuna versione vista prima (primo avvio) o nessuna nota da mostrare → niente popup.
     if (!recap.lastSeen || !Array.isArray(recap.notes) || !recap.notes.length) return false;
     renderUpdateRecap(recap, onClose);
     return true;
   }
 
-  // Testo del recap per la condivisione/copia.
   function buildRecapText({ lastSeen, current, features, fixes }) {
     const lines = [`Filo ${lastSeen} → ${current}`];
     if (features.length) { lines.push('', 'Novità:'); for (const f of features) lines.push(`• ${f}`); }
@@ -2232,8 +2265,7 @@
   }
 
   function renderUpdateRecap({ lastSeen, current, notes }, onClose) {
-    // Aggrega le voci di tutte le versioni saltate (notes è già ordinato dalla
-    // più recente): tutte le novità in un blocco, tutte le correzioni nell'altro.
+    // notes è già ordinato dalla più recente: novità in un blocco, correzioni nell'altro.
     const features = [];
     const fixes = [];
     for (const n of notes) {
@@ -2257,8 +2289,7 @@
       settled = true;
       document.removeEventListener('keydown', onKey, true);
       overlay.remove();
-      // Salva la versione corrente come "vista": il recap non riapparirà fino al
-      // prossimo update.
+      // Salva la versione corrente come «vista»: il recap non riapparirà fino al prossimo update.
       send({ type: MSG.MARK_UPDATE_SEEN });
       if (typeof onClose === 'function') { try { onClose(); } catch (_) {} }
     }
@@ -2268,7 +2299,6 @@
     document.addEventListener('keydown', onKey, true);
     overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
 
-    // Header: "vecchia → nuova".
     const header = document.createElement('div');
     header.className = 'dash-recap-header';
     const title = document.createElement('div');
@@ -2556,7 +2586,6 @@
     document.addEventListener('keydown', onKey, true);
     overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
 
-    // Header: ringraziamento + totale crediti guadagnati.
     const header = document.createElement('div');
     header.className = 'dash-recap-header dash-thanks-header';
     const title = document.createElement('div');
@@ -2743,9 +2772,7 @@
     inCodaPopup(chiediAllarmeOwner);
   })();
 
-  // Hook per i test Playwright (stesso pattern di __filoEditorFormat
-  // nell'editor): permette di renderizzare azioni come farebbe una bolla di
-  // chat senza dover pilotare l'LLM.
+  // Hook per i test Playwright: rende azioni come farebbe una bolla di chat, senza l'LLM.
   window.__filoDashActions = {
     renderActions: Att.renderActions,
     applyCommandCwd: Term.applyCommandCwd,

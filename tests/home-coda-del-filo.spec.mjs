@@ -263,6 +263,36 @@ test('le pagine visitate entrano ripiegate: si aprono, riaprono la pagina scelta
   void casa;
 });
 
+// #1307.4 — una visita si scrive a pagina caricata: se arriva con la home già davanti, nessun ritorno in vista la porta.
+test('una pagina che finisce di caricarsi con la home davanti entra nel suo gruppo, anche dopo una tolta, e il titolo che si dà dopo le dà il nome', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await home(app);
+  const pagine = ['orche che cacciano', 'balene', 'delfini'].map((titolo, i) => ({ url: `https://esempio.test/${i}`, titolo, ts: oggiFa(0.05 - i * 0.01, 1000 * (i + 1)) }));
+  await semina(app, { pagine });
+  const page = await openTab('filo://newtab/');
+  const riga = page.locator('.dash-pagine').last();
+  await expect(riga.locator('.dash-pagine-testo')).toHaveText('3 pagine, fra cui delfini');
+  await riga.locator('.dash-pagine-testa').click();
+  await riga.locator('.dash-pagina', { hasText: 'balene' }).click({ button: 'right' });
+  await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await expect(riga.locator('.dash-pagine-testo')).toHaveText('2 pagine, fra cui delfini');
+  const id = await app.evaluate(async () => (await globalThis.SN_IL_FILO.registraVisita({ url: 'https://esempio.test/1', titolo: 'Caricamento…' })).id);
+  await expect(riga.locator('.dash-pagine-testo')).toHaveText('3 pagine, fra cui Caricamento…');
+  await app.evaluate((_e, visita) => globalThis.SN_IL_FILO.aggiornaTitolo({ visita, titolo: 'balene' }), id);
+  await expect(riga.locator('.dash-pagine-testo')).toHaveText('3 pagine, fra cui balene');
+  await expect(page.locator('.dash-pagine')).toHaveCount(1);
+  await expect(riga).toHaveClass(/dash-pagine-aperte/);
+  await expect(riga.locator(`.dash-pagina[data-id="${id}"]`)).toContainText('balene');
+});
+
+test('con la home vuota davanti, una pagina che finisce di caricarsi entra nel filo', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await expect(page.locator('.dash-pagine')).toHaveCount(0);
+  await app.evaluate(() => globalThis.SN_IL_FILO.registraVisita({ url: 'https://esempio.test/orche', titolo: 'orche' }));
+  await expect(page.locator('.dash-pagine .dash-pagine-testo')).toHaveText(['1 pagina: orche']);
+});
+
 test('cerco «orche» nel campo: trovo lo scambio e la pagina senza che la chat risponda, e il clic porta lì', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const chats = [{ id: 'sab', messaggi: [{ role: 'user', text: 'come cacciano le orche?', ts: alle(5, 10) }, { role: 'filo', text: 'In branco, con le onde.', ts: alle(5, 10, 1) }] }];

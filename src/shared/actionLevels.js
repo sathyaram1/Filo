@@ -75,10 +75,8 @@
     return action.valore ?? action.value ?? action.val ?? action.colore;
   }
 
-  // Etichetta leggibile di un paese per le azioni proxy (#152). Le location
-  // curate combaciano con ProxyTab.LOCATIONS; per qualsiasi altro alpha-2 valido
-  // ripieghiamo sul codice maiuscolo (il linguaggio naturale può chiedere paesi
-  // fuori dalla lista curata).
+  // Le location curate combaciano con ProxyTab.LOCATIONS; ogni altro alpha-2 valido ripiega
+  // sul codice maiuscolo: a voce si può chiedere un paese fuori dalla lista.
   const COUNTRY_LABELS = {
     us: 'Stati Uniti', gb: 'Regno Unito', fr: 'Francia', de: 'Germania',
     es: 'Spagna', nl: 'Paesi Bassi', jp: 'Giappone',
@@ -165,11 +163,16 @@
   }
 
   // Perché la cartella di CERCA_DOCUMENTI esce dal perimetro ('' se ci sta, o se si cerca nelle cartelle di sempre).
+  // Si misura la cartella che la ricerca leggerà: `_cartella` la risolve il main come la risolve l'indice ('' = una di
+  // serie o nessuna); senza, il nome pulito come lo pulisce lui (#1499).
   function cartellaDocumentiFuori(a) {
-    const c = String((a && a.cartella) || '').trim();
-    if (!c || /^(documenti|documents|download|downloads|scaricati|scrivania|desktop)$/i.test(c)) return '';
     const C = global.SN_CMD_CLASSIFY;
+    const pulisci = C && C.pulisciPercorso ? C.pulisciPercorso : (v) => String(v || '').trim();
+    const c = pulisci(a && a.cartella);
+    if (!c) return '';
     if (!C || !C.fuoriPerimetro) return 'non si sa dove legge';
+    if (typeof a._cartella === 'string') return a._cartella ? C.fuoriPerimetro(a._cartella, a._perimetro) : '';
+    if (/^(documenti|documents|download|downloads|scaricati|scrivania|desktop)$/i.test(c)) return '';
     return C.fuoriPerimetro(c, a && a._perimetro);
   }
 
@@ -615,7 +618,8 @@
       },
       describe: (a) => {
         const q = String((a && (a.cosa ?? a.query ?? a.testo)) || '').trim();
-        const c = String((a && a.cartella) || '').trim();
+        // La cartella che si leggerà davvero, se il main l'ha risolta: «"/etc» del modello è /etc.
+        const c = String((a && (a._cartella || a.cartella)) || '').trim();
         const perche = cartellaDocumentiFuori(a);
         // Richiesta e cartella le scrive il modello: intere, nel loro riquadro, come nell'Aiuto.
         return ['Cercare fra i tuoi documenti', ...(q ? [' ', cit(q)] : []), ...(c ? [' nella cartella ', cit(c, true)] : []),
@@ -706,9 +710,12 @@
         const righe = Array.isArray(a && a._righe) ? a._righe : [];
         if (!righe.length) return 'Dimenticare una cosa';
         const per = a && a.per_sempre === true;
-        return [`Filo sta per ${per ? 'cancellare per sempre' : 'dimenticare'} ${righe.length === 1 ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`,
-          elenco(righe), per ? '\n\nNon entreranno più nelle conversazioni, e il testo sparisce anche dal quaderno delle memorie.'
-            : '\n\nNon entreranno più nelle conversazioni. Le ritrovi nascoste nel quaderno delle memorie, se vuoi rimetterle.'];
+        const una = righe.length === 1;
+        const dove = per ? ', e il testo sparisce anche dal quaderno delle memorie.'
+          : (una ? '. La ritrovi nascosta nel quaderno delle memorie, se vuoi rimetterla.'
+            : '. Le ritrovi nascoste nel quaderno delle memorie, se vuoi rimetterle.');
+        return [`Filo sta per ${per ? 'cancellare per sempre' : 'dimenticare'} ${una ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`,
+          elenco(righe), `\n\n${una ? 'Non entrerà' : 'Non entreranno'} più nelle conversazioni${dove}`];
       },
       describeDone: (a) => `${a && a.per_sempre === true ? 'Cancellato per sempre' : 'Dimenticato'}: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
     },
@@ -1300,8 +1307,7 @@
     return piatto(describeParts(action));
   }
 
-  // La stessa cosa a fatto compiuto, per l'esito che torna al modello: dove
-  // il registro non distingue («Avviare il timer “pasta”») vale `describe`.
+  // A fatto compiuto, per l'esito che torna al modello; senza voce propria vale `describe`.
   function describeDone(action) {
     if (!action || typeof action !== 'object') return '';
     const entry = REGISTRY[String(action.type || '').toUpperCase()];

@@ -28,10 +28,8 @@
     const thumbnail = accettabile(page.thumbnail);
     const pages = await list();
 
-    // Dedupe per URL: salvare di nuovo una pagina già in "Aperti per dopo"
-    // NON deve creare un doppione. Aggiorna la voce esistente (rinfresca titolo,
-    // favicon, anteprima e data) e la riporta in cima, preservando id e categoria
-    // già assegnata. Così ri-salvare = "aggiorna e riporta su", senza attrito.
+    // Ri-salvare una pagina già in elenco aggiorna la voce e la riporta in cima, senza
+    // doppioni: id e categoria già assegnati restano.
     const idx = pages.findIndex((p) => p.url === page.url);
     if (idx >= 0) {
       const existing = pages[idx];
@@ -73,7 +71,7 @@
     const testo = fuori.length === 1
       ? `Le pagine salvate per dopo sono al massimo ${SAVED_PAGES_LIMIT}. ${nome(fuori[0])}, la più vecchia, è uscita dall’elenco.`
       : `Le pagine salvate per dopo sono al massimo ${SAVED_PAGES_LIMIT}. Le ${fuori.length} più vecchie sono uscite dall’elenco.`;
-    try { require('./avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'pagine-salvate-tetto' }); } catch (_) {}
+    try { require('./avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'pagine-salvate-tetto', tipo: 'pagine_salvate_tetto' }); } catch (_) {}
   }
 
   // Aggiorna SOLO la miniatura di una scheda già salvata (per id). Serve al

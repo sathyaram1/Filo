@@ -1,12 +1,6 @@
-// Overlay di evidenziazione per la sidebar Aiuto. Cornice colorata + tooltip
-// sopra l'elemento individuato via CSS selector. Due modalità:
-// - action="click": il tooltip mostra "text"; clic sul target → onAction()
-// - action="fill":  il tooltip mostra "text" + valore proposto + bottone
-//                   "✓ Accetta"; clic sul bottone → inserisce il valore nel
-//                   target (senza Invio) e poi → onAction()
-//
-// Il telaio della cornice resta sempre pointer-events:none così non blocca
-// l'utente; il bottone Accetta è invece interattivo (pointer-events:auto).
+// Evidenziazione per la sidebar Aiuto: cornice e tooltip sull'elemento di un selettore.
+// Modalità «click» (il clic conferma il passo) e «fill» (propone un valore e lo inserisce).
+// La cornice è pointer-events:none: solo il bottone Accetta è interattivo.
 
 (function (global) {
   'use strict';
@@ -34,10 +28,8 @@
     }
     onTargetClick = null;
     activeTarget = null;
-    // NB: il force-hover NON viene pulito qui: deve sopravvivere tra turni
-    // perché l'agente, dopo aver fatto hover su un menu, vorrà evidenziare
-    // una voce interna con un "click". Lo puliamo solo a fine sessione o
-    // dopo un click utente reale (vedi clearForceHover esposto).
+    // Il force-hover sopravvive fra un turno e l'altro: dopo un hover su un menu l'agente
+    // vorrà evidenziare una voce interna. Lo tolgono la fine sessione o un click vero.
   }
 
   function safeQuery(selector) {
@@ -45,17 +37,8 @@
     catch (_) { return null; }
   }
 
-  // ---------------------------------------------------------------------------
-  // Azioni "auto" eseguite dall'agente senza interazione utente.
-  // - reveal: apre un <details> o un disclosure aria-expanded=false con
-  //   aria-controls. Whitelist stretta lato SN_EXTRACT.canRevealElement per
-  //   evitare di cliccare link/submit/elementi di form. NB: l'unica via
-  //   programmatica affidabile per il pattern aria-expanded è .click()
-  //   sull'elemento; la whitelist garantisce che il click non navighi né
-  //   submitta.
-  // - hover: simula mouseenter/over per aprire menu JS-driven; in fallback
-  //   inietta una regola CSS che forza la visibilità del menu figlio.
-  // ---------------------------------------------------------------------------
+  // reveal: per aria-expanded l'unica via affidabile è .click(), e a garantire che non
+  // navighi è la whitelist di SN_EXTRACT.canRevealElement. hover: mouseenter/over.
 
   const forceHoverTargets = new Set();
   function ensureForceHoverSheet() {
@@ -63,9 +46,8 @@
     const s = document.createElement('style');
     s.id = 'sn-force-hover-sheet';
     global.SN_FILO_UI?.mark(s);
-    // Regola "best effort": copre i pattern dropdown più comuni. Non
-    // garantita su markup esotici, ma il dispatch di mouseenter copre
-    // il 90% dei casi reali; questo è il fallback per :hover puro CSS.
+    // Best effort sui pattern dropdown più comuni: il dispatch di mouseenter copre quasi tutti i
+    // casi veri, questa regola serve ai menu che vivono solo su :hover CSS.
     s.textContent =
       '[data-sn-force-hover] > [role="menu"],'
       + '[data-sn-force-hover] + [role="menu"],'
@@ -113,7 +95,6 @@
         el.parentElement.open = true;
         return true;
       }
-      // aria-expanded pattern: safe per whitelist (no nav, no submit)
       el.click();
       return true;
     } catch (_) { return false; }
@@ -137,8 +118,7 @@
     } catch (_) { return false; }
   }
 
-  // Esegue un'azione auto (reveal | hover) e ritorna un descrittore
-  // sintetico {ok, action, label} che la sidebar usa per il follow-up.
+  // Ritorna un descrittore {ok, action, label} che la sidebar usa per il follow-up.
   function autoAction(selector, action) {
     const target = safeQuery(selector);
     if (!target) return { ok: false, action, reason: 'selector-not-found' };
@@ -153,9 +133,8 @@
     return { ok: false, action, reason: 'unknown-action' };
   }
 
-  // Inserisce text in input/textarea/contenteditable senza simulare Invio.
-  // Usa il setter del prototype per essere compatibile con framework reattivi
-  // (React, Vue, Svelte) che intercettano le modifiche dirette di .value.
+  // Inserisce il testo senza simulare Invio, e passa dal setter del prototype perché i framework
+  // reattivi (React, Vue, Svelte) intercettano le scritture dirette di .value.
   function fillElement(el, text) {
     if (!el) return false;
     try {
@@ -172,9 +151,8 @@
       }
       if (el.isContentEditable) {
         el.focus();
-        // Selezione totale del contenuto, poi sostituzione tramite execCommand
-        // (così gli editor con paste/input handlers — Slate, Lexical, ProseMirror —
-        // ricevono l'evento correttamente).
+        // Selezione totale e sostituzione via execCommand: gli editor con handler di paste/input
+        // (Slate, Lexical, ProseMirror) ricevono l'evento solo così.
         const sel = window.getSelection();
         const range = document.createRange();
         range.selectNodeContents(el);
@@ -189,15 +167,13 @@
     return false;
   }
 
-  // opts: { note?, action?: 'click'|'fill', value?: string, onAction?: () => void }
-  // Backward-compat: se opts è una stringa, viene trattato come opts.note.
+  // Se `opts` è una stringa vale come opts.note.
   function show(selector, opts, legacyOnClick) {
     clear();
     const target = safeQuery(selector);
     if (!target) return false;
     activeTarget = target;
 
-    // Normalizza signature: legacy = show(selector, noteString, onClickFn)
     let options = opts;
     if (typeof opts === 'string' || opts == null) {
       options = { note: opts || '', action: 'click', onAction: legacyOnClick };
@@ -263,8 +239,6 @@
         return;
       }
       const r = activeTarget.getBoundingClientRect();
-      // Sposta la sidebar di lato se sta coprendo il target (idempotente: se
-      // non si sovrappone, non fa nulla).
       try { global.SN_SIDEBAR?.ensureNotOverTarget?.(r); } catch (_) {}
       frame.style.left = `${r.left}px`;
       frame.style.top = `${r.top}px`;
@@ -288,7 +262,6 @@
     window.addEventListener('resize', scrollListener);
     setTimeout(reposition, 350);
 
-    // Solo per action="click": il clic sul target stesso conferma il passo.
     if (action === 'click' && onTargetClick) {
       clickListener = (e) => {
         if (!activeTarget || !gestoVero(e)) return;

@@ -46,7 +46,6 @@
     try { return new URL(a).host === new URL(b).host; } catch (_) { return true; }
   }
 
-  // Broadcast dal main: c'è una proposta geo-block per questa pagina.
   try {
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== T_PROPOSE) return;

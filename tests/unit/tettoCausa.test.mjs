@@ -35,7 +35,8 @@ test('nessun host ammesso regge gli strumenti: la frase parla degli strumenti, n
   assert.equal(e.code, 'NO_TOOL_HOST');
   assert.equal(e.maxTokens, undefined);
   assert.match(CE.sentence(e), /^Per il modello scelto nessun fornitore ammesso sa usare gli strumenti/);
-  assert.equal(CE.rimedio(e), '');
+  // La cura è un altro modello: il tasto porta alle Opzioni.
+  assert.equal(CE.rimedio(e), 'opzioni');
 });
 
 test('gli host con gli strumenti non arrivano al tetto: la frase nomina il tetto e porta alle Preferenze', async () => {

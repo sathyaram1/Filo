@@ -1,43 +1,6 @@
-// La barra dei menu dell'applicazione.
-//
-// PERCHÉ ESISTE (#527)
-//   Su Windows e Linux la finestra di Filo è senza cornice: nessuna barra dei
-//   menu viene disegnata e i suoi tasti non arrivano a nessuno. Su macOS la
-//   barra è dell'APPLICAZIONE: sta in cima allo schermo, c'è sempre — anche con
-//   la finestra senza cornice — ed è la PRIMA a vedere i tasti, prima di
-//   qualunque cosa la pagina ascolti.
-//
-//   Filo non ne dichiarava nessuna, quindi restava appesa quella di serie di
-//   Electron: in inglese, con le voci di un altro prodotto e i link al suo
-//   sito, e con otto voci che si prendevano Cmd+W, Cmd+R, Cmd+Z e Cmd +/-/0 —
-//   cioè proprio le scorciatoie che il manifesto delle capacità promette
-//   all'utente Mac. Chiudere una scheda gli chiudeva la finestra intera.
-//
-// LA REGOLA, UNA SOLA
-//   Ogni tasto che compare in questa barra fa ESATTAMENTE quello che Filo fa
-//   già per quel tasto. Non basta togliere la barra: su macOS Chromium NON ha
-//   scorciatoie di modifica proprie (taglia, copia, incolla, seleziona tutto,
-//   annulla le lascia apposta al menu dell'applicazione), quindi una barra
-//   assente spegne copia e incolla in ogni campo di testo. Va sostituita, non
-//   rimossa.
-//
-//   Da qui le due metà del file:
-//   · i `role` di Electron si usano SOLO dove il tasto non è di Filo (taglia,
-//     copia, incolla, seleziona tutto, nascondi, riduci a icona, esci);
-//   · dove il tasto è di Filo (T, W, R, Z, +, -, 0) la voce NON ha `role`: ha
-//     un `click` che chiama la stessa funzione della scorciatoia. Un `role` lì
-//     significherebbe il comportamento di Electron al posto di quello di Filo,
-//     ed è esattamente il difetto che questo file chiude.
-//
-//   `registerAccelerator: false` non è una via d'uscita su Mac: Electron lo
-//   onora solo su Windows e Linux. Lì lo usiamo, ed è giusto — i tasti li
-//   gestiscono già le pagine (src/main/tabs.js, src/renderer/shell.js), la
-//   barra non si vede e non deve toglierglieli. Su Mac l'unico modo di non
-//   prendersi un tasto è non scriverlo.
-//
-// NIENTE STRUMENTI DA SVILUPPATORE
-//   La barra di serie apriva le DevTools con Opzione+Cmd+I a chiunque. Non è
-//   una voce per l'utente di Filo: qui non c'è.
+// La barra dei menu dell'applicazione (#527). Su Mac esiste sempre ed è la prima a vedere
+// i tasti: ogni voce fa esattamente quello che Filo fa già, e toglierla spegnerebbe copia
+// e incolla. Il perché: patterns/quello-che-il-sistema-aggancia-da-se-va-dichiarato.md
 
 // Electron si chiede DENTRO le funzioni, non qui in cima: così `template()` —
 // la forma della barra, cioè la parte che va tenuta d'occhio — si legge anche
@@ -46,8 +9,6 @@
 // Il nome di una scorciatoia non si scrive a mano nemmeno qui: su Mac indietro
 // e avanti stanno su un'altra combinazione (src/shared/tasti.js).
 require('../shared/tasti');
-
-// ─── a chi si parla ─────────────────────────────────────────────────────────
 
 function finestra() {
   const { BrowserWindow } = require('electron');
@@ -64,8 +25,7 @@ function schedaAttiva() {
   return tab ? { win, tabs, tab } : null;
 }
 
-// La webContents che ha davvero il cursore: può essere la shell (la fila delle
-// schede) o la pagina dentro la scheda attiva.
+// Può essere la shell (la fila delle schede) o la pagina dentro la scheda.
 function contenutoAFuoco() {
   try {
     const { webContents } = require('electron');
@@ -95,11 +55,21 @@ async function staScrivendo(wc) {
       .map((f) => f.executeJavaScript(sorgente, false).catch(() => true)));
     return risposte.some((r) => r === true);
   } catch (_) {
-    // Nel dubbio si annulla, non si naviga: annullare quando non c'è niente da
-    // annullare non fa nulla, mentre andare indietro mentre si scrive porta via
-    // il testo appena battuto.
+    // Nel dubbio si annulla: un annulla a vuoto non fa niente, un "indietro"
+    // mentre si scrive porta via il testo appena battuto.
     return true;
   }
+}
+
+const SORGENTE_CAMPO_VUOTO = `(() => {
+  let a = document.activeElement;
+  while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+  if (!a) return false;
+  const v = typeof a.value === 'string' ? a.value : a.textContent;
+  return typeof v === 'string' && v.trim() === '';
+})()`;
+async function campoVuoto(wc) {
+  try { return (await wc.executeJavaScript(SORGENTE_CAMPO_VUOTO, false)) === true; } catch (_) { return false; }
 }
 
 // Le Preferenze stanno registrando una scorciatoia (#842): su Mac la barra vede il tasto prima della pagina, che
@@ -122,48 +92,58 @@ function oRegistra(accel, fa, mac, aFuoco = contenutoAFuoco) {
 
 // ─── le azioni, le stesse delle scorciatoie ─────────────────────────────────
 
-function nuovaScheda() {
-  const win = finestra();
-  try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
+// Ogni voce è un'azione contata (#1461), con lo stesso id della scorciatoia che la fa nelle pagine.
+function contata(azione, fn) {
+  return (...args) => {
+    const win = finestra();
+    return require('./services/azioniContate').azione(azione, () => fn(...args), { incognito: !!(win && win._filoIncognito) });
+  };
 }
 
-function chiudiScheda() {
+const nuovaScheda = contata('new-tab', () => {
+  const win = finestra();
+  try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
+});
+
+// Dal tasto è Ctrl/Cmd+W, da un clic sulla voce un'altra strada (contatori della finestra, #1470).
+const chiudiScheda = contata('close-tab', (_voce, _win, ev) => {
   const c = schedaAttiva();
-  try { c && c.tabs.closeTab(c.tab.id); } catch (_) {}
-}
+  try { c && c.tabs.closeTab(c.tab.id, { via: ev && ev.triggeredByAccelerator ? 'ctrl_w' : 'altro' }); } catch (_) {}
+});
 
 function chiudiFinestra() {
   const win = finestra();
   try { win && win.close(); } catch (_) {}
 }
 
-function ricarica() {
+const ricarica = contata('reload', () => {
   const c = schedaAttiva();
   try { c && c.tabs.reload(c.tab.id); } catch (_) {}
-}
+});
 
 // Indietro e avanti passano dalla stessa porta di tutte le altre strade
 // (scorciatoia, tasti laterali del mouse, swipe): se non c'è dove andare non
 // succede niente.
-function indietro() {
+const indietro = contata('navigate-back-forward', () => {
   const c = schedaAttiva();
   try { c && c.tabs.navigaCronologia('indietro', c.tab.id); } catch (_) {}
-}
+});
 
-function avanti() {
+const avanti = contata('navigate-back-forward', () => {
   const c = schedaAttiva();
   try { c && c.tabs.navigaCronologia('avanti', c.tab.id); } catch (_) {}
-}
+});
 
-function vaiAScrivereUnIndirizzo() {
+const vaiAScrivereUnIndirizzo = contata('address-bar', () => {
   const c = schedaAttiva();
   if (c) { try { c.tabs.navigate(c.tab.id, 'filo://newtab/'); } catch (_) {} return; }
-  nuovaScheda();
-}
+  const win = finestra();
+  try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
+});
 
-// Lo zoom è della PAGINA, non della fila delle schede: passa dallo stesso punto
-// da cui passa Ctrl+rotella (src/preload/wheel-zoom.js), così le pagine che
-// zoomano da sé — l'editor — restano escluse anche da questa strada.
+// Stessa porta di Ctrl+rotella (src/preload/wheel-zoom.js): lo zoom è della
+// PAGINA, e le pagine che zoomano da sé restano escluse anche da qui.
+// Lo zoom si conta dove si registra, la raffica finita (src/main/tabs.js): da qui, dalla tastiera e dalla rotella.
 function zoom(verso) {
   const c = schedaAttiva();
   if (!c) return;
@@ -171,12 +151,13 @@ function zoom(verso) {
 }
 
 // Dal tasto, lo schermo pieno chiesto dalla pagina a fuoco (un video) resta suo, come in src/main/shortcuts.js.
-function schermoIntero(_voce, _finestra, evento) {
+const schermoIntero = contata('fullscreen', (_voce, _finestra, evento) => {
   const win = finestra();
   if (evento && evento.triggeredByAccelerator && win && win._filoTabs && win._filoTabs.schermoPienoDi(contenutoAFuoco())) return;
   try { win && win._filoTabs.toggleContentFullscreen(); } catch (_) {}
-}
+});
 
+// La barra laterale e l'Aiuto si contano dove arrivano tutte le loro strade: la barra che si apre, il comando.
 function barraLaterale() {
   const win = finestra();
   try { win && win._filoTabs.barra.commuta('tasto'); } catch (_) {}
@@ -187,29 +168,37 @@ function apriPagina(url) {
   try { win && win._filoTabs.openTab(url, { origine: { tipo: 'filo' } }); } catch (_) {}
 }
 
-function finestraIncognito() {
+const finestraIncognito = contata('incognito', () => {
   try { require('./window').createIncognitoWindow(); } catch (_) {}
-}
+});
 
 function assistenteLaterale() {
   try { require('./shortcuts').dispatch('open-help-sidebar', finestra()); } catch (_) {}
 }
 
-// Ctrl/Cmd+Z: dentro un campo di testo annulla quello che si sta scrivendo,
-// fuori torna alla pagina precedente. È la stessa regola di src/content/content.js
-// — quella strada vale dove il tasto arriva alla pagina, questa dove se lo
-// prende la barra dei menu.
+// Ctrl/Cmd+Z: nel campo di testo annulla, fuori torna indietro. Stessa regola di
+// src/content/content.js, che vale quando il tasto arriva alla pagina.
 async function annulla() {
   const wc = contenutoAFuoco();
   if (!wc) return;
-  if (await staScrivendo(wc)) { try { wc.undo(); } catch (_) {} return; }
+  const win = finestra();
+  const incognito = !!(win && win._filoIncognito);
+  if (await staScrivendo(wc)) {
+    // Un campo vuoto non ha niente da disfare: è l'azione di Filo appena fatta (src/content/content.js, stessa regola).
+    if (await campoVuoto(wc)) { try { globalThis.SN_CONTATORI_MAIN && globalThis.SN_CONTATORI_MAIN.tastoAnnulla({ incognito }); } catch (_) {} }
+    try { wc.undo(); } catch (_) {}
+    return;
+  }
+  // Subito dopo un'azione di Filo, Ctrl/Cmd+Z è un «annulla» per lei (#1461); ed è comunque un indietro.
+  try { globalThis.SN_CONTATORI_MAIN && globalThis.SN_CONTATORI_MAIN.tastoAnnulla({ incognito }); } catch (_) {}
   const c = schedaAttiva();
-  try { c && c.tabs.goBack(c.tab.id); } catch (_) {}
+  require('./services/azioniContate').azione('navigate-back-forward', () => {
+    try { c && c.tabs.goBack(c.tab.id); } catch (_) {}
+  }, { incognito });
 }
 
-// Ctrl/Cmd+Shift+Z: solo "ripeti", e solo mentre si scrive. Fuori da un campo
-// di testo non significa niente (Filo non ha un "avanti" su questo tasto), e
-// una voce che non fa niente è meglio di una che fa una cosa a sorpresa.
+// Solo mentre si scrive: fuori da un campo Filo non ha un "avanti" su questo
+// tasto, e una voce che non fa niente è meglio di una che sorprende.
 async function ripeti() {
   const wc = contenutoAFuoco();
   if (!wc) return;
@@ -265,8 +254,7 @@ function template(piattaforma) {
       { label: 'Quaderno delle memorie', click: () => apriPagina('filo://quaderno/quaderno.html') },
       { label: 'Cronologia AI', click: () => apriPagina('filo://history/history.html') },
       { type: 'separator' },
-      // Cmd+W chiude la SCHEDA, non la finestra: è quello che Filo promette e
-      // quello che fa dovunque non ci sia una barra dei menu di mezzo.
+      // Cmd+W chiude la SCHEDA, non la finestra: è quello che Filo promette.
       { label: 'Chiudi scheda', accelerator: 'CommandOrControl+W', click: chiudiScheda, ...SOLO_SCRITTA },
       { label: 'Chiudi finestra', click: chiudiFinestra },
     ],
@@ -290,8 +278,8 @@ function template(piattaforma) {
     label: 'Vista',
     submenu: [
       { label: 'Ingrandisci', accelerator: 'CommandOrControl+Plus', click: () => zoom('in'), ...SOLO_SCRITTA },
-      // Sulle tastiere il "+" si fa con Shift: senza questo alias Cmd+= — il
-      // modo in cui lo zoom si preme davvero — resterebbe scoperto.
+      // Il "+" si fa con Shift: senza questo alias Cmd+=, che è come lo zoom si
+      // preme davvero, resterebbe scoperto.
       { label: 'Ingrandisci', accelerator: 'CommandOrControl+=', click: () => zoom('in'), visible: false, ...SOLO_SCRITTA },
       { label: 'Rimpicciolisci', accelerator: 'CommandOrControl+-', click: () => zoom('out'), ...SOLO_SCRITTA },
       { label: 'Dimensione reale', accelerator: 'CommandOrControl+0', click: () => zoom('reset'), ...SOLO_SCRITTA },

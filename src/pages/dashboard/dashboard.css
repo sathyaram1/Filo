@@ -983,6 +983,10 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-file-btn-nome { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-file-btn-dove { opacity: 0.65; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-file-btn-dove[hidden] { display: none; }
+/* Il nome dato da Filo: più piano del nome vero, e senza spazio cede tutto lui. Il fattore è enorme
+   perché con uno piccolo al nome vero tocca una frazione di pixel, e già i puntini. */
+.dash-file-btn-etichetta { opacity: 0.8; min-width: 0; flex-shrink: 100000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-file-btn-etichetta[hidden] { display: none; }
 /* L'uscita dall'accoglienza: discreta, perché l'intervista è la strada principale, ma deve essere
    lì anche quando il modello non risponde. */
 .dash-skip-row {
@@ -1581,6 +1585,12 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   max-width: 720px;
   box-sizing: border-box;
 }
+/* Un file trascinato sopra la home (#1623): il campo si accende, è lì che andrà a finire. */
+.dash-input-wrap { transition: border-color calc(0.15s * var(--sn-motion, 1)) ease, box-shadow calc(0.15s * var(--sn-motion, 1)) ease; }
+.dash-input-wrap.dash-input-bersaglio {
+  border-color: var(--sn-accent);
+  box-shadow: 0 0 0 4px rgba(var(--sn-accent-rgb), 0.18);
+}
 .dash-input {
   flex: 1;
   min-width: 0;
@@ -1710,6 +1720,9 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 /* La scelta dell'autonomia nell'intervista (#1188): i livelli come pillole con le tacche di una carica, piene fino
    al livello; sotto, la frase del livello su cui si passa (o di quello scelto). */
 .dash-autonomia-scelta { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
+/* La scelta dei contatori nell'intervista (#1461): Sì e No, con le pillole dell'autonomia. */
+.dash-contatori-scelta { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
+.dash-contatori-voci { display: flex; flex-wrap: wrap; gap: 8px; }
 .dash-autonomia-livelli { display: flex; flex-wrap: wrap; gap: 8px; }
 .dash-autonomia-livello {
   display: inline-flex;

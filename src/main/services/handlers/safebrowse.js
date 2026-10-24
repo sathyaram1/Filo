@@ -75,8 +75,7 @@ module.exports = function register(on, ctx) {
     return { ok: true, richiesta: win._filoTabs.richiestaCasa(tabId) };
   }));
 
-  // Geo-block: l'utente ha accettato la proposta inline (#151) → instrada la tab
-  // dal paese indicato. Il tabId arriva dal sender (content script).
+  // Geo-block accettato: instrada la tab dal paese indicato; il tabId arriva dal sender.
   on(MSG.GEO_PROPOSE_ACCEPT, async (msg, sender) => {
     const win = winOf(sender);
     const tabId = sender?.tab?.id;
@@ -84,8 +83,7 @@ module.exports = function register(on, ctx) {
     return win._filoTabs.geoProposeAccept(tabId, msg.country);
   });
 
-  // Geo-block: l'utente ha rifiutato/chiuso la proposta → non riproporla per
-  // questo dominio nel tab.
+  // Geo-block: proposta rifiutata o chiusa → non riproporla per questo dominio nel tab.
   on(MSG.GEO_PROPOSE_DISMISS, async (msg, sender, origin) => {
     const win = winOf(sender);
     const tabId = sender?.tab?.id;

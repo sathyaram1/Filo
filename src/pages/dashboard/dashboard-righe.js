@@ -194,9 +194,9 @@
     voci.push({ type: 'item', icon: icona('copy', 16), label: 'Copia lo scambio', onClick: () => copia(r).catch(() => {}) });
     // #1295 — come una conversazione della home: nascosta si rimette, «Togli dal filo» la cancella.
     if (global.SN_DASH_CODA && global.SN_DASH_CODA.nascondi) {
-      voci.push({ type: 'item', icon: icona('eyeOff', 16), label: 'Nascondi la conversazione', onClick: () => { global.SN_DASH_CODA.nascondi(r.vista.id, { vicino: r.el }).catch(() => {}); } });
+      voci.push({ type: 'item', icon: icona('eyeOff', 16), label: 'Nascondi la conversazione', azione: 'chat-archive', onClick: () => { global.SN_DASH_CODA.nascondi(r.vista.id, { vicino: r.el }).catch(() => {}); } });
     }
-    voci.push({ type: 'item', icon: icona('trash', 16), label: 'Togli dal filo', onClick: () => togli(r).catch(() => {}) });
+    voci.push({ type: 'item', icon: icona('trash', 16), label: 'Togli dal filo', azione: 'chat-archive', onClick: () => togli(r).catch(() => {}) });
     return voci;
   }
 

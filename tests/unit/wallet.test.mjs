@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
@@ -59,6 +60,76 @@ test('la riga del registro ha SOLO i campi del contratto, nell\'ordine, con tipi
   assert.equal(row.at, '2026-09-08T10:00:00.000Z');
   assert.equal(W.usageRow({ action: 'CHAT' }), null, 'senza pseudonimo non c\'è riga');
   assert.equal(W.usageRow({ pseudonym: 'p', costUsd: 'boh' }).costUsd, 0);
+});
+
+test('la riga del registro sta nei tetti di lunghezza della regola, e i tetti sono quelli di firestore.rules', () => {
+  const regole = readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8');
+  const blocco = regole.slice(regole.indexOf('match /wallet-usage/{id}'));
+  for (const [campo, tetto] of Object.entries(W.USAGE_LIMITS)) {
+    const m = blocco.match(new RegExp(`request\\.resource\\.data\\.${campo}\\.size\\(\\) <= (\\d+)`));
+    assert.ok(m, `la regola non ha più il tetto su ${campo}`);
+    assert.equal(Number(m[1]), tetto, `tetto di ${campo}`);
+  }
+  const row = W.usageRow({ pseudonym: 'abcdef0123456789', action: 'A'.repeat(300), model: 'm'.repeat(500), servedBy: 's'.repeat(300) });
+  for (const [campo, tetto] of Object.entries(W.USAGE_LIMITS)) assert.ok(row[campo].length <= tetto, `${campo} lungo ${row[campo].length}`);
+  assert.equal(row.model, 'm'.repeat(200));
+});
+
+test('una riga che il server rifiuta non ferma le altre: il lotto si divide finché resta sola (#1601)', async () => {
+  const righe = ['a', 'b', 'CATTIVA', 'c', 'd'].map((id) => ({ id }));
+  const visti = [];
+  const commit = async (lotto) => {
+    visti.push(lotto.map((r) => r.id));
+    return lotto.some((r) => r.id === 'CATTIVA') ? { ok: false, motivo: '403: Missing or insufficient permissions.' } : { ok: true };
+  };
+  const esito = await W.scriviIsolando(righe, commit);
+  assert.deepEqual(esito.scritte.map((r) => r.id), ['a', 'b', 'c', 'd'], 'le buone passano, nell\'ordine');
+  assert.deepEqual(esito.rifiutate.map((x) => x.riga.id), ['CATTIVA']);
+  assert.match(esito.rifiutate[0].motivo, /403/);
+  assert.deepEqual(esito.rimaste, []);
+  assert.equal(esito.errore, null);
+  assert.ok(visti.length <= 7, `troppi commit: ${JSON.stringify(visti)}`);
+
+  const tutteCattive = await W.scriviIsolando(righe, async () => ({ ok: false, motivo: 'no' }));
+  assert.equal(tutteCattive.rifiutate.length, righe.length);
+  assert.equal(tutteCattive.scritte.length, 0);
+
+  assert.deepEqual(await W.scriviIsolando([], commit), { scritte: [], rifiutate: [], rimaste: [], errore: null });
+});
+
+test('rifiuto della riga o guasto: la regola che dice no sì, la chiave API ruotata o la rete no', () => {
+  const regola = '{ "error": { "code": 403, "message": "Missing or insufficient permissions.", "status": "PERMISSION_DENIED" } }';
+  assert.equal(W.rifiutoDellaRigaUso(403, regola), true);
+  assert.equal(W.rifiutoDellaRigaUso(400, '{ "error": { "code": 400, "message": "Invalid value at \'writes[0].update.fields[1].value\'", "status": "INVALID_ARGUMENT" } }'), true);
+  assert.equal(W.rifiutoDellaRigaUso(400, '{ "error": { "code": 400, "message": "API key not valid. Please pass a valid API key.", "status": "INVALID_ARGUMENT" } }'), false);
+  assert.equal(W.rifiutoDellaRigaUso(403, '{ "error": { "code": 403, "message": "Requests to this API firestore.googleapis.com method google.firestore.v1.Firestore.Commit are blocked.", "status": "PERMISSION_DENIED", "details": [{ "reason": "API_KEY_SERVICE_BLOCKED" }] } }'), false);
+  for (const st of [401, 404, 429, 500, 503]) assert.equal(W.rifiutoDellaRigaUso(st, regola), false, `${st}`);
+});
+
+test('un guasto passeggero a metà ferma gli invii e tiene tutto ciò che non è passato, nell\'ordine', async () => {
+  const righe = ['a', 'CATTIVA', 'b', 'c'].map((id) => ({ id }));
+  let n = 0;
+  const commit = async (lotto) => {
+    n += 1;
+    if (n === 4) throw new Error('fetch failed');
+    return lotto.some((r) => r.id === 'CATTIVA') ? { ok: false, motivo: '403' } : { ok: true };
+  };
+  const esito = await W.scriviIsolando(righe, commit);
+  const contate = [...esito.scritte, ...esito.rifiutate.map((x) => x.riga), ...esito.rimaste].map((r) => r.id).sort();
+  assert.deepEqual(contate, ['CATTIVA', 'a', 'b', 'c'], 'nessuna riga persa né doppia');
+  assert.match(String(esito.errore && esito.errore.message), /fetch failed/);
+  assert.ok(esito.rimaste.length > 0);
+  const ordine = righe.map((r) => r.id).filter((id) => esito.rimaste.some((r) => r.id === id));
+  assert.deepEqual(esito.rimaste.map((r) => r.id), ordine);
+});
+
+test('la riga della pagina Crediti sui consumi non registrati: numero, motivo, singolare e plurale', () => {
+  assert.equal(W.registroScartateTesto(null), '');
+  assert.equal(W.registroScartateTesto({ rifiutata: 0 }), '');
+  assert.equal(W.registroScartateTesto({ rifiutata: 1 }), 'Un consumo non è stato registrato: rifiutato dal server.');
+  assert.equal(W.registroScartateTesto({ altra_identita: 3 }), '3 consumi non sono stati registrati: di un portafoglio di prima.');
+  const misto = W.registroScartateTesto({ rifiutata: 1, altra_identita: 2, coda_piena: 4, ignoto: 9 });
+  assert.equal(misto, '7 consumi non sono stati registrati: 1 rifiutato dal server, 2 di un portafoglio di prima, 4 persi perché ce n\'erano troppi in attesa.');
 });
 
 test('il messaggio di crediti finiti distingue chiave di Filo e chiave propria', () => {

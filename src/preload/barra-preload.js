@@ -2,7 +2,7 @@
 // dell'utente (spinta sul bordo, clic, trascinamenti, puntatore dentro o fuori, gesti del vuoto).
 // Nient'altro deve poter chiedere al main: le azioni sono id che il main riconosce, o niente.
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const manda = (canale) => (dati) => ipcRenderer.send(canale, dati == null ? {} : dati);
 
@@ -29,4 +29,7 @@ contextBridge.exposeInMainWorld('barra', {
     ipcRenderer.on('barra:cursore', (_event, forma) => { try { fn(forma); } catch (_) {} });
   },
   chiedi: manda('barra:chiedi'),
+  // #1623 — le immagini lasciate sulla barra: { voci: [{ nome, percorso } | { nome, dataUrl }] }.
+  rilascio: manda('barra:rilascio'),
+  percorsoDelFile: (f) => { try { return (webUtils && webUtils.getPathForFile(f)) || ''; } catch (_) { return ''; } },
 });

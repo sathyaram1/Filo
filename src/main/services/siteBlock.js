@@ -13,8 +13,8 @@ function normalizeDomain(raw) {
   if (!raw) return '';
   let s = String(raw).trim().toLowerCase();
   if (!s) return '';
-  s = s.replace(/^[a-z]+:\/\//, ''); // schema
-  s = s.split('/')[0]; // path
+  s = s.replace(/^[a-z]+:\/\//, '');
+  s = s.split('/')[0];
   s = s.split('?')[0];
   s = s.split('#')[0];
   s = s.split(':')[0]; // porta
@@ -32,12 +32,11 @@ function isValidDomain(host) {
   return NomiSito.valido(host);
 }
 
-// Da lista grezza (settings) → Set di domini normalizzati E validi.
 function toBlacklistSet(list) {
   return new Set(list.map(normalizeDomain).filter(isValidDomain));
 }
 
-// Match per suffisso di dominio: "a.b.example.com" matcha "example.com".
+// Match per suffisso: "a.b.example.com" matcha "example.com".
 function matchesSuffix(host, set) {
   if (!host || !set || !set.size) return false;
   let h = host;
@@ -99,7 +98,7 @@ function configureFromSettings(settings) {
   userBlacklist = toBlacklistSet(list);
 }
 
-// Per i test: imposta stato senza passare da settings.
+// Per i test: imposta lo stato senza passare da settings.
 function setForTest({ enabled: en, useAdblockLists: ual, blacklist } = {}) {
   if (en !== undefined) enabled = !!en;
   if (ual !== undefined) useAdblockLists = !!ual;

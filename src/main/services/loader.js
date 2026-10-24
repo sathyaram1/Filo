@@ -1,16 +1,11 @@
-// Loader: importa i moduli "background" (portati 1:1 dall'estensione) e
-// "shared" nell'ordine corretto. Tutti i file usano il pattern IIFE che
-// si registra su globalThis, quindi require() basta a renderli disponibili.
-//
-// Lo shim chrome.* deve essere già stato caricato prima di questo file
-// (main.js lo fa nell'ordine giusto).
+// Importa i moduli background e shared nell'ordine corretto.
+// Lo shim chrome.* dev'essere già caricato prima di questo file (lo fa main.js).
 
 const path = require('node:path');
 
 const SHARED = path.join(__dirname, '..', '..', 'shared');
 const SVC = __dirname;
 
-// Ordine identico al vecchio background.js importScripts(...).
 require(path.join(SHARED, 'constants.js'));
 // #593 — la porta unica da cui passa il contenuto esterno (pagina, ricerca
 // web, percorsi di altri) prima di entrare in un prompt. Va PRIMA di chi la
@@ -33,13 +28,12 @@ require(path.join(SHARED, 'disposizioneIcone.js'));
 // annulla o torna indietro. La barra dei menu la manda a valutare nelle pagine
 // (src/main/menu.js), i content script la chiamano direttamente.
 require(path.join(SHARED, 'campoTesto.js'));
-require(path.join(SHARED, 'timeFormat.js')); // formattazione durate/countdown (#323)
+require(path.join(SHARED, 'timeFormat.js'));
 require(path.join(SHARED, 'modelCaps.js'));
-// Censimento dei punti in cui Filo usa un modello: è la sorgente di verità
-// dell'elenco di funzioni impostabili, quindi va caricato PRIMA dell'editor
-// delle catene (che da lì prende l'elenco).
+// Va PRIMA dell'editor delle catene, che da qui prende l'elenco delle funzioni impostabili.
 require(path.join(SHARED, 'modelUsage.js'));
 require(path.join(SHARED, 'contatoriGiornalieri.js')); // #969 — i contatori giornalieri: elenchi chiusi e forma del documento
+require(path.join(SHARED, 'contatoriFinestra.js')); // #1470 — i contatori della finestra, dopo quelli che ne danno gli errori
 // Elenco delle funzioni impostabili + le loro etichette: serve al main per
 // chiamare una funzione scoperta con lo STESSO nome che l'utente legge nelle
 // Opzioni (il messaggio d'errore gli dice di andare lì). Il modulo tocca il DOM
@@ -60,8 +54,7 @@ require(path.join(SHARED, 'nomiFile.js')); // #950 — nome sensato ai file dell
 // (che la usa in scrittura) e di handlers.js (che la usa in lettura).
 require(path.join(SHARED, 'pathsSafety.js'));
 require(path.join(SHARED, 'paths.js'));
-// Elenco e stato della micro-intervista di benvenuto (#524): logica pura, va
-// PRIMA di filoMemory (che ci passa lo stato letto dallo storage).
+// Va PRIMA di filoMemory, che gli passa lo stato letto dallo storage.
 require(path.join(SHARED, 'onboarding.js'));
 require(path.join(SHARED, 'quaderno.js')); // #872 — fonti delle memorie e righe tolte (logica pura), prima di filoMemory
 require(path.join(SHARED, 'filoMemory.js'));
@@ -90,7 +83,7 @@ require(path.join(SHARED, 'feedbackAttese.js')); // #903 — «aspetta #N»: pri
 require(path.join(SHARED, 'manageReview.js'));
 require(path.join(SHARED, 'manageSearch.js')); // #1118 — la ricerca fra i feedback: il classificatore gira nel main
 require(path.join(SHARED, 'feedbackClientIdHash.js')); // prima di feedbackPublicView: l'impronta della scheda (#583)
-require(path.join(SHARED, 'feedbackPublicView.js')); // #583 — quali feedback hanno una scheda pubblica, e con quali campi (dopo manageReview: la usa)
+require(path.join(SHARED, 'feedbackPublicView.js')); // dopo manageReview: lo usa
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'calendarEvent.js')); // evento proposto in chat → .ics per il calendario del computer
 require(path.join(SHARED, 'cmdClassify.js'));
@@ -129,10 +122,9 @@ require(path.join(SHARED, 'cambi.js'));  // #867 — i cambi di stato come event
 require(path.join(SHARED, 'vociImpostazioni.js'));  // #949 — le voci delle pagine delle impostazioni: cosa legge e cambia la chat
 require(path.join(SHARED, 'ttsChunk.js'));
 require(path.join(SHARED, 'ttsCache.js'));
-require(path.join(SHARED, 'ttsVoices.js'));          // voci del modello di lettura (Kokoro)
-require(path.join(SHARED, 'dictationSegmenter.js')); // dettatura in diretta: spezzoni di parlato (logica pura)
-// Solo nei test: registro e catene di modelli di prova (l'app non ha modelli
-// scritti nel codice; vedi tests/fixtures/testModels.js).
+require(path.join(SHARED, 'ttsVoices.js'));
+require(path.join(SHARED, 'dictationSegmenter.js'));
+// Solo nei test: l'app non ha modelli scritti nel codice.
 if (process.env.NODE_ENV === 'test') {
   try { require(path.join(__dirname, '..', '..', '..', 'tests', 'fixtures', 'testModels.js')); } catch (e) { console.warn('[loader] testModels non caricato:', e.message); }
 }
@@ -146,7 +138,7 @@ require(path.join(SHARED, 'transparency.js'));
 require(path.join(SHARED, 'autoFeedback.js'));  // F4 — dipende da capabilities
 require(path.join(SHARED, 'feedbackPublicKey.js'));
 require(path.join(SHARED, 'feedbackCrypto.js'));
-require(path.join(SHARED, 'feedbackImage.js')); // S1.2: sniff MIME + data URL per immagini decifrate
+require(path.join(SHARED, 'feedbackImage.js'));
 require(path.join(SHARED, 'userCredibility.js'));
 require(path.join(SHARED, 'spellLanguages.js'));
 require(path.join(SHARED, 'decks.js'));
@@ -191,8 +183,7 @@ require(path.join(SVC, 'geoBlockClassifier.js'));
 require(path.join(SVC, 'geoBlockRules.js'));
 
 module.exports = {
-  // Esponiamo gli oggetti popolati su globalThis per chi vuole un riferimento
-  // diretto invece di pescare da globalThis.
+  // Per chi vuole un riferimento diretto invece di pescare da globalThis.
   get SN_CONST() { return globalThis.SN_CONST; },
   get SN_MSG() { return globalThis.SN_MSG; },
   get SN_STORAGE() { return globalThis.SN_STORAGE; },

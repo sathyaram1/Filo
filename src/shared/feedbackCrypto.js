@@ -38,7 +38,6 @@
   const EPH_LEN = 65; // chiave pubblica P-256 in formato raw (0x04 || X || Y)
   const IV_LEN = 12;  // nonce AES-GCM
 
-  // ---- WebCrypto: stesso oggetto in Node 22+ e nel browser ----
   function subtle() {
     const c = (global && global.crypto) || (typeof crypto !== 'undefined' ? crypto : null);
     if (!c || !c.subtle) {
@@ -53,13 +52,11 @@
     return out;
   }
 
-  // ---- testo <-> byte ----
   const enc = new TextEncoder();
   const dec = new TextDecoder();
   const textToBytes = (s) => enc.encode(s);
   const bytesToText = (b) => dec.decode(b);
 
-  // ---- base64url (portabile Node/browser) ----
   function bytesToB64url(bytes) {
     let b64;
     if (typeof Buffer !== 'undefined') {
@@ -80,15 +77,12 @@
     return out;
   }
 
-  // ---- import chiavi ECDH P-256 ----
   function importPublicKey(b64url) {
     const raw = b64ToBytes(b64url);
     return subtle().importKey('raw', raw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
   }
-  // La chiave privata importata viene tenuta in memoria (una sola voce: la
-  // dashboard decifra centinaia di campi con la STESSA chiave, e importarla
-  // da capo ogni volta costava più della decifratura stessa). Se cambia la
-  // stringa cambia la voce; un import fallito non resta in cache.
+  // La privata importata resta in memoria: reimportarla a ogni campo costava più della
+  // decifratura stessa. Un import fallito non resta in cache.
   let privKeyCache = null; // { b64, key }
   async function importPrivateKey(b64) {
     if (privKeyCache && privKeyCache.b64 === b64) return privKeyCache.key;
@@ -98,8 +92,7 @@
     return key;
   }
 
-  // ECDH -> HKDF-SHA256 -> AES-256-GCM. `info` = chiave effimera, lega la chiave
-  // derivata a questo specifico messaggio.
+  // `info` = chiave effimera: lega la chiave derivata a questo specifico messaggio.
   async function deriveAesKey(privateKey, publicKey, info) {
     const bits = await subtle().deriveBits({ name: 'ECDH', public: publicKey }, privateKey, 256);
     const base = await subtle().importKey('raw', bits, 'HKDF', false, ['deriveKey']);
@@ -142,7 +135,6 @@
     return k;
   }
 
-  // ---- core byte-level ----
   async function sealBytes(plainBytes, pubKeyB64url) {
     const pub = await importPublicKey(resolvePubKey(pubKeyB64url));
     const eph = await subtle().generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
@@ -161,7 +153,6 @@
     return new Uint8Array(pt);
   }
 
-  // ---- API testo ----
   async function encryptForOwner(plaintext, pubKeyB64url) {
     if (plaintext == null) return plaintext; // null/undefined restano tali
     const packed = await sealBytes(textToBytes(String(plaintext)), pubKeyB64url);
@@ -177,7 +168,6 @@
     return bytesToText(await openBytes(packed, privKeyB64));
   }
 
-  // ---- API byte (screenshot) ----
   async function encryptBytesForOwner(plainBytes, pubKeyB64url) {
     return sealBytes(plainBytes instanceof Uint8Array ? plainBytes : new Uint8Array(plainBytes), pubKeyB64url);
   }
@@ -185,7 +175,6 @@
     return openBytes(packed instanceof Uint8Array ? packed : new Uint8Array(packed), privKeyB64);
   }
 
-  // ---- helper di rilevamento ----
   function isEncrypted(value) {
     return typeof value === 'string' && value.startsWith(STR_PREFIX);
   }
@@ -195,8 +184,7 @@
   function hasPublicKey() {
     return !!(global.SN_FEEDBACK_PUBKEY);
   }
-  // La cifratura è ATTIVA solo se c'è la chiave pubblica E l'interruttore di
-  // attivazione (cutover) è acceso. Vedi feedbackPublicKey.js → SN_FEEDBACK_ENC_ENABLED.
+  // Serve la chiave pubblica E l'interruttore acceso (feedbackPublicKey.js).
   function isEnabled() {
     return hasPublicKey() && !!global.SN_FEEDBACK_ENC_ENABLED;
   }

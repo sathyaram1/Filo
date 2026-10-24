@@ -189,6 +189,36 @@ function apriAlbero(git, base, nome, sha) {
   return { dir };
 }
 
+// I nomi dei worktree che una prova apre nella sua base: `ramo` è quello dei controlli di finish (#1480).
+const ALBERI = ['fusione', 'main', 'ramo'];
+
+/**
+ * Un worktree staccato su `sha`, con node_modules collegato nella base: chi prova lì non vede la cartella cambiare ramo
+ * sotto i piedi (#1480, D-91). { dir, base, moduli, chiudi } | { errore }. `chiudi` è sincrona e si può chiamare due volte.
+ */
+export function apriProvaSulCommit({ root, sha, git = gitIn(root) } = {}) {
+  const base = realpathSync.native(mkdtempSync(join(tmpdir(), 'filo-fusione-')));
+  try { writeFileSync(join(base, FILE_PID), String(process.pid)); } catch (_) { /* senza pid la cartella vale viva per età */ }
+  const moduli = cartellaModuli(root);
+  if (moduli) {
+    try { symlinkSync(moduli, join(base, 'node_modules'), 'junction'); } catch (e) {
+      togliBase(base);
+      return { errore: `non riesco a collegare node_modules nella cartella di prova (${e.message})` };
+    }
+  }
+  const a = apriAlbero(git, base, 'ramo', sha);
+  let chiusa = false;
+  const chiudi = () => {
+    if (chiusa) return { ok: true };
+    chiusa = true;
+    const rimasti = [...(a.dir ? [chiudiAlbero(git, a.dir)] : []), togliCollegamento(join(base, 'node_modules'))].filter((r) => !r.ok);
+    if (rimasti.length) return rimasti[0];
+    return togliBase(base);
+  };
+  if (a.errore) { chiudi(); return { errore: a.errore }; }
+  return { dir: a.dir, base, moduli: moduli ? join(base, 'node_modules') : '', chiudi };
+}
+
 /** La cartella base di una prova, senza mai attraversare il collegamento: prima lui, poi il resto. */
 function togliBase(base) {
   const c = togliCollegamento(join(base, 'node_modules'));
@@ -206,7 +236,8 @@ function pidVivo(pid) {
 function provaViva(base, { vivo = pidVivo, oraMs = Date.now() } = {}) {
   let pid = NaN;
   try { pid = Number.parseInt(readFileSync(join(base, FILE_PID), 'utf8'), 10); } catch (_) { /* senza pid: decide l'età */ }
-  if (Number.isInteger(pid) && pid > 0) return pid !== process.pid && vivo(pid);
+  // La propria è in uso: la cartella dei controlli di finish vive mentre la prova sulla fusione pulisce (#1480).
+  if (Number.isInteger(pid) && pid > 0) return pid === process.pid || vivo(pid);
   try { return oraMs - statSync(base).mtimeMs < VIVA_SENZA_PID_MS; } catch (_) { return false; }
 }
 
@@ -229,7 +260,7 @@ export function pulisciResti({ git, tmp = tmpdir(), vivo = pidVivo, oraMs = Date
     for (const r of l.out.split(/\r?\n/)) {
       if (!r.startsWith('worktree ')) continue;
       const dir = r.slice(9).trim();
-      if (['fusione', 'main'].includes(basename(dir))) aggiungi(dirname(dir), dir);
+      if (ALBERI.includes(basename(dir))) aggiungi(dirname(dir), dir);
     }
   }
   try {
@@ -238,10 +269,10 @@ export function pulisciResti({ git, tmp = tmpdir(), vivo = pidVivo, oraMs = Date
   const tolte = [];
   for (const [base, dirs] of basi) {
     if (existsSync(base) && provaViva(base, { vivo, oraMs })) continue;
-    for (const nome of ['fusione', 'main']) dirs.add(join(base, nome));
+    for (const nome of ALBERI) dirs.add(join(base, nome));
     const chiusi = [...dirs].map((d) => (existsSync(d) ? chiudiAlbero(git, d) : (git(['worktree', 'unlock', d]), { ok: true })));
     // La base si toglie solo se nessun collegamento è rimasto dentro: rmSync non li segue, ma non si rischia.
-    if (chiusi.every((c) => c.ok) && !['fusione', 'main'].some((n) => { try { lstatSync(join(base, n, 'node_modules')); return true; } catch (_) { return false; } })) {
+    if (chiusi.every((c) => c.ok) && !ALBERI.some((n) => { try { lstatSync(join(base, n, 'node_modules')); return true; } catch (_) { return false; } })) {
       if (togliBase(base).ok) tolte.push(base);
     }
   }
@@ -387,7 +418,10 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
   // Con main già dentro, il risultato della fusione è il ramo stesso: si prova lui.
   const contenuto = git(['merge-base', '--is-ancestor', mainSha, punta]).ok;
   if (contenuto && !ancheContenuto) return { esito: 'main_contenuto', mainSha };
-  const segno = contenuto ? { contenuto: true } : {};
+  // La base del ramo va detta: chi riprova un rosso «su main da solo» partendo da lì vede main di prima (#1580.1).
+  const comune = contenuto ? null : git(['merge-base', mainSha, punta]);
+  const baseRamo = comune && comune.ok ? String(comune.out || '').trim() : '';
+  const segno = contenuto ? { contenuto: true } : (/^[0-9a-f]{40}$/i.test(baseRamo) ? { baseRamo } : {});
   const sulla = contenuto ? 'sul ramo' : 'sulla fusione';
 
   const base = realpathSync.native(mkdtempSync(join(tmpdir(), 'filo-fusione-')));

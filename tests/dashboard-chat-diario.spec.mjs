@@ -445,6 +445,9 @@ test('F2 — la conversazione chiusa col bottone resta chiusa nella scheda nuova
 
   const nuova = await openTab('filo://newtab/');
   await expect(nuova.locator('#input')).toBeVisible();
+  // Chiusa non vuol dire sparita: la home nuova mostra lo scambio nel filo (#869, #553.13), solo non lo continua.
+  await expect(nuova.locator('#bubbles .dash-bubble-user', { hasText: 'portami alla home' })).toBeVisible();
+  await expect(nuova.locator('#bubbles .dash-bubble-filo', { hasText: 'Sei già qui' })).toBeVisible();
   await nuova.locator('#input').fill('grazie');
   await nuova.locator('#sendBtn').click();
   await expect(nuova.locator('.dash-bubble-filo', { hasText: 'Di niente.' })).toBeVisible({ timeout: 10_000 });

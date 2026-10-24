@@ -1,30 +1,12 @@
-// SORGENTE UNICA del rendering "testo di Filo -> HTML leggero" (#418).
-//
-// Ovunque Filo scriva una risposta - la chat della home (filo://dashboard), il
-// popup di risposta AI sulle pagine web, il riquadro "Spiega" del tasto destro,
-// la sidebar - il testo del modello va mostrato con una formattazione leggera e
-// COERENTE: grassetto, corsivo, codice, elenchi, titoli e LINK cliccabili. Prima
-// il popup aveva una sua copia (senza link) e la home non interpretava nulla:
-// due superfici, due comportamenti diversi. Da qui in poi tutte usano questo.
-//
-// SICUREZZA - il testo di Filo e' contenuto NON FIDATO (puo' nascere da una
-// pagina web che il modello ha letto). Un link renderizzato:
-//   - deve avere uno schema esplicito e sicuro (http/https/mailto). Tutto il
-//     resto (filo://, javascript:, data:, file:, about:, e i link RELATIVI o
-//     protocol-relative //host, che su una pagina filo:// risolverebbero verso
-//     le pagine INTERNE dell'app) viene scartato: il testo resta visibile ma non
-//     cliccabile;
-//   - porta rel="noopener noreferrer nofollow" e apre in una nuova scheda.
-// La classe `filo-md-link` e' l'aggancio con cui ogni superficie intercetta il
-// click e apre il link nel modo giusto (nuova scheda), invece di navigare via la
-// pagina interna.
+// SORGENTE UNICA del rendering «testo di Filo → HTML leggero» (#418).
+// Il testo del modello NON è fidato: un link si rende cliccabile solo con schema http,
+// https o mailto, perché filo://, javascript: e i relativi puntano dentro l'app.
 
 (function (global) {
   'use strict';
 
   const LINK_CLASS = 'filo-md-link';
-  // Sentinelle Private-Use: non compaiono mai nel testo del modello, quindi un
-  // innocente " T3 " nella prosa non viene scambiato per un segnaposto.
+  // Sentinelle Private-Use: non compaiono nel testo del modello, quindi la prosa è al sicuro.
   const S0 = '';
   const S1 = '';
 
@@ -34,11 +16,8 @@
     })[c]);
   }
 
-  // Dato un URL (gia' HTML-escapato: & e' &amp;, ecc.), ritorna l'URL se e' un
-  // link esterno SICURO da rendere cliccabile, altrimenti null. Solo schema
-  // esplicito http/https/mailto: niente filo://, javascript:, data:, file:,
-  // niente link relativi o protocol-relative (che punterebbero alle pagine
-  // interne dell'app).
+  // Ritorna l'URL solo se è un link esterno SICURO: niente filo://, javascript:, data:, file:,
+  // né relativi o protocol-relative. Altrimenti null: il testo resta visibile, non cliccabile.
   function safeLinkUrl(rawUrl) {
     const u = String(rawUrl || '').trim();
     if (!u) return null;
@@ -89,7 +68,6 @@
     const stash = (html) => S0 + (tokens.push(html) - 1) + S1;
     let t = String(escaped);
 
-    // Codice inline `...`
     t = t.replace(/`([^`\n]+)`/g, (m, code) => stash('<code>' + code + '</code>'));
 
     // Link markdown [testo](url): l'url può contenere parentesi bilanciate
@@ -108,12 +86,11 @@
       return (safe ? stash(anchor(safe, url)) : url) + trail;
     });
 
-    // Grassetto poi corsivo (l'ordine evita che ** venga letto come due *).
+    // Grassetto poi corsivo: l'ordine evita che ** venga letto come due *.
     t = t
       .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
       .replace(/(^|[^*\w])\*(?!\s)([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
 
-    // Ripristina i segnaposto (codice e link).
     t = t.replace(new RegExp(S0 + '(\\d+)' + S1, 'g'), (m, i) => tokens[Number(i)] || '');
     return t;
   }
@@ -227,5 +204,11 @@
     return () => { try { rootEl.removeEventListener('click', onClick); } catch (_) {} };
   }
 
-  global.SN_MARKDOWN = { render, testo, inlineMd, escapeHtml, safeLinkUrl, bindLinks, LINK_CLASS };
+  // Un collegamento disegnato da qui, o dentro una frase di Filo, l'ha scritto un modello: senza verdetto della porta,
+  // clic, tasto destro e anteprima lo trattano da indirizzo da confermare (#1505).
+  function scrittoDaUnModello(el) {
+    return !!(el && el.closest && (el.closest('a.' + LINK_CLASS) || el.closest('[data-filo-verdetti]')));
+  }
+
+  global.SN_MARKDOWN = { render, testo, inlineMd, escapeHtml, safeLinkUrl, bindLinks, scrittoDaUnModello, LINK_CLASS };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

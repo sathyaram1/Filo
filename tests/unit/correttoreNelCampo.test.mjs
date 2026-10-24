@@ -28,6 +28,9 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
   const docListeners = {};
   const richieste = [];
   const dizionario = new Set(sbagliate);
+  // Come il dizionario vero (src/preload/dizionario.js): ogni chiamata è un viaggio al processo principale.
+  const viaggi = [];
+  const sbagliataFinta = (w) => w === 'qzxwvkjh' || dizionario.has(w);
   class FintaData extends Date {
     constructor(...a) { super(...(a.length ? a : [ora])); }
     static now() { return ora; }
@@ -61,7 +64,11 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
     },
     SN_MSG: { MSG: { AI_REQUEST: 'ai' } },
     SN_GESTO: { prendi: () => true, dentro: () => () => true, CHIUDE: 'chiude' },
-    SN_DIZIONARIO: { sbagliata: (w) => w === 'qzxwvkjh' || dizionario.has(w), proposte: () => [] },
+    SN_DIZIONARIO: {
+      sbagliata: (w) => { viaggi.push([w]); return sbagliataFinta(w); },
+      sbagliate: (ws) => { viaggi.push(ws.slice()); return ws.map(sbagliataFinta); },
+      proposte: () => [],
+    },
   };
   sb.window = sb; sb.globalThis = sb; sb.self = sb;
   sb.getComputedStyle = () => ({ borderStyle: '', direction: 'ltr', getPropertyValue: () => '' });
@@ -110,7 +117,7 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
   const rapide = () => richieste.filter((r) => r.action === 'spellcheck_semantic');
   const ragionate = () => richieste.filter((r) => r.action === 'spellcheck_context');
   return {
-    sb, richieste, rapide, ragionate, passa, campo, segni, tick,
+    sb, richieste, rapide, ragionate, passa, campo, segni, tick, viaggi,
     entra: (el) => docListeners.focusin.forEach((f) => f({ target: el })),
     esce: (el) => docListeners.focusout.forEach((f) => f({ target: el })),
     visibile: () => (docListeners.visibilitychange || []).forEach((f) => f()),
@@ -170,6 +177,23 @@ test('una parola fuori dizionario appena chiusa fa partire il controllo subito, 
   assert.deepEqual(c.segni('sn-errore'), [{ testo: 'quseta', dubbio: true }], 'sbiadito finché non è giudicato');
   await c.risponde(c.rapide()[0], '[quseta][questa][refuso][errore]');
   assert.deepEqual(c.segni('sn-errore'), [{ testo: 'quseta', dubbio: false }], 'confermato si riempie');
+});
+
+test('le parole di un campo si chiedono al dizionario tutte in un viaggio, e una parola già chiesta non riparte', async () => {
+  const c = correttore({ sbagliate: ['quseta'] });
+  const el = c.campo();
+  c.entra(el);
+  const parole = Array.from({ length: 300 }, (_, i) => `parola${'abcdefghij'[i % 10]}${'abcdefghij'[Math.floor(i / 10) % 10]}${'abc'[Math.floor(i / 100)]}`);
+  c.scrive(el, `${parole.join(' ')} quseta `);
+  await c.passa(1);
+  const conLeParole = c.viaggi.filter((v) => v.some((w) => w !== 'qzxwvkjh'));
+  assert.equal(conLeParole.length, 1, `${conLeParole.length} viaggi per un campo solo`);
+  assert.equal(conLeParole[0].length, 301);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['quseta']);
+  const prima = c.viaggi.length;
+  c.scrive(el, `${parole.join(' ')} quseta nuova `);
+  await c.passa(1);
+  assert.deepEqual(JSON.parse(JSON.stringify(c.viaggi.slice(prima).filter((v) => v.some((w) => w !== 'qzxwvkjh')))), [['nuova']]);
 });
 
 test('un candidato giudicato giusto sparisce, e la stessa parola più avanti non è più un candidato', async () => {

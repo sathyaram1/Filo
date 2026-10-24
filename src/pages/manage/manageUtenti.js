@@ -367,16 +367,33 @@
     return 'il server non risponde';
   }
 
+  // La scheda Contatori dice la stessa cosa e chiede la stessa soglia; la sua frase per un guasto è questa.
+  window.SN_MG_FRASE_CONTATORI = fraseContatori;
+
+  // Sotto le cinque copie il main manda `sotto` e niente numero (#1462). Il riquadro si apre sulla scheda Contatori.
   function riquadroInstallazioni(v, nome, spiega, r) {
-    const noto = Boolean(v && Number.isFinite(Number(v.n)));
-    const n = noto ? Number(v.n) : null;
-    const valore = !noto ? '—' : `${v.completo === false ? 'almeno ' : ''}${formatInt(n)}`;
-    const title = noto ? spiega : `I contatori non si sono letti: ${fraseContatori(r && r.error)}.`;
+    const pochi = Boolean(v && v.sotto === true);
+    const noto = pochi || Boolean(v && v.n != null && Number.isFinite(Number(v.n)));
+    const n = noto && !pochi ? Number(v.n) : null;
+    const valore = !noto ? '—' : (pochi ? 'meno di 5' : `${v.completo === false ? 'almeno ' : ''}${formatInt(n)}`);
+    const title = !noto ? `I contatori non si sono letti: ${fraseContatori(r && r.error)}.`
+      : (pochi ? `${spiega} Meno di cinque: il numero esatto non si mostra, per non leggere il comportamento di un tester.` : spiega);
     const li = riquadro(valore, nome(n), title, { nota: noto ? '' : 'non letti' });
+    const apriContatori = () => { location.hash = 'contatori'; };
+    if (noto) {
+      li.classList.add('is-apribile');
+      li.tabIndex = 0;
+      li.setAttribute('role', 'button');
+      li.addEventListener('click', apriContatori);
+      li.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); apriContatori(); }
+      });
+    }
     li.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
       apriMenu([
-        ...(noto ? [['Copia il numero', () => copia(String(n))]] : []),
+        ...(n != null ? [['Copia il numero', () => copia(String(n))]] : []),
+        ...(noto ? [['Apri i contatori', apriContatori]] : []),
         ['Rileggi', () => { loadInstallazioni().catch(() => {}); }],
       ], ev.clientX, ev.clientY);
     });
@@ -1232,9 +1249,7 @@
   function formatInt(n) {
     return new Intl.NumberFormat('it-IT', { useGrouping: true }).format(Math.round(Number(n) || 0));
   }
-  // Crediti con al più un decimale: mostra "137" per un valore intero e "0,3"
-  // per una frazione, così un consumo sotto il credito resta visibile invece di
-  // sparire arrotondato a zero. Il decimale sparisce se il valore è intero.
+  // Al più un decimale: un consumo sotto il credito deve restare visibile, non sparire a zero.
   function formatCredits(n) {
     const v = Math.round((Number(n) || 0) * 10) / 10;
     return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(v);

@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { mimeDiAllegato } from '../../scripts/claude-feedback.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -83,4 +84,35 @@ test('input mancanti/degeneri non esplodono e sono rifiutati', () => {
   assert.equal(A.classify(null), null);
   assert.equal(A.classify(undefined), null);
   assert.equal(f(undefined, undefined), null);
+});
+
+// ── La riga di comando: stesso elenco del riquadro (#582, #1518) ────────────
+// Il deposito non tiene più una sua lista di tipi: l'elenco unico è questo, e
+// `npm run feedback:apri` ammette quello che ammette una persona dal riquadro.
+
+test('la riga di comando ammette gli stessi allegati del riquadro, né uno di più né uno di meno', () => {
+  for (const ext of [...A.IMAGE_EXT, ...A.DOC_EXT]) {
+    const nome = `a.${ext}`;
+    const tipo = mimeDiAllegato(nome);
+    assert.ok(tipo, `${nome}: il riquadro lo allega, la riga di comando no`);
+    assert.equal(A.classify({ name: nome, type: tipo }), A.classify({ name: nome, type: '' }),
+      `${nome}: la riga di comando lo dichiara ${tipo} e il riquadro lo classifica diverso`);
+  }
+  for (const nome of ['a.zip', 'a.exe', 'a.html', 'a.svg', 'a.octetstream', 'a']) {
+    assert.equal(mimeDiAllegato(nome), '', `${nome}: la riga di comando lo manderebbe`);
+  }
+});
+
+test('il tipo di un allegato è sempre una stringa, anche coi nomi di serie', () => {
+  // Verifica #582, giro 7: la chiave è l'estensione di un nome di file, e in una
+  // tabella normale `__proto__` e `constructor` ci sono già. Un file chiamato
+  // `note.__proto__` si faceva dare un «tipo» che non è una stringa e partiva
+  // con `data:[object Object]`.
+  for (const nome of ['a.__proto__', 'a.constructor', 'a.tostring', 'a.valueof', 'a.exe', 'a']) {
+    const tipo = mimeDiAllegato(nome);
+    assert.equal(typeof tipo, 'string', `${nome}: il tipo non è una stringa`);
+    assert.equal(tipo, '', `${nome}: tipo non ammesso accettato come «${String(tipo)}»`);
+  }
+  assert.equal(mimeDiAllegato('a.png'), 'image/png');
+  assert.equal(mimeDiAllegato('a.yaml'), 'application/x-yaml');
 });

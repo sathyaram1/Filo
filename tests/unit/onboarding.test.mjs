@@ -43,10 +43,11 @@ test('si registra su globalThis con la sua API', () => {
 
 test("l'elenco copre le cose da scoprire E quelle da dire", () => {
   const ids = O.ITEMS.map((i) => i.id);
-  for (const id of ['profilo', 'stile', 'autonomia', 'estetica', 'privacy', 'modelli', 'crediti']) {
+  for (const id of ['profilo', 'stile', 'autonomia', 'estetica', 'privacy', 'contatori', 'modelli', 'crediti']) {
     assert.ok(ids.includes(id), `manca la voce "${id}"`);
   }
-  assert.deepEqual(O.ITEMS.filter((i) => i.kind === 'scoprire').map((i) => i.id), ['profilo', 'stile', 'autonomia']);
+  // I contatori anonimi sono una scelta da fare, non una cosa da dire (#1461).
+  assert.deepEqual(O.ITEMS.filter((i) => i.kind === 'scoprire').map((i) => i.id), ['profilo', 'stile', 'autonomia', 'contatori']);
   assert.equal(new Set(ids).size, ids.length, 'id duplicati');
   for (const i of O.ITEMS) {
     assert.ok(i.label && i.detail, `voce ${i.id} senza etichetta o dettaglio`);
@@ -588,4 +589,17 @@ test('#1592 — l’intervista di benvenuto non lega l’accesso Google al voto 
     assert.doesNotMatch(testo, /\bvot|bacheca|ancora rotto/i, `la voce «${i.id}» nomina il voto o la Bacheca`);
   }
   assert.match(O.ITEMS.find((i) => i.id === 'crediti').detail, /L’accesso Google serve per dare inviti ad altri/);
+});
+
+// #1461 — chi risponde a parole alla domanda sui contatori deve ottenere quello che ha detto: l'istruzione nomina lo
+// strumento e la chiave della chat che li accendono e li spengono davvero, e non dice al modello che non può farlo.
+test('la voce dei contatori dice come applicare una risposta data a parole, con una chiave che esiste', () => {
+  for (const m of ['tabColor', 'constants', 'contenutoEsterno', 'preferences']) require(join(ROOT, 'src', 'shared', `${m}.js`));
+  const voce = O.ITEMS.find((i) => i.id === 'contatori');
+  assert.match(voce.applica, /a parole/);
+  assert.doesNotMatch(voce.applica, /non hai un.azione/i);
+  const m = /IMPOSTA_PREFERENZA, chiave "([^"]+)"/.exec(voce.applica);
+  assert.ok(m, 'l’istruzione nomina IMPOSTA_PREFERENZA e la sua chiave');
+  assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial(m[1], false).partial, { contatori: { attivi: false } });
+  assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial(m[1], true).partial, { contatori: { attivi: true } });
 });

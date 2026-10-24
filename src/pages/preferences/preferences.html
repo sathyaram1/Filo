@@ -271,7 +271,7 @@
       <div id="onboardingArchive" class="onb-archive" hidden></div>
     </section>
 
-    <section>
+    <section id="sec-lettura">
       <h2>Lettura ad alta voce</h2>
       <p class="sn-muted">Seleziona del testo in una pagina e scegli <strong>🔊 Leggi</strong> dal menu del tasto destro per ascoltarlo. Legge con una voce naturale, scelta in base alla lingua del testo; se non è raggiungibile, usa una voce installata sul tuo sistema operativo, che funziona anche offline.</p>
       <label for="ttsModelVoice" class="sn-muted" style="display:block;margin-bottom:4px;">Voce naturale</label>
@@ -468,13 +468,36 @@
             <span>Segna le parole ripetute per sbaglio, come «il il»</span>
           </label>
         </div>
+        <div class="sn-toggle-row">
+          <label title="Quando finisci una parola: «perchè» diventa «perché», «marco» diventa «Marco». Si annulla subito dopo con la scorciatoia di annulla, o col tasto destro sulla parola.">
+            <input type="checkbox" id="correttoreAutomatica" />
+            <span>Correzione automatica</span>
+          </label>
+        </div>
+        <label for="correttoreAccetti" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Una correzione che scegli diventa automatica dopo (volte, da 1 a 100)</label>
+        <input type="number" id="correttoreAccetti" min="1" max="100" step="1" style="width:120px;" />
+        <label for="correttoreAnnulli" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Una correzione automatica che annulli non torna più dopo (volte, da 1 a 100)</label>
+        <input type="number" id="correttoreAnnulli" min="1" max="100" step="1" style="width:120px;" />
+        <label for="correttoreRiscritte" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Una parola che il correttore non conosce smette di essere segnata dopo che la scrivi uguale (volte, da 1 a 100)</label>
+        <input type="number" id="correttoreRiscritte" min="1" max="100" step="1" style="width:120px;" />
+          <label title="Scrivi delle x al posto di un dato che non ricordi («nel 14xx», «un p/e di xx») e Filo lo trova: il valore compare sopra le x, un clic lo mette.">
+            <input type="checkbox" id="correttoreSegnaposti" />
+            <span>Segnaposto</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label title="Per un dato che cambia nel tempo, come un prezzo o una quotazione, Filo cerca anche sul web (circa 0,8 centesimi a ricerca). Spento, cerca solo su Wikipedia e Wikidata, gratis.">
+            <input type="checkbox" id="correttoreSegnapostiWeb" />
+            <span>Cerca sul web per i segnaposto</span>
+          </label>
+        </div>
         <label for="correttorePausaRapido" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa prima del controllo degli errori (millisecondi, da 200 a 5.000)</label>
         <input type="number" id="correttorePausaRapido" min="200" max="5000" step="50" style="width:120px;" />
         <label for="correttoreOgniRapido" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Mentre scrivi senza pause, un controllo degli errori ogni (millisecondi, da 1.000 a 60.000)</label>
         <input type="number" id="correttoreOgniRapido" min="1000" max="60000" step="500" style="width:120px;" />
         <label for="correttorePausaRagionato" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa prima del controllo dei suggerimenti (millisecondi, da 1.000 a 30.000)</label>
         <input type="number" id="correttorePausaRagionato" min="1000" max="30000" step="500" style="width:120px;" />
-        <p class="sn-muted" style="margin-top:12px;"><a id="correttoreModelli" href="filo://options/options.html">I modelli dei due controlli</a></p>
+        <p class="sn-muted" style="margin-top:12px;"><a id="correttoreModelli" href="filo://options/options.html">I modelli dei due controlli</a> · <a id="correttoreGestisci" href="filo://spellcheck/spellcheck.html">Parole imparate e correzioni</a></p>
       </section>
 
       <section id="sec-barra">
@@ -496,6 +519,12 @@
         <input type="number" id="barraAttesa" min="100" max="3000" step="50" style="width:120px;" />
         <label for="barraUscita" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Dopo quanto si chiude quando il mouse esce (millisecondi, da 100 a 5.000)</label>
         <input type="number" id="barraUscita" min="100" max="5000" step="50" style="width:120px;" />
+      </section>
+
+      <section id="sec-schermo-pieno">
+        <h2>Schermo intero</h2>
+        <label for="avvisoSchermoPienoDurata" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Quanto resta in vista il nome del sito quando una pagina va a schermo intero (millisecondi, da 1.000 a 10.000)</label>
+        <input type="number" id="avvisoSchermoPienoDurata" min="1000" max="10000" step="500" style="width:120px;" />
       </section>
 
       <!-- #842 — i tasti di Spiega, Traduci, Salva per dopo e Aiuto: le righe le scrive preferences.js. -->
@@ -632,10 +661,10 @@
         </div>
       </section>
 
-      <!-- #969 — i contatori giornalieri: cosa esce lo dice la pagina Privacy, che dice anche come spegnerli. -->
+      <!-- #969, #1461 — i contatori anonimi: cosa esce lo dice la pagina Privacy, che dice anche come spegnerli. -->
       <section id="sec-contatori">
         <h2>Contatori anonimi</h2>
-        <p class="sn-muted">Una volta al giorno Filo manda a chi lo sviluppa solo dei numeri: quante volte usi ogni funzione, quanto aspetti la risposta, quante chiamate falliscono. Niente testi, indirizzi o nomi di file, con un codice che cambia ogni mese. In incognito non conta niente. <a id="contatoriPrivacy" href="filo://transparency/transparency.html?doc=privacy">Cosa esce, nel dettaglio</a></p>
+        <p class="sn-muted">Ogni ora Filo manda a chi lo sviluppa solo dei numeri: quante volte usi ogni funzione e quanto aspetti, quali impostazioni cambi, cosa non va. Niente testi, indirizzi o nomi di file, con un codice che cambia ogni mese. In incognito non conta niente. <a id="contatoriPrivacy" href="filo://transparency/transparency.html?doc=privacy">Cosa esce, nel dettaglio</a></p>
         <div class="sn-toggle-row">
           <label>
             <input type="checkbox" id="contatoriAttivi" />

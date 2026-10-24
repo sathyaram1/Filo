@@ -59,7 +59,10 @@
 //         deve succedere sempre non si chiede a chi lavora. Senza biglietto fra
 //         gli argomenti lo ritrova da solo, come le consegne.
 //
-//   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"]
+//   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--forza]
+//       → exit 5, e niente rilasciato, se nella cartella lavora ancora qualcuno (#1480): per l'orchestratore un
+//         battito, un salvataggio recente o un processo (`--forza` solo per il worker morto davvero), per un worker
+//         i suoi processi.
 //       → fine lavoro: il biglietto muore e il semaforo si libera. Con
 //         `--guasto` DICHIARI un guasto al server (SPEC-RIDISEGNO-MAX.md §12):
 //         è così che il server smette di dare lavoro per il giro — le
@@ -124,10 +127,13 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
-import { isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT } from './lib/branch-integrity.mjs';
+import {
+  isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT, lavoroVivo, testoLavoroVivo,
+  USCITA_LAVORO_VIVO,
+} from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
-import { haFormaDiBigliettoVero, leggiBigliettoAMano, looksLikeTicket } from './lib/routine-ticket.mjs';
+import { bigliettoFinito, haFormaDiBigliettoVero, leggiBigliettoAMano, leggiMarcatoreBiglietto, looksLikeTicket, segnaBigliettoFinito } from './lib/routine-ticket.mjs';
 import { apreUnElenco } from './lib/argomenti.mjs';
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
@@ -1088,7 +1094,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda',
+    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -1120,7 +1126,7 @@ if (isMain) {
   // posizionali, e chi lo cercava lì non lo trovava: il ruolo usciva vuoto,
   // chi guida leggeva «server vecchio» e lanciava sempre il worker generico —
   // col biglietto ormai ritirato, che è la cosa che non si annulla (#565).
-  const CAMPI_BANDIERA = new Set(['json', 'senza-push', 'senza-rapporto', 'stop']);
+  const CAMPI_BANDIERA = new Set(['json', 'senza-push', 'senza-rapporto', 'stop', 'forza']);
   const args = [];
   const flags = [];
   const data = {};
@@ -1362,6 +1368,7 @@ if (isMain) {
     }
     if (!flags.includes('--loop')) {
       const r = await heartbeat(biglietto);
+      if (!r.ok && r.final) segnaBigliettoFinito(ROOT, biglietto, r.reason);
       if (!r.ok) { console.error(`guasto ${r.reason}`); process.exit(3); }
       console.log(`OK: semaforo vivo fino a ${r.expiresAt}`);
       for (const a of r.avvisi) console.error(`misura scartata dal server (${a.campo}: ${a.reason}): ${a.detail || ''}`);
@@ -1382,7 +1389,7 @@ if (isMain) {
           for (const a of r.avvisi) console.error(`misura scartata dal server (${a.campo}: ${a.reason}): ${a.detail || ''}`);
           primoGuastoMs = 0; await defaultSleep(attesaBattito(r.expiresAt)); continue;
         }
-        if (r.final) { console.error(`battito finito: ${r.reason}`); process.exit(0); }
+        if (r.final) { segnaBigliettoFinito(ROOT, biglietto, r.reason); console.error(`battito finito: ${r.reason}`); process.exit(0); }
         const ora = Date.now();
         if (!primoGuastoMs) primoGuastoMs = ora;
         if (ora - primoGuastoMs >= LEASE_TTL_MS) {
@@ -1404,12 +1411,35 @@ if (isMain) {
       process.exit(1);
     }
     const guasto = typeof data.guasto === 'string' ? data.guasto : '';
+    // Chi lavora ancora qui non perde biglietto né cartella (#1480): l'orchestratore rilascia solo senza lavoro vivo
+    // (`--forza` per il worker morto davvero), un worker solo quando i suoi processi sono finiti.
+    const marcatore = leggiMarcatoreBiglietto(ROOT);
+    const cartellaSua = !marcatore || !marcatore.ticket || String(marcatore.ticket) === String(args[0]);
+    const chiRilascia = typeof data.role === 'string' ? data.role : '';
+    if (chiRilascia === 'orchestrator' ? data.forza !== true : cartellaSua && !!marcatore) {
+      const vivo = lavoroVivo(ROOT, chiRilascia === 'orchestrator' ? {} : { cosa: ['processi'] });
+      if (vivo.vivo) {
+        console.error(`LAVORO VIVO: ${testoLavoroVivo(vivo, 'rilasciato il biglietto')}`);
+        console.error(chiRilascia === 'orchestrator'
+          ? 'Chiudi il giro senza rilasciare: chi lavora qui consegna e rilascia da sé, e un biglietto abbandonato scade da solo. --forza solo per un worker morto davvero (il gancio ti ha detto «Worker finito», o il canale dice che il suo battito è scaduto).'
+          : 'Aspetta che finiscano (un comando in sottofondo si aspetta, non si abbandona), o fermali se non servono più, poi rilancia lo stesso comando.');
+        process.exit(USCITA_LAVORO_VIVO);
+      }
+    }
+    // Un biglietto già finito non spedisce più (lo prenderebbe chi ha il ramo adesso); la cartella di un altro biglietto
+    // non si committa, non si spedisce e non si sigilla.
+    const finito = cartellaSua && bigliettoFinito(marcatore);
+    if (!cartellaSua || finito) {
+      console.error(!cartellaSua
+        ? `la cartella è del biglietto ${String(marcatore.ticket).slice(0, 8)}…, non di questo: non committo, non spedisco e non sigillo niente.`
+        : 'questo biglietto è già finito (rilasciato, o morto per il battito): non committo e non spedisco niente.');
+    }
     // PRIMA del server: il ramo corrente va su origin. Un commit fatto a mano
     // dal worker non passa dall'hook, e senza questo push moriva col
     // contenitore. Se il push non riesce NON si rilascia: si stampa la causa e
     // si esce diverso da zero, il worker sistema e rilancia (il biglietto scade
     // da solo dopo 60 minuti se muore). `--senza-push` dove non c'è un repo.
-    if (data['senza-push'] !== true) {
+    if (data['senza-push'] !== true && cartellaSua && !finito) {
       // Prima quello che è rimasto fuori dai commit (un file nato da una
       // shell non passa dall'hook): si committa qui, e si dice.
       const c = commitRestante(ROOT);
@@ -1463,17 +1493,25 @@ if (isMain) {
     if (r.ok) {
       const { stopBeat } = await import('./lib/routine-beat.mjs');
       stopBeat(ROOT, { ticket: args[0] });
+      segnaBigliettoFinito(ROOT, args[0], 'rilasciato');
       // Fine giro LEGITTIMA: il punto fermo si sigilla sul contenuto attuale
       // (#507). Senza, i commit fatti dopo l'ultima consegna — la pulizia del
       // verificatore, per esempio — al posizionamento successivo nello stesso
       // clone verrebbero scartati come moncone di un'istanza morta.
-      try {
+      if (cartellaSua) try {
         const { sealCurrentWork } = await import('./lib/branch-integrity.mjs');
         const { readRole } = await import('./lib/routine-role.mjs');
         // Il ruolo nel sigillo: dopo un «pass» vale come pulizia solo quello del verificatore (#880).
         const chi = readRole(ROOT);
         sealCurrentWork(ROOT, { by: chi ? `release:${chi}` : 'release' });
       } catch (_) { /* best-effort: il rilascio è già andato */ }
+    }
+    // Un biglietto che il server dice morto non ha più niente da tenere vivo: il battito si spegne e la fine si segna,
+    // o il suo battito ancora acceso varrebbe come lavoro vivo per chi viene dopo (#1480).
+    if (!r.ok && BATTITO_FINITO.has(r.reason)) {
+      const { stopBeat } = await import('./lib/routine-beat.mjs');
+      stopBeat(ROOT, { ticket: args[0] });
+      segnaBigliettoFinito(ROOT, args[0], r.reason);
     }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');
     else console.log(`rilascio non riuscito (${r.reason})`);

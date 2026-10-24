@@ -21,6 +21,8 @@ const TIPI = {
   notifications: 'notifiche',
   'window-management': 'schermi',
   'idle-detection': 'presenza',
+  // Chrome chiede anche il MIDI senza sysex; Electron 44 ne manda la richiesta come midiSysex, il controllo come midi.
+  midi: 'strumenti',
   midiSysex: 'strumenti',
   'local-network-access': 'rete',
   'local-network': 'rete',
@@ -35,16 +37,18 @@ const SALVATAGGIO_MS = 60_000;
 // Ciò che Chrome concede di fabbrica passa senza domanda.
 const INNOCUI = new Set([
   'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'keyboardLock', 'mediaKeySystem',
-  'speaker-selection', 'storage-access', 'top-level-storage-access', 'midi',
+  'storage-access', 'top-level-storage-access',
   'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler', 'persistent-storage',
 ]);
 // Ciò che Filo non sa dare è no, senza domanda: i dispositivi collegati vogliono una scelta (quale dispositivo) che Filo
 // non ha (lo schermo si condivide da `chiediLoSchermo`, non da questo nome); realtà virtuale, NFC, stampa diretta e app web installate Filo non
 // le ha; e quello che Chrome lascia solo alle app installate (schermo intero senza gesto, sincronia periodica) qui non c'è.
+// L'uscita audio e i font del computer arrivano solo dal controllo, senza domanda: un sì darebbe a ogni sito i nomi delle
+// uscite (che seguono il sì al microfono) e l'elenco dei font installati, un'impronta uguale in ogni sito (#1524).
 const NON_DISPONIBILI = new Set([
   'display-capture', 'captured-surface-control', 'unknown', 'hid', 'serial', 'usb', 'smart-card', 'nfc', 'ar', 'vr',
   'hand-tracking', 'web-printing', 'web-app-installation', 'automatic-fullscreen', 'periodic-background-sync',
-  'system-wake-lock',
+  'system-wake-lock', 'speaker-selection', 'local-fonts',
 ]);
 // Il controllo dice sì solo dopo un sì vero: la lettura sincrona degli appunti non sa chiedere, le notifiche Electron le
 // mostra a chi il controllo dà per concesse, chi sa che sei al computer lo saprebbe senza domanda, e un file o una
@@ -53,9 +57,6 @@ const CONTROLLO_SOLO_COL_SI = new Set(['deprecated-sync-clipboard-read', 'notifi
 const SOLO_CONTROLLO = new Set(['deprecated-sync-clipboard-read']);
 // Notifiche: si chiedono solo subito dopo un gesto dell'utente sulla pagina.
 const DOPO_UN_GESTO = new Set(['notifications']);
-// I font del computer Electron non li fa chiedere (arriva solo il controllo): passano subito dopo un gesto sulla pagina,
-// che è anche quello che la pagina deve avere per leggerli.
-const COL_GESTO_SENZA_DOMANDA = new Set(['local-fonts']);
 const GESTO_MS = 5000;
 const GESTI = new Set(['mouseDown', 'mouseUp', 'rawKeyDown', 'keyDown', 'char', 'touchStart', 'touchEnd', 'gestureTap']);
 // Come in Chrome una finestra la apre l'inizio di un gesto: il rilascio dello stesso clic o il carattere dello stesso
@@ -358,12 +359,27 @@ function gestoDiFilo(wc) {
 // Ciò che l'utente ha scelto di aprire (il collegamento che ha cliccato, la voce del menu di Filo) si apre anche se la
 // pagina ha già speso il gesto per la sua pubblicità (#737.1 giro 6). Lo segna il preload su un input vero, prima
 // che la pagina apra: vale per quell'indirizzo, una volta, subito.
-function aperturaScelta(wc, url) {
+function aperturaScelta(wc, url, azione = null) {
   const u = indirizzoPieno(url);
   if (!wc || !u) return;
   const ora = Date.now();
   wc._filoAperture = (wc._filoAperture || []).filter((x) => x.fino > ora && x.url !== u).slice(-7);
-  wc._filoAperture.push({ url: u, fino: ora + APERTURA_SCELTA_MS });
+  // L'azione del menu che apre (#1461): solo un nome breve e un istante del minuto appena passato.
+  const t0 = azione && Number(azione.t0);
+  const a = azione && /^[a-z0-9][a-z0-9-]{0,59}$/.test(String(azione.id || '')) && Number.isFinite(t0) && t0 <= ora && ora - t0 < 60000
+    ? { id: String(azione.id), t0 } : null;
+  wc._filoAperture.push({ url: u, fino: ora + APERTURA_SCELTA_MS, azione: a });
+}
+
+// L'azione che l'apertura scelta porta con sé, una volta: chi apre la scheda la misura fino alla pagina caricata.
+function azioneDellApertura(wc, url) {
+  const u = indirizzoPieno(url);
+  const ora = Date.now();
+  const x = u && wc ? (wc._filoAperture || []).find((v) => v.url === u && v.fino > ora && v.azione) : null;
+  if (!x) return null;
+  const a = x.azione;
+  x.azione = null;
+  return a;
 }
 
 // La finestra che la pagina chiede passa se l'utente l'ha scelta o se arriva col gesto; la scelta spende anche il gesto,
@@ -535,12 +551,19 @@ function installa(ses, { schedaDi, prima, esterno, aggiorna } = {}) {
     // «Posso?» risponde sì finché l'utente non ha detto no: un «negato» qui farebbe credere al sito che non valga la pena
     // chiedere. Nella pagina quel sì senza risposta si legge «da chiedere» (`siDato`).
     ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
-      const chi = origineDi(wc, (details && details.requestingUrl) || requestingOrigin);
+      const d = details || {};
+      // securityOrigin lo porta solo l'elenco dei dispositivi, ed è il frame che lo legge: requestingUrl lì è la pagina.
+      const chi = origineDi(wc, d.securityOrigin || d.requestingUrl || requestingOrigin);
       if (chi.filo) return true;
       if (SOLO_DALLA_PAGINA.has(permission) && riquadroDiAltri(wc, details, requestingOrigin)) return false;
       const origine = chi.origine;
       if (!origine) return false;
-      if (COL_GESTO_SENZA_DOMANDA.has(permission)) return gestoPer(wc, (details && details.requestingUrl) || requestingOrigin);
+      // Col sì qui Chromium mette nell'elenco dei dispositivi i nomi veri di microfoni, fotocamere e uscite audio, uguali in
+      // ogni sito (#1524): come in Chrome solo dopo un sì vero a quella parte. permissions.query arriva senza securityOrigin.
+      if (permission === 'media' && d.securityOrigin) {
+        const noti = partiNote(d);
+        return noti.length > 0 && noti.every((parte) => sceltePer(ses).get(`${origine}|${parte}`) === true);
+      }
       const tipo = tipoDi(permission, details);
       if (!tipo) return senzaTipoPassa(permission);
       if (tipo === 'file') segnaFile(ses, origine, details);
@@ -832,9 +855,9 @@ function statoNotifiche(ses, url) {
   return scelta === true ? 'granted' : scelta === false ? 'denied' : 'default';
 }
 
-// Il controllo di Chromium dice concessi fotocamera, microfono e posizione anche a chi nessuno ha risposto: la pagina li
-// legge «da chiedere» finché qui non c'è un sì (preload/stato-permessi.js, #1057).
-const PARTI_CON_SI = new Set(['audio', 'video', 'posizione']);
+// Il controllo di Chromium dice concessi fotocamera, microfono, posizione e strumenti musicali anche a chi nessuno ha
+// risposto: la pagina li legge «da chiedere» finché qui non c'è un sì (preload/stato-permessi.js, #1057).
+const PARTI_CON_SI = new Set(['audio', 'video', 'posizione', 'strumenti']);
 function siDato(ses, url, parte) {
   const origine = origineWeb(url);
   return Boolean(origine && ses && PARTI_CON_SI.has(parte) && sceltePer(ses).get(`${origine}|${parte}`) === true);
@@ -843,8 +866,8 @@ function siDato(ses, url, parte) {
 module.exports = {
   installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
-  gestoDiFilo, aperturaScelta, perUnaFinestra, sceltaDallUtente, chiediScrittura,
-  TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
+  gestoDiFilo, aperturaScelta, azioneDellApertura, perUnaFinestra, sceltaDallUtente, chiediScrittura,
+  TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
   _usaFontiSchermo: (f) => { fontiDelloSchermo = f; },
 };

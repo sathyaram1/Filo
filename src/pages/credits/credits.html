@@ -33,6 +33,8 @@
         <p class="sn-wallet-msg" id="redeemMsg" role="status" hidden></p>
       </form>
       <p class="sn-muted sn-wallet-note" id="walletNote" role="status" hidden></p>
+      <!-- I consumi usciti dalla coda del registro senza arrivare al server (#1601): nessuno sparisce senza dirlo. -->
+      <p class="sn-muted sn-wallet-note" id="usageLogNote" role="status" hidden></p>
       <button type="button" class="sn-btn sn-btn-secondary" id="reissueBtn" hidden>Richiedi una nuova chiave</button>
       <button type="button" class="sn-btn sn-btn-secondary" id="resetIdentityBtn" hidden>Ricomincia con un nuovo invito</button>
       <span class="sn-wallet-inline" id="resetIdentityConfirm" hidden>

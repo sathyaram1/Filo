@@ -8,6 +8,8 @@ await globalThis.SN_STORAGE.updateSettings({
   modelRegistry: { finto: { label: 'Finto', provider: 'openrouter', model: 'finto/finto', weights: 'open' } },
   models: { [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'finto', [C.ACTIONS.SPELLCHECK_CONTEXT]: 'finto' },
   featureFlags: { spellcheck: true, spellcheckContext: true },
+  // «qual'è» deve restare scritto per mostrare il segno: la correzione automatica (#1447) l'ha correttore-automatica.js.
+  correttore: { automatica: false },
 });
 const fine = (text) => ({ text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} });
 const finto = async ({ messages }) => {

@@ -167,7 +167,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     if (ora - avvisi.illeggibile < RIPETI_ILLEGGIBILE_MS) return;
     avvisi.illeggibile = ora;
     avvisa(`Filo non riesce a leggere le chat e le pagine visitate, perché ${causaDi(e)}. Finché non ci riesce non salva niente di nuovo, e riprova a ogni richiesta.`,
-      { chiave: 'filo-illeggibile' });
+      { chiave: 'filo-illeggibile', tipo: 'filo_illeggibile' });
   }
 
   async function avvisaSePesa() {
@@ -177,7 +177,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     if (byte <= SOGLIA_AVVISO) return;
     avvisi.peso = true;
     avvisa(`Le chat e le pagine visitate occupano ${Math.round(byte / (1024 * 1024))} MB sul disco. Cancellare le pagine di un periodo le alleggerisce.`,
-      { chiave: 'filo-pesante', azioni: [{ label: 'Cancella pagine', openUrl: CANCELLA_PAGINE_URL }] });
+      { chiave: 'filo-pesante', tipo: 'filo_pesante', azioni: [{ label: 'Cancella pagine', openUrl: CANCELLA_PAGINE_URL }] });
   }
 
   // Le chat salvate prima del filo (#525) diventano segmenti: una chat già nel filo non si riscrive, così la
@@ -278,14 +278,27 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
         tolti += r.tolti;
       }
       if (tolti) incognito.eventi = E().compatta(incognito.eventi);
+      annunciaPagine(scritti, true);
       return { scritti, tolti };
     }
     const nuovi = daScrivere.filter((ev) => !normale.stato.ids.has(ev.id));
     if (!nuovi.length) return { scritti: [], tolti: 0 };
     await scriviInCoda(nuovi.map(E().riga).join(''));
     for (const ev of nuovi) tolti += E().applica(normale.stato, ev).tolti;
+    annunciaPagine(nuovi, false);
     if (tolti) await compattaFile();
     return { scritti: nuovi, tolti };
+  }
+
+  // Ogni pagina che entra, cambia titolo o se ne va passa di qui, e da qui lo sanno le home aperte: una visita si scrive
+  // a pagina caricata, spesso con la home già davanti (#1307.4). Si annuncia a stato già piegato: chi rilegge la vede.
+  const sullePagine = new Set();
+  function suPagine(fn) { if (typeof fn === 'function') sullePagine.add(fn); }
+  function annunciaPagine(scritti, incog) {
+    const T = E().TIPI;
+    const tocca = (ev) => ev.tipo === T.NAVIGAZIONE || ev.tipo === T.TITOLO_PAGINA || (ev.tipo === T.CANCELLAZIONE && ev.chat == null);
+    if (!scritti.some(tocca)) return;
+    for (const fn of sullePagine) { try { fn({ incognito: incog }); } catch (_) {} }
   }
 
   // Leggere, decidere e scrivere senza che un'altra scrittura passi in mezzo: due schede che chattano insieme non
@@ -400,10 +413,6 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     return periodi.length ? cancella(periodi, opts, { schedeChiuse }) : Promise.resolve(0);
   }
 
-  // Ogni strada che toglie pagine passa di qui, e da qui lo sanno le home aperte.
-  const pagineTolte = new Set();
-  function suPagineTolte(fn) { if (typeof fn === 'function') pagineTolte.add(fn); }
-
   function cancella(periodi, opts, { schedeChiuse = true } = {}) {
     return transazione(async (t) => {
       const voci = periodi.map((periodo) => {
@@ -418,7 +427,6 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
         if (!siti.has(k)) { siti.add(k); try { await globalThis.SN_DELICATE?.dimentica(v.pagine); } catch (_) {} }
         if (schedeChiuse) { try { await globalThis.SN_ARCHIVED_TABS?.dimenticaPagine({ ...v.pagine, url: v.url }); } catch (_) {} }
       }
-      for (const fn of pagineTolte) { try { fn({ incognito: t.incognito }); } catch (_) {} }
       return tolti;
     }, opts);
   }
@@ -513,7 +521,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   }
 
   return {
-    carica, transazione, chats, chat, perLaCoda, pagine, dove, ultimaDomanda, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagineTolte,
+    carica, transazione, chats, chat, perLaCoda, pagine, dove, ultimaDomanda, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagine,
     esporta, importa, importaChatSalvate,
     resetIncognito, dispositivo, quandoFermo, percorso: fileEventi,
   };

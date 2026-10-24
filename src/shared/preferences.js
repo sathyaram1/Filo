@@ -17,9 +17,8 @@
     return null;
   }
 
-  // Maschera una chiave API per l'etichetta di conferma: mostra i primi/ultimi
-  // caratteri (così l'utente riconosce QUALE chiave sta impostando) senza
-  // stampare l'intero segreto nel popup. Vedi i setter `chiave_*`.
+  // Maschera la chiave API nell'etichetta di conferma: i primi e gli ultimi caratteri bastano
+  // a riconoscere QUALE chiave si sta impostando, senza stampare il segreto nel popup.
   function maskKey(k) {
     const s = String(k == null ? '' : k).trim();
     if (s.length <= 8) return '••••';
@@ -51,10 +50,8 @@
     let s = String(raw == null ? '' : raw).trim().replace(/[^0-9.,-]/g, '');
     if (!s) return NaN;
     if (s.includes(',')) {
-      // virgola = decimale, punto = migliaia (formato italiano completo)
       s = s.replace(/\./g, '').replace(',', '.');
     } else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) {
-      // solo punti come raggruppamento delle migliaia (gruppi esatti da 3)
       s = s.replace(/\./g, '');
     }
     const n = parseFloat(s);
@@ -357,7 +354,8 @@
       const m = s.match(re);
       if (m) { op = nome; resto = s.slice(m[0].length); break; }
     }
-    const pezzi = resto.split(/[\s,;]+/).map((x) => x.trim()).filter((x) => x && !CONGIUNZIONI.has(x.toLowerCase()));
+    const N = nomiSito();
+    const pezzi = N ? N.pezziDi(resto, CONGIUNZIONI) : [];
     if (!pezzi.length) return null;
     const voci = [];
     const errati = [];
@@ -638,6 +636,16 @@
     return { partial: { correttore: { [campo]: n } }, label: etichetta(cifre(n)) };
   }
 
+  // Quante volte serve per imparare, nella correzione automatica (#1447): un numero intero dentro i limiti.
+  function volteCorrettore(v, campo, etichetta) {
+    const n = parseItalianNumber(String(v == null ? '' : v).trim().toLowerCase().replace(/[^0-9.,-]/g, ''));
+    if (!Number.isFinite(n)) return null;
+    const volte = Math.round(n);
+    const { min, max } = global.SN_CONST.CORRETTORE_SOGLIE[campo];
+    if (volte < min || volte > max) return { rifiuto: `${cifre(volte)} volte è fuori dai limiti: da ${cifre(min)} a ${cifre(max)}` };
+    return { partial: { correttore: { [campo]: volte } }, label: etichetta(cifre(volte)) };
+  }
+
   function msBarra(v, campo, etichetta) {
     const s = String(v == null ? '' : v).trim().toLowerCase();
     let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
@@ -648,6 +656,19 @@
     const [min, max] = global.SN_CONST.BARRA_LATERALE_LIMITI[campo];
     if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
     return { partial: { barraLaterale: { [campo]: n } }, label: etichetta(cifre(n)) };
+  }
+
+  // Il minimo è un secondo: un numero sotto 100 senza unità sono secondi («mettilo a 5»).
+  function msAvvisoSchermoPieno(v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
+    if (!Number.isFinite(n)) return null;
+    const ms = /\bms\b|millisecond/.test(s);
+    if ((/\bs(ec|econd[oi])?\b/.test(s) && !ms) || (!ms && !/[a-z]/.test(s) && n > 0 && n < 100)) n *= 1000;
+    n = Math.round(n);
+    const [min, max] = global.SN_CONST.AVVISO_SCHERMO_PIENO_LIMITI.durataMs;
+    if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
+    return { partial: { avvisoSchermoPieno: { durataMs: n } }, label: `Avviso del sito a schermo intero → ${cifre(n)} ms` };
   }
 
   // Quanto stringe un modo: scendere di rigore abbassa una difesa. Il valore attuale ignoto vale il più stretto.
@@ -831,6 +852,14 @@
       },
     },
     {
+      scrive: ['avvisoSchermoPieno.durataMs'],
+      costo: 1,
+      aiuto: 'millisecondi 1000-10000 (quanto resta l\'avviso col nome del sito quando una pagina va a schermo intero; non si spegne)',
+      keys: ['avviso_schermo_pieno', 'avviso schermo pieno', 'avviso schermo intero', 'avviso a schermo intero',
+        'durata avviso schermo intero', 'avviso del sito a schermo intero', 'esc per uscire'],
+      build(v) { return msAvvisoSchermoPieno(v); },
+    },
+    {
       scrive: ['terminal.enabled'],
       aiuto: 'true | false',
       keys: ['modalita_terminale', 'modalità terminale', 'modalita terminale', 'terminale', 'terminal'],
@@ -963,9 +992,8 @@
         + 'vengono interpretati i comandi che Filo lancia.',
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
-        // 'sh' e 'zsh' sono i nomi che ha senso pronunciare su Mac e Linux: là
-        // powershell/cmd non esistono e il main ricade comunque su /bin/sh —
-        // ma se l'utente li chiede per nome, la richiesta deve arrivare.
+        // 'sh' e 'zsh' sono i nomi che ha senso pronunciare su Mac e Linux, dove powershell e cmd
+        // non esistono: il main ricade comunque su /bin/sh, ma la richiesta per nome deve arrivare.
         const map = {
           powershell: 'powershell', ps: 'powershell',
           cmd: 'cmd', 'prompt dei comandi': 'cmd', prompt: 'cmd',
@@ -1033,9 +1061,8 @@
         }
         const Voices = global.SN_TTS_VOICES;
         if (Voices) {
-          // Si cerca fra TUTTI i cataloghi: quale modello legge non lo sa
-          // questa pagina, e una voce di un altro modello viene comunque
-          // ignorata al momento della lettura (resolveVoice).
+          // Si cerca fra TUTTI i cataloghi: quale modello legge non lo sa questa pagina, e una voce
+          // di un altro modello viene comunque ignorata al momento della lettura.
           const hit = Voices.allVoices().find((x) => x.id === low || x.id.toLowerCase() === low
             || x.label.toLowerCase() === low || x.label.toLowerCase().split(' ')[0] === low);
           if (hit) return { partial: { tts: { modelVoice: hit.id } }, label: `Voce naturale → ${hit.label} (${Voices.LANG_LABELS[hit.lang] || hit.lang})` };
@@ -1095,6 +1122,28 @@
       },
     },
     {
+      scrive: ['correttore.segnaposti'],
+      aiuto: 'true | false (i SEGNAPOSTO del correttore: l\'utente scrive delle x al posto di un dato che non ricorda, «nel 14xx», e Filo lo trova e lo propone sopra le x)',
+      costo: 1,
+      keys: ['segnaposto', 'segnaposti', 'dati mancanti', 'riempi le x', 'xx', 'dato da trovare', 'completa i dati'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { correttore: { segnaposti: b } }, label: `Segnaposto del correttore → ${b ? 'attivi' : 'spenti'}` };
+      },
+    },
+    {
+      scrive: ['correttore.segnapostiWeb'],
+      aiuto: 'true | false (per un segnaposto con un dato che cambia nel tempo, come prezzi e quotazioni, il correttore cerca anche sul web, circa 0,8 centesimi a ricerca; spento cerca solo su Wikipedia)',
+      costo: 1,
+      keys: ['cerca sul web per i segnaposto', 'ricerca web segnaposto', 'segnaposto sul web', 'segnaposti web'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { correttore: { segnapostiWeb: b } }, label: `Ricerca sul web per i segnaposto → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
+    {
       scrive: ['correttore.pausaRapidoMs'],
       costo: 1,
       aiuto: 'millisecondi 200-5000 (pausa nello scrivere prima del controllo degli errori)',
@@ -1114,6 +1163,38 @@
       aiuto: 'millisecondi 1000-30000 (pausa nello scrivere prima del controllo dei suggerimenti)',
       keys: ['pausa suggerimenti', 'controllo ragionato dopo', 'attesa suggerimenti'],
       build(v) { return msCorrettore(v, 'pausaRagionatoMs', (n) => `Controllo dei suggerimenti dopo ${n} ms di pausa`); },
+    },
+    {
+      scrive: ['correttore.automatica'],
+      aiuto: 'true | false (la correzione automatica a fine parola: «perchè» → «perché», «marco» → «Marco»; si annulla subito dopo con la scorciatoia di annulla o col tasto destro sulla parola)',
+      costo: 1,
+      keys: ['correzione automatica', 'autocorrezione', 'autocorrect', 'correggi da solo', 'correggi in automatico', 'correzione a fine parola', 'maiuscole dei nomi'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { correttore: { automatica: b } }, label: `Correzione automatica → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
+    {
+      scrive: ['correttore.accettiPerImparare'],
+      costo: 1,
+      aiuto: 'volte 1-100 (quante volte una correzione scelta dal tasto destro per la stessa parola serve perché diventi automatica)',
+      keys: ['correzioni accettate', 'accetti per imparare', 'volte per correzione automatica', 'quante volte accettare'],
+      build(v) { return volteCorrettore(v, 'accettiPerImparare', (n) => `Una correzione scelta ${n} volte diventa automatica`); },
+    },
+    {
+      scrive: ['correttore.annulliPerImparare'],
+      costo: 1,
+      aiuto: 'volte 1-100 (quante volte una correzione automatica annullata per la stessa parola serve perché non torni più)',
+      keys: ['correzioni annullate', 'annulli per imparare', 'quante volte annullare'],
+      build(v) { return volteCorrettore(v, 'annulliPerImparare', (n) => `Una correzione automatica annullata ${n} volte non torna più`); },
+    },
+    {
+      scrive: ['correttore.riscrittePerImparare'],
+      costo: 1,
+      aiuto: 'volte 1-100 (quante volte una parola che il correttore non conosce, scritta uguale e non corretta, serve perché non sia più segnata)',
+      keys: ['parole imparate', 'riscritte per imparare', 'quante volte riscrivere', 'impara le parole'],
+      build(v) { return volteCorrettore(v, 'riscrittePerImparare', (n) => `Una parola scritta uguale ${n} volte non è più segnata`); },
     },
     {
       scrive: ['featureFlags.help'],
@@ -1694,11 +1775,12 @@
       spentoAllenta: false,
       nome: 'Contatori anonimi d\'uso',
       stati: ['accesi', 'spenti'],
-      aiuto: 'true | false (una volta al giorno manda a chi sviluppa Filo solo numeri: quante volte si usa ogni funzione, '
-        + 'quanto si aspetta la risposta, quante chiamate falliscono; spenti, non si conta niente e non parte niente)',
-      risk: 'Decide se Filo manda una volta al giorno a chi lo sviluppa dei numeri senza contenuto (usi e attese per '
-        + 'funzione, chiamate fallite, versione e sistema), con uno pseudonimo che cambia ogni mese: mai testi, '
-        + 'indirizzi o nomi di file.',
+      aiuto: 'true | false (ogni ora manda a chi sviluppa Filo solo numeri e nomi da elenchi fissi: usi e attese di funzioni '
+        + 'e azioni, impostazioni cambiate, ricerche nei pannelli, proposte del correttore, conferme, annulli, errori visti, '
+        + 'scelte dell\'intervista; spenti, non si conta niente e non parte niente, nemmeno lo spegnimento)',
+      risk: 'Decide se Filo manda ogni ora a chi lo sviluppa dei numeri senza contenuto (usi e attese di funzioni e azioni, '
+        + 'impostazioni cambiate, ricerche nei pannelli, correttore, conferme, annulli, errori visti, intervista, versione e '
+        + 'sistema), con uno pseudonimo che cambia ogni mese: mai testi, indirizzi, titoli, nomi di file o parole.',
     }),
     elenco({
       keys: ['siti_bloccati', 'siti bloccati', 'blacklist', 'domini in blacklist', 'elenco dei siti bloccati', 'lista dei siti bloccati'],
