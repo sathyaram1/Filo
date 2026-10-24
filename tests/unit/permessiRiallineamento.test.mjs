@@ -25,7 +25,9 @@ test('.claude/settings.json ammette fetch, rebase e merge, nessuna regola tocca 
     assert.doesNotMatch(r, /push|--force|reset|clean/, `${r}: il push forzato resta al gancio di salvataggio`);
   }
   // Un file ignorato non arriva nel clone del cloud: check-ignore esce 1 quando il file NON è ignorato.
-  assert.throws(() => execFileSync('git', ['check-ignore', '-q', '.claude/settings.json'], { cwd: RADICE, stdio: 'pipe' }), /status 1/);
+  let stato = 0;
+  try { execFileSync('git', ['check-ignore', '-q', '.claude/settings.json'], { cwd: RADICE, stdio: 'pipe' }); } catch (e) { stato = e.status; }
+  assert.equal(stato, 1, '.gitignore esclude il file');
   const tracciati = execFileSync('git', ['ls-files', '.claude/settings.json'], { cwd: RADICE, encoding: 'utf8' }).trim();
   assert.equal(tracciati, '.claude/settings.json', 'il file non è tracciato da git');
 });
