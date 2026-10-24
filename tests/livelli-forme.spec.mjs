@@ -835,6 +835,28 @@ test('un lavoro anche sul server: ogni seguito del cancello del server detto in 
   }
 });
 
+test('il salto che passa dalla prova degli unit, o che torna alle routine, detto in italiano (#1502)', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_BOCCIATO]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_BOCCIATO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]').click();
+  const esito = page.locator('#mgSideBody .mg-liv-esito');
+  const casi = [
+    ['attesa_unit', /GitHub prova gli unit sulla fusione/, 'ok'],
+    ['riverifica', /torna alle routine per la verifica/, 'err'],
+    ['ricontrollo', /torna al controllo di sicurezza sulla punta di adesso/, 'err'],
+  ];
+  for (const [nome, testo, kind] of casi) {
+    await stub(page, { saltaReply: { ok: true, esito: nome } });
+    await page.locator('#mgSaltaL4Btn').click();
+    await page.locator('#mgSaltaL4Btn').click();
+    await expect(esito).toContainText(testo, { timeout: 8_000 });
+    await expect(esito).toHaveAttribute('data-kind', kind);
+    await expect(esito).not.toContainText('Il server ha risposto');
+    await page.waitForTimeout(1_000);
+  }
+});
+
 test('GitHub giù: il salto è registrato e lo si può ripremere', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [FB_BOCCIATO], { saltaReply: { ok: true, esito: 'guasto' } });

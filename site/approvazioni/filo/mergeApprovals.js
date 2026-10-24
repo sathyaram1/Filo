@@ -453,6 +453,7 @@
     // Il salto segue la strada di un controllo passato: unit sulla fusione da GitHub, poi il cancello (#1502).
     attesa_unit: { kind: 'ok', text: 'Saltato. GitHub prova gli unit sulla fusione con main, poi il cancello fonde il ramo o lo ferma per il tuo via libera.' },
     riverifica: { kind: 'err', text: 'Non c’era più un controllo da saltare, perché i verdetti erano stati azzerati. Il lavoro torna alle routine per la verifica e un controllo nuovo.' },
+    ricontrollo: { kind: 'err', text: 'Questo controllo non dice su quale commit è stato fatto, quindi non si può saltare. Il lavoro torna al controllo di sicurezza sulla punta di adesso: se boccia ancora, potrai saltare quello.' },
     fuso: { kind: 'ok', text: 'Saltato: il lavoro è entrato in main.' },
     conflitto: { kind: 'err', text: 'Saltato, ma il ramo è in conflitto con main: torna in lavorazione per riallinearlo.' },
     ramo_assente: { kind: 'err', text: 'Il ramo di questa pratica non c’è più: non c’è niente da fondere.' },
