@@ -138,6 +138,7 @@ for (const [esito, testo] of [
   [{ accodata: true }, /la prende il prossimo giro di lavoro/],
   [{ nonServiva: true }, /Non serviva: il lavoro è già fuso con questa scelta/],
   [{ rimandata: true }, /il lavoro torna in verifica con la tua risposta/],
+  [{ lavoroArchiviato: true }, /Il lavoro è archiviato: la risposta non lo riapre/],
 ]) {
   test(`una ripresa che non sposta il lavoro lo dice: ${Object.keys(esito)[0]}`, async ({ openTab }) => {
     const page = await openTab(MANAGE);

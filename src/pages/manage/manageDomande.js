@@ -466,6 +466,7 @@
     else if (e && e.ok && d.stato === 'chiusa' && e.nonServiva) testo = 'Non serviva: il lavoro è già fuso con questa scelta.';
     else if (e && e.ok && d.stato === 'chiusa' && e.accodata) testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}: la prende il prossimo giro di lavoro.`;
     else if (e && e.ok && d.stato === 'chiusa' && e.rimandata) testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}: il lavoro torna in verifica con la tua risposta.`;
+    else if (e && e.ok && d.stato === 'chiusa' && e.lavoroArchiviato) testo = 'Il lavoro è archiviato: la risposta non lo riapre.';
     // Una domanda riaperta da un chiarimento può portarsi dietro l'esito di prima: «fatto» solo se è chiusa.
     else if (e && e.ok && d.stato === 'chiusa') testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
     if (!testo) return null;

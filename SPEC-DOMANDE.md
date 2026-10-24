@@ -278,9 +278,13 @@ dall'owner e dal server. Campi:
   verifica non sposta lo stato: la decisione si accoda e la prende il giro
   dopo. Un lavoro già passato, al controllo di sicurezza, torna in verifica
   con la risposta (sicurezza e fusione non leggono le decisioni), salvo la
-  stessa scelta della provvisoria. Finché una bloccante è aperta la fusione
-  non parte. Una fermata (§ 3.8) blocca da sé. `legata` e `provvisoria` le
-  scrive il server.
+  stessa scelta della provvisoria. Un lavoro che l'owner ha archiviato dopo
+  la nascita della domanda resta archiviato: la risposta si scrive nella sua
+  conversazione e non lo riapre; una domanda nata su un lavoro già chiuso lo
+  riapre. Finché una bloccante è aperta la fusione non parte. Una fermata
+  (§ 3.8) blocca da sé. `legata`, `provvisoria` e `nataSuChiuso` le scrive il
+  server. I guasti fermi da prima senza la loro domanda la prendono dalla
+  migrazione che parte da sola col server nuovo.
 - `destinatario`: l'owner, oppure la gestione del lavoro per le domande di
   guasto (§ 4.3), tranne quelle dell'addetto comunicazioni.
 - `soloOwner`: sulle domande dell'addetto comunicazioni (§ 4.1), che nessun
