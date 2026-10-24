@@ -40,9 +40,10 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
    git rebase origin/main
    ```
 
-   Se fallisce (conflitti, rete): chiudi il giro — NON risolvere niente a mano. Il clone è fresco: un conflitto qui è
-   il sintomo di una sovrapposizione che deve vedere l'owner, non un intoppo
-   da rattoppare. (Vale anche per i worker: nessuno tocca `main`, mai.)
+   Se fallisce (conflitti, rete): chiudi il giro — NON risolvere niente a
+   mano. Il clone è fresco: un conflitto qui è il sintomo di una
+   sovrapposizione che deve vedere l'owner, non un intoppo da rattoppare.
+   (Vale anche per i worker: nessuno tocca `main`, mai.)
    - Di solito qui non c'è più niente da fare: il preflight si è già allineato
      da sé prima di fissare gli strumenti, perché una copia presa da un
      checkout indietro sarebbe vecchia in partenza. Questo passo resta come
