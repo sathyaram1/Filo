@@ -281,6 +281,7 @@
         global_cap: 'si supererebbe il tetto di tutti i regali, alzalo in Gestione, sezione Utenti, o carica OpenRouter',
         missing_exchange_rate: 'manca il cambio del giorno',
         provider_error: 'OpenRouter non ha accettato il tetto nuovo, niente è cambiato',
+        suspended: 'la sua chiave è spenta su OpenRouter: riaccendila dal pannello di OpenRouter, poi riprova',
       }[res && res.reason];
       const guasto = fraseGuasto(r && r.error);
       if (rifiuto || (res && res.reason) || guasto.certo) {

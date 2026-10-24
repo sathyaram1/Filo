@@ -1229,6 +1229,7 @@
         missing_exchange_rate: 'manca il cambio del giorno',
         nothing_to_grant: 'zero crediti non sono un regalo',
         provider_error: 'OpenRouter non ha accettato il tetto nuovo, niente è cambiato',
+        suspended: 'la sua chiave è spenta su OpenRouter: riaccendila dal pannello di OpenRouter, poi riprova',
       }[res.reason];
       if (!why) console.warn('[credits/owner] regalo rifiutato:', res.reason);
       esitoModulo(`Regalo non fatto: ${why || 'il server dei crediti non l’ha accettato'}.`, {
