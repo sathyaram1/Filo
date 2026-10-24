@@ -41,6 +41,15 @@ export const AMBIENTE = Object.freeze({
 });
 // Con FORCE acceso Claude Code ignora il modello del lancio e della definizione: un'installazione vecchia la lascerebbe.
 export const AMBIENTE_TOLTO = Object.freeze(['CLAUDE_CODE_SUBAGENT_MODEL_FORCE']);
+// Le stesse di .claude/settings.json: lì le perde ogni ramo nato prima, qui reggono al cambio di ramo. Una regola a
+// prefisso non vede `git -C`, quindi il clone del server ha le sue, col percorso vero.
+export const REGOLE_GIT = Object.freeze(['Bash(git fetch:*)', 'Bash(git rebase:*)', 'Bash(git merge:*)']);
+export function regoleGit(clone = '') {
+  const p = String(clone || '').trim().split('\\').join('/');
+  if (!p) return [...REGOLE_GIT];
+  const conClone = ['fetch', 'rebase', 'merge'].flatMap((v) => [`Bash(git -C "${p}" ${v}:*)`, `Bash(git -C ${p} ${v}:*)`]);
+  return [...REGOLE_GIT, ...conClone];
+}
 
 // Il corpo finisce fra apici singoli nella shell del gancio: solo virgolette doppie, niente apostrofi nemmeno nei
 // commenti, niente barre rovesciate (la riga di comando di Windows le mangia), nella regex solo classi di caratteri.
