@@ -224,6 +224,15 @@ describe('l’esito di un’approvazione', () => {
     assert.match(m.text, /abcdef12/);
   });
 
+  test('sì a un ramo del server: approvata, la fusione la porta il server (#1497)', () => {
+    const m = UI.outcomeMessage({ ok: true, result: 'server', esito: 'server:attesa_suite' });
+    assert.equal(m.kind, 'ok');
+    assert.match(m.text, /^Approvata/);
+    assert.doesNotMatch(m.text, /nessuna fusione|inatteso/i);
+    assert.equal(UI.branchLabel({ branch: 'worker/x', repo: 'server' }), 'server · worker/x');
+    assert.equal(UI.branchLabel({ branch: 'worker/x' }), 'worker/x');
+  });
+
   test('conflitto e ramo cambiato portano a due gesti diversi', () => {
     const c = UI.outcomeMessage({ ok: true, result: 'conflict' });
     const s = UI.outcomeMessage({ ok: true, result: 'stale' });

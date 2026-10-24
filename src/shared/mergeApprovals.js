@@ -273,6 +273,18 @@
     return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
   }
 
+  /** Il ramo come lo legge l'owner: quello del server (filo-security) lo dice, perché ha lo stesso nome di quello dell'app. PURA. */
+  function branchLabel(req) {
+    var b = String((req && req.branch) || '') || '(ramo sconosciuto)';
+    return req && req.repo === 'server' ? 'server · ' + b : b;
+  }
+
+  function branchEl(req) {
+    var span = el('span', 'sn-mac-branch', branchLabel(req));
+    if (req && req.repo === 'server') span.title = 'Il ramo del server (filo-security): col tuo sì il server riprende e lo porta su main.';
+    return span;
+  }
+
   function howToRetry(req) {
     return originOf(req) === 'routine'
       ? 'Il lavoro torna alla routine, che riallinea il ramo e rifà i controlli: poi ti arriva una nuova richiesta da approvare.'
@@ -424,6 +436,8 @@
       return { kind: 'warn', text: 'Il ramo è andato avanti dopo i controlli: la richiesta decade. ' + retry };
     }
     if (r.result === 'discarded') return { kind: 'ok', text: 'Scartata.' };
+    // Il sì a un ramo del server: la fusione la fa il server, quando i suoi controlli sono verdi.
+    if (r.result === 'server') return { kind: 'ok', text: 'Approvata: il server riprende e porta il lavoro su main appena i suoi controlli sono verdi.' };
     return { kind: 'warn', text: 'Esito inatteso: nessuna fusione è avvenuta.' };
   }
 
@@ -621,7 +635,7 @@
       origin.title = originHint(req);
     }
     head.appendChild(origin);
-    head.appendChild(el('span', 'sn-mac-branch', req.branch || '(ramo sconosciuto)'));
+    head.appendChild(branchEl(req));
     var sha = linkEsterno('sn-mac-sha', shortSha(req.sha), req.diffUrl);
     sha.title = 'Il commit esaminato: ' + String(req.sha || '') + (linkGitHub(req.diffUrl) ? '\nApri il diff su GitHub' : '');
     head.appendChild(sha);
@@ -828,7 +842,7 @@
       origin.title = originHint(req);
     }
     head.appendChild(origin);
-    head.appendChild(el('span', 'sn-mac-branch', req.branch || '(ramo sconosciuto)'));
+    head.appendChild(branchEl(req));
     var sha = el('span', 'sn-mac-sha', shortSha(req.sha));
     sha.title = 'Il commit che avevi approvato: ' + String(req.sha || '');
     head.appendChild(sha);
@@ -1183,6 +1197,7 @@
     linkGitHub: linkGitHub,
     gruppiDiBlocchi: gruppiDiBlocchi,
     outcomeMessage: outcomeMessage,
+    branchLabel: branchLabel,
     render: render,
     occupata: occupata,
     quandoLibera: quandoLibera,
