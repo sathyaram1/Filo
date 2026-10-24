@@ -1,6 +1,6 @@
 // Orchestratore cieco: nella sessione di un giro il testo dei worker non entra nel suo contesto, modello e sforzo del worker
-// li mette il gancio come li ha decisi il server, e nessuno (worker compresi) manda notifiche all'owner. Gancio e registro
-// stanno nelle impostazioni dell'UTENTE, mai nella cartella del progetto. Regole: tests/unit/orchestratoreCieco.test.mjs.
+// li mette il gancio come li ha decisi il server, e nessuno (worker compresi) manda notifiche all'owner. Gancio, registro e
+// permessi git stanno nelle impostazioni dell'UTENTE, mai nella cartella del progetto. Regole: tests/unit/orchestratoreCieco.test.mjs.
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
