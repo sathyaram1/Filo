@@ -75,12 +75,13 @@ const fissaFinta = (_c, ramo, sha) => ({ ok: true, ramo: `${ramo}-verificato-${s
 // Il registro dei rami (#1159): per difetto il ramo non ne ha uno, come i lavori locali di prima.
 const SENZA_REGISTRO = async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: '', motivo: 'il ramo non ha un registro' });
 
-function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta, lavoroDelRamo = SENZA_REGISTRO, puntaRamo = () => 'c'.repeat(40), cancello = null, daGitHub = false }) {
+function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta, lavoroDelRamo = SENZA_REGISTRO, puntaRamo = () => 'c'.repeat(40), cancello = null, daGitHub = false, registro = () => ({ outcome: 'registrato' }) }) {
   return conRete(docs, async (scritture) => {
     const lanci = [];
     const righe = [];
     const chiesti = [];
     const alCancello = [];
+    const registrati = [];
     const k = await esegui(argv, {
       env: {}, bearer: 'finto', base: FIRESTORE_BASE, funzioni: '/srv/functions',
       log: (s) => righe.push(String(s)), err: (s) => righe.push(String(s)),
@@ -89,8 +90,9 @@ function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, 
       lavoroDelRamo: async (x) => { chiesti.push(x); return lavoroDelRamo(x); }, puntaRamo,
       chiediAlCancello: async (x) => { alCancello.push(x); return cancello ? cancello(x) : { outcome: 'fault', reason: 'nessun cancello nella prova' }; },
       allinea: () => {}, deployDaGitHub: () => daGitHub,
+      registraMain: async (x) => { registrati.push(x); return registro(x); },
     });
-    return { k, lanci, scritture, chiesti, alCancello, testo: righe.join('\n') };
+    return { k, lanci, scritture, chiesti, alCancello, registrati, testo: righe.join('\n') };
   });
 }
 
@@ -444,6 +446,28 @@ test('GitHub rifiuta la spinta su main: la stessa fusione la chiede il cancello,
   assert.match(r.testo, /lo scrive solo il cancello: gli chiedo di portarci cccccccc/);
   assert.match(r.testo, /Il cancello ha portato claude\/x su main di filo-security/);
   assert.match(r.testo, /Pratica #910 chiusa/);
+});
+
+// #1521: il server allarma su un main che nessun cammino registrato ha portato.
+test('la spinta su main riuscita dal PC si registra sul server; quella del cancello la registra lui', async () => {
+  const fidato = async () => ({ ok: true, registro: true, lavoroFidato: true, attesa: '', motivo: '' });
+  const dalPc = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato });
+  assert.equal(dalPc.k, 0, dalPc.testo);
+  assert.deepEqual(dalPc.registrati, [{ branch: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'p' }], 'lo sha su cui main è davvero');
+  assert.doesNotMatch(dalPc.testo, /fuori registro/);
+  const cancello = await giro({
+    docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato,
+    codiceServer: USCITA_SPINTA_RIFIUTATA, cancello: () => ({ outcome: 'merged', sha: 'c'.repeat(40) }),
+  });
+  assert.deepEqual(cancello.registrati, []);
+  const fermo = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato, codiceServer: 1 });
+  assert.deepEqual(fermo.registrati, [], 'main non si è mosso: niente da registrare');
+  // Il server dice di no: main è spinto, la pratica si chiude come sempre, e l'owner sa dell'allarme che arriverà.
+  const no = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato, registro: () => ({ outcome: 'unreachable', reason: 'rete giù' }) });
+  assert.equal(no.k, 0, no.testo);
+  assert.match(no.testo, /non l’ha registrato come portato da server:fondi \(Server non raggiungibile: rete giù\)\. Aprirà un allarme su main fuori registro/);
+  assert.match(no.testo, /Pratica #910 chiusa/);
+  assert.equal(classifyServerMerge(200, { result: { ok: true, result: 'registrato', sha: 'a'.repeat(40) } }).outcome, 'registrato');
 });
 
 test('il cancello non fonde (suite non verde): la pratica resta in lavorazione, col motivo', async () => {
