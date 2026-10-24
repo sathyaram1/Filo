@@ -32,12 +32,13 @@ test('.claude/settings.json ammette fetch, rebase e merge, nessuna regola tocca 
   assert.equal(tracciati, '.claude/settings.json', 'il file non è tracciato da git');
 });
 
-// I comandi di un ruolo: le righe dei blocchi di codice e gli inserti fra apici inversi, anche spezzati da un ritorno a riga.
+// I comandi di un ruolo: le righe dei blocchi di codice e gli inserti fra apici inversi, anche spezzati da un ritorno a
+// riga. Un comando ha almeno tre parole: `git pull` o `git -C` nominati da soli sono forme vietate, non comandi.
 function comandiDi(testo) {
   const trovati = [];
   const fuori = testo.replace(/```[^\n]*\n([\s\S]*?)```/g, (_, corpo) => { trovati.push(...corpo.split('\n')); return ' '; });
   trovati.push(...[...fuori.matchAll(/`([^`]+)`/g)].map((m) => m[1]));
-  return trovati.map((c) => c.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  return trovati.map((c) => c.replace(/\s+/g, ' ').trim()).filter((c) => c.split(' ').length >= 3);
 }
 const RIALLINEA = /\bgit\s+(fetch|rebase|pull)\b/;
 const NUDI = ['git fetch origin main', 'git rebase origin/main', 'git rebase --continue', 'git rebase --abort'];
