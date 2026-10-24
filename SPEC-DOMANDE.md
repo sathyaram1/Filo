@@ -129,10 +129,20 @@ controllo di sicurezza compresi.
   anche su un feedback fidato col ramo pulito: il suo commit lascia il ramo non
   pulito, e la fusione chiede il sì dell'owner. Un lavoro server non nasce in
   un'accensione sporca: resta per l'accensione dopo.
-- Il contenitore sporco conosce parola d'ordine e identificativo. Un secondo
-  sondaggio con la stessa parola, mentre l'ultima accensione di quella parola è
-  sporca e non è finita, eredita lo sporco. Quando un'accensione è finita lo
-  decide il server, mai il contenitore: nel dubbio è viva, e sporca.
+- Il contenitore sporco conosce parola d'ordine e identificativo. Quando un
+  biglietto nasce non fidato o si sporca, con la sua accensione si sporca anche
+  la chiave. Un sondaggio con una chiave sporca apre un'accensione già sporca.
+  La chiave resta sporca finché non passano 12 ore senza richieste da
+  un'accensione sporca o senza identificativo valido: più del tetto di un
+  semaforo, così il contenitore sporco non la scavalca stando zitto mentre un
+  suo worker lavora. Quando un'accensione è finita lo decide il server, mai il
+  contenitore: nel dubbio è viva, e sporca.
+- Il pacemaker porta in ogni sessione che accende un segreto monouso (nel
+  testo dell'accensione, valido 3 ore), e l'orchestratore lo passa al primo
+  biglietto. Un sondaggio con un segreto buono apre un'accensione pulita anche
+  con la chiave sporca: la sessione nuova sta in un contenitore nuovo, e quello
+  sporco il segreto non l'ha visto. Usato una volta, scaduto o inventato, vale
+  come nessun segreto.
 - Dopo un biglietto non fidato la sessione non si chiude: i successivi nascono
   non fidati. Costa solo più richieste di sì all'owner, nessuna riaccensione.
 - Niente difese dentro il contenitore (impronte degli strumenti, pulizie più

@@ -32,14 +32,14 @@
 //   `--biglietto`); in tutti e due i posti dev'essere lo stesso. Senza biglietto l'uscita è 1, non 3:
 //   il server non è stato chiamato.
 //
-//   node scripts/routine-channel.mjs probe <parola-d-ordine>
+//   node scripts/routine-channel.mjs probe <parola-d-ordine> [--accensione-pacemaker <segreto>]
 //       → c'è lavoro? Non prende semafori. Apre l'accensione del contenitore e ne ricorda l'identificativo
 //         (lib/accensione.mjs, #1498). Exit 0 = sì, 2 = niente da fare, 3 = guasto.
 //
-//   node scripts/routine-channel.mjs ticket <parola-d-ordine> [--json]
+//   node scripts/routine-channel.mjs ticket <parola-d-ordine> [--json] [--accensione-pacemaker <segreto>]
 //       → stampa il biglietto su stdout (una riga), oppure "niente da fare".
-//         Ogni richiesta porta l'accensione; senza, fa prima il sondaggio da sé: un biglietto chiesto senza nasce
-//         non fidato.
+//         Ogni richiesta porta l'accensione; senza, fa prima il sondaggio da sé, col segreto che il pacemaker ha
+//         messo nel prompt della sessione: un biglietto chiesto senza accensione nasce non fidato.
 //         Con `--json` stampa biglietto E ruolo insieme (più `model` ed `effort` se il server li ha decisi):
 //         il ruolo serve a chi guida per scegliere il tipo di worker PRIMA di lanciarlo. In tutte e due le forme
 //         registra la decisione per il gancio dell'orchestratore cieco, che mette modello e sforzo al lancio.
@@ -271,7 +271,10 @@ export async function accensioneDelGiro(passphrase, opts = {}) {
  * @returns {{ outcome:'work'|'nothing'|'fault', reason?: string, accensione?: string }}
  */
 export async function probe(passphrase, opts) {
-  const { status, body } = await call('routineTicket', { passphrase, probe: true, ...creditiDi(opts) }, opts);
+  // Il segreto monouso del pacemaker (stessa forma di un'accensione): con quello l'accensione nasce pulita anche se la
+  // chiave è sporca. Senza, il server la giudica come quella di un contenitore qualunque.
+  const segreto = haFormaDiAccensione(opts?.segretoPacemaker) ? { segretoPacemaker: opts.segretoPacemaker } : {};
+  const { status, body } = await call('routineTicket', { passphrase, probe: true, ...segreto, ...creditiDi(opts) }, opts);
   const b = body || {};
   const conAccensione = accensioneDa(b) ? { accensione: accensioneDa(b) } : {};
   if (status === 200 && b.ok && b.work === true) return { outcome: 'work', ...conAccensione };
@@ -1139,6 +1142,7 @@ if (isMain) {
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
     'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
+    'accensione-pacemaker',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -1163,7 +1167,7 @@ if (isMain) {
   // vuol dire consegnare a vuoto.
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
-    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
+    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda', 'accensione-pacemaker',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -1345,13 +1349,13 @@ if (isMain) {
     if (r.esito === 'assente') { console.error(`risposta non arrivata (${r.reason}): chiudi comunque, senza insistere.`); process.exit(EXIT_CHIUSURA.assente); }
     console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato);
   } else if (cmd === 'probe') {
-    const r = await probe(args[0]);
+    const r = await probe(args[0], { segretoPacemaker: data['accensione-pacemaker'] });
     if (r.outcome !== 'fault') scriviAccensione(args[0], r.accensione || '');
     if (r.outcome === 'work') { console.log('c’è lavoro'); process.exit(0); }
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'ticket') {
-    const accensione = await accensioneDelGiro(args[0]);
+    const accensione = await accensioneDelGiro(args[0], { segretoPacemaker: data['accensione-pacemaker'] });
     const r = await ticket(args[0], { accensione });
     if (r.accensione && r.accensione !== accensione) scriviAccensione(args[0], r.accensione);
     if (r.outcome === 'work') {

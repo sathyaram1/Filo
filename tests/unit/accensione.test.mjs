@@ -1,5 +1,6 @@
 // #1498: la fiducia di un biglietto il server la lega anche all'accensione del contenitore. Qui la parte dell'app: il
-// sondaggio la apre e la ricorda, ogni richiesta di biglietto la porta, e senza il canale fa il sondaggio da sé.
+// sondaggio la apre e la ricorda, ogni richiesta di biglietto la porta, e senza il canale fa il sondaggio da sé, col
+// segreto del pacemaker quando l'orchestratore lo passa.
 
 import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
@@ -47,6 +48,23 @@ test('il sondaggio restituisce l\'accensione del server, anche senza lavoro; un 
   assert.deepEqual(await canale.probe('p', finto({ ok: true, work: true }).opts), { outcome: 'work' }, 'server vecchio: nessuna accensione');
   const g = await canale.probe('p', { ...finto({ status: 403, body: { ok: false, reason: 'bad_passphrase', accensione: ACC } }).opts, attempts: 1 });
   assert.deepEqual(g, { outcome: 'fault', reason: 'bad_passphrase' });
+});
+
+test('il segreto del pacemaker va al sondaggio, anche a quello che il biglietto fa da sé; uno storto no', async () => {
+  const SEGRETO = 'Pm_0123456789abcdefghijABCDEFGHIJ-_xyz012345';
+  const { corpi, opts } = finto({ ok: true, work: true, accensione: ACC });
+  await canale.probe('p', { ...opts, segretoPacemaker: SEGRETO });
+  await canale.probe('p', { ...opts, segretoPacemaker: '<script>' });
+  await canale.probe('p', opts);
+  assert.deepEqual(corpi.map((c) => c.body.segretoPacemaker), [SEGRETO, undefined, undefined]);
+  const dir = cartellaTemporanea('filo-accensione-segreto-');
+  try {
+    const giro = finto({ ok: true, work: true, accensione: ACC });
+    assert.equal(await canale.accensioneDelGiro('parola', { ...giro.opts, dirAccensione: dir, segretoPacemaker: SEGRETO }), ACC);
+    assert.equal(giro.corpi[0].body.probe, true);
+    assert.equal(giro.corpi[0].body.segretoPacemaker, SEGRETO);
+    assert.ok(!readFileSync(join(dir, FILE_ACCENSIONE), 'utf8').includes(SEGRETO), 'il segreto non si ricorda');
+  } finally { togliCartella(dir); }
 });
 
 test('una risposta di biglietto con un\'accensione nuova la porta fuori', () => {
@@ -114,10 +132,12 @@ test('da riga di comando: il primo biglietto apre l\'accensione, i successivi la
     p.on('close', (code) => ok({ code, so, se }));
   });
   try {
-    const primo = await esegui(['ticket', 'parola-d-ordine', '--json']);
+    const primo = await esegui(['ticket', 'parola-d-ordine', '--json', '--accensione-pacemaker', 'Pm_segreto_del_pacemaker_0123']);
     assert.equal(primo.code, 0, primo.se);
     assert.deepEqual(JSON.parse(primo.so.trim()), { ticket: BIGLIETTO, role: 'new-work' }, 'l\'accensione non esce all\'orchestratore');
     assert.deepEqual(ricevute.map((r) => [r.probe === true, r.accensione]), [[true, undefined], [false, ACC]]);
+    assert.equal(ricevute[0].segretoPacemaker, 'Pm_segreto_del_pacemaker_0123', 'il segreto va al sondaggio');
+    assert.equal('segretoPacemaker' in ricevute[1], false, 'e solo lì');
 
     // Il secondo biglietto la riporta senza sondaggio; la sua risposta ne porta una nuova, che vale dal terzo.
     const secondo = await esegui(['ticket', 'parola-d-ordine']);

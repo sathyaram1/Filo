@@ -55,6 +55,11 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
    La parola d'ordine arriva nel prompt della schedulazione e NON va mai
    esportata nell'ambiente. exit 2 → chiudi (niente da fare); exit 3 → chiudi
    (in dubbio ci si ferma: meglio un giro saltato che un giro senza controlli).
+   - Se il prompt porta una riga `Accensione del pacemaker: <codice>`, aggiungi
+     `--accensione-pacemaker "<codice>"` a ogni `ticket`: è il segreto
+     monouso con cui il server riconosce una sessione nuova e le dà biglietti
+     fidati anche dopo un contenitore sporco (SPEC-DOMANDE § 1.2). Senza
+     quella riga il comando resta com'è.
 
 ## Loop
 
