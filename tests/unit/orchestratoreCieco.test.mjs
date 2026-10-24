@@ -273,7 +273,7 @@ test('installa: unisce alle impostazioni utente senza toccare il resto, toglie F
     assert.equal(installa({ dir, sessione: 's1', creato: 10 }).ok, true);
     assert.equal(installa({ dir, sessione: 's2', creato: 20 }).ok, true);
     const s = JSON.parse(readFileSync(file, 'utf8'));
-    assert.deepEqual(s.permissions, { allow: ['Bash(ls)'] });
+    assert.deepEqual(s.permissions, { allow: ['Bash(ls)', ...REGOLE_GIT] }, 'le regole dell utente restano, quelle git una volta sola');
     assert.deepEqual(s.env, { MIO: '1', ...AMBIENTE }, 'FORCE farebbe ignorare a Claude Code il modello deciso dal server');
     assert.deepEqual(s.hooks.PreToolUse[0], altrui);
     for (const [ev, matcher] of [['PreToolUse', MATCHER_PRIMA], ['PostToolUse', 'Agent|Task'], ['ConfigChange', 'user_settings']]) {
