@@ -685,6 +685,37 @@
     return ul;
   }
 
+  // Gli usi fuori politica letti: restano qui sotto, e la persona torna segnata solo per un uso nuovo (#1520).
+  function bottoneVisto(pseudonym) {
+    const riga = document.createElement('div');
+    riga.className = 'sn-wallet-router-visto';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-btn sn-btn-secondary';
+    b.textContent = 'Visto';
+    b.title = 'Torna segnata solo per un uso nuovo';
+    const esito = document.createElement('span');
+    esito.className = 'sn-muted';
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      esito.textContent = '';
+      const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_OFF_POLICY_SEEN, pseudonym }).catch(() => null);
+      const res = r && r.ok && r.result;
+      if (res && res.ok) {
+        esito.textContent = 'Segnato come visto.';
+        loadOverview().catch(() => {});
+        return;
+      }
+      b.disabled = false;
+      if (r && r.error) console.warn('[credits/owner] segno di visto non arrivato:', r.error);
+      esito.textContent = res && res.reason === 'no_wallet'
+        ? 'Questa persona non risulta più al server.'
+        : `Non salvato: ${fraseGuasto(r && r.error)}.`;
+    });
+    riga.append(b, esito);
+    return riga;
+  }
+
   function usageDetail(usage) {
     const wrap = document.createElement('div');
     wrap.className = 'sn-wallet-usage-detail';
@@ -886,7 +917,11 @@
     // Accanto alle righe scritte dall'app, quello che il router ha fatto pagare alla sua chiave (#1520): un uso fuori
     // politica si legge qui anche quando le righe dicono un modello ammesso.
     const router = consumoRouterDetail(d.router, rec);
-    if (router) wrap.appendChild(bloccoScheda('Secondo il router', router));
+    if (router) {
+      const blocco = bloccoScheda('Secondo il router', router);
+      if (rec && Array.isArray(rec.reasons) && rec.reasons.includes('off_policy')) blocco.appendChild(bottoneVisto(u.pseudonym));
+      wrap.appendChild(blocco);
+    }
 
     // I movimenti: da dove vengono i crediti che ha ricevuto. È qui che si
     // vedono i premi per le segnalazioni.

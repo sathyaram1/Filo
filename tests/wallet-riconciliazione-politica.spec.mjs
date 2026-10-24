@@ -19,6 +19,12 @@ const PULITO = 'dddd000000000004';
 
 let server;
 let base = '';
+// Chi l'owner ha segnato come visto: da lì la riconciliazione non lo segna più per gli usi già letti.
+const visti = new Set();
+const ackChiesti = [];
+const conVisto = (p) => (visti.has(p.pseudonym)
+  ? { ...p, reconcile: { ...p.reconcile, flagged: false, reasons: [], offPolicy: [] } }
+  : p);
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
 function jwt(uid, extra = {}) {
@@ -77,12 +83,12 @@ test.beforeAll(async () => {
             totals: { users: PERSONE.length, totalLimitUsd: 16.8, maxGrantUsd: 57.33 },
             ownerInvites: [],
             reconcile: { lastRunAt: '2026-10-21T09:00:00.000Z', summary: { flagged: 3, errors: 0 } },
-            users: PERSONE,
+            users: PERSONE.map(conVisto),
           },
         });
       }
       if (url === '/walletUserDetail') {
-        const lei = PERSONE.find((p) => body.data && p.pseudonym === body.data.pseudonym);
+        const lei = PERSONE.map(conVisto).find((p) => body.data && p.pseudonym === body.data.pseudonym);
         if (!lei) return json(res, 200, { result: { found: false } });
         const detail = {
           found: true, pseudonym: lei.pseudonym, balance: lei.balance, createdAt: lei.createdAt, invitedBy: 'owner',
@@ -92,6 +98,14 @@ test.beforeAll(async () => {
         };
         if (ROUTER[lei.pseudonym]) detail.router = ROUTER[lei.pseudonym];
         return json(res, 200, { result: detail });
+      }
+      if (url === '/walletAckOffPolicy') {
+        const p = String((body.data && body.data.pseudonym) || '');
+        ackChiesti.push(p);
+        const lei = PERSONE.find((x) => x.pseudonym === p);
+        if (!lei) return json(res, 200, { result: { ok: false, reason: 'no_wallet' } });
+        visti.add(p);
+        return json(res, 200, { result: { ok: true, reconcile: conVisto(lei).reconcile } });
       }
       json(res, 404, { error: { message: 'not found ' + url } });
     });
@@ -211,4 +225,38 @@ test('un router che non ha risposto si dice, e senza consumo letto né usi segna
   await expect(scarto.locator('li', { hasText: 'Riconciliazione' })).toContainText('non registrato 0,42 $');
   await expect(scarto.locator('.sn-wallet-scheda-blocco', { hasText: 'Movimenti' })).toBeVisible();
   await expect(scarto.locator('.sn-wallet-scheda-blocco', { hasText: 'Secondo il router' })).toHaveCount(0);
+});
+
+test('«Visto» sugli usi fuori politica: la persona non è più segnata, l’uso resta nella scheda', async ({ app }) => {
+  visti.clear();
+  ackChiesti.length = 0;
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+  await expect(page.locator('#ownerUsers tr.sn-wallet-user')).toHaveCount(4, { timeout: 15_000 });
+
+  // Solo chi è segnato fuori politica ha il pulsante: le righe in eccesso non si spengono da qui.
+  await riga(page, ECCESSO).click();
+  await expect(schedaDi(page, ECCESSO)).toBeVisible({ timeout: 15_000 });
+  await expect(schedaDi(page, ECCESSO).getByRole('button', { name: 'Visto' })).toHaveCount(0);
+
+  await riga(page, FUORI).click();
+  const scheda = schedaDi(page, FUORI);
+  await expect(scheda).toBeVisible({ timeout: 15_000 });
+  const visto = scheda.getByRole('button', { name: 'Visto' });
+  await expect(visto).toHaveAttribute('title', 'Torna segnata solo per un uso nuovo');
+  mkdirSync(join('tests', '.shots'), { recursive: true });
+  await scheda.screenshot({ path: join('tests', '.shots', 'riconciliazione-politica-visto.png') });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await scheda.screenshot({ path: join('tests', '.shots', 'riconciliazione-politica-visto-scura.png') });
+  await page.emulateMedia({ colorScheme: 'light' });
+  await visto.click();
+
+  await expect(riga(page, FUORI).locator('td').nth(4)).toHaveText('ok', { timeout: 15_000 });
+  expect(ackChiesti).toEqual([FUORI]);
+  await expect(scheda.locator('li', { hasText: 'Riconciliazione' })).toContainText('torna', { timeout: 15_000 });
+  const router = scheda.locator('.sn-wallet-scheda-blocco', { hasText: 'Secondo il router' });
+  await expect(router.locator('li').nth(0)).toContainText('openai/gpt-5 · Azure · modello fuori politica');
+  await expect(router.locator('li').nth(0)).toHaveClass(/is-flagged/);
+  await expect(scheda.getByRole('button', { name: 'Visto' })).toHaveCount(0);
 });

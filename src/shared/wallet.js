@@ -208,6 +208,8 @@
     missing_exchange_rate: 'Il server non è ancora pronto (manca il cambio del giorno): riprova fra qualche minuto.',
     not_configured: 'Il server non è ancora configurato per i crediti.',
     provider_error: 'Il servizio dei modelli non ha risposto: riprova fra poco.',
+    // Le chiavi spente si rileggono per un mese (#1520): oltre trenta in quel mese il server dice di no.
+    too_many_reissues: 'Hai chiesto troppe chiavi nuove nell’ultimo mese: riprova fra qualche giorno.',
     internal: 'Qualcosa è andato storto sul server: riprova.',
     not_reachable: 'Non riesco a raggiungere il server: controlla la connessione.',
     // Dà inviti solo chi ha collegato Google (#1120): il codice resta suo, e torna buono quando si collega.

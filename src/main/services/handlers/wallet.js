@@ -755,6 +755,11 @@ module.exports = function register(on, ctx) {
   on(MSG.WALLET_OWNER_USER_DETAIL, ownerOnly(async (msg) => ({
     detail: await callable('walletUserDetail', { pseudonym: String((msg && msg.pseudonym) || '') }, { asOwner: true }),
   })));
+  on(MSG.WALLET_OWNER_OFF_POLICY_SEEN, ownerOnly(async (msg) => {
+    const result = await callable('walletAckOffPolicy', { pseudonym: String((msg && msg.pseudonym) || '') }, { asOwner: true });
+    vistaLetta = null;
+    return { result };
+  }));
 
   // Le manopole dei crediti (#652). Non passano da una callable: `config/credits`
   // è un documento che l'account admin scrive direttamente, come già fa per i
