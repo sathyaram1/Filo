@@ -156,7 +156,7 @@ export function registraDecisione({ ticket, role = '', model = '', effort = '' }
 const nostro = (gruppo) => (gruppo?.hooks || []).some((h) => String(h?.command || '').includes(ETICHETTA));
 
 // Unisce senza toccare il resto delle impostazioni dell'utente; un file illeggibile non si riscrive.
-export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato = Date.now() } = {}) {
+export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato = Date.now(), clone = '' } = {}) {
   const file = join(dir, 'settings.json');
   let s = {};
   if (existsSync(file)) {
