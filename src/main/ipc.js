@@ -228,6 +228,9 @@ function registerIpcHandlers() {
     require('./services/permessiPagine').schermoVecchio(event.sender, event.senderFrame);
     event.returnValue = true;
   });
+  // #1608 — la diagnostica delle passkey, che scrive solo se acceso da chi lancia Filo (services/diagnosiPasskey.js).
+  require('./services/diagnosiPasskey').avvia();
+  ipcMain.on('filo:passkey-diagnosi', (event, testo) => { require('./services/diagnosiPasskey').registra(event, testo); });
   ipcMain.on('filo:apertura-scelta', (event, url, azione) => {
     require('./services/permessiPagine').aperturaScelta(event.sender, url, azione);
     event.returnValue = true;

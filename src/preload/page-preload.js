@@ -259,6 +259,15 @@ try {
     const { buildRiquadriVuotiSource } = require('./riquadri-vuoti.js');
     const corpi = [buildSchermoVecchioCorpo()];
     const ascolti = [[EVENTO_SCHERMO_VECCHIO, () => { try { ipcRenderer.sendSync('filo:schermo-vecchio'); } catch (_) {} }]];
+    // La diagnostica delle passkey (#1608, preload/diagnosi-passkey.js): spenta, qui non entra niente.
+    const passkey = require('./diagnosi-passkey.js');
+    const modoPasskey = passkey.modoDiagnosiPasskey(process.env[passkey.VARIABILE_PASSKEY]);
+    if (modoPasskey && /^(https?|blob):/i.test(loc)) {
+      corpi.push(passkey.buildPasskeyCorpo(modoPasskey));
+      ascolti.push([passkey.EVENTO_PASSKEY, (e) => {
+        try { if (typeof e.detail === 'string') ipcRenderer.send('filo:passkey-diagnosi', e.detail.slice(0, 32768)); } catch (_) {}
+      }]);
+    }
     // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
     if (!IS_SUBFRAME && /^(https?|blob):/i.test(loc)) try {
       const { buildStatoPermessiCorpo, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE, SI_DATO, PARTI_LETTE } = require('./stato-permessi.js');
