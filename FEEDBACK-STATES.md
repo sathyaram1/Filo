@@ -470,9 +470,13 @@ dalle fermate lo stato non cambia: un `todo` o un ramo in revisione con una doma
 bloccante aperta tiene il suo id in `domandeBloccanti` (lo scrive solo il server, nella
 transazione che cambia la domanda), nessuna routine lo prende, e in dashboard sta in
 **Aspettano** col segno «aspetta D-n». Alla risposta l'id esce dall'elenco e il lavoro
-riparte con la decisione. La ripresa non sposta un `working` né un ramo in revisione (la
-decisione si accoda per il giro dopo); un `done` torna `todo` se la scelta non è la
-provvisoria di una domanda non bloccante, altrimenti la risposta dice «non serviva».
+riparte con la decisione. La ripresa non sposta un `todo`, un `working` né un
+`revision_capability` (la decisione si accoda per il giro dopo); un `revision_security`
+torna `revision_capability` coi verdetti azzerati, perché sicurezza e fusione non leggono
+le decisioni; un `done` torna `todo`. Fanno eccezione gli ultimi due quando la scelta è la
+provvisoria di una domanda non bloccante, senza parole in più: il `revision_security` resta
+dov'è con la decisione accodata, e sul `done` la risposta dice «non serviva». Finché una bloccante è aperta né il recupero delle fusioni né la richiesta del
+server fondono il ramo.
 
 Presentazione (scelta owner 2026-08-29): i casi `secaudit` e `l5` sono **ROSSI** in
 dashboard (un blocco di sicurezza, non una questione di gusto); gli altri restano verdi. Nel
