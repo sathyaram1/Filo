@@ -249,8 +249,14 @@
     WALLET_OWNER_GRANT: 'wallet_owner_grant',
     // CONTATORI_INSTALLAZIONI (#969): quante copie di Filo hanno spedito i contatori giornalieri di ieri e del mese in
     //   corso, cioè gli pseudonimi distinti. Solo pagine di Filo e solo owner, col token dell'account Google.
-    //   { } → { ok, installazioni: { ieri: { giorno, n, completo }, mese: { mese, n, completo } } }
+    //   { } → { ok, installazioni: { ieri: { giorno, n, completo }, mese: { mese, n, completo } } }; sotto le cinque
+    //   copie `n` è null e `sotto` è vero.
     CONTATORI_INSTALLAZIONI: 'contatori_installazioni',
+    // CONTATORI_SOMME (#1462): le somme della scheda Contatori di Gestione per un intervallo di giorni, una versione e un
+    //   sistema ('' per tutti). Solo pagine di Filo e solo owner; alla pagina escono solo somme, e una cella con meno di
+    //   cinque copie esce come { sotto: true }. `forza`: rilegge invece di usare la lettura di pochi minuti fa.
+    //   { dal, al, app, os, forza } → { ok, somme } (forma: src/main/services/contatoriSomme.js)
+    CONTATORI_SOMME: 'contatori_somme',
     // CONTATORI_USO (#969): la persona ha visto la risposta di una chiamata partita prima che la chiedesse (una
     //   spiegazione preparata alla selezione, la correzione di una parola già pronta): l'uso lo conta chi la mostra.
     //   `anticipata`: la risposta era stata preparata in anticipo, e questa è la sua apertura (#1461).

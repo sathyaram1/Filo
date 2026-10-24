@@ -1,11 +1,12 @@
-// Handler di dominio dei contatori anonimi (#969, #1461): crea il servizio, lo mette a disposizione del cancello dei
-// modelli, segue le scritture delle impostazioni e riceve i gesti contati nelle pagine. Cosa si conta e quando parte:
-// src/main/services/contatori.js. Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
+// Handler di dominio dei contatori anonimi (#969, #1461, #1462): crea il servizio, segue le impostazioni, riceve i gesti
+// contati nelle pagine e dà all'owner le somme, mai sotto le cinque copie. Cosa si conta: src/main/services/contatori.js.
+// Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
 
 const { soloFilo } = require('./origine');
 const auth = require('../../auth/google-auth');
 const Servizio = require('../contatori');
 const Finestra = require('../contatoriFinestra');
+const Somme = require('../contatoriSomme');
 const Disco = require('../../shim/storage');
 const Registro = require('../registroCambi');
 
@@ -140,7 +141,23 @@ module.exports = function register(on, ctx) {
   on(MSG.CONTATORI_INSTALLAZIONI, soloFilo(async () => {
     if (!ctx.isAdmin()) return { ok: false, error: 'not_admin' };
     try {
-      return { ok: true, installazioni: await contatori.installazioni({ idToken: await auth.getIdToken() }) };
+      const i = await contatori.installazioni({ idToken: await auth.getIdToken() });
+      return { ok: true, installazioni: { ...i, ieri: Somme.sottoSoglia(i && i.ieri), mese: Somme.sottoSoglia(i && i.mese) } };
+    } catch (e) {
+      return { ok: false, error: String((e && e.message) || e) };
+    }
+  }));
+
+  on(MSG.CONTATORI_SOMME, soloFilo(async (msg) => {
+    if (!ctx.isAdmin()) return { ok: false, error: 'not_admin' };
+    const m = msg && typeof msg === 'object' ? msg : {};
+    try {
+      return {
+        ok: true,
+        somme: await contatori.somme({
+          idToken: await auth.getIdToken(), dal: testo(m.dal), al: testo(m.al), app: testo(m.app), os: testo(m.os), forza: m.forza === true,
+        }),
+      };
     } catch (e) {
       return { ok: false, error: String((e && e.message) || e) };
     }
