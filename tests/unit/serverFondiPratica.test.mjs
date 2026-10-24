@@ -75,7 +75,7 @@ const fissaFinta = (_c, ramo, sha) => ({ ok: true, ramo: `${ramo}-verificato-${s
 // Il registro dei rami (#1159): per difetto il ramo non ne ha uno, come i lavori locali di prima.
 const SENZA_REGISTRO = async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: '', motivo: 'il ramo non ha un registro' });
 
-function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta, lavoroDelRamo = SENZA_REGISTRO, puntaRamo = () => 'c'.repeat(40), cancello = null, daGitHub = false, registro = () => ({ outcome: 'registrato' }) }) {
+function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta, lavoroDelRamo = SENZA_REGISTRO, puntaRamo = () => 'c'.repeat(40), cancello = null, daGitHub = false, registro = () => ({ outcome: 'registrato' }), mainPrima = () => 'b'.repeat(40) }) {
   return conRete(docs, async (scritture) => {
     const lanci = [];
     const righe = [];
@@ -90,7 +90,7 @@ function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, 
       lavoroDelRamo: async (x) => { chiesti.push(x); return lavoroDelRamo(x); }, puntaRamo,
       chiediAlCancello: async (x) => { alCancello.push(x); return cancello ? cancello(x) : { outcome: 'fault', reason: 'nessun cancello nella prova' }; },
       allinea: () => {}, deployDaGitHub: () => daGitHub,
-      registraMain: async (x) => { registrati.push(x); return registro(x); },
+      registraMain: async (x) => { registrati.push(x); return registro(x); }, mainPrima,
     });
     return { k, lanci, scritture, chiesti, alCancello, registrati, testo: righe.join('\n') };
   });
@@ -468,6 +468,19 @@ test('la spinta su main riuscita dal PC si registra sul server; quella del cance
   assert.match(no.testo, /non l’ha registrato come portato da server:fondi \(Server non raggiungibile: rete giù\)\. Aprirà un allarme su main fuori registro/);
   assert.match(no.testo, /Pratica #910 chiusa/);
   assert.equal(classifyServerMerge(200, { result: { ok: true, result: 'registrato', sha: 'a'.repeat(40) } }).outcome, 'registrato');
+});
+
+// #1521: server:fondi esce 0 anche col ramo già dentro main; main non si è mosso e lo sha su cui sta non è del PC.
+test('server:fondi che non ha spinto niente non registra main; main non letto prima non si registra e si dice', async () => {
+  const fidato = async () => ({ ok: true, registro: true, lavoroFidato: true, attesa: '', motivo: '' });
+  const fermo = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato, mainPrima: () => 'a'.repeat(40) });
+  assert.equal(fermo.k, 0, fermo.testo);
+  assert.deepEqual(fermo.registrati, []);
+  assert.doesNotMatch(fermo.testo, /fuori registro/);
+  const ignoto = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato, mainPrima: () => null });
+  assert.equal(ignoto.k, 0, ignoto.testo);
+  assert.deepEqual(ignoto.registrati, []);
+  assert.match(ignoto.testo, /non ho letto main del server prima della fusione.*non lo registro.*per aaaaaaaaa/);
 });
 
 test('il cancello non fonde (suite non verde): la pratica resta in lavorazione, col motivo', async () => {
