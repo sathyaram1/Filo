@@ -1,6 +1,6 @@
 // La politica sui modelli come regola: quali modelli girano coi crediti di Filo e quali fornitori li possono servire.
-// PURO e autosufficiente (niente require, niente altri SN_*): lo incorpora il server col bake per controllare l'uso
-// delle chiavi dei crediti (#1520). constants.js lo riespone. Prove: tests/unit/politicaModelli.test.mjs.
+// PURO e autosufficiente (niente require, niente altri SN_*): il server lo incorpora al deploy e ci giudica le sue
+// chiamate e il consumo delle chiavi dei crediti (#1520). constants.js lo riespone. Prove: tests/unit/politicaModelli.test.mjs.
 
 (function (global) {
   'use strict';
