@@ -2138,8 +2138,8 @@ async function decisioneAzionePagina({ costo, campo = 'web', sender = null } = {
 }
 
 // #892.1 — un comando scritto a mano nella home passa dagli stessi livelli di quelli di Filo, giudicato nella cartella
-// e con la shell della sessione che lo eseguirà. Incollato o trascinato, l'autore è ignoto come quello di una pagina web.
-async function decisioneComandoAMano({ comando, cwd = '', shell = '', incollato = false } = {}) {
+// e con la shell della sessione che lo eseguirà. L'ha scritto la persona: niente di letto sporca il compito.
+async function decisioneComandoAMano({ comando, cwd = '', shell = '' } = {}) {
   const Levels = globalThis.SN_ACTION_LEVELS;
   const cmd = String(comando || '').trim();
   let impostazioni = {};
@@ -2147,8 +2147,7 @@ async function decisioneComandoAMano({ comando, cwd = '', shell = '', incollato 
   const action = { type: 'ESEGUI_COMANDO', comando: cmd, _perimetro: { ...perimetroLettura(null, cwd), shell } };
   const ing = Levels ? Levels.ingressi(action, { impostazioni }) : null;
   if (!cmd || !ing) return { risposta: 'no', digita: false, no: 'Questo comando non lo lancio.' };
-  const fonti = incollato ? [{ classe: 5, campo: 'terminale', chiave: 'terminale:incollato', motivo: 'il comando arriva da un testo incollato' }] : [];
-  const d = decisioneAutonomia(ing, { fontiLette: fonti, impostazioni });
+  const d = decisioneAutonomia(ing, { impostazioni });
   const contati = ingressiContati(ing, d, { origine: 'chat', dentroPerimetro: ing.dentroPerimetro });
   if (d.risposta === 'no') return { risposta: 'no', digita: false, no: fraseNo(ing, d, null).breve, contati };
   if (d.risposta === 'si') return { risposta: 'si', digita: false, contati };

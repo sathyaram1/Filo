@@ -193,7 +193,7 @@
 
   // #968 — un comando scritto a mano è fallito: se aveva un percorso con spazi senza virgolette, sotto l'errore
   // compare la versione con le virgolette, da lanciare con un clic. Parte solo quello che c'è scritto lì.
-  async function proponiVirgolette({ command, cwd, shell, out, chat, incollato }) {
+  async function proponiVirgolette({ command, cwd, shell, out, chat }) {
     let r = null;
     try { r = await window.filo?.shellPropostaVirgolette?.({ comando: command, shell, cwd }); } catch (_) { r = null; }
     const p = r && r.proposta;
@@ -219,7 +219,7 @@
     const lancia = () => {
       if (esegui.disabled) return;
       esegui.disabled = true;
-      runShellCommand(p.comando, chat, { incollato }).then((partito) => { if (!partito) esegui.disabled = false; });
+      runShellCommand(p.comando, chat).then((partito) => { if (!partito) esegui.disabled = false; });
     };
     const nellaBarra = () => {
       inputEl.value = `/${p.comando}`;
@@ -253,9 +253,9 @@
 
   // #892.1 — prima di partire il comando passa dai livelli di autonomia, come quelli di Filo: la risposta la dà il main,
   // che la richiede quando il comando parte. Torna false se la persona ha detto no e non è partito niente.
-  async function chiediPrimaDiLanciare(command, { cwd, shell, incollato }) {
+  async function chiediPrimaDiLanciare(command, { cwd, shell }) {
     let v = null;
-    try { v = await window.filo?.shellVaglia?.({ command, cwd, shell, incollato }); } catch (_) { v = null; }
+    try { v = await window.filo?.shellVaglia?.({ command, cwd, shell }); } catch (_) { v = null; }
     if (!v || !v.ok) return { via: true };
     if (v.risposta === 'si') return { via: true };
     if (v.risposta === 'no') return { via: true, no: v.no || 'Questo comando non lo lancio.' };
@@ -266,7 +266,7 @@
     return { via: true, gettone: v.gettone };
   }
 
-  async function runShellCommand(command, chat, { incollato = false } = {}) {
+  async function runShellCommand(command, chat) {
     if (!command) return false;
     // La conversazione a cui il comando e il suo esito appartengono è questa,
     // anche se l'esito arriva fra dieci secondi e intanto l'utente se n'è andato.
@@ -274,7 +274,7 @@
     // Dove e con quale shell è girato: la proposta dopo un errore legge i percorsi da lì, non da dove si è poi.
     const cwdDelComando = currentCwd;
     const shellDelComando = terminalShell;
-    const permesso = await chiediPrimaDiLanciare(command, { cwd: cwdDelComando, shell: shellDelComando, incollato });
+    const permesso = await chiediPrimaDiLanciare(command, { cwd: cwdDelComando, shell: shellDelComando });
     if (!permesso.via) return false;
     if (document.body.dataset.state !== 'thread') goThread();
     comandoInChat = true;
@@ -423,13 +423,12 @@
       cwd: cwdDelComando,
       shell: shellDelComando,
       chat: chatDelComando,
-      incollato,
       gettone: permesso.gettone,
       onData: ({ chunk, stream }) => appendOut(chunk, stream === 'stderr'),
       onExit: ({ code, cwd }) => {
         if (cwd) setCwd(cwd);
         finish(code === 0 ? null : `(uscita con codice ${code})`);
-        if (code !== 0) proponiVirgolette({ command, cwd: cwdDelComando, shell: shellDelComando, out, chat: chatDelComando, incollato });
+        if (code !== 0) proponiVirgolette({ command, cwd: cwdDelComando, shell: shellDelComando, out, chat: chatDelComando });
       },
       onError: ({ message }) => {
         appendOut(`\n${message || 'Errore di esecuzione.'}`, true);

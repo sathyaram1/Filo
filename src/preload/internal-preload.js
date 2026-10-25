@@ -110,7 +110,7 @@ const filoApi = {
   // Esecuzione shell (modalità terminale della dashboard), gemella di aiStream.
   // onData({chunk, stream}), onExit({code, cwd}), onError({message}).
   // Ritorna { sendInput(text), abort() }.
-  shellExec: ({ command, cwd, shell, chat, incollato, gettone, onData, onExit, onError }) => {
+  shellExec: ({ command, cwd, shell, chat, gettone, onData, onExit, onError }) => {
     const execId = `sh${Date.now()}_${++streamCounter}`;
     const offData = (_e, data) => onData && onData(data);
     const offExit = (_e, data) => { cleanup(); onExit && onExit(data); };
@@ -123,7 +123,7 @@ const filoApi = {
     ipcRenderer.on(`shell:${execId}:data`, offData);
     ipcRenderer.on(`shell:${execId}:exit`, offExit);
     ipcRenderer.on(`shell:${execId}:error`, offError);
-    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell, chat, incollato, gettone });
+    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell, chat, gettone });
     return {
       sendInput: (text) => ipcRenderer.send('shell:input', { execId, text }),
       abort: () => { ipcRenderer.send('shell:abort', { execId }); cleanup(); },

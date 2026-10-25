@@ -430,12 +430,10 @@ function registerIpcHandlers() {
     const s = shellSessions.get(key);
     return s && !s.dead && s.shell === resolveShell(shell) ? s.cwd : cwd;
   };
-  ipcMain.handle('shell:vaglia', async (event, { command, cwd, shell, incollato } = {}) => {
+  ipcMain.handle('shell:vaglia', async (event, { command, cwd, shell } = {}) => {
     if (!(event.sender.getURL() || '').startsWith('filo://')) return { ok: false, error: 'forbidden' };
     if (typeof command !== 'string') return { ok: false, error: 'bad-args' };
-    const v = await decisioneComandoAMano({
-      comando: command, cwd: cartellaDellaSessione(event.sender.id, shell, cwd), shell: resolveShell(shell), incollato: incollato === true,
-    });
+    const v = await decisioneComandoAMano({ comando: command, cwd: cartellaDellaSessione(event.sender.id, shell, cwd), shell: resolveShell(shell) });
     if (v.risposta === 'si') { contaSe('confermaDecisa', 'ESEGUI_COMANDO', v.contati, 'automatica'); return { ok: true, risposta: 'si' }; }
     if (v.risposta === 'no') { contaSe('confermaDecisa', 'ESEGUI_COMANDO', v.contati, 'negata'); return { ok: true, risposta: 'no', no: v.no }; }
     const gettone = `comando:${require('node:crypto').randomBytes(12).toString('hex')}`;
@@ -452,7 +450,7 @@ function registerIpcHandlers() {
     contaSe('confermaRisposta', gettone, 'rifiutata');
   });
 
-  ipcMain.handle('shell:start', async (event, { execId, command, cwd, shell, chat, incollato, gettone } = {}) => {
+  ipcMain.handle('shell:start', async (event, { execId, command, cwd, shell, chat, gettone } = {}) => {
     const url = event.sender.getURL() || '';
     if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
     if (!execId || typeof command !== 'string') return { ok: false, error: 'bad-args' };
@@ -460,9 +458,7 @@ function registerIpcHandlers() {
       try { event.sender.send(`shell:${execId}:${suffix}`, data); } catch (_) {}
     };
     const key = event.sender.id;
-    const v = await decisioneComandoAMano({
-      comando: command, cwd: cartellaDellaSessione(key, shell, cwd), shell: resolveShell(shell), incollato: incollato === true,
-    });
+    const v = await decisioneComandoAMano({ comando: command, cwd: cartellaDellaSessione(key, shell, cwd), shell: resolveShell(shell) });
     if (v.risposta !== 'si') {
       const c = gettone ? comandiDaConfermare.get(gettone) : null;
       const valido = v.risposta !== 'no' && !!c && c.chi === key && c.comando === command.trim() && c.scade >= Date.now();
