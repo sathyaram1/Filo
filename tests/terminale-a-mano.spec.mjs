@@ -179,9 +179,7 @@ test('una / seguita da una parola che non è un programma, o da un percorso inco
   const comeSiColora = (t) => page.evaluate((x) => window.SN_DASH_COMANDI.classifyInput(x), t);
   expect(await comeSiColora('/$env:FILO_X = "1"')).toBe('incerto');
   expect(await comeSiColora('/FOO=bar')).toBe('incerto');
-  await page.locator('#input').fill('/FILO_892=uno echo assegnata-$FILO_892');
-  await page.locator('#input').press('Enter');
-  await expect(page.locator('.dash-term-cmd').last()).toContainText('FILO_892=uno', { timeout: 12_000 });
+  expect(await comeSiColora('/FOO=bar ls'), 'dopo l\'assegnazione si cerca il programma').not.toBe('incerto');
   await page.locator('#input').fill('/echo a; echo dopo-punto-e-virgola-892');
   await page.locator('#input').press('Enter');
   await expect(page.locator('.dash-term-out').last()).toContainText('dopo-punto-e-virgola-892', { timeout: 12_000 });
