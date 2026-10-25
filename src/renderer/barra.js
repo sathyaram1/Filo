@@ -100,7 +100,8 @@
   // patterns/un-riquadro-che-si-riempie-dopo-va-rimisurato-dopo-la-posa.md.
   let suggTimer = null;
   let suggDi = null;
-  function programmaSuggerimento(el) {
+  // `ridetto`: lo stesso puntatore, l'icona cambiata dal clic; per i contatori non è un nome letto di nuovo.
+  function programmaSuggerimento(el, { ridetto = false } = {}) {
     nascondiSuggerimento();
     suggDi = el;
     suggTimer = setTimeout(() => {
@@ -109,13 +110,15 @@
       if (!el.isConnected || trascina || !stato.aperta || !el.matches(':hover')) { suggDi = null; return; }
       const r = el.getBoundingClientRect();
       const p = pannello.getBoundingClientRect();
-      api.suggerimento({ testo: el.dataset.sugg || el.getAttribute('aria-label') || '', x: Math.round(p.right + 8), y: Math.round(r.top + r.height / 2 - 11) });
+      // L'id dell'icona o della voce fissa: il main conta se il nome letto diventa un clic (#1471).
+      api.suggerimento({ testo: el.dataset.sugg || el.getAttribute('aria-label') || '', x: Math.round(p.right + 8), y: Math.round(r.top + r.height / 2 - 11), id: el.dataset.id || el.dataset.comando || '', ridetto });
     }, SUGGERIMENTO_MS);
   }
-  function nascondiSuggerimento() {
+  // `lasciato`: il puntatore è uscito dall'icona; premuta, il clic che segue è ancora una scelta fatta leggendo.
+  function nascondiSuggerimento({ lasciato = false } = {}) {
     if (suggTimer) { clearTimeout(suggTimer); suggTimer = null; }
     suggDi = null;
-    api.suggerimento({ testo: '' });
+    api.suggerimento({ testo: '', lasciato });
   }
 
   // ── le icone del primo gruppo ────────────────────────────────────────────
@@ -124,7 +127,7 @@
     b.type = 'button';
     b.className = classe;
     b.addEventListener('pointerenter', (e) => { if (e.isTrusted) programmaSuggerimento(b); });
-    b.addEventListener('pointerleave', () => { if (suggDi === b) nascondiSuggerimento(); });
+    b.addEventListener('pointerleave', () => { if (suggDi === b) nascondiSuggerimento({ lasciato: true }); });
     b.addEventListener('pointerdown', () => { if (suggDi === b) nascondiSuggerimento(); });
     return b;
   }
@@ -134,7 +137,7 @@
     aspettoIcona(b, it);
     // Il clic ha cambiato cosa fa l'icona (Aiuto → Parla): il puntatore ancora sopra lo legge subito.
     const ora = b.dataset.sugg || b.getAttribute('aria-label') || '';
-    if (detto && ora !== detto && b.isConnected && b.matches(':hover') && !trascina) programmaSuggerimento(b);
+    if (detto && ora !== detto && b.isConnected && b.matches(':hover') && !trascina) programmaSuggerimento(b, { ridetto: true });
   }
 
   function aspettoIcona(b, it) {
@@ -357,6 +360,7 @@
       const y = Math.round(ev.clientY);
       if (annullato) {
         if (fuori) api.trascinaFuori({ fase: 'annulla', id, x, y });
+        api.annullato({ id });
       } else if (!dentroPannello(ev.clientX)) {
         api.trascinaFuori({ fase: 'rilascia', id, x, y });
       } else {

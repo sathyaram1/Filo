@@ -1,4 +1,4 @@
-// Le regole Firestore dei contatori anonimi (#969, #1461, #1464, #1466), provate col MOTORE VERO e col codice vero dell'app.
+// Le regole Firestore dei contatori anonimi (#969, #1461, #1464, #1466, #1471), provate col MOTORE VERO e col codice vero dell'app.
 //
 // NON è un unit test: il nome non finisce in `.test.mjs` apposta (vedi pathsRegole.motore-vero.mjs, che spiega
 // perché e come si prepara la cartella usa-e-getta con l'emulatore). La sentinella sempre accesa è
@@ -9,7 +9,7 @@
 // Si lancia come l'altro, con in più FILO_REPO=<repo>:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-969 "node <cartella>/contatoriRegole.motore-vero.mjs"
-// Esito atteso: 71 righe verdi, uscita 0 (#1466 su #1464, 2026-10-23). È l'unica prova del tetto di mille espressioni
+// Esito atteso: 82 righe verdi, uscita 0 (#1471 su #1466, 2026-10-23). È l'unica prova del tetto di mille espressioni
 // che Firestore concede a una scrittura: le regole dell'ora ne valutano già circa 950, e un controllo in più le fa
 // rifiutare tutte (per questo le chiamate ai modelli hanno il loro documento), mentre la sentinella che legge il file
 // non se ne accorge. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
@@ -26,7 +26,8 @@ const PROGETTO = 'filo-prova-969';
 const BASE = `http://127.0.0.1:8089/v1/projects/${PROGETTO}/databases/(default)/documents`;
 
 const require = createRequire(join(REPO, 'package.json'));
-for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'contatoriGiornalieri']) {
+for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi',
+  'disposizioneIcone', 'carteHome', 'themeTokens', 'tabColor', 'contatoriGiornalieri']) {
   require(join(REPO, `src/shared/${f}.js`));
 }
 const Servizio = require(join(REPO, 'src/main/services/contatori.js'));
@@ -112,10 +113,22 @@ await prova('l’ora chiusa parte, con ogni misura, e il server la accetta', asy
   s.aggiornamento('trovato');
   s.sessione({ esito: 'ripristinata', schede: 3, t0: 0 }).vista();
   s.secondaIstanza();
+  // I gesti (#1471): partono nel terzo documento della stessa ora.
+  s.disposizioneIcone(globalThis.SN_DISPOSIZIONE_ICONE.DEFAULT);
+  s.gesto('icona_spostata', { icona: 'qrCode', da: 'primary', a: 'bar', via: 'trascina' });
+  s.gesto('barra_aperta', { motivo: 'spinta', esito: 'a_vuoto', apertaMs: 400 });
+  s.gesto('trascinamento', { da: 'carta_home', a: 'chat_home', esito: 'posato' });
+  s.gesto('modulo_editor', { colonne: 8, righe: 12 });
+  s.gesto('ripristino', { cosa: 'token', token: 'accent' });
+  s.cambioRitirato({ tipo: 'impostazioni', via: 'chat', ts: new Date(IERI - 90000).toISOString(), cambi: [{ chiave: 'theme' }] });
   await new Promise((r) => setTimeout(r, 30));
   sposta(ORA);
   const esito = await s.controlla();
   vero(esito === 'inviati', `esito ${esito}, errore ${JSON.stringify(disco.get(Servizio.CHIAVE)?.errore)}`);
+  const id = `${'ab'.repeat(9)}01_2026-10-15_10`;
+  let letti = null;
+  await env.withSecurityRulesDisabled(async (ctx) => { letti = (await getDoc(doc(ctx.firestore(), `${C.COLLEZIONE_GESTI}/${id}`))).data(); });
+  vero(letti && letti.trascinamento && letti.trascinamento.carta_home === 'chat_home|posato|1', `gesti: ${JSON.stringify(letti)}`);
 });
 await prova('rispedita, la stessa ora non si riscrive (create sì, update no) e l’app la dà per arrivata', async () => {
   const { s, sposta } = servizio(IERI);
@@ -151,6 +164,11 @@ C.registraChiamata(datiBuoni, 'help', { modello: 'deepseek/deepseek-v4-flash', i
 C.registraChiamate(datiBuoni, 'help', 2);
 const CHIAMATE = C.documentoChiamate({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiBuoni });
 const COLL_CHIAMATE = C.COLLEZIONE_CHIAMATE;
+const datiGesti = C.oraVuota();
+C.registraGesto(datiGesti, 'carta_home', { carta: 'editor', mossa: 'togli' });
+C.segnaDisposizione(datiGesti, { primary: 'si', secondary: 'no', bar: 'si' });
+const GESTI = C.documentoGesti({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiGesti });
+const COLL_GESTI = C.COLLEZIONE_GESTI;
 const GIORNO_VECCHIO = C.documentoGiorno({ pseudonimo: 'e'.repeat(20), giorno: '2026-10-13', app: '0.2.240', os: 'win', dati: { uso: { help: { n: 2, fasce: { s2: 1 } } }, errori: {} } });
 
 console.log('\n— quello che NON si deve poter fare —');
@@ -185,6 +203,13 @@ await prova('le chiamate senza una misura', () => { const { spesa, ...senza } = 
 await prova('le chiamate sotto l’id di un’altra ora', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${'c'.repeat(20)}_2026-10-14_11`), CHIAMATE)));
 await prova('le chiamate nella collezione delle ore', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), CHIAMATE)));
 await prova('un anonimo legge le chiamate', () => assertFails(getDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`))));
+await prova('un trascinamento col testo trascinato al posto della destinazione', () => assertFails(setDoc(doc(anon, `${COLL_GESTI}/${idBuono}`), { ...GESTI, trascinamento: { carta_home: 'ecco la relazione di Mario|posato|1' } })));
+await prova('un’origine di trascinamento fuori elenco', () => assertFails(setDoc(doc(anon, `${COLL_GESTI}/${idBuono}`), { ...GESTI, trascinamento: { 'file di mario': 'chat_home|posato|1' } })));
+await prova('il valore di un token al posto del suo nome', () => assertFails(setDoc(doc(anon, `${COLL_GESTI}/${idBuono}`), { ...GESTI, ripristino: { token: '#ff0000|1' } })));
+await prova('una disposizione che non è sì o no', () => assertFails(setDoc(doc(anon, `${COLL_GESTI}/${idBuono}`), { ...GESTI, disposizione_di_serie: { bar: 'quasi' } })));
+await prova('i gesti senza una misura', () => { const { ripristino, ...senza } = GESTI; return assertFails(setDoc(doc(anon, `${COLL_GESTI}/${idBuono}`), senza)); });
+await prova('i gesti sotto l’id di un’altra ora', () => assertFails(setDoc(doc(anon, `${COLL_GESTI}/${'c'.repeat(20)}_2026-10-14_11`), GESTI)));
+await prova('un anonimo legge i gesti', () => assertFails(getDoc(doc(anon, `${COLL_GESTI}/${idBuono}`))));
 await prova('una prima volta che è un testo', () => rifiuta({ primeVolte: ['help', 'appunti di mario'] }));
 await prova('le prime volte come stringa', () => rifiuta({ primeVolte: 'help' }));
 await prova('un’ora che non esiste', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${'c'.repeat(20)}_2026-10-14_24`), conCampo({ ora: '24' }))));
@@ -232,6 +257,21 @@ await prova('le chiamate più cariche che l’app costruisce (ogni misura di ogn
   const piene = C.documentoChiamate({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '9999.9999.999999', os: 'linux', dati });
   vero(C.validaChiamate(piene).ok, C.validaChiamate(piene).motivo);
   return assertSucceeds(setDoc(doc(anon, `${COLL_CHIAMATE}/${C.idDocumento(piene)}`), piene));
+});
+await prova('un anonimo crea i gesti della sua ora', () => assertSucceeds(setDoc(doc(anon, `${COLL_GESTI}/${idBuono}`), GESTI)));
+await prova('ma non li riscrive', () => assertFails(setDoc(doc(anon, `${COLL_GESTI}/${idBuono}`), GESTI)));
+await prova('l’admin li legge', () => assertSucceeds(getDoc(doc(owner, `${COLL_GESTI}/${idBuono}`))));
+await prova('i gesti più carichi che l’app costruisce (ogni voce di ogni chiave, ai tetti) passano', () => {
+  const dati = C.oraVuota();
+  for (const c of C.MISURE_GESTI) {
+    if (c === 'barra_aperta') {
+      for (const m of C.MOTIVI_BARRA) dati[c][m] = Object.fromEntries(C.ESITI_BARRA.map((e) => [e, { n: 999999999, fasce: Object.fromEntries(C.NOMI_FASCE.map((f) => [f, 142857142])) }]));
+    } else if (c === 'disposizione_di_serie') dati[c] = { primary: 'no', secondary: 'no', bar: 'no' };
+    else for (const k of C.chiaviGesto(c)) dati[c][k] = Object.fromEntries(C.vociGesto(c, k).map((v) => [v, 999999999]));
+  }
+  const pieni = C.documentoGesti({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '9999.9999.999999', os: 'linux', dati });
+  vero(C.validaGesti(pieni).ok, C.validaGesti(pieni).motivo);
+  return assertSucceeds(setDoc(doc(anon, `${COLL_GESTI}/${C.idDocumento(pieni)}`), pieni));
 });
 await prova('una copia vecchia crea ancora il suo giorno', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(GIORNO_VECCHIO)}`), GIORNO_VECCHIO)));
 await prova('una copia vecchia crea ancora la sua ora v2, senza il sistema', () => {

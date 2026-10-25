@@ -649,6 +649,8 @@
     }));
     modal.addEventListener('drop', async (e) => {
       const dropped = e.dataTransfer?.files;
+      // Qui servono solo i file: un testo lasciato nel riquadro non va da nessuna parte (#1471).
+      if (e.isTrusted) try { Popup?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'campo_feedback', !!(dropped && dropped.length))); } catch (_) {}
       if (!dropped || !dropped.length) return;
       for (const f of dropped) await addAttachment(f);
     });

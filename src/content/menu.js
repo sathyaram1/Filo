@@ -148,6 +148,9 @@
     } catch (_) {}
   }
   const contaBox = (ev) => contaNelMenu({ misura: 'ricerca', pannello: 'tasto-destro', ...ev });
+  // I gesti del menu (#1471): il nome letto su un'icona, il riquadro «Altro…», un'icona trascinata e lasciata nel vuoto.
+  const contaGesto = (gesto, campi) => contaNelMenu({ misura: 'gesto', gesto, ...campi });
+  const lettura = global.SN_GESTI ? global.SN_GESTI.lettore((ev) => contaNelMenu(ev)) : { mostrato() {}, clic() {}, via() {} };
   // Una voce che fa un'azione del catalogo delle capacità la nomina con `azione` (#1461): si misura qui, dal clic alla
   // fine del suo lavoro, per ogni menu che passa da open, nella pagina e nello strato. Una voce non si misura due volte.
   const MISURATE = new WeakSet();
@@ -209,6 +212,7 @@
 
   function close() {
     try { dismissTooltip?.(); } catch (_) {}
+    lettura.via();
     clearSubCloseTimer();
     if (activeMenu) {
       if (activeMenu.ricerca && !activeMenu.ricerca.scelta) contaBox({ esito: 'vuota' });
@@ -1234,6 +1238,7 @@
       staccaSub();
       return;
     }
+    contaGesto('altro_del_menu', { aperto: true });
     const cols = opts.cols || 4;
     const sub = document.createElement('div');
     sub.className = 'sn-menu sn-menu-sub sn-menu-icon-grid';
@@ -1306,10 +1311,14 @@
   function attachTooltip(el, text) {
     el.addEventListener('mouseenter', () => {
       clearTimeout(tooltipHideTimer);
-      tooltipHideTimer = setTimeout(() => showTooltip(el, text), 250);
+      tooltipHideTimer = setTimeout(() => {
+        showTooltip(el, text);
+        if (el.dataset.snIconId) lettura.mostrato(el.dataset.snIconId, 'menu');
+      }, 250);
     });
     el.addEventListener('mouseleave', () => {
       dismissTooltip();
+      lettura.via();
     });
     el.addEventListener('mousedown', () => {
       dismissTooltip();
@@ -1385,6 +1394,7 @@
       b.addEventListener('click', () => {
         if (sub.kind === 'empty') return;
         if (sub.disabled) return; // greyed: niente azione (ma resta trascinabile)
+        if (sub.id) lettura.clic(sub.id);
         close();
         try { sub.onClick && sub.onClick(); } catch (er) { console.error(er); }
       });
@@ -1413,6 +1423,7 @@
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       if (it.disabled) return;
+      if (it.id) { lettura.clic(it.id); contaGesto('altro_del_menu', { icona: it.id }); }
       close();
       try { it.onClick && it.onClick(); } catch (er) { console.error(er); }
     });
@@ -1563,14 +1574,17 @@
           const beforeBtn = findInsertBefore(zone.zoneEl, e.clientX, e.clientY, el);
           const beforeId = beforeBtn?.dataset?.snIconId || null;
           try { zone.onDrop && zone.onDrop({ id, source, target: zone.target, beforeId }); } catch (er) { console.error(er); }
-        }
+        } else if (!inBarra) contaGesto('trascinamento', { da: 'icona_menu', a: 'nessuna', esito: 'annullato' });
         // Sopprime il click che segue il pointerup dopo un drag.
         const swallow = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
         window.addEventListener('click', swallow, { capture: true, once: true });
         setTimeout(() => { try { window.removeEventListener('click', swallow, true); } catch (_) {} }, 50);
       };
 
-      const onCancel = () => cleanup();
+      const onCancel = () => {
+        if (dragging) contaGesto('trascinamento', { da: 'icona_menu', a: 'nessuna', esito: 'annullato' });
+        cleanup();
+      };
 
       window.addEventListener('pointermove', onMove, true);
       window.addEventListener('pointerup', onUp, true);
@@ -1612,7 +1626,7 @@
     if (fase === 'rilascia') {
       const zona = findZoneAt(x, y);
       via();
-      if (!zona) return false;
+      if (!zona) { contaGesto('trascinamento', { da: 'icona_barra', a: 'nessuna', esito: 'annullato' }); return false; }
       const prima = findInsertBefore(zona.zoneEl, x, y, null);
       try { zona.onDrop && zona.onDrop({ id, source: 'bar', target: zona.target, beforeId: prima?.dataset?.snIconId || null }); } catch (er) { console.error(er); }
       return true;
