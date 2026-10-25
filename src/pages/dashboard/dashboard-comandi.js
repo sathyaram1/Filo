@@ -672,7 +672,7 @@
     if (isTerminalMode()) {
       const chat = chatDellaRiga();
       const programma = programmaDi(text);
-      if (!programma || (!sintassiShell(programma) && (await esisteInShell(programma)) === false)) { updateInputClass(); return false; }
+      if (!programma || (programma !== SINTASSI && (await esisteInShell(programma)) === false)) { updateInputClass(); return false; }
       inputEl.value = '';
       autoGrowInput();
       updateInputClass();
