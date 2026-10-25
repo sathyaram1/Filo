@@ -462,6 +462,7 @@
       // In terminale "/x" è un comando shell: azzurro se esiste, rosso se no.
       const cmd = programmaDi(t);
       if (!cmd) return 'none';
+      if (sintassiShell(cmd)) return 'incerto';
       const chiave = chiaveShell(cmd);
       if (shellCmdCache.has(chiave)) return shellCmdCache.get(chiave) ? 'shell' : 'unknown';
       if (Date.now() - (shellCmdIncerti.get(chiave) ?? -Infinity) < RIPROVA_INCERTO_MS) return 'incerto';
