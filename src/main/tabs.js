@@ -3746,7 +3746,7 @@ class TabManager {
     const NE = globalThis.SN_NET_ERROR;
     const p = NE && NE.parse(paginaErrore);
     if (!p || !p.target || p.code === NE.BLOCKED_CODE || p.code === NE.CRASH_CODE) return;
-    tab._riprova = { codice: p.code, wc: tab.view.webContents, t: Date.now() };
+    tab._riprova = { codice: p.code, wc: tab.view.webContents, t: Date.now(), verso: indirizzoCanonico(p.target) };
   }
 
   // Il salto chiesto dalla pagina d'errore stessa verso il suo sito: il suo «Riprova». Solo dietro un input vero:
