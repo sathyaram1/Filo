@@ -2742,7 +2742,11 @@ class TabManager {
       const NE = globalThis.SN_NET_ERROR;
       if (!NE) return;
       const failed = failedUrl || tab.url || '';
-      if (!NE.shouldShowErrorPage({ code, failedUrl: failed, isMainFrame })) return;
+      if (!NE.shouldShowErrorPage({ code, failedUrl: failed, isMainFrame })) {
+        // Fermato (Esc) o diventato uno scaricamento: quel «Riprova» non ha un esito da contare.
+        if (isMainFrame && tab._riprova && tab._riprova.wc === wc) tab._riprova = null;
+        return;
+      }
       // Per l'utente la scheda resta SUL sito fallito: la pagina d'errore è la
       // faccia del fallimento, non una destinazione.
       tab.url = failed;
