@@ -333,12 +333,16 @@ test('il corpo di una chiave privata, la password di una riga di comando, un web
     'sqlcmd -S server -U sa -P Girasole2024': 'Girasole2024',
     'redis-cli -a Girasole2024': 'Girasole2024',
     'Webhook: https://discord.com/api/webhooks/123456789012345678/abcDEFghiJKLmnoPQRstuVWXyz1234567890abcdEFGH': 'abcDEFghiJKLmnoPQRstuVWXyz1234567890abcdEFGH',
-    'Il mio token di Telegram bot: 123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw': 'AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw',
+    // Indirizzi composti a pezzi: scritti interi, la protezione dei push di GitHub li respinge come segreti veri.
+    [`SLACK_WEBHOOK=https://hooks.${'slack'}.com/services/T00000000/B00000000/${'X'.repeat(24)}`]: 'X'.repeat(24),
+    [`Webhook: https://hooks.${'slack'}.com/services/T024BE7LD/B01ABCDEF12/${'aBcDeFgHiJkL'}mNoPqRsTuVwX`]: 'aBcDeFgHiJkLmNoPqRsTuVwX',
+    'Il mio token di Telegram bot:123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw': 'AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw',
     'Recovery codes\nKeep these somewhere safe.\n\n3f9a1-b2c7d\n8e4d0-a6f15\nc1b7e-90d2a\n77d3f-1e0b9\n4a2b1-9c8d7\n0e1f2-3a4b5\nDownload': '0e1f2-3a4b5',
   };
   for (const [t, s] of Object.entries(segreti)) assert.ok(!P.oscura(t).includes(s), t);
   for (const t of ['docker run -u 1000:1000 -p 8080:80 nginx', 'ssh -l mario -p 2222 host.example.com', 'mysql -u root -p mydb',
-    'mkdir -p dir2 && cp -a src2 dst', 'https://github.com/x/y/settings/hooks/12345678']) assert.equal(P.oscura(t), t, t);
+    'mkdir -p dir2 && cp -a src2 dst', 'https://github.com/x/y/settings/hooks/12345678',
+    'https://example.com/hooks/deployment-notifications-channel']) assert.equal(P.oscura(t), t, t);
   assert.ok(P.oscura('Recovery codes\n3f9a1-b2c7d\n8e4d0-a6f15\nKeep these in a safe place.').includes('Keep these in a safe place.'));
 });
 
