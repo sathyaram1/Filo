@@ -37,10 +37,20 @@
   const ETICHETTA_IT = /\b[Cc]odic[ei]\s+(?:d(?:i|el|ella|ello|ei|egli|elle|ell['’])\s*)?([a-zà-ÿ]{3,})\s*(?:[:=#]|è|\bn\.?|\bnr\.?)?\s*$/;
   const ETICHETTA_EN = /\b([a-z][a-z-]{2,})\s+codes?\s*(?:[:=#]|\bis\b|\bno\.?)?\s*$/;
   const RESTA_UN_CODICE = /^(?:conferm\w*|sicurezza|temporane\w*|provvisori\w*|segret\w*|personal\w*|attivazion\w*|recupero|ripristino|emergenza|associazion\w*|abbinament\w*|ricevut\w*|inviat\w*|numeric\w*|nuovo|seguente|unico|sms|email|mail|your|the|my|this|that|our|its|new|same|following|above|below|one|confirmation|security|backup|recovery|reset|activation|temporary|secret|pairing|text|unique|special)$/;
+  // Le cose che un codice apre sono poche e si riconoscono: il loro codice è un segreto anche col nome comune davanti
+  // («Il codice del cancello è 4829», «Codice di ritiro: 640385»). «Porta» conta solo come nome del codice: è anche un verbo.
+  const APRE = /\b(?:cancell(?:o|i|etto)|portone|ingresso|entrata|citofono|cassaforte|casseforti|cassett[ae]\s+(?:delle\s+)?chiavi|keybox|lockbox|key\s?safe|lucchett[oi]|serratur[ae]|allarm[ei]|antifurto|ritir(?:o|are)|preliev(?:o|i|are)|armadiett[oi]|locker|wi-?fi|wlan|dispositiv[oi]|device|garage|gate|door|safe|alarm|pick-?up|withdrawal|keypad)\b/i;
   const etichettaDiUnIdentificativo = (prima) => {
     const m = ETICHETTA_IT.exec(prima) || ETICHETTA_EN.exec(prima);
-    return !!m && !RESTA_UN_CODICE.test(m[1]) && !SEGNO_FORTE.test(m[1]);
+    return !!m && !RESTA_UN_CODICE.test(m[1]) && !SEGNO_FORTE.test(m[1]) && !APRE.test(m[1]) && !/^port[ae]$/.test(m[1]);
   };
+  // Il valore sulla riga sotto si cerca solo per un codice che non ha già il suo numero sulla sua riga, dopo di lui:
+  // in «Codice evento | 739204» la riga sotto è un altro dato. Un pezzo di telefono o un anno non sono il suo numero.
+  const haGiaIlNumero = (resto) => [...resto.matchAll(FORMA_CODICE)].some((m) => {
+    if (!m[2] && ANNO.test(m[4])) return false;
+    const prima = resto.slice(0, m.index);
+    return !/(?:\+|\d)[ .]?$/.test(prima) && !FINE_DI_UN_NUMERO.test(prima);
+  });
   function codiciVicini(s, out) {
     const righe = s.split('\n');
     const frasi = (riga) => riga.split(/(?<=[.!?;])\s+(?=[A-ZÀ-Ý«"])|[|\t]/);
