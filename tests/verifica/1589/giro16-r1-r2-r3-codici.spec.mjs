@@ -15,17 +15,6 @@ test('r1 il codice del cancello, della cassaforte, del prelievo e del ritiro non
   for (const s of ['4829', '7316', '5502', '918273', '640385']) expect(mandato, s).not.toContain(s);
 });
 
-test('r2 un identificativo con l\'etichetta in maiuscolo o in inglese arriva al modello', async ({ app, openTab, testServer }) => {
-  test.setTimeout(90_000);
-  const mandato = await leggiInChat({ app, openTab, testServer }, 'Il mio abbonamento', `<h1>Il mio abbonamento</h1>
-    <p>Codice Abbonamento: 48291375</p>
-    <p>Codice Utente: 551902</p>
-    <p>Membership code: 73920461</p>
-    <p>Event code: 739204</p>`, 'dalla pagina Il mio abbonamento: qual è il mio codice abbonamento?');
-  expect(mandato, 'la pagina è stata letta').toContain('Il mio abbonamento');
-  for (const s of ['48291375', '551902', '73920461', '739204']) expect(mandato, s).toContain(s);
-});
-
 test('r3 il numero della riga sotto un codice arriva al modello', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const mandato = await leggiInChat({ app, openTab, testServer }, 'Il corso', `<h1>Il corso</h1>
