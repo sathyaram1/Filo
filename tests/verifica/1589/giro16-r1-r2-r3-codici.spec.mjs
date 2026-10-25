@@ -1,5 +1,5 @@
 // Verifica #1589 giro 16. r1: un codice che apre qualcosa (cancello, cassaforte, prelievo, ritiro) arriva al modello.
-// r2: un identificativo con l'etichetta in maiuscolo o in inglese sparisce. r3: un numero sulla riga sotto un codice sparisce.
+// r3: un numero sulla riga sotto un codice sparisce.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { leggiInChat } from './giro16-aiuto.mjs';
 
