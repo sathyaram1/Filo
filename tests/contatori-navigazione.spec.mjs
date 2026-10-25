@@ -95,6 +95,37 @@ test('una pagina d’errore conta il codice di Chromium; «Riprova» e la ricari
   for (const x of ['mario', 'conto', String(porta)]) expect(tutto).not.toContain(x);
 });
 
+test('un «Riprova» che non arriva al sito (resta appeso, o diventa uno scaricamento) e poi Indietro non è riuscito', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await openTab(testServer.html('<!doctype html><title>partenza</title><p id="partenza">partenza</p>'));
+  const id = await schedaDavanti(app);
+  const indietro = () => app.evaluate(({ BrowserWindow }, i) => {
+    BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.goBack(i);
+  }, id);
+  const spento = await server(pagina('x'));
+  const porta = spento.porta;
+  await spento.chiudi();
+  const url = `http://127.0.0.1:${porta}/pagina`;
+  for (const risponde of [() => {}, (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="a.bin"' });
+    res.end('dati');
+  }]) {
+    await naviga(app, id, url);
+    await expect(page.locator('#err-retry')).toBeVisible({ timeout: 15_000 });
+    const s = await server(risponde, porta);
+    try {
+      await page.locator('#err-retry').click({ noWaitAfter: true });
+      await page.waitForTimeout(1500);
+      await indietro();
+      await expect(page.locator('#partenza')).toBeVisible({ timeout: 15_000 });
+      await page.waitForTimeout(1000);
+      expect(((await voce(app, 'navRiprove', '-102')) || [0, 0])[0]).toBe(0);
+    } finally {
+      await s.chiudi();
+    }
+  }
+});
+
 test('la pagina «Sei offline» che si riapre da sola al ritorno della rete non è un «Riprova» premuto', async ({ app, openTab, testServer }) => {
   const page = await openTab(testServer.html('<!doctype html><title>partenza</title><p>partenza</p>'));
   const bersaglio = testServer.html('<!doctype html><title>tornato</title><p id="ok">tornato</p>');
