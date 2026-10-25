@@ -359,7 +359,7 @@
   function chiaviInChiaro(s, out) {
     passwordDiComando(s, out);
     // Col ritorno a capo in testa: dentro un JSON la «n» di «\n» toccherebbe il corpo, e il segnaposto cerca una parola intera.
-    for (const m of s.matchAll(CORPO_PEM)) out.push({ valore: m[1], regola: 'chiave' });
+    for (const re of [CORPO_PEM, CORPO_PUTTY]) for (const m of s.matchAll(re)) out.push({ valore: m[1], regola: 'chiave' });
     for (const m of s.matchAll(TOKEN_TELEGRAM)) out.push({ valore: m[0], regola: 'token' });
     for (const m of s.matchAll(SEGRETO_ACCANTO)) {
       const v = formaDiSegreto(m[1].replace(/[.»”"']+$/, ''));
