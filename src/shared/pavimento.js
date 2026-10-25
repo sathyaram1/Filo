@@ -34,7 +34,7 @@
   // L'etichetta che dice di che cosa è il codice, subito prima del numero («Codice abbonamento: 4829», «Il codice del
   // corso è 4829», «event code 4829»): un nome comune qualunque lo fa un identificativo, senza elencarli. Restano codici
   // il nome di un servizio («Telegram code», «codice Amazon») e le parole del monouso qui sotto.
-  const ETICHETTA_IT = /\b[Cc]odic[ei]\s+(?:d(?:i|el|ella|ello|ei|egli|elle|ell['’])\s*)?([a-zà-ÿ]{3,})\s*(?:[:=#]|\bè\b|\bn\.?|\bnr\.?)?\s*$/;
+  const ETICHETTA_IT = /\b[Cc]odic[ei]\s+(?:d(?:i|el|ella|ello|ei|egli|elle|ell['’])\s*)?([a-zà-ÿ]{3,})\s*(?:[:=#]|è|\bn\.?|\bnr\.?)?\s*$/;
   const ETICHETTA_EN = /\b([a-z][a-z-]{2,})\s+codes?\s*(?:[:=#]|\bis\b|\bno\.?)?\s*$/;
   const RESTA_UN_CODICE = /^(?:conferm\w*|sicurezza|temporane\w*|provvisori\w*|segret\w*|personal\w*|attivazion\w*|recupero|ripristino|emergenza|associazion\w*|abbinament\w*|ricevut\w*|inviat\w*|numeric\w*|nuovo|seguente|unico|sms|email|mail|your|the|my|this|that|our|its|new|same|following|above|below|one|confirmation|security|backup|recovery|reset|activation|temporary|secret|pairing|text|unique|special)$/;
   const etichettaDiUnIdentificativo = (prima) => {
@@ -66,7 +66,8 @@
             // A coppie («48-29-13») somiglia a una data: conta solo dove la frase parla di entrare.
             if (/^\d\d-/.test(v) && !forte) continue;
             if (!nome && !(m[1] || m[3] || INTRODOTTO.test(z.slice(0, m.index)))) continue;
-            if (nome && !forte && etichettaDiUnIdentificativo(z === frase ? z.slice(0, m.index) : frase)) continue;
+            const prima = z.slice(0, m.index);
+            if (nome && !forte && etichettaDiUnIdentificativo(z === frase || prima.trim() ? prima : frase)) continue;
             // Un pezzo di un numero più lungo («+39 333 1234567», «Chiama 02 4829 1736») è un telefono, non il codice;
             // così le cifre finali di un numero coperto o annunciate come tali («al ***4567», «che termina con 4567»).
             if (/(?:\+|\d)[ .]?$/.test(z.slice(0, m.index)) || FINE_DI_UN_NUMERO.test(z.slice(0, m.index))) continue;

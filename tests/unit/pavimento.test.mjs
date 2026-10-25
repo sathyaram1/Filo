@@ -357,3 +357,26 @@ test('le etichette, i tempi e il codice accanto a una chiave password e le cifre
     'Codice di verifica: 482913. Inviato al numero che termina con 4567': '482913' })) assert.ok(!P.oscura(t).includes(s), t);
   assert.ok(P.oscura('Codice di verifica: 482913. Inviato al numero che termina con 4567').endsWith('termina con 4567'));
 });
+
+// Il nome comune subito prima del numero lo fa un identificativo, senza elencarli; il servizio o il monouso no.
+test('il numero di un «codice di qualcosa» resta; quello del codice di un servizio o temporaneo no', () => {
+  for (const t of ['Codice abbonamento 48291375', 'Il tuo codice utente è 551902', 'Codice evento 739204', 'Il codice del corso è 4829',
+    'Il codice dell\'esame è 48291', 'Codice aula 1203', 'Codice paziente 482913', 'Codice abbonamento\n48291375', 'The event code is 4829',
+    'Codice abbonamento 48291375\nIl tuo codice utente è 551902']) {
+    assert.equal(P.oscura(t), t, t);
+  }
+  for (const [t, s] of [['Codice temporaneo: 482913', '482913'], ['Inserisci il codice ricevuto via SMS: 482913', '482913'],
+    ['your code is 482913', '482913'], ['backup code: 48291736', '48291736'], ['Il tuo codice segreto è 48291', '48291'],
+    ['Codice evento 739204 per accedere alla sala', '739204'], ['Il codice SMS è 482913', '482913']]) {
+    assert.ok(!P.oscura(t).includes(s), t);
+  }
+});
+
+test('il corpo di una chiave privata PGP e di una chiave PuTTY non esce', () => {
+  const pgp = '-----BEGIN PGP PRIVATE KEY BLOCK-----\nVersion: GnuPG v2\n\nlQOYBF3jN2kBCAC5q8xR2vT7mN4pK9wL3sA1dF6gH8jZ0cX2vB5nM7qW4eR9tY1u\n=Ab3x\n-----END PGP PRIVATE KEY BLOCK-----';
+  assert.ok(!P.oscura(pgp).includes('lQOYBF3jN2kBCAC5q8xR2vT7mN4pK9wL3sA1dF6gH8jZ0cX2vB5nM7qW4eR9tY1u'));
+  const ppk = 'PuTTY-User-Key-File-3: ssh-ed25519\nEncryption: none\nPublic-Lines: 1\nAAAAC3NzaC1lZDI1NTE5AAAAIOgJ8X2vB5nM7qW4eR9tY1u\nPrivate-Lines: 1\nAAAAIFq8xR2vT7mN4pK9wL3sA1dF6gH8jZ0cX2vB5nM7qW4eR9tY1uLqW3eR5\nPrivate-MAC: 8f14e45f';
+  const t = P.oscura(ppk);
+  assert.ok(!t.includes('AAAAIFq8xR2vT7mN4pK9wL3sA1dF6gH8jZ0cX2vB5nM7qW4eR9tY1uLqW3eR5'));
+  assert.ok(t.includes('AAAAC3NzaC1lZDI1NTE5AAAAIOgJ8X2vB5nM7qW4eR9tY1u'), 'la parte pubblica resta');
+});
