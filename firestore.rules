@@ -167,8 +167,13 @@ service cloud.firestore {
       return u is string && u.size() <= 2000
         && u.matches('^https://firebasestorage[.]googleapis[.]com/v0/b/filo-8b9cb[.]firebasestorage[.]app/o/feedback%2F(agent_)?[0-9]{10,17}_[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}[.][a-z0-9]{1,12}[?]alt=media&token=[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
     }
+    // Una voce di `files[]` porta solo ciò che scrive il caricatore (url, nome, tipo): le routine la ricevono,
+    // e un campo in più sarebbe testo che i giudici non hanno visto (#1515). Tetti: SN_FEEDBACK.VOCE_DOCUMENTO.
     function documentoAllegato(f) {
-      return f is map && indirizzoAllegato(f.get('url', ''));
+      return f is map && f.keys().hasOnly(['url', 'name', 'type'])
+        && indirizzoAllegato(f.get('url', ''))
+        && f.get('name', '') is string && f.get('name', '').size() <= 500
+        && f.get('type', '') is string && f.get('type', '').size() <= 255;
     }
     // Le regole non hanno cicli: una riga per posto, fino al tetto di 5.
     function immaginiValide(l) {
@@ -367,7 +372,8 @@ service cloud.firestore {
       // tests/unit/firestoreRulesFiducia.test.mjs.
       allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
         && waitsForValido(request.resource.data)
-        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo'])
+        // `inCoda` (#1515): il segno che la coda delle routine legge. Lo scrive solo il server, a ogni cambio di stato.
+        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda'])
         && bigliettoLocaleValido(request.resource.data)
         && immaginiValide(request.resource.data.get('images', []))
         && documentiValidi(request.resource.data.get('files', []))
@@ -952,7 +958,8 @@ service cloud.firestore {
     // tests/unit/firestoreRulesContatori.test.mjs confronta tutto con l'app: una funzione nuova va aggiunta e
     // ripubblicata, o le ore che la portano restano in attesa; una tolta dall'app RESTA, le copie vecchie la mandano.
     // Legge solo l'admin.
-    // Le funzioni contate e il controllo delle mappe a chiavi chiuse servono alle ore e alle loro chiamate.
+    // Le funzioni contate e il controllo delle mappe, a chiavi chiuse o a forma, servono alle ore, alle loro chiamate
+    // e ai loro gesti.
     function funzioniContate() {
       return [
         'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
@@ -966,6 +973,10 @@ service cloud.firestore {
     }
     function chiuse(m, chiavi, tetto, valori) {
       return m is map && m.keys().hasOnly(chiavi)
+        && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori);
+    }
+    function aForma(m, chiavi, tettoChiavi, tetto, valori) {
+      return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
         && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori);
     }
     match /contatori-giornalieri/{docId} {
@@ -986,10 +997,6 @@ service cloud.firestore {
           && d.errori is map && d.errori.keys().hasOnly(funzioniContate())
           && d.errori.values().join('#').size() <= 600000
           && d.errori.values().join('#').matches('^([a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*)*)?$');
-      }
-      function aForma(m, chiavi, tettoChiavi, tetto, valori) {
-        return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
-          && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori);
       }
       // Pseudonimo, giorno, ora, versione, sistema e segno del primo documento: uguali per le ore v2 e v3.
       function testaOra(d) {
@@ -1125,6 +1132,44 @@ service cloud.firestore {
       }
       allow get, list: if isAdmin();
       allow create: if contatoriFinestra(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ── I gesti della personalizzazione dei contatori (#1471) ────────────────
+    //
+    // Per ogni ora di contatori che ne ha, cosa si sposta, si trascina e si rimette: le pose delle icone fra barra e
+    // tasto destro, se le zone sono come di serie, il riquadro «Altro…», le aperture della barra laterale, il nome
+    // letto su un'icona, le carte e il riquadro di sistema della home, i moduli dell'Editor, i ripristini, gli
+    // «annulla» sui cambi e i trascinamenti (origine e destinazione, mai il contenuto). Stesso pseudonimo, stessa ora e
+    // stesso id dell'ora, in un documento a parte per il tetto di espressioni. Le stesse regole: sola creazione, senza
+    // login, forma fissa, legge solo l'admin. Sentinella: tests/unit/firestoreRulesContatori.test.mjs.
+    match /contatori-gesti/{docId} {
+      function contatoriGesti(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'icona_spostata', 'disposizione_di_serie', 'altro_del_menu', 'barra_aperta', 'suggerimento_letto', 'carta_home', 'riquadro_sistema', 'modulo_editor', 'ripristino', 'annulla_cambio', 'trascinamento'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'icona_spostata', 'disposizione_di_serie', 'altro_del_menu', 'barra_aperta', 'suggerimento_letto', 'carta_home', 'riquadro_sistema', 'modulo_editor', 'ripristino', 'annulla_cambio', 'trascinamento'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && aForma(d.icona_spostata, '^([A-Za-z][A-Za-z0-9]{0,39}(#[A-Za-z][A-Za-z0-9]{0,39})*)?$', 2000, 60000, '^((primary|secondary|bar)[|](primary|secondary|bar)[|](trascina|rimessa_nel_menu|chat)[|][0-9]{1,9}(;(primary|secondary|bar)[|](primary|secondary|bar)[|](trascina|rimessa_nel_menu|chat)[|][0-9]{1,9})*(#(primary|secondary|bar)[|](primary|secondary|bar)[|](trascina|rimessa_nel_menu|chat)[|][0-9]{1,9}(;(primary|secondary|bar)[|](primary|secondary|bar)[|](trascina|rimessa_nel_menu|chat)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.disposizione_di_serie, ['primary', 'secondary', 'bar'], 20, '^((si|no)(#(si|no))*)?$')
+          && aForma(d.altro_del_menu, '^([A-Za-z][A-Za-z0-9]{0,39}(#[A-Za-z][A-Za-z0-9]{0,39})*)?$', 2000, 2000, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.barra_aperta, ['spinta', 'clic', 'tasto', 'chat', 'trascina'], 4000, '^((azione|sistema|tasto_destro|a_vuoto)[|][0-9]{1,9}[|][0-9]{1,9}(,[0-9]{1,9}){6}(;(azione|sistema|tasto_destro|a_vuoto)[|][0-9]{1,9}[|][0-9]{1,9}(,[0-9]{1,9}){6})*(#(azione|sistema|tasto_destro|a_vuoto)[|][0-9]{1,9}[|][0-9]{1,9}(,[0-9]{1,9}){6}(;(azione|sistema|tasto_destro|a_vuoto)[|][0-9]{1,9}[|][0-9]{1,9}(,[0-9]{1,9}){6})*)*)?$')
+          && aForma(d.suggerimento_letto, '^([A-Za-z][A-Za-z0-9]{0,39}(#[A-Za-z][A-Za-z0-9]{0,39})*)?$', 2000, 8000, '^((barra|menu)[|](clic|via)[|][0-9]{1,9}(;(barra|menu)[|](clic|via)[|][0-9]{1,9})*(#(barra|menu)[|](clic|via)[|][0-9]{1,9}(;(barra|menu)[|](clic|via)[|][0-9]{1,9})*)*)?$')
+          && aForma(d.carta_home, '^([A-Za-z][A-Za-z0-9]{0,39}(#[A-Za-z][A-Za-z0-9]{0,39})*)?$', 2000, 16000, '^(((mostra|aggiungi|togli|ripristina|ordina)|(sinistra|destra|altro)[|](clic|invio|tasto_destro))[|][0-9]{1,9}(;((mostra|aggiungi|togli|ripristina|ordina)|(sinistra|destra|altro)[|](clic|invio|tasto_destro))[|][0-9]{1,9})*(#((mostra|aggiungi|togli|ripristina|ordina)|(sinistra|destra|altro)[|](clic|invio|tasto_destro))[|][0-9]{1,9}(;((mostra|aggiungi|togli|ripristina|ordina)|(sinistra|destra|altro)[|](clic|invio|tasto_destro))[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.riquadro_sistema, ['ora', 'batteria', 'rete', 'bluetooth', 'volume'], 2000, '^((clic|tasto_destro|tastiera|trascina_in_chat|comando_dato)[|][0-9]{1,9}(;(clic|tasto_destro|tastiera|trascina_in_chat|comando_dato)[|][0-9]{1,9})*(#(clic|tasto_destro|tastiera|trascina_in_chat|comando_dato)[|][0-9]{1,9}(;(clic|tasto_destro|tastiera|trascina_in_chat|comando_dato)[|][0-9]{1,9})*)*)?$')
+          && aForma(d.modulo_editor, '^([a-z][a-z0-9-]{0,39}(#[a-z][a-z0-9-]{0,39})*)?$', 1000, 15000, '^(([0-9]{1,9}|((aggiunto|tolto|spostato|ridimensionato|configurato|usato|scorciatoia_si|scorciatoia_no)|(3|4|5|6|7|8|9|10|11|12)[|](4|5|6|7|8|9|10|11|12|13|14|15|16))[|][0-9]{1,9}(;((aggiunto|tolto|spostato|ridimensionato|configurato|usato|scorciatoia_si|scorciatoia_no)|(3|4|5|6|7|8|9|10|11|12)[|](4|5|6|7|8|9|10|11|12|13|14|15|16))[|][0-9]{1,9})*)(#([0-9]{1,9}|((aggiunto|tolto|spostato|ridimensionato|configurato|usato|scorciatoia_si|scorciatoia_no)|(3|4|5|6|7|8|9|10|11|12)[|](4|5|6|7|8|9|10|11|12|13|14|15|16))[|][0-9]{1,9}(;((aggiunto|tolto|spostato|ridimensionato|configurato|usato|scorciatoia_si|scorciatoia_no)|(3|4|5|6|7|8|9|10|11|12)[|](4|5|6|7|8|9|10|11|12|13|14|15|16))[|][0-9]{1,9})*))*)?$')
+          && chiuse(d.ripristino, ['token', 'tutti_token', 'tutte_impostazioni', 'colore_schede', 'tutto_colore_schede', 'carte_home', 'avanzate_viste'], 4000, '^(([0-9]{1,9}|[a-z][A-Za-z0-9._]{0,59}[|][0-9]{1,9}(;[a-z][A-Za-z0-9._]{0,59}[|][0-9]{1,9})*)(#([0-9]{1,9}|[a-z][A-Za-z0-9._]{0,59}[|][0-9]{1,9}(;[a-z][A-Za-z0-9._]{0,59}[|][0-9]{1,9})*))*)?$')
+          && aForma(d.annulla_cambio, '^([A-Za-z0-9_.*-]{1,80}(#[A-Za-z0-9_.*-]{1,80})*)?$', 15000, 250000, '^((chat|assistente|interfaccia|pagina|importazione|filo|altro)[|](s10|m1|m10|h1|oltre)[|][0-9]{1,9}(;(chat|assistente|interfaccia|pagina|importazione|filo|altro)[|](s10|m1|m10|h1|oltre)[|][0-9]{1,9})*(#(chat|assistente|interfaccia|pagina|importazione|filo|altro)[|](s10|m1|m10|h1|oltre)[|][0-9]{1,9}(;(chat|assistente|interfaccia|pagina|importazione|filo|altro)[|](s10|m1|m10|h1|oltre)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.trascinamento, ['carta_home', 'voce_sistema', 'file_da_chat', 'pagina_salvata', 'icona_barra', 'icona_menu', 'scheda', 'modulo_editor', 'palette_editor', 'testo_pagina', 'file_disco', 'immagine'], 25000, '^((chat_home|chat_aiuto|chat_modulo_editor|colonna_home|altro_home|barra|riga_menu|altro_menu|striscia_schede|griglia_editor|campo_feedback|nessuna)[|](posato|annullato)[|][0-9]{1,9}(;(chat_home|chat_aiuto|chat_modulo_editor|colonna_home|altro_home|barra|riga_menu|altro_menu|striscia_schede|griglia_editor|campo_feedback|nessuna)[|](posato|annullato)[|][0-9]{1,9})*(#(chat_home|chat_aiuto|chat_modulo_editor|colonna_home|altro_home|barra|riga_menu|altro_menu|striscia_schede|griglia_editor|campo_feedback|nessuna)[|](posato|annullato)[|][0-9]{1,9}(;(chat_home|chat_aiuto|chat_modulo_editor|colonna_home|altro_home|barra|riga_menu|altro_menu|striscia_schede|griglia_editor|campo_feedback|nessuna)[|](posato|annullato)[|][0-9]{1,9})*)*)?$');
+      }
+      allow get, list: if isAdmin();
+      allow create: if contatoriGesti(request.resource.data);
       allow update, delete: if false;
     }
 

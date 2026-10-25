@@ -83,7 +83,7 @@
       base: [FIRESTORE],
       quando: 'avvio',
       occasione: 'ogni ora, a Filo aperto: i numeri dell\'ora prima, e di quelle rimaste indietro; a contatori spenti, niente',
-      riceve: 'per funzione e per azione usi e attese in fasce, impostazioni cambiate, ricerche nei pannelli, proposte del correttore, conferme, annulli, anticipi, errori visti, scelte dell\'intervista, prime volte del mese, chiamate fallite per modello, host e tipo, versione e famiglia del sistema, con uno pseudonimo che cambia ogni mese; mai testi, indirizzi o nomi di file',
+      riceve: 'per funzione e per azione usi e attese in fasce, impostazioni cambiate, ricerche nei pannelli, proposte del correttore, conferme, annulli, anticipi, errori visti, scelte dell\'intervista, prime volte del mese, chiamate fallite per modello, host e tipo, gesti della personalizzazione e trascinamenti (da dove a dove, mai cosa), versione e famiglia del sistema, con uno pseudonimo che cambia ogni mese; mai testi, indirizzi o nomi di file',
       frase: 'Ogni ora Filo manda al server i numeri dell\'ora prima',
       dove: ['src/main/services/contatori.js'], prova: 'C.COLLEZIONE',
     },

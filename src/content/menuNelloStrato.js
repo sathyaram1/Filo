@@ -270,7 +270,14 @@
   // Un'icona portata dalla barra laterale sopra il menu aperto (#871): il gesto è della barra, lo strato la posa.
   Menu.trascinaDaFuori = (d) => {
     if (!acceso()) return locale.trascinaDaFuori(d);
-    if (!corrente || !d) return false;
+    if (!d) return false;
+    // Nessun menu aperto: l'icona lasciata qui dalla barra non va da nessuna parte (#1471), come nella pagina.
+    if (!corrente) {
+      if (d.fase === 'rilascia') {
+        try { global.SN_POPUP?.conta?.({ misura: 'gesto', gesto: 'trascinamento', da: 'icona_barra', a: 'nessuna', esito: 'annullato' }); } catch (_) {}
+      }
+      return false;
+    }
     aggiorna(corrente, 'fuori', {
       fase: String(d.fase || ''), icona: String(d.id || ''), x: Number(d.x) || 0, y: Number(d.y) || 0,
       svg: typeof d.icon === 'string' ? d.icon : '',

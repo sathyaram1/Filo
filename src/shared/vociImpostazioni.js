@@ -104,6 +104,7 @@
         TTS_VOICES: 'legge le voci installate per riempire il menu: non salva niente',
         OPEN_URL: 'apre una pagina collegata: non salva niente',
         REGISTRA_TASTI: 'lascia arrivare alla pagina i tasti premuti mentre si registra una scorciatoia: dalla chat la combinazione si scrive (scorciatoia)',
+        CONTATORI_EVENTO: 'conta per i contatori anonimi cosa si rimette di serie (#1471): non salva niente e non legge impostazioni',
       },
     },
     security: {

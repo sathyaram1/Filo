@@ -748,6 +748,11 @@
     let toIndex = nodes.indexOf(d.el);
     if (toIndex < 0) toIndex = nodes.map((x) => x.dataset.id).indexOf(d.id);
     if (toIndex >= 0) api.tabs.move(d.id, toIndex);
+    // Una scheda trascinata nella striscia, per i contatori (#1471): dove è finita, mai quale.
+    try {
+      Promise.resolve(api.message({ type: 'contatori_evento', misura: 'gesto', gesto: 'trascinamento', da: 'scheda',
+        a: toIndex >= 0 ? 'striscia_schede' : 'nessuna', esito: toIndex >= 0 ? 'posato' : 'annullato' })).catch(() => {});
+    } catch (_) {}
   }
 
   // Un clic arriva solo se pressione e rilascio cadono sullo stesso nodo: se un aggiornamento ricrea la

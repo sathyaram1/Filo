@@ -1,6 +1,6 @@
-// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1464, #1466): le collezioni sono a sola creazione, lette
+// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1464, #1466, #1471): le collezioni sono a sola creazione, lette
 // solo dall'admin, e la forma che accettano è quella che l'app costruisce: le ore (v3, più le v2 e i giorni v1 delle copie
-// vecchie) e le chiamate ai modelli di un'ora. Il motore vero la prova contatoriRegole.motore-vero.mjs; questa rilegge il file.
+// vecchie), le chiamate ai modelli e i gesti di un'ora. Il motore vero la prova contatoriRegole.motore-vero.mjs; questa rilegge il file.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +14,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
 
-for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'contatoriGiornalieri']) {
+for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi',
+  'disposizioneIcone', 'carteHome', 'themeTokens', 'tabColor', 'contatoriGiornalieri']) {
   require(join(ROOT, 'src', 'shared', `${f}.js`));
 }
 const C = globalThis.SN_CONTATORI;
@@ -31,6 +32,7 @@ function blocco(collezione) {
 }
 const B = blocco(C.COLLEZIONE);
 const BC = blocco(C.COLLEZIONE_CHIAMATE);
+const BG = blocco(C.COLLEZIONE_GESTI);
 // Le funzioni che le ore e le loro chiamate condividono stanno fra l'intestazione dei contatori e il blocco delle ore.
 const CONDIVISE = (() => {
   const a = RULES.indexOf('    // ── I contatori anonimi');
@@ -38,7 +40,7 @@ const CONDIVISE = (() => {
   assert.ok(a >= 0 && b > a, 'le funzioni condivise dei contatori stanno prima del blocco delle ore');
   return senzaCommenti(RULES.slice(a, b));
 })();
-const TUTTO = [CONDIVISE, B, BC].join('\n');
+const TUTTO = [CONDIVISE, B, BC, BG].join('\n');
 
 // Il corpo di una funzione delle regole, coi `let` già sostituiti dove sono usati: la rilettura vede quello che si valuta.
 function corpo(nome) {
@@ -57,6 +59,7 @@ const CHIAMATE = corpo('contatoriChiamate');
 const ORA3 = corpo('contatoriOra3');
 const TESTA = corpo('testaOra');
 const MISURE_ORA = corpo('misureOra');
+const GESTI = corpo('contatoriGesti');
 
 function regole(testo) {
   const out = [];
@@ -310,7 +313,7 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
 });
 
 test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l’id dice pseudonimo, giorno e ora', () => {
-  for (const testo of [GIORNO, TESTA, CHIAMATE]) {
+  for (const testo of [GIORNO, TESTA, CHIAMATE, GESTI]) {
     const pattern = (campo) => {
       const m = new RegExp(`d\\.${campo}\\.matches\\('([^']+)'\\)`).exec(testo);
       assert.ok(m, `manca il controllo di forma su ${campo}`);
@@ -328,7 +331,7 @@ test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l
     assert.deepEqual(stringhe(os[1]), [...C.OS]);
   }
   assert.match(GIORNO, /docId == d\.pseudonimo \+ '_' \+ d\.giorno &&/);
-  for (const testo of [TESTA, CHIAMATE]) {
+  for (const testo of [TESTA, CHIAMATE, GESTI]) {
     assert.match(testo, /docId == d\.pseudonimo \+ '_' \+ d\.giorno \+ '_' \+ d\.ora/);
     const ora = /d\.ora is string && d\.ora\.matches\('([^']+)'\)/.exec(testo);
     assert.ok(ora);
@@ -422,4 +425,85 @@ test('nessuna espressione regolare del blocco passa i 4096 caratteri che le rego
 test('le due funzioni di controllo delle mappe sono quelle che si credono', () => {
   assert.equal(corpo('chiuse'), "m is map && m.keys().hasOnly(chiavi) && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori)");
   assert.equal(corpo('aForma'), "m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi) && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori)");
+});
+
+// ── I gesti della personalizzazione di un'ora (#1471) ─────────────────────
+function misureGesti(testo) {
+  const out = misureChiuse(testo);
+  for (const m of testo.matchAll(/aForma\(d\.(\w+), '([^']+)', (\d+), (\d+), '([^']+)'\)/g)) {
+    out[m[1]] = { formaChiavi: m[2], tettoChiavi: Number(m[3]), tetto: Number(m[4]), valori: m[5] };
+  }
+  return out;
+}
+const MG = misureGesti(GESTI);
+
+// L'ora più carica: ogni voce di ogni chiave di ogni misura, ai conti più alti.
+function gestiPieni() {
+  const ora = C.oraVuota();
+  for (const c of C.MISURE_GESTI) {
+    if (c === 'barra_aperta') {
+      for (const m of C.MOTIVI_BARRA) {
+        ora[c][m] = Object.fromEntries(C.ESITI_BARRA.map((e) => [e, { n: 999999999, fasce: Object.fromEntries(C.NOMI_FASCE.map((f) => [f, 142857142])) }]));
+      }
+    } else if (c === 'disposizione_di_serie') ora[c] = { primary: 'no', secondary: 'no', bar: 'no' };
+    else for (const k of C.chiaviGesto(c)) ora[c][k] = Object.fromEntries(C.vociGesto(c, k).map((v) => [v, 999999999]));
+  }
+  return C.documentoGesti({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'win', dati: ora });
+}
+
+test('i gesti: sola creazione, letti dall’admin, coi campi e la versione dell’app e lo stesso id dell’ora', () => {
+  const RG = regole(BG);
+  assert.deepEqual(per('get', RG).map((r) => r.cond), ['isAdmin()']);
+  assert.deepEqual(per('list', RG).map((r) => r.cond), ['isAdmin()']);
+  assert.ok(!per('read', RG).length && !per('write', RG).length);
+  for (const v of ['update', 'delete']) assert.ok(per(v, RG).length >= 1 && per(v, RG).every((r) => r.cond === 'false'));
+  assert.deepEqual(per('create', RG).map((r) => r.cond), ['contatoriGesti(request.resource.data)']);
+  assert.deepEqual(elencoDopo(GESTI, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_GESTI]);
+  assert.deepEqual(elencoDopo(GESTI, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_GESTI]);
+  assert.equal(Number(/d\.v == (\d+)/.exec(GESTI)[1]), C.VERSIONE_GESTI);
+  const doc = C.documentoGesti({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.249', os: 'win', dati: C.oraVuota() });
+  assert.deepEqual(Object.keys(doc), [...C.CAMPI_GESTI]);
+  assert.equal(C.idDocumento(doc), `${'a'.repeat(20)}_2026-10-15_09`, 'lo stesso id della sua ora');
+  assert.equal(C.senzaGesti(doc), true, 'un’ora senza gesti non ha il terzo documento');
+});
+
+test('i gesti: chiavi e valori di ogni misura hanno la forma dell’app, e il documento più carico passa', () => {
+  assert.deepEqual(Object.keys(MG).sort(), [...C.MISURE_GESTI].sort(), 'ogni misura ha il suo controllo, e nessuna in più');
+  for (const c of C.MISURE_GESTI) {
+    const chiavi = C.CHIAVI_GESTI[c];
+    if (Array.isArray(chiavi)) assert.deepEqual(MG[c].chiavi, [...chiavi], `${c}: le chiavi chiuse sono l’elenco dell’app`);
+    else assert.equal(MG[c].formaChiavi, unite(chiavi), `${c}: la forma delle chiavi è quella dell’app`);
+    assert.equal(MG[c].valori, unite(C.FORME_GESTI[c]), `forma dei valori di ${c}`);
+    // Ogni chiave che l'app può scrivere entra nella forma delle regole.
+    if (!Array.isArray(chiavi)) for (const k of C.chiaviGesto(c)) assert.match(k, new RegExp(chiavi), `${c}: «${k}»`);
+  }
+  const doc = gestiPieni();
+  assert.equal(C.validaGesti(doc).ok, true, C.validaGesti(doc).motivo);
+  assert.equal(passa(doc, MG), '', 'i gesti più carichi dell’app devono passare le regole');
+  const totale = Object.values(MG).reduce((a, r) => a + r.tetto + (r.tettoChiavi || 0), 0);
+  assert.ok(totale <= 1000000, `i tetti dei gesti sommano ${totale}: oltre, un documento passerebbe il limite di Firestore (1 MiB)`);
+  assert.ok(JSON.stringify(doc).length < 1000000);
+  const vuoto = C.documentoGesti({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T00', app: '0.2.249', os: 'win', dati: C.oraVuota() });
+  assert.equal(passa(vuoto, MG), '');
+  const manomesso = (campo, v) => passa({ ...doc, [campo]: v }, MG);
+  assert.notEqual(manomesso('trascinamento', { carta_home: 'chat_home|posato|1;Ciao Mario, ecco il file|1' }), '');
+  assert.notEqual(manomesso('trascinamento', { 'appunti di mario': 'chat_home|posato|1' }), '', 'un’origine fuori elenco');
+  assert.notEqual(manomesso('icona_spostata', { 'mario rossi': 'bar|primary|trascina|1' }), '', 'una chiave con uno spazio');
+  assert.notEqual(manomesso('carta_home', { editor: 'spostata in alto|1' }), '');
+  assert.notEqual(manomesso('ripristino', { token: 'rosso fuoco|1' }), '', 'il valore di un token non esce');
+  assert.notEqual(manomesso('annulla_cambio', { 'https://mario.it': 'chat|m1|1' }), '', 'un indirizzo come chiave');
+  assert.notEqual(manomesso('modulo_editor', { griglia: '20|30|1' }), '', 'una griglia fuori dai numeri chiusi');
+  assert.notEqual(manomesso('disposizione_di_serie', { bar: 'forse' }), '');
+  assert.notEqual(manomesso('barra_aperta', { spinta: { n: 1 } }), '', 'una mappa al posto della stringa non si unisce');
+  for (const k of ['mario rossi', 'https://x.it/a', 'relazione finale.docx', '<script>', 'ciao, come stai']) {
+    for (const c of C.MISURE_GESTI.filter((x) => !Array.isArray(C.CHIAVI_GESTI[x]))) {
+      assert.ok(!new RegExp(C.CHIAVI_GESTI[c]).test(k), `${c}: «${k}» passerebbe le regole`);
+    }
+  }
+});
+
+test('le funzioni di controllo delle mappe stanno fra quelle comuni: ore, chiamate e gesti le usano tutte', () => {
+  assert.match(CONDIVISE, /function chiuse\(/);
+  assert.match(CONDIVISE, /function aForma\(/);
+  assert.equal((TUTTO.match(/function aForma\(/g) || []).length, 1, 'una regola sola, in un posto');
 });

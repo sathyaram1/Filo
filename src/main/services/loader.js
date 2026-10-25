@@ -6,6 +6,8 @@ const path = require('node:path');
 const SHARED = path.join(__dirname, '..', '..', 'shared');
 const SVC = __dirname;
 
+// La politica sui modelli (#1520): constants.js la riespone, il server la incorpora col bake.
+require(path.join(SHARED, 'politicaModelli.js'));
 require(path.join(SHARED, 'constants.js'));
 // #593 — la porta unica da cui passa il contenuto esterno (pagina, ricerca
 // web, percorsi di altri) prima di entrare in un prompt. Va PRIMA di chi la
@@ -34,6 +36,7 @@ require(path.join(SHARED, 'modelCaps.js'));
 require(path.join(SHARED, 'modelUsage.js'));
 require(path.join(SHARED, 'contatoriGiornalieri.js')); // #969 — i contatori giornalieri: elenchi chiusi e forma del documento
 require(path.join(SHARED, 'contatoriFinestra.js')); // #1470 — i contatori della finestra, dopo quelli che ne danno gli errori
+require(path.join(SHARED, 'gestiContati.js')); // #1471 — i gesti contati: segno dei trascinamenti, nome letto su un'icona
 // Elenco delle funzioni impostabili + le loro etichette: serve al main per
 // chiamare una funzione scoperta con lo STESSO nome che l'utente legge nelle
 // Opzioni (il messaggio d'errore gli dice di andare lì). Il modulo tocca il DOM
@@ -105,6 +108,7 @@ require(path.join(SHARED, 'campoNumero.js'));
 require(path.join(SHARED, 'routineSessioni.js'));
 require(path.join(SHARED, 'routineCrediti.js'));  // #1356 — i numeri dell'owner sui crediti: stesse regole in pagina e nel main
 require(path.join(SHARED, 'routineModelli.js'));  // #1193 — modello e sforzo per fase: stesse regole in pagina e nel main
+require(path.join(SHARED, 'spesaGiudici.js'));  // #1515 — tetto di spesa dei giudici: stesse regole in pagina e nel main
 require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
 // #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
 // Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).

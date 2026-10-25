@@ -3595,7 +3595,7 @@ async function eseguiAzioneFilo(action, {
         }
         const incognito = !!winOf(sender)?._filoIncognito;
         const layout = await require('./layoutIcone').posa(
-          { id, target: D.DOVE[dove], beforeId: D.noto(prima) && prima !== id ? prima : null }, { incognito });
+          { id, target: D.DOVE[dove], beforeId: D.noto(prima) && prima !== id ? prima : null }, { incognito, via: 'chat' });
         if (!layout) return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
         // La riga del tasto destro ha sei posti: chi ci entra per ultimo può spingerne fuori un'altra.
         const finita = ['bar', 'primary', 'secondary'].find((z) => layout[z].includes(id));
@@ -6302,7 +6302,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
   else if (verso === 'giu') dove = Math.min(ordine.length, at + 1);
   else return no('verso sconosciuto');
   ordine.splice(dove, 0, v.chiave);
-  const esito = await Carte.modifica({ tipo: 'ordina-sinistra', ordine });
+  const esito = await Carte.modifica({ tipo: 'ordina-sinistra', ordine, chiave: v.chiave });
   if (esito.errore) return no(esito.errore);
   if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
   return { executed: true, kept: true, output: { spostata: v.titolo, sinistra: elenco(ordinaCome(sx, esito.layout)) } };
@@ -7499,7 +7499,8 @@ Registro.collega({
     return false;
   },
   annuncia: (ids) => broadcastToFiloPages({ type: MSG.CAMBI_AGGIORNATI, ids }),
-  annullato: (ids) => contaSe('cambioAnnullato', ids),
+  // `evento`: il cambio su cui si è premuto «annulla», per i contatori dei ripensamenti (#1471).
+  annullato: (ids, evento) => { contaSe('cambioAnnullato', ids); contaSe('cambioRitirato', evento); },
 });
 Registro.avvia();
 

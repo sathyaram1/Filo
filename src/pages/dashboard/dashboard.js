@@ -1785,6 +1785,11 @@
     inputEl.focus();
     return true;
   }
+  // Da dove veniva e se è servito, per i contatori (#1471): mai cosa porta. Sul campo e fuori conta uguale.
+  const contaNellaChat = (dt, usato) => {
+    const ev = self.SN_GESTI && self.SN_GESTI.rilascio(dt, 'chat_home', usato);
+    if (ev) send({ type: MSG.CONTATORI_EVENTO, ...ev });
+  };
   // Fuori dal campo il rilascio va alla chat se nessun altro lo vuole (#1623), e finché si trascina il campo si accende:
   // si vede dove andrà a finire.
   const portaFile = (dt) => { const t = Array.from(dt?.types || []); return t.includes('Files') || t.includes('application/x-filo-file'); };
@@ -1802,7 +1807,7 @@
     spegniBersaglio();
     if (e.defaultPrevented || !portaFile(e.dataTransfer)) return;
     e.preventDefault();
-    fileNelCampo(e.dataTransfer);
+    if (fileNelCampo(e.dataTransfer)) contaNellaChat(e.dataTransfer, true);
   });
   inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
   // Un file diventa un allegato; un testo trascinato (una voce della colonna destra, una frase da
@@ -1810,8 +1815,9 @@
   // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
-    if (fileNelCampo(e.dataTransfer)) return;
+    if (fileNelCampo(e.dataTransfer)) { contaNellaChat(e.dataTransfer, true); return; }
     const testo = e.dataTransfer?.getData('text/plain') || '';
+    contaNellaChat(e.dataTransfer, !!testo);
     if (!testo) return;
     testoDaFuori = true;
     const prima = inputEl.value.slice(0, inputEl.selectionStart);

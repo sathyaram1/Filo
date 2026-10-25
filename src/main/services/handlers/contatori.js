@@ -1,5 +1,5 @@
-// Handler di dominio dei contatori anonimi (#969, #1461, #1462): crea il servizio, segue le impostazioni, riceve i gesti
-// contati nelle pagine e dà all'owner le somme, mai sotto le cinque copie. Cosa si conta: src/main/services/contatori.js.
+// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1471): crea il servizio, segue le impostazioni, riceve i
+// gesti contati nelle pagine e dà all'owner le somme, mai sotto le cinque copie. Cosa si conta: src/main/services/contatori.js.
 // Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
 
 const { soloFilo } = require('./origine');
@@ -133,6 +133,8 @@ module.exports = function register(on, ctx) {
       case 'conferma': ok = contatori.confermaRisposta(testo(m.chiave), testo(m.esito)); break;
       case 'voce-menu-scheda': ok = finestra.voceMenu(testo(m.id)); break;
       case 'notifica': ok = finestra.notifica(testo(m.tipo), testo(m.esito), { letta: m.letta === true, inAttesa: m.inAttesa === true }); break;
+      // I gesti della personalizzazione (#1471): solo quelli che nascono in una pagina, coi campi dei loro elenchi.
+      case 'gesto': ok = C.GESTI_DALLE_PAGINE.includes(testo(m.gesto)) && contatori.gesto(testo(m.gesto), m); break;
       default: ok = false;
     }
     return { ok: Boolean(ok) };

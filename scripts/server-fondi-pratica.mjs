@@ -159,6 +159,14 @@ function puntaDelServer(cartella) {
   try { return execFileSync('git', ['rev-parse', 'refs/remotes/origin/main'], { cwd: cartella, encoding: 'utf8' }).trim(); } catch (_) { return ''; }
 }
 
+/** main del server letto adesso da origin: sha, null se origin non si legge. */
+function mainRemotoServer(cartella) {
+  const r = gitEsito(dirname(cartella), ['ls-remote', 'origin', 'refs/heads/main']);
+  if (!r.ok) return null;
+  const sha = String(r.out).trim().split(/\s+/)[0] || '';
+  return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
+}
+
 function deployDaGitHub(cartella) {
   return gitEsito(cartella, ['cat-file', '-e', 'refs/remotes/origin/main:.github/workflows/deploy.yml']).ok;
 }
@@ -201,6 +209,28 @@ export async function fusioneDalCancello({ cartella, ramo, sha, feedbackId }, { 
   log(riga);
   allinea(cartella, log);
   return 0;
+}
+
+/**
+ * Il server registra che main del server su `sha` l'ha portato server:fondi dal PC (#1521): senza la voce, il suo
+ * controllo dei riferimenti allarma. Main è già spinto: un no si dice e basta. `prima`: main letto da origin prima di
+ * server:fondi; uguale a `sha` vuol dire niente spinto (ramo già dentro), e registrarlo sdoganerebbe chi l'ha portato lì.
+ */
+export async function registraMainDalPc({ ramo, sha, prima, feedbackId }, { registra, err }) {
+  if (!/^[0-9a-f]{40}$/.test(String(sha || ''))) {
+    err('Attenzione: non leggo lo sha di main del server dopo la spinta, e il server non sa che l’ha portato server:fondi: aprirà un allarme su main fuori registro, che puoi chiudere.');
+    return false;
+  }
+  if (prima === sha) return false;
+  if (!/^[0-9a-f]{40}$/.test(String(prima || ''))) {
+    err(`Attenzione: non ho letto main del server prima della fusione, e non so se l’ha mosso questo server:fondi: non lo registro. Se il server apre un allarme su main fuori registro per ${sha.slice(0, 9)} ed è questa spinta, chiudilo.`);
+    return false;
+  }
+  const { registraSpintaServer, messageForServerMerge } = await import('./lib/owner-merge.mjs');
+  const risposta = await (registra || registraSpintaServer)({ branch: ramo, sha, feedbackId });
+  if (risposta && risposta.outcome === 'registrato') return true;
+  err(`Attenzione: main del server è su ${sha.slice(0, 9)}, ma il server non l’ha registrato come portato da server:fondi (${messageForServerMerge(risposta, ramo).replace(/\.$/, '')}). Aprirà un allarme su main fuori registro: se è questa spinta, chiudilo.`);
+  return false;
 }
 
 /** origin/main del server riletto, e il checkout di main portato lì solo in avanti; un passo che non riesce si dice e basta. */
@@ -374,7 +404,9 @@ export async function esegui(argv, deps = {}) {
       if (!presa.ok) { err(`Pratica ${chi} non aggiornata (${presa.motivo}): non porto il ramo su main senza.`); return 1; }
       log(`Pratica ${chi}: ${presa.from === presa.to ? 'giro annotato' : 'presa in carico («In lavorazione»)'}.`);
     }
+    const mainPrima = (deps.mainPrima || mainRemotoServer)(cartella);
     let k = lanciaFissato(cartella, a.ramo, daFondere, figlio, fissate);
+    const dalPc = k === 0;
     if (k === USCITA_SPINTA_RIFIUTATA) {
       const shaCancello = (daFondere && daFondere.server && daFondere.server.sha) || (deps.puntaRamo || puntaRamoServer)(cartella, a.ramo) || '';
       k = await fusioneDalCancello({ cartella, ramo: a.ramo, sha: shaCancello, feedbackId: r.id }, { chiedi: deps.chiediAlCancello, allinea: deps.allinea, log, err });
@@ -394,6 +426,8 @@ export async function esegui(argv, deps = {}) {
     if (verificato && sha && sha !== verificato) {
       err(`Attenzione: main del server è su ${sha.slice(0, 9)}, non sullo sha verificato ${verificato.slice(0, 9)}: il ramo si è mosso fra il controllo e la fusione.`);
     }
+    // La fusione chiesta al cancello la registra il server; la spinta dal PC la dice questo passo.
+    if (dalPc) await registraMainDalPc({ ramo: a.ramo, sha, prima: mainPrima, feedbackId: r.id }, { registra: deps.registraMain, err });
     const parte = await of.registraParte(r.id, 'server', { bearer, solo, ramo: a.ramo });
     if (!parte.ok) err(`La pratica ${chi} non ha registrato che la parte del server è su main (${parte.motivo}): una parte dell'app che arrivasse a pratica chiusa non la troverebbe.`);
     const daGitHub = (deps.deployDaGitHub || deployDaGitHub)(cartella);

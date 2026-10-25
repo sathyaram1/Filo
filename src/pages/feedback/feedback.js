@@ -53,6 +53,13 @@
     fbFileWhyCache.clear();
   }
 
+  // Quello che arriva nel campo del feedback, per i contatori (#1471): da dove viene e se è servito, mai cosa porta.
+  // Un testo lo scrive il browser nel campo; un file diventa un allegato.
+  function contaRilascio(e, usato) {
+    const ev = window.SN_GESTI && window.SN_GESTI.rilascio(e.dataTransfer, 'campo_feedback', usato);
+    if (ev) Promise.resolve(sendToMain({ type: window.SN_MSG?.MSG?.CONTATORI_EVENTO, ...ev })).catch(() => {});
+  }
+
   // Su pagine filo:// il ponte col main è sempre presente.
   function sendToMain(msg) {
     if (window.filo?.message) return window.filo.message(msg);
@@ -623,6 +630,7 @@
     ['dragleave', 'drop'].forEach((ev) => textarea.addEventListener(ev, (e) => { textarea.classList.remove('fb-drop-hover'); }));
     textarea.addEventListener('drop', async (e) => {
       const dropped = e.dataTransfer && e.dataTransfer.files;
+      contaRilascio(e, !!(dropped && dropped.length) || !!(e.dataTransfer && e.dataTransfer.getData('text/plain')));
       if (!dropped || !dropped.length) return;
       e.preventDefault();
       for (const f of dropped) await addFile(f);

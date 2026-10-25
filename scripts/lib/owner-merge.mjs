@@ -399,7 +399,8 @@ export function erroreDiConnessione(e) {
 // ── Il ramo del server, dopo il passo 10 (#1159 fase 2) ─────────────────────
 // Su main di filo-security scrive solo il cancello: server:fondi prova la spinta e, rifiutata, chiede a lui.
 
-const ESITI_SERVER = new Set(['merged', 'aspetta_suite', 'suite_rossa', 'non_rapido', 'rifiutata', 'main_moved']);
+// `registrato`: la risposta a `registraMain`, la spinta su main fatta dal PC entrata nel registro di chi porta main (#1521).
+const ESITI_SERVER = new Set(['merged', 'aspetta_suite', 'suite_rossa', 'non_rapido', 'rifiutata', 'main_moved', 'registrato']);
 
 /** La risposta di ownerMerge con `repo: 'server'` in un esito. PURA. */
 export function classifyServerMerge(status, body) {
@@ -435,6 +436,7 @@ export function messageForServerMerge(reply, ramo = 'il ramo') {
     case 'non_rapido': return `${ramo} non contiene main di filo-security: nel ramo git merge origin/main, prove, spinta, poi rilancia.`;
     case 'rifiutata': return `Anche il cancello è stato rifiutato da GitHub (${String(r.detail || '').slice(0, 160)}): controlla il bypass della regola di main di filo-security.`;
     case 'main_moved': return 'main di filo-security si è mosso mentre il cancello fondeva: rilancia lo stesso comando.';
+    case 'registrato': return `Il server sa che main di filo-security${sha ? ` (${sha})` : ''} l’ha portato server:fondi dal PC.`;
     case 'no_owner_credential': return 'Su questa macchina non c’è la credenziale admin per chiedere la fusione al server.';
     case 'not_deployed': return 'Il server non conosce ancora la fusione del ramo del server (ownerMerge senza repo «server»): va pubblicato il server della fase 2.';
     case 'denied': return `Il server non riconosce l’owner: ${String(r.reason || '').slice(0, 160)}`;
@@ -445,10 +447,10 @@ export function messageForServerMerge(reply, ramo = 'il ramo') {
 }
 
 /**
- * «Porta questo sha del ramo del server su main di filo-security»: ownerMerge con `repo: 'server'`. Ritorna sempre un
- * esito classificato, mai un'eccezione.
+ * «Porta questo sha del ramo del server su main di filo-security»: ownerMerge con `repo: 'server'`. Con `registraMain`
+ * invece «main è su questo sha perché l'ho spinto io dal PC». Ritorna sempre un esito classificato, mai un'eccezione.
  */
-export async function askServerMergeServer({ branch, sha, feedbackId, fetchImpl = fetch, mintImpl = fetch, attese = null, url = OWNER_MERGE_URL } = {}) {
+export async function askServerMergeServer({ branch, sha, feedbackId, registraMain = false, fetchImpl = fetch, mintImpl = fetch, attese = null, url = OWNER_MERGE_URL } = {}) {
   const refresh = findAdminRefreshToken();
   if (!refresh) return { outcome: 'no_owner_credential' };
   let idToken;
@@ -462,7 +464,7 @@ export async function askServerMergeServer({ branch, sha, feedbackId, fetchImpl 
     const res = await fetchRitentato(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-      body: JSON.stringify({ data: { repo: 'server', branch: String(branch || ''), sha: String(sha || ''), feedbackId: String(feedbackId || '') } }),
+      body: JSON.stringify({ data: Object.assign({ repo: 'server', branch: String(branch || ''), sha: String(sha || ''), feedbackId: String(feedbackId || '') }, registraMain ? { registraMain: true } : {}) }),
     }, { fetchImpl, ...(attese ? { attese } : {}) });
     const text = await res.text();
     let body = {};
@@ -472,3 +474,6 @@ export async function askServerMergeServer({ branch, sha, feedbackId, fetchImpl 
     return { outcome: 'unreachable', reason: `rete verso il server: ${descriviErroreDiRete(e)}`.slice(0, 300) };
   }
 }
+
+/** La spinta su main del server fatta dal PC entra nel registro di chi porta main: senza, il server alza un allarme. */
+export const registraSpintaServer = (x) => askServerMergeServer(Object.assign({}, x, { registraMain: true }));

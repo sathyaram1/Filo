@@ -237,7 +237,7 @@ async function annullaOra(id, prov = {}) {
     if (riuscito && !raccolti.length) registra({ tipo: e.tipo, cambi: [] }, { vuoto: true });
   });
   if (!riuscito) return { ok: false, motivo: 'la pagina di quel sito non è aperta', id: e.id };
-  try { app.annullato([...new Set([String(id || ''), String(trovato.id), String(e.id)])].filter(Boolean)); } catch (_) {}
+  try { app.annullato([...new Set([String(id || ''), String(trovato.id), String(e.id)])].filter(Boolean), trovato); } catch (_) {}
   return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati };
 }
 
