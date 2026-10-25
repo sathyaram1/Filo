@@ -167,8 +167,13 @@ service cloud.firestore {
       return u is string && u.size() <= 2000
         && u.matches('^https://firebasestorage[.]googleapis[.]com/v0/b/filo-8b9cb[.]firebasestorage[.]app/o/feedback%2F(agent_)?[0-9]{10,17}_[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}[.][a-z0-9]{1,12}[?]alt=media&token=[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
     }
+    // Una voce di `files[]` porta solo ciò che scrive il caricatore (url, nome, tipo): le routine la ricevono,
+    // e un campo in più sarebbe testo che i giudici non hanno visto (#1515). Tetti: SN_FEEDBACK.VOCE_DOCUMENTO.
     function documentoAllegato(f) {
-      return f is map && indirizzoAllegato(f.get('url', ''));
+      return f is map && f.keys().hasOnly(['url', 'name', 'type'])
+        && indirizzoAllegato(f.get('url', ''))
+        && f.get('name', '') is string && f.get('name', '').size() <= 500
+        && f.get('type', '') is string && f.get('type', '').size() <= 255;
     }
     // Le regole non hanno cicli: una riga per posto, fino al tetto di 5.
     function immaginiValide(l) {
@@ -367,7 +372,8 @@ service cloud.firestore {
       // tests/unit/firestoreRulesFiducia.test.mjs.
       allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
         && waitsForValido(request.resource.data)
-        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo'])
+        // `inCoda` (#1515): il segno che la coda delle routine legge. Lo scrive solo il server, a ogni cambio di stato.
+        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda'])
         && bigliettoLocaleValido(request.resource.data)
         && immaginiValide(request.resource.data.get('images', []))
         && documentiValidi(request.resource.data.get('files', []))

@@ -71,6 +71,12 @@
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
+  // Tetto di spesa e lunghezza dei giudici per i non fidati (#1515): un campo per chiave della risposta del main.
+  const mgJudgeCampi = {
+    tettoUsd: ['mgJudgeBudget', 'mgJudgeBudgetSave', 'mgJudgeBudgetRimetti', 'mgJudgeBudgetMsg'],
+    maxCaratteri: ['mgJudgeChars', 'mgJudgeCharsSave', 'mgJudgeCharsRimetti', 'mgJudgeCharsMsg'],
+  };
+  for (const k of Object.keys(mgJudgeCampi)) mgJudgeCampi[k] = mgJudgeCampi[k].map((id) => document.getElementById(id));
 
   const mgLogLoading = document.getElementById('mgLogLoading');
   const mgLogDenied  = document.getElementById('mgLogDenied');
@@ -380,7 +386,7 @@
   function caricaImpostazioni() {
     // Le pause non trattengono gli altri controlli «in lettura»: sono una riga in più, non un valore da scegliere.
     loadPause();
-    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals()])
+    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadJudgeBudget(), loadMergeApprovals()])
       .finally(fineLetturaAutomazioni);
   }
 
@@ -646,7 +652,8 @@
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
       mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
-      mgAccountA, mgAccountB, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove)]) {
+      mgAccountA, mgAccountB, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
+      ...Object.values(mgJudgeCampi).flatMap(([input, salva, rimetti]) => [input, salva, rimetti])]) {
       if (el) el.disabled = !isAdmin;
     }
   }
@@ -1345,6 +1352,62 @@
   }
   if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.addEventListener('click', saveJudgeTimeout);
   if (mgJudgeTimeout) mgJudgeTimeout.addEventListener('input', () => setJudgeTimeoutMsg('', null));
+
+  // Tetto di spesa e lunghezza dei giudici per i non fidati (#1515). Regole in SN_SPESA_GIUDICI, comportamento del
+  // campo (Invio, uscita dal campo, «Rimetti com'era») in SN_CAMPO_NUMERO; la spesa di oggi la scrive solo il server.
+  const JUDGE_BUDGET_GET = (window.SN_MSG?.MSG?.AUTOMATION_JUDGE_BUDGET_GET) || 'automation_judge_budget_get';
+  const JUDGE_BUDGET_SET = (window.SN_MSG?.MSG?.AUTOMATION_JUDGE_BUDGET_SET) || 'automation_judge_budget_set';
+  const SG = window.SN_SPESA_GIUDICI;
+  const giudiciCampi = new Map();
+  let giudiciLetto = null; // l'ultima risposta del main: { tettoUsd, maxCaratteri, spesa, oraMs }
+
+  function mostraSpesaGiudici() {
+    const box = document.getElementById('mgJudgeSpesa');
+    if (!box || !SG) return;
+    const r = giudiciLetto;
+    const riga = SG.rigaSpesa(r ? r.spesa : null, r ? r.tettoUsd : null, (r && r.oraMs) || Date.now());
+    const nota = document.getElementById('mgJudgeSpesaNota');
+    const barra = document.getElementById('mgJudgeSpesaBarra');
+    document.getElementById('mgJudgeSpesaTesto').textContent = riga.testo;
+    box.title = riga.dettaglio;
+    box.classList.toggle('is-pieno', riga.pieno);
+    // Il motivo si legge senza hover quando cambia qualcosa per l'owner: tetto pieno o spesa ignota.
+    nota.textContent = riga.pieno || riga.quota === null ? riga.dettaglio : '';
+    nota.hidden = !nota.textContent;
+    barra.hidden = riga.quota === null;
+    document.getElementById('mgJudgeSpesaQuota').style.width = `${Math.round((riga.quota || 0) * 100)}%`;
+  }
+
+  async function salvaGiudici(chiave, valore) {
+    const r = await sendToMain({ type: JUDGE_BUDGET_SET, [chiave]: valore });
+    if (!r || r.ok === false) return { ok: false, errore: String((r && r.error) || 'il server non ha risposto').replace(/\.\s*$/, '') };
+    giudiciLetto = r.letto === false ? Object.assign({}, giudiciLetto, r) : r;
+    mostraSpesaGiudici();
+    return { ok: true, valore: r[chiave] };
+  }
+
+  if (SG && window.SN_CAMPO_NUMERO) {
+    for (const [chiave, [input, salvaBtn, rimetti, msg]] of Object.entries(mgJudgeCampi)) {
+      if (!input) continue;
+      const regole = chiave === 'tettoUsd' ? SG.REGOLE_CAMPO.tetto : SG.REGOLE_CAMPO.caratteri;
+      giudiciCampi.set(chiave, window.SN_CAMPO_NUMERO.collega({
+        input, salvaBtn, rimetti, msg, regole, salva: (valore) => salvaGiudici(chiave, valore),
+      }));
+    }
+  }
+
+  async function loadJudgeBudget() {
+    let r = null;
+    try { r = await sendToMain({ type: JUDGE_BUDGET_GET }); } catch (_) { r = null; }
+    giudiciLetto = r && r.ok !== false ? r : null;
+    mostraSpesaGiudici();
+    for (const [chiave, campo] of giudiciCampi) {
+      // Un numero scritto e non ancora partito resta sotto le dita di chi lo scrive.
+      if (!campo.stato().pulito) continue;
+      if (giudiciLetto) campo.mostra(giudiciLetto[chiave], { daCapo: true });
+      else campo.dillo(`Non letto: ${String((r && r.error) || 'il server non ha risposto').replace(/\.\s*$/, '')}.`, 'is-error');
+    }
+  }
 
   // Tab «Log»: gli ultimi worker spawnati. Fonte config/automation.workerLog, scritto dal
   // server al rilascio di ogni biglietto; sola lettura via main (owner-gated).

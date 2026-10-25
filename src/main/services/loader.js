@@ -107,6 +107,7 @@ require(path.join(SHARED, 'campoNumero.js'));
 require(path.join(SHARED, 'routineSessioni.js'));
 require(path.join(SHARED, 'routineCrediti.js'));  // #1356 — i numeri dell'owner sui crediti: stesse regole in pagina e nel main
 require(path.join(SHARED, 'routineModelli.js'));  // #1193 — modello e sforzo per fase: stesse regole in pagina e nel main
+require(path.join(SHARED, 'spesaGiudici.js'));  // #1515 — tetto di spesa dei giudici: stesse regole in pagina e nel main
 require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
 // #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
 // Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).

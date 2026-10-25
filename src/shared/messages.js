@@ -667,6 +667,10 @@
     // consegna un biglietto. Owner-only.
     AUTOMATION_ROLE_MODELS_GET: 'automation_role_models_get', // → { ok, roleModels } | { ok:false, error }
     AUTOMATION_ROLE_MODELS_SET: 'automation_role_models_set', // { ruolo, campo, valore } → { ok, letto, scritto, roleModels? } | { ok:false, error }
+    // Il tetto di spesa dei giudici per i non fidati e la lunghezza che ricevono (config/automation, #1515; regole in
+    // src/shared/spesaGiudici.js), con la spesa di oggi (`spesa: null` = non letta). Owner-only.
+    AUTOMATION_JUDGE_BUDGET_GET: 'automation_judge_budget_get', // → { ok, tettoUsd, maxCaratteri, spesa, oraMs } | { ok:false, error }
+    AUTOMATION_JUDGE_BUDGET_SET: 'automation_judge_budget_set', // { tettoUsd?, maxCaratteri? } → come sopra, `letto:false` se non riletto | { ok:false, error }
     // Log dei worker delle routine (doc config/automation, campo `workerLog`):
     // elenco degli ultimi worker spawnati, con ruolo e istante di avvio. Lo
     // scrive scripts/dispatch.mjs a ogni spawn; lo legge la tab "Log" della
