@@ -1418,6 +1418,7 @@
     verifier:   'Verifica',
     fixer:      'Correzione',
     secaudit:   'Audit sicurezza',
+    risposta:   'Gestisci la risposta',
     prober:     'Esplorazione',
     idle:       'Fermo',
     off:        'Routine spente',

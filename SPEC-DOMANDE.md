@@ -288,6 +288,9 @@ dall'owner e dal server. Campi:
 - `soloOwner`: sulle domande dell'addetto comunicazioni (§ 4.1), che nessun
   compito legge.
 - `fiducia`: § 1.
+- `principio`: la regola generale che la risposta stabilisce (§ 3.6), la
+  scrive il compito della § 3.5; `conPrincipio` in chiaro la fa trovare al
+  registro.
 - `stato`: `aperta`, `in_lavorazione`, `chiusa`, `superata`.
 - `conversazione`: i turni, con autore (owner o biglietto) e ora.
 - `creataIl` e `modificataIl`: la seconda è l'ultima volta che un agente ha
@@ -379,6 +382,40 @@ Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
   - apre una domanda nuova;
   - scrive il principio (§ 3.6);
   - aggiorna `notePerAgenti`.
+
+Come funziona oggi (#1152):
+
+- **Nascita.** La risposta presa (in lavorazione) fa nascere il compito
+  `risposta` (`compiti/C-n`, uno aperto per domanda, puntatore `dq:<id>`) con
+  la fiducia della domanda dopo il turno dell'owner, e la domanda lo nomina in
+  `esito.compito.id`. Il pacemaker tiene la rete: una domanda in lavorazione
+  senza il suo compito lo riceve (le risposte di prima di #1152 comprese), un
+  compito la cui domanda non lo aspetta più si chiude `superato`.
+- **Biglietto.** La coda dà i compiti senza feedback con la loro urgenza e
+  li conta come una priorità 3: non aspettano nessuno, e li passa solo chi ha
+  urgenza più alta. Né il giro su un solo feedback né la chiave dei lavori
+  server li prendono. Il semaforo è sul compito (`compito:C-n`); il biglietto
+  ha il ruolo `risposta`, nasce pulito solo con compito e domanda fidati e la
+  chiave a rete limitata, e la domanda non fidata lo sporca prima che il testo
+  esca.
+- **Fascicolo.** La domanda intera (conversazione coi turni dell'owner, i suoi
+  allegati aperti dal server, `notePerAgenti`), numero, stato e priorità dei
+  feedback che nomina. Il registro (§ 3.6) è testo di altre domande, cioè
+  riservato (§ 5.1): arriva solo a un biglietto della chiave con `ambiente:
+  'riservati'`, e da pulito con i soli principi fidati.
+- **Operazioni** (intento `risposta` del canale, `domanda.mjs` col biglietto):
+  `mostra`, `chiarimento` (turno `chiarimento`, la domanda torna `aperta` e
+  il compito è fatto), `note`, `principio`, `azione`, `chiudi` (resoconto per
+  l'owner e principio, la domanda si chiude). Chiarimento e chiusura si
+  rifiutano se l'owner ha scritto dopo l'ultima lettura (`domanda_cambiata`).
+  `azione` applica solo `riprendi`, `priorita` e `archivia`, e solo sui
+  feedback che la domanda nomina: mai un'azione di consenso. Nel feedback
+  ripreso il turno dell'owner porta le sue parole lette dalla domanda; la nota
+  del compito resta testo d'agente. Feedback e domande che il compito apre
+  restano scritti nella conversazione della sua domanda.
+- **Tentativi.** Un biglietto che finisce senza chiarire né chiudere rimette
+  il compito in attesa; al terzo la domanda torna `aperta` all'owner, con un
+  turno del server che lo dice.
 
 ### 3.6 Registro, raggruppamento, risposte automatiche
 

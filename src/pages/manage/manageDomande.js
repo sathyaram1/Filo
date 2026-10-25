@@ -640,7 +640,9 @@
     }
     if (d.contesto) art.appendChild(sezione('', 'Contesto', md(d.contesto)));
     if (d.problema) art.appendChild(sezione('', 'Problema', md(d.problema)));
-    for (const parte of [opzioni(d), consiglio(d), esito(d), conversazione(d), risposta(d)]) if (parte) art.appendChild(parte);
+    // Il principio (§3.6) lo scrive chi ha gestito la risposta: è la regola che entra nel registro, e l'owner la vede.
+    const principio = d.principio ? sezione('mg-dq-principio', 'Principio', md(d.principio)) : null;
+    for (const parte of [opzioni(d), consiglio(d), esito(d), principio, conversazione(d), risposta(d)]) if (parte) art.appendChild(parte);
     if (d.notePerAgenti) {
       const det = el('details', 'mg-dq-note');
       det.appendChild(el('summary', '', 'Note per gli agenti'));

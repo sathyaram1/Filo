@@ -29,6 +29,7 @@
     testoTurno: 10000,
     conversazioneByte: 300 * 1024,
     aperteBiglietto: 20,
+    principio: 2000,
   });
 
   // Le chiavi che un'azione `automazione` può scrivere: solo booleani già in Automazioni. `spegne`: il vero spegne.
@@ -98,7 +99,7 @@
 
   const CAMPI_DOMANDA = Object.freeze(['titolo', 'contesto', 'problema', 'opzioni', 'consiglio', 'priorita', 'origine', 'collegamenti', 'notePerAgenti', 'gruppo', 'blocca']);
   // Li decide il server: nell'ingresso si ignorano, così un «fidato» scritto da chi chiede non vale niente.
-  const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito', 'legata', 'provvisoria']);
+  const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito', 'legata', 'provvisoria', 'principio']);
   const CAMPI_OPZIONE = Object.freeze(['testo', 'pro', 'contro', 'azione']);
 
   function validaOpzione(o, i) {
@@ -290,6 +291,22 @@
     return null;
   }
 
+  // Le azioni che il compito «Gestisci la risposta» (§3.5) applica da sé: quelle che l'owner applica anche in blocco.
+  // Una di consenso resta a un gesto dell'owner nella finestra (§1.4), e un compito non ne fa nascere un altro.
+  const DEL_COMPITO = Object.freeze(['riprendi', 'priorita', 'archivia']);
+
+  /** Il rifiuto per un'azione che il compito non applica, o null se la può applicare. PURA. */
+  function vietataAlCompito(azione) {
+    const v = validaAzione(azione);
+    if (!v.ok) return v;
+    const t = v.azione.tipo;
+    if (TIPI[t].consenso === true) {
+      return no('azione_di_consenso', `«${t}» vuole il consenso dell'owner: la applica solo lui, dalla finestra di Filo. Scrivigli un chiarimento che gli dica quale opzione scegliere`);
+    }
+    if (!DEL_COMPITO.includes(t)) return no('azione_non_del_compito', `«${t}» non la applica un agente: le sue azioni sono ${DEL_COMPITO.join(', ')}`);
+    return null;
+  }
+
   function riferimentoDi(riferimenti, id) {
     const r = isOggetto(riferimenti) && ha(riferimenti, id) ? riferimenti[id] : null;
     return r && typeof r.num === 'string' && /^#\d{1,9}(\.\d{1,6})?$/.test(r.num) ? r : null;
@@ -375,6 +392,7 @@
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
     validaAzione, validaDomanda, controllaTestoOwner, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca,
+    DEL_COMPITO, vietataAlCompito,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

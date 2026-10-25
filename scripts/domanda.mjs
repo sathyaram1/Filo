@@ -23,7 +23,19 @@ const USO = [
   '  rispondi D-n [--scelta N] [--testo "…" | --testo -]   N è il numero dell\'opzione come lo stampa «mostra»',
   '  consiglio D-1 [D-2 …]                 applica l\'opzione consigliata',
   '  archivia D-n | riapri D-n             la toglie senza applicare niente, o la rimette aperta',
+  '',
+  'Col biglietto del compito che gestisce una risposta (la domanda la dice il biglietto):',
+  '  mostra                                rilegge la domanda, coi feedback che nomina e il registro',
+  '  chiarimento --testo "…" | --testo -   chiede all\'owner un chiarimento: la domanda torna aperta',
+  '  note --testo "…" | --testo -          riscrive le note per gli agenti (vuote: le toglie)',
+  '  principio --testo "…" | --testo -     la regola generale che la risposta stabilisce',
+  '  azione \'{"tipo":…}\' [--testo …]     applica riprendi, priorita o archivia su un feedback della domanda',
+  '  chiudi --testo "…" | --testo - [--principio "…"]   il resoconto per l\'owner: la domanda si chiude',
 ].join('\n');
+
+// I comandi del compito «Gestisci la risposta» (#1152, SPEC-DOMANDE.md §3.5): passano dal canale delle routine.
+const DEL_COMPITO = Object.freeze(['chiarimento', 'note', 'principio', 'azione', 'chiudi']);
+const TESTO_SERVE = Object.freeze(['chiarimento', 'chiudi']);
 
 /** Le parole della riga di comando. PURA. @returns {{ cmd, … } | { errore }} */
 export function leggiArgomenti(argv) {
@@ -33,9 +45,11 @@ export function leggiArgomenti(argv) {
   if (cmd === 'chiedi') {
     return a.length === 2 && a[1] ? { cmd, file: a[1] } : { errore: `chiedi vuole un file JSON, o «-» per leggerlo da stdin.\n${USO}` };
   }
+  if (cmd === 'mostra' && a.length === 1) return { cmd, delCompito: true };
   if (cmd === 'mostra' || cmd === 'archivia' || cmd === 'riapri') {
     return a.length === 2 && idOk(a[1]) ? { cmd, id: a[1].trim() } : { errore: `${cmd} vuole una domanda nella forma D-12.\n${USO}` };
   }
+  if (DEL_COMPITO.includes(cmd)) return argomentiDelCompito(cmd, a.slice(1));
   if (cmd === 'elenco') {
     if (a.length === 1) return { cmd, tutte: false };
     return a.length === 2 && a[1] === '--tutte' ? { cmd, tutte: true } : { errore: `"${a[1].slice(0, 40)}" non vale qui.\n${USO}` };
@@ -67,6 +81,32 @@ export function leggiArgomenti(argv) {
     return { cmd, ids: [...new Set(ids.map((x) => x.trim()))] };
   }
   return { errore: USO };
+}
+
+/** Le opzioni di un comando del compito, controllate come le controlla il server. PURA. */
+function argomentiDelCompito(cmd, resto) {
+  const out = { cmd };
+  const ammesse = cmd === 'chiudi' ? ['testo', 'principio'] : ['testo'];
+  const lista = resto.slice();
+  if (cmd === 'azione') {
+    const json = lista.shift();
+    if (json === undefined || json.startsWith('--')) return { errore: `azione vuole l'azione in JSON, per esempio '{"tipo":"riprendi","feedbackId":"…"}'.\n${USO}` };
+    let azione;
+    try { azione = JSON.parse(json); } catch (e) { return { errore: `l'azione non è JSON valido: ${String(e?.message || e).slice(0, 120)}.` }; }
+    const vietata = D.vietataAlCompito(azione);
+    if (vietata) return { errore: `${vietata.errore}: ${vietata.dettaglio}.` };
+    out.azione = azione;
+  }
+  for (let i = 0; i < lista.length; i++) {
+    const m = /^--([a-z]+)(?:=(.*))?$/s.exec(lista[i]);
+    if (!m || !ammesse.includes(m[1])) return { errore: `"${lista[i].slice(0, 40)}" non vale con ${cmd}: ${ammesse.map((x) => `--${x}`).join(', ')}.\n${USO}` };
+    const v = m[2] !== undefined ? m[2] : lista[++i];
+    if (v === undefined) return { errore: `--${m[1]} vuole un valore (o «-» per leggerlo da stdin).` };
+    out[m[1]] = v;
+  }
+  if (out.testo === undefined && cmd !== 'azione') return { errore: `${cmd} vuole --testo "…", o --testo - per leggerlo da stdin.\n${USO}` };
+  if (out.principio === '-') return { errore: '--principio si scrive sulla riga: da stdin arriva solo --testo.' };
+  return out;
 }
 
 /** Il JSON di una domanda, controllato come lo controlla il server, prima di chiamarlo. PURA. */
@@ -151,9 +191,38 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
     righe.push('', `Esito: ${cosa} · ${e.ok ? 'applicato' : `non applicato${e.errore ? ` (${visibile(e.errore)})` : ''}`}`
       + `${e.compito ? ` · compito ${visibile(e.compito.stato || '')}` : ''}`);
   }
+  if (x.principio) righe.push('', 'Principio', rientro(x.principio));
   if (x.notePerAgenti) righe.push('', 'Note per gli agenti', rientro(x.notePerAgenti));
   if (x.stato === 'aperta') righe.push('', `Per rispondere: node scripts/domanda.mjs rispondi ${visibile(x.id || 'D-n')} --scelta N | --testo "…"`);
   return righe.join('\n');
+}
+
+/** Il fascicolo del compito per il terminale: la domanda, poi il registro delle decisioni. PURA. */
+export function formattaFascicolo(f) {
+  const x = f || {};
+  if (x.affidata === false) {
+    return `La risposta non è più affidata a te${x.motivo ? ` (${visibile(x.motivo)})` : ''}: non c'è niente da fare, rilascia il biglietto.`;
+  }
+  const righe = [formattaDomanda(x.domanda, x.riferimenti)];
+  const r = x.registro || {};
+  const voci = Array.isArray(r.voci) ? r.voci : [];
+  righe.push('', `Registro delle decisioni (${voci.length}${r.altre ? `, e altre ${r.altre} più vecchie` : ''})`);
+  for (const v of voci) righe.push(`  ${visibile(v.id)} ${visibile(v.titolo || '')}`, rientro(v.principio || '', '    '));
+  if (r.assente) righe.push(`  ${visibile(r.assente)}`);
+  else if (!voci.length) righe.push('  nessun principio ancora');
+  if (r.nonFidateTolte) righe.push(`  (${r.nonFidateTolte} di domande non fidate non ti arrivano: il tuo biglietto è pulito)`);
+  if (r.errore) righe.push(`  ${visibile(r.errore)}`);
+  return righe.join('\n');
+}
+
+/** Cosa stampa un'operazione del compito andata a buon fine. PURA. */
+export function testoDelCompito(cmd, reply = {}) {
+  if (cmd === 'chiarimento') return 'OK: chiarimento scritto, la domanda torna all\'owner. Hai finito: rilascia il biglietto.';
+  if (cmd === 'chiudi') return 'OK: risposta gestita, la domanda è chiusa. Hai finito: rilascia il biglietto.';
+  if (cmd === 'note') return 'OK: note per gli agenti scritte.';
+  if (cmd === 'principio') return 'OK: principio scritto.';
+  const dove = reply.accodata ? ' (il lavoro era già in coda o in mano a qualcuno: la prende il prossimo giro)' : reply.rimandata ? ' (il lavoro torna in verifica)' : '';
+  return `OK: ${visibile(reply.azione || 'azione')} applicata${dove}. Quando hai finito, chiudi o chiedi un chiarimento.`;
 }
 
 /** L'elenco nell'ordine della §3.7, a blocchi. PURA. */
@@ -199,6 +268,11 @@ async function consegnaDomanda(biglietto, domanda) {
   return deliver(biglietto, 'domanda', { domanda });
 }
 
+async function consegnaRisposta(biglietto, data) {
+  const { deliver } = await import('./routine-channel.mjs');
+  return deliver(biglietto, 'risposta', data);
+}
+
 /** Il segreto del biglietto della sessione (il più sporco se più d'uno), '' senza: il server allora la fa non fidata. */
 async function segretoLocale() {
   const { trovaBiglietto } = await import('./lib/biglietto-locale.mjs');
@@ -235,7 +309,7 @@ async function leggiStdin() {
  */
 export async function esegui(argv, io = {}) {
   const {
-    chiama = chiamaOwner, consegna = consegnaDomanda, biglietto = bigliettoDelGiro,
+    chiama = chiamaOwner, consegna = consegnaDomanda, risposta = consegnaRisposta, biglietto = bigliettoDelGiro,
     bigliettoLocale = segretoLocale, sporca = sporcaSessione,
     leggiFile = (p) => readFileSync(p, 'utf8'), stdin = leggiStdin,
     scrivi = (s) => console.log(s), errore = (s) => console.error(s),
@@ -262,6 +336,23 @@ export async function esegui(argv, io = {}) {
       const r = await chiama(Object.assign({ op: 'chiedi', domanda: letta.domanda }, segreto ? { biglietto: segreto } : {}));
       scrivi(`OK: domanda ${visibile(r.id || '')} aperta (${fiduciaDetta(r.fiducia)}).`);
       return 0;
+    }
+    // Il compito che gestisce una risposta (#1152): la domanda la dice il biglietto, e il server lo sporca se serve.
+    if (a.delCompito || DEL_COMPITO.includes(a.cmd)) {
+      const t = await biglietto();
+      if (!t) {
+        errore(`RIFIUTATO: ${a.delCompito ? '«mostra» senza domanda' : `«${a.cmd}»`} vale col biglietto del compito che gestisce una risposta, e qui non ce n'è uno. Fuori da quel compito: mostra D-n, rispondi D-n.`);
+        return 1;
+      }
+      const data = { op: a.delCompito ? 'mostra' : a.cmd };
+      if (a.testo !== undefined) data.testo = a.testo === '-' ? await stdin() : a.testo;
+      if (a.principio !== undefined) data.principio = a.principio;
+      if (a.azione) data.azione = a.azione;
+      if (TESTO_SERVE.includes(a.cmd) && !String(data.testo || '').trim()) { errore(`RIFIUTATO: ${a.cmd} vuole un testo che non sia vuoto. Non ho mandato niente.`); return 1; }
+      const r = await risposta(t, data);
+      if (r.outcome === 'ok') { scrivi(a.delCompito ? formattaFascicolo(r.reply) : testoDelCompito(a.cmd, r.reply || {})); return 0; }
+      if (r.outcome === 'refused') { errore(`RIFIUTATO dal server: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
+      errore(`guasto del canale delle routine (${visibile(r.reason)}): non è arrivato niente.`); return 3;
     }
     // Il testo di una domanda non fidata è testo esterno: la sessione si sporca PRIMA di stamparlo (#1148).
     if (a.cmd === 'mostra') {
