@@ -14,11 +14,15 @@ domanda a parte, e un lavoro che serve sul server lo passi tu ai lavori server
 («Se il lavoro si fa solo in locale»). L'owner risponde nella sezione Domande
 della Gestione.
 
-**Una domanda così FERMA il lavoro.** Il feedback aspetta la sua risposta e
-non riparte prima; poi riprende da dove era, con la risposta davanti. Quindi ci
-va solo una scelta che spetta a lui: un difetto lo correggi (o, se stai
-verificando, lo scrivi come rilievo col suo livello), non lo chiedi. Consegna
-comunque tutto quello che hai fatto: è da lì che si riprende.
+**Una domanda che blocca FERMA il lavoro** (senza `blocca` blocca; la regola
+per sceglierlo sta in «Una domanda per l'owner si scrive per lui»). Il feedback
+aspetta la sua risposta e non riparte prima; poi riprende da dove era, con la
+risposta davanti. Con `"blocca": false` la consegna va avanti col suo esito:
+il lavoro fatto è quello della consigliata, e chi viene dopo trova la domanda
+in `payload.provvisorie`. In ogni caso ci va solo una scelta che spetta a lui:
+un difetto lo correggi (o, se stai verificando, lo scrivi come rilievo col suo
+livello), non lo chiedi. Consegna comunque tutto quello che hai fatto: è da lì
+che si riprende.
 
 Una domanda per consegna: due scelte stanno nella stessa domanda, come opzioni
 o nel problema. `--segnala <file.md>` col markdown in tre parti (Problema,

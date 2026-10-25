@@ -260,6 +260,31 @@ dall'owner e dal server. Campi:
 - `origine` e `collegamenti`: feedback, rami, compiti, altre domande.
 - `notePerAgenti`: testo privato per chi riprenderà la domanda (§ 3.2).
 - `gruppo`: il tema, per il raggruppamento.
+- `blocca` (#1577): una domanda legata a un feedback (un'opzione `riprendi`
+  lo riprende) dice se lo ferma; lo decide chi la apre, e col biglietto senza
+  si rifiuta. Blocca se andare avanti con la consigliata, e poi l'owner sceglie
+  altro, lascia un danno che un altro giro non rimedia (soldi, dati
+  dell'utente, sicurezza e segreti, politica sui modelli, terzi, account e
+  credenziali), o se serve un fatto che sa solo l'owner; nel dubbio blocca.
+  Una bloccante aperta toglie il feedback alla coda (`todo` o in revisione):
+  il server ne scrive l'id in `domandeBloccanti` sul feedback, che in Gestione
+  sta fra quelli che aspettano col segno «aspetta D-n»; alla risposta riparte
+  con la decisione in `payload.decisioni`. Una non bloccante non ferma: il
+  lavoro va avanti con la consigliata, scritta come decisione provvisoria
+  nella conversazione (`payload.provvisorie` per chi viene dopo). Una risposta
+  diversa dalla provvisoria riporta in coda anche un fuso (`done` → `todo`);
+  la stessa, senza parole in più, su un fuso risponde «non serviva». Una
+  risposta che arriva mentre il lavoro è in coda, in mano a qualcuno o in
+  verifica non sposta lo stato: la decisione si accoda e la prende il giro
+  dopo. Un lavoro già passato, al controllo di sicurezza, torna in verifica
+  con la risposta (sicurezza e fusione non leggono le decisioni), salvo la
+  stessa scelta della provvisoria. Un lavoro che l'owner ha archiviato dopo
+  la nascita della domanda resta archiviato: la risposta si scrive nella sua
+  conversazione e non lo riapre; una domanda nata su un lavoro già chiuso lo
+  riapre. Finché una bloccante è aperta la fusione non parte. Una fermata
+  (§ 3.8) blocca da sé. `legata`, `provvisoria` e `nataSuChiuso` le scrive il
+  server. I guasti fermi da prima senza la loro domanda la prendono dalla
+  migrazione che parte da sola col server nuovo.
 - `destinatario`: l'owner, oppure la gestione del lavoro per le domande di
   guasto (§ 4.3), tranne quelle dell'addetto comunicazioni.
 - `soloOwner`: sulle domande dell'addetto comunicazioni (§ 4.1), che nessun
@@ -388,9 +413,9 @@ gruppo e poi per età. Un gruppo si apre come un blocco solo.
 |---|---|
 | `design` + `clarify`/`decisione`, segnalazione L3 | domanda, azione `riprendi` |
 | `design` + `locale` | nessuna domanda per il codice del server: un lavoro fidato prende il segno dei lavori server e lo fa la loro routine (#1253); uno non fidato va in Ricevuti L3 come richiesta di renderlo fidato (motivo `fidato`), e «Segna fidato» lo rimette in coda. Diventa domanda solo ciò che chiede il suo PC o un suo passo (una prova sulla sua macchina, segreti, automazioni GitHub), scritta da chi si ferma (#1358) |
-| `design` + `guasto` | la domanda c'è già: la apre chi cade sul guasto, col gruppo `guasto: <la cosa rotta>` e il numero nella nota (#1241); va alla gestione del lavoro, che risponde con le azioni `riprendi`, `attendi` o `archivia` (§ 4.3), dal punto 9 dell'ordine di lavoro (§ 13); fino ad allora, e sempre per l'addetto comunicazioni (§ 4.1), va all'owner |
+| `design` + `guasto` | domanda, azioni `riprendi` / `archivia`: la scrive chi cade sul guasto, col gruppo `guasto: <la cosa rotta>`, e la consegna con la fermata (#1577; senza, la consegna è rifiutata). Va alla gestione del lavoro, che risponde con le azioni `riprendi`, `attendi` o `archivia` (§ 4.3), dal punto 9 dell'ordine di lavoro (§ 13); fino ad allora, e sempre per l'addetto comunicazioni (§ 4.1), va all'owner |
 | `design` + `attesa_chiusa`, `loop`, `arenato`; `aligned` + `origine_chiusa`/`origine_mancante` | domanda, azioni `riprendi` / `archivia` |
-| `design` + `secaudit`, `l5`, `fidato`; attacchi, spam (anche segnati dal worker, L3), sospetti | Ricevuti |
+| `design` + `secaudit`, `l5`, `fidato`; attacchi, spam (anche segnati dal worker, L3), sospetti | Ricevuti, e nessun altro |
 
 Il feedback in attesa resta `design` (o `aligned`) col suo motivo e prende
 `domandaId`: la macchina a stati non cambia. Per l'owner, però, un `design` con una domanda

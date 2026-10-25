@@ -117,13 +117,15 @@ test('ogni ruolo che lavora riceve la regola una volta sola, dal pezzo condiviso
   assert.match(readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8'), /<!-- includi: _domanda-per-owner\.md -->/);
 });
 
-test('il modello della domanda di guasto: errore in parole, cosa fa l’owner, un’opzione per riparare, il messaggio nelle note', () => {
+test('il modello della domanda di guasto: errore in parole, cosa fa l’owner, strade che sbloccano, la riparazione a parte, il messaggio nelle note', () => {
   const pezzo = readFileSync(join(RUOLI, '_guasto-in-attesa.md'), 'utf8');
   const d = JSON.parse(/```json\n([\s\S]*?)\n\s*```/.exec(pezzo)[1]);
   assert.match(d.contesto, /cosa vuol dire l'errore, in parole tue/);
   assert.doesNotMatch(d.contesto, /messaggio|esatto/i, 'il messaggio esatto non sta nel testo per l’owner');
   assert.match(d.problema, /<cosa deve fare l'owner>/);
-  assert.ok(d.opzioni.some((o) => o.azione.tipo === 'compito'), 'un’opzione affida la riparazione a un agente');
+  // In una fermata ogni strada sblocca il lavoro (#1577): la riparazione da un agente va in una domanda a parte.
+  assert.ok(d.opzioni.every((o) => ['riprendi', 'archivia'].includes(o.azione.tipo)), 'ogni strada riprende o archivia');
+  assert.match(piatto(pezzo), /Una riparazione che un agente col repo può fare la proponi in una domanda a parte \(`domanda\.mjs chiedi`, azione `compito`, senza `blocca`\)/);
   assert.ok(d.opzioni.every((o) => !/^nessuno$/i.test(o.pro)), 'nessun «Nessuno» nel modello');
   assert.match(d.notePerAgenti, /il messaggio esatto/);
   assert.match(piatto(pezzo), /tieni quelle che per questo guasto hanno un pro vero/);

@@ -323,6 +323,9 @@
     .mg-dq-fiducia { padding: 0 6px; border-radius: 999px; cursor: help;
       color: var(--mg-fidata-color); border: 1px solid color-mix(in srgb, var(--mg-fidata-color) 55%, transparent); }
     .mg-dq-fiducia--no { color: var(--mg-nonfidata-color); border-color: color-mix(in srgb, var(--mg-nonfidata-color) 55%, transparent); }
+    /* Cosa fa la domanda al suo lavoro (#1577): ferma si legge come l'urgenza, va avanti resta tenue. */
+    .mg-dq-ferma { cursor: help; }
+    .mg-dq-ferma--si { color: var(--mg-urgente-color, #c0392b); font-weight: 600; }
     .mg-dq-legami { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
     .mg-dq-legami-pre { margin-right: 2px; }
     .mg-dq-legame { all: unset; cursor: pointer; color: var(--sn-accent); font-variant-numeric: tabular-nums; }

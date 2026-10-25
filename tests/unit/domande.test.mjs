@@ -118,3 +118,27 @@ test('schedaDi e gli id D-n', () => {
   assert.equal(D.numeroDi('D-0'), null);
   assert.equal(D.numeroDi('D-12/../x'), null);
 });
+
+// #1577: chi apre una domanda che riprende il lavoro dice se lo ferma; il server la lega e decide da lì.
+test('blocca: true o false, e serve quando un’opzione riprende il lavoro; senza riprendi non vale', () => {
+  const base = {
+    titolo: 'Caldo o freddo?', priorita: 'importante',
+    opzioni: [{ testo: 'Caldo', azione: { tipo: 'riprendi', feedbackId: 'f1' } }], consiglio: { opzione: 0, perche: 'è Filo' },
+  };
+  assert.equal(D.validaDomanda({ ...base, blocca: true }).domanda.blocca, true);
+  assert.equal(D.validaDomanda({ ...base, blocca: false }).domanda.blocca, false);
+  assert.equal('blocca' in D.validaDomanda(base).domanda, false, 'assente resta assente: la regola la applica chi sa il feedback');
+  assert.equal(D.validaDomanda({ ...base, blocca: 'sì' }).errore, 'domanda_non_valida');
+  for (const campo of ['legata', 'provvisoria']) assert.equal(D.validaDomanda({ ...base, [campo]: 'f9' }).ok, true, `${campo} lo scrive il server: si ignora`);
+  assert.equal(D.validaDomanda({ ...base, legata: 'f9' }).domanda.legata, undefined);
+
+  assert.equal(D.controllaBlocca(D.validaDomanda(base).domanda, 'f1').errore, 'blocca_mancante');
+  assert.match(D.controllaBlocca(D.validaDomanda(base).domanda, 'f1').dettaglio, /nel dubbio blocca/);
+  assert.equal(D.controllaBlocca(D.validaDomanda({ ...base, blocca: false }).domanda, 'f1'), null);
+  assert.equal(D.controllaBlocca(D.validaDomanda(base).domanda, 'f2'), null, 'riprende un altro feedback: non lega questo lavoro');
+  const aParte = D.validaDomanda({ ...base, opzioni: [{ testo: 'Spegni', azione: { tipo: 'automazione', chiave: 'routine.enabled', valore: false } }], blocca: true }).domanda;
+  assert.equal(D.controllaBlocca(aParte, 'f1').errore, 'blocca_senza_ripresa');
+  assert.equal(D.riprende(base, 'f1'), true);
+  assert.equal(D.riprende(base, 'f2'), false);
+  assert.equal(D.riprende(base), true);
+});
