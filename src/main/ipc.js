@@ -430,10 +430,10 @@ function registerIpcHandlers() {
     const s = shellSessions.get(key);
     return s && !s.dead && s.shell === resolveShell(shell) ? s.cwd : cwd;
   };
-  ipcMain.handle('shell:vaglia', async (event, { command, cwd, shell } = {}) => {
+  ipcMain.handle('shell:vaglia', async (event, { command, cwd, shell, daFuori } = {}) => {
     if (!(event.sender.getURL() || '').startsWith('filo://')) return { ok: false, error: 'forbidden' };
     if (typeof command !== 'string') return { ok: false, error: 'bad-args' };
-    const v = await decisioneComandoAMano({ comando: command, cwd: cartellaDellaSessione(event.sender.id, shell, cwd), shell: resolveShell(shell) });
+    const v = await decisioneComandoAMano({ comando: command, cwd: cartellaDellaSessione(event.sender.id, shell, cwd), shell: resolveShell(shell), daFuori: daFuori === true });
     if (v.risposta === 'si') { contaSe('confermaDecisa', 'ESEGUI_COMANDO', v.contati, 'automatica'); return { ok: true, risposta: 'si' }; }
     if (v.risposta === 'no') { contaSe('confermaDecisa', 'ESEGUI_COMANDO', v.contati, 'negata'); return { ok: true, risposta: 'no', no: v.no }; }
     const gettone = `comando:${require('node:crypto').randomBytes(12).toString('hex')}`;
