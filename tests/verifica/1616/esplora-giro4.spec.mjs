@@ -64,7 +64,7 @@ test.describe('finestrella', () => {
         const q = navigator.credentials.get({ mediation: 'conditional', signal: ctrl.signal, publicKey: { challenge: new Uint8Array(32), rpId: location.hostname, allowCredentials: [] } });
         const e = await Promise.race([q.then(() => 'ok', (x) => 'no:' + x.name), new Promise((res) => setTimeout(() => res('attesa'), 1000))]);
         ctrl.abort();
-        return { gpc: navigator.globalPrivacyControl, chrome: !!(window.chrome && window.chrome.runtime), cond: e };
+        return { gpc: navigator.globalPrivacyControl === true, chrome: !!(window.chrome && window.chrome.runtime), cond: e };
       });
       console.log('POPUP JS', JSON.stringify(r));
       expect({ gpc: v['sec-gpc'], ch: /Chromium/.test(v['sec-ch-ua'] || ''), js: r }).toEqual({ gpc: undefined, ch: true, js: { gpc: false, chrome: true, cond: 'attesa' } });
