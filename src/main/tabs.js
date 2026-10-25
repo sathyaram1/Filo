@@ -2757,8 +2757,14 @@ class TabManager {
         if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(failed, code, desc, { altroPaese: !!tab.proxy }));
       } catch (_) {}
     });
+    // L'esito di «Riprova» lo dà solo il viaggio verso il sito ritentato: Indietro, Avanti o un'altra pagina lo annullano.
+    wc.on('did-start-navigation', (details) => {
+      const r = tab._riprova;
+      if (!r || r.wc !== wc || !details || details.isMainFrame === false || details.isSameDocument) return;
+      if (indirizzoCanonico(details.url) !== r.verso) tab._riprova = null;
+    });
     wc.on('did-navigate', (_e, url) => {
-      if (tab._riprova && !(globalThis.SN_NET_ERROR && globalThis.SN_NET_ERROR.isErrorPageUrl(url))) this._esitoRiprova(tab, wc, true);
+      if (tab._riprova &&!(globalThis.SN_NET_ERROR && globalThis.SN_NET_ERROR.isErrorPageUrl(url))) this._esitoRiprova(tab, wc, true);
     });
     wc.on('did-finish-load', () => { if (tab._invioRespinto) tab._invioRespinto.caricata = true; });
     // #327 — renderer morto (crash/oom): stessa scheda bianca, stessa cura.
