@@ -2137,6 +2137,34 @@ async function decisioneAzionePagina({ costo, campo = 'web', sender = null } = {
   };
 }
 
+// #892.1 — un comando scritto a mano nella home passa dagli stessi livelli di quelli di Filo, giudicato nella cartella
+// e con la shell della sessione che lo eseguirà. Incollato o trascinato, l'autore è ignoto come quello di una pagina web.
+async function decisioneComandoAMano({ comando, cwd = '', shell = '', incollato = false } = {}) {
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  const cmd = String(comando || '').trim();
+  let impostazioni = {};
+  try { impostazioni = await Storage.getSettings(); } catch (_) {}
+  const action = { type: 'ESEGUI_COMANDO', comando: cmd, _perimetro: { ...perimetroLettura(null, cwd), shell } };
+  const ing = Levels ? Levels.ingressi(action, { impostazioni }) : null;
+  if (!cmd || !ing) return { risposta: 'no', digita: false, no: 'Questo comando non lo lancio.' };
+  const fonti = incollato ? [{ classe: 5, campo: 'terminale', chiave: 'terminale:incollato', motivo: 'il comando arriva da un testo incollato' }] : [];
+  const d = decisioneAutonomia(ing, { fontiLette: fonti, impostazioni });
+  const contati = ingressiContati(ing, d, { origine: 'chat', dentroPerimetro: ing.dentroPerimetro });
+  if (d.risposta === 'no') return { risposta: 'no', digita: false, no: fraseNo(ing, d, null).breve, contati };
+  if (d.risposta === 'si') return { risposta: 'si', digita: false, contati };
+  const C = globalThis.SN_CMD_CLASSIFY;
+  let motivo = '';
+  try { motivo = C && C.classifyDetail ? C.classifyDetail(cmd, action._perimetro).motivo : ''; } catch (_) {}
+  const dove = displayCwd(cartellaDelComando(cwd));
+  const parti = [
+    'Il comando che hai scritto, nel terminale:\n', { citazione: cmd, nuda: true },
+    ...(dove ? ['\nCartella di lavoro:\n', { citazione: dove, nuda: true }] : []),
+    ...(motivo ? [`\nPerché te lo chiedo: ${motivo}`] : []),
+    ...(d.perche ? [`\n\n${d.perche}`] : []),
+  ];
+  return { risposta: d.risposta, digita: d.digita, parti, contati };
+}
+
 // Il testo di un «no» lo dà SN_AUTONOMIA.fraseNo: breve per il diario, intero per il modello, con la strada che resta.
 function fraseNo(ing, decisione, sender) {
   return globalThis.SN_AUTONOMIA.fraseNo({
