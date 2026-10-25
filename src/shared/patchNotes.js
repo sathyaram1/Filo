@@ -12,7 +12,7 @@
       version: '0.2.251', date: '2026-10-29',
       features: [],
       fixes: [
-        'I tuoi feedback arrivano ai giudici solo attraverso host che si impegnano a non conservarli, come già le chiamate fatte coi crediti di Filo.',
+        'I tuoi feedback arrivano ai giudici solo attraverso host che si impegnano a non conservarli, come già le chiamate fatte coi crediti di Filo. Fa eccezione il giudice su Claude, che passa solo da Anthropic, e Anthropic li cancella entro 30 giorni.',
       ],
     },
     {

@@ -297,3 +297,11 @@ test('una riga fusa dopo che la sua versione è uscita arriva a chi aggiorna, in
     assert.deepEqual(PN.recap('0.2.230', '0.2.229', foto), []);
   });
 });
+
+// #851: una promessa sulla ritenzione zero dei giudici nomina l'eccezione del giudice su Claude, servito da Anthropic.
+test('una novità sui giudici che promette la ritenzione zero dice anche che Claude passa da Anthropic', () => {
+  const righe = PN.NOTES.flatMap((v) => [...(v.features || []), ...(v.fixes || [])])
+    .filter((r) => /giudici/.test(r) && /non conservar/.test(r));
+  assert.ok(righe.length > 0);
+  for (const r of righe) assert.match(r, /Anthropic/);
+});
