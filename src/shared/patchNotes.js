@@ -18,6 +18,7 @@
         'La pagina sulla privacy ora dice dove sta ogni parte del server, dal codice al database alle identità. Prima diceva solo che il codice gira in Europa, e sembrava che ci stessero anche i dati, che invece per ora sono negli Stati Uniti.',
         'Un\'immagine oltre i 4 MB incollata nella chat della home ora entra rimpicciolita. Prima spariva senza dire niente.',
         'L\'accesso con Google e con gli altri provider funziona anche in un Filo appena installato, e una passkey salvata sul telefono si usa col QR.',
+        'Un comando che scrivi nella home dopo la barra ora passa dagli stessi controlli dei comandi di Filo. Prima di cancellare qualcosa ti chiede un OK, e se annulli il comando torna nella casella com\'era. Una barra seguita da una parola che non è un programma torna a essere un messaggio per Filo.',
       ],
     },
     {
