@@ -73,6 +73,7 @@ async function conserva(dato) {
 
 async function scrivi(buf, tipo) {
   const nome = `${crypto.createHmac('sha256', laChiave()).update(buf).digest('hex').slice(0, 40)}.${ESTENSIONE[tipo]}`;
+  recenti.set(nome, Date.now());
   const file = path.join(cartella(), nome);
   if (!fs.existsSync(file)) {
     // La cartella può sparire con Filo aperto: si rifà.
