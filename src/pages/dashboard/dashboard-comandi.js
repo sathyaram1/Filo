@@ -665,9 +665,7 @@
     if (isTerminalMode()) {
       const chat = chatDellaRiga();
       const programma = programmaDi(text);
-      // Solo una parola o un percorso: `$x = 1`, `FOO=bar`, `(cd x)` sono sintassi della shell, non programmi da cercare.
-      const parola = !!programma && /^[\p{L}\p{N}_.~/\\:-]+$/u.test(programma);
-      if (!programma || (parola && (await esisteInShell(programma)) === false)) { updateInputClass(); return false; }
+      if (!programma || (!sintassiShell(programma) && (await esisteInShell(programma)) === false)) { updateInputClass(); return false; }
       inputEl.value = '';
       autoGrowInput();
       updateInputClass();
