@@ -5577,9 +5577,10 @@
     if (!v) {
       const nota = MR.judgesNote ? MR.judgesNote(fb) : null;
       const saltati = MR.judgesSkippedText(fb);
+      const causa = expected ? MR.judgeFailureText(fb, expected[i], { owner: isAdmin }) : '';
       openSidebar(anonLabel, `
         <div class="mg-judge-detail">
-          <div class="mg-liv-testo">${saltati ? esc(saltati) : 'Nessun verdetto in questa valutazione: il giudice non ha risposto — scaduto il tempo, credito esaurito o modello non configurato.'}</div>
+          <div class="mg-liv-testo">${saltati ? esc(saltati) : causa ? esc(causa) : 'Nessun verdetto in questa valutazione: il giudice non ha risposto — scaduto il tempo, credito esaurito o modello non configurato.'}</div>
           ${nota && nota.text && !saltati ? `<div class="mg-judge-model">${esc(nota.text)}</div>` : ''}
           ${nonVisteRow}
         </div>

@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
     // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.251', date: '2026-10-29',
+      features: [],
+      fixes: [
+        'I tuoi feedback arrivano ai giudici solo attraverso host che si impegnano a non conservarli, come già le chiamate fatte coi crediti di Filo.',
+      ],
+    },
+    {
       version: '0.2.250', date: '2026-10-23',
       features: [
         'Passando il mouse su una risposta di Filo, sotto compaiono Copia e Rispondi. Copia mette il testo negli appunti senza segni di formattazione. Rispondi la cita sopra la casella, come su WhatsApp, e il tuo messaggio parte con la citazione in testa. Così Filo sa a cosa stai rispondendo, e un clic sulla citazione ti riporta alla sua risposta.',

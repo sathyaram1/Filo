@@ -967,8 +967,38 @@ test('reevalErrorHint: ogni causa azionabile ha una frase; sconosciuto/other →
   assert.match(MR.reevalErrorHint('rate_limit'), /sovraccarico|riprova/i);
   assert.match(MR.reevalErrorHint('bad_request'), /modell/i);
   assert.match(MR.reevalErrorHint('timeout'), /[Tt]imeout/);
+  assert.match(MR.reevalErrorHint('zdr'), /non conservare i dati/);
+  assert.match(MR.reevalErrorHint('no_host'), /politica sui modelli/);
   assert.equal(MR.reevalErrorHint('other'), null);
   assert.equal(MR.reevalErrorHint(null), null);
+});
+
+// #851: il server scrive perché un giudice non ha votato; il pallino tratteggiato lo dice invece della frase generica.
+test('judgeFailureText: la causa scritta dal server, col modello solo per l\'owner', () => {
+  const fb = { pipeline: {
+    expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3'],
+    missingJudges: ['fixed_2', 'fixed_3'],
+    judgeFailures: [
+      { judge: 'fixed_2', kind: 'zdr', model: 'z-ai/glm-5.2', message: 'nessun host a ritenzione zero per z-ai/glm-5.2' },
+      { judge: 'fixed_3', kind: 'other', model: 'moonshotai/kimi-k2.6', message: 'verdetto non interpretabile da fixed_3' },
+    ],
+  } };
+  const owner = MR.judgeFailureText(fb, 'fixed_2', { owner: true });
+  assert.match(owner, /«z-ai\/glm-5\.2»/);
+  assert.match(owner, /non conservare i dati/);
+  assert.match(owner, /Modelli di supporto/);
+  const altri = MR.judgeFailureText(fb, 'fixed_2');
+  assert.doesNotMatch(altri, /glm/, 'il modello di un giudice non si mostra a chi non è owner');
+  assert.match(altri, /non conservare i dati/);
+  assert.match(MR.judgeFailureText(fb, 'fixed_3', { owner: true }), /verdetto non interpretabile/);
+  assert.equal(MR.judgeFailureText(fb, 'fixed_3'), '');
+  assert.match(MR.judgeFailureText({ pipeline: { judgeFailures: [{ judge: 'dynamic', kind: 'no_host', model: 'x/y' }] } }, 'dynamic', { owner: true }), /politica sui modelli/);
+  assert.match(MR.judgeFailureText({ pipeline: { judgeFailures: [{ judge: 'dynamic', kind: 'credit' }] } }, 'dynamic'), /credito/);
+  // Senza causa registrata (pipeline di prima, giudice che ha votato, campo rotto) resta la frase generica.
+  for (const x of [{}, { pipeline: null }, { pipeline: { judgeFailures: 'x' } }, { pipeline: { judgeFailures: [null, 3] } }]) {
+    assert.equal(MR.judgeFailureText(x, 'fixed_2', { owner: true }), '');
+  }
+  assert.equal(MR.judgeFailureText(fb, 'fixed_1', { owner: true }), '');
 });
 
 test('classifyReevalResult: niente da fare (already_complete / not_unfiltered) → outcome noop', () => {

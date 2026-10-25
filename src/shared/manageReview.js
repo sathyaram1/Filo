@@ -1053,9 +1053,31 @@
         return 'I giudici non hanno risposto in tempo: alza il "Timeout dei giudici" in Automazioni se usi modelli lenti.';
       case 'non_decifrabile':
         return 'Il server non riesce ancora a decifrare il feedback: l’allarme dice cosa riparare.';
+      case 'zdr':
+        return 'Un modello dei giudici non ha host che si impegnano a non conservare i dati, e i giudici non ripiegano su chi li conserva: cambialo in Automazioni, fra i Modelli di supporto.';
+      case 'no_host':
+        return 'Un modello dei giudici non ha host ammessi dalla politica sui modelli: cambialo in Automazioni, fra i Modelli di supporto.';
       default:
         return null;
     }
+  }
+
+  // Perché un giudice non ha votato, dalla causa che il server scrive nel pipeline (#851); '' se non c'è. Il modello
+  // lo legge solo l'owner, come nel titolo di un verdetto.
+  function judgeFailureText(fb, judgeName, { owner = false } = {}) {
+    const p = fb && fb.pipeline;
+    const l = p && typeof p === 'object' && Array.isArray(p.judgeFailures) ? p.judgeFailures : [];
+    const f = l.find((x) => x && typeof x === 'object' && x.judge === judgeName);
+    if (!f) return '';
+    const model = owner && typeof f.model === 'string' ? f.model.trim() : '';
+    const di = model ? `di «${model}»` : 'del modello di questo giudice';
+    const rimedio = owner ? ' Cambia modello in Automazioni, fra i Modelli di supporto.' : '';
+    if (f.kind === 'zdr') return `Nessun host ${di} si impegna a non conservare i dati: il giudizio è fallito invece di ripiegare su chi li conserva.${rimedio}`;
+    if (f.kind === 'no_host') return `Nessun host ${di} è ammesso dalla politica sui modelli: il giudizio è fallito invece di ripiegare.${rimedio}`;
+    const hint = reevalErrorHint(f.kind);
+    if (hint) return hint;
+    const msg = owner && typeof f.message === 'string' ? f.message.trim() : '';
+    return msg ? `Il giudice non ha risposto: ${msg}` : '';
   }
 
   // Quanti 'wasted' di fila tollerare prima di fermare tutto: se i giudici falliscono a vuoto
@@ -1925,7 +1947,7 @@
     panelComplete, judgesNote, reasonText,
     statusUnreadable, valueUnreadable, sectionsReliable, publicStateLabel, PUBLIC_STATE_HINT,
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
-    classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
+    classifyReevalResult, reevalErrorHint, judgeFailureText, REEVAL_WASTE_LIMIT,
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
     fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, schedaIngresso, rigiudicabile,
