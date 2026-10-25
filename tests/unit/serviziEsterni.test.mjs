@@ -110,6 +110,7 @@ const IMMAGINI_DAI_DATI = [
   { file: 'src/pages/feedback/feedback.js', funzione: 'render', testo: 'img.src = dataUrl;', perche: 'l’allegato decifrato dal main, data:' },
   { file: 'src/pages/manage/manage.js', funzione: 'resolveBubbleImages', testo: 'img.src = dataUrl;', perche: 'l’allegato decifrato dal main, data:' },
   { file: 'src/pages/manage/manage.js', funzione: 'openLightbox', testo: 'mgLightboxImg.src = src;', perche: 'l’ingrandimento di un’anteprima già a schermo' },
+  { file: 'src/shared/immaginiChat.js', funzione: 'apri', testo: 'img.src = url;', perche: 'un’immagine della chat che il sistema non apre da solo (svg): un blob: fatto lì sopra dai suoi byte' },
 ];
 
 // In un file che fa rete ogni testo con la forma di un nome di dominio è una destinazione, per qualunque strada arrivi
