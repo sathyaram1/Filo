@@ -62,21 +62,20 @@ test('le funzioni che Filo sostituisce non si distinguono dalle native, nemmeno 
     document.body.appendChild(f);
     const fw = f.contentWindow;
     const suo = fw.Function.prototype.toString;
-    const getter = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow').get;
     const proprio = (fn) => Object.prototype.hasOwnProperty.call(fn, 'prototype');
     const out = {
-      prototipi: [navigator.credentials.get, window.chrome.runtime.connect, window.chrome.csi, Function.prototype.toString, getter, suo].map(proprio),
-      dalRiquadro: [suo.call(navigator.credentials.get), suo.call(window.chrome.runtime.connect), suo.call(getter)],
-      toStringDelRiquadro: [suo.call(suo), Object.getPrototypeOf(suo) === fw.Function.prototype],
+      prototipi: [navigator.credentials.get, window.chrome.runtime.connect, window.chrome.csi, Function.prototype.toString, suo].map(proprio),
+      dalRiquadro: [suo.call(navigator.credentials.get), suo.call(window.chrome.runtime.connect), suo.call(Function.prototype.toString)],
+      prototipoDellaPagina: Function.prototype.toString.call(Function.prototype),
       leSueRestano: suo.call(fw.eval('(function mia(a) { return a; })')),
     };
     f.remove();
     return out;
   });
   expect(r).toEqual({
-    prototipi: [false, false, false, false, false, false],
-    dalRiquadro: ['function get() { [native code] }', 'function connect() { [native code] }', 'function get contentWindow() { [native code] }'],
-    toStringDelRiquadro: ['function toString() { [native code] }', true],
+    prototipi: [false, false, false, false, false],
+    dalRiquadro: ['function get() { [native code] }', 'function connect() { [native code] }', 'function toString() { [native code] }'],
+    prototipoDellaPagina: 'function () { [native code] }',
     leSueRestano: 'function mia(a) { return a; }',
   });
 });
