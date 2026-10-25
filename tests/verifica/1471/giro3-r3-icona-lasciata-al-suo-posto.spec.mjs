@@ -1,4 +1,4 @@
-// Verifica #1471, giro 2, rilievo 3: un'icona presa e lasciata dov'era non è uno spostamento.
+// Verifica #1471, giro 3, rilievo 3: un'icona presa e lasciata dov'era non è uno spostamento.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { menuDi } from '../../helpers/menuContestuale.mjs';
