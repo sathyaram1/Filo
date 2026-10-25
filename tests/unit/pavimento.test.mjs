@@ -380,3 +380,19 @@ test('il corpo di una chiave privata PGP e di una chiave PuTTY non esce', () => 
   assert.ok(!t.includes('AAAAIFq8xR2vT7mN4pK9wL3sA1dF6gH8jZ0cX2vB5nM7qW4eR9tY1uLqW3eR5'));
   assert.ok(t.includes('AAAAC3NzaC1lZDI1NTE5AAAAIOgJ8X2vB5nM7qW4eR9tY1u'), 'la parte pubblica resta');
 });
+
+// Le cose che un codice apre si riconoscono; il numero sulla riga sotto conta solo per un codice che non ha già il suo.
+test('il codice che apre un cancello, una cassaforte, un ritiro o un prelievo non esce; la riga sotto un codice completo resta', () => {
+  for (const [t, s] of [['Il codice del cancello è 4829.', '4829'], ['Il codice della cassetta delle chiavi è 7316.', '7316'],
+    ['Il codice della cassaforte è 5502.', '5502'], ['Il tuo codice di prelievo è 918273.', '918273'], ['Codice di ritiro: 640385', '640385'],
+    ['Codice di ritiro del tuo ordine: 640385', '640385'], ['Codice allarme: 4829', '4829'], ['Il codice del wifi è 48291375', '48291375'],
+    ['Il codice del dispositivo è 4829-1736', '4829-1736'], ['Codice porta 4829', '4829'], ['Your pickup code is 640385', '640385'],
+    ['gate code 4829', '4829'], ['Il tuo codice di verifica\n482913', '482913'], ['Ti abbiamo inviato un codice al +39 333 1234567\n482913', '482913'],
+    ['Grazie per l\'ordine 48291. Il tuo codice di verifica è:\n482913', '482913']]) {
+    assert.ok(!P.oscura(t).includes(s), t);
+  }
+  for (const t of ['Codice evento | 739204\nPosti disponibili | 1200', 'Codice corso: 4829\nAula 1203',
+    'Il corso inizia alle 18. Codice del corso: 4829\nIscritti 1250', 'Porta con te il codice abbonamento 48291375']) {
+    assert.equal(P.oscura(t), t, t);
+  }
+});
