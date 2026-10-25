@@ -2,7 +2,7 @@
 id: models
 title: Politica sui modelli
 subtitle: Le motivazioni etiche che governano la scelta dei modelli.
-updated: 2026-09-26
+updated: 2026-10-25
 order: 1
 ---
 
@@ -42,6 +42,8 @@ La regola non è "mai il produttore": da Anthropic compro esattamente dal produt
 Non verranno quindi mai usati, attraverso i crediti di Filo, i **servizi** di **OpenAI** (ChatGPT), **xAI/SpaceX** (Grok), **Meta** (l'azienda che controlla Facebook e Instagram, e produce MuseSpark), **Google** (formalmente Alphabet, che produce Gemini) e dei laboratori cinesi (Moonshot, Z.ai, Alibaba, DeepSeek, Xiaomi...). Le ragioni sono nelle sezioni che seguono.
 
 **Come è applicata:** Filo non compra dai fornitori direttamente: passa da un servizio (OpenRouter) che smista le richieste e sceglie da sé chi ospita ogni modello. Lasciato a sé, prima o poi manderebbe la richiesta anche al produttore escluso da questa policy. Quindi la lista di esclusione viaggia con ogni richiesta, e **a risposta arrivata Filo registra chi l'ha effettivamente servita** e segnala se è qualcuno che doveva essere fuori.
+
+**Vale anche fuori da Filo.** La stessa lista è scritta sulla chiave personale con cui spendi i crediti di Filo. Se la copi in un altro programma, OpenRouter rifiuta comunque di mandare le richieste ai fornitori esclusi. La chiave però blocca chi serve, non quale modello chiedi. Le tre categorie le applica Filo, e fuori dall'app resta solo la lista di esclusione.
 
 **Con una tua chiave OpenRouter puoi usare quello che vuoi, basta un interruttore nelle Opzioni:** non ti impongo limiti con i tuoi soldi. I limiti valgono solo per i crediti di Filo.
 
