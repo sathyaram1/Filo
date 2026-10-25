@@ -2152,8 +2152,13 @@ async function decisioneComandoAMano({ comando, cwd = '', shell = '' } = {}) {
   if (d.risposta === 'no') return { risposta: 'no', digita: false, no: fraseNo(ing, d, null).breve, contati };
   if (d.risposta === 'si') return { risposta: 'si', digita: false, contati };
   const C = globalThis.SN_CMD_CLASSIFY;
+  // Chi incolla una riga da un sito non legge il comando: la domanda dice a parole cosa rischia, anche quando il
+  // classificatore non ha un motivo di perimetro (il suo livello 3 è «cambia, cancella o non lo riconosco»).
   let motivo = '';
-  try { motivo = C && C.classifyDetail ? C.classifyDetail(cmd, action._perimetro).motivo : ''; } catch (_) {}
+  try {
+    const det = C && C.classifyDetail ? C.classifyDetail(cmd, action._perimetro) : null;
+    motivo = (det && det.motivo) || (!det || det.level >= 3 ? 'questo comando può cancellare o cambiare dei file, oppure Filo non sa dire cosa fa.' : '');
+  } catch (_) {}
   const dove = displayCwd(cartellaDelComando(cwd));
   const parti = [
     'Il comando che hai scritto, nel terminale:\n', { citazione: cmd, nuda: true },
