@@ -461,8 +461,9 @@
     if (isTerminalMode()) {
       // In terminale "/x" è un comando shell: azzurro se esiste, rosso se no.
       const cmd = programmaDi(t);
-      if (!cmd) return 'none';
-      if (sintassiShell(cmd)) return 'incerto';
+      if (cmd === SINTASSI) return 'incerto';
+      // Senza programma va a Filo: rosso, salvo mentre si sta ancora aprendo la riga («/», «/(»).
+      if (!cmd) return /^\/[\s({!&]*$/.test(t) ? 'none' : 'unknown';
       const chiave = chiaveShell(cmd);
       if (shellCmdCache.has(chiave)) return shellCmdCache.get(chiave) ? 'shell' : 'unknown';
       if (Date.now() - (shellCmdIncerti.get(chiave) ?? -Infinity) < RIPROVA_INCERTO_MS) return 'incerto';
