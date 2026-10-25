@@ -44,6 +44,7 @@ test('profilo nuovo: una cancellazione scritta a mano chiede prima, col no torna
   const st = await confirmState(page);
   expect(st.text, 'il popup mostra il comando che partirà').toContain(rmDi(bersaglio));
   expect(st.hasInput, 'su un profilo nuovo (Normale) una cancellazione chiede un OK').toBe(false);
+  expect(st.fuori, 'fuori dal comando citato la domanda dice a parole cosa rischia chi preme OK').toMatch(/cancellare/);
   await page.screenshot({ path: 'tests/.shots/892-1-conferma.png' }).catch(() => {});
   expect(existsSync(bersaglio), 'mentre chiede non è partito niente').toBe(true);
 
