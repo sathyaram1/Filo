@@ -439,7 +439,7 @@ function registerIpcHandlers() {
     const gettone = `comando:${require('node:crypto').randomBytes(12).toString('hex')}`;
     const ora = Date.now();
     for (const [g, c] of comandiDaConfermare) if (c.scade < ora) comandiDaConfermare.delete(g);
-    comandiDaConfermare.set(gettone, { chi: event.sender.id, comando: command.trim(), scade: ora + CONFERMA_COMANDO_MS });
+    comandiDaConfermare.set(gettone, { chi: event.sender.id, comando: command.trim(), daFuori: daFuori === true, scade: ora + CONFERMA_COMANDO_MS });
     contaSe('confermaChiesta', gettone, 'ESEGUI_COMANDO', v.contati);
     return { ok: true, risposta: v.risposta, digita: v.digita === true, parti: v.parti, gettone };
   });
