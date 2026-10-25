@@ -6,6 +6,7 @@
   const { STORAGE_KEYS, SAVED_PAGES_LIMIT } = global.SN_CONST;
   // Nel file dei dati entra solo un'anteprima già piccola, da qualunque strada arrivi (#839).
   const { accettabile } = require('./miniature');
+  const Copie = require('./copieIcone');
 
   function uuid() {
     if (crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -16,16 +17,31 @@
     });
   }
 
-  async function list() {
-    const res = await chrome.storage.local.get(STORAGE_KEYS.SAVED_PAGES);
-    return res[STORAGE_KEYS.SAVED_PAGES] || [];
+  // L'icona di una voce è la copia che Filo tiene (#1273): un indirizzo di rete (le voci di prima) non arriva a nessuna
+  // pagina, passa in `faviconDaChiedere`, che il riordino delle icone chiede una volta sola, senza cookie.
+  function conIconaLocale(p) {
+    const f = p && typeof p.favicon === 'string' ? p.favicon : '';
+    if (!f || Copie.eLocale(f)) return p;
+    const daChiedere = p.faviconDaChiedere || (/^https?:\/\//i.test(f) ? f : '');
+    const { faviconDaChiedere, ...resto } = p;
+    return { ...resto, favicon: '', ...(daChiedere ? { faviconDaChiedere: daChiedere } : {}) };
   }
 
-  async function save(page) {
+  async function list() {
+    const res = await chrome.storage.local.get(STORAGE_KEYS.SAVED_PAGES);
+    return (res[STORAGE_KEYS.SAVED_PAGES] || []).map(conIconaLocale);
+  }
+
+  // `page.favicon`: il data: URL che la scheda ha già scaricato con la sua sessione; un indirizzo qui non si segue.
+  // Senza copia la voce la chiede una volta al riordino delle icone (iconeVecchie.js), salvo se `proxy` dice che la scheda
+  // passava da un proxy: da qui la richiesta uscirebbe dalla connessione vera.
+  async function save(page, { proxy = null } = {}) {
     // Dalla pagina d'errore di Filo si mette da parte il sito che non si è caricato, non la pagina interna (#839).
     const sito = global.SN_NET_ERROR?.targetOf?.(page.url);
     if (sito) page = { ...page, url: sito, favicon: '' };
     const thumbnail = accettabile(page.thumbnail);
+    const icona = await Copie.conserva(page.favicon);
+    const dalProxy = proxy && proxy.country ? { country: String(proxy.country), tier: proxy.tier || null } : null;
     const pages = await list();
 
     // Ri-salvare una pagina già in elenco aggiorna la voce e la riporta in cima, senza
@@ -34,12 +50,16 @@
     if (idx >= 0) {
       const existing = pages[idx];
       existing.title = page.title || existing.title || page.url;
-      if (page.favicon) existing.favicon = page.favicon;
+      const vecchia = existing.favicon;
+      if (icona) { existing.favicon = icona; delete existing.faviconDaChiedere; delete existing.iconaMancante; }
+      if (dalProxy) existing.proxy = dalProxy;
       if (thumbnail) existing.thumbnail = thumbnail;
       existing.savedAt = new Date().toISOString();
       pages.splice(idx, 1);
       pages.unshift(existing);
       await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: pages });
+      if (vecchia !== existing.favicon) Copie.togliSeOrfane(vecchia);
+      if (!existing.favicon) riordinaIcone();
       return existing;
     }
 
@@ -47,7 +67,8 @@
       id: uuid(),
       url: page.url,
       title: page.title || page.url,
-      favicon: page.favicon || '',
+      favicon: icona,
+      ...(dalProxy ? { proxy: dalProxy } : {}),
       thumbnail,
       savedAt: new Date().toISOString(),
       category: page.category || null,
@@ -55,13 +76,22 @@
     };
     pages.unshift(entry);
     await scriviNelTetto(pages);
+    if (!icona && !dalProxy) riordinaIcone();
     return entry;
+  }
+
+  const Vecchie = () => require('./iconeVecchie');
+  function riordinaIcone() {
+    try { Vecchie().pianifica(); } catch (_) {}
   }
 
   async function scriviNelTetto(pages) {
     const fuori = pages.length > SAVED_PAGES_LIMIT ? pages.splice(SAVED_PAGES_LIMIT) : [];
     await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: pages });
-    if (fuori.length) dichiaraUscite(fuori);
+    if (fuori.length) {
+      dichiaraUscite(fuori);
+      Copie.togliSeOrfane(fuori.map((p) => p.favicon));
+    }
   }
 
   // L'elenco vive in storage.json, che si riscrive intero: il tetto resta, ma chi esce lo si dice (#1088).
@@ -99,10 +129,16 @@
     const indice = pages.findIndex((p) => p.id === id);
     if (indice < 0) return pages;
     rimosse.delete(id);
-    rimosse.set(id, { entry: pages[indice], indice });
+    const tolta = { entry: pages[indice], indice, icona: '' };
+    rimosse.set(id, tolta);
     while (rimosse.size > RIMOSSE_TETTO) rimosse.delete(rimosse.keys().next().value);
     const filtered = pages.filter((p) => p.id !== id);
     await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: filtered });
+    // Il file dell'icona se ne va con la voce; per l'«Annulla» i suoi byte restano qui in memoria.
+    if (Copie.eCopia(tolta.entry.favicon)) {
+      tolta.icona = await Copie.comeDato(tolta.entry.favicon);
+      Copie.togliSeOrfane(tolta.entry.favicon);
+    }
     return filtered;
   }
 
@@ -110,12 +146,13 @@
   // stata eliminata, la voce torna fra le non categorizzate invece di finire in un gruppo che non si vede).
   async function rimetti(id, categorie) {
     const tolta = rimosse.get(id);
+    const icona = tolta && tolta.icona ? await Copie.conserva(tolta.icona) : '';
     const pages = await list();
     if (!tolta) return { pages, entry: null };
     rimosse.delete(id);
     // Risalvata nel frattempo: resta quella più nuova, senza doppioni.
     if (pages.some((p) => p.id === id || p.url === tolta.entry.url)) return { pages, entry: null };
-    const entry = { ...tolta.entry };
+    const entry = { ...tolta.entry, ...(tolta.icona ? { favicon: icona } : {}) };
     if (entry.categoryId && Array.isArray(categorie)) {
       const cat = categorie.find((c) => c.id === entry.categoryId);
       entry.categoryId = cat ? cat.id : null;
@@ -135,5 +172,26 @@
     return remove(id);
   }
 
-  global.SN_SAVED_PAGES = { list, save, setThumbnail, remove, rimetti, consume, rimpicciolisciMiniature: require('./miniature').rimpicciolisciSalvate };
+  // `esiti`: id → { prima, a } dal riordino delle icone (iconeVecchie.js); una voce cambiata nel frattempo resta com'è.
+  async function aggiornaIcone(esiti) {
+    const pages = await list();
+    let cambiate = 0;
+    for (const p of pages) {
+      const e = esiti.get(p.id);
+      if (!e || Vecchie().statoIcona(p) !== e.prima) continue;
+      Object.assign(p, Vecchie().esitoIcona(p, e.a));
+      if (!p.faviconDaChiedere) delete p.faviconDaChiedere;
+      if (!p.iconaMancante) delete p.iconaMancante;
+      cambiate++;
+    }
+    if (cambiate) await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: pages });
+    return cambiate;
+  }
+
+  Copie.usaCopie('pagine-salvate', async () => (await list()).map((p) => p.favicon));
+
+  global.SN_SAVED_PAGES = {
+    list, save, setThumbnail, remove, rimetti, consume, aggiornaIcone,
+    rimpicciolisciMiniature: require('./miniature').rimpicciolisciSalvate,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -15,6 +15,7 @@
         'Nella home puoi chiedere a Filo di chiudere le schede: «chiudi tutte le schede tranne questa», «chiudi YouTube», «chiudi tutto tranne Gmail». Le pagine chiuse restano nel filo della home. Una scheda con del testo che non hai ancora inviato resta aperta, a meno che tu non insista.',
       ],
       fixes: [
+        'Le icone delle pagine salvate e delle schede chiuse, e la foto del tuo account Google, Filo le tiene sul tuo computer. La home e la chat le mostrano subito, senza chiederle ogni volta ai siti, e l\'icona di una scheda aperta da un altro paese non esce più dal proxy.',
         'La pagina sulla privacy ora dice dove sta ogni parte del server, dal codice al database alle identità. Prima diceva solo che il codice gira in Europa, e sembrava che ci stessero anche i dati, che invece per ora sono negli Stati Uniti.',
         'Un\'immagine oltre i 4 MB incollata nella chat della home ora entra rimpicciolita. Prima spariva senza dire niente.',
         'L\'accesso con Google e con gli altri provider funziona anche in un Filo appena installato, e una passkey salvata sul telefono si usa col QR.',

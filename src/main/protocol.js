@@ -1,6 +1,6 @@
 // Protocollo filo://: serve pagine interne e asset dal disco (la tabella
 // host → cartella sta in filoHandler). Registrato standard+secure+fetch, quindi
-// non deve MAI servire un file fuori dalla root del progetto.
+// non deve MAI servire un file fuori dalla root del progetto (filo://icone: dalla cartella dati).
 
 const { protocol, net } = require('electron');
 const path = require('node:path');
@@ -97,6 +97,8 @@ async function filoHandler(request) {
 
     const spostato = indirizzoSpostato(host, rel);
     if (spostato) return new Response(null, { status: 302, headers: { Location: spostato } });
+    // Le icone che Filo tiene per pagine salvate e schede archiviate (#1273) stanno nella cartella dati, non nel pacchetto.
+    if (host === 'icone') return require('./services/copieIcone').risposta(rel);
 
     let fsPath;
     if (host === 'shell') {

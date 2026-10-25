@@ -267,11 +267,22 @@
 
     const dom = document.createElement('div');
     dom.className = 'sn-card-domain';
-    if (page.favicon) {
+    // Solo la copia che Filo tiene dell'icona (#1273): un indirizzo di rete aprirebbe una richiesta a ogni apertura.
+    // Senza copia, o se non si carica, il globo: come la home per gli stessi siti.
+    const generica = () => {
+      const g = document.createElement('span');
+      g.className = 'sn-card-ico';
+      g.setAttribute('aria-hidden', 'true');
+      g.innerHTML = typeof window.SN_ICONS?.globe === 'function' ? window.SN_ICONS.globe(14) : '';
+      return g;
+    };
+    if (/^(filo:\/\/icone\/|data:image\/)/.test(page.favicon || '')) {
       const img = document.createElement('img');
       img.src = page.favicon;
-      img.onerror = () => img.remove();
+      img.onerror = () => img.replaceWith(generica());
       dom.appendChild(img);
+    } else {
+      dom.appendChild(generica());
     }
     const span = document.createElement('span');
     try { span.textContent = new URL(page.url).hostname; } catch (_) { span.textContent = page.url; }

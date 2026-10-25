@@ -193,11 +193,12 @@ async function salvaPerDopo(win, tab) {
   // I dati della scheda si fotografano prima di ogni attesa: un redirect intanto farebbe salvare la pagina sbagliata (#334).
   const url = tab.url;
   const title = tab.title;
-  const favicon = tab.faviconUrl || '';
+  // L'icona già scaricata con la sessione della scheda (proxy compreso): la voce ne tiene la copia (#1273).
+  const favicon = tab.favicon || '';
   if (await consegnaConRicevuta(tab, 'save-for-later')) return null;
   // Pagina che non l'ha presa (ancora in caricamento, bloccata): si salva comunque, prima della miniatura.
   const entry = await comeLaFinestra(win, async () => {
-    const res = await handleMessage({ type: MSG.SAVE_PAGE, page: { url, title, favicon } });
+    const res = await handleMessage({ type: MSG.SAVE_PAGE, page: { url, title, favicon }, proxy: tab.proxy || null });
     const thumbnail = await dallaScheda(tab.view.webContents);
     if (thumbnail && res?.entry?.id) await globalThis.SN_SAVED_PAGES.setThumbnail(res.entry.id, thumbnail);
     return res?.entry;

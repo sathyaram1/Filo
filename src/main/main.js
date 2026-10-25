@@ -270,6 +270,8 @@ app.whenReady().then(async () => {
     try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}
     // Le miniature grandi di «Aperti per dopo» (#839), qualche secondo dopo: l’avvio non le aspetta.
     setTimeout(() => { globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {}); }, 3000);
+    // Le icone delle voci rimaste senza copia (#1273), una volta sola e dopo l'avvio.
+    try { require('./services/iconeVecchie').avvio(); } catch (_) {}
     // La cronologia AI di storage.json passa ai suoi file subito, non alla prima richiesta: fino ad allora ogni scrittura la ripaga.
     setTimeout(() => { globalThis.SN_HISTORY?.prepara().catch(() => {}); }, 2000);
   } catch (_) {}

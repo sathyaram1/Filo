@@ -1,5 +1,5 @@
-// Le icone dei siti della home e della chat (#848): prima la copia già vista, poi /favicon.ico del sito, senza cookie,
-// e nessun servizio di icone di terzi in src/.
+// Le icone dei siti della home e della chat (#848): prima la copia già vista o tenuta da Filo (#1273), poi, per un sito
+// che Filo non ha fra le sue voci, /favicon.ico del sito, senza cookie; e nessun servizio di icone di terzi in src/.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,17 +44,39 @@ test('una scheda di un altro sito, o di un\'altra porta, non presta la sua icona
   assert.deepEqual(ses.chiesti.map((c) => c.url), ['http://127.0.0.1:8000/favicon.ico']);
 });
 
-test('senza schede: prima l\'icona dichiarata da una pagina salvata o archiviata, poi /favicon.ico, sempre senza cookie', async () => {
-  const ses = sessione({ 'https://cdn.esempio.it/logo.png': PNG });
-  const { cercaIconaSito } = I.crea();
+const COPIA = 'filo://icone/0123456789abcdef0123456789abcdef01234567.png';
+
+test('senza schede: la copia che Filo tiene per una pagina salvata o archiviata di quel sito, senza nessuna richiesta', async () => {
+  const ses = sessione({ 'https://esempio.it/favicon.ico': PNG });
+  const letti = [];
+  const { cercaIconaSito } = I.crea({ leggiCopia: async (r) => { letti.push(r); return r === COPIA ? DATO : ''; } });
   const voci = async () => [
-    { url: 'https://altro.it/', favicon: 'https://altro.it/a.png' },
-    { url: 'https://esempio.it/salvata', favicon: 'https://esempio.it/vecchia.png' },
-    { url: 'https://www.esempio.it/archiviata', favicon: 'https://cdn.esempio.it/logo.png' },
+    { url: 'https://altro.it/', favicon: 'filo://icone/ffffffffffffffffffffffffffffffffffffffff.png' },
+    { url: 'https://esempio.it/salvata', favicon: '' },
+    { url: 'https://www.esempio.it/archiviata', favicon: COPIA },
   ];
   assert.equal(await cercaIconaSito('https://esempio.it/', { ses, voci }), DATO);
-  assert.deepEqual(ses.chiesti.map((c) => c.url), ['https://esempio.it/vecchia.png', 'https://cdn.esempio.it/logo.png']);
-  assert.ok(ses.chiesti.every((c) => c.init.credentials === 'omit'), 'a un sito che non hai aperto non vanno i cookie');
+  assert.deepEqual(letti, [COPIA]);
+  assert.deepEqual(ses.chiesti, [], 'l\'icona di un sito salvato o archiviato non si richiede a ogni avvio');
+});
+
+test('un sito fra le voci senza copia la fa chiedere una volta al riordino delle icone, mai da qui; dal proxy, già tentata o in incognito niente', async () => {
+  const ses = sessione({ 'https://dal-proxy.it/favicon.ico': PNG, 'https://vecchio.it/icona.png': PNG });
+  let vecchie = [{ url: 'https://vecchio.it/a', favicon: '', faviconDaChiedere: 'https://vecchio.it/icona.png' }];
+  const giri = [];
+  const { cercaIconaSito } = I.crea({
+    leggiCopia: async (r) => (r === COPIA ? DATO : ''),
+    completaVoci: async () => { giri.push(1); vecchie = [{ url: 'https://vecchio.it/a', favicon: COPIA }]; },
+  });
+  assert.equal(await cercaIconaSito('https://vecchio.it/', { ses, voci: async () => vecchie }), DATO);
+  assert.equal(giri.length, 1);
+  for (const voce of [
+    { url: 'https://dal-proxy.it/a', favicon: '', proxy: { country: 'us' } },
+    { url: 'https://senza.it/a', favicon: '', iconaMancante: true },
+  ]) assert.equal(await cercaIconaSito(voce.url, { ses, voci: async () => [voce] }), '', voce.url);
+  assert.equal(await cercaIconaSito('https://nuova.it/', { ses, incognito: true, voci: async () => [{ url: 'https://nuova.it/a', favicon: '' }] }), '');
+  assert.equal(giri.length, 1, 'il riordino delle icone si chiede solo per una voce che deve ancora provarci');
+  assert.deepEqual(ses.chiesti, []);
 });
 
 test('/favicon.ico del sito stesso, con lo schema e la porta del suggerimento', async () => {
@@ -64,14 +86,15 @@ test('/favicon.ico del sito stesso, con lo schema e la porta del suggerimento', 
   assert.deepEqual(ses.chiesti.map((c) => c.url), ['http://esempio.it:8080/favicon.ico']);
 });
 
-test('le copie dichiarate si fermano a tre, e un indirizzo che non è un\'immagine o una pagina web non si segue', () => {
-  const sito = I.sitoDi('https://esempio.it/');
+test('le copie si fermano a tre, e un indirizzo che non è una copia di Filo non si prende', () => {
   const voci = [
     { url: 'https://esempio.it/1', favicon: 'file:///C:/segreto.png' },
     { url: 'https://esempio.it/2', favicon: 'filo://settings/x.png' },
-    ...[1, 2, 3, 4].map((n) => ({ url: `https://esempio.it/${n}`, favicon: `https://esempio.it/${n}.png` })),
+    { url: 'https://esempio.it/3', favicon: 'https://esempio.it/3.png' },
+    { url: 'https://esempio.it/4', favicon: 'filo://icone/../storage.json' },
+    ...[1, 2, 3, 4].map((n) => ({ url: `https://esempio.it/c${n}`, favicon: `filo://icone/${String(n).repeat(40)}.png` })),
   ];
-  assert.deepEqual(I.candidati(sito, voci), ['https://esempio.it/1.png', 'https://esempio.it/2.png', 'https://esempio.it/3.png', 'https://esempio.it/favicon.ico']);
+  assert.deepEqual(I.copieDi(voci), [1, 2, 3].map((n) => `filo://icone/${String(n).repeat(40)}.png`));
 });
 
 test('un indirizzo che non è un sito web non chiede niente', async () => {
@@ -103,6 +126,7 @@ test('un indirizzo che chiede l\'OK prende solo copie già in casa: scheda, icon
   const { cercaIconaSito } = I.crea();
   const solo = { ses, soloCopie: true };
   assert.equal(await cercaIconaSito('https://spia.it/x', { ...solo, voci: async () => [{ url: 'https://spia.it/a', favicon: 'https://spia.it/icona.png' }] }), '');
+  assert.equal(await cercaIconaSito('https://spia.it/x', solo), '');
   assert.equal(await cercaIconaSito('https://spia.it/x', { ...solo, schede: [{ url: 'https://spia.it/b', favicon: DATO }] }), DATO);
   assert.equal(await cercaIconaSito('https://spia.it/x', { ...solo, voci: async () => [{ url: 'https://spia.it/a', favicon: DATO }] }), DATO);
   assert.deepEqual(ses.chiesti, []);

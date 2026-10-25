@@ -64,12 +64,12 @@ test('anche nella finestra normale la barra mostra l\'icona come data: URL, pure
   await expect.poll(async () => (await sfondoIcona(shell)).some((s) => s.includes(`data:image/png;base64,${PNG_B64}`)), {
     timeout: 15000, message: 'la scheda doveva mostrare l\'icona del sito',
   }).toBe(true);
-  // L'indirizzo dichiarato resta al main per archivio e salvati.
-  const dichiarato = await app.evaluate(({ BrowserWindow }, u) => {
+  // Anche il main tiene i byte, non l'indirizzo: salvati e archivio ne fanno la loro copia (#1273).
+  const tenuta = await app.evaluate(({ BrowserWindow }, u) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    return w._filoTabs.tabs.find((t) => t.url === u)?.faviconUrl || '';
+    return w._filoTabs.tabs.find((t) => t.url === u)?.favicon || '';
   }, url);
-  expect(dichiarato).toBe(icona);
+  expect(tenuta).toBe(`data:image/png;base64,${PNG_B64}`);
 });
 
 test('passando a un altro sito l\'icona di prima non resta sulla scheda mentre arriva quella nuova', async ({ app, shell }) => {
