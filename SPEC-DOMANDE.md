@@ -128,6 +128,12 @@ Il figlio è fidato se e solo se lo sono tutti i genitori. Lo stesso schema vale
 ogni volta che un agente sporco deve far nascere qualcosa che può restare
 fidato: passa numeri e ruoli, mai testo.
 
+Dal #1153 il biglietto di unione è un compito senza feedback (§ 6.1) con l'ambito
+`unisci` e i soli numeri dei genitori: lo chiede `coda.unione`, su 2–12 feedback
+in coda non ancora iniziati, e finché è aperto nessun altro lavoro prende i
+genitori. Il figlio lo scrive `unisci.scrivi`; i genitori diventano `archived`
+col rimando `unitoIn`.
+
 ### 1.4 Le parole dell'owner
 
 Una risposta dell'owner è un **turno a sé**, scritto col suo token e
@@ -652,6 +658,24 @@ Lo sforzo parte da `high`, come nelle fasi di un feedback dopo il primo lavoro
 vedono e si cambiano su ciascuno, in Routine → Compiti ricorrenti. La gestione
 del lavoro (§ 4.3) può lanciare riordino e potatura anche fuori cadenza.
 
+Com'è fatto dal #1153:
+
+- il server semina la tabella una volta, coi testi di `ruoli/` del suo repo; da
+  lì un ricorrente si cambia, si spegne, si toglie o si aggiunge solo in Routine
+  → Compiti ricorrenti, e uno tolto non torna. Le ore della tabella: revisione
+  delle domande 07:00, gestione del lavoro 06:00, addetto comunicazioni 09:00,
+  riordino lunedì 01:00, potatura lunedì 02:00, audit domenica 00:30;
+- nascono spenti la gestione del lavoro e l'addetto comunicazioni, i cui
+  strumenti arrivano coi punti 9 e 14 (§ 13): un'istanza senza i suoi strumenti
+  spende e basta;
+- il pacemaker fa nascere l'istanza quando l'ora è venuta, con `nonPrimaDi` uguale
+  a quell'ora; dopo un fermo ne nasce una sola, e la prossima ora si conta da
+  adesso. «Avvia adesso» ne fa nascere una subito;
+- il rapporto (`rapporto`) chiude l'istanza e resta sul ricorrente, cifrato, con
+  la fiducia e il segno riservato del biglietto che lo scrive. Un compito senza
+  esito torna in coda; dopo tre tentativi il server lo ferma;
+- la domanda di fine turno di un ricorrente è il suo slot (§ 5.4).
+
 ### 4.2 Due canali di aggiornamento
 
 - **Veloce** (com'è oggi): una versione ogni sei ore, il commit più nuovo con la
@@ -939,6 +963,20 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
 | `giudizio` | ricevere dal server l'esito di un esperimento e quello dell'originale, senza sapere quale sia quale; consegnare il verdetto | tutto il resto, uscire in rete compreso |
 | `server` | come `lavoro`, più spingere un ramo su filo-security (§ 7) | — solo per biglietti puliti |
 
+L'elenco chiuso delle operazioni e questa tabella vivono come dati in
+`src/shared/ambiti.js` (#1153), che il server incorpora al deploy; una sentinella
+la confronta con questa tabella. Ogni operazione dice quale gamba della triade
+tocca, e una sentinella la controlla su ogni ambito. Un'operazione dell'ambito
+che il server non fa ancora (il taccuino, la curva, i principi) è rifiutata col
+suo nome, come una fuori ambito; `opportunita`, `posta`, `esperimento` e
+`giudizio` non si possono ancora dare a un compito. Le operazioni passano dal
+canale (`routine-channel.mjs operazione`, `segnala`, `rapporto`).
+
+L'ambiente dei riservati lo dichiara la chiave della sua routine
+(`routine-keys.mjs ambiente <nome> riservati`): i suoi biglietti ricevono solo
+compiti, e soltanto loro il testo riservato. Finché nessuna chiave lo dichiara,
+i compiti che lo leggono aspettano, e la Gestione lo dice.
+
 ### 5.3 Ambiti nuovi
 
 Un agente che ne ha bisogno apre una domanda con la proposta: le operazioni,
@@ -977,6 +1015,12 @@ vale per tutti i compiti di quel tipo.
   (§ 5.3), che decide l'owner.
 - **Gli esperimenti** non hanno né l'una né l'altra: scrivono tutto nell'esito
   (§ 4.6).
+
+Dal #1153 la segnalazione libera è `segnala`, che ogni biglietto delle routine
+può fare: un feedback con `tipo: 'segnalazione'`, priorità 0 e la fiducia del
+biglietto, finché il punto 9 non la manda alla gestione del lavoro. La domanda di
+fine turno ha gli slot `tutti`, `orchestrator`, `worker`, uno per ruolo
+(`compito` compreso) e `compito:<ricorrente>`; vale il più preciso.
 
 ## 6. Feedback e compiti
 
