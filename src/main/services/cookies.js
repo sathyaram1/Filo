@@ -800,6 +800,7 @@ module.exports = {
   ensureHeaderHook,
   applyGpc,
   senzaGpc,
+  urlDelFrame,
   applyTrackerBlocking,
   coverAdblock,
   ensureRequestHook,

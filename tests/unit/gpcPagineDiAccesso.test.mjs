@@ -50,3 +50,21 @@ test('le due porte del GPC passano dalla stessa regola, e i client hints dall\'u
   assert.ok(i > 0, 'la proprietà navigator.globalPrivacyControl non si inietta più da tabs.js');
   assert.match(tabs.slice(Math.max(0, i - 600), i), /!Cookies\.senzaGpc\(current\)/, 'la proprietà GPC si inietta senza guardare senzaGpc');
 });
+
+test('il frame che chiede conta solo per le risorse, non per le navigazioni', () => {
+  const pagina = { url: 'https://accounts.google.com/v3/signin/identifier' };
+  assert.equal(Cookies.senzaGpc(Cookies.urlDelFrame({ resourceType: 'script', frame: pagina })), true);
+  assert.equal(Cookies.senzaGpc(Cookies.urlDelFrame({ resourceType: 'image', frame: pagina })), true);
+  // Dall'accesso si torna al sito: quella navigazione il GPC lo porta.
+  assert.equal(Cookies.urlDelFrame({ resourceType: 'mainFrame', frame: pagina }), '');
+  assert.equal(Cookies.urlDelFrame({ resourceType: 'subFrame', frame: pagina }), '');
+  assert.equal(Cookies.urlDelFrame({ resourceType: 'script', frame: null }), '');
+  assert.equal(Cookies.urlDelFrame({ resourceType: 'script', get frame() { throw new Error('frame distrutto'); } }), '');
+  assert.equal(Cookies.urlDelFrame(null), '');
+});
+
+test('i client hints valgono per ogni sessione, incognito e proxy comprese', () => {
+  const main = readFileSync(join(ROOT, 'src', 'main', 'main.js'), 'utf8');
+  assert.match(main, /app\.on\('session-created',[^\n]*ensureHeaderHook\(ses\)/,
+    'una sessione nata fuori da cookies.js (incognito, proxy) partirebbe senza client hints');
+});

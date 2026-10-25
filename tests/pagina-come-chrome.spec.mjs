@@ -55,6 +55,52 @@ test('la pagina vede window.chrome pieno e la richiesta passkey condizionale res
   });
 });
 
+test('le funzioni che Filo sostituisce non si distinguono dalle native, nemmeno guardate da un riquadro vuoto creato dalla pagina', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, '<title>SEGNI</title><p>ok</p>');
+  const r = await page.evaluate(() => {
+    const f = document.createElement('iframe');
+    document.body.appendChild(f);
+    const fw = f.contentWindow;
+    const suo = fw.Function.prototype.toString;
+    const getter = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow').get;
+    const proprio = (fn) => Object.prototype.hasOwnProperty.call(fn, 'prototype');
+    const out = {
+      prototipi: [navigator.credentials.get, window.chrome.runtime.connect, window.chrome.csi, Function.prototype.toString, getter, suo].map(proprio),
+      dalRiquadro: [suo.call(navigator.credentials.get), suo.call(window.chrome.runtime.connect), suo.call(getter)],
+      toStringDelRiquadro: [suo.call(suo), Object.getPrototypeOf(suo) === fw.Function.prototype],
+      leSueRestano: suo.call(fw.eval('(function mia(a) { return a; })')),
+      crossOrigin: null,
+    };
+    f.remove();
+    return out;
+  });
+  expect(r).toEqual({
+    prototipi: [false, false, false, false, false, false],
+    dalRiquadro: ['function get() { [native code] }', 'function connect() { [native code] }', 'function get contentWindow() { [native code] }'],
+    toStringDelRiquadro: ['function toString() { [native code] }', true],
+    leSueRestano: 'function mia(a) { return a; }',
+    crossOrigin: null,
+  });
+});
+
+test('nella finestra incognito, sessione sempre nuova, la pagina riceve i client hints come in una scheda normale', async ({ app, shell }) => {
+  const sito = await sitoCheAnnota('<title>INCOGNITO</title><p>ok</p>');
+  try {
+    await shell.evaluate(() => window.filoShell.openIncognito());
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+      return w && w._filoTabs ? w._filoTabs.tabs.length : 0;
+    }), { timeout: 15_000 }).toBe(1);
+    await app.evaluate(({ BrowserWindow }, u) => {
+      BrowserWindow.getAllWindows().find((x) => x._filoIncognito)._filoTabs.openTab(u);
+    }, sito.url);
+    await expect.poll(() => sito.viste.get('127.0.0.1')?.['sec-ch-ua'], { timeout: 10_000 }).toMatch(/"Chromium";v="\d+"/);
+    const h = sito.viste.get('127.0.0.1');
+    expect(h['sec-ch-ua-mobile']).toBe('?0');
+    expect(h['sec-ch-ua-platform']).toMatch(/^"(Windows|macOS|Linux)"$/);
+  } finally { await sito.chiudi(); }
+});
+
 test('il sito riceve i client hints onesti, con la versione vera di Chromium, e il GPC', async ({ openTab }) => {
   const sito = await sitoCheAnnota();
   try {
