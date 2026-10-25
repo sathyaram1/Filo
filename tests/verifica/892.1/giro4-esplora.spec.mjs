@@ -19,20 +19,18 @@ async function newtabPage(app) {
 }
 
 test('incollata e Invio premuto due volte di fila: il comando parte una volta sola', async ({ app }) => {
-  const dir = cartellaTemporanea('filo-892-1-g4-');
-  const f = path.join(dir, 'conta.txt');
-  writeFileSync(f, '');
   const page = await newtabPage(app);
-  const riga = `/printf x >> "${f}"`;
+  const riga = '/echo doppio892';
   await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), riga);
   await page.locator('#input').focus();
   await page.keyboard.press('Control+V');
   await page.keyboard.press('Enter');
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(1500);
-  const n = await page.evaluate(() => document.querySelectorAll(window.SN_CONFIRM_UI ? '.sn-confirm-host' : 'x').length);
-  console.log('dialoghi aperti', n, await confirmState(page));
+  await page.waitForTimeout(3000);
+  const n = await page.locator('.dash-term-cmd', { hasText: 'doppio892' }).count();
+  console.log('bolle del comando', n, 'dialogo', JSON.stringify(await confirmState(page)));
   await page.screenshot({ path: 'tests/.shots/892-1-g4-doppio.png' }).catch(() => {});
+  expect(n).toBe(1);
 });
 
 test('la domanda prima di una cancellazione scritta a mano, in tema scuro', async ({ app }) => {
