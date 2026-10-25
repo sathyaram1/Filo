@@ -534,6 +534,79 @@
     return p;
   }
 
+  // Verifica (immediata) se l'host di un "/sito.tld" risolve, e popola la cache.
+  // Usata sull'invio: in caso di dubbio (rete giù, errore) torna true così non
+  // blocca mai una navigazione legittima.
+  async function ensureSiteResolved(host) {
+    if (!host) return true;
+    if (siteResolveCache.has(host)) return siteResolveCache.get(host);
+    let resolves = true;
+    try {
+      const r = await window.filo?.siteResolves?.({ host });
+      resolves = !(r && r.resolves === false);
+    } catch (_) { resolves = true; }
+    siteResolveCache.set(host, resolves);
+    return resolves;
+  }
+
+  // #433 — Enter su "/sito" il cui host il DNS non conosce. Prima non succedeva
+  // ASSOLUTAMENTE NULLA: nessuna scheda, nessun messaggio, solo l'input rosso —
+  // indistinguibile da un tasto Invio rotto. Il controllo esistenza serve a non
+  // finire su una pagina bianca dopo un errore di battitura, ma può sbagliarsi
+  // (VPN, rete aziendale, DNS che non conosce quel nome): quindi Filo lo dice e
+  // lascia comunque aprire con un clic, invece di rifiutare in silenzio.
+  // Il testo resta nel campo: se era un typo, si corregge senza riscriverlo.
+  let unresolvedLine = null; // { el, host } dell'ultimo avviso ancora non agito
+  function showUnresolvedSite(text, host) {
+    // Un secondo invio dello STESSO indirizzo non impila avvisi identici. Uno su
+    // un indirizzo diverso, o uno già agito ("Apri comunque"), resta in chat: è
+    // roba successa, non rumore da sostituire.
+    if (unresolvedLine && unresolvedLine.host === host) {
+      unresolvedLine.el.remove();
+      unresolvedLine = null;
+    }
+    if (document.body.dataset.state !== 'thread') goThread();
+    const bubble = makeBubble({
+      role: 'filo',
+      // Una riga sola: il bottone qui sotto dice già l'altra metà. Spiegare a
+      // parole cosa fa un bottone è la spiegazione della UI dentro la UI.
+      text: `Non trovo “${host}” — controlla se c’è un errore di battitura.`,
+    });
+    const row = document.createElement('div');
+    row.className = 'dash-bubble-actions';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn dash-action-btn-primary';
+    btn.textContent = '↗ Apri comunque';
+    btn.title = `Apri ${host} senza il controllo`;
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      if (unresolvedLine && unresolvedLine.el === bubble) unresolvedLine = null;
+      // L'utente ha deciso: da qui in poi quell'host non viene più messo in
+      // dubbio (niente rosso, niente avviso al prossimo invio).
+      siteResolveCache.set(host, true);
+      send({ type: MSG.OPEN_URL, url: siteUrlOf(text), parole: [text] });
+      if (inputEl.value.trim() === text) { inputEl.value = ''; autoGrowInput(); }
+      updateInputClass();
+    });
+    row.appendChild(btn);
+    bubble.appendChild(row);
+    bubblesEl.appendChild(bubble);
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    unresolvedLine = { el: bubble, host };
+  }
+
+  // Come sopra ma con debounce, per la verifica live mentre si scrive: parte
+  // solo quando l'utente si ferma, poi ricolora (rosso se il dominio non esiste).
+  function scheduleSiteResolve(host) {
+    clearTimeout(siteResolveTimer);
+    siteResolveTimer = setTimeout(async () => {
+      if (!host || siteResolveCache.has(host)) { updateInputClass(); return; }
+      await ensureSiteResolved(host);
+      updateInputClass();
+    }, 250);
+  }
+
   function updateInputClass() {
     const kind = classifyInput(inputEl.value);
     // 'pending' (controllo "esiste?" in corso) tiene il colore che c'era: aggiungere
