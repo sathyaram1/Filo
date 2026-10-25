@@ -74,7 +74,7 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
   sb.getComputedStyle = () => ({ borderStyle: '', direction: 'ltr', getPropertyValue: () => '' });
   sb.addEventListener = () => {};
   vm.createContext(sb);
-  for (const f of ['src/shared/constants.js', 'src/content/coerenza.js', 'src/content/correttoreRegole.js', 'src/content/spellcheck.js']) {
+  for (const f of ['src/shared/politicaModelli.js', 'src/shared/constants.js', 'src/content/coerenza.js', 'src/content/correttoreRegole.js', 'src/content/spellcheck.js']) {
     vm.runInContext(src(f), sb);
   }
   sb.SN_SPELLCHECK.init({ featureFlags: { spellcheck: true, spellcheckContext: true }, ...impostazioni });

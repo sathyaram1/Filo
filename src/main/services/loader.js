@@ -6,6 +6,8 @@ const path = require('node:path');
 const SHARED = path.join(__dirname, '..', '..', 'shared');
 const SVC = __dirname;
 
+// La politica sui modelli (#1520): constants.js la riespone, il server la incorpora col bake.
+require(path.join(SHARED, 'politicaModelli.js'));
 require(path.join(SHARED, 'constants.js'));
 // #593 — la porta unica da cui passa il contenuto esterno (pagina, ricerca
 // web, percorsi di altri) prima di entrare in un prompt. Va PRIMA di chi la

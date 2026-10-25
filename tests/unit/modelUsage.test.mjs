@@ -178,6 +178,8 @@ const ALLOWED_FILES = new Set([
   // i nomi dei modelli sono il DATO, e sono tutti sovrascrivibili (dall'utente
   // nelle Opzioni, da chi gestisce Filo nei modelli predefiniti).
   path.join('src', 'shared', 'constants.js'),
+  // La politica sui modelli: famiglie e fornitori sono il dato della regola, non un modello che il codice sceglie.
+  path.join('src', 'shared', 'politicaModelli.js'),
 ]);
 
 const VENDOR_ID = /^(google|anthropic|openai|meta-llama|mistralai|deepseek|qwen|moonshotai|minimax|x-ai|z-ai)\/[A-Za-z0-9][A-Za-z0-9._:-]*$/;

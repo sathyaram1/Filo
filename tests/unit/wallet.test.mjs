@@ -148,6 +148,11 @@ test('ogni esito del server ha una frase; uno sconosciuto cade su quella generic
   assert.equal(W.redeemMessage('boh'), W.REDEEM_MESSAGES.internal);
 });
 
+test('troppe chiavi nuove nel mese (#1520): il rifiuto del server si dice, non cade su «qualcosa è andato storto»', () => {
+  assert.notEqual(W.redeemMessage('too_many_reissues'), W.REDEEM_MESSAGES.internal);
+  assert.match(W.redeemMessage('too_many_reissues'), /chiavi nuove/);
+});
+
 // Un invito vale per più persone: un rifiuto per posti finiti non si racconta
 // come «il codice è già stato usato», o chi l'ha ricevuto crede che se lo sia
 // speso chi gliel'ha mandato e va a chiedergliene un altro che non esiste.
