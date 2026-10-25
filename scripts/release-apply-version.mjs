@@ -1,6 +1,6 @@
 // Applica in locale, al manifesto del commit provato dalla suite, il numero che
 // il server ha scritto su main (release.yml, #641). Non committa e non spinge:
-// cambia solo la riga della versione, come il commit del server.
+// cambia solo la riga della versione; `prossimaVersione` resta, qui non la legge nessuno.
 //
 // USO   node scripts/release-apply-version.mjs <X.Y.Z | vX.Y.Z>
 // Exit  0 fatto · 2 rifiutato (numero malformato, non più alto, manifesto strano)
@@ -38,6 +38,11 @@ export function applicaVersione(testo, richiesta) {
   if (!/^\d+\.\d+\.\d+$/.test(previous)) return { ok: false, reason: `versione attuale malformata: "${previous}"` };
   if (confrontaVersioni(version, previous) <= 0) {
     return { ok: false, reason: `${version} non è più alto di ${previous}, il numero di questo albero` };
+  }
+  // Un numero diverso da quello dichiarato: il server non ha letto questo campo (non lo conosce, o su main è cambiato), e
+  // le note del blocco in cima uscirebbero sotto un numero che non è il loro.
+  if (Object.hasOwn(prima, 'prossimaVersione') && prima.prossimaVersione !== version) {
+    return { ok: false, reason: `il manifesto dichiara come prossima versione ${JSON.stringify(prima.prossimaVersione)}, il server ha scritto ${version}` };
   }
   const m = testo.match(RIGA_VERSIONE);
   if (!m || m[2] !== previous) return { ok: false, reason: 'la riga della versione non è quella del manifesto' };
