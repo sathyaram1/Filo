@@ -170,3 +170,16 @@ test('nel benvenuto delle schede aperte arriva solo il sito, non il titolo che l
   assert.ok(benvenuto.includes('sito-ostile.example'));
   assert.ok(benvenuto.includes('[FOCUS]'));
 });
+
+test('alla chat ogni scheda ha il suo numero fino a cento, gli altri prompt ne vedono dodici (#413)', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'contenutoEsterno.js'));
+  const tabs = Array.from({ length: 20 }, (_, i) => ({ id: i + 1, url: `https://s${i}.example/`, title: `Pagina ${i + 1}`, lastAccessed: null }));
+  const chat = FS.renderForPrompt(baseState({ tabs: [{ ...tabs[0], chat: true }, ...tabs.slice(1)] }));
+  assert.ok(/(^|\n)20\. Pagina 20/.test(chat), 'la ventesima scheda ha il suo numero');
+  assert.ok(!chat.includes('...altre'));
+  const altri = FS.renderForPrompt(baseState({ tabs }));
+  assert.ok(!/(^|\n)13\. /.test(altri));
+  assert.ok(altri.includes('...altre 8 tab'));
+  const tante = Array.from({ length: FS.SCHEDE_NUMERATE_CHAT + 5 }, (_, i) => ({ id: i + 1, url: 'https://x.example/', title: `P${i + 1}`, chat: i === 0 }));
+  assert.ok(FS.renderForPrompt(baseState({ tabs: tante })).includes('...altre 5 tab'), 'oltre il tetto lo dice');
+});

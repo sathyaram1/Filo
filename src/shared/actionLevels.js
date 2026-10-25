@@ -656,6 +656,33 @@
         return n ? `Schede riordinate: archiviate ${n} non più utili` : 'Schede riordinate: nessuna da archiviare';
       },
     },
+    // Le schede (`_targets`, `_targetIds`) le sceglie il main, mai l'LLM (#413). Una si riapre dal filo della home:
+    // costo 1; più d'una insieme è il freno di CANCELLA_SVEGLIA, così dopo una pagina letta «chiudile tutte» chiede.
+    CHIUDI_SCHEDE: {
+      costo: (a) => (targetCount(a) === 1 ? 1 : 2),
+      campo: null,
+      describe: (a) => {
+        const list = targetList(a);
+        const dove = a && a._inIncognito ? '\n\nIn incognito non restano nel filo della home.'
+          : '\n\nLe pagine chiuse restano nel filo della home, da dove le riapri.';
+        if (!list.length) {
+          const sito = String((a && (a.sito ?? a.dominio)) || '').trim();
+          if (sito) return ['Chiudere le schede di ', cit(sito, true), dove];
+          return [`${a && (a.tutte === true || a.tranne) ? 'Chiudere tutte le schede tranne questa' : 'Chiudere delle schede'}${dove}`];
+        }
+        const MOSTRATE = 15;
+        const oltre = list.length > MOSTRATE ? `\n…e altre ${list.length - MOSTRATE}` : '';
+        return [`Chiudere ${list.length === 1 ? 'questa scheda' : `queste ${list.length} schede`}:\n`,
+          elenco(list.slice(0, MOSTRATE)), `${oltre}${dove}`];
+      },
+      describeDone: (a) => {
+        const out = a && a._output;
+        const n = out && Number.isFinite(Number(out.chiuse)) ? Number(out.chiuse) : targetList(a).length;
+        if (!n) return 'Nessuna scheda chiusa';
+        const dove = a && a._inIncognito ? '' : (n === 1 ? ': resta nel filo della home' : ': restano nel filo della home');
+        return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}${dove}`;
+      },
+    },
     CANCELLA_ARCHIVIO: {
       costo: 3,
       campo: null,
@@ -954,7 +981,7 @@
     // sa già fare l'assistente di pagina. Tutti costo 1: azionare un controllo
     // della finestra è benigno e completamente reversibile (uno schermo intero si
     // toglie, un menu si richiude). "close" è ESCLUSO di proposito: l'AI non
-    // chiude finestra né schede.
+    // chiude la finestra; le schede le chiude CHIUDI_SCHEDE.
     COMANDO_FINESTRA: {
       costo: 1,
       campo: null,
@@ -1227,6 +1254,7 @@
     COMANDO_FINESTRA: senza('already'),
     TIENI_APERTA: fatta,
     NON_TENERE_APERTA: fatta,
+    CHIUDI_SCHEDE: senza('restano'),
     STILE_PAGINA: fatta,
     RIPRISTINA_STILE_PAGINA: fatta,
     SALVA_APPUNTO: fatta,

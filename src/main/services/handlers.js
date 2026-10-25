@@ -20,6 +20,7 @@ const ConversazioniApp = require('./conversazioniApp');
 const FiloParla = require('./filoParla');
 const Schermo = require('./schermo').crea();
 const SempreAperte = require('./sempreAperte');
+const ChiudiSchede = require('./chiudiSchede');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -1162,6 +1163,18 @@ function targetWebTab(sender) {
   return { win, tm, tab: recent[0] || null };
 }
 
+// Il nome di una scheda come lo vede il modello in TAB APERTE: il titolo, e di una pagina delicata solo il sito (#1004).
+async function nomeDellaScheda() {
+  let delicata = () => null;
+  try { if (globalThis.SN_DELICATE) delicata = await globalThis.SN_DELICATE.filtro(); } catch (_) {}
+  return (t) => {
+    let sito = '';
+    try { sito = new URL(t.url || '').hostname.replace(/^www\./, ''); } catch (_) {}
+    if (delicata(t.url || '')) return `${sito || 'sito'} (pagina delicata)`;
+    return String(t.title || '').replace(/\s+/g, ' ').trim().slice(0, 80) || sito || 'scheda senza titolo';
+  };
+}
+
 // Esito di PROXY_TAB e REGOLA_PROXY_DOMINIO senza fornitore: proxyUnavailableForPrompt
 // e la riga del diario lo riconoscono da `proxy`, e nessuno dei due lo dà per fatto.
 const proxyNonDisponibile = () => ({ proxy: 'non_disponibile' });
@@ -2163,7 +2176,7 @@ function ingressiContati(ing, decisione, { origine, dentroPerimetro }) {
 async function eseguiAzioneFilo(action, {
   confirmed = false, sender = null, contesto = null, provenienza = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
   chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false, segnale = null, nascostiDellaChat = null,
-  domanda = '', soloConferma = false, capRilettura = null,
+  domanda = '', soloConferma = false, capRilettura = null, schedeViste = null,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -2385,6 +2398,40 @@ async function eseguiAzioneFilo(action, {
       else action._voci = await SempreAperte.daTogliere(detto || davanti);
     } catch (_) {}
     action._detto = detto || davanti;
+  }
+
+  // CHIUDI_SCHEDE (#413): le schede le sceglie il main dai numeri che il modello aveva davanti, prima del gate, così il
+  // popup le nomina; all'OK si chiudono quelle mostrate (bersagliMostrati). La scheda della chat solo se nominata.
+  if (type === 'CHIUDI_SCHEDE') {
+    const tm = winOf(sender)?._filoTabs;
+    if (!tm) return { executed: false, kept: false, output: { error: 'nessuna finestra con schede' } };
+    const chat = sender?.tab?.id ?? null;
+    let scelta;
+    if (confirmed) {
+      const visti = bersagliMostrati(sender, action);
+      const ids = visti && Array.isArray(visti.targetIds) ? visti.targetIds : [];
+      scelta = { chiudere: tm.tabs.filter((t) => ids.includes(t.id)), restano: [] };
+    } else {
+      const viste = Array.isArray(schedeViste) ? schedeViste
+        : (await FiloState.listTabs({ windowId: winOf(sender)?.id ?? null })).map((t) => t.id);
+      const motivo = await tm.motiviPerRestare();
+      // Un sito nominato si chiude anche se è tenuto sempre aperto: l'ha detto l'utente; il testo non inviato resta.
+      const resta = (tab, modo) => { const m = motivo(tab); return m === 'sempre' && modo !== 'tutte' ? '' : m; };
+      scelta = ChiudiSchede.risolvi(action, { schede: tm.tabs, viste, numerate: FiloState.SCHEDE_NUMERATE_CHAT, chat, resta });
+      if (scelta.errore) return { executed: false, kept: false, output: { error: scelta.errore } };
+    }
+    const nome = await nomeDellaScheda();
+    action._targets = scelta.chiudere.map((t) => (t.id === chat ? 'questa scheda, con la conversazione' : nome(t)));
+    action._targetIds = scelta.chiudere.map((t) => t.id);
+    action._restano = scelta.restano.map((x) => ({ nome: x.tab ? nome(x.tab) : `la numero ${x.numero}`, perche: x.perche }));
+    action._inIncognito = !!tm.incognito;
+    if (!scelta.chiudere.length) {
+      const nessuna = scelta.restano.length ? '' : (scelta.sito && !scelta.tutte ? 'sito' : 'niente');
+      return {
+        executed: false, kept: false,
+        output: { chiuse: 0, ...contoRestano(action._restano), ...(nessuna ? { nessuna } : {}) },
+      };
+    }
   }
 
   // CANCELLA_PAGINE (#866): periodo e numero di pagine li calcola il main, così il popup dice il conto vero.
@@ -3632,6 +3679,11 @@ async function eseguiAzioneFilo(action, {
         if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
         return { executed: true, kept: true, output: dove };
       }
+      case 'CHIUDI_SCHEDE': {
+        const tm = winOf(sender)?._filoTabs;
+        const chiuse = tm ? tm.chiudiSchede(action._targetIds) : [];
+        return { executed: chiuse.length > 0, kept: false, output: { chiuse: chiuse.length, ...contoRestano(action._restano) } };
+      }
       case 'COMANDO_FINESTRA': {
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
         // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva
@@ -4694,6 +4746,43 @@ const LEGACY_CONTINUE_NUDGE =
   + 'usando questi dati (link ESATTI presi dai risultati, numeri presi dal testo), senza ripetere '
   + 'le stesse azioni. Se il compito è finito, rispondi senza eseguire altro.';
 
+// I nomi delle schede li scrivono i siti: tornano recintati, coi perché di Filo fuori dal recinto.
+const PERCHE_RESTA_APERTA = {
+  testo: 'Lasciate aperte perché hanno del testo scritto e non ancora inviato',
+  sempre: 'Lasciate aperte perché sono di siti che l\'utente tiene sempre aperti',
+  chiusa: 'Non c\'erano più',
+  nuova: 'Lasciate aperte perché si sono aperte dopo l\'elenco che avevi davanti',
+};
+// Quante restano e perché, per la riga sotto la risposta: l'utente che ha detto «tutte» non ne ha indicata nessuna.
+function contoRestano(restano) {
+  const lista = Array.isArray(restano) ? restano : [];
+  if (!lista.length) return {};
+  const restanoPer = {};
+  for (const x of lista) restanoPer[x.perche] = (restanoPer[x.perche] || 0) + 1;
+  return { restano: lista.length, restanoPer };
+}
+function esitoChiusuraPerModello(action, o) {
+  if (o.error) return `Nessuna scheda chiusa: ${o.error}. Correggi e riprova, o chiedi all'utente quali intende.`;
+  const E = globalThis.SN_ESTERNO;
+  const restano = Array.isArray(action._restano) ? action._restano : [];
+  const gruppi = Object.keys(PERCHE_RESTA_APERTA).map((p) => {
+    const nomi = restano.filter((x) => x.perche === p).map((x) => `- ${E.neutralizza(String(x.nome || ''), { unaRiga: true })}`);
+    return nomi.length ? `${PERCHE_RESTA_APERTA[p]}:\n${E.imbusta({ tipo: 'DATI_PAGINA', testo: nomi.join('\n') })}` : '';
+  }).filter(Boolean);
+  const insiste = restano.some((x) => x.perche === 'testo' || x.perche === 'sempre')
+    ? '\nSe l\'utente vuole chiudere anche quelle col testo o dei siti sempre aperti, chiudile col loro numero.' : '';
+  const coda = `${gruppi.length ? `\n${gruppi.join('\n')}${insiste}` : ''}\nDillo all'utente in una riga.`;
+  const n = Number(o.chiuse) || 0;
+  if (!n) {
+    const perche = o.nessuna === 'sito' ? 'nessuna scheda aperta in questa finestra è di quel sito'
+      : o.nessuna === 'niente' ? 'oltre a quella di questa conversazione e a quelle da lasciare non ce n\'è nessuna' : 'nessuna di quelle indicate si poteva chiudere';
+    return `Nessuna scheda chiusa: ${perche}.${coda}`;
+  }
+  const dove = action._inIncognito ? 'In incognito non restano nel filo della home.'
+    : 'Le pagine restano nel filo della home: se l\'utente vuole riaprirne una, trovala con CERCA_CHAT e riaprila con NAVIGA.';
+  return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}. ${dove}${coda}`;
+}
+
 // L'esito di UNA azione, come risposta allo strumento che il modello ha
 // chiamato. Chi ha un esito da leggere (ricerca, documento, comando) lo
 // riceve per intero; chi non ce l'ha riceve una riga: fatto, in attesa di
@@ -4773,6 +4862,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
       ? `Schede riordinate: ${n} archiviate, restano nel filo della home (le ritrova col campo «Cerca nel filo»). Dillo all'utente in una riga.`
       : 'Schede riordinate: nessuna da archiviare. Dillo all\'utente in una riga.';
   }
+  if (type === 'CHIUDI_SCHEDE' && res.output && !res.needsConfirm) return esitoChiusuraPerModello(action, res.output);
   if (type === 'VEDI_SCHERMO') {
     const t = vediSchermoPerModello(action, res);
     if (t) return t;
@@ -5402,7 +5492,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
   // Nel benvenuto delle schede aperte arriva solo il sito: un titolo scritto da una pagina non detta lo stile (#1297).
-  const { stateText, attese: attesePrimaDelModello } = await FiloState.assemble({ creditiFreschi: true, soloSiti: onbActive });
+  const { state: statoDelTurno, stateText, attese: attesePrimaDelModello } = await FiloState.assemble({
+    creditiFreschi: true, soloSiti: onbActive, finestra: winOf(sender)?.id ?? null, schedaChat: sender?.tab?.id ?? null,
+  });
+  // I numeri delle schede che il modello vede valgono per tutto il turno: CHIUDI_SCHEDE li legge da qui (#413).
+  const schedeViste = ((statoDelTurno && statoDelTurno.tabs) || []).map((t) => t.id);
   // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
@@ -5795,7 +5889,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       const avvia = (a, { contesto, fonti }) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto, provenienza, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette: fonti, richiesta, accoglienza, nascostiDellaChat, capRilettura,
+          sender, contesto, provenienza, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette: fonti, richiesta, accoglienza, nascostiDellaChat, capRilettura, schedeViste,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,

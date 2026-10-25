@@ -44,6 +44,7 @@
     TOGLI_PERMESSO_SITO: ['Tolto un permesso', (k) => `Tolti ${n(k)} permessi`, 'permesso'],
     ESEGUI_COMANDO: ['Eseguito un comando', (k) => `Eseguiti ${n(k)} comandi`, 'comando'],
     PULISCI_TAB: ['Riordinate le schede', (k) => `Riordinate le schede ${n(k)} volte`, 'schede'],
+    CHIUDI_SCHEDE: ['Chiuse delle schede', (k) => `Chiuse schede ${n(k)} volte`, 'schede'],
     CANCELLA_ARCHIVIO: ['Eliminate schede dall\'archivio', (k) => `Eliminate schede dall'archivio ${n(k)} volte`, 'archivio'],
     INVIA_FEEDBACK: ['Preparata una segnalazione', (k) => `Preparate ${n(k)} segnalazioni`, 'segnalazione'],
     ONBOARDING: ['Proseguita l\'accoglienza', (k) => `Proseguita l'accoglienza ${n(k)} volte`, 'accoglienza'],
