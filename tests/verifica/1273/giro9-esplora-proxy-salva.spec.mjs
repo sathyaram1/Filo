@@ -74,7 +74,7 @@ test.describe('dal proxy, salvando per dopo', () => {
         await globalThis.SN_STORAGE.updateSettings({ proxy: { datacenter: `socks5://127.0.0.1:${porta}`, bypass: '<-loopback>' } });
       }, socks.porta);
       const conProxy = async (host) => {
-        const page = await openTab(`http://${host}:${siti.porta}/pagina`);
+        let page = await openTab(`http://${host}:${siti.porta}/pagina`);
         const id = await idScheda(app, host);
         expect((await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.setTabProxy(i, 'us'), id)).ok).toBe(true);
         await expect.poll(() => siti.richieste.proxy.some((r) => r.startsWith(`${host}/`)), { timeout: 15_000 }).toBe(true);
