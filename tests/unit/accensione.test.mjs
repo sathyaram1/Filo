@@ -93,10 +93,10 @@ test('l\'accensione del giro: un sondaggio solo per parola d\'ordine, rifatto pe
     assert.equal(await canale.accensioneDelGiro('altra-parola', o), ACC, 'quella di ieri non si riusa');
     assert.equal(corpi.length, 3);
 
-    // Un guasto non si ricorda: il biglietto dopo ci riprova invece di partire per un giorno senza accensione.
+    // Un guasto non si ricorda, e non vale come «il server non la dà»: il biglietto dopo ci riprova.
     writeFileSync(join(dir, FILE_ACCENSIONE), '{rotto');
     risposta = { status: 503, body: { ok: false, reason: 'down' } };
-    assert.equal(await canale.accensioneDelGiro('parola', o), '');
+    assert.equal(await canale.accensioneDelGiro('parola', o), null);
     assert.equal(leggiAccensione('parola', { dir }).nota, false);
     risposta = { ok: true, work: false, reason: 'idle' };
     assert.equal(await canale.accensioneDelGiro('parola', o), '', 'un server che non la dà');
@@ -153,6 +153,40 @@ test('da riga di comando: il primo biglietto apre l\'accensione, i successivi la
     await esegui(['ticket', 'parola-d-ordine']);
     assert.equal(ricevute.at(-1).accensione, 'acc_sondaggio_esplicito_01');
     assert.ok(!readFileSync(join(utente, FILE_ACCENSIONE), 'utf8').includes('parola-d-ordine'));
+  } finally {
+    await new Promise((ok) => srv.close(ok));
+    togliCartella(utente);
+  }
+});
+
+test('da riga di comando: col sondaggio in guasto il biglietto non parte senza accensione, ed esce col guasto', async () => {
+  const utente = cartellaTemporanea('filo-accensione-guasto-');
+  const ricevute = [];
+  const srv = createServer((req, res) => {
+    let b = '';
+    req.on('data', (c) => { b += c; });
+    req.on('end', () => {
+      const body = JSON.parse(b || '{}');
+      ricevute.push(body);
+      res.setHeader('Content-Type', 'application/json');
+      // Un rifiuto non si ritenta: il guasto arriva subito, senza le attese dei ritentativi.
+      if (body.probe) { res.statusCode = 403; return res.end(JSON.stringify({ ok: false, reason: 'rate_limited' })); }
+      res.end(JSON.stringify({ ok: true, work: true, ticket: BIGLIETTO, role: 'verifier' }));
+    });
+  });
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+  try {
+    const esito = await new Promise((ok) => {
+      const p = spawn(process.execPath, [CANALE, 'ticket', 'parola-d-ordine', '--json', '--accensione-pacemaker', 'Pm_segreto_del_pacemaker_0123'], {
+        env: { ...process.env, FILO_ROUTINE_TICKET: '', FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`, CLAUDE_CONFIG_DIR: utente },
+      });
+      let so = '';
+      p.stdout.on('data', (c) => { so += c; });
+      p.on('close', (code) => ok({ code, so }));
+    });
+    assert.equal(esito.code, 3);
+    assert.equal(esito.so.trim(), '', 'nessun biglietto all\'orchestratore');
+    assert.deepEqual(ricevute.map((r) => r.probe === true), [true], 'nessuna richiesta di biglietto senza accensione');
   } finally {
     await new Promise((ok) => srv.close(ok));
     togliCartella(utente);

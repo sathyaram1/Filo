@@ -39,7 +39,8 @@
 //   node scripts/routine-channel.mjs ticket <parola-d-ordine> [--json] [--accensione-pacemaker <segreto>]
 //       → stampa il biglietto su stdout (una riga), oppure "niente da fare".
 //         Ogni richiesta porta l'accensione; senza, fa prima il sondaggio da sé, col segreto che il pacemaker ha
-//         messo nel prompt della sessione: un biglietto chiesto senza accensione nasce non fidato.
+//         messo nel prompt della sessione: un biglietto chiesto senza accensione nasce non fidato. Col sondaggio
+//         in guasto esce con 3 senza chiedere il biglietto.
 //         Con `--json` stampa biglietto E ruolo insieme (più `model` ed `effort` se il server li ha decisi):
 //         il ruolo serve a chi guida per scegliere il tipo di worker PRIMA di lanciarlo. In tutte e due le forme
 //         registra la decisione per il gancio dell'orchestratore cieco, che mette modello e sforzo al lancio.
@@ -245,14 +246,15 @@ export async function ticket(passphrase, opts) {
 
 /**
  * L'accensione da mandare col biglietto: quella ricordata per questa parola d'ordine, altrimenti la apre un sondaggio
- * e la ricorda. Un sondaggio in guasto non si ricorda, così il biglietto dopo ci riprova. '' se il server non la dà.
+ * e la ricorda. '' se il server non la dà. null per un sondaggio in guasto, che non si ricorda: il biglietto non
+ * parte, perché uno chiesto senza accensione nasce non fidato e toglie alla sessione il segreto del pacemaker.
  */
 export async function accensioneDelGiro(passphrase, opts = {}) {
   const dove = opts.dirAccensione ? { dir: opts.dirAccensione } : {};
   const nota = leggiAccensione(passphrase, dove);
   if (nota.nota) return nota.accensione;
   const r = await probe(passphrase, opts);
-  if (r.outcome === 'fault') return '';
+  if (r.outcome === 'fault') return null;
   scriviAccensione(passphrase, r.accensione || '', dove);
   return r.accensione || '';
 }
@@ -1356,6 +1358,7 @@ if (isMain) {
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'ticket') {
     const accensione = await accensioneDelGiro(args[0], { segretoPacemaker: data['accensione-pacemaker'] });
+    if (accensione === null) { console.error('guasto del sondaggio di partenza: nessun biglietto senza accensione'); process.exit(3); }
     const r = await ticket(args[0], { accensione });
     if (r.accensione && r.accensione !== accensione) scriviAccensione(args[0], r.accensione);
     if (r.outcome === 'work') {

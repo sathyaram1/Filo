@@ -141,12 +141,21 @@ controllo di sicurezza compresi.
   semaforo, così il contenitore sporco non la scavalca stando zitto mentre un
   suo worker lavora. Quando un'accensione è finita lo decide il server, mai il
   contenitore: nel dubbio è viva, e sporca.
-- Il pacemaker porta in ogni sessione che accende un segreto monouso (nel
-  testo dell'accensione, valido 3 ore), e l'orchestratore lo passa al primo
+- Il pacemaker porta in ogni sessione che accende un segreto (nel testo
+  dell'accensione, valido 3 ore), e l'orchestratore lo passa al primo
   biglietto. Un sondaggio con un segreto buono apre un'accensione pulita anche
   con la chiave sporca: la sessione nuova sta in un contenitore nuovo, e quello
-  sporco il segreto non l'ha visto. Usato una volta, scaduto o inventato, vale
+  sporco il segreto non l'ha visto. Il segreto apre sempre la stessa
+  accensione: un sondaggio ritentato ritrova la sua. Scaduto o inventato vale
   come nessun segreto.
+- Il segreto non ripulisce un contenitore che ha già ospitato lavoro non
+  fidato: se da quando è nato la chiave ha visto nascere o sporcarsi un
+  biglietto non fidato (anche uno chiesto senza accensione, anche dentro
+  un'accensione già sporca), l'accensione che apre è sporca. Così il segreto,
+  che resta nella conversazione dell'orchestratore, non serve a un worker non
+  fidato che lo legge dal disco.
+- Il canale non chiede mai un biglietto senza accensione: col sondaggio in
+  guasto esce col guasto, e l'orchestratore chiude il giro.
 - Dopo un biglietto non fidato la sessione non si chiude: i successivi nascono
   non fidati. Costa solo più richieste di sì all'owner, nessuna riaccensione.
 - Niente difese dentro il contenitore (impronte degli strumenti, pulizie più
