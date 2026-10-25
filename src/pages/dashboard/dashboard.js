@@ -227,7 +227,7 @@
     isTerminalMode: () => Term.isEnabled(),
     getShell: () => Term.getShell(),
     getCwd: () => Term.getCwd(),
-    runShellCommand: (command, chat) => Term.runShellCommand(command, chat),
+    runShellCommand: (command, chat, opzioni) => Term.runShellCommand(command, chat, opzioni),
     // Un comando a cui la persona ha detto no torna com'era, incollato compreso; quello che intanto ha scritto resta.
     rimettiNellaBarra: (testo, incollato) => {
       if (inputEl.value.trim()) return;

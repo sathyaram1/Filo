@@ -665,7 +665,7 @@
       autoGrowInput();
       updateInputClass();
       // Passa dai livelli di autonomia: se la persona dice no, il comando torna nella barra com'era.
-      const partito = await runShellCommand(text.slice(1).trim(), chat);
+      const partito = await runShellCommand(text.slice(1).trim(), chat, { daFuori: incollato });
       if (partito === false) rimettiNellaBarra(text, incollato);
       return true;
     }
