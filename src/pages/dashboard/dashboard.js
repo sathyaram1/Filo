@@ -227,7 +227,17 @@
     isTerminalMode: () => Term.isEnabled(),
     getShell: () => Term.getShell(),
     getCwd: () => Term.getCwd(),
-    runShellCommand: (command, chat) => Term.runShellCommand(command, chat),
+    runShellCommand: (command, chat, opz) => Term.runShellCommand(command, chat, opz),
+    // Un comando a cui la persona ha detto no torna com'era, incollato compreso; quello che intanto ha scritto resta.
+    rimettiNellaBarra: (testo, incollato) => {
+      if (inputEl.value.trim()) return;
+      inputEl.value = testo;
+      testoDaFuori = !!incollato;
+      autoGrowInput();
+      Comandi.updateInputClass();
+      inputEl.focus();
+      inputEl.setSelectionRange(testo.length, testo.length);
+    },
   });
   Accoglienza.init({
     $,
@@ -1507,8 +1517,11 @@
       bolla = null;
       // Il comando svuota la casella: quello che l'utente sta scrivendo intanto resta suo.
       const bozza = inputEl.value;
-      const fatto = await comandoLocale(s.c.text);
-      if (bozza && !inputEl.value) { inputEl.value = bozza; autoGrowInput(); Comandi.updateInputClass(); }
+      const fatto = await comandoLocale(s.c.text, { incollato: !!s.c.incollato });
+      if (bozza && inputEl.value !== bozza) {
+        inputEl.value = inputEl.value ? `${inputEl.value}\n${bozza}` : bozza;
+        autoGrowInput(); Comandi.updateInputClass();
+      }
       if (fatto) { if (seguiti.length && !sending) await partiSeguito(); return; }
     }
     await inviaComposto(s.c, { bolla });
@@ -1881,11 +1894,11 @@
     const text = inputEl.value.trim();
     // Il secondo colpo di chi ha appena fermato (clic o Invio) non riprende: il menu, scelta deliberata, sì.
     if (!text && pendingImages.length === 0 && pendingFiles.length === 0) { if (!appenaFermato()) riprendi(); return; }
-    if (await comandoLocale(text)) return;
+    if (await comandoLocale(text, { incollato: testoDaFuori })) { if (!inputEl.value) testoDaFuori = false; return; }
     submitMessage(text);
   });
   // Quello che la barra fa da sé, senza il modello: vero se l'ha fatto.
-  async function comandoLocale(text) {
+  async function comandoLocale(text, { incollato = false } = {}) {
     // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
     // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
     // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
@@ -1895,7 +1908,7 @@
       const resolves = host ? await Comandi.ensureSiteResolved(host) : true;
       if (resolves === false) { Comandi.updateInputClass(); Comandi.showUnresolvedSite(text, host); return true; }
     }
-    return Comandi.handleSlashCommand(text);
+    return Comandi.handleSlashCommand(text, { incollato });
   }
 
   // Invio manda, Shift+Invio va a capo: il campo è una textarea, quindi Invio di suo andrebbe a
