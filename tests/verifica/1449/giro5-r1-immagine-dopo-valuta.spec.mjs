@@ -55,7 +55,9 @@ async function domandaConImmagine(app, page) {
   await page.press('.sn-sidebar-input textarea', 'Enter');
   await expect(page.locator('.sn-sidebar-msg-assistant', { hasText: 'Vista.' })).toBeVisible({ timeout: 20_000 });
   const tutte = await app.evaluate(() => globalThis.__chiamate);
-  return tutte[tutte.length - 1];
+  const messages = JSON.parse(tutte[tutte.length - 1]);
+  // La foto della pagina viaggia nell'ultimo messaggio; l'immagine allegata nel turno dell'utente che lo precede.
+  return { ultimo: JSON.stringify(messages[messages.length - 1]), prima: JSON.stringify(messages.slice(0, -1)) };
 }
 
 test('r1 dopo «Valuta» e il campo cambiato, l’immagine allegata alla domanda arriva al modello in quel turno', async ({ app, openTab, testServer }) => {
@@ -71,9 +73,9 @@ test('r1 dopo «Valuta» e il campo cambiato, l’immagine allegata alla domanda
   await page.locator('.sn-sidebar-correzione').click();
   await expect(page.locator('#ta')).toHaveValue(/i miei amici/);
 
-  const ultima = await domandaConImmagine(app, page);
-  expect(ultima).toContain('e questa?');
-  expect(ultima).toContain(B64.slice(20, 60));
+  const { ultimo, prima } = await domandaConImmagine(app, page);
+  expect(ultimo).toContain('e questa?');
+  expect(prima).toContain('image_url');
 });
 
 test('controllo: senza «Valuta» la stessa immagine arriva al modello', async ({ app, openTab, testServer }) => {
@@ -83,6 +85,6 @@ test('controllo: senza «Valuta» la stessa immagine arriva al modello', async (
   const page = await testServer.openReady(openTab, PAGINA);
   await nelMondoDiFilo(app, page, () => { globalThis.SN_SIDEBAR.open(); return 1; });
   await page.waitForSelector('.sn-sidebar-input textarea');
-  const ultima = await domandaConImmagine(app, page);
-  expect(ultima).toContain(B64.slice(20, 60));
+  const { prima } = await domandaConImmagine(app, page);
+  expect(prima).toContain('image_url');
 });
