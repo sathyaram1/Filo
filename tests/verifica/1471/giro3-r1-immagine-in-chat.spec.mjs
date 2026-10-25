@@ -1,4 +1,4 @@
-// Verifica #1471, giro 2, rilievo 1: un'immagine che Filo porta comunque in una chat si conta posata, da ogni punto.
+// Verifica #1471, giro 3, rilievo 1: un'immagine che Filo porta comunque in una chat si conta posata, da ogni punto.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { writeFileSync } from 'node:fs';
