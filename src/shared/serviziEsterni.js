@@ -254,7 +254,7 @@
       id: 'icone-dei-siti', nome: 'I siti che Filo ti suggerisce, per la loro icona',
       base: [], indirizzo: 'il /favicon.ico di un sito che Filo non ha fra le pagine salvate e le schede archiviate; per una di queste rimasta senza copia, l’icona che la sua pagina dichiarava',
       quando: 'funzione',
-      occasione: 'quando la home mostra i siti che Filo ti suggerisce, e in chat i siti che Filo apre per te, se Filo non ne ha già la copia (da una scheda aperta, una pagina salvata o una scheda archiviata); una trovata non si richiede finché Filo resta aperto. Per una pagina salvata o archiviata rimasta senza copia (un link salvato, una scheda chiusa prima che l’icona arrivasse, le voci di prima che Filo ne tenesse la copia) una volta sola, dopo l’avvio o quando la home la mostra; mai per una scheda passata da un proxy',
+      occasione: 'quando la home mostra i siti che Filo ti suggerisce, e in chat i siti che Filo apre per te, se Filo non ne ha già la copia (da una scheda aperta, una pagina salvata o una scheda archiviata); una trovata non si richiede finché Filo resta aperto. Per una pagina salvata o archiviata rimasta senza copia (un link salvato, una scheda chiusa prima che l’icona arrivasse, le voci di prima che Filo ne tenesse la copia) una volta sola: pochi secondi dopo che la salvi o chiudi la scheda, dopo l’avvio per le voci di prima, o quando la home la mostra; mai per una scheda passata da un proxy',
       riceve: 'la richiesta dell’icona, senza cookie',
       frase: 'Filo usa quella che ha già scaricato per una scheda aperta',
       dove: ['src/main/services/iconeSiti.js', 'src/main/services/handlers/tabs.js', 'src/main/services/iconeVecchie.js'],
