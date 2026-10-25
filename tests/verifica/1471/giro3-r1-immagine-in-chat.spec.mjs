@@ -38,7 +38,9 @@ const allegati = (app, page) => nelMondoDiFilo(app, page, () => (globalThis.__fi
 
 test('r1 un’immagine lasciata sulla fila delle schede entra nella chat della home e si conta posata', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://newtab')), { timeout: 10_000 }).toBe(true);
   const casa = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+  await expect(casa.locator('#input')).toBeVisible({ timeout: 10_000 });
   const box = await shell.locator('.tab').first().boundingBox();
   await lascia(shell, [foto()], { x: box.x + box.width + 120, y: box.y + box.height / 2 });
   await expect(casa.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1, { timeout: 5_000 });
