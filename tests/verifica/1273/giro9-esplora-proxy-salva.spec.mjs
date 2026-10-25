@@ -78,6 +78,8 @@ test.describe('dal proxy, salvando per dopo', () => {
         const id = await idScheda(app, host);
         expect((await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.setTabProxy(i, 'us'), id)).ok).toBe(true);
         await expect.poll(() => siti.richieste.proxy.some((r) => r.startsWith(`${host}/`)), { timeout: 15_000 }).toBe(true);
+        await new Promise((r) => setTimeout(r, 1500));
+        page = app.windows().filter((w) => { try { return !w.isClosed() && new URL(w.url()).hostname === host; } catch (_) { return false; } }).pop();
         await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 15_000 }).catch(() => {});
         await page.waitForLoadState('domcontentloaded').catch(() => {});
         return { page, id };
