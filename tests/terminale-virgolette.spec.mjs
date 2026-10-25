@@ -4,7 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
-import { clickConfirm } from './helpers/confirm.mjs';
+import { clickConfirm, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
