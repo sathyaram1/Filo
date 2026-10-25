@@ -1397,12 +1397,12 @@ function cleanLabel(v) {
 
 // Il perimetro di lettura del comando o documento (#587): lo decide il main,
 // mai l'LLM, e lo sovrascrive sempre (gli argomenti del modello possono averne uno).
-function perimetroLettura(sender) {
+function perimetroLettura(sender, cartella = null) {
   let home = '';
   try { home = require('node:os').homedir() || ''; } catch (_) {}
   const win = process.platform === 'win32';
   let cwd = '';
-  try { cwd = cartellaDelComando(getAssistantCwd(sender)) || ''; } catch (_) {}
+  try { cwd = cartellaDelComando(cartella == null ? getAssistantCwd(sender) : cartella) || ''; } catch (_) {}
   let reti = [];
   try { reti = require('./shell').unitaDiRete(cwd); } catch (_) {}
   return { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
