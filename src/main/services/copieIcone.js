@@ -82,7 +82,6 @@ async function scrivi(buf, tipo) {
     await fsp.writeFile(tmp, buf);
     await fsp.rename(tmp, file).catch(async (e) => { await fsp.rm(tmp, { force: true }).catch(() => {}); if (!fs.existsSync(file)) throw e; });
   }
-  recenti.set(nome, Date.now());
   return PREFISSO + nome;
 }
 
