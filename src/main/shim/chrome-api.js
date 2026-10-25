@@ -74,7 +74,8 @@ const chromeShim = {
     // davanti, e il suggerimento di fare pulizia, che nasce dal loro numero,
     // non compariva mai. Le schede le possiede il TabManager della finestra:
     // qui se ne espone la vista piatta che il chiamante si aspetta.
-    async query() {
+    // `windowId`: le schede di quella finestra, come in chrome.tabs; la chat chiede le sue (#413).
+    async query({ windowId } = {}) {
       const zoomDi = (t) => {
         // Una pagina che scala il proprio contenuto (l'editor scala il foglio)
         // lascia la finestra al 100%: il numero vero lo dichiara lei (#686).
@@ -82,7 +83,9 @@ const chromeShim = {
         try { return Math.round(t.view.webContents.getZoomFactor() * 100); }
         catch (_) { return null; }
       };
-      const win = finestraConSchede();
+      const chiesta = windowId == null ? null
+        : require('electron').BrowserWindow.getAllWindows().find((w) => w.id === windowId && w._filoTabs && !w.isDestroyed());
+      const win = chiesta || finestraConSchede();
       const tm = win && win._filoTabs;
       if (!tm || !Array.isArray(tm.tabs)) return [];
       return tm.tabs.map((t) => ({

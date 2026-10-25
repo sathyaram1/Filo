@@ -33,6 +33,7 @@
     TOGLI_PERMESSO_SITO: 'eraser',
     EVENTO_CALENDARIO: 'calendar',
     PULISCI_TAB: 'broom',
+    CHIUDI_SCHEDE: 'close',
     CANCELLA_ARCHIVIO: 'trash',
     CANCELLA_MEMORIA: 'eraser',
     DIMENTICA: 'eraser',
@@ -88,7 +89,6 @@
     CONDIVIDI: 'share',
     // APRI_APP: l'icona è quella dell'app aperta (vedi APP), non la griglia.
     APRI_APP: 'apps',
-    CHIUDI_SCHEDA: 'close',
     CERCA_SCHEDE: 'tabs',
     CERCA_CRONOLOGIA: 'history',
     POSIZIONE: 'location',

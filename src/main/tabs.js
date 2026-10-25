@@ -1160,6 +1160,53 @@ class TabManager {
     if (idx < 0) return;
     const tab = this.tabs[idx];
     ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
+    this._smontaScheda(tab);
+    this.tabs.splice(idx, 1);
+    if (this.activeId === id) {
+      // Si torna alla PENULTIMA scheda guardata, non a quella a sinistra: è quella che l'utente
+      // si aspetta. Se nessuna è mai stata attivata vale l'adiacente.
+      const next = this._mostRecentlyActiveTab() || this.tabs[idx] || this.tabs[idx - 1];
+      if (next) this.activate(next.id);
+      else this.openTab('filo://newtab/'); // niente tab → nuovo newtab
+    }
+    this._broadcast();
+  }
+
+  // Più schede in un colpo, chieste alla chat (#413): come closeTab per ognuna, con una sola attivazione alla fine,
+  // così una scheda che sta per chiudersi non si carica solo per passarci sopra. Torna gli id chiusi davvero.
+  chiudiSchede(ids) {
+    const via = new Set(Array.isArray(ids) ? ids : []);
+    const chiuse = this.tabs.filter((t) => via.has(t.id));
+    if (!chiuse.length) return [];
+    const eraAttiva = chiuse.some((t) => t.id === this.activeId);
+    for (const tab of chiuse) {
+      ContatoriFinestra.misura('chiusa', tab, 'chat', { incognito: this.incognito });
+      this._smontaScheda(tab);
+    }
+    this.tabs = this.tabs.filter((t) => !via.has(t.id));
+    if (eraAttiva) {
+      const next = this._mostRecentlyActiveTab() || this.tabs[0];
+      if (next) this.activate(next.id);
+      else this.openTab('filo://newtab/');
+    }
+    this._broadcast();
+    return chiuse.map((t) => t.id);
+  }
+
+  // A «chiudile tutte» chiesto in chat (#413) restano il testo scritto e non inviato e i siti tenuti sempre aperti:
+  // la funzione che torna dice 'testo', 'sempre' o '' (si chiude).
+  async motiviPerRestare() {
+    await this._caricaSempreAperte();
+    return (tab) => {
+      if (!tab) return '';
+      if (tab.formDirty || this._invioNonTenuto(tab)) return 'testo';
+      return this._sempreAperta(tab) ? 'sempre' : '';
+    };
+  }
+
+  // Quello che ogni chiusura chiesta fa a una scheda prima di toglierla dall'elenco.
+  _smontaScheda(tab) {
+    const id = tab.id;
     this._avvisaSorvegliante(tab, 'chiusa');
     // Se la scheda che se ne va è quella che aveva chiesto il fullscreen al
     // sito (Ctrl+W funziona anche a tutto schermo), lo schermo intero resterebbe
@@ -1178,15 +1225,6 @@ class TabManager {
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     ChiusuraConCaselle.chiudi(tab.view.webContents);
-    this.tabs.splice(idx, 1);
-    if (this.activeId === id) {
-      // Si torna alla PENULTIMA scheda guardata, non a quella a sinistra: è quella che l'utente
-      // si aspetta. Se nessuna è mai stata attivata vale l'adiacente.
-      const next = this._mostRecentlyActiveTab() || this.tabs[idx] || this.tabs[idx - 1];
-      if (next) this.activate(next.id);
-      else this.openTab('filo://newtab/'); // niente tab → nuovo newtab
-    }
-    this._broadcast();
   }
 
   // Contatore crescente invece di Date.now(): due attivazioni possono cadere

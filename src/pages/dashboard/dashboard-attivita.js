@@ -608,6 +608,7 @@
     WIFI: () => 'comandato il Wi-Fi',
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
     PULISCI_TAB: () => 'riordinato le schede',
+    CHIUDI_SCHEDE: (n) => (n > 1 ? `chiuso schede ${n} volte` : 'chiuso delle schede'),
     CANCELLA_ARCHIVIO: () => 'eliminato schede dall\'archivio',
   };
   // Le azioni che Filo propone e l'utente finisce col bottone: finché il click non arriva il riassunto dice la
@@ -680,6 +681,20 @@
   // di controllo (un byte nullo nell'etichetta finiva tale e quale nel diario).
   function pulito(v) {
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  }
+  // Perché qualche scheda non si è chiusa (#413): dopo «tutte» l'utente non ne ha indicata nessuna, e deve sapere il motivo.
+  const PERCHE_RESTANO = {
+    testo: (n) => (n === 1 ? 'una resta aperta col testo non inviato' : `${n} restano aperte col testo non inviato`),
+    sempre: (n) => (n === 1 ? 'una resta aperta, è di un sito tenuto sempre aperto' : `${n} restano aperte, sono di siti tenuti sempre aperti`),
+    nuova: (n) => (n === 1 ? 'una aperta dopo la richiesta resta' : `${n} aperte dopo la richiesta restano`),
+    chiusa: (n) => (n === 1 ? 'una era già chiusa' : `${n} erano già chiuse`),
+  };
+  function restanoAperte(o) {
+    const r = Number(o && o.restano) || 0;
+    if (!r) return '';
+    const per = o.restanoPer && typeof o.restanoPer === 'object' ? o.restanoPer : null;
+    const parti = per ? Object.keys(PERCHE_RESTANO).filter((k) => Number(per[k]) > 0).map((k) => PERCHE_RESTANO[k](Number(per[k]))) : [];
+    return parti.length ? parti.join(', ') : (r === 1 ? 'una resta aperta' : `${r} restano aperte`);
   }
   // «lunedì 28 set»: il giorno di una conversazione senza titolo.
   function quandoBreve(ts) {
@@ -870,6 +885,14 @@
       const n = Number(a._output && a._output.archived) || 0;
       return { icon: '🧹', text: n ? `Schede riordinate · ${n} ${n === 1 ? 'archiviata' : 'archiviate'}` : 'Schede riordinate · nessuna da archiviare' };
     },
+    CHIUDI_SCHEDE: (a) => {
+      const o = a._output || {};
+      const n = Number(o.chiuse) || 0;
+      const parti = restanoAperte(o);
+      const resto = parti ? ` · ${parti}` : '';
+      if (!n) return { icon: '✕', text: `Nessuna scheda chiusa${resto}`, failed: true };
+      return { icon: '✕', text: `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}${resto}` };
+    },
     CANCELLA_ARCHIVIO: (a) => {
       const n = Number(a._output && a._output.eliminate) || 0;
       return { icon: '🗑', text: `Eliminate dall’archivio · ${n} ${n === 1 ? 'scheda' : 'schede'}` };
@@ -978,6 +1001,7 @@
     ESEGUI_COMANDO: 'Comando non eseguito', CANCELLA_MEMORIA: 'Memoria non cancellata',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
     PULISCI_TAB: 'Riordino non riuscito', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
+    CHIUDI_SCHEDE: 'Nessuna scheda chiusa',
   };
   function rigaRadio(a, radio) {
     const o = a._output || {};
@@ -1108,6 +1132,12 @@
     if (o.ok === false && o.errore && o.frase) return String(o.frase);
     if (o.ok === false && o.detail) return String(o.detail);
     if (o.ok === false && o.dettaglio) return String(o.dettaglio);
+    if (isType(a, 'CHIUDI_SCHEDE')) {
+      if (o.error) return 'schede non riconosciute';
+      if (o.restano) return restanoAperte(o);
+      if (o.nessuna === 'sito') return 'nessuna di quel sito';
+      if (o.nessuna === 'niente') return 'c\'è solo questa';
+    }
     if (o.error) return String(o.error);
     return '';
   }
@@ -1904,7 +1934,7 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'CORREGGI_MEMORIA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO'];
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'CORREGGI_MEMORIA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO', 'CHIUDI_SCHEDE'];
       // Una difesa abbassata (#530) vuole la parola, ma non è distruttiva: il box si apre da solo come il popup.
       if (AUTO_CONFIRM_TYPES.includes(type) && (a._confirm.level === 2 || a._confirm.avviso)) {
         btn.dataset.autoConfirm = '1';

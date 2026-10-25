@@ -12,6 +12,7 @@
       version: '0.2.250', date: '2026-10-23',
       features: [
         'Un\'immagine che trascini dentro Filo entra nella chat dovunque la lasci. Nella home va nella casella da qualunque punto della pagina, che si accende mentre la trascini. Su un sito si apre l\'Aiuto con l\'immagine già allegata, salvo che il sito la voglia per sé, come una pagina che carica file. Nell\'Aiuto ora la puoi anche incollare.',
+        'Nella home puoi chiedere a Filo di chiudere le schede: «chiudi tutte le schede tranne questa», «chiudi YouTube», «chiudi tutto tranne Gmail». Le pagine chiuse restano nel filo della home. Una scheda con del testo che non hai ancora inviato resta aperta, a meno che tu non insista.',
       ],
       fixes: [
         'La pagina sulla privacy ora dice dove sta ogni parte del server, dal codice al database alle identità. Prima diceva solo che il codice gira in Europa, e sembrava che ci stessero anche i dati, che invece per ora sono negli Stati Uniti.',
