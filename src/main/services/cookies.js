@@ -186,6 +186,13 @@ function senzaGpc(href) {
   } catch (_) { return false; }
 }
 
+// Le risorse che la pagina di accesso carica da altri host (script, immagini) contano come la pagina: si guarda il frame
+// che chiede. Non per una navigazione: lì il frame è ancora sulla pagina che si lascia, e conta solo la meta.
+function urlDelFrame(details) {
+  if (!details || details.resourceType === 'mainFrame' || details.resourceType === 'subFrame') return '';
+  try { return (details.frame && details.frame.url) || ''; } catch (_) { return ''; }
+}
+
 // Registra il listener se manca, SENZA toccare lo stato GPC.
 function ensureHeaderHook(ses) {
   if (!ses || !ses.webRequest) return null;
@@ -196,7 +203,7 @@ function ensureHeaderHook(ses) {
     ses.webRequest.onBeforeSendHeaders((details, callback) => {
       const s = gpcState.get(ses);
       const headers = /^(https?|wss?):/i.test(details.url) ? completaClientHints(details.requestHeaders) : { ...details.requestHeaders };
-      if (s && s.enabled && !senzaGpc(details.url)) headers['Sec-GPC'] = '1';
+      if (s && s.enabled && !senzaGpc(details.url) && !senzaGpc(urlDelFrame(details))) headers['Sec-GPC'] = '1';
       callback({ requestHeaders: headers });
     });
   }

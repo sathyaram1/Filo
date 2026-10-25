@@ -219,7 +219,8 @@ if (!IS_SUBFRAME) try {
 // QR): regole in preload/mondo-chrome.js. In ogni frame http(s), finestrelle di accesso comprese, prima degli script del sito.
 try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (/^https?:/i.test(loc)) webFrame.executeJavaScript(require('./mondo-chrome.js').buildSource(), false).catch(() => {});
+  // Anche i riquadri vuoti (about:blank, srcdoc) della pagina: da lì la pagina leggerebbe il codice delle funzioni di Filo.
+  if (/^(https?:|about:(blank|srcdoc)$)/i.test(loc)) webFrame.executeJavaScript(require('./mondo-chrome.js').buildSource(), false).catch(() => {});
 } catch (_) { /* mai bloccare il caricamento */ }
 
 // #576 — i riquadri della pubblicità che il blocco di rete lascia vuoti o che il sito serve da sé: regole in preload/nascondi-pubblicita.js.

@@ -8,19 +8,44 @@ function buildSource() {
   return `(function(){
   'use strict';
   try {
-    var FP = Function.prototype, prev = FP.toString, originali = new WeakMap();
+    var FP = Function.prototype, prima = FP.toString, originali = new WeakMap(), adottati = new WeakSet();
     // Google respinge un browser con le API ritoccate: ogni funzione di Filo si presenta come quella nativa, e la
     // catena di toString regge le altre maschere di Filo (menu-del-sito.js), prima o dopo di questa.
-    function toString() { var o = originali.get(this); if (typeof o === 'string') return o; return prev.apply(o || this, arguments); }
-    originali.set(toString, prev);
-    FP.toString = toString;
-    function nativa(fn, nome, orig) {
+    // Metodi, non funzioni: le native non hanno «prototype» e non si costruiscono, e la pagina lo controlla.
+    // Una funzione di un altro riquadro della pagina la racconta il toString del suo riquadro, l'unico che la conosce.
+    function fattoToString(fp, prev) {
+      var t = ({ toString() {
+        var o = originali.get(this); if (typeof o === 'string') return o;
+        if (!o && typeof this === 'function') { try { var casa = Object.getPrototypeOf(this); if (casa && casa !== fp && typeof casa.toString === 'function' && casa.toString !== t) return casa.toString.call(this); } catch (e) {} }
+        return prev.apply(o || this, arguments);
+      } }).toString;
+      originali.set(t, prev);
+      return t;
+    }
+    FP.toString = fattoToString(FP, prima);
+    adottati.add(FP);
+    // Un riquadro vuoto creato dallo script non riceve il preload: il suo toString, se è ancora nativo, si sostituisce
+    // la prima volta che la pagina raggiunge il riquadro, o da lì leggerebbe il codice delle funzioni di Filo.
+    function adotta(w) {
       try {
-        Object.defineProperty(fn, 'name', { value: nome, configurable: true });
-        Object.defineProperty(fn, 'length', { value: orig ? orig.length : 0, configurable: true });
+        var cfp = w && w !== window && w.Function && w.Function.prototype;
+        if (!cfp || adottati.has(cfp)) return;
+        adottati.add(cfp);
+        var suo = cfp.toString;
+        if (typeof suo !== 'function' || !/\\[native code\\]\\s*\\}$/.test(prima.call(suo))) return;
+        var t = fattoToString(cfp, suo);
+        Object.setPrototypeOf(t, cfp);
+        cfp.toString = t;
       } catch (e) {}
-      originali.set(fn, orig || ('function ' + nome + '() { [native code] }'));
-      return fn;
+    }
+    function nativa(fn, nome, orig) {
+      var m = fn;
+      try {
+        m = ({ [nome]() { return fn.apply(this, arguments); } })[nome];
+        Object.defineProperty(m, 'length', { value: orig ? orig.length : 0, configurable: true });
+      } catch (e) {}
+      originali.set(m, orig || ('function ' + nome + '() { [native code] }'));
+      return m;
     }
     function evento() {
       return {
@@ -83,6 +108,17 @@ function buildSource() {
       if (base) { for (var k in chrome) { try { Object.defineProperty(base, k, { value: chrome[k], writable: true, enumerable: true, configurable: true }); } catch (e) {} } }
       else Object.defineProperty(window, 'chrome', { value: chrome, writable: true, enumerable: true, configurable: true });
     }
+    [typeof HTMLIFrameElement === 'function' && HTMLIFrameElement.prototype, typeof HTMLFrameElement === 'function' && HTMLFrameElement.prototype].forEach(function (proto) {
+      if (!proto) return;
+      ['contentWindow', 'contentDocument'].forEach(function (nome) {
+        var d = Object.getOwnPropertyDescriptor(proto, nome);
+        if (!d || typeof d.get !== 'function') return;
+        var g = d.get;
+        var ng = Object.getOwnPropertyDescriptor({ get [nome]() { var r = g.call(this); if (r) adotta(nome === 'contentDocument' ? r.defaultView : r); return r; } }, nome).get;
+        originali.set(ng, g);
+        Object.defineProperty(proto, nome, { get: ng, set: d.set, enumerable: d.enumerable, configurable: true });
+      });
+    });
     var CC = typeof CredentialsContainer === 'function' && CredentialsContainer.prototype;
     var dGet = CC && Object.getOwnPropertyDescriptor(CC, 'get');
     if (dGet && typeof dGet.value === 'function') {
@@ -124,7 +160,7 @@ function buildSource() {
         }
         return oGet.apply(this, args);
       };
-      nativa(get, 'get', oGet);
+      get = nativa(get, 'get', oGet);
       Object.defineProperty(CC, 'get', { value: get, writable: dGet.writable, enumerable: dGet.enumerable, configurable: true });
     }
   } catch (e) {}
