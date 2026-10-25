@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { checkEnvelope, serverCtx, buildPayload, readRoleInstructions } from '../../scripts/dispatch.mjs';
 import { leggiArgomenti, esegui, formattaFascicolo } from '../../scripts/domanda.mjs';
+import { normalizeRole } from '../../scripts/lib/routine-role.mjs';
 
 const DOMANDA = {
   id: 'D-12', titolo: 'Come chiudere il caso della barra?', priorita: 'importante', stato: 'in_lavorazione', fiducia: 'fidato',
@@ -34,6 +35,10 @@ test('dispatch apre la busta di una risposta: niente feedback né ramo, ma il co
   assert.deepEqual(p.domanda, DOMANDA);
   assert.deepEqual(p.registro, FASCICOLO.registro);
   assert.equal(p.compito, 'C-3');
+});
+
+test('il marcatore locale riconosce il ruolo: un worker di risposta non eredita quello del worker di prima', () => {
+  assert.equal(normalizeRole('risposta'), 'risposta');
 });
 
 test('il ruolo riceve un testo intero, col contratto dei worker e i suoi comandi', () => {
