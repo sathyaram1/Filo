@@ -62,6 +62,30 @@ test('profilo nuovo: una cancellazione scritta a mano chiede prima, col no torna
   await expect(input).toHaveValue('');
 });
 
+test('una cancellazione incollata conta come scritta da altri: chiede la parola «conferma», anche dopo un Annulla', async ({ app }) => {
+  const bersaglio = cartellaDaCancellare();
+  const page = await newtabPage(app);
+  const input = page.locator('#input');
+  const comando = `/${rmDi(bersaglio)}`;
+
+  await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), comando);
+  await input.focus();
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+V' : 'Control+V');
+  await expect(input).toHaveValue(comando);
+  await input.press('Enter');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  expect((await confirmState(page)).hasInput, 'una riga incollata che cancella vuole la parola, non basta un OK').toBe(true);
+  await clickConfirm(page, 'cancel');
+  await expect(input).toHaveValue(comando);
+
+  await input.press('Enter');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  expect((await confirmState(page)).hasInput, 'rimessa nella barra resta incollata').toBe(true);
+  await fillConfirmInput(page, 'conferma');
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => existsSync(bersaglio), { timeout: 12_000 }).toBe(false);
+});
+
 test('una lettura scritta a mano parte subito; la shell chiamata senza il sì non cancella', async ({ app }) => {
   const bersaglio = cartellaDaCancellare();
   const page = await newtabPage(app);
