@@ -492,6 +492,12 @@
     return V ? V.primoComando(t.slice(1)) : (t.split(/\s+/)[0] || '').slice(1);
   }
 
+  // `$x = 1`, `FOO=bar cmd`, `(cd x)`, `& "C:\x.exe"`: sintassi della shell, non un programma da cercare. Tutto il resto
+  // (anche «cos'è», «ciao,», «perché?») si cerca: se non esiste è un messaggio per Filo, e la barra lo colora così (#892.1).
+  function sintassiShell(programma) {
+    return /^[$({[&!]/.test(programma) || /^[\p{L}_][\p{L}\p{N}_]*=/u.test(programma) || /[|<>;`]/.test(programma);
+  }
+
   // Verifica (con debounce) se il primo token è un comando shell esistente e
   // poi ricolora. Debounce così il controllo parte solo quando l'utente si
   // ferma: digitando di getto "/git" i prefissi non vengono mai controllati e
