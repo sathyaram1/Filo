@@ -120,7 +120,9 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   legittimo»).
 
 **Routine** (canale autenticato: il server valida ogni mossa con la tabella incorporata):
-- `todo` —claim (§6)→ `working`.
+- `todo` —claim (§6)→ `working`; —riordino o unione→ `archived` (#1153: solo un biglietto con
+  l'ambito `coda` o `unisci`, su un lavoro non ancora iniziato; l'unione scrive sul genitore il
+  rimando `unitoIn` al figlio).
 - `working` —routine→ `revision_capability`; —arenato (ramo fermo da un'ora)→ `todo`;
   —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
