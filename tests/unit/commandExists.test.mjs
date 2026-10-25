@@ -123,3 +123,26 @@ test('#1176: un probe che conferma basta anche dopo uno incerto, e solo tutti «
   assert.equal(await esitoDeiProbe([esce(1), esce(1)], undefined, TETTO_ATTESA_MS), false);
   assert.equal(await esitoDeiProbe([esce(2)], undefined, TETTO_ATTESA_MS), false);
 });
+
+// #892.1 — su Windows una / seguita dal percorso di un documento che esiste è un messaggio per Filo, non un programma:
+// conta solo un'estensione che Windows esegue, scritta o sottintesa. Il ramo di Windows si prova fingendo la piattaforma.
+test('#892.1: su Windows un documento al percorso non è un programma, un eseguibile sì', async () => {
+  const { writeFileSync } = await import('node:fs');
+  const { cartellaTemporanea } = await import('../helpers/percorsi.mjs');
+  const dir = cartellaTemporanea('filo-892-1-');
+  for (const f of ['lettera.docx', 'foto.jpg', 'setup.exe', 'avvia.cmd', 'build.ps1']) writeFileSync(join(dir, f), 'x');
+  const vera = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', { value: 'win32' });
+  try {
+    const c = (command, shell = 'powershell') => commandExists({ shell, cwd: dir, command, attesaMs: 2000 });
+    assert.equal(await c(join(dir, 'lettera.docx')), false);
+    assert.equal(await c(join(dir, 'foto.jpg')), false);
+    assert.equal(await c(dir), false, 'una cartella non è un programma');
+    assert.equal(await c(join(dir, 'setup.exe')), true);
+    assert.equal(await c(join(dir, 'avvia')), true, 'l\'estensione sottintesa vale come in Windows');
+    assert.equal(await c('./build.ps1'), true);
+    assert.equal(await c(join(dir, 'foto.jpg'), 'bash'), true, 'in WSL decide il bit d\'esecuzione, che da qui non si vede');
+  } finally {
+    Object.defineProperty(process, 'platform', vera);
+  }
+});

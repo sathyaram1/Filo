@@ -502,6 +502,16 @@ async function esitoDeiProbe(probes, cwd, attesaMs = ATTESA_PROBE_MS) {
   return incerto ? null : false;
 }
 
+// PATHEXT più gli script di PowerShell e gli installatori; in WSL decide il bit d'esecuzione, che da qui non si vede.
+function programmaWindowsAlPercorso(p, shell) {
+  const file = (f) => { try { return fs.statSync(f).isFile(); } catch (_) { return false; } };
+  if (shell === 'bash') return file(p);
+  const est = new Set(String(process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC')
+    .toLowerCase().split(';').filter(Boolean).concat(['.ps1', '.msi']));
+  if (est.has(path.extname(p).toLowerCase())) return file(p);
+  return [...est].some((e) => file(p + e));
+}
+
 // true esiste, false non esiste di certo, null non si è potuto sapere (la dashboard lo lascia senza colore).
 async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS } = {}) {
   const cmd = String(command == null ? '' : command).trim();
@@ -513,9 +523,8 @@ async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS }
   }
   // Un programma dato col percorso (anche fra virgolette, #968): `where.exe` rifiuta i percorsi e cmd resterebbe
   // rosso. Fuori da Windows `command -v` qui sotto risolve già un percorso, e controlla anche che sia eseguibile.
-  if (process.platform === 'win32' && /[\\/]/.test(cmd)) {
-    try { if (fs.statSync(path.resolve(cwd || defaultCwd(), cmd)).isFile()) return true; } catch (_) {}
-  }
+  // Lì un documento esistente non è un programma (#892.1): conta solo un'estensione che si esegue, scritta o sottintesa.
+  if (process.platform === 'win32' && /[\\/]/.test(cmd)) return programmaWindowsAlPercorso(path.resolve(cwd || defaultCwd(), cmd), shell);
   return esitoDeiProbe(existenceProbes({ shell, cmd }), cwd, attesaMs);
 }
 

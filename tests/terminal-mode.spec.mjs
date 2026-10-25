@@ -16,6 +16,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { clickConfirm } from './helpers/confirm.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -129,6 +130,8 @@ test('la shell è PERSISTENTE per scheda: una variabile impostata sopravvive al 
 
   // Primo comando: imposta la variabile in UN processo shell.
   await submitInput(page, setCmd);
+  // Impostare una variabile il classificatore non lo riconosce: anche scritto a mano chiede un OK (#892.1).
+  await clickConfirm(page, 'ok');
   // Aspetta che il primo comando sia finito (i controlli Stop spariscono).
   await expect(page.locator('.dash-term-controls')).toHaveCount(0, { timeout: 12_000 });
 
@@ -202,6 +205,7 @@ test('i colori ANSI vengono resi (niente codici grezzi nel testo visibile)', asy
     ? '/echo "$([char]27)[31mROSSO$([char]27)[0m-FINE"'
     : "/printf '\\033[31mROSSO\\033[0m-FINE\\n'";
   await submitInput(page, cmd);
+  await clickConfirm(page, 'ok');
 
   const out = page.locator('.dash-term-out').last();
   // Il testo visibile è "ROSSO-FINE" CONTIGUO: i codici ESC[..m sono stati

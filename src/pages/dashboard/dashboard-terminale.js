@@ -193,7 +193,7 @@
 
   // #968 — un comando scritto a mano è fallito: se aveva un percorso con spazi senza virgolette, sotto l'errore
   // compare la versione con le virgolette, da lanciare con un clic. Parte solo quello che c'è scritto lì.
-  async function proponiVirgolette({ command, cwd, shell, out, chat }) {
+  async function proponiVirgolette({ command, cwd, shell, out, chat, daFuori = false }) {
     let r = null;
     try { r = await window.filo?.shellPropostaVirgolette?.({ comando: command, shell, cwd }); } catch (_) { r = null; }
     const p = r && r.proposta;
@@ -219,7 +219,7 @@
     const lancia = () => {
       if (esegui.disabled) return;
       esegui.disabled = true;
-      runShellCommand(p.comando, chat);
+      runShellCommand(p.comando, chat, { daFuori }).then((partito) => { if (!partito) esegui.disabled = false; });
     };
     const nellaBarra = () => {
       inputEl.value = `/${p.comando}`;
@@ -251,17 +251,35 @@
     if (inFondo) bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
-  function runShellCommand(command, chat) {
-    if (!command) return;
-    if (document.body.dataset.state !== 'thread') goThread();
-    comandoInChat = true;
-    applyTerminalMode();
+  // #892.1 — prima di partire il comando passa dai livelli di autonomia, come quelli di Filo: la risposta la dà il main,
+  // che la richiede quando il comando parte. Torna false se la persona ha detto no e non è partito niente.
+  async function chiediPrimaDiLanciare(command, { cwd, shell, daFuori = false }) {
+    let v = null;
+    try { v = await window.filo?.shellVaglia?.({ command, cwd, shell, daFuori: daFuori === true }); } catch (_) { v = null; }
+    if (!v || !v.ok) return { via: true };
+    if (v.risposta === 'si') return { via: true };
+    if (v.risposta === 'no') return { via: true, no: v.no || 'Questo comando non lo lancio.' };
+    const Ui = global.SN_CONFIRM_UI;
+    const opts = { title: 'Filo chiede conferma', text: '', parti: Array.isArray(v.parti) ? v.parti : [] };
+    const ok = Ui ? await (v.digita ? Ui.confirmTyped(opts) : Ui.confirm(opts)) : window.confirm(command);
+    if (!ok) { try { window.filo?.shellAnnulla?.(v.gettone); } catch (_) {} return { via: false }; }
+    return { via: true, gettone: v.gettone };
+  }
+
+  // `daFuori`: la riga è stata incollata o trascinata, e conta come scritta da altri (#892.1).
+  async function runShellCommand(command, chat, { daFuori = false } = {}) {
+    if (!command) return false;
     // La conversazione a cui il comando e il suo esito appartengono è questa,
     // anche se l'esito arriva fra dieci secondi e intanto l'utente se n'è andato.
     const chatDelComando = chat || chatDellaRiga();
     // Dove e con quale shell è girato: la proposta dopo un errore legge i percorsi da lì, non da dove si è poi.
     const cwdDelComando = currentCwd;
     const shellDelComando = terminalShell;
+    const permesso = await chiediPrimaDiLanciare(command, { cwd: cwdDelComando, shell: shellDelComando, daFuori });
+    if (!permesso.via) return false;
+    if (document.body.dataset.state !== 'thread') goThread();
+    comandoInChat = true;
+    applyTerminalMode();
 
     // #525 — il comando e il suo esito sono battute di QUESTA conversazione:
     // l'utente li legge qui, in mezzo alle altre, e riaprendo la chat da
@@ -396,16 +414,23 @@
       archiviaRiga(CA ? CA.clampOutput(daScrivere) : daScrivere, 'filo', chatDelComando, 'comando');
     };
 
+    if (permesso.no) {
+      appendOut(permesso.no, true);
+      finish('(non eseguito)');
+      return true;
+    }
     const handle = window.filo.shellExec({
       command,
-      cwd: currentCwd,
-      shell: terminalShell,
+      cwd: cwdDelComando,
+      shell: shellDelComando,
       chat: chatDelComando,
+      gettone: permesso.gettone,
+      daFuori,
       onData: ({ chunk, stream }) => appendOut(chunk, stream === 'stderr'),
       onExit: ({ code, cwd }) => {
         if (cwd) setCwd(cwd);
         finish(code === 0 ? null : `(uscita con codice ${code})`);
-        if (code !== 0) proponiVirgolette({ command, cwd: cwdDelComando, shell: shellDelComando, out, chat: chatDelComando });
+        if (code !== 0) proponiVirgolette({ command, cwd: cwdDelComando, shell: shellDelComando, out, chat: chatDelComando, daFuori });
       },
       onError: ({ message }) => {
         appendOut(`\n${message || 'Errore di esecuzione.'}`, true);
@@ -429,6 +454,7 @@
     // il comando successivo senza ricliccare. Il campo "Invio testo al comando…"
     // qui sopra resta cliccabile per i comandi interattivi che chiedono stdin.
     inputEl.focus();
+    return true;
   }
 
   function init(deps) {
