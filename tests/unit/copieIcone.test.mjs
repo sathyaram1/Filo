@@ -6,11 +6,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import Module from 'node:module';
-import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, renameSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const userData = cartellaTemporanea('filo-icone-');
@@ -225,4 +225,29 @@ test('all’avvio i file che nessuna voce nomina se ne vanno', async () => {
   assert.ok(!existsSync(orfano));
   assert.ok(existsSync(fileDi(usata)));
   assert.ok(existsSync(join(cartella, 'chiave')), 'la chiave dei nomi resta');
+});
+
+test('una copia che non si scrive lascia la voce col globo: la scheda chiusa si archivia e la pagina si salva lo stesso; una cartella sparita si rifà', async () => {
+  const gif = (n) => `data:image/gif;base64,${Buffer.from(`GIF89a${String.fromCharCode(n)}`, 'latin1').toString('base64')}`;
+  const daParte = `${cartella}.da-parte`;
+  // Al posto della cartella un file: ogni scrittura fallisce, come col disco pieno o un file bloccato.
+  renameSync(cartella, daParte);
+  writeFileSync(cartella, 'non una cartella');
+  try {
+    assert.equal(await Copie.conserva(gif(1)), '');
+    const t = await A.archive({ url: 'https://chiusa.test/', title: 'Chiusa', favicon: gif(2), proxy: { country: 'us' } });
+    assert.ok(t && t.id, 'la scheda chiusa non è entrata nell’archivio');
+    assert.equal(t.favicon, '');
+    const tab = { id: 21, url: 'https://salvata.test/', favicon: gif(3), _origineIcona: 'https://salvata.test', proxy: { country: 'us' } };
+    const r = await registro.get(MSG.SAVE_PAGE)({ type: MSG.SAVE_PAGE, page: { url: tab.url, title: 'Salvata' } }, daScheda(tab), tab.url);
+    assert.equal(r.ok, true);
+    assert.equal((await S.list()).find((p) => p.url === tab.url).favicon, '');
+  } finally {
+    rmSync(cartella, { force: true });
+    renameSync(daParte, cartella);
+  }
+  assert.ok(togliCartella(cartella));
+  const rif = await Copie.conserva(gif(4));
+  assert.match(rif, /^filo:\/\/icone\//);
+  assert.ok(existsSync(fileDi(rif)), 'la cartella sparita non si è rifatta');
 });
