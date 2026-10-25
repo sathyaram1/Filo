@@ -37,6 +37,10 @@ test('la decisione è quella dei comandi di Filo: registro delle azioni e SN_AUT
   assert.match(corpo, /decisioneAutonomia\(ing/);
   assert.match(corpo, /perimetroLettura\(null, cwd\)/, 'il comando si giudica dove girerà, non nella cartella dell\'assistente');
   assert.doesNotMatch(corpo, /needsConfirm/, 'needsConfirm resta del dispatch delle azioni');
+  assert.match(corpo, /fontiLette: daFuori === true \? \[FONTE_COMANDO_DA_FUORI\]/, 'una riga incollata conta come scritta da altri');
+  const ipc = leggi('src', 'main', 'ipc.js');
+  const start = corpoDa(ipc, "ipcMain.handle('shell:start'", "ipcMain.handle('shell:which'");
+  assert.match(start, /daFuori: daFuori === true \|\| daFuoriAllaDomanda/, 'alla partenza vale ancora com\'era alla domanda');
 });
 
 test('la home chiede prima di mostrare il comando, e il no non lancia niente', () => {
