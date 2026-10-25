@@ -67,14 +67,21 @@ async function conserva(dato) {
   const tipo = buf && buf.length && buf.length <= TETTO_BYTE ? tipoImmagine(buf) : '';
   if (!tipo) return '';
   if (inIncognito()) return `data:${tipo};base64,${buf.toString('base64')}`;
+  // Una copia che non si scrive (disco pieno, file bloccato) lascia la voce col globo: mai la voce persa per la sua icona.
+  try { return await scrivi(buf, tipo); } catch (_) { return ''; }
+}
+
+async function scrivi(buf, tipo) {
   const nome = `${crypto.createHmac('sha256', laChiave()).update(buf).digest('hex').slice(0, 40)}.${ESTENSIONE[tipo]}`;
-  recenti.set(nome, Date.now());
   const file = path.join(cartella(), nome);
   if (!fs.existsSync(file)) {
+    // La cartella può sparire con Filo aperto: si rifà.
+    await fsp.mkdir(cartella(), { recursive: true });
     const tmp = `${file}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
     await fsp.writeFile(tmp, buf);
     await fsp.rename(tmp, file).catch(async (e) => { await fsp.rm(tmp, { force: true }).catch(() => {}); if (!fs.existsSync(file)) throw e; });
   }
+  recenti.set(nome, Date.now());
   return PREFISSO + nome;
 }
 
