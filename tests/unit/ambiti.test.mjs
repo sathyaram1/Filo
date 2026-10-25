@@ -63,3 +63,11 @@ test('un ambito approvato vale come gli iniziali; uno che il server rifiuterebbe
   assert.ok(!A.attivi(approvati).includes('spia'));
   assert.ok(!A.attivi().includes('posta'), 'la posta aspetta la casella');
 });
+
+test('la tabella degli ambiti di SPEC-DOMANDE § 5.2 e questi dati nominano gli stessi ambiti', async () => {
+  const { readFileSync } = await import('node:fs');
+  const spec = readFileSync(join(ROOT, 'SPEC-DOMANDE.md'), 'utf8');
+  const sezione = spec.slice(spec.indexOf('### 5.2'), spec.indexOf('### 5.3'));
+  const nomi = sezione.split('\n').map((r) => /^\| `([a-z_]+)` \|/.exec(r)).filter(Boolean).map((m) => m[1]).sort();
+  assert.deepEqual(nomi, Object.keys(A.INIZIALI).sort());
+});
