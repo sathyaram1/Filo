@@ -11,6 +11,7 @@
     {
       version: '0.2.250', date: '2026-10-23',
       features: [
+        'Puoi scegliere quali versioni di Filo ricevere. «Veloce» le prende appena escono, anche più volte al giorno. «Stabile» ne prende una a settimana, il lunedì, e quella settimana la salta se c\'è un problema di sicurezza ancora aperto. Lo trovi in Preferenze, sotto Aggiornamenti, oppure chiedilo a Filo. Le novità delle versioni saltate le leggi tutte insieme quando arriva quella del lunedì.',
         'Un\'immagine che trascini dentro Filo entra nella chat dovunque la lasci. Nella home va nella casella da qualunque punto della pagina, che si accende mentre la trascini. Su un sito si apre l\'Aiuto con l\'immagine già allegata, salvo che il sito la voglia per sé, come una pagina che carica file. Nell\'Aiuto ora la puoi anche incollare.',
         'Nella home puoi chiedere a Filo di chiudere le schede: «chiudi tutte le schede tranne questa», «chiudi YouTube», «chiudi tutto tranne Gmail». Le pagine chiuse restano nel filo della home. Una scheda con del testo che non hai ancora inviato resta aperta, a meno che tu non insista.',
       ],
@@ -89,7 +90,6 @@
     {
       version: '0.2.244', date: '2026-10-21',
       features: [
-        'Puoi scegliere quali versioni di Filo ricevere. «Veloce» le prende appena escono, anche più volte al giorno. «Stabile» ne prende una a settimana, il lunedì, e quella settimana la salta se c\'è un problema di sicurezza ancora aperto. Lo trovi in Preferenze, sotto Aggiornamenti, oppure chiedilo a Filo. Le novità delle versioni saltate le leggi tutte insieme quando arriva quella del lunedì.',
         'In cima alla barra laterale c\'è l\'icona Aiuto. Un clic apre l\'Aiuto sulla pagina, un secondo clic nello stesso punto ti fa parlare e un terzo ferma la dettatura. Se riduci o chiudi l\'Aiuto mentre Filo risponde, la risposta resta lì e la striscia sul bordo sinistro si accende finché non la apri. Puoi spostare o togliere l\'icona come le altre.',
       ],
       fixes: [
