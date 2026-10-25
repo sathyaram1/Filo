@@ -1,4 +1,4 @@
-// Verifica #1471, giro 2, rilievo 2: l'uso della carta «Impostazioni rapide» dalle sue pastiglie si conta.
+// Verifica #1471, giro 3, rilievo 2: l'uso della carta «Impostazioni rapide» dalle sue pastiglie si conta.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
