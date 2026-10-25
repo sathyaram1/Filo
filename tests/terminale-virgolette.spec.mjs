@@ -134,8 +134,10 @@ test('#968: al posto del programma il percorso fra virgolette è un comando che 
   await expect(input).toHaveValue(windows ? `/& "${programma}"` : `/"${programma}"`, { timeout: 8_000 });
   await expect(input).toHaveClass(/is-cmd-shell/, { timeout: 12_000 });
   await page.keyboard.press('Enter');
-  // Un programma che il terminale non riconosce chiede un OK anche scritto a mano (#892.1).
-  await clickConfirm(page, 'ok');
+  // Un programma che il terminale non riconosce chiede prima; incollato, vuole la parola «conferma» (#892.1).
+  await fillConfirmInput(page, 'conferma');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'danger');
   await expect(page.locator('.dash-term-out').last()).toContainText('eseguito-968', { timeout: 15_000 });
 });
 
