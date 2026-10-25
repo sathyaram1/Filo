@@ -450,7 +450,7 @@ function registerIpcHandlers() {
     contaSe('confermaRisposta', gettone, 'rifiutata');
   });
 
-  ipcMain.handle('shell:start', async (event, { execId, command, cwd, shell, chat, gettone } = {}) => {
+  ipcMain.handle('shell:start', async (event, { execId, command, cwd, shell, chat, gettone, daFuori } = {}) => {
     const url = event.sender.getURL() || '';
     if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
     if (!execId || typeof command !== 'string') return { ok: false, error: 'bad-args' };
@@ -458,7 +458,9 @@ function registerIpcHandlers() {
       try { event.sender.send(`shell:${execId}:${suffix}`, data); } catch (_) {}
     };
     const key = event.sender.id;
-    const v = await decisioneComandoAMano({ comando: command, cwd: cartellaDellaSessione(key, shell, cwd), shell: resolveShell(shell) });
+    // Un comando incollato resta incollato fino alla partenza: il gettone ricorda com'era quando è stato chiesto.
+    const daFuoriAllaDomanda = !!(gettone && comandiDaConfermare.get(gettone)?.daFuori);
+    const v = await decisioneComandoAMano({ comando: command, cwd: cartellaDellaSessione(key, shell, cwd), shell: resolveShell(shell), daFuori: daFuori === true || daFuoriAllaDomanda });
     if (v.risposta !== 'si') {
       const c = gettone ? comandiDaConfermare.get(gettone) : null;
       const valido = v.risposta !== 'no' && !!c && c.chi === key && c.comando === command.trim() && c.scade >= Date.now();
