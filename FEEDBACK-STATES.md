@@ -312,12 +312,12 @@ c'è più.
 Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il feedback è
 **fidato** (#1148, `functions/src/nascita.js`); il mittente decide solo dove va:
 
-- lavoro locale fidato (§4b): `todo` col segno, senza nemmeno L0;
-- owner, sessione col biglietto pulito (`claude-feedback.mjs --non-locale`): L0, poi `todo` In
+- lavoro locale fidato (§4b): `todo` col segno, senza nemmeno il cancello degli allegati;
+- owner, sessione col biglietto pulito (`claude-feedback.mjs --non-locale`): il cancello degli allegati, poi `todo` In
   coda (`pipeline.skipped: 'fidato'`); la priorità scelta con `--priorita` nasce col documento
   (`priorityManual`), senza scelta la decide il giudice;
 - ritrovamento fidato del server (`routine:`/`agent:` + `senderProof: 'server'`: ritrovamenti,
-  derivati, allarmi della costruzione): L0, poi dove dice l'**origine** (`pipeline.skipped:
+  derivati, allarmi della costruzione): il cancello degli allegati, poi dove dice l'**origine** (`pipeline.skipped:
   'routine_proven'`, decisione dell'owner del 04/10). Un ritrovamento NON fidato passa dai
   giudici; se lo manderebbero in coda, aspetta comunque l'origine come sotto. L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
   mai la routine; `parentId` resta un collegamento) e conta il genitore diretto:
@@ -683,11 +683,11 @@ oggi il codice dice altro vale il codice (le sezioni sopra).
 - [x] **F6 — filo-security** (fatto 2026-07-03, commit bd93b47, DEPLOYATO):
       `src/statusMap.js` (decisione→status canonico; fidati mai attack/spam →
       unlabeled; canWriteStatus = la pipeline non regredisce feedback oltre il
-      giudizio — vale anche per le ri-valutazioni); `src/l0/fileGate.js` (gate
+      giudizio — vale anche per le ri-valutazioni); `src/cancelloAllegati.js` (cancello
       deterministico allowlist su `files[]`, PRIMA dei giudici → suspicious_file,
       niente panel); `feedbackState.recordDecision` scrive `status` CIFRATO (come
       il pipeline: anti hill-climbing, la dashboard lo decifra già — status è nei
-      TEXT_FIELDS) + `statusPublic` in chiaro; runner: gate L0, owner-accepted →
+      TEXT_FIELDS) + `statusPublic` in chiaro; runner: cancello degli allegati, owner-accepted →
       todo, trusted, reeval aggiorna lo status. Test 279 verdi. `storage.rules`
       (repo Filo): via i wildcard `text/.*`/`image/.*` (passava text/html!),
       allowlist esplicita — DEPLOYATE.

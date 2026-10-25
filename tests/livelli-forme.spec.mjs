@@ -119,7 +119,7 @@ const FB_ATTACCO = {
   pipeline: {
     action: 'block_attack',
     l1Category: 'dangerous',
-    l1Reasons: ['linked_prior_attack', 'obfuscation'],
+    l1Reasons: ['linked_prior_attack'],
     verdicts: [],
     stage: 'L1',
   },
@@ -148,7 +148,7 @@ function richiesta(over = {}) {
  * `window.__chiamate`, così si può asserire che il gesto è ARRIVATO al main —
  * non solo che la UI ha cambiato colore.
  */
-async function stub(page, { pending = [], failed = [], saltaReply = null } = {}) {
+async function stub(page, { pending = [], failed = [], saltaReply = null, rigiudicaReply = null } = {}) {
   await page.evaluate((cfg) => {
     window.__chiamate = [];
     const orig = window.filo.message.bind(window.filo);
@@ -164,10 +164,14 @@ async function stub(page, { pending = [], failed = [], saltaReply = null } = {})
         window.__chiamate.push(msg);
         return cfg.saltaReply || { ok: true, esito: 'fuso' };
       }
+      if (t === 'feedback_reevaluate') {
+        window.__chiamate.push(msg);
+        return cfg.rigiudicaReply || { ok: true, results: [{ ok: true, changed: true, fullRun: true }], reevaluated: 1, remaining: 0 };
+      }
       if (t === 'feedback_update') { window.__chiamate.push(msg); return { ok: true }; }
       return orig(msg);
     };
-  }, { pending, failed, saltaReply });
+  }, { pending, failed, saltaReply, rigiudicaReply });
 }
 
 async function apri(page, feedbacks, opts = {}) {
@@ -262,8 +266,9 @@ test('il triangolo dice categoria, motivi in italiano, chi ha deciso e cosa ha f
   await expect(corpo).toContainText('Pericoloso');
   // I motivi in italiano leggibile, non i codici del server.
   await expect(corpo).toContainText('collegato a un attacco precedente');
-  await expect(corpo).toContainText('offuscamento');
   await expect(corpo).not.toContainText('linked_prior_attack');
+  // Fermata dal segno sul mittente: il gesto è togliere il segno, non ri-giudicare.
+  await expect(page.locator('#mgRigiudicaBtn')).toHaveCount(0);
   // Chi ha deciso, e cosa ha fatto.
   await expect(corpo).toContainText(/filtro automatico/i);
   await expect(corpo).toContainText(/ha fermato la segnalazione come attacco/i);
@@ -957,6 +962,139 @@ test('una richiesta che arriva a pagina aperta cambia il quadrato e la card', as
 
   await expect(page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]')).toHaveClass(/mg-forma--attack/, { timeout: 8_000 });
   await expect(page.locator('.mg-item .mg-fusione-badge')).toBeVisible({ timeout: 8_000 });
+});
+
+// ── Il triangolo con la scheda che compone il server ────────────────────────
+
+// La scheda del filtro d'ingresso arriva fatta dal server (pipeline.ingresso): la pagina mostra righe e testo
+// senza sapere cosa vogliono dire. I contenuti qui sono finti apposta.
+const FB_SCHEDA = {
+  _id: 'fb-livelli-scheda',
+  text: 'Il menu non si apre.',
+  name: 'Menu chiuso',
+  seq: 704, subSeq: 0,
+  status: 'aligned',
+  clientId: 'anonimo-43',
+  createdAt: '2026-09-09T09:00:00Z',
+  images: [],
+  pipeline: {
+    action: 'human_review', l1Category: 'clean', l1Reasons: [], l2Class: 'aligned', stage: 'L2',
+    expectedJudges: ['fixed_1'], verdicts: [{ judge: 'fixed_1', class: 'aligned', reasoning: 'Ok.' }],
+    ingresso: {
+      classe: 'design', esito: 'reso leggibile', rigiudica: false,
+      righe: [{ etichetta: 'Esito', valore: 'passato ai giudici col testo reso leggibile' }, { etichetta: 'Punti trovati', valore: 'prova: 2 punti' }],
+      parti: [{
+        titolo: 'Testo del feedback',
+        segmenti: [
+          { t: 'Il menu ' },
+          { t: '⟪segnaposto del server⟫', nota: 'nota del server sul primo punto' },
+          { t: ' non si apre <b>davvero</b>.\nSeconda riga ' },
+          { t: 'parola', nota: 'nota del server sul secondo punto' },
+        ],
+      }],
+    },
+  },
+};
+
+test('il triangolo mostra le righe e il testo che compone il server, coi punti evidenziati e il perché sotto il puntatore', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_SCHEDA]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_SCHEDA._id);
+
+  const tri = page.locator('#mgLivelliRow .mg-forma[data-livello="l1"]');
+  await expect(tri).toHaveClass(/mg-forma--design/);
+  await tri.click();
+  const corpo = page.locator('#mgSideBody');
+  await expect(corpo).toContainText('passato ai giudici col testo reso leggibile');
+  await expect(corpo).toContainText('prova: 2 punti');
+  const testo = corpo.locator('.mg-liv-leggibile-testo');
+  await expect(corpo.locator('.mg-liv-leggibile h4')).toHaveText('Testo del feedback');
+  await expect(testo).toContainText('Il menu ⟪segnaposto del server⟫ non si apre <b>davvero</b>.');
+  // Il markup che arriva da fuori resta testo.
+  await expect(testo.locator('b')).toHaveCount(0);
+  const segnati = testo.locator('mark');
+  await expect(segnati).toHaveCount(2);
+  await expect(segnati.first()).toHaveText('⟪segnaposto del server⟫');
+  expect(await segnati.first().getAttribute('title')).toBe('nota del server sul primo punto');
+  // Passato ai giudici: non c'è niente da ri-giudicare da qui.
+  await expect(page.locator('#mgRigiudicaBtn')).toHaveCount(0);
+
+  for (const tema of ['light', 'dark']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.waitForTimeout(150);
+    const colori = await segnati.first().evaluate((el) => ({
+      fondo: getComputedStyle(el).backgroundColor,
+      testo: getComputedStyle(el).color,
+      box: getComputedStyle(el.parentElement).backgroundColor,
+    }));
+    expect(colori.fondo, `tema ${tema}`).not.toBe('rgba(0, 0, 0, 0)');
+    expect(colori.fondo, `tema ${tema}`).not.toBe(colori.box);
+    await page.screenshot({ path: `tests/.shots/livelli-scheda-ingresso-${tema}.png` }).catch(() => {});
+  }
+});
+
+test('una pratica fermata prima dei giudici si ri-giudica dal triangolo, e il pannello dice l\'esito vero', async ({ openTab }) => {
+  const fermata = {
+    ...FB_SCHEDA, _id: 'fb-livelli-fermata', seq: 705, status: 'unlabeled',
+    pipeline: {
+      action: 'human_review', l1Category: null, l1Reasons: [], stage: 'altro', verdicts: [],
+      ingresso: {
+        classe: 'spam', esito: 'fermo', rigiudica: true, breve: 'Fermata dal server per una prova',
+        righe: [{ etichetta: 'Esito', valore: 'fermata per una prova' }], parti: [],
+      },
+    },
+  };
+  const page = await openTab(MANAGE);
+  await apri(page, [fermata]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fermata._id);
+
+  // In lista e nel pannello il perché è quello del server, non «in attesa del giudizio».
+  const segno = page.locator(`.mg-item[data-id="${fermata._id}"] .mg-segno-fermata`);
+  await expect(segno).toHaveAttribute('title', 'Fermata dal server per una prova');
+  await expect(segno).toHaveAttribute('data-forma', 'triangolo');
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l1"]').click();
+  await expect(page.locator('#mgSideBody')).toContainText('fermata per una prova');
+  const btn = page.locator('#mgRigiudicaBtn');
+  await expect(btn).toBeVisible();
+  await btn.click();
+  await expect(page.locator('#mgSideBody .mg-liv-esito')).toContainText('Giudicata');
+  const chiamate = await page.evaluate(() => window.__chiamate.filter((m) => m.type === 'feedback_reevaluate'));
+  expect(chiamate).toEqual([{ type: 'feedback_reevaluate', feedbackIds: [fermata._id] }]);
+  await page.screenshot({ path: 'tests/.shots/livelli-rigiudica.png' }).catch(() => {});
+});
+
+test('ri-giudica: se il server non riesce ancora a leggerla lo dice, senza contarla come fatta', async ({ openTab }) => {
+  const fermata = {
+    ...FB_SCHEDA, _id: 'fb-livelli-illeggibile', seq: 706, status: 'unlabeled',
+    pipeline: {
+      action: 'human_review', l1Category: null, l1Reasons: [], stage: 'altro', verdicts: [],
+      ingresso: { classe: 'spam', esito: 'fermo', rigiudica: true, righe: [{ etichetta: 'Esito', valore: 'ferma' }], parti: [] },
+    },
+  };
+  const page = await openTab(MANAGE);
+  await apri(page, [fermata], {
+    rigiudicaReply: { ok: true, results: [{ ok: true, changed: false, reason: 'non_decifrabile', errorKind: 'non_decifrabile' }], reevaluated: 0, remaining: 0 },
+  });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fermata._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l1"]').click();
+  await page.locator('#mgRigiudicaBtn').click();
+  const esito = page.locator('#mgSideBody .mg-liv-esito');
+  await expect(esito).toContainText('non riesce ancora a decifrare');
+  await expect(esito).toHaveAttribute('data-kind', 'err');
+});
+
+test('una pratica vecchia fermata al filtro senza il segno si ri-giudica anche senza la scheda del server', async ({ openTab }) => {
+  const vecchia = {
+    ...FB_ATTACCO, _id: 'fb-livelli-vecchia', seq: 707,
+    pipeline: { action: 'human_review', l1Category: 'dangerous', l1Reasons: ['codice_di_prima'], verdicts: [], stage: 'L1' },
+  };
+  const page = await openTab(MANAGE);
+  await apri(page, [vecchia]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), vecchia._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l1"]').click();
+  await expect(page.locator('#mgSideBody')).toContainText('codice di prima');
+  await page.locator('#mgRigiudicaBtn').click();
+  await expect(page.locator('#mgSideBody .mg-liv-esito')).toContainText('Giudicata');
 });
 
 // ── Tema chiaro e tema scuro ────────────────────────────────────────────────

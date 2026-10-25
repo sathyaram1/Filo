@@ -5214,6 +5214,8 @@
       body.appendChild(t);
     }
 
+    if (Array.isArray(p.parti) && p.parti.length) body.appendChild(partiLeggibili(p.parti));
+    if (liv.key === 'l1' && isAdmin && p.azioni.includes('rigiudica')) body.appendChild(pannelloRigiudica(fb));
     if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
     const strade = liv.key === 'l5' ? pannelloStradeFusione(fb, liv) : null;
     if (strade) body.appendChild(strade);
@@ -5422,6 +5424,72 @@
     });
     box.appendChild(btn);
     box.appendChild(esito);
+    return box;
+  }
+
+  // Il testo che il server ha reso leggibile, coi punti che ha segnato evidenziati: il perché di ognuno sta sotto
+  // il puntatore. Testo e note arrivano da fuori: solo nodi di testo, mai markup.
+  function partiLeggibili(parti) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-leggibile';
+    for (const parte of parti) {
+      const sez = document.createElement('section');
+      const h = document.createElement('h4');
+      h.textContent = parte.titolo;
+      const testo = document.createElement('div');
+      testo.className = 'mg-liv-leggibile-testo';
+      for (const s of parte.segmenti) {
+        if (!s.nota) { testo.appendChild(document.createTextNode(s.t)); continue; }
+        const m = document.createElement('mark');
+        m.textContent = s.t;
+        m.title = s.nota;
+        testo.appendChild(m);
+      }
+      sez.append(h, testo);
+      box.appendChild(sez);
+    }
+    return box;
+  }
+
+  // Ri-giudica dal triangolo: la pratica che il filtro d'ingresso ha fermato torna dai giudici, come i non
+  // filtrati della barra in cima ma una sola.
+  function pannelloRigiudica(fb) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn sn-btn-secondary';
+    btn.id = 'mgRigiudicaBtn';
+    btn.textContent = 'Ri-giudica';
+    btn.title = 'Rimanda la segnalazione ai giudici';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.setAttribute('role', 'status');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      esito.dataset.kind = 'wait';
+      esito.textContent = 'I giudici stanno leggendo…';
+      const card = startCardEvaluating(fb._id);
+      let r;
+      try {
+        r = await sendToMain({ type: 'feedback_reevaluate', feedbackIds: [fb._id] });
+      } catch (e) {
+        r = { ok: false, error: (e && e.message) || String(e) };
+      }
+      stopCardEvaluating(card);
+      const { outcome, errorKind } = MR.classifyReevalResult(r);
+      const hint = MR.reevalErrorHint(errorKind);
+      const fatto = outcome === 'recovered';
+      const testo = fatto ? 'Giudicata: il verdetto è nei cerchi.'
+        : outcome === 'budget' ? 'Il server ha finito il tempo: riprova tra poco.'
+          : hint || (outcome === 'error' ? `Non riuscito: ${(r && r.error) || 'riprova'}.` : 'Niente da rifare: il server l’ha lasciata com’era.');
+      esito.dataset.kind = fatto ? 'ok' : 'err';
+      esito.textContent = testo;
+      toast(testo, fatto ? 'ok' : 'err');
+      btn.disabled = false;
+      if (fatto) refreshFromRemote({ force: true }).catch(() => {});
+    });
+    box.append(btn, esito);
     return box;
   }
 

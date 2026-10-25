@@ -1280,6 +1280,22 @@
        come l'approvazione di una fusione, perché il primo non basti. */
     .mg-liv-azioni { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
     .mg-liv-strade { display: flex; flex-wrap: wrap; gap: 8px; }
+    /* Il testo reso leggibile dal filtro d'ingresso: monospazio perché i segnaposto e le codifiche si contano a
+       caratteri; i punti segnati sono evidenziati col colore d'accento, il loro perché sta sotto il puntatore. */
+    .mg-liv-leggibile { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+    .mg-liv-leggibile h4 { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--sn-muted); }
+    .mg-liv-leggibile-testo {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.6;
+      white-space: pre-wrap; word-break: break-word; color: var(--sn-text);
+      max-height: 340px; overflow: auto; padding: 8px 10px; border-radius: 6px;
+      background: color-mix(in srgb, var(--sn-fg) 4%, transparent);
+    }
+    .mg-liv-leggibile-testo mark {
+      color: inherit; border-radius: 3px; padding: 0 1px; cursor: help;
+      background: color-mix(in srgb, var(--sn-accent) 26%, transparent);
+      transition: background calc(0.15s * var(--sn-motion, 1)) ease;
+    }
+    .mg-liv-leggibile-testo mark:hover { background: color-mix(in srgb, var(--sn-accent) 42%, transparent); }
     .mg-liv-esito { font-size: 12px; }
     .mg-liv-esito[data-kind="ok"]   { color: #2e9e5b; }
     .mg-liv-esito[data-kind="err"]  { color: #c0392b; }
