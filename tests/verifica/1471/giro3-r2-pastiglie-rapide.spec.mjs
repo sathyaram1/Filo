@@ -19,6 +19,7 @@ const uso = (app, carta) => app.evaluate(async (c) => {
 
 test('r2 un clic su una pastiglia della carta «Impostazioni rapide» è un uso della carta', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://newtab')), { timeout: 10_000 }).toBe(true);
   const casa = app.windows().find((w) => w.url().startsWith('filo://newtab'));
   const pastiglia = casa.locator('.dash-carta[data-chiave="rapide"] .dash-pastiglia').first();
   await expect(pastiglia).toBeVisible({ timeout: 10_000 });
