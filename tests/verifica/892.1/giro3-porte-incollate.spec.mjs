@@ -30,6 +30,7 @@ const rmDi = (c) => (process.platform === 'win32' ? `Remove-Item -Recurse -Force
 async function vuoleLaParola(page, b) {
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
   expect((await confirmState(page)).hasInput, 'una cancellazione portata da fuori vuole la parola «conferma»').toBe(true);
+  await page.screenshot({ path: `tests/.shots/892-1-g3-${test.info().title.slice(0, 12).replace(/\W+/g, '-')}.png` }).catch(() => {});
   await clickConfirm(page, 'cancel');
   expect(existsSync(b)).toBe(true);
 }
