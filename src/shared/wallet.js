@@ -265,6 +265,8 @@
     missing_exchange_rate: 'Il server non è ancora pronto (manca il cambio del giorno): riprova fra qualche minuto.',
     not_configured: 'Il server non è ancora configurato per i crediti.',
     provider_error: 'Il servizio dei modelli non ha risposto: riprova fra poco.',
+    // Le chiavi spente si rileggono per un mese (#1520): oltre trenta in quel mese il server dice di no.
+    too_many_reissues: 'Hai chiesto troppe chiavi nuove nell’ultimo mese: riprova fra qualche giorno.',
     internal: 'Qualcosa è andato storto sul server: riprova.',
     not_reachable: 'Non riesco a raggiungere il server: controlla la connessione.',
     // Dà inviti solo chi ha collegato Google (#1120): il codice resta suo, e torna buono quando si collega.
@@ -802,6 +804,65 @@
     return { dire: (conto.allarmi || []).filter((a) => !prima.includes(a.kind)), detti: accesi };
   }
 
+  // ── La riconciliazione segnata (#1520) ─────────────────────────────────────
+  // Il server scrive in `reconcile` i motivi (`reasons`) e gli usi fuori politica (`offPolicy`: [{ model, provider,
+  // usd, requests, violation }], `violation` di SN_POLITICA_MODELLI.creditsUsageViolation); la scheda della persona
+  // porta `router` ({ rows } della stessa forma, o { error }). Un segno senza `reasons` viene da prima: scarto positivo.
+  const MOTIVI_SCARTO = Object.freeze({
+    unrecorded: 'non registrato', excess_rows: 'righe in eccesso', off_policy: 'fuori politica',
+  });
+  const FRASI_SCARTO = Object.freeze({
+    unrecorded: 'qualcuno consuma senza scrivere il registro d\'uso',
+    excess_rows: 'il registro d\'uso conta più di quanto il router ha fatto pagare',
+    off_policy: 'la chiave dei crediti ha pagato modelli o fornitori fuori dalla politica sui modelli',
+  });
+  const VIOLAZIONI_USO = Object.freeze({
+    model: 'modello fuori politica', excluded: 'fornitore escluso', 'not-producer': 'non servito dal produttore',
+  });
+  const testoCorto = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const perSpesa = (a, b) => (b.usd || 0) - (a.usd || 0);
+
+  function usoDelRouter(u) {
+    if (!u || typeof u !== 'object') return null;
+    const model = testoCorto(u.model, 200);
+    if (!model) return null;
+    const violation = typeof u.violation === 'string' && Object.prototype.hasOwnProperty.call(VIOLAZIONI_USO, u.violation) ? u.violation : '';
+    return {
+      model, provider: testoCorto(u.provider, 200), usd: numeroO(u.usd), requests: numeroO(u.requests),
+      violation, fuori: violation ? VIOLAZIONI_USO[violation] : '',
+    };
+  }
+
+  function usiFuoriPolitica(rec) {
+    const lista = rec && typeof rec === 'object' && Array.isArray(rec.offPolicy) ? rec.offPolicy : [];
+    return lista.map(usoDelRouter).filter((u) => u && u.violation).sort(perSpesa);
+  }
+
+  // I motivi di un portafoglio segnato, coi dollari che li misurano (null se non si sanno); [] se non è segnato.
+  function motiviScarto(rec) {
+    if (!rec || typeof rec !== 'object' || !rec.flagged) return [];
+    const drift = numeroO(rec.driftUsd);
+    const chiavi = Array.isArray(rec.reasons) ? [...new Set(rec.reasons.filter((k) => typeof k === 'string' && k))] : [];
+    if (!chiavi.length) chiavi.push(drift != null && drift < 0 ? 'excess_rows' : 'unrecorded');
+    const fuori = usiFuoriPolitica(rec);
+    return chiavi.map((chiave) => {
+      if (chiave === 'off_policy') {
+        return { chiave, testo: MOTIVI_SCARTO.off_policy, usd: fuori.some((u) => u.usd != null) ? fuori.reduce((a, u) => a + (u.usd || 0), 0) : null };
+      }
+      if (chiave === 'unrecorded' || chiave === 'excess_rows') return { chiave, testo: MOTIVI_SCARTO[chiave], usd: drift == null ? null : Math.abs(drift) };
+      return { chiave, testo: 'segnato', usd: null };
+    });
+  }
+
+  // Il consumo della chiave secondo il router, per modello e fornitore, dalla spesa più alta. `letto` è falso se il
+  // server non l'ha letto (campo assente) o non ci è riuscito (`errore`): un consumo non letto non è un consumo zero.
+  function consumoRouter(router) {
+    if (!router || typeof router !== 'object') return { letto: false, errore: '', righe: [] };
+    if (router.error) return { letto: false, errore: testoCorto(String(router.error), 300) || 'errore', righe: [] };
+    const righe = (Array.isArray(router.rows) ? router.rows : []).map(usoDelRouter).filter(Boolean).sort(perSpesa);
+    return { letto: true, errore: '', righe };
+  }
+
   // ── Gli avvisi all'owner fra le notifiche della home (#855) ─────────────────
   // Un caso per ogni cosa che ferma gli utenti, un marcatore per ogni soglia superata. Un caso che la vista non dice
   // (campo assente) non è rientrato: non compare nell'elenco, e la sua carta resta com'era.
@@ -873,14 +934,28 @@
     const rs = o.reconcile && typeof o.reconcile === 'object' && o.reconcile.summary && typeof o.reconcile.summary === 'object' ? o.reconcile.summary : null;
     const riassunto = rs ? numeroO(rs.flagged) : null;
     if (utenti || riassunto != null) {
-      const segnati = [...new Set((utenti || [])
-        .filter((u) => u && u.reconcile && u.reconcile.flagged && typeof u.pseudonym === 'string' && u.pseudonym)
-        .map((u) => u.pseudonym))].sort();
+      // Un motivo nuovo su un portafoglio già segnato (#1520) è un marcatore nuovo: un uso fuori politica si dice anche lì.
+      const motivi = new Map();
+      for (const u of utenti || []) {
+        if (!u || typeof u.pseudonym !== 'string' || !u.pseudonym) continue;
+        const chiavi = motiviScarto(u.reconcile).map((m) => m.chiave);
+        if (chiavi.length) motivi.set(u.pseudonym, [...new Set([...(motivi.get(u.pseudonym) || []), ...chiavi])]);
+      }
+      const segnati = [...motivi.keys()].sort();
       const n = segnati.length || Math.max(0, Math.floor(riassunto || 0));
+      const cause = [...new Set(segnati.flatMap((p) => motivi.get(p)))].filter((k) => FRASI_SCARTO[k]);
+      const soloScarto = cause.length === 1 && cause[0] === 'unrecorded';
+      const quanti = n === 1 ? '1 portafoglio' : `${n} portafogli`;
+      const chi = segnati.length ? ` (${elencoBreve(segnati)})` : '';
+      const frase = cause.map((k) => FRASI_SCARTO[k]).join('; ');
       casi.push({
         caso: 'scarto', numero: n,
-        marcatori: segnati.length ? segnati.map((p) => `scarto:${p}`) : (n > 0 ? ['scarto:?'] : []),
-        testo: `La riconciliazione ha trovato uno scarto su ${n === 1 ? '1 portafoglio' : `${n} portafogli`}${segnati.length ? ` (${elencoBreve(segnati)})` : ''}. Qualcuno consuma senza scrivere il registro d'uso, e trovi le righe segnate ${DOVE}.`,
+        marcatori: segnati.length
+          ? segnati.flatMap((p) => motivi.get(p).map((k) => (k === 'unrecorded' ? `scarto:${p}` : `scarto:${p}:${k}`)))
+          : (n > 0 ? ['scarto:?'] : []),
+        testo: soloScarto
+          ? `La riconciliazione ha trovato uno scarto su ${quanti}${chi}. Qualcuno consuma senza scrivere il registro d'uso, e trovi le righe segnate ${DOVE}.`
+          : `La riconciliazione ha segnato ${quanti}${chi}${frase ? `: ${frase}` : ''}. Trovi le righe segnate ${DOVE}.`,
       });
     }
     return casi;
@@ -949,5 +1024,7 @@
     creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
     // Gli avvisi all'owner nella home (#855)
     AVVISO_OWNER, PAGINA_OWNER, SOGLIE_TETTO, INVITI_POCHI, avvisiOwner, avvisiOwnerPiano, applicaAvvisiOwner,
+    // La riconciliazione col consumo che il router dichiara per chiave (#1520)
+    MOTIVI_SCARTO, VIOLAZIONI_USO, motiviScarto, usiFuoriPolitica, consumoRouter,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

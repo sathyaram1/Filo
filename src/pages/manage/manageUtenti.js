@@ -90,7 +90,7 @@
     const fine = (usoLetto.ultimo || {})[u.pseudonym];
     return [
       u.pseudonym, formatCredits(b.credits), formatInt(b.creditsGranted), fmtUsd(b.usageUsd),
-      !rec ? '—' : (rec.flagged ? `scarto ${fmtUsd(rec.driftUsd)}` : 'ok'),
+      !rec ? '—' : (rec.flagged ? registroSegnato(rec) : 'ok'),
       u.invitedBy === 'owner' ? 'te' : (u.invitedBy || '—'), formatDate(u.createdAt),
       fine ? giornoBreve(fine) : (u.usage && !u.usage.rows ? 'mai' : '—'),
     ];
@@ -367,16 +367,33 @@
     return 'il server non risponde';
   }
 
+  // La scheda Contatori dice la stessa cosa e chiede la stessa soglia; la sua frase per un guasto è questa.
+  window.SN_MG_FRASE_CONTATORI = fraseContatori;
+
+  // Sotto le cinque copie il main manda `sotto` e niente numero (#1462). Il riquadro si apre sulla scheda Contatori.
   function riquadroInstallazioni(v, nome, spiega, r) {
-    const noto = Boolean(v && Number.isFinite(Number(v.n)));
-    const n = noto ? Number(v.n) : null;
-    const valore = !noto ? '—' : `${v.completo === false ? 'almeno ' : ''}${formatInt(n)}`;
-    const title = noto ? spiega : `I contatori non si sono letti: ${fraseContatori(r && r.error)}.`;
+    const pochi = Boolean(v && v.sotto === true);
+    const noto = pochi || Boolean(v && v.n != null && Number.isFinite(Number(v.n)));
+    const n = noto && !pochi ? Number(v.n) : null;
+    const valore = !noto ? '—' : (pochi ? 'meno di 5' : `${v.completo === false ? 'almeno ' : ''}${formatInt(n)}`);
+    const title = !noto ? `I contatori non si sono letti: ${fraseContatori(r && r.error)}.`
+      : (pochi ? `${spiega} Meno di cinque: il numero esatto non si mostra, per non leggere il comportamento di un tester.` : spiega);
     const li = riquadro(valore, nome(n), title, { nota: noto ? '' : 'non letti' });
+    const apriContatori = () => { location.hash = 'contatori'; };
+    if (noto) {
+      li.classList.add('is-apribile');
+      li.tabIndex = 0;
+      li.setAttribute('role', 'button');
+      li.addEventListener('click', apriContatori);
+      li.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); apriContatori(); }
+      });
+    }
     li.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
       apriMenu([
-        ...(noto ? [['Copia il numero', () => copia(String(n))]] : []),
+        ...(n != null ? [['Copia il numero', () => copia(String(n))]] : []),
+        ...(noto ? [['Apri i contatori', apriContatori]] : []),
         ['Rileggi', () => { loadInstallazioni().catch(() => {}); }],
       ], ev.clientX, ev.clientY);
     });
@@ -652,6 +669,75 @@
     primaLettura = false;
   }
 
+  // Perché la riconciliazione ha segnato la persona, coi dollari quando si sanno (#1520).
+  function registroSegnato(rec) {
+    return W.motiviScarto(rec).map((m) => (m.usd != null ? `${m.testo} ${fmtUsd(m.usd)}` : m.testo)).join(' · ');
+  }
+
+  // Il consumo della chiave per modello e fornitore; senza la lettura del router restano gli usi fuori politica che
+  // la riconciliazione ha segnato. null se il server non manda né l'uno né gli altri.
+  function consumoRouterDetail(router, rec) {
+    const c = W.consumoRouter(router);
+    const righe = c.letto ? c.righe : W.usiFuoriPolitica(rec);
+    if (!righe.length) {
+      if (!c.letto && !c.errore) return null;
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = c.errore ? `Il router non ha risposto: ${c.errore}` : 'Nessun consumo sulla sua chiave.';
+      return p;
+    }
+    const ul = document.createElement('ul');
+    ul.className = 'sn-wallet-scheda-elenco sn-wallet-router';
+    for (const r of righe) {
+      const li = document.createElement('li');
+      li.classList.toggle('is-flagged', Boolean(r.violation));
+      if (r.requests != null) li.title = `${formatInt(r.requests)} ${r.requests === 1 ? 'chiamata' : 'chiamate'}`;
+      const a = document.createElement('span');
+      a.textContent = [r.model, r.provider, r.fuori].filter(Boolean).join(' · ');
+      const b = document.createElement('span');
+      b.textContent = r.usd == null ? '—' : fmtUsd(r.usd);
+      li.append(a, b);
+      ul.appendChild(li);
+    }
+    return ul;
+  }
+
+  // Gli usi fuori politica letti: restano qui sotto, e la persona torna segnata solo per un uso nuovo (#1520). Il
+  // server segna visto solo quello che questa scheda mostra: un uso arrivato dopo resta segnato.
+  function bottoneVisto(pseudonym, rec) {
+    const shown = (Array.isArray(rec && rec.offPolicy) ? rec.offPolicy : [])
+      .filter((u) => u && typeof u.model === 'string' && u.model)
+      .map((u) => ({ model: u.model, provider: typeof u.provider === 'string' ? u.provider : '', usd: Number(u.usd) || 0, requests: Number(u.requests) || 0 }));
+    const riga = document.createElement('div');
+    riga.className = 'sn-wallet-router-visto';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-btn sn-btn-secondary';
+    b.textContent = 'Visto';
+    b.title = 'Torna segnata solo per un uso nuovo';
+    const esito = document.createElement('span');
+    esito.className = 'sn-muted';
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      esito.textContent = '';
+      const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_OFF_POLICY_SEEN, pseudonym, shown }).catch(() => null);
+      const res = r && r.ok && r.result;
+      if (res && res.ok) {
+        const ancora = W.motiviScarto(res.reconcile).some((m) => m.chiave === 'off_policy');
+        esito.textContent = ancora ? 'Nel frattempo è arrivato un uso nuovo: resta segnata.' : 'Segnato come visto.';
+        loadOverview().catch(() => {});
+        return;
+      }
+      b.disabled = false;
+      if (r && r.error) console.warn('[credits/owner] segno di visto non arrivato:', r.error);
+      esito.textContent = res && res.reason === 'no_wallet'
+        ? 'Questa persona non risulta più al server.'
+        : `Non salvato: ${fraseGuasto(r && r.error)}.`;
+    });
+    riga.append(b, esito);
+    return riga;
+  }
+
   function usageDetail(usage) {
     const wrap = document.createElement('div');
     wrap.className = 'sn-wallet-usage-detail';
@@ -844,12 +930,20 @@
       ['Ricevuti in tutto', `${formatInt(b.creditsGranted)} crediti`],
       ['Speso', fmtUsd(b.usageUsd)],
       ['Tetto della sua chiave', fmtUsd(b.limitUsd)],
-      ['Riconciliazione', !rec ? 'mai fatta' : (rec.flagged ? `scarto ${fmtUsd(rec.driftUsd)}` : 'torna')],
+      ['Riconciliazione', !rec ? 'mai fatta' : (rec.flagged ? registroSegnato(rec) : 'torna')],
       ['Invitato da', invitata],
       ['Con Filo dal', formatDate(d.createdAt || u.createdAt) || '—'],
     ], '')));
 
     wrap.appendChild(bloccoScheda('Dove sono andati i crediti', usageDetail(d.usage || u.usage)));
+    // Accanto alle righe scritte dall'app, quello che il router ha fatto pagare alla sua chiave (#1520): un uso fuori
+    // politica si legge qui anche quando le righe dicono un modello ammesso.
+    const router = consumoRouterDetail(d.router, rec);
+    if (router) {
+      const blocco = bloccoScheda('Secondo il router', router);
+      if (rec && Array.isArray(rec.reasons) && rec.reasons.includes('off_policy')) blocco.appendChild(bottoneVisto(u.pseudonym, rec));
+      wrap.appendChild(blocco);
+    }
 
     // I movimenti: da dove vengono i crediti che ha ricevuto. È qui che si
     // vedono i premi per le segnalazioni.

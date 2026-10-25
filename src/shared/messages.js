@@ -239,6 +239,8 @@
     //   `overview.account` (#820) è il conto OpenRouter di Filo, che il server legge con la sua chiave di gestione
     //   (GET /api/v1/credits): { totalCreditsUsd, totalUsageUsd, readAt } (caricato e speso), o { error } se
     //   OpenRouter non ha risposto. Senza il campo la pagina dice che il conto non è letto.
+    //   `users[].reconcile` (#1520): { flagged, driftUsd, reasons, offPolicy }, forma e motivi accanto a motiviScarto
+    //   in src/shared/wallet.js.
     WALLET_OWNER_OVERVIEW: 'wallet_owner_overview',
     // WALLET_OWNER_ALARM_PENDING (#820): gli allarmi del conto OpenRouter da dire all'owner all'avvio, una volta
     //   finché la situazione resta quella. Chi non è owner non fa partire nessuna lettura. La risposta arriva quando
@@ -249,8 +251,14 @@
     WALLET_OWNER_GRANT: 'wallet_owner_grant',
     // CONTATORI_INSTALLAZIONI (#969): quante copie di Filo hanno spedito i contatori giornalieri di ieri e del mese in
     //   corso, cioè gli pseudonimi distinti. Solo pagine di Filo e solo owner, col token dell'account Google.
-    //   { } → { ok, installazioni: { ieri: { giorno, n, completo }, mese: { mese, n, completo } } }
+    //   { } → { ok, installazioni: { ieri: { giorno, n, completo }, mese: { mese, n, completo } } }; sotto le cinque
+    //   copie `n` è null e `sotto` è vero.
     CONTATORI_INSTALLAZIONI: 'contatori_installazioni',
+    // CONTATORI_SOMME (#1462): le somme della scheda Contatori di Gestione per un intervallo di giorni, una versione e un
+    //   sistema ('' per tutti). Solo pagine di Filo e solo owner; alla pagina escono solo somme, e una cella con meno di
+    //   cinque copie esce come { sotto: true }. `forza`: rilegge invece di usare la lettura di pochi minuti fa.
+    //   { dal, al, app, os, forza } → { ok, somme } (forma: src/main/services/contatoriSomme.js)
+    CONTATORI_SOMME: 'contatori_somme',
     // CONTATORI_USO (#969): la persona ha visto la risposta di una chiamata partita prima che la chiedesse (una
     //   spiegazione preparata alla selezione, la correzione di una parola già pronta): l'uso lo conta chi la mostra.
     //   `anticipata`: la risposta era stata preparata in anticipo, e questa è la sua apertura (#1461).
@@ -271,8 +279,13 @@
     // WALLET_OWNER_USER_DETAIL (#652): la scheda di UNA persona — movimenti,
     //   suoi inviti con chi è entrato, ultime chiamate con modello, chi ha
     //   servito e costo. { pseudonym } → { ok, detail } (detail.found false se
-    //   lo pseudonimo non esiste).
+    //   lo pseudonimo non esiste). `detail.router` (#1520): il consumo della sua chiave secondo il router,
+    //   { rows: [{ model, provider, usd, requests, violation }] } o { error }; lo legge consumoRouter in wallet.js.
     WALLET_OWNER_USER_DETAIL: 'wallet_owner_user_detail',
+    // WALLET_OWNER_OFF_POLICY_SEEN (#1520): l'owner ha visto gli usi fuori politica di una persona; restano nella
+    //   scheda, e la persona torna segnata solo per un uso nuovo. { pseudonym, shown } → { ok, result: { ok, reconcile } };
+    //   `shown` è `reconcile.offPolicy` come la scheda lo mostrava: un uso arrivato dopo resta segnato.
+    WALLET_OWNER_OFF_POLICY_SEEN: 'wallet_owner_off_policy_seen',
     // Le due foto (pagina e barra) vanno solo alla pagina in vista, che inquadra sé stessa: services/fotoDellaPagina.js.
     CAPTURE_VISIBLE_TAB: 'capture_visible_tab', // { leggera? } → { ok, dataUrl? }; leggera: JPEG ai pixel che si vedono
     // "Salva immagine come…" dal menu contestuale. Instradato dal main
@@ -437,6 +450,10 @@
     // Aperti ai siti (#1432): ci scrive il content script dell'Aiuto, e toccano solo la scheda che li manda.
     AIUTO_STATO: 'aiuto_stato',                     // { pannello: chiuso|ridotto|aperto, voce, spento: ''|aiuto|sito|pagina } → { ok }
     RISPOSTA_IN_ATTESA: 'risposta_in_attesa',       // { fonte: aiuto|app, attesa } → { ok }: la striscia della barra si accende
+    // main → la sola scheda davanti (#1623): le immagini lasciate sulla fila delle schede o sulla barra laterale.
+    // { dove: casa|aiuto, immagini: [{ dataUrl, nome, percorso }], file: [percorso], grandi }: la home prende le sue,
+    // l'Aiuto le altre; `grandi` sono quelle oltre il tetto che non entrano.
+    CHAT_ALLEGA: 'chat_allega',
     TOGGLE_FULLSCREEN: 'toggle_fullscreen',
     EXIT_FULLSCREEN: 'exit_fullscreen',             // idempotente (Esc)
     FULLSCREEN_CHANGED: 'fullscreen_changed',       // broadcast → { fullscreen: bool }
@@ -650,6 +667,10 @@
     // consegna un biglietto. Owner-only.
     AUTOMATION_ROLE_MODELS_GET: 'automation_role_models_get', // → { ok, roleModels } | { ok:false, error }
     AUTOMATION_ROLE_MODELS_SET: 'automation_role_models_set', // { ruolo, campo, valore } → { ok, letto, scritto, roleModels? } | { ok:false, error }
+    // Il tetto di spesa dei giudici per i non fidati e la lunghezza che ricevono (config/automation, #1515; regole in
+    // src/shared/spesaGiudici.js), con la spesa di oggi (`spesa: null` = non letta). Owner-only.
+    AUTOMATION_JUDGE_BUDGET_GET: 'automation_judge_budget_get', // → { ok, tettoUsd, maxCaratteri, spesa, oraMs } | { ok:false, error }
+    AUTOMATION_JUDGE_BUDGET_SET: 'automation_judge_budget_set', // { tettoUsd?, maxCaratteri? } → come sopra, `letto:false` se non riletto | { ok:false, error }
     // Log dei worker delle routine (doc config/automation, campo `workerLog`):
     // elenco degli ultimi worker spawnati, con ruolo e istante di avvio. Lo
     // scrive scripts/dispatch.mjs a ogni spawn; lo legge la tab "Log" della
@@ -678,8 +699,9 @@
     // fusione (L5) resta, e parte subito dopo — l'esito dice se il ramo è
     // entrato in main o se si è aperta una richiesta da approvare.
     // Stessa origine e stesso cancello delle approvazioni di fusione: solo
-    // pagine `filo://`, solo il proprietario.
-    LIVELLO4_SALTA: 'livello4_salta',  // { feedbackId } → { ok, esito:'fuso'|'bloccato'|'conflitto'|'ramo_assente'|'attesa_server'|'server_al_pc'|'rimandato'|'all_owner', requestId? } | { ok:false, error }
+    // pagine `filo://`, solo il proprietario. `mosso`/`senza_controllo`: la punta non è la versione letta da
+    // verifica e audit, o non si sa quale fosse (#1040.1): niente fusione, niente richiesta.
+    LIVELLO4_SALTA: 'livello4_salta',  // { feedbackId } → { ok, esito:'fuso'|'bloccato'|'conflitto'|'ramo_assente'|'attesa_server'|'server_al_pc'|'rimandato'|'all_owner'|'mosso'|'senza_controllo', requestId? } | { ok:false, error }
     // Il segno di mittente pericoloso di chi ha mandato quel feedback (#922), dalla callable ownerSenderFlag.
     // `clear` toglie il segno solo con la frase della conferma, che la pagina manda dopo il sì dell'owner.
     // Solo pagine `filo://`, solo il proprietario.

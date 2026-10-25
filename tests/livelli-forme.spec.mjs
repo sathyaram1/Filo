@@ -164,6 +164,7 @@ async function stub(page, { pending = [], failed = [], saltaReply = null } = {})
         window.__chiamate.push(msg);
         return cfg.saltaReply || { ok: true, esito: 'fuso' };
       }
+      if (t === 'feedback_update') { window.__chiamate.push(msg); return { ok: true }; }
       return orig(msg);
     };
   }, { pending, failed, saltaReply });
@@ -836,6 +837,65 @@ test('GitHub giù: il salto è registrato e lo si può ripremere', async ({ open
 
   await expect(page.locator('#mgSideBody .mg-liv-esito')).toContainText(/ripremi/i, { timeout: 8_000 });
   await expect(page.locator('#mgSaltaL4Btn')).toBeEnabled();
+});
+
+// #1040.1: dopo verifica e audit il ramo ha preso un commit. Il server non salta e non fonde; la scheda lo dice, la
+// rilettura dopo l'esito non ripropone il salto, e la strada è rimandarla in lavorazione.
+test('salto col ramo mosso dopo i controlli: lo dice, non ripropone il salto e la rimanda in lavorazione', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_BOCCIATO], { saltaReply: { ok: true, esito: 'mosso' } });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_BOCCIATO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]').click();
+  const salta = page.locator('#mgSaltaL4Btn');
+  const dovEra = await salta.boundingBox();
+  await salta.click();
+  await salta.click();
+
+  const esito = page.locator('#mgL4StradeEsito');
+  await expect(esito).toContainText('commit che nessuno ha letto');
+  await expect(esito).toHaveAttribute('data-kind', 'err');
+  await expect(page.locator('#mgToast')).toContainText('commit che nessuno ha letto');
+  await expect(page.locator('#mgSideBody')).toContainText('scrive nelle regole del database');
+  const rimanda = page.locator('#mgL4RimandaBtn');
+  await expect(rimanda).toHaveText('Rimanda in lavorazione');
+  await expect(salta).toHaveCount(0);
+  // Un clic in più dove stava il salto non rimanda la pratica.
+  expect((await rimanda.boundingBox()).y).toBeGreaterThanOrEqual(dovEra.y + dovEra.height);
+
+  // La rilettura che segue ogni esito ridisegna il pannello: la frase e la strada restano.
+  await page.waitForTimeout(1_000);
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await expect(esito).toContainText('commit che nessuno ha letto');
+  await expect(salta).toHaveCount(0);
+
+  for (const tema of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.waitForTimeout(150);
+    await page.screenshot({ path: `tests/.shots/1040-1-salto-ramo-mosso-${tema}.png` });
+  }
+
+  await rimanda.click();
+  await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['livello4_salta', 'feedback_update']);
+  expect(await page.evaluate(() => window.__chiamate[1])).toMatchObject({ id: FB_BOCCIATO._id, status: 'todo', reviewDecision: 'accepted' });
+});
+
+test('salto senza la versione letta dai controlli: lo dice; un audit nuovo ripropone il salto', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_BOCCIATO], { saltaReply: { ok: true, esito: 'senza_controllo' } });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_BOCCIATO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]').click();
+  await page.locator('#mgSaltaL4Btn').click();
+  await page.locator('#mgSaltaL4Btn').click();
+  await expect(page.locator('#mgL4StradeEsito')).toContainText('Non trovo quale versione del ramo hanno letto i controlli');
+  await expect(page.locator('#mgL4RimandaBtn')).toBeVisible();
+
+  // Il giro dopo: l'audit ha bocciato un'altra versione. Quella risposta non vale più, il salto torna.
+  const nuovo = { ...FB_BOCCIATO, livelli: { l4: { esito: 'fail', at: '2026-09-14T12:00:00Z', testo: 'Il fix tocca ancora le regole.' } } };
+  await page.evaluate((fbs) => window.__mgTest.setData(fbs), [nuovo]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_BOCCIATO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]').click();
+  await expect(page.locator('#mgSaltaL4Btn')).toHaveText('Salta il controllo');
+  await expect(page.locator('#mgL4RimandaBtn')).toHaveCount(0);
 });
 
 // ── 5. In lista: una fusione ferma si riconosce e sta in cima ───────────────

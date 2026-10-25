@@ -126,7 +126,7 @@ function fraseEsito(e) {
 function annuncia() {
   const frase = fraseEsito(esito);
   if (!frase) return;
-  try { require('./services/avvisoFinestra').avvisoQuandoPronta(frase, { chiave: 'cancella-tutto' }); } catch (_) {}
+  try { require('./services/avvisoFinestra').avvisoQuandoPronta(frase, { chiave: 'cancella-tutto', tipo: 'cancella_tutto' }); } catch (_) {}
 }
 
 // Le dipendenze che le prove sostituiscono: in test il riavvio aprirebbe un Filo che nessuno chiude.

@@ -22,6 +22,16 @@ const IS_FILO_ORIGIN = (() => {
 try { require('../shared/riquadriInArrivo.js'); } catch (e) { console.error('[Filo internal] riquadri in arrivo', e); }
 try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer, interna: IS_FILO_ORIGIN }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
 try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo internal] cmd-freccia', e); }
+// Un'immagine lasciata dove la pagina non la vuole va all'Aiuto (#1623); la home la prende da sé, nel suo campo.
+if (IS_FILO_ORIGIN) {
+  try {
+    require('./rilascio-file.js')(window, {
+      pronta: () => globalThis.SN_SIDEBAR?.accoglieRilascio?.() === true,
+      consegna: (files) => globalThis.SN_SIDEBAR.allega(files),
+      pannello: (t) => globalThis.SN_SIDEBAR?.contiene?.(t) === true,
+    });
+  } catch (e) { console.error('[Filo internal] rilascio', e); }
+}
 
 let streamCounter = 0;
 
@@ -281,6 +291,7 @@ function loadContentScripts() {
   const safe = (p) => { try { require(p); } catch (e) { console.error('[Filo CS]', p, e.message); } };
   // L'ordine conta: le ragioni stanno in fila nella gemella src/preload/page-preload.js.
   safe(path.join(SHARED, 'constants.js'));
+  safe(path.join(SHARED, 'immaginiChat.js')); // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
   safe(path.join(SHARED, 'contenutoEsterno.js')); // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js
   // Il marchio della UI di Filo (menu, avvisi, popup): lo mettono i moduli che
   // la disegnano, lo legge chi cammina sulla pagina.

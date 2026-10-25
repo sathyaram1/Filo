@@ -300,7 +300,7 @@ module.exports = function register(on, ctx) {
       // Nel main e non nelle pagine: all'accesso si arriva da molte porte
       // (menu account, bacheca, posta, red-team, siti), e l'avviso vale per tutte.
       if (auth.isSignedIn() && !remembered) {
-        avvisoNellaFinestra(testoAccessoNonRicordato(), { chiave: CHIAVE_AVVISO_NON_RICORDATO });
+        avvisoNellaFinestra(testoAccessoNonRicordato(), { chiave: CHIAVE_AVVISO_NON_RICORDATO, tipo: 'accesso_non_ricordato' });
       }
       // Rinfresca la config condivisa in background. Le chiavi ruotate
       // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e
@@ -748,6 +748,28 @@ module.exports = function register(on, ctx) {
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const r = await Defaults.setRoutineRoleModel({ ruolo: msg.ruolo, campo: msg.campo, valore: msg.valore }, idToken);
       return Object.assign({ ok: true }, r);
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
+  // Il tetto di spesa dei giudici per i non fidati (#1515): tocca SOLO i campi che riceve.
+  on(MSG.AUTOMATION_JUDGE_BUDGET_GET, ownerOnly(async () => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      return Object.assign({ ok: true }, await Defaults.getJudgeBudget(idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+  on(MSG.AUTOMATION_JUDGE_BUDGET_SET, ownerOnly(async (msg) => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const patch = {};
+      for (const k of ['tettoUsd', 'maxCaratteri']) if (msg && msg[k] !== undefined) patch[k] = msg[k];
+      return Object.assign({ ok: true }, await Defaults.setJudgeBudget(patch, idToken));
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -1360,7 +1382,7 @@ module.exports = function register(on, ctx) {
   // Non è un via libera cieco: il server segna l'audit come saltato e poi fa
   // partire il cancello di fusione, che può fermare tutto lo stesso. Quello che
   // torna è l'esito VERO di quel cancello, non un "fatto" generico.
-  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente', 'attesa_server', 'server_al_pc', 'rimandato', 'all_owner'];
+  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente', 'attesa_server', 'server_al_pc', 'rimandato', 'all_owner', 'mosso', 'senza_controllo'];
   on(MSG.LIVELLO4_SALTA, ownerOnly(async (msg) => {
     const feedbackId = String(msg?.feedbackId || '').trim();
     if (!feedbackId) return { ok: false, error: 'Manca la segnalazione su cui saltare il controllo.' };

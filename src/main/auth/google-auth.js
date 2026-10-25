@@ -298,7 +298,7 @@ function passaAlBrowser(f, motivo) {
   // La riga «continua nel browser» solo se il browser si è aperto: altrimenti parla l'errore dell'accesso.
   apriBrowser(f.url).then(() => {
     const testo = nonCaricata ? AVVISO_NON_CARICATA : AVVISO_NEL_BROWSER;
-    try { require('../services/avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'accesso-nel-browser' }); } catch (_) {}
+    try { require('../services/avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'accesso-nel-browser', tipo: 'accesso_nel_browser' }); } catch (_) {}
   }, (e) => f.loop.abort(e));
 }
 

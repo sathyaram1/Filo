@@ -571,7 +571,7 @@ function completa(rec) {
       persist();
       broadcast('error', rec);
       contaNonRiuscito(rec);
-      shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8 }, scopeOf(rec));
+      shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'download_failed' }, scopeOf(rec));
       return;
     }
   }
@@ -585,6 +585,7 @@ function completa(rec) {
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
   shellToast(`Scaricato: ${shortName(rec.filename)}`, {
     durationSec: 8,
+    tipo: 'download_finito',
     actions: [
       { label: 'Apri file', openDownloadId: rec.id },
       { label: 'Apri cartella', revealDownloadId: rec.id },
@@ -609,14 +610,16 @@ async function nominaDaSolo(rec) {
     // Senza modello, o col modello che non risponde, l'utente che ha acceso la funzione deve saperlo.
     if (p.errore === 'modello' && !avvisatoSenzaNome) {
       avvisatoSenzaNome = true;
-      shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${p.frase}`, { durationSec: 10 }, '');
+      shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${p.frase}`, { durationSec: 10, tipo: 'download_senza_nome' }, '');
     }
     return;
   }
   const r = await Nomi.rinomina(letto, p.proposta);
   if (!r.ok || r.invariato) return;
+  require('./contatoriFinestra').misura('rinominato');
   shellToast(`Nome dato: ${shortName(r.nome)}`, {
     durationSec: 10,
+    tipo: 'download_nome_dato',
     actions: [
       { label: 'Annulla', rimettiNomeDownloadId: rec.id },
       { label: 'Apri file', openDownloadId: rec.id },
@@ -793,7 +796,7 @@ function onWillDownload(item, webContents, scope = '') {
       broadcast('error', rec);
       if (rec.state !== 'cancelled') {
         contaNonRiuscito(rec);
-        shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8 }, scopeOf(rec));
+        shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'download_failed' }, scopeOf(rec));
       }
     }
   }

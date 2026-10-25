@@ -1,6 +1,8 @@
 # Domande all'owner, fiducia e lavoro che si organizza da solo
 
-Specifica decisa con l'owner l'08–09/10/2026; compiti e urgenze (§ 6) il 12/10.
+Specifica decisa con l'owner l'08–09/10/2026; compiti e urgenze (§ 6) il 12/10;
+gestione del lavoro (§ 4.3–4.8) il 13/10; guasti, segnalazioni e addetto
+comunicazioni il 23/10.
 È il riferimento per i feedback che la realizzano: chi ne lavora uno legge la
 sezione che gli tocca, non tutto il file.
 
@@ -68,6 +70,7 @@ fidato) e **si sporca** appena il server gli consegna qualcosa di non fidato:
 - il testo di un feedback, una domanda o una conversazione non fidati (il
   server li decifra: sa cosa consegna);
 - la posta;
+- le pagine web che il server cerca per un compito (§ 5.1);
 - registri che possono citare testo di utenti;
 - un ramo scritto da un biglietto sporco.
 
@@ -77,8 +80,18 @@ che il biglietto ha **in quel momento**.
 Quello che non passa dal server (pagine web, file fuori dal repo) il server non
 lo vede:
 
-- **in cloud:** gli ambienti dei lavori fidati hanno la rete limitata al
-  repo e ai pacchetti;
+- **in cloud:** gli ambienti dei lavori fidati hanno la rete limitata al repo
+  e ai pacchetti, e le loro sessioni partono senza gli strumenti web propri
+  della sessione: la ricerca web la fa il fornitore del modello, fuori dal
+  contenitore, e la rete limitata non la ferma;
+- **in cloud, l'ambiente dei riservati** (§ 5.1) ha una regola sola: l'unica
+  uscita è il server. Il clone e i pacchetti li prepara l'ambiente prima che
+  la sessione parta; da lì la rete arriva al server e, in sola lettura, al
+  repo. La sessione parte senza strumenti web propri, senza permesso di
+  scrittura su GitHub e senza salvataggio automatico, che spingerebbe il ramo
+  sul repo pubblico a ogni modifica. Quello che produce lo consegna al server
+  come dati. Un canale che non passa dal server resta chiuso, anche uno nuovo.
+  È l'unico ambiente a cui il server consegna testo riservato (§ 5.1);
 - **in locale:** un gancio sporca il biglietto dopo ogni strumento, tranne un
   elenco chiuso di quelli che non portano dentro niente da fuori (la shell, le
   ricerche nel disco, le scritture, i sotto-agenti locali, i compiti); uno
@@ -131,7 +144,9 @@ detto».
 
 - **Lavoro fidato:** tutti i biglietti che hanno scritto sul ramo (primo
   lavoro, correzioni, riallineamenti) sono rimasti puliti, e il feedback è
-  fidato. In questo caso **L5 non si applica**: il blocco si registra in
+  fidato. Non conta lo sporco della domanda di fine turno della gestione del
+  lavoro, che arriva quando il biglietto non scrive più sul ramo (§ 5.4). In
+  questo caso **L5 non si applica**: il blocco si registra in
   Automazioni, non ferma. L'owner non legge il codice e non saprebbe
   distinguere un blocco giusto da uno sbagliato meglio della catena pulita.
 - **Lavoro non fidato:** L5 si applica come oggi. L'owner approva in Ricevuti,
@@ -168,6 +183,8 @@ lo può scrivere anche un agente pulito.
 
 - `fiducia` su feedback, domande, compiti e biglietti. La scrive solo l'Admin
   SDK; le regole la vietano ai client.
+- `riservato` su feedback, domande, compiti e biglietti (§ 5.1), scritto come
+  `fiducia`.
 - `genitori: [id…]` sul feedback derivato.
 - `scrittoDa: [{biglietto, fiducia}]` sul ramo di lavoro, per il § 1.5.
 - **Migrazione:** fidati i feedback con mittente provato (`senderProof` admin o
@@ -186,7 +203,7 @@ una **barra di sezioni**, ciascuna con le sue schede:
 |---|---|---|
 | **Domande** | Da rispondere · In lavorazione · Risposte automatiche · Archivio | adesso |
 | **Feedback** | Ricevuti · In coda · Aspettano · Risolti · Archiviati · Statistiche · Red Team | adesso (spostate) |
-| **Routine** | Automazioni · Crediti · Monitoraggio · Log · Compiti · Compiti ricorrenti | adesso (spostate più le nuove) |
+| **Routine** | Automazioni · Crediti · Gestione del lavoro · Log · Compiti · Compiti ricorrenti | adesso (spostate più le nuove) |
 | **Utenti** | Inviti e utenti (la pagina che era `credits/owner.html`) | spostata (#1414) |
 | **Impostazioni predefinite** | Modelli predefiniti, poi tutte le impostazioni predefinite di Filo | spostata (#1414); i Modelli di supporto restano in Automazioni (#1110) |
 | **Statistiche d'uso** | — | lavoro a parte |
@@ -236,11 +253,17 @@ dall'owner e dal server. Campi:
 - `problema`: cosa succede in pratica. Per un buco, cosa fa un attaccante; per
   una funzione, cosa vede l'utente.
 - `opzioni`: per ciascuna testo, pro, contro e `azione` strutturata (§ 3.3).
+  Vuote in un resoconto senza niente da decidere (§ 4.8): l'owner lo chiude
+  con «letto».
 - `consiglio`: l'opzione che sceglierebbe chi chiede, e perché.
 - `priorita`: `bloccante`, `importante`, `quando_puoi`.
 - `origine` e `collegamenti`: feedback, rami, compiti, altre domande.
 - `notePerAgenti`: testo privato per chi riprenderà la domanda (§ 3.2).
 - `gruppo`: il tema, per il raggruppamento.
+- `destinatario`: l'owner, oppure la gestione del lavoro per le domande di
+  guasto (§ 4.3), tranne quelle dell'addetto comunicazioni.
+- `soloOwner`: sulle domande dell'addetto comunicazioni (§ 4.1), che nessun
+  compito legge.
 - `fiducia`: § 1.
 - `stato`: `aperta`, `in_lavorazione`, `chiusa`, `superata`.
 - `conversazione`: i turni, con autore (owner o biglietto) e ora.
@@ -288,7 +311,16 @@ Tipi ammessi:
 - `approva_locale`;
 - `automazione` (accendi o spegni una voce);
 - `ambito` (approva un ambito nuovo, § 5.3);
-- `esperimento` (approva un esperimento del monitor, § 4.3);
+- `attendi` (il feedback fermo aspetta il feedback indicato, che ne corregge
+  la causa: quando quello si fonde, il server anticipa l'istanza della
+  gestione del lavoro, che controlla e riprende, § 4.3);
+- `esperimento` (approva un esperimento della gestione del lavoro oltre il suo
+  budget, § 4.8);
+- `cancella_rami` (cancella i rami elencati nell'azione, § 4.7);
+- `invia_mail` (il server manda la mail: destinatario, oggetto, testo, e i
+  solleciti con il loro testo e dopo quanti giorni lavorativi. Un sollecito
+  parte solo se nella stessa conversazione non è arrivata risposta. L'owner
+  può correggere il testo prima di approvare, e il testo corretto è suo);
 - `compito` (l'opzione richiede lavoro: nasce il compito della § 3.5).
 
 Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
@@ -303,6 +335,8 @@ Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
 4. **Discuterne.** Il pulsante copia una riga sola («Discutiamo la domanda
    D-123») da incollare in una sessione locale. La sessione legge la domanda con
    `domanda.mjs mostra` e risponde con `domanda.mjs rispondi`.
+5. **Letto**, su un resoconto senza opzioni (§ 3.1): la domanda si chiude,
+   senza agenti.
 
 ### 3.5 Il compito «Gestisci la risposta»
 
@@ -311,6 +345,8 @@ Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
 - Lo lavora **Opus col repo**: una decisione capita male costa più di qualunque
   risparmio sul modello.
 - Il biglietto nasce con la fiducia della domanda (§ 1.2).
+- Non lavora le domande dell'addetto comunicazioni: una risposta scritta su
+  una di quelle la riceve l'addetto stesso (§ 4.1).
 - Legge la domanda con conversazione e note, i collegamenti e il registro
   delle decisioni, e poi fa una o più di queste cose:
   - apre o aggiorna feedback;
@@ -329,14 +365,17 @@ Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
   `domanda.mjs`. Nessun file a parte.
 - **Prima di chiedere**, un agente cerca nel registro. Se un principio risponde,
   lo applica e lo cita.
-- **Revisione quotidiana** (§ 4). Il compito:
+- **Revisione quotidiana** (§ 4). Lavora sulle domande per l'owner, tranne
+  quelle dell'addetto comunicazioni (§ 4.1). Il compito:
   - raggruppa le domande aperte;
   - assorbe in una domanda sola quelle che sono casi dello stesso problema e
     propone il ripensamento del sistema (le assorbite diventano `superata`);
   - rivede le priorità;
   - risponde coi principi. Queste risposte vanno nella scheda «Risposte
     automatiche», e l'owner può riaprirle: una riapertura corregge anche il
-    principio.
+    principio. Un'opzione con un'azione che esce (`invia_mail`) non si
+    applica da una risposta automatica: la sceglie solo l'owner (§ 1.4), che
+    legge la mail prima che parta.
 
 ### 3.7 Ordine
 
@@ -349,7 +388,7 @@ gruppo e poi per età. Un gruppo si apre come un blocco solo.
 |---|---|
 | `design` + `clarify`/`decisione`, segnalazione L3 | domanda, azione `riprendi` |
 | `design` + `locale` | nessuna domanda per il codice del server: un lavoro fidato prende il segno dei lavori server e lo fa la loro routine (#1253); uno non fidato va in Ricevuti L3 come richiesta di renderlo fidato (motivo `fidato`), e «Segna fidato» lo rimette in coda. Diventa domanda solo ciò che chiede il suo PC o un suo passo (una prova sulla sua macchina, segreti, automazioni GitHub), scritta da chi si ferma (#1358) |
-| `design` + `guasto` | la domanda c'è già: la apre chi cade sul guasto, col gruppo `guasto: <la cosa rotta>` e il numero nella nota (#1241) |
+| `design` + `guasto` | la domanda c'è già: la apre chi cade sul guasto, col gruppo `guasto: <la cosa rotta>` e il numero nella nota (#1241); va alla gestione del lavoro, che risponde con le azioni `riprendi`, `attendi` o `archivia` (§ 4.3), dal punto 9 dell'ordine di lavoro (§ 13); fino ad allora, e sempre per l'addetto comunicazioni (§ 4.1), va all'owner |
 | `design` + `attesa_chiusa`, `loop`, `arenato`; `aligned` + `origine_chiusa`/`origine_mancante` | domanda, azioni `riprendi` / `archivia` |
 | `design` + `secaudit`, `l5`, `fidato`; attacchi, spam (anche segnati dal worker, L3), sospetti | Ricevuti |
 
@@ -359,7 +398,7 @@ aperta si vede nella scheda **In coda**, col segno «aspetta una domanda» che
 porta alla domanda, e non in Ricevuti. Il dettaglio di come nasce, si risponde e
 si migra sta in FEEDBACK-STATES.md §5.
 
-## 4. Compiti ricorrenti, pubblicazione, monitoraggio
+## 4. Compiti ricorrenti, pubblicazione, gestione del lavoro
 
 ### 4.1 Compiti ricorrenti
 
@@ -371,20 +410,50 @@ ancora iniziata quando nasce la successiva si chiude come «superata»: le
 istanze non si accumulano.
 
 Un ruolo generico `compito` esegue il testo del ricorrente. I permessi li dà
-l'ambito, non il ruolo.
+l'ambito, non il ruolo. I testi dei ricorrenti stanno nel repo privato del
+server (§ 9), non in questa spec.
+
+Ogni istanza chiude con un **rapporto**: cosa ha fatto, cosa ha trovato, da
+dove deve ripartire la prossima. Resta legato al ricorrente: l'istanza
+successiva lo riceve col biglietto, con la fiducia che aveva. È così che
+l'audit sa da quale commit ripartire e la potatura quanti rami sono nuovi.
+Riordino e potatura lo scrivono anche nel taccuino della gestione del lavoro
+(§ 4.3). Un ricorrente che segue cose lunghe settimane ha anche un
+**taccuino** suo sul server, come la gestione del lavoro: oggi l'addetto
+comunicazioni, con le opportunità e le loro pratiche.
+
+**L'addetto comunicazioni** è un compito solo con due ambiti in fila (§ 5.1):
+prima `opportunita` cerca sul web, poi il server consegna la casella e da lì
+vale `posta`, che non esce più. Quello che l'istanza scrive dopo la casella (il
+rapporto, la parte del taccuino) è figlio della casella: l'istanza successiva
+lo riceve insieme alla casella, non col biglietto. Uno spunto arrivato per mail
+non si cerca: diventa una domanda per l'owner.
+
+Le sue domande sono solo per l'owner (`soloOwner`, § 3.1), e nessun altro
+compito le legge: né la revisione, né «Gestisci la risposta», né la gestione
+del lavoro, che delle sue istanze vede solo i numeri (costo, durata, esito),
+non sessioni, registri, taccuino o rapporti. Per la stessa ragione le sue
+segnalazioni libere, le sue domande di guasto e le sue risposte alla domanda
+di fine turno vanno all'owner, `soloOwner` come le altre sue domande, e non
+alla gestione del lavoro (§ 4.3, § 5.4).
+Una risposta scritta dell'owner
+su una di quelle anticipa l'istanza dell'addetto, che la riceve insieme alla
+casella. La mail resta
+fra l'addetto comunicazioni e l'owner.
 
 | Quando (ora italiana) | Compito | Ambito | Urgenza | Modello iniziale | Sforzo iniziale |
 |---|---|---|---|---|---|
 | ogni giorno | revisione delle domande (§ 3.6) | `domande` | 30 | Opus | `high` |
-| ogni giorno | posta di Filo: legge e prepara domande con le bozze di risposta | `posta` | 30 | Opus | `high` |
-| ogni giorno | monitoraggio (§ 4.3) | `monitor` | 45 | Opus | `high` |
+| ogni giorno | addetto comunicazioni: incentivi, crediti, programmi sul web; poi la casella di Filo | `opportunita`, poi `posta` | 30 | Opus | `high` |
+| ogni giorno | gestione del lavoro (§ 4.3) | `gestione_lavoro` | 45 | Opus | `high` |
 | lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) | `high` |
-| lunedì | potatura dei rami fusi | `rami` | 5 | Opus; Haiku da provare | `high` |
-| domenica | audit di sicurezza | `lavoro` | 45 | Opus | `high` |
+| lunedì | potatura dei rami (§ 4.7) | `rami` | 5 | Opus; Haiku da provare | `high` |
+| domenica | audit di sicurezza | `audit` | 45 | Opus | `high` |
 
 Lo sforzo parte da `high`, come nelle fasi di un feedback dopo il primo lavoro
 (§ 6.4), perché nessun ricorrente costruisce codice da zero. Modello e sforzo si
-vedono e si cambiano su ciascuno, in Routine → Compiti ricorrenti.
+vedono e si cambiano su ciascuno, in Routine → Compiti ricorrenti. La gestione
+del lavoro (§ 4.3) può lanciare riordino e potatura anche fuori cadenza.
 
 ### 4.2 Due canali di aggiornamento
 
@@ -393,36 +462,195 @@ vedono e si cambiano su ciascuno, in Routine → Compiti ricorrenti.
 - **Stabile** (nuovo): una versione minor il lunedì alle 00:00. Esce solo se non
   c'è nessun feedback di sicurezza a priorità 3 aperto. La domenica l'audit li
   cerca; le routine hanno 24 ore per chiuderli. Se ne resta uno aperto, quella
-  settimana la minor non esce: nessuna domanda, lo dice il monitoraggio.
+  settimana la minor non esce: nessuna domanda, lo dice la gestione del lavoro.
 
 L'utente sceglie il canale nelle impostazioni. Il canale stabile è per chi
 preferisce un'esperienza più ferma, con le verifiche fatte poco prima.
 
-### 4.3 Monitoraggio
+### 4.3 Gestione del lavoro
 
-Legge i registri:
+Tre compiti gestiscono il lavoro delle routine: la **gestione del lavoro**, che
+decide (fino al 23/10 si chiamava monitoraggio), e il **riordino della coda**
+(§ 6.6) e la **potatura dei rami** (§ 4.7), che lavorano per lei. Lo scopo è
+uno: fondere più lavoro utile possibile per ogni credito speso, a cominciare
+dal più urgente. Decisioni dell'owner del 13/10 e del 23/10.
 
-- costi e giri delle routine;
-- fusioni e tempi;
-- accensioni a vuoto;
-- suite, rilasci, esecuzioni in cloud;
-- **tutte le domande passate** con le risposte.
+La gestione del lavoro legge i registri: costi e giri delle routine, fusioni e
+tempi, accensioni a vuoto, sessioni, suite, rilasci, esecuzioni in cloud, e
+**tutte le domande passate** con le risposte. Dell'addetto comunicazioni vede
+solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
 
-Quando qualcosa non va, apre una domanda o un feedback.
-
-- **Ha un taccuino suo,** persistente sul server: appunti da ricontrollare il
-  giorno dopo, modifiche che sta studiando, ipotesi. Lo legge a ogni
-  accensione.
-- **Propone esperimenti** (per esempio rifare un feedback con altri prompt o
-  modelli): diventano domande con azione `esperimento`.
-- **Cambia la domanda di fine turno** dei ruoli (§ 5.4).
-- **Può spegnere** routine o account in emergenza, non riaccenderli. Riaccendere
-  spende, e lo decide l'owner.
+- **Il suo contesto è sempre non fidato:** legge testo scritto da chiunque.
+  Quindi non scrive codice e non cambia feedback. Apre feedback e domande, e i
+  suoi feedback che toccano L5 li approva l'owner (§ 1.5).
+- **Lancia riordino e potatura per numeri.** Chiede al server di anticipare
+  l'istanza di un ricorrente, al massimo con dei numeri di feedback, mai testo.
+  Come per l'unione (§ 1.3), l'istanza nasce fidata e lavora col suo ambito.
+- **Riordino e potatura le fanno rapporto:** a fine istanza scrivono nel suo
+  taccuino cosa hanno fatto e cosa hanno trovato.
+- **Le arrivano i problemi dei worker.** I worker sanno che esiste e le
+  segnalano quello che non va: le segnalazioni libere (§ 5.4) e le domande di
+  guasto delle routine (§ 3.8) vanno a lei, non all'owner, tranne quelle
+  dell'addetto comunicazioni, che vanno all'owner (§ 4.1). Per ciascuna cerca
+  la causa, apre il feedback della correzione, mette il feedback fermo in
+  attesa di quello e lo riprende quando la causa è sparita. Quando la
+  segnalazione o la domanda dice già la causa, il feedback della correzione lo
+  fa nascere per numero, come l'unione (§ 1.3): il testo resta di chi ha
+  segnalato, con la sua fiducia. Quello che scrive lei nasce non fidato.
+- **Sulle domande di guasto risponde solo con le azioni** `riprendi`,
+  `attendi` o `archivia` (§ 3.3), mai con testo, come per i lanci per numeri:
+  così il feedback ripreso resta fidato. Le sue risposte si vedono in Domande →
+  Risposte automatiche, e l'owner può riaprirle.
+- **All'owner** arrivano solo le domande di prodotto e le sue, quando dopo
+  l'indagine la scelta spetta a lui: soldi, sicurezza, permessi, gusto.
+- **Le sue leve:** ritmo e parallelismo (§ 4.5), quando lanciare riordino e
+  potatura, indagini ed esperimenti (§ 4.6), la domanda di fine turno dei ruoli
+  (§ 5.4), lo spegnimento in emergenza.
+- **Non sono sue leve:** la priorità dei feedback, i criteri di verifica, i
+  prompt dei ruoli, i blocchi di sicurezza. Può proporre di cambiarli con una
+  domanda. Così non può migliorare i suoi indicatori verificando di meno o
+  gonfiando le priorità.
+- **Spegne in emergenza** routine o account, e riaccende solo quello che ha
+  spento lei, mai quello che ha spento l'owner.
+- **Taccuino**, persistente sul server: appunti da ricontrollare, ipotesi,
+  modifiche in studio, i rapporti di riordino e potatura, i guasti e le
+  segnalazioni che segue. Lo legge a ogni accensione.
+- **Una sessione al giorno**, che riparte dal taccuino, non un contesto che vive
+  per sempre. Un guasto le anticipa l'istanza: una sessione al giorno non basta
+  a un feedback fermo. Le indagini lunghe le fanno sotto-agenti, e il suo
+  contesto resta piccolo.
 - **Segue un problema da vicino:**
   - resta accesa quanto serve e si risveglia da sola ogni 55 minuti al
     massimo, così la cache (60 minuti) resta calda;
   - per attese più lunghe chiede al server una **sveglia**, che il pacemaker
     rispetta con un tetto suo, separato da quello del lavoro.
+- **Chi controlla lei:** se il server non la vede scrivere nel taccuino da 26
+  ore, apre una domanda.
+
+### 4.4 Cosa minimizzare
+
+La gestione del lavoro non ha un numero da massimizzare: qualunque conteggio si
+gonfia, spezzando un lavoro in tre, aprendo ogni ritrovamento a parte o alzando
+le priorità. Ha indicatori da tenere bassi, e li usa come indizi, non come
+regole.
+
+- **Lavoro a vuoto:** spesa che non finisce in una fusione al primo colpo.
+  - accensioni a vuoto e compiti morti;
+  - giri di verifica oltre il primo;
+  - riallineamenti con main;
+  - lavori archiviati dopo averci speso.
+- **Contesto inutile:** token letti che al compito non servivano. File interi
+  al posto di un pezzo, uscite non filtrate, istruzioni che il ruolo non usa,
+  rapporti di sotto-agenti incollati interi. Si giudica caso per caso, leggendo
+  le sessioni.
+- **Cache freddata:** contesto scritto in cache e non riletto prima che scada.
+  Pause più lunghe della durata della cache dentro una sessione, sessioni che
+  muoiono subito dopo una scrittura grossa, cambi di modello a metà sessione.
+
+**Vincoli**, che non devono peggiorare: regressioni dopo una fusione, suite
+rossa nuova, feedback riaperti.
+
+**Andamento**, da leggere e non da inseguire: le **radici chiuse**. Una radice
+è una segnalazione nata fuori dalle routine: dell'owner, di un utente, di una
+sessione locale. Figli e derivati non contano come risultato, e il loro costo
+si somma a quello della radice da cui vengono. Un'unione di tre radici ne
+chiude tre. I feedback che le routine aprono da sole (audit, gestione del
+lavoro) contano solo come spesa. Il costo per radice dipende anche da
+cosa c'è in coda, quindi da solo non dice se il processo è migliorato: lo
+dicono gli esperimenti (§ 4.6).
+
+### 4.5 Ritmo e parallelismo
+
+- La gestione del lavoro scrive una **curva**: quanti lavori insieme (N, § 12.2) in
+  base alla quota usata e alle ore che mancano al rinnovo di ciascun account.
+  Il server la applica a ogni battito del pacemaker (10 minuti). La
+  gestione del lavoro non è sempre accesa, e a pieno ritmo la quota sale di circa
+  1,4% l'ora (26/09: 662 $ in 21,5 ore).
+- **Niente tetto.** Bruciare una settimana costa solo un po' di efficienza, in
+  riallineamenti: il lavoro resta fatto. Il parallelismo giusto è quello che
+  fonde di più, non quello che spende di più. Oltre un certo N i conflitti con
+  main crescono, e la gestione del lavoro lo misura.
+- **Inizio settimana più pieno:** spendere presto sfrutta un rinnovo
+  anticipato, se arriva.
+- **Fine quota senza compiti morti.** Vicino al limite la curva scende, per
+  esempio 4 lavori fino al 95% e poi 1. Il server dà biglietti solo ai compiti
+  il cui costo tipico, per fase e ruolo, sta nella quota rimasta. Abbassare N
+  non ferma i lavori in corso (§ 12.2).
+- Resta la **riserva dell'owner** su A (§ 8.2). Non è un tetto al
+  parallelismo: è la quota per le sessioni locali.
+- **Senza curva**, perché la gestione del lavoro non è mai partita o la
+  curva è scaduta, vale il passo del § 8.2.
+
+### 4.6 Indagini ed esperimenti
+
+- **Indagini.** Quando un indicatore va male, la gestione del lavoro scende nel
+  caso:
+  un feedback con molti giri di verifica (per esempio 4 o più), una sessione
+  con molto contesto inutile, una fila di compiti morti. Un sotto-agente legge
+  i motivi (rilievi dei giri, registro della sessione), e l'ipotesi va nel
+  taccuino.
+- **Esperimenti.** Un'ipotesi si prova rifacendo un lavoro già fatto con una
+  cosa cambiata: prompt del ruolo, modello, sforzo, contesto. Un esperimento è
+  un compito con ambito `esperimento`:
+  - parte da un commit fissato, lo stato di allora, col numero del feedback;
+  - porta il testo alternativo scritto dalla gestione del lavoro, quindi non
+    fidato;
+  - è riservato (§ 5.1): il testo della gestione del lavoro porta con sé
+    quello che lei ha letto. Quindi gira nell'ambiente dei riservati (§ 1.2),
+    che non può spingere su GitHub, dove i rami sono pubblici: consegna
+    l'esito al server, come dati (il diff e il rapporto);
+  - non fonde, non apre feedback né domande;
+  - non vede il `main` di oggi: in una copia del repo il ref `main` è quello
+    attuale, e un esperimento che lo legge falsa il confronto (lab di Haiku,
+    12/10);
+  - l'esito lo confronta con l'originale un giudice cieco, un compito con
+    ambito `giudizio`: riceve i due esiti dal server senza sapere quale sia
+    l'esperimento, ed è riservato anch'esso;
+  - non ha la segnalazione libera né la domanda di fine turno (§ 5.4): quello
+    che segnalerebbe o risponderebbe lo scrive nell'esito, che legge la
+    gestione del lavoro.
+
+  Ha meno permessi di un primo lavoro, per questo lo decide la gestione del
+  lavoro da sola, dentro il budget (§ 4.8). L'urgenza dell'esperimento e del
+  suo giudice è fissa (§ 6.3): la gestione del lavoro non la sceglie.
+- **Proposte.** Se un esperimento conferma l'ipotesi, la gestione del lavoro
+  apre una domanda con la modifica (a un prompt, ai criteri, a una regola) e le prove.
+  La approva l'owner, perché tocca tutti i lavori futuri. Gli sprechi che si
+  correggono nel codice diventano feedback.
+
+### 4.7 Potatura dei rami
+
+- **La cancellazione è meccanica.** La fa il server il lunedì, per regola: un
+  ramo fuso in `main` che nessun feedback aperto nomina. L'agente non allunga
+  l'elenco.
+- **L'agente capisce perché i rami sono lì.** Prima della cancellazione legge
+  i candidati e gli altri rami fermi (non fusi, o di feedback chiusi senza
+  fusione) e li raggruppa per causa, non uno per uno: il 07/10 erano 617. Per
+  ogni causa:
+  - un problema del processo (per esempio nessuno cancella il ramo dopo la
+    fusione) → un feedback;
+  - lavoro non fuso che forse serve → una domanda, con azioni `riprendi` o
+    `cancella_rami`.
+- Il rapporto va alla gestione del lavoro (§ 4.3).
+
+### 4.8 Budget e rapporto settimanale
+
+- **Budget:** 200 € a settimana per tutta la manutenzione del processo:
+  sessioni della gestione del lavoro, indagini, esperimenti, e le pulizie della coda e
+  dei rami (riordino e potatura, anche quelle del lunedì). È circa
+  il 10% della settimana di un account (§ 8.1). La gestione del lavoro lo divide
+  come crede; sforare di poco va bene. Si conta come nei rapporti delle routine.
+- **Oltre il budget** chiede con una domanda, azione `esperimento`.
+- **Rapporto settimanale:** una domanda, anche senza opzioni se non c'è niente
+  da decidere. Contiene:
+  - cosa ha fatto: curve, indagini, esperimenti, feedback e domande aperti;
+  - l'andamento degli indicatori (§ 4.4) rispetto alle settimane prima;
+  - una **stima del risparmio** e quanto è costato lui, per decidere se il
+    ruolo serve ancora e con che budget. È una stima con l'incertezza
+    dichiarata: dagli esperimenti quando ci sono, altrimenti dal prima e dopo
+    di ogni modifica.
+- **In mezzo alla settimana** le domande arrivano quando servono, come tutte le
+  altre.
 
 ## 5. Ambiti: i permessi stanno sul server
 
@@ -436,23 +664,73 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
   - leggere testo non fidato;
   - vedere segreti o dati privati;
   - agire verso l'esterno.
+- **La triade segue il testo.** Il testo libero porta con sé quello che ha
+  visto chi lo scrive, quindi la triade non si guarda solo sulle operazioni di
+  un ambito:
+  - un biglietto che riceve dati privati diventa **riservato**. Sono dati
+    privati la casella e quello che ne è figlio (§ 4.1), le sessioni e i
+    registri, i testi di feedback e domande che non sono del suo lavoro;
+  - come lo sporco (§ 1.2), il segno non si toglie e passa a quello che il
+    biglietto scrive; numeri, ruoli e dati strutturati non lo portano (§ 1.3);
+  - un compito che nasce da testo riservato, o lo riceve, è riservato e per la
+    triade vede dati privati. Quindi non agisce verso l'esterno: gira
+    nell'ambiente dei riservati (§ 1.2), che esce solo verso il server e non
+    può spingere su GitHub, dove i rami sono pubblici, e non fa partire azioni
+    che escono (§ 3.6);
+  - il segno si prende alla consegna, l'ambiente si sceglie quando la sessione
+    parte e non cambia dopo. Quindi **il server consegna testo riservato solo
+    a un biglietto che gira già nell'ambiente dei riservati**, e a ogni altro
+    lo rifiuta, come rifiuta le ricerche alla posta dopo la casella. Chi lo
+    legge per mestiere parte lì: oggi l'addetto comunicazioni, la gestione del
+    lavoro, l'audit, la revisione delle domande, «Gestisci la risposta», il
+    riordino della coda, la potatura dei rami, gli esperimenti e il loro
+    giudice (§ 4.6);
+    l'unione e i compiti figli (§ 12.2) quando uno dei testi che riceveranno è
+    riservato, cosa che il server sa già quando li crea. Le eccezioni sono
+    due, tutte e due limiti accettati dall'owner: il lavoro su un feedback,
+    qui sotto, e la domanda di fine turno della gestione del lavoro (§ 5.4).
+    Un'eccezione nuova non si aggiunge senza una sua decisione.
+- **Limite accettato dall'owner (21/10):** un feedback aperto o cambiato da
+  un biglietto riservato (l'addetto comunicazioni dalle mail degli utenti, la
+  gestione del lavoro, l'audit, «Gestisci la risposta») è testo riservato, ma
+  il lavoro su un feedback spinge il suo ramo sul repo pubblico. Quel lavoro
+  è un'eccezione alla regola sopra e va come gli altri: per portare fuori dati
+  privati da qui vanno ingannati due agenti di fila, chi apre il feedback e
+  chi lo lavora. L'owner ha scartato sia la lettura in Ricevuti di quei
+  feedback sia i rami su un repo privato: non è un difetto da segnalare.
 - **Nessun ambito** può approvare blocchi di sicurezza, cambiare la fiducia,
   creare ambiti o toccare le chiavi.
-- **I segreti** (casella di posta) stanno solo nell'ambiente cloud del compito
-  che li usa. Gli ambienti li crea l'owner.
+- **I segreti** stanno solo nell'ambiente cloud del compito che li usa. Gli
+  ambienti li crea l'owner.
+- **La casella di posta** la legge e la scrive solo il server: le credenziali
+  non arrivano mai a un agente. Chi legge la posta legge testo non fidato, e
+  con la password potrebbe anche spedire. L'agente riceve i messaggi come dati
+  e propone bozze; il server manda quelle approvate (azione `invia_mail`,
+  § 3.3).
+- **Due ambiti in fila.** Un compito che deve sia uscire sia leggere dati
+  privati li fa in due tempi, con due ambiti: oggi solo l'addetto
+  comunicazioni (§ 4.1). Gira dall'inizio nell'ambiente dei riservati
+  (§ 1.2), dove l'unica uscita è il server: le ricerche sul web le fa il
+  server per lui, come la posta, quindi le vede e le può fermare. Quando
+  l'agente chiede la casella, il server passa il biglietto da `opportunita` a
+  `posta` prima di consegnarla, e da lì rifiuta ogni ricerca.
+  Non si torna indietro.
 
 ### 5.2 Gli ambiti iniziali
 
 | Ambito | Può | Non può |
 |---|---|---|
 | `lavoro` | lavorare il suo feedback, spingere il suo ramo, chiedere la fusione, aprire feedback e domande | tutto il resto |
-| `coda` | leggere i feedback **in coda** (non quelli in Ricevuti né quelli fermi per attacco), cambiare priorità, chiedere un biglietto di unione (§ 1.3), archiviare | scrivere testi di feedback, cancellare, toccare Ricevuti |
+| `coda` | leggere i feedback **in coda** (non quelli in Ricevuti né quelli fermi per attacco), cambiare priorità, chiedere un biglietto di unione (§ 1.3), archiviare, scrivere nel taccuino della gestione del lavoro | scrivere testi di feedback, cancellare, toccare Ricevuti |
 | `unisci` | leggere i genitori indicati, scrivere il figlio, chiudere i genitori col rimando | leggere altro |
-| `domande` | leggere le domande e il registro, raggruppare, cambiare priorità, rispondere coi principi | rispondere senza un principio, cambiare i principi |
-| `posta` | leggere la casella di Filo, aprire domande con bozze | mandare mail |
-| `invio` | mandare una bozza approvata dall'owner | scrivere testi |
-| `monitor` | leggere registri e domande passate, il suo taccuino, cambiare la domanda di fine turno, spegnere, chiedere una sveglia, aprire domande e feedback | accendere, cambiare feedback |
-| `rami` | cancellare rami fusi che nessun feedback aperto nomina | tutto il resto |
+| `domande` | leggere le domande per l'owner, tranne quelle dell'addetto comunicazioni, e il registro; raggruppare, cambiare priorità, rispondere coi principi | rispondere senza un principio, cambiare i principi |
+| `opportunita` | cercare sul web attraverso il server; leggere la parte del suo taccuino scritta prima della casella e scriverci; aprire domande con bozze di mail, solo per l'owner; chiedere la casella, che passa il biglietto all'ambito `posta` (§ 5.1) | ricevere la casella e quello che ne è figlio (la parte del taccuino scritta dopo, il rapporto dell'istanza prima); mandare mail |
+| `posta` | ricevere dal server i messaggi della casella di Filo, con la parte del taccuino scritta dopo la casella e il rapporto dell'istanza prima; tenere il suo taccuino; aprire domande con bozze di mail, solo per l'owner; aprire feedback dalle mail degli utenti | uscire in rete, nemmeno attraverso il server; tornare all'ambito `opportunita`; mandare mail; vedere le credenziali della casella |
+| `gestione_lavoro` | leggere registri, sessioni, domande passate, feedback e rami; il suo taccuino; ricevere le segnalazioni e le domande di guasto, tranne quelle dell'addetto comunicazioni, e rispondere a queste con le azioni `riprendi`, `attendi`, `archivia`; far nascere per numero un feedback da una segnalazione o da una domanda di guasto; scrivere la curva del parallelismo (§ 4.5); anticipare riordino e potatura; lanciare esperimenti nel budget; cambiare la domanda di fine turno; spegnere, e riaccendere quello che ha spento lei; chiedere una sveglia; aprire domande e feedback | scrivere codice; cambiare feedback, priorità, criteri di verifica, prompt dei ruoli; rispondere con testo a una domanda di guasto; leggere dell'addetto comunicazioni altro che i numeri (domande, segnalazioni, sessioni, registri, taccuino, rapporti); riaccendere quello che ha spento l'owner |
+| `rami` | leggere rami, storia di git e feedback; aprire feedback e domande; scrivere nel taccuino della gestione del lavoro | cancellare rami: lo fa la regola del server (§ 4.7) |
+| `audit` | leggere il codice di Filo e del server, i metadati dei feedback aperti e i testi che servono; provare il codice nel contenitore; aprire feedback e domande | spingere rami, chiedere fusioni, cambiare feedback |
+| `esperimento` | lavorare dal commit indicato nell'ambiente dei riservati (§ 1.2); consegnare l'esito al server, come dati | fondere, aprire feedback o domande, spingere su GitHub, uscire in rete, leggere il `main` di oggi |
+| `giudizio` | ricevere dal server l'esito di un esperimento e quello dell'originale, senza sapere quale sia quale; consegnare il verdetto | tutto il resto, uscire in rete compreso |
 | `server` | come `lavoro`, più spingere un ramo su filo-security (§ 7) | — solo per biglietti puliti |
 
 ### 5.3 Ambiti nuovi
@@ -465,13 +743,34 @@ vale per tutti i compiti di quel tipo.
 
 - **Domanda di fine turno:** si può impostare per **ogni ruolo**, compiti
   compresi, o per tutti insieme, come oggi per le routine. Serve a indagare
-  una cosa precisa.
+  una cosa precisa. Quella scritta dalla gestione del lavoro arriva a tutti i
+  ruoli, come quella scritta dall'owner (D-141).
+- **La domanda della gestione del lavoro arriva dopo l'ultima scrittura.** È
+  testo non fidato e sporca chi la riceve (§ 1.2). Quindi il server la
+  consegna solo al rilascio, dopo la consegna dell'esito e il salvataggio del
+  ramo; da lì il rilascio non salva più niente e la risposta va al server. Il
+  ramo resta scritto da un biglietto pulito e il lavoro resta fidato (§ 1.5).
+  Una spinta sul ramo arrivata dopo la consegna della domanda è del biglietto
+  sporco: il lavoro diventa non fidato.
+- **Limite accettato dall'owner (23/10), accanto a quello dei feedback
+  (§ 5.1):** la domanda della gestione del lavoro è testo riservato, e chi la
+  riceve fuori dall'ambiente dei riservati può ancora scrivere un file che il
+  salvataggio automatico spinge sul repo pubblico. Per portare fuori dati privati da qui
+  vanno ingannati due agenti di fila, la gestione del lavoro e chi riceve la
+  domanda. La posta non c'è, perché dell'addetto comunicazioni la gestione del
+  lavoro vede solo i numeri (§ 4.1): da una mail servono tre agenti
+  ingannati, l'addetto che ne apre un feedback, la gestione del lavoro che lo
+  legge e chi riceve la domanda.
 - **Segnalazione libera:** ogni biglietto ha un comando `segnala "testo"` anche
   senza domanda. Serve per un errore avuto, un problema trovato, un permesso
-  che mancava. Il server ne fa un **feedback** di tipo `segnalazione`: è una
-  cosa da valutare, non serve un oggetto nuovo. La fiducia è quella del
-  biglietto, la priorità la decide la revisione. Una richiesta di permessi la
-  revisione la trasforma in una proposta d'ambito (§ 5.3).
+  che mancava. Il server la consegna alla **gestione del lavoro** (§ 4.3), non
+  all'owner, con la fiducia del biglietto; quelle dell'addetto comunicazioni
+  vanno all'owner (§ 4.1). Lei ne cerca la causa e, se serve,
+  apre il feedback della correzione o lo fa nascere dalla segnalazione per
+  numero. Una richiesta di permessi la trasforma in una proposta d'ambito
+  (§ 5.3), che decide l'owner.
+- **Gli esperimenti** non hanno né l'una né l'altra: scrivono tutto nell'esito
+  (§ 4.6).
 
 ## 6. Feedback e compiti
 
@@ -504,8 +803,9 @@ Invariante, con sentinella: al massimo un compito di fase aperto per feedback.
 I compiti figli, qui sotto, non contano.
 
 **Senza feedback:** le istanze dei ricorrenti (§ 4.1), «Gestisci la risposta»
-(§ 3.5), l'invio di una mail approvata, l'unione (§ 1.3), e i compiti creati a
-mano dall'owner o da una sessione locale.
+(§ 3.5), l'unione (§ 1.3), gli esperimenti della gestione del lavoro (§ 4.6),
+che rifanno un lavoro già fatto ma non sono una fase del suo feedback, e i
+compiti creati a mano dall'owner o da una sessione locale.
 
 **Da un altro compito:** i figli (§ 12.2). Un figlio è legato al compito padre,
 non al feedback, e al feedback arriva attraverso il padre. Così un padre di fase
@@ -514,8 +814,8 @@ seguono il padre: quando il trigger o il pacemaker ne ricalcola l'urgenza
 o lo chiude come «superato», lo stesso vale per i figli ancora aperti.
 
 **Non sono compiti**, perché non chiamano un agente: la fusione (la fa il
-server), il blocco di sicurezza (diventa una domanda), la segnalazione (diventa
-un feedback, § 5.4).
+server), l'invio di una mail approvata (lo fa il server, § 5.1), il blocco di
+sicurezza (diventa una domanda), la segnalazione (va alla gestione del lavoro, § 5.4).
 
 ### 6.2 Le fasi di un cambio di codice
 
@@ -552,9 +852,9 @@ fidato e figlio. I nipoti contano come figli.
 | Compito | Urgenza |
 |---|---|
 | Gestisci la risposta | 47 |
-| Invio di una mail approvata | 46 |
-| Monitoraggio, audit di sicurezza, riordino della coda | 45 |
-| Revisione delle domande, posta | 30 |
+| Gestione del lavoro, audit di sicurezza, riordino della coda | 45 |
+| Esperimento della gestione del lavoro, e il giudice cieco che ne confronta l'esito (§ 4.6) | 44 |
+| Revisione delle domande, addetto comunicazioni | 30 |
 | Unione di feedback | 20 |
 | Potatura dei rami | 5 |
 
@@ -610,7 +910,9 @@ scrive: con i compiti quella lettura si toglie.
   - archivia gli stantii e i già fatti;
   - rivede le priorità con la scala 3/2/1/0.
 
-  Quelli che aspettano una scelta li segnala alla revisione delle domande.
+  Quelli che aspettano una scelta li segnala alla revisione delle domande. Il
+  rapporto va alla gestione del lavoro, che può anche lanciare il riordino
+  fuori cadenza (§ 4.3).
 - I feedback a bassa priorità che si accumulano sono normali: aspettano i
   crediti (§ 8).
 - I lavori `localOnly` di oggi diventano **lavori server**: lavori che hanno
@@ -724,14 +1026,15 @@ I numeri restano dell'owner, in Routine → Crediti.
   10% resta sempre libero: il pacemaker non ci accende più niente oltre il 90%
   della settimana. Le sessioni locali dell'owner consumano da A: col dato della
   barra di stato entrano nel conto da sole. L'account B può arrivare al 100%.
-- **Passo:** ogni giorno si spende al massimo il rimasto diviso i giorni che
-  mancano al rinnovo, così la settimana non finisce il martedì.
+- **Passo:** lo decide la curva della gestione del lavoro (§ 4.5). Senza curva, ogni
+  giorno si spende al massimo il rimasto diviso i giorni che mancano al
+  rinnovo.
 - **Ordine:** quello della coda, cioè l'urgenza dei compiti (§ 6.3). Il passo
   e la riserva dicono quanto si spende, non cosa viene prima: la priorità 3
   resta sopra le risposte e i ricorrenti.
 - **Fine settimana:** nelle ultime 24 ore prima del rinnovo la quota non spesa
   si perderebbe, quindi si apre alle priorità basse (0 e 1).
-- **Controllo:** il monitoraggio confronta speso e passo, e apre una domanda se
+- **Controllo:** la gestione del lavoro confronta speso e passo, e apre una domanda se
   la quota non basta per le priorità 3.
 
 ## 9. Istruzioni dei ruoli: dal repo al server
@@ -816,6 +1119,7 @@ migrazione le mappa. Il codice che decide in base al prefisso
   vivi, di tutti gli orchestratori insieme, sono meno di N. L'orchestratore non
   fa conti: chiede, e il server risponde sì o no. Così più orchestratori
   possono convivere e i lavori non superano mai N.
+- **N lo decide la curva della gestione del lavoro** (§ 4.5), applicata dal server.
 - **Abbassare N** non chiude niente: il server smette di dare biglietti, e i
   lavori in corso finiscono.
 - **Vita di 4 ore.** Dopo 4 ore, o col contesto oltre il 70%, l'orchestratore
@@ -849,7 +1153,7 @@ Da sistemare prima dei worker in parallelo:
   al padre, non al feedback (§ 6.1), e ne ereditano urgenza, modello e
   sforzo, e la fiducia che il padre ha in quel momento. Il padre aspetta i loro esiti
   dal server.
-  Le chiusure a metà e i crash li segue il monitoraggio.
+  Le chiusure a metà e i crash li segue la gestione del lavoro.
 - **Le prove** non devono contendersi display virtuali, porte o cartelle: vanno
   provate con 2, 3 e 4 worker insieme.
 - **Account:** ogni orchestratore consuma dall'account che lo ha acceso.
@@ -862,25 +1166,42 @@ lavorano in locale.
 
 1. *server*: biglietti che si sporcano, campo `fiducia`, migrazione, spareggio
    provvisorio (§ 1.6; lo sostituisce l'urgenza al punto 5), L5 decisa dalla
-   fiducia, fine di `mergePreapproved`.
+   fiducia, fine di `mergePreapproved`, sessioni cloud dei lavori fidati senza
+   strumenti web propri.
 2. *server*: collezione `domande`, regole, operazioni, azioni strutturate.
 3. App: barra delle sezioni, sezione Domande, Ricevuti coi filtri L1–L5.
 4. Le attese di oggi diventano domande (§ 3.8); `domanda.mjs` per tutti.
+   Le domande di guasto vanno all'owner fino al punto 9.
 5. *server*: compiti (§ 6): collezione, funzione delle fasi col trigger e il
    controllo nel pacemaker, urgenza al posto dell'ordine di oggi, biglietto
-   legato al compito, modello e sforzo dal compito; app: scheda Routine →
-   Compiti. Serve ai punti 6 e 8.
+   legato al compito, modello e sforzo dal compito, segno riservato che segue
+   il testo (§ 5.1) e ambiente dei riservati (§ 1.2: uscita solo verso il
+   server, senza scrittura su GitHub e senza salvataggio automatico), prima
+   di ogni compito che legge testo riservato; app: scheda Routine → Compiti.
+   Serve ai punti 6 e 8.
 6. Compito «Gestisci la risposta», chiarimenti, «discutiamone», note per gli
    agenti.
 7. Registro, revisione quotidiana, risposte automatiche.
 8. Compiti ricorrenti, ruolo `compito`, ambiti `coda`/`unisci`/`domande`/
-   `monitor`/`rami`, segnalazioni, domanda di fine turno per tutti i ruoli.
-9. Monitoraggio: taccuino, sveglie, esperimenti.
+   `gestione_lavoro`/`rami`/`audit`, rapporto che passa all'istanza
+   successiva, domanda di fine turno per tutti i ruoli.
+9. Gestione del lavoro (§ 4.3–4.8): taccuino, sveglie, controllo della
+   gestione del lavoro, segnalazioni e domande di guasto che vanno a lei
+   (campo `destinatario`, istanza anticipata da un guasto, feedback per
+   numero, azione `attendi`), la sua domanda di fine turno consegnata dopo
+   l'ultima scrittura (§ 5.4), lanci per numeri, curva del parallelismo applicata dal
+   server, indicatori, ambiti `esperimento` e `giudizio` con l'esito
+   consegnato al server, budget, rapporto settimanale,
+   potatura per regola sul server, azioni `esperimento` e `cancella_rami`.
 10. Crediti (§ 8), dopo la conferma dei numeri.
 11. Lavori server dalla cloud (§ 7).
 12. Istruzioni dei ruoli sul server (§ 9).
 13. Canale stabile (§ 4.2).
-14. Posta (`posta`, `invio`), quando l'owner ha creato l'ambiente.
+14. Addetto comunicazioni: il server legge e scrive la casella con le sue
+    credenziali e cerca sul web per il compito, che gira nell'ambiente dei
+    riservati, ambiti `opportunita` e `posta` col passaggio dall'uno
+    all'altro, azione `invia_mail` coi solleciti, taccuino, domande
+    `soloOwner` con le risposte scritte che tornano all'addetto.
 15. Mittenti normalizzati (§ 10).
 16. Cartella padre per le sessioni cloud (§ 11).
 17. Orchestratore Haiku con worker in parallelo (§ 12): prima la misura di K e

@@ -6,8 +6,18 @@
   'use strict';
 
   const NOTES = [
-    // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
-    // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
+    // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
+    // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
+    {
+      version: '0.2.250', date: '2026-10-23',
+      features: [
+        'Un\'immagine che trascini dentro Filo entra nella chat dovunque la lasci. Nella home va nella casella da qualunque punto della pagina, che si accende mentre la trascini. Su un sito si apre l\'Aiuto con l\'immagine già allegata, salvo che il sito la voglia per sé, come una pagina che carica file. Nell\'Aiuto ora la puoi anche incollare.',
+      ],
+      fixes: [
+        'La pagina sulla privacy ora dice dove sta ogni parte del server, dal codice al database alle identità. Prima diceva solo che il codice gira in Europa, e sembrava che ci stessero anche i dati, che invece per ora sono negli Stati Uniti.',
+        'Un\'immagine oltre i 4 MB incollata nella chat della home ora entra rimpicciolita. Prima spariva senza dire niente.',
+      ],
+    },
     {
       version: '0.2.249', date: '2026-10-23',
       features: [

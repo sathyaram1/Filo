@@ -10,6 +10,7 @@ const RedteamGate = require('./services/redteamGate');
 const AzioniContate = require('./services/azioniContate');
 const { tastoPremuto } = require('./tastoDelMouse');
 const RisposteInAttesa = require('./risposteInAttesa');
+const RilascioNellaChat = require('./rilascioNellaChat');
 
 const STRISCIA = 4;
 const PANNELLO = 56;
@@ -635,7 +636,7 @@ class BarraLaterale {
           else tabs.openTab('filo://newtab/');
           break;
         case 'newTab': tabs.openTab('filo://newtab/'); break;
-        case 'closeTab': if (attiva) tabs.closeTab(attiva.id); break;
+        case 'closeTab': if (attiva) tabs.closeTab(attiva.id, { via: 'barra' }); break;
         case 'fullscreen': tabs.toggleContentFullscreen(); break;
         case 'incognito': try { require('./window').createIncognitoWindow(); } catch (_) {} break;
         case 'openOptions': tabs.openTab('filo://options/options.html'); break;
@@ -978,6 +979,8 @@ class BarraLaterale {
       }
       case 'barra:trascina-fuori': this._fuori(d); break;
       case 'barra:inoltra': this.vuoto.inoltra(d); break;
+      // #1623 — un'immagine lasciata sulla barra va alla chat della scheda davanti.
+      case 'barra:rilascio': RilascioNellaChat.consegna(this.win, d.voci).catch(() => {}); break;
       case 'barra:chiedi': this._chiediEtichette(); break;
       default: break;
     }
