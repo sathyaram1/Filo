@@ -154,10 +154,13 @@ test('una / seguita da una parola che non è un programma, o da un percorso inco
   await page.locator('#input').press('Enter');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Risposta 2 di Filo.' })).toBeVisible({ timeout: 15_000 });
 
-  // La prima parola di una frase porta spesso un apostrofo o la punteggiatura: resta una parola da cercare.
-  const frasi = ["/cos'è un terminale?", '/ciao, come stai?', '/perché?'];
+  // La prima parola di una frase porta spesso un apostrofo, la punteggiatura o un segno che la shell leggerebbe come
+  // sintassi: il programma dietro quei segni si cerca comunque, e la barra rossa annuncia che va a Filo.
+  const frasi = ["/cos'è un terminale?", '/ciao, come stai?', '/perché?', '/(nota) compra il latte', '/$5 bastano?',
+    '/ciao; ci sei?', '/[bozza] lettera a Marco', '/!importante domani', '/a=b è vero?', '/<3 grazie'];
   for (const [i, frase] of frasi.entries()) {
     await page.locator('#input').fill(frase);
+    await expect(page.locator('#input'), `${frase}: rossa prima dell'invio`).toHaveClass(/is-cmd-unknown/, { timeout: 8_000 });
     await page.locator('#input').press('Enter');
     await expect(page.locator('.dash-bubble-filo', { hasText: `Risposta ${i + 3} di Filo.` }), frase).toBeVisible({ timeout: 15_000 });
     await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
