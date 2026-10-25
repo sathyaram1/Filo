@@ -20,7 +20,8 @@ const USO = [
   '  chiedi <file.json | ->                apre una domanda (JSON da file o da stdin)',
   '  mostra D-n                            la domanda intera, con le note per gli agenti',
   '  elenco [--tutte]                      le domande aperte e in lavorazione (--tutte: anche chiuse)',
-  '  rispondi D-n [--scelta N] [--testo "…" | --testo -]   N è il numero dell\'opzione come lo stampa «mostra»',
+  '  rispondi D-n [--scelta N] [--testo "…" | --testo -]   --scelta applica l\'opzione N, numerata come in «mostra»;',
+  '                                        il testo da solo resta parole e non applica niente',
   '  consiglio D-1 [D-2 …]                 applica l\'opzione consigliata',
   '  archivia D-n | riapri D-n             la toglie senza applicare niente, o la rimette aperta',
   '',
@@ -138,6 +139,20 @@ export function messaggioErrore(status, body) {
   return visibile(msg);
 }
 
+/**
+ * Cosa ha applicato il server a una risposta, detto a chi l'ha mandata. Senza scelta le parole non applicano niente
+ * (SPEC-DOMANDE §3.4): un'azione partita lo stesso è il difetto di #1598, e si dice forte. PURA.
+ */
+export function esitoRisposta(esito, riferimenti = {}, { conScelta = false } = {}) {
+  const e = esito && typeof esito === 'object' ? esito : {};
+  if (!e.azione) return { riga: 'risposta a parole, nessuna azione applicata', avviso: '' };
+  const azione = D.etichettaAzione(e.azione, riferimenti) || `l'azione «${visibile(e.azione.tipo || '?')}»`;
+  if (e.ok === false) return { riga: `non applicata: ${azione}${e.errore ? ` (${visibile(e.errore)})` : ''}`, avviso: '' };
+  const avviso = conScelta ? ''
+    : `ATTENZIONE: non hai scelto un'opzione, eppure il server ha applicato ${azione}. Le parole da sole non dovrebbero applicare niente: segnalalo.`;
+  return { riga: `applicata: ${azione}`, avviso };
+}
+
 function dataOra(ms) {
   const n = Number(ms);
   return Number.isFinite(n) && n > 0 ? new Date(n).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) : '?';
@@ -193,7 +208,10 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
   }
   if (x.principio) righe.push('', 'Principio', rientro(x.principio));
   if (x.notePerAgenti) righe.push('', 'Note per gli agenti', rientro(x.notePerAgenti));
-  if (x.stato === 'aperta') righe.push('', `Per rispondere: node scripts/domanda.mjs rispondi ${visibile(x.id || 'D-n')} --scelta N | --testo "…"`);
+  if (x.stato === 'aperta') {
+    righe.push('', `Per rispondere: node scripts/domanda.mjs rispondi ${visibile(x.id || 'D-n')} --scelta N [--testo "…"] | --testo "…"`
+      + ' (senza --scelta solo parole: nessuna azione)');
+  }
   return righe.join('\n');
 }
 
@@ -383,21 +401,28 @@ export async function esegui(argv, io = {}) {
     }
     if (a.cmd === 'rispondi') {
       if (a.testo === '-') a.testo = await stdin();
+      const conTesto = typeof a.testo === 'string' && a.testo.trim() !== '';
+      if (a.scelta === undefined && !conTesto) { errore(`RIFIUTATO: il testo per ${a.id} è vuoto e non hai scelto un'opzione. Non ho risposto.`); return 1; }
+      let riferimenti = {};
       if (a.scelta !== undefined) {
-        const { domanda } = await chiama({ op: 'mostra', id: a.id });
-        const o = domanda && Array.isArray(domanda.opzioni) ? domanda.opzioni[a.scelta] : null;
+        const m = await chiama({ op: 'mostra', id: a.id });
+        const o = m.domanda && Array.isArray(m.domanda.opzioni) ? m.domanda.opzioni[a.scelta] : null;
         if (!o) { errore(`RIFIUTATO: ${a.id} non ha l'opzione ${a.scelta + 1}. Non ho risposto.`); return 1; }
         if (soloDaFilo(o.azione)) {
           errore(`RIFIUTATO: l'opzione ${a.scelta + 1} di ${a.id} vale solo dalla finestra di Filo (Gestione, Domande): da qui non la applico.`);
           return 1;
         }
+        riferimenti = m.riferimenti || {};
       }
       const data = Object.assign({ op: 'rispondi', id: a.id }, await daSessione());
       if (a.scelta !== undefined) data.scelta = a.scelta;
-      if (typeof a.testo === 'string' && a.testo.trim()) data.testo = a.testo;
+      if (conTesto) data.testo = a.testo;
       const r = await chiama(data);
-      const e = r.esito || {};
-      scrivi(`OK: ${a.id} è ${visibile((r.domanda && r.domanda.stato) || '?')}${e.ok === false && e.errore ? ` (azione non applicata: ${visibile(e.errore)})` : ''}.`);
+      const detto = esitoRisposta(r.esito, Object.assign({}, riferimenti, r.riferimenti), { conScelta: a.scelta !== undefined });
+      const stato = (r.domanda && r.domanda.stato) || '?';
+      scrivi(`OK: ${a.id} è ${visibile(stato)}; ${detto.riga}.`);
+      if (stato === 'aperta' && a.scelta === undefined) scrivi(`Le opzioni restano da scegliere: node scripts/domanda.mjs rispondi ${a.id} --scelta N (queste parole arrivano a chi riprende il lavoro).`);
+      if (detto.avviso) errore(detto.avviso);
       return 0;
     }
     if (a.cmd === 'consiglio') {

@@ -607,8 +607,8 @@ entra nell'attesa. Una domanda aperta di un'attesa lasciata per un'altra strada 
 `superata`. In dashboard un `design`/`aligned` con `domandaId` e uno di quei motivi sta
 **In coda**, col segno «aspetta D-n» che apre la domanda nella sezione Domande; nel
 dettaglio la casella di risposta lascia il posto al tasto «Rispondi alla domanda»: si
-risponde in un posto solo. La risposta con l'opzione `riprendi` (o col solo testo) lo
-riporta `todo` con la decisione in `payload.decisioni`, `notePerAgenti` comprese; una
+risponde in un posto solo. La risposta con l'opzione `riprendi` (o col solo testo dell'owner
+dalla Gestione; quello di una sessione resta parole, SPEC-DOMANDE §3.4) lo riporta `todo` con la decisione in `payload.decisioni`, `notePerAgenti` comprese; una
 domanda archiviata o superata non sblocca niente. Restano nei Ricevuti, anche con un
 `domandaId`: `secaudit`, `l5`, `fidato`, attacchi, spam e file sospetti. Le
 attese aperte prima si migrano con `ownerDomande { op: 'migra' }`, a lotti

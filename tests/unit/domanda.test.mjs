@@ -95,6 +95,56 @@ test('rispondi: un’azione di consenso o da fare una per una non parte da una s
   assert.deepEqual(ok.chiamate[1], { op: 'rispondi', id: 'D-3', scelta: 0, sessione: true });
 });
 
+test('rispondi a parole (#1598): al server non parte una scelta, e lo script dice che non è partita nessuna azione', async () => {
+  const parole = finto({ rispondi: { ok: true, domanda: { stato: 'in_lavorazione' }, esito: { ok: true } } });
+  assert.equal(await esegui(['rispondi', 'D-96', '--testo', 'ne parliamo domani'], parole.io), 0);
+  assert.deepEqual(parole.chiamate, [{ op: 'rispondi', id: 'D-96', testo: 'ne parliamo domani', sessione: true }]);
+  assert.match(parole.out.join('\n'), /^OK: D-96 è in_lavorazione; risposta a parole, nessuna azione applicata\.$/);
+  assert.equal(parole.err.length, 0);
+
+  // Su un'attesa le parole di una sessione lasciano la domanda aperta: lo script dice come si sceglie ancora.
+  const aperta = finto({ rispondi: { ok: true, domanda: { stato: 'aperta' }, esito: { ok: true, azione: null } } });
+  assert.equal(await esegui(['rispondi', 'D-96', '--testo', 'ci penso'], aperta.io), 0);
+  assert.match(aperta.out.join('\n'), /OK: D-96 è aperta; risposta a parole, nessuna azione applicata\.\nLe opzioni restano da scegliere: node scripts\/domanda\.mjs rispondi D-96 --scelta N \(queste parole arrivano a chi riprende il lavoro\)\./);
+
+  // Il difetto visto: senza scelta il server riprende lo stesso il lavoro. Lo script non lo nasconde.
+  const riprende = finto({ rispondi: { ok: true, domanda: { stato: 'chiusa' }, esito: { ok: true, azione: { tipo: 'riprendi', feedbackId: 'f553' } }, riferimenti: { f553: { num: '#553.2' } } } });
+  assert.equal(await esegui(['rispondi', 'D-96', '--testo', 'ne parliamo domani'], riprende.io), 0);
+  assert.match(riprende.out.join('\n'), /applicata: Riprendi #553\.2 con questa scelta/);
+  assert.match(riprende.err.join('\n'), /ATTENZIONE: non hai scelto un'opzione, eppure il server ha applicato Riprendi #553\.2/);
+
+  for (const vuoto of [['--testo', '   '], ['--testo', '-']]) {
+    const f = finto({ stdin: ' \n' });
+    assert.equal(await esegui(['rispondi', 'D-96', ...vuoto], f.io), 1, vuoto.join(' '));
+    assert.equal(f.chiamate.length, 0, 'una risposta vuota non parte');
+    assert.match(f.err.join('\n'), /vuoto/);
+  }
+});
+
+test('rispondi con la scelta: l’azione applicata si legge col pulsante che le corrisponde, senza avvisi', async () => {
+  const f = finto({
+    mostra: { ok: true, domanda: { id: 'D-3', ...DOMANDA }, riferimenti: { f1: { num: '#902' } } },
+    rispondi: { ok: true, domanda: { stato: 'chiusa' }, esito: { ok: true, azione: { tipo: 'archivia', feedbackId: 'f1' } } },
+  });
+  assert.equal(await esegui(['rispondi', 'D-3', '--scelta', '1', '--testo', 'doppione'], f.io), 0);
+  assert.deepEqual(f.chiamate[1], { op: 'rispondi', id: 'D-3', scelta: 0, testo: 'doppione', sessione: true });
+  assert.match(f.out.join('\n'), /^OK: D-3 è chiusa; applicata: Archivia #902\.$/);
+  assert.equal(f.err.length, 0);
+
+  const ko = finto({
+    mostra: { ok: true, domanda: { id: 'D-3', ...DOMANDA } },
+    rispondi: { ok: true, domanda: { stato: 'aperta' }, esito: { ok: false, errore: 'feedback_assente', azione: { tipo: 'archivia', feedbackId: 'f1' } } },
+  });
+  assert.equal(await esegui(['rispondi', 'D-3', '--scelta', '1'], ko.io), 0);
+  assert.match(ko.out.join('\n'), /non applicata: l'azione «archivia» \(feedback_assente\)/);
+});
+
+test('l’uso e «mostra» dicono che senza scelta la risposta resta parole', () => {
+  assert.match(leggiArgomenti(['boh']).errore, /il testo da solo resta parole e non applica niente/);
+  const testo = formattaDomanda({ id: 'D-9', stato: 'aperta', titolo: 't', opzioni: DOMANDA.opzioni }, {}, { quando: () => 'ora' });
+  assert.match(testo, /--scelta N \[--testo "…"\] \| --testo "…" \(senza --scelta solo parole: nessuna azione\)/);
+});
+
 test('rispondi, consiglio, archivia e riapri dicono al server che scrive una sessione, col suo biglietto', async () => {
   // Col token del proprietario il server non distingue: senza questo, le parole di una sessione sporca valgono come dell'owner.
   const risposte = {
