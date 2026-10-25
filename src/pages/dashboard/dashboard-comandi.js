@@ -487,16 +487,22 @@
     );
   }
 
-  // Il programma di un "/comando": un percorso fra virgolette (#968) è uno solo, anche con gli spazi.
+  // Il programma che la shell lancerebbe, sempre da cercare (#892.1): oltre i segni d'apertura e le assegnazioni, fino
+  // al primo segno che chiude la parola. «(nota) …», «ciao; …», «$5 …» non esistono e restano messaggi per Filo.
+  // SINTASSI: una riga senza programma da cercare (`$x = 1`, `X=1`, `` `date` ``); un percorso fra virgolette è uno (#968).
+  const SINTASSI = Symbol('sintassi');
   function programmaDi(t) {
+    let s = String(t).trim().slice(1).trimStart();
+    for (let prima = null; prima !== s;) {
+      prima = s;
+      s = s.replace(/^[({!&]+\s*/, '');
+      const a = s.match(/^[\p{L}_][\p{L}\p{N}_]*=("[^"]*"|'[^']*'|\S*)(\s+|$)/u);
+      if (a) { s = s.slice(a[0].length); if (!s) return SINTASSI; }
+    }
+    if (/^\$[\p{L}_{(]/u.test(s) || s.startsWith('`') || /^\[[\p{L}\p{N}_.]+\]::/u.test(s)) return SINTASSI;
     const V = global.SN_VIRGOLETTE;
-    return V ? V.primoComando(t.slice(1)) : (t.split(/\s+/)[0] || '').slice(1);
-  }
-
-  // `$x = 1`, `FOO=bar cmd`, `(cd x)`, `& "C:\x.exe"`: sintassi della shell, non un programma da cercare. Tutto il resto
-  // (anche «cos'è», «ciao,», «perché?») si cerca: se non esiste è un messaggio per Filo, e la barra lo colora così (#892.1).
-  function sintassiShell(programma) {
-    return /^[$({[&!]/.test(programma) || /^[\p{L}_][\p{L}\p{N}_]*=/u.test(programma) || /[|<>;`]/.test(programma);
+    if (V && /^["']/.test(s)) return V.primoComando(s);
+    return s.split(/[\s|<>;&(){}`]/)[0] || '';
   }
 
   // Verifica (con debounce) se il primo token è un comando shell esistente e
