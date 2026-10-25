@@ -127,12 +127,14 @@ service firebase.storage {
     }
 
     // Nessun metadato scelto da chi carica (#1518): nome di scarico, codifica, cache, lingua,
-    // chiavi personalizzate. Il codice di scarico lo aggiunge Firebase e qui non si vede; le due
-    // forme di Content-Disposition che scrive da sé passano, il nome lo fissa lui. Il `in` serve:
-    // l'emulatore non passa cacheControl né contentLanguage, e leggerli nudi negava tutto.
-    // Motore vero: tests/rules/storage-allegati-motore-vero.mjs.
+    // chiavi personalizzate. L'unica chiave ammessa è il codice di scarico: il motore vero lo scrive
+    // nei metadati PRIMA di valutare le regole, e col divieto secco nessun allegato saliva (#1666);
+    // l'emulatore lo toglie prima, quindi lì non si misura. Le due forme di Content-Disposition che
+    // Firebase scrive da sé passano, il nome lo fissa lui. Il `in` serve: l'emulatore non passa
+    // cacheControl né contentLanguage, e leggerli nudi negava tutto. Motore vero:
+    // tests/rules/storage-allegati-motore-vero.mjs; la prova che conta è un caricamento dall'app pubblicata.
     function senzaMetadatiScelti(r, file) {
-      return (r.metadata == null || r.metadata.size() == 0)
+      return (r.metadata == null || r.metadata.keys().hasOnly(['firebaseStorageDownloadTokens']))
         && (r.contentDisposition == null || r.contentDisposition == ''
           || r.contentDisposition == 'inline'
           || r.contentDisposition == "inline; filename*=utf-8''" + file)
