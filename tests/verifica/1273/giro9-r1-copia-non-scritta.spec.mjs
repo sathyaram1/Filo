@@ -47,8 +47,9 @@ test.describe('copia dell\'icona non scritta', () => {
       const id = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)
         ._filoTabs.tabs.find((t) => /archiviata\.test/.test(t.url || '')).id);
       await shell.evaluate((i) => window.filoShell.tabs.close(i), id);
-      await expect.poll(() => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((t) => t.title)), { timeout: 10_000, message: 'la scheda chiusa non è nell\'archivio' })
-        .toContain('Pagina di archiviata.test');
+      // Morbida: anche «Salva per dopo» si prova, se l'archivio manca.
+      await expect.soft(async () => expect(await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((t) => t.title)), 'la scheda chiusa non è nell\'archivio')
+        .toContain('Pagina di archiviata.test')).toPass({ timeout: 10_000 });
 
       const pagina = await openTab(`http://salvata.test:${s.porta}/b`);
       await iconaArrivata(app, 'salvata.test');
