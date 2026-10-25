@@ -95,7 +95,6 @@ test.describe('dal proxy, salvando per dopo', () => {
       await expect.poll(() => siti.richieste.proxy.some((r) => r.startsWith('img.piattaforma.test/dal-proxy.test')), { timeout: 15_000 }).toBe(true);
       const b = await conProxy('senza-icona.test');
       // Il link sulla pagina col proxy: tasto destro, «Salva per dopo» sul link.
-      await b.page.waitForTimeout(1500);
       const prima = siti.richieste.diretto.length;
       await salvaDalMenu(a.page);
       await expect.poll(() => app.evaluate(async () => (await globalThis.SN_SAVED_PAGES.list()).length), { timeout: 10_000 }).toBe(1);
