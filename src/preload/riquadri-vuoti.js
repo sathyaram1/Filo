@@ -164,7 +164,15 @@ function buildRiquadriVuotiSource(corpi) {
   function mascheraIn(w) {
     try {
       var FP = w.Function.prototype, t = FP.toString;
-      var m = { toString() { return (typeof this === 'function' && finti.get(this)) || t.apply(this, arguments); } }.toString;
+      // Una funzione nata in un altro riquadro (la pagina, con le sue maschere) la racconta il toString del suo (#1616).
+      var m = { toString() {
+        var f = typeof this === 'function' && finti.get(this);
+        if (f) return f;
+        if (typeof this === 'function') {
+          try { var casa = Object.getPrototypeOf(this); if (typeof casa === 'function' && casa !== FP && casa.toString !== m) return casa.toString.call(this); } catch (e) {}
+        }
+        return t.apply(this, arguments);
+      } }.toString;
       def(FP, 'toString', { value: comeNativo(m, t, 'toString'), writable: true, enumerable: false, configurable: true });
     } catch (e) {}
   }

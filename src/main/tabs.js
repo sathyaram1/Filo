@@ -2789,7 +2789,7 @@ class TabManager {
       try { wc.insertCSS(getContentScriptCss()); } catch (_) {}
       // GPC: gemella dell'header Sec-GPC, via executeJavaScript perché uno <script> iniettato lo
       // bloccherebbe la CSP. Segnale per il futuro: oggi il lavoro lo fa il rifiuto del banner.
-      if (this.cookieMode !== Cookies.MODES.MANUAL) {
+      if (this.cookieMode !== Cookies.MODES.MANUAL && !Cookies.senzaGpc(current)) {
         try {
           wc.executeJavaScript(
             'try{Object.defineProperty(navigator,"globalPrivacyControl",{get:function(){return true;},configurable:true});}catch(e){}',
@@ -3270,6 +3270,10 @@ class TabManager {
     };
     win.on('page-title-updated', (e) => e.preventDefault());
     pwc._filoFinestrella = true;
+    // Come per le schede: fuori produzione i log della finestrella arrivano al main.
+    if (process.env.NODE_ENV !== 'production') {
+      pwc.on('console-message', ({ level, message }) => { console.log(`[popup:${level || 'log'}] ${message}`); });
+    }
     const rientra = (b) => {
       if (!win.isDestroyed()) try { win.setBounds(dentroLoSchermo(b)); } catch (_) {}
     };
