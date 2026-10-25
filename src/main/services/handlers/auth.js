@@ -1360,7 +1360,7 @@ module.exports = function register(on, ctx) {
   // Non è un via libera cieco: il server segna l'audit come saltato e poi fa
   // partire il cancello di fusione, che può fermare tutto lo stesso. Quello che
   // torna è l'esito VERO di quel cancello, non un "fatto" generico.
-  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente', 'attesa_server', 'server_al_pc', 'rimandato', 'all_owner'];
+  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente', 'attesa_server', 'server_al_pc', 'rimandato', 'all_owner', 'mosso', 'senza_controllo'];
   on(MSG.LIVELLO4_SALTA, ownerOnly(async (msg) => {
     const feedbackId = String(msg?.feedbackId || '').trim();
     if (!feedbackId) return { ok: false, error: 'Manca la segnalazione su cui saltare il controllo.' };

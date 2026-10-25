@@ -5228,24 +5228,25 @@
     box.className = 'mg-liv-azioni';
     const fila = document.createElement('div');
     fila.className = 'mg-liv-strade';
-    for (const s of strade) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'sn-btn' + (s.primary ? '' : ' sn-btn-secondary');
-      b.id = s.id;
-      b.dataset.strada = s.key;
-      b.textContent = s.label;
-      b.title = titoloStrada(fb, s.key);
-      b.disabled = azioniInVolo;
-      b.addEventListener('click', () => applyAction(s.azione, null));
-      fila.appendChild(b);
-    }
+    for (const s of strade) fila.appendChild(tastoStrada(fb, s));
     const esito = document.createElement('span');
     esito.className = 'mg-liv-esito';
     esito.id = 'mgL5StradeEsito';
     esito.setAttribute('role', 'status');
     box.append(fila, esito);
     return box;
+  }
+  function tastoStrada(fb, s) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-btn' + (s.primary ? '' : ' sn-btn-secondary');
+    b.id = s.id;
+    b.dataset.strada = s.key;
+    b.textContent = s.label;
+    b.title = titoloStrada(fb, s.key);
+    b.disabled = azioniInVolo;
+    b.addEventListener('click', () => applyAction(s.azione, null));
+    return b;
   }
 
   // «Salta il controllo» si offre su una bocciatura dell'audit — e anche sulle
@@ -5276,9 +5277,25 @@
     server_al_pc: { kind: 'ok', text: 'Saltato. La parte del server la porta su main il tuo PC: npm run orchestra -- fusioni-server.' },
     rimandato: { kind: 'err', text: 'Saltato, ma il lavoro torna alle routine per un altro giro prima di entrare in main.' },
     all_owner: { kind: 'err', text: 'Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.' },
+    // Il salto vale per la versione che verifica e audit hanno letto (#1040.1): niente fusione e niente richiesta.
+    mosso: { kind: 'err', text: 'Dopo i controlli il ramo ha preso commit che nessuno ha letto, quindi non entra in main e non chiede il tuo via libera. Rimandala in lavorazione e un giro nuovo li leggerà.', giroNuovo: true },
+    senza_controllo: { kind: 'err', text: 'Non trovo quale versione del ramo hanno letto i controlli, e senza quella il ramo non entra in main. Rimandala in lavorazione per un giro nuovo.', giroNuovo: true },
   };
 
+  // Un esito che chiede un giro nuovo resta per pratica: la rilettura dopo l'esito ridisegna il pannello e
+  // riproporrebbe il salto. Vale finché stato e audit sono quelli su cui il server ha risposto.
+  const esitiSalta = new Map();
+  function firmaSalta(fb) {
+    const n = MR.normalizeStatus(fb);
+    const l4 = (fb && fb.livelli && fb.livelli.l4) || {};
+    return JSON.stringify([n.status, n.statusReason || '', l4.esito || '', l4.at || '']);
+  }
+
   function pannelloSaltaAudit(fb) {
+    const fermo = esitiSalta.get(fb._id);
+    const azione = fermo && fermo.firma === firmaSalta(fb) && MR.ownerActionFor(fb, 'accept', { releasedVersion });
+    if (azione) return pannelloSaltoFermo(fb, fermo.m, azione);
+    if (fermo) esitiSalta.delete(fb._id);
     const box = document.createElement('div');
     box.className = 'mg-liv-azioni';
     const btn = document.createElement('button');
@@ -5325,6 +5342,10 @@
         esito.dataset.kind = m.kind;
         esito.textContent = m.text;
         toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
+        if (m.giroNuovo) {
+          esitiSalta.set(fb._id, { m, firma: firmaSalta(fb) });
+          ridisegnaPannelloAperto();
+        }
         // L'esito cambia il pentagono e (se si è aperta una richiesta) il
         // quadrato: si rilegge tutto invece di indovinare.
         setTimeout(() => { loadMergeApprovals(); refreshFromRemote({ force: true }).catch(() => {}); }, 800);
@@ -5338,6 +5359,21 @@
     });
     box.appendChild(btn);
     box.appendChild(esito);
+    return box;
+  }
+
+  // Il salto non c'è più da proporre: prima cosa è successo, poi la strada, sotto e non dove stava il salto, così
+  // un clic in più sul punto di prima non rimanda la pratica.
+  function pannelloSaltoFermo(fb, m, azione) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.id = 'mgL4StradeEsito';
+    esito.setAttribute('role', 'status');
+    esito.dataset.kind = m.kind;
+    esito.textContent = m.text;
+    box.append(esito, tastoStrada(fb, { ...STRADE_FUSIONE.rimanda, id: 'mgL4RimandaBtn', azione }));
     return box;
   }
 
