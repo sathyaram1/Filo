@@ -232,9 +232,14 @@ async function buildMessages(action, payload, { sender = null } = {}) {
       url: payload.url, title: payload.title, outline: payload.outline,
       viewport: payload.viewport, siteKnowledge, knownPaths,
       apertaIl: payload.schedaApertaIl, paginaDal: payload.paginaDal, adesso: Date.now(),
+      valuta: payload.valuta === true ? await memoriaPerValuta() : null,
     }) };
     const parts = [];
-    const userText = payload.userMessage || testoDelTurnoAutomatico(payload);
+    // «Valuta» (#1449): il testo del campo arriva grezzo, e qui diventa la richiesta (o la coda della domanda) imbustata.
+    const campo = payload.esterno && payload.esterno.testoDaValutare;
+    const userText = campo && typeof campo.testo === 'string'
+      ? PROMPTS.richiestaValuta({ testo: campo.testo, domanda: payload.userMessage || '' })
+      : (payload.userMessage || testoDelTurnoAutomatico(payload));
     if (userText) parts.push({ type: 'text', text: userText });
     const origine = PROMPTS.origineImmaginiAiuto(payload.origineImmagini);
     if (origine) parts.push({ type: 'text', text: origine });
@@ -748,17 +753,19 @@ async function handleAIRequest({ intera = false, ...opts }) {
   return r;
 }
 
-async function chiamaIlModello({ action, payload, origin, sender = null, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null }) {
+async function chiamaIlModello({ action, payload, origin, sender = null, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null, modelloDi = null }) {
   const settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE payload.modelOverride: il modello di una funzione viene SOLO dalla configurazione
-  // effettiva, o un chiamante potrebbe imporne uno scritto nel codice.
-  const model = modelForAction(settings, action);
+  // effettiva, o un chiamante potrebbe imporne uno scritto nel codice. `modelloDi` nomina
+  // un'altra funzione di cui prendere il modello («Valuta» usa quello della chat, #1449): lo decide il main.
+  const configurata = modelloDi || action;
+  const model = modelForAction(settings, configurata);
   // Nome CONCRETO del modello primario, non il nickname: l'assistente deve poter dire che
   // modello è (#158). Un problema di configurazione invece ferma tutto subito.
   let modelName = model;
   try {
-    const ch = buildAttemptChain(settings, model, action);
+    const ch = buildAttemptChain(settings, model, configurata);
     if (ch[0] && ch[0].model) modelName = ch[0].model;
   } catch (e) {
     if (e && e.code === 'NO_MODEL_FOR_ACTION') throw e;
@@ -776,7 +783,7 @@ async function chiamaIlModello({ action, payload, origin, sender = null, onReaso
     return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
 
-  const attempts = buildAttemptChain(settings, model, action);
+  const attempts = buildAttemptChain(settings, model, configurata);
 
   // Col ragionamento o la risposta in diretta si usa lo streaming: la risposta finale è
   // identica, accumulata dai delta. I tempi del turno si contano dalla partenza.
@@ -919,6 +926,17 @@ async function lessonsBufferText() {
   const buf = await FiloMem.getLessonsBuffer();
   if (!buf.length) return '';
   return buf.map((l) => `- ${l.text}`).join('\n');
+}
+
+// Il contesto dell'utente che «Valuta» porta all'Aiuto (#1449): la stessa memoria della chat. Senza, il parere parte lo stesso.
+async function memoriaPerValuta() {
+  try {
+    const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(await FiloMem.getMemory());
+    return { profilo, preferenze, espansioni, lezioni: await lessonsBufferText() };
+  } catch (e) {
+    console.warn('[Filo] memoria per «Valuta»:', e?.message || e);
+    return {};
+  }
 }
 
 // Le lezioni che Filo si scrive da solo dopo un turno passano dalla regola di SALVA_LEZIONE: se a questo livello,

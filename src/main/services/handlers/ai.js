@@ -132,6 +132,20 @@ module.exports = function register(on, ctx) {
     return delicata;
   }
 
+  // «Valuta» dell'Aiuto (#1449) risponde col modello della chat. Se quello non vede le immagini la pagina gli arriva
+  // senza la foto: outline, indirizzo e testo del campo bastano a giudicare.
+  async function chiediValuta(payload, origin, sender) {
+    const chiedi = (p) => handleAIRequest({ action: SN_CONST.ACTIONS.HELP, payload: p, origin, sender, modelloDi: SN_CONST.ACTIONS.FILO_CHAT });
+    try {
+      return await chiedi(payload);
+    } catch (e) {
+      const FC = globalThis.SN_FILO_CONTESTO;
+      if (!payload.screenshot || !FC || !FC.rifiutaImmagini(e)) throw e;
+      const { screenshot, ...senzaFoto } = payload;
+      return chiedi(senzaFoto);
+    }
+  }
+
   const tettoAutomatiche = require('../tettoAutomatiche').crea();
   const { spingiAllaScheda } = require('../impostazioniPerOrigine');
   // Il tetto avvisa una volta per pausa, nella scheda che l'ha toccato: chi legge sa perché qualcosa si è fermato.
@@ -258,9 +272,11 @@ module.exports = function register(on, ctx) {
     const daSola = msg && msg.action === SN_CONST.ACTIONS.EXPLAIN && msg.suRichiesta !== true && AC && AC.comeAnticipata;
     // Il correttore ripete una volta la domanda la cui risposta era illeggibile (#1580): la cache la ridarebbe uguale.
     const noCache = Boolean(msg && msg.riprova === true && DEL_CORRETTORE.has(msg.action));
+    const valuta = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.valuta === true;
     const chiedi = daSola
       ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender }))
-      : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache });
+      : valuta ? () => chiediValuta(msg.payload, origin, sender)
+        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache });
     const K = globalThis.SN_WALLET_MAIN;
     const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).

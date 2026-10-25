@@ -1659,7 +1659,7 @@
     return { selection, sentence: value.trim() || selection };
   }
 
-  async function buildBaseItemsAt(mouseEvent) {
+  async function buildBaseItemsAt(mouseEvent, { senzaValuta = false } = {}) {
     const target = realTarget(mouseEvent);
     let selInfo = Extract.getSelectionWithSentence(target);
     if (!selInfo) selInfo = getInputSelectionInfo(target);
@@ -1675,7 +1675,7 @@
       Actions.getNavState(),
     ]);
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target, senzaValuta,
     });
   }
 
@@ -1862,8 +1862,9 @@
     return righe;
   }
 
-  // Su un suggerimento: il perché con la frase della pagina, la correzione se c'è, «Ignora». Mai applicato da solo.
-  function vociSuggerimento(editableEl, sugg) {
+  // Su un suggerimento: il perché con la frase della pagina, la correzione se c'è, «Ignora», e «Valuta» per il parere
+  // sul testo intero (#1449). Mai applicato da solo.
+  function vociSuggerimento(editableEl, sugg, valutaQui = null) {
     if (sugg.tipo === 'segnaposto') return vociSegnaposto(editableEl, sugg);
     if (!sugg.dubbio && (sugg.fonte === 'ragionato' || sugg.giudicatoDa === 'ragionato')) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_CONTEXT);
     const righe = [rigaDelPerche(sugg)];
@@ -1876,10 +1877,9 @@
         senzaFreccia: true,
       });
     }
-    righe.push(
-      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sugg) },
-      { type: 'separator' },
-    );
+    righe.push({ type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sugg) });
+    if (valutaQui) righe.push(buildValutaItem(valutaQui));
+    righe.push({ type: 'separator' });
     return righe;
   }
 
@@ -1905,12 +1905,14 @@
   }
 
   async function openSpellMarksMenu(editableEl, { errore, suggerimento }, mouseEvent, sito = null) {
-    const items = await buildBaseItemsAt(mouseEvent);
+    // Su un suggerimento «Valuta» sta col suggerimento, e una volta sola nel menu.
+    const valutaQui = suggerimento ? campoDaValutare(editableEl) : null;
+    const items = await buildBaseItemsAt(mouseEvent, { senzaValuta: !!valutaQui });
     const sopra = [];
     const annulla = voceAnnullaCorrezione(editableEl, mouseEvent);
     if (annulla) sopra.push(annulla, { type: 'separator' });
     if (errore) sopra.push(...vociErrore(editableEl, errore));
-    if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento));
+    if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento, valutaQui));
     const correggibile = (s) => s && !s.dubbio && (s.segno === 'errore' || (s.tipo === 'segnaposto' && !s.cercando && s.correzioni?.length));
     const tutti = voceCorreggiTutti(editableEl, 1 + [errore, suggerimento].filter(correggibile).length);
     if (tutti) sopra.push(tutti, { type: 'separator' });
@@ -2011,6 +2013,7 @@
   // fa da ancora, la zona contestuale cambia col click.
   function buildMenuItems({
     selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target = null,
+    senzaValuta = false,
   }) {
     const items = [];
 
@@ -2051,7 +2054,7 @@
     const contextItems = [
       ...vociDellaPagina(target),
       ...buildContextualItems({
-        selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
+        selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, senzaValuta,
       }),
       ...vociRiquadro,
     ];
@@ -2142,6 +2145,57 @@
       shortcut: Tasti.etichetta('Ctrl+0'),
       onClick: () => { try { zoomPagina()?.azzera(); } catch (_) {} },
     };
+  }
+
+  // «Valuta» (#1449): il campo di testo sotto il tasto destro, se c'è qualcosa da valutare. Mai una password né un pezzo
+  // di Filo. L'Aiuto vive nella pagina: un riquadro dello stesso sito (gli editor dei CMS) le passa il campo, che lei
+  // legge e corregge da sé; in quello di un altro sito la pagina non arriva, e la voce non c'è.
+  function campoDaValutare(target) {
+    if (!target || !aiutoAcceso() || !SpellCheck?.testoDelCampo) return null;
+    if (IS_SUBFRAME ? !paginaArrivaQui() : !Sidebar?.valuta) return null;
+    if (self.SN_FILO_UI?.inside?.(target)) return null;
+    let campo = target.closest?.('input, textarea') || null;
+    if (campo) {
+      if (!isEditable(campo) || Extract.campoSegreto?.(campo)) return null;
+      const tipo = String(campo.getAttribute('type') || '').toLowerCase();
+      if (campo.tagName === 'INPUT' && !['', 'text', 'search'].includes(tipo)) return null;
+    } else {
+      for (let el = target.nodeType === 1 ? target : target.parentElement; el && el.isContentEditable; el = el.parentElement) campo = el;
+    }
+    // Il testo vero si legge al clic: qui basta sapere che non è vuoto, senza misurare ogni riga del campo.
+    return campo && String(campo.value ?? campo.textContent ?? '').trim() ? campo : null;
+  }
+
+  function buildValutaItem(campo) {
+    return {
+      type: 'item',
+      label: I18n.t('menu_valuta'),
+      onClick: () => {
+        if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
+        if (!IS_SUBFRAME) { Sidebar.valuta({ campo, testo: SpellCheck.testoDelCampo(campo) }); return; }
+        // Il campo lo ritrova la pagina dal fuoco: il ponte fra i riquadri non porta elementi.
+        try { campo.focus({ preventScroll: true }); } catch (_) {}
+        openSurface('valuta', () => {});
+      },
+    };
+  }
+
+  // Ogni riquadro fra qui e la pagina è dello stesso sito: per uno di un altro sito `frameElement` è null.
+  function paginaArrivaQui() {
+    try {
+      for (let w = window; w !== w.top; w = w.parent) if (!w.frameElement) return false;
+      return true;
+    } catch (_) { return false; }
+  }
+
+  // Nella pagina: il campo del riquadro dove «Valuta» ha lasciato il fuoco.
+  function valutaDalRiquadro() {
+    let el = document.activeElement;
+    try {
+      while (el && /^(IFRAME|FRAME)$/.test(el.tagName)) el = self.SN_RIQUADRI_IN_ARRIVO?.documento(el)?.activeElement || null;
+    } catch (_) { el = null; }
+    const campo = el && el.ownerDocument !== document ? campoDaValutare(el) : null;
+    if (campo) Sidebar.valuta({ campo, testo: SpellCheck.testoDelCampo(campo) });
   }
 
   function buildHelpItem() {
@@ -2248,8 +2302,10 @@
   // casella input / niente.
   function buildContextualItems({
     selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
+    senzaValuta = false,
   }) {
     const items = [];
+    const valutaQui = editable && !senzaValuta ? campoDaValutare(target) : null;
 
     if (selInfo && editable) {
       items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
@@ -2265,6 +2321,7 @@
         label: I18n.t('menu_edit_selection'),
         onClick: () => EditBox.openEditBox(selInfo.selection),
       });
+      if (valutaQui) items.push(buildValutaItem(valutaQui));
       return items;
     }
 
@@ -2362,6 +2419,7 @@
     if (editable) {
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
+      if (valutaQui) items.push({ type: 'separator' }, buildValutaItem(valutaQui));
       return items;
     }
 
@@ -2530,6 +2588,7 @@
         if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
         else if (msg.surface === 'redteam') { if (redteamVisibile) self.SN_REDTEAM_ATTACK_UI?.open(); }
         else if (msg.surface === 'help') openHelpSidebar();
+        else if (msg.surface === 'valuta') valutaDalRiquadro();
         else MenuIcons.runIconAction(msg.iconId);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
       // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).

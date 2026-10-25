@@ -11,6 +11,7 @@
     {
       version: '0.2.250', date: '2026-10-23',
       features: [
+        'Col tasto destro su un campo dove stai scrivendo c\'è «Valuta». L\'Aiuto legge tutto il testo e ti segnala errori, frasi poco chiare, un tono sbagliato e fatti dubbi. Ogni correzione che propone la scrivi nel campo con un clic, e con un altro clic la togli.',
         'Un\'immagine che trascini dentro Filo entra nella chat dovunque la lasci. Nella home va nella casella da qualunque punto della pagina, che si accende mentre la trascini. Su un sito si apre l\'Aiuto con l\'immagine già allegata, salvo che il sito la voglia per sé, come una pagina che carica file. Nell\'Aiuto ora la puoi anche incollare.',
       ],
       fixes: [
