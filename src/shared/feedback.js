@@ -48,6 +48,20 @@
     return `${COLLECTION}/${et ? `${et}_` : ''}${Date.now()}_${uuid()}.${ATTACHMENT_EXT}`;
   }
 
+  // La voce di `files[]` come la ammettono le regole (documentoAllegato in firestore.rules): solo url, nome e tipo,
+  // nei tetti. Un nome oltre il tetto perde la parte centrale, non l'estensione; un tipo oltre il tetto non è un tipo.
+  const VOCE_DOCUMENTO = Object.freeze({ NOME_MAX: 500, TIPO_MAX: 255 });
+  function voceDocumento(url, name, type) {
+    let nome = Array.from(String(name || 'allegato'));
+    if (nome.length > VOCE_DOCUMENTO.NOME_MAX) {
+      const punto = nome.lastIndexOf('.');
+      const ext = punto > 0 && nome.length - punto <= 20 ? nome.slice(punto) : [];
+      nome = nome.slice(0, VOCE_DOCUMENTO.NOME_MAX - ext.length - 1).concat('…', ext);
+    }
+    const tipo = String(type || '');
+    return { url: String(url), name: nome.join(''), type: tipo.length <= VOCE_DOCUMENTO.TIPO_MAX ? tipo : '' };
+  }
+
   // Host → inizi ammessi, NOME DEL DEPOSITO compreso: REST di Firebase e diretto di Storage.
   // I nomi del deposito sono due: senza quello storico un allegato vecchio non si apre più.
   const DEPOSITI = [BUCKET, `${PROJECT_ID}.appspot.com`];
@@ -616,7 +630,7 @@
         // S1.2: cifra anche gli allegati non-immagine.
         const blobToUpload = await sealForUpload(rawBlob);
         const u = await uploadImage(blobToUpload); // upload generico (usa blob.type)
-        uploadedFiles.push({ url: u.url, name: fname, type: String(f.type || rawBlob.type || '') });
+        uploadedFiles.push(voceDocumento(u.url, fname, f.type || rawBlob.type || ''));
       } catch (e) {
         if (isEncryptionError(e)) throw e; // come sopra: si ferma tutto
         console.warn('[SN feedback] upload file fallito:', e);
@@ -822,7 +836,7 @@
   const CAMPI_LISTA = [
     'archiveOverride', 'attesa', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
     'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
-    'clientIdHash', 'createdAt', 'domandaId', 'fiducia', 'fiduciaDa', 'genitori', 'localApproval', 'localMerges', 'localOnly',
+    'clientIdHash', 'createdAt', 'domandaId', 'domandeBloccanti', 'fiducia', 'fiduciaDa', 'genitori', 'localApproval', 'localMerges', 'localOnly',
     'mittenteClasse', 'mittenteRuolo', 'name', 'parentId', 'pipeline',
     'priority', 'priorityManual', 'reopenRequests', 'resolvedAt',
     'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'senderProof', 'seq', 'stalls',
@@ -2130,6 +2144,8 @@
     attachmentPath,
     ATTACHMENT_CONTENT_TYPE,
     ATTACHMENT_EXT,
+    VOCE_DOCUMENTO,
+    voceDocumento,
     isAttachmentUrl,
     attachmentFetchHeaders,
     // La scritta di un collegamento che arriva da fuori: dice dove si va (#582).

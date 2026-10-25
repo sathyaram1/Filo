@@ -1,5 +1,5 @@
-// Cookie e consenso, lato main: GPC, blocco dei tracker, partizione per sito, wipe mirato.
-// Modalità in settings.security.cookies.mode: manual, default, privacy.
+// Cookie e consenso, lato main: GPC (non sulle pagine di accesso dei provider noti, senzaGpc), client hints,
+// blocco dei tracker, partizione per sito, wipe mirato. Modalità in settings.security.cookies.mode: manual, default, privacy.
 // Banner CMP ed embed YouTube stanno in src/content/cookies.js; l'iniezione GPC in tabs.js.
 
 'use strict';
@@ -7,6 +7,7 @@
 const { session } = require('electron');
 const Sito = require('../../shared/stessoSito');
 const Google = require('../../shared/dominiGoogle');
+const { completaClientHints } = require('./clientHints');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
@@ -175,6 +176,23 @@ function sessioneEffimera(site) {
 
 const gpcState = new WeakMap(); // session → { enabled }
 
+// Le pagine di accesso dei provider noti (la lista dell'esenzione anti-fingerprint) non ricevono il GPC, né l'header
+// né la proprietà in tabs.js: con quel segnale Google respinge l'accesso in un profilo nuovo (#1616). Altrove resta.
+function senzaGpc(href) {
+  try {
+    require('../../shared/authPopup');
+    const A = globalThis.SN_AUTH_POPUP;
+    return !!(A && A.isIdentityAuthSurface(String(href || '')));
+  } catch (_) { return false; }
+}
+
+// Le risorse che la pagina di accesso carica da altri host (script, immagini) contano come la pagina: si guarda il frame
+// che chiede. Non per una navigazione: lì il frame è ancora sulla pagina che si lascia, e conta solo la meta.
+function urlDelFrame(details) {
+  if (!details || details.resourceType === 'mainFrame' || details.resourceType === 'subFrame') return '';
+  try { return (details.frame && details.frame.url) || ''; } catch (_) { return ''; }
+}
+
 // Registra il listener se manca, SENZA toccare lo stato GPC.
 function ensureHeaderHook(ses) {
   if (!ses || !ses.webRequest) return null;
@@ -184,8 +202,8 @@ function ensureHeaderHook(ses) {
     gpcState.set(ses, state);
     ses.webRequest.onBeforeSendHeaders((details, callback) => {
       const s = gpcState.get(ses);
-      let headers = details.requestHeaders;
-      if (s && s.enabled) headers = { ...headers, 'Sec-GPC': '1' };
+      const headers = /^(https?|wss?):/i.test(details.url) ? completaClientHints(details.requestHeaders) : { ...details.requestHeaders };
+      if (s && s.enabled && !senzaGpc(details.url) && !senzaGpc(urlDelFrame(details))) headers['Sec-GPC'] = '1';
       callback({ requestHeaders: headers });
     });
   }
@@ -781,6 +799,8 @@ module.exports = {
   partitionForTab,
   ensureHeaderHook,
   applyGpc,
+  senzaGpc,
+  urlDelFrame,
   applyTrackerBlocking,
   coverAdblock,
   ensureRequestHook,

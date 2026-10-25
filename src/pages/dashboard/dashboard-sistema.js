@@ -111,6 +111,12 @@
     cambiaVisibili(Sis().vociVisibili(settings));
   }
 
+  // I gesti sul riquadro (#1471): per voce, come la si apre o la si trascina, e i comandi dati da qui.
+  function contaGesto(campi) {
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'gesto', ...campi })).catch(() => {}); } catch (_) {}
+  }
+  const contaVoce = (voce, come) => contaGesto({ gesto: 'riquadro_sistema', voce, come });
+
   function creaVoce(v) {
     const el = document.createElement('div');
     el.className = 'dash-sis-voce';
@@ -124,14 +130,16 @@
     const testo = document.createElement('span');
     testo.className = 'dash-sis-testo';
     el.append(icona, testo);
-    el.addEventListener('click', () => apriBox(v, el));
+    el.addEventListener('click', () => { contaVoce(v, 'clic'); apriBox(v, el); });
     el.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      contaVoce(v, 'tasto_destro');
       apriBox(v, el, { x: e.clientX, y: e.clientY });
     });
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
+        contaVoce(v, 'tastiera');
         apriBox(v, el);
       }
     });
@@ -141,6 +149,13 @@
       if (!d || !e.dataTransfer) { e.preventDefault(); return; }
       e.dataTransfer.setData('text/plain', d.copia);
       e.dataTransfer.effectAllowed = 'copy';
+      global.SN_GESTI?.marca(e.dataTransfer, 'voce_sistema');
+    });
+    // Presa da una chat, la voce è trascinata in chat; lasciata dove nessuno la prende, un trascinamento a vuoto.
+    el.addEventListener('dragend', (e) => {
+      const ev = global.SN_GESTI && global.SN_GESTI.fine(e, 'voce_sistema');
+      if (ev) contaGesto(ev);
+      else if (global.SN_GESTI) contaVoce(v, 'trascina_in_chat');
     });
     if (v === 'ora') host.append(el, riga);
     else riga.appendChild(el);
@@ -303,6 +318,7 @@
     const questo = box;
     inAttesa(opt, true);
     const r = await comanda(richiesta);
+    if (r.ok && questo) contaVoce(questo.voce, 'comando_dato');
     if (!questo || box !== questo) return;
     inAttesa(opt, false);
     // L'annuncio del nuovo stato può arrivare mentre l'opzione aspettava: la si rietichetta adesso.
@@ -322,6 +338,7 @@
       const n = volumeVoluto;
       volumeVoluto = null;
       const r = await comanda({ cosa: 'volume', livello: n });
+      if (r.ok) contaVoce('volume', 'comando_dato');
       if (box && box === questo) mostraErrore(questo.errore, r.ok ? null : r);
       if (!r.ok) volumeVoluto = null;
     }

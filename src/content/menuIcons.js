@@ -179,13 +179,13 @@
     if (setLayout(v)) { try { redrawIconRows(); } catch (_) {} }
   }
 
-  // Il drop si vede subito qui, poi vale quello che il main ha scritto.
-  function applyIconDrop({ id, target, beforeId }) {
+  // Il drop si vede subito qui, poi vale quello che il main ha scritto. `source` 'bar': arriva dalla barra laterale.
+  function applyIconDrop({ id, source, target, beforeId }) {
     if (!id) return;
     const locale = Disp.applicaPosa(getIconLayout(), { id, target, beforeId: beforeId || null });
     if (locale) setLayout(locale);
     try {
-      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.ICON_LAYOUT_DROP, id, target, beforeId: beforeId || null }))
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.ICON_LAYOUT_DROP, id, source: source === 'bar' ? 'bar' : 'menu', target, beforeId: beforeId || null }))
         .then((r) => { if (r && r.ok) layoutCambiato(r.layout); })
         .catch(() => {});
     } catch (_) {}

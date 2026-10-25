@@ -777,7 +777,13 @@ verifica l'identità, scrive `livelli.l4 = { esito: saltato, by: owner, at }`
 conservando il testo del fail, segna nello stato del giro `secauditVerdict:
 saltato` (che il cancello tratta come `pass`) e lancia subito L5 sul ramo come
 per un'approvazione; l'esito torna al chiamante (`fuso`, `bloccato` con
-richiesta aperta, `conflitto`, `ramo assente`). Un lavoro server non si fonde
+richiesta aperta, `conflitto`, `ramo assente`). Prima di tutto questo confronta
+la punta del ramo col commit verificato e con quello esaminato dall'audit,
+scritti nello stato del giro (#1040.1): se la
+punta è un'altra risponde `mosso`, se il giro non li ha `senza_controllo`, e in
+tutti e due i casi non scrive il salto, non lancia L5 e non apre richieste: un
+commit arrivato dopo i controlli non entra in main senza che nessuno l'abbia
+letto. Un lavoro server non si fonde
 da lì (#1230): la pratica torna in revisione e passa dal cancello del server,
 prima l'app e poi il server (esiti in più: `attesa_server`, `server_al_pc`,
 `rimandato`, `all_owner`); allo stesso modo il sì a un suo blocco L5 la chiude
@@ -807,12 +813,18 @@ ma a scriverlo è il server.
      moltiplicano, e un freno che si azzera a ogni riavvio non frena. Il cron
      pubblica ogni sei ore: nessuno dei due tetti intralcia l'uso onesto;
   3. legge `package.json` **da `main`, via API**, col suo `sha` di blob;
-  4. **calcola lui** il numero successivo (aumento della patch). Nessun numero
-     che arrivi dal chiamante viene letto;
+  4. **calcola lui** il numero successivo: l'aumento della patch, o il campo
+     di primo livello `prossimaVersione` del manifesto quando c'è (un salto
+     come 0.3.0, dichiarato una volta dal repo). Il campo dev'essere `a.b.c` e
+     più alto della versione, a confronto fra numeri; se no si rifiuta
+     (`bad_next_version`) e non si scrive niente. Nessun numero che arrivi dal
+     chiamante viene letto;
   5. **costruisce lui** il contenuto nuovo partendo da quello vecchio, e
      verifica due volte che cambi SOLO la versione (una riga sola diversa nel
-     testo; manifesto identico una volta riletto come dati). Se una delle due
-     non torna, non si scrive niente;
+     testo; manifesto identico una volta riletto come dati). Col campo, nello
+     stesso commit sparisce anche la sua riga (un secondo commit passerebbe
+     per codice nuovo da pubblicare) e il JSON resta valido. Se una delle due
+     verifiche non torna, non si scrive niente;
   6. scrive il commit `release: vX.Y.Z [skip ci]` con l'identità dell'App,
      legandolo allo `sha` del blob letto: se `main` si è mossa nel mezzo,
      GitHub risponde 409 e non si scrive.
@@ -825,7 +837,8 @@ ma a scriverlo è il server.
   pubblicazione costruisce il commit **provato dalla suite**, non la punta di
   `main` (#641): `scripts/release-apply-version.mjs` applica quel numero in
   locale al suo manifesto, senza commit né push, e si ferma se non è più alto
-  di quello dell'albero. Il tag nasce sul commit costruito (`--target`).
+  di quello dell'albero o se l'albero ne dichiara un altro in
+  `prossimaVersione`. Il tag nasce sul commit costruito (`--target`).
 - Nel lavoro di pubblicazione non è rimasto **nessun** `git push`, `git commit`
   o `npm version`, e una sentinella negli unit test diventa rossa se ci tornano.
 

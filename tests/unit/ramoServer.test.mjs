@@ -358,6 +358,7 @@ async function fondi(sc, radice, primaDelServer = () => {}, argv = [RAMO, '--fee
       env: {}, radice, funzioni: join(sc.server, 'functions'), bearer: 'finto', base: FIRESTORE_BASE, ramiAperti: () => [],
       // Un lavoro locale di prima del registro dei rami (#1159): vale la verifica, come qui si prova.
       lavoroDelRamo: async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: '' }),
+      registraMain: async () => ({ outcome: 'registrato' }),
       log: (x) => righe.push(String(x)), err: (x) => righe.push(String(x)),
       lancia: (_cartella, args) => {
         primaDelServer();

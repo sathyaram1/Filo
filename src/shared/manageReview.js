@@ -482,6 +482,13 @@
         const num = o && typeof o === 'object' ? String(o.num || '').trim() : '';
         return { text: `Aspetta la fusione di ${num || 'il feedback da cui nasce'}, poi entra in coda da solo.`, color: null };
       }
+      // Un non fidato che i giudici non hanno visto (#1515): è fermo per l'owner, non in attesa del giudizio.
+      if (statusReason === 'budget_giudici' || statusReason === 'lunghezza_giudici') {
+        const perche = statusReason === 'budget_giudici'
+          ? 'Non giudicato, perché oggi i giudici dei non fidati hanno già speso il tetto.'
+          : 'Non giudicato, perché è troppo lungo per i giudici.';
+        return { text: `${perche} Leggilo e decidi tu, o mandalo ai giudici lo stesso con «Ri-valuta i non filtrati».`, color: null };
+      }
       if (panelComplete(fb)) {
         const worst = worstVerdictBlock(fb);
         if (worst) {
@@ -493,6 +500,9 @@
       }
       const p = fb && fb.pipeline;
       const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
+      // Fermata prima dei giudici: il perché lo scrive il server nella scheda del filtro d'ingresso.
+      const sch = verdicts.length ? null : schedaIngresso(fb);
+      if (sch && sch.breve) return { text: `${sch.breve}.`, color: sch.classe ? LIVELLO_COLORI[sch.classe] : null };
       if (!verdicts.length) return { text: 'In attesa del giudizio.', color: null };
       const missing = Math.max(0, panelSize(p) - verdicts.length);
       return { text: `Panel incompleto: ${missing} giudic${missing === 1 ? 'e' : 'i'} senza verdetto.`, color: null };
@@ -520,6 +530,9 @@
     guasto: 'fermo per un guasto',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
+    // #1515: i due motivi con cui il server lascia un non fidato all'owner senza giudici.
+    budget_giudici: 'tetto di spesa dei giudici raggiunto',
+    lunghezza_giudici: 'troppo lungo per i giudici',
   };
   function reasonText(statusReason) {
     const k = String(statusReason || '');
@@ -557,21 +570,32 @@
     // Un'attesa con la sua domanda (SPEC-DOMANDE §3.8): si risponde nella domanda, il lavoro sta in coda col segno.
     if (tab === 'inbox' && aspettaDomanda(fb)) return 'queue';
     // Il segno dei lavori server non sposta di scheda (#1575): lo dice l'etichetta «server» sulla riga.
-    // Chi aspetta un feedback non ancora fuso la coda non lo dà a nessuno (#903): sta fra quelli che aspettano.
-    if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && aspettaAncora(fb, opts)) return 'waiting';
+    // Chi aspetta un feedback non ancora fuso (#903), o una domanda aperta che lo ferma (#1577), la coda non lo dà a
+    // nessuno: sta fra quelli che aspettano.
+    if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && (aspettaAncora(fb, opts) || fermoSuDomanda(fb))) return 'waiting';
     return tab;
   }
 
   // Le attese che aprono una domanda (functions/src/domande/attese.js): mai i blocchi di sicurezza né `fidato`.
   const ATTESE_CON_DOMANDA = {
-    design: ['clarify', 'decisione', 'loop', 'arenato', 'locale', 'attesa_chiusa'],
+    design: ['clarify', 'decisione', 'loop', 'arenato', 'locale', 'attesa_chiusa', 'guasto'],
     aligned: ['origine_chiusa', 'origine_mancante'],
   };
   const DOMANDA_ID_RE = /^D-[1-9]\d{0,8}$/;
 
-  /** L'id della domanda che questo feedback aspetta (`D-12`), o ''. PURA. */
+  /** Le domande aperte che fermano questo feedback in coda (#1577): le scrive il server in `domandeBloccanti`. PURA. */
+  function domandeBloccantiDi(fb) {
+    const l = fb && fb.domandeBloccanti;
+    return Array.isArray(l) ? l.map(String).filter((id) => DOMANDA_ID_RE.test(id)) : [];
+  }
+  function fermoSuDomanda(fb) {
+    return !!fb && !statusUnreadable(fb) && STATI_CHE_ASPETTANO.includes(normalizeStatus(fb).status) && domandeBloccantiDi(fb).length > 0;
+  }
+
+  /** L'id della domanda che questo feedback aspetta (`D-12`), o '': quella della sua attesa, o la prima che lo ferma in coda. PURA. */
   function aspettaDomanda(fb) {
     if (!fb || statusUnreadable(fb)) return '';
+    if (fermoSuDomanda(fb)) return domandeBloccantiDi(fb)[0];
     const id = String(fb.domandaId || '');
     if (!DOMANDA_ID_RE.test(id)) return '';
     const { status, statusReason } = normalizeStatus(fb);
@@ -1027,6 +1051,8 @@
         return 'Un modello dei giudici non è valido o non esiste più: controlla i modelli in Automazioni, fra i Modelli di supporto.';
       case 'timeout':
         return 'I giudici non hanno risposto in tempo: alza il "Timeout dei giudici" in Automazioni se usi modelli lenti.';
+      case 'non_decifrabile':
+        return 'Il server non riesce ancora a decifrare il feedback: l’allarme dice cosa riparare.';
       default:
         return null;
     }
@@ -1049,29 +1075,11 @@
     locale:  LOCALE.color,           // azzurro — chiede lavoro locale
   };
 
-  // Perché il filtro d'ingresso ha deciso così. Un codice che questa tabella non conosce si
-  // scrive lo stesso, coi trattini bassi sciolti: un motivo grezzo dice più di uno nascosto.
+  // I motivi delle pratiche fermate prima che il server componesse lui le righe del triangolo
+  // (pipeline.ingresso): solo codici che manda davvero. Uno che la tabella non conosce si scrive
+  // lo stesso, coi trattini bassi sciolti: un motivo grezzo dice più di uno nascosto.
   const L1_MOTIVI = {
     linked_prior_attack: 'collegato a un attacco precedente',
-    prior_attack: 'chi l’ha scritta aveva già tentato un attacco',
-    flagged_identity: 'identità già segnalata',
-    blocked_identity: 'identità bloccata',
-    new_account: 'account nuovo',
-    new_account_vpn: 'account nuovo da VPN',
-    vpn: 'connessione da VPN',
-    obfuscation: 'offuscamento',
-    encoding: 'testo codificato per nascondere il contenuto',
-    instruction_override: 'prova a scavalcare le istruzioni',
-    prompt_injection: 'tentativo di iniezione di istruzioni',
-    secrets: 'chiede chiavi o segreti',
-    rate_limit: 'troppe segnalazioni in poco tempo',
-    flood: 'troppe segnalazioni in poco tempo',
-    duplicate: 'già inviata',
-    too_long: 'testo fuori misura',
-    empty: 'testo vuoto',
-    link_spam: 'pieno di link',
-    gibberish: 'testo senza senso',
-    suspicious_file: 'allegato sospetto',
     origine_bloccata: 'il feedback da cui nasce è stato bloccato',
   };
   function l1MotivoText(code) {
@@ -1145,10 +1153,59 @@
     return righe;
   }
 
-  // Livello 1: il filtro d'ingresso (identità, forma, indizi).
+  /**
+   * La scheda del filtro d'ingresso che compone il server (`pipeline.ingresso`): righe, testo reso leggibile coi
+   * punti segnati, colore, se si può ri-giudicare e una frase breve per la lista. Qui si ripulisce e basta: cosa
+   * vuol dire lo sa solo il server. null se manca o è storta. PURA.
+   */
+  function schedaIngresso(fb) {
+    const p = fb && fb.pipeline;
+    const s = p && typeof p === 'object' ? p.ingresso : null;
+    if (!s || typeof s !== 'object' || !Array.isArray(s.righe)) return null;
+    const str = (v) => String(v == null ? '' : v);
+    const parti = (Array.isArray(s.parti) ? s.parti : [])
+      .filter((x) => x && typeof x === 'object' && Array.isArray(x.segmenti))
+      .map((x) => ({
+        titolo: str(x.titolo),
+        segmenti: x.segmenti
+          .filter((g) => g && typeof g === 'object' && str(g.t))
+          .map((g) => (str(g.nota).trim() ? { t: str(g.t), nota: str(g.nota) } : { t: str(g.t) })),
+      }))
+      .filter((x) => x.segmenti.length);
+    return {
+      classe: Object.hasOwn(LIVELLO_COLORI, s.classe) ? s.classe : null,
+      esito: str(s.esito).trim(),
+      breve: str(s.breve).trim(),
+      rigiudica: s.rigiudica === true,
+      righe: s.righe.filter((r) => r && typeof r === 'object').map((r) => riga(r.etichetta, r.valore)),
+      parti,
+    };
+  }
+
+  /**
+   * Ri-giudica si offre su una pratica fermata prima dei giudici, ancora nelle mani della pipeline: per quelle con
+   * la scheda lo dice il server, per le vecchie basta lo stadio L1 senza il segno (che ha il suo gesto). PURA.
+   */
+  function rigiudicabile(fb) {
+    if (!fb || statusUnreadable(fb)) return false;
+    if (!['unlabeled', 'attack', 'spam'].includes(normalizeStatus(fb).status)) return false;
+    const sch = schedaIngresso(fb);
+    if (sch) return sch.rigiudica;
+    const p = fb.pipeline;
+    return !!(p && typeof p === 'object' && p.stage === 'L1' && !fermatoDalSegno(fb));
+  }
+
+  /** Livello 1: il filtro d'ingresso. Con la scheda del server si mostrano le sue righe e il suo testo. PURA. */
   function livelloL1(fb) {
     const titolo = 'Filtro d’ingresso';
     const p = (fb && fb.pipeline && typeof fb.pipeline === 'object') ? fb.pipeline : null;
+    const azioni = rigiudicabile(fb) ? ['rigiudica'] : [];
+    const sch = schedaIngresso(fb);
+    if (sch) {
+      return forma('l1', 'triangolo', titolo, sch.classe, sch.esito || (sch.classe ? 'fatto' : 'assente'), {
+        titolo, righe: sch.righe.concat(righeStato(fb)), testo: '', azioni, parti: sch.parti,
+      });
+    }
     const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
     // Senza categoria ma coi verdetti dei giudici: L2 gira solo se L1 ha fatto passare, quindi
     // «pulito» è un fatto dedotto, non un'ipotesi.
@@ -1170,7 +1227,7 @@
     righe.push(riga('Chi ha deciso', 'il filtro automatico, prima dei giudici'));
     if (azione) righe.push(riga('Cosa ha fatto', L1_AZIONI[azione] || azione.replace(/_/g, ' ')));
     return forma('l1', 'triangolo', titolo, cat.classe, cat.esito, {
-      titolo, righe: righe.concat(righeStato(fb)), testo: '', azioni: [],
+      titolo, righe: righe.concat(righeStato(fb)), testo: '', azioni,
     });
   }
 
@@ -1677,6 +1734,10 @@
     }
     const worst = worstVerdictBlock(fb);
     if (status === 'unlabeled') {
+      const sch = schedaIngresso(fb);
+      if (sch && sch.breve && !(Array.isArray(p.verdicts) && p.verdicts.some((v) => v && v.class))) {
+        return out('triangolo', 'l1', sch.classe, sch.breve);
+      }
       if (panelComplete(fb) && worst) return out('cerchio', 'l2', worst.reason, `Un giudice l’ha segnalata come ${worst.label.toLowerCase()}`);
       const nota = judgesNote(fb);
       return out('cerchio', 'l2', null, (nota && nota.text) ? nota.text.replace(/\.$/, '') : 'Non filtrato: manca il verdetto di un giudice');
@@ -1867,8 +1928,8 @@
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
     fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
-    l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
-    aspettaRisposta, aspettaDomanda, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
+    l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, schedaIngresso, rigiudicabile,
+    aspettaRisposta, aspettaDomanda, domandeBloccantiDi, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
     SEZIONI, sezioneDiScheda, schedaPredefinita, schedaDaIndirizzo, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,

@@ -4,7 +4,7 @@
 
 const { ipcMain, BrowserWindow, app, session } = require('electron');
 const path = require('node:path');
-const { handleMessage, handleStream, broadcastToTabs } = require('./services/handlers');
+const { handleMessage, handleStream, broadcastToTabs, decisioneComandoAMano, contaSe } = require('./services/handlers');
 const { showPopupMenu } = require('./popup-menu');
 const MenuDiRiserva = require('./menuDiRiserva');
 const { showTooltip, hideTooltip } = require('./popup-tooltip');
@@ -27,6 +27,8 @@ const inFlightStreams = new Map(); // requestId → AbortController
 // processo (variabili, $env, cwd persistono). Muore alla chiusura della scheda.
 const shellSessions = new Map(); // webContents.id → sessione shell persistente
 const comandiInCorso = new Map(); // webContents.id → chiude la carta del comando nella home (#870)
+const comandiDaConfermare = new Map(); // gettone → { chi, comando, scade }: il sì della persona a un comando scritto a mano (#892.1)
+const CONFERMA_COMANDO_MS = 10 * 60 * 1000;
 
 // La finestra di Filo di cui `wc` è la barra, o null. Essere il frame principale di una
 // finestra non basta: un popup di accesso è una finestra vera con dentro un sito (#589.3).
@@ -228,6 +230,9 @@ function registerIpcHandlers() {
     require('./services/permessiPagine').schermoVecchio(event.sender, event.senderFrame);
     event.returnValue = true;
   });
+  // #1608 — la diagnostica delle passkey, che scrive solo se acceso da chi lancia Filo (services/diagnosiPasskey.js).
+  require('./services/diagnosiPasskey').avvia();
+  ipcMain.on('filo:passkey-diagnosi', (event, testo) => { require('./services/diagnosiPasskey').registra(event, testo); });
   ipcMain.on('filo:apertura-scelta', (event, url, azione) => {
     require('./services/permessiPagine').aperturaScelta(event.sender, url, azione);
     event.returnValue = true;
@@ -419,7 +424,33 @@ function registerIpcHandlers() {
   // Esegue un comando in streaming su una shell PERSISTENTE per scheda. SOLO
   // per le pagine interne fidate (filo://): le pagine web esterne NON devono
   // poter avviare una shell.
-  ipcMain.handle('shell:start', (event, { execId, command, cwd, shell, chat } = {}) => {
+  // #892.1 — un comando scritto a mano passa dai livelli di autonomia come quelli di Filo. La pagina chiede qui
+  // cosa serve prima di mostrarlo; `shell:start` rifà la stessa domanda, e quello che chiede parte solo col gettone.
+  const cartellaDellaSessione = (key, shell, cwd) => {
+    const s = shellSessions.get(key);
+    return s && !s.dead && s.shell === resolveShell(shell) ? s.cwd : cwd;
+  };
+  ipcMain.handle('shell:vaglia', async (event, { command, cwd, shell, daFuori } = {}) => {
+    if (!(event.sender.getURL() || '').startsWith('filo://')) return { ok: false, error: 'forbidden' };
+    if (typeof command !== 'string') return { ok: false, error: 'bad-args' };
+    const v = await decisioneComandoAMano({ comando: command, cwd: cartellaDellaSessione(event.sender.id, shell, cwd), shell: resolveShell(shell), daFuori: daFuori === true });
+    if (v.risposta === 'si') { contaSe('confermaDecisa', 'ESEGUI_COMANDO', v.contati, 'automatica'); return { ok: true, risposta: 'si' }; }
+    if (v.risposta === 'no') { contaSe('confermaDecisa', 'ESEGUI_COMANDO', v.contati, 'negata'); return { ok: true, risposta: 'no', no: v.no }; }
+    const gettone = `comando:${require('node:crypto').randomBytes(12).toString('hex')}`;
+    const ora = Date.now();
+    for (const [g, c] of comandiDaConfermare) if (c.scade < ora) comandiDaConfermare.delete(g);
+    comandiDaConfermare.set(gettone, { chi: event.sender.id, comando: command.trim(), daFuori: daFuori === true, scade: ora + CONFERMA_COMANDO_MS });
+    contaSe('confermaChiesta', gettone, 'ESEGUI_COMANDO', v.contati);
+    return { ok: true, risposta: v.risposta, digita: v.digita === true, parti: v.parti, gettone };
+  });
+  ipcMain.on('shell:annulla', (event, { gettone } = {}) => {
+    const c = comandiDaConfermare.get(gettone);
+    if (!c || c.chi !== event.sender.id) return;
+    comandiDaConfermare.delete(gettone);
+    contaSe('confermaRisposta', gettone, 'rifiutata');
+  });
+
+  ipcMain.handle('shell:start', async (event, { execId, command, cwd, shell, chat, gettone, daFuori } = {}) => {
     const url = event.sender.getURL() || '';
     if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
     if (!execId || typeof command !== 'string') return { ok: false, error: 'bad-args' };
@@ -427,6 +458,19 @@ function registerIpcHandlers() {
       try { event.sender.send(`shell:${execId}:${suffix}`, data); } catch (_) {}
     };
     const key = event.sender.id;
+    // Un comando incollato resta incollato fino alla partenza: il gettone ricorda com'era quando è stato chiesto.
+    const daFuoriAllaDomanda = !!(gettone && comandiDaConfermare.get(gettone)?.daFuori);
+    const v = await decisioneComandoAMano({ comando: command, cwd: cartellaDellaSessione(key, shell, cwd), shell: resolveShell(shell), daFuori: daFuori === true || daFuoriAllaDomanda });
+    if (v.risposta !== 'si') {
+      const c = gettone ? comandiDaConfermare.get(gettone) : null;
+      const valido = v.risposta !== 'no' && !!c && c.chi === key && c.comando === command.trim() && c.scade >= Date.now();
+      if (!valido) {
+        send('error', { message: v.risposta === 'no' ? v.no : 'Questo comando aspetta la tua conferma: premi di nuovo Invio.' });
+        return { ok: false, error: 'conferma' };
+      }
+      comandiDaConfermare.delete(gettone);
+      contaSe('confermaRisposta', gettone, 'approvata');
+    }
     // La shell EFFETTIVA su questo sistema: fuori da Windows «powershell» e
     // «cmd» non esistono e diventano la shell di sistema. Si confronta quella,
     // non quella chiesta, altrimenti su Linux e Mac la sessione risulterebbe

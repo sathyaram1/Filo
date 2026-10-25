@@ -71,6 +71,12 @@
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
+  // Tetto di spesa e lunghezza dei giudici per i non fidati (#1515): un campo per chiave della risposta del main.
+  const mgJudgeCampi = {
+    tettoUsd: ['mgJudgeBudget', 'mgJudgeBudgetSave', 'mgJudgeBudgetRimetti', 'mgJudgeBudgetMsg'],
+    maxCaratteri: ['mgJudgeChars', 'mgJudgeCharsSave', 'mgJudgeCharsRimetti', 'mgJudgeCharsMsg'],
+  };
+  for (const k of Object.keys(mgJudgeCampi)) mgJudgeCampi[k] = mgJudgeCampi[k].map((id) => document.getElementById(id));
 
   const mgLogLoading = document.getElementById('mgLogLoading');
   const mgLogDenied  = document.getElementById('mgLogDenied');
@@ -380,7 +386,7 @@
   function caricaImpostazioni() {
     // Le pause non trattengono gli altri controlli «in lettura»: sono una riga in più, non un valore da scegliere.
     loadPause();
-    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals()])
+    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadJudgeBudget(), loadMergeApprovals()])
       .finally(fineLetturaAutomazioni);
   }
 
@@ -646,7 +652,8 @@
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
       mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
-      mgAccountA, mgAccountB, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove)]) {
+      mgAccountA, mgAccountB, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
+      ...Object.values(mgJudgeCampi).flatMap(([input, salva, rimetti]) => [input, salva, rimetti])]) {
       if (el) el.disabled = !isAdmin;
     }
   }
@@ -1345,6 +1352,62 @@
   }
   if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.addEventListener('click', saveJudgeTimeout);
   if (mgJudgeTimeout) mgJudgeTimeout.addEventListener('input', () => setJudgeTimeoutMsg('', null));
+
+  // Tetto di spesa e lunghezza dei giudici per i non fidati (#1515). Regole in SN_SPESA_GIUDICI, comportamento del
+  // campo (Invio, uscita dal campo, «Rimetti com'era») in SN_CAMPO_NUMERO; la spesa di oggi la scrive solo il server.
+  const JUDGE_BUDGET_GET = (window.SN_MSG?.MSG?.AUTOMATION_JUDGE_BUDGET_GET) || 'automation_judge_budget_get';
+  const JUDGE_BUDGET_SET = (window.SN_MSG?.MSG?.AUTOMATION_JUDGE_BUDGET_SET) || 'automation_judge_budget_set';
+  const SG = window.SN_SPESA_GIUDICI;
+  const giudiciCampi = new Map();
+  let giudiciLetto = null; // l'ultima risposta del main: { tettoUsd, maxCaratteri, spesa, oraMs }
+
+  function mostraSpesaGiudici() {
+    const box = document.getElementById('mgJudgeSpesa');
+    if (!box || !SG) return;
+    const r = giudiciLetto;
+    const riga = SG.rigaSpesa(r ? r.spesa : null, r ? r.tettoUsd : null, (r && r.oraMs) || Date.now());
+    const nota = document.getElementById('mgJudgeSpesaNota');
+    const barra = document.getElementById('mgJudgeSpesaBarra');
+    document.getElementById('mgJudgeSpesaTesto').textContent = riga.testo;
+    box.title = riga.dettaglio;
+    box.classList.toggle('is-pieno', riga.pieno);
+    // Il motivo si legge senza hover quando cambia qualcosa per l'owner: tetto pieno o spesa ignota.
+    nota.textContent = riga.pieno || riga.quota === null ? riga.dettaglio : '';
+    nota.hidden = !nota.textContent;
+    barra.hidden = riga.quota === null;
+    document.getElementById('mgJudgeSpesaQuota').style.width = `${Math.round((riga.quota || 0) * 100)}%`;
+  }
+
+  async function salvaGiudici(chiave, valore) {
+    const r = await sendToMain({ type: JUDGE_BUDGET_SET, [chiave]: valore });
+    if (!r || r.ok === false) return { ok: false, errore: String((r && r.error) || 'il server non ha risposto').replace(/\.\s*$/, '') };
+    giudiciLetto = r.letto === false ? Object.assign({}, giudiciLetto, r) : r;
+    mostraSpesaGiudici();
+    return { ok: true, valore: r[chiave] };
+  }
+
+  if (SG && window.SN_CAMPO_NUMERO) {
+    for (const [chiave, [input, salvaBtn, rimetti, msg]] of Object.entries(mgJudgeCampi)) {
+      if (!input) continue;
+      const regole = chiave === 'tettoUsd' ? SG.REGOLE_CAMPO.tetto : SG.REGOLE_CAMPO.caratteri;
+      giudiciCampi.set(chiave, window.SN_CAMPO_NUMERO.collega({
+        input, salvaBtn, rimetti, msg, regole, salva: (valore) => salvaGiudici(chiave, valore),
+      }));
+    }
+  }
+
+  async function loadJudgeBudget() {
+    let r = null;
+    try { r = await sendToMain({ type: JUDGE_BUDGET_GET }); } catch (_) { r = null; }
+    giudiciLetto = r && r.ok !== false ? r : null;
+    mostraSpesaGiudici();
+    for (const [chiave, campo] of giudiciCampi) {
+      // Un numero scritto e non ancora partito resta sotto le dita di chi lo scrive.
+      if (!campo.stato().pulito) continue;
+      if (giudiciLetto) campo.mostra(giudiciLetto[chiave], { daCapo: true });
+      else campo.dillo(`Non letto: ${String((r && r.error) || 'il server non ha risposto').replace(/\.\s*$/, '')}.`, 'is-error');
+    }
+  }
 
   // Tab «Log»: gli ultimi worker spawnati. Fonte config/automation.workerLog, scritto dal
   // server al rilascio di ogni biglietto; sola lettura via main (owner-gated).
@@ -2689,8 +2752,12 @@
   function domandaBadgeHtml(fb) {
     const id = MR.aspettaDomanda(fb);
     if (!id) return '';
-    const motivo = MR.reasonText(MR.normalizeStatus(fb).statusReason);
-    const titolo = `Aspetta la tua risposta alla domanda ${id}${motivo ? ` (${motivo})` : ''}: aprila`;
+    // Fermo in coda su una domanda (#1577): il motivo è lei, non lo stato.
+    const ferme = MR.domandeBloccantiDi(fb);
+    const motivo = ferme.includes(id) ? '' : MR.reasonText(MR.normalizeStatus(fb).statusReason);
+    const titolo = ferme.includes(id)
+      ? `Nessuna routine lo prende finché non rispondi ${ferme.length > 1 ? `alle domande ${ferme.join(', ')}` : `alla domanda ${id}`}: apri ${id}`
+      : `Aspetta la tua risposta alla domanda ${id}${motivo ? ` (${motivo})` : ''}: aprila`;
     return `<button type="button" class="mg-domanda-badge" data-domanda="${esc(id)}" title="${esc(titolo)}" aria-label="${esc(titolo)}">aspetta ${esc(id)}</button>`;
   }
 
@@ -2796,10 +2863,14 @@
     // vera.
     // Chi aspetta altri feedback non lo prende nessuno finché non sono fusi: né un verificatore né il rientro in coda.
     const aspetta = !!(ATT && fb && ATT.aspettaAncora(fb, trovaAtteso));
+    // Così chi è fermo su una domanda bloccante (#1577): riparte alla risposta.
+    const ferme = fb && MR.domandeBloccantiDi(fb).includes(MR.aspettaDomanda(fb)) ? MR.domandeBloccantiDi(fb) : [];
     const who = progress.active
       ? `<span class="mg-work-live"><i></i>Un'istanza ci sta lavorando ora</span>`
       : `<span class="mg-work-idle">${
-          aspetta
+          ferme.length
+            ? esc(`Nessuna istanza al lavoro: riparte quando rispondi a ${ferme.join(', ')}`)
+            : aspetta
             ? 'Nessuna istanza al lavoro: riparte quando quelli che aspetta sono fusi'
             : progress.current.key === 'impl'
             ? 'Nessuna istanza al lavoro: rientra in coda da solo'
@@ -5151,6 +5222,8 @@
       body.appendChild(t);
     }
 
+    if (Array.isArray(p.parti) && p.parti.length) body.appendChild(partiLeggibili(p.parti));
+    if (liv.key === 'l1' && isAdmin && p.azioni.includes('rigiudica')) body.appendChild(pannelloRigiudica(fb));
     if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
     const strade = liv.key === 'l5' ? pannelloStradeFusione(fb, liv) : null;
     if (strade) body.appendChild(strade);
@@ -5228,24 +5301,25 @@
     box.className = 'mg-liv-azioni';
     const fila = document.createElement('div');
     fila.className = 'mg-liv-strade';
-    for (const s of strade) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'sn-btn' + (s.primary ? '' : ' sn-btn-secondary');
-      b.id = s.id;
-      b.dataset.strada = s.key;
-      b.textContent = s.label;
-      b.title = titoloStrada(fb, s.key);
-      b.disabled = azioniInVolo;
-      b.addEventListener('click', () => applyAction(s.azione, null));
-      fila.appendChild(b);
-    }
+    for (const s of strade) fila.appendChild(tastoStrada(fb, s));
     const esito = document.createElement('span');
     esito.className = 'mg-liv-esito';
     esito.id = 'mgL5StradeEsito';
     esito.setAttribute('role', 'status');
     box.append(fila, esito);
     return box;
+  }
+  function tastoStrada(fb, s) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-btn' + (s.primary ? '' : ' sn-btn-secondary');
+    b.id = s.id;
+    b.dataset.strada = s.key;
+    b.textContent = s.label;
+    b.title = titoloStrada(fb, s.key);
+    b.disabled = azioniInVolo;
+    b.addEventListener('click', () => applyAction(s.azione, null));
+    return b;
   }
 
   // «Salta il controllo» si offre su una bocciatura dell'audit — e anche sulle
@@ -5276,9 +5350,25 @@
     server_al_pc: { kind: 'ok', text: 'Saltato. La parte del server la porta su main il tuo PC: npm run orchestra -- fusioni-server.' },
     rimandato: { kind: 'err', text: 'Saltato, ma il lavoro torna alle routine per un altro giro prima di entrare in main.' },
     all_owner: { kind: 'err', text: 'Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.' },
+    // Il salto vale per la versione che verifica e audit hanno letto (#1040.1): niente fusione e niente richiesta.
+    mosso: { kind: 'err', text: 'Dopo i controlli il ramo ha preso commit che nessuno ha letto, quindi non entra in main e non chiede il tuo via libera. Rimandala in lavorazione e un giro nuovo li leggerà.', giroNuovo: true },
+    senza_controllo: { kind: 'err', text: 'Non trovo quale versione del ramo hanno letto i controlli, e senza quella il ramo non entra in main. Rimandala in lavorazione per un giro nuovo.', giroNuovo: true },
   };
 
+  // Un esito che chiede un giro nuovo resta per pratica: la rilettura dopo l'esito ridisegna il pannello e
+  // riproporrebbe il salto. Vale finché stato e audit sono quelli su cui il server ha risposto.
+  const esitiSalta = new Map();
+  function firmaSalta(fb) {
+    const n = MR.normalizeStatus(fb);
+    const l4 = (fb && fb.livelli && fb.livelli.l4) || {};
+    return JSON.stringify([n.status, n.statusReason || '', l4.esito || '', l4.at || '']);
+  }
+
   function pannelloSaltaAudit(fb) {
+    const fermo = esitiSalta.get(fb._id);
+    const azione = fermo && fermo.firma === firmaSalta(fb) && MR.ownerActionFor(fb, 'accept', { releasedVersion });
+    if (azione) return pannelloSaltoFermo(fb, fermo.m, azione);
+    if (fermo) esitiSalta.delete(fb._id);
     const box = document.createElement('div');
     box.className = 'mg-liv-azioni';
     const btn = document.createElement('button');
@@ -5325,6 +5415,10 @@
         esito.dataset.kind = m.kind;
         esito.textContent = m.text;
         toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
+        if (m.giroNuovo) {
+          esitiSalta.set(fb._id, { m, firma: firmaSalta(fb) });
+          ridisegnaPannelloAperto();
+        }
         // L'esito cambia il pentagono e (se si è aperta una richiesta) il
         // quadrato: si rilegge tutto invece di indovinare.
         setTimeout(() => { loadMergeApprovals(); refreshFromRemote({ force: true }).catch(() => {}); }, 800);
@@ -5338,6 +5432,87 @@
     });
     box.appendChild(btn);
     box.appendChild(esito);
+    return box;
+  }
+
+  // Il testo che il server ha reso leggibile, coi punti che ha segnato evidenziati: il perché di ognuno sta sotto
+  // il puntatore. Testo e note arrivano da fuori: solo nodi di testo, mai markup.
+  function partiLeggibili(parti) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-leggibile';
+    for (const parte of parti) {
+      const sez = document.createElement('section');
+      const h = document.createElement('h4');
+      h.textContent = parte.titolo;
+      const testo = document.createElement('div');
+      testo.className = 'mg-liv-leggibile-testo';
+      for (const s of parte.segmenti) {
+        if (!s.nota) { testo.appendChild(document.createTextNode(s.t)); continue; }
+        const m = document.createElement('mark');
+        m.textContent = s.t;
+        m.title = s.nota;
+        testo.appendChild(m);
+      }
+      sez.append(h, testo);
+      box.appendChild(sez);
+    }
+    return box;
+  }
+
+  // Ri-giudica dal triangolo: la pratica che il filtro d'ingresso ha fermato torna dai giudici, come i non
+  // filtrati della barra in cima ma una sola.
+  function pannelloRigiudica(fb) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn sn-btn-secondary';
+    btn.id = 'mgRigiudicaBtn';
+    btn.textContent = 'Ri-giudica';
+    btn.title = 'Rimanda la segnalazione ai giudici';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.setAttribute('role', 'status');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      esito.dataset.kind = 'wait';
+      esito.textContent = 'I giudici stanno leggendo…';
+      const card = startCardEvaluating(fb._id);
+      let r;
+      try {
+        r = await sendToMain({ type: 'feedback_reevaluate', feedbackIds: [fb._id] });
+      } catch (e) {
+        r = { ok: false, error: (e && e.message) || String(e) };
+      }
+      stopCardEvaluating(card);
+      const { outcome, errorKind } = MR.classifyReevalResult(r);
+      const hint = MR.reevalErrorHint(errorKind);
+      const fatto = outcome === 'recovered';
+      const testo = fatto ? 'Giudicata: il verdetto è nei cerchi.'
+        : outcome === 'budget' ? 'Il server ha finito il tempo: riprova tra poco.'
+          : hint || (outcome === 'error' ? `Non riuscito: ${(r && r.error) || 'riprova'}.` : 'Niente da rifare: il server l’ha lasciata com’era.');
+      esito.dataset.kind = fatto ? 'ok' : 'err';
+      esito.textContent = testo;
+      toast(testo, fatto ? 'ok' : 'err');
+      btn.disabled = false;
+      if (fatto) refreshFromRemote({ force: true }).catch(() => {});
+    });
+    box.append(btn, esito);
+    return box;
+  }
+
+  // Il salto non c'è più da proporre: prima cosa è successo, poi la strada, sotto e non dove stava il salto, così
+  // un clic in più sul punto di prima non rimanda la pratica.
+  function pannelloSaltoFermo(fb, m, azione) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.id = 'mgL4StradeEsito';
+    esito.setAttribute('role', 'status');
+    esito.dataset.kind = m.kind;
+    esito.textContent = m.text;
+    box.append(esito, tastoStrada(fb, { ...STRADE_FUSIONE.rimanda, id: 'mgL4RimandaBtn', azione }));
     return box;
   }
 

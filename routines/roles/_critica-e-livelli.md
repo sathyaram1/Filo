@@ -195,8 +195,9 @@ Qui la domanda accompagna un rilievo col `?`: la riga nella critica resta una
 riga, le scelte e i loro costi stanno nella domanda. Un difetto non va lì: è un
 rilievo col suo livello. Sulla critica fermano il lavoro un rilievo interno
 di livello 2 o 3 col `?` e la domanda allegata, anche senza rilievi: con
-`--domanda` il lavoro aspetta l'owner in ogni esito, e i rilievi da correggere
-restano davanti a chi riprende dopo la sua risposta. Un rilievo col `?` senza
+`--domanda` che blocca il lavoro aspetta l'owner in ogni esito, e i rilievi da
+correggere restano davanti a chi riprende dopo la sua risposta; con
+`"blocca": false` la critica va avanti col suo esito e la domanda resta aperta. Un rilievo col `?` senza
 domanda allegata la fa nascere dal server, coi rilievi come problema. Un 1 col
 `?`, o un esterno di qualunque livello, va avanti in un feedback derivato che
 l'owner decide a parte. Se poi il server ti manda a correggere, una domanda a

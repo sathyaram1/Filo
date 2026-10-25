@@ -215,6 +215,13 @@ if (!IS_SUBFRAME) try {
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
 
+// Il mondo della pagina come in Chrome (window.chrome pieno, passkey condizionale in sospeso, passkey del telefono dal
+// QR): regole in preload/mondo-chrome.js. In ogni frame http(s), finestrelle di accesso comprese, prima degli script del sito.
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) webFrame.executeJavaScript(require('./mondo-chrome.js').buildSource(), false).catch(() => {});
+} catch (_) { /* mai bloccare il caricamento */ }
+
 // #576 — i riquadri della pubblicità che il blocco di rete lascia vuoti o che il sito serve da sé: regole in preload/nascondi-pubblicita.js.
 // Ciò che il blocco ferma si chiude in ogni frame, riquadri compresi: lì può stare l'annuncio.
 try {
@@ -259,6 +266,15 @@ try {
     const { buildRiquadriVuotiSource } = require('./riquadri-vuoti.js');
     const corpi = [buildSchermoVecchioCorpo()];
     const ascolti = [[EVENTO_SCHERMO_VECCHIO, () => { try { ipcRenderer.sendSync('filo:schermo-vecchio'); } catch (_) {} }]];
+    // La diagnostica delle passkey (#1608, preload/diagnosi-passkey.js): spenta, qui non entra niente.
+    const passkey = require('./diagnosi-passkey.js');
+    const modoPasskey = passkey.modoDiagnosiPasskey(process.env[passkey.VARIABILE_PASSKEY]);
+    if (modoPasskey && /^(https?|blob):/i.test(loc)) {
+      corpi.push(passkey.buildPasskeyCorpo(modoPasskey));
+      ascolti.push([passkey.EVENTO_PASSKEY, (e) => {
+        try { if (typeof e.detail === 'string') ipcRenderer.send('filo:passkey-diagnosi', e.detail.slice(0, 32768)); } catch (_) {}
+      }]);
+    }
     // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
     if (!IS_SUBFRAME && /^(https?|blob):/i.test(loc)) try {
       const { buildStatoPermessiCorpo, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE, SI_DATO, PARTI_LETTE } = require('./stato-permessi.js');
@@ -895,6 +911,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(SHARED_DIR, 'tasti.js')); } catch (e) { console.error('[Filo CS] tasti', e); } // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   try { require(path.join(SHARED_DIR, 'disposizioneIcone.js')); } catch (e) { console.error('[Filo CS] disposizioneIcone', e); } // dove sta ogni icona globale: PRIMA di menuIcons
+  try { require(path.join(SHARED_DIR, 'gestiContati.js')); } catch (e) { console.error('[Filo CS] gestiContati', e); } // #1471 — segno dei trascinamenti e nome letto su un'icona: PRIMA di menu.js
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
   try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo CS] nomiSito', e); } // #843 — il sito di «Spegni Filo su questo sito»

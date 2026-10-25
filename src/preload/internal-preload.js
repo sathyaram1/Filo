@@ -110,7 +110,7 @@ const filoApi = {
   // Esecuzione shell (modalità terminale della dashboard), gemella di aiStream.
   // onData({chunk, stream}), onExit({code, cwd}), onError({message}).
   // Ritorna { sendInput(text), abort() }.
-  shellExec: ({ command, cwd, shell, chat, onData, onExit, onError }) => {
+  shellExec: ({ command, cwd, shell, chat, gettone, daFuori, onData, onExit, onError }) => {
     const execId = `sh${Date.now()}_${++streamCounter}`;
     const offData = (_e, data) => onData && onData(data);
     const offExit = (_e, data) => { cleanup(); onExit && onExit(data); };
@@ -123,13 +123,16 @@ const filoApi = {
     ipcRenderer.on(`shell:${execId}:data`, offData);
     ipcRenderer.on(`shell:${execId}:exit`, offExit);
     ipcRenderer.on(`shell:${execId}:error`, offError);
-    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell, chat });
+    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell, chat, gettone, daFuori: daFuori === true });
     return {
       sendInput: (text) => ipcRenderer.send('shell:input', { execId, text }),
       abort: () => { ipcRenderer.send('shell:abort', { execId }); cleanup(); },
     };
   },
   shellHome: () => ipcRenderer.invoke('shell:home'),
+  // #892.1 — cosa chiede un comando scritto a mano prima di partire, coi livelli di quelli di Filo; il no della persona.
+  shellVaglia: (opts) => ipcRenderer.invoke('shell:vaglia', opts),
+  shellAnnulla: (gettone) => ipcRenderer.send('shell:annulla', { gettone }),
   shellWhich: (opts) => ipcRenderer.invoke('shell:which', opts),
   // #968 — le virgolette a un percorso con spazi: appena incollato nel comando, e proposte dopo un errore.
   shellVirgoletteIncolla: (opts) => ipcRenderer.invoke('shell:virgolette-incolla', opts),
@@ -301,6 +304,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'messages.js'));
   safe(path.join(SHARED, 'tasti.js')); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   safe(path.join(SHARED, 'disposizioneIcone.js')); // dove sta ogni icona globale: PRIMA di menuIcons
+  safe(path.join(SHARED, 'gestiContati.js')); // #1471 — segno dei trascinamenti e nome letto su un'icona: PRIMA di menu.js
   safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
   safe(path.join(SHARED, 'nomiSito.js')); // #843 — il sito di «Spegni Filo su questo sito»

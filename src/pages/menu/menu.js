@@ -23,8 +23,11 @@
   });
 
   // La ricerca nella cronologia degli appunti fatta nello strato: il main la conta come quella nella pagina (#1461).
+  // Così i gesti del menu (#1471): il riquadro «Altro…», il nome letto su un'icona, un trascinamento finito nel vuoto.
   globalThis.SN_MENU_CONTA = (evento) => {
-    if (!evento || evento.misura !== 'ricerca') return;
+    if (!evento) return;
+    if (evento.misura === 'gesto') { api.chiedi('conta', { ...evento }); return; }
+    if (evento.misura !== 'ricerca') return;
     api.chiedi('conta', { pannello: evento.pannello, esito: evento.esito, attesaMs: evento.attesaMs, posizione: evento.posizione });
   };
 

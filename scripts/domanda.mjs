@@ -112,6 +112,7 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
   righe.push(visibile(x.titolo || '(senza titolo)'));
   righe.push(`creata il ${quando(x.creataIl)} · modificata il ${quando(x.modificataIl)}${x.gruppo ? ` · gruppo «${visibile(x.gruppo)}»` : ''}`);
   if (x.origine && x.origine.tipo) righe.push(`origine: ${visibile(x.origine.tipo)} ${visibile(x.origine.id || '')}`.trimEnd());
+  if (x.legata) righe.push(`${x.blocca ? 'ferma' : 'non ferma'} il lavoro di ${visibile(riferimenti?.[x.legata]?.num || x.legata)}`);
   if (Array.isArray(x.collegamenti) && x.collegamenti.length) {
     righe.push(`collegamenti: ${x.collegamenti.map((c) => `${visibile(c.tipo)} ${visibile(c.id)}`).join(', ')}`);
   }

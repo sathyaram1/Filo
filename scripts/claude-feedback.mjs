@@ -37,7 +37,7 @@
 //   cifrato per l'owner come il testo. È la strada per una spec o un log che
 //   nel testo non entra (tetto ~6000 caratteri): il server la apre con la sua
 //   chiave e la consegna ai giudici e alle routine come testo. Ammessi i tipi
-//   dell'allowlist del gate L0 (md, txt, log, json, csv, tsv, yaml, pdf,
+//   dell'allowlist del cancello degli allegati (md, txt, log, json, csv, tsv, yaml, pdf,
 //   immagini); un tipo diverso è un errore d'uso, non un feedback sospetto.
 //   node scripts/claude-feedback.mjs "<titolo>" -          ← testo da stdin
 //
@@ -79,8 +79,8 @@ const FB = globalThis.SN_FEEDBACK;
 export const CLIENT_ID = (THREAD && THREAD.LOCAL_CLIENT_ID) || 'local:claude';
 
 // Tipo dichiarato per estensione; se ammetterlo lo decide `SN_FEEDBACK_ATTACH.classify`, l'elenco
-// unico del riquadro e della pagina dei feedback, a cui resta allineato il gate L0 del server
-// (filo-security, fileGate). Fuori da lì il feedback diventerebbe `suspicious_file`.
+// unico del riquadro e della pagina dei feedback, a cui resta allineato il cancello degli allegati del server
+// (filo-security, cancelloAllegati). Fuori da lì il feedback diventerebbe `suspicious_file`.
 // ⚠️ Tabella SENZA eredità, per lo stesso motivo di `PREFISSI_ALLEGATO` in
 // src/shared/feedback.js (#582, giro 7): la chiave è l'estensione di un nome di
 // file, e una tabella normale contiene già `__proto__` e `constructor` senza che

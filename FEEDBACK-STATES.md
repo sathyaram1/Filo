@@ -312,12 +312,12 @@ c'è più.
 Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il feedback è
 **fidato** (#1148, `functions/src/nascita.js`); il mittente decide solo dove va:
 
-- lavoro locale fidato (§4b): `todo` col segno, senza nemmeno L0;
-- owner, sessione col biglietto pulito (`claude-feedback.mjs --non-locale`): L0, poi `todo` In
+- lavoro locale fidato (§4b): `todo` col segno, senza nemmeno il cancello degli allegati;
+- owner, sessione col biglietto pulito (`claude-feedback.mjs --non-locale`): il cancello degli allegati, poi `todo` In
   coda (`pipeline.skipped: 'fidato'`); la priorità scelta con `--priorita` nasce col documento
   (`priorityManual`), senza scelta la decide il giudice;
 - ritrovamento fidato del server (`routine:`/`agent:` + `senderProof: 'server'`: ritrovamenti,
-  derivati, allarmi della costruzione): L0, poi dove dice l'**origine** (`pipeline.skipped:
+  derivati, allarmi della costruzione): il cancello degli allegati, poi dove dice l'**origine** (`pipeline.skipped:
   'routine_proven'`, decisione dell'owner del 04/10). Un ritrovamento NON fidato passa dai
   giudici; se lo manderebbero in coda, aspetta comunque l'origine come sotto. L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
   mai la routine; `parentId` resta un collegamento) e conta il genitore diretto:
@@ -431,19 +431,23 @@ fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
 stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
 arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
-corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): ha già
-aperto una domanda col gruppo del guasto, e la nota ne porta il numero. Non è
-lavoro per regola: quello è `locale`, e la sua nota dice quale regola lo tiene
-fuori dalla cloud. La risposta dell'owner appende
+corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): la
+consegna porta la domanda col gruppo del guasto (#1577; senza, è rifiutata).
+Non è lavoro per regola: quello è `locale`, e la sua nota dice quale regola lo
+tiene fuori dalla cloud. La risposta dell'owner appende
 alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
 ramo; l'esito è quello di un'approvazione (fuso → `done`; bloccato → richiesta
 di fusione in attesa; conflitto → riallineamento). Non serve una transizione
-nuova: è `design` → `todo` con attore owner, e da lì il cancello.
+nuova: è `design` → `todo` con attore owner, e da lì il cancello. Il salto vale
+solo per la versione letta da verifica e audit (#1040.1): se la punta del ramo
+non è più quella, o il giro non dice quale fosse, il server non salta, non fonde
+e non apre richieste (esiti `mosso`, `senza_controllo`), la pratica resta dov'è
+e il pentagono propone di rimandarla in lavorazione.
 
 **Le attese con la loro domanda (#1358, SPEC-DOMANDE §3.8).** Ogni fermata dei casi (2),
-(2b), (3), (5), `attesa_chiusa`, `locale` con la domanda, e `aligned` con `origine_chiusa`
+(2b), (3), (5), (6), `attesa_chiusa`, `locale` con la domanda, e `aligned` con `origine_chiusa`
 o `origine_mancante` apre una domanda per l'owner e il feedback prende `domandaId`,
 restando nello stato e col motivo di prima: la macchina a stati non cambia. Dal canale la
 domanda nasce nella stessa transazione dello stato (quella scritta da chi si ferma con
@@ -456,9 +460,23 @@ dettaglio la casella di risposta lascia il posto al tasto «Rispondi alla domand
 risponde in un posto solo. La risposta con l'opzione `riprendi` (o col solo testo) lo
 riporta `todo` con la decisione in `payload.decisioni`, `notePerAgenti` comprese; una
 domanda archiviata o superata non sblocca niente. Restano nei Ricevuti, anche con un
-`domandaId`: `secaudit`, `l5`, `guasto`, `fidato`, attacchi, spam e file sospetti. Le
+`domandaId`: `secaudit`, `l5`, `fidato`, attacchi, spam e file sospetti. Le
 attese aperte prima si migrano con `ownerDomande { op: 'migra' }`, a lotti
-(`npm run domande:migra`, a secco; `-- --dal-vero` per creare).
+(`npm run domande:migra`, a secco; `-- --dal-vero` per creare); un guasto di prima, che
+nominava la domanda solo nella nota, la adotta.
+
+**Le domande che fermano un lavoro in coda (#1577, SPEC-DOMANDE §3.1 `blocca`).** Fuori
+dalle fermate lo stato non cambia: un `todo` o un ramo in revisione con una domanda
+bloccante aperta tiene il suo id in `domandeBloccanti` (lo scrive solo il server, nella
+transazione che cambia la domanda), nessuna routine lo prende, e in dashboard sta in
+**Aspettano** col segno «aspetta D-n». Alla risposta l'id esce dall'elenco e il lavoro
+riparte con la decisione. La ripresa non sposta un `todo`, un `working` né un
+`revision_capability` (la decisione si accoda per il giro dopo); un `revision_security`
+torna `revision_capability` coi verdetti azzerati, perché sicurezza e fusione non leggono
+le decisioni; un `done` torna `todo`. Fanno eccezione gli ultimi due quando la scelta è la
+provvisoria di una domanda non bloccante, senza parole in più: il `revision_security` resta
+dov'è con la decisione accodata, e sul `done` la risposta dice «non serviva». Finché una bloccante è aperta né il recupero delle fusioni né la richiesta del
+server fondono il ramo.
 
 Presentazione (scelta owner 2026-08-29): i casi `secaudit` e `l5` sono **ROSSI** in
 dashboard (un blocco di sicurezza, non una questione di gusto); gli altri restano verdi. Nel
@@ -679,11 +697,11 @@ oggi il codice dice altro vale il codice (le sezioni sopra).
 - [x] **F6 — filo-security** (fatto 2026-07-03, commit bd93b47, DEPLOYATO):
       `src/statusMap.js` (decisione→status canonico; fidati mai attack/spam →
       unlabeled; canWriteStatus = la pipeline non regredisce feedback oltre il
-      giudizio — vale anche per le ri-valutazioni); `src/l0/fileGate.js` (gate
+      giudizio — vale anche per le ri-valutazioni); `src/cancelloAllegati.js` (cancello
       deterministico allowlist su `files[]`, PRIMA dei giudici → suspicious_file,
       niente panel); `feedbackState.recordDecision` scrive `status` CIFRATO (come
       il pipeline: anti hill-climbing, la dashboard lo decifra già — status è nei
-      TEXT_FIELDS) + `statusPublic` in chiaro; runner: gate L0, owner-accepted →
+      TEXT_FIELDS) + `statusPublic` in chiaro; runner: cancello degli allegati, owner-accepted →
       todo, trusted, reeval aggiorna lo status. Test 279 verdi. `storage.rules`
       (repo Filo): via i wildcard `text/.*`/`image/.*` (passava text/html!),
       allowlist esplicita — DEPLOYATE.

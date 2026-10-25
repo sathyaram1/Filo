@@ -344,6 +344,11 @@
     } catch (_) {}
   }
   const contaModello = (r) => contaErroreVisto({ misura: 'errore-modello', code: String((r && (r.code || r.errorCode)) || ''), status: Number(r && r.status) || 0 });
+  // La griglia dei moduli (#1471): per tipo di modulo cosa gli succede, la griglia ridimensionata, la vista delle
+  // impostazioni, i trascinamenti. Mai il testo del documento, né quello che si scrive in un modulo.
+  const contaGesto = (campi) => contaErroreVisto({ misura: 'gesto', ...campi });
+  const contaModulo = (m, evento) => { if (m && m.type) contaGesto({ gesto: 'modulo_editor', modulo: m.type, evento }); };
+  const contaTrascinamento = (ev) => { if (ev) contaErroreVisto(ev); };
 
   function save(flash) {
     documentoAlSicuro.spedita('doc');
@@ -1705,22 +1710,22 @@
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-fmt';
     const cfg = SIMPLE_FORMATS[m.type];
-    pad.appendChild(fmtButton(cfg.glyph, cfg.title, cfg.act));
+    pad.appendChild(fmtButton(cfg.glyph, cfg.title, () => { contaModulo(m, 'usato'); cfg.act(); }));
     cell.appendChild(pad);
   }
-  function renderTextSize(cell, _m) {
+  function renderTextSize(cell, m) {
     cell.classList.add('ed-fmt-mod');
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-fmt ed-fmt-row';
-    const minus = fmtButton('A<small>−</small>', 'Riduci dimensione testo', () => stepFontSize(-1));
-    const plus = fmtButton('A<big>+</big>', 'Aumenta dimensione testo', () => stepFontSize(1));
+    const minus = fmtButton('A<small>−</small>', 'Riduci dimensione testo', () => { contaModulo(m, 'usato'); stepFontSize(-1); });
+    const plus = fmtButton('A<big>+</big>', 'Aumenta dimensione testo', () => { contaModulo(m, 'usato'); stepFontSize(1); });
     minus.dataset.size = 'down';
     plus.dataset.size = 'up';
     pad.appendChild(minus);
     pad.appendChild(plus);
     cell.appendChild(pad);
   }
-  function renderAlign(cell, _m) {
+  function renderAlign(cell, m) {
     cell.classList.add('ed-fmt-mod');
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-fmt ed-fmt-row ed-align';
@@ -1731,7 +1736,7 @@
       ['justify', 'Giustifica', 'justifyFull'],
     ];
     for (const [kind, title, cmd] of defs) {
-      const b = fmtButton(alignSvg(kind), title, () => execCss(cmd));
+      const b = fmtButton(alignSvg(kind), title, () => { contaModulo(m, 'usato'); execCss(cmd); });
       b.dataset.align = kind;
       pad.appendChild(b);
     }
@@ -2001,6 +2006,7 @@
       sel.selectedIndex = 0; // torna al placeholder "Font…"
       valueEl.textContent = 'Font…';
       if (!font) return;
+      contaModulo(m, 'usato');
       restoreDocSelection();
       execCss('fontName', font);
     });
@@ -2325,6 +2331,7 @@
     cols = Math.max(GRID_MIN_COLS, Math.min(GRID_MAX_COLS, Math.round(cols)));
     rows = Math.max(GRID_MIN_ROWS, Math.min(GRID_MAX_ROWS, Math.round(rows)));
     if (cols === GRID_COLS && rows === GRID_ROWS) return;
+    contaGesto({ gesto: 'modulo_editor', colonne: cols, righe: rows });
     GRID_COLS = cols;
     GRID_ROWS = rows;
     for (const m of doc.modules) {
@@ -2489,7 +2496,9 @@
     const clearHighlight = () => {
       if (targetEl) { targetEl.classList.remove('drop-target'); targetEl = null; }
     };
+    let mosso = false;
     const onMove = (ev) => {
+      mosso = true;
       // La cella in drag ha pointer-events:none, così elementFromPoint vede la
       // cella vuota sottostante.
       const el = document.elementFromPoint(ev.clientX, ev.clientY);
@@ -2519,6 +2528,8 @@
       clearHighlight();
       removeGhost();
       if (target) { m.x = target.x; m.y = target.y; m.z = z; renderGrid(); markDirty(); }
+      if (target) contaModulo(m, 'spostato');
+      if (target || mosso) contaTrascinamento(window.SN_GESTI?.trascinamento('modulo_editor', target ? 'griglia_editor' : 'nessuna', target ? 'posato' : 'annullato'));
     };
     document.addEventListener('mousemove', onMove, true);
     document.addEventListener('mouseup', onUp, true);
@@ -2529,16 +2540,17 @@
     empty.addEventListener('drop', (e) => {
       e.preventDefault();
       empty.classList.remove('drop-target');
+      const conta = (usato) => contaTrascinamento(window.SN_GESTI?.rilascio(e.dataTransfer, 'griglia_editor', usato));
       let payload;
-      try { payload = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (_) { return; }
+      try { payload = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (_) { conta(false); return; }
       if (payload.move) {
         const m = doc.modules.find((mm) => mm.id === payload.move);
         if (!m) return;
         const target = { x, y, w: m.w, h: m.h };
         if (fitsFor(m, target, z)) { m.x = x; m.y = y; m.z = z; renderGrid(); markDirty(); }
       } else if (payload.add) {
-        addModule(payload.add, x, y, z);
-      }
+        conta(addModule(payload.add, x, y, z) === true);
+      } else conta(false);
     });
   }
 
@@ -2554,9 +2566,12 @@
     const data = type === 'switch'
       ? { activePage: 0, pages: [{ z: 0, name: 'Pagina 1', icon: '1' }, { z: 1, name: 'Pagina 2', icon: '2' }] }
       : (type === 'word-count' ? { count: 'words' } : {});
-    doc.modules.push(mkModule(type, x, y, w, h, z, data));
+    const nuovo = mkModule(type, x, y, w, h, z, data);
+    doc.modules.push(nuovo);
     renderGrid();
     markDirty();
+    contaModulo(nuovo, 'aggiunto');
+    return true;
   }
 
   function openAddModule(x, y, z) {
@@ -2601,7 +2616,11 @@
     cell.title = 'Impostazioni moduli';
     cell.innerHTML = (ICONS.options ? ICONS.options(18) : '⚙');
     // In capture/stopPropagation così non scatta il click generico della cella.
-    cell.addEventListener('click', (e) => { e.stopPropagation(); toggleSettingsMode(); });
+    cell.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSettingsMode();
+      if (settingsMode) contaGesto({ gesto: 'modulo_editor', impostazioni: true });
+    });
   }
 
   // Modulo: switch / workspace
@@ -2618,7 +2637,7 @@
     right.className = 'ed-switch-arrow' + (pages.length >= 4 ? ' disabled' : '');
     right.textContent = '›';
     right.title = 'Aggiungi pagina';
-    right.addEventListener('click', (e) => { e.stopPropagation(); growSwitch(m); });
+    right.addEventListener('click', (e) => { e.stopPropagation(); if (growSwitch(m)) contaModulo(m, 'ridimensionato'); });
 
     const icons = document.createElement('div');
     icons.className = 'ed-switch-icons';
@@ -2627,7 +2646,7 @@
       ic.className = 'ed-switch-icon' + ((m.data.activePage || 0) === p.z ? ' active' : '');
       ic.title = p.name;
       ic.innerHTML = switchIconHtml(p.icon, idx);
-      ic.addEventListener('click', (e) => { if (!settingsMode) { e.stopPropagation(); setActivePage(p.z); } });
+      ic.addEventListener('click', (e) => { if (!settingsMode) { e.stopPropagation(); contaModulo(m, 'usato'); setActivePage(p.z); } });
       icons.appendChild(ic);
     });
     cell.appendChild(left);
@@ -2718,7 +2737,7 @@
     overlayBox.querySelectorAll('button[data-del-z]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const ok = deletePage(m, Number(btn.dataset.delZ));
-        if (ok) closeOverlay();
+        if (ok) { contaModulo(m, 'ridimensionato'); closeOverlay(); }
       });
     });
   }
@@ -2828,7 +2847,7 @@
     };
     fill();
     cell._wcFill = fill;
-    pad.addEventListener('click', (e) => { if (settingsMode) return; e.stopPropagation(); showStatsOverlay(); });
+    pad.addEventListener('click', (e) => { if (settingsMode) return; e.stopPropagation(); contaModulo(m, 'usato'); showStatsOverlay(); });
   }
   function updateWordCountModules() {
     gridEl.querySelectorAll('.ed-module[data-type="word-count"]').forEach((c) => { if (c._wcFill) c._wcFill(); });
@@ -2878,6 +2897,11 @@
     cell._srFocus = () => findInput.focus();
     const updateCount = () => { countEl.textContent = findState.hits.length ? `${findState.idx + 1}/${findState.hits.length}` : (findInput.value ? 'nessun risultato' : ''); };
     const run = () => { runFind(findInput.value); updateCount(); };
+    // Un uso è una ricerca, non ogni tasto né ogni sostituzione: uno per volta che il campo prende il fuoco.
+    let usato = false;
+    const contaUnaVolta = () => { if (!usato) { usato = true; contaModulo(m, 'usato'); } };
+    findInput.addEventListener('input', contaUnaVolta);
+    findInput.addEventListener('focus', () => { usato = false; });
     findInput.addEventListener('input', run);
     findInput.addEventListener('click', (e) => e.stopPropagation());
     // Invio = "vai lì" (Shift+Invio: indietro), come in qualsiasi campo di
@@ -2903,8 +2927,8 @@
     pad.querySelector('[data-sr="prev"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(-1); updateCount(); });
     // Dopo replaceOne NON si rilancia run(): una ri-scansione azzererebbe l'indice e ri-matcherebbe
     // dentro il testo appena inserito (#310). replaceOne avanza da sé.
-    pad.querySelector('[data-sr="one"]').addEventListener('click', (e) => { e.stopPropagation(); replaceOne(replInput.value); updateCount(); });
-    pad.querySelector('[data-sr="all"]').addEventListener('click', (e) => { e.stopPropagation(); replaceAll(findInput.value, replInput.value); run(); });
+    pad.querySelector('[data-sr="one"]').addEventListener('click', (e) => { e.stopPropagation(); contaUnaVolta(); replaceOne(replInput.value); updateCount(); });
+    pad.querySelector('[data-sr="all"]').addEventListener('click', (e) => { e.stopPropagation(); contaUnaVolta(); replaceAll(findInput.value, replInput.value); run(); });
   }
   function clearFind() {
     // Uno spostamento ancora in attesa punterebbe a evidenziazioni che stiamo
@@ -3095,6 +3119,7 @@
     pad.addEventListener('click', (e) => {
       if (settingsMode) return;
       e.stopPropagation();
+      contaModulo(m, 'usato');
       if (doc.comments.length) showCommentsList();
       else startCommenting();
     });
@@ -3563,6 +3588,11 @@
     };
     const log = pad.querySelector('[data-chat="log"]');
     const input = pad.querySelector('[data-chat="input"]');
+    // Un testo lasciato nella casella lo scrive il browser; qui si conta solo da dove veniva (#1471).
+    input.addEventListener('drop', (e) => {
+      const testo = (() => { try { return e.dataTransfer.getData('text/plain'); } catch (_) { return ''; } })();
+      contaTrascinamento(window.SN_GESTI?.rilascio(e.dataTransfer, 'chat_modulo_editor', !!testo));
+    });
     const sendBtn = pad.querySelector('[data-chat="send"]');
     // La riga del ripiego sui crediti di Filo (#662) resta sotto la sua risposta finché la
     // pagina è aperta: è un fatto di quel momento, non entra nel documento.
@@ -3653,6 +3683,7 @@
     const send = async () => {
       const text = input.value.trim();
       if (!text) return;
+      contaModulo(m, 'usato');
       input.value = '';
       disponi();
       m.data.messages.push({ role: 'user', content: text });
@@ -3766,7 +3797,9 @@
       item.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('text/plain', JSON.stringify({ add: type }));
         e.dataTransfer.effectAllowed = 'copy';
+        window.SN_GESTI?.marca(e.dataTransfer, 'palette_editor');
       });
+      item.addEventListener('dragend', (e) => contaTrascinamento(window.SN_GESTI?.fine(e, 'palette_editor')));
       paletteEl.appendChild(item);
     }
   }
@@ -3814,6 +3847,7 @@
       if (m.type === 'chat') dimenticaNelFilo({ rif: `${doc.id}:${m.id}` });
       doc.modules = doc.modules.filter((x) => x.id !== m.id);
       closeOverlay(); renderGrid(); markDirty();
+      contaModulo(m, 'tolto');
     });
     const cfgShortcut = $('cfgShortcut');
     const cfgShortcutHint = $('cfgShortcutHint');
@@ -3920,6 +3954,8 @@
       }
       closeOverlay(); renderGrid(); markDirty();
       if (nuovaScorciatoia) save(false);
+      contaModulo(m, 'configurato');
+      if (nuovaScorciatoia) contaModulo(m, c ? 'scorciatoia_si' : 'scorciatoia_no');
     });
     // Invio in un campo conferma come «Salva», come Esc annulla (#545).
     overlayBox.querySelectorAll('input[type="text"]').forEach((inp) => inp.addEventListener('keydown', (e) => {
@@ -4176,6 +4212,8 @@
   function triggerModuleShortcut(m) {
     const fa = AZIONE_SCORCIATOIA[m.type];
     if (!fa) return;
+    // La chat e la ricerca prendono solo il fuoco: l'uso lo conta l'invio, o la ricerca scritta.
+    if (m.type !== 'chat' && m.type !== 'search-replace') contaModulo(m, 'usato');
     if ((m.z || 0) !== activePage()) setActivePage(m.z);
     fa(gridEl.querySelector(`.ed-module[data-id="${m.id}"]`));
   }
@@ -4322,6 +4360,8 @@
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
           reconcileSwitchPages(m, targetLen);
+          // Più stretto, la pagina da togliere si sceglie nel riquadro: lì si conta.
+          if (m.data.pages.length > startLen) contaModulo(m, 'ridimensionato');
         };
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
@@ -4356,6 +4396,7 @@
           document.removeEventListener('mouseup', onUp);
           renderGrid();
           markDirty();
+          if (m.w !== startW || m.h !== startH) contaModulo(m, 'ridimensionato');
         };
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);

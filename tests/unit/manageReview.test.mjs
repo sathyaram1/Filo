@@ -1373,7 +1373,7 @@ test('livelli: cinque forme, sempre, sempre nello stesso ordine', () => {
 
 test('livelli L1: categoria, motivi in italiano, chi ha deciso e cosa ha fatto', () => {
   const l1 = MR.livelloL1({
-    pipeline: { l1Category: 'dangerous', l1Reasons: ['linked_prior_attack', 'obfuscation'], action: 'block_attack' },
+    pipeline: { l1Category: 'dangerous', l1Reasons: ['linked_prior_attack'], action: 'block_attack' },
   });
   assert.equal(l1.esito, 'pericoloso');
   assert.equal(l1.classe, 'attack');
@@ -1381,12 +1381,79 @@ test('livelli L1: categoria, motivi in italiano, chi ha deciso e cosa ha fatto',
   const testo = l1.pannello.righe.map((r) => `${r.etichetta}: ${r.valore}`).join(' | ');
   assert.match(testo, /Categoria: Pericoloso/);
   assert.match(testo, /collegato a un attacco precedente/);
-  assert.match(testo, /offuscamento/);
   assert.match(testo, /filtro automatico/);
   assert.match(testo, /ha fermato la segnalazione come attacco/);
   // Un codice che la tabella non conosce si scrive lo stesso: meglio grezzo
   // che muto.
   assert.equal(MR.l1MotivoText('qualcosa_di_nuovo'), 'qualcosa di nuovo');
+});
+
+// La scheda che compone il server (pipeline.ingresso): qui i contenuti sono finti apposta, la pagina non li capisce.
+const SCHEDA = {
+  classe: 'design', esito: 'esito del server', breve: 'frase breve del server', rigiudica: false,
+  righe: [{ etichetta: 'Esito', valore: 'riga del server' }, { etichetta: 'Altro', valore: 3 }, null, 'storta'],
+  parti: [
+    { titolo: 'Testo del feedback', segmenti: [{ t: 'prima ' }, { t: 'segnato', nota: 'perché' }, { t: '' }, null, { t: ' dopo', nota: '  ' }] },
+    { titolo: 'vuota', segmenti: [] },
+    'storta',
+  ],
+};
+
+test('livelli L1: con la scheda del server il triangolo mostra le sue righe, il suo colore e il suo testo', () => {
+  const fb = { status: 'aligned', pipeline: { l1Category: 'clean', verdicts: [{ judge: 'a', class: 'aligned' }], ingresso: SCHEDA } };
+  const l1 = MR.livelloL1(fb);
+  assert.equal(l1.classe, 'design');
+  assert.equal(l1.colore, MR.LIVELLO_COLORI.design);
+  assert.equal(l1.esito, 'esito del server');
+  const righe = l1.pannello.righe.map((r) => `${r.etichetta}: ${r.valore}`);
+  assert.deepEqual(righe.slice(0, 2), ['Esito: riga del server', 'Altro: 3']);
+  assert.ok(!righe.some((r) => /Categoria|filtro automatico/.test(r)), 'le righe di prima non si mescolano a quelle del server');
+  assert.deepEqual(l1.pannello.parti, [
+    { titolo: 'Testo del feedback', segmenti: [{ t: 'prima ' }, { t: 'segnato', nota: 'perché' }, { t: ' dopo' }] },
+  ]);
+  assert.deepEqual(l1.pannello.azioni, []);
+});
+
+test('livelli L1: una scheda storta o con un colore sconosciuto non rompe il triangolo', () => {
+  assert.equal(MR.schedaIngresso({ pipeline: { ingresso: { righe: 'no' } } }), null);
+  assert.equal(MR.schedaIngresso({ pipeline: 'FENC1:abc' }), null);
+  const l1 = MR.livelloL1({ status: 'unlabeled', pipeline: { ingresso: { classe: 'viola', righe: [] } } });
+  assert.equal(l1.classe, null);
+  assert.equal(l1.vuoto, true);
+  assert.equal(l1.esito, 'assente');
+});
+
+test('livelli L1: Ri-giudica si offre dove il server lo dice, e sulle vecchie fermate al filtro senza il segno', () => {
+  const conScheda = (status, rigiudica) => ({ status, pipeline: { stage: 'altro', verdicts: [], ingresso: { ...SCHEDA, rigiudica } } });
+  assert.deepEqual(MR.livelloL1(conScheda('unlabeled', true)).pannello.azioni, ['rigiudica']);
+  assert.deepEqual(MR.livelloL1(conScheda('unlabeled', false)).pannello.azioni, []);
+  // Già uscita dalle mani della pipeline: niente da ri-giudicare.
+  assert.deepEqual(MR.livelloL1(conScheda('todo', true)).pannello.azioni, []);
+  const vecchia = (l1Reasons) => ({ status: 'attack', pipeline: { stage: 'L1', l1Category: 'dangerous', l1Reasons, verdicts: [] } });
+  assert.deepEqual(MR.livelloL1(vecchia(['codice_di_prima'])).pannello.azioni, ['rigiudica']);
+  assert.deepEqual(MR.livelloL1(vecchia(['linked_prior_attack'])).pannello.azioni, [], 'il segno ha il suo gesto');
+  assert.equal(MR.rigiudicabile({ status: 'attack', pipeline: { stage: 'L2', verdicts: [{ class: 'attack' }] } }), false);
+});
+
+test('fermata prima dei giudici: la frase breve del server va in lista e nel pannello, non «in attesa del giudizio»', () => {
+  const fb = { status: 'unlabeled', pipeline: { stage: 'altro', verdicts: [], ingresso: { ...SCHEDA, classe: 'spam', rigiudica: true } } };
+  assert.deepEqual(MR.judgesNote(fb), { text: 'frase breve del server.', color: MR.LIVELLO_COLORI.spam });
+  const segno = MR.segnoFermata(fb, {});
+  assert.equal(segno.forma, 'triangolo');
+  assert.equal(segno.livello, 'l1');
+  assert.equal(segno.classe, 'spam');
+  assert.equal(segno.testo, 'frase breve del server');
+  // Senza la frase resta quello di prima.
+  const senza = { status: 'unlabeled', pipeline: { verdicts: [], ingresso: { ...SCHEDA, breve: '' } } };
+  assert.equal(MR.judgesNote(senza).text, 'In attesa del giudizio.');
+});
+
+test('ri-valutazione: il server che non riesce ancora a leggere non conta come fatto, e si dice perché', () => {
+  const r = { ok: true, remaining: 0, results: [{ ok: true, changed: false, reason: 'non_decifrabile', errorKind: 'non_decifrabile' }] };
+  const esito = MR.classifyReevalResult(r);
+  assert.equal(esito.outcome, 'noop');
+  assert.equal(esito.errorKind, 'non_decifrabile');
+  assert.match(MR.reevalErrorHint('non_decifrabile'), /non riesce ancora a decifrare/);
 });
 
 test('livelli L1: spam giallo, pulito blu, e "pulito" dedotto se i giudici hanno votato', () => {
@@ -1733,7 +1800,7 @@ test('praticaChiusa e localSignCheck: su un lavoro locale chiuso togliere il seg
 
 test('segno: fermato dal segno solo col motivo linked_prior_attack del filtro d’ingresso', () => {
   assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: ['linked_prior_attack'] } }), true);
-  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: ['obfuscation', ' linked_prior_attack '] } }), true);
+  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: ['prefisso_riservato_senza_prova', ' linked_prior_attack '] } }), true);
   // Le raffiche non le ha fermate nessun segno: si sbloccano col rigiudizio.
   for (const r of ['raffica_mittente', 'raffica_globale', 'raffica_non_contata', 'prior_attack']) {
     assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: [r] } }), false, r);

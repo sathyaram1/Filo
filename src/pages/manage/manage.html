@@ -11,6 +11,7 @@
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/avvisiTempo.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/politicaModelli.js"></script>
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
@@ -49,6 +50,7 @@
   <script src="filo://shared/stimaCosto.js"></script>
   <script src="filo://shared/wallet.js"></script>
   <script src="filo://shared/campoNumero.js"></script>
+  <script src="filo://shared/spesaGiudici.js"></script>
   <link rel="stylesheet" href="filo://credits/credits.css" />
   <style>
     /* Le misure verticali della testata stanno qui, una volta sola, perché più
@@ -321,6 +323,9 @@
     .mg-dq-fiducia { padding: 0 6px; border-radius: 999px; cursor: help;
       color: var(--mg-fidata-color); border: 1px solid color-mix(in srgb, var(--mg-fidata-color) 55%, transparent); }
     .mg-dq-fiducia--no { color: var(--mg-nonfidata-color); border-color: color-mix(in srgb, var(--mg-nonfidata-color) 55%, transparent); }
+    /* Cosa fa la domanda al suo lavoro (#1577): ferma si legge come l'urgenza, va avanti resta tenue. */
+    .mg-dq-ferma { cursor: help; }
+    .mg-dq-ferma--si { color: var(--mg-urgente-color, #c0392b); font-weight: 600; }
     .mg-dq-legami { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
     .mg-dq-legami-pre { margin-right: 2px; }
     .mg-dq-legame { all: unset; cursor: pointer; color: var(--sn-accent); font-variant-numeric: tabular-nums; }
@@ -1278,6 +1283,22 @@
        come l'approvazione di una fusione, perché il primo non basti. */
     .mg-liv-azioni { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
     .mg-liv-strade { display: flex; flex-wrap: wrap; gap: 8px; }
+    /* Il testo reso leggibile dal filtro d'ingresso: monospazio perché i segnaposto e le codifiche si contano a
+       caratteri; i punti segnati sono evidenziati col colore d'accento, il loro perché sta sotto il puntatore. */
+    .mg-liv-leggibile { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+    .mg-liv-leggibile h4 { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--sn-muted); }
+    .mg-liv-leggibile-testo {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.6;
+      white-space: pre-wrap; word-break: break-word; color: var(--sn-text);
+      max-height: 340px; overflow: auto; padding: 8px 10px; border-radius: 6px;
+      background: color-mix(in srgb, var(--sn-fg) 4%, transparent);
+    }
+    .mg-liv-leggibile-testo mark {
+      color: inherit; border-radius: 3px; padding: 0 1px; cursor: help;
+      background: color-mix(in srgb, var(--sn-accent) 26%, transparent);
+      transition: background calc(0.15s * var(--sn-motion, 1)) ease;
+    }
+    .mg-liv-leggibile-testo mark:hover { background: color-mix(in srgb, var(--sn-accent) 42%, transparent); }
     .mg-liv-esito { font-size: 12px; }
     .mg-liv-esito[data-kind="ok"]   { color: #2e9e5b; }
     .mg-liv-esito[data-kind="err"]  { color: #c0392b; }
@@ -1592,6 +1613,25 @@
       color: var(--sn-fg); text-align: center;
     }
     .mg-auto-number:disabled { opacity: 0.5; cursor: not-allowed; }
+    .sn-page input.mg-auto-number--largo { width: 96px; }
+    /* Le manopole dei giudici (#1515) usano SN_CAMPO_NUMERO, che parla con .sn-manopola: qui tengono la pelle di
+       Automazioni, col bordo acceso finché il numero scritto non è sul server. */
+    .mg-auto-block.sn-manopola { display: block; }
+    .sn-page .mg-auto-block.sn-manopola.is-sporco input.mg-auto-number {
+      border-color: var(--sn-accent); box-shadow: 0 0 0 3px rgba(var(--sn-accent-rgb), 0.16);
+    }
+    .mg-action-msg.is-ok { color: #2e9e5b; }
+    .mg-action-msg.is-error { color: #c0392b; }
+    .mg-judge-spesa { display: grid; gap: 6px; margin-top: 12px; max-width: 360px; }
+    .mg-judge-spesa-barra { height: 6px; border-radius: 3px; background: var(--sn-border); overflow: hidden; }
+    .mg-judge-spesa-barra > span {
+      display: block; height: 100%; width: 0; border-radius: inherit; background: var(--sn-accent);
+      transition: width calc(240ms * var(--sn-motion, 1)) ease;
+    }
+    .mg-judge-spesa.is-pieno .mg-judge-spesa-barra > span { background: #c0392b; }
+    .mg-judge-spesa-testo { font-size: 13px; color: var(--sn-fg); }
+    .mg-judge-spesa-nota { font-size: 12px; color: var(--sn-muted); }
+    .mg-judge-spesa.is-pieno .mg-judge-spesa-nota { color: #c0392b; }
     /* Le istruzioni per chi corregge hanno la stessa pelle del campo numerico, ma larghe e a più righe. */
     .mg-auto-field-row--stack { flex-direction: column; align-items: stretch; gap: 8px; }
     .mg-auto-textarea {
@@ -2464,6 +2504,43 @@
                     min="10" max="300" step="1" inputmode="numeric" />
                   <button type="button" class="sn-btn" id="mgJudgeTimeoutSave">Salva</button>
                   <span class="mg-action-msg" id="mgJudgeTimeoutMsg" role="status"></span>
+                </div>
+              </section>
+
+              <!-- Il tetto di spesa dei giudici per i non fidati e la lunghezza che leggono (#1515): li legge e li
+                 scrive manage.js, le regole stanno in spesaGiudici.js. -->
+              <section class="mg-auto-block sn-manopola" id="mgJudgeBudgetBlock">
+                <label class="mg-auto-field-label" for="mgJudgeBudget">Tetto di spesa dei giudici (dollari al giorno)</label>
+                <p class="mg-auto-block-desc">
+                  Quanto possono spendere in un giorno i giudici sui feedback dei non fidati. Oltre il tetto
+                  quei feedback non vengono giudicati e aspettano te.
+                </p>
+                <div class="mg-judge-spesa" id="mgJudgeSpesa">
+                  <div class="mg-judge-spesa-barra" id="mgJudgeSpesaBarra" hidden><span id="mgJudgeSpesaQuota"></span></div>
+                  <span class="mg-judge-spesa-testo" id="mgJudgeSpesaTesto" role="status">Oggi: —</span>
+                  <span class="mg-judge-spesa-nota" id="mgJudgeSpesaNota" hidden></span>
+                </div>
+                <div class="mg-auto-field-row">
+                  <input type="number" id="mgJudgeBudget" class="mg-auto-number" step="0.01"
+                    inputmode="decimal" autocomplete="off" />
+                  <button type="button" class="sn-btn" id="mgJudgeBudgetSave">Salva</button>
+                  <button type="button" class="sn-btn sn-btn-secondary" id="mgJudgeBudgetRimetti" hidden>Rimetti com’era</button>
+                  <span class="mg-action-msg" id="mgJudgeBudgetMsg" role="status"></span>
+                </div>
+              </section>
+
+              <section class="mg-auto-block sn-manopola" id="mgJudgeCharsBlock">
+                <label class="mg-auto-field-label" for="mgJudgeChars">Feedback più lungo che i giudici leggono (caratteri)</label>
+                <p class="mg-auto-block-desc">
+                  Un feedback di un non fidato più lungo di così, fra testo e documenti, non va ai giudici e
+                  aspetta te. Non si taglia, perché chi ci lavora riceverebbe anche la parte che nessuno ha giudicato.
+                </p>
+                <div class="mg-auto-field-row">
+                  <input type="number" id="mgJudgeChars" class="mg-auto-number mg-auto-number--largo"
+                    inputmode="numeric" autocomplete="off" />
+                  <button type="button" class="sn-btn" id="mgJudgeCharsSave">Salva</button>
+                  <button type="button" class="sn-btn sn-btn-secondary" id="mgJudgeCharsRimetti" hidden>Rimetti com’era</button>
+                  <span class="mg-action-msg" id="mgJudgeCharsMsg" role="status"></span>
                 </div>
               </section>
             </div>

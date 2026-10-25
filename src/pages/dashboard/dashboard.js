@@ -227,7 +227,17 @@
     isTerminalMode: () => Term.isEnabled(),
     getShell: () => Term.getShell(),
     getCwd: () => Term.getCwd(),
-    runShellCommand: (command, chat) => Term.runShellCommand(command, chat),
+    runShellCommand: (command, chat, opzioni) => Term.runShellCommand(command, chat, opzioni),
+    // Un comando a cui la persona ha detto no torna com'era, incollato compreso; quello che intanto ha scritto resta.
+    rimettiNellaBarra: (testo, incollato) => {
+      if (inputEl.value.trim()) return;
+      inputEl.value = testo;
+      testoDaFuori = !!incollato;
+      autoGrowInput();
+      Comandi.updateInputClass();
+      inputEl.focus();
+      inputEl.setSelectionRange(testo.length, testo.length);
+    },
   });
   Accoglienza.init({
     $,
@@ -896,6 +906,7 @@
     WIFI: 'Chiedo al Wi-Fi…',
     INSTALLA_AGGIORNAMENTO: 'Cerco la versione nuova…',
     RIMEDIO_CREDITI: 'Guardo i crediti…',
+    CHIUDI_SCHEDE: 'Chiudo le schede…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
@@ -1506,8 +1517,11 @@
       bolla = null;
       // Il comando svuota la casella: quello che l'utente sta scrivendo intanto resta suo.
       const bozza = inputEl.value;
-      const fatto = await comandoLocale(s.c.text);
-      if (bozza && !inputEl.value) { inputEl.value = bozza; autoGrowInput(); Comandi.updateInputClass(); }
+      const fatto = await comandoLocale(s.c.text, { incollato: !!s.c.incollato });
+      if (bozza && inputEl.value !== bozza) {
+        inputEl.value = inputEl.value ? `${inputEl.value}\n${bozza}` : bozza;
+        autoGrowInput(); Comandi.updateInputClass();
+      }
       if (fatto) { if (seguiti.length && !sending) await partiSeguito(); return; }
     }
     await inviaComposto(s.c, { bolla });
@@ -1785,6 +1799,11 @@
     inputEl.focus();
     return true;
   }
+  // Da dove veniva e se è servito, per i contatori (#1471): mai cosa porta. Sul campo e fuori conta uguale.
+  const contaNellaChat = (dt, usato) => {
+    const ev = self.SN_GESTI && self.SN_GESTI.rilascio(dt, 'chat_home', usato);
+    if (ev) send({ type: MSG.CONTATORI_EVENTO, ...ev });
+  };
   // Fuori dal campo il rilascio va alla chat se nessun altro lo vuole (#1623), e finché si trascina il campo si accende:
   // si vede dove andrà a finire.
   const portaFile = (dt) => { const t = Array.from(dt?.types || []); return t.includes('Files') || t.includes('application/x-filo-file'); };
@@ -1802,7 +1821,7 @@
     spegniBersaglio();
     if (e.defaultPrevented || !portaFile(e.dataTransfer)) return;
     e.preventDefault();
-    fileNelCampo(e.dataTransfer);
+    if (fileNelCampo(e.dataTransfer)) contaNellaChat(e.dataTransfer, true);
   });
   inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
   // Un file diventa un allegato; un testo trascinato (una voce della colonna destra, una frase da
@@ -1810,8 +1829,9 @@
   // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
-    if (fileNelCampo(e.dataTransfer)) return;
+    if (fileNelCampo(e.dataTransfer)) { contaNellaChat(e.dataTransfer, true); return; }
     const testo = e.dataTransfer?.getData('text/plain') || '';
+    contaNellaChat(e.dataTransfer, !!testo);
     if (!testo) return;
     testoDaFuori = true;
     const prima = inputEl.value.slice(0, inputEl.selectionStart);
@@ -1874,11 +1894,11 @@
     const text = inputEl.value.trim();
     // Il secondo colpo di chi ha appena fermato (clic o Invio) non riprende: il menu, scelta deliberata, sì.
     if (!text && pendingImages.length === 0 && pendingFiles.length === 0) { if (!appenaFermato()) riprendi(); return; }
-    if (await comandoLocale(text)) return;
+    if (await comandoLocale(text, { incollato: testoDaFuori })) { if (!inputEl.value) testoDaFuori = false; return; }
     submitMessage(text);
   });
   // Quello che la barra fa da sé, senza il modello: vero se l'ha fatto.
-  async function comandoLocale(text) {
+  async function comandoLocale(text, { incollato = false } = {}) {
     // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
     // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
     // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
@@ -1888,7 +1908,7 @@
       const resolves = host ? await Comandi.ensureSiteResolved(host) : true;
       if (resolves === false) { Comandi.updateInputClass(); Comandi.showUnresolvedSite(text, host); return true; }
     }
-    return Comandi.handleSlashCommand(text);
+    return Comandi.handleSlashCommand(text, { incollato });
   }
 
   // Invio manda, Shift+Invio va a capo: il campo è una textarea, quindi Invio di suo andrebbe a

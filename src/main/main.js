@@ -27,11 +27,14 @@ if (process.platform === 'win32') {
 
 // UA pulita (il perché in src/main/userAgent.js). `userAgentFallback` è quella
 // che eredita ogni session, e va fissata PRIMA di whenReady.
+// I client hints che una UA riscritta fa sparire li rimette services/clientHints.js, dall'unico onBeforeSendHeaders.
 try {
   const { stripEmbeddedUaTokens } = require('./userAgent');
   const cleaned = stripEmbeddedUaTokens(app.userAgentFallback || '', app.getName());
   if (cleaned) app.userAgentFallback = cleaned;
 } catch (_) { /* best-effort: in peggio resta la UA di default */ }
+// In OGNI sessione, anche incognito e proxy: senza client hints Google respinge l'accesso (#1616). Il GPC resta spento finché la modalità non lo accende.
+app.on('session-created', (ses) => { try { require('./services/cookies').ensureHeaderHook(ses); } catch (_) {} });
 
 // Il portachiavi si sceglie solo prima di `ready`: senza, su sway/i3 l'accesso
 // non sopravvive alla chiusura nemmeno col portachiavi acceso (#708.1).

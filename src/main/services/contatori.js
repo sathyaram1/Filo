@@ -1,5 +1,5 @@
-// I contatori anonimi (#969, #1461, #1464, #1466): misura usi e chiamate dei modelli, azioni, gesti e guasti di elenco
-// chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito e a contatori spenti non conta e non
+// I contatori anonimi (#969, #1461, #1464, #1466, #1471): misura usi e chiamate dei modelli, azioni, gesti e guasti di
+// elenco chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito e a contatori spenti non conta e non
 // spedisce; spenti, butta quello che aveva, senza un ultimo segnale. Cosa esce: src/shared/contatoriGiornalieri.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
@@ -191,9 +191,13 @@ function crea(dip = {}) {
     return true;
   }
 
+  // Per zona, se le icone sono disposte come di serie (#1471): l'ora in corso la prende da qui, com'è adesso.
+  let disposizione = null;
+
   function oraCorrente() {
     const k = C.oraDi(adesso());
     if (!stato.ore[k]) stato.ore[k] = { ...C.oraVuota(), app: C.versioneApp(versione()) };
+    if (disposizione) C.segnaDisposizione(stato.ore[k], disposizione);
     return stato.ore[k];
   }
 
@@ -852,6 +856,38 @@ function crea(dip = {}) {
   }
   function primaDiOgniScrittura(fn) { if (typeof fn === 'function') primaDiScrivere.push(fn); }
 
+  // ── I gesti della personalizzazione (#1471) ─────────────────────────────
+  // `dati` può venire da una pagina: ne passano solo le chiavi e le voci dei suoi elenchi.
+  function gesto(misura, dati, { incognito = null } = {}) {
+    try {
+      if (!C.MISURE_GESTI.includes(misura) || misura === 'disposizione_di_serie') return false;
+      if (misura === 'barra_aperta' ? !C.gestoBarraValido(dati) : !C.voceGesto(misura, dati)) return false;
+      const d = misura === 'barra_aperta' ? { motivo: dati.motivo, esito: dati.esito, apertaMs: attesaPulita(dati.apertaMs) } : dati;
+      conta((ora) => C.registraGesto(ora, misura, d), { incognito }).catch(() => {});
+      return true;
+    } catch (_) { return false; }
+  }
+
+  // La disposizione delle icone di una finestra normale, letta o appena cambiata: l'ora in corso la tiene com'è ora.
+  function disposizioneIcone(layout) {
+    const d = C.disposizioneDiSerie(layout);
+    if (!d) return false;
+    disposizione = d;
+    const k = C.oraDi(adesso());
+    if (stato && stato.ore && stato.ore[k]) { C.segnaDisposizione(stato.ore[k], d); salvaPresto(); }
+    return true;
+  }
+
+  // L'«annulla» sul segno di un cambio del registro, con la via del cambio e quanto tempo dopo.
+  function cambioRitirato(evento, { incognito = null } = {}) {
+    try {
+      const voci = C.annullaCambio(evento, adesso());
+      if (!voci.length) return false;
+      conta((ora) => { for (const v of voci) C.registraGesto(ora, 'annulla_cambio', v); }, { incognito }).catch(() => {});
+      return true;
+    } catch (_) { return false; }
+  }
+
   // ── La spedizione ────────────────────────────────────────────────────────
   async function spedisci(doc, collezione = C.COLLEZIONE) {
     const { FIRESTORE_BASE, API_KEY } = rest();
@@ -934,13 +970,15 @@ function crea(dip = {}) {
       }
       const chiamate = giorno ? null : documentoChiamate(k, { ...base, chiave: k });
       const diFinestra = giorno ? null : documentoFinestra(k, { ...base, chiave: k });
+      const gesti = giorno ? null : documentoGesti(k, { ...base, chiave: k });
       let r = await spedisci(doc);
       if (mia !== generazione) return 'spenti';
       // L'ora è arrivata: il suo segno di primo documento vale anche se le sue chiamate partono al giro dopo, e
-      // allora l'ora rispedita risponde 409.
+      // allora l'ora rispedita risponde 409. Lo stesso per i gesti, dopo le chiamate.
       if (r.ok && primo) { stato.primi[g] = true; stato.primi[C.meseDi(g)] = true; }
-      if (r.ok && chiamate) {
-        r = await spedisci(chiamate, C.COLLEZIONE_CHIAMATE);
+      for (const [altro, collezione] of [[chiamate, C.COLLEZIONE_CHIAMATE], [gesti, C.COLLEZIONE_GESTI]]) {
+        if (!r.ok || !altro) continue;
+        r = await spedisci(altro, collezione);
         if (mia !== generazione) return 'spenti';
       }
       if (r.ok && diFinestra) {
@@ -989,6 +1027,16 @@ function crea(dip = {}) {
     const v = F.valida(d);
     if (v.ok) return d;
     log(`la finestra di ${k} non parte: ${v.motivo}`);
+    return null;
+  }
+
+  // I gesti di un'ora (#1471), se ne ha: come le chiamate, un documento storto non ferma l'ora.
+  function documentoGesti(k, base) {
+    const d = C.documentoGesti(base);
+    if (C.senzaGesti(d)) return null;
+    const v = C.validaGesti(d);
+    if (v.ok) return d;
+    log(`i gesti di ${k} non partono: ${v.motivo}`);
     return null;
   }
 
@@ -1189,7 +1237,7 @@ function crea(dip = {}) {
   return {
     apri, unUso, parteDiUnUso, servitaDaCache, usoDallaPagina, azione, azioneMisurata, impostazioniCambiate, ricerca,
     proposta, anticipoPronto, anticipoAperto, chiesto, adattamento, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa, confermaChiesta, confermaRisposta,
-    azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, primaDiOgniScrittura,
+    azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, primaDiOgniScrittura, gesto, disposizioneIcone, cambioRitirato,
     controlla, avvia, seguiImpostazioni, installazioni, somme, accesi, letto, salva,
     passoAvvio, passoAvvioFino, processoMorto, eccezione, ipcSincrono, aggiornamento, seguiFinestra, sessione,
     avvioProcesso, secondaIstanza, inizioChiusura, tettoChiusura, fineChiusura, perLaChiusura, salvaSubito,

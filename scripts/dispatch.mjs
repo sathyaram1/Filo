@@ -1298,6 +1298,9 @@ export function verifierReplyText(reply, id = '<id>') {
     ? capKeys.map((k) => (b[k] ? `${k}: ${b[k].left} giri residui su ${b[k].cap}` : null)).filter(Boolean).join(' · ')
     : '';
   const derivati = derivatiAperti(r.phase2 ? r.phase2.derived : r.derived);
+  // La domanda con «blocca»: false (#1577) non ferma il giro: va detto, o chi verifica crede di aspettare l'owner.
+  const provvRiga = typeof r.domandaProvvisoria === 'string' && r.domandaProvvisoria
+    ? `La domanda ${r.domandaProvvisoria} non ferma il lavoro: vale la consigliata finché l'owner non risponde.` : null;
   // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza dei
   // 3 non fermano il lavoro; il server li ha già messi nel feedback dei rimasti.
   const dueDaParte = derivati.filter((d) => d.tipo === 'rimasti')
@@ -1312,6 +1315,7 @@ export function verifierReplyText(reply, id = '<id>') {
   if (r.outcome === 'fix' && r.phase2) {
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
+      provvRiga,
       'Rilievi interni da correggere in questo giro (con la loro famiglia: le altre porte della stessa causa):',
       fmt(r.phase2.findings),
       'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu):',
@@ -1338,6 +1342,7 @@ export function verifierReplyText(reply, id = '<id>') {
     const sospesi = Array.isArray(r.sospesi) ? r.sospesi : [];
     return [
       '══ RISPOSTA DEL SERVER: il lavoro si ferma ══',
+      provvRiga,
       perSegnalazione
         ? 'La segnalazione è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
         : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o un 3/2 che chiede una decisione): decide l\'owner.',
@@ -1351,6 +1356,7 @@ export function verifierReplyText(reply, id = '<id>') {
   if (r.outcome === 'pass') {
     return [
       '══ RISPOSTA DEL SERVER: verifica superata ══',
+      provvRiga,
       derivati.length ? `Rilievi non corretti, diventati feedback derivati (esterni e domande uno per rilievo, gli altri insieme nel feedback dei rimasti):\n${derivatiRighe(derivati)}` : 'Nessun rilievo da mettere da parte.',
       dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
@@ -1381,6 +1387,8 @@ export function verifierReplyText(reply, id = '<id>') {
 export function fixedReplyText(id, reply, conSegnalazione = false) {
   const fermato = reply && reply.outcome === 'stop';
   if (fermato) return `stato ${id}: lavoro FERMATO, in attesa dell'owner (la segnalazione è consegnata). Rilascia il biglietto.`;
+  // «blocca»: false (#1577): la domanda è aperta e la correzione va in verifica con la consigliata.
+  if (reply && reply.outcome === 'provvisoria') return `stato ${id}: consegnato, torna in coda per la verifica. La domanda ${reply.domanda || ''} non ferma il lavoro: vale la consigliata finché l'owner non risponde.`;
   // Un server vecchio, che non ferma su una segnalazione, rimette in coda: dirlo, o chi ha segnalato crede di essersi fermato.
   if (conSegnalazione) return `stato ${id}: ATTENZIONE, la consegna portava una segnalazione ma il server non ha fermato il lavoro: è tornato in coda per la verifica. La segnalazione è consegnata lo stesso.`;
   return `stato ${id}: consegnato, torna in coda per la verifica`;
@@ -2437,7 +2445,7 @@ if (isMainModule) {
           // (lib/orchestratore-cieco.mjs). Senza gancio il giro non parte: meglio un giro saltato che uno che vede.
           // Solo in cloud: sulla macchina dell'owner le impostazioni utente valgono per tutte le sue sessioni.
           const cieco = process.env.CLAUDE_CODE_REMOTE === 'true'
-            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '' })
+            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', clone: cartellaCloneServer() })
             : { ok: true, saltato: true };
           if (cieco.saltato) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
           if (!cieco.ok) {
