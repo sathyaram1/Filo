@@ -31,6 +31,16 @@
   const FORMA_CODICE = /(?<![\w./:€$£-])(?:([A-Z]{1,3}-)?(\d{3,4}(?:[ -]\d{3,4}){1,2}|\d{2}-\d{2}-\d{2})|([A-Z]{1,3}-)?(\d{4,8}))(?![\w/]|[.,:]\d|-\d|\s?(?:€|%|euro\b|eur\b|usd\b))/g;
   const ANNO = /^(?:19|20)\d\d$/;
   const FINE_DI_UN_NUMERO = /(?:[*•·xX]{2,}[ .-]?|\b(?:termin\w*|finisc\w*|ending|ends?)\s+(?:con|in|with|per)\s+(?:le\s+cifre\s+)?)$/i;
+  // L'etichetta che dice di che cosa è il codice, subito prima del numero («Codice abbonamento: 4829», «Il codice del
+  // corso è 4829», «event code 4829»): un nome comune qualunque lo fa un identificativo, senza elencarli. Restano codici
+  // il nome di un servizio («Telegram code», «codice Amazon») e le parole del monouso qui sotto.
+  const ETICHETTA_IT = /\b[Cc]odic[ei]\s+(?:d(?:i|el|ella|ello|ei|egli|elle|ell['’])\s*)?([a-zà-ÿ]{3,})\s*(?:[:=#]|\bè\b|\bn\.?|\bnr\.?)?\s*$/;
+  const ETICHETTA_EN = /\b([a-z][a-z-]{2,})\s+codes?\s*(?:[:=#]|\bis\b|\bno\.?)?\s*$/;
+  const RESTA_UN_CODICE = /^(?:conferm\w*|sicurezza|temporane\w*|provvisori\w*|segret\w*|personal\w*|attivazion\w*|recupero|ripristino|emergenza|associazion\w*|abbinament\w*|ricevut\w*|inviat\w*|numeric\w*|nuovo|seguente|unico|sms|email|mail|your|the|my|this|that|our|its|new|same|following|above|below|one|confirmation|security|backup|recovery|reset|activation|temporary|secret|personal|pairing|text|numeric|unique|special)$/;
+  const etichettaDiUnIdentificativo = (prima) => {
+    const m = ETICHETTA_IT.exec(prima) || ETICHETTA_EN.exec(prima);
+    return !!m && !RESTA_UN_CODICE.test(m[1]) && !SEGNO_FORTE.test(m[1]);
+  };
   function codiciVicini(s, out) {
     const righe = s.split('\n');
     const frasi = (riga) => riga.split(/(?<=[.!?;])\s+(?=[A-ZÀ-Ý«"])|[|\t]/);
