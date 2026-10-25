@@ -149,11 +149,12 @@
       if (NOME_SEGRETO.test(nome) && valoreSegreto(nome, m[2])) out.push({ valore: m[2], regola: 'token' });
     }
     // Un webhook porta il segreto nel percorso, e l'indirizzo dice che è un webhook (hooks.slack.com, /api/webhooks/):
-    // dopo quel nome si toglie ogni pezzo lungo con lettere e cifre.
+    // dopo quel nome si toglie ogni pezzo lungo che non è un nome fatto di parole minuscole. Il segreto di Slack può
+    // non avere cifre (l'esempio della sua documentazione è tutto «X»).
     const w = url.match(/^[a-z][a-z0-9+.-]*:\/\/(?:[^/?#\s]*\bhooks?\b[^/?#\s]*|[^/?#\s]+(?:\/[^/?#\s]+)*?\/(?:web)?hooks?)(\/[^?#\s]*)/i);
     if (w) {
       for (const pezzo of w[1].split('/')) {
-        if (pezzo.length >= 20 && /[A-Za-z]/.test(pezzo) && /[0-9]/.test(pezzo)) out.push({ valore: pezzo, regola: 'token' });
+        if (pezzo.length >= 20 && /^[A-Za-z0-9_-]+$/.test(pezzo) && /[A-Za-z]/.test(pezzo) && !/^[a-z]+(?:[-_][a-z]+)*$/.test(pezzo)) out.push({ valore: pezzo, regola: 'token' });
       }
     }
   }
