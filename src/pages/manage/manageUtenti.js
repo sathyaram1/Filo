@@ -685,8 +685,12 @@
     return ul;
   }
 
-  // Gli usi fuori politica letti: restano qui sotto, e la persona torna segnata solo per un uso nuovo (#1520).
-  function bottoneVisto(pseudonym) {
+  // Gli usi fuori politica letti: restano qui sotto, e la persona torna segnata solo per un uso nuovo (#1520). Il
+  // server segna visto solo quello che questa scheda mostra: un uso arrivato dopo resta segnato.
+  function bottoneVisto(pseudonym, rec) {
+    const shown = (Array.isArray(rec && rec.offPolicy) ? rec.offPolicy : [])
+      .filter((u) => u && typeof u.model === 'string' && u.model)
+      .map((u) => ({ model: u.model, provider: typeof u.provider === 'string' ? u.provider : '', usd: Number(u.usd) || 0, requests: Number(u.requests) || 0 }));
     const riga = document.createElement('div');
     riga.className = 'sn-wallet-router-visto';
     const b = document.createElement('button');
@@ -699,10 +703,11 @@
     b.addEventListener('click', async () => {
       b.disabled = true;
       esito.textContent = '';
-      const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_OFF_POLICY_SEEN, pseudonym }).catch(() => null);
+      const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_OFF_POLICY_SEEN, pseudonym, shown }).catch(() => null);
       const res = r && r.ok && r.result;
       if (res && res.ok) {
-        esito.textContent = 'Segnato come visto.';
+        const ancora = W.motiviScarto(res.reconcile).some((m) => m.chiave === 'off_policy');
+        esito.textContent = ancora ? 'Nel frattempo è arrivato un uso nuovo: resta segnata.' : 'Segnato come visto.';
         loadOverview().catch(() => {});
         return;
       }
@@ -919,7 +924,7 @@
     const router = consumoRouterDetail(d.router, rec);
     if (router) {
       const blocco = bloccoScheda('Secondo il router', router);
-      if (rec && Array.isArray(rec.reasons) && rec.reasons.includes('off_policy')) blocco.appendChild(bottoneVisto(u.pseudonym));
+      if (rec && Array.isArray(rec.reasons) && rec.reasons.includes('off_policy')) blocco.appendChild(bottoneVisto(u.pseudonym, rec));
       wrap.appendChild(blocco);
     }
 

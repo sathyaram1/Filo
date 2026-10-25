@@ -22,6 +22,8 @@ let base = '';
 // Chi l'owner ha segnato come visto: da lì la riconciliazione non lo segna più per gli usi già letti.
 const visti = new Set();
 const ackChiesti = [];
+// Quello che la scheda mostrava quando l'owner ha premuto «Visto»: il server segna visto solo quello.
+const ackMostrati = [];
 const conVisto = (p) => (visti.has(p.pseudonym)
   ? { ...p, reconcile: { ...p.reconcile, flagged: false, reasons: [], offPolicy: [] } }
   : p);
@@ -102,6 +104,7 @@ test.beforeAll(async () => {
       if (url === '/walletAckOffPolicy') {
         const p = String((body.data && body.data.pseudonym) || '');
         ackChiesti.push(p);
+        ackMostrati.push(body.data && body.data.shown);
         const lei = PERSONE.find((x) => x.pseudonym === p);
         if (!lei) return json(res, 200, { result: { ok: false, reason: 'no_wallet' } });
         visti.add(p);
@@ -230,6 +233,7 @@ test('un router che non ha risposto si dice, e senza consumo letto né usi segna
 test('«Visto» sugli usi fuori politica: la persona non è più segnata, l’uso resta nella scheda', async ({ app }) => {
   visti.clear();
   ackChiesti.length = 0;
+  ackMostrati.length = 0;
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
@@ -254,6 +258,7 @@ test('«Visto» sugli usi fuori politica: la persona non è più segnata, l’us
 
   await expect(riga(page, FUORI).locator('td').nth(4)).toHaveText('ok', { timeout: 15_000 });
   expect(ackChiesti).toEqual([FUORI]);
+  expect(ackMostrati).toEqual([[{ model: 'openai/gpt-5', provider: 'Azure', usd: 1, requests: 3 }]]);
   await expect(scheda.locator('li', { hasText: 'Riconciliazione' })).toContainText('torna', { timeout: 15_000 });
   const router = scheda.locator('.sn-wallet-scheda-blocco', { hasText: 'Secondo il router' });
   await expect(router.locator('li').nth(0)).toContainText('openai/gpt-5 · Azure · modello fuori politica');

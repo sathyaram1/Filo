@@ -756,7 +756,8 @@ module.exports = function register(on, ctx) {
     detail: await callable('walletUserDetail', { pseudonym: String((msg && msg.pseudonym) || '') }, { asOwner: true }),
   })));
   on(MSG.WALLET_OWNER_OFF_POLICY_SEEN, ownerOnly(async (msg) => {
-    const result = await callable('walletAckOffPolicy', { pseudonym: String((msg && msg.pseudonym) || '') }, { asOwner: true });
+    const shown = Array.isArray(msg && msg.shown) ? msg.shown : [];
+    const result = await callable('walletAckOffPolicy', { pseudonym: String((msg && msg.pseudonym) || ''), shown }, { asOwner: true });
     vistaLetta = null;
     return { result };
   }));
