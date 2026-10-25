@@ -9,6 +9,15 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
     // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.251', date: '2026-10-29',
+      features: [],
+      fixes: [
+        'Nel riquadro «Invia feedback» il pulsante Allega mostra anche le tabelle .tsv. Prima le vedevi solo passando a «Tutti i file».',
+        'Ai feedback si allegano anche i file di log e .yaml su Linux e i .csv su Windows con Excel installato: prima Filo li mostrava fra quelli da scegliere e poi li rifiutava.',
+        'Se una segnalazione rimasta in attesa della rete alla fine non può partire, quello che avevi scritto torna nel riquadro dei feedback e l\'avviso ti dice su quale sito. Prima il testo andava perso.',
+      ],
+    },
+    {
       version: '0.2.250', date: '2026-10-23',
       features: [
         'Passando il mouse su una risposta di Filo, sotto compaiono Copia e Rispondi. Copia mette il testo negli appunti senza segni di formattazione. Rispondi la cita sopra la casella, come su WhatsApp, e il tuo messaggio parte con la citazione in testa. Così Filo sa a cosa stai rispondendo, e un clic sulla citazione ti riporta alla sua risposta.',
@@ -107,9 +116,6 @@
         'L\'assistente di pagina e la spiegazione del tasto destro non leggono più la password, il numero della carta e i codici che scrivi in un modulo, nemmeno nel riquadro del servizio di pagamento. L\'assistente sa a cosa serve ogni campo, ma al posto di quello che hai scritto vede i puntini.',
         'Nell\'Editor, con la finestra piccola o quando la domanda accanto a microfono e invio non si leggerebbe tutta, la casella della chat prende tutta la riga e i due tasti vanno sotto. Prima poteva restare larga due o tre parole. Mentre scrivi resta in vista la fine dell\'ultima risposta di Filo. In una chat molto bassa una domanda lunga scorre dentro la casella, e per leggerla tutta basta allargare il riquadro della chat.',
         'Nella home il microfono e il tasto per inviare stanno al centro del campo dove scrivi, alla stessa distanza dal bordo sopra, sotto e a destra. Quando vai a capo restano sull\'ultima riga.',
-        'Nel riquadro «Invia feedback» il pulsante Allega mostra anche le tabelle .tsv. Prima le vedevi solo passando a «Tutti i file».',
-        'Ai feedback si allegano anche i file di log e .yaml su Linux e i .csv su Windows con Excel installato: prima Filo li mostrava fra quelli da scegliere e poi li rifiutava.',
-        'Se una segnalazione rimasta in attesa della rete alla fine non può partire, quello che avevi scritto torna nel riquadro dei feedback e l\'avviso ti dice su quale sito. Prima il testo andava perso.',
         'Dopo «Importa dati» quello che arriva dal backup compare subito anche nelle schede già aperte, come pagine salvate, Cronologia AI e download, e non sparisce più al primo download o alla prima copia. Se un elenco è pieno, la conferma dice prima quante voci restano fuori. Un backup con un limite di spesa più alto, o senza limite, non te lo cambia più da solo, e nella conferma c\'è un pulsante per usarlo. Un archivio rovinato in qualche byte si importa lo stesso, e la conferma dice cosa non si legge.',
         'Filo legge le pagine molto lunghe aperte in una scheda anche su un computer lento. Se non fa in tempo a leggerle tutte usa la prima parte e ti dice che il resto non l\'ha letto. Prima a volte non ne leggeva niente.',
         'Nei riquadri incorporati dello stesso sito, come un blocco commenti, Alt+E e il tasto destro di Filo funzionano sempre. Prima, se il riquadro finiva di caricare dopo la pagina o ci passavi sopra col puntatore mentre caricava, lì dentro Filo non rispondeva più.',
