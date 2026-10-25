@@ -69,7 +69,6 @@ test('le funzioni che Filo sostituisce non si distinguono dalle native, nemmeno 
       dalRiquadro: [suo.call(navigator.credentials.get), suo.call(window.chrome.runtime.connect), suo.call(getter)],
       toStringDelRiquadro: [suo.call(suo), Object.getPrototypeOf(suo) === fw.Function.prototype],
       leSueRestano: suo.call(fw.eval('(function mia(a) { return a; })')),
-      crossOrigin: null,
     };
     f.remove();
     return out;
@@ -79,7 +78,6 @@ test('le funzioni che Filo sostituisce non si distinguono dalle native, nemmeno 
     dalRiquadro: ['function get() { [native code] }', 'function connect() { [native code] }', 'function get contentWindow() { [native code] }'],
     toStringDelRiquadro: ['function toString() { [native code] }', true],
     leSueRestano: 'function mia(a) { return a; }',
-    crossOrigin: null,
   });
 });
 
@@ -148,5 +146,36 @@ test.describe('pagina di accesso di un provider noto', () => {
       expect(await accesso.evaluate(() => ({ gpc: navigator.globalPrivacyControl === true, chrome: !!(window.chrome && window.chrome.runtime) })))
         .toEqual({ gpc: false, chrome: true });
     } finally { await sito.chiudi(); }
+  });
+
+  // Come Google, che dalla pagina di accesso carica il suo programma da gstatic e le risorse da www.google.com.
+  test('nemmeno gli script e le immagini che la pagina di accesso carica da altri host portano il GPC; il ritorno al sito sì', async ({ app, shell }) => {
+    await app.evaluate(() => globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null }));
+    const viste = [];
+    const server = createServer((req, res) => {
+      viste.push({ host: String(req.headers.host || '').split(':')[0], url: req.url, h: { ...req.headers } });
+      const port = server.address().port;
+      if (req.url.startsWith('/programma')) { res.writeHead(200, { 'Content-Type': 'text/javascript' }); res.end(`location.href = 'http://127.0.0.1:${port}/ritorno';`); return; }
+      if (req.url.startsWith('/logo')) { res.writeHead(200, { 'Content-Type': 'image/svg+xml' }); res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(req.url.startsWith('/login')
+        ? `<title>Accedi</title><img src="http://127.0.0.1:${port}/logo.svg"><script src="http://127.0.0.1:${port}/programma.js"></script>`
+        : '<title>Tornato</title><p>ok</p>');
+    });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    try {
+      let host = null;
+      for (const h of HOST_DI_ACCESSO) {
+        await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${h}:${server.address().port}/login`);
+        if (await expect.poll(() => viste.some((v) => v.host === h), { timeout: 3_000 }).toBe(true).then(() => true, () => false)) { host = h; break; }
+      }
+      expect(host, `nessun host di accesso si apre più in http: ${HOST_DI_ACCESSO.join(', ')}`).not.toBeNull();
+      await expect.poll(() => viste.some((v) => v.url.startsWith('/ritorno')), { timeout: 10_000 }).toBe(true);
+      const di = (inizio) => viste.find((v) => v.url.startsWith(inizio)).h;
+      expect(di('/login')['sec-gpc']).toBeUndefined();
+      expect(di('/programma')['sec-gpc'], 'lo script della pagina di accesso porta il GPC').toBeUndefined();
+      expect(di('/logo')['sec-gpc'], 'l\'immagine della pagina di accesso porta il GPC').toBeUndefined();
+      expect(di('/ritorno')['sec-gpc'], 'tornando al sito dalla pagina di accesso il GPC non parte').toBe('1');
+    } finally { try { server.closeAllConnections?.(); } catch (_) {} await new Promise((r) => server.close(r)); }
   });
 });
