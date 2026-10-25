@@ -374,6 +374,7 @@
     }
     if (r.result === 'discarded') return { kind: 'ok', text: 'Scartata.' };
     // Il sì a un ramo del server: la fusione la fa il server, quando i suoi controlli sono verdi.
+    if (r.result === 'server' && r.esito === 'al_pc') return { kind: 'ok', text: 'Approvata: il lavoro lo porta su main il tuo PC, alla prossima fusione dei lavori del server.' };
     if (r.result === 'server') return { kind: 'ok', text: 'Approvata: il server riprende e porta il lavoro su main appena i suoi controlli sono verdi.' };
     return { kind: 'warn', text: 'Esito inatteso: nessuna fusione è avvenuta.' };
   }

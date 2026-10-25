@@ -474,4 +474,8 @@ test('classifyServerMerge e messageForServerMerge: gli esiti del cancello per il
   assert.match(messageForServerMerge({ outcome: 'non_rapido' }, 'claude/x'), /claude\/x non contiene main di filo-security/);
   assert.match(messageForServerMerge({ outcome: 'rifiutata', detail: '422' }), /bypass della regola di main/);
   assert.match(messageForServerMerge({ outcome: 'not_deployed' }), /server della fase 2/);
+  // Le guardie del server toccate (#1497): un esito, non un guasto, e la riga dice cosa manca.
+  const si = ok('chiedi_si', { sha: 'c'.repeat(40), detail: 'il ramo del server tocca functions/src/l5/gates.js' });
+  assert.equal(si.outcome, 'chiedi_si');
+  assert.match(messageForServerMerge(si, 'worker/x'), /^Il cancello non porta worker\/x su main di filo-security senza il tuo sì: .*functions\/src\/l5\/gates\.js/);
 });
