@@ -1,5 +1,5 @@
-// Verifica #1273 giro 9, esplorazione: «Salva per dopo» da una scheda col proxy (pagina e link), con l'icona arrivata e
-// senza; poi home, «Aperti per dopo» e il riordino delle icone non chiedono niente fuori dal proxy.
+// Verifica #1273 giro 9, porta provata e chiusa: «Salva per dopo» da schede col proxy, una con l'icona arrivata e una
+// senza; poi riordino delle icone, home e «Aperti per dopo» non chiedono niente fuori dal proxy.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
@@ -65,7 +65,7 @@ const idScheda = (app, host) => app.evaluate(({ BrowserWindow }, h) => {
 test.describe('dal proxy, salvando per dopo', () => {
   test.use({ hostInPiu: NOMI });
 
-  test('pagina con icona, pagina senza icona e link salvati da schede col proxy: niente esce dalla connessione vera', async ({ app, openTab }) => {
+  test('pagina con icona e pagina senza icona salvate da schede col proxy: niente esce dalla connessione vera', async ({ app, openTab }) => {
     test.setTimeout(150_000);
     const siti = await sitiFinti();
     const socks = await proxySocks(siti.portaProxy);
@@ -94,14 +94,11 @@ test.describe('dal proxy, salvando per dopo', () => {
       const a = await conProxy('dal-proxy.test');
       await expect.poll(() => siti.richieste.proxy.some((r) => r.startsWith('img.piattaforma.test/dal-proxy.test')), { timeout: 15_000 }).toBe(true);
       const b = await conProxy('senza-icona.test');
-      // Il link sulla pagina col proxy: tasto destro, «Salva per dopo» sul link.
       const prima = siti.richieste.diretto.length;
       await salvaDalMenu(a.page);
       await expect.poll(() => app.evaluate(async () => (await globalThis.SN_SAVED_PAGES.list()).length), { timeout: 10_000 }).toBe(1);
       await salvaDalMenu(b.page);
       await expect.poll(() => app.evaluate(async () => (await globalThis.SN_SAVED_PAGES.list()).length), { timeout: 10_000 }).toBe(2);
-      const voci = await app.evaluate(async () => (await globalThis.SN_SAVED_PAGES.list()).map((p) => ({ url: p.url, favicon: p.favicon, proxy: p.proxy })));
-      console.log('VOCI', JSON.stringify(voci));
       await new Promise((r) => setTimeout(r, 5000));
       await app.evaluate(() => globalThis.__filoIconeVecchie?.completa());
       const home = await openTab('filo://newtab/');
@@ -109,7 +106,6 @@ test.describe('dal proxy, salvando per dopo', () => {
       const salvate = await openTab('filo://home/home.html');
       await salvate.waitForTimeout(3000);
       await app.evaluate(() => globalThis.__filoIconeVecchie?.completa());
-      console.log('DIRETTE', JSON.stringify(siti.richieste.diretto.slice(prima)));
       expect(siti.richieste.diretto.slice(prima), 'niente fuori dal proxy').toEqual([]);
     } finally {
       await socks.close();
