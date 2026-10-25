@@ -514,7 +514,7 @@
     clearTimeout(whichTimer);
     whichTimer = setTimeout(async () => {
       const cmd = programmaDi(value.trim());
-      if (!cmd) { updateInputClass(); return; }
+      if (!cmd || cmd === SINTASSI) { updateInputClass(); return; }
       const chiave = chiaveShell(cmd);
       // Lo stesso comando già in controllo non ne lancia un secondo (sotto carico ogni spawn in più allunga gli
       // altri): ricolora quello in volo, quando risponde.
