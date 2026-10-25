@@ -3,7 +3,7 @@
 // chiamata direttamente. Una / seguita da una parola che non è un programma resta un messaggio per Filo.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST, confirmState, clickConfirm } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmState, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
