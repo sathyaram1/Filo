@@ -82,7 +82,8 @@ test('una cancellazione incollata conta come scritta da altri: chiede la parola 
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
   expect((await confirmState(page)).hasInput, 'rimessa nella barra resta incollata').toBe(true);
   await fillConfirmInput(page, 'conferma');
-  await clickConfirm(page, 'ok');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'danger');
   await expect.poll(() => existsSync(bersaglio), { timeout: 12_000 }).toBe(false);
 });
 
