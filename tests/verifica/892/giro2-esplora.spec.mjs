@@ -22,6 +22,8 @@ test('decisioni', async ({ app }) => {
   const b = path.join(dir, 'b');
   const page = await newtabPage(app);
   const comandi = [
+    'cp /dev/null ~/.bashrc',
+    'mv ~/.profile ~/.bashrc',
     `rm -rf "${b}"`,
     'rm -rf ~/Documenti',
     `echo ciao; rm -rf "${b}"`,
