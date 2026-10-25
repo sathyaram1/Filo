@@ -129,6 +129,10 @@ controllo di sicurezza compresi.
   anche su un feedback fidato col ramo pulito: il suo commit lascia il ramo non
   pulito, e la fusione chiede il sì dell'owner. Un lavoro server non nasce in
   un'accensione sporca: resta per l'accensione dopo.
+- Vale anche per chi non spinge: il controllo di sicurezza apre il cancello
+  col suo verdetto, quindi un suo biglietto non fidato che consegna lascia nel
+  registro del ramo una voce non fidata (senza sha), e la fusione chiede il sì.
+  Uno fidato nel registro non scrive niente.
 - Il contenitore sporco conosce parola d'ordine e identificativo. Quando un
   biglietto nasce non fidato o si sporca, con la sua accensione si sporca anche
   la chiave. Un sondaggio con una chiave sporca apre un'accensione già sporca.
