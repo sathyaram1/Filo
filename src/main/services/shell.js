@@ -502,6 +502,16 @@ async function esitoDeiProbe(probes, cwd, attesaMs = ATTESA_PROBE_MS) {
   return incerto ? null : false;
 }
 
+// PATHEXT più gli script di PowerShell e gli installatori; in WSL decide il bit d'esecuzione, che da qui non si vede.
+function programmaWindowsAlPercorso(p, shell) {
+  const file = (f) => { try { return fs.statSync(f).isFile(); } catch (_) { return false; } };
+  if (shell === 'bash') return file(p);
+  const est = new Set(String(process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC')
+    .toLowerCase().split(';').filter(Boolean).concat(['.ps1', '.msi']));
+  if (est.has(path.extname(p).toLowerCase())) return file(p);
+  return [...est].some((e) => file(p + e));
+}
+
 // true esiste, false non esiste di certo, null non si è potuto sapere (la dashboard lo lascia senza colore).
 async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS } = {}) {
   const cmd = String(command == null ? '' : command).trim();
