@@ -36,7 +36,7 @@
   // il nome di un servizio («Telegram code», «codice Amazon») e le parole del monouso qui sotto.
   const ETICHETTA_IT = /\b[Cc]odic[ei]\s+(?:d(?:i|el|ella|ello|ei|egli|elle|ell['’])\s*)?([a-zà-ÿ]{3,})\s*(?:[:=#]|\bè\b|\bn\.?|\bnr\.?)?\s*$/;
   const ETICHETTA_EN = /\b([a-z][a-z-]{2,})\s+codes?\s*(?:[:=#]|\bis\b|\bno\.?)?\s*$/;
-  const RESTA_UN_CODICE = /^(?:conferm\w*|sicurezza|temporane\w*|provvisori\w*|segret\w*|personal\w*|attivazion\w*|recupero|ripristino|emergenza|associazion\w*|abbinament\w*|ricevut\w*|inviat\w*|numeric\w*|nuovo|seguente|unico|sms|email|mail|your|the|my|this|that|our|its|new|same|following|above|below|one|confirmation|security|backup|recovery|reset|activation|temporary|secret|personal|pairing|text|numeric|unique|special)$/;
+  const RESTA_UN_CODICE = /^(?:conferm\w*|sicurezza|temporane\w*|provvisori\w*|segret\w*|personal\w*|attivazion\w*|recupero|ripristino|emergenza|associazion\w*|abbinament\w*|ricevut\w*|inviat\w*|numeric\w*|nuovo|seguente|unico|sms|email|mail|your|the|my|this|that|our|its|new|same|following|above|below|one|confirmation|security|backup|recovery|reset|activation|temporary|secret|pairing|text|unique|special)$/;
   const etichettaDiUnIdentificativo = (prima) => {
     const m = ETICHETTA_IT.exec(prima) || ETICHETTA_EN.exec(prima);
     return !!m && !RESTA_UN_CODICE.test(m[1]) && !SEGNO_FORTE.test(m[1]);
