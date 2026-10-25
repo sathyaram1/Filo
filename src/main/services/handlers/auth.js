@@ -249,6 +249,12 @@ module.exports = function register(on, ctx) {
     // L'owner entrato o uscito cambia chi vede Bacheca e Mazzi senza che l'interruttore si muova (#1592).
     try { require('../inPausa').accessoCambiato(); } catch (_) {}
   };
+  // La copia della foto del profilo arriva dopo l'accesso (#1273): barra, shell e home la ridisegnano da qui.
+  if (typeof auth.suFoto === 'function') {
+    auth.suFoto((profile) => avvisaLeSuperficiDiFilo({
+      type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile, remembered: auth.isRemembered(),
+    }));
+  }
 
   // I token restano nel main process: qui torniamo solo il profilo pubblico
   // + se l'utente è admin (può triagiare i feedback). `uid` è il claim

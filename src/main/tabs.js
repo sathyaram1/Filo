@@ -960,9 +960,8 @@ class TabManager {
       view,
       title: rinviata ? titoloInAttesa(url) : 'Nuova scheda',
       url,
-      // `favicon` è il data: URL che vede la barra; `faviconUrl` l'indirizzo dichiarato dalla pagina, per archivio e salvati.
+      // Il data: URL scaricato con la sessione della scheda: lo vede la barra, e salvati e archivio ne tengono la copia.
       favicon: '',
-      faviconUrl: '',
       loading: true,
       canBack: false,
       canFwd: false,
@@ -1339,7 +1338,8 @@ class TabManager {
         Archive.archive({
           url,
           title: tab.title || url,
-          favicon: tab.faviconUrl || '',
+          // I byte che la scheda ha già scaricato con la sua sessione, proxy compreso: l'archivio ne tiene la copia (#1273).
+          favicon: tab.favicon || '',
           identityColor: tab.identityColor || null,
           openedAt: tab.openedAt || null,
           closedAt: new Date().toISOString(),
@@ -1856,16 +1856,14 @@ class TabManager {
   // Fino all'arrivo resta quella di prima: un'icona che cambia nella stessa pagina (un contatore) non lampeggia.
   _aggiornaIcona(tab, wc, candidati) {
     const lista = (Array.isArray(candidati) ? candidati : []).filter((u) => typeof u === 'string' && u);
-    tab.faviconUrl = lista[0] || '';
     const giro = (tab._giroIcona || 0) + 1;
     tab._giroIcona = giro;
     const vivo = () => tab._giroIcona === giro && !!tab.view && tab.view.webContents === wc && !wc.isDestroyed();
     let pagina = '';
     try { pagina = wc.getURL() || ''; } catch (_) {}
     const interna = /^filo:/i.test(pagina);
-    IconaScheda.iconaPer(wc.session, lista, { interna, vivo, pagina }).then(({ url, dato }) => {
+    IconaScheda.iconaPer(wc.session, lista, { interna, vivo, pagina }).then(({ dato }) => {
       if (!vivo()) return;
-      if (url) tab.faviconUrl = url;
       try { tab._origineIcona = origineDi(wc.getURL()); } catch (_) {}
       if (tab.favicon === dato) return;
       tab.favicon = dato;

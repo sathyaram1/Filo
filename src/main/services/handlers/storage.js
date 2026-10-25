@@ -126,8 +126,14 @@ module.exports = function register(on, ctx) {
       const { buildExportZip } = require('../exportData');
 
       const allData = await DiskStorage.get(null);
+      // Le copie delle icone stanno in file loro (#1273): nel backup tornano immagini, e l'importazione ne rifà la copia.
+      const Copie = require('../copieIcone');
+      const conIcone = (voci) => Promise.all(voci.map(async (v) => (
+        v && Copie.eCopia(v.favicon) ? { ...v, favicon: await Copie.comeDato(v.favicon) } : v)));
+      const SALVATE = SN_CONST.STORAGE_KEYS.SAVED_PAGES;
+      if (Array.isArray(allData[SALVATE])) allData[SALVATE] = await conIcone(allData[SALVATE]);
       // L'archivio delle schede ha file suoi: nel backup torna sotto la chiave di sempre.
-      const archivio = await globalThis.SN_ARCHIVED_TABS.list();
+      const archivio = await conIcone(await globalThis.SN_ARCHIVED_TABS.list());
       if (archivio.length) allData[ARCHIVE_KEY] = archivio;
       const cronologia = await History.list();
       if (cronologia.length) allData[HISTORY_KEY] = cronologia;
@@ -354,6 +360,8 @@ module.exports = function register(on, ctx) {
       // Un backup di una versione vecchia porta le miniature a piena risoluzione (#839).
       globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {});
       await annunciaAllePagine(new Set(Object.keys(rest)), sender);
+      // Le icone del backup arrivano come immagini: diventano copie, e quelle di un backup di prima si chiedono una volta (#1273).
+      try { require('../iconeVecchie').pianifica(1000); } catch (_) {}
 
       return { ok: true, added: stats.added, updated: stats.updated, unchanged: stats.unchanged };
     } catch (e) {

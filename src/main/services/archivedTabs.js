@@ -9,6 +9,7 @@
   const { creaDeposito } = require('./depositoAggiunte');
   const { MISURA, taglia } = require('./misurePagine');
   const Disco = require('../shim/storage');
+  const Copie = require('./copieIcone');
 
   // La chiave dove l'archivio stava in storage.json: serve solo a migrarlo.
   const CHIAVE_VECCHIA = global.SN_CONST.STORAGE_KEYS.ARCHIVED_TABS;
@@ -50,6 +51,7 @@
         const d = creaDeposito({ cartella: cartella(), meseDi });
         await d.carica();
         await migra(d);
+        await iconeLocali(d);
         return d;
       })();
       apertura.catch(() => { apertura = null; });
@@ -77,6 +79,26 @@
     await chrome.storage.local.remove(CHIAVE_VECCHIA);
   }
 
+  // L'icona di una scheda archiviata è la copia che Filo tiene (#1273): l'indirizzo delle voci di prima passa in
+  // `faviconDaChiedere` (iconeVecchie.js), tranne per una scheda passata dal proxy; un data: URL diventa una copia.
+  async function iconaLocale(t) {
+    const f = typeof t.favicon === 'string' ? t.favicon : '';
+    if (!f || Copie.eCopia(f)) return t;
+    if (/^data:/i.test(f)) return { ...t, favicon: await Copie.conserva(f) };
+    const daChiedere = !t.proxy && /^https?:\/\//i.test(f) ? f : '';
+    const { faviconDaChiedere, ...resto } = t;
+    return { ...resto, favicon: '', ...(daChiedere ? { faviconDaChiedere: daChiedere } : {}) };
+  }
+
+  async function iconeLocali(d) {
+    const nuove = new Map();
+    for (const t of d.tutti()) {
+      const n = await iconaLocale(t);
+      if (n !== t) nuove.set(t.id, n);
+    }
+    if (nuove.size) d.riscrivi((t) => nuove.get(t.id) || t);
+  }
+
   async function list() {
     if (Disco.inIncognito()) return [];
     return (await apri()).tutti();
@@ -95,14 +117,15 @@
     const prova = { url: u.testo, openedAt: meta.openedAt || null, closedAt: meta.closedAt || new Date().toISOString() };
     if (dimenticate.some((r) => coperta(prova, r))) return null;
     const d = await apri();
+    // `meta.favicon`: il data: URL che la scheda ha scaricato con la sua sessione (col proxy, se ce l'aveva).
+    const favicon = await Copie.conserva(meta.favicon);
     const entry = {
       id: uuid(),
       url: u.testo,
       title: t.testo,
       ...(u.tagliato ? { urlTagliato: true } : {}),
       ...(t.tagliato ? { titleTagliato: true } : {}),
-      // Anche l'icona la sceglie il sito (un data: lungo un mega): oltre la misura non si tiene, a metà non si disegna.
-      favicon: typeof meta.favicon === 'string' && meta.favicon.length <= MISURA.url ? meta.favicon : '',
+      favicon,
       // Colore identità del sito (§1.2): serve all'ordine cromatico in archivio.
       identityColor: meta.identityColor || null,
       openedAt: meta.openedAt || null,
@@ -120,7 +143,14 @@
     };
     const r = d.aggiungi(entry);
     if (r) entrate([r]);
+    // Senza copia (chiusa prima che l'icona arrivasse) la si chiede una volta, se la scheda non passava da un proxy.
+    if (r && !r.favicon && !r.proxy) riordinaIcone();
     return r;
+  }
+
+  const Vecchie = () => require('./iconeVecchie');
+  function riordinaIcone() {
+    try { Vecchie().pianifica(); } catch (_) {}
   }
 
   // Come list() ma SENZA gli embedding: è ciò che mandiamo al renderer, per non
@@ -140,9 +170,10 @@
   function togli(d, ids) {
     const via = new Set(ids);
     const urlVia = new Set();
-    for (const id of via) { const t = d.prendi(id); if (t && t.url) urlVia.add(t.url); }
+    const icone = [];
+    for (const id of via) { const t = d.prendi(id); if (t && t.url) urlVia.add(t.url); if (t) icone.push(t.favicon); }
     for (const t of d.tutti()) if (!via.has(t.id) && urlVia.has(t.url)) urlVia.delete(t.url);
-    return d.togli([...via], (t) => {
+    const tolte = d.togli([...via], (t) => {
       if (!urlVia.size || !Array.isArray(t.coOpenUrls) || !t.coOpenUrls.some((u) => urlVia.has(u))) return t;
       const tagliati = new Set(Array.isArray(t.coOpenUrlsTagliati) ? t.coOpenUrlsTagliati : []);
       const resta = t.coOpenUrls.map((u, i) => ({ u, tagliato: tagliati.has(i) })).filter((x) => !urlVia.has(x.u));
@@ -150,6 +181,9 @@
       const segni = resta.map((x, i) => (x.tagliato ? i : -1)).filter((i) => i >= 0);
       return { ...senza, coOpenUrls: resta.map((x) => x.u), ...(segni.length ? { coOpenUrlsTagliati: segni } : {}) };
     });
+    // L'icona se ne va con la scheda, se nessun'altra voce la usa.
+    Copie.togliSeOrfane(icone);
+    return tolte;
   }
 
   async function remove(id) {
@@ -199,7 +233,10 @@
 
   async function clear() {
     if (Disco.inIncognito()) return [];
-    (await apri()).svuota();
+    const d = await apri();
+    const icone = d.tutti().map((t) => t.favicon);
+    d.svuota();
+    Copie.togliSeOrfane(icone);
     return [];
   }
 
@@ -208,14 +245,36 @@
   async function importa(voci) {
     if (Disco.inIncognito() || !Array.isArray(voci)) return 0;
     const d = await apri();
-    const pronte = voci
-      .filter((t) => t && typeof t === 'object' && !Array.isArray(t))
-      .map((t) => (typeof t.id === 'string' && t.id ? t : { ...t, id: uuid() }));
-    return entrate(d.aggiungiMolti(pronte, { inCoda: true })).length;
+    const pronte = [];
+    for (const t of voci) {
+      if (!t || typeof t !== 'object' || Array.isArray(t)) continue;
+      pronte.push(await iconaLocale(typeof t.id === 'string' && t.id ? t : { ...t, id: uuid() }));
+    }
+    const entrati = entrate(d.aggiungiMolti(pronte, { inCoda: true }));
+    if (entrati.some((t) => !t.favicon && !t.proxy)) riordinaIcone();
+    return entrati.length;
   }
 
+  // `esiti`: id → { prima, a }, come in SN_SAVED_PAGES.aggiornaIcone. Una riscrittura sola: l'indirizzo chiesto non resta nei file.
+  async function aggiornaIcone(esiti) {
+    if (Disco.inIncognito()) return 0;
+    const d = await apri();
+    let cambiate = 0;
+    d.riscrivi((t) => {
+      const e = esiti.get(t.id);
+      if (!e || Vecchie().statoIcona(t) !== e.prima) return t;
+      cambiate++;
+      const { faviconDaChiedere, iconaMancante, ...resto } = t;
+      const esito = Vecchie().esitoIcona(t, e.a);
+      return { ...resto, favicon: esito.favicon, ...(esito.iconaMancante ? { iconaMancante: true } : {}) };
+    });
+    return cambiate;
+  }
+
+  Copie.usaCopie('schede-archiviate', async () => (Disco.inIncognito() ? [] : (await apri()).tutti().map((t) => t.favicon)));
+
   global.SN_ARCHIVED_TABS = {
-    list, listMeta, archive, update, remove, removeMany, dimenticaPagine, clear, importa,
+    list, listMeta, archive, update, remove, removeMany, dimenticaPagine, clear, importa, aggiornaIcone,
     suEntrate, cartella,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

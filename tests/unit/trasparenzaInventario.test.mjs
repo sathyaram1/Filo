@@ -45,6 +45,7 @@ const CARTELLA_DATI = {
   'segreti-letti.bin': { frase: 'E per un mese i segreti letti' },
   'appunti-tolti.json': { frase: 'un\'impronta da cui non si ricava né il testo né l\'immagine' },
   'archivio-schede': { frase: 'le schede aperte e quelle archiviate' },
+  icone: { frase: 'una copia delle icone delle pagine salvate e delle schede archiviate' },
   'segnalazioni-mie': { frase: 'una copia delle segnalazioni che hai mandato' },
   'cronologia-ai': { frase: 'l\'elenco delle richieste fatte ai modelli con domanda e risposta' },
   filo: { frase: 'le chat, l\'elenco delle richieste fatte ai modelli' },

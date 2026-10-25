@@ -367,8 +367,9 @@
       accountBtn.dataset.tip = authProfile.email ? `${label} — ${authProfile.email}` : label;
       accountBtn.setAttribute('aria-label', `Account: ${label}`);
       accountBtn.classList.add('signed-in');
-      if (authProfile.picture) {
-        // Via DOM per poter ripiegare sull'icona se la foto non si carica.
+      // La foto è la copia che il main tiene nella cartella dati (#1273): un indirizzo di rete qui non si carica.
+      if (/^filo:\/\/icone\//.test(authProfile.picture || '')) {
+        // Via DOM per poter ripiegare sull'icona se la copia non si legge.
         const img = document.createElement('img');
         img.className = 'account-avatar';
         img.alt = '';

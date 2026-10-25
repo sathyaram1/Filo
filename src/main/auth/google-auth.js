@@ -168,8 +168,50 @@ function persist() {
     email: session.email,
     name: session.name,
     picture: session.picture,
+    foto: session.foto || '',
+    fotoDi: session.fotoDi || '',
   });
 }
+
+// La foto del profilo è una copia nella cartella dati (#1273): si scarica una volta per account (o quando Google ne indica
+// un'altra, o all'avvio dopo se non era arrivata), senza cookie, e barra, shell e home la mostrano da lì. `suFoto` avvisa chi deve ridisegnarla.
+const copie = () => require('../services/copieIcone');
+const ascoltaFoto = new Set();
+function suFoto(fn) { ascoltaFoto.add(fn); return () => ascoltaFoto.delete(fn); }
+let fotoInCorso = null;
+let fotoPer = null;
+// L'account vale per tutte le finestre: la copia va su disco anche se l'accesso è partito da una finestra in incognito.
+const fuoriIncognito = (fn) => { try { return require('../shim/storage').runNormale(fn); } catch (_) { return fn(); } };
+
+function aggiornaFoto() {
+  const s = session;
+  // Un accesso nuovo mentre arriva la foto di quello prima aspetta il suo turno, non la perde.
+  if (fotoInCorso) return fotoPer === s ? fotoInCorso : fotoInCorso.then(() => aggiornaFoto());
+  if (!s || (!s.picture && !s.foto)) return Promise.resolve();
+  const nome = copie().nomeDa(s.foto);
+  const presente = !!nome && require('node:fs').existsSync(require('node:path').join(copie().cartella(), nome));
+  if (s.fotoDi === s.picture && (presente || !s.foto)) return Promise.resolve();
+  fotoPer = s;
+  fotoInCorso = fuoriIncognito(async () => {
+    let rif = '';
+    if (s.picture) {
+      const { session: sessioni } = require('electron');
+      const { dato } = await require('../services/iconaScheda').iconaPer(sessioni.defaultSession, [s.picture], { cookie: false });
+      rif = dato ? await copie().conserva(dato) : '';
+    }
+    if (session !== s) { copie().togliSeOrfane(rif); return; }
+    // Non arrivata (rete assente, server che non risponde): non si segna come presa, così l'avvio dopo la richiede.
+    if (s.picture && !rif) return;
+    const vecchia = s.foto;
+    s.foto = rif;
+    s.fotoDi = s.picture;
+    persist();
+    if (vecchia && vecchia !== rif) copie().togliSeOrfane(vecchia);
+    for (const fn of ascoltaFoto) { try { fn(getProfile()); } catch (_) {} }
+  }).catch(() => {}).finally(() => { fotoInCorso = null; fotoPer = null; });
+  return fotoInCorso;
+}
+copie().usaCopie('foto-profilo', () => [session && session.foto]);
 
 // Una risposta 200 può non essere un accesso (FEDERATED_USER_ID_ALREADY_LINKED, needConfirmation): senza i due
 // token non c'è sessione, e salvarla farebbe credere a un accesso riuscito.
@@ -180,13 +222,20 @@ function rispostaConSessione(fb) {
 function setSession(fb) {
   // Prima di toccare la sessione o il segno dell'owner caduto (#912): un accesso non avvenuto non li cambia.
   if (!rispostaConSessione(fb)) throw new Error('accesso senza sessione: risposta di Firebase senza token');
+  const prima = session;
+  const picture = fb.photoUrl || '';
+  // Lo stesso account con la stessa foto tiene la sua copia; un altro account la sua la scarica di nuovo.
+  const stessaFoto = !!(prima && prima.foto && prima.fotoDi === picture && prima.email === (fb.email || ''));
+  if (prima && prima.foto && !stessaFoto) copie().togliSeOrfane(prima.foto);
   session = {
     refreshToken: fb.refreshToken,
     idToken: fb.idToken,
     idTokenExp: Date.now() + (Number(fb.expiresIn || 3600) - 60) * 1000,
     email: fb.email || '',
     name: fb.displayName || '',
-    picture: fb.photoUrl || '',
+    picture,
+    foto: stessaFoto ? prima.foto : '',
+    fotoDi: stessaFoto ? prima.fotoDi : '',
   };
   segnaOwnerCaduto(false);
 }
@@ -223,6 +272,8 @@ function restore() {
   if (saved?.refreshToken) {
     session = { ...saved, idToken: null, idTokenExp: 0 };
     ricordata = store.canEncrypt();
+    // Una sessione di prima del #1273 ha solo l'indirizzo della foto: la copia si fa una volta, adesso.
+    try { aggiornaFoto(); } catch (_) {}
   }
   return getProfile();
 }
@@ -355,6 +406,7 @@ async function nuovoFlusso() {
     const fb = await signInWithFirebase(googleTok.id_token);
     setSession(fb);
     persist();
+    aggiornaFoto();
     return getProfile();
   })();
   return f;
@@ -366,9 +418,11 @@ function segreti() {
 }
 
 function chiudiSessione() {
+  const foto = session && session.foto;
   session = null;
   ricordata = false;
   store.clear();
+  if (foto) copie().togliSeOrfane(foto);
 }
 
 function signOut() {
@@ -422,9 +476,10 @@ async function getUid() {
   } catch (_) { return null; }
 }
 
+// `picture` è la copia della foto (filo://icone/…), mai l'indirizzo di Google: le pagine non la chiedono a nessuno.
 function getProfile() {
   if (!session) return null;
-  return { email: session.email, name: session.name, picture: session.picture };
+  return { email: session.email, name: session.name, picture: copie().eCopia(session.foto) ? session.foto : '' };
 }
 
 // Claim email/email_verified come le vedono le regole: servono a spiegare un 403
@@ -465,6 +520,8 @@ module.exports = {
   isRemembered,
   isAdmin,
   accessoOwnerCaduto,
+  suFoto,
+  aggiornaFoto,
   // esportati per i test
   _internals: { decodeJwtPayload, startLoopback, nuovoFlusso },
 };

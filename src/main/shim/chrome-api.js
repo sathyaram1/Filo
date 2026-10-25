@@ -24,6 +24,8 @@ const chromeShim = {
         await globalThis.SN_ARCHIVED_TABS?.clear();
         await globalThis.SN_HISTORY?.clear();
         await globalThis.SN_SEGNALAZIONI_MIE?.svuota();
+        // Le copie delle icone delle voci appena cancellate (#1273).
+        if (!storage.inIncognito()) await require('../services/copieIcone').pulisci();
       },
     },
     onChanged: {

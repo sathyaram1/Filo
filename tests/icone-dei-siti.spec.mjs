@@ -103,7 +103,7 @@ test('la home e la chat mostrano l\'icona dei siti senza chiedere niente a Googl
   }
 });
 
-test('l\'icona viene dalla scheda aperta e, chiusa la scheda, dall\'archivio: mai da /favicon.ico se il sito ne dichiara un\'altra', async ({ app, openTab }) => {
+test('l\'icona viene dalla scheda aperta e, chiusa la scheda, dalla copia dell\'archivio: senza nessuna richiesta', async ({ app, openTab }) => {
   await sitiFinti(app);
   await openTab('https://scheda.test/pagina');
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
@@ -117,18 +117,18 @@ test('l\'icona viene dalla scheda aperta e, chiusa la scheda, dall\'archivio: ma
   await expect(riga.locator('img')).toHaveAttribute('src', dato(PNG_BLU), { timeout: 10000 });
   expect((await richieste(app)).slice(dopoLaScheda), 'la copia della scheda aperta non chiede niente a nessuno').toEqual([]);
 
-  // Chiusa la scheda, l'archivio ricorda l'indirizzo che il sito dichiarava: la home lo usa, senza passare da /favicon.ico.
+  // Chiusa la scheda, l'archivio tiene la copia dell'icona che la scheda aveva scaricato (#1273): né l'indirizzo
+  // dichiarato né /favicon.ico ricevono niente.
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     w._filoTabs.closeTab(w._filoTabs.tabs.find((t) => /scheda\.test/.test(t.url || '')).id);
   });
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list())
-    .some((t) => /scheda\.test/.test(t.url) && t.favicon)), { timeout: 15000 }).toBe(true);
+    .some((t) => /scheda\.test/.test(t.url) && /^filo:\/\/icone\//.test(t.favicon))), { timeout: 15000 }).toBe(true);
   await home.reload();
   const rigaDopo = await rigaDiChat(home, 'riga-archivio', 'https://scheda.test/un-altra-pagina');
   await expect(rigaDopo.locator('img')).toHaveAttribute('src', dato(PNG_BLU), { timeout: 10000 });
-  const nuove = (await richieste(app)).slice(dopoLaScheda);
-  expect(nuove).toEqual(['scheda.test/icona-della-scheda.png']);
+  expect((await richieste(app)).slice(dopoLaScheda)).toEqual([]);
   expect(versoTerzi(await richieste(app))).toEqual([]);
 });
 

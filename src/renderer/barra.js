@@ -250,7 +250,8 @@
     const nome = a && a.dentro ? (a.etichetta || 'Profilo') : 'Accedi';
     b.setAttribute('aria-label', a && a.dentro ? `Profilo: ${nome}` : nome);
     b.dataset.sugg = nome;
-    if (a && a.dentro && /^https:\/\//.test(a.foto || '')) {
+    // Solo la copia che Filo tiene della foto (#1273): un indirizzo di rete qui non si carica.
+    if (a && a.dentro && /^filo:\/\/icone\/[0-9a-f]{40}\.[a-z]+$/.test(a.foto || '')) {
       const img = document.createElement('img');
       img.className = 'avatar';
       img.alt = '';

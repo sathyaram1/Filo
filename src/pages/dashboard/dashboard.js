@@ -2192,13 +2192,14 @@
     if (!accountCtrlBtn) return;
     const ICONS = self.SN_ICONS || {};
     const userIcon = typeof ICONS.user === 'function' ? ICONS.user(18) : '';
-    if (profile && profile.picture) {
+    // La foto è la copia che il main tiene nella cartella dati (#1273): un indirizzo di rete qui non si carica.
+    if (profile && /^filo:\/\/icone\//.test(profile.picture || '')) {
       const name = profile.name || (profile.email || '').split('@')[0] || 'Account';
       const img = document.createElement('img');
       img.className = 'account-avatar';
       img.alt = '';
       img.referrerPolicy = 'no-referrer';
-      // Se la foto Google non carica (CSP/rete) ripieghiamo sull'icona utente.
+      // Se la copia non si legge ripieghiamo sull'icona utente.
       img.onerror = () => { accountCtrlBtn.innerHTML = userIcon; };
       img.src = profile.picture;
       accountCtrlBtn.replaceChildren(img);

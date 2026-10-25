@@ -211,10 +211,12 @@ test('indirizzi e titolo lunghissimi escono tagliati e segnati, anche fra le sch
 test('l’icona di un sito oltre la misura non entra nell’archivio, quella normale resta', async () => {
   const icona = 'data:image/svg+xml,' + 'a'.repeat(1_000_000);
   const lunga = await A.archive({ url: 'https://icona-1525.test/', title: 'Icona', favicon: icona });
-  const breve = await A.archive({ url: 'https://icona-breve-1525.test/', title: 'Breve', favicon: 'https://icona-breve-1525.test/favicon.ico' });
+  // Quella normale arriva come i byte che la scheda ha già scaricato, e l'archivio ne tiene la copia (#1273).
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4YaMBAAL8AS3/gzpXAAAAAElFTkSuQmCC';
+  const breve = await A.archive({ url: 'https://icona-breve-1525.test/', title: 'Breve', favicon: png });
   const lista = await A.list();
   assert.equal(lista.find((x) => x.id === lunga.id).favicon, '');
-  assert.equal(lista.find((x) => x.id === breve.id).favicon, 'https://icona-breve-1525.test/favicon.ico');
+  assert.match(lista.find((x) => x.id === breve.id).favicon, /^filo:\/\/icone\/[0-9a-f]{40}\.png$/);
   await A.removeMany([lunga.id, breve.id]);
 });
 

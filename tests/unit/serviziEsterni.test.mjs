@@ -77,6 +77,42 @@ const CHIAMATE_LOCALI = {
   'src/pages/security/security.js': 'fetch su un data: URL, per rimettere un’immagine negli appunti',
 };
 
+// Una pagina di Filo contatta un sito anche senza fetch: un'immagine il cui indirizzo viene dai dati (#849.6, #1273).
+// Ognuna si riconosce dal file, dalla funzione che la contiene e da un pezzo della sua riga: o il servizio che contatta,
+// o il perché non contatta nessuno. Una nuova fa rosso finché non è qui.
+const IMMAGINI_DAI_DATI = [
+  { file: 'src/pages/editor/editor.js', funzione: 'inlineToHtml', testo: '<img src="${escapeHtml(String(n.attrs.src).trim())}"', servizio: 'immagini-nei-documenti' },
+  { file: 'src/pages/decks/decks.js', funzione: 'manaHtml', testo: 'src="${esc(uri)}"', servizio: 'scryfall' },
+  { file: 'src/pages/decks/decks.js', funzione: 'deckCardHtml', testo: "background-image:url('${esc(art)}')", servizio: 'scryfall' },
+  { file: 'src/pages/decks/decks.js', funzione: 'preloadImage', testo: 'img.src = url;', servizio: 'scryfall' },
+  { file: 'src/pages/decks/decks.js', funzione: 'paintCardImage', testo: 'img.src = (card && card.image)', servizio: 'scryfall' },
+  { file: 'src/pages/decks/decks.js', funzione: 'flipCardImage', testo: 'img.src = toBack ? card.backImage : card.image;', servizio: 'scryfall' },
+  { file: 'src/pages/home/home.js', funzione: 'renderCard', testo: 'img.src = page.favicon;', perche: 'la copia dell’icona che Filo tiene (filo://icone/), o un data: in incognito: la riga sopra non lascia passare altro' },
+  { file: 'src/pages/home/home.js', funzione: 'renderCard', testo: 'url(${JSON.stringify(page.thumbnail)})', perche: 'la miniatura della pagina salvata, un data: fatto dal main (miniature.accettabile)' },
+  { file: 'src/pages/home/home.js', funzione: 'renderTile', testo: 'url(${JSON.stringify(t.thumb)})', perche: 'la miniatura della categoria, la stessa della pagina che l’ha creata' },
+  { file: 'src/pages/dashboard/dashboard.js', funzione: 'applyAccountProfile', testo: 'img.src = profile.picture;', perche: 'la copia della foto del profilo (filo://icone/), controllata sopra' },
+  { file: 'src/renderer/shell.js', funzione: 'renderAccount', testo: 'img.src = authProfile.picture;', perche: 'la copia della foto del profilo (filo://icone/), controllata sopra' },
+  { file: 'src/renderer/barra.js', funzione: 'disegnaAccount', testo: 'img.src = a.foto;', perche: 'la copia della foto del profilo (filo://icone/), controllata sopra' },
+  { file: 'src/pages/dashboard/dashboard-carte.js', funzione: 'faviconDi', testo: 'img.src = dato', perche: 'l’icona del sito che il main consegna come data: (voce «icone-dei-siti»)' },
+  { file: 'src/pages/dashboard/dashboard-attivita.js', funzione: 'iconaSitoEl', testo: 'img.src = dato', perche: 'l’icona del sito che il main consegna come data: (voce «icone-dei-siti»)' },
+  { file: 'src/renderer/shell.js', funzione: 'applicaScheda', testo: 'url("${nota.dato}")', perche: 'l’icona della scheda, un data: scaricato dal main con la sessione della scheda' },
+  { file: 'src/renderer/shell.js', funzione: 'fontiDelloSchermo', testo: 'img.src = f.anteprima;', perche: 'l’anteprima della fonte, un data: controllato sopra' },
+  { file: 'src/renderer/anteprima.js', testo: 'img.src = d.src;', perche: 'un data: controllato sopra' },
+  { file: 'src/pages/dashboard/dashboard.js', funzione: 'rendiMessaggi', testo: 'img.src = src;', perche: 'le foto mandate in chat, data: filtrati prima' },
+  { file: 'src/pages/dashboard/dashboard.js', funzione: 'bollaUtente', testo: 'img.src = src;', perche: 'le immagini del messaggio appena scritto, data: incollati o trascinati' },
+  { file: 'src/pages/dashboard/dashboard.js', funzione: 'renderImagePreviews', testo: 'img.src = dataUrl;', perche: 'le immagini incollate in attesa di partire, data:' },
+  { file: 'src/pages/dashboard/dashboard.js', funzione: 'openLightbox', testo: ".src = src;", perche: 'l’ingrandimento di un’immagine della chat già a schermo' },
+  { file: 'src/pages/security/security.js', funzione: 'renderClipboard', testo: 'thumb.src = entry.dataUrl;', perche: 'la cronologia degli appunti: le immagini copiate, data:' },
+  { file: 'src/pages/feedback/feedback.js', funzione: 'mostraAnteprimaAllegato', testo: 'im.src = locale;', perche: 'l’allegato appena scelto, un blob: del file' },
+  { file: 'src/pages/feedback/feedback.js', funzione: 'mostraAnteprimaAllegato', testo: 'im.src = dataUrl;', perche: 'l’allegato decifrato dal main, data:' },
+  { file: 'src/pages/feedback/feedback.js', funzione: 'renderThumbs', testo: 'lightboxImg.src = piena;', perche: 'l’ingrandimento di un’anteprima già a schermo' },
+  { file: 'src/pages/feedback/feedback.js', funzione: 'render', testo: 'lightboxImg.src = img.dataset.full;', perche: 'l’ingrandimento di un’anteprima già a schermo' },
+  { file: 'src/pages/feedback/feedback.js', funzione: 'render', testo: 'img.src = dataUrl;', perche: 'l’allegato decifrato dal main, data:' },
+  { file: 'src/pages/manage/manage.js', funzione: 'resolveBubbleImages', testo: 'img.src = dataUrl;', perche: 'l’allegato decifrato dal main, data:' },
+  { file: 'src/pages/manage/manage.js', funzione: 'openLightbox', testo: 'mgLightboxImg.src = src;', perche: 'l’ingrandimento di un’anteprima già a schermo' },
+  { file: 'src/shared/immaginiChat.js', funzione: 'apri', testo: 'img.src = url;', perche: 'un’immagine della chat che il sistema non apre da solo (svg): un blob: fatto lì sopra dai suoi byte' },
+];
+
 // In un file che fa rete ogni testo con la forma di un nome di dominio è una destinazione, per qualunque strada arrivi
 // alla chiamata (opzioni, join, concat…). Fanno eccezione le costanti qui sotto, nomi che il file confronta e non contatta.
 const NOMI_NON_CONTATTATI = [
@@ -251,14 +287,63 @@ function destinazioniNelCodice(file, testo, righe) {
   return out;
 }
 
+// Il codice che gira dentro le pagine di Filo: le pagine, la barra, e i moduli condivisi che le pagine caricano
+// (finestre di conferma, avvisi, pannelli); quello che caricano parte dalla loro sessione, coi dati dell'utente intorno.
+const PAGINE_INTERNE = /^src\/(pages|renderer|shared)\/.+\.[cm]?js$/;
+// `background` da solo è quasi sempre un colore: un'immagine lì dentro passa da `url(`, che lo vede la regola dei testi.
+const PROPRIETA_IMMAGINE = new Set(['src', 'srcset', 'poster', 'backgroundImage']);
+const ATTRIBUTI_IMMAGINE = new Set(['src', 'srcset', 'poster', 'background-image']);
+// Un testo che apre un attributo d'immagine o un url() CSS: l'espressione che lo segue è l'indirizzo che si carica.
+const APRE_SORGENTE = /(?:\b(?:src|srcset|poster)\s*=\s*["']?|url\(\s*["']?)$/i;
+const letterale = (e) => !!e && (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e));
+const ultimoLetterale = (e) => (letterale(e) ? e : e && ts.isBinaryExpression(e) && e.operatorToken.kind === K.PlusToken ? ultimoLetterale(e.right) : null);
+
+function nomeDiFunzione(n) {
+  if ((ts.isFunctionDeclaration(n) || ts.isFunctionExpression(n) || ts.isMethodDeclaration(n)) && n.name) return n.name.getText();
+  if ((ts.isVariableDeclaration(n) || ts.isPropertyAssignment(n)) && n.initializer
+    && (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer))) return n.name.getText();
+  return '';
+}
+
+// Un'immagine che una pagina interna carica da un indirizzo non scritto nel codice: `img.src = voce.favicon`,
+// setAttribute('src', …), `<img src="${…}">`, `url(${…})`. Una per riga.
+function immaginiDi(file, testo, righe) {
+  if (!PAGINE_INTERNE.test(file)) return [];
+  const sf = ts.createSourceFile(file, testo, ts.ScriptTarget.ESNext, true, ts.ScriptKind.JS);
+  const trovate = new Map();
+  const segna = (n, funzione) => {
+    const riga = sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
+    if (!trovate.has(riga)) trovate.set(riga, { file, riga, funzione, testoRiga: righe[riga - 1] || '' });
+  };
+  (function giro(n, funzione) {
+    funzione = nomeDiFunzione(n) || funzione;
+    if (ts.isBinaryExpression(n) && n.operatorToken.kind === K.EqualsToken && ts.isPropertyAccessExpression(n.left)
+      && PROPRIETA_IMMAGINE.has(n.left.name.text) && !letterale(n.right)) segna(n, funzione);
+    if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression) && /^(setAttribute|setProperty)$/.test(n.expression.name.text)
+      && letterale(n.arguments[0]) && ATTRIBUTI_IMMAGINE.has(n.arguments[0].text) && n.arguments[1] && !letterale(n.arguments[1])) segna(n, funzione);
+    if (ts.isTemplateExpression(n)) {
+      const prima = [n.head, ...n.templateSpans.map((s) => s.literal)];
+      n.templateSpans.forEach((s, i) => { if (APRE_SORGENTE.test(prima[i].text)) segna(s.expression, funzione); });
+    }
+    if (ts.isBinaryExpression(n) && n.operatorToken.kind === K.PlusToken && !letterale(n.right)) {
+      const l = ultimoLetterale(n.left);
+      if (l && APRE_SORGENTE.test(l.text)) segna(n.right, funzione);
+    }
+    ts.forEachChild(n, (c) => giro(c, funzione));
+  })(sf, '');
+  return [...trovate.values()];
+}
+
 function analizza(sorgenti) {
   const indirizzi = [];
   const chiamate = new Set();
   const testi = new Map();
+  const immagini = [];
   for (const [file, testo] of Object.entries(sorgenti)) {
     const l = leggi(file, testo);
     testi.set(file, l);
     const righe = testo.split('\n');
+    immagini.push(...immaginiDi(file, testo, righe));
     const letti = indirizziDi(l.frammenti, righe);
     for (const u of letti) indirizzi.push({ file, ...u });
     if (CHIAMATA_RE.test(l.codice) || MODULO_RETE_RE.test(l.senzaCommenti)) {
@@ -270,8 +355,16 @@ function analizza(sorgenti) {
       }
     }
   }
-  return { indirizzi, chiamate, testi, sorgenti };
+  return { indirizzi, chiamate, testi, sorgenti, immagini };
 }
+
+const immagineDi = (u) => IMMAGINI_DAI_DATI.find((c) => c.file === u.file && (!c.funzione || c.funzione === u.funzione) && u.testoRiga.includes(c.testo));
+
+function immaginiScoperte(analisi) {
+  return analisi.immagini.filter((u) => !immagineDi(u)).map((u) => `${u.file}:${u.riga} (${u.funzione || 'fuori da una funzione'}) ${u.testoRiga.trim()}`);
+}
+
+const usaConImmagini = (v, f, analisi) => analisi.immagini.some((u) => u.file === f && immagineDi(u)?.servizio === v.id);
 
 const nonDiRete = (host) => NON_DI_RETE.some((r) => r.host.test(host.replace(/:\d*$/, '')));
 const esempioDi = (file, url) => ESEMPI.find((e) => e.file === file && SE.copre(e.url, url));
@@ -303,6 +396,7 @@ const proveDi = (v) => [].concat(v.prova || []);
 // In un file che serve più servizi la chiamata e l'indirizzo condiviso non dicono quale: vale la «prova» della voce,
 // o un indirizzo sotto la sua base che nessun'altra voce di quel file copre.
 function vivaNelFile(v, f, analisi, fissi) {
+  if (usaConImmagini(v, f, analisi)) return true;
   const l = analisi.testi.get(f);
   const prove = proveDi(v);
   const conProva = prove.some((p) => l.senzaCommenti.includes(p));
@@ -328,7 +422,8 @@ function vociMorte(analisi) {
       out.push(`${v.id}: «${prove.join('», «')}» non compare più in ${v.dove.join(', ')}`);
     }
     // Un indirizzo rimasto in una costante non è un uso: senza una chiamata nei suoi file serve la «prova» di come parte.
-    if (SE.SERVIZI.includes(v) && !v.nellaLibreria && !prove.length && !v.dove.some((f) => analisi.chiamate.has(f))) {
+    if (SE.SERVIZI.includes(v) && !v.nellaLibreria && !prove.length
+      && !v.dove.some((f) => analisi.chiamate.has(f) || usaConImmagini(v, f, analisi))) {
       out.push(`${v.id}: nessun file del suo «dove» fa chiamate di rete; se parte in un altro modo (un'immagine, una finestra) scrivilo nella «prova»`);
     }
     if (v.nellaLibreria) continue;
@@ -369,6 +464,13 @@ test('ogni file che fa chiamate di rete è nel «dove» di un servizio dell’el
   assert.deepEqual(scoperte, [], `File con chiamate di rete che nessuna voce nomina:\n  ${scoperte.join('\n  ')}\n${COME_SI_CORREGGE}`);
 });
 
+test('ogni immagine che una pagina di Filo carica da un indirizzo letto dai dati dice cosa contatta', () => {
+  const scoperte = immaginiScoperte(ANALISI);
+  assert.deepEqual(scoperte, [], `Immagini con l’indirizzo preso dai dati che nessuno dichiara:\n  ${scoperte.join('\n  ')}\n`
+    + 'Se contattano un sito, aggiungi il servizio in src/shared/serviziEsterni.js e la riga in IMMAGINI_DAI_DATI col suo «servizio»; '
+    + 'se l’indirizzo è una copia locale (data:, blob:, filo://), la riga col suo perché.');
+});
+
 test('ogni voce dell’elenco è ancora usata dal codice', () => {
   const morte = vociMorte(ANALISI);
   assert.deepEqual(morte, [], `Voci che il codice non usa più:\n  ${morte.join('\n  ')}\nToglile da src/shared/serviziEsterni.js, o correggi «base», «dove» o «prova».`);
@@ -400,6 +502,13 @@ test('le esclusioni dichiarate qui servono ancora', () => {
   }
   for (const f of Object.keys(CHIAMATE_LOCALI)) {
     assert.ok(ANALISI.chiamate.has(f), `${f} non fa più chiamate: togli l’esclusione`);
+  }
+  for (const c of IMMAGINI_DAI_DATI) {
+    assert.ok(ANALISI.immagini.some((u) => immagineDi(u) === c), `l’immagine «${c.testo}» non è più in ${c.file}${c.funzione ? ` (${c.funzione})` : ''}: togli la riga`);
+    if (c.servizio) {
+      const v = SE.SERVIZI.find((x) => x.id === c.servizio);
+      assert.ok(v && v.dove.includes(c.file), `«${c.testo}»: il servizio ${c.servizio} non esiste o non ha ${c.file} nel suo «dove»`);
+    } else assert.ok(c.perche, `«${c.testo}»: senza servizio serve il perché`);
   }
   for (const n of NOMI_NON_CONTATTATI) {
     const dichiarata = new RegExp(`\\b(?:const|let|var)\\s+${n.costante}\\b`).test(ANALISI.testi.get(n.file)?.codice || '');
@@ -504,6 +613,7 @@ function conFile(f, testo, base) {
     chiamate,
     testi: new Map([...base.testi, [f, nuovo.testi.get(f)]]),
     sorgenti: { ...base.sorgenti, [f]: testo },
+    immagini: [...base.immagini.filter((u) => u.file !== f), ...nuovo.immagini],
   };
 }
 
@@ -592,6 +702,36 @@ const PROVE = {
   'una richiesta con l’host nelle opzioni, in un file già nell’elenco, è rossa': (base) => {
     const a = aggiungiA(WALLET, base, "\nrequire('electron').net.request({ protocol: 'https:', hostname: 'nuovo.example', path: '/' });\n");
     assert.deepEqual(senzaRiga(nuovi(indirizziScoperti, a, base)), [`${WALLET} https://nuovo.example`]);
+  },
+  'una pagina interna che carica un’immagine da un indirizzo letto dai dati è rossa, per qualunque strada': (base) => {
+    const f = 'src/pages/zzNuova/zzNuova.js';
+    for (const via of [
+      'img.src = voce.favicon;',
+      "img.setAttribute('src', voce.favicon);",
+      'riga.innerHTML = `<img class="ico" src="${voce.favicon}">`;',
+      "riga.innerHTML = '<img src=\"' + voce.favicon + '\">';",
+      'el.style.backgroundImage = `url(${voce.favicon})`;',
+      "el.style.setProperty('background-image', voce.sfondo);",
+    ]) {
+      const a = conFile(f, `function riga(voce, img, riga, el) {\n  ${via}\n}\n`, base);
+      assert.deepEqual(nuovi(immaginiScoperte, a, base), [`${f}:2 (riga) ${via}`], via);
+    }
+    // Un indirizzo scritto nel codice lo vede già la regola degli indirizzi; un content script gira nella pagina del sito.
+    const fisso = conFile(f, "img.src = 'filo://asset/icons/icon-32.png';\n", base);
+    assert.deepEqual(nuovi(immaginiScoperte, fisso, base), []);
+    const nelSito = conFile('src/content/zzNuovo.js', 'img.src = voce.favicon;\n', base);
+    assert.deepEqual(nuovi(immaginiScoperte, nelSito, base), []);
+    // Un modulo condiviso d'interfaccia (una finestra di conferma) gira dentro le pagine di Filo come la pagina stessa.
+    const condiviso = 'src/shared/confirmUi.js';
+    const nelModulo = conFile(condiviso, `${base.sorgenti[condiviso]}\nfunction icona(voce, img) { img.src = voce.favicon; }\n`, base);
+    assert.equal(nuovi(immaginiScoperte, nelModulo, base).length, 1, 'un modulo condiviso che carica un’immagine dai dati resta verde');
+  },
+  'un’immagine dichiarata locale che cambia funzione o testo torna rossa': (base) => {
+    const home = 'src/pages/home/home.js';
+    const testo = base.sorgenti[home];
+    assert.ok(testo.includes('img.src = page.favicon;'), 'l’icona delle pagine salvate non è più scritta così: aggiorna la prova');
+    const a = conFile(home, testo.replace('img.src = page.favicon;', 'img.src = page.faviconDichiarata;'), base);
+    assert.equal(nuovi(immaginiScoperte, a, base).length, 1);
   },
   'un servizio tolto da un file che ne serve altri sullo stesso server rende rossa la sua voce': (base) => {
     const testo = base.sorgenti[WALLET];
