@@ -1,6 +1,6 @@
 // Orchestratore cieco: nella sessione di un giro il testo dei worker non entra nel suo contesto, modello e sforzo del worker
-// li mette il gancio come li ha decisi il server, e nessuno (worker compresi) manda notifiche all'owner. Gancio e registro
-// stanno nelle impostazioni dell'UTENTE, mai nella cartella del progetto. Regole: tests/unit/orchestratoreCieco.test.mjs.
+// li mette il gancio come li ha decisi il server, e nessuno (worker compresi) manda notifiche all'owner. Gancio, registro e
+// permessi git stanno nelle impostazioni dell'UTENTE, mai nella cartella del progetto. Regole: tests/unit/orchestratoreCieco.test.mjs.
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -41,6 +41,15 @@ export const AMBIENTE = Object.freeze({
 });
 // Con FORCE acceso Claude Code ignora il modello del lancio e della definizione: un'installazione vecchia la lascerebbe.
 export const AMBIENTE_TOLTO = Object.freeze(['CLAUDE_CODE_SUBAGENT_MODEL_FORCE']);
+// Le stesse di .claude/settings.json: lì le perde ogni ramo nato prima, qui reggono al cambio di ramo. Una regola a
+// prefisso non vede `git -C`, quindi il clone del server ha le sue, col percorso vero.
+export const REGOLE_GIT = Object.freeze(['Bash(git fetch:*)', 'Bash(git rebase:*)', 'Bash(git merge:*)']);
+export function regoleGit(clone = '') {
+  const p = String(clone || '').trim().split('\\').join('/');
+  if (!p) return [...REGOLE_GIT];
+  const conClone = ['fetch', 'rebase', 'merge'].flatMap((v) => [`Bash(git -C "${p}" ${v}:*)`, `Bash(git -C ${p} ${v}:*)`]);
+  return [...REGOLE_GIT, ...conClone];
+}
 
 // Il corpo finisce fra apici singoli nella shell del gancio: solo virgolette doppie, niente apostrofi nemmeno nei
 // commenti, niente barre rovesciate (la riga di comando di Windows le mangia), nella regex solo classi di caratteri.
@@ -147,7 +156,7 @@ export function registraDecisione({ ticket, role = '', model = '', effort = '' }
 const nostro = (gruppo) => (gruppo?.hooks || []).some((h) => String(h?.command || '').includes(ETICHETTA));
 
 // Unisce senza toccare il resto delle impostazioni dell'utente; un file illeggibile non si riscrive.
-export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato = Date.now() } = {}) {
+export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato = Date.now(), clone = '' } = {}) {
   const file = join(dir, 'settings.json');
   let s = {};
   if (existsSync(file)) {
@@ -162,7 +171,9 @@ export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato 
   }
   const env = { ...(s.env || {}), ...AMBIENTE };
   for (const k of AMBIENTE_TOLTO) delete env[k];
-  const nuovo = { ...s, env, hooks };
+  const vecchie = Array.isArray(s.permissions?.allow) ? s.permissions.allow : [];
+  const permissions = { ...(s.permissions || {}), allow: [...new Set([...vecchie, ...regoleGit(clone)])] };
+  const nuovo = { ...s, env, hooks, permissions };
   try {
     mkdirSync(dir, { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`;

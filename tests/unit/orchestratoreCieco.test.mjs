@@ -13,7 +13,7 @@ const RADICE = resolve(import.meta.dirname, '..', '..');
 const {
   decidi, comando, installa, registraDecisione, impronta, AL_POSTO_DEL_TESTO, AL_POSTO_VIVO, VALIDITA_MS, DURATA_VOCE_MS, AMBIENTE,
   AMBIENTE_TOLTO, ETICHETTA, FILE_REGISTRO, MODELLI, SFORZI, MOTIVO_SOTTOFONDO, MOTIVO_SENZA_BIGLIETTO, MOTIVO_DUE_BIGLIETTI,
-  MOTIVO_REGISTRO, MOTIVO_SCONOSCIUTO, MOTIVO_IGNOTO, MOTIVO_NOTIFICA, MATCHER_PRIMA,
+  MOTIVO_REGISTRO, MOTIVO_SCONOSCIUTO, MOTIVO_IGNOTO, MOTIVO_NOTIFICA, MATCHER_PRIMA, REGOLE_GIT, regoleGit,
 } = await import('../../scripts/lib/orchestratore-cieco.mjs');
 
 const B = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde';
@@ -273,7 +273,7 @@ test('installa: unisce alle impostazioni utente senza toccare il resto, toglie F
     assert.equal(installa({ dir, sessione: 's1', creato: 10 }).ok, true);
     assert.equal(installa({ dir, sessione: 's2', creato: 20 }).ok, true);
     const s = JSON.parse(readFileSync(file, 'utf8'));
-    assert.deepEqual(s.permissions, { allow: ['Bash(ls)'] });
+    assert.deepEqual(s.permissions, { allow: ['Bash(ls)', ...REGOLE_GIT] }, 'le regole dell utente restano, quelle git una volta sola');
     assert.deepEqual(s.env, { MIO: '1', ...AMBIENTE }, 'FORCE farebbe ignorare a Claude Code il modello deciso dal server');
     assert.deepEqual(s.hooks.PreToolUse[0], altrui);
     for (const [ev, matcher] of [['PreToolUse', MATCHER_PRIMA], ['PostToolUse', 'Agent|Task'], ['ConfigChange', 'user_settings']]) {
@@ -283,6 +283,44 @@ test('installa: unisce alle impostazioni utente senza toccare il resto, toglie F
       assert.equal(nostri[0].hooks[0].command, comando({ sessione: 's2', creato: 20, registro: join(dir, FILE_REGISTRO) }));
     }
   } finally { togliCartella(dir); }
+});
+
+// Una regola a prefisso, come la legge Claude Code: `Bash(x:*)` vale per x e per x seguito da altro.
+const coperto = (cmd, regole) => regole.some((r) => {
+  const m = /^Bash\((.*):\*\)$/.exec(r);
+  return m ? cmd === m[1] || cmd.startsWith(`${m[1]} `) : r === `Bash(${cmd})`;
+});
+
+test('permessi git: le regole del progetto sono quelle che il preflight porta nelle impostazioni utente', () => {
+  const progetto = JSON.parse(readFileSync(join(RADICE, '.claude', 'settings.json'), 'utf8')).permissions.allow;
+  for (const r of REGOLE_GIT) assert.ok(progetto.includes(r), `${r} manca in .claude/settings.json`);
+  assert.deepEqual(regoleGit(''), [...REGOLE_GIT]);
+});
+
+// Un ramo nato prima delle regole del progetto le toglie dalla cartella quando il giro lo apre (#1454).
+test('permessi git: dopo l installazione fetch, rebase e merge restano coperti anche col clone del server', () => {
+  const dir = cartellaTemporanea('filo-cieco-permessi-');
+  const clone = '/root/filo-security';
+  try {
+    assert.equal(installa({ dir, sessione: 's1', clone }).ok, true);
+    assert.equal(installa({ dir, sessione: 's1', clone }).ok, true);
+    const allow = JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8')).permissions.allow;
+    assert.equal(new Set(allow).size, allow.length, 'una seconda installazione non duplica');
+    const ruoli = join(RADICE, 'routines', 'roles');
+    const comandi = ['git fetch origin main', 'git rebase origin/main', 'git rebase --continue', 'git merge origin/main'];
+    for (const f of readdirSync(ruoli).filter((n) => n.endsWith('.md'))) {
+      const t = readFileSync(join(ruoli, f), 'utf8').split('<CLONE>').join(clone);
+      for (const m of t.matchAll(/`(git(?:\s+-C\s+(?:"[^"]*"|\S+))?\s+(?:fetch|rebase|merge)\b[^`\n]*)`/g)) comandi.push(m[1].trim());
+    }
+    assert.ok(comandi.some((c) => c.includes(`-C "${clone}" merge`)), 'il merge del clone del server è fra i comandi provati');
+    assert.deepEqual(comandi.filter((c) => !coperto(c, allow)), []);
+    assert.equal(coperto('git -C "/altrove" merge origin/main', allow), false, 'le regole col percorso valgono solo per il clone');
+  } finally { togliCartella(dir); }
+});
+
+test('cablaggio: il preflight passa il clone del server a chi installa i permessi', () => {
+  const src = readFileSync(join(RADICE, 'scripts', 'dispatch.mjs'), 'utf8');
+  assert.match(src, /installaCecita\(\{[^}]*clone: cartellaCloneServer\(\)/);
 });
 
 test('installa: cartella mancante la crea; un file illeggibile non lo riscrive e lo dice', () => {

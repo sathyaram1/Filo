@@ -31,10 +31,19 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
      progetto diventa quella del ramo, strumenti e ricette compresi — e un ramo
      aperto giorni fa riporta indietro anche le correzioni già fatte. È già
      costato un'ora di lavoro con la correzione in produzione da un giorno.
-4. `git pull --rebase origin main`. Se fallisce (conflitti, rete): chiudi il
-   giro — NON risolvere niente a mano. Il clone è fresco: un conflitto qui è
-   il sintomo di una sovrapposizione che deve vedere l'owner, non un intoppo
-   da rattoppare. (Vale anche per i worker: nessuno tocca `main`, mai.)
+4. Due comandi, ognuno da solo nella sua chiamata e scritto così, senza
+   `&&`, `cd` o `-C` (sono gli stessi del riallineamento, coperti dalle
+   regole dei permessi del repo; `git pull` non lo è):
+
+   ```bash
+   git fetch origin main
+   git rebase origin/main
+   ```
+
+   Se fallisce (conflitti, rete): chiudi il giro — NON risolvere niente a
+   mano. Il clone è fresco: un conflitto qui è il sintomo di una
+   sovrapposizione che deve vedere l'owner, non un intoppo da rattoppare.
+   (Vale anche per i worker: nessuno tocca `main`, mai.)
    - Di solito qui non c'è più niente da fare: il preflight si è già allineato
      da sé prima di fissare gli strumenti, perché una copia presa da un
      checkout indietro sarebbe vecchia in partenza. Questo passo resta come
