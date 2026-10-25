@@ -7788,4 +7788,6 @@ module.exports = {
   runTabTriageDecision,
   executeFiloAction,
   applySettingsUpdate,
+  decisioneComandoAMano,
+  contaSe,
 };
