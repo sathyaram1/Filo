@@ -154,8 +154,23 @@ test('una / seguita da una parola che non è un programma, o da un percorso inco
   await page.locator('#input').press('Enter');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Risposta 2 di Filo.' })).toBeVisible({ timeout: 15_000 });
 
+  // La prima parola di una frase porta spesso un apostrofo o la punteggiatura: resta una parola da cercare.
+  const frasi = ["/cos'è un terminale?", '/ciao, come stai?', '/perché?'];
+  for (const [i, frase] of frasi.entries()) {
+    await page.locator('#input').fill(frase);
+    await page.locator('#input').press('Enter');
+    await expect(page.locator('.dash-bubble-filo', { hasText: `Risposta ${i + 3} di Filo.` }), frase).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  }
+
   const chiesto = await app.evaluate(() => globalThis.__chiesto892);
   expect(chiesto[0]).toContain('/parolainventata892 come stai');
   expect(chiesto[1]).toContain('nota-892.txt');
+  expect(chiesto[2]).toContain("cos'è un terminale?");
   await expect(page.locator('.dash-term-cmd'), 'niente è andato alla shell').toHaveCount(0);
+
+  // La sintassi della shell davanti al programma non si cerca come un programma: va alla shell.
+  await page.locator('#input').fill('/(echo sintassi892)');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-term-out').last()).toContainText('sintassi892', { timeout: 12_000 });
 });
