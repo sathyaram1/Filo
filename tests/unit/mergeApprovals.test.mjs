@@ -229,6 +229,10 @@ describe('l’esito di un’approvazione', () => {
     assert.equal(m.kind, 'ok');
     assert.match(m.text, /^Approvata/);
     assert.doesNotMatch(m.text, /nessuna fusione|inatteso/i);
+    // Il blocco l'ha messo la fusione dal PC: lì torna il lavoro.
+    const pc = UI.outcomeMessage({ ok: true, result: 'server', esito: 'al_pc' });
+    assert.equal(pc.kind, 'ok');
+    assert.match(pc.text, /^Approvata: .*tuo PC/);
     assert.equal(UI.branchLabel({ branch: 'worker/x', repo: 'server' }), 'server · worker/x');
     assert.equal(UI.branchLabel({ branch: 'worker/x' }), 'worker/x');
   });
