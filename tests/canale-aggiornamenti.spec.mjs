@@ -130,7 +130,8 @@ test('«passa agli aggiornamenti stabili» in chat sceglie lo stabile, e le Pref
   await chat.bringToFront();
   await chat.locator('#input').fill('passa agli aggiornamenti stabili');
   await chat.locator('#sendBtn').click();
-  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Fatto: aggiornamenti stabili.' })).toBeVisible({ timeout: 10_000 });
+  // Un comando secco riuscito chiude il turno (#1130): la conferma è il segno del cambio in chat, non un'altra risposta.
+  await expect(chat.getByRole('button', { name: /Cambi fatti: canale degli aggiornamenti: .*→ stabile/ })).toBeVisible({ timeout: 10_000 });
   await expect.poll(() => canale(app), { timeout: 5_000 }).toBe('stabile');
   await expect(pref.locator('#aggiornamentiCanale input[value="stabile"]')).toBeChecked({ timeout: 5_000 });
 });
