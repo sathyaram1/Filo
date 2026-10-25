@@ -40,14 +40,16 @@ async function callSecurityFunction(name, data = {}) {
   if (!res.ok) {
     let detail = '';
     let code = '';
+    let reason = '';
     try {
       const err = (await res.json())?.error || {};
       detail = err.message || '';
       code = err.status || '';
+      reason = (err.details && typeof err.details.reason === 'string') ? err.details.reason : '';
     } catch (_) {}
     // Codice e spiegazione del server restano attaccati all'errore: chi chiama sceglie la frase per l'owner.
     throw Object.assign(new Error(`callable ${name} ${res.status}${detail ? ': ' + detail : ''}`),
-      { httpStatus: res.status, code: String(code), detail: String(detail) });
+      { httpStatus: res.status, code: String(code), detail: String(detail), reason });
   }
   const body = await res.json();
   return body && body.result;
@@ -97,11 +99,13 @@ function erroreCrediti(e) {
   return e?.message || 'Non riuscito.';
 }
 
-// Un errore di ownerCompiti detto all'owner. Prima del deploy la callable non esiste (404 senza codice): lo si dice.
-function erroreCompiti(e) {
+// Un errore di ownerCompiti detto all'owner. Prima del deploy la callable non esiste (404 senza codice), e un server
+// più vecchio dell'app non conosce l'op (`op_sconosciuta`): lo si dice, con `nonAncora` per le op nuove.
+function erroreCompiti(e, nonAncora) {
   const code = String(e?.code || '').toUpperCase();
   const detail = String(e?.detail || '').trim();
   if (e?.httpStatus === 404 && !code) return 'I compiti non sono ancora pubblicati sul server: arrivano col prossimo aggiornamento del server.';
+  if (nonAncora && e?.reason === 'op_sconosciuta') return nonAncora;
   if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può vedere i compiti: serve quello del proprietario.';
   if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
   if (detail) return detail;
@@ -1536,13 +1540,14 @@ module.exports = function register(on, ctx) {
 
   // I compiti delle routine (SPEC-DOMANDE.md §6): il main fa da tramite verso ownerCompiti e rifà il controllo della
   // pagina (SN_COMPITI); fiducia e numeri li decide il server. Dalla finestra scrive l'owner, mai una sessione.
-  async function chiamaCompiti(data) {
+  async function chiamaCompiti(data, nonAncora) {
     let r;
     try {
       r = await callSecurityFunction('ownerCompiti', data);
     } catch (e) {
-      return { ok: false, error: erroreCompiti(e) };
+      return { ok: false, error: erroreCompiti(e, nonAncora) };
     }
+    if (nonAncora && r && r.ok === false && r.errore === 'op_sconosciuta') return { ok: false, error: nonAncora };
     if (!r || r.ok === false) return { ok: false, error: (r && (r.dettaglio || r.errore || r.detail)) || 'Il server non ha risposto sui compiti.' };
     return r;
   }
@@ -1561,6 +1566,7 @@ module.exports = function register(on, ctx) {
       // Oltre la pagina dello storico il server lo dice: la scheda non deve credere di vederli tutti.
       altri: r.altri === true,
       adesso: Number(r.adesso) || 0,
+      ambiti: Array.isArray(r.ambiti) ? r.ambiti : [],
     };
   }));
   on(MSG.COMPITO_CREA, ownerOnly(async (msg) => {
@@ -1576,6 +1582,54 @@ module.exports = function register(on, ctx) {
     const r = await chiamaCompiti({ op: 'annulla', id });
     if (!r.ok) return r;
     return { ok: true, id };
+  }));
+
+  // I compiti ricorrenti (SPEC-DOMANDE.md §4.1): li scrive solo l'owner. Il main rifà i controlli della scheda
+  // (ricorrenti.js per i campi suoi, SN_COMPITI per le scelte); un ambito non ancora attivo vale: il ricorrente lo aspetta.
+  const NON_ANCORA_RICORRENTI = 'I compiti ricorrenti non sono ancora sul server: arrivano col prossimo aggiornamento del server.';
+  const idRicorrente = (v) => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    return /^[A-Za-z0-9_.:-]{1,200}$/.test(s) ? s : '';
+  };
+  on(MSG.RICORRENTI_ELENCO, ownerOnly(async () => {
+    const r = await chiamaCompiti({ op: 'ricorrenti' }, NON_ANCORA_RICORRENTI);
+    if (!r.ok) return r;
+    return {
+      ok: true,
+      adesso: Number(r.adesso) || 0,
+      ricorrenti: Array.isArray(r.ricorrenti) ? r.ricorrenti : [],
+      ambiti: Array.isArray(r.ambiti) ? r.ambiti : [],
+    };
+  }));
+  on(MSG.RICORRENTE_SALVA, ownerOnly(async (msg) => {
+    const raw = msg?.ricorrente;
+    const K = globalThis.SN_COMPITI;
+    const c = globalThis.SN_RICORRENTI.validaCampi(raw);
+    if (!c.ok) return { ok: false, error: K.frase(c.dettaglio) };
+    const s = K.validaScelte(raw, undefined, { spenti: true });
+    if (!s.ok) return { ok: false, error: s.testo };
+    const ricorrente = Object.assign({}, c.campi, s.scelte);
+    if (raw.id !== undefined && raw.id !== null && raw.id !== '') {
+      ricorrente.id = idRicorrente(raw.id);
+      if (!ricorrente.id) return { ok: false, error: 'Il ricorrente da salvare non ha un identificativo valido.' };
+    }
+    const r = await chiamaCompiti({ op: 'ricorrente_salva', ricorrente }, NON_ANCORA_RICORRENTI);
+    if (!r.ok) return r;
+    return { ok: true, id: String(r.id || ricorrente.id || '') };
+  }));
+  on(MSG.RICORRENTE_TOGLI, ownerOnly(async (msg) => {
+    const id = idRicorrente(msg?.id);
+    if (!id) return { ok: false, error: 'Manca il ricorrente da togliere.' };
+    const r = await chiamaCompiti({ op: 'ricorrente_togli', id }, NON_ANCORA_RICORRENTI);
+    if (!r.ok) return r;
+    return { ok: true, id };
+  }));
+  on(MSG.RICORRENTE_AVVIA, ownerOnly(async (msg) => {
+    const id = idRicorrente(msg?.id);
+    if (!id) return { ok: false, error: 'Manca il ricorrente da avviare.' };
+    const r = await chiamaCompiti({ op: 'ricorrente_avvia', id }, NON_ANCORA_RICORRENTI);
+    if (!r.ok) return r;
+    return { ok: true, id, compitoId: String(r.compitoId || '') };
   }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {

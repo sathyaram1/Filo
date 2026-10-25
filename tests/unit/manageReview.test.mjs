@@ -1891,7 +1891,7 @@ test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta 
     domande: 'domande', 'domande-lavoro': 'domande', 'domande-archivio': 'domande',
     inbox: 'feedback', queue: 'feedback', waiting: 'feedback', resolved: 'feedback', archived: 'feedback',
     fbstats: 'feedback', stats: 'feedback',
-    automation: 'routine', compiti: 'routine', crediti: 'routine', log: 'routine',
+    automation: 'routine', compiti: 'routine', ricorrenti: 'routine', crediti: 'routine', log: 'routine',
     utenti: 'utenti', contatori: 'utenti', predefiniti: 'predefinite',
   };
   for (const [tab, sez] of Object.entries(attese)) assert.equal(MR.sezioneDiScheda(tab), sez, tab);

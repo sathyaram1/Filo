@@ -47,8 +47,8 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   // «Statistiche feedback» (#496) in più, «Modelli di supporto» dentro Automazioni (#1110), i lavori server nella
   // scheda del loro stato (#1575); più le tre della sezione Domande (#1150), «Aspettano» (#903), «Crediti» (#1356) e
   // «Compiti» (#1196) fra le Routine, le pagine dell'owner entrate in Gestione, «Inviti e utenti» e «Modelli
-  // predefiniti» (#1414), e «Contatori» accanto a «Inviti e utenti» (#1462).
-  await expect(page.locator('.mg-tab')).toHaveCount(17);
+  // predefiniti» (#1414), «Contatori» accanto a «Inviti e utenti» (#1462) e «Compiti ricorrenti» (#1153).
+  await expect(page.locator('.mg-tab')).toHaveCount(18);
   // Con i feedback caricati (qui: nessuno) le sei schede-lista dicono
   // quante ne contengono, le altre no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
@@ -67,6 +67,7 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');
   await expect(page.locator('.mg-tab[data-tab="crediti"]')).toHaveText('Crediti');
   await expect(page.locator('.mg-tab[data-tab="compiti"]')).toHaveText('Compiti');
+  await expect(page.locator('.mg-tab[data-tab="ricorrenti"]')).toHaveText('Compiti ricorrenti');
   await expect(page.locator('.mg-tab[data-tab="log"]')).toHaveText('Log');
   await expect(page.locator('.mg-tab[data-tab="utenti"]')).toHaveText('Inviti e utenti');
   await expect(page.locator('.mg-tab[data-tab="contatori"]')).toHaveText('Contatori');

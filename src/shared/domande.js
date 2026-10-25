@@ -45,6 +45,10 @@
     valorePriorita: (v) => Number.isInteger(v) && v >= 0 && v <= 3,
     chiave: (v) => typeof v === 'string' && Object.prototype.hasOwnProperty.call(CHIAVI_AUTOMAZIONE, v),
     valoreBooleano: (v) => typeof v === 'boolean',
+    // La forma soltanto: operazioni dell'elenco chiuso e triade le controlla il server prima di approvare (ambiti.js).
+    nomeAmbito: (v) => typeof v === 'string' && /^[a-z][a-z_]{2,30}$/.test(v),
+    operazioniAmbito: (v) => Array.isArray(v) && v.length >= 1 && v.length <= 30 && v.every((o) => typeof o === 'string' && /^[a-z_]{1,30}(\.[a-z_]{1,30})?$/.test(o)),
+    testoAmbito: (v) => typeof v === 'string' && v.trim().length >= 1 && v.length <= 1000,
   });
 
   // `bulk`: ammessa in «applica il consiglio» su più domande. `consenso`: vale solo da un gesto dell'owner nella finestra.
@@ -57,7 +61,7 @@
     archivia: tipo({ feedbackId: 'feedbackId' }, { bulk: true, consenso: false, attivo: true }),
     approva_locale: tipo({ feedbackId: 'feedbackId' }, { bulk: false, consenso: true, attivo: true }),
     automazione: tipo({ chiave: 'chiave', valore: 'valoreBooleano' }, { bulk: false, consenso: false, attivo: true }),
-    ambito: tipo({}, { bulk: false, consenso: true, attivo: false }),
+    ambito: tipo({ nome: 'nomeAmbito', operazioni: 'operazioniAmbito', nonPuo: 'testoAmbito' }, { bulk: false, consenso: true, attivo: true }),
     esperimento: tipo({}, { bulk: false, consenso: true, attivo: false }),
     compito: tipo({}, { bulk: true, consenso: false, attivo: true }),
   });
@@ -318,6 +322,12 @@
     if (!v.ok) return null;
     const a = v.azione;
     if (a.tipo === 'compito') return 'Affida a un agente';
+    if (a.tipo === 'ambito') {
+      // Le operazioni dette con le parole dell'elenco chiuso (ambiti.js), mai con quelle di chi propone.
+      const A = global.SN_AMBITI;
+      const descr = (o) => (A && A.OPERAZIONI && A.OPERAZIONI[o] ? A.OPERAZIONI[o].descr : o);
+      return `Approva l’ambito «${a.nome}»: ${a.operazioni.map(descr).join('; ')}`;
+    }
     if (a.tipo === 'automazione') {
       const k = CHIAVI_AUTOMAZIONE[a.chiave];
       return `${k.nome}: ${a.valore !== k.spegne ? 'accendi' : 'spegni'}`;

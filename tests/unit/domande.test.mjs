@@ -24,9 +24,11 @@ test('ogni tipo attivo ha la sua etichetta, fatta di numero e parametri', () => 
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.accountBOff', valore: true }, {}), 'Routine dell’account B: spegni');
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.accountAOff', valore: false }, {}), 'Routine dell’account A: accendi');
   assert.equal(D.etichettaAzione({ tipo: 'compito' }, {}), 'Affida a un agente');
+  assert.equal(D.etichettaAzione({ tipo: 'ambito', nome: 'lettore_code', operazioni: ['feedback.metadati', 'x.y'], nonPuo: 'scrivere' }, {}),
+    'Approva l’ambito «lettore_code»: feedback.metadati; x.y', 'senza l’elenco delle operazioni caricato restano i nomi, mai il testo di chi propone');
   for (const [nome, spec] of Object.entries(D.TIPI)) {
     if (!spec.attivo) continue;
-    const esempio = { riprendi: { feedbackId: 'f1' }, priorita: { feedbackId: 'f1', valore: 2 }, archivia: { feedbackId: 'f1' }, approva_locale: { feedbackId: 'f1' }, automazione: { chiave: 'routine.enabled', valore: true }, compito: {} }[nome];
+    const esempio = { riprendi: { feedbackId: 'f1' }, priorita: { feedbackId: 'f1', valore: 2 }, archivia: { feedbackId: 'f1' }, approva_locale: { feedbackId: 'f1' }, automazione: { chiave: 'routine.enabled', valore: true }, compito: {}, ambito: { nome: 'lettore_code', operazioni: ['feedback.metadati'], nonPuo: 'scrivere' } }[nome];
     assert.ok(esempio, `il tipo attivo «${nome}» non ha un esempio in questo test`);
     assert.equal(typeof D.etichettaAzione({ tipo: nome, ...esempio }, RIF), 'string', nome);
   }
@@ -34,7 +36,8 @@ test('ogni tipo attivo ha la sua etichetta, fatta di numero e parametri', () => 
 
 test('tipo ignoto, non attivo, parametri storti o riferimento assente: nessun pulsante', () => {
   assert.equal(D.etichettaAzione({ tipo: 'cancella_tutto', feedbackId: 'f1' }, RIF), null);
-  assert.equal(D.etichettaAzione({ tipo: 'ambito' }, RIF), null);
+  assert.equal(D.etichettaAzione({ tipo: 'ambito' }, RIF), null, 'un ambito senza nome e operazioni non ha pulsante');
+  assert.equal(D.etichettaAzione({ tipo: 'ambito', nome: 'lettore_code', operazioni: ['Approva <b>'], nonPuo: 'x' }, RIF), null);
   assert.equal(D.etichettaAzione({ tipo: 'esperimento' }, RIF), null);
   assert.equal(D.etichettaAzione({ tipo: 'priorita', feedbackId: 'f1', valore: 7 }, RIF), null);
   assert.equal(D.etichettaAzione({ tipo: 'priorita', feedbackId: 'f1', valore: '3' }, RIF), null);
@@ -48,7 +51,8 @@ test('tipo ignoto, non attivo, parametri storti o riferimento assente: nessun pu
 test('validaAzione: tipo e soli parametri; i non attivi rifiutati col loro codice', () => {
   assert.deepEqual(D.validaAzione({ tipo: 'priorita', feedbackId: 'abc', valore: 0 }), { ok: true, azione: { tipo: 'priorita', feedbackId: 'abc', valore: 0 } });
   assert.equal(D.validaAzione({ tipo: 'boh' }).errore, 'tipo_sconosciuto');
-  assert.equal(D.validaAzione({ tipo: 'ambito' }).errore, 'tipo_non_attivo');
+  assert.equal(D.validaAzione({ tipo: 'esperimento' }).errore, 'tipo_non_attivo');
+  assert.equal(D.validaAzione({ tipo: 'ambito' }).errore, 'parametri_non_validi');
   assert.equal(D.validaAzione({ tipo: 'riprendi', feedbackId: '../x' }).errore, 'parametri_non_validi');
   assert.equal(D.validaAzione({ tipo: 'compito', feedbackId: 'f1' }).errore, 'parametri_non_validi');
 });
@@ -76,7 +80,7 @@ test('validaDomanda: consiglio obbligatorio con le opzioni, indice valido; campi
   assert.equal(D.validaDomanda(base({ consiglio: { opzione: 3, perche: 'x' } })).errore, 'consiglio_non_valido');
   assert.equal(D.validaDomanda(base({ opzoni: [] })).errore, 'campo_sconosciuto');
   assert.equal(D.validaDomanda(base({ priorita: 'urgentissima' })).errore, 'priorita_non_valida');
-  assert.equal(D.validaDomanda(base({ opzioni: [{ testo: 'x', azione: { tipo: 'ambito' } }] })).errore, 'tipo_non_attivo');
+  assert.equal(D.validaDomanda(base({ opzioni: [{ testo: 'x', azione: { tipo: 'esperimento' } }] })).errore, 'tipo_non_attivo');
   const r = D.validaDomanda(base({ fiducia: 'fidato', stato: 'chiusa', conversazione: [{ autore: { tipo: 'owner' } }] }));
   assert.equal(r.ok, true);
   assert.equal(r.domanda.fiducia, undefined);

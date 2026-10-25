@@ -98,6 +98,12 @@
 //       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
 //         repo). Da lì ciò che scrivi nasce non fidato. Exit 0 = registrato, 4 = rifiutato, 3 = guasto.
 //
+//   node scripts/routine-channel.mjs operazione <operazione> ['<dati JSON>'] [--ticket <biglietto>]
+//   node scripts/routine-channel.mjs segnala|rapporto [--ticket <biglietto>] <<'FINE' … FINE
+//       → un'operazione del biglietto (#1153, SPEC-DOMANDE.md §5): `segnala` per tutti, `rapporto` per i compiti,
+//         le altre se l'ambito del biglietto le ha. I dati JSON anche da stdin. Stampa la risposta del server.
+//         Exit 0 = fatto, 1 = uso, 4 = rifiutato (fuori ambito, fuori ambiente, dati sbagliati), 3 = guasto.
+//
 //   node scripts/routine-channel.mjs git-server <clone|ls-remote|fetch|push> <cartella-del-clone> [<ramo>]
 //       → l'unica strada di git verso filo-security in un lavoro server (#1159, #1233): chiede il token del biglietto e
 //         lo dà a quella sola chiamata di git (lib/git-server.mjs). Exit 0 = fatto, 1 = uso o git fallito, 4 = token
@@ -840,6 +846,32 @@ export async function sporca(t, motivo, opts) {
   return { outcome: status >= 500 || status === 0 ? 'fault' : 'refused', reason: String((body && body.reason) || `http_${status}`) };
 }
 
+/**
+ * Un'operazione del biglietto (#1153, SPEC-DOMANDE.md §5): `segnala` e `rapporto`, e quelle del suo ambito. Il server
+ * decide cosa si può fare: qui si porta la richiesta e si riporta la risposta com'è.
+ * @returns {{ outcome:'ok'|'refused'|'fault', body?, reason?, detail? }}
+ */
+export async function operazione(t, op, dati, opts) {
+  const { status, body } = await call('routineOperazione', { ticket: t, op: String(op || ''), dati: dati && typeof dati === 'object' ? dati : {} }, opts);
+  if (status === 200 && body && body.ok) return { outcome: 'ok', body };
+  if (status === 404 && !(body && body.reason)) return { outcome: 'fault', reason: 'routineOperazione non è ancora pubblicata sul server' };
+  return {
+    outcome: status >= 500 || status === 0 ? 'fault' : 'refused',
+    reason: String((body && body.reason) || `http_${status}`),
+    detail: String((body && body.detail) || ''),
+  };
+}
+
+/** I dati di un'operazione dalla riga (`'{"id":"…"}'`) o da stdin; '' → {}. PURA. → { dati } | { errore } */
+export function datiOperazione(grezzo) {
+  const t = String(grezzo || '').trim();
+  if (!t) return { dati: {} };
+  let dati;
+  try { dati = JSON.parse(t); } catch (e) { return { errore: `i dati sono un oggetto JSON, per esempio '{"id":"abc"}': ${e.message}` }; }
+  if (!dati || typeof dati !== 'object' || Array.isArray(dati)) return { errore: 'i dati sono un oggetto JSON, per esempio \'{"id":"abc"}\'' };
+  return { dati };
+}
+
 // ─── Lavori server (SPEC-DOMANDE.md §7, mappa #1159 §1.5) ────────────────────
 
 /** Il token di filo-lavori per il biglietto (routineGitToken). → { outcome:'ok', token, scadeIl } | { outcome, reason } */
@@ -1286,13 +1318,13 @@ if (isMain) {
     // la copia fissata, `scripts/…` porterebbe a quello del ramo di lavoro —
     // cioè proprio la cosa che il contratto dei worker vieta di scrivere a mano.
     const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
-    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|release|deliver|sporca|git-server|ramo-server|compare|domanda|risposta> <segreto> [...]`);
+    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|release|deliver|operazione|segnala|rapporto|sporca|git-server|ramo-server|compare|domanda|risposta> <segreto> [...]`);
     process.exit(1);
   };
 
   // `heartbeat` può girare senza posizionali (il biglietto viaggia nell'ambiente);
   // `domanda` e `risposta` del worker hanno il biglietto in `--biglietto`.
-  if (!cmd || (!args[0] && !['heartbeat', 'domanda', 'risposta'].includes(cmd))) usage();
+  if (!cmd || (!args[0] && !['heartbeat', 'domanda', 'risposta', 'segnala', 'rapporto'].includes(cmd))) usage();
 
   if (cmd === 'domanda' || cmd === 'risposta') {
     const a = argomentiChiusura(cmd, args, data);
@@ -1726,6 +1758,42 @@ if (isMain) {
     if (r.outcome === 'ok' && guardia && guardia.id) azzeraRifiuti(ROOT, guardia.id);
     if (r.outcome === 'ok') {
       console.log(testoConsegnaRiuscita(r, data, intento));
+      process.exit(0);
+    }
+    if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
+    console.error(`guasto ${r.reason}`); process.exit(3);
+  } else if (cmd === 'operazione' || cmd === 'segnala' || cmd === 'rapporto') {
+    // Il testo da stdin (heredoc): sulla riga gli apostrofi italiani romperebbero la shell. Da un terminale senza tubo
+    // non si aspetta.
+    const leggiStdin = async () => {
+      if (process.stdin.isTTY) return '';
+      const pezzi = [];
+      for await (const p of process.stdin) pezzi.push(p);
+      return Buffer.concat(pezzi).toString('utf8');
+    };
+    const nome = cmd === 'operazione' ? String(args[0] || '').trim() : cmd;
+    const sullaRiga = (cmd === 'operazione' ? args.slice(1) : args).join(' ').trim();
+    const grezzo = sullaRiga || (await leggiStdin()).trim();
+    let dati;
+    if (cmd === 'operazione') {
+      const d = datiOperazione(grezzo);
+      if (d.errore) { console.error(`${nome}: ${d.errore}. Il server non è stato chiamato.`); process.exit(1); }
+      dati = d.dati;
+    } else {
+      if (!grezzo) {
+        console.error(`${cmd} vuole il testo, fra due righe FINE: … ${cmd} <<'FINE'\n  <testo>\n  FINE\nIl server non è stato chiamato.`);
+        process.exit(1);
+      }
+      dati = { testo: grezzo };
+    }
+    const { readTicket } = await import('./lib/routine-ticket.mjs');
+    const biglietto = mano.ticket || readTicket(ROOT);
+    if (!biglietto) { console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'); process.exit(1); }
+    const r = await operazione(biglietto, nome, dati);
+    if (r.outcome === 'ok') {
+      if (cmd === 'segnala') console.log(`OK: segnalazione ${r.body.num || r.body.id} aperta (${r.body.fiducia === 'fidato' ? 'fidata' : 'non fidata'}).`);
+      else if (cmd === 'rapporto') console.log(`OK: rapporto consegnato${r.body.chiuso ? `, ${r.body.compito} chiuso` : ''}.`);
+      else console.log(JSON.stringify(r.body, null, 2));
       process.exit(0);
     }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }

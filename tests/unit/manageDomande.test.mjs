@@ -20,6 +20,9 @@ const ESEMPI = {
   valorePriorita: 3,
   chiave: Object.keys(D.CHIAVI_AUTOMAZIONE)[0],
   valoreBooleano: true,
+  nomeAmbito: 'lettore_code',
+  operazioniAmbito: ['feedback.metadati'],
+  testoAmbito: 'scrivere',
 };
 const RIFERIMENTI = { fb902: { num: '#902', priorita: 1, stato: 'todo', motivo: '' } };
 

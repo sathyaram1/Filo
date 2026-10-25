@@ -214,6 +214,11 @@ service cloud.firestore {
     match /compiti-indice/{id} {
       allow read, write: if false;
     }
+    // I compiti ricorrenti (#1153, SPEC-DOMANDE.md §4.1): modelli dell'owner coi testi cifrati, li legge e li scrive solo
+    // il server (ownerCompiti), che ne fa le istanze.
+    match /compiti-ricorrenti/{id} {
+      allow read, write: if false;
+    }
 
     // Allowlist routine. Gestita SOLO da console Firebase.
     match /routines/{email} {
@@ -382,7 +387,9 @@ service cloud.firestore {
       allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
         && waitsForValido(request.resource.data)
         // `inCoda` (#1515): il segno che la coda delle routine legge. Lo scrive solo il server, a ogni cambio di stato.
-        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda'])
+        // `riservato`, `tipo` e `unitoIn` (#1153): il segno che segue il testo riservato, la segnalazione, il rimando
+        // dell'unione. Come la fiducia, li scrive solo il server.
+        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda', 'riservato', 'tipo', 'unitoIn'])
         && bigliettoLocaleValido(request.resource.data)
         && immaginiValide(request.resource.data.get('images', []))
         && documentiValidi(request.resource.data.get('files', []))
