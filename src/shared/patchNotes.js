@@ -15,6 +15,7 @@
         'Nel riquadro «Invia feedback» il pulsante Allega mostra anche le tabelle .tsv. Prima le vedevi solo passando a «Tutti i file».',
         'Ai feedback si allegano anche i file di log e .yaml su Linux e i .csv su Windows con Excel installato: prima Filo li mostrava fra quelli da scegliere e poi li rifiutava.',
         'Se una segnalazione rimasta in attesa della rete alla fine non può partire, quello che avevi scritto torna nel riquadro dei feedback e l\'avviso ti dice su quale sito. Prima il testo andava perso.',
+        'Se premi Invia nel riquadro dei feedback appena finito di scrivere, alla riapertura il riquadro è vuoto. Prima a volte ritrovavi il testo già mandato, pronto per partire una seconda volta.',
       ],
     },
     {

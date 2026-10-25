@@ -280,6 +280,8 @@
     }
     function clearDraft() {
       if (!DRAFT_KEY) return;
+      // Un salvataggio ancora in attesa riscriverebbe il testo appena mandato (Invia subito dopo l'ultima battuta).
+      clearTimeout(saveTimer);
       try { chrome.storage.local.remove([DRAFT_KEY]); } catch (_) {}
     }
     textEl.addEventListener('input', () => {
