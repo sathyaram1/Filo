@@ -31,7 +31,8 @@
   let isTerminalMode = () => false;
   let getShell = () => 'powershell';
   let getCwd = () => '';
-  let runShellCommand = () => {};
+  let runShellCommand = async () => false;
+  let rimettiNellaBarra = () => {};
 
   // Vero se l'account loggato è l'owner (admin): abilita i comandi /users e
   // /gift in /help. Il gate forte resta nel main (auth.isAdmin) e sul server.
@@ -421,8 +422,7 @@
   }
 
   // Cache "il comando shell esiste?" (shell + token → bool), per non rifare lo
-  // spawn di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
-  // su PATH; per i casi limite (script relativi) la piccola imprecisione è ok.
+  // spawn di controllo a ogni tasto: decide anche se l'Invio va alla shell o a Filo (#892.1).
   // Tiene solo risposte certe: un controllo scaduto (macchina carica) resta senza
   // colore e si ritenta passati RIPROVA_INCERTO_MS, alla prossima battitura (#1176).
   const shellCmdCache = new Map();
@@ -430,7 +430,8 @@
   const shellCmdInVolo = new Set();
   const RIPROVA_INCERTO_MS = 20000;
   let whichTimer = null;
-  const chiaveShell = (cmd) => `${getShell() || ''}\u0000${cmd}`;
+  // Un programma dato col percorso dipende dalla cartella: lo stesso «./x» c'è in una e non nell'altra.
+  const chiaveShell = (cmd) => `${getShell() || ''}\u0000${/[\\/]/.test(cmd) ? getCwd() || '' : ''}\u0000${cmd}`;
 
   // Cache "il dominio /sito.tld esiste?" (host → bool). Evita di rifare il
   // lookup DNS a ogni tasto; popolata sia dalla verifica live sia da quella
@@ -505,90 +506,32 @@
       // altri): ricolora quello in volo, quando risponde.
       if (shellCmdInVolo.has(chiave)) return;
       if (shellCmdCache.has(chiave)) { updateInputClass(); return; }
-      shellCmdInVolo.add(chiave);
+      await esisteInShell(cmd);
+      updateInputClass(); // ricolora sullo stato attuale dell'input
+    }, 250);
+  }
+
+  // true/false se la shell ha risposto, null se il controllo non ha saputo dirlo.
+  const controlliInVolo = new Map();
+  function esisteInShell(cmd) {
+    const chiave = chiaveShell(cmd);
+    if (shellCmdCache.has(chiave)) return Promise.resolve(shellCmdCache.get(chiave));
+    if (controlliInVolo.has(chiave)) return controlliInVolo.get(chiave);
+    shellCmdInVolo.add(chiave);
+    const p = (async () => {
       let exists = null;
       try {
         const r = await window.filo?.shellWhich?.({ command: cmd, shell: getShell(), cwd: getCwd() });
         if (r && typeof r.exists === 'boolean') exists = r.exists;
       } catch (_) { exists = null; }
       shellCmdInVolo.delete(chiave);
+      controlliInVolo.delete(chiave);
       if (exists === null) shellCmdIncerti.set(chiave, Date.now());
       else { shellCmdCache.set(chiave, exists); shellCmdIncerti.delete(chiave); }
-      updateInputClass(); // ricolora sullo stato attuale dell'input
-    }, 250);
-  }
-
-  // Verifica (immediata) se l'host di un "/sito.tld" risolve, e popola la cache.
-  // Usata sull'invio: in caso di dubbio (rete giù, errore) torna true così non
-  // blocca mai una navigazione legittima.
-  async function ensureSiteResolved(host) {
-    if (!host) return true;
-    if (siteResolveCache.has(host)) return siteResolveCache.get(host);
-    let resolves = true;
-    try {
-      const r = await window.filo?.siteResolves?.({ host });
-      resolves = !(r && r.resolves === false);
-    } catch (_) { resolves = true; }
-    siteResolveCache.set(host, resolves);
-    return resolves;
-  }
-
-  // #433 — Enter su "/sito" il cui host il DNS non conosce. Prima non succedeva
-  // ASSOLUTAMENTE NULLA: nessuna scheda, nessun messaggio, solo l'input rosso —
-  // indistinguibile da un tasto Invio rotto. Il controllo esistenza serve a non
-  // finire su una pagina bianca dopo un errore di battitura, ma può sbagliarsi
-  // (VPN, rete aziendale, DNS che non conosce quel nome): quindi Filo lo dice e
-  // lascia comunque aprire con un clic, invece di rifiutare in silenzio.
-  // Il testo resta nel campo: se era un typo, si corregge senza riscriverlo.
-  let unresolvedLine = null; // { el, host } dell'ultimo avviso ancora non agito
-  function showUnresolvedSite(text, host) {
-    // Un secondo invio dello STESSO indirizzo non impila avvisi identici. Uno su
-    // un indirizzo diverso, o uno già agito ("Apri comunque"), resta in chat: è
-    // roba successa, non rumore da sostituire.
-    if (unresolvedLine && unresolvedLine.host === host) {
-      unresolvedLine.el.remove();
-      unresolvedLine = null;
-    }
-    if (document.body.dataset.state !== 'thread') goThread();
-    const bubble = makeBubble({
-      role: 'filo',
-      // Una riga sola: il bottone qui sotto dice già l'altra metà. Spiegare a
-      // parole cosa fa un bottone è la spiegazione della UI dentro la UI.
-      text: `Non trovo “${host}” — controlla se c’è un errore di battitura.`,
-    });
-    const row = document.createElement('div');
-    row.className = 'dash-bubble-actions';
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'dash-action-btn dash-action-btn-primary';
-    btn.textContent = '↗ Apri comunque';
-    btn.title = `Apri ${host} senza il controllo`;
-    btn.addEventListener('click', () => {
-      btn.disabled = true;
-      if (unresolvedLine && unresolvedLine.el === bubble) unresolvedLine = null;
-      // L'utente ha deciso: da qui in poi quell'host non viene più messo in
-      // dubbio (niente rosso, niente avviso al prossimo invio).
-      siteResolveCache.set(host, true);
-      send({ type: MSG.OPEN_URL, url: siteUrlOf(text), parole: [text] });
-      if (inputEl.value.trim() === text) { inputEl.value = ''; autoGrowInput(); }
-      updateInputClass();
-    });
-    row.appendChild(btn);
-    bubble.appendChild(row);
-    bubblesEl.appendChild(bubble);
-    bubblesEl.scrollTop = bubblesEl.scrollHeight;
-    unresolvedLine = { el: bubble, host };
-  }
-
-  // Come sopra ma con debounce, per la verifica live mentre si scrive: parte
-  // solo quando l'utente si ferma, poi ricolora (rosso se il dominio non esiste).
-  function scheduleSiteResolve(host) {
-    clearTimeout(siteResolveTimer);
-    siteResolveTimer = setTimeout(async () => {
-      if (!host || siteResolveCache.has(host)) { updateInputClass(); return; }
-      await ensureSiteResolved(host);
-      updateInputClass();
-    }, 250);
+      return exists;
+    })();
+    controlliInVolo.set(chiave, p);
+    return p;
   }
 
   function updateInputClass() {
@@ -613,7 +556,7 @@
     }
   }
 
-  function handleSlashCommand(text) {
+  async function handleSlashCommand(text, { incollato = false } = {}) {
     if (!text.startsWith('/')) return false;
     const firstToken = text.split(/\s+/)[0];
     // 1) Comandi interni di Filo: vincono SEMPRE, anche in modalità terminale.
@@ -637,13 +580,18 @@
       updateInputClass();
       return true;
     }
-    // 3) Modalità terminale: tutto il resto con `/` viene eseguito dalla shell
-    //    (non passa mai all'LLM).
+    // 3) Modalità terminale: alla shell va un programma che c'è (#892.1). Una parola qualsiasi o un percorso incollato
+    //    dopo la barra restano un messaggio per Filo, come col terminale spento; un controllo senza risposta non decide.
     if (isTerminalMode()) {
-      runShellCommand(text.slice(1).trim(), chatDellaRiga());
+      const chat = chatDellaRiga();
+      const programma = programmaDi(text);
+      if (!programma || (await esisteInShell(programma)) === false) { updateInputClass(); return false; }
       inputEl.value = '';
       autoGrowInput();
       updateInputClass();
+      // Passa dai livelli di autonomia: se la persona dice no, il comando torna nella barra com'era.
+      const partito = await runShellCommand(text.slice(1).trim(), chat, { incollato });
+      if (partito === false) rimettiNellaBarra(text, incollato);
       return true;
     }
     // 4) Modalità normale, comando `/` sconosciuto: lascialo all'LLM (storico).
@@ -671,6 +619,7 @@
     if (deps.getShell) getShell = deps.getShell;
     if (deps.getCwd) getCwd = deps.getCwd;
     if (deps.runShellCommand) runShellCommand = deps.runShellCommand;
+    if (deps.rimettiNellaBarra) rimettiNellaBarra = deps.rimettiNellaBarra;
   }
 
   global.SN_DASH_COMANDI = {
