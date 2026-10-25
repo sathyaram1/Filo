@@ -350,8 +350,10 @@
     }
   }
   // Una chiave privata ha intestazione e coda fisse: si toglie il corpo che segue l'intestazione, qualunque sia il formato
-  // (OpenSSH, RSA, EC, cifrata), anche coi ritorni a capo scritti come «\n» dentro un JSON.
-  const CORPO_PEM = /-----BEGIN (?:[A-Z0-9]+ ){0,4}PRIVATE KEY-----((?:(?:\r?\n|(?:\\r)?\\n)[A-Za-z-]{1,20}:[^\n\\]{0,200}){0,4}(?:(?:\r?\n|(?:\\r)?\\n|[ \t]){1,8}[A-Za-z0-9+/=]{4,})+)/g;
+  // (OpenSSH, RSA, EC, cifrata, PGP), anche coi ritorni a capo scritti come «\n» dentro un JSON. PuTTY non ha
+  // intestazione: la parte privata è il blocco dopo «Private-Lines:».
+  const CORPO_PUTTY = /\bPrivate-Lines:[ \t]*\d{1,3}((?:(?:\r?\n|(?:\\r)?\\n)[A-Za-z0-9+/=]{4,})+)/g;
+  const CORPO_PEM = /-----BEGIN (?:[A-Z0-9]+ ){0,4}PRIVATE KEY(?: BLOCK)?-----((?:(?:\r?\n|(?:\\r)?\\n)[A-Za-z-]{1,20}:[^\n\\]{0,200}){0,4}(?:(?:\r?\n|(?:\\r)?\\n|[ \t]){1,8}[A-Za-z0-9+/=]{4,})+)/g;
   // Il token di un bot Telegram ha la sua forma: l'id del bot, i due punti, «AA» e una trentina di caratteri.
   const TOKEN_TELEGRAM = /(?<![\w-])\d{8,10}:AA[A-Za-z0-9_-]{30,40}(?![\w-])/g;
   function chiaviInChiaro(s, out) {
