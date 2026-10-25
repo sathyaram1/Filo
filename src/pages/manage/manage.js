@@ -1684,8 +1684,12 @@
   function openFeedbackByNum(num) {
     const cerca = String(num || '').trim();
     if (!cerca || !FB || typeof FB.formatNum !== 'function') return;
-    const fb = allFeedbacks.find((f) => FB.formatNum(f.seq, f.subSeq) === cerca);
-    if (!fb) return;
+    apriFeedback(allFeedbacks.find((f) => FB.formatNum(f.seq, f.subSeq) === cerca));
+  }
+
+  // Un feedback nominato da un'altra scheda (Domande, Compiti) si apre nella sua.
+  function apriFeedback(fb) {
+    if (!fb) return false;
     // Aprire una pratica precisa spegne il filtro dei livelli se la nasconderebbe.
     mostraNelFiltro(fb);
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
@@ -1694,6 +1698,7 @@
     // Dal Log o da Automazioni il dettaglio sta in un pannello che non è a schermo.
     else if (!LIST_TABS.includes(schedaAttiva())) selectTab(currentTab);
     openDetail(fb._id);
+    return true;
   }
 
   // `already` è l'elenco già pronto quando ad avvisare è il main: una pagina aperta deve
@@ -2338,6 +2343,7 @@
   }
   // Lo stesso menu per le schede che vivono in un file loro (manageRedteam.js).
   window.SN_MANAGE_MENU = { apri: apriMenu };
+  window.SN_MANAGE_FEEDBACK = { apri: (id) => apriFeedback(allFeedbacks.find((f) => f._id === String(id || ''))) };
   // Lo stesso cammino del tasto nel dettaglio (applyAction), che scrive solo la pratica aperta: l'esito si legge lì.
   function approvaDalMenu(fb, azione) {
     if (selectedId !== fb._id) openDetail(fb._id);

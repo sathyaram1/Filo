@@ -109,6 +109,8 @@ const COLLEZIONI = {
   '/config/credits': CONFIGURAZIONE,
   '/admins/{email}': { perche: 'gli indirizzi di chi amministra il server' },
   '/domande/{id}': { frase: 'l\'agente mi scrive una domanda' },
+  '/compiti/{id}': { perche: 'il registro delle chiamate degli agenti delle routine (fase, modello, costo, esito), scritto dal server: niente di chi usa l\'app' },
+  '/compiti-indice/{id}': { perche: 'il contatore dei compiti e il compito aperto di ogni feedback, soli numeri' },
   '/routines/{email}': { perche: 'le identità delle routine che lavorano i feedback' },
 };
 const CAMPI_PUBBLICI_SCRITTI = {

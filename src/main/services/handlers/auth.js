@@ -97,6 +97,19 @@ function erroreCrediti(e) {
   return e?.message || 'Non riuscito.';
 }
 
+// Un errore di ownerCompiti detto all'owner. Prima del deploy la callable non esiste (404 senza codice): lo si dice.
+function erroreCompiti(e) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (e?.httpStatus === 404 && !code) return 'I compiti non sono ancora pubblicati sul server: arrivano col prossimo aggiornamento del server.';
+  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può vedere i compiti: serve quello del proprietario.';
+  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
+  if (detail) return detail;
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
 // Dallo stato dei crediti la scheda usa questi campi per account; le sessioni restano sul server.
 const CREDITI_CAMPI_ACCOUNT = Object.freeze(['pct', 'lettura', 'stima', 'fonte', 'limite', 'taratura', 'taraturaDa',
   'letturaAtMs', 'usdSettimana', 'settimanaDaMs', 'rinnovoAtMs', 'passo', 'fermo', 'basseAperte']);
@@ -1519,6 +1532,50 @@ module.exports = function register(on, ctx) {
     }
     if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || (togli ? 'Il server non ha tolto la fiducia.' : 'Il server non l’ha segnato fidato.') };
     return Object.assign({ ok: true, fiducia: togli ? 'non_fidato' : 'fidato' }, r.rimessoInCoda === true ? { rimessoInCoda: true } : {});
+  }));
+
+  // I compiti delle routine (SPEC-DOMANDE.md §6): il main fa da tramite verso ownerCompiti e rifà il controllo della
+  // pagina (SN_COMPITI); fiducia e numeri li decide il server. Dalla finestra scrive l'owner, mai una sessione.
+  async function chiamaCompiti(data) {
+    let r;
+    try {
+      r = await callSecurityFunction('ownerCompiti', data);
+    } catch (e) {
+      return { ok: false, error: erroreCompiti(e) };
+    }
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.dettaglio || r.errore || r.detail)) || 'Il server non ha risposto sui compiti.' };
+    return r;
+  }
+  on(MSG.COMPITI_ELENCO, ownerOnly(async (msg) => {
+    const data = { op: 'elenco' };
+    if (Number.isInteger(msg?.storico) && msg.storico > 0) data.storico = msg.storico;
+    if (Number.isFinite(msg?.prima) && msg.prima > 0) data.prima = msg.prima;
+    // Gli ultimi già visti allo stesso istante del cursore: senza, una pagina che si chiude lì ne salterebbe.
+    if (data.prima && Array.isArray(msg?.visti)) data.visti = msg.visti.filter((x) => /^C-\d{1,9}$/.test(String(x))).slice(0, 500);
+    const r = await chiamaCompiti(data);
+    if (!r.ok) return r;
+    return {
+      ok: true,
+      aperti: Array.isArray(r.aperti) ? r.aperti : [],
+      storico: Array.isArray(r.storico) ? r.storico : [],
+      // Oltre la pagina dello storico il server lo dice: la scheda non deve credere di vederli tutti.
+      altri: r.altri === true,
+      adesso: Number(r.adesso) || 0,
+    };
+  }));
+  on(MSG.COMPITO_CREA, ownerOnly(async (msg) => {
+    const v = globalThis.SN_COMPITI.validaNuovo(msg?.compito);
+    if (!v.ok) return { ok: false, error: v.testo };
+    const r = await chiamaCompiti({ op: 'crea', compito: v.compito });
+    if (!r.ok) return r;
+    return { ok: true, id: String(r.id || '') };
+  }));
+  on(MSG.COMPITO_ANNULLA, ownerOnly(async (msg) => {
+    const id = String(msg?.id || '').trim();
+    if (!/^C-\d{1,9}$/.test(id)) return { ok: false, error: 'Manca il compito da annullare.' };
+    const r = await chiamaCompiti({ op: 'annulla', id });
+    if (!r.ok) return r;
+    return { ok: true, id };
   }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
