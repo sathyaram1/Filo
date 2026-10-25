@@ -123,7 +123,7 @@ const filoApi = {
     ipcRenderer.on(`shell:${execId}:data`, offData);
     ipcRenderer.on(`shell:${execId}:exit`, offExit);
     ipcRenderer.on(`shell:${execId}:error`, offError);
-    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell, chat, gettone });
+    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell, chat, gettone, daFuori: daFuori === true });
     return {
       sendInput: (text) => ipcRenderer.send('shell:input', { execId, text }),
       abort: () => { ipcRenderer.send('shell:abort', { execId }); cleanup(); },
