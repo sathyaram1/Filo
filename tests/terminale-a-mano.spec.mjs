@@ -172,8 +172,17 @@ test('una / seguita da una parola che non è un programma, o da un percorso inco
   expect(chiesto[2]).toContain("cos'è un terminale?");
   await expect(page.locator('.dash-term-cmd'), 'niente è andato alla shell').toHaveCount(0);
 
-  // La sintassi della shell davanti al programma non si cerca come un programma: va alla shell.
+  // Dietro la sintassi della shell c'è un programma vero: va alla shell. Un'espressione senza programma pure.
   await page.locator('#input').fill('/(echo sintassi892)');
   await page.locator('#input').press('Enter');
   await expect(page.locator('.dash-term-out').last()).toContainText('sintassi892', { timeout: 12_000 });
+  const comeSiColora = (t) => page.evaluate((x) => window.SN_DASH_COMANDI.classifyInput(x), t);
+  expect(await comeSiColora('/$env:FILO_X = "1"')).toBe('incerto');
+  expect(await comeSiColora('/FOO=bar')).toBe('incerto');
+  await page.locator('#input').fill('/FILO_892=uno echo assegnata-$FILO_892');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-term-cmd').last()).toContainText('FILO_892=uno', { timeout: 12_000 });
+  await page.locator('#input').fill('/echo a; echo dopo-punto-e-virgola-892');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-term-out').last()).toContainText('dopo-punto-e-virgola-892', { timeout: 12_000 });
 });
