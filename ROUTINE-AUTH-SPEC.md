@@ -807,12 +807,18 @@ ma a scriverlo è il server.
      moltiplicano, e un freno che si azzera a ogni riavvio non frena. Il cron
      pubblica ogni sei ore: nessuno dei due tetti intralcia l'uso onesto;
   3. legge `package.json` **da `main`, via API**, col suo `sha` di blob;
-  4. **calcola lui** il numero successivo (aumento della patch). Nessun numero
-     che arrivi dal chiamante viene letto;
+  4. **calcola lui** il numero successivo: l'aumento della patch, o il campo
+     di primo livello `prossimaVersione` del manifesto quando c'è (un salto
+     come 0.3.0, dichiarato una volta dal repo). Il campo dev'essere `a.b.c` e
+     più alto della versione, a confronto fra numeri; se no si rifiuta
+     (`bad_next_version`) e non si scrive niente. Nessun numero che arrivi dal
+     chiamante viene letto;
   5. **costruisce lui** il contenuto nuovo partendo da quello vecchio, e
      verifica due volte che cambi SOLO la versione (una riga sola diversa nel
-     testo; manifesto identico una volta riletto come dati). Se una delle due
-     non torna, non si scrive niente;
+     testo; manifesto identico una volta riletto come dati). Col campo, nello
+     stesso commit sparisce anche la sua riga (un secondo commit passerebbe
+     per codice nuovo da pubblicare) e il JSON resta valido. Se una delle due
+     verifiche non torna, non si scrive niente;
   6. scrive il commit `release: vX.Y.Z [skip ci]` con l'identità dell'App,
      legandolo allo `sha` del blob letto: se `main` si è mossa nel mezzo,
      GitHub risponde 409 e non si scrive.
@@ -825,7 +831,8 @@ ma a scriverlo è il server.
   pubblicazione costruisce il commit **provato dalla suite**, non la punta di
   `main` (#641): `scripts/release-apply-version.mjs` applica quel numero in
   locale al suo manifesto, senza commit né push, e si ferma se non è più alto
-  di quello dell'albero. Il tag nasce sul commit costruito (`--target`).
+  di quello dell'albero o se l'albero ne dichiara un altro in
+  `prossimaVersione`. Il tag nasce sul commit costruito (`--target`).
 - Nel lavoro di pubblicazione non è rimasto **nessun** `git push`, `git commit`
   o `npm version`, e una sentinella negli unit test diventa rossa se ci tornano.
 

@@ -1,5 +1,5 @@
-// Il numero del server applicato in locale al commit provato (#641), e il conto
-// "c'è qualcosa di nuovo dal tag" di release.yml eseguito su un repo vero.
+// Il numero del server applicato in locale al commit provato (#641), solo se combacia con la prossima versione
+// dichiarata, e il conto "c'è qualcosa di nuovo dal tag" di release.yml eseguito su un repo vero.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,15 +9,17 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applicaVersione, confrontaVersioni } from '../../scripts/release-apply-version.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { prossimaVersione } from '../helpers/prossimaVersione.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PKG = readFileSync(join(ROOT, 'package.json'), 'utf8');
 const ATTUALE = JSON.parse(PKG).version;
-const [MA, MI, PA] = ATTUALE.split('.').map(Number);
-const SUCCESSIVA = `${MA}.${MI}.${PA + 1}`;
+const PROSSIMA = prossimaVersione(JSON.parse(PKG));
+const SUCCESSIVA = PROSSIMA.versione;
 
 describe('applicaVersione', () => {
-  test('sul manifesto vero cambia solo la riga della versione, come il commit del server', () => {
+  test('sul manifesto vero, col numero che il server scriverà, cambia solo la riga della versione', () => {
+    assert.ok(!PROSSIMA.errore, PROSSIMA.errore);
     const r = applicaVersione(PKG, `v${SUCCESSIVA}`);
     assert.equal(r.ok, true, r.reason);
     assert.equal(r.previous, ATTUALE);
@@ -49,6 +51,28 @@ describe('applicaVersione', () => {
   test('rifiuta un manifesto non leggibile o senza versione', () => {
     assert.equal(applicaVersione('{ rotto', '9.9.9').ok, false);
     assert.equal(applicaVersione('{"name":"x"}', '9.9.9').ok, false);
+  });
+
+  test('col manifesto che dichiara la prossima versione accetta solo quella, e il campo resta', () => {
+    const conCampo = '{\n  "name": "filo",\n  "version": "0.2.247",\n  "prossimaVersione": "0.3.0",\n  "private": true\n}\n';
+    const r = applicaVersione(conCampo, 'v0.3.0');
+    assert.equal(r.ok, true, r.reason);
+    assert.equal(r.testo, conCampo.replace('"version": "0.2.247"', '"version": "0.3.0"'));
+
+    // Un server che non legge il campo scrive patch+1: le note del blocco 0.3.0 uscirebbero sotto la 0.2.248.
+    for (const v of ['0.2.248', '0.3.1', '0.4.0']) {
+      const no = applicaVersione(conCampo, v);
+      assert.equal(no.ok, false, `accettato ${v}`);
+      assert.match(no.reason, /dichiara come prossima versione "0\.3\.0", il server ha scritto/);
+    }
+    // Un campo che il server avrebbe rifiutato non combacia con nessun numero.
+    for (const campo of ['"0.3"', '"v0.3.0"', 'null', '"0.2.247"']) {
+      const t = conCampo.replace('"0.3.0"', campo);
+      for (const v of ['0.2.248', '0.3.0']) assert.equal(applicaVersione(t, v).ok, false, `${campo} con ${v}`);
+    }
+    // Solo a primo livello, come `version`.
+    const annidato = '{\n  "version": "0.2.247",\n  "build": {\n    "prossimaVersione": "0.3.0"\n  }\n}\n';
+    assert.equal(applicaVersione(annidato, '0.2.248').ok, true);
   });
 
   test('il confronto è numerico, non alfabetico (0.2.230 > 0.2.99 > 0.2.9)', () => {

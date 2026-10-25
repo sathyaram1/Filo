@@ -217,7 +217,8 @@ anche di tre righe, applica **`.claude/skills/unslop/SKILL.md`**.
 ## Fonti di verità singole (aggiornale nello stesso commit)
 
 - **`src/shared/patchNotes.js`**: changelog per l'utente comune. Il blocco in
-  cima porta il numero della prossima versione (`package.json` + 1 patch); se
+  cima porta il numero della prossima versione (`package.json` + 1 patch, o il
+  suo `prossimaVersione` se lo dichiara); se
   quel numero è già uscito se ne apre uno nuovo, perché una riga sotto una
   versione uscita non la vede chi aggiorna. Sentinella:
   `tests/unit/patchNotes.test.mjs`.
