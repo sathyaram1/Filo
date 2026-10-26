@@ -948,15 +948,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // ── I contatori anonimi (#969, #1461, #1466) ─────────────────────────────
+    // ── I contatori anonimi (#969, #1461, #1463, #1466) ─────────────────────
     //
     // Numeri senza contenuto: per funzione quante volte è stata usata e quanto si è aspettato (in fasce), i guasti
     // delle chiamate, e (#1461) l'attesa delle azioni, le impostazioni cambiate, le ricerche nei pannelli, le
     // proposte del correttore, le conferme di Filo, gli annulli, gli anticipi, gli errori visti, l'intervista e le
     // prime volte del mese; (#1466, ore v3) i passi dell'avvio, i processi morti, i blocchi, le eccezioni del main, la
     // memoria, le chiamate sincrone, la chiusura, il disco, la sessione e gli aggiornamenti, tutti in elenchi chiusi.
-    // Un documento per copia di Filo e per ora (v3; le ore v2 e i giorni v1 partono ancora dalle copie vecchie):
-    // l'id è pseudonimo, giorno e ora, e si scrive una volta sola (create, mai update). Lo pseudonimo è
+    // Un documento per copia di Filo e per ora (v3; le ore v2 e i giorni v1 partono ancora dalle copie vecchie), più
+    // quello della chat della stessa ora (v4, #1463): l'id è pseudonimo, giorno e ora (e «_chat»), e si scrive una
+    // volta sola (create, mai update). Lo pseudonimo è
     // casuale, cambia ogni mese, e non è il codice dei feedback né lo pseudonimo dei crediti.
     //
     // SOLA CREAZIONE E SENZA LOGIN, come i feedback: chi ha la chiave web può scrivere numeri falsi, e i contatori
@@ -1057,11 +1058,35 @@ service cloud.firestore {
           && d.sistema is string && d.sistema.size() <= 16000
           && d.sistema.matches('^((^|;)(avvioPasso[.](impostazioni_lette|protocollo_ipc|adblock|fingerprint|permessi|finestra_creata|prima_scheda_visibile|sessione_ripristinata)[.](ms500|s1|s2|s5|s10|s30|oltre)|avvioTipo[.](freddo|dopo_aggiornamento|seconda_istanza)|processoMorto[.](gpu|utility|zygote|sandbox_helper|pepper_plugin|scheda_in_recupero|altro)[.](abnormal-exit|killed|crashed|oom|launch-failed|integrity-failure|memory-eviction|altro)|finestraBloccata[.]((volte)|(tornata)[.](ms500|s1|s2|s5|s10|s30|oltre)|(chiusa_da_utente)[.](ms500|s1|s2|s5|s10|s30|oltre))|mainFermo[.]((max)[.](ms500|s1|s2|s5|s10|s30|oltre)|(blocchi)[.](ms200|ms1000|ms5000))|eccezioneMain[.](uncaught|rejection)[.](TypeError|RangeError|ReferenceError|SyntaxError|Error|altro)|memoria[.]((totale)[.](mb256|mb512|mb1024|mb2048|mb4096|oltre)|(vive)[.](n0|n1|n5|n20|n50|oltre)|(attesa)[.](n0|n1|n5|n20|n50|oltre))|ipcSincrono[.](fp-config|cookie-wipe|adblock-css|permessi-stato)[.](ms500|s1|s2|s5|s10|s30|oltre)|chiusura[.]((durata)[.](ms500|s1|s2|s5|s10|s30|oltre)|(tetto))|uscitaPrecedente[.](pulita|non_pulita)|storageEsito[.](lettura_ok|lettura_vuoto|lettura_illeggibile|lettura_rovinato_con_copia|lettura_rovinato_senza_copia|lettura_non_spostato_sola_memoria|salvataggio_fallito_enospc|salvataggio_fallito_eacces|salvataggio_fallito_eperm|salvataggio_fallito_erofs|salvataggio_fallito_ebusy|salvataggio_fallito_altro|salvataggio_tornato|rinomina_ritentata_ebusy|rinomina_ritentata_eperm|rinomina_ritentata_eacces|chiave_non_serializzabile|cambiato_senza_set|cifratura_assente|dimensione_mb1|dimensione_mb5|dimensione_mb20|dimensione_mb50|dimensione_mb100|dimensione_oltre|flush_ms500|flush_s1|flush_s2|flush_s5|flush_s10|flush_s30|flush_oltre)|sessione[.]((schede)[.](n0|n1|n5|n20|n50|oltre)|(esiti)[.](ripristinata|niente|lettura_fallita)|(vista)[.](ms500|s1|s2|s5|s10|s30|oltre)|(coda)[.](ms500|s1|s2|s5|s10|s30|oltre))|aggiornamento[.](trovato|scaricato|scaricamento_fallito|installatore_non_valido|installazione_lanciata_all_avvio|installazione_fallita|installazione_fallita_secondo_avviso|versione_rifiutata|bloccato_mac|bloccato_linux|installatore_non_avviato))[|][0-9]{1,9})*$');
       }
+      // La chat e l'agente della stessa ora (#1463, v4), in un documento suo: nell'ora le regole non hanno più posto (il
+      // motore valuta al più mille espressioni per scrittura). I turni coi loro giri, le strade di riserva, gli strumenti
+      // per nome ed esito, le azioni per giro, le reazioni, le copie da una bolla e le chat finite. Il nome di uno
+      // strumento ha la sua forma, maiuscole e cifre senza spazi: l'elenco lo tiene l'app.
+      function contatoriChat(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'chatTurni', 'chatRecuperi', 'strumenti', 'azioniPerGiro', 'chatReazioni', 'chatCopie', 'chatChiuse'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'chatTurni', 'chatRecuperi', 'strumenti', 'azioniPerGiro', 'chatReazioni', 'chatCopie', 'chatChiuse'])
+          && d.v == 4
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora + '_chat'
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && chiuse(d.chatTurni, ['filo-chat'], 2000, '^((risposta|tetto_giri|fermato|tagliato|muto_dopo_letture|non_disponibile|vuoto|errore)[|](g1|g2|g3|g4_6|g7_11|tetto)[|][0-9]{1,9}(;(risposta|tetto_giri|fermato|tagliato|muto_dopo_letture|non_disponibile|vuoto|errore)[|](g1|g2|g3|g4_6|g7_11|tetto)[|][0-9]{1,9})*(#(risposta|tetto_giri|fermato|tagliato|muto_dopo_letture|non_disponibile|vuoto|errore)[|](g1|g2|g3|g4_6|g7_11|tetto)[|][0-9]{1,9}(;(risposta|tetto_giri|fermato|tagliato|muto_dopo_letture|non_disponibile|vuoto|errore)[|](g1|g2|g3|g4_6|g7_11|tetto)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.chatRecuperi, ['senza_foto', 'contesto_stretto', 'sollecito', 'formato_vecchio', 'file_aggiunto', 'proposta_segnalazione'], 200, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.strumenti, ['filo-chat'], 9000, '^((altro|[A-Z][A-Z0-9_]{0,39})[|](eseguito|non_riuscito|rifiutato|argomenti_errati|argomenti_tagliati|in_conferma|fermato_segreto|non_disponibile)[|][0-9]{1,9}(;(altro|[A-Z][A-Z0-9_]{0,39})[|](eseguito|non_riuscito|rifiutato|argomenti_errati|argomenti_tagliati|in_conferma|fermato_segreto|non_disponibile)[|][0-9]{1,9})*(#(altro|[A-Z][A-Z0-9_]{0,39})[|](eseguito|non_riuscito|rifiutato|argomenti_errati|argomenti_tagliati|in_conferma|fermato_segreto|non_disponibile)[|][0-9]{1,9}(;(altro|[A-Z][A-Z0-9_]{0,39})[|](eseguito|non_riuscito|rifiutato|argomenti_errati|argomenti_tagliati|in_conferma|fermato_segreto|non_disponibile)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.azioniPerGiro, ['filo-chat'], 100, '^([0-9]{1,9}(,[0-9]{1,9}){3}(#[0-9]{1,9}(,[0-9]{1,9}){3})*)?$')
+          && chiuse(d.chatReazioni, ['ferma_prima_del_testo', 'ferma_durante_azioni', 'ferma_durante_testo', 'riprendi', 'continua_tetto_giri', 'continua_tagliato', 'continua_muto_dopo_letture', 'riprova', 'seguito_scritto'], 200, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.chatCopie, ['risposta', 'attivita', 'utente'], 100, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.chatChiuse, ['home', 'chat_nuova', 'uscita', 'nascosta', 'appesa_all_avvio', 'risposta_tardiva'], 17000, '^((m1|m2|m3_5|m6_10|oltre)[|](min1|min5|min30|ora|oltre)[|](conversazione|comando|nessuno)[|][0-9]{1,9}(;(m1|m2|m3_5|m6_10|oltre)[|](min1|min5|min30|ora|oltre)[|](conversazione|comando|nessuno)[|][0-9]{1,9})*(#(m1|m2|m3_5|m6_10|oltre)[|](min1|min5|min30|ora|oltre)[|](conversazione|comando|nessuno)[|][0-9]{1,9}(;(m1|m2|m3_5|m6_10|oltre)[|](min1|min5|min30|ora|oltre)[|](conversazione|comando|nessuno)[|][0-9]{1,9})*)*)?$');
+      }
       // La forma si sceglie dalla versione prima di provarla: il server valuta al più mille espressioni a richiesta (ogni
       // uso di un argomento si rivaluta, ogni elemento di un elenco conta), e un'ora v3 provata dopo le altre ci passerebbe
       // sopra. Il margine lo misura solo il motore vero: tests/unit/contatoriRegole.motore-vero.mjs.
       function contatori(d) {
-        return (d.v == 3 && contatoriOra3(d)) || (d.v == 2 && contatoriOra(d)) || (d.v == 1 && contatoriGiorno(d));
+        return (d.v == 3 && contatoriOra3(d)) || (d.v == 2 && contatoriOra(d)) || (d.v == 4 && contatoriChat(d)) || (d.v == 1 && contatoriGiorno(d));
       }
       allow get, list: if isAdmin();
       allow create: if contatori(request.resource.data);
