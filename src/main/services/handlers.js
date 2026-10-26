@@ -3913,7 +3913,7 @@ async function eseguiAzioneFilo(action, {
         }
         const t = P.provaTono(action, settings);
         if (t.rifiuto) return no(t.rifiuto, { rifiuto: true });
-        const win = winOf(sender) || filoWin();
+        const win = winOf(sender);
         if (!win || win.isDestroyed()) return no('non c\'è una finestra di Filo dove suonare');
         win.webContents.send('shell:suona', { tono: t.tono, volume: t.volume });
         return {
@@ -4013,7 +4013,7 @@ async function anteprimaRipristino() {
 }
 // La home che ospita l'intervista rifatta: col segno, così le altre home restano il filo (#1297).
 function apriIntervistaRifatta(sender) {
-  const win = winOf(sender) || filoWin();
+  const win = winOf(sender);
   if (!win || !win._filoTabs) return false;
   win._filoTabs.openTab('filo://newtab/?accoglienza=1');
   return true;
@@ -5280,6 +5280,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
       return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
         + `sul segno accanto al messaggio dell'utente, o chiedendolo a te.${costo}${avviso}`;
     }
+    if (type === 'PULSANTE_PREFERENZE') return `Eseguita: ${done}.${dopoPulsante(res.output || {})}`;
     return `Eseguita: ${done}.`;
   }
   if (res.output && res.output.invariato && res.output.error) {
