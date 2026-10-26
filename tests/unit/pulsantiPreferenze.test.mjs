@@ -91,6 +91,9 @@ test('registro: le prove suonano e basta, rifare l\'intervista si rimedia, il ri
   const leggero = azione('ripristina_tutto', { _ripristino: { frasi: K.frasi({ cambi }), livello: K.livello({ cambi }) } });
   assert.equal(AL.costoFor(leggero), 2);
   assert.equal(AL.REGISTRY.PULSANTE_PREFERENZE.difesa(leggero), false);
+  // Un clic a ogni livello, anche ad Automatico: tutte insieme non si rimettono da sole.
+  assert.equal(AL.REGISTRY.PULSANTE_PREFERENZE.perimetro(leggero), false);
+  assert.equal(AL.REGISTRY.PULSANTE_PREFERENZE.perimetro(azione('prova_suono')), true);
   const sicurezza = { ...diSerie(), security: { ...diSerie().security, blockPopups: !diSerie().security.blockPopups } };
   const cambiS = K.cambiImpostazioni(sicurezza, P.impostazioniDiSerie(sicurezza), (x) => x);
   const pesante = azione('ripristina_tutto', { _ripristino: { frasi: K.frasi({ cambi: cambiS }), livello: K.livello({ cambi: cambiS }) } });
