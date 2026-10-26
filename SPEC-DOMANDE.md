@@ -132,7 +132,9 @@ Dal #1153 il biglietto di unione è un compito senza feedback (§ 6.1) con l'amb
 `unisci` e i soli numeri dei genitori: lo chiede `coda.unione`, su 2–12 feedback
 in coda non ancora iniziati, e finché è aperto nessun altro lavoro prende i
 genitori. Il figlio lo scrive `unisci.scrivi`; i genitori diventano `archived`
-col rimando `unitoIn`.
+col rimando `unitoIn`. Immagini, documenti, pagina e decisioni dell'owner dei
+genitori li porta il server nel figlio, insieme al segno di chi ha scritto le
+domande di quelle decisioni: l'unione non perde niente.
 
 ### 1.4 Le parole dell'owner
 
@@ -829,7 +831,10 @@ canale (`routine-channel.mjs operazione`, `segnala`, `rapporto`).
 L'ambiente dei riservati lo dichiara la chiave della sua routine
 (`routine-keys.mjs ambiente <nome> riservati`): i suoi biglietti ricevono solo
 compiti, e soltanto loro il testo riservato. Finché nessuna chiave lo dichiara,
-i compiti che lo leggono aspettano, e la Gestione lo dice.
+i compiti che lo leggono aspettano, e la Gestione lo dice. Il pacemaker conta il
+lavoro di ogni account con rete e ambiente delle sue chiavi: un'istanza pronta
+accende la routine dei riservati anche a coda vuota, e un feedback non la
+accende mai.
 
 ### 5.3 Ambiti nuovi
 
@@ -872,7 +877,8 @@ vale per tutti i compiti di quel tipo.
 
 Dal #1153 la segnalazione libera è `segnala`, che ogni biglietto delle routine
 può fare: un feedback con `tipo: 'segnalazione'`, priorità 0 e la fiducia del
-biglietto, finché il punto 9 non la manda alla gestione del lavoro. La domanda di
+biglietto, finché il punto 9 non la manda alla gestione del lavoro. Conta nel
+tetto delle consegne del biglietto, come un feedback aperto. La domanda di
 fine turno ha gli slot `tutti`, `orchestrator`, `worker`, uno per ruolo
 (`compito` compreso) e `compito:<ricorrente>`; vale il più preciso.
 
