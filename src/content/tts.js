@@ -365,7 +365,8 @@
 
   // Anti-attesa: la prima frase, corta, suona subito mentre le altre si preparano in
   // parallelo; il tempo prima della prima parola crolla.
-  async function readAloud(text, tokens) {
+  // `voce`: una voce naturale da provare al posto di quella scelta, senza salvarla.
+  async function readAloud(text, tokens, { voce = '' } = {}) {
     const full = String(text == null ? '' : text);
     if (!full.trim()) return;
     // Due letture sovrapposte sono incomprensibili: prima si ferma quella in corso.
