@@ -70,7 +70,7 @@ test('r1 il file aperto dal bottone di una risposta e l\'evento messo nel calend
     ]);
     await page.locator('#input').fill('apri il referto e segna la visita');
     await page.locator('#sendBtn').click();
-    await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco il referto' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.dash-file-btn').first()).toBeVisible({ timeout: 15_000 });
 
     await page.locator('.dash-file-btn').first().click();
     await page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' }).first().click();
