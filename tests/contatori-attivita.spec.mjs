@@ -491,14 +491,8 @@ test('la home senza un modello conta il suo motivo all’apertura; le pagine sal
     await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: '' }, useDefaultModels: true });
     await globalThis.SN_SAVED_PAGES.save({ url: 'https://salvata.test/ricetta', title: 'La ricetta salvata' });
   });
-  // La home dell'avvio può contare la sua apertura dopo: si parte da un conto fermo da un secondo.
-  let prima = -1;
-  await expect.poll(async () => {
-    const ora = (await misura(app, 'home')).senza_ai_chiave || 0;
-    const fermo = ora === prima;
-    prima = ora;
-    return fermo;
-  }, { timeout: 10_000, intervals: [1000] }).toBe(true);
+  await homeDellAvvioContata(app);
+  const prima = (await misura(app, 'home')).senza_ai_chiave || 0;
   const home = await openTab('filo://newtab/?prova=home-senza-chiave');
   await expect.poll(async () => (await misura(app, 'home')).senza_ai_chiave || 0, { timeout: 8_000 }).toBe(prima + 1);
   const voce = home.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce', { hasText: 'La ricetta salvata' });
