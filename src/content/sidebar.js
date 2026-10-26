@@ -1953,7 +1953,7 @@
         }
       }
     } catch (err) {
-      if (session) session.esito = 'errore';
+      if (session) { session.esito = 'errore'; session.dopoPasso = false; }
       if (thinking) { thinking.stop(); thinking.el.remove(); }
       const raw = err?.message || String(err);
       // #360 — la chat non è un log: «fetch failed» non dice niente all'utente. Stessa
