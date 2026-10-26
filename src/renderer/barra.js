@@ -206,6 +206,7 @@
       if (!e.isTrusted) return;
       const avevaFuoco = document.activeElement === b;
       altroAperto = !altroAperto;
+      if (altroAperto) api.altroAperto();
       firma = null;
       disegnaIcone(Array.isArray(stato.icone) ? stato.icone : [], false);
       const nuovo = nav.querySelector('[data-altro]');
