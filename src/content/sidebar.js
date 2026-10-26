@@ -77,7 +77,7 @@
     };
   }
   const datiSessione = (s) => ({
-    esito: s.chiusaPrima ? 'chiusa_prima' : s.esito || 'chiusa_prima', passiDaSolo: s.passiDaSolo,
+    esito: s.chiusaPrima ? 'chiusa_prima' : s.esito || (s.dopoPasso ? 'pagina_cambiata' : 'chiusa_prima'), passiDaSolo: s.passiDaSolo,
     passiCliccati: s.passiCliccati, nonTrovati: s.nonTrovati, documenti: s.documentiLetti, id: s.id,
   });
   // Una sessione si conta una volta, quando finisce: chiusa, o portata via dalla pagina che se ne va. Finché è aperta il
