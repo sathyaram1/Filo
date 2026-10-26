@@ -37,9 +37,27 @@
   const ETICHETTA_IT = /\b[Cc]odic[ei]\s+(?:d(?:i|el|ella|ello|ei|egli|elle|ell['’])\s*)?([a-zà-ÿ]{3,})\s*(?:[:=#]|è|\bn\.?|\bnr\.?)?\s*$/;
   const ETICHETTA_EN = /\b([a-z][a-z-]{2,})\s+codes?\s*(?:[:=#]|\bis\b|\bno\.?)?\s*$/;
   const RESTA_UN_CODICE = /^(?:conferm\w*|sicurezza|temporane\w*|provvisori\w*|segret\w*|personal\w*|attivazion\w*|recupero|ripristino|emergenza|associazion\w*|abbinament\w*|ricevut\w*|inviat\w*|numeric\w*|nuovo|seguente|unico|sms|email|mail|your|the|my|this|that|our|its|new|same|following|above|below|one|confirmation|security|backup|recovery|reset|activation|temporary|secret|pairing|text|unique|special)$/;
-  // Le cose che un codice apre sono poche e si riconoscono: il loro codice è un segreto anche col nome comune davanti
-  // («Il codice del cancello è 4829», «Codice di ritiro: 640385»). «Porta» conta solo come nome del codice: è anche un verbo.
-  const APRE = /\b(?:cancell(?:o|i|etto)|portone|ingresso|entrata|citofono|cassaforte|casseforti|cassett[ae]\s+(?:delle\s+)?chiavi|keybox|lockbox|key\s?safe|lucchett[oi]|serratur[ae]|allarm[ei]|antifurto|ritir(?:o|are)|preliev(?:o|i|are)|armadiett[oi]|locker|wi-?fi|wlan|dispositiv[oi]|device|garage|gate|door|safe|alarm|pick-?up|withdrawal|keypad)\b/i;
+  // Le cose che un codice apre: il loro codice è un segreto anche col nome comune davanti («Il codice del cancello è
+  // 4829», «Codice di ritiro: 640385»). Contano solo come nome del codice, cioè subito dopo «codice» o subito prima di
+  // «code»: «Videocitofono Wi-Fi, codice prodotto 4829» è un identificativo. «Porta» è anche un verbo: solo lì.
+  const COSE_CHE_SI_APRONO = 'cancell(?:o|i|etto)|portone|ingresso|entrata|citofono|cassaforte|casseforti|cassett[ae]\\s+(?:delle\\s+)?chiavi|keybox|lockbox|key\\s?safe|lucchett[oi]|serratur[ae]|allarm[ei]|antifurto|ritir(?:o|are)|preliev(?:o|i|are)|armadiett[oi]|locker|wi-?fi|wlan|dispositiv[oi]|device|garage|gate|door|safe|alarm|pick-?up|withdrawal|keypad|appartament[oi]|apartment|serrand[ae]|ascensor[ei]|elevator|bancomat|building|entry|lock';
+  const APRE = new RegExp(`\\b(?:${COSE_CHE_SI_APRONO})\\b`, 'i');
+  const NOME_CHE_APRE = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae]|apri(?:re)?|apre|entra(?:re)?)\\b`, 'i');
+  const NOME_CHE_APRE_SOLO = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae])\\s*(?:[:=#]|è|\\bis\\b)?\\s*$`, 'i');
+  const LEGAMI = /^(?:\s+|(?:d|l|dell|all|dall|nell)['’]|(?:di|del|della|dello|dei|degli|delle|per|da|a|al|alla|allo|il|la|lo|i|gli|le|tuo|tua|of|for|to|the|your)\b)+/i;
+  const PER_APRIRE = /\b(?:apri(?:re)?|apre|aprono|open(?:s|ing)?|entra(?:re)?)\b/i;
+  // Il nome del codice nell'etichetta prima del numero: quello che segue l'ultimo «codice», o la parola prima di «code».
+  const nomeDelCodice = (prima) => {
+    if (/\bkeycodes?\b/i.test(prima)) return { apre: true, solo: /\bkeycodes?\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima) };
+    const it = [...prima.matchAll(/\b(?:codic[ei]|pin)\b/gi)].pop();
+    const en = [...prima.matchAll(/\b([A-Za-z-]+)\s+(?:codes?|pin)\b/g)].pop();
+    if (en && (!it || en.index > it.index) && NOME_CHE_APRE.test(en[1])) {
+      return { apre: true, solo: /^\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima.slice(en.index + en[0].length)) };
+    }
+    if (!it) return { apre: false, solo: false };
+    const coda = prima.slice(it.index + it[0].length).replace(LEGAMI, '');
+    return { apre: NOME_CHE_APRE.test(coda), solo: NOME_CHE_APRE_SOLO.test(coda) };
+  };
   const etichettaDiUnIdentificativo = (prima) => {
     const m = ETICHETTA_IT.exec(prima) || ETICHETTA_EN.exec(prima);
     return !!m && !RESTA_UN_CODICE.test(m[1]) && !SEGNO_FORTE.test(m[1]) && !APRE.test(m[1]) && !/^port[ae]$/.test(m[1]);
