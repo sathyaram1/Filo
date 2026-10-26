@@ -1100,6 +1100,55 @@
         return f ? `Rimesso com'era prima di: ${f}` : 'Cambio annullato';
       },
     },
+    // ── i pulsanti della pagina Preferenze chiesti in chat (#1619) ───────────
+    // Le prove suonano e basta: 0. Rifare l'intervista lascia quella di prima da rileggere: 1. Il ripristino si
+    // annulla dal segno sulla bolla, e pesa quanto il suo annullo: `_ripristino` (cosa cambia e a che livello) lo
+    // scrive il main prima del cancello, con la stessa funzione che poi scrive le impostazioni.
+    PULSANTE_PREFERENZE: {
+      costo: (a) => {
+        const p = pulsante(a);
+        if (p.startsWith('prova_')) return 0;
+        if (p !== 'ripristina_tutto') return 1;
+        return frasiRipristino(a).length ? 2 : 0;
+      },
+      campo: null,
+      difesa: (a) => pulsante(a) === 'ripristina_tutto' && frasiRipristino(a).length > 0
+        && !(a && a._ripristino && a._ripristino.livello === 1),
+      describe: (a) => {
+        const p = pulsante(a);
+        if (p === 'prova_suono' || p === 'prova_suoneria') {
+          const t = global.SN_PREF && a && a.tono != null ? global.SN_PREF.tonoDa(String(a.tono)) : null;
+          const nome = t ? ` «${global.SN_PREF.TONI_ETICHETTE[t]}»` : '';
+          return p === 'prova_suono' ? `Far sentire il suono degli avvisi${nome}` : `Far sentire la suoneria di timer e sveglie${nome}`;
+        }
+        if (p === 'prova_voce') {
+          const v = String((a && a.voce) || '').trim();
+          return v ? ['Far sentire la voce della lettura ', cit(v.slice(0, 80))] : 'Far sentire la voce della lettura ad alta voce';
+        }
+        if (p === 'rifai_intervista') {
+          return 'Ricominciare l\'intervista di benvenuto in una home nuova. Quella di prima resta da rileggere in Preferenze.';
+        }
+        if (p === 'ripristina_tutto') {
+          const f = frasiRipristino(a);
+          if (!f.length) return 'Riportare le impostazioni ai valori di serie: lo sono già tutte';
+          const base = [`Riportare ai valori di serie ${f.length === 1 ? 'un\'impostazione' : `${f.length} impostazioni`}:\n`, elenco(f),
+            '\n\nRestano le chiavi API e il registro dei modelli. Si rimette com\'era con «annulla» sul segno accanto al tuo messaggio.'];
+          if (a && a._ripristino && a._ripristino.livello === 1) return base;
+          return [...base, '\n\nTocca impostazioni di sicurezza, dei modelli o delle spese: conferma solo se l\'hai chiesto tu.'];
+        }
+        return 'Usare un pulsante delle Preferenze';
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const p = pulsante(a);
+        if (p === 'prova_suono') return `Suonato il suono degli avvisi${o.etichetta ? ` «${o.etichetta}»` : ''}`;
+        if (p === 'prova_suoneria') return `Suonata la suoneria${o.etichetta ? ` «${o.etichetta}»` : ''}`;
+        if (p === 'prova_voce') return 'Letta una frase con la voce della lettura';
+        if (p === 'rifai_intervista') return 'Ricominciata l\'intervista di benvenuto in una home nuova';
+        if (p === 'ripristina_tutto') return 'Impostazioni riportate ai valori di serie';
+        return 'Fatto';
+      },
+    },
     // ── volume, Bluetooth e Wi-Fi del computer (#874) ───────────────────────
     // Spegnere o staccare quello che sta servendo (le cuffie, la tastiera, la rete della chat stessa) è 2; il resto
     // 1, e 1 anche ciò che è già com'è chiesto (`gia`: niente cade). Il costo legge `_richiestaSistema`, che il main scrive sempre prima del cancello con la stessa funzione che
