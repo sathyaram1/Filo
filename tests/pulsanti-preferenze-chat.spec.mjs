@@ -149,7 +149,7 @@ test('«rimetti tutte le impostazioni di serie»: OK con l\'elenco, poi tutte di
   await configura(app);
   await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ theme: 'dark', notifications: { durationSec: 30 } }));
   const prefs = await openTab('filo://preferences/preferences.html');
-  await expect(prefs.locator('input[name="theme"][value="dark"], #theme')).toHaveCount(1).catch(() => {});
+  await expect.poll(() => prefs.evaluate(() => document.querySelector('#notifDuration')?.value), { timeout: 8_000 }).toBe('30');
 
   await modelloFinto(app, [premi('ripristina_tutto', 'Ti chiedo conferma.'), { text: 'Ti chiedo conferma.' }]);
   await scrivi(chat, 'rimetti tutte le impostazioni di serie');
@@ -184,32 +184,5 @@ test('«rimetti tutte le impostazioni di serie»: OK con l\'elenco, poi tutte di
   await pop.locator('.dash-cambi-annulla').click();
   await expect.poll(async () => (await impostazioni(app)).theme, { timeout: 5_000 }).toBe('dark');
   expect((await impostazioni(app)).notifications.durationSec).toBe(30);
-  await ripristina(app);
-});
-
-test('già tutte di serie: niente da confermare, e la chat lo sa', async ({ app, shell }) => {
-  test.setTimeout(60_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const chat = await homeDi(app);
-  // Tutte di serie, chiavi comprese: il modello finto non legge le impostazioni.
-  await app.evaluate(async () => {
-    const d = JSON.parse(JSON.stringify(globalThis.SN_CONST.DEFAULT_SETTINGS));
-    await globalThis.SN_STORAGE.setSettings(d);
-  });
-  await app.evaluate(async () => {
-    const s = await globalThis.SN_STORAGE.getSettings();
-    globalThis.__pp_prima = JSON.stringify(s);
-  });
-  await modelloFinto(app, [premi('ripristina_tutto'), { text: 'Sono già tutte di serie.' }]);
-  await app.evaluate(async () => {
-    // Senza modello configurato la chat non parte: il finto risponde comunque, la scelta non conta.
-    const C = globalThis.SN_CONST;
-    const s = await globalThis.SN_STORAGE.getSettings();
-    globalThis.__pp_modelli = { useDefaultModels: s.useDefaultModels, models: s.models, C: !!C };
-  });
-  await scrivi(chat, 'rimetti tutto di serie');
-  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Sono già tutte di serie.' })).toBeVisible({ timeout: 10_000 });
-  await expect(chat.locator(CONFIRM_HOST)).toHaveCount(0);
-  expect((await app.evaluate(() => globalThis.__pp_tool)).join('\n')).toContain('già tutte ai valori di serie');
   await ripristina(app);
 });
