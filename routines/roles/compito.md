@@ -34,7 +34,9 @@ node scripts/routine-channel.mjs operazione <operazione> '<dati in JSON>'
 I dati si possono passare anche su stdin. La risposta è il JSON del server su
 stdout (exit 0); un rifiuto stampa `RIFIUTATO dal server: <motivo>: <perché>`
 ed esce 4. Un'operazione fuori dal tuo ambito il server la rifiuta sempre: non
-riprovarla in un altro modo.
+riprovarla in un altro modo. I testi si leggono a gruppi (`{"ids": [...]}`, fino
+a 20): oltre 30 operazioni al minuto il server risponde `rate_limited`, e lì si
+aspetta un minuto e si riprende.
 
 Le due operazioni che ha ogni compito:
 

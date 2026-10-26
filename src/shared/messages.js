@@ -740,6 +740,7 @@
     RICORRENTE_SALVA: 'ricorrente_salva',   // { ricorrente:{ id?, nome, testo, giorni, ora, ambito, urgenza, modello, sforzo, attivo, domandaFineTurno } } → { ok, id } | { ok:false, error }
     RICORRENTE_TOGLI: 'ricorrente_togli',   // { id } → { ok, id } (chiude anche l'istanza in attesa) | { ok:false, error }
     RICORRENTE_AVVIA: 'ricorrente_avvia',   // { id } → { ok, id, compitoId } | { ok:false, error }
+    AMBITO_TOGLI: 'ambito_togli',           // { nome } → { ok, nome } (solo uno approvato dall'owner, non in uso) | { ok:false, error }
     // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
     // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
     // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner

@@ -31,12 +31,12 @@ const ISTANZA_COMPITI = {
 };
 
 // Un main finto con lo stato del server: `salva`, `togli` e `avvia` lo cambiano come ownerCompiti.
-async function installa(page, { owner = true, rifiuta = '', ricorrenti = [REVISIONE, POTATURA] } = {}) {
+async function installa(page, { owner = true, rifiuta = '', ricorrenti = [REVISIONE, POTATURA], approvati = {}, rifiutaAmbito = {} } = {}) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo && window.SN_RICORRENTI && window.SN_AMBITI && window.__mgRicorrenti);
   await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate(({ owner, rifiuta, ricorrenti, istanza, lunedi }) => {
-    window.__rc = { ricorrenti, inviati: [], letture: 0, rifiuta, compiti: [] };
+  await page.evaluate(({ owner, rifiuta, ricorrenti, approvati, rifiutaAmbito, istanza, lunedi }) => {
+    window.__rc = { ricorrenti, inviati: [], letture: 0, rifiuta, compiti: [], approvati, rifiutaAmbito };
     const orig = window.filo.message.bind(window.filo);
     const copia = (x) => JSON.parse(JSON.stringify(x));
     window.filo.message = async (msg) => {
@@ -44,7 +44,13 @@ async function installa(page, { owner = true, rifiuta = '', ricorrenti = [REVISI
       if (msg && msg.type === 'auth_status') return { ok: true, isAdmin: owner, signedIn: true };
       if (msg && msg.type === 'ricorrenti_elenco') {
         rc.letture += 1;
-        return { ok: true, adesso: Date.now(), ricorrenti: copia(rc.ricorrenti), ambiti: window.SN_AMBITI.elenco() };
+        return { ok: true, adesso: Date.now(), ricorrenti: copia(rc.ricorrenti), ambiti: window.SN_AMBITI.elenco(rc.approvati) };
+      }
+      if (msg && msg.type === 'ambito_togli') {
+        rc.inviati.push(copia(msg));
+        if (rc.rifiutaAmbito[msg.nome]) return { ok: false, error: rc.rifiutaAmbito[msg.nome] };
+        delete rc.approvati[msg.nome];
+        return { ok: true, nome: msg.nome };
       }
       if (msg && msg.type === 'ricorrente_salva') {
         rc.inviati.push(copia(msg));
@@ -71,7 +77,7 @@ async function installa(page, { owner = true, rifiuta = '', ricorrenti = [REVISI
       if (msg && msg.type === 'compiti_elenco') return { ok: true, aperti: copia(rc.compiti), storico: [], altri: false, adesso: Date.now(), ambiti: window.SN_AMBITI.elenco() };
       return orig(msg);
     };
-  }, { owner, rifiuta, ricorrenti, istanza: ISTANZA_COMPITI, lunedi: LUNEDI_6 });
+  }, { owner, rifiuta, ricorrenti, approvati, rifiutaAmbito, istanza: ISTANZA_COMPITI, lunedi: LUNEDI_6 });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await apriScheda(page, 'ricorrenti');
   await expect(page.locator('#panel-ricorrenti')).toHaveClass(/mg-panel--active/);
@@ -81,6 +87,15 @@ async function apri(openTab, opzioni) {
   const page = await openTab(URL);
   await installa(page, opzioni);
   return page;
+}
+
+// Col margine: un tasto a filo del bordo destro, nella foto del solo elemento, sembra tagliato.
+async function fotoAmbiti(page, path) {
+  const b = await page.locator('.mg-rc-ambiti').evaluate((n) => {
+    const r = n.getBoundingClientRect();
+    return { x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height };
+  });
+  await page.screenshot({ path, fullPage: true, clip: { x: Math.max(0, b.x - 16), y: Math.max(0, b.y - 16), width: b.w + 32, height: b.h + 32 } });
 }
 
 const riga = (page, id) => page.locator(`.mg-rc-riga[data-id="${id}"]`);
@@ -358,4 +373,46 @@ test('tema scuro: la scheda si legge come in chiaro', async ({ openTab }) => {
   });
   expect(colori.testo).not.toBe(colori.fondo);
   await page.screenshot({ path: 'tests/.shots/manage-ricorrenti-scuro.png', fullPage: true });
+});
+
+test('un ambito approvato si toglie con la conferma sul posto; gli iniziali no; un rifiuto dice perché accanto all\'ambito', async ({ openTab }) => {
+  const approvati = {
+    notizie: { operazioni: ['feedback.apri', 'domanda.apri'], nonPuo: 'leggere altro' },
+    sondaggi: { operazioni: ['feedback.apri'], nonPuo: 'tutto il resto' },
+  };
+  const rassegna = { ...POTATURA, id: 'rassegna', nome: 'Rassegna', ambito: 'notizie' };
+  const page = await apri(openTab, { approvati, ricorrenti: [REVISIONE, rassegna], rifiutaAmbito: { notizie: 'l’ambito notizie lo usa Rassegna: cambia prima il suo ambito' } });
+  const togli = page.locator('.mg-rc-ambito [data-azione="togli-ambito"]');
+  await expect(togli).toHaveCount(2);
+  for (const nome of await page.evaluate(() => Object.keys(window.SN_AMBITI.INIZIALI))) {
+    await expect(page.locator(`.mg-rc-ambito[data-nome="${nome}"] [data-azione="togli-ambito"]`), nome).toHaveCount(0);
+  }
+  const s = page.locator('.mg-rc-ambito[data-nome="sondaggi"]');
+  const b = s.locator('[data-azione="togli-ambito"]');
+  await expect(s.locator('.mg-rc-tag')).toContainText(['approvato da te']);
+  const prima = await b.boundingBox();
+  await b.dblclick();
+  await expect(b).toHaveText('Sì, toglilo');
+  expect(await inviati(page, 'ambito_togli')).toHaveLength(0);
+  const armato = await b.boundingBox();
+  expect(Math.round(armato.x + armato.width)).toBe(Math.round(prima.x + prima.width));
+  await fotoAmbiti(page, 'tests/.shots/manage-ricorrenti-ambiti.png');
+  // Un clic altrove disarma, come per i ricorrenti.
+  await page.locator('#mgRcStato').click();
+  await expect(b).toHaveText('Togli');
+  await b.click();
+  await b.click();
+  await expect(s).toHaveCount(0);
+  expect(await inviati(page, 'ambito_togli')).toEqual([{ type: 'ambito_togli', nome: 'sondaggi' }]);
+  await expect(page.locator('#mgRcStato')).toHaveText('Tolto l’ambito «sondaggi».');
+
+  const n = page.locator('.mg-rc-ambito[data-nome="notizie"]');
+  await expect(n).toContainText('Lo usa: Rassegna');
+  await n.locator('[data-azione="togli-ambito"]').click();
+  await n.locator('[data-azione="togli-ambito"]').click();
+  await expect(n.locator('.mg-rc-ambito-esito')).toHaveText('L’ambito notizie lo usa Rassegna: cambia prima il suo ambito.');
+  await expect(n.locator('[data-azione="togli-ambito"]')).toHaveText('Togli');
+  await expect(n.locator('[data-azione="togli-ambito"]')).toBeFocused();
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
+  await fotoAmbiti(page, 'tests/.shots/manage-ricorrenti-ambiti-scuro.png');
 });

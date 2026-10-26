@@ -10,6 +10,7 @@
   const SALVA = MSG.RICORRENTE_SALVA || 'ricorrente_salva';
   const TOGLI = MSG.RICORRENTE_TOGLI || 'ricorrente_togli';
   const AVVIA = MSG.RICORRENTE_AVVIA || 'ricorrente_avvia';
+  const TOGLI_AMBITO = MSG.AMBITO_TOGLI || 'ambito_togli';
   const K = window.SN_COMPITI;
   const R = window.SN_RICORRENTI;
   const A = window.SN_AMBITI;
@@ -55,6 +56,9 @@
     bozze: new Map(),
     msgModulo: new Map(),
     conferma: '',
+    confermaAmbito: '',
+    ambitoInVolo: '',
+    esitoAmbito: new Map(),
     misure: new Map(),
     occupato: new Map(),
     esito: new Map(),
@@ -438,7 +442,7 @@
   function disegnaAmbiti() {
     const usati = new Map();
     for (const r of stato.ricorrenti) usati.set(r.ambito, (usati.get(r.ambito) || []).concat([r.nome || r.id]));
-    const firma = JSON.stringify([stato.ambiti, [...usati]]);
+    const firma = JSON.stringify([stato.ambiti, [...usati], stato.confermaAmbito, stato.ambitoInVolo, [...stato.esitoAmbito]]);
     if (firma === ambitiDisegnati) return;
     ambitiDisegnati = firma;
     el.ambiti.replaceChildren(...stato.ambiti.map((a) => {
@@ -450,7 +454,10 @@
       if (!a.attivo) testa.append(nodo('span', 'mg-rc-tag', 'non ancora attivo', 'Il server non lo dà ancora a nessun compito'));
       if (a.riservato) testa.append(nodo('span', 'mg-rc-tag mg-rc-tag--riservato', 'ambiente dei riservati', 'Legge testo riservato: i suoi compiti girano solo nell’ambiente dei riservati'));
       if (a.soloPuliti) testa.append(nodo('span', 'mg-rc-tag', 'solo biglietti puliti', 'Vale solo per un biglietto che non ha letto testo non fidato'));
-      if (a.approvato) testa.append(nodo('span', 'mg-rc-tag', 'approvato da te', 'Nato da una domanda a cui hai detto sì'));
+      if (a.approvato) {
+        testa.append(nodo('span', 'mg-rc-tag', 'approvato da te', 'Nato da una domanda a cui hai detto sì'));
+        testa.append(bottoneTogliAmbito(a.nome));
+      }
       const puo = nodo('ul', 'mg-rc-puo');
       puo.setAttribute('aria-label', 'Può');
       for (const p of Array.isArray(a.puo) ? a.puo : []) {
@@ -469,14 +476,38 @@
         u.append(nodo('b', '', 'Lo usa: '), document.createTextNode(chi.join(', ')));
         li.append(u);
       }
+      const e = stato.esitoAmbito.get(a.nome);
+      if (e) {
+        const p = nodo('p', 'mg-action-msg mg-err mg-rc-ambito-esito', e);
+        p.setAttribute('role', 'status');
+        li.append(p);
+      }
       return li;
     }));
+  }
+
+  // Solo gli ambiti approvati dall'owner: quelli iniziali sono del codice, e il server li rifiuterebbe.
+  function bottoneTogliAmbito(nome) {
+    const armato = stato.confermaAmbito === nome;
+    const inVolo = stato.ambitoInVolo === nome;
+    const b = bottone('togli-ambito', inVolo ? 'Lo tolgo…' : armato ? 'Sì, toglilo' : 'Togli',
+      armato ? 'Non si può riprendere: per riaverlo serve una domanda nuova' : 'Toglie l’ambito: non lo può più avere nessun compito',
+      // Quello in volo resta abilitato (lo ferma togliAmbito): un tasto spento perde il fuoco, e la tastiera con lui.
+      (e, el) => togliAmbito(nome, e, el), { disabilitato: !!stato.ambitoInVolo && !inVolo });
+    if (armato || inVolo) {
+      b.className = 'sn-btn sn-btn-danger';
+      const m = stato.misure.get(`ambito:${nome}`);
+      if (m) { b.style.minWidth = `${m.w}px`; b.style.minHeight = `${m.h}px`; }
+    }
+    return b;
   }
 
   /** Dov'è il fuoco dentro la scheda, con la selezione: un campo rifatto dalla bozza lo ritrova. */
   function fuoco() {
     const a = document.activeElement;
     if (!a || !root.contains(a)) return null;
+    const amb = a.closest('.mg-rc-ambito');
+    if (amb) return { ambito: amb.dataset.nome, azione: a.dataset.azione || '', nodo: a };
     const li = a.closest('.mg-rc-riga, .mg-rc-nuovo');
     if (!li) return null;
     const sel = typeof a.selectionStart === 'number' ? [a.selectionStart, a.selectionEnd] : null;
@@ -484,7 +515,8 @@
   }
   function rimettiFuoco(f) {
     if (!f || document.contains(f.nodo)) return;
-    const box = f.id === NUOVO ? el.nuovo : el.lista.querySelector(`.mg-rc-riga[data-id="${CSS.escape(f.id)}"]`);
+    const box = f.ambito ? el.ambiti.querySelector(`.mg-rc-ambito[data-nome="${CSS.escape(f.ambito)}"]`)
+      : f.id === NUOVO ? el.nuovo : el.lista.querySelector(`.mg-rc-riga[data-id="${CSS.escape(f.id)}"]`);
     if (!box) return;
     let n = null;
     if (f.campo) n = box.querySelector(`[data-campo="${CSS.escape(f.campo)}"]${f.giorno ? `[data-giorno="${CSS.escape(f.giorno)}"]` : ''}`);
@@ -731,6 +763,32 @@
     await carica();
   }
 
+  async function togliAmbito(nome, e, b) {
+    if (stato.ambitoInVolo) return;
+    if (e && e.detail > 1) return;
+    if (stato.confermaAmbito !== nome) {
+      const box = b && b.getBoundingClientRect();
+      if (box && box.width) stato.misure.set(`ambito:${nome}`, { w: Math.ceil(box.width), h: Math.ceil(box.height) });
+      stato.confermaAmbito = nome;
+      stato.esitoAmbito.delete(nome);
+      disegna();
+      return;
+    }
+    stato.confermaAmbito = '';
+    stato.ambitoInVolo = nome;
+    disegna();
+    let r;
+    try {
+      r = await send({ type: TOGLI_AMBITO, nome });
+    } catch (err) {
+      r = { ok: false, error: erroreDi(err) };
+    }
+    stato.ambitoInVolo = '';
+    if (!r || r.ok === false) stato.esitoAmbito.set(nome, K.frase((r && r.error) || 'il server non ha risposto'));
+    else avvisa(`Tolto l’ambito «${nome}».`);
+    await carica();
+  }
+
   function apriCompito(compitoId) {
     const scheda = document.querySelector('.mg-tab[data-tab="compiti"]');
     if (!scheda || !window.__mgCompiti || !window.__mgCompiti.mostra) { avvisa('La scheda dei compiti non è in questa pagina.'); return; }
@@ -764,15 +822,16 @@
 
   // Un clic fuori dal «Sì, toglilo» lo disarma: la conferma vale per il clic subito dopo, non per uno di domani.
   root.addEventListener('click', (e) => {
-    if (!stato.conferma) return;
-    const b = e.target.closest && e.target.closest('[data-azione="togli"]');
-    const li = b && b.closest('.mg-rc-riga');
-    if (li && li.dataset.id === stato.conferma) return;
-    stato.conferma = '';
-    disegna();
+    const b = e.target.closest && e.target.closest('[data-azione="togli"], [data-azione="togli-ambito"]');
+    const li = b && b.dataset.azione === 'togli' ? b.closest('.mg-rc-riga') : null;
+    const amb = b && b.dataset.azione === 'togli-ambito' ? b.closest('.mg-rc-ambito') : null;
+    let cambia = false;
+    if (stato.conferma && !(li && li.dataset.id === stato.conferma)) { stato.conferma = ''; cambia = true; }
+    if (stato.confermaAmbito && !(amb && amb.dataset.nome === stato.confermaAmbito)) { stato.confermaAmbito = ''; cambia = true; }
+    if (cambia) disegna();
   }, true);
   root.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && stato.conferma) { stato.conferma = ''; disegna(); }
+    if (e.key === 'Escape' && (stato.conferma || stato.confermaAmbito)) { stato.conferma = ''; stato.confermaAmbito = ''; disegna(); }
   });
   root.addEventListener('contextmenu', (e) => {
     const menu = window.SN_MANAGE_MENU;
@@ -793,6 +852,9 @@
       if (r.rapporto && r.rapporto.testo) voci.push({ testo: 'Copia il rapporto', azione: () => copia(r.rapporto.testo) });
       voci.push({ testo: 'Copia il nome', titolo: r.nome, azione: () => copia(r.nome || r.id) });
     }
+    const amb = e.target.closest('.mg-rc-ambito');
+    const a = amb ? ambitoDi(amb.dataset.nome) : null;
+    if (a && a.approvato && !stato.ambitoInVolo) voci.push({ testo: `Togli l’ambito «${a.nome}»`, titolo: 'Chiede conferma', azione: () => { stato.confermaAmbito = a.nome; disegna(); } });
     voci.push({ testo: 'Nuovo compito ricorrente', azione: () => apriModulo(NUOVO) });
     voci.push({ testo: 'Rileggi dal server', azione: () => { stato.avviso = ''; carica(); } });
     menu.apri(e.clientX, e.clientY, voci);

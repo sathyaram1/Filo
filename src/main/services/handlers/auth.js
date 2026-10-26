@@ -1636,6 +1636,14 @@ module.exports = function register(on, ctx) {
     if (!r.ok) return r;
     return { ok: true, id, compitoId: String(r.compitoId || '') };
   }));
+  // Chi può aggiungere un ambito (sì a una domanda) deve poterlo togliere: gli iniziali e quelli in uso li rifiuta il server.
+  on(MSG.AMBITO_TOGLI, ownerOnly(async (msg) => {
+    const nome = typeof msg?.nome === 'string' ? msg.nome.trim() : '';
+    if (!/^[a-z][a-z_]{2,30}$/.test(nome)) return { ok: false, error: 'Manca l’ambito da togliere.' };
+    const r = await chiamaCompiti({ op: 'ambito_togli', nome }, 'Togliere un ambito non è ancora sul server: arriva col prossimo aggiornamento del server.');
+    if (!r.ok) return r;
+    return { ok: true, nome };
+  }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') });

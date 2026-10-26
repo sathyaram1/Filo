@@ -285,9 +285,26 @@ test('ricorrenti: togli e avvia portano l\'id; gli errori del server arrivano co
   assert.match((await chiama({ type: MSG.RICORRENTI_ELENCO })).error, /serve quello del proprietario/);
 });
 
+test('ambiti: si toglie per nome uno approvato; un nome storto non parte; il rifiuto del server arriva con la sua frase', async () => {
+  rispondi = () => ({ status: 200, body: { result: { ok: true, nome: 'notizie' } } });
+  assert.deepEqual(await chiama({ type: MSG.AMBITO_TOGLI, nome: ' notizie ' }), { ok: true, nome: 'notizie' });
+  assert.deepEqual(ricevute.map((x) => [x.path, x.data]), [['/ownerCompiti', { op: 'ambito_togli', nome: 'notizie' }]]);
+  for (const nome of ['', 'No', 'Notizie', '1abc', 'a/b', 'x'.repeat(32), null, 7]) {
+    assert.equal((await chiama({ type: MSG.AMBITO_TOGLI, nome })).ok, false, String(nome));
+    assert.equal(ricevute.length, 0, 'niente chiamata per un nome storto');
+  }
+  rispondi = () => ({ status: 400, body: { error: { status: 'FAILED_PRECONDITION', message: 'l’ambito notizie lo usa Rassegna: cambia prima il suo ambito', details: { reason: 'ambito_in_uso' } } } });
+  assert.deepEqual(await chiama({ type: MSG.AMBITO_TOGLI, nome: 'notizie' }), { ok: false, error: 'l’ambito notizie lo usa Rassegna: cambia prima il suo ambito' });
+  rispondi = () => ({ status: 200, body: { result: { ok: false, errore: 'ambito_iniziale', dettaglio: 'gli ambiti iniziali non si tolgono' } } });
+  assert.deepEqual(await chiama({ type: MSG.AMBITO_TOGLI, nome: 'lavoro' }), { ok: false, error: 'gli ambiti iniziali non si tolgono' });
+  rispondi = () => ({ status: 400, body: { error: { status: 'INVALID_ARGUMENT', message: 'op fra elenco, crea, annulla', details: { reason: 'op_sconosciuta' } } } });
+  assert.match((await chiama({ type: MSG.AMBITO_TOGLI, nome: 'notizie' })).error, /non è ancora sul server/);
+});
+
 test('le porte dei compiti e dei ricorrenti rispondono solo alle pagine di Filo, e solo all\'owner', async () => {
   const porte = [{ type: MSG.COMPITI_ELENCO }, { type: MSG.COMPITO_CREA, compito: { titolo: 'x', urgenza: 5 } }, { type: MSG.COMPITO_ANNULLA, id: 'C-1' },
-    { type: MSG.RICORRENTI_ELENCO }, { type: MSG.RICORRENTE_SALVA, ricorrente: RICORRENTE }, { type: MSG.RICORRENTE_TOGLI, id: 'r1' }, { type: MSG.RICORRENTE_AVVIA, id: 'r1' }];
+    { type: MSG.RICORRENTI_ELENCO }, { type: MSG.RICORRENTE_SALVA, ricorrente: RICORRENTE }, { type: MSG.RICORRENTE_TOGLI, id: 'r1' }, { type: MSG.RICORRENTE_AVVIA, id: 'r1' },
+    { type: MSG.AMBITO_TOGLI, nome: 'notizie' }];
   for (const msg of porte) {
     const r = await chiama(msg, 'https://esempio.it/', {});
     assert.equal(r.ok, false, msg.type);
