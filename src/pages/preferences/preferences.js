@@ -684,8 +684,7 @@
     syncCustomVoiceField();
   }
 
-  const MODEL_VOICE_SAMPLES = (window.SN_TTS_VOICES && window.SN_TTS_VOICES.FRASI_DI_PROVA)
-    || { it: 'Ciao, sono Filo. Questa è la voce naturale scelta per la lettura ad alta voce.' };
+  const MODEL_VOICE_SAMPLES = window.SN_TTS_VOICES.FRASI_DI_PROVA;
 
   // PCM 16 bit mono → WAV in un blob URL (stesso incapsulamento del content script).
   function pcmBase64ToWavUrl(base64, sampleRate) {
