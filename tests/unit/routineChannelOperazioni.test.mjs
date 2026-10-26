@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -102,6 +103,13 @@ test('il server che non ha ancora l’indirizzo è un guasto, non un rifiuto', a
     assert.equal(r.code, 3);
     assert.match(r.se, /routineOperazione non è ancora pubblicata/);
   });
+});
+
+test('il contratto comune di ogni worker insegna la segnalazione libera, con la ricetta che esegue', () => {
+  // Il server la accetta da ogni biglietto: senza la ricetta nel contratto la usavano solo i compiti.
+  const contratto = readFileSync(resolve(REPO, 'routines', 'roles', '_contratto-worker.md'), 'utf8');
+  assert.match(contratto, /node scripts\/routine-channel\.mjs segnala <<'FINE'\n[^\n]+\n\s*FINE/);
+  assert.match(contratto.replace(/\s+/g, ' '), /un permesso che mancava/);
 });
 
 test('datiOperazione: vuoto è un oggetto vuoto, il resto deve essere un oggetto JSON', () => {

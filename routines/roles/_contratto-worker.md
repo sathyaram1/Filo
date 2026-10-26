@@ -13,6 +13,18 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
 - un trade-off vero o una domanda di design (CLAUDE.md § Iniziativa: non lo
   decidi tu) → `--domanda <file.json>` sulla consegna (`--record-fixed`,
   `--record-verifier`). Nel report da solo si perde;
+- un errore avuto, uno strumento che sbaglia, un permesso che mancava, un
+  problema trovato fuori dal tuo lavoro → la segnalazione libera, anche senza
+  nessuna domanda: il server ne fa un feedback di tipo segnalazione, con la
+  fiducia del tuo biglietto, che qualcuno valuterà. Nelle note o nel guasto si
+  perde. Non sostituisce la domanda di un guasto che ti ferma:
+
+  ```bash
+  node scripts/routine-channel.mjs segnala <<'FINE'
+  <cosa è successo, dove, cosa mancava>
+  FINE
+  ```
+
 - l'esito del controllo di sicurezza → sempre con la sua nota
   (`--record-secaudit … --nota <file.md>`), anche quando passa. I file di
   `--domanda` e `--nota` si scrivono FUORI dal repo, nella cartella temporanea
