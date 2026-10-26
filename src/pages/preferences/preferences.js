@@ -684,13 +684,8 @@
     syncCustomVoiceField();
   }
 
-  const MODEL_VOICE_SAMPLES = {
-    it: 'Ciao, sono Filo. Questa è la voce naturale scelta per la lettura ad alta voce.',
-    en: 'Hi, I am Filo. This is the natural voice chosen for reading aloud.',
-    es: 'Hola, soy Filo. Esta es la voz natural elegida para la lectura en voz alta.',
-    fr: 'Bonjour, je suis Filo. Voici la voix naturelle choisie pour la lecture à voix haute.',
-    pt: 'Olá, eu sou o Filo. Esta é a voz natural escolhida para a leitura em voz alta.',
-  };
+  const MODEL_VOICE_SAMPLES = (window.SN_TTS_VOICES && window.SN_TTS_VOICES.FRASI_DI_PROVA)
+    || { it: 'Ciao, sono Filo. Questa è la voce naturale scelta per la lettura ad alta voce.' };
 
   // PCM 16 bit mono → WAV in un blob URL (stesso incapsulamento del content script).
   function pcmBase64ToWavUrl(base64, sampleRate) {
