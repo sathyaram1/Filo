@@ -189,6 +189,8 @@
     if (!msg) return false;
     if (msg.type === MSG.TTS_GLOBAL_READING) { globalReading = !!msg.active; return true; }
     if (msg.type === MSG.TTS_STOP) { stopReading(); return true; }
+    // La prova di una voce chiesta in chat (#1619): la manda il main solo alla pagina della chat.
+    if (msg.type === MSG.TTS_PROVA) { readAloud(msg.testo, null, { voce: typeof msg.voce === 'string' ? msg.voce : '' }); return true; }
     return false;
   }
 
