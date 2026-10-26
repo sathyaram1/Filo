@@ -66,6 +66,7 @@
     BLUETOOTH: ['Comandato il Bluetooth', (k) => `Comandato il Bluetooth ${n(k)} volte`, 'Bluetooth'],
     WIFI: ['Comandato il Wi-Fi', (k) => `Comandato il Wi-Fi ${n(k)} volte`, 'Wi-Fi'],
     ORDINA_DESKTOP: ['Sistemate le icone del desktop', (k) => `Sistemate le icone del desktop ${n(k)} volte`, 'desktop'],
+    PULSANTE_PREFERENZE: ['Usato un pulsante delle Preferenze', (k) => `Usati ${n(k)} pulsanti delle Preferenze`, 'Preferenze'],
     RIMEDIO_CREDITI: ['Lavorato sui crediti', (k) => `Lavorato sui crediti ${n(k)} volte`, 'crediti'],
     INSTALLA_AGGIORNAMENTO: ['Avviato l\'aggiornamento', (k) => `Avviato l'aggiornamento ${n(k)} volte`, 'aggiornamento'],
   };

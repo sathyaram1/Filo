@@ -944,6 +944,7 @@
     ORDINA_DESKTOP: 'Sistemo le icone del desktop…',
     INSTALLA_AGGIORNAMENTO: 'Cerco la versione nuova…',
     RIMEDIO_CREDITI: 'Guardo i crediti…',
+    PULSANTE_PREFERENZE: 'Uso le Preferenze…',
     CHIUDI_SCHEDE: 'Chiudo le schede…',
     ACCOUNT: 'Sistemo l\'accesso…',
   };

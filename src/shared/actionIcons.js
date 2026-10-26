@@ -56,6 +56,7 @@
     SPOSTA_ICONA: 'pin',
     INSTALLA_AGGIORNAMENTO: 'download',
     RIMEDIO_CREDITI: 'credits',
+    PULSANTE_PREFERENZE: 'options',
     CARTA_HOME: 'home',
     ZOOM_PAGINA: 'zoomPagina',
     VOLUME: 'volume',
