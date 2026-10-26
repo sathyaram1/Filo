@@ -5068,6 +5068,22 @@ function esitoChiusuraPerModello(action, o) {
   return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}. ${dove}${coda}`;
 }
 
+// Quello che un pulsante delle Preferenze premuto dalla chat lascia da dire all'utente (#1619).
+function dopoPulsante(o) {
+  if (o.ripristinate) {
+    return ' Di\' in una frase che le impostazioni sono tornate di serie e che si rimettono com\'era con «annulla» sul segno '
+      + 'accanto al messaggio dell\'utente, o chiedendolo a te.';
+  }
+  if (o.aperta) return ' L\'intervista è in una home nuova, già davanti all\'utente; questa conversazione resta qui.';
+  if (o.voce) {
+    return ' La frase la legge adesso la pagina della chat; se la voce naturale non è disponibile si sente quella del '
+      + 'sistema e un avviso dice perché. Per sceglierla si usa IMPOSTA_PREFERENZA voce_modello.';
+  }
+  if (o.muto) return ' Però il volume è a zero e non si è sentito niente: dillo all\'utente e proponigli di alzarlo con IMPOSTA_PREFERENZA.';
+  if (o.spento) return ' Il suono degli avvisi però è spento: gli avvisi arrivano muti finché non lo accende (IMPOSTA_PREFERENZA suono_notifiche).';
+  return '';
+}
+
 // L'esito di UNA azione, come risposta allo strumento che il modello ha
 // chiamato. Chi ha un esito da leggere (ricerca, documento, comando) lo
 // riceve per intero; chi non ce l'ha riceve una riga: fatto, in attesa di
