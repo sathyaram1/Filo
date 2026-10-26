@@ -401,7 +401,9 @@
       // disponibile ci serve `error`/`firstFallback` per spiegare all'utente
       // perché la lettura passa alla voce del browser (vedi notifyModelFallback).
       // Una lettura è un uso: lo conta il primo pezzo, gli altri solo se si guastano (#969).
-      fetches[ci] = chrome.runtime.sendMessage({ type: MSG.TTS_SYNTH, text: ctext, lang: pageLang(), ...(ci > 0 ? { parteDiUnUso: true } : {}) })
+      fetches[ci] = chrome.runtime.sendMessage({
+        type: MSG.TTS_SYNTH, text: ctext, lang: pageLang(), ...(voce ? { voice: voce } : {}), ...(ci > 0 ? { parteDiUnUso: true } : {}),
+      })
         .then((res) => res || null)
         .catch(() => null);
     };
