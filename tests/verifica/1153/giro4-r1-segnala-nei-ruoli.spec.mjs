@@ -1,4 +1,4 @@
-// Verifica #1153, giro 3: ogni worker delle routine deve sapere che ha la segnalazione libera. Il contratto comune è
+// Verifica #1153, giro 4 (già nel giro 3): ogni worker delle routine deve sapere che ha la segnalazione libera. Il contratto comune è
 // il testo che dispatch dà a ogni ruolo di lavoro: senza la riga sul comando, nessuno di loro lo usa.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
