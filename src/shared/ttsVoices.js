@@ -254,7 +254,7 @@
   }
 
   global.SN_TTS_VOICES = {
-    CATALOGS, VOICES: KOKORO_VOICES, LANG_LABELS,
+    CATALOGS, VOICES: KOKORO_VOICES, LANG_LABELS, FRASI_DI_PROVA,
     catalogFor, voicesFor, allVoices, catalogOfVoice, isKnownVoice, langOfVoice, labelOfVoice,
     defaultVoiceFor, resolveVoice, voicesFromError, isVoiceRequiredError, pickFromList,
     langOf, groupedByLang,
