@@ -76,7 +76,9 @@
       for (const frase of frasi(righe[i])) {
         const nome = NOME_CODICE.test(frase);
         const forte = SEGNO_FORTE.test(frase);
-        if (!nome && !forte && !PER_APRIRE.test(frase)) continue;
+        // Senza il nome del codice: «Per aprire il cancello digita 3958», non «Apri il file e inserisci 48291».
+        const perAprire = PER_APRIRE.test(frase) && (APRE.test(frase) || /\b(?:port[ae]|entra(?:re)?)\b/i.test(frase));
+        if (!nome && !forte && !perAprire) continue;
         const zona = [frase];
         const dove = righe[i].indexOf(frase);
         if (righe[i].trim().length <= 80 && !haGiaIlNumero(righe[i].slice(dove < 0 ? 0 : dove))) {
