@@ -256,7 +256,7 @@ Questi dati vengono salvati su Google Firebase (Firestore + Storage) e ci
 servono solo per correggere bug e migliorare l'app. Oltre alle persone il
 testo lo leggono i **giudici automatici**, modelli scelti fra quelli ammessi
 dalla politica sui modelli, che decidono se un feedback è legittimo, spam o un
-attacco (`FEEDBACK-STATES.md`, `filo-model-policy.md`), e gli **agenti** che
+attacco (`FEEDBACK-STATES.md`, `transparency/models.md`), e gli **agenti** che
 lavorano la segnalazione. **Non includere in un feedback dati che non vuoi
 condividere.**
 
