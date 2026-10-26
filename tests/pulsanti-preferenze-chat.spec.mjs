@@ -64,8 +64,9 @@ async function scrivi(page, testo) {
 async function rigaDelDiario(chat, testo) {
   const diario = chat.locator('.dash-activity').last();
   await expect(diario).toBeVisible({ timeout: 10_000 });
-  if (!(await diario.locator('.dash-activity-body').isVisible().catch(() => false))) await diario.locator('.dash-activity-head').click();
-  return diario.locator('.dash-activity-row', { hasText: testo });
+  const riga = diario.locator('.dash-activity-row', { hasText: testo });
+  if (!(await riga.isVisible().catch(() => false))) await diario.locator('.dash-activity-head').click();
+  return riga;
 }
 
 test('«fammi sentire la suoneria carillon» la suona col volume salvato senza sceglierla; a volume zero lo dice', async ({ app, shell }) => {
