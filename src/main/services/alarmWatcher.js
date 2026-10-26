@@ -58,6 +58,8 @@ async function passata(incognito) {
   if (!fresh.length) return;
   for (const t of fresh) {
     visti.add(t.id);
+    // Che suona è un evento del filo (#1561), anche in incognito (dove resta in memoria).
+    try { require('./accaduti').timerScattato(t, { incognito }); } catch (_) {}
     // Filo lo scrive anche nel filo (#869), fuori dall'incognito per la stessa ragione della notifica qui sotto.
     if (!incognito) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'timer', testo: `${t.kind === 'alarm' ? 'sveglia' : 'timer'}${t.label ? ` «${t.label}»` : ''}` }); } catch (_) {} }
     // Niente notifica di sistema per una scadenza incognito: titolo ed etichetta

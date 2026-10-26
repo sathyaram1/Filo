@@ -1,6 +1,6 @@
 // Il registro dei cambi (#867): ogni scrittura dello stato (impostazioni, timer e sveglie, regole del
-// proxy) diventa un evento del filo nel momento in cui si salva, chiunque l'abbia chiesta. Chi chiede
-// dichiara solo da dove viene (`con`). Frasi, esclusioni e annullo: src/shared/cambi.js.
+// proxy) diventa un evento del filo (src/main/services/ilFilo.js) nel momento in cui si salva, chiunque l'abbia
+// chiesta. Chi chiede dichiara solo da dove viene (`con`). Frasi, esclusioni e annullo: src/shared/cambi.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { randomUUID } = require('node:crypto');
@@ -9,6 +9,8 @@ const Disco = require('../shim/storage');
 const provenienze = new AsyncLocalStorage();
 const K = () => globalThis.SN_CAMBI;
 const CHIAVI = () => globalThis.SN_CONST.STORAGE_KEYS;
+const Filo = () => require('./ilFilo');
+const E = () => globalThis.SN_FILO_EVENTI;
 
 // Quello che il registro deve far fare al resto dell'app per annullare: lo passa handlers.js.
 const app = {
@@ -36,23 +38,36 @@ function nuovoId() {
   return `c${randomUUID().replace(/-/g, '').slice(0, 10)}`;
 }
 
-// Una coda per lato: le scritture del disco e quelle dell'incognito non si mescolano mai.
-const code = { normale: Promise.resolve(), incognito: Promise.resolve() };
-function inCoda(incognito, lavoro) {
-  const lato = incognito ? 'incognito' : 'normale';
-  const corri = () => (incognito ? Disco.runIncognito(lavoro) : Disco.runNormale(lavoro));
-  const p = code[lato].then(corri, corri);
-  code[lato] = p.then(() => {}, () => {});
+// Una coda sola: l'ordine dei cambi è quello in cui si sono salvati. Il lato (disco o incognito) lo decide il filo.
+let coda = Promise.resolve();
+function inCoda(lavoro) {
+  const p = coda.then(lavoro, lavoro);
+  coda = p.then(() => {}, () => {});
   return p;
 }
 function attesa() {
-  return Promise.all([code.normale, code.incognito]);
+  return coda;
 }
 
 async function leggiLista() {
-  const r = await globalThis.chrome.storage.local.get(CHIAVI().FILO_CAMBI);
-  const l = r && r[CHIAVI().FILO_CAMBI];
-  return Array.isArray(l) ? l : [];
+  return Filo().cambi({ incognito: Disco.inIncognito() });
+}
+
+// Il ritocco della stessa cosa riscrive il cambio di prima con un evento in coda (`fonde`), e tornato al valore di
+// partenza lo ritira: il filo non si riscrive, si piega.
+function salva(evento, incognito) {
+  return Filo().transazione(async (t) => {
+    const ultimo = t.ultimoCambio();
+    const opz = { dispositivo: t.dispositivo };
+    let ev;
+    if (K().fondibile(ultimo, evento)) {
+      const fuso = K().fondi(ultimo, evento);
+      ev = E().eventoCambio(fuso || { ...ultimo, cambi: [] }, { ...opz, fonde: true, ts: evento.ts });
+    } else {
+      ev = E().eventoCambio(evento, opz);
+    }
+    await t.scrivi([ev]);
+  }, { incognito });
 }
 
 function raccogli(ctx, evento) {
@@ -76,18 +91,8 @@ function registra({ tipo, cambi }, { incognito = Disco.inIncognito(), vuoto = fa
     cambi,
   };
   raccogli(ctx, evento);
-  inCoda(incognito, async () => {
-    const lista = await leggiLista();
-    const ultimo = lista[lista.length - 1];
-    let nuova;
-    if (K().fondibile(ultimo, evento)) {
-      const fuso = K().fondi(ultimo, evento);
-      nuova = fuso ? [...lista.slice(0, -1), fuso] : lista.slice(0, -1);
-    } else {
-      nuova = [...lista, evento];
-    }
-    await globalThis.chrome.storage.local.set({ [CHIAVI().FILO_CAMBI]: nuova });
-  }).then(() => app.annuncia([evento.id])).catch((e) => console.warn('[Filo cambi] evento non salvato:', e?.message || e));
+  inCoda(() => salva(evento, !!incognito))
+    .then(() => app.annuncia([evento.id])).catch((e) => console.warn('[Filo cambi] evento non salvato:', e?.message || e));
   return evento;
 }
 
@@ -166,6 +171,12 @@ async function tutti() {
   }));
 }
 
+// I cambi così come il filo li ha piegati, nel contesto di chi chiede (prove, migrazioni).
+async function lista() {
+  await attesa();
+  return leggiLista();
+}
+
 async function ultimi({ max = 40 } = {}) {
   await attesa();
   const lista = await leggiLista();
@@ -241,5 +252,5 @@ async function annullaOra(id, prov = {}) {
   return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati };
 }
 
-module.exports = { avvia, con, corrente, registra, registraZoom, leggi, tutti, ultimi, livelloDi, annulla, collega, attesa };
+module.exports = { avvia, con, corrente, registra, registraZoom, leggi, tutti, lista, ultimi, livelloDi, annulla, collega, attesa };
 globalThis.SN_REGISTRO_CAMBI = module.exports;

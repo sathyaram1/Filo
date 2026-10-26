@@ -18,7 +18,24 @@
     NAVIGAZIONE: 'navigazione',
     TITOLO_PAGINA: 'navigazione.titolo',
     CANCELLAZIONE: 'cancellazione',
+    // Un cambio di stato annullabile (#867): `cambio` è il suo id per ANNULLA_CAMBIO, `ambito` impostazioni, timer,
+    // proxy o zoom. Con `fonde` riscrive il cambio con quell'id (ritocchi della stessa cosa), con `cambi` vuoti lo ritira.
+    CAMBIO: 'cambio',
+    // Quello che succede fuori dalla chat (#1561), scritto da src/main/services/accaduti.js e dai punti che scrivono
+    // quello stato. Le schede dicono solo quale: la pagina è nella visita che porta lo stesso `scheda`.
+    AZIONE: 'azione',
+    SCHEDA_APERTA: 'scheda.aperta',
+    SCHEDA_CHIUSA: 'scheda.chiusa',
+    SCHEDA_DAVANTI: 'scheda.davanti',
+    RICERCA: 'ricerca',
+    DOWNLOAD: 'download',
+    FILE: 'file',
+    TIMER_SCATTATO: 'timer.scattato',
+    NOTIFICA: 'notifica',
+    SISTEMA: 'sistema',
   });
+  const ACCADUTI = new Set([TIPI.AZIONE, TIPI.SCHEDA_APERTA, TIPI.SCHEDA_CHIUSA, TIPI.SCHEDA_DAVANTI, TIPI.RICERCA,
+    TIPI.DOWNLOAD, TIPI.FILE, TIPI.TIMER_SCATTATO, TIPI.NOTIFICA, TIPI.SISTEMA]);
   const AUTORI = Object.freeze(['utente', 'filo', 'automazione']);
   const ORA_MS = 60 * 60 * 1000;
   const PERIODI = Object.freeze(['ultima_ora', 'oggi', 'ieri', 'tutto']);
@@ -30,6 +47,7 @@
 
   const isoValida = (s) => typeof s === 'string' && s.length >= 20 && !Number.isNaN(Date.parse(s));
   const stringa = (s) => typeof s === 'string' && s.length > 0;
+  const oggetto = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
 
   // Un tipo sconosciuto è valido: lo scriverà una versione più nuova (le azioni, un altro dispositivo) e chi non lo
   // capisce lo conserva senza piegarlo, invece di buttarlo alla prima riscrittura.
@@ -58,6 +76,28 @@
         return !!ev.pagine && typeof ev.pagine === 'object'
           && (ev.pagine.da == null || isoValida(ev.pagine.da)) && (ev.pagine.a == null || isoValida(ev.pagine.a))
           && (ev.pagine.sito == null || stringa(ev.pagine.sito));
+      case TIPI.CAMBIO:
+        return stringa(ev.cambio) && stringa(ev.ambito) && Array.isArray(ev.cambi)
+          && ev.cambi.every((c) => c && typeof c === 'object' && stringa(c.chiave));
+      case TIPI.AZIONE:
+        return stringa(ev.nome) && oggetto(ev.esito) && (ev.parametri == null || oggetto(ev.parametri))
+          && (ev.chat == null || stringa(ev.chat));
+      case TIPI.SCHEDA_APERTA:
+      case TIPI.SCHEDA_CHIUSA:
+      case TIPI.SCHEDA_DAVANTI:
+        return stringa(ev.scheda);
+      case TIPI.RICERCA:
+        return stringa(ev.testo) && (ev.visita == null || stringa(ev.visita)) && (ev.chat == null || stringa(ev.chat));
+      case TIPI.DOWNLOAD:
+        return stringa(ev.scaricamento) && stringa(ev.stato) && typeof ev.file === 'string';
+      case TIPI.FILE:
+        return stringa(ev.file) && stringa(ev.azione);
+      case TIPI.TIMER_SCATTATO:
+        return stringa(ev.timer);
+      case TIPI.NOTIFICA:
+        return stringa(ev.testo) && (ev.url == null || stringa(ev.url));
+      case TIPI.SISTEMA:
+        return stringa(ev.cosa);
       default:
         return true;
     }
@@ -114,7 +154,9 @@
 
   function nuovoStato() {
     // `messaggi`: l'id di ogni evento-messaggio porta alla sua chat (#872: le memorie ricordano da dove sono nate).
-    return { chat: new Map(), pagine: new Map(), ids: new Set(), pos: 0, tagli: [], messaggi: new Map() };
+    // `cambi`: i cambi di stato nell'ordine in cui sono nati, nella forma che legge src/shared/cambi.js.
+    // `accaduti`: gli eventi di ACCADUTI così come sono arrivati, in ordine (azioni, schede, ricerche…).
+    return { chat: new Map(), pagine: new Map(), ids: new Set(), pos: 0, tagli: [], messaggi: new Map(), cambi: [], accaduti: [] };
   }
 
   function nelPeriodo(ts, pagine) {
@@ -136,6 +178,9 @@
     if (!sito) return true;
     let host = '';
     try { host = new URL(url).hostname.toLowerCase().replace(/^www\./, ''); } catch (_) { return false; }
+    return hostDelSito(host, sito);
+  }
+  function hostDelSito(host, sito) {
     if (!host) return false;
     if (sito.includes('.')) return host === sito || host.endsWith('.' + sito);
     return host.split('.').includes(sito);
@@ -153,12 +198,53 @@
     return nelPeriodo(pagina.ts, c) && delSito(pagina.url, c.sito);
   }
 
+  // I siti che un'azione nomina nei suoi parametri («apri clinica.it/visita»), con o senza schema.
+  function hostIn(v, out = [], prof = 0) {
+    if (typeof v === 'string') {
+      const s = v.trim();
+      if (/^https?:\/\//i.test(s)) {
+        try { out.push(new URL(s).hostname.toLowerCase().replace(/^www\./, '')); } catch (_) {}
+      } else {
+        const m = /^(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,})(?::\d+)?(?:[/?#]|$)/i.exec(s);
+        if (m) out.push(m[1].toLowerCase());
+      }
+    } else if (prof < 4 && v && typeof v === 'object') {
+      for (const x of Array.isArray(v) ? v : Object.values(v)) hostIn(x, out, prof + 1);
+    }
+    return out;
+  }
+
+  // I siti che un testo libero nomina («Sito bloccato: casino.com · pubblicità»), parola per parola.
+  function hostNelTesto(testo, out = []) {
+    for (const p of String(testo || '').split(/\s+/)) hostIn(p.replace(/^[«"'(\[]+|[»"')\],;:.!?]+$/g, ''), out);
+    return out;
+  }
+
+  // Una regola sola per quello che nasce dall'uso (download, ricerche di Filo, azioni, avvisi): cancellare le pagine
+  // di un periodo lo porta via, e con un sito porta via quello che ne nomina un indirizzo (`url`, parametri, testo
+  // dell'avviso). Le ricerche sui siti stanno con la loro visita; quelle di Filo sul web non nominano un sito.
+  const DALL_USO = new Set([TIPI.DOWNLOAD, TIPI.RICERCA, TIPI.AZIONE, TIPI.NOTIFICA]);
+  function copreAccaduto(c, ev) {
+    if (!DALL_USO.has(ev.tipo) || !nelPeriodo(ev.ts, c)) return false;
+    if (ev.tipo === TIPI.RICERCA && stringa(ev.visita)) return false;
+    if (ev.tipo === TIPI.DOWNLOAD && !stringa(ev.url)) return false;
+    if (!c.sito) return true;
+    if (ev.tipo === TIPI.RICERCA) return false;
+    const siti = hostIn(ev.parametri, hostIn(ev.url));
+    if (ev.tipo === TIPI.NOTIFICA) hostNelTesto(ev.testo, siti);
+    return siti.some((h) => hostDelSito(h, c.sito));
+  }
+
   // Una visita che una cancellazione già vista copre non entra: non si scrive nemmeno. Il titolo nuovo di una visita
-  // che qui non c'è (cancellata, o mai entrata) nemmeno: `visite` sono quelle che arrivano insieme a lui.
+  // che qui non c'è (cancellata, o mai entrata) nemmeno, né la ricerca letta nel suo indirizzo: `visite` sono quelle
+  // che arrivano insieme a loro.
   function coperto(stato, ev, visite) {
     if (!ev) return false;
-    if (ev.tipo === TIPI.TITOLO_PAGINA) return !stato.pagine.has(ev.visita) && !(visite && visite.has(ev.visita));
-    return ev.tipo === TIPI.NAVIGAZIONE && stato.tagli.some((c) => copre(c, ev));
+    if (ev.tipo === TIPI.TITOLO_PAGINA || (ev.tipo === TIPI.RICERCA && stringa(ev.visita))) {
+      return !stato.pagine.has(ev.visita) && !(visite && visite.has(ev.visita));
+    }
+    if (ev.tipo === TIPI.NAVIGAZIONE) return stato.tagli.some((c) => copre(c, ev));
+    return ACCADUTI.has(ev.tipo) && stato.tagli.some((c) => copreAccaduto(c, ev));
   }
 
   function chatNuova(id, ts) {
@@ -255,24 +341,76 @@
         break;
       }
       case TIPI.CANCELLAZIONE: {
+        // `pagine` sono le visite tolte, il numero che si dice all'utente; `tolti` conta tutto e dice di compattare.
         let tolti = 0;
+        let pagine = 0;
+        const acc = Array.isArray(stato.accaduti) ? stato.accaduti : [];
+        let via = () => false;
         if (ev.chat != null) {
-          const via = stato.chat.get(ev.chat);
-          if (via && stato.messaggi) for (const ids of via._ids || []) for (const id of ids || []) stato.messaggi.delete(id);
+          const c = stato.chat.get(ev.chat);
+          if (c && stato.messaggi) for (const ids of c._ids || []) for (const id of ids || []) stato.messaggi.delete(id);
           if (stato.chat.delete(ev.chat)) tolti = 1;
+          via = (a) => a.chat === ev.chat;
         } else {
           const c = copertura(ev);
           stato.tagli.push(c);
+          const visite = new Set();
           for (const [id, p] of stato.pagine) {
-            if (copre(c, p)) { stato.pagine.delete(id); tolti++; }
+            if (copre(c, p)) { stato.pagine.delete(id); visite.add(id); tolti++; pagine++; }
           }
+          via = (a) => (a.tipo === TIPI.RICERCA && visite.has(a.visita)) || copreAccaduto(c, a);
         }
-        return { nuovo: true, tolti };
+        const restano = acc.filter((a) => !via(a));
+        tolti += acc.length - restano.length;
+        stato.accaduti = restano;
+        return { nuovo: true, tolti, pagine };
       }
+      case TIPI.CAMBIO:
+        piegaCambio(stato, ev);
+        break;
       default:
+        if (ACCADUTI.has(ev.tipo)) {
+          if (coperto(stato, ev)) return { nuovo: true, tolti: 1 };
+          if (!Array.isArray(stato.accaduti)) stato.accaduti = [];
+          stato.accaduti.push(ev);
+        }
         break;
     }
     return { nuovo: true, tolti: 0 };
+  }
+
+  // Gli accaduti in ordine di arrivo, copiati: `tipi` per sceglierne alcuni, `da` per quelli dopo un istante.
+  function accadutiDi(stato, { tipi, da } = {}) {
+    const voluti = Array.isArray(tipi) && tipi.length ? new Set(tipi) : null;
+    const t0 = da != null ? Date.parse(da) : NaN;
+    return (stato && Array.isArray(stato.accaduti) ? stato.accaduti : [])
+      .filter((ev) => (!voluti || voluti.has(ev.tipo)) && (Number.isNaN(t0) || Date.parse(ev.ts) > t0))
+      .map((ev) => JSON.parse(JSON.stringify(ev)));
+  }
+
+  function piegaCambio(stato, ev) {
+    if (!Array.isArray(stato.cambi)) stato.cambi = [];
+    const lista = stato.cambi;
+    const cambi = ev.cambi.map((c) => ({ ...c }));
+    if (ev.fonde === true) {
+      let i = lista.length - 1;
+      while (i >= 0 && lista[i].id !== ev.cambio) i--;
+      if (i >= 0) {
+        if (!cambi.length) lista.splice(i, 1);
+        else lista[i] = { ...lista[i], cambi, agg: ev.ts };
+        return;
+      }
+      if (!cambi.length) return;
+    }
+    lista.push({
+      id: ev.cambio, ts: ev.ts, tipo: ev.ambito, via: stringa(ev.via) ? ev.via : 'filo',
+      ...(stringa(ev.dove) ? { dove: ev.dove } : {}), ...(stringa(ev.annulla) ? { annulla: ev.annulla } : {}), cambi,
+    });
+  }
+
+  // Le copie dei cambi per chi le legge: nessuno tocca lo stato piegato.
+  function cambiDi(stato) {
+    return (stato && Array.isArray(stato.cambi) ? stato.cambi : []).map((e) => ({ ...e, cambi: e.cambi.map((c) => ({ ...c })) }));
   }
 
   // Cosa resta su disco dopo le cancellazioni: gli eventi di una chat cancellata DOPO di loro e le pagine che una
@@ -292,7 +430,8 @@
       }
       if (ev.chat != null && chatCancellate.has(ev.chat)) continue;
       if (ev.tipo === TIPI.NAVIGAZIONE && visiteTolte.has(ev.id)) continue;
-      if (ev.tipo === TIPI.TITOLO_PAGINA && visiteTolte.has(ev.visita)) continue;
+      if ((ev.tipo === TIPI.TITOLO_PAGINA || ev.tipo === TIPI.RICERCA) && visiteTolte.has(ev.visita)) continue;
+      if (ACCADUTI.has(ev.tipo) && tagli.some((c) => copreAccaduto(c, ev))) continue;
       tenuti.push(ev);
     }
     return tenuti.reverse();
@@ -374,6 +513,37 @@
     return eventi;
   }
 
+  // Chi ha fatto la cosa, da dove l'ha chiesta: dalla chat o dall'Aiuto la fa Filo, da una pagina o dall'interfaccia l'utente.
+  function autoreDi(via) {
+    if (via === 'chat' || via === 'assistente' || via === 'filo') return 'filo';
+    if (via === 'automazione') return 'automazione';
+    return 'utente';
+  }
+
+  // L'evento di un cambio, nella forma del registro (`{ id, ts, tipo, via, dove?, annulla?, cambi }`).
+  function eventoCambio(e, { fonde = false, ts, dispositivo, id } = {}) {
+    return crea(TIPI.CAMBIO, {
+      cambio: e.id, ambito: e.tipo, via: e.via || 'filo',
+      dove: stringa(e.dove) ? e.dove : undefined, annulla: stringa(e.annulla) ? e.annulla : undefined,
+      cambi: (Array.isArray(e.cambi) ? e.cambi : []).map((c) => ({ ...c })), fonde: fonde ? true : undefined,
+    }, { id, ts: ts || e.ts, dispositivo, autore: autoreDi(e.via) });
+  }
+
+  // Il registro dei cambi di prima (`filo_cambi` in storage.json) diventa eventi alla loro ora: un cambio ritoccato
+  // porta anche la sua fusione, così ritrova l'ora dell'ultimo ritocco. Uno già nel filo non rientra.
+  function daCambiSalvati(lista, { dispositivo, gia } = {}) {
+    const visti = gia instanceof Set ? gia : new Set();
+    const eventi = [];
+    for (const e of Array.isArray(lista) ? lista : []) {
+      if (!e || !stringa(e.id) || !stringa(e.tipo) || !Array.isArray(e.cambi) || visti.has(e.id)) continue;
+      visti.add(e.id);
+      const ts = isoValida(e.ts) ? e.ts : normaTs(e.ts);
+      eventi.push(eventoCambio({ ...e, ts }, { dispositivo }));
+      if (isoValida(e.agg) && e.agg !== ts && e.cambi.length) eventi.push(eventoCambio(e, { fonde: true, ts: e.agg, dispositivo }));
+    }
+    return eventi.filter(valido);
+  }
+
   // Un giorno scritto senza ora («2026-10-02») vale per il giorno intero dell'utente, non dalla mezzanotte di Greenwich.
   function istante(x, { fineGiorno = false } = {}) {
     if (x == null || x === '') return null;
@@ -424,5 +594,6 @@
     VERSIONE, TIPI, AUTORI, PERIODI,
     uuid, valido, crea, riga, analizza, analizzaRiga, nuovoStato, applica, compatta, elencoChat, copiaChat, dove,
     daChatSalvate, periodo, pagineNelPeriodo, nelPeriodo, normaSito, delSito, coperto,
+    autoreDi, eventoCambio, daCambiSalvati, cambiDi, ACCADUTI, accadutiDi,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

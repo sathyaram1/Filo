@@ -1578,6 +1578,7 @@
         testo: c.querySelector('.shell-notif-msg')?.textContent || '',
         azioni: Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || ''),
         chiusa: c.dataset.closing === '1',
+        indirizzo: c.dataset.indirizzo || '',
       }));
       const altre = tutte.filter((c) => c.dataset.attesa === '1' && c.dataset.closing !== '1').length;
       const cs = getComputedStyle(document.documentElement);
@@ -1697,6 +1698,7 @@
     // `alChiudere`: chiamata una volta quando l'avviso esce di scena, in qualunque modo (X, tempo, azione, «Chiudi tutti»).
     // `unica`: finché una notifica con la stessa chiave è a schermo non ne nasce un'altra;
     // quella riparte da capo con le azioni nuove. Chiusa, la prossima ricompare subito.
+    // `indirizzo`: il sito da cui nasce l'avviso; nel filo se ne va con le pagine di quel sito (#1561).
     function show(text, opts) {
       if (!text) return null;
       opts = opts || {};
@@ -1716,6 +1718,7 @@
         gemella._inAttesa = false;
         if (gemella._alChiudere !== opts.alChiudere) uscita(gemella);
         gemella._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
+        gemella.dataset.indirizzo = opts.indirizzo ? String(opts.indirizzo) : '';
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
         gemella._durata = durata;
@@ -1733,6 +1736,7 @@
       card._tipo = typeof opts.tipo === 'string' ? opts.tipo : '';
       if (opts.key) card.dataset.key = String(opts.key);
       if (chiave) card.dataset.unica = chiave;
+      if (opts.indirizzo) card.dataset.indirizzo = String(opts.indirizzo);
 
       const msg = document.createElement('div');
       msg.className = 'shell-notif-msg';

@@ -705,12 +705,12 @@ function registerIpcHandlers() {
   ipcMain.handle('tabs:set-proxy', async (event, { id, country, tier } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
-    return win._filoTabs.setTabProxy(id, country, { tier });
+    return require('./services/registroCambi').con({ via: 'interfaccia', dove: 'menu-scheda' }, () => win._filoTabs.setTabProxy(id, country, { tier }));
   });
   ipcMain.handle('tabs:clear-proxy', (event, { id } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
-    return win._filoTabs.clearTabProxy(id);
+    return require('./services/registroCambi').con({ via: 'interfaccia', dove: 'menu-scheda' }, () => win._filoTabs.clearTabProxy(id));
   });
   // #759 — «Resta connesso qui» dal menu della scheda (id) o dalla proposta dopo un accesso (sito). Solo dalla
   // shell e solo nel profilo normale: l'incognito non ha jar persistenti.

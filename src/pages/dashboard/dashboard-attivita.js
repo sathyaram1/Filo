@@ -28,6 +28,7 @@
   let paroleUtente = () => [];
   let apriProposta = () => {};
   let archiviaAzione = () => {};
+  let chatAttuale = () => '';
   let sceltaAutonomiaEl = () => null;
   let sceltaContatoriEl = () => null;
   let prosegui = () => {};
@@ -1969,7 +1970,7 @@
         btn.disabled = true;
         // Catturare e far leggere una finestra prende qualche secondo: il bottone dice che Filo ci sta lavorando.
         if (type === 'VEDI_SCHERMO') btn.textContent = 'Guardo la finestra…';
-        const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a, parole: paroleUtente() });
+        const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a, parole: paroleUtente(), chatId: chatAttuale() || '' });
         // Nemmeno l'OK fa uscire un segreto (#810): la riga dice cosa è stato fermato.
         if (r && r.output && r.output.blocked === 'segreto') {
           a._output = r.output;
@@ -2349,7 +2350,7 @@
   // Il riordino chiesto fuori dalla chat (/pulisci, il suggerimento della home) passa dalla stessa regola della
   // chat: parte nel main, o torna la domanda da fare. `{ annullato }`, o l'esito come lo legge l'utente (`esitoRiordino`).
   async function riordinaSchede() {
-    const r = await send({ type: MSG.FILO_RUN_ACTION, action: { type: 'PULISCI_TAB' }, parole: paroleUtente() });
+    const r = await send({ type: MSG.FILO_RUN_ACTION, action: { type: 'PULISCI_TAB' }, parole: paroleUtente(), interfaccia: true });
     if (r && r.executed) return esitoRiordino({ ok: true, ...(r.output || {}) });
     if (!r || !r.kept) {
       const o = (r && r.output) || {};
@@ -2496,6 +2497,7 @@
     if (deps.paroleUtente) paroleUtente = deps.paroleUtente;
     if (deps.apriProposta) apriProposta = deps.apriProposta;
     if (deps.archiviaAzione) archiviaAzione = deps.archiviaAzione;
+    if (deps.chatAttuale) chatAttuale = deps.chatAttuale;
     if (deps.sceltaAutonomia) sceltaAutonomiaEl = deps.sceltaAutonomia;
     if (deps.sceltaContatori) sceltaContatoriEl = deps.sceltaContatori;
     if (deps.prosegui) prosegui = deps.prosegui;

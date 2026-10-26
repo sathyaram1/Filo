@@ -326,10 +326,21 @@
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (_) { return null; }
   }
 
+  // La data di modifica si muove solo se il documento è cambiato: aprirlo, lasciarlo o salvarlo uguale non è
+  // scriverlo, e il filo conta le scritture da lei (#1561).
   function syncActiveIntoCollection() {
     if (!doc) return;
+    const senzaData = (f) => { try { return JSON.stringify({ ...f, meta: { ...(f.meta || {}), modified: null } }); } catch (_) { return null; } };
+    const prima = STORE.findFile(collection, doc.id);
+    const eraDel = prima && prima.meta ? prima.meta.modified : undefined;
+    const com = prima ? senzaData(prima) : null;
     STORE.replaceFile(collection, doc.id, serialize());
     collection.activeId = doc.id;
+    const dopo = STORE.findFile(collection, doc.id);
+    if (com && eraDel && dopo && dopo.meta && senzaData(dopo) === com) {
+      dopo.meta.modified = eraDel;
+      if (doc.meta) doc.meta.modified = eraDel;
+    }
   }
 
   // Il documento parte dopo la pausa e prima che la scheda, la finestra o Filo si chiudano: la regola delle caselle.
@@ -689,8 +700,15 @@
     maybeRecordManualVersion();
     syncActiveIntoCollection();
     activateFile(target);
-    writeCollection();
+    segnaAperto();
     closeDocPop();
+  }
+
+  // Il documento che l'utente mette davanti si salva con l'ora: il filo segna così i documenti aperti, anche solo
+  // letti, e la distingue da due editor che si rubano il documento a ogni salvataggio (src/shared/filoAccaduti.js).
+  function segnaAperto() {
+    collection.apertoAlle = new Date().toISOString();
+    writeCollection();
   }
 
   function createFile() {
@@ -4527,6 +4545,7 @@
   activateFile((fileChiesto && STORE.findFile(collection, fileChiesto)) || STORE.activeFile(collection));
   const archivioLetto = reloadFromArchive().then(() => {
     if (fileChiesto && STORE.findFile(collection, fileChiesto) && (!doc || doc.id !== fileChiesto)) switchToFile(fileChiesto);
+    else if (doc && STORE.findFile(collection, doc.id)) segnaAperto();
   });
   // Dopo la fusione con l'archivio: scrivere prima cancellerebbe gli appunti che Filo ci ha messo (vedi loadCollection).
   Promise.all([archivioLetto, leggiLayout()]).then(convertiCollezione, () => {});

@@ -2036,7 +2036,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         }[parsed.command] || parsed.command;
         let okShell = false;
         try {
-          const r = await chrome.runtime.sendMessage({ type: MSG.SHELL_ACTION, command: parsed.command });
+          const r = await chrome.runtime.sendMessage({ type: MSG.SHELL_ACTION, command: parsed.command, assistente: true });
           okShell = !!(r && r.ok);
         } catch (_) {}
         appendActionLog(okShell ? `comando Filo: ${human}` : `comando Filo non riuscito: ${human}`);

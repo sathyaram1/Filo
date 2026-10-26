@@ -471,6 +471,16 @@ function aggiornaBarra(scope = '') {
   } catch (_) {}
 }
 
+// L'inizio e ogni esito diverso dal precedente (interrotto, poi ripreso e finito) entrano nel filo una volta (#1561).
+function nelFilo(kind, rec, scope) {
+  if (!rec) return;
+  let quale = null;
+  if (kind === 'start' && !rec._filoInizio) { rec._filoInizio = true; quale = rec; }
+  else if ((kind === 'done' || kind === 'error') && rec._filoEsito !== rec.state) { rec._filoEsito = rec.state; quale = rec; }
+  if (!quale) return;
+  try { require('./accaduti').download(quale, { incognito: !!scope }); } catch (_) {}
+}
+
 // ─── broadcast verso la shell ───────────────────────────────────────────
 function broadcast(kind, rec) {
   // Una voce tolta dall'elenco non torna nella barra con l'esito tardivo del
@@ -478,6 +488,7 @@ function broadcast(kind, rec) {
   if (kind !== 'removed' && rec && !records.has(rec.id)) { notifyTabs(); aggiornaBarra(scopeOf(rec)); return; }
   const scope = scopeOf(rec);
   aggiornaBarra(scope);
+  nelFilo(kind, rec, scope);
   try {
     const payload = { kind, item: publicRecord(rec) };
     // Solo le finestre di Filo: un popup di accesso è la pagina di un sito, e il
@@ -593,7 +604,7 @@ function completa(rec) {
       broadcast('error', rec);
       contaNonRiuscito(rec);
       contaFine(rec);
-      shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'download_failed' }, scopeOf(rec));
+      shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'download_failed', indirizzo: rec.url }, scopeOf(rec));
       return;
     }
   }
@@ -609,6 +620,7 @@ function completa(rec) {
   shellToast(`Scaricato: ${shortName(rec.filename)}`, {
     durationSec: 8,
     tipo: 'download_finito',
+    indirizzo: rec.url,
     actions: [
       { label: 'Apri file', openDownloadId: rec.id },
       { label: 'Apri cartella', revealDownloadId: rec.id },
@@ -633,16 +645,17 @@ async function nominaDaSolo(rec) {
     // Senza modello, o col modello che non risponde, l'utente che ha acceso la funzione deve saperlo.
     if (p.errore === 'modello' && !avvisatoSenzaNome) {
       avvisatoSenzaNome = true;
-      shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${p.frase}`, { durationSec: 10, tipo: 'download_senza_nome' }, '');
+      shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${p.frase}`, { durationSec: 10, tipo: 'download_senza_nome', indirizzo: rec.url }, '');
     }
     return;
   }
-  const r = await Nomi.rinomina(letto, p.proposta);
+  const r = await Nomi.rinomina(letto, p.proposta, { daSola: 'automazione' });
   if (!r.ok || r.invariato) return;
   require('./contatoriFinestra').misura('rinominato');
   shellToast(`Nome dato: ${shortName(r.nome)}`, {
     durationSec: 10,
     tipo: 'download_nome_dato',
+    indirizzo: rec.url,
     actions: [
       { label: 'Annulla', rimettiNomeDownloadId: rec.id },
       { label: 'Apri file', openDownloadId: rec.id },
@@ -676,6 +689,17 @@ function rinominato(da, a) {
 function percorsoDi(id, scope = '') {
   const rec = recordIn(id, scope);
   return rec && rec.state === 'completed' ? (rec.savePath || '') : '';
+}
+
+// Il sito da cui è arrivato un file scaricato (per id o per percorso), '' se non è uno scaricamento: le azioni sul file
+// se ne vanno con le pagine di quel sito (#1561).
+function indirizzoDi({ id, percorso } = {}) {
+  let rec = id != null ? records.get(String(id)) : null;
+  if (!rec && typeof percorso === 'string' && percorso) {
+    const p = path.resolve(percorso);
+    for (const r of records.values()) if (r.savePath && stessoPercorso(r.savePath, p)) { rec = r; break; }
+  }
+  return rec && /^https?:\/\//i.test(String(rec.url || '')) ? rec.url : '';
 }
 
 async function rimettiNome(id, scope = '') {
@@ -820,7 +844,7 @@ function onWillDownload(item, webContents, scope = '') {
       contaFine(rec);
       if (rec.state !== 'cancelled') {
         contaNonRiuscito(rec);
-        shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'download_failed' }, scopeOf(rec));
+        shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'download_failed', indirizzo: rec.url }, scopeOf(rec));
       }
     }
   }
@@ -1120,8 +1144,18 @@ function servitoDi(rec) {
   try { return ESE().sito(rec.url); } catch (_) { return ''; }
 }
 
+// Da qualunque superficie (avviso, carta della home, pagina), l'apertura entra nel filo com'è andata (#1561).
 function openFile(id, opts, scope = '') {
   const rec = recordIn(id, scope);
+  const r = apriScaricato(rec, opts);
+  if (!rec) return r;
+  const segna = (x) => {
+    try { require('./accaduti').fileAperto({ scaricamento: String(rec.id), file: String(rec.filename || '') }, x, { incognito: !!scope }); } catch (_) {}
+    return x;
+  };
+  return r && typeof r.then === 'function' ? r.then(segna) : segna(r);
+}
+function apriScaricato(rec, opts) {
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
   if (rec.state === 'pending') {
     return { ok: false, error: 'Questo programma non è ancora sul computer. Rispondi prima all’avviso' };
@@ -1215,6 +1249,7 @@ module.exports = {
   HISTORY_LIMIT,
   rinominato,
   percorsoDi,
+  indirizzoDi,
   rimettiNome,
   attachSession,
   forgetScope,

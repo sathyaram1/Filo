@@ -197,8 +197,14 @@ function percorsoDi(wc, chiave) {
 const esiste = (p) => { try { return fs.statSync(p).isFile(); } catch (_) { return false; } };
 const nonCe = { ok: false, frase: 'Il file non c’è più: forse è stato spostato o cancellato' };
 
+// L'apertura entra nel filo da qui, com'è andata, come quella dei bottoni della chat (#1561).
 async function apri(wc, chiave) {
   const p = percorsoDi(wc, chiave);
+  const r = await apriFile(p);
+  if (p) { try { require('./accaduti').fileAperto({ percorso: p }, r); } catch (_) {} }
+  return r;
+}
+async function apriFile(p) {
   if (!p || !esiste(p)) return nonCe;
   try {
     const errore = await require('electron').shell.openPath(p);

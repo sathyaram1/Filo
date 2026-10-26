@@ -79,8 +79,15 @@ module.exports = function register(on, ctx) {
   const IMMAGINI = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic', '.tif', '.tiff']);
   const apribile = (p) => !!Testo.tipoDi(p) || IMMAGINI.has(path.extname(p).toLowerCase());
   const esiste = (p) => { try { return fs.statSync(p).isFile(); } catch (_) { return false; } };
+  // L'apertura entra nel filo da qui, com'è andata (#1561).
   on(MSG.FILE_APRI, soloFilo(async (msg) => {
     const p = percorsoDi(msg);
+    const r = await apriDalBottone(p);
+    const chiesto = p || (typeof msg?.percorso === 'string' ? msg.percorso.trim() : '');
+    if (chiesto) { try { require('../accaduti').fileAperto({ percorso: chiesto }, r); } catch (_) {} }
+    return r;
+  }));
+  async function apriDalBottone(p) {
     if (!p) return senza(p);
     // Il tipo si guarda sul nome, prima di chiedere niente al disco.
     if (!apribile(p)) {
@@ -93,7 +100,7 @@ module.exports = function register(on, ctx) {
     } catch (_) {
       return { ok: false, errore: 'sistema', frase: 'Il computer non ha un programma per aprire questo file' };
     }
-  }));
+  }
   on(MSG.FILE_MOSTRA_CARTELLA, soloFilo(async (msg) => {
     const p = percorsoDi(msg);
     if (!p) return senza(p);
@@ -140,6 +147,10 @@ module.exports = function register(on, ctx) {
       const scaricato = r.candidati.some((c) => ctx.fileScaricato(AiutoDoc.percorsoDi(wc, c.chiave)));
       try { ctx.segnaLetturaAiuto(sender, { type: 'CERCA_DOCUMENTI', cosa: r.cercato, _output: { cercato: r.cercato, risultati: r.candidati, scaricato } }); } catch (_) {}
     }
+    try {
+      ctx.azioneDellAiuto({ type: 'CERCA_DOCUMENTI', cosa: msg.cosa, ...(msg.cartella ? { cartella: msg.cartella } : {}) },
+        { executed: !!(r && r.ok), output: r && r.ok ? { cercato: r.cercato, risultati: r.candidati } : { error: (r && (r.error || r.code)) || 'non riuscita' } }, sender);
+    } catch (_) {}
     return r;
   }));
   on(MSG.AIUTO_DOCUMENTI_FERMA, daScheda(async (_msg, _sender, wc) => ({ ok: AiutoDoc.ferma(wc) })));

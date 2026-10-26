@@ -236,8 +236,11 @@ test('le pagine visitate entrano ripiegate: si aprono, riaprono la pagina scelta
   await page.screenshot({ path: `${SHOTS}/home-coda-pagine.png` });
   const schede = async () => (await shell.evaluate(() => window.filoShell.tabs.snapshot())).tabs.map((t) => t.url);
   const quante = (await schede()).filter((u) => u === urls[1]).length;
+  // La visita cliccata: tornati alla home la riga ha anche quella nuova che il clic apre, con lo stesso titolo.
+  const visita = await balene.getAttribute('data-id');
   await balene.click();
   await expect.poll(async () => (await schede()).filter((u) => u === urls[1]).length).toBe(quante + 1);
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).length)).toBe(4);
 
   await page.bringToFront();
   await shell.evaluate(async () => {
@@ -245,8 +248,7 @@ test('le pagine visitate entrano ripiegate: si aprono, riaprono la pagina scelta
     const t = s.tabs.filter((x) => String(x.url).startsWith('filo://newtab')).pop();
     await window.filoShell.tabs.activate(t.id);
   });
-  const visita = await balene.getAttribute('data-id');
-  await balene.click({ button: 'right' });
+  await riga.locator(`.dash-pagina[data-id="${visita}"]`).click({ button: 'right' });
   await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   // Via quella visita; la riga si rifà sul filo, dove c'è anche la visita nuova che il clic ha aperto.
   await expect(riga.locator(`.dash-pagina[data-id="${visita}"]`)).toHaveCount(0);
@@ -337,7 +339,7 @@ async function zoomDi(app, page) {
     return null;
   }, url);
 }
-const cambiDelRegistro = (app) => app.evaluate(async () => (await globalThis.chrome.storage.local.get('filo_cambi')).filo_cambi || []);
+const cambiDelRegistro = (app) => app.evaluate(async () => globalThis.SN_REGISTRO_CAMBI.lista());
 
 test('#1490 — lo zoom ritoccato a più riprese è una riga sola, da com’era a com’è, e da lì torna com’era', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
@@ -374,12 +376,14 @@ test('#1490 — con la home aperta il ritocco riscrive la riga che c’è già, 
     await R.attesa();
   }, { prima, dopo });
   await semina(app, { pagine: [{ url: 'https://www.youtube.com/watch?v=j', titolo: 'jazz music - YouTube', ts: new Date(Date.now() - 120_000).toISOString() }] });
-  await zoom(125, 114);
   // Il primo ritocco è di mezzo minuto fa: oltre i passi di un cursore trascinato, dentro i ritocchi di chi cerca il valore.
   await app.evaluate(async () => {
-    const lista = (await globalThis.chrome.storage.local.get('filo_cambi')).filo_cambi;
-    lista[lista.length - 1].ts = new Date(Date.now() - 30_000).toISOString();
-    await globalThis.chrome.storage.local.set({ filo_cambi: lista });
+    const E = globalThis.SN_FILO_EVENTI;
+    const primo = {
+      id: 'c00zoom0001', ts: new Date(Date.now() - 30_000).toISOString(), tipo: 'zoom', via: 'interfaccia', dove: 'zoom',
+      cambi: [{ chiave: 'zoom:youtube.com', prima: 125, dopo: 114 }],
+    };
+    await globalThis.SN_IL_FILO.transazione((t) => t.scrivi([E.eventoCambio(primo, { dispositivo: t.dispositivo })]));
   });
   const casa = await openTab('filo://newtab/');
   const righe = casa.locator('.dash-cambio', { hasText: 'zoom di youtube.com' });

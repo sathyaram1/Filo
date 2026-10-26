@@ -91,10 +91,18 @@
     });
   }
 
+  // Ogni ricerca che Filo fa sul web (la chat, l'Aiuto) entra nel filo da qui, una volta, riuscita o no (#1561).
   async function search({ query, tavilyKey, maxResults = 5 }) {
     const q = (query || '').trim().slice(0, MAX_QUERY_LEN);
     if (!q) return { ok: false, results: [], reason: 'query vuota' };
+    const r = await cerca(q, { tavilyKey, maxResults });
+    try {
+      global.SN_ACCADUTI?.ricerca({ testo: q, motore: r && r.provider, risultati: r && Array.isArray(r.results) ? r.results.length : 0 });
+    } catch (_) {}
+    return r;
+  }
 
+  async function cerca(q, { tavilyKey, maxResults }) {
     if (tavilyKey) {
       try {
         return await searchTavily({ query: q, apiKey: tavilyKey, maxResults });

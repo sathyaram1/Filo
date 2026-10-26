@@ -118,6 +118,8 @@
     sceltaContatori: (a) => Accoglienza.sceltaContatori(!(a._output && a._output.attivi === false)),
     // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
     allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
+    // L'azione confermata dopo il turno entra nel filo con la sua chat, e se ne va con lei (#1561).
+    chatAttuale: () => chatDellaRiga(),
     archiviaAzione: (type, cambi, a) => {
       const id = chatDellaRiga();
       const ids = Array.isArray(cambi) ? cambi : [];

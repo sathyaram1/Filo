@@ -140,7 +140,8 @@
     FILO_PROXY_RULES: 'filo_proxy_rules',
     // Siti che l'utente vuole sempre aperti (#823): { <host>: { ts } }. La pulizia delle schede non li archivia.
     FILO_KEEP_OPEN: 'filo_keep_open',
-    // I cambi di stato come eventi del filo, in ordine, senza tetto (#867): src/main/services/registroCambi.js.
+    // Il registro dei cambi di prima (#867): alla partenza entra nel filo e la chiave sparisce (ilFilo.js). Resta per
+    // i vecchi backup, che lo portano qui dentro e non lo importano.
     FILO_CAMBI: 'filo_cambi',
     // Modalità automatica (dashboard Gestione → tab Automazioni): switch owner-only
     // che attiva/disattiva l'operatività automatica di Filo (routine/red-team).

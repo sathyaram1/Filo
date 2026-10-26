@@ -91,8 +91,10 @@ module.exports = function register(on, ctx) {
 
   // Il livello si riclassifica qui dentro anche con `confirmed`: un client compromesso non può
   // far eseguire un'azione fuori registro.
-  on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg), domanda: domandaDa(msg) });
+  on(MSG.FILO_CONFIRM_ACTION, async (msg, sender, origin) => {
+    // La chat dice solo dove l'azione resta nel filo: da una pagina di Filo, mai da un sito.
+    const chatId = isFilo(origin) && typeof msg.chatId === 'string' ? msg.chatId : '';
+    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg), domanda: domandaDa(msg), chatNelFilo: chatId });
     if (r && r.output && msg.assistente === true) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
     // col risultato vero davanti (quante pagine cancellate, quante schede archiviate), come la riga del diario.
@@ -130,8 +132,10 @@ module.exports = function register(on, ctx) {
   // viene eseguita finché la sidebar non rimanda la conferma (FILO_CONFIRM_ACTION).
   // Le azioni fuori registro vengono rifiutate dal dispatch, esattamente come
   // per la chat: la sidebar non è un canale privilegiato.
-  on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { sender, assistente: true, parole: paroleDa(msg), domanda: domandaDa(msg) });
+  on(MSG.FILO_RUN_ACTION, async (msg, sender, origin) => {
+    // Lo usa anche la home per un tasto dell'utente (il riordino): lo dice lei, e solo da una pagina di Filo.
+    const via = isFilo(origin) && msg.interfaccia === true ? 'interfaccia' : undefined;
+    const r = await executeFiloAction(msg.action, { sender, assistente: true, via, parole: paroleDa(msg), domanda: domandaDa(msg) });
     if (r && r.output) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     return { ok: true, ...r };
   });
@@ -233,7 +237,7 @@ module.exports = function register(on, ctx) {
   // gesto dell'utente su una superficie di Filo: non passa dai livelli, che servono a ciò che decide il modello.
   on(MSG.SISTEMA_COMANDA, require('./origine').soloFilo(async (msg) => {
     const Comandi = require('../comandiSistema');
-    return Comandi.comanda(msg && msg.richiesta);
+    return require('../registroCambi').con({ via: 'interfaccia', dove: 'home' }, () => Comandi.comanda(msg && msg.richiesta));
   }));
   on(MSG.SISTEMA_APRI_IMPOSTAZIONI, require('./origine').soloFilo(async (msg) => {
     const uri = require('../comandiSistema').uriImpostazioni(String((msg && msg.chiave) || ''));
@@ -550,6 +554,7 @@ module.exports = function register(on, ctx) {
     }
     const rif = app === 'aiuto' ? `${recinto}|${String(msg.rif == null ? '' : msg.rif)}` : msg.rif;
     const chat = await globalThis.SN_CONVERSAZIONI_APP.annota({ app, rif, soggetto, dove, messaggi: msg.messaggi });
+    if (chat && app === 'aiuto') ctx.segnaChatAiuto(sender, chat.id);
     return chat ? { ok: true, id: chat.id } : { ok: false, error: 'niente da scrivere' };
   });
 

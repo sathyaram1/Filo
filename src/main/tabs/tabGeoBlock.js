@@ -79,7 +79,7 @@ const geoBlockMethods = {
     // proxy fallisce del tutto (es. tier non configurato), non c'è retry: si propone.
     const tier = decision.tier;
     let res = { ok: false };
-    try { res = await this.setTabProxy(tab.id, country, { tier }); } catch (_) { res = { ok: false }; }
+    try { res = await this.setTabProxy(tab.id, country, { tier, daSola: 'automazione' }); } catch (_) { res = { ok: false }; }
     if (res && res.ok) {
       // Informare, non chiedere (spec §5): toast discreto. La ri-rilevazione del
       // blocco dopo il reload proxato (se l'IP è bloccato) farà scattare l'escalation.
