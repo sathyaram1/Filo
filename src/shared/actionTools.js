@@ -667,7 +667,7 @@
         + 'prova_voce legge una frase con la voce naturale della lettura ad alta voce ("com\'è la voce Nicola?"), senza sceglierla. '
         + 'rifai_intervista ricomincia l\'intervista di benvenuto in una home nuova; quella di prima resta da rileggere in Preferenze. '
         + 'ripristina_tutto riporta tutte le impostazioni ai valori di serie ("rimetti tutte le impostazioni come all\'inizio"): '
-        + 'restano le chiavi API e il registro dei modelli, e l\'OK lo chiede il sistema, con l\'elenco di cosa cambia.',
+        + 'restano le chiavi API e il registro dei modelli; se serve un OK lo chiede il sistema, con l\'elenco di cosa cambia, e tu non lo chiedi a parole.',
       properties: {
         pulsante: S('Quale pulsante.', { enum: ['prova_suono', 'prova_suoneria', 'prova_voce', 'rifai_intervista', 'ripristina_tutto'] }),
         tono: S('Per prova_suono e prova_suoneria: standard, delicata, urgente o carillon. Senza, quello scelto adesso.'),

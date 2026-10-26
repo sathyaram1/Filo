@@ -13,8 +13,9 @@
     return PULSANTI.includes(s) ? s : '';
   }
 
-  // Quello che il modello ha scritto torna all'utente nel diario: una riga, corta.
-  const corto = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, 40);
+  const detto = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  // Quello che il modello ha scritto torna all'utente nel diario: si controlla intero, si ripete corto.
+  const eco = (t) => (t.length > 40 ? `${t.slice(0, 39)}…` : t);
 
   function volumeDa(v) {
     const n = Number(v);
@@ -27,10 +28,10 @@
     const s = settings || {};
     const suoneria = pulsanteDi(action) === 'prova_suoneria';
     const n = s.notifications || {};
-    const detto = corto(action && action.tono);
+    const chiesto = detto(action && action.tono);
     const salvato = suoneria ? s.timerRingtone : n.sound;
-    const tono = detto ? P.tonoDa(detto) : (P.TONI_ETICHETTE[salvato] ? salvato : 'default');
-    if (!tono) return { rifiuto: `il tono «${detto}» non c'è: si sceglie fra standard, delicata, urgente e carillon` };
+    const tono = chiesto ? P.tonoDa(chiesto) : (P.TONI_ETICHETTE[salvato] ? salvato : 'default');
+    if (!tono) return { rifiuto: `il tono «${eco(chiesto)}» non c'è: si sceglie fra standard, delicata, urgente e carillon` };
     const volume = volumeDa(suoneria ? s.timerRingtoneVolume : n.soundVolume);
     return { tono, volume, etichetta: P.TONI_ETICHETTE[tono], suoneria, acceso: suoneria || n.soundEnabled === true };
   }
@@ -39,19 +40,19 @@
   function provaVoce(action, settings) {
     const P = global.SN_PREF;
     const V = global.SN_TTS_VOICES;
-    const detta = corto(action && action.voce);
+    const chiesta = detto(action && action.voce);
     let voce = String((settings && settings.tts && settings.tts.modelVoice) || '').trim();
-    if (detta) {
-      const b = P.buildPreferencePartial('voce_modello', detta);
+    if (chiesta) {
+      const b = P.buildPreferencePartial('voce_modello', chiesta);
       if (!b || b.rifiuto || !b.partial || !b.partial.tts) {
-        return { rifiuto: (b && b.rifiuto) || `«${detta}» non è il nome di una voce` };
+        return { rifiuto: (b && b.rifiuto) || `«${eco(chiesta)}» non è il nome di una voce` };
       }
       voce = String(b.partial.tts.modelVoice || '');
     }
     const lang = (voce && V && V.langOfVoice(voce)) || 'it';
     const frasi = (V && V.FRASI_DI_PROVA) || {};
     const testo = frasi[lang] || frasi.it || 'Ciao, sono Filo.';
-    const etichetta = voce ? ((V && V.labelOfVoice(voce)) || voce) : 'automatica';
+    const etichetta = voce ? eco((V && V.labelOfVoice(voce)) || voce) : 'automatica';
     return { voce, lang, testo, etichetta };
   }
 
