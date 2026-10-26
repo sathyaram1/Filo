@@ -19,6 +19,11 @@ const oggi = (app) => app.evaluate(async () => {
 });
 const misura = async (app, m) => (await oggi(app))[m];
 const tutteLeChiavi = async (app) => Object.values(await oggi(app)).flatMap((x) => Object.keys(x)).join('\n');
+// La home dell'avvio può finire di caricarsi dopo l'inizio della prova, e senza un modello si conta sempre: un conto
+// di partenza preso prima di lei finisce per contarla insieme alla scheda aperta dalla prova.
+async function homeDellAvvioContata(app) {
+  await expect.poll(async () => Object.values(await misura(app, 'home')).reduce((a, n) => a + n, 0), { timeout: 10_000 }).toBeGreaterThan(0);
+}
 
 async function trovaPagina(app, prova, timeout = 10_000) {
   const deadline = Date.now() + timeout;
