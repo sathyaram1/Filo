@@ -1,6 +1,5 @@
 // Editor di Filo — prototipo. Testo contenteditable serializzato in JSON compatibile
 // ProseMirror + griglia moduli configurabile con workspace/pagine e drag-and-drop.
-// Formato di salvataggio in editor-spec.md.
 
 (() => {
   'use strict';
