@@ -412,3 +412,38 @@ test('una parola dell\'aprire nella frase non copre un identificativo; il codice
     assert.ok(!P.oscura(t).includes(s), t);
   }
 });
+
+// Il codice ha un posto, come la password: un altro numero della frase che dice «code» non è il codice, e non sparisce
+// dalla pagina.
+test('un numero nella frase del codice che non sta al posto del codice resta, in tutta la pagina e nelle ricerche', () => {
+  for (const t of ['Start the server with npm start. The code uses port 3000.\nThen open http://localhost:3000',
+    'Il codice è stato scaricato 48291 volte', 'My code returns 1024 instead of 2048', 'Il codice va eseguito con almeno 4096 MB di RAM',
+    'Il codice è valido per 1200 utenti', 'Inserisci il codice e ricevi 1000 punti', 'QR code scansionato 4829 volte',
+    'The building code requires 1200 mm of clearance', 'In the code below, MAX_SIZE is 65536', 'Il PIN dell\'evento è stato visto da 1532 persone',
+    'node code port 3000 already in use', 'PIN predefinito 0000 cuffie bluetooth']) {
+    assert.equal(P.oscura(t), t, t);
+  }
+  for (const [t, s] of [['Il tuo codice di verifica, valido 10 minuti, è 482913', '482913'], ['Il codice qui sotto scade tra 10 minuti: 482913', '482913'],
+    ['Codice OTP | 482913', '482913'], ['Codice:\n482913', '482913'], ['Use code 482913 to sign in', '482913'],
+    ['Codice di apertura: 6153', '6153'], ['Codice di disattivazione: 4829', '4829'], ['Per disattivare l\'allarme digita 5261', '5261']]) {
+    assert.ok(!P.oscura(t).includes(s), t);
+  }
+});
+
+test('un codice usa e getta di lettere e cifre non esce; un identificativo di lettere e cifre resta', () => {
+  for (const [t, s] of [['Il tuo codice Steam Guard è 7K2F9', '7K2F9'], ['Enter this code on your TV: WDJB-MJHT', 'WDJB-MJHT']]) {
+    assert.ok(!P.oscura(t).includes(s), t);
+  }
+  for (const t of ['Codice prodotto AB12C', 'Usa il codice sconto ESTATE20 al checkout', 'Codice modello KDL40W', 'Codice volo AZ1234',
+    'The code uses SHA256 hashing', 'Il codice promozionale BLACK50 scade domani']) {
+    assert.equal(P.oscura(t), t, t);
+  }
+});
+
+// Coi puntini o un bottone sulla riga dell'etichetta la password è già mostrata coperta: la riga sotto è un altro campo.
+test('con la password a puntini o un bottone accanto all\'etichetta, la parola della riga sotto resta', () => {
+  for (const t of ['Password ••••••••\nNotifiche', 'Password Modifica\nSicurezza', 'Password ••••••• Modifica\nTelefono']) {
+    assert.equal(P.oscura(t), t, t);
+  }
+  assert.ok(!P.oscura('Password ••••••• Mostra\nGirasole2024').includes('Girasole2024'));
+});

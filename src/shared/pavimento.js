@@ -74,9 +74,9 @@
   // dopo un'etichetta breve in testa («Codice OTP 482913»), prima di «è il tuo codice», da solo in testa alla riga o alla
   // cella dopo l'etichetta. Un altro numero della frase («The code uses port 3000») non è il codice.
   const NOMI_CODICE = /\b(?:codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa)\b/gi;
-  const CHIUDE_ETICHETTA = /(?:[:=#]|\b(?:è|e'|is|was|era|sarà|will\s+be|sono|are)|\bn\.|\bnr\.?|\bno\.)\s*$/i;
+  const CHIUDE_ETICHETTA = /(?:[:=#]|(?:^|\s)(?:è|e'|is|was|era|sarà|will\s+be|sono|are)|\bn\.|\bnr\.?|\bno\.)\s*$/i;
   const PRIMA_DEL_NOME = /^\s*(?:[:=-]\s*)?(?:è|e'|is|=|sarà|was)\s+(?:[\p{L}'’-]+\s+){0,4}?(?:codic[ei]|codes?|pin|otp|passcode)\b/iu;
-  function alPostoDelCodice(z, m, inTesta) {
+  function alPostoDelCodice(z, m, inTesta, forte) {
     const prima = z.slice(0, m.index);
     if (inTesta) return !prima.trim();
     if (PRIMA_DEL_NOME.test(z.slice(m.index + m[0].length))) return true;
@@ -84,7 +84,8 @@
     if (!n) return false;
     const fra = prima.slice(n.index + n[0].length);
     if (!fra.trim()) return true;
-    if (fra.length > 60 || /[,;!?]|\d{4,}/.test(fra)) return false;
+    // Una virgola chiude la frase del codice («In the code below, MAX_SIZE is 65536»), salvo dove parla di entrare.
+    if (fra.length > 60 || /[;!?]|\d{4,}/.test(fra) || (!forte && fra.includes(','))) return false;
     if (CHIUDE_ETICHETTA.test(fra)) return true;
     return /^[\s•*·>–-]*$/.test(prima.slice(0, n.index)) && !/\d/.test(fra) && fra.trim().split(/\s+/).length <= 4;
   }
@@ -125,7 +126,7 @@
               const chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
               const entra = forte || chiave.apre;
               if (nonApre && !(nome && entra)) continue;
-              if (nome ? !(alPostoDelCodice(z, m, inTesta) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
+              if (nome ? !(alPostoDelCodice(z, m, inTesta, forte) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
                 : !(m[1] || m[3] || INTRODOTTO.test(prima))) continue;
               // Un anno resta, tranne subito dopo il nome di quello che apre: «Il codice del cancello è 1990».
               if (!lettere && !m[2] && ANNO.test(v) && !chiave.solo) continue;
@@ -284,6 +285,7 @@
   const DOPO_CORTA = new RegExp(`${ETICHETTA_CORTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t]{6,70})`, 'gi');
   const DA_SOLA = /^[.,;!]?[ \t]*(?:$|\(|[^\s:]{1,30}:(?:\s|$)|[·•–—-]\s)/;
   const SOLO_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}${ACCANTO}[ \\t]*:?[ \\t]*$`, 'i');
+  const TESTA_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}`, 'i');
   function alPostoDelValore(s, out) {
     const righe = s.split('\n');
     const forma = (pezzo) => { const v = formaVicina(pezzo); if (v) out.push({ valore: v, regola: 'password' }); };
@@ -301,8 +303,9 @@
       const { riga, j, saltate } = rigaSotto(righe, i);
       const sotto = riga.trim().split(/\s+/);
       // Oltre i bottoni o i puntini (la password mostrata coperta) la riga dopo è spesso un altro campo («Telefono»):
-      // lì conta solo la forma di una password.
-      if (sotto.length === 1 && !saltate) {
+      // lì conta solo la forma di una password, anche coi puntini o il bottone sulla riga dell'etichetta.
+      const accanto = righe[i].replace(TESTA_ETICHETTA, '').replace(/:/g, '');
+      if (sotto.length === 1 && !saltate && !(accanto.trim() && SOLO_BOTTONI.test(accanto))) {
         const v = valorePassword(sotto[0]);
         if (v) out.push(alPosto(v, inizi[j], riga));
       } else forma(sotto[0]);
