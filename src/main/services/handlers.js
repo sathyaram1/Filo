@@ -59,6 +59,14 @@ function contaSe(metodo, ...args) {
   } catch (_) { return undefined; }
 }
 const { TURNO_MUTO } = require('./contatori');
+// Una scheda chiusa che la chat riapre col suo indirizzo si conta come quella riaperta dalla home (#1467).
+async function contaSeRiaperta(url, win) {
+  if (!url || !win || win._filoIncognito) return;
+  try {
+    const voce = await ArchivedTabs.ultimaPer(url);
+    if (voce) contaSe('riaperta', voce, { incognito: false });
+  } catch (_) {}
+}
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
@@ -976,16 +984,24 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti = 
       intera: true,
     });
     const text = (r?.text || '').trim();
-    if (!text || /^NULLA DA IMPARARE/i.test(text)) return;
+    const contaLezione = (esito) => { try { globalThis.SN_CONTATORI_MAIN?.attivita('lezioni', esito); } catch (_) {} };
+    if (!text || /^NULLA DA IMPARARE/i.test(text)) { contaLezione({ nulla: true }); return; }
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    let scritte = 0;
+    let scartate = 0;
     for (const line of lines) {
       const m = line.match(/^LEZIONE:\s*(.+)$/i);
       if (!m) continue;
       // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592).
       const l = global.SN_PREF.lezioneDaAzione({ testo: m[1] });
-      if (l.rifiuto) { console.warn('[Filo] lezione automatica scartata:', l.rifiuto); continue; }
-      if (l.testo) await FiloMem.appendLesson(l.testo, { fonti });
+      if (l.rifiuto) { scartate += 1; console.warn('[Filo] lezione automatica scartata:', l.rifiuto); continue; }
+      if (!l.testo) continue;
+      // Una lezione che ripete una riga tolta dalla persona non si scrive (#872): per i contatori è scartata.
+      const buf = await FiloMem.appendLesson(l.testo, { fonti });
+      const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
+      if (ultima && ultima.text === String(l.testo).trim()) scritte += 1; else scartate += 1;
     }
+    contaLezione({ scritte, scartate });
     if (await FiloMem.lessonsBufferShouldCompact()) {
       maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
     }
@@ -1018,16 +1034,22 @@ async function maybeRunCompactor() {
     const text = (r?.text || '').trim();
     const versione = meta.versione || 0;
     let applicata;
-    if (!text || /^NESSUNA MODIFICA/i.test(text)) {
+    const nessuna = !text || /^NESSUNA MODIFICA/i.test(text);
+    let nonRimesse = 0;
+    if (nessuna) {
       applicata = await FiloMem.applicaCompattazione({ patch: {}, usate: buf, versione });
     } else {
       const letto = Q.leggiCompattatore(FiloMem.parseCompactorOutput(text), {
         rif, meta, tolte: meta.nascoste, ora: inizio,
       });
+      nonRimesse = letto.scartate.length;
       if (letto.scartate.length) console.warn(`[Filo] compattatore: ${letto.scartate.length} righe tolte dall'utente non rimesse`);
       applicata = await FiloMem.applicaCompattazione({ patch: letto.patch, righe: letto.righe, usate: buf, versione });
     }
     if (!applicata) console.warn('[Filo] compattatore: l\'utente ha cambiato la memoria mentre lavorava, riparte al giro dopo');
+    try {
+      globalThis.SN_CONTATORI_MAIN?.attivita('compattazioni', { esito: !applicata ? 'rimandata' : nessuna ? 'nessuna' : 'applicata', nonRimesse });
+    } catch (_) {}
     return applicata;
   } catch (e) {
     console.warn('[Filo] compactor failed', e);
@@ -2825,6 +2847,7 @@ async function eseguiAzioneFilo(action, {
             const esito = typeof tm.esitoApertura === 'function' ? await tm.esitoApertura(tabId) : null;
             if (esito && esito.bloccata) return fermata(esito.bloccata.host, esito.bloccata.reason, esito.bloccata.target);
             opened = true;
+            contaSeRiaperta(url, win);
           }
         } catch (e) {
           console.warn('[Filo] apertura link fallita', e?.message || e);
@@ -3088,6 +3111,7 @@ async function eseguiAzioneFilo(action, {
           const settings = await getEffectiveSettings();
           const tavilyKey = settings.apiKeys?.tavily || '';
           const r = await WS.search({ query, tavilyKey, maxResults: 5 });
+          try { globalThis.SN_CONTATORI_MAIN?.attivita('ricercaWeb', { da: 'chat', ...globalThis.SN_CONTATORI.esitoRicerca(r) }); } catch (_) {}
           const results = Array.isArray(r?.results) ? r.results : [];
           return { executed: results.length > 0, kept: true, output: { search: query, results, provider: r?.provider || '', reason: r?.reason || '' } };
         } catch (e) {
@@ -3475,6 +3499,7 @@ async function eseguiAzioneFilo(action, {
           await FiloMem.svuotaQuaderno();
           // E le interviste di benvenuto conservate: sono quello che l'utente gli ha raccontato di sé (#1297).
           if (Onboarding) await saveOnboarding(Onboarding.dimentica(await FiloMem.getOnboarding()));
+          try { globalThis.SN_CONTATORI_MAIN?.memoriaCorretta('chat', 'svuota', null); } catch (_) {}
           broadcastLiveUpdate();
           return { executed: true, kept: false };
         } catch (e) {
@@ -3488,7 +3513,9 @@ async function eseguiAzioneFilo(action, {
         if (!rigaDaCorreggere || !l.testo) {
           return { executed: false, kept: false, output: { corrette: 0, trovate: (action._righe || []).length } };
         }
+        const com = await FiloMem.descriviRiga(rigaDaCorreggere.via);
         const ok = await FiloMem.editLine(rigaDaCorreggere.via, l.testo);
+        if (ok) { try { globalThis.SN_CONTATORI_MAIN?.memoriaCorretta('chat', 'correggi', com); } catch (_) {} }
         return { executed: ok, kept: false, output: ok ? { corretta: l.testo, prima: rigaDaCorreggere.testo } : { corrette: 0, trovate: 0 } };
       }
       case 'TOGLI_CHAT': {
@@ -3513,8 +3540,10 @@ async function eseguiAzioneFilo(action, {
             if (await FiloMem.forgetLine(r.via)) tolte.push(r.testo);
             continue;
           }
+          const com = await FiloMem.descriviRiga(r.via);
           const id = await FiloMem.hideLine(r.via);
           if (!id) continue;
+          try { globalThis.SN_CONTATORI_MAIN?.memoriaCorretta('chat', 'togli', com); } catch (_) {}
           if (action.per_sempre === true) await FiloMem.forgetHiddenForever(id);
           tolte.push(r.testo);
         }
@@ -6724,21 +6753,28 @@ async function filoPuoParlare() {
 // La home chiede i suggerimenti aprendosi: quelli in cache, senza mai chiamare il modello (#869). Il modello parte solo
 // con `force` («Aggiorna» sulla carta, la fine dell'accoglienza, i crediti arrivati). Senza un modello servibile, la
 // frase che dice perché e la strada ai Crediti.
-async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } = {}) {
+// `apertura`: la home che si apre (non un ricalcolo). Si conta lì, una volta per apertura, con quello che mostra (#1467):
+// i suggerimenti scritti da un modello, o perché manca un modello per la home (la sua sola: la chat può averlo).
+async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0, apertura = false } = {}) {
   await FiloMem.gcTimers();
   const settings = await getEffectiveSettings();
+  const contaHome = (esito) => { try { if (apertura && esito) globalThis.SN_CONTATORI_MAIN?.attivita('home', { esito }); } catch (_) {} };
   if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_DASHBOARD)) {
     const saved = await SavedPages.list();
     const payload = buildNoKeyDashboard(settings, saved);
+    contaHome(globalThis.SN_CONTATORI?.esitoHome(SN_CONST.whyCannotServe(settings, [ACTIONS.FILO_DASHBOARD])));
     return { ...payload, senzaChiave: true, cached: false, ts: new Date().toISOString() };
   }
   if (force) {
     const inputs = await gatherDashboardInputs({ openTabsCount });
     const result = await generateDashboardFromInputs(inputs);
+    if (result.suggestions && result.suggestions.length) contaHome('generata');
     return { suggestions: result.suggestions, cached: false, ts: result.ts };
   }
   const cached = await FiloMem.getDashboardCache();
-  return { suggestions: (cached && !cached.senzaChiave && cached.suggestions) || [], cached: !!cached, ts: cached?.ts || null };
+  const suggestions = (cached && !cached.senzaChiave && cached.suggestions) || [];
+  if (suggestions.length) contaHome('generata');
+  return { suggestions, cached: !!cached, ts: cached?.ts || null };
 }
 
 async function maybeCategorizeAsync(savedEntry, pageInput) {

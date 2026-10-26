@@ -1,4 +1,4 @@
-// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1471): crea il servizio, segue le impostazioni, riceve i
+// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1467, #1471): crea il servizio, segue le impostazioni, riceve i
 // gesti contati nelle pagine e dà all'owner le somme, mai sotto le cinque copie. Cosa si conta: src/main/services/contatori.js.
 // Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
 
@@ -125,8 +125,52 @@ module.exports = function register(on, ctx) {
     ok: contatori.usoDallaPagina(msg && msg.action, msg && msg.attesaMs, { anticipata: Boolean(msg && msg.anticipata === true) }),
   }));
 
-  on(MSG.CONTATORI_EVENTO, async (msg) => {
+  // Le attività che una pagina conta quando finiscono (#1467): i conti arrivano come numeri, e qui diventano fasce.
+  function attivitaDellaPagina(cosa, m) {
+    switch (cosa) {
+      case 'aiuto': return ['aiuto', {
+        esito: testo(m.esito), passiDaSolo: numero(m.passiDaSolo), passiCliccati: numero(m.passiCliccati),
+        nonTrovati: numero(m.nonTrovati), documenti: numero(m.documenti),
+      }];
+      case 'dettatura': return ['dettatura', { motivo: testo(m.motivo), frasi: numero(m.frasi), invio: testo(m.invio), provvisorie: m.provvisorie === true }];
+      case 'lettura': {
+        const motivo = C.motivoLettura({
+          ripiego: m.ripiego === true, codice: testo(m.codice), chiaveRifiutata: m.chiaveRifiutata === true,
+          errore: m.senzaModello === true ? 'no_tts_model' : '',
+        });
+        return ['lettura', { voce: testo(m.voce), motivo, fino: C.finoLettura(numero(m.quota), m.finita === true) }];
+      }
+      default: return null;
+    }
+  }
+  // Una pagina che si chiude non lo dice (chiudere una scheda non le dà eventi): quello che aveva aperto lo conta il
+  // main quando la sua WebContents se ne va. `id` distingue due attività dello stesso tipo nella stessa pagina.
+  const seguite = new WeakSet();
+  const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
+  function chiaveInCorso(sender, cosa, id) {
+    const wc = sender && sender.wc;
+    if (!wc || typeof wc.id !== 'number' || !ID_RE.test(String(id || ''))) return '';
+    if (!seguite.has(wc) && typeof wc.once === 'function') {
+      seguite.add(wc);
+      const prefisso = `${wc.id}|`;
+      wc.once('destroyed', () => contatori.chiudiInCorso(prefisso));
+    }
+    return `${wc.id}|${cosa}|${id}`;
+  }
+
+  on(MSG.CONTATORI_EVENTO, async (msg, sender) => {
     const m = msg && typeof msg === 'object' ? msg : {};
+    if (m.misura === 'in-corso') {
+      const a = attivitaDellaPagina(testo(m.cosa), m);
+      const k = a ? chiaveInCorso(sender, m.cosa, m.id) : '';
+      return { ok: Boolean(k) && contatori.apertaInCorso(k, a[0], a[1]) };
+    }
+    const fine = attivitaDellaPagina(testo(m.misura), m);
+    if (fine) {
+      const k = m.id == null ? '' : chiaveInCorso(sender, m.misura, m.id);
+      if (k) contatori.finitaInCorso(k);
+      return { ok: contatori.attivita(fine[0], fine[1]) };
+    }
     const attese = { vistoMs: numero(m.vistoMs), fineMs: numero(m.fineMs) };
     let ok = false;
     switch (m.misura) {
@@ -152,6 +196,8 @@ module.exports = function register(on, ctx) {
       case 'gesto': ok = C.GESTI_DALLE_PAGINE.includes(testo(m.gesto)) && contatori.gesto(testo(m.gesto), m); break;
       case 'reazione': ok = contatori.reazione(testo(m.voce)); break;
       case 'copia': ok = contatori.copia(testo(m.ruolo)); break;
+      case 'ricerca-web-tetto': ok = contatori.attivita('ricercaWeb', { da: 'aiuto', alTetto: true }); break;
+      case 'suggerimento': ok = contatori.attivita('suggerimenti', { tipo: testo(m.tipo), posizione: numero(m.posizione), etaMs: numero(m.etaMs) }); break;
       default: ok = false;
     }
     return { ok: Boolean(ok) };

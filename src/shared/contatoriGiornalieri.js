@@ -1,4 +1,4 @@
-// I contatori anonimi (#969, #1461, #1463, #1464, #1466, #1469, #1471): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
+// I contatori anonimi (#969, #1461, #1463, #1464, #1466, #1467, #1469, #1471): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
 // Esce solo ciò che sta negli elenchi chiusi di questo file; le regole Firestore ne tengono la forma, e la sentinella
 // tests/unit/firestoreRulesContatori.test.mjs le confronta. Misura e spedizione: src/main/services/contatori.js.
 
@@ -145,8 +145,78 @@
   });
   const MISURE_NAVIGAZIONE = Object.freeze(Object.keys(NAVIGAZIONE));
   const CAMPI_NAVIGAZIONE = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_NAVIGAZIONE]);
-  // Tutto quello che un'ora tiene sul disco, nei quattro documenti.
-  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE, ...MISURE_GESTI, ...MISURE_NAVIGAZIONE]);
+
+  // ── Le attività di Filo da solo o a metà con la persona (#1467) ─────────────
+  // Nel loro documento, accanto all'ora e con lo stesso id, come le chiamate. Per misura una mappa «combinazione → n»:
+  // la combinazione è fatta di nomi da elenchi chiusi uniti da «|», e le sue parti stanno in DIMENSIONI_ATTIVITA.
+  const VERSIONE_ATTIVITA = 1;
+  const COLLEZIONE_ATTIVITA = 'contatori-attivita';
+  const MIN_MS = 60 * 1000;
+  const ORA_MS = 60 * MIN_MS;
+  const GIORNO_MS = 24 * ORA_MS;
+  const SI_NO = Object.freeze(['si', 'no']);
+  const FASCE_PASSI = Object.freeze([['p0', 0], ['p1', 1], ['p2_5', 5], ['p6_20', 20], ['oltre', Infinity]]);
+  const FASCE_TROVATI = Object.freeze([['n0', 0], ['n1', 1], ['n2_oltre', Infinity]]);
+  const FASCE_RISULTATI = Object.freeze([['r0', 0], ['r1_2', 2], ['r3_5', 5], ['oltre', Infinity]]);
+  const FASCE_FRASI = Object.freeze([['f0', 0], ['f1', 1], ['f2_5', 5], ['oltre', Infinity]]);
+  const FASCE_LEZIONI = Object.freeze([['l0', 0], ['l1', 1], ['l2_3', 3], ['oltre', Infinity]]);
+  const FASCE_NON_RIMESSE = Object.freeze([['r0', 0], ['r1', 1], ['r2_5', 5], ['oltre', Infinity]]);
+  const FASCE_SCHEDE_PULIZIA = Object.freeze([['s0', 0], ['s1', 1], ['s2_5', 5], ['s6_20', 20], ['oltre', Infinity]]);
+  const ETA_RIGA = Object.freeze([['giorno', GIORNO_MS], ['settimana', 7 * GIORNO_MS], ['mese', 31 * GIORNO_MS], ['oltre', Infinity]]);
+  const ETA_RIAPERTA = Object.freeze([['min10', 10 * MIN_MS], ['ora', ORA_MS], ['giorno', GIORNO_MS], ['oltre', Infinity]]);
+  const ETA_HOME = Object.freeze([['ora', ORA_MS], ['giorno', GIORNO_MS], ['oltre', Infinity]]);
+  const POSIZIONI_SUGGERIMENTO = Object.freeze([['1', 1], ['2', 2], ['3', 3], ['4_oltre', Infinity]]);
+  // «pagina_cambiata»: la pagina se n'è andata al passo indicato e cliccato dalla persona, non lasciata da lei.
+  const ESITI_AIUTO = Object.freeze(['fatto', 'chiusa_prima', 'tetto_passi', 'errore', 'pagina_cambiata']);
+  const DA_RICERCA = Object.freeze(['chat', 'aiuto']);
+  const FORNITORI_RICERCA = Object.freeze(['tavily', 'duckduckgo', 'nessuno']);
+  // I motivi con cui SN_ASCOLTO chiude una sessione del microfono.
+  const MOTIVI_DETTATURA = Object.freeze(['utente', 'finito', 'muto', 'tempo', 'errore', 'altro', 'annulla']);
+  // Che fine ha fatto il testo, saputo quando parte: «da_sola» l'invio automatico, «a_mano» mandato com'era, «cambiata»
+  // corretto prima, «tenuta» lasciato nella casella e mai mandato, «annullata» cancellato o perso con la chat;
+  // «nessuno»: niente da inviare (nessuna frase, o la dettatura in un campo di una pagina, che non ha un invio).
+  const INVII_DETTATURA = Object.freeze(['da_sola', 'cambiata', 'tenuta', 'annullata', 'a_mano', 'nessuno']);
+  const VOCI_LETTURA = Object.freeze(['modello', 'browser', 'mista']);
+  // Perché la lettura è passata alla voce del browser: i codici che l'avviso spiega, la chiave rifiutata, nessun modello.
+  const CODICI_LETTURA = Object.freeze(['NO_API_KEY', 'LIMIT_REACHED', 'NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL',
+    'NO_ALLOWED_HOST', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN']);
+  const MOTIVI_LETTURA = Object.freeze(['nessuno', ...CODICI_LETTURA.map((c) => c.toLowerCase()), 'chiave_rifiutata',
+    'no_tts_model', 'altro']);
+  // «q100»: fermata nell'ultimo quarto; «fine»: letta fino in fondo.
+  const FINO_LETTURA = Object.freeze(['q25', 'q50', 'q75', 'q100', 'fine']);
+  const ESITI_COMPATTAZIONE = Object.freeze(['nessuna', 'applicata', 'rimandata']);
+  const VIE_MEMORIA = Object.freeze(['quaderno', 'chat']);
+  const OPERAZIONI_MEMORIA = Object.freeze(['togli', 'correggi', 'ripristina', 'svuota']);
+  const RIGHE_MEMORIA = Object.freeze(['profilo', 'preferenze', 'espansioni', 'lezione', 'tutte']);
+  const TRIGGER_PULIZIA = Object.freeze(['idle', 'reopen', 'manual']);
+  const CHIUSE_DA = Object.freeze(['pulizia', 'duplicato', 'persona']);
+  const ESITI_HOME = Object.freeze(['generata', 'senza_ai_chiave', 'senza_ai_pesi_aperti', 'senza_ai_modelli']);
+  // Il tipo dell'azione di un suggerimento cresce col registro: nelle regole ne sta la forma, l'elenco lo tiene l'app.
+  const TIPO_SUGGERIMENTO = 'tipo';
+  const nomiDi = (fasce) => Object.freeze(fasce.map(([k]) => k));
+  const ND_ETA = 'nd';
+  const conNd = (fasce) => Object.freeze([...nomiDi(fasce), ND_ETA]);
+  // Per misura, le forme possibili della combinazione: ogni forma è l'elenco chiuso di ogni sua parte.
+  const DIMENSIONI_ATTIVITA = Object.freeze({
+    aiuto: [[ESITI_AIUTO, nomiDi(FASCE_PASSI), nomiDi(FASCE_PASSI), nomiDi(FASCE_TROVATI), nomiDi(FASCE_TROVATI)]],
+    ricercaWeb: [[DA_RICERCA, FORNITORI_RICERCA, SI_NO, nomiDi(FASCE_RISULTATI)], [['aiuto'], ['al_tetto']]],
+    dettatura: [[MOTIVI_DETTATURA, nomiDi(FASCE_FRASI), INVII_DETTATURA, SI_NO]],
+    lettura: [[VOCI_LETTURA, MOTIVI_LETTURA, FINO_LETTURA]],
+    lezioni: [[['nulla']], [nomiDi(FASCE_LEZIONI), nomiDi(FASCE_LEZIONI)]],
+    compattazioni: [[ESITI_COMPATTAZIONE, nomiDi(FASCE_NON_RIMESSE)]],
+    memoria: [[VIE_MEMORIA, OPERAZIONI_MEMORIA, RIGHE_MEMORIA, conNd(ETA_RIGA)]],
+    pulizia: [[TRIGGER_PULIZIA, nomiDi(FASCE_SCHEDE_PULIZIA), nomiDi(FASCE_SCHEDE_PULIZIA), nomiDi(FASCE_SCHEDE_PULIZIA), SI_NO]],
+    riaperte: [[CHIUSE_DA, nomiDi(ETA_RIAPERTA)]],
+    home: [[ESITI_HOME]],
+    suggerimenti: [[TIPO_SUGGERIMENTO, nomiDi(POSIZIONI_SUGGERIMENTO), conNd(ETA_HOME)]],
+  });
+  const MISURE_ATTIVITA = Object.freeze(Object.keys(DIMENSIONI_ATTIVITA));
+  const CAMPI_ATTIVITA = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_ATTIVITA]);
+  // Le combinazioni diverse di una misura in un'ora: oltre, la nuova si somma in «altro», e il conto non perde niente.
+  const TETTO_VOCI_ATTIVITA = 100;
+
+  // Tutto quello che un'ora tiene sul disco, nei cinque documenti.
+  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE, ...MISURE_GESTI, ...MISURE_NAVIGAZIONE, ...MISURE_ATTIVITA]);
   // Il primo documento di un giorno, o di un mese, di una copia di Filo: chi conta le installazioni legge solo quelli.
   const PRIMI = Object.freeze(['', 'giorno', 'mese']);
 
@@ -392,6 +462,10 @@
   const AZIONI_PER_GIRO_FORMA = `^${N}(,${N}){${AZIONI_PER_GIRO.length - 1}}$`;
   const VOCE_CHIUSA = `${alternative(NOMI_MESSAGGI_CHAT)}[|]${alternative(NOMI_DURATE_CHAT)}[|]${alternative(TIPI_CHAT)}[|]${N}`;
   const CHIUSE_FORMA = forma(VOCE_CHIUSA);
+  // Le attività: per misura la forma di una combinazione (le chiavi); i valori sono conti.
+  const parteForma = (d) => (d === TIPO_SUGGERIMENTO ? TIPO_AZIONE_FORMA.slice(1, -1) : alternative(d));
+  const FORME_ATTIVITA = Object.freeze(Object.fromEntries(MISURE_ATTIVITA.map((m) => [m,
+    `^${alternative([...DIMENSIONI_ATTIVITA[m].map((f) => f.map(parteForma).join('[|]')), ALTRO])}$`])));
 
   const re = (s) => new RegExp(s);
   const USO_RE = re(USO_FORMA);
@@ -412,6 +486,7 @@
   const STRUMENTI_RE = re(STRUMENTI_FORMA);
   const AZIONI_PER_GIRO_RE = re(AZIONI_PER_GIRO_FORMA);
   const CHIUSE_RE = re(CHIUSE_FORMA);
+  const ATTIVITA_RE = Object.freeze(Object.fromEntries(MISURE_ATTIVITA.map((m) => [m, re(FORME_ATTIVITA[m])])));
 
   // Il tetto di caratteri di ogni valore annidato, misurato sulla sua voce più lunga possibile, con margine.
   const TETTO_CARATTERI_USO = 80;
@@ -441,6 +516,13 @@
   const TETTO_CARATTERI_STRUMENTI = 70 * TETTO_STRUMENTI;
   const TETTO_CARATTERI_AZIONI_PER_GIRO = 10 * AZIONI_PER_GIRO.length;
   const TETTO_CARATTERI_CHIUSE = 36 * NOMI_MESSAGGI_CHAT.length * NOMI_DURATE_CHAT.length * TIPI_CHAT.length;
+  // Le chiavi di una misura delle attività: tutte le combinazioni ammesse più «altro», alla loro lunghezza massima.
+  const lungaParte = (d) => (d === TIPO_SUGGERIMENTO ? 40 : Math.max(...d.map((x) => x.length)));
+  const lungaChiave = (m) => Math.max(ALTRO.length,
+    ...DIMENSIONI_ATTIVITA[m].map((f) => f.reduce((a, d) => a + lungaParte(d), f.length - 1)));
+  const TETTI_CHIAVI_ATTIVITA = Object.freeze(Object.fromEntries(MISURE_ATTIVITA.map((m) => [m,
+    (TETTO_VOCI_ATTIVITA + 1) * (lungaChiave(m) + 1)])));
+  const TETTO_CARATTERI_ATTIVITA = (TETTO_VOCI_ATTIVITA + 1) * 10;
 
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const intero = (n) => Number.isInteger(n) && n >= 0;
@@ -707,6 +789,7 @@
       ...Object.fromEntries(MISURE_GESTI.map((k) => [k, {}])),
       ...Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c, {}])),
       chatTurni: {}, chatRecuperi: {}, strumenti: {}, azioniPerGiro: {}, chatReazioni: {}, chatCopie: {}, chatChiuse: {},
+      ...Object.fromEntries(MISURE_ATTIVITA.map((m) => [m, {}])),
     };
     for (const k of MISURE_SISTEMA) o[k] = {};
     return o;
@@ -960,7 +1043,6 @@
   }
 
   // ── Il sistema (#1466) ────────────────────────────────────────────────────
-  const ORA_MS = 60 * 60 * 1000;
   const sotto = (o, k) => (oggetto(o[k]) ? o[k] : (o[k] = {}));
   const testo = (v) => (typeof v === 'string' ? v : '');
   function fasciaTra(v, fasce) {
@@ -1148,7 +1230,6 @@
   const ZONE_ICONE = Object.freeze(['primary', 'secondary', 'bar']);
   // La posa: trascinata, spostata dal tasto destro su un'icona della barra (fra «Altro…» e le icone in vista), o chiesta a Filo.
   const VIE_POSA = Object.freeze(['trascina', 'rimessa_nel_menu', 'chat']);
-  const SI_NO = Object.freeze(['si', 'no']);
   const APERTURE = 'aperture';
   const MOTIVI_BARRA = Object.freeze(['spinta', 'clic', 'tasto', 'chat', 'trascina']);
   const ESITI_BARRA = Object.freeze(['azione', 'sistema', 'tasto_destro', 'a_vuoto']);
@@ -1477,6 +1558,113 @@
     const t = TIPI_CHAT.includes(tipo) ? tipo : SENZA_TIPO;
     piuUno(mappaDi(normale(ora), 'chatChiuse', via), `${m}|${d}|${t}`);
     return true;
+  }
+
+  // ── Le attività (#1467) ──────────────────────────────────────────────────
+  // Il tipo d'azione di un suggerimento della home: quelli del registro, la domanda in chat, e «altro».
+  function tipiSuggerimento() { return [...tipiAzione(), 'CHAT', ALTRO]; }
+  function tipoSuggerimento(t) {
+    const s = String(t || '').toUpperCase();
+    return tipiSuggerimento().includes(s) ? s : ALTRO;
+  }
+  const elencoParte = (d) => (d === TIPO_SUGGERIMENTO ? tipiSuggerimento() : d);
+
+  function combinazioneValida(misura, k) {
+    const forme = has(DIMENSIONI_ATTIVITA, misura) ? DIMENSIONI_ATTIVITA[misura] : null;
+    if (!forme || typeof k !== 'string') return false;
+    if (k === ALTRO) return true;
+    const parti = k.split('|');
+    return forme.some((f) => f.length === parti.length && f.every((d, i) => elencoParte(d).includes(parti[i])));
+  }
+
+  const quanti = (n) => { const v = numero(n); return v == null ? 0 : Math.floor(v); };
+  const fasciaEtaNd = (fasce, ms) => (numero(ms) == null ? ND_ETA : fasciaIn(fasce, ms));
+  const siNo = (b) => (b === true ? 'si' : 'no');
+  function posizioneSuggerimento(i) {
+    const v = Number(i);
+    return Number.isInteger(v) && v >= 1 ? fasciaIn(POSIZIONI_SUGGERIMENTO, v) : '';
+  }
+
+  // Le parti della combinazione di un'attività, dai suoi dati: numeri e nomi, che qui diventano fasce ed elenchi.
+  function partiAttivita(misura, x) {
+    const o = oggetto(x) ? x : {};
+    switch (misura) {
+      case 'aiuto': return [o.esito, fasciaIn(FASCE_PASSI, quanti(o.passiDaSolo)), fasciaIn(FASCE_PASSI, quanti(o.passiCliccati)),
+        fasciaIn(FASCE_TROVATI, quanti(o.nonTrovati)), fasciaIn(FASCE_TROVATI, quanti(o.documenti))];
+      case 'ricercaWeb': return o.alTetto === true ? ['aiuto', 'al_tetto']
+        : [o.da, o.fornitore, siNo(o.ripiego), fasciaIn(FASCE_RISULTATI, quanti(o.risultati))];
+      case 'dettatura': return [o.motivo, fasciaIn(FASCE_FRASI, quanti(o.frasi)), o.invio, siNo(o.provvisorie)];
+      case 'lettura': return [o.voce, o.motivo, o.fino];
+      case 'lezioni': return o.nulla === true ? ['nulla']
+        : [fasciaIn(FASCE_LEZIONI, quanti(o.scritte)), fasciaIn(FASCE_LEZIONI, quanti(o.scartate))];
+      case 'compattazioni': return [o.esito, fasciaIn(FASCE_NON_RIMESSE, quanti(o.nonRimesse))];
+      case 'memoria': return [o.via, o.operazione, o.riga, fasciaEtaNd(ETA_RIGA, o.etaMs)];
+      case 'pulizia': return [o.trigger, fasciaIn(FASCE_SCHEDE_PULIZIA, quanti(o.candidate)),
+        fasciaIn(FASCE_SCHEDE_PULIZIA, quanti(o.archiviate)), fasciaIn(FASCE_SCHEDE_PULIZIA, quanti(o.duplicati)),
+        siNo(o.giudizioMancato)];
+      case 'riaperte': return [o.chiusaDa, fasciaIn(ETA_RIAPERTA, o.etaMs)];
+      case 'home': return [o.esito];
+      case 'suggerimenti': return [tipoSuggerimento(o.tipo), posizioneSuggerimento(o.posizione), fasciaEtaNd(ETA_HOME, o.etaMs)];
+      default: return null;
+    }
+  }
+
+  // La chiave che l'attività scrive nell'ora, o '' se una parte non sta nel suo elenco.
+  function chiaveAttivita(misura, x) {
+    const p = partiAttivita(misura, x);
+    if (!p || p.some((v) => typeof v !== 'string' || !v)) return '';
+    const k = p.join('|');
+    return k !== ALTRO && combinazioneValida(misura, k) ? k : '';
+  }
+
+  function registraAttivita(ora, misura, x) {
+    const k = chiaveAttivita(misura, x);
+    if (!k) return false;
+    const mappa = normale(ora)[misura];
+    const piene = Object.keys(mappa).filter((c) => c !== ALTRO).length;
+    piuUno(mappa, has(mappa, k) || piene < TETTO_VOCI_ATTIVITA ? k : ALTRO);
+    return true;
+  }
+
+  // Chi ha risposto a una ricerca web (SN_WEB_SEARCH.search), se è il ripiego di Tavily, e quanti risultati.
+  function esitoRicerca(r) {
+    const ok = !!(r && r.ok);
+    const fornitore = ok && ['tavily', 'duckduckgo'].includes(r.provider) ? r.provider : 'nessuno';
+    return { fornitore, ripiego: !!(r && r.ripiego === true), risultati: ok && Array.isArray(r.results) ? r.results.length : 0 };
+  }
+
+  // Perché una lettura è passata alla voce del browser, dalla risposta che non ha portato l'audio.
+  function motivoLettura({ ripiego = false, codice = '', chiaveRifiutata = false, errore = '' } = {}) {
+    if (!ripiego) return 'nessuno';
+    if (CODICI_LETTURA.includes(codice)) return codice.toLowerCase();
+    if (chiaveRifiutata === true) return 'chiave_rifiutata';
+    return errore === 'no_tts_model' ? 'no_tts_model' : ALTRO;
+  }
+
+  // Fin dove è arrivata una lettura: `quota` da 0 a 1 di quello che c'era da leggere.
+  function finoLettura(quota, finita = false) {
+    if (finita === true) return 'fine';
+    const q = numero(quota);
+    if (q == null) return '';
+    return q <= 0.25 ? 'q25' : q <= 0.5 ? 'q50' : q <= 0.75 ? 'q75' : 'q100';
+  }
+
+  // Chi aveva chiuso la scheda che si riapre dall'archivio: «manual» è la persona, il resto il giro di pulizia.
+  // '' per una scheda chiusa dalla pagina stessa o da un crash: non l'ha chiusa nessuno dei tre, e non si conta.
+  function chiusaDa(reason, daSola = false) {
+    if (daSola === true) return '';
+    const r = String(reason || 'manual');
+    return r === 'manual' ? 'persona' : r === 'duplicato' ? 'duplicato' : 'pulizia';
+  }
+
+  function rigaMemoria({ modulo = '', lezione = false } = {}) {
+    if (lezione === true) return 'lezione';
+    return modulo === 'PROFILO' ? 'profilo' : modulo === 'PREFERENZE' ? 'preferenze' : 'espansioni';
+  }
+
+  // La home servita senza un modello, col motivo di SN_CONST.whyCannotServe.
+  function esitoHome(motivo) {
+    return { chiave: 'senza_ai_chiave', 'pesi-aperti': 'senza_ai_pesi_aperti', modelli: 'senza_ai_modelli' }[motivo] || '';
   }
 
   // ── Il documento che esce ─────────────────────────────────────────────────
@@ -1981,6 +2169,36 @@
   }
   function haChat(doc) { return !!doc && MISURE_CHAT.some((k) => oggetto(doc[k]) && Object.keys(doc[k]).length > 0); }
 
+  // Una misura delle attività: le sole combinazioni ammesse, al più TETTO_VOCI_ATTIVITA più la riga «altro».
+  function attivitaPulite(mappa, misura) {
+    const out = {};
+    let specifiche = 0;
+    for (const [k, v] of Object.entries(oggetto(mappa) ? mappa : {})) {
+      if (!intero(v) || v === 0 || !combinazioneValida(misura, k)) continue;
+      let c = k;
+      if (c !== ALTRO && !has(out, c)) { if (specifiche >= TETTO_VOCI_ATTIVITA) c = ALTRO; else specifiche += 1; }
+      out[c] = String(conto((Number(out[c]) || 0) + v));
+    }
+    return out;
+  }
+
+  // Le attività della stessa ora, nel loro documento: stesso pseudonimo, stessa ora, stesso id (#1467).
+  function documentoAttivita({ pseudonimo, chiave, app, os, dati }) {
+    const d = normale(oggetto(dati) ? JSON.parse(JSON.stringify(dati)) : {});
+    const [giorno, ora] = String(chiave || '').split('T');
+    return {
+      v: VERSIONE_ATTIVITA,
+      pseudonimo: String(pseudonimo || ''),
+      giorno: String(giorno || ''),
+      mese: meseDi(giorno),
+      ora: String(ora || ''),
+      app: versioneApp(app),
+      os: OS.includes(os) ? os : ALTRO,
+      ...Object.fromEntries(MISURE_ATTIVITA.map((m) => [m, attivitaPulite(d[m], m)])),
+    };
+  }
+  function senzaAttivita(doc) { return MISURE_ATTIVITA.every((m) => !oggetto(doc && doc[m]) || !Object.keys(doc[m]).length); }
+
   // I giorni rimasti da prima dell'invio ogni ora: «n;f1,…,f7» per funzione, come allora.
   function documentoGiorno({ pseudonimo, giorno, app, os, dati }) {
     const d = oggetto(dati) ? dati : {};
@@ -2218,6 +2436,28 @@
     return { ok: true, motivo: '' };
   }
 
+  function validaAttivita(doc) {
+    const no = (motivo) => ({ ok: false, motivo });
+    if (!oggetto(doc)) return no('non è un documento');
+    const chiavi = Object.keys(doc);
+    if (chiavi.length !== CAMPI_ATTIVITA.length || !CAMPI_ATTIVITA.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
+    if (doc.v !== VERSIONE_ATTIVITA) return no('versione');
+    const base = validaTesta(doc);
+    if (base) return no(base);
+    if (!ORA_RE.test(String(doc.ora))) return no('ora');
+    for (const m of MISURE_ATTIVITA) {
+      const mappa = doc[m];
+      if (!oggetto(mappa)) return no(m);
+      const ks = Object.keys(mappa);
+      if (ks.length > TETTO_VOCI_ATTIVITA + 1 || ks.join('#').length > TETTI_CHIAVI_ATTIVITA[m]) return no(`${m}: oltre il tetto`);
+      for (const [k, v] of Object.entries(mappa)) {
+        if (!combinazioneValida(m, k) || !ATTIVITA_RE[m].test(k)) return no(`${m}: chiave ${k}`);
+        if (typeof v !== 'string' || !CONTO_RE.test(v) || Number(v) === 0) return no(`${m} di ${k}`);
+      }
+    }
+    return { ok: true, motivo: '' };
+  }
+
   function validaTesta(doc) {
     if (!PSEUDONIMO_RE.test(String(doc.pseudonimo))) return 'pseudonimo';
     if (!GIORNO_RE.test(String(doc.giorno)) || doc.mese !== meseDi(doc.giorno)) return 'giorno';
@@ -2325,6 +2565,10 @@
     VERSIONE_NAVIGAZIONE, COLLEZIONE_NAVIGAZIONE, CAMPI_NAVIGAZIONE, MISURE_NAVIGAZIONE, NAVIGAZIONE, NAV, CODICI_RETE, FONTI_GEO,
     CLASSI_GEO, MOTIVI_GEO, PAESI_PROXY, TIER_PROXY, LISTE, ESITI_LISTA, FASCE_ETA, FASCE_DOMINI, ORIGINI_BLOCCO, ESITI_BANNER,
     ESITI_PULIZIA, SERVIZI_RIQUADRO, EVENTI_RIQUADRO, ESITI_SCARICAMENTO, FASCE_MB_SCARICAMENTO, FASCE_DURATA, CLASSI_PROGRAMMA, EVENTI_PROGRAMMA,
+    VERSIONE_ATTIVITA, COLLEZIONE_ATTIVITA, CAMPI_ATTIVITA, MISURE_ATTIVITA, DIMENSIONI_ATTIVITA, TIPO_SUGGERIMENTO,
+    TETTO_VOCI_ATTIVITA, ESITI_AIUTO, DA_RICERCA, FORNITORI_RICERCA, MOTIVI_DETTATURA, INVII_DETTATURA, VOCI_LETTURA,
+    CODICI_LETTURA, MOTIVI_LETTURA, FINO_LETTURA, ESITI_COMPATTAZIONE, VIE_MEMORIA, OPERAZIONI_MEMORIA, RIGHE_MEMORIA,
+    TRIGGER_PULIZIA, CHIUSE_DA, ESITI_HOME,
     VIE, PANNELLI, TIPI_PROPOSTA, ESITI_PROPOSTA, LIVELLI_AUTONOMIA, STATI_COMPITO, COSTI, PERIMETRI, ORIGINI, RISPOSTE,
     ESITI_CONFERMA, ANNULLABILI_IN_PAGINA, DOVE_CRASH, MOTIVI_CRASH, TIPI_ERRORE_VISTO, AVVISI_ERRORE, SCELTE_INTERVISTA,
     AVVIO, AZIONE_PAGINA, AZIONE_DI_ICONA, AZIONE_DI_PAGINA, IMPOSTAZIONI_EXTRA, MAI_CONTATE,
@@ -2338,6 +2582,8 @@
       CONTO_FORMA, ANTICIPO_FORMA, INTERVISTA_FORMA, CHIAVE_AZIONE_FORMA, CHIAVE_IMPOSTAZIONE_FORMA, TIPO_AZIONE_FORMA,
       ERRORE_VISTO_FORMA, PASSO_FORMA, CHIAMATE_FORMA, SISTEMA_FORMA, MODELLI: FORME_MODELLI, NAVIGAZIONE: FORME_NAVIGAZIONE, TURNI_FORMA,
       NOME_STRUMENTO_FORMA, STRUMENTI_FORMA, AZIONI_PER_GIRO_FORMA, CHIUSE_FORMA,
+      ERRORE_VISTO_FORMA, PASSO_FORMA, CHIAMATE_FORMA, SISTEMA_FORMA, MODELLI: FORME_MODELLI, NAVIGAZIONE: FORME_NAVIGAZIONE,
+      ATTIVITA: FORME_ATTIVITA,
     }),
     TETTI: Object.freeze({
       TETTO_CARATTERI_USO, TETTO_CARATTERI_ERRORI, TETTO_CARATTERI_ERRORI_ORA, TETTO_CARATTERI_MISURA, TETTO_CARATTERI_IMPOSTAZIONE,
@@ -2345,6 +2591,7 @@
       TETTO_CARATTERI_ANTICIPO, TETTO_CARATTERI_INTERVISTA, TETTO_CARATTERI_CHIAMATE, TETTO_CARATTERI_SISTEMA,
       MODELLI: TETTI_CARATTERI_MODELLI, NAVIGAZIONE: TETTI_CARATTERI_NAVIGAZIONE,
       TETTO_CARATTERI_TURNI, TETTO_CARATTERI_STRUMENTI, TETTO_CARATTERI_AZIONI_PER_GIRO, TETTO_CARATTERI_CHIUSE,
+      TETTO_CARATTERI_ATTIVITA, CHIAVI_ATTIVITA: TETTI_CHIAVI_ATTIVITA,
     }),
     funzioni, funzioneDi, azioni, azioneDiPagina, tipiAzione, chiaviImpostazioni, chiaveImpostazione, valoreImpostazione, viaDi,
     passiIntervista, erroreVisto, tipoErroreVisto, fasciaDi, posizioneDi, famigliaOs, versioneApp, modelloPulito,
@@ -2361,6 +2608,10 @@
     registraTurno, registraStrumento, registraAzioniDelGiro, registraRecupero, registraReazione, registraCopia, registraChatChiusa,
     documentoChat, haChat,
     leggiSistema, sistemaInChiaro,
+    tipiSuggerimento, tipoSuggerimento, combinazioneValida, chiaveAttivita, registraAttivita, esitoRicerca, motivoLettura,
+    finoLettura, chiusaDa, rigaMemoria, esitoHome,
+    documento, documentoGiorno, documentoChiamate, senzaChiamate, documentoAttivita, senzaAttivita, validaAttivita,
+    idDocumento, valida, validaChiamate, leggiUso, leggiMisura, leggiErrori, leggiRicerca, leggiModelli, leggiChiamate,
     giornoDi, oraDi, giornoPrima, meseDi, oreDaInviare, daInviare, potaOre, potaGiorni, pseudonimoDelMese,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -104,6 +104,18 @@
     return (await apri()).tutti();
   }
 
+  // La voce più recente di una pagina chiusa con questo indirizzo intero, o null: chi la riapre per indirizzo (la home,
+  // la chat) la riapre com'era e la conta fra le riaperte (#1467).
+  async function ultimaPer(url) {
+    if (typeof url !== 'string' || !url) return null;
+    let ultima = null;
+    for (const t of await list()) {
+      if (!t || t.url !== url || t.urlTagliato) continue;
+      if (!ultima || (Date.parse(t.closedAt) || 0) > (Date.parse(ultima.closedAt) || 0)) ultima = t;
+    }
+    return ultima;
+  }
+
   // Archivia una tab chiusa. `meta` contiene i campi catturati al momento della
   // chiusura (vedi tabs.js _archiveClosedTab). Ritorna l'entry creata, o null se
   // la tab non è archiviabile (manca l'URL, o la chiamata arriva dall'incognito).
@@ -132,6 +144,8 @@
       closedAt: meta.closedAt || new Date().toISOString(),
       // 'manual' per la chiusura dell'utente, altri valori dall'auto-archiviazione (§2.1).
       reason: meta.reason || 'manual',
+      // Chiusa dalla pagina stessa o da un crash: né la persona né la pulizia (i contatori delle riaperte, #1467).
+      ...(meta.chiusaDaSola === true ? { chiusaDaSola: true } : {}),
       // URL delle altre tab aperte nello stesso momento (contesto di lavoro).
       coOpenUrls: insieme.map((x) => x.testo),
       ...(insiemeTagliati.length ? { coOpenUrlsTagliati: insiemeTagliati } : {}),
@@ -274,7 +288,7 @@
   Copie.usaCopie('schede-archiviate', async () => (Disco.inIncognito() ? [] : (await apri()).tutti().map((t) => t.favicon)));
 
   global.SN_ARCHIVED_TABS = {
-    list, listMeta, archive, update, remove, removeMany, dimenticaPagine, clear, importa, aggiornaIcone,
+    list, listMeta, ultimaPer, archive, update, remove, removeMany, dimenticaPagine, clear, importa, aggiornaIcone,
     suEntrate, cartella,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

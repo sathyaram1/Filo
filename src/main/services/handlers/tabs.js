@@ -203,14 +203,21 @@ module.exports = function register(on, ctx) {
 
   // Riapre una scheda chiusa com'era: lo scroll e il paese da cui passava. Dal #872 la chiede la ricerca del filo con
   // l'id della voce d'archivio, e indirizzo, scroll e paese li legge il main; solo le pagine di Filo.
+  function contaRiaperta(voce, win) {
+    try { globalThis.SN_CONTATORI_MAIN?.riaperta(voce, { incognito: !!(win && win._filoIncognito) }); } catch (_) {}
+  }
   on(MSG.REOPEN_ARCHIVED_TAB, soloFilo(async (msg, sender) => {
     const win = winOf(sender);
     let voce = null;
     if (msg && typeof msg.id === 'string' && msg.id) {
       try { voce = (await ArchivedTabs.list()).find((t) => t.id === msg.id) || null; } catch (_) {}
       if (!voce) return { ok: false, error: 'not_found' };
-      // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: chi chiede apre il sito.
-      if (voce.urlTagliato) return { ok: false, error: 'url_tagliato' };
+      // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: chi chiede apre il sito, e la riapertura conta.
+      if (voce.urlTagliato) { contaRiaperta(voce, win); return { ok: false, error: 'url_tagliato' }; }
+    } else if (msg && msg.perIndirizzo === true) {
+      // Una pagina del filo senza la sua voce (una visita): se è una scheda chiusa, si riapre da lì.
+      try { voce = await ArchivedTabs.ultimaPer(msg.url); } catch (_) {}
+      if (!voce) return { ok: false, error: 'not_found' };
     }
     const url = voce ? voce.url : msg.url;
     if (win && win._filoTabs && typeof url === 'string' && /^(https?|file):/i.test(url)) {
@@ -220,6 +227,7 @@ module.exports = function register(on, ctx) {
       const id = win._filoTabs.openTab(url, { activate: true, restoreScrollPct: pct, origine: { tipo: 'filo' } });
       // Una scheda chiusa dal riordino e riaperta (#1470): il riordino ha sbagliato. Esce solo il tempo, in fasce.
       if (id && voce) require('../contatoriFinestra').misura('riapertaDallArchivio', voce);
+      if (id && voce) contaRiaperta(voce, win);
       // Se la tab archiviata era instradata "da un altro paese", riaprila
       // proxata sulla stessa location: setTabProxy ricrea la view nella
       // partition proxata e ricarica l'URL attraverso l'endpoint del paese.

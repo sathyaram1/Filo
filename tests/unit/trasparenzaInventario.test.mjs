@@ -83,6 +83,7 @@ const COLLEZIONI = {
   '/contatori-finestra/{docId}': { frase: 'Della finestra di Filo, in fasce' },
   '/contatori-gesti/{docId}': { frase: 'Cosa sposti, trascini e rimetti com\'era' },
   '/contatori-navigazione/{docId}': { frase: 'Cosa succede mentre navighi, sempre senza il sito' },
+  '/contatori-attivita/{docId}': { frase: 'Quello che Filo fa da solo o insieme a te' },
   '/wallet-accounts/{uid}': { frase: 'tiene un documento con il tuo pseudonimo' },
   '/wallet-invites/{code}': { frase: 'il codice d\'invito con cui sei entrato' },
   '/wallet-state/{doc}': { perche: 'l\'esito dell\'ultimo confronto fra registro d\'uso e consumo di OpenRouter' },

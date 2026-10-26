@@ -263,7 +263,7 @@ module.exports = function register(on, ctx) {
         ).length;
       }
     } catch (_) {}
-    const r = await handleFiloGenerateDashboard({ force: !!msg.force, openTabsCount });
+    const r = await handleFiloGenerateDashboard({ force: !!msg.force, openTabsCount, apertura: msg.apertura === true });
     return { ok: true, ...r };
   });
 
@@ -320,7 +320,11 @@ module.exports = function register(on, ctx) {
     if (!lezione && !riga && !sempreAperta) return { ok: false, error: 'bad_request' };
     if (sempreAperta) return { ok: true, tolta: await FiloMem.forgetLine({ sempreAperta: msg.sempreAperta }) };
     // La riga resta fra le nascoste del quaderno (#872): l'id serve al suo «Rimetti».
-    const id = await FiloMem.hideLine(lezione ? { lezione: msg.lezione } : { modulo: msg.modulo, riga: msg.riga });
+    const via = lezione ? { lezione: msg.lezione } : { modulo: msg.modulo, riga: msg.riga };
+    const com = await FiloMem.descriviRiga(via);
+    const id = await FiloMem.hideLine(via);
+    // L'Annulla sotto «Mi ricorderò» della chat (#1467) dice da dove viene; di serie è il quaderno.
+    if (id) contatori()?.memoriaCorretta(msg.da === 'chat' ? 'chat' : 'quaderno', 'togli', com);
     return { ok: true, tolta: !!id, id: id || null };
   });
 
@@ -362,17 +366,24 @@ module.exports = function register(on, ctx) {
     const fonti = Array.isArray(msg.fonti) ? msg.fonti.filter((x) => typeof x === 'string') : [];
     const l = globalThis.SN_PREF.lezioneDaAzione({ testo: msg.testo.replace(/\s*[\r\n]+\s*/g, ' ') }, { cosa: 'la correzione' });
     if (l.rifiuto) return { ok: false, error: `${l.rifiuto[0].toUpperCase()}${l.rifiuto.slice(1)}. Accorciala per salvarla.`, rifiuto: true };
+    const com = await FiloMem.descriviRiga(msg.via);
     if (!l.testo) {
       const id = await FiloMem.hideLine(msg.via, { fonti });
+      if (id) contatori()?.memoriaCorretta('quaderno', 'togli', com);
       return { ok: true, tolta: !!id, id: id || null };
     }
-    return { ok: true, corretta: await FiloMem.editLine(msg.via, l.testo, { fonti }), testo: l.testo };
+    const corretta = await FiloMem.editLine(msg.via, l.testo, { fonti });
+    if (corretta) contatori()?.memoriaCorretta('quaderno', 'correggi', com);
+    return { ok: true, corretta, testo: l.testo };
   });
 
   on(MSG.FILO_MEMORY_RESTORE, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
     if (!msg || typeof msg.id !== 'string') return { ok: false, error: 'bad_request' };
-    return { ok: true, rimessa: await FiloMem.restoreHidden(msg.id) };
+    const com = await FiloMem.descriviNascosta(msg.id);
+    const rimessa = await FiloMem.restoreHidden(msg.id);
+    if (rimessa) contatori()?.memoriaCorretta('quaderno', 'ripristina', com);
+    return { ok: true, rimessa };
   });
 
   on(MSG.FILO_MEMORY_FOREVER, async (msg, sender, origin) => {

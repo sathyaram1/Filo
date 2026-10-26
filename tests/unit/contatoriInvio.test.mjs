@@ -34,9 +34,10 @@ function daFs(v) {
 
 function banco({ accesi = true, incognito = false, finestra = true, risposta = 200, disco = new Map() } = {}) {
   const inviati = [];
-  // Le chiamate ai modelli di un'ora (#1464) partono nella loro collezione: si contano a parte.
+  // Le chiamate ai modelli (#1464) e le attività (#1467) di un'ora partono nella loro collezione: si contano a parte.
   const chiamate = [];
-  const b = { t: T0, accesi, incognito, finestra, risposta, disco, inviati, chiamate, n: 0 };
+  const attivita = [];
+  const b = { t: T0, accesi, incognito, finestra, risposta, disco, inviati, chiamate, attivita, n: 0 };
   b.s = Servizio.crea({
     contatori: C,
     storage: {
@@ -56,7 +57,7 @@ function banco({ accesi = true, incognito = false, finestra = true, risposta = 2
     fetch: async (url, opt) => {
       if (b.risposta === 'rete') throw new TypeError('fetch failed');
       const doc = Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)]));
-      (url.includes(`/${C.COLLEZIONE_CHIAMATE}?`) ? chiamate : inviati).push({ url, opt, doc });
+      (url.includes(`/${C.COLLEZIONE_CHIAMATE}?`) ? chiamate : url.includes(`/${C.COLLEZIONE_ATTIVITA}?`) ? attivita : inviati).push({ url, opt, doc });
       const st = typeof b.risposta === 'function' ? b.risposta(doc) : b.risposta;
       return { ok: st >= 200 && st < 300, status: st, json: async () => ({}) };
     },
@@ -233,6 +234,70 @@ test('le chiamate che il server non accetta ancora (#1464) si riprovano il giorn
   assert.equal(b.chiamate[1].doc.spesa.explain, 'a/b|router|100');
   assert.deepEqual(Object.keys((await b.s.letto()).ore), []);
   assert.equal(b.inviati[1].doc.primo, '', 'il segno del primo documento è già dell’ora arrivata');
+});
+
+// ── Le attività (#1467) ─────────────────────────────────────────────────
+test('le attività di un’ora partono accanto all’ora, con lo stesso id; un’ora senza attività non ha il terzo documento', async () => {
+  const b = banco({ finestra: false });
+  assert.equal(b.s.attivita('aiuto', { esito: 'fatto', passiDaSolo: 3, passiCliccati: 1, nonTrovati: 0, documenti: 0 }), true);
+  assert.equal(b.s.attivita('ricercaWeb', { da: 'chat', fornitore: 'duckduckgo', ripiego: true, risultati: 5 }), true);
+  assert.equal(b.s.attivita('pulizia', { trigger: 'idle', candidate: 8, archiviate: 2, duplicati: 1, giudizioMancato: false }), true);
+  assert.equal(b.s.memoriaCorretta('quaderno', 'togli', { modulo: 'PROFILO', lezione: false, nata: new Date(b.t - 3 * GIORNO).toISOString() }), true);
+  assert.equal(b.s.memoriaCorretta('chat', 'svuota', null), true);
+  assert.equal(b.s.memoriaCorretta('chat', 'togli', null), false, 'una riga che non si sa cos’era non si conta');
+  assert.equal(b.s.attivita('aiuto', { esito: 'cerca il volo per Roma' }), false, 'un esito fuori elenco non entra');
+  await attendi();
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'inviati');
+  assert.equal(b.inviati.length, 1);
+  assert.equal(b.chiamate.length, 0, 'senza chiamate ai modelli non parte il loro documento');
+  assert.equal(b.attivita.length, 1);
+  assert.equal(b.attivita[0].url, `${BASE}/${C.COLLEZIONE_ATTIVITA}?documentId=99999999999999999901_2026-10-15_09&key=K`);
+  assert.deepEqual(b.attivita[0].doc, {
+    v: 1, pseudonimo: '99999999999999999901', giorno: '2026-10-15', mese: '2026-10', ora: '09', app: '0.2.243', os: 'mac',
+    aiuto: { 'fatto|p2_5|p1|n0|n0': '1' }, ricercaWeb: { 'chat|duckduckgo|si|r3_5': '1' }, dettatura: {}, lettura: {}, lezioni: {},
+    compattazioni: {}, memoria: { 'quaderno|togli|profilo|settimana': '1', 'chat|svuota|tutte|nd': '1' },
+    pulizia: { 'idle|s6_20|s2_5|s1|no': '1' }, riaperte: {}, home: {}, suggerimenti: {},
+  });
+  assert.equal(C.validaAttivita(b.attivita[0].doc).ok, true);
+  // Un'ora con un solo uso e nessuna attività: niente terzo documento.
+  await usa(b, A.EXPLAIN);
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'inviati');
+  assert.equal(b.inviati.length, 2);
+  assert.equal(b.attivita.length, 1);
+});
+
+test('le attività in incognito e a contatori spenti non si contano', async () => {
+  const b = banco({ incognito: true, finestra: false });
+  assert.equal(b.s.attivita('home', { esito: 'generata' }), false);
+  b.incognito = false;
+  assert.equal(b.s.attivita('riaperte', { chiusaDa: 'pulizia', etaMs: 1000 }, { incognito: true }), false, 'una finestra in incognito lo dice da sé');
+  b.accesi = false;
+  b.s.attivita('home', { esito: 'generata' });
+  await attendi();
+  b.accesi = true;
+  b.t += ORA;
+  await b.s.controlla();
+  assert.equal(b.inviati.length + b.attivita.length, 0);
+});
+
+test('le attività che il server non accetta ancora (#1467) si riprovano il giorno dopo, e l’ora già arrivata non si riscrive', async () => {
+  const b = banco({ finestra: false });
+  b.risposta = (doc) => ('aiuto' in doc ? 403 : 200);
+  b.s.attivita('home', { esito: 'senza_ai_chiave' });
+  await attendi();
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'fallito');
+  assert.equal(b.inviati.length, 1, 'l’ora è partita');
+  assert.equal(b.attivita.length, 1, 'le sue attività sono state rifiutate');
+  assert.equal(Object.keys((await b.s.letto()).ore).length, 1, 'l’ora resta per le sue attività');
+  b.risposta = (doc) => ('primo' in doc ? 409 : 200);
+  b.t += 24 * ORA;
+  assert.equal(await b.s.controlla(), 'inviati');
+  assert.equal(b.attivita.length, 2);
+  assert.deepEqual(b.attivita[1].doc.home, { senza_ai_chiave: '1' });
+  assert.deepEqual(Object.keys((await b.s.letto()).ore), []);
 });
 
 test('in incognito non si conta niente e non parte nessun documento', async () => {
@@ -808,4 +873,33 @@ test('la chat dell’ora parte nel suo documento dopo l’ora; rifiutata, ripart
   b.t += ORA;
   await b.s.controlla();
   assert.deepEqual(b.inviati.slice(n).map((x) => x.doc.v), [C.VERSIONE]);
+});
+
+// Chiudere una scheda, una finestra o Filo non dà alla pagina nessun evento (#1467): quello che aveva aperto lo conta il
+// main, una volta, com'era all'ultimo aggiornamento; quello che la pagina ha già contato da sé non si riconta.
+test('le attività aperte in una pagina che se ne va si contano una volta, col loro ultimo stato', async () => {
+  const b = banco();
+  const aiuto = (esito, passi) => ({ esito, passiDaSolo: passi, passiCliccati: 0, nonTrovati: 0, documenti: 0 });
+  assert.equal(b.s.apertaInCorso('7|aiuto|a1', 'aiuto', aiuto('chiusa_prima', 0)), true);
+  b.s.apertaInCorso('7|aiuto|a1', 'aiuto', aiuto('fatto', 2));
+  b.s.apertaInCorso('7|lettura|l1', 'lettura', { voce: 'modello', motivo: 'nessuno', fino: 'q50' });
+  b.s.apertaInCorso('8|aiuto|a2', 'aiuto', aiuto('fatto', 1));
+  // La lettura l'ha chiusa la pagina: conta lei, e il main la dimentica.
+  b.s.finitaInCorso('7|lettura|l1');
+  b.s.chiudiInCorso('7|');
+  await attendi();
+  let ora = Object.values((await b.s.letto()).ore)[0];
+  assert.deepEqual(ora.aiuto, { 'fatto|p2_5|p0|n0|n0': 1 });
+  assert.deepEqual(ora.lettura, {});
+  b.s.chiudiInCorso('7|');
+  // Filo che si chiude conta le altre e salva sul disco prima di uscire.
+  const congedo = b.s.congeda();
+  assert.ok(congedo, 'c’era qualcosa da contare');
+  await congedo;
+  ora = Object.values(b.disco.get(Servizio.CHIAVE).ore)[0];
+  assert.deepEqual(ora.aiuto, { 'fatto|p2_5|p0|n0|n0': 1, 'fatto|p1|p0|n0|n0': 1 });
+  assert.equal(b.s.congeda(), null, 'niente più da contare né da salvare');
+  // In incognito non si tiene niente.
+  b.incognito = true;
+  assert.equal(b.s.apertaInCorso('9|aiuto|a3', 'aiuto', aiuto('fatto', 1)), false);
 });

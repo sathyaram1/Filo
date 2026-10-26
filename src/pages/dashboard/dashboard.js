@@ -32,6 +32,10 @@
 
   // Stato locale
   let suggestions = [];
+  // Quando sono stati scritti i suggerimenti a schermo: l'età che i contatori leggono a un clic (#1467).
+  let suggerimentiDel = null;
+  // Scritti da un modello: senza, la carta mostra le pagine salvate e la strada per sceglierne uno, che non si contano.
+  let suggerimentiDelModello = false;
   let threadHistory = []; // [{role: 'user'|'filo', text, actions?}]
   // #525 — la targa della chat in corso. Viaggia con ogni messaggio: è il main
   // a scrivere la conversazione su disco, turno per turno, così una chat
@@ -311,7 +315,8 @@
       return bolle.some((b) => b.dataset.senzaCrediti === '1')
         && bolle.every((b) => b.dataset.senzaCrediti === '1' || b.classList.contains('dash-bubble-user'));
     },
-    setSuggestions: (list) => { suggestions = list; renderSuggestions(); },
+    // Arrivano col messaggio appena scritto: la loro età parte da adesso.
+    setSuggestions: (list) => { suggestions = list; suggerimentiDel = new Date().toISOString(); suggerimentiDelModello = true; renderSuggestions(); },
     loadDashboard: () => loadDashboard(),
     // Una bozza o un allegato in sospeso sono dell'utente: un clic su una scelta non li manda via con sé.
     rispondi: (testo) => {
@@ -326,7 +331,7 @@
     tieniEl: $('tieni'),
     altroEl: $('altro'),
     refreshLive: () => refreshLive(),
-    onSuggestionClick: (s, vicino) => onSuggestionClick(s, vicino),
+    onSuggestionClick: (s, vicino, posizione) => onSuggestionClick(s, vicino, posizione),
     aggiornaSuggerimenti: () => loadDashboard({ force: true }).catch(() => {}),
     iconaDelSito: (url, opz) => iconaDelSito(url, opz),
     apriNelFilo: (o) => apriNelFilo(o),
@@ -700,6 +705,8 @@
     if (e.type === 'auxclick' && e.button !== 1) return;
     const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
     if (!a || !/^(?:https?|mailto|tel|sms):/i.test(a.href)) return;
+    // Una pagina chiusa nel filo si riapre com'era, dalla sua voce d'archivio: ci pensa il suo clic.
+    if (e.type === 'click' && a.classList.contains('dash-pagina')) return;
     e.preventDefault();
     e.stopPropagation();
     apriProposta(a.href, a);
@@ -739,11 +746,20 @@
     Carte.setSuggerimenti(suggestions, { pronti });
   }
 
-  async function onSuggestionClick(s, vicino = null) {
+  // `posizione`: il posto del suggerimento nella carta, da 1. Si conta col tipo dell'azione e l'età dei suggerimenti
+  // (#1467), mai il testo né l'indirizzo.
+  async function onSuggestionClick(s, vicino = null, posizione = null) {
     if (s.fermata) { notaFermata(String(s.fermata), vicino); return; }
     const a = s.action;
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
+    const del = Date.parse(suggerimentiDel || '');
+    if (suggerimentiDelModello) {
+      Promise.resolve(send({
+        type: MSG.CONTATORI_EVENTO, misura: 'suggerimento', tipo: type, posizione: Number(posizione) || null,
+        etaMs: Number.isFinite(del) ? Math.max(0, Date.now() - del) : null,
+      })).catch(() => {});
+    }
     if (type === 'PULISCI_TAB') {
       // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530). L'esito si legge
       // sul suggerimento stesso: un riordino mai partito non deve somigliare a uno in cui non c'era niente da chiudere.
@@ -810,14 +826,17 @@
   // prima vale quanto la cache che la risposta servirebbe: i suggerimenti che ha portato restano («Aggiorna» no).
   let giroDashboard = 0;
   let spinteDashboard = 0;
-  async function loadDashboard({ force = false } = {}) {
+  // `apertura`: la home che si apre, che il main conta se è senza un modello (#1467); i ricalcoli no.
+  async function loadDashboard({ force = false, apertura = false } = {}) {
     const giro = ++giroDashboard;
     renderSuggestions({ pronti: false });
-    const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD, force });
+    const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD, force, ...(apertura ? { apertura: true } : {}) });
     if (giro !== giroDashboard) return;
     mostraSenzaModello(r?.ok && r.senzaChiave ? r.message : '');
     if (!force && spinteDashboard) { renderSuggestions(); return; }
     suggestions = (r?.ok && Array.isArray(r.suggestions)) ? r.suggestions : [];
+    suggerimentiDel = r?.ok ? r.ts || null : null;
+    suggerimentiDelModello = Boolean(r?.ok && !r.senzaChiave);
     renderSuggestions();
   }
 
@@ -830,6 +849,8 @@
     const nuovi = Array.isArray(r.suggestions) ? r.suggestions : [];
     if (JSON.stringify(nuovi) === JSON.stringify(suggestions)) return;
     suggestions = nuovi;
+    suggerimentiDel = r.ts || null;
+    suggerimentiDelModello = !r.senzaChiave;
     renderSuggestions();
   }
 
@@ -2172,6 +2193,8 @@
       // La frase arriva solo senza un modello (handlers/wallet.js): con un modello se ne va.
       mostraSenzaModello(msg.message || '');
       suggestions = Array.isArray(msg.suggestions) ? msg.suggestions : [];
+      suggerimentiDel = msg.ts || null;
+      suggerimentiDelModello = !(msg.senzaChiave || msg.message);
       renderSuggestions();
       // La home si rifà da sola anche quando arriva un modello (invito, chiave propria): l'intervista
       // che lo aspettava parte qui, non alla prossima scheda.
@@ -2823,7 +2846,7 @@
     const eventoId = onbState ? null : eventoFromUrl();
     // Suggerimenti, stato vivo e coda del filo insieme: niente di questo chiama il modello (#869).
     await Promise.all([
-      onbState ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
+      onbState ? Promise.resolve() : loadDashboard({ apertura: true }).catch((e) => console.warn('[Filo] dashboard load', e)),
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
       onbState ? Promise.resolve() : caricaFilo().catch((e) => console.warn('[Filo] coda del filo', e)),
     ]);

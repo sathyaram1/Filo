@@ -61,8 +61,39 @@
       feedbackShown: false,
       webSearchCount: 0,
       documentiCount: 0,
+      // Per i contatori (#1467): l'esito dell'ultimo turno (null finché è in corso) e i passi, mai cosa c'era nella pagina.
+      esito: null,
+      passiDaSolo: 0,
+      passiCliccati: 0,
+      nonTrovati: 0,
+      // I documenti davvero cercati: `documentiCount` conta anche le ricerche rifiutate, per il tetto.
+      documentiLetti: 0,
+      // Chiusa con la × mentre una risposta arrivava: finita prima, qualunque cosa dica poi la risposta.
+      chiusaPrima: false,
+      // Dal clic sul passo indicato alla risposta che lo segue: una pagina che se ne va qui l'ha portata via il passo.
+      dopoPasso: false,
+      id: `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+      contata: false,
     };
   }
+  const datiSessione = (s) => ({
+    esito: s.chiusaPrima ? 'chiusa_prima' : s.esito || (s.dopoPasso ? 'pagina_cambiata' : 'chiusa_prima'), passiDaSolo: s.passiDaSolo,
+    passiCliccati: s.passiCliccati, nonTrovati: s.nonTrovati, documenti: s.documentiLetti, id: s.id,
+  });
+  // Una sessione si conta una volta, quando finisce: chiusa, o portata via dalla pagina che se ne va. Finché è aperta il
+  // main ne tiene l'ultimo stato, e la conta lui se la scheda si chiude (chiudere non dà alla pagina nessun evento).
+  function contaSessione() {
+    const s = session;
+    if (!s || s.contata) return;
+    s.contata = true;
+    try { Popup?.conta?.({ misura: 'aiuto', ...datiSessione(s) }); } catch (_) {}
+  }
+  function segnaSessione() {
+    const s = session;
+    if (!s || s.contata) return;
+    try { Popup?.conta?.({ misura: 'in-corso', cosa: 'aiuto', ...datiSessione(s) }); } catch (_) {}
+  }
+  try { window.addEventListener('pagehide', () => contaSessione()); } catch (_) {}
   // Cap difensivo: il prompt dice «max 2» ma l'AI può insistere; le ricerche oltre il
   // limite si ignorano in silenzio.
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
@@ -81,7 +112,11 @@
   // `davvero`: anche con una risposta in arrivo (l'Aiuto spento in Preferenze).
   function close({ davvero = false } = {}) {
     if (!root) return;
-    if (!davvero && inVolo > 0) { if (!nascosto) nascondi(); return; }
+    if (!davvero && inVolo > 0) {
+      if (session) { session.chiusaPrima = true; segnaSessione(); }
+      if (!nascosto) nascondi();
+      return;
+    }
     Highlight.clear();
     try { Highlight.clearForceHover?.(); } catch (_) {}
     if (docClickHandler) {
@@ -98,10 +133,13 @@
     documenti = null;
     collapsed = false;
     aiPrefersOpen = false;
+    contaSessione();
     session = null;
     nascosto = false;
     ridottoDallUtente = false;
     nonLetta = false;
+    // La chat se ne va: la dettatura ancora in corso o in attesa d'invio è annullata, il testo lasciato nella casella tenuto.
+    try { voce?.scollega(); } catch (_) {}
     voce = null;
     statoVoce = 'pronto';
     valutazione = null;
@@ -120,6 +158,7 @@
   // Già lì, ridotto o nascosto: «Aiuto» lo mostra intero, con la risposta arrivata nel frattempo.
   function mostra() {
     nascosto = false;
+    if (session && session.chiusaPrima) { session.chiusaPrima = false; segnaSessione(); }
     root.classList.remove('sn-sidebar-nascosta');
     expand({ ai: false });
     try { root.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
@@ -149,6 +188,7 @@
     // se l'utente è arrivato qui da altre pagine, contano solo le azioni che
     // farà DA QUI in avanti.
     session.initialUrl = location.href;
+    segnaSessione();
     // Aperta dal tasto destro su una scheda: una riga di storia non mostrata in chat dice
     // all'agente che la richiesta parte da lì.
     if (context && context.source === 'tab') {
@@ -1542,19 +1582,22 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     let text = '';
     let imgEl = null;
     let linkEl = null;
+    const nonTrovato = () => { if (session) session.nonTrovati += 1; };
     if (spec.target === 'text') {
       text = resolveActionText(page);
       if (!text && page.op !== 'edit_text') {
+        nonTrovato();
         appendActionLog(`${label}: nessun testo selezionato`);
         return false;
       }
     } else if (spec.target === 'image') {
       imgEl = resolveImageEl(page);
-      if (!imgEl) { appendActionLog(`${label}: immagine non trovata`); return false; }
+      if (!imgEl) { nonTrovato(); appendActionLog(`${label}: immagine non trovata`); return false; }
     } else if (spec.target === 'link') {
       linkEl = resolveLinkEl(page);
       const fallbackUrl = String(page.url ?? page.href ?? '').trim();
       if (!linkEl && !(page.op === 'open_link' && fallbackUrl)) {
+        nonTrovato();
         appendActionLog(`${label}: link non trovato`);
         return false;
       }
@@ -1817,6 +1860,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     inVolo += 1;
     try { await turno(op); } finally {
       inVolo -= 1;
+      segnaSessione();
       // Chiuso mentre pensava e niente da leggere: allora era chiuso davvero.
       if (nascosto && !inVolo && !nonLetta) close({ davvero: true });
     }
@@ -1831,9 +1875,13 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       passiDaSolo = 0;
       if (continuaAperto) { continuaAperto.disabled = true; continuaAperto = null; }
     } else if (++passiDaSolo > MAX_PASSI_DA_SOLO) {
+      if (session) session.esito = 'tetto_passi';
       fermaPassiDaSolo(userAction, esterno, dopoDocumenti);
       return;
+    } else if (session) {
+      session.passiDaSolo += 1;
     }
+    if (session) session.esito = null;
     const wasCollapsed = collapsed;
     // Si espande solo se l'utente ha scritto: sui proseguimenti automatici il box non deve
     // riaprirsi mentre il modello elabora.
@@ -1922,6 +1970,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         ripiegoDetto = false;
       }
       const parsed = parseAssistantOutput(res.text);
+      // Una ricerca chiesta dal modello è un turno a metà: il seguito lo dice il turno dopo.
+      if (session) {
+        session.esito = parsed.status === 'done' && !['web_search', 'documenti'].includes(parsed.kind) ? 'fatto' : null;
+        session.dopoPasso = false;
+      }
 
       // L'AI ha chiesto una ricerca: si esegue e si rilancia un turno coi risultati come nota
       // di sistema, così l'AI può produrre il JSON normale.
@@ -1929,6 +1982,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         if (thinking) { thinking.stop(); thinking.el.remove(); }
         if (session && session.webSearchCount >= MAX_WEB_SEARCHES_PER_SESSION) {
           appendActionLog('ricerca web: limite raggiunto, ignorata');
+          try { Popup?.conta?.({ misura: 'ricerca-web-tetto' }); } catch (_) {}
           setTimeout(() => submit({
             userAction: 'limite di ricerche web raggiunto per questa sessione. Rispondi ora con il JSON normale usando solo ciò che già sai (pagina, llms.txt, percorsi noti).',
             preActionUrl: location.href,
@@ -2001,6 +2055,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         if (session) session.documentiCount += 1;
         const r = await cercaDocumenti(parsed);
         if (!r || !r.ok) {
+          // Rifiutata dalla persona: l'ha fermato lei prima che finisse; non riuscita: un errore.
+          if (session) session.esito = r && r.annullata ? 'chiusa_prima' : 'errore';
           if (r && r.annullata) {
             history.push({
               role: 'user',
@@ -2012,6 +2068,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
           diciRipiego();
           return;
         }
+        if (session) session.documentiLetti += 1;
         documenti = { cercato: r.cercato, candidati: Array.isArray(r.candidati) ? r.candidati : [] };
         // Il main rimette i candidati interi; questi, senza chiavi, sono quelli che la cronologia ricorda.
         const perCronologia = {
@@ -2168,6 +2225,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
               ? `reveal rifiutato (motivo: ${result.reason}). L'elemento non è un disclosure sicuro (details/aria-expanded+aria-controls non-link non-submit). Usa "click" con highlight per chiedere conferma all'utente, oppure scegli un altro target.`
               : `hover non eseguibile (motivo: ${result.reason}). Selector non trovato o azione fallita.`;
             appendActionLog(act === 'reveal' ? 'reveal rifiutato' : 'hover fallito');
+            if (session && result.reason === 'selector-not-found') session.nonTrovati += 1;
             if (parsed.status === 'continue') {
               setTimeout(() => submit({ userAction: aiNote, preActionUrl: location.href }), 50);
             }
@@ -2182,12 +2240,13 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
             fermata(fermo);
             parsed.highlight = null;
           } else {
-            Highlight.show(parsed.highlight.selector, {
+            const mostrato = Highlight.show(parsed.highlight.selector, {
               note: parsed.highlight.note || '',
               action: parsed.highlight.action,
               value: parsed.highlight.value,
               onAction: onAct,
             });
+            if (mostrato === false && session) session.nonTrovati += 1;
           }
         }
       }
@@ -2231,6 +2290,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         }
       }
     } catch (err) {
+      if (session) { session.esito = 'errore'; session.dopoPasso = false; }
       if (thinking) { thinking.stop(); thinking.el.remove(); }
       const raw = err?.message || String(err);
       // #360 — la chat non è un log: «fetch failed» non dice niente all'utente. Stessa
@@ -2273,6 +2333,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // nella nota. Prima entrava fra parentesi dentro «(Sistema: …)».
       aiNote = 'l\'utente ha cliccato sull\'elemento che avevi indicato, descritto qui sotto';
     }
+    if (session) { session.passiCliccati += 1; session.dopoPasso = true; segnaSessione(); }
     // Telemetria: niente value, anche per un fill — il contenuto dei campi può essere sensibile.
     if (session) session.executedSteps.push({
       selector: highlight.selector,

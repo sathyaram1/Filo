@@ -1061,7 +1061,7 @@ class TabManager {
     if (adotta) {
       const wc = view.webContents;
       AzioniContate.scheda(wc);
-      wc.once('destroyed', () => setImmediate(() => { if (this.tabs.includes(tab) && tab.view.webContents === wc) this.closeTab(tab.id); }));
+      wc.once('destroyed', () => setImmediate(() => { if (this.tabs.includes(tab) && tab.view.webContents === wc) this.closeTab(tab.id, { daSola: true }); }));
     }
     if (activate) {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
@@ -1172,13 +1172,14 @@ class TabManager {
     return this._dropTab(tab);
   }
 
-  // `via`: come la si chiude, per i contatori della finestra (#1470).
-  closeTab(id, { via = 'altro' } = {}) {
+  // `via`: come la si chiude, per i contatori della finestra (#1470). `daSola`: chiusa senza che la persona o la pulizia
+  // l'abbiano chiesto (la pagina stessa, un'estensione, un crash).
+  closeTab(id, { via = 'altro', daSola = false } = {}) {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
     const tab = this.tabs[idx];
     ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
-    this._smontaScheda(tab);
+    this._smontaScheda(tab, { daSola });
     this.tabs.splice(idx, 1);
     if (this.activeId === id) {
       // Si torna alla PENULTIMA scheda guardata, non a quella a sinistra: è quella che l'utente
@@ -1223,7 +1224,7 @@ class TabManager {
   }
 
   // Quello che ogni chiusura chiesta fa a una scheda prima di toglierla dall'elenco.
-  _smontaScheda(tab) {
+  _smontaScheda(tab, { daSola = false } = {}) {
     const id = tab.id;
     this._avvisaSorvegliante(tab, 'chiusa');
     this._nelFilo('schedaChiusa', tab);
@@ -1240,7 +1241,7 @@ class TabManager {
     this.annullaUscitaSchermoIntero();
     // §3.1/§4 — chiudere è archiviare: i metadati si salvano PRIMA di
     // distruggere la vista, o non c'è più niente da leggere.
-    this._archiveClosedTab(tab);
+    this._archiveClosedTab(tab, 'manual', { daSola });
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     ChiusuraConCaselle.chiudi(tab.view.webContents);
@@ -1340,7 +1341,7 @@ class TabManager {
 
   // §3.1 — non bloccante: la chiusura non aspetta l'archivio. NON archivia
   // incognito (§5), pagine interne e nuova scheda: non sono cose da ritrovare.
-  _archiveClosedTab(tab, reason = 'manual') {
+  _archiveClosedTab(tab, reason = 'manual', { daSola = false } = {}) {
     try {
       if (!tab || this.incognito || tab._passaggio) return;
       const Archive = globalThis.SN_ARCHIVED_TABS;
@@ -1362,6 +1363,7 @@ class TabManager {
           openedAt: tab.openedAt || null,
           closedAt: new Date().toISOString(),
           reason: reason || 'manual',
+          ...(daSola ? { chiusaDaSola: true } : {}),
           coOpenUrls,
           scrollPosition: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
           // La location si salva, o riaprendo dall'archivio la scheda
@@ -1711,8 +1713,15 @@ class TabManager {
       await this._ricontrollaModuli();
       await this._caricaSempreAperte();
       const cands = this._triageCandidates();
+      // Un giro si conta coi suoi numeri, mai con le schede (#1467): quante candidate, archiviate, duplicate.
+      const contaGiro = (archiviate, duplicati, giudizioMancato) => {
+        try {
+          globalThis.SN_CONTATORI_MAIN?.attivita('pulizia', { trigger, candidate: cands.length, archiviate, duplicati, giudizioMancato }, { incognito: !!this.incognito });
+        } catch (_) {}
+      };
       if (!cands.length) {
         ContatoriFinestra.misura('giroRiordino', trigger, {});
+        contaGiro(0, 0, false);
         return { archived: 0 };
       }
       // 1) Duplicati esatti: decisione deterministica e affidabile.
@@ -1773,6 +1782,7 @@ class TabManager {
       }
       const esito = this.applyTriageDecisions(cands, [...byIndex.values()], { via: da === 'chat' ? 'chat' : 'riordino_automatico' });
       ContatoriFinestra.misura('giroRiordino', trigger, { duplicati: esito.duplicati, modello: esito.archived - esito.duplicati, giudizioMancato });
+      contaGiro(esito.archived, dupIdx.size, giudizioMancato);
       return giudizioMancato ? { ...esito, giudizioMancato: true } : esito;
     } finally {
       this._triageRunning = false;
@@ -3253,7 +3263,7 @@ class TabManager {
     if (!tab || tab.isInternal !== false) return;
     let storia = 1;
     try { storia = wc.navigationHistory.length(); } catch (_) {}
-    if (tab._openedByLink || storia <= 1) this.closeTab(tab.id);
+    if (tab._openedByLink || storia <= 1) this.closeTab(tab.id, { daSola: true });
   }
 
   // Una scheda proxata ha la partizione sua, e in privacy ogni sito la sua: lì la finestra non può restare alla pagina.

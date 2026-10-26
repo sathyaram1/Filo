@@ -1245,7 +1245,7 @@
       if (btn.disabled) return;
       btn.disabled = true;
       let r = null;
-      try { r = await send({ type: MSG.FILO_MEMORY_FORGET, lezione: { ts: o.ricordo.ts, text: o.ricordo.text } }); } catch (_) { r = null; }
+      try { r = await send({ type: MSG.FILO_MEMORY_FORGET, lezione: { ts: o.ricordo.ts, text: o.ricordo.text }, da: 'chat' }); } catch (_) { r = null; }
       btn.disabled = false;
       if (r && r.ok) { o.dimenticato = r.tolta ? 'si' : 'tardi'; mostra(); return; }
       btn.textContent = 'Annulla non riuscito: riprova';

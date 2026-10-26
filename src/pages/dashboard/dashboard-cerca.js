@@ -87,7 +87,8 @@
       const dove = global.SN_FILO_CODA.daAprire(r);
       if (!dove) return;
       // Una scheda chiusa si riapre com'era (scroll, paese); se la sua voce non c'è più, come una pagina qualunque.
-      const riaperta = r.archivio && !dove.sito ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: r.archivio }) : null;
+      const riaperta = r.archivio ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: r.archivio })
+        : !dove.sito ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, url: dove.url, perIndirizzo: true }) : null;
       if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: dove.url });
       return;
     }
