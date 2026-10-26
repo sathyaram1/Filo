@@ -6975,6 +6975,9 @@ const handlerCtx = {
   finishOnboarding,
   claimOnboardingResume,
   releaseOnboardingResume,
+  // I pulsanti delle Preferenze, uguali dalla pagina e dalla chat (#1619)
+  ricominciaIntervista,
+  ripristinaImpostazioni,
 };
 
 require('./handlers/nav')(on, handlerCtx);
