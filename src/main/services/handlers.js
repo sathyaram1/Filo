@@ -2745,6 +2745,14 @@ async function eseguiAzioneFilo(action, {
     action._conBarra = action._riavvio && st.piattaforma === 'win32';
   }
 
+  // #1619 — il ripristino pesa quanto quello che cambierebbe adesso: lo legge il main, sempre, sopra qualunque
+  // valore arrivato col modello; all'OK si rilegge, e si conferma quello che poi si scrive.
+  if (type === 'PULSANTE_PREFERENZE') {
+    delete action._ripristino;
+    const P = globalThis.SN_PULSANTI_PREFERENZE;
+    if (P && P.pulsanteDi(action) === 'ripristina_tutto') action._ripristino = await anteprimaRipristino();
+  }
+
   // ── chi decide se parte (#530) ─────────────────────────────────────────────
   // Il registro dà costo, campo, elenco fisso e difesa (src/shared/actionLevels.js), mai l'LLM; la risposta
   // la dà SN_AUTONOMIA col livello scelto dall'utente e lo stato del compito. Fuori registro o senza costo:
