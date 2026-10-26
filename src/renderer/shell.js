@@ -1839,6 +1839,12 @@
   // programma?», dove la pagina non la copre.
   let chiediApertura = null;
 
+  if (api.onSuona) api.onSuona((info) => {
+    const S = window.SN_SOUNDS;
+    if (!S || !info || !S.TONES[info.tono]) return;
+    S.play(info.tono, info.volume);
+  });
+
   if (api.onToast) api.onToast((info) => {
     if (!info || !info.text) return;
     let annullata = false;
