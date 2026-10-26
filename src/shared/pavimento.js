@@ -88,15 +88,19 @@
         }
         for (const z of zona) {
           const nonApre = NON_APRE.test(`${frase} ${z}`);
-          if (nonApre && !(nome && forte)) continue;
           for (const m of z.matchAll(FORMA_CODICE)) {
             const v = m[2] || m[4];
-            if (!m[2] && ANNO.test(v)) continue;
-            // A coppie («48-29-13») somiglia a una data: conta solo dove la frase parla di entrare.
-            if (/^\d\d-/.test(v) && !forte) continue;
-            if (!nome && !(m[1] || m[3] || INTRODOTTO.test(z.slice(0, m.index)))) continue;
             const prima = z.slice(0, m.index);
-            if (nome && !forte && etichettaDiUnIdentificativo(z === frase || prima.trim() ? prima : frase)) continue;
+            const etichetta = z === frase || prima.trim() ? prima : frase;
+            const chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
+            const entra = forte || chiave.apre;
+            if (nonApre && !(nome && entra)) continue;
+            // Un anno resta, tranne subito dopo il nome di quello che apre: «Il codice del cancello è 1990».
+            if (!m[2] && ANNO.test(v) && !chiave.solo) continue;
+            // A coppie («48-29-13») somiglia a una data: conta solo dove la frase parla di entrare.
+            if (/^\d\d-/.test(v) && !entra) continue;
+            if (!nome && !(m[1] || m[3] || INTRODOTTO.test(prima))) continue;
+            if (nome && !entra && etichettaDiUnIdentificativo(etichetta)) continue;
             // Un pezzo di un numero più lungo («+39 333 1234567», «Chiama 02 4829 1736») è un telefono, non il codice;
             // così le cifre finali di un numero coperto o annunciate come tali («al ***4567», «che termina con 4567»).
             if (/(?:\+|\d)[ .]?$/.test(z.slice(0, m.index)) || FINE_DI_UN_NUMERO.test(z.slice(0, m.index))) continue;
