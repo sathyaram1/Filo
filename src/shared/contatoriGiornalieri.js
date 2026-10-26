@@ -1143,8 +1143,9 @@
 
   // ── I gesti della personalizzazione (#1471) ─────────────────────────────
   // Ogni misura è una mappa: per chiave (un'icona, una carta, un'origine…) le voci di elenco chiuso e il loro conto.
-  const ZONE_ICONE = Object.freeze(['primary', 'secondary', 'bar']);
-  // La posa: trascinata, rimessa nel menu dal tasto destro su un'icona della barra, o chiesta a Filo.
+  // Le zone della disposizione delle icone: una che lì non c'è più farebbe scartare tutta la misura (sentinella negli unit).
+  const ZONE_ICONE = Object.freeze(['secondary', 'bar']);
+  // La posa: trascinata, spostata dal tasto destro su un'icona della barra (fra «Altro…» e le icone in vista), o chiesta a Filo.
   const VIE_POSA = Object.freeze(['trascina', 'rimessa_nel_menu', 'chat']);
   const SI_NO = Object.freeze(['si', 'no']);
   const APERTURE = 'aperture';
