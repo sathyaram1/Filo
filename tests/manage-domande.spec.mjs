@@ -263,3 +263,41 @@ test('un gruppo si apre come un blocco solo', async ({ openTab }) => {
   await expect(page.locator('#mgDomandaDettaglio .mg-dq')).toHaveCount(2);
   await expect(page.locator('#mgDomandaDettaglio .mg-dq').nth(0)).toHaveAttribute('data-id', 'D-5');
 });
+
+// #1152: la risposta a parole la gestisce un agente. Quello che scrive si legge nella conversazione col suo ruolo, e il
+// principio che lascia (la regola del registro) sta sotto l'esito, dove l'owner lo vede.
+const GESTITA = domanda(12, {
+  stato: 'chiusa', fiducia: 'fidato', titolo: 'Crediti dichiarati dal client',
+  esito: { azione: null, ok: true, applicataIl: ora - 400, compito: { id: 'C-3', stato: 'fatto' } },
+  principio: 'Zero fiducia nei crediti dichiarati dal client.',
+  conversazione: [
+    { autore: { tipo: 'owner', fiducia: 'fidato' }, ora: ora - 3000, tipo: 'risposta', testo: 'Non fidarti dei crediti del client.' },
+    { autore: { tipo: 'biglietto', ruolo: 'risposta', fiducia: 'fidato' }, ora: ora - 2000, tipo: 'chiarimento', testo: 'Vale anche per i crediti regalati?' },
+    { autore: { tipo: 'owner', fiducia: 'fidato' }, ora: ora - 1000, tipo: 'risposta', testo: 'Sì, per tutti.' },
+    { autore: { tipo: 'biglietto', ruolo: 'risposta', fiducia: 'fidato' }, ora: ora - 500, tipo: 'esito', testo: 'Aperto #1300 per il controllo sul server.' },
+  ],
+});
+
+test('una risposta gestita da un agente: chiarimento e resoconto nella conversazione, il principio sotto l’esito, in chiaro e in scuro', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriDomande(page, [GESTITA]);
+  await page.locator('.mg-tab[data-tab="domande-archivio"]').click();
+  await page.locator('#mgDomandeLista .mg-domanda').first().click();
+  const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-12"]');
+  await expect(dq.locator('.mg-dq-principio')).toContainText('Principio');
+  await expect(dq.locator('.mg-dq-principio')).toContainText('Zero fiducia nei crediti dichiarati dal client.');
+  await expect(dq.locator('.mg-dq-esito')).toContainText('Fatto');
+  const turni = dq.locator('.mg-dq-turno');
+  await expect(turni).toHaveCount(4);
+  await expect(turni.nth(1)).toContainText('Agente (risposta)');
+  await expect(turni.nth(1)).toContainText('Vale anche per i crediti regalati?');
+  await expect(turni.nth(3)).toContainText('Aperto #1300 per il controllo sul server.');
+  // Il principio sta fra l'esito e la conversazione.
+  const ordine = await dq.evaluate((art) => [...art.children].map((c) => c.className.split(' ').find((x) => /mg-dq-(esito|principio|conv)$/.test(x))).filter(Boolean));
+  expect(ordine).toEqual(['mg-dq-esito', 'mg-dq-principio', 'mg-dq-conv']);
+  await dq.screenshot({ path: 'tests/.shots/manage-domande-principio.png' });
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
+  const colori = await dq.locator('.mg-dq-principio').evaluate((s) => ({ testo: getComputedStyle(s).color, fondo: getComputedStyle(document.body).backgroundColor }));
+  expect(colori.testo).not.toBe(colori.fondo);
+  await dq.screenshot({ path: 'tests/.shots/manage-domande-principio-scuro.png' });
+});

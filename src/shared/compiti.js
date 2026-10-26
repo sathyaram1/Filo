@@ -22,6 +22,7 @@
   function etichetta(c) {
     if (!c || typeof c !== 'object') return '';
     if (c.tipo === 'fase') return `${c.feedbackNum || 'feedback'} · ${NOME_FASE[c.fase] || c.fase || '?'}`;
+    if (c.tipo === 'risposta') return `${c.id} · Gestisci la risposta a ${testo(c.domandaId) || 'una domanda'}`;
     const t = testo(c.titolo).trim();
     return t ? `${c.id} · ${t}` : String(c.id || '');
   }

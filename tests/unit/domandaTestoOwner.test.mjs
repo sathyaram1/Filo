@@ -100,7 +100,7 @@ test('più campi sporchi: un rifiuto solo li elenca tutti, così si correggono i
 
 test('ogni ruolo che lavora riceve la regola una volta sola, dal pezzo condiviso, e chi scrive domande la richiama', () => {
   const ruoli = [['new-work', {}], ['fixer', {}], ['fixer', { caso: 'ripresa' }], ['fixer', { caso: 'riallineamento' }],
-    ['verifier', { scope: 'pieno' }], ['verifier', { scope: 'chiusura' }], ['verifier', { scope: 'riallineamento' }], ['secaudit', {}]];
+    ['verifier', { scope: 'pieno' }], ['verifier', { scope: 'chiusura' }], ['verifier', { scope: 'riallineamento' }], ['secaudit', {}], ['risposta', {}]];
   for (const [ruolo, opts] of ruoli) {
     const t = readRoleInstructions(ruolo, opts);
     assert.equal(t.split(SEZIONE).length - 1, 1, `${ruolo} ${JSON.stringify(opts)}: la regola una volta sola`);

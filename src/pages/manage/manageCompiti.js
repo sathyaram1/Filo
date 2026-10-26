@@ -142,6 +142,7 @@
     const box = document.createElement('div');
     box.className = 'mg-cp-azioni';
     if (c.tipo === 'fase' && c.feedbackId) box.append(bottone('apri', 'Apri il feedback', c.feedbackNum, () => apriFeedback(c)));
+    if (c.tipo === 'risposta' && c.domandaId) box.append(bottone('apri', 'Apri la domanda', c.domandaId, () => apriDomanda(c)));
     if (annullabile(c)) {
       const conferma = stato.conferma === c.id;
       const inCorso = stato.annullando.has(c.id);
@@ -152,6 +153,7 @@
   }
 
   function provenienza(c) {
+    if (c.tipo === 'risposta') return c.fiducia === 'fidato' ? '' : 'non fidato';
     if (c.tipo !== 'manuale') return '';
     const chi = c.creatoDa === 'sessione' ? 'da una sessione' : c.creatoDa === 'owner' ? 'tuo' : '';
     const fiducia = c.fiducia === 'fidato' ? '' : 'non fidato';
@@ -330,6 +332,12 @@
     if (!apri || !apri(c.feedbackId)) avvisa(`${c.feedbackNum || 'Il feedback'} non è fra i feedback caricati in questa pagina.`);
   }
 
+  async function apriDomanda(c) {
+    const DQ = window.SN_MG_DOMANDE;
+    const ok = !!DQ && typeof DQ.apriDomanda === 'function' && await DQ.apriDomanda(c.domandaId);
+    if (!ok) avvisa(`La domanda ${c.domandaId} non si apre adesso: cercala nella sezione Domande.`);
+  }
+
   async function annulla(c) {
     if (stato.annullando.has(c.id)) return;
     stato.erroreAzione.delete(c.id);
@@ -446,6 +454,7 @@
     const voci = [];
     if (c) {
       if (c.tipo === 'fase' && c.feedbackId) voci.push({ testo: 'Apri il feedback', titolo: c.feedbackNum, azione: () => apriFeedback(c) });
+      if (c.tipo === 'risposta' && c.domandaId) voci.push({ testo: 'Apri la domanda', titolo: c.domandaId, azione: () => apriDomanda(c) });
       voci.push({ testo: stato.aperte.has(c.id) ? 'Chiudi le chiamate' : 'Mostra le chiamate', azione: () => apriChiudi(c.id) });
       if (annullabile(c)) voci.push({ testo: 'Annulla il compito', titolo: 'Chiede conferma', azione: () => { stato.conferma = ''; annulla(c); } });
       voci.push({ testo: 'Copia il nome', titolo: K.etichetta(c), azione: () => copia(K.etichetta(c)) });

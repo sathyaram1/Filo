@@ -36,7 +36,7 @@ const FATTO = {
 const VECCHIO = { ...FATTO, id: 'C-1', numero: 1, feedbackNum: '#650', stato: 'superato', esito: 'risolto', chiusoIl: ORA - 900 * MIN, biglietti: [] };
 
 // Un main finto con lo stato del server: `crea` e `annulla` lo cambiano come ownerCompiti.
-async function apri(openTab, { owner = true, elenco = null, falliscono = false } = {}) {
+async function apri(openTab, { owner = true, elenco = null, falliscono = false, aperti = null } = {}) {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo && window.SN_COMPITI && window.__mgCompiti);
@@ -75,7 +75,7 @@ async function apri(openTab, { owner = true, elenco = null, falliscono = false }
       }
       return orig(msg);
     };
-  }, { owner, elenco, falliscono, base: { aperti: [P3, IN_CORSO, MANUALE], storico: [FATTO], vecchi: [VECCHIO] } });
+  }, { owner, elenco, falliscono, base: { aperti: aperti || [P3, IN_CORSO, MANUALE], storico: [FATTO], vecchi: [VECCHIO] } });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await apriScheda(page, 'compiti');
   await expect(page.locator('#panel-compiti')).toHaveClass(/mg-panel--active/);
@@ -286,4 +286,23 @@ test('«Apri il feedback» su un feedback che la pagina non ha lo dice, invece d
   await r.click();
   await r.getByRole('button', { name: 'Apri il feedback' }).click();
   await expect(page.locator('#mgCpStato')).toHaveText('#1196 non è fra i feedback caricati in questa pagina.');
+});
+
+// #1152: «Gestisci la risposta» è un compito senza feedback, legato alla sua domanda.
+const RISPOSTA = {
+  id: 'C-11', numero: 11, tipo: 'risposta', stato: 'aperto', aperto: true, domandaId: 'D-12', ruolo: 'risposta', urgenza: 47,
+  modello: 'opus', sforzo: 'high', ambito: 'risposta', fiducia: 'non_fidato', creatoIl: ORA - 2 * MIN, biglietti: [],
+};
+
+test('il compito di una risposta si chiama dalla sua domanda, dice se non è fidato e apre la domanda', async ({ openTab }) => {
+  const page = await apri(openTab, { aperti: [P3, RISPOSTA, MANUALE] });
+  await page.evaluate((d) => window.__mgTest.setDomande(d), [{ id: 'D-12', numero: 12, stato: 'in_lavorazione', priorita: 'importante', titolo: 'Crediti dichiarati dal client', creataIl: ORA, fiducia: 'non_fidato', opzioni: [], conversazione: [] }]);
+  const r = righe(page, 'inAttesa').nth(1);
+  await expect(r.locator('.mg-cp-nome')).toHaveText('C-11 · Gestisci la risposta a D-12');
+  await expect(r).toContainText('non fidato');
+  await r.click();
+  await page.screenshot({ path: 'tests/.shots/manage-compiti-risposta.png' });
+  await r.getByRole('button', { name: 'Apri la domanda' }).click();
+  await expect(page.locator('#panel-domande')).toHaveClass(/mg-panel--active/);
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-12"]')).toBeVisible();
 });

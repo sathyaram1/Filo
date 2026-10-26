@@ -581,6 +581,8 @@ const ROLE_FILE = {
   fixer: 'resolver-rebase.md',
   'new-work': 'resolver.md',
   resolver: 'resolver.md',
+  // «Gestisci la risposta» (#1152): un ruolo solo per ogni risposta, qualunque cosa chieda l'owner.
+  risposta: 'risposta.md',
   halt: 'halt.md',
 };
 // Il correttore ha due casi (payload.case), e la ripresa dopo la risposta
@@ -884,6 +886,10 @@ export function buildPayload(bucket, ctx = {}) {
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
       return out;
+    }
+    case 'risposta': {
+      const { role: _ruolo, ...resto } = (ctx && ctx.risposta) || {};
+      return { ...resto, case: 'risposta', num: bucket.num || '' };
     }
     case 'halt':
       // Guasto: nessun lavoro, solo il motivo per cui non si può lavorare.
@@ -1983,7 +1989,7 @@ function positionOnBranch(bucket) {
  */
 // I ruoli che questa macchina sa eseguire. Un ruolo fuori da qui non è un
 // lavoro: è una busta che non sappiamo aprire.
-const RUOLI_LAVORABILI = ['secaudit', 'verifier', 'fixer', 'new-work'];
+const RUOLI_LAVORABILI = ['secaudit', 'verifier', 'fixer', 'new-work', 'risposta'];
 // Chi lavora su un ramo esistente: senza, non c'è niente su cui posizionarsi.
 const RUOLI_CON_RAMO = ['secaudit', 'verifier', 'fixer'];
 
@@ -2016,6 +2022,13 @@ export function checkEnvelope(w) {
   if (RUOLI_CON_RAMO.includes(role) && !String((w && w.branch) || '')) {
     return `lavoro "${role}" senza il ramo su cui lavorare`;
   }
+  // Il compito di una risposta non ha un feedback: ha la sua domanda, o il server dice che non gli è più affidata.
+  if (role === 'risposta') {
+    const p = (w && w.payload) || {};
+    if (!String(p.compito || '')) return 'lavoro "risposta" senza il compito a cui si riferisce';
+    if (p.affidata !== false && !String((p.domanda && p.domanda.id) || '')) return 'lavoro "risposta" con la domanda vuota: non c\'è niente su cui lavorare';
+    return null;
+  }
   if (!String((w && w.id) || '')) {
     return `lavoro "${role}" senza il feedback a cui si riferisce`;
   }
@@ -2047,6 +2060,8 @@ export function serverCtx(bucket, fromServer, diff = '') {
     }
     return { diff, ...server };
   }
+  // La risposta arriva com'è: domanda, feedback nominati e registro li ha già scelti il server per questo ruolo.
+  if (role === 'risposta') return { risposta: payload || {} };
   if (role === 'verifier' || role === 'fixer' || role === 'new-work') {
     // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
     // se lo vada a rileggere: il ripiego sarebbe la chiave, ed è proprio ciò
