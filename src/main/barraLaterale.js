@@ -951,7 +951,8 @@ class BarraLaterale {
         this._nascondiSuggerimento();
         if (this.aperta && (this.motivo !== 'tasto' || !this._haFuoco())) this._programmaUscita();
         break;
-      case 'barra:azione': this.esegui(testo(d.id), { colore: testo(d.colore) }); break;
+      case 'barra:azione': this.esegui(testo(d.id), { colore: testo(d.colore), daAltro: d.daAltro === true }); break;
+      case 'barra:altro': if (this.aperta) this._contaGesto('altro_del_menu', { aperto: true }); break;
       case 'barra:sistema': this.sistema(testo(d.comando), d); break;
       case 'barra:menu': this._menu(d); break;
       case 'barra:suggerimento': this._mostraSuggerimento(d); break;
