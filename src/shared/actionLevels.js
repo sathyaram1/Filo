@@ -1124,6 +1124,9 @@
       campo: null,
       difesa: (a) => pulsante(a) === 'ripristina_tutto' && frasiRipristino(a).length > 0
         && !(a && a._ripristino && a._ripristino.livello === 1),
+      // Tutte insieme non si rimettono senza un clic, a nessun livello: un «rimetti com'era» capito male le perderebbe.
+      perimetro: (a) => !(pulsante(a) === 'ripristina_tutto' && frasiRipristino(a).length > 0),
+      perchePerimetro: 'Rimettere tutte le impostazioni di serie te lo chiedo sempre prima.',
       describe: (a) => {
         const p = pulsante(a);
         if (p === 'prova_suono' || p === 'prova_suoneria') {
