@@ -11,5 +11,5 @@ test('r3 con la password a puntini o un bottone sulla riga dell\'etichetta, la r
     <div>Sicurezza</div>`, 'dalla pagina Sicurezza account: cosa posso cambiare?');
   expect(mandato, 'la pagina è stata letta').toContain('Sicurezza account');
   expect(mandato).toContain('Notifiche');
-  expect(mandato).toMatch(/Modifica\\n+Sicurezza/);
+  expect(mandato).toMatch(/Modifica(?:\\n)+Sicurezza/);
 });
