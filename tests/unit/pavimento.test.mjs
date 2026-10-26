@@ -396,3 +396,19 @@ test('il codice che apre un cancello, una cassaforte, un ritiro o un prelievo no
     assert.equal(P.oscura(t), t, t);
   }
 });
+
+// Quello che il codice apre è il suo nome, non una parola qualunque della frase; un anno dopo quel nome è il codice.
+test('una parola dell\'aprire nella frase non copre un identificativo; il codice di quello che si apre, anche fuori elenco, non esce', () => {
+  for (const t of ['Videocitofono smart Wi-Fi, codice prodotto 48291375', 'Codice evento 739204 - Teatro alla Scala, ingresso principale',
+    'Codice ordine 482913: ritiro in negozio entro il 30/11', 'Codice errore 4829 sul dispositivo', 'Codice impianto 48291 (allarme)',
+    'Codice prodotto: 48291 - Cassaforte a muro', 'Il codice postale dell\'ingresso è 20121', 'Codice del cancello installato nel 2019',
+    'Apri il file e inserisci 48291 nel campo quantità', 'Codice abbonamento 48291375, apri l\'app per i dettagli']) {
+    assert.equal(P.oscura(t), t, t);
+  }
+  for (const [t, s] of [['Il codice dell\'appartamento è 7316.', '7316'], ['Codice della serranda: 5502', '5502'], ['Codice ascensore: 6403', '6403'],
+    ['building code 8812', '8812'], ['Codice bancomat: 91827', '91827'], ['Keycode: 4829', '4829'], ['front door code: 4829', '4829'],
+    ['Per aprire il cancello digita 3958 sul tastierino', '3958'], ['Per entrare digita 4829', '4829'], ['Il codice del cancello è 1990', '1990'],
+    ['Il codice per aprire il cancello è 4829', '4829'], ['Il codice del cancello è 4829, per problemi chiama il numero verde', '4829']]) {
+    assert.ok(!P.oscura(t).includes(s), t);
+  }
+});
