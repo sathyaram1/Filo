@@ -124,6 +124,48 @@ test('l’Aiuto aperto su una scheda che si chiude conta la sessione, una volta'
   expect(await misura(app, 'aiuto')).toEqual({ 'fatto|p0|p0|n0|n0': 1 });
 });
 
+// L'Aiuto indica «Account» e aspetta il clic: la pagina che cambia a quel clic non è una sessione lasciata a metà.
+async function aiutoCheIndica(page, dopo) {
+  await page.waitForFunction(() => typeof window.SN_SIDEBAR?.open === 'function', null, { timeout: 8000 });
+  await page.evaluate((u) => {
+    const b = document.createElement('button');
+    b.id = 'vai-account';
+    b.textContent = 'Account';
+    b.style.cssText = 'position:fixed;left:40px;top:120px;z-index:5;padding:12px 20px';
+    b.addEventListener('click', () => { location.href = u; });
+    document.body.appendChild(b);
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (msg, ...rest) => {
+      if (msg && msg.type === 'ai_request') {
+        return Promise.resolve({ ok: true, text: '{"text":"Apri «Account».","status":"continue","highlight":{"selector":"#vai-account","action":"click","note":"Clicca qui"}}' });
+      }
+      if (msg && msg.type === 'capture_visible_tab') return Promise.resolve({ ok: false });
+      return orig(msg, ...rest);
+    };
+  }, dopo);
+  await page.evaluate(() => window.SN_SIDEBAR.open());
+  await page.fill('.sn-sidebar-input textarea', 'come disdico l\'abbonamento?');
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+  await expect(page.locator('.sn-sidebar-conv')).toContainText('Apri «Account».', { timeout: 20_000 });
+  await expect(page.locator('.sn-highlight')).toHaveCount(1, { timeout: 5_000 });
+}
+
+test('l’Aiuto: la pagina che cambia al passo cliccato si conta «pagina cambiata»; la scheda chiusa prima del clic resta «chiusa prima»', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab('filo://newtab/?prova=aiuto-passo');
+  await aiutoCheIndica(page, 'filo://newtab/?prova=aiuto-account');
+  await page.locator('#vai-account').click();
+  await page.waitForURL(/aiuto-account/, { timeout: 10_000 });
+  await expect.poll(() => misura(app, 'aiuto'), { timeout: 8_000 }).toEqual({ 'pagina_cambiata|p0|p1|n0|n0': 1 });
+
+  const url = 'filo://newtab/?prova=aiuto-lasciata';
+  const lasciata = await openTab(url);
+  await aiutoCheIndica(lasciata, 'filo://newtab/?prova=mai');
+  await chiudiScheda(app, url);
+  await expect.poll(() => misura(app, 'aiuto'), { timeout: 8_000 })
+    .toEqual({ 'pagina_cambiata|p0|p1|n0|n0': 1, 'chiusa_prima|p0|p0|n0|n0': 1 });
+});
+
 test('l’Aiuto in una finestra in incognito non conta sessioni né ricerche', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await ricercheFinte(app);
