@@ -794,7 +794,7 @@ class BarraLaterale {
       else if (icona.motivo) voci.push({ label: icona.motivo, disabled: true });
       voci.push(icona.riserva ? { label: 'Porta fra le icone in vista', action: 'barra:in-vista' } : { label: 'Sposta in «Altro…»', action: 'barra:in-altro' });
       scegli = (a) => {
-        if (a === 'barra:esegui') this.esegui(id);
+        if (a === 'barra:esegui') this.esegui(id, { daAltro: !!icona.riserva });
         else if (a === 'barra:in-altro') this._posa({ id, target: 'secondary', beforeId: null }, { via: 'rimessa_nel_menu' });
         else if (a === 'barra:in-vista') this._posa({ id, target: 'bar', beforeId: null }, { via: 'rimessa_nel_menu' });
         else if (a.startsWith('barra:voce:') && scheda) {
