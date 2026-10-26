@@ -19,14 +19,14 @@
   const CODICE_ACCESSO = /\b(?:codice|code|pin)\b(?:\s+(?:di|da|per|the|your|il|tuo))*\s+(?:verifica|accesso|conferma|sicurezza|autenticazione|autorizzazione|login|verification|security|confirmation|access|sign-?in)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
   const CODICE_ACCESSO_EN = /\b(?:verification|security|confirmation|access|login|sign-?in|one-?time|otp|2fa)\s+(?:code|codice|pin)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
   const PIN = /\bpin\b\s*(?:[:=]|è|e'|is)?\s*(\d{4,8})\b/gi;
-  // La regola sulla forma, per i codici: un numero con la forma di un codice (quattro-otto cifre, o due-tre gruppi) nella
-  // frase che lo nomina, prima o dopo di lui, o sulla riga sotto. Col nome del codice («Telegram code: 48291») conta, a
+  // La regola sulla forma, per i codici: un numero con la forma di un codice (quattro-otto cifre, o due-tre gruppi) al
+  // posto del codice (vedi alPostoDelCodice), nella frase che lo nomina o sulla riga sotto. Col nome del codice conta, a
   // meno che la frase lo dica un identificativo che non apre niente (cliente, ordine, prenotazione) senza parole
   // dell'entrare (verifica, autorizza, accedi, sblocca); senza nome conta solo dopo «usa», «inserisci», «enter» o col
   // prefisso («Use 337164 to verify», «G-482913»), perché «Verificato da 1532 utenti» non è un codice. Un anno resta.
   const NOME_CODICE = /\b(?:codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa)\b/i;
   const SEGNO_FORTE = /\b(?:verific\w*|verif(?:y|ied|ies|ication)\w*|autorizz\w*|authori[sz]\w*|autentic\w*|authentic\w*|sblocc\w*|unlock\w*|acced\w*|accesso|access|log-?in|log\s+in|sign-?in|sign\s+in|monouso|one-?time|usa\s+e\s+getta|otp|passcode|2fa|mfa)\b/i;
-  const NON_APRE = /\b(?:client[ei]|customer|client|ordin[ei]|orders?|prenotazion[ei]|booking|reservation|pratica|scont[oi]|discount|promo\w*|coupon|fiscale|postale|postal|zip|cap|prodott[oi]|products?|articol[oi]|items?|sku|tracking|spedizion[ei]|shipp?(?:ing|ment)|fattur[ae]|invoices?|riferimento|reference|tribut[oi]|civile|penale|strada|procedura|error[ei]?|errors?|status|http|abi|cab|ateco|ean|isbn|iban|swift|bic|ticket|bigliett[oi]|vol[oi]|flights?|ricetta|esenzione|destinatario|sdi|cig|cup|colore|colou?r|sorgente|source|paese|country|comune|catastale|matricola|tessera|socio|membro|member|telefono|phone|tel|numero\s+verde|chiam\w*|call)\b/i;
+  const NON_APRE = /\b(?:client[ei]|customer|client|ordin[ei]|orders?|prenotazion[ei]|booking|reservation|pratica|scont[oi]|discount|promo\w*|coupon|fiscale|postale|postal|zip|cap|prodott[oi]|products?|articol[oi]|items?|sku|tracking|spedizion[ei]|shipp?(?:ing|ment)|fattur[ae]|invoices?|riferimento|reference|tribut[oi]|civile|penale|strada|procedura|error[ei]?|errors?|status|http|abi|cab|ateco|ean|isbn|iban|swift|bic|ticket|bigliett[oi]|vol[oi]|flights?|ricetta|esenzione|destinatario|sdi|cig|cup|colore|colou?r|sorgente|source|paese|country|comune|catastale|matricola|tessera|socio|membro|member|telefono|phone|tel|numero\s+verde|chiam\w*|call|predefinit\w*|default|factory|fabbrica)\b/i;
   const INTRODOTTO = /\b(?:use|usa|utilizza|inserisci|immetti|digita|enter|type)\s+$/i;
   const FORMA_CODICE = /(?<![\w./:€$£-])(?:([A-Z]{1,3}-)?(\d{3,4}(?:[ -]\d{3,4}){1,2}|\d{2}-\d{2}-\d{2})|([A-Z]{1,3}-)?(\d{4,8}))(?![\w/]|[.,:]\d|-\d|\s?(?:€|%|euro\b|eur\b|usd\b))/g;
   const ANNO = /^(?:19|20)\d\d$/;
@@ -40,12 +40,12 @@
   // Le cose che un codice apre: il loro codice è un segreto anche col nome comune davanti («Il codice del cancello è
   // 4829», «Codice di ritiro: 640385»). Contano solo come nome del codice, cioè subito dopo «codice» o subito prima di
   // «code»: «Videocitofono Wi-Fi, codice prodotto 4829» è un identificativo. «Porta» è anche un verbo: solo lì.
-  const COSE_CHE_SI_APRONO = 'cancell(?:o|i|etto)|portone|ingresso|entrata|citofono|cassaforte|casseforti|cassett[ae]\\s+(?:delle\\s+)?chiavi|keybox|lockbox|key\\s?safe|lucchett[oi]|serratur[ae]|allarm[ei]|antifurto|ritir(?:o|are)|preliev(?:o|i|are)|armadiett[oi]|locker|wi-?fi|wlan|dispositiv[oi]|device|garage|gate|door|safe|alarm|pick-?up|withdrawal|keypad|appartament[oi]|apartment|serrand[ae]|ascensor[ei]|elevator|bancomat|building|entry|lock';
+  const COSE_CHE_SI_APRONO = 'cancell(?:o|i|etto)|portone|ingresso|entrata|citofono|cassaforte|casseforti|cassett[ae]\\s+(?:delle\\s+)?chiavi|keybox|lockbox|key\\s?safe|lucchett[oi]|serratur[ae]|allarm[ei]|antifurto|ritir(?:o|are)|preliev(?:o|i|are)|armadiett[oi]|locker|wi-?fi|wlan|dispositiv[oi]|device|garage|gate|door|safe|alarm|pick-?up|withdrawal|keypad|appartament[oi]|apartment|serrand[ae]|ascensor[ei]|elevator|bancomat|building|entry|lock|apertur[ae]|disattivazion[ei]|disinseriment[oi]|opening';
   const APRE = new RegExp(`\\b(?:${COSE_CHE_SI_APRONO})\\b`, 'i');
   const NOME_CHE_APRE = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae]|apri(?:re)?|apre|entra(?:re)?)\\b`, 'i');
   const NOME_CHE_APRE_SOLO = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae])\\s*(?:[:=#]|è|\\bis\\b)?\\s*$`, 'i');
   const LEGAMI = /^(?:\s+|(?:d|l|dell|all|dall|nell)['’]|(?:di|del|della|dello|dei|degli|delle|per|da|a|al|alla|allo|il|la|lo|i|gli|le|tuo|tua|of|for|to|the|your)\b)+/i;
-  const PER_APRIRE = /\b(?:apri(?:re)?|apre|aprono|open(?:s|ing)?|entra(?:re)?)\b/i;
+  const PER_APRIRE = /\b(?:apri(?:re)?|apre|aprono|open(?:s|ing)?|entra(?:re)?|disattiva(?:re)?|disinseri(?:re|sci)|disarm(?:a|are)?)\b/i;
   // Il nome del codice nell'etichetta prima del numero: quello che segue l'ultimo «codice», o la parola prima di «code».
   const nomeDelCodice = (prima) => {
     if (/\bkeycodes?\b/i.test(prima)) return { apre: true, solo: /\bkeycodes?\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima) };
@@ -69,44 +69,74 @@
     const prima = resto.slice(0, m.index);
     return !/(?:\+|\d)[ .]?$/.test(prima) && !FINE_DI_UN_NUMERO.test(prima);
   });
+  // Il posto del codice, come quello della password: subito dopo il suo nome («Inserisci il codice 615204»), dopo il
+  // separatore o il verbo che chiude l'etichetta («Telegram code: 48291», «il codice per autorizzare l'operazione è …»),
+  // dopo un'etichetta breve in testa («Codice OTP 482913»), prima di «è il tuo codice», da solo in testa alla riga o alla
+  // cella dopo l'etichetta. Un altro numero della frase («The code uses port 3000») non è il codice.
+  const NOMI_CODICE = /\b(?:codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa)\b/gi;
+  const CHIUDE_ETICHETTA = /(?:[:=#]|\b(?:è|e'|is|was|era|sarà|will\s+be|sono|are)|\bn\.|\bnr\.?|\bno\.)\s*$/i;
+  const PRIMA_DEL_NOME = /^\s*(?:[:=-]\s*)?(?:è|e'|is|=|sarà|was)\s+(?:[\p{L}'’-]+\s+){0,4}?(?:codic[ei]|codes?|pin|otp|passcode)\b/iu;
+  function alPostoDelCodice(z, m, inTesta) {
+    const prima = z.slice(0, m.index);
+    if (inTesta) return !prima.trim();
+    if (PRIMA_DEL_NOME.test(z.slice(m.index + m[0].length))) return true;
+    const n = [...prima.matchAll(NOMI_CODICE)].pop();
+    if (!n) return false;
+    const fra = prima.slice(n.index + n[0].length);
+    if (!fra.trim()) return true;
+    if (fra.length > 60 || /[,;!?]|\d{4,}/.test(fra)) return false;
+    if (CHIUDE_ETICHETTA.test(fra)) return true;
+    return /^[\s•*·>–-]*$/.test(prima.slice(0, n.index)) && !/\d/.test(fra) && fra.trim().split(/\s+/).length <= 4;
+  }
+  // Un codice usa e getta di lettere e cifre («Steam Guard code: 7K2F9», quello da scrivere sulla TV, «WDJB-MJHT»):
+  // conta solo al posto del codice, come i numeri, e col nome del codice nella frase.
+  const CODICE_ALFANUMERICO = /(?<![\w./:-])(?:(?=[A-Z]*\d)(?=\d*[A-Z])[A-Z0-9]{5,10}|[A-Z]{4}-[A-Z]{4})(?![\w/-])/g;
   function codiciVicini(s, out) {
     const righe = s.split('\n');
-    const frasi = (riga) => riga.split(/(?<=[.!?;])\s+(?=[A-ZÀ-Ý«"])|[|\t]/);
     for (let i = 0; i < righe.length; i++) {
-      for (const frase of frasi(righe[i])) {
-        const nome = NOME_CODICE.test(frase);
-        const forte = SEGNO_FORTE.test(frase);
-        // Senza il nome del codice: «Per aprire il cancello digita 3958», non «Apri il file e inserisci 48291».
-        const perAprire = PER_APRIRE.test(frase) && (APRE.test(frase) || /\b(?:port[ae]|entra(?:re)?)\b/i.test(frase));
-        if (!nome && !forte && !perAprire) continue;
-        const zona = [frase];
-        const dove = righe[i].indexOf(frase);
-        if (righe[i].trim().length <= 80 && !haGiaIlNumero(righe[i].slice(dove < 0 ? 0 : dove))) {
-          for (let j = i + 1, vuote = 0; j < righe.length && vuote <= 2; j++) {
-            if (!righe[j].trim()) { vuote++; continue; }
-            zona.push(righe[j]);
-            break;
+      const celle = righe[i].split(/[|\t]/);
+      for (let c = 0; c < celle.length; c++) {
+        const pezzi = celle[c].split(/(?<=[.!?;])\s+(?=[A-ZÀ-Ý«"])/);
+        for (let f = 0; f < pezzi.length; f++) {
+          const frase = pezzi[f];
+          const nome = NOME_CODICE.test(frase);
+          const forte = SEGNO_FORTE.test(frase);
+          // Senza il nome del codice: «Per aprire il cancello digita 3958», non «Apri il file e inserisci 48291».
+          const perAprire = PER_APRIRE.test(frase) && (APRE.test(frase) || /\b(?:port[ae]|entra(?:re)?)\b/i.test(frase));
+          if (!nome && !forte && !perAprire) continue;
+          const zona = [{ z: frase, inTesta: false }];
+          const ultima = f === pezzi.length - 1;
+          if (ultima && c + 1 < celle.length && !haGiaIlNumero(frase)) zona.push({ z: celle[c + 1], inTesta: true });
+          const dove = righe[i].indexOf(frase);
+          if (righe[i].trim().length <= 80 && !haGiaIlNumero(righe[i].slice(dove < 0 ? 0 : dove))) {
+            for (let j = i + 1, vuote = 0; j < righe.length && vuote <= 2; j++) {
+              if (!righe[j].trim()) { vuote++; continue; }
+              zona.push({ z: righe[j], inTesta: true });
+              break;
+            }
           }
-        }
-        for (const z of zona) {
-          const nonApre = NON_APRE.test(`${frase} ${z}`);
-          for (const m of z.matchAll(FORMA_CODICE)) {
-            const v = m[2] || m[4];
-            const prima = z.slice(0, m.index);
-            const etichetta = z === frase || prima.trim() ? prima : frase;
-            const chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
-            const entra = forte || chiave.apre;
-            if (nonApre && !(nome && entra)) continue;
-            // Un anno resta, tranne subito dopo il nome di quello che apre: «Il codice del cancello è 1990».
-            if (!m[2] && ANNO.test(v) && !chiave.solo) continue;
-            // A coppie («48-29-13») somiglia a una data: conta solo dove la frase parla di entrare.
-            if (/^\d\d-/.test(v) && !entra) continue;
-            if (!nome && !(m[1] || m[3] || INTRODOTTO.test(prima))) continue;
-            if (nome && !entra && etichettaDiUnIdentificativo(etichetta)) continue;
-            // Un pezzo di un numero più lungo («+39 333 1234567», «Chiama 02 4829 1736») è un telefono, non il codice;
-            // così le cifre finali di un numero coperto o annunciate come tali («al ***4567», «che termina con 4567»).
-            if (/(?:\+|\d)[ .]?$/.test(z.slice(0, m.index)) || FINE_DI_UN_NUMERO.test(z.slice(0, m.index))) continue;
-            out.push({ valore: v, regola: 'codice' });
+          for (const { z, inTesta } of zona) {
+            const nonApre = NON_APRE.test(`${frase} ${z}`);
+            const trovati = [...z.matchAll(FORMA_CODICE)].map((m) => ({ m, v: m[2] || m[4] }));
+            if (nome) for (const m of z.matchAll(CODICE_ALFANUMERICO)) trovati.push({ m, v: m[0], lettere: true });
+            for (const { m, v, lettere } of trovati) {
+              const prima = z.slice(0, m.index);
+              const etichetta = inTesta ? frase : prima;
+              const chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
+              const entra = forte || chiave.apre;
+              if (nonApre && !(nome && entra)) continue;
+              if (nome ? !(alPostoDelCodice(z, m, inTesta) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
+                : !(m[1] || m[3] || INTRODOTTO.test(prima))) continue;
+              // Un anno resta, tranne subito dopo il nome di quello che apre: «Il codice del cancello è 1990».
+              if (!lettere && !m[2] && ANNO.test(v) && !chiave.solo) continue;
+              // A coppie («48-29-13») somiglia a una data: conta solo dove la frase parla di entrare.
+              if (/^\d\d-/.test(v) && !entra) continue;
+              if (nome && !entra && etichettaDiUnIdentificativo(etichetta)) continue;
+              // Un pezzo di un numero più lungo («+39 333 1234567», «Chiama 02 4829 1736») è un telefono, non il codice;
+              // così le cifre finali di un numero coperto o annunciate come tali («al ***4567», «che termina con 4567»).
+              if (/(?:\+|\d)[ .]?$/.test(prima) || FINE_DI_UN_NUMERO.test(prima)) continue;
+              out.push({ valore: v, regola: 'codice' });
+            }
           }
         }
       }
