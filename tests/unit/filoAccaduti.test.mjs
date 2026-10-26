@@ -357,7 +357,7 @@ const SEGNO_DAI_TASTI = {
   // Dai tasti lascia lo stato che scrive: un cambio, una scheda, un documento, una cancellazione, una ricerca.
   stato: ['NAVIGA', 'TIMER', 'SVEGLIA', 'CANCELLA_SVEGLIA', 'MODIFICA_SVEGLIA', 'SALVA_APPUNTO', 'CERCA_WEB', 'APRI_SALVATA',
     'CANCELLA_PAGINE', 'TOGLI_CHAT', 'RIMETTI_CHAT', 'IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'REGOLA_PROXY_DOMINIO',
-    'RIMUOVI_REGOLA_PROXY', 'ANNULLA_CAMBIO', 'ZOOM_PAGINA', 'RIMEDIO_CREDITI'],
+    'RIMUOVI_REGOLA_PROXY', 'ANNULLA_CAMBIO', 'ZOOM_PAGINA', 'RIMEDIO_CREDITI', 'CHIUDI_SCHEDE'],
   // I tasti della finestra sono gesti, non azioni di Filo.
   barra: ['COMANDO_FINESTRA'],
   // Nessun tasto la fa: letture, proposte e comandi che si chiedono solo a parole.
