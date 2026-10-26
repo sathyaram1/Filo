@@ -660,6 +660,21 @@
       required: ['operazione'],
       risultato: true,
     },
+    PULSANTE_PREFERENZE: {
+      description: 'Fa quello che fanno i pulsanti della pagina Preferenze, invece di spiegare all\'utente dove cliccare. '
+        + 'prova_suono fa sentire il suono degli avvisi e prova_suoneria quello di timer e sveglie ("fammi sentire la suoneria carillon"), '
+        + 'col volume salvato; non cambiano niente, e per sceglierli si usa IMPOSTA_PREFERENZA. '
+        + 'prova_voce legge una frase con la voce naturale della lettura ad alta voce ("com\'è la voce Nicola?"), senza sceglierla. '
+        + 'rifai_intervista ricomincia l\'intervista di benvenuto in una home nuova; quella di prima resta da rileggere in Preferenze. '
+        + 'ripristina_tutto riporta tutte le impostazioni ai valori di serie ("rimetti tutte le impostazioni come all\'inizio"): '
+        + 'restano le chiavi API e il registro dei modelli, e l\'OK lo chiede il sistema, con l\'elenco di cosa cambia.',
+      properties: {
+        pulsante: S('Quale pulsante.', { enum: ['prova_suono', 'prova_suoneria', 'prova_voce', 'rifai_intervista', 'ripristina_tutto'] }),
+        tono: S('Per prova_suono e prova_suoneria: standard, delicata, urgente o carillon. Senza, quello scelto adesso.'),
+        voce: S('Per prova_voce: il nome della voce naturale, come "Sara" o "Nicola". Senza, quella scelta adesso.'),
+      },
+      required: ['pulsante'],
+    },
     CARTA_HOME: {
       description: 'Dispone le carte della home. A destra quelle che l\'utente tiene ("togli la carta dei suggerimenti", "rimetti l\'editor", "metti i suggerimenti in cima", "rimetti le carte com\'erano"): una carta tolta diventa un\'icona in «altro», sotto le carte, e da lì si rimette. A sinistra quello che sta succedendo (timer, sveglie, scaricamenti, avvisi, lavori in corso): si spostano ("metti il timer della pasta in cima") e si tolgono ("togli l\'avviso del backup": un avviso si chiude, uno scaricamento o un lavoro spariscono solo dalla home, e con rimetti tornano). Un timer o una sveglia si tolgono con CANCELLA_SVEGLIA. Se la carta di sinistra non si trova, l\'esito elenca quelle che ci sono con la loro chiave.',
       properties: {
