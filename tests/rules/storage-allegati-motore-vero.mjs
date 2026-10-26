@@ -38,6 +38,13 @@
 // regole; il codice di scarico scelto da chi carica l'emulatore lo toglie dai
 // metadati prima di valutarle).
 //
+// QUEL CHE L'EMULATORE NON DICE (#1666): il motore vero scrive il codice di
+// scarico in `metadata.firebaseStorageDownloadTokens` PRIMA di valutare le
+// regole. Con `metadata.size() == 0` qui tutto era verde e in produzione ogni
+// allegato prendeva 403 dal 23/10 al 25/10. Dopo ogni pubblicazione delle
+// regole la prova che conta è un caricamento vero dall'app (o `sealForUpload`
+// più POST al deposito): se risponde 403, il verde di questo file non vale.
+//
 // CONTROPROVA, che è la metà che conta: le stesse chiamate con le regole di
 // PRIMA (`git show origin/main:storage.rules > vecchie.rules`, poi
 // `STORAGE_RULES_FILE=vecchie.rules`; `HEAD` no, sul ramo il salvataggio

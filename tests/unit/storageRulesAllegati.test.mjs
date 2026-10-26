@@ -211,7 +211,11 @@ test('in creazione nessun metadato scelto da chi carica', () => {
   // sistemato» che la pulizia degli allegati legge. Il motore vero di questa
   // riga è tests/rules/storage-allegati-motore-vero.mjs.
   const cond = espandi(CREATE().cond);
-  assert.match(cond, /\bmetadata\.size\(\)\s*==\s*0/, 'le chiavi personalizzate passano');
+  // Una chiave sola può esserci: il codice di scarico, che il motore vero scrive nei metadati prima
+  // di valutare le regole. Con `metadata.size() == 0` nessun allegato saliva più (#1666, dal 23/10).
+  assert.match(cond, /\bmetadata\.keys\(\)\.hasOnly\(\['firebaseStorageDownloadTokens'\]\)/,
+    'le chiavi personalizzate passano, o il codice di scarico che scrive Firebase viene rifiutato');
+  assert.ok(!/\bmetadata\.size\(\)/.test(cond), 'il conteggio delle chiavi rifiuta anche il codice di scarico di Firebase');
   for (const campo of ['contentDisposition', 'contentEncoding', 'cacheControl', 'contentLanguage']) {
     assert.match(cond, new RegExp(`\\.${campo}\\s*==\\s*null`), `${campo} lo sceglie chi carica`);
   }
