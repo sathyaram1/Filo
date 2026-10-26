@@ -29,6 +29,7 @@ test('l’Aiuto: esito, passi da solo e cliccati, elementi non trovati e documen
   assert.equal(conta('aiuto', { esito: 'tetto_passi', passiDaSolo: 20, passiCliccati: 5, nonTrovati: 2, documenti: 7 }), 'tetto_passi|p6_20|p2_5|n2_oltre|n2_oltre');
   assert.equal(conta('aiuto', { esito: 'chiusa_prima', passiDaSolo: 21 }), 'chiusa_prima|oltre|p0|n0|n0', 'i numeri che mancano valgono zero');
   assert.equal(conta('aiuto', { esito: 'errore', passiDaSolo: -3 }), 'errore|p0|p0|n0|n0');
+  assert.equal(conta('aiuto', { esito: 'pagina_cambiata', passiCliccati: 1 }), 'pagina_cambiata|p0|p1|n0|n0');
   assert.equal(conta('aiuto', { esito: 'fatto ma male' }), '');
   assert.equal(conta('aiuto', {}), '');
 });
