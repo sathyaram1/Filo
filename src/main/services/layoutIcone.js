@@ -52,7 +52,7 @@ async function riscrivi(cambia, { incognito = false, mossa = null } = {}) {
 }
 
 // `via`: 'trascina', 'rimessa_nel_menu' (tasto destro su un'icona della barra) o 'chat'. `origine`: chi l'ha
-// trascinata, per i contatori ('icona_barra' o 'icona_menu'); niente se non è un trascinamento.
+// trascinata, per i contatori ('icona_barra'); niente se non è un trascinamento.
 async function posa(drop, { incognito = false, via = 'trascina', origine = '' } = {}) {
   const d = drop || {};
   let da = '';
