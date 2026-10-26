@@ -1351,6 +1351,7 @@
     BLUETOOTH: accesaOSpenta,
     IMPOSTA_PREFERENZA: senza('costoModello', 'avviso'),
     IMPOSTA_ESTETICA: fatta,
+    PULSANTE_PREFERENZE: senza('muto', 'spento'),
     COMANDO_FINESTRA: senza('already'),
     TIENI_APERTA: fatta,
     NON_TENERE_APERTA: fatta,
