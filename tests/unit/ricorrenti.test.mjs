@@ -26,6 +26,14 @@ test('nell’ora che salta vale l’ora dopo, in quella che si ripete la prima',
   assert.equal(iso(R.prossimaIl({ giorni: [0], ora: '02:30' }, Date.parse('2026-10-24T12:00:00Z'))), '2026-10-25T00:30:00.000Z');
 });
 
+test('il sabato sera prima dell’ora legale la domenica, che dura 23 ore, non si salta', () => {
+  const ogniGiorno = { giorni: [0, 1, 2, 3, 4, 5, 6], ora: '23:30' };
+  assert.equal(iso(R.prossimaIl(ogniGiorno, Date.parse('2027-03-27T22:35:00Z'))), '2027-03-28T21:30:00.000Z', 'domenica 28 alle 23:30');
+  assert.equal(iso(R.prossimaIl({ giorni: [0], ora: '10:00' }, Date.parse('2026-03-28T22:10:00Z'))), '2026-03-29T08:00:00.000Z', 'domenica 29, non quella dopo');
+  // Il ritorno all'ora solare: la domenica di 25 ore non ne fa contare due.
+  assert.equal(iso(R.prossimaIl({ giorni: [1], ora: '00:30' }, Date.parse('2026-10-24T22:40:00Z'))), '2026-10-25T23:30:00.000Z', 'lunedì 26 alle 00:30');
+});
+
 test('la cadenza si dice come la direbbe l’owner, con la domenica in fondo', () => {
   assert.equal(R.cadenzaTesto({ giorni: [6, 5, 4, 3, 2, 1, 0], ora: '06:00' }), 'ogni giorno alle 06:00');
   assert.equal(R.cadenzaTesto({ giorni: [1], ora: '01:00' }), 'il lunedì alle 01:00');

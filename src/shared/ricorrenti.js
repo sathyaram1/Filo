@@ -10,7 +10,6 @@
   // Abbondanti e rifiutati col numero: il testo di un ricorrente è un ruolo intero (il più lungo di oggi ne ha 13.000).
   const TETTI = Object.freeze({ nome: 120, testo: 40000, domandaFineTurno: 4000 });
   const ORA_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
-  const GIORNO_MS = 24 * 60 * 60 * 1000;
 
   const no = (errore, dettaglio) => ({ ok: false, errore, dettaglio });
   const testo = (v) => (typeof v === 'string' ? v : '');
@@ -59,10 +58,12 @@
     if (!v.ok || !Number.isFinite(Number(dopoMs))) return 0;
     const [hh, mm] = v.cadenza.ora.split(':').map(Number);
     const da = Number(dopoMs);
+    // Si conta per date del calendario di Roma, non per 24 ore: la domenica dell'ora legale ne dura 23.
+    const oggi = partiRoma(da);
     for (let d = 0; d <= 8; d++) {
-      const p = partiRoma(da + d * GIORNO_MS);
-      if (!v.cadenza.giorni.includes(p.settimana)) continue;
-      const ms = daOraRoma(p.anno, p.mese, p.giorno, hh, mm);
+      const g = new Date(Date.UTC(oggi.anno, oggi.mese - 1, oggi.giorno + d));
+      if (!v.cadenza.giorni.includes(g.getUTCDay())) continue;
+      const ms = daOraRoma(g.getUTCFullYear(), g.getUTCMonth() + 1, g.getUTCDate(), hh, mm);
       if (ms > da) return ms;
     }
     return 0;
