@@ -68,7 +68,7 @@ function banco({ incognito = false, accesi = true, risposta = 200 } = {}) {
 test('ogni gesto entra nella sua misura con le voci dei suoi elenchi; quello fuori elenco no', () => {
   const o = C.oraVuota();
   const si = [
-    ['icona_spostata', { icona: 'qrCode', da: 'primary', a: 'bar', via: 'trascina' }],
+    ['icona_spostata', { icona: 'qrCode', da: 'secondary', a: 'bar', via: 'trascina' }],
     ['icona_spostata', { icona: 'back', da: 'bar', a: 'secondary', via: 'rimessa_nel_menu' }],
     ['altro_del_menu', { aperto: true }],
     ['altro_del_menu', { icona: 'transcribe' }],
@@ -91,8 +91,8 @@ test('ogni gesto entra nella sua misura con le voci dei suoi elenchi; quello fuo
   ];
   for (const [m, d] of si) assert.equal(C.registraGesto(o, m, d), true, `${m} ${JSON.stringify(d)}`);
   const no = [
-    ['icona_spostata', { icona: 'mario', da: 'primary', a: 'bar', via: 'trascina' }],
-    ['icona_spostata', { icona: 'qrCode', da: 'primary', a: 'barra laterale', via: 'trascina' }],
+    ['icona_spostata', { icona: 'mario', da: 'secondary', a: 'bar', via: 'trascina' }],
+    ['icona_spostata', { icona: 'qrCode', da: 'secondary', a: 'barra laterale', via: 'trascina' }],
     ['suggerimento_letto', { icona: 'history', dove: 'barra', esito: 'letto con calma' }],
     ['carta_home', { carta: 'Il mio editor', mossa: 'togli' }],
     ['carta_home', { carta: 'mario:rossi', colonna: 'sinistra', come: 'clic' }],
@@ -110,7 +110,7 @@ test('ogni gesto entra nella sua misura con le voci dei suoi elenchi; quello fuo
   for (const [m, d] of no) assert.equal(C.registraGesto(o, m, d), false, `${m} ${JSON.stringify(d)}`);
   const doc = C.documentoGesti({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.249', os: 'win', dati: o });
   assert.equal(C.validaGesti(doc).ok, true, C.validaGesti(doc).motivo);
-  assert.equal(doc.icona_spostata.qrCode, 'primary|bar|trascina|1');
+  assert.equal(doc.icona_spostata.qrCode, 'secondary|bar|trascina|1');
   assert.equal(doc.icona_spostata.back, 'bar|secondary|rimessa_nel_menu|1');
   assert.deepEqual(doc.altro_del_menu, { aperture: '1', transcribe: '1' });
   assert.equal(doc.carta_home.download, 'sinistra|invio|1', 'di una carta di sinistra esce solo il tipo');
@@ -124,12 +124,19 @@ test('ogni gesto entra nella sua misura con le voci dei suoi elenchi; quello fuo
 });
 
 test('la disposizione di serie per zona, e l’annulla di un cambio con la sua via e il tempo, senza il rifai', () => {
-  assert.deepEqual(C.disposizioneDiSerie(D.DEFAULT), { primary: 'si', secondary: 'si', bar: 'si' });
-  const spostata = D.applicaPosa(D.DEFAULT, { id: 'qrCode', target: 'bar' });
-  assert.deepEqual(C.disposizioneDiSerie(spostata), { primary: 'no', secondary: 'si', bar: 'no' });
-  const rimessa = D.applicaPosa(spostata, { id: 'qrCode', target: 'primary', beforeId: 'newTab' });
-  assert.deepEqual(C.disposizioneDiSerie(rimessa), { primary: 'si', secondary: 'si', bar: 'si' }, 'rimessa com’era è di nuovo di serie');
-  assert.equal(C.disposizioneDiSerie({ primary: [] }), null);
+  for (const z of D.ZONE) assert.ok(C.ZONE_ICONE.includes(z), `la zona «${z}» della disposizione la accetta anche il server`);
+  assert.deepEqual(C.disposizioneDiSerie(D.DEFAULT), { secondary: 'si', bar: 'si' });
+  const spostata = D.applicaPosa(D.DEFAULT, { id: 'transcribe', target: 'bar' });
+  assert.deepEqual(C.disposizioneDiSerie(spostata), { secondary: 'no', bar: 'no' });
+  const rimessa = D.applicaPosa(spostata, { id: 'transcribe', target: 'secondary', beforeId: 'colorPicker' });
+  assert.deepEqual(C.disposizioneDiSerie(rimessa), { secondary: 'si', bar: 'si' }, 'rimessa com’era è di nuovo di serie');
+  const riordinata = D.applicaPosa(D.DEFAULT, { id: 'qrCode', target: 'bar', beforeId: 'help' });
+  assert.deepEqual(C.disposizioneDiSerie(riordinata), { secondary: 'si', bar: 'no' }, 'anche un riordino nella barra la toglie dalla serie');
+  assert.equal(C.disposizioneDiSerie({ bar: [] }), null);
+  const o = C.oraVuota();
+  assert.equal(C.segnaDisposizione(o, { secondary: 'si', bar: 'no', fila: 'si' }), false, 'una zona sconosciuta non passa');
+  assert.equal(C.segnaDisposizione(o, C.disposizioneDiSerie(D.DEFAULT)), true);
+  assert.deepEqual(o.disposizione_di_serie, { secondary: 'si', bar: 'si' });
 
   const t = Date.parse('2026-10-15T10:00:00Z');
   const cambio = (ms, extra = {}) => ({ id: 'c1', tipo: 'impostazioni', via: 'interfaccia', ts: new Date(t - ms).toISOString(),
@@ -196,9 +203,9 @@ test('i gesti partono nel terzo documento della stessa ora, con la disposizione;
   assert.equal(b.per.ore.length, 1);
   assert.equal(b.per.gesti.length, 0, 'un’ora senza gesti né disposizione nota non ha il documento dei gesti');
 
-  assert.equal(b.s.disposizioneIcone(D.applicaPosa(D.DEFAULT, { id: 'qrCode', target: 'bar' })), true);
-  b.s.gesto('icona_spostata', { icona: 'qrCode', da: 'primary', a: 'bar', via: 'trascina' });
-  b.s.gesto('trascinamento', { da: 'icona_menu', a: 'barra', esito: 'posato' });
+  assert.equal(b.s.disposizioneIcone(D.applicaPosa(D.DEFAULT, { id: 'qrCode', target: 'secondary' })), true);
+  b.s.gesto('icona_spostata', { icona: 'qrCode', da: 'bar', a: 'secondary', via: 'trascina' });
+  b.s.gesto('trascinamento', { da: 'icona_barra', a: 'altro_menu', esito: 'posato' });
   b.s.gesto('barra_aperta', { motivo: 'clic', esito: 'azione', apertaMs: 99 * 60 * 60 * 1000 });
   assert.equal(b.s.gesto('disposizione_di_serie', { bar: 'si' }), false, 'la disposizione la legge il main, non la manda nessuno');
   b.s.cambioRitirato({ id: 'c9', tipo: 'impostazioni', via: 'chat', ts: new Date(b.t - 20000).toISOString(), cambi: [{ chiave: 'theme' }] });
@@ -209,9 +216,9 @@ test('i gesti partono nel terzo documento della stessa ora, con la disposizione;
   const { url, doc } = b.per.gesti[0];
   assert.equal(C.idDocumento(doc), C.idDocumento(b.per.ore[1].doc), 'lo stesso id della sua ora');
   assert.match(url, new RegExp(`/${C.COLLEZIONE_GESTI}\\?documentId=`));
-  assert.deepEqual(doc.disposizione_di_serie, { primary: 'no', secondary: 'si', bar: 'no' });
-  assert.equal(doc.icona_spostata.qrCode, 'primary|bar|trascina|1');
-  assert.equal(doc.trascinamento.icona_menu, 'barra|posato|1');
+  assert.deepEqual(doc.disposizione_di_serie, { secondary: 'no', bar: 'no' });
+  assert.equal(doc.icona_spostata.qrCode, 'bar|secondary|trascina|1');
+  assert.equal(doc.trascinamento.icona_barra, 'altro_menu|posato|1');
   assert.equal(doc.barra_aperta.clic, 'azione|1|0,0,0,0,0,0,1', 'un’ora e più aperta sta nell’ultima fascia');
   assert.equal(doc.annulla_cambio.theme, 'chat|m1|1');
   assert.equal(C.validaGesti(doc).ok, true);
@@ -223,7 +230,7 @@ test('i gesti partono nel terzo documento della stessa ora, con la disposizione;
   await b.s.controlla();
   assert.equal(b.per.gesti.length, 2);
   assert.deepEqual(Object.keys(b.per.gesti[1].doc.icona_spostata), []);
-  assert.deepEqual(b.per.gesti[1].doc.disposizione_di_serie, { primary: 'no', secondary: 'si', bar: 'no' });
+  assert.deepEqual(b.per.gesti[1].doc.disposizione_di_serie, { secondary: 'no', bar: 'no' });
 });
 
 test('i gesti in incognito e a contatori spenti non si contano; quelli che il server non accetta ancora si riprovano', async () => {
@@ -292,10 +299,15 @@ test('ogni gesto nominato nel codice è una misura, ogni origine e destinazione 
   assert.ok(nomi >= 15, 'i gesti si nominano davvero');
   // Ogni origine di Filo ha chi la segna, ogni destinazione chi la conta.
   const testo = tutti.map(([, s]) => s).join('\n');
-  for (const o of C.ORIGINI_TRASCINA.filter((x) => !['testo_pagina', 'file_disco', 'immagine'].includes(x))) {
+  for (const o of C.ORIGINI_TRASCINA.filter((x) => !['testo_pagina', 'file_disco', 'immagine', ...C.RITIRATI_TRASCINA].includes(x))) {
     assert.ok(testo.includes(`'${o}'`), `l’origine «${o}» non la segna nessuno`);
   }
-  for (const a of C.DESTINAZIONI_TRASCINA) assert.ok(testo.includes(`'${a}'`) || a === 'nessuna', `la destinazione «${a}» non la conta nessuno`);
+  for (const a of C.DESTINAZIONI_TRASCINA.filter((x) => !C.RITIRATI_TRASCINA.includes(x))) assert.ok(testo.includes(`'${a}'`) || a === 'nessuna', `la destinazione «${a}» non la conta nessuno`);
+  // Le ritirate restano accettate dal server, ma nessuno le scrive più.
+  for (const r of C.RITIRATI_TRASCINA) {
+    assert.ok(C.ORIGINI_TRASCINA.includes(r) || C.DESTINAZIONI_TRASCINA.includes(r), r);
+    assert.ok(!tutti.some(([f, s]) => f !== 'src/shared/contatoriGiornalieri.js' && s.includes(`'${r}'`)), `«${r}» è ritirata`);
+  }
   // Quelli che nascono nel main non li accetta da una pagina.
   for (const m of ['icona_spostata', 'disposizione_di_serie', 'barra_aperta', 'annulla_cambio']) assert.ok(!C.GESTI_DALLE_PAGINE.includes(m), m);
   assert.match(leggi('src/main/services/handlers/contatori.js'), /case 'gesto': ok = C\.GESTI_DALLE_PAGINE\.includes\(testo\(m\.gesto\)\) && contatori\.gesto\(/);
@@ -316,13 +328,15 @@ test('i tipi dei moduli dell’Editor sono quelli che i contatori conoscono', ()
 });
 
 test('ogni posa delle icone passa da una porta sola, e ognuna dice la sua via', () => {
-  const posa = [...sorgenti()].flatMap(([f, s]) => [...s.matchAll(/(?:Layout|require\('\.\/layoutIcone'\))\.posa\(([\s\S]*?)\)\.catch|(?:Layout|require\('\.\/layoutIcone'\))\.posa\(\s*([\s\S]*?\}[^)]*)\);/g)].map((m) => [f, m[1] || m[2]]));
-  assert.ok(posa.length >= 5, `le pose si trovano (${posa.length})`);
-  const testo = posa.map(([, x]) => x).join('\n');
-  assert.match(testo, /via: 'rimessa_nel_menu'/);
-  assert.match(testo, /via: 'chat'/);
-  assert.match(testo, /origine: 'icona_menu'/);
-  assert.match(testo, /origine: 'icona_barra'/);
-  assert.match(leggi('src/main/services/handlers/barra.js'), /msg\?\.source === 'bar' \? 'icona_barra' : 'icona_menu'/);
-  assert.match(leggi('src/content/menuIcons.js'), /source: source === 'bar' \? 'bar' : 'menu'/);
+  // Le icone stanno solo nella barra laterale: la posa dell'utente passa da `_posa` (registro dei cambi), quella chiesta da `posa` del gestore della chat.
+  const pose = [...sorgenti()].flatMap(([f, s]) => [...s.matchAll(/(?:Layout|require\('\.\/layoutIcone'\))\.posa\(/g)].map(() => f));
+  assert.deepEqual([...new Set(pose)].sort(), ['src/main/barraLaterale.js', 'src/main/services/handlers.js'], 'nessun’altra porta scrive la disposizione');
+  const barra = leggi('src/main/barraLaterale.js');
+  const viaBarra = [...barra.matchAll(/this\._posa\(([^;]*)\);/g)].map((m) => m[1]).join('\n');
+  assert.match(viaBarra, /via: 'rimessa_nel_menu'/);
+  assert.match(viaBarra, /origine: 'icona_barra'/);
+  assert.match(leggi('src/main/services/handlers.js'), /layoutIcone'\)\.posa\([\s\S]{0,200}via: 'chat'/);
+  // «Altro…» della barra: le aperture e l'icona scelta lì.
+  assert.match(barra, /'altro_del_menu', \{ aperto: true \}/);
+  assert.match(barra, /'altro_del_menu', \{ icona: id \}/);
 });

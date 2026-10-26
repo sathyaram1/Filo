@@ -1143,8 +1143,9 @@
 
   // ── I gesti della personalizzazione (#1471) ─────────────────────────────
   // Ogni misura è una mappa: per chiave (un'icona, una carta, un'origine…) le voci di elenco chiuso e il loro conto.
-  // Le zone della disposizione delle icone: una che lì non c'è più farebbe scartare tutta la misura (sentinella negli unit).
-  const ZONE_ICONE = Object.freeze(['secondary', 'bar']);
+  // Le zone che il server accetta. 'primary' (la fila del tasto destro, #1343) non si scrive più ma resta accettata per le
+  // copie non aggiornate; la disposizione si misura sulle zone che ha davvero (sentinella negli unit).
+  const ZONE_ICONE = Object.freeze(['primary', 'secondary', 'bar']);
   // La posa: trascinata, spostata dal tasto destro su un'icona della barra (fra «Altro…» e le icone in vista), o chiesta a Filo.
   const VIE_POSA = Object.freeze(['trascina', 'rimessa_nel_menu', 'chat']);
   const SI_NO = Object.freeze(['si', 'no']);
@@ -1185,6 +1186,8 @@
     ['h1', 60 * 60 * 1000], ['oltre', Infinity]]);
   // I cambi che non sono impostazioni, per tipo: la loro chiave porta un dominio o un id, che non esce.
   const CAMBI_NON_IMPOSTAZIONI = Object.freeze({ timer: 'cambio.timer', proxy: 'cambio.proxy', zoom: 'cambio.zoom' });
+  // Accettate ma non più segnate da nessuno, come 'primary': la fila di icone del tasto destro non c'è più (#1343).
+  const RITIRATI_TRASCINA = Object.freeze(['icona_menu', 'riga_menu']);
   const ORIGINI_TRASCINA = Object.freeze(['carta_home', 'voce_sistema', 'file_da_chat', 'pagina_salvata', 'icona_barra',
     'icona_menu', 'scheda', 'modulo_editor', 'palette_editor', 'testo_pagina', 'file_disco', 'immagine']);
   const DESTINAZIONI_TRASCINA = Object.freeze(['chat_home', 'chat_aiuto', 'chat_modulo_editor', 'colonna_home', 'altro_home',
@@ -1298,9 +1301,9 @@
   // Per zona, se la disposizione delle icone è quella di serie. L'ora tiene com'era alla sua fine.
   function disposizioneDiSerie(layout) {
     const D = global.SN_DISPOSIZIONE_ICONE;
-    if (!D || !oggetto(D.DEFAULT) || !oggetto(layout)) return null;
+    if (!D || !oggetto(D.DEFAULT) || !oggetto(layout) || !Array.isArray(D.ZONE) || !D.ZONE.every((z) => ZONE_ICONE.includes(z))) return null;
     const out = {};
-    for (const z of ZONE_ICONE) {
+    for (const z of D.ZONE) {
       const a = layout[z];
       const b = D.DEFAULT[z];
       if (!Array.isArray(a) || !Array.isArray(b)) return null;
@@ -1309,8 +1312,9 @@
     return out;
   }
   function segnaDisposizione(ora, flags) {
-    if (!oggetto(flags) || !ZONE_ICONE.every((z) => SI_NO.includes(flags[z]))) return false;
-    normale(ora).disposizione_di_serie = Object.fromEntries(ZONE_ICONE.map((z) => [z, flags[z]]));
+    const d = disposizionePulita(flags);
+    if (!Object.keys(d).length) return false;
+    normale(ora).disposizione_di_serie = d;
     return true;
   }
 
@@ -1898,8 +1902,11 @@
     return out;
   }
 
+  // Una mappa di sole zone note, ognuna sì o no; altrimenti vuota.
   function disposizionePulita(d) {
-    return oggetto(d) && ZONE_ICONE.every((z) => SI_NO.includes(d[z])) ? Object.fromEntries(ZONE_ICONE.map((z) => [z, d[z]])) : {};
+    const zone = oggetto(d) ? Object.keys(d) : [];
+    return zone.length && zone.every((z) => ZONE_ICONE.includes(z) && SI_NO.includes(d[z]))
+      ? Object.fromEntries(ZONE_ICONE.filter((z) => z in d).map((z) => [z, d[z]])) : {};
   }
 
   function documentoGesti({ pseudonimo, chiave, app, os, dati }) {
@@ -2307,7 +2314,7 @@
     CAMPI_ORA_V2, MISURE_SISTEMA, PASSI_AVVIO, TIPI_AVVIO, TIPO_PROCESSO_DI, TIPI_PROCESSO, COSE_FINESTRA, SOGLIE_FERMO,
     ORIGINI_ECCEZIONE, NOMI_ECCEZIONE, FASCE_MB, NOMI_MB, FASCE_SCHEDE, NOMI_SCHEDE, CANALI_SINCRONI, ESITI_USCITA, ESITI_LETTURA,
     CODICI_DISCO, CODICI_RINOMINA, FASCE_MB_FILE, EVENTI_STORAGE, ESITI_SESSIONE, EVENTI_AGGIORNAMENTO, SCHEMA_SISTEMA,
-    VERSIONE_GESTI, COLLEZIONE_GESTI, MISURE_GESTI, CAMPI_GESTI, GESTI_DALLE_PAGINE, ZONE_ICONE, VIE_POSA, APERTURE,
+    VERSIONE_GESTI, COLLEZIONE_GESTI, MISURE_GESTI, CAMPI_GESTI, GESTI_DALLE_PAGINE, ZONE_ICONE, RITIRATI_TRASCINA, VIE_POSA, APERTURE,
     MOTIVI_BARRA, ESITI_BARRA, VOCI_BARRA, DOVE_NOME, ESITI_NOME, MOSSE_CARTA, COLONNE_HOME, GESTI_CARTA,
     TIPI_CARTA_SINISTRA, TUTTE_LE_CARTE, VOCI_SISTEMA, GESTI_SISTEMA, MODULI_EDITOR, EVENTI_MODULO, GRIGLIA,
     VISTA_IMPOSTAZIONI, COLONNE_GRIGLIA, RIGHE_GRIGLIA, RIPRISTINI, ESITI_RIPRISTINO, VIE_CAMBIO, FASCE_RIPENSAMENTO,
