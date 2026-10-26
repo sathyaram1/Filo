@@ -980,7 +980,7 @@
         aCapo();
         return;
       }
-      const blocco = !/^inline/.test(window.getComputedStyle(n).display);
+      const blocco = !/^inline/.test((n.ownerDocument.defaultView || window).getComputedStyle(n).display);
       if (blocco) serveACapo = true;
       for (const c of n.childNodes) visita(c);
       if (blocco) serveACapo = true;
@@ -2610,8 +2610,10 @@
       if (radice.activeElement !== el) el.focus({ preventScroll: true });
       if (radice.activeElement !== el) return false;
       el.setSelectionRange(range.start, range.end);
-      if (testo) document.execCommand('insertText', false, testo);
-      else if (range.end > range.start) document.execCommand('delete', false);
+      // Il documento del campo: quello di un riquadro, quando lo corregge la pagina («Valuta», #1449).
+      const doc = el.ownerDocument || document;
+      if (testo) doc.execCommand('insertText', false, testo);
+      else if (range.end > range.start) doc.execCommand('delete', false);
     } catch (_) {}
     if (el.value === prima) return false;
     if (cursorMode === 'preserve' && typeof caret === 'number') {
@@ -2677,7 +2679,8 @@
       }
       // Salva l'offset originale del caret, per ripristinarlo in modalità 'preserve'.
       const caretBefore = cursorMode === 'preserve' ? contenteditableCaretOffset(el) : -1;
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const doc = el.ownerDocument || document;
+      const walker = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       let cur = 0, startNode = null, startOff = 0, endNode = null, endOff = 0, n;
       while ((n = walker.nextNode())) {
         const len = n.nodeValue.length;
@@ -2694,8 +2697,8 @@
       }
       if (!startNode || !endNode) return;
 
-      const sel = window.getSelection();
-      const r = document.createRange();
+      const sel = (doc.defaultView || window).getSelection();
+      const r = doc.createRange();
       try {
         r.setStart(startNode, startOff);
         r.setEnd(endNode, endOff);
@@ -2711,9 +2714,9 @@
       let ok = false;
       try {
         if (safeReplacement.length > 0) {
-          ok = document.execCommand('insertText', false, safeReplacement);
+          ok = doc.execCommand('insertText', false, safeReplacement);
         } else {
-          ok = document.execCommand('delete', false);
+          ok = doc.execCommand('delete', false);
         }
       } catch (_) {}
       // La battuta lascia il cursore dopo la parola inserita: la correzione a fine parola lo rimette dopo lo spazio, se
@@ -2734,10 +2737,10 @@
           r.deleteContents();
           let newNode = null;
           if (safeReplacement.length > 0) {
-            newNode = document.createTextNode(safeReplacement);
+            newNode = doc.createTextNode(safeReplacement);
             r.insertNode(newNode);
           }
-          const cr = document.createRange();
+          const cr = doc.createRange();
           if (cursorMode === 'preserve' && caretBefore >= 0) {
             const delta = safeReplacement.length - (range.end - range.start);
             const target = caretBefore >= range.end ? caretBefore + delta : caretBefore;
@@ -2776,6 +2779,72 @@
         programmaRagionato(state, { gesto: true });
       }
     }
+  }
+
+  // ============================================================================
+  // Le correzioni di «Valuta» (#1449)
+  // ============================================================================
+  // Il testo del campo come lo legge il modello, con le sue righe; una correzione è un pezzo scritto su quel testo.
+  function testoDelCampo(el) {
+    try { return el && el.isConnected ? testoDaControllare(el).testo : ''; } catch (_) { return ''; }
+  }
+
+  // Un modello riscrive apostrofi, virgolette, lineette e spazi: se il pezzo esatto non c'è, si cerca con quei segni
+  // resi uguali. `da[k]` è la posizione nel testo vero del carattere k del testo piegato.
+  const PIEGA = {
+    '‘': "'", '’': "'", '‚': "'", 'ʼ': "'", '′': "'",
+    '“': '"', '”': '"', '„': '"', '«': '"', '»': '"',
+    '–': '-', '—': '-', '…': '...',
+  };
+  function piega(s) {
+    let out = '';
+    const da = [];
+    let spazio = false;
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (/[­​-‏⁠﻿]/.test(c)) continue;
+      if (/\s/.test(c)) {
+        if (!spazio) { out += ' '; da.push(i); }
+        spazio = true;
+        continue;
+      }
+      spazio = false;
+      for (const ch of PIEGA[c] || c) { out += ch; da.push(i); }
+    }
+    return { out, da };
+  }
+
+  // Fra due pezzi uguali vince quello più vicino a `vicinoA`: lì l'aveva visto il modello, o lì era stato scritto.
+  function cercaPezzo(testo, pezzo, vicinoA) {
+    const tutte = (h, n) => {
+      const r = [];
+      for (let i = n ? h.indexOf(n) : -1; i >= 0; i = h.indexOf(n, i + 1)) r.push(i);
+      return r;
+    };
+    const vicina = (lista) => lista.reduce((m, r) => (Math.abs(r.start - vicinoA) < Math.abs(m.start - vicinoA) ? r : m));
+    const esatte = tutte(testo, pezzo).map((i) => ({ start: i, end: i + pezzo.length }));
+    if (esatte.length) return vicina(esatte);
+    const t = piega(testo);
+    const p = piega(pezzo).out;
+    const piegate = tutte(t.out, p).map((j) => ({ start: t.da[j], end: t.da[j + p.length - 1] + 1 }));
+    return piegate.length ? vicina(piegate) : null;
+  }
+
+  // Scrive `dopo` al posto di `prima` come la correzione del menu (Ctrl+Z la annulla). `{ dove }` è l'inizio del pezzo
+  // nuovo nel testo del campo; `{ manca }` se `prima` non c'è più, `{ fermo }` se il campo non si è lasciato scrivere.
+  function sostituisciNelCampo(el, prima, dopo, vicinoA = 0) {
+    if (!el || !el.isConnected) return { manca: true };
+    const pezzo = String(prima || '');
+    if (!pezzo) return { manca: true };
+    const { testo, riporta } = testoDaControllare(el);
+    const trovato = cercaPezzo(testo, pezzo, Number(vicinoA) || 0);
+    const r = trovato ? riporta([trovato])[0] : null;
+    if (!r) return { manca: true };
+    const campo = getEditableText(el);
+    // Il fuoco sta nell'Aiuto: la selezione di un campo modificabile vale per il browser solo nel campo a fuoco.
+    if (!campoDiTesto(el)) { try { el.focus({ preventScroll: true }); } catch (_) {} }
+    applyFix(el, r, String(dopo == null ? '' : dopo), { expectedSegment: campo.slice(r.start, r.end) });
+    return getEditableText(el) !== campo ? { dove: trovato.start } : { fermo: true };
   }
 
   // ============================================================================
@@ -2872,6 +2941,8 @@
     esitoProposta,
     esitoSegno,
     chiaveSegno,
+    testoDelCampo,
+    sostituisciNelCampo,
     sostituisciComeBattuta,
     riallineaIssues,
     addToDictionary,

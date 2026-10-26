@@ -170,6 +170,71 @@
   border-color: var(--sn-border);
 }
 
+/* Le correzioni di «Valuta» (#1449): una riga per correzione, il pezzo di prima barrato e quello nuovo; scritta nel
+   campo prende la spunta e il colore dell'accento, e un altro clic la toglie. */
+.sn-sidebar-correzioni {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: -4px;
+  min-width: 0;
+}
+.sn-sidebar-correzione {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 100%;
+  padding: 6px 10px 6px 28px;
+  position: relative;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  cursor: pointer;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  transition: border-color calc(120ms * var(--sn-motion, 1)) ease, background calc(120ms * var(--sn-motion, 1)) ease, transform calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-sidebar-correzione::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 8px;
+  width: 11px;
+  height: 11px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--sn-muted);
+  border-radius: 50%;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-sidebar-correzione:hover { border-color: var(--sn-accent); background: var(--sn-hover, rgba(127,127,127,0.10)); }
+.sn-sidebar-correzione:hover::before { border-color: var(--sn-accent); }
+.sn-sidebar-correzione:active { transform: scale(0.99); }
+.sn-sidebar-correzione:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+.sn-sidebar-correzione-prima { color: var(--sn-muted); text-decoration: line-through; }
+.sn-sidebar-correzione-freccia { color: var(--sn-muted); margin: 0 6px; }
+.sn-sidebar-correzione-dopo { font-weight: 600; }
+.sn-sidebar-correzione-perche { color: var(--sn-muted); font-size: 11px; }
+.sn-sidebar-correzione-fatta { border-color: var(--sn-accent); }
+.sn-sidebar-correzione-fatta::before { border-color: var(--sn-accent); background: var(--sn-accent); }
+/* La spunta è l'angolo di un rettangolo ruotato: niente immagini, sta dentro il cerchio dell'accento scelto. */
+.sn-sidebar-correzione-fatta::after {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 9.5px;
+  width: 3px;
+  height: 6px;
+  border: solid #fff;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
 /* Il documento trovato (#947.3): un bottone che si apre o si trascina nella pagina, come il file in una cartella. */
 .sn-sidebar-files {
   align-self: stretch;

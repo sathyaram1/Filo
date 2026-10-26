@@ -90,6 +90,8 @@
     menu_share_link: 'Condividi link',
     menu_redeem_invite: 'Riscatta l’invito',
     menu_edit_selection: 'Modifica',
+    // «Valuta» (#1449): il parere dell'Aiuto sul testo intero del campo.
+    menu_valuta: 'Valuta',
     menu_read_aloud: 'Leggi',
     menu_stop_reading: 'Interrompi lettura',
     tts_not_supported: 'Lettura ad alta voce non supportata in questo browser',
@@ -233,6 +235,14 @@
     err_no_selection: 'Nessuna selezione di testo.',
     err_secret_selection: 'Filo non manda al modello password e dati della carta.',
     help_disabled: 'L\'Aiuto è spento. Lo riaccendi in Preferenze, o chiedendolo a Filo.',
+    help_valuta_richiesta: 'Valuta «%s»',
+    help_valuta_lungo: 'Il testo è lungo: Filo ne valuta i primi %s caratteri.',
+    help_correzione_applica: 'Scrivi nel campo',
+    help_correzione_togli: 'Togli dal campo',
+    help_correzione_manca: 'Nel campo non trovo «%s»: forse il testo è cambiato.',
+    help_correzione_ferma: 'Il campo non si è lasciato scrivere.',
+    help_correzione_sparito: 'Il campo non c\'è più nella pagina.',
+    help_correzione_non_tolta: 'Il testo è cambiato: per togliere la correzione usa %s nel campo.',
     // L'icona Aiuto della barra laterale (#1432): la risposta da leggere, e perché è spenta.
     aiuto_leggi_risposta: 'Leggi la risposta',
     aiuto_spento_barra: 'Aiuto spento in Preferenze',
