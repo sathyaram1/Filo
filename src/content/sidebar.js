@@ -318,7 +318,7 @@
     try { ascoltaCambi(stato()); } catch (_) {}
   }
 
-  // L'icona Aiuto (barra, riga del tasto destro): il clic fa quello che l'icona mostra, decisi dalla stessa regola.
+  // L'icona Aiuto della barra: il clic fa quello che l'icona mostra, decisi dalla stessa regola.
   function passo(context) {
     const aspetto = global.SN_DISPOSIZIONE_ICONE?.aspettoAiuto?.(stato());
     const detta = aspetto ? aspetto.icona === 'mic' : (isOpen() && !nascosto && !collapsed);

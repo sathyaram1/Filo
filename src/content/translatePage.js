@@ -978,6 +978,8 @@
   // C'è dell'altro da tradurre, per un motivo o per l'altro: nei due casi
   // l'icona del menu serve a CONTINUARE, non a tornare all'originale.
   function canContinue() { return isPartial() || hasNewContent(); }
+  // La barra laterale chiede il nome dell'icona senza toccare la pagina: la risposta va rifatta.
+  function ricontrolla() { revealedDirty = true; }
   // L'icona torna all'originale a traduzione completa e ferma, e anche MENTRE traduce: una
   // cosa che parte si deve poter fermare. Fonte unica: icona e voce etichettata la usano.
   function showsRestore() { return pageTranslating || (pageHasTranslation && !canContinue()); }
@@ -994,6 +996,6 @@
 
   global.SN_TRANSLATE_PAGE = {
     translatePage, restoreOriginal, hasTranslation,
-    isPartial, hasNewContent, canContinue, showsRestore, missing, total, buildRestoreOriginalItem,
+    isPartial, hasNewContent, canContinue, ricontrolla, showsRestore, missing, total, buildRestoreOriginalItem,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

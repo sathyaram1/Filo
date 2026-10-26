@@ -493,7 +493,7 @@ html[data-chrome-compact="1"] .addr {
   align-self: stretch;
 }
 
-/* Tooltip della shell, in pendant con .sn-tooltip di src/styles/menu.css: senza, l'hover su
+/* Tooltip della shell, nello stile dei menu di Filo (src/styles/menu.css): senza, l'hover su
    nav-btn e tab-new mostrerebbe il tooltip nativo bianco e squadrato. */
 .shell-tooltip {
   position: fixed;

@@ -30,12 +30,6 @@
     getLastMouseEvent: () => lastMouseEvent,
     spiegaAnticipata: () => !(settings && settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false),
   });
-  MenuIcons.init({
-    isContentFullscreen: () => contentFullscreen,
-    aiutoPasso: () => aiutoPasso(),
-    aiutoStato: () => Sidebar.stato(),
-    aiutoAcceso: () => aiutoAcceso(),
-  });
   TTS.init({
     getSettings: () => settings,
     restorePasteContext: () => restorePasteContext(),
@@ -230,9 +224,6 @@
     } catch (_) {}
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement) restituisciEsc();
-      // Il nome della voce guarda anche lo schermo pieno della PAGINA: l'annuncio del main
-      // arriva mentre il documento sta ancora uscendo, e la voce si ridisegnerebbe identica.
-      try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
     });
 
     // Il tasto si rimette in circolo com'era, ma non è «fidato»: una pagina non può usarlo
@@ -893,7 +884,7 @@
   }
 
   // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).
-  const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_FUORI, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
+  const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
 
   // Il segno che legge il ponte del tasto destro (page-preload.js) a ogni clic, rifatto a ogni cambio dell'elenco.
   // Spegnendosi se ne va il menu di Filo già aperto; l'Aiuto aperto resta, perché ci si sta parlando.
@@ -1188,12 +1179,9 @@
     } = detectContext(target, e.clientX, e.clientY);
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const [clipboardHistory, navState] = await Promise.all([
-      Actions.getClipboardHistory(),
-      Actions.getNavState(),
-    ]);
+    const clipboardHistory = await Actions.getClipboardHistory();
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
@@ -1670,12 +1658,9 @@
     // usava un contesto stantio e incollava all'inizio del campo.
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const [clipboardHistory, navState] = await Promise.all([
-      Actions.getClipboardHistory(),
-      Actions.getNavState(),
-    ]);
+    const clipboardHistory = await Actions.getClipboardHistory();
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target, senzaValuta,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, senzaValuta,
     });
   }
 
@@ -2009,18 +1994,20 @@
     } catch (_) {}
   }
 
-  // Ordine: icone globali, Aiuto, zona contestuale, Feedback. La riga globale è stabile e
-  // fa da ancora, la zona contestuale cambia col click.
+  // Ordine: Aiuto, zona contestuale, Feedback. Le icone delle azioni sulla pagina stanno nella barra laterale (#1246).
   function buildMenuItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target = null,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
     senzaValuta = false,
   }) {
     const items = [];
+    // Il separatore sta solo fra due sezioni che hanno qualcosa: mai in cima al menu.
+    const sezione = (voci) => {
+      if (!voci.length) return;
+      if (items.length) items.push({ type: 'separator' });
+      items.push(...voci);
+    };
 
-    // Registro, layout persistente e drag delle icone: src/content/menuIcons.js.
-    items.push(MenuIcons.buildGlobalIconRow(navState));
-
-    // 2. Aiuto, se è acceso, e le voci di stato qui sotto: il separatore c'è solo se la sezione ha qualcosa.
+    // 1. Aiuto, se è acceso, e le voci di stato qui sotto.
     const sezioneAiuto = [];
     if (aiutoAcceso()) sezioneAiuto.push(buildHelpItem());
 
@@ -2039,16 +2026,16 @@
       sezioneAiuto.push(TranslatePage.buildRestoreOriginalItem());
     }
 
-    // 2d. Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
+    // Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
     // lo stato meno visibile che il tasto destro può raccontare: una pagina
     // rimasta zoomata da un'altra visita spiega da sé perché è così, e la voce
     // è anche la via d'uscita. Il livello lo sa il preload: glielo si chiede
     // con un evento, la risposta arriva nel dataset nello stesso dispatch.
     const zoomItem = buildZoomItem();
     if (zoomItem) sezioneAiuto.push(zoomItem);
-    if (sezioneAiuto.length) items.push({ type: 'separator' }, ...sezioneAiuto);
+    sezione(sezioneAiuto);
 
-    // 3. Zona contestuale — assente se non c'è contesto utile.
+    // 2. Zona contestuale — assente se non c'è contesto utile.
     // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
     const vociRiquadro = (self.SN_RIQUADRO_COOKIE && self.SN_RIQUADRO_COOKIE.voci()) || [];
     const contextItems = [
@@ -2058,17 +2045,12 @@
       }),
       ...vociRiquadro,
     ];
-    if (contextItems.length > 0) {
-      items.push({ type: 'separator' });
-      // Da tastiera il fuoco parte da qui: è quello che si può fare proprio sull'elemento (#1295).
-      const prima = contextItems.findIndex((it) => it && (it.type === 'item' || !it.type));
-      contextItems.forEach((it, i) => items.push(i === prima ? { ...it, primaDaTastiera: true } : it));
-    }
+    // Da tastiera il fuoco parte da qui: è quello che si può fare proprio sull'elemento (#1295).
+    const prima = contextItems.findIndex((it) => it && (it.type === 'item' || !it.type));
+    sezione(contextItems.map((it, i) => (i === prima ? { ...it, primaDaTastiera: true } : it)));
 
-    items.push({ type: 'separator' });
-    items.push(buildFeedbackItem());
     const spegni = buildSpegniFiloItem();
-    if (spegni) items.push(spegni);
+    sezione([buildFeedbackItem(), ...(spegni ? [spegni] : [])]);
     // In pausa (#896) la voce c'è solo per chi vede il Red Team. Si richiede a ogni apertura: vale dalla successiva.
     refreshRedteamVisibile();
     if (redteamVisibile) items.push(buildRedteamAttackItem());
@@ -2499,7 +2481,7 @@
   // Le immagini lasciate sulla pagina (#1623): il pannello vive nel frame principale.
   Sidebar?.suChiusura?.(() => (IS_SUBFRAME || motivoBlocco() ? 'sito' : aiutoAcceso() ? '' : 'aiuto'));
 
-  // L'icona Aiuto (barra laterale, riga del tasto destro): apre, poi detta, poi ferma (#1432).
+  // L'icona Aiuto della barra laterale: apre, poi detta, poi ferma (#1432).
   function aiutoPasso() {
     if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.passo();
@@ -2546,15 +2528,6 @@
   }
 
   function onRuntimeMessage(msg, sender, sendResponse) {
-    // #871 — la disposizione delle icone è cambiata altrove, o un'icona arriva dalla barra laterale.
-    if (msg?.type === MSG.ICON_LAYOUT_CHANGED) {
-      try { MenuIcons.layoutCambiato?.(msg.layout); } catch (_) {}
-      return;
-    }
-    if (msg?.type === MSG.BARRA_FUORI) {
-      try { MenuIcons.dallaBarra?.(msg); } catch (_) {}
-      return;
-    }
     // Le immagini lasciate sulla fila delle schede o sulla barra (#1623): quelle per la home le prende la home.
     if (msg?.type === MSG.CHAT_ALLEGA) {
       if (msg.dove === 'aiuto' && !IS_SUBFRAME) { try { Promise.resolve(Sidebar?.allegaDaFuori?.(msg)).catch(() => {}); } catch (_) {} }
@@ -2567,9 +2540,6 @@
     if (msg?.type === MSG.FULLSCREEN_CHANGED) {
       fullscreenAnnunciato = true;
       contentFullscreen = !!msg.fullscreen;
-      // Se un menu è aperto adesso, la sua voce dello schermo intero sta mentendo: si
-      // ridisegna sul posto invece di lasciarla lì fino alla chiusura (#514).
-      try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
       return;
     }
     // L'Esc consegnato dal main (schermo pieno del sito) si rimette in circolo, e il giro di
@@ -2590,7 +2560,7 @@
       try { Menu.close(); } catch (_) {}
       return;
     }
-    // Azione di PAGINA scelta dal menu aperto dentro un riquadro: rimandata qui perché solo
+    // Azione di PAGINA dalla barra laterale, o scelta dal menu aperto dentro un riquadro: qui perché solo
     // il frame principale è «la pagina» (#405).
     if (msg?.type === MSG.TOP_FRAME_COMMAND) {
       try {
@@ -2598,7 +2568,7 @@
         else if (msg.surface === 'redteam') { if (redteamVisibile) self.SN_REDTEAM_ATTACK_UI?.open(); }
         else if (msg.surface === 'help') openHelpSidebar();
         else if (msg.surface === 'valuta') valutaDalRiquadro();
-        else MenuIcons.runIconAction(msg.iconId);
+        else if (msg.daBarra) MenuIcons.runIconAction(msg.iconId, msg.colore);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
       // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).
       if (msg.daBarra) setTimeout(() => rispondiEtichetteBarra([msg.iconId]), 60);

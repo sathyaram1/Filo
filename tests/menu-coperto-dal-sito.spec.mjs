@@ -221,26 +221,9 @@ test('un velo della pagina sopra un riquadro incorporato copre anche il menu ape
   expect(await frame.locator('#campo').inputValue()).not.toContain(SEGRETO);
 });
 
-test('i pezzi di Filo sopra il menu non contano come velo: etichetta delle icone e conferma annullata', async ({ app, shell, openTab, testServer }) => {
+test('i pezzi di Filo sopra il menu non contano come velo: la conferma annullata', async ({ app, shell, openTab, testServer }) => {
   await conCronologia(shell);
   const page = await apri(openTab, testServer);
-
-  // L'etichetta di un'icona scende sulle voci sotto la riga: per il browser restano scoperte.
-  await page.locator('#campo').click({ button: 'right' });
-  const icona = menuDi(page).locator('.sn-menu-row-btn[aria-label]').first();
-  await icona.hover();
-  await expect(menuDi(page).etichetta).toBeVisible();
-  await page.waitForTimeout(400);
-  const sotto = await nelMondoDelMenu(app, page, `(() => {
-    const t = document.querySelector('.sn-tooltip').getBoundingClientRect();
-    return [...document.querySelectorAll('.sn-menu button')].filter((b) => {
-      const r = b.getBoundingClientRect();
-      return r.left < t.right && t.left < r.right && r.top < t.bottom && t.top < r.bottom;
-    }).map((b) => SN_VISTO._test.stato(b));
-  })()`);
-  expect(sotto.length, 'l\'etichetta copre almeno una voce').toBeGreaterThan(0);
-  expect(sotto.every((s) => s === 'visibile')).toBe(true);
-  await page.keyboard.press('Escape');
 
   // Svuota → Annulla: la conferma sta sopra la scheda (#592.6), e chi torna subito su una voce incolla.
   await page.locator('#campo').click({ button: 'right' });

@@ -159,15 +159,6 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.NAV_STATE, async (msg, sender) => {
-    if (!sender?.tab?.id) return { ok: false, canBack: false, canFwd: false };
-    const win = winOf(sender);
-    const tab = win?._filoTabs?.tabs?.find((t) => t.id === sender.tab.id);
-    if (!tab?.view?.webContents) return { ok: false, canBack: false, canFwd: false };
-    const tabs = win._filoTabs;
-    return { ok: true, canBack: tabs.puoTornare(tab, 'indietro'), canFwd: tabs.puoTornare(tab, 'avanti') };
-  });
-
   on(MSG.TOGGLE_FULLSCREEN, async (msg, sender) => {
     // `requestFullscreen()` da una WebContentsView non porta a tutto schermo la finestra: la
     // view resta nel suo bounds, quindi si agisce sulla BrowserWindow.
@@ -263,7 +254,7 @@ module.exports = function register(on, ctx) {
   });
 
   // Un iframe non può parlare col frame che lo ospita (origini diverse): passa da qui. Non
-  // porta dati arbitrari, solo l'id di un'icona che il frame principale risolve da sé.
+  // porta dati arbitrari, solo il nome di un pannello che il frame principale apre da sé.
   const frameBridge = (msg, sender, payload) => {
     const wc = sender && sender.wc;
     if (!wc) return { ok: false, error: 'no-sender' };
@@ -286,7 +277,6 @@ module.exports = function register(on, ctx) {
 
   on(MSG.RUN_IN_TOP_FRAME, async (msg, sender) => frameBridge(msg, sender, {
     type: MSG.TOP_FRAME_COMMAND,
-    iconId: String(msg?.iconId || ''),
     surface: String(msg?.surface || ''),
   }));
 

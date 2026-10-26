@@ -1,18 +1,19 @@
-// Dove sta ogni icona globale: riga del tasto destro, «Altro…» o barra laterale (#871).
-// Solo dati e funzioni pure: la scrive il main (una porta sola), la leggono menu e barra.
+// Dove sta ogni icona: nella barra laterale o nel suo «Altro…» (#871, #1246: la riga del tasto destro non c'è più).
+// Solo dati e funzioni pure: la scrive il main (una porta sola), la legge la barra.
 // Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 (function (global) {
   'use strict';
 
-  const ZONE = Object.freeze(['primary', 'secondary', 'bar']);
+  // `primary` (la riga del tasto destro) vive solo nei salvati di prima: migra() la versa nella barra.
+  const ZONE = Object.freeze(['bar', 'secondary']);
 
   // Della finestra e del sistema, non dell'elemento: stanno nella barra, non in «Altro…».
   const GLOBALI = Object.freeze(['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
 
   // `tipo`: chi esegue. 'finestra' la fa il main, 'pagina' il content script della scheda, 'aiuto' il pannello
   // Aiuto della scheda, con l'aspetto che dice cosa farà il clic (aspettoAiuto).
-  // Le etichette sono quelle del menu (menuIcons.js): la sentinella le tiene uguali.
+  // Le etichette sono quelle del registro della pagina (menuIcons.js): la sentinella le tiene uguali.
   const ICONE = Object.freeze({
     help: { icona: 'help', etichetta: 'menu_help', tipo: 'aiuto' },
     translate: { icona: 'translate', etichetta: 'menu_global_translate', tipo: 'pagina' },
@@ -30,19 +31,18 @@
     closeTab: { icona: 'close', etichetta: 'menu_close_tab', tipo: 'finestra' },
     newTab: { icona: 'filoLogo', etichetta: 'menu_new_tab', tipo: 'finestra' },
     incognito: { icona: 'incognito', etichetta: 'menu_incognito', tipo: 'finestra' },
-    openOptions: { icona: 'options', etichetta: 'menu_open_options', tipo: 'finestra' },
+    openOptions: { icona: 'models', etichetta: 'menu_open_options', tipo: 'finestra' },
     home: { icona: 'home', etichetta: 'menu_open_home', tipo: 'finestra' },
     editorApp: { icona: 'editor', etichetta: 'menu_open_editor', tipo: 'finestra' },
     feedbackApp: { icona: 'feedback', etichetta: 'menu_open_feedback', tipo: 'finestra', soloOwner: true },
   });
 
+  // Le azioni sulla pagina (quelle che stavano nella riga del tasto destro) vengono dopo quelle della finestra.
   const DEFAULT = Object.freeze({
-    primary: Object.freeze(['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab']),
+    bar: Object.freeze(['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab',
+      'translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab']),
     secondary: Object.freeze(['openOptions', 'editorApp', 'feedbackApp', 'screenshotCrop', 'transcribe', 'colorPicker']),
-    bar: Object.freeze(['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']),
   });
-
-  const MAX_PRIMARY = 6;
 
   // Ritirate dal registro: restando nel salvato farebbero bottoni fantasma.
   const RITIRATE = Object.freeze(['openForLater']);
@@ -58,12 +58,12 @@
   // Fra le aggiunte, quelle che arrivano in cima alla barra invece che in fondo.
   const IN_CIMA = Object.freeze(['help']);
 
-  const copia = (l) => ({ primary: [...l.primary], secondary: [...l.secondary], bar: [...l.bar] });
+  const copia = (l) => ({ bar: [...l.bar], secondary: [...l.secondary] });
   const uguali = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
   const noto = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(ICONE, id);
 
-  // Le zone come le dice chi parla con Filo (SPOSTA_ICONA): la barra, la riga del tasto destro, «Altro…».
-  const DOVE = Object.freeze({ barra: 'bar', menu: 'primary', altro: 'secondary' });
+  // Le zone come le dice chi parla con Filo (SPOSTA_ICONA): la barra e il suo «Altro…».
+  const DOVE = Object.freeze({ barra: 'bar', altro: 'secondary' });
 
   // Il nome che l'utente legge nel menu, per la chat.
   function nome(id) {
@@ -74,15 +74,15 @@
   }
 
   function valida(v) {
-    return !!(v && typeof v === 'object' && Array.isArray(v.primary) && Array.isArray(v.secondary));
+    return !!(v && typeof v === 'object' && Array.isArray(v.secondary) && (Array.isArray(v.bar) || Array.isArray(v.primary)));
   }
 
-  // Disposizione salvata → disposizione da usare, e se va riscritta. `qrPromosso` è il segno
-  // della promozione una tantum del QR nella riga: senza, il QR sale una volta sola.
-  function migra(salvato, { qrPromosso = false } = {}) {
-    if (!valida(salvato)) return { layout: copia(DEFAULT), scrivi: false, segnaQr: !qrPromosso };
+  // Disposizione salvata → disposizione da usare, e se va riscritta. La riga del tasto destro di prima finisce in
+  // fondo alla barra, nel suo ordine (#1246): chi l'aveva disposta ritrova le stesse icone, una sotto l'altra.
+  function migra(salvato) {
+    if (!valida(salvato)) return { layout: copia(DEFAULT), scrivi: false };
     if (uguali(salvato.primary, DEFAULT_ANTICO.primary) && uguali(salvato.secondary, DEFAULT_ANTICO.secondary) && !Array.isArray(salvato.bar)) {
-      return { layout: copia(DEFAULT), scrivi: true, segnaQr: true };
+      return { layout: copia(DEFAULT), scrivi: true };
     }
     const visti = new Set();
     const pulisci = (arr) => (Array.isArray(arr) ? arr : []).filter((id) => {
@@ -96,11 +96,11 @@
     let secondary = pulisci(salvato.secondary);
     let barra = bar;
     if (!barra) {
-      // Prima volta con la barra: le globali rimaste in «Altro…» ci vanno, quelle che
-      // l'utente aveva portato nella riga restano dov'erano.
-      barra = DEFAULT.bar.filter((id) => secondary.includes(id));
+      // Prima volta con la barra: le globali rimaste in «Altro…» ci vanno.
+      barra = [...IN_CIMA, ...GLOBALI].filter((id) => secondary.includes(id));
       secondary = secondary.filter((id) => !barra.includes(id));
     }
+    barra.push(...primary);
     for (const id of AGGIUNTE) {
       if (visti.has(id)) continue;
       visti.add(id);
@@ -108,32 +108,79 @@
       else if (GLOBALI.includes(id)) barra.push(id);
       else secondary.unshift(id);
     }
-    const layout = { primary, secondary, bar: barra };
-    if (!qrPromosso && !layout.primary.includes('qrCode') && layout.secondary.includes('qrCode')
-        && layout.primary.length < MAX_PRIMARY) {
-      layout.primary.push('qrCode');
-      layout.secondary = layout.secondary.filter((id) => id !== 'qrCode');
-    }
-    const cambiata = !uguali(layout.primary, salvato.primary) || !uguali(layout.secondary, salvato.secondary)
-      || !uguali(layout.bar, salvato.bar);
-    return { layout, scrivi: cambiata || !qrPromosso, segnaQr: true };
+    const layout = { bar: barra, secondary };
+    const cambiata = Array.isArray(salvato.primary) || !uguali(layout.secondary, salvato.secondary) || !uguali(layout.bar, salvato.bar);
+    return { layout, scrivi: cambiata };
   }
 
-  // Sposta `id` davanti a `beforeId` (null: in fondo) nella zona `target`. La riga ha un
-  // tetto: chi trabocca scende in cima ad «Altro…».
+  // Sposta `id` davanti a `beforeId` (null: in fondo) nella zona `target`.
   function applicaPosa(layout, { id, target, beforeId = null } = {}) {
     if (!noto(id) || !ZONE.includes(target)) return null;
-    const out = copia(valida(layout) ? { ...layout, bar: Array.isArray(layout.bar) ? layout.bar : [] } : DEFAULT);
+    const out = migra(layout).layout;
+    // Davanti a sé stessa, nella zona dove già sta: resta dov'è.
+    if (beforeId === id && out[target].includes(id)) return out;
     for (const z of ZONE) out[z] = out[z].filter((x) => x !== id);
     const zona = out[target];
     const i = beforeId ? zona.indexOf(beforeId) : -1;
     if (i >= 0) zona.splice(i, 0, id);
     else zona.push(id);
-    while (out.primary.length > MAX_PRIMARY) {
-      const fuori = out.primary.pop();
-      if (fuori && !out.secondary.includes(fuori)) out.secondary.unshift(fuori);
+    return out;
+  }
+
+  // ── per il registro dei cambi (#867.1): chi si è spostato, e come rimetterlo ──
+  // Dove sta un'icona: la zona, l'icona che le sta dietro nella stessa zona (null: è l'ultima) e il posto, da 1.
+  function posizione(layout, id) {
+    for (const z of ZONE) {
+      const arr = layout && Array.isArray(layout[z]) ? layout[z] : [];
+      const i = arr.indexOf(id);
+      if (i >= 0) return { zona: z, davanti: arr[i + 1] || null, posto: i + 1 };
+    }
+    return null;
+  }
+
+  function sottosequenza(a, b) {
+    const m = a.map(() => b.map(() => 0));
+    const v = (i, j) => (i >= 0 && j >= 0 ? m[i][j] : 0);
+    a.forEach((x, i) => b.forEach((y, j) => { m[i][j] = x === y ? v(i - 1, j - 1) + 1 : Math.max(v(i - 1, j), v(i, j - 1)); }));
+    const ferme = new Set();
+    for (let i = a.length - 1, j = b.length - 1; i >= 0 && j >= 0;) {
+      if (a[i] === b[j]) { ferme.add(a[i]); i--; j--; } else if (v(i - 1, j) >= v(i, j - 1)) i--; else j--;
+    }
+    return ferme;
+  }
+
+  // Le icone che una scrittura ha spostato. `mossa` è quella che chi scrive dice di aver mosso: se basta lei a spiegare
+  // il cambio è lei, perché fra due vicine scambiate il confronto da solo non sa quale sia partita.
+  function spostate(prima, dopo, { mossa = null } = {}) {
+    const a = migra(prima).layout;
+    const b = migra(dopo).layout;
+    const senza = (l, id) => ZONE.map((z) => l[z].filter((x) => x !== id).join('|')).join('/');
+    const cambiata = (id) => {
+      const pa = posizione(a, id);
+      const pb = posizione(b, id);
+      return !!(pa && pb) && (pa.zona !== pb.zona || pa.posto !== pb.posto || pa.davanti !== pb.davanti);
+    };
+    if (noto(mossa) && senza(a, mossa) === senza(b, mossa)) return cambiata(mossa) ? [mossa] : [];
+    const out = [];
+    for (const z of ZONE) {
+      const comuni = (l) => l[z].filter((id) => posizione(a, id)?.zona === z && posizione(b, id)?.zona === z);
+      const ferme = sottosequenza(comuni(a), comuni(b));
+      for (const id of b[z]) {
+        const pa = posizione(a, id);
+        if (pa && (pa.zona !== z || !ferme.has(id))) out.push(id);
+      }
     }
     return out;
+  }
+
+  // La posa che rimette `id` nella posizione `p` sulla disposizione di adesso: davanti alla stessa icona se sta
+  // ancora in quella zona, se no allo stesso posto.
+  function posaPer(layout, id, p) {
+    if (!noto(id) || !p || !ZONE.includes(p.zona)) return null;
+    const zona = migra(layout).layout[p.zona].filter((x) => x !== id);
+    let beforeId = p.davanti && zona.includes(p.davanti) ? p.davanti : null;
+    if (!beforeId && p.davanti && Number.isFinite(p.posto)) beforeId = zona[Math.max(0, p.posto - 1)] || null;
+    return { id, target: p.zona, beforeId };
   }
 
   // L'icona Aiuto dice cosa farà il clic (#1432): chiuso o ridotto apre, aperto detta, mentre detta ferma (anche
@@ -147,7 +194,7 @@
   }
 
   global.SN_DISPOSIZIONE_ICONE = {
-    ZONE, GLOBALI, ICONE, DEFAULT, MAX_PRIMARY, RITIRATE, AGGIUNTE, IN_CIMA, DOVE,
-    noto, nome, valida, migra, applicaPosa, aspettoAiuto,
+    ZONE, GLOBALI, ICONE, DEFAULT, RITIRATE, AGGIUNTE, IN_CIMA, DOVE,
+    noto, nome, valida, migra, applicaPosa, aspettoAiuto, posizione, spostate, posaPer,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

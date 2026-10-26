@@ -24,6 +24,7 @@ import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 import { statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { premiNellaBarra } from './helpers/barra.mjs';
 
 // Sui siti spiegazione e Modifica stanno in uno shadow root chiuso (#1071): si leggono dal mondo dei content script.
 const testoDi = async (app, page, sel) => (await statoDi(app, page, sel))?.testo || '';
@@ -776,8 +777,7 @@ test('(M) «Traduci la pagina» con la chiave propria rifiutata: al primo pezzo 
       }
     }).observe(document.documentElement, { childList: true, subtree: true });
   });
-  await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
-  await menuDi(page).locator('[data-sn-icon-id="translate"]').click();
+  await premiNellaBarra(app, 'translate');
   const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
   const avvisi = () => page.evaluate(() => window.__toasts.join(' | '));
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
@@ -846,12 +846,9 @@ test('(P) le strade che non scrivono la riga del ripiego lo dicono con un avviso
   const avvisi = () => page.evaluate(() => window.__toasts.join(' | '));
   const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
 
-  // «Trascrivi» (tasto destro, «Altro…»): il testo arriva coi crediti di Filo, e l'avviso lo dice.
+  // «Trascrivi» (barra laterale, «Altro…»): il testo arriva coi crediti di Filo, e l'avviso lo dice.
   const prima = seen.completions.length;
-  await page.locator('#t').click({ button: 'right', position: { x: 5, y: 5 } });
-  await menuDi(page).locator('.sn-menu-row-overflow').hover();
-  await menuDi(page).locator('.sn-menu-row-overflow').click().catch(() => {});
-  await menuDi(page).locator('[data-sn-icon-id="transcribe"]').click();
+  await premiNellaBarra(app, 'transcribe');
   await expect(page.locator('.sn-region-overlay')).toBeVisible({ timeout: 10000 });
   await page.mouse.move(30, 100);
   await page.mouse.down();

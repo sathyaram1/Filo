@@ -2,7 +2,8 @@
 // il menu restava aperto e a schermo intero la modalità se ne andava. Regola: patterns/esc-chiude-prima-il-riquadro-aperto-poi-la-modalita.md.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi, menuAperto } from './helpers/menuContestuale.mjs';
+import { menuAperto } from './helpers/menuContestuale.mjs';
+import { premiNellaBarra } from './helpers/barra.mjs';
 
 // Il gestore sta nella testa del documento, il primo script della pagina: prima di così un sito non può arrivare.
 const sito = (ferma, extra = '') => `<!doctype html><html><head><script>
@@ -84,14 +85,11 @@ test('fuori dallo schermo intero, sul sito che ferma l\'Esc, il menu si chiude l
   expect(await page.evaluate(() => window.__escDelSito)).toBe(prima + 1);
 });
 
-// Un'altra famiglia di riquadri, aperta da una voce del menu: la regola non conosce il riquadro.
+// Un'altra famiglia di riquadri, aperta da un'icona della barra laterale: la regola non conosce il riquadro.
 test('sito che ferma l\'Esc: il QR della pagina si chiude col primo Esc, lo schermo intero resta', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, sito('tutto'));
   await entra(app);
-  await apriMenu(page);
-  const qr = menuDi(page).locator('[data-sn-icon-id="qrCode"]');
-  if (await qr.count() === 0) await menuDi(page).locator('.sn-menu-row-overflow').first().click();
-  await qr.first().click();
+  await premiNellaBarra(app, 'qrCode');
   await expect(page.locator('.sn-qr-overlay')).toBeVisible({ timeout: 8000 });
   await new Promise((r) => setTimeout(r, 300));
 

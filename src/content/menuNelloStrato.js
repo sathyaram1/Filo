@@ -18,13 +18,8 @@
   const locale = {
     open: Menu.open,
     close: Menu.close,
-    openIconGridSubmenu: Menu.openIconGridSubmenu,
-    refreshIconRow: Menu.refreshIconRow,
-    refreshIconGrid: Menu.refreshIconGrid,
-    isSubMenuOpen: Menu.isSubMenuOpen,
     isOpen: Menu.isOpen,
     testoNascosto: Menu.testoNascosto,
-    trascinaDaFuori: Menu.trascinaDaFuori,
   };
 
   // Le sezioni che si riempiono dopo (spiegazioni) e le righe di correzione nascono in un documento senza finestra:
@@ -35,7 +30,7 @@
     return inerte;
   }
 
-  // Un bottone dello strato passato a una voce (l'ancora della griglia «Altro…»): qui è solo il suo segno.
+  // Un bottone dello strato passato a una voce (l'ancora di un pannello): qui è solo il suo segno.
   class Ancora {
     constructor(segno) { this.segno = String(segno); }
   }
@@ -241,22 +236,6 @@
 
   Menu.open = (o) => { if (o) Menu.misuraLeAzioni(o.items); return acceso() ? apri(o) : locale.open(o); };
   Menu.close = () => (acceso() ? chiudi() : locale.close());
-  Menu.openIconGridSubmenu = (ancora, items, opts) => {
-    if (!acceso()) return locale.openIconGridSubmenu(ancora, items, opts);
-    const m = corrente;
-    if (!m || !(ancora instanceof Ancora)) return;
-    const op = opDi(m);
-    aggiorna(m, 'griglia-apri', { ancora: ancora.segno, items: D.descrivi(items || [], op), opts: D.descrivi(opts || {}, op) });
-  };
-  Menu.refreshIconRow = (items) => {
-    if (!acceso()) return locale.refreshIconRow(items);
-    if (corrente) aggiorna(corrente, 'riga', { items: D.descrivi(items || [], opDi(corrente)) });
-  };
-  Menu.refreshIconGrid = (items) => {
-    if (!acceso()) return locale.refreshIconGrid(items);
-    if (corrente) aggiorna(corrente, 'griglia', { items: D.descrivi(items || [], opDi(corrente)) });
-  };
-  Menu.isSubMenuOpen = () => (acceso() ? false : locale.isSubMenuOpen());
   Menu.isOpen = () => (acceso() ? !!corrente : locale.isOpen());
   // Il testo di un'immagine descritta nello strato è testo e basta: lì non c'è un sito che lo cerchi.
   Menu.testoNascosto = (labelEl, btnEl, s) => {
@@ -266,22 +245,5 @@
       return;
     }
     locale.testoNascosto(labelEl, btnEl, s);
-  };
-  // Un'icona portata dalla barra laterale sopra il menu aperto (#871): il gesto è della barra, lo strato la posa.
-  Menu.trascinaDaFuori = (d) => {
-    if (!acceso()) return locale.trascinaDaFuori(d);
-    if (!d) return false;
-    // Nessun menu aperto: l'icona lasciata qui dalla barra non va da nessuna parte (#1471), come nella pagina.
-    if (!corrente) {
-      if (d.fase === 'rilascia') {
-        try { global.SN_POPUP?.conta?.({ misura: 'gesto', gesto: 'trascinamento', da: 'icona_barra', a: 'nessuna', esito: 'annullato' }); } catch (_) {}
-      }
-      return false;
-    }
-    aggiorna(corrente, 'fuori', {
-      fase: String(d.fase || ''), icona: String(d.id || ''), x: Number(d.x) || 0, y: Number(d.y) || 0,
-      svg: typeof d.icon === 'string' ? d.icon : '',
-    });
-    return true;
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

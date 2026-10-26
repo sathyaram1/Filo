@@ -30,7 +30,13 @@
     getLastMouseEvent: () => ({ clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 }),
   };
 
-  function copyToClipboard(text) {
+  // Gli appunti li scrive prima il main (anche in cronologia): la pagina può non avere il fuoco, come col visore PDF
+  // o dopo un clic nella barra laterale (#1343). Se il main dice no, ci prova la pagina.
+  async function copyToClipboard(text) {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text });
+      if (r && r.ok) { Popup.showToast(I18n.t('toast_copied')); return; }
+    } catch (_) {}
     navigator.clipboard.writeText(text).then(
       () => {
         Popup.showToast(I18n.t('toast_copied'));
@@ -48,6 +54,17 @@
     if (!global.SN_URL_NAV) return !!raw;
     return global.SN_URL_NAV.isShareableAddress(raw);
   }
+
+  // L'indirizzo della pagina per chi lo condivide o lo salva: sulla pagina «sito non raggiungibile» è il sito che si
+  // voleva aprire, non l'indirizzo interno dell'errore (#1343).
+  function indirizzoDellaPagina() {
+    const qui = String(location.href || '');
+    if (!qui.startsWith('filo://error/')) return qui;
+    let voluto = '';
+    try { voluto = new URL(qui).searchParams.get('url') || ''; } catch (_) { voluto = ''; }
+    return /^https?:\/\//i.test(voluto) && isAddress(voluto) ? voluto : qui;
+  }
+  const paginaDErrore = () => indirizzoDellaPagina() !== String(location.href || '');
 
   function copyUrlToClipboard(url) {
     if (!isAddress(url)) {
@@ -373,15 +390,6 @@
       const r = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY });
       return r?.items || [];
     } catch (_) { return []; }
-  }
-
-  // Serve a mostrare in grigio avanti e indietro nel menu quando la cronologia non lo
-  // consente, come i tasti nella barra in alto.
-  async function getNavState() {
-    try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.NAV_STATE });
-      return { canBack: !!r?.canBack, canFwd: !!r?.canFwd };
-    } catch (_) { return { canBack: true, canFwd: true }; }
   }
 
   // `via: 'paste'` dice a chi tiene la cronologia che la voce viene da un
@@ -988,6 +996,8 @@
   }
 
   function buildSavePayload() {
+    // Del sito non raggiungibile si salva solo dove sta: il testo qui è quello dell'errore.
+    if (paginaDErrore()) return { url: indirizzoDellaPagina(), title: document.title, favicon: '', description: '', excerpt: '' };
     const meta = Extract.pageMeta();
     return {
       url: location.href,
@@ -1241,11 +1251,12 @@
   }
 
   async function shareCurrentPage() {
-    const data = { title: document.title, url: location.href };
+    const url = indirizzoDellaPagina();
+    const data = { title: document.title, url };
     if (navigator.share) {
       try { await navigator.share(data); return; } catch (_) {}
     }
-    copyToClipboard(location.href);
+    copyToClipboard(url);
   }
 
   // Senza condivisione nativa si copia negli appunti: vale il discorso di «Copia URL»
@@ -1515,6 +1526,22 @@
     apriInSchedaNuova(url);
   }
 
+  // Come copyToClipboard: prima il main, che non chiede il fuoco alla pagina; se dice no, la pagina. `blobPng()` → Blob.
+  async function immagineNegliAppunti(dataUrl, blobPng) {
+    if (/^data:image\/png;base64,/.test(String(dataUrl || ''))) {
+      try {
+        const r = await chrome.runtime.sendMessage({ type: MSG.COPY_IMAGE_TO_CLIPBOARD, dataUrl });
+        if (r && r.ok) return true;
+      } catch (_) {}
+    }
+    try {
+      const pngBlob = await blobPng();
+      if (!pngBlob || !navigator.clipboard?.write) return false;
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+      return true;
+    } catch (_) { return false; }
+  }
+
   async function takeScreenshot() {
     try {
       const cap = await captureVisibleTab();
@@ -1522,14 +1549,7 @@
         Popup.toastErrore('err_provider_failed');
         return;
       }
-      let copied = false;
-      try {
-        const pngBlob = await dataUrlToPngBlob(cap.dataUrl);
-        if (pngBlob && navigator.clipboard?.write) {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
-          copied = true;
-        }
-      } catch (_) {}
+      const copied = await immagineNegliAppunti(cap.dataUrl, () => dataUrlToPngBlob(cap.dataUrl));
       // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
       const desc = await descrizioneCoperta(cap.dataUrl, cap.campi).catch(() => null);
@@ -1698,13 +1718,7 @@
       const region = await selectScreenRegion();
       if (!region) { Popup.showToast(I18n.t('toast_region_cancelled')); return; }
       const { dataUrl, blob } = region;
-      let copied = false;
-      try {
-        if (blob && navigator.clipboard?.write) {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          copied = true;
-        }
-      } catch (_) {}
+      const copied = await immagineNegliAppunti(dataUrl, async () => blob);
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
       const desc = await descrizioneCoperta(dataUrl, region.campi, region.rect).catch(() => null);
       try {
@@ -1780,7 +1794,7 @@
   // click sull'icona il cursore cambia (gestito dal browser/SO) e la prossima
   // pressione del tasto sinistro su un pixel qualsiasi della pagina copia il
   // colore in formato hex nella clipboard. Esc annulla.
-  // `scelto`: il colore l'ha già preso lo strato del menu sopra la scheda, che ha il gesto dell'utente (#1054).
+  // `scelto`: il colore l'ha già preso la barra laterale, che ha il gesto dell'utente e la pagina no (#1246).
   async function pickColor(scelto) {
     const giaScelto = typeof scelto === 'string' && /^#[0-9a-f]{6}$/i.test(scelto);
     if (!giaScelto && typeof window.EyeDropper !== 'function') {
@@ -1810,7 +1824,7 @@
   // Resta nero su bianco a prescindere dal tema: il contrasto che gli scanner pretendono.
   function showPageQrCode() {
     const QR = global.SN_QR;
-    const url = String(location.href || '');
+    const url = indirizzoDellaPagina();
     if (!QR || typeof QR.toMatrix !== 'function') {
       Popup.toastErrore('qr_error', { duration: 3000 });
       return;
@@ -2014,7 +2028,6 @@
     insertDictatedText,
     buildPasteItem,
     getClipboardHistory,
-    getNavState,
     pushClipboardEntry,
     requestImageDescription,
     descriptionToFilename,

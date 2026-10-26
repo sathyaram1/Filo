@@ -1037,7 +1037,7 @@
         const id = String((a && (a.icona ?? a.id)) || '').trim();
         // Un nome che Filo non conosce l'ha scritto il modello: nel riquadro.
         const nome = D && D.noto(id) ? `«${D.nome(id)}»` : (id ? cit(id) : 'un\'icona');
-        const dove = { barra: 'nella barra laterale', menu: 'nella riga del tasto destro', altro: 'in «Altro…» del tasto destro' };
+        const dove = { barra: 'nella barra laterale', altro: 'in «Altro…» della barra laterale' };
         const d = dove[String((a && a.dove) || '').trim().toLowerCase()];
         return ['Spostare ', nome, d ? ` ${d}` : ''];
       },
@@ -1045,7 +1045,7 @@
         const D = global.SN_DISPOSIZIONE_ICONE;
         const id = String((a && (a.icona ?? a.id)) || '').trim();
         const nome = D && D.noto(id) ? D.nome(id) : id;
-        const dove = { barra: 'nella barra laterale', menu: 'nella riga del tasto destro', altro: 'in «Altro…» del tasto destro' };
+        const dove = { barra: 'nella barra laterale', altro: 'in «Altro…» della barra laterale' };
         return `«${nome}» ora sta ${dove[String((a && a.dove) || '').trim().toLowerCase()] || 'al suo nuovo posto'}`;
       },
     },

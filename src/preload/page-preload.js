@@ -192,6 +192,7 @@ if (!IS_SUBFRAME) {
 
 // In ogni frame, riquadri compresi: il tasto arriva solo al frame che ha il fuoco.
 try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo CS] cmd-freccia', e); }
+try { require('./trascina-bordo.js')(window, ipcRenderer); } catch (e) { console.error('[Filo CS] trascina-bordo', e); }
 
 // ─── Protezione anti-fingerprinting ────────────────────────────────────────
 //

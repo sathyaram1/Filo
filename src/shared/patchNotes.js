@@ -14,9 +14,13 @@
         'Col tasto destro su un campo dove stai scrivendo c\'è «Valuta». L\'Aiuto legge tutto il testo e ti segnala errori, frasi poco chiare, un tono sbagliato e fatti dubbi. Ogni correzione che propone la scrivi nel campo con un clic, e con un altro clic la togli.',
         'Un\'immagine che trascini dentro Filo entra nella chat dovunque la lasci. Nella home va nella casella da qualunque punto della pagina, che si accende mentre la trascini. Su un sito si apre l\'Aiuto con l\'immagine già allegata, salvo che il sito la voglia per sé, come una pagina che carica file. Nell\'Aiuto ora la puoi anche incollare.',
         'Nella home puoi chiedere a Filo di chiudere le schede: «chiudi tutte le schede tranne questa», «chiudi YouTube», «chiudi tutto tranne Gmail». Le pagine chiuse restano nel filo della home. Una scheda con del testo che non hai ancora inviato resta aperta, a meno che tu non insista.',
+        'Le icone che stavano in cima al menu del tasto destro (Traduci, Screenshot, Condividi, Salva per dopo, QR code e Nuova scheda) ora sono nella barra laterale a sinistra, e agiscono sulla scheda che hai davanti. Le altre aspettano in «Altro…», in fondo alla barra. Le riordini trascinandole, e una lasciata sulla freccia di «Altro…» va messa da parte.',
+        'Se sposti un\'icona della barra laterale e poi scrivi a Filo «rimetti come prima», l\'icona torna dov\'era e il resto non cambia.',
+        'A schermo intero le schede compaiono quando porti il mouse sul bordo alto e lo tieni fermo un attimo, e spariscono quando torni sulla pagina. Arrivano anche mentre trascini un collegamento o un\'immagine. Se non le vuoi, le spegni in Preferenze, nella sezione «Barra laterale».',
       ],
       fixes: [
         'Le icone delle pagine salvate e delle schede chiuse, e la foto del tuo account Google, Filo le tiene sul tuo computer. La home e la chat le mostrano subito, senza chiederle ogni volta ai siti, e l\'icona di una scheda aperta da un altro paese non esce più dal proxy.',
+        'Sulla pagina di un sito che non risponde, Condividi, QR code e Salva per dopo usano l\'indirizzo del sito e non quello interno della pagina d\'errore. Su un PDF Condividi e Screenshot funzionano.',
         'La pagina sulla privacy ora dice dove sta ogni parte del server, dal codice al database alle identità. Prima diceva solo che il codice gira in Europa, e sembrava che ci stessero anche i dati, che invece per ora sono negli Stati Uniti.',
         'Un\'immagine oltre i 4 MB incollata nella chat della home ora entra rimpicciolita. Prima spariva senza dire niente.',
         'L\'accesso con Google e con gli altri provider funziona anche in un Filo appena installato, e una passkey salvata sul telefono si usa col QR.',

@@ -50,6 +50,7 @@
         nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
         barraSpinta: 'barraLaterale.spinta',
         barraStriscia: 'barraLaterale.striscia',
+        barraSchede: 'barraLaterale.schede',
         barraAttesa: 'barraLaterale.attesaMs',
         barraUscita: 'barraLaterale.uscitaMs',
         avvisoSchermoPienoDurata: 'avvisoSchermoPieno.durataMs',

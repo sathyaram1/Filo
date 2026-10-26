@@ -34,30 +34,25 @@ test('ogni avviso d’errore dei content script si conta per chiave, e la chiave
   assert.ok(usate.size >= 10, 'gli avvisi d’errore si contano davvero');
 });
 
-test('un’icona del tasto destro si conta una volta sola: o nella pagina, o nel main al suo messaggio', () => {
+test('un’icona della barra si conta una volta sola: quelle della pagina nella pagina, quelle della finestra nel main', () => {
+  const D = globalThis.SN_DISPOSIZIONE_ICONE;
   const icone = leggi('src', 'content', 'menuIcons.js');
-  const m = /const CONTATE_DAL_MAIN = new Set\(\[([^\]]*)\]\)/.exec(icone);
-  assert.ok(m, 'manca l’elenco delle icone che conta il main');
-  const dalMain = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
-  const nav = leggi('src', 'main', 'services', 'handlers', 'nav.js');
-  // Il messaggio che ognuna manda al main, e l'azione con cui nav.js la conta.
-  const attese = {
-    back: ['NAV_BACK', 'navigate-back-forward'], forward: ['NAV_FORWARD', 'navigate-back-forward'], reload: ['NAV_RELOAD', 'reload'],
-    closeTab: ['CLOSE_TAB', 'close-tab'], newTab: ['OPEN_NEW_TAB', 'new-tab'], incognito: ['OPEN_INCOGNITO', 'incognito'],
-    openOptions: ['OPEN_OPTIONS', 'options-models'], home: ['GO_HOME', 'home'],
-  };
-  // Quelle che aprono una pagina di Filo le conta l'apertura stessa, per indirizzo, come da ogni altra strada.
-  const perPagina = { editorApp: 'filo://editor/editor.html', feedbackApp: 'filo://feedback/feedback.html' };
-  assert.deepEqual([...dalMain].sort(), [...Object.keys(attese), ...Object.keys(perPagina)].sort());
-  for (const [icona, url] of Object.entries(perPagina)) {
-    assert.ok(icone.includes(`type: MSG.OPEN_URL, url: '${url}'`), `l’icona ${icona} apre ${url}`);
-    assert.equal(C.azioneDiPagina(url), C.AZIONE_DI_ICONA[icona]);
-  }
-  for (const [icona, [msg, azione]] of Object.entries(attese)) {
-    assert.match(icone, new RegExp(`${icona}:[^\\n]*type: MSG\\.${msg}\\b`), `l’icona ${icona} manda ${msg}`);
-    const handler = new RegExp(`on\\(MSG\\.${msg}, [\\s\\S]*?contata\\('${azione}'`).exec(nav);
-    assert.ok(handler, `nav.js conta ${msg} come ${azione}`);
-    assert.equal(C.AZIONE_DI_ICONA[icona], azione);
+  // Il registro della pagina ha solo le sue azioni (#1246), e le conta tutte dal clic alla fine.
+  const nelRegistro = [...icone.matchAll(/^\s+(\w+):\s*\{ id: '(\w+)'/gm)].map((m) => m[2]);
+  const dellaPagina = Object.keys(D.ICONE).filter((id) => D.ICONE[id].tipo === 'pagina');
+  assert.deepEqual([...nelRegistro].sort(), [...dellaPagina].sort());
+  assert.match(icone, /for \(const \[id, voce\] of Object\.entries\(reg\)\) contaIcona\(id, voce\)/);
+  // La barra le manda alla pagina e se ne va prima di contare: quelle della finestra le conta lei, una volta.
+  const barra = leggi('src', 'main', 'barraLaterale.js');
+  const esegui = /\n {2}esegui\(id[^\n]*\{\n([\s\S]*?)\n {2}\}/.exec(barra);
+  assert.ok(esegui, 'manca esegui() nella barra');
+  const pagina = esegui[1].indexOf("if (d.tipo === 'pagina')");
+  const conta = esegui[1].indexOf('AzioniContate.azione(');
+  assert.ok(pagina > 0 && conta > pagina && /if \(d\.tipo === 'pagina'\) \{[\s\S]*?return;\s*\}/.test(esegui[1]),
+    'un’azione della pagina dalla barra la conta la pagina, non anche il main');
+  for (const id of Object.keys(D.ICONE)) {
+    if (D.ICONE[id].tipo === 'aiuto') continue;
+    assert.ok(C.AZIONE_DI_ICONA[id], `l’icona ${id} non vale nessuna azione contata`);
   }
 });
 
@@ -141,8 +136,9 @@ test('ogni voce del tasto destro che fa un’azione del catalogo la misura, e il
   // Gli appunti si aprono con l'icona dell'Editor: la loro attesa è quella di «editor».
   const altroNome = { 'filo-notes': 'editor' };
   const K = globalThis.SN_CAPABILITIES.CAPABILITIES;
-  const dalMenu = K.filter((c) => /(menu del tasto destro|[Cc]lic destro)[^.]*?(→|scegli)/.test(String(c.invoke)));
-  assert.ok(dalMenu.length >= 15, 'le capacità del tasto destro si riconoscono');
+  // Anche le icone della barra laterale (#1246): le azioni sulla pagina stanno lì, non più nel menu.
+  const dalMenu = K.filter((c) => /(menu del tasto destro|[Cc]lic destro)[^.]*?(→|scegli)|[Ii]cona «[^»]+»[^.]*?barra laterale/.test(String(c.invoke)));
+  assert.ok(dalMenu.length >= 20, 'le capacità del tasto destro e della barra si riconoscono');
   for (const c of dalMenu) {
     if (coiModelli.includes(c.id)) continue;
     assert.ok(misurate.has(altroNome[c.id] || c.id), `«${c.id}» si sceglie dal tasto destro ma la sua attesa non si misura`);
