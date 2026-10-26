@@ -75,8 +75,8 @@
     for (let i = 0; i < righe.length; i++) {
       for (const frase of frasi(righe[i])) {
         const nome = NOME_CODICE.test(frase);
-        const forte = SEGNO_FORTE.test(frase) || (nome && APRE.test(frase));
-        if (!nome && !forte) continue;
+        const forte = SEGNO_FORTE.test(frase);
+        if (!nome && !forte && !PER_APRIRE.test(frase)) continue;
         const zona = [frase];
         const dove = righe[i].indexOf(frase);
         if (righe[i].trim().length <= 80 && !haGiaIlNumero(righe[i].slice(dove < 0 ? 0 : dove))) {
