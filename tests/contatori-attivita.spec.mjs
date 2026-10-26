@@ -519,6 +519,7 @@ test('la home senza un modello suo (la chat ne ha uno) conta il motivo; con i su
     return { home: C.canServeAction(s, C.ACTIONS.FILO_DASHBOARD), chat: C.canServeAction(s, C.ACTIONS.FILO_CHAT) };
   });
   expect(servibili).toEqual({ home: false, chat: true });
+  await homeDellAvvioContata(app);
   const prima = await misura(app, 'home');
   await openTab('filo://newtab/?prova=home-senza-modello');
   await expect.poll(async () => (await misura(app, 'home')).senza_ai_modelli || 0, { timeout: 8_000 }).toBe((prima.senza_ai_modelli || 0) + 1);
