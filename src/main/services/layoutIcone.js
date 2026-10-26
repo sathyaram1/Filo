@@ -36,7 +36,7 @@ function leggi({ incognito = false } = {}) {
 }
 
 // Dove arriva un'icona trascinata, nei nomi dei contatori (#1471).
-const DESTINAZIONE = Object.freeze({ bar: 'barra', primary: 'riga_menu', secondary: 'altro_menu' });
+const DESTINAZIONE = Object.freeze({ bar: 'barra', secondary: 'altro_menu' });
 
 // `cambia(prima)` → la disposizione nuova, o null. `mossa` dice al registro dei cambi quale icona si è spostata.
 async function riscrivi(cambia, { incognito = false, mossa = null } = {}) {
