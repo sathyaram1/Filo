@@ -163,13 +163,13 @@
 
   // Il contagocce vuole il gesto dell'utente, e la pagina non l'ha avuto: lo apre la barra, dove il clic c'è stato, e alla
   // pagina va solo il colore. Rinunciare (Esc) non fa niente; senza contagocce decide la pagina, che lo dice.
-  function contagocce(id) {
+  function contagocce(id, daAltro) {
     let aperto;
-    try { aperto = new window.EyeDropper().open(); } catch (_) { api.azione({ id }); return; }
+    try { aperto = new window.EyeDropper().open(); } catch (_) { api.azione({ id, daAltro }); return; }
     aperto.then((r) => {
       const colore = String((r && r.sRGBHex) || '');
-      if (/^#[0-9a-f]{6}$/i.test(colore)) api.azione({ id, colore });
-    }, (err) => { if (!err || err.name !== 'AbortError') api.azione({ id }); });
+      if (/^#[0-9a-f]{6}$/i.test(colore)) api.azione({ id, colore, daAltro });
+    }, (err) => { if (!err || err.name !== 'AbortError') api.azione({ id, daAltro }); });
   }
 
   function bottoneIcona(it, animaNuove, prima) {
