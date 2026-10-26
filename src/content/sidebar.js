@@ -1991,7 +1991,7 @@
       // nella nota. Prima entrava fra parentesi dentro «(Sistema: …)».
       aiNote = 'l\'utente ha cliccato sull\'elemento che avevi indicato, descritto qui sotto';
     }
-    if (session) { session.passiCliccati += 1; segnaSessione(); }
+    if (session) { session.passiCliccati += 1; session.dopoPasso = true; segnaSessione(); }
     // Telemetria: niente value, anche per un fill — il contenuto dei campi può essere sensibile.
     if (session) session.executedSteps.push({
       selector: highlight.selector,
