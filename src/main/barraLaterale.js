@@ -657,11 +657,13 @@ class BarraLaterale {
   // ── azioni ──────────────────────────────────────────────────────────────
 
   // `colore`: quello che la barra ha già preso col contagocce (#1246), da passare alla pagina.
-  esegui(id, { colore = '' } = {}) {
+  // `daAltro`: scelta dentro «Altro…», per i contatori (#1471).
+  esegui(id, { colore = '', daAltro = false } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const d = D && D.noto(id) ? D.ICONE[id] : null;
     if (!d || !this.layout || !this._inBarra().includes(id)) return;
     if (d.soloOwner && !this._owner()) return;
+    if (daAltro && Array.isArray(this.layout.secondary) && this.layout.secondary.includes(id)) this._contaGesto('altro_del_menu', { icona: id });
     this._lettura().clic(id);
     this._esito('azione');
     this._sceltaRicerca(this._icone().findIndex((i) => i.id === id) + 1);
