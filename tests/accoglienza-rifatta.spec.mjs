@@ -44,6 +44,10 @@ async function stubAgents(app) {
       if (all.includes('integrare le nuove lezioni')) return 'PROFILO:\nAnna, insegnante.\n\nPREFERENZE:\nRisposte brevi.';
       if (all.includes('analizzare l')) return 'NESSUNA';
       if (all.includes('preparare la dashboard')) return JSON.stringify({ message: 'Buongiorno.', suggestions: [] });
+      // Il correttore rilegge anche quello che entra nella chat della home, un testo incollato subito (#1447): i suoi
+      // controlli non prendono le risposte accodate per Filo.
+      if (all.includes('Sei il controllo rapido degli errori')) return '';
+      if (all.includes('proponi SUGGERIMENTI')) return '[][][][nessuno]';
       globalThis.__chatPrompts.push(all);
       const next = globalThis.__chatReplies.shift();
       return next || JSON.stringify({ text: 'Dimmi pure.', actions: [] });

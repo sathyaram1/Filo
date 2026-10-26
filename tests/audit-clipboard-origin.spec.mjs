@@ -82,18 +82,40 @@ test('una pagina web può leggere la cronologia appunti di Filo (nessun check or
   }
 });
 
-test('una pagina web non può aggiungere voci alla cronologia appunti via main world (contesto isolato)', async ({ openTab, testServer }) => {
-  // Una pagina esterna prova ad aggiungere una voce alla cronologia.
+test('una pagina web non può aggiungere voci alla cronologia appunti via main world (contesto isolato)', async ({ app, openTab, testServer }) => {
+  // Dal #1616 ogni pagina http(s) vede un window.chrome come in Chrome, runtime.sendMessage e runtime.connect compresi
+  // (preload/mondo-chrome.js): la difesa non è più «chrome.runtime manca», è che quella porta non arriva a Filo.
   const page = await testServer.openReady(openTab,
     '<!doctype html><html><body>test</body></html>');
+  const INTRUSA = 'AUDIT_CLIP_INTRUSA_DAL_SITO_XK7Q';
+  const tipo = await app.evaluate(() => globalThis.SN_MSG.MSG.PUSH_CLIPBOARD_ENTRY);
 
-  // Verifica se chrome è accessibile dal main world.
-  const chromeInMainWorld = await page.evaluate(() =>
-    typeof chrome !== 'undefined' && typeof chrome?.runtime?.sendMessage === 'function');
+  // Tutte le forme con cui uno script di pagina può provare a mandare un messaggio: nessuna risponde come Filo.
+  const esiti = await page.evaluate(async ({ tipo, testo }) => {
+    const msg = { type: tipo, entry: { type: 'text', text: testo } };
+    const id = 'a'.repeat(32);
+    const out = {};
+    const tenta = async (nome, fn) => {
+      try { out[nome] = JSON.stringify(await fn()) ?? 'undefined'; } catch (e) { out[nome] = 'throw: ' + String(e.message).slice(0, 80); }
+    };
+    await tenta('senzaId', () => chrome.runtime.sendMessage(msg));
+    await tenta('conId', () => chrome.runtime.sendMessage(id, msg));
+    await tenta('callback', () => new Promise((r) => chrome.runtime.sendMessage(id, msg, r)));
+    await tenta('porta', () => new Promise((r) => {
+      const p = chrome.runtime.connect(id);
+      p.onMessage.addListener((m) => r({ risposta: m }));
+      p.onDisconnect.addListener(() => r('chiusa'));
+      p.postMessage(msg);
+    }));
+    return out;
+  }, { tipo, testo: INTRUSA });
+  for (const [nome, esito] of Object.entries(esiti)) {
+    expect(esito, `${nome}: la pagina non deve ricevere una risposta di Filo`).not.toContain('"ok":true');
+  }
 
-  // La difesa corretta: chrome.runtime NON deve essere nel main world delle
-  // pagine esterne (contextIsolation:true garantisce questo).
-  expect(chromeInMainWorld,
-    'chrome.runtime deve essere assente nel main world delle pagine web esterne'
+  // E la cronologia, letta dal main, non ha la voce: è questo che conta per chi apre «Incolla».
+  const items = await app.evaluate(() => globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []));
+  expect(items.some((i) => i && i.type === 'text' && i.text === INTRUSA),
+    'una voce scritta da uno script di pagina è finita nella cronologia appunti'
   ).toBe(false);
 });

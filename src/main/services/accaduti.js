@@ -83,7 +83,7 @@ function azione(action, res, { via, chatId, fatto = '', segreti = [], incognito,
   let campi = {
     nome: action.type,
     parametri,
-    esito: A().esitoAzione(res, { fatto, cambi: res && res.cambi }),
+    esito: A().esitoAzione(res, { fatto: A().perSempre(action) ? '' : fatto, cambi: res && res.cambi }),
     ...(stringa(chatId) ? { chat: chatId } : {}),
     ...(sito ? { url: sito } : {}),
   };

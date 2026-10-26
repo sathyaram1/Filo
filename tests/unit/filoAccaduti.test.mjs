@@ -69,6 +69,20 @@ test('un\'azione porta quello che è stato chiesto e com\'è andata, non i campi
   assert.ok(!JSON.stringify(A.esitoAzione({ executed: true, output: { pagina: 'TESTO LUNGO' } })).includes('TESTO LUNGO'), 'il contenuto letto non va su disco');
 });
 
+test('cancellato per sempre: la riga dell\'azione dice che è stata fatta e su cosa, non il testo che ha buttato', () => {
+  const chat = { type: 'TOGLI_CHAT', id: 'c1', per_sempre: true, _titolo: 'Parliamo dei soldi segretissimi' };
+  assert.equal(A.perSempre(chat), true);
+  assert.deepEqual(A.parametriAzione(chat), { id: 'c1', per_sempre: true });
+  const riga = { type: 'DIMENTICA', testo: 'il PIN è 1234', per_sempre: true, _righe: ['il PIN è 1234'] };
+  assert.deepEqual(A.parametriAzione(riga), { per_sempre: true });
+  // Nascosta o dimenticata (si rimette), il testo resta: è il «per sempre» che lo butta.
+  assert.equal(A.perSempre({ type: 'TOGLI_CHAT', id: 'c1' }), false);
+  assert.deepEqual(A.parametriAzione({ type: 'DIMENTICA', testo: 'il PIN è 1234' }), { testo: 'il PIN è 1234' });
+  // La porta del main scrive l'esito senza il «fatto» che cita il titolo: tests/chat-nascoste.spec.mjs lo legge dal disco.
+  const src = readFileSync(join(ROOT, 'src/main/services/accaduti.js'), 'utf8');
+  assert.match(src, /perSempre\(action\) \? '' : fatto/, 'accaduti.azione scrive il «fatto» anche per un «per sempre»');
+});
+
 test('una pagina di risultati è una ricerca, con le parole cercate; una pagina qualsiasi no', () => {
   assert.deepEqual(A.ricercaNellIndirizzo('https://www.google.com/search?q=orche+assassine&sca_esv=1&source=hp'), { testo: 'orche assassine', sito: 'Google' });
   assert.deepEqual(A.ricercaNellIndirizzo('https://www.youtube.com/results?search_query=jazz'), { testo: 'jazz', sito: 'YouTube' });

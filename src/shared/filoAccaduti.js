@@ -8,12 +8,21 @@
   const stringa = (s) => typeof s === 'string' && s.length > 0;
   const oggetto = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
 
+  // «Per sempre» vuol dire anche fuori dal filo: dell'azione resta che è stata fatta e su cosa (l'id), non il testo
+  // che ha buttato. La riga dell'azione si scrive DOPO la cancellazione, e la compattazione la tiene.
+  const PER_SEMPRE = { TOGLI_CHAT: [], DIMENTICA: ['testo', 'text', 'riga', 'righe'] };
+  function perSempre(action) {
+    return oggetto(action) && action.per_sempre === true && Object.prototype.hasOwnProperty.call(PER_SEMPRE, action.type);
+  }
+
   // I campi con `_` li scrive Filo sull'azione (esiti, conferme, id della chiamata): l'azione è quello che è stato chiesto.
   function parametriAzione(action) {
     const out = {};
     if (!oggetto(action)) return out;
+    const taciuti = perSempre(action) ? PER_SEMPRE[action.type] : [];
     for (const k of Object.keys(action)) {
       if (k === 'type' || k.startsWith('_') || action[k] === undefined || typeof action[k] === 'function') continue;
+      if (taciuti.includes(k)) continue;
       out[k] = action[k];
     }
     try { return JSON.parse(JSON.stringify(out)); } catch (_) { return {}; }
@@ -212,7 +221,7 @@
   }
 
   global.SN_FILO_ACCADUTI = {
-    parametriAzione, esitoAzione, ricercaNellIndirizzo, cambiSistema, SOGLIE_BATTERIA, cambiEditor, RAFFICA_MS,
+    parametriAzione, esitoAzione, perSempre, ricercaNellIndirizzo, cambiSistema, SOGLIE_BATTERIA, cambiEditor, RAFFICA_MS,
     GESTI, gestoComeAzione,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
