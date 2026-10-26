@@ -1638,7 +1638,10 @@
       }
       const parsed = parseAssistantOutput(res.text);
       // Una ricerca chiesta dal modello è un turno a metà: il seguito lo dice il turno dopo.
-      if (session) session.esito = parsed.status === 'done' && !['web_search', 'documenti'].includes(parsed.kind) ? 'fatto' : null;
+      if (session) {
+        session.esito = parsed.status === 'done' && !['web_search', 'documenti'].includes(parsed.kind) ? 'fatto' : null;
+        session.dopoPasso = false;
+      }
 
       // L'AI ha chiesto una ricerca: si esegue e si rilancia un turno coi risultati come nota
       // di sistema, così l'AI può produrre il JSON normale.
