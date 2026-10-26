@@ -701,7 +701,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, transform calc(0.15s * var(--sn-motion, 1)) ease, visibility 0s;
 }
 .dash-cambi-riga { display: flex; align-items: center; gap: 9px; }
-.dash-cambi-frase { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* Un cambio di tante voci insieme (tutte le impostazioni di serie) scorre dentro la pastiglia, che resta nello schermo. */
+.dash-cambi-frase { flex: 1; min-width: 0; overflow-wrap: anywhere; max-height: min(40vh, 240px); overflow-y: auto; }
 .dash-cambi-annullato .dash-cambi-frase { text-decoration: line-through; opacity: 0.6; }
 .dash-cambi-stato { flex: none; opacity: 0.6; font-size: 11px; }
 .dash-activity-row.dash-cambi-annullato > span:nth-child(2) { text-decoration: line-through; opacity: 0.6; }

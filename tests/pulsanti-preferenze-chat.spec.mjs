@@ -61,11 +61,16 @@ async function scrivi(page, testo) {
   await page.locator('#input').fill(testo);
   await page.locator('#sendBtn').click();
 }
+// Il diario si apre in due passi: il nodo della risposta, poi il passo che contiene la riga.
 async function rigaDelDiario(chat, testo) {
   const diario = chat.locator('.dash-activity').last();
   await expect(diario).toBeVisible({ timeout: 10_000 });
   const riga = diario.locator('.dash-activity-row', { hasText: testo });
-  if (!(await riga.isVisible().catch(() => false))) await diario.locator('.dash-activity-head').click();
+  const apri = async (testa) => { if ((await testa.getAttribute('aria-expanded')) !== 'true') await testa.click(); };
+  if (!(await riga.isVisible().catch(() => false))) {
+    await apri(diario.locator('.dash-activity-head'));
+    await apri(diario.locator('.dash-activity-seg', { hasText: testo }).locator('.dash-activity-seg-head'));
+  }
   return riga;
 }
 
@@ -186,4 +191,23 @@ test('«rimetti tutte le impostazioni di serie»: OK con l\'elenco, poi tutte di
   await expect.poll(async () => (await impostazioni(app)).theme, { timeout: 5_000 }).toBe('dark');
   expect((await impostazioni(app)).notifications.durationSec).toBe(30);
   await ripristina(app);
+});
+
+test('il ripristino dalla pagina Preferenze si rimette com\'era dalla riga del cambio nella home, come dice il riquadro', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await homeDi(app);
+  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+  const prefs = await openTab('filo://preferences/preferences.html');
+  await prefs.locator('#resetAllSettings').click();
+  await expect.poll(async () => (await confirmState(prefs))?.text || '', { timeout: 5_000 }).toContain('Si rimette com’era');
+  await scrollConfirmToEnd(prefs);
+  await clickConfirm(prefs, 'ok');
+  await expect.poll(async () => (await impostazioni(app)).theme, { timeout: 5_000 }).toBe('system');
+  await home.bringToFront();
+  // Il ripristino è un cambio solo: la sua riga nomina i primi e conta gli altri.
+  const riga = home.locator('.dash-cambio', { hasText: 'dalle Preferenze' }).last();
+  await expect(riga).toBeVisible({ timeout: 10_000 });
+  await riga.locator('.dash-cambio-annulla').click();
+  await expect.poll(async () => (await impostazioni(app)).theme, { timeout: 5_000 }).toBe('dark');
 });
