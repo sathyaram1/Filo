@@ -178,8 +178,10 @@
     if (animaNuove && !prima.has(it.id)) b.classList.add('nuova');
     b.addEventListener('click', (e) => {
       if (!e.isTrusted || b.getAttribute('aria-disabled') === 'true') return;
-      if (it.id === 'colorPicker' && typeof window.EyeDropper === 'function') contagocce(it.id);
-      else api.azione({ id: it.id });
+      // Scelta dentro «Altro…»: i contatori la tengono a parte (#1471).
+      const daAltro = b.classList.contains('riserva');
+      if (it.id === 'colorPicker' && typeof window.EyeDropper === 'function') contagocce(it.id, daAltro);
+      else api.azione({ id: it.id, daAltro });
     });
     b.addEventListener('contextmenu', (e) => {
       e.preventDefault();
