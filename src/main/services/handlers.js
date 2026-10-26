@@ -3882,6 +3882,46 @@ async function eseguiAzioneFilo(action, {
         const chiuse = tm ? tm.chiudiSchede(action._targetIds) : [];
         return { executed: chiuse.length > 0, kept: false, output: { chiuse: chiuse.length, ...contoRestano(action._restano) } };
       }
+      case 'PULSANTE_PREFERENZE': {
+        // #1619 — i pulsanti delle Preferenze con le loro stesse funzioni: la chat li preme invece di spiegarli.
+        const P = globalThis.SN_PULSANTI_PREFERENZE;
+        const pulsante = P ? P.pulsanteDi(action) : '';
+        const no = (error, extra) => ({ executed: false, kept: false, output: { error, ...(extra || {}) } });
+        if (!pulsante) return no(`pulsante sconosciuto: si sceglie fra ${P ? P.PULSANTI.join(', ') : 'quelli delle Preferenze'}`, { rifiuto: true });
+        if (pulsante === 'ripristina_tutto') {
+          const n = action._ripristino && Array.isArray(action._ripristino.frasi) ? action._ripristino.frasi.length : 0;
+          if (!n) return no('le impostazioni sono già tutte ai valori di serie', { invariato: true });
+          await ripristinaImpostazioni();
+          return { executed: true, kept: false, output: { ripristinate: n } };
+        }
+        if (pulsante === 'rifai_intervista') {
+          if (!Onboarding) return no('l\'intervista di benvenuto non è disponibile');
+          await ricominciaIntervista();
+          return apriIntervistaRifatta(sender)
+            ? { executed: true, kept: false, output: { aperta: true } }
+            : no('l\'intervista è pronta, ma non c\'è una finestra dove aprirla: la ritrovi aprendo una home nuova');
+        }
+        const settings = await getEffectiveSettings();
+        if (pulsante === 'prova_voce') {
+          const v = P.provaVoce(action, settings);
+          if (v.rifiuto) return no(v.rifiuto, { rifiuto: true });
+          // La legge la pagina della chat, come «Leggi ad alta voce»: senza la voce naturale ripiega su quella del sistema.
+          const wc = sender && sender.wc;
+          if (!wc || (typeof wc.isDestroyed === 'function' && wc.isDestroyed())) return no('non c\'è una pagina dove far sentire la voce');
+          wc.send('filo:broadcast', { type: MSG.TTS_PROVA, testo: v.testo, voce: v.voce });
+          return { executed: true, kept: false, output: { voce: v.etichetta } };
+        }
+        const t = P.provaTono(action, settings);
+        if (t.rifiuto) return no(t.rifiuto, { rifiuto: true });
+        const win = winOf(sender) || filoWin();
+        if (!win || win.isDestroyed()) return no('non c\'è una finestra di Filo dove suonare');
+        win.webContents.send('shell:suona', { tono: t.tono, volume: t.volume });
+        return {
+          executed: true,
+          kept: false,
+          output: { etichetta: t.etichetta, volume: t.volume, ...(t.volume === 0 ? { muto: true } : {}), ...(t.acceso ? {} : { spento: true }) },
+        };
+      }
       case 'COMANDO_FINESTRA': {
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
         // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva
