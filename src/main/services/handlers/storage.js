@@ -100,18 +100,7 @@ module.exports = function register(on, ctx) {
 
   on(MSG.RESET_SETTINGS, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
-    // Ripristino completo: sostituisce l'INTERO oggetto settings, non un merge, così spariscono
-    // anche le chiavi residue. Si preservano solo le credenziali dei provider AI.
-    const current = await Storage.getSettings();
-    const defaults = JSON.parse(JSON.stringify(SN_CONST.DEFAULT_SETTINGS));
-    if (current && current.apiKeys) defaults.apiKeys = current.apiKeys;
-    if (current && current.modelRegistry) defaults.modelRegistry = current.modelRegistry;
-    // Tornare al predefinito non alza l'autonomia di Filo: alzarla vuole «conferma» (#530).
-    const A = globalThis.SN_AUTONOMIA;
-    if (A && current) defaults.autonomia = A.unisciPiuStretta(current.autonomia, defaults.autonomia);
-    await Storage.setSettings(defaults);
-    const merged = await applySettingsUpdate({});
-    return { ok: true, settings: merged };
+    return { ok: true, settings: await ripristinaImpostazioni() };
   });
 
   on(MSG.EXPORT_DATA, async (msg, sender, origin) => {
