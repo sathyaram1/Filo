@@ -3938,6 +3938,39 @@ async function saveOnboarding(state, { via = '' } = {}) {
   return next;
 }
 
+// Rifare l'intervista dalle Preferenze o dalla chat riparte dal benvenuto; quella di prima resta nell'archivio (`past`).
+// `riprendi` (#1297): la stessa intervista, da dove si era fermata.
+async function ricominciaIntervista({ riprendi = false } = {}) {
+  const prev = await FiloMem.getOnboarding();
+  const base = riprendi ? Onboarding.riprendi(prev) : Onboarding.restart(prev);
+  return saveOnboarding(base.thread.length
+    ? base
+    : Onboarding.appendTurn(base, { role: 'filo', text: Onboarding.WELCOME_MESSAGE }));
+}
+
+// Il ripristino di tutte le impostazioni, dalla pagina e dalla chat: sostituisce l'oggetto intero invece di fonderlo.
+async function ripristinaImpostazioni() {
+  const correnti = await Storage.getSettings();
+  await Storage.setSettings(globalThis.SN_PULSANTI_PREFERENZE.impostazioniDiSerie(correnti));
+  return applySettingsUpdate({});
+}
+// Cosa cambierebbe il ripristino, letto con la regola del registro dei cambi: le sue frasi e il livello del suo annullo.
+async function anteprimaRipristino() {
+  const K = globalThis.SN_CAMBI;
+  const correnti = await Storage.getSettings();
+  const cambi = K.cambiImpostazioni(correnti, globalThis.SN_PULSANTI_PREFERENZE.impostazioniDiSerie(correnti),
+    globalThis.SN_STORAGE.normalizza);
+  const evento = { tipo: 'impostazioni', cambi };
+  return { frasi: K.frasi(evento), livello: K.livello(evento) };
+}
+// La home che ospita l'intervista rifatta: col segno, così le altre home restano il filo (#1297).
+function apriIntervistaRifatta(sender) {
+  const win = winOf(sender) || filoWin();
+  if (!win || !win._filoTabs) return false;
+  win._filoTabs.openTab('filo://newtab/?accoglienza=1');
+  return true;
+}
+
 // L'intervista per i contatori (#1461): le voci spuntate, come si è chiusa e, chiusa a metà, il passo dove si è fermata.
 // Le scelte (autonomia, contatori) si leggono dalle impostazioni a fine turno, quando la voce è spuntata: col clic o a
 // parole, è la stessa scelta, e nello stesso turno il modello può spuntare prima di applicare.
