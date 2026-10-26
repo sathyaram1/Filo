@@ -58,6 +58,16 @@
     return P.buildPreferencePartial(chiave, valore, { attuali: attuali || null });
   }
 
+  const pulsante = (a) => {
+    const P = global.SN_PULSANTI_PREFERENZE;
+    return P ? P.pulsanteDi(a) : '';
+  };
+  // Le frasi di cosa cambierebbe il ripristino: un elenco del main, ognuna nel suo riquadro.
+  const frasiRipristino = (a) => {
+    const f = a && a._ripristino && a._ripristino.frasi;
+    return Array.isArray(f) ? f.map(String) : [];
+  };
+
   // Lo stile proposto nell'intervista di benvenuto si imposta senza riquadro (decisione dell'owner, #592.2):
   // `_accoglienza` lo scrive solo il main, quando nel contesto non c'è testo di altri. Torna il testo, o ''.
   function stileDellAccoglienza(action) {
