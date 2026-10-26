@@ -70,6 +70,8 @@
       documentiLetti: 0,
       // Chiusa con la × mentre una risposta arrivava: finita prima, qualunque cosa dica poi la risposta.
       chiusaPrima: false,
+      // Dal clic sul passo indicato alla risposta che lo segue: una pagina che se ne va qui l'ha portata via il passo.
+      dopoPasso: false,
       id: `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
       contata: false,
     };
