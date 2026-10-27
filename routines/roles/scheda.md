@@ -16,7 +16,7 @@ Repo: la radice di Filo (comandi git con `git -C <radice> …`).
    - 1 o 2 `grep -rl` in `src/` o `scripts/` sulla parola chiave della funzione nominata, per vedere se esiste ancora;
    - se serve, `git -C … log origin/main --oneline -5 -- <file>`.
    Niente file interi: al massimo due estratti di 60 righe con `sed -n`.
-3. Scrivi la scheda in JSON nel file `C:\Users\AGENTI~1\AppData\Local\Temp\claude\C--Users-agenti-AI-Desktop-Filo-Filo\8eaf7f24-9f42-4657-bbad-f3e72a35b3ee\scratchpad\schede\<N>.json` con questi campi:
+3. Scrivi la scheda in JSON nel file `<cartella delle schede>/<N>.json` con questi campi:
 
 ```json
 {
