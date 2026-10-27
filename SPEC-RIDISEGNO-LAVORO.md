@@ -33,7 +33,10 @@ doppione, se è già risolto su main. La scrive un agente Haiku dal testo del
 feedback e da pochi controlli su repo e git; Opus rilegge un campione del 10%
 e tutte le schede che dicono «non valido» o «doppione», perché quelle fanno
 sparire lavoro. La scheda è fatta per il manutentore; chi lavora legge il
-feedback intero. Formato: `scheda-prompt.md` del censimento (vedi § 5).
+feedback intero. Il ruolo che la scrive: `routines/roles/scheda.md`. La scheda
+nasce con il feedback (un agente Haiku alla nascita, Opus rilegge solo quelle
+che tolgono lavoro) e si rifà quando il feedback cambia; il manutentore le
+legge tutte, Haiku gli serve anche per le letture di massa che non decidono.
 
 **Pacchetto.** Un feedback che contiene più segnalazioni della stessa area, non
 ancora lavorate, con il testo che è una spec: cosa cambia, per ogni
