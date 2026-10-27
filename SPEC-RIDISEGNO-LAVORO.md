@@ -117,6 +117,9 @@ dell'app. Prima di accendere una sessione si guardano i file dei rami in corso.
 
 **Fase 2.** Il manutentore gira in cloud come compito ricorrente (SPEC-DOMANDE
 § 4.3, con i poteri in più di § 2); il server accende una sessione per feedback.
+Serve un'operazione del server che dia schede e testi a chi ha la chiave delle
+routine: oggi dal cloud non si legge un feedback a scelta (servono il token
+admin e la chiave di decifratura, che stanno solo sul PC dell'owner).
 
 ## 6. Da costruire
 
