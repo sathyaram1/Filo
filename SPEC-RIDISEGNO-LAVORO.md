@@ -105,8 +105,8 @@ verificatore.
 ## 5. Transizione
 
 **Fase 0, ora, in locale.** Censimento: una scheda per ogni feedback aperto
-(#1679), Opus rilegge, e le proposte di pacchetto vanno all'owner come
-domande, con i numeri uniti e la spec di ciascuno.
+(#1679), Opus rilegge, e il manutentore compone i pacchetti da solo: l'owner
+(27/10) non vuole le proposte una per una, si fida dell'ordine scelto.
 
 **Fase 1, con i 240 € di crediti.** Il manutentore è la sessione locale; le
 sessioni cloud si accendono a mano, una per feedback, come routine (parola
