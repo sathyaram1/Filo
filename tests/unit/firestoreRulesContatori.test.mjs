@@ -597,7 +597,7 @@ test('le attività: sola creazione, lette dall’admin, con gli stessi campi e l
   assert.deepEqual(per('list', RA).map((r) => r.cond), ['isAdmin()']);
   assert.ok(!per('read', RA).length && !per('write', RA).length);
   for (const v of ['update', 'delete']) assert.ok(per(v, RA).length >= 1 && per(v, RA).every((r) => r.cond === 'false'));
-  assert.deepEqual(per('create', RA).map((r) => r.cond), ['contatoriAttivita(request.resource.data)']);
+  assert.deepEqual(per('create', RA).map((r) => r.cond), ['request.auth != null && contatoriAttivita(request.resource.data)']);
   assert.deepEqual(elencoDopo(ATTIVITA, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_ATTIVITA]);
   assert.deepEqual(elencoDopo(ATTIVITA, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_ATTIVITA]);
   assert.equal(Number(/d\.v == (\d+)/.exec(ATTIVITA)[1]), C.VERSIONE_ATTIVITA);
