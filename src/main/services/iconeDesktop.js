@@ -579,7 +579,9 @@ async function ordinaOra(q) {
   if (q.ordine === 'data' || q.ordine === 'dimensione') await arricchisci(letto.voci);
   const p = piano(letto, q);
   if (p.errore) return fallito(p.errore, p.errore === 'non-ci-stanno' ? { totale: p.totale, posti: p.posti } : {});
-  const base = { ok: true, cosa: 'desktop', ...come, totale: letto.voci.length, righe: p.righe, colonne: p.colonne, nascoste: letto.nascoste };
+  const base = {
+    ok: true, cosa: 'desktop', ...come, detto: comeDetto(come), totale: letto.voci.length, righe: p.righe, colonne: p.colonne, nascoste: letto.nascoste,
+  };
   const ora = new Map(letto.voci.map((v) => [v.id, v]));
   if (!letto.auto && p.posizioni.every((x) => ora.get(x.id).x === x.x && ora.get(x.id).y === x.y)) {
     return { ...base, gia: true, spostate: 0 };
