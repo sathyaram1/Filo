@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { EventEmitter } from 'node:events';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
