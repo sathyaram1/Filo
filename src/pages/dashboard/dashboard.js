@@ -1087,6 +1087,8 @@
       internal,
       ...(daModello ? { daModello: true } : {}),
       ...(daFuori ? { daFuori: true } : {}),
+      // La risposta di Filo che il messaggio cita (#1620): il main ne ritrova il posto nel filo.
+      ...(rispostaA ? { rispostaA } : {}),
       // #525 — la chat si archivia nel main, mentre la si fa.
       chatId: ensureChatId(),
     };
