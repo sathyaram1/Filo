@@ -189,6 +189,8 @@
   // del prezzo. `allow_fallbacks` resta acceso: fra gli host AMMESSI il ripiego
   // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`, e
   // nessun ripiego: se il produttore non risponde l'errore deve vedersi (#1059).
+  // Per lui anche `order` con il produttore primo, e niente `sort` che lo scavalchi (#1583): col solo `only` il router
+  // ha servito Claude da AWS coi suoi crediti, e la chiave Anthropic dell'owner data a OpenRouter (BYOK) restava ferma.
   // `ownKey`: la chiamata è pagata con la chiave propria (la lista la sceglie excludedFor).
   function providerBlock(routing, model, { tools = false, ownKey = false } = {}) {
     const p = {};
