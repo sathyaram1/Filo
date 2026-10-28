@@ -1334,6 +1334,43 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── I riquadri AI e l'Editor dei contatori (#1465) ───────────────────────
+    //
+    // Per ogni ora che ne ha, solo numeri sotto chiavi di elenchi chiusi: com'era la risposta preparata in anticipo
+    // quando la persona l'ha aperta (Spiega, il correttore su una parola), i riquadri chiusi prima della risposta con
+    // l'attesa in fasce, cosa se ne è fatto (Copia, quante domande dopo, Approfondisci, la risposta ricominciata), la
+    // riscrittura (scorciatoia, esito, proposte), l'OCR, la traduzione della pagina (esito, parte rimasta, ritorno
+    // all'originale entro un minuto), il titolo automatico dell'Editor e la sua chat. Mai un testo, un titolo o un
+    // sito. Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle espressioni; le
+    // stesse regole: sola creazione, senza login, forma fissa, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatori.test.mjs.
+    match /contatori-riquadri/{docId} {
+      function contatoriRiquadri(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'anticipo_al_gesto', 'riquadro_chiuso_prima', 'riquadro_uso', 'riscrittura', 'ocr', 'traduzione_pagina', 'editor_titolo', 'editor_chat'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'anticipo_al_gesto', 'riquadro_chiuso_prima', 'riquadro_uso', 'riscrittura', 'ocr', 'traduzione_pagina', 'editor_titolo', 'editor_chat'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && chiuse(d.anticipo_al_gesto, ['spiega', 'correttore_parola'], 100, '^([0-9]{1,9}(,[0-9]{1,9}){4}(#[0-9]{1,9}(,[0-9]{1,9}){4})*)?$')
+          && chiuse(d.riquadro_chiuso_prima, ['explain', 'explain-deep', 'translate-selection', 'explain-link', 'describe-image'], 350, '^([0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
+          && chiuse(d.riquadro_uso, ['explain', 'explain-deep', 'translate-selection', 'explain-link', 'describe-image'], 350, '^([0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
+          && chiuse(d.riscrittura, ['formale', 'informale', 'riassumi', 'traduci', 'correggi', 'libera'], 600, '^([0-9]{1,9}(,[0-9]{1,9}){9}(#[0-9]{1,9}(,[0-9]{1,9}){9})*)?$')
+          && chiuse(d.ocr, ['copiato', 'vuoto', 'annullato', 'tagliato'], 40, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.traduzione_pagina, ['intera', 'parziale', 'fermata'], 240, '^([0-9]{1,9}(,[0-9]{1,9}){7}(#[0-9]{1,9}(,[0-9]{1,9}){7})*)?$')
+          && chiuse(d.editor_titolo, ['automatico', 'rigenerato'], 140, '^([0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
+          && chiuse(d.editor_chat, ['intero', 'oltre_tetto'], 120, '^([0-9]{1,9}(,[0-9]{1,9}){5}(#[0-9]{1,9}(,[0-9]{1,9}){5})*)?$');
+      }
+      allow get, list: if isAdmin();
+      allow create: if contatoriRiquadri(request.resource.data);
+      allow update, delete: if false;
+    }
+
     // Le manopole dei crediti (euro per credito, ingresso, quota, inviti
     // rimasti, tetto globale) più cambio e somma dei tetti scritti dal server.
     // Campi non enumerati, come gli altri config/*: aggiungerne uno non

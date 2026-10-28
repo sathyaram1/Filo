@@ -358,6 +358,8 @@
   // La griglia dei moduli (#1471): per tipo di modulo cosa gli succede, la griglia ridimensionata, la vista delle
   // impostazioni, i trascinamenti. Mai il testo del documento, né quello che si scrive in un modulo.
   const contaGesto = (campi) => contaErroreVisto({ misura: 'gesto', ...campi });
+  // Il titolo automatico e la chat del documento (#1465): esiti e fasce, mai il titolo né il testo.
+  const contaRiquadro = (cosa, campi) => contaErroreVisto({ misura: 'riquadro', cosa, ...campi });
   const contaModulo = (m, evento) => { if (m && m.type) contaGesto({ gesto: 'modulo_editor', modulo: m.type, evento }); };
   const contaTrascinamento = (ev) => { if (ev) contaErroreVisto(ev); };
 
@@ -987,8 +989,14 @@
   // `manual` (default true) segna che il titolo l'ha scelto l'utente: il titolo automatico non
   // lo sovrascrive. Vale solo se il nome finale è vero: il flag segue il titolo risultante.
   function renameFileAction(id, title, { manual = true } = {}) {
+    const prima = STORE.findFile(collection, id);
+    const diFilo = manual && titoloDiFilo(prima) ? { ...prima.meta } : null;
     STORE.renameFile(collection, id, title);
     const f = STORE.findFile(collection, id);
+    // Il titolo che Filo aveva scritto, riscritto a mano: quanto dopo (#1465).
+    if (diFilo && f && f.meta && f.meta.title !== diFilo.title) {
+      contaRiquadro('editor_titolo', { via: diFilo.titleAutoVia, riscrittoDopoMs: Math.max(0, Date.now() - diFilo.titleAutoAt) });
+    }
     const named = !!(f && f.meta && f.meta.title && f.meta.title !== STORE.DEFAULT_TITLE);
     if (f && f.meta && manual) f.meta.titleManual = named;
     if (doc && doc.id === id && doc.meta && f && f.meta) {
@@ -1057,17 +1065,24 @@
     } catch (_) { return ''; }
   }
 
+  // Il titolo in vista l'ha scritto Filo, con la via e l'ora: quelli di prima dei contatori (#1465) non le hanno.
+  function titoloDiFilo(f) {
+    const m = f && f.meta;
+    return !!(m && m.titleAuto && !m.titleManual && m.title && m.title !== STORE.DEFAULT_TITLE
+      && Number.isFinite(m.titleAutoAt) && ['automatico', 'rigenerato'].includes(m.titleAutoVia));
+  }
+
   // Titolo automatico: conta come «già generato» e toglie il flag manuale.
-  function applyGeneratedTitle(id, raw) {
+  function applyGeneratedTitle(id, raw, via = 'automatico') {
     const clean = cleanTitle(raw);
     if (!clean) return false;
     STORE.renameFile(collection, id, clean);
     const f = STORE.findFile(collection, id);
-    if (f && f.meta) { f.meta.titleAuto = true; f.meta.titleManual = false; }
+    const segno = { titleAuto: true, titleManual: false, titleAutoAt: Date.now(), titleAutoVia: via };
+    if (f && f.meta) Object.assign(f.meta, segno);
     if (doc && doc.id === id && doc.meta) {
       doc.meta.title = f.meta.title;
-      doc.meta.titleAuto = true;
-      doc.meta.titleManual = false;
+      Object.assign(doc.meta, segno);
     }
     writeCollection();
     renderDocSwitcher();
@@ -1095,15 +1110,19 @@
       { role: 'user', content: [bloccoDocumento(letto), ...contesto].join('\n\n') },
     ];
     if (!auto && docSwitchBtn) docSwitchBtn.classList.add('ed-doc-generating');
+    const via = auto ? 'automatico' : 'rigenerato';
+    const esito = (e) => contaRiquadro('editor_titolo', { via, esito: e });
     try {
       const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
-      if (rawText == null) { if (!auto) { contaModello(r); avvisoNonGenerato('il titolo', r); } return false; }
-      const ok = applyGeneratedTitle(id, rawText);
+      if (rawText == null) { esito('fallito'); if (!auto) { contaModello(r); avvisoNonGenerato('il titolo', r); } return false; }
+      const ok = applyGeneratedTitle(id, rawText, via);
+      esito(ok ? 'applicato' : 'vuoto');
       if (!ok && !auto) { contaErroreVisto({ misura: 'avviso', chiave: 'titolo_non_generato' }); showEditorToast('Non sono riuscito a generare il titolo.'); }
       if (ok && !auto && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il titolo'));
       return ok;
     } catch (e) {
+      esito('fallito');
       if (!auto) { contaErroreVisto({ misura: 'avviso', chiave: 'titolo_non_generato' }); avvisoNonGenerato('il titolo', { error: e && e.message, code: e && e.code }); }
       return false;
     } finally {
@@ -3671,7 +3690,7 @@
         tasto.className = 'ed-chat-continua';
         tasto.textContent = 'Continua';
         tasto.title = 'Continua la risposta da dove si è interrotta';
-        tasto.addEventListener('click', (e) => { e.stopPropagation(); input.value = CE.CHIEDI_SEGUITO; send(); });
+        tasto.addEventListener('click', (e) => { e.stopPropagation(); input.value = CE.CHIEDI_SEGUITO; send({ continua: true }); });
         log.appendChild(tasto);
       }
       log.scrollTop = log.scrollHeight;
@@ -3698,7 +3717,7 @@
     };
     input.addEventListener('input', disponi);
     if (typeof ResizeObserver === 'function') new ResizeObserver(disponi).observe(pad);
-    const send = async () => {
+    const send = async ({ continua = false } = {}) => {
       const text = input.value.trim();
       if (!text) return;
       contaModulo(m, 'usato');
@@ -3729,11 +3748,15 @@
             sendMessage({ type: MSG.KEY_FALLBACK_SHOWN });
           }
           if (letto.tagliato) noteTaglio.set(thinking, notaTaglio(letto));
+          // Per i contatori (#1465): il documento letto intero o no, e quante azioni di formato sono andate a segno.
+          const contaTurno = (campi) => contaRiquadro('editor_chat', { oltreTetto: !!letto.tagliato, ...campi });
+          if (continua) contaTurno({ continua: true });
           // Se la risposta contiene azioni di formattazione, applicale al
           // documento e mostra in chat la conferma; altrimenti è testo normale.
           const parsed = parseFormatActions(raw);
           if (parsed && parsed.actions.length) {
             const n = applyFormatActions(parsed.actions);
+            contaTurno(n ? { formati: n } : { nonTrovato: true });
             thinking.content = parsed.reply
               || (n ? 'Fatto.' : 'Non ho trovato testo a cui applicare la formattazione.');
             if (!n && !parsed.reply) {
@@ -3741,6 +3764,7 @@
             }
           } else {
             thinking.content = raw;
+            contaTurno({ formati: 0 });
           }
           // Fermata al tetto di lunghezza (#1097.3): lo si legge sotto, e il modello lo vede al giro dopo.
           const interrotta = window.SN_CHAT_ERRORS?.rispostaInterrotta?.(r.finishReason);

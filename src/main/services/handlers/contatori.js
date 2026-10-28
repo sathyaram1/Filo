@@ -1,4 +1,4 @@
-// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1467, #1471, #1474): crea il servizio, segue le impostazioni,
+// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1465, #1467, #1471, #1474): crea il servizio, segue le impostazioni,
 // riceve i gesti contati nelle pagine e dà all'owner le somme, mai sotto le cinque copie. Cosa si conta: src/main/services/contatori.js.
 // Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
 
