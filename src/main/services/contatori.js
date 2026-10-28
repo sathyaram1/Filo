@@ -760,6 +760,13 @@ function crea(dip = {}) {
     return true;
   }
 
+  // I riquadri AI e l'Editor (#1465): `voce` la costruisce C.voceRiquadro dal messaggio della pagina, o è null.
+  function riquadro(voce, { incognito = null } = {}) {
+    if (!oggetto(voce)) return false;
+    conta((ora) => C.registraRiquadro(ora, voce.misura, voce.chiave, voce.voci), { incognito }).catch(() => {});
+    return true;
+  }
+
   // All'uscita il salvataggio non aspetta i suoi tre secondi, o l'ultima voce (la pulizia dei cookie) non arriverebbe
   // sul disco: il main lo scrive tutto prima di chiudere.
   async function allUscita(voce = null) {

@@ -1,4 +1,4 @@
-// I contatori anonimi (#969, #1461, #1463, #1464, #1466, #1467, #1469, #1471): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
+// I contatori anonimi (#969, #1461, #1463, #1464, #1465, #1466, #1467, #1469, #1471): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
 // Esce solo ciò che sta negli elenchi chiusi di questo file; le regole Firestore ne tengono la forma, e la sentinella
 // tests/unit/firestoreRulesContatori.test.mjs le confronta. Misura e spedizione: src/main/services/contatori.js.
 
