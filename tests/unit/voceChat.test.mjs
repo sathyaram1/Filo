@@ -43,7 +43,7 @@ test('«invia da solo» e «lascia il testo da correggere» si chiedono anche a 
   assert.equal(auto(false), false);
   assert.equal(auto('boh'), undefined);
   assert.equal(P.buildPreferencePartial('invio_vocale', true).costo, 1, 'reversibile e innocua: niente conferma');
-  const desc = globalThis.SN_ACTION_TOOLS.definitions({ sistema: 'linux' })
+  const desc = globalThis.SN_ACTION_TOOLS.definitions()
     .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
   assert.match(desc, /invio_vocale/, 'il modello non sa che la chiave esiste');
   assert.equal(globalThis.SN_CONST.DEFAULT_SETTINGS.dictation.autoSend, true, 'di serie la richiesta parte da sola');
@@ -62,7 +62,7 @@ test('la pausa che chiude e l\'attimo per annullare sono dell\'utente: si chiedo
   assert.equal(P.buildPreferencePartial('attesa_invio_vocale', '0').partial.dictation.cancelSec, 0);
   assert.equal(P.buildPreferencePartial('attesa_invio_vocale', '3,5').partial.dictation.cancelSec, 3.5);
   assert.equal(P.buildPreferencePartial('pausa_microfono', 'boh'), null);
-  const desc = globalThis.SN_ACTION_TOOLS.definitions({ sistema: 'linux' })
+  const desc = globalThis.SN_ACTION_TOOLS.definitions()
     .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
   assert.match(desc, /pausa_microfono/);
   assert.match(desc, /attesa_invio_vocale/);

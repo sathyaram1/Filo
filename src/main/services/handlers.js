@@ -2387,7 +2387,7 @@ function ingressiContati(ing, decisione, { origine, dentroPerimetro }) {
 async function eseguiAzioneFilo(action, {
   confirmed = false, sender = null, contesto = null, provenienza = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
   chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false, segnale = null, nascostiDellaChat = null,
-  domanda = '', soloConferma = false, capRilettura = null, schedeViste = null,
+  domanda = '', soloConferma = false, capRilettura = null, schedeViste = null, intervista = false,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -3017,6 +3017,8 @@ async function eseguiAzioneFilo(action, {
         // Tocca solo il taccuino dell'intervista: ciò che l'intervista APPLICA passa dalle azioni
         // vere (IMPOSTA_PREFERENZA, SALVA_LEZIONE), col loro livello.
         if (!Onboarding) return { executed: false, kept: false };
+        // Lo strumento c'è in ogni chat (gli strumenti sono uguali per ogni ruolo): vale solo nel turno dell'intervista.
+        if (!intervista) return { no: true, executed: false, kept: false, error: 'l\'intervista di benvenuto non è in corso in questa conversazione' };
         const state = await FiloMem.getOnboarding();
         if (state.done) return { executed: false, kept: false };
         const raw = action.spunta ?? action.spunte ?? action.fatto ?? action.done_items ?? action.ids;
@@ -6292,7 +6294,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       const avvia = (a, { contesto, fonti }) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto, provenienza, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette: fonti, richiesta, accoglienza, nascostiDellaChat, capRilettura, schedeViste,
+          sender, contesto, provenienza, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette: fonti, richiesta, accoglienza, intervista: onbActive, nascostiDellaChat, capRilettura, schedeViste,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,

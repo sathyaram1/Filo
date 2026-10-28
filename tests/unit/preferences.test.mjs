@@ -390,7 +390,7 @@ test('i toni che la chat sa scegliere sono quelli che Filo sa suonare', () => {
   }
   // E il modello li legge nell'elenco delle chiavi, insieme alla durata.
   require(join(__dirname, '..', '..', 'src', 'shared', 'actionTools.js'));
-  const desc = globalThis.SN_ACTION_TOOLS.definitions({ sistema: 'linux' })
+  const desc = globalThis.SN_ACTION_TOOLS.definitions()
     .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
   assert.match(desc, /durata_notifiche/);
   assert.match(desc, /suono_notifiche/);
