@@ -1804,7 +1804,6 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
   const pagina = paginaDi(wc);
   const u = await controllaUscita({ type: tipo, url: indirizzo }, { sender: wc ? { wc, url: pagina } : null, parole });
   if (u.blocca) {
-    ContatoriSicurezza.misura('uscitaFermata', u, { type: tipo });
     if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase }, { inVista: true });
     return { aperto: false, frase: u.frase };
   }
