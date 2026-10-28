@@ -3711,7 +3711,7 @@ async function eseguiAzioneFilo(action, {
         // «Rimetti come prima»: vale per i cambi chiesti in chat e per quelli fatti dalle pagine.
         const r = await Registro.annulla(idDelCambio(action), { via: assistente ? 'assistente' : 'chat' });
         if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
-        return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [] } };
+        return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [], ...(r.saltatiPerche ? { saltatiPerche: r.saltatiPerche } : {}) } };
       }
       case 'RIMEDIO_CREDITI': {
         // #818 — i rimedi dell'avviso dei crediti a parole: la stessa porta dei pulsanti, col suo «com'era».
