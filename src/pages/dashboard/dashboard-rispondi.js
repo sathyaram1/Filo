@@ -224,6 +224,18 @@
     return q;
   }
 
+  // La citazione come la manda il filo (src/shared/rispostaA.js, risolvi): il testo è quello scritto da Filo.
+  function dalFilo(r) {
+    if (!r || typeof r !== 'object') return null;
+    const Md = global.SN_MARKDOWN;
+    const scritto = String(r.testo == null ? '' : r.testo);
+    return {
+      chat: typeof r.chat === 'string' ? r.chat : '', i: Number.isInteger(r.i) ? r.i : null, ts: r.ts || '',
+      role: r.role === 'user' ? 'user' : 'filo', manca: r.manca === true,
+      testo: (Md && Md.testo ? Md.testo(scritto) : scritto).trim(),
+    };
+  }
+
   function luce(n) {
     n.classList.remove('dash-trovato');
     void n.offsetWidth;
