@@ -93,6 +93,7 @@ test('un modello non di Anthropic non viene legato a un host', async () => {
     apiKey: 'k', model: 'deepseek/deepseek-v4-flash', messages: [{ role: 'user', content: 'x' }], providerRouting: { ignore: ['DeepSeek'] },
   }));
   assert.equal(sent.provider.only, undefined);
+  assert.equal(sent.provider.order, undefined);
   assert.equal(sent.provider.allow_fallbacks, undefined, 'fra gli host ammessi di un modello aperto il ripiego serve');
   assert.equal(C.producerOnlyRule('mistralai/anthropic-like'), null);
   assert.equal(C.producerOnlyRule(''), null);
