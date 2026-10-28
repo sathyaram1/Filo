@@ -1260,7 +1260,7 @@ service cloud.firestore {
     // corrette, i giri di pulizia e le schede riaperte, la home e i suggerimenti usati. Per misura una mappa
     // «combinazione → n»: la combinazione è fatta di nomi da elenchi chiusi uniti da «|», e qui ne sta l'elenco (per il
     // tipo d'azione di un suggerimento, che cresce col registro delle azioni, la forma). Stesso pseudonimo, stessa ora e
-    // stesso id dell'ora; sola creazione, senza login, legge solo l'admin. Sentinella:
+    // stesso id dell'ora; sola creazione con l'identità anonima, legge solo l'admin. Sentinella:
     // tests/unit/firestoreRulesContatori.test.mjs.
     match /contatori-attivita/{docId} {
       function conti(m, chiavi, tettoChiavi, tetto) {
