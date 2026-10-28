@@ -527,6 +527,7 @@
   const CHIAMATE_RE = re(CHIAMATE_FORMA);
   const SISTEMA_RE = re(SISTEMA_FORMA);
   const NAVIGAZIONE_RE = Object.freeze(Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c, re(FORME_NAVIGAZIONE[c])])));
+  const RIQUADRI_RE = Object.freeze(Object.fromEntries(MISURE_RIQUADRI.map((c) => [c, re(FORME_RIQUADRI[c])])));
   const TURNI_RE = re(TURNI_FORMA);
   const STRUMENTI_RE = re(STRUMENTI_FORMA);
   const AZIONI_PER_GIRO_RE = re(AZIONI_PER_GIRO_FORMA);
