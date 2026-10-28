@@ -1539,6 +1539,8 @@ async function recordSecaudit(id, verdict, testo = '') {
   // Il server prima dello stato locale: vedi il commento in recordVerifier.
   // La nota (L4) va nel payload: il server la cifra in `livelli.l4`, anche su
   // pass, così il pentagono in dashboard ha qualcosa da mostrare.
+  const nonSpedita = await spedisciPrimaDellaConsegna(shaControllato, 'verdetto non registrato');
+  if (nonSpedita) return nonSpedita;
   const sent = await deliverToChannel('secaudit', secauditPayload({ verdict, branch: next.branch || '', testo, sha: shaControllato }));
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `verdetto non accettato (${motivoRifiuto(sent)})` };
