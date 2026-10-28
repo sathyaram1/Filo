@@ -1030,8 +1030,7 @@ export async function registraPunteScritte({ ramo, sha, feedbackId = '', serverA
 export function rigaServerNonSpinto(ramo, atteso, srv) {
   if (!srv) return 'Registro del ramo del server non aggiornato: accanto al repo non trovo più il checkout del server.';
   if (!srv.origine) return '';
-  const qui = srv.sha && srv.sha !== atteso ? srv.sha : atteso;
-  return `Registro del ramo del server non aggiornato: su filo-security ${ramo} è a ${srv.origine.slice(0, 8)}, qui a ${qui.slice(0, 8)}. `
+  return `Registro del ramo del server non aggiornato: su filo-security ${ramo} è a ${srv.origine.slice(0, 8)}, qui a ${String(atteso).slice(0, 8)}. `
     + 'Spingilo (git push nel checkout del server), poi node scripts/verify-local.mjs registra: a sessione chiusa una punta '
     + 'diversa dalla voce il server la segnala come ramo riscritto fuori registro, e il lavoro non va su main.';
 }
