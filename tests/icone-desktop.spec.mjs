@@ -103,6 +103,11 @@ test('«in ordine alfabetico, da sinistra in alto a destra in basso»: le icone 
   await bolla.locator('.dash-cambi-segno').hover();
   await pop.locator('.dash-cambi-annulla').click();
   await expect.poll(() => righeViste(app)).toEqual(IN_FILA);
+
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark', { timeout: 5_000 }).catch(() => {});
+  await page.locator('.dash-activity').first().screenshot({ path: 'tests/.shots/icone-desktop-riga-scuro.png' });
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'light' }));
 });
 
 test('«rimettile com\'erano» a parole: ANNULLA_CAMBIO riporta ogni icona al suo posto', async ({ app }) => {
