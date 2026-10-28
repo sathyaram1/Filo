@@ -2531,6 +2531,22 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.TAB_IN_VISTA && msg.inVista && inRiserva !== false) nonPiuRiserva();
   });
+  // I contatori contano una home quando la persona la vede la prima volta, non quando si carica (#1467): la home pronta
+  // dietro e quelle di una sessione riaperta rimaste dietro si contano arrivando davanti, con lo stato di quel momento.
+  let homeContata = false;
+  function contaHomeVista() {
+    if (homeContata) return;
+    homeContata = true;
+    Promise.resolve(send({ type: MSG.FILO_HOME_VISTA })).catch(() => {});
+  }
+  function contaQuandoVista() {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg?.type === MSG.TAB_IN_VISTA && msg.inVista) contaHomeVista();
+    });
+    send({ type: MSG.TAB_IN_VISTA_GET }).then((r) => {
+      if (!r || (r.inVista && !r.riserva)) contaHomeVista();
+    }, () => contaHomeVista());
+  }
   async function quandoVisibile() {
     if (inRiserva !== false) await new Promise((ok) => attesiConsegna.push(ok));
     if (document.visibilityState !== 'hidden') return;
