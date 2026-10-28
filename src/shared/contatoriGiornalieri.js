@@ -2355,14 +2355,16 @@
   }
   function leggiChiamate(s) { return CHIAMATE_RE.test(String(s)) ? fasceLette(s, nomi(FASCE_CHIAMATE)) : null; }
   // Una voce della navigazione: un oggetto per gruppo, coi conti per nome («ok», «g1», «d100k»…).
-  function leggiNavigazione(misura, s) {
-    if (!has(NAVIGAZIONE_RE, misura) || !NAVIGAZIONE_RE[misura].test(String(s))) return null;
+  function leggiAConti(tabella, forme, misura, s) {
+    if (!has(forme, misura) || !forme[misura].test(String(s))) return null;
     const parti = String(s).split(';');
-    return NAVIGAZIONE[misura].gruppi.map((g, i) => {
+    return tabella[misura].gruppi.map((g, i) => {
       const n = parti[i].split(',').map(Number);
       return Object.fromEntries(g.map((nome, j) => [nome, n[j]]));
     });
   }
+  const leggiNavigazione = (misura, s) => leggiAConti(NAVIGAZIONE, NAVIGAZIONE_RE, misura, s);
+  const leggiRiquadri = (misura, s) => leggiAConti(RIQUADRI, RIQUADRI_RE, misura, s);
   const somma = (o) => Object.values(o).reduce((a, n) => a + n, 0);
   // ── La validazione: la stessa forma che chiedono le regole, e in più i conti che devono tornare ─────────────
   function valida(doc) {
