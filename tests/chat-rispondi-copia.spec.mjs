@@ -114,7 +114,7 @@ test('Copia e Rispondi sotto una risposta di Filo: la citazione parte col messag
   await scrivi(home, 'grazie');
   await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Prego!' })).toBeVisible({ timeout: 20_000 });
   const tutte = await app.evaluate(() => globalThis.__chiamate);
-  const storia = tutte[tutte.length - 1].map(testo).find((t) => t.includes('la seconda')) || '';
+  const storia = tutte[tutte.length - 1].filter((m) => m.role === 'user').map(testo).find((t) => t.trim().endsWith('la seconda')) || '';
   expect(storia).toContain("l'utente risponde al tuo messaggio");
   expect(storia).toContain('Risotto ai funghi');
 
