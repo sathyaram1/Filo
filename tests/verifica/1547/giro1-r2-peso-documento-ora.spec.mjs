@@ -23,7 +23,6 @@ function somma(testo) {
 test('r2 il documento più pesante che le regole accettano pesa decine di KB', () => {
   const ora = somma(corpo('function misureOra(d)', 'function contatoriOra(d)')) + somma(corpo('function contatoriOra3(d)', 'function contatoriChat(d)'));
   const gesti = somma(corpo('function contatoriGesti(d)', 'allow get'));
-  expect({ ora, gesti }).toEqual({ ora: expect.any(Number), gesti: expect.any(Number) });
   expect(ora, 'ora v3').toBeLessThanOrEqual(100000);
   expect(gesti, 'gesti').toBeLessThanOrEqual(100000);
 });
