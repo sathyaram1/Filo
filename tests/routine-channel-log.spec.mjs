@@ -53,6 +53,29 @@ test('i rifiuti del canale compaiono all owner, col motivo in chiaro e la routin
   await expect(rows.nth(0).locator('.mg-log-role--deny')).toHaveCount(1);
 });
 
+// #1653: una fusione fermata da L5 nel recupero del server deve dire di quale feedback è, sennò da qui non si sa chi è fermo.
+test('un rifiuto per una fusione fermata dai controlli porta il numero del feedback e il motivo in chiaro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
+  await apriScheda(page, 'log');
+
+  const rej = [
+    { id: 'r3', at: '2026-10-25T06:14:00.000Z', slug: 'recupero dal server', reason: 'l5_blocked', action: 'merge', num: '#1040' },
+    { id: 'r4', at: '2026-10-25T06:20:00.000Z', slug: 'recupero dal server', reason: 'l5_blocked', action: 'merge', num: 1578 },
+    { id: 'r5', at: '2026-10-25T06:30:00.000Z', slug: 'recupero dal server', reason: 'l5_blocked', action: 'merge' },
+  ];
+  await page.evaluate((r) => window.__mgTest.renderChannelLog(r, []), rej);
+
+  const rows = page.locator('#mgChannelList .mg-log-row');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(2)).toContainText('fusione fermata dai controlli di sicurezza · #1040 · recupero dal server');
+  await expect(rows.nth(1)).toContainText('fusione fermata dai controlli di sicurezza · #1578');
+  await expect(rows.nth(0)).toContainText('fusione fermata dai controlli di sicurezza · recupero dal server');
+  await expect(page.locator('#mgChannelList')).not.toContainText('l5_blocked');
+  await expect(page.locator('#mgChannelList')).not.toContainText('##');
+});
+
 test('i confronti dicono quando le due strade scelgono lo stesso lavoro e quando no', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
