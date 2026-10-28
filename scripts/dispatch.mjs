@@ -1548,6 +1548,7 @@ async function recordSecaudit(id, verdict, testo = '') {
   }
 
   sealTransition(next, `secaudit:${verdict}`);
+  sigillaLaConsegna('secaudit', shaControllato);
   // Su fail il server porta già in `design`; su pass la fusione e la chiusura
   // le porta il server, dopo gli unit sulla fusione (#1207).
   return next;
