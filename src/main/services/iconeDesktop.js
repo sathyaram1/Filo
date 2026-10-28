@@ -503,7 +503,7 @@ function esitoPerModello(o) {
   const parti = [`Icone del desktop ${comeDetto(o)}: ${o.spostate} icone su ${o.righe} ${o.righe === 1 ? 'riga' : 'righe'} e ${o.colonne} ${o.colonne === 1 ? 'colonna' : 'colonne'}, sullo schermo principale.`];
   if (o.autoTolto) parti.push('Era acceso «Disponi automaticamente», che le rimette in colonna: Filo l\'ha spento, dillo all\'utente.');
   if (o.fuoriPosto) parti.push(`${o.fuoriPosto} icone non sono finite al loro posto: dillo all'utente.`);
-  if (o.mancanti) parti.push(`${o.mancanti} icone sono sparite dal desktop mentre le spostavo.`);
+  if (o.mancanti) parti.push(`${o.mancanti} icone sono sparite dal desktop durante lo spostamento.`);
   if (o.nascoste) parti.push('Le icone del desktop sono nascoste: si vedono rimettendo la spunta su «Mostra icone del desktop» (tasto destro sul desktop → Visualizza). Diglielo.');
   if (o.cambio) parti.push(`Per rimetterle dov'erano: ANNULLA_CAMBIO con id ${o.cambio}.`);
   return parti.join(' ');
