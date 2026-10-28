@@ -739,6 +739,7 @@
     annulloTimer,
     annulloRegoleProxy,
     annulloIcone,
+    fraseOrdineDesktop,
     righePerModello,
     nomePaese,
   };
