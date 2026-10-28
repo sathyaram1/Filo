@@ -134,11 +134,11 @@ service firebase.storage {
     // cacheControl né contentLanguage, e leggerli nudi negava tutto. Motore vero:
     // tests/rules/storage-allegati-motore-vero.mjs; la prova che conta è un caricamento dall'app pubblicata.
     function senzaMetadatiScelti(r, file) {
-      return (r.metadata == null || r.metadata.keys().hasOnly(['firebaseStorageDownloadTokens']))
-        && (r.contentDisposition == null || r.contentDisposition == ''
+      return (!('metadata' in r) || r.metadata == null || r.metadata.keys().hasOnly(['firebaseStorageDownloadTokens']))
+        && (!('contentDisposition' in r) || r.contentDisposition == null || r.contentDisposition == ''
           || r.contentDisposition == 'inline'
           || r.contentDisposition == "inline; filename*=utf-8''" + file)
-        && (r.contentEncoding == null || r.contentEncoding == '')
+        && (!('contentEncoding' in r) || r.contentEncoding == null || r.contentEncoding == '')
         && (!('cacheControl' in r) || r.cacheControl == null || r.cacheControl == '')
         && (!('contentLanguage' in r) || r.contentLanguage == null || r.contentLanguage == '');
     }
