@@ -845,7 +845,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-citata::after {
   content: attr(data-testo);
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
-  font-size: 13px; line-height: 1.4; white-space: pre-line; overflow-wrap: anywhere;
+  font-size: 13px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere;
   opacity: 0.78;
 }
 .dash-citata.dash-citata-manca { cursor: default; }
@@ -878,7 +878,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-citazione-chi { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: var(--dash-accent); }
 .dash-citazione-testo {
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
-  font-size: 13px; line-height: 1.4; white-space: pre-line; overflow-wrap: anywhere;
+  font-size: 13px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere;
 }
 .dash-citazione-togli {
   flex: none; width: 28px; height: 28px; padding: 0;

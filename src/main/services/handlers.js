@@ -7089,6 +7089,8 @@ async function citazioneDelMessaggio(rispostaA, chatId) {
   const id = p.chat || chatId;
   let chat = null;
   try { chat = id && FiloChats ? await FiloChats.get(id) : null; } catch (_) { chat = null; }
+  // La sua conversazione è stata cancellata mentre si scriveva: il testo se n'è andato con lei, e qui non rinasce.
+  if (p.chat && !chat) return { ref: null, citata: { manca: true } };
   const i = chat ? RispostaA.posto(chat, { i: p.i, testo: p.testo }) : -1;
   const ref = i >= 0
     ? RispostaA.riferimento({ chat: chat.id, i, ts: chat.messages[i].ts })
