@@ -960,7 +960,8 @@ service cloud.firestore {
     // volta sola (create, mai update). Lo pseudonimo è
     // casuale, cambia ogni mese, e non è il codice dei feedback né lo pseudonimo dei crediti.
     //
-    // SOLA CREAZIONE E SENZA LOGIN, come i feedback: chi ha la chiave web può scrivere numeri falsi, e i contatori
+    // SOLA CREAZIONE, CON L'IDENTITÀ ANONIMA DELL'INSTALLAZIONE (#1547): senza, chiunque abbia la chiave web riempirebbe
+    // le collezioni a piacere. Il documento non porta l'uid. Chi ha un'identità può scrivere numeri falsi, e i contatori
     // servono a leggere tendenze, non a dare niente a nessuno. Qui si tiene la forma: i campi, i tipi, e i valori
     // annidati, ognuno una stringa di forma fissa (le regole non passano in rassegna una mappa, ma ne uniscono chiavi
     // e valori in una stringa sola, che si misura e si confronta). Le chiavi degli elenchi piccoli e fermi (funzioni,
@@ -1006,7 +1007,7 @@ service cloud.firestore {
           && d.uso.values().join('#').size() <= 8000
           && d.uso.values().join('#').matches('^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
           && d.errori is map && d.errori.keys().hasOnly(funzioniContate())
-          && d.errori.values().join('#').size() <= 600000
+          && d.errori.values().join('#').size() <= 48000
           && d.errori.values().join('#').matches('^([a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*)*)?$');
       }
       // Pseudonimo, giorno, ora, versione, sistema e segno del primo documento: uguali per le ore v2 e v3.
@@ -1025,7 +1026,7 @@ service cloud.firestore {
       function misureOra(d) {
         let funzioni = funzioniContate();
         return chiuse(d.uso, funzioni, 15000, '^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9})*)?$')
-          && chiuse(d.errori, funzioni, 300000, '^([a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.errori, funzioni, 48000, '^([a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*)*)?$')
           && aForma(d.azioni, '^([a-z0-9][a-z0-9-]{0,59}(#[a-z0-9][a-z0-9-]{0,59})*)?$', 15000, 40000, '^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9})*)?$')
           && aForma(d.impostazioni, '^([A-Za-z0-9_.*-]{1,80}(#[A-Za-z0-9_.*-]{1,80})*)?$', 15000, 100000, '^([A-Za-z0-9_.-]{1,40}[|](mano|chat|auto|import)[|][0-9]{1,9}(;[A-Za-z0-9_.-]{1,40}[|](mano|chat|auto|import)[|][0-9]{1,9})*(#[A-Za-z0-9_.-]{1,40}[|](mano|chat|auto|import)[|][0-9]{1,9}(;[A-Za-z0-9_.-]{1,40}[|](mano|chat|auto|import)[|][0-9]{1,9})*)*)?$')
           && chiuse(d.ricerche, ['cerca-filo', 'incolla', 'font', 'modello', 'barra-laterale', 'tasto-destro', 'menu'], 4000, '^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){5};[0-9]{1,9}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){5};[0-9]{1,9})*)?$')
@@ -1089,7 +1090,7 @@ service cloud.firestore {
         return (d.v == 3 && contatoriOra3(d)) || (d.v == 2 && contatoriOra(d)) || (d.v == 4 && contatoriChat(d)) || (d.v == 1 && contatoriGiorno(d));
       }
       allow get, list: if isAdmin();
-      allow create: if contatori(request.resource.data);
+      allow create: if request.auth != null && contatori(request.resource.data);
       allow update, delete: if false;
     }
 
@@ -1099,7 +1100,7 @@ service cloud.firestore {
     // cache, il ragionamento, l'uscita, i ripieghi, la spesa e gli adattamenti, in fasce; le chiamate per uso. Stesso
     // pseudonimo, stessa ora e stesso id dell'ora; sta in un documento a parte perché le regole dell'ora sono già
     // vicine al tetto di mille espressioni che Firestore valuta per scrittura. Le stesse regole dell'ora: sola
-    // creazione, senza login, forma fissa, legge solo l'admin. Sentinella: tests/unit/firestoreRulesContatori.test.mjs.
+    // creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella: tests/unit/firestoreRulesContatori.test.mjs.
     match /contatori-chiamate/{docId} {
       function contatoriChiamate(d) {
         let f = funzioniContate();
@@ -1124,7 +1125,7 @@ service cloud.firestore {
           && chiuse(d.chiamate, f, 5000, '^([0-9]{1,9}(,[0-9]{1,9}){4}(#[0-9]{1,9}(,[0-9]{1,9}){4})*)?$');
       }
       allow get, list: if isAdmin();
-      allow create: if contatoriChiamate(request.resource.data);
+      allow create: if request.auth != null && contatoriChiamate(request.resource.data);
       allow update, delete: if false;
     }
 
@@ -1135,7 +1136,7 @@ service cloud.firestore {
     // della scheda, la carta d'anteprima, l'esito delle notifiche per tipo, le azioni sugli scaricamenti, larghezza,
     // scala, stato e tema della finestra, le schede ripristinate all'avvio e quante se ne chiudono subito. Ogni mappa
     // ha per chiave un nome dei suoi elenchi chiusi (i tipi di notifica, che crescono, per forma) e per valore un conto.
-    // Stesso id dell'ora, sola creazione, senza login, legge solo l'admin. Sentinella:
+    // Stesso id dell'ora, sola creazione con l'identità anonima, legge solo l'admin. Sentinella:
     // tests/unit/firestoreRulesContatoriFinestra.test.mjs.
     match /contatori-finestra/{docId} {
       function conti(m, chiavi, tettoChiavi, tetto) {
@@ -1166,7 +1167,7 @@ service cloud.firestore {
           && conti(d.sessioneRipristinata, '^((n1|n2_5|n6_10|n11_20|n21_50|oltre)[:](zero|q25|q50|q75|q100)(#(n1|n2_5|n6_10|n11_20|n21_50|oltre)[:](zero|q25|q50|q75|q100))*)?$', 700, 400);
       }
       allow get, list: if isAdmin();
-      allow create: if contatoriFinestra(request.resource.data);
+      allow create: if request.auth != null && contatoriFinestra(request.resource.data);
       allow update, delete: if false;
     }
 
@@ -1176,8 +1177,8 @@ service cloud.firestore {
     // tasto destro, se le zone sono come di serie, il riquadro «Altro…», le aperture della barra laterale, il nome
     // letto su un'icona, le carte e il riquadro di sistema della home, i moduli dell'Editor, i ripristini, gli
     // «annulla» sui cambi e i trascinamenti (origine e destinazione, mai il contenuto). Stesso pseudonimo, stessa ora e
-    // stesso id dell'ora, in un documento a parte per il tetto di espressioni. Le stesse regole: sola creazione, senza
-    // login, forma fissa, legge solo l'admin. Sentinella: tests/unit/firestoreRulesContatori.test.mjs.
+    // stesso id dell'ora, in un documento a parte per il tetto di espressioni. Le stesse regole: sola creazione con
+    // l'identità anonima, forma fissa, legge solo l'admin. Sentinella: tests/unit/firestoreRulesContatori.test.mjs.
     match /contatori-gesti/{docId} {
       function contatoriGesti(d) {
         return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'icona_spostata', 'disposizione_di_serie', 'altro_del_menu', 'barra_aperta', 'suggerimento_letto', 'carta_home', 'riquadro_sistema', 'modulo_editor', 'ripristino', 'annulla_cambio', 'trascinamento'])
@@ -1204,7 +1205,7 @@ service cloud.firestore {
           && chiuse(d.trascinamento, ['carta_home', 'voce_sistema', 'file_da_chat', 'pagina_salvata', 'icona_barra', 'icona_menu', 'scheda', 'modulo_editor', 'palette_editor', 'testo_pagina', 'file_disco', 'immagine'], 25000, '^((chat_home|chat_aiuto|chat_modulo_editor|colonna_home|altro_home|barra|riga_menu|altro_menu|striscia_schede|griglia_editor|campo_feedback|nessuna)[|](posato|annullato)[|][0-9]{1,9}(;(chat_home|chat_aiuto|chat_modulo_editor|colonna_home|altro_home|barra|riga_menu|altro_menu|striscia_schede|griglia_editor|campo_feedback|nessuna)[|](posato|annullato)[|][0-9]{1,9})*(#(chat_home|chat_aiuto|chat_modulo_editor|colonna_home|altro_home|barra|riga_menu|altro_menu|striscia_schede|griglia_editor|campo_feedback|nessuna)[|](posato|annullato)[|][0-9]{1,9}(;(chat_home|chat_aiuto|chat_modulo_editor|colonna_home|altro_home|barra|riga_menu|altro_menu|striscia_schede|griglia_editor|campo_feedback|nessuna)[|](posato|annullato)[|][0-9]{1,9})*)*)?$');
       }
       allow get, list: if isAdmin();
-      allow create: if contatoriGesti(request.resource.data);
+      allow create: if request.auth != null && contatoriGesti(request.resource.data);
       allow update, delete: if false;
     }
 
@@ -1216,7 +1217,7 @@ service cloud.firestore {
     // banner (esito, età e domini in fasce); i siti bloccati per lista e i loro «Apri comunque»; i banner dei cookie;
     // la pulizia dei cookie all'uscita; i riquadri rotti per servizio; gli scaricamenti in fasce e le domande dei
     // programmi per classe. Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle
-    // espressioni; le stesse regole: sola creazione, senza login, forma fissa, legge solo l'admin. Sentinella:
+    // espressioni; le stesse regole: sola creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella:
     // tests/unit/firestoreRulesContatori.test.mjs.
     match /contatori-navigazione/{docId} {
       function contatoriNavigazione(d) {
@@ -1247,7 +1248,7 @@ service cloud.firestore {
           && chiuse(d.programmi, ['programma', 'immagine_disco'], 100, '^([0-9]{1,9}(,[0-9]{1,9}){4}(#[0-9]{1,9}(,[0-9]{1,9}){4})*)?$');
       }
       allow get, list: if isAdmin();
-      allow create: if contatoriNavigazione(request.resource.data);
+      allow create: if request.auth != null && contatoriNavigazione(request.resource.data);
       allow update, delete: if false;
     }
 

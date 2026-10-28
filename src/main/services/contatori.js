@@ -104,6 +104,9 @@ function crea(dip = {}) {
   const esclusi = dip.esclusi || (async () => []);
   const casuale = dip.casuale || (() => crypto.randomBytes(10).toString('hex'));
   const rest = dip.rest || (() => (globalThis.SN_FEEDBACK && globalThis.SN_FEEDBACK.rest) || {});
+  // L'identità anonima dell'installazione, la stessa dei crediti: le regole non accettano un'ora senza (#1547). Si chiede
+  // solo spedendo, quindi a contatori accesi; il documento non la porta.
+  const idToken = dip.idToken || (() => require('../auth/anon-auth').getIdToken());
   const log = dip.log || ((...a) => console.warn('[contatori]', ...a));
   // L'ora conta come «Filo aperto» solo con una finestra normale: chi usa solo l'incognito non lascia traccia.
   const finestreDiFilo = () => {
