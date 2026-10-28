@@ -1038,6 +1038,7 @@ export function rigaServerNonSpinto(ramo, atteso, srv) {
     + 'Spingilo (git push nel checkout del server), poi node scripts/verify-local.mjs registra: a sessione chiusa una punta '
     + 'diversa dalla voce il server la segnala come ramo riscritto fuori registro, e il lavoro non va su main.';
 }
+
 /** Ci sono modifiche non salvate (anche solo nell'area di stage)? */
 export function isDirty(root = ROOT) { return git(['status', '--porcelain'], root).length > 0; }
 
