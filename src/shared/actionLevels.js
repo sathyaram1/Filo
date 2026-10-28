@@ -998,6 +998,26 @@
         return labels[cmd] || 'Azionare un comando della finestra di Filo';
       },
     },
+    // #1615 — le voci del menu dell'account a parole. Entrare e collegare aprono una pagina dove sceglie l'utente (1);
+    // uscire ferma sincronia e segnalazioni finché non si rientra, che si fa con un gesto (2).
+    ACCOUNT: {
+      costo: (a) => (cosaAccount(a) === 'esci' ? 2 : 1),
+      campo: null,
+      describe: (a) => ({
+        accedi: 'Aprire l\'accesso a Filo con Google',
+        collega_google: 'Collegare YouTube, Gmail e Drive nelle schede al tuo account Google',
+        esci: 'Uscire dall\'account di Filo',
+      }[cosaAccount(a)] || 'Usare il menu dell\'account di Filo'),
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        if (o.gia) return o.frase || 'Niente da cambiare nell\'account';
+        return {
+          accedi: 'Aperto l\'accesso a Filo con Google',
+          collega_google: 'Aperto il collegamento di YouTube, Gmail e Drive al tuo account Google',
+          esci: 'Uscito dall\'account di Filo',
+        }[cosaAccount(a)] || 'Usato il menu dell\'account';
+      },
+    },
     // #870 — le carte della home, come le dispone l'utente trascinandole. Costo 1: ogni mossa si annulla con
     // quella opposta, e una carta tolta resta in «altro», da cui si rimette.
     CARTA_HOME: {
