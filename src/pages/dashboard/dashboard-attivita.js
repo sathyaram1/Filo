@@ -970,6 +970,14 @@
       if (cmd === 'home' && a._output && a._output.already) return { icon: '🏠', text: 'Sei già nella home', failed: true };
       return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };
     },
+    ACCOUNT: (a) => {
+      const o = a._output || {};
+      // Chi era già dove chiedeva non ha avuto niente di nuovo: la riga lo dice e resta fuori dal riassunto.
+      const gia = { dentro: 'Eri già dentro Filo', collegato: 'YouTube, Gmail e Drive erano già collegati', fuori: 'Non eri dentro nessun account' }[o.gia];
+      if (gia) return { icon: '👤', text: gia, failed: true };
+      const fatto = { accedi: 'Accesso con Google aperto', collega_google: 'Collegamento di YouTube, Gmail e Drive aperto', esci: 'Uscito dall\'account di Filo' }[o.voce];
+      return { icon: '👤', text: fatto || 'Account' };
+    },
     SPOSTA_ICONA: (a) => {
       const D = window.SN_DISPOSIZIONE_ICONE;
       const id = String(a.icona || a.id || '');
