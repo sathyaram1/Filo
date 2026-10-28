@@ -65,7 +65,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { verdictForCurrentBranch, readState, registraNelRegistro } from './verify-local.mjs';
+import { verdictForCurrentBranch, readState, registraPunteScritte } from './verify-local.mjs';
 import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaForseInAttesa } from './lib/owner-merge.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
@@ -869,13 +869,11 @@ async function main() {
 
   // I controlli durano minuti: intanto il ramo omonimo del server può essersi mosso, e il verdetto vale
   // per tutti e due (#1062).
-  {
-    const ancora = verdictForCurrentBranch(ROOT);
-    if (!ancora.ok) {
-      console.error(`\n✗ La verifica non regge più: ${ancora.reason}`);
-      console.error('  Non chiedo la fusione.');
-      process.exit(1);
-    }
+  const ancora = verdictForCurrentBranch(ROOT);
+  if (!ancora.ok) {
+    console.error(`\n✗ La verifica non regge più: ${ancora.reason}`);
+    console.error('  Non chiedo la fusione.');
+    process.exit(1);
   }
 
   // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
@@ -888,8 +886,9 @@ async function main() {
     const riga = await riapriPerIlServer({ id: pratica.id, ramo: branch, pendingParts }, { of: await import('./owner-feedback.mjs') });
     if (riga) console.log(riga);
   }
-  // Il registro dei rami (#1148): la punta che si fonde l'ha scritta questa sessione, con la fiducia del suo biglietto.
-  for (const riga of await registraNelRegistro({ ramo: branch, sha: cur, feedbackId: pratica ? pratica.id : '' })) console.log(`  ${riga}`);
+  // Il registro dei rami (#1148): le punte che si fondono, app e server (#1648), le ha scritte questa sessione.
+  const voci = await registraPunteScritte({ ramo: branch, sha: cur, feedbackId: pratica ? pratica.id : '', serverAtteso: (ancora.server && ancora.server.sha) || '' });
+  for (const riga of voci) console.log(`  ${riga}`);
   const primaProva = provaDaRiusare({ fatta: provaDelRamo, punta: cur });
   if (primaProva) console.log('\n▸ Unit sulla fusione: vale la prova fatta qui sopra sullo stesso ramo. Se main si è mosso, il server lo dice e la rifaccio.');
   const giro = await chiediConProva({

@@ -725,3 +725,14 @@ test('senza pratica la chiusura si ferma e dice come aprirla; --check e una prat
   assert.equal(senzaPraticaStop({ checkOnly: true, pratica: null }), '');
   assert.equal(senzaPraticaStop({ checkOnly: false, pratica: { id: 'abc', seq: 908 } }), '');
 });
+
+// #1648: la punta del server che si fonde (anche una fusione pulita di main entrata dopo il verdetto) va nel registro
+// con quella dell'app; senza, a sessione chiusa il server segnala il ramo come riscritto fuori registro.
+test('finish registra anche il ramo del server, con la punta del verdetto riletto subito prima', () => {
+  const codice = SORGENTE.split('\n').filter((r) => !/^\s*\/\//.test(r)).join('\n');
+  assert.doesNotMatch(codice, /registraNelRegistro\(/, 'la strada che registra solo l’app non va più usata qui');
+  const riletto = codice.indexOf('const ancora = verdictForCurrentBranch(ROOT);');
+  const voce = codice.indexOf('registraPunteScritte({');
+  assert.ok(riletto > 0 && voce > riletto, 'la voce si scrive dopo aver riletto il verdetto');
+  assert.match(codice.slice(voce, voce + 300), /serverAtteso: \(ancora\.server && ancora\.server\.sha\) \|\| ''/);
+});

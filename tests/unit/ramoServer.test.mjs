@@ -491,3 +491,76 @@ test('un file nuovo non aggiunto nel checkout del server ferma critica e consegn
   assert.doesNotMatch(k.out, /Nessun commit nuovo/);
   assert.match(k.out, /functions\/altro-modulo\.js/);
 });
+
+// ─── #1648: ogni punta del server che la sessione scrive entra nel registro, solo se è quella su filo-security ────
+
+const REPORT = 'Corretto il salvataggio del campo nuovo nel ramo del server; l\'app non andava toccata, è rimasta com\'era.';
+
+test('registraPunteScritte: il server spinto entra con la sua punta e il suo deposito; non spinto no, e lo dice', async () => {
+  const sc = scenario();
+  const viste = [];
+  const registra = async (a) => { viste.push([a.repo, a.sha, a.cartella]); return { ok: true, ramoFidato: true, fiducia: 'fidato' }; };
+  const app = g(sc.work, 'rev-parse', 'HEAD');
+  const v1 = g(sc.server, 'rev-parse', 'HEAD');
+  let righe = await VL.registraPunteScritte({ ramo: RAMO, sha: app, serverAtteso: v1, root: sc.work }, { registra });
+  assert.deepEqual(viste, [['app', app, sc.work], ['server', v1, sc.server]]);
+  assert.equal(righe.length, 2);
+  assert.match(righe[1], /^Registro del ramo del server: lavoro fidato/);
+
+  // Committato e non spinto: la voce resterebbe davanti a GitHub, quindi non si scrive e si dice come chiudere.
+  viste.length = 0;
+  const v2 = commit(sc.server, 'functions/lavoro.js', 'v2\n', 'correzione non spinta');
+  righe = await VL.registraPunteScritte({ ramo: RAMO, sha: app, serverAtteso: v2, root: sc.work }, { registra });
+  assert.deepEqual(viste.map((x) => x[0]), ['app']);
+  assert.match(righe.at(-1), new RegExp(`su filo-security claude/prova è a ${v1.slice(0, 8)}, qui a ${v2.slice(0, 8)}`));
+  assert.match(righe.at(-1), /git push nel checkout del server\), poi node scripts\/verify-local\.mjs registra/);
+
+  // Spinto da un'altra macchina mentre qui si lavora: la punta su GitHub non è quella di questa sessione.
+  viste.length = 0;
+  const fuori = spintoDaFuori(sc);
+  righe = await VL.registraPunteScritte({ ramo: RAMO, sha: app, serverAtteso: v2, root: sc.work }, { registra });
+  assert.deepEqual(viste.map((x) => x[0]), ['app']);
+  assert.match(righe.at(-1), new RegExp(`è a ${fuori.slice(0, 8)}, qui a ${v2.slice(0, 8)}`));
+
+  // Su filo-security il ramo non c'è (server:fondi porta lui lo sha verificato): niente da confrontare, niente avviso.
+  viste.length = 0;
+  g(sc.server, 'push', '-q', 'origin', `:refs/heads/${RAMO}`);
+  righe = await VL.registraPunteScritte({ ramo: RAMO, sha: app, serverAtteso: v2, root: sc.work }, { registra });
+  assert.deepEqual(viste.map((x) => x[0]), ['app']);
+  assert.equal(righe.length, 1);
+  assert.equal(VL.rigaServerNonSpinto(RAMO, v2, null), 'Registro del ramo del server non aggiornato: accanto al repo non trovo più il checkout del server.');
+});
+
+test('corretto registra la correzione spinta sul server; una non spinta la chiude registra, dopo la spinta', () => {
+  const sc = scenario();
+  assert.equal(vl(sc.work, 'start', 'fai X su app e server').code, 0);
+  assert.equal(vl(sc.work, 'critica', FIX).code, 0);
+  commit(sc.server, 'functions/lavoro.js', 'v2, corretto\n', 'correzione del server');
+  g(sc.server, 'push', '-q', 'origin', `refs/heads/${RAMO}:refs/heads/${RAMO}`);
+  const c = vl(sc.work, 'corretto', REPORT);
+  assert.equal(c.code, 0, c.out);
+  assert.match(c.out, /Registro del ramo del server: questa sessione non ha un biglietto/, 'la voce del server si chiede anche alla consegna');
+  assert.doesNotMatch(c.out, /non aggiornato/);
+
+  assert.equal(vl(sc.work, 'start').code, 0);
+  assert.equal(vl(sc.work, 'critica', FIX).code, 0);
+  const v3 = commit(sc.server, 'functions/lavoro.js', 'v3, corretto ancora\n', 'seconda correzione del server');
+  const k = vl(sc.work, 'corretto', REPORT);
+  assert.equal(k.code, 0, k.out);
+  assert.match(k.out, new RegExp(`non aggiornato: su filo-security claude/prova è a [0-9a-f]{8}, qui a ${v3.slice(0, 8)}`));
+  assert.doesNotMatch(k.out, /Registro del ramo del server: questa sessione/);
+  g(sc.server, 'push', '-q', 'origin', `refs/heads/${RAMO}:refs/heads/${RAMO}`);
+  const r = vl(sc.work, 'registra');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Registro del ramo dell’app: questa sessione non ha un biglietto/);
+  assert.match(r.out, /Registro del ramo del server: questa sessione non ha un biglietto/);
+  assert.doesNotMatch(r.out, /non aggiornato/);
+});
+
+test('registra su main non scrive niente', () => {
+  const sc = scenario();
+  g(sc.work, 'checkout', '-q', 'main');
+  const r = vl(sc.work, 'registra');
+  assert.equal(r.code, 1);
+  assert.match(r.out, /registra vale per un ramo di lavoro, e qui sei su main: non ho scritto niente/);
+});
