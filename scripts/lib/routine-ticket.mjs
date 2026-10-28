@@ -98,8 +98,12 @@ export function writeTicket(root, ticket) {
   try {
     mkdirSync(resolve(root, '.claude'), { recursive: true });
     // Il timbro del gancio di salvataggio è del biglietto di prima: col nuovo varrebbe come suo lavoro vivo (#1480).
-    if (String((readMarkerFrom(root) || {}).ticket || '') !== t) rmSync(resolve(root, '.claude', 'routine-beat-hook.stamp'), { force: true });
-    const marker = { ticket: t, since: new Date().toISOString() };
+    const prima = readMarkerFrom(root) || {};
+    const stesso = String(prima.ticket || '') === t;
+    if (!stesso) rmSync(resolve(root, '.claude', 'routine-beat-hook.stamp'), { force: true });
+    // Dispatch rilanciato dallo stesso worker è lo stesso giro: la punta che il registro conosce e la chiusura restano.
+    const giro = stesso ? Object.fromEntries(['punta', 'chiuso'].filter((k) => prima[k]).map((k) => [k, prima[k]])) : {};
+    const marker = { ticket: t, since: new Date().toISOString(), ...giro };
     writeFileSync(ticketFile(root), JSON.stringify(marker, null, 2) + '\n', 'utf8');
     return marker;
   } catch (_) {
