@@ -67,6 +67,9 @@ const SCRITTURE_ANONIME_DICHIARATE = {
   'contatori-sicurezza':
     'la sicurezza di un’ora dei contatori (#1474), accanto all’ora e con lo stesso id: stesse ragioni, e solo numeri ' +
     'sotto chiavi di elenchi chiusi (livelli, motivi, controlli, scelte, categorie, tipi, tetti), mai un dominio o un segreto.',
+  'contatori-riquadri':
+    'i riquadri AI e l’Editor di un’ora dei contatori (#1465), accanto all’ora e con lo stesso id: stesse ragioni, e solo ' +
+    'numeri sotto chiavi di elenchi chiusi (funzioni, scorciatoie, esiti), mai un testo, un titolo o un sito.',
 };
 
 const VERBI_SCRITTURA = ['write', 'create', 'update', 'delete'];

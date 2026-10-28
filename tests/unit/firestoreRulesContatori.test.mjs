@@ -1,6 +1,6 @@
-// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1463, #1464, #1466, #1467, #1469, #1471): collezioni a sola creazione,
+// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1463, #1464, #1465, #1466, #1467, #1469, #1471): collezioni a sola creazione,
 // lette solo dall'admin, nella forma che l'app costruisce: ore (v3, più v2 e giorni v1 delle copie vecchie), la loro chat (v4),
-// chiamate, navigazione, gesti e attività di un'ora; e gli elenchi della navigazione uguali al codice che li possiede. Il motore vero: contatoriRegole.motore-vero.mjs.
+// chiamate, navigazione, riquadri, gesti e attività di un'ora; e gli elenchi della navigazione uguali al codice che li possiede. Il motore vero: contatoriRegole.motore-vero.mjs.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -35,6 +35,7 @@ const BC = blocco(C.COLLEZIONE_CHIAMATE);
 const BG = blocco(C.COLLEZIONE_GESTI);
 const BN = blocco(C.COLLEZIONE_NAVIGAZIONE);
 const BA = blocco(C.COLLEZIONE_ATTIVITA);
+const BR = blocco(C.COLLEZIONE_RIQUADRI);
 // Le funzioni che le ore e le loro chiamate condividono stanno fra l'intestazione dei contatori e il blocco delle ore.
 const CONDIVISE = (() => {
   const a = RULES.indexOf('    // ── I contatori anonimi');
@@ -42,7 +43,7 @@ const CONDIVISE = (() => {
   assert.ok(a >= 0 && b > a, 'le funzioni condivise dei contatori stanno prima del blocco delle ore');
   return senzaCommenti(RULES.slice(a, b));
 })();
-const TUTTO = [CONDIVISE, B, BC, BG, BN, BA].join('\n');
+const TUTTO = [CONDIVISE, B, BC, BG, BN, BA, BR].join('\n');
 
 // Il corpo di una funzione delle regole, coi `let` già sostituiti dove sono usati: la rilettura vede quello che si valuta.
 function corpo(nome) {
@@ -63,6 +64,7 @@ const TESTA = corpo('testaOra');
 const MISURE_ORA = corpo('misureOra');
 const GESTI = corpo('contatoriGesti');
 const NAVIGAZIONE = corpo('contatoriNavigazione');
+const RIQUADRI = corpo('contatoriRiquadri');
 const CHAT = corpo('contatoriChat');
 const ATTIVITA = corpo('contatoriAttivita');
 
@@ -318,7 +320,7 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
 });
 
 test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l’id dice pseudonimo, giorno e ora', () => {
-  for (const testo of [GIORNO, TESTA, CHAT, CHIAMATE, GESTI, NAVIGAZIONE, ATTIVITA]) {
+  for (const testo of [GIORNO, TESTA, CHAT, CHIAMATE, GESTI, NAVIGAZIONE, ATTIVITA, RIQUADRI]) {
     const pattern = (campo) => {
       const m = new RegExp(`d\\.${campo}\\.matches\\('([^']+)'\\)`).exec(testo);
       assert.ok(m, `manca il controllo di forma su ${campo}`);
@@ -336,7 +338,7 @@ test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l
     assert.deepEqual(stringhe(os[1]), [...C.OS]);
   }
   assert.match(GIORNO, /docId == d\.pseudonimo \+ '_' \+ d\.giorno &&/);
-  for (const testo of [TESTA, CHIAMATE, GESTI, NAVIGAZIONE, ATTIVITA]) {
+  for (const testo of [TESTA, CHIAMATE, GESTI, NAVIGAZIONE, ATTIVITA, RIQUADRI]) {
     assert.match(testo, /docId == d\.pseudonimo \+ '_' \+ d\.giorno \+ '_' \+ d\.ora/);
     const ora = /d\.ora is string && d\.ora\.matches\('([^']+)'\)/.exec(testo);
     assert.ok(ora);
@@ -762,4 +764,57 @@ test('la chat più carica che l’app sa fare passa le regole, e una manomessa n
   assert.notEqual(manomesso('chatReazioni', { 'ferma perché sbagliava': '1' }), '');
   assert.notEqual(manomesso('chatCopie', { risposta: 'il testo copiato' }), '');
   assert.notEqual(manomesso('chatRecuperi', { sollecito: { n: 1, nota: 'ciao' } }), '', 'una mappa al posto della stringa non si unisce');
+});
+
+// ── I riquadri AI e l'Editor di un'ora (#1465) ─────────────────────────────
+const MR = (() => {
+  const out = {};
+  for (const m of RIQUADRI.matchAll(/chiuse\(d\.(\w+), (\[[^\]]*\]), (\d+), '([^']+)'\)/g)) {
+    out[m[1]] = { chiavi: stringhe(m[2]), tetto: Number(m[3]), valori: m[4] };
+  }
+  return out;
+})();
+
+test('i riquadri: sola creazione, letti dall’admin, coi campi e la versione dell’app e lo stesso id dell’ora', () => {
+  const RR = regole(BR);
+  assert.deepEqual(per('get', RR).map((r) => r.cond), ['isAdmin()']);
+  assert.deepEqual(per('list', RR).map((r) => r.cond), ['isAdmin()']);
+  assert.ok(!per('read', RR).length && !per('write', RR).length);
+  for (const v of ['update', 'delete']) assert.ok(per(v, RR).length >= 1 && per(v, RR).every((r) => r.cond === 'false'));
+  assert.deepEqual(per('create', RR).map((r) => r.cond), ['contatoriRiquadri(request.resource.data)']);
+  assert.deepEqual(elencoDopo(RIQUADRI, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_RIQUADRI]);
+  assert.deepEqual(elencoDopo(RIQUADRI, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_RIQUADRI]);
+  assert.equal(Number(/d\.v == (\d+)/.exec(RIQUADRI)[1]), C.VERSIONE_RIQUADRI);
+  const doc = C.documentoRiquadri({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.249', os: 'win', dati: C.oraVuota() });
+  assert.deepEqual(Object.keys(doc), [...C.CAMPI_RIQUADRI]);
+  assert.equal(C.idDocumento(doc), `${'a'.repeat(20)}_2026-10-15_09`, 'lo stesso id della sua ora');
+  assert.ok(!/primo/.test(RIQUADRI), 'il segno del primo documento è dell’ora');
+  const lunghe = [...BR.matchAll(/'(\^[^']*)'/g)].map((m) => m[1].length).filter((n) => n > 4096);
+  assert.deepEqual(lunghe, [], 'una forma oltre i 4096 caratteri: le regole non si pubblicano');
+});
+
+test('i riquadri: ogni misura ha le chiavi, il tetto e la forma dell’app; il documento più carico passa, uno manomesso no', () => {
+  assert.deepEqual(Object.keys(MR).sort(), [...C.MISURE_RIQUADRI].sort(), 'ogni misura ha il suo controllo, e nessuna in più');
+  for (const c of C.MISURE_RIQUADRI) {
+    assert.deepEqual(MR[c].chiavi, [...C.RIQUADRI[c].chiavi], `${c}: le chiavi delle regole sono quelle dell’app`);
+    assert.equal(MR[c].tetto, C.TETTI.RIQUADRI[c], `${c}: il tetto`);
+    assert.equal(MR[c].valori, unite(C.FORME.RIQUADRI[c]), `${c}: la forma dei valori`);
+  }
+  const ora = C.oraVuota();
+  for (const c of C.MISURE_RIQUADRI) {
+    const n = C.RIQUADRI[c].gruppi.reduce((a, g) => a + g.length, 0);
+    for (const k of C.RIQUADRI[c].chiavi) ora[c][k] = Array(n).fill(999999999);
+  }
+  const doc = C.documentoRiquadri({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'linux', dati: ora });
+  assert.equal(C.validaRiquadri(doc).ok, true, C.validaRiquadri(doc).motivo);
+  assert.equal(passa(doc, MR), '', 'i riquadri più carichi dell’app devono passare le regole');
+  const vuoto = C.documentoRiquadri({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T00', app: '0.2.249', os: 'win', dati: C.oraVuota() });
+  assert.equal(passa(vuoto, MR), '');
+  assert.equal(C.senzaRiquadri(vuoto), true, 'un’ora senza riquadri non ha il loro documento');
+  const manomesso = (campo, v) => passa({ ...doc, [campo]: v }, MR);
+  assert.notEqual(manomesso('riscrittura', { 'rendilo più gentile': '1,0,0,0,0,0,0,0,0,0' }), '', 'un’istruzione scritta come chiave');
+  assert.notEqual(manomesso('riquadro_uso', { explain: '1,0,0,0,0,0,0 <b>copiato</b>' }), '', 'del testo dentro il valore');
+  assert.notEqual(manomesso('editor_titolo', { 'Lettera a Mario': '1,0,0,0,0,0,0' }), '', 'un titolo come chiave');
+  assert.notEqual(manomesso('traduzione_pagina', { parziale: '1,0,0,0' }), '', 'un conto che manca');
+  assert.notEqual(manomesso('ocr', { copiato: { n: 1 } }), '', 'una mappa al posto della stringa');
 });
