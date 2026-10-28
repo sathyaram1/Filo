@@ -1551,9 +1551,25 @@
       + `</li>`;
   }
 
-  function renderChannelLog(rejections, comparisons, prove = null) {
+  // Una sessione uscita per lasciare il posto all'altra voce (#1652): chi, quale lavoro ha lasciato, per quale.
+  function righePostiLasciati(posti) {
+    const lavoro = (w) => `${(w && w.num) || '—'} (${roleLabel(w && w.role)}, p${Number(w && w.priority) || 0})`;
+    return (Array.isArray(posti) ? posti : []).map((p) => {
+      const per = Array.isArray(p && p.perIl) ? p.perIl : [];
+      const altri = Number(p && p.altriInAttesa) || per.length;
+      return {
+        at: p && p.at,
+        kind: 'cmp',
+        label: 'Posto lasciato',
+        text: `${lavoro(p && p.lasciato)} lasciato alla routine ${p && p.altraVoce === 'server' ? 'server' : 'normale'} per ${per.map(lavoro).join(', ') || '—'}`
+          + `${altri > per.length ? ` e altri ${altri - per.length}` : ''}${p && p.slug ? ` · ${p.slug}` : ''}`,
+      };
+    });
+  }
+
+  function renderChannelLog(rejections, comparisons, prove = null, posti = null) {
     if (!mgChannelSection || !mgChannelList) return;
-    const rows = righeSenzaProva(prove);
+    const rows = righeSenzaProva(prove).concat(righePostiLasciati(posti));
     for (const r of (Array.isArray(rejections) ? rejections : [])) {
       rows.push({
         at: r && r.at,
@@ -1846,7 +1862,7 @@
     try {
       const r = await sendToMain({ type: ROUTINE_LOG_GET });
       if (!r || r.ok === false) { mgChannelSection.hidden = true; return; }
-      renderChannelLog(r.rejections, r.comparisons, r.proveFusione);
+      renderChannelLog(r.rejections, r.comparisons, r.proveFusione, r.postiLasciati);
     } catch (err) {
       console.error('[manage] caricamento registri canale fallito:', err);
       mgChannelSection.hidden = true;
