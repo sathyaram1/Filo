@@ -201,16 +201,15 @@
   // ── La citazione in testa alla bolla che parte ────────────────────────────
   // Il testo sta in attributi disegnati dal CSS: la bolla resta fatta delle sole parole dell'utente, che è come il filo
   // la riconosce, la cerca e la copia.
+  // `c.testo` è già quello che si legge: dalla bolla citata (rispondi) o dal filo (dalFilo).
   function citaIn(bolla, c) {
     if (!bolla || !c) return null;
-    const Md = global.SN_MARKDOWN;
     const vecchia = bolla.querySelector(':scope > .dash-citata');
     if (vecchia) vecchia.remove();
     const q = document.createElement('span');
     q.className = 'dash-citata';
     const chi = c.role === 'user' ? 'Tu' : 'Filo';
-    const testo = c.manca ? 'Messaggio non più nel filo'
-      : String((c.bolla ? c.testo : (Md && Md.testo ? Md.testo(c.testo || '') : c.testo)) || '').trim();
+    const testo = c.manca ? 'Messaggio non più nel filo' : String(c.testo || '').trim();
     q.dataset.chi = chi;
     q.dataset.testo = testo;
     q.setAttribute('aria-label', `In risposta a ${chi}: ${testo}`);
