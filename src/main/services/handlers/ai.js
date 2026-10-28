@@ -1014,9 +1014,8 @@ module.exports = function register(on, ctx) {
       const tavilyKey = settings.apiKeys?.tavily || '';
       // La ricerca porta la conversazione dell'Aiuto che l'ha chiesta, e se ne va con lei (#1561).
       const chat = ctx.chatAiutoDi(sender);
-      const cerca = () => WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
+      const cerca = () => WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5, da: 'aiuto' });
       const r = await (chat ? require('../registroCambi').con({ chat }, cerca) : cerca());
-      try { globalThis.SN_CONTATORI_MAIN?.attivita('ricercaWeb', { da: 'aiuto', ...globalThis.SN_CONTATORI.esitoRicerca(r) }); } catch (_) {}
       segnaLetturaAiuto(sender, { type: 'CERCA_WEB', query: msg.query, _output: r });
       const results = Array.isArray(r?.results) ? r.results : [];
       ctx.azioneDellAiuto({ type: 'CERCA_WEB', query: msg.query },
