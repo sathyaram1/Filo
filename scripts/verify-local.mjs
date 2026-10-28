@@ -1570,6 +1570,10 @@ if (isMain) {
   }
 
   if (cmd === 'registra') {
+    if (!branch || branch === 'HEAD' || ['main', 'master'].includes(branch.toLowerCase())) {
+      console.error(`registra vale per un ramo di lavoro, e qui sei su ${branch || 'nessun ramo'}: non ho scritto niente.`);
+      process.exit(1);
+    }
     const srvR = serverDelRamo(branch);
     const voci = await registraPunteScritte({
       ramo: branch, sha, feedbackId: (readState()[branch] || {}).feedbackId || '', serverAtteso: (srvR && srvR.locale) || '',
