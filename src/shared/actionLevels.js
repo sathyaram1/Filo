@@ -1152,8 +1152,8 @@
       costo: 1,
       campo: null,
       describe: (a) => {
-        const come = { nome: 'in ordine alfabetico', tipo: 'per tipo', data: 'per data', dimensione: 'per dimensione' };
-        return `Mettere le icone del desktop ${come[String((a && a.ordine) || 'nome').trim().toLowerCase()] || 'in ordine'}`;
+        const come = new Map([['nome', 'in ordine alfabetico'], ['tipo', 'per tipo'], ['data', 'per data'], ['dimensione', 'per dimensione']]);
+        return `Mettere le icone del desktop ${come.get(String((a && a.ordine) || 'nome').trim().toLowerCase()) || 'in ordine'}`;
       },
     },
     // ── zoom della pagina via chat (#686) ────────────────────────────────────
