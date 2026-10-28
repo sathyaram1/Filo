@@ -112,6 +112,11 @@ test('«esci» esce dall\'account e il bottone torna «Accedi»; un secondo «es
 test('chiesto due volte mentre la pagina d\'accesso aspetta: resta una scheda sola, riportata davanti', async ({ app, shell, testServer, openTab }) => {
   test.setTimeout(60_000);
   const pagina = await preparaLogin(app, testServer);
+  // Un'operazione che l'account non ha non apre niente.
+  expect((await esegui(app, { type: 'ACCOUNT', cosa: 'cancella' })).executed).toBe(false);
+  await shell.waitForTimeout(500);
+  expect(await schedeSu(app, pagina)).toHaveLength(0);
+
   expect((await esegui(app, { type: 'ACCOUNT', cosa: 'accedi' })).executed).toBe(true);
   expect(await indirizzoDellAccesso(app, pagina)).toBeTruthy();
   await openTab('filo://editor/editor.html');
@@ -120,10 +125,4 @@ test('chiesto due volte mentre la pagina d\'accesso aspetta: resta una scheda so
   expect((await esegui(app, { type: 'ACCOUNT', cosa: 'accedi' })).executed).toBe(true);
   await expect.poll(async () => (await schedeSu(app, pagina))[0]?.attiva, { timeout: 8_000 }).toBe(true);
   expect(await schedeSu(app, pagina)).toHaveLength(1);
-});
-
-test('un\'operazione che l\'account non ha non tocca niente', async ({ app, shell }) => {
-  const r = await esegui(app, { type: 'ACCOUNT', cosa: 'cancella' });
-  expect(r.executed).toBe(false);
-  expect((await stato(shell)).signedIn).toBe(false);
 });
