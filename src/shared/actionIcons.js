@@ -52,6 +52,7 @@
     TIENI_APERTA: 'pin',
     NON_TENERE_APERTA: 'eraser',
     COMANDO_FINESTRA: 'windowFrame',
+    ACCOUNT: 'user',
     SPOSTA_ICONA: 'pin',
     INSTALLA_AGGIORNAMENTO: 'download',
     RIMEDIO_CREDITI: 'credits',
