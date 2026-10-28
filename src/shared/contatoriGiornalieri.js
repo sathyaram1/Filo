@@ -554,10 +554,14 @@
   // Ogni percorso del sistema una volta, col conto più alto: il caso che non arriva mai, e il documento resta piccolo.
   const TETTO_CARATTERI_SISTEMA = 16000;
   // Ogni conto nove cifre più il suo separatore; la misura, tutte le sue chiavi unite.
-  const TETTI_VOCE_NAVIGAZIONE = Object.freeze(Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c,
-    NAVIGAZIONE[c].gruppi.reduce((a, g) => a + g.length * 10, 0)])));
-  const TETTI_CARATTERI_NAVIGAZIONE = Object.freeze(Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c,
-    NAVIGAZIONE[c].chiavi.length * TETTI_VOCE_NAVIGAZIONE[c]])));
+  const tettiVoce = (tabella) => Object.freeze(Object.fromEntries(Object.keys(tabella).map((c) => [c,
+    tabella[c].gruppi.reduce((a, g) => a + g.length * 10, 0)])));
+  const tettiCaratteri = (tabella, voce) => Object.freeze(Object.fromEntries(Object.keys(tabella).map((c) => [c,
+    tabella[c].chiavi.length * voce[c]])));
+  const TETTI_VOCE_NAVIGAZIONE = tettiVoce(NAVIGAZIONE);
+  const TETTI_CARATTERI_NAVIGAZIONE = tettiCaratteri(NAVIGAZIONE, TETTI_VOCE_NAVIGAZIONE);
+  const TETTI_VOCE_RIQUADRI = tettiVoce(RIQUADRI);
+  const TETTI_CARATTERI_RIQUADRI = tettiCaratteri(RIQUADRI, TETTI_VOCE_RIQUADRI);
   const TETTO_CARATTERI_TURNI = 36 * ESITI_TURNO.length * NOMI_GIRI.length;
   const TETTO_CARATTERI_STRUMENTI = 70 * TETTO_STRUMENTI;
   const TETTO_CARATTERI_AZIONI_PER_GIRO = 10 * AZIONI_PER_GIRO.length;
