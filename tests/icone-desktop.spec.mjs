@@ -85,8 +85,8 @@ test('«in ordine alfabetico, da sinistra in alto a destra in basso»: le icone 
   expect(esito).not.toContain('Bilancio 2024');
 
   await page.locator('.dash-activity-head').first().click();
-  const riga = page.locator('.dash-activity-row', { hasText: 'Icone del desktop in ordine alfabetico, a righe · 8 spostate' });
-  await expect(riga).toBeVisible();
+  await expect(page.locator('.dash-activity-row', { hasText: 'Icone del desktop · in ordine alfabetico, a righe · 8 spostate' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Sistemate le icone del desktop · in ordine alfabetico, a righe · 8 spostate' })).toBeVisible();
   await page.locator('.dash-activity').first().screenshot({ path: 'tests/.shots/icone-desktop-riga.png' });
   const bolla = page.locator('.dash-bubble-user', { hasText: 'ordina le icone del desktop' });
   await bolla.locator('.dash-cambi-segno').hover();
