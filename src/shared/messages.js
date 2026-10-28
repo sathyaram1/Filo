@@ -1141,7 +1141,7 @@
     // Broadcast da background -> content: ferma la tua lettura locale, se ne hai
     // una. Inviato a tutte le schede quando una di esse chiede lo stop globale.
     TTS_STOP: 'tts_stop',
-    // Main -> la sola pagina della chat che l'ha chiesto (#1619): leggi questa frase con questa voce. { testo, voce }
+    // Main -> la sola pagina della chat che l'ha chiesto (#1619): leggi questa frase con questa voce. { testo, voce, sistema }
     TTS_PROVA: 'tts_prova',
 
     // Canale red-team: ponte verso le Cloud Function di filo-security, invocate dal main col

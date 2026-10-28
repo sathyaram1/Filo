@@ -139,6 +139,8 @@
     fr: 'Bonjour, je suis Filo. Voici la voix naturelle choisie pour la lecture à voix haute.',
     pt: 'Olá, eu sou o Filo. Esta é a voz natural escolhida para a leitura em voz alta.',
   });
+  // E quella della voce di riserva del sistema, dal suo «Prova la voce».
+  const FRASE_DI_PROVA_SISTEMA = 'Ciao, sono Filo. Questa è la voce scelta per la lettura ad alta voce.';
 
   // 'it-IT' → 'it'.
   function langOf(tag) {
@@ -254,7 +256,7 @@
   }
 
   global.SN_TTS_VOICES = {
-    CATALOGS, VOICES: KOKORO_VOICES, LANG_LABELS, FRASI_DI_PROVA,
+    CATALOGS, VOICES: KOKORO_VOICES, LANG_LABELS, FRASI_DI_PROVA, FRASE_DI_PROVA_SISTEMA,
     catalogFor, voicesFor, allVoices, catalogOfVoice, isKnownVoice, langOfVoice, labelOfVoice,
     defaultVoiceFor, resolveVoice, voicesFromError, isVoiceRequiredError, pickFromList,
     langOf, groupedByLang,

@@ -5,7 +5,8 @@
 (function (global) {
   'use strict';
 
-  const PULSANTI = Object.freeze(['prova_suono', 'prova_suoneria', 'prova_voce', 'rifai_intervista', 'ripristina_tutto']);
+  const PULSANTI = Object.freeze(['prova_suono', 'prova_suoneria', 'prova_voce', 'prova_voce_sistema', 'rifai_intervista',
+    'ripristina_aspetto', 'ripristina_tutto']);
 
   function pulsanteDi(action) {
     const a = action || {};
@@ -56,17 +57,27 @@
     return { voce, lang, testo, etichetta };
   }
 
+  // «Prova la voce» della voce di riserva: quella del sistema scelta, con velocità e tono salvati (li legge chi suona).
+  function provaVoceSistema(settings) {
+    const V = global.SN_TTS_VOICES;
+    const scelta = String((settings && settings.tts && settings.tts.voice) || '').trim();
+    return { sistema: true, testo: (V && V.FRASE_DI_PROVA_SISTEMA) || 'Ciao, sono Filo.', etichetta: scelta ? eco(scelta) : 'del sistema' };
+  }
+
   // Le impostazioni che il ripristino scrive, intere, così spariscono anche le chiavi residue. Restano le chiavi
-  // dei fornitori e il registro dei modelli; l'autonomia non sale, perché alzarla vuole «conferma» (#530).
+  // dei fornitori, il registro dei modelli e l'autonomia: la sceglie solo l'utente, e «annulla» non la toccherebbe (#530).
   function impostazioniDiSerie(correnti) {
     const C = global.SN_CONST;
-    const A = global.SN_AUTONOMIA;
     const out = JSON.parse(JSON.stringify(C.DEFAULT_SETTINGS));
     if (correnti && correnti.apiKeys) out.apiKeys = correnti.apiKeys;
     if (correnti && correnti.modelRegistry) out.modelRegistry = correnti.modelRegistry;
-    if (A && correnti) out.autonomia = A.unisciPiuStretta(correnti.autonomia, out.autonomia);
+    if (correnti && correnti.autonomia && typeof correnti.autonomia === 'object') {
+      out.autonomia = JSON.parse(JSON.stringify(correnti.autonomia));
+    }
     return out;
   }
 
-  global.SN_PULSANTI_PREFERENZE = { PULSANTI, pulsanteDi, provaTono, provaVoce, impostazioniDiSerie };
+  global.SN_PULSANTI_PREFERENZE = {
+    PULSANTI, pulsanteDi, provaTono, provaVoce, provaVoceSistema, impostazioniDiSerie,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

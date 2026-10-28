@@ -1118,6 +1118,7 @@
       costo: (a) => {
         const p = pulsante(a);
         if (p.startsWith('prova_')) return 0;
+        // L'aspetto si rimette dal segno come un IMPOSTA_ESTETICA: 1.
         if (p !== 'ripristina_tutto') return 1;
         return frasiRipristino(a).length ? 2 : 0;
       },
@@ -1138,6 +1139,10 @@
           const v = String((a && a.voce) || '').trim();
           return v ? ['Far sentire la voce della lettura ', cit(v.slice(0, 80))] : 'Far sentire la voce della lettura ad alta voce';
         }
+        if (p === 'prova_voce_sistema') return 'Far sentire la voce di riserva del sistema';
+        if (p === 'ripristina_aspetto') {
+          return 'Riportare colori, caratteri e misure dell\'aspetto ai valori di serie. Si rimette com\'era con «annulla» sul segno accanto al tuo messaggio.';
+        }
         if (p === 'rifai_intervista') {
           return 'Ricominciare l\'intervista di benvenuto in una home nuova. Quella di prima resta da rileggere in Preferenze.';
         }
@@ -1145,7 +1150,7 @@
           const f = frasiRipristino(a);
           if (!f.length) return 'Riportare le impostazioni ai valori di serie: lo sono già tutte';
           const base = [`Riportare ai valori di serie ${f.length === 1 ? 'un\'impostazione' : `${f.length} impostazioni`}:\n`, elenco(f),
-            '\n\nRestano le chiavi API e il registro dei modelli. Si rimette com\'era con «annulla» sul segno accanto al tuo messaggio.'];
+            '\n\nRestano le chiavi API, il registro dei modelli e l\'autonomia di Filo. Si rimette com\'era con «annulla» sul segno accanto al tuo messaggio.'];
           if (a && a._ripristino && a._ripristino.livello === 1) return base;
           return [...base, '\n\nTocca impostazioni di sicurezza, dei modelli o delle spese: conferma solo se l\'hai chiesto tu.'];
         }
@@ -1157,6 +1162,8 @@
         if (p === 'prova_suono') return `Suonato il suono degli avvisi${o.etichetta ? ` «${o.etichetta}»` : ''}`;
         if (p === 'prova_suoneria') return `Suonata la suoneria${o.etichetta ? ` «${o.etichetta}»` : ''}`;
         if (p === 'prova_voce') return 'Letta una frase con la voce della lettura';
+        if (p === 'prova_voce_sistema') return 'Letta una frase con la voce di riserva del sistema';
+        if (p === 'ripristina_aspetto') return 'Aspetto riportato ai valori di serie';
         if (p === 'rifai_intervista') return 'Ricominciata l\'intervista di benvenuto in una home nuova';
         if (p === 'ripristina_tutto') return 'Impostazioni riportate ai valori di serie';
         return 'Fatto';

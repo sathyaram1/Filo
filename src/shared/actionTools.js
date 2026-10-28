@@ -664,12 +664,15 @@
       description: 'Fa quello che fanno i pulsanti della pagina Preferenze, invece di spiegare all\'utente dove cliccare. '
         + 'prova_suono fa sentire il suono degli avvisi e prova_suoneria quello di timer e sveglie ("fammi sentire la suoneria carillon"), '
         + 'col volume salvato; non cambiano niente, e per sceglierli si usa IMPOSTA_PREFERENZA. '
-        + 'prova_voce legge una frase con la voce naturale della lettura ad alta voce ("com\'è la voce Nicola?"), senza sceglierla. '
+        + 'prova_voce legge una frase con la voce naturale della lettura ad alta voce ("com\'è la voce Nicola?"), senza sceglierla; '
+        + 'prova_voce_sistema con la voce di riserva del sistema ("fammi sentire la voce di riserva"). '
         + 'rifai_intervista ricomincia l\'intervista di benvenuto in una home nuova; quella di prima resta da rileggere in Preferenze. '
+        + 'ripristina_aspetto riporta ai valori di serie tutti i colori, i caratteri e le misure dell\'aspetto ("rimetti l\'aspetto di serie", '
+        + 'dopo "uno stile più retrò"), invece di un IMPOSTA_ESTETICA per ogni token. '
         + 'ripristina_tutto riporta tutte le impostazioni ai valori di serie ("rimetti tutte le impostazioni come all\'inizio"): '
-        + 'restano le chiavi API e il registro dei modelli; se serve un OK lo chiede il sistema, con l\'elenco di cosa cambia, e tu non lo chiedi a parole.',
+        + 'restano le chiavi API, il registro dei modelli e l\'autonomia di Filo; se serve un OK lo chiede il sistema, con l\'elenco di cosa cambia, e tu non lo chiedi a parole.',
       properties: {
-        pulsante: S('Quale pulsante.', { enum: ['prova_suono', 'prova_suoneria', 'prova_voce', 'rifai_intervista', 'ripristina_tutto'] }),
+        pulsante: S('Quale pulsante.', { enum: ['prova_suono', 'prova_suoneria', 'prova_voce', 'prova_voce_sistema', 'rifai_intervista', 'ripristina_aspetto', 'ripristina_tutto'] }),
         tono: S('Per prova_suono e prova_suoneria: standard, delicata, urgente o carillon. Senza, quello scelto adesso.'),
         voce: S('Per prova_voce: il nome della voce naturale, come "Sara" o "Nicola". Senza, quella scelta adesso.'),
       },

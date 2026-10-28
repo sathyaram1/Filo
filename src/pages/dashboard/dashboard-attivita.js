@@ -958,6 +958,11 @@
       if (p === 'prova_suono') return { icon: '🔔', text: `Suono degli avvisi${o.etichetta ? ` · ${o.etichetta}` : ''}${coda}` };
       if (p === 'prova_suoneria') return { icon: '⏰', text: `Suoneria di timer e sveglie${o.etichetta ? ` · ${o.etichetta}` : ''}${coda}` };
       if (p === 'prova_voce') return { icon: '🗣', text: `Voce della lettura${o.voce ? ` · ${o.voce}` : ''}` };
+      if (p === 'prova_voce_sistema') return { icon: '🗣', text: `Voce di riserva${o.voce ? ` · ${o.voce}` : ''}` };
+      if (p === 'ripristina_aspetto') {
+        const n = Number(o.ripristinati) || 0;
+        return { icon: '🎨', text: n ? `Aspetto di serie · ${n === 1 ? '1 valore cambiato' : `${n} valori cambiati`}` : 'Aspetto di serie' };
+      }
       if (p === 'rifai_intervista') return { icon: '👋', text: 'Intervista di benvenuto ricominciata in una home nuova' };
       if (p === 'ripristina_tutto') {
         const n = Number(o.ripristinate) || 0;

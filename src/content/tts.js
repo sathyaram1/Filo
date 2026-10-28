@@ -190,7 +190,10 @@
     if (msg.type === MSG.TTS_GLOBAL_READING) { globalReading = !!msg.active; return true; }
     if (msg.type === MSG.TTS_STOP) { stopReading(); return true; }
     // La prova di una voce chiesta in chat (#1619): la manda il main solo alla pagina della chat.
-    if (msg.type === MSG.TTS_PROVA) { readAloud(msg.testo, null, { voce: typeof msg.voce === 'string' ? msg.voce : '' }); return true; }
+    if (msg.type === MSG.TTS_PROVA) {
+      readAloud(msg.testo, null, { voce: typeof msg.voce === 'string' ? msg.voce : '', sistema: msg.sistema === true });
+      return true;
+    }
     return false;
   }
 
@@ -365,8 +368,8 @@
 
   // Anti-attesa: la prima frase, corta, suona subito mentre le altre si preparano in
   // parallelo; il tempo prima della prima parola crolla.
-  // `voce`: una voce naturale da provare al posto di quella scelta, senza salvarla.
-  async function readAloud(text, tokens, { voce = '' } = {}) {
+  // `voce`: una voce naturale da provare al posto di quella scelta, senza salvarla. `sistema`: solo la voce di riserva.
+  async function readAloud(text, tokens, { voce = '', sistema = false } = {}) {
     const full = String(text == null ? '' : text);
     if (!full.trim()) return;
     // Due letture sovrapposte sono incomprensibili: prima si ferma quella in corso.
@@ -386,6 +389,7 @@
       document.dispatchEvent(new CustomEvent('filo:read-aloud', { detail: { text: full.trim() } }));
     } catch (_) {}
 
+    if (sistema) { playBrowserChunk(s, full, 0); return; }
     // Senza token non c'è evidenziazione possibile: un chunk unico, from=-1.
     const chunks = readTokens.length
       ? Chunk.chunkTokens(readTokens, {})

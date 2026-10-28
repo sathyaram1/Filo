@@ -291,7 +291,7 @@
     const text = 'Riporta TUTTE le impostazioni di Filo ai valori predefiniti: '
       + 'tema, colori e aspetto, colore delle schede, dimensione del testo, '
       + 'notifiche, gestione delle schede e ogni altra preferenza. '
-      + 'Le tue chiavi API restano salvate. Si rimette com’era con «annulla» sulla riga del cambio nella home, o chiedendolo a Filo.';
+      + 'Le tue chiavi API e l’autonomia di Filo restano come sono. Si rimette com’era con «annulla» sulla riga del cambio nella home, o chiedendolo a Filo.';
     const ok = Ui
       ? await Ui.confirm({ title: 'Ripristina tutte le impostazioni', text, okLabel: 'Ripristina tutto' })
       : window.confirm(`${text} Procedo?`);
@@ -739,7 +739,7 @@
     if (!ttsSupported()) return;
     const synth = window.speechSynthesis;
     synth.cancel();
-    const u = new SpeechSynthesisUtterance('Ciao, sono Filo. Questa è la voce scelta per la lettura ad alta voce.');
+    const u = new SpeechSynthesisUtterance(window.SN_TTS_VOICES.FRASE_DI_PROVA_SISTEMA);
     u.rate = parseFloat($('ttsRate').value) || 1;
     u.pitch = parseFloat($('ttsPitch').value) || 1;
     const voiceId = $('ttsVoice').value;

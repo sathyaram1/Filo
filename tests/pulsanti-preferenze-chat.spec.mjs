@@ -211,3 +211,79 @@ test('il ripristino dalla pagina Preferenze si rimette com\'era dalla riga del c
   await riga.locator('.dash-cambio-annulla').click();
   await expect.poll(async () => (await impostazioni(app)).theme, { timeout: 5_000 }).toBe('dark');
 });
+
+test('il ripristino da Automatico coi modelli scelti a mano: una riga vera per i modelli, e l\'autonomia resta com\'è', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await homeDi(app);
+  await configura(app);
+  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ theme: 'dark', autonomia: { livello: 'automatico', manopole: {}, fonti: {} } }));
+  await modelloFinto(app, [premi('ripristina_tutto', 'Ti chiedo conferma.'), { text: 'Fatto.' }]);
+  await scrivi(chat, 'rimetti tutte le impostazioni di serie');
+  await expect.poll(async () => (await confirmState(chat))?.text || '', { timeout: 8_000 }).toContain('tema: scuro');
+  const testo = (await confirmState(chat)).text;
+  await chat.screenshot({ path: 'tests/.shots/pulsanti-preferenze-ripristino-modelli.png' });
+  expect(testo).not.toContain('→ nessuno');
+  expect(testo).toMatch(/modelli scelti a mano per \d+ funzioni: tolti, valgono quelli predefiniti di Filo/);
+  expect(testo).toContain('Restano le chiavi API, il registro dei modelli e l\'autonomia di Filo');
+  await fillConfirmInput(chat, 'conferma');
+  await scrollConfirmToEnd(chat);
+  await clickConfirm(chat, 'danger');
+  await expect.poll(async () => (await impostazioni(app)).theme, { timeout: 5_000 }).toBe('system');
+  expect((await impostazioni(app)).autonomia.livello).toBe('automatico');
+  await ripristina(app);
+});
+
+test('«rimetti l\'aspetto di serie» toglie tutti i ritocchi in un gesto, e il segno li rimette', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await homeDi(app);
+  await configura(app);
+  const ritocchi = { accent: '#2f6b3a', radius: '2px' };
+  await app.evaluate(async (_e, t) => globalThis.SN_STORAGE.updateSettings({ themeTokens: t }), ritocchi);
+  await modelloFinto(app, [premi('ripristina_aspetto', 'Rimesso.'), { text: 'Rimesso.' }]);
+  await scrivi(chat, 'rimetti l\'aspetto di serie');
+  await expect.poll(async () => (await impostazioni(app)).themeTokens, { timeout: 8_000 }).toEqual({});
+  await expect(await rigaDelDiario(chat, 'Aspetto di serie · 2 valori cambiati')).toBeVisible();
+  const bolla = chat.locator('.dash-bubble-user', { hasText: 'rimetti l\'aspetto di serie' });
+  const segno = bolla.locator('.dash-cambi-segno');
+  await expect(segno).toBeVisible({ timeout: 5_000 });
+  await segno.hover();
+  await bolla.locator('.dash-cambi-pop .dash-cambi-annulla').click();
+  await expect.poll(async () => (await impostazioni(app)).themeTokens, { timeout: 5_000 }).toEqual(ritocchi);
+  await ripristina(app);
+});
+
+test('«fammi sentire la voce di riserva» la legge con la voce del sistema, senza chiedere la voce naturale', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await homeDi(app);
+  await configura(app);
+  await app.evaluate(() => { globalThis.__filoTestTtsCanned = true; globalThis.__filoTestTtsChieste = []; });
+  await chat.evaluate(() => {
+    window.__dette = [];
+    if (window.speechSynthesis) window.speechSynthesis.speak = (u) => { window.__dette.push(u.text); };
+  });
+  const frase = await app.evaluate(() => globalThis.SN_TTS_VOICES.FRASE_DI_PROVA_SISTEMA);
+  await modelloFinto(app, [premi('prova_voce_sistema', 'Eccola.')]);
+  await scrivi(chat, 'fammi sentire la voce di riserva');
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Eccola.' })).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => chat.evaluate(() => window.__dette), { timeout: 5_000 }).toEqual([frase]);
+  expect(await app.evaluate(() => globalThis.__filoTestTtsChieste)).toEqual([]);
+  await expect(await rigaDelDiario(chat, 'Voce di riserva')).toBeVisible();
+  await ripristina(app);
+});
+
+test('il ripristino dalla pagina Preferenze, ad Automatico, lo dice e lascia l\'autonomia com\'è', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ theme: 'dark', autonomia: { livello: 'automatico', manopole: {}, fonti: {} } }));
+  const prefs = await openTab('filo://preferences/preferences.html');
+  await expect(prefs.locator('#autonomia-automatico')).toBeChecked({ timeout: 8_000 });
+  await prefs.locator('#resetAllSettings').click();
+  await expect.poll(async () => (await confirmState(prefs))?.text || '', { timeout: 5_000 }).toContain('l’autonomia di Filo restano come sono');
+  await scrollConfirmToEnd(prefs);
+  await clickConfirm(prefs, 'ok');
+  await expect.poll(async () => (await impostazioni(app)).theme, { timeout: 5_000 }).toBe('system');
+  expect((await impostazioni(app)).autonomia.livello).toBe('automatico');
+});

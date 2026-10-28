@@ -281,14 +281,17 @@
   // `normalizza`: lo stesso di getSettings (default fusi), così una chiave assente non sembra tolta.
   function cambiImpostazioni(primaGrezze, dopoGrezze, normalizza) {
     const n = typeof normalizza === 'function' ? normalizza : (x) => x || {};
+    const dopo = n(dopoGrezze);
+    // Coi modelli predefiniti accesi quelli scelti funzione per funzione non valgono: si dicono in una riga (#1619).
+    const coperti = !dopo || dopo.useDefaultModels !== false;
     const out = [];
-    for (const c of foglie(n(primaGrezze), n(dopoGrezze), '', [])) {
+    for (const c of foglie(n(primaGrezze), dopo, '', [])) {
       if (esclusa(c.chiave)) continue;
       const v = voce(c.chiave);
       if (v && v.segreto) {
         out.push({ chiave: c.chiave, segreto: true, vuotoPrima: !c.prima, vuotoDopo: !c.dopo });
       } else {
-        out.push(c);
+        out.push(coperti && c.chiave.startsWith('models.') ? { ...c, coperto: true } : c);
       }
     }
     return out;
@@ -497,7 +500,15 @@
 
   // Le frasi di un evento, una per cambio: chi le mostra sceglie quante.
   function frasi(evento) {
-    return (evento && Array.isArray(evento.cambi) ? evento.cambi : []).map(fraseCambio);
+    const cambi = evento && Array.isArray(evento.cambi) ? evento.cambi : [];
+    const out = cambi.filter((c) => !(c && c.coperto)).map(fraseCambio);
+    const coperti = cambi.filter((c) => c && c.coperto);
+    if (coperti.length) {
+      const tolti = coperti.every((c) => !c.dopo);
+      const quanti = coperti.length === 1 ? 'una funzione' : `${coperti.length} funzioni`;
+      out.push(`modelli scelti a mano per ${quanti}: ${tolti ? 'tolti' : 'cambiati'}, valgono quelli predefiniti di Filo`);
+    }
+    return out;
   }
   function frase(evento, max = 3) {
     const f = frasi(evento);

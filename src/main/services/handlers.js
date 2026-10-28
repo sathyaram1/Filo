@@ -3894,6 +3894,14 @@ async function eseguiAzioneFilo(action, {
           await ripristinaImpostazioni();
           return { executed: true, kept: false, output: { ripristinate: n } };
         }
+        if (pulsante === 'ripristina_aspetto') {
+          // Il «Ripristina tutti i predefiniti» dell'aspetto: la mappa dei token si sostituisce intera, vuota.
+          const correnti = await Storage.getSettings();
+          const n = Object.keys(correnti.themeTokens || {}).length;
+          if (!n) return no('l\'aspetto è già tutto ai valori di serie', { invariato: true });
+          await applySettingsUpdate({ themeTokens: {} });
+          return { executed: true, kept: false, output: { ripristinati: n } };
+        }
         if (pulsante === 'rifai_intervista') {
           if (!Onboarding) return no('l\'intervista di benvenuto non è disponibile');
           await ricominciaIntervista();
@@ -3902,6 +3910,13 @@ async function eseguiAzioneFilo(action, {
             : no('l\'intervista è pronta, ma non c\'è una finestra dove aprirla: la ritrovi aprendo una home nuova');
         }
         const settings = await getEffectiveSettings();
+        if (pulsante === 'prova_voce_sistema') {
+          const v = P.provaVoceSistema(settings);
+          const wc = sender && sender.wc;
+          if (!wc || (typeof wc.isDestroyed === 'function' && wc.isDestroyed())) return no('non c\'è una pagina dove far sentire la voce');
+          wc.send('filo:broadcast', { type: MSG.TTS_PROVA, testo: v.testo, sistema: true });
+          return { executed: true, kept: false, output: { voce: v.etichetta, sistema: true } };
+        }
         if (pulsante === 'prova_voce') {
           const v = P.provaVoce(action, settings);
           if (v.rifiuto) return no(v.rifiuto, { rifiuto: true });
@@ -5074,7 +5089,12 @@ function dopoPulsante(o) {
     return ' Di\' in una frase che le impostazioni sono tornate di serie e che si rimettono com\'era con «annulla» sul segno '
       + 'accanto al messaggio dell\'utente, o chiedendolo a te.';
   }
+  if (o.ripristinati) {
+    return ' Di\' in una frase che colori, caratteri e misure dell\'aspetto sono tornati di serie e che si rimettono com\'era '
+      + 'con «annulla» sul segno accanto al messaggio dell\'utente, o chiedendolo a te.';
+  }
   if (o.aperta) return ' L\'intervista è in una home nuova, già davanti all\'utente; questa conversazione resta qui.';
+  if (o.sistema) return ' La frase la legge adesso la pagina della chat con la voce di riserva del sistema, con velocità e tono salvati.';
   if (o.voce) {
     return ' La frase la legge adesso la pagina della chat; se la voce naturale non è disponibile si sente quella del '
       + 'sistema e un avviso dice perché. Per sceglierla si usa IMPOSTA_PREFERENZA voce_modello.';

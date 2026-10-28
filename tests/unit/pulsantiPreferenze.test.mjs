@@ -122,3 +122,40 @@ test('la chat non manda l\'utente a cercare in Preferenze ciò che sceglie solo 
   const html = readFileSync(join(ROOT, 'src', 'pages', 'preferences', 'preferences.html'), 'utf8');
   for (const id of ['autonomia', 'restartOnboarding']) assert.match(html, new RegExp(`id="${id}"`), `#${id} non c'è più nella pagina`);
 });
+
+test('r1: chi aveva scelto i modelli a mano legge una riga sola per loro, e vera: tornano quelli predefiniti', () => {
+  const correnti = {
+    ...diSerie(), theme: 'dark', useDefaultModels: false,
+    models: { ...diSerie().models, [C.ACTIONS.EXPLAIN]: 'deepseek-flash', [C.ACTIONS.HELP]: 'deepseek', [C.ACTIONS.FILO_CHAT]: 'deepseek' },
+  };
+  const f = K.frasi({ cambi: K.cambiImpostazioni(correnti, P.impostazioniDiSerie(correnti), (x) => x) });
+  assert.ok(!f.some((r) => /→ nessuno/.test(r)), f.join('\n'));
+  assert.equal(f.filter((r) => /modell/.test(r) && /funzion/.test(r)).length, 1, f.join('\n'));
+  assert.ok(f.includes('modelli scelti a mano per 3 funzioni: tolti, valgono quelli predefiniti di Filo'), f.join('\n'));
+  assert.ok(f.includes('tema: scuro → come il sistema'));
+  // Coi predefiniti spenti un modello cambiato resta la sua riga: lì vale davvero.
+  const scelti = { ...correnti, models: { ...correnti.models, [C.ACTIONS.EXPLAIN]: 'gemma' } };
+  assert.deepEqual(K.frasi({ cambi: K.cambiImpostazioni(correnti, scelti, (x) => x) }), ['modello per «Spiega»: deepseek-flash → gemma']);
+});
+
+test('r2: il ripristino lascia l\'autonomia scelta com\'è, in su e in giù: «annulla» non la rimetterebbe', () => {
+  for (const livello of ['automatico', 'conservativo', 'default']) {
+    const autonomia = { livello, manopole: {}, fonti: {} };
+    assert.deepEqual(P.impostazioniDiSerie({ ...diSerie(), autonomia }).autonomia, autonomia, livello);
+  }
+  assert.match(String(AL.describe(azione('ripristina_tutto', { _ripristino: { frasi: ['tema: scuro → chiaro'], livello: 1 } }))), /autonomia/);
+});
+
+test('r3: anche «Ripristina tutti i predefiniti» dell\'aspetto e «Prova la voce» di riserva si chiedono in chat', () => {
+  assert.equal(P.pulsanteDi({ pulsante: 'ripristina aspetto' }), 'ripristina_aspetto');
+  assert.equal(P.pulsanteDi({ pulsante: 'prova_voce_sistema' }), 'prova_voce_sistema');
+  const schema = globalThis.SN_ACTION_TOOLS.TOOLS.PULSANTE_PREFERENZE.properties.pulsante;
+  for (const p of P.PULSANTI) assert.ok(JSON.stringify(schema).includes(p), `lo strumento non offre ${p}`);
+  const v = P.provaVoceSistema({ tts: { voice: 'Microsoft Elsa - Italian (Italy)' } });
+  assert.equal(v.sistema, true);
+  assert.equal(v.testo, globalThis.SN_TTS_VOICES.FRASE_DI_PROVA_SISTEMA);
+  assert.equal(P.provaVoceSistema({}).etichetta, 'del sistema');
+  assert.equal(AL.costoFor(azione('prova_voce_sistema')), 0);
+  assert.equal(AL.costoFor(azione('ripristina_aspetto')), 1);
+  assert.match(String(AL.describe(azione('ripristina_aspetto'))), /aspetto/);
+});
