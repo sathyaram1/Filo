@@ -110,6 +110,7 @@ test('«esci» esce dall\'account e il bottone torna «Accedi»; un secondo «es
   const daSito = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a, { sender: { url: 'https://sito-pubblico.test/' }, assistente: true }),
     { type: 'ACCOUNT', cosa: 'esci' });
   expect(daSito.executed).toBe(false);
+  expect(JSON.stringify(daSito)).toContain('non si esce dall');
   expect((await stato(shell)).signedIn).toBe(true);
   await livelloAutonomia(app, 'default');
 
