@@ -626,7 +626,7 @@
       required: ['comando'],
     },
     ACCOUNT: {
-      description: 'Fa per l\'utente le voci del menu dell\'account di Filo, invece di spiegargli dove cliccare. "accedi" apre l\'accesso a Filo con Google in una scheda: l\'utente sceglie l\'account e la scheda si chiude da sola (YouTube, Gmail e Drive nelle schede si collegano insieme). "collega_google" collega YouTube, Gmail e Drive nelle schede per chi è già dentro Filo. "esci" esce dall\'account di Filo (Google nelle schede resta collegato). L\'esito dice com\'era (già dentro, già collegato, già fuori): riporta quello. Non sa entrare con un altro servizio né cambiare account senza uscire prima.',
+      description: 'Fa per l\'utente le voci del menu dell\'account di Filo, invece di spiegargli dove cliccare. "accedi" apre l\'accesso a Filo con Google in una scheda: l\'utente sceglie l\'account e la scheda si chiude da sola (YouTube, Gmail e Drive nelle schede si collegano insieme). "collega_google" collega YouTube, Gmail e Drive nelle schede per chi è già dentro Filo. "esci" esce dall\'account di Filo (Google nelle schede resta collegato). L\'esito dice com\'era (già dentro, già collegato, già fuori): riporta quello. Per cambiare account: prima esci, poi accedi. Si entra solo con Google.',
       properties: { cosa: S('accedi, collega_google o esci.', { enum: ['accedi', 'collega_google', 'esci'] }) },
       required: ['cosa'],
     },
