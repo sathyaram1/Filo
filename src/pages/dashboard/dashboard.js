@@ -1324,16 +1324,19 @@
 
     // Bolla utente. Nella storia lo stesso testo che parte: diverso, il main lo rimandava come un messaggio in più.
     const domanda = c.text || 'Descrivi questa immagine.';
+    const rispostaA = Rispondi.perIlMain(c.citata);
+    const nelloStorico = Rispondi.perLoStorico(c.citata);
     threadHistory.push({
       role: 'user', text: domanda,
       ...(c.immagini.length ? { images: c.immagini.length } : {}),
       ...(daModello ? { daModello: true } : {}), ...(c.daFuori ? { daFuori: true } : {}),
+      ...(nelloStorico ? { rispostaA: nelloStorico } : {}),
     });
     if (!bolla) bubblesEl.appendChild(bollaUtente(c));
     Coda.segnaGiorni();
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
-    await runTurnAndContinue({ userMessage: domanda, images: c.immagini, daModello, daFuori: c.daFuori });
+    await runTurnAndContinue({ userMessage: domanda, images: c.immagini, daModello, daFuori: c.daFuori, ...(rispostaA ? { rispostaA } : {}) });
   }
 
   // Condiviso fra il primo invio e il «Riprova»: riprovare deve comportarsi come inviare.
