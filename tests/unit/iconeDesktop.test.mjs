@@ -121,8 +121,10 @@ test('la griglia prende l\'allineamento di Windows dalle icone, anche su uno sch
 
 test('più icone di quante ne tiene lo schermo: niente si sposta, e si dice quante ce ne stanno', () => {
   const voci = Array.from({ length: 13 }, (_, i) => voce([`C:\\D\\f${i}`, `f${i}`, 3, 2]));
-  const p = D.piano({ voci, area: { sinistra: 0, alto: 0, destra: 300, basso: 300 }, passo: { x: 75, y: 100 }, griglia: true }, { ordine: 'nome', verso: 'righe' });
+  const area = { sinistra: 0, alto: 0, destra: 303, basso: 302 };
+  const p = D.piano({ voci, area, passo: { x: 75, y: 100 }, griglia: true }, { ordine: 'nome', verso: 'righe' });
   assert.deepEqual(p, { errore: 'non-ci-stanno', totale: 13, posti: 12 });
+  assert.equal(D.piano({ voci: voci.slice(1), area, passo: { x: 75, y: 100 }, griglia: true }, { ordine: 'nome', verso: 'righe' }).posizioni.length, 12);
   const s = D.spiega('non-ci-stanno', p);
   assert.match(s.frase, /13 icone.*ne tiene 12/);
   assert.match(s.dove, /Icone piccole/);
