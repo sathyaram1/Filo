@@ -53,6 +53,7 @@ function banco({ incognito = false, accesi = true, risposta = 200 } = {}) {
     piattaforma: 'linux',
     casuale: () => `${'7'.repeat(18)}${String(++b.n).padStart(2, '0')}`,
     rest: () => ({ FIRESTORE_BASE: 'https://firestore.test/v1/projects/p/databases/(default)/documents', API_KEY: 'K' }),
+    idToken: async () => 'token-anonimo',
     fetch: async (url, opt) => {
       const doc = Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)]));
       const dove = url.includes(`/${C.COLLEZIONE_GESTI}?`) ? 'gesti' : url.includes(`/${C.COLLEZIONE_CHIAMATE}?`) ? 'chiamate' : 'ore';

@@ -54,6 +54,7 @@ function banco({ accesi = true, incognito = false, risposta = 200 } = {}) {
     esclusi: async () => [],
     casuale: () => `${'7'.repeat(18)}${String(++b.n).padStart(2, '0')}`,
     rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'K' }),
+    idToken: async () => 'token-anonimo',
     fetch: async (url, opt) => {
       const doc = Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)]));
       const dove = url.includes(`/${C.COLLEZIONE_NAVIGAZIONE}?`) ? 'navigazione' : url.includes(`/${C.COLLEZIONE_CHIAMATE}?`) ? 'chiamate' : 'ore';

@@ -1162,7 +1162,7 @@ function crea(dip = {}) {
     const fields = Object.fromEntries(Object.entries(doc).map(([k, v]) => [k, valoreFs(v)]));
     // Senza identità (offline, persa, illeggibile) l'ora resta in attesa come per un server giù: niente avvisi.
     let token = '';
-    try { token = await idToken(); } catch (e) { token = ''; }
+    try { token = await idToken(); } catch (_) { token = ''; }
     if (!token) return { ok: false, motivo: 'identità dell\'installazione non pronta' };
     let res;
     try {

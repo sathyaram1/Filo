@@ -54,6 +54,7 @@ function banco({ schede = [{ id: 'a', openedAt: new Date(T0 - 2 * MIN).toISOStri
     esclusi: async () => [],
     casuale: () => `${'7'.repeat(18)}${String(++b.n).padStart(2, '0')}`,
     rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'K' }),
+    idToken: async () => 'token-anonimo',
     fetch: async (url, opt) => {
       const coll = /documents\/([a-z-]+)\?/.exec(url)[1];
       const doc = Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)]));
