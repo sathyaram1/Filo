@@ -766,6 +766,7 @@
     mic:          (size) => wrap(mic, { size }),
     memory:       (size) => wrap(memory, { size }),
     copy:         (size) => wrap(copy, { size }),
+    reply:        (size) => wrap(reply, { size }),
     bell:         (size) => wrap(bell, { size }),
     repeat:       (size) => wrap(repeat, { size }),
     question:     (size) => wrap(question, { size }),
