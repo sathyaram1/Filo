@@ -477,7 +477,7 @@ function spiega(errore, { totale = 0, posti = 0 } = {}) {
     },
     prove: { frase: 'Durante le prove automatiche Filo non tocca il desktop vero.' },
   };
-  const voce = T[errore] || { frase: 'Windows non ha spostato le icone del desktop.' };
+  const voce = Object.prototype.hasOwnProperty.call(T, errore) ? T[errore] : { frase: 'Windows non ha spostato le icone del desktop.' };
   return { errore, frase: voce.frase, ...(voce.dove ? { dove: voce.dove } : {}) };
 }
 
