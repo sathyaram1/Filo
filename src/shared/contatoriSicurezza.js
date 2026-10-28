@@ -131,9 +131,9 @@
   // I segreti per funzione hanno posto per quattro volte le funzioni di oggi: una funzione nuova non aspetta regole nuove.
   const FUNZIONI_PREVISTE = 160;
   const TETTI = Object.freeze({
-    sito_verdetto: [5000, 1800], sito_approfondito: [3000, 1300], avviso_scelta: [2400, 500], pagina_delicata: [4800, 1200],
+    sito_verdetto: [3600, 1700], sito_approfondito: [3800, 2300], avviso_scelta: [1500, 500], pagina_delicata: [2700, 1200],
     segreto_oscurato: [FUNZIONI_PREVISTE * TIPI_SEGRETO.length * 54, FUNZIONI_PREVISTE * TIPI_SEGRETO.length * 10],
-    uscita_fermata: [7500, 2000], tetto_toccato: [400, 200],
+    uscita_fermata: [7200, 2900], tetto_toccato: [400, 200],
   });
 
   // ── L'ora, in memoria ─────────────────────────────────────────────────
