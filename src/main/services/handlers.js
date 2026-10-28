@@ -6670,7 +6670,6 @@ async function generateDashboardFromInputs(inputs, { precedente = null } = {}) {
   for (let i = 0; i < suggestions.length; i++) {
     const u = suggestions[i].action ? await controllaUscita(suggestions[i].action, casa) : null;
     if (u && u.blocca) {
-      ContatoriSicurezza.misura('uscitaFermata', u, suggestions[i].action);
       suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase };
       continue;
     }
