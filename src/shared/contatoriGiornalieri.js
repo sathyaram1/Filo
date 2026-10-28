@@ -493,8 +493,10 @@
   const SISTEMA_FORMA = `^((^|;)${VOCE_SISTEMA})*$`;
   // La navigazione: i conti di un gruppo separati da «,», i gruppi da «;».
   const conti = (k) => (k > 1 ? `${N}(,${N}){${k - 1}}` : N);
-  const FORME_NAVIGAZIONE = Object.freeze(Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c,
-    `^${NAVIGAZIONE[c].gruppi.map((g) => conti(g.length)).join(';')}$`])));
+  const formeConti = (tabella) => Object.freeze(Object.fromEntries(Object.keys(tabella).map((c) => [c,
+    `^${tabella[c].gruppi.map((g) => conti(g.length)).join(';')}$`])));
+  const FORME_NAVIGAZIONE = formeConti(NAVIGAZIONE);
+  const FORME_RIQUADRI = formeConti(RIQUADRI);
   // La chat (#1463): «esito|fascia dei giri|n», «strumento|esito|n», «messaggi|durata|tipo|n». Il nome di uno strumento
   // ha nelle regole la sua forma (maiuscole, cifre, trattino basso): l'elenco cresce con Filo e lo tiene l'app.
   const VOCE_TURNO = `${alternative(ESITI_TURNO)}[|]${alternative(NOMI_GIRI)}[|]${N}`;
