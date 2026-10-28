@@ -3737,6 +3737,10 @@ async function eseguiAzioneFilo(action, {
         const r = await require('./comandiSistema').comanda(richiestaDaEseguire(type, action));
         return { executed: !!r.ok, kept: false, output: r };
       }
+      case 'ORDINA_DESKTOP': {
+        const r = await require('./iconeDesktop').ordinaIcone(action);
+        return { executed: !!r.ok, kept: false, output: r };
+      }
       case 'ZOOM_PAGINA': {
         // #686 — lo zoom della pagina si chiede anche a parole, non solo con
         // Ctrl +/-/0. Non zooma da qui: gira la richiesta alla scheda attiva
