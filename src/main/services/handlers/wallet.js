@@ -414,7 +414,13 @@ module.exports = function register(on, ctx) {
   // caratteri sul campo, niente taglio: o dentro c'è un codice, o si dice.
   // La lettura è lineare (#664): qui gira nel main, e un conto lento ferma
   // tutte le schede.
+  // L'esito di ogni riscatto, da qualunque strada, lo contano i contatori del servizio (#1472): lo status, mai il codice.
   async function doRedeem(rawCode) {
+    const out = await riscatta(rawCode);
+    require('../contatoriServizio').misura('invito', (out && out.status) || 'internal');
+    return out;
+  }
+  async function riscatta(rawCode) {
     const codes = W.codesFromInput(rawCode || '');
     if (!codes.length) return { ok: false, status: 'bad_code', message: W.redeemMessage('bad_code') };
     const idErr = await identityProblem();
@@ -612,6 +618,7 @@ module.exports = function register(on, ctx) {
   async function riscattaInvito(code) {
     if (walletStore.personalKey()) {
       const rec = await setNotice('already_in', 'Hai già i crediti di Filo su questo computer. Questo invito puoi darlo a qualcun altro.');
+      require('../contatoriServizio').misura('invito', 'already_in');
       return { ok: false, status: 'already_in', message: rec.text };
     }
     const out = await doRedeem(code);
@@ -1061,6 +1068,7 @@ module.exports = function register(on, ctx) {
     // L'avviso nomina la pagina Crediti: porta il tasto per andarci, come ogni frase sui crediti (#663).
     try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: text.charAt(0).toUpperCase() + text.slice(1), duration: 8000, rimedio: { keyRefused: true } }); } catch (_) {}
     try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:crediti_finiti'); } catch (_) {}
+    require('../contatoriServizio').misura('avviso', 'finiti', 'mostrato');
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
 

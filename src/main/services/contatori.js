@@ -1,5 +1,5 @@
-// I contatori anonimi (#969, #1461, #1463, #1464, #1465, #1466, #1467, #1469, #1471, #1473, #1474): misura usi e chiamate dei modelli, azioni,
-// chat, attività, navigazione, riquadri, gesti, sicurezza, home e automatismi e guasti di elenco chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito
+// I contatori anonimi (#969, #1461, #1463, #1464, #1465, #1466, #1467, #1469, #1471, #1472, #1473, #1474): usi e chiamate dei modelli, azioni, chat,
+// attività, navigazione, riquadri, gesti, servizio, sicurezza, home e automatismi e guasti di elenco chiuso, per ora sul disco e spediti ogni ora a ore chiuse. In incognito
 // e a contatori spenti non conta e non spedisce; spenti, butta quello che aveva, senza un ultimo segnale. Cosa esce: src/shared/contatoriGiornalieri.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
@@ -90,6 +90,7 @@ function crea(dip = {}) {
   const F = dip.contatoriFinestra || globalThis.SN_CONTATORI_FINESTRA || null;
   const S = dip.contatoriSicurezza || globalThis.SN_CONTATORI_SICUREZZA || null;
   const H = dip.contatoriHomePagina || globalThis.SN_CONTATORI_HOME_PAGINA || null;
+  const R = dip.contatoriServizio || globalThis.SN_CONTATORI_SERVIZIO || null;
   const disco = () => require('../shim/storage');
   const storage = dip.storage || globalThis.SN_STORAGE;
   const impostazioni = dip.impostazioni || (() => storage.getSettings());
@@ -152,6 +153,8 @@ function crea(dip = {}) {
   // L'ultima risposta dell'interruttore, per chi non può aspettarla (un campione al secondo, la chiusura). null: non
   // ancora letta, e quello che arriva intanto aspetta la prima lettura.
   let ultimoAccesi = null;
+  // Le ultime impostazioni lette dall'interruttore: l'istantanea dell'ora (#1472) non può aspettarne una lettura.
+  let ultimeImpostazioni = null;
   // Il sistema (#1466) si raccoglie qui, fuori dall'ora e senza scrivere: entra nell'ora alla prima scrittura che c'è
   // comunque (un conto, il giro dell'ora, la chiusura). Un campione al secondo o una chiamata sincrona per pagina non
   // diventano così una scrittura dello storage ciascuno.
@@ -198,6 +201,7 @@ function crea(dip = {}) {
   async function accesi() {
     try {
       const s = await impostazioni();
+      ultimeImpostazioni = s && typeof s === 'object' ? s : null;
       ultimoAccesi = Boolean(s) && !spentiIn(s);
     } catch (_) { ultimoAccesi = false; }
     return ultimoAccesi;
@@ -1003,9 +1007,11 @@ function crea(dip = {}) {
     return conta(scrivi, { incognito }).catch(() => false);
   }
   function primaDiOgniScrittura(fn) { if (typeof fn === 'function') primaDiScrivere.push(fn); }
-  // La sicurezza (#1474), la home e gli automatismi sulla pagina (#1473) entrano dalla stessa porta.
+  // La sicurezza (#1474), il servizio (#1472), la home e gli automatismi sulla pagina (#1473) entrano dalla stessa porta.
   const sicurezza = finestra;
+  const servizio = finestra;
   const homePagina = finestra;
+  const impostazioniViste = () => ultimeImpostazioni;
 
   // ── I gesti della personalizzazione (#1471) ─────────────────────────────
   // `dati` può venire da una pagina: ne passano solo le chiavi e le voci dei suoi elenchi.
@@ -1242,6 +1248,7 @@ function crea(dip = {}) {
       const accanto = giorno ? [] : documentiAccanto(k, { ...base, chiave: k });
       const diFinestra = giorno ? null : documentoFinestra(k, { ...base, chiave: k });
       const diSicurezza = giorno ? null : documentoSicurezza(k, { ...base, chiave: k });
+      const diServizio = giorno ? null : documentoServizio(k, { ...base, chiave: k });
       const diHomePagina = giorno ? null : documentoHomePagina(k, { ...base, chiave: k });
       const gesti = giorno ? null : documentoGesti(k, { ...base, chiave: k });
       const riquadri = giorno ? null : documentoRiquadri(k, { ...base, chiave: k });
@@ -1270,6 +1277,10 @@ function crea(dip = {}) {
       }
       if (r.ok && diSicurezza) {
         r = await spedisci(diSicurezza, S.COLLEZIONE);
+        if (mia !== generazione) return 'spenti';
+      }
+      if (r.ok && diServizio) {
+        r = await spedisci(diServizio, R.COLLEZIONE);
         if (mia !== generazione) return 'spenti';
       }
       // Per ultimi: finché le regole pubblicate non conoscono la loro collezione, il rifiuto non tiene indietro gli altri.
@@ -1342,6 +1353,17 @@ function crea(dip = {}) {
     const v = S.valida(d);
     if (v.ok) return d;
     log(`la sicurezza di ${k} non parte: ${v.motivo}`);
+    return null;
+  }
+
+  // Il servizio di un'ora (#1472), se ne ha: come la sicurezza.
+  function documentoServizio(k, base) {
+    if (!R) return null;
+    const d = R.documento(base);
+    if (R.senzaDati(d)) return null;
+    const v = R.valida(d);
+    if (v.ok) return d;
+    log(`il servizio di ${k} non parte: ${v.motivo}`);
     return null;
   }
 
@@ -1577,7 +1599,7 @@ function crea(dip = {}) {
     congeda, riaperta, memoriaCorretta, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa,
     confermaChiesta, confermaRisposta,
     navigazione, riquadro, allUscita,
-    azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, sicurezza, homePagina, primaDiOgniScrittura, gesto, disposizioneIcone, cambioRitirato,
+    azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, sicurezza, servizio, homePagina, impostazioniViste, primaDiOgniScrittura, gesto, disposizioneIcone, cambioRitirato,
     turnoChat, reazione, copia: copiaDaBolla, chatChiusa, chatClassificata, chatInUscita, uscitaFinita, usciteInSospeso,
     controlla, avvia, seguiImpostazioni, installazioni, somme, accesi, letto, salva, alChiudere,
     passoAvvio, passoAvvioFino, processoMorto, eccezione, ipcSincrono, aggiornamento, seguiFinestra, sessione,

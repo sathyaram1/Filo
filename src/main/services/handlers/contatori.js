@@ -1,4 +1,4 @@
-// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1465, #1467, #1471, #1473, #1474): crea il servizio, segue le impostazioni,
+// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1465, #1467, #1471, #1472, #1473, #1474): crea il servizio, segue le impostazioni,
 // riceve i gesti contati nelle pagine e dà all'owner le somme, mai sotto le cinque copie. Cosa si conta: src/main/services/contatori.js.
 // Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
 
@@ -8,6 +8,7 @@ const Servizio = require('../contatori');
 const Finestra = require('../contatoriFinestra');
 const Sicurezza = require('../contatoriSicurezza');
 const HomePagina = require('../contatoriHomePagina');
+const MisureServizio = require('../contatoriServizio');
 const Somme = require('../contatoriSomme');
 const Disco = require('../../shim/storage');
 const Registro = require('../registroCambi');
@@ -94,6 +95,9 @@ module.exports = function register(on, ctx) {
   // La home e quello che Filo fa da sé sulla pagina (#1473).
   const homePagina = HomePagina.crea({ contatori });
   globalThis.SN_CONTATORI_HOME_PAGINA_MAIN = homePagina;
+  // Il servizio (#1472): politica dei modelli, chiavi, crediti, identità, accesso e segnalazioni; quello che è arrivato
+  // prima, all'avvio, entra adesso.
+  MisureServizio.avvia(MisureServizio.crea({ contatori }));
   contatori.avvia();
 
   // Ogni scrittura delle impostazioni, chiunque l'abbia chiesta, col segno di chi l'ha chiesta (#867): un valore di
@@ -221,6 +225,8 @@ module.exports = function register(on, ctx) {
       // I riquadri AI e l'Editor (#1465): la voce si costruisce dai soli campi degli elenchi, il resto del messaggio si perde.
       case 'riquadro': ok = contatori.riquadro(C.voceRiquadro(testo(m.cosa), m)); break;
       case 'reazione': ok = contatori.reazione(testo(m.voce)); break;
+      // L'unico rimedio dei crediti che resta nella pagina (#1472): apre il campo della chiave, il main non lo vede.
+      case 'rimedio-crediti': ok = testo(m.id) === 'chiave' && MisureServizio.misura('avviso', 'rimedio', 'chiave'); break;
       case 'copia': ok = contatori.copia(testo(m.ruolo)); break;
       case 'ricerca-web-tetto': ok = contatori.attivita('ricercaWeb', { da: 'aiuto', alTetto: true }); break;
       case 'suggerimento': ok = contatori.attivita('suggerimenti', { tipo: testo(m.tipo), posizione: numero(m.posizione), etaMs: numero(m.etaMs) }); break;

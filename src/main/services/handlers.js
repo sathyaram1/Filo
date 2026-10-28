@@ -13,6 +13,7 @@ const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 const SegretiLetti = require('./segretiLetti');
 const VerdettiUscite = require('./verdettiUscite');
 const ContatoriSicurezza = require('./contatoriSicurezza');
+const ContatoriServizio = require('./contatoriServizio');
 const Registro = require('./registroCambi');
 const GiroAzioni = require('./giroAzioni');
 const ContestoFilo = require('./contestoFilo');
@@ -522,6 +523,7 @@ function buildAttemptChain(settings, modelRef, action) {
   // «Solo modelli a pesi aperti»: ogni modello proprietario è SOSTITUITO col suo equivalente
   // aperto, e chi non ne ha esce. Un ripiego su un proprietario non si costruisce proprio.
   const openWeightsOnly = settings.openWeightsOnly === true;
+  let pesiAperti = null;
   if (openWeightsOnly) {
     // Il sostituto deve saper fare QUEL mestiere, o la dettatura finisce su un modello muto.
     const pol = SN_CONST.applyOpenWeightsPolicy(usable, registry, action);
@@ -531,6 +533,7 @@ function buildAttemptChain(settings, modelRef, action) {
     }
     if (!pol.refs.length) throw openWeightsConfigError(settings, action, pol.dropped);
     usable = pol.refs;
+    pesiAperti = { sostituiti: pol.substituted.length, tolti: pol.dropped.length };
   }
 
   // Stesso ordine di fornitori di SN_CONST.canServeAction: se le due liste
@@ -559,6 +562,8 @@ function buildAttemptChain(settings, modelRef, action) {
   try { owner = Defaults.get().lunghezzaRisposte; } catch (_) {}
   const tetto = LR ? LR.perAzione(action, settings.lunghezzaRisposte, owner) : null;
   if (tetto) for (const a of out) a.maxTokens = tetto;
+  // I modelli che l'interruttore ha cambiato: li contano i contatori del servizio (#1472) quando la catena parte davvero.
+  if (pesiAperti) Object.defineProperty(out, 'pesiAperti', { value: pesiAperti, enumerable: false });
   return out;
 }
 
@@ -579,6 +584,7 @@ function openWeightsBlockReason(settings, entry) {
   const kind = SN_CONST.openWeightsBlockKind(
     settings && settings.openWeightsOnly === true, entry,
   );
+  if (kind) ContatoriServizio.misura('bloccoPesi', kind);
   if (kind === 'provider') return I18n.t('err_open_weights_only_provider_blocked');
   if (kind === 'model') {
     return I18n.t('err_open_weights_only_model_blocked', (entry && entry.model) || '—');
@@ -613,7 +619,11 @@ function noteServedProvider(settings, action, result) {
       + 'esclusione): aggiornare excludedProviders in config/models.',
     );
   }
-  if (violation) avvisaFuoriPolitica(settings, why, servedBy, model, action);
+  if (violation) {
+    avvisaFuoriPolitica(settings, why, servedBy, model, action);
+    const fonte = (result && (result.keySource || (result.usage && result.usage.keySource))) || '';
+    ContatoriServizio.misura('violazione', { action, modello: model, host: servedBy, motivo: why, fonte });
+  }
   return { servedBy, violation };
 }
 
@@ -653,6 +663,7 @@ async function trascrivi({ settings, payload, origin, signal }) {
   const model = modelForAction(settings, ACTIONS.TRANSCRIBE_AUDIO);
   const attempts = buildAttemptChain(settings, model, ACTIONS.TRANSCRIBE_AUDIO);
   await Gate.ensureUnderLimit(settings);
+  ContatoriServizio.misura('catena', ACTIONS.TRANSCRIBE_AUDIO, attempts);
   let audioBase64 = typeof p.audioBase64 === 'string' ? p.audioBase64 : '';
   let format = typeof p.format === 'string' && p.format ? p.format : 'wav';
   if (!audioBase64 && typeof p.dataUrl === 'string') {
@@ -760,7 +771,14 @@ function createAnswerStreamer(onText) {
 // `intera`: chi legge la risposta come dati (JSON, memoria, etichette) non riceve mai un pezzo tagliato, ma un errore.
 // Un taglio senza niente da mostrare è un errore per tutti: «qualcosa è andato storto» non direbbe del tetto.
 async function handleAIRequest({ intera = false, ...opts }) {
-  const r = await chiamaIlModello(opts);
+  let r;
+  try {
+    r = await chiamaIlModello(opts);
+  } catch (e) {
+    // Chiave, modello o margine di spesa mancanti fermano la chiamata prima del cancello: la conta chi l'ha chiesta (#1472).
+    ContatoriServizio.misura('maiPartita', opts.action, e);
+    throw e;
+  }
   const taglio = globalThis.SN_CHAT_ERRORS.erroreDelTaglio(r, { intera });
   if (taglio) throw taglio;
   return r;
@@ -5260,7 +5278,9 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
     const Caps = globalThis.SN_CAPABILITIES;
     const analysis = AF.analyzeReply(textReply, rawActions, userMessage, Caps ? Caps.all(cancelliAperti()) : []);
     if (!analysis || !analysis.kind) return null;
-    return AF.composeProposal(analysis, { userMessage, textReply: citaRisposta ? textReply : '' });
+    const proposta = AF.composeProposal(analysis, { userMessage, textReply: citaRisposta ? textReply : '' });
+    // Il segno torna con la conferma: i contatori del servizio (#1472) la distinguono da una che il modello ha scritto.
+    return proposta ? { ...proposta, _proposta: true } : null;
   } catch (e) {
     console.warn('[#360] proposta di segnalazione non composta:', e?.message || e);
     return null;
@@ -5278,24 +5298,26 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
 // utile (dice cosa aveva chiesto) di quella generica.
 async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed = false, chatId = '' }) {
   try {
-    if (proposed) return;
-    if (Array.isArray(rawActions)
-      && rawActions.some((a) => a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK')) return;
     const AF = globalThis.SN_AUTO_FEEDBACK;
     const FB = globalThis.SN_FEEDBACK;
     if (!AF || !FB || typeof FB.submit !== 'function') return;
+    const Caps = globalThis.SN_CAPABILITIES;
+    const capabilities = Caps ? Caps.all(cancelliAperti()) : [];
+    const analysis = AF.analyzeReply(textReply, rawActions, userMessage, capabilities);
+    if (!analysis || !analysis.kind) return;
+    // I contatori del servizio (#1472): il tipo, la capacità e come finisce, con l'incognito della chat da cui nasce.
+    let incognito = null;
+    try { incognito = require('../shim/storage').inIncognito(); } catch (_) { incognito = null; }
+    const esito = (e) => ContatoriServizio.misura('f4', analysis.kind, analysis.capabilityId, e, { incognito });
+    if (proposed || (Array.isArray(rawActions)
+      && rawActions.some((a) => a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK'))) { esito('sostituita'); return; }
 
     // Setting autoFeedback, default ON se non impostato dall'utente.
     const settings = await getEffectiveSettings().catch(() => ({}));
     const autoEnabled = (settings && settings.security && settings.security.autoFeedback) === undefined
       ? true
       : !!(settings && settings.security && settings.security.autoFeedback);
-    if (!autoEnabled) return;
-
-    const Caps = globalThis.SN_CAPABILITIES;
-    const capabilities = Caps ? Caps.all(cancelliAperti()) : [];
-    const analysis = AF.analyzeReply(textReply, rawActions, userMessage, capabilities);
-    if (!analysis || !analysis.kind) return;
+    if (!autoEnabled) { esito('spenta'); return; }
 
     const payload = AF.compose(analysis);
     if (!payload) return;
@@ -5325,7 +5347,7 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
       .then(nelFilo, (e) => { nelFilo({ ok: false, error: e?.message || String(e) }); throw e; });
     const Attesa = require('./autoFeedbackAttesa');
     const win = winOf(sender);
-    const biglietto = Attesa.trattieni(spedisci, win);
+    const biglietto = Attesa.trattieni(spedisci, win, { esito });
     // Filo segnala da sé (#1473): «Annulla» sull'avviso la disfa (handlers/filo.js).
     require('./contatoriHomePagina').misura('fatto', 'segnalazione_automatica', { incognito: !!(win && win._filoIncognito) });
     try {
@@ -6342,6 +6364,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       if (res.output) rendered._output = res.output;
       renderedActions.push(rendered);
       conto.recupero('proposta_segnalazione');
+      ContatoriServizio.misura('proposta', 'mostrata');
     }
   }
   // #947 — il documento che la risposta nomina ha il suo bottone anche se il modello non l'ha mostrato con APRI_FILE:

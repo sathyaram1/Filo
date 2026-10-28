@@ -123,6 +123,11 @@
     load().then(() => { if (queue.length) scheduleFlush(0); }).catch(() => {});
   }
 
+  // I contatori del servizio (#1472): rinunce e attese d'accesso per motivo, mai la voce.
+  function conta(nome, ...a) {
+    try { require('./contatoriServizio').misura(nome, ...a); } catch (_) {}
+  }
+
   function scheduleFlush(delay) {
     if (!auto || timer) return;
     timer = setTimeout(() => { timer = null; flush().catch(() => {}); }, Math.max(0, delay | 0));
@@ -140,7 +145,10 @@
     // Dedup su submissionId: due invii della stessa bozza non accodano due voci.
     if (!queue.some((it) => it.id === id)) {
       queue.push({ id, payload, name: titolo, prepared: !!titolo, queuedAt: Date.now(), attempts: 0, dallOwner });
-      if (queue.length > MAX_ITEMS) queue = queue.slice(-MAX_ITEMS);
+      if (queue.length > MAX_ITEMS) {
+        conta('rinuncia', 'troppe', queue.length - MAX_ITEMS);
+        queue = queue.slice(-MAX_ITEMS);
+      }
       await persist();
     }
     scheduleFlush(0);
@@ -170,6 +178,7 @@
 
   // Detto una volta per voce e per motivo; un avvisatore che risponde `false` (nessuno a cui dirlo) riprova al giro dopo.
   function attendiAccesso(it, motivo, perche) {
+    if (it.attesaContata !== perche) { it.attesaContata = perche; conta('attesaAccesso', perche); }
     it.attesaAccesso = true;
     logFn('voce dell\'owner ferma finché torna il suo accesso:', it.id, motivo);
     if (it.avvisatoAccesso === perche || !onAttesaOwnerFn) return;
@@ -212,6 +221,7 @@
         // Una voce dell'owner che aspetta il suo accesso non scade: buttarla perderebbe il feedback, che parte appena torna.
         if (!it.attesaAccesso && Date.now() - it.queuedAt > MAX_AGE_MS) {
           logFn('voce scaduta dopo troppi tentativi, rinuncio:', it.id);
+          conta('rinuncia', 'scaduta');
           remove(it.id);
           try { onScadutaFn && onScadutaFn(it); } catch (_) {}
           continue;
@@ -255,6 +265,7 @@
           // Qui si smette subito e glielo si dice.
           if (fb.isEncryptionError && fb.isEncryptionError(e)) {
             logFn('rinuncio, la cifratura non si può fare:', it.id, e?.message || e);
+            conta('rinuncia', 'cifratura');
             it.rinuncia = true;
             it.motivoRinuncia = e?.message || String(e);
             if (annunciaRinuncia(it)) remove(it.id);
@@ -294,6 +305,11 @@
     flush,
     accessoCambiato,
     size: () => queue.length,
+    // Per i contatori (#1472): quante voci aspettano e da quanto la più vecchia, solo numeri.
+    stato: () => {
+      const t = queue.map((it) => Number(it.queuedAt)).filter((x) => Number.isFinite(x));
+      return { voci: queue.length, piuVecchiaMs: t.length ? Math.max(0, Date.now() - Math.min(...t)) : null };
+    },
     // helper per i test (logica pura, nessun effetto in produzione)
     _peek: () => queue.map(serialize),
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },

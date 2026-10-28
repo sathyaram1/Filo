@@ -3,6 +3,7 @@
 // diario dei consumi. Un avviso per calo: si riarma solo quando il saldo risale, mai a calendario.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
+const ContatoriServizio = require('../contatoriServizio');
 
 module.exports = function register(on, ctx) {
   const { MSG, broadcastToFiloPages } = ctx;
@@ -243,6 +244,7 @@ module.exports = function register(on, ctx) {
       sogliaRiarmo: CA.sogliaRiarmo({ sogliaSaldo: sit.v.sogliaSaldo, quota: sit.quota }),
     });
     consegna(avviso);
+    for (const m of (sit.v && sit.v.motivi) || []) ContatoriServizio.misura('avviso', 'scattato', m);
     return { esito: 'avvisato', avviso };
   }
 
@@ -336,6 +338,10 @@ module.exports = function register(on, ctx) {
       await scriviApplicati(applicati);
       throw e;
     }
+    // Il rimedio scelto, e per «automatiche» quali ha spento davvero: lo contano i contatori del servizio (#1472).
+    ContatoriServizio.misura('avviso', 'rimedio', id);
+    const perPercorso = new Map(CA.automatiche().map((x) => [x.percorso, x.id]));
+    for (const c of rec.cambi) if (perPercorso.has(c.percorso)) ContatoriServizio.misura('avviso', 'spenta', perPercorso.get(c.percorso));
     return { ok: true, frase: id === 'modello' ? 'Fatto: le funzioni usano i modelli più economici.' : 'Fatto: spente.' };
   }
 

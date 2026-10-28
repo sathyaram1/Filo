@@ -96,6 +96,8 @@
     const opz = li._opz || {};
     if (!r) return;
     if (r.azione === 'chiave') {
+      // Il rimedio che il main non vede: lo dice ai contatori del servizio (#1472).
+      try { if (opz.invia) Promise.resolve(opz.invia({ type: MSG().CONTATORI_EVENTO, misura: 'rimedio-crediti', id: 'chiave' })).catch(() => {}); } catch (_) {}
       if (opz.apriChiave) opz.apriChiave();
       return;
     }

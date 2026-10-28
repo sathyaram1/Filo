@@ -96,6 +96,11 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender, origin) => {
     // La chat dice solo dove l'azione resta nel filo: da una pagina di Filo, mai da un sito.
     const chatId = isFilo(origin) && typeof msg.chatId === 'string' ? msg.chatId : '';
+    // La segnalazione che Filo aveva proposto in chat (#360), confermata: la contano i contatori del servizio (#1472).
+    const a = msg && msg.action;
+    if (isFilo(origin) && a && a._proposta === true && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK') {
+      require('../contatoriServizio').misura('proposta', 'confermata');
+    }
     const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg), domanda: domandaDa(msg), chatNelFilo: chatId });
     if (r && r.output && msg.assistente === true) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
