@@ -3,9 +3,13 @@
 // Le pagine di Google sono finte (tests/helpers/googleFinto.mjs): il login gira davvero fino a Firebase finto.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { home, modelloFinto, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { googleFinto, risposteFinte, schedeSu, indirizzoDellAccesso, rispondiAlLoopback } from './helpers/googleFinto.mjs';
 
+const SHOTS = join(dirname(fileURLToPath(import.meta.url)), '.shots');
 const EMAIL = 'chi.accede@prova.test';
 
 async function preparaLogin(app, testServer) {
