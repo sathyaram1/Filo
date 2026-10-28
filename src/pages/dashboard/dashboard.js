@@ -553,7 +553,10 @@
   function rigaDiStoria(m, { quante, guardate, types }) {
     const text = String(m.text || '');
     if (m.role === 'user') {
-      return { role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}) };
+      return {
+        role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}),
+        ...(m.rispostaA ? { rispostaA: m.rispostaA } : {}),
+      };
     }
     return {
       role: 'filo', text,
