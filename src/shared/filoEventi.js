@@ -244,7 +244,10 @@
       return !stato.pagine.has(ev.visita) && !(visite && visite.has(ev.visita));
     }
     if (ev.tipo === TIPI.NAVIGAZIONE) return stato.tagli.some((c) => copre(c, ev));
-    return ACCADUTI.has(ev.tipo) && stato.tagli.some((c) => copreAccaduto(c, ev));
+    if (!ACCADUTI.has(ev.tipo)) return false;
+    // Un accaduto di una chat cancellata se ne va con lei anche se arriva dopo: l'azione che la cancella ne dice il titolo.
+    if (ev.chat != null && stato.chatTolte.has(ev.chat)) return true;
+    return stato.tagli.some((c) => copreAccaduto(c, ev));
   }
 
   function chatNuova(id, ts) {
