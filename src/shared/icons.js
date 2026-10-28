@@ -524,6 +524,17 @@
     `<path d="M6 6.75h.01"/>` +
     `<path d="M8.5 6.75h.01"/>`;
 
+  // --- Icone del desktop in ordine: schermo col piede e le icone in fila, la seconda riga ancora a metà.
+  const desktopIcons =
+    `<rect x="3" y="3.5" width="18" height="12.5" rx="2"/>` +
+    `<path d="M12 16v4"/>` +
+    `<path d="M8.5 20h7"/>` +
+    `<rect x="6.25" y="6.5" width="1.5" height="1.5" rx=".4"/>` +
+    `<rect x="11.25" y="6.5" width="1.5" height="1.5" rx=".4"/>` +
+    `<rect x="16.25" y="6.5" width="1.5" height="1.5" rx=".4"/>` +
+    `<rect x="6.25" y="11.5" width="1.5" height="1.5" rx=".4"/>` +
+    `<rect x="11.25" y="11.5" width="1.5" height="1.5" rx=".4"/>`;
+
   // --- Stile della pagina: pennello (manico diagonale + ciuffo).
   const brush =
     `<path d="M20 4c-3.5 1-8 5.5-10 9l1.5 1.5c3.5-2 8-7 8.5-10.5z"/>` +
