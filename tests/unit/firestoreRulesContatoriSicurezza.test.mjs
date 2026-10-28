@@ -68,7 +68,7 @@ test('si legge solo da admin, si crea una volta e non si tocca più', () => {
   assert.deepEqual(per('write'), []);
   assert.deepEqual(per('update'), ['false']);
   assert.deepEqual(per('delete'), ['false']);
-  assert.deepEqual(per('create'), ['contatoriSicurezza(request.resource.data)']);
+  assert.deepEqual(per('create'), ['request.auth != null && contatoriSicurezza(request.resource.data)']);
 });
 
 test('i campi sono quelli che l’app costruisce, tutti obbligatori, con la testa delle altre ore', () => {
