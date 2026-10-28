@@ -341,6 +341,9 @@
   const TETTO_COMBINAZIONI = 50;
   // Gli errori di un'ora per funzione: trenta combinazioni di modello e host bastano anche a un pomeriggio di guasti.
   const TETTO_ERRORI_ORA = 30;
+  // E in tutto il documento, su tutte le funzioni: oltre, la voce va nella riga «altro» del suo tipo, che resta libera.
+  // Tiene il caso peggiore a decine di KB, e con lui il tetto delle regole che chiunque abbia un'identità può riempire.
+  const TETTO_ERRORI_DOCUMENTO = 150;
   const TETTO_CONFERME = 20;
   const TETTO_VALORI = 12;
   const TETTO_PRIME_VOLTE = 400;
