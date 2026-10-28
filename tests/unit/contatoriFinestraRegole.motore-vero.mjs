@@ -3,7 +3,7 @@
 // accesa è firestoreRulesContatoriFinestra.test.mjs. Si lancia come contatoriRegole.motore-vero.mjs:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-1470 "node <cartella>/contatoriFinestraRegole.motore-vero.mjs"
-// Esito atteso: 14 righe verdi, uscita 0 (2026-10-23).
+// Esito atteso: 15 righe verdi, uscita 0 (#1547, 2026-10-28).
 
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
@@ -31,7 +31,17 @@ const env = await initializeTestEnvironment({
 });
 await env.clearFirestore();
 await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), 'admins/owner@filo.it'), { ok: true }); });
-const anon = env.unauthenticatedContext().firestore();
+// Una copia di Filo scrive con la sua identità anonima; senza identità non si crea niente (#1547).
+const anon = env.authenticatedContext('installazione-di-prova', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+const senzaIdentita = env.unauthenticatedContext().firestore();
+function tokenAnonimo(uid = 'installazione-di-prova') {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const ora = Math.floor(Date.now() / 1000);
+  return `${b64({ alg: 'none', typ: 'JWT' })}.${b64({
+    iss: `https://securetoken.google.com/${PROGETTO}`, aud: PROGETTO, sub: uid, user_id: uid,
+    iat: ora, exp: ora + 3600, auth_time: ora, firebase: { sign_in_provider: 'anonymous', identities: {} },
+  })}.`;
+}
 const owner = env.authenticatedContext('owner', { email: 'owner@filo.it', email_verified: true }).firestore();
 const chiunque = env.authenticatedContext('x', { email: 'chiunque@filo.it', email_verified: true }).firestore();
 
@@ -60,6 +70,7 @@ await prova('un’ora con ogni misura della finestra parte coi suoi tre document
     piattaforma: 'linux',
     casuale: () => `${'cd'.repeat(9)}${String(++n).padStart(2, '0')}`,
     rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'chiave-di-prova' }),
+    idToken: async () => tokenAnonimo(),
     log: () => {},
   });
   const schede = [{ id: 'a', openedAt: new Date(IERI - 3 * ORA).toISOString() }, { id: 'b', openedAt: new Date(IERI - 60000).toISOString() }];
@@ -103,6 +114,7 @@ const piena = (() => {
 })();
 vero(F.valida(piena).ok, F.valida(piena).motivo);
 const idPiena = C.idDocumento(piena);
+await prova('senza identità non si crea', () => assertFails(setDoc(doc(senzaIdentita, `${F.COLLEZIONE}/${idPiena}`), piena)));
 await prova('il documento più carico dell’app passa', () => assertSucceeds(setDoc(doc(anon, `${F.COLLEZIONE}/${idPiena}`), piena)));
 await prova('ma non si riscrive', () => assertFails(setDoc(doc(anon, `${F.COLLEZIONE}/${idPiena}`), piena)));
 await prova('né si aggiorna', () => assertFails(updateDoc(doc(anon, `${F.COLLEZIONE}/${idPiena}`), { os: 'win' })));
