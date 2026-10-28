@@ -838,6 +838,7 @@
       contesto: {}, cache: {}, ragionamento: {}, uscita: {}, ripieghi: {}, spesa: {}, adattamenti: {}, chiamate: {},
       ...Object.fromEntries(MISURE_GESTI.map((k) => [k, {}])),
       ...Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c, {}])),
+      ...Object.fromEntries(MISURE_RIQUADRI.map((c) => [c, {}])),
       chatTurni: {}, chatRecuperi: {}, strumenti: {}, azioniPerGiro: {}, chatReazioni: {}, chatCopie: {}, chatChiuse: {},
       ...Object.fromEntries(MISURE_ATTIVITA.map((m) => [m, {}])),
     };
