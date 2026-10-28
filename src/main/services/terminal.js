@@ -93,7 +93,7 @@ function truncate(text, max = MAX_OUTPUT_CHARS) {
   // per numero di unità si può restare con la prima metà, che da sola non è
   // nessun carattere e si mostra come un rombo. Se in fondo resta una metà di
   // coppia, la si lascia fuori: un carattere in meno, nessun carattere rotto.
-  let n = MAX_OUTPUT_CHARS;
+  let n = max;
   const ultimo = s.charCodeAt(n - 1);
   if (ultimo >= 0xD800 && ultimo <= 0xDBFF) n -= 1;
   return { text: s.slice(0, n), truncated: true };
