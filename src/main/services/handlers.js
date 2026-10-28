@@ -6871,6 +6871,7 @@ const handlerCtx = {
   fermaFiloChat,
   seguitoFiloChat,
   handleFiloGenerateDashboard,
+  contaHomeVista,
   executeFiloAction,
   chiaveConferma: pendingConfirmKey,
   controllaUscita,
