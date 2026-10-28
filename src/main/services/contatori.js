@@ -1160,10 +1160,14 @@ function crea(dip = {}) {
     if (!FIRESTORE_BASE || !API_KEY) return { ok: false, motivo: 'server non configurato' };
     const url = `${FIRESTORE_BASE}/${collezione}?documentId=${encodeURIComponent(C.idDocumento(doc))}&key=${API_KEY}`;
     const fields = Object.fromEntries(Object.entries(doc).map(([k, v]) => [k, valoreFs(v)]));
+    // Senza identità (offline, persa, illeggibile) l'ora resta in attesa come per un server giù: niente avvisi.
+    let token = '';
+    try { token = await idToken(); } catch (e) { token = ''; }
+    if (!token) return { ok: false, motivo: 'identità dell\'installazione non pronta' };
     let res;
     try {
       res = await fetchFn(url, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }),
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ fields }),
         signal: AbortSignal.timeout(ATTESA_RETE_MS),
       });
     } catch (e) {
