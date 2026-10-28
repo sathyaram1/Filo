@@ -356,6 +356,7 @@
           const c = stato.chat.get(ev.chat);
           if (c && stato.messaggi) for (const ids of c._ids || []) for (const id of ids || []) stato.messaggi.delete(id);
           if (stato.chat.delete(ev.chat)) tolti = 1;
+          stato.chatTolte.add(ev.chat);
           via = (a) => a.chat === ev.chat;
         } else {
           const c = copertura(ev);
