@@ -19,6 +19,7 @@
   function ricorda(bolla, testo) {
     if (bolla) scritti.set(bolla, String(testo == null ? '' : testo));
   }
+  const scritto = (bolla) => (bolla && scritti.has(bolla) ? scritti.get(bolla) : null);
 
   // Quello che si legge nella bolla, senza i bottoni sotto né le note: è quello che va negli appunti.
   function testoDi(bolla) {
