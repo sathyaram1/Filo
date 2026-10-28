@@ -483,7 +483,7 @@
     for (const b of d.bubblesEl.querySelectorAll(`.dash-bubble-${v.role === 'user' ? 'user' : 'filo'}:not([data-key])`)) {
       // Una risposta formattata a schermo non ha più gli asterischi del filo: si confronta il testo com'era arrivato.
       const scritto = d.scritto ? d.scritto(b) : null;
-      const suo = scritto != null ? scritto : (b.dataset.cambiTesto != null ? b.dataset.cambiTesto : b.textContent);
+      const suo = scritto || (b.dataset.cambiTesto != null ? b.dataset.cambiTesto : b.textContent);
       if (String(suo || '').trim() !== testo) continue;
       b.dataset.key = v.key;
       b.dataset.chat = v.chat;
