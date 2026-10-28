@@ -65,6 +65,11 @@ test('«accedi con Google» in chat: Filo apre la pagina d\'accesso e, scelto l\
   const bottone = shell.locator('#nav-account');
   await expect(bottone).toHaveClass(/signed-in/);
   await expect(bottone).toHaveAttribute('data-tip', new RegExp(EMAIL.replace(/\./g, '\\.')));
+  // Chiusa la scheda d'accesso si torna alla chat, dove il diario dice cosa ha fatto Filo.
+  await expect.poll(() => schedeSu(app, pagina).then((s) => s.length), { timeout: 10_000 }).toBe(0);
+  mkdirSync(SHOTS, { recursive: true });
+  await page.screenshot({ path: join(SHOTS, 'account-dalla-chat.png') });
+  await shell.screenshot({ path: join(SHOTS, 'account-dalla-chat-barra.png') });
 });
 
 test('già dentro: «accedi» non riapre niente se Google è collegato, e apre il collegamento con l\'email se non lo è', async ({ app, shell, testServer }) => {
