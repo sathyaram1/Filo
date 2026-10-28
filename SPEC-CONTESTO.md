@@ -281,15 +281,28 @@ il 07/10.
 
 ## Fornitore e chiavi
 
-- **Il trasporto segue la chiave** (vedi «Da decidere»). Con la chiave
-  dell'owner dentro OpenRouter le richieste restano su `openrouter.js` e
-  partono coi crediti Anthropic dell'owner. Col proxy sul server serve un
-  fornitore Anthropic diretto in `src/main/services/providers/`, accanto a
-  `openrouter.js`, più la funzione sul server. Senza nessuna delle due, via
-  OpenRouter i crediti Anthropic non si usano.
-- **Claude lo serve solo Anthropic**, con l'una o l'altra strada: OpenRouter
-  potrebbe servirlo da Google Vertex, che la politica sui modelli esclude, e
-  #904 lo impedisce già. Chi ha servito si registra come per gli altri
+- **La chiave è quella Anthropic dell'owner, dentro OpenRouter** (BYOK,
+  risposta a D-74 del 21/10). Una sola per tutti gli utenti, perché la cache
+  del blocco 2 sia condivisa. Il trasporto non cambia: le richieste restano
+  su `openrouter.js` e quelle ai modelli Anthropic partono coi crediti
+  Anthropic dell'owner. Niente fornitore diretto né proxy sul server.
+- **Anthropic per primo.** Per i modelli `anthropic/` il blocco `provider`
+  porta `order` con Anthropic in testa (la lista di `only`) e nessun `sort`,
+  nemmeno quello scelto dall'utente. Col solo `only` OpenRouter ha servito
+  Claude da «Claude Platform on AWS» senza la chiave dell'owner (prova del
+  21/10: `is_byok` falso, saldo OpenRouter consumato, cache separata); con
+  Anthropic primo la stessa richiesta parte con la sua chiave (#1583).
+- **Il costo vero.** Con la chiave dell'owner `usage.cost` è la sola
+  commissione di OpenRouter, e il costo di Anthropic sta in
+  `usage.cost_details.upstream_inference_cost`: Cronologia AI, limite di
+  spesa e registro d'uso contano la somma (#1582).
+- **Il tetto.** La spesa fatta con la chiave dell'owner entra nel tetto
+  della chiave di un'installazione solo se il server la crea con
+  `include_byok_in_limit`; senza, un'installazione può spendere i crediti
+  Anthropic dell'owner oltre il suo tetto di crediti Filo. Per questo #1583
+  va in produzione insieme a quel lavoro del server, o dopo.
+- **Claude lo serve solo Anthropic**: OpenRouter potrebbe servirlo da Google
+  Vertex, che la politica sui modelli esclude, e #904 lo impedisce già. Chi ha servito si registra come per gli altri
   fornitori.
 - **I punti di cache** (`cache_control`) si mettono solo sulle richieste ai
   modelli Anthropic: attraverso OpenRouter viaggiano nella richiesta e
@@ -299,8 +312,6 @@ il 07/10.
   dell'host.
 - **L'interruttore «solo pesi aperti»** riporta la chat su un modello aperto
   via OpenRouter; il contesto è lo stesso.
-- **La chiave.** Una sola chiave Anthropic per tutti gli utenti, perché la
-  cache del blocco 2 sia condivisa. Due strade, da decidere (vedi sotto).
 
 ## Come si misura
 
@@ -322,8 +333,9 @@ fanno ~5 $ al giorno, compattazioni comprese.
 
 1. **Cache esplicita** sui blocchi stabili, registro di chi ha servito e dei
    token letti e scritti in cache. Prima misura sul banco col contesto di
-   oggi: è la base del confronto. Il trasporto Anthropic (chiave dentro
-   OpenRouter o fornitore diretto) segue la risposta sulla chiave.
+   oggi: è la base del confronto. Fusa con #1412. Il trasporto Anthropic è
+   la chiave dell'owner dentro OpenRouter (D-74), con Anthropic primo e il
+   costo vero (vedi «Fornitore e chiavi»).
 2. **Il filo completo**: gli eventi mancanti (azioni con esito, cambi di stato,
    schede, file, sistema) nascono dove si scrive lo stato; `filo_cambi` entra
    nel filo; via il registro vecchio.
@@ -362,21 +374,15 @@ una chiamata vera.
 
 ## Da decidere (owner)
 
-1. **Chiave Anthropic della chat** (domanda aperta insieme a #1412):
-   - **la chiave dell'owner dentro OpenRouter** (BYOK, consigliata): il
-     trasporto non cambia, le richieste ai modelli Anthropic partono con la
-     chiave dell'owner e quindi coi suoi crediti, con una cache sola per tutti.
-     Va provato che i punti di cache e la compattazione lato server passino
-     attraverso OpenRouter;
-   - **un proxy sulle functions del server**: la chiave non lascia mai il
-     server e i limiti per utente li applica il sistema crediti che c'è già;
-     servono un fornitore diretto nell'app e la funzione sul server, e ogni
-     risposta fa un passaggio in più.
-
-   Finché la domanda è aperta, della fase 1 si fa solo la parte che non
-   dipende dalla chiave. Le chiavi per utente nello stesso workspace sono
-   uscite dalle strade: non è detto che l'API di amministrazione permetta di
-   crearle.
+1. **Chiave Anthropic della chat**: decisa il 21/10 (D-74), la chiave
+   dell'owner dentro OpenRouter; come si usa sta in «Fornitore e chiavi».
+   Scartato il proxy sulle functions del server, che chiedeva un fornitore
+   diretto nell'app, la funzione sul server e un passaggio in più a ogni
+   risposta. Fuori anche le chiavi per utente nello stesso workspace: non è
+   detto che l'API di amministrazione permetta di crearle. Da provare con una
+   chiamata vera: `usage.is_byok` vero e il costo nella Cronologia AI; che la
+   compattazione lato server passi attraverso OpenRouter resta in «Da
+   verificare».
 
 ## Rimandato
 

@@ -57,7 +57,8 @@
   // Modelli chiusi che la politica ammette solo comprati dal produttore (#904): il
   // router li fa servire anche da rivenditori (Amazon Bedrock, Azure) che la lista
   // di esclusione non può togliere, perché servono anche modelli a pesi aperti.
-  // `only` va a OpenRouter come slug; `hosts` sono i nomi con cui riporta chi ha servito; `nome` è il produttore nelle frasi.
+  // `only` va a OpenRouter come slug, ed è anche l'ordine (#1583): il produttore per primo. `hosts` sono i nomi con cui
+  // riporta chi ha servito; `nome` è il produttore nelle frasi.
   // Claude Platform on AWS lo gestisce Anthropic (diverso da Bedrock, gestito da AWS).
   const PRODUCER_ONLY_MODELS = [
     { prefix: 'anthropic/', nome: 'Anthropic', only: ['anthropic', 'claude-on-aws'], hosts: ['Anthropic', 'Claude Platform on AWS'] },

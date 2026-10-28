@@ -492,14 +492,14 @@
     reasoning_high: 'Alto',
     admin_defaults_sort: 'host',
     admin_defaults_sort_desc:
-      'Come OpenRouter sceglie l\'host di questo modello. «Automatico» segue la scelta generale qui sotto. I fornitori esclusi restano esclusi.',
+      'Come OpenRouter sceglie l\'host di questo modello. «Automatico» segue la scelta generale qui sotto. I fornitori esclusi restano esclusi; Claude parte sempre da Anthropic.',
     admin_defaults_sort_general: 'Scelta generale degli host',
     admin_defaults_sort_general_desc:
       'Vale per i modelli lasciati su «Automatico». Di serie Filo non chiede nessun ordine e l\'host lo sceglie OpenRouter.',
     provider_sort_general_auto: 'Lo sceglie OpenRouter',
     options_host_order: 'Host dei modelli',
     options_host_order_desc:
-      'Lo stesso modello lo servono più host: i più veloci rispondono prima, i più economici costano meno. Vale per tutti i modelli, anche per quelli predefiniti. I fornitori esclusi restano esclusi.',
+      'Lo stesso modello lo servono più host: i più veloci rispondono prima, i più economici costano meno. Vale per tutti i modelli, anche per quelli predefiniti, tranne Claude, che parte sempre da Anthropic. I fornitori esclusi restano esclusi.',
     options_host_order_filo: 'Li sceglie Filo',
     provider_sort_auto: 'Automatico',
     provider_sort_throughput: 'Più veloce',

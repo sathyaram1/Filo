@@ -609,7 +609,7 @@
       id: 'host-order', title: 'Host più veloci o più economici', category: 'settings',
       desc: 'Lo stesso modello lo servono più host: scegli se Filo chiede i più veloci, quelli che cominciano a rispondere prima o i più economici. Vale per tutti i modelli, anche per quelli predefiniti. Il pulsante «Prova» misura ogni modello con la scelta in uso, e la misura resta finché modello e host non cambiano.',
       invoke: 'Opzioni → «Host dei modelli», oppure chiedendolo a Filo ("voglio la chat più veloce", "usa gli host più economici").',
-      doesNot: 'Non fa servire un modello da un fornitore escluso dalla politica di Filo, e non cambia il modello: cambia solo chi lo serve.',
+      doesNot: 'Non fa servire un modello da un fornitore escluso dalla politica di Filo, e non cambia il modello: cambia solo chi lo serve. Non vale per Claude, che parte sempre da Anthropic.',
     },
     {
       id: 'model-usage-census', title: 'Dove Filo usa un modello', category: 'settings',
