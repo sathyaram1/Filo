@@ -168,7 +168,8 @@
   const POSIZIONI_SUGGERIMENTO = Object.freeze([['1', 1], ['2', 2], ['3', 3], ['4_oltre', Infinity]]);
   // «pagina_cambiata»: la pagina se n'è andata al passo indicato e cliccato dalla persona, non lasciata da lei.
   const ESITI_AIUTO = Object.freeze(['fatto', 'chiusa_prima', 'tetto_passi', 'errore', 'pagina_cambiata']);
-  const DA_RICERCA = Object.freeze(['chat', 'aiuto']);
+  // «correttore»: la ricerca che riempie un segnaposto lasciato nel testo.
+  const DA_RICERCA = Object.freeze(['chat', 'aiuto', 'correttore']);
   const FORNITORI_RICERCA = Object.freeze(['tavily', 'duckduckgo', 'nessuno']);
   // I motivi con cui SN_ASCOLTO chiude una sessione del microfono.
   const MOTIVI_DETTATURA = Object.freeze(['utente', 'finito', 'muto', 'tempo', 'errore', 'altro', 'annulla']);
