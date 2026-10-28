@@ -889,6 +889,9 @@
     // { force?: boolean }
     // Risposta: { ok, message, suggestions, cached, ts }
     FILO_GENERATE_DASHBOARD: 'filo_generate_dashboard',
+    // La home vista per la prima volta dalla persona, per i contatori (#1467): la pagina lo dice quando arriva davanti.
+    // Risposta: { ok }
+    FILO_HOME_VISTA: 'filo_home_vista',
     // === Archivio delle chat con Filo (#525) ===
     // Ogni chat si salva per intero, turno per turno, mentre la si fa (il
     // salvataggio lo fa il main dentro FILO_CHAT, che riceve `chatId`). Questi
