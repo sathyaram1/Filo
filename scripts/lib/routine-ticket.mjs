@@ -155,6 +155,46 @@ export function segnaBigliettoFinito(root, ticket, perche, { now = Date.now() } 
   }
 }
 
+const SHA_INTERO = /^[0-9a-f]{40}$/;
+// Le consegne che il registro del ramo segna con lo sha (ROUTINE-AUTH-SPEC.md § La fiducia decide L5).
+const CONSEGNE_CON_SHA = ['verdict', 'fixed', 'secaudit', 'status', 'pulizia'];
+
+/**
+ * Dopo questa consegna il giro spinge ancora? Solo dopo una critica a cui il server risponde «c'è da correggere»:
+ * la correzione la consegna lo stesso biglietto, e quella consegna registra la punta nuova. PURA.
+ */
+export function consegnaChiudeLeSpinte(intento, esito = '') {
+  if (!CONSEGNE_CON_SHA.includes(intento)) return false;
+  return !(intento === 'verdict' && esito === 'fix');
+}
+
+/**
+ * Dopo una consegna registrata con lo sha, il ramo su origin resta su quello sha finché lo stesso biglietto non ne
+ * registra un altro: una spinta dopo lascia un buco nel registro del ramo e il lavoro perde la fiducia (#1555).
+ * Lo leggono il salvataggio automatico, il pre-push e il rilascio. Il marcatore di un altro biglietto non si tocca.
+ */
+export function segnaConsegna(root, ticket, { sha, ramo, intento, esito = '' } = {}, { now = Date.now() } = {}) {
+  const t = String(ticket || '').trim();
+  const s = String(sha || '').toLowerCase();
+  const r = String(ramo || '').trim();
+  const m = readMarkerFrom(root);
+  if (!t || !m || String(m.ticket || '') !== t || !SHA_INTERO.test(s) || !r) return false;
+  try {
+    const consegna = { sha: s, ramo: r, intento: String(intento || ''), ...(esito ? { esito: String(esito) } : {}), ora: new Date(now).toISOString() };
+    writeFileSync(ticketFile(root), JSON.stringify({ ...m, consegna }, null, 2) + '\n', 'utf8');
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/** La consegna che chiude le spinte del biglietto del marcatore: { sha, ramo, intento, esito } o null. PURA. */
+export function consegnaDelMarcatore(marker) {
+  const c = marker && marker.consegna;
+  if (!c || typeof c !== 'object' || !SHA_INTERO.test(String(c.sha || '')) || !String(c.ramo || '').trim()) return null;
+  return { sha: String(c.sha), ramo: String(c.ramo), intento: String(c.intento || ''), esito: String(c.esito || '') };
+}
+
 /**
  * Il biglietto del giro in corso, o '' se non c'è.
  *
