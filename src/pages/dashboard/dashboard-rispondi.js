@@ -135,7 +135,6 @@
   function disegnaAnteprima() {
     if (!anteprima) return;
     anteprima.hidden = !citata;
-    d.formEl.classList.toggle('dash-con-citazione', !!citata);
     if (!citata) return;
     anteprima.querySelector('.dash-citazione-testo').textContent = citata.testo;
     anteprima.querySelector('.dash-citazione-chi').textContent = citata.role === 'user' ? 'Tu' : 'Filo';
