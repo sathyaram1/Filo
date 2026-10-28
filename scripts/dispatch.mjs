@@ -1475,6 +1475,7 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   const reply = sent.reply && typeof sent.reply === 'object' ? sent.reply : {};
   if (reply.outcome === 'stop') next.verifierVerdict = 'stop';
   sealTransition(next, `${readRole(ROOT) || 'fixer'}:${reply.outcome === 'stop' ? 'ferma' : 'consegna'}`);
+  sigillaLaConsegna('fixed', shaConsegnato);
   next.reply = reply;
   return next;
 }
