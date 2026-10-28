@@ -126,7 +126,7 @@
       i: k ? Number(k[2]) : null,
       ts: b.dataset.ts || '',
       role: 'filo',
-      scritto: scritti.has(b) ? scritti.get(b) : testoDi(b),
+      scritto: scritto(b) ?? testoDi(b),
       testo: testoDi(b),
     };
     disegnaAnteprima();
