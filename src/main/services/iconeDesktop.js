@@ -454,7 +454,7 @@ const stessaDisposizione = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 // ── Le frasi ────────────────────────────────────────────────────────────────
 
 const IMPOSTAZIONI_WINDOWS = 'tasto destro sul desktop → Visualizza';
-function spiega(errore, { piattaforma = process.platform, totale = 0, posti = 0 } = {}) {
+function spiega(errore, { totale = 0, posti = 0 } = {}) {
   const T = {
     'nessun-desktop': {
       frase: 'Windows non ha dato a Filo il desktop: succede se Esplora risorse è fermo, o se il desktop lo disegna un altro programma.',
