@@ -81,4 +81,18 @@ function misura(nome, ...args) {
   } catch (_) { return undefined; }
 }
 
-module.exports = { crea, misura };
+// La porta delle uscite che conta i suoi blocchi: ogni strada che la usa conta da qui, mai dal chiamante. Non conta chi
+// giudica soltanto (`soloGiudizio`: un collegamento giudicato prima del clic, che al clic ripassa). Avvolta due volte conta una.
+const CONTATA = Symbol('uscite contate');
+function contaUscite(porta) {
+  if (typeof porta !== 'function' || porta[CONTATA]) return porta;
+  const contata = async (action, opzioni) => {
+    const u = await porta(action, opzioni);
+    if (u && u.blocca && !(opzioni && opzioni.soloGiudizio)) misura('uscitaFermata', u, action);
+    return u;
+  };
+  contata[CONTATA] = true;
+  return contata;
+}
+
+module.exports = { crea, misura, contaUscite };
