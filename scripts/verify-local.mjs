@@ -1017,23 +1017,24 @@ export async function registraNelRegistro({ ramo, sha, feedbackId = '', server =
 
 /**
  * Le punte che la sessione ha appena scritto, nel registro (#1648): una spinta sul ramo del server senza la sua voce,
- * a biglietto chiuso, il server la segnala come ramo riscritto fuori registro. Il server entra solo se `serverAtteso`
- * è anche la punta su filo-security: una voce davanti alla spinta sarebbe la stessa differenza, rovesciata.
+ * a biglietto chiuso, il server la segnala come ramo riscritto fuori registro. Il server entra se su filo-security è a
+ * `serverAtteso` o non c'è (come a start): una voce davanti a una punta diversa sarebbe la stessa differenza, rovesciata.
  */
 export async function registraPunteScritte({ ramo, sha, feedbackId = '', serverAtteso = '', root = ROOT }, {
   registra = registraRamo, server = () => serverDelRamo(ramo, { root, fetch: true }),
 } = {}) {
   const srv = serverAtteso ? server() : null;
-  const spinto = !!(srv && srv.sha === serverAtteso && srv.origine === serverAtteso);
-  const righe = await registraNelRegistro({ ramo, sha, feedbackId, server: spinto ? srv : null, root }, registra);
-  const avviso = serverAtteso && !spinto ? rigaServerNonSpinto(ramo, serverAtteso, srv) : '';
-  return avviso ? [...righe, avviso] : righe;
+  const scrivibile = !!(srv && srv.sha === serverAtteso && (!srv.origine || srv.origine === serverAtteso));
+  const righe = await registraNelRegistro({ ramo, sha, feedbackId, server: scrivibile ? srv : null, root }, registra);
+  return serverAtteso && !scrivibile ? [...righe, rigaServerNonSpinto(ramo, serverAtteso, srv)] : righe;
 }
 
-/** Perché la voce del server non si è scritta; '' se su filo-security il ramo non c'è (niente da confrontare). PURA. */
+/** Perché la voce del server non si è scritta. PURA. */
 export function rigaServerNonSpinto(ramo, atteso, srv) {
   if (!srv) return 'Registro del ramo del server non aggiornato: accanto al repo non trovo più il checkout del server.';
-  if (!srv.origine) return '';
+  if (!srv.origine || srv.origine === atteso) {
+    return `Registro del ramo del server non aggiornato: ${ramo} si è mosso mentre lo registravo (${String(atteso).slice(0, 8)} → ${String(srv.sha || '').slice(0, 8) || 'sparito'}). Rilancia node scripts/verify-local.mjs registra.`;
+  }
   return `Registro del ramo del server non aggiornato: su filo-security ${ramo} è a ${srv.origine.slice(0, 8)}, qui a ${String(atteso).slice(0, 8)}. `
     + 'Spingilo (git push nel checkout del server), poi node scripts/verify-local.mjs registra: a sessione chiusa una punta '
     + 'diversa dalla voce il server la segnala come ramo riscritto fuori registro, e il lavoro non va su main.';
