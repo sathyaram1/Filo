@@ -250,6 +250,16 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
 - Il segno `localOnly` (#908) non sposta di scheda (#1575): la pratica sta nella scheda del suo stato con l'etichetta «server».
 - Aspettano (#903): `waitsFor: [{ id, num }]` (in chiaro, da 1 a 20, scrive l'admin da Gestione, `npm run feedback -- <n> --aspetta 676,663.2` / `--aspetta-niente` e `feedback:apri --aspetta`; inesistenti, sé stesso e giri si rifiutano; un'attesa già scritta non si rifiuta perché il suo aspettato è sparito, e da riga di comando la risposta dice quelle che sostituisce): finché un aspettato non è fuso (`done`, o `archived` con `resolvedInVersion`) né biglietti né accensioni per un `todo` o un ramo in revisione, poi entra in coda da solo; se uno si chiude senza fusione o sparisce, il pacemaker lo porta in `design` (`statusReason: attesa_chiusa`) con la domanda e toglie quell'attesa.
+  - **La priorità risale le attese** (#1630, decisione dell'owner del 23/10): se B aspetta A, `priority` di A
+    vale almeno quella di B, lungo tutta la catena (C aspetta B che aspetta A → A ≥ B ≥ C), e **solo verso
+    l'alto**: un'attesa tolta o B riabbassato non riabbassano niente. Scatta quando la priorità di un feedback
+    sale o gli si aggiunge o cambia un'attesa (anche alla nascita); salgono al suo valore gli aspettati aperti
+    (non fusi, non chiusi, non archiviati, non cancellati), e da loro i loro aspettati. Uno con stato o priorità
+    illeggibili si salta, mai riscritto più basso. La scrive il server, in un punto solo (trigger sul documento
+    feedback, qualunque scrittore), cifrata e con `priorityManual: true` perché il giudice non la riabbassi,
+    con la nota «priorità 3: la eredita da #B, che lo aspetta»; l'alzato entra in coda con la priorità nuova.
+    Logica pura: `ereditaPriorita`, `scattaEredita`, `notaEredita` in `src/shared/feedbackAttese.js`,
+    sentinella in `tests/unit/feedbackAttese.test.mjs`.
 - Risolti: `done(rilasciato)` — Archiviati: `archived` (+ filtro ⭐; + filtro "Bloccati
   confermati" per `*_confirmed`, decisione presa: restano ispezionabili come log lì).
 

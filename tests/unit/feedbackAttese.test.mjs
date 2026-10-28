@@ -266,3 +266,116 @@ test('--aspetta da riga di comando: dice quelle che sostituisce e cosa succede d
     assert.match(owner.rispostaAttese('903', await owner.segnaAttese('id903', '', { bearer: 'tok' })), /non aspetta più niente \(tolte le attese su #663\.2, #951\)/);
   } finally { rete.ripristina(); }
 });
+
+// La priorità risale le attese (#1630): se B aspetta A, A vale almeno B, lungo la catena e solo verso l'alto.
+function grafo(docs) {
+  const letture = [];
+  return {
+    letture,
+    leggi: async (ids) => { letture.push(ids.slice()); return new Map(ids.map((id) => [id, docs[id] || { missing: true }])); },
+  };
+}
+const aspetta = (...coppie) => coppie.map(([id, num]) => ({ id, num }));
+
+test('eredità: la priorità scende lungo tutta la catena di attese, e la nota dice da chi', async () => {
+  // C (3) aspetta B (1), che aspetta A (nessuna) e D (2).
+  const docs = {
+    B: { num: '20', status: 'todo', priority: 1, waitsFor: aspetta(['A', '10'], ['D', '11']) },
+    A: { num: '10', status: 'unlabeled', waitsFor: [] },
+    D: { num: '11', status: 'design', priority: '2', waitsFor: [] },
+  };
+  const g = grafo(docs);
+  const r = await A.ereditaPriorita({ id: 'C', num: '30', priority: 3, waitsFor: aspetta(['B', '20']) }, g.leggi);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.alzati, [
+    { id: 'B', num: '20', prima: 1, dopo: 3, da: { id: 'C', num: '30' } },
+    { id: 'A', num: '10', prima: 0, dopo: 3, da: { id: 'B', num: '20' } },
+    { id: 'D', num: '11', prima: 2, dopo: 3, da: { id: 'B', num: '20' } },
+  ]);
+  assert.deepEqual(g.letture, [['B'], ['A', 'D']], 'una lettura per anello della catena, non una per feedback');
+  assert.equal(A.notaEredita(r.alzati[1]), 'priorità 3: la eredita da #20, che lo aspetta');
+  assert.equal(A.notaEredita({ dopo: 2, da: { id: 'x' } }), 'priorità 2: la eredita da un feedback senza numero, che lo aspetta');
+});
+
+test('eredità: mai verso il basso, e chi vale già quanto la fonte non si tocca', async () => {
+  const docs = {
+    A: { num: '10', status: 'todo', priority: 3, waitsFor: aspetta(['Z', '9']) },
+    P: { num: '12', status: 'todo', priority: 2, waitsFor: [] },
+    Z: { num: '9', status: 'todo', priority: 1, waitsFor: [] },
+  };
+  const r = await A.ereditaPriorita({ id: 'B', num: '20', priority: 2, waitsFor: aspetta(['A', '10'], ['P', '12']) }, grafo(docs).leggi);
+  assert.deepEqual(r.alzati, [], 'un aspettato più alto resta com\'è, uno uguale anche');
+  for (const nessuna of [0, null, undefined, '', '0']) {
+    const v = await A.ereditaPriorita({ id: 'B', priority: nessuna, waitsFor: aspetta(['Z', '9']) }, grafo(docs).leggi);
+    assert.deepEqual(v.alzati, [], `fonte senza priorità (${nessuna}) non alza nessuno`);
+  }
+
+  const conAttese = { priority: 3, waitsFor: aspetta(['A', '10']) };
+  assert.equal(A.scattaEredita({ ...conAttese }, { ...conAttese, priority: 1 }), false, 'B riabbassato: niente si riabbassa');
+  assert.equal(A.scattaEredita({ priority: 3, waitsFor: aspetta(['A', '10'], ['Z', '9']) }, conAttese), false, 'attesa tolta: niente si riabbassa');
+  assert.equal(A.scattaEredita(conAttese, { ...conAttese }), false, 'scrittura senza cambi di priorità né di attese');
+});
+
+test('eredità: quando scatta (priorità salita, attesa nuova o cambiata, nascita con attese)', () => {
+  const w = aspetta(['A', '10']);
+  assert.equal(A.scattaEredita({ priority: 1, waitsFor: w }, { priority: 2, waitsFor: w }), true, 'priorità salita');
+  assert.equal(A.scattaEredita({ priority: 2, waitsFor: [] }, { priority: 2, waitsFor: w }), true, 'attesa aggiunta');
+  assert.equal(A.scattaEredita({ priority: 2, waitsFor: w }, { priority: 2, waitsFor: aspetta(['Z', '9']) }), true, 'attesa cambiata');
+  assert.equal(A.scattaEredita(null, { priority: 3, waitsFor: w }), true, 'alla nascita con --aspetta');
+  assert.equal(A.scattaEredita({ priority: 'FENC:xyz', waitsFor: w }, { priority: 2, waitsFor: w }), true, 'da illeggibile a leggibile');
+  assert.equal(A.scattaEredita(null, { waitsFor: w }), false, 'senza priorità non c\'è niente da ereditare');
+  assert.equal(A.scattaEredita({ priority: 1 }, { priority: 3 }), false, 'senza attese nessuno eredita');
+});
+
+test('eredità: fusi, chiusi, archiviati e cancellati non salgono e non passano la priorità ai loro aspettati', async () => {
+  const sotto = { num: '1', status: 'todo', priority: 0, waitsFor: [] };
+  const chiusi = {
+    fuso: { num: '2', status: 'done', priority: 1, waitsFor: aspetta(['sotto', '1']) },
+    verificato: { num: '3', status: 'archived', resolvedInVersion: '1.0.9', priority: 1, waitsFor: aspetta(['sotto', '1']) },
+    archiviato: { num: '4', status: 'archived', priority: 1, waitsFor: aspetta(['sotto', '1']) },
+    attacco: { num: '5', status: 'attack_confirmed', priority: 0, waitsFor: aspetta(['sotto', '1']) },
+    spam: { num: '6', status: 'spam_confirmed', priority: 0, waitsFor: aspetta(['sotto', '1']) },
+    sotto,
+  };
+  const ids = ['fuso', 'verificato', 'archiviato', 'attacco', 'spam', 'sparito'];
+  const r = await A.ereditaPriorita({ id: 'B', num: '20', priority: 3, waitsFor: aspetta(...ids.map((id) => [id, ''])) }, grafo(chiusi).leggi);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.alzati, []);
+  assert.deepEqual(r.illeggibili, []);
+
+  // Ogni stato non chiuso è aperto, Ricevuti e domande comprese.
+  for (const status of ['unlabeled', 'aligned', 'todo', 'working', 'revision_capability', 'revision_security', 'design']) {
+    const v = await A.ereditaPriorita({ id: 'B', priority: 2, waitsFor: aspetta(['X', '7']) }, grafo({ X: { num: '7', status, priority: 1 } }).leggi);
+    assert.deepEqual(v.alzati.map((a) => a.dopo), [2], status);
+  }
+});
+
+test('eredità: uno stato o una priorità non letti non si riscrivono, e si dicono', async () => {
+  const docs = {
+    cifrato: { num: '7', status: 'FENC:abc', priority: 0, waitsFor: [] },
+    prio: { num: '8', status: 'todo', priority: 'FENC:def', waitsFor: [] },
+  };
+  const r = await A.ereditaPriorita({ id: 'B', priority: 3, waitsFor: aspetta(['cifrato', '7'], ['prio', '8']) }, grafo(docs).leggi);
+  assert.deepEqual(r.alzati, []);
+  assert.deepEqual(r.illeggibili, [{ id: 'cifrato', num: '7' }, { id: 'prio', num: '8' }]);
+  assert.equal(A.prioritaDi({ priority: 'FENC:def' }), null);
+  assert.equal(A.prioritaDi({ priority: ' 2 ' }), 2);
+  assert.equal(A.prioritaDi({ priority: 7 }), 0);
+});
+
+test('eredità: un giro di attese rimasto nei dati non la fa girare per sempre, e la fonte non si rialza', async () => {
+  const docs = {
+    A: { num: '10', status: 'todo', priority: 0, waitsFor: aspetta(['B', '20']) },
+    B: { num: '20', status: 'todo', priority: 0, waitsFor: aspetta(['A', '10'], ['S', '1']) },
+  };
+  const r = await A.ereditaPriorita({ id: 'S', num: '1', priority: 2, waitsFor: aspetta(['A', '10']) }, grafo(docs).leggi);
+  assert.deepEqual(r.alzati.map((a) => a.id), ['A', 'B']);
+});
+
+test('eredità: oltre il tetto di feedback visitati si rifiuta col numero, mai un taglio', async () => {
+  const docs = {};
+  for (let i = 0; i < 2100; i++) docs[`n${i}`] = { num: String(i + 1), status: 'todo', priority: 0, waitsFor: aspetta([`n${i + 1}`, String(i + 2)]) };
+  const r = await A.ereditaPriorita({ id: 'S', priority: 1, waitsFor: aspetta(['n0', '1']) }, grafo(docs).leggi);
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /superano 2000 feedback/);
+});
