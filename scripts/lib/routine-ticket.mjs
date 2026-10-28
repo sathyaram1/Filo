@@ -160,6 +160,44 @@ export function segnaBigliettoFinito(root, ticket, perche, { now = Date.now() } 
 }
 
 /**
+ * La punta che il registro del ramo conosce per QUESTO giro (#1555): quella trovata all'avvio (`inizio`), l'ultima
+ * consegna che la registra, la chiusura. Chi chiude il giro registra la punta solo se è un'altra. Best-effort.
+ */
+export function segnaPuntaDelGiro(root, ticket, { sha = '', ramo = '', via = '' } = {}, { now = Date.now(), seManca = false } = {}) {
+  const t = String(ticket || '').trim();
+  const m = readMarkerFrom(root);
+  if (!t || !m || String(m.ticket || '') !== t) return false;
+  if (seManca && m.punta && m.punta.ramo === String(ramo)) return true;
+  return scriviMarcatore(root, { ...m, punta: { sha: String(sha || ''), ramo: String(ramo || ''), via: String(via || ''), ora: new Date(now).toISOString() } });
+}
+
+/**
+ * Il giro ha chiuso il ramo (domanda di fine sessione o rilascio, #1555): da lì niente parte più, perché la domanda
+ * può sporcare il biglietto e una spinta dopo romperebbe il registro (SPEC-DOMANDE §5.4). Best-effort.
+ */
+export function segnaGiroChiuso(root, ticket, { sha = '' } = {}, { now = Date.now() } = {}) {
+  const t = String(ticket || '').trim();
+  const m = readMarkerFrom(root);
+  if (!t || !m || String(m.ticket || '') !== t) return false;
+  if (giroChiuso(m)) return true;
+  return scriviMarcatore(root, { ...m, chiuso: { sha: String(sha || ''), ora: new Date(now).toISOString() } });
+}
+
+/** Il giro del marcatore ha già chiuso il ramo? PURA. La riga che lo legge nel gancio cerca la stessa chiave. */
+export function giroChiuso(marker) {
+  return !!(marker && marker.chiuso && typeof marker.chiuso === 'object' && /^[0-9a-f]{40}$/.test(String(marker.chiuso.sha || '')));
+}
+
+function scriviMarcatore(root, marker) {
+  try {
+    writeFileSync(ticketFile(root), JSON.stringify(marker, null, 2) + '\n', 'utf8');
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
  * Il biglietto del giro in corso, o '' se non c'è.
  *
  * Stessa precedenza del marcatore di ruolo: variabile esplicita > marcatore di
