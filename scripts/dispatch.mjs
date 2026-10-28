@@ -1176,6 +1176,8 @@ async function recordVerifier(id, critiqueText, segnalazione = '', domanda = nul
   // locale accanto all'esito. Uno solo, letto una volta: leggerlo due volte
   // vorrebbe dire poter mandare al server uno sha e scriverne un altro qui.
   const shaProvato = headSha(ROOT) || '';
+  const nonSpedita = await spedisciPrimaDellaConsegna(shaProvato, 'critica non registrata');
+  if (nonSpedita) return nonSpedita;
   const sent = await deliverToChannel('verdict', {
     findings: parsed.findings,
     summary: parsed.summary,
