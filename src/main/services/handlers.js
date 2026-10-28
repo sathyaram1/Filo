@@ -5723,7 +5723,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     threadMessages.push({ role: 'user', content: parts });
     ricordaOrigineInChat(chatId, origine);
   } else {
-    threadMessages.push({ role: 'user', content: giaLetta ? `${String(userMessage || '')}\n\n${giaLetta}` : String(userMessage || '') });
+    threadMessages.push({ role: 'user', content: giaLetta ? `${domandaConCitazione}\n\n${giaLetta}` : domandaConCitazione });
   }
 
   // Reasoning in diretta: se il client ha aperto un canale, i thought summary arrivano alla
