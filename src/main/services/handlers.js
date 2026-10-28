@@ -5113,7 +5113,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     const det = Array.isArray(o.dettagli) && o.dettagli.length ? `\n${o.dettagli.join('\n')}` : '';
     return `${o.frase || (res.executed ? 'Fatto.' : 'Non riuscito.')}${det}\nDillo all'utente in una riga, con parole tue; non ripetere l'azione.`;
   }
-  if (type === 'INSTALLA_AGGIORNAMENTO' && res.output && res.output.frase) {
+  if ((type === 'INSTALLA_AGGIORNAMENTO' || type === 'ACCOUNT') && res.output && res.output.frase) {
     return `${res.output.frase}\nDillo all'utente in una riga, con parole tue; non ripetere l'azione.`;
   }
   // #686 — lo zoom lo riferisce il numero VERO, non quello chiesto: un «al
