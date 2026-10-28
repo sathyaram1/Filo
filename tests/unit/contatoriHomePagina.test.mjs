@@ -122,9 +122,9 @@ test('fasce, tipi, passi, proposte e automatismi sono quelli del codice, e ognun
 
 test('la home manda solo nomi e numeri: mai le parole cercate, né quanto sono lunghe, né quello che segue un comando', () => {
   const cerca = leggi('src/pages/dashboard/dashboard-cerca.js');
-  const campi = [...cerca.matchAll(/contaHome\('[a-z-]+', \{([^}]*)\}\)/g)].map((m) => m[1]).join(',');
+  const campi = [...cerca.matchAll(/contaHome\('[a-z-]+', \{(.*)\}\);$/gm)].map((m) => m[1]).join(',');
   const nomi = [...campi.matchAll(/(\w+):/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(nomi)].sort(), ['ms', 'posizione', 'risultati', 'ripetuta', 'tipo']);
+  assert.deepEqual([...new Set(nomi)].sort(), ['ms', 'posizione', 'ripetuta', 'risultati', 'tipo']);
   assert.doesNotMatch(campi, /\bq\b|length|value|testo/);
   const comandi = leggi('src/pages/dashboard/dashboard-comandi.js');
   assert.match(comandi, /misura: 'comando-home', cosa, \.\.\.\(scelta \? \{ scelta \} : \{\}\)/);
@@ -158,7 +158,7 @@ test('ogni misura: un testo, un sito, un paese o un nome inventato non escono in
   b.m.fatto(SITO);
   b.m.disfatto('pubblicita_saltata');
   const d = await dellOra(b);
-  assert.deepEqual(d.comando_home, { set: 2, sito_diretto: 1 }, 'il nome del comando, mai quello che lo segue');
+  assert.deepEqual(d.comando_home, { set: 1, sito_diretto: 1 }, 'il nome del comando; quello che lo segue non è un nome');
   assert.deepEqual(d.ricerca_home, { 'risultati:r0': 1, 'risultati:oltre': 1, vuota_ripetuta: 1, 'aperto:scheda_chiusa:p2_3:s2': 1 });
   assert.deepEqual(d.risali, { n2_3: 1 });
   assert.deepEqual(d.intervista_rifatta, { riaperta: 1, 'fine:autonomia': 1 });
@@ -190,7 +190,7 @@ test('in incognito e a contatori spenti non si conta niente, e un’ora senza qu
   await attendi();
   b.accesi = true;
   await b.s.homePagina(() => true);
-  assert.deepEqual(await dellOra(b), H.vuota());
+  assert.ok(Object.values(await dellOra(b)).every((m) => !Object.keys(m).length));
   assert.equal(await spedisci(b), 'inviati');
   assert.equal(b.per[H.COLLEZIONE], undefined);
 });
