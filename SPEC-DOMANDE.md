@@ -399,13 +399,15 @@ Come funziona oggi (#1152):
   `esito.compito.id`. Il pacemaker tiene la rete: una domanda in lavorazione
   senza il suo compito lo riceve (le risposte di prima di #1152 comprese), un
   compito la cui domanda non lo aspetta più si chiude `superato`.
-- **Biglietto.** La coda dà i compiti senza feedback con la loro urgenza e
+- **Biglietto.** La coda dà i compiti di risposta con la loro urgenza e
   li conta come una priorità 3: non aspettano nessuno, e li passa solo chi ha
-  urgenza più alta. Né il giro su un solo feedback né la chiave dei lavori
+  urgenza più alta (gli altri compiti senza feedback non hanno priorità,
+  § 6.3). Né il giro su un solo feedback né la chiave dei lavori
   server li prendono. Il semaforo è sul compito (`compito:C-n`); il biglietto
-  ha il ruolo `risposta`, nasce pulito solo con compito e domanda fidati e la
-  chiave a rete limitata, e la domanda non fidata lo sporca prima che il testo
-  esca.
+  ha il ruolo `risposta` e l'ambito `lavoro` (§ 5.2: le sue operazioni sulla
+  domanda sono quelle del ruolo), nasce pulito solo con compito e domanda
+  fidati e la chiave a rete limitata, e la domanda non fidata lo sporca prima
+  che il testo esca.
 - **Fascicolo.** La domanda intera (conversazione coi turni dell'owner, i suoi
   allegati aperti dal server, `notePerAgenti`), numero, stato e priorità dei
   feedback che nomina. Il registro (§ 3.6) è testo di altre domande, cioè

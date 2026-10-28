@@ -198,7 +198,9 @@ test('un rifiuto del server si legge accanto al modulo col suo dettaglio, e quel
   await expect(form.locator('.mg-rc-form-msg')).toHaveText('La cadenza ha almeno un giorno.');
   expect(await inviati(page, 'ricorrente_salva')).toHaveLength(0);
   await form.locator('[data-giorno="3"]').click();
-  await form.locator('[data-campo="testo"]').fill('x'.repeat(40001));
+  // A parole, come un testo incollato: una parola sola di 40.001 lettere blocca Chromium per oltre trenta secondi
+  // quando la si sostituisce, sotto lo schermo virtuale delle routine.
+  await form.locator('[data-campo="testo"]').fill('abcd '.repeat(8000) + 'x');
   await form.getByRole('button', { name: 'Salva' }).click();
   await expect(form.locator('.mg-rc-form-msg')).toHaveText('Il testo ha 40001 caratteri, il massimo è 40000.');
   await form.locator('[data-campo="testo"]').fill('Testo nuovo');
