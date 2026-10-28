@@ -32,10 +32,10 @@ function daFs(v) {
   throw new Error(`tipo inatteso ${JSON.stringify(v)}`);
 }
 
-function banco({ accesi = true, incognito = false } = {}) {
+function banco({ accesi = true, incognito = false, risposta = () => 200 } = {}) {
   const disco = new Map();
   const per = { ore: [], riquadri: [], altro: [] };
-  const b = { t: T0, accesi, incognito, disco, per, n: 0 };
+  const b = { t: T0, accesi, incognito, disco, per, n: 0, risposta };
   b.s = Servizio.crea({
     contatori: C,
     storage: {
@@ -56,7 +56,8 @@ function banco({ accesi = true, incognito = false } = {}) {
       const doc = Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)]));
       const dove = url.includes(`/${C.COLLEZIONE_RIQUADRI}?`) ? 'riquadri' : url.includes(`/${C.COLLEZIONE}?`) ? 'ore' : 'altro';
       per[dove].push({ url, doc });
-      return { ok: true, status: 200, json: async () => ({}) };
+      const st = b.risposta(dove, url);
+      return { ok: st >= 200 && st < 300, status: st, json: async () => ({}) };
     },
     log: () => {},
   });
@@ -140,6 +141,25 @@ test('i riquadri partono accanto alla loro ora, con lo stesso id; un’ora senza
   await b.s.controlla();
   assert.equal(b.per.ore.length, 2);
   assert.equal(b.per.riquadri.length, 1, 'l’ora senza riquadri non ha il loro documento');
+});
+
+test('finché le regole pubblicate non conoscono i riquadri, il loro rifiuto non tiene indietro gli altri documenti dell’ora', async () => {
+  let pubblicate = false;
+  const b = banco({ risposta: (dove) => (dove === 'riquadri' && !pubblicate ? 403 : 200) });
+  b.s.riquadro(v('ocr', { esito: 'copiato' }));
+  b.s.gesto('trascinamento', { da: 'scheda', a: 'chat_home', esito: 'posato' });
+  await attendi();
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'fallito');
+  assert.equal(b.per.ore.length, 1);
+  assert.ok(b.per.altro.some((x) => x.url.includes(`/${C.COLLEZIONE_GESTI}?`)), 'i gesti dell’ora partono prima dei riquadri');
+  assert.equal(b.per.riquadri.length, 1);
+  // Il giorno dopo, con le regole pubblicate, l'ora riparte e i riquadri arrivano.
+  pubblicate = true;
+  b.t += 24 * ORA;
+  await b.s.controlla();
+  assert.equal(b.per.riquadri.length, 2);
+  assert.deepEqual(b.per.riquadri[1].doc.ocr, { copiato: '1' });
 });
 
 test('in incognito e a contatori spenti i riquadri non si contano e non partono', async () => {

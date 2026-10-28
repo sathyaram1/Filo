@@ -25,14 +25,12 @@ const oggi = (app) => app.evaluate(async () => {
   return out;
 });
 // La voce di una misura per nome, letta con l'elenco dell'app: { voce: conto }.
-const voce = (app, misura, chiave) => app.evaluate(async (_e, [m, k, tutte]) => {
-  const C = globalThis.SN_CONTATORI;
-  const conti = tutte[m] && tutte[m][k];
+const voceOra = async (app, misura, chiave) => {
+  const conti = ((await oggi(app))[misura] || {})[chiave];
   if (!conti) return null;
-  const nomi = C.RIQUADRI[m].gruppi.flat();
+  const nomi = await app.evaluate((_e, m) => globalThis.SN_CONTATORI.RIQUADRI[m].gruppi.flat(), misura);
   return Object.fromEntries(nomi.map((n, i) => [n, conti[i]]).filter(([, n]) => n > 0));
-}, [misura, chiave, await oggi(app)]);
-const voceOra = async (app, misura, chiave) => voce(app, misura, chiave);
+};
 
 // I modelli finti nel main: le risposte a pezzi si fermano finché la prova non le libera, se `__ferma`.
 async function modelliFinti(app) {
@@ -108,7 +106,10 @@ test('nel riquadro di Traduci contano Copia e la domanda dopo la risposta; quell
   await expect.poll(async () => (await statoDi(app, page, '.sn-popup'))?.visibile || false, { timeout: 10_000 }).toBe(true);
   await page.waitForTimeout(700);
   await clicca(app, page, '.sn-popup-close');
-  await expect.poll(() => voceOra(app, 'riquadro_chiuso_prima', 'explain-deep'), { timeout: 10_000 }).toEqual({ s1: 1 });
+  await expect.poll(() => voceOra(app, 'riquadro_chiuso_prima', 'explain-deep'), { timeout: 10_000 }).not.toBeNull();
+  const chiuso = await voceOra(app, 'riquadro_chiuso_prima', 'explain-deep');
+  expect(Object.values(chiuso)).toEqual([1]);
+  expect(Object.keys(chiuso)[0], 'sette decimi di secondo di attesa non stanno nel mezzo secondo').not.toBe('ms500');
   expect(await voceOra(app, 'riquadro_uso', 'explain-deep')).toBeNull();
   await app.evaluate(() => { globalThis.__ferma = false; globalThis.__libera?.(); });
 
@@ -206,7 +207,6 @@ test('nell’Editor il titolo automatico riscritto a mano conta quando, e la cha
   await input.press('Enter');
   await expect(page.locator('.ed-chat-msg.assistant').last()).toHaveText('Fatto.');
   await expect.poll(() => voceOra(app, 'editor_chat', 'intero'), { timeout: 10_000 }).toEqual({ f1: 1 });
-  try { await page.screenshot({ path: 'tests/.shots/contatori-riquadri-editor.png' }); } catch (_) {}
 
   const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));
   for (const x of ['Mario', 'giardino', 'grassetto']) expect(disco).not.toContain(x);

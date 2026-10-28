@@ -1200,6 +1200,7 @@ function crea(dip = {}) {
       const diFinestra = giorno ? null : documentoFinestra(k, { ...base, chiave: k });
       const diSicurezza = giorno ? null : documentoSicurezza(k, { ...base, chiave: k });
       const gesti = giorno ? null : documentoGesti(k, { ...base, chiave: k });
+      const riquadri = giorno ? null : documentoRiquadri(k, { ...base, chiave: k });
       // La chat della stessa ora parte nel suo documento, dopo l'ora (#1463). Rifiutata, l'ora resta: rispedita, quella
       // già arrivata risponde 409 e la chat riparte con lei.
       let chat = giorno ? null : C.documentoChat({ ...base, chiave: k });
@@ -1227,6 +1228,11 @@ function crea(dip = {}) {
         r = await spedisci(diSicurezza, S.COLLEZIONE);
         if (mia !== generazione) return 'spenti';
       }
+      // Per ultimi: finché le regole pubblicate non conoscono la loro collezione, il rifiuto non tiene indietro gli altri.
+      if (r.ok && riquadri) {
+        r = await spedisci(riquadri, C.COLLEZIONE_RIQUADRI);
+        if (mia !== generazione) return 'spenti';
+      }
       if (!r.ok && r.soloQuesto) {
         stato.rifiutati[k] = oggi;
         stato.errore = r.motivo;
@@ -1251,15 +1257,14 @@ function crea(dip = {}) {
     return esito;
   }
 
-  // Le chiamate ai modelli (#1464), la navigazione (#1469), le attività (#1467) e i riquadri (#1465) di un'ora, se ne ha: un
-  // documento che non passa la validazione non ferma l'ora.
+  // Le chiamate ai modelli (#1464), la navigazione (#1469) e le attività (#1467) di un'ora, se ne ha: un documento che
+  // non passa la validazione non ferma l'ora.
   function documentiAccanto(k, base) {
     const out = [];
     for (const [costruisci, vuoto, valida, collezione, cosa] of [
       [C.documentoChiamate, C.senzaChiamate, C.validaChiamate, C.COLLEZIONE_CHIAMATE, 'le chiamate'],
       [C.documentoNavigazione, C.senzaNavigazione, C.validaNavigazione, C.COLLEZIONE_NAVIGAZIONE, 'la navigazione'],
       [C.documentoAttivita, C.senzaAttivita, C.validaAttivita, C.COLLEZIONE_ATTIVITA, 'le attività'],
-      [C.documentoRiquadri, C.senzaRiquadri, C.validaRiquadri, C.COLLEZIONE_RIQUADRI, 'i riquadri'],
     ]) {
       const d = costruisci(base);
       if (vuoto(d)) continue;
@@ -1289,6 +1294,16 @@ function crea(dip = {}) {
     const v = S.valida(d);
     if (v.ok) return d;
     log(`la sicurezza di ${k} non parte: ${v.motivo}`);
+    return null;
+  }
+
+  // I riquadri di un'ora (#1465), se ne ha: come i gesti.
+  function documentoRiquadri(k, base) {
+    const d = C.documentoRiquadri(base);
+    if (C.senzaRiquadri(d)) return null;
+    const v = C.validaRiquadri(d);
+    if (v.ok) return d;
+    log(`i riquadri di ${k} non partono: ${v.motivo}`);
     return null;
   }
 
