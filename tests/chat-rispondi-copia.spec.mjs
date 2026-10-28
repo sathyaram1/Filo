@@ -105,6 +105,17 @@ test('Copia e Rispondi sotto una risposta di Filo: la citazione parte col messag
   expect(await paroleDellaBolla(mia)).toBe('la seconda');
   await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Ottima scelta' })).toBeVisible({ timeout: 20_000 });
 
+  // Nel filo il messaggio tiene il posto della risposta citata, non una sua copia.
+  const salvata = await app.evaluate(async () => {
+    const chats = await globalThis.SN_IL_FILO.chats();
+    const mia = chats.flatMap((c) => c.messages).find((m) => m.role === 'user' && m.text === 'la seconda');
+    const r = mia && mia.rispostaA;
+    const citata = r && chats.find((c) => c.id === r.chat);
+    return { r, testo: citata ? citata.messages[r.i].text : null };
+  });
+  expect(salvata.r.testo).toBeUndefined();
+  expect(salvata.testo).toBe(RISPOSTA);
+
   // Il modello sa a quale risposta si risponde: la citazione in testa alle parole dell'utente.
   const detta = await ultimaDomanda(app);
   expect(detta).toContain("l'utente risponde al tuo messaggio");
