@@ -529,11 +529,11 @@
     `<rect x="3" y="3.5" width="18" height="12.5" rx="2"/>` +
     `<path d="M12 16v4"/>` +
     `<path d="M8.5 20h7"/>` +
-    `<rect x="6.25" y="6.5" width="1.5" height="1.5" rx=".4"/>` +
-    `<rect x="11.25" y="6.5" width="1.5" height="1.5" rx=".4"/>` +
-    `<rect x="16.25" y="6.5" width="1.5" height="1.5" rx=".4"/>` +
-    `<rect x="6.25" y="11.5" width="1.5" height="1.5" rx=".4"/>` +
-    `<rect x="11.25" y="11.5" width="1.5" height="1.5" rx=".4"/>`;
+    `<path d="M7.5 7.75h.01"/>` +
+    `<path d="M12 7.75h.01"/>` +
+    `<path d="M16.5 7.75h.01"/>` +
+    `<path d="M7.5 11.75h.01"/>` +
+    `<path d="M12 11.75h.01"/>`;
 
   // --- Stile della pagina: pennello (manico diagonale + ciuffo).
   const brush =
