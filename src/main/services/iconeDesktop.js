@@ -575,7 +575,7 @@ async function ordinaOra(q) {
   const letto = await computer().leggi();
   if (!letto.ok) return fallito(letto.errore);
   const come = { ordine: q.ordine, verso: q.verso, alContrario: q.alContrario, cartellePrima: q.cartellePrima };
-  if (!letto.voci.length) return { ok: true, cosa: 'desktop', ...come, vuoto: true, totale: 0, spostate: 0 };
+  if (!letto.voci.length) return { ok: true, cosa: 'desktop', ...come, detto: comeDetto(come), vuoto: true, totale: 0, spostate: 0 };
   if (q.ordine === 'data' || q.ordine === 'dimensione') await arricchisci(letto.voci);
   const p = piano(letto, q);
   if (p.errore) return fallito(p.errore, p.errore === 'non-ci-stanno' ? { totale: p.totale, posti: p.posti } : {});
