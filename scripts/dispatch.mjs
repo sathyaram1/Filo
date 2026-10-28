@@ -1065,6 +1065,19 @@ async function deliverToChannel(intent, data) {
 }
 
 /**
+ * La consegna parte su origin prima di registrare la punta (#1555; regola in routine-channel spedisciPerLaConsegna).
+ * null = spedita; altrimenti il rifiuto da restituire. Senza biglietto la consegna si ferma dopo, con le sue parole.
+ */
+async function spedisciPrimaDellaConsegna(sha, cosa) {
+  const ticket = readRoutineTicket(ROOT);
+  if (!ticket) return null;
+  const { spedisciPerLaConsegna } = await import('./routine-channel.mjs');
+  const r = spedisciPerLaConsegna(ROOT, ticket, sha);
+  if (r.avviso) process.stderr.write(`${r.avviso}\n`);
+  return r.ok ? null : { rejected: true, nonSpedita: true, message: `${cosa}: ${r.motivo}` };
+}
+
+/**
  * C — ogni scrittura nella macchina a stati RICALCOLA l'identità della directory
  * e rifiuta la transizione se non corrisponde al branch assegnato. Non chiede
  * all'istanza dove si trova: lo guarda.
