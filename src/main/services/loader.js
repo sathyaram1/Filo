@@ -36,6 +36,7 @@ require(path.join(SHARED, 'modelCaps.js'));
 require(path.join(SHARED, 'modelUsage.js'));
 require(path.join(SHARED, 'contatoriGiornalieri.js')); // #969 — i contatori giornalieri: elenchi chiusi e forma del documento
 require(path.join(SHARED, 'contatoriFinestra.js')); // #1470 — i contatori della finestra, dopo quelli che ne danno gli errori
+require(path.join(SHARED, 'contatoriSicurezza.js')); // #1474 — i contatori della sicurezza, dopo quelli che ne danno le funzioni
 require(path.join(SHARED, 'gestiContati.js')); // #1471 — i gesti contati: segno dei trascinamenti, nome letto su un'icona
 // Elenco delle funzioni impostabili + le loro etichette: serve al main per
 // chiamare una funzione scoperta con lo STESSO nome che l'utente legge nelle

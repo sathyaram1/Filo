@@ -28,6 +28,7 @@ const rifiutate = new Set();  // servizio|ospite a cui l'utente ha detto no, per
 const funziona = new Map();   // pagina|riquadro → quando il modello l'ha visto non rotto
 const fotoMancate = new Map(); // riquadro → foto non riuscite
 let visioni = [];
+let visioniPiene = false;
 
 function Cookies() { return require('./cookies'); }
 function MSG() { return (globalThis.SN_MSG && globalThis.SN_MSG.MSG) || {}; }
@@ -212,11 +213,25 @@ async function guarda(c, segno) {
   if (quando && Date.now() - quando < FUNZIONA_MS) return null;
   if (diCasa(c.urlFrame) || diCasa(c.urlTop)) return null;
   // Una pagina delicata (password, carta: #1004) non va a un modello, nemmeno a pezzi.
+  const Sicurezza = require('./contatoriSicurezza');
+  const perContatori = { incognito: !!c.incognito };
   try {
     const delicata = await globalThis.SN_DELICATE.filtro();
-    if (delicata(c.urlTop) || delicata(c.urlFrame)) { conta(idServizio(c.urlFrame), 'pagina_delicata', c.incognito); return null; }
-  } catch (_) { return null; }
-  if (!restanoVisioni()) { conta(idServizio(c.urlFrame), 'tetto_visioni', c.incognito); return null; }
+    const motivo = delicata(c.urlTop) || delicata(c.urlFrame);
+    if (motivo) {
+      conta(idServizio(c.urlFrame), 'pagina_delicata', c.incognito);
+      Sicurezza.misura('paginaDelicata', motivo, 'riquadri', perContatori);
+      return null;
+    }
+  } catch (_) { Sicurezza.misura('filtroGuasto', 'riquadri', perContatori); return null; }
+  if (!restanoVisioni()) {
+    conta(idServizio(c.urlFrame), 'tetto_visioni', c.incognito);
+    // Il tetto si conta toccato una volta, finché non torna a passare uno sguardo (#1474).
+    if (!visioniPiene) Sicurezza.misura('tetto', 'riquadri_visioni', perContatori);
+    visioniPiene = true;
+    return null;
+  }
+  visioniPiene = false;
   const immagine = await foto(c, segno);
   if (!immagine) return FOTO_MANCATA;
   visioni.push(Date.now());

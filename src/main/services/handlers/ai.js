@@ -5,12 +5,15 @@ module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
     providerRouting, openWeightsBlockReason, modelGate,
-    Defaults, isAdmin, broadcastToTabs, controllaUscita, ricordaLettoDallAiuto, segnaLetturaAiuto, winOf,
+    Defaults, isAdmin, broadcastToTabs, controllaUscita: portaUscite, ricordaLettoDallAiuto, segnaLetturaAiuto, winOf,
   } = ctx;
   const { SN_CONST } = globalThis;
   const WebSearch = globalThis.SN_WEB_SEARCH;
   const PathsCollector = globalThis.SN_PATHS_COLLECTOR;
   require('../fontiSegnaposto');
+  const ContatoriSicurezza = require('../contatoriSicurezza');
+  // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
+  const controllaUscita = ContatoriSicurezza.contaUscite(portaUscite);
 
   // Cache audio in memoria: rileggere lo stesso testo con la stessa voce e lo stesso modello
   // è istantaneo invece di rifare la chiamata lenta. Dura quanto la sessione.
@@ -86,9 +89,12 @@ module.exports = function register(on, ctx) {
     const preparata = Boolean(msg && msg.action === A.EXPLAIN && msg.suRichiesta !== true);
     if (!immagine && !preparata) return false;
     const url = String(sender?.tab?.url || sender?.url || '');
+    const lavoro = immagine ? 'descrizione_automatica' : 'spiegazione_preparata';
     let delicata = null;
-    try { delicata = await globalThis.SN_DELICATE.filtro(); } catch (_) { return true; }
-    const daQui = /^https?:/i.test(url) && Boolean(delicata(url));
+    try { delicata = await globalThis.SN_DELICATE.filtro(); } catch (_) { ContatoriSicurezza.misura('filtroGuasto', lavoro); return true; }
+    const motivo = /^https?:/i.test(url) ? delicata(url) : null;
+    const daQui = Boolean(motivo);
+    if (daQui) ContatoriSicurezza.misura('paginaDelicata', motivo, lavoro);
     if (!immagine) return daQui;
     const Immagini = require('../immaginiDelicate').perFilo();
     const dataUrl = msg.payload.dataUrl;
@@ -123,9 +129,11 @@ module.exports = function register(on, ctx) {
     if (!msg || !DEL_CORRETTORE.has(msg.action) || !msg.payload || typeof msg.payload !== 'object') return false;
     const url = String(sender?.tab?.url || sender?.url || '');
     if (!/^https?:/i.test(url)) return false;
-    let delicata = true;
-    try { delicata = Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) {}
+    let motivo = 'filtro_guasto';
+    try { motivo = (await globalThis.SN_DELICATE.filtro())(url) || null; } catch (_) {}
+    const delicata = Boolean(motivo);
     if (delicata) {
+      ContatoriSicurezza.misura('paginaDelicata', motivo, 'contesto_correttore');
       const sito = msg.payload.luogo && typeof msg.payload.luogo.sito === 'string' ? msg.payload.luogo.sito : '';
       msg.payload = { ...msg.payload, contesto: {}, luogo: sito ? { sito } : {} };
     }
@@ -158,6 +166,7 @@ module.exports = function register(on, ctx) {
     if (fermo.primo) {
       try { spingiAllaScheda(wc, { type: MSG.SHOW_TOAST, text: frase, duration: 9000 }, { inVista: true }); } catch (_) {}
       try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:tetto_automatiche'); } catch (_) {}
+      ContatoriSicurezza.misura('tetto', `automatiche_${fermo.gruppo}`);
     }
     return { ok: false, code: 'TROPPE_AUTOMATICHE', error: frase };
   }

@@ -805,6 +805,11 @@
   }
 
   function piuUno(mappa, chiave) { mappa[chiave] = conto(mappa[chiave]) + 1; }
+  // Una combinazione finita in «altro» per il tetto: i contatori della sicurezza la contano fra i tetti toccati (#1474).
+  function tettoCombinazioni(ora) {
+    const S = global.SN_CONTATORI_SICUREZZA;
+    if (S && oggetto(ora)) S.registraTetto(ora, 'contatori_combinazioni');
+  }
 
   function misura(mappa, chiave, { visto = null, fine = null, ripetuta = false } = {}) {
     const m = oggetto(mappa[chiave]) ? mappa[chiave] : { n: 0, visto: {}, fine: {}, rip: 0 };
@@ -839,7 +844,7 @@
     let chiave = `${modelloPulito(modello)}|${hostPulito(host)}|${tipo}`;
     // Il posto per le sei righe «altro» (una per tipo) resta sempre libero: oltre il tetto non si perde niente.
     const specifiche = Object.keys(per).filter((k) => !k.startsWith(`${ALTRO}||`)).length;
-    if (!has(per, chiave) && specifiche >= TETTO_ERRORI_ORA - ERRORI.length) chiave = `${ALTRO}||${tipo}`;
+    if (!has(per, chiave) && specifiche >= TETTO_ERRORI_ORA - ERRORI.length) { chiave = `${ALTRO}||${tipo}`; tettoCombinazioni(ora); }
     piuUno(per, chiave);
     g.errori[funzione] = per;
     return true;
@@ -881,7 +886,7 @@
     const g = normale(ora);
     const per = oggetto(g.correttore[tipo]) ? g.correttore[tipo] : {};
     let m = modelloPulito(modello);
-    if (!has(per, m) && Object.keys(per).filter((k) => k !== ALTRO).length >= TETTO_COMBINAZIONI - 1) m = ALTRO;
+    if (!has(per, m) && Object.keys(per).filter((k) => k !== ALTRO).length >= TETTO_COMBINAZIONI - 1) { m = ALTRO; tettoCombinazioni(ora); }
     const c = Array.isArray(per[m]) && per[m].length === 4 ? per[m] : [0, 0, 0, 0];
     const i = ESITI_PROPOSTA.indexOf(esito);
     c[i] = conto(c[i]) + 1;
@@ -988,7 +993,7 @@
     const mappa = normale(ora)[campo];
     const per = oggetto(mappa[funzione]) ? mappa[funzione] : {};
     let m = modelloPulito(modello);
-    if (m !== ALTRO && !has(per, `${m}|${resto}`) && voceSpecifiche(mappa) >= TETTO_MODELLI_ORA) m = ALTRO;
+    if (m !== ALTRO && !has(per, `${m}|${resto}`) && voceSpecifiche(mappa) >= TETTO_MODELLI_ORA) { m = ALTRO; tettoCombinazioni(ora); }
     const k = `${m}|${resto}`;
     const prima = Number(per[k]);
     per[k] = Math.min(MAX_CONTO, (Number.isFinite(prima) && prima > 0 ? prima : 0) + quanto);
@@ -1520,7 +1525,7 @@
     let chiave = `${nomeStrumento(nome)}|${esito}`;
     // Il posto per le righe «altro» (una per esito) resta sempre libero: oltre il tetto non si perde niente.
     const specifiche = Object.keys(per).filter((x) => !x.startsWith(`${ALTRO}|`)).length;
-    if (!has(per, chiave) && specifiche >= TETTO_STRUMENTI - ESITI_STRUMENTO.length) chiave = `${ALTRO}|${esito}`;
+    if (!has(per, chiave) && specifiche >= TETTO_STRUMENTI - ESITI_STRUMENTO.length) { chiave = `${ALTRO}|${esito}`; tettoCombinazioni(ora); }
     piuN(per, chiave, k);
     return true;
   }

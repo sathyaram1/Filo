@@ -228,7 +228,9 @@ async function immagineNegliAppunti() {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita, apriDaFilo, contattabilePrimaDelClic } = ctx;
+  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita: portaUscite, apriDaFilo, contattabilePrimaDelClic } = ctx;
+  // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
+  const controllaUscita = require('../contatoriSicurezza').contaUscite(portaUscite);
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
   // Titolo generato da un LLM economico: best-effort, si ripiega sulle prime parole del testo

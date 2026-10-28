@@ -37,6 +37,7 @@ const sandbox = require('./sandbox');
 const rimandi = require('./rimandi');
 const links = require('./links');
 const { origineLink } = require('./origine');
+const ContatoriSicurezza = require('../contatoriSicurezza');
 
 class TtlCache {
   constructor(ttlMs) { this.ttl = ttlMs; this.m = new Map(); }
@@ -86,7 +87,11 @@ function configure(opts = {}) {
   const { gsbKey, runLlm, enableSandbox = true, enableNetwork = true } = opts;
   const keyOf = typeof gsbKey === 'function' ? gsbKey : (gsbKey ? () => gsbKey : null);
   setProviders({
-    gsb: keyOf ? ((rawUrl) => (currentGsbKey() ? gsbLookup.check(rawUrl) : null)) : null,
+    gsb: keyOf ? ((rawUrl, _norm, info) => {
+      if (currentGsbKey()) return gsbLookup.check(rawUrl, info);
+      if (info) info.esito = 'non_configurato';
+      return null;
+    }) : null,
     gsbPeek: keyOf ? ((rawUrl) => gsbLookup.peek(rawUrl)) : null,
     rdap: enableNetwork ? ((reg) => net.rdapAgeDays(reg)) : null,
     ct: enableNetwork ? ((reg) => net.ctFirstSeenDays(reg)) : null,
@@ -164,23 +169,54 @@ function budgetKey(norm, url, loaded) {
   return ownerKey(norm, url);
 }
 
-// Qualche chiamata all'ora per chiave; la stessa regola per ogni lavoro automatico che chiama il modello.
+// Qualche chiamata all'ora per chiave; la stessa regola per ogni lavoro automatico che chiama il modello. `toccato` scatta
+// al primo rifiuto di una chiave piena, una volta finché non torna a passare: i contatori ne contano le volte (#1474).
 function createOwnerBudget({ perHour = DEEP_BUDGET, max = 5000 } = {}) {
   const m = new Map();
+  const piene = new Set();
   return {
     m,
-    spend(k) {
+    spend(k, toccato = null) {
       const now = Date.now();
+      if (!m.has(k)) piene.delete(k);
       const recent = (m.get(k) || []).filter((t) => now - t < HOUR);
       m.delete(k);
-      if (recent.length >= perHour) { m.set(k, recent); return false; }
+      if (recent.length >= perHour) {
+        m.set(k, recent);
+        if (!piene.has(k)) { piene.add(k); try { if (toccato) toccato(); } catch (_) {} }
+        return false;
+      }
+      piene.delete(k);
       recent.push(now);
       m.set(k, recent);
       // Tetto largo: una chiave dimenticata riparte col conto pieno, e costa qualche chiamata, non un buco.
-      if (m.size > max) m.delete(m.keys().next().value);
+      if (m.size > max) { const via = m.keys().next().value; m.delete(via); piene.delete(via); }
       return true;
     },
   };
+}
+
+// I contatori della sicurezza (#1474): esito e durata di ogni controllo di rete, mai l'indirizzo. Non lanciano mai.
+const misura = (...a) => ContatoriSicurezza.misura(...a);
+const conIncognito = (ctx) => ({ incognito: !!(ctx && ctx.incognito) });
+function contaControllo(controllo, esito, ms, ctx) { misura('controllo', controllo, esito, ms, conIncognito(ctx)); }
+// Un controllo spento si conta una volta l'ora per pagina: senza la sua cache ogni verifica della pagina lo ritroverebbe.
+const spentiVisti = new TtlCache(HOUR);
+function contaSpento(controllo, pKey, ctx) {
+  const k = controllo + ':' + pKey;
+  if (spentiVisti.has(k)) return;
+  spentiVisti.set(k, true);
+  if (spentiVisti.m.size > 5000) spentiVisti.m.delete(spentiVisti.m.keys().next().value);
+  contaControllo(controllo, 'non_configurato', null, ctx);
+}
+// `esitoDi(r)`: 'ok', 'transitorio', 'fallito' o 'non_configurato' dal risultato; un'eccezione è «fallito».
+function cronometra(controllo, pKey, ctx, run, esitoDi) {
+  const t0 = Date.now();
+  const conta = (esito) => {
+    if (esito === 'non_configurato') contaSpento(controllo, pKey, ctx);
+    else contaControllo(controllo, esito, Date.now() - t0, ctx);
+  };
+  return Promise.resolve().then(run).then((r) => { conta(esitoDi(r)); return r; }, (e) => { conta('fallito'); throw e; });
 }
 
 // Gli indizi che vede il giudice: lo stesso sito con indizi diversi è un'altra domanda.
@@ -193,7 +229,7 @@ function cluesOf(norm, ctx, verdict) {
 }
 
 const deepBudget = createOwnerBudget();
-const spend = (k) => deepBudget.spend(k);
+const spend = (k, ctx) => deepBudget.spend(k, () => misura('tetto', 'safebrowse_approfondimenti', conIncognito(ctx)));
 
 // Un controllo che non ha dato verdetto (risposta illeggibile, fornitore in errore) non si ripete sullo stesso sito per poco.
 const FAILED_RETRY_MS = 5 * MIN;
@@ -220,11 +256,11 @@ async function settled() {
 }
 
 // In volo una per pagina, qualunque indizio abbia l'analisi che arriva dopo: la risposta si ricorda per pagina.
-function deepen(stage, bKey, pKey, siteKey, run, store) {
+function deepen(stage, bKey, pKey, siteKey, run, store, ctx) {
   const fly = stage + ':' + pKey;
   const k = stage + ':' + siteKey;
   if (inflight.has(fly)) return inflight.get(fly);
-  if (deepFailed.has(k) || !spend(stage + ':' + bKey)) return null;
+  if (deepFailed.has(k) || !spend(stage + ':' + bKey, ctx)) return null;
   return once(fly, () => Promise.resolve(run()).then((r) => {
     if (!r) { deepFailed.set(k, true); return null; }
     store(r);
@@ -251,16 +287,19 @@ const deepWorth = (v) => !v.whitelisted && (v.level === 'sospetto' || v.needsLlm
 
 const settle = (v) => Promise.resolve(v).then((r) => r, () => net.TRANSIENT);
 
-// crt.sh solo se RDAP non ha dato l'età.
-async function lookupAge(reg, norm, ctOk) {
+// crt.sh solo se RDAP non ha dato l'età. «Non si sa» di un registro che ha risposto conta come «fallito»: niente età.
+const esitoEta = (r, eta) => (eta(r) ? 'ok' : r && r.transient ? 'transitorio' : 'fallito');
+async function lookupAge(reg, norm, ctOk, ctx) {
   let transient = false;
   if (providers.rdap) {
-    const r = await settle(providers.rdap(reg, norm));
+    const rdap = providers.rdap;
+    const r = await cronometra('rdap', reg, ctx, () => settle(rdap(reg, norm)), (x) => esitoEta(x, (y) => typeof y === 'number'));
     if (typeof r === 'number') { ageCache.set(reg, r); return; }
     if (r && r.transient) transient = true;
   }
   if (providers.ct && ctOk) {
-    const r = await settle(providers.ct(reg, norm));
+    const ct = providers.ct;
+    const r = await cronometra('ct', reg, ctx, () => settle(ct(reg, norm)), (x) => esitoEta(x, (y) => !!y && typeof y.firstSeenDays === 'number'));
     if (r && typeof r.firstSeenDays === 'number') { ageCache.set(reg, r.firstSeenDays); return; }
     if (r && r.transient) transient = true;
   }
@@ -324,13 +363,20 @@ function analyze(url, ctx = {}, onUpdate) {
 
   // La risposta decide questa verifica anche quando Google chiede di non tenerla in cache.
   let gsbNow;
+  // I controlli di rete fatti partire da questa verifica, non da una gemella in volo: dopo, i contatori sanno se hanno
+  // cambiato il verdetto (#1474).
+  let partiti = 0;
   if (providers.gsb && need.gsb === undefined) {
     // In volo una per indirizzo: l'arrivo e la pagina pronta chiedono a pochi millisecondi (#813.1).
     const gsb = providers.gsb;
-    tasks.push(once('gsb:' + url, () => gsb(url, norm)).then((r) => {
+    tasks.push(once('gsb:' + url, () => {
+      partiti++;
+      const info = {};
+      return cronometra('gsb', key, ctx, () => gsb(url, norm, info), (r) => (r ? 'ok' : info.esito || 'fallito'));
+    }).then((r) => {
       if (r) gsbNow = r;
     }).catch(() => {}));
-  }
+  } else if (need.gsb === undefined) contaSpento('gsb', key, ctx);
   const known = () => {
     const data = assembleCached(norm, url);
     if (data.gsb === undefined && gsbNow) data.gsb = gsbNow;
@@ -343,9 +389,12 @@ function analyze(url, ctx = {}, onUpdate) {
     if (verdictChanged(last, next)) { last = next; try { onUpdate(next); } catch (_) {} }
   };
   let ageTask = null;
-  if (worthDeepening && need.ageDays === undefined && (providers.rdap || providers.ct) && !ageUnknowable(norm, url)) {
+  const ageNeeded = worthDeepening && need.ageDays === undefined && !ageUnknowable(norm, url);
+  if (ageNeeded && !providers.rdap) contaSpento('rdap', reg, ctx);
+  if (ageNeeded && !providers.ct && !need.cert) contaSpento('ct', reg, ctx);
+  if (ageNeeded && (providers.rdap || providers.ct)) {
     const ctOk = !need.cert;
-    ageTask = once('age:' + reg, () => lookupAge(reg, norm, ctOk)).then(notify);
+    ageTask = once('age:' + reg, () => { partiti++; return lookupAge(reg, norm, ctOk, ctx); }).then(notify);
     tasks.push(ageTask);
   }
   // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist). Con l'età in arrivo si decide dopo
@@ -358,16 +407,20 @@ function analyze(url, ctx = {}, onUpdate) {
     const out = [];
     // In incognito nessun lavoro che consuma crediti o visita il sito di nuovo (#1081).
     if (ctx.incognito) return out;
+    const esitoDi = (r) => (r ? 'ok' : 'fallito');
+    const parte = (controllo, run) => () => { partiti++; return cronometra(controllo, key, ctx, run, esitoDi); };
+    if (llmCache.get(key) === undefined && !providers.llm) contaSpento('llm', key, ctx);
     if (providers.llm && llmCache.get(key) === undefined) {
       const llm = providers.llm;
       const meta = buildLlmMeta(norm, ctx, verdict);
-      out.push(deepen('llm', bKey, key, siteKey, () => llm(meta), (r) => llmCache.set(key, r)));
+      out.push(deepen('llm', bKey, key, siteKey, parte('llm', () => llm(meta)), (r) => llmCache.set(key, r), ctx));
     }
     // Riaprire una pagina già aperta è una seconda visita, senza cookie, che ripete quello che il suo indirizzo fa al
     // GET (una conferma, un token monouso): la finestra nascosta prova solo un link prima che si apra (#1081).
+    if (ctx.daAprire === true && sandboxCache.get(key) === undefined && !providers.sandbox) contaSpento('sandbox', key, ctx);
     if (providers.sandbox && ctx.daAprire === true && sandboxCache.get(key) === undefined) {
       const detonate = providers.sandbox;
-      out.push(deepen('sb', bKey, key, siteKey, () => detonate(url, norm, ctx.rete || null), (r) => sandboxCache.set(key, r)));
+      out.push(deepen('sb', bKey, key, siteKey, parte('sandbox', () => detonate(url, norm, ctx.rete || null)), (r) => sandboxCache.set(key, r), ctx));
     }
     return out.filter(Boolean);
   };
@@ -377,7 +430,12 @@ function analyze(url, ctx = {}, onUpdate) {
     tasks.push(...deepTasks(first));
   }
 
-  if (tasks.length) track(Promise.allSettled(tasks).then(notify));
+  if (tasks.length) {
+    track(Promise.allSettled(tasks).then(() => {
+      notify();
+      if (partiti) misura('cambiato', engine.evaluate(url, ctx, known()).level !== first.level, conIncognito(ctx));
+    }));
+  }
   return first;
 }
 
@@ -404,7 +462,7 @@ function preverifica(url, ctx = {}) {
   // Senza finestra (in incognito, o a interruttore spento) la destinazione non si è cercata: dove si può, si cerca.
   if (gia && !(gia.finito && gia.senzaFinestra && !ctx.incognito && providers.destinazione)) return gia.pronto;
   const chi = (ctx.pagina && ownerOf(ctx.pagina)) || 'filo';
-  if (!preBudget.spend(chi)) {
+  if (!preBudget.spend(chi, () => misura('tetto', 'link_accorciati', conIncognito(ctx)))) {
     console.warn(`[safebrowse] ${PRE_PER_ORA} link accorciati controllati in un'ora su ${chi}: ${link} si controlla all'apertura`);
     return null;
   }
@@ -544,7 +602,7 @@ const API = {
   // cache (per test / invalidazione)
   DEEP_BUDGET,
   PRE_PER_ORA,
-  _caches: { ageCache, certCache, sandboxCache, llmCache, deepBudget, deepFailed, preCache, preBudget },
+  _caches: { ageCache, certCache, sandboxCache, llmCache, deepBudget, deepFailed, preCache, preBudget, spentiVisti },
   _settled: settled,
   _gsbLookup: gsbLookup,
   // sotto-moduli (per test)

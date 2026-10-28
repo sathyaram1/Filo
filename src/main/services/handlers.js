@@ -12,6 +12,7 @@ const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = requir
 const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 const SegretiLetti = require('./segretiLetti');
 const VerdettiUscite = require('./verdettiUscite');
+const ContatoriSicurezza = require('./contatoriSicurezza');
 const Registro = require('./registroCambi');
 const GiroAzioni = require('./giroAzioni');
 const ContestoFilo = require('./contestoFilo');
@@ -34,7 +35,8 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   routing: (s, a) => providerRouting(s, a && a.sort, a && a.weights),
   noteServed: (s, action, r) => noteServedProvider(s, action, r),
   costs: Costs,
-  segreti: async () => (await segretiCustoditi()).map((x) => x.valore),
+  segreti: async () => segretiCustoditi(),
+  segretiTolti: (action, tipi) => ContatoriSicurezza.misura('segretiTolti', action, tipi),
   ricordaEsterni: (messages) => SegretiLetti.ricordaBuste(messages),
   // La prova di una riga delle Opzioni non è una funzione: la frase nomina solo il modello.
   funzioneDi: (action) => (action === ACTIONS.PROVIDER_TEST ? '' : actionLabelForSettings(action)),
@@ -1580,10 +1582,11 @@ function lettiDallAiuto(sender) {
 
 // La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
 // chiamano executeFiloAction e la ricerca dell'assistente di pagina, prima di ogni livello.
-// Non lancia mai: su un guasto torna un blocco con `regola: 'guasto'` (#1505, verdettiUscite.js).
-const controllaUscita = VerdettiUscite.chiudiAGuasto(giudicaUscita, {
+// Non lancia mai: su un guasto torna un blocco con `regola: 'guasto'` (#1505, verdettiUscite.js). Ogni blocco si conta
+// fra le uscite fermate qui dentro (#1474); chi giudica un collegamento prima del clic passa `soloGiudizio`.
+const controllaUscita = ContatoriSicurezza.contaUscite(VerdettiUscite.chiudiAGuasto(giudicaUscita, {
   avvisa: (e) => console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e),
-});
+}));
 async function giudicaUscita(action, { sender = null, contesto = null, provenienza = null, parole = '', domanda = '' } = {}) {
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
@@ -1740,7 +1743,7 @@ const sitoDaConfermare = (url) => VerdettiUscite.sitoDaConfermare(url);
 async function contattabilePrimaDelClic(url, { sender = null, daFilo = false, proposta = false, delSito = false, porta = null } = {}) {
   if (!VerdettiUscite.contattabile(url, { proposta: daFilo && proposta })) return false;
   if (daFilo || delSito) return true;
-  const u = porta || await controllaUscita({ type: 'NAVIGA', url }, { sender });
+  const u = porta || await controllaUscita({ type: 'NAVIGA', url }, { sender, soloGiudizio: true });
   return !u.blocca && !(await exfilChiedeOk(String(url || ''), u, { wc: sender?.wc || null, pagina: paginaDi(sender?.wc) || sender?.url || '' }));
 }
 const ricordaVerdettiArchiviati = (messages) => VerdettiUscite.ricordaArchiviati(messages, indirizziCliccabili);
@@ -1768,7 +1771,7 @@ async function linkCheChiedonoOk(testo, { sender = null, contesto = null, proven
   const Levels = globalThis.SN_ACTION_LEVELS;
   let impostazioni = null;
   return VerdettiUscite.giudica([...indirizzi, ...indirizziCliccabili(testo)], {
-    porta: (url) => controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, provenienza, parole, domanda }),
+    porta: (url) => controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, provenienza, parole, domanda, soloGiudizio: true }),
     chiede: async (url, u) => {
       if (sempre || !Levels) return true;
       if (!impostazioni) { try { impostazioni = await Storage.getSettings(); } catch (_) { impostazioni = {}; } }
@@ -6666,7 +6669,10 @@ async function generateDashboardFromInputs(inputs, { precedente = null } = {}) {
   const casa = contestoDellaHome(inputs);
   for (let i = 0; i < suggestions.length; i++) {
     const u = suggestions[i].action ? await controllaUscita(suggestions[i].action, casa) : null;
-    if (u && u.blocca) { suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase }; continue; }
+    if (u && u.blocca) {
+      suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase };
+      continue;
+    }
     // Un indirizzo con un dato dell'utente, o composto dal modello, chiede l'OK al clic; un controllo mancato pure.
     const a = suggestions[i].action;
     const url = a && /^(?:NAVIGA|APRI_FILE)$/i.test(String(a.type || '')) ? String(a.url || a.path || '') : '';
@@ -6958,6 +6964,7 @@ async function filtroDelicate(settings) {
   // Senza la regola non si sa: nel dubbio, vale delicata (patterns/un-interruttore-che-promette-una-garanzia-non-ha-ripieghi.md).
   const tutte = () => 'campi';
   tutte.voce = () => 'campi';
+  tutte.guasto = true;
   return tutte;
 }
 // Il riassunto delle schede chiuse (#1004): spento, di una scheda che si chiude non parte niente verso i modelli.
@@ -7584,8 +7591,10 @@ async function enrichArchivedTab(id, payload) {
     }
     const settings = await getEffectiveSettings();
     // Di una pagina delicata restano titolo e indirizzo: il testo non va al modello e non resta sul disco (#1004).
-    const delicata = payload && typeof payload === 'object' ? (await filtroDelicate(settings))(payload.url) : null;
+    const fuori = await filtroDelicate(settings);
+    const delicata = payload && typeof payload === 'object' ? fuori(payload.url) : null;
     if (delicata) {
+      ContatoriSicurezza.misura('paginaDelicata', fuori.guasto ? 'filtro_guasto' : delicata, 'riassunto_schede');
       await ArchivedTabs.update(id, { delicata });
       return;
     }

@@ -1141,7 +1141,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     const gate = readFileSync(join(ROOT, 'src', 'main', 'services', 'modelGate.js'), 'utf8');
     // I messaggi oscurati stanno in una costante prima della chiamata: il piano della cache si fa su quelli (#1412).
     for (const f of ['completeWithFallback', 'streamCompleteWithFallback']) {
-      const re = new RegExp(`const (\\w+) = await senzaSegreti\\(messages\\);\\s*r = await providers\\(\\)\\.${f}\\(\\{[^}]*?messages: \\1,`);
+      const re = new RegExp(`const (\\w+) = await senzaSegreti\\(messages(?:, action)?\\);\\s*r = await providers\\(\\)\\.${f}\\(\\{[^}]*?messages: \\1,`);
       assert.match(gate, re, `${f} senza oscuramento`);
     }
     assert.ok(/segreti:\s*async/.test(handlers), 'il cancello di Filo non riceve i segreti custoditi');
@@ -1274,7 +1274,7 @@ describe('sentinella: nessun chiamante della porta prende un guasto per via libe
   const handlers = src('main', 'services', 'handlers.js');
 
   test('la porta è costruita chiusa a guasto, e chi la chiama non la avvolge in un try', () => {
-    assert.match(handlers, /const controllaUscita = VerdettiUscite\.chiudiAGuasto\(giudicaUscita,/);
+    assert.match(handlers, /const controllaUscita = ContatoriSicurezza\.contaUscite\(VerdettiUscite\.chiudiAGuasto\(giudicaUscita,/);
     const esegui = corpo(handlers, 'async function eseguiAzioneFilo(');
     const i = esegui.indexOf('await controllaUscita(action');
     assert.ok(i > 0);

@@ -100,7 +100,10 @@
       noteServed = plainNoteServed,
       costs = global.SN_COSTS,
       auditDelaysMs = AUDIT_DELAYS_MS,
+      // Stringhe, o { valore, tipo } quando chi li dà sa di che tipo sono (#1474).
       segreti = async () => [],
+      // Una richiesta partita con almeno un segreto tolto: la funzione e i tipi tolti, mai i valori.
+      segretiTolti = () => {},
       ricordaEsterni = () => {},
       funzioneDi = () => '',
       rimedioDi = () => '',
@@ -182,13 +185,32 @@
     // ha, il modello non lo può far uscire. Sentinella: tests/unit/usciteSegreti.test.mjs.
     // Di qui passa anche tutto quello che da fuori arriva a un modello, qualunque strada abbia preso: i segreti che
     // contiene diventano letti, e la porta delle uscite li ferma (#810).
-    async function senzaSegreti(messages) {
+    async function senzaSegreti(messages, action) {
       try { ricordaEsterni(messages); } catch (_) {}
       const G = global.SN_GUARDIANO_STATICO;
       if (!G || typeof G.oscuraSegreti !== 'function') return messages;
+      const lista = await custoditi();
+      const fuori = G.oscuraSegreti(messages, lista.map((x) => x.valore));
+      if (fuori !== messages) contaTolti(action, lista, (valori) => G.oscuraSegreti(messages, valori) !== messages);
+      return fuori;
+    }
+
+    async function custoditi() {
       let lista = [];
       try { lista = await segreti(); } catch (_) { lista = []; }
-      return G.oscuraSegreti(messages, lista);
+      return (Array.isArray(lista) ? lista : [])
+        .map((x) => (typeof x === 'string' ? { valore: x, tipo: '' } : { valore: String((x && x.valore) || ''), tipo: String((x && x.tipo) || '') }))
+        .filter((x) => x.valore);
+    }
+
+    // Chiamata solo quando qualcosa è sparito, cioè quasi mai: `toglie(valori)` rifà l'oscuramento per un tipo (#1474).
+    function contaTolti(action, lista, toglie) {
+      try {
+        const perTipo = new Map();
+        for (const x of lista) perTipo.set(x.tipo, [...(perTipo.get(x.tipo) || []), x.valore]);
+        const tipi = perTipo.size === 1 ? [...perTipo.keys()] : [...perTipo].filter(([, valori]) => toglie(valori)).map(([t]) => t);
+        segretiTolti(action, tipi.length ? tipi : ['']);
+      } catch (_) {}
     }
 
     // Il piano si fa sui messaggi già oscurati: sono quelli che partono, e un taglio a caratteri deve cadere su di loro.
@@ -247,7 +269,7 @@
       const { s, chain } = await chainFor({ action, settings, attempts });
       let r;
       try {
-        const daMandare = await senzaSegreti(messages);
+        const daMandare = await senzaSegreti(messages, action);
         r = await providers().completeWithFallback({
           attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare, s), tools, toolChoice, signal, onFallback, onTentativoFallito: m.errore,
         });
@@ -277,7 +299,7 @@
       const { s, chain } = await chainFor({ action, settings, attempts });
       let r;
       try {
-        const daMandare = await senzaSegreti(messages);
+        const daMandare = await senzaSegreti(messages, action);
         r = await providers().streamCompleteWithFallback({
           attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare, s), tools, toolChoice, signal,
           onDelta: vedendo(m, onDelta), onReasoning: vedendo(m, onReasoning), onToolCall: vedendo(m, onToolCall),
@@ -350,7 +372,7 @@
       }
       const testi = {};
       for (const k of CAMPI_TESTO) if (args && args[k] != null) testi[k] = args[k];
-      const oscurati = Object.keys(testi).length ? await senzaSegreti(testi) : {};
+      const oscurati = Object.keys(testi).length ? await senzaSegreti(testi, action) : {};
       const input = {
         ...(args || {}),
         ...oscurati,
@@ -416,13 +438,13 @@
       if (!usable.length) throw codeError('Nessun fornitore della catena sa classificare', 'PROVIDER_METHOD_MISSING');
       const Coda = global.SN_CODA_ADATTIVA;
       if (!Coda) throw codeError('Coda dei lavori non caricata', 'GATE_METHOD');
-      let lista = [];
-      try { lista = await segreti(); } catch (_) { lista = []; }
+      const lista = await custoditi();
       const G = global.SN_GUARDIANO_STATICO;
-      const oscura = (v) => (G && typeof G.oscuraSegreti === 'function' ? G.oscuraSegreti(v, lista) : v);
-      const richieste = (Array.isArray(requests) ? requests : []).map((r) => ({
-        state: oscura(r && r.state), questions: oscura(r && r.questions),
-      }));
+      const oscura = (v, valori = lista.map((x) => x.valore)) => (G && typeof G.oscuraSegreti === 'function' ? G.oscuraSegreti(v, valori) : v);
+      const prima = (Array.isArray(requests) ? requests : []).map((r) => ({ state: r && r.state, questions: r && r.questions }));
+      const richieste = prima.map((r) => ({ state: oscura(r.state), questions: oscura(r.questions) }));
+      const toglie = (valori) => prima.some((r) => oscura(r.state, valori) !== r.state || oscura(r.questions, valori) !== r.questions);
+      if (richieste.some((r, i) => r.state !== prima[i].state || r.questions !== prima[i].questions)) contaTolti(action, lista, toglie);
       let ultimo = null;
       for (const [indice, a] of usable.entries()) {
         const P = providerOf(a.provider);
