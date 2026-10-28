@@ -411,26 +411,27 @@ test('ogni documento parte con l’identità anonima; senza, non parte niente, l
   await usa(b, A.FILO_CHAT, { attesa: 900 });
   b.s.gesto('trascinamento', { da: 'carta_home', a: 'chat_home', esito: 'posato' });
   b.s.navigazione(C.NAV.navFallita(-105, true));
+  b.s.attivita('pulizia', { trigger: 'idle', candidate: 8, archiviate: 2, duplicati: 1, giudizioMancato: false });
   await attendi();
   assert.equal(await b.s.controlla(), 'niente');
   assert.equal(b.identitaChieste, 0, 'senza niente da spedire l’identità non si chiede');
 
   b.t += ORA;
   assert.equal(await b.s.controlla(), 'fallito');
-  assert.deepEqual([b.inviati.length, b.chiamate.length], [0, 0], 'senza identità non si bussa nemmeno');
+  assert.deepEqual([b.inviati.length, b.chiamate.length, b.attivita.length], [0, 0, 0], 'senza identità non si bussa nemmeno');
   assert.equal(await b.s.controlla(), 'rimandato', 'nella stessa ora non si riprova');
   assert.deepEqual(Object.keys((await b.s.letto()).ore), ['2026-10-15T09'], 'l’ora resta in attesa');
   b.identita = '';
   b.t += ORA;
   assert.equal(await b.s.controlla(), 'fallito', 'un token vuoto vale come nessuna identità');
-  assert.deepEqual([b.inviati.length, b.chiamate.length], [0, 0]);
+  assert.deepEqual([b.inviati.length, b.chiamate.length, b.attivita.length], [0, 0, 0]);
 
   b.identita = 'token-anonimo';
   b.t += ORA;
   assert.equal(await b.s.controlla(), 'inviati');
-  const partiti = [...b.inviati, ...b.chiamate];
+  const partiti = [...b.inviati, ...b.chiamate, ...b.attivita];
   const collezioni = partiti.map((x) => new URL(x.url).pathname.split('/').slice(-1)[0]).sort();
-  assert.deepEqual(collezioni, [C.COLLEZIONE_CHIAMATE, C.COLLEZIONE, C.COLLEZIONE_GESTI, C.COLLEZIONE_NAVIGAZIONE].sort());
+  assert.deepEqual(collezioni, [C.COLLEZIONE_CHIAMATE, C.COLLEZIONE, C.COLLEZIONE_GESTI, C.COLLEZIONE_NAVIGAZIONE, C.COLLEZIONE_ATTIVITA].sort());
   for (const { opt } of partiti) assert.equal(opt.headers.Authorization, 'Bearer token-anonimo');
   assert.equal(b.inviati.find((x) => x.url.includes(`/${C.COLLEZIONE}?`)).doc.ora, '09');
   assert.ok(partiti.every(({ doc }) => !JSON.stringify(doc).includes('token-anonimo')), 'il documento non porta l’identità');
