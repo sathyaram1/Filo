@@ -1527,6 +1527,16 @@
   };
   // Il numero del feedback viene subito dopo il motivo: da qui si deve leggere chi è fermo (#1653).
   const numDiRifiuto = (r) => { const n = String((r && r.num) || '').trim().replace(/^#+/, ''); return n ? ` · #${n}` : ''; };
+  // Un blocco L5 su un lavoro che si fonde lo stesso (fidato o pre-approvato) si registra soltanto: non è un fermo.
+  const bloccoCheSiFonde = (r) => String(r && r.reason) === 'l5_blocked'
+    && (r.siFonde === true || /si fonde e si registra/.test(String(r.detail || '')));
+  const rigaBloccoRegistrato = (r) => ({
+    at: r && r.at,
+    kind: 'l5reg',
+    label: 'Registrato',
+    text: `controlli di sicurezza scattati, ${/^pre-approvata/.test(String(r.detail || '')) ? 'pre-approvata dall’owner' : 'lavoro fidato'}: la fusione prosegue`
+      + `${numDiRifiuto(r)}${r.slug ? ` · ${r.slug}` : ''}`,
+  });
 
   // Le richieste di fusione senza gli unit sul risultato (#958): una per una, e in cima un avviso quando il server
   // le giudica frequenti. Una prova che manca sempre non protegge niente, e nessuno se ne accorgerebbe.
@@ -1558,6 +1568,7 @@
     if (!mgChannelSection || !mgChannelList) return;
     const rows = righeSenzaProva(prove);
     for (const r of (Array.isArray(rejections) ? rejections : [])) {
+      if (bloccoCheSiFonde(r)) { rows.push(rigaBloccoRegistrato(r)); continue; }
       rows.push({
         at: r && r.at,
         kind: 'deny',
