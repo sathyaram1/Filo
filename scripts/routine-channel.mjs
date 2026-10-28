@@ -1723,6 +1723,11 @@ if (isMain) {
         sealCurrentWork(ROOT, { by: `deliver:${intento}` });
       } catch (_) { /* best-effort: la consegna è già registrata */ }
     }
+    if (r.outcome === 'ok' && passaAllaVerifica) {
+      const { consegnaChiudeLeSpinte, segnaConsegna } = await import('./lib/routine-ticket.mjs');
+      const esito = r.reply && typeof r.reply.outcome === 'string' ? r.reply.outcome : '';
+      if (consegnaChiudeLeSpinte(intento, esito)) segnaConsegna(ROOT, biglietto, { sha: data.sha, ramo: data.branch, intento, esito });
+    }
     if (r.outcome === 'ok' && guardia && guardia.id) azzeraRifiuti(ROOT, guardia.id);
     if (r.outcome === 'ok') {
       console.log(testoConsegnaRiuscita(r, data, intento));
