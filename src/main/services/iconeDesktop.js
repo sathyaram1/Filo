@@ -1,6 +1,6 @@
 // Le icone del desktop del computer in ordine a comando (#1621): uno script fisso le legge e le sposta, l'ordine e la
 // griglia li decide JavaScript, e ogni disposizione è un cambio che si annulla. Solo Windows: su Mac e Linux lo dice.
-// Regole: patterns/le-icone-del-desktop-si-mettono-nella-griglia-di-windows.md; prove: tests/unit/iconeDesktop.test.mjs.
+// Regole: patterns/il-computer-si-comanda-con-script-fissi.md (§ Le icone del desktop); prove: tests/unit/iconeDesktop.test.mjs.
 
 'use strict';
 
