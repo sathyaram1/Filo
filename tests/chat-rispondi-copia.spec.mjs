@@ -26,6 +26,8 @@ async function preparaModello(app, copione) {
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       globalThis.__chiamate.push(JSON.parse(JSON.stringify(messages)));
       const r = globalThis.__copione.shift() || { text: 'ok' };
+      // Un turno che resta al lavoro finché la prova non lo lascia andare.
+      if (r.attendi) await new Promise((ok) => { globalThis.__sblocca = ok; });
       try { onDelta && onDelta(r.text); } catch (_) {}
       return { ...base, text: r.text, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
     };
