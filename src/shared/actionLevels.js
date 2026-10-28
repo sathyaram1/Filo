@@ -1146,6 +1146,16 @@
         return r.acceso === false ? 'Wi-Fi spento' : r.acceso === true ? 'Wi-Fi acceso' : 'Wi-Fi cambiato';
       },
     },
+    // ── icone del desktop del computer (#1621) ───────────────────────────────
+    // Costo 1: ogni riordino è un cambio del filo, e l'annullo rimette ogni icona dov'era.
+    ORDINA_DESKTOP: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const come = { nome: 'in ordine alfabetico', tipo: 'per tipo', data: 'per data', dimensione: 'per dimensione' };
+        return `Mettere le icone del desktop ${come[String((a && a.ordine) || 'nome').trim().toLowerCase()] || 'in ordine'}`;
+      },
+    },
     // ── zoom della pagina via chat (#686) ────────────────────────────────────
     // Costo 1: è la stessa cosa che fanno Ctrl +/- e Ctrl 0, visibile e
     // reversibile in un tasto.
