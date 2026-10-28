@@ -618,7 +618,7 @@ function sulDesktop(fn) {
 function ordinaIcone(richiesta) {
   const q = normalizzaRichiesta(richiesta);
   if (q.errore) return Promise.resolve({ ok: false, cosa: 'desktop', errore: 'richiesta', frase: q.errore });
-  return nelleProve(() => ordinaOra(q));
+  return sulDesktop(() => ordinaOra(q));
 }
 
 // L'annullo di un cambio: le icone che ci sono ancora tornano dove stavano, «Disponi automaticamente» com'era.
