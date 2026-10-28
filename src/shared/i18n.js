@@ -499,7 +499,7 @@
     provider_sort_general_auto: 'Lo sceglie OpenRouter',
     options_host_order: 'Host dei modelli',
     options_host_order_desc:
-      'Lo stesso modello lo servono più host: i più veloci rispondono prima, i più economici costano meno. Vale per tutti i modelli, anche per quelli predefiniti. I fornitori esclusi restano esclusi.',
+      'Lo stesso modello lo servono più host: i più veloci rispondono prima, i più economici costano meno. Vale per tutti i modelli, anche per quelli predefiniti, tranne Claude, che parte sempre da Anthropic. I fornitori esclusi restano esclusi.',
     options_host_order_filo: 'Li sceglie Filo',
     provider_sort_auto: 'Automatico',
     provider_sort_throughput: 'Più veloce',
