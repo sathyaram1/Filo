@@ -601,7 +601,7 @@ async function ordinaOra(q) {
   };
 }
 
-function nelleProve(fn) {
+function sulDesktop(fn) {
   return inFila(async () => {
     try {
       // Una prova che si è dimenticata il computer finto non sposta le icone di chi la lancia.
