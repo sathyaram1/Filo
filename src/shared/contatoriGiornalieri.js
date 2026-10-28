@@ -1479,8 +1479,9 @@
 
   // ── La navigazione (#1469) ──────────────────────────────────────────────
   // Dove sta ogni voce nella fila dei conti della sua chiave; null se misura, chiave o una voce non sono dei loro elenchi.
-  function posizioniNav(misura, chiave, voci) {
-    const m = has(NAVIGAZIONE, misura) ? NAVIGAZIONE[misura] : null;
+  // Vale per le due tabelle a conti: la navigazione e i riquadri (#1465).
+  function posizioniIn(tabella, misura, chiave, voci) {
+    const m = has(tabella, misura) ? tabella[misura] : null;
     if (!m || !m.chiavi.includes(chiave) || !Array.isArray(voci) || voci.length !== m.gruppi.length) return null;
     const pos = [];
     let base = 0;
@@ -1492,9 +1493,10 @@
     }
     return { pos, lunghezza: base };
   }
+  const posizioniNav = (misura, chiave, voci) => posizioniIn(NAVIGAZIONE, misura, chiave, voci);
 
-  function registraNavigazione(ora, misura, chiave, voci) {
-    const p = posizioniNav(misura, chiave, voci);
+  function registraConti(tabella, ora, misura, chiave, voci) {
+    const p = posizioniIn(tabella, misura, chiave, voci);
     if (!p) return false;
     const mappa = normale(ora)[misura];
     const c = Array.isArray(mappa[chiave]) && mappa[chiave].length === p.lunghezza ? mappa[chiave] : Array(p.lunghezza).fill(0);
@@ -1502,6 +1504,8 @@
     mappa[chiave] = c;
     return true;
   }
+  const registraNavigazione = (ora, misura, chiave, voci) => registraConti(NAVIGAZIONE, ora, misura, chiave, voci);
+  const registraRiquadro = (ora, misura, chiave, voci) => registraConti(RIQUADRI, ora, misura, chiave, voci);
 
   // Le voci si costruiscono da qui, coi valori che il codice ha in mano: quello che non è degli elenchi diventa
   // «altro» dove l'elenco lo prevede, e altrimenti la voce non c'è (null) e non si conta niente.
