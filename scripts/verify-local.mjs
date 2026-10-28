@@ -1214,7 +1214,7 @@ const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.m
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2);
 
-  const USO = 'Comandi: start ["<richiesta>"] [--feedback <N>] | critica "<rilievi coi livelli>" | pulizia | corretto "<report>" | status';
+  const USO = 'Comandi: start ["<richiesta>"] [--feedback <N>] | critica "<rilievi coi livelli>" | pulizia | corretto "<report>" | registra | status';
   // L’aiuto si stampa e basta, DOVUNQUE stia nella riga. Chiedere aiuto a uno
   // strumento è il primo gesto di chi verifica, e qui era l’unico posto dove
   // al posto dell’aiuto partiva l’azione: `start --help` apriva il giro per
