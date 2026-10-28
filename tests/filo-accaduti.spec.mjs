@@ -9,6 +9,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { barraPage, comandaBarra, pannelloFermo, statoBarra } from './helpers/barra.mjs';
 import { createServer } from 'node:http';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
