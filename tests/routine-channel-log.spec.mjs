@@ -133,3 +133,24 @@ test('le fusioni senza prova degli unit compaiono all owner, e quando sono frequ
   await expect(rows).toHaveCount(2);
   await expect(page.locator('#mgChannelList')).not.toContainText('delle ultime');
 });
+
+// #1652: una sessione che lascia il posto all'altra voce dice all'owner quale lavoro ha lasciato e per quale.
+test('i posti lasciati all altra routine compaiono all owner, col lavoro lasciato e quello che aspettava', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
+  await apriScheda(page, 'log');
+
+  const posti = [{
+    at: '2026-10-25T16:45:00.000Z', slug: 'server-a', reason: 'slot_to_other_voice', voce: 'server', altraVoce: 'normale',
+    lasciato: { num: '#1499', role: 'verifier', priority: 2 }, perIl: [{ num: '#1196', role: 'secaudit', priority: 3 }], altriInAttesa: 1,
+  }];
+  await page.evaluate((p) => window.__mgTest.renderChannelLog([], [], null, p), posti);
+  const rows = page.locator('#mgChannelList .mg-log-row');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.nth(0)).toContainText('Posto lasciato');
+  await expect(rows.nth(0)).toContainText('#1499 (Verifica, p2) lasciato alla routine normale per #1196');
+  await expect(rows.nth(0)).toContainText('server-a');
+  await expect(page.locator('#mgChannelList')).not.toContainText('slot_to_other_voice');
+  await expect(page.locator('#mgChannelList')).not.toContainText('secaudit');
+});
