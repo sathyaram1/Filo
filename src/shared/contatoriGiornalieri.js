@@ -1557,6 +1557,33 @@
     programma: (classe, evento) => voceNav('programmi', testoDa(classe), [testoDa(evento)]),
   });
 
+  // ── I riquadri AI e l'Editor (#1465) ──────────────────────────────────────
+  // Il messaggio di una pagina ridotto alla sua voce: solo nomi degli elenchi e numeri, mai il testo.
+  const numeroDa = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+  const nel = (v, elenco) => (elenco.includes(testoDa(v)) ? v : '');
+  const RIQUADRO_DI = Object.freeze({
+    anticipo_al_gesto: (d) => [nel(d.funzione, ANTICIPATE), nel(d.stato, STATI_ANTICIPO)],
+    riquadro_chiuso_prima: (d) => [funzioneDi(testoDa(d.action)), numeroDa(d.attesaMs) == null ? '' : fasciaDi(d.attesaMs)],
+    riquadro_uso: (d) => [funzioneDi(testoDa(d.action)),
+      Number.isInteger(d.domande) && d.domande >= 0 ? inFascia(DOMANDE, d.domande) : nel(d.uso, ['copia', 'approfondisci', 'ricominciata'])],
+    riscrittura: (d) => [nel(d.scorciatoia, SCORCIATOIE), d.tagliata === true ? TAGLIATA
+      : Number.isInteger(d.proposte) && d.proposte >= 1 && nel(d.esito, ESITI_RISCRITTURA) ? `${d.esito}|${inFascia(PROPOSTE, d.proposte)}` : ''],
+    ocr: (d) => [nel(d.esito, ESITI_OCR), 'n'],
+    traduzione_pagina: (d) => [nel(d.esito, ESITI_TRADUZIONE),
+      numeroDa(d.rimasto) == null || typeof d.originale !== 'boolean' ? '' : `${inFascia(RIMASTO, d.rimasto)}|${d.originale ? 'si' : 'no'}`],
+    editor_titolo: (d) => [nel(d.via, TITOLI),
+      numeroDa(d.riscrittoDopoMs) != null ? `riscritto_${inFascia(ETA_TITOLO, d.riscrittoDopoMs)}` : nel(d.esito, ESITI_TITOLO)],
+    editor_chat: (d) => [typeof d.oltreTetto === 'boolean' ? (d.oltreTetto ? 'oltre_tetto' : 'intero') : '',
+      d.continua === true ? 'continua' : d.nonTrovato === true ? 'formato_non_trovato'
+        : Number.isInteger(d.formati) && d.formati >= 0 ? inFascia(FORMATI, d.formati) : ''],
+  });
+  function voceRiquadro(misura, dati) {
+    if (!has(RIQUADRO_DI, misura) || !oggetto(dati)) return null;
+    const [chiave, voce] = RIQUADRO_DI[misura](dati);
+    if (!chiave || !voce) return null;
+    return posizioniIn(RIQUADRI, misura, chiave, [voce]) ? Object.freeze({ misura, chiave, voci: Object.freeze([voce]) }) : null;
+  }
+
   // ── La chat e l'agente (#1463) ────────────────────────────────────────────
   function piuN(mappa, chiave, n) { mappa[chiave] = Math.min(conto(mappa[chiave]) + n, MAX_CONTO); }
   const quante = (n) => (n == null ? 1 : Number.isInteger(n) && n > 0 ? n : 0);
