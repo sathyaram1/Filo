@@ -2606,7 +2606,13 @@
       const lista = leggiErrori(e);
       if (!lista || lista.length > TETTO_COMBINAZIONI || lista.some((x) => x.n === 0)) return no(`errori di ${f}`);
     }
+    if (erroriOltreIlTetto(doc.errori)) return no('errori oltre il tetto del documento');
     return { ok: true, motivo: '' };
+  }
+
+  function erroriOltreIlTetto(errori) {
+    const specifiche = Object.values(errori).flatMap((e) => leggiErrori(e) || []).filter((x) => x.modello !== ALTRO || x.host);
+    return specifiche.length > TETTO_ERRORI_DOCUMENTO;
   }
 
   // ── Ore, giorni e pseudonimo ──────────────────────────────────────────────
