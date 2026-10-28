@@ -1,6 +1,7 @@
 // I contatori del servizio (#1472) nell'app vera: una risposta servita conta chi l'ha pagata e chi l'ha servita, una
 // chiamata senza modello conta una volta sola anche passando da due porte, la prova di un modello proprietario con
-// «solo pesi aperti» si conta come bloccata. Forma, spedizione e regole: tests/unit/contatoriServizio.test.mjs.
+// «solo pesi aperti» si conta come bloccata. L'avviso dei crediti e i suoi rimedi: avviso-crediti.spec.mjs (B). Forma,
+// spedizione e regole: tests/unit/contatoriServizio.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -57,7 +58,7 @@ test('una spiegazione servita conta chi l’ha pagata; senza modello conta la ch
   }, via);
   expect(await spiega('richiesta')).toBe('ok');
   await expect.poll(() => voce(app, 'chiave_fonte', 'explain|own'), { timeout: 5_000 }).toBe(1);
-  expect(await voce(app, 'servita_ignota', 'explain|deepseek/deepseek-chat'), 'DeepInfra l’ha detto nella risposta').toBe(0);
+  expect((await servizio(app)).servita_ignota || {}, 'DeepInfra l’ha detto nella risposta').toEqual({});
 
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
