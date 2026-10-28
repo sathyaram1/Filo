@@ -165,6 +165,8 @@
     bubblesEl,
     rendiMessaggi: (lista, dove) => rendiMessaggi(lista, dove),
     setBubbleText: (el, t) => setBubbleText(el, t, true),
+    // Il testo com'è arrivato, prima della formattazione: è quello che il filo ha, e da lì riconosce la bolla.
+    scritto: (el) => Rispondi.scritto(el),
     righe: Righe,
     chatId: () => chatId,
     chatLasciata: (c) => lasciateConRighe.has(c),
