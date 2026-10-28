@@ -145,7 +145,7 @@ async function web(domanda, tavilyKey) {
   const q = String(domanda || '').trim().slice(0, 200);
   if (!q) return [];
   // Una ricerca non riuscita non è «nessun risultato»: chi chiama la dice fallita e lascia riprovare.
-  const r = await WS.search({ query: q, tavilyKey, maxResults: 5 });
+  const r = await WS.search({ query: q, tavilyKey, maxResults: 5, da: 'correttore' });
   if (!r || !r.ok) throw new Error(`ricerca web non riuscita: ${(r && r.reason) || 'nessuna risposta'}`);
   return (r.results || []).filter((x) => x && /^https:\/\//i.test(String(x.url || '')) && (x.snippet || x.title)).map((x) => {
     let sito = '';
