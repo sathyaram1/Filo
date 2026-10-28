@@ -535,7 +535,9 @@ test('la home senza un modello suo (la chat ne ha uno) conta il motivo; con i su
     });
   });
   const generate = (await misura(app, 'home')).generata || 0;
+  // Ognuna si conta quando la si vede: la seconda si apre dopo che la prima è stata davanti.
   await openTab('filo://newtab/?prova=home-1');
+  await expect.poll(async () => (await misura(app, 'home')).generata || 0, { timeout: 8_000 }).toBe(generate + 1);
   const home = await openTab('filo://newtab/?prova=home-2');
   await expect.poll(async () => (await misura(app, 'home')).generata || 0, { timeout: 8_000 }).toBe(generate + 2);
 
