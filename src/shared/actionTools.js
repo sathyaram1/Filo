@@ -570,7 +570,7 @@
       required: [],
     },
     ANNULLA_CAMBIO: {
-      description: 'Rimette com\'era un cambio di stato: un\'impostazione, l\'aspetto, una sveglia o un timer, una regola del proxy, lo zoom di un sito, la disposizione delle icone della barra laterale. Per "rimetti come prima", "annulla", "torna com\'era", "no, era meglio prima". I cambi sono nei CAMBI RECENTI dello STATO, con l\'id e da dove sono venuti: valgono allo stesso modo quelli chiesti in chat e quelli fatti dall\'utente nelle pagine delle impostazioni. Passa l\'id del cambio che l\'utente intende; senza id si annulla l\'ultimo ancora in piedi. Anche l\'annullo è un cambio: annullarlo rifà quello di prima. Il livello lo decide il sistema dal cambio: per le impostazioni sensibili chiede lui conferma all\'utente.',
+      description: 'Rimette com\'era un cambio di stato: un\'impostazione, l\'aspetto, una sveglia o un timer, una regola del proxy, lo zoom di un sito, la disposizione delle icone della barra laterale, le icone del desktop del computer messe in ordine. Per "rimetti come prima", "annulla", "torna com\'era", "no, era meglio prima". I cambi sono nei CAMBI RECENTI dello STATO, con l\'id e da dove sono venuti: valgono allo stesso modo quelli chiesti in chat e quelli fatti dall\'utente nelle pagine delle impostazioni. Passa l\'id del cambio che l\'utente intende; senza id si annulla l\'ultimo ancora in piedi. Anche l\'annullo è un cambio: annullarlo rifà quello di prima. Il livello lo decide il sistema dal cambio: per le impostazioni sensibili chiede lui conferma all\'utente.',
       properties: { id: S('L\'id del cambio da annullare, dai CAMBI RECENTI (per esempio "c1a2b3c4d5").') },
       required: [],
     },
