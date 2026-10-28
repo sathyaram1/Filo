@@ -2,7 +2,7 @@
 // riceve i gesti contati nelle pagine e dà all'owner le somme, mai sotto le cinque copie. Cosa si conta: src/main/services/contatori.js.
 // Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
 
-const { soloFilo } = require('./origine');
+const { soloFilo, daFilo } = require('./origine');
 const auth = require('../../auth/google-auth');
 const Servizio = require('../contatori');
 const Finestra = require('../contatoriFinestra');
@@ -174,8 +174,11 @@ module.exports = function register(on, ctx) {
     return `${wc.id}|${cosa}|${id}`;
   }
 
-  on(MSG.CONTATORI_EVENTO, async (msg, sender) => {
+  // Le misure della home (#1473) nascono solo in una pagina di Filo: da un sito non arrivano.
+  const DELLA_HOME = new Set(['comando-home', 'ricerca-home', 'ricerca-home-aperta', 'risali', 'risali-fine']);
+  on(MSG.CONTATORI_EVENTO, async (msg, sender, origin) => {
     const m = msg && typeof msg === 'object' ? msg : {};
+    if (DELLA_HOME.has(m.misura) && !daFilo(origin, sender)) return { ok: false };
     if (m.misura === 'in-corso') {
       const a = attivitaDellaPagina(testo(m.cosa), m);
       const k = a ? chiaveInCorso(sender, m.cosa, m.id) : '';

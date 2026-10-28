@@ -1,6 +1,6 @@
 // I contatori della home e degli automatismi sulla pagina (#1473) nell'app vera: i comandi della barra della home, la
 // ricerca nel filo, i «risali» di fila, l'intervista rifatta, le proposte sulla pagina e gli automatismi fatti e disfatti.
-// Si conta nell'ora in corso, e mai quello che si scrive, un sito o un paese. Forma e regole: tests/unit/contatoriHomePagina.test.mjs.
+// Si conta nell'ora in corso, mai quello che si scrive, un sito o un paese. Forma e regole: tests/unit/contatoriHomePagina.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
@@ -28,11 +28,18 @@ const evento = (app, msg, mittente) => app.evaluate(
   (_e, [m, s]) => globalThis.SN_HANDLE_MESSAGE({ ...m, type: globalThis.SN_MSG.MSG.CONTATORI_EVENTO }, s),
   [msg, mittente],
 );
-const schedaCon = (shell, pezzo) => shell.evaluate(async (p) => {
-  const s = await window.filoShell.tabs.snapshot();
-  const t = (s.tabs || []).find((x) => String(x.url || '').includes(p));
-  return t ? t.id : null;
-}, pezzo);
+// La scheda di una pagina che il test ha in mano: la home d'avvio è anche lei una «newtab».
+async function schedaDi(app, page) {
+  const segno = `prova-${Math.random().toString(36).slice(2)}`;
+  await page.evaluate((s) => { window.__segnoProva = s; }, segno);
+  return app.evaluate(async ({ BrowserWindow }, s) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+    for (const t of tm.tabs) {
+      try { if (await t.view.webContents.executeJavaScript('window.__segnoProva || ""') === s) return t.id; } catch (_) {}
+    }
+    return null;
+  }, segno);
+}
 
 // Eventi del filo scritti come li scrive chi salva (come in home-coda-del-filo.spec.mjs).
 async function semina(app, chats) {
@@ -81,7 +88,8 @@ test('la barra della home conta il nome del comando, «/sito», il «/qualcosa»
   // E uno lasciato chiudendo la scheda, che alla pagina non dà nessun evento: lo conta il main.
   await scrivi(page, '/sito-inesistente-tre.test');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'sito-inesistente-tre.test' })).toBeVisible({ timeout: 8_000 });
-  const id = await schedaCon(shell, 'newtab');
+  const id = await schedaDi(app, page);
+  expect(id).not.toBeNull();
   await shell.evaluate(async (i) => window.filoShell.tabs.close(i), id);
   await expect.poll(() => voce(app, 'comando_home', 'sito_non_risolto:lascia')).toBe(2);
 
@@ -139,12 +147,23 @@ test('l’intervista rifatta dalle Preferenze conta la riapertura e il passo dov
     return Object.values(s.ore || {}).map((o) => o.intervista || {}).filter((x) => Object.keys(x).length);
   });
   const prima = await primaVolta();
+  // Senza un modello la home non apre l'intervista: una chiave finta basta, il «Salta» non chiama nessuno.
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash', [C.ACTIONS.FILO_DASHBOARD]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+  });
   const prefs = await openTab('filo://preferences/preferences.html');
   await prefs.locator('#restartOnboarding').click();
   await expect.poll(() => voce(app, 'intervista_rifatta', 'riaperta')).toBe(1);
+  // L'intervista si apre in una scheda nuova, col suo segno nell'indirizzo.
   let intervista = null;
   await expect.poll(() => {
-    intervista = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    intervista = app.windows().find((w) => w.url().startsWith('filo://newtab') && w.url().includes('accoglienza=1')) || null;
     return Boolean(intervista);
   }, { timeout: 15_000 }).toBe(true);
   await expect(intervista.locator('#skipOnboarding')).toBeVisible({ timeout: 15_000 });
@@ -241,24 +260,42 @@ const proposteRiquadro = (app) => app.evaluate(async ({ BrowserWindow }) => {
   return [];
 });
 
-test('la proposta del riquadro rotto: la pagina ricaricata senza risposta la lascia ignorata, il «No» la rifiuta', async ({ app, openTab }) => {
-  test.setTimeout(90_000);
+async function propostaDelRiquadro(app, openTab, srv) {
+  await app.evaluate(() => {
+    globalThis.__filoRiquadriRotti.servizioTest({ nome: 'Fotogrammi', domini: ['b.localhost'], segnaposto: ['accedi per vedere il post'] });
+    globalThis.SN_URL_NAV.isHomeNetworkUrl = () => false;
+  });
+  const page = await openTab(`http://a.localhost:${srv.porta}/art`);
+  let p = null;
+  await expect.poll(async () => { [p] = await proposteRiquadro(app); return Boolean(p); }, { timeout: 25_000 }).toBe(true);
+  return { page, p };
+}
+
+test('la proposta del riquadro rotto lasciata senza risposta da una pagina nuova è ignorata', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
   const srv = await serviRiquadri();
   try {
-    await app.evaluate(() => {
-      globalThis.__filoRiquadriRotti.servizioTest({ nome: 'Fotogrammi', domini: ['b.localhost'], segnaposto: ['accedi per vedere il post'] });
-      globalThis.SN_URL_NAV.isHomeNetworkUrl = () => false;
-    });
-    const page = await openTab(`http://a.localhost:${srv.porta}/art`);
-    await expect.poll(async () => (await proposteRiquadro(app)).length, { timeout: 25_000 }).toBe(1);
-    await page.reload();
+    const { page } = await propostaDelRiquadro(app, openTab, srv);
+    await page.evaluate(() => { location.href = '/altro'; });
     await expect.poll(() => voce(app, 'proposta_sulla_pagina', 'riquadro_rotto:ignorata'), { timeout: 10_000 }).toBe(1);
-    let p = null;
-    await expect.poll(async () => { [p] = await proposteRiquadro(app); return Boolean(p); }, { timeout: 25_000 }).toBe(true);
+    expect(await voce(app, 'proposta_sulla_pagina', 'riquadro_rotto:rifiutata')).toBe(0);
+    expect(await statoContatori(app)).not.toContain('localhost');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('la proposta del riquadro rotto: il «No» la rifiuta, una volta', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const srv = await serviRiquadri();
+  try {
+    const { page, p } = await propostaDelRiquadro(app, openTab, srv);
     await page.mouse.click(p.no.x, p.no.y);
     await expect.poll(() => voce(app, 'proposta_sulla_pagina', 'riquadro_rotto:rifiutata'), { timeout: 10_000 }).toBe(1);
-    expect(await voce(app, 'proposta_sulla_pagina', 'riquadro_rotto:ignorata')).toBe(1);
-    expect(await statoContatori(app)).not.toContain('localhost');
+    await page.evaluate(() => { location.href = '/altro'; });
+    await page.waitForLoadState('domcontentloaded');
+    await new Promise((r) => setTimeout(r, 800));
+    expect(await voce(app, 'proposta_sulla_pagina', 'riquadro_rotto:ignorata'), 'una proposta con la sua risposta non è anche ignorata').toBe(0);
   } finally {
     await srv.chiudi();
   }
@@ -315,8 +352,13 @@ test('restare connessi: come se ne va l’avviso è la risposta; da una pagina w
   await evento(app, { misura: 'notifica', tipo: 'proposta_email_spenta', esito: 'chiusa_x' }, BARRA);
   expect((await evento(app, { misura: 'automatismo', tipo: 'pubblicita_saltata' }, SITO)).ok).toBe(true);
   expect((await evento(app, { misura: 'automatismo', tipo: 'banner_cookie' }, SITO)).ok, 'quello che conta il main non arriva da una pagina').toBe(false);
+  for (const m of [{ misura: 'comando-home', cosa: '/help' }, { misura: 'ricerca-home', risultati: 3 }, { misura: 'risali', pezzi: 1 }]) {
+    expect((await evento(app, m, SITO)).ok, `${m.misura} nasce solo nella home`).toBe(false);
+  }
   await expect.poll(() => voce(app, 'automatismo_fatto', 'pubblicita_saltata')).toBe(1);
   const d = await homePagina(app);
   expect(d.proposta_sulla_pagina).toEqual({ 'resta_connesso:accettata': 1, 'resta_connesso:rifiutata': 1, 'resta_connesso:ignorata': 2 });
   expect(d.automatismo_fatto).toEqual({ pubblicita_saltata: 1 });
+  expect(d.comando_home || {}).toEqual({});
+  expect(d.ricerca_home || {}).toEqual({});
 });
