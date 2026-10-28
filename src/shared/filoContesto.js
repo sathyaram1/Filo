@@ -169,6 +169,21 @@
       .filter((x) => x.testo.trim());
   }
 
+  // La risposta di Filo che l'utente cita col suo messaggio (#1620), già ritrovata nel filo (SN_RISPOSTA_A.risolvi). Un
+  // testo arrivato da fuori resta fuori anche qui, come nel resto del filo: l'ora e l'id bastano a rileggerlo.
+  function notaRisposta(r) {
+    if (!r || typeof r !== 'object') return '';
+    if (r.manca) return "(l'utente risponde a un tuo messaggio che nel filo non c'è più)";
+    const dove = r.ts || r.chat ? ` ${intestazione(r.ts, r.chat)}` : '';
+    const di = r.role === 'user' ? 'a un suo messaggio' : 'al tuo messaggio';
+    if (r.esterno) {
+      const come = r.chat ? `: si rilegge con CERCA_CHAT e l'id "${r.chat}"` : '';
+      return `(l'utente risponde al testo arrivato ${r.esterno}${dove}${come})`;
+    }
+    const t = String(r.testo == null ? '' : r.testo).trim();
+    return t ? `(l'utente risponde ${di}${dove}: «${t}»)` : `(l'utente risponde ${di}${dove})`;
+  }
+
   // `prima`: il messaggio che precede nel blocco. Ora e conversazione stanno sui messaggi dell'utente; su quelli di
   // Filo solo quando aprono un tratto di un'altra conversazione, così il modello non impara a scriverle nelle risposte.
   // `foto`: le immagini del messaggio che tornano davanti al modello in questo turno (la finestra decide quali).
