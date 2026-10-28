@@ -546,3 +546,52 @@ test('la home senza un modello suo (la chat ne ha uno) conta il motivo; con i su
   await expect.poll(() => misura(app, 'suggerimenti'), { timeout: 5_000 }).toEqual({ 'NAVIGA|1|ora': 1 });
   expect(await tutteLeChiavi(app)).not.toMatch(/notizie/i);
 });
+
+// La home pronta dietro per la scheda nuova (accesa per chi usa Filo) non si conta finché nessuno la vede: si conta
+// quando diventa la scheda, con lo stato di quel momento.
+test.describe('con la home pronta accesa', () => {
+  test.use({ riservaNuovaScheda: true });
+  const homeTotali = async (app) => Object.values(await misura(app, 'home')).reduce((a, n) => a + n, 0);
+
+  test('si conta solo la home che si vede; quella pronta si conta quando diventa la scheda, col motivo di allora', async ({ app, openTab }) => {
+    test.setTimeout(60_000);
+    await expect.poll(() => app.evaluate(({ webContents }) => webContents.getAllWebContents()
+      .filter((w) => w.getURL().startsWith('filo://newtab')).length), { timeout: 15_000 }).toBe(2);
+    await expect.poll(() => homeTotali(app), { timeout: 10_000 }).toBe(1);
+    await new Promise((r) => setTimeout(r, 2000));
+    expect(await homeTotali(app)).toBe(1);
+
+    // Dopo che la home pronta è stata preparata la home perde il suo modello: la scheda nuova lo conta così.
+    await app.evaluate(async () => {
+      const C = globalThis.SN_CONST;
+      await globalThis.SN_STORAGE.updateSettings({
+        useDefaultModels: false,
+        apiKeys: { openrouter: 'k-test' },
+        models: { ...globalThis.SN_TEST_MODELS.models, [C.ACTIONS.FILO_CHAT]: 'deepseek-flash', [C.ACTIONS.FILO_DASHBOARD]: 'modello-che-non-esiste' },
+        modelRegistry: globalThis.SN_TEST_MODELS.registry,
+      });
+    });
+    await openTab('filo://newtab/');
+    await expect.poll(async () => (await misura(app, 'home')).senza_ai_modelli || 0, { timeout: 8_000 }).toBe(1);
+    // La home pronta preparata dopo questa scheda resta dietro, non contata.
+    await new Promise((r) => setTimeout(r, 2000));
+    expect(await homeTotali(app)).toBe(2);
+  });
+});
+
+test('la ricerca web che riempie un segnaposto del correttore si conta, col suo nome, mai la domanda', async ({ app }) => {
+  await app.evaluate(() => {
+    const vero = globalThis.fetch;
+    globalThis.fetch = async (url, init) => {
+      if (String(url).startsWith('https://html.duckduckgo.com/')) {
+        const voce = (n) => `<a rel="nofollow" class="result__a" href="https://esempio.it/${n}">Fonte ${n}</a><a class="result__snippet" href="x">dato ${n}</a>`;
+        return new Response(`<html><body>${voce(1)}${voce(2)}</body></html>`, { status: 200, headers: { 'content-type': 'text/html' } });
+      }
+      return vero(url, init);
+    };
+  });
+  const fonti = await app.evaluate(() => globalThis.SN_FONTI_SEGNAPOSTO.web('in che anno è nato Dante', ''));
+  expect(fonti).toHaveLength(2);
+  await expect.poll(() => misura(app, 'ricercaWeb'), { timeout: 5_000 }).toEqual({ 'correttore|duckduckgo|no|r1_2': 1 });
+  expect(await tutteLeChiavi(app)).not.toMatch(/dante/i);
+});
