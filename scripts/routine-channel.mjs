@@ -817,7 +817,7 @@ export async function chiudiGiro(root, ticket, { exec = execFileSync, env = proc
     if (!st.ok) return { ok: false, fase: 'commit', reason: `non so cosa c'è fuori dai commit: ${st.motivo}` };
     const head = headSha(root);
     if (st.lines.length || head !== m.chiuso.sha) {
-      return { ok: false, fase: 'chiuso', sha: m.chiuso.sha, file: st.lines.map((l) => l.slice(3)), commitDopo: head !== m.chiuso.sha };
+      return { ok: false, fase: 'chiuso', sha: m.chiuso.sha, file: st.lines, commitDopo: head !== m.chiuso.sha };
     }
     return { ok: true, giaChiuso: true, committed: [], push: null, registrata: null };
   }
