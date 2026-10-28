@@ -855,6 +855,7 @@
   // #418 — per le risposte di Filo la formattazione leggera condivisa, per il resto testo
   // letterale. I link sono già filtrati da SN_MARKDOWN: nessuno punta alle pagine interne.
   function setBubbleText(el, text, markdown) {
+    Rispondi.ricorda(el, text);
     if (markdown && text && self.SN_MARKDOWN) {
       el.innerHTML = self.SN_MARKDOWN.render(text);
       el.classList.add('dash-bubble-md');
