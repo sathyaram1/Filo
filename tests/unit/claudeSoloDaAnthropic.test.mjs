@@ -60,19 +60,31 @@ test('Claude via OpenRouter: la richiesta può andare solo agli host di Anthropi
   }));
   assert.deepEqual(conLista.provider.only, SOLO_ANTHROPIC);
   assert.deepEqual(conLista.provider.ignore, ['Google', 'OpenAI'], 'la lista di esclusione resta');
-  assert.equal(conLista.provider.sort, 'latency');
+  // #1583: Anthropic per primo, così la chiave dell'owner data a OpenRouter serve davvero; l'ordinamento
+  // chiesto dall'utente non lo scavalca (col solo `only` il router ha servito Claude da AWS coi suoi crediti).
+  assert.deepEqual(conLista.provider.order, SOLO_ANTHROPIC);
+  assert.equal(conLista.provider.order[0], 'anthropic');
+  assert.equal(conLista.provider.sort, undefined);
   // Nessun ripiego oltre il produttore (#1059): se Anthropic non risponde, l'errore si vede.
   assert.equal(conLista.provider.allow_fallbacks, false);
 
   const senzaLista = await bodyOf(() => OpenRouter.complete({ apiKey: 'k', model: CLAUDE, messages: msgs }));
-  assert.deepEqual(senzaLista.provider, { only: SOLO_ANTHROPIC, allow_fallbacks: false });
+  assert.deepEqual(senzaLista.provider, { only: SOLO_ANTHROPIC, order: SOLO_ANTHROPIC, allow_fallbacks: false });
 
-  const inStreaming = await bodyOf(() => OpenRouter.streamComplete({ apiKey: 'k', model: 'Anthropic/Claude-Sonnet-4.5:thinking', messages: msgs, onDelta: () => {} }));
+  for (const sort of ['price', 'throughput']) {
+    const ordinato = await bodyOf(() => OpenRouter.complete({ apiKey: 'k', model: CLAUDE, messages: msgs, providerRouting: { sort } }));
+    assert.deepEqual(ordinato.provider, senzaLista.provider, `l'ordinamento «${sort}» non cambia l'ordine di Claude`);
+  }
+
+  const inStreaming = await bodyOf(() => OpenRouter.streamComplete({ apiKey: 'k', model: 'Anthropic/Claude-Sonnet-4.5:thinking', messages: msgs, onDelta: () => {}, providerRouting: { sort: 'throughput' } }));
   assert.deepEqual(inStreaming.provider.only, SOLO_ANTHROPIC, 'maiuscole e varianti con i due punti sono lo stesso modello');
+  assert.deepEqual(inStreaming.provider.order, SOLO_ANTHROPIC);
+  assert.equal(inStreaming.provider.sort, undefined);
   assert.equal(inStreaming.provider.allow_fallbacks, false);
 
   const indicizzazione = await bodyOf(() => OpenRouter.embed({ apiKey: 'k', model: CLAUDE, texts: ['a'] }));
   assert.deepEqual(indicizzazione.provider.only, SOLO_ANTHROPIC);
+  assert.deepEqual(indicizzazione.provider.order, SOLO_ANTHROPIC);
   assert.equal(indicizzazione.provider.allow_fallbacks, false);
 });
 
