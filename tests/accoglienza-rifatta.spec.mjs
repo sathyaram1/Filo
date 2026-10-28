@@ -44,6 +44,8 @@ async function stubAgents(app) {
       if (all.includes('integrare le nuove lezioni')) return 'PROFILO:\nAnna, insegnante.\n\nPREFERENZE:\nRisposte brevi.';
       if (all.includes('analizzare l')) return 'NESSUNA';
       if (all.includes('preparare la dashboard')) return JSON.stringify({ message: 'Buongiorno.', suggestions: [] });
+      // Il correttore rilegge anche il campo della home: un testo incollato lo sveglia prima dell'invio.
+      if (all.includes('<testo_nuovo>')) return '[][][][nessuno]';
       // La coda è solo della chat: il correttore rilegge la chat di casa (#1447) e una sua chiamata se la prendeva.
       if (!JSON.stringify(messages?.[0] ?? '').includes('attraverso un campo di testo nella dashboard')) return 'NIENTE';
       globalThis.__chatPrompts.push(all);
