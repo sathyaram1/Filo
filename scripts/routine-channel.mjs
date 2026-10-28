@@ -1817,6 +1817,10 @@ if (isMain) {
       } catch (_) { /* best-effort: la consegna è già registrata */ }
     }
     if (r.outcome === 'ok' && guardia && guardia.id) azzeraRifiuti(ROOT, guardia.id);
+    // Correzione e revisione sono le consegne che il registro scrive di sicuro: chi chiude il giro non le ripete.
+    if (r.outcome === 'ok' && (intento === 'fixed' || (intento === 'status' && data.status === 'revision_capability'))) {
+      segnaPuntaDelGiro(ROOT, biglietto, { sha: data.sha, ramo: data.branch, via: intento });
+    }
     if (r.outcome === 'ok') {
       console.log(testoConsegnaRiuscita(r, data, intento));
       process.exit(0);
