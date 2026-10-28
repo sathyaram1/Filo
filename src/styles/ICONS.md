@@ -121,6 +121,7 @@ self.SN_ICONS_UTIL = { isSvgIcon, wrap };
 | `volume` | Altoparlante a cono con due onde: il volume del computer |
 | `volumeMute` | Lo stesso altoparlante con una croce al posto delle onde: muto |
 | `windowFrame` | Cornice con barra del titolo e due pallini: comando della finestra |
+| `desktopIcons` | Schermo col piede e piccole icone in fila: le icone del desktop messe in ordine |
 | `brush` | Pennello: stile della pagina |
 | `undo` | Freccia che torna indietro: ripristina |
 | `mailOpen` | Busta aperta: posta letta (prevista) |
