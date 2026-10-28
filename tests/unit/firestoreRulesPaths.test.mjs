@@ -60,6 +60,10 @@ const SCRITTURE_ANONIME_DICHIARATE = {
   'contatori-navigazione':
     'la navigazione di un’ora dei contatori (#1469), accanto all’ora e con lo stesso id: stesse ragioni, e solo ' +
     'numeri sotto chiavi di elenchi chiusi (codici di rete, fonti, paesi, servizi), mai un sito o un nome di file.',
+  'contatori-attivita':
+    'le attività di un’ora dei contatori (#1467: Aiuto, ricerche web, voce, lezioni, memoria, pulizia delle schede, ' +
+    'home), accanto all’ora e con lo stesso id: stesse ragioni, chiavi fatte solo di nomi da elenchi chiusi e valori ' +
+    'che sono conti, a sola creazione e letti solo dall’admin.',
 };
 
 const VERBI_SCRITTURA = ['write', 'create', 'update', 'delete'];

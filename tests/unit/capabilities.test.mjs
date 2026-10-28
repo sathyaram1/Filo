@@ -179,6 +179,8 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     // di memoria, che l'utente conosce già come "filo-memory". Non è una voce a
     // sé: nessuno chiede "compatta le lezioni", chiede "ricordati questo".
     'FILO_COMPACT_MEMORY',
+    // La home vista, per i contatori anonimi (#1467): non fa niente per l'utente.
+    'FILO_HOME_VISTA',
   ]);
 
   // Mappa handler → id della capacità che lo descrive nel manifesto. Più handler

@@ -192,7 +192,34 @@
     return false;
   }
 
+  // Una lettura si conta una volta, quando finisce o si ferma (#1467): con che voce, perché il ripiego, fin dove.
+  // Escono il codice del guasto e la quota letta, mai il testo.
+  // Finché legge, il main ne tiene l'ultimo stato e la conta lui se la scheda si chiude (chiudere non dà eventi).
+  function datiLettura(s, finita) {
+    const r = s.ripiego && s.ripiego.res;
+    return {
+      misura: 'lettura', voce: !s.ripiego ? 'modello' : s.pezziModello > 0 ? 'mista' : 'browser', ripiego: !!s.ripiego,
+      codice: String((r && r.errorCode) || ''), chiaveRifiutata: !!(r && r.keyRefused), senzaModello: !!(r && r.error === 'no_tts_model'),
+      // Finita senza che si sia sentito niente (l'audio rifiutato) non è letta fino in fondo.
+      quota: Math.min(1, (s.letti || 0) / s.totale), finita: finita === true && (s.letti || 0) > 0, id: s.idConto,
+    };
+  }
+  function contaLettura(s, finita) {
+    if (!s || s.contata || !s.totale) return;
+    s.contata = true;
+    try { Popup.conta(datiLettura(s, finita)); } catch (_) {}
+  }
+  function segnaLettura(s, subito = false) {
+    if (!s || s.contata || !s.totale) return;
+    const ora = Date.now();
+    if (!subito && ora - (s.segnata || 0) < 1000) return;
+    s.segnata = ora;
+    try { Popup.conta({ ...datiLettura(s, false), misura: 'in-corso', cosa: 'lettura' }); } catch (_) {}
+  }
+  try { window.addEventListener('pagehide', () => { if (session && !session.cancelled) contaLettura(session, false); }); } catch (_) {}
+
   function stopReading() {
+    if (session && !session.cancelled) contaLettura(session, false);
     if (session) session.cancelled = true;
     if (ttsAudio) {
       const a = ttsAudio;
@@ -233,7 +260,7 @@
   // `baseChar` è l'offset di `utterText` nel testo completo: mappa l'onboundary sui token
   // globali quando il ripiego parte a metà.
   function playBrowserChunk(s, utterText, baseChar) {
-    if (!ttsSupported()) { Popup.toastErrore('tts_not_supported'); clearHighlight(); reportReadingState(false); return; }
+    if (!ttsSupported()) { Popup.toastErrore('tts_not_supported'); clearHighlight(); reportReadingState(false); contaLettura(s, false); return; }
     const synth = window.speechSynthesis;
     synth.cancel();
     const u = new SpeechSynthesisUtterance(utterText);
@@ -248,18 +275,18 @@
       const v = voices.find((vo) => vo.voiceURI === tts.voice || vo.name === tts.voice);
       if (v) { u.voice = v; u.lang = v.lang; }
     }
-    // La voce del browser dà tempi esatti per parola (onboundary): evidenziazione precisa.
-    if (readTokens.length) {
-      u.onboundary = (e) => {
-        if (!sessionAlive(s)) return;
-        if (e.name && e.name !== 'word') return;
-        setHighlight(Chunk.charIndexToToken(readTokens, baseChar + (e.charIndex || 0)));
-      };
-    }
-    u.onend = () => { if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); } };
+    // La voce del browser dà tempi esatti per parola (onboundary): evidenziazione precisa, e fin dove è arrivata.
+    u.onboundary = (e) => {
+      if (!sessionAlive(s)) return;
+      s.letti = Math.max(s.letti || 0, baseChar + (e.charIndex || 0));
+      segnaLettura(s);
+      if (!readTokens.length || (e.name && e.name !== 'word')) return;
+      setHighlight(Chunk.charIndexToToken(readTokens, baseChar + (e.charIndex || 0)));
+    };
+    u.onend = () => { if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); contaLettura(s, true); } };
     // Se la voce del browser fallisce la lettura finisce comunque: uno stato «sta leggendo»
     // appeso darebbe alle altre schede uno stop morto. L'evidenziazione qui NON si azzera.
-    u.onerror = () => { if (sessionAlive(s)) reportReadingState(false); };
+    u.onerror = () => { if (sessionAlive(s)) { reportReadingState(false); contaLettura(s, false); } };
     synth.speak(u);
   }
 
@@ -281,6 +308,14 @@
       };
       audio.onended = () => finish(true);
       audio.onerror = () => finish(false);
+      audio.addEventListener('timeupdate', () => {
+        const d = audio.duration;
+        if (!sessionAlive(s) || !d || !isFinite(d)) return;
+        s.letti = Math.max(s.letti || 0, chunk.start + (chunk.end - chunk.start) * (audio.currentTime / d));
+        segnaLettura(s);
+      });
+      // La voce del modello conta da quando si sente, non da quando l'audio è arrivato.
+      audio.addEventListener('playing', () => { if (!chunk.sentito && sessionAlive(s)) { chunk.sentito = true; s.pezziModello += 1; } });
       // Se l'utente ferma (stopReading mette in pausa), sblocca la pipeline.
       audio.onpause = () => { if (!sessionAlive(s)) finish(true); };
       if (chunk.from >= 0 && readTokens.length) {
@@ -334,6 +369,11 @@
     // Due letture sovrapposte sono incomprensibili: prima si ferma quella in corso.
     stopReading();
     const s = newSession();
+    Object.assign(s, {
+      totale: full.length, letti: 0, pezziModello: 0, ripiego: null, contata: false,
+      idConto: `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+    });
+    segnaLettura(s, true);
     reportReadingState(true);
     readTokens = Array.isArray(tokens) ? tokens.slice() : [];
     ensureReadStyle();
@@ -371,17 +411,21 @@
       if (!sessionAlive(s)) return;
       if (res && res.ok && res.audioBase64) {
         startFetch(ci + 1); // mantieni il successivo in volo mentre si suona
-        await playModelChunk(s, res, chunks[ci]);
+        const suonato = await playModelChunk(s, res, chunks[ci]);
         if (!sessionAlive(s)) return;
+        if (suonato && chunks[ci].sentito) s.letti = Math.max(s.letti, chunks[ci].end);
+        segnaLettura(s, true);
       } else {
         // Dal chunk fallito in poi la voce del browser legge tutto il resto, in un'unica
         // utterance con onboundary.
+        s.ripiego = { res };
+        segnaLettura(s, true);
         notifyModelFallback(res);
         playBrowserChunk(s, full.slice(chunks[ci].start), chunks[ci].start);
         return;
       }
     }
-    if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); }
+    if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); contaLettura(s, true); }
   }
 
   // Mentre si legge questa voce non si ripropone: lo stop è una voce globale di ogni menu.
@@ -559,7 +603,8 @@
       // Dove il cursore si trova ADESSO: mentre si detta si può continuare a scrivere o spostarsi nel campo.
       suFrase: (text) => deps.insertDictatedText(text + ' '),
       suStato: (st) => { if (st === 'trascrive') label.textContent = I18n.t('menu_dictate_transcribing'); },
-      suFine: chiudi,
+      // Nel campo di una pagina il testo resta dov'è: non c'è un invio da contare.
+      suFine: (esito) => { chiudi(); global.SN_ASCOLTO.contaSessione(esito, 'nessuno'); },
     });
     if (!sessione) { chiudi(); return; }
     state.sessione = sessione;

@@ -1,4 +1,4 @@
-// Le regole Firestore dei contatori anonimi (#969, #1461, #1463, #1464, #1466, #1469, #1471), provate col MOTORE VERO e col codice vero dell'app.
+// Le regole Firestore dei contatori anonimi (#969, #1461, #1463, #1464, #1466, #1467, #1469, #1471), provate col MOTORE VERO e col codice vero dell'app.
 //
 // NON è un unit test: il nome non finisce in `.test.mjs` apposta (vedi pathsRegole.motore-vero.mjs, che spiega
 // perché e come si prepara la cartella usa-e-getta con l'emulatore). La sentinella sempre accesa è
@@ -9,9 +9,9 @@
 // Si lancia come l'altro, con in più FILO_REPO=<repo>:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-969 "node <cartella>/contatoriRegole.motore-vero.mjs"
-// Esito atteso: 111 righe verdi, uscita 0 (#1463 su #1469 e #1471, 2026-10-26). È l'unica prova del tetto di mille
+// Esito atteso: 124 righe verdi, uscita 0 (#1467 su #1463, 2026-10-28). È l'unica prova del tetto di mille
 // espressioni che Firestore concede a una scrittura: le regole dell'ora ne valutano già circa 950, e un controllo in più
-// le fa rifiutare tutte (per questo le chiamate ai modelli e la chat hanno il loro documento), mentre la sentinella che
+// le fa rifiutare tutte (per questo chiamate ai modelli, chat e attività hanno il loro documento), mentre la sentinella che
 // legge il file non se ne accorge. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
 
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
@@ -136,6 +136,10 @@ await prova('l’ora chiusa parte, con ogni misura, e il server la accetta', asy
   s.reazione('ferma_durante_testo'); s.copia('risposta');
   await s.chatChiusa('chat-1', { via: 'uscita', messaggi: 3, durataMs: 120000 });
   await s.chatClassificata('chat-1', 'conversazione');
+  s.attivita('aiuto', { esito: 'fatto', passiDaSolo: 3, passiCliccati: 1, nonTrovati: 1, documenti: 0 });
+  s.attivita('ricercaWeb', { da: 'chat', fornitore: 'tavily', ripiego: false, risultati: 5 });
+  s.attivita('suggerimenti', { tipo: 'NAVIGA', posizione: 2, etaMs: 60000 });
+  s.memoriaCorretta('quaderno', 'togli', { modulo: 'PROFILO', lezione: false, nata: '2026-10-01T10:00:00.000Z' });
   await new Promise((r) => setTimeout(r, 30));
   sposta(ORA);
   const esito = await s.controlla();
@@ -197,6 +201,11 @@ C.registraStrumento(datiChat, 'filo-chat', 'NAVIGA', 'eseguito');
 C.registraChatChiusa(datiChat, { via: 'chat_nuova', messaggi: 2, durataMs: 90000, tipo: 'comando' });
 const CHAT = C.documentoChat({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiChat });
 const idChat = C.idDocumento(CHAT);
+C.registraAttivita(datiBuoni, 'dettatura', { motivo: 'finito', frasi: 2, invio: 'da_sola' });
+C.registraAttivita(datiBuoni, 'riaperte', { chiusaDa: 'pulizia', etaMs: 120000 });
+const ATTIVITA = C.documentoAttivita({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiBuoni });
+const COLL_ATTIVITA = C.COLLEZIONE_ATTIVITA;
+const conAttivita = (patch) => assertFails(setDoc(doc(anon, `${COLL_ATTIVITA}/${idBuono}`), { ...ATTIVITA, ...patch }));
 const GIORNO_VECCHIO = C.documentoGiorno({ pseudonimo: 'e'.repeat(20), giorno: '2026-10-13', app: '0.2.240', os: 'win', dati: { uso: { help: { n: 2, fasce: { s2: 1 } } }, errori: {} } });
 
 console.log('\n— quello che NON si deve poter fare —');
@@ -249,6 +258,15 @@ await prova('la navigazione con un campo dell’ora', () => rifiutaNav({ uso: {}
 await prova('la navigazione senza una misura', () => { const { programmi, ...senza } = NAVIGA; return assertFails(setDoc(doc(anon, `${COLL_NAV}/${idBuono}`), senza)); });
 await prova('la navigazione sotto l’id di un’altra ora', () => assertFails(setDoc(doc(anon, `${COLL_NAV}/${'c'.repeat(20)}_2026-10-14_11`), NAVIGA)));
 await prova('un anonimo legge la navigazione', () => assertFails(getDoc(doc(anon, `${COLL_NAV}/${idBuono}`))));
+await prova('un’attività con un testo come combinazione', () => conAttivita({ aiuto: { 'cerca il volo per Roma': '1' } }));
+await prova('un’attività con un indirizzo dentro la combinazione', () => conAttivita({ suggerimenti: { 'NAVIGA|1|ora|https://mario.it': '1' } }));
+await prova('un’attività col conto scritto a parole', () => conAttivita({ dettatura: { 'finito|f1|da_sola|no': '1 volta' } }));
+await prova('un’attività col conto come mappa', () => conAttivita({ home: { generata: { n: 1, nota: 'ciao' } } }));
+await prova('le attività con un campo dell’ora', () => conAttivita({ uso: {} }));
+await prova('le attività senza una misura', () => { const { lettura, ...senza } = ATTIVITA; return assertFails(setDoc(doc(anon, `${COLL_ATTIVITA}/${idBuono}`), senza)); });
+await prova('le attività sotto l’id di un’altra ora', () => assertFails(setDoc(doc(anon, `${COLL_ATTIVITA}/${'c'.repeat(20)}_2026-10-14_11`), ATTIVITA)));
+await prova('le attività nella collezione delle chiamate', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), ATTIVITA)));
+await prova('un anonimo legge le attività', () => assertFails(getDoc(doc(anon, `${COLL_ATTIVITA}/${idBuono}`))));
 await prova('una prima volta che è un testo', () => rifiuta({ primeVolte: ['help', 'appunti di mario'] }));
 await prova('le prime volte come stringa', () => rifiuta({ primeVolte: 'help' }));
 await prova('un’ora che non esiste', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${'c'.repeat(20)}_2026-10-14_24`), conCampo({ ora: '24' }))));
@@ -353,6 +371,22 @@ await prova('la chat più carica che l’app costruisce passa', () => {
   const piena = C.documentoChat({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '0.2.243', os: 'linux', dati });
   vero(C.valida(piena).ok, C.valida(piena).motivo);
   return assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(piena)}`), piena));
+});
+await prova('un anonimo crea le attività della sua ora', () => assertSucceeds(setDoc(doc(anon, `${COLL_ATTIVITA}/${idBuono}`), ATTIVITA)));
+await prova('ma non le riscrive', () => assertFails(setDoc(doc(anon, `${COLL_ATTIVITA}/${idBuono}`), ATTIVITA)));
+await prova('l’admin legge le attività', () => assertSucceeds(getDoc(doc(owner, `${COLL_ATTIVITA}/${idBuono}`))));
+await prova('le attività più cariche che l’app costruisce (ogni combinazione di ogni misura, ai tetti) passano', () => {
+  const dati = C.oraVuota();
+  const combinazioni = (forma) => forma
+    .reduce((acc, d) => acc.flatMap((p) => (d === C.TIPO_SUGGERIMENTO ? C.tipiSuggerimento() : d).map((x) => [...p, x])), [[]])
+    .map((p) => p.join('|'));
+  for (const m of C.MISURE_ATTIVITA) {
+    const tutte = C.DIMENSIONI_ATTIVITA[m].flatMap(combinazioni).sort((a, b) => b.length - a.length);
+    dati[m] = Object.fromEntries([...tutte.map((k) => [k, 999999999]), ['altro', 999999999]]);
+  }
+  const piene = C.documentoAttivita({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '9999.9999.999999', os: 'linux', dati });
+  vero(C.validaAttivita(piene).ok, C.validaAttivita(piene).motivo);
+  return assertSucceeds(setDoc(doc(anon, `${COLL_ATTIVITA}/${C.idDocumento(piene)}`), piene));
 });
 await prova('una copia vecchia crea ancora il suo giorno', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(GIORNO_VECCHIO)}`), GIORNO_VECCHIO)));
 await prova('una copia vecchia crea ancora la sua ora v2, senza il sistema', () => {

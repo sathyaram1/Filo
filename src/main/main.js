@@ -498,6 +498,11 @@ app.on('before-quit', (e) => {
   const attese = BrowserWindow.getAllWindows()
     .map((w) => { try { return w.isDestroyed() ? null : congedaSchede(w._filoTabs); } catch (_) { return null; } })
     .filter(Boolean);
+  // Le attività ancora aperte nelle pagine (#1467) si contano e vanno sul disco: il salvataggio dei contatori aspetta.
+  try {
+    const contatori = globalThis.SN_CONTATORI_MAIN?.congeda?.();
+    if (contatori) attese.push(Promise.race([contatori, new Promise((r) => setTimeout(r, 1500))]));
+  } catch (_) {}
   if (!attese.length) return;
   e.preventDefault();
   const esci = () => { try { app.quit(); } catch (_) {} };

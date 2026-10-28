@@ -92,28 +92,33 @@
   }
 
   // Ogni ricerca che Filo fa sul web (la chat, l'Aiuto) entra nel filo da qui, una volta, riuscita o no (#1561).
-  async function search({ query, tavilyKey, maxResults = 5 }) {
+  // `da`: chi cerca, dall'elenco dei contatori (SN_CONTATORI.DA_RICERCA): ogni ricerca si conta qui, da qualunque strada (#1467).
+  async function search({ query, tavilyKey, maxResults = 5, da = '' }) {
     const q = (query || '').trim().slice(0, MAX_QUERY_LEN);
     if (!q) return { ok: false, results: [], reason: 'query vuota' };
     const r = await cerca(q, { tavilyKey, maxResults });
     try {
       global.SN_ACCADUTI?.ricerca({ testo: q, motore: r && r.provider, risultati: r && Array.isArray(r.results) ? r.results.length : 0 });
     } catch (_) {}
+    try { global.SN_CONTATORI_MAIN?.attivita('ricercaWeb', { da, ...global.SN_CONTATORI.esitoRicerca(r) }); } catch (_) {}
     return r;
   }
 
   async function cerca(q, { tavilyKey, maxResults }) {
+    // `ripiego`: Tavily c'era e non ha risposto (lo contano i contatori, #1467).
+    let ripiego = false;
     if (tavilyKey) {
       try {
         return await searchTavily({ query: q, apiKey: tavilyKey, maxResults });
       } catch (e) {
         console.warn('[SN] tavily failed, fallback ddg:', e.message || e);
+        ripiego = true;
       }
     }
     try {
-      return await searchDuckDuckGo({ query: q, maxResults });
+      return { ...(await searchDuckDuckGo({ query: q, maxResults })), ...(ripiego ? { ripiego } : {}) };
     } catch (e) {
-      return { ok: false, results: [], reason: `tutti i provider hanno fallito: ${e.message || e}` };
+      return { ok: false, results: [], reason: `tutti i provider hanno fallito: ${e.message || e}`, ...(ripiego ? { ripiego } : {}) };
     }
   }
 
