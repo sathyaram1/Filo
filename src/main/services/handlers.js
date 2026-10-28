@@ -5493,6 +5493,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // non si era ancora letto.
   // Gli eventi del filo con cui questo turno ci entra: le lezioni che ne nascono li ricordano come fonti (#872).
   const fontiTurno = [];
+  const citazione = internal ? { ref: null, citata: null } : await citazioneDelMessaggio(rispostaA, chatId);
   if (chatId && !internal) {
     // Da adesso questa chat è di questa scheda: quando la scheda sparisce, la
     // chat è finita (vedi `affidaChat`). L'intervista di benvenuto fa
