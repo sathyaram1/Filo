@@ -610,6 +610,16 @@
       },
       required: [],
     },
+    ORDINA_DESKTOP: {
+      description: 'Mette in ordine le icone del DESKTOP del computer (quelle del sistema operativo, non le icone della barra laterale di Filo, che sono SPOSTA_ICONA): "metti in ordine alfabetico le icone del desktop", "ordinale da sinistra a destra", "per data, le più recenti in alto", "cartelle prima". Le dispone nella griglia dello schermo principale; se è acceso «Disponi automaticamente», che le rimetterebbe in colonna, lo spegne. Per rimetterle dov\'erano c\'è ANNULLA_CAMBIO col cambio che l\'esito ti dà. Per ora solo su Windows: altrove l\'esito ti dà la frase e la strada del sistema, riportala. Esegue subito.',
+      properties: {
+        ordine: S('Il criterio: "nome" (dalla A alla Z, è il valore se lo ometti), "tipo" (per estensione), "data" (dalla più recente), "dimensione" (dalla più grande).', { enum: ['nome', 'tipo', 'data', 'dimensione'] }),
+        verso: S('"righe" = da sinistra a destra e poi la riga sotto, come si legge (è il valore se lo ometti); "colonne" = dall\'alto in basso e poi la colonna a destra, come fa Windows da sé.', { enum: ['righe', 'colonne'] }),
+        al_contrario: B('true gira l\'ordine: dalla Z alla A, dalla più vecchia, dalla più piccola.'),
+        cartelle_prima: B('true mette prima le cartelle (e le icone di sistema come il Cestino), poi i file.'),
+      },
+      required: [],
+    },
     COMANDO_FINESTRA: {
       description: 'Aziona un controllo del browser Filo (la finestra e la barra in alto), non il sito. "fullscreen" = schermo intero immersivo (la pagina attiva copre tutta la finestra, barre nascoste, Esc esce), non il pulsante del lettore video dentro il sito. NON esiste un comando per CHIUDERE la finestra; le schede si chiudono con CHIUDI_SCHEDE. Esegue subito.',
       properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (menu Account), sidebar (apri la barra laterale).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account', 'sidebar'] }) },
