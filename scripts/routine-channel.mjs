@@ -1393,6 +1393,13 @@ if (isMain) {
     const a = argomentiChiusura(cmd, args, data);
     if (a.errore) { console.error(`${a.errore} — non ho mandato niente.`); process.exit(1); }
     if (cmd === 'domanda') {
+      // La domanda può sporcare il biglietto (SPEC-DOMANDE §5.4): il giro chiude il ramo PRIMA di riceverla (#1555).
+      const marcatore = a.cred.ticket ? leggiMarcatoreBiglietto(ROOT) : null;
+      if (marcatore && String(marcatore.ticket || '') === a.cred.ticket && !bigliettoFinito(marcatore)) {
+        const g = await chiudiGiro(ROOT, a.cred.ticket);
+        for (const riga of righeChiusuraGiro(g)) console.error(riga);
+        if (!g.ok) { console.error('Non ho chiesto la domanda: prima il ramo, poi la domanda.'); process.exit(1); }
+      }
       const r = await domandaChiusura(a.cred);
       if (r.esito === 'assente') { console.error(`nessuna domanda (${r.reason}): niente da rispondere, chiudi o rilascia come sempre.`); process.exit(EXIT_CHIUSURA.assente); }
       if (r.esito === 'rifiutato') { console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato); }
