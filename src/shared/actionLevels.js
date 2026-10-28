@@ -1010,12 +1010,16 @@
       }[cosaAccount(a)] || 'Usare il menu dell\'account di Filo'),
       describeDone: (a) => {
         const o = (a && a._output) || {};
-        if (o.gia) return o.frase || 'Niente da cambiare nell\'account';
-        return {
+        const gia = {
+          dentro: 'Eri già dentro Filo col tuo account Google',
+          collegato: 'YouTube, Gmail e Drive nelle schede erano già collegati',
+          fuori: 'Non eri dentro nessun account di Filo',
+        }[o.gia];
+        return gia || {
           accedi: 'Aperto l\'accesso a Filo con Google',
           collega_google: 'Aperto il collegamento di YouTube, Gmail e Drive al tuo account Google',
           esci: 'Uscito dall\'account di Filo',
-        }[cosaAccount(a)] || 'Usato il menu dell\'account';
+        }[o.voce || cosaAccount(a)] || 'Usato il menu dell\'account';
       },
     },
     // #870 — le carte della home, come le dispone l'utente trascinandole. Costo 1: ogni mossa si annulla con
