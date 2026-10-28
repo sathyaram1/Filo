@@ -1,6 +1,7 @@
 // Orchestratore cieco: nella sessione di un giro il testo dei worker non entra nel suo contesto, modello e sforzo del worker
 // li mette il gancio come li ha decisi il server, e nessuno (worker compresi) manda notifiche all'owner. Gancio, registro e
-// permessi git stanno nelle impostazioni dell'UTENTE, mai nella cartella del progetto. Regole: tests/unit/orchestratoreCieco.test.mjs.
+// permessi git stanno nelle impostazioni dell'UTENTE, mai nel progetto; per tutto il giro impostazioni e skill restano quelle
+// di partenza. Regole: tests/unit/orchestratoreCieco.test.mjs.
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -22,7 +23,7 @@ export const AL_POSTO_DEL_TESTO = 'Worker finito. Il suo testo di ritorno non ti
 export const AL_POSTO_VIVO = 'Worker ANCORA VIVO: Claude Code lo ha spostato in sottofondo mentre lavorava, non è finito. Non rilasciare il suo biglietto, non toccare la cartella, non chiedere biglietti e non lanciare altri worker: chiudi il turno senza fare altro e aspetta la notifica di fine del worker. Quando arriva, riparti dal passo 0 del tuo ruolo, come dopo un worker finito.';
 export const MOTIVO_SOTTOFONDO = 'Il worker si lancia in primo piano (senza run_in_background): in sottofondo il suo testo ti arriverebbe nella notifica.';
 export const MOTIVO_LANCIO = 'Worker in primo piano, con modello e sforzo decisi dal server (quelli della sua definizione se il server non ne ha detti).';
-export const MOTIVO_IMPOSTAZIONI = 'Durante il giro le impostazioni utente non cambiano: portano il gancio che rende cieco chi guida il giro.';
+export const MOTIVO_IMPOSTAZIONI = 'Durante il giro impostazioni e skill restano quelle di partenza: un worker non deve poter spegnere o affiancare il gancio che rende cieco chi guida il giro.';
 export const MOTIVO_SENZA_BIGLIETTO = 'Lancio rifiutato: nel prompt del worker manca il biglietto (--ticket <biglietto>), e senza non so modello e sforzo decisi dal server.';
 export const MOTIVO_DUE_BIGLIETTI = 'Lancio rifiutato: nel prompt ci sono biglietti diversi e non so di quale seguire la decisione del server. Lascia solo il --ticket del worker che lanci.';
 export const MOTIVO_REGISTRO = 'Lancio rifiutato: non leggo il registro delle decisioni del server, che scrive il comando ticket. Rilascia il biglietto (release <biglietto> --role orchestrator) e chiudi il giro.';
@@ -53,12 +54,14 @@ export function regoleGit(clone = '') {
 
 // Il corpo finisce fra apici singoli nella shell del gancio: solo virgolette doppie, niente apostrofi nemmeno nei
 // commenti, niente barre rovesciate (la riga di comando di Windows le mangia), nella regex solo classi di caratteri.
+// Si ferma ogni fonte di configurazione, anche ignota: il progetto vince sull'utente, e un disableAllHooks scritto lì
+// spegnerebbe il gancio (#1182).
 // registro = { testo } del file o { errore }; impronta = sha256 esadecimale.
 export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), registro = null, impronta = null } = {}) {
   if (!input || !(adesso - Number(creato) < VALIDITA_MS)) return null;
   if (sessione && input.session_id && input.session_id !== sessione) return null;
   if (input.hook_event_name === "ConfigChange") {
-    if (!sessione || (input.source && input.source !== "user_settings")) return null;
+    if (!sessione || input.source === "policy_settings") return null;
     return { decision: "block", reason: MOTIVO_IMPOSTAZIONI };
   }
   const strumento = input.tool_name;
@@ -165,9 +168,11 @@ export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato 
   }
   const cmd = comando({ sessione, creato, registro: join(dir, FILE_REGISTRO) });
   const hooks = { ...(s.hooks || {}) };
-  const voci = { PreToolUse: MATCHER_PRIMA, PostToolUse: 'Agent|Task', ConfigChange: 'user_settings' };
+  // ConfigChange senza matcher: ogni fonte arriva a decidi, che sceglie cosa fermare.
+  const voci = { PreToolUse: MATCHER_PRIMA, PostToolUse: 'Agent|Task', ConfigChange: '' };
   for (const [ev, matcher] of Object.entries(voci)) {
-    hooks[ev] = [...(hooks[ev] || []).filter((g) => !nostro(g)), { matcher, hooks: [{ type: 'command', command: cmd }] }];
+    const gruppo = { ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: cmd }] };
+    hooks[ev] = [...(hooks[ev] || []).filter((g) => !nostro(g)), gruppo];
   }
   const env = { ...(s.env || {}), ...AMBIENTE };
   for (const k of AMBIENTE_TOLTO) delete env[k];

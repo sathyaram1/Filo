@@ -1195,8 +1195,9 @@ migrazione le mappa. Il codice che decide in base al prefisso
 
 Da sistemare prima dei worker in parallelo:
 
-- **Una copia del repo per worker.** Oggi il worker porta l'unica cartella del
-  progetto sul suo ramo. Due worker lavorano su rami diversi, ma hanno bisogno
+- **Una copia del repo per worker.** Accesa per il worker singolo (#1182): in
+  cloud dispatch lo porta nel clone 1 e la cartella della sessione resta su
+  main. Due worker lavorano su rami diversi, ma hanno bisogno
   di due cartelle. Le cartelle di lavoro di git condividono la stessa `.git`:
   scaricare e spingere insieme si contendono i lock dei riferimenti. In più il
   salvataggio automatico passa da tutte le cartelle. Quindi ogni worker ha il

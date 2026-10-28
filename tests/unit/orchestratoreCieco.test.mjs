@@ -142,12 +142,22 @@ test('fuori dal giro è inerte: altra sessione o installazione scaduta; senza se
   assert.equal(decidi(dopo({ session_id: 's2' }), { ...OPZ, sessione: '' }).hookSpecificOutput.updatedToolOutput, AL_POSTO_DEL_TESTO);
 });
 
-// Il worker può riscrivere le impostazioni utente da shell: nella sessione del giro la modifica non si applica.
-test('nella sessione del giro le impostazioni utente non cambiano; le altre e le altre sessioni sì', () => {
-  assert.equal(decidi(cambio(), OPZ).decision, 'block');
-  assert.equal(decidi(cambio({ source: 'local_settings' }), OPZ), null);
-  assert.equal(decidi(cambio({ session_id: 's2' }), OPZ), null);
-  assert.equal(decidi(cambio(), { ...OPZ, sessione: '' }), null, 'senza sessione nota non si blocca nessuno');
+// Il worker scrive da shell nelle impostazioni utente e nella cartella del progetto, che vince sull'utente: un
+// disableAllHooks o un gancio suo lì spegnerebbero la cecità (#1182). Nella sessione del giro nessuna modifica si applica.
+test('nella sessione del giro impostazioni e skill restano quelle di partenza, da qualunque file arrivi la modifica', () => {
+  const progetto = '/home/user/Filo/.claude';
+  for (const c of [
+    {},
+    { source: 'project_settings', file_path: `${progetto}/settings.json` },
+    { source: 'local_settings', file_path: `${progetto}/settings.local.json` },
+    { source: 'skills', file_path: `${progetto}/skills/nuova/SKILL.md` },
+    { source: undefined },
+    { source: 'fonte_di_domani' },
+  ]) assert.equal(decidi(cambio(c), OPZ)?.decision, 'block', JSON.stringify(c));
+  assert.equal(decidi(cambio({ source: 'policy_settings' }), OPZ), null, 'le impostazioni gestite Claude Code le applica comunque');
+  assert.equal(decidi(cambio({ source: 'local_settings', session_id: 's2' }), OPZ), null);
+  assert.equal(decidi(cambio({ source: 'project_settings' }), { ...OPZ, sessione: '' }), null, 'senza sessione nota non si blocca nessuno');
+  assert.equal(decidi(cambio({ source: 'local_settings' }), { ...OPZ, creato: ADESSO - VALIDITA_MS - 1 }), null, 'scaduta, inerte');
 });
 
 // Il caso dei giri passati: a worker finito la cartella è sul ramo del worker, senza gancio né impostazioni del giro.
@@ -173,6 +183,10 @@ test('il comando installato, dalla shell, acceca e mette la decisione del server
     assert.equal(JSON.parse(run(JSON.stringify(dopo({ tool_response: SPOSTATO }))).stdout).hookSpecificOutput.updatedToolOutput, AL_POSTO_VIVO);
     assert.equal(JSON.parse(run(JSON.stringify(dopo({ tool_response: FINITO }))).stdout).hookSpecificOutput.updatedToolOutput, AL_POSTO_DEL_TESTO);
     assert.equal(JSON.parse(run(JSON.stringify(cambio())).stdout).decision, 'block');
+    for (const source of ['project_settings', 'local_settings', 'skills']) {
+      assert.equal(JSON.parse(run(JSON.stringify(cambio({ source }))).stdout).decision, 'block', source);
+    }
+    assert.equal(run(JSON.stringify(cambio({ source: 'policy_settings' }))).stdout, '');
     assert.equal(run(JSON.stringify(dopo({ agent_id: 'w1' }))).stdout, '');
     assert.equal(run(JSON.stringify(prima(false, { agent_id: 'w1' }))).stdout, '');
     assert.equal(run(JSON.stringify(dopo({ session_id: 's2' }))).stdout, '');
@@ -276,7 +290,7 @@ test('installa: unisce alle impostazioni utente senza toccare il resto, toglie F
     assert.deepEqual(s.permissions, { allow: ['Bash(ls)', ...REGOLE_GIT] }, 'le regole dell utente restano, quelle git una volta sola');
     assert.deepEqual(s.env, { MIO: '1', ...AMBIENTE }, 'FORCE farebbe ignorare a Claude Code il modello deciso dal server');
     assert.deepEqual(s.hooks.PreToolUse[0], altrui);
-    for (const [ev, matcher] of [['PreToolUse', MATCHER_PRIMA], ['PostToolUse', 'Agent|Task'], ['ConfigChange', 'user_settings']]) {
+    for (const [ev, matcher] of [['PreToolUse', MATCHER_PRIMA], ['PostToolUse', 'Agent|Task'], ['ConfigChange', undefined]]) {
       const nostri = s.hooks[ev].filter((g) => g.hooks.some((h) => h.command.includes(ETICHETTA)));
       assert.equal(nostri.length, 1, `${ev}: una voce sola anche dopo due installazioni`);
       assert.equal(nostri[0].matcher, matcher);
