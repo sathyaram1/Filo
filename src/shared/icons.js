@@ -763,6 +763,7 @@
     volume:       (size) => wrap(volume, { size }),
     volumeMute:   (size) => wrap(volumeMute, { size }),
     windowFrame:  (size) => wrap(windowFrame, { size }),
+    desktopIcons: (size) => wrap(desktopIcons, { size }),
     brush:        (size) => wrap(brush, { size }),
     undo:         (size) => wrap(undo, { size }),
     mailOpen:     (size) => wrap(mailOpen, { size }),
