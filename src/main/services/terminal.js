@@ -437,7 +437,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: 
         if (letto.code !== null) realCode = letto.code;
         if (letto.cwd) resultCwd = letto.cwd;
       }
-      const out = truncate(rawOut);
+      const out = truncate(rawOut, tettoUscita);
       const err = truncate(stderr);
       resolve({
         command: cmd,
