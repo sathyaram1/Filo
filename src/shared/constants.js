@@ -1293,7 +1293,7 @@
 
   // Una segnalazione scritta da Filo in tono da agente (nomi di azioni, ordini a chi lavora)
   // i giudici all'ingresso la leggono come un utente che si finge sviluppatore e la bloccano (#1627).
-  const VOCE_SEGNALAZIONE = 'Il testo scrivilo come lo direbbe l\'utente, in prima persona e con parole sue: cosa voleva fare e cosa è successo, o cosa gli piacerebbe. Niente nomi di azioni o strumenti, di funzioni interne di Filo o di chiavi delle impostazioni, e nessun ordine a chi la leggerà: una richiesta si scrive come un desiderio («vorrei che…»).';
+  const VOCE_SEGNALAZIONE = 'Il testo scrivilo come lo direbbe l\'utente, in prima persona e con parole sue: cosa voleva fare e cosa è successo, o cosa gli piacerebbe. Niente nomi di azioni o strumenti, di funzioni interne di Filo o di chiavi delle impostazioni, e nessun ordine a chi lo leggerà: una richiesta si scrive come un desiderio («vorrei che…»).';
 
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
   const PROMPTS = {
