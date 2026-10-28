@@ -1608,6 +1608,9 @@
       for (const d of c.immagini) addPendingImage(d, c.percorsi.get(d));
       for (const f of c.file) addPendingFile(f.percorso);
     }
+    // Una citazione sola sta nel campo: quella del primo che torna, se quella che c'è adesso non è dell'utente.
+    const citata = tornati.find((c) => c.citata);
+    if (citata && !Rispondi.inCorso()) Rispondi.rimetti(citata.citata);
     autoGrowInput();
     Comandi.updateInputClass();
     aggiornaTasto();
