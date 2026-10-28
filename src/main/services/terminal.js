@@ -86,9 +86,9 @@ function invocazione(shell, command, { trackCwd = false, mark = '' } = {}) {
   return { ...shellInvocation(shell, testo), stdin: null };
 }
 
-function truncate(text) {
+function truncate(text, max = MAX_OUTPUT_CHARS) {
   const s = String(text || '');
-  if (s.length <= MAX_OUTPUT_CHARS) return { text: s, truncated: false };
+  if (s.length <= max) return { text: s, truncated: false };
   // Il taglio cade dove capita, e un'emoji occupa DUE unità di testo: tagliando
   // per numero di unità si può restare con la prima metà, che da sola non è
   // nessun carattere e si mostra come un rombo. Se in fondo resta una metà di
