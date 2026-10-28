@@ -59,7 +59,8 @@ test('il modello legge la citazione in testa alle parole dell\'utente, con l\'or
   messaggi[2].rispostaA = R.risolvi(cena.messages[2].rispostaA, () => cena, { max: R.PER_IL_MODELLO });
   const f = FC.finestra(messaggi, { ora: Date.parse('2026-10-28T12:00:00.000Z'), giorni: 3, token: 100000 });
   const detto = f.messaggi.map((m) => String(m.content)).find((t) => t.includes('la seconda'));
-  assert.match(detto, /\(l'utente risponde al tuo messaggio \[mer 28 ott 2026, \d\d:\d\d · chat ccen\]: «\*\*Tre idee\*\*:\n\n1\. Pasta\n2\. Risotto»\)\nla seconda$/);
+  const dove = FC.intestazione('2026-10-28T10:00:05.000Z', 'c-cena');
+  assert.ok(detto.endsWith(`(l'utente risponde al tuo messaggio ${dove}: «**Tre idee**:\n\n1. Pasta\n2. Risotto»)\nla seconda`), detto);
 });
 
 test('un testo arrivato da fuori non entra nella citazione, né una risposta che non c\'è più', () => {
