@@ -2257,7 +2257,7 @@ async function eseguiAccount(action, sender) {
       while (auth.isSignedIn() && Date.now() < scade) await new Promise((r) => setTimeout(r, 50));
       if (auth.isSignedIn()) return { executed: false, kept: false, output: { error: 'l\'uscita dall\'account non è riuscita' } };
       const google = googleNelleSchede ? ' Google nelle schede resta collegato: per uscire anche da lì si esce dalla pagina di Google.' : '';
-      return { executed: true, kept: false, output: { voce: 'esci', frase: `Uscito dall'account di Filo.${google} Per rientrare basta chiederlo a te, o «Accedi con Google» nel menu dell'account.` } };
+      return { executed: true, kept: false, output: { voce: 'esci', frase: `Uscito dall'account di Filo.${google} Per rientrare può chiederlo in chat, o scegliere «Accedi con Google» nel menu dell'account.` } };
     }
     if (!dentro) {
       premi('auth-signin');
