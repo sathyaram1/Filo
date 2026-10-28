@@ -208,6 +208,8 @@
     const rule = C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
     if (rule) {
       p.only = rule.only.slice();
+      p.order = rule.only.slice();
+      delete p.sort;
       p.allow_fallbacks = false;
     }
     if (zdrApplies(model, ownKey)) p.zdr = true;
