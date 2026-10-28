@@ -1743,7 +1743,7 @@ const sitoDaConfermare = (url) => VerdettiUscite.sitoDaConfermare(url);
 async function contattabilePrimaDelClic(url, { sender = null, daFilo = false, proposta = false, delSito = false, porta = null } = {}) {
   if (!VerdettiUscite.contattabile(url, { proposta: daFilo && proposta })) return false;
   if (daFilo || delSito) return true;
-  const u = porta || await controllaUscita({ type: 'NAVIGA', url }, { sender });
+  const u = porta || await controllaUscita({ type: 'NAVIGA', url }, { sender, soloGiudizio: true });
   return !u.blocca && !(await exfilChiedeOk(String(url || ''), u, { wc: sender?.wc || null, pagina: paginaDi(sender?.wc) || sender?.url || '' }));
 }
 const ricordaVerdettiArchiviati = (messages) => VerdettiUscite.ricordaArchiviati(messages, indirizziCliccabili);
