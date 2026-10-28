@@ -595,6 +595,11 @@
     `<path d="M9.5 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 1.5 5A3 3 0 0 0 9.5 20c1.3 0 2.5-.8 2.5-2V6a2.5 2.5 0 0 0-2.5-2z"/>` +
     `<path d="M14.5 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-1.5 5A3 3 0 0 1 14.5 20c-1.3 0-2.5-.8-2.5-2V6a2.5 2.5 0 0 1 2.5-2z"/>`;
 
+  // --- Rispondi a un messaggio: la freccia che torna indietro piegata, come nelle app di messaggi.
+  const reply =
+    `<path d="M9 17l-5-5 5-5"/>` +
+    `<path d="M20 18v-2a4 4 0 0 0-4-4H4"/>`;
+
   // PREVISTE: copia (due fogli sovrapposti).
   const copy =
     `<rect x="9" y="9" width="11" height="11" rx="2"/>` +
