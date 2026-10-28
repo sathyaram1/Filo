@@ -493,6 +493,7 @@
           attachImageLightbox(img, src);
           b.insertBefore(img, b.childNodes[i] || null);
         });
+        if (isUser && m.rispostaA) Rispondi.citaIn(b, Rispondi.dalFilo(m.rispostaA));
         metti(b);
         if (isUser) bollaUtente = b;
       }
