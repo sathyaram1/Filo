@@ -367,7 +367,8 @@ test('il giorno di prima più carico che l’app costruisce passa, e i suoi erro
 
 test('ogni collezione dei contatori si crea solo con un’identità: la chiave web da sola non basta (#1547)', () => {
   const blocchi = [...RULES.matchAll(/^ {4}match\s+\/(contatori-[a-z-]+)\/\{/gm)].map((m) => m[1]);
-  assert.deepEqual(blocchi.sort(), [C.COLLEZIONE, C.COLLEZIONE_CHIAMATE, C.COLLEZIONE_GESTI, C.COLLEZIONE_NAVIGAZIONE, 'contatori-finestra'].sort(),
+  assert.deepEqual(blocchi.sort(), [C.COLLEZIONE, C.COLLEZIONE_CHIAMATE, C.COLLEZIONE_GESTI, C.COLLEZIONE_NAVIGAZIONE, C.COLLEZIONE_ATTIVITA,
+    'contatori-finestra'].sort(),
     'una collezione dei contatori nuova va aggiunta qui, e la sua creazione chiede l’identità');
   for (const nome of blocchi) {
     const create = per('create', regole(blocco(nome)));
