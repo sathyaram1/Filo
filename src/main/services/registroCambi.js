@@ -280,7 +280,7 @@ async function annullaOra(id, prov = {}) {
   });
   if (!riuscito) return { ok: false, motivo, id: e.id };
   try { app.annullato([...new Set([String(id || ''), String(trovato.id), String(e.id)])].filter(Boolean), trovato); } catch (_) {}
-  return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati };
+  return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati, ...(saltati.length ? { saltatiPerche: perche } : {}) };
 }
 
 module.exports = { avvia, con, conDettaglio, corrente, registra, registraZoom, leggi, tutti, lista, ultimi, livelloDi, annulla, collega, attesa };
