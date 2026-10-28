@@ -625,7 +625,8 @@ function ordinaIcone(richiesta) {
 // Gira dentro il contesto dell'annullo (registroCambi.js), che segna il cambio nuovo come annullo di quello.
 function rimetti(d) {
   const voci = d && Array.isArray(d.voci) ? d.voci.filter((v) => Array.isArray(v) && typeof v[0] === 'string' && Number.isInteger(v[1]) && Number.isInteger(v[2])) : [];
-  return nelleProve(async () => {
+  const auto = !!(d && d.auto);
+  return sulDesktop(async () => {
     const letto = await computer().leggi();
     if (!letto.ok) return fallito(letto.errore);
     const ci = new Set(letto.voci.map((v) => v.id));
