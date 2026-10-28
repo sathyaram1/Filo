@@ -522,13 +522,17 @@ test('registraPunteScritte: il server spinto entra con la sua punta e il suo dep
   assert.deepEqual(viste.map((x) => x[0]), ['app']);
   assert.match(righe.at(-1), new RegExp(`è a ${fuori.slice(0, 8)}, qui a ${v2.slice(0, 8)}`));
 
-  // Su filo-security il ramo non c'è (server:fondi porta lui lo sha verificato): niente da confrontare, niente avviso.
+  // Su filo-security il ramo non c'è (server:fondi porta lui lo sha verificato): niente da confrontare, la voce si
+  // scrive come a start, e server:fondi la trova.
   viste.length = 0;
   g(sc.server, 'push', '-q', 'origin', `:refs/heads/${RAMO}`);
   righe = await VL.registraPunteScritte({ ramo: RAMO, sha: app, serverAtteso: v2, root: sc.work }, { registra });
-  assert.deepEqual(viste.map((x) => x[0]), ['app']);
-  assert.equal(righe.length, 1);
+  assert.deepEqual(viste, [['app', app, sc.work], ['server', v2, sc.server]]);
+  assert.equal(righe.length, 2);
+  assert.doesNotMatch(righe.join('\n'), /non aggiornato/);
+
   assert.equal(VL.rigaServerNonSpinto(RAMO, v2, null), 'Registro del ramo del server non aggiornato: accanto al repo non trovo più il checkout del server.');
+  assert.match(VL.rigaServerNonSpinto(RAMO, v2, { sha: v1, origine: '' }), new RegExp(`si è mosso mentre lo registravo \\(${v2.slice(0, 8)} → ${v1.slice(0, 8)}\\)\\. Rilancia node scripts/verify-local\\.mjs registra`));
 });
 
 test('corretto registra la correzione spinta sul server; una non spinta la chiude registra, dopo la spinta', () => {
