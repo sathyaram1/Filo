@@ -216,8 +216,50 @@
   // Le combinazioni diverse di una misura in un'ora: oltre, la nuova si somma in «altro», e il conto non perde niente.
   const TETTO_VOCI_ATTIVITA = 100;
 
-  // Tutto quello che un'ora tiene sul disco, nei cinque documenti.
-  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE, ...MISURE_GESTI, ...MISURE_NAVIGAZIONE, ...MISURE_ATTIVITA]);
+  // ── I riquadri AI e l'Editor (#1465) ──────────────────────────────────────
+  // Cosa si fa delle risposte nei riquadri, se l'anticipo arriva in tempo, la riscrittura, l'OCR, la traduzione della
+  // pagina, il titolo e la chat dell'Editor. Stessa forma della navigazione (conti per chiave chiusa), documento suo.
+  const VERSIONE_RIQUADRI = 1;
+  const COLLEZIONE_RIQUADRI = 'contatori-riquadri';
+  const coppie = (a, b) => a.flatMap((x) => b.map((y) => `${x}|${y}`));
+  const ANTICIPATE = Object.freeze(['spiega', 'correttore_parola']);
+  const STATI_ANTICIPO = Object.freeze(['pronto', 'in_volo', 'assente', 'fermato_tetto', 'contesto_cambiato']);
+  // Le funzioni (id del censimento) che rispondono in un riquadro sulla pagina: il menu del tasto destro e il popup.
+  const FUNZIONI_RIQUADRO = Object.freeze(['explain', 'explain-deep', 'translate-selection', 'explain-link', 'describe-image']);
+  const DOMANDE = Object.freeze([['d0', 0], ['d1', 1], ['d2', 2], ['d3_oltre', Infinity]]);
+  const USI_RIQUADRO = Object.freeze(['copia', ...nomi(DOMANDE), 'approfondisci', 'ricominciata']);
+  const SCORCIATOIE = Object.freeze(['formale', 'informale', 'riassumi', 'traduci', 'correggi', 'libera']);
+  const ESITI_RISCRITTURA = Object.freeze(['sostituito', 'copiato', 'chiuso']);
+  const PROPOSTE = Object.freeze([['p1', 1], ['p2', 2], ['p3_oltre', Infinity]]);
+  // Una proposta mostrata col «Sostituisci» spento perché tagliata dal tetto di lunghezza.
+  const TAGLIATA = 'tagliata';
+  const ESITI_OCR = Object.freeze(['copiato', 'vuoto', 'annullato', 'tagliato']);
+  const ESITI_TRADUZIONE = Object.freeze(['intera', 'parziale', 'fermata']);
+  // La parte della pagina rimasta in lingua originale, e se entro un minuto dalla fine si è tornati all'originale.
+  const RIMASTO = Object.freeze([['r10', 0.1], ['r25', 0.25], ['r50', 0.5], ['oltre', Infinity]]);
+  const ORIGINALE_MS = 60 * 1000;
+  const TITOLI = Object.freeze(['automatico', 'rigenerato']);
+  const ESITI_TITOLO = Object.freeze(['applicato', 'fallito', 'vuoto']);
+  // Quanto dopo il titolo di Filo la persona lo riscrive a mano.
+  const ETA_TITOLO = Object.freeze([['ora', 60 * 60 * 1000], ['giorno', 24 * 60 * 60 * 1000], ['mese', 30 * 24 * 60 * 60 * 1000],
+    ['oltre', Infinity]]);
+  const DOCUMENTO_CHAT = Object.freeze(['intero', 'oltre_tetto']);
+  const FORMATI = Object.freeze([['f0', 0], ['f1', 1], ['f2_5', 5], ['oltre', Infinity]]);
+  const RIQUADRI = Object.freeze({
+    anticipo_al_gesto: misuraNav(ANTICIPATE, [STATI_ANTICIPO]),
+    riquadro_chiuso_prima: misuraNav(FUNZIONI_RIQUADRO, [NOMI_FASCE]),
+    riquadro_uso: misuraNav(FUNZIONI_RIQUADRO, [USI_RIQUADRO]),
+    riscrittura: misuraNav(SCORCIATOIE, [[...coppie(ESITI_RISCRITTURA, nomi(PROPOSTE)), TAGLIATA]]),
+    ocr: misuraNav(ESITI_OCR, [UNO]),
+    traduzione_pagina: misuraNav(ESITI_TRADUZIONE, [coppie(nomi(RIMASTO), ['si', 'no'])]),
+    editor_titolo: misuraNav(TITOLI, [[...ESITI_TITOLO, ...nomi(ETA_TITOLO).map((e) => `riscritto_${e}`)]]),
+    editor_chat: misuraNav(DOCUMENTO_CHAT, [[...nomi(FORMATI), 'formato_non_trovato', 'continua']]),
+  });
+  const MISURE_RIQUADRI = Object.freeze(Object.keys(RIQUADRI));
+  const CAMPI_RIQUADRI = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_RIQUADRI]);
+  // Tutto quello che un'ora tiene sul disco, nei sei documenti.
+  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE, ...MISURE_GESTI, ...MISURE_NAVIGAZIONE, ...MISURE_ATTIVITA,
+    ...MISURE_RIQUADRI]);
   // Il primo documento di un giorno, o di un mese, di una copia di Filo: chi conta le installazioni legge solo quelli.
   const PRIMI = Object.freeze(['', 'giorno', 'mese']);
 
