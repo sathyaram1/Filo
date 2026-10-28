@@ -1000,8 +1000,8 @@ export function rigaRegistro(repo, r) {
 
 /**
  * Questa sessione ha scritto la punta di adesso (#1148): una voce nel registro dei rami, con la fiducia del suo
- * biglietto in questo momento e i commit del ramo letti nel suo deposito. La chiamano start e finish. Mai un'eccezione:
- * senza voce il lavoro non è fidato.
+ * biglietto in questo momento e i commit del ramo letti nel suo deposito. La chiama start; corretto, finish e registra
+ * passano da registraPunteScritte. Mai un'eccezione: senza voce il lavoro non è fidato.
  */
 export async function registraNelRegistro({ ramo, sha, feedbackId = '', server = null, root = ROOT }, registra = registraRamo) {
   const righe = [rigaRegistro('app', await registra({ repo: 'app', ramo, sha, feedbackId, cartella: root }))];
@@ -1009,6 +1009,31 @@ export async function registraNelRegistro({ ramo, sha, feedbackId = '', server =
     righe.push(rigaRegistro('server', await registra({ repo: 'server', ramo: server.ramo, sha: server.sha, feedbackId, cartella: server.radice || server.checkout || '' })));
   }
   return righe;
+}
+
+/**
+ * Le punte che la sessione ha appena scritto, nel registro (#1648): una spinta sul ramo del server senza la sua voce,
+ * a biglietto chiuso, il server la segnala come ramo riscritto fuori registro. Il server entra solo se `serverAtteso`
+ * è anche la punta su filo-security: una voce davanti alla spinta sarebbe la stessa differenza, rovesciata.
+ */
+export async function registraPunteScritte({ ramo, sha, feedbackId = '', serverAtteso = '', root = ROOT }, {
+  registra = registraRamo, server = () => serverDelRamo(ramo, { root, fetch: true }),
+} = {}) {
+  const srv = serverAtteso ? server() : null;
+  const spinto = !!(srv && srv.sha === serverAtteso && srv.origine === serverAtteso);
+  const righe = await registraNelRegistro({ ramo, sha, feedbackId, server: spinto ? srv : null, root }, registra);
+  const avviso = serverAtteso && !spinto ? rigaServerNonSpinto(ramo, serverAtteso, srv) : '';
+  return avviso ? [...righe, avviso] : righe;
+}
+
+/** Perché la voce del server non si è scritta; '' se su filo-security il ramo non c'è (niente da confrontare). PURA. */
+export function rigaServerNonSpinto(ramo, atteso, srv) {
+  if (!srv) return 'Registro del ramo del server non aggiornato: accanto al repo non trovo più il checkout del server.';
+  if (!srv.origine) return '';
+  const qui = srv.sha && srv.sha !== atteso ? srv.sha : atteso;
+  return `Registro del ramo del server non aggiornato: su filo-security ${ramo} è a ${srv.origine.slice(0, 8)}, qui a ${qui.slice(0, 8)}. `
+    + 'Spingilo (git push nel checkout del server), poi node scripts/verify-local.mjs registra: a sessione chiusa una punta '
+    + 'diversa dalla voce il server la segnala come ramo riscritto fuori registro, e il lavoro non va su main.';
 }
 /** Ci sono modifiche non salvate (anche solo nell'area di stage)? */
 export function isDirty(root = ROOT) { return git(['status', '--porcelain'], root).length > 0; }
