@@ -399,3 +399,37 @@ test('la porta delle uscite dice il tipo del segreto custodito; i tetti toccati 
   assert.equal(d.tetto_toccato.segreti_saturo, 2);
   assert.ok(d.tetto_toccato.contatori_combinazioni >= 1);
 });
+
+// ── Le uscite fermate si contano nella porta, da ogni strada ───────────────────
+
+test('la porta conta ogni blocco una volta, da qualunque strada; chi giudica soltanto prima del clic no', async () => {
+  require(join(ROOT, 'src', 'shared', 'messages.js'));
+  const b = banco();
+  const blocco = { blocca: true, regola: 'custodito', tipo: 'chiave', frase: `fermata: ${SEGRETO}` };
+  const porta = Misure.contaUscite(async (a) => (String(a.query || a.url || '').includes(SEGRETO) ? blocco : { blocca: false }));
+  assert.equal(Misure.contaUscite(porta), porta, 'avvolta due volte conta una');
+  await porta({ type: 'NAVIGA', url: `https://${DOMINIO}/?k=${SEGRETO}` }, {});
+  await porta({ type: 'NAVIGA', url: `https://${DOMINIO}/?k=${SEGRETO}` }, { soloGiudizio: true });
+  await porta({ type: 'NAVIGA', url: `https://${DOMINIO}/` }, {});
+  // La ricerca dell'Aiuto riceve la porta da ctx: il suo blocco si conta come quello della chat.
+  const handlers = {};
+  const MSG = globalThis.SN_MSG.MSG;
+  require(join(ROOT, 'src', 'main', 'services', 'handlers', 'ai.js'))((tipo, fn) => { handlers[tipo] = fn; }, {
+    MSG, controllaUscita: async () => blocco, azioneDellAiuto() {}, chatAiutoDi() { return null; },
+    getEffectiveSettings: async () => ({ apiKeys: {}, correttore: {} }),
+  });
+  const r = await handlers[MSG.WEB_SEARCH]({ query: `cerca ${SEGRETO}`, parole: [] }, { url: `https://${DOMINIO}/` });
+  assert.equal(r.blocked, 'segreto');
+  assert.deepEqual((await sicurezzaDellOra(b)).uscita_fermata, { 'custodito:chiave:NAVIGA': 1, 'custodito:chiave:CERCA_WEB': 1 });
+
+  // Nessuna strada conta da sé: chi riceve la porta da ctx la avvolge, e la porta vera nasce avvolta.
+  const dir = join('src', 'main', 'services', 'handlers');
+  for (const f of ['ai.js', 'misc.js', 'filo.js']) {
+    const s = leggi(join(dir, f));
+    assert.match(s, /controllaUscita: portaUscite/, `${f} riceve la porta da ctx col suo nome`);
+    assert.match(s, /const controllaUscita = (ContatoriSicurezza|require\('\.\.\/contatoriSicurezza'\))\.contaUscite\(portaUscite\)/, `${f} non la avvolge`);
+  }
+  const tutti = ['src/main/services/handlers.js', ...['ai.js', 'misc.js', 'filo.js'].map((f) => join(dir, f))].map(leggi).join('\n');
+  assert.match(tutti, /const controllaUscita = ContatoriSicurezza\.contaUscite\(VerdettiUscite\.chiudiAGuasto\(/);
+  assert.doesNotMatch(tutti, /misura\('uscitaFermata'/, 'un chiamante che conta da sé conterebbe due volte');
+});

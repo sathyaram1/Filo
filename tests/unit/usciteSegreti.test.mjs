@@ -1274,7 +1274,7 @@ describe('sentinella: nessun chiamante della porta prende un guasto per via libe
   const handlers = src('main', 'services', 'handlers.js');
 
   test('la porta è costruita chiusa a guasto, e chi la chiama non la avvolge in un try', () => {
-    assert.match(handlers, /const controllaUscita = VerdettiUscite\.chiudiAGuasto\(giudicaUscita,/);
+    assert.match(handlers, /const controllaUscita = ContatoriSicurezza\.contaUscite\(VerdettiUscite\.chiudiAGuasto\(giudicaUscita,/);
     const esegui = corpo(handlers, 'async function eseguiAzioneFilo(');
     const i = esegui.indexOf('await controllaUscita(action');
     assert.ok(i > 0);
