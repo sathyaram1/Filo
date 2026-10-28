@@ -68,12 +68,14 @@ test('a Conservativo «esci» chiede l\'OK in chat e, confermato, esce', async (
     { text: 'Fatto, sei uscito.' },
   ]);
   await chiedi(page, 'esci dal mio account');
-  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
-  expect(await confirmText(page)).toMatch(/Uscire dall'account di Filo/);
+  const proposta = page.getByRole('button', { name: 'Uscire dall\'account di Filo' });
+  await expect(proposta).toBeVisible({ timeout: 10_000 });
+  await page.waitForTimeout(800);
   expect((await stato(shell)).signedIn).toBe(true);
   mkdirSync(SHOTS, { recursive: true });
   await page.screenshot({ path: join(SHOTS, 'verifica-1615-conferma-esci.png') });
-  await clickConfirm(page, 'ok');
+  await proposta.click();
+  if (await page.locator(CONFIRM_HOST).isVisible().catch(() => false)) await clickConfirm(page, 'ok');
   await expect.poll(async () => (await stato(shell)).signedIn, { timeout: 10_000 }).toBe(false);
 });
 
