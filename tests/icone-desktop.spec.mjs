@@ -110,8 +110,8 @@ test('«rimettile com\'erano» a parole: ANNULLA_CAMBIO riporta ogni icona al su
   await modelloFinto(app, [
     { toolCalls: [{ id: 'd1', name: 'ORDINA_DESKTOP', arguments: JSON.stringify({ verso: 'righe' }) }] },
     { text: 'Messe in fila.' },
-    { toolCalls: [{ id: 'a1', name: 'ANNULLA_CAMBIO', arguments: '{}' }] },
-    { text: 'Rimesse dov\'erano.' },
+    // L'annullo riuscito chiude il turno da sé: il testo arriva col suo giro.
+    { text: 'Rimesse dov\'erano.', toolCalls: [{ id: 'a1', name: 'ANNULLA_CAMBIO', arguments: '{}' }] },
   ]);
   await chiedi(page, 'metti in ordine alfabetico le icone del desktop');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Messe in fila.' })).toBeVisible({ timeout: 10_000 });
