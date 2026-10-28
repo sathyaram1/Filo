@@ -84,10 +84,11 @@ function banco({ risposta = 200 } = {}) {
     esclusi: async () => [],
     casuale: () => `${'7'.repeat(18)}${String(++b.n).padStart(2, '0')}`,
     rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'K' }),
+    idToken: async () => 'token-anonimo',
     fetch: async (url, opt) => {
       const coll = /documents\/([a-z-]+)\?/.exec(url)[1];
       const doc = Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)]));
-      (per[coll] || (per[coll] = [])).push({ url, doc, body: opt.body });
+      (per[coll] || (per[coll] = [])).push({ url, doc, body: opt.body, auth: opt.headers.Authorization });
       const st = typeof b.risposta === 'function' ? b.risposta(coll, doc) : b.risposta;
       return { ok: st >= 200 && st < 300, status: st, json: async () => ({}) };
     },
@@ -201,6 +202,7 @@ test('ogni misura: un indirizzo, un segreto vero e una categoria remota inventat
   const [sic] = b.per[S.COLLEZIONE];
   assert.equal(S.valida(sic.doc).ok, true, S.valida(sic.doc).motivo);
   assert.equal(C.idDocumento(sic.doc), C.idDocumento(b.per[C.COLLEZIONE][0].doc), 'lo stesso id dell’ora');
+  assert.equal(sic.auth, 'Bearer token-anonimo', 'le regole della sicurezza vogliono l’identità anonima, come le altre ore');
   for (const lista of Object.values(b.per)) for (const x of lista) nienteDiSegreto(x.body);
 });
 

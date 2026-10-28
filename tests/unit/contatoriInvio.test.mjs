@@ -444,6 +444,17 @@ test('ogni documento parte con l’identità anonima; senza, non parte niente, l
   assert.equal(spenti.identitaChieste, 0, 'a contatori spenti i contatori non chiedono né creano l’identità');
 });
 
+// Senza un'identità finta il servizio chiede quella vera a Google: a ogni corsa un account anonimo nel progetto, e senza
+// rete il banco diventa rosso.
+test('ogni banco che spedisce i contatori porta la sua identità finta, mai quella vera del server (#1547)', () => {
+  const cartella = join(ROOT, 'tests', 'unit');
+  const banchi = readdirSync(cartella).filter((f) => f.endsWith('.mjs'))
+    .map((f) => [f, readFileSync(join(cartella, f), 'utf8')])
+    .filter(([, t]) => /require\(join\([^)]*'services', 'contatori\.js'\)\)|require\([^)]*services\/contatori\.js'\)/.test(t));
+  assert.ok(banchi.length >= 5, `banchi trovati: ${banchi.map(([f]) => f).join(', ')}`);
+  for (const [f, t] of banchi) assert.match(t, /idToken: /, `${f}: il servizio dei contatori senza un’identità finta`);
+});
+
 test('un’ora che il server rifiuta non ferma le altre: si riprova il giorno dopo, e parte quando le regole la accettano', async () => {
   const b = banco();
   const rifiuta = new Set(['explain-deep']);
