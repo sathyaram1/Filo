@@ -890,6 +890,13 @@
     return true;
   }
 
+  const erroreAltro = (chiave) => String(chiave).startsWith(`${ALTRO}||`);
+  function erroriSpecifici(errori) {
+    let n = 0;
+    for (const per of Object.values(errori)) if (oggetto(per)) for (const k of Object.keys(per)) if (!erroreAltro(k)) n++;
+    return n;
+  }
+
   function registraErrore(ora, funzione, { modello, host, tipo } = {}) {
     if (!funzioni().includes(funzione) || !ERRORI.includes(tipo)) return false;
     const g = normale(ora);
