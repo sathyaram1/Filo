@@ -2279,6 +2279,7 @@ if (isMainModule) {
     // Critica scritta male: si sistema la riga e si rilancia (esci 1, come un
     // errore d'uso). Il server non è stato chiamato e niente è stato scritto.
     if (s.formatRejected) { console.error(`[dispatch] ${s.message}\nNiente è stato registrato: sistema le righe e rilancia lo stesso comando.`); process.exit(1); }
+    if (s.nonSpedita) { console.error(`[dispatch] ${s.message}\nNiente è stato registrato: il server non è stato chiamato. Sistema e rilancia lo stesso comando.`); process.exit(1); }
     if (s.rebase) { console.error(rebaseRejectionText(s.message)); process.exit(1); }
     if (s.altrove) { console.error(lavoroAltroveText(s.message)); process.exit(1); }
     if (s.serverDown) { console.error(serverDownText(s.message)); process.exit(3); }
