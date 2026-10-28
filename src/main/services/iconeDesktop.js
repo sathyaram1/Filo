@@ -460,7 +460,7 @@ function spiega(errore, { totale = 0, posti = 0 } = {}) {
       frase: 'Windows non ha dato a Filo il desktop: succede se Esplora risorse è fermo, o se il desktop lo disegna un altro programma.',
       dove: 'Esplora risorse si riavvia da Gestione attività: clic destro su «Esplora risorse» → Riavvia.',
     },
-    griglia: { frase: 'Windows non ha detto quanto sono distanti le icone del desktop, e senza Filo non sa dove metterle.' },
+    griglia: { frase: 'Windows non ha detto quanto sono distanti le icone del desktop, e senza quel numero Filo non sa dove metterle.' },
     'non-ci-stanno': {
       frase: `Sul desktop ci sono ${totale} icone e lo schermo, in griglia, ne tiene ${posti}: in ordine non ci stanno tutte.`,
       dove: `Con le icone più piccole ci stanno (${IMPOSTAZIONI_WINDOWS} → Icone piccole): poi Filo le rimette in ordine.`,
