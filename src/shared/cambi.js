@@ -362,6 +362,19 @@
     return l;
   }
 
+  // Le icone del desktop del computer (#1621): `prima` e `dopo` sono { auto, voci: [[id, x, y]] }, `come` l'ordine chiesto.
+  const ORDINI_DESKTOP = new Map([['nome', 'in ordine alfabetico'], ['tipo', 'per tipo'], ['data', 'per data'], ['dimensione', 'per dimensione']]);
+  function fraseOrdineDesktop(come) {
+    const c = come || {};
+    const verso = c.verso === 'colonne' ? 'a colonne' : 'a righe';
+    return `${ORDINI_DESKTOP.get(c.ordine) || 'in ordine'}${c.alContrario ? ' al contrario' : ''}, ${verso}${c.cartellePrima ? ', cartelle prima' : ''}`;
+  }
+  function spostateSulDesktop(c) {
+    const voci = (d) => (d && Array.isArray(d.voci) ? d.voci : []);
+    const prima = new Map(voci(c.prima).map((v) => [v[0], `${v[1]},${v[2]}`]));
+    return voci(c.dopo).filter((v) => prima.has(v[0]) && prima.get(v[0]) !== `${v[1]},${v[2]}`).length;
+  }
+
   // ── Le frasi ────────────────────────────────────────────────────────────────
   const PAESI = {
     us: 'Stati Uniti', gb: 'Regno Unito', fr: 'Francia', de: 'Germania', es: 'Spagna', nl: 'Paesi Bassi', jp: 'Giappone', it: 'Italia',
