@@ -256,8 +256,11 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
     sale o gli si aggiunge o cambia un'attesa (anche alla nascita); salgono al suo valore gli aspettati aperti
     (non fusi, non chiusi, non archiviati, non cancellati), e da loro i loro aspettati. Uno con stato o priorità
     illeggibili si salta, mai riscritto più basso. La scrive il server, in un punto solo (trigger sul documento
-    feedback, qualunque scrittore), cifrata e con `priorityManual: true` perché il giudice non la riabbassi,
-    con la nota «priorità 3: la eredita da #B, che lo aspetta»; l'alzato entra in coda con la priorità nuova.
+    feedback, qualunque scrittore), cifrata e col segno `priorityInherited: true` (in chiaro): il giudice di
+    priorità può alzarla ma non abbassarla; su un `priorityManual` il segno manuale resta e il giudice continua a
+    non toccarla. Con la nota «priorità 3: la eredita da #B, che lo aspetta»; l'alzato entra in coda con la
+    priorità nuova. L'owner resta libero di abbassare a mano un aspettato sotto chi lo aspetta; un aspettato fuso
+    e poi riaperto eredita alla prossima salita di priorità o cambio d'attesa di chi lo aspetta.
     Logica pura: `ereditaPriorita`, `scattaEredita`, `notaEredita` in `src/shared/feedbackAttese.js`,
     sentinella in `tests/unit/feedbackAttese.test.mjs`.
 - Risolti: `done(rilasciato)` — Archiviati: `archived` (+ filtro ⭐; + filtro "Bloccati
