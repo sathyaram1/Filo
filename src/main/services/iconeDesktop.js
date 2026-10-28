@@ -485,11 +485,8 @@ function fallito(errore, extra = {}) {
   return { ok: false, cosa: 'desktop', ...spiega(errore, extra), ...extra };
 }
 
-const DETTI = { nome: 'in ordine alfabetico', tipo: 'per tipo', data: 'per data', dimensione: 'per dimensione' };
 function comeDetto(come) {
-  const c = come || {};
-  const verso = c.verso === 'colonne' ? 'a colonne' : 'a righe';
-  return `${DETTI[c.ordine] || 'in ordine'}${c.alContrario ? ' al contrario' : ''}, ${verso}${c.cartellePrima ? ', cartelle prima' : ''}`;
+  return globalThis.SN_CAMBI.fraseOrdineDesktop(come);
 }
 
 // L'esito per il modello: numeri e parole di Filo, nessun nome di file.
