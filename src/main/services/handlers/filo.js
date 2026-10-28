@@ -54,7 +54,7 @@ module.exports = function register(on, ctx) {
       // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
       const chatId = msg.chatId || null;
       fineLavoro = require('../lavoriInCorso').inizia({ tipo: 'risposta', chat: chatId, testo: msg.userMessage, wc: sender && sender.wc, ambito: ctx.ambitoDellaFinestra(sender && sender.win) });
-      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, daFuori: msg.daFuori === true, chatId, sender });
+      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, daFuori: msg.daFuori === true, chatId, rispostaA: msg.rispostaA || null, sender });
       return { ok: true, ...r };
     } catch (e) {
       // La chat non è un log: a turno fallito l'utente deve leggere cosa non ha funzionato, non il

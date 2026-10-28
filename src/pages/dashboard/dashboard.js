@@ -150,6 +150,13 @@
     // Le righe stanno sempre nel filo al centro (#869).
     send, bubblesEl, homeEl: $('righeApp'), inThread: () => true, chatId: () => chatId,
   });
+  // Copia e Rispondi sotto le risposte di Filo, e la citazione nel campo e nella bolla che parte (#1620).
+  const Rispondi = self.SN_DASH_RISPONDI;
+  Rispondi.init({
+    send, bubblesEl, inputEl, formEl: inputForm, anteprimaEl: $('citazione'),
+    contaCopia: (n) => contaCopia(n),
+    vaiA: (o) => Coda.vaiA(o),
+  });
   // La coda del filo al centro (#869) e il campo per cercarci dentro.
   const Coda = self.SN_DASH_CODA;
   const lasciateConRighe = new Set();
@@ -158,6 +165,8 @@
     bubblesEl,
     rendiMessaggi: (lista, dove) => rendiMessaggi(lista, dove),
     setBubbleText: (el, t) => setBubbleText(el, t, true),
+    // Il testo com'è arrivato, prima della formattazione: è quello che il filo ha, e da lì riconosce la bolla.
+    scritto: (el) => Rispondi.scritto(el),
     righe: Righe,
     chatId: () => chatId,
     chatLasciata: (c) => lasciateConRighe.has(c),
@@ -486,6 +495,7 @@
           attachImageLightbox(img, src);
           b.insertBefore(img, b.childNodes[i] || null);
         });
+        if (isUser && m.rispostaA) Rispondi.citaIn(b, Rispondi.dalFilo(m.rispostaA));
         metti(b);
         if (isUser) bollaUtente = b;
       }
@@ -545,7 +555,10 @@
   function rigaDiStoria(m, { quante, guardate, types }) {
     const text = String(m.text || '');
     if (m.role === 'user') {
-      return { role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}) };
+      return {
+        role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}),
+        ...(m.rispostaA ? { rispostaA: m.rispostaA } : {}),
+      };
     }
     return {
       role: 'filo', text,
@@ -848,6 +861,7 @@
   // #418 — per le risposte di Filo la formattazione leggera condivisa, per il resto testo
   // letterale. I link sono già filtrati da SN_MARKDOWN: nessuno punta alle pagine interne.
   function setBubbleText(el, text, markdown) {
+    Rispondi.ricorda(el, text);
     if (markdown && text && self.SN_MARKDOWN) {
       el.innerHTML = self.SN_MARKDOWN.render(text);
       el.classList.add('dash-bubble-md');
@@ -949,7 +963,7 @@
     return h;
   }
 
-  async function runFiloTurn({ userMessage, images = [], internal = false, daModello = false, daFuori = false, activity = null }) {
+  async function runFiloTurn({ userMessage, images = [], internal = false, daModello = false, daFuori = false, rispostaA = null, activity = null }) {
     // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
     const pending = activity || Att.create(bubblesEl);
@@ -1079,6 +1093,8 @@
       internal,
       ...(daModello ? { daModello: true } : {}),
       ...(daFuori ? { daFuori: true } : {}),
+      // La risposta di Filo che il messaggio cita (#1620): il main ne ritrova il posto nel filo.
+      ...(rispostaA ? { rispostaA } : {}),
       // #525 — la chat si archivia nel main, mentre la si fa.
       chatId: ensureChatId(),
     };
@@ -1152,7 +1168,7 @@
       retry.className = 'dash-action-btn';
       retry.textContent = '↻ Riprova';
       retry.title = 'Rimanda lo stesso messaggio';
-      retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal }));
+      retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal, ...(rispostaA ? { rispostaA } : {}) }));
       // #598 — senza nessuna chiave «Riprova» non porta da nessuna parte: la
       // strada è la pagina Crediti, e sta qui sotto, non in un menu. Lo stesso
       // quando il servizio ha rifiutato la chiave (#629): è lì che si cambia.
@@ -1288,7 +1304,8 @@
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
     autoGrowInput();
-    return { text: text || '', immagini, daFuori, scritto, incollato, file, percorsi };
+    const citata = Rispondi.prendi();
+    return { text: text || '', immagini, daFuori, scritto, incollato, file, percorsi, citata };
   }
   function bollaUtente(c) {
     const userBubble = makeBubble({ role: 'user', text: c.text });
@@ -1300,6 +1317,7 @@
       attachImageLightbox(img, src);
       userBubble.insertBefore(img, userBubble.childNodes[i] || null);
     });
+    if (c.citata) Rispondi.citaIn(userBubble, c.citata);
     return userBubble;
   }
   // `bolla`: quella del seguito che era in attesa, che diventa la bolla del messaggio.
@@ -1314,16 +1332,19 @@
 
     // Bolla utente. Nella storia lo stesso testo che parte: diverso, il main lo rimandava come un messaggio in più.
     const domanda = c.text || 'Descrivi questa immagine.';
+    const rispostaA = Rispondi.perIlMain(c.citata);
+    const nelloStorico = Rispondi.perLoStorico(c.citata);
     threadHistory.push({
       role: 'user', text: domanda,
       ...(c.immagini.length ? { images: c.immagini.length } : {}),
       ...(daModello ? { daModello: true } : {}), ...(c.daFuori ? { daFuori: true } : {}),
+      ...(nelloStorico ? { rispostaA: nelloStorico } : {}),
     });
     if (!bolla) bubblesEl.appendChild(bollaUtente(c));
     Coda.segnaGiorni();
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
-    await runTurnAndContinue({ userMessage: domanda, images: c.immagini, daModello, daFuori: c.daFuori });
+    await runTurnAndContinue({ userMessage: domanda, images: c.immagini, daModello, daFuori: c.daFuori, ...(rispostaA ? { rispostaA } : {}) });
   }
 
   // Condiviso fra il primo invio e il «Riprova»: riprovare deve comportarsi come inviare.
@@ -1525,12 +1546,12 @@
     void stopBtn.offsetWidth;
     stopBtn.style.animation = '';
   }
-  // Nel turno entrano solo parole battute qui: un allegato, un testo incollato o un comando con la barra partono a turno
-  // finito, dalla strada di sempre. L'accoglienza tiene la sua conversazione e il seguito la aspetta. Un seguito che il
-  // turno di prima non ha preso lo offre anche il turno dopo, appena parte.
+  // Nel turno entrano solo parole battute qui: un allegato, un testo incollato, una risposta citata o un comando con la
+  // barra partono a turno finito, dalla strada di sempre. L'accoglienza tiene la sua conversazione e il seguito la
+  // aspetta. Un seguito che il turno di prima non ha preso lo offre anche il turno dopo, appena parte.
   function affidaAlTurno(s, t) {
     const { c } = s;
-    if (!t || t.fermato || c.immagini.length || c.file.length || c.daFuori || c.text.startsWith('/') || Accoglienza.isActive()) return;
+    if (!t || t.fermato || c.immagini.length || c.file.length || c.daFuori || c.citata || c.text.startsWith('/') || Accoglienza.isActive()) return;
     s.turno = t;
     send({ type: MSG.FILO_CHAT_SEGUITO, reqId: t.reqId, id: s.id, testo: c.text })
       .then((r) => { if (!(r && r.accolto) && s.turno === t) s.turno = null; })
@@ -1593,6 +1614,9 @@
       for (const d of c.immagini) addPendingImage(d, c.percorsi.get(d));
       for (const f of c.file) addPendingFile(f.percorso);
     }
+    // Nel campo sta una citazione sola: torna quella del primo, se intanto l'utente non ne ha scelta un'altra.
+    const citata = tornati.find((c) => c.citata);
+    if (citata && !Rispondi.inCorso()) Rispondi.rimetti(citata.citata);
     autoGrowInput();
     Comandi.updateInputClass();
     aggiornaTasto();

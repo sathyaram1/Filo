@@ -481,7 +481,10 @@
     const testo = String(v.text || '').trim();
     if (!testo) return false;
     for (const b of d.bubblesEl.querySelectorAll(`.dash-bubble-${v.role === 'user' ? 'user' : 'filo'}:not([data-key])`)) {
-      if (String((b.dataset.cambiTesto != null ? b.dataset.cambiTesto : b.textContent) || '').trim() !== testo) continue;
+      // Una risposta formattata a schermo non ha più gli asterischi del filo: si confronta il testo com'era arrivato.
+      const scritto = d.scritto ? d.scritto(b) : null;
+      const suo = scritto || (b.dataset.cambiTesto != null ? b.dataset.cambiTesto : b.textContent);
+      if (String(suo || '').trim() !== testo) continue;
       b.dataset.key = v.key;
       b.dataset.chat = v.chat;
       // Con l'ora la bolla fa da segno: una riga tardiva posata dopo si mette prima di lei, non in fondo (#1295).

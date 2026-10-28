@@ -11,6 +11,7 @@
     {
       version: '0.2.250', date: '2026-10-23',
       features: [
+        'Passando il mouse su una risposta di Filo, sotto compaiono Copia e Rispondi. Copia mette il testo negli appunti senza segni di formattazione. Rispondi la cita sopra la casella, come su WhatsApp, e il tuo messaggio parte con la citazione in testa. Così Filo sa a cosa stai rispondendo, e un clic sulla citazione ti riporta alla sua risposta.',
         'Col tasto destro su un campo dove stai scrivendo c\'è «Valuta». L\'Aiuto legge tutto il testo e ti segnala errori, frasi poco chiare, un tono sbagliato e fatti dubbi. Ogni correzione che propone la scrivi nel campo con un clic, e con un altro clic la togli.',
         'Un\'immagine che trascini dentro Filo entra nella chat dovunque la lasci. Nella home va nella casella da qualunque punto della pagina, che si accende mentre la trascini. Su un sito si apre l\'Aiuto con l\'immagine già allegata, salvo che il sito la voglia per sé, come una pagina che carica file. Nell\'Aiuto ora la puoi anche incollare.',
         'Nella home puoi chiedere a Filo di chiudere le schede: «chiudi tutte le schede tranne questa», «chiudi YouTube», «chiudi tutto tranne Gmail». Le pagine chiuse restano nel filo della home. Una scheda con del testo che non hai ancora inviato resta aperta, a meno che tu non insista.',

@@ -64,6 +64,7 @@ const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
 const FiloChats = globalThis.SN_FILO_CHATS;       // #525 — archivio delle chat con Filo
 const ChatArchive = globalThis.SN_CHAT_ARCHIVE;   // #525 — titoli, tipi, ricerca (logica pura)
+const RispostaA = globalThis.SN_RISPOSTA_A;        // #1620 — la risposta di Filo che un messaggio cita
 const I18n = globalThis.SN_I18N;
 const Categorizer = globalThis.SN_CATEGORIZER;
 const AICache = globalThis.SN_AI_CACHE;
@@ -5465,7 +5466,7 @@ async function handleFiloChat(richiesta) {
   }
 }
 
-async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }, volo) {
+async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, rispostaA = null, sender = null }, volo) {
   const inizioTurno = Date.now();
   // Un messaggio vero dell'utente è una richiesta nuova: le finestre guardate prima tornano a chiedere (#778).
   if (!internal) Schermo.nuovoTurno(chiaveSchermo(sender));
@@ -5494,6 +5495,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // non si era ancora letto.
   // Gli eventi del filo con cui questo turno ci entra: le lezioni che ne nascono li ricordano come fonti (#872).
   const fontiTurno = [];
+  const citazione = internal ? { ref: null, citata: null } : await citazioneDelMessaggio(rispostaA, chatId);
   if (chatId && !internal) {
     // Da adesso questa chat è di questa scheda: quando la scheda sparisce, la
     // chat è finita (vedi `affidaChat`). L'intervista di benvenuto fa
@@ -5507,6 +5509,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       text: String(userMessage || ''),
       images: imageList.length,
       ...(daModello ? { daModello: true } : {}),
+      ...(citazione.ref ? { rispostaA: citazione.ref } : {}),
     }, { onboarding: onbActive });
     // Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
     const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
@@ -5678,6 +5681,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const riprovata = imageList.length && String(m.text || '') === String(userMessage || '');
     const quanteFoto = role === 'user' && !riprovata ? FCx.numeroImmagini(m) : 0;
     if (quanteFoto) content = `${content}\n${FCx.notaImmagini(quanteFoto)}`;
+    // La risposta citata, come la pagina l'ha davanti: qui arrivano solo i messaggi che il filo non ha (#1620).
+    const citataQui = role === 'user' && m.rispostaA && RispostaA ? RispostaA.daPagina(m.rispostaA) : null;
+    if (citataQui && citataQui.testo.trim()) {
+      content = `${FCx.notaRisposta({ role: 'filo', testo: RispostaA.taglia(citataQui.testo, RispostaA.PER_IL_MODELLO) })}\n${content}`;
+    }
     const msg = { role, content };
     if (role === 'assistant') {
       const parts = [];
@@ -5702,9 +5710,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   const indiceDomanda = threadMessages.length;
   const giaLetta = origineGiaLettaInChat(chatId);
+  const notaCitazione = FCx.notaRisposta(citazione.citata);
+  const domandaConCitazione = notaCitazione ? `${notaCitazione}\n${String(userMessage || '')}` : String(userMessage || '');
   if (imageList.length) {
     const parts = [];
-    if (userMessage) parts.push({ type: 'text', text: String(userMessage) });
+    if (domandaConCitazione) parts.push({ type: 'text', text: domandaConCitazione });
     for (const im of imageList) parts.push({ type: 'image_url', image_url: { url: im } });
     // #711 — «questa foto è fatta con l'AI?» deve avere in chat la stessa
     // risposta del tasto destro, quindi il controllo si fa SEMPRE: capire
@@ -5715,7 +5725,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     threadMessages.push({ role: 'user', content: parts });
     ricordaOrigineInChat(chatId, origine);
   } else {
-    threadMessages.push({ role: 'user', content: giaLetta ? `${String(userMessage || '')}\n\n${giaLetta}` : String(userMessage || '') });
+    threadMessages.push({ role: 'user', content: giaLetta ? `${domandaConCitazione}\n\n${giaLetta}` : domandaConCitazione });
   }
 
   // Reasoning in diretta: se il client ha aperto un canale, i thought summary arrivano alla
@@ -7078,6 +7088,23 @@ async function appendToChatArchive(chatId, turn, meta) {
   if (chatCancellate.has(String(chatId))) return null;
   try { return await FiloChats.append(chatId, turn, meta); }
   catch (e) { console.warn('[Filo] chat non archiviata:', e?.message || e); return null; }
+}
+
+// La risposta che il messaggio cita (#1620), ritrovata nell'archivio: si salva il suo posto, e il modello ne legge il
+// testo da lì, non da quello che manda la pagina. Una bolla che l'archivio non ha (un errore) si cita col suo testo.
+async function citazioneDelMessaggio(rispostaA, chatId) {
+  const p = RispostaA ? RispostaA.daPagina(rispostaA) : null;
+  if (!p) return { ref: null, citata: null };
+  const id = p.chat || chatId;
+  let chat = null;
+  try { chat = id && FiloChats ? await FiloChats.get(id) : null; } catch (_) { chat = null; }
+  // La sua conversazione è stata cancellata mentre si scriveva: il testo se n'è andato con lei, e qui non rinasce.
+  if (p.chat && !chat) return { ref: null, citata: { manca: true } };
+  const i = chat ? RispostaA.posto(chat, { i: p.i, testo: p.testo }) : -1;
+  const ref = i >= 0
+    ? RispostaA.riferimento({ chat: chat.id, i, ts: chat.messages[i].ts })
+    : RispostaA.riferimento({ testo: p.testo });
+  return { ref, citata: ref ? RispostaA.risolvi(ref, () => chat, { max: RispostaA.PER_IL_MODELLO }) : null };
 }
 
 // ── Chi tiene viva una chat è la pagina che la sta facendo ─────────────────
