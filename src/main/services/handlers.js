@@ -3870,6 +3870,8 @@ async function eseguiAzioneFilo(action, {
         catch (_) { return { executed: false, kept: false }; }
         return { executed: true, kept: false, output: { window: cmd } };
       }
+      case 'ACCOUNT':
+        return eseguiAccount(action, sender);
       default:
         return { executed: false, kept: false };
     }
