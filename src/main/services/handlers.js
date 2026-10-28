@@ -2250,6 +2250,10 @@ async function eseguiAccount(action, sender) {
   const premi = (voce) => { win.webContents.send('shell:menu-action', voce); };
   try {
     if (cosa === 'esci') {
+      // Come per l'uscita dal menu, che solo Filo chiede: dall'Aiuto dentro un sito sarebbe una porta per buttare fuori l'utente.
+      if (/^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))) {
+        return { executed: false, kept: false, output: { error: 'dall\'Aiuto di un sito non si esce dall\'account: si chiede alla chat di Filo o al menu dell\'account' } };
+      }
       if (!dentro) return { executed: true, kept: false, output: { gia: 'fuori', frase: 'L\'utente non è dentro nessun account di Filo: non c\'era niente da cui uscire.' } };
       premi('auth-signout');
       // L'uscita la fa la shell: un «accedi» chiesto subito dopo deve già trovarla fatta.
