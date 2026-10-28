@@ -268,7 +268,7 @@ async function annullaOra(id, prov = {}) {
     } else if (e.tipo === 'desktop') {
       const r = await require('./iconeDesktop').rimetti(e.cambi[0].prima);
       riuscito = !!(r && r.ok);
-      if (!riuscito) motivo = (r && r.frase) || 'le icone del desktop non si sono spostate';
+      if (!riuscito) motivo = [r && r.frase, r && r.dove].filter(Boolean).join(' ') || 'le icone del desktop non si sono spostate';
       else if (r.sparite) saltati = [`${r.sparite === 1 ? 'un\'icona che' : `${r.sparite} icone che`} non ${r.sparite === 1 ? 'è' : 'sono'} più sul desktop`];
     }
     // Lo stato era già quello di prima (rimesso a mano nel frattempo): l'annullo resta come evento.
