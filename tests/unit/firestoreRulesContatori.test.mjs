@@ -633,6 +633,7 @@ test('le attività: ogni combinazione degli elenchi dell’app passa le regole, 
   const doc = C.documentoAttivita({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'win', dati: ora });
   assert.equal(C.validaAttivita(doc).ok, true, C.validaAttivita(doc).motivo);
   assert.equal(passa(doc, MA), '', 'le attività più cariche dell’app devono passare le regole');
+  assert.deepEqual(larghi(doc, MA), [], 'tetti delle attività oltre il doppio del caso peggiore');
   for (const m of C.MISURE_ATTIVITA) {
     const tutte = C.DIMENSIONI_ATTIVITA[m].flatMap(combinazioni).length;
     assert.equal(Object.keys(doc[m]).length, Math.min(tutte, C.TETTO_VOCI_ATTIVITA) + 1, `${m}: al tetto, più la riga «altro»`);
