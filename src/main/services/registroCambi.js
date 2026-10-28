@@ -1,5 +1,5 @@
 // Il registro dei cambi (#867): ogni scrittura dello stato (impostazioni, timer e sveglie, regole del
-// proxy, disposizione delle icone) diventa un evento del filo (src/main/services/ilFilo.js) nel momento in cui si salva,
+// proxy, disposizione delle icone, icone del desktop) diventa un evento del filo (src/main/services/ilFilo.js) nel momento in cui si salva,
 // chiunque l'abbia chiesta. Chi chiede dichiara solo da dove viene (`con`). Frasi, esclusioni e annullo: src/shared/cambi.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
