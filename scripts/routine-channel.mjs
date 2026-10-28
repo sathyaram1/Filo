@@ -1761,6 +1761,13 @@ if (isMain) {
         process.exit(1);
       }
       data.sha = punta;
+      const spedito = spedisciPerLaConsegna(ROOT, biglietto, punta);
+      if (!spedito.ok) {
+        console.error(`${quale}: ${spedito.motivo}.`);
+        console.error('Niente è stato consegnato: il registro del ramo confronta questa punta con quella che troverà chi viene dopo. Sistema e rilancia lo stesso comando.');
+        process.exit(1);
+      }
+      if (spedito.avviso) console.error(spedito.avviso);
     }
     // Una domanda all'owner (#1149) è un oggetto: arriva da file, controllata come la controlla il server.
     if (intento === 'domanda') {
