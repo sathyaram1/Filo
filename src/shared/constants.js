@@ -3180,6 +3180,7 @@
     opzioniAvvisoSchermoPieno,
     testoLeggibile,
     LESSON_MAX,
+    VOCE_SEGNALAZIONE,
     memoriaImbustata,
     VALUTA_MAX_CARATTERI,
     AGENT_STYLE_PRESETS,
