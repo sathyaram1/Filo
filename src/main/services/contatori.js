@@ -1,5 +1,5 @@
-// I contatori anonimi (#969, #1461, #1463, #1464, #1466, #1467, #1469, #1471, #1474): misura usi e chiamate dei modelli, azioni,
-// chat, attività, navigazione, gesti, sicurezza e guasti di elenco chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito
+// I contatori anonimi (#969, #1461, #1463, #1464, #1465, #1466, #1467, #1469, #1471, #1474): misura usi e chiamate dei modelli, azioni,
+// chat, attività, navigazione, riquadri, gesti, sicurezza e guasti di elenco chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito
 // e a contatori spenti non conta e non spedisce; spenti, butta quello che aveva, senza un ultimo segnale. Cosa esce: src/shared/contatoriGiornalieri.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
@@ -1251,8 +1251,8 @@ function crea(dip = {}) {
     return esito;
   }
 
-  // Le chiamate ai modelli (#1464), la navigazione (#1469) e le attività (#1467) di un'ora, se ne ha: un documento che
-  // non passa la validazione non ferma l'ora.
+  // Le chiamate ai modelli (#1464), la navigazione (#1469), le attività (#1467) e i riquadri (#1465) di un'ora, se ne ha: un
+  // documento che non passa la validazione non ferma l'ora.
   function documentiAccanto(k, base) {
     const out = [];
     for (const [costruisci, vuoto, valida, collezione, cosa] of [
@@ -1501,7 +1501,7 @@ function crea(dip = {}) {
     proposta, anticipoPronto, anticipoAperto, chiesto, adattamento, attivita, apertaInCorso, finitaInCorso, chiudiInCorso,
     congeda, riaperta, memoriaCorretta, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa,
     confermaChiesta, confermaRisposta,
-    navigazione, allUscita,
+    navigazione, riquadro, allUscita,
     azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, sicurezza, primaDiOgniScrittura, gesto, disposizioneIcone, cambioRitirato,
     turnoChat, reazione, copia: copiaDaBolla, chatChiusa, chatClassificata, chatInUscita, uscitaFinita, usciteInSospeso,
     controlla, avvia, seguiImpostazioni, installazioni, somme, accesi, letto, salva, alChiudere,

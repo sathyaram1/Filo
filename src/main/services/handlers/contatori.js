@@ -197,6 +197,8 @@ module.exports = function register(on, ctx) {
       case 'notifica': ok = finestra.notifica(testo(m.tipo), testo(m.esito), { letta: m.letta === true, inAttesa: m.inAttesa === true }); break;
       // I gesti della personalizzazione (#1471): solo quelli che nascono in una pagina, coi campi dei loro elenchi.
       case 'gesto': ok = C.GESTI_DALLE_PAGINE.includes(testo(m.gesto)) && contatori.gesto(testo(m.gesto), m); break;
+      // I riquadri AI e l'Editor (#1465): la voce si costruisce dai soli campi degli elenchi, il resto del messaggio si perde.
+      case 'riquadro': ok = contatori.riquadro(C.voceRiquadro(testo(m.cosa), m)); break;
       case 'reazione': ok = contatori.reazione(testo(m.voce)); break;
       case 'copia': ok = contatori.copia(testo(m.ruolo)); break;
       case 'ricerca-web-tetto': ok = contatori.attivita('ricercaWeb', { da: 'aiuto', alTetto: true }); break;
