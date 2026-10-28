@@ -5464,7 +5464,7 @@ async function handleFiloChat(richiesta) {
   }
 }
 
-async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }, volo) {
+async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, rispostaA = null, sender = null }, volo) {
   const inizioTurno = Date.now();
   // Un messaggio vero dell'utente è una richiesta nuova: le finestre guardate prima tornano a chiedere (#778).
   if (!internal) Schermo.nuovoTurno(chiaveSchermo(sender));
