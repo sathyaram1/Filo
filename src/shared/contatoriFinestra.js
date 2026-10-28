@@ -130,11 +130,12 @@
     ambienteFinestra: `^(${alternative(nomi(FASCE_LARGHEZZA))}[:]${alternative(SCALE)}[:]${alternative(STATI_FINESTRA)}[:]${alternative(TEMI)})?$`,
   });
   // I tetti di caratteri delle chiavi unite e dei conti uniti, per misura: il doppio dell'elenco di oggi. Le notifiche
-  // hanno posto per quattro volte i tipi di oggi: un avviso nuovo non deve aspettare regole nuove.
-  const TIPI_PREVISTI = 300;
+  // hanno posto per quasi il doppio dei tipi di oggi, a trecento caratteri di chiavi ciascuno: un avviso nuovo non
+  // aspetta regole nuove, e chi scrive a mano non trova spazio oltre il doppio del caso peggiore (#1547).
+  const TIPI_PREVISTI = 135;
   const TETTI = Object.freeze({
     chiusuraScheda: [2500, 1500], riordinoAutomatico: [1500, 800], schedaTrascinata: [100, 100], voceMenuScheda: [600, 300],
-    anteprimaScheda: [1500, 700], notifica: [TIPI_PREVISTI * 10 * 54, TIPI_PREVISTI * 10 * 10], downloadAzione: [1000, 600],
+    anteprimaScheda: [1500, 700], notifica: [TIPI_PREVISTI * 300, TIPI_PREVISTI * 100], downloadAzione: [1000, 600],
     sessioneRipristinata: [700, 400],
   });
 

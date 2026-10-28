@@ -114,6 +114,16 @@ test('il documento più carico dell’app passa; uno con un testo, un indirizzo 
   assert.equal(F.valida(doc).ok, true, F.valida(doc).motivo);
   assert.equal(passa(doc), '');
   assert.ok(JSON.stringify(doc).length < 1000000);
+  // Ogni tetto passa il caso peggiore dell'app al più del doppio o di cinquemila caratteri: oltre, è spazio che riempie
+  // solo chi scrive a mano (#1547). La stessa regola delle ore: firestoreRulesContatori.test.mjs.
+  const largo = (tetto, n) => tetto > Math.max(2 * n, n + 5000);
+  const larghi = F.MAPPE.flatMap((c) => {
+    const [tk, tv] = F.TETTI[c];
+    const k = Object.keys(doc[c]).join('#').length;
+    const v = Object.values(doc[c]).join('#').length;
+    return [largo(tk, k) ? `${c}, chiavi: ${tk} per ${k}` : '', largo(tv, v) ? `${c}: ${tv} per ${v}` : ''].filter(Boolean);
+  });
+  assert.deepEqual(larghi, [], 'tetti della finestra oltre il doppio del caso peggiore');
   const vuoto = F.documento({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-23T00', app: '0.2.249', os: 'win', dati: {} });
   assert.equal(passa(vuoto), '');
   assert.equal(F.senzaDati(vuoto), true, 'un’ora senza niente della finestra non ha il terzo documento');

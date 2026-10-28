@@ -136,6 +136,21 @@ function passa(doc, misure = M) {
   return '';
 }
 
+// Ogni tetto delle regole sta sopra il caso peggiore dell'app, e lo passa al più del doppio o di cinquemila caratteri:
+// oltre, è spazio che riempie solo chi scrive a mano (#1547). Dà le misure fuori, col tetto e il caso peggiore.
+function larghi(doc, misure) {
+  const fuori = [];
+  const largo = (tetto, n) => tetto > Math.max(2 * n, n + 5000);
+  for (const [campo, r] of Object.entries(misure)) {
+    const v = doc[campo];
+    const valori = r.stringa ? String(v) : r.lista ? v.join('#') : Object.values(v).join('#');
+    if (largo(r.tetto, valori.length)) fuori.push(`${campo}: ${r.tetto} per ${valori.length}`);
+    const chiavi = r.tettoChiavi ? Object.keys(v).join('#') : '';
+    if (r.tettoChiavi && largo(r.tettoChiavi, chiavi.length)) fuori.push(`${campo}, chiavi: ${r.tettoChiavi} per ${chiavi.length}`);
+  }
+  return fuori;
+}
+
 test('si legge solo da admin, si crea una volta e non si tocca più', () => {
   assert.deepEqual(per('get').map((r) => r.cond), ['isAdmin()']);
   assert.deepEqual(per('list').map((r) => r.cond), ['isAdmin()']);
@@ -246,8 +261,14 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
     for (const ms of [100, 900, 1500, 4000, 9000, 20000, 99999]) C.registraAzione(ora, a, { visto: ms, fine: ms, ripetuta: true });
     C.registraPrimaVolta(ora, a);
   }
+  // Ogni valore nominato di ogni impostazione, oltre ad acceso, spento e cambiato.
+  const nominati = (k) => {
+    const v = C.IMPOSTAZIONI_EXTRA[k] ? { valoriContati: C.IMPOSTAZIONI_EXTRA[k] } : (globalThis.SN_CAMBI.VOCI[k] || {});
+    return Array.isArray(v.valoriContati) ? v.valoriContati : v.valori && typeof v.valori === 'object' ? Object.keys(v.valori) : [];
+  };
   for (const k of C.chiaviImpostazioni()) {
-    for (const via of C.VIE) for (const v of [true, false, 'dark', 'light', 'system', 'yolo', 3, 'x'.repeat(200)]) C.registraImpostazione(ora, k, v, via);
+    const valori = [...nominati(k)].sort((a, b) => b.length - a.length);
+    for (const via of C.VIE) for (const v of [...valori, true, false, 3, 'x'.repeat(200)]) C.registraImpostazione(ora, k, v, via);
   }
   for (const p of C.PANNELLI) {
     C.registraRicerca(ora, p, { esito: 'aperta' }); C.registraRicerca(ora, p, { esito: 'vuota' });
@@ -290,6 +311,7 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
   const doc = C.documento({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'win', dati: ora });
   assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
   assert.equal(passa(doc), '', 'il documento più carico dell’app deve passare le regole');
+  assert.deepEqual(larghi(doc, M), [], 'tetti dell’ora oltre il doppio del caso peggiore');
   // Gli errori hanno il tetto del documento (#1547): decine di KB, non centinaia, per chi riempie le ore a mano.
   assert.ok(M.errori.tetto <= 64000, `il tetto degli errori nelle regole è ${M.errori.tetto}`);
   assert.equal(Object.values(doc.errori).flatMap((e) => C.leggiErrori(e)).filter((x) => x.modello !== 'altro' || x.host).length, C.TETTO_ERRORI_DOCUMENTO);
@@ -433,11 +455,13 @@ test('le chiamate: ogni misura si chiude sulle funzioni con la forma dell’app,
         ora[c][f][`altro|${r}`] = 999999999;
       }
     }
-    for (const n of [1, 2, 4, 9, 40]) { C.registraChiamate(ora, f, n); ora.chiamate[f] = Object.fromEntries(Object.keys(ora.chiamate[f]).map((x) => [x, 999999999])); }
+    // Ogni fascia piena, col totale che sta ancora nel conto più alto.
+    for (const n of [1, 2, 4, 9, 40]) { C.registraChiamate(ora, f, n); ora.chiamate[f] = Object.fromEntries(Object.keys(ora.chiamate[f]).map((x) => [x, 199999999])); }
   }
   const doc = C.documentoChiamate({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'win', dati: ora });
   assert.equal(C.validaChiamate(doc).ok, true, C.validaChiamate(doc).motivo);
   assert.equal(passa(doc, MC), '', 'le chiamate più cariche dell’app devono passare le regole');
+  assert.deepEqual(larghi(doc, MC), [], 'tetti delle chiamate oltre il doppio del caso peggiore');
   for (const c of C.MISURE_MODELLI) {
     const voci = Object.values(doc[c]).flatMap((v) => C.leggiModelli(c, v));
     assert.equal(voci.filter((x) => x.modello !== 'altro').length, C.TETTO_MODELLI_ORA, `${c}: le voci col modello si fermano al tetto`);
@@ -510,6 +534,7 @@ test('la navigazione: ogni misura ha le chiavi, il tetto e la forma dell’app, 
   const doc = C.documentoNavigazione({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'linux', dati: ora });
   assert.equal(C.validaNavigazione(doc).ok, true, C.validaNavigazione(doc).motivo);
   assert.equal(passa(doc, MN), '', 'la navigazione più carica dell’app deve passare le regole');
+  assert.deepEqual(larghi(doc, MN), [], 'tetti della navigazione oltre il doppio del caso peggiore');
   assert.ok(JSON.stringify(doc).length < 1000000);
   const vuoto = C.documentoNavigazione({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T00', app: '0.2.249', os: 'win', dati: C.oraVuota() });
   assert.equal(passa(vuoto, MN), '');
@@ -684,6 +709,7 @@ test('i gesti: chiavi e valori di ogni misura hanno la forma dell’app, e il do
   const doc = gestiPieni();
   assert.equal(C.validaGesti(doc).ok, true, C.validaGesti(doc).motivo);
   assert.equal(passa(doc, MG), '', 'i gesti più carichi dell’app devono passare le regole');
+  assert.deepEqual(larghi(doc, MG), [], 'tetti dei gesti oltre il doppio del caso peggiore');
   const totale = Object.values(MG).reduce((a, r) => a + r.tetto + (r.tettoChiavi || 0), 0);
   assert.ok(totale <= 1000000, `i tetti dei gesti sommano ${totale}: oltre, un documento passerebbe il limite di Firestore (1 MiB)`);
   assert.ok(JSON.stringify(doc).length < 1000000);
@@ -788,6 +814,7 @@ test('la chat più carica che l’app sa fare passa le regole, e una manomessa n
   const doc = C.documentoChat({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'win', dati });
   assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
   assert.equal(passaChat(doc), '', 'la chat più carica dell’app deve passare le regole');
+  assert.deepEqual(larghi(doc, MCHAT), [], 'tetti della chat oltre il doppio del caso peggiore');
   assert.ok(JSON.stringify(doc).length < 200000);
   const vuota = C.documentoChat({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T00', app: '0.2.243', os: 'win', dati: C.oraVuota() });
   assert.equal(passaChat(vuota), '');
