@@ -1162,7 +1162,7 @@
       retry.className = 'dash-action-btn';
       retry.textContent = '↻ Riprova';
       retry.title = 'Rimanda lo stesso messaggio';
-      retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal }));
+      retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal, ...(rispostaA ? { rispostaA } : {}) }));
       // #598 — senza nessuna chiave «Riprova» non porta da nessuna parte: la
       // strada è la pagina Crediti, e sta qui sotto, non in un menu. Lo stesso
       // quando il servizio ha rifiutato la chiave (#629): è lì che si cambia.
