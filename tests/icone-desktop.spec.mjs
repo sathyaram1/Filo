@@ -98,8 +98,6 @@ test('«in ordine alfabetico, da sinistra in alto a destra in basso»: le icone 
   await expect.poll(() => posizioni(app)).toEqual(ORIGINALI);
   expect((await desktop(app)).auto, '«Disponi automaticamente» torna com\'era').toBe(true);
   await expect(pop.locator('.dash-cambi-annulla')).toHaveText('rifai');
-  await page.mouse.move(5, 5);
-  await page.screenshot({ path: 'tests/.shots/icone-desktop-annullate.png' });
 
   // Rifai le rimette in fila.
   await bolla.locator('.dash-cambi-segno').hover();
