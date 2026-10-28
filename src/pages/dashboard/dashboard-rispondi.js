@@ -308,7 +308,7 @@
   }
 
   global.SN_DASH_RISPONDI = {
-    init, ricorda, testoDi, prendi, rimetti, annulla, citaIn, dalFilo, perIlMain, perLoStorico, rispondi, copia,
+    init, ricorda, scritto, testoDi, prendi, rimetti, annulla, citaIn, dalFilo, perIlMain, perLoStorico, rispondi, copia,
     inCorso: () => !!citata,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
