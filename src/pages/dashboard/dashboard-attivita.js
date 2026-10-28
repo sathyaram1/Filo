@@ -607,7 +607,7 @@
     VOLUME: () => 'cambiato il volume',
     BLUETOOTH: () => 'comandato il Bluetooth',
     WIFI: () => 'comandato il Wi-Fi',
-    ORDINA_DESKTOP: (n) => (n > 1 ? `messo in ordine il desktop ${n} volte` : 'messo in ordine il desktop'),
+    ORDINA_DESKTOP: (n) => (n > 1 ? `sistemato le icone del desktop ${n} volte` : 'sistemato le icone del desktop'),
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
     PULISCI_TAB: () => 'riordinato le schede',
     CHIUDI_SCHEDE: (n) => (n > 1 ? `chiuso schede ${n} volte` : 'chiuso delle schede'),
