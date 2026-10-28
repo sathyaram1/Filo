@@ -1791,21 +1791,27 @@
     return out;
   }
 
-  // Errori: «modello|host|tipo|n» separati da «;», al più TETTO_COMBINAZIONI per funzione.
+  // Errori: «modello|host|tipo|n» separati da «;». Oltre il tetto per funzione o quello del documento la voce si somma
+  // alla riga «altro» del suo tipo: anche le ore e i giorni rimasti da prima del tetto partono dentro, coi conti interi.
   function erroriPuliti(errori, tetto = TETTO_ERRORI_ORA) {
     const out = {};
+    let specifiche = 0;
     for (const f of funzioni()) {
       const per = oggetto(errori) && has(errori, f) ? errori[f] : null;
       if (!oggetto(per)) continue;
-      const lista = [];
+      const voci = new Map();
       for (const [chiave, n] of Object.entries(per)) {
         if (!intero(n) || n === 0) continue;
         const [m, h, t] = String(chiave).split('|');
         if (!ERRORI.includes(t)) continue;
-        lista.push(`${modelloPulito(m)}|${hostPulito(h)}|${t}|${conto(n)}`);
-        if (lista.length >= tetto) break;
+        let k = `${modelloPulito(m)}|${hostPulito(h)}|${t}`;
+        if (!erroreAltro(k) && !voci.has(k)) {
+          const qui = [...voci.keys()].filter((x) => !erroreAltro(x)).length;
+          if (qui >= tetto - ERRORI.length || specifiche >= TETTO_ERRORI_DOCUMENTO) k = `${ALTRO}||${t}`; else specifiche += 1;
+        }
+        voci.set(k, conto((voci.get(k) || 0) + n));
       }
-      if (lista.length) out[f] = lista.join(';');
+      if (voci.size) out[f] = [...voci].map(([k, n]) => `${k}|${n}`).join(';');
     }
     return out;
   }
