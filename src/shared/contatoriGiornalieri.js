@@ -2468,24 +2468,28 @@
     return { ok: true, motivo: '' };
   }
 
-  function validaNavigazione(doc) {
+  function validaAConti(doc, { tabella, campi, v, forme, tetti }) {
     const no = (motivo) => ({ ok: false, motivo });
     if (!oggetto(doc)) return no('non è un documento');
     const chiavi = Object.keys(doc);
-    if (chiavi.length !== CAMPI_NAVIGAZIONE.length || !CAMPI_NAVIGAZIONE.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
-    if (doc.v !== VERSIONE_NAVIGAZIONE) return no('versione');
+    if (chiavi.length !== campi.length || !campi.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
+    if (doc.v !== v) return no('versione');
     const base = validaTesta(doc);
     if (base) return no(base);
     if (!ORA_RE.test(String(doc.ora))) return no('ora');
-    for (const c of MISURE_NAVIGAZIONE) {
+    for (const c of Object.keys(tabella)) {
       if (!oggetto(doc[c])) return no(c);
-      for (const [k, v] of Object.entries(doc[c])) {
-        if (!NAVIGAZIONE[c].chiavi.includes(k)) return no(`${c}: chiave ${k}`);
-        if (typeof v !== 'string' || v.length > TETTI_VOCE_NAVIGAZIONE[c] || !NAVIGAZIONE_RE[c].test(v)) return no(`${c} di ${k}`);
+      for (const [k, x] of Object.entries(doc[c])) {
+        if (!tabella[c].chiavi.includes(k)) return no(`${c}: chiave ${k}`);
+        if (typeof x !== 'string' || x.length > tetti[c] || !forme[c].test(x)) return no(`${c} di ${k}`);
       }
     }
     return { ok: true, motivo: '' };
   }
+  const validaNavigazione = (doc) => validaAConti(doc, { tabella: NAVIGAZIONE, campi: CAMPI_NAVIGAZIONE, v: VERSIONE_NAVIGAZIONE,
+    forme: NAVIGAZIONE_RE, tetti: TETTI_VOCE_NAVIGAZIONE });
+  const validaRiquadri = (doc) => validaAConti(doc, { tabella: RIQUADRI, campi: CAMPI_RIQUADRI, v: VERSIONE_RIQUADRI,
+    forme: RIQUADRI_RE, tetti: TETTI_VOCE_RIQUADRI });
 
   function mappeFuoriForma(doc, mappe) {
     for (const [campo, [chiaviAmmesse, formaValore, tetto]] of Object.entries(mappe)) {
