@@ -167,6 +167,17 @@ test('solo server: --solo-server, niente finish', async () => {
   assert.equal(fine.pratiche[7].fase, 'fuso');
   assert.ok(indice(b.righe(), /server-fondi-pratica\.mjs claude\/sette --feedback 7 --solo-server/) >= 0);
   assert.equal(indice(b.righe(), /finish-local/), -1);
+  // #1648: senza finish la voce della punta spinta la scrive registra, dopo la spinta e prima di server:fondi.
+  const spinta = indice(b.righe(), /^git push origin refs\/heads\/claude\/sette:refs\/heads\/claude\/sette$/);
+  const voce = indice(b.righe(), /^node scripts\/verify-local\.mjs registra$/);
+  assert.ok(spinta >= 0 && voce > spinta && voce < indice(b.righe(), /server-fondi-pratica/), b.righe().join('\n'));
+});
+
+test('app e server: la voce del server la scrive finish, niente registra in più', async () => {
+  const b = banco();
+  await b.motore.avvia();
+  assert.ok(indice(b.righe(), /finish-local/) >= 0);
+  assert.equal(indice(b.righe(), /verify-local\.mjs registra/), -1);
 });
 
 test('deploy.yml su main di filo-security: la spinta del server la pubblica GitHub, il PC non lancia un secondo deploy insieme', async () => {
