@@ -1296,7 +1296,8 @@
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
     autoGrowInput();
-    return { text: text || '', immagini, daFuori, scritto, incollato, file, percorsi };
+    const citata = Rispondi.prendi();
+    return { text: text || '', immagini, daFuori, scritto, incollato, file, percorsi, citata };
   }
   function bollaUtente(c) {
     const userBubble = makeBubble({ role: 'user', text: c.text });
@@ -1308,6 +1309,7 @@
       attachImageLightbox(img, src);
       userBubble.insertBefore(img, userBubble.childNodes[i] || null);
     });
+    if (c.citata) Rispondi.citaIn(userBubble, c.citata);
     return userBubble;
   }
   // `bolla`: quella del seguito che era in attesa, che diventa la bolla del messaggio.
