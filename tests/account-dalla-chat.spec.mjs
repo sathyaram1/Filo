@@ -53,6 +53,8 @@ test('«accedi con Google» in chat: Filo apre la pagina d\'accesso e, scelto l\
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ti ho aperto l\'accesso con Google' })).toBeVisible({ timeout: 10_000 });
   const esito = JSON.stringify((await chiamateAlModello(app)).at(-1));
   expect(esito).toContain('Aperta in una scheda la pagina d\'accesso di Google');
+  mkdirSync(SHOTS, { recursive: true });
+  await page.screenshot({ path: join(SHOTS, 'account-dalla-chat.png') });
 
   await rispondiAlLoopback(url);
   await expect.poll(async () => (await stato(shell)).signedIn, { timeout: 10_000 }).toBe(true);
