@@ -2216,22 +2216,26 @@
     return out;
   }
 
-  // La navigazione della stessa ora (#1469), nel suo documento: stesso pseudonimo, stessa ora, stesso id.
-  function documentoNavigazione({ pseudonimo, chiave, app, os, dati }) {
+  // Il documento a conti della stessa ora, accanto all'ora: stesso pseudonimo, stessa ora, stesso id.
+  function documentoAConti(tabella, v, { pseudonimo, chiave, app, os, dati }) {
     const d = normale(oggetto(dati) ? JSON.parse(JSON.stringify(dati)) : {});
     const [giorno, ora] = String(chiave || '').split('T');
     return {
-      v: VERSIONE_NAVIGAZIONE,
+      v,
       pseudonimo: String(pseudonimo || ''),
       giorno: String(giorno || ''),
       mese: meseDi(giorno),
       ora: String(ora || ''),
       app: versioneApp(app),
       os: OS.includes(os) ? os : ALTRO,
-      ...Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c, navigazionePulita(d[c], c)])),
+      ...Object.fromEntries(Object.keys(tabella).map((c) => [c, contiDellaTabella(tabella, d[c], c)])),
     };
   }
-  function senzaNavigazione(doc) { return MISURE_NAVIGAZIONE.every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length); }
+  const senzaConti = (tabella, doc) => Object.keys(tabella).every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length);
+  const documentoNavigazione = (base) => documentoAConti(NAVIGAZIONE, VERSIONE_NAVIGAZIONE, base);
+  const senzaNavigazione = (doc) => senzaConti(NAVIGAZIONE, doc);
+  const documentoRiquadri = (base) => documentoAConti(RIQUADRI, VERSIONE_RIQUADRI, base);
+  const senzaRiquadri = (doc) => senzaConti(RIQUADRI, doc);
 
   // La chat della stessa ora, nel suo documento (#1463): parte solo se ha qualcosa, e l'id è quello dell'ora più «_chat».
   function documentoChat({ pseudonimo, chiave, app, os, dati }) {
