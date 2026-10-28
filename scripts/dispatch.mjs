@@ -500,6 +500,12 @@ function puntaDellaCartella() {
   }
 }
 
+// Una consegna registrata con lo sha è l'ultima spinta del giro (#1555): da qui il ramo su origin resta lì.
+function sigillaLaConsegna(intento, sha, esito = '') {
+  if (!consegnaChiudeLeSpinte(intento, esito)) return;
+  segnaConsegna(ROOT, readRoutineTicket(ROOT), { sha, ramo: currentBranch(ROOT), intento, esito });
+}
+
 /**
  * `--ferma` da solo non ferma niente: è la segnalazione che ferma il lavoro, e
  * senza l'owner non saprebbe cosa decidere. Ritorna la frase che ferma, o ''. PURA.
