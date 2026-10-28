@@ -693,8 +693,19 @@
     };
   }
 
+  // Com'è finito il riquadro, per i contatori (#1465): chiuso prima della prima risposta, o con quante domande scritte
+  // dopo. Una volta sola, anche se la pagina se ne va con il riquadro aperto.
+  function contaFine(popup) {
+    if (!popup || popup.fineContata || !popup.action) return;
+    popup.fineContata = true;
+    if (!popup.primaRisposta) conta({ misura: 'riquadro', cosa: 'riquadro_chiuso_prima', action: popup.action, attesaMs: Date.now() - popup.apertoIl });
+    else conta({ misura: 'riquadro', cosa: 'riquadro_uso', action: popup.action, domande: popup.domande });
+  }
+  try { global.addEventListener?.('pagehide', () => { for (const p of popups) contaFine(p); }); } catch (_) {}
+
   function closePopup(popup) {
     if (!popup) return;
+    contaFine(popup);
     try { popup.activePort?.disconnect(); } catch (_) {}
     try { popup.cleanupZoom?.(); } catch (_) {}
     try { popup.pose?.dispose(); } catch (_) {}
@@ -784,6 +795,9 @@
       metaEl: root.querySelector('.sn-popup-meta'),
       inputEl: root.querySelector('.sn-popup-input'),
       sendEl: root.querySelector('.sn-popup-send'),
+      apertoIl: Date.now(),
+      primaRisposta: false,
+      domande: 0,
     };
 
     root.querySelector('.sn-popup-close').addEventListener('click', () => closePopup(popup));
@@ -916,7 +930,7 @@
     try { await navigator.clipboard.writeText(testo); return true; } catch (_) { return false; }
   }
   const iconaCopia = (nome) => (global.SN_ICONS && typeof global.SN_ICONS[nome] === 'function' ? global.SN_ICONS[nome](14) : '');
-  function tastoCopia(wrap, sorgente) {
+  function tastoCopia(wrap, sorgente, alClic = null) {
     const Md = global.SN_MARKDOWN;
     const testo = Md && Md.testo ? Md.testo(sorgente) : String(sorgente || '');
     if (!wrap || !testo.trim()) return null;
@@ -938,6 +952,7 @@
     btn.addEventListener('mousedown', (e) => e.preventDefault());
     btn.addEventListener('click', async (e) => {
       if (!e.isTrusted) return;
+      if (typeof alClic === 'function') { try { alClic(); } catch (_) {} }
       const ok = await copiaTesto(testo);
       clearTimeout(timer);
       mostra(ok ? 'ok' : 'no');
@@ -977,6 +992,7 @@
     try {
       port = chrome.runtime.connect({ name: PORTS.AI_STREAM });
     } catch (_) {
+      popup.primaRisposta = true;
       bubble.text.textContent = I18n.t('err_provider_failed');
       bubble.wrap.classList.add('sn-msg-error');
       return;
@@ -993,6 +1009,7 @@
         if (Array.isArray(m.messages) && m.messages.length) popup.conversation = m.messages.slice();
         setMeta(popup, `${I18n.t('popup_model')}: ${popup.model}`);
       } else if (m.type === 'delta') {
+        popup.primaRisposta = true;
         if (firstDelta) {
           bubble.text.innerHTML = '';
           firstDelta = false;
@@ -1006,6 +1023,7 @@
       } else if (m.type === 'reset') {
         // Il provider è caduto a metà risposta e si riparte su un ripiego: il testo parziale si
         // butta, così il messaggio finale è SOLO la risposta del provider che riesce.
+        conta({ misura: 'riquadro', cosa: 'riquadro_uso', action: popup.action, uso: 'ricominciata' });
         buf = '';
         firstDelta = true;
         // Si riparte da zero su un altro provider: il testo parziale sparisce e
@@ -1018,6 +1036,7 @@
           bubble.text.appendChild(retry);
         }, true);
       } else if (m.type === 'done') {
+        popup.primaRisposta = true;
         const vuota = firstDelta;   // nessun delta arrivato (es. cache vuota errore)
         const resolved = resolveCalcMarkers(buf);
         const eur = m.costEur || 0;
@@ -1032,7 +1051,7 @@
             bubble.wrap.classList.add('sn-msg-muted');
           } else {
             bubble.text.innerHTML = renderMarkdown(daMostrare);
-            tastoCopia(bubble.wrap, daMostrare);
+            tastoCopia(bubble.wrap, daMostrare, () => conta({ misura: 'riquadro', cosa: 'riquadro_uso', action: popup.action, uso: 'copia' }));
           }
           notaRipiego(bubble.text, m.keyFallback);
           notaInterrotta(bubble.text, m.finishReason, () => continuaRisposta(popup));
@@ -1043,6 +1062,7 @@
         try { onAssistantDone && onAssistantDone(resolved); } catch (_) {}
         popup.activePort = null;
       } else if (m.type === 'error') {
+        popup.primaRisposta = true;
         // L'errore va LETTO: è l'unica cosa rimasta da leggere, la vista ci va.
         // E va letto in italiano: la riga grezza del servizio («OpenRouter 402:
         // {…}») non dice niente a chi ha finito i crediti (#663).
@@ -1068,6 +1088,7 @@
     if (popup.activePort) return; // già in streaming
     popup.inputEl.value = '';
     popup.inputEl.style.height = 'auto';
+    if (popup.primaRisposta) popup.domande += 1;
     chiedi(popup, txt);
   }
 

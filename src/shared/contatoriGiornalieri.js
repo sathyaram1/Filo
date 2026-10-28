@@ -1,4 +1,4 @@
-// I contatori anonimi (#969, #1461, #1463, #1464, #1466, #1467, #1469, #1471): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
+// I contatori anonimi (#969, #1461, #1463, #1464, #1465, #1466, #1467, #1469, #1471): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
 // Esce solo ciò che sta negli elenchi chiusi di questo file; le regole Firestore ne tengono la forma, e la sentinella
 // tests/unit/firestoreRulesContatori.test.mjs le confronta. Misura e spedizione: src/main/services/contatori.js.
 
@@ -216,8 +216,50 @@
   // Le combinazioni diverse di una misura in un'ora: oltre, la nuova si somma in «altro», e il conto non perde niente.
   const TETTO_VOCI_ATTIVITA = 100;
 
-  // Tutto quello che un'ora tiene sul disco, nei cinque documenti.
-  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE, ...MISURE_GESTI, ...MISURE_NAVIGAZIONE, ...MISURE_ATTIVITA]);
+  // ── I riquadri AI e l'Editor (#1465) ──────────────────────────────────────
+  // Cosa si fa delle risposte nei riquadri, se l'anticipo arriva in tempo, la riscrittura, l'OCR, la traduzione della
+  // pagina, il titolo e la chat dell'Editor. Stessa forma della navigazione (conti per chiave chiusa), documento suo.
+  const VERSIONE_RIQUADRI = 1;
+  const COLLEZIONE_RIQUADRI = 'contatori-riquadri';
+  const coppie = (a, b) => a.flatMap((x) => b.map((y) => `${x}|${y}`));
+  const ANTICIPATE = Object.freeze(['spiega', 'correttore_parola']);
+  const STATI_ANTICIPO = Object.freeze(['pronto', 'in_volo', 'assente', 'fermato_tetto', 'contesto_cambiato']);
+  // Le funzioni (id del censimento) che rispondono in un riquadro sulla pagina: il menu del tasto destro e il popup.
+  const FUNZIONI_RIQUADRO = Object.freeze(['explain', 'explain-deep', 'translate-selection', 'explain-link', 'describe-image']);
+  const DOMANDE = Object.freeze([['d0', 0], ['d1', 1], ['d2', 2], ['d3_oltre', Infinity]]);
+  const USI_RIQUADRO = Object.freeze(['copia', ...nomi(DOMANDE), 'approfondisci', 'ricominciata']);
+  const SCORCIATOIE = Object.freeze(['formale', 'informale', 'riassumi', 'traduci', 'correggi', 'libera']);
+  const ESITI_RISCRITTURA = Object.freeze(['sostituito', 'copiato', 'chiuso']);
+  const PROPOSTE = Object.freeze([['p1', 1], ['p2', 2], ['p3_oltre', Infinity]]);
+  // Una proposta mostrata col «Sostituisci» spento perché tagliata dal tetto di lunghezza.
+  const TAGLIATA = 'tagliata';
+  const ESITI_OCR = Object.freeze(['copiato', 'vuoto', 'annullato', 'tagliato']);
+  const ESITI_TRADUZIONE = Object.freeze(['intera', 'parziale', 'fermata']);
+  // La parte della pagina rimasta in lingua originale, e se entro un minuto dalla fine si è tornati all'originale.
+  const RIMASTO = Object.freeze([['r10', 0.1], ['r25', 0.25], ['r50', 0.5], ['oltre', Infinity]]);
+  const ORIGINALE_MS = 60 * 1000;
+  const TITOLI = Object.freeze(['automatico', 'rigenerato']);
+  const ESITI_TITOLO = Object.freeze(['applicato', 'fallito', 'vuoto']);
+  // Quanto dopo il titolo di Filo la persona lo riscrive a mano.
+  const ETA_TITOLO = Object.freeze([['ora', 60 * 60 * 1000], ['giorno', 24 * 60 * 60 * 1000], ['mese', 30 * 24 * 60 * 60 * 1000],
+    ['oltre', Infinity]]);
+  const DOCUMENTO_CHAT = Object.freeze(['intero', 'oltre_tetto']);
+  const FORMATI = Object.freeze([['f0', 0], ['f1', 1], ['f2_5', 5], ['oltre', Infinity]]);
+  const RIQUADRI = Object.freeze({
+    anticipo_al_gesto: misuraNav(ANTICIPATE, [STATI_ANTICIPO]),
+    riquadro_chiuso_prima: misuraNav(FUNZIONI_RIQUADRO, [NOMI_FASCE]),
+    riquadro_uso: misuraNav(FUNZIONI_RIQUADRO, [USI_RIQUADRO]),
+    riscrittura: misuraNav(SCORCIATOIE, [[...coppie(ESITI_RISCRITTURA, nomi(PROPOSTE)), TAGLIATA]]),
+    ocr: misuraNav(ESITI_OCR, [UNO]),
+    traduzione_pagina: misuraNav(ESITI_TRADUZIONE, [coppie(nomi(RIMASTO), ['si', 'no'])]),
+    editor_titolo: misuraNav(TITOLI, [[...ESITI_TITOLO, ...nomi(ETA_TITOLO).map((e) => `riscritto_${e}`)]]),
+    editor_chat: misuraNav(DOCUMENTO_CHAT, [[...nomi(FORMATI), 'formato_non_trovato', 'continua']]),
+  });
+  const MISURE_RIQUADRI = Object.freeze(Object.keys(RIQUADRI));
+  const CAMPI_RIQUADRI = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_RIQUADRI]);
+  // Tutto quello che un'ora tiene sul disco, nei sei documenti.
+  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE, ...MISURE_GESTI, ...MISURE_NAVIGAZIONE, ...MISURE_ATTIVITA,
+    ...MISURE_RIQUADRI]);
   // Il primo documento di un giorno, o di un mese, di una copia di Filo: chi conta le installazioni legge solo quelli.
   const PRIMI = Object.freeze(['', 'giorno', 'mese']);
 
@@ -451,8 +493,10 @@
   const SISTEMA_FORMA = `^((^|;)${VOCE_SISTEMA})*$`;
   // La navigazione: i conti di un gruppo separati da «,», i gruppi da «;».
   const conti = (k) => (k > 1 ? `${N}(,${N}){${k - 1}}` : N);
-  const FORME_NAVIGAZIONE = Object.freeze(Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c,
-    `^${NAVIGAZIONE[c].gruppi.map((g) => conti(g.length)).join(';')}$`])));
+  const formeConti = (tabella) => Object.freeze(Object.fromEntries(Object.keys(tabella).map((c) => [c,
+    `^${tabella[c].gruppi.map((g) => conti(g.length)).join(';')}$`])));
+  const FORME_NAVIGAZIONE = formeConti(NAVIGAZIONE);
+  const FORME_RIQUADRI = formeConti(RIQUADRI);
   // La chat (#1463): «esito|fascia dei giri|n», «strumento|esito|n», «messaggi|durata|tipo|n». Il nome di uno strumento
   // ha nelle regole la sua forma (maiuscole, cifre, trattino basso): l'elenco cresce con Filo e lo tiene l'app.
   const VOCE_TURNO = `${alternative(ESITI_TURNO)}[|]${alternative(NOMI_GIRI)}[|]${N}`;
@@ -483,6 +527,7 @@
   const CHIAMATE_RE = re(CHIAMATE_FORMA);
   const SISTEMA_RE = re(SISTEMA_FORMA);
   const NAVIGAZIONE_RE = Object.freeze(Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c, re(FORME_NAVIGAZIONE[c])])));
+  const RIQUADRI_RE = Object.freeze(Object.fromEntries(MISURE_RIQUADRI.map((c) => [c, re(FORME_RIQUADRI[c])])));
   const TURNI_RE = re(TURNI_FORMA);
   const STRUMENTI_RE = re(STRUMENTI_FORMA);
   const AZIONI_PER_GIRO_RE = re(AZIONI_PER_GIRO_FORMA);
@@ -509,10 +554,14 @@
   // Ogni percorso del sistema una volta, col conto più alto: il caso che non arriva mai, e il documento resta piccolo.
   const TETTO_CARATTERI_SISTEMA = 16000;
   // Ogni conto nove cifre più il suo separatore; la misura, tutte le sue chiavi unite.
-  const TETTI_VOCE_NAVIGAZIONE = Object.freeze(Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c,
-    NAVIGAZIONE[c].gruppi.reduce((a, g) => a + g.length * 10, 0)])));
-  const TETTI_CARATTERI_NAVIGAZIONE = Object.freeze(Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c,
-    NAVIGAZIONE[c].chiavi.length * TETTI_VOCE_NAVIGAZIONE[c]])));
+  const tettiVoce = (tabella) => Object.freeze(Object.fromEntries(Object.keys(tabella).map((c) => [c,
+    tabella[c].gruppi.reduce((a, g) => a + g.length * 10, 0)])));
+  const tettiCaratteri = (tabella, voce) => Object.freeze(Object.fromEntries(Object.keys(tabella).map((c) => [c,
+    tabella[c].chiavi.length * voce[c]])));
+  const TETTI_VOCE_NAVIGAZIONE = tettiVoce(NAVIGAZIONE);
+  const TETTI_CARATTERI_NAVIGAZIONE = tettiCaratteri(NAVIGAZIONE, TETTI_VOCE_NAVIGAZIONE);
+  const TETTI_VOCE_RIQUADRI = tettiVoce(RIQUADRI);
+  const TETTI_CARATTERI_RIQUADRI = tettiCaratteri(RIQUADRI, TETTI_VOCE_RIQUADRI);
   const TETTO_CARATTERI_TURNI = 36 * ESITI_TURNO.length * NOMI_GIRI.length;
   const TETTO_CARATTERI_STRUMENTI = 70 * TETTO_STRUMENTI;
   const TETTO_CARATTERI_AZIONI_PER_GIRO = 10 * AZIONI_PER_GIRO.length;
@@ -789,6 +838,7 @@
       contesto: {}, cache: {}, ragionamento: {}, uscita: {}, ripieghi: {}, spesa: {}, adattamenti: {}, chiamate: {},
       ...Object.fromEntries(MISURE_GESTI.map((k) => [k, {}])),
       ...Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c, {}])),
+      ...Object.fromEntries(MISURE_RIQUADRI.map((c) => [c, {}])),
       chatTurni: {}, chatRecuperi: {}, strumenti: {}, azioniPerGiro: {}, chatReazioni: {}, chatCopie: {}, chatChiuse: {},
       ...Object.fromEntries(MISURE_ATTIVITA.map((m) => [m, {}])),
     };
@@ -1429,8 +1479,9 @@
 
   // ── La navigazione (#1469) ──────────────────────────────────────────────
   // Dove sta ogni voce nella fila dei conti della sua chiave; null se misura, chiave o una voce non sono dei loro elenchi.
-  function posizioniNav(misura, chiave, voci) {
-    const m = has(NAVIGAZIONE, misura) ? NAVIGAZIONE[misura] : null;
+  // Vale per le due tabelle a conti: la navigazione e i riquadri (#1465).
+  function posizioniIn(tabella, misura, chiave, voci) {
+    const m = has(tabella, misura) ? tabella[misura] : null;
     if (!m || !m.chiavi.includes(chiave) || !Array.isArray(voci) || voci.length !== m.gruppi.length) return null;
     const pos = [];
     let base = 0;
@@ -1442,9 +1493,10 @@
     }
     return { pos, lunghezza: base };
   }
+  const posizioniNav = (misura, chiave, voci) => posizioniIn(NAVIGAZIONE, misura, chiave, voci);
 
-  function registraNavigazione(ora, misura, chiave, voci) {
-    const p = posizioniNav(misura, chiave, voci);
+  function registraConti(tabella, ora, misura, chiave, voci) {
+    const p = posizioniIn(tabella, misura, chiave, voci);
     if (!p) return false;
     const mappa = normale(ora)[misura];
     const c = Array.isArray(mappa[chiave]) && mappa[chiave].length === p.lunghezza ? mappa[chiave] : Array(p.lunghezza).fill(0);
@@ -1452,6 +1504,8 @@
     mappa[chiave] = c;
     return true;
   }
+  const registraNavigazione = (ora, misura, chiave, voci) => registraConti(NAVIGAZIONE, ora, misura, chiave, voci);
+  const registraRiquadro = (ora, misura, chiave, voci) => registraConti(RIQUADRI, ora, misura, chiave, voci);
 
   // Le voci si costruiscono da qui, coi valori che il codice ha in mano: quello che non è degli elenchi diventa
   // «altro» dove l'elenco lo prevede, e altrimenti la voce non c'è (null) e non si conta niente.
@@ -1502,6 +1556,33 @@
       [inFascia(FASCE_MB_SCARICAMENTO, quantita(byte) / MB), inFascia(FASCE_DURATA, quantita(ms))]),
     programma: (classe, evento) => voceNav('programmi', testoDa(classe), [testoDa(evento)]),
   });
+
+  // ── I riquadri AI e l'Editor (#1465) ──────────────────────────────────────
+  // Il messaggio di una pagina ridotto alla sua voce: solo nomi degli elenchi e numeri, mai il testo.
+  const numeroDa = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+  const nel = (v, elenco) => (elenco.includes(testoDa(v)) ? v : '');
+  const RIQUADRO_DI = Object.freeze({
+    anticipo_al_gesto: (d) => [nel(d.funzione, ANTICIPATE), nel(d.stato, STATI_ANTICIPO)],
+    riquadro_chiuso_prima: (d) => [funzioneDi(testoDa(d.action)), numeroDa(d.attesaMs) == null ? '' : fasciaDi(d.attesaMs)],
+    riquadro_uso: (d) => [funzioneDi(testoDa(d.action)),
+      Number.isInteger(d.domande) && d.domande >= 0 ? inFascia(DOMANDE, d.domande) : nel(d.uso, ['copia', 'approfondisci', 'ricominciata'])],
+    riscrittura: (d) => [nel(d.scorciatoia, SCORCIATOIE), d.tagliata === true ? TAGLIATA
+      : Number.isInteger(d.proposte) && d.proposte >= 1 && nel(d.esito, ESITI_RISCRITTURA) ? `${d.esito}|${inFascia(PROPOSTE, d.proposte)}` : ''],
+    ocr: (d) => [nel(d.esito, ESITI_OCR), 'n'],
+    traduzione_pagina: (d) => [nel(d.esito, ESITI_TRADUZIONE),
+      numeroDa(d.rimasto) == null || typeof d.originale !== 'boolean' ? '' : `${inFascia(RIMASTO, d.rimasto)}|${d.originale ? 'si' : 'no'}`],
+    editor_titolo: (d) => [nel(d.via, TITOLI),
+      numeroDa(d.riscrittoDopoMs) != null ? `riscritto_${inFascia(ETA_TITOLO, d.riscrittoDopoMs)}` : nel(d.esito, ESITI_TITOLO)],
+    editor_chat: (d) => [typeof d.oltreTetto === 'boolean' ? (d.oltreTetto ? 'oltre_tetto' : 'intero') : '',
+      d.continua === true ? 'continua' : d.nonTrovato === true ? 'formato_non_trovato'
+        : Number.isInteger(d.formati) && d.formati >= 0 ? inFascia(FORMATI, d.formati) : ''],
+  });
+  function voceRiquadro(misura, dati) {
+    if (!has(RIQUADRO_DI, misura) || !oggetto(dati)) return null;
+    const [chiave, voce] = RIQUADRO_DI[misura](dati);
+    if (!chiave || !voce) return null;
+    return posizioniIn(RIQUADRI, misura, chiave, [voce]) ? Object.freeze({ misura, chiave, voci: Object.freeze([voce]) }) : null;
+  }
 
   // ── La chat e l'agente (#1463) ────────────────────────────────────────────
   function piuN(mappa, chiave, n) { mappa[chiave] = Math.min(conto(mappa[chiave]) + n, MAX_CONTO); }
@@ -2121,9 +2202,9 @@
   // Un'ora senza gesti né disposizione nota non ha il terzo documento.
   function senzaGesti(doc) { return MISURE_GESTI.every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length); }
 
-  // Una misura della navigazione: per ogni chiave dell'elenco i suoi conti, gruppo per gruppo.
-  function navigazionePulita(mappa, misura) {
-    const m = NAVIGAZIONE[misura];
+  // Una misura a conti (navigazione, riquadri): per ogni chiave dell'elenco i suoi conti, gruppo per gruppo.
+  function contiDellaTabella(tabella, mappa, misura) {
+    const m = tabella[misura];
     const lunghezza = m.gruppi.reduce((a, g) => a + g.length, 0);
     const out = {};
     for (const k of m.chiavi) {
@@ -2135,22 +2216,26 @@
     return out;
   }
 
-  // La navigazione della stessa ora (#1469), nel suo documento: stesso pseudonimo, stessa ora, stesso id.
-  function documentoNavigazione({ pseudonimo, chiave, app, os, dati }) {
+  // Il documento a conti della stessa ora, accanto all'ora: stesso pseudonimo, stessa ora, stesso id.
+  function documentoAConti(tabella, v, { pseudonimo, chiave, app, os, dati }) {
     const d = normale(oggetto(dati) ? JSON.parse(JSON.stringify(dati)) : {});
     const [giorno, ora] = String(chiave || '').split('T');
     return {
-      v: VERSIONE_NAVIGAZIONE,
+      v,
       pseudonimo: String(pseudonimo || ''),
       giorno: String(giorno || ''),
       mese: meseDi(giorno),
       ora: String(ora || ''),
       app: versioneApp(app),
       os: OS.includes(os) ? os : ALTRO,
-      ...Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c, navigazionePulita(d[c], c)])),
+      ...Object.fromEntries(Object.keys(tabella).map((c) => [c, contiDellaTabella(tabella, d[c], c)])),
     };
   }
-  function senzaNavigazione(doc) { return MISURE_NAVIGAZIONE.every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length); }
+  const senzaConti = (tabella, doc) => Object.keys(tabella).every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length);
+  const documentoNavigazione = (base) => documentoAConti(NAVIGAZIONE, VERSIONE_NAVIGAZIONE, base);
+  const senzaNavigazione = (doc) => senzaConti(NAVIGAZIONE, doc);
+  const documentoRiquadri = (base) => documentoAConti(RIQUADRI, VERSIONE_RIQUADRI, base);
+  const senzaRiquadri = (doc) => senzaConti(RIQUADRI, doc);
 
   // La chat della stessa ora, nel suo documento (#1463): parte solo se ha qualcosa, e l'id è quello dell'ora più «_chat».
   function documentoChat({ pseudonimo, chiave, app, os, dati }) {
@@ -2270,14 +2355,16 @@
   }
   function leggiChiamate(s) { return CHIAMATE_RE.test(String(s)) ? fasceLette(s, nomi(FASCE_CHIAMATE)) : null; }
   // Una voce della navigazione: un oggetto per gruppo, coi conti per nome («ok», «g1», «d100k»…).
-  function leggiNavigazione(misura, s) {
-    if (!has(NAVIGAZIONE_RE, misura) || !NAVIGAZIONE_RE[misura].test(String(s))) return null;
+  function leggiAConti(tabella, forme, misura, s) {
+    if (!has(forme, misura) || !forme[misura].test(String(s))) return null;
     const parti = String(s).split(';');
-    return NAVIGAZIONE[misura].gruppi.map((g, i) => {
+    return tabella[misura].gruppi.map((g, i) => {
       const n = parti[i].split(',').map(Number);
       return Object.fromEntries(g.map((nome, j) => [nome, n[j]]));
     });
   }
+  const leggiNavigazione = (misura, s) => leggiAConti(NAVIGAZIONE, NAVIGAZIONE_RE, misura, s);
+  const leggiRiquadri = (misura, s) => leggiAConti(RIQUADRI, RIQUADRI_RE, misura, s);
   const somma = (o) => Object.values(o).reduce((a, n) => a + n, 0);
   // ── La validazione: la stessa forma che chiedono le regole, e in più i conti che devono tornare ─────────────
   function valida(doc) {
@@ -2383,24 +2470,28 @@
     return { ok: true, motivo: '' };
   }
 
-  function validaNavigazione(doc) {
+  function validaAConti(doc, { tabella, campi, v, forme, tetti }) {
     const no = (motivo) => ({ ok: false, motivo });
     if (!oggetto(doc)) return no('non è un documento');
     const chiavi = Object.keys(doc);
-    if (chiavi.length !== CAMPI_NAVIGAZIONE.length || !CAMPI_NAVIGAZIONE.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
-    if (doc.v !== VERSIONE_NAVIGAZIONE) return no('versione');
+    if (chiavi.length !== campi.length || !campi.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
+    if (doc.v !== v) return no('versione');
     const base = validaTesta(doc);
     if (base) return no(base);
     if (!ORA_RE.test(String(doc.ora))) return no('ora');
-    for (const c of MISURE_NAVIGAZIONE) {
+    for (const c of Object.keys(tabella)) {
       if (!oggetto(doc[c])) return no(c);
-      for (const [k, v] of Object.entries(doc[c])) {
-        if (!NAVIGAZIONE[c].chiavi.includes(k)) return no(`${c}: chiave ${k}`);
-        if (typeof v !== 'string' || v.length > TETTI_VOCE_NAVIGAZIONE[c] || !NAVIGAZIONE_RE[c].test(v)) return no(`${c} di ${k}`);
+      for (const [k, x] of Object.entries(doc[c])) {
+        if (!tabella[c].chiavi.includes(k)) return no(`${c}: chiave ${k}`);
+        if (typeof x !== 'string' || x.length > tetti[c] || !forme[c].test(x)) return no(`${c} di ${k}`);
       }
     }
     return { ok: true, motivo: '' };
   }
+  const validaNavigazione = (doc) => validaAConti(doc, { tabella: NAVIGAZIONE, campi: CAMPI_NAVIGAZIONE, v: VERSIONE_NAVIGAZIONE,
+    forme: NAVIGAZIONE_RE, tetti: TETTI_VOCE_NAVIGAZIONE });
+  const validaRiquadri = (doc) => validaAConti(doc, { tabella: RIQUADRI, campi: CAMPI_RIQUADRI, v: VERSIONE_RIQUADRI,
+    forme: RIQUADRI_RE, tetti: TETTI_VOCE_RIQUADRI });
 
   function mappeFuoriForma(doc, mappe) {
     for (const [campo, [chiaviAmmesse, formaValore, tetto]] of Object.entries(mappe)) {
@@ -2575,6 +2666,10 @@
     TETTO_VOCI_ATTIVITA, ESITI_AIUTO, DA_RICERCA, FORNITORI_RICERCA, MOTIVI_DETTATURA, INVII_DETTATURA, VOCI_LETTURA,
     CODICI_LETTURA, MOTIVI_LETTURA, FINO_LETTURA, ESITI_COMPATTAZIONE, VIE_MEMORIA, OPERAZIONI_MEMORIA, RIGHE_MEMORIA,
     TRIGGER_PULIZIA, CHIUSE_DA, ESITI_HOME,
+    VERSIONE_RIQUADRI, COLLEZIONE_RIQUADRI, CAMPI_RIQUADRI, MISURE_RIQUADRI, RIQUADRI, ANTICIPATE, STATI_ANTICIPO, FUNZIONI_RIQUADRO,
+    DOMANDE, USI_RIQUADRO, SCORCIATOIE, ESITI_RISCRITTURA, PROPOSTE, TAGLIATA, ESITI_OCR, ESITI_TRADUZIONE, RIMASTO, ORIGINALE_MS,
+    TITOLI, ESITI_TITOLO, ETA_TITOLO, DOCUMENTO_CHAT, FORMATI,
+    voceRiquadro, registraRiquadro, documentoRiquadri, senzaRiquadri, validaRiquadri, leggiRiquadri,
     VIE, PANNELLI, TIPI_PROPOSTA, ESITI_PROPOSTA, LIVELLI_AUTONOMIA, STATI_COMPITO, COSTI, PERIMETRI, ORIGINI, RISPOSTE,
     ESITI_CONFERMA, ANNULLABILI_IN_PAGINA, DOVE_CRASH, MOTIVI_CRASH, TIPI_ERRORE_VISTO, AVVISI_ERRORE, SCELTE_INTERVISTA,
     AVVIO, AZIONE_PAGINA, AZIONE_DI_ICONA, AZIONE_DI_PAGINA, IMPOSTAZIONI_EXTRA, MAI_CONTATE,
@@ -2586,7 +2681,8 @@
     FORME: Object.freeze({
       USO_FORMA, ERRORI_FORMA, MISURA_FORMA, IMPOSTAZIONI_FORMA, RICERCA_FORMA, CORRETTORE_FORMA, CONFERME_FORMA,
       CONTO_FORMA, ANTICIPO_FORMA, INTERVISTA_FORMA, CHIAVE_AZIONE_FORMA, CHIAVE_IMPOSTAZIONE_FORMA, TIPO_AZIONE_FORMA,
-      ERRORE_VISTO_FORMA, PASSO_FORMA, CHIAMATE_FORMA, SISTEMA_FORMA, MODELLI: FORME_MODELLI, NAVIGAZIONE: FORME_NAVIGAZIONE, TURNI_FORMA,
+      ERRORE_VISTO_FORMA, PASSO_FORMA, CHIAMATE_FORMA, SISTEMA_FORMA, MODELLI: FORME_MODELLI, NAVIGAZIONE: FORME_NAVIGAZIONE,
+      RIQUADRI: FORME_RIQUADRI, TURNI_FORMA,
       NOME_STRUMENTO_FORMA, STRUMENTI_FORMA, AZIONI_PER_GIRO_FORMA, CHIUSE_FORMA,
       ERRORE_VISTO_FORMA, PASSO_FORMA, CHIAMATE_FORMA, SISTEMA_FORMA, MODELLI: FORME_MODELLI, NAVIGAZIONE: FORME_NAVIGAZIONE,
       ATTIVITA: FORME_ATTIVITA,
@@ -2595,7 +2691,7 @@
       TETTO_CARATTERI_USO, TETTO_CARATTERI_ERRORI, TETTO_CARATTERI_ERRORI_ORA, TETTO_CARATTERI_MISURA, TETTO_CARATTERI_IMPOSTAZIONE,
       TETTO_CARATTERI_RICERCA, TETTO_CARATTERI_CORRETTORE, TETTO_CARATTERI_CONFERME, TETTO_CARATTERI_CONTO,
       TETTO_CARATTERI_ANTICIPO, TETTO_CARATTERI_INTERVISTA, TETTO_CARATTERI_CHIAMATE, TETTO_CARATTERI_SISTEMA,
-      MODELLI: TETTI_CARATTERI_MODELLI, NAVIGAZIONE: TETTI_CARATTERI_NAVIGAZIONE,
+      MODELLI: TETTI_CARATTERI_MODELLI, NAVIGAZIONE: TETTI_CARATTERI_NAVIGAZIONE, RIQUADRI: TETTI_CARATTERI_RIQUADRI,
       TETTO_CARATTERI_TURNI, TETTO_CARATTERI_STRUMENTI, TETTO_CARATTERI_AZIONI_PER_GIRO, TETTO_CARATTERI_CHIUSE,
       TETTO_CARATTERI_ATTIVITA, CHIAVI_ATTIVITA: TETTI_CHIAVI_ATTIVITA,
     }),

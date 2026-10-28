@@ -88,6 +88,37 @@
   // Giro in corso, col conto dei riquadri: attesi, fatti vivi, finiti, e quanto è rimasto in
   // lingua originale. La chiave del giro tiene fuori i resoconti di un giro già chiuso.
   const frameRuns = new Map();
+  // Com'è finita la traduzione, per i contatori (#1465): parte quando si sa se entro un minuto si è tornati
+  // all'originale, o quando la pagina se ne va. `avanzamento` dice quanto era fatto a chi la ferma a metà.
+  const ORIGINALE_MS = 60 * 1000;
+  let finale = null;
+  let avanzamento = { applied: 0, total: 0 };
+  function contaFinale(originale) {
+    if (!finale) return;
+    const f = finale;
+    finale = null;
+    clearTimeout(f.timer);
+    Popup.conta?.({ misura: 'riquadro', cosa: 'traduzione_pagina', esito: f.esito, rimasto: f.rimasto, originale });
+  }
+  function traduzioneFinita(esito, rimasti, tutti) {
+    contaFinale(false);
+    const rimasto = tutti > 0 ? Math.min(1, Math.max(0, rimasti / tutti)) : 0;
+    finale = { esito, rimasto, timer: setTimeout(() => contaFinale(false), ORIGINALE_MS) };
+  }
+  // Senza nessun testo tradotto non c'è una traduzione da contare.
+  function contaEsito(result, moreArrived, frames) {
+    if (!result || result.kind === 'onlyClosed' || result.kind === 'aborted') return;
+    const fLeft = (frames && frames.left) || 0;
+    const fApplied = (frames && frames.applied) || 0;
+    if (result.kind === 'none' && !fApplied && !fLeft) return;
+    const chiusi = result.kind === 'done' ? Number(result.unreachable || 0) : 0;
+    const rimasti = (result.kind === 'none' ? 0 : missingCount) + chiusi + fLeft;
+    const tutti = (result.kind === 'none' ? 0 : totalCount) + chiusi + fApplied + fLeft;
+    const esito = result.kind === 'stopped' || result.kind === 'failed' ? 'fermata'
+      : rimasti > 0 || moreArrived ? 'parziale' : 'intera';
+    traduzioneFinita(esito, result.kind === 'failed' && !tutti ? 1 : rimasti, result.kind === 'failed' && !tutti ? 1 : tutti);
+  }
+  try { global.addEventListener?.('pagehide', () => contaFinale(false)); } catch (_) {}
 
   // Un riquadro incorporato non è "la pagina": lì gli avvisi non si mostrano
   // (li mostra chi lo ospita) e il giro non si indice.
@@ -116,6 +147,8 @@
     }
     pageTranslating = true;
     ripiegoDelGiro = '';
+    // Ripresa o nuovo giro: chi continua non è tornato all'originale.
+    if (!quiet) { contaFinale(false); avanzamento = { applied: 0, total: 0 }; }
     // Una traduzione è un uso, non un uso per blocco: la conta la prima richiesta del giro, le altre (e quelle dei
     // riquadri incorporati) contano solo se si guastano (#969).
     usoContato = quiet;
@@ -159,6 +192,7 @@
       }
       progress.close();
       showResultToast(result, newContentSeen, frames);
+      contaEsito(result, newContentSeen, frames);
     } finally {
       progress.close();
       if (framesRunId) frameRuns.delete(framesRunId);
@@ -266,6 +300,7 @@
     const grandTotal = already + units.length + truncated;
     const tick = () => {
       const applied = already + units.filter((u) => u.applied).length;
+      avanzamento = { applied, total: grandTotal };
       try { progress.el.textContent = I18n.t('toast_translating_page_progress', applied, grandTotal); } catch (_) {}
     };
     tick();
@@ -900,6 +935,12 @@
     // metà una pagina che l'utente ha appena riportato indietro.
     runSeq++;
     const wasWorking = pageTranslating;
+    // Fermata a metà dalla persona, o tornata all'originale entro un minuto dalla fine.
+    if (!quiet) {
+      const t = avanzamento.total;
+      if (wasWorking) traduzioneFinita('fermata', t ? t - avanzamento.applied : 1, t || 1);
+      contaFinale(true);
+    }
     // Il giro in corso finisce qui: l'utente deve poter far ripartire una traduzione subito,
     // senza aspettare che le richieste già spedite tornino.
     pageTranslating = false;

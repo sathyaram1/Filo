@@ -1774,9 +1774,13 @@
     const avvia = () => {
       if (staccato || !ascolti.length) return;
       staccato = SpellCheck.seguiSegno(editableEl, errore, (nuovo) => { if (nuovo && !nuovo.dubbio) for (const fn of ascolti) fn(nuovo); });
-      SpellCheck.giudicaOra(editableEl, errore);
+      const giudizio = SpellCheck.giudicaOra(editableEl, errore);
+      if (giudizio) contaAnticipoParola(giudizio === 'in_volo' ? 'in_volo' : 'assente');
     };
-    if (!errore.dubbio && (errore.fonte === 'rapido' || errore.giudicatoDa === 'rapido')) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_SEMANTIC);
+    if (!errore.dubbio && (errore.fonte === 'rapido' || errore.giudicatoDa === 'rapido')) {
+      contaUsoDelCorrettore(ACTIONS.SPELLCHECK_SEMANTIC);
+      contaAnticipoParola('pronto');
+    }
     const items = [
       {
         type: 'correction', ...riga(errore),
@@ -1880,6 +1884,10 @@
   function contaUsoDelCorrettore(action) {
     try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs: 0 })).catch(() => {}); } catch (_) {}
   }
+  // Com'era il giudizio del modello sulla parola quando la persona ha aperto il menu (#1465).
+  function contaAnticipoParola(stato) {
+    Popup.conta?.({ misura: 'riquadro', cosa: 'anticipo_al_gesto', funzione: 'correttore_parola', stato });
+  }
 
   // La parola che il correttore ha corretto da sé (#1447): «Annulla correzione» la riporta com'era scritta, e conta
   // come un rifiuto da cui Filo impara.
@@ -1938,6 +1946,8 @@
       alChiudere: () => setTimeout(() => esito('ignorata'), 1500),
     });
     if (mostrata) SpellCheck.propostaMostrata?.(editableEl, 'ortografia', chiave, 'nativo');
+    // Qui il modello non aveva preparato niente: il controllo parte adesso.
+    if (SpellCheck.modelloErrori?.()) contaAnticipoParola('assente');
 
     const mostra = (corr, alts, modello = 'nativo') => {
       if (!updateCorrection || !corr || corr === wordCtx.word) return;

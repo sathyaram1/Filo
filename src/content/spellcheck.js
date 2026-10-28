@@ -2084,12 +2084,12 @@
   }
 
   // Un candidato ancora da giudicare sotto il tasto destro: il controllo rapido parte adesso, e il menu aperto si
-  // aggiorna quando risponde (seguiSegno).
+  // aggiorna quando risponde (seguiSegno). Dice se un controllo era già in volo ('in_volo') o parte ora ('partito').
   function giudicaOra(el, segno) {
     const state = el && monitored.get(el);
     if (!state || !segno || !segno.dubbio || segno.segno !== 'errore' || !modelloErrori()) return false;
     const k = R().chiaveVerdetto(segno);
-    if (state.inViaggio.some((v) => v.start < segno.end && v.end > segno.start)) return true;
+    if (state.inViaggio.some((v) => v.start < segno.end && v.end > segno.start)) return 'in_volo';
     state.richiesti.add(k);
     // Fuori dalla base, così il pezzo torna nuovo anche se era già stato mandato; ciò che era da giudicare resta.
     const d = testoDaControllare(el);
@@ -2102,7 +2102,7 @@
       state.baseRapido = d.testo.slice(0, da) + d.testo.slice(fino);
     }
     controlloRapido(state, { suRichiesta: true, ignoraScrittura: true });
-    return true;
+    return 'partito';
   }
 
   function seguiSegno(el, segno, cb) {

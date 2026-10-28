@@ -608,6 +608,8 @@
       ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true, anticipo: true }),
     }).then(
       (res) => {
+        // Per i contatori (#1465): l'anticipo era già qui quando la persona ha aperto Spiega, o ancora in volo.
+        entry.arrivata = true;
         // Fermata dal tetto o da una pagina delicata (#1274): al tasto destro si chiede davvero.
         if (res && (res.code === 'TROPPE_AUTOMATICHE' || res.code === 'PAGINA_DELICATA')) entry.fermata = true;
         // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
@@ -615,7 +617,7 @@
           ? { text: res.text, keyFallback: res.keyFallback || null }
           : { errore: res || {} };
       },
-      (e) => ({ errore: { message: e?.message } }),
+      (e) => { entry.arrivata = true; return { errore: { message: e?.message } }; },
     );
     return entry;
   }
@@ -623,13 +625,18 @@
   function contaUso(action, attesaMs, anticipata = false) {
     try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs, anticipata })).catch(() => {}); } catch (_) {}
   }
+  // I riquadri del tasto destro e del popup (#1465): nomi degli elenchi chiusi e numeri, mai il testo.
+  const contaRiquadro = (cosa, campi) => Popup.conta({ misura: 'riquadro', cosa, ...campi });
 
   // Restituisce la Promise per la spiegazione di questa selezione.
   // Riusa il prefetch se è dello stesso testo; altrimenti parte ora.
   // Un anticipo fermato dal tetto delle automatiche non è la risposta: al tasto destro si chiede davvero.
   function getExplainPromise(selInfo) {
     const key = explainKey(selInfo.selection);
-    const chiedi = () => {
+    // Com'era l'anticipo al gesto (#1465): contato alla prima apertura della selezione, una riapertura no.
+    const anticipo = (stato) => contaRiquadro('anticipo_al_gesto', { funzione: 'spiega', stato });
+    const chiedi = (stato = '') => {
+      if (stato) anticipo(stato);
       // Con la spiegazione in anticipo spenta la chiede la persona: è il gesto che quella scelta le costa (#1461).
       if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
       const entry = startExplainRequest(selInfo, { suRichiesta: true });
@@ -637,9 +644,14 @@
       return entry.promise;
     };
     const pre = prefetchedExplain;
-    if (pre && pre.key === key && !pre.fermata) {
+    const stessa = !!pre && pre.key === key;
+    const primaApertura = stessa && !!pre.anticipata && !pre.aperta;
+    if (stessa) pre.aperta = true;
+    if (stessa && !pre.fermata) {
+      const stato = !primaApertura ? '' : pre.sentence !== selInfo.sentence ? 'contesto_cambiato' : pre.arrivata ? 'pronto' : 'in_volo';
       return pre.promise.then((res) => {
-        if (pre.fermata) return chiedi();
+        if (pre.fermata) return chiedi(primaApertura ? 'fermato_tetto' : '');
+        if (stato) anticipo(stato);
         // Preparata e aperta: per i crediti non è una chiamata sprecata (#818). Una fermata non è partita.
         const primaVolta = !!pre.anticipata && !pre.usata;
         if (primaVolta) {
@@ -650,7 +662,7 @@
         return { ...res, giaChiesta: true, anticipata: primaVolta && !!res && !res.errore && !!res.text };
       });
     }
-    return chiedi();
+    return chiedi(primaApertura ? 'fermato_tetto' : stessa ? '' : 'assente');
   }
 
   // Il tasto del rimedio sotto una spiegazione del menu apre un'altra scheda: il menu non resta aperto sopra il sito.
@@ -680,6 +692,8 @@
           arrow.textContent = '▸';
           arrow.addEventListener('click', (e) => {
             e.stopPropagation();
+            approfondita = true;
+            contaRiquadro('riquadro_uso', { action: ACTIONS.EXPLAIN, uso: 'approfondisci' });
             try { global.SN_MENU?.close?.(); } catch (_) {}
             triggerExplainDeep(selInfo, deps.getLastMouseEvent());
           });
@@ -687,8 +701,11 @@
         }
 
         let cancelled = false;
+        let arrivata = false;
+        let approfondita = false;
         const apertaIl = Date.now();
         getExplainPromise(selInfo).then((res) => {
+          arrivata = true;
           // Una risposta già chiesta prima (l'anticipo alla selezione) non passa dal conto delle chiamate: l'uso lo
           // conta chi la mostra, con l'attesa da quando la persona ha aperto Spiega (#969).
           if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null, res.anticipata);
@@ -710,7 +727,11 @@
           Popup.notaRipiego(body, res.keyFallback);
           Popup.notaInterrotta(body, res.finishReason);
         });
-        return () => { cancelled = true; };
+        // Il menu chiuso prima della spiegazione (#1465); passare ad Approfondisci non è lasciarla lì.
+        return () => {
+          cancelled = true;
+          if (!arrivata && !approfondita) contaRiquadro('riquadro_chiuso_prima', { action: ACTIONS.EXPLAIN, attesaMs: Date.now() - apertaIl });
+        };
       },
     };
   }
@@ -811,6 +832,8 @@
           return () => {};
         }
         let cancelled = false;
+        let arrivata = false;
+        const apertaIl = Date.now();
         // Il sito in lista lo dice anche l'immagine che fa da link, come il link di testo; la domanda non contatta il sito.
         if (indirizzo) {
           chrome.runtime.sendMessage({ type: MSG.LINK_FERMATO, url: indirizzo }).then((r) => {
@@ -827,6 +850,7 @@
             dataUrl = await scaricaImmagine(src, imgEl);
           } catch (_) {
             if (cancelled) return;
+            arrivata = true;
             el.classList.remove('sn-menu-inline-loading');
             el.classList.add('sn-menu-inline-error');
             body.textContent = I18n.t('menu_image_unreadable');
@@ -853,6 +877,7 @@
               diceRipiego: true,
             });
             if (cancelled) return;
+            arrivata = true;
             el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
               el.classList.add('sn-menu-inline-error');
@@ -864,12 +889,16 @@
             Popup.notaInterrotta(el, res.finishReason);
           } catch (e) {
             if (cancelled) return;
+            arrivata = true;
             el.classList.remove('sn-menu-inline-loading');
             el.classList.add('sn-menu-inline-error');
             body.textContent = I18n.t('err_provider_failed');
           }
         })();
-        return () => { cancelled = true; };
+        return () => {
+          cancelled = true;
+          if (!arrivata) contaRiquadro('riquadro_chiuso_prima', { action: ACTIONS.DESCRIBE_IMAGE, attesaMs: Date.now() - apertaIl });
+        };
       },
     };
   }
@@ -883,6 +912,8 @@
       onMount: (el) => {
         el.classList.add('sn-menu-inline-loading');
         let cancelled = false;
+        let arrivata = false;
+        const apertaIl = Date.now();
         (async () => {
           const url = indirizzoDelLink(linkEl);
           const anchorText = nomeDelLink(linkEl).slice(0, 200);
@@ -905,6 +936,7 @@
           if (cancelled) return;
           if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
           else if (r?.bloccato) {
+            arrivata = true;
             el.classList.remove('sn-menu-inline-loading');
             body.textContent = I18n.t(r.bloccato === 'lists' ? 'menu_link_blocked_lists' : 'menu_link_blocked', r.host || '');
             return;
@@ -914,6 +946,7 @@
           try {
             port = chrome.runtime.connect({ name: global.SN_MSG.PORTS.AI_STREAM });
           } catch (_) {
+            arrivata = true;
             el.classList.remove('sn-menu-inline-loading');
             el.classList.add('sn-menu-inline-error');
             body.textContent = I18n.t('err_provider_failed');
@@ -923,6 +956,7 @@
           let firstDelta = true;
           port.onMessage.addListener((m) => {
             if (m.type === 'delta') {
+              arrivata = true;
               if (firstDelta) {
                 el.classList.remove('sn-menu-inline-loading');
                 firstDelta = false;
@@ -935,10 +969,13 @@
               // butta il testo parziale (l'avviso sicurezza resta).
               buf = '';
               body.textContent = '';
+              if (!cancelled) contaRiquadro('riquadro_uso', { action: ACTIONS.EXPLAIN_LINK, uso: 'ricominciata' });
             } else if (m.type === 'done') {
+              arrivata = true;
               Popup.notaRipiego(el, m.keyFallback);
               Popup.notaInterrotta(el, m.finishReason);
             } else if (m.type === 'error') {
+              arrivata = true;
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
               Popup.scriviErrore(body, m, { dopo: chiudiMenu });
@@ -951,7 +988,10 @@
             origin: location.href,
           });
         })();
-        return () => { cancelled = true; };
+        return () => {
+          cancelled = true;
+          if (!arrivata) contaRiquadro('riquadro_chiuso_prima', { action: ACTIONS.EXPLAIN_LINK, attesaMs: Date.now() - apertaIl });
+        };
       },
     };
   }
@@ -1740,7 +1780,9 @@
   async function transcribeRegion() {
     try {
       const region = await selectScreenRegion();
-      if (!region) { Popup.showToast(I18n.t('toast_region_cancelled')); return; }
+      // Com'è finita la trascrizione (#1465); un guasto del modello lo contano già gli errori.
+      const ocr = (esito) => contaRiquadro('ocr', { esito });
+      if (!region) { ocr('annullato'); Popup.showToast(I18n.t('toast_region_cancelled')); return; }
       Popup.showToast(I18n.t('toast_transcribing'), { duration: 2500 });
       const res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
@@ -1749,7 +1791,7 @@
       });
       if (!res?.ok) { Popup.avvisoErrore(res); return; }
       const text = (res.text || '').trim();
-      if (!text) { Popup.toastErrore('toast_transcribe_empty'); return; }
+      if (!text) { ocr('vuoto'); Popup.toastErrore('toast_transcribe_empty'); return; }
       try { await navigator.clipboard.writeText(text); } catch (_) {
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -1761,6 +1803,7 @@
       try { pushClipboardEntry({ type: 'text', text }); } catch (_) {}
       // Copiato, ma non intero: fermato al tetto di lunghezza (#1097.3).
       const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
+      ocr(interrotta ? 'tagliato' : 'copiato');
       Popup.showToast(interrotta ? `${I18n.t('toast_transcribed')} ${interrotta}` : I18n.t('toast_transcribed'), interrotta ? { duration: 9000 } : undefined);
     } catch (_) {
       Popup.toastErrore('err_provider_failed');

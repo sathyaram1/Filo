@@ -76,6 +76,19 @@
       translate: 'Traduci il testo in inglese.',
       fix: 'Correggi eventuali errori grammaticali e di ortografia, senza alterare il senso.',
     };
+    // Per i contatori (#1465): quale scorciatoia ha fatto la proposta (un'istruzione scritta è «libera», mai il suo
+    // testo), quante proposte prima dell'esito, e l'esito.
+    const CONTATA = { formal: 'formale', casual: 'informale', summarize: 'riassumi', translate: 'traduci', fix: 'correggi' };
+    const scorciatoiaDi = (istruzione) => CONTATA[Object.keys(SHORTCUTS).find((k) => SHORTCUTS[k] === istruzione)] || 'libera';
+    const conta = (campi) => Popup.conta?.({ misura: 'riquadro', cosa: 'riscrittura', ...campi });
+    let proposte = 0;
+    let scorciatoia = '';
+    let finita = false;
+    const fine = (esito) => {
+      if (finita) return;
+      finita = true;
+      if (proposte > 0) conta({ scorciatoia, esito, proposte });
+    };
     // Una riscrittura spende una chiamata: parte solo da un tasto o da un clic dell'utente (#1071).
     root.querySelectorAll('.sn-editbox-shortcuts button').forEach((b) => {
       b.addEventListener('click', (e) => {
@@ -115,6 +128,8 @@
           return;
         }
         currentResult = res.text.trim();
+        proposte += 1;
+        scorciatoia = scorciatoiaDi(instruction);
         $prop.classList.remove('sn-editbox-empty');
         renderDiff($prop, originalText, currentResult);
         $nota = Popup.notaRipiego($prop.parentNode, res.keyFallback);
@@ -122,6 +137,7 @@
         $copy.disabled = false;
         // Una riscrittura tagliata al posto del testo intero ne perderebbe la coda: si copia, non si sostituisce.
         $replace.disabled = !!global.SN_CHAT_ERRORS?.troncata?.(res.finishReason);
+        if ($replace.disabled) conta({ scorciatoia, tagliata: true });
       } catch (e) {
         mostraErrore({ message: e?.message });
       } finally {
@@ -153,6 +169,7 @@
       if (!e.isTrusted) return;
       navigator.clipboard.writeText(currentResult).then(() => {
         Popup.showToast(I18n.t('toast_copied'));
+        fine('copiato');
         close();
       }, () => Popup.toastErrore('err_provider_failed'));
     });
@@ -181,14 +198,19 @@
       }
       Popup.modificaDiFilo(savedCtx.el || document.activeElement, 'modifica-testo');
       Popup.showToast(I18n.t('edit_box_replaced'));
+      fine('sostituito');
       close();
     });
 
     function close() {
+      fine('chiuso');
       if (Popup.togliRiquadro) Popup.togliRiquadro(root);
       else { try { root.remove(); } catch (_) {} }
       document.removeEventListener('keydown', onDocKey, true);
+      window.removeEventListener('pagehide', close);
     }
+    // La pagina che se ne va col riquadro aperto lo chiude.
+    window.addEventListener('pagehide', close);
     const onDocKey = (e) => {
       if (e.key !== 'Escape') return;
       close();

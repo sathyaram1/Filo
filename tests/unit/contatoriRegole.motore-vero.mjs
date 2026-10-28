@@ -1,4 +1,4 @@
-// Le regole Firestore dei contatori anonimi (#969, #1461, #1463, #1464, #1466, #1467, #1469, #1471), provate col MOTORE VERO e col codice vero dell'app.
+// Le regole Firestore dei contatori anonimi (#969, #1461, #1463, #1464, #1465, #1466, #1467, #1469, #1471), provate col MOTORE VERO e col codice vero dell'app.
 //
 // NON è un unit test: il nome non finisce in `.test.mjs` apposta (vedi pathsRegole.motore-vero.mjs, che spiega
 // perché e come si prepara la cartella usa-e-getta con l'emulatore). La sentinella sempre accesa è
@@ -9,7 +9,7 @@
 // Si lancia come l'altro, con in più FILO_REPO=<repo>:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-969 "node <cartella>/contatoriRegole.motore-vero.mjs"
-// Esito atteso: 124 righe verdi, uscita 0 (#1467 su #1463, 2026-10-28). È l'unica prova del tetto di mille
+// Esito atteso: 130 righe verdi, uscita 0 (#1465 su #1467, 2026-10-28). È l'unica prova del tetto di mille
 // espressioni che Firestore concede a una scrittura: le regole dell'ora ne valutano già circa 950, e un controllo in più
 // le fa rifiutare tutte (per questo chiamate ai modelli, chat e attività hanno il loro documento), mentre la sentinella che
 // legge il file non se ne accorge. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
@@ -323,6 +323,31 @@ await prova('la navigazione più carica che l’app costruisce (ogni chiave di o
   const piena = C.documentoNavigazione({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '9999.9999.999999', os: 'linux', dati });
   vero(C.validaNavigazione(piena).ok, C.validaNavigazione(piena).motivo);
   return assertSucceeds(setDoc(doc(anon, `${COLL_NAV}/${C.idDocumento(piena)}`), piena));
+});
+// I riquadri AI e l'Editor (#1465): come la navigazione, il loro documento accanto all'ora.
+const COLL_RIQ = C.COLLEZIONE_RIQUADRI;
+const datiRiq = C.oraVuota();
+for (const [m, d] of [['ocr', { esito: 'copiato' }], ['riscrittura', { scorciatoia: 'formale', esito: 'sostituito', proposte: 2 }],
+  ['traduzione_pagina', { esito: 'parziale', rimasto: 0.3, originale: true }]]) {
+  const v = C.voceRiquadro(m, d);
+  C.registraRiquadro(datiRiq, v.misura, v.chiave, v.voci);
+}
+const RIQ = C.documentoRiquadri({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiRiq });
+await prova('un anonimo crea i riquadri della sua ora', () => assertSucceeds(setDoc(doc(anon, `${COLL_RIQ}/${idBuono}`), RIQ)));
+await prova('ma non li riscrive', () => assertFails(setDoc(doc(anon, `${COLL_RIQ}/${idBuono}`), RIQ)));
+await prova('l’admin legge i riquadri', () => assertSucceeds(getDoc(doc(owner, `${COLL_RIQ}/${idBuono}`))));
+await prova('un anonimo non li legge', () => assertFails(getDoc(doc(anon, `${COLL_RIQ}/${idBuono}`))));
+await prova('un’istruzione scritta come chiave della riscrittura no', () => assertFails(setDoc(doc(anon, `${COLL_RIQ}/${C.idDocumento({ ...RIQ, ora: '11' })}`),
+  { ...RIQ, ora: '11', riscrittura: { 'rendilo gentile': '1,0,0,0,0,0,0,0,0,0' } })));
+await prova('i riquadri più carichi che l’app costruisce (ogni chiave di ogni misura, ai tetti) passano', () => {
+  const dati = C.oraVuota();
+  for (const c of C.MISURE_RIQUADRI) {
+    const n = C.RIQUADRI[c].gruppi.reduce((a, g) => a + g.length, 0);
+    for (const k of C.RIQUADRI[c].chiavi) dati[c][k] = Array(n).fill(999999999);
+  }
+  const pieni = C.documentoRiquadri({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '9999.9999.999999', os: 'linux', dati });
+  vero(C.validaRiquadri(pieni).ok, C.validaRiquadri(pieni).motivo);
+  return assertSucceeds(setDoc(doc(anon, `${COLL_RIQ}/${C.idDocumento(pieni)}`), pieni));
 });
 await prova('l’admin le legge', () => assertSucceeds(getDoc(doc(owner, `${COLL_CHIAMATE}/${idBuono}`))));
 await prova('le chiamate più cariche che l’app costruisce (ogni misura di ogni funzione, ai tetti) passano', () => {
