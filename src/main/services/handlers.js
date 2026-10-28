@@ -5679,6 +5679,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const riprovata = imageList.length && String(m.text || '') === String(userMessage || '');
     const quanteFoto = role === 'user' && !riprovata ? FCx.numeroImmagini(m) : 0;
     if (quanteFoto) content = `${content}\n${FCx.notaImmagini(quanteFoto)}`;
+    // La risposta citata, come la pagina l'ha davanti: qui arrivano solo i messaggi che il filo non ha (#1620).
+    const citataQui = role === 'user' && m.rispostaA && RispostaA ? RispostaA.daPagina(m.rispostaA) : null;
+    if (citataQui && citataQui.testo.trim()) {
+      content = `${FCx.notaRisposta({ role: 'filo', testo: RispostaA.taglia(citataQui.testo, RispostaA.PER_IL_MODELLO) })}\n${content}`;
+    }
     const msg = { role, content };
     if (role === 'assistant') {
       const parts = [];
