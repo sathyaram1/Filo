@@ -1,4 +1,4 @@
-// Le regole Firestore dei contatori anonimi (#969, #1461, #1463, #1464, #1466, #1467, #1469, #1471), provate col MOTORE VERO e col codice vero dell'app.
+// Le regole Firestore dei contatori anonimi (#969, #1461, #1463, #1464, #1465, #1466, #1467, #1469, #1471), provate col MOTORE VERO e col codice vero dell'app.
 //
 // NON è un unit test: il nome non finisce in `.test.mjs` apposta (vedi pathsRegole.motore-vero.mjs, che spiega
 // perché e come si prepara la cartella usa-e-getta con l'emulatore). La sentinella sempre accesa è
