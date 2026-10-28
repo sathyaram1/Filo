@@ -1483,6 +1483,7 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   // dal biglietto, ed è lui che ha accettato o rifiutato.
   const reply = sent.reply && typeof sent.reply === 'object' ? sent.reply : {};
   if (reply.outcome === 'stop') next.verifierVerdict = 'stop';
+  segnaPuntaDelGiro(ROOT, readRoutineTicket(ROOT), { sha: shaConsegnato, ramo: currentBranch(ROOT), via: 'fixed' });
   sealTransition(next, `${readRole(ROOT) || 'fixer'}:${reply.outcome === 'stop' ? 'ferma' : 'consegna'}`);
   next.reply = reply;
   return next;
