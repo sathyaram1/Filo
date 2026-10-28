@@ -105,12 +105,12 @@ test('«esci» esce dall\'account e il bottone torna «Accedi»; un secondo «es
   const pagina = await preparaLogin(app, testServer);
   await entra(app, shell, pagina);
 
-  // Dall'Aiuto dentro un sito no, nemmeno a Yolo dove nessuno chiede l'OK: un sito non butta fuori l'utente.
+  // Da un sito no, nemmeno a Yolo dove nessuno chiede l'OK: come l'uscita dal menu, la chiede solo Filo.
   await livelloAutonomia(app, 'yolo');
   const daSito = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a, { sender: { url: 'https://sito-pubblico.test/' }, assistente: true }),
     { type: 'ACCOUNT', cosa: 'esci' });
   expect(daSito.executed).toBe(false);
-  expect(JSON.stringify(daSito)).toContain('non si esce dall');
+  expect(daSito.code).toBe('forbidden');
   expect((await stato(shell)).signedIn).toBe(true);
   await livelloAutonomia(app, 'default');
 
