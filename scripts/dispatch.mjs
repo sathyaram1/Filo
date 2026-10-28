@@ -1214,6 +1214,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '', domanda = nul
     ? { sha: shaProvato, n: daParte.reduce((k, d) => k + d.rilievi.length, 0), numeri: daParte.flatMap((d) => d.rilievi.map((f) => f.n)).filter(Number.isInteger), avvio: avvio || '' }
     : null;
   sealTransition(next, `verifier:${outcome}`);
+  sigillaLaConsegna('verdict', shaProvato, outcome);
   next.reply = reply;
   return next;
 }
