@@ -122,10 +122,6 @@ html.aperta .pannello {
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 26px, #000 calc(100% - 26px), transparent);
   mask-image: linear-gradient(to bottom, transparent, #000 26px, #000 calc(100% - 26px), transparent);
 }
-.nav.mira {
-  background: rgba(var(--accent-rgb), 0.08);
-  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.55);
-}
 /* Le carte di sinistra della home, compatte: vuoto finché le carte non esistono. */
 .carte { flex: 1 1 0; min-height: 0; padding: 0; }
 .sistema { flex: 0 0 auto; border-top: 1px solid var(--border); padding-top: 6px; }
@@ -171,6 +167,20 @@ html.aperta .pannello {
 @media (prefers-color-scheme: dark) {
   .ico.risposta::after { box-shadow: 0 0 0 2px var(--tab-bg, var(--tab-active)); }
 }
+/* Il cassetto di «Altro…»: una linea sopra lo separa dalle icone in vista, la freccia si gira quando è aperto. */
+.ico.altro { height: 26px; margin-top: 2px; }
+.ico.altro::before {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: 10px;
+  right: 10px;
+  height: 1px;
+  background: var(--border);
+}
+.ico.altro svg { width: 16px; height: 16px; transition: transform calc(var(--dur) * var(--sn-motion, 1)) ease; }
+.ico.altro[aria-expanded="true"] svg { transform: rotate(180deg); }
+.ico.altro.mira, .ico.altro.mira:hover { color: var(--accent); background: rgba(var(--accent-rgb), 0.12); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.55); }
 .ico.nuova { animation: posa calc(320ms * var(--sn-motion, 1)) cubic-bezier(0.4, 0, 0.2, 1); }
 .ico.trascinata { opacity: 0.3; }
 .ico svg { width: 18px; height: 18px; display: block; pointer-events: none; }
@@ -203,7 +213,10 @@ html.aperta .pannello {
   z-index: 5;
   pointer-events: none;
   opacity: 0.9;
+  transition: opacity calc(120ms * var(--sn-motion, 1)) ease;
   background: var(--tab-active);
   box-shadow: 0 4px 12px rgba(0, 0, 0, calc(0.18 * var(--sn-ombra, 1)));
 }
+/* Fuori dal pannello non c'è dove posarla: sbiadisce, e rilasciata lì resta dov'era. */
+.fantasma.fuori { opacity: 0.35; }
 [hidden] { display: none !important; }

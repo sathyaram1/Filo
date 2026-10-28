@@ -248,6 +248,8 @@
     aiuto_spento_barra: 'Aiuto spento in Preferenze',
     aiuto_spento_sito: 'Filo è spento su questo sito',
     aiuto_spento_pagina: 'Qui l\'Aiuto non c\'è',
+    azioni_spente_pagina: 'Su questa pagina Filo non può agire',
+    azioni_spente_interna: 'Questa pagina di Filo non ha un indirizzo da condividere',
     // Configurazione dei modelli: una funzione senza modello NON parte e lo dice
     // (niente ripieghi silenziosi su modelli scritti nel codice). %s = nome della
     // funzione, poi dove si imposta.
@@ -280,7 +282,7 @@
     toast_page_translated: 'Pagina tradotta',
     // Il sito aggiunge testo mentre traduciamo, e a un certo punto si smette di rincorrerlo.
     // Qui sotto si dice sempre cosa è rimasto in inglese: «Pagina tradotta» sarebbe falso.
-    toast_page_translated_new_arrived: 'Pagina tradotta. Il sito ne ha aggiunta dell\'altra mentre lavoravo: dal tasto destro trovi «Traduci il testo nuovo».',
+    toast_page_translated_new_arrived: 'Pagina tradotta. Il sito ne ha aggiunta dell\'altra mentre lavoravo: l\'icona Traduci della barra laterale ora dice «Traduci il testo nuovo».',
     // #439 — parti della pagina che nessuno script può leggere (componenti chiusi a chiave).
     toast_page_translated_partial: 'Pagina tradotta solo in parte: alcuni componenti di questo sito sono chiusi e restano nella lingua originale.',
     toast_only_closed_components: 'Il testo di questa pagina vive dentro componenti chiusi del sito: non riesco a leggerlo, e resta nella lingua originale.',
@@ -288,9 +290,9 @@
     // che resta in inglese in mezzo a una pagina italiana.
     toast_page_translated_partial_frame: 'Pagina tradotta, tranne un riquadro incorporato. Il sito non lascia leggere il testo lì dentro, e resta nella lingua originale.',
     // Traduzione interrotta a metà (#408): quanto manca, perché si è fermata, come riprendere.
-    toast_page_translate_stopped: 'Traduzione interrotta dopo %s blocchi su %s. %s Puoi riprenderla dal tasto destro senza rifare la parte già tradotta.',
+    toast_page_translate_stopped: 'Traduzione interrotta dopo %s blocchi su %s. %s Puoi riprenderla dall\'icona Traduci della barra laterale senza rifare la parte già tradotta.',
     // Più lunga di quanta ne entri in un giro solo: non è un guasto, è un lavoro a tratti.
-    toast_page_translate_batch: 'Pagina molto lunga: tradotti %s blocchi su %s. Riprendi dal tasto destro per continuare.',
+    toast_page_translate_batch: 'Pagina molto lunga: tradotti %s blocchi su %s. Riprendi dall\'icona Traduci della barra laterale per continuare.',
     toast_page_translate_failed: 'Non sono riuscito a tradurre la pagina. %s',
     reason_translate_incomplete: 'Alcuni blocchi sono tornati vuoti dal modello.',
     toast_nothing_to_translate: 'Non ho trovato testo da tradurre in questa pagina',

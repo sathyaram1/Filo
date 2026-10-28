@@ -153,7 +153,7 @@ Un messaggio IPC nuovo:
 ```bash
 npm run test:smoke     # smoke headless con screenshot (tests/.smoke/)
 npm run test:unit      # unit test Node (veloci)
-npm test               # suite Playwright completa (~590 spec, ~1.450 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
+npm test               # suite Playwright completa (~620 spec, ~1.450 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
 npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
 ```
 

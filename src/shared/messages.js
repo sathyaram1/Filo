@@ -436,15 +436,9 @@
     NAV_BACK: 'nav_back',
     NAV_FORWARD: 'nav_forward',
     NAV_RELOAD: 'nav_reload',
-    NAV_STATE: 'nav_state',                         // → { ok, canBack, canFwd }
-    // Barra laterale (#871): aperti anche ai content script dei siti, perché dicono e
-    // spostano solo dove stanno le icone di Filo. La disposizione la scrive il main, uno solo.
-    ICON_LAYOUT_GET: 'icon_layout_get',             // → { ok, layout }
-    ICON_LAYOUT_DROP: 'icon_layout_drop',           // { id, target, beforeId } → { ok, layout }
-    ICON_LAYOUT_CHANGED: 'icon_layout_changed',     // spinta → { layout }
     CORRETTORE_MEMORIE: 'correttore_memorie',       // spinta → { memorie: { sn_personal_dict?, sn_autocorrect?, rifiutate? } } (#1447)
-    BARRA_TRASCINA: 'barra_trascina',               // { fase: inizio|sopra|posa|fine, id, x, y } → { ok, larghezza }
-    BARRA_FUORI: 'barra_fuori',                     // spinta alla scheda davanti → { fase: muovi|rilascia|annulla, id, x, y }
+    // Barra laterale (#871): aperti anche ai content script dei siti, perché dicono solo il nome che hanno adesso le
+    // azioni della pagina. La disposizione delle icone la scrive il main, uno solo.
     BARRA_ETICHETTE_CHIEDI: 'barra_etichette_chiedi', // spinta alla scheda davanti → { ids }: come si chiamano adesso le sue azioni nella barra
     BARRA_ETICHETTE: 'barra_etichette',             // dalla scheda davanti { voci: [{ id, etichetta, icona }] } → { ok }
     // Aperti ai siti (#1432): ci scrive il content script dell'Aiuto, e toccano solo la scheda che li manda.
@@ -844,6 +838,7 @@
     GET_CLIPBOARD_HISTORY: 'get_clipboard_history',
     PUSH_CLIPBOARD_ENTRY: 'push_clipboard_entry',     // { entry }
     COPY_TEXT_TO_CLIPBOARD: 'copy_text_to_clipboard', // { text } → { ok }: appunti di sistema e cronologia, dal «Copia» delle risposte (#846); cancello di PUSH
+    COPY_IMAGE_TO_CLIPBOARD: 'copy_image_to_clipboard', // { dataUrl png } → { ok }: solo appunti di sistema, la pagina può non avere il fuoco (#1343); cancello di PUSH
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
     REMOVE_CLIPBOARD_ENTRY: 'remove_clipboard_entry', // { entry }
     CLEAR_CLIPBOARD_HISTORY: 'clear_clipboard_history',

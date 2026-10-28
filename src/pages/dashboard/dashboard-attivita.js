@@ -963,7 +963,7 @@
       const D = window.SN_DISPOSIZIONE_ICONE;
       const id = String(a.icona || a.id || '');
       const nome = D && D.noto && D.noto(id) ? D.nome(id) : id;
-      const dove = { barra: 'nella barra laterale', menu: 'nel tasto destro', altro: 'in «Altro…»' }[String(a.dove || '').toLowerCase()] || '';
+      const dove = { barra: 'nella barra laterale', altro: 'in «Altro…» della barra laterale' }[String(a.dove || '').toLowerCase()] || '';
       return { icon: '📌', text: `Icona spostata · ${nome}${dove ? ` ${dove}` : ''}` };
     },
   };

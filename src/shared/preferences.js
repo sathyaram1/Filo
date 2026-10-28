@@ -852,6 +852,17 @@
       },
     },
     {
+      scrive: ['barraLaterale.schede'],
+      costo: 1,
+      aiuto: 'true | false (a schermo intero le schede compaiono portando il mouse sul bordo alto, e spariscono allontanandolo)',
+      keys: ['barra_schede', 'schede a schermo intero', 'schede dal bordo alto', 'mostra le schede a schermo intero', 'schede in alto a schermo intero'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { barraLaterale: { schede: b } }, label: `Schede dal bordo alto a schermo intero → ${b ? 'compaiono' : 'restano nascoste'}` };
+      },
+    },
+    {
       scrive: ['avvisoSchermoPieno.durataMs'],
       costo: 1,
       aiuto: 'millisecondi 1000-10000 (quanto resta l\'avviso col nome del sito quando una pagina va a schermo intero; non si spegne)',

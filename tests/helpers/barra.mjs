@@ -1,5 +1,5 @@
-// La barra laterale nelle prove (#871): la sua vista, il suo stato nel main, e le icone da
-// rimettere nel menu per chi prova le strade del tasto destro che un utente può ancora avere.
+// La barra laterale nelle prove (#871): la sua vista, il suo stato nel main, e le sue icone da spostare e da premere
+// come fa l'utente (#1246: le azioni sulla pagina stanno qui, non più nel menu del tasto destro).
 
 export async function barraPage(app, { tetto = 10_000 } = {}) {
   const scadenza = Date.now() + tetto;
@@ -27,7 +27,6 @@ export function statoBarra(app) {
       motivo: b.motivo,
       bounds: v ? v.getBounds() : null,
       bar: b.layout ? [...b.layout.bar] : null,
-      primary: b.layout ? [...b.layout.primary] : null,
       secondary: b.layout ? [...b.layout.secondary] : null,
       schermoIntero: !!w._filoTabs.contentFullscreen,
       chiusa: b._larghezzaChiusa(),
@@ -80,12 +79,24 @@ export function premi(app, dove, keyCode, modifiers = []) {
   }, { dove, keyCode, modifiers });
 }
 
-// Sposta le icone nel menu del tasto destro come farebbe l'utente trascinandole.
-export async function mettiNelMenu(app, ids, zona = 'secondary') {
+// Mette le icone nella barra (`bar`) o nel suo «Altro…» (`secondary`) dalla porta unica della disposizione,
+// quella che usano il trascinamento e la chat (#1246).
+export async function mettiNellaBarra(app, ids, zona = 'bar') {
   for (const id of ids) {
-    const r = await app.evaluate(async (_, dati) => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: dati.id, target: dati.zona }, {}), { id, zona });
-    if (!r || !r.ok) throw new Error(`mettiNelMenu: ${id} non spostata`);
+    const r = await app.evaluate(async (_, d) => globalThis.SN_LAYOUT_ICONE.posa({ id: d.id, target: d.zona, beforeId: null }), { id, zona });
+    if (!r) throw new Error(`mettiNellaBarra: ${id} non spostata`);
   }
+}
+
+// Un'icona della barra premuta come la preme l'utente: barra aperta, e «Altro…» aperto se l'icona sta lì.
+export async function premiNellaBarra(app, id) {
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  const ico = barra.locator(`#nav .ico[data-id="${id}"]`);
+  if (!(await ico.count())) await barra.locator('#nav [data-altro]').click();
+  await ico.click();
+  return barra;
 }
 
 // Il menu di Filo aperto adesso (una finestra data: con le voci; anche il suggerimento è data:, ma senza .menu).

@@ -9,6 +9,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { barraPage, comandaBarra, pannelloFermo, statoBarra } from './helpers/barra.mjs';
 import { createServer } from 'node:http';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -374,8 +375,19 @@ test('«Installa» sulla carta, un sito tolto dal Quaderno e un\'icona spostata 
   await manda(casa, { type: 'filo_installa_aggiornamento' });
   const quaderno = await openTab('filo://quaderno/quaderno.html');
   expect((await manda(quaderno, { type: 'filo_memory_forget', sempreAperta: 'mail.example.com' })).ok).toBe(true);
+  // L'icona trascinata col mouse sulla freccia di «Altro…» della barra laterale, dove le icone si spostano (#1246).
   const icona = await app.evaluate(() => globalThis.SN_DISPOSIZIONE_ICONE.DEFAULT.bar[1]);
-  expect((await manda(casa, { type: 'icon_layout_drop', id: icona, target: 'secondary' })).ok).toBe(true);
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  const b = await barra.locator(`#nav .ico[data-id="${icona}"]`).boundingBox();
+  const cassetto = await barra.locator('#nav [data-altro]').boundingBox();
+  await barra.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await barra.mouse.down();
+  await barra.mouse.move(b.x + b.width / 2 + 2, b.y + b.height / 2 - 6, { steps: 3 });
+  await barra.mouse.move(b.x + b.width / 2, cassetto.y + cassetto.height - 3, { steps: 8 });
+  await barra.mouse.up();
+  await expect.poll(async () => (await statoBarra(app)).secondary).toContain(icona);
   for (const nome of ['INSTALLA_AGGIORNAMENTO', 'NON_TENERE_APERTA', 'SPOSTA_ICONA']) {
     await expect.poll(async () => (await azioni(nome)).map((e) => e.via), { message: nome }).toEqual(['chat', 'interfaccia']);
   }

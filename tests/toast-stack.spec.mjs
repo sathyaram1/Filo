@@ -1,21 +1,11 @@
-// #409 — Due avvisi ravvicinati DENTRO la pagina si sovrapponevano.
-//
-// Scritto black-box dal sintomo: tasto destro vero su un link, "Copia URL", e
-// subito dopo "Salva link per dopo". Prima ogni avviso era ancorato da solo in
-// basso a destra: il secondo veniva disegnato SOPRA il primo (stesso bordo
-// superiore) e non se ne leggeva nessuno dei due.
-//
-// Assert di SUCCESSO (rossi senza il fix):
-//   1. i due avvisi sono entrambi presenti, partono da altezze diverse e i loro
-//      riquadri NON si intersecano;
-//   2. una raffica di avvisi non si accavalla, non straripa dalla finestra e non
-//      cresce senza tetto;
-//   3. anche la conferma cliccabile di "Salva per dopo" — ancorata allo stesso
-//      angolo — sta nella pila invece di finire sotto/sopra un avviso.
+// #409 — due avvisi ravvicinati DENTRO la pagina (Copia URL e Salva link per dopo su un collegamento) si disegnavano
+// uno sopra l'altro. Adesso stanno in pila senza toccarsi, una raffica ha un tetto e non esce dalla finestra, e la
+// conferma cliccabile di «Salva per dopo» (dalla barra laterale) sta nella stessa pila.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { premiNellaBarra } from './helpers/barra.mjs';
 
 const PAGE = `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif;height:100vh">
   <h1>Pagina con un collegamento</h1>
@@ -132,15 +122,11 @@ test('una raffica di avvisi non si accavalla e non straripa dalla finestra', asy
   expect(maxLive, 'la pila di avvisi cresce senza tetto').toBeLessThanOrEqual(5);
 });
 
-test('la conferma cliccabile di "Salva per dopo" sta nella pila con gli avvisi', async ({ openTab, testServer }) => {
+test('la conferma cliccabile di "Salva per dopo" sta nella pila con gli avvisi', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGE);
 
-  // "Salva per dopo" mostra una conferma cliccabile ancorata allo STESSO angolo
-  // dei toast: prima si sovrapponeva a qualunque avviso arrivasse nel frattempo.
-  await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
-  const saveBtn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
-  await expect(saveBtn).toBeVisible();
-  await saveBtn.click();
+  // La conferma è ancorata allo STESSO angolo dei toast: prima copriva qualunque avviso arrivasse nel frattempo.
+  await premiNellaBarra(app, 'saveForLater');
   await expect(page.locator('.sn-save-confirm')).toBeVisible({ timeout: 5000 });
 
   // Mentre la conferma è ancora sullo schermo, un avviso normale.

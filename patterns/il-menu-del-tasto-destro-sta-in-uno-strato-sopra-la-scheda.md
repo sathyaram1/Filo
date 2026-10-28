@@ -19,7 +19,7 @@ WebContentsView trasparente per finestra, posata sopra la scheda attiva, con la 
   clic, come invece fa `src/main/popup-menu.js` (fuoco a un'altra finestra, trasparenza che su Linux
   dipende dal compositore).
 - **Grande quanto la scheda, in cima a tutto tranne la barra laterale**, che resta raggiungibile a menu aperto
-  e ci porta le sue icone (#871). Un clic fuori dal menu cade sullo strato: lo chiude e basta, alla pagina sotto
+  (#871). Le icone delle azioni sulla pagina stanno solo lì (#1246): lo strato non le riproduce. Un clic fuori dal menu cade sullo strato: lo chiude e basta, alla pagina sotto
   non arriva. Diversa dalle viste grandi quanto il contenuto
   (`patterns/la-shell-non-disegna-sopra-la-pagina.md`), che rigirano i gesti del vuoto alla pagina.
 - **Il punto viene dal `context-menu` della scheda**, `params.x/y`: px della vista, già fuori da zoom e
@@ -41,7 +41,7 @@ WebContentsView trasparente per finestra, posata sopra la scheda attiva, con la 
   funzioni restano lì, tenute per numero, e il clic torna come numero. Lo strato disegna con `src/content/menu.js`,
   `src/styles/menu.css` e `src/styles/popup.css` per la spiegazione (le guardie contro i siti lì non servono e si spengono da sole). Le sezioni che crescono dopo
   (spiegazioni) nascono in un documento senza finestra e arrivano allo strato come HTML ripulito, e un suo collegamento lo apre il content script dalla porta delle uscite; le righe che cambiano
-  (correttore, icone, griglia «Altro…») come aggiornamenti dello stesso menu.
+  (correttore, spiegazioni) come aggiornamenti dello stesso menu.
 - **Il menu si apre solo dal riquadro del tasto destro appena visto dal main**, entro pochi secondi: un sito non apre lo
   strato. Una voce vale solo dopo un gesto sullo strato che il main ha visto (`input-event`), non per quello che la
   pagina dichiara.
@@ -49,7 +49,7 @@ WebContentsView trasparente per finestra, posata sopra la scheda attiva, con la 
   e la voce scelta li legge il main dopo il clic nello strato, e alla scheda arriva solo il testo da scrivere nel campo
   catturato al tasto destro, col fuoco rimesso lì. Il sito vede quello che si incolla, come in ogni browser.
 - **Alla pagina non si regala il gesto** (`patterns/un-clic-vero-dato-a-una-pagina-e-un-gesto-regalato.md`): la voce
-  scelta parte col fuoco tornato alla scheda, e quello che chiede un gesto vero lo fa lo strato (il contagocce).
+  scelta parte col fuoco tornato alla scheda.
 - **Un tasto destro fuori dal menu** chiude e il main lo rigioca sulla scheda: il menu nuovo si apre lì, come oggi.
 - **Test:** `tests/strato-del-menu.spec.mjs` (lo strato) e `tests/menu-nello-strato.spec.mjs` (il menu, e il sito
   ostile di #586 giro 16). Gli spec che trovano il menu da `menuDi` lo trovano nello strato da soli. Il tasto destro passa da `page.mouse` (lo smistamento di

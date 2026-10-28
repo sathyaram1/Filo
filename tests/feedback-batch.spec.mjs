@@ -1,15 +1,9 @@
-// Test per i 3 fix di feedback alpha:
-//   1) la textarea della chat newtab si svuota subito al click su Invia,
-//      non solo dopo la risposta del modello;
-//   2) nel menu tasto-destro i bottoni avanti/indietro diventano disabilitati
-//      quando la cronologia non lo consente, in parità con i tasti analoghi
-//      della barra in alto;
-//   3) durante la selezione dell'area screenshot il cursore viene reso
-//      sempre visibile (custom SVG ad alto contrasto sopra la maschera).
+// Tre fix di feedback alpha: la casella della chat della nuova scheda si svuota al clic su Invia, non alla risposta;
+// Indietro e Avanti della barra laterale sono spenti, e si vede, quando la cronologia non porta da nessuna parte;
+// mentre si sceglie l'area di uno screenshot il cursore si vede sempre, anche sopra la maschera.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { mettiNelMenu } from './helpers/barra.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { barraPage, comandaBarra, pannelloFermo, premiNellaBarra } from './helpers/barra.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -21,15 +15,11 @@ async function newtabPage(app) {
   throw new Error('newtab non trovata');
 }
 
-async function openOverflowGrid(page, selector = 'h1') {
-  await page.locator(selector).click({ button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
-  const overflow = menu.locator('.sn-menu-row-overflow').first();
-  await overflow.hover();
-  const grid = menuDi(page).locator('.sn-menu-icon-grid');
-  await expect(grid).toBeVisible({ timeout: 2000 });
-  return grid;
+async function barraAperta(app) {
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  return barra;
 }
 
 test('newtab: l\'input si svuota subito al submit (non aspetta la risposta)', async ({ app, shell }) => {
@@ -57,60 +47,46 @@ test('newtab: l\'input si svuota subito al submit (non aspetta la risposta)', as
 const HTML_A = '<!doctype html><html><body><h1>A</h1></body></html>';
 const HTML_B = '<!doctype html><html><body><h1>B</h1></body></html>';
 
-test('menu: back/forward disabilitati quando la history non lo consente', async ({ app, openTab, testServer }) => {
-  // Da #871 indietro e avanti stanno nella barra laterale: qui la strada di chi li ha rimessi nel menu.
-  await mettiNelMenu(app, ['back', 'forward']);
+test('barra laterale: back/forward spenti quando la history non lo consente', async ({ app, openTab, testServer }) => {
   const page = await openTab(testServer.html(HTML_A));
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
 
-  // Tab appena aperto: niente history → back e forward devono essere "grigi".
-  // NB: la disabilitazione è via classe (sn-menu-btn-disabled), non attributo
-  // `disabled` nativo, così l'icona resta trascinabile per riordinarla
-  // (feedback yqgFIs). Lo stato grigio si verifica sulla classe, non su
-  // toBeDisabled().
-  let grid = await openOverflowGrid(page);
-  const back1 = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="back"]');
-  const fwd1 = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="forward"]');
-  await expect(back1).toHaveClass(/sn-menu-btn-disabled/);
-  await expect(fwd1).toHaveClass(/sn-menu-btn-disabled/);
-  // Chiudo il menu prima di navigare.
-  await page.keyboard.press('Escape');
+  // Scheda appena aperta, senza cronologia: tutti e due spenti.
+  const barra = await barraAperta(app);
+  const back = barra.locator('#nav .ico[data-id="back"]');
+  const fwd = barra.locator('#nav .ico[data-id="forward"]');
+  await expect(back).toHaveAttribute('aria-disabled', 'true');
+  await expect(fwd).toHaveAttribute('aria-disabled', 'true');
+  await comandaBarra(app, 'chiudi');
 
-  // Naviga a B: ora è possibile tornare indietro.
   await page.goto(testServer.html(HTML_B));
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
 
-  grid = await openOverflowGrid(page);
-  await expect(grid.locator('.sn-menu-icon-btn[data-sn-icon-id="back"]')).not.toHaveClass(/sn-menu-btn-disabled/);
-  // Da B non posso ancora andare avanti.
-  await expect(grid.locator('.sn-menu-icon-btn[data-sn-icon-id="forward"]')).toHaveClass(/sn-menu-btn-disabled/);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await expect(back).toHaveAttribute('aria-disabled', 'false');
+  // Da B non si va ancora avanti.
+  await expect(fwd).toHaveAttribute('aria-disabled', 'true');
 });
 
-test('menu: back/forward disabilitati sono visibilmente grigi (opacity ridotta)', async ({ app, openTab, testServer }) => {
-  await mettiNelMenu(app, ['back', 'forward']);
-  // In parità con .nav-btn:disabled della shell, i bottoni back/forward del
-  // menu tasto-destro disabilitati devono apparire sbiaditi (opacity < 1),
-  // non solo testualmente "muted". Senza questa regola l'utente non capisce
-  // a colpo d'occhio che il bottone non è cliccabile.
+test('barra laterale: back/forward spenti sono visibilmente grigi (opacity ridotta)', async ({ app, openTab, testServer }) => {
+  // Sbiadito, non solo smorzato: a colpo d'occhio si capisce che non si clicca.
   const page = await openTab(testServer.html(HTML_A));
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
-  const grid = await openOverflowGrid(page);
-  const back = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="back"]');
-  await expect(back).toHaveClass(/sn-menu-btn-disabled/);
-  const opacity = await back.evaluate((el) => parseFloat(getComputedStyle(el).opacity));
-  expect(opacity).toBeLessThan(1);
+  const barra = await barraAperta(app);
+  const back = barra.locator('#nav .ico[data-id="back"]');
+  await expect(back).toHaveAttribute('aria-disabled', 'true');
+  await expect.poll(() => back.evaluate((el) => parseFloat(getComputedStyle(el).opacity))).toBeLessThan(1);
+  await expect.poll(() => barra.locator('#nav .ico[data-id="reload"]').evaluate((el) => parseFloat(getComputedStyle(el).opacity)),
+    { message: 'un\'icona accesa resta piena' }).toBe(1);
 });
 
-test('screenshot area: l\'overlay imposta un cursore custom visibile su tutti i quadranti', async ({ openTab, testServer }) => {
+test('screenshot area: l\'overlay imposta un cursore custom visibile su tutti i quadranti', async ({ app, openTab, testServer }) => {
   const page = await openTab(testServer.html('<!doctype html><html><body style="height:600px"><h1>Test</h1></body></html>'));
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
 
-  // Lancio il flusso reale: apro overflow e clicco "screenshotCrop".
-  // capturePage in test può restituire un'immagine vuota, ma il flusso
-  // arriva comunque a costruire l'overlay (l'immagine vuota carica e
-  // selectScreenRegion appende l'overlay).
-  const grid = await openOverflowGrid(page);
-  await grid.locator('.sn-menu-icon-btn[data-sn-icon-id="screenshotCrop"]').click();
+  // Il flusso vero, dalla barra: anche con un'immagine vuota da capturePage l'overlay si costruisce.
+  await premiNellaBarra(app, 'screenshotCrop');
 
   const overlay = page.locator('.sn-region-overlay');
   await expect(overlay).toBeVisible({ timeout: 8000 });

@@ -27,8 +27,6 @@ const AGGIORNA_MAX_BYTE = 4 * 1024 * 1024;
 const ID_MAX = 80;
 // Quanto un menu aspetta lo strato che finisce di caricare, appena aperta la finestra.
 const PRONTA_MS = 5000;
-// Il contagocce aspetta che l'utente scelga un punto dello schermo: il clic che lo chiude non arriva allo strato.
-const CONTAGOCCE_MS = 120000;
 
 const msg = () => (globalThis.SN_MSG && globalThis.SN_MSG.MSG) || {};
 
@@ -154,15 +152,8 @@ class StratoDelMenu {
   aggiornaDa(sender, d) {
     if (!d || !idValido(d.id) || pesa(d) > AGGIORNA_MAX_BYTE) return { ok: false };
     const cosa = String(d.cosa || '');
-    if (!['riga', 'griglia', 'griglia-apri', 'correzione', 'inline', 'fuori'].includes(cosa)) return { ok: false };
+    if (!['correzione', 'inline'].includes(cosa)) return { ok: false };
     const { type: _t, ...dati } = d;
-    // L'icona dalla barra arriva in px della pagina: lo strato, a zoom 1, li vuole della vista.
-    if (cosa === 'fuori') {
-      let zoom = 1;
-      try { zoom = (sender && sender.wc && sender.wc.getZoomFactor()) || 1; } catch (_) { zoom = 1; }
-      dati.x = (Number(dati.x) || 0) * zoom;
-      dati.y = (Number(dati.y) || 0) * zoom;
-    }
     const di = (r) => r && r.id === d.id && r.wc === (sender && sender.wc) && r.nodo === nodoDi(sender && sender.frame);
     if (di(this.inArrivo)) { this.inArrivo.coda.push(dati); return { ok: true }; }
     const m = this.menu;
@@ -242,8 +233,7 @@ class StratoDelMenu {
     const a = this.aperto;
     if (!m || !m.pronto || !a || !d || Number(d.seq) !== a.seq || d.id !== m.id) return;
     const ora = Date.now();
-    const contagocce = canale === 'strato:esegui' && d.contagocce === true && ora - this.clicAlle <= CONTAGOCCE_MS;
-    if (ora - this.gestoAlle > GESTO_MS && !contagocce) return;
+    if (ora - this.gestoAlle > GESTO_MS) return;
     const unClic = ora - this.clicAlle <= GESTO_MS;
     const M = msg();
     if (canale === 'strato:tastiera') {
@@ -271,8 +261,8 @@ class StratoDelMenu {
       const esegui = { type: M.STRATO_MENU_ESEGUI, id: m.id, n: d.n, args, chiude };
       if (!chiude) { this._alContent(m, esegui); return; }
       // Alla pagina non si regala il gesto (patterns/un-clic-vero-dato-a-una-pagina-e-un-gesto-regalato.md): la voce
-      // parte col fuoco rimesso alla scheda, e quello che chiede un gesto vero lo fa lo strato (il contagocce).
-      if (!unClic && !contagocce) return;
+      // parte col fuoco rimesso alla scheda.
+      if (!unClic) return;
       this.nascondi({ dopo: () => this._alContent(m, esegui) });
       return;
     }
@@ -316,19 +306,6 @@ class StratoDelMenu {
       wc.sendInputEvent({ type: 'mouseDown', x: q.x, y: q.y, button: 'right', clickCount: 1 });
       wc.sendInputEvent({ type: 'mouseUp', x: q.x, y: q.y, button: 'right', clickCount: 1 });
     } catch (_) {}
-  }
-
-  // Un'icona trascinata dal menu dello strato verso la barra laterale: i px dello strato sono quelli della scheda.
-  _versoLaBarra(d) {
-    const m = this.menu;
-    const barra = this.barra();
-    const s = m && this.scheda(m.wc);
-    if (!m || !m.pronto || !barra || !s || !d || Date.now() - this.gestoAlle > GESTO_MS) return { ok: false };
-    const fase = String(d.fase || '');
-    if (!['inizio', 'sopra', 'posa', 'fine'].includes(fase)) return { ok: false };
-    const num = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
-    const dati = { fase, id: String(d.id || ''), menuSinistra: num(d.menuSinistra), x: num(d.x), y: num(d.y) };
-    try { return barra.dallaScheda(dati, s.id, { zoom: 1 }); } catch (_) { return { ok: false }; }
   }
 
   mostra(wc, punto, dati = {}) {
@@ -386,7 +363,7 @@ class StratoDelMenu {
   }
 
   // Sopra tutto tranne la barra laterale: la sua striscia sul bordo e il pannello aperto restano raggiungibili a menu
-  // aperto, come col menu nella pagina, e un'icona si porta dalla barra al menu (#871).
+  // aperto, come col menu nella pagina (#871).
   inCima() {
     if (!this.aperto || !this.vista || this.vista.webContents.isDestroyed()) return;
     const cv = this.win.contentView;
@@ -402,11 +379,6 @@ class StratoDelMenu {
     if (giusto) return;
     cv.addChildView(this.vista);
     if (sopra && suaPrima >= 0) cv.addChildView(sopra);
-  }
-
-  // Un'icona trascinata dalla barra verso il menu aperto: un gesto dell'utente che il main ha visto, nella barra.
-  gestoDallaBarra() {
-    if (this.aperto) this.gestoAlle = Date.now();
   }
 
   // Esc chiude lo strato prima di ogni altro uso del tasto (schermo intero compreso), da qualunque vista arrivi.
@@ -518,7 +490,6 @@ class StratoDelMenu {
       }
       if (/^strato:(esegui|incolla|scegli|togli|svuota|tastiera|rotella)$/.test(canale)) this._dalloStrato(canale, dati).catch(() => {});
     });
-    try { wc.ipc.handle('strato:barra', (_e, dati) => this._versoLaBarra(dati)); } catch (_) {}
     wc.once('did-finish-load', () => {
       // I px dello strato devono essere quelli del punto: uno zoom rimasto sull'host «menu» li sposterebbe.
       try { wc.setZoomFactor(1); } catch (_) {}

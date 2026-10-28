@@ -1,11 +1,11 @@
 // #1432 — L'icona Aiuto della barra laterale: un clic apre l'Aiuto sulla pagina, il secondo nello stesso punto
 // detta nella sua casella, il terzo ferma. Una risposta arrivata ad Aiuto ridotto o chiuso accende la striscia
-// finché non la si apre. Dove la voce «Aiuto» non c'è l'icona è spenta e dice perché; nel menu fa lo stesso.
+// finché non la si apre. Dove la voce «Aiuto» non c'è l'icona è spenta e dice perché; in «Altro…» fa lo stesso.
 // Microfono finto nella cornice (un tono), trascrizione e modello finti nel main: il resto è il codice vero.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNellaBarra } from './helpers/barra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = 'tests/.shots';
@@ -145,7 +145,7 @@ test('in cima alla barra: un clic apre l\'Aiuto, il secondo detta nella sua case
 });
 
 // Giro 1 della verifica: l'icona diceva «Ferma» ma il clic riapriva il pannello, col microfono acceso.
-test('Aiuto ridotto mentre detta: l\'icona dice «Ferma» e il clic ferma, nella barra e nella riga del tasto destro', async ({ app, shell, openTab, testServer }) => {
+test('Aiuto ridotto mentre detta: l\'icona dice «Ferma» e il clic ferma, senza riaprire il pannello ridotto', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   await prepara(app);
   await microfonoFinto(shell);
@@ -165,32 +165,19 @@ test('Aiuto ridotto mentre detta: l\'icona dice «Ferma» e il clic ferma, nella
   await expect(help).toHaveAttribute('aria-label', 'Ferma');
   await help.click();
   await expect(mic).not.toHaveAttribute('data-stato', 'ascolta', { timeout: 10_000 });
-  // Fermato, a pannello ridotto l'icona torna a dire che lo apre, e lo fa.
-  await expect(mic).toHaveAttribute('data-stato', 'pronto', { timeout: 10_000 });
-  await expect(help).toHaveAttribute('aria-label', 'Aiuto');
-  await help.click();
-  await expect(aiuto).not.toHaveClass(/sn-sidebar-collapsed/);
-
-  // La stessa regola per l'icona portata nella riga del tasto destro.
-  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'help', target: 'primary', beforeId: 'translate' }, {}));
-  await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('help');
-  await comandaBarra(app, 'chiudi');
-  await page.locator('h1').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]').click();
-  await expect(mic).toHaveAttribute('data-stato', 'ascolta', { timeout: 8_000 });
-  await aiuto.locator('.sn-sidebar-collapse').click();
-  await expect(aiuto).toHaveClass(/sn-sidebar-collapsed/);
-  await page.locator('h1').click({ button: 'right' });
-  const nelMenu = menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]');
-  await expect(nelMenu).toHaveAttribute('aria-label', 'Ferma', { timeout: 8_000 });
-  await nelMenu.click();
-  await expect(mic).not.toHaveAttribute('data-stato', 'ascolta', { timeout: 10_000 });
   // Il testo dettato e il cursore rimesso in fondo non riaprono il pannello che l'utente ha ridotto, nemmeno quando la
   // pagina riprende il fuoco.
   await expect(mic).toHaveAttribute('data-stato', 'pronto', { timeout: 10_000 });
   await page.locator('h1').click();
   await page.waitForTimeout(400);
   await expect(aiuto).toHaveClass(/sn-sidebar-collapsed/);
+
+  // Fermato, a pannello ridotto l'icona torna a dire che lo apre, e lo fa.
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await expect(help).toHaveAttribute('aria-label', 'Aiuto');
+  await help.click();
+  await expect(aiuto).not.toHaveClass(/sn-sidebar-collapsed/);
 });
 
 test('Filo risponde ad Aiuto ridotto: la striscia si accende e si spegne aprendo la risposta', async ({ app, openTab, testServer }) => {
@@ -335,27 +322,27 @@ test('dove la voce «Aiuto» non c\'è l\'icona è spenta e dice perché; senza 
   await expect(help).toHaveAttribute('aria-label', 'Aiuto');
 });
 
-test('l\'icona si toglie dalla barra e nel menu del tasto destro fa lo stesso; la voce «Aiuto» riapre l\'Aiuto ridotto', async ({ app, openTab, testServer }) => {
+test('in «Altro…» l\'icona fa lo stesso che nella barra; la voce «Aiuto» del tasto destro riapre l\'Aiuto ridotto', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   await prepara(app);
   const page = await sito(app, openTab, testServer);
   const barra = await barraPage(app);
-  // Nella riga del tasto destro, in testa: in fondo sarebbe lei a scendere in «Altro…».
-  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'help', target: 'primary', beforeId: 'translate' }, {}));
+  await mettiNellaBarra(app, ['help'], 'secondary');
   await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('help');
-  await expect(icona(barra)).toHaveCount(0);
+  expect((await statoBarra(app)).secondary).toContain('help');
 
-  await page.locator('h1').click({ button: 'right' });
-  const nelMenu = menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]');
-  await expect(nelMenu).toBeVisible({ timeout: 8_000 });
-  await expect(nelMenu).toHaveAttribute('aria-label', 'Aiuto');
-  await nelMenu.click();
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await expect(icona(barra)).toHaveCount(0);
+  await barra.locator('#nav [data-altro]').click();
+  const daParte = barra.locator('#nav .ico.riserva[data-id="help"]');
+  await expect(daParte).toHaveAttribute('aria-label', 'Aiuto');
+  await daParte.click();
   const aiuto = page.locator('.sn-sidebar');
   await expect(aiuto).toBeVisible({ timeout: 8_000 });
   // Con l'Aiuto aperto la stessa icona è il microfono.
-  await page.locator('h1').click({ button: 'right' });
-  await expect(menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]')).toHaveAttribute('aria-label', 'Parla', { timeout: 8_000 });
-  await page.keyboard.press('Escape');
+  await expect(daParte).toHaveAttribute('aria-label', 'Parla', { timeout: 8_000 });
+  await comandaBarra(app, 'chiudi');
 
   // Ridotto, la voce «Aiuto» lo riapre intero (prima non faceva niente).
   await aiuto.locator('.sn-sidebar-collapse').click();
@@ -364,18 +351,19 @@ test('l\'icona si toglie dalla barra e nel menu del tasto destro fa lo stesso; l
   await menuDi(page).voce('Aiuto').first().click();
   await expect(aiuto).not.toHaveClass(/sn-sidebar-collapsed/);
 
-  // Spento in Preferenze: nella riga è spenta e dice perché, come nella barra.
+  // Spento in Preferenze: in «Altro…» è spenta e dice perché, come nella barra.
   await imposta(app, { featureFlags: { help: false } });
   await expect(aiuto).toHaveCount(0, { timeout: 8_000 });
-  await page.locator('h1').click({ button: 'right' });
-  const spenta = menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]');
-  await expect(spenta).toHaveClass(/sn-menu-btn-disabled/, { timeout: 8_000 });
-  await expect(spenta).toHaveAttribute('aria-label', 'Aiuto spento in Preferenze');
-  await page.keyboard.press('Escape');
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  if (await daParte.count() === 0) await barra.locator('#nav [data-altro]').click();
+  await expect(daParte).toHaveAttribute('aria-disabled', 'true', { timeout: 8_000 });
+  await expect(daParte).toHaveAttribute('data-sugg', 'Aiuto spento in Preferenze');
+  await comandaBarra(app, 'chiudi');
   await imposta(app, { featureFlags: { help: true } });
 
-  // E si rimette nella barra.
-  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'help', target: 'bar', beforeId: 'back' }, {}));
+  // E si rimette nella barra, in cima.
+  await app.evaluate(async () => globalThis.SN_LAYOUT_ICONE.posa({ id: 'help', target: 'bar', beforeId: 'back' }));
   await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 2)).toEqual(['help', 'back']);
 });
 

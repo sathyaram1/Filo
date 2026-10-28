@@ -1,10 +1,9 @@
 // I contatori dei gesti della personalizzazione (#1471) nell'app vera: la barra laterale (perché si apre, cosa ci si
-// fa, il nome letto su un'icona, l'icona rimessa nel menu), «Altro…» del tasto destro, le carte e il riquadro della
+// fa, il nome letto su un'icona, l'icona spostata dal suo tasto destro, il suo «Altro…»), le carte e il riquadro della
 // home, i moduli dell'Editor, i ripristini delle Preferenze, l'«annulla» su un cambio e i trascinamenti; l'incognito
 // no. Forma e spedizione: tests/unit/contatoriGesti.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, menuAperto, scegliNelMenu } from './helpers/barra.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -105,45 +104,42 @@ test('la barra laterale conta perché si apre e cosa ci si fa, e il nome letto s
   expect(await conto(app, 'barra_aperta', 'tasto', 'a_vuoto')).toBe(0);
 });
 
-test('un’icona rimessa nel menu dal tasto destro della barra: la posa con la sua via, e la barra non è più di serie', async ({ app, openTab, testServer }) => {
+test('un’icona spostata in «Altro…» dal tasto destro della barra: la posa con la sua via, e la barra non è più di serie', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   await paginaDiProva(openTab, testServer);
   const barra = await barraPage(app);
-  await expect.poll(async () => (await gesti(app)).disposizione_di_serie, { timeout: 8_000 }).toEqual({ primary: 'si', secondary: 'si', bar: 'si' });
+  await expect.poll(async () => (await gesti(app)).disposizione_di_serie, { timeout: 8_000 }).toEqual({ secondary: 'si', bar: 'si' });
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
   await barra.locator('#nav .ico[data-id="fullscreen"]').click({ button: 'right' });
   const menu = await menuAperto(app);
   expect(menu, 'il menu dell’icona deve aprirsi').toBeTruthy();
-  await scegliNelMenu(menu, 'Rimetti nel menu');
+  await scegliNelMenu(menu, 'Sposta in «Altro…»');
   await expect.poll(async () => (await statoBarra(app)).secondary.includes('fullscreen'), { timeout: 8_000 }).toBe(true);
   await expect.poll(() => conto(app, 'icona_spostata', 'fullscreen', 'bar|secondary|rimessa_nel_menu'), { timeout: 8_000 }).toBe(1);
-  expect((await gesti(app)).disposizione_di_serie).toEqual({ primary: 'si', secondary: 'no', bar: 'no' });
+  expect((await gesti(app)).disposizione_di_serie).toEqual({ secondary: 'no', bar: 'no' });
   await comandaBarra(app, 'chiudi');
   await expect.poll(() => conto(app, 'barra_aperta', 'clic', 'tasto_destro'), { timeout: 8_000 }).toBe(1);
 });
 
-test('«Altro…» del tasto destro conta le aperture e l’icona scelta lì; il nome letto nella riga prima del clic', async ({ app, openTab, testServer }) => {
+test('«Altro…» della barra laterale conta le aperture e l’icona scelta lì', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
-  const page = await paginaDiProva(openTab, testServer);
-  await page.locator('#p').click({ button: 'right' });
-  const menu = menuDi(page);
-  await expect(menu.principale).toBeVisible({ timeout: 8_000 });
-  await menu.locator('.sn-menu-row-overflow').click();
-  await expect(menu.griglia).toBeVisible({ timeout: 8_000 });
+  await paginaDiProva(openTab, testServer);
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await barra.locator('#nav .ico.altro').click();
+  await expect(barra.locator('#nav .ico.riserva[data-id="openOptions"]')).toBeVisible({ timeout: 8_000 });
   await expect.poll(() => conto(app, 'altro_del_menu', 'aperture'), { timeout: 8_000 }).toBe(1);
-  await menu.griglia.locator('[data-sn-icon-id="openOptions"]').click();
+  await barra.locator('#nav .ico.riserva[data-id="openOptions"]').click();
   await expect.poll(() => conto(app, 'altro_del_menu', 'openOptions'), { timeout: 8_000 }).toBe(1);
-
-  await page.bringToFront();
-  await page.locator('#p').click({ button: 'right' });
-  await expect(menu.principale).toBeVisible({ timeout: 8_000 });
-  const share = menu.icona('share');
-  await share.hover();
-  await expect(menu.etichetta).toBeVisible({ timeout: 4_000 });
-  await menu.icona('qrCode').hover();
-  await expect.poll(() => conto(app, 'suggerimento_letto', 'share', 'menu|via'), { timeout: 8_000 }).toBe(1);
-  expect(JSON.stringify(await gesti(app))).not.toMatch(/Clic destro qui/);
+  // Un'icona in vista non è una scelta fatta in «Altro…».
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await barra.locator('#nav .ico[data-id="reload"]').click();
+  await comandaBarra(app, 'chiudi');
+  await expect.poll(() => conto(app, 'barra_aperta', 'clic', 'azione'), { timeout: 8_000 }).toBeGreaterThan(0);
+  expect(Object.keys((await gesti(app)).altro_del_menu).sort()).toEqual(['aperture', 'openOptions']);
 });
 
 test('le carte della home: l’uso per colonna e gesto, le mosse scritte dal main, il ripristino; il riquadro di sistema', async ({ app, shell }) => {

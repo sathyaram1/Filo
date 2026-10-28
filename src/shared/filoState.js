@@ -436,7 +436,7 @@
     lines.push('');
     // Le frasi portano nomi di timer e valori che può aver scritto un modello: recinto come sopra.
     if (state.cambi) {
-      lines.push('CAMBI RECENTI (impostazioni, aspetto, sveglie e timer, regole del proxy, zoom; dal più vecchio al più nuovo)');
+      lines.push('CAMBI RECENTI (impostazioni, aspetto, sveglie e timer, regole del proxy, zoom, icone della barra laterale; dal più vecchio al più nuovo)');
       lines.push('Fatti dalla chat o dalle pagine, sono lo stesso evento: «rimetti come prima» si fa con ANNULLA_CAMBIO e l\'id.');
       if (!state.cambi.righe.length) lines.push('(nessuno)');
       else lines.push(salvati(state.cambi.righe));

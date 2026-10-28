@@ -326,6 +326,15 @@ function registerIpcHandlers() {
     }
   });
 
+  // #1343 — un trascinamento sulla pagina contro il bordo alto, o via da lì: a schermo intero chiama le schede.
+  ipcMain.on('filo:trascina-bordo', (event, stato) => {
+    // Anche da un riquadro: in cima alla pagina può esserci quello di un altro sito. Il bordo lo misura il preload.
+    if (!event.senderFrame) return;
+    for (const w of BrowserWindow.getAllWindows()) {
+      try { w._filoTabs?.schedeInAlto?.dalTrascinamento(event.sender, stato === 'bordo' || stato === 'via' ? stato : 'fine'); } catch (_) {}
+    }
+  });
+
   // È la chiave a essere stata rifiutata (credito finito compreso, moderazione
   // no)? Lo decide SN_WALLET, una volta sola; qui viaggia con l'errore perché
   // chi lo mostra possa offrire la pagina Crediti invece del solo «Riprova».
@@ -834,7 +843,10 @@ function registerIpcHandlers() {
   ipcMain.handle('window:toggle-maximize', (event) => {
     const win = winFor(event);
     if (win) {
-      if (win.isMaximized()) win.unmaximize(); else win.maximize();
+      // A schermo intero il quadrato (scoperto con le schede dal bordo alto) non ha niente da massimizzare: ne esce.
+      const tabs = win._filoTabs;
+      if (tabs && tabs.contentFullscreen) tabs.setContentFullscreen(false);
+      else if (win.isMaximized()) win.unmaximize(); else win.maximize();
     }
     return { ok: true };
   });

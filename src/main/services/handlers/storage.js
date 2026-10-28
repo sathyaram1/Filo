@@ -419,6 +419,20 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // Lo screenshot premuto dalla barra laterale: la pagina senza fuoco (il visore PDF) non può scrivere gli appunti.
+  on(MSG.COPY_IMAGE_TO_CLIPBOARD, async (msg, sender, origin) => {
+    const dataUrl = typeof msg.dataUrl === 'string' && msg.dataUrl.startsWith('data:image/png;base64,') ? msg.dataUrl : '';
+    if (!dataUrl) return { ok: false, error: 'empty' };
+    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, { type: 'image', dataUrl })) return vietato;
+    try {
+      const { clipboard, ClipboardItem } = require('electron');
+      const png = Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64');
+      if (!png.length) return { ok: false, error: 'image' };
+      await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+    } catch (_) { return { ok: false, error: 'clipboard' }; }
+    return { ok: true };
+  });
+
   async function inCronologia(e, via) {
     if (!e) return { ok: true };
     // `tenuta: false` dice alla pagina di non far descrivere a un modello un'immagine che la cronologia non tiene.

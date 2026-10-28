@@ -1,6 +1,6 @@
 // Il registro dei cambi (#867): ogni scrittura dello stato (impostazioni, timer e sveglie, regole del
-// proxy) diventa un evento del filo (src/main/services/ilFilo.js) nel momento in cui si salva, chiunque l'abbia
-// chiesta. Chi chiede dichiara solo da dove viene (`con`). Frasi, esclusioni e annullo: src/shared/cambi.js.
+// proxy, disposizione delle icone) diventa un evento del filo (src/main/services/ilFilo.js) nel momento in cui si salva,
+// chiunque l'abbia chiesta. Chi chiede dichiara solo da dove viene (`con`). Frasi, esclusioni e annullo: src/shared/cambi.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { randomUUID } = require('node:crypto');
@@ -18,6 +18,8 @@ const app = {
   aggiornaVivo: () => {},
   aggiornaRegoleProxy: () => {},
   zoomSu: null,
+  // (cambia(disposizione) → disposizione, { mossa }) passando dalla porta unica delle icone (layoutIcone.js).
+  disposizioneIcone: null,
   annuncia: () => {},
   // Un annullo riuscito, con l'id chiesto e quello dell'evento trovato: lo contano i contatori (#1461).
   annullato: () => {},
@@ -32,6 +34,13 @@ function con(prov, fn) {
 }
 function corrente() {
   return provenienze.getStore() || null;
+}
+// Un dettaglio per chi osserva la scrittura (l'icona spostata), con la provenienza di chi l'ha chiesta.
+function conDettaglio(extra, fn) {
+  const c = corrente();
+  const eredita = {};
+  if (c) for (const k of ['via', 'dove', 'annulla']) if (c[k] !== undefined) eredita[k] = c[k];
+  return con({ ...eredita, ...extra }, fn);
 }
 
 function nuovoId() {
@@ -110,12 +119,16 @@ function osserva(changes, { incognito }) {
   if (t && Array.isArray(t.newValue)) registra({ tipo: 'timer', cambi: K().cambiTimer(t.oldValue, t.newValue, adesso) }, { incognito });
   const r = changes[C.FILO_PROXY_RULES];
   if (r && r.newValue && typeof r.newValue === 'object') registra({ tipo: 'proxy', cambi: K().cambiRegoleProxy(r.oldValue, r.newValue) }, { incognito });
+  const i = changes[C.ICON_LAYOUT];
+  if (i && i.newValue && typeof i.newValue === 'object') {
+    registra({ tipo: 'icone', cambi: K().cambiIcone(i.oldValue, i.newValue, { mossa: corrente()?.mossa }) }, { incognito });
+  }
 }
 
 let staccato = null;
 function avvia() {
   const C = CHIAVI();
-  if (!staccato) staccato = Disco.onScrittura(osserva, [C.SETTINGS, C.FILO_TIMERS, C.FILO_PROXY_RULES]);
+  if (!staccato) staccato = Disco.onScrittura(osserva, [C.SETTINGS, C.FILO_TIMERS, C.FILO_PROXY_RULES, C.ICON_LAYOUT]);
 }
 
 // Lo zoom non passa dallo storage: lo salva Chromium per sito. Il punto in cui il main lo viene a
@@ -240,6 +253,14 @@ async function annullaOra(id, prov = {}) {
       const regole = K().annulloRegoleProxy(e, await FM.listProxyRules());
       await globalThis.chrome.storage.local.set({ [CHIAVI().FILO_PROXY_RULES]: regole });
       app.aggiornaRegoleProxy();
+    } else if (e.tipo === 'icone') {
+      const rimetti = (attuale) => K().annulloIcone(e, attuale);
+      if (app.disposizioneIcone) await app.disposizioneIcone(rimetti, { mossa: e.cambi.length === 1 ? K().iconaDi(e.cambi[0]) : null });
+      else {
+        const C = CHIAVI();
+        const letta = await globalThis.chrome.storage.local.get(C.ICON_LAYOUT);
+        await globalThis.chrome.storage.local.set({ [C.ICON_LAYOUT]: rimetti(letta && letta[C.ICON_LAYOUT]) });
+      }
     } else if (e.tipo === 'zoom') {
       const c = e.cambi[0];
       riuscito = !!(app.zoomSu && await app.zoomSu(String(c.chiave).slice(5), c.prima));
@@ -252,5 +273,5 @@ async function annullaOra(id, prov = {}) {
   return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati };
 }
 
-module.exports = { avvia, con, corrente, registra, registraZoom, leggi, tutti, lista, ultimi, livelloDi, annulla, collega, attesa };
+module.exports = { avvia, con, conDettaglio, corrente, registra, registraZoom, leggi, tutti, lista, ultimi, livelloDi, annulla, collega, attesa };
 globalThis.SN_REGISTRO_CAMBI = module.exports;

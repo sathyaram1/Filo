@@ -109,6 +109,7 @@
     'autoArchive.idleHours': { nome: 'ore di inattività prima di archiviare', valore: numero, livello: 1 },
     'autoArchive.onClose': { nome: 'riordino alla riapertura', valore: ATTIVO, livello: 1 },
     'barraLaterale.spinta': { nome: 'apertura della barra laterale dal bordo', valore: ATTIVA, livello: 1 },
+    'barraLaterale.schede': { nome: 'schede dal bordo alto a schermo intero', valore: sino('compaiono', 'restano nascoste'), livello: 1 },
     'barraLaterale.striscia': { nome: 'striscia della barra laterale', valore: sino('visibile', 'nascosta'), livello: 1 },
     'barraLaterale.attesaMs': { nome: 'attesa sul bordo prima che la barra laterale si apra', valore: millisecondi, livello: 1 },
     'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },
@@ -339,6 +340,28 @@
     return out;
   }
 
+  // La disposizione delle icone della barra (#867.1): un cambio per icona spostata, con dov'era e dove è finita.
+  function cambiIcone(prima, dopo, { mossa = null } = {}) {
+    const D = global.SN_DISPOSIZIONE_ICONE;
+    if (!D) return [];
+    const a = D.migra(prima).layout;
+    const b = D.migra(dopo).layout;
+    return D.spostate(a, b, { mossa }).map((id) => ({ chiave: `icona:${id}`, prima: D.posizione(a, id), dopo: D.posizione(b, id) }));
+  }
+  const iconaDi = (c) => String((c && c.chiave) || '').slice(6);
+
+  // Le icone rimesse com'erano sulla disposizione di adesso, una alla volta e dall'ultima: quelle spostate dopo
+  // restano dove sono.
+  function annulloIcone(evento, attuale) {
+    const D = global.SN_DISPOSIZIONE_ICONE;
+    let l = D.migra(attuale).layout;
+    for (const c of ((evento && evento.cambi) || []).slice().reverse()) {
+      const posa = D.posaPer(l, iconaDi(c), c.prima);
+      l = (posa && D.applicaPosa(l, posa)) || l;
+    }
+    return l;
+  }
+
   // ── Le frasi ────────────────────────────────────────────────────────────────
   const PAESI = {
     us: 'Stati Uniti', gb: 'Regno Unito', fr: 'Francia', de: 'Germania', es: 'Spagna', nl: 'Paesi Bassi', jp: 'Giappone', it: 'Italia',
@@ -413,6 +436,18 @@
       const p = (x) => (Number.isFinite(Number(x)) ? `${Math.round(Number(x))}%` : '?');
       return `zoom di ${k.slice(5)}: ${p(c.prima)} → ${p(c.dopo)}`;
     }
+    if (k.startsWith('icona:')) {
+      const D = global.SN_DISPOSIZIONE_ICONE;
+      const id = iconaDi(c);
+      const nome = `icona «${D && D.nome ? D.nome(id) : id}»`;
+      const altro = (p) => !!p && p.zona === 'secondary';
+      const zona = (p) => (altro(p) ? '«Altro…» della barra laterale' : 'barra laterale');
+      const posto = (p) => `${Number(p && p.posto) || '?'}° posto`;
+      if (c.prima && c.dopo && c.prima.zona === c.dopo.zona) {
+        return `${nome} ${altro(c.dopo) ? 'in' : 'nella'} ${zona(c.dopo)}: ${posto(c.prima)} → ${posto(c.dopo)}`;
+      }
+      return `${nome}: ${zona(c.prima)} → ${zona(c.dopo)}`;
+    }
     const v = voce(k);
     const nome = v ? v.nome : 'un\'impostazione di Filo';
     if (c.segreto) {
@@ -461,6 +496,7 @@
     'menu-scheda': 'dal menu della scheda',
     'proposta-accesso': 'dalla proposta dopo un accesso',
     zoom: 'con un gesto sulla pagina',
+    barra: 'dalla barra laterale',
   };
   function provenienza(evento) {
     const e = evento || {};
@@ -522,7 +558,7 @@
     let max = cambi.filter((c) => String(c.chiave || '').startsWith('timer:')).length > 1 ? 2 : 1;
     for (const c of cambi) {
       const k = String(c.chiave || '');
-      if (k.startsWith('timer:') || k.startsWith('zoom:')) continue;
+      if (k.startsWith('timer:') || k.startsWith('zoom:') || k.startsWith('icona:')) continue;
       if (k.startsWith('proxy:')) { max = Math.max(max, 1); continue; }
       const v = voce(k);
       max = Math.max(max, v && v.livello === 1 ? 1 : 2);
@@ -666,6 +702,8 @@
     cambiImpostazioni,
     cambiTimer,
     cambiRegoleProxy,
+    cambiIcone,
+    iconaDi,
     fraseCambio,
     valore: (chiave, x) => valoreDi(voce(chiave), x),
     frasi,
@@ -679,6 +717,7 @@
     annulloImpostazioni,
     annulloTimer,
     annulloRegoleProxy,
+    annulloIcone,
     righePerModello,
     nomePaese,
   };

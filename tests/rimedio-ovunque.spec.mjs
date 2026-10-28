@@ -7,6 +7,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { statoDi, clicca, scrivi, nelMondoDiFilo } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { premiNellaBarra } from './helpers/barra.mjs';
 
 const SHOTS = 'tests/.shots';
 const PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
@@ -171,8 +172,7 @@ test('«Traduci la pagina» coi crediti finiti: l’avviso porta ai Crediti, col
   await creditiFiniti(app);
   const page = await testServer.openReady(openTab, '<!doctype html><html lang="en"><meta charset="utf-8"><title>Article</title>'
     + '<p id="p1" style="margin:80px 40px">The quick brown fox jumps over the lazy dog, again and again, in the morning light.</p>');
-  await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
-  await menuDi(page).icona('translate').click();
+  await premiNellaBarra(app, 'translate');
 
   const avviso = page.locator('.sn-toast', { hasText: 'Non sono riuscito a tradurre la pagina' });
   await expect(avviso).toBeVisible({ timeout: 30_000 });
@@ -202,10 +202,7 @@ test('«Trascrivi» una zona, senza invito: l’avviso porta ai Crediti', async 
   await senzaChiave(app);
   const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Scansione</title>'
     + '<p id="t" style="font:28px sans-serif;margin:120px 40px">Un testo da trascrivere</p>');
-  await page.locator('#t').click({ button: 'right', position: { x: 5, y: 5 } });
-  await menuDi(page).locator('.sn-menu-row-overflow').hover();
-  await menuDi(page).locator('.sn-menu-row-overflow').click().catch(() => {});
-  await menuDi(page).icona('transcribe').click();
+  await premiNellaBarra(app, 'transcribe');
   await expect(page.locator('.sn-region-overlay')).toBeVisible({ timeout: 10_000 });
   await page.mouse.move(30, 100);
   await page.mouse.down();

@@ -11,7 +11,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = join(APP_ROOT, 'tests', '.shots');
@@ -140,16 +140,16 @@ test('salvata e archiviata: riaperto Filo, home, «Aperti per dopo» e chat most
   const blog = `http://blog.test:${siti.porta}/ricetta`;
   let app = null;
   try {
-    // ── Primo avvio: «Salva per dopo» dal tasto destro, e una scheda chiusa.
+    // ── Primo avvio: «Salva per dopo» dalla barra laterale, e una scheda chiusa.
     let shell;
     ({ app, shell } = await avvia(userData));
     const pagina = await apri(app, shell, negozio);
     await iconaArrivata(app, 'negozio.test');
     await pagina.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 10_000 });
-    await pagina.click('body', { button: 'right', position: { x: 300, y: 200 } });
-    const salva = menuDi(pagina).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
-    await expect(salva).toBeVisible();
-    await salva.click();
+    const barra = await barraPage(app);
+    await comandaBarra(app, 'clic');
+    await pannelloFermo(barra);
+    await barra.locator('#nav .ico[data-id="saveForLater"]').click();
     await expect.poll(() => app.evaluate(async () => (await globalThis.SN_SAVED_PAGES.list()).map((p) => p.title)), { timeout: 10_000 })
       .toEqual(['Il negozio di dischi']);
     // Finita la conferma, la scheda salvata si chiude da sola.

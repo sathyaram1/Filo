@@ -3739,12 +3739,15 @@ async function eseguiAzioneFilo(action, {
         };
       }
       case 'SPOSTA_ICONA': {
-        // #871 — la disposizione delle icone (barra laterale, riga e «Altro…» del tasto destro) a parole: stessa
-        // porta del trascinamento, così menu aperti e barre di tutte le finestre la ricevono uguale.
+        // #871, #1246 — la disposizione delle icone della barra laterale (barra e «Altro…») a parole: stessa porta del
+        // trascinamento, così le barre di tutte le finestre la ricevono uguale.
         const D = globalThis.SN_DISPOSIZIONE_ICONE;
         const id = String(action.icona ?? action.id ?? '').trim();
         const dove = String(action.dove ?? '').trim().toLowerCase();
         const prima = String(action.prima_di ?? '').trim();
+        if (dove === 'menu') {
+          return { executed: false, kept: false, output: { icona: 'invalid', id, dove, motivo: 'il menu del tasto destro non ha più icone: stanno nella barra laterale ("barra") o nel suo «Altro…» ("altro")' } };
+        }
         if (!D || !D.noto(id) || !Object.prototype.hasOwnProperty.call(D.DOVE, dove)) {
           return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
         }
@@ -3752,9 +3755,7 @@ async function eseguiAzioneFilo(action, {
         const layout = await require('./layoutIcone').posa(
           { id, target: D.DOVE[dove], beforeId: D.noto(prima) && prima !== id ? prima : null }, { incognito, via: 'chat' });
         if (!layout) return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
-        // La riga del tasto destro ha sei posti: chi ci entra per ultimo può spingerne fuori un'altra.
-        const finita = ['bar', 'primary', 'secondary'].find((z) => layout[z].includes(id));
-        return { executed: true, kept: false, output: { icona: id, dove, finita, layout } };
+        return { executed: true, kept: false, output: { icona: id, dove, layout } };
       }
       case 'CARTA_HOME': {
         const op = String(action.operazione ?? action.op ?? '').trim().toLowerCase();
@@ -7788,6 +7789,7 @@ Registro.collega({
     }
     return false;
   },
+  disposizioneIcone: (cambia, { mossa } = {}) => require('./layoutIcone').riscrivi(cambia, { incognito: require('../shim/storage').inIncognito(), mossa }),
   annuncia: (ids) => broadcastToFiloPages({ type: MSG.CAMBI_AGGIORNATI, ids }),
   // `evento`: il cambio su cui si è premuto «annulla», per i contatori dei ripensamenti (#1471).
   annullato: (ids, evento) => { contaSe('cambioAnnullato', ids); contaSe('cambioRitirato', evento); },

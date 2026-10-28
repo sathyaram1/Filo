@@ -139,8 +139,7 @@
   // ── Il box come pannello in cui si cerca una voce, per i contatori (#1461) ──────────────────────────────────────
   // Dall'apertura alla prima scelta, a che posto era la voce fra quelle in vista (prima il pannello, poi il
   // sottomenu), o chiuso senza scegliere. Escono solo esiti e numeri, nella pagina e nello strato.
-  const VOCI = '.sn-menu-item, .sn-menu-split-main, .sn-menu-paste-main, .sn-menu-correction-main, .sn-menu-row-btn, '
-    + '.sn-menu-icon-btn, .sn-menu-history-item';
+  const VOCI = '.sn-menu-item, .sn-menu-split-main, .sn-menu-paste-main, .sn-menu-correction-main, .sn-menu-history-item';
   function contaNelMenu(evento) {
     try {
       if (global.SN_POPUP && typeof global.SN_POPUP.conta === 'function') global.SN_POPUP.conta(evento);
@@ -148,9 +147,6 @@
     } catch (_) {}
   }
   const contaBox = (ev) => contaNelMenu({ misura: 'ricerca', pannello: 'tasto-destro', ...ev });
-  // I gesti del menu (#1471): il nome letto su un'icona, il riquadro «Altro…», un'icona trascinata e lasciata nel vuoto.
-  const contaGesto = (gesto, campi) => contaNelMenu({ misura: 'gesto', gesto, ...campi });
-  const lettura = global.SN_GESTI ? global.SN_GESTI.lettore((ev) => contaNelMenu(ev)) : { mostrato() {}, clic() {}, via() {} };
   // Una voce che fa un'azione del catalogo delle capacità la nomina con `azione` (#1461): si misura qui, dal clic alla
   // fine del suo lavoro, per ogni menu che passa da open, nella pagina e nello strato. Una voce non si misura due volte.
   const MISURATE = new WeakSet();
@@ -181,8 +177,7 @@
   }
   function vociInVista(pannello) {
     if (!pannello) return [];
-    return [...pannello.querySelectorAll(VOCI)].filter((b) => !b.classList.contains('sn-menu-row-overflow')
-      && !b.classList.contains('sn-menu-row-empty') && !b.classList.contains('sn-menu-history-gone')
+    return [...pannello.querySelectorAll(VOCI)].filter((b) => !b.classList.contains('sn-menu-history-gone')
       && b.getClientRects().length > 0);
   }
   function sceltaNelMenu(voce) {
@@ -205,14 +200,11 @@
     const voce = percorso.find((n) => n && n.nodeType === 1 && typeof n.matches === 'function' && n.matches(VOCI));
     if (!voce || voce.matches('.sn-menu-history-item')) return;
     if (voce.disabled || voce.dataset.snDisabled === '1' || voce.closest('.sn-disabled')) return;
-    if (voce.classList.contains('sn-menu-row-overflow') || voce.classList.contains('sn-menu-row-empty')) return;
     if (!activeMenu.root.contains(voce) && !(activeMenu.subRoot && activeMenu.subRoot.contains(voce))) return;
     sceltaNelMenu(voce);
   }
 
   function close() {
-    try { dismissTooltip?.(); } catch (_) {}
-    lettura.via();
     clearSubCloseTimer();
     if (activeMenu) {
       if (activeMenu.ricerca && !activeMenu.ricerca.scelta) contaBox({ esito: 'vuota' });
@@ -236,8 +228,6 @@
       try { allaChiusura?.(); } catch (_) {}
     }
     try { global.SN_POPUP?.sottoIlMenu?.(false); } catch (_) {}
-    // Pulisce zone di drop residue (vengono ri-registrate alla prossima apertura).
-    dropZones.length = 0;
   }
 
   // Lo strato sopra la scheda (#1054) sa così che il menu si è chiuso da sé: una voce, un clic fuori, Esc.
@@ -338,15 +328,8 @@
       visH: root.offsetHeight * scale,
       vw, vh, from,
     });
-    const primaLeft = parseFloat(root.style.left);
-    const primaTop = parseFloat(root.style.top);
     root.style.left = `${p.left}px`;
     root.style.top = `${p.top}px`;
-    // L'etichetta si toglie solo se il menu si è mosso davvero: un menu che cresce restando
-    // fermo non deve farla sparire a chi la sta leggendo (#500).
-    const mosso = (Number.isFinite(primaTop) && Math.abs(p.top - primaTop) > 0.5)
-      || (Number.isFinite(primaLeft) && Math.abs(p.left - primaLeft) > 0.5);
-    if (mosso) dismissTooltip();
     repositionSub();
   }
 
@@ -395,7 +378,7 @@
     placeSub(sub, anchor, activeMenu.subMode);
   }
 
-  // items: { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled,
+  // items: { type: 'item'|'separator'|'inline'|'paste', label, shortcut, disabled,
   // onClick, items? }. 'inline' mostra contenuto dinamico, 'paste' apre la cronologia.
   // `alChiudere`: chi ha aperto il menu vuole sapere quando si chiude, da sé o con una voce.
   function open({ x, y, items, keepOnScroll, alChiudere }) {
@@ -434,15 +417,6 @@
           sep.dataset.snHiddenSep = '1';
         }
         root.appendChild(sep);
-        continue;
-      }
-      if (it.type === 'row') {
-        const row = document.createElement('div');
-        row.className = 'sn-menu-row';
-        if (it.dropTarget) row.dataset.snDropTarget = it.dropTarget;
-        populateRow(row, it.items, { dropTarget: it.dropTarget });
-        if (it.dropTarget) attachDropZone(row, { target: it.dropTarget, onDrop: it.onDrop });
-        root.appendChild(row);
         continue;
       }
       if (it.type === 'inline') {
@@ -699,7 +673,6 @@
         if (root.contains(t)) {
           // Il menu ha scorso sotto al pannello ancorato: la freccetta si è spostata e il pannello
           // va con lei, o si chiude se è uscita dal bordo (#500).
-          try { dismissTooltip?.(); } catch (_) {}
           repositionSub();
           return;
         }
@@ -1230,441 +1203,6 @@
     attachSubmenuHover(sub);
   }
 
-  // Griglia del pannello «Altro…»: ancorata a un bottone ma NON chiude il menu padre, e
-  // regge il drag fra griglia secondaria e riga principale.
-  function openIconGridSubmenu(anchorEl, items, opts = {}) {
-    if (!activeMenu) return;
-    if (activeMenu.subRoot) {
-      staccaSub();
-      return;
-    }
-    contaGesto('altro_del_menu', { aperto: true });
-    const cols = opts.cols || 4;
-    const sub = document.createElement('div');
-    sub.className = 'sn-menu sn-menu-sub sn-menu-icon-grid';
-    global.SN_FILO_UI?.mark(sub);
-    global.SN_FILO_UI?.soloGestiVeri(sub);
-    sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
-    sub.style.setProperty('--sn-icon-cols', String(cols));
-    if (opts.dropTarget) sub.dataset.snDropTarget = opts.dropTarget;
-
-    populateGrid(sub, items, { dropTarget: opts.dropTarget });
-    if (opts.dropTarget) attachDropZone(sub, { target: opts.dropTarget, onDrop: opts.onDrop });
-
-    monta(sub);
-    const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
-    activeMenu.cleanups.push(cleanupZoom);
-    activeMenu.subRoot = sub;
-    activeMenu.subAnchor = anchorEl;
-    activeMenu.subMode = 'anchor';
-
-    placeSub(sub, anchorEl, 'anchor');
-    sorveglia(sub);
-    // Senza questo, il timer di mouseleave sull'ancora (overflow) chiude il
-    // sub-menu appena il cursore entra nella griglia (feedback alpha).
-    attachSubmenuHover(sub);
-  }
-
-  // Tooltip custom in stile menu, singleton globale.
-  let tooltipEl = null;
-  let tooltipHideTimer = null;
-  function ensureTooltipEl() {
-    if (tooltipEl && document.documentElement.contains(tooltipEl)) return tooltipEl;
-    tooltipEl = document.createElement('div');
-    tooltipEl.className = 'sn-tooltip';
-    global.SN_FILO_UI?.mark(tooltipEl);
-    tooltipEl.style.display = 'none';
-    monta(tooltipEl);
-    return tooltipEl;
-  }
-  function showTooltip(target, text) {
-    if (!text) return;
-    const el = ensureTooltipEl();
-    // Sopra i pannelli aperti dopo di lei (stesso piano: vale l'ordine), sotto le sonde (#589.11).
-    const host = menuHost();
-    annullaZoom(el, host);
-    host.insertBefore(el, global.SN_VISTO?.prima(host, el) || null);
-    el.dataset.snTheme = document.documentElement.dataset.snTheme || '';
-    el.textContent = text;
-    el.style.display = '';
-    const r = target.getBoundingClientRect();
-    const tw = el.offsetWidth, th = el.offsetHeight;
-    let left = r.left + r.width / 2 - tw / 2;
-    let top = r.bottom + 6;
-    if (top + th + 8 > window.innerHeight) top = r.top - th - 6;
-    if (left + tw + 4 > window.innerWidth) left = window.innerWidth - tw - 4;
-    if (left < 4) left = 4;
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
-  }
-  function hideTooltip() {
-    if (!tooltipEl) return;
-    tooltipEl.style.display = 'none';
-  }
-  // Toglie l'etichetta e l'attesa che sta per farla comparire: se a muoversi è il menu,
-  // comparirebbe l'etichetta di un bottone che nel frattempo è altrove.
-  function dismissTooltip() {
-    clearTimeout(tooltipHideTimer);
-    tooltipHideTimer = null;
-    hideTooltip();
-  }
-  function attachTooltip(el, text) {
-    el.addEventListener('mouseenter', () => {
-      clearTimeout(tooltipHideTimer);
-      tooltipHideTimer = setTimeout(() => {
-        showTooltip(el, text);
-        if (el.dataset.snIconId) lettura.mostrato(el.dataset.snIconId, 'menu');
-      }, 250);
-    });
-    el.addEventListener('mouseleave', () => {
-      dismissTooltip();
-      lettura.via();
-    });
-    el.addEventListener('mousedown', () => {
-      dismissTooltip();
-    });
-  }
-
-  // ============================================================================
-  // Costruzione bottoni della riga icone / griglia secondaria (estratti per
-  // poter rigenerare in-place dopo un drag senza chiudere il menu).
-  // ============================================================================
-  // Chi apre un pannello sostando sopra durante un trascinamento: chiamato da qui, perché un clic
-  // fabbricato da codice non passerebbe da `soloGestiVeri`.
-  const apritori = new WeakMap();
-
-  // Il suggerimento di un'icona nomina anche il suo tasto, se ne ha uno (`tasto`, chiesto a SN_TASTI).
-  function conTasto(it) { return it.tasto ? `${it.label} (${it.tasto})` : it.label; }
-
-  function makeRowButton(sub, opts = {}) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'sn-menu-row-btn';
-    if (sub.kind === 'overflow') b.classList.add('sn-menu-row-overflow');
-    if (sub.kind === 'empty') b.classList.add('sn-menu-row-empty');
-    // Disabilitazione «soft» con una classe: l'attributo `disabled` azzera i pointer event e
-    // impedirebbe di trascinare l'icona. Il click lo neutralizza il guard più sotto.
-    if (sub.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
-    // L'overflow apre subito un sotto-menu su hover: non mostrare il tooltip
-    // "Altro…" che altrimenti coprirebbe/preannuncerebbe la stessa cosa.
-    if (sub.kind !== 'empty' && sub.kind !== 'overflow' && sub.label) attachTooltip(b, conTasto(sub));
-    setIconContent(b, sub.icon || sub.label);
-    // Il bottone contiene solo un disegno: senza nome accessibile è un bottone
-    // muto per chi legge lo schermo (e invisibile a chi lo cerca per etichetta).
-    if (sub.label) b.setAttribute('aria-label', sub.label);
-    if (sub.id) b.dataset.snIconId = sub.id;
-    if (sub.kind === 'overflow') {
-      // L'overflow apre la griglia secondaria come sotto-menu ancorato, senza chiudere il menu
-      // principale; durante un drag è hover-target e si apre da sé.
-      b.dataset.snDragHoverOpen = '1';
-      const openOverflow = () => {
-        if (sub.disabled) return;
-        try { sub.onClick && sub.onClick(b); } catch (er) { console.error(er); }
-        if (activeMenu) activeMenu.subOwner = b;
-      };
-      b.addEventListener('mouseenter', () => {
-        clearSubCloseTimer();
-        if (activeMenu?.subRoot && activeMenu.subOwner !== b) {
-          activeMenu.subLocked = false;
-          closeSubmenu();
-        }
-        if (!activeMenu?.subRoot) openOverflow();
-      });
-      b.addEventListener('mouseleave', () => {
-        if (activeMenu?.subLocked) return;
-        clearSubCloseTimer();
-        subCloseTimer = setTimeout(() => closeSubmenu(), 500);
-      });
-      const apriFermo = () => {
-        clearSubCloseTimer();
-        if (activeMenu?.subRoot && activeMenu.subOwner === b) {
-          activeMenu.subLocked = true;
-        } else {
-          if (activeMenu?.subRoot) closeSubmenu();
-          openOverflow();
-          if (activeMenu) activeMenu.subLocked = true;
-        }
-      };
-      apritori.set(b, apriFermo);
-      b.addEventListener('click', (e) => {
-        e.stopPropagation();
-        apriFermo();
-      });
-    } else {
-      b.addEventListener('click', () => {
-        if (sub.kind === 'empty') return;
-        if (sub.disabled) return; // greyed: niente azione (ma resta trascinabile)
-        if (sub.id) lettura.clic(sub.id);
-        close();
-        try { sub.onClick && sub.onClick(); } catch (er) { console.error(er); }
-      });
-    }
-    if (sub.draggable && sub.id) attachDrag(b, { id: sub.id, source: opts.dropTarget || 'row' });
-    return b;
-  }
-
-  function populateRow(row, items, opts = {}) {
-    row.innerHTML = '';
-    row.__snRowOpts = opts;
-    for (const sub of items) row.appendChild(makeRowButton(sub, opts));
-    global.SN_FILO_UI?.soloGestiVeri(row);
-  }
-
-  function makeGridButton(it, opts = {}) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'sn-menu-icon-btn';
-    // Vedi makeRowButton: disabilitazione via classe per restare trascinabile.
-    if (it.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
-    setIconContent(b, it.icon || it.label || '');
-    if (it.id) b.dataset.snIconId = it.id;
-    // Vedi makeRowButton: nome accessibile su un bottone di sola icona.
-    if (it.label) { b.setAttribute('aria-label', it.label); attachTooltip(b, conTasto(it)); }
-    b.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (it.disabled) return;
-      if (it.id) { lettura.clic(it.id); contaGesto('altro_del_menu', { icona: it.id }); }
-      close();
-      try { it.onClick && it.onClick(); } catch (er) { console.error(er); }
-    });
-    if (it.draggable !== false && it.id) attachDrag(b, { id: it.id, source: opts.dropTarget || 'grid' });
-    return b;
-  }
-
-  function populateGrid(sub, items, opts = {}) {
-    sub.innerHTML = '';
-    sub.__snGridOpts = opts;
-    if (!items || items.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'sn-menu-empty';
-      empty.textContent = '—';
-      sub.appendChild(empty);
-    } else {
-      for (const it of items) sub.appendChild(makeGridButton(it, opts));
-    }
-    global.SN_FILO_UI?.soloGestiVeri(sub);
-  }
-
-  function refreshIconRow(items) {
-    if (!activeMenu) return;
-    const row = activeMenu.root.querySelector('.sn-menu-row');
-    if (!row) return;
-    populateRow(row, items, row.__snRowOpts || {});
-  }
-
-  function refreshIconGrid(items) {
-    if (!activeMenu || !activeMenu.subRoot) return;
-    populateGrid(activeMenu.subRoot, items, activeMenu.subRoot.__snGridOpts || {});
-  }
-
-  function isSubMenuOpen() {
-    return !!(activeMenu && activeMenu.subRoot && activeMenu.subRoot.isConnected);
-  }
-
-  // Drag pointer-based: quello HTML5 non parte in modo affidabile con un transform sul
-  // menu o su un <button>, e l'immagine di trascinamento spesso non si vede.
-  const dropZones = [];
-
-  // La barra laterale come zona in più (#871): la installa menuIcons.js. Il puntatore resta della
-  // pagina per tutto il gesto, anche sopra la barra, quindi è da qui che si dice dove cade.
-  let ponteBarra = null;
-  function setPonteBarra(p) { ponteBarra = p || null; }
-  // Dove comincia il menu aperto: se sta dove si apre la barra, lei aspetta che il puntatore vada al bordo.
-  function sinistraDelMenu() {
-    const els = [activeMenu?.root, activeMenu?.subRoot].filter((e) => e && e.isConnected);
-    return els.length ? Math.min(...els.map((e) => e.getBoundingClientRect().left)) : null;
-  }
-
-  function attachDrag(el, { id, source }) {
-    el.dataset.snDraggable = '1';
-    el.addEventListener('pointerdown', (ev) => {
-      // Solo gesti veri: un trascinamento finto aprirebbe la barra a comando di un sito.
-      if (!ev.isTrusted || ev.button !== 0) return;
-      if (el.disabled) return;
-      const startX = ev.clientX, startY = ev.clientY;
-      let dragging = false;
-      let preview = null;
-      let lastHoverZone = null;
-      let lastHoverOpener = null;
-      let hoverOpenTimer = null;
-      const THRESHOLD = 4;
-      const HOVER_OPEN_DELAY = 350;
-
-      const updatePreview = (x, y) => {
-        if (!preview) return;
-        const w = preview.offsetWidth || 0;
-        const h = preview.offsetHeight || 0;
-        preview.style.left = (x - w / 2) + 'px';
-        preview.style.top = (y - h / 2) + 'px';
-      };
-
-      const setHover = (zone) => {
-        if (lastHoverZone === zone) return;
-        if (lastHoverZone) lastHoverZone.zoneEl.classList.remove('sn-drop-hover');
-        lastHoverZone = zone;
-        if (zone) zone.zoneEl.classList.add('sn-drop-hover');
-      };
-
-      const startDrag = (x, y) => {
-        dragging = true;
-        try { dismissTooltip?.(); } catch (_) {}
-        el.classList.add('sn-dragging');
-        preview = el.cloneNode(true);
-        preview.classList.add('sn-drag-preview');
-        const r = el.getBoundingClientRect();
-        preview.style.width = r.width + 'px';
-        preview.style.height = r.height + 'px';
-        monta(preview);
-        updatePreview(x, y);
-        try { ponteBarra?.inizio(id, sinistraDelMenu()); } catch (_) {}
-      };
-
-      const checkHoverOpen = (x, y) => {
-        // Apre automaticamente l'overflow (e simili) se l'utente sosta sopra
-        // il loro bottone durante un drag.
-        if (preview) preview.style.visibility = 'hidden';
-        const elAt = document.elementFromPoint(x, y);
-        if (preview) preview.style.visibility = '';
-        const opener = elAt && elAt.closest ? elAt.closest('[data-sn-drag-hover-open="1"]') : null;
-        if (opener === lastHoverOpener) return;
-        lastHoverOpener = opener;
-        if (hoverOpenTimer) { clearTimeout(hoverOpenTimer); hoverOpenTimer = null; }
-        if (opener && !isSubMenuOpen()) {
-          hoverOpenTimer = setTimeout(() => {
-            if (lastHoverOpener === opener && !isSubMenuOpen()) {
-              try { apritori.get(opener)?.(); } catch (_) {}
-            }
-          }, HOVER_OPEN_DELAY);
-        }
-      };
-
-      const onMove = (e) => {
-        if (!e.isTrusted) return;
-        if (!dragging) {
-          if (Math.hypot(e.clientX - startX, e.clientY - startY) < THRESHOLD) return;
-          startDrag(e.clientX, e.clientY);
-        }
-        e.preventDefault();
-        updatePreview(e.clientX, e.clientY);
-        let sopraBarra = false;
-        try { sopraBarra = !!ponteBarra?.sopra(e.clientX, e.clientY); } catch (_) {}
-        setHover(sopraBarra ? null : findZoneAt(e.clientX, e.clientY));
-        checkHoverOpen(e.clientX, e.clientY);
-      };
-
-      const cleanup = () => {
-        window.removeEventListener('pointermove', onMove, true);
-        window.removeEventListener('pointerup', onUp, true);
-        window.removeEventListener('pointercancel', onCancel, true);
-        if (hoverOpenTimer) { clearTimeout(hoverOpenTimer); hoverOpenTimer = null; }
-        el.classList.remove('sn-dragging');
-        setHover(null);
-        if (preview) { try { preview.remove(); } catch (_) {} preview = null; }
-        if (dragging) { try { ponteBarra?.fine(); } catch (_) {} }
-      };
-
-      const onUp = (e) => {
-        if (!e.isTrusted) return;
-        if (!dragging) { cleanup(); return; }
-        let inBarra = false;
-        try { inBarra = !!ponteBarra?.posa(id, e.clientX, e.clientY); } catch (_) {}
-        const zone = inBarra ? null : findZoneAt(e.clientX, e.clientY);
-        cleanup();
-        if (zone) {
-          const beforeBtn = findInsertBefore(zone.zoneEl, e.clientX, e.clientY, el);
-          const beforeId = beforeBtn?.dataset?.snIconId || null;
-          try { zone.onDrop && zone.onDrop({ id, source, target: zone.target, beforeId }); } catch (er) { console.error(er); }
-        } else if (!inBarra) contaGesto('trascinamento', { da: 'icona_menu', a: 'nessuna', esito: 'annullato' });
-        // Sopprime il click che segue il pointerup dopo un drag.
-        const swallow = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
-        window.addEventListener('click', swallow, { capture: true, once: true });
-        setTimeout(() => { try { window.removeEventListener('click', swallow, true); } catch (_) {} }, 50);
-      };
-
-      const onCancel = () => {
-        if (dragging) contaGesto('trascinamento', { da: 'icona_menu', a: 'nessuna', esito: 'annullato' });
-        cleanup();
-      };
-
-      window.addEventListener('pointermove', onMove, true);
-      window.addEventListener('pointerup', onUp, true);
-      window.addEventListener('pointercancel', onCancel, true);
-    });
-  }
-
-  // Un'icona trascinata fuori dalla barra laterale, sopra questa pagina: il gesto è della barra,
-  // qui arrivano solo le coordinate. Se il menu è aperto, cade nelle sue zone.
-  let esterno = null;
-  function trascinaDaFuori({ fase, id, x, y, icon }) {
-    const via = () => {
-      if (!esterno) return;
-      if (esterno.zona) esterno.zona.zoneEl.classList.remove('sn-drop-hover');
-      try { esterno.preview.remove(); } catch (_) {}
-      esterno = null;
-    };
-    if (fase === 'muovi') {
-      if (!esterno || esterno.id !== id) {
-        via();
-        const preview = document.createElement('div');
-        preview.className = 'sn-drag-preview';
-        preview.style.width = '36px';
-        preview.style.height = '36px';
-        preview.innerHTML = icon || '';
-        monta(preview);
-        esterno = { id, preview, zona: null };
-      }
-      esterno.preview.style.left = (x - 18) + 'px';
-      esterno.preview.style.top = (y - 18) + 'px';
-      const zona = findZoneAt(x, y);
-      if (zona !== esterno.zona) {
-        if (esterno.zona) esterno.zona.zoneEl.classList.remove('sn-drop-hover');
-        if (zona) zona.zoneEl.classList.add('sn-drop-hover');
-        esterno.zona = zona;
-      }
-      return true;
-    }
-    if (fase === 'rilascia') {
-      const zona = findZoneAt(x, y);
-      via();
-      if (!zona) { contaGesto('trascinamento', { da: 'icona_barra', a: 'nessuna', esito: 'annullato' }); return false; }
-      const prima = findInsertBefore(zona.zoneEl, x, y, null);
-      try { zona.onDrop && zona.onDrop({ id, source: 'bar', target: zona.target, beforeId: prima?.dataset?.snIconId || null }); } catch (er) { console.error(er); }
-      return true;
-    }
-    via();
-    return false;
-  }
-
-  function attachDropZone(zoneEl, { target, onDrop }) {
-    dropZones.push({ zoneEl, target, onDrop });
-  }
-
-  function findZoneAt(x, y) {
-    for (let i = dropZones.length - 1; i >= 0; i--) {
-      const z = dropZones[i];
-      if (!document.documentElement.contains(z.zoneEl)) {
-        dropZones.splice(i, 1);
-        continue;
-      }
-      const r = z.zoneEl.getBoundingClientRect();
-      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return z;
-    }
-    return null;
-  }
-
-  // Trova il bottone davanti al quale inserire, in reading order (alto→basso, sinistra→destra).
-  // Salta l'elemento sorgente per non auto-collidere.
-  function findInsertBefore(zoneEl, x, y, skipEl) {
-    const btns = Array.from(zoneEl.querySelectorAll('[data-sn-icon-id]'))
-      .filter((b) => b !== skipEl);
-    for (const b of btns) {
-      const r = b.getBoundingClientRect();
-      if (y < r.top) return b;
-      if (y >= r.top && y <= r.bottom && x < r.left + r.width / 2) return b;
-    }
-    return null;
-  }
-
   // Per gli spec: lo shadow root chiuso della cronologia non lo attraversa nessun locator. Sui siti SN_MENU
   // vive nel mondo isolato dei content script, quindi la pagina da qui non passa.
   function statoCronologia() {
@@ -1728,14 +1266,8 @@
     computeOffset: Place.computeOffset,
     computeSubOffset,
     openGenericSubmenu,
-    openIconGridSubmenu,
     closeSubmenu,
     allaChiusura: (fn) => { allaChiusura = typeof fn === 'function' ? fn : null; },
-    refreshIconRow,
-    refreshIconGrid,
-    isSubMenuOpen,
-    setPonteBarra,
-    trascinaDaFuori,
     testoNascosto,
     // C'è un menu aperto adesso? Lo chiede content.js per decidere di chi è
     // l'Esc quando si è a tutto schermo (#514).
