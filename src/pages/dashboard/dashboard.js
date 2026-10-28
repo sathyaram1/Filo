@@ -1547,8 +1547,8 @@
     stopBtn.style.animation = '';
   }
   // Nel turno entrano solo parole battute qui: un allegato, un testo incollato, una risposta citata o un comando con la
-  // barra partono a turno finito, dalla strada di sempre. L'accoglienza tiene la sua conversazione e il seguito la aspetta. Un seguito che il
-  // turno di prima non ha preso lo offre anche il turno dopo, appena parte.
+  // barra partono a turno finito, dalla strada di sempre. L'accoglienza tiene la sua conversazione e il seguito la
+  // aspetta. Un seguito che il turno di prima non ha preso lo offre anche il turno dopo, appena parte.
   function affidaAlTurno(s, t) {
     const { c } = s;
     if (!t || t.fermato || c.immagini.length || c.file.length || c.daFuori || c.citata || c.text.startsWith('/') || Accoglienza.isActive()) return;

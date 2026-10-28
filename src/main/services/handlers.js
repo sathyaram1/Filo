@@ -7081,6 +7081,14 @@ async function summarizeTab(title, content) {
 // disponibile), il turno di chat prosegue. Perdere una chat è brutto; perdere
 // la risposta che l'utente sta aspettando perché non si è potuta archiviare lo
 // è di più.
+async function appendToChatArchive(chatId, turn, meta) {
+  if (!chatId || !FiloChats) return null;
+  // Cancellata per sempre mentre il turno era in corso: la risposta non la fa rinascere con la stessa targa.
+  if (chatCancellate.has(String(chatId))) return null;
+  try { return await FiloChats.append(chatId, turn, meta); }
+  catch (e) { console.warn('[Filo] chat non archiviata:', e?.message || e); return null; }
+}
+
 // La risposta che il messaggio cita (#1620), ritrovata nell'archivio: si salva il suo posto, e il modello ne legge il
 // testo da lì, non da quello che manda la pagina. Una bolla che l'archivio non ha (un errore) si cita col suo testo.
 async function citazioneDelMessaggio(rispostaA, chatId) {
@@ -7096,14 +7104,6 @@ async function citazioneDelMessaggio(rispostaA, chatId) {
     ? RispostaA.riferimento({ chat: chat.id, i, ts: chat.messages[i].ts })
     : RispostaA.riferimento({ testo: p.testo });
   return { ref, citata: ref ? RispostaA.risolvi(ref, () => chat, { max: RispostaA.PER_IL_MODELLO }) : null };
-}
-
-async function appendToChatArchive(chatId, turn, meta) {
-  if (!chatId || !FiloChats) return null;
-  // Cancellata per sempre mentre il turno era in corso: la risposta non la fa rinascere con la stessa targa.
-  if (chatCancellate.has(String(chatId))) return null;
-  try { return await FiloChats.append(chatId, turn, meta); }
-  catch (e) { console.warn('[Filo] chat non archiviata:', e?.message || e); return null; }
 }
 
 // ── Chi tiene viva una chat è la pagina che la sta facendo ─────────────────

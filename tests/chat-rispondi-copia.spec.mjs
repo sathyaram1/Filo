@@ -186,3 +186,50 @@ test('dal tasto destro di una risposta: Rispondi e Copia il messaggio fanno quel
   await menuDi(home).voce('Rispondi').first().click();
   await expect(home.locator('#citazione')).toContainText('Il treno parte alle 9.');
 });
+
+test('una risposta citata mentre Filo lavora aspetta la fine del lavoro e parte con la sua citazione', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await preparaModello(app, [
+    { text: 'Il museo apre alle 10.' },
+    { text: 'Il biglietto costa 12 euro.', attendi: true },
+    { text: 'Sì, la domenica apre alle 9.' },
+  ]);
+  const home = await apriHome(openTab);
+  await scrivi(home, 'a che ora apre il museo?');
+  const prima = home.locator('#bubbles > .dash-bubble-filo', { hasText: 'apre alle 10' });
+  await expect(prima).toBeVisible({ timeout: 20_000 });
+  await scrivi(home, 'quanto costa il biglietto?');
+  await expect.poll(() => app.evaluate(() => typeof globalThis.__sblocca === 'function'), { timeout: 15_000 }).toBe(true);
+
+  await prima.hover();
+  await prima.getByRole('button', { name: 'Rispondi' }).click();
+  await home.locator('#input').fill('anche la domenica?');
+  await home.locator('#input').press('Enter');
+  const inAttesa = home.locator('#bubbles > .dash-bubble-user.dash-bubble-attesa');
+  await expect(inAttesa.locator('.dash-citata')).toHaveAttribute('data-testo', 'Il museo apre alle 10.');
+
+  await app.evaluate(() => globalThis.__sblocca());
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'la domenica apre alle 9' })).toBeVisible({ timeout: 20_000 });
+  const detta = await ultimaDomanda(app);
+  expect(detta).toContain('«Il museo apre alle 10.»');
+  expect(detta.trim().endsWith('anche la domenica?')).toBe(true);
+});
+
+test('tolta la conversazione della risposta citata, la citazione dice che non c\'è più e non ne tiene il testo', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await preparaModello(app, []);
+  await app.evaluate(async () => {
+    const F = globalThis.SN_FILO_CHATS;
+    const ts = (s) => new Date(Date.now() - s * 1000).toISOString();
+    await F.append('c-vecchia', [{ role: 'user', text: 'che film vedo?', ts: ts(600) }, { role: 'filo', text: 'Prova *Amarcord*.', ts: ts(590) }]);
+    await F.append('c-nuova', [{ role: 'user', text: 'e un altro?', ts: ts(60), rispostaA: { chat: 'c-vecchia', i: 1 } }]);
+  });
+  const home = await apriHome(openTab);
+  const mia = home.locator('#bubbles > .dash-bubble-user', { hasText: 'e un altro?' });
+  await expect(mia.locator('.dash-citata')).toHaveAttribute('data-testo', 'Prova Amarcord.', { timeout: 15_000 });
+
+  await app.evaluate(() => globalThis.SN_FILO_CHATS.remove('c-vecchia'));
+  await home.reload();
+  await expect(mia.locator('.dash-citata')).toHaveClass(/dash-citata-manca/, { timeout: 15_000 });
+  await expect(mia.locator('.dash-citata')).toHaveAttribute('data-testo', 'Messaggio non più nel filo');
+});
