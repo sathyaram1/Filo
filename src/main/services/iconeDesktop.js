@@ -632,7 +632,7 @@ function rimetti(d) {
     const ci = new Set(letto.voci.map((v) => v.id));
     const posizioni = voci.filter((v) => ci.has(v[0])).map(([id, x, y]) => ({ id, x, y }));
     const sparite = voci.length - posizioni.length;
-    const fatto = await computer().disponi(posizioni, { auto: !!d.auto });
+    const fatto = await computer().disponi(posizioni, { auto });
     if (!fatto.ok) return fallito(fatto.errore);
     const evento = registraCambio(letto, fatto, null);
     return { ok: true, cosa: 'desktop', rimesse: posizioni.length, sparite, ...(evento ? { cambio: evento.id } : {}) };
