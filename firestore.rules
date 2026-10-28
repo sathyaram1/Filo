@@ -969,7 +969,7 @@ service cloud.firestore {
     // impostazioni, tipi d'azione, errori) ne hanno la forma, senza spazi né testo: l'elenco chiuso lo tiene l'app.
     // tests/unit/firestoreRulesContatori.test.mjs confronta tutto con l'app: una funzione nuova va aggiunta e
     // ripubblicata, o le ore che la portano restano in attesa; una tolta dall'app RESTA, le copie vecchie la mandano.
-    // Ogni tetto sta sopra il caso peggiore dell'app e non lo passa di più del doppio: lo misura la stessa sentinella.
+    // Ogni tetto sta sopra il caso peggiore dell'app, con un margine che la stessa sentinella tiene stretto (#1547).
     // Legge solo l'admin.
     // Le funzioni contate e il controllo delle mappe, a chiavi chiuse o a forma, servono alle ore, alle loro chiamate
     // e ai loro gesti.
