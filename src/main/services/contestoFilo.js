@@ -97,6 +97,9 @@ async function messaggiDelFilo(opts) {
 
 function messaggiDi(chats) {
   const out = [];
+  const perId = new Map(chats.filter((c) => c && c.id).map((c) => [c.id, c]));
+  const R = globalThis.SN_RISPOSTA_A;
+  const citata = (m) => (m.rispostaA && R ? R.risolvi(m.rispostaA, (id) => perId.get(id), { max: R.PER_IL_MODELLO }) : null);
   for (const c of chats) {
     // Una conversazione dell'Editor, dei Mazzi o dell'Aiuto (#974) entra come una riga all'ora in cui è cominciata:
     // lo scambio si rilegge con CERCA_CHAT. Non è voce dell'utente né di Filo, e i ricordi non la ripescano.
