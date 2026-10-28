@@ -896,8 +896,11 @@
     const per = oggetto(g.errori[funzione]) ? g.errori[funzione] : {};
     let chiave = `${modelloPulito(modello)}|${hostPulito(host)}|${tipo}`;
     // Il posto per le sei righe «altro» (una per tipo) resta sempre libero: oltre il tetto non si perde niente.
-    const specifiche = Object.keys(per).filter((k) => !k.startsWith(`${ALTRO}||`)).length;
-    if (!has(per, chiave) && specifiche >= TETTO_ERRORI_ORA - ERRORI.length) { chiave = `${ALTRO}||${tipo}`; tettoCombinazioni(ora); }
+    const specifiche = Object.keys(per).filter((k) => !erroreAltro(k)).length;
+    if (!has(per, chiave) && (specifiche >= TETTO_ERRORI_ORA - ERRORI.length || erroriSpecifici(g.errori) >= TETTO_ERRORI_DOCUMENTO)) {
+      chiave = `${ALTRO}||${tipo}`;
+      tettoCombinazioni(ora);
+    }
     piuUno(per, chiave);
     g.errori[funzione] = per;
     return true;
