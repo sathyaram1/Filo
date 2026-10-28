@@ -110,7 +110,8 @@ così la stessa cosa fatta dalla chat o da una pagina lascia lo stesso evento, c
   sito bloccato) porta il suo `url` (`indirizzo` nelle opzioni dell'avviso della cornice), perché il testo non sempre
   lo dice. Allo stesso modo un'azione su un file scaricato porta il sito da cui è arrivato (`indirizzoDelFile`, chiesto
   PRIMA di farla: rinominato, il file non ha più il percorso chiesto). Azioni e ricerche nate in una conversazione
-  portano la sua `chat` e se ne vanno con lei: per l'Aiuto è quella che il pannello della scheda ha scritto per ultima
+  portano la sua `chat` e se ne vanno con lei, anche quando arrivano dopo la cancellazione (l'azione che la cancella
+  ne dice il titolo): per l'Aiuto è quella che il pannello della scheda ha scritto per ultima
   (`segnaChatAiuto`). Un evento che nomina qualcosa porta il legame con quello che lo cancella: senza, resta.
 - **Il contenuto letto non va su disco.** Di un'azione resta com'è andata (fatta, chiesta, fermata, l'errore, la frase
   del fatto, i cambi), non la pagina o il documento letto: quello vive in memoria con la sua chat. I segreti custoditi

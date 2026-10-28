@@ -156,7 +156,10 @@
     // `messaggi`: l'id di ogni evento-messaggio porta alla sua chat (#872: le memorie ricordano da dove sono nate).
     // `cambi`: i cambi di stato nell'ordine in cui sono nati, nella forma che legge src/shared/cambi.js.
     // `accaduti`: gli eventi di ACCADUTI così come sono arrivati, in ordine (azioni, schede, ricerche…).
-    return { chat: new Map(), pagine: new Map(), ids: new Set(), pos: 0, tagli: [], messaggi: new Map(), cambi: [], accaduti: [] };
+    // `chatTolte`: le chat cancellate per sempre, che coprono anche gli accaduti arrivati dopo.
+    return {
+      chat: new Map(), pagine: new Map(), ids: new Set(), pos: 0, tagli: [], chatTolte: new Set(), messaggi: new Map(), cambi: [], accaduti: [],
+    };
   }
 
   function nelPeriodo(ts, pagine) {
@@ -244,7 +247,10 @@
       return !stato.pagine.has(ev.visita) && !(visite && visite.has(ev.visita));
     }
     if (ev.tipo === TIPI.NAVIGAZIONE) return stato.tagli.some((c) => copre(c, ev));
-    return ACCADUTI.has(ev.tipo) && stato.tagli.some((c) => copreAccaduto(c, ev));
+    if (!ACCADUTI.has(ev.tipo)) return false;
+    // Un accaduto di una chat cancellata se ne va con lei anche se arriva dopo: l'azione che la cancella ne dice il titolo.
+    if (ev.chat != null && stato.chatTolte.has(ev.chat)) return true;
+    return stato.tagli.some((c) => copreAccaduto(c, ev));
   }
 
   function chatNuova(id, ts) {
@@ -350,6 +356,7 @@
           const c = stato.chat.get(ev.chat);
           if (c && stato.messaggi) for (const ids of c._ids || []) for (const id of ids || []) stato.messaggi.delete(id);
           if (stato.chat.delete(ev.chat)) tolti = 1;
+          stato.chatTolte.add(ev.chat);
           via = (a) => a.chat === ev.chat;
         } else {
           const c = copertura(ev);
@@ -413,10 +420,12 @@
     return (stato && Array.isArray(stato.cambi) ? stato.cambi : []).map((e) => ({ ...e, cambi: e.cambi.map((c) => ({ ...c })) }));
   }
 
-  // Cosa resta su disco dopo le cancellazioni: gli eventi di una chat cancellata DOPO di loro e le pagine che una
-  // cancellazione copre se ne vanno, il resto resta identico e in ordine. Le cancellazioni restano: un altro dispositivo dovrà saperle.
+  // Cosa resta su disco dopo le cancellazioni: gli eventi di una chat cancellata DOPO di loro (i suoi accaduti in
+  // qualunque ordine) e le pagine che una cancellazione copre se ne vanno, il resto resta identico e in ordine. Le
+  // cancellazioni restano: un altro dispositivo dovrà saperle.
   function compatta(eventi) {
     const chatCancellate = new Set();
+    const chatTolte = new Set(eventi.filter((ev) => ev.tipo === TIPI.CANCELLAZIONE && ev.chat != null).map((ev) => ev.chat));
     const tagli = eventi.filter((ev) => ev.tipo === TIPI.CANCELLAZIONE && ev.chat == null).map(copertura);
     // Il titolo di una pagina cancellata è suo contenuto: se ne va con lei.
     const visiteTolte = new Set(eventi.filter((ev) => ev.tipo === TIPI.NAVIGAZIONE && tagli.some((c) => copre(c, ev))).map((ev) => ev.id));
@@ -428,7 +437,7 @@
         tenuti.push(ev);
         continue;
       }
-      if (ev.chat != null && chatCancellate.has(ev.chat)) continue;
+      if (ev.chat != null && (chatCancellate.has(ev.chat) || (ACCADUTI.has(ev.tipo) && chatTolte.has(ev.chat)))) continue;
       if (ev.tipo === TIPI.NAVIGAZIONE && visiteTolte.has(ev.id)) continue;
       if ((ev.tipo === TIPI.TITOLO_PAGINA || ev.tipo === TIPI.RICERCA) && visiteTolte.has(ev.visita)) continue;
       if (ACCADUTI.has(ev.tipo) && tagli.some((c) => copreAccaduto(c, ev))) continue;

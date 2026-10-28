@@ -5,7 +5,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync, appendFileSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
@@ -170,6 +170,25 @@ test('cancellare una chat porta via anche le sue azioni e le sue ricerche, dal d
   await Chats.remove('via');
   assert.ok(!leggi(file).includes('SEGRETO-CHAT'), 'il testo della chat cancellata è ancora su disco');
   assert.deepEqual((await f.accaduti()).map((e) => e.chat), ['resta']);
+  // L'azione che l'ha cancellata arriva dopo la cancellazione, col titolo nel suo esito: se ne va con lei.
+  await scrivi(f, E.TIPI.AZIONE, {
+    nome: 'TOGLI_CHAT', parametri: { per_sempre: true }, esito: { eseguita: true, fatto: 'Cancellata per sempre la conversazione «SEGRETO-CHAT»' }, chat: 'via',
+  }, { autore: 'filo' });
+  assert.ok(!leggi(file).includes('SEGRETO-CHAT'), 'l\'azione arrivata dopo la cancellazione ha riscritto il titolo su disco');
+  assert.deepEqual((await f.accaduti()).map((e) => e.chat), ['resta']);
+});
+
+test('un accaduto di una chat cancellata, rimasto sul disco dopo la cancellazione, se ne va alla riapertura', async () => {
+  const { f, file } = nuovo();
+  await Chats.append('tarda', { role: 'user', text: 'ciao' });
+  await Chats.remove('tarda');
+  const tardo = E.crea(E.TIPI.AZIONE, { nome: 'TOGLI_CHAT', parametri: {}, esito: { eseguita: true, fatto: 'TITOLO-TARDIVO' }, chat: 'tarda' },
+    { autore: 'filo', dispositivo: 'd' });
+  appendFileSync(file, E.riga(tardo));
+  const g = creaFilo({ cartella: dirname(file) });
+  assert.deepEqual((await g.accaduti()).map((e) => e.chat), []);
+  assert.ok(!leggi(file).includes('TITOLO-TARDIVO'), 'la riapertura non ha tolto l\'accaduto della chat cancellata');
+  assert.ok(leggi(file).includes('"cancellazione"'), 'la cancellazione resta per gli altri dispositivi');
 });
 
 test('cancellare le pagine porta via le ricerche fatte su quei siti, i download e le ricerche di Filo del periodo', async () => {
