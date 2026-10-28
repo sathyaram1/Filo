@@ -197,7 +197,7 @@
     INVIA_FEEDBACK: {
       description: 'Invia un feedback agli sviluppatori di Filo a nome dell\'utente. Se serve il suo OK il sistema glielo chiede da sé, con l\'anteprima: tu prepara il testo e basta.',
       properties: {
-        testo: S('La segnalazione completa.'),
+        testo: S('La segnalazione completa, con le parole dell\'utente.'),
         titolo: S('Un riassunto di 2-6 parole.'),
       },
       required: ['testo', 'titolo'],
