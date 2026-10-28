@@ -8,6 +8,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { home, modelloFinto, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { googleFinto, risposteFinte, schedeSu, indirizzoDellAccesso, rispondiAlLoopback } from './helpers/googleFinto.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const SHOTS = join(dirname(fileURLToPath(import.meta.url)), '.shots');
 const EMAIL = 'chi.accede@prova.test';
