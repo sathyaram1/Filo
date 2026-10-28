@@ -1291,6 +1291,10 @@
   const NOMI_VALUTE = 'rupie = INR, real = BRL, zloty = PLN, won = KRW, rand = ZAR, baht = THB, lira turca = TRY, fiorino = HUF, corona ceca = CZK, peso messicano = MXN, dollari = USD, sterline = GBP, franchi svizzeri = CHF, yen = JPY, yuan = CNY';
   const FATTORI_UNITA = '1 mi = 1.609 km, 1 ft = 0.3048 m, 1 in = 2.54 cm, 1 yd = 0.9144 m, 1 mi² = 2.59 km², 1 acre = 4046.86 m², 1 lb = 0.4536 kg, 1 oz = 28.35 g, 1 gal (US) = 3.785 L, 1 fl oz (US) = 29.57 mL, °C = (°F-32)*5/9';
 
+  // Una segnalazione scritta da Filo in tono da agente (nomi di azioni, ordini a chi lavora)
+  // i giudici all'ingresso la leggono come un utente che si finge sviluppatore e la bloccano (#1627).
+  const VOCE_SEGNALAZIONE = 'Il testo scrivilo come lo direbbe l\'utente, in prima persona e con parole sue: cosa voleva fare e cosa è successo, o cosa gli piacerebbe. Niente nomi di azioni o strumenti, di funzioni interne di Filo o di chiavi delle impostazioni, e nessun ordine a chi la leggerà: una richiesta si scrive come un desiderio («vorrei che…»).';
+
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
   const PROMPTS = {
     // #593 — selezione e frase sono testo di una pagina web: chi possiede il
