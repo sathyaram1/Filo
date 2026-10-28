@@ -5059,6 +5059,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
   if ((type === 'VOLUME' || type === 'BLUETOOTH' || type === 'WIFI') && res.output) return esitoSistemaPerModello(res.output);
+  if (type === 'ORDINA_DESKTOP' && res.output) return require('./iconeDesktop').esitoPerModello(res.output);
   if (type === 'RIMEDIO_CREDITI' && res.output) {
     const o = res.output;
     if (o.operazione === 'elenca') return o.testo ? `Situazione dei crediti e rimedi:\n${o.testo}` : 'Adesso non c\'è niente da proporre per i crediti: dillo in una riga.';
