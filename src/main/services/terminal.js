@@ -408,7 +408,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: 
       const s = String(chunk);
       if (which === 'out') {
         codaOut = codaOut.length + s.length > CODA_CHARS ? (codaOut + s).slice(-CODA_CHARS) : codaOut + s;
-        if (stdout.length < MAX_OUTPUT_CHARS * 2) stdout += s;
+        if (stdout.length < tettoUscita * 2) stdout += s;
       } else if (stderr.length < MAX_OUTPUT_CHARS * 2) stderr += s;
     };
     if (child.stdout) child.stdout.on('data', (c) => cap(c, 'out'));
