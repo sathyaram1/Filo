@@ -28,6 +28,13 @@
     return a && a._exfil ? Math.max(base, 2) : base;
   }
 
+  // Le voci del menu dell'account (#1615), coi nomi che un modello usa anche fuori dall'enum: '' se non è nessuna.
+  const ALIAS_ACCOUNT = { accedi: 'accedi', entra: 'accedi', login: 'accedi', collega_google: 'collega_google', collega: 'collega_google', esci: 'esci', logout: 'esci' };
+  function cosaAccount(a) {
+    const k = String((a && (a.cosa ?? a.azione ?? a.operazione)) || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+    return Object.prototype.hasOwnProperty.call(ALIAS_ACCOUNT, k) ? ALIAS_ACCOUNT[k] : '';
+  }
+
   // L'utente che chiede di mandare una segnalazione la nomina: chi non la nomina non l'ha chiesta.
   const CHIESTA_SEGNALAZIONE = /\b(?:segnal\w*|feedback|sviluppator\w*|report\w*|bug)\b|\bdi['’]\s+al\s+team\b|\bal\s+team\s+di\s+filo\b/i;
 
