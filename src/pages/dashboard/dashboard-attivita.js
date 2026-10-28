@@ -598,6 +598,7 @@
     STILE_PAGINA: () => 'cambiato l\'aspetto della pagina',
     RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
+    ACCOUNT: () => 'sistemato l\'accesso',
     SPOSTA_ICONA: () => 'spostato un\'icona',
     INSTALLA_AGGIORNAMENTO: () => 'chiesto la versione nuova di Filo',
     RIMEDIO_CREDITI: () => 'lavorato sui crediti',
