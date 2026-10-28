@@ -437,6 +437,9 @@
     if (turn.images) out.images = Number(turn.images) || 0;
     // Un messaggio partito da un suggerimento della home l'ha scritto un modello: riaperta, non è voce dell'utente (#810).
     if (role === 'user' && turn.daModello) out.daModello = true;
+    // La risposta di Filo a cui il messaggio risponde (#1620): il suo posto nel filo, non una copia.
+    const rispostaA = role === 'user' && global.SN_RISPOSTA_A ? global.SN_RISPOSTA_A.riferimento(turn.rispostaA) : null;
+    if (rispostaA) out.rispostaA = rispostaA;
     // Da dove venivano i segreti che una frase di Filo ripete, o il testo stesso se l'ha scritto un comando (#810):
     // riaperta, la chat li tratta ancora da letti. Regole: src/shared/urlExfil.js (lettiNelTesto).
     if (role === 'filo') {
