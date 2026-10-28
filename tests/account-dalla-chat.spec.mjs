@@ -68,7 +68,7 @@ test('«accedi con Google» in chat: Filo apre la pagina d\'accesso e, scelto l\
   // Chiusa la scheda d'accesso si torna alla chat, dove il diario dice cosa ha fatto Filo.
   await expect.poll(() => schedeSu(app, pagina).then((s) => s.length), { timeout: 10_000 }).toBe(0);
   await page.locator('.dash-activity-head').last().click();
-  await expect(page.locator('.dash-activity-body').last()).toContainText('Accesso con Google aperto');
+  await expect(page.getByText('Accesso con Google aperto')).toBeVisible();
   mkdirSync(SHOTS, { recursive: true });
   await page.screenshot({ path: join(SHOTS, 'account-dalla-chat.png') });
 });
