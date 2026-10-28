@@ -92,13 +92,15 @@
   }
 
   // Ogni ricerca che Filo fa sul web (la chat, l'Aiuto) entra nel filo da qui, una volta, riuscita o no (#1561).
-  async function search({ query, tavilyKey, maxResults = 5 }) {
+  // `da`: chi cerca, dall'elenco dei contatori (SN_CONTATORI.DA_RICERCA): ogni ricerca si conta qui, da qualunque strada (#1467).
+  async function search({ query, tavilyKey, maxResults = 5, da = '' }) {
     const q = (query || '').trim().slice(0, MAX_QUERY_LEN);
     if (!q) return { ok: false, results: [], reason: 'query vuota' };
     const r = await cerca(q, { tavilyKey, maxResults });
     try {
       global.SN_ACCADUTI?.ricerca({ testo: q, motore: r && r.provider, risultati: r && Array.isArray(r.results) ? r.results.length : 0 });
     } catch (_) {}
+    try { global.SN_CONTATORI_MAIN?.attivita('ricercaWeb', { da, ...global.SN_CONTATORI.esitoRicerca(r) }); } catch (_) {}
     return r;
   }
 
