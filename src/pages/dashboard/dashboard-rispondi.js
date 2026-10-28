@@ -209,7 +209,7 @@
     const q = document.createElement('span');
     q.className = 'dash-citata';
     const chi = c.role === 'user' ? 'Tu' : 'Filo';
-    const testo = c.manca ? 'Messaggio non più nel filo' : String(c.testo || '').trim();
+    const testo = c.manca ? 'Messaggio non più nel filo' : (String(c.testo || '').trim() || '…');
     q.dataset.chi = chi;
     q.dataset.testo = testo;
     q.setAttribute('aria-label', `In risposta a ${chi}: ${testo}`);
