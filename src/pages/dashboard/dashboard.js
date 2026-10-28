@@ -2859,6 +2859,7 @@
     // finita, e durante l'intervista in archivio non c'è ancora niente.
     const reopenId = onbState ? null : chatIdFromUrl();
     const eventoId = onbState ? null : eventoFromUrl();
+    if (!onbState) contaQuandoVista();
     // Suggerimenti, stato vivo e coda del filo insieme: niente di questo chiama il modello (#869).
     await Promise.all([
       onbState ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
