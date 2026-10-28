@@ -78,10 +78,45 @@ mai chi chiede. I casi noti:
 - **Linux**: `wpctl`, poi `pactl`, poi `amixer`; `bluetoothctl` (più `rfkill`
   per sbloccare); `nmcli`, che può essere negato da polkit.
 
+## Le icone del desktop (#1621)
+
+«Mettile in ordine alfabetico, da sinistra a destra»: Windows sa ordinarle solo a
+colonne, con «Disponi automaticamente». Filo le sposta una per una con la stessa
+regola degli altri comandi, con qualche punto in più:
+
+- **Lo script legge e sposta, JavaScript decide.** La Shell (l'`IFolderView2` della
+  finestra del desktop) dà nomi, posizioni, passo della griglia e l'area dello
+  schermo principale nelle stesse coordinate; ordine e griglia sono logica pura,
+  provata su Linux. Le posizioni tornano allo script nell'ambiente, a pezzi sotto
+  il tetto di una variabile di Windows (`FILO_SIS_POS_0`, `_1`…), e l'uscita si
+  legge col suo tetto (`tettoUscita` di `runCommand`), non con quello del modello.
+- **Pixel veri.** Lo script chiede a Windows le coordinate senza scala: a 125%
+  l'area dello schermo uscirebbe più piccola delle posizioni delle icone.
+- **La griglia è quella di Windows.** Con «Allinea alla griglia» le icone stanno
+  già su una griglia; le nuove posizioni ne prendono l'allineamento, così
+  riaccendendola nessuna salta di casella. Durante lo spostamento «Disponi
+  automaticamente» e «Allinea alla griglia» si spengono (la prima rimette tutto in
+  colonna, la seconda sposta chi trova la casella ancora occupata); la griglia
+  torna com'era, la disposizione automatica resta spenta e l'esito lo dice.
+- **Si rilegge.** Dopo lo spostamento si confrontano le posizioni vere con quelle
+  volute: un desktop che non si è mosso (una regola dell'azienda) è un fallimento
+  detto, non un «fatto».
+- **Troppe per lo schermo: niente.** Fuori dallo schermo un'icona non si raggiunge
+  più; si rifiuta coi due numeri e la strada (icone piccole).
+- **Ogni disposizione è un cambio del filo** (`tipo: 'desktop'`, prima e dopo con
+  tutte le posizioni e «Disponi automaticamente»): l'annullo di ANNULLA_CAMBIO e
+  del segno sulla bolla rimette ogni icona ancora presente, e rifarlo rimette
+  l'ordine. Al modello vanno numeri e frasi di Filo, mai i nomi dei file.
+- **Mac e Linux** per ora lo dicono, con la strada del sistema: il Finder non dà il
+  passo della griglia, e su Linux ogni ambiente grafico tiene le posizioni a modo
+  suo.
+
 ## Dove vive
 
 - `src/main/services/comandiSistema.js`: script, costruttori, letture delle uscite,
   frasi, la coda.
+- `src/main/services/iconeDesktop.js`: le icone del desktop (prove in
+  `tests/unit/iconeDesktop.test.mjs` e `tests/icone-desktop.spec.mjs`).
 - `src/main/services/statoSistema.js`: legge anche volume e radio del Wi-Fi.
 - `src/pages/dashboard/dashboard-sistema.js`: i comandi nel riquadro delle voci.
 - Prove: `tests/unit/comandiSistema.test.mjs` (gli script di Linux e Mac girano
