@@ -5708,9 +5708,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   const indiceDomanda = threadMessages.length;
   const giaLetta = origineGiaLettaInChat(chatId);
+  const notaCitazione = FCx.notaRisposta(citazione.citata);
+  const domandaConCitazione = notaCitazione ? `${notaCitazione}\n${String(userMessage || '')}` : String(userMessage || '');
   if (imageList.length) {
     const parts = [];
-    if (userMessage) parts.push({ type: 'text', text: String(userMessage) });
+    if (domandaConCitazione) parts.push({ type: 'text', text: domandaConCitazione });
     for (const im of imageList) parts.push({ type: 'image_url', image_url: { url: im } });
     // #711 — «questa foto è fatta con l'AI?» deve avere in chat la stessa
     // risposta del tasto destro, quindi il controllo si fa SEMPRE: capire
