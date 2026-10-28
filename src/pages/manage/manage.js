@@ -1523,7 +1523,10 @@
     rate_limited: 'troppe richieste',
     malformed: 'richiesta non interpretabile',
     routines_off: 'routine spente',
+    l5_blocked: 'fusione fermata dai controlli di sicurezza',
   };
+  // Il numero del feedback viene subito dopo il motivo: da qui si deve leggere chi è fermo (#1653).
+  const numDiRifiuto = (r) => { const n = String((r && r.num) || '').trim().replace(/^#+/, ''); return n ? ` · #${n}` : ''; };
 
   // Le richieste di fusione senza gli unit sul risultato (#958): una per una, e in cima un avviso quando il server
   // le giudica frequenti. Una prova che manca sempre non protegge niente, e nessuno se ne accorgerebbe.
