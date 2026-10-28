@@ -174,8 +174,88 @@
     return null;
   }
 
+  /**
+   * 1..3, 0 = nessuna. null = illeggibile (un cifrato, un testo storto): chi eredita non lo scambia per 0,
+   * altrimenti una priorità vera rimasta cifrata verrebbe riscritta più bassa.
+   */
+  function prioritaDi(doc) {
+    const raw = doc ? doc.priority : undefined;
+    if (raw === undefined || raw === null || raw === '' || raw === false) return 0;
+    const n = typeof raw === 'number' ? raw : (/^\s*\d+(?:\.\d+)?\s*$/.test(String(raw)) ? Number(raw) : NaN);
+    if (!Number.isFinite(n)) return null;
+    const p = Math.round(n);
+    return p >= 1 && p <= 3 ? p : 0;
+  }
+
+  /** La scrittura `prima` → `dopo` (prima null alla nascita) chiede l'eredità: priorità salita, o un'attesa nuova. */
+  function scattaEredita(prima, dopo) {
+    const p = prioritaDi(dopo);
+    if (!p || !atteseDi(dopo).length) return false;
+    const p0 = prima ? prioritaDi(prima) : 0;
+    if (p0 === null || p > p0) return true;
+    const gia = new Set(atteseDi(prima).map((w) => w.id));
+    return atteseDi(dopo).some((w) => !gia.has(w.id));
+  }
+
+  /**
+   * Chi sale quando `fonte` ({ id, num, priority, waitsFor }, in chiaro) ha la priorità o le attese nuove: ogni aspettato
+   * aperto sotto la sua priorità sale fino a lei, e a catena i suoi. Mai verso il basso; fusi, chiusi e cancellati restano.
+   * `leggi(ids)` → Map id → documento in chiaro ({ num, status, resolvedInVersion, priority, waitsFor }) o { missing: true }.
+   * `da` è chi lo aspetta direttamente (per `notaEredita`); `illeggibili` sono quelli saltati per stato o priorità non letti.
+   * @returns {Promise<{ ok: true, alzati: Array<{ id, num, prima, dopo, da: { id, num } }>, illeggibili: Array<{ id, num }> }
+   *   | { ok: false, motivo: string }>}
+   */
+  async function ereditaPriorita(fonte, leggi) {
+    const p = prioritaDi(fonte);
+    const alzati = [];
+    const illeggibili = [];
+    if (!p) return { ok: true, alzati, illeggibili };
+    const fonteId = String((fonte && fonte.id) || '');
+    const visti = new Set(fonteId ? [fonteId] : []);
+    let frontiera = [{ id: fonteId, num: normalizzaNumero(fonte && fonte.num), attese: atteseDi(fonte) }];
+    while (frontiera.length) {
+      const coppie = [];
+      for (const chi of frontiera) {
+        for (const w of chi.attese) {
+          if (visti.has(w.id)) continue;
+          visti.add(w.id);
+          coppie.push({ w, da: { id: chi.id, num: chi.num } });
+        }
+      }
+      if (visti.size > MAX_VISITATI) {
+        return { ok: false, motivo: `le attese a catena superano ${MAX_VISITATI} feedback: l'eredità di priorità non è stata calcolata` };
+      }
+      if (!coppie.length) break;
+      // eslint-disable-next-line no-await-in-loop
+      const mappa = await leggi(coppie.map((c) => c.w.id));
+      const prossima = [];
+      for (const { w, da } of coppie) {
+        const doc = mappa && typeof mappa.get === 'function' ? mappa.get(w.id) : undefined;
+        const num = normalizzaNumero(doc && doc.num) || w.num;
+        const stato = statoAttesa(doc);
+        if (stato === STATO.IGNOTO) { illeggibili.push({ id: w.id, num }); continue; }
+        if (stato !== STATO.APERTO) continue;
+        const prima = prioritaDi(doc);
+        if (prima === null) { illeggibili.push({ id: w.id, num }); continue; }
+        // Chi vale già quanto la fonte ha i suoi aspettati in regola: l'eredità li ha alzati quando è salito lui.
+        if (prima >= p) continue;
+        alzati.push({ id: w.id, num, prima, dopo: p, da });
+        prossima.push({ id: w.id, num, attese: atteseDi(doc) });
+      }
+      frontiera = prossima;
+    }
+    return { ok: true, alzati, illeggibili };
+  }
+
+  /** «priorità 3: la eredita da #1630, che lo aspetta». */
+  function notaEredita(alzato) {
+    const a = alzato || {};
+    return `priorità ${a.dopo}: la eredita da ${etichetta(a.da)}, che lo aspetta`;
+  }
+
   global.SN_FB_ATTESE = {
     CAMPO, MAX, STATO, ETICHETTA,
     normalizzaNumero, leggiNumeri, atteseDi, statoAttesa, statiDelleAttese, aspettaAncora, etichetta, testoAttese, valida,
+    prioritaDi, scattaEredita, ereditaPriorita, notaEredita,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
