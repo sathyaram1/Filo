@@ -46,6 +46,10 @@
 //     Lo lancia chi ha corretto: chiude il giro e chiede un'altra verifica
 //     sul commit nuovo.
 //
+//   node scripts/verify-local.mjs registra
+//     Dopo una spinta a mano sul ramo del server: scrive nel registro dei rami
+//     le punte di adesso (il server solo se è quella su filo-security).
+//
 //   node scripts/verify-local.mjs status
 //     Esito per il ramo corrente. Exit 0 = si può pubblicare.
 //
