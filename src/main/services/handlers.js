@@ -5507,6 +5507,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       text: String(userMessage || ''),
       images: imageList.length,
       ...(daModello ? { daModello: true } : {}),
+      ...(citazione.ref ? { rispostaA: citazione.ref } : {}),
     }, { onboarding: onbActive });
     // Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
     const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
