@@ -774,6 +774,99 @@ export function operazioneGitInCorso(root, { exec = execFileSync } = {}) {
   return '';
 }
 
+// ─── La punta del giro nel registro del ramo (#1555) ─────────────────────────
+//
+// Il registro confronta l'ultima punta registrata con quella che trova all'emissione del biglietto dopo: una spinta
+// del giro arrivata dopo l'ultima registrazione (la pulizia dopo un pass, il commit del rilascio) è un buco, e da lì il
+// lavoro fidato passa da L5 come uno qualunque. Regola: la consegna parte prima di registrare, chi chiude il giro
+// registra la punta che resta, e dopo la chiusura non parte più niente.
+
+/** La punta che il giro lascia sul ramo entra nel registro (routinePunta). → { outcome: 'ok'|'assente'|'refused'|'fault', … } */
+export async function registraPunta(t, ramo, sha, opts) {
+  const { status, body } = await call('routinePunta', { ticket: t, ramo: String(ramo || ''), sha: String(sha || '') }, opts);
+  const b = body || {};
+  if (status === 200 && b.ok) return { outcome: 'ok', sha: String(b.sha || sha || ''), fiducia: b.fiducia };
+  if (status === 404 && (!b.reason || b.reason === 'malformed_response')) return { outcome: 'assente', reason: 'routinePunta non è ancora pubblicata sul server' };
+  return { outcome: status >= 500 || status === 0 ? 'fault' : 'refused', reason: String(b.reason || `http_${status}`), detail: String(b.detail || '') };
+}
+
+/**
+ * Prima di una consegna che dichiara una punta: il ramo parte su origin, o il registro troverebbe dopo un'altra punta.
+ * Dopo la chiusura del giro non parte niente: vale solo la punta chiusa. → { ok, avviso?, motivo? }
+ */
+export function spedisciPerLaConsegna(root, ticket, sha, { exec = execFileSync, env = process.env } = {}) {
+  const m = leggiMarcatoreBiglietto(root);
+  if (m && String(m.ticket || '') === String(ticket || '') && giroChiuso(m) && m.chiuso.sha !== String(sha || '')) {
+    return { ok: false, motivo: `il giro ha già chiuso il ramo su ${m.chiuso.sha.slice(0, 12)} (domanda di fine sessione o rilascio) e dopo non parte più niente: si consegna solo quella punta, non ${String(sha || '?').slice(0, 12)}` };
+  }
+  const p = pushRamoCorrente(root, { exec, env });
+  if (!p.ok) return { ok: false, motivo: `il ramo${p.branch ? ` '${p.branch}'` : ''} non è arrivato su origin: ${p.reason}` };
+  return { ok: true, avviso: p.avviso || '' };
+}
+
+/**
+ * Chiude il giro sul ramo: committa quello che è rimasto fuori, spedisce, e registra la punta se non è quella che il
+ * registro conosce per questo giro. La chiamano la domanda di fine sessione (prima di riceverla: può sporcare il
+ * biglietto) e il rilascio. Un giro già chiuso non spedisce più: con modifiche dopo la chiusura torna `ok` falso.
+ */
+export async function chiudiGiro(root, ticket, { exec = execFileSync, env = process.env, registra = registraPunta, opts } = {}) {
+  const m = leggiMarcatoreBiglietto(root);
+  const mio = !!(m && String(m.ticket || '') === String(ticket || ''));
+  if (mio && giroChiuso(m)) {
+    const st = statoDirectory(root);
+    if (!st.ok) return { ok: false, fase: 'commit', reason: `non so cosa c'è fuori dai commit: ${st.motivo}` };
+    const head = headSha(root);
+    if (st.lines.length || head !== m.chiuso.sha) {
+      return { ok: false, fase: 'chiuso', sha: m.chiuso.sha, file: st.lines.map((l) => l.slice(3)), commitDopo: head !== m.chiuso.sha };
+    }
+    return { ok: true, giaChiuso: true, committed: [], push: null, registrata: null };
+  }
+  const c = commitRestante(root, { exec, env });
+  if (!c.ok) return { ok: false, fase: 'commit', reason: c.reason };
+  const p = pushRamoCorrente(root, { exec, env });
+  if (!p.ok) return { ok: false, fase: 'push', committed: c.committed, fuori: c.fuori, branch: p.branch, reason: p.reason };
+  const head = headSha(root);
+  const punta = mio && m.punta && typeof m.punta === 'object' ? m.punta : null;
+  let registrata = null;
+  if (punta && !p.skipped && head && p.branch === punta.ramo && head !== punta.sha) {
+    registrata = { ...(await registra(ticket, p.branch, head, opts)), sha: head };
+    if (registrata.outcome === 'ok') segnaPuntaDelGiro(root, ticket, { sha: head, ramo: p.branch, via: 'chiusura' });
+  }
+  if (mio && head && !p.skipped) segnaGiroChiuso(root, ticket, { sha: head });
+  return { ok: true, committed: c.committed, fuori: c.fuori, push: p, registrata };
+}
+
+/** Le righe da stampare dopo chiudiGiro, esito buono o no. PURA. */
+export function righeChiusuraGiro(g) {
+  const righe = [];
+  if (!g) return righe;
+  const elenco = (l) => `${l.slice(0, 3).join(', ')}${l.length > 3 ? ` (+${l.length - 3} file)` : ''}`;
+  if (g.fase === 'chiuso') {
+    const sha = String(g.sha || '');
+    righe.push(`Dopo la chiusura del giro il ramo è cambiato${g.file && g.file.length ? ` (${elenco(g.file)})` : ''}${g.commitDopo ? ', con commit dopo la punta chiusa' : ''}. Non spedisco: dopo la domanda di fine sessione il biglietto può essere sporco, e una spinta romperebbe il registro del ramo.`);
+    righe.push(`Il lavoro consegnato è quello di ${sha.slice(0, 12)}: togli il resto (git stash -u && git reset --hard ${sha}) e rilancia lo stesso comando.`);
+    return righe;
+  }
+  if (g.fase === 'commit') { righe.push(`Modifiche fuori dai commit che non riesco a committare: ${g.reason}`); return righe; }
+  if (g.committed && g.committed.length) righe.push(`committate ${g.committed.length} modifiche rimaste fuori dai commit: ${elenco(g.committed)}`);
+  if (g.fuori && g.fuori.length) {
+    righe.push(`NON committo e NON spedisco ${g.fuori.join(', ')}: ha la forma di una copia dei dati del server e il repo è pubblico. Resta nella cartella, invisibile a git: spostalo nella cartella temporanea del sistema (os.tmpdir()).`);
+  }
+  if (g.fase === 'push') { righe.push(`Il ramo${g.branch ? ` '${g.branch}'` : ''} NON è arrivato su origin: ${g.reason}`); return righe; }
+  const p = g.push;
+  if (p) {
+    if (p.avviso) righe.push(p.avviso);
+    righe.push(p.skipped ? `push saltato: ${p.reason}` : `ramo '${p.branch}' spedito su origin${p.forced ? ' (storia riscritta: --force-with-lease)' : ''}`);
+  }
+  const r = g.registrata;
+  if (r && r.outcome === 'ok') righe.push(`punta ${r.sha.slice(0, 12)} registrata nel registro del ramo: è l'ultima spinta di questo giro.`);
+  else if (r) {
+    const perche = r.outcome === 'assente' ? r.reason : `${r.outcome === 'fault' ? 'server non raggiunto' : 'rifiutata'}: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`;
+    righe.push(`ATTENZIONE: la punta ${r.sha.slice(0, 12)} non è entrata nel registro del ramo (${perche}). Chi viene dopo la troverà come un buco, e il lavoro perde la fiducia.`);
+  }
+  return righe;
+}
+
 /** Le righe di git che dicono qualcosa (via i `hint:` e le vuote), in una riga. */
 function pulisciGit(testo) {
   return String(testo || '').split('\n').map((l) => l.trim()).filter((l) => l && !/^hint:|^To /.test(l)).slice(0, 3).join(' ');
