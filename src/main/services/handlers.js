@@ -64,6 +64,7 @@ const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
 const FiloChats = globalThis.SN_FILO_CHATS;       // #525 — archivio delle chat con Filo
 const ChatArchive = globalThis.SN_CHAT_ARCHIVE;   // #525 — titoli, tipi, ricerca (logica pura)
+const RispostaA = globalThis.SN_RISPOSTA_A;        // #1620 — la risposta di Filo che un messaggio cita
 const I18n = globalThis.SN_I18N;
 const Categorizer = globalThis.SN_CATEGORIZER;
 const AICache = globalThis.SN_AI_CACHE;
