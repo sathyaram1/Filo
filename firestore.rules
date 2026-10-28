@@ -1304,7 +1304,7 @@ service cloud.firestore {
     // il filtro si è rotto), le richieste ai modelli partite con un segreto tolto (per tipo e funzione), le uscite fermate
     // (regola, tipo di segreto e tipo d'azione) e i tetti del codice toccati. Mai un dominio, un indirizzo o un segreto.
     // Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle espressioni; le stesse
-    // regole: sola creazione, senza login, forma fissa, legge solo l'admin. Sentinella:
+    // regole: sola creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella:
     // tests/unit/firestoreRulesContatoriSicurezza.test.mjs.
     match /contatori-sicurezza/{docId} {
       function conti(m, chiavi, tettoChiavi, tetto) {
@@ -1332,7 +1332,7 @@ service cloud.firestore {
           && conti(d.tetto_toccato, '^((automatiche_spiegazioni|automatiche_correttore|riquadri_visioni|geo_budget|safebrowse_approfondimenti|link_accorciati|segreti_saturo|contatori_combinazioni)(#(automatiche_spiegazioni|automatiche_correttore|riquadri_visioni|geo_budget|safebrowse_approfondimenti|link_accorciati|segreti_saturo|contatori_combinazioni))*)?$', 400, 200);
       }
       allow get, list: if isAdmin();
-      allow create: if contatoriSicurezza(request.resource.data);
+      allow create: if request.auth != null && contatoriSicurezza(request.resource.data);
       allow update, delete: if false;
     }
 
