@@ -826,11 +826,10 @@
   // prima vale quanto la cache che la risposta servirebbe: i suggerimenti che ha portato restano («Aggiorna» no).
   let giroDashboard = 0;
   let spinteDashboard = 0;
-  // `apertura`: la home che si apre, che il main conta se è senza un modello (#1467); i ricalcoli no.
-  async function loadDashboard({ force = false, apertura = false } = {}) {
+  async function loadDashboard({ force = false } = {}) {
     const giro = ++giroDashboard;
     renderSuggestions({ pronti: false });
-    const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD, force, ...(apertura ? { apertura: true } : {}) });
+    const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD, force });
     if (giro !== giroDashboard) return;
     mostraSenzaModello(r?.ok && r.senzaChiave ? r.message : '');
     if (!force && spinteDashboard) { renderSuggestions(); return; }
