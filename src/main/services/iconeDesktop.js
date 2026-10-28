@@ -318,16 +318,16 @@ function interpretaLettura(u) {
 
 // ── La richiesta, l'ordine e la griglia: logica pura ────────────────────────
 
-const ORDINI = {
+const ORDINI = new Map(Object.entries({
   nome: 'nome', alfabetico: 'nome', alfabetica: 'nome', name: 'nome',
   tipo: 'tipo', estensione: 'tipo', type: 'tipo',
   data: 'data', date: 'data', modifica: 'data', recenti: 'data',
   dimensione: 'dimensione', dimensioni: 'dimensione', grandezza: 'dimensione', peso: 'dimensione', size: 'dimensione',
-};
-const VERSI = {
+}));
+const VERSI = new Map(Object.entries({
   righe: 'righe', riga: 'righe', orizzontale: 'righe', rows: 'righe',
   colonne: 'colonne', colonna: 'colonne', verticale: 'colonne', columns: 'colonne',
-};
+}));
 
 const vero = (v) => v === true || v === 1 || /^(true|1|si|sì|yes)$/i.test(String(v ?? '').trim());
 const falso = (v) => v === false || v === 0 || /^(false|0|no)$/i.test(String(v ?? '').trim());
