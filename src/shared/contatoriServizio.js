@@ -115,14 +115,19 @@
     const s = String(id || '');
     return s ? dalElenco(s, capacita()) : NESSUNO;
   }
+  // Un modello o un host scritti a mano possono essere una chiave o un codice d'invito incollati nel posto sbagliato:
+  // un pezzo lungo di lettere e cifre, «sk-», la forma di un codice (ABCD-EFGH) o un modello senza fornitore escono «altro».
+  const sembraSegreto = (s) => /^sk[-_]/i.test(s) || /^[a-z0-9]{4}-[a-z0-9]{4}$/i.test(s)
+    || s.split(/[^A-Za-z0-9]+/).some((p) => p.length >= 20 && /[0-9]/.test(p) && /[a-z]/i.test(p));
   function modelloDa(m) {
     const C = global.SN_CONTATORI;
-    return C && typeof C.modelloPulito === 'function' ? C.modelloPulito(m) : ALTRO;
+    const s = C && typeof C.modelloPulito === 'function' ? C.modelloPulito(m) : ALTRO;
+    return s !== ALTRO && s.includes('/') && !sembraSegreto(s) ? s : ALTRO;
   }
   function hostDa(h) {
     const C = global.SN_CONTATORI;
     const s = C && typeof C.hostPulito === 'function' ? C.hostPulito(h) : '';
-    return s || ALTRO;
+    return s && s.split(' ').length <= 4 && !sembraSegreto(s) ? s : ALTRO;
   }
   function fonteDa(keySource) {
     const s = String(keySource || '');

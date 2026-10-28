@@ -54,8 +54,9 @@ function passa(doc) {
 
 // Ogni chiave degli elenchi chiusi, e per le misure aperte il tetto delle voci coi nomi più lunghi che l'app lascia
 // uscire, più le righe «altro»: il documento più carico che l'app sa fare.
-const lunghissimo = (i) => `${'m'.repeat(60)}/${'x'.repeat(56)}${String(i % 1000).padStart(3, '0')}`;
-const hostLungo = (i) => `H${'o'.repeat(43)}${String(i % 1000).padStart(4, '0')}`;
+// Il modello e l'host più lunghi che passano: pezzi di sole lettere o sole cifre, mai uno che sembri una chiave.
+const lunghissimo = (i) => `${'m'.repeat(60)}/${'x'.repeat(55)}-${String(i % 1000).padStart(3, '0')}`;
+const hostLungo = (i) => `H${'o'.repeat(20)} C${'l'.repeat(20)} ${String(i % 10000).padStart(4, '0')}`;
 function piena() {
   const ora = {};
   const d = S.dati(ora);
@@ -137,4 +138,13 @@ test('il documento più carico dell’app passa; uno con una chiave, un codice d
   assert.notEqual(manomesso('f4', { 'complaint|Non riesco a tradurre la pagina|inviata': '1' }), '', 'il testo di una segnalazione no');
   assert.notEqual(manomesso('accesso', { 'esito|ok': 'mario@example.com' }), '', 'un testo come conto no');
   assert.notEqual(manomesso('coda_feedback', { 'voci|n1': { n: 1 } }), '');
+});
+
+test('il modello e l’host più lunghi della prova sono davvero quelli che l’app lascia uscire', () => {
+  const ora = {};
+  S.registraViolazione(ora, { funzione: 'filo-chat', modello: lunghissimo(7), host: hostLungo(7), motivo: 'excluded', fonte: 'own' });
+  const [k] = Object.keys(S.dati(ora).politica_violata);
+  assert.equal(k, `filo-chat|${lunghissimo(7)}|${hostLungo(7)}|excluded|own`);
+  assert.equal(lunghissimo(7).length, 120);
+  assert.equal(hostLungo(7).length, 48);
 });

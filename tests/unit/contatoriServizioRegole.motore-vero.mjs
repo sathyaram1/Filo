@@ -98,7 +98,8 @@ await prova('un’ora con ogni misura del servizio parte col suo documento, e il
 });
 
 console.log('\n— la forma —');
-const lunghissimo = (i) => `${'m'.repeat(60)}/${'x'.repeat(56)}${String(i % 1000).padStart(3, '0')}`;
+// Il modello e l'host più lunghi che passano: pezzi di sole lettere o sole cifre, mai uno che sembri una chiave.
+const lunghissimo = (i) => `${'m'.repeat(60)}/${'x'.repeat(55)}-${String(i % 1000).padStart(3, '0')}`;
 const piena = (() => {
   const ora = {};
   const d = S.dati(ora);

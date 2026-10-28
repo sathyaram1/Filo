@@ -99,6 +99,8 @@ const delServizio = async (b) => {
   const s = await b.s.letto();
   return (s.ore[C.oraDi(b.t)] || {}).servizio || {};
 };
+// Lo stato dell'interruttore entra in ogni ora: le prove sui conti lo tolgono.
+const senzaStato = (m) => Object.fromEntries(Object.entries(m || {}).filter(([k]) => !k.startsWith('stato|')));
 const spedisci = async (b) => {
   await attendi();
   b.t += ORA;
@@ -113,7 +115,9 @@ test('i motivi della politica, del «nessun host» e delle chiamate mai partite 
   assert.deepEqual(tra(/return '([a-z-]+)'/g, corpoViolazione).map((x) => x.replace(/-/g, '_')).sort(), [...R.MOTIVI_VIOLAZIONE].sort());
 
   const router = leggi('src/main/services/providers/openrouter.js');
-  const motivi = new Set([...tra(/err\.reason = '([a-z]+)'/g, router), ...tra(/reason: '([a-z]+)'/g, router)]);
+  const verdetto = /async function hostVerdict\([^)]*\) \{([\s\S]*?)\n {2}\}/.exec(router)[1];
+  const motivi = new Set([...tra(/err\.reason = '([a-z]+)'/g, router),
+    ...tra(/reason: ([^,]+),/g, verdetto).flatMap((x) => tra(/'([a-z]+)'/g, x))]);
   assert.deepEqual([...motivi].sort(), [...R.MOTIVI_HOST].sort(), 'i motivi del «nessun host ammesso»');
   const giornalieri = leggi('src/shared/contatoriGiornalieri.js');
   const senzaHost = tra(/'([A-Z_]+)'/g, /const SENZA_HOST = new Set\(\[([^\]]*)\]\)/.exec(giornalieri)[1]);
@@ -123,7 +127,7 @@ test('i motivi della politica, del «nessun host» e delle chiamate mai partite 
 
   const cancello = leggi('src/main/services/modelGate.js');
   const decisione = /function esitoDecisione\([^)]*\) \{([\s\S]*?)\n {2}\}/.exec(cancello)[1];
-  assert.deepEqual([...new Set([...tra(/return '([a-z]+)'/g, decisione), ...tra(/tipo = '([a-z]+)'/g, decisione)])].sort(),
+  assert.deepEqual([...new Set(tra(/'([a-z]+)'/g, decisione).filter((x) => x !== 'function'))].sort(),
     [...R.DECISIONI].sort(), 'le decisioni del classificatore');
 
   const portafoglio = leggi('src/main/services/handlers/wallet.js');
@@ -139,7 +143,7 @@ test('crediti, inviti, accesso e segnalazioni: gli elenchi sono quelli del codic
   const rimedi = tra(/out\.push\(\{ id: '([a-z]+)'/g, avviso);
   assert.deepEqual(['modello', 'automatiche', ...rimedi.filter((r) => r !== 'attesa')].sort(), [...R.RIMEDI].sort(),
     'i rimedi da un clic: «attesa» è solo un testo');
-  assert.match(avviso, /id: 'attesa'[^}]*soloTesto: true/);
+  assert.match(avviso, /id: 'attesa'.*soloTesto: true/);
 
   assert.deepEqual([...Object.keys(W.REDEEM_MESSAGES), 'no_identity', R.ALTRO].sort(), [...R.ESITI_INVITO].sort());
   assert.match(leggi('src/main/services/handlers/wallet.js'), /status: 'no_identity'/);
@@ -168,7 +172,7 @@ test('ogni voce degli elenchi che nascono qui la conta qualcuno', () => {
   assert.deepEqual([...new Set(tra(/conta\('rinuncia', '([a-z]+)'/g, coda))].sort(), [...R.MOTIVI_RINUNCIA].sort());
   assert.deepEqual([...new Set(tra(/attendiAccesso\(it, [^,]+, '([a-z]+)'\)/g, coda))].sort(), [...R.ATTESE_ACCESSO].sort());
   const or = leggi('src/main/services/providers/openrouter.js');
-  assert.deepEqual([...new Set(tra(/contaRipiego\([^,]+, '([a-z_]+)'\)/g, or))].sort(), [...R.ESITI_RIPIEGO_CHIAVE].sort());
+  assert.deepEqual([...new Set(tra(/contaRipiego\(([^)]*)\)/g, or).flatMap((x) => tra(/'([a-z_]+)'/g, x)))].sort(), [...R.ESITI_RIPIEGO_CHIAVE].sort());
   assert.match(or, /contaRipiego\(refused\.status, res\.ok \? 'riuscito' : 'fallito'\)/);
   assert.match(handlers, /Object\.defineProperty\(out, 'pesiAperti'/, 'la catena porta i modelli cambiati dall’interruttore');
   assert.match(handlers, /misura\('bloccoPesi', kind\)/);
@@ -325,7 +329,7 @@ test('il cancello: una chiamata mai partita si conta una volta sola, anche se la
   Misure.misura('maiPartita', ACTIONS.TRANSCRIBE_AUDIO, Object.assign(new Error('rete'), { code: 'ECONNRESET' }));
   const d = await delServizio(b);
   assert.deepEqual(d.mai_partita, { 'explain|no_open_weights_model': 1, 'transcribe-audio|limit_reached': 1 });
-  assert.deepEqual(d.pesi_aperti, { 'explain|tolto': 2 });
+  assert.deepEqual(senzaStato(d.pesi_aperti), { 'explain|tolto': 2 });
 });
 
 test('il cancello: voce e dettatura chiedono dopo chi ha servito; a tentativi finiti senza risposta è ignota', async () => {
@@ -360,9 +364,10 @@ test('il cancello: i tentativi rotti e già pagati, e le decisioni del classific
   try {
     await G.stream({ action: ACTIONS.FILO_CHAT, messages: [] });
   } finally { ripristina(); }
+  // Il classificatore: una richiesta risposta, poi un 400 che si scarta; un'altra catena con un 400 prima di ogni risposta.
   const finto = {
     decisions: async ({ questions }) => {
-      if (questions === 'lento') throw Object.assign(new Error('troppe'), { status: 429 });
+      if (questions === 'storta') throw Object.assign(new Error(ROUTER), { status: 400 });
       return { answers: { a: true }, model: 'a/b', servedBy: 'DeepInfra', usage: { keySource: 'factory' } };
     },
   };
@@ -373,15 +378,16 @@ test('il cancello: i tentativi rotti e già pagati, e le decisioni del classific
       getSettings: async () => ({}), buildChain: () => [{ provider: 'openrouter', model: 'a/b' }], modelFor: () => 'x',
       costs: { isOverLimit: async () => false, record: async () => 0 }, contatore: () => b.s,
     });
-    globalThis.SN_PROVIDERS = { ...globalThis.SN_PROVIDERS, getProvider: () => ({ ...finto, decisions: finto.decisions }) };
-    await G2.decideAll({ action: ACTIONS.FILO_TAB_TRIAGE, requests: [{ state: 's', questions: 'q' }, { state: 's', questions: 'q2' }], parallel: 2 });
+    await G2.decideAll({ action: ACTIONS.FILO_TAB_TRIAGE, requests: [{ state: 's', questions: 'q' }, { state: 's', questions: 'storta' }], parallel: 1 });
+    await G2.decideAll({ action: ACTIONS.FILO_TAB_TRIAGE, requests: [{ state: 's', questions: 'storta' }], parallel: 1 }).catch(() => null);
   } finally { globalThis.SN_PROVIDERS = prima; }
   const d = await delServizio(b);
   assert.equal(d.ripiego['filo-chat|spezzato'], 2);
-  assert.deepEqual(d.chiave_fonte, { 'filo-chat|personal': 1, 'tab-triage|factory': 2 });
-  assert.equal(d.servita_ignota, undefined);
-  const decisione = globalThis.SN_MODEL_GATE;
-  void decisione;
+  assert.equal(d.ripiego['tab-triage|scarta'], 1, 'risposto una volta, il 400 è di quella richiesta');
+  assert.equal(d.ripiego['tab-triage|fatale'], 1, 'prima di ogni risposta il 400 ferma la catena');
+  assert.deepEqual(d.chiave_fonte, { 'filo-chat|personal': 1, 'tab-triage|factory': 1 });
+  assert.deepEqual(d.servita_ignota || {}, {});
+  assert.deepEqual(d.zdr, { 'filo-chat|partita': 1, 'tab-triage|partita': 1 });
 });
 
 test('il ripiego dalla chiave propria ai crediti: riuscito, fallito o non ammesso, per status', async () => {
@@ -399,6 +405,7 @@ test('il ripiego dalla chiave propria ai crediti: riuscito, fallito o non ammess
     keySourceOf: async (k) => (k === OWN ? 'own' : k === PERSONAL ? 'personal' : ''),
     noteOwnKeyRefusal: async () => {},
   };
+  K.creditsAllowModelLetto = () => true;
   globalThis.fetch = async (url, init) => {
     const key = String(init.headers.Authorization || '').replace('Bearer ', '');
     const status = statusFor[key] ?? 200;
@@ -415,7 +422,7 @@ test('il ripiego dalla chiave propria ai crediti: riuscito, fallito o non ammess
     K.creditsAllowModelLetto = () => false;
     statusFor = { [OWN]: 403 };
     await assert.rejects(P.complete({ apiKey: OWN, model: 'anthropic/claude-x', messages: [] }), (e) => e.code === 'NO_ALLOWED_HOST');
-    K.creditsAllowModelLetto = primaAmmesso;
+    K.creditsAllowModelLetto = () => true;
     statusFor = { [OWN]: 500 };
     await assert.rejects(P.complete({ apiKey: OWN, model: 'm', messages: [] }));
   } finally {
@@ -498,7 +505,7 @@ test('pesi aperti: la stessa catena conta una volta; le prove bloccate per tipo'
   b.m.bloccoPesi('provider');
   b.m.bloccoPesi('altro');
   const d = await delServizio(b);
-  assert.deepEqual(d.pesi_aperti, { 'filo-chat|sostituito': 1, 'filo-chat|tolto': 2, 'provider-test|blocco_model': 1, 'provider-test|blocco_provider': 1 });
+  assert.deepEqual(senzaStato(d.pesi_aperti), { 'filo-chat|sostituito': 1, 'filo-chat|tolto': 2, 'provider-test|blocco_model': 1, 'provider-test|blocco_provider': 1 });
 });
 
 test('quello che arriva prima del servizio (l’identità all’avvio) aspetta ed entra quando c’è', async () => {
