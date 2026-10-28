@@ -533,6 +533,12 @@
       invoke: 'In chat: «alza il volume al 40%», «abbassa un po’», «metti muto», «spegni il Bluetooth», «collega le cuffie», «collegati alla rete dell’ufficio», «spegni il Wi-Fi», «quali dispositivi ho abbinato?». Nella home: clic o tasto destro sulla voce del volume (cursore e muto), del Bluetooth (accendi o spegni, e i dispositivi abbinati da collegare o scollegare) o della rete (accendi o spegni il Wi-Fi, e le reti conosciute). Quando lo chiedi in chat, spegnere il Bluetooth o il Wi-Fi, scollegare un dispositivo e cambiare rete chiedono prima conferma.',
       doesNot: 'Non abbina dispositivi nuovi e non entra in reti mai usate (quelle che vogliono la password): quelle si aggiungono dalle impostazioni del sistema. Su Windows collega da qui cuffie, casse e auricolari; gli altri dispositivi Windows li collega da sé quando li accendi. Non cambia il volume di un video dentro un sito. Dopo aver spento il Wi-Fi, senza un cavo, la chat non può riaccenderlo (non ha più la rete): si riaccende dalla voce della rete nella home.',
     },
+    {
+      id: 'desktop-icons', title: 'Icone del desktop in ordine', category: 'assistant',
+      desc: 'Su Windows Filo mette in ordine le icone del desktop come gli chiedi: per nome, per tipo, per data o per dimensione, a righe da sinistra a destra oppure a colonne dall’alto in basso, al contrario o con le cartelle prima. Le dispone nella griglia dello schermo principale; se è acceso «Disponi automaticamente», che le rimetterebbe in colonna, lo spegne e te lo dice. Ogni riordino si annulla: le icone tornano dov’erano, e «Disponi automaticamente» com’era.',
+      invoke: 'In chat: «metti in ordine alfabetico le icone del desktop, da sinistra a destra», «ordina il desktop per data, le più recenti in alto», «metti prima le cartelle». Per tornare indietro: «rimetti le icone del desktop com’erano», oppure «annulla» sotto la risposta o sulla riga del cambio nel filo della home.',
+      doesNot: 'Su Mac e Linux non le sposta ancora: lo dice e ti indica come ordinarle dal sistema. Usa solo lo schermo principale: le icone sugli altri schermi le porta lì. Se le icone sono più di quante lo schermo ne tiene in griglia non le sposta, e ti dice quante ce ne stanno.',
+    },
 
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
