@@ -64,7 +64,7 @@
     VOLUME: ['Cambiato il volume', (k) => `Cambiato il volume ${n(k)} volte`, 'volume'],
     BLUETOOTH: ['Comandato il Bluetooth', (k) => `Comandato il Bluetooth ${n(k)} volte`, 'Bluetooth'],
     WIFI: ['Comandato il Wi-Fi', (k) => `Comandato il Wi-Fi ${n(k)} volte`, 'Wi-Fi'],
-    ORDINA_DESKTOP: ['Messo in ordine il desktop', (k) => `Messo in ordine il desktop ${n(k)} volte`, 'desktop'],
+    ORDINA_DESKTOP: ['Sistemate le icone del desktop', (k) => `Sistemate le icone del desktop ${n(k)} volte`, 'desktop'],
     RIMEDIO_CREDITI: ['Lavorato sui crediti', (k) => `Lavorato sui crediti ${n(k)} volte`, 'crediti'],
     INSTALLA_AGGIORNAMENTO: ['Avviato l\'aggiornamento', (k) => `Avviato l'aggiornamento ${n(k)} volte`, 'aggiornamento'],
   };
