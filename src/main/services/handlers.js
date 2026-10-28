@@ -1582,10 +1582,11 @@ function lettiDallAiuto(sender) {
 
 // La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
 // chiamano executeFiloAction e la ricerca dell'assistente di pagina, prima di ogni livello.
-// Non lancia mai: su un guasto torna un blocco con `regola: 'guasto'` (#1505, verdettiUscite.js).
-const controllaUscita = VerdettiUscite.chiudiAGuasto(giudicaUscita, {
+// Non lancia mai: su un guasto torna un blocco con `regola: 'guasto'` (#1505, verdettiUscite.js). Ogni blocco si conta
+// fra le uscite fermate qui dentro (#1474); chi giudica un collegamento prima del clic passa `soloGiudizio`.
+const controllaUscita = ContatoriSicurezza.contaUscite(VerdettiUscite.chiudiAGuasto(giudicaUscita, {
   avvisa: (e) => console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e),
-});
+}));
 async function giudicaUscita(action, { sender = null, contesto = null, provenienza = null, parole = '', domanda = '' } = {}) {
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
