@@ -335,9 +335,9 @@ const falso = (v) => v === false || v === 0 || /^(false|0|no)$/i.test(String(v ?
 function normalizzaRichiesta(r) {
   const q = r && typeof r === 'object' ? r : {};
   const parola = (v) => String(v ?? '').trim().toLowerCase();
-  const ordine = ORDINI[parola(q.ordine) || 'nome'];
+  const ordine = ORDINI.get(parola(q.ordine) || 'nome');
   if (!ordine) return { errore: 'ordine non capito: nome, tipo, data o dimensione' };
-  const verso = VERSI[parola(q.verso) || 'righe'];
+  const verso = VERSI.get(parola(q.verso) || 'righe');
   if (!verso) return { errore: 'verso non capito: righe o colonne' };
   const sino = (v, nome) => {
     if (v == null || v === '') return false;
