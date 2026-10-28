@@ -2430,7 +2430,6 @@ async function eseguiAzioneFilo(action, {
   // La porta non lancia: un suo guasto arriva qui come blocco e l'azione non parte (#1505).
   const u = await controllaUscita(action, { sender, contesto, provenienza, parole, domanda });
   if (u.blocca) {
-    ContatoriSicurezza.misura('uscitaFermata', u, action);
     const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
     return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...(u.regola === 'guasto' ? { guasto: true } : {}), ...comando } };
   }
