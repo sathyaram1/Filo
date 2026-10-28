@@ -269,7 +269,7 @@
       return [{ type: 'item', icon: icona('reply', 16), label: 'Vai al messaggio citato', onClick: () => { vaiDallaCitazione(q).catch(() => {}); } }];
     }
     if (anteprima && anteprima.contains(el) && citata) {
-      return [{ type: 'item', icon: icona('close', 16) || undefined, label: 'Non rispondere', onClick: () => { annulla(); d.inputEl.focus(); } }];
+      return [{ type: 'item', icon: icona('close', 16), label: 'Non rispondere', onClick: () => { annulla(); d.inputEl.focus(); } }];
     }
     const b = d.bubblesEl.contains(el) ? bollaDi(el) : null;
     if (!b) return [];
