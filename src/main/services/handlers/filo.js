@@ -3,7 +3,7 @@
 
 module.exports = function register(on, ctx) {
   const {
-    MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard,
+    MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard, contaHomeVista,
     executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, ricordaVerdettiArchiviati, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume, chiaveConferma,
