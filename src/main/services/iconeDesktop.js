@@ -369,18 +369,19 @@ function chiaveTipo(v) {
 function ordina(voci, { ordine = 'nome', alContrario = false, cartellePrima = false } = {}) {
   const giro = alContrario ? -1 : 1;
   const perNome = (a, b) => collatore.compare(a.nome, b.nome) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-  const numero = (campo, a, b) => {
-    const va = Number.isFinite(a[campo]) ? a[campo] : null;
-    const vb = Number.isFinite(b[campo]) ? b[campo] : null;
+  const numero = (valore) => (a, b) => {
+    const va = valore(a);
+    const vb = valore(b);
     if (va == null || vb == null) return va == null && vb == null ? perNome(a, b) : va == null ? 1 : -1;
     return giro * (vb - va) || perNome(a, b);
   };
+  const se = (v) => (Number.isFinite(v) ? v : null);
   const criterio = {
     nome: (a, b) => giro * perNome(a, b),
     tipo: (a, b) => giro * collatore.compare(chiaveTipo(a), chiaveTipo(b)) || perNome(a, b),
-    data: (a, b) => numero('data', a, b),
-    dimensione: (a, b) => numero('dimensione', { ...a, dimensione: a.cartella ? null : a.dimensione }, { ...b, dimensione: b.cartella ? null : b.dimensione }),
-  }[ordine] || ((a, b) => perNome(a, b));
+    data: numero((v) => se(v.data)),
+    dimensione: numero((v) => (v.cartella ? null : se(v.dimensione))),
+  }[ordine] || perNome;
   return voci.slice().sort((a, b) => (cartellePrima ? Number(!!b.cartella) - Number(!!a.cartella) : 0) || criterio(a, b));
 }
 
