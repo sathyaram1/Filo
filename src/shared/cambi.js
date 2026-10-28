@@ -461,6 +461,14 @@
       }
       return `${nome}: ${zona(c.prima)} → ${zona(c.dopo)}`;
     }
+    if (k === 'desktop') {
+      if (c.come) return `icone del desktop ${fraseOrdineDesktop(c.come)}`;
+      const n = spostateSulDesktop(c);
+      const auto = !!(c.prima && c.prima.auto) !== !!(c.dopo && c.dopo.auto);
+      const parti = [n === 1 ? 'spostata 1' : `spostate ${n}`];
+      if (auto) parti.push(`«Disponi automaticamente» ${c.dopo && c.dopo.auto ? 'acceso' : 'spento'}`);
+      return `icone del desktop: ${parti.join(', ')}`;
+    }
     const v = voce(k);
     const nome = v ? v.nome : 'un\'impostazione di Filo';
     if (c.segreto) {
