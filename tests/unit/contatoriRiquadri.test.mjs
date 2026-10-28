@@ -172,7 +172,7 @@ test('le pagine mandano solo misure dell’elenco, e ogni misura ha chi la manda
   const viste = new Set();
   for (const p of MANDANO) {
     const s = leggi(...p);
-    for (const m of s.matchAll(/cosa: '([a-z_]+)'|contaRiquadro\('([a-z_]+)'/g)) {
+    for (const m of s.matchAll(/misura: 'riquadro', cosa: '([a-z_]+)'|contaRiquadro\('([a-z_]+)'/g)) {
       const cosa = m[1] || m[2];
       assert.ok(C.MISURE_RIQUADRI.includes(cosa), `${p.join('/')}: «${cosa}» non è una misura dei riquadri`);
       viste.add(cosa);
