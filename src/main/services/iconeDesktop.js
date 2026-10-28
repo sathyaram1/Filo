@@ -495,7 +495,8 @@ function esitoPerModello(o) {
   if (!o || !o.ok) {
     if (o && o.errore === 'richiesta') return `Non fatto: ${o.frase}. Correggi i parametri e riprova.`;
     const s = o || spiega('sconosciuto');
-    return `Non fatto: ${s.frase}${s.dove ? ` ${s.dove}` : ''} Riporta all'utente queste parole; non riprovare uguale.`;
+    const resto = s.cambio ? ` Qualcosa sul desktop è cambiato lo stesso: si rimette com'era con ANNULLA_CAMBIO, id ${s.cambio}.` : '';
+    return `Non fatto: ${s.frase}${s.dove ? ` ${s.dove}` : ''} Riporta all'utente queste parole; non riprovare uguale.${resto}`;
   }
   if (o.vuoto) return 'Sul desktop non ci sono icone: niente da mettere in ordine.';
   if (o.gia) return `Le ${o.totale} icone del desktop erano già ${comeDetto(o)}: niente spostato.`;
