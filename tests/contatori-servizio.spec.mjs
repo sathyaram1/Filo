@@ -1,7 +1,6 @@
-// I contatori del servizio (#1472) nell'app vera: una risposta servita conta chi l'ha pagata e chi l'ha servita, una
-// chiamata senza modello conta una volta sola anche passando da due porte, la prova di un modello proprietario con
-// «solo pesi aperti» si conta come bloccata. L'avviso dei crediti e i suoi rimedi: avviso-crediti.spec.mjs (B). Forma,
-// spedizione e regole: tests/unit/contatoriServizio.test.mjs.
+// I contatori del servizio (#1472) nell'app vera: chi ha pagato e chi ha servito una risposta, la chiamata senza modello
+// contata una volta da ogni porta, la prova bloccata da «solo pesi aperti». L'avviso dei crediti: avviso-crediti.spec.mjs
+// (B). Forma, spedizione e regole: tests/unit/contatoriServizio.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 
