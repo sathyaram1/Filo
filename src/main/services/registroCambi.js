@@ -1,5 +1,5 @@
 // Il registro dei cambi (#867): ogni scrittura dello stato (impostazioni, timer e sveglie, regole del
-// proxy, disposizione delle icone) diventa un evento del filo (src/main/services/ilFilo.js) nel momento in cui si salva,
+// proxy, disposizione delle icone, icone del desktop) diventa un evento del filo (src/main/services/ilFilo.js) nel momento in cui si salva,
 // chiunque l'abbia chiesta. Chi chiede dichiara solo da dove viene (`con`). Frasi, esclusioni e annullo: src/shared/cambi.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
@@ -236,6 +236,8 @@ async function annullaOra(id, prov = {}) {
   const raccolti = [];
   let saltati = [];
   let riuscito = true;
+  let motivo = 'la pagina di quel sito non è aperta';
+  let perche = 'perché nel frattempo sarebbero già scaduti';
   await con({ via: prov.via || 'interfaccia', ...(prov.dove ? { dove: prov.dove } : {}), annulla: e.id, raccolti }, async () => {
     if (e.tipo === 'impostazioni') {
       const correnti = await globalThis.SN_STORAGE.getSettings();
@@ -264,13 +266,21 @@ async function annullaOra(id, prov = {}) {
     } else if (e.tipo === 'zoom') {
       const c = e.cambi[0];
       riuscito = !!(app.zoomSu && await app.zoomSu(String(c.chiave).slice(5), c.prima));
+    } else if (e.tipo === 'desktop') {
+      const r = await require('./iconeDesktop').rimetti(e.cambi[0].prima);
+      riuscito = !!(r && r.ok);
+      if (!riuscito) motivo = [r && r.frase, r && r.dove].filter(Boolean).join(' ') || 'le icone del desktop non si sono spostate';
+      else if (r.sparite) {
+        saltati = [r.sparite === 1 ? 'un\'icona' : `${r.sparite} icone`];
+        perche = 'perché non sono più sul desktop';
+      }
     }
     // Lo stato era già quello di prima (rimesso a mano nel frattempo): l'annullo resta come evento.
     if (riuscito && !raccolti.length) registra({ tipo: e.tipo, cambi: [] }, { vuoto: true });
   });
-  if (!riuscito) return { ok: false, motivo: 'la pagina di quel sito non è aperta', id: e.id };
+  if (!riuscito) return { ok: false, motivo, id: e.id };
   try { app.annullato([...new Set([String(id || ''), String(trovato.id), String(e.id)])].filter(Boolean), trovato); } catch (_) {}
-  return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati };
+  return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati, ...(saltati.length ? { saltatiPerche: perche } : {}) };
 }
 
 module.exports = { avvia, con, conDettaglio, corrente, registra, registraZoom, leggi, tutti, lista, ultimi, livelloDi, annulla, collega, attesa };

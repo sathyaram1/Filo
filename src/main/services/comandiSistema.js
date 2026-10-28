@@ -1410,5 +1410,5 @@ module.exports = {
   costruisci, parametri, nomeValido, leggiUscita, decodifica, spiega, scegliNome, piega,
   interpretaVolume, interpretaRadio, interpretaBtElenco, interpretaBtCollega, interpretaWifiElenco, interpretaWifiCollega,
   campiNmcli, erroreWlan,
-  _interni: { CS_VOLUME, CS_CUFFIE, CS_WLAN, PS_INIZIO, PS_ATTESA, PS_RADIO_TIPI, SH_INIZIO },
+  _interni: { CS_VOLUME, CS_CUFFIE, CS_WLAN, PS_INIZIO, PS_ATTESA, PS_RADIO_TIPI, SH_INIZIO, psCompila },
 };

@@ -607,6 +607,7 @@
     VOLUME: () => 'cambiato il volume',
     BLUETOOTH: () => 'comandato il Bluetooth',
     WIFI: () => 'comandato il Wi-Fi',
+    ORDINA_DESKTOP: (n) => (n > 1 ? `sistemato le icone del desktop ${n} volte` : 'sistemato le icone del desktop'),
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
     PULISCI_TAB: () => 'riordinato le schede',
     CHIUDI_SCHEDE: (n) => (n > 1 ? `chiuso schede ${n} volte` : 'chiuso delle schede'),
@@ -929,6 +930,15 @@
     },
     BLUETOOTH: (a) => rigaRadio(a, 'Bluetooth'),
     WIFI: (a) => rigaRadio(a, 'Wi-Fi'),
+    // #1621 — l'ordine chiesto e quante icone Windows ha davvero spostato.
+    ORDINA_DESKTOP: (a) => {
+      const o = a._output || {};
+      if (o.vuoto) return { icon: '🖥', text: 'Icone del desktop · nessuna da spostare' };
+      const come = pulito(o.detto) || 'in ordine';
+      if (o.gia) return { icon: '🖥', text: `Icone del desktop · già ${come}` };
+      const n = Number(o.spostate) || 0;
+      return { icon: '🖥', text: `Icone del desktop · ${come} · ${n === 1 ? '1 spostata' : `${n} spostate`}` };
+    },
     RIMEDIO_CREDITI: (a) => {
       const op = String(a.operazione || '').toLowerCase();
       const r = String(a.rimedio || '').toLowerCase();
@@ -999,6 +1009,7 @@
     CANCELLA_PAGINE: 'Pagine non cancellate', ZOOM_PAGINA: 'Zoom non cambiato',
     EVENTO_CALENDARIO: 'Evento non proposto', ONBOARDING: 'Accoglienza non aggiornata',
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
+    ORDINA_DESKTOP: 'Icone del desktop non spostate',
     ESEGUI_COMANDO: 'Comando non eseguito', CANCELLA_MEMORIA: 'Memoria non cancellata',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
     PULISCI_TAB: 'Riordino non riuscito', CANCELLA_ARCHIVIO: 'Archivio non svuotato',

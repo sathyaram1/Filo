@@ -382,7 +382,8 @@ const SEGNO_DAI_TASTI = {
   // Nessun tasto la fa: letture, proposte e comandi che si chiedono solo a parole.
   soloFilo: ['SALVA_LEZIONE', 'ONBOARDING', 'CAPACITA_DETTAGLIO', 'LEGGI_IMPOSTAZIONI', 'CERCA_CHAT',
     'CERCA_SALVATE', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_PAGINA', 'VEDI_SCHERMO', 'CERCA_DOCUMENTI', 'LEGGI_TRASPARENZA',
-    'CANCELLA_MEMORIA', 'ESEGUI_COMANDO', 'RIMUOVI_PROXY_TUTTE', 'TIENI_APERTA', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'],
+    'CANCELLA_MEMORIA', 'ESEGUI_COMANDO', 'RIMUOVI_PROXY_TUTTE', 'TIENI_APERTA', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA',
+    'ORDINA_DESKTOP'],
 };
 
 test('ogni azione del catalogo dice dove nasce il suo segno quando la fa l\'utente coi tasti, e ogni tasto dichiarato esiste', () => {

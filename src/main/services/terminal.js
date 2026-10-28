@@ -86,14 +86,14 @@ function invocazione(shell, command, { trackCwd = false, mark = '' } = {}) {
   return { ...shellInvocation(shell, testo), stdin: null };
 }
 
-function truncate(text) {
+function truncate(text, max = MAX_OUTPUT_CHARS) {
   const s = String(text || '');
-  if (s.length <= MAX_OUTPUT_CHARS) return { text: s, truncated: false };
+  if (s.length <= max) return { text: s, truncated: false };
   // Il taglio cade dove capita, e un'emoji occupa DUE unità di testo: tagliando
   // per numero di unità si può restare con la prima metà, che da sola non è
   // nessun carattere e si mostra come un rombo. Se in fondo resta una metà di
   // coppia, la si lascia fuori: un carattere in meno, nessun carattere rotto.
-  let n = MAX_OUTPUT_CHARS;
+  let n = max;
   const ultimo = s.charCodeAt(n - 1);
   if (ultimo >= 0xD800 && ultimo <= 0xDBFF) n -= 1;
   return { text: s.slice(0, n), truncated: true };
@@ -315,8 +315,8 @@ function extractCwdMark(rawStdout, mark) {
 }
 
 // Non rigetta mai: gli errori di spawn finiscono in stderr/code, così il chiamante ha sempre un
-// esito da mostrare.
-function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: chiesto, trackCwd = false } = {}) {
+// esito da mostrare. `tettoUscita`: chi legge l'uscita col codice (un elenco intero) non ha il tetto del modello.
+function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: chiesto, trackCwd = false, tettoUscita = MAX_OUTPUT_CHARS } = {}) {
   const cmd = String(command || '').trim();
   const env = ambienteComandi(chiesto || process.env);
   const startedAt = Date.now();
@@ -408,7 +408,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: 
       const s = String(chunk);
       if (which === 'out') {
         codaOut = codaOut.length + s.length > CODA_CHARS ? (codaOut + s).slice(-CODA_CHARS) : codaOut + s;
-        if (stdout.length < MAX_OUTPUT_CHARS * 2) stdout += s;
+        if (stdout.length < tettoUscita * 2) stdout += s;
       } else if (stderr.length < MAX_OUTPUT_CHARS * 2) stderr += s;
     };
     if (child.stdout) child.stdout.on('data', (c) => cap(c, 'out'));
@@ -437,7 +437,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: 
         if (letto.code !== null) realCode = letto.code;
         if (letto.cwd) resultCwd = letto.cwd;
       }
-      const out = truncate(rawOut);
+      const out = truncate(rawOut, tettoUscita);
       const err = truncate(stderr);
       resolve({
         command: cmd,

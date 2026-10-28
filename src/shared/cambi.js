@@ -362,6 +362,19 @@
     return l;
   }
 
+  // Le icone del desktop del computer (#1621): `prima` e `dopo` sono { auto, voci: [[id, x, y]] }, `come` l'ordine chiesto.
+  const ORDINI_DESKTOP = new Map([['nome', 'in ordine alfabetico'], ['tipo', 'per tipo'], ['data', 'per data'], ['dimensione', 'per dimensione']]);
+  function fraseOrdineDesktop(come) {
+    const c = come || {};
+    const verso = c.verso === 'colonne' ? 'a colonne' : 'a righe';
+    return `${ORDINI_DESKTOP.get(c.ordine) || 'in ordine'}${c.alContrario ? ' al contrario' : ''}, ${verso}${c.cartellePrima ? ', cartelle prima' : ''}`;
+  }
+  function spostateSulDesktop(c) {
+    const voci = (d) => (d && Array.isArray(d.voci) ? d.voci : []);
+    const prima = new Map(voci(c.prima).map((v) => [v[0], `${v[1]},${v[2]}`]));
+    return voci(c.dopo).filter((v) => prima.has(v[0]) && prima.get(v[0]) !== `${v[1]},${v[2]}`).length;
+  }
+
   // ── Le frasi ────────────────────────────────────────────────────────────────
   const PAESI = {
     us: 'Stati Uniti', gb: 'Regno Unito', fr: 'Francia', de: 'Germania', es: 'Spagna', nl: 'Paesi Bassi', jp: 'Giappone', it: 'Italia',
@@ -447,6 +460,14 @@
         return `${nome} ${altro(c.dopo) ? 'in' : 'nella'} ${zona(c.dopo)}: ${posto(c.prima)} → ${posto(c.dopo)}`;
       }
       return `${nome}: ${zona(c.prima)} → ${zona(c.dopo)}`;
+    }
+    if (k === 'desktop') {
+      if (c.come) return `icone del desktop ${fraseOrdineDesktop(c.come)}`;
+      const n = spostateSulDesktop(c);
+      const auto = !!(c.prima && c.prima.auto) !== !!(c.dopo && c.dopo.auto);
+      const parti = [n === 1 ? 'spostata 1' : `spostate ${n}`];
+      if (auto) parti.push(`«Disponi automaticamente» ${c.dopo && c.dopo.auto ? 'acceso' : 'spento'}`);
+      return `icone del desktop: ${parti.join(', ')}`;
     }
     const v = voce(k);
     const nome = v ? v.nome : 'un\'impostazione di Filo';
@@ -558,7 +579,7 @@
     let max = cambi.filter((c) => String(c.chiave || '').startsWith('timer:')).length > 1 ? 2 : 1;
     for (const c of cambi) {
       const k = String(c.chiave || '');
-      if (k.startsWith('timer:') || k.startsWith('zoom:') || k.startsWith('icona:')) continue;
+      if (k.startsWith('timer:') || k.startsWith('zoom:') || k.startsWith('icona:') || k === 'desktop') continue;
       if (k.startsWith('proxy:')) { max = Math.max(max, 1); continue; }
       const v = voce(k);
       max = Math.max(max, v && v.livello === 1 ? 1 : 2);
@@ -718,6 +739,7 @@
     annulloTimer,
     annulloRegoleProxy,
     annulloIcone,
+    fraseOrdineDesktop,
     righePerModello,
     nomePaese,
   };

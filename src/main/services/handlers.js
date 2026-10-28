@@ -3711,7 +3711,7 @@ async function eseguiAzioneFilo(action, {
         // «Rimetti come prima»: vale per i cambi chiesti in chat e per quelli fatti dalle pagine.
         const r = await Registro.annulla(idDelCambio(action), { via: assistente ? 'assistente' : 'chat' });
         if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
-        return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [] } };
+        return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [], ...(r.saltatiPerche ? { saltatiPerche: r.saltatiPerche } : {}) } };
       }
       case 'RIMEDIO_CREDITI': {
         // #818 — i rimedi dell'avviso dei crediti a parole: la stessa porta dei pulsanti, col suo «com'era».
@@ -3735,6 +3735,10 @@ async function eseguiAzioneFilo(action, {
       case 'WIFI': {
         // #874 — la stessa porta dei tasti della home (MSG.SISTEMA_COMANDA): due cammini, un risultato.
         const r = await require('./comandiSistema').comanda(richiestaDaEseguire(type, action));
+        return { executed: !!r.ok, kept: false, output: r };
+      }
+      case 'ORDINA_DESKTOP': {
+        const r = await require('./iconeDesktop').ordinaIcone(action);
         return { executed: !!r.ok, kept: false, output: r };
       }
       case 'ZOOM_PAGINA': {
@@ -5055,6 +5059,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
   if ((type === 'VOLUME' || type === 'BLUETOOTH' || type === 'WIFI') && res.output) return esitoSistemaPerModello(res.output);
+  if (type === 'ORDINA_DESKTOP' && res.output) return require('./iconeDesktop').esitoPerModello(res.output);
   if (type === 'RIMEDIO_CREDITI' && res.output) {
     const o = res.output;
     if (o.operazione === 'elenca') return o.testo ? `Situazione dei crediti e rimedi:\n${o.testo}` : 'Adesso non c\'è niente da proporre per i crediti: dillo in una riga.';
@@ -5091,7 +5096,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
       return `Niente annullato: ${o.error || 'cambio non trovato'}. Rileggi i CAMBI RECENTI nello STATO e, se non è chiaro quale intende, chiediglielo.`;
     }
     const saltati = Array.isArray(o.saltati) && o.saltati.length
-      ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
+      ? `\nNon rimessi, ${o.saltatiPerche || 'perché nel frattempo sarebbero già scaduti'}:\n${nomiSalvati(o.saltati)}` : '';
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
   }
   // La home chiesta da chi è già nella home: non è stato ricaricato niente, e il modello non deve dire di averlo portato

@@ -941,6 +941,7 @@
     VOLUME: 'Cambio il volume…',
     BLUETOOTH: 'Chiedo al Bluetooth…',
     WIFI: 'Chiedo al Wi-Fi…',
+    ORDINA_DESKTOP: 'Sistemo le icone del desktop…',
     INSTALLA_AGGIORNAMENTO: 'Cerco la versione nuova…',
     RIMEDIO_CREDITI: 'Guardo i crediti…',
     CHIUDI_SCHEDE: 'Chiudo le schede…',

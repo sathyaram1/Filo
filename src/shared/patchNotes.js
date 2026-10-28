@@ -18,6 +18,7 @@
         'Le icone che stavano in cima al menu del tasto destro (Traduci, Screenshot, Condividi, Salva per dopo, QR code e Nuova scheda) ora sono nella barra laterale a sinistra, e agiscono sulla scheda che hai davanti. Le altre aspettano in «Altro…», in fondo alla barra. Le riordini trascinandole, e una lasciata sulla freccia di «Altro…» va messa da parte.',
         'Se sposti un\'icona della barra laterale e poi scrivi a Filo «rimetti come prima», l\'icona torna dov\'era e il resto non cambia.',
         'A schermo intero le schede compaiono quando porti il mouse sul bordo alto e lo tieni fermo un attimo, e spariscono quando torni sulla pagina. Arrivano anche mentre trascini un collegamento o un\'immagine. Se non le vuoi, le spegni in Preferenze, nella sezione «Barra laterale».',
+        'Su Windows puoi chiedere a Filo di mettere in ordine le icone del desktop: «in ordine alfabetico, da sinistra a destra», «per data», «con le cartelle prima». Se non ti piace, «rimettile com\'erano» le riporta dove stavano.',
       ],
       fixes: [
         'Le icone delle pagine salvate e delle schede chiuse, e la foto del tuo account Google, Filo le tiene sul tuo computer. La home e la chat le mostrano subito, senza chiederle ogni volta ai siti, e l\'icona di una scheda aperta da un altro paese non esce più dal proxy.',

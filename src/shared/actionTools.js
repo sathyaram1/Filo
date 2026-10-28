@@ -570,7 +570,7 @@
       required: [],
     },
     ANNULLA_CAMBIO: {
-      description: 'Rimette com\'era un cambio di stato: un\'impostazione, l\'aspetto, una sveglia o un timer, una regola del proxy, lo zoom di un sito, la disposizione delle icone della barra laterale. Per "rimetti come prima", "annulla", "torna com\'era", "no, era meglio prima". I cambi sono nei CAMBI RECENTI dello STATO, con l\'id e da dove sono venuti: valgono allo stesso modo quelli chiesti in chat e quelli fatti dall\'utente nelle pagine delle impostazioni. Passa l\'id del cambio che l\'utente intende; senza id si annulla l\'ultimo ancora in piedi. Anche l\'annullo è un cambio: annullarlo rifà quello di prima. Il livello lo decide il sistema dal cambio: per le impostazioni sensibili chiede lui conferma all\'utente.',
+      description: 'Rimette com\'era un cambio di stato: un\'impostazione, l\'aspetto, una sveglia o un timer, una regola del proxy, lo zoom di un sito, la disposizione delle icone della barra laterale, le icone del desktop del computer messe in ordine. Per "rimetti come prima", "annulla", "torna com\'era", "no, era meglio prima". I cambi sono nei CAMBI RECENTI dello STATO, con l\'id e da dove sono venuti: valgono allo stesso modo quelli chiesti in chat e quelli fatti dall\'utente nelle pagine delle impostazioni. Passa l\'id del cambio che l\'utente intende; senza id si annulla l\'ultimo ancora in piedi. Anche l\'annullo è un cambio: annullarlo rifà quello di prima. Il livello lo decide il sistema dal cambio: per le impostazioni sensibili chiede lui conferma all\'utente.',
       properties: { id: S('L\'id del cambio da annullare, dai CAMBI RECENTI (per esempio "c1a2b3c4d5").') },
       required: [],
     },
@@ -607,6 +607,16 @@
         acceso: B('true accende, false spegne.'),
         rete: S('La rete conosciuta a cui collegarsi, come la chiama l\'utente.'),
         elenca: B('true per avere le reti conosciute, senza cambiare niente.'),
+      },
+      required: [],
+    },
+    ORDINA_DESKTOP: {
+      description: 'Mette in ordine le icone del DESKTOP del computer (quelle del sistema operativo, non le icone della barra laterale di Filo, che sono SPOSTA_ICONA): "metti in ordine alfabetico le icone del desktop", "ordinale da sinistra a destra", "per data, le più recenti in alto", "cartelle prima". Le dispone nella griglia dello schermo principale; se è acceso «Disponi automaticamente», che le rimetterebbe in colonna, lo spegne. Per rimetterle dov\'erano c\'è ANNULLA_CAMBIO col cambio che l\'esito ti dà. Per ora solo su Windows: altrove l\'esito ti dà la frase e la strada del sistema, riportala. Esegue subito.',
+      properties: {
+        ordine: S('Il criterio: "nome" (dalla A alla Z, è il valore se lo ometti), "tipo" (per estensione), "data" (dalla più recente), "dimensione" (dalla più grande).', { enum: ['nome', 'tipo', 'data', 'dimensione'] }),
+        verso: S('"righe" = da sinistra a destra e poi la riga sotto, come si legge (è il valore se lo ometti); "colonne" = dall\'alto in basso e poi la colonna a destra, come fa Windows da sé.', { enum: ['righe', 'colonne'] }),
+        al_contrario: B('true gira l\'ordine: dalla Z alla A, dalla più vecchia, dalla più piccola.'),
+        cartelle_prima: B('true mette prima le cartelle (e le icone di sistema come il Cestino), poi i file.'),
       },
       required: [],
     },
