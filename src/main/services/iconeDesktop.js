@@ -486,6 +486,7 @@ function fallito(errore, extra = {}) {
 }
 
 function comeDetto(come) {
+  if (!globalThis.SN_CAMBI) require('../../shared/cambi.js');
   return globalThis.SN_CAMBI.fraseOrdineDesktop(come);
 }
 
