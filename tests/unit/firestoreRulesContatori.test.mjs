@@ -145,7 +145,7 @@ test('si legge solo da admin, si crea una volta e non si tocca più', () => {
   }
   assert.ok(per('write').length === 0, 'una `write` scavalcherebbe il no a update e delete');
   assert.equal(per('create').length, 1);
-  assert.equal(per('create')[0].cond, 'contatori(request.resource.data)');
+  assert.equal(per('create')[0].cond, 'request.auth != null && contatori(request.resource.data)');
   // La forma si sceglie dalla versione: provarle tutte in fila passerebbe il tetto di mille espressioni a richiesta.
   assert.equal(corpo('contatori'), '(d.v == 3 && contatoriOra3(d)) || (d.v == 2 && contatoriOra(d)) || (d.v == 4 && contatoriChat(d)) || (d.v == 1 && contatoriGiorno(d))');
 });
@@ -236,7 +236,8 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
   const ora = C.oraVuota();
   const modello = (i) => `${'m'.repeat(60)}/${'x'.repeat(50)}${i}`;
   for (const f of C.funzioni()) {
-    for (let i = 0; i < 80; i++) C.registraErrore(ora, f, { modello: modello(i), host: 'H'.repeat(48), tipo: 'fornitore' });
+    // Ottanta errori diversi per funzione, i più lunghi col modello e host, e la riga «altro» di ogni tipo.
+    for (let i = 0; i < 80; i++) C.registraErrore(ora, f, { modello: modello(i), host: 'H'.repeat(48), tipo: i < 74 ? 'nessun_host' : C.ERRORI[i - 74] });
     for (const ms of [100, 900, 1500, 4000, 9000, 20000, 99999]) C.registraUso(ora, f, { visto: ms, fine: ms * 2, ripetuta: true });
     C.registraAnticipo(ora, f, 'preparato'); C.registraAnticipo(ora, f, 'aperto'); C.registraChiesto(ora, f);
     C.registraPrimaVolta(ora, f);
@@ -289,6 +290,9 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
   const doc = C.documento({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'win', dati: ora });
   assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
   assert.equal(passa(doc), '', 'il documento più carico dell’app deve passare le regole');
+  // Gli errori hanno il tetto del documento (#1547): decine di KB, non centinaia, per chi riempie le ore a mano.
+  assert.ok(M.errori.tetto <= 64000, `il tetto degli errori nelle regole è ${M.errori.tetto}`);
+  assert.equal(Object.values(doc.errori).flatMap((e) => C.leggiErrori(e)).filter((x) => x.modello !== 'altro' || x.host).length, C.TETTO_ERRORI_DOCUMENTO);
   const letto = C.leggiSistema(doc.sistema);
   for (const campo of C.MISURE_SISTEMA) assert.ok(Object.keys(letto[campo]).length, `${campo} è pieno nel documento più carico`);
   assert.ok(doc.sistema.length <= T.TETTO_CARATTERI_SISTEMA, `il sistema più carico è lungo ${doc.sistema.length}`);
@@ -317,6 +321,38 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
   assert.notEqual(manomesso('sistema', 'avvioPasso.adblock.ms500|1 lento'), '');
   assert.notEqual(manomesso('sistema', { avvioPasso: 'adblock' }), '', 'una mappa al posto della stringa');
   assert.notEqual(manomesso('sistema', 'aggiornamento.trovato|1;'.repeat(2000)), '', 'oltre il tetto');
+});
+
+test('il giorno di prima più carico che l’app costruisce passa, e i suoi errori hanno il tetto del documento (#1547)', () => {
+  const tetto = (campo) => Number(new RegExp(`d\\.${campo}\\.values\\(\\)\\.join\\('#'\\)\\.size\\(\\) <= (\\d+)`).exec(GIORNO)[1]);
+  assert.ok(tetto('errori') <= 64000, `il tetto degli errori del giorno nelle regole è ${tetto('errori')}`);
+  const modello = (i) => `${'m'.repeat(60)}/${'x'.repeat(50)}${i}`;
+  const dati = { uso: {}, errori: {} };
+  for (const f of C.funzioni()) {
+    dati.uso[f] = { n: 999999999, fasce: Object.fromEntries(C.NOMI_FASCE.map((k) => [k, 142857142])) };
+    dati.errori[f] = {};
+    for (let i = 0; i < 80; i++) dati.errori[f][`${modello(i)}|${'H'.repeat(48)}|${i < 74 ? 'nessun_host' : C.ERRORI[i - 74]}`] = 999999999;
+  }
+  const doc = C.documentoGiorno({ pseudonimo: 'a'.repeat(20), giorno: '2026-10-14', app: '9999.9999.999999', os: 'win', dati });
+  assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
+  for (const campo of ['uso', 'errori']) {
+    const valori = Object.values(doc[campo]).join('#');
+    assert.ok(valori.length <= tetto(campo), `${campo}: ${valori.length} caratteri, oltre il tetto delle regole`);
+    const forma = new RegExp(`d\\.${campo}\\.values\\(\\)\\.join\\('#'\\)\\.matches\\('([^']+)'\\)`).exec(GIORNO)[1];
+    assert.match(valori, new RegExp(forma), `${campo}: fuori dalla forma delle regole`);
+  }
+});
+
+test('ogni collezione dei contatori si crea solo con un’identità: la chiave web da sola non basta (#1547)', () => {
+  const blocchi = [...RULES.matchAll(/^ {4}match\s+\/(contatori-[a-z-]+)\/\{/gm)].map((m) => m[1]);
+  assert.deepEqual(blocchi.sort(), [C.COLLEZIONE, C.COLLEZIONE_CHIAMATE, C.COLLEZIONE_GESTI, C.COLLEZIONE_NAVIGAZIONE, 'contatori-finestra'].sort(),
+    'una collezione dei contatori nuova va aggiunta qui, e la sua creazione chiede l’identità');
+  for (const nome of blocchi) {
+    const create = per('create', regole(blocco(nome)));
+    assert.equal(create.length, 1, `${nome}: una sola regola di creazione`);
+    assert.match(create[0].cond, /^request\.auth != null && \w+\(request\.resource\.data\)$/, `${nome}: la creazione non chiede l’identità`);
+    assert.ok(per('write', regole(blocco(nome))).length === 0, `${nome}: una write scavalcherebbe la regola di creazione`);
+  }
 });
 
 test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l’id dice pseudonimo, giorno e ora', () => {
@@ -363,7 +399,7 @@ test('le chiamate: sola creazione, lette dall’admin, con gli stessi campi e la
   assert.deepEqual(per('list', RC).map((r) => r.cond), ['isAdmin()']);
   assert.ok(!per('read', RC).length && !per('write', RC).length);
   for (const v of ['update', 'delete']) assert.ok(per(v, RC).length >= 1 && per(v, RC).every((r) => r.cond === 'false'));
-  assert.deepEqual(per('create', RC).map((r) => r.cond), ['contatoriChiamate(request.resource.data)']);
+  assert.deepEqual(per('create', RC).map((r) => r.cond), ['request.auth != null && contatoriChiamate(request.resource.data)']);
   assert.deepEqual(elencoDopo(CHIAMATE, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_CHIAMATE]);
   assert.deepEqual(elencoDopo(CHIAMATE, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_CHIAMATE]);
   assert.equal(Number(/d\.v == (\d+)/.exec(CHIAMATE)[1]), C.VERSIONE_CHIAMATE);
@@ -449,7 +485,7 @@ test('la navigazione: sola creazione, letta dall’admin, coi campi e la version
   assert.deepEqual(per('list', RN).map((r) => r.cond), ['isAdmin()']);
   assert.ok(!per('read', RN).length && !per('write', RN).length);
   for (const v of ['update', 'delete']) assert.ok(per(v, RN).length >= 1 && per(v, RN).every((r) => r.cond === 'false'));
-  assert.deepEqual(per('create', RN).map((r) => r.cond), ['contatoriNavigazione(request.resource.data)']);
+  assert.deepEqual(per('create', RN).map((r) => r.cond), ['request.auth != null && contatoriNavigazione(request.resource.data)']);
   assert.deepEqual(elencoDopo(NAVIGAZIONE, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_NAVIGAZIONE]);
   assert.deepEqual(elencoDopo(NAVIGAZIONE, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_NAVIGAZIONE]);
   assert.equal(Number(/d\.v == (\d+)/.exec(NAVIGAZIONE)[1]), C.VERSIONE_NAVIGAZIONE);
@@ -625,7 +661,7 @@ test('i gesti: sola creazione, letti dall’admin, coi campi e la versione dell�
   assert.deepEqual(per('list', RG).map((r) => r.cond), ['isAdmin()']);
   assert.ok(!per('read', RG).length && !per('write', RG).length);
   for (const v of ['update', 'delete']) assert.ok(per(v, RG).length >= 1 && per(v, RG).every((r) => r.cond === 'false'));
-  assert.deepEqual(per('create', RG).map((r) => r.cond), ['contatoriGesti(request.resource.data)']);
+  assert.deepEqual(per('create', RG).map((r) => r.cond), ['request.auth != null && contatoriGesti(request.resource.data)']);
   assert.deepEqual(elencoDopo(GESTI, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_GESTI]);
   assert.deepEqual(elencoDopo(GESTI, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_GESTI]);
   assert.equal(Number(/d\.v == (\d+)/.exec(GESTI)[1]), C.VERSIONE_GESTI);
