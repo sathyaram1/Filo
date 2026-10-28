@@ -5,13 +5,15 @@ module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
     providerRouting, openWeightsBlockReason, modelGate,
-    Defaults, isAdmin, broadcastToTabs, controllaUscita, ricordaLettoDallAiuto, segnaLetturaAiuto, winOf,
+    Defaults, isAdmin, broadcastToTabs, controllaUscita: portaUscite, ricordaLettoDallAiuto, segnaLetturaAiuto, winOf,
   } = ctx;
   const { SN_CONST } = globalThis;
   const WebSearch = globalThis.SN_WEB_SEARCH;
   const PathsCollector = globalThis.SN_PATHS_COLLECTOR;
   require('../fontiSegnaposto');
   const ContatoriSicurezza = require('../contatoriSicurezza');
+  // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
+  const controllaUscita = ContatoriSicurezza.contaUscite(portaUscite);
 
   // Cache audio in memoria: rileggere lo stesso testo con la stessa voce e lo stesso modello
   // è istantaneo invece di rifare la chiamata lenta. Dura quanto la sessione.
