@@ -1987,6 +1987,9 @@ function positionOnBranch(bucket) {
   writeState(state);
   // Esposta alla guardia fuori sessione (.claude/hooks/branch-guard.sh).
   writeExpectation(ROOT, { branch, id: bucket.id });
+  // La punta che il server ha trovato all'emissione: chi chiude il giro registra solo una punta diversa (#1555).
+  const suOrigin = gitIn(ROOT)(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]);
+  segnaPuntaDelGiro(ROOT, readRoutineTicket(ROOT), { sha: suOrigin.ok ? suOrigin.out : '', ramo: branch, via: 'inizio' }, { seManca: true });
   bucket.branch = branch;
   bucket.state = state;
   return { ok: true, branch };
