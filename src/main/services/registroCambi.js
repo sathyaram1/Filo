@@ -237,6 +237,7 @@ async function annullaOra(id, prov = {}) {
   let saltati = [];
   let riuscito = true;
   let motivo = 'la pagina di quel sito non è aperta';
+  let perche = 'perché nel frattempo sarebbero già scaduti';
   await con({ via: prov.via || 'interfaccia', ...(prov.dove ? { dove: prov.dove } : {}), annulla: e.id, raccolti }, async () => {
     if (e.tipo === 'impostazioni') {
       const correnti = await globalThis.SN_STORAGE.getSettings();
