@@ -177,7 +177,8 @@
     const daFuori = daFuoriIl(m);
     const testo = daFuori ? '' : tienilo(m.text, tetto, m.chat);
     if (m.role === 'user') {
-      const detto = `${intestazione(m.ts, m.chat)} ${testo}`.trim();
+      const nota = notaRisposta(m.rispostaA);
+      const detto = `${intestazione(m.ts, m.chat)} ${nota ? `${nota}\n` : ''}${testo}`.trim();
       const quante = numeroImmagini(m);
       if (!quante) return { role: 'user', content: detto };
       if (Array.isArray(foto) && foto.length) {
