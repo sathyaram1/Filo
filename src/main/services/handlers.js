@@ -6753,28 +6753,37 @@ async function filoPuoParlare() {
 // La home chiede i suggerimenti aprendosi: quelli in cache, senza mai chiamare il modello (#869). Il modello parte solo
 // con `force` («Aggiorna» sulla carta, la fine dell'accoglienza, i crediti arrivati). Senza un modello servibile, la
 // frase che dice perché e la strada ai Crediti.
-// `apertura`: la home che si apre (non un ricalcolo). Si conta lì, una volta per apertura, con quello che mostra (#1467):
-// i suggerimenti scritti da un modello, o perché manca un modello per la home (la sua sola: la chat può averlo).
-async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0, apertura = false } = {}) {
+async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } = {}) {
   await FiloMem.gcTimers();
   const settings = await getEffectiveSettings();
-  const contaHome = (esito) => { try { if (apertura && esito) globalThis.SN_CONTATORI_MAIN?.attivita('home', { esito }); } catch (_) {} };
   if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_DASHBOARD)) {
     const saved = await SavedPages.list();
     const payload = buildNoKeyDashboard(settings, saved);
-    contaHome(globalThis.SN_CONTATORI?.esitoHome(SN_CONST.whyCannotServe(settings, [ACTIONS.FILO_DASHBOARD])));
     return { ...payload, senzaChiave: true, cached: false, ts: new Date().toISOString() };
   }
   if (force) {
     const inputs = await gatherDashboardInputs({ openTabsCount });
     const result = await generateDashboardFromInputs(inputs);
-    if (result.suggestions && result.suggestions.length) contaHome('generata');
     return { suggestions: result.suggestions, cached: false, ts: result.ts };
   }
   const cached = await FiloMem.getDashboardCache();
-  const suggestions = (cached && !cached.senzaChiave && cached.suggestions) || [];
-  if (suggestions.length) contaHome('generata');
-  return { suggestions, cached: !!cached, ts: cached?.ts || null };
+  return { suggestions: (cached && !cached.senzaChiave && cached.suggestions) || [], cached: !!cached, ts: cached?.ts || null };
+}
+
+// Una home che la persona vede per la prima volta (#1467), con quello che mostra adesso: i suggerimenti scritti da un
+// modello, o perché manca un modello per la home (la sua sola: la chat può averlo). Nessun modello chiamato.
+async function contaHomeVista() {
+  try {
+    const settings = await getEffectiveSettings();
+    let esito = '';
+    if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_DASHBOARD)) {
+      esito = globalThis.SN_CONTATORI?.esitoHome(SN_CONST.whyCannotServe(settings, [ACTIONS.FILO_DASHBOARD])) || '';
+    } else {
+      const cached = await FiloMem.getDashboardCache();
+      if (cached && !cached.senzaChiave && Array.isArray(cached.suggestions) && cached.suggestions.length) esito = 'generata';
+    }
+    return Boolean(esito && globalThis.SN_CONTATORI_MAIN?.attivita('home', { esito }));
+  } catch (_) { return false; }
 }
 
 async function maybeCategorizeAsync(savedEntry, pageInput) {
