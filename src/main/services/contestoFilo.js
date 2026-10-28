@@ -127,6 +127,7 @@ function messaggiDi(chats) {
         ...(typeof m.esterno === 'string' ? { esterno: m.esterno } : {}),
         ...(m.daModello ? { daModello: true } : {}),
         ...(Number(m.images) > 0 ? { images: Number(m.images) } : {}),
+        ...(m.role === 'user' && m.rispostaA ? { rispostaA: citata(m) } : {}),
         _i: i,
       });
     });
