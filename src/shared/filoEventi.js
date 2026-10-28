@@ -437,7 +437,7 @@
         tenuti.push(ev);
         continue;
       }
-      if (ev.chat != null && chatCancellate.has(ev.chat)) continue;
+      if (ev.chat != null && (chatCancellate.has(ev.chat) || (ACCADUTI.has(ev.tipo) && chatTolte.has(ev.chat)))) continue;
       if (ev.tipo === TIPI.NAVIGAZIONE && visiteTolte.has(ev.id)) continue;
       if ((ev.tipo === TIPI.TITOLO_PAGINA || ev.tipo === TIPI.RICERCA) && visiteTolte.has(ev.visita)) continue;
       if (ACCADUTI.has(ev.tipo) && tagli.some((c) => copreAccaduto(c, ev))) continue;
