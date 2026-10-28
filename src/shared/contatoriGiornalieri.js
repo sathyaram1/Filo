@@ -1800,14 +1800,15 @@
       const per = oggetto(errori) && has(errori, f) ? errori[f] : null;
       if (!oggetto(per)) continue;
       const voci = new Map();
+      let qui = 0;
       for (const [chiave, n] of Object.entries(per)) {
         if (!intero(n) || n === 0) continue;
         const [m, h, t] = String(chiave).split('|');
         if (!ERRORI.includes(t)) continue;
         let k = `${modelloPulito(m)}|${hostPulito(h)}|${t}`;
         if (!erroreAltro(k) && !voci.has(k)) {
-          const qui = [...voci.keys()].filter((x) => !erroreAltro(x)).length;
-          if (qui >= tetto - ERRORI.length || specifiche >= TETTO_ERRORI_DOCUMENTO) k = `${ALTRO}||${t}`; else specifiche += 1;
+          if (qui >= tetto - ERRORI.length || specifiche >= TETTO_ERRORI_DOCUMENTO) k = `${ALTRO}||${t}`;
+          else { qui += 1; specifiche += 1; }
         }
         voci.set(k, conto((voci.get(k) || 0) + n));
       }
