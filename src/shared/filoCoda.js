@@ -56,6 +56,8 @@
   function elementi({ chats = [], pagine = [], cambi = [], qui = '' } = {}) {
     const altri = [];
     let n = 0;
+    const perId = new Map((Array.isArray(chats) ? chats : []).filter((c) => c && c.id).map((c) => [c.id, c]));
+    const trovaChat = (id) => perId.get(id) || null;
     for (const c of Array.isArray(chats) ? chats : []) {
       if (!c || !Array.isArray(c.messages) || !c.messages.length) continue;
       if (eApp(c)) {
