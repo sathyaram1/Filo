@@ -1565,6 +1565,15 @@ if (isMain) {
     process.exit(0);
   }
 
+  if (cmd === 'registra') {
+    const srvR = serverDelRamo(branch);
+    const voci = await registraPunteScritte({
+      ramo: branch, sha, feedbackId: (readState()[branch] || {}).feedbackId || '', serverAtteso: (srvR && srvR.locale) || '',
+    });
+    for (const riga of voci) console.log(riga);
+    process.exit(0);
+  }
+
   if (cmd === 'status' || !cmd) {
     // I NUMERI qui non si stampano. Sapere quanti giri restano per un livello
     // orienta il livello mentre lo si sceglie, e `status` è il primo comando
