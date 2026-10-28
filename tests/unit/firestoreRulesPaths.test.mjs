@@ -64,6 +64,9 @@ const SCRITTURE_ANONIME_DICHIARATE = {
     'le attività di un’ora dei contatori (#1467: Aiuto, ricerche web, voce, lezioni, memoria, pulizia delle schede, ' +
     'home), accanto all’ora e con lo stesso id: stesse ragioni, chiavi fatte solo di nomi da elenchi chiusi e valori ' +
     'che sono conti, a sola creazione e letti solo dall’admin.',
+  'contatori-sicurezza':
+    'la sicurezza di un’ora dei contatori (#1474), accanto all’ora e con lo stesso id: stesse ragioni, e solo numeri ' +
+    'sotto chiavi di elenchi chiusi (livelli, motivi, controlli, scelte, categorie, tipi, tetti), mai un dominio o un segreto.',
 };
 
 const VERBI_SCRITTURA = ['write', 'create', 'update', 'delete'];

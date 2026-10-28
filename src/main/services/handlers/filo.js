@@ -191,6 +191,7 @@ module.exports = function register(on, ctx) {
     const testo = String((msg && msg.testo) || '');
     if (!testo.trim()) return { ok: true, blocca: false };
     const u = await controllaUscita({ type: 'CAMPO_PAGINA', testo }, { sender, parole: paroleDa(msg) });
+    if (u.blocca) require('../contatoriSicurezza').misura('uscitaFermata', u, { type: 'CAMPO_PAGINA' });
     return { ok: true, blocca: !!u.blocca, frase: u.blocca ? u.frase : '' };
   });
 

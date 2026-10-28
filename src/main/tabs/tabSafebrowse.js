@@ -6,6 +6,7 @@ const { pageHints } = require('../../content/safebrowseHints.js');
 const Permessi = require('../services/permessiPagine');
 const { riquadroArrivato } = require('../services/riquadroArrivato');
 const ProxyTab = require('../services/proxyTab');
+const ContatoriSicurezza = require('../services/contatoriSicurezza');
 
 // Un programma che parte entro questo tempo dall'ultimo clic o tasto vero nella scheda (in qualunque riquadro, o sul link
 // che l'ha aperta), anche dopo pagine di passaggio, è voluto. Oltre, o senza, è partito da solo (#814).
@@ -187,8 +188,12 @@ const safebrowseMethods = {
     return { ...v, norm: verdict ? verdict.norm : null, scope: SB.scopeOf(url) };
   },
 
+  // Il verdetto del sito, prima delle conferme dell'utente, è quello che i contatori tengono per la pagina (#1474).
   _sbDellaScheda(tab, url, verdict) {
-    return this._sbApplyState(tab, this._sbConLink(tab, url, verdict));
+    const v = this._sbConLink(tab, url, verdict);
+    const doc = tab._sbDoc;
+    if (doc && doc.url && stessoSito(url, doc.url)) ContatoriSicurezza.misura('verdetto', doc, v, { incognito: !!this.incognito });
+    return this._sbApplyState(tab, v);
   },
 
   // Arriva solo ad alzare l'avviso: quello a schermo può venire da indizi della pagina che qui non si rivedono.
@@ -714,6 +719,7 @@ const safebrowseMethods = {
   _sbScelta(tab, scelta, dati = {}) {
     const a = tab && tab.sbAvviso;
     if (!a) return;
+    this._sbContaScelta(a, scelta, dati);
     if (a.prima && ['procedi', 'continua', 'indietro'].includes(scelta)) {
       this._sbSceltaPrima(tab, a, scelta, dati);
     } else if (scelta === 'procedi') {
@@ -732,6 +738,16 @@ const safebrowseMethods = {
     }
     // Una scheda tenuta aperta solo per l'avviso di un file non ha niente da mostrare quando l'avviso va via (#814).
     if (tab._sbSoloAvviso && !tab.sbAvviso) this._dropTab(tab);
+  },
+
+  // Si conta la scelta che fa qualcosa: un «Procedi» senza «confermo» o un «Continua» su un pericoloso non sono scelte.
+  _sbContaScelta(a, scelta, dati = {}) {
+    const confermo = String(dati.testo || '').trim().toLowerCase() === 'confermo';
+    const vale = scelta === 'procedi' ? a.level === 'pericoloso' && confermo
+      : scelta === 'continua' ? a.level === 'sospetto' : ['indietro', 'copia', 'chiedi', 'segnala'].includes(scelta);
+    if (!vale) return;
+    ContatoriSicurezza.misura('scelta', scelta === 'segnala' ? 'segnala_falso_allarme' : scelta, a.level,
+      a.prima ? 'prima_di_aprire' : 'dopo', { incognito: !!this.incognito });
   },
 
   _sbVociMenu(tab) {

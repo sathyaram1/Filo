@@ -161,7 +161,7 @@ function sistemaVero() {
     },
     delicata: async (url) => {
       if (!/^https?:/i.test(String(url || ''))) return '';
-      try { return String((await globalThis.SN_DELICATE.filtro())(url) || ''); } catch (_) { return 'delicata'; }
+      try { return String((await globalThis.SN_DELICATE.filtro())(url) || ''); } catch (_) { return 'filtro_guasto'; }
     },
   };
 }
@@ -276,6 +276,7 @@ function crea({ sistema = null } = {}) {
     const v = scelta.voce;
     const web = !!(v.filo && /^https?:/i.test(String(v.url || '')));
     const delicata = v.filo && web ? await S().delicata(v.url) : '';
+    if (delicata) require('./contatoriSicurezza').misura('paginaDelicata', delicata, 'schermo');
     action._finestra = { id: v.id, nome: v.nome, tipo: v.tipo, filo: !!v.filo, web, ...(delicata ? { delicata } : {}) };
     action._approvata = approvata(chiave, v.id);
     return { voce: v };

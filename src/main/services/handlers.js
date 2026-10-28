@@ -12,6 +12,7 @@ const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = requir
 const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 const SegretiLetti = require('./segretiLetti');
 const VerdettiUscite = require('./verdettiUscite');
+const ContatoriSicurezza = require('./contatoriSicurezza');
 const Registro = require('./registroCambi');
 const GiroAzioni = require('./giroAzioni');
 const ContestoFilo = require('./contestoFilo');
@@ -34,7 +35,8 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   routing: (s, a) => providerRouting(s, a && a.sort, a && a.weights),
   noteServed: (s, action, r) => noteServedProvider(s, action, r),
   costs: Costs,
-  segreti: async () => (await segretiCustoditi()).map((x) => x.valore),
+  segreti: () => segretiCustoditi(),
+  segretiTolti: (action, tipi) => ContatoriSicurezza.misura('segretiTolti', action, tipi),
   ricordaEsterni: (messages) => SegretiLetti.ricordaBuste(messages),
   // La prova di una riga delle Opzioni non è una funzione: la frase nomina solo il modello.
   funzioneDi: (action) => (action === ACTIONS.PROVIDER_TEST ? '' : actionLabelForSettings(action)),
@@ -1801,6 +1803,7 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
   const pagina = paginaDi(wc);
   const u = await controllaUscita({ type: tipo, url: indirizzo }, { sender: wc ? { wc, url: pagina } : null, parole });
   if (u.blocca) {
+    ContatoriSicurezza.misura('uscitaFermata', u, { type: tipo });
     if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase }, { inVista: true });
     return { aperto: false, frase: u.frase };
   }
@@ -2427,6 +2430,7 @@ async function eseguiAzioneFilo(action, {
   // La porta non lancia: un suo guasto arriva qui come blocco e l'azione non parte (#1505).
   const u = await controllaUscita(action, { sender, contesto, provenienza, parole, domanda });
   if (u.blocca) {
+    ContatoriSicurezza.misura('uscitaFermata', u, action);
     const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
     return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...(u.regola === 'guasto' ? { guasto: true } : {}), ...comando } };
   }
@@ -6666,7 +6670,11 @@ async function generateDashboardFromInputs(inputs, { precedente = null } = {}) {
   const casa = contestoDellaHome(inputs);
   for (let i = 0; i < suggestions.length; i++) {
     const u = suggestions[i].action ? await controllaUscita(suggestions[i].action, casa) : null;
-    if (u && u.blocca) { suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase }; continue; }
+    if (u && u.blocca) {
+      ContatoriSicurezza.misura('uscitaFermata', u, suggestions[i].action);
+      suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase };
+      continue;
+    }
     // Un indirizzo con un dato dell'utente, o composto dal modello, chiede l'OK al clic; un controllo mancato pure.
     const a = suggestions[i].action;
     const url = a && /^(?:NAVIGA|APRI_FILE)$/i.test(String(a.type || '')) ? String(a.url || a.path || '') : '';
@@ -6958,6 +6966,7 @@ async function filtroDelicate(settings) {
   // Senza la regola non si sa: nel dubbio, vale delicata (patterns/un-interruttore-che-promette-una-garanzia-non-ha-ripieghi.md).
   const tutte = () => 'campi';
   tutte.voce = () => 'campi';
+  tutte.guasto = true;
   return tutte;
 }
 // Il riassunto delle schede chiuse (#1004): spento, di una scheda che si chiude non parte niente verso i modelli.
@@ -7584,8 +7593,10 @@ async function enrichArchivedTab(id, payload) {
     }
     const settings = await getEffectiveSettings();
     // Di una pagina delicata restano titolo e indirizzo: il testo non va al modello e non resta sul disco (#1004).
-    const delicata = payload && typeof payload === 'object' ? (await filtroDelicate(settings))(payload.url) : null;
+    const fuori = await filtroDelicate(settings);
+    const delicata = payload && typeof payload === 'object' ? fuori(payload.url) : null;
     if (delicata) {
+      ContatoriSicurezza.misura('paginaDelicata', fuori.guasto ? 'filtro_guasto' : delicata, 'riassunto_schede');
       await ArchivedTabs.update(id, { delicata });
       return;
     }

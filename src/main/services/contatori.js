@@ -1,5 +1,5 @@
-// I contatori anonimi (#969, #1461, #1463, #1464, #1466, #1467, #1469, #1471): misura usi e chiamate dei modelli, azioni, chat,
-// attività, navigazione, gesti e guasti di elenco chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito
+// I contatori anonimi (#969, #1461, #1463, #1464, #1466, #1467, #1469, #1471, #1474): misura usi e chiamate dei modelli, azioni,
+// chat, attività, navigazione, gesti, sicurezza e guasti di elenco chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito
 // e a contatori spenti non conta e non spedisce; spenti, butta quello che aveva, senza un ultimo segnale. Cosa esce: src/shared/contatoriGiornalieri.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
@@ -88,6 +88,7 @@ function normale(s) {
 function crea(dip = {}) {
   const C = dip.contatori || globalThis.SN_CONTATORI;
   const F = dip.contatoriFinestra || globalThis.SN_CONTATORI_FINESTRA || null;
+  const S = dip.contatoriSicurezza || globalThis.SN_CONTATORI_SICUREZZA || null;
   const disco = () => require('../shim/storage');
   const storage = dip.storage || globalThis.SN_STORAGE;
   const impostazioni = dip.impostazioni || (() => storage.getSettings());
@@ -957,6 +958,8 @@ function crea(dip = {}) {
     return conta(scrivi, { incognito }).catch(() => false);
   }
   function primaDiOgniScrittura(fn) { if (typeof fn === 'function') primaDiScrivere.push(fn); }
+  // La sicurezza (#1474) entra dalla stessa porta.
+  const sicurezza = finestra;
 
   // ── I gesti della personalizzazione (#1471) ─────────────────────────────
   // `dati` può venire da una pagina: ne passano solo le chiavi e le voci dei suoi elenchi.
@@ -1188,6 +1191,7 @@ function crea(dip = {}) {
       }
       const accanto = giorno ? [] : documentiAccanto(k, { ...base, chiave: k });
       const diFinestra = giorno ? null : documentoFinestra(k, { ...base, chiave: k });
+      const diSicurezza = giorno ? null : documentoSicurezza(k, { ...base, chiave: k });
       const gesti = giorno ? null : documentoGesti(k, { ...base, chiave: k });
       // La chat della stessa ora parte nel suo documento, dopo l'ora (#1463). Rifiutata, l'ora resta: rispedita, quella
       // già arrivata risponde 409 e la chat riparte con lei.
@@ -1210,6 +1214,10 @@ function crea(dip = {}) {
       }
       if (r.ok && diFinestra) {
         r = await spedisci(diFinestra, F.COLLEZIONE);
+        if (mia !== generazione) return 'spenti';
+      }
+      if (r.ok && diSicurezza) {
+        r = await spedisci(diSicurezza, S.COLLEZIONE);
         if (mia !== generazione) return 'spenti';
       }
       if (!r.ok && r.soloQuesto) {
@@ -1262,6 +1270,17 @@ function crea(dip = {}) {
     const v = F.valida(d);
     if (v.ok) return d;
     log(`la finestra di ${k} non parte: ${v.motivo}`);
+    return null;
+  }
+
+  // La sicurezza di un'ora (#1474), se ne ha: come la finestra.
+  function documentoSicurezza(k, base) {
+    if (!S) return null;
+    const d = S.documento(base);
+    if (S.senzaDati(d)) return null;
+    const v = S.valida(d);
+    if (v.ok) return d;
+    log(`la sicurezza di ${k} non parte: ${v.motivo}`);
     return null;
   }
 
@@ -1475,7 +1494,7 @@ function crea(dip = {}) {
     congeda, riaperta, memoriaCorretta, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa,
     confermaChiesta, confermaRisposta,
     navigazione, allUscita,
-    azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, primaDiOgniScrittura, gesto, disposizioneIcone, cambioRitirato,
+    azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, sicurezza, primaDiOgniScrittura, gesto, disposizioneIcone, cambioRitirato,
     turnoChat, reazione, copia: copiaDaBolla, chatChiusa, chatClassificata, chatInUscita, uscitaFinita, usciteInSospeso,
     controlla, avvia, seguiImpostazioni, installazioni, somme, accesi, letto, salva, alChiudere,
     passoAvvio, passoAvvioFino, processoMorto, eccezione, ipcSincrono, aggiornamento, seguiFinestra, sessione,

@@ -1294,6 +1294,46 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── La sicurezza dei contatori (#1474) ───────────────────────────────────
+    //
+    // Per ogni ora che ne ha, solo numeri sotto chiavi di elenchi chiusi, copie di quelli del codice: il verdetto di ogni
+    // pagina aperta (livello e motivi del motore), l'esito e la durata in fasce dei controlli di rete del verdetto e se
+    // l'hanno cambiato, le scelte sull'avviso del sito, i lavori fermati da una pagina delicata (per categoria, e quando
+    // il filtro si è rotto), le richieste ai modelli partite con un segreto tolto (per tipo e funzione), le uscite fermate
+    // (regola, tipo di segreto e tipo d'azione) e i tetti del codice toccati. Mai un dominio, un indirizzo o un segreto.
+    // Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle espressioni; le stesse
+    // regole: sola creazione, senza login, forma fissa, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatoriSicurezza.test.mjs.
+    match /contatori-sicurezza/{docId} {
+      function conti(m, chiavi, tettoChiavi, tetto) {
+        return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
+          && m.values().join('#').size() <= tetto && m.values().join('#').matches('^([0-9]{1,9}(#[0-9]{1,9})*)?$');
+      }
+      function contatoriSicurezza(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'sito_verdetto', 'sito_approfondito', 'avviso_scelta', 'pagina_delicata', 'segreto_oscurato', 'uscita_fermata', 'tetto_toccato'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'sito_verdetto', 'sito_approfondito', 'avviso_scelta', 'pagina_delicata', 'segreto_oscurato', 'uscita_fermata', 'tetto_toccato'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && conti(d.sito_verdetto, '^((safe|sospetto|pericoloso)([:](gsb_malware|gsb_phishing|gsb_unwanted|gsb_listed|strict_impersonation|broad_impersonation|weak_typo|young_domain|cert_expired|cert_mismatch|cert_self_signed|cert_untrusted|cert_absent|cert_revoked|sandbox_dangerous|llm|insecure_form|insecure_transport|sensitive_input|auto_download|double_extension|hosted_content|whitelisted|clean|local_host|unparsable|altro))?(#(safe|sospetto|pericoloso)([:](gsb_malware|gsb_phishing|gsb_unwanted|gsb_listed|strict_impersonation|broad_impersonation|weak_typo|young_domain|cert_expired|cert_mismatch|cert_self_signed|cert_untrusted|cert_absent|cert_revoked|sandbox_dangerous|llm|insecure_form|insecure_transport|sensitive_input|auto_download|double_extension|hosted_content|whitelisted|clean|local_host|unparsable|altro))?)*)?$', 3600, 1700)
+          && conti(d.sito_approfondito, '^(((gsb|rdap|ct|sandbox|llm)[:]((ok|transitorio|fallito)[:](ms500|s1|s2|s5|s10|s30|oltre)|non_configurato)|cert[:](ok|fallito)|cambiato[:](si|no))(#((gsb|rdap|ct|sandbox|llm)[:]((ok|transitorio|fallito)[:](ms500|s1|s2|s5|s10|s30|oltre)|non_configurato)|cert[:](ok|fallito)|cambiato[:](si|no)))*)?$', 3800, 2300)
+          && conti(d.avviso_scelta, '^((procedi|continua|indietro|copia|chiedi|segnala_falso_allarme)[:](sospetto|pericoloso)[:](prima_di_aprire|dopo)(#(procedi|continua|indietro|copia|chiedi|segnala_falso_allarme)[:](sospetto|pericoloso)[:](prima_di_aprire|dopo))*)?$', 1500, 500)
+          && conti(d.pagina_delicata, '^((utente|posta|banche|sanita|pa|campi|altro|filtro_guasto)[:](descrizione_automatica|spiegazione_preparata|contesto_correttore|riquadri|schermo|riordino_schede|riassunto_schede)(#(utente|posta|banche|sanita|pa|campi|altro|filtro_guasto)[:](descrizione_automatica|spiegazione_preparata|contesto_correttore|riquadri|schermo|riordino_schede|riassunto_schede))*)?$', 2700, 1200)
+          && conti(d.segreto_oscurato, '^((portafoglio|accesso|identita|feedback|chiave|altro)[:][a-z][a-z0-9-]{0,39}(#(portafoglio|accesso|identita|feedback|chiave|altro)[:][a-z][a-z0-9-]{0,39})*)?$', 51840, 9600)
+          && conti(d.uscita_fermata, '^((custodito[:](portafoglio|accesso|identita|feedback|chiave|altro)|(codice|password|chiave|iban|carta|guasto|altro))[:](NAVIGA|LEGGI_PAGINA|CERCA_WEB|ESEGUI_COMANDO|INVIA_FEEDBACK|APRI_FILE|APRI_SALVATA|CERCA_DOCUMENTI|CAMPO_PAGINA|SCARICA_COLLEGAMENTO|altro)(#(custodito[:](portafoglio|accesso|identita|feedback|chiave|altro)|(codice|password|chiave|iban|carta|guasto|altro))[:](NAVIGA|LEGGI_PAGINA|CERCA_WEB|ESEGUI_COMANDO|INVIA_FEEDBACK|APRI_FILE|APRI_SALVATA|CERCA_DOCUMENTI|CAMPO_PAGINA|SCARICA_COLLEGAMENTO|altro))*)?$', 7200, 2900)
+          && conti(d.tetto_toccato, '^((automatiche_spiegazioni|automatiche_correttore|riquadri_visioni|geo_budget|safebrowse_approfondimenti|link_accorciati|segreti_saturo|contatori_combinazioni)(#(automatiche_spiegazioni|automatiche_correttore|riquadri_visioni|geo_budget|safebrowse_approfondimenti|link_accorciati|segreti_saturo|contatori_combinazioni))*)?$', 400, 200);
+      }
+      allow get, list: if isAdmin();
+      allow create: if contatoriSicurezza(request.resource.data);
+      allow update, delete: if false;
+    }
+
     // Le manopole dei crediti (euro per credito, ingresso, quota, inviti
     // rimasti, tetto globale) più cambio e somma dei tetti scritti dal server.
     // Campi non enumerati, come gli altri config/*: aggiungerne uno non

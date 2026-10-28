@@ -1,6 +1,6 @@
-// Le misure della sicurezza (#1474): verdetti delle pagine, controlli di rete, scelte sull'avviso, pagine delicate, segreti
-// tolti ai modelli, uscite fermate e tetti toccati. Passa nomi da elenchi chiusi e numeri al servizio dei contatori, che
-// tiene interruttore e incognito; non passa mai un indirizzo, un segreto o un testo. Forma: src/shared/contatoriSicurezza.js.
+// Le misure della sicurezza (#1474): verdetti, controlli di rete, avvisi, pagine delicate, segreti tolti, uscite e tetti.
+// Passa nomi da elenchi chiusi e numeri al servizio dei contatori, che tiene interruttore e incognito; mai un indirizzo,
+// un segreto o un testo. Forma: src/shared/contatoriSicurezza.js.
 
 function crea(dip = {}) {
   const contatori = dip.contatori;

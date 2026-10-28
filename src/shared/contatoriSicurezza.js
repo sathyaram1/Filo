@@ -1,6 +1,6 @@
-// I contatori della sicurezza (#1474): verdetti sui siti, controlli di rete, scelte sull'avviso, pagine delicate, segreti
-// tolti ai modelli, uscite fermate e tetti toccati. Solo nomi da elenchi chiusi e numeri: mai un dominio, un indirizzo, un
-// segreto né la sua lunghezza. Forma nelle regole: tests/unit/firestoreRulesContatoriSicurezza.test.mjs. Misura: src/main/services/contatoriSicurezza.js.
+// I contatori della sicurezza (#1474): verdetti sui siti, controlli di rete, avvisi, pagine delicate, segreti tolti,
+// uscite fermate e tetti toccati: nomi da elenchi chiusi e numeri, mai un dominio, un indirizzo o un segreto.
+// Regole: tests/unit/firestoreRulesContatoriSicurezza.test.mjs. Misura: src/main/services/contatoriSicurezza.js.
 
 (function (global) {
   'use strict';
@@ -159,9 +159,8 @@
     const visti = [...new Set((Array.isArray(motivi) ? motivi : []).map((m) => dalElenco(String(m), MOTIVI_SITO)))];
     return [livello, ...visti.map((m) => `${livello}:${m}`)];
   }
-  // Un verdetto per pagina aperta (#1474), l'ultimo che la scheda ne ha avuto: `segno` è della pagina, e ricorda dove e
-  // con quali chiavi l'ha contata. Un verdetto nuovo nella stessa ora prende il posto del suo; dopo l'ora la pagina resta
-  // contata dov'era, e una seconda volta non si conta.
+  // Un verdetto per pagina aperta, l'ultimo: `segno` è della pagina e ricorda dove e con quali chiavi l'ha contata. Nella
+  // stessa ora il verdetto nuovo prende il posto del vecchio; dopo, la pagina resta contata dov'era.
   function registraVerdetto(ora, segno) {
     if (!oggetto(segno) || !oggetto(segno.verdetto)) return false;
     const nuove = chiaviVerdetto(segno.verdetto.livello, segno.verdetto.motivi);

@@ -1,11 +1,12 @@
-// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1467, #1471): crea il servizio, segue le impostazioni, riceve i
-// gesti contati nelle pagine e dà all'owner le somme, mai sotto le cinque copie. Cosa si conta: src/main/services/contatori.js.
+// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1467, #1471, #1474): crea il servizio, segue le impostazioni,
+// riceve i gesti contati nelle pagine e dà all'owner le somme, mai sotto le cinque copie. Cosa si conta: src/main/services/contatori.js.
 // Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
 
 const { soloFilo } = require('./origine');
 const auth = require('../../auth/google-auth');
 const Servizio = require('../contatori');
 const Finestra = require('../contatoriFinestra');
+const Sicurezza = require('../contatoriSicurezza');
 const Somme = require('../contatoriSomme');
 const Disco = require('../../shim/storage');
 const Registro = require('../registroCambi');
@@ -83,6 +84,8 @@ module.exports = function register(on, ctx) {
   // La finestra (#1470): le sue misure passano dallo stesso servizio.
   const finestra = Finestra.crea({ contatori });
   globalThis.SN_CONTATORI_FINESTRA_MAIN = finestra;
+  // La sicurezza (#1474): verdetti, controlli, avvisi, pagine delicate, segreti, uscite e tetti, dallo stesso servizio.
+  globalThis.SN_CONTATORI_SICUREZZA_MAIN = Sicurezza.crea({ contatori });
   contatori.avvia();
 
   // Ogni scrittura delle impostazioni, chiunque l'abbia chiesta, col segno di chi l'ha chiesta (#867): un valore di

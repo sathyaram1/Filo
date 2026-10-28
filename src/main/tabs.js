@@ -25,6 +25,7 @@ const IconaScheda = require('./services/iconaScheda');
 const ChiusuraConCaselle = require('./tabs/chiusuraConCaselle');
 const AzioniContate = require('./services/azioniContate');
 const ContatoriFinestra = require('./services/contatoriFinestra');
+const ContatoriSicurezza = require('./services/contatoriSicurezza');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -1666,10 +1667,15 @@ class TabManager {
   }
 
   async _gatherTriageInput(cands) {
-    let fuori = () => null;
-    try { fuori = await globalThis.SN_DELICATE.filtro(); } catch (_) {}
+    // Senza la regola non si sa: nel dubbio ogni pagina vale delicata, come negli altri lavori automatici (#1004).
+    let fuori = () => 'campi';
+    let guasto = true;
+    try { fuori = await globalThis.SN_DELICATE.filtro(); guasto = false; } catch (_) {}
     // Di una pagina delicata il testo non si legge nemmeno: al modello arriva solo il tipo (#1004).
     const delicate = cands.map((t) => fuori(t.url));
+    for (const d of delicate) {
+      if (d) ContatoriSicurezza.misura('paginaDelicata', guasto ? 'filtro_guasto' : d, 'riordino_schede', { incognito: !!this.incognito });
+    }
     const estratti = await Promise.all(cands.map((t, i) => (delicate[i] || t._rinviata ? '' : leggiEstratto(t))));
     const now = Date.now();
     const minutiDa = (ms) => (Number.isFinite(ms) && ms > 0 ? Math.max(0, Math.round((now - ms) / 60000)) : null);
@@ -3113,11 +3119,14 @@ class TabManager {
     // Si registra lo stato per il verdetto, ma il comportamento resta quello
     // sicuro: callback(false) rifiuta la connessione.
     wc.on('certificate-error', (event, url, error, _cert, callback) => {
+      // Un certificato rotto che il verdetto non riceve lascia passare il sito senza dirlo: i contatori lo vedono (#1474).
+      let esito = 'fallito';
       try {
         const SB = globalThis.SN_SAFEBROWSE;
         const norm = SB && SB.normalize(url);
-        if (norm && norm.host) SB.recordCert(norm.host, mapCertError(error));
+        if (norm && norm.host) { SB.recordCert(norm.host, mapCertError(error)); esito = 'ok'; }
       } catch (_) {}
+      ContatoriSicurezza.misura('controllo', 'cert', esito, null, { incognito: !!this.incognito });
       try { callback(false); } catch (_) {}
     });
 

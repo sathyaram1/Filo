@@ -9,7 +9,8 @@ const GIORNI_RICORDO = 30;
 
 // Pieno, il registro toglie dalla lettura che ha portato più voci: una pagina che nasconde migliaia di codici finti
 // consuma solo il proprio posto, e il codice vero letto altrove resta. Prova: tests/unit/usciteSegreti.test.mjs.
-function registro(max = MAX_LETTI, { cambiato = () => {} } = {}) {
+// `saturo`: il registro ha tolto voci, o è arrivato un testo con più segreti di quanti se ne raccolgano (#1474).
+function registro(max = MAX_LETTI, { cambiato = () => {}, saturo = () => {} } = {}) {
   const voci = new Map();
   const lotti = new Map();
   let ultimo = 0;
@@ -26,6 +27,7 @@ function registro(max = MAX_LETTI, { cambiato = () => {} } = {}) {
   }
 
   function sfoltisci() {
+    const pieno = voci.size > max;
     while (voci.size > max) {
       let piu = null;
       for (const [lotto, chiavi] of lotti) if (!piu || chiavi.size > piu.chiavi.size) piu = { lotto, chiavi };
@@ -36,15 +38,17 @@ function registro(max = MAX_LETTI, { cambiato = () => {} } = {}) {
       }
       if (!piu.chiavi.size) lotti.delete(piu.lotto);
     }
+    return pieno;
   }
+  const avvisa = () => { try { saturo(); } catch (_) {} };
 
   return {
-    aggiungi(x, fonte) { const nuovo = metti(x, fonte, ++ultimo); sfoltisci(); if (nuovo) cambiato(); },
+    aggiungi(x, fonte) { const nuovo = metti(x, fonte, ++ultimo); if (sfoltisci()) avvisa(); if (nuovo) cambiato(); },
     aggiungiTutti(lista, fonte) {
       const lotto = ++ultimo;
       let nuovi = false;
       for (const x of Array.isArray(lista) ? lista : []) nuovi = metti(x, fonte, lotto) || nuovi;
-      sfoltisci();
+      if (sfoltisci() || (lista && lista.saturo)) avvisa();
       if (nuovi) cambiato();
     },
     tutti: () => [...voci.values()].map(({ valore, regola, fonte }) => ({ valore, regola, fonte })),
@@ -104,7 +108,10 @@ function salvaPresto() {
   if (typeof inAttesa.unref === 'function') inAttesa.unref();
 }
 
-const letti = registro(MAX_LETTI, { cambiato: salvaPresto });
+const letti = registro(MAX_LETTI, {
+  cambiato: salvaPresto,
+  saturo: () => require('./contatoriSicurezza').misura('tetto', 'segreti_saturo'),
+});
 
 function carica() {
   if (caricato) return;
