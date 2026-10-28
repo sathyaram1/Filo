@@ -1562,7 +1562,7 @@
         at: r && r.at,
         kind: 'deny',
         label: 'Respinto',
-        text: `${DENY_LABELS[String(r && r.reason)] || String((r && r.reason) || '—')}`
+        text: `${DENY_LABELS[String(r && r.reason)] || String((r && r.reason) || '—')}${numDiRifiuto(r)}`
           + `${r && r.slug ? ` · ${r.slug}` : ''}${r && r.action ? ` · ${r.action}` : ''}`,
       });
     }
