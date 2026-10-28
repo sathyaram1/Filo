@@ -35,21 +35,20 @@ Module._load = function (request, parent, isMain) {
 const Disco = require(join(ROOT, 'src', 'main', 'shim', 'storage.js'));
 globalThis.self = globalThis;
 globalThis.chrome = { storage: { local: { get: Disco.get, set: Disco.set, remove: Disco.remove } } };
-for (const m of ['constants', 'i18n', 'contenutoEsterno', 'timeFormat', 'storage', 'themeTokens', 'tabColor', 'ttsVoices', 'filoMemory', 'preferences', 'disposizioneIcone', 'cambi']) {
+for (const m of ['constants', 'i18n', 'contenutoEsterno', 'timeFormat', 'storage', 'themeTokens', 'tabColor', 'ttsVoices', 'filoMemory', 'preferences', 'disposizioneIcone', 'cambi', 'filoEventi']) {
   require(join(ROOT, 'src', 'shared', `${m}.js`));
 }
 const Registro = require(join(ROOT, 'src', 'main', 'services', 'registroCambi.js'));
 const Layout = require(join(ROOT, 'src', 'main', 'services', 'layoutIcone.js'));
 const D = globalThis.SN_DISPOSIZIONE_ICONE;
 const C = globalThis.SN_CAMBI;
-const K = globalThis.SN_CONST.STORAGE_KEYS;
 Registro.collega({ disposizioneIcone: (cambia, o) => Layout.riscrivi(cambia, o) });
 Registro.avvia();
 
+// Dalla porta del registro, non dal posto dove tiene i cambi: quel posto è già cambiato una volta (#1561).
 async function eventi(tipo) {
   await Registro.attesa();
-  const r = await Disco.get(K.FILO_CAMBI);
-  return (r[K.FILO_CAMBI] || []).filter((e) => !tipo || e.tipo === tipo);
+  return (await Registro.lista()).filter((e) => !tipo || e.tipo === tipo);
 }
 const dallaBarra = (fn) => Registro.con({ via: 'interfaccia', dove: 'barra' }, fn);
 // Dove sta rispetto alle vicine: il posto in numeri cambia se un'altra icona si sposta sopra di lei.
@@ -121,4 +120,16 @@ test('due spostamenti di icone diverse sono due cambi, e annullare il primo lasc
   const dopo = await Layout.leggi();
   assert.deepEqual(vicina(dopo, 'share'), vicina(prima, 'share'));
   assert.equal(dopo.bar[0], 'colorPicker', 'il secondo spostamento resta');
+});
+
+// Chi annulla legge questi tre testi: uno che non nomina le icone gli fa credere che il riordino non si rimetta così.
+test('l\'annullo, i CAMBI RECENTI e il manifesto nominano le icone della barra laterale', () => {
+  require(join(ROOT, 'src', 'shared', 'actionTools.js'));
+  require(join(ROOT, 'src', 'shared', 'filoState.js'));
+  require(join(ROOT, 'src', 'shared', 'capabilities.js'));
+  assert.match(globalThis.SN_ACTION_TOOLS.TOOLS.ANNULLA_CAMBIO.description, /icone della barra laterale/);
+  const titolo = (globalThis.SN_FILO_STATE.renderForPrompt.toString().match(/'CAMBI RECENTI[^']*'/) || [''])[0];
+  assert.match(titolo, /icone della barra laterale/);
+  const voce = globalThis.SN_CAPABILITIES.CAPABILITIES.find((c) => c.id === 'undo-changes');
+  assert.match(voce.desc, /icone della barra laterale/);
 });

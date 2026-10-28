@@ -17,10 +17,10 @@ const salvate = (app) => app.evaluate(async () => {
   const r = await globalThis.chrome.storage.local.get('savedPages');
   return (r.savedPages || []).map((p) => p.url);
 });
+// Dalla porta del registro, non dal posto dove tiene i cambi: quel posto è già cambiato una volta (#1561).
 const registro = (app) => app.evaluate(async () => {
   await globalThis.SN_REGISTRO_CAMBI.attesa();
-  const r = await globalThis.chrome.storage.local.get('filo_cambi');
-  return r.filo_cambi || [];
+  return globalThis.SN_REGISTRO_CAMBI.lista();
 });
 const ordine = (barra) => barra.$$eval('#nav .ico[data-id]', (els) => els.map((e) => e.dataset.id));
 
