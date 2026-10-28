@@ -1556,6 +1556,10 @@ if (isMain) {
       console.log(testoProveDaCancellare(branch, r.derived));
       process.exit(0);
     }
+    if (srvC && srvC.sha) {
+      const voci = await registraPunteScritte({ ramo: branch, sha, feedbackId: r.state[branch].feedbackId || '', serverAtteso: srvC.sha });
+      for (const riga of voci) console.error(riga);
+    }
     console.log(`Correzione consegnata su '${branch}' (${sha.slice(0, 8)}${testoServer(srvC)}). Serve un'altra verifica, di un'altra istanza:`);
     console.log('  node scripts/verify-local.mjs start');
     process.exit(0);
