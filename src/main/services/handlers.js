@@ -2234,6 +2234,51 @@ function ricercaSuAltroComputer(action) {
   return { cercato: cosa, cartella, risultati: [], cartellaDiRete: cartella };
 }
 
+// #1615 — le voci del menu dell'account chieste a parole: le preme la shell della finestra, come un clic, così avvisi
+// d'errore e stato del bottone sono quelli del menu. Chi è già dove chiede lo sa dall'esito, e niente si riapre.
+const FRASE_ACCESSO = 'Aperta in una scheda la pagina d\'accesso di Google: l\'utente sceglie l\'account, poi la scheda si chiude da sola e torna dov\'era. Se Google non accetta l\'accesso dentro Filo, la pagina si apre nel browser del computer e Filo glielo dice.';
+const FRASE_COLLEGA = 'Aperta in una scheda la pagina d\'accesso di Google con l\'email del suo account già scritta: entrando lì, YouTube, Gmail e Drive nelle schede si collegano.';
+async function eseguiAccount(action, sender) {
+  const cosa = globalThis.SN_ACTION_LEVELS.cosaAccount(action);
+  if (!cosa) return { executed: false, kept: false, output: { error: 'operazione dell\'account non riconosciuta: si usa accedi, collega_google o esci' } };
+  const win = winOf(sender);
+  if (!win || win.isDestroyed()) return { executed: false, kept: false, output: { error: 'nessuna finestra di Filo aperta' } };
+  const auth = require('../auth/google-auth');
+  const dentro = auth.isSignedIn();
+  let googleNelleSchede = false;
+  if (dentro) { try { googleNelleSchede = await require('./accessoGoogle').collegatoNelleSchede(); } catch (_) {} }
+  const premi = (voce) => { win.webContents.send('shell:menu-action', voce); };
+  try {
+    if (cosa === 'esci') {
+      if (!dentro) return { executed: true, kept: false, output: { gia: 'fuori', frase: 'L\'utente non è dentro nessun account di Filo: non c\'era niente da cui uscire.' } };
+      premi('auth-signout');
+      // L'uscita la fa la shell: un «accedi» chiesto subito dopo deve già trovarla fatta.
+      const scade = Date.now() + 3000;
+      while (auth.isSignedIn() && Date.now() < scade) await new Promise((r) => setTimeout(r, 50));
+      if (auth.isSignedIn()) return { executed: false, kept: false, output: { error: 'l\'uscita dall\'account non è riuscita' } };
+      const google = googleNelleSchede ? ' Google nelle schede resta collegato: per uscire anche da lì si esce dalla pagina di Google.' : '';
+      return { executed: true, kept: false, output: { voce: 'esci', frase: `Uscito dall'account di Filo.${google} Per rientrare basta chiederlo a te, o «Accedi con Google» nel menu dell'account.` } };
+    }
+    if (!dentro) {
+      premi('auth-signin');
+      const insieme = cosa === 'collega_google' ? ' Entrando in Filo con Google si collegano insieme anche YouTube, Gmail e Drive nelle schede.' : '';
+      return { executed: true, kept: false, output: { voce: 'accedi', frase: `${FRASE_ACCESSO}${insieme}` } };
+    }
+    if (googleNelleSchede) {
+      const frase = cosa === 'accedi'
+        ? 'L\'utente è già dentro Filo col suo account Google, e YouTube, Gmail e Drive nelle schede sono collegati: non c\'era niente da fare.'
+        : 'YouTube, Gmail e Drive nelle schede sono già collegati al suo account Google: non c\'era niente da fare.';
+      return { executed: true, kept: false, output: { gia: cosa === 'accedi' ? 'dentro' : 'collegato', frase } };
+    }
+    // Dentro Filo ma fuori da Google nelle schede: chi chiede di entrare di solito l'ha visto da YouTube o Gmail scollegati.
+    premi('collega-google');
+    const prima = cosa === 'accedi' ? 'L\'utente era già dentro Filo, ma YouTube, Gmail e Drive nelle schede non erano collegati. ' : '';
+    return { executed: true, kept: false, output: { voce: 'collega_google', frase: `${prima}${FRASE_COLLEGA}` } };
+  } catch (_) {
+    return { executed: false, kept: false, output: { error: 'il menu dell\'account non ha risposto' } };
+  }
+}
+
 async function executeFiloAction(action, opzioni = {}) {
   const raccolti = [];
   // Chi è stato lo dice chi manda (#1561): un tasto della home che usa la porta dell'Aiuto resta un gesto dell'utente.
