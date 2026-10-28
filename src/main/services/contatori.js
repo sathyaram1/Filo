@@ -1259,6 +1259,7 @@ function crea(dip = {}) {
       [C.documentoChiamate, C.senzaChiamate, C.validaChiamate, C.COLLEZIONE_CHIAMATE, 'le chiamate'],
       [C.documentoNavigazione, C.senzaNavigazione, C.validaNavigazione, C.COLLEZIONE_NAVIGAZIONE, 'la navigazione'],
       [C.documentoAttivita, C.senzaAttivita, C.validaAttivita, C.COLLEZIONE_ATTIVITA, 'le attività'],
+      [C.documentoRiquadri, C.senzaRiquadri, C.validaRiquadri, C.COLLEZIONE_RIQUADRI, 'i riquadri'],
     ]) {
       const d = costruisci(base);
       if (vuoto(d)) continue;
