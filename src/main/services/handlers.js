@@ -5091,7 +5091,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
       return `Niente annullato: ${o.error || 'cambio non trovato'}. Rileggi i CAMBI RECENTI nello STATO e, se non è chiaro quale intende, chiediglielo.`;
     }
     const saltati = Array.isArray(o.saltati) && o.saltati.length
-      ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
+      ? `\nNon rimessi, ${o.saltatiPerche || 'perché nel frattempo sarebbero già scaduti'}:\n${nomiSalvati(o.saltati)}` : '';
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
   }
   // La home chiesta da chi è già nella home: non è stato ricaricato niente, e il modello non deve dire di averlo portato
