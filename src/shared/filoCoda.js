@@ -74,7 +74,7 @@
         const posto = m.tardiva && Number.isFinite(prima) && prima < t ? prima + 1 : t;
         prima = posto;
         if (!haContenuto(m)) return;
-        const v = voceMessaggio(c, m, i, qui);
+        const v = voceMessaggio(c, m, i, qui, trovaChat);
         if (posto !== t) { v.ts = new Date(posto).toISOString(); v.fine = m.ts; }
         altri.push({ ...v, _n: n++ });
       });
