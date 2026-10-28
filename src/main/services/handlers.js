@@ -1771,7 +1771,7 @@ async function linkCheChiedonoOk(testo, { sender = null, contesto = null, proven
   const Levels = globalThis.SN_ACTION_LEVELS;
   let impostazioni = null;
   return VerdettiUscite.giudica([...indirizzi, ...indirizziCliccabili(testo)], {
-    porta: (url) => controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, provenienza, parole, domanda }),
+    porta: (url) => controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, provenienza, parole, domanda, soloGiudizio: true }),
     chiede: async (url, u) => {
       if (sempre || !Levels) return true;
       if (!impostazioni) { try { impostazioni = await Storage.getSettings(); } catch (_) { impostazioni = {}; } }
