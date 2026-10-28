@@ -26,11 +26,15 @@
       || Number(m.images) > 0 || (Array.isArray(m.guardate) && m.guardate.length));
   }
 
-  function voceMessaggio(c, m, i, qui) {
+  // `trovaChat(id)`: la chat del filo con quell'id, per la risposta citata da un messaggio (#1620).
+  function voceMessaggio(c, m, i, qui, trovaChat = null) {
     const v = {
       k: 'msg', key: `m:${c.id}:${i}`, chat: c.id, i, ts: m.ts, role: m.role === 'user' ? 'user' : 'filo',
       text: String(m.text == null ? '' : m.text),
     };
+    const R = global.SN_RISPOSTA_A;
+    const citata = m.rispostaA && R ? R.risolvi(m.rispostaA, trovaChat) : null;
+    if (citata) v.rispostaA = citata;
     if (Array.isArray(m.actions) && m.actions.length) v.actions = m.actions.slice();
     if (Array.isArray(m.cambi) && m.cambi.length) v.cambi = m.cambi.slice();
     if (Number(m.images) > 0) v.images = Number(m.images);
