@@ -1545,7 +1545,7 @@
   // turno di prima non ha preso lo offre anche il turno dopo, appena parte.
   function affidaAlTurno(s, t) {
     const { c } = s;
-    if (!t || t.fermato || c.immagini.length || c.file.length || c.daFuori || c.text.startsWith('/') || Accoglienza.isActive()) return;
+    if (!t || t.fermato || c.immagini.length || c.file.length || c.daFuori || c.citata || c.text.startsWith('/') || Accoglienza.isActive()) return;
     s.turno = t;
     send({ type: MSG.FILO_CHAT_SEGUITO, reqId: t.reqId, id: s.id, testo: c.text })
       .then((r) => { if (!(r && r.accolto) && s.turno === t) s.turno = null; })
