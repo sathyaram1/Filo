@@ -48,12 +48,31 @@
     return n;
   }
 
+  // I clic su «risali» di fila, per i contatori (#1473): la serie finisce con un'altra cosa fatta nella home, con
+  // l'inizio del filo o con la pagina che se ne va; se la scheda si chiude la conta il main.
+  let pezziDiFila = 0;
+  function contaRisali(misura, campi = {}) {
+    try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura, ...campi })).catch(() => {}); } catch (_) {}
+  }
+  function fineRisali() {
+    if (!pezziDiFila) return;
+    pezziDiFila = 0;
+    contaRisali('risali-fine');
+  }
+  async function risaliCliccato() {
+    if (caricando || finito || !primo) return;
+    pezziDiFila += 1;
+    contaRisali('risali', { pezzi: pezziDiFila });
+    await sali();
+    if (finito) fineRisali();
+  }
+
   function bottoneRisali() {
     if (risali && risali.isConnected) return risali;
     risali = el('div', 'dash-risali');
     const b = el('button', 'dash-risali-btn', 'risali il filo');
     b.type = 'button';
-    b.addEventListener('click', () => { sali().catch(() => {}); });
+    b.addEventListener('click', () => { risaliCliccato().catch(() => {}); });
     risali.appendChild(b);
     d.bubblesEl.insertBefore(risali, d.bubblesEl.firstChild);
     return risali;
@@ -397,6 +416,7 @@
     return p;
   }
   async function caricaOra() {
+    fineRisali();
     primo = null;
     finito = false;
     const res = await d.send({ type: MSG.FILO_CODA });
@@ -569,6 +589,7 @@
 
   // Va al punto del filo dove sta una conversazione (o un suo messaggio), caricando i pezzi che mancano.
   async function vaiA({ chat, i = null, app = false, ts = null }) {
+    fineRisali();
     const chiave = app ? `a:${chat}` : (i != null ? `m:${chat}:${i}` : null);
     const trova = () => (chiave && conChiave(chiave))
       || [...d.bubblesEl.querySelectorAll('[data-chat]')].find((n) => n.dataset.chat === chat) || null;
@@ -747,6 +768,7 @@
     }, { passive: true });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') allinea({ daAltrove: true }).catch(() => {});
+      else fineRisali();
     });
     try {
       global.chrome.runtime.onMessage.addListener((m) => {
@@ -768,6 +790,6 @@
   }
 
   global.SN_DASH_CODA = {
-    init, carica, sali, allinea, metti, vaiA, daCapo, togliChat, rimettiChat, nascondi: nascondiConversazione, nascostaAltrove, togliIndirizzo, segnaGiorni, nomeDelGiorno,
+    init, carica, sali, fineRisali, allinea, metti, vaiA, daCapo, togliChat, rimettiChat, nascondi: nascondiConversazione, nascostaAltrove, togliIndirizzo, segnaGiorni, nomeDelGiorno,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

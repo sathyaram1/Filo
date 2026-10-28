@@ -208,6 +208,10 @@ const cookieMethods = {
     rememberOutcome(this, site, outcome);
     if (prev[outcome]) { tab.cookieOutcome = prev; return { ok: true }; }
     conta();
+    // Filo ha tolto il banner da sé, rifiutando o nascondendo (#1473): una volta per scheda e sito, come sopra.
+    if (!prev.rejected && !prev.hidden) {
+      require('../services/contatoriHomePagina').misura('fatto', 'banner_cookie', { incognito: !!(this.incognito || (this.win && this.win._filoIncognito)) });
+    }
     tab.cookieOutcome = { ...prev, [outcome]: true, ...(outcome === 'rejected' ? { unconfirmed: false } : {}) };
     this._broadcast();
     return { ok: true };

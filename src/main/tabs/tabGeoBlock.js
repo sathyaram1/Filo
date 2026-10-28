@@ -5,6 +5,7 @@
 const ProxyTab = require('../services/proxyTab');
 const GeoBlock = require('../services/geoBlock');
 const GeoBlockRules = require('../services/geoBlockRules');
+const ContatoriHomePagina = require('../services/contatoriHomePagina');
 
 const geoBlockMethods = {
   // Qui solo rilevamento, segnale interno e azione (#151). Un segnale solo per navigazione:
@@ -112,6 +113,11 @@ const geoBlockMethods = {
     try {
       tab.view.webContents.send('filo:broadcast', { type: T, url, country, countryLabel: label });
     } catch (_) {}
+    // I contatori (#1473): la risposta, o la pagina che se ne va senza (tabs.js); mai il sito né il paese.
+    if (!tab._proposte) tab._proposte = {};
+    ContatoriHomePagina.misura('propostaMostrata', tab._proposte, 'apri_da_altro_paese', {
+      chiave: url, incognito: !!(this.incognito || (this.win && this.win._filoIncognito)),
+    });
   },
 
   _geoState(tab) {
@@ -130,6 +136,7 @@ const geoBlockMethods = {
     this._geoState(tab);
     if (host) tab.geoDismissed.delete(host);
     tab.geoRetry = { host, stage: 'settled' }; // scelta presa: niente auto-escalation
+    ContatoriHomePagina.misura('propostaRisposta', tab._proposte, 'apri_da_altro_paese', 'accettata');
     return this.setTabProxy(tabId, country);
   },
 
@@ -143,6 +150,7 @@ const geoBlockMethods = {
     try { host = url ? new URL(url).hostname : (tab.geoBlock ? tab.geoBlock.host : ''); } catch (_) {}
     if (host) tab.geoDismissed.add(host);
     tab.geoRetry = { host, stage: 'settled' };
+    ContatoriHomePagina.misura('propostaRisposta', tab._proposte, 'apri_da_altro_paese', 'rifiutata');
     return { ok: true };
   },
 

@@ -3895,6 +3895,8 @@ const scelteDaContare = new Set();
 function contaIntervista(prima, dopo, via) {
   try {
     if (!Onboarding || !dopo) return;
+    // Rifatta dalle Preferenze (#1473): solo dove si ferma, nei suoi contatori; quelli qui sotto sono della prima volta.
+    if (dopo.daCapo === true) { contaIntervistaRifatta(prima, dopo); return; }
     const gia = new Set((prima && Array.isArray(prima.ticked)) ? prima.ticked : []);
     for (const id of Array.isArray(dopo.ticked) ? dopo.ticked : []) {
       if (gia.has(id)) continue;
@@ -3904,7 +3906,7 @@ function contaIntervista(prima, dopo, via) {
     const passo = Onboarding.ITEM_IDS.find((id) => !(dopo.ticked || []).includes(id));
     if ((prima && prima.done) || !dopo.done) {
       // Aperta: il passo dove si trova, per chi la lascia lì senza chiuderla (contato dopo un giorno di fermo).
-      if (!dopo.done) contaSe('intervistaToccata', passo || 'chiusura', false);
+      if (!dopo.done) contaSe('intervistaToccata', passo || 'chiusura', false, { inizio: dopo.startedAt || '' });
       return;
     }
     if (Onboarding.isComplete(dopo)) contaSe('intervista', 'chiusura', 'completa');
@@ -3915,6 +3917,16 @@ function contaIntervista(prima, dopo, via) {
     if (via) contaSe('intervista', 'chiusura', via);
     contaSe('intervistaToccata', '', true);
   } catch (_) {}
+}
+
+function contaIntervistaRifatta(prima, dopo) {
+  const passo = Onboarding.ITEM_IDS.find((id) => !(dopo.ticked || []).includes(id));
+  const segni = { daCapo: true, inizio: dopo.startedAt || '' };
+  if (!dopo.done) { contaSe('intervistaToccata', passo || 'chiusura', false, segni); return; }
+  if (prima && prima.done) return;
+  if (Onboarding.isComplete(dopo)) require('./contatoriHomePagina').misura('intervistaFine', 'completa');
+  else contaSe('intervistaAbbandonata', passo || 'chiusura', { daCapo: true });
+  contaSe('intervistaToccata', '', true);
 }
 
 async function contaScelteIntervista() {
@@ -5262,6 +5274,8 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     const Attesa = require('./autoFeedbackAttesa');
     const win = winOf(sender);
     const biglietto = Attesa.trattieni(spedisci, win);
+    // Filo segnala da sé (#1473): «Annulla» sull'avviso la disfa (handlers/filo.js).
+    require('./contatoriHomePagina').misura('fatto', 'segnalazione_automatica', { incognito: !!(win && win._filoIncognito) });
     try {
       win.webContents.send('shell:toast', {
         text: 'L\'ho segnalato a chi sviluppa Filo',

@@ -10,10 +10,11 @@
   const COLLEZIONE = 'contatori-home-pagina';
 
   // ── Gli elenchi chiusi: copie di quelli del codice, tests/unit/contatoriHomePagina.test.mjs li confronta ─────────
-  // I comandi di SLASH_COMMANDS (src/pages/dashboard/dashboard-comandi.js) per nome, senza /incognito: da quale strada
-  // parte una finestra in incognito non esce.
-  const COMANDI = Object.freeze(['home', 'clear', 'kill', 'newtab', 'models', 'modelli', 'sicurezza', 'preferenze', 'editor',
-    'feedback', 'pulisci', 'pulizia', 'riordina', 'set']);
+  // I comandi di SLASH_COMMANDS (src/pages/dashboard/dashboard-comandi.js) per nome, senza la barra e con «_» al posto
+  // dello spazio; /incognito no: da quale strada parte una finestra in incognito non esce.
+  const COMANDI = Object.freeze(['home', 'clear', 'clear_all', 'kill', 'newtab', 'models', 'modelli', 'sicurezza', 'preferenze',
+    'editor', 'feedback', 'pulisci', 'pulizia', 'riordina', 'set', 'invito', 'users', 'gift', 'help']);
+  const nomeComando = (chiave) => String(chiave || '').replace(/^\//, '').replace(/ /g, '_');
   // «sito_diretto»: «/dominio»; «shell»: un comando della modalità terminale; «sconosciuto_inviato»: un «/qualcosa» rosso
   // mandato lo stesso al modello.
   const STRADE = Object.freeze(['sito_diretto', 'shell', 'sconosciuto_inviato']);
@@ -21,7 +22,7 @@
   const SCELTE_NON_RISOLTO = Object.freeze(['apri_lo_stesso', 'lascia']);
 
   const FASCE_RISULTATI = Object.freeze([['r0', 0], ['r1_3', 3], ['r4_10', 10], ['oltre', Infinity]]);
-  const TIPI_RISULTATO = Object.freeze(['messaggio', 'pagina', 'scheda_chiusa']);
+  const TIPI_RISULTATO = Object.freeze(['messaggio', 'pagina', 'scheda_chiusa', 'conversazione_nascosta']);
   const FASCE_POSIZIONE = Object.freeze([['p1', 1], ['p2_3', 3], ['p4_10', 10], ['oltre', Infinity]]);
   // Le attese nelle fasce dei contatori dell'ora (SN_CONTATORI.FASCE).
   const FASCE_TEMPO = Object.freeze([
@@ -30,6 +31,9 @@
   const VUOTA_RIPETUTA = 'vuota_ripetuta';
   // Una ricerca a zero risultati seguita da un'altra entro questo tempo: chi si è perso riprova.
   const RIPETUTA_MS = 10 * 1000;
+  // Una ricerca conta quando i suoi risultati restano a schermo tanto così, o se ne apre uno, o si chiude il pannello:
+  // la ricerca parte a ogni pausa di chi scrive, e le parole a metà non sono ricerche.
+  const ASSESTATA_MS = 800;
 
   const FASCE_PEZZI = Object.freeze([['n1', 1], ['n2_3', 3], ['n4_10', 10], ['oltre', Infinity]]);
 
@@ -60,11 +64,12 @@
     return fasce.find(([, fino]) => n <= fino)[0];
   }
 
-  // I passi dell'intervista (SN_ONBOARDING.ITEM_IDS): l'elenco lo tiene l'intervista, le regole ne tengono la forma.
+  // I passi dell'intervista come li contano i contatori della prima volta (le voci, più «chiusura»): l'elenco lo tiene
+  // l'intervista, le regole ne tengono la forma.
   const FORMA_PASSO = '[a-z][a-z0-9_]{0,29}';
   function passi() {
-    const O = global.SN_ONBOARDING;
-    const l = O && Array.isArray(O.ITEM_IDS) ? O.ITEM_IDS : [];
+    const C = global.SN_CONTATORI;
+    const l = C && typeof C.passiIntervista === 'function' ? C.passiIntervista() : [];
     return l.filter((p) => new RegExp(`^${FORMA_PASSO}$`).test(p) && p !== COMPLETA);
   }
 
@@ -111,7 +116,7 @@
   // L'intervista ha posto per quattro volte i passi di oggi: un passo nuovo non aspetta regole nuove.
   const PASSI_PREVISTI = 40;
   const TETTI = Object.freeze({
-    comando_home: [600, 400], ricerca_home: [5600, 1800], risali: [100, 100],
+    comando_home: [600, 500], ricerca_home: [7000, 2400], risali: [100, 100],
     intervista_rifatta: [PASSI_PREVISTI * 36, PASSI_PREVISTI * 10], proposta_sulla_pagina: [1200, 400],
     automatismo_fatto: [200, 100], automatismo_disfatto: [200, 100],
   });
@@ -135,13 +140,16 @@
     return true;
   }
 
-  // `cosa`: un comando di COMANDI, una strada di STRADE, o «sito_non_risolto» con la scelta.
+  // `cosa`: una chiave di SLASH_COMMANDS («/clear all») o un nome di COMANDI, una strada di STRADE, o «sito_non_risolto»
+  // con la scelta.
   function chiaveComando(cosa, scelta = '') {
     const c = String(cosa || '');
     if (c === NON_RISOLTO) return SCELTE_NON_RISOLTO.includes(scelta) ? `${NON_RISOLTO}:${scelta}` : '';
-    return COMANDI.includes(c) || STRADE.includes(c) ? c : '';
+    if (STRADE.includes(c)) return c;
+    const n = nomeComando(c);
+    return COMANDI.includes(n) ? n : '';
   }
-  function registraComando(ora, cosa, scelta) {
+  function registraComando(ora, cosa, scelta = '') {
     const k = chiaveComando(cosa, scelta);
     return k ? piuUno(ora, 'comando_home', k) : false;
   }
@@ -250,9 +258,9 @@
   global.SN_CONTATORI_HOME_PAGINA = {
     VERSIONE, COLLEZIONE, CAMPI, MAPPE, FORME, TETTI, CHIAVI_FORMA, PASSI_PREVISTI, FORMA_PASSO,
     COMANDI, STRADE, NON_RISOLTO, SCELTE_NON_RISOLTO, FASCE_RISULTATI, TIPI_RISULTATO, FASCE_POSIZIONE, FASCE_TEMPO,
-    VUOTA_RIPETUTA, RIPETUTA_MS, FASCE_PEZZI, RIAPERTA, COMPLETA, TIPI_PROPOSTA, ESITI_PROPOSTA, COME_EMAIL, AUTOMATISMI,
+    VUOTA_RIPETUTA, RIPETUTA_MS, ASSESTATA_MS, FASCE_PEZZI, RIAPERTA, COMPLETA, TIPI_PROPOSTA, ESITI_PROPOSTA, COME_EMAIL, AUTOMATISMI,
     DISFACIBILI,
-    passi, chiaviDi, fasciaIn, chiaveComando, chiaveProposta,
+    nomeComando, passi, chiaviDi, fasciaIn, chiaveComando, chiaveProposta,
     vuota, dati, registraComando, registraRicerca, registraAperto, registraVuotaRipetuta, registraRisali,
     registraIntervistaRiaperta, registraIntervistaFine, registraProposta, registraFatto, registraDisfatto,
     documento, senzaDati, valida,

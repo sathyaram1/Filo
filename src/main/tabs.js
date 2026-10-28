@@ -25,6 +25,7 @@ const IconaScheda = require('./services/iconaScheda');
 const ChiusuraConCaselle = require('./tabs/chiusuraConCaselle');
 const AzioniContate = require('./services/azioniContate');
 const ContatoriFinestra = require('./services/contatoriFinestra');
+const ContatoriHomePagina = require('./services/contatoriHomePagina');
 const ContatoriSicurezza = require('./services/contatoriSicurezza');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
@@ -1228,6 +1229,7 @@ class TabManager {
   _smontaScheda(tab, { daSola = false } = {}) {
     const id = tab.id;
     this._avvisaSorvegliante(tab, 'chiusa');
+    ContatoriHomePagina.misura('proposteVia', tab._proposte);
     this._nelFilo('schedaChiusa', tab);
     // Se la scheda che se ne va è quella che aveva chiesto il fullscreen al
     // sito (Ctrl+W funziona anche a tutto schermo), lo schermo intero resterebbe
@@ -2547,6 +2549,7 @@ class TabManager {
     const tab = bersaglio || this.tabs.find((t) => t.id === this.activeId);
     const esito = await this._chiediZoom(tab, spec);
     if (esito && typeof esito.prima === 'number' && typeof esito.percentuale === 'number') {
+      if (esito.prima !== esito.percentuale) this._zoomCambiato(tab, esito.percentuale);
       try {
         require('./services/registroCambi').registraZoom(
           { host: ospiteDelloZoom(tab.url), prima: esito.prima, dopo: esito.percentuale },
@@ -2555,6 +2558,27 @@ class TabManager {
       } catch (_) {}
     }
     return esito;
+  }
+
+  // Lo zoom che Chromium ricorda per sito, ritrovato entrando in un sito (#1473): Filo l'ha rimesso da sé, e riportarlo
+  // al 100% prima di averlo toccato lo disfa. Una pagina dello stesso sito nella stessa scheda è la stessa visita.
+  _zoomDellaVisita(tab, wc, url) {
+    const ospite = /^https?:\/\//i.test(String(url || '')) ? ospiteDelloZoom(url) : '';
+    const prima = tab._ospiteVisita;
+    tab._ospiteVisita = ospite;
+    if (ospite && ospite === prima) return;
+    tab._zoomRicordato = false;
+    if (!ospite) return;
+    let f = 1;
+    try { f = wc.getZoomFactor(); } catch (_) { f = 1; }
+    if (!(Math.abs(f - 1) > 0.001)) return;
+    tab._zoomRicordato = true;
+    ContatoriHomePagina.misura('fatto', 'zoom_ricordato', { incognito: !!this.incognito });
+  }
+  _zoomCambiato(tab, dopo) {
+    if (!tab || !tab._zoomRicordato) return;
+    tab._zoomRicordato = false;
+    if (Math.round(Number(dopo)) === 100) ContatoriHomePagina.misura('disfatto', 'zoom_ricordato', { incognito: !!this.incognito });
   }
 
   // «Rimetti com'era» uno zoom: sulla scheda di quel sito che si vede, o su un'altra dello stesso sito.
@@ -2632,6 +2656,7 @@ class TabManager {
         ));
         // Una raffica di zoom è un'azione contata (#1461): dal menu, dai tasti o dalla rotella, a effetto immediato.
         AzioniContate.azione('page-zoom', () => {}, { incognito: !!this.incognito });
+        this._zoomCambiato(tab, d.dopo);
       });
     } catch (_) {}
     // In modalità "contenuto a tutto schermo" la pagina copre la barra, quindi
@@ -2947,6 +2972,9 @@ class TabManager {
     wc.on('page-favicon-updated', (_e, favicons) => this._aggiornaIcona(tab, wc, favicons));
     wc.on('did-navigate', (_e, url, httpResponseCode) => {
       const urlPrima = tab.url;
+      // Le proposte sul documento di prima se ne vanno con lui (#1473), prima che quello nuovo ne faccia.
+      ContatoriHomePagina.misura('proposteVia', tab._proposte);
+      this._zoomDellaVisita(tab, wc, url);
       // #412 — questa scheda ha committato una vera navigazione main-frame:
       // NON è più il "contenitore vuoto" di un download (una scheda aperta da un
       // link Scarica target=_blank che diventa subito scaricamento non committa
@@ -3591,6 +3619,7 @@ class TabManager {
     const idx = this.tabs.findIndex((t) => t.id === tab.id);
     if (idx < 0) return false;
     this._avvisaSorvegliante(tab, 'chiusa');
+    ContatoriHomePagina.misura('proposteVia', tab._proposte);
     this._nelFilo('schedaChiusa', tab, { come: 'servizio' });
     this._esitoApertura(tab, null);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}

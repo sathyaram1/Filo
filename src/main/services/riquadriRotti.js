@@ -130,6 +130,26 @@ function conta(id, evento, incognito = false) {
   } catch (_) {}
 }
 
+// La risposta alla proposta, per i contatori della pagina (#1473): una sola, e quella senza risposta se ne va con la
+// pagina che la mostrava (un documento nuovo, la scheda chiusa). In incognito non si propone niente.
+function contaProposta(esito) {
+  require('./contatoriHomePagina').misura('proposta', 'riquadro_rotto', esito);
+}
+const pagineSeguite = new WeakSet();
+function seguiPagina(wc) {
+  if (!wc || pagineSeguite.has(wc) || typeof wc.on !== 'function') return;
+  pagineSeguite.add(wc);
+  const id = wc.id;
+  const via = () => {
+    for (const [token, p] of [...proposte]) {
+      if (p.wcId !== id) continue;
+      proposte.delete(token);
+      contaProposta('ignorata');
+    }
+  };
+  try { wc.on('did-navigate', via); wc.once('destroyed', via); } catch (_) {}
+}
+
 // I riquadri ricaricati dopo il sì: la loro prossima segnalazione dice se adesso funzionano.
 const dopoIlSi = new Map(); // wcId|ftn → { id, t }
 const DOPO_IL_SI_MS = 2 * 60 * 1000;
@@ -143,6 +163,7 @@ function proponi(c, nome, segno) {
   conta(id, 'mostrata', c.incognito);
   proposte.set(token, { wcId: c.wc.id, ftn: c.figlio.frameTreeNodeId, servizio: c.servizio, ospite: c.ospite, nome, url, origin, segno, id });
   while (proposte.size > MAX_VOCI) proposte.delete(proposte.keys().next().value);
+  seguiPagina(c.wc);
   try { c.top.send('filo:broadcast', { type: MSG().RIQUADRO_COOKIE_PROPONI, token, nome, url, origin, segno }); } catch (_) {}
 }
 
@@ -338,13 +359,17 @@ async function cambia(msg, sender) {
   const attiva = !!(msg && msg.attiva);
   if (attiva && !riattivati.has(c.servizio) && !rifiutati(c)) return { ok: false };
   await scrivi(c.servizio, attiva);
+  let ritirate = 0;
   for (const [token, p] of [...proposte]) {
     if (p.servizio !== c.servizio) continue;
     proposte.delete(token);
+    ritirate++;
     let w = null;
     try { w = require('electron').webContents.fromId(p.wcId); } catch (_) {}
     if (w && !w.isDestroyed()) ritira(w, token);
   }
+  // Il tasto destro sul riquadro risponde alla proposta che c'era, come il suo «Sì» o il suo «No».
+  if (ritirate) contaProposta(attiva ? 'accettata' : 'rifiutata');
   await ricarica(c.wc.id, c.figlio.frameTreeNodeId, segnoDi(msg));
   return { ok: true };
 }
@@ -356,11 +381,15 @@ async function risposta(msg, sender) {
   const wc = sender && sender.wc;
   if (!p || !wc || wc.isDestroyed() || wc.id !== p.wcId || !stesso(sender.frame, wc.mainFrame)) return { ok: false };
   proposte.delete(token);
+  // La pagina non ha trovato il riquadro dove mettere la barra: nessuno l'ha vista, e non è un no.
+  if (msg && msg.nonTrovato === true) return { ok: true };
   if (!(msg && msg.si === true)) {
     tieni(rifiutate, `${p.servizio}|${p.ospite}`);
+    contaProposta('rifiutata');
     return { ok: true };
   }
   conta(p.id, 'accettata');
+  contaProposta('accettata');
   await scrivi(p.servizio, true);
   // Gli altri riquadri dello stesso servizio erano rotti per la stessa ragione: si ricaricano anche loro.
   const fratelli = [...proposte].filter(([, q]) => q.servizio === p.servizio);

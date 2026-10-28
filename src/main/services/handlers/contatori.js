@@ -1,4 +1,4 @@
-// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1465, #1467, #1471, #1474): crea il servizio, segue le impostazioni,
+// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1465, #1467, #1471, #1473, #1474): crea il servizio, segue le impostazioni,
 // riceve i gesti contati nelle pagine e dà all'owner le somme, mai sotto le cinque copie. Cosa si conta: src/main/services/contatori.js.
 // Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
 
@@ -7,6 +7,7 @@ const auth = require('../../auth/google-auth');
 const Servizio = require('../contatori');
 const Finestra = require('../contatoriFinestra');
 const Sicurezza = require('../contatoriSicurezza');
+const HomePagina = require('../contatoriHomePagina');
 const Somme = require('../contatoriSomme');
 const Disco = require('../../shim/storage');
 const Registro = require('../registroCambi');
@@ -14,6 +15,10 @@ const Registro = require('../registroCambi');
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const testo = (v) => (typeof v === 'string' ? v : '');
 const numero = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+// La proposta di restare connessi è un avviso della finestra: come se ne va è la sua risposta (#1473).
+const RISPOSTE_RESTA_CONNESSO = Object.freeze({
+  azione_0: 'accettata', chiusa_x: 'rifiutata', scaduta: 'ignorata', sostituita: 'ignorata', chiuse_tutte: 'ignorata', ritirata: 'ignorata',
+});
 const sitiCoiBanner = (s) => {
   const l = s && s.security && s.security.cookies && s.security.cookies.bannerSites;
   return Array.isArray(l) ? [...new Set(l.filter((x) => typeof x === 'string' && x))] : [];
@@ -86,6 +91,9 @@ module.exports = function register(on, ctx) {
   globalThis.SN_CONTATORI_FINESTRA_MAIN = finestra;
   // La sicurezza (#1474): verdetti, controlli, avvisi, pagine delicate, segreti, uscite e tetti, dallo stesso servizio.
   globalThis.SN_CONTATORI_SICUREZZA_MAIN = Sicurezza.crea({ contatori });
+  // La home e quello che Filo fa da sé sulla pagina (#1473).
+  const homePagina = HomePagina.crea({ contatori });
+  globalThis.SN_CONTATORI_HOME_PAGINA_MAIN = homePagina;
   contatori.avvia();
 
   // Ogni scrittura delle impostazioni, chiunque l'abbia chiesta, col segno di chi l'ha chiesta (#867): un valore di
@@ -113,7 +121,12 @@ module.exports = function register(on, ctx) {
     // Preferenze, chat): sono i siti che Filo ha rotto nascondendo il banner (#1469). Un'importazione no.
     if (['mano', 'chat'].includes(C.viaDi(prov))) {
       const prima = new Set(sitiCoiBanner(c.oldValue));
-      for (const s of sitiCoiBanner(c.newValue)) if (!prima.has(s)) contatori.navigazione(C.NAV.banner('mostra_banner'), { incognito });
+      for (const s of sitiCoiBanner(c.newValue)) {
+        if (prima.has(s)) continue;
+        contatori.navigazione(C.NAV.banner('mostra_banner'), { incognito });
+        // Lo stesso gesto disfa il banner nascosto o rifiutato da Filo (#1473).
+        homePagina.disfatto('banner_cookie', { incognito });
+      }
     }
   }, [SETTINGS]);
 
@@ -194,7 +207,12 @@ module.exports = function register(on, ctx) {
       case 'anticipo-aperto': ok = contatori.anticipoAperto(testo(m.action)); break;
       case 'conferma': ok = contatori.confermaRisposta(testo(m.chiave), testo(m.esito)); break;
       case 'voce-menu-scheda': ok = finestra.voceMenu(testo(m.id)); break;
-      case 'notifica': ok = finestra.notifica(testo(m.tipo), testo(m.esito), { letta: m.letta === true, inAttesa: m.inAttesa === true }); break;
+      case 'notifica':
+        ok = finestra.notifica(testo(m.tipo), testo(m.esito), { letta: m.letta === true, inAttesa: m.inAttesa === true });
+        if (testo(m.tipo) === 'resta_connesso_proposta' && has(RISPOSTE_RESTA_CONNESSO, testo(m.esito))) {
+          homePagina.proposta('resta_connesso', RISPOSTE_RESTA_CONNESSO[m.esito]);
+        }
+        break;
       // I gesti della personalizzazione (#1471): solo quelli che nascono in una pagina, coi campi dei loro elenchi.
       case 'gesto': ok = C.GESTI_DALLE_PAGINE.includes(testo(m.gesto)) && contatori.gesto(testo(m.gesto), m); break;
       // I riquadri AI e l'Editor (#1465): la voce si costruisce dai soli campi degli elenchi, il resto del messaggio si perde.
@@ -203,6 +221,21 @@ module.exports = function register(on, ctx) {
       case 'copia': ok = contatori.copia(testo(m.ruolo)); break;
       case 'ricerca-web-tetto': ok = contatori.attivita('ricercaWeb', { da: 'aiuto', alTetto: true }); break;
       case 'suggerimento': ok = contatori.attivita('suggerimenti', { tipo: testo(m.tipo), posizione: numero(m.posizione), etaMs: numero(m.etaMs) }); break;
+      // La barra della home (#1473): l'avviso del sito non trovato e i «risali» di fila restano aperti nella pagina finché
+      // non finiscono, e li chiude il main se la scheda se ne va.
+      case 'comando-home': {
+        const cosa = testo(m.cosa);
+        ok = cosa === globalThis.SN_CONTATORI_HOME_PAGINA.NON_RISOLTO
+          ? homePagina.nonRisolto(chiaveInCorso(sender, 'non-risolto', 'home'), testo(m.scelta))
+          : homePagina.comando(cosa);
+        break;
+      }
+      case 'ricerca-home': ok = homePagina.ricerca(numero(m.risultati), { ripetuta: m.ripetuta === true }); break;
+      case 'ricerca-home-aperta': ok = homePagina.aperto(testo(m.tipo), numero(m.posizione), numero(m.ms)); break;
+      case 'risali': ok = homePagina.risaliDiFila(chiaveInCorso(sender, 'risali', 'home'), numero(m.pezzi)); break;
+      case 'risali-fine': ok = homePagina.fineInCorso(chiaveInCorso(sender, 'risali', 'home')); break;
+      // Dalle pagine web arriva solo quello che vede soltanto la pagina: la pubblicità saltata.
+      case 'automatismo': ok = testo(m.tipo) === 'pubblicita_saltata' && homePagina.fatto('pubblicita_saltata'); break;
       default: ok = false;
     }
     return { ok: Boolean(ok) };

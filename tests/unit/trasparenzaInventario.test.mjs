@@ -86,6 +86,7 @@ const COLLEZIONI = {
   '/contatori-attivita/{docId}': { frase: 'Quello che Filo fa da solo o insieme a te' },
   '/contatori-sicurezza/{docId}': { frase: 'Cosa fa Filo per la tua sicurezza' },
   '/contatori-riquadri/{docId}': { frase: 'Cosa fai delle risposte nei riquadri, sempre senza il testo' },
+  '/contatori-home-pagina/{docId}': { frase: 'La home e quello che Filo fa da solo sulle pagine' },
   '/wallet-accounts/{uid}': { frase: 'tiene un documento con il tuo pseudonimo' },
   '/wallet-invites/{code}': { frase: 'il codice d\'invito con cui sei entrato' },
   '/wallet-state/{doc}': { perche: 'l\'esito dell\'ultimo confronto fra registro d\'uso e consumo di OpenRouter' },

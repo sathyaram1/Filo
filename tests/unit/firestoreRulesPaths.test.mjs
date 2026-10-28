@@ -70,6 +70,9 @@ const SCRITTURE_ANONIME_DICHIARATE = {
   'contatori-riquadri':
     'i riquadri AI e l’Editor di un’ora dei contatori (#1465), accanto all’ora e con lo stesso id: stesse ragioni, e solo ' +
     'numeri sotto chiavi di elenchi chiusi (funzioni, scorciatoie, esiti), mai un testo, un titolo o un sito.',
+  'contatori-home-pagina':
+    'la home e gli automatismi sulla pagina di un’ora dei contatori (#1473), accanto all’ora e con lo stesso id: stesse ' +
+    'ragioni, e solo numeri sotto chiavi di elenchi chiusi (comandi, fasce, tipi, passi, esiti), mai un testo, un sito o un paese.',
 };
 
 const VERBI_SCRITTURA = ['write', 'create', 'update', 'delete'];
