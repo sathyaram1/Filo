@@ -156,7 +156,10 @@
     // `messaggi`: l'id di ogni evento-messaggio porta alla sua chat (#872: le memorie ricordano da dove sono nate).
     // `cambi`: i cambi di stato nell'ordine in cui sono nati, nella forma che legge src/shared/cambi.js.
     // `accaduti`: gli eventi di ACCADUTI così come sono arrivati, in ordine (azioni, schede, ricerche…).
-    return { chat: new Map(), pagine: new Map(), ids: new Set(), pos: 0, tagli: [], messaggi: new Map(), cambi: [], accaduti: [] };
+    // `chatTolte`: le chat cancellate per sempre, che coprono anche gli accaduti arrivati dopo.
+    return {
+      chat: new Map(), pagine: new Map(), ids: new Set(), pos: 0, tagli: [], chatTolte: new Set(), messaggi: new Map(), cambi: [], accaduti: [],
+    };
   }
 
   function nelPeriodo(ts, pagine) {
