@@ -2203,7 +2203,7 @@
   function senzaGesti(doc) { return MISURE_GESTI.every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length); }
 
   // Una misura a conti (navigazione, riquadri): per ogni chiave dell'elenco i suoi conti, gruppo per gruppo.
-  function contiPuliti(tabella, mappa, misura) {
+  function contiDellaTabella(tabella, mappa, misura) {
     const m = tabella[misura];
     const lunghezza = m.gruppi.reduce((a, g) => a + g.length, 0);
     const out = {};
