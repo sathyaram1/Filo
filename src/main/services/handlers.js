@@ -35,7 +35,7 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   routing: (s, a) => providerRouting(s, a && a.sort, a && a.weights),
   noteServed: (s, action, r) => noteServedProvider(s, action, r),
   costs: Costs,
-  segreti: () => segretiCustoditi(),
+  segreti: async () => segretiCustoditi(),
   segretiTolti: (action, tipi) => ContatoriSicurezza.misura('segretiTolti', action, tipi),
   ricordaEsterni: (messages) => SegretiLetti.ricordaBuste(messages),
   // La prova di una riga delle Opzioni non è una funzione: la frase nomina solo il modello.

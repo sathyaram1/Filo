@@ -111,8 +111,8 @@ test('il documento più carico dell’app passa; uno con un dominio, un segreto 
   assert.notEqual(manomesso('sito_verdetto', { 'pericoloso:gsb_phishing': 'https://x.it' }), '');
   assert.notEqual(manomesso('sito_approfondito', { 'gsb:ok:1234ms': '1' }), '', 'la durata esce solo in fasce');
   assert.notEqual(manomesso('pagina_delicata', { 'assicurazioni:riquadri': '1' }), '', 'una categoria remota esce «altro»');
-  assert.notEqual(manomesso('segreto_oscurato', { 'chiave:sk-or-v1-0123456789abcdef': '1' }), '', 'un segreto non passa');
-  assert.notEqual(manomesso('segreto_oscurato', { 'chiave:filo-chat': '40' + 'x' }), '');
+  assert.notEqual(manomesso('segreto_oscurato', { 'chiave:Chiave_Di_Prova_Con_Maiuscole': '1' }), '', 'una chiave non passa');
+  assert.notEqual(manomesso('segreto_oscurato', { 'chiave:filo-chat': '40x' }), '');
   assert.notEqual(manomesso('uscita_fermata', { 'codice:NAVIGA:482913': '1' }), '', 'il codice letto non passa');
   assert.notEqual(manomesso('uscita_fermata', { 'custodito:portafoglio:naviga': '1' }), '');
   assert.notEqual(manomesso('tetto_toccato', { 'geo_budget:example.com': '1' }), '');

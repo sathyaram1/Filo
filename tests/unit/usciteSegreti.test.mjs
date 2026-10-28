@@ -1141,7 +1141,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     const gate = readFileSync(join(ROOT, 'src', 'main', 'services', 'modelGate.js'), 'utf8');
     // I messaggi oscurati stanno in una costante prima della chiamata: il piano della cache si fa su quelli (#1412).
     for (const f of ['completeWithFallback', 'streamCompleteWithFallback']) {
-      const re = new RegExp(`const (\\w+) = await senzaSegreti\\(messages\\);\\s*r = await providers\\(\\)\\.${f}\\(\\{[^}]*?messages: \\1,`);
+      const re = new RegExp(`const (\\w+) = await senzaSegreti\\(messages(?:, action)?\\);\\s*r = await providers\\(\\)\\.${f}\\(\\{[^}]*?messages: \\1,`);
       assert.match(gate, re, `${f} senza oscuramento`);
     }
     assert.ok(/segreti:\s*async/.test(handlers), 'il cancello di Filo non riceve i segreti custoditi');
