@@ -64,6 +64,8 @@ test('Copia e Rispondi sotto una risposta di Filo: la citazione parte col messag
   await expect(risposta).toBeVisible({ timeout: 20_000 });
   const domanda = home.locator('#bubbles > .dash-bubble-user', { hasText: 'cosa cucino stasera?' });
   await expect(domanda).toBeVisible();
+  // Anche formattata, la risposta appena scritta prende il suo posto nel filo: è quello che la citazione salva.
+  await expect(risposta).toHaveAttribute('data-key', /^m:/, { timeout: 10_000 });
 
   // Al passaggio del mouse i tasti compaiono SOTTO la risposta, e niente si sposta.
   const prima = await risposta.boundingBox();
