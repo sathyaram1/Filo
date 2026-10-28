@@ -933,11 +933,11 @@
     // #1621 — l'ordine chiesto e quante icone Windows ha davvero spostato.
     ORDINA_DESKTOP: (a) => {
       const o = a._output || {};
-      if (o.vuoto) return { icon: '🖥', text: 'Desktop senza icone' };
-      const come = pulito(o.detto);
-      if (o.gia) return { icon: '🖥', text: `Icone del desktop già ${come || 'in ordine'}` };
+      if (o.vuoto) return { icon: '🖥', text: 'Icone del desktop · nessuna da spostare' };
+      const come = pulito(o.detto) || 'in ordine';
+      if (o.gia) return { icon: '🖥', text: `Icone del desktop · già ${come}` };
       const n = Number(o.spostate) || 0;
-      return { icon: '🖥', text: `Icone del desktop ${come || 'in ordine'} · ${n === 1 ? '1 spostata' : `${n} spostate`}` };
+      return { icon: '🖥', text: `Icone del desktop · ${come} · ${n === 1 ? '1 spostata' : `${n} spostate`}` };
     },
     RIMEDIO_CREDITI: (a) => {
       const op = String(a.operazione || '').toLowerCase();
