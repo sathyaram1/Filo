@@ -60,6 +60,7 @@
     VOLUME: 'volume',
     BLUETOOTH: 'bluetooth',
     WIFI: 'wifi',
+    ORDINA_DESKTOP: 'desktopIcons',
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',
     ANNULLA_CAMBIO: 'undo',
