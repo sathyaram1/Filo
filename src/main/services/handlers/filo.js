@@ -263,8 +263,13 @@ module.exports = function register(on, ctx) {
         ).length;
       }
     } catch (_) {}
-    const r = await handleFiloGenerateDashboard({ force: !!msg.force, openTabsCount, apertura: msg.apertura === true });
+    const r = await handleFiloGenerateDashboard({ force: !!msg.force, openTabsCount });
     return { ok: true, ...r };
+  });
+
+  on(MSG.FILO_HOME_VISTA, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    return { ok: await contaHomeVista() };
   });
 
   // Filo non ha un calendario suo: scrive l'evento in un .ics e lo passa al
