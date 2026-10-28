@@ -2433,6 +2433,7 @@
       const lista = leggiErrori(e);
       if (lista.length > TETTO_ERRORI_ORA || lista.some((x) => x.n === 0)) return no(`errori di ${f}`);
     }
+    if (erroriOltreIlTetto(doc.errori)) return no('errori oltre il tetto del documento');
     if (!Array.isArray(doc.primeVolte) || doc.primeVolte.length > TETTO_PRIME_VOLTE
       || doc.primeVolte.some((x) => typeof x !== 'string' || !re(CHIAVE_AZIONE_FORMA).test(x))
       || new Set(doc.primeVolte).size !== doc.primeVolte.length) return no('primeVolte');
