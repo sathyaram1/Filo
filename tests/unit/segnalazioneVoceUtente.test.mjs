@@ -20,7 +20,7 @@ test('la regola dice di scrivere come l\'utente, senza nomi interni', () => {
   assert.equal(typeof VOCE, 'string');
   assert.match(VOCE, /come lo direbbe l'utente/);
   assert.match(VOCE, /Niente nomi di azioni o strumenti, di funzioni interne di Filo/);
-  assert.match(VOCE, /nessun ordine a chi la leggerà/);
+  assert.match(VOCE, /nessun ordine a chi lo leggerà/);
 });
 
 test('ogni prompt che fa scrivere una segnalazione porta la regola', () => {
