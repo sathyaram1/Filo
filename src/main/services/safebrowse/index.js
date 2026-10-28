@@ -363,13 +363,14 @@ function analyze(url, ctx = {}, onUpdate) {
 
   // La risposta decide questa verifica anche quando Google chiede di non tenerla in cache.
   let gsbNow;
-  // I controlli di rete partiti da questa verifica: dopo, i contatori sanno se hanno cambiato il verdetto (#1474).
+  // I controlli di rete fatti partire da questa verifica, non da una gemella in volo: dopo, i contatori sanno se hanno
+  // cambiato il verdetto (#1474).
   let partiti = 0;
   if (providers.gsb && need.gsb === undefined) {
     // In volo una per indirizzo: l'arrivo e la pagina pronta chiedono a pochi millisecondi (#813.1).
     const gsb = providers.gsb;
-    partiti++;
     tasks.push(once('gsb:' + url, () => {
+      partiti++;
       const info = {};
       return cronometra('gsb', key, ctx, () => gsb(url, norm, info), (r) => (r ? 'ok' : info.esito || 'fallito'));
     }).then((r) => {
@@ -393,8 +394,7 @@ function analyze(url, ctx = {}, onUpdate) {
   if (ageNeeded && !providers.ct && !need.cert) contaSpento('ct', reg, ctx);
   if (ageNeeded && (providers.rdap || providers.ct)) {
     const ctOk = !need.cert;
-    partiti++;
-    ageTask = once('age:' + reg, () => lookupAge(reg, norm, ctOk, ctx)).then(notify);
+    ageTask = once('age:' + reg, () => { partiti++; return lookupAge(reg, norm, ctOk, ctx); }).then(notify);
     tasks.push(ageTask);
   }
   // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist). Con l'età in arrivo si decide dopo
@@ -408,23 +408,21 @@ function analyze(url, ctx = {}, onUpdate) {
     // In incognito nessun lavoro che consuma crediti o visita il sito di nuovo (#1081).
     if (ctx.incognito) return out;
     const esitoDi = (r) => (r ? 'ok' : 'fallito');
+    const parte = (controllo, run) => () => { partiti++; return cronometra(controllo, key, ctx, run, esitoDi); };
     if (llmCache.get(key) === undefined && !providers.llm) contaSpento('llm', key, ctx);
     if (providers.llm && llmCache.get(key) === undefined) {
       const llm = providers.llm;
       const meta = buildLlmMeta(norm, ctx, verdict);
-      out.push(deepen('llm', bKey, key, siteKey, () => cronometra('llm', key, ctx, () => llm(meta), esitoDi), (r) => llmCache.set(key, r), ctx));
+      out.push(deepen('llm', bKey, key, siteKey, parte('llm', () => llm(meta)), (r) => llmCache.set(key, r), ctx));
     }
     // Riaprire una pagina già aperta è una seconda visita, senza cookie, che ripete quello che il suo indirizzo fa al
     // GET (una conferma, un token monouso): la finestra nascosta prova solo un link prima che si apra (#1081).
     if (ctx.daAprire === true && sandboxCache.get(key) === undefined && !providers.sandbox) contaSpento('sandbox', key, ctx);
     if (providers.sandbox && ctx.daAprire === true && sandboxCache.get(key) === undefined) {
       const detonate = providers.sandbox;
-      out.push(deepen('sb', bKey, key, siteKey, () => cronometra('sandbox', key, ctx, () => detonate(url, norm, ctx.rete || null), esitoDi),
-        (r) => sandboxCache.set(key, r), ctx));
+      out.push(deepen('sb', bKey, key, siteKey, parte('sandbox', () => detonate(url, norm, ctx.rete || null)), (r) => sandboxCache.set(key, r), ctx));
     }
-    const partite = out.filter(Boolean);
-    partiti += partite.length;
-    return partite;
+    return out.filter(Boolean);
   };
   if (worthDeepening && ageTask) {
     tasks.push(ageTask.then(() => Promise.allSettled(deepTasks(engine.evaluate(url, ctx, known())))));
