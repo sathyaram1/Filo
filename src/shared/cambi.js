@@ -579,7 +579,7 @@
     let max = cambi.filter((c) => String(c.chiave || '').startsWith('timer:')).length > 1 ? 2 : 1;
     for (const c of cambi) {
       const k = String(c.chiave || '');
-      if (k.startsWith('timer:') || k.startsWith('zoom:') || k.startsWith('icona:')) continue;
+      if (k.startsWith('timer:') || k.startsWith('zoom:') || k.startsWith('icona:') || k === 'desktop') continue;
       if (k.startsWith('proxy:')) { max = Math.max(max, 1); continue; }
       const v = voce(k);
       max = Math.max(max, v && v.livello === 1 ? 1 : 2);
