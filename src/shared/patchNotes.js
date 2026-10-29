@@ -29,7 +29,7 @@
         'Un\'immagine oltre i 4 MB incollata nella chat della home ora entra rimpicciolita. Prima spariva senza dire niente.',
         'L\'accesso con Google e con gli altri provider funziona anche in un Filo appena installato, e una passkey salvata sul telefono si usa col QR.',
         'Un comando che scrivi nella home dopo la barra ora passa dagli stessi controlli dei comandi di Filo. Prima di cancellare qualcosa ti chiede un OK, o la parola «conferma» se il comando l\'hai incollato, e se annulli il comando torna nella casella com\'era. Una barra seguita da una parola che non è un programma torna a essere un messaggio per Filo.',
-        'Gli screenshot e i file che alleghi a una segnalazione arrivano di nuovo. Dal 26 ottobre venivano rifiutati e la segnalazione partiva senza.',
+        'Gli screenshot e i file che alleghi a una segnalazione arrivano di nuovo. Dal 23 ottobre venivano rifiutati e la segnalazione partiva senza.',
       ],
     },
     {
