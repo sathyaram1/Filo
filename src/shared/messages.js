@@ -1037,9 +1037,6 @@
     // #810 — main → pagina di Filo: un indirizzo che la pagina ha chiesto di aprire (menu, link) è stato fermato
     // dalla porta delle uscite. { frase }
     USCITA_FERMATA: 'uscita_fermata',
-    // #810 — il testo che l'assistente di pagina vuole scrivere in un campo passa dalla porta delle uscite.
-    // { testo, parole } → { blocca, frase }
-    CONTROLLA_CAMPO: 'controlla_campo',
 
     // #405 — un'azione di PAGINA invocata dal menu aperto dentro un riquadro
     // incorporato (iframe). Il riquadro conosce solo se stesso: tradurre,
