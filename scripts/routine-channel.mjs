@@ -479,12 +479,16 @@ export async function heartbeat(t, opts = {}) {
  * `report`, se presente, è il rapporto di fine sessione (session-report.mjs):
  * viaggia nel corpo col nome `report`. Per la ritentata quando il server lo
  * rifiuta c'è releaseConRapporto, qui sotto.
+ *
+ * `punta` ({ branch, sha }) è quella che il rilascio ha appena spedito: il server la registra per il biglietto se è
+ * ancora la punta del ramo, così una spinta dello stesso giro dopo la consegna non resta un buco nel registro (#1555).
  */
-export async function release(t, fault = '', opts, report = null) {
+export async function release(t, fault = '', opts, report = null, punta = null) {
   const payload = { ticket: t };
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
   if (report && typeof report === 'object') payload.report = report;
+  Object.assign(payload, campiPunta(punta));
   Object.assign(payload, creditiDi(opts));
   const { status, body } = await call('routineRelease', payload, opts);
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
