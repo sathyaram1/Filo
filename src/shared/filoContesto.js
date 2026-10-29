@@ -507,9 +507,16 @@
     const st = Number(err && err.status);
     if (Number.isFinite(st) && st > 0 && ![400, 413, 422].includes(st)) return null;
     const s = String((err && (err.message || err.error)) || err || '');
-    if (!/maximum context|context[ _-]?(length|window)|too many tokens|prompt is too long|input is too long|reduce the length of the (messages|prompt)/i.test(s)) return null;
-    // Anthropic: «prompt is too long: 214263 tokens > 200000 maximum». OpenRouter mette nel chiesto anche il tetto
-    // della risposta e dice a parte l'ingresso («69000 of text input»): solo quando c'è, `ingresso`.
+    if (!/maximum context|context[ _-]?(length|window)|context limit:|too many tokens|prompt is too long|input is too long|reduce the length of the (messages|prompt)/i.test(s)) return null;
+    // Anthropic ha due forme: «prompt is too long: 214263 tokens > 200000 maximum» (il solo ingresso) e, quando a far
+    // sforare è il tetto della risposta, «exceed context limit: 188240 + 21333 > 200000» (ingresso + tetto > finestra).
+    const somma = s.match(new RegExp(`context limit:?\\s*${NUMERO}\\s*\\+\\s*${NUMERO}\\s*>\\s*${NUMERO}`, 'i'));
+    if (somma) {
+      const [a, b, f] = somma.slice(1, 4).map((x) => Number(String(x).replace(/[,.']/g, '')));
+      if (a > 0 && b > 0 && f > 0) return { ingresso: a, max: f, chiesti: a + b };
+    }
+    // OpenRouter mette nel chiesto anche il tetto della risposta e dice a parte l'ingresso («69000 of text input»):
+    // solo quando c'è, `ingresso`.
     const ingresso = numeroDa(s, new RegExp(`${NUMERO} of (?:text )?input`, 'i'));
     return {
       ...(ingresso ? { ingresso } : {}),
