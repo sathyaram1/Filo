@@ -271,14 +271,21 @@ test('una pagina con 5.000 link resta reattiva: esame a lotti, prima i link a sc
     + '<a id="giu" href="https://paypa1.com/in-fondo">in fondo</a>' + righe.join('')
     + '<a id="su" href="https://paypal-login.com/in-cima">in cima</a></div>';
 
-  // Il main misura i suoi buchi: il tempo più lungo in cui non ha potuto rispondere a nient'altro.
-  await app.evaluate(() => {
+  // Il main misura i suoi buchi: il tempo più lungo in cui non ha potuto rispondere a nient'altro, con l'esame in corso
+  // all'inizio o alla fine del buco. Aprire la scheda ferma il main per conto suo, e su una macchina carica supera il
+  // tetto senza che i link c'entrino (#1792).
+  await app.evaluate(({ BrowserWindow }) => {
     globalThis.__buco = { max: 0, attivo: true };
+    const inEsame = () => BrowserWindow.getAllWindows()
+      .some((w) => ((w._filoTabs && w._filoTabs.tabs) || []).some((t) => (t._sbLinkInCoda || 0) > 0));
     let prima = performance.now();
+    let eraInEsame = inEsame();
     const giro = () => {
       const ora = performance.now();
-      globalThis.__buco.max = Math.max(globalThis.__buco.max, ora - prima);
+      const adesso = inEsame();
+      if (eraInEsame || adesso) globalThis.__buco.max = Math.max(globalThis.__buco.max, ora - prima);
       prima = ora;
+      eraInEsame = adesso;
       if (globalThis.__buco.attivo) setTimeout(giro, 1);
     };
     setTimeout(giro, 1);
