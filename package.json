@@ -38,6 +38,8 @@
     "feedback": "node scripts/owner-feedback.mjs",
     "feedback:apri": "node scripts/claude-feedback.mjs",
     "feedback:leggi": "node scripts/leggi-feedback.mjs",
+    "feedback:schede": "node scripts/schede.mjs",
+    "manutentore": "node scripts/manutentore.mjs",
     "fiducia:migra": "node scripts/fiducia-migra.mjs",
     "domande:migra": "node scripts/domande-migra.mjs",
     "mittenti:migra": "node scripts/mittenti-migra.mjs"
