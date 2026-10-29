@@ -1,6 +1,6 @@
 // Le regole Firestore del servizio dei contatori (#1472), provate col MOTORE VERO e col codice vero dell'app.
 // NON è un unit test (vedi pathsRegole.motore-vero.mjs); la sentinella sempre accesa è firestoreRulesContatoriServizio.test.mjs.
-// Si lancia come contatoriFinestraRegole.motore-vero.mjs, col progetto filo-prova-1472: 16 righe verdi, uscita 0 (2026-10-28).
+// Si lancia come contatoriFinestraRegole.motore-vero.mjs, col progetto filo-prova-1472: 17 righe verdi, uscita 0 (con l'identità di #1547, 2026-10-29).
 
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
