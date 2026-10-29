@@ -247,13 +247,23 @@ function downloadsDir() {
   try { return electron().app.getPath('home'); } catch (_) { return process.cwd(); }
 }
 
+// Il percorso di uno scaricamento ancora vivo è preso anche se sul disco non c'è ancora: tre copie dello stesso file
+// avviate insieme si scrivevano una sull'altra e ne restava una (#440).
+function percorsoPreso(p) {
+  for (const id of liveItems.keys()) {
+    const r = records.get(id);
+    if (r && r.savePath && stessoPercorso(r.savePath, p)) return true;
+  }
+  return false;
+}
+
 // Non si sovrascrive in silenzio uno scaricamento omonimo: «file.pdf» → «file (2).pdf».
 function uniquePath(dir, filename) {
   const ext = path.extname(filename);
   const base = path.basename(filename, ext);
   let candidate = path.join(dir, filename);
   let n = 2;
-  while (fs.existsSync(candidate)) {
+  while (fs.existsSync(candidate) || percorsoPreso(candidate)) {
     candidate = path.join(dir, `${base} (${n})${ext}`);
     n++;
   }
