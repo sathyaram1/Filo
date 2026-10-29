@@ -45,7 +45,10 @@ test('r2 Aiuto: il sito seleziona tutto al clic dell\'utente nella casella, e il
   await ta.click();
   await page.keyboard.type('?');
   await page.waitForTimeout(300);
-  expect((await ta.inputValue()).startsWith('dove si cambia la password')).toBe(true);
+  // Il carattere cade dove l'utente ha cliccato: conta che il resto del testo resti intero (decisione owner, D-116).
+  const v = await ta.inputValue();
+  expect(v.length).toBe('dove si cambia la password'.length + 1);
+  expect(v.replace('?', '')).toBe('dove si cambia la password');
 });
 
 test('r2 feedback: il sito seleziona tutto al clic dell\'utente nella casella, e il carattere dopo cancella il testo', async ({ app, openTab, testServer }) => {
