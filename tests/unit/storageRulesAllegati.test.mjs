@@ -203,27 +203,35 @@ test('il deposito ammette un tipo solo: quello dei blob cifrati, lo stesso dell�
   assert.ok(!/contentType[^&]*\|\|/.test(cond), `un’alternativa sul tipo riapre la lista: ${cond}`);
 });
 
-test('in creazione nessun metadato scelto da chi carica', () => {
-  // Il nome con cui il file si scarica (Content-Disposition), la codifica, la
-  // cache, la lingua e le chiavi personalizzate li sceglierebbe uno
-  // sconosciuto: `fattura.exe` su un dominio di Google, o un segno «già
-  // sistemato» che la pulizia degli allegati legge. Il motore vero di questa
-  // riga è tests/rules/storage-allegati-motore-vero.mjs.
+test('in creazione nessuna chiave né nome di scarico scelti da chi carica', () => {
+  // Il nome con cui il file si scarica (Content-Disposition) e le chiavi personalizzate li sceglierebbe
+  // uno sconosciuto: `fattura.exe` su un dominio di Google, o un segno «già sistemato» che la pulizia
+  // degli allegati legge.
   const cond = espandi(CREATE().cond);
-  // Una chiave sola può esserci: il codice di scarico, che il motore vero scrive nei metadati prima
-  // di valutare le regole. Con `metadata.size() == 0` nessun allegato saliva più (#1666, dal 23/10).
+  // Una chiave sola può esserci: il codice di scarico, che il deposito vero scrive nei metadati prima
+  // di valutare le regole. Con `metadata.size() == 0` nessun allegato saliva più (#1666).
   assert.match(cond, /\bmetadata\.keys\(\)\.hasOnly\(\['firebaseStorageDownloadTokens'\]\)/,
     'le chiavi personalizzate passano, o il codice di scarico che scrive Firebase viene rifiutato');
   assert.ok(!/\bmetadata\.size\(\)/.test(cond), 'il conteggio delle chiavi rifiuta anche il codice di scarico di Firebase');
-  for (const campo of ['contentDisposition', 'contentEncoding', 'cacheControl', 'contentLanguage']) {
-    assert.match(cond, new RegExp(`\\.${campo}\\s*==\\s*null`), `${campo} lo sceglie chi carica`);
-  }
-  // Il Content-Disposition ammette solo le forme che scrive Firebase, col nome dell'oggetto:
-  // un confronto in più, o un `matches`, rimette il nome di scarico nelle mani di chi carica.
-  const ammessi = new Set(["null", "''", "'inline'", `"inline; filename*=utf-8''" + file`]);
-  const usi = [...cond.matchAll(/\.contentDisposition\b(\s*==\s*(null|''|'inline'|"inline; filename\*=utf-8''" \+ file))?/g)];
+  // Il Content-Disposition ammette solo le forme che scrive Firebase, col nome dell'oggetto: una forma
+  // in più, o un `matches`, rimette il nome di scarico nelle mani di chi carica.
+  const ammessi = ["''", "'inline'", `"inline; filename*=utf-8''" + file`];
+  const usi = [...cond.matchAll(/\.contentDisposition\b(?:\s*==\s*null\b|\s+in\s+\[([^\]]*)\])?/g)];
+  assert.ok(usi.some((u) => u[1] !== undefined), `il Content-Disposition non ha la sua lista di forme: ${cond}`);
   for (const u of usi) {
-    assert.ok(u[2] && ammessi.has(u[2]), `uso del Content-Disposition non ammesso: ${u[0]}`);
+    assert.ok(u[0] !== '.contentDisposition', `uso del Content-Disposition non ammesso: ${cond}`);
+    if (u[1] === undefined) continue;
+    const forme = u[1].split(',').map((f) => f.trim());
+    assert.deepEqual([...forme].sort(), [...ammessi].sort(), `forme del Content-Disposition diverse da quelle di Firebase: [${u[1]}]`);
+  }
+});
+
+test('codifica, cache e lingua non si leggono: il deposito vero le riempie da sé', () => {
+  // #1769: ogni regola su questi campi, verde a emulatore e API di prova, ha negato ogni caricamento vero
+  // dal 23/10 al 29/10. Il loro valore al deposito da qui non si vede; sceglierli su un blob opaco servito
+  // solo col codice di scarico non cambia tipo né nome di scarico (rischio accettato, scritto in storage.rules).
+  for (const campo of ['contentEncoding', 'cacheControl', 'contentLanguage']) {
+    assert.ok(!new RegExp(`\\b${campo}\\b`).test(VIVO), `le regole leggono di nuovo ${campo}: al deposito vero può negare ogni allegato`);
   }
 });
 
