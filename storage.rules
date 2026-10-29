@@ -128,17 +128,18 @@ service firebase.storage {
 
     // Nessun metadato scelto da chi carica (#1518): nome di scarico, codifica, cache, lingua,
     // chiavi personalizzate. L'unica chiave ammessa è il codice di scarico: il motore vero lo scrive
-    // nei metadati PRIMA di valutare le regole, e col divieto secco nessun allegato saliva (#1666);
-    // l'emulatore lo toglie prima, quindi lì non si misura. Le due forme di Content-Disposition che
-    // Firebase scrive da sé passano, il nome lo fissa lui. Il `in` serve: l'emulatore non passa
-    // cacheControl né contentLanguage, e leggerli nudi negava tutto. Motore vero:
-    // tests/rules/storage-allegati-motore-vero.mjs; la prova che conta è un caricamento dall'app pubblicata.
+    // nei metadati PRIMA di valutare le regole (#1666); l'emulatore lo toglie prima. Le due forme di
+    // Content-Disposition che Firebase scrive da sé passano, il nome lo fissa lui. Ogni campo si legge
+    // dopo il suo `in`: un campo assente manda il motore in errore e l'errore nega, e quali campi
+    // mancano cambia fra emulatore e motore vero (#1728: contentEncoding mancava solo al vero).
+    // Motore vero: tests/rules/storage-allegati-motore-vero.mjs; la prova che conta è un caricamento dall'app pubblicata.
     function senzaMetadatiScelti(r, file) {
-      return (r.metadata == null || r.metadata.keys().hasOnly(['firebaseStorageDownloadTokens']))
-        && (r.contentDisposition == null || r.contentDisposition == ''
+      return (!('metadata' in r) || r.metadata == null
+          || r.metadata.keys().hasOnly(['firebaseStorageDownloadTokens']))
+        && (!('contentDisposition' in r) || r.contentDisposition == null || r.contentDisposition == ''
           || r.contentDisposition == 'inline'
           || r.contentDisposition == "inline; filename*=utf-8''" + file)
-        && (r.contentEncoding == null || r.contentEncoding == '')
+        && (!('contentEncoding' in r) || r.contentEncoding == null || r.contentEncoding == '')
         && (!('cacheControl' in r) || r.cacheControl == null || r.cacheControl == '')
         && (!('contentLanguage' in r) || r.contentLanguage == null || r.contentLanguage == '');
     }
