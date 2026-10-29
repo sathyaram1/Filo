@@ -252,7 +252,18 @@ const CASI = {
   'cache-nulla': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'cacheControl': null, 'contentLanguage': null}", 'ok'],
   'cache-scelta': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'cacheControl': 'public, max-age=31536000'}", 'ko'],
   'lingua-scelta': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'contentLanguage': 'it'}", 'ko'],
-  'codice-visibile': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': null, 'contentEncoding': null}", 'ko'],
+  // Il codice di scarico lo scrive il motore vero prima delle regole (#1666): da solo passa, con un'altra chiave no.
+  'codice-visibile': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': null, 'contentEncoding': null}", 'ok'],
+  'codice-e-chiave': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'filoSistemato': 'si'}}", 'ko'],
+  // Campi ASSENTI, non nulli (#1728): al motore vero un caricamento normale non porta contentEncoding, e leggerlo
+  // nudo negava ogni allegato. Su questa risorsa scritta a mano l'emulatore fa lo stesso errore.
+  'senza-codifica': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': 'inline'}", 'ok'],
+  'senza-nome-di-scarico': ["{'metadata': {}, 'contentEncoding': null}", 'ok'],
+  'senza-chiavi': ["{'contentDisposition': null, 'contentEncoding': null}", 'ok'],
+  'nessun-campo': ['{}', 'ok'],
+  'solo-codifica-scelta': ["{'contentEncoding': 'gzip'}", 'ko'],
+  'solo-nome-scelto': ["{'contentDisposition': 'attachment; filename=\"fattura.exe\"'}", 'ko'],
+  'solo-chiave-scelta': ["{'metadata': {'filoSistemato': 'si'}}", 'ko'],
 };
 const regole = readFileSync(REGOLE_STORAGE, 'utf8');
 const coda = regole.lastIndexOf('match /{path=**}');
