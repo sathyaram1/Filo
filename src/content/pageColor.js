@@ -203,7 +203,7 @@
             cv.width = W; cv.height = H;
             const cx = cv.getContext('2d', { willReadFrequently: true });
             cx.drawImage(img, 0, 0, W, H);
-            const data = cx.getImageData(0, 0, W, H).data; // può lanciare se tainted
+            const data = cx.getImageData(0, 0, W, H).data;
             const TC = self.SN_TAB_COLOR;
             if (TC && TC.extractIdentityFromPixels) {
               return finish(TC.extractIdentityFromPixels(data, W, H, params()));
