@@ -4006,6 +4006,8 @@ async function saveOnboarding(state, { via = '' } = {}) {
 async function ricominciaIntervista({ riprendi = false } = {}) {
   const prev = await FiloMem.getOnboarding();
   const base = riprendi ? Onboarding.riprendi(prev) : Onboarding.restart(prev);
+  // Rifatta da capo (#1473), dal pulsante o dalla chat: «Riprendiamola» continua quella che c'era, e non è una riapertura.
+  if (!riprendi) require('./contatoriHomePagina').misura('intervistaRiaperta');
   return saveOnboarding(base.thread.length
     ? base
     : Onboarding.appendTurn(base, { role: 'filo', text: Onboarding.WELCOME_MESSAGE }));
