@@ -263,7 +263,7 @@ const PROPAGAZIONE = `
   var MO = MutationObserver, moObserve = MO.prototype.observe;
   var addEL = EventTarget.prototype.addEventListener, bersaglio = gOPD(Event.prototype, 'target').get;
   var annulla = Event.prototype.preventDefault, proprio = Object.prototype.hasOwnProperty;
-  var WSP = WeakSet.prototype, wsHas = WSP.has, wsAdd = WSP.add, preparate = new WeakSet();
+  var WSP = WeakSet.prototype, wsHas = WSP.has, wsAdd = WSP.add, preparate = new WeakSet(), conPreload = new WeakSet();
   var dW = function (n) { return gOPD(window, n) || gOPD(Window.prototype, n) || {}; };
   var cornice = dW('frameElement').get, quanteF = dW('length').get;
   var vista = gOPD(Document.prototype, 'defaultView').get, misura = gOPD(HTMLElement.prototype, 'offsetWidth').get;
