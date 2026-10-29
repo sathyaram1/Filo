@@ -15,9 +15,8 @@ test('un sito che non manda mai il favicon finisce di caricarsi lo stesso, e la 
   const appese = [];
   const server = createServer((req, res) => {
     if (req.url.startsWith('/favicon.ico')) {
-      console.log('HDR', JSON.stringify(req.headers));
-      // L'icona della barra la scarica il main per conto suo: se parte prima, la richiesta della pagina aspetta dietro
-      // di lei nella cache della sessione e qui non arriva mai (#1492). A lei si risponde subito: la prova è sulla pagina.
+      // L'icona della barra la scarica il main per conto suo (no-cors): se parte prima, la richiesta della pagina aspetta
+      // dietro di lei nella cache della sessione e qui non arriva mai (#1492). A lei si risponde subito: la prova è sulla pagina.
       if (req.headers['sec-fetch-mode'] !== 'cors') { res.writeHead(404); res.end(); return; }
       const r = { chiusa: false };
       res.on('close', () => { r.chiusa = true; });
