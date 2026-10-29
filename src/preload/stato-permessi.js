@@ -17,8 +17,10 @@ function buildStatoPermessiCorpo(stato) {
   const gestoMs = Number(stato && stato.gestoMs) > 0 ? Number(stato.gestoMs) : 5000;
   return `(function(){
   'use strict';
+  // Presi prima della pagina: un riquadro vuoto nato dopo che lei li ha riscritti si prepara lo stesso (#798).
+  var gOPD = Object.getOwnPropertyDescriptor, defP = Object.defineProperty;
   var N = window.Notification;
-  var d = typeof N === 'function' ? Object.getOwnPropertyDescriptor(N, 'permission') : null;
+  var d = typeof N === 'function' ? gOPD(N, 'permission') : null;
   var vero = d && typeof d.get === 'function' ? d.get : null;
   var deciso = ${JSON.stringify(iniziale)};
   // Il sì vero lo dice Chromium; un no lo dice solo l'utente, mai il silenzio di una domanda non fatta.
