@@ -122,7 +122,7 @@ function buildRiquadriVuotiSource(corpi) {
   var cercaIn = [Element.prototype.querySelector, DocumentFragment.prototype.querySelector];
   // Il giro costa: si fa solo se l'inserimento può aver fatto nascere un riquadro.
   function ospite(n) {
-    try { return OSPITE.test(nomeDi.call(n)); } catch (e) { return false; }
+    try { return OSPITE.test(R(nomeDi, n, [])); } catch (e) { return false; }
   }
   function conOspiti(n) {
     if (!n || typeof n !== 'object') return false;
