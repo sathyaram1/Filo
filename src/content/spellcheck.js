@@ -499,8 +499,18 @@
     o.className = 'sn-spell-overlay';
     global.SN_FILO_UI?.mark(o);
     o.setAttribute('aria-hidden', 'true');
-    (radiceDi(state.el) || document.body).appendChild(o);
+    casaDelloSpecchio(state.el).appendChild(o);
     state.overlay = o;
+  }
+  // Un campo dentro un pezzo di Filo nel documento (l'Aiuto) ha lo specchio dentro quel pezzo: sopra, la guardia dei
+  // clic lo prendeva per un velo del sito sul microfono, e con l'Aiuto spostato restava indietro (#1340, giro 4).
+  function casaDelloSpecchio(el) {
+    const r = radiceDi(el);
+    if (r) return r;
+    const UI = global.SN_FILO_UI;
+    let pezzo = null;
+    try { pezzo = UI && el.parentElement ? el.parentElement.closest(UI.SELECTOR) : null; } catch (_) {}
+    return pezzo || document.body;
   }
 
   const SPORGENZA_SEGNI = 8;
