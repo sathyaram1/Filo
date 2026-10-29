@@ -764,6 +764,42 @@ export function commitRestante(root, { exec = execFileSync, env = process.env } 
 }
 
 /**
+ * L'ultima spinta del giro: quello rimasto fuori dai commit si committa, poi il ramo va su origin. La fanno il rilascio
+ * e, prima di lui, la domanda di fine sessione; la `punta` spedita va al server, che la registra per il biglietto (#1555).
+ * → { ok, righe: string[], punta: { branch, sha } | null, errore?, rimedio? }: un `ok` falso ferma chi chiama.
+ */
+export function salvaRamoDelGiro(root, { exec = execFileSync, env = process.env } = {}) {
+  const righe = [];
+  const c = commitRestante(root, { exec, env });
+  if (!c.ok) return { ok: false, righe, punta: null, errore: `Modifiche fuori dai commit che non riesco a committare: ${c.reason}`, rimedio: 'porta la directory a un commit e rilancia lo stesso comando.' };
+  if (c.committed.length) righe.push(`committate ${c.committed.length} modifiche rimaste fuori dai commit: ${c.committed.slice(0, 3).join(', ')}${c.committed.length > 3 ? ` (+${c.committed.length - 3} file)` : ''}`);
+  if (c.fuori && c.fuori.length) righe.push(`NON committo e NON spedisco ${c.fuori.join(', ')}: ha la forma di una copia dei dati del server e il repo è pubblico. Resta nella cartella, invisibile a git: spostalo nella cartella temporanea del sistema (os.tmpdir()).`);
+  const p = pushRamoCorrente(root, { exec, env });
+  if (!p.ok) return { ok: false, righe, punta: null, errore: `Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`, rimedio: 'sistema il push e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).' };
+  if (p.avviso) righe.push(p.avviso);
+  righe.push(p.skipped ? `push saltato: ${p.reason}` : `ramo '${p.branch}' spedito su origin${p.forced ? ' (storia riscritta: --force-with-lease)' : ''}`);
+  const sha = p.skipped ? '' : headSha(root);
+  return { ok: true, righe, punta: sha ? { branch: p.branch, sha } : null };
+}
+
+/**
+ * Cosa è rimasto fuori dal ramo dopo la punta salvata per la domanda di fine sessione: i commit locali dopo di lei e i
+ * file fuori dai commit. '' se niente. Lo dice il rilascio, che da lì non spedisce più (#1555).
+ */
+export function fermoDopoLaChiusura(root, sha, { exec = execFileSync } = {}) {
+  const run = (args) => {
+    try { return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() }; } catch (_) { return { ok: false, out: '' }; }
+  };
+  const parti = [];
+  const dopo = sha ? run(['rev-list', '--count', `${sha}..HEAD`]) : { ok: false };
+  const n = dopo.ok ? Number(dopo.out) || 0 : 0;
+  if (n) parti.push(`${n} commit`);
+  const st = statoDirectory(root);
+  if (st.ok && st.lines.length) parti.push(`${st.lines.length} file fuori dai commit`);
+  return parti.join(' e ');
+}
+
+/**
  * Un'operazione di git ferma a metà in `root` — «un rebase», «una fusione»,
  * «un cherry-pick», «un revert», o «la risoluzione di un conflitto» (file
  * non ancora fusi nell'indice) — oppure '' se non ce n'è nessuna. Stessa
