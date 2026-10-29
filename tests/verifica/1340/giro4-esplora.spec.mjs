@@ -121,3 +121,205 @@ test('x7 feedback: trascinare una parola selezionata dentro la casella', async (
   await page.waitForTimeout(400);
   console.log('x7 valore', JSON.stringify((await statoDi(app, page, '.sn-fb-text')).valore));
 });
+
+for (const attesa of [500, 800, 1200]) {
+  test(`x4b microfono: spostato il pannello, clic dopo ${attesa} ms`, async ({ app, shell, openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, pagina());
+    await apriAiuto(shell, page);
+    await contaAscolti(app, page);
+    await page.waitForTimeout(1500);
+    const h = await page.locator('.sn-sidebar-header').boundingBox();
+    await page.mouse.move(h.x + 30, h.y + h.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(h.x - 200, h.y - 100, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(attesa);
+    const p = await centro(page.locator('.sn-sidebar .sn-voce-btn'));
+    await page.mouse.click(p.x, p.y);
+    await page.waitForTimeout(800);
+    console.log('x4b', attesa, 'ascolti', await ascolti(app, page), 'avviso', await avvisoCoperto(page).count());
+  });
+}
+
+test('x6b feedback: testo di 100k, 60 caratteri di seguito, poi Ctrl+Z', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, pagina());
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
+  const lungo = 'Log: '.padEnd(100000, 'abcdefghij ');
+  await scrivi(app, page, '.sn-fb-text', lungo);
+  await page.keyboard.press('Control+End');
+  await page.waitForTimeout(300);
+  await page.keyboard.type('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
+  const prima = (await statoDi(app, page, '.sn-fb-text')).valore.length;
+  await page.keyboard.press('Control+Z');
+  await page.waitForTimeout(400);
+  const dopo = (await statoDi(app, page, '.sn-fb-text')).valore.length;
+  console.log('x6b lunghezze', lungo.length, prima, dopo);
+});
+
+test('x7b taratura: lo stesso trascinamento in una casella del sito', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina('<textarea id="t" style="font:13px sans-serif;width:400px;height:80px"></textarea>'));
+  await page.locator('#t').click();
+  await page.keyboard.insertText('uno due tre');
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Shift+Control+ArrowRight');
+  const r = await page.locator('#t').boundingBox();
+  await page.mouse.move(r.x + 12, r.y + 14);
+  await page.mouse.down();
+  await page.mouse.move(r.x + 60, r.y + 14, { steps: 5 });
+  await page.mouse.move(r.x + 95, r.y + 14, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  console.log('x7b valore', JSON.stringify(await page.locator('#t').inputValue()));
+});
+
+test('x4c microfono: spostato il pannello, clic dopo 3 s e ancora dopo', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina());
+  await apriAiuto(shell, page);
+  await contaAscolti(app, page);
+  await page.waitForTimeout(1500);
+  const h = await page.locator('.sn-sidebar-header').boundingBox();
+  await page.mouse.move(h.x + 30, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x - 200, h.y - 100, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(3000);
+  const p = await centro(page.locator('.sn-sidebar .sn-voce-btn'));
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(1500);
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(800);
+  const sonde = await nelMondoDiFilo(app, page, () => {
+    const el = document.querySelector('.sn-sidebar .sn-voce-btn');
+    const V = globalThis.SN_VISTO;
+    return { stato: JSON.stringify(V._test.stato(el)), pronta: V._test.pronta(el), mic: JSON.stringify(el.getBoundingClientRect()) };
+  });
+  console.log('x4c ascolti', await ascolti(app, page), 'avviso', await avvisoCoperto(page).count(), JSON.stringify(sonde));
+  await page.screenshot({ path: 'tests/.shots/g4-x4c.png' });
+});
+
+test('x6c taratura: 100k in una casella del sito, 60 caratteri, Ctrl+Z', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina('<textarea id="t"></textarea>'));
+  await page.locator('#t').click();
+  await page.keyboard.insertText('Log: '.padEnd(100000, 'abcdefghij '));
+  await page.keyboard.press('Control+End');
+  await page.waitForTimeout(300);
+  await page.keyboard.type('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
+  const prima = (await page.locator('#t').inputValue()).length;
+  await page.keyboard.press('Control+Z');
+  await page.waitForTimeout(400);
+  console.log('x6c lunghezze', prima, (await page.locator('#t').inputValue()).length);
+});
+
+test('x7c feedback: trascinamento con gli eventi registrati', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina());
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
+  await scrivi(app, page, '.sn-fb-text', 'uno due tre');
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Shift+Control+ArrowRight');
+  const r = await nelMondoDiFilo(app, page, () => {
+    const t = globalThis.SN_FILO_UI._test.trova('.sn-fb-text');
+    globalThis.__ev = [];
+    for (const k of ['dragstart', 'drop', 'beforeinput', 'input']) t.addEventListener(k, (e) => globalThis.__ev.push(k + ':' + (e.inputType || '') + ':' + e.isTrusted + ':' + JSON.stringify(t.value)));
+    const b = t.getBoundingClientRect();
+    const cs = getComputedStyle(t);
+    return { x: b.x, y: b.y, pl: cs.paddingLeft, pt: cs.paddingTop, font: cs.font, sel: [t.selectionStart, t.selectionEnd] };
+  });
+  console.log('x7c', JSON.stringify(r));
+  const x0 = r.x + parseFloat(r.pl) + 8; const y0 = r.y + parseFloat(r.pt) + 8;
+  await page.mouse.move(x0, y0);
+  await page.mouse.down();
+  await page.mouse.move(x0 + 40, y0, { steps: 5 });
+  await page.mouse.move(x0 + 90, y0, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  console.log('x7c valore', JSON.stringify((await statoDi(app, page, '.sn-fb-text')).valore), JSON.stringify(await nelMondoDiFilo(app, page, () => globalThis.__ev)));
+});
+
+test('x4d microfono: pannello spostato di poco a sinistra', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina());
+  await apriAiuto(shell, page);
+  await contaAscolti(app, page);
+  await page.waitForTimeout(1500);
+  const h = await page.locator('.sn-sidebar-header').boundingBox();
+  await page.mouse.move(h.x + 30, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x - 50, h.y + h.height / 2 + 40, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(2000);
+  const p = await centro(page.locator('.sn-sidebar .sn-voce-btn'));
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(800);
+  console.log('x4d ascolti', await ascolti(app, page), 'avviso', await avvisoCoperto(page).count());
+});
+
+test('x4e microfono: finestra ridimensionata con l\'Aiuto aperto', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina());
+  await apriAiuto(shell, page);
+  await contaAscolti(app, page);
+  await page.waitForTimeout(1500);
+  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; const [a, b] = w.getSize(); w.setSize(a - 200, b - 100); });
+  await page.waitForTimeout(2000);
+  const p = await centro(page.locator('.sn-sidebar .sn-voce-btn'));
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(800);
+  console.log('x4e ascolti', await ascolti(app, page), 'avviso', await avvisoCoperto(page).count());
+});
+
+test('x8 Aiuto: trascinare una parola selezionata dentro la casella', async ({ shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina());
+  await apriAiuto(shell, page);
+  const ta = page.locator('.sn-sidebar-input textarea');
+  await ta.click();
+  await page.keyboard.insertText('uno due tre');
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Shift+Control+ArrowRight');
+  const r = await ta.boundingBox();
+  const pad = await ta.evaluate((t) => { const c = getComputedStyle(t); return [parseFloat(c.paddingLeft), parseFloat(c.paddingTop)]; });
+  const x0 = r.x + pad[0] + 8; const y0 = r.y + pad[1] + 8;
+  await page.mouse.move(x0, y0);
+  await page.mouse.down();
+  await page.mouse.move(x0 + 40, y0, { steps: 5 });
+  await page.mouse.move(x0 + 90, y0, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  console.log('x8 valore', JSON.stringify(await ta.inputValue()));
+});
+
+test('x6d feedback: testo di 100k, 60 caratteri, Ctrl+Z, attesa lunga', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, pagina());
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
+  await scrivi(app, page, '.sn-fb-text', 'Log: '.padEnd(100000, 'abcdefghij '));
+  await page.keyboard.press('Control+End');
+  await page.waitForTimeout(300);
+  await page.keyboard.type('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
+  await page.waitForTimeout(1000);
+  const prima = (await statoDi(app, page, '.sn-fb-text')).valore.length;
+  await page.keyboard.press('Control+Z');
+  await page.waitForTimeout(2500);
+  const dopo = (await statoDi(app, page, '.sn-fb-text')).valore.length;
+  console.log('x6d lunghezze', prima, dopo);
+});
+
+for (const [lung, scritti] of [[10000, 300], [5000, 100]]) {
+  test(`x6e feedback: testo di ${lung}, ${scritti} caratteri, Ctrl+Z`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(120_000);
+    const page = await testServer.openReady(openTab, pagina());
+    await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+    await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
+    await scrivi(app, page, '.sn-fb-text', 'Log: '.padEnd(lung, 'abcdefghij '));
+    await page.keyboard.press('Control+End');
+    await page.waitForTimeout(300);
+    await page.keyboard.type('x'.repeat(scritti));
+    await page.waitForTimeout(500);
+    const prima = (await statoDi(app, page, '.sn-fb-text')).valore.length;
+    await page.keyboard.press('Control+Z');
+    await page.waitForTimeout(1500);
+    const dopo = (await statoDi(app, page, '.sn-fb-text')).valore.length;
+    console.log('x6e', lung, scritti, 'lunghezze', prima, dopo);
+  });
+}
