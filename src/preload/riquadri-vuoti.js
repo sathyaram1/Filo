@@ -61,7 +61,7 @@ function buildRiquadriVuotiSource(corpi) {
     for (var i = 0; i < finestreDi.length; i++) { try { var w = R(finestreDi[i], t, []); if (w) return w; } catch (e) {} }
     return null;
   }
-  function aperta(w) { try { return !chiusa.call(w); } catch (e) { return false; } }
+  function aperta(w) { try { return !R(chiusa, w, []); } catch (e) { return false; } }
   var OSPITI = 'iframe,frame,object,embed', OSPITE = /^(iframe|frame|object|embed)$/;
   var nomeDi = (D(Element.prototype, 'localName') || {}).get;
   var perNome = Document.prototype.getElementsByTagName, haAttr = Element.prototype.hasAttribute, attr = Element.prototype.getAttribute;
