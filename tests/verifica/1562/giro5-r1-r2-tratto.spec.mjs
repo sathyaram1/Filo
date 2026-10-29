@@ -24,6 +24,7 @@ async function preparaModello(app, copione, extra = {}) {
       }
       globalThis.__chiamate.push(JSON.parse(JSON.stringify({ messages })));
       const r = globalThis.__copione.shift() || { text: 'ok' };
+      if (r.errore) throw new Error(r.errore);
       const calls = r.toolCalls || [];
       for (const c of calls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
       try { if (r.text) onDelta && onDelta(r.text); } catch (_) {}
