@@ -208,6 +208,9 @@ function ensureHeaderHook(ses) {
       const s = gpcState.get(ses);
       const headers = /^(https?|wss?):/i.test(details.url) ? completaClientHints(details.requestHeaders) : { ...details.requestHeaders };
       if (s && s.enabled && !senzaGpc(details.url) && !senzaGpc(urlDelFrame(details))) headers['Sec-GPC'] = '1';
+      if (refererFn && !Object.keys(headers).some((h) => h.toLowerCase() === 'referer')) {
+        try { const r = refererFn(details, ses); if (r) headers.Referer = r; } catch (_) {}
+      }
       callback({ requestHeaders: headers });
     });
   }
