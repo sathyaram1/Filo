@@ -34,6 +34,9 @@ Tre unit test rossi solo su Windows.
   nella shell vera), si asserisce la relazione e non il valore:
   `encodingPrelude(s) === PRELUDI_CODIFICA[resolveShell(s)]`. Vale su ogni sistema e
   diventa rossa se qualcuno lega il risultato alla richiesta.
+- Un percorso che il codice compone con `path` si aspetta componendolo allo stesso modo,
+  non scritto a mano: `join('/x/schede', '12.json')` su Windows è `\x\schede\12.json`
+  (#1780, `tests/unit/schede.test.mjs`).
 - Se il caso non c'entra con la proprietà, si scelgono dati che non ne dipendono: due
   nomi che differiscono per l'accento, non per le maiuscole, danno la stessa ambiguità
   dappertutto.
