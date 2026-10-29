@@ -8468,6 +8468,7 @@ module.exports = {
   broadcastLiveUpdate,
   broadcastToTabs,
   broadcastToFiloPages,
+  annunciaIconaScheda,
   handleAIRequest,
   maybeCategorizeAsync,
   wireSafebrowse,
