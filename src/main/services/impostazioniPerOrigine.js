@@ -83,7 +83,7 @@ function domandaAmmessaDaUnSito(type, { inVista = false, schedaInVista = false, 
 }
 
 // Quelle che il codice di Filo nelle pagine fa solo dopo un gesto dell'utente (Incolla, Detta, Salva per dopo, la voce
-// della dettatura, l'invio di un feedback, gli scaricamenti, un altro paese, il «Ha funzionato?» dell'Aiuto) e gli
+// della dettatura, l'invio di un feedback, gli scaricamenti, un altro paese, il «Ha funzionato?» e i file dell'Aiuto) e gli
 // scomparti che scrive solo così (dizionario, correzioni, disposizione del menu): da un sito vogliono un gesto vero e
 // recente su quella scheda.
 const DOMANDE_WEB_COL_GESTO = Object.freeze(new Set([
