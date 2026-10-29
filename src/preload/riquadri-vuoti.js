@@ -127,7 +127,7 @@ function buildRiquadriVuotiSource(corpi) {
   function conOspiti(n) {
     if (!n || typeof n !== 'object') return false;
     if (ospite(n)) return true;
-    for (var i = 0; i < cercaIn.length; i++) { try { return cercaIn[i].call(n, OSPITI) !== null; } catch (e) {} }
+    for (var i = 0; i < cercaIn.length; i++) { try { return R(cercaIn[i], n, [OSPITI]) !== null; } catch (e) {} }
     return false;
   }
   function inPagina(t) { try { return connesso.call(t); } catch (e) { return true; } }
