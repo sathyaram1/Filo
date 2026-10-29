@@ -185,10 +185,10 @@
         v.querySelector('.pd-voce-icona').innerHTML = ic;
         v.querySelector('.pd-voce-nome').textContent = e.nome;
         v.addEventListener('mousedown', (ev) => iniziaTrascina(ev, e.id, 'catalogo', v));
-        v.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); aggiungi(e.id); } });
+        v.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); posa(e.id); } });
         v.addEventListener('contextmenu', (ev) => {
           ev.preventDefault();
-          apriMenu(ev.clientX, ev.clientY, [{ etichetta: 'Aggiungi al pannello', fa: () => aggiungi(e.id) }]);
+          apriMenu(ev.clientX, ev.clientY, [{ etichetta: 'Aggiungi al pannello', fa: () => posa(e.id) }]);
         });
         catalogoEl.appendChild(v);
       }
