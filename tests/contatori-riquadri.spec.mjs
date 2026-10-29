@@ -4,7 +4,7 @@
 // Forma, spedizione e regole: tests/unit/contatoriRiquadri.test.mjs e firestoreRulesContatori.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
+import { statoDi, conta, clicca, scrivi, paginaDelloStrato } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
