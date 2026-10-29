@@ -804,7 +804,7 @@
       if (!P || !P.catalogo(app)) continue;
       for (const e of P.scorciatoie(app, tutti[app])) {
         if (!forma(e.shortcut)) continue;
-        lista.push([e.shortcut, `la usa «${e.nome}» nel pannello dell'${P.catalogo(app).nome}`]);
+        lista.push([e.shortcut, `la usa «${e.nome}» fra gli strumenti dell'${P.catalogo(app).nome}`]);
       }
     }
     moduliPresi = lista;

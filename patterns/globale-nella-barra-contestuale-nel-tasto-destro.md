@@ -177,8 +177,9 @@ porta fuori dal foglio e li riporta con un gesto; la chat è diventata l'Aiuto, 
   righe al loro posto](una-lista-che-si-rilegge-da-sola-aggiorna-le-righe-al-loro-posto.md)).
 - **Una risposta di Filo in un pannello chiuso** accende la sua striscia e passa al main con la fonte `app`, come
   l'Aiuto (#1432).
-- **Le scorciatoie restano agli strumenti**, e valgono finché lo strumento sta nel pannello. Chi controlla che una
-  combinazione sia libera legge i pannelli salvati (`SN_TASTI.usaScorciatoiePannelli`).
+- **Le scorciatoie restano agli strumenti**, dentro o fuori dal pannello: una scorciatoia mostrata nelle regolazioni
+  funziona sempre. Chi controlla che una combinazione sia libera legge i pannelli salvati
+  (`SN_TASTI.usaScorciatoiePannelli`).
 
 Prove: `tests/pannello-destro-bordo.spec.mjs` (puntatore vero, XTest), `tests/pannello-destro.spec.mjs`,
 `tests/unit/pannelliApp.test.mjs`.

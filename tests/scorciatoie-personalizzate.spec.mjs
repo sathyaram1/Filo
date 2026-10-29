@@ -253,7 +253,7 @@ test('una combinazione già data a uno strumento dell\'Editor si rifiuta per Tra
 
   const r = await chiedi(app, 'Traduci: Ctrl+Shift+Y');
   expect(r.executed).toBe(false);
-  expect(r.output.error).toContain('nel pannello dell\'Editor');
+  expect(r.output.error).toContain('fra gli strumenti dell\'Editor');
 
   await editor.click('#doc');
   await premi(app, 'Y', ['control', 'shift']);
@@ -264,6 +264,6 @@ test('una combinazione già data a uno strumento dell\'Editor si rifiuta per Tra
   await tastiDellaRiga(pref, 'translate-selection').click();
   await premi(app, 'Y', ['control', 'shift']);
   const errore = pref.locator('#scorciatoieFilo .sc-riga[data-azione="translate-selection"] .sc-errore');
-  await expect(errore).toContainText('nel pannello dell\'Editor');
+  await expect(errore).toContainText('fra gli strumenti dell\'Editor');
   expect((await scelte(app))['translate-selection'] || '').toBe('');
 });

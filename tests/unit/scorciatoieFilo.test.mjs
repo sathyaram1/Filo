@@ -214,7 +214,7 @@ test('una combinazione di uno strumento del pannello dell\'Editor non va a una d
     T.usaScorciatoiePannelli(pannelli('Ctrl+Shift+Y'));
     const r = T.rifiutoScorciatoiaFilo('translate-selection', 'Ctrl+Shift+Y', 'win32');
     assert.equal(r && r.tipo, 'presa');
-    assert.match(T.testoRifiutoFilo(r, 'win32'), /«Conteggio» nel pannello dell'Editor/);
+    assert.match(T.testoRifiutoFilo(r, 'win32'), /«Conteggio» fra gli strumenti dell'Editor/);
     assert.match(build('Traduci: Ctrl+Shift+Y').rifiuto, /«Conteggio»/);
     // Il tasto di serie preso da uno strumento: «tutte di serie» rimette le altre e dice perché quella resta.
     conScelta({ 'translate-selection': 'Ctrl+Shift+Y' }, () => {
@@ -224,9 +224,9 @@ test('una combinazione di uno strumento del pannello dell\'Editor non va a una d
       assert.match(tutte.label, /tranne «Traduci»: Alt\+T è già in uso/);
       assert.match(build('Traduci: di serie').rifiuto, /«Conteggio»/);
     });
-    // Tolto dal pannello lo strumento non parte, e la combinazione si libera.
+    // Tolto dal pannello lo strumento parte lo stesso col suo tasto (#1433), quindi la combinazione resta sua.
     T.usaScorciatoiePannelli(pannelli('Ctrl+Shift+Y', ['comment']));
-    assert.equal(T.rifiutoScorciatoiaFilo('translate-selection', 'Ctrl+Shift+Y', 'win32'), null, 'tolto lo strumento, la combinazione si libera');
+    assert.equal(T.rifiutoScorciatoiaFilo('translate-selection', 'Ctrl+Shift+Y', 'win32')?.tipo, 'presa', 'tolto lo strumento, la combinazione resta sua');
     T.usaScorciatoiePannelli(null);
     assert.equal(T.rifiutoScorciatoiaFilo('translate-selection', 'Ctrl+Shift+Y', 'win32'), null);
   } finally {

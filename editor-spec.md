@@ -66,8 +66,9 @@ Catalogo e partenza in `src/shared/pannelliApp.js`; come si disegnano in `src/pa
 | Impostazioni | no | no | le regolazioni di ogni strumento (scorciatoia, cosa conta il conteggio) |
 | Grassetto, Corsivo, Sottolineato | no | sì | di partenza passano dal tasto destro e da Ctrl+B, Ctrl+I, Ctrl+U |
 
-Le scorciatoie restano agli strumenti e valgono finché lo strumento sta nel pannello. La configurazione di uno
-strumento vale per tutti i documenti.
+Le scorciatoie restano agli strumenti e valgono anche quando lo strumento non sta nel pannello: Cerca e
+sostituisci, che ha bisogno del suo campo, ci rientra da solo. La configurazione di uno strumento vale per tutti i
+documenti.
 
 ### La chat è l'Aiuto
 
@@ -98,7 +99,7 @@ Il foglio è un `contenteditable` serializzato in JSON compatibile ProseMirror (
 
 - `Ctrl+S`: salva.
 - `Ctrl+\`: apre e chiude il pannello degli strumenti.
-- `Ctrl+F`: porta al campo di Cerca e sostituisci (se lo strumento sta nel pannello).
+- `Ctrl+F`: porta al campo di Cerca e sostituisci (se lo strumento era stato tolto, rientra nel pannello).
 - Markdown shortcuts per titoli e formattazione inline.
 - `Ctrl+Z` / `Ctrl+Y`: undo/redo.
 - Su Mac Cmd al posto di Ctrl.

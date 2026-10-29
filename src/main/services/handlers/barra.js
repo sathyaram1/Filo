@@ -88,6 +88,8 @@ module.exports = function register(on, ctx) {
       aperto: msg?.aperto === true,
       dentro: msg?.dentro === true,
       motivo: String(msg?.motivo || '').slice(0, 20),
+      // I pixel dal bordo destro che il puntatore attraversa per arrivare al pannello: l'Aiuto aperto accanto.
+      transito: Math.max(0, Math.min(4000, Math.round(Number(msg?.transito) || 0))),
     } : null;
     s.tabs.barra?.destro?.statoDallaScheda(s.tab);
     return { ok: true };
