@@ -179,3 +179,38 @@ test('e6 spiega una parola selezionata dentro la risposta', async ({ app, openTa
 });
 
 void nelMondoDiFilo; void RISPOSTA;
+
+test('e7 il tasto Indietro del mouse sul vuoto non clicca la pagina', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await modelloFinto(app);
+  const p = await testServer.openReady(openTab, pagina('<button id="compra" onclick="window.__compra=(window.__compra||0)+1" style="margin-top:300px;width:300px;height:80px">Compra</button>'));
+  await traduci(app, p);
+  const strato = await paginaDelloStrato(app, p);
+  const cdp = await strato.context().newCDPSession(strato);
+  const b = await p.locator('#compra').boundingBox();
+  const x = Math.round(b.x + b.width / 2); const y = Math.round(b.y + b.height / 2);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'back', buttons: 8, clickCount: 1 });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'back', buttons: 0, clickCount: 1 });
+  await p.waitForTimeout(800);
+  console.log('clic su Compra dal tasto Indietro', await p.evaluate(() => window.__compra || 0));
+  expect(await p.evaluate(() => window.__compra || 0)).toBe(0);
+});
+
+test('e8 con la pagina ingrandita la risposta si apre accanto alla parola', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await modelloFinto(app);
+  const p = await testServer.openReady(openTab, pagina());
+  await app.evaluate(({ BrowserWindow }, u) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w._filoTabs.tabs.find((t) => t.view?.webContents?.getURL() === u).view.webContents.setZoomFactor(1.5);
+  }, p.url());
+  await p.waitForTimeout(500);
+  await traduci(app, p);
+  const parola = await p.locator('#parola').boundingBox();
+  const pop = await statoDi(app, p, '.sn-popup');
+  console.log('parola (px pagina)', JSON.stringify(parola), 'risposta (px vista)', JSON.stringify({ l: pop.left, t: pop.top, r: pop.right, b: pop.bottom }));
+  const px = { x: parola.x * 1.5, y: parola.y * 1.5, w: parola.width * 1.5, h: parola.height * 1.5 };
+  expect(pop.left <= px.x + px.w && pop.right >= px.x).toBe(true);
+  expect(Math.min(Math.abs(pop.top - (px.y + px.h)), Math.abs(pop.bottom - px.y))).toBeLessThan(80);
+});
