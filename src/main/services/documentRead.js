@@ -82,8 +82,8 @@ const KNOWN_BINARY = {
  * terminale parte, mai sulla cartella del programma.
  */
 function normalizePath(input, base, { path: P = path, casa = os.homedir() } = {}) {
-  // Gli incarti (apici inversi, file://) si sciolgono come nella barra (#1318); i segni spaiati come nel perimetro (#1499).
-  let p = classificatore().pulisciPercorso(globalThis.SN_URL_NAV.pulisciPercorso(input));
+  // La pulizia del perimetro, che scioglie anche gli incarti come la barra (#1318): chi misura e chi legge vedono un file.
+  let p = classificatore().pulisciPercorso(input);
   if (!p) return '';
   if (p === '~') p = casa;
   else if (p.startsWith('~/') || p.startsWith('~\\')) p = P.join(casa, p.slice(2));
