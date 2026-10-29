@@ -139,8 +139,34 @@ module.exports = function register(on, ctx) {
     const K = globalThis.SN_WALLET_MAIN;
     const r = await (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     if (lettura) await lettura;
-    return { ok: true, ...r };
+    const fermato = lettura ? await campoFermato(r, msg, sender) : null;
+    return { ok: true, ...r, ...(fermato || {}) };
   });
+
+  // Il testo che l'assistente di pagina propone per un campo esce verso il sito: la porta delle uscite lo guarda qui,
+  // sulla risposta del modello, e alla pagina arrivano la risposta senza quel testo e la frase (#810). Una domanda
+  // della pagina su un testo scelto da lei sarebbe un oracolo sui segreti letti altrove (#589.1 giro 4).
+  function campoProposto(testo) {
+    const t = String(testo || '').trim();
+    const a = t.indexOf('{');
+    const b = t.lastIndexOf('}');
+    if (a < 0 || b <= a) return null;
+    try {
+      const obj = JSON.parse(t.slice(a, b + 1));
+      const h = obj && obj.highlight;
+      if (!h || h.action !== 'fill' || typeof h.selector !== 'string') return null;
+      const valore = String(h.value ?? '');
+      return valore.trim() ? { obj, valore } : null;
+    } catch (_) { return null; }
+  }
+  async function campoFermato(r, msg, sender) {
+    const proposto = r && campoProposto(r.text);
+    if (!proposto) return null;
+    const parole = (Array.isArray(msg && msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string');
+    const u = await controllaUscita({ type: 'CAMPO_PAGINA', testo: proposto.valore }, { sender, parole: parole.join('\n').slice(-200000) });
+    if (!u || !u.blocca) return null;
+    return { text: JSON.stringify({ ...proposto.obj, highlight: null }), campoFermato: String(u.frase || 'non ho scritto nel campo') };
+  }
 
   // ─── Classificatore della ricerca fra i feedback (#1118) ──────────────────
   // Il giro gira qui e la pagina chiede a che punto è: così il conto si registra una volta per ricerca, e la
