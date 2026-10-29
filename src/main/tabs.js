@@ -308,6 +308,8 @@ const TAG_CON_SORGENTE = 'img,source,video,audio,track,iframe,frame,embed,object
 function risorsaDellaPagina(frame, url) {
   let u = '';
   try { u = new URL(url).href; } catch (_) { return Promise.resolve(false); }
+  // Un riquadro ancora in arrivo non ha ricevuto clic né eseguito script: il rifiuto non è un'apertura dell'utente.
+  if (!riquadroArrivato(frame)) return Promise.resolve(true);
   const codice = `(function (u) {
     var stesso = function (v) { try { return !!v && new URL(v, document.baseURI).href === u; } catch (_) { return false; } };
     return Array.prototype.some.call(document.querySelectorAll(${JSON.stringify(TAG_CON_SORGENTE)}), function (el) {
