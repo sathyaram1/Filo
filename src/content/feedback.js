@@ -50,6 +50,8 @@
 
   async function getClientId() {
     if (clientIdCache) return clientIdCache;
+    // Su un sito il segno dell'installazione non si legge: al feedback lo mette il main (#589.1 giro 5).
+    if (location.protocol !== 'filo:') return '';
     try {
       // Lo shim chrome.storage in Filo ritorna una Promise (no callback).
       const r = await chrome.storage.local.get(['sn_feedback_client_id']);
