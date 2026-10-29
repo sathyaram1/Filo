@@ -77,7 +77,7 @@ test('r1 una conversazione ripresa dalla Cronologia e quella della home, alterna
   expect(due.messages[0].content).toBe(uno.messages[0].content);
   // Senza la domanda (l'ultimo messaggio), il tratto del turno prima deve stare tale e quale in testa a quello dopo.
   const tratto = (c) => c.messages.slice(1, -1).map(testo);
-  expect(tratto(due).slice(0, tratto(uno).length)).toEqual([...tratto(uno).slice(0), ]);
+  expect(tratto(due).slice(0, tratto(uno).length)).toEqual(tratto(uno));
   expect(tratto(tre).slice(0, tratto(due).length)).toEqual(tratto(due));
 });
 
