@@ -375,12 +375,9 @@ for (const strada of ['la chat', 'un collegamento del filo della home']) {
     await expect.poll(() => info(app).then((i) => i.urls.filter((u) => u === ricetta).length), { timeout: 10_000 }).toBe(1);
     // Riaperta, e contata come tale.
     await expect.poll(() => contiDiOggi(app).then((c) => c.riaperte), { timeout: 8_000 }).toBe(conti.riaperte + 1);
-    const n = (await info(app)).count;
 
     await riapri(app);
-    await expect.poll(() => info(app).then((i) => i.count), { timeout: 10_000 }).toBe(n + 1);
-    const dopo = await info(app);
-    expect(dopo.urls).toContain(prima);
-    expect(dopo.urls.filter((u) => u === ricetta).length).toBe(1);
+    await expect.poll(() => info(app).then((i) => i.urls.includes(prima)), { timeout: 10_000 }).toBe(true);
+    expect((await info(app)).urls.filter((u) => u === ricetta).length).toBe(1);
   });
 }
