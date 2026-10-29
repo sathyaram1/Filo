@@ -364,8 +364,9 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     return memo;
   };
   // I ricordi ripescati per un turno restano nella sua domanda, tranne le conversazioni cancellate dopo (#868.1).
-  const turnoDi = (memo) => [
-    memo.onboarding || '',
+  // L'intervista no: sono istruzioni del turno, e rimandate dirigerebbero ogni chat dopo (#1297).
+  const turnoDi = (memo, { intervista = false } = {}) => [
+    intervista ? memo.onboarding || '' : '',
     Array.isArray(memo.ricordi) && memo.ricordi.length ? FC().rendiRicordi(memo.ricordi.filter((r) => r && r.tratto && vivi.chat(r.tratto.chat))) : '',
   ].map((x) => String(x || '').trim()).filter(Boolean).join('\n\n');
   const preambolo = (m) => {
