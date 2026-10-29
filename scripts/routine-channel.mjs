@@ -550,11 +550,22 @@ export async function releaseConRapporto(t, fault, report, opts, punta = null) {
 
 // ─── Domanda di fine sessione (endpoint routineClosing) ─────────────────────
 
-/** Il corpo della richiesta: una credenziale sola, il server ne rifiuta due o nessuna. PURA. */
-export function corpoChiusura(op, { passphrase = '', ticket = '', id = '', answer, requestId = '' } = {}) {
+/** I campi `branch` e `sha` di una punta appena spedita, o niente. PURA. */
+export function campiPunta(punta) {
+  const sha = String((punta && punta.sha) || '').trim().toLowerCase();
+  const branch = String((punta && punta.branch) || '').trim();
+  return /^[0-9a-f]{40}$/.test(sha) && branch ? { branch, sha } : {};
+}
+
+/**
+ * Il corpo della richiesta: una credenziale sola, il server ne rifiuta due o nessuna. PURA.
+ * La domanda di un worker porta la punta salvata prima di lei: il server la registra prima del testo che sporca (#1555).
+ */
+export function corpoChiusura(op, { passphrase = '', ticket = '', id = '', answer, requestId = '', punta = null } = {}) {
   if (!passphrase === !ticket) throw new Error('serve esattamente una fra parola d\'ordine e biglietto');
   const corpo = passphrase ? { passphrase: String(passphrase), op } : { ticket: String(ticket), op };
   if (op === 'question' && passphrase && requestId) corpo.requestId = String(requestId);
+  if (op === 'question' && ticket) Object.assign(corpo, campiPunta(punta));
   if (op === 'answer') {
     if (passphrase) corpo.id = String(id || '');
     corpo.answer = String(answer ?? '');
