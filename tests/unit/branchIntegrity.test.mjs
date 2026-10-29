@@ -364,13 +364,13 @@ describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', 
     return { work, origin, id, branch, base, consegna };
   }
 
-  test('senza sigillo il posizionamento successivo SCARTA la consegna (il guasto)', () => {
+  test('anche senza sigillo la consegna spedita resta: un punto fermo più vecchio della punta è di un giro passato (D-207)', () => {
     const { work, id, branch, base, consegna } = scenaConsegna();
     const r = prepareBranch({ root: work, branch, checkpoint: lastCheckpoint(readBranchState(work, id)) });
     assert.equal(r.ok, true, r.message);
-    assert.equal(r.head, base, 'questo è il guasto documentato dal #507: la consegna sparisce');
-    assert.notEqual(r.head, consegna);
-    assert.ok(r.discarded, 'la consegna finisce parcheggiata su discarded/');
+    assert.equal(r.head, consegna, 'la punta pubblicata è l’ultima consegna: il guasto del #507 non torna');
+    assert.equal(r.superato, base, 'il punto fermo lasciato si dice');
+    assert.equal(r.discarded, null);
   });
 
   test('con il sigillo alla consegna il lavoro RESTA (la cura)', () => {
