@@ -1957,8 +1957,8 @@
       };
       if (allaChiusura) opts.alChiudere = allaChiusura;
       // #588.8 — l'avviso di un file arrivato si trascina come il file: dove lo si lascia, arriva quello.
-      const delFile = opts.actions.find((a) => a && a.openDownloadId);
-      if (delFile && !opts.trascinaDownloadId) opts.trascinaDownloadId = info.opts.actions.find((a) => a && a.openDownloadId).openDownloadId;
+      const delFile = info.opts.actions.find((a) => a && typeof a.openDownloadId === 'string');
+      if (delFile) opts.trascinaDownloadId = delFile.openDownloadId;
     }
     NOTIFS.show(info.text, opts);
   });
