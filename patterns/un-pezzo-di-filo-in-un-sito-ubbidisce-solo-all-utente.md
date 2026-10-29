@@ -136,6 +136,12 @@ il clic sul pulsante del sito.
      volta. Gli effetti del contenitore restano sospesi finché il pannello è
      aperto, col fondo sotto il piano più basso: una pagina in grigio resta
      grigia, e l'Aiuto risponde.
+   - un **pezzo di Filo sopra un pannello guardato** è un velo come quello del
+     sito: la guardia non li distingue. Quello che accompagna un campo del
+     pannello (lo specchio del correttore) sta **dentro** il pannello, sotto le
+     sue sonde, e lo segue quando si sposta; gli avvisi stanno **a fianco**
+     dell'Aiuto anche spostato (#1340, giro 4: trascinato l'Aiuto, lo specchio
+     rimasto indietro copriva il microfono e ogni clic si fermava).
 
    Sulle pagine `filo://` la guardia è spenta: nessuno script può coprire il menu.
 
