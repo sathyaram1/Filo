@@ -1855,6 +1855,14 @@
     }).catch(() => {});
   }
 
+  // #1287 — «Riprova» da un avviso o da una riga: lo stesso indirizzo riparte nella stessa voce.
+  function riprovaDownload(id) {
+    if (!api.downloads || !api.downloads.riprova) return Promise.resolve();
+    return api.downloads.riprova(id).then((res) => {
+      if (res && res.ok === false) avvisoErrore(res.error || 'Non sono riuscito a far ripartire lo scaricamento', 'download_failed');
+    }).catch(() => {});
+  }
+
   // #588 — impostata dal pannello scaricamenti: porta lì la domanda «aprire un
   // programma?», dove la pagina non la copre.
   let chiediApertura = null;
@@ -2158,9 +2166,13 @@
       meta.className = 'dl-row-meta';
       const p = pct(r);
       if (isActive(r)) {
-        meta.textContent = p != null
+        const base = p != null
           ? `${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
           : `${fmtBytes(r.receivedBytes)} scaricati`;
+        // #1287 — quanto va veloce e quanto manca, misurati dal main.
+        let corsa = '';
+        try { corsa = window.SN_SCARICAMENTI_AVANZAMENTO.velocitaEResto(r); } catch (_) {}
+        meta.textContent = corsa ? `${base} · ${corsa}` : base;
       } else if (r.missing) {
         meta.textContent = `Non più sul disco · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       } else if (r.state === 'pending') {
@@ -2229,9 +2241,21 @@
         addBtn('Apri cartella', () => openDownloadFolder(r.id));
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
       } else {
+        if (r.state === 'interrupted' && /^https?:/i.test(String(r.url || ''))) addBtn('Riprova', () => riprovaDownload(r.id));
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
       }
       row.appendChild(actions);
+      // #588.8 — un file arrivato si trascina dalla sua riga: sul campo per caricare file di un sito, nella chat.
+      if (r.state === 'completed' && !r.missing && api.downloads.trascina) {
+        row.draggable = true;
+        row.dataset.trascina = '1';
+        row.addEventListener('dragstart', (e) => {
+          e.preventDefault();
+          api.downloads.trascina(r.id).then((res) => {
+            if (res && res.ok === false && res.error) { avvisiRiga.set(r.id, res.error); if (panelOpen) renderPanel(); }
+          }).catch(() => {});
+        });
+      }
       if (r.state === 'completed' && !apri) {
         row.addEventListener('contextmenu', (e) => { e.preventDefault(); apriMenuRiga(r); });
         if (menuRiga.id === r.id && menuRiga.voci.length) {
