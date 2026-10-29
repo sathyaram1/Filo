@@ -134,7 +134,9 @@ function registerIpcHandlers() {
   // `sonda`: nelle prove la guardia si lascia riconoscere (preload/fingerprint-guard.js), fuori mai.
   const CANALE_FP = 'x' + require('crypto').randomBytes(16).toString('hex');
   const SONDA_FP = !!process.env.FILO_USER_DATA;
-  const conCanale = (cfg) => (cfg && cfg.level > 0 ? { ...cfg, canale: CANALE_FP, sonda: SONDA_FP } : cfg);
+  // `esenti`: nel sito del documento alcune pagine sono esenti, e la guardia non prepara da fuori chi non ha il preload.
+  const conCanale = (cfg, href) => (cfg && cfg.level > 0
+    ? { ...cfg, canale: CANALE_FP, sonda: SONDA_FP, esenti: require('./services/fingerprint').esentiNelSito(href) } : cfg);
   ipcMain.on('filo:fp-config', cronometrata('fp-config', (event, href, opts) => {
     try {
       const F = require('./services/fingerprint');
