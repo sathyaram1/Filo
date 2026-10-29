@@ -40,8 +40,6 @@ test('r1 Ctrl+Shift+T e Ctrl+L dalla barra si misurano fra le azioni, come Ctrl+
   }, a);
   await expect.poll(() => urls(app).then((l) => l.includes(a)), { timeout: 10_000 }).toBe(false);
 
-  await shell.bringToFront();
-  await shell.locator('body').click({ position: { x: 5, y: 5 } }).catch(() => {});
   await shell.keyboard.press('Control+t');
   await expect.poll(async () => (await oggi(app))['new-tab'] || 0, { timeout: 10_000 }).toBe(1);
 
