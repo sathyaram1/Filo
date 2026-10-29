@@ -1467,6 +1467,7 @@
         action: ACTIONS.HELP,
         payload,
         diceRipiego: true,
+        parole: paroleUtente(),
       });
       // Col suo codice: senza, la frase già scritta per l'utente («serve un
       // invito») diventava «qualcosa è andato storto» (#663).
