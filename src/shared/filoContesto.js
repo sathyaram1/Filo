@@ -438,7 +438,7 @@
     if (totale + ripresi.peso > token) {
       while (inizio < n && totale + ripresi.peso > token * RIENTRO) {
         totale -= pesa(inizio);
-        if (lista[inizio].chat === chatCorrente) { mieDavanti++; ripresi = riprendi(); }
+        if (riprese.has(lista[inizio].chat)) { mieDavanti++; ripresi = riprendi(); }
         inizio++;
       }
     }
