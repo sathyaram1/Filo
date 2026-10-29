@@ -494,6 +494,15 @@ export function leggiMotivo(testo) {
 }
 
 /**
+ * Il motivo di una consegna `fixed`: obbligatorio solo per il correttore (regola 4), come sul server. Il verificatore che
+ * corregge i propri rilievi non è stato chiamato per un motivo; se lo scrive, vale la stessa forma. PURA.
+ */
+export function motivoDellaConsegna(testo, ruolo) {
+  if (testo === undefined && ruolo !== 'fixer') return { ok: true, motivo: null };
+  return leggiMotivo(testo);
+}
+
+/**
  * Cosa dice il confronto della punta verificata con quella riallineata, accanto al motivo del correttore: la riga da
  * stampare e il campo per il server. `confronto`: l'uscita di fileRiscritti, o null fuori da un riallineamento. PURA.
  */
@@ -2453,7 +2462,7 @@ if (isMainModule) {
     } else if (flag === '--record-fixed') {
       const ferma = opz['--ferma'] === true;
       const [, id, ...rest] = conBiglietto(argv);
-      if (!id) { console.error('Uso: --record-fixed <id> "report" --motivo "…" [--frase "…"] [--segnala <file.md>] [--domanda <file.json>]'); process.exit(1); }
+      if (!id) { console.error('Uso: --record-fixed <id> "report" [--motivo "…" (obbligatorio per il correttore)] [--frase "…"] [--segnala <file.md>] [--domanda <file.json>]'); process.exit(1); }
       if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--motivo "…", --frase "…", --segnala <file.md> e --ferma')); process.exit(1); }
       const senza = fermaSenzaSegnalazione(ferma, opz['--segnala'] || opz['--domanda']);
       if (senza) { console.error(senza); process.exit(1); }
@@ -2479,7 +2488,7 @@ if (isMainModule) {
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
       const domanda = opz['--domanda'] ? await leggiDomandaDaFile(opz['--domanda']) : null;
       // Senza motivo il biglietto del correttore non si chiude (SPEC-RIDISEGNO-LAVORO.md §3, regola 4).
-      const motivo = leggiMotivo(opz['--motivo']);
+      const motivo = motivoDellaConsegna(opz['--motivo'], readMarker(ROOT)?.role);
       if (!motivo.ok) { console.error(`${motivo.errore} Non ho consegnato niente.`); process.exit(1); }
       const s = await recordFixed(id, report, frase, segnalazione.testo, ferma, domanda, motivo.motivo);
       if (s.rejected) esciRespinto(s);

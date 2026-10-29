@@ -219,3 +219,11 @@ test('il primo lavoro riceve il piano di chi l\'ha preceduto e le fusioni su mai
   const ripresa = buildPayload({ role: 'fixer', id: 'x', num: '#77' }, { ripresa: { domanda: 'd' }, piano: 'p' });
   assert.equal(ripresa.piano, 'p', 'anche chi riprende dopo una risposta riceve il piano');
 });
+
+test('il motivo si chiede al correttore, non al verificatore che corregge i propri rilievi (come sul server)', async () => {
+  const { motivoDellaConsegna } = await import('../../scripts/dispatch.mjs');
+  assert.deepEqual(motivoDellaConsegna(undefined, 'verifier'), { ok: true, motivo: null });
+  assert.equal(motivoDellaConsegna(undefined, 'fixer').ok, false, 'il correttore senza motivo non consegna');
+  assert.deepEqual(motivoDellaConsegna('ripresa', 'fixer'), { ok: true, motivo: { tipo: 'ripresa' } });
+  assert.equal(motivoDellaConsegna('boh', 'verifier').ok, false, 'un motivo scritto vale nella sua forma anche per il verificatore');
+});
