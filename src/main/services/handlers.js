@@ -6025,6 +6025,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (filo) {
     fotografia = ContestoFilo.fotografa({
       incognito: require('../shim/storage').inIncognito(), sezioni: sezioniUtente, ancora: filo.ancora, durata: tettiChat && tettiChat.cache,
+      segna: !!filo.haDomanda && !internal,
     });
     // Una fotografia nuova toglie dai messaggi passati le sezioni cambiate di quella prima: ora le ha il CONTESTO.
     if (fotografia.epoca !== filo.epoca) {
