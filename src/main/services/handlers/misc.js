@@ -296,6 +296,20 @@ async function byteImmagineDaEstraneo(url) {
   }
 }
 
+// Lo stesso che il riquadro del feedback si crea nelle pagine di Filo (content/feedback.js).
+async function segnoDellInstallazione() {
+  const CHIAVE = 'sn_feedback_client_id';
+  let id = ((await globalThis.chrome.storage.local.get([CHIAVE])) || {})[CHIAVE];
+  if (typeof id !== 'string' || !id) {
+    id = require('node:crypto').randomUUID();
+    await globalThis.chrome.storage.local.set({ [CHIAVE]: id });
+  }
+  const H = globalThis.SN_FEEDBACK_CLIENT_ID_HASH;
+  let clientIdHash = '';
+  try { if (H && H.hashClientId) clientIdHash = await H.hashClientId(id); } catch (_) {}
+  return { clientId: id, clientIdHash };
+}
+
 function bytesDaDataUrl(dataUrl) {
   const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));
   if (!m) return null;
