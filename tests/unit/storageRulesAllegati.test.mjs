@@ -228,6 +228,43 @@ test('in creazione nessun metadato scelto da chi carica', () => {
   }
 });
 
+/** `a && (b) && (c)` → i pezzi fra gli `&&` fuori da ogni parentesi. */
+function congiunti(espr) {
+  const out = [];
+  let liv = 0;
+  let da = 0;
+  for (let i = 0; i < espr.length; i++) {
+    const c = espr[i];
+    if (c === '(' || c === '[') liv++;
+    else if (c === ')' || c === ']') liv--;
+    else if (liv === 0 && espr.startsWith('&&', i)) { out.push(espr.slice(da, i).trim()); da = i + 2; i++; }
+  }
+  out.push(espr.slice(da).trim());
+  return out;
+}
+
+test('ogni campo dei metadati si legge solo dopo il suo `in`: un campo assente, sul motore vero, nega il caricamento', () => {
+  // #1728: dal 26/10 ogni allegato prendeva 403. Al motore vero un caricamento normale non porta contentEncoding,
+  // leggerlo nudo è un errore e l'errore nega; l'emulatore riempie quei campi, e lì tutto era verde.
+  const m = /function\s+senzaMetadatiScelti\s*\(\s*(\w+)\s*,[^)]*\)\s*\{\s*return\s+([\s\S]*?);\s*\n\s*\}/.exec(VIVO);
+  assert.ok(m, 'manca la funzione senzaMetadatiScelti(r, file)');
+  const r = m[1];
+  const corpo = m[2].replace(/\s+/g, ' ').trim();
+  const lette = new Set();
+  for (const pezzo of congiunti(corpo)) {
+    const dentro = pezzo.replace(/^\(\s*/, '').replace(/\s*\)$/, '');
+    const campi = [...new Set([...dentro.matchAll(new RegExp(`\\b${r}\\.(\\w+)`, 'g'))].map((x) => x[1]))];
+    for (const campo of campi) {
+      lette.add(campo);
+      const guardia = new RegExp(`^(?:!\\(\\s*'\\w+'\\s+in\\s+${r}\\s*\\)\\s*\\|\\|\\s*)*!\\(\\s*'${campo}'\\s+in\\s+${r}\\s*\\)\\s*\\|\\|`);
+      assert.match(dentro, guardia, `${r}.${campo} si legge senza aprire con !('${campo}' in ${r}) ||: ${pezzo}`);
+    }
+  }
+  for (const atteso of ['metadata', 'contentDisposition', 'contentEncoding', 'cacheControl', 'contentLanguage']) {
+    assert.ok(lette.has(atteso), `senzaMetadatiScelti non guarda più ${atteso}`);
+  }
+});
+
 // ── Il nome dell'allegato: le regole e l'app devono dire la stessa cosa ──────
 
 /** L'espressione del nome, così com'è scritta nelle regole, come RegExp JS. */
