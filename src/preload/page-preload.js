@@ -208,16 +208,18 @@ try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (IS_SUBFRAME ? /^(https?|data|blob):|^about:srcdoc$/i.test(loc) : /^https?:/i.test(loc)) {
     const cfg = ipcRenderer.sendSync('filo:fp-config', loc, { riquadro: IS_SUBFRAME }) || { level: 0, seed: 0 };
+    // Un riquadro della stessa origine chiede prima la guardia della finestra che lo contiene: se gliela monta lei,
+    // le due finestre condividono ciò che sanno dei canvas (fingerprint-guard.js, ascolta). Esente, lo dice lo stesso:
+    // chi lo contiene prepara al load solo i documenti senza preload.
+    let unito = false;
+    if (IS_SUBFRAME && cfg && cfg.canale) {
+      try {
+        const el = window.frameElement;
+        const tipo = cfg.level > 0 ? cfg.canale : cfg.canale + '-';
+        if (el) unito = !el.dispatchEvent(new Event(tipo, { cancelable: true, composed: true }));
+      } catch (_) { unito = false; }
+    }
     if (cfg && cfg.level > 0) {
-      // Un riquadro della stessa origine chiede prima la guardia della finestra che lo contiene: se gliela monta lei,
-      // le due finestre condividono ciò che sanno dei canvas (fingerprint-guard.js, ascolta).
-      let unito = false;
-      if (IS_SUBFRAME && cfg.canale) {
-        try {
-          const el = window.frameElement;
-          if (el) unito = !el.dispatchEvent(new Event(cfg.canale, { cancelable: true, composed: true }));
-        } catch (_) { unito = false; }
-      }
       if (!unito) {
         const { buildGuardSource } = require('./fingerprint-guard.js');
         webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level, cfg.canale, cfg.sonda), false).catch(() => {});
