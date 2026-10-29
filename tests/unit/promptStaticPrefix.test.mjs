@@ -95,8 +95,10 @@ test('chat della home: il riordino non ha perso informazioni', () => {
   for (const data of ['gemini-3.1-flash-lite', 'Si chiama Mario', 'Risposte brevi', 'TEMPO: 10:04', '[f-1] Appunti']) {
     assert.ok(p.includes(data), `il prompt completo non contiene più: ${data}`);
   }
+  // A inizio riga: «PREFERENZE:» e «STATO:» stanno anche dentro le istruzioni (PULSANTE_PREFERENZE:, «dello STATO:»).
   for (const section of ['PROFILO UTENTE:', 'PREFERENZE:', 'LEZIONI RECENTI:', 'STATO:', "FILE DELL'EDITOR"]) {
-    assert.ok(p.includes(section), `manca la sezione: ${section}`);
+    const riga = new RegExp(`^${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'm');
+    assert.ok(riga.test(p), `manca la sezione: ${section}`);
   }
   // I rimandi interni non devono più mandare il modello a cercare "sopra" un
   // blocco che ora sta sotto.
