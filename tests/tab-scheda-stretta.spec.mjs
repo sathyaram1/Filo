@@ -71,7 +71,7 @@ test('scheda stretta: cede paese, poi titolo, poi la X sulle inattive; l\'attiva
   for (const attiva of [ids[4], ids[2]]) {
     await shell.evaluate((id) => window.filoShell.tabs.activate(id), attiva);
     await expect(shell.locator(`#tabs .tab[data-id="${attiva}"]`)).toHaveClass(/active/);
-    for (const w of [40, 44, 50, 57, 58, 60, 63, 64, 70, 80, 95, 96, 110, 140, 200]) {
+    for (const w of [40, 44, 50, 57, 58, 60, 63, 64, 65, 66, 70, 80, 89, 90, 95, 96, 99, 100, 110, 123, 124, 140, 200]) {
       await larghe(w);
       for (const s of await misura(shell)) {
         const dove = `scheda ${s.id}${s.active ? ' (attiva)' : ''} larga ${s.width}px: ${JSON.stringify(s.figli.map((f) => [f.cls, Math.round(f.left - s.left), Math.round(f.width)]))}`;
