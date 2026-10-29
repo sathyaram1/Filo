@@ -63,5 +63,7 @@ test('r2 feedback: il sito seleziona tutto al clic dell\'utente nella casella, e
   await page.mouse.click(r.x, r.y);
   await page.keyboard.type('!');
   await page.waitForTimeout(300);
-  expect(((await statoDi(app, page, '.sn-fb-text'))?.valore || '').startsWith('Il tasto indietro')).toBe(true);
+  const v = (await statoDi(app, page, '.sn-fb-text'))?.valore || '';
+  expect(v.length).toBe('Il tasto indietro non va'.length + 1);
+  expect(v.replace('!', '')).toBe('Il tasto indietro non va');
 });
