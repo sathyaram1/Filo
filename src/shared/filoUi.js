@@ -414,7 +414,7 @@
       e.stopImmediatePropagation();
     }, true);
     // Solo la composizione vera: una finta del sito spegnerebbe il ritorno della selezione (#1340, giro 3).
-    c.addEventListener('compositionstart', (e) => { if (e.isTrusted) { st.componendo = true; st.tasto = null; } }, true);
+    c.addEventListener('compositionstart', (e) => { if (e.isTrusted) { st.componendo = true; if (st.tasto?.e !== e) st.tasto = null; } }, true);
     c.addEventListener('compositionend', (e) => { if (e.isTrusted) st.componendo = false; }, true);
     // Di riserva, dove il ponte di page-preload non c'è; nei riquadri il tasto arriva come copia nostra.
     const qui = (e) => { if (!global.__snPrimiAscolti && veroONostro(e)) gestoSu(c, st, e); };
