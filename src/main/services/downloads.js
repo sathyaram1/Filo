@@ -1304,6 +1304,7 @@ async function trascina(wc, id, scope = '') {
 
 async function init() {
   try { electron().app.on('before-quit', () => { uscendo = true; }); } catch (_) {}
+  try { require('./cookies').presentaReferer(refererDaPresentare); } catch (_) {}
   await loadHistory();
   // Nessuna attesa sopravvive a un riavvio (loadHistory le chiude): quello che
   // resta in quarantena è orfano, e un programma orfano non deve restare su
