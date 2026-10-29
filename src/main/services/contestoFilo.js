@@ -386,17 +386,17 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
   // cui esito la scheda ha visto cambiare dopo (un sì nel popup, #1396; la pagina aperta che si sposta da sé su un sito
   // bloccato, #590): il giro lo darebbe com'era, l'esito vero lo porta la risposta sola.
   const valido = (g) => !!g && senzaTolti(g.azioni) === g.azioni;
-  const confermataDopo = (k) => {
+  const cambiataDopo = (k) => {
     const s = dallaScheda.get(k);
     return !!s && s.azioni.some((a) => a && (a._confirmed || (a._output && a._output.dopo)));
   };
   const giroDi = (m) => {
     const k = FC().chiave(m);
     const g = giri.get(k);
-    return valido(g) && !confermataDopo(k) ? g : null;
+    return valido(g) && !cambiataDopo(k) ? g : null;
   };
   const seguitiNeiGiri = new Set();
-  for (const [k, g] of giri) if (g.seguiti.length && valido(g) && !confermataDopo(k)) for (const x of g.seguiti) seguitiNeiGiri.add(x);
+  for (const [k, g] of giri) if (g.seguiti.length && valido(g) && !cambiataDopo(k)) for (const x of g.seguiti) seguitiNeiGiri.add(x);
   // La riga di una conversazione di un'altra app sta all'ora d'inizio e cambia mentre l'app continua (messaggi, nome del
   // documento): resta com'era fino alla prossima fotografia, o riscriverebbe il tratto da lì.
   const nelTratto = tutti.map((m) => {
