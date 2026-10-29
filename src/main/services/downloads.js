@@ -787,10 +787,12 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
     site: sito,
     siteUncertain: incerto,
     servedBy: servito,
-    _pagina: paginaDi(webContents),
+    _pagina: paginaDi(webContents) || (ripresa ? ripresa._pagina || '' : ''),
     _quarantena: attesa,
     _scope: scope || '',
+    _sessione: ses || (webContents && !webContents.isDestroyed?.() ? webContents.session : null),
   };
+  campiona(rec);
   records.set(id, rec);
   liveItems.set(id, item);
   persist();
