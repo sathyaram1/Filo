@@ -190,6 +190,38 @@ test('un turno con strumenti torna com\'era: giro, esiti e ragionamento di ogni 
   assert.deepEqual(conRagionamento(due.corpo), [uno.messages.length, uno.messages.length + 2], 'il ragionamento dei passi del turno prima non torna');
 });
 
+// #1297 — le istruzioni dell'intervista valgono per il turno dell'intervista: rimandate nel tratto, la chat scritta dopo
+// in un'altra scheda le avrebbe davanti e continuerebbe l'intervista.
+test('l\'intervista sta solo nella domanda del suo turno: il turno dopo, in un\'altra chat, non ne ha le istruzioni', async () => {
+  azzera();
+  const intervista = 'STAI ACCOGLIENDO QUESTO UTENTE\nDA SCOPRIRE (chiedi):\n- profilo';
+  const uno = await turno({ chat: 'in01', testo: 'sono Anna', minutiFa: 30, onboarding: intervista });
+  assert.match(testoDi(uno.messages.at(-1)), /DA SCOPRIRE[\s\S]*sono Anna$/, 'la domanda dell\'intervista non ha le sue istruzioni');
+  const due = await turno({ chat: 'zz99', testo: 'che tempo fa domani?', minutiFa: 20 });
+  assert.doesNotMatch(due.messages.map(testoDi).join('\n'), /DA SCOPRIRE|ACCOGLIENDO/);
+  assert.match(due.messages.map(testoDi).join('\n'), /sono Anna/, 'il messaggio dell\'intervista è uscito dal tratto');
+  // Il prefisso prima della domanda dell'intervista resta quello di prima: si rilegge solo il suo turno.
+  assert.equal(json(due.messages.slice(0, uno.messages.length - 1)), json(uno.messages.slice(0, -1)));
+});
+
+// #590 — l'esito che la scheda ha visto cambiare dopo il turno vale più del giro com'era: la pagina aperta che più tardi
+// si sposta da sé su un sito bloccato non arriva al modello come aperta.
+test('un\'apertura che si sposta dopo il turno su un sito bloccato: il turno torna con l\'esito della scheda, non col giro', async () => {
+  azzera();
+  await turno({ testo: 'apri quel link', minutiFa: 30, giro: 'Eseguita: Aprire http://accorcia.test/lento.' });
+  await Chats.append('ab12', { role: 'user', text: 'si è aperta?', ts: fa(20) });
+  const naviga = { type: 'NAVIGA', url: 'http://accorcia.test/lento', _callId: 'c1', _executed: true };
+  const storia = (azione) => [{ role: 'user', text: 'apri quel link' }, { role: 'filo', text: 'Risposta apri quel link.', actions: [azione] }];
+  const osserva = (azioni) => (azioni.some((a) => a && a._output && a._output.dopo) ? 'SPOSTATA SU UN SITO BLOCCATO' : 'APERTA');
+  const tratto = async (s) => (await Contesto.componi({ chatId: 'ab12', userMessage: 'si è aperta?', storia: s, tetti: TETTI, osserva, incognito: false }))
+    .messaggi.map(testoDi).join('\n');
+  const comEra = await tratto(storia(naviga));
+  assert.match(comEra, /Eseguita: Aprire/, 'senza un esito cambiato il turno non torna col suo giro');
+  const fermata = await tratto(storia({ ...naviga, _executed: false, _output: { blocked: 'site', host: 'blocked.test', dopo: true } }));
+  assert.match(fermata, /SPOSTATA SU UN SITO BLOCCATO/);
+  assert.doesNotMatch(fermata, /Eseguita: Aprire/, 'il modello ha davanti la pagina come aperta');
+});
+
 test('un messaggio già mandato torna com\'era: la riga dell\'Editor che continua, un messaggio lunghissimo', async () => {
   azzera();
   const App = globalThis.SN_CONVERSAZIONI_APP;
