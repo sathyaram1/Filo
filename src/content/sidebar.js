@@ -1244,6 +1244,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   const NOTA_COLLEGAMENTO = 'l\'utente ha cliccato un collegamento della tua risposta, ma non si è aperto: avrebbe portato '
     + 'fuori un codice, una password, una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire '
     + 'a nessun livello. Non riproporlo in un\'altra forma';
+  const NOTA_ALTRO_DOCUMENTO = 'l\'utente ha aperto un altro documento: i messaggi di prima parlavano di quello di prima, '
+    + 'il documento allegato da qui in poi è quello nuovo';
   function notaFermata(frase) {
     logFermata(frase);
     history.push({ role: 'user', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_COLLEGAMENTO, perCronologia: true }), kind: 'action' });
