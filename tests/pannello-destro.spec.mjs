@@ -460,6 +460,36 @@ test('l\'Impostazioni degli strumenti nel pannello ha la cornice degli altri str
   expect(m.settings).toEqual(m.undo);
 });
 
+test('ogni strumento del pannello tiene i suoi comandi alla stessa distanza dalla cornice', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  const tutti = ['text-size', 'align', 'font', 'undo', 'redo', 'settings', 'bold', 'italic', 'underline'];
+  for (const id of tutti) await app.evaluate((_e, el) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'PANNELLO_APP', operazione: 'aggiungi', elemento: el }), id);
+  await ed.waitForSelector('.pd-elemento[data-elemento="underline"]', { state: 'attached' });
+  await app.evaluate((_e) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'PANNELLO_APP', operazione: 'apri' }));
+  await expect.poll(() => aperto(ed)).toBe(true);
+  const margini = await ed.evaluate((ids) => Object.fromEntries(ids.map((id) => {
+    const sez = document.querySelector(`.pd-elemento[data-elemento="${id}"]`);
+    const primo = [...sez.querySelectorAll('.pd-contenuto .ed-mod-pad > *')].find((n) => n.getBoundingClientRect().width > 0);
+    return [id, Math.round(primo.getBoundingClientRect().left - sez.getBoundingClientRect().left)];
+  })), ['word-count', 'search-replace', 'comment', ...tutti]);
+  expect(new Set(Object.values(margini)).size, JSON.stringify(margini)).toBe(1);
+});
+
+test('Commenta col testo già selezionato apre subito il commento su quel testo', async ({ openTab }) => {
+  const ed = await apriEditor(openTab);
+  await ed.click('#doc');
+  await ed.keyboard.type('alfa beta gamma delta');
+  await ed.keyboard.press('Control+A');
+  await ed.evaluate(() => document.querySelector('.pd-striscia').click());
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.locator('.pd-elemento[data-elemento="comment"] .ed-cm-nuovo').click();
+  await expect(ed.locator('#cmText')).toBeVisible();
+  await expect(ed.locator('#overlay')).toContainText('alfa beta gamma delta');
+  await ed.fill('#cmText', 'da rivedere');
+  await ed.click('#cmSave');
+  await expect(ed.locator('#doc [data-comment-id]').first()).toHaveText('alfa beta gamma delta');
+});
+
 // Un clic sulla striscia o sul vuoto del pannello lascia la selezione al foglio: gli strumenti di formattazione la usano.
 test('aperto con un clic sulla striscia o cliccato sul vuoto, il pannello formatta il testo selezionato nel foglio', async ({ app, openTab }) => {
   const ed = await apriEditor(openTab);
