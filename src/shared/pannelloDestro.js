@@ -299,11 +299,11 @@
       t.nodo.classList.remove('pd-in-volo');
       if (t.fantasma) t.fantasma.remove();
       // Un clic su una voce del catalogo la mette in fondo: chi non trascina arriva allo stesso posto.
-      if (!t.partito) { if (t.da === 'catalogo') aggiungi(t.id); return; }
+      if (!t.partito) { if (t.da === 'catalogo') posa(t.id); return; }
       const d = t.dove || { fuori: true };
-      if (t.da === 'catalogo' && !d.fuori) aggiungi(t.id, d.primaDi);
-      else if (t.da === 'elenco' && d.fuori) togli(t.id);
-      else if (t.da === 'elenco') aggiungi(t.id, d.primaDi);
+      if (t.da === 'catalogo' && !d.fuori) posa(t.id, d.primaDi);
+      else if (t.da === 'elenco' && d.fuori) leva(t.id);
+      else if (t.da === 'elenco') posa(t.id, d.primaDi);
     }
 
     // ── menu proprio (patterns/menu-contestuale-proprio-nelle-pagine-filo-preventdefault.md) ──
