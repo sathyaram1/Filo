@@ -225,7 +225,7 @@ const SCHEDE = [
   ['Nero', 'rgb(0,0,0)', 'rgb(0, 0, 0)'],
   ['Senza', null, null],
   ['Blu', 'rgb(0,0,255)', 'rgb(0, 0, 255)'],
-  ['Netflix', 'rgb(229,9,20)', 'rgb(229, 9, 20)'],
+  ['Netflix', 'rgb(229,9,20)', 'rgb(255, 0, 13)'],
   ['Bianco', 'rgb(255,255,255)', 'rgb(255, 255, 255)'],
   ['Rosso', 'rgb(255,0,0)', 'rgb(255, 0, 0)'],
 ];
