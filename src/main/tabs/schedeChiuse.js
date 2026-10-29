@@ -42,12 +42,17 @@ function crea({ tetto = TETTO } = {}) {
     return pila[pila.length - 1];
   }
 
-  // L'archivio ha rifiutato la scheda (le sue pagine erano state tolte dal filo): la pila non la ridà.
-  function archiviata(voce, id) {
-    if (!voce) return;
-    if (!id) { togliDove((v) => v === voce); return; }
+  // `e` è la voce d'archivio (o il suo id), che `prendi` ridà con la scheda per contarla fra le riaperte. Vero se la
+  // scheda è tornata prima della risposta dell'archivio: chi conta la conta adesso. Senza voce l'archivio l'ha
+  // rifiutata (le sue pagine erano state tolte dal filo): la pila non la ridà.
+  function archiviata(voce, e) {
+    if (!voce) return false;
+    const id = e && typeof e === 'object' ? e.id : e;
+    if (!id) { togliDove((v) => v === voce); return false; }
     voce.archivio = id;
+    if (e && typeof e === 'object') voce.voceArchivio = e;
     if (voce.riaperta) riaperte.add(id);
+    return voce.riaperta;
   }
 
   function prendi() {
