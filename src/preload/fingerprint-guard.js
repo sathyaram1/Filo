@@ -475,9 +475,6 @@ const PROPAGAZIONE = `
         if (preparata(cw)) R(annulla, e, []);
       } catch (x) {}
     }, true]);
-    R(su, w, [CANALE + '-', function (e) {
-      try { var el = R(bersaglio, e, []), tag = tagName(el); if (TAG[tag]) segna(finestraDi(el, tag)); } catch (x) {}
-    }, true]);
   }
 
   function riquadri(w) {
