@@ -256,14 +256,18 @@
       } catch (_) {}
     }
 
-    // A pagina caricata: un'immagine chiesta prima trattiene il «load» della pagina finché il sito non la manda, e un
-    // favicon che non arriva lascerebbe la scheda in caricamento. Una pagina che il suo «load» non lo dà mai aspetta 5 s.
+    // Si parte a testa della pagina letta (c'è il corpo), dove stanno icona e theme-color: non al «load», che su un sito
+    // lento arriva dopo secondi (#1456.2), e non prima, quando la scheda di un sito già visto perderebbe il suo colore.
+    // I due ritentativi servono ai siti che li mettono dopo; una testa che non finisce mai aspetta al massimo 2 s.
     const parti = () => { send(); setTimeout(send, 800); setTimeout(send, 2000); };
-    if (document.readyState === 'complete') { parti(); return; }
-    let partito = false;
-    const una = () => { if (!partito) { partito = true; parti(); } };
-    global.addEventListener('load', una, { once: true });
-    setTimeout(una, 5000);
+    const testaLetta = () => !!document.body || document.readyState !== 'loading';
+    if (testaLetta()) { parti(); return; }
+    let giri = 0;
+    const attesa = setInterval(() => {
+      if (!testaLetta() && ++giri < 40) return;
+      clearInterval(attesa);
+      parti();
+    }, 50);
   }
 
   global.SN_PAGE_COLOR = { startTabColorSampler, reportTabIdentityColor };
