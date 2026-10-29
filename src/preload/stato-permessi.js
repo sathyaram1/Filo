@@ -61,16 +61,16 @@ function buildStatoPermessiCorpo(stato) {
       try { w.addEventListener(t, gesto, true); } catch (e) {}
     });
     var WN = w.Notification;
-    var wd = typeof WN === 'function' ? Object.getOwnPropertyDescriptor(WN, 'permission') : null;
+    var wd = typeof WN === 'function' ? gOPD(WN, 'permission') : null;
     if (vero && wd && typeof wd.get === 'function') {
-      var g = Object.getOwnPropertyDescriptor({ get permission() { return leggi(); } }, 'permission').get;
-      try { Object.defineProperty(WN, 'permission', { get: nativo(g, wd.get, 'get permission'), enumerable: wd.enumerable, configurable: true }); } catch (e) {}
+      var g = gOPD({ get permission() { return leggi(); } }, 'permission').get;
+      try { defP(WN, 'permission', { __proto__: null, get: nativo(g, wd.get, 'get permission'), enumerable: wd.enumerable, configurable: true }); } catch (e) {}
       if (typeof chiedi === 'function' && typeof WN.requestPermission === 'function') {
-        try { Object.defineProperty(WN, 'requestPermission', { value: nativo(r.requestPermission, chiedi, 'requestPermission'), writable: true, configurable: true, enumerable: true }); } catch (e) {}
+        try { defP(WN, 'requestPermission', { __proto__: null, value: nativo(r.requestPermission, chiedi, 'requestPermission'), writable: true, configurable: true, enumerable: true }); } catch (e) {}
       }
     }
     var P = w.Permissions && w.Permissions.prototype;
-    var S = w.PermissionStatus && Object.getOwnPropertyDescriptor(w.PermissionStatus.prototype, 'state');
+    var S = w.PermissionStatus && gOPD(w.PermissionStatus.prototype, 'state');
     if (P && typeof P.query === 'function' && S && typeof S.get === 'function') {
       var q = P.query, stato = S.get;
       var o = { query(richiesta) {
