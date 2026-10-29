@@ -129,23 +129,65 @@
   const SCHEMI_SENZA_BARRE = /^(?:mailto|tel|sms|data|javascript|file):/i;
 
   // Un percorso del computer scritto com'è (\\nas\cartella, C:\…, /home/…, ~/…) è un file, non una ricerca (#482 giro 2):
-  // diventato ricerca, il percorso finiva su Google invece di essere fermato e detto come ogni file.
-  const RADICI_DEL_COMPUTER = /^\/(?:home|Users|tmp|private|var|etc|opt|mnt|media|Volumes|root|srv|usr|Library|Applications|System)(?:\/|$)/;
+  // diventato ricerca, il percorso finiva su Google invece di essere fermato e detto come ogni file. Le radici sono
+  // quelle dove sta un file dell'utente, anche la chiavetta di Linux sotto /run/media (#1318); «/wiki/Roma» resta testo.
+  const RADICI_DEL_COMPUTER = /^\/(?:home|Users|tmp|private|var|etc|opt|mnt|media|run|Volumes|Network|root|srv|usr|bin|sbin|lib|lib64|boot|dev|proc|sys|snap|nix|net|afs|cygdrive|sdcard|storage|Library|Applications|System)(?:\/|$)/;
+  // Fuori da quelle radici (un secondo disco montato in /data) vale la forma: tre pezzi, o due col nome di un file.
+  const PERCORSO_PER_FORMA = /^\/[^/\s][^/]*(?:\/[^/\s][^/]*){2,}\/?$|^\/[^/\s][^/]*\/[^/\s][^/]*\.[a-z0-9]{1,8}$/i;
   const pezzi = (s) => s.replace(/\\/g, '/').split('/').map((p) => encodeURIComponent(p)).join('/');
   function percorsoDelComputer(raw) {
     let m = /^\\\\([^\\/\s?#]+)(?:[\\/](.*))?$/.exec(raw);
     if (m) return `file://${m[1]}/${pezzi(m[2] || '')}`;
     m = /^([a-z]):[\\/](.*)$/i.exec(raw);
     if (m) return `file:///${m[1]}:/${pezzi(m[2])}`;
-    if (RADICI_DEL_COMPUTER.test(raw)) return `file://${pezzi(raw)}`;
+    if (RADICI_DEL_COMPUTER.test(raw) || PERCORSO_PER_FORMA.test(raw)) return `file://${pezzi(raw)}`;
     if (/^~(?:[\\/]|$)/.test(raw)) return `file:///${pezzi(raw)}`;
     return null;
+  }
+
+  // Le coppie con cui un percorso arriva incartato: «Copia come percorso» di Windows, il Markdown di un modello, le
+  // virgolette tipografiche di un testo incollato.
+  const INCARTI = [['"', '"'], ['\'', '\''], ['`', '`'], ['«', '»'], ['“', '”'], ['‘', '’'], ['„', '“'], ['<', '>']];
+  const incartato = (t) => INCARTI.some(([a, b]) => t.length > a.length + b.length && t.startsWith(a) && t.endsWith(b));
+  function senzaIncarti(s) {
+    let t = String(s == null ? '' : s).trim();
+    // Il punto fuori dalle virgolette, come lo scrive un modello in una frase, non è del percorso.
+    const senzaPunto = t.replace(/[.,;:!?]+$/, '');
+    if (senzaPunto !== t && incartato(senzaPunto)) t = senzaPunto;
+    for (let giro = 0; giro < 4; giro++) {
+      const c = INCARTI.find(([a, b]) => t.length > a.length + b.length && t.startsWith(a) && t.endsWith(b));
+      if (!c) break;
+      t = t.slice(c[0].length, t.length - c[1].length).trim();
+    }
+    return t;
+  }
+
+  function percorsoDiFile(indirizzo) {
+    let u;
+    try { u = new URL(indirizzo); } catch (_) { return indirizzo; }
+    if (u.protocol !== 'file:') return indirizzo;
+    let p = u.pathname;
+    try { p = decodeURIComponent(p); } catch (_) {}
+    // file:///C:/x arriva come «/C:/x», e normalizeUrl scrive ~/x come file:///~/x.
+    if (/^\/(?:[a-z]:|~(?:\/|$))/i.test(p)) p = p.slice(1);
+    return u.hostname && u.hostname !== 'localhost' ? `\\\\${u.hostname}${p.replace(/\//g, '\\')}` : p;
+  }
+
+  // Il percorso nudo, comunque sia stato incollato: fra virgolette o apici inversi, come indirizzo file://, col prefisso
+  // \\?\ dei percorsi lunghi di Windows. Una funzione sola per la barra e per la lettura dei documenti (#1318).
+  function pulisciPercorso(input) {
+    let s = senzaIncarti(input);
+    if (/^file:/i.test(s)) s = percorsoDiFile(s);
+    return s.replace(/^\\\\[?.]\\UNC\\/i, '\\\\').replace(/^\\\\[?.]\\(?=[a-z]:)/i, '');
   }
 
   function normalizeUrl(input) {
     const raw = String(input || '').trim();
     if (!raw) return 'filo://newtab/';
-    const file = percorsoDelComputer(raw);
+    // Un file:// fra virgolette resta l'indirizzo che è; un percorso incartato è il file che c'è dentro.
+    const nudo = senzaIncarti(raw);
+    if (/^file:/i.test(nudo)) return nudo;
+    const file = percorsoDelComputer(pulisciPercorso(nudo));
     if (file) return file;
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith('filo://') || SCHEMI_SENZA_BARRE.test(raw)) return raw;
 
@@ -168,7 +210,34 @@
         return scheme + raw;
       }
     }
-    return 'https://www.google.com/search?q=' + encodeURIComponent(raw);
+    return RICERCA + encodeURIComponent(raw);
+  }
+  const RICERCA = 'https://www.google.com/search?q=';
+
+  // Quello che l'assistente chiede di aprire non diventa mai una ricerca (per cercare ha la sua azione, #1318 giro 1):
+  // un indirizzo di posta senza «mailto:» va al programma di posta, il resto è '' e l'assistente lo sa.
+  const POSTA_NUDA = /^[^\s@<>()"'`,;:\\/]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}$/i;
+  function indirizzoChiesto(input) {
+    const s = String(input == null ? '' : input).trim();
+    const url = indirizzoDaCaricare(s);
+    if (url !== RICERCA + encodeURIComponent(s)) return url;
+    const posta = senzaIncarti(s);
+    return POSTA_NUDA.test(posta) ? `mailto:${posta}` : '';
+  }
+  // Ha la forma di un percorso anche dove Filo non sa dove porta: relativo, con una variabile, con le barre di Windows.
+  function sembraPercorso(input) {
+    const s = pulisciPercorso(input);
+    return /\\/.test(s) || /^(?:\.{1,2}[\\/]|[/~]|%[^%\s]+%|\$[a-z_]+)/i.test(s);
+  }
+
+  // Quello che diventa un indirizzo scritto da un modello o dall'interfaccia di Filo: con uno schema vero si carica com'è,
+  // il resto come lo legge la barra. «localhost:3000» e «nas.lan:5000» sembrano uno schema ma sono host e porta, e un
+  // percorso fra virgolette è un file: presi per schemi venivano fermati come indirizzi ignoti (#1318).
+  const HOST_E_PORTA = /^[a-z0-9.-]+:\d{1,5}(?:[/?#]|$)/i;
+  function indirizzoDaCaricare(input) {
+    const s = String(input == null ? '' : input).trim();
+    if (/^[a-z][a-z0-9+.-]*:/i.test(s) && !/^[a-z]:[\\/]/i.test(s) && !HOST_E_PORTA.test(s)) return s;
+    return normalizeUrl(s);
   }
 
   // Stretta di proposito: deve distinguere un indirizzo da un comando shell. Niente spazi,
@@ -224,6 +293,6 @@
   global.SN_URL_NAV = {
     isLocalHost, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
     noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
-    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress,
+    normalizeUrl, indirizzoDaCaricare, indirizzoChiesto, sembraPercorso, pulisciPercorso, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

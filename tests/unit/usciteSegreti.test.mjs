@@ -1021,7 +1021,8 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     const finestre = tabs.slice(tabs.indexOf('wc.setWindowOpenHandler((details)'));
     prima(finestre, 'SN_USCITA_DA_FILO(', 'this.openTab(', 'una pagina di Filo apre una scheda prima della porta');
     prima(finestre, 'SN_USCITA_DA_FILO(', 'openExternalScheme(', 'una pagina di Filo passa la posta al sistema prima della porta');
-    assert.match(finestre.slice(0, finestre.indexOf('return { action: \'deny\' }')), /SN_USCITA_DA_FILO\(url, wc, \(\) => \{\s*this\.apriDaCollegamento\(/);
+    // La porta giudica lo stesso indirizzo che poi si apre (#1318: quello già letto come dalla barra).
+    assert.match(finestre.slice(0, finestre.indexOf('return { action: \'deny\' }')), /SN_USCITA_DA_FILO\((\w+), wc, \(\) => \{\s*this\.apriDaCollegamento\(\1,/);
     const apre = corpo(tabs, '  apriDaCollegamento(url');
     for (const passo of ['fermaNavigazione(', '_maybeBlockNavigation(', 'this.openTab(']) assert.ok(apre.includes(passo), `apriDaCollegamento senza ${passo}`);
     assert.ok(corpo(tabs, 'function fermaNavigazione(').includes('openExternalScheme('), 'fermaNavigazione non passa la posta al sistema');

@@ -49,7 +49,6 @@ const COMPOSTI = [
   { file: 'src/main/services/llmsTxt.js', testo: '`https://${domain}/llms.txt`', servizio: 'llms-txt' },
   { file: 'src/main/services/fontiSegnaposto.js', testo: '`https://${lingua}.wikipedia.org`', servizio: 'fonti-segnaposti' },
   { file: 'src/main/services/geoBlockClassifier.js', testo: 'SB.ownerOf(url || `https://${host}/`', perche: 'chiave del conto dei giudizi per sito' },
-  { file: 'src/main/services/handlers.js', testo: 'url : `https://${url}`', perche: 'chiede al blocco dei siti di un indirizzo scritto senza schema' },
   { file: 'src/main/services/handlers.js', testo: 'sito ? `https://${sito}/`', perche: 'l’indirizzo mostrato al posto di una pagina delicata' },
   { file: 'src/main/services/permessiPagine.js', testo: '`http://${t}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/main/services/safebrowse/normalize.js', testo: "new URL('http://' + s)", perche: 'normalizza l’indirizzo da controllare' },

@@ -33,6 +33,7 @@
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
+require('../../shared/urlNav.js');
 
 // Tetto sul testo restituito: un contratto intero ci sta, il prompt non esplode.
 // Oltre il tetto si tronca, e il troncamento si DICHIARA.
@@ -68,7 +69,7 @@ const KNOWN_BINARY = {
 };
 
 /**
- * Normalizza il percorso che arriva dall'LLM: toglie virgolette e spazi, espande
+ * Normalizza il percorso che arriva dall'LLM: toglie incarti e spazi, espande
  * `~` nella home dell'utente, e restituisce un assoluto. PURA.
  *
  * `base` è la cartella in cui Filo sta guardando col terminale, e serve ai nomi
@@ -81,8 +82,8 @@ const KNOWN_BINARY = {
  * terminale parte, mai sulla cartella del programma.
  */
 function normalizePath(input, base, { path: P = path, casa = os.homedir() } = {}) {
-  // Gli LLM incartano volentieri i percorsi tra virgolette o apici: la pulizia è quella del perimetro.
-  let p = classificatore().pulisciPercorso(input);
+  // Gli incarti (apici inversi, file://) si sciolgono come nella barra (#1318); i segni spaiati come nel perimetro (#1499).
+  let p = classificatore().pulisciPercorso(globalThis.SN_URL_NAV.pulisciPercorso(input));
   if (!p) return '';
   if (p === '~') p = casa;
   else if (p.startsWith('~/') || p.startsWith('~\\')) p = P.join(casa, p.slice(2));

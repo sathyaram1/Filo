@@ -84,7 +84,8 @@ module.exports = function register(on, ctx) {
   on(MSG.OPEN_URL, async (msg, sender, origin) => {
     const win = winOf(sender);
     if (!win?._filoTabs || !msg.url) return { ok: true };
-    const url = String(msg.url);
+    // Si giudica quello che diventa caricandolo: «localhost:3000» è una pagina e passa dalla porta come le altre (#1318).
+    const url = globalThis.SN_URL_NAV?.indirizzoDaCaricare?.(String(msg.url)) || String(msg.url);
     // Da una pagina di Filo un indirizzo web o di posta passa dalla porta delle uscite (#810); `parole` = scritto dall'utente.
     if (isFilo(origin) && SCHEMI_USCITA.test(url)) {
       const parole = (Array.isArray(msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').join('\n');
@@ -210,10 +211,16 @@ module.exports = function register(on, ctx) {
   on(MSG.OPEN_NEW_TAB, async (msg, sender, origin) => {
     const win = winOf(sender);
     if (filoNegatoAllaPagina(msg.url, sender, origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
-    if (win?._filoTabs) {
-      const apri = () => win._filoTabs.openTab(msg.url || 'filo://newtab/');
-      if (msg.url) apri(); else contata('new-tab', apri);
+    if (!win?._filoTabs) return { ok: true };
+    let pagina = '';
+    try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
+    // Un file scelto su una pagina web (il suo «Apri in nuova tab»): il percorso l'ha scritto lei, l'avviso nomina il sito.
+    if (/^https?:/i.test(pagina) && msg.url && require('../../tabs').isWebUnsafeNav(String(msg.url))) {
+      win._filoTabs.apriDaCollegamento(String(msg.url), { fromUrl: pagina });
+      return { ok: true };
     }
+    const apri = () => win._filoTabs.openTab(msg.url || 'filo://newtab/');
+    if (msg.url) apri(); else contata('new-tab', apri);
     return { ok: true };
   });
 

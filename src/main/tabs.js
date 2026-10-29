@@ -19,7 +19,7 @@ const { installZoom } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const { installRestaConnesso } = require('./tabs/tabRestaConnesso');
 const Permessi = require('./services/permessiPagine');
-const { avvisoIndirizzoFermato } = require('./services/indirizzoFermato');
+const { avvisoIndirizzoFermato, avvisoDallaPagina, indirizzoRifiutatoDaChromium } = require('./services/indirizzoFermato');
 const { navigazioneVersoFilo, paginaDeiBloccati } = require('./services/navigazioneVersoFilo');
 const MenuDiRiserva = require('./menuDiRiserva');
 const IconaScheda = require('./services/iconaScheda');
@@ -33,7 +33,7 @@ const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
 const { isAuthPopup } = globalThis.SN_AUTH_POPUP;
 require('../shared/urlNav');
-const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
+const { normalizeUrl, indirizzoDaCaricare, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tabColor');
@@ -295,15 +295,35 @@ function invitoFermato(rawUrl, { win = null, wc = null } = {}) {
   return true;
 }
 // Un indirizzo fermato non resta muto (#482): il silenzio sembra un'app rotta. Solo testo, niente «Apri comunque».
-function avvisaIndirizzoFermato(rawUrl, win) {
-  const a = avvisoIndirizzoFermato(rawUrl);
+// `pagina`: la pagina web che l'ha scritto; allora l'avviso nomina il sito, non il percorso scelto da lei.
+function avvisaIndirizzoFermato(rawUrl, win, pagina = '') {
+  const daPagina = /^https?:/i.test(String(pagina || ''));
+  const a = (daPagina && avvisoDallaPagina(rawUrl, globalThis.SN_NOMI_SITO.sitoDi(pagina))) || avvisoIndirizzoFermato(rawUrl);
   if (!a || !win || win.isDestroyed?.()) return;
   try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave, tipo: 'indirizzo_fermato' } }); } catch (_) {}
+}
+// L'indirizzo rifiutato è la sorgente di un elemento della pagina (un'immagine incollata da Word, un riquadro)? Gira
+// nel mondo della pagina: barando può solo tacere il proprio avviso o farne nascere uno senza testo suo.
+const TAG_CON_SORGENTE = 'img,source,video,audio,track,iframe,frame,embed,object,link,script,input';
+function risorsaDellaPagina(frame, url) {
+  let u = '';
+  try { u = new URL(url).href; } catch (_) { return Promise.resolve(false); }
+  const codice = `(function (u) {
+    var stesso = function (v) { try { return !!v && new URL(v, document.baseURI).href === u; } catch (_) { return false; } };
+    return Array.prototype.some.call(document.querySelectorAll(${JSON.stringify(TAG_CON_SORGENTE)}), function (el) {
+      return stesso(el.currentSrc) || stesso(el.getAttribute('src')) || stesso(el.getAttribute('data'))
+        || (el.tagName === 'LINK' && stesso(el.getAttribute('href'))) || String(el.getAttribute('srcset') || '').indexOf(u) >= 0;
+    });
+  })(${JSON.stringify(u)})`;
+  try { return Promise.resolve(frame.executeJavaScript(codice)).then((v) => v === true, () => false); } catch (_) { return Promise.resolve(false); }
+}
+function urlDellaPagina(wc) {
+  try { return wc && !wc.isDestroyed() ? String(wc.getURL() || '') : ''; } catch (_) { return ''; }
 }
 // Vero se l'indirizzo ha avuto la sua strada (invito, posta al sistema); falso se è stato fermato, e allora lo dice.
 function fermaNavigazione(rawUrl, ctx) {
   if (invitoFermato(rawUrl, ctx) || openExternalScheme(rawUrl)) return true;
-  avvisaIndirizzoFermato(rawUrl, ctx && ctx.win);
+  avvisaIndirizzoFermato(rawUrl, ctx && ctx.win, ctx && ctx.pagina);
   return false;
 }
 // La pagina intera passa da will-navigate; qui solo i riquadri, e solo l'invito.
@@ -874,6 +894,7 @@ class TabManager {
     } catch (_) {}
     installaPermessi(view.webContents.session);
     Permessi.seguiGesti(view.webContents);
+    this._seguiRifiutiDiChromium(view.webContents);
     require('./services/homeNetwork').attach(view.webContents.session);
     return view;
   }
@@ -930,8 +951,8 @@ class TabManager {
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
     // ingresso convergono su un solo URL, qualunque chiamante li apra.
     if (typeof url === 'string' && url.startsWith('filo://')) url = canonicalizeFiloUrl(url);
-    // Un indirizzo nudo («sito.com/pagina», come a volte lo manda il modello) caricato così resta bianco.
-    else if (typeof url === 'string' && !/^[a-z][a-z0-9+.-]*:/i.test(url.trim())) url = normalizeUrl(url);
+    // Un indirizzo nudo («sito.com/pagina», «localhost:3000», come a volte lo manda il modello) caricato così resta bianco.
+    else if (typeof url === 'string') url = indirizzoDaCaricare(url);
 
     // Aprire una pagina di Filo è un'azione contata da qualunque strada ci si arrivi (#1461): menu, carte, barra dei
     // menu, link. Chi l'ha già aperta come gesto suo la misura lui; il ripristino apre dietro e non è un gesto.
@@ -3336,8 +3357,10 @@ class TabManager {
       // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
       if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
         const gesto = Permessi.gestoRecente(wc);
-        globalThis.SN_USCITA_DA_FILO(url, wc, () => {
-          this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab', daScheda: this.tabs.includes(tab) ? tab : null, gesto });
+        // «localhost:3000» scritto da un modello è la pagina, come dalla barra (#1318): la porta giudica quella.
+        const indirizzo = indirizzoDaCaricare(url);
+        globalThis.SN_USCITA_DA_FILO(indirizzo, wc, () => {
+          this.apriDaCollegamento(indirizzo, { sfondo: disposition === 'background-tab', daScheda: this.tabs.includes(tab) ? tab : null, gesto });
         }).catch(() => {});
         return { action: 'deny' };
       }
@@ -3547,6 +3570,7 @@ class TabManager {
     registraFinestraDelSito(win, this.win);
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
+    this._seguiRifiutiDiChromium(pwc);
     MenuDiRiserva.segui(pwc);
     this._stratoNellaFinestrella(win, pwc);
     try {
@@ -3655,7 +3679,7 @@ class TabManager {
       // Il clic dell'utente su un indirizzo fermato (zoommtg:, ms-teams:…) lo dice (#482); la pagina da sola resta muta.
       const dalClic = Permessi.perUnaFinestra(wc, url, referrer)
         || (navigazione && (Permessi.gestoPerLaNavigazione(wc) || Permessi.navigazioneDaGesto(wc)));
-      if (dalClic) avvisaIndirizzoFermato(url, this.win);
+      if (dalClic) avvisaIndirizzoFermato(url, this.win, urlDellaPagina(wc));
       return;
     }
     // Per l'invito il clic che ha fatto partire la navigazione lo conta `invitoFermato`, che lo spegne all'arrivo (#664).
@@ -3669,11 +3693,21 @@ class TabManager {
     openExternalScheme(url);
   }
 
-  // Il collegamento file: che Chromium ha rifiutato a una pagina (page-preload.js): vale solo dopo un input vero, che
-  // la pagina non può fingere.
-  indirizzoRifiutatoDallaPagina(wc, url) {
-    if (!/^file:/i.test(String(url || '')) || !Permessi.gestoRecente(wc)) return;
-    avvisaIndirizzoFermato(url, this.win);
+  // Un file: o un data: che Chromium rifiuta alla pagina prima che Filo lo veda (collegamento, script, finestra nuova):
+  // dopo un clic o un tasto veri dell'utente si dice, uno per gesto; quello che la pagina tenta da sola resta muto (#1318).
+  // Chromium scrive la stessa riga per un'immagine o un riquadro della pagina: quelli non sono aperture dell'utente.
+  _seguiRifiutiDiChromium(wc) {
+    if (!wc || wc._filoRifiutiSeguiti) return;
+    wc._filoRifiutiSeguiti = true;
+    wc.on('console-message', (e) => {
+      if (!e || e.level !== 'error') return;
+      const url = indirizzoRifiutatoDaChromium(e.message);
+      if (!url || !Permessi.gestoEntro(wc, Permessi.GESTO_MS)) return;
+      risorsaDellaPagina(e.frame || wc.mainFrame, url).then((risorsa) => {
+        if (risorsa || wc.isDestroyed() || !Permessi.gestoPerUnAvviso(wc)) return;
+        avvisaIndirizzoFermato(url, this.win, urlDellaPagina(wc));
+      });
+    });
   }
 
   // Il lasciapassare che «Apri» dà alla finestra di accesso che la pagina richiede su suo ordine: una volta, subito.
@@ -3811,7 +3845,10 @@ class TabManager {
   // `daScheda`: la pagina dove l'utente ha scelto il link (menu di riserva, una pagina di Filo, l'assistente sopra una
   // pagina), dove compare l'avviso che lo precede (#965).
   apriDaCollegamento(url, { sfondo = false, daScheda = null, gesto = false, fromUrl = '' } = {}) {
-    if (isWebUnsafeNav(url)) return fermaNavigazione(url, { win: this.win });
+    if (isWebUnsafeNav(url)) {
+      const pagina = fromUrl || (daScheda && !daScheda.isInternal ? urlDellaPagina(daScheda.view && daScheda.view.webContents) : '');
+      return fermaNavigazione(url, { win: this.win, pagina });
+    }
     if (this._maybeBlockNavigation(null, url)) return false;
     const origine = /^https?:/i.test(String(fromUrl || '')) ? { tipo: 'link', da: String(fromUrl), gesto: !!gesto } : { tipo: 'filo', gesto: !!gesto };
     const apri = (segna) => {
@@ -3831,7 +3868,7 @@ class TabManager {
     if (this._siteAllowedIn(tab, url)) return null;
     // Un indirizzo nudo («sito.com», come lo manda a volte il modello) si
     // giudica per quello che diventerà caricandolo.
-    const target = /^[a-z][a-z0-9+.-]*:/i.test(String(url || '')) ? url : normalizeUrl(url);
+    const target = indirizzoDaCaricare(url);
     let decision;
     try {
       decision = require('./services/siteBlock').shouldBlockNavigation(target);

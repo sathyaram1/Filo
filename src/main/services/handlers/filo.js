@@ -147,6 +147,13 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // Un indirizzo scritto da un modello («localhost:3000», un percorso fra virgolette) si giudica e si apre come lo legge
+  // la barra (#1318).
+  const caricato = (msg) => {
+    const scritto = String((msg && msg.url) || '').trim();
+    return (scritto && globalThis.SN_URL_NAV?.indirizzoDaCaricare?.(scritto)) || scritto;
+  };
+
   // #965 — la scheda da cui parte un collegamento che Filo apre per lei: l'avviso di un sito da avviso compare lì, prima.
   const schedaDi = (tm, sender) => (tm && tm.tabs.find((t) => t.id === sender?.tab?.id && t.view && t.view.webContents === sender.wc)) || null;
 
@@ -154,7 +161,7 @@ module.exports = function register(on, ctx) {
   // bottone, un suggerimento della home) si apre solo dopo la porta delle uscite (#810). La frase torna a chi ha cliccato.
   on(MSG.FILO_APRI_PROPOSTA, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
-    const url = String((msg && msg.url) || '').trim();
+    const url = caricato(msg);
     const web = /^https?:/i.test(url);
     if (!SCHEMI_USCITA.test(url) || (web && !/^https?:\/\//i.test(url))) return { ok: false, error: 'indirizzo non ammesso' };
     const win = winOf(sender);
@@ -182,7 +189,7 @@ module.exports = function register(on, ctx) {
   // Dentro una pagina web un window.open dei content script non si distingue da quelli della pagina: i collegamenti
   // che un modello scrive lì (assistente di pagina, Spiega, richiesta rapida) li apre il main, dopo la porta (#810).
   on(MSG.APRI_COLLEGAMENTO_FILO, async (msg, sender, origin) => {
-    const url = String((msg && msg.url) || '').trim();
+    const url = caricato(msg);
     if (!SCHEMI_USCITA.test(url) || (/^https?:/i.test(url) && !/^https?:\/\//i.test(url))) return { ok: false, error: 'indirizzo non ammesso' };
     const tm = winOf(sender)?._filoTabs;
     const avvisato = isFilo(origin);

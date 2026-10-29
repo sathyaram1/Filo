@@ -429,8 +429,10 @@
         const o = a._output || {};
         let dettaglio = '';
         try { if (tipo === 'NAVIGA') dettaglio = new URL(String(a.url || o.url || '')).hostname.replace(/^www\./, ''); } catch (_) {}
-        if (tipo === 'APRI_FILE') dettaglio = String(a.percorso || a.path || '').split(/[\\/]/).pop();
-        const testo = fallita ? (FAILED_LABELS[tipo] || 'Azione non riuscita') : '';
+        if (tipo === 'APRI_FILE') dettaglio = String((self.SN_URL_NAV ? self.SN_URL_NAV.pulisciPercorso(a.percorso || a.path) : (a.percorso || a.path)) || '').split(/[\\/]/).pop();
+        // Un indirizzo fermato per sicurezza dice quale, come lo dice al modello (#1318).
+        const fermato = tipo === 'NAVIGA' && typeof o.avviso === 'string' ? pulito(o.avviso) : '';
+        const testo = fallita ? `${FAILED_LABELS[tipo] || 'Azione non riuscita'}${fermato ? ` · ${fermato}` : ''}` : '';
         registra({ tipo, testo, dettaglio, esito: a._confirm ? 'chiesta' : (fallita ? 'fallita' : 'ok') }, a);
       },
       // La bolla di un giro che NON era l'ultimo («Provo subito tutti e tre…») diventa una nota del suo nodo.
@@ -1162,7 +1164,7 @@
       if (o.nessuna) return `nessuna finestra «${pulito(o.richiesta)}»`;
       if (o.errore) return `${o.finestra ? `«${pulito(o.finestra)}»: ` : ''}${pulito(o.errore)}`;
     }
-    if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    if (o.blocked === 'scheme' || o.blocked === 'indirizzo') return o.avviso ? pulito(o.avviso) : 'indirizzo non ammesso';
     if (o.cartellaDiRete) return 'la cartella sta su un altro computer della rete';
     if (o.errore === 'fuori_perimetro') return 'la cartella sta fuori dalla tua cartella personale';
     if (o.blocked === 'site') {
@@ -2105,9 +2107,15 @@
       // apre la scheda). Questo chip resta come riferimento per RIAPRIRLO, ma deve
       // SEMPRE avere un'etichetta leggibile: il favicon da solo, senza testo, era
       // il bottone "misterioso" del feedback. Mostriamo favicon + nome del sito.
+      // L'indirizzo che il main ha aperto, non quello scritto: «localhost:3000» o «sito.it/x» come href non riaprono niente (#1318).
+      const url = (self.SN_URL_NAV && a.url && self.SN_URL_NAV.indirizzoDaCaricare(a.url)) || a.url || '';
       let label = String(a.label || a.etichetta || '').trim();
       if (!label) {
-        try { label = new URL(a.url).hostname.replace(/^www\./, ''); } catch (_) { label = a.url || 'Apri'; }
+        try {
+          const u = new URL(url);
+          label = u.protocol === 'mailto:' ? decodeURIComponent(u.pathname) : u.hostname.replace(/^www\./, '');
+        } catch (_) { label = ''; }
+        label = label || url || 'Apri';
       }
       // #376 — aperto in SECONDO PIANO: la scheda esiste già e sta suonando
       // dietro. Il chip allora non è più "riapri" ma "portami lì": attiva
@@ -2122,17 +2130,17 @@
           const r = await send({ type: MSG.FOCUS_TAB, id: bgTabId });
           // Se quella scheda nel frattempo è stata chiusa, il riferimento deve
           // comunque funzionare: riapre il link invece di non fare nulla.
-          if (!r || !r.ok) apriProposta(a.url || '', btn);
+          if (!r || !r.ok) apriProposta(url, btn);
         });
       } else {
-        btn.href = a.url || '#';
+        btn.href = url || '#';
         btn.target = '_blank';
         btn.rel = 'noopener';
         btn.title = `Riapri ${label}`;
       }
       btn.className = 'dash-action-btn dash-action-link-chip';
       if (a._callId) btn.dataset.callId = String(a._callId);
-      btn.appendChild(iconaSitoEl(a.url));
+      btn.appendChild(iconaSitoEl(url));
       btn.appendChild(document.createTextNode(bgTabId ? `▸ ${label}` : `↗ ${label}`));
       return btn;
     }
@@ -2142,7 +2150,11 @@
     if (lezioneAccoglienza(a)) return rigaLezioneAccoglienza(a);
     if (sceltaAutonomia(a)) return sceltaAutonomiaEl(a);
     if (sceltaContatori(a)) return sceltaContatoriEl(a);
-    if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);
+    if (type === 'APRI_FILE') {
+      // Fra virgolette («Copia come percorso» di Windows), fra apici inversi o come file:// è lo stesso file (#1318).
+      const pulito = self.SN_URL_NAV ? self.SN_URL_NAV.pulisciPercorso(a.percorso || a.path) : String(a.percorso || a.path || '');
+      if (percorsoLocale(pulito)) { a.percorso = pulito; return bottoneFile(a); }
+    }
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
       btn.className = 'dash-action-btn';

@@ -268,6 +268,14 @@ function gestoRecente(wc) {
   return gestoEntro(wc, GESTO_MS);
 }
 
+// Un avviso per gesto vero: il clic che fa rifiutare tre file ne dice uno, e la pagina da sola nessuno (#1318).
+function gestoPerUnAvviso(wc) {
+  const t = wc && wc._filoGestoAlle;
+  if (!t || Date.now() - t >= GESTO_MS || (wc._filoAvvisoDopo || 0) >= t) return false;
+  wc._filoAvvisoDopo = Date.now();
+  return true;
+}
+
 // Un clic o un tasto vero sulla pagina negli ultimi `ms`: il conto riparte a ogni navigazione della pagina intera.
 function gestoEntro(wc, ms) {
   const t = wc && wc._filoGestoAlle;
@@ -870,7 +878,7 @@ function siDato(ses, url, parte) {
 }
 
 module.exports = {
-  installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
+  installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoPerUnAvviso, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
   gestoDiFilo, gestoSulloStrato, aperturaScelta, azioneDellApertura, perUnaFinestra, sceltaDallUtente, chiediScrittura,
   TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,

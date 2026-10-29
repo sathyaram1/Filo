@@ -131,3 +131,82 @@ test('#482 una barra davanti a una parola qualunque non è un file', () => {
     assert.ok(normalizeUrl(s).startsWith('https://www.google.com/search?q='), s);
   }
 });
+
+// #1318 — un percorso non finisce mai in una ricerca: anche fra virgolette («Copia come percorso» di Windows), fra apici
+// inversi, come file:// incollato o sotto le radici dove Linux monta la chiavetta.
+test('#1318 un percorso incartato o sotto /run/media è un file, non una ricerca', () => {
+  assert.equal(normalizeUrl('/run/media/mario/CHIAVETTA/conto.pdf'), 'file:///run/media/mario/CHIAVETTA/conto.pdf');
+  assert.equal(normalizeUrl('"C:\\Users\\agenti AI\\Documenti\\conto.pdf"'), 'file:///C:/Users/agenti%20AI/Documenti/conto.pdf');
+  assert.equal(normalizeUrl('  "C:\\Users\\x.pdf"  '), 'file:///C:/Users/x.pdf');
+  assert.equal(normalizeUrl('`/home/utente/a.txt`'), 'file:///home/utente/a.txt');
+  assert.equal(normalizeUrl('«/media/utente/USB/a.txt»'), 'file:///media/utente/USB/a.txt');
+  assert.equal(normalizeUrl("'~/Scaricati/x.pdf'"), 'file:///~/Scaricati/x.pdf');
+  assert.equal(normalizeUrl('"\\\\nas\\condivisa\\x.xlsx"'), 'file://nas/condivisa/x.xlsx');
+  assert.equal(normalizeUrl('"file:///C:/x/conto.pdf"'), 'file:///C:/x/conto.pdf');
+  assert.equal(normalizeUrl('\\\\?\\C:\\lungo\\x.txt'), 'file:///C:/lungo/x.txt');
+  for (const r of ['/mnt/c/Users/x', '/srv/dati', '/dev/sdb1', '/snap/bin', '/net/server/x', '/storage/emulated/0/Download/a.pdf']) {
+    assert.ok(normalizeUrl(r).startsWith('file:///'), r);
+  }
+});
+
+test('#1318 le virgolette intorno a un testo che non è un percorso restano della ricerca', () => {
+  assert.equal(normalizeUrl('"ricetta carbonara"'), 'https://www.google.com/search?q=%22ricetta%20carbonara%22');
+  for (const s of ['/wiki/Roma', '/runner', '/r/italy', '"/wiki/Roma"', '``', '""']) {
+    assert.ok(normalizeUrl(s).startsWith('https://www.google.com/search?q='), s);
+  }
+});
+
+test('#1318 pulisciPercorso: la stessa pulizia per la barra e per la lettura dei documenti', () => {
+  const { pulisciPercorso } = globalThis.SN_URL_NAV;
+  assert.equal(pulisciPercorso('"C:\\Users\\agenti AI\\a.pdf"'), 'C:\\Users\\agenti AI\\a.pdf');
+  assert.equal(pulisciPercorso('`/home/u/a b.txt`'), '/home/u/a b.txt');
+  assert.equal(pulisciPercorso('file:///home/u/a%20b.txt'), '/home/u/a b.txt');
+  assert.equal(pulisciPercorso('"file:///C:/Users/agenti%20AI/a.pdf"'), 'C:/Users/agenti AI/a.pdf');
+  assert.equal(pulisciPercorso('file://nas/condivisa/x.xlsx'), '\\\\nas\\condivisa\\x.xlsx');
+  assert.equal(pulisciPercorso('file://localhost/etc/hosts'), '/etc/hosts');
+  assert.equal(pulisciPercorso('file:///~/Scaricati/x.pdf'), '~/Scaricati/x.pdf');
+  assert.equal(pulisciPercorso('  conto.pdf '), 'conto.pdf');
+  assert.equal(pulisciPercorso(null), '');
+});
+
+// #1318 — con uno schema vero si carica com'è; host e porta senza http, o un percorso, li legge la barra.
+test('#1318 indirizzoDaCaricare: localhost e la rete di casa con la porta sono pagine, come dalla barra', () => {
+  const { indirizzoDaCaricare } = globalThis.SN_URL_NAV;
+  assert.equal(indirizzoDaCaricare('localhost:3000'), 'http://localhost:3000');
+  assert.equal(indirizzoDaCaricare('localhost:3000/app?x=1#y'), 'http://localhost:3000/app?x=1#y');
+  assert.equal(indirizzoDaCaricare('nas.lan:5000'), 'http://nas.lan:5000');
+  assert.equal(indirizzoDaCaricare('127.0.0.1:8080'), 'http://127.0.0.1:8080');
+  assert.equal(indirizzoDaCaricare('example.com:8443/admin'), 'https://example.com:8443/admin');
+  assert.equal(indirizzoDaCaricare('sito.it/pagina'), 'https://sito.it/pagina');
+  assert.equal(indirizzoDaCaricare('C:\\x\\a.pdf'), 'file:///C:/x/a.pdf');
+  assert.equal(indirizzoDaCaricare('"/run/media/u/USB/a.pdf"'), 'file:///run/media/u/USB/a.pdf');
+  for (const u of ['https://x.it', 'http://localhost:3000', 'filo://newtab/', 'mailto:mario@esempio.it', 'tel:12345', 'zoommtg:join',
+    'about:blank', 'data:text/html,x', 'file:///etc/hosts', 'spotify:track:6rqhFgbbKwnb9MLmUQDhG6']) {
+    assert.equal(indirizzoDaCaricare(u), u, u);
+  }
+  assert.equal(indirizzoDaCaricare('  https://x.it  '), 'https://x.it');
+  assert.equal(indirizzoDaCaricare(''), 'filo://newtab/');
+});
+
+// #1318 giro 1 — un percorso fuori dalle radici conosciute, o fra virgolette chiuse da un punto, resta un file.
+test('#1318 un percorso per forma (secondo disco in /data) o col punto dopo le virgolette è un file', () => {
+  assert.equal(normalizeUrl('/data/progetti/conto.pdf'), 'file:///data/progetti/conto.pdf');
+  assert.equal(normalizeUrl('/dati/conto marzo.pdf'), 'file:///dati/conto%20marzo.pdf');
+  assert.equal(normalizeUrl('"C:\\Users\\agenti AI\\conto.pdf".'), 'file:///C:/Users/agenti%20AI/conto.pdf');
+  assert.ok(normalizeUrl('"ricetta carbonara".').startsWith('https://www.google.com/search?q='));
+});
+
+// #1318 giro 1 — quello che l'assistente chiede di aprire non diventa mai una ricerca su Google.
+test('#1318 indirizzoChiesto: la posta senza mailto va al programma di posta, il resto non diventa una ricerca', () => {
+  const { indirizzoChiesto, sembraPercorso } = globalThis.SN_URL_NAV;
+  assert.equal(indirizzoChiesto('mario.rossi@esempio.it'), 'mailto:mario.rossi@esempio.it');
+  assert.equal(indirizzoChiesto('"mario.rossi@esempio.it"'), 'mailto:mario.rossi@esempio.it');
+  assert.equal(indirizzoChiesto('localhost:3000'), 'http://localhost:3000');
+  assert.equal(indirizzoChiesto('https://www.google.com/search?q=gatti'), 'https://www.google.com/search?q=gatti');
+  assert.equal(indirizzoChiesto('sito.it'), 'https://sito.it');
+  for (const s of ['ricetta carbonara', 'Documenti\\conto.pdf', '%USERPROFILE%\\Desktop\\x.pdf', '$HOME/x.pdf', 'mario@', '']) {
+    assert.equal(indirizzoChiesto(s), s ? '' : 'filo://newtab/', s);
+  }
+  for (const s of ['Documenti\\conto.pdf', '%USERPROFILE%\\Desktop\\x.pdf', '$HOME/x.pdf', './a.txt', '/wiki/Roma']) assert.ok(sembraPercorso(s), s);
+  for (const s of ['ricetta carbonara', 'mario.rossi@esempio.it', 'gatti buffi']) assert.ok(!sembraPercorso(s), s);
+});

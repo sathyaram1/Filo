@@ -211,6 +211,20 @@ test('l\'elenco dei dispositivi ha i nomi solo dopo un sì vero, parte per parte
   assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', { mediaType: 'video' }), false, 'e permissions.query lo dice');
 });
 
+// #1318 — un file che Chromium rifiuta alla pagina si dice dopo un gesto vero, una volta per gesto.
+test('un avviso per gesto: niente senza un input vero, uno solo per la stessa raffica, di nuovo al clic dopo', async () => {
+  const wc = wcFinto('https://intranet.example/');
+  Permessi.seguiGesti(wc);
+  assert.equal(Permessi.gestoPerUnAvviso(wc), false, 'la pagina da sola');
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  wc.emetti('input-event', {}, { type: 'mouseUp' });
+  assert.equal(Permessi.gestoPerUnAvviso(wc), true);
+  assert.equal(Permessi.gestoPerUnAvviso(wc), false, 'lo stesso clic che fa rifiutare un secondo file');
+  await new Promise((r) => setTimeout(r, 5));
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  assert.equal(Permessi.gestoPerUnAvviso(wc), true, 'il clic dopo');
+});
+
 // Filo sono solo le sue pagine: un blob porta l'origine del sito che l'ha creato (#591, giro 20).
 test('un documento blob di un sito è quel sito: chiede col suo nome e non ha sì di comodo', () => {
   const ses = sessioneFinta();

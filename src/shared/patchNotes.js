@@ -16,6 +16,7 @@
       fixes: [
         'Ctrl+L (Cmd+L su Mac) sulla home non cancella più quello che stavi scrivendo. Porta il cursore nel campo e seleziona il testo, come la barra degli indirizzi di un browser.',
         'Ctrl+L (Cmd+L su Mac) su una pagina dove stai scrivendo apre la home in una scheda accanto, così il testo che hai scritto resta dov\'era.',
+        'Se un sito apre un file del computer da un pulsante invece che da un link, Filo adesso ti dice che l\'ha fermato. Prima il clic non faceva niente. Se chiedi a Filo di aprire un indirizzo come localhost:3000, la pagina si apre come dalla barra, e se gli chiedi di scrivere una mail parte il tuo programma di posta. Un percorso del computer, anche fra virgolette o sulla chiavetta USB, non finisce più in una ricerca su Google.',
       ],
     },
     {

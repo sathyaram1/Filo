@@ -251,13 +251,6 @@ function registerIpcHandlers() {
     } catch (_) {}
     event.returnValue = fermo;
   });
-  ipcMain.on('filo:indirizzo-rifiutato', (event, url) => {
-    try {
-      const wc = event.sender;
-      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
-      if (win) win._filoTabs.indirizzoRifiutatoDallaPagina(wc, url);
-    } catch (_) {}
-  });
   // #1623 — le immagini lasciate sulla fila delle schede: solo dalla barra di una finestra, mai da una pagina.
   ipcMain.on('shell:rilascio-nella-chat', (event, voci) => {
     const win = finestraDellaBarra(event.sender);

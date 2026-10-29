@@ -1652,8 +1652,7 @@ function testoDiSconosciuti(azioni) {
 
 function indirizzoCaricato(tipo, indirizzo) {
   if (tipo === 'LEGGI_PAGINA') return PageRead.normalizzaUrl(indirizzo).url || '';
-  if (/^[a-z][a-z0-9+.-]*:/i.test(indirizzo)) return indirizzo;
-  return (globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.normalizeUrl && globalThis.SN_URL_NAV.normalizeUrl(indirizzo)) || '';
+  return (globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.indirizzoChiesto && globalThis.SN_URL_NAV.indirizzoChiesto(indirizzo)) || '';
 }
 
 function urlDellaScheda(s) {
@@ -2874,22 +2873,37 @@ async function eseguiAzioneFilo(action, {
         // aprire → vuole arrivarci) — a meno che l'azione chieda il SECONDO
         // PIANO (#376, vedi sotto). La bolla conserva comunque un riferimento
         // cliccabile per riaprirlo (kept:true).
-        const url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
-        if (!url) return { executed: false, kept: false };
+        const scritto = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
+        if (!scritto) return { executed: false, kept: false };
         // SICUREZZA: l'agente non apre schemi non-web. Una pagina ostile può
         // iniettare istruzioni nel modello (prompt injection) per fargli aprire
         // un file://attacker (leak hash NTLM su Windows) o data:/javascript:.
-        // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui. Un URL
-        // "nudo" (es. "example.com") non parsa e prosegue: openTab → normalizeUrl
-        // gli antepone https://.
-        // Si giudica quello che diventerà caricandolo: un percorso del computer scritto com'è è un file (#482 giro 2).
-        const caricato = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : (globalThis.SN_URL_NAV?.normalizeUrl?.(url) || url);
-        try {
-          const proto = new URL(caricato).protocol.toLowerCase();
-          if (!['http:', 'https:', 'filo:'].includes(proto)) {
-            return { executed: false, kept: true, output: { blocked: 'scheme' } };
-          }
-        } catch (_) { /* URL non assoluto: lo normalizza openTab */ }
+        // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui.
+        // Si giudica e si apre quello che diventa caricandolo, come dalla barra: «localhost:3000» è una pagina, un percorso
+        // anche fra virgolette è un file (#482 giro 2, #1318).
+        // Quello che non è un indirizzo non diventa una ricerca data per pagina aperta: un percorso è un file fermato, il
+        // resto lo si dice al modello (#1318 giro 1).
+        const url = globalThis.SN_URL_NAV?.indirizzoChiesto ? globalThis.SN_URL_NAV.indirizzoChiesto(scritto) : scritto;
+        if (!url) {
+          const Fermato = require('./indirizzoFermato');
+          const percorso = globalThis.SN_URL_NAV.sembraPercorso(scritto);
+          const avviso = percorso ? Fermato.avvisoPercorsoScritto(globalThis.SN_URL_NAV.pulisciPercorso(scritto)) : Fermato.avvisoNonIndirizzo(scritto);
+          return { executed: false, kept: true, output: { blocked: percorso ? 'scheme' : 'indirizzo', avviso } };
+        }
+        let proto = '';
+        try { proto = new URL(url).protocol.toLowerCase(); } catch (_) { /* lo dice openTab */ }
+        // Posta, telefono e SMS vanno al loro programma come cliccati su una pagina (#1318): la porta delle uscite
+        // l'hanno già passata qui sopra, come ogni indirizzo di NAVIGA.
+        if (['mailto:', 'tel:', 'sms:'].includes(proto)) {
+          const tm = winOf(sender)?._filoTabs;
+          if (!tm || typeof tm.apriDaCollegamento !== 'function') return { executed: false, kept: false };
+          const consegnato = tm.apriDaCollegamento(url) === true;
+          return { executed: consegnato, kept: consegnato, output: { esterno: proto, indirizzo: url } };
+        }
+        if (proto && !['http:', 'https:', 'filo:'].includes(proto)) {
+          const avviso = require('./indirizzoFermato').avvisoIndirizzoFermato(url);
+          return { executed: false, kept: true, output: { blocked: 'scheme', ...(avviso ? { avviso: avviso.testo } : {}) } };
+        }
         // Apertura in SECONDO PIANO quando ciò che Filo apre non va guardato adesso: la scheda
         // nasce senza rubare il primo piano. Il flag accetta anche «true» stringa, dai più piccoli.
         const truthy = (v) => v === true || v === 1 || /^(true|1|si|sì|yes)$/i.test(String(v ?? ''));
@@ -2917,10 +2931,9 @@ async function eseguiAzioneFilo(action, {
               return { executed: false, kept: true, output: { blocked: 'site', host: host || '', reason: reason || '', url: target } };
             };
             if (!tabId) {
-              const assoluto = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`;
               let d = null;
-              try { d = require('./siteBlock').shouldBlockNavigation(assoluto); } catch (_) {}
-              return fermata(d && d.host, d && d.reason, assoluto);
+              try { d = require('./siteBlock').shouldBlockNavigation(url); } catch (_) {}
+              return fermata(d && d.host, d && d.reason, url);
             }
             // Un blocco che la pagina provoca dopo l'attesa qui sotto arriva lo stesso a chi l'ha chiesta:
             // la chat della home o l'assistente sulla pagina.
@@ -3651,7 +3664,7 @@ async function eseguiAzioneFilo(action, {
         const pulito = percorsi.find(Boolean);
         if (pulito) { action.percorso = pulito; if (action.path) action.path = pulito; }
         // Il bottone dice dove sta il file con i nomi delle cartelle di Filo, non con quelli del disco (#947).
-        const p = String(action.percorso ?? action.path ?? '').trim();
+        const p = globalThis.SN_URL_NAV?.pulisciPercorso?.(action.percorso ?? action.path) ?? String(action.percorso ?? action.path ?? '').trim();
         let dove = '';
         if (/^(~([\\/]|$)|[\\/]|[a-z]:[\\/])/i.test(p)) {
           try { dove = await require('./documentiIndice').doveSta(DR.normalizePath(p)); } catch (_) {}
@@ -5210,8 +5223,18 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return `Pagina NON aperta: ${sito} ${chi}. Diglielo in una riga: se vuole aprirla lo stesso, sotto la tua risposta c'è «Apri comunque». Non riprovare e non cercare un altro indirizzo per arrivarci.`;
   }
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'scheme') {
-    // #482 — un indirizzo fermato non resta muto: è il modello a dirlo, col perché.
-    return 'Pagina NON aperta: per sicurezza Filo non apre in una scheda i file del computer, le cartelle di rete e gli indirizzi che non sono pagine web (solo http e https). Diglielo in una riga. Non riprovare con lo stesso indirizzo.';
+    // #482 — un indirizzo fermato non resta muto: è il modello a dirlo, col perché e con la cosa vera che è (#1318).
+    const cosa = typeof res.output.avviso === 'string' && res.output.avviso ? ` (${res.output.avviso})` : '';
+    return `Pagina NON aperta${cosa}: per sicurezza Filo non apre in una scheda i file del computer, le cartelle di rete e gli indirizzi che non sono pagine web (solo http e https). Diglielo in una riga. Non riprovare con lo stesso indirizzo e non cercarlo sul web.`;
+  }
+  if (type === 'NAVIGA' && res.output && res.output.blocked === 'indirizzo') {
+    return `Pagina NON aperta: ${res.output.avviso || 'non è un indirizzo'}. Per cercarlo sul web usa CERCA_WEB; per aprire una pagina serve il suo indirizzo. Non dire che è aperta.`;
+  }
+  if (type === 'NAVIGA' && res.output && res.output.esterno) {
+    const programma = { 'mailto:': 'di posta', 'tel:': 'delle chiamate', 'sms:': 'degli SMS' }[res.output.esterno] || 'del sistema';
+    if (!res.executed) return `NON aperto: il programma ${programma} non è partito. Dillo all'utente in una riga.`;
+    // Una bozza aperta non è un messaggio mandato: lo manda l'utente da lì.
+    return `Passato al programma ${programma} del computer, che si apre col messaggio da completare: lo manda o lo chiama l'utente da lì. Non dire che è già stato inviato.`;
   }
   if (type === 'PULISCI_TAB' && res.executed && res.output) {
     const n = Number(res.output.archived) || 0;

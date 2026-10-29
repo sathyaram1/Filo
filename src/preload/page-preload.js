@@ -659,15 +659,6 @@ try {
     if (!SCHEMI_APRIBILI.test(url)) return;
     try { ipcRenderer.sendSync('filo:apertura-scelta', url); } catch (_) {}
   };
-  // Un collegamento file: da una pagina web lo rifiuta Chromium prima che Filo lo veda, senza dire niente (#482): il clic
-  // dell'utente che la pagina non ha fermato lo riferisce, e Filo lo dice. data: no: con «download» scarica davvero.
-  const rifiutato = (e) => {
-    if (!e.isTrusted || e.defaultPrevented || (e.type === 'auxclick' && e.button !== 1)) return;
-    const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
-    const a = percorso.find((n) => n && (n.localName === 'a' || n.localName === 'area') && n.href);
-    if (!a || !/^file:/i.test(String(a.href))) return;
-    try { ipcRenderer.send('filo:indirizzo-rifiutato', String(a.href)); } catch (_) {}
-  };
   // #965 — un link «scarica» verso un file da avviso non parte: l'avviso compare sulla pagina, come per un link che apre.
   // Dopo la pagina, che può gestire il clic da sé; confermato, il main lo riclicca da qui (SN_RISCARICA).
   let scaricaDaRifare = null;
@@ -706,7 +697,6 @@ try {
     for (const ev of ['click', 'auxclick']) {
       win.addEventListener(ev, scelto, { capture: true, passive: true });
       win.addEventListener(ev, scelto, { passive: true });
-      win.addEventListener(ev, rifiutato, { passive: true });
     }
     win.addEventListener('click', scaricaScelto);
     win.addEventListener('pointerover', confine, { capture: true, passive: true });

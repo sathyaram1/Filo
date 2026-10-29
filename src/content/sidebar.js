@@ -1473,7 +1473,10 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     // Una preferenza cambiata si dice col suo nome e il valore («Filo spento su docs.google.com», #843).
     if (done) return o && typeof o.etichetta === 'string' && o.etichetta.trim() ? o.etichetta.trim() : `${label}: fatto`;
     const perche = o && (o.rifiuto || o.invariato) && typeof o.error === 'string' ? o.error.trim() : '';
-    return perche ? `${label}: non applicata, ${perche}` : `${label}: non riuscita`;
+    if (perche) return `${label}: non applicata, ${perche}`;
+    // Un indirizzo fermato per sicurezza dice quale (#1318): «File del computer bloccato per sicurezza: …».
+    const fermato = o && typeof o.avviso === 'string' ? o.avviso.trim() : '';
+    return fermato ? `${label}: non riuscita, ${fermato.charAt(0).toLowerCase()}${fermato.slice(1)}` : `${label}: non riuscita`;
   }
 
   // ---------- Azioni SULLA PAGINA (parità col menu tasto destro) ----------
