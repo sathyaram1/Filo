@@ -1419,8 +1419,8 @@ service cloud.firestore {
     // classificatore, la chiave che ha pagato e il ripiego sui crediti, l'avviso dei crediti, saldo e spesa in fasce,
     // l'esito di un riscatto d'invito, i guasti dell'identità, l'accesso con Google, le segnalazioni automatiche e la
     // coda dei feedback. Mai una chiave, un codice d'invito o un'email. Stesso pseudonimo, stessa ora e stesso id
-    // dell'ora, in un documento suo per il tetto delle espressioni; le stesse regole: sola creazione, senza login,
-    // forma fissa, legge solo l'admin. Sentinella: tests/unit/firestoreRulesContatoriServizio.test.mjs.
+    // dell'ora, in un documento suo per il tetto delle espressioni; le stesse regole: sola creazione con l'identità
+    // anonima, forma fissa, legge solo l'admin. Sentinella: tests/unit/firestoreRulesContatoriServizio.test.mjs.
     match /contatori-servizio/{docId} {
       function conti(m, chiavi, tettoChiavi, tetto) {
         return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
