@@ -376,7 +376,15 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
   };
   const seguitiNeiGiri = new Set();
   for (const [k, g] of giri) if (g.seguiti.length && valido(g) && !confermataDopo(k)) for (const x of g.seguiti) seguitiNeiGiri.add(x);
-  const f = FC().finestra(tutti, {
+  // La riga di una conversazione di un'altra app sta all'ora d'inizio e cambia mentre l'app continua (messaggi, nome del
+  // documento): resta com'era fino alla prossima fotografia, o riscriverebbe il tratto da lì.
+  const nelTratto = tutti.map((m) => {
+    if (!m.riga) return m;
+    const memo = memoDi(FC().chiave(m));
+    if (!memo.riga || memo.riga.epoca !== epoca) memo.riga = { epoca, testo: m.text };
+    return memo.riga.testo === m.text ? m : { ...m, text: memo.riga.testo };
+  });
+  const f = FC().finestra(nelTratto, {
     ora,
     giorni: tetti.giorni,
     token: tetti.token,
