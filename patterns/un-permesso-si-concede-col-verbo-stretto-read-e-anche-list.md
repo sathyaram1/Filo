@@ -59,11 +59,14 @@ l'altra metà si nomina, e se è di un altro lavoro lo si dice.
 
 Dove vive: `storage.rules`, con la sentinella
 `tests/unit/storageRulesAllegati.test.mjs` (rilegge il file che si deploya, in
-millisecondi) e la prova col motore vero
+millisecondi) e la prova con l'emulatore
 `tests/rules/storage-allegati-motore-vero.mjs` (emulatori ufficiali, si lancia
 a mano: ha in testa le istruzioni). E ricordati che **una regola cambia solo
 quando la pubblichi**: finché `npm run regole:pubblica` (da main, dopo la
-fusione) non gira, la porta in produzione è quella di prima.
+fusione) non gira, la porta in produzione è quella di prima. E che **la prova
+di una regola del deposito è un caricamento vero**, dopo la pubblicazione:
+emulatore e API di prova non vedono i campi che il deposito scrive da sé, e per
+sei giorni sono stati verdi su regole che negavano ogni allegato (#1769).
 
 Vicino: [«Sei loggato» non è un permesso](sei-loggato-non-e-un-permesso.md) —
 l'altra metà di come si legge una regola: il verbo dice *cosa*, la condizione

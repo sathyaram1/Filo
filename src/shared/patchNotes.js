@@ -9,6 +9,17 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
     // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.251', date: '2026-10-29',
+      features: [
+        'Ctrl+Shift+T (Cmd+Shift+T su Mac) riapre l\'ultima scheda chiusa, come negli altri browser, invece di aprirne una nuova. Torna nello stesso posto della fila, con Indietro e Avanti com\'erano. Premendolo ancora riapre quelle chiuse prima, anche dopo aver riaperto Filo.',
+      ],
+      fixes: [
+        'Ctrl+L (Cmd+L su Mac) sulla home non cancella più quello che stavi scrivendo. Porta il cursore nel campo e seleziona il testo, come la barra degli indirizzi di un browser.',
+        'Ctrl+L (Cmd+L su Mac) su una pagina dove stai scrivendo apre la home in una scheda accanto, così il testo che hai scritto resta dov\'era.',
+        'Se le pagine che Filo legge per risponderti sono troppe per il modello tutte insieme, Filo risponde con quelle che ci stanno e sotto la risposta ti dice quali siti ha lasciato fuori. Se ti servono, chiediglielo e le rilegge. Prima la risposta non arrivava, e l\'errore consigliava di cambiare modello.',
+      ],
+    },
+    {
       version: '0.2.250', date: '2026-10-23',
       features: [
         'Passando il mouse su una risposta di Filo, sotto compaiono Copia e Rispondi. Copia mette il testo negli appunti senza segni di formattazione. Rispondi la cita sopra la casella, come su WhatsApp, e il tuo messaggio parte con la citazione in testa. Così Filo sa a cosa stai rispondendo, e un clic sulla citazione ti riporta alla sua risposta.',
@@ -29,8 +40,7 @@
         'Un\'immagine oltre i 4 MB incollata nella chat della home ora entra rimpicciolita. Prima spariva senza dire niente.',
         'L\'accesso con Google e con gli altri provider funziona anche in un Filo appena installato, e una passkey salvata sul telefono si usa col QR.',
         'Un comando che scrivi nella home dopo la barra ora passa dagli stessi controlli dei comandi di Filo. Prima di cancellare qualcosa ti chiede un OK, o la parola «conferma» se il comando l\'hai incollato, e se annulli il comando torna nella casella com\'era. Una barra seguita da una parola che non è un programma torna a essere un messaggio per Filo.',
-        'Gli screenshot e i file che alleghi a una segnalazione arrivano di nuovo. Dal 26 ottobre venivano rifiutati e la segnalazione partiva senza.',
-        'Se le pagine che Filo legge per risponderti sono troppe per il modello tutte insieme, Filo risponde con quelle che ci stanno e sotto la risposta ti dice quali siti ha lasciato fuori. Se ti servono, chiediglielo e le rilegge. Prima la risposta non arrivava, e l\'errore consigliava di cambiare modello.',
+        'Gli screenshot e i file che alleghi a una segnalazione arrivano di nuovo. Dal 23 ottobre venivano rifiutati e la segnalazione partiva senza.',
       ],
     },
     {

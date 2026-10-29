@@ -19,8 +19,8 @@ rules_version = '2';
 // Il confine ora:
 // - Upload: chiunque manda un feedback, anche senza login — l'invio anonimo è
 //   voluto, e resta — fino a 4 MB, SOLO in creazione, SOLO un blob cifrato
-//   dall'app (tipo opaco, estensione fissa, nessun metadato scelto da chi
-//   carica: #1518) e SOLO su un nome che non si indovina (sotto, in dettaglio).
+//   dall'app (tipo opaco, estensione fissa, nessuna chiave né nome di scarico
+//   scelti da chi carica: #1518, #1769) e SOLO su un nome che non si indovina.
 //   Il tipo VERO del file lo decide il client prima di cifrare
 //   (src/shared/feedbackAttachTypes.js) e lo ricontrolla il gate L0 del server
 //   (filo-security, fileGate) sul documento del feedback: qui non c'è più una
@@ -90,6 +90,8 @@ rules_version = '2';
 // ⚠️ Queste regole diventano vere il giorno in cui le si pubblica sul progetto
 // Firebase. Finché quel comando non gira, nel repo c'è un confine stretto e in
 // produzione la porta è ancora quella di prima: è un passo da fare a mano.
+// E dopo, un caricamento vero: emulatore e API di prova non vedono i campi che
+// il deposito scrive da sé, e sono stati verdi su regole che negavano tutto (#1769).
 
 service firebase.storage {
   match /b/{bucket}/o {
@@ -126,22 +128,16 @@ service firebase.storage {
       return file.matches('^([a-z]{1,16}_)?[0-9]{10,17}_[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}\\.octetstream$');
     }
 
-    // Nessun metadato scelto da chi carica (#1518): nome di scarico, codifica, cache, lingua,
-    // chiavi personalizzate. L'unica chiave ammessa è il codice di scarico: il motore vero lo scrive
-    // nei metadati PRIMA di valutare le regole (#1666); l'emulatore lo toglie prima. Le due forme di
-    // Content-Disposition che Firebase scrive da sé passano, il nome lo fissa lui. Ogni campo si legge
-    // dopo il suo `in`: un campo assente manda il motore in errore e l'errore nega, e quali campi
-    // mancano cambia fra emulatore e motore vero (#1728: contentEncoding mancava solo al vero).
-    // Motore vero: tests/rules/storage-allegati-motore-vero.mjs; la prova che conta è un caricamento dall'app pubblicata.
+    // Nessuna chiave né nome di scarico scelti da chi carica (#1518): passano solo il codice di scarico e le
+    // forme di Content-Disposition che Firebase scrive da sé. Codifica, cache e lingua NON si leggono (#1769):
+    // il deposito vero le riempie da sé (probabile la codifica «identity»), e ogni regola su di loro ha negato
+    // ogni caricamento vero dal 23/10, verde a emulatore e API di prova. Sceglierle su un blob opaco servito
+    // solo col codice non cambia tipo né nome di scarico: rischio accettato. Regole: storageRulesAllegati.test.
     function senzaMetadatiScelti(r, file) {
       return (!('metadata' in r) || r.metadata == null
           || r.metadata.keys().hasOnly(['firebaseStorageDownloadTokens']))
-        && (!('contentDisposition' in r) || r.contentDisposition == null || r.contentDisposition == ''
-          || r.contentDisposition == 'inline'
-          || r.contentDisposition == "inline; filename*=utf-8''" + file)
-        && (!('contentEncoding' in r) || r.contentEncoding == null || r.contentEncoding == '')
-        && (!('cacheControl' in r) || r.cacheControl == null || r.cacheControl == '')
-        && (!('contentLanguage' in r) || r.contentLanguage == null || r.contentLanguage == '');
+        && (!('contentDisposition' in r) || r.contentDisposition == null
+          || r.contentDisposition in ['', 'inline', "inline; filename*=utf-8''" + file]);
     }
 
     match /feedback/{file} {

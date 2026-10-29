@@ -602,6 +602,7 @@ test('il sistema arriva al prompt dal main process', () => {
 // il difetto. Perciò qui non ci può essere un role, ci deve essere un click.
 const TASTI_DI_FILO = {
   'CommandOrControl+T': 'nuova scheda',
+  'CommandOrControl+Shift+T': 'riapri l\'ultima scheda chiusa (#1476)',
   'CommandOrControl+W': 'chiudi la SCHEDA (il role "close" chiuderebbe la finestra con dentro tutte le altre)',
   'CommandOrControl+R': 'ricarica la pagina (il role "reload" ricaricherebbe la fila delle schede)',
   'CommandOrControl+L': 'vai a scrivere un indirizzo',

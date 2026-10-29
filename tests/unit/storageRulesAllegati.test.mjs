@@ -10,13 +10,12 @@
 //     allegato ci scriveva sopra o lo cancellava;
 //   · un bucket aperto in lettura è hosting gratuito sul dominio dell'owner.
 //
-// Perché una sentinella e non solo il motore vero. Provare le regole davvero
-// vuol dire emulatore Storage (Java, centinaia di MB, due servizi da avviare):
-// quella prova esiste, sta in `tests/rules/storage-allegati-motore-vero.mjs` e
-// si lancia a mano con le istruzioni che ha in testa. Qui il rischio non è che
-// il motore sbagli, è che qualcuno riapra la porta scrivendo un'altra riga:
-// questo test rilegge il file che si deploya e diventa rosso in millisecondi,
-// sulla macchina di chi la riga l'ha scritta.
+// Perché una sentinella. L'emulatore Storage (Java, centinaia di MB) sta in
+// `tests/rules/storage-allegati-motore-vero.mjs` e si lancia a mano, ma NON è il
+// deposito vero: non vede i campi che il deposito scrive da sé, ed è stato verde
+// su regole che negavano ogni caricamento (#1769). La prova che conta è un
+// caricamento vero dopo la pubblicazione. Qui il rischio è che qualcuno riapra la
+// porta, o rilegga un campo che il deposito riempie, scrivendo un'altra riga.
 //
 // Senza il fix è ROSSO tre volte: `allow read: if true`, `allow write` senza
 // `resource == null`, nessun vincolo sul nome. Senza #1518 è rosso sul tipo
@@ -204,27 +203,33 @@ test('il deposito ammette un tipo solo: quello dei blob cifrati, lo stesso dell�
   assert.ok(!/contentType[^&]*\|\|/.test(cond), `un’alternativa sul tipo riapre la lista: ${cond}`);
 });
 
-test('in creazione nessun metadato scelto da chi carica', () => {
-  // Il nome con cui il file si scarica (Content-Disposition), la codifica, la
-  // cache, la lingua e le chiavi personalizzate li sceglierebbe uno
-  // sconosciuto: `fattura.exe` su un dominio di Google, o un segno «già
-  // sistemato» che la pulizia degli allegati legge. Il motore vero di questa
-  // riga è tests/rules/storage-allegati-motore-vero.mjs.
+test('in creazione nessuna chiave né nome di scarico scelti da chi carica', () => {
+  // Il nome con cui il file si scarica (Content-Disposition) e le chiavi personalizzate li sceglierebbe
+  // uno sconosciuto: `fattura.exe` su un dominio di Google, o un segno «già sistemato» che la pulizia
+  // degli allegati legge.
   const cond = espandi(CREATE().cond);
-  // Una chiave sola può esserci: il codice di scarico, che il motore vero scrive nei metadati prima
-  // di valutare le regole. Con `metadata.size() == 0` nessun allegato saliva più (#1666, dal 23/10).
+  // Una chiave sola può esserci: il codice di scarico, che il deposito vero scrive nei metadati prima
+  // di valutare le regole. Con `metadata.size() == 0` nessun allegato saliva più (#1666).
   assert.match(cond, /\bmetadata\.keys\(\)\.hasOnly\(\['firebaseStorageDownloadTokens'\]\)/,
     'le chiavi personalizzate passano, o il codice di scarico che scrive Firebase viene rifiutato');
   assert.ok(!/\bmetadata\.size\(\)/.test(cond), 'il conteggio delle chiavi rifiuta anche il codice di scarico di Firebase');
-  for (const campo of ['contentDisposition', 'contentEncoding', 'cacheControl', 'contentLanguage']) {
-    assert.match(cond, new RegExp(`\\.${campo}\\s*==\\s*null`), `${campo} lo sceglie chi carica`);
-  }
-  // Il Content-Disposition ammette solo le forme che scrive Firebase, col nome dell'oggetto:
-  // un confronto in più, o un `matches`, rimette il nome di scarico nelle mani di chi carica.
-  const ammessi = new Set(["null", "''", "'inline'", `"inline; filename*=utf-8''" + file`]);
-  const usi = [...cond.matchAll(/\.contentDisposition\b(\s*==\s*(null|''|'inline'|"inline; filename\*=utf-8''" \+ file))?/g)];
+  // Il Content-Disposition ammette solo le forme che scrive Firebase, col nome dell'oggetto: una forma
+  // in più, o un `matches`, rimette il nome di scarico nelle mani di chi carica.
+  const ammessi = new Set(['null', "''", "'inline'", `"inline; filename*=utf-8''" + file`]);
+  const usi = [...cond.matchAll(/\.contentDisposition\b(?:\s*==\s*(null|''|'inline'|"inline; filename\*=utf-8''" \+ file)|\s+in\s+\[([^\]]*)\])?/g)];
+  assert.ok(usi.length > 0, `il Content-Disposition non si controlla: ${cond}`);
   for (const u of usi) {
-    assert.ok(u[2] && ammessi.has(u[2]), `uso del Content-Disposition non ammesso: ${u[0]}`);
+    const forme = u[1] !== undefined ? [u[1]] : u[2] !== undefined ? u[2].split(',').map((f) => f.trim()) : [];
+    assert.ok(forme.length > 0 && forme.every((f) => ammessi.has(f)), `uso del Content-Disposition non ammesso: ${u[0]}`);
+  }
+});
+
+test('codifica, cache e lingua non si leggono: il deposito vero le riempie da sé', () => {
+  // #1769: ogni regola su questi campi, verde a emulatore e API di prova, ha negato ogni caricamento vero
+  // dal 23/10 al 29/10. Il loro valore al deposito da qui non si vede; sceglierli su un blob opaco servito
+  // solo col codice di scarico non cambia tipo né nome di scarico (rischio accettato, scritto in storage.rules).
+  for (const campo of ['contentEncoding', 'cacheControl', 'contentLanguage']) {
+    assert.ok(!new RegExp(`\\b${campo}\\b`).test(VIVO), `le regole leggono di nuovo ${campo}: al deposito vero può negare ogni allegato`);
   }
 });
 
@@ -243,9 +248,10 @@ function congiunti(espr) {
   return out;
 }
 
-test('ogni campo dei metadati si legge solo dopo il suo `in`: un campo assente, sul motore vero, nega il caricamento', () => {
-  // #1728: dal 26/10 ogni allegato prendeva 403. Al motore vero un caricamento normale non porta contentEncoding,
-  // leggerlo nudo è un errore e l'errore nega; l'emulatore riempie quei campi, e lì tutto era verde.
+test('ogni campo dei metadati si legge solo dopo il suo `in`, e i campi letti sono solo chiavi e nome di scarico', () => {
+  // La guardia tiene vera la clausola sia col campo assente (all'emulatore, che metadati e nome di scarico non li
+  // scrive: letto nudo è un errore, e l'errore nega) sia col campo presente al deposito vero: là, se `in` andasse
+  // in errore, `||` lo assorbe: con queste guardie, al deposito vero, il primo passo di un caricamento ripristinabile passava.
   const m = /function\s+senzaMetadatiScelti\s*\(\s*(\w+)\s*,[^)]*\)\s*\{\s*return\s+([\s\S]*?);\s*\n\s*\}/.exec(VIVO);
   assert.ok(m, 'manca la funzione senzaMetadatiScelti(r, file)');
   const r = m[1];
@@ -260,9 +266,8 @@ test('ogni campo dei metadati si legge solo dopo il suo `in`: un campo assente, 
       assert.match(dentro, guardia, `${r}.${campo} si legge senza aprire con !('${campo}' in ${r}) ||: ${pezzo}`);
     }
   }
-  for (const atteso of ['metadata', 'contentDisposition', 'contentEncoding', 'cacheControl', 'contentLanguage']) {
-    assert.ok(lette.has(atteso), `senzaMetadatiScelti non guarda più ${atteso}`);
-  }
+  assert.deepEqual([...lette].sort(), ['contentDisposition', 'metadata'],
+    'senzaMetadatiScelti deve leggere le chiavi e il nome di scarico, e nient’altro');
 });
 
 // ── Il nome dell'allegato: le regole e l'app devono dire la stessa cosa ──────
