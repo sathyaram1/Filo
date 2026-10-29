@@ -269,6 +269,10 @@ html[data-chrome-compact="1"] .addr {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.tab.misura .title { container-type: normal; }
+@container titolo (width < 2em) {
+  .tab .title > span { visibility: hidden; }
+}
 .tab .close {
   /* La larghezza oltre alla base: la scheda misurata col contenuto conta la larghezza, non la base (#429). */
   flex: 0 0 18px;
