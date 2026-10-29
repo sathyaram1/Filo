@@ -146,6 +146,7 @@ test('«rifai l\'intervista di benvenuto» la ricomincia in una home nuova, e la
   const stato = await app.evaluate(async () => globalThis.SN_FILO_MEMORY.getOnboarding());
   expect(stato.done).toBe(false);
   expect((stato.past || []).length).toBeGreaterThanOrEqual(prima);
+  await expect.poll(riaperte, { timeout: 8_000 }).toBe(riapertePrima + 1);
   await intervista.screenshot({ path: 'tests/.shots/pulsanti-preferenze-intervista.png' });
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Ricominciamo da capo.' })).toBeVisible();
   await expect(await rigaDelDiario(chat, 'Intervista di benvenuto ricominciata')).toBeVisible();
