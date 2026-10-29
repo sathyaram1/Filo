@@ -253,7 +253,7 @@ function congiunti(espr) {
 test('ogni campo dei metadati si legge solo dopo il suo `in`, e i campi letti sono solo chiavi e nome di scarico', () => {
   // La guardia tiene vera la clausola sia col campo assente (all'emulatore, che metadati e nome di scarico non li
   // scrive: letto nudo è un errore, e l'errore nega) sia col campo presente al deposito vero: là, se `in` andasse
-  // in errore, `||` lo assorbe; il primo passo di un caricamento ripristinabile, che queste guardie le aveva, passava.
+  // in errore, `||` lo assorbe: con queste guardie, al deposito vero, il primo passo di un caricamento ripristinabile passava.
   const m = /function\s+senzaMetadatiScelti\s*\(\s*(\w+)\s*,[^)]*\)\s*\{\s*return\s+([\s\S]*?);\s*\n\s*\}/.exec(VIVO);
   assert.ok(m, 'manca la funzione senzaMetadatiScelti(r, file)');
   const r = m[1];
