@@ -1610,6 +1610,8 @@
         azioni: Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || ''),
         chiusa: c.dataset.closing === '1',
         indirizzo: c.dataset.indirizzo || '',
+        // #588.8 — lo scaricamento che la carta porta con sé quando la si trascina.
+        trascina: c.dataset.trascina || '',
       }));
       const altre = tutte.filter((c) => c.dataset.attesa === '1' && c.dataset.closing !== '1').length;
       const cs = getComputedStyle(document.documentElement);
@@ -1750,6 +1752,7 @@
         if (gemella._alChiudere !== opts.alChiudere) uscita(gemella);
         gemella._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
         gemella.dataset.indirizzo = opts.indirizzo ? String(opts.indirizzo) : '';
+        gemella.dataset.trascina = opts.trascinaDownloadId ? String(opts.trascinaDownloadId) : '';
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
         gemella._durata = durata;
@@ -1768,6 +1771,7 @@
       if (opts.key) card.dataset.key = String(opts.key);
       if (chiave) card.dataset.unica = chiave;
       if (opts.indirizzo) card.dataset.indirizzo = String(opts.indirizzo);
+      if (opts.trascinaDownloadId) card.dataset.trascina = String(opts.trascinaDownloadId);
 
       const msg = document.createElement('div');
       msg.className = 'shell-notif-msg';

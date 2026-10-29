@@ -74,6 +74,7 @@
       testo: String((c && c.testo) || ''),
       azioni: Array.isArray(c && c.azioni) ? c.azioni.map((a) => String(a || '')) : [],
       chiusa: !!(c && c.chiusa),
+      trascina: !!(c && c.trascina),
     })).filter((c) => c.id);
   }
 
@@ -101,6 +102,9 @@
   }
 
   function aggiorna(card, c) {
+    // #588.8 — l'avviso di un file arrivato si trascina come il file (il trascinamento lo fa il sistema, dal main).
+    card.draggable = c.trascina;
+    if (c.trascina) card.dataset.trascina = '1'; else delete card.dataset.trascina;
     const msg = card.querySelector('.shell-notif-msg');
     if (msg.textContent !== c.testo) msg.textContent = c.testo;
     const firma = JSON.stringify(c.azioni);
@@ -255,6 +259,14 @@
       : !!cartaSotto(e) || (tipo === 'giu' && suBarraDellaPila(e))),
     // La vista tocca i bordi destro e basso della finestra: uscendo di lì il puntatore lascia anche la pagina.
     versoLaPagina: (e) => e.clientX < innerWidth - 1 && e.clientY < innerHeight - 1,
+  });
+
+  pila.addEventListener('dragstart', (e) => {
+    const card = e.target && e.target.closest && e.target.closest('.shell-notif[data-trascina="1"]');
+    if (!card || !api.trascina) return;
+    e.preventDefault();
+    nascondiTip();
+    api.trascina(card.dataset.nid);
   });
 
   // Tasto destro su una carta: il menu di Filo con le sue azioni; nel vuoto è della pagina (già rigirato).
