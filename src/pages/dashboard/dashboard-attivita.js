@@ -598,6 +598,7 @@
     STILE_PAGINA: () => 'cambiato l\'aspetto della pagina',
     RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
+    ACCOUNT: () => 'sistemato l\'accesso',
     SPOSTA_ICONA: () => 'spostato un\'icona',
     INSTALLA_AGGIORNAMENTO: () => 'chiesto la versione nuova di Filo',
     RIMEDIO_CREDITI: () => 'lavorato sui crediti',
@@ -969,6 +970,14 @@
       if (cmd === 'home' && a._output && a._output.already) return { icon: '🏠', text: 'Sei già nella home', failed: true };
       return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };
     },
+    ACCOUNT: (a) => {
+      const o = a._output || {};
+      // Chi era già dove chiedeva non ha avuto niente di nuovo: la riga lo dice e resta fuori dal riassunto.
+      const gia = { dentro: 'Eri già dentro Filo', collegato: 'YouTube, Gmail e Drive erano già collegati', fuori: 'Non eri dentro nessun account' }[o.gia];
+      if (gia) return { icon: '👤', text: gia, failed: true };
+      const fatto = { accedi: 'Accesso con Google aperto', collega_google: 'Collegamento di YouTube, Gmail e Drive aperto', esci: 'Uscito dall\'account di Filo' }[o.voce];
+      return { icon: '👤', text: fatto || 'Account' };
+    },
     SPOSTA_ICONA: (a) => {
       const D = window.SN_DISPOSIZIONE_ICONE;
       const id = String(a.icona || a.id || '');
@@ -1002,6 +1011,7 @@
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
     RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito', SPOSTA_ICONA: 'Icona non spostata',
+    ACCOUNT: 'Account non cambiato',
     TIENI_APERTA: 'Sito non salvato', NON_TENERE_APERTA: 'Nessun sito da togliere',
     INSTALLA_AGGIORNAMENTO: 'Aggiornamento non partito',
     RIMEDIO_CREDITI: 'Rimedio dei crediti non applicato',

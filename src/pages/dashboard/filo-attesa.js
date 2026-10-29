@@ -56,6 +56,7 @@
     TIENI_APERTA: ['Salvato un sito da tenere aperto', (k) => `Salvati ${n(k)} siti da tenere aperti`, 'siti aperti'],
     NON_TENERE_APERTA: ['Tolto un sito da tenere aperto', (k) => `Tolti ${n(k)} siti da tenere aperti`, 'siti aperti'],
     COMANDO_FINESTRA: ['Azionata la finestra', (k) => `Azionata la finestra ${n(k)} volte`, 'finestra'],
+    ACCOUNT: ['Sistemato l\'accesso', (k) => `Sistemato l'accesso ${n(k)} volte`, 'accesso'],
     CARTA_HOME: ['Sistemata una carta della home', (k) => `Sistemate ${n(k)} carte della home`, 'carta'],
     SPOSTA_ICONA: ['Spostata un\'icona', (k) => `Spostate ${n(k)} icone`, 'icona'],
     STILE_PAGINA: ['Cambiato l\'aspetto della pagina', (k) => `Cambiato l'aspetto della pagina ${n(k)} volte`, 'aspetto della pagina'],

@@ -28,6 +28,13 @@
     return a && a._exfil ? Math.max(base, 2) : base;
   }
 
+  // Le voci del menu dell'account (#1615), coi nomi che un modello usa anche fuori dall'enum: '' se non è nessuna.
+  const ALIAS_ACCOUNT = { accedi: 'accedi', entra: 'accedi', login: 'accedi', collega_google: 'collega_google', collega: 'collega_google', esci: 'esci', logout: 'esci' };
+  function cosaAccount(a) {
+    const k = String((a && (a.cosa ?? a.azione ?? a.operazione)) || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+    return Object.prototype.hasOwnProperty.call(ALIAS_ACCOUNT, k) ? ALIAS_ACCOUNT[k] : '';
+  }
+
   // L'utente che chiede di mandare una segnalazione la nomina: chi non la nomina non l'ha chiesta.
   const CHIESTA_SEGNALAZIONE = /\b(?:segnal\w*|feedback|sviluppator\w*|report\w*|bug)\b|\bdi['’]\s+al\s+team\b|\bal\s+team\s+di\s+filo\b/i;
 
@@ -998,6 +1005,30 @@
         return labels[cmd] || 'Azionare un comando della finestra di Filo';
       },
     },
+    // #1615 — le voci del menu dell'account a parole. Entrare e collegare aprono una pagina dove sceglie l'utente (1);
+    // uscire ferma sincronia e segnalazioni finché non si rientra, che si fa con un gesto (2).
+    ACCOUNT: {
+      costo: (a) => (cosaAccount(a) === 'esci' ? 2 : 1),
+      campo: null,
+      describe: (a) => ({
+        accedi: 'Aprire l\'accesso a Filo con Google',
+        collega_google: 'Collegare YouTube, Gmail e Drive nelle schede al tuo account Google',
+        esci: 'Uscire dall\'account di Filo',
+      }[cosaAccount(a)] || 'Usare il menu dell\'account di Filo'),
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const gia = {
+          dentro: 'Eri già dentro Filo col tuo account Google',
+          collegato: 'YouTube, Gmail e Drive nelle schede erano già collegati',
+          fuori: 'Non eri dentro nessun account di Filo',
+        }[o.gia];
+        return gia || {
+          accedi: 'Aperto l\'accesso a Filo con Google',
+          collega_google: 'Aperto il collegamento di YouTube, Gmail e Drive al tuo account Google',
+          esci: 'Uscito dall\'account di Filo',
+        }[o.voce || cosaAccount(a)] || 'Usato il menu dell\'account';
+      },
+    },
     // #870 — le carte della home, come le dispone l'utente trascinandole. Costo 1: ogni mossa si annulla con
     // quella opposta, e una carta tolta resta in «altro», da cui si rimette.
     CARTA_HOME: {
@@ -1366,5 +1397,5 @@
     return '';
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo };
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo, cosaAccount };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -409,7 +409,8 @@
   }
 
   async function doSignIn() {
-    if (authBusy) return;
+    // Con un accesso già aperto (lo chiede anche la chat, #1615) il main ne riporta davanti la pagina: l'esito resta al primo.
+    if (authBusy) { Promise.resolve(api.auth.signIn()).catch(() => {}); return; }
     authBusy = true; renderAccount();
     try {
       const r = await api.auth.signIn();

@@ -622,8 +622,13 @@
     },
     COMANDO_FINESTRA: {
       description: 'Aziona un controllo del browser Filo (la finestra e la barra in alto), non il sito. "fullscreen" = schermo intero immersivo (la pagina attiva copre tutta la finestra, barre nascoste, Esc esce), non il pulsante del lettore video dentro il sito. NON esiste un comando per CHIUDERE la finestra; le schede si chiudono con CHIUDI_SCHEDE. Esegue subito.',
-      properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (menu Account), sidebar (apri la barra laterale).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account', 'sidebar'] }) },
+      properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (solo aprire il menu Account: per entrare, collegare Google o uscire c\'è ACCOUNT), sidebar (apri la barra laterale).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account', 'sidebar'] }) },
       required: ['comando'],
+    },
+    ACCOUNT: {
+      description: 'Fa per l\'utente le voci del menu dell\'account di Filo, invece di spiegargli dove cliccare. "accedi" apre l\'accesso a Filo con Google in una scheda: l\'utente sceglie l\'account e la scheda si chiude da sola (YouTube, Gmail e Drive nelle schede si collegano insieme). "collega_google" collega YouTube, Gmail e Drive nelle schede per chi è già dentro Filo. "esci" esce dall\'account di Filo (Google nelle schede resta collegato). L\'esito dice com\'era (già dentro, già collegato, già fuori): riporta quello. Per cambiare account: prima esci, poi accedi. Si entra solo con Google.',
+      properties: { cosa: S('accedi, collega_google o esci.', { enum: ['accedi', 'collega_google', 'esci'] }) },
+      required: ['cosa'],
     },
     SPOSTA_ICONA: {
       description: 'Sposta o riordina un\'icona della barra laterale (bordo sinistro): fra quelle in vista e quelle tenute in «Altro…» in fondo alla barra. È la stessa cosa che l\'utente fa trascinandola, e resta anche dopo un riavvio. Il menu del tasto destro non ha icone. Per "metti Screenshot in cima alla barra", "togli Chiudi scheda dalla barra", "riporta il QR nella barra". Togliere dalla barra = "altro". Esegue subito.',
