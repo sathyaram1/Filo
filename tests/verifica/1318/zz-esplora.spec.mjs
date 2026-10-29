@@ -1,0 +1,45 @@
+import { test, expect } from '../../fixtures/electron.mjs';
+test('esplora voci intere', async ({ app, openTab, testServer }) => {
+  const page = await openTab(testServer.html('<title>Prova</title><a id="l" href="file:///C:/x/link.pdf">link</a>'));
+  await page.locator('#l').click();
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { new Audio('file:///C:/x/a.wav').play().catch(() => {}); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { const v = document.createElement('video'); v.src = 'file:///C:/x/v.mp4'; });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { const i = new Image(); i.src = 'file:///C:/x/i.png'; });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { const s = document.createElement('script'); s.src = 'file:///C:/x/s.js'; document.head.appendChild(s); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { const s = document.createElement('link'); s.rel = 'stylesheet'; s.href = 'file:///C:/x/s.css'; document.head.appendChild(s); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { new Worker('file:///C:/x/w.js'); }).catch(() => {});
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { navigator.sendBeacon('file:///C:/x/b'); }).catch(() => {});
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { const o = document.createElement('object'); o.data = 'file:///C:/x/o.pdf'; document.body.appendChild(o); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { const o = document.createElement('embed'); o.src = 'file:///C:/x/e.pdf'; document.body.appendChild(o); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { new EventSource('file:///C:/x/es'); }).catch(() => {});
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { const f = new FontFace('x', 'url(file:///C:/x/f.woff)'); f.load().catch(() => {}); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { location.assign('file:///C:/x/assign.pdf'); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { const a = document.createElement('a'); a.href = 'file:///C:/x/dl.pdf'; a.download = 'x.pdf'; a.click(); });
+  await page.waitForTimeout(400);
+  const voci = await app.evaluate(async ({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const wc = tm.tabs.map((t) => t.view.webContents).find((w) => /127\.0\.0\.1/.test(w.getURL()));
+    const out = [];
+    const dbg = wc.debugger;
+    dbg.attach('1.3');
+    dbg.on('message', (_e, method, params) => { if (method === 'Log.entryAdded') out.push(params.entry); });
+    await dbg.sendCommand('Log.enable');
+    await new Promise((r) => setTimeout(r, 300));
+    dbg.detach();
+    return out;
+  });
+  for (const v of voci) { if (v.stackTrace) v.stackTrace = { n: v.stackTrace.callFrames.length, f: v.stackTrace.callFrames[0] && v.stackTrace.callFrames[0].url }; console.log('V', JSON.stringify(v)); }
+});

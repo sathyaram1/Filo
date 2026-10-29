@@ -303,22 +303,71 @@ function avvisaIndirizzoFermato(rawUrl, win, pagina = '') {
   if (!a || !win || win.isDestroyed?.()) return;
   try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave, tipo: 'indirizzo_fermato' } }); } catch (_) {}
 }
-// L'indirizzo rifiutato è la sorgente di un elemento della pagina (un'immagine incollata da Word, un riquadro)? Gira
-// nel mondo della pagina: barando può solo tacere il proprio avviso o farne nascere uno senza testo suo.
+// L'indirizzo rifiutato nella pagina: 'risorsa' se è la sorgente di un elemento (un'immagine incollata da Word, un
+// riquadro), 'collegamento' se un collegamento o un modulo ci porta, '' se non si trova. Gira nel mondo della pagina:
+// barando può solo tacere il proprio avviso o farne nascere uno senza testo suo.
 const TAG_CON_SORGENTE = 'img,source,video,audio,track,iframe,frame,embed,object,link,script,input';
-function risorsaDellaPagina(frame, url) {
+function cosaNellaPagina(frame, url) {
   let u = '';
-  try { u = new URL(url).href; } catch (_) { return Promise.resolve(false); }
+  try { u = new URL(url).href; } catch (_) { return Promise.resolve(''); }
   // Un riquadro ancora in arrivo non ha ricevuto clic né eseguito script: il rifiuto non è un'apertura dell'utente.
-  if (!riquadroArrivato(frame)) return Promise.resolve(true);
+  if (!riquadroArrivato(frame)) return Promise.resolve('risorsa');
   const codice = `(function (u) {
-    var stesso = function (v) { try { return !!v && new URL(v, document.baseURI).href === u; } catch (_) { return false; } };
-    return Array.prototype.some.call(document.querySelectorAll(${JSON.stringify(TAG_CON_SORGENTE)}), function (el) {
+    var norma = function (v) { try { var h = new URL(v, document.baseURI).href; try { return decodeURI(h); } catch (_) { return h; } } catch (_) { return ''; } };
+    var cercato = norma(u);
+    var stesso = function (v) { return !!v && norma(v) === cercato; };
+    var senzaDomanda = function (v) { return String(v || '').replace(/[?#][\\s\\S]*$/, ''); };
+    var risorsa = Array.prototype.some.call(document.querySelectorAll(${JSON.stringify(TAG_CON_SORGENTE)}), function (el) {
       return stesso(el.currentSrc) || stesso(el.getAttribute('src')) || stesso(el.getAttribute('data'))
         || (el.tagName === 'LINK' && stesso(el.getAttribute('href'))) || String(el.getAttribute('srcset') || '').indexOf(u) >= 0;
     });
+    if (risorsa) return 'risorsa';
+    var porta = Array.prototype.some.call(document.querySelectorAll('a[href],area[href]'), function (el) { return stesso(el.getAttribute('href')); })
+      || Array.prototype.some.call(document.forms, function (f) { return senzaDomanda(norma(f.getAttribute('action') || '')) === senzaDomanda(cercato); });
+    return porta ? 'collegamento' : '';
   })(${JSON.stringify(u)})`;
-  try { return Promise.resolve(frame.executeJavaScript(codice)).then((v) => v === true, () => false); } catch (_) { return Promise.resolve(false); }
+  try { return Promise.resolve(frame.executeJavaScript(codice)).then((v) => (typeof v === 'string' ? v : ''), () => ''); } catch (_) { return Promise.resolve(''); }
+}
+// Il registro di Chromium dice chi ha fatto rifiutare l'indirizzo, e la pagina non ci scrive (un suo console.error lì
+// non arriva): 'security' è un'apertura (o un suono), 'javascript' un caricamento in sottofondo. Rileggerlo lo rimanda
+// intero. In fila per pagina: un secondo «Log.enable» mentre il primo è acceso non rimanda niente.
+const registroInFila = new WeakMap();
+function voceDelRifiuto(wc, messaggio) {
+  const ora = (registroInFila.get(wc) || Promise.resolve()).then(() => leggiVoceDelRifiuto(wc, messaggio));
+  registroInFila.set(wc, ora.catch(() => {}));
+  return ora;
+}
+async function leggiVoceDelRifiuto(wc, messaggio) {
+  const dbg = wc && !wc.isDestroyed() ? wc.debugger : null;
+  if (!dbg) return null;
+  let voce = null;
+  const su = (_e, metodo, p) => {
+    const v = metodo === 'Log.entryAdded' && p && p.entry;
+    if (v && v.text === messaggio) voce = { fonte: String(v.source || ''), script: !!v.stackTrace };
+  };
+  let mio = false;
+  try {
+    if (!dbg.isAttached()) { dbg.attach('1.3'); mio = true; }
+    dbg.on('message', su);
+    await dbg.sendCommand('Log.enable');
+    await new Promise((r) => setImmediate(r));
+    await dbg.sendCommand('Log.disable').catch(() => {});
+  } catch (_) {
+    voce = null;
+  } finally {
+    dbg.removeListener('message', su);
+    if (mio) { try { dbg.detach(); } catch (_) {} }
+  }
+  return voce;
+}
+// Un'apertura dell'utente: un cambio di pagina o una finestra da script, o il clic su un collegamento o un modulo che
+// ci porta. Un caricamento in sottofondo (sfondo, richiesta, suono, immagine) dopo il clic non lo è (#1318 giro 3).
+async function aperturaDellUtente(wc, frame, url, messaggio) {
+  const voce = await voceDelRifiuto(wc, messaggio);
+  if (!voce || voce.fonte !== 'security') return false;
+  const cosa = await cosaNellaPagina(frame, url);
+  if (cosa === 'risorsa') return false;
+  return voce.script || cosa === 'collegamento';
 }
 function urlDellaPagina(wc) {
   try { return wc && !wc.isDestroyed() ? String(wc.getURL() || '') : ''; } catch (_) { return ''; }
