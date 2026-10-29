@@ -207,3 +207,29 @@ test('i posti lasciati all altra routine compaiono all owner, col lavoro lasciat
   await expect(page.locator('#mgChannelList')).not.toContainText('slot_to_other_voice');
   await expect(page.locator('#mgChannelList')).not.toContainText('secaudit');
 });
+
+// #1785: chi ha letto schede e testi dei feedback dal cloud lo vede l'owner, e le letture non coprono i rifiuti.
+test('le letture di schede e testi compaiono coi numeri e la routine, solo le più recenti, accanto ai rifiuti', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
+  await apriScheda(page, 'log');
+  const letture = Array.from({ length: 30 }, (_, i) => ({
+    id: `l${i}`, at: new Date(Date.UTC(2026, 9, 29, 12, 59 - i)).toISOString(), slug: 'manutentore', role: 'manutentore',
+    op: 'leggi', testi: true, schede: false, numeri: [String(800 + i)], quanti: 1,
+  }));
+  letture[0] = { ...letture[0], op: 'scheda', testi: false, schede: true, numeri: ['812'] };
+  letture[1] = { ...letture[1], testi: false, schede: true, aperti: true, numeri: Array.from({ length: 50 }, (_, k) => String(k + 1)), quanti: 640 };
+  const rej = [{ id: 'r', at: '2026-10-29T11:00:00.000Z', slug: 'manutentore', role: 'manutentore', reason: 'fuori_riservati', action: 'feedback.leggi' }];
+  await page.evaluate(({ r, l }) => window.__mgTest.renderChannelLog(r, [], null, null, l), { r: rej, l: letture });
+
+  const list = page.locator('#mgChannelList');
+  await expect(list.locator('.mg-log-row')).toHaveCount(11);
+  await expect(list.locator('.mg-log-row').nth(0)).toContainText('scheda scritta: #812 · manutentore');
+  await expect(list).toContainText('schede lette: tutti gli aperti (640)');
+  await expect(list).toContainText('testi letti: #802');
+  await expect(list).not.toContainText('#829', { useInnerText: true });
+  await expect(list).toContainText('testi riservati chiesti fuori dall’ambiente dei riservati');
+  await expect(list).not.toContainText('fuori_riservati');
+  await page.screenshot({ path: 'tests/.shots/1785-letture-log.png' });
+});

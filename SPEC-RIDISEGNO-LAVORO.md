@@ -208,4 +208,7 @@ pacemaker, voce server compresa; mancano finché il conto, partito col deploy, n
 la finestra). Il freno che ferma un account resta `fermo` per account (`riserva`, che su
 B è il tetto, o `passo`).
 
-Resta: l'operazione che dà schede e testi a chi ha la chiave delle routine.
+Fatto in #1785 (server da rideployare): `routineFeedback`, che dà schede e testi a un
+biglietto con l'ambito `gestione_lavoro` nell'ambiente dei riservati e salva le schede nel
+feedback (ROUTINE-AUTH-SPEC.md § 15); `feedback:leggi` e `feedback:schede` lo usano in
+una routine, il token dell'owner in locale.
