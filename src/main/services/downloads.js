@@ -735,8 +735,7 @@ async function rimettiNome(id, scope = '') {
 }
 
 // ─── intercettazione ────────────────────────────────────────────────────
-function onWillDownload(item, webContents, scope = '') {
-  const id = uuid();
+function onWillDownload(item, webContents, scope = '', ses = null) {
   const filename = safeName(item.getFilename() || (function () {
     try { return decodeURIComponent(new URL(item.getURL()).pathname.split('/').pop() || ''); }
     catch (_) { return ''; }
@@ -747,6 +746,9 @@ function onWillDownload(item, webContents, scope = '') {
   // cliccato; chi ha servito il file davvero va comunque nominato (#588.3).
   let primo = url;
   try { const c = item.getURLChain(); if (Array.isArray(c) && c[0]) primo = c[0]; } catch (_) {}
+  // «Riprova» riempie la stessa voce: avvisi, righe e carte che la nominano seguono il nuovo tentativo.
+  const ripresa = prendiRiprova(scope, primo);
+  const id = ripresa ? ripresa.id : uuid();
   const { sito, incerto } = sitoDi(primo, webContents);
   let servito = '';
   try { servito = ESE().servitoDa(sito, url); } catch (_) {}
