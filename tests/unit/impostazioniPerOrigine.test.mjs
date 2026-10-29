@@ -451,7 +451,7 @@ test('sentinella: ogni scomparto del magazzino usato dai content script è fra q
     }
   }
   assert.ok([...usati].some((u) => u.startsWith('sn_personal_dict ')), 'la sentinella non vede più il dizionario del correttore');
-  const mancanti = [...usati].filter((u) => !W.CHIAVI_STORAGE_WEB.includes(u.split(' ')[0]));
+  const mancanti = [...usati].filter((u) => !W.CHIAVI_STORAGE_WEB.includes(u.split(' ')[0]) && !SOLO_NELLE_PAGINE_DI_FILO.has(u));
   assert.deepEqual(mancanti, [], 'scomparti usati sui siti ma non ammessi in impostazioniPerOrigine.js');
 });
 
