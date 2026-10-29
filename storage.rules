@@ -90,6 +90,8 @@ rules_version = '2';
 // ⚠️ Queste regole diventano vere il giorno in cui le si pubblica sul progetto
 // Firebase. Finché quel comando non gira, nel repo c'è un confine stretto e in
 // produzione la porta è ancora quella di prima: è un passo da fare a mano.
+// E dopo, un caricamento vero: emulatore e API di prova non vedono i campi che
+// il deposito scrive da sé, e sono stati verdi su regole che negavano tutto (#1769).
 
 service firebase.storage {
   match /b/{bucket}/o {
