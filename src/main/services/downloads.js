@@ -459,7 +459,7 @@ function importa(lista) {
 function persist() {
   try {
     // Le voci incognito non toccano mai il disco.
-    const arr = listRecords('').slice(0, HISTORY_LIMIT);
+    const arr = listRecords('').slice(0, HISTORY_LIMIT).map(({ velocita, restano, ...r }) => r);
     chrome.storage.local.set({ [storageKey()]: arr });
   } catch (_) { /* best-effort */ }
 }
