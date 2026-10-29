@@ -2209,6 +2209,7 @@
         <span class="ed-strumento-nome">${escapeHtml(nomeElemento(id))}</span>
         <span class="ed-strumento-nota">${escapeHtml(nota)}</span></button>`;
     }).join('');
+    contaGesto({ gesto: 'modulo_editor', impostazioni: true });
     openOverlay(`<h3>Strumenti</h3>${righe}
       <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
     $('ovClose').addEventListener('click', closeOverlay);
