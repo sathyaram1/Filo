@@ -6,7 +6,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
-import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { riquadroDelSegno, stileDelSegno } from './helpers/segniDelCorrettore.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:20px;font:16px sans-serif">
@@ -91,7 +91,7 @@ async function apri(app, openTab, testServer, opz = {}) {
 const errore = (page, testo) => page.locator('.sn-spell-overlay .sn-errore', { hasText: testo });
 const suggerimento = (page, testo) => page.locator('.sn-spell-overlay .sn-suggerimento', { hasText: testo });
 const rapide = (app) => app.evaluate(() => globalThis.__rapide);
-const coloreDelSegno = (loc) => loc.evaluate((el) => getComputedStyle(el).textDecorationColor);
+const coloreDelSegno = async (loc) => (await stileDelSegno(loc, ['text-decoration-color']))['text-decoration-color'];
 
 async function tastoDestroSu(page, loc) {
   const b = await riquadroDelSegno(loc);
