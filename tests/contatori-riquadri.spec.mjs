@@ -7,6 +7,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
+import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
 
 // Le ore di oggi sommate, misura per misura.
 const oggi = (app) => app.evaluate(async () => {
@@ -161,7 +162,7 @@ test('la pagina tradotta intera e riportata all’originale entro un minuto cont
   await expect.poll(() => voceOra(app, 'traduzione_pagina', 'intera'), { timeout: 10_000 }).toEqual({ 'r10|si': 1 });
 });
 
-test('nell’Editor il titolo automatico riscritto a mano conta quando, e la chat che formatta conta le modifiche', async ({ app, openTab }) => {
+test('nell’Editor il titolo automatico riscritto a mano conta quando, e l’Aiuto che formatta conta le modifiche', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#docSwitch');
@@ -196,16 +197,26 @@ test('nell’Editor il titolo automatico riscritto a mano conta quando, e la cha
   await expect(page.locator('#docTitle')).toHaveText('Appunti di Mario');
   await expect.poll(() => voceOra(app, 'editor_titolo', 'automatico'), { timeout: 10_000 }).toEqual({ applicato: 1, riscritto_ora: 1 });
 
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await page.waitForSelector('.ed-module[data-type="chat"]');
-  await page.evaluate(() => {
-    window.__risposta = '```json\n{"actions":[{"op":"format","target":"headings","style":"bold","value":true}],"reply":"Fatto."}\n```';
+  // La chat dell'Editor è l'Aiuto (#1433): la sua risposta arriva dal main, finta anche lei.
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { ...globalThis.SN_TEST_MODELS.models, [C.ACTIONS.HELP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const risponde = async ({ attempts, messages }) => {
+      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, finishReason: 'stop' };
+      if (!sistema.includes('# Protocollo di risposta')) return { ...base, text: 'ok' };
+      return { ...base, text: JSON.stringify({ text: 'Fatto.', formatta: [{ op: 'format', target: 'headings', style: 'bold', value: true }] }) };
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = risponde;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = risponde;
   });
-  const input = page.locator('.ed-module[data-type="chat"] [data-chat="input"]');
-  await input.click();
-  await input.fill('metti in grassetto i titoli');
-  await input.press('Enter');
-  await expect(page.locator('.ed-chat-msg.assistant').last()).toHaveText('Fatto.');
+  await apriAiuto(app, page);
+  await chiediAllAiuto(page, 'metti in grassetto i titoli');
+  await expect(page.locator('.sn-sidebar-msg-assistant').last()).toContainText('Fatto.');
   await expect.poll(() => voceOra(app, 'editor_chat', 'intero'), { timeout: 10_000 }).toEqual({ f1: 1 });
 
   const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));

@@ -124,6 +124,8 @@
           a.dataset.pdSeguita = '1';
           guardaAiuto.observe(a, { attributes: true, attributeFilter: ['class', 'style'] });
           if (typeof ResizeObserver === 'function') new ResizeObserver(posa).observe(a);
+          // L'Aiuto entra scivolando: misurato a metà, la striscia resterebbe sotto di lui.
+          for (const ev of ['transitionend', 'animationend']) a.addEventListener(ev, (e) => { if (e.target === a) posa(); });
         }
       };
       new MutationObserver(segui).observe(html, { childList: true });
