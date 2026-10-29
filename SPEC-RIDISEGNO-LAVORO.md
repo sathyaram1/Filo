@@ -181,5 +181,10 @@ Fatto dalla parte del server (ramo omonimo di filo-security, da rideployare):
   dell'accensione; il biglietto che quella sessione riceve per il suo feedback e uno solo. Il prompt salvato della routine non cambia: la sessione accesa
   così è l'orchestratore cieco, ristretto dal server al suo feedback.
 
-Resta: fase 2, la spesa dell'account per il manutentore e l'operazione che dà schede e
-testi a chi ha la chiave delle routine.
+Fatto in #1785 (server da rideployare): `routineFeedback`, che dà schede e testi a un
+biglietto con l'ambito `gestione_lavoro` nell'ambiente dei riservati e salva le schede nel
+feedback (ROUTINE-AUTH-SPEC.md § 15); `feedback:leggi` e `feedback:schede` lo usano in
+una routine, il token dell'owner in locale.
+
+Resta: fase 2 (il compito ricorrente del manutentore, che porta l'ambito, e la scrittura
+dell'ordine dal cloud) e la spesa dell'account per il manutentore.

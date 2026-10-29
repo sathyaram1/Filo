@@ -173,6 +173,23 @@ export async function decryptFeedbackFields(fb, privKey) {
 }
 
 /**
+ * Un campo cifrato che contiene JSON (la scheda di un feedback, #1785), in chiaro e già letto: null se manca, non si
+ * apre o non è JSON. Senza chiave null: chi chiama lo dice, non inventa.
+ */
+export async function decryptJsonField(v, privKey) {
+  if (typeof v !== 'string' || !v) return null;
+  loadCrypto();
+  const C = globalThis.SN_FEEDBACK_CRYPTO;
+  try {
+    if (!C || !C.isEncrypted(v)) return JSON.parse(v);
+    const priv = privKey || readPrivKey();
+    return priv ? JSON.parse(await C.decrypt(v, priv)) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
  * I byte di un allegato, in chiaro: quelli cifrati si aprono con la stessa chiave dei campi, gli altri passano.
  * Lancia se sono cifrati e la chiave manca o non li apre: un allegato illeggibile si dice, non si inventa.
  * @param {Uint8Array} bytes

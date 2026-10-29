@@ -893,3 +893,36 @@ token.
   sì del server lo fa rispettare lo strumento, non la rete. Quello che arriva
   su main di filo-security passa comunque dal registro dei rami e dal
   cancello.
+
+## 15. Schede e testi dei feedback per chi gestisce il lavoro: `routineFeedback` (#1785)
+
+Il manutentore in cloud (SPEC-RIDISEGNO-LAVORO.md § 5, fase 2) legge le schede e,
+per scriverle, i testi dei feedback: dal cloud non ci sono token admin né chiave
+di decifratura, quindi li dà il server.
+
+- **`routineFeedback` `{ ticket, op: 'leggi', numeri: [...] | 'aperti', schede?, testi?, allegato? }`**
+  → `{ ok, voci, resto }`. Solo un biglietto con l'ambito `gestione_lavoro`;
+  schede e testi solo se gira nell'ambiente dei riservati (SPEC-DOMANDE § 5.1:
+  sono testo riservato), altrimenti si leggono solo numeri, stati e attese. Per
+  ogni numero: la riga dell'indice, la scheda salvata nel feedback e, con
+  `testi`, titolo, pagina, testo, conversazione, il mittente senza identità e
+  gli allegati testuali in chiaro. Un feedback segnalato come attacco o file
+  sospetto ha solo la riga e `rifiutato` col motivo (la regola del lettore
+  locale, provata da un gemello). Tetto: 2000 numeri, oltre `troppi_numeri`
+  col conteggio; i testi a pagine da sei milioni di caratteri, il resto in
+  `resto`, un allegato che non ci sta torna `rinviato` e si chiede da solo con
+  `allegato`. Il biglietto si sporca prima che esca testo, o una scheda, non
+  fidati.
+- **`routineFeedback` `{ ticket, op: 'scheda', numero, scheda, rilettura?, modello? }`**
+  → `{ ok, scheda, aggiornato }`: la scheda validata con `src/shared/schede.js`,
+  cifrata nel feedback (`scheda`) con la versione dello schema, la fonte e la
+  fiducia di chi la scrive e del feedback; `schedaAt` in chiaro è l'ora della
+  scrittura, uguale all'aggiornamento del feedback finché nessuno lo tocca.
+- **`ownerSchede` (callable owner)** `{ op: 'scheda', … }`: la stessa scrittura
+  dalla macchina dell'owner.
+- **Registro**: ogni lettura con schede o testi e ogni scheda scritta vanno in
+  `routine-letture` (biglietto, ruolo, numeri), che `routineLog` rimanda in `letture`.
+- **Due strade, stessa uscita**: `npm run feedback:leggi` e `npm run
+  feedback:schede` passano dal server con `FILO_ROUTINE` e il biglietto, dal
+  token dell'owner altrimenti (`scripts/lib/feedback-cloud.mjs`). Il server
+  rimanda campi in chiaro e la cornice la mette l'app su tutte e due.

@@ -1,6 +1,6 @@
 // Le schede dei feedback aperti per il manutentore (SPEC-RIDISEGNO-LAVORO.md § 2): Haiku le scrive col ruolo scheda.md, Opus
-// rilegge chi toglie lavoro e un campione. Solo in locale (token e chiave dell'owner), fuori dal repo. Test: tests/unit/schede.test.mjs.
-// Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] | rileggi [--quota 0.1] | stato [--cartella <dir>] [--dry-run]
+// rilegge chi toglie lavoro e un campione. Si salvano nel feedback; la cartella fuori dal repo è la copia di lavoro. Due strade
+// (#1785): il server col biglietto in una routine, il token dell'owner in locale. Test: tests/unit/schede.test.mjs.
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -8,17 +8,18 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import './lib/freno-letture.mjs';
+import '../src/shared/schede.js';
+
+const SS = globalThis.SN_SCHEDE;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const CARTELLA_PREDEFINITA = resolve(ROOT, '..', 'filo-schede');
 export const INDICE = 'indice.json';
 
-export const STATI_CHIUSI = ['done', 'archived', 'attack_confirmed', 'spam_confirmed'];
-export const VALIDI = ['si', 'no', 'dubbio', 'non letto'];
-export const TIPI = ['bug', 'feature', 'design', 'processo', 'sicurezza', 'documento'];
-export const AREE = ['chat-filo', 'home', 'editor', 'browser-schede', 'impostazioni', 'gestione-owner', 'feedback-app',
-  'server-filo-security', 'routine-script', 'test', 'sito', 'pacchetti-rilasci', 'deck-builder', 'altro'];
+export const { STATI_CHIUSI, VALIDI, TIPI, AREE, validaScheda } = SS;
 export const CAMPI_LETTI = ['seq', 'subSeq', 'status', 'priority', 'updatedAt', 'waitsFor', 'unisce'];
+// In più, sulla strada locale: la scheda salvata nel feedback e il giudizio che dice se si può dare (come fa il server).
+const CAMPI_SCHEDA = ['scheda', 'schedaAt', 'pipeline'];
 
 const RILETTURA = [
   'RILETTURA. La scheda che trovi nel file l\'ha scritta un modello più piccolo. Rifai i controlli dei passi 1-3 e',
@@ -49,34 +50,6 @@ export function apertiDaRighe(righe) {
     }))
     .filter((f) => f.id && f.num && f.stato && !STATI_CHIUSI.includes(f.stato))
     .sort((a, b) => Number(a.num) - Number(b.num));
-}
-
-/** I motivi per cui una scheda non è buona (vuoto = buona). PURA. */
-export function validaScheda(s, num) {
-  if (!s || typeof s !== 'object' || Array.isArray(s)) return ['non è un oggetto JSON'];
-  const m = [];
-  const testo = (k, max) => {
-    if (typeof s[k] !== 'string' || !s[k].trim()) m.push(`manca «${k}»`);
-    else if (max && s[k].length > max) m.push(`«${k}» è lungo ${s[k].length} caratteri, il massimo è ${max}`);
-  };
-  const elenco = (k, max) => {
-    if (!Array.isArray(s[k]) || s[k].some((x) => typeof x !== 'string')) m.push(`«${k}» non è un elenco di testi`);
-    else if (max && s[k].length > max) m.push(`«${k}» ha ${s[k].length} voci, il massimo è ${max}`);
-  };
-  if (String(s.numero || '').replace(/^#/, '') !== String(num)) m.push(`«numero» è ${JSON.stringify(s.numero)}, non ${num}`);
-  testo('titolo_breve', 80);
-  testo('riassunto', 2000);
-  testo('prova', 1000);
-  if (!VALIDI.includes(s.valido)) m.push(`«valido» deve essere uno fra ${VALIDI.join(', ')}`);
-  if (!TIPI.includes(s.tipo) && s.valido !== 'non letto') m.push(`«tipo» deve essere uno fra ${TIPI.join(', ')}`);
-  if (!AREE.includes(s.area) && s.valido !== 'non letto') m.push(`«area» deve essere una fra ${AREE.join(', ')}`);
-  if (typeof s.urgente !== 'boolean') m.push('«urgente» deve essere true o false');
-  elenco('file_probabili', 5);
-  elenco('doppione_di');
-  elenco('parole_chiave', 10);
-  if (s.risolto_su_main !== null && typeof s.risolto_su_main !== 'string') m.push('«risolto_su_main» è uno sha con la riga, o null');
-  if (s.valido === 'no' && !String(s.prova || '').trim()) m.push('«valido: no» vuole la prova');
-  return m;
 }
 
 /** La scheda va (ri)scritta? Manca, non è buona o non ha la stessa fonte del feedback di adesso. PURA. */
@@ -163,22 +136,98 @@ function opzione(argv, nome) {
   return argv[i].includes('=') ? argv[i].slice(nome.length + 1) : argv[i + 1];
 }
 
-async function elenca(cartella, dryRun) {
+/**
+ * Le schede salvate nei feedback, dalle righe della strada locale (già decifrate, `scheda` ancora cifrata): solo dei
+ * feedback aperti e leggibili, come le dà il server. `apri(v)` → l'oggetto in chiaro o null; `vietato(stato, giudizio)`
+ * è la regola del lettore. → [scheda nella forma dei file]
+ */
+export async function schedeDaRighe(righe, { apri, vietato }) {
+  const out = [];
+  for (const r of Array.isArray(righe) ? righe : []) {
+    const stato = String(r.status || '').trim();
+    if (!r.scheda || !r._id || STATI_CHIUSI.includes(stato) || vietato(stato, r.pipeline)) continue;
+    const s = SS.dalDocumento(await apri(r.scheda), { id: String(r._id), aggiornato: String(r.schedaAt || '') });
+    if (s) out.push(s);
+  }
+  return out;
+}
+
+/**
+ * Le schede del feedback nella cartella: una manca, non è buona o è più vecchia di quella salvata (`_fonte.at`) → si
+ * scrive quella salvata. Una scritta qui dopo resta. → quante scritte.
+ */
+export function importaSchede(cartella, schede) {
+  let scritte = 0;
+  for (const s of schede) {
+    const num = String(s.numero || '').replace(/^#/, '');
+    if (!/^\d+(\.\d+)?$/.test(num)) continue;
+    const qui = leggiJson(fileScheda(cartella, num));
+    const piuNuova = qui && !validaScheda(qui, num).length && String((qui._fonte || {}).at || '') > String((s._fonte || {}).at || '');
+    if (piuNuova) continue;
+    writeFileSync(fileScheda(cartella, num), `${JSON.stringify(s, null, 1)}\n`);
+    scritte += 1;
+  }
+  return scritte;
+}
+
+/** Righe e schede dalla strada locale: token e chiave dell'owner. → { ok, righe, schede, complete } | { ok:false, codice, motivo } */
+async function letturaLocale() {
   const { acquireBearer } = await import('./lib/firestore-auth.mjs');
   // La pubblica prima della cifratura, come in claude-feedback.mjs.
   for (const m of ['feedbackThread.js', 'feedbackPublicKey.js', 'feedbackCrypto.js', 'feedback.js']) await import(`../src/shared/${m}`);
-  const { decryptFeedbackList } = await import('./lib/decrypt-feedback-fields.mjs');
+  const { decryptFeedbackList, decryptJsonField } = await import('./lib/decrypt-feedback-fields.mjs');
+  const { vietatoLeggere } = await import('./leggi-feedback.mjs');
   const token = await acquireBearer();
-  const r = await globalThis.SN_FEEDBACK.listAllPaged({ idToken: token, fields: CAMPI_LETTI });
+  const r = await globalThis.SN_FEEDBACK.listAllPaged({ idToken: token, fields: [...CAMPI_LETTI, ...CAMPI_SCHEDA] });
   const righe = await decryptFeedbackList(r.rows);
+  const schede = await schedeDaRighe(righe, { apri: (v) => decryptJsonField(v), vietato: vietatoLeggere });
+  return { ok: true, righe, schede, complete: r.complete !== false };
+}
+
+/** Righe e schede dal server, col biglietto della routine. */
+async function letturaCloud(ticket) {
+  const { leggiDalServer } = await import('./lib/feedback-cloud.mjs');
+  const r = await leggiDalServer(ticket, { numeri: 'aperti', schede: true, testi: false });
+  if (!r.ok) return { ok: false, codice: r.guasto ? 4 : 3, motivo: r.motivo };
+  return { ok: true, righe: r.voci.filter((v) => v.riga).map((v) => v.riga), schede: r.voci.filter((v) => v.scheda).map((v) => v.scheda), complete: true };
+}
+
+async function strada() {
+  const { stradaFeedback, bigliettoDelGiro } = await import('./lib/feedback-cloud.mjs');
+  const ticket = await bigliettoDelGiro(ROOT);
+  return { via: stradaFeedback({ env: process.env, biglietto: ticket }), ticket };
+}
+
+async function elenca(cartella, dryRun) {
+  const { via, ticket } = await strada();
+  const r = via === 'cloud' ? await letturaCloud(ticket) : await letturaLocale();
+  if (!r.ok) { console.error(`${r.codice === 4 ? 'GUASTO' : 'RIFIUTATO'}: ${r.motivo}. Indice non scritto.`); return r.codice; }
+  const { righe } = r;
   // Un indice sbagliato è peggio di uno vecchio: chi lo legge non lo distingue da uno buono.
   if (r.complete === false) { console.error(`RIFIUTATO: la lettura non è completa (${righe.length} documenti): indice non scritto, rilancia.`); return 1; }
   const illeggibili = righe.filter(statoIllegibile).length;
   if (illeggibili) { console.error(`RIFIUTATO: lo stato di ${illeggibili} feedback su ${righe.length} non si decifra (manca la chiave privata, o è un'altra): senza non so chi è aperto, indice non scritto.`); return 1; }
   const indice = apertiDaRighe(righe);
-  if (!dryRun) { mkdirSync(cartella, { recursive: true }); writeFileSync(join(cartella, INDICE), `${JSON.stringify(indice, null, 1)}\n`); }
-  console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}.`);
+  let scritte = 0;
+  if (!dryRun) {
+    mkdirSync(cartella, { recursive: true });
+    writeFileSync(join(cartella, INDICE), `${JSON.stringify(indice, null, 1)}\n`);
+    scritte = importaSchede(cartella, r.schede);
+  }
+  const salvate = `${r.schede.length} schede salvate nei feedback${dryRun ? '' : `, ${scritte} copiate nella cartella`}`;
+  console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}; ${salvate}.`);
   return 0;
+}
+
+/** La scheda nel feedback, sulla strada del giro. → { ok, scheda?, aggiornato? } | { ok:false, motivo } */
+async function salvaNelFeedback(dati, { via, ticket }) {
+  const { salvaSchedaDalServer, salvaSchedaDaOwner } = await import('./lib/feedback-cloud.mjs');
+  return via === 'cloud' ? salvaSchedaDalServer(ticket, dati) : salvaSchedaDaOwner(dati);
+}
+
+/** L'indice col nuovo aggiornamento dei feedback appena toccati dalle schede: senza, le si darebbe per vecchie. PURA. */
+export function indiceAggiornato(indice, aggiornati) {
+  return (indice || []).map((f) => (aggiornati.has(f.num) ? { ...f, aggiornato: aggiornati.get(f.num) } : f));
 }
 
 async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dryRun }) {
@@ -194,6 +243,9 @@ async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dry
   const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'scheda.md'), 'utf8'), dirRuoli);
   let costo = 0;
   let falliti = 0;
+  let nonSalvate = 0;
+  const giro = await strada();
+  const aggiornati = new Map();
   await aGruppi(voci, paralleli, async (v) => {
     const args = argomentiClaude({ model: modello, effort: '', nome: `scheda #${v.num}`, addDirs: [cartella] });
     // Una scheda vecchia che l'agente non riscrive resterebbe buona e verrebbe timbrata come nuova: conta l'ora del file.
@@ -213,10 +265,24 @@ async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dry
     const stampata = { ...nuova, _fonte: { id: v.id, stato: v.stato, aggiornato: v.aggiornato, at: new Date().toISOString(), modello } };
     if (rilettura) stampata._riletta = { at: new Date().toISOString(), modello };
     writeFileSync(fileScheda(cartella, v.num), `${JSON.stringify(stampata, null, 1)}\n`);
+    // La fonte è il feedback: la cartella è la copia di lavoro, e il manutentore in cloud legge solo da lì.
+    const salvata = await salvaNelFeedback({ numero: v.num, scheda: SS.campiDellAgente(nuova), rilettura, modello }, giro);
+    if (salvata.ok && salvata.scheda) {
+      writeFileSync(fileScheda(cartella, v.num), `${JSON.stringify(salvata.scheda, null, 1)}\n`);
+      if (salvata.aggiornato) aggiornati.set(v.num, salvata.aggiornato);
+    } else {
+      nonSalvate += 1;
+      console.error(`#${v.num}: scheda nella cartella ma non nel feedback (${salvata.motivo || 'risposta vuota'}).`);
+    }
     console.log(u.testo.split('\n').find((r) => r.trim()) || `#${v.num}: fatta`);
   });
-  console.log(`${voci.length - falliti} schede su ${voci.length}${falliti ? `, ${falliti} da rifare (rilancia lo stesso comando)` : ''}. Costo dichiarato dagli agenti: ${costo.toFixed(2)} $.`);
-  return falliti ? 3 : 0;
+  if (aggiornati.size) {
+    const indice = leggiJson(join(cartella, INDICE));
+    if (Array.isArray(indice)) writeFileSync(join(cartella, INDICE), `${JSON.stringify(indiceAggiornato(indice, aggiornati), null, 1)}\n`);
+  }
+  const salvate = nonSalvate ? `, ${nonSalvate} non salvate nel feedback (rilancia lo stesso comando)` : '';
+  console.log(`${voci.length - falliti} schede su ${voci.length}${falliti ? `, ${falliti} da rifare (rilancia lo stesso comando)` : ''}${salvate}. Costo dichiarato dagli agenti: ${costo.toFixed(2)} $.`);
+  return falliti || nonSalvate ? 3 : 0;
 }
 
 export async function main(argv) {

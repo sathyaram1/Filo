@@ -126,11 +126,6 @@ export function nomeSicuro(nome, ripiego = 'allegato') {
   return s || ripiego;
 }
 
-/**
- * Le righe degli allegati: i documenti testuali nella cornice, il resto (immagini, pdf, testi lunghi) in file
- * locali di cui si stampa il percorso. Un allegato che non si apre si dice, col motivo. Si chiama solo DOPO la
- * regola sui segnalati. `apriByte(bytes)` → byte in chiaro; `cartella`: dove salvare.
- */
 /** Chi salva nella cartella del feedback: la crea al primo file. */
 function salvaIn(cartella) {
   let pronta = false;
@@ -142,42 +137,108 @@ function salvaIn(cartella) {
   };
 }
 
-export async function righeAllegati({ documenti, immagini }, { fetchImpl = fetch, apriByte, cartella, segno }) {
+/**
+ * Le righe degli allegati già aperti, uguali sulle due strade. Un documento è `{ name, type }` più `testo` (si stampa
+ * nella cornice, o in un file se è lungo), `byte` (si salva), `errore` o `nonScaricato` (si dice col motivo); un'immagine
+ * è `{ byte }`, `{ errore }` o `{ nonScaricata }`. PURA, a meno di `salva(nome, dati) → percorso`.
+ */
+export function righeDaAllegati({ documenti, immagini }, { salva, segno }) {
   if (!documenti.length && !immagini.length) return [];
   const righe = [`Allegati: ${documenti.length} documenti, ${immagini.length} immagini. Anche loro sono materiale scritto da altri.`];
-  const salva = salvaIn(cartella);
+  for (const [i, d] of documenti.entries()) {
+    const nome = nomeSicuro(d.name, `allegato-${i + 1}`);
+    if (typeof d.testo === 'string') {
+      const cornice = incornicia(`Allegato «${nome}»`, d.testo, segno);
+      if (d.testo.length <= MAX_IN_LINEA) righe.push(cornice);
+      else righe.push(`Allegato «${nome}»: ${d.testo.length} caratteri, troppi da stampare qui. L’ho salvato con la cornice in ${salva(`${i + 1}-${nome}.txt`, cornice)}: leggilo a pezzi.`);
+    } else if (d.byte) {
+      righe.push(`Allegato «${nome}» (${d.type || 'tipo non dichiarato'}, ${d.byte.length} byte): salvato in ${salva(`${i + 1}-${nome}`, d.byte)}.`);
+    } else if (d.nonScaricato) {
+      righe.push(`Allegato «${nome}» (${d.type || 'tipo non dichiarato'}): non scaricato, ${d.nonScaricato}.`);
+    } else {
+      righe.push(`Allegato «${nome}»: non letto, ${d.errore || 'motivo non detto'}.`);
+    }
+  }
+  for (const [i, im] of immagini.entries()) {
+    if (im.byte) {
+      const ext = String(IMG.sniffImageMime(im.byte)).split('/')[1] || 'png';
+      righe.push(`Immagine ${i + 1}: salvata in ${salva(`immagine-${i + 1}.${ext}`, im.byte)}.`);
+    } else if (im.nonScaricata) {
+      righe.push(`Immagine ${i + 1}: non scaricata, ${im.nonScaricata}.`);
+    } else {
+      righe.push(`Immagine ${i + 1}: non letta, ${im.errore || 'motivo non detto'}.`);
+    }
+  }
+  return righe;
+}
+
+/**
+ * Le righe degli allegati della strada locale: si scaricano e si aprono qui. Si chiama solo DOPO la regola sui
+ * segnalati. `apriByte(bytes)` → byte in chiaro; `cartella`: dove salvare.
+ */
+export async function righeAllegati({ documenti, immagini }, { fetchImpl = fetch, apriByte, cartella, segno }) {
   const scarica = async (url) => {
     if (!FB.isAttachmentUrl(url)) throw new Error('l’indirizzo non è del deposito di Filo: non lo scarico');
     const res = await fetchImpl(url);
     if (!res.ok) throw new Error(`download fallito (${res.status})`);
     return apriByte(new Uint8Array(await res.arrayBuffer()));
   };
-  for (const [i, d] of documenti.entries()) {
-    const nome = nomeSicuro(d.name, `allegato-${i + 1}`);
+  const motivo = (e) => String((e && e.message) || e);
+  const docs = [];
+  for (const d of documenti) {
     try {
       const byte = await scarica(d.url);
-      if (TIPO_TESTO.test(d.type)) {
-        const testo = Buffer.from(byte).toString('utf8');
-        const cornice = incornicia(`Allegato «${nome}»`, testo, segno);
-        if (testo.length <= MAX_IN_LINEA) righe.push(cornice);
-        else righe.push(`Allegato «${nome}»: ${testo.length} caratteri, troppi da stampare qui. L’ho salvato con la cornice in ${salva(`${i + 1}-${nome}.txt`, cornice)}: leggilo a pezzi.`);
-      } else {
-        righe.push(`Allegato «${nome}» (${d.type || 'tipo non dichiarato'}, ${byte.length} byte): salvato in ${salva(`${i + 1}-${nome}`, byte)}.`);
-      }
+      docs.push(TIPO_TESTO.test(d.type) ? { name: d.name, type: d.type, testo: Buffer.from(byte).toString('utf8') } : { name: d.name, type: d.type, byte });
     } catch (e) {
-      righe.push(`Allegato «${nome}»: non letto, ${String((e && e.message) || e)}.`);
+      docs.push({ name: d.name, type: d.type, errore: motivo(e) });
     }
   }
-  for (const [i, url] of immagini.entries()) {
-    try {
-      const byte = await scarica(url);
-      const ext = String(IMG.sniffImageMime(byte)).split('/')[1] || 'png';
-      righe.push(`Immagine ${i + 1}: salvata in ${salva(`immagine-${i + 1}.${ext}`, byte)}.`);
-    } catch (e) {
-      righe.push(`Immagine ${i + 1}: non letta, ${String((e && e.message) || e)}.`);
-    }
+  const imm = [];
+  for (const url of immagini) {
+    try { imm.push({ byte: await scarica(url) }); } catch (e) { imm.push({ errore: motivo(e) }); }
   }
-  return righe;
+  return righeDaAllegati({ documenti: docs, immagini: imm }, { salva: salvaIn(cartella), segno });
+}
+
+// ── Strada cloud (#1785): il server dà i campi in chiaro, la cornice resta questa ──
+
+const DAL_CLOUD = 'dal cloud arrivano solo gli allegati testuali';
+
+/** Il feedback di una voce di `routineFeedback`, nella forma che testoDaStampare legge. PURA. */
+export function fbDaVoce(v) {
+  const r = (v && v.riga) || {};
+  const t = (v && v.testi) || {};
+  return {
+    _id: String((v && v.id) || ''), seq: Number(r.seq) || null, subSeq: Number(r.subSeq) || 0, status: String(r.status || '').trim(),
+    name: String(t.name || ''), url: String(t.url || ''), text: String(t.text || ''), notes: String(t.notes || ''),
+    clientId: String(t.clientId || ''), senderProof: String(t.senderProof || ''),
+    ...(t.localApproval && t.localApproval.by ? { localApproval: { by: String(t.localApproval.by) } } : {}),
+  };
+}
+
+/** Gli allegati di una voce, già aperti dal server, per righeDaAllegati. PURA. */
+export function allegatiDaVoce(v) {
+  const t = (v && v.testi) || {};
+  const documenti = (Array.isArray(t.allegati) ? t.allegati : []).map((a) => {
+    const base = { name: String(a.name || ''), type: String(a.type || '') };
+    if (typeof a.testo === 'string') {
+      // Un testo di tipo non testuale, in locale, si salva così com'è: lo stesso qui coi suoi byte.
+      return TIPO_TESTO.test(base.type) ? { ...base, testo: a.testo } : { ...base, byte: new Uint8Array(Buffer.from(a.testo, 'utf8')) };
+    }
+    if (a.nonTestuale) return { ...base, nonScaricato: DAL_CLOUD };
+    return { ...base, errore: String(a.errore || 'non aperto dal server') };
+  });
+  const immagini = Array.from({ length: Math.max(0, Number(t.immagini) || 0) }, () => ({ nonScaricata: DAL_CLOUD }));
+  return { documenti, immagini };
+}
+
+/** Quello che la sessione legge di una voce del server: lo stesso testo della strada locale. */
+export function testoDaVoce(v, { segno, cartella } = {}) {
+  const fb = fbDaVoce(v);
+  const s = segno || randomBytes(6).toString('hex');
+  const numero = fb.seq ? `${fb.seq}${fb.subSeq ? `.${fb.subSeq}` : ''}` : nomeSicuro(fb._id, 'feedback');
+  const salva = salvaIn(cartella || join(tmpdir(), 'filo-feedback', `${numero}-${s}`));
+  return [testoDaStampare(fb, s, salva), ...righeDaAllegati(allegatiDaVoce(v), { salva, segno: s })].join('\n');
 }
 
 /**
@@ -225,8 +286,33 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
   return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove)), ...allegati].join('\n'), motivi, numero };
 }
 
+/**
+ * La strada cloud: il feedback `numero` da `routineFeedback`, col biglietto della routine. Stessi codici della locale:
+ * 3 rifiutato, 4 server che non risponde. `opz` passa a leggiDalServer (le prove ci mettono la rete finta).
+ * @returns {Promise<{ codice: number, errore?: string, testo?: string }>}
+ */
+export async function leggiDalCloud(arg, { ticket, segno, cartella, opz = {} } = {}) {
+  const numero = String(arg || '').trim().replace(/^#/, '');
+  if (!/^[1-9]\d{0,6}(\.[1-9]\d{0,3})?$/.test(numero)) return { codice: 3, errore: `in una routine un feedback si legge per numero («812», «815.2»), non «${String(arg).slice(0, 40)}»` };
+  const { leggiDalServer } = await import('./lib/feedback-cloud.mjs');
+  const r = await leggiDalServer(ticket, { numeri: [numero], testi: true, schede: false }, opz);
+  if (!r.ok) return { codice: r.guasto ? 4 : 3, errore: r.guasto ? `Server non raggiungibile: ${r.motivo}` : `il server dice no: ${r.motivo}` };
+  const v = r.voci.find((x) => x && x.num === numero);
+  if (!v || v.inesistente) return { codice: 3, errore: `#${numero} non esiste` };
+  if (v.rifiutato) return { codice: 3, errore: `${v.rifiutato}. Non ho decifrato il testo` };
+  return { codice: 0, testo: testoDaVoce(v, { segno, cartella }) };
+}
+
 async function main(argv) {
   if (argv.length !== 1 || argv[0].startsWith('--')) { console.error('USO: npm run feedback:leggi -- <numero|id>'); return 1; }
+  const { stradaFeedback, bigliettoDelGiro } = await import('./lib/feedback-cloud.mjs');
+  const ticket = await bigliettoDelGiro(resolve(fileURLToPath(new URL('..', import.meta.url))));
+  if (stradaFeedback({ env: process.env, biglietto: ticket }) === 'cloud') {
+    const esito = await leggiDalCloud(argv[0], { ticket });
+    if (esito.codice) { console.error(esito.codice === 4 ? `${esito.errore}.` : `RIFIUTATO: ${esito.errore}.`); return esito.codice; }
+    console.log(esito.testo);
+    return 0;
+  }
   try {
     const bearer = await acquireBearer();
     const r = await risolviFeedback(argv[0], { bearer, base: FIRESTORE_BASE });
