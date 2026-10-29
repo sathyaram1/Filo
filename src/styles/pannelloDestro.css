@@ -25,6 +25,8 @@
 /* Filo ha risposto nel pannello mentre era chiuso: accesa e ferma, finché non lo si apre (#1432). */
 .pd-striscia.pd-risposta::before { opacity: 1; width: 4px; background: var(--sn-accent); }
 html.pd-senza-striscia .pd-striscia:not(.pd-bordo):not(.pd-risposta)::before { opacity: 0; }
+/* Con l'Aiuto aperto accanto, la striscia sta sul suo fianco sinistro, dove il pannello si apre: sotto non si vedrebbe. */
+html.pd-accanto .pd-striscia { right: calc(var(--pd-destra, 0px) - 8px); }
 html.pd-aperto .pd-striscia { pointer-events: none; }
 html.pd-aperto .pd-striscia::before { opacity: 0; }
 
