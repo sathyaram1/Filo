@@ -18,7 +18,7 @@ const titolo = (shell, id) => shell.evaluate((id) => new Promise((ok) => request
   c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
   const serve = c.measureText(([...t.textContent][0] || '') + '…').width;
   ok({ leggibile: cs.display !== 'none' && cs.visibility === 'visible' && t.offsetWidth >= serve, largo: t.offsetWidth });
-})))), id);
+}))), id);
 
 test('r1 la scheda dietro che comincia a suonare tiene un titolo leggibile, come le vicine', async ({ shell, app }) => {
   await app.evaluate(({ BrowserWindow }) => {
