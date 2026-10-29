@@ -597,6 +597,13 @@ All'ora giusta il server ne crea un'istanza: un compito fidato (§ 6) con
 ancora iniziata quando nasce la successiva si chiude come «superata»: le
 istanze non si accumulano.
 
+Un ricorrente lavora con un'istanza alla volta, qualunque porta l'abbia fatta
+nascere. Se all'ora giusta una sua istanza è al lavoro, la cadenza salta quel
+giro: vale quella al lavoro, come per «Avvia adesso», che in quel caso
+rifiuta. Un'istanza nata da un'altra porta (la gestione del lavoro, la risposta
+che anticipa l'addetto comunicazioni) aspetta in coda che quella al lavoro
+chiuda: la coda non dà mai due istanze dello stesso ricorrente insieme.
+
 Un ruolo generico `compito` esegue il testo del ricorrente. I permessi li dà
 l'ambito, non il ruolo. I testi dei ricorrenti stanno nel repo privato del
 server (§ 9), non in questa spec.
