@@ -42,7 +42,8 @@ test('r1 dall\'Aiuto di un sito il file trovato si mostra nella sua cartella', a
   expect(chiave, 'la ricerca dell\'Aiuto non ha trovato il file').toBeTruthy();
 
   const mostra = await sito(`chrome.runtime.sendMessage({ type: "aiuto_mostra_file", chiave: ${JSON.stringify(chiave)} })`);
-  expect(mostra.risposta, 'il bottone «Mostra nella cartella» dell\'Aiuto è rifiutato').toMatchObject({ ok: true });
+  expect(mostra.risposta?.code, 'il bottone «Mostra nella cartella» dell\'Aiuto è rifiutato').not.toBe('forbidden');
+  expect(mostra.risposta).toMatchObject({ ok: true });
   expect(await app.evaluate(() => globalThis.__mostrati)).toContain(file);
 
   const apri = await sito(`chrome.runtime.sendMessage({ type: "aiuto_apri_file", chiave: ${JSON.stringify(chiave)} })`);
