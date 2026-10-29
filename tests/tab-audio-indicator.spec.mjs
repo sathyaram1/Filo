@@ -189,8 +189,7 @@ test('audio che parte e si ferma: le schede e il «+» restano dove sono, e il n
   await expect(shell.locator('.tab', { hasText: 'Wikipedia' })).toHaveClass(/active/);
   await expect.poll(() => shell.evaluate((id) => {
     const t = document.querySelector(`.tab[data-id="${id}"] .title`);
-    const testo = t && t.firstElementChild;
-    return !!t && getComputedStyle(t).display !== 'none' && getComputedStyle(testo || t).visibility === 'visible'
+    return !!t && getComputedStyle(t).display !== 'none' && getComputedStyle(t).visibility === 'visible'
       && t.scrollWidth <= t.clientWidth;
   }, gmail), { timeout: 5000, message: 'nome intero di Gmail dopo il riordino' }).toBe(true);
 });
