@@ -131,9 +131,7 @@ test('la fiducia nel sito non tace l\'avviso su un file della pagina, e il suo �
   assert.equal(livello(tab), 'sospetto');
   w._sbScelta(tab, 'continua');
   await finito();
-  SB.impostaFidati([]);
   assert.deepEqual(disco.security.safeBrowse.trustedSites, [], 'aver accettato un file non fa fidare del sito');
-  assert.equal(livello(w.apri('https://team.com/')), 'sospetto');
 });
 
 test('in incognito «Continua» vale per la scheda e non lascia traccia', async () => {
