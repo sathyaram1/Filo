@@ -94,7 +94,7 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
       for (const c of toolCalls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
       return { ...base, text: '', toolCalls, finishReason: 'tool_calls' };
     };
-  }, { finestra, posto, listino, misure, piani });
+  }, { finestra, posto, listino, misure, piani, anthropic, pesante });
 }
 
 async function preparaPagine(app, testServer) {
