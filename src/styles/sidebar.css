@@ -243,6 +243,11 @@ html:has(> .sn-sidebar:not([data-spostata])) > .sn-toasts {
   right: calc(16px + 360px + 12px);
   max-width: max(200px, calc(100vw - 408px));
 }
+/* Spostato, gli stanno a fianco dove lo dice sidebar.js (#1340). */
+html:has(> .sn-sidebar[data-spostata]) > .sn-toasts {
+  right: var(--filo-avvisi-destra, 20px);
+  max-width: var(--filo-avvisi-larghi, min(420px, calc(100vw - 40px)));
+}
 
 /* Stato collassato: visibile solo la barra di input. Il pannello si rimpicciolisce
    verso l'alto (height:auto), restando ancorato al bottom: l'input resta dov'era. */
