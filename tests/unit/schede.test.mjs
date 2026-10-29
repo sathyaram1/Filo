@@ -27,9 +27,18 @@ test('l\'indice tiene solo gli aperti, dal numero più basso, con stato e priori
     { _id: 'e', status: 'todo' },
   ];
   assert.deepEqual(S.apertiDaRighe(righe), [
-    { id: 'b', num: '3.1', stato: 'design', priorita: null, aggiornato: 't2' },
-    { id: 'a', num: '12', stato: 'todo', priorita: 2, aggiornato: 't1' },
+    { id: 'b', num: '3.1', stato: 'design', priorita: null, aggiornato: 't2', attese: [], unisce: [] },
+    { id: 'a', num: '12', stato: 'todo', priorita: 2, aggiornato: 't1', attese: [], unisce: [] },
   ]);
+});
+
+test('l\'indice porta le attese e le unite di ogni aperto, e riconosce uno stato non decifrato', () => {
+  const [f] = S.apertiDaRighe([{ _id: 'a', seq: 812, status: 'todo', waitsFor: [{ id: 'p', num: '950' }], unisce: [{ id: 'u', num: '#7' }] }]);
+  assert.deepEqual([f.attese, f.unisce], [['950'], ['7']]);
+  assert.equal(S.statoIllegibile({ status: 'todo' }), false);
+  assert.equal(S.statoIllegibile({ status: '' }), false, 'senza stato la riga esce già dall\'indice');
+  assert.equal(S.statoIllegibile({ status: '[cifrato — chiave privata non configurata]' }), true);
+  assert.equal(S.statoIllegibile({ status: 'FENC1:abc' }), true);
 });
 
 test('una scheda è buona solo coi campi del ruolo; ogni difetto è detto', () => {

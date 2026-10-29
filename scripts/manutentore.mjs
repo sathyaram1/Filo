@@ -3,12 +3,12 @@
 // tests/unit/manutentore.test.mjs. Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { incroci, ramiInCorso } from './lib/su-main.mjs';
-import { CARTELLA_PREDEFINITA, INDICE, leggiSchede } from './schede.mjs';
+import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './schede.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -49,11 +49,29 @@ async function documentoOrdine(metodo, corpo) {
 // Ogni campo di una scheda viene dal testo di un feedback: una riga per scheda è ciò che lo tiene un dato.
 const unaRiga = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
 
-/** Una scheda in una riga, con stato e priorità dall'indice. PURA. */
+/**
+ * Quanto ci si può fidare della scheda, in parole, o '' se è buona: non buona, scritta su una versione vecchia del
+ * feedback, o un «toglie lavoro» che la rilettura non ha confermato. PURA.
+ */
+export function avvisoScheda(s, f = {}) {
+  const num = unaRiga(s.numero).replace(/^#/, '');
+  const fonte = s._fonte || {};
+  const toglie = s.valido === 'no' || (Array.isArray(s.doppione_di) && s.doppione_di.length > 0);
+  return [
+    validaScheda(s, num).length ? 'SCHEDA NON BUONA, da rifare' : '',
+    // L'aggiornamento cambia a ogni modifica del feedback, stato compreso.
+    f && f.id && (fonte.id !== f.id || fonte.aggiornato !== f.aggiornato) ? 'SCHEDA VECCHIA, il feedback è cambiato' : '',
+    toglie && !s._riletta ? 'non riletta: non togliere lavoro su questa' : '',
+  ].filter(Boolean).join(' · ');
+}
+
+/** Una scheda in una riga, con stato, priorità e attese dall'indice. PURA. */
 export function rigaScheda(s, f = {}) {
   const num = unaRiga(s.numero).replace(/^#/, '');
+  const numeri = (l) => (Array.isArray(l) ? l : []).map((n) => `#${unaRiga(n).replace(/^#/, '')}`).join(', ');
   const pezzi = [
     `#${num}`,
+    avvisoScheda(s, f),
     `[${unaRiga(s.area) || '?'}/${unaRiga(s.tipo) || '?'}]`,
     unaRiga(f.stato || s.stato) || '?',
     Number.isInteger(f.priorita) ? `p${f.priorita}` : 'p?',
@@ -61,6 +79,8 @@ export function rigaScheda(s, f = {}) {
     `valido ${unaRiga(s.valido) || '?'}`,
     s.risolto_su_main ? `risolto? ${unaRiga(s.risolto_su_main).slice(0, 60)}` : '',
     Array.isArray(s.doppione_di) && s.doppione_di.length ? `doppione di ${s.doppione_di.map((n) => `#${unaRiga(n).replace(/^#/, '')}`).join(', ')}` : '',
+    f && Array.isArray(f.unisce) && f.unisce.length ? `pacchetto di ${numeri(f.unisce)}` : '',
+    f && Array.isArray(f.attese) && f.attese.length ? `aspetta ${numeri(f.attese)}` : '',
   ].filter(Boolean).join(' · ');
   const file = Array.isArray(s.file_probabili) && s.file_probabili.length ? ` | file: ${s.file_probabili.map(unaRiga).join(', ')}` : '';
   return `${pezzi} — ${unaRiga(s.titolo_breve)}: ${unaRiga(s.riassunto)}${file}`;
@@ -72,6 +92,24 @@ export function conNumeri(rami, indice) {
   return (rami || []).map((r) => {
     const n = perId.get((/^worker\/([A-Za-z0-9]+)-\d{8}T\d{6}Z$/.exec(r.ramo) || [])[1]);
     return n ? { ...r, feedback: [n, ...(r.feedback || []).filter((x) => x !== n)] } : r;
+  });
+}
+
+/**
+ * Toglie i rami i cui feedback citati sono tutti chiusi secondo l'indice (arrivati su main da un altro ramo, o
+ * archiviati): non arriveranno su main. Un numero oltre l'ultimo dell'indice può essere nato dopo: resta. Senza indice
+ * non si sa, e restano tutti. `fuori.chiusi` riceve i tolti. PURA.
+ */
+export function senzaChiusi(rami, indice, fuori = {}) {
+  const aperti = new Set((indice || []).map((f) => String(f.num)));
+  fuori.chiusi = [];
+  if (!aperti.size) return rami || [];
+  const ultimo = Math.max(...[...aperti].map((n) => Number(String(n).split('.')[0]) || 0));
+  return (rami || []).filter((r) => {
+    const fb = (r.feedback || []).map(String);
+    if (!fb.length || fb.some((n) => aperti.has(n) || Number(n.split('.')[0]) > ultimo)) return true;
+    fuori.chiusi.push(r.ramo);
+    return false;
   });
 }
 
@@ -88,6 +126,7 @@ export function rigaFuori(fuori, giorni) {
   const pezzi = [
     f.vecchi ? `${f.vecchi} rami fermi da più di ${giorni} giorni (--giorni N per vederli, --giorni 0 tutti)` : '',
     f.altri && f.altri.length ? `${f.altri.length} rami che non sono di lavoro (${f.altri.slice(0, 5).join(', ')}${f.altri.length > 5 ? ', …' : ''})` : '',
+    f.chiusi && f.chiusi.length ? `${f.chiusi.length} rami di feedback già chiusi, non arriveranno su main (${f.chiusi.slice(0, 5).join(', ')}${f.chiusi.length > 5 ? ', …' : ''})` : '',
   ].filter(Boolean);
   return pezzi.length ? `Non elencati: ${pezzi.join('; ')}.` : '';
 }
@@ -106,7 +145,7 @@ export function rigaOrdine(numeri, indice) {
 }
 
 /** Il contesto intero, in testo. PURA rispetto ai suoi ingressi. */
-export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorni = 30 }) {
+export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorni = 30, indiceDel = '' }) {
   const numero = (s) => String(s.numero).replace(/^#/, '');
   const perNum = new Map((indice || []).map((f) => [f.num, f]));
   // Con l'indice valgono solo le schede dei feedback ancora aperti: le altre sono di feedback chiusi da allora.
@@ -117,6 +156,7 @@ export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorn
   return [
     ruolo.trim(), '',
     `## Schede (${aperte.length})`, '',
+    ...(indiceDel ? [`Aperti secondo l'indice del ${indiceDel}: un feedback nato dopo non c'è (npm run feedback:schede -- elenca).`, ''] : []),
     ...ordinate.map((s) => rigaScheda(s, perNum.get(numero(s)))),
     ...(senza.length ? ['', `Senza scheda (${senza.length}): ${senza.map((f) => `#${f.num}`).join(', ')}. Si scrivono con npm run feedback:schede -- scrivi.`] : []),
     ...(chiuse ? ['', `Fuori: ${chiuse} schede di feedback che l'indice non ha più fra gli aperti.`] : []),
@@ -126,6 +166,19 @@ export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorn
     '', '## Spesa', '',
     'Questo strumento non la sa: chiedi all\'owner il consumo della settimana dell\'account (Gestione → Automazioni), non la somma dei biglietti.',
   ].join('\n');
+}
+
+const CON_VALORE = ['--cartella', '--giorni'];
+
+/** Gli argomenti di `accendi` che sono numeri: né le opzioni né i loro valori. PURA. */
+export function numeriDiAccendi(args) {
+  const out = [];
+  for (let i = 0; i < (args || []).length; i++) {
+    const a = String(args[i]);
+    if (a.startsWith('--')) { if (CON_VALORE.includes(a)) i += 1; continue; }
+    out.push(a);
+  }
+  return out;
 }
 
 function opzione(argv, nome) {
@@ -143,11 +196,15 @@ export async function main(argv, { root = ROOT } = {}) {
   // L'ordine da accendere: il pacemaker accende una sessione per ciascun feedback che ha lavoro, in quest'ordine.
   const cartella = resolve(opzione(argv, '--cartella') || CARTELLA_PREDEFINITA);
   let indice = [];
-  try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente stato, priorità né numeri dei worker */ }
+  let indiceDel = '';
+  try {
+    indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8'));
+    indiceDel = statSync(join(cartella, INDICE)).mtime.toISOString().slice(0, 16).replace('T', ' ');
+  } catch (_) { /* senza indice niente stato, priorità né numeri dei worker */ }
   if (cmd === 'ordine' || cmd === 'accendi') {
     let numeri = [];
     if (cmd === 'accendi' && arg !== '--niente') {
-      const o = leggiOrdine(argv.slice(1).filter((a) => !a.startsWith('--')).join(','));
+      const o = leggiOrdine(numeriDiAccendi(argv.slice(1)).join(','));
       if (!o.ok) { console.error(`RIFIUTATO: ${o.motivo}. Non ho scritto niente.`); return 1; }
       numeri = o.numeri;
     }
@@ -164,7 +221,7 @@ export async function main(argv, { root = ROOT } = {}) {
     }
   }
   const fuori = {};
-  const rami = conNumeri(ramiInCorso(root, { giorni, fuori }), indice);
+  const rami = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori }), indice), indice, fuori);
   if (cmd === 'rami') { console.log([rami.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', rigaFuori(fuori, giorni)].filter(Boolean).join('\n')); return 0; }
   const schede = leggiSchede(cartella);
   if (cmd === 'incroci') {
@@ -180,7 +237,7 @@ export async function main(argv, { root = ROOT } = {}) {
   if (!schede.length) console.error(`AVVISO: nessuna scheda in ${cartella}: npm run feedback:schede -- elenca, poi scrivi.`);
   const dirRuoli = join(ROOT, 'routines', 'roles');
   const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'manutentore.md'), 'utf8'), dirRuoli);
-  console.log(testoContesto({ ruolo, schede, indice, rami, fuori, giorni }));
+  console.log(testoContesto({ ruolo, schede, indice, rami, fuori, giorni, indiceDel }));
   return 0;
 }
 

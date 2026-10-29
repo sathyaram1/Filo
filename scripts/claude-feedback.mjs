@@ -273,9 +273,11 @@ export const attese = {
 
 /**
  * Le segnalazioni lette per `--pacchetto` → i motivi per cui non entrano (vuoto = entrano tutte). PURA.
- * `lette`: [{ ok, num, stato, priorita, locale, attese, motivo? }]; `aspetta`: i numeri che il pacchetto stesso aspetta.
+ * `lette`: [{ ok, num, stato, priorita, locale, attese, ramo?, motivo? }]; `aspetta`: i numeri che il pacchetto stesso
+ * aspetta; `pacchetti`: i numeri dei pacchetti aperti fra gli aspettati dalle unite.
  */
-export function controllaUnite(lette, { aspetta = [] } = {}) {
+export function controllaUnite(lette, { aspetta = [], pacchetti = [] } = {}) {
+  const giaPacchetti = new Set(pacchetti.map((n) => String(n).replace(/^#/, '')));
   const MAX = globalThis.SN_FB_ATTESE.MAX;
   const motivi = [];
   for (const u of Array.isArray(lette) ? lette : []) {
@@ -283,6 +285,10 @@ export function controllaUnite(lette, { aspetta = [] } = {}) {
     if (!u.ok) { motivi.push(`${n}: ${u.motivo}`); continue; }
     if (!u.stato) motivi.push(`${n}: lo stato non si legge (manca la chiave privata?), e senza non so se è già in lavorazione`);
     else if (u.stato !== 'todo') motivi.push(`${n} è «${u.stato}»: nel pacchetto vanno solo segnalazioni in coda e non ancora lavorate`);
+    // In coda non vuol dire mai lavorata: dopo una risposta dell'owner o una riapertura il ramo resta.
+    else if (u.ramo) motivi.push(`${n} ha già un ramo con lavoro (${u.ramo}): nel pacchetto si rifarebbe da capo`);
+    const dentro = (u.attese || []).map((w) => String(w.num || '').replace(/^#/, '')).filter((x) => giaPacchetti.has(x));
+    if (dentro.length) motivi.push(`${n} è già nel pacchetto ${dentro.map((x) => `#${x}`).join(', ')}: due pacchetti farebbero lo stesso lavoro`);
     if (u.priorita === 3) motivi.push(`${n} ha priorità 3: si lavora subito e da sola, fuori dai pacchetti`);
     if (u.locale) motivi.push(`${n} è un lavoro locale: nessuna routine la prende, e nel pacchetto resterebbe ferma`);
     if ((u.attese || []).length >= MAX) motivi.push(`${n} aspetta già ${MAX} feedback: un'attesa in più non ci sta`);
@@ -459,7 +465,19 @@ export async function main(argvIn) {
       console.error(`RIFIUTATO: --pacchetto: lettura delle segnalazioni fallita (${String((e && e.message) || e)}). Non ho aperto niente.`);
       return EXIT.IRRAGGIUNGIBILE;
     }
-    const motivi = controllaUnite(lette, { aspetta: numeriAttesa.numeri });
+    // Chi aspetta già un pacchetto aperto è già preso: si leggono gli aspettati per saperlo.
+    const attesi = [...new Set(lette.filter((u) => u && u.ok).flatMap((u) => (u.attese || []).map((w) => String(w.num || '').replace(/^#/, '')).filter(Boolean)))];
+    let pacchetti = [];
+    if (attesi.length) {
+      try {
+        pacchetti = (await pacchetto.leggi(attesi, cred.idToken))
+          .filter((p) => p && p.ok && Array.isArray(p.unisce) && p.unisce.length && !['done', 'archived'].includes(p.stato)).map((p) => String(p.num));
+      } catch (e) {
+        console.error(`RIFIUTATO: --pacchetto: lettura dei feedback aspettati fallita (${String((e && e.message) || e)}). Non ho aperto niente.`);
+        return EXIT.IRRAGGIUNGIBILE;
+      }
+    }
+    const motivi = controllaUnite(lette, { aspetta: numeriAttesa.numeri, pacchetti });
     if (motivi.length) {
       console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${motivi.map((m) => `  - ${m}`).join('\n')}`);
       return EXIT.RIFIUTATO;

@@ -325,7 +325,7 @@ export async function segnalazioneDaUnire(riferimento, opts = {}) {
   const bearer = opts.bearer || await acquireBearer();
   const r = await risolviFeedback(riferimento, { bearer, base: FIRESTORE_BASE });
   if (!r.ok) return { ok: false, motivo: r.motivo, inesistente: /^nessun feedback/.test(r.motivo) };
-  const doc = await getDoc(r.id, bearer, ['seq', 'subSeq', 'status', 'priority', 'localOnly', ATT.CAMPO]);
+  const doc = await getDoc(r.id, bearer, ['seq', 'subSeq', 'status', 'priority', 'localOnly', 'branch', 'unisce', ATT.CAMPO]);
   if (!doc) return { ok: false, motivo: `nessun feedback ${riferimento}`, inesistente: true };
   const f = doc.fields || {};
   const { from, leggibile } = await statoAttuale(doc);
@@ -334,6 +334,8 @@ export async function segnalazioneDaUnire(riferimento, opts = {}) {
     num: globalThis.SN_FEEDBACK.formatNum(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)) || String(riferimento),
     stato: leggibile ? from : '', priorita: await prioritaPrecedente(doc), locale: !!f.localOnly?.mapValue,
     attese: ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) }),
+    ramo: String(f.branch?.stringValue || '').trim(),
+    unisce: (f.unisce?.arrayValue?.values || []).map((v) => String(v?.mapValue?.fields?.num?.stringValue || '')).filter(Boolean),
   };
 }
 

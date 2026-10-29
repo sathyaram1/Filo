@@ -11,7 +11,8 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 const M = await import('../../scripts/manutentore.mjs');
 const scheda = (num, extra = {}) => ({
   numero: String(num), titolo_breve: 'Menu immagini', riassunto: 'Il menu\nnon si apre.', tipo: 'bug', area: 'browser-schede',
-  file_probabili: ['src/content/menu.js'], urgente: false, valido: 'si', risolto_su_main: null, doppione_di: [], ...extra,
+  file_probabili: ['src/content/menu.js'], urgente: false, valido: 'si', prova: 'Letto il gestore.', risolto_su_main: null, parole_chiave: [],
+  doppione_di: [], ...extra,
 });
 
 test('una scheda in una riga: area, stato, priorità, i segni che contano, il riassunto e i file', () => {
@@ -104,4 +105,64 @@ test('l\'ordine da accendere: numeri nell\'ordine dato, senza doppioni, col rifi
   assert.match(M.leggiOrdine(tanti).motivo, /il massimo è/, 'oltre il tetto si rifiuta col numero, non si taglia');
   const c = M.corpoOrdine(['73', '71'], new Date(0));
   assert.deepEqual(c.fields.ordine.arrayValue.values.map((v) => v.stringValue), ['73', '71']);
+});
+
+test('una scheda di cui non fidarsi lo dice nella sua riga: non buona, vecchia, o un «toglie lavoro» non riletto', () => {
+  const f = { id: 'A', num: '12', stato: 'todo', priorita: 1, aggiornato: 't2' };
+  const fonte = (aggiornato) => ({ _fonte: { id: 'A', stato: 'todo', aggiornato } });
+  assert.equal(M.avvisoScheda(scheda(12, fonte('t2')), f), '');
+  assert.match(M.rigaScheda(scheda(12, { riassunto: '' }), f), /^#12 · SCHEDA NON BUONA/);
+  assert.match(M.rigaScheda(scheda(12, fonte('t1')), f), /^#12 · SCHEDA VECCHIA/);
+  assert.match(M.rigaScheda(scheda(12, { ...fonte('t2'), valido: 'no' }), f), /^#12 · non riletta/);
+  assert.match(M.rigaScheda(scheda(12, { ...fonte('t2'), doppione_di: ['#7'] }), f), /^#12 · non riletta/);
+  assert.equal(M.avvisoScheda(scheda(12, { ...fonte('t2'), valido: 'no', _riletta: { at: 'x', modello: 'opus' } }), f), '');
+});
+
+test('la riga di una scheda dice se il feedback aspetta un pacchetto, o se è lui il pacchetto', () => {
+  const riga = M.rigaScheda(scheda(812), { stato: 'todo', priorita: 1, attese: ['950'] });
+  assert.match(riga, / · aspetta #950/);
+  assert.match(M.rigaScheda(scheda(950), { stato: 'todo', priorita: 1, unisce: ['812', '815'] }), / · pacchetto di #812, #815/);
+});
+
+test('un ramo i cui feedback sono tutti chiusi secondo l\'indice non è in corso, e si dice fra i lasciati fuori', () => {
+  const rami = [
+    { ramo: 'claude/morto', feedback: ['1728'] }, { ramo: 'claude/vivo', feedback: ['1728', '900'] },
+    { ramo: 'claude/senza-numero', feedback: [] }, { ramo: 'claude/nuovo', feedback: ['5000'] },
+  ];
+  const indice = [{ num: '900' }, { num: '1800' }];
+  const fuori = {};
+  assert.deepEqual(M.senzaChiusi(rami, indice, fuori).map((r) => r.ramo), ['claude/vivo', 'claude/senza-numero', 'claude/nuovo']);
+  assert.deepEqual(fuori.chiusi, ['claude/morto']);
+  assert.match(M.rigaFuori(fuori, 30), /1 rami di feedback già chiusi, non arriveranno su main \(claude\/morto\)/);
+  assert.equal(M.senzaChiusi(rami, [], {}).length, 4, 'senza indice non si sa: restano');
+});
+
+test('incroci non manda ad aspettare il ramo locale di un feedback già arrivato su main da un altro ramo', async (t) => {
+  const base = cartellaTemporanea('manutentore-chiusi');
+  t.after(() => togliCartella(base));
+  const repo = join(base, 'repo');
+  const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
+  mkdirSync(repo, { recursive: true });
+  g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't');
+  writeFileSync(join(repo, 'a.js'), 'uno\n'); g('add', '-A'); g('commit', '-qm', 'inizio');
+  g('checkout', '-qb', 'locale'); writeFileSync(join(repo, 'a.js'), 'prima\n'); g('commit', '-qam', '#812 regole: prima versione');
+  g('update-ref', 'refs/remotes/origin/claude/regole-locali', 'HEAD');
+  g('checkout', '-q', 'main'); g('checkout', '-qb', 'routine'); writeFileSync(join(repo, 'a.js'), 'fusa\n'); g('commit', '-qam', '#812 regole');
+  g('checkout', '-q', 'main'); g('merge', '-q', '--no-ff', '-m', 'merge-gate: #812 via server', 'routine');
+  g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  const schede = join(base, 'schede');
+  mkdirSync(schede, { recursive: true });
+  writeFileSync(join(schede, 'indice.json'), JSON.stringify([{ id: 'D', num: '900', stato: 'todo', priorita: 1, aggiornato: 'x' }]));
+  writeFileSync(join(schede, '900.json'), JSON.stringify(scheda(900, { file_probabili: ['a.js'] })));
+  const out = [];
+  const l = console.log;
+  console.log = (...a) => out.push(a.join(' '));
+  t.after(() => { console.log = l; });
+  assert.equal(await M.main(['incroci', '900', '--cartella', schede, '--senza-fetch'], { root: repo }), 0);
+  assert.doesNotMatch(out.join('\n'), /claude\/regole-locali/);
+});
+
+test('accendi prende i numeri, non le opzioni né i loro valori', () => {
+  assert.deepEqual(M.numeriDiAccendi(['812', '--giorni', '30', '--cartella', '/dir', '815,820', '--senza-fetch']), ['812', '815,820']);
+  assert.deepEqual(M.numeriDiAccendi(['--cartella', '/dir']), []);
 });

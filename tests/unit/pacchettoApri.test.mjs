@@ -89,3 +89,20 @@ test('submit scrive `unisce` solo col token admin, nella forma delle attese', as
   const regole = (await import('node:fs')).readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8');
   assert.match(regole, /&& unisceValido\(request\.resource\.data\)/, 'le regole controllano la forma alla nascita');
 });
+
+test('una segnalazione già in un pacchetto aperto, o con un ramo di lavoro, non entra in un altro', async () => {
+  const lette = {
+    812: seg('812', { attese: [{ id: 'id950', num: '950' }] }),
+    815: seg('815', { ramo: 'worker/abc-20261020T100000Z' }),
+    816: seg('816', { attese: [{ id: 'id700', num: '700' }] }),
+    950: seg('950', { unisce: ['812'] }),
+    700: seg('700'),
+  };
+  const r = await conRete({ lette }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812,815,816']));
+  assert.equal(r.code, 3);
+  assert.equal(r.submit.length, 0);
+  const testo = r.err.join('\n');
+  assert.match(testo, /#812 è già nel pacchetto #950/);
+  assert.match(testo, /#815 ha già un ramo con lavoro/);
+  assert.doesNotMatch(testo, /#816/, 'aspettare un feedback che non è un pacchetto non ferma');
+});

@@ -18,13 +18,21 @@ export const VALIDI = ['si', 'no', 'dubbio', 'non letto'];
 export const TIPI = ['bug', 'feature', 'design', 'processo', 'sicurezza', 'documento'];
 export const AREE = ['chat-filo', 'home', 'editor', 'browser-schede', 'impostazioni', 'gestione-owner', 'feedback-app',
   'server-filo-security', 'routine-script', 'test', 'sito', 'pacchetti-rilasci', 'deck-builder', 'altro'];
-export const CAMPI_LETTI = ['seq', 'subSeq', 'status', 'priority', 'updatedAt'];
+export const CAMPI_LETTI = ['seq', 'subSeq', 'status', 'priority', 'updatedAt', 'waitsFor', 'unisce'];
 
 const RILETTURA = [
   'RILETTURA. La scheda che trovi nel file l\'ha scritta un modello più piccolo. Rifai i controlli dei passi 1-3 e',
   'correggi i campi sbagliati, con le stesse regole; poi aggiungi alla scheda il campo "riletta" con una riga su cosa',
   'hai cambiato ("confermata" se niente). Riscrivi il file intero, e rispondi con la riga del passo 4.',
 ].join(' ');
+
+const numeriDi = (lista) => (Array.isArray(lista) ? lista : []).map((w) => String((w && w.num) || '').replace(/^#/, '')).filter(Boolean);
+
+/** Uno stato che non si è decifrato (manca la chiave, o è sbagliata): con lui non si sa chi è aperto. PURA. */
+export function statoIllegibile(r) {
+  const st = String((r && r.status) || '').trim();
+  return st !== '' && !/^[a-z_]+$/.test(st);
+}
 
 /** Le righe lette (già decifrate) → i feedback aperti dell'indice, dal numero più basso. PURA. */
 export function apertiDaRighe(righe) {
@@ -37,6 +45,7 @@ export function apertiDaRighe(righe) {
       id: String(r._id || ''), num: num(r), stato: String(r.status || '').trim(),
       priorita: Number.isInteger(Number(r.priority)) && String(r.priority).trim() !== '' ? Number(r.priority) : null,
       aggiornato: String(r.updatedAt || r._updateTime || ''),
+      attese: numeriDi(r.waitsFor), unisce: numeriDi(r.unisce),
     }))
     .filter((f) => f.id && f.num && f.stato && !STATI_CHIUSI.includes(f.stato))
     .sort((a, b) => Number(a.num) - Number(b.num));
@@ -162,11 +171,14 @@ async function elenca(cartella, dryRun) {
   const token = await acquireBearer();
   const r = await globalThis.SN_FEEDBACK.listAllPaged({ idToken: token, fields: CAMPI_LETTI });
   const righe = await decryptFeedbackList(r.rows);
+  // Un indice sbagliato è peggio di uno vecchio: chi lo legge non lo distingue da uno buono.
+  if (r.complete === false) { console.error(`RIFIUTATO: la lettura non è completa (${righe.length} documenti): indice non scritto, rilancia.`); return 1; }
+  const illeggibili = righe.filter(statoIllegibile).length;
+  if (illeggibili) { console.error(`RIFIUTATO: lo stato di ${illeggibili} feedback su ${righe.length} non si decifra (manca la chiave privata, o è un'altra): senza non so chi è aperto, indice non scritto.`); return 1; }
   const indice = apertiDaRighe(righe);
   if (!dryRun) { mkdirSync(cartella, { recursive: true }); writeFileSync(join(cartella, INDICE), `${JSON.stringify(indice, null, 1)}\n`); }
   console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}.`);
-  if (r.complete === false) console.error(`AVVISO: la lettura non è completa, ${righe.length} documenti: rilancia prima di scrivere le schede.`);
-  console.log(`Documenti letti: ${righe.length}.`);
+  return 0;
 }
 
 async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dryRun }) {
@@ -218,7 +230,7 @@ export async function main(argv) {
   const dryRun = argv.includes('--dry-run');
   const paralleli = Math.max(1, Math.min(20, Number(opzione(argv, '--paralleli')) || 6));
   const indice = leggiJson(join(cartella, INDICE));
-  if (cmd === 'elenca') { await elenca(cartella, dryRun); return 0; }
+  if (cmd === 'elenca') return elenca(cartella, dryRun);
   if (!['scrivi', 'rileggi', 'stato'].includes(cmd)) {
     console.error('Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] | rileggi [--quota 0.1] | stato [--cartella <dir>] [--dry-run]');
     return 1;

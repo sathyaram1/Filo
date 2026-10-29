@@ -180,7 +180,7 @@ test('il pacchetto si aggiunge alle attese di una segnalazione unita senza togli
   const rete = reteFinta({ ...DOCS, id951: { seq: 951 }, id903: { seq: 903, status: 'todo', waitsFor: [{ id: 'id676', num: '676' }] } });
   try {
     const letta = await owner.segnalazioneDaUnire('903', { bearer: 'tok' });
-    assert.deepEqual({ ...letta, priorita: letta.priorita ?? null }, { ok: true, id: 'id903', num: '903', stato: 'todo', priorita: null, locale: false, attese: [{ id: 'id676', num: '676' }] });
+    assert.deepEqual({ ...letta, priorita: letta.priorita ?? null }, { ok: true, id: 'id903', num: '903', stato: 'todo', priorita: null, locale: false, attese: [{ id: 'id676', num: '676' }], ramo: '', unisce: [] });
     assert.equal((await owner.segnalazioneDaUnire('999', { bearer: 'tok' })).inesistente, true);
     const r = await owner.aggiungiAttesa('id903', { id: 'id951', num: '951' }, { bearer: 'tok' });
     assert.equal(r.ok, true);

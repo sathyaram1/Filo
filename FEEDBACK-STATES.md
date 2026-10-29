@@ -259,7 +259,11 @@ accendono una sessione per ciascuno fino ai posti liberi. Legano ogni sessione a
 numero con l'id che la risposta di accensione restituisce (`routine-accensioni/<sessione>`);
 per un primo lavoro la voce normale fa prima la ricerca «già risolto su main» e la lega
 anche quella. La sessione di un compito senza feedback resta libera, e una sessione libera
-con un ordine riceve la stessa scelta: niente primo lavoro fuori dall'ordine. Un numero
+con un ordine riceve la stessa scelta: niente primo lavoro fuori dall'ordine, né un
+feedback legato a un'altra sessione accesa che non ha ancora preso il suo biglietto (entro
+la finestra d'avvio del pacemaker; dopo è nata morta e il feedback torna libero). Quando
+una sessione conta i lavori dell'altra voce per lasciarle il posto, l'ordine vale anche
+lì: un primo lavoro che il pacemaker non accenderà non chiede un posto. Un numero
 dell'ordine chiuso o inesistente non conta, e un ordine senza feedback aperti vale come
 nessun ordine. Senza ordine vale la coda per priorità, come ripiego (SPEC § 4). Le unite di
 un pacchetto si chiudono solo sulle strade della fusione: un «fatto» consegnato da un ruolo
@@ -305,14 +309,19 @@ segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce
 chiaro, da 1 a 20, solo alla nascita e solo admin: `unisceValido` nelle regole), e ogni
 segnalazione unita prende P fra le sue attese (`waitsFor`, che resta com'era più P). Lo
 strumento controlla tutte le segnalazioni prima di aprire e dice tutti i motivi insieme:
-fuori chi non è `todo` (già in lavorazione o ferma), chi è a priorità 3, un lavoro
-locale, chi ha già 20 attese, chi P stesso aspetta. Senza `--priorita` P nasce con la
+fuori chi non è `todo` (già in lavorazione o ferma), chi ha già un ramo (tornata in coda
+dopo una risposta o una riapertura), chi aspetta già un altro pacchetto aperto, chi è a
+priorità 3, un lavoro locale, chi ha già 20 attese, chi P stesso aspetta. Area, tetto e
+urgenti li controlla il manutentore. Senza `--priorita` P nasce con la
 priorità più alta fra le unite. Un pezzo che si blocca in verifica non si stacca: P passa
 o non passa intero. Alla fusione di P (`done`) il server chiude ogni segnalazione di
 `unisce` che lo aspetta ancora ed è `todo`: `todo → done` (pipeline,
-`statusReason: pacchetto`), con la frase di P come `userNote` e la versione di P se ne ha
-una; quelle in un altro stato, o che non aspettano più P, restano dove sono, e il server
-lo scrive nelle note di P. Le chiude PRIMA di scrivere P in `done`, così l'attesa
+`statusReason: pacchetto`), con la frase di P come `userNote` (senza, una frase di
+ripiego, e le note di P lo dicono) e la versione di P se ne ha una; quelle in un altro
+stato, o che non aspettano più P, restano dove sono, e il server lo scrive nelle note di
+P. Un'unita che è a sua volta un pacchetto chiude prima le sue, allo stesso modo (così
+si aggiunge un doppione a un pacchetto già aperto: un pacchetto nuovo che unisce il
+vecchio). Le chiude PRIMA di scrivere P in `done`, così l'attesa
 sciolta non le rimette in coda; il gancio è uno solo per ogni strada che porta P a
 `done` dopo una fusione. Il messaggio della fusione di P cita anche le unite
 (`merge-gate: #P via server (unisce #N, #M)`), così la ricerca «già risolto su main» le
