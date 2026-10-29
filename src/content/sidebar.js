@@ -1705,6 +1705,8 @@
       // non il "text" della chat: evita di duplicare il messaggio nel riquadrino.
       // Per i "fill" il riquadro è comunque mostrato (contiene valore + bottone Accetta).
       Highlight.clear();
+      // Un testo per un campo che porterebbe fuori un segreto lo toglie il main dalla risposta (#810): resta la frase.
+      if (res.campoFermato) fermata(String(res.campoFermato));
       if (parsed.highlight) {
         const act = parsed.highlight.action;
         if (act === 'reveal' || act === 'hover') {
