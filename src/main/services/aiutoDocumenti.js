@@ -239,9 +239,19 @@ async function iconaDi(p) {
   return foglio();
 }
 
+// Senza il tasto del mouse giù startDrag chiude Filo (visto su Linux): un trascinamento per pressione (#589.1 giro 5).
+const TASTO_GIU_MS = 10000;
+function tastoGiu(wc) {
+  const t = wc && wc._filoTastoGiuAlle;
+  if (!t || Date.now() - t >= TASTO_GIU_MS) return false;
+  wc._filoTastoGiuAlle = 0;
+  return true;
+}
+
 async function trascina(wc, chiave) {
   const p = percorsoDi(wc, chiave);
   if (!p || !esiste(p)) return nonCe;
+  if (!tastoGiu(wc)) return { ok: false, frase: 'Non sono riuscito a prendere il file: aprilo dalla sua cartella e trascinalo da lì' };
   try {
     wc.startDrag({ file: p, icon: await iconaDi(p) });
     return { ok: true };

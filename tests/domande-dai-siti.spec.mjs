@@ -402,8 +402,8 @@ test('a un sito di sfondo non arrivano i siti degli altri, e non porta davanti u
 });
 
 // #589.1 giro 5 — i bottoni del file trovato dall'Aiuto su un sito: la lista li dimenticava, e Apri e Mostra
-// rispondevano «non si è aperto». Li chiede l'utente col clic, dalla scheda che guarda.
-test('dall\'Aiuto di un sito il file trovato si mostra e si apre col clic dell\'utente, non senza', async ({ app, openTab, testServer }) => {
+// rispondevano «non si è aperto». Aprire e mostrare portano una finestra davanti: solo dalla scheda che l'utente guarda.
+test('dall\'Aiuto di un sito il file trovato si mostra e si apre; da una scheda di sfondo no', async ({ app, openTab, testServer }) => {
   const file = join(cartellaTemporanea('aiuto-file-'), 'preventivo.txt');
   writeFileSync(file, 'preventivo del giardino');
   await app.evaluate(({ shell }, { dir, file: f }) => {
@@ -416,17 +416,20 @@ test('dall\'Aiuto di un sito il file trovato si mostra e si apre col clic dell\'
     shell.showItemInFolder = (p) => { globalThis.__mostrati.push(p); };
     shell.openPath = async (p) => { globalThis.__aperti.push(p); return ''; };
   }, { dir: join(process.cwd(), 'src', 'main', 'services'), file });
-  const pagina = await testServer.openReady(openTab, '<h1 style="height:60vh">sito</h1>');
+  await testServer.openReady(openTab, '<h1>sito</h1>');
   const sito = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
   const cerca = await sito(chiedi('aiuto_cerca_documenti', { cosa: 'preventivo giardino' }));
   expect(cerca.nonTrovata || cerca.errore, JSON.stringify(cerca)).toBeFalsy();
   const chiave = cerca.risposta?.candidati?.[0]?.chiave;
   expect(chiave, 'la ricerca dell\'Aiuto non ha trovato il file').toBeTruthy();
 
-  expect((await sito(chiedi('aiuto_mostra_file', { chiave }))).risposta?.code, 'senza il clic dell\'utente il sito apre la cartella').toBe('forbidden');
-  await pagina.click('h1');
   expect((await sito(chiedi('aiuto_mostra_file', { chiave }))).risposta, '«Mostra nella cartella» dell\'Aiuto').toMatchObject({ ok: true });
   expect((await sito(chiedi('aiuto_apri_file', { chiave }))).risposta, '«Apri» dell\'Aiuto').toMatchObject({ ok: true });
+  expect(await app.evaluate(() => [globalThis.__mostrati, globalThis.__aperti])).toEqual([[file], [file]]);
+
+  await openTab(testServer.html('<h1>quella che guardo</h1>', { pubblico: true }));
+  expect((await sito(chiedi('aiuto_apri_file', { chiave }))).risposta?.code, 'da una scheda di sfondo il sito apre un file').toBe('forbidden');
+  expect((await sito(chiedi('aiuto_mostra_file', { chiave }))).risposta?.code).toBe('forbidden');
   expect(await app.evaluate(() => [globalThis.__mostrati, globalThis.__aperti])).toEqual([[file], [file]]);
 });
 
