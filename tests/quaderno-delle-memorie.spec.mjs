@@ -204,13 +204,9 @@ test('tolgo una riga: sparisce, il prompt non la vede, non ricompare dallo stess
   await expect(riga(page, 'Ama le spezie')).toHaveCount(1, { timeout: 5_000 });
   await turno(app, 'chat-cena', 'cosa mi cucino?');
   // La memoria del prompt non la porta più (il messaggio di allora resta nel filo, ed è giusto che il modello lo veda).
-  const ultimo = await app.evaluate(() => globalThis.__q_prompt[globalThis.__q_prompt.length - 1]);
-  // La sezione è la riga «PREFERENZE:» da sola: il nome di un'azione (PULSANTE_PREFERENZE:) la contiene già.
-  const inizio = ultimo.search(/^PREFERENZE:$/m);
-  expect(inizio).toBeGreaterThan(-1);
-  const preferenze = ultimo.slice(inizio).split('\n\n')[0];
-  expect(preferenze).toContain('Ama le spezie');
-  expect(preferenze).not.toContain('vegetariano');
+  const memoriaDopo = memoriaNelPrompt(await ultimoPrompt(app));
+  expect(memoriaDopo).toContain('Ama le spezie');
+  expect(memoriaDopo).not.toContain('vegetariano');
 
   // Tasto destro sulla nascosta: rimetti.
   const voci = await vociMenu(page, 'È vegetariano');
