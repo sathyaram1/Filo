@@ -123,14 +123,16 @@ const riprese = (a) => (a && Array.isArray(a.riprese) ? a.riprese.join('|') : ''
 const stessaAncora = (prima, ora) => !prima || (!!ora && prima.ts === ora.ts && prima.giorni === ora.giorni && prima.token === ora.token
   && riprese(prima) === riprese(ora));
 
-function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', ora = Date.now() } = {}) {
+// `segna: false`: la richiesta non ha un messaggio dell'utente che porti i cambi ai turni dopo (un «Continua», un turno
+// interno): restano da dire al prossimo messaggio, o si perderebbero (#1562).
+function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', ora = Date.now(), segna = true } = {}) {
   const lato = incognito ? 'incognito' : 'normale';
   const f = fotografie[lato];
   const fresca = f && ora - f.usata <= (DURATE_MS[durata] || DURATE_MS['1h']) && stessaAncora(f.ancora, ancora);
   if (fresca) {
     const d = TV().confronta(f.viste, sezioni);
     if (!d.rifai) {
-      f.viste = d.viste;
+      if (segna) f.viste = d.viste;
       f.usata = ora;
       f.ancora = f.ancora || ancora;
       return { testo: f.testo, epoca: f.epoca, cambiate: TV().rendiCambiate(d.cambiate), nuova: false };
