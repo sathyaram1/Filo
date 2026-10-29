@@ -217,8 +217,9 @@ faceva spendere una chiamata.
   compone), Backspace e Canc tolgono un solo carattere come lo vede l'utente
   (`Intl.Segmenter`), le altre cancellazioni tolgono e basta, attaccate al
   cursore. Se non combacia, Filo rimette il tasto dell'utente sul suo testo.
-  Annulla e rifai valgono solo se riportano un testo che la casella ha già avuto;
-  il rilascio di un trascinamento e la sostituzione del correttore solo se il loro
+  Annulla e rifai valgono solo se riportano un testo che la casella ha già avuto
+  (se ne tiene l'impronta con un seme del mondo isolato, non il testo: interi, un
+  log di centomila caratteri ne lasciava una ventina, #1340 giro 4); il rilascio di un trascinamento e la sostituzione del correttore solo se il loro
   testo è entrato in un punto e il resto è rimasto.
 
   **Anche Filo annuncia.** Un suo `execCommand` (la correzione del correttore, il
