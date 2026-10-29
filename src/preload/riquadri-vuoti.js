@@ -238,7 +238,7 @@ function buildRiquadriVuotiSource(corpi) {
     dopo(Doc, 'writeln', SE.sempre);
     dopo(Doc, 'execCommand', SE.testo(2));
     // La riscrittura da capo toglie gli ascolti del documento; con tre argomenti apre una finestra.
-    dopo(Doc, 'open', SE.sempre, function (doc, r) { ascolta(doc); if (finestra(r)) applica(r); });
+    dopo(Doc, 'open', SE.sempre, function (doc, r) { ascolta(doc, su); if (finestra(r)) applica(r); });
     var R = proto(w, 'Range');
     ['insertNode', 'surroundContents'].forEach(function (m) { dopo(R, m, SE.gamma); });
     dopo(proto(w, 'Element'), 'attachShadow', function () { return false; }, function (el, radice) { ascolta(radice, su); });
