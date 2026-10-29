@@ -239,7 +239,11 @@ faceva spendere una chiamata.
   tasto: dal rilascio al clic (e al doppio clic) il browser può solo chiudere in
   un punto la selezione su cui si è cliccato, anche dopo aver mandato il clic; il
   resto torna. La composizione conta solo se è vera: un inizio finto del sito
-  spegneva il ritorno della selezione (#1340, giro 3). Fuori da quei giri la
+  spegneva il ritorno della selezione (#1340, giro 3). Incolla, taglia e l'inizio
+  di una composizione arrivano anche senza un tasto che la pagina veda (Incolla del
+  menu dell'app, che su Mac è la strada di Cmd+V): il ponte li guarda prima del
+  sito, e l'annuncio parte dalla selezione che avevano trovato (#1340, giro 4).
+  Fuori da quei giri la
   selezione la sposta anche «Seleziona tutto» della barra dei menu (Cmd+A su
   Mac), che la pagina non vede: lì vale, e resta il limite qui sotto.
 - **Una bozza resta al sito dove è nata, e lo decide il main**: la chiave porta
