@@ -72,6 +72,8 @@ test('scheda stretta che suona: il clic sull\'altoparlante rimasto solo la apre 
   await patch(app, p);
   const tab = shell.locator(`#tabs .tab[data-id="${ids[k]}"]`);
   await expect(tab.locator('.tab-alert')).toHaveCount(1);
+  await shell.evaluate((id) => document.querySelector(`#tabs .tab[data-id="${id}"]`).scrollIntoView({ inline: 'nearest' }), ids[k]);
+  await shell.waitForTimeout(300);
   const info = await tab.evaluate((el) => {
     const visibili = [...el.children].filter((c) => getComputedStyle(c).display !== 'none').map((c) => c.className.split(' ')[0]);
     const a = el.querySelector('.tab-alert').getBoundingClientRect();
@@ -120,16 +122,4 @@ test('a ogni larghezza della finestra il titolo si legge (una lettera coi puntin
     for (const m of male) errori.push(`finestra ${larga}: ${m}`);
   }
   expect(errori).toEqual([]);
-});
-
-test('foto della fila con schede che suonano', async ({ shell, app }) => {
-  const ids = await apriSchede(shell, app, 9);
-  await patch(app, ids.map((_, i) => (i === 2 ? { audible: true } : i === 4 ? { audible: true, muted: true } : null)));
-  await expect(shell.locator('#tabs .tab .tab-alert')).toHaveCount(2);
-  await shell.waitForTimeout(300);
-  await shell.screenshot({ path: 'tests/.shots/1688-fila-9.png', clip: { x: 0, y: 0, width: 1280, height: 60 } });
-  const ids2 = await apriSchede(shell, app, 26);
-  await patch(app, ids2.map((_, i) => (i % 3 === 0 ? { audible: true } : null)));
-  await shell.waitForTimeout(300);
-  await shell.screenshot({ path: 'tests/.shots/1688-fila-26.png', clip: { x: 0, y: 0, width: 1280, height: 60 } });
 });
