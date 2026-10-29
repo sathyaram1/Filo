@@ -76,6 +76,23 @@ test('«scrivi una mail a Mario»: si apre il programma di posta e il modello sa
   await page.screenshot({ path: 'tests/.shots/chat-indirizzi-posta.png' });
 });
 
+test('la posta chiesta senza «mailto:»: il bottone in chat la riapre, non una ricerca Google', async ({ app }) => {
+  test.setTimeout(90_000);
+  await app.evaluate(({ shell: s }) => { globalThis.__esterni = []; s.openExternal = async (u) => { globalThis.__esterni.push(String(u)); }; });
+  await modelloFinto(app, [{ text: 'Ti apro la mail.', toolCalls: [naviga('m2', 'mario.rossi@esempio.it')] }, { text: 'Fatto.' }]);
+  const page = await home(app);
+  await chiedi(page, 'scrivi una mail a mario.rossi@esempio.it');
+  await expect.poll(() => app.evaluate(() => globalThis.__esterni), { timeout: 15_000 }).toEqual(['mailto:mario.rossi@esempio.it']);
+  const bottone = page.locator('a.dash-action-link-chip');
+  await expect(bottone).toHaveCount(1, { timeout: 15_000 });
+  await expect(bottone).toHaveAttribute('href', 'mailto:mario.rossi@esempio.it');
+  await expect(bottone).toContainText('mario.rossi@esempio.it');
+  await bottone.evaluate((a) => a.click());
+  await expect.poll(() => app.evaluate(() => globalThis.__esterni), { timeout: 10_000 })
+    .toEqual(['mailto:mario.rossi@esempio.it', 'mailto:mario.rossi@esempio.it']);
+  expect(await cerche(app)).toEqual([]);
+});
+
 test('un percorso fra virgolette o sulla chiavetta non diventa una ricerca: è fermato, e il modello sa quale file', async ({ app }) => {
   test.setTimeout(90_000);
   const dir = join(await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR), 'Banca');
