@@ -31,7 +31,7 @@ function misura(shell) {
       .filter((c) => getComputedStyle(c).display !== 'none')
       .map((c) => {
         const q = c.getBoundingClientRect();
-        return { cls: c.className, left: q.left, right: q.right, width: q.width };
+        return { cls: c.className, left: q.left, right: q.right, width: q.width, fuori: getComputedStyle(c).position === 'absolute' };
       });
     return { id: tab.dataset.id, active: tab.classList.contains('active'), left: r.left, right: r.right, width: r.width, figli };
   }));
@@ -136,10 +136,13 @@ test('scheda stretta: l\'avviso audio resta sempre, la favicon cede solo quando 
         expect(f.left, dove).toBeGreaterThanOrEqual(s.left - 0.5);
         expect(f.right, dove).toBeLessThanOrEqual(s.right + 0.5);
       }
-      const piene = s.figli.filter((f) => f.width > 0);
+      // La X fuori fila delle schede dietro sta sopra la fine del nome, mai sopra l'avviso (#1688).
+      const piene = s.figli.filter((f) => f.width > 0 && !f.fuori);
       for (let i = 1; i < piene.length; i++) expect(piene[i].left, dove).toBeGreaterThanOrEqual(piene[i - 1].right - 0.5);
 
       const avviso = s.figli.find((f) => f.cls.includes('tab-alert'));
+      const xFuori = s.figli.find((f) => f.cls === 'close' && f.fuori);
+      if (xFuori) expect(xFuori.right, dove).toBeLessThanOrEqual(avviso.left + 0.5);
       const favicon = s.figli.find((f) => f.cls === 'favicon' || f.cls === 'spinner');
       expect(avviso && avviso.width, dove).toBe(16);
       // La favicon cede solo sotto i 56px: 10+8 di margini, 16+6+16 per le due icone.
@@ -422,4 +425,43 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
     await expect.poll(() => scritte(app), { timeout: 3000, message: `${cls} senza anteprima` })
       .toEqual({ carta: null, suggerimento: atteso });
   }
+});
+
+test('scheda dietro di larghezza media che comincia a suonare: il nome resta leggibile e la X compare sopra la sua fine (#1688)', async ({ app, shell, openTab, testServer }) => {
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setSize(1280, 800));
+  for (let i = 0; i < 8; i++) await openPage(openTab, testServer, `Sito numero ${i} con un titolo abbastanza lungo da tagliare`);
+  await expect(shell.locator('.tab .spinner')).toHaveCount(0, { timeout: 15_000 });
+  await shell.mouse.move(600, 400);
+  const [, suona] = await patchWebTabs(app, [null, { audible: true }]);
+  const tab = shell.locator(`.tab[data-id="${suona}"]`);
+  await expect(tab.locator('.audio-ind')).toHaveCount(1, { timeout: 10_000 });
+  await dueFotogrammi(shell);
+  const leggi = () => tab.evaluate((el) => {
+    const t = el.querySelector('.title');
+    const cs = getComputedStyle(t);
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const r = (q) => el.querySelector(q).getBoundingClientRect();
+    return {
+      largo: el.getBoundingClientRect().width,
+      leggibile: cs.display !== 'none' && cs.visibility === 'visible' && t.offsetWidth >= c.measureText(t.textContent[0] + '…').width,
+      xPrimaDellAvviso: r('.close').right <= r('.tab-alert').left + 0.5,
+    };
+  });
+  const s = await leggi();
+  // La larghezza del caso: tra quella in cui il nome non ci sta più nemmeno senza X e quella in cui ci sta con la X in fila.
+  expect(s.largo).toBeGreaterThan(88);
+  expect(s.largo).toBeLessThan(112);
+  expect(s).toMatchObject({ leggibile: true, xPrimaDellAvviso: true });
+
+  // Al passaggio la X si vede e si prende; l'altoparlante resta dov'era e muta.
+  const prima = await tab.locator('.audio-ind').boundingBox();
+  await tab.locator('.title').hover();
+  await expect(tab.locator('.close')).toHaveCSS('opacity', '1');
+  const x = await tab.locator('.close').boundingBox();
+  const sotto = await shell.evaluate(([cx, cy]) => document.elementFromPoint(cx, cy)?.closest('.close') != null, [x.x + x.width / 2, x.y + x.height / 2]);
+  expect(sotto).toBe(true);
+  expect(await tab.locator('.audio-ind').boundingBox()).toEqual(prima);
+  await tab.locator('.audio-ind').click();
+  await expect(tab.locator('.mute-ind')).toHaveCount(1, { timeout: 5000 });
 });
