@@ -82,9 +82,12 @@ test('una scheda che l\'agente non ha riscritto, o una rilettura senza «riletta
 });
 
 test('il prompt porta il ruolo e in coda i dati del giro; la rilettura dice quale file', () => {
-  const p = S.promptScheda('# Ruolo', { num: '12', cartella: '/x/schede', radice: '/x/Filo' });
-  assert.match(p, /^# Ruolo\n\nFeedback: 12\nCartella delle schede: \/x\/schede\nRadice del repo: \/x\/Filo$/);
-  assert.match(S.promptScheda('# Ruolo', { num: '12', cartella: '/x/schede', radice: '/x/Filo', rilettura: true }), /RILETTURA\..*Il file: \/x\/schede\/12\.json$/s);
+  const dati = { num: '12', cartella: '/x/schede', radice: '/x/Filo' };
+  assert.equal(S.promptScheda('# Ruolo', dati), '# Ruolo\n\nFeedback: 12\nCartella delle schede: /x/schede\nRadice del repo: /x/Filo');
+  // Il file lo compone il path del sistema (su Windows `\x\schede\12.json`): si asserisce la relazione, non il valore.
+  const r = S.promptScheda('# Ruolo', { ...dati, rilettura: true });
+  assert.match(r, /\n\nRILETTURA\. /);
+  assert.ok(r.endsWith(`Il file: ${join(dati.cartella, '12.json')}`), r);
 });
 
 test('i lavori partono al più N alla volta, tutti, e ognuno col suo esito', async () => {
