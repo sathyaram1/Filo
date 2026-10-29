@@ -168,6 +168,10 @@ porta fuori dal foglio e li riporta con un gesto; la chat è diventata l'Aiuto, 
   stringe e la barra di scorrimento resta sul bordo); sbloccato si apre sopra il foglio senza spingerlo, così il testo
   non si risistema a ogni apertura. Bloccato non si chiude da solo; il tasto e la chat lo chiudono lo stesso.
 - **L'Aiuto e il pannello insieme**: l'Aiuto resta sul bordo, il pannello si posa alla sua sinistra (`--pd-destra`).
+- **Il foglio fa posto a ciò che sta fisso a destra**, con una regola sola (`--pd-spinta`): l'Aiuto aperto, anche
+  ridotto, e il pannello bloccato. Il testo non finisce mai sotto di loro (rientrato tre volte da porte diverse:
+  lucchetto con l'Aiuto, finestra stretta, Aiuto da solo). Sotto il foglio minimo l'Aiuto torna sopra il foglio e il
+  lucchetto smette di spingere.
 - **Gli strumenti li conserva il main, uno solo** (`src/main/services/pannelliApp.js`): la pagina manda la mossa
   (posa, togli, configura), il main la mette in fila e annuncia il risultato a ogni pagina di Filo aperta ([Chi rilegge
   tutto e riscrive tutto mette le scritture in fila](chi-rilegge-tutto-e-riscrive-tutto-mette-le-scritture-in-fila.md)).
