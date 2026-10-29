@@ -101,7 +101,8 @@
 //   node scripts/routine-channel.mjs git-server <clone|ls-remote|fetch|push> <cartella-del-clone> [<ramo>]
 //       → l'unica strada di git verso filo-security in un lavoro server (#1159, #1233, #1761): chiede il token del
 //         biglietto e, in locale, lo dà a quella sola chiamata di git; in cloud lascia autenticare il proxy della sessione
-//         (lib/git-server.mjs). Exit 0 = fatto, 1 = uso o git fallito, 4 = token rifiutato, 3 = guasto.
+//         (lib/git-server.mjs). Una push riuscita fa anche ramo-server (#1648).
+//         Exit 0 = fatto, 1 = uso o git fallito, 4 = token rifiutato, 3 = guasto.
 //
 //   node scripts/routine-channel.mjs ramo-server <ramo> [<sha>]
 //       → dopo il push su filo-security: il server legge la punta e la registra (registro dei rami). Exit come sporca.
@@ -870,12 +871,13 @@ export async function ramoServer(t, ramo, sha, opts) {
 
 /**
  * `git-server <azione> <cartella> [<ramo>]`: un git verso filo-security solo dopo il sì del server al biglietto. In
- * locale il token di quel sì va a quella sola chiamata; in cloud no, autentica il proxy della sessione (#1761).
- * → exit: 0 fatto, 1 uso o git fallito, 3 guasto, 4 token rifiutato. `lancia`, `token` ed `eco` per le prove.
+ * locale il token di quel sì va a quella sola chiamata; in cloud no, autentica il proxy della sessione (#1761). Una
+ * spinta riuscita scrive anche la voce del registro. → exit: 0 fatto, 1 uso o git fallito, 3 guasto, 4 token
+ * rifiutato. `lancia`, `token`, `registra` ed `eco` per le prove.
  */
 export async function eseguiGitServer({
   azione, cartella, ramo, biglietto, root = ROOT, env = process.env, strada = stradaGitServer(env),
-  lancia = (argv, o) => spawnSync('git', argv, o), token = gitToken, scrivi = (r) => console.error(r),
+  lancia = (argv, o) => spawnSync('git', argv, o), token = gitToken, registra = ramoServer, scrivi = (r) => console.error(r),
   eco = (dove, testo) => (dove === 'out' ? process.stdout : process.stderr).write(testo),
 } = {}) {
   const clonato = Boolean(String(cartella || '').trim()) && existsSync(join(resolve(String(cartella)), '.git'));
@@ -937,7 +939,29 @@ export async function eseguiGitServer({
     scrivi(`git-server: git è uscito con ${r ? (r.status ?? r.signal) : '?'}. Il token c'era, nell'URL di ${URL_SERVER} per questa sola chiamata: ${chi}`);
     return 1;
   }
+  if (azione === 'push') await registraSpinta({ dir: piano.dir, ramo: String(ramo).trim(), biglietto, env, lancia, registra, scrivi });
   return 0;
+}
+
+/**
+ * La voce della punta appena spinta, nello stesso passo della spinta (#1648): un worker fermo fra i due lascerebbe su
+ * GitHub una punta che il server, a biglietto chiuso, segnala come ramo riscritto fuori registro. La spinta resta
+ * riuscita anche se la voce no: il rimedio è ramo-server, che il ruolo chiede comunque.
+ */
+async function registraSpinta({ dir, ramo, biglietto, env, lancia, registra, scrivi }) {
+  const rimedio = `La spinta è fatta: registra la punta con ramo-server ${ramo}.`;
+  const { env: ambienteNudo } = ambienteGitServer(env, '');
+  const letta = lancia(['-C', dir, 'rev-parse', '--verify', '--quiet', `refs/heads/${ramo}^{commit}`], { env: ambienteNudo, encoding: 'utf8' });
+  const sha = letta && letta.status === 0 ? String(letta.stdout || '').trim() : '';
+  if (!/^[0-9a-f]{40}$/i.test(sha)) { scrivi(`git-server: non leggo la punta di ${ramo} nel clone, la voce del registro non è scritta. ${rimedio}`); return; }
+  let v;
+  try { v = await registra(biglietto, ramo, sha); } catch (e) { v = { outcome: 'fault', reason: String((e && e.message) || e) }; }
+  if (v.outcome === 'ok') {
+    scrivi(`git-server: ramo del server registrato: ${ramo} a ${String(v.sha || sha).slice(0, 12)}${v.ramoFidato ? '' : ' (il registro dice: non fidato)'}.`);
+    return;
+  }
+  const motivo = `${v.reason}${v.detail ? `: ${v.detail}` : ''}`;
+  scrivi(`git-server: voce del registro non scritta (${v.outcome === 'refused' ? 'rifiutata' : 'guasto'}: ${motivo}). ${rimedio}`);
 }
 
 // ─── L'impronta dichiarata a mano ────────────────────────────────────────────

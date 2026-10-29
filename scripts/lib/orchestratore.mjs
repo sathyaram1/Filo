@@ -634,8 +634,8 @@ export function creaMotore(dep, opzioni = {}) {
       // di Filo che ha già la parte dell'app (#1222), come dal cancello.
       const serverDaFondere = nSrv && !p.fusa.server;
       if (serverDaFondere) await git(P.serverRadice, 'push', 'origin', `refs/heads/${ramoDi(p)}:refs/heads/${ramoDi(p)}`);
-      // La voce della punta appena spinta la scrive finish; senza finish (solo server) nessuno, e il ramo resterebbe fuori registro (#1648).
-      if (serverDaFondere && !(nApp && !p.fusa.app)) {
+      // La voce della punta spinta subito, non a fine finish: una chiusura ferma prima lascerebbe il ramo fuori registro (#1648).
+      if (serverDaFondere) {
         const reg = await node(wt, ['scripts/verify-local.mjs', 'registra'], 5 * 60_000);
         for (const riga of String(reg.out || '').split('\n').filter((x) => x.trim())) dep.log(`#${p.num} ${riga.trim()}`);
       }

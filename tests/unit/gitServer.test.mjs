@@ -136,19 +136,27 @@ test('eseguiGitServer: il token chiesto col biglietto arriva a git nell’ambien
   const echi = [];
   const lancia = (argv, o) => {
     lanciati.push({ argv, env: o.env });
+    if (argv.includes('rev-parse')) return { status: 0, stdout: `${'c'.repeat(40)}\n` };
     return argv.includes('get-url') ? { status: 0, stdout: `${URL_SERVER}\n` }
       : { status: 0, stdout: `ok ${TOKEN}\n`, stderr: `To ${urlConToken(TOKEN)}\n` };
   };
   const chiesti = [];
   const token = async (b) => { chiesti.push(b); return { outcome: 'ok', token: TOKEN, scadeIl: Date.parse('2026-10-15T11:00:00Z') }; };
+  const registrati = [];
+  const registra = async (b, ramo, sha) => { registrati.push([b, ramo, sha]); return { outcome: 'ok', sha, ramoFidato: true }; };
   try {
     const exit = await eseguiGitServer({
       azione: 'push', cartella: clone, ramo: 'worker/f1', biglietto: 'B1', root: join(casa, 'Filo'),
-      env: { GIT_ASKPASS: '/proxy/askpass' }, lancia, token, scrivi: (r) => righe.push(r), eco: (d, t) => echi.push([d, t]),
+      env: { GIT_ASKPASS: '/proxy/askpass' }, lancia, token, registra, scrivi: (r) => righe.push(r), eco: (d, t) => echi.push([d, t]),
     });
     assert.equal(exit, 0, righe.join('\n'));
     assert.deepEqual(chiesti, ['B1']);
-    assert.equal(lanciati.length, 3, 'due letture dell’origin e la spinta');
+    assert.equal(lanciati.length, 4, 'due letture dell’origin, la spinta e la punta spinta');
+    // #1648: la voce del registro nello stesso passo della spinta, con la punta del ramo spinto e senza token.
+    assert.deepEqual(lanciati[3].argv, ['-C', clone, 'rev-parse', '--verify', '--quiet', 'refs/heads/worker/f1^{commit}']);
+    assert.ok(!JSON.stringify(lanciati[3]).includes(TOKEN));
+    assert.deepEqual(registrati, [['B1', 'worker/f1', 'c'.repeat(40)]]);
+    assert.match(righe.join('\n'), /ramo del server registrato: worker\/f1 a cccccccccccc\./);
     const spinta = lanciati[2];
     assert.deepEqual(spinta.argv, ['-C', clone, 'push', 'origin', 'refs/heads/worker/f1:refs/heads/worker/f1']);
     assert.ok(vociDi(spinta.env).some(([k, v]) => k === `url.${urlConToken(TOKEN)}.pushInsteadOf` && v === URL_SERVER));
@@ -159,6 +167,38 @@ test('eseguiGitServer: il token chiesto col biglietto arriva a git nell’ambien
     assert.ok(!righe.join('\n').includes(TOKEN));
     assert.match(righe.join('\n'), /scade alle 11:00 UTC/);
     assert.match(righe.join('\n'), /tolti per questa chiamata: GIT_ASKPASS/);
+  } finally {
+    togliCartella(casa);
+  }
+});
+
+test('eseguiGitServer: la voce della spinta solo dopo una spinta riuscita; una voce mancata non annulla la spinta e dice il rimedio', async () => {
+  const casa = cartellaTemporanea('filo-git-server-');
+  const clone = join(casa, 'filo-security');
+  mkdirSync(join(clone, '.git'), { recursive: true });
+  const base = { azione: 'push', cartella: clone, ramo: 'worker/f1', biglietto: 'B1', root: join(casa, 'Filo'), env: {}, eco: () => {}, token: async () => ({ outcome: 'ok', token: TOKEN }) };
+  const git = ({ spinta = 0, punta = 'd'.repeat(40) } = {}) => (argv) => {
+    if (argv.includes('get-url')) return { status: 0, stdout: URL_SERVER };
+    if (argv.includes('rev-parse')) return punta ? { status: 0, stdout: `${punta}\n` } : { status: 1, stdout: '' };
+    return { status: spinta, stderr: spinta ? 'error: failed to push some refs\n' : '' };
+  };
+  try {
+    let chiamate = 0;
+    const conta = async () => { chiamate += 1; return { outcome: 'ok', sha: 'd'.repeat(40) }; };
+    assert.equal(await eseguiGitServer({ ...base, lancia: git({ spinta: 1 }), registra: conta, scrivi: () => {} }), 1);
+    assert.equal(chiamate, 0, 'una spinta respinta non si registra');
+    assert.equal(await eseguiGitServer({ ...base, azione: 'fetch', lancia: git(), registra: conta, scrivi: () => {} }), 0);
+    assert.equal(chiamate, 0, 'solo la spinta scrive la voce');
+    for (const [nome, opz, registra, atteso] of [
+      ['rifiutata', {}, async () => ({ outcome: 'refused', reason: 'biglietto_chiuso' }), /voce del registro non scritta \(rifiutata: biglietto_chiuso\)\. La spinta è fatta: registra la punta con ramo-server worker\/f1\./],
+      ['guasto', {}, async () => ({ outcome: 'fault', reason: 'http_503' }), /voce del registro non scritta \(guasto: http_503\)/],
+      ['eccezione', {}, async () => { throw new Error('rete giù'); }, /voce del registro non scritta \(guasto: rete giù\)/],
+      ['punta illeggibile', { punta: '' }, conta, /non leggo la punta di worker\/f1 nel clone[^]*ramo-server worker\/f1/],
+    ]) {
+      const righe = [];
+      assert.equal(await eseguiGitServer({ ...base, lancia: git(opz), registra, scrivi: (r) => righe.push(r) }), 0, nome);
+      assert.match(righe.join('\n'), atteso, nome);
+    }
   } finally {
     togliCartella(casa);
   }

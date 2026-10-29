@@ -173,12 +173,23 @@ test('solo server: --solo-server, niente finish', async () => {
   assert.ok(spinta >= 0 && voce > spinta && voce < indice(b.righe(), /server-fondi-pratica/), b.righe().join('\n'));
 });
 
-test('app e server: la voce del server la scrive finish, niente registra in più', async () => {
-  const b = banco();
-  await b.motore.avvia();
-  assert.ok(indice(b.righe(), /finish-local/) >= 0);
-  assert.equal(indice(b.righe(), /verify-local\.mjs registra/), -1);
-});
+// #1648: la spinta del server precede finish, che può fermarsi prima della sua voce: la voce si scrive subito dopo la spinta.
+for (const [nome, risposte] of [
+  ['finish fuso', []],
+  ['finish rosso', [[/finish-local/, { code: 1, out: 'unit rossi' }]]],
+  ['ramo del server senza main del server', [[/merge-base --is-ancestor refs\/remotes\/origin\/main refs\/heads\/claude\/sette/, { code: 1, out: '' }]]],
+]) {
+  test(`app e server, ${nome}: la punta del server spinta entra nel registro prima di finish`, async () => {
+    const b = banco({ risposte, opz: { ritenta: 0 } });
+    await b.motore.avvia();
+    const righe = b.righe();
+    const spinta = indice(righe, /^git push origin refs\/heads\/claude\/sette:refs\/heads\/claude\/sette$/);
+    const voce = indice(righe, /^node scripts\/verify-local\.mjs registra$/);
+    assert.ok(spinta >= 0 && voce > spinta, righe.join('\n'));
+    const finish = indice(righe, /finish-local/);
+    assert.ok(finish === -1 || voce < finish, righe.join('\n'));
+  });
+}
 
 test('deploy.yml su main di filo-security: la spinta del server la pubblica GitHub, il PC non lancia un secondo deploy insieme', async () => {
   const soloScript = [/diff --name-only/, { code: 0, out: 'scripts/a.mjs' }];
