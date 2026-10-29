@@ -128,7 +128,7 @@ test('l\'annullo, i CAMBI RECENTI e il manifesto nominano le icone della barra l
   require(join(ROOT, 'src', 'shared', 'filoState.js'));
   require(join(ROOT, 'src', 'shared', 'capabilities.js'));
   assert.match(globalThis.SN_ACTION_TOOLS.TOOLS.ANNULLA_CAMBIO.description, /icone della barra laterale/);
-  const titolo = (globalThis.SN_FILO_STATE.renderForPrompt.toString().match(/'CAMBI RECENTI[^']*'/) || [''])[0];
+  const titolo = (globalThis.SN_FILO_STATE.sezioni.toString().match(/'CAMBI RECENTI[^']*'/) || [''])[0];
   assert.match(titolo, /icone della barra laterale/);
   const voce = globalThis.SN_CAPABILITIES.CAPABILITIES.find((c) => c.id === 'undo-changes');
   assert.match(voce.desc, /icone della barra laterale/);

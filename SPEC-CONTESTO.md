@@ -341,6 +341,12 @@ fanno ~5 $ al giorno, compattazioni comprese.
    nel filo; via il registro vecchio.
 3. **La richiesta nuova**: i quattro blocchi nell'ordine della tabella, il
    tratto vivo costruito dal filo, gli eventi grezzi davanti a ogni messaggio.
+   Fatta con #1562. Finché manca la fase 4 la parte dell'utente si rifotografa
+   quando l'inizio del tratto si sposta, a cache fredda o per un cambio che non
+   si dice con un'aggiunta (una riga di memoria tolta, lo stile, le capacità).
+   Le pagine visitate restano fuori finché l'owner non decide (D56); il tetto
+   di un esito e il budget in token al posto dei 12 giri vanno con la soglia
+   della fase 4.
 4. **La compattazione** a livelli, con la soglia e la parte dell'utente
    fotografata.
 5. **Parte fissa e strumenti nuovi**, misurati sul banco allargato contro la
@@ -366,10 +372,9 @@ una chiamata vera.
   cambiato è un errore 400, e via OpenRouter la chiave dell'owner ripiega sui
   crediti del router. Filo manda il ragionamento a Claude solo col prefisso
   intatto (regola nel pattern del contesto), dentro un giro di strumenti
-  compreso. Col tratto di oggi i turni passati non lo riportano mai: il
-  CONTESTO DI ADESSO davanti alla domanda sparisce al turno dopo. Per riaverlo
-  serve la richiesta della fase 3, che cresce solo in coda; per i promemoria di
-  ogni turno Anthropic offre i messaggi di sistema a metà conversazione
+  compreso. Con la richiesta della fase 3 (#1562), che cresce solo in coda, lo
+  riportano anche i turni passati, giri di strumenti compresi; per i promemoria
+  di ogni turno Anthropic offre i messaggi di sistema a metà conversazione
   (`clear_at`), da provare attraverso OpenRouter.
 
 ## Da decidere (owner)

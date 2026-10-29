@@ -5,30 +5,49 @@
 Fino al #868 la chat mandava al modello gli ultimi venti messaggi della scheda, più trenta righe del registro grezzo
 tagliate a 200 caratteri. Una scheda nuova non sapeva niente di quella accanto. Adesso il modello ha davanti il
 **filo** (#866): le conversazioni degli ultimi giorni, di tutte le schede, in ordine di tempo, con l'ora e la chat
-in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (pura), la lettura del filo in
-`src/main/services/contestoFilo.js`, i ricordi in `src/main/services/ricordiFilo.js`.
+in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` e `src/shared/filoTrattoVivo.js` (pure),
+la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoFilo.js`, i ricordi in
+`src/main/services/ricordiFilo.js`. Dal #1562 la richiesta è quella di SPEC-CONTESTO § La richiesta, in quattro blocchi.
 
 ## Le regole
 
 - **Due tetti, vince il minore**: giorni (3) e token (100.000). L'utente li cambia in Preferenze → Impostazioni
   avanzate o dalla chat; l'owner nei Modelli predefiniti (`contestoFilo` in `config/models`). Vuoto = predefinito.
-- **L'ordine della richiesta**: istruzioni fisse → tratto del filo → quello che la scheda ha e il filo no (un turno
-  interrotto) → CONTESTO DI ADESSO (stato, memorie, file, ricordi ripescati) → domanda. Tutto ciò che cambia a ogni
-  turno sta dopo il tratto: su un prefisso da 100k token senza cache si paga tutto a ogni messaggio. Sentinella
-  `tests/unit/filoContesto.test.mjs` (due turni hanno lo stesso prefisso; i ricordi stanno dopo gli eventi recenti).
-- **I punti di cache stanno sui confini di quell'ordine** (#1412): fine della parte fissa (prima dell'accoglienza,
-  durata un'ora), fine del tratto, ultimo messaggio. Se un messaggio del tratto al turno dopo perde esito o
-  ragionamento (esce dagli ultimi venti), il punto della storia va sul messaggio prima: più avanti non verrebbe mai
-  riletto. Il piano lo fa il cancello dei modelli sui messaggi già
-  oscurati; lo scrive nel corpo solo il fornitore, e solo per i modelli Anthropic: gli altri la cache la fanno da
-  soli e ricevono i messaggi tali e quali. Un pezzo variabile nuovo nel system si apre con uno degli inizi di
-  `INIZI_VARIABILI_CHAT`, se no finisce nella parte in cache. Sentinella `tests/unit/puntiDiCache.test.mjs`.
-- **Il prefisso non si muove fra due turni.** Ore assolute, mai «2 ore fa»; un nome di chat fisso (quattro caratteri
-  dell'id), non «questa scheda»; il taglio per giorni si sposta a scatti (da un'ora a sei); oltre il tetto in token
-  si taglia un quarto sotto e l'inizio si tiene finché basta. Il ragionamento allegato a una risposta vive quanto i
-  suoi esiti, in ogni scheda: tolto alla sola penultima cambierebbe a ogni turno un messaggio già in cache. Una
+- **L'ordine della richiesta** (#1562): strumenti, uguali per ogni utente, sistema e ruolo (`definitions()` senza
+  argomenti: ONBOARDING c'è sempre e fuori dall'intervista lo ferma il main) → parte fissa (`filoChatStatic()`, uguale byte
+  per byte per tutti) → CONTESTO dell'utente (sistema operativo, capacità, stile, modello, memoria, STATO senza ora né
+  tempi relativi, cambi delle valute, file), fotografato → tratto vivo → domanda → giro di strumenti. Sentinella
+  `tests/unit/richiestaChat.test.mjs`.
+- **Il CONTESTO si fotografa e sta fermo** fino al prossimo taglio del tratto (il suo inizio si sposta), alla cache
+  fredda (fermo più della sua durata) o a un cambio che non si dice con un'aggiunta (una riga di memoria tolta, le
+  capacità): una riga dimenticata non resta davanti al modello con accanto «tolta». Quello che cambia nel frattempo
+  arriva nella domanda dopo, sezione per sezione (`SN_TRATTO_VIVO.confronta`): la memoria per righe nuove, i file per id,
+  il resto intero; il sistema a ogni cambio (la sezione dice di rispondere da lì), i crediti quando cambiano le prime due
+  cifre, e il testo lo dice. Una fotografia nuova toglie dai messaggi passati le sezioni cambiate di quella prima.
+  Un cambio si dà per detto solo quando un messaggio dell'utente lo porta: un «Continua» o un turno interno lo lasciano
+  al messaggio dopo, e un «Riprova» tiene quelli del primo invio.
+- **Davanti a ogni messaggio dell'utente** Filo scrive, in un blocco suo dopo l'ora e la chat, le cose successe dal
+  messaggio dell'utente prima (accaduti e cambi del filo, con l'id dei cambi per ANNULLA_CAMBIO, in una busta), le
+  sezioni cambiate, e nella domanda di quel turno i ricordi ripescati e l'intervista. Le azioni di una chat dentro il suo
+  turno non ci sono: le racconta il turno. Le pagine visitate no: entrano solo cercate. Si scrivono la prima volta e
+  restano quelle (un evento in ritardo non riscrive un messaggio già mandato); dopo una cancellazione si rifanno.
+- **I punti di cache stanno sui confini dei blocchi**: fine della parte fissa e fine del CONTESTO (tutte e due della
+  durata scelta, un'ora di serie), fine del tratto prima della domanda, ultimo messaggio: quattro, il massimo di
+  Anthropic. Il piano lo fa il cancello dei modelli sui messaggi già oscurati; lo scrive nel corpo solo il fornitore, e
+  solo per i modelli Anthropic (due punti nello stesso system si dividono da sinistra). Un pezzo variabile nuovo nel
+  system si apre con uno degli inizi di `INIZI_VARIABILI_CHAT`. Sentinella `tests/unit/puntiDiCache.test.mjs`.
+- **Il prefisso non si muove fra due turni: il tratto cresce solo in coda.** Ore assolute, mai «2 ore fa»; un nome di
+  chat fisso (quattro caratteri dell'id), non «questa scheda»; il taglio per giorni si sposta a scatti (da un'ora a
+  sei); oltre il tetto in token si taglia un quarto sotto e l'inizio si tiene finché basta. La domanda di un turno è già
+  resa come la renderà il tratto dei turni dopo, e la risposta torna col suo giro (strumenti, esiti, seguiti) finché la
+  memoria lo tiene: un turno passato riscritto rompe la cache da lì e il ragionamento nato dentro i suoi giri. Le copie che servono a
+  rimandarlo (giro, esiti, quello scritto in testa) vivono quanto il messaggio nel tratto, non per numero: un tetto a
+  trecento turni dimenticava il più vecchio e riscriveva il tratto a ogni messaggio. Fino
+  alla prossima fotografia un messaggio mandato intero resta intero, e la riga di un'app resta com'era (#1562). Una
   conversazione ripresa da prima dei tetti riporta i suoi ultimi messaggi dentro un quarto del tetto in token, e la
-  finestra si stringe di altrettanto: il tetto vale sempre.
+  finestra si stringe di altrettanto: il tetto vale sempre. La ripresa è del tratto, non della scheda: entra una volta
+  (il tratto riparte, come per un inizio che si sposta) e resta davanti da ogni scheda finché l'inizio tiene. Due
+  turni in corso insieme fanno due richieste diverse, e quella dopo ne continua al più una: lì si paga una riscrittura.
 - **Verso Claude il ragionamento parte solo col prefisso con cui è nato** (#1552). Sui conti Anthropic nati dal
   31/08/2026 un blocco di ragionamento con davanti un system, strumenti o messaggi diversi da quelli della sua nascita
   fa rifiutare la richiesta, e via OpenRouter la chiave dell'owner ripiega in silenzio sui crediti del router. Ogni
@@ -36,24 +55,21 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   ragionamento, tolto prima di ogni invio); il fornitore la confronta con quello che precede il messaggio adesso, nel
   corpo che parte davvero, e per i modelli Anthropic manda il ragionamento solo se coincide. Una regola sola per tutte
   le porte: taglio del tetto, parte fissa, strumenti, segreti oscurati, compattazione. I ragionamenti davanti contano
-  come il testo: più stretto di Anthropic, che ammette di toglierli dalla testa, mai un blocco in dubbio. Col tratto di
-  oggi i turni passati non passano mai: il CONTESTO DI ADESSO sta davanti alla domanda solo nel suo turno, e nel tratto
-  la domanda prende ora e chat in testa. Partono quelli del giro di strumenti in corso. Per riavere gli altri serve una
-  richiesta che cresce solo in coda (SPEC-CONTESTO, fase 3). Sentinella `tests/unit/ragionamentoRimandato.test.mjs`.
-- **Le letture non vivono più di prima** (#553.2, decisione dell'owner aperta): l'esito di una pagina, un documento,
-  un comando, e il ragionamento di una risposta, entrano nel messaggio che li ha prodotti finché è fra gli ultimi
-  venti della sua chat, nella scheda di quella chat; nelle altre schede solo finché è anche fra gli ultimi venti del
-  filo. Poi resta il nome dell'azione. Contati solo sul filo morivano prima di oggi a chi parla in due schede; contati
-  solo sulla loro chat, una chat ferma li teneva davanti a ogni scheda per giorni. Gli esiti stanno in memoria (mai
-  su disco) e se ne vanno con la loro chat. Il testo che la chat scrive nella conversazione venendo da fuori
-  (l'esito di un comando dato in chat con «/», il nome di un file scaricato) è una lettura allo stesso modo
-  (`letturaDaFuori`): mai nudo come parole di Filo, imbustato, contato per le uscite, con la stessa vita. Resta una
-  lettura anche quando torna dall'archivio (un ricordo, una ricerca, una rilettura con l'id): l'azione che lo riporta
-  lo dichiara in `_output.daFuori`, e uscite (`contestoDaAzioni`) e conferme (`fonteDi`) lo contano per tutte le
-  azioni allo stesso modo. Una regola sul messaggio segnato, non una per strada: tre giri l'avevano messa sulla strada.
-- **Le immagini mandate in chat tornano col loro messaggio** (#1166), con la vita delle letture, dalle più nuove: al
+  come il testo: più stretto di Anthropic, che ammette di toglierli dalla testa, mai un blocco in dubbio. Con la
+  richiesta che cresce solo in coda (#1562) tornano anche quelli dei turni passati. Sentinella
+  `tests/unit/ragionamentoRimandato.test.mjs`.
+- **Le letture restano col tratto** (#1562, SPEC-CONTESTO § Gli esiti degli strumenti, che chiude #553.2): l'esito di
+  una pagina, un documento, un comando, e il ragionamento di una risposta, restano nel messaggio che li ha prodotti
+  finché il messaggio è nel tratto, in ogni scheda; un turno passato non si riscrive. Gli esiti stanno in memoria (mai
+  su disco) e se ne vanno con la loro chat. Il testo che la chat scrive nella conversazione venendo da fuori (l'esito
+  di un comando dato in chat con «/», il nome di un file scaricato) è una lettura allo stesso modo (`letturaDaFuori`):
+  mai nudo come parole di Filo, imbustato, contato per le uscite. Resta una lettura anche quando torna dall'archivio
+  (un ricordo, una ricerca, una rilettura con l'id): l'azione che lo riporta lo dichiara in `_output.daFuori`, e uscite
+  (`contestoDaAzioni`) e conferme (`fonteDi`) lo contano per tutte le azioni allo stesso modo.
+- **Le immagini mandate in chat tornano col loro messaggio** (#1166), finché sono in memoria, dalle più nuove: al
   più sedici e 24 milioni di caratteri per richiesta (sotto i limiti dei fornitori); per i tetti in token una pesa
-  1.500 token, non i caratteri del data URL. Stanno in memoria, mai su disco, e se ne vanno con la loro chat. Quando
+  1.500 token, non i caratteri del data URL. Oltre i tetti si scende di un quarto, come per i token, e il taglio si tiene
+  finché basta: una foto nuova non riscrive il tratto a ogni messaggio. Stanno in memoria, mai su disco, e se ne vanno con la loro chat. Quando
   non tornano (vecchie, oltre i tetti, Filo riaperto, modello che le rifiuta) al loro posto c'è una nota: quante
   erano, e che quello che il modello ne ha scritto l'aveva letto da lì. Senza, al turno dopo diceva di non vederle e
   ritrattava letture giuste. Un modello che rifiuta le immagini dei turni passati (solo testo, una per richiesta)
@@ -70,7 +86,8 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   aperto da un'altra.
 - **I pezzi vecchi si ripescano da soli**: ogni scambio più vecchio della finestra ha un vettore (modello della
   Cronologia, una volta sola, file accanto al filo, via con la sua chat, mai in incognito). La domanda ne porta al
-  massimo tre sopra la soglia nel CONTESTO DI ADESSO, imbustati come archivio, e il blocco di attività lo dice come
+  massimo tre sopra la soglia nel blocco che Filo le scrive in testa, imbustati come archivio, e ci restano nei turni
+  dopo (non fra gli esiti della risposta, che li ripeterebbe), e il blocco di attività lo dice come
   una ricerca («Ricordato dal filo · titolo», ogni conversazione una volta anche se ne arrivano più pezzi). Un pezzo
   che il modello ha già davanti (ripescato da un turno prima e ancora vivo come lettura, o la sua conversazione
   riletta intera) non si ripesca: a ogni messaggio sullo stesso argomento le copie si accumulavano (#868.1). Senza
@@ -81,7 +98,8 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
 - **Ciò che è cancellato non torna dalle copie** (#868.1): gli esiti di ricordi, ricerche e riletture davanti al
   modello perdono le conversazioni e le pagine che il filo non ha più, dal messaggio dopo e in ogni scheda (la
   rilettura dice che è stata cancellata, la ricerca quanti risultati). Una regola sola quando si compone il
-  contesto, sulle due copie (memoria e storia della scheda): vale per ogni strada che cancella.
+  contesto, sulle copie (memoria, storia della scheda, giro di un turno, ricordi nella domanda, cose successe): vale per
+  ogni strada che cancella. Un giro con dentro qualcosa che non c'è più torna come risposta sola, ripulita.
 - **Il tetto in token cede alla finestra del modello**: se il fornitore rifiuta la richiesta perché supera la finestra
   del modello della chat, il tratto si stringe quanto dicono le misure del rifiuto (senza misure, a metà) e lo stesso
   giro riparte; il tetto che ha retto vale per i turni dopo con quel modello (in memoria). Si stringe prima la parte

@@ -437,6 +437,8 @@
     if (turn.images) out.images = Number(turn.images) || 0;
     // Un messaggio partito da un suggerimento della home l'ha scritto un modello: riaperta, non è voce dell'utente (#810).
     if (role === 'user' && turn.daModello) out.daModello = true;
+    // Scritto mentre Filo rispondeva (#1296): sta dentro quel turno, che lo rimanda col suo giro (contestoFilo.js).
+    if (role === 'user' && turn.seguito === true) out.seguito = true;
     // La risposta di Filo a cui il messaggio risponde (#1620): il suo posto nel filo, non una copia.
     const rispostaA = role === 'user' && global.SN_RISPOSTA_A ? global.SN_RISPOSTA_A.riferimento(turn.rispostaA) : null;
     if (rispostaA) out.rispostaA = rispostaA;

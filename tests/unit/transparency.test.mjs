@@ -341,7 +341,7 @@ function loadTools() {
 
 function toolTrasparenza() {
   const Tools = loadTools();
-  const def = Tools.definitions({ sistema: 'win32' })
+  const def = Tools.definitions()
     .find((d) => d.function.name === 'LEGGI_TRASPARENZA');
   assert.ok(def, 'LEGGI_TRASPARENZA non è più uno strumento del modello');
   return def.function;

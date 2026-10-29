@@ -34,15 +34,20 @@ async function configura(app) {
 }
 
 // Quante volte `ago` compare nel testo, e quante fuori da un recinto TESTO_SALVATO.
+// Dentro un recinto: quello dei testi salvati, o quello delle cose successe che la chat riceve davanti a un messaggio
+// (#1562: la sveglia messa al turno prima vi arriva come cambio).
 async function conta(app, testo, ago) {
-  const m = await app.evaluate(() => globalThis.SN_ESTERNO.marcature('TESTO_SALVATO'));
+  const recinti = await app.evaluate(() => ['TESTO_SALVATO', 'FILO_ACCADUTI'].map((t) => globalThis.SN_ESTERNO.marcature(t)));
   let volte = 0;
   let fuori = 0;
   for (let p = testo.indexOf(ago); p >= 0; p = testo.indexOf(ago, p + 1)) {
     volte += 1;
-    const apre = testo.lastIndexOf(m.inizio, p);
-    const chiude = testo.indexOf(m.fine, p);
-    if (apre < 0 || chiude < 0 || testo.indexOf(m.fine, apre) !== chiude) fuori += 1;
+    const dentro = recinti.some((m) => {
+      const apre = testo.lastIndexOf(m.inizio, p);
+      const chiude = testo.indexOf(m.fine, p);
+      return apre >= 0 && chiude >= 0 && testo.indexOf(m.fine, apre) === chiude;
+    });
+    if (!dentro) fuori += 1;
   }
   return { volte, fuori };
 }
@@ -103,8 +108,8 @@ test('sveglia e appunto messi dal modello: al messaggio dopo il loro nome arriva
 
   const calls = await app.evaluate(() => globalThis.__calls);
   expect(calls).toHaveLength(2);
-  // Istruzioni e contesto di adesso (#868: il contesto sta subito prima della domanda, non nel messaggio di sistema).
-  const sistema = calls[1].filter((m) => m.role === 'system' || String(m.content).startsWith('═══ CONTESTO DI ADESSO')).map((m) => m.content).join('\n');
+  // Il CONTESTO nel system e quello che è cambiato dopo nella domanda (SPEC-CONTESTO fase 3): sveglia e appunto sono nuovi.
+  const sistema = [calls[1][0], calls[1][calls[1].length - 1]].map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
   // Il modello li vede (sa quali sveglie e quali appunti ci sono)…
   const { volte, fuori } = await conta(app, sistema, AGO);
   expect(volte).toBeGreaterThanOrEqual(2);
@@ -200,7 +205,7 @@ test('il testo di un file dell\'editor letto per intero torna recintato', async 
   // La chiusura scritta nel file non ha chiuso niente: ne resta una sola, la vera.
   const m = await app.evaluate(() => globalThis.SN_ESTERNO.marcature('TESTO_SALVATO'));
   const inizioFile = prompt.indexOf('[Contenuto completo del file');
-  const fineFile = prompt.indexOf('═══ CONTESTO DI ADESSO', inizioFile);
+  const fineFile = prompt.indexOf('═══ DA FILO, PRIMA DI QUESTO MESSAGGIO', inizioFile);
   const dopoIlFile = prompt.slice(inizioFile, fineFile < 0 ? undefined : fineFile);
   expect(dopoIlFile.split(m.fine).length - 1).toBe(1);
 });

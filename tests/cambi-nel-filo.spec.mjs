@@ -38,7 +38,7 @@ async function configura(app, extra = {}) {
 }
 
 // Il modello finto: un giro per elemento di `giri`. `annullaTema: true` cerca nel prompt l'id del
-// cambio del tema e lo annulla, come farebbe il modello leggendo i CAMBI RECENTI.
+// cambio del tema e lo annulla, come farebbe il modello leggendo i cambi che il filo gli riporta.
 // Un comando secco chiude il turno al primo giro (#1130): la frase va scritta insieme alle azioni.
 async function modelloFinto(app, giri) {
   await app.evaluate(async (_e, g) => {
@@ -144,10 +144,10 @@ test('B — tema cambiato dalle Preferenze, poi «rimetti come prima» in chat: 
   await shell.locator('.tab').first().click();
   await modelloFinto(app, [{ annullaTema: true, text: 'Rimesso.' }]);
   await scrivi(page, 'rimetti come prima', 'Rimesso.');
-  // Il modello l'ha visto nello STATO, con la sua provenienza, ed è tornato il chiaro.
+  // Il modello l'ha visto fra le cose successe prima del messaggio (#1562), con la sua provenienza, ed è tornato il chiaro.
   const prompt = await app.evaluate(() => globalThis.__finto_prompt[0]);
-  expect(prompt).toContain('CAMBI RECENTI');
-  expect(prompt).toMatch(/dalle Preferenze\] c[0-9a-f]{10}: tema: chiaro → scuro/);
+  expect(prompt).not.toContain('CAMBI RECENTI');
+  expect(prompt).toMatch(/cambio dalle Preferenze c[0-9a-f]{10}: tema: chiaro → scuro/);
   await expect.poll(async () => (await impostazioni(app)).theme).toBe('light');
   // Anche l'annullo chiesto a parole lascia il segno sulla bolla, e si può a sua volta annullare.
   const bolla = page.locator('.dash-bubble-user', { hasText: 'rimetti come prima' });

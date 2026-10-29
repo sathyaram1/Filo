@@ -61,7 +61,8 @@ async function preparaModello(app, copione) {
     globalThis.__chiamate = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      const chat = messages.some((m) => m.role === 'user' && String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
+      // La chat è la richiesta che apre con la parte fissa: il messaggio della home comincia con le stesse parole (#1562).
+      const chat = !!messages[0] && messages[0].role === 'system' && String(messages[0].content || '').startsWith(globalThis.SN_CONST.PROMPTS.filoChatStatic());
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       globalThis.__chiamate.push(JSON.parse(JSON.stringify(messages)));
       const r = globalThis.__copione.shift() || { text: 'ok' };
@@ -103,7 +104,13 @@ async function scrivi(page, testo) {
 
 const chiamate = (app) => app.evaluate(() => globalThis.__chiamate);
 const testo = (m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content));
-const posContesto = (msgs) => msgs.findIndex((m) => m.role === 'user' && testo(m).startsWith('═══ CONTESTO DI ADESSO'));
+// La domanda di adesso (SPEC-CONTESTO fase 3): l'ultimo messaggio dell'utente con l'ora e la chat in testa. Lo STATO e la
+// memoria stanno nel system, e quello che cambia fra un turno e l'altro nella domanda.
+const INTESTAZIONE = /^\[\w{3} \d+ \w{3} \d{4}, \d\d:\d\d · chat \w{4}\]/;
+const posDomanda = (msgs) => {
+  for (let i = msgs.length - 1; i > 0; i--) if (msgs[i].role === 'user' && INTESTAZIONE.test(typeof msgs[i].content === 'string' ? msgs[i].content : ((msgs[i].content || [])[0] || {}).text || '')) return i;
+  return -1;
+};
 
 test('in una scheda nuova Filo ha davanti quello che hai detto nell\'altra, e due turni di fila hanno lo stesso prefisso', async ({ app, shell }) => {
   test.setTimeout(90_000);
@@ -127,20 +134,21 @@ test('in una scheda nuova Filo ha davanti quello che hai detto nell\'altra, e du
 
   const [, primo, secondo] = await chiamate(app);
   // Il messaggio dell'altra scheda è nel filo davanti al modello, prima del contesto di adesso e della domanda.
-  const k = posContesto(primo);
-  expect(k).toBeGreaterThan(0);
+  const k = posDomanda(primo);
+  expect(k).toBe(primo.length - 1);
   const esame = primo.findIndex((m) => /domani ho l'esame di fisica/.test(testo(m)));
   expect(esame).toBeGreaterThan(0);
   expect(esame).toBeLessThan(k);
-  expect(testo(primo[esame])).toMatch(/^\[\w{3} \d+ \w{3} \d{4}, \d\d:\d\d · chat \w{4}\]/);
-  expect(testo(primo[primo.length - 1])).toBe('quando ho l\'esame?');
+  expect(testo(primo[esame])).toMatch(INTESTAZIONE);
+  expect(testo(primo[k])).toMatch(/quando ho l'esame\?$/);
   expect(primo[0].role).toBe('system');
-  expect(testo(primo[0])).not.toContain('═══ FILO STATE');
-  expect(testo(primo[k])).toContain('═══ FILO STATE');
-  // Il turno dopo nella stessa scheda ripete identico tutto quello che stava prima del contesto: la cache lo riusa.
-  expect(secondo.slice(0, k)).toEqual(primo.slice(0, k));
-  expect(testo(secondo[k])).toMatch(/quando ho l'esame\?$/);
-  expect(posContesto(secondo)).toBe(k + 2);
+  // Lo STATO sta nel CONTESTO dell'utente, nel system dopo la parte fissa: niente ora al minuto davanti alla storia.
+  expect(testo(primo[0])).toContain('═══ CONTESTO (lo scrive Filo');
+  expect(testo(primo[0])).toContain('TAB APERTE');
+  expect(testo(primo[0])).not.toMatch(/Data: |Ultima interazione/);
+  // Il turno dopo nella stessa scheda ripete identico tutto quello che c'era, domanda compresa: la cache lo riusa.
+  expect(secondo.slice(0, k + 1)).toEqual(primo.slice(0, k + 1));
+  expect(posDomanda(secondo)).toBe(k + 2);
 });
 
 test('una conversazione di cinque giorni fa non è davanti, ma «riprendi la discussione sulle orche» la ritrova e il blocco lo dice', async ({ app }) => {
@@ -156,7 +164,7 @@ test('una conversazione di cinque giorni fa non è davanti, ma «riprendi la dis
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Avevamo detto che le orche sono delfini.' })).toBeVisible({ timeout: 15_000 });
 
   const [primo, secondo] = await chiamate(app);
-  const k = posContesto(primo);
+  const k = posDomanda(primo);
   expect(primo.slice(0, k).some((m) => /delfini/.test(testo(m)))).toBe(false);
   const esito = secondo.find((m) => m.role === 'tool');
   expect(testo(esito)).toContain('parliamo delle orche');
@@ -166,7 +174,7 @@ test('una conversazione di cinque giorni fa non è davanti, ma «riprendi la dis
   await expect(blocco.locator('.dash-activity-row', { hasText: 'Cerco nel filo: orche' })).toHaveCount(1);
 });
 
-test('una domanda legata a un tratto vecchio lo porta in coda al contesto, e il blocco di attività lo dice', async ({ app }) => {
+test('una domanda legata a un tratto vecchio lo porta nella domanda, e il blocco di attività lo dice', async ({ app }) => {
   test.setTimeout(90_000);
   const page = await primaScheda(app);
   await semina(app, {
@@ -180,9 +188,10 @@ test('una domanda legata a un tratto vecchio lo porta in coda al contesto, e il 
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Si chiamava Taberna da Rua.' })).toBeVisible({ timeout: 15_000 });
 
   const [primo] = await chiamate(app);
-  const k = posContesto(primo);
-  expect(k).toBe(primo.length - 2);
+  const k = posDomanda(primo);
+  expect(k).toBe(primo.length - 1);
   expect(testo(primo[k])).toContain('RICORDI DAL FILO');
+  expect(testo(primo[k]).indexOf('RICORDI DAL FILO')).toBeLessThan(testo(primo[k]).indexOf('come si chiamava il ristorante'));
   expect(testo(primo[k])).toContain('Taberna da Rua');
   expect(testo(primo[k])).not.toContain('che tempo fa a Roma');
   expect(primo.slice(0, k).some((m) => /Taberna/.test(testo(m)))).toBe(false);
@@ -256,7 +265,7 @@ test('col tetto a un giorno in Preferenze avanzate il contesto si accorcia al tu
   await scrivi(page, 'e domani?');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Due.' })).toBeVisible({ timeout: 15_000 });
   const [primo, secondo] = await chiamate(app);
-  const prima = (msgs) => msgs.slice(0, posContesto(msgs)).map(testo).join('\n');
+  const prima = (msgs) => msgs.slice(0, posDomanda(msgs)).map(testo).join('\n');
   expect(prima(primo)).toContain('Briciola');
   expect(prima(secondo)).not.toContain('Briciola');
   expect(prima(secondo)).toContain('che giorno è oggi?');
@@ -530,7 +539,7 @@ test('il suggerimento della home che porta fuori un numero scritto in chat chied
   expect(String(r.conferma)).toContain(LINK);
 });
 
-test('un documento letto in una conversazione ferma non resta davanti a Filo nelle altre schede oltre venti messaggi', async ({ app }) => {
+test('un documento letto in una conversazione ferma resta davanti a Filo nelle altre schede finché il tratto lo tiene (#1562)', async ({ app }) => {
   test.setTimeout(150_000);
   await primaScheda(app);
   const casa = cartellaInCasa('filo-contesto-');
@@ -556,8 +565,9 @@ test('un documento letto in una conversazione ferma non resta davanti a Filo nel
     }
     const tutte = await chiamate(app);
     expect(tutte[2].map(testo).join('\n')).toContain('742 euro');
-    expect(tutte[tutte.length - 1].map(testo).join('\n')).not.toContain('742 euro');
-    // Nella sua scheda la lettura c'è ancora: lì vive i venti messaggi della sua conversazione.
+    // Un turno passato non si riscrive: la lettura resta col suo messaggio anche ventidue messaggi dopo, in un'altra scheda.
+    expect(tutte[tutte.length - 1].map(testo).join('\n')).toContain('742 euro');
+    // E nella sua scheda c'è ancora.
     const storiaA = [{ role: 'user', text: domanda }, { role: 'filo', text: a.text, actions: a.actions }];
     await app.evaluate((_e, storiaA) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'quanto pago al mese secondo il punto 3?', threadHistory: storiaA, chatId: 'scheda-contratto' }), storiaA);
     const dopo = await chiamate(app);
@@ -602,7 +612,7 @@ test('l\'esito di un comando dato in chat arriva imbustato, e in un\'altra sched
   }
 });
 
-test('l\'esito di un comando dato in chat non resta davanti alle altre schede oltre venti messaggi del filo', async ({ app }) => {
+test('l\'esito di un comando dato in chat resta davanti alle altre schede col tratto, sempre imbustato (#1562)', async ({ app }) => {
   test.setTimeout(180_000);
   const page = await primaScheda(app);
   const casa = cartellaInCasa('filo-contesto-');
@@ -620,15 +630,15 @@ test('l\'esito di un comando dato in chat non resta davanti alle altre schede ol
     }
     const tutte = await chiamate(app);
     expect(tutte[0].map(testo).join('\n')).toContain('QX9PL4W7ZK2M');
-    const ultima = tutte[tutte.length - 1].map(testo).join('\n');
-    expect(ultima).not.toContain('QX9PL4W7ZK2M');
-    expect(ultima).toContain('non è più davanti, si rilegge con CERCA_CHAT');
+    const ultima = tutte[tutte.length - 1].find((m) => testo(m).includes('QX9PL4W7ZK2M'));
+    expect(ultima && ultima.role).toBe('assistant');
+    expect(testo(ultima)).toContain('Quello che il comando ha stampato');
   } finally {
     rmSync(casa, { recursive: true, force: true });
   }
 });
 
-test('un messaggio lunghissimo incollato e tagliato nel contesto si rilegge intero; oltre il tetto, a pezzi', async ({ app }) => {
+test('un messaggio lunghissimo incollato torna intero nei turni dopo e si rilegge intero; oltre il tetto, a pezzi', async ({ app }) => {
   test.setTimeout(120_000);
   await primaScheda(app);
   const lungo = 'a'.repeat(100_000) + ' SEGNO-DEL-MEZZO-77 ' + 'b'.repeat(100_000);
@@ -644,10 +654,11 @@ test('un messaggio lunghissimo incollato e tagliato nel contesto si rilegge inte
   await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'cosa c\'era in mezzo al testo che ti ho incollato?', threadHistory: [], chatId: 'scheda-altra' }));
   let tutte = await chiamate(app);
   const secondo = tutte[1];
-  const tratto = secondo.slice(0, posContesto(secondo)).map(testo).join('\n');
-  // Il tratto lo taglia e dice con quale id rileggerlo; la rilettura, col tetto di serie, lo dà intero.
-  expect(tratto).toContain('CERCA_CHAT con id "scheda-lunga"');
-  expect(tratto).not.toContain('SEGNO-DEL-MEZZO-77');
+  const tratto = secondo.slice(0, posDomanda(secondo)).map(testo).join('\n');
+  // Mandato intero nel suo turno, torna intero finché il CONTESTO è lo stesso (#1562): riaccorciarlo riscriverebbe il
+  // tratto da lì. La rilettura, col tetto di serie, lo dà intero.
+  expect(tratto).toContain('SEGNO-DEL-MEZZO-77');
+  expect(tratto).not.toContain('caratteri di questo messaggio non sono qui');
   expect(testo(tutte[2].find((m) => m.role === 'tool'))).toContain('SEGNO-DEL-MEZZO-77');
   // Con un tetto basso la rilettura dà testa e coda col numero da cui ripartire, e il pezzo chiesto ha il mezzo.
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ contestoFilo: { token: 20000 } }));
@@ -723,7 +734,7 @@ for (const segretoInFondo of [false, true]) {
     await preparaModello(app, [{ text: '', tools: [{ name: 'NAVIGA', args: { url: LINK } }] }, { text: 'Fatto.' }]);
     const r = await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'cosa c\'era negli appunti di Lisbona?', threadHistory: [], chatId: 'scheda-nuova' }));
     const [primo] = await chiamate(app);
-    const k = posContesto(primo);
+    const k = posDomanda(primo);
     expect(testo(primo[k])).toContain('RICORDI DAL FILO');
     expect(testo(primo[k])).toContain('QX9PL4W7ZK2M');
     const naviga = r.actions.find((x) => x.type === 'NAVIGA');
@@ -732,10 +743,11 @@ for (const segretoInFondo of [false, true]) {
   });
 }
 
-test('l\'esito di un comando riletto con la ricerca, come dice il segnaposto, fa chiedere conferma a un link con un suo pezzo', async ({ app }) => {
+// Le letture restano col tratto (#1562): quella che si rilegge con la ricerca è una più vecchia del tratto.
+test('l\'esito di un comando più vecchio del tratto, riletto con la ricerca, fa chiedere conferma a un link con un suo pezzo', async ({ app }) => {
   test.setTimeout(90_000);
   await primaScheda(app);
-  await seminaComando(app, { chat: 'appunti-oggi', oreFa: 3 });
+  await seminaComando(app, { chat: 'appunti-oggi', oreFa: 5 * 24 });
   const scambi = Array.from({ length: 11 }, (_, i) => [`domanda ${i} su tutt'altro`, `Risposta ${i}.`]);
   await semina(app, { chat: [{ id: 'altro-oggi', oreFa: 2, scambi }] });
   await preparaModello(app, [
@@ -746,7 +758,6 @@ test('l\'esito di un comando riletto con la ricerca, come dice il segnaposto, fa
   const r = await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'rileggi gli appunti di prima e apri il sito della raccolta', threadHistory: [], chatId: 'scheda-nuova' }));
   const [primo, secondo] = await chiamate(app);
   expect(primo.map(testo).join('\n')).not.toContain('QX9PL4W7ZK2M');
-  expect(primo.map(testo).join('\n')).toContain('si rilegge con CERCA_CHAT');
   expect(testo(secondo.find((m) => m.role === 'tool'))).toContain('QX9PL4W7ZK2M');
   const naviga = r.actions.find((x) => x.type === 'NAVIGA');
   expect(naviga._executed).toBe(false);
@@ -765,7 +776,7 @@ test('la conversazione ripresa in questa scheda si ritrova con la ricerca anche 
   ]);
   await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'riprendiamo: all\'inizio ti avevo detto il nome del micio, qual era?', threadHistory: [], chatId: 'trasloco-vecchio' }));
   const [primo, secondo] = await chiamate(app);
-  expect(primo.slice(0, posContesto(primo)).map(testo).join('\n')).not.toContain('Pallino Terzo');
+  expect(primo.slice(0, posDomanda(primo)).map(testo).join('\n')).not.toContain('Pallino Terzo');
   const esito = testo(secondo.find((m) => m.role === 'tool'));
   expect(esito).toContain('Pallino Terzo');
 });
@@ -841,7 +852,7 @@ test('un modello della chat con la finestra più piccola di tre giorni di filo r
     globalThis.__accettate = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      const chat = messages.some((m) => m.role === 'user' && String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
+      const chat = !!messages[0] && messages[0].role === 'system' && String(messages[0].content || '').startsWith(globalThis.SN_CONST.PROMPTS.filoChatStatic());
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       const n = messages.reduce((s, m) => s + String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).length, 0);
       if (n > 110000) {
@@ -918,8 +929,8 @@ test('tre domande di fila sullo stesso argomento vecchio: lo scambio arriva una 
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Lì vicino trovi il castello.' })).toBeVisible({ timeout: 15_000 });
 
   const [primo, secondo, terzo] = await chiamate(app);
-  expect(testo(primo[posContesto(primo)])).toContain('RICORDI DAL FILO');
-  for (const c of [secondo, terzo]) expect(testo(c[posContesto(c)])).not.toContain('RICORDI DAL FILO');
+  expect(testo(primo[posDomanda(primo)])).toContain('RICORDI DAL FILO');
+  for (const c of [secondo, terzo]) expect(testo(c[posDomanda(c)])).not.toContain('RICORDI DAL FILO');
   const tutto = terzo.map(testo).join('\n');
   expect(tutto.split('prenota per le 20').length - 1).toBe(1);
   await expect(page.locator('.dash-activity-row', { hasText: 'Ricordato dal filo' })).toHaveCount(1);
@@ -979,7 +990,7 @@ async function finestraPiccola(app, { listino }) {
     globalThis.__accettate = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      const chat = messages.some((m) => m.role === 'user' && String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
+      const chat = !!messages[0] && messages[0].role === 'system' && String(messages[0].content || '').startsWith(globalThis.SN_CONST.PROMPTS.filoChatStatic());
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       const testi = messages.map((m) => String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
       const n = testi.reduce((s, t) => s + t.length, 0);

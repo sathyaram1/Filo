@@ -140,13 +140,13 @@ test('dopo un riordino «rimetti come prima» in chat rimette la disposizione di
   expect(mossa).toMatchObject({ via: 'interfaccia', dove: 'barra' });
   await comandaBarra(app, 'chiudi');
 
-  // Il modello finto fa quello che farebbe uno vero: legge i CAMBI RECENTI e annulla l'ultimo, quello delle icone.
+  // Il modello finto fa quello che farebbe uno vero: legge i cambi che il filo gli riporta e annulla l'ultimo, delle icone.
   await app.evaluate(() => {
     const finto = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => {
       const testo = o.messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
       globalThis.__visto = testo;
-      const m = testo.match(/dalla barra laterale\] (c[0-9a-f]{10}): icona «[^»]+» nella barra laterale/);
+      const m = testo.match(/cambio dalla barra laterale (c[0-9a-f]{10}): icona «[^»]+» nella barra laterale/);
       const r = await finto(o);
       if (!m || globalThis.__annullato) return r;
       globalThis.__annullato = true;

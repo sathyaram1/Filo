@@ -80,10 +80,14 @@ test('chat della home: nella parte fissa non finisce nulla di variabile', () => 
   for (const leak of ['gemini-3.1-flash-lite', 'Mario', 'Risposte brevi', '10:04', 'f-1']) {
     assert.ok(!s.includes(leak), `la parte fissa contiene un dato variabile: ${leak}`);
   }
-  // La parte fissa è il manuale: istruzioni, capacità, come si lavora con le
-  // azioni (che sono strumenti nativi, non più un JSON nel testo), tono.
-  for (const section of ['COME RISPONDI', 'CLASSIFICAZIONE INTENTO', 'COSA SA FARE FILO', 'COME LAVORI', 'TONO E STILE']) {
+  // La parte fissa è il manuale: istruzioni, come si lavora con le azioni (che sono strumenti nativi, non più un JSON
+  // nel testo), tono. Le capacità e il sistema cambiano con l'installazione: stanno nel CONTESTO (SPEC-CONTESTO).
+  for (const section of ['COME RISPONDI', 'CLASSIFICAZIONE INTENTO', 'COME LAVORI', 'TONO E STILE']) {
     assert.ok(s.includes(section), `manca dalla parte fissa: ${section}`);
+  }
+  for (const fuori of ['COSA SA FARE FILO', "IL COMPUTER DELL'UTENTE"]) {
+    assert.ok(!s.includes(fuori), `nella parte fissa c'è ancora ${fuori}, che cambia con l'installazione`);
+    assert.ok(C.PROMPTS.filoChat(chatA).includes(fuori), `${fuori} non arriva più al modello`);
   }
   for (const gone of ['FORMATO OUTPUT', '"actions"', 'AZIONI DISPONIBILI']) {
     assert.ok(!s.includes(gone), `il prompt descrive ancora il formato JSON: ${gone}`);

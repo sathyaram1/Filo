@@ -1401,10 +1401,11 @@
     },
     {
       scrive: ['scorciatoie.explain-selection', 'scorciatoie.translate-selection', 'scorciatoie.save-for-later', 'scorciatoie.open-help-sidebar'],
+      // Uguale su ogni sistema: la descrizione finisce negli strumenti della chat, che sono gli stessi per tutti.
       aiuto: () => {
         const T = tastiDiFilo();
-        const esempio = T ? T.etichettaFilo('Ctrl+Shift+Y') : '';
-        return `"<azione>: <combinazione>", azione fra Spiega, Traduci, Salva per dopo e Aiuto (es. "Traduci: ${esempio}"); "<azione>: di serie" la rimette com'era, "tutte di serie" tutte e quattro`;
+        const esempio = T ? `"Traduci: ${T.etichettaFilo('Ctrl+Shift+Y', 'win32')}", su Mac "Traduci: ${T.etichettaFilo('Ctrl+Shift+Y', 'darwin')}"` : '"Traduci: Ctrl+Shift+Y"';
+        return `"<azione>: <combinazione>", azione fra Spiega, Traduci, Salva per dopo e Aiuto (es. ${esempio}); "<azione>: di serie" la rimette com'era, "tutte di serie" tutte e quattro`;
       },
       keys: ['scorciatoia', 'scorciatoie', 'scorciatoia da tastiera', 'scorciatoie da tastiera', 'tasto di scelta rapida',
         'scorciatoia di spiega', 'scorciatoia di traduci', 'scorciatoia di salva per dopo', 'scorciatoia di aiuto'],

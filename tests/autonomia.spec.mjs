@@ -765,10 +765,9 @@ test('in chat Filo sa a che livello di autonomia sta: il contesto di ogni turno 
   try {
     await chiedi(page, 'a che livello di autonomia sei adesso?');
     await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 15000 }).toBeGreaterThan(0);
-    // Lo stato cambia a ogni turno: sta nel contesto di adesso, in coda, non nel prefisso in cache (#868).
-    const contesto = (await chiamateAlModello(app))[0]
-      .map((m) => String(m.content || '')).find((t) => t.startsWith('═══ CONTESTO DI ADESSO')) || '';
-    expect(contesto).toMatch(/AUTONOMIA DI FILO\nLivello scelto dall'utente: Conservativo\./);
+    // Lo stato sta nel CONTESTO dell'utente, nel system dopo la parte fissa; se cambia dopo, arriva nella domanda (#1562).
+    const contesto = String((await chiamateAlModello(app))[0][0].content || '');
+    expect(contesto.slice(contesto.indexOf('═══ CONTESTO (lo scrive Filo'))).toMatch(/AUTONOMIA DI FILO\nLivello scelto dall'utente: Conservativo\./);
   } finally {
     await ripristina(app);
   }

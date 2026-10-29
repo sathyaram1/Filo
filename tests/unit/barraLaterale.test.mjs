@@ -198,7 +198,7 @@ test('SPOSTA_ICONA: lo strumento elenca le icone vere col nome del menu, e dice 
   require('../../src/shared/actionLevels.js');
   require('../../src/shared/actionTools.js');
   const D = globalThis.SN_DISPOSIZIONE_ICONE;
-  const def = globalThis.SN_ACTION_TOOLS.definitions({ sistema: 'win32' }).find((d) => d.function.name === 'SPOSTA_ICONA');
+  const def = globalThis.SN_ACTION_TOOLS.definitions().find((d) => d.function.name === 'SPOSTA_ICONA');
   assert.ok(def, 'strumento SPOSTA_ICONA assente');
   const p = def.function.parameters.properties;
   assert.deepEqual(p.icona.enum, Object.keys(D.ICONE));
