@@ -486,7 +486,7 @@
   }
   function gestoSu(c, st, e) {
     sciogli(c, st);
-    if (APPUNTI.includes(e.type)) {
+    if (PRIMA_DELL_ANNUNCIO.includes(e.type)) {
       // Dentro Ctrl+V la selezione buona è già quella del tasto.
       if (st.tasto || st.componendo) return;
       const t = { e, sel: selezioneDi(c) };
