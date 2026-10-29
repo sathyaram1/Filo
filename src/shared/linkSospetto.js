@@ -224,7 +224,7 @@
 
   // poste.it si legge meglio col nome di chi lo gestisce: «Poste Italiane (poste.it)».
   function conMarchio(dominio) {
-    const brand = LEGIT_DOMAINS && LEGIT_DOMAINS.get(dominio);
+    const brand = PRINCIPALI.get(dominio) || (LEGIT_DOMAINS && LEGIT_DOMAINS.get(dominio));
     return brand ? `${brand.display} (${dominio})` : dominio;
   }
 
