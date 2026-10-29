@@ -3,6 +3,10 @@
 // Senza il fix è ROSSO: memoria, pagine salvate, stato, foto della scheda in vista, chiusura di altre schede.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { createServer } from 'node:http';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const MEMORIA = 'Anna, vive a MILANO-5891, lavora in ospedale';
 const SALVATA = 'CONTO-CORRENTE-5891';
@@ -395,4 +399,77 @@ test('a un sito di sfondo non arrivano i siti degli altri, e non porta davanti u
   const r = await davanti(chiedi('apri_collegamento_filo', { url: 'https://example.org/scelto' }));
   expect(r.nonTrovata || r.errore, JSON.stringify(r)).toBeFalsy();
   expect(r.risposta).toMatchObject({ ok: true, aperto: true });
+});
+
+// #589.1 giro 5 — i bottoni del file trovato dall'Aiuto su un sito: la lista li dimenticava, e Apri e Mostra
+// rispondevano «non si è aperto». Li chiede l'utente col clic, dalla scheda che guarda.
+test('dall\'Aiuto di un sito il file trovato si mostra e si apre col clic dell\'utente, non senza', async ({ app, openTab, testServer }) => {
+  const file = join(cartellaTemporanea('aiuto-file-'), 'preventivo.txt');
+  writeFileSync(file, 'preventivo del giardino');
+  await app.evaluate(({ shell }, { dir, file: f }) => {
+    process.mainModule.require(`${dir}/aiutoDocumenti.js`).configura({
+      chiediSi: async () => true,
+      cerca: async () => ({ risultati: [{ percorso: f, nome: 'preventivo.txt', tipo: 'txt', data: '' }] }),
+      doveSta: async () => 'Documenti',
+    });
+    globalThis.__mostrati = []; globalThis.__aperti = [];
+    shell.showItemInFolder = (p) => { globalThis.__mostrati.push(p); };
+    shell.openPath = async (p) => { globalThis.__aperti.push(p); return ''; };
+  }, { dir: join(process.cwd(), 'src', 'main', 'services'), file });
+  const pagina = await testServer.openReady(openTab, '<h1 style="height:60vh">sito</h1>');
+  const sito = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+  const cerca = await sito(chiedi('aiuto_cerca_documenti', { cosa: 'preventivo giardino' }));
+  expect(cerca.nonTrovata || cerca.errore, JSON.stringify(cerca)).toBeFalsy();
+  const chiave = cerca.risposta?.candidati?.[0]?.chiave;
+  expect(chiave, 'la ricerca dell\'Aiuto non ha trovato il file').toBeTruthy();
+
+  expect((await sito(chiedi('aiuto_mostra_file', { chiave }))).risposta?.code, 'senza il clic dell\'utente il sito apre la cartella').toBe('forbidden');
+  await pagina.click('h1');
+  expect((await sito(chiedi('aiuto_mostra_file', { chiave }))).risposta, '«Mostra nella cartella» dell\'Aiuto').toMatchObject({ ok: true });
+  expect((await sito(chiedi('aiuto_apri_file', { chiave }))).risposta, '«Apri» dell\'Aiuto').toMatchObject({ ok: true });
+  expect(await app.evaluate(() => [globalThis.__mostrati, globalThis.__aperti])).toEqual([[file], [file]]);
+});
+
+// #589.1 giro 5 — il segno con cui Filo firma i feedback è uguale su ogni sito: un sito non lo legge né lo sceglie.
+test('un sito non legge né riscrive il segno dei feedback, uguale su ogni sito', async ({ app, openTab, testServer }) => {
+  const SEGNO = 'segno-di-questa-installazione-5891';
+  await app.evaluate(async (_e, segno) => { await globalThis.chrome.storage.local.set({ sn_feedback_client_id: segno }); }, SEGNO);
+  await testServer.openReady(openTab, '<h1>sito</h1>', { pubblico: true });
+  await openTab(testServer.html('<h1>quella che guardo</h1>'));
+  const sito = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
+  const letto = await sito(chiedi('_storage:get', { keys: ['sn_feedback_client_id'] }));
+  expect(letto.nonTrovata || letto.errore, JSON.stringify(letto)).toBeFalsy();
+  expect(JSON.stringify(letto.risposta)).not.toContain(SEGNO);
+  await sito(chiedi('_storage:set', { obj: { sn_feedback_client_id: 'scelto-dal-sito' } }));
+  expect(await app.evaluate(async () => (await globalThis.chrome.storage.local.get(['sn_feedback_client_id'])).sn_feedback_client_id)).toBe(SEGNO);
+});
+
+// #589.1 giro 5 — per un sito Filo scarica un'immagine come un estraneo: senza i cookie dell'utente e non dalla rete di
+// casa. Coi cookie solo dopo il tasto destro dell'utente su quella pagina (tests/provenienza-immagine.spec.mjs).
+test('un sito di sfondo non si fa portare l\'immagine di un altro sito coi cookie dell\'utente', async ({ app, openTab, testServer }) => {
+  const FOTO = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0xff, 0xd9]);
+  const altro = createServer((req, res) => {
+    if (!String(req.headers.cookie || '').includes('sessione=dell-utente')) { res.writeHead(403); res.end('accedi'); return; }
+    res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': FOTO.length });
+    res.end(FOTO);
+  });
+  await new Promise((r) => altro.listen(0, '127.0.0.1', r));
+  const foto = `http://127.0.0.1:${altro.address().port}/estratto-conto.jpg`;
+  try {
+    await testServer.openReady(openTab, '<h1>sito</h1>', { pubblico: true });
+    await openTab(testServer.html('<h1>quella che guardo</h1>'));
+    await app.evaluate(async ({ BrowserWindow }, url) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      const wc = w._filoTabs.tabs.find((t) => t.view.webContents.getURL().startsWith('http://sito-pubblico.test')).view.webContents;
+      await wc.session.cookies.set({ url, name: 'sessione', value: 'dell-utente' });
+    }, foto);
+    const sito = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
+    const r = await sito(chiedi('image_bytes', { url: foto }));
+    expect(r.nonTrovata || r.errore, JSON.stringify(r)).toBeFalsy();
+    expect(r.risposta?.ok).toBe(false);
+    expect(r.risposta?.dataUrl, 'un sito di sfondo ha letto un\'immagine dietro l\'accesso dell\'utente').toBeFalsy();
+  } finally {
+    altro.closeAllConnections?.();
+    await new Promise((r) => altro.close(r));
+  }
 });

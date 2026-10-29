@@ -149,7 +149,15 @@ Un verdetto su un testo scelto da chi chiede è un oracolo: il controllo del
 campo dell'assistente di pagina diceva a un sito se il suo IBAN inventato era
 uno letto altrove, e dove. La porta delle uscite si chiede nel main sul testo
 del modello (la risposta dell'Aiuto arriva alla pagina già senza il testo
-fermato), mai con una domanda della pagina.
+fermato), mai con una domanda della pagina. Al giro 5 la porta è rientrata una
+terza volta. Un sito leggeva dal magazzino il segno con cui Filo firma i
+feedback, uguale su ogni sito: riconosceva l'utente ovunque e poteva
+sceglierlo lui. Adesso al feedback mandato da un sito il segno lo mette il main.
+E i byte di un'immagine Filo li scaricava per qualunque sito coi cookie
+dell'utente, anche dalla rete di casa: per un sito ora scarica come un estraneo
+(`safeFetch`), e coi cookie solo dopo il tasto destro vero in quel riquadro,
+nella scheda in vista. La regola: ciò che Filo dà a un sito, o va a prendere per
+lui, è quello che il sito potrebbe avere da sé.
 
 Una domanda che il codice di Filo fa solo **dopo un gesto dell'utente** vuole il
 gesto anche nel main (#589.1, giro 2). Incolla e Detta si danno il permesso
