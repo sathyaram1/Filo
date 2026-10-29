@@ -368,7 +368,7 @@ test('il giorno di prima più carico che l’app costruisce passa, e i suoi erro
 test('ogni collezione dei contatori si crea solo con un’identità: la chiave web da sola non basta (#1547)', () => {
   const blocchi = [...RULES.matchAll(/^ {4}match\s+\/(contatori-[a-z-]+)\/\{/gm)].map((m) => m[1]);
   assert.deepEqual(blocchi.sort(), [C.COLLEZIONE, C.COLLEZIONE_CHIAMATE, C.COLLEZIONE_GESTI, C.COLLEZIONE_NAVIGAZIONE, C.COLLEZIONE_ATTIVITA,
-    'contatori-finestra', 'contatori-sicurezza'].sort(),
+    C.COLLEZIONE_RIQUADRI, 'contatori-finestra', 'contatori-sicurezza'].sort(),
     'una collezione dei contatori nuova va aggiunta qui, e la sua creazione chiede l’identità');
   for (const nome of blocchi) {
     const create = per('create', regole(blocco(nome)));
@@ -846,7 +846,7 @@ test('i riquadri: sola creazione, letti dall’admin, coi campi e la versione de
   assert.deepEqual(per('list', RR).map((r) => r.cond), ['isAdmin()']);
   assert.ok(!per('read', RR).length && !per('write', RR).length);
   for (const v of ['update', 'delete']) assert.ok(per(v, RR).length >= 1 && per(v, RR).every((r) => r.cond === 'false'));
-  assert.deepEqual(per('create', RR).map((r) => r.cond), ['contatoriRiquadri(request.resource.data)']);
+  assert.deepEqual(per('create', RR).map((r) => r.cond), ['request.auth != null && contatoriRiquadri(request.resource.data)']);
   assert.deepEqual(elencoDopo(RIQUADRI, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_RIQUADRI]);
   assert.deepEqual(elencoDopo(RIQUADRI, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_RIQUADRI]);
   assert.equal(Number(/d\.v == (\d+)/.exec(RIQUADRI)[1]), C.VERSIONE_RIQUADRI);
