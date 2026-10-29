@@ -88,7 +88,43 @@ test('esplora: cancellazione di una chat vecchia dopo un cambio ritoccato', asyn
   console.log('domanda 2:', testo(c[1].messages[c[1].messages.length - 1]).slice(0, 800));
 });
 
-test('esplora: un turno con strumenti, poi due turni, poi un Riprova e un turno', async ({ app, openTab }) => {
+test('esplora: cancellazione dopo che il taglio dei giorni ha fatto uno scatto', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  await preparaModello(app, [{ text: 'Uno.' }, { text: 'Due.' }]);
+  await app.evaluate(async () => {
+    const H = 3600000;
+    const vero = Date.now.bind(Date);
+    const B = Math.ceil((vero() + H) / (6 * H)) * 6 * H;
+    globalThis.__spost = B - 5 * 60000 - vero();
+    Date.now = () => vero() + globalThis.__spost;
+    const T0 = B - 3 * 24 * H;
+    const iso = (t) => new Date(t).toISOString();
+    const X = 'a1a1a1a1-0000-4000-8000-0000000000a1';
+    await globalThis.SN_FILO_CHATS.append(X, { role: 'user', text: 'domanda della sera', ts: iso(T0 - H) });
+    await globalThis.SN_FILO_CHATS.append(X, { role: 'filo', text: 'Risposta della sera.', ts: iso(T0 - H + 60000) });
+    const T = globalThis.SN_FILO_EVENTI.TIPI;
+    await globalThis.SN_IL_FILO.transazione((t) => t.scrivi([t.evento(T.NOTIFICA, { testo: 'La copia di sicurezza è pronta.' }, { autore: 'filo', ts: iso(T0 + 2 * H) })]));
+    await globalThis.SN_FILO_CHATS.append(X, { role: 'user', text: 'domanda del mattino', ts: iso(T0 + 7 * H) });
+    await globalThis.SN_FILO_CHATS.append(X, { role: 'filo', text: 'Risposta del mattino.', ts: iso(T0 + 7 * H + 60000) });
+    const Z = 'c0c0c0c0-0000-4000-8000-00000000000c';
+    await globalThis.SN_FILO_CHATS.append(Z, { role: 'user', text: 'una ricetta di dieci giorni fa', ts: iso(B - 10 * 24 * H) });
+    await globalThis.SN_FILO_CHATS.append(Z, { role: 'filo', text: 'Eccola.', ts: iso(B - 10 * 24 * H + 60000) });
+  });
+  const home = await openTab('filo://newtab/');
+  await expect(home.locator('#input')).toBeEditable({ timeout: 15_000 });
+  await scrivi(home, 'ciao', 'Uno.');
+  // Dieci minuti dopo, oltre lo scatto delle sei ore, una chat di dieci giorni fa tolta dalla Cronologia.
+  await app.evaluate(async () => {
+    globalThis.__spost += 10 * 60000;
+    await globalThis.SN_FILO_CHATS.remove('c0c0c0c0-0000-4000-8000-00000000000c');
+  });
+  await scrivi(home, 'e adesso?', 'Due.');
+  const c = await app.evaluate(() => globalThis.__chiamate);
+  console.log('primo:', testo(c[0].messages[1]).slice(0, 900));
+  console.log('1→2', JSON.stringify(primaDifferenza(c[0], c[1]), null, 1));
+});
+
+test('esplora: un turno con strumenti, poi due turni, poi un Riprova e un turno',async ({ app, openTab }) => {
   test.setTimeout(150_000);
   await preparaModello(app, [
     { text: 'Guardo.', toolCalls: [{ id: 'l1', name: 'LEGGI_IMPOSTAZIONI', arguments: JSON.stringify({ cerca: 'tema' }) }] },
