@@ -459,9 +459,8 @@ test('oltre il tetto delle foto il taglio va a scatti: una foto nuova non riscri
     prima = f.messaggi;
     ancora = f.ancora;
   }
-  // Trenta foto, una per messaggio: il tetto si passa due volte, e solo lì il tratto cambia.
-  assert.deepEqual(rotture, [16, 21, 26].slice(0, rotture.length));
-  assert.ok(rotture.length <= 3, `il tratto si riscrive ai turni ${rotture.join(', ')}`);
+  // Trenta foto, una per messaggio: il tratto cambia solo quando si passa il tetto, poi riparte da dodici.
+  assert.deepEqual(rotture, [16, 21, 26]);
 });
 
 test('un messaggio con più foto di quante ne stiano nei tetti tiene le prime che ci stanno, e la nota dice le altre', () => {
