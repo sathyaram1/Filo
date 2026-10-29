@@ -19,8 +19,8 @@ rules_version = '2';
 // Il confine ora:
 // - Upload: chiunque manda un feedback, anche senza login — l'invio anonimo è
 //   voluto, e resta — fino a 4 MB, SOLO in creazione, SOLO un blob cifrato
-//   dall'app (tipo opaco, estensione fissa, nessun metadato scelto da chi
-//   carica: #1518) e SOLO su un nome che non si indovina (sotto, in dettaglio).
+//   dall'app (tipo opaco, estensione fissa, nessuna chiave né nome di scarico
+//   scelti da chi carica: #1518, #1769) e SOLO su un nome che non si indovina.
 //   Il tipo VERO del file lo decide il client prima di cifrare
 //   (src/shared/feedbackAttachTypes.js) e lo ricontrolla il gate L0 del server
 //   (filo-security, fileGate) sul documento del feedback: qui non c'è più una
