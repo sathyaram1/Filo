@@ -6169,7 +6169,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     await segnaFonteLetta(chatId, fontiLette, a);
   }
   // La domanda come la rende il tratto dei turni dopo (SPEC-CONTESTO: il tratto cresce solo in coda): le sezioni del
-  // CONTESTO cambiate, l'intervista, i ricordi e le note sulle immagini si fissano qui, nel messaggio dell'utente.
+  // CONTESTO cambiate, i ricordi e le note sulle immagini si fissano qui, nel messaggio dell'utente; l'intervista vale
+  // solo per questo turno.
   if (filo && filo.haDomanda && !internal) {
     const resa = filo.domanda({
       stato: fotografia ? fotografia.cambiate : '', epoca: fotografia ? fotografia.epoca : filo.epoca,
