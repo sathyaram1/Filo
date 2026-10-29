@@ -1294,6 +1294,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '', domanda = nul
   next.messiDaParteGiro = outcome === 'fix'
     ? { sha: shaProvato, n: daParte.reduce((k, d) => k + d.rilievi.length, 0), numeri: daParte.flatMap((d) => d.rilievi.map((f) => f.n)).filter(Number.isInteger), avvio: avvio || '' }
     : null;
+  next.criticaNelGiro = true;
   sealTransition(next, `verifier:${outcome}`);
   next.reply = reply;
   return next;
