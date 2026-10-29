@@ -1,0 +1,124 @@
+// Esplorazione giro 4 (si cancella).
+import { test, expect } from '../../fixtures/electron.mjs';
+import { mkdirSync } from 'node:fs';
+
+const EDITOR = 'filo://editor/editor.html';
+const SHOTS = 'tests/.shots';
+mkdirSync(SHOTS, { recursive: true });
+
+async function apriEditor(openTab) {
+  const ed = await openTab(EDITOR);
+  await ed.waitForSelector('#doc');
+  await ed.waitForFunction(() => document.querySelector('.pd-pannello') && document.querySelector('.pd-elemento[data-elemento="word-count"]'));
+  return ed;
+}
+const aperto = (ed) => ed.evaluate(() => document.documentElement.classList.contains('pd-aperto'));
+const elementi = (ed) => ed.evaluate(() => [...document.querySelectorAll('.pd-elementi > .pd-elemento')].map((n) => n.dataset.elemento));
+const esegui = (app, a) => app.evaluate((_e, x) => globalThis.SN_EXECUTE_FILO_ACTION(x), a);
+
+test('e1 tema scuro e chiaro, tutti gli strumenti, scorrimento del pannello', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  await ed.click('#doc');
+  await ed.keyboard.type('Una riga di prova per vedere il foglio.');
+  for (const id of ['text-size', 'align', 'font', 'undo', 'redo', 'settings', 'bold', 'italic', 'underline']) {
+    await esegui(app, { type: 'PANNELLO_APP', operazione: 'aggiungi', elemento: id });
+  }
+  await expect.poll(() => elementi(ed)).toHaveLength(12);
+  await ed.evaluate(() => document.querySelector('.pd-striscia').click());
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.waitForTimeout(400);
+  await ed.screenshot({ path: `${SHOTS}/e1-tutti-chiaro.png` });
+  const sc = await ed.evaluate(() => { const c = document.querySelector('.pd-corpo'); return { sh: c.scrollHeight, ch: c.clientHeight, ov: getComputedStyle(c).overflowY }; });
+  console.log('corpo', JSON.stringify(sc));
+  await ed.evaluate(() => { const c = document.querySelector('.pd-corpo'); c.scrollTop = c.scrollHeight; });
+  await ed.waitForTimeout(200);
+  await ed.screenshot({ path: `${SHOTS}/e1-tutti-chiaro-fondo.png` });
+  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { theme: 'dark' } }, { url: 'filo://preferences/preferences.html' }));
+  await ed.waitForTimeout(800);
+  await ed.evaluate(() => document.querySelector('.pd-striscia').click());
+  await ed.evaluate(() => { const c = document.querySelector('.pd-corpo'); c.scrollTop = 0; });
+  await ed.waitForTimeout(300);
+  console.log('tema', await ed.evaluate(() => document.documentElement.dataset.snTheme), 'aperto', await aperto(ed));
+  await ed.screenshot({ path: `${SHOTS}/e1-tutti-scuro.png` });
+  await ed.click('.pd-piu');
+  await ed.waitForTimeout(300);
+  await ed.screenshot({ path: `${SHOTS}/e1-espanso-scuro.png` });
+});
+
+test('e2 i pulsanti del pannello agiscono sulla selezione del foglio', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  for (const id of ['text-size', 'align', 'undo', 'italic']) await esegui(app, { type: 'PANNELLO_APP', operazione: 'aggiungi', elemento: id });
+  await ed.click('#doc');
+  await ed.keyboard.type('parola uno');
+  await ed.keyboard.press('Control+A');
+  await ed.evaluate(() => document.querySelector('.pd-striscia').click());
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.waitForTimeout(300);
+  console.log('html-text-size', await ed.locator('.pd-elemento[data-elemento="text-size"] .pd-contenuto').innerHTML());
+  console.log('html-align', await ed.locator('.pd-elemento[data-elemento="align"] .pd-contenuto').innerHTML());
+  // corsivo con clic vero
+  await ed.locator('.pd-elemento[data-elemento="italic"] .pd-contenuto button').first().click();
+  await ed.waitForTimeout(300);
+  console.log('dopo corsivo', await ed.locator('#doc').innerHTML());
+  // allinea al centro con clic vero
+  const btns = ed.locator('.pd-elemento[data-elemento="align"] .pd-contenuto button');
+  console.log('n align', await btns.count());
+  if (await btns.count() > 1) await btns.nth(1).click();
+  await ed.waitForTimeout(300);
+  console.log('dopo allinea', await ed.locator('#doc').innerHTML());
+  const ts = ed.locator('.pd-elemento[data-elemento="text-size"] .pd-contenuto button');
+  if (await ts.count()) await ts.last().click();
+  await ed.waitForTimeout(300);
+  console.log('dopo dimensione', await ed.locator('#doc').innerHTML());
+  await ed.screenshot({ path: `${SHOTS}/e2-dopo.png` });
+  await ed.locator('.pd-elemento[data-elemento="undo"] .pd-contenuto button').first().click();
+  await ed.waitForTimeout(300);
+  console.log('dopo indietro', await ed.locator('#doc').innerHTML());
+  console.log('aperto', await aperto(ed));
+});
+
+test('e3 due schede dell\'Editor: lo strumento aggiunto in una compare nell\'altra; Sposta su', async ({ app, openTab }) => {
+  const a = await apriEditor(openTab);
+  const b = await apriEditor(openTab);
+  await b.evaluate(() => document.querySelector('.pd-striscia').click());
+  await b.click('.pd-piu');
+  await b.locator('.pd-catalogo .pd-voce[data-elemento="font"]').click();
+  await expect.poll(() => elementi(b)).toEqual(['word-count', 'search-replace', 'comment', 'font']);
+  await expect.poll(() => elementi(a)).toEqual(['word-count', 'search-replace', 'comment', 'font']);
+  await b.click('.pd-piu');
+  await b.click('.pd-elemento[data-elemento="font"] .pd-contenuto', { button: 'right', position: { x: 5, y: 5 } });
+  console.log('voci', await b.locator('.pd-menu .sn-select-option').allTextContents());
+  await b.locator('.pd-menu .sn-select-option', { hasText: 'Sposta su' }).click();
+  await expect.poll(() => elementi(a)).toEqual(['word-count', 'search-replace', 'font', 'comment']);
+});
+
+test('e4 Aiuto ridotto alla casella e pannello', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  await ed.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1');
+  await ed.click('#doc');
+  await ed.keyboard.type('Una riga del documento abbastanza lunga da arrivare vicino al bordo della colonna di testo centrale.');
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.barra.esegui('help'));
+  await expect(ed.locator('.sn-sidebar')).toBeVisible();
+  await ed.waitForTimeout(500);
+  await ed.mouse.click(200, 300);
+  await ed.waitForTimeout(600);
+  console.log('aiuto classi', await ed.evaluate(() => document.querySelector('html > .sn-sidebar')?.className), JSON.stringify(await ed.locator('.sn-sidebar').boundingBox()));
+  await ed.evaluate(() => document.querySelector('.pd-striscia').click());
+  await ed.waitForTimeout(400);
+  console.log('pan', JSON.stringify(await ed.locator('.pd-pannello').boundingBox()), 'vw', await ed.evaluate(() => innerWidth));
+  await ed.screenshot({ path: `${SHOTS}/e4-aiuto-ridotto-pannello.png` });
+  await ed.click('.pd-lucchetto');
+  await ed.waitForTimeout(400);
+  console.log('doc', JSON.stringify(await ed.locator('#doc').boundingBox()), 'pan', JSON.stringify(await ed.locator('.pd-pannello').boundingBox()));
+  await ed.screenshot({ path: `${SHOTS}/e4-aiuto-ridotto-bloccato.png` });
+});
+
+test('e5 pagina web: niente striscia, niente pannello, Ctrl+\\ passa', async ({ app, openTab, server }) => {
+  const url = server ? `${server.url}/` : 'data:text/html,<p>ciao</p>';
+  const p = await openTab(url);
+  await p.waitForLoadState('domcontentloaded');
+  console.log('striscia web', await p.evaluate(() => !!document.querySelector('.pd-striscia, .pd-pannello')));
+  const r = await esegui(app, { type: 'PANNELLO_APP', operazione: 'apri' });
+  console.log('apri su web', JSON.stringify(r));
+});
