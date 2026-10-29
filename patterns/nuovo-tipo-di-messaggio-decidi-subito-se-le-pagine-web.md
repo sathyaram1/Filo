@@ -145,6 +145,11 @@ scegliere il menu del sito rispondevano con l'elenco di tutti i siti
 dell'utente. Una domanda che apre una scheda entra in
 `DOMANDE_WEB_SCHEDA_IN_VISTA`; una risposta con un elenco di siti si ritaglia
 in `RISPOSTE_WEB`, sulla voce di chi chiede, come la lettura delle impostazioni.
+Un verdetto su un testo scelto da chi chiede è un oracolo: il controllo del
+campo dell'assistente di pagina diceva a un sito se il suo IBAN inventato era
+uno letto altrove, e dove. La porta delle uscite si chiede nel main sul testo
+del modello (la risposta dell'Aiuto arriva alla pagina già senza il testo
+fermato), mai con una domanda della pagina.
 
 Una domanda che il codice di Filo fa solo **dopo un gesto dell'utente** vuole il
 gesto anche nel main (#589.1, giro 2). Incolla e Detta si danno il permesso
