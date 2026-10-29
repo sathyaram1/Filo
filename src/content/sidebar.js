@@ -105,6 +105,8 @@
   // «Valuta» (#1449): il campo dell'ultima valutazione e il testo che il modello ne ha visto. Da lì la conversazione
   // risponde col modello della chat, e le correzioni proposte si scrivono in quel campo.
   let valutazione = null;
+  // Il documento dell'app (l'Editor) di cui parla la conversazione: cambiato a metà, il modello lo sa.
+  let docConversazione = '';
 
   // Una pagina che si riscrive da capo porta via il pannello: staccato vale chiuso.
   function isOpen() { return !!(root && root.isConnected); }
