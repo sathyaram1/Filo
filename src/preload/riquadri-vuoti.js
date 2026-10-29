@@ -173,11 +173,11 @@ function buildRiquadriVuotiSource(corpi) {
         var f = typeof this === 'function' && finti.get(this);
         if (f) return f;
         if (typeof this === 'function') {
-          try { var casa = Object.getPrototypeOf(this); if (typeof casa === 'function' && casa !== FP && casa.toString !== m) return casa.toString.call(this); } catch (e) {}
+          try { var casa = protoDi(this); if (typeof casa === 'function' && casa !== FP && casa.toString !== m) return R(casa.toString, this, []); } catch (e) {}
         }
-        return t.apply(this, arguments);
+        return R(t, this, arguments);
       } }.toString;
-      def(FP, 'toString', { value: comeNativo(m, t, 'toString'), writable: true, enumerable: false, configurable: true });
+      def(FP, 'toString', { __proto__: null, value: comeNativo(m, t, 'toString'), writable: true, enumerable: false, configurable: true });
     } catch (e) {}
   }
   function dopo(o, nome, se, poi) {
