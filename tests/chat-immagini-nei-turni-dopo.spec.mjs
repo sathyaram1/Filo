@@ -19,7 +19,8 @@ async function preparaModello(app, copione, { rifiuta = null } = {}) {
     const foto = (messages) => messages.reduce((n, m) => n + (Array.isArray(m.content) ? m.content.filter((p) => p && p.type === 'image_url').length : 0), 0);
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      const chat = String((messages[0] && messages[0].content) || '').startsWith('Sei Filo, un assistente personale.');
+      // La chat è la richiesta che apre con la parte fissa: il messaggio della home comincia con le stesse parole (#1562).
+      const chat = !!messages[0] && messages[0].role === 'system' && String(messages[0].content || '').startsWith(globalThis.SN_CONST.PROMPTS.filoChatStatic());
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       // Come i fornitori veri: un modello di solo testo, o uno che regge al più una foto per richiesta.
       if (rifiuta === 'testo' && foto(messages) > 0) {

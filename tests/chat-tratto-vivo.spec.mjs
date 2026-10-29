@@ -19,7 +19,8 @@ async function preparaModello(app, copione) {
     globalThis.__chiamate = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, tools, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      if (!String((messages[0] && messages[0].content) || '').startsWith('Sei Filo, un assistente personale.')) {
+      // La chat è la richiesta che apre con la parte fissa: il messaggio della home comincia con le stesse parole.
+      if (!(!!messages[0] && messages[0].role === 'system' && String(messages[0].content || '').startsWith(globalThis.SN_CONST.PROMPTS.filoChatStatic()))) {
         return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       }
       globalThis.__chiamate.push(JSON.parse(JSON.stringify({ messages, tools })));

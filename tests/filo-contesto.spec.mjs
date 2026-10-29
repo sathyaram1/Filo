@@ -61,7 +61,8 @@ async function preparaModello(app, copione) {
     globalThis.__chiamate = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      const chat = String((messages[0] && messages[0].content) || '').startsWith('Sei Filo, un assistente personale.');
+      // La chat è la richiesta che apre con la parte fissa: il messaggio della home comincia con le stesse parole (#1562).
+      const chat = !!messages[0] && messages[0].role === 'system' && String(messages[0].content || '').startsWith(globalThis.SN_CONST.PROMPTS.filoChatStatic());
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       globalThis.__chiamate.push(JSON.parse(JSON.stringify(messages)));
       const r = globalThis.__copione.shift() || { text: 'ok' };
@@ -851,7 +852,7 @@ test('un modello della chat con la finestra più piccola di tre giorni di filo r
     globalThis.__accettate = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      const chat = String((messages[0] && messages[0].content) || '').startsWith('Sei Filo, un assistente personale.');
+      const chat = !!messages[0] && messages[0].role === 'system' && String(messages[0].content || '').startsWith(globalThis.SN_CONST.PROMPTS.filoChatStatic());
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       const n = messages.reduce((s, m) => s + String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).length, 0);
       if (n > 110000) {
@@ -989,7 +990,7 @@ async function finestraPiccola(app, { listino }) {
     globalThis.__accettate = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      const chat = String((messages[0] && messages[0].content) || '').startsWith('Sei Filo, un assistente personale.');
+      const chat = !!messages[0] && messages[0].role === 'system' && String(messages[0].content || '').startsWith(globalThis.SN_CONST.PROMPTS.filoChatStatic());
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       const testi = messages.map((m) => String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
       const n = testi.reduce((s, t) => s + t.length, 0);
