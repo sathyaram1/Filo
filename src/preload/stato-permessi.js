@@ -90,7 +90,7 @@ function buildStatoPermessiCorpo(stato) {
           return st;
         });
       } };
-      try { Object.defineProperty(P, 'query', { value: nativo(o.query, q, 'query'), writable: true, configurable: true, enumerable: true }); } catch (e) {}
+      try { defP(P, 'query', { __proto__: null, value: nativo(o.query, q, 'query'), writable: true, configurable: true, enumerable: true }); } catch (e) {}
     }
   };
 })()`;
