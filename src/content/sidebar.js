@@ -152,6 +152,7 @@
     voce = null;
     statoVoce = 'pronto';
     valutazione = null;
+    docConversazione = '';
     cambiato();
   }
 
