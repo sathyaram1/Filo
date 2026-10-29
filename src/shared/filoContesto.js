@@ -407,19 +407,27 @@
       if (!memo.has(i)) memo.set(i, rendiIl(i, lista[i - 1]).reduce((k, x) => k + tokenDi(x.content), 0));
       return memo.get(i);
     };
-    // La conversazione di questa scheda, se è ripresa da prima dei tetti: i suoi ultimi messaggi restano davanti,
-    // dentro la loro quota. Il tetto in token vale per loro e per la finestra insieme.
+    // Le conversazioni riprese da prima dei tetti: i loro ultimi messaggi restano davanti, dentro la loro quota, e il tetto
+    // in token vale per loro e per la finestra insieme. Sono del tratto, non della scheda: finché l'inizio tiene restano
+    // davanti da ogni scheda, o il tratto si riscriverebbe a ogni cambio di scheda (#1562).
+    const tieni = stessaAncora && inizio < n && lista[inizio].ts === ancora.ts && Array.isArray(ancora.riprese);
+    const riprese = new Set(tieni ? ancora.riprese : []);
+    if (chatCorrente) riprese.add(chatCorrente);
     const mie = [];
-    if (chatCorrente) for (let i = 0; i < n; i++) if (lista[i].chat === chatCorrente) mie.push(i);
+    for (let i = 0; i < n; i++) if (riprese.has(lista[i].chat)) mie.push(i);
     let mieDavanti = 0;
     while (mieDavanti < mie.length && mie[mieDavanti] < inizio) mieDavanti++;
     const riprendi = () => {
       const indici = [];
+      const perChat = new Map();
       let peso = 0;
-      for (let k = mieDavanti - 1; k >= 0 && indici.length < MESSAGGI_DELLA_CHAT; k--) {
+      for (let k = mieDavanti - 1; k >= 0; k--) {
+        const c = lista[mie[k]].chat;
+        if ((perChat.get(c) || 0) >= MESSAGGI_DELLA_CHAT) continue;
         const p = pesa(mie[k]);
         if (peso + p > token * QUOTA_RIPRESI) break;
         peso += p;
+        perChat.set(c, (perChat.get(c) || 0) + 1);
         indici.unshift(mie[k]);
       }
       return { indici, peso };
