@@ -2,6 +2,7 @@
 // feedback (annotazione/invio) e fetch dei metadati Open Graph di un link.
 
 const { safeFetch } = require('../safe-fetch');
+const { daUnSito } = require('./origine');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
 const Foto = require('../fotoDellaPagina');
 const auth = require('../../auth/google-auth');
