@@ -1,12 +1,12 @@
-// Le regole Storage degli allegati (#582) provate col MOTORE VERO.
+// Le regole Storage degli allegati (#582) provate con l'EMULATORE ufficiale.
 //
 // NON è uno spec: il nome finisce in `.mjs` e non in `.spec.mjs` apposta, così
 // la suite non prova a lanciarlo. Per girare ha bisogno di due cose che nella
 // suite non ci sono e non ci devono essere — gli emulatori ufficiali Firebase
 // (centinaia di MB) e Java. La sentinella sempre accesa è
 // `tests/unit/storageRulesAllegati.test.mjs`, che rilegge il file che si
-// deploya in millisecondi; questo file è l'altra metà: la prova che quel file,
-// dato in pasto al motore vero, si comporta come dice.
+// deploya in millisecondi; questo file prova che le porte chiuse restano chiuse.
+// Che un allegato vero passi NON lo prova (sotto, «Quel che l'emulatore non dice»).
 //
 // Si lanciano DUE emulatori, non uno. Non più perché le regole interroghino
 // Firestore — quel ramo non c'è più, la lettura è negata a tutti — ma perché i
