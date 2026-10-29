@@ -24,6 +24,8 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   arriva nella domanda dopo, sezione per sezione (`SN_TRATTO_VIVO.confronta`): la memoria per righe nuove, i file per id,
   il resto intero; il sistema a ogni cambio (la sezione dice di rispondere da lì), i crediti quando cambiano le prime due
   cifre, e il testo lo dice. Una fotografia nuova toglie dai messaggi passati le sezioni cambiate di quella prima.
+  Un cambio si dà per detto solo quando un messaggio dell'utente lo porta: un «Continua» o un turno interno lo lasciano
+  al messaggio dopo, e un «Riprova» tiene quelli del primo invio.
 - **Davanti a ogni messaggio dell'utente** Filo scrive, in un blocco suo dopo l'ora e la chat, le cose successe dal
   messaggio dell'utente prima (accaduti e cambi del filo, con l'id dei cambi per ANNULLA_CAMBIO, in una busta), le
   sezioni cambiate, e nella domanda di quel turno i ricordi ripescati e l'intervista. Le azioni di una chat dentro il suo
