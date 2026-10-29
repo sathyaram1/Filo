@@ -1240,14 +1240,16 @@ function riprova(id, scope = '') {
   if (rec.state !== 'interrupted' && rec.state !== 'cancelled') {
     return { ok: false, error: 'Questo scaricamento non è fallito', items: listRecords(scope) };
   }
-  if (!/^https?:/i.test(String(rec.url || ''))) {
+  // Si rifà il clic: dall'indirizzo cliccato (dopo un riavvio resta solo quello finale), con la pagina da cui partiva.
+  const indirizzo = /^https?:/i.test(String(rec._primo || '')) ? rec._primo : String(rec.url || '');
+  if (!/^https?:/i.test(indirizzo)) {
     return { ok: false, error: 'Questo file non ha un indirizzo da cui riscaricarlo', items: listRecords(scope) };
   }
   const ses = sessioneDi(rec);
   if (!ses || typeof ses.downloadURL !== 'function') {
     return { ok: false, error: 'Non sono riuscito a far ripartire lo scaricamento', items: listRecords(scope) };
   }
-  const k = chiaveRiprova(scope, rec.url);
+  const k = chiaveRiprova(scope, indirizzo);
   riprove.set(k, (riprove.get(k) || []).concat(rec.id));
   // La riga riparte subito: il server può metterci un attimo a rispondere, e un clic senza effetto sembra rotto.
   Object.assign(rec, { state: 'progressing', receivedBytes: 0, totalBytes: 0, endedAt: null, paused: false, canResume: false });
