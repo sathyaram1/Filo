@@ -42,6 +42,16 @@ async function prova(nome, fn) {
 }
 function vero(cond, msg) { if (!cond) throw new Error(msg); }
 
+// Un idToken anonimo come quello che l'app manda: l'emulatore non ne controlla la firma.
+function tokenAnonimo(uid = 'installazione-di-prova') {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const ora = Math.floor(Date.now() / 1000);
+  return `${b64({ alg: 'none', typ: 'JWT' })}.${b64({
+    iss: `https://securetoken.google.com/${PROGETTO}`, aud: PROGETTO, sub: uid, user_id: uid,
+    iat: ora, exp: ora + 3600, auth_time: ora, firebase: { sign_in_provider: 'anonymous', identities: {} },
+  })}.`;
+}
+
 const IERI = new Date(2026, 9, 27, 10, 0, 0).getTime();
 const ORA = 60 * 60 * 1000;
 
