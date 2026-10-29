@@ -134,7 +134,7 @@ test('i link della risposta tengono codice e grassetto, e una fila di quadre ape
   await expect(bolla.locator('a.filo-md-link[href="https://example.com/guida"]')).toHaveText('https://example.com/guida');
   await expect(bolla.locator('code', { hasText: 'index.html' })).toBeVisible();
   const segnaposti = await bolla.evaluate((el) => {
-    const re = /[]/;
+    const re = /[\uE000\uE001]/;
     return re.test(el.textContent) || [...el.querySelectorAll('a')].some((a) => re.test(a.getAttribute('href') || ''));
   });
   expect(segnaposti, 'segnaposti interni finiti nel testo o negli indirizzi').toBe(false);

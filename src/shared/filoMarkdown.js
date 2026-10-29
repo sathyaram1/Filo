@@ -69,10 +69,10 @@
   // Link markdown [testo](url). Il testo non contiene [ né ]: da ogni [ la ricerca
   // si ferma alla quadra seguente, così una fila di [ aperte resta lineare (#853).
   // L'url può contenere parentesi bilanciate (wiki/Mercurio_(astronomia)), mai un segnaposto.
-  const LINK_MD = /\[([^[\]\n]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)/g;
+  const LINK_MD = /\[([^[\]\n]+)\]\(((?:[^()\s\uE000\uE001]|\([^()\s\uE000\uE001]*\))+)\)/g;
   // Dove finisce un URL nudo lo decide separaCoda; qui si ferma ai caratteri che in un URL
   // non stanno mai (" < > già escapati, virgolette tipografiche) e al codice che gli sta attaccato.
-  const URL_NUDO = /\bhttps?:\/\/(?:&amp;|&#39;|[^\s&«»“”])+/gi;
+  const URL_NUDO = /\bhttps?:\/\/(?:&amp;|&#39;|[^\s&«»“”\uE000\uE001])+/gi;
 
   // Formattazione inline su testo GIA' escapato. Codice e link si mettono da parte
   // con segnaposto, così autolink ed enfasi non ne toccano il contenuto; il testo

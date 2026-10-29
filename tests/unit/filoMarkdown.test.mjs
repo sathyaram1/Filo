@@ -151,7 +151,7 @@ test('#853 una coda lunghissima dopo un URL nudo non blocca il disegno', () => {
 
 // #853.2 — codice e grassetto dentro il testo di un link uscivano come «0» e come **asterischi**; un URL attaccato a
 // del codice si portava dietro il segnaposto nell'indirizzo.
-const SEGNAPOSTI = /[]/;
+const SEGNAPOSTI = /[\uE000\uE001]/;
 const linkDi = (html) => [...html.matchAll(/<a class="filo-md-link" href="([^"]*)"[^>]*>(.*?)<\/a>/g)].map((m) => ({ href: m[1], dentro: m[2] }));
 
 test('#853 il testo di un link resta quello scritto, anche con codice o grassetto dentro', () => {
@@ -179,7 +179,7 @@ test('#853 un URL nudo attaccato a del codice si ferma dove comincia il codice',
 });
 
 test('#853 i caratteri dei segnaposto scritti dal modello non tirano fuori pezzi d\'altri', () => {
-  const html = render('Prima `uno` poi 0 e [0](https://example.com/0)');
+  const html = render('Prima `uno` poi \uE0000\uE001 e [\uE0000\uE001](https://example.com/\uE0000\uE001)');
   assert.doesNotMatch(html, SEGNAPOSTI);
   assert.equal((html.match(/<code>uno<\/code>/g) || []).length, 1, html);
 });
