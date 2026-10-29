@@ -2082,9 +2082,8 @@ function positionOnBranch(bucket) {
     process.stderr.write(`[dispatch] ${branch}: lavoro di un'istanza interrotta riportato all'ultimo punto fermo; i commit scartati restano su ${res.discarded}\n`);
   }
 
-  // Identità attesa del contenuto: è il valore che le transizioni (C) e il ripristino (D) confronteranno. Lo stato di
-  // un'altra storia (un altro ramo, questo prima di una riscrittura, un giro passato da un'altra cartella) non descrive
-  // il lavoro di adesso: punti fermi, esiti e pulizie ripartono da zero (#1486, D-207).
+  // Identità attesa del contenuto, che transizioni (C) e ripristino (D) confronteranno. Lo stato di un'altra storia
+  // (altro ramo, riscrittura, giro passato da un'altra cartella) riparte da zero, esiti e pulizie compresi (D-207).
   const altraStoria = prev?.branch !== branch || !!res.rewritten || !!res.superato;
   const base = altraStoria
     ? defaultState(bucket.id, branch)
