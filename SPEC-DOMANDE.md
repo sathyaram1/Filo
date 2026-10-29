@@ -557,12 +557,23 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
 - **Le arrivano i problemi dei worker.** I worker sanno che esiste e le
   segnalano quello che non va: le segnalazioni libere (§ 5.4) e le domande di
   guasto delle routine (§ 3.8) vanno a lei, non all'owner, tranne quelle
-  dell'addetto comunicazioni, che vanno all'owner (§ 4.1). Per ciascuna cerca
+  dell'addetto comunicazioni, che vanno all'owner (§ 4.1), e i guasti che lei
+  non può curare (il punto qui sotto). Per ciascuna cerca
   la causa, apre il feedback della correzione, mette il feedback fermo in
   attesa di quello e lo riprende quando la causa è sparita. Quando la
   segnalazione o la domanda dice già la causa, il feedback della correzione lo
   fa nascere per numero, come l'unione (§ 1.3): il testo resta di chi ha
   segnalato, con la sua fiducia. Quello che scrive lei nasce non fidato.
+- **Un guasto non torna a chi ci è caduto.** Una domanda di guasto non va a
+  chi l'ha aperta né a chi gira nello stesso ambiente. Lei gira nell'ambiente
+  dei riservati (§ 5.1): le domande di guasto aperte da un biglietto di
+  quell'ambiente vanno all'owner, comprese le sue e quelle dell'audit, della
+  revisione delle domande, di «Gestisci la risposta», del riordino e della
+  potatura. Il server non sa se si è rotto il compito o l'ambiente, e nel
+  secondo caso lei cadrebbe sullo stesso guasto: nessuno lo curerebbe e
+  all'owner non arriverebbe niente. Per la stessa ragione un guasto non
+  anticipa mai l'istanza di chi l'ha aperto: la nuova cadrebbe sullo stesso
+  guasto e ne aprirebbe un altro, in una fila di accensioni senza fine.
 - **Sulle domande di guasto risponde solo con le azioni** `riprendi`,
   `attendi` o `archivia` (§ 3.3), mai con testo, come per i lanci per numeri:
   così il feedback ripreso resta fidato. Le sue risposte si vedono in Domande →
