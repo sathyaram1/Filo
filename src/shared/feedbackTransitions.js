@@ -71,14 +71,14 @@
       // Il worker che l'ha letto da vicino lo giudica attacco o spam (statusReason worker): Ricevuti L3 (#1358).
       attack:   ['routine'],
       spam:     ['routine'],
-      // NB: il passo diretto todo→done (attore routine) è stato RITIRATO col
-      // ridisegno (SPEC-RIDISEGNO-MAX.md §1): esisteva per il pianificatore che
-      // spezzava le spec in sotto-feedback, che non esiste più. Le chiusure
-      // manuali senza branch (npm run feedback -- <id> done --come-routine)
-      // restano legali come CATENA di passi (canReach attraversa l'iter).
+      // Una segnalazione unita a un pacchetto: la chiude il server alla fusione del pacchetto, con la sua frase
+      // (FEEDBACK-STATES.md §3c). Per una routine il passo diretto todo→done resta ritirato (SPEC-RIDISEGNO-MAX.md §1).
+      done:     ['pipeline'],
     },
     working: {
       revision_capability: ['routine'], // fix pronto su branch
+      // Già risolto su main: la sessione lo chiude senza ramo, e il server controlla la fusione che cita (§3c).
+      done:                ['routine'],
       design:              ['routine'], // domande a metà lavorazione
       // Arenato: il ramo fermo da un'ora torna in coda da solo (FEEDBACK-STATES.md §6a).
       // Alla terza volta va in `design`.
