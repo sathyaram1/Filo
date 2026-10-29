@@ -6,9 +6,11 @@
   'use strict';
 
   const LINK_CLASS = 'filo-md-link';
-  // Sentinelle Private-Use: non compaiono nel testo del modello, quindi la prosa è al sicuro.
-  const S0 = '';
-  const S1 = '';
+  // Sentinelle Private-Use dei segnaposto: tolte dal testo in arrivo, così ogni segnaposto è uno dei nostri.
+  const S0 = '\uE000';
+  const S1 = '\uE001';
+  const SENTINELLE = /[\uE000\uE001]/g;
+  const SEGNAPOSTO = /\uE000(\d+)\uE001/g;
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
@@ -59,40 +61,42 @@
     return [m.slice(0, fine), m.slice(fine)];
   }
 
-  // Formattazione inline su testo GIA' escapato: codice, link markdown, autolink
-  // di URL nudi, grassetto, corsivo. Codice e link vengono "messi da parte" con
-  // segnaposto cosi' le trasformazioni successive (autolink, grassetto/corsivo)
-  // non ne corrompono il contenuto e non ri-linkano l'href appena creato.
+  // Grassetto poi corsivo: l'ordine evita che ** venga letto come due *.
+  const enfasi = (s) => s
+    .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*\w])\*(?!\s)([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
+
+  // Link markdown [testo](url). Il testo non contiene [ né ]: da ogni [ la ricerca
+  // si ferma alla quadra seguente, così una fila di [ aperte resta lineare (#853).
+  // L'url può contenere parentesi bilanciate (wiki/Mercurio_(astronomia)), mai un segnaposto.
+  const LINK_MD = /\[([^[\]\n]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)/g;
+  // Dove finisce un URL nudo lo decide separaCoda; qui si ferma ai caratteri che in un URL
+  // non stanno mai (" < > già escapati, virgolette tipografiche) e al codice che gli sta attaccato.
+  const URL_NUDO = /\bhttps?:\/\/(?:&amp;|&#39;|[^\s&«»“”])+/gi;
+
+  // Formattazione inline su testo GIA' escapato. Codice e link si mettono da parte
+  // con segnaposto, così autolink ed enfasi non ne toccano il contenuto; il testo
+  // di un link ha la sua enfasi e il suo codice, rimessi dentro l'<a> (#853).
   function inlineMd(escaped) {
     const tokens = [];
     const stash = (html) => S0 + (tokens.push(html) - 1) + S1;
-    let t = String(escaped);
+    const rimetti = (s) => s.replace(SEGNAPOSTO, (m, i) => tokens[Number(i)] || '');
+    let t = String(escaped).replace(SENTINELLE, '');
 
     t = t.replace(/`([^`\n]+)`/g, (m, code) => stash('<code>' + code + '</code>'));
 
-    // Link markdown [testo](url): l'url può contenere parentesi bilanciate
-    // (wiki/Mercurio_(astronomia)).
-    t = t.replace(/\[([^\]\n]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)/g, (m, label, url) => {
+    t = t.replace(LINK_MD, (m, label, url) => {
       const safe = safeLinkUrl(url);
-      return safe ? stash(anchor(safe, label)) : label;
+      return safe ? stash(anchor(safe, rimetti(enfasi(label)))) : label;
     });
 
-    // Autolink di URL nudi http(s)://... (mostrano l'URL stesso come testo).
-    // Dove finisce l'URL lo decide separaCoda; qui si ferma solo ai caratteri
-    // che in un URL non stanno mai (" < > già escapati, virgolette tipografiche).
-    t = t.replace(/\bhttps?:\/\/(?:&amp;|&#39;|[^\s&«»“”])+/gi, (m) => {
+    t = t.replace(URL_NUDO, (m) => {
       const [url, trail] = separaCoda(m);
       const safe = safeLinkUrl(url);
       return (safe ? stash(anchor(safe, url)) : url) + trail;
     });
 
-    // Grassetto poi corsivo: l'ordine evita che ** venga letto come due *.
-    t = t
-      .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/(^|[^*\w])\*(?!\s)([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
-
-    t = t.replace(new RegExp(S0 + '(\\d+)' + S1, 'g'), (m, i) => tokens[Number(i)] || '');
-    return t;
+    return rimetti(enfasi(t));
   }
 
   // I blocchi del testo (paragrafi, titoli, elenchi, codice ```), con le righe GIA' escapate. Li leggono sia
