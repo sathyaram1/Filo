@@ -187,6 +187,27 @@ test('un turno con strumenti torna com\'era: giro, esiti e ragionamento di ogni 
   assert.deepEqual(conRagionamento(due.corpo), [uno.messages.length, uno.messages.length + 2], 'il ragionamento dei passi del turno prima non torna');
 });
 
+test('un messaggio già mandato torna com\'era: la riga dell\'Editor che continua, un messaggio lunghissimo', async () => {
+  azzera();
+  const App = globalThis.SN_CONVERSAZIONI_APP;
+  await turno({ testo: 'ciao', minutiFa: 30 });
+  await App.annota({ app: 'editor', rif: 'doc1', soggetto: 'Tesi', messaggi: [{ role: 'user', text: 'riassumi' }, { role: 'filo', text: 'ecco' }] });
+  // La riga sta all'ora in cui la conversazione dell'Editor è cominciata, adesso: i turni dopo vengono più tardi.
+  const due = await turno({ testo: 'secondo', minutiFa: -5 });
+  await App.annota({ app: 'editor', rif: 'doc1', soggetto: 'Tesi', messaggi: [{ role: 'user', text: 'accorcia' }, { role: 'filo', text: 'fatto' }] });
+  await App.rinomina({ app: 'editor', rif: 'doc1', soggetto: 'Tesi finale' });
+  const lungo = `${'parola '.repeat(20000)}fine`;
+  const tre = await turno({ testo: lungo, minutiFa: -10 });
+  assert.equal(json(tre.messages.slice(0, due.messages.length)), json(due.messages), 'la riga dell\'Editor ha riscritto il tratto');
+  assert.ok(testoDi(tre.messages.at(-1)).endsWith(lungo));
+  const quattro = await turno({ testo: 'ok', minutiFa: -15 });
+  assert.equal(json(quattro.messages.slice(0, tre.messages.length)), json(tre.messages), 'il messaggio lungo è tornato accorciato');
+  // Alla fotografia dopo (qui la cache fredda) la riga si rifà com'è adesso.
+  Contesto.fotografa({ incognito: false, sezioni: sezioniDi(), ancora: null, durata: '5m', ora: Date.now() + 60 * 60000 });
+  const c = await Contesto.componi({ chatId: 'ab12', userMessage: null, storia: [], tetti: TETTI, osserva: () => '', incognito: false });
+  assert.match(c.messaggi.map(testoDi).join('\n'), /«Tesi finale»: 4 messaggi/);
+});
+
 test('quello che succede fra due messaggi entra davanti al messaggio dopo, e ci resta', async () => {
   const f = azzera();
   await turno({ testo: 'ciao', minutiFa: 30 });
