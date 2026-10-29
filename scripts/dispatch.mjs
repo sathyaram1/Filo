@@ -1536,6 +1536,16 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   const confronto = marcatore && marcatore.role === 'fixer' && marcatore.dal ? fileRiscritti(ROOT, { prima: marcatore.dal }) : null;
   const esito = esitoRiallineamento(confronto, motivo);
   if (esito.riga) process.stderr.write(`${esito.riga}\n`);
+  // Il server rifà il confronto sulla punta presa da GitHub: se non c'è ancora (si spinge al rilascio) sceglie il giro pieno.
+  if (confronto && process.env.FILO_ROUTINE && process.env.FILO_ROUTINE !== '0') {
+    try {
+      const ch = await import('./routine-channel.mjs');
+      const spinta = ch.pushRamoCorrente(ROOT);
+      if (!spinta.ok) process.stderr.write(`Il ramo non è partito prima della consegna (${spinta.reason}): il server rifarà la verifica intera.\n`);
+    } catch (e) {
+      process.stderr.write(`Il ramo non è partito prima della consegna (${e?.message || e}): il server rifarà la verifica intera.\n`);
+    }
+  }
   const sent = await deliverToChannel('fixed', fixedPayload({
     report, frase, branch: next.branch || '', segnalazione, ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento,
   }));

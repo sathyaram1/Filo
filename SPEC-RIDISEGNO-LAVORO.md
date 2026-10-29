@@ -158,8 +158,21 @@ Fatto dalla parte dell'app, con le regole in FEEDBACK-STATES.md § 3a:
 - sessione per feedback: preflight `--feedback <N>` col ruolo `sessione.md`, e
   `ticket … --feedback <N>`.
 
-Resta al server tutta la sua voce qui sopra: è lui a dare il biglietto di un
-feedback, rifiutarlo se già risolto, accettare la chiusura «già risolto» (con la sua
-riga nella tabella delle transizioni), tenere e rimandare il piano, chiudere le unite,
-scrivere il motivo nel biglietto e saltare il giro dopo un riallineamento pulito.
-L'orchestratore si toglie quando il server accende una sessione per feedback.
+Fatto dalla parte del server (ramo omonimo di filo-security, da rideployare):
+
+- biglietto per numero (`routineTicket` con `feedback`), con tutti i controlli della
+  scelta di sempre; un feedback già risolto il biglietto lo prende e lo chiude il primo
+  lavoro;
+- `suMain` nel primo lavoro (API di GitHub) e chiusura `gia_risolto` provata dal server,
+  con la riga `working → done` (routine) nella tabella;
+- piano consegnato, cifrato nel feedback, rimandato al primo lavoro e alla ripresa,
+  tolto alla chiusura;
+- unite chiuse alla fusione del pacchetto, e il messaggio della fusione che le cita;
+- motivo del correttore obbligatorio e scritto nel biglietto; `shaVerificato` al
+  correttore di un riallineamento; confronto rifatto dal server e niente giro dopo un
+  riallineamento pulito.
+
+Resta: il pacemaker che accende da sé una sessione per feedback scelto dal manutentore
+(serve che il prompt salvato della routine passi il numero, passo dell'owner su
+claude.ai); poi si toglie l'orchestratore. Fase 2: la spesa dell'account per il
+manutentore e l'operazione che dà schede e testi a chi ha la chiave delle routine.

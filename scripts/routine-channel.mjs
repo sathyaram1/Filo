@@ -243,7 +243,7 @@ export function readTicketReply(status, body) {
 
 /**
  * `opts.feedback`: il numero del feedback per cui la sessione è stata accesa (SPEC-RIDISEGNO-LAVORO.md § 2). Il server
- * dà il biglietto di quel feedback, o risponde «niente» col motivo (già risolto su main, non in coda, posti pieni).
+ * dà il biglietto di quel feedback, o risponde «niente» col motivo (non in coda, posti pieni, inesistente).
  */
 export async function ticket(passphrase, opts) {
   const feedback = opts && opts.feedback ? { feedback: String(opts.feedback) } : {};

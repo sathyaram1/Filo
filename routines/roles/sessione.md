@@ -37,8 +37,10 @@ quello lo accende il server, in un'altra sessione.
    ```
 
    - exit 0: stampa il biglietto;
-   - exit 2: per questo feedback adesso non c'è lavoro (già risolto su main,
-     fuori dalla coda, nessun posto libero), e il motivo è stampato: chiudi;
+   - exit 2: per questo feedback adesso non c'è lavoro (fuori dalla coda,
+     nessun posto libero, inesistente), e il motivo è stampato: chiudi. Un
+     feedback già risolto su main il biglietto lo dà lo stesso: lo chiude il
+     primo lavoro;
    - exit 3: guasto, chiudi senza ritentare. Vale anche quando il server dà
      il biglietto di un altro feedback: lo strumento lo restituisce da sé.
 
