@@ -69,7 +69,7 @@ test('Alt+E sul testo selezionato nel riquadro dello stesso sito arrivato dopo l
     });
     await expect.poll(async () => (await statoDi(app, page, '.sn-popup .sn-popup-title', frame))?.testo, { timeout: 8000 })
       .toBe('Approfondimento');
-    expect(await conta(app, page, '.sn-popup')).toBe(0);
+    expect(await nelMondoDiFilo(app, page, () => document.querySelectorAll('.sn-popup').length)).toBe(0);
   } finally {
     await sito.chiudi();
   }
