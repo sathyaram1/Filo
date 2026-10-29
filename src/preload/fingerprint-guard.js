@@ -461,17 +461,23 @@ const PROPAGAZIONE = `
   }
 
   // Un riquadro della stessa origine col suo preload chiede, prima dei suoi script, questo stesso preambolo: un canvas
-  // annotato da uno si legge con le funzioni dell'altro. Il tipo dell'evento è un segreto della sessione.
+  // annotato da uno si legge con le funzioni dell'altro. Il tipo dell'evento è un segreto della sessione; col trattino
+  // in coda lo manda un preload che la guardia non la vuole (sito esente): basta sapere che lì il preload c'è.
   function ascolta(w) {
     if (!CANALE) return;
-    R(ascoltoDi(w), w, [CANALE, function (e) {
+    var su = ascoltoDi(w);
+    R(su, w, [CANALE, function (e) {
       try {
         var el = R(bersaglio, e, []), tag = tagName(el);
         if (!TAG[tag]) return;
         var cw = finestraDi(el, tag);
+        segna(cw);
         prepara(cw, true);
         if (preparata(cw)) R(annulla, e, []);
       } catch (x) {}
+    }, true]);
+    R(su, w, [CANALE + '-', function (e) {
+      try { var el = R(bersaglio, e, []), tag = tagName(el); if (TAG[tag]) segna(finestraDi(el, tag)); } catch (x) {}
     }, true]);
   }
 
