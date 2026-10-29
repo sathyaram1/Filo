@@ -508,9 +508,9 @@ async function presiPrimaDelCarico(urls) {
     indice: () => window[window.length - 1],
     frames: () => frames[frames.length - 1],
     nome: (f) => window[f.name],
-    esente: () => window[window.length - 1],
   };
   for (const [k, prendi] of Object.entries(prese)) {
+    if (!urls[k]) continue;
     const f = document.createElement('iframe');
     f.name = 'preso_' + k;
     f.src = urls[k];
@@ -522,37 +522,50 @@ async function presiPrimaDelCarico(urls) {
     out[k + 'Suo'] = suo(w);
   }
   const h = document.getElementById('nellHtml');
-  if (!window.__arrivato) await carico(h);
-  out.html = leggi(window.__html);
-  out.htmlSuo = suo(window.__html);
+  if (h) {
+    if (!window.__arrivato) await carico(h);
+    out.html = leggi(window.__html);
+    out.htmlSuo = suo(window.__html);
+  }
   return out;
 }
 
-test.describe('riquadri presi prima del carico', () => {
-  test.use({ hostInPiu: ['slack.com'] });
+async function apriEPresi(openTab, pagina, urls) {
+  const leggi = async (u) => {
+    const page = await openTab(u);
+    await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
+    return page.evaluate(presiPrimaDelCarico, urls);
+  };
+  const on = await leggi(pagina);
+  await setFpMode(openTab, 'off');
+  const off = await leggi(pagina + '?off');
+  expect(on.pagina).not.toBe(off.pagina);
+  return { on, off };
+}
 
-  test('un riquadro della stessa origine preso per indice o per nome prima del carico ha il rumore della pagina dopo il load', async ({ openTab, testServer }) => {
+test('un riquadro della stessa origine preso per indice o per nome prima del carico ha il rumore della pagina dopo il load', async ({ openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const urls = {};
+  for (const k of ['indice', 'frames', 'nome']) urls[k] = testServer.html(`<!doctype html><p>${k}</p>`);
+  const pagina = testServer.html(`<!doctype html><html><head><meta charset="utf-8"><script>${IMPRONTA}</script></head><body>
+    <iframe id="nellHtml" onload="window.__arrivato = true" src="${testServer.html('<!doctype html><p>html</p>')}"></iframe>
+    <script>window.__html = frames[0];</script></body></html>`);
+  const { on, off } = await apriEPresi(openTab, pagina, urls);
+  for (const k of ['indice', 'indiceSuo', 'frames', 'framesSuo', 'nome', 'nomeSuo', 'html', 'htmlSuo']) {
+    expect.soft(on[k], `${k}: col rumore della pagina`).toBe(on.pagina);
+    expect.soft(off[k], `${k}: in Off come la pagina`).toBe(off.pagina);
+  }
+});
+
+test.describe('una pagina di accesso del sito', () => {
+  // Un sito noto che risponde in http: quelli nell'elenco HSTS del browser passerebbero a https.
+  test.use({ hostInPiu: ['www.linkedin.com'] });
+
+  test('presa per indice prima del carico resta esente', async ({ openTab, testServer }) => {
     test.setTimeout(90_000);
-    const sito = (u) => u.replace('127.0.0.1', 'slack.com');
-    const urls = {};
-    for (const k of ['indice', 'frames', 'nome']) urls[k] = sito(testServer.html(`<!doctype html><p>${k}</p>`));
-    urls.esente = sito(testServer.origin) + '/login';
-    const pagina = sito(testServer.html(`<!doctype html><html><head><meta charset="utf-8"><script>${IMPRONTA}</script></head><body>
-      <iframe id="nellHtml" onload="window.__arrivato = true" src="${sito(testServer.html('<!doctype html><p>html</p>'))}"></iframe>
-      <script>window.__html = frames[0];</script></body></html>`));
-    const leggi = async (u) => {
-      const page = await openTab(u);
-      await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
-      return page.evaluate(presiPrimaDelCarico, urls);
-    };
-    const on = await leggi(pagina);
-    await setFpMode(openTab, 'off');
-    const off = await leggi(pagina + '?off');
-    expect(on.pagina).not.toBe(off.pagina);
-    for (const k of ['indice', 'indiceSuo', 'frames', 'framesSuo', 'nome', 'nomeSuo', 'html', 'htmlSuo']) {
-      expect.soft(on[k], `${k}: col rumore della pagina`).toBe(on.pagina);
-      expect.soft(off[k], `${k}: in Off come la pagina`).toBe(off.pagina);
-    }
-    expect.soft(on.esente, 'una pagina di accesso resta esente').toBe(off.pagina);
+    const sito = (u) => u.replace('127.0.0.1', 'www.linkedin.com');
+    const pagina = sito(testServer.html(`<!doctype html><html><head><meta charset="utf-8"><script>${IMPRONTA}</script></head><body></body></html>`));
+    const { on, off } = await apriEPresi(openTab, pagina, { indice: sito(testServer.origin) + '/login' });
+    expect(on.indice, 'letta con le funzioni della pagina di accesso: come Off').toBe(off.pagina);
   });
 });
