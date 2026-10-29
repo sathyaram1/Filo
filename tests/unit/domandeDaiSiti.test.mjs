@@ -47,8 +47,9 @@ function tipiRegistrati() {
   return tipi;
 }
 
-// I tipi che uno script mette in un messaggio: `type: MSG.X`, `type: 'x'`, o una costante
-// locale che vale MSG.X o 'x' (i `T_GET` dei moduli cookie e simili).
+// I tipi che uno script mette in un messaggio: `type: MSG.X`, `type: 'x'`, una costante
+// locale che vale MSG.X o 'x' (i `T_GET` dei moduli cookie e simili), e ogni MSG.X nominato
+// altrove: il tipo può arrivare al messaggio da un argomento (i bottoni dei file dell'Aiuto, #589.1 giro 5).
 function tipiNominati(src) {
   const alias = new Map();
   for (const m of src.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:[\w$.?]*MSG\??\.([A-Z_0-9]+))?\s*(?:\|\|\s*)?(?:'([\w:-]+)')?\s*[;,\n]/g)) {
