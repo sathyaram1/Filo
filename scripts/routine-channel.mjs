@@ -1623,7 +1623,8 @@ if (isMain) {
         const { readRole } = await import('./lib/routine-role.mjs');
         // Il ruolo nel sigillo: dopo un «pass» vale come pulizia solo quello del verificatore (#880).
         const chi = readRole(ROOT);
-        sealCurrentWork(ROOT, { by: chi ? `release:${chi}` : 'release' });
+        // Dopo la domanda il punto fermo è la punta salvata: un commit rimasto qui non lo spedisce chi viene dopo.
+        sealCurrentWork(ROOT, { by: chi ? `release:${chi}` : 'release', sha: chiusura ? chiusura.sha : '' });
       } catch (_) { /* best-effort: il rilascio è già andato */ }
     }
     // Un biglietto che il server dice morto non ha più niente da tenere vivo: il battito si spegne e la fine si segna,
