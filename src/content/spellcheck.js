@@ -1445,7 +1445,11 @@
       .filter((m) => (m.fonte === 'rapido' ? modelloErrori() : (m.tipo === 'segnaposto' ? segnapostiAttivi() : suggerimentiAttivi())))
       .map(conRicerca);
     const valido = (x) => x.start >= 0 && x.end <= testo.length && x.end > x.start && testo.slice(x.start, x.end) === x.segment;
-    const tieni = (x) => valido(x) && !ignorato(state, x, testo)
+    // Le x di un segnaposto sono volute: un errore che ci cade sopra (rapido, ragionato, giudicato rimesso) non si vede né si
+    // corregge, a prescindere dal verdetto del candidato. Il testo del rapido è misurato sul banco e non lo dice (#1448.9).
+    const xVolute = segnapostiAttivi() ? state.codice.filter((c) => c.fonte === 'segnaposto') : [];
+    const sulleX = (x) => x.segno === 'errore' && xVolute.some((s) => x.start < s.end && x.end > s.start);
+    const tieni = (x) => valido(x) && !sulleX(x) && !ignorato(state, x, testo)
       && !(x.segno === 'errore' && !/\s/.test(x.segment.trim()) && (isInDictionary(x.segment) || nomeNoto(x.segment)))
       && !(scrive && x.start < scrive.end && x.end > scrive.start);
     const ordina = (k) => [
