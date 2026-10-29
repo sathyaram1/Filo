@@ -220,9 +220,14 @@
             finish(`rgb(${Math.round(acc[0] / n)}, ${Math.round(acc[1] / n)}, ${Math.round(acc[2] / n)})`);
           } catch (_) { finish(null); }
         };
-        img.src = href;
-        // Failsafe: se l'immagine non carica entro 3s, rinuncia e chiude la richiesta, che appesa resterebbe aperta.
-        setTimeout(() => { if (!done) { finish(null); img.removeAttribute('src'); } }, 3000);
+        fetch(href, { signal: ctrl.signal })
+          .then((res) => (res && res.ok ? res.blob() : null))
+          .then((blob) => {
+            if (done || !blob) return finish(null);
+            copia = URL.createObjectURL(blob);
+            img.src = copia;
+          })
+          .catch(() => finish(null));
       });
     }
 
