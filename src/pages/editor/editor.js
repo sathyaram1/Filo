@@ -2413,13 +2413,23 @@
     const ultimo = cur && cur.marks[cur.marks.length - 1];
     if (!ultimo || !ultimo.isConnected) return null;
     const block = findBlockOf(ultimo.firstChild || ultimo);
+    // Qui i mark contano: è il loro testo che si misura.
+    const testi = () => {
+      const w = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
+        acceptNode: (n) => (n.parentElement && !n.parentElement.closest('.ed-collapse-toggle') && findBlockOf(n) === block
+          ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+      });
+      const out = [];
+      let n; while ((n = w.nextNode())) out.push(n);
+      return out;
+    };
     let off = 0;
     let fine = -1;
-    for (const t of findTextNodesOfBlock(block)) { off += t.nodeValue.length; if (ultimo.contains(t)) fine = off; }
+    for (const t of testi()) { off += t.nodeValue.length; if (ultimo.contains(t)) fine = off; }
     if (fine < 0) return null;
     return () => {
       let cum = 0;
-      for (const t of findTextNodesOfBlock(block)) {
+      for (const t of testi()) {
         if (cum + t.nodeValue.length >= fine) { const r = document.createRange(); r.setStart(t, fine - cum); r.collapse(true); return r; }
         cum += t.nodeValue.length;
       }

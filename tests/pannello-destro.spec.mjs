@@ -554,3 +554,59 @@ test('con l\'Aiuto aperto la striscia sta alla sua sinistra: un clic la apre e i
   await ed.waitForTimeout(900);
   expect(await aperto(ed), 'il puntatore fermo dove ha cliccato non lo chiude').toBe(true);
 });
+
+test('con l\'Aiuto aperto, anche dopo un clic sul foglio, nessuna riga del documento resta sotto l\'Aiuto', async ({ app, openTab }) => {
+  // Una finestra da portatile: con la colonna di testo al centro, la fine delle righe cadrebbe sotto l'Aiuto.
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito).setContentSize(1180, 760));
+  const ed = await apriEditor(openTab);
+  await ed.click('#doc');
+  await ed.keyboard.type('Un paragrafo abbastanza lungo da occupare tutta la colonna di testo del foglio e andare a capo almeno una volta, per vedere dove finisce davvero ogni riga.');
+  await ed.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1' && typeof window.SN_SIDEBAR?.open === 'function');
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.barra.esegui('help'));
+  await expect(ed.locator('.sn-sidebar')).toBeVisible();
+  const righeSotto = () => ed.evaluate(() => {
+    const a = document.querySelector('.sn-sidebar').getBoundingClientRect();
+    const r = document.createRange();
+    r.selectNodeContents(document.getElementById('doc'));
+    return [...r.getClientRects()].filter((x) => x.width > 0 && x.right > a.left + 1 && x.left < a.right && x.bottom > a.top && x.top < a.bottom).length;
+  });
+  await expect.poll(righeSotto).toBe(0);
+  await ed.mouse.click(300, 300);
+  await ed.waitForTimeout(600);
+  expect(await righeSotto()).toBe(0);
+  await ed.keyboard.type(' Fine.');
+  await expect(ed.locator('#doc')).toContainText('Fine.');
+});
+
+test('Ctrl+F, cerca, Esc: il pannello si chiude e si torna a scrivere nel foglio, dopo la parola trovata', async ({ openTab }) => {
+  const ed = await apriEditor(openTab);
+  await ed.click('#doc');
+  await ed.keyboard.type('alfa beta gamma alfa');
+  await ed.keyboard.press('Control+f');
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.keyboard.type('gamma');
+  await ed.keyboard.press('Enter');
+  await ed.keyboard.press('Escape');
+  await expect.poll(() => aperto(ed)).toBe(false);
+  await expect(ed.locator('mark.ed-find-hit')).toHaveCount(0);
+  await ed.keyboard.type('X');
+  await expect(ed.locator('#doc')).toHaveText('alfa beta gammaX alfa');
+  // Anche da Sostituisci.
+  await ed.keyboard.press('Control+f');
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.click('[data-sr="repl"]');
+  await ed.keyboard.press('Escape');
+  await expect.poll(() => aperto(ed)).toBe(false);
+  expect(await ed.evaluate(() => document.getElementById('doc').contains(document.activeElement) || document.activeElement.id === 'doc')).toBe(true);
+});
+
+test('nel catalogo del «+» ogni nome si legge intero', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  await premi(app, '\\', ['control']);
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.click('.pd-piu');
+  await expect(ed.locator('.pd-catalogo')).toBeVisible();
+  const tagliati = await ed.evaluate(() => [...document.querySelectorAll('.pd-catalogo .pd-voce-nome')]
+    .filter((n) => n.scrollWidth > n.clientWidth + 0.5 || n.scrollHeight > n.clientHeight + 0.5).map((n) => n.textContent));
+  expect(tagliati).toEqual([]);
+});
