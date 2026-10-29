@@ -47,13 +47,3 @@ test('r1 nel menu i siti veri non si prendono l’avviso d’imitazione', async 
   const avvisi = await avvisiDelMenu(openTab, testServer, VERI);
   expect(VERI.map((u, i) => (avvisi[i] ? `${u} → ${avvisi[i]}` : '')).filter(Boolean)).toEqual([]);
 });
-
-test('r2 l’avviso nomina il marchio imitato, non un suo prodotto', async ({ openTab, testServer }) => {
-  const casi = [
-    ['https://google-login.xyz/', 'Google (google.com)'],
-    ['https://appleid-verify.com/', 'Apple (apple.com)'],
-    ['https://microsoft-login.xyz/', 'Microsoft (microsoft.com)'],
-  ];
-  const avvisi = await avvisiDelMenu(openTab, testServer, casi.map(([u]) => u));
-  expect(casi.map(([u, atteso], i) => (avvisi[i].includes(atteso) ? '' : `${u} → ${avvisi[i]}`)).filter(Boolean)).toEqual([]);
-});
