@@ -522,18 +522,18 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   const co = hasLocal ? g(['checkout', branch]) : g(['checkout', '-B', branch, `origin/${branch}`]);
   if (!co.ok) return { ok: false, kind: 'transient', message: `checkout di ${branch} fallito: ${co.out.slice(0, 200)}` };
 
-  // Bersaglio del ripristino: l'ultimo punto fermo se lo conosciamo e se è
-  // raggiungibile; altrimenti lo stato remoto del branch (che È la consegna).
   // NB: senza punto fermo NON si torna a main — su un branch di revisione il
   // contenuto consegnato è tutto ciò che abbiamo.
   const tip = hasRemote ? g(['rev-parse', `origin/${branch}`]) : null;
   const remoteTip = tip && tip.ok ? tip.out : '';
   let target = commitExists(g, checkpoint) ? checkpoint : null;
-  // Un punto fermo fuori dalla linea della punta pubblicata è di una storia riscritta altrove (un riallineamento):
-  // vince la punta. Antenato della punta resta il caso dell'interruzione (#507), discendente è lavoro non spedito (#1486).
+  // La punta pubblicata è l'ultima consegna, da qualunque cartella sia partita: il punto fermo locale vince solo se
+  // è lei o sta più avanti (sigillato e non spedito, #1486). Più vecchio è di un giro passato altrove (D-207), fuori
+  // dalla sua linea è di una storia riscritta da un riallineamento: in tutti e due i casi si parte dalla punta.
   let rewritten = null;
-  if (target && remoteTip && !sullaStessaLinea(g, target, remoteTip)) {
-    rewritten = target;
+  let superato = null;
+  if (target && remoteTip && target !== remoteTip && !antenato(g, remoteTip, target)) {
+    if (antenato(g, target, remoteTip)) superato = target; else rewritten = target;
     target = remoteTip;
   }
   if (!target) target = remoteTip || headSha(root);
@@ -541,7 +541,8 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
 
   const before = headSha(root);
   let discarded = null;
-  if (before && before !== target) {
+  // Una cartella rimasta indietro avanza e basta: di lato vanno solo i commit che il bersaglio non contiene.
+  if (before && before !== target && !antenato(g, before, target)) {
     // I commit scartati NON si distruggono: sono la traccia con cui si
     // ricostruisce cosa è successo. Si spostano di lato su un branch di
     // servizio (pushato se possibile) e solo allora si riporta indietro.
