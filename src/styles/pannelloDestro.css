@@ -161,7 +161,8 @@ html.pd-bloccato .pd-pannello {
 .pd-voce:hover, .pd-voce:focus-visible { background: var(--sn-hover); border-color: rgba(var(--sn-accent-rgb), 0.45); outline: none; }
 .pd-voce-icona { flex: 0 0 auto; display: inline-flex; color: var(--sn-accent); }
 .pd-voce-icona svg { width: 16px; height: 16px; }
-.pd-voce-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+/* Un nome lungo va a capo invece di tagliarsi: «Dimensione…» non dice quale strumento è. */
+.pd-voce-nome { min-width: 0; overflow-wrap: break-word; line-height: 1.25; font-size: 12px; }
 .pd-catalogo-pieno { grid-column: 1 / -1; color: var(--sn-muted); font-size: 12px; text-align: center; padding: 4px 0; }
 
 .pd-fantasma {
