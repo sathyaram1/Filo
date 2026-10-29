@@ -190,6 +190,11 @@
     return true;
   }
 
+  // Il «Salta» premuto da Filo che se ne va: la pubblicità è saltata, e i contatori lo sanno (#1473). Solo il nome.
+  function saltata() {
+    send({ type: MSG.CONTATORI_EVENTO || 'contatori_evento', misura: 'automatismo', tipo: 'pubblicita_saltata' });
+  }
+
   function pianifica(ms) {
     if (timer || !seguiti.size) return;
     timer = setTimeout(giro, ms);
@@ -201,8 +206,9 @@
     const ora = Date.now();
     let visibili = 0;
     for (const [el, s] of seguiti) {
-      if (!el.isConnected) { seguiti.delete(el); continue; }
+      if (!el.isConnected) { if (s.visibile && s.tentativi > 0) saltata(); seguiti.delete(el); continue; }
       if (!premibile(el)) {
+        if (s.visibile && s.tentativi > 0) saltata();
         s.visibile = false;
         if (ora - s.visto > SEGUI_NASCOSTO_MS) seguiti.delete(el);
         continue;

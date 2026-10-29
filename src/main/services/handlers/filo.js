@@ -677,6 +677,8 @@ module.exports = function register(on, ctx) {
     if (!Onboarding) return { ok: false, error: 'onboarding non disponibile' };
     const prev = await FiloMem.getOnboarding();
     const base = msg?.riprendi === true ? Onboarding.riprendi(prev) : Onboarding.restart(prev);
+    // Rifatta da capo (#1473): «Riprendiamola» continua quella che c'era, e non è una riapertura.
+    if (msg?.riprendi !== true) require('../contatoriHomePagina').misura('intervistaRiaperta');
     const state = await saveOnboarding(base.thread.length
       ? base
       : Onboarding.appendTurn(base, { role: 'filo', text: Onboarding.WELCOME_MESSAGE }));
@@ -799,7 +801,12 @@ module.exports = function register(on, ctx) {
 
   // F4 — l'avviso della segnalazione automatica: mai da un sito, e solo per una partita da qui (#784.3, #784.6).
   const AttesaAutoFeedback = require('../autoFeedbackAttesa');
-  on(MSG.CANCEL_AUTO_FEEDBACK, soloSuperficiDiFilo(async (msg) => AttesaAutoFeedback.annulla(String(msg && msg.id || '').trim())));
+  on(MSG.CANCEL_AUTO_FEEDBACK, soloSuperficiDiFilo(async (msg) => {
+    const r = await AttesaAutoFeedback.annulla(String(msg && msg.id || '').trim());
+    // Ritirata davvero: la segnalazione automatica disfatta (#1473). Quella arrivata tardi resta fatta.
+    if (r && r.ok) require('../contatoriHomePagina').misura('disfatto', 'segnalazione_automatica');
+    return r;
+  }));
   on(MSG.AUTO_FEEDBACK_PARTI, soloSuperficiDiFilo(async (msg) => (AttesaAutoFeedback.parti(String(msg && msg.id || '').trim())
     ? { ok: true } : { ok: false, error: 'non è una segnalazione partita da qui' })));
 };

@@ -1345,6 +1345,8 @@
   async function inviaComposto(c, { daModello = false, bolla = null } = {}) {
     sending = true;
     scrittoQui = true;
+    Comandi.lasciaNonRisolto();
+    Coda.fineRisali();
     // Chi scrive altro dopo aver fermato non vuole più riprendere: l'offerta finisce qui.
     chiudiRipresa();
     aggiornaTasto();
@@ -1987,6 +1989,8 @@
   });
   // Quello che la barra fa da sé, senza il modello: vero se l'ha fatto.
   async function comandoLocale(text, { incollato = false } = {}) {
+    Comandi.lasciaNonRisolto();
+    Coda.fineRisali();
     // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
     // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
     // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
@@ -1996,7 +2000,10 @@
       const resolves = host ? await Comandi.ensureSiteResolved(host) : true;
       if (resolves === false) { Comandi.updateInputClass(); Comandi.showUnresolvedSite(text, host); return true; }
     }
-    return Comandi.handleSlashCommand(text, { incollato });
+    const fatto = await Comandi.handleSlashCommand(text, { incollato });
+    // Chi la chiama, se non è un comando, la manda al modello: un «/qualcosa» che non è niente parte così (#1473).
+    if (!fatto && text.startsWith('/')) Comandi.contaComando('sconosciuto_inviato');
+    return fatto;
   }
 
   // Invio manda, Shift+Invio va a capo: il campo è una textarea, quindi Invio di suo andrebbe a
@@ -2804,6 +2811,7 @@
   // all'avvio successivo (main.js → sweepPendingChats), che chiude e classifica
   // le chat rimaste appese.
   self.addEventListener('pagehide', () => {
+    try { Comandi.lasciaNonRisolto(); Coda.fineRisali(); } catch (_) {}
     try {
       // Mentre l'intervista di benvenuto è in corso la scheda che sparisce non
       // chiude niente: l'intervista riprende dov'era alla prossima apertura, e

@@ -1371,6 +1371,43 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // La home e quello che Filo fa da sé sulla pagina in un'ora dei contatori (#1473), per nome da elenchi chiusi: i
+    // comandi della barra della home, le ricerche nel filo (risultati, tipo e posto di quello aperto, quanto per
+    // aprirlo, in fasce), i «risali» di fila, l'intervista rifatta dalle Preferenze e il passo dove si ferma, le
+    // proposte sulla pagina per tipo ed esito, gli automatismi fatti e disfatti. Mai un testo, un sito o un paese.
+    // Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle espressioni; le stesse
+    // regole: sola creazione, senza login, forma fissa, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatoriHomePagina.test.mjs.
+    match /contatori-home-pagina/{docId} {
+      function conti(m, chiavi, tettoChiavi, tetto) {
+        return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
+          && m.values().join('#').size() <= tetto && m.values().join('#').matches('^([0-9]{1,9}(#[0-9]{1,9})*)?$');
+      }
+      function contatoriHomePagina(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'comando_home', 'ricerca_home', 'risali', 'intervista_rifatta', 'proposta_sulla_pagina', 'automatismo_fatto', 'automatismo_disfatto'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'comando_home', 'ricerca_home', 'risali', 'intervista_rifatta', 'proposta_sulla_pagina', 'automatismo_fatto', 'automatismo_disfatto'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && conti(d.comando_home, '^(((home|clear|clear_all|kill|newtab|models|modelli|sicurezza|preferenze|editor|feedback|pulisci|pulizia|riordina|set|invito|users|gift|help|sito_diretto|shell|sconosciuto_inviato)|sito_non_risolto[:](apri_lo_stesso|lascia))(#((home|clear|clear_all|kill|newtab|models|modelli|sicurezza|preferenze|editor|feedback|pulisci|pulizia|riordina|set|invito|users|gift|help|sito_diretto|shell|sconosciuto_inviato)|sito_non_risolto[:](apri_lo_stesso|lascia)))*)?$', 600, 500)
+          && conti(d.ricerca_home, '^((risultati[:](r0|r1_3|r4_10|oltre)|aperto[:](messaggio|pagina|scheda_chiusa|conversazione_nascosta)[:](p1|p2_3|p4_10|oltre)[:](ms500|s1|s2|s5|s10|s30|oltre)|vuota_ripetuta)(#(risultati[:](r0|r1_3|r4_10|oltre)|aperto[:](messaggio|pagina|scheda_chiusa|conversazione_nascosta)[:](p1|p2_3|p4_10|oltre)[:](ms500|s1|s2|s5|s10|s30|oltre)|vuota_ripetuta))*)?$', 7000, 2400)
+          && conti(d.risali, '^((n1|n2_3|n4_10|oltre)(#(n1|n2_3|n4_10|oltre))*)?$', 100, 100)
+          && conti(d.intervista_rifatta, '^((riaperta|fine[:][a-z][a-z0-9_]{0,29})(#(riaperta|fine[:][a-z][a-z0-9_]{0,29}))*)?$', 1440, 400)
+          && conti(d.proposta_sulla_pagina, '^(((apri_da_altro_paese|email_account|riquadro_rotto|resta_connesso)[:](accettata|rifiutata|spenta_per_sempre|ignorata)|email_account[:]accettata[:](clic|tastiera|menu))(#((apri_da_altro_paese|email_account|riquadro_rotto|resta_connesso)[:](accettata|rifiutata|spenta_per_sempre|ignorata)|email_account[:]accettata[:](clic|tastiera|menu)))*)?$', 1200, 400)
+          && conti(d.automatismo_fatto, '^((banner_cookie|zoom_ricordato|segnalazione_automatica|pubblicita_saltata)(#(banner_cookie|zoom_ricordato|segnalazione_automatica|pubblicita_saltata))*)?$', 200, 100)
+          && conti(d.automatismo_disfatto, '^((banner_cookie|zoom_ricordato|segnalazione_automatica)(#(banner_cookie|zoom_ricordato|segnalazione_automatica))*)?$', 200, 100);
+      }
+      allow get, list: if isAdmin();
+      allow create: if contatoriHomePagina(request.resource.data);
+      allow update, delete: if false;
+    }
+
     // Le manopole dei crediti (euro per credito, ingresso, quota, inviti
     // rimasti, tetto globale) più cambio e somma dei tetti scritti dal server.
     // Campi non enumerati, come gli altri config/*: aggiungerne uno non

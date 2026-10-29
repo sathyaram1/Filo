@@ -5,6 +5,7 @@
 const path = require('node:path');
 const { BrowserWindow, webContents: WebContents } = require('electron');
 const { collegaScorciatoie } = require('./shortcuts');
+const ContatoriHomePagina = require('./services/contatoriHomePagina');
 require('../shared/campoAccesso.js');
 
 const C = globalThis.SN_CAMPO_ACCESSO;
@@ -114,6 +115,7 @@ class PropostaEmail {
   campo(wc, frame, d, { email, tema, incognito = false }) {
     if (this._vecchio(d)) return;
     if (!this._suo(wc, frame, d.campo)) {
+      this._lascia(this.c);
       this.c = { wc, frame, origine: origineDi(frame), campo: d.campo, chiusa: false, evidenziata: false, armataDa: 0, incognito };
       this._segui(wc);
     }
@@ -171,8 +173,22 @@ class PropostaEmail {
   }
 
   fine() {
+    this._lascia(this.c);
     this.c = null;
     this._nascondi();
+  }
+
+  // I contatori (#1473): una proposta per campo finché non ha la sua risposta; tornata dopo Esc è un'altra. Quella
+  // rimasta a metà (il campo lasciato, la pagina cambiata, un altro campo) è ignorata.
+  _contaMostrata(c) {
+    if (!c._proposte) c._proposte = {};
+    ContatoriHomePagina.misura('propostaMostrata', c._proposte, 'email_account', { incognito: !!c.incognito });
+  }
+  _contaRisposta(c, esito, come = '') {
+    if (c && c._proposte) ContatoriHomePagina.misura('propostaRisposta', c._proposte, 'email_account', esito, { come });
+  }
+  _lascia(c) {
+    if (c && c._proposte) ContatoriHomePagina.misura('proposteVia', c._proposte);
   }
 
   inCima() {
@@ -242,6 +258,7 @@ class PropostaEmail {
       vista.setVisible(true);
       this.mostrata = true;
       c.armataDa = Date.now();
+      this._contaMostrata(c);
     } else if (prima && (Math.abs(prima.x - b.x) > 4 || Math.abs(prima.y - b.y) > 4)) {
       c.armataDa = Date.now();
     }
@@ -274,7 +291,7 @@ class PropostaEmail {
     if (k === 'ArrowDown') this._evidenzia(true);
     else if (k === 'ArrowUp' && this.c.evidenziata) this._evidenzia(false);
     else if (k === 'Enter' && this.c.evidenziata) this._scegli('tastiera');
-    else if (k === 'Escape') { this.c.chiusa = true; this.posa(); } else return false;
+    else if (k === 'Escape') { this._contaRisposta(this.c, 'rifiutata'); this.c.chiusa = true; this.posa(); } else return false;
     this.ingoiati.add(k);
     return true;
   }
@@ -288,6 +305,7 @@ class PropostaEmail {
     if (!email || email !== c.email) { this.fine(); return; }
     if (!frameVivo(c.frame) || origineDi(c.frame) !== c.origine) { this.fine(); return; }
     try { c.frame.send('filo:broadcast', { type: RIEMPI(), campo: c.campo, email }); } catch (_) { this.fine(); return; }
+    this._contaRisposta(c, 'accettata', come);
     c.valore = email;
     c.digitato = true;
     this.posa();
@@ -306,7 +324,7 @@ class PropostaEmail {
     ], b.x + coord(d.x), b.y + coord(d.y), (scelta) => {
       this.menuPer = null;
       if (scelta === '@action:proposta-email:inserisci' && this.c === c) this._scegli('menu');
-      else if (scelta === '@action:proposta-email:spegni') spegni(this.win);
+      else if (scelta === '@action:proposta-email:spegni') { this._contaRisposta(c, 'spenta_per_sempre'); spegni(this.win); }
     });
     Menu.quandoChiuso(this.win, () => {
       if (this.menuPer !== c) return;

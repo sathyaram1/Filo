@@ -1,5 +1,5 @@
-// I contatori anonimi (#969, #1461, #1463, #1464, #1465, #1466, #1467, #1469, #1471, #1474): misura usi e chiamate dei modelli, azioni,
-// chat, attività, navigazione, riquadri, gesti, sicurezza e guasti di elenco chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito
+// I contatori anonimi (#969, #1461, #1463, #1464, #1465, #1466, #1467, #1469, #1471, #1473, #1474): misura usi e chiamate dei modelli, azioni,
+// chat, attività, navigazione, riquadri, gesti, sicurezza, home e automatismi e guasti di elenco chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito
 // e a contatori spenti non conta e non spedisce; spenti, butta quello che aveva, senza un ultimo segnale. Cosa esce: src/shared/contatoriGiornalieri.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
@@ -89,6 +89,7 @@ function crea(dip = {}) {
   const C = dip.contatori || globalThis.SN_CONTATORI;
   const F = dip.contatoriFinestra || globalThis.SN_CONTATORI_FINESTRA || null;
   const S = dip.contatoriSicurezza || globalThis.SN_CONTATORI_SICUREZZA || null;
+  const H = dip.contatoriHomePagina || globalThis.SN_CONTATORI_HOME_PAGINA || null;
   const disco = () => require('../shim/storage');
   const storage = dip.storage || globalThis.SN_STORAGE;
   const impostazioni = dip.impostazioni || (() => storage.getSettings());
@@ -798,14 +799,40 @@ function crea(dip = {}) {
     inCorso.set(chiave, { misura, info });
     return true;
   }
+  // Un conto di un'altra famiglia ancora aperto in una pagina (#1473: i «risali» di fila, il sito non trovato): `fine` lo
+  // conta, e rende la scrittura perché l'uscita la aspetti.
+  function sospesaInCorso(chiave, fine) {
+    if (typeof fine !== 'function' || inIncognito()) { inCorso.delete(chiave); return false; }
+    if (!inCorso.has(chiave) && inCorso.size >= TETTO_IN_CORSO) inCorso.delete(inCorso.keys().next().value);
+    inCorso.set(chiave, { fine });
+    return true;
+  }
+  function haInCorso(chiave) { return inCorso.has(chiave); }
   // La pagina l'ha chiusa lei, e conta da sé: quella in attesa non vale più.
   function finitaInCorso(chiave) { inCorso.delete(chiave); }
+  function contaInCorso(v) {
+    if (typeof v.fine !== 'function') { attivita(v.misura, v.info, { incognito: false }); return; }
+    let p = null;
+    try { p = v.fine(); } catch (_) { p = null; }
+    if (!p || typeof p.then !== 'function') return;
+    const q = Promise.resolve(p).catch(() => {});
+    inVolo.add(q);
+    q.finally(() => inVolo.delete(q));
+  }
+  // La pagina dice che è finita: si conta adesso, una volta. Falso se non c'era niente in attesa.
+  function chiudiUnaInCorso(chiave) {
+    const v = inCorso.get(chiave);
+    if (!v) return false;
+    inCorso.delete(chiave);
+    contaInCorso(v);
+    return true;
+  }
   // La pagina se n'è andata senza dirlo: si contano le sue, com'erano all'ultimo aggiornamento.
   function chiudiInCorso(prefisso) {
     for (const [k, v] of [...inCorso]) {
       if (!k.startsWith(prefisso)) continue;
       inCorso.delete(k);
-      attivita(v.misura, v.info, { incognito: false });
+      contaInCorso(v);
     }
   }
   // Filo che si chiude: le attività aperte si contano, e lo stato va sul disco prima dell'uscita. Null: niente da fare.
@@ -864,23 +891,31 @@ function crea(dip = {}) {
   }
 
   // Ogni scrittura dell'intervista: aperta resta col passo dove si trova; chiusa si dimentica. Chi la lascia lì senza
-  // chiuderla la ritrova `giro`, un giorno dopo.
-  async function intervistaToccata(passo, chiusa) {
+  // chiuderla la ritrova `giro`, un giorno dopo. `daCapo`: rifatta dalle Preferenze, che si conta a parte (#1473);
+  // `inizio`: quando è cominciata, perché l'abbandono già contato di quella di prima non valga per la nuova.
+  async function intervistaToccata(passo, chiusa, { daCapo = false, inizio = '' } = {}) {
     if (inIncognito() || !(await accesi())) return;
     await carica();
     const prima = stato.intervista;
-    stato.intervista = chiusa ? null : { passo: String(passo || ''), t: adesso(), contato: Boolean(prima && prima.contato) };
+    const stessa = !prima || !prima.inizio || !inizio || prima.inizio === String(inizio);
+    stato.intervista = chiusa ? null : {
+      passo: String(passo || ''), t: adesso(), contato: Boolean(prima && prima.contato && stessa),
+      ...(inizio ? { inizio: String(inizio) } : {}), ...(daCapo ? { daCapo: true } : {}),
+    };
     salvaPresto();
   }
   // Chiusa a metà con «Salta», una frase di stop o il tetto: l'abbandono, se non l'ha già contato un giorno di fermo.
-  function intervistaAbbandonata(passo) {
+  function intervistaAbbandonata(passo, { daCapo = false } = {}) {
     if (stato && stato.intervista && stato.intervista.contato) return false;
-    return intervista(passo, 'abbandono');
+    if (!daCapo) return intervista(passo, 'abbandono');
+    if (!H || !H.passi().includes(passo)) return false;
+    conta((ora) => H.registraIntervistaFine(ora, passo)).catch(() => {});
+    return true;
   }
   function abbandonoPerFermo() {
     const iv = stato.intervista;
     if (!oggetto(iv) || iv.contato || !C.passiIntervista().includes(iv.passo) || !(adesso() - Number(iv.t) >= INTERVISTA_FERMA_MS)) return;
-    C.registraIntervista(oraCorrente(), iv.passo, 'abbandono');
+    if (iv.daCapo) { if (H) H.registraIntervistaFine(oraCorrente(), iv.passo); } else C.registraIntervista(oraCorrente(), iv.passo, 'abbandono');
     iv.contato = true;
   }
 
@@ -965,8 +1000,9 @@ function crea(dip = {}) {
     return conta(scrivi, { incognito }).catch(() => false);
   }
   function primaDiOgniScrittura(fn) { if (typeof fn === 'function') primaDiScrivere.push(fn); }
-  // La sicurezza (#1474) entra dalla stessa porta.
+  // La sicurezza (#1474), la home e gli automatismi sulla pagina (#1473) entrano dalla stessa porta.
   const sicurezza = finestra;
+  const homePagina = finestra;
 
   // ── I gesti della personalizzazione (#1471) ─────────────────────────────
   // `dati` può venire da una pagina: ne passano solo le chiavi e le voci dei suoi elenchi.
@@ -1199,6 +1235,7 @@ function crea(dip = {}) {
       const accanto = giorno ? [] : documentiAccanto(k, { ...base, chiave: k });
       const diFinestra = giorno ? null : documentoFinestra(k, { ...base, chiave: k });
       const diSicurezza = giorno ? null : documentoSicurezza(k, { ...base, chiave: k });
+      const diHomePagina = giorno ? null : documentoHomePagina(k, { ...base, chiave: k });
       const gesti = giorno ? null : documentoGesti(k, { ...base, chiave: k });
       const riquadri = giorno ? null : documentoRiquadri(k, { ...base, chiave: k });
       // La chat della stessa ora parte nel suo documento, dopo l'ora (#1463). Rifiutata, l'ora resta: rispedita, quella
@@ -1229,6 +1266,10 @@ function crea(dip = {}) {
         if (mia !== generazione) return 'spenti';
       }
       // Per ultimi: finché le regole pubblicate non conoscono la loro collezione, il rifiuto non tiene indietro gli altri.
+      if (r.ok && diHomePagina) {
+        r = await spedisci(diHomePagina, H.COLLEZIONE);
+        if (mia !== generazione) return 'spenti';
+      }
       if (r.ok && riquadri) {
         r = await spedisci(riquadri, C.COLLEZIONE_RIQUADRI);
         if (mia !== generazione) return 'spenti';
@@ -1304,6 +1345,17 @@ function crea(dip = {}) {
     const v = C.validaRiquadri(d);
     if (v.ok) return d;
     log(`i riquadri di ${k} non partono: ${v.motivo}`);
+    return null;
+  }
+
+  // La home e gli automatismi di un'ora (#1473), se ne ha: come la finestra.
+  function documentoHomePagina(k, base) {
+    if (!H) return null;
+    const d = H.documento(base);
+    if (H.senzaDati(d)) return null;
+    const v = H.valida(d);
+    if (v.ok) return d;
+    log(`la home e gli automatismi di ${k} non partono: ${v.motivo}`);
     return null;
   }
 
@@ -1514,10 +1566,11 @@ function crea(dip = {}) {
   return {
     apri, unUso, parteDiUnUso, servitaDaCache, usoDallaPagina, azione, azioneMisurata, impostazioniCambiate, ricerca,
     proposta, anticipoPronto, anticipoAperto, chiesto, adattamento, attivita, apertaInCorso, finitaInCorso, chiudiInCorso,
+    sospesaInCorso, haInCorso, chiudiUnaInCorso,
     congeda, riaperta, memoriaCorretta, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa,
     confermaChiesta, confermaRisposta,
     navigazione, riquadro, allUscita,
-    azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, sicurezza, primaDiOgniScrittura, gesto, disposizioneIcone, cambioRitirato,
+    azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, sicurezza, homePagina, primaDiOgniScrittura, gesto, disposizioneIcone, cambioRitirato,
     turnoChat, reazione, copia: copiaDaBolla, chatChiusa, chatClassificata, chatInUscita, uscitaFinita, usciteInSospeso,
     controlla, avvia, seguiImpostazioni, installazioni, somme, accesi, letto, salva, alChiudere,
     passoAvvio, passoAvvioFino, processoMorto, eccezione, ipcSincrono, aggiornamento, seguiFinestra, sessione,

@@ -34,6 +34,11 @@
   let runShellCommand = async () => false;
   let rimettiNellaBarra = () => {};
 
+  // I contatori della barra (#1473): il nome del comando o la strada, mai quello che si è scritto dopo.
+  function contaComando(cosa, scelta = '') {
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'comando-home', cosa, ...(scelta ? { scelta } : {}) })).catch(() => {}); } catch (_) {}
+  }
+
   // Vero se l'account loggato è l'owner (admin): abilita i comandi /users e
   // /gift in /help. Il gate forte resta nel main (auth.isAdmin) e sul server.
   let isOwner = false;
@@ -571,6 +576,13 @@
   // lascia comunque aprire con un clic, invece di rifiutare in silenzio.
   // Il testo resta nel campo: se era un typo, si corregge senza riscriverlo.
   let unresolvedLine = null; // { el, host } dell'ultimo avviso ancora non agito
+  // L'avviso che aspetta ancora una scelta per i contatori (#1473): l'invio dopo, o la pagina che se ne va, lo lascia.
+  let nonRisoltoInAttesa = null;
+  function lasciaNonRisolto() {
+    if (!nonRisoltoInAttesa) return;
+    nonRisoltoInAttesa = null;
+    contaComando('sito_non_risolto', 'lascia');
+  }
   function showUnresolvedSite(text, host) {
     // Un secondo invio dello STESSO indirizzo non impila avvisi identici. Uno su
     // un indirizzo diverso, o uno già agito ("Apri comunque"), resta in chat: è
@@ -596,6 +608,7 @@
     btn.addEventListener('click', () => {
       btn.disabled = true;
       if (unresolvedLine && unresolvedLine.el === bubble) unresolvedLine = null;
+      if (nonRisoltoInAttesa === bubble) { nonRisoltoInAttesa = null; contaComando('sito_non_risolto', 'apri_lo_stesso'); }
       // L'utente ha deciso: da qui in poi quell'host non viene più messo in
       // dubbio (niente rosso, niente avviso al prossimo invio).
       siteResolveCache.set(host, true);
@@ -608,6 +621,9 @@
     bubblesEl.appendChild(bubble);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     unresolvedLine = { el: bubble, host };
+    lasciaNonRisolto();
+    nonRisoltoInAttesa = bubble;
+    contaComando('sito_non_risolto', 'in_attesa');
   }
 
   // Come sopra ma con debounce, per la verifica live mentre si scrive: parte
@@ -652,6 +668,8 @@
     // Invio: quello che il comando dirà fra dieci secondi appartiene a questa
     // chat anche se intanto l'utente è tornato alla home.
     if (handler) {
+      const chiave = SLASH_COMMANDS[text] ? text : firstToken;
+      if (chiave !== '/incognito') contaComando(chiave);
       handler(text, chatDellaRiga());
       inputEl.value = ''; autoGrowInput(); updateInputClass(); return true;
     }
@@ -661,6 +679,7 @@
     //    indirizzi — SN_URL_NAV.normalizeUrl (#398) — così "/localhost:3000" o
     //    "/192.168.1.1" si aprono davvero invece di partire su un https vuoto.
     if (isSiteToken(text)) {
+      contaComando('sito_diretto');
       send({ type: MSG.OPEN_URL, url: siteUrlOf(text), parole: [text] });
       inputEl.value = '';
       autoGrowInput();
@@ -679,6 +698,7 @@
       // Passa dai livelli di autonomia: se la persona dice no, il comando torna nella barra com'era.
       const partito = await runShellCommand(text.slice(1).trim(), chat, { daFuori: incollato });
       if (partito === false) rimettiNellaBarra(text, incollato);
+      else contaComando('shell');
       return true;
     }
     // 4) Modalità normale, comando `/` sconosciuto: lascialo all'LLM (storico).
@@ -720,6 +740,8 @@
     siteUrlOf,
     ensureSiteResolved,
     showUnresolvedSite,
+    lasciaNonRisolto,
+    contaComando,
     showFiloLine,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

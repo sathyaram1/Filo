@@ -268,6 +268,8 @@
       ...(Number(s.scambiPrima) > 0 ? { scambiPrima: Math.floor(Number(s.scambiPrima)) } : {}),
       // Rifatta o ripresa: non è più il primo avvio, e la home la mostra solo nelle pagine che l'hanno chiesta (#1297).
       ...(s.rifatta === true ? { rifatta: true } : {}),
+      // Rifatta da capo dalle Preferenze, anche se poi ripresa: i contatori la tengono fuori da quelli della prima volta.
+      ...(s.daCapo === true ? { daCapo: true } : {}),
     };
   }
 
@@ -340,7 +342,7 @@
         thread: cur.thread,
       }].slice(-PAST_CAP)
       : cur.past;
-    return { ...emptyState(), past, startedAt: at, rifatta: true };
+    return { ...emptyState(), past, startedAt: at, rifatta: true, daCapo: true };
   }
 
   // «Riprendiamola» (#1297): l'intervista chiusa a metà si riapre dov'era, con le spunte e la stessa targa. Il congedo
@@ -398,7 +400,7 @@
     const cur = normalize(state);
     return cur.done
       ? { ...emptyState(), done: true, closedAt: cur.closedAt }
-      : { ...emptyState(), ...(cur.rifatta ? { rifatta: true } : {}) };
+      : { ...emptyState(), ...(cur.rifatta ? { rifatta: true } : {}), ...(cur.daCapo ? { daCapo: true } : {}) };
   }
 
   // Le interviste conservate, dalla più recente: la corrente (appena ha una conversazione) e

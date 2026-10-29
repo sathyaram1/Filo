@@ -111,13 +111,21 @@ test('su YouTube il «Salta» si preme da solo appena compare, con un clic vero'
   await expect(page.locator('#movie_player')).not.toHaveClass(/ad-showing/);
 });
 
-test('una serie di pubblicità: il «Salta» che ricompare si preme di nuovo', async ({ openTab, testServer, suYouTube }) => {
+// I contatori (#1473): una pubblicità saltata da Filo si conta una volta, quando il suo «Salta» se ne va.
+const saltateOggi = (app) => app.evaluate(async () => {
+  const s = await globalThis.SN_CONTATORI_MAIN.letto();
+  return Object.values(s.ore || {}).reduce((n, o) => n + ((((o.homePagina || {}).automatismo_fatto) || {}).pubblicita_saltata || 0), 0);
+});
+
+test('una serie di pubblicità: il «Salta» che ricompare si preme di nuovo', async ({ app, openTab, testServer, suYouTube }) => {
   const page = await apri(openTab, suYouTube(testServer.html(lettore())));
   await expect.poll(async () => (await stato(page)).saltata, { timeout: 5_000 }).toBe(true);
+  await expect.poll(() => saltateOggi(app), { timeout: 5_000 }).toBe(1);
   await page.evaluate(() => { window.__saltata = false; window.__mostra(); });
   await expect.poll(async () => (await stato(page)).saltata, { timeout: 5_000 }).toBe(true);
   const s = await stato(page);
   expect(s.clic.filter((c) => c.vero).length).toBe(2);
+  await expect.poll(() => saltateOggi(app), { timeout: 5_000 }).toBe(2);
 });
 
 test('con la pagina ingrandita il clic vero cade ancora sul «Salta»', async ({ app, openTab, testServer, suYouTube }) => {

@@ -17,6 +17,37 @@
   function contaRicerca(evento) {
     try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura: 'ricerca', pannello: 'cerca-filo', ...evento })).catch(() => {}); } catch (_) {}
   }
+  // La ricerca nei propri dati, per i contatori della home (#1473): quanti risultati, quale si apre, a che posto e dopo
+  // quanto. Le parole cercate restano qui, e nemmeno la loro lunghezza esce.
+  const H = () => global.SN_CONTATORI_HOME_PAGINA || { RIPETUTA_MS: 10000, ASSESTATA_MS: 800 };
+  let corrente = null;
+  let ultimaVuota = 0;
+  let assestata = null;
+  function contaHome(misura, campi) {
+    try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura, ...campi })).catch(() => {}); } catch (_) {}
+  }
+  function contaCorrente() {
+    clearTimeout(assestata);
+    const c = corrente;
+    if (!c || c.contata) return;
+    c.contata = true;
+    const ripetuta = ultimaVuota > 0 && c.t - ultimaVuota <= H().RIPETUTA_MS;
+    ultimaVuota = c.n === 0 ? c.t : 0;
+    contaHome('ricerca-home', { risultati: c.n, ...(ripetuta ? { ripetuta: true } : {}) });
+  }
+  // `n`: i risultati a schermo. La stessa ricerca ridisegnata (il fuoco che torna nel campo) non è una ricerca nuova.
+  function nuovaCorrente(q, n) {
+    clearTimeout(assestata);
+    if (corrente && !corrente.contata && corrente.q !== q) corrente = null;
+    const stessa = corrente && corrente.q === q;
+    corrente = { q, n, t: Date.now(), contata: !!(stessa && corrente.contata) };
+    if (!corrente.contata) assestata = setTimeout(contaCorrente, H().ASSESTATA_MS);
+  }
+  function tipoDi(r) {
+    if (r.k === 'nascosta') return 'conversazione_nascosta';
+    if (r.k === 'pagina') return r.archivio ? 'scheda_chiusa' : 'pagina';
+    return 'messaggio';
+  }
 
   function icona(nome, size = 14) {
     const I = global.SN_ICONS;
@@ -37,6 +68,7 @@
   }
 
   function chiudi({ svuota = false } = {}) {
+    contaCorrente();
     if (sessione && !sessione.scelto) contaRicerca({ esito: 'vuota' });
     sessione = null;
     pannello.hidden = true;
@@ -77,10 +109,15 @@
 
   async function apri(r) {
     if (r.k === 'significato') return significato(r);
+    const i = voci.findIndex((v) => v._risultato === r);
     if (sessione) {
-      const i = voci.findIndex((v) => v._risultato === r);
       contaRicerca({ esito: 'scelta', attesaMs: Date.now() - sessione.t0, posizione: i >= 0 ? i + 1 : null });
       sessione.scelto = true;
+    }
+    if (corrente && i >= 0) {
+      const c = corrente;
+      contaCorrente();
+      contaHome('ricerca-home-aperta', { tipo: tipoDi(r), posizione: i + 1, ms: Date.now() - c.t });
     }
     if (r.k === 'nascosta') return rimetti(r);
     if (r.k === 'pagina') {
@@ -190,6 +227,7 @@
     }
     pannello.hidden = false;
     campo.setAttribute('aria-expanded', 'true');
+    nuovaCorrente(q, voci.filter((b) => b._risultato && b._risultato.k !== 'significato').length);
     if (!sessione) {
       sessione = { t0: Date.now(), scelto: false };
       contaRicerca({ esito: 'aperta' });
@@ -211,6 +249,8 @@
     const mio = ++giro;
     const res = await d.send({ type: MSG.FILO_CERCA, nascoste: 'tutte' });
     if (mio !== giro || !res || !res.ok) return;
+    contaCorrente();
+    corrente = null;
     const tutte = Array.isArray(res.nascoste) ? res.nascoste : [];
     pannello.replaceChildren();
     voci = [];
@@ -243,7 +283,7 @@
     const r = b._risultato;
     if (r.k === 'nascosta') {
       return [
-        { type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', azione: 'chat-archive', onClick: () => { rimetti(r).catch(() => {}); } },
+        { type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', azione: 'chat-archive', onClick: () => { apri(r).catch(() => {}); } },
         { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
       ];
     }
