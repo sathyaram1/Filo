@@ -145,9 +145,8 @@ function registerIpcHandlers() {
       if (fr ? !fr.parent : !(opts && opts.riquadro)) { event.returnValue = conCanale(F.configForHref(href, ambito), href); return; }
       const catena = [];
       for (let f = fr; f; f = f.parent) catena.push(String(f.url || ''));
-      // Anche a un riquadro esente: dice a chi lo contiene che lì il preload gira, e non va preparato da fuori.
       const web = catena.find((u) => /^https?:/i.test(u)) || '';
-      event.returnValue = { ...(catena.length > 1 ? conCanale(F.configForFrames(catena, ambito), web) : { level: 0, seed: 0 }), canale: CANALE_FP };
+      event.returnValue = catena.length > 1 ? conCanale(F.configForFrames(catena, ambito), web) : { level: 0, seed: 0 };
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };
     }
