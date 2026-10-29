@@ -91,7 +91,7 @@ async function apri(app, openTab, testServer, opz = {}) {
 const errore = (page, testo) => page.locator('.sn-spell-overlay .sn-errore', { hasText: testo });
 const suggerimento = (page, testo) => page.locator('.sn-spell-overlay .sn-suggerimento', { hasText: testo });
 const rapide = (app) => app.evaluate(() => globalThis.__rapide);
-const coloreDelSegno = (loc) => loc.evaluate((el) => getComputedStyle(el).textDecorationColor);
+const coloreDelSegno = async (loc) => (await stileDelSegno(loc, ['text-decoration-color']))['text-decoration-color'];
 
 async function tastoDestroSu(page, loc) {
   const b = await riquadroDelSegno(loc);
