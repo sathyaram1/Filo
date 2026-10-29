@@ -579,3 +579,20 @@ test('il nome vero col trattino si vede in ogni pezzo, non solo nel nome del sit
   }
   assert.ok(LS.analizza('https://paypal-login.appspot.com/').some((c) => c.startsWith('nome_altrui:paypal.com')));
 });
+
+// #725.8 giro 6: google.com sta anche fra i domini di Gmail, e l'avviso diceva «usa il nome di Gmail (google.com)».
+test('l’avviso nomina il marchio di cui il dominio è il sito principale, non un suo prodotto', () => {
+  for (const [u, atteso] of [
+    ['https://google-login.xyz/', 'Google (google.com)'],
+    ['https://appleid-verify.com/', 'Apple (apple.com)'],
+    ['https://microsoft-login.xyz/', 'Microsoft (microsoft.com)'],
+    ['https://www.google.com@accesso-sicuro.net/', 'Google (google.com)'],
+    ['https://icloud-verifica.com/', 'iCloud (icloud.com)'],
+    ['https://gmail-accesso.com/', 'Gmail (gmail.com)'],
+    ['https://office365-login.com/', 'Microsoft 365 (office.com)'],
+    ['https://poste.it.accesso-sicuro.net/', 'Poste Italiane (poste.it)'],
+  ]) {
+    const testo = LS.avviso(LS.analizza(u));
+    assert.ok(testo.includes(`usa il nome di ${atteso},`), `${u} → ${testo}`);
+  }
+});
