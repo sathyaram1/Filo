@@ -225,10 +225,7 @@ module.exports = function register(on, ctx) {
       // Scroll e paese come li aveva: la stessa porta di Ctrl+Shift+T, che dopo questa non la riapre di nuovo.
       const px = voce ? voce.proxy : msg && msg.proxy;
       const id = await win._filoTabs.riapri(voce ? daArchivio(voce) : daArchivio({ url, scrollPosition: msg.scrollPct, proxy: px }));
-      if (voce) win._filoTabs.segnaRiaperta(voce.id);
-      // Una scheda chiusa dal riordino e riaperta (#1470): il riordino ha sbagliato. Esce solo il tempo, in fasce.
-      if (id && voce) require('../contatoriFinestra').misura('riapertaDallArchivio', voce);
-      if (id && voce) contaRiaperta(voce, win);
+      if (id && voce) win._filoTabs.tornata(voce);
     }
     return { ok: true };
   }));
