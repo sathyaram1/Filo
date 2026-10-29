@@ -250,9 +250,10 @@ function congiunti(espr) {
   return out;
 }
 
-test('ogni campo dei metadati si legge solo dopo il suo `in`: un campo assente, sul motore vero, nega il caricamento', () => {
-  // #1728: dal 26/10 ogni allegato prendeva 403. Al motore vero un caricamento normale non porta contentEncoding,
-  // leggerlo nudo è un errore e l'errore nega; l'emulatore riempie quei campi, e lì tutto era verde.
+test('ogni campo dei metadati si legge solo dopo il suo `in`, e i campi letti sono solo chiavi e nome di scarico', () => {
+  // La guardia tiene vera la clausola sia col campo assente (all'emulatore, che metadati e nome di scarico non li
+  // scrive: letto nudo è un errore, e l'errore nega) sia col campo presente al deposito vero: là, se `in` andasse
+  // in errore, `||` lo assorbe; il primo passo di un caricamento ripristinabile, che queste guardie le aveva, passava.
   const m = /function\s+senzaMetadatiScelti\s*\(\s*(\w+)\s*,[^)]*\)\s*\{\s*return\s+([\s\S]*?);\s*\n\s*\}/.exec(VIVO);
   assert.ok(m, 'manca la funzione senzaMetadatiScelti(r, file)');
   const r = m[1];
