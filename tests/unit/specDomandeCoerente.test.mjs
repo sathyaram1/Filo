@@ -193,7 +193,7 @@ test('i guasti dell\'ambiente dei riservati vanno all\'owner, e un guasto non an
   assert.match(s43, /aperte da un biglietto di quell'ambiente vanno all'owner, comprese le sue/);
   assert.match(s43, /non anticipa mai l'istanza di chi l'ha aperto/);
   assert.match(s43, /Un guasto che va a lei le anticipa l'istanza/);
-  assert.match(sezione('### 3.1').replace(/\s+/g, ' '), /`destinatario`[^.]*altri biglietti dell'ambiente dei riservati, lei compresa: vanno all'owner/);
+  assert.match(sezione('### 3.1').replace(/\s+/g, ' '), /`destinatario`.{0,120}altri biglietti dell'ambiente dei riservati, lei compresa: vanno all'owner/);
   assert.match(sezione('### 3.8').replace(/\s+/g, ' '), /altri biglietti dell'ambiente dei riservati, lei compresa \(§ 4\.3\), va all'owner/);
   const riga = righe(sezione('### 5.2')).map(celle).find((c) => nomiFraApici(c[0]).includes('gestione_lavoro'));
   assert.match(riga[1], /domande di guasto dei biglietti fuori dall'ambiente dei riservati/);
