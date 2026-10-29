@@ -29,19 +29,25 @@ test('localhost con la porta chiesto alla chat si apre, e il suo bottone in chat
   test.setTimeout(90_000);
   const scritto = testServer.html('<title>Server di sviluppo</title><p>pronto</p>').replace('http://127.0.0.1', 'localhost');
   const pagina = `http://${scritto}`;
-  await modelloFinto(app, [{ toolCalls: [naviga('n1', scritto, 'Server di sviluppo')] }, { text: 'Fatto.' }]);
+  // Un'apertura riuscita chiude il turno senza richiamare il modello (#1130): quello che dice l'ha scritto insieme.
+  await modelloFinto(app, [{ text: 'Apro il server di sviluppo.', toolCalls: [naviga('n1', scritto, 'Server di sviluppo')] }]);
   const page = await home(app);
   await chiedi(page, `apri ${scritto}`);
 
   await expect.poll(async () => (await schede(app)).filter((u) => u === pagina).length, { timeout: 15_000 }).toBe(1);
-  await expect.poll(() => esitoPerIlModello(app, 'n1'), { timeout: 10_000 }).not.toBe('');
-  expect(await esitoPerIlModello(app, 'n1')).not.toContain('NON');
+  await expect(page.locator('.dash-bubble-filo').last()).toContainText('Apro il server di sviluppo.', { timeout: 10_000 });
 
   const bottone = page.locator('a.dash-action-link-chip');
   await expect(bottone).toHaveCount(1, { timeout: 15_000 });
   await expect(bottone).toHaveAttribute('href', pagina);
+  // La pagina l'assistente l'ha appena aperta: il bottone la riapre senza chiedere un OK «non ho potuto controllare».
+  await page.evaluate(() => {
+    window.__ok = [];
+    if (window.SN_CONFIRM_UI) window.SN_CONFIRM_UI.confirm = async (o) => { window.__ok.push(String(o && o.text)); return false; };
+  });
   await bottone.evaluate((a) => a.click());
   await expect.poll(async () => (await schede(app)).filter((u) => u === pagina).length, { timeout: 15_000 }).toBe(2);
+  expect(await page.evaluate(() => window.__ok), 'nessun OK chiesto per la pagina appena aperta').toEqual([]);
   expect(await avvisiBloccati(shell), 'nessun «bloccato per sicurezza» per una pagina che si apre').toBe(0);
   expect(await cerche(app)).toEqual([]);
 });
@@ -50,18 +56,23 @@ test('«scrivi una mail a Mario»: si apre il programma di posta e il modello sa
   test.setTimeout(90_000);
   await app.evaluate(({ shell: s }) => { globalThis.__esterni = []; s.openExternal = async (u) => { globalThis.__esterni.push(String(u)); }; });
   const posta = 'mailto:mario.rossi@esempio.it?subject=Cena%20di%20sabato';
-  await modelloFinto(app, [{ toolCalls: [naviga('m1', posta)] }, { text: 'Ti ho aperto la mail per Mario.' }]);
+  // Un turno solo (#1130): che la bozza la manda l'utente il modello lo sa prima, dalla descrizione dell'azione.
+  await modelloFinto(app, [{ text: 'Ti apro la mail per Mario: la mandi tu.', toolCalls: [naviga('m1', posta)] }]);
+  await app.evaluate(() => {
+    const finto = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.__strumenti = '';
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = (o) => { globalThis.__strumenti = JSON.stringify(o.tools || []); return finto(o); };
+  });
   const page = await home(app);
   const prima = await schede(app);
   await chiedi(page, 'scrivi una mail a mario.rossi@esempio.it per la cena di sabato');
 
   await expect.poll(() => app.evaluate(() => globalThis.__esterni), { timeout: 15_000 }).toEqual([posta]);
-  await expect.poll(() => esitoPerIlModello(app, 'm1'), { timeout: 10_000 }).toContain('programma di posta');
-  expect(await esitoPerIlModello(app, 'm1')).toContain('Non dire che è già stato inviato');
+  expect(await app.evaluate(() => globalThis.__strumenti)).toContain('si apre il programma di posta con la bozza');
   await page.waitForTimeout(500);
   expect(await schede(app), 'la posta non apre schede').toEqual(prima);
   expect(await avvisiBloccati(shell)).toBe(0);
-  await expect(page.locator('.dash-bubble-filo').last()).toContainText('Ti ho aperto la mail per Mario.');
+  await expect(page.locator('.dash-bubble-filo').last()).toContainText('Ti apro la mail per Mario: la mandi tu.');
   await page.screenshot({ path: 'tests/.shots/chat-indirizzi-posta.png' });
 });
 
