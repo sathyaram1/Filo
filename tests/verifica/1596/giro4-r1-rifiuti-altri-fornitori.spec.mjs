@@ -112,6 +112,7 @@ test('tre pagine e posto per una e mezza: la prima intera e della seconda almeno
   await expect(bolla).toBeVisible({ timeout: 40_000 });
   await expect(bolla).toContainText('visti: ALFA, BETA');
   await expect(bolla).toContainText('Il modello non riusciva a leggere tutto insieme');
+  await page.screenshot({ path: 'tests/.shots/1596-giro4-avviso.png' });
 });
 
 for (const formato of ['moonshot', 'google', 'together', 'xai']) {
