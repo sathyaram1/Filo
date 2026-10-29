@@ -81,7 +81,7 @@
     };
     while (out.length < lotto && daRifare.length) prendi(daRifare.shift());
     while (out.length < lotto && aSchermoDa < aSchermo.length) prendi(hrefDi(aSchermo[aSchermoDa++]));
-    while (out.length < lotto && restoDa < resto.length) {
+    while (out.length < lotto && restoDa < resto.length && !aspettaSchermo()) {
       const el = resto[restoDa++];
       if (io) { try { io.unobserve(el); } catch (_) {} }
       prendi(hrefDi(el));
