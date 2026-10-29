@@ -1,7 +1,10 @@
 // #1509.1 giro 4: con una risposta di Filo aperta sopra un sito, il tasto laterale del mouse non clicca la pagina (r1),
 // e lo screenshot del feedback mostra la risposta che l'utente ha davanti (r2).
 import { test, expect } from '../../fixtures/electron.mjs';
-import { nelMondoDiFilo, nelloStrato, statoDi, clicca, conta, paginaDelloStrato } from '../../helpers/riquadri.mjs';
+import { nelMondoDiFilo, neiRiquadri, statoDi, clicca, conta, scrivi, nelloStrato, paginaDelloStrato } from '../../helpers/riquadri.mjs';
+
+// Dove arriva il mouse dell'utente sopra la risposta aperta: lo strato sopra la scheda se c'è, la scheda altrimenti.
+const sottoIlMouse = async (app, p) => ((await nelloStrato(app, p, () => true)) ? paginaDelloStrato(app, p) : p);
 
 const pagina = (corpo = '') => `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:40px;font:16px sans-serif;background:#fff">`
   + `<p style="font-size:20px">Il <span id="parola">gatto</span> dorme.</p>${corpo}</body></html>`;
@@ -43,8 +46,8 @@ test('r1 con la risposta aperta i tasti laterali del mouse sulla pagina non prem
   await modelloFinto(app);
   const p = await testServer.openReady(openTab, pagina('<button id="compra" onclick="window.__compra=(window.__compra||0)+1" style="margin-top:300px;width:300px;height:80px">Compra</button>'));
   await traduci(app, p);
-  const strato = await paginaDelloStrato(app, p);
-  const cdp = await strato.context().newCDPSession(strato);
+  const dove = await sottoIlMouse(app, p);
+  const cdp = await dove.context().newCDPSession(dove);
   const b = await p.locator('#compra').boundingBox();
   const x = Math.round(b.x + b.width / 2);
   const y = Math.round(b.y + b.height / 2);
@@ -67,21 +70,19 @@ test('r2 lo screenshot del feedback mostra la risposta di Filo aperta sulla pagi
   await nelMondoDiFilo(app, p, () => globalThis.SN_FEEDBACK_UI.open());
   await expect.poll(() => statoDi(app, p, '.sn-fb-text')).not.toBeNull();
   expect(await conta(app, p, '.sn-popup'), 'la risposta resta aperta sotto il feedback').toBe(1);
-  await nelloStrato(app, p, () => {
+  await neiRiquadri(app, p, () => {
     const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
     chrome.runtime.sendMessage = (m, ...r) => {
       if (m && m.type === 'submit_feedback') { globalThis.__inviato = m.payload; return Promise.resolve({ ok: true }); }
       return orig(m, ...r);
     };
   });
-  await clicca(app, p, '.sn-fb-text');
-  const strato = await paginaDelloStrato(app, p);
-  await strato.keyboard.insertText('la traduzione è sbagliata');
+  await scrivi(app, p, '.sn-fb-text', 'la traduzione è sbagliata');
   await clicca(app, p, '.sn-fb-clear');
   await clicca(app, p, '.sn-fb-send');
-  await expect.poll(() => nelloStrato(app, p, () => (globalThis.__inviato?.images || []).length), { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect.poll(() => neiRiquadri(app, p, () => (globalThis.__inviato?.images || []).length), { timeout: 15_000 }).toBeGreaterThan(0);
   // Il colore della foto dove l'utente vedeva la risposta: la pagina sotto è bianca.
-  const colore = await nelloStrato(app, p, async (r) => {
+  const colore = await neiRiquadri(app, p, async (r) => {
     const imgs = globalThis.__inviato.images;
     const src = imgs[imgs.length - 1].dataUrl;
     const im = new Image();
