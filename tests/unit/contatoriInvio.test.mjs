@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { EventEmitter } from 'node:events';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -32,12 +33,13 @@ function daFs(v) {
   throw new Error(`tipo inatteso ${JSON.stringify(v)}`);
 }
 
-function banco({ accesi = true, incognito = false, finestra = true, risposta = 200, disco = new Map() } = {}) {
+function banco({ accesi = true, incognito = false, finestra = true, risposta = 200, disco = new Map(), identita = 'token-anonimo' } = {}) {
   const inviati = [];
   // Le chiamate ai modelli (#1464) e le attività (#1467) di un'ora partono nella loro collezione: si contano a parte.
   const chiamate = [];
   const attivita = [];
-  const b = { t: T0, accesi, incognito, finestra, risposta, disco, inviati, chiamate, attivita, n: 0 };
+  // `identita`: l'idToken dell'installazione, un errore se non si ottiene (offline, persa); `identitaChieste` le volte.
+  const b = { t: T0, accesi, incognito, finestra, risposta, disco, inviati, chiamate, attivita, n: 0, identita, identitaChieste: 0 };
   b.s = Servizio.crea({
     contatori: C,
     storage: {
@@ -54,6 +56,11 @@ function banco({ accesi = true, incognito = false, finestra = true, risposta = 2
     esclusi: async () => ['abcdef0123456789'],
     casuale: () => `${'9'.repeat(18)}${String(++b.n).padStart(2, '0')}`,
     rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'K' }),
+    idToken: async () => {
+      b.identitaChieste += 1;
+      if (b.identita instanceof Error) throw b.identita;
+      return b.identita;
+    },
     fetch: async (url, opt) => {
       if (b.risposta === 'rete') throw new TypeError('fetch failed');
       const doc = Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)]));
@@ -92,7 +99,7 @@ test('un documento per ora, con la forma giusta e niente altro; un giorno senza 
   assert.equal(b.inviati.length, 1);
   const [{ url, opt, doc }] = b.inviati;
   assert.equal(opt.method, 'POST');
-  assert.ok(!opt.headers.Authorization, 'si spedisce senza login, come i feedback');
+  assert.equal(opt.headers.Authorization, 'Bearer token-anonimo', 'si spedisce con l’identità anonima dell’installazione (#1547)');
   assert.equal(url, `${BASE}/${C.COLLEZIONE}?documentId=99999999999999999901_2026-10-15_09&key=K`);
   assert.deepEqual(doc, {
     v: C.VERSIONE, pseudonimo: '99999999999999999901', giorno: '2026-10-15', mese: '2026-10', ora: '09', app: '0.2.243', os: 'mac', primo: 'mese',
@@ -397,6 +404,67 @@ test('un invio fallito riprova l’ora dopo, e al ritorno partono tutte le ore r
   assert.equal(await b.s.controlla(), 'inviati');
   assert.deepEqual(b.inviati.map((x) => x.doc.ora), ['09', '10', '11']);
   assert.equal(C.leggiMisura(b.inviati[0].doc.uso['translate-page']).n, 1);
+});
+
+test('ogni documento parte con l’identità anonima; senza, non parte niente, l’ora resta e parte quando torna (#1547)', async () => {
+  const offline = Object.assign(new Error('nessuna connessione a internet'), { code: 'offline' });
+  const b = banco({ identita: offline });
+  await usa(b, A.FILO_CHAT, { attesa: 900 });
+  b.s.gesto('trascinamento', { da: 'carta_home', a: 'chat_home', esito: 'posato' });
+  b.s.navigazione(C.NAV.navFallita(-105, true));
+  b.s.attivita('pulizia', { trigger: 'idle', candidate: 8, archiviate: 2, duplicati: 1, giudizioMancato: false });
+  await attendi();
+  assert.equal(await b.s.controlla(), 'niente');
+  assert.equal(b.identitaChieste, 0, 'senza niente da spedire l’identità non si chiede');
+
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'fallito');
+  assert.deepEqual([b.inviati.length, b.chiamate.length, b.attivita.length], [0, 0, 0], 'senza identità non si bussa nemmeno');
+  assert.equal(await b.s.controlla(), 'rimandato', 'nella stessa ora non si riprova');
+  assert.deepEqual(Object.keys((await b.s.letto()).ore), ['2026-10-15T09'], 'l’ora resta in attesa');
+  b.identita = '';
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'fallito', 'un token vuoto vale come nessuna identità');
+  assert.deepEqual([b.inviati.length, b.chiamate.length, b.attivita.length], [0, 0, 0]);
+
+  b.identita = 'token-anonimo';
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'inviati');
+  const partiti = [...b.inviati, ...b.chiamate, ...b.attivita];
+  const collezioni = partiti.map((x) => new URL(x.url).pathname.split('/').slice(-1)[0]).sort();
+  assert.deepEqual(collezioni, [C.COLLEZIONE_CHIAMATE, C.COLLEZIONE, C.COLLEZIONE_GESTI, C.COLLEZIONE_NAVIGAZIONE, C.COLLEZIONE_ATTIVITA].sort());
+  for (const { opt } of partiti) assert.equal(opt.headers.Authorization, 'Bearer token-anonimo');
+  assert.equal(b.inviati.find((x) => x.url.includes(`/${C.COLLEZIONE}?`)).doc.ora, '09');
+  assert.ok(partiti.every(({ doc }) => !JSON.stringify(doc).includes('token-anonimo')), 'il documento non porta l’identità');
+  assert.deepEqual((await b.s.letto()).ore, {});
+
+  const spenti = banco({ accesi: false });
+  await usa(spenti, A.HELP);
+  spenti.t += ORA;
+  assert.equal(await spenti.s.controlla(), 'spenti');
+  assert.equal(spenti.identitaChieste, 0, 'a contatori spenti i contatori non chiedono né creano l’identità');
+});
+
+// Senza un'identità finta il servizio chiede quella vera a Google: a ogni corsa un account anonimo nel progetto, e senza
+// rete il banco diventa rosso.
+test('ogni banco che spedisce i contatori porta la sua identità finta, mai quella vera del server (#1547)', () => {
+  const cartella = join(ROOT, 'tests', 'unit');
+  const banchi = readdirSync(cartella).filter((f) => f.endsWith('.mjs'))
+    .map((f) => [f, readFileSync(join(cartella, f), 'utf8')])
+    .filter(([, t]) => /require\(join\([^)]*'services', 'contatori\.js'\)\)|require\([^)]*services\/contatori\.js'\)/.test(t));
+  assert.ok(banchi.length >= 5, `banchi trovati: ${banchi.map(([f]) => f).join(', ')}`);
+  for (const [f, t] of banchi) assert.match(t, /idToken: /, `${f}: il servizio dei contatori senza un’identità finta`);
+});
+
+// L'identità anonima la crea chiunque con la chiave web: la Privacy non promette che riconosca Filo, e lo scopo dello
+// pseudonimo resta attaccato allo pseudonimo, non alle frasi sull'identità.
+test('la Privacy dice dell’identità dei contatori solo quello che è vero, senza staccare lo pseudonimo dal suo scopo (#1547)', () => {
+  for (const f of ['transparency/privacy.md', 'site/transparency/privacy.html']) {
+    const t = readFileSync(join(ROOT, f), 'utf8');
+    assert.doesNotMatch(t, /accetta solo contatori che arrivano da una copia di Filo/, f);
+    assert.match(t, /una anonima se la può creare chiunque/, `${f}: l’identità non prova che i contatori vengano da Filo`);
+    assert.match(t, /e cambia ogni mese\. Serve a distinguere il problema di una persona sola/, `${f}: lo scopo dello pseudonimo subito dopo lo pseudonimo`);
+  }
 });
 
 test('un’ora che il server rifiuta non ferma le altre: si riprova il giorno dopo, e parte quando le regole la accettano', async () => {

@@ -9,7 +9,7 @@
 // Si lancia come l'altro, con in più FILO_REPO=<repo>:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-969 "node <cartella>/contatoriRegole.motore-vero.mjs"
-// Esito atteso: 130 righe verdi, uscita 0 (#1465 su #1467, 2026-10-28). È l'unica prova del tetto di mille
+// Esito atteso: 139 righe verdi, uscita 0 (#1547 su #1465, 2026-10-28; con le regole di prima 14 rosse). È l'unica prova del tetto di mille
 // espressioni che Firestore concede a una scrittura: le regole dell'ora ne valutano già circa 950, e un controllo in più
 // le fa rifiutare tutte (per questo chiamate ai modelli, chat e attività hanno il loro documento), mentre la sentinella che
 // legge il file non se ne accorge. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
@@ -48,13 +48,22 @@ async function prova(nome, fn) {
 }
 function vero(cond, msg) { if (!cond) throw new Error(msg); }
 
-// Un token senza firma, come quelli che l'emulatore accetta: serve alla lettura REST dell'owner.
+// Un token senza firma, come quelli che l'emulatore accetta: serve alla lettura REST dell'owner e, anonimo, all'invio
+// delle ore, che senza un'identità le regole rifiutano (#1547).
 function tokenDi(email) {
   const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
   const ora = Math.floor(Date.now() / 1000);
   return `${b64({ alg: 'none', typ: 'JWT' })}.${b64({
     iss: `https://securetoken.google.com/${PROGETTO}`, aud: PROGETTO, sub: email, user_id: email, email,
     email_verified: true, iat: ora, exp: ora + 3600, auth_time: ora, firebase: { sign_in_provider: 'google.com', identities: {} },
+  })}.`;
+}
+function tokenAnonimo(uid = 'installazione-di-prova') {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const ora = Math.floor(Date.now() / 1000);
+  return `${b64({ alg: 'none', typ: 'JWT' })}.${b64({
+    iss: `https://securetoken.google.com/${PROGETTO}`, aud: PROGETTO, sub: uid, user_id: uid,
+    iat: ora, exp: ora + 3600, auth_time: ora, firebase: { sign_in_provider: 'anonymous', identities: {} },
   })}.`;
 }
 
@@ -73,6 +82,7 @@ function servizio(ore, impostazioni = { contatori: { attivi: true } }) {
     piattaforma: 'win32',
     casuale: () => `${'ab'.repeat(9)}${String(++n).padStart(2, '0')}`,
     rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'chiave-di-prova' }),
+    idToken: async () => tokenAnonimo(),
     log: () => {},
   });
   return { s, disco, sposta: (ms) => { t += ms; } };
@@ -173,7 +183,9 @@ await prova('chi non è admin non legge', async () => {
   vero(/403/.test(errore), `doveva essere rifiutato: «${errore}»`);
 });
 
-const anon = env.unauthenticatedContext().firestore();
+// Una copia di Filo scrive con la sua identità anonima; senza identità non si crea niente (#1547).
+const anon = env.authenticatedContext('installazione-di-prova', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+const senzaIdentita = env.unauthenticatedContext().firestore();
 const owner = env.authenticatedContext('owner', { email: 'owner@filo.it', email_verified: true }).firestore();
 const datiBuoni = C.oraVuota();
 C.registraUso(datiBuoni, 'help', { visto: 1500, fine: 3000 });
@@ -220,6 +232,7 @@ await prova('un uso che è un numero', () => rifiuta({ uso: { help: 1 } }));
 await prova('un uso con testo in coda', () => rifiuta({ uso: { help: '1;0,0,0,0,0,0,0;0,0,0,0,0,0,0;0 testo libero' } }));
 await prova('un errore col testo libero al posto del modello', () => rifiuta({ errori: { help: 'Scrivi a mario.rossi@gmail.com|H|rete|1' } }));
 await prova('errori oltre il tetto di lunghezza', () => rifiuta({ errori: { help: Array.from({ length: 2500 }, (_, i) => `${'m'.repeat(120)}|${'H'.repeat(48)}|fornitore|${i + 1}`).join(';') } }));
+await prova('errori appena oltre il tetto del documento (#1547)', () => rifiuta({ errori: { help: Array.from({ length: 270 }, (_, i) => `${'m'.repeat(120)}|${'H'.repeat(48)}|fornitore|${i + 1}`).join(';') } }));
 await prova('un’azione con uno spazio (un testo) come chiave', () => rifiuta({ azioni: { 'cerca mario rossi': '1;0,0,0,0,0,0,0;0,0,0,0,0,0,0;0' } }));
 await prova('un’impostazione col valore scritto da chi usa Filo', () => rifiuta({ impostazioni: { theme: 'il mio tema preferito|mano|1' } }));
 await prova('un’impostazione con un indirizzo come chiave', () => rifiuta({ impostazioni: { 'https://mario.it': 'cambiato|mano|1' } }));
@@ -307,6 +320,15 @@ await prova('un’ora v2 col sistema', () => rifiuta({ v: 2 }));
 await prova('un anonimo legge un’ora', () => assertFails(getDoc(doc(anon, `contatori-giornalieri/${idBuono}`))));
 await prova('un anonimo elenca la collezione', () => assertFails(getDocs(collection(anon, 'contatori-giornalieri'))));
 
+await prova('senza identità non si crea l’ora', () => assertFails(setDoc(doc(senzaIdentita, `contatori-giornalieri/${idBuono}`), BUONO)));
+await prova('senza identità non si crea la chat dell’ora', () => assertFails(setDoc(doc(senzaIdentita, `contatori-giornalieri/${idChat}`), CHAT)));
+await prova('senza identità non si crea il giorno di una copia vecchia', () => assertFails(setDoc(doc(senzaIdentita, `contatori-giornalieri/${C.idDocumento(GIORNO_VECCHIO)}`), GIORNO_VECCHIO)));
+await prova('senza identità non si creano le chiamate', () => assertFails(setDoc(doc(senzaIdentita, `${COLL_CHIAMATE}/${idBuono}`), CHIAMATE)));
+await prova('senza identità non si creano i gesti', () => assertFails(setDoc(doc(senzaIdentita, `${COLL_GESTI}/${idBuono}`), GESTI)));
+await prova('senza identità non si crea la navigazione', () => assertFails(setDoc(doc(senzaIdentita, `${COLL_NAV}/${idBuono}`), NAVIGA)));
+await prova('senza identità non si creano le attività', () => assertFails(setDoc(doc(senzaIdentita, `${COLL_ATTIVITA}/${idBuono}`), ATTIVITA)));
+await prova('senza identità non si legge un’ora', () => assertFails(getDoc(doc(senzaIdentita, `contatori-giornalieri/${idBuono}`))));
+
 console.log('\n— quello che si deve poter fare, e poi più —');
 await prova('un anonimo crea la sua ora', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), BUONO)));
 await prova('un anonimo crea le chiamate della sua ora', () => assertSucceeds(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), CHIAMATE)));
@@ -333,6 +355,7 @@ for (const [m, d] of [['ocr', { esito: 'copiato' }], ['riscrittura', { scorciato
   C.registraRiquadro(datiRiq, v.misura, v.chiave, v.voci);
 }
 const RIQ = C.documentoRiquadri({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiRiq });
+await prova('senza identità non si creano i riquadri', () => assertFails(setDoc(doc(senzaIdentita, `${COLL_RIQ}/${idBuono}`), RIQ)));
 await prova('un anonimo crea i riquadri della sua ora', () => assertSucceeds(setDoc(doc(anon, `${COLL_RIQ}/${idBuono}`), RIQ)));
 await prova('ma non li riscrive', () => assertFails(setDoc(doc(anon, `${COLL_RIQ}/${idBuono}`), RIQ)));
 await prova('l’admin legge i riquadri', () => assertSucceeds(getDoc(doc(owner, `${COLL_RIQ}/${idBuono}`))));

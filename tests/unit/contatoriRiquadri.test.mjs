@@ -52,10 +52,11 @@ function banco({ accesi = true, incognito = false, risposta = () => 200 } = {}) 
     esclusi: async () => [],
     casuale: () => `${'7'.repeat(18)}${String(++b.n).padStart(2, '0')}`,
     rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'K' }),
+    idToken: async () => 'token-anonimo',
     fetch: async (url, opt) => {
       const doc = Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)]));
       const dove = url.includes(`/${C.COLLEZIONE_RIQUADRI}?`) ? 'riquadri' : url.includes(`/${C.COLLEZIONE}?`) ? 'ore' : 'altro';
-      per[dove].push({ url, doc });
+      per[dove].push({ url, doc, auth: opt.headers.Authorization });
       const st = b.risposta(dove, url);
       return { ok: st >= 200 && st < 300, status: st, json: async () => ({}) };
     },
@@ -125,7 +126,8 @@ test('i riquadri partono accanto alla loro ora, con lo stesso id; un’ora senza
   assert.equal(await b.s.controlla(), 'inviati');
   assert.equal(b.per.ore.length, 1);
   assert.equal(b.per.riquadri.length, 1);
-  const [{ url, doc }] = b.per.riquadri;
+  const [{ url, doc, auth }] = b.per.riquadri;
+  assert.equal(auth, 'Bearer token-anonimo', 'i riquadri partono con l’identità anonima, come l’ora (#1547)');
   assert.ok(url.includes(`documentId=${encodeURIComponent(C.idDocumento(b.per.ore[0].doc))}`), 'lo stesso id dell’ora');
   assert.deepEqual(Object.keys(doc), [...C.CAMPI_RIQUADRI]);
   assert.deepEqual(C.leggiRiquadri('riquadro_uso', doc.riquadro_uso['translate-selection']), [

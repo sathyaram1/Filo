@@ -238,6 +238,7 @@ function banco({ dir = null, versione = '0.2.249', accesi = true } = {}) {
     esclusi: async () => [],
     casuale: () => `${'7'.repeat(18)}${String(++b.n).padStart(2, '0')}`,
     rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'K' }),
+    idToken: async () => 'token-anonimo',
     fetch: async (url, opt) => {
       const fields = JSON.parse(opt.body).fields;
       const daFs = (v) => ('stringValue' in v ? v.stringValue : 'integerValue' in v ? Number(v.integerValue)

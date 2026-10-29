@@ -210,6 +210,63 @@ test('le combinazioni di errore hanno un tetto, oltre si sommano in «altro» e 
   assert.equal(lista.reduce((a, x) => a + x.n, 0), C.TETTO_ERRORI_ORA + 5);
 });
 
+// Le voci specifiche (modello e host) di un documento intero, su tutte le funzioni: le righe «altro» restano fuori.
+const specificheDi = (errori) => Object.values(errori).flatMap((e) => C.leggiErrori(e)).filter((x) => x.modello !== 'altro' || x.host);
+const contiDi = (errori) => Object.values(errori).flatMap((e) => C.leggiErrori(e)).reduce((a, x) => a + x.n, 0);
+
+test('gli errori hanno un tetto anche per documento: oltre, la voce va in «altro» del suo tipo e il conto resta intero (#1547)', () => {
+  const g = C.oraVuota();
+  let registrati = 0;
+  for (const f of C.funzioni()) {
+    for (let i = 0; i < 80; i++) {
+      C.registraErrore(g, f, { modello: `fornitore/modello-${f}-${i}`, host: 'DeepInfra', tipo: C.ERRORI[i % C.ERRORI.length] });
+      registrati += 1;
+    }
+  }
+  const doc = docDi(g);
+  assert.equal(specificheDi(doc.errori).length, C.TETTO_ERRORI_DOCUMENTO, 'le voci col modello si fermano al tetto del documento');
+  assert.equal(contiDi(doc.errori), registrati, 'il passaggio ad «altro» non perde conti');
+  for (const [f, e] of Object.entries(doc.errori)) {
+    const lista = C.leggiErrori(e);
+    assert.ok(lista.length <= C.TETTO_ERRORI_ORA, `${f}: ${lista.length} voci`);
+    assert.equal(new Set(lista.map((x) => `${x.modello}|${x.host}|${x.tipo}`)).size, lista.length, `${f}: una voce ripetuta`);
+  }
+  assert.ok(Object.values(g.errori).reduce((a, per) => a + Object.keys(per).filter((k) => !k.startsWith('altro||')).length, 0) <= C.TETTO_ERRORI_DOCUMENTO,
+    'anche l’ora sul disco si ferma al tetto');
+  assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
+  // Un documento con più voci specifiche del tetto non parte.
+  const troppe = { ...doc, errori: { ...doc.errori, help: Array.from({ length: 20 }, (_, i) => `x/y${i}|H|rete|1`).join(';') } };
+  assert.equal(C.valida(troppe).ok, false);
+});
+
+test('un giorno di prima con 80 combinazioni per funzione parte dentro il tetto del documento, coi conti interi (#1547)', () => {
+  const errori = {};
+  let registrati = 0;
+  for (const f of C.funzioni()) {
+    errori[f] = {};
+    for (let i = 0; i < 80; i++) { errori[f][`fornitore/modello-${i}|DeepInfra|${C.ERRORI[i % C.ERRORI.length]}`] = i + 1; registrati += i + 1; }
+  }
+  const doc = C.documentoGiorno({ pseudonimo: PSEUDO, giorno: '2026-10-14', app: '0.2.240', os: 'win', dati: { uso: {}, errori } });
+  assert.equal(specificheDi(doc.errori).length, C.TETTO_ERRORI_DOCUMENTO);
+  assert.equal(contiDi(doc.errori), registrati, 'la somma dei conti nel documento è quella registrata');
+  for (const e of Object.values(doc.errori)) assert.ok(C.leggiErrori(e).length <= C.TETTO_COMBINAZIONI);
+  assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
+});
+
+test('un’ora rimasta sul disco da prima del tetto parte dentro il tetto, coi conti interi (#1547)', () => {
+  const g = C.oraVuota();
+  let registrati = 0;
+  for (const f of C.funzioni()) {
+    g.errori[f] = {};
+    for (let i = 0; i < 24; i++) { g.errori[f][`fornitore/m-${i}|Host|rete`] = 2; registrati += 2; }
+    g.errori[f]['altro||rete'] = 3; registrati += 3;
+  }
+  const doc = docDi(g);
+  assert.equal(specificheDi(doc.errori).length, C.TETTO_ERRORI_DOCUMENTO);
+  assert.equal(contiDi(doc.errori), registrati);
+  assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
+});
+
 test('il tipo di guasto viene dall’elenco chiuso, e annullare non è un guasto', () => {
   const e = (props, msg = 'x') => Object.assign(new Error(msg), props);
   assert.equal(C.tipoErrore(e({ status: 402 })), 'crediti');

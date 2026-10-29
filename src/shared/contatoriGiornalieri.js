@@ -341,6 +341,9 @@
   const TETTO_COMBINAZIONI = 50;
   // Gli errori di un'ora per funzione: trenta combinazioni di modello e host bastano anche a un pomeriggio di guasti.
   const TETTO_ERRORI_ORA = 30;
+  // E in tutto il documento, su tutte le funzioni: oltre, la voce va nella riga «altro» del suo tipo, che resta libera.
+  // Tiene il caso peggiore a decine di KB, e con lui il tetto delle regole che chiunque abbia un'identità può riempire.
+  const TETTO_ERRORI_DOCUMENTO = 150;
   const TETTO_CONFERME = 20;
   const TETTO_VALORI = 12;
   const TETTO_PRIME_VOLTE = 400;
@@ -887,14 +890,24 @@
     return true;
   }
 
+  const erroreAltro = (chiave) => String(chiave).startsWith(`${ALTRO}||`);
+  function erroriSpecifici(errori) {
+    let n = 0;
+    for (const per of Object.values(errori)) if (oggetto(per)) for (const k of Object.keys(per)) if (!erroreAltro(k)) n++;
+    return n;
+  }
+
   function registraErrore(ora, funzione, { modello, host, tipo } = {}) {
     if (!funzioni().includes(funzione) || !ERRORI.includes(tipo)) return false;
     const g = normale(ora);
     const per = oggetto(g.errori[funzione]) ? g.errori[funzione] : {};
     let chiave = `${modelloPulito(modello)}|${hostPulito(host)}|${tipo}`;
     // Il posto per le sei righe «altro» (una per tipo) resta sempre libero: oltre il tetto non si perde niente.
-    const specifiche = Object.keys(per).filter((k) => !k.startsWith(`${ALTRO}||`)).length;
-    if (!has(per, chiave) && specifiche >= TETTO_ERRORI_ORA - ERRORI.length) { chiave = `${ALTRO}||${tipo}`; tettoCombinazioni(ora); }
+    const specifiche = Object.keys(per).filter((k) => !erroreAltro(k)).length;
+    if (!has(per, chiave) && (specifiche >= TETTO_ERRORI_ORA - ERRORI.length || erroriSpecifici(g.errori) >= TETTO_ERRORI_DOCUMENTO)) {
+      chiave = `${ALTRO}||${tipo}`;
+      tettoCombinazioni(ora);
+    }
     piuUno(per, chiave);
     g.errori[funzione] = per;
     return true;
@@ -1778,21 +1791,28 @@
     return out;
   }
 
-  // Errori: «modello|host|tipo|n» separati da «;», al più TETTO_COMBINAZIONI per funzione.
+  // Errori: «modello|host|tipo|n» separati da «;». Oltre il tetto per funzione o quello del documento la voce si somma
+  // alla riga «altro» del suo tipo: anche le ore e i giorni rimasti da prima del tetto partono dentro, coi conti interi.
   function erroriPuliti(errori, tetto = TETTO_ERRORI_ORA) {
     const out = {};
+    let specifiche = 0;
     for (const f of funzioni()) {
       const per = oggetto(errori) && has(errori, f) ? errori[f] : null;
       if (!oggetto(per)) continue;
-      const lista = [];
+      const voci = new Map();
+      let qui = 0;
       for (const [chiave, n] of Object.entries(per)) {
         if (!intero(n) || n === 0) continue;
         const [m, h, t] = String(chiave).split('|');
         if (!ERRORI.includes(t)) continue;
-        lista.push(`${modelloPulito(m)}|${hostPulito(h)}|${t}|${conto(n)}`);
-        if (lista.length >= tetto) break;
+        let k = `${modelloPulito(m)}|${hostPulito(h)}|${t}`;
+        if (!erroreAltro(k) && !voci.has(k)) {
+          if (qui >= tetto - ERRORI.length || specifiche >= TETTO_ERRORI_DOCUMENTO) k = `${ALTRO}||${t}`;
+          else { qui += 1; specifiche += 1; }
+        }
+        voci.set(k, conto((voci.get(k) || 0) + n));
       }
-      if (lista.length) out[f] = lista.join(';');
+      if (voci.size) out[f] = [...voci].map(([k, n]) => `${k}|${n}`).join(';');
     }
     return out;
   }
@@ -2413,6 +2433,7 @@
       const lista = leggiErrori(e);
       if (lista.length > TETTO_ERRORI_ORA || lista.some((x) => x.n === 0)) return no(`errori di ${f}`);
     }
+    if (erroriOltreIlTetto(doc.errori)) return no('errori oltre il tetto del documento');
     if (!Array.isArray(doc.primeVolte) || doc.primeVolte.length > TETTO_PRIME_VOLTE
       || doc.primeVolte.some((x) => typeof x !== 'string' || !re(CHIAVE_AZIONE_FORMA).test(x))
       || new Set(doc.primeVolte).size !== doc.primeVolte.length) return no('primeVolte');
@@ -2585,7 +2606,13 @@
       const lista = leggiErrori(e);
       if (!lista || lista.length > TETTO_COMBINAZIONI || lista.some((x) => x.n === 0)) return no(`errori di ${f}`);
     }
+    if (erroriOltreIlTetto(doc.errori)) return no('errori oltre il tetto del documento');
     return { ok: true, motivo: '' };
+  }
+
+  function erroriOltreIlTetto(errori) {
+    const specifiche = Object.values(errori).flatMap((e) => leggiErrori(e) || []).filter((x) => x.modello !== ALTRO || x.host);
+    return specifiche.length > TETTO_ERRORI_DOCUMENTO;
   }
 
   // ── Ore, giorni e pseudonimo ──────────────────────────────────────────────
@@ -2675,7 +2702,7 @@
     AVVIO, AZIONE_PAGINA, AZIONE_DI_ICONA, AZIONE_DI_PAGINA, IMPOSTAZIONI_EXTRA, MAI_CONTATE,
     AGENTI, ESITI_TURNO, GIRI, NOMI_GIRI, RECUPERI, ESITI_STRUMENTO, AZIONI_PER_GIRO, NOMI_AZIONI_PER_GIRO, REAZIONI,
     RUOLI_COPIA, VIE_CHIUSURA, MESSAGGI_CHAT, NOMI_MESSAGGI_CHAT, DURATE_CHAT, NOMI_DURATE_CHAT, TIPI_CHAT, SENZA_TIPO,
-    TETTO_COMBINAZIONI, TETTO_ERRORI_ORA, TETTO_CONFERME, TETTO_VALORI, TETTO_PRIME_VOLTE, TETTO_ORE_IN_ATTESA, TETTO_GIORNI_IN_ATTESA,
+    TETTO_COMBINAZIONI, TETTO_ERRORI_ORA, TETTO_ERRORI_DOCUMENTO, TETTO_CONFERME, TETTO_VALORI, TETTO_PRIME_VOLTE, TETTO_ORE_IN_ATTESA, TETTO_GIORNI_IN_ATTESA,
     TETTO_INVII_PER_GIRO, TETTO_STRUMENTI, RIPETUTA_MS, ANNULLO_MS,
     PSEUDONIMO_RE, GIORNO_RE, ORA_RE, CHIAVE_ORA_RE, APP_RE, MODELLO_RE, HOST_RE,
     FORME: Object.freeze({

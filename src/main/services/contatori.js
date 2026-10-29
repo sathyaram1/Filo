@@ -104,6 +104,9 @@ function crea(dip = {}) {
   const esclusi = dip.esclusi || (async () => []);
   const casuale = dip.casuale || (() => crypto.randomBytes(10).toString('hex'));
   const rest = dip.rest || (() => (globalThis.SN_FEEDBACK && globalThis.SN_FEEDBACK.rest) || {});
+  // L'identità anonima dell'installazione, la stessa dei crediti: le regole non accettano un'ora senza (#1547). Si chiede
+  // solo spedendo, quindi a contatori accesi; il documento non la porta.
+  const idToken = dip.idToken || (() => require('../auth/anon-auth').getIdToken());
   const log = dip.log || ((...a) => console.warn('[contatori]', ...a));
   // L'ora conta come «Filo aperto» solo con una finestra normale: chi usa solo l'incognito non lascia traccia.
   const finestreDiFilo = () => {
@@ -1157,10 +1160,14 @@ function crea(dip = {}) {
     if (!FIRESTORE_BASE || !API_KEY) return { ok: false, motivo: 'server non configurato' };
     const url = `${FIRESTORE_BASE}/${collezione}?documentId=${encodeURIComponent(C.idDocumento(doc))}&key=${API_KEY}`;
     const fields = Object.fromEntries(Object.entries(doc).map(([k, v]) => [k, valoreFs(v)]));
+    // Senza identità (offline, persa, illeggibile) l'ora resta in attesa come per un server giù: niente avvisi.
+    let token = '';
+    try { token = await idToken(); } catch (_) { token = ''; }
+    if (!token) return { ok: false, motivo: 'identità dell\'installazione non pronta' };
     let res;
     try {
       res = await fetchFn(url, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }),
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ fields }),
         signal: AbortSignal.timeout(ATTESA_RETE_MS),
       });
     } catch (e) {
