@@ -469,7 +469,7 @@
       vecchi: lista.slice(0, inizio),
       ultimo: visti.length ? visti[visti.length - 1] : null,
       ancora: inizio < n
-        ? { ts: lista[inizio].ts, giorni, token, ...(fotoDa ? { foto: fotoDa } : {}) }
+        ? { ts: lista[inizio].ts, giorni, token, ...(fotoDa ? { foto: fotoDa } : {}), ...(ripreseOra.length ? { riprese: ripreseOra } : {}) }
         : (stessaAncora ? ancora : null),
       token: totale + ripresi.peso,
     };
