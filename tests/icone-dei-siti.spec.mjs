@@ -139,13 +139,13 @@ test('la riga di un sito che si sta aprendo prende l\'icona appena la scheda la 
   await app.evaluate(({ session, net }, blu) => {
     session.defaultSession.protocol.handle('https', (req) => {
       const u = new URL(req.url);
-      if (u.hostname !== 'lento.test') return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      if (u.hostname.replace(/^www\./, '') !== 'lento.test') return net.fetch(req, { bypassCustomProtocolHandlers: true });
       if (u.pathname === '/icona.png') return new Response(Buffer.from(blu, 'base64'), { headers: { 'content-type': 'image/png' } });
       if (u.pathname === '/favicon.ico') return new Response('no', { status: 404 });
       // La pagina arriva dopo un attimo, come un sito vero: la riga della chat è già disegnata.
       return new Promise((ok) => setTimeout(() => ok(new Response(
         '<!doctype html><html><head><meta charset="utf-8"><title>Lento</title><link rel="icon" href="/icona.png"></head><body>s</body></html>',
-        { headers: { 'content-type': 'text/html; charset=utf-8' } })), 1500));
+        { headers: { 'content-type': 'text/html; charset=utf-8' } })), 3000));
     });
   }, PNG_BLU);
   const home = await openTab(NEWTAB);
@@ -159,6 +159,8 @@ test('la riga di un sito che si sta aprendo prende l\'icona appena la scheda la 
   });
   expect(await iconaDellaScheda(), 'la riga va disegnata prima che la scheda abbia l\'icona').toBe('');
   await riga.evaluate((el) => { el.__primaDellIcona = true; });
+  // Il sito non ha /favicon.ico: la prima ricerca torna senza niente, e il posto dell'icona si nasconde.
+  await expect(riga.locator('img')).toBeHidden({ timeout: 2500 });
 
   await expect(riga.locator('img')).toHaveAttribute('src', dato(PNG_BLU), { timeout: 15000 });
   await expect(riga.locator('img')).toBeVisible();
@@ -173,22 +175,16 @@ test('l\'icona trovata da una scheda arriva solo alle pagine di Filo del suo amb
   const riga = await rigaDiChat(home, 'riga-ambito', 'https://senza-icona.test/x');
   await expect(riga.locator('img')).toBeHidden({ timeout: 10000 });
 
-  await app.evaluate((_e, rosso) => globalThis.__filoHandlers.annunciaIconaScheda(
-    { _filoIncognito: true, _filoTabs: { partition: 'incognito-prova' } }, 'senza-icona.test', rosso), dato(PNG_ROSSO));
-  // Un annuncio per un altro sito, o senza un'immagine, non tocca la riga.
-  await app.evaluate(({ BrowserWindow }, rosso) => {
+  // In fila, come le manda il main: l'ambito incognito, un altro sito e un indirizzo al posto dell'immagine non toccano
+  // la riga; l'ultima sì, e la prima icona arrivata resta, quindi trovarci il blu dice che le altre non sono passate.
+  await app.evaluate(({ BrowserWindow }, { rosso, blu }) => {
+    const H = globalThis.__filoHandlers;
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    globalThis.__filoHandlers.annunciaIconaScheda(w, 'altro.test', rosso);
-    globalThis.__filoHandlers.annunciaIconaScheda(w, 'senza-icona.test', 'https://senza-icona.test/favicon.ico');
-  }, dato(PNG_ROSSO));
-  await home.waitForTimeout(500);
-  await expect(riga.locator('img')).toBeHidden();
-  await expect(riga.locator('img')).not.toHaveAttribute('src', /./);
-
-  await app.evaluate(({ BrowserWindow }, blu) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    globalThis.__filoHandlers.annunciaIconaScheda(w, 'senza-icona.test', blu);
-  }, dato(PNG_BLU));
+    H.annunciaIconaScheda({ _filoIncognito: true, _filoTabs: { partition: 'incognito-prova' } }, 'senza-icona.test', rosso);
+    H.annunciaIconaScheda(w, 'altro.test', rosso);
+    H.annunciaIconaScheda(w, 'senza-icona.test', 'https://senza-icona.test/favicon.ico');
+    H.annunciaIconaScheda(w, 'senza-icona.test', blu);
+  }, { rosso: dato(PNG_ROSSO), blu: dato(PNG_BLU) });
   await expect(riga.locator('img')).toHaveAttribute('src', dato(PNG_BLU), { timeout: 5000 });
   await expect(riga.locator('img')).toBeVisible();
 });

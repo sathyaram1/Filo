@@ -149,6 +149,62 @@ test('#853 una coda lunghissima dopo un URL nudo non blocca il disegno', () => {
   }
 });
 
+// #853.2 — codice e grassetto dentro il testo di un link uscivano come «0» e come **asterischi**; un URL attaccato a
+// del codice si portava dietro il segnaposto nell'indirizzo.
+const SEGNAPOSTI = /[]/;
+const linkDi = (html) => [...html.matchAll(/<a class="filo-md-link" href="([^"]*)"[^>]*>(.*?)<\/a>/g)].map((m) => ({ href: m[1], dentro: m[2] }));
+
+test('#853 il testo di un link resta quello scritto, anche con codice o grassetto dentro', () => {
+  const html = render('Vedi [`Array.prototype.map()`](https://developer.mozilla.org/x/map) e [**Wikipedia**](https://it.wikipedia.org/wiki/Roma).');
+  assert.deepEqual(linkDi(html), [
+    { href: 'https://developer.mozilla.org/x/map', dentro: '<code>Array.prototype.map()</code>' },
+    { href: 'https://it.wikipedia.org/wiki/Roma', dentro: '<strong>Wikipedia</strong>' },
+  ]);
+  const misto = render('[*vedi* `x` e **y**](https://example.com/a_(b))');
+  assert.deepEqual(linkDi(misto), [{ href: 'https://example.com/a_(b)', dentro: '<em>vedi</em> <code>x</code> e <strong>y</strong>' }]);
+  assert.doesNotMatch(html + misto, SEGNAPOSTI);
+  // «Copia» porta lo stesso testo che si legge.
+  assert.equal(globalThis.SN_MARKDOWN.testo('Vedi [`map()`](https://example.com/m) e [**Roma**](https://example.com/r).'), 'Vedi map() e Roma.');
+});
+
+test('#853 un URL nudo attaccato a del codice si ferma dove comincia il codice', () => {
+  const html = render('Pagina: https://example.com/guida`index.html` fine.');
+  assert.deepEqual(linkDi(html), [{ href: 'https://example.com/guida', dentro: 'https://example.com/guida' }]);
+  assert.match(html, /<\/a><code>index\.html<\/code> fine\./);
+  // Un indirizzo con del codice dentro le parentesi di un link non è un indirizzo: resta testo, col suo codice.
+  const dentro = render('[x](https://example.com/`a`)');
+  assert.match(dentro, /<code>a<\/code>/);
+  assert.ok(linkDi(dentro).every((l) => !SEGNAPOSTI.test(l.href)));
+  assert.doesNotMatch(html + dentro, SEGNAPOSTI);
+});
+
+test('#853 i caratteri dei segnaposto scritti dal modello non tirano fuori pezzi d\'altri', () => {
+  const html = render('Prima `uno` poi 0 e [0](https://example.com/0)');
+  assert.doesNotMatch(html, SEGNAPOSTI);
+  assert.equal((html.match(/<code>uno<\/code>/g) || []).length, 1, html);
+});
+
+test('#853 una fila di parentesi quadre aperte non blocca il disegno', () => {
+  const file = {
+    aperte: 'Vedi ' + '['.repeat(80_000) + ' fine della spiegazione',
+    chiuse: 'Vedi ' + '['.repeat(80_000) + '] fine',
+    spaziate: '[ '.repeat(40_000),
+    senzaParentesi: '[a]'.repeat(30_000) + '(',
+    linkAperti: '[a]('.repeat(30_000),
+    parentesiNelLink: '[a](' + '(x)'.repeat(30_000),
+    linkInFila: '[a]((x)'.repeat(20_000),
+  };
+  for (const [nome, testo] of Object.entries(file)) {
+    let html;
+    const c = costoInUnita(() => { html = render(testo); }, { tetto: 10 });
+    assert.ok(c.entro, `${nome}: ${c.come}`);
+    assert.ok(html.length > 0);
+  }
+  assert.match(render(file.aperte), /fine della spiegazione/);
+  // La quadra più vicina al testo è quella del link, come in CommonMark: le altre restano testo.
+  assert.deepEqual(linkDi(render('[a [b](https://example.com/b)')), [{ href: 'https://example.com/b', dentro: 'b' }]);
+});
+
 // ─── sicurezza: contenuto NON FIDATO, niente link verso l'interno dell'app ───
 
 test('#418 un link filo:// (pagina interna) NON diventa cliccabile', () => {
