@@ -270,11 +270,17 @@
   // ------------------------------------------------------------
   // La chiave è il colore salvato, cioè quello estratto: l'adattamento a schermo non sposta nessuno.
   // Grigi chiari in testa e scuri in coda, dal più chiaro al più scuro; i senza colore dopo, com'erano.
+  // Il cerchio si taglia a metà fra magenta e rosso (330°): un rosso che tende al magenta (Netflix, Pinterest)
+  // apre l'arcobaleno accanto al rosso pieno, invece di chiuderlo dopo il viola (#822.1).
+  const TAGLIO_ARCOBALENO = 330 / 360;
   function rainbowKey(color) {
     const c = toRgb(color);
     if (!c || !c.every(Number.isFinite)) return [3, 0];
     const mx = Math.max(c[0], c[1], c[2]), mn = Math.min(c[0], c[1], c[2]);
-    if (mx - mn >= IDENTITY_CHROMA_MIN) return [1, rgbToHsl(c[0], c[1], c[2])[0]];
+    if (mx - mn >= IDENTITY_CHROMA_MIN) {
+      const h = rgbToHsl(c[0], c[1], c[2])[0];
+      return [1, h >= TAGLIO_ARCOBALENO ? h - 1 : h];
+    }
     const l = (mx + mn) / 510;
     return [l >= 0.5 ? 0 : 2, -l];
   }
