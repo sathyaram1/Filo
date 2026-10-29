@@ -515,6 +515,7 @@ function buildPreamboloSource({ fp, canale, sonda, esenti } = {}) {
   var getProto = Object.getPrototypeOf, setProto = Object.setPrototypeOf, imul = Math.imul, ceil = Math.ceil;
   var WMP = WeakMap.prototype, wmGet = WMP.get, wmSet = WMP.set, wmHas = WMP.has;
   var parti = [], CANALE = ${JSON.stringify(String(canale || ''))}, LIVELLO = ${(fp && fp.level) | 0}, aspetta = setTimeout;
+  var ESENTI = ${esenti ? 'true' : 'false'};
 
   // Un sostituto deve somigliare a un nativo anche a chi lo ispeziona: metodo senza prototype né new,
   // nessuna proprietà propria in più, testo nativo anche da Function.prototype.toString.call (#799), e
