@@ -569,14 +569,16 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // lasciano residui che al checkout successivo verrebbero TRASPORTATI sul
   // branch del compito dopo, finendo nel diff che va al cancello di sicurezza.
   g(['clean', '-fd']);
-  return { ok: true, head: headSha(root), discarded, rewritten };
+  return { ok: true, head: headSha(root), discarded, rewritten, superato };
+}
+
+function antenato(g, a, b) {
+  return g(['merge-base', '--is-ancestor', a, b]).ok;
 }
 
 /** `a` e `b` stanno sulla stessa storia: uguali, o uno antenato dell'altro. */
 function sullaStessaLinea(g, a, b) {
-  return a === b
-    || g(['merge-base', '--is-ancestor', a, b]).ok
-    || g(['merge-base', '--is-ancestor', b, a]).ok;
+  return a === b || antenato(g, a, b) || antenato(g, b, a);
 }
 
 // ─── C: il controllo che ogni scrittura di stato deve fare ───────────────────
