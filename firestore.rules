@@ -1344,7 +1344,7 @@ service cloud.firestore {
     // riscrittura (scorciatoia, esito, proposte), l'OCR, la traduzione della pagina (esito, parte rimasta, ritorno
     // all'originale entro un minuto), il titolo automatico dell'Editor e la sua chat. Mai un testo, un titolo o un
     // sito. Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle espressioni; le
-    // stesse regole: sola creazione, senza login, forma fissa, legge solo l'admin. Sentinella:
+    // stesse regole: sola creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella:
     // tests/unit/firestoreRulesContatori.test.mjs.
     match /contatori-riquadri/{docId} {
       function contatoriRiquadri(d) {
