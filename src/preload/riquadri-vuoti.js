@@ -80,13 +80,13 @@ function buildRiquadriVuotiSource(corpi) {
   function inVolo(t, d) {
     if (arrivati.has(t)) return false;
     try {
-      var n = nomeDi.call(t);
-      if (n === 'iframe' && haAttr.call(t, 'srcdoc')) return true;
+      var n = R(nomeDi, t, []);
+      if (n === 'iframe' && R(haAttr, t, ['srcdoc'])) return true;
       var a = n === 'object' ? 'data' : 'src';
-      if (!haAttr.call(t, a)) return false;
-      var v = String(attr.call(t, a)).trim();
+      if (!R(haAttr, t, [a])) return false;
+      var v = String(R(attr, t, [a])).trim();
       if (!v || VUOTO.test(v)) return false;
-      return new Indirizzo(v, baseDi.call(d)).origin === ORIGINE;
+      return R(origineDi, new Indirizzo(v, R(baseDi, d, [])), []) === ORIGINE;
     } catch (e) { return false; }
   }
   var inGiro = false;
