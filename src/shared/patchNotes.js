@@ -12,6 +12,7 @@
       version: '0.2.251', date: '2026-10-29',
       features: [
         'Ctrl+Shift+T (Cmd+Shift+T su Mac) riapre l\'ultima scheda chiusa, come negli altri browser, invece di aprirne una nuova. Torna nello stesso posto della fila, con Indietro e Avanti com\'erano. Premendolo ancora riapre quelle chiuse prima, anche dopo aver riaperto Filo.',
+        'In chat Filo sa cosa è successo fra un tuo messaggio e l\'altro: il timer che ha suonato, il tema cambiato dalle Preferenze, il Wi-Fi caduto, un documento dell\'Editor scritto. E un documento o una pagina che ti ha letto restano davanti a lui anche dopo molti messaggi, finché Filo resta aperto.',
       ],
       fixes: [
         'Ctrl+L (Cmd+L su Mac) sulla home non cancella più quello che stavi scrivendo. Porta il cursore nel campo e seleziona il testo, come la barra degli indirizzi di un browser.',
