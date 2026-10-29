@@ -164,7 +164,7 @@ function buildRiquadriVuotiSource(corpi) {
     if (w) applica(w);
     spazza();
   }
-  function ascolta(t) { try { t.addEventListener('load', alLoad, true); } catch (e) {} }
+  function ascolta(t) { try { R(suEvento, t, ['load', alLoad, true]); } catch (e) {} }
   function mascheraIn(w) {
     try {
       var FP = w.Function.prototype, t = FP.toString;
