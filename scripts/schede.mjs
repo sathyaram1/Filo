@@ -19,7 +19,7 @@ export const VALIDI = ['si', 'no', 'dubbio', 'non letto'];
 export const TIPI = ['bug', 'feature', 'design', 'processo', 'sicurezza', 'documento'];
 export const AREE = ['chat-filo', 'home', 'editor', 'browser-schede', 'impostazioni', 'gestione-owner', 'feedback-app',
   'server-filo-security', 'routine-script', 'test', 'sito', 'pacchetti-rilasci', 'deck-builder', 'altro'];
-export const CAMPI_LETTI = ['seq', 'subSeq', 'status', 'updatedAt'];
+export const CAMPI_LETTI = ['seq', 'subSeq', 'status', 'priority', 'updatedAt'];
 
 const RILETTURA = [
   'RILETTURA. La scheda che trovi nel file l\'ha scritta un modello più piccolo. Rifai i controlli dei passi 1-3 e',
@@ -34,7 +34,11 @@ export function apertiDaRighe(righe) {
     return Number.isInteger(s) && s > 0 ? (Number.isInteger(sub) && sub > 0 ? `${s}.${sub}` : String(s)) : '';
   };
   return (Array.isArray(righe) ? righe : [])
-    .map((r) => ({ id: String(r._id || ''), num: num(r), stato: String(r.status || '').trim(), aggiornato: String(r.updatedAt || r._updateTime || '') }))
+    .map((r) => ({
+      id: String(r._id || ''), num: num(r), stato: String(r.status || '').trim(),
+      priorita: Number.isInteger(Number(r.priority)) && String(r.priority).trim() !== '' ? Number(r.priority) : null,
+      aggiornato: String(r.updatedAt || r._updateTime || ''),
+    }))
     .filter((f) => f.id && f.num && f.stato && !STATI_CHIUSI.includes(f.stato))
     .sort((a, b) => Number(a.num) - Number(b.num));
 }
@@ -148,7 +152,8 @@ function opzione(argv, nome) {
 async function elenca(cartella, dryRun) {
   const { acquireBearer } = await import('./lib/firestore-auth.mjs');
   await import('./lib/freno-letture.mjs');
-  await import('../src/shared/feedback.js');
+  // La pubblica prima della cifratura, come in claude-feedback.mjs.
+  for (const m of ['feedbackThread.js', 'feedbackPublicKey.js', 'feedbackCrypto.js', 'feedback.js']) await import(`../src/shared/${m}`);
   const { decryptFeedbackList } = await import('./lib/decrypt-feedback-fields.mjs');
   const token = await acquireBearer();
   const r = await globalThis.SN_FEEDBACK.listAllPaged({ idToken: token, fields: CAMPI_LETTI });
