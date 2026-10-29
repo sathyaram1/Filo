@@ -61,8 +61,8 @@ const safebrowseMethods = {
   },
 
   // Abbassa il verdetto a "safe" se l'utente ha già confermato l'avviso per questo dominio in questa scheda, o se si
-  // fida del sito (#967): la fiducia tace solo il «sospetto». Il sospetto taciuto resta da parte, per ridarlo se la
-  // fiducia viene tolta mentre la pagina è aperta.
+  // fida del sito (#967): la fiducia tace solo il «sospetto» sul sito, non quello su un file o un modulo della pagina
+  // (`diPagina`). Il sospetto taciuto resta da parte, per ridarlo se la fiducia viene tolta mentre la pagina è aperta.
   _sbApplyState(tab, verdict) {
     if (!verdict || verdict.level === 'safe') return verdict;
     const reg = verdict.scope || (verdict.norm && verdict.norm.registrable);
@@ -72,7 +72,7 @@ const safebrowseMethods = {
       return { ...verdict, level: 'safe', message: null };
     }
     const SB = globalThis.SN_SAFEBROWSE;
-    if (verdict.level === 'sospetto' && (tab.sbDismissed.has(reg) || (SB && SB.fidato(reg)))) {
+    if (verdict.level === 'sospetto' && (tab.sbDismissed.has(reg) || (SB && !verdict.diPagina && SB.fidato(reg)))) {
       tab._sbTaciuto = { scope: reg, verdict: { level: 'sospetto', message: verdict.message || null } };
       return { ...verdict, level: 'safe', message: null };
     }
@@ -92,7 +92,7 @@ const safebrowseMethods = {
       const a = tab.sbAvviso;
       let scopeAvviso = null;
       try { scopeAvviso = a ? SB.scopeOf(a.url) : null; } catch (_) {}
-      if (a && a.level === 'sospetto' && scopeAvviso && aggiunti.includes(scopeAvviso)) {
+      if (a && a.level === 'sospetto' && !a.diPagina && !a.prima && scopeAvviso && aggiunti.includes(scopeAvviso)) {
         tab._sbTaciuto = { scope: scopeAvviso, verdict: { level: 'sospetto', message: a.message || null } };
         this._sbMostra(tab, a.url, { level: 'safe', message: null });
         continue;
@@ -118,7 +118,7 @@ const safebrowseMethods = {
     const prima = JSON.stringify(tab.sbAvviso || null);
     const delLink = tab.sbAvviso && tab.sbAvviso.prima ? tab.sbAvviso : null;
     tab.sbAvviso = (level === 'pericoloso' || level === 'sospetto')
-      ? { level, message: verdict.message || null, url: url || wc.getURL() } : delLink;
+      ? { level, message: verdict.message || null, url: url || wc.getURL(), diPagina: !!verdict.diPagina } : delLink;
     if (tab.id === this.activeId && JSON.stringify(tab.sbAvviso) !== prima) this.layout();
     if (tab.sbAvviso && tab._sbFinestrelle) for (const segui of [...tab._sbFinestrelle]) { try { segui(); } catch (_) {} }
   },
@@ -315,7 +315,7 @@ const safebrowseMethods = {
     // chiesto di nuovo mentre è a schermo no.
     const a = tab.sbAvviso;
     const n = a && a.prima && a.url === String(url) && a.level === v.level ? a.prima.n : ++avvisiDiLink;
-    tab.sbAvviso = { level: v.level, message: v.message || null, url: String(url), prima: { apri, n } };
+    tab.sbAvviso = { level: v.level, message: v.message || null, url: String(url), diPagina: !!v.diPagina, prima: { apri, n } };
     if (tab.id === this.activeId) this.layout();
     return true;
   },
@@ -386,6 +386,8 @@ const safebrowseMethods = {
         this._sbState(t);
         (procedi ? t.sbBypass : t.sbDismissed).add(chiave);
       };
+      // «Continua» sul link vale quanto quello sulla pagina (#967): il sito d'arrivo entra fra quelli fidati.
+      if (continua && chiave && !a.diPagina) this._sbFidati(chiave);
       try { a.prima.apri(segna); } catch (_) {}
     } else if (scelta === 'indietro') {
       via();
@@ -722,7 +724,8 @@ const safebrowseMethods = {
   },
 
   // «Continua» sul "sospetto" (#967): il sito entra fra quelli di cui l'utente si fida, in ogni scheda e dopo i riavvii.
-  // La scheda lo tace subito, senza aspettare la scrittura; in incognito vale solo per lei.
+  // La scheda lo tace subito, senza aspettare la scrittura; in incognito vale solo per lei. Su un avviso per un file o un
+  // modulo della pagina (`diPagina`) vale solo per la scheda: l'utente ha accettato quel file, non il sito.
   safebrowseDismiss(tabId, url) {
     const SB = globalThis.SN_SAFEBROWSE;
     const tab = this.tabs.find((t) => t.id === tabId);
@@ -734,11 +737,15 @@ const safebrowseMethods = {
       tab.sbDismissed.add(key);
       const a = tab.sbAvviso;
       if (a && a.level === 'sospetto') tab._sbTaciuto = { scope: key, verdict: { level: 'sospetto', message: a.message || null } };
-      require('../services/sitiFidati').fidati(key, { win: this.win, incognito: !!this.incognito })
-        .catch((e) => console.warn('[Filo] sito fidato non salvato', e && e.message));
+      if (!(a && a.diPagina)) this._sbFidati(key);
     }
     this._sbMostra(tab, url, { level: 'safe', message: null });
     return { ok: true };
+  },
+
+  _sbFidati(key) {
+    require('../services/sitiFidati').fidati(key, { win: this.win, incognito: !!this.incognito })
+      .catch((e) => console.warn('[Filo] sito fidato non salvato', e && e.message));
   },
 
   // «Torna indietro» non conferma mai il sito (#288): si torna alla pagina di prima, o si esce su una pagina vuota.

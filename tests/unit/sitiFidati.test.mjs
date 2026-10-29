@@ -107,6 +107,35 @@ test('«confermo» sul pericoloso resta della scheda e non entra nell\'elenco', 
   assert.equal(livello(w.apri('https://paypa1.com/login')), 'pericoloso', 'in una scheda nuova l\'avviso torna');
 });
 
+test('«Continua» sull\'avviso di un link fa entrare il sito d\'arrivo come quello sulla pagina', async () => {
+  const w = finestra();
+  const tab = w.apri('https://example.com/');
+  tab.isInternal = false;
+  let aperto = false;
+  assert.equal(w._sbPrimaDelClic(tab, 'https://team.com/accesso', () => { aperto = true; }), true, 'il link a team.com si ferma all\'avviso');
+  w._sbScelta(tab, 'continua');
+  await finito();
+  assert.equal(aperto, true);
+  assert.deepEqual(disco.security.safeBrowse.trustedSites, ['team.com']);
+  assert.equal(w._sbPrimaDelClic(tab, 'https://team.com/altro', () => {}), false, 'il prossimo link a team.com si apre e basta');
+});
+
+test('la fiducia nel sito non tace l\'avviso su un file della pagina, e il suo «Continua» non la dà', async () => {
+  SB.impostaFidati(['example.com']);
+  const w = finestra();
+  const tab = w.apri('https://example.com/');
+  tab.isInternal = false;
+  assert.equal(livello(tab), 'safe');
+  const exe = 'https://www.example.com/fattura.pdf.exe';
+  assert.equal(w._sbPrimaDelClic(tab, exe, () => {}), true, 'il programma travestito da documento avvisa anche sul sito fidato');
+  assert.equal(livello(tab), 'sospetto');
+  w._sbScelta(tab, 'continua');
+  await finito();
+  SB.impostaFidati([]);
+  assert.deepEqual(disco.security.safeBrowse.trustedSites, [], 'aver accettato un file non fa fidare del sito');
+  assert.equal(livello(w.apri('https://team.com/')), 'sospetto');
+});
+
 test('in incognito «Continua» vale per la scheda e non lascia traccia', async () => {
   const w = finestra({ incognito: true });
   const tab = w.apri('https://team.com/');
