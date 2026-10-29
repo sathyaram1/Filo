@@ -1035,6 +1035,7 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
       const now = Date.now();
       if (now - lastPush < MIN_PUSH_MS) return;
       lastPush = now;
+      campiona(rec);
       broadcast('progress', rec);
     },
     done(savePath) {
