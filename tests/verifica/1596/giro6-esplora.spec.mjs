@@ -112,13 +112,13 @@ test('pezzi della stessa pagina letti uno dopo l\'altro: la risposta arriva e l\
   }
 });
 
-test.skip('due turni di fila con tre pagine ciascuno', async ({ app, openTab, testServer }) => {
+test('due turni di fila con tre pagine ciascuno', async ({ app, openTab, testServer }) => {
   test.setTimeout(200_000);
   const page = await openTab(NEWTAB);
-  await preparaPagine(app, testServer, MARCHI);
+  const urls = await preparaPagine(app, testServer, MARCHI);
   const tre = (q, from) => [
     { strumenti: [{ nome: 'CERCA_WEB', args: { query: q } }] },
-    { strumenti: [0, 1, 2].map((indice) => ({ nome: 'LEGGI_PAGINA', urlDa: URL_RE, indice: indice + from })) },
+    { strumenti: [0, 1, 2].map((i) => ({ nome: 'LEGGI_PAGINA', args: { url: urls[i + from] } })) },
   ];
   await modello(app, { finestra: 72000, piani: [...tre('uno', 0), { finale: 'PRIMO' }, ...tre('due', 3), { finale: 'SECONDO' }] });
   await chiedi(page, 'confronta le tre guide che trovi');
