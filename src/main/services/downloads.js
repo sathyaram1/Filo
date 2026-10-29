@@ -249,10 +249,12 @@ function downloadsDir() {
 
 // Il percorso di uno scaricamento ancora vivo è preso anche se sul disco non c'è ancora: tre copie dello stesso file
 // avviate insieme si scrivevano una sull'altra e ne restava una (#440).
+// Si chiede al DownloadItem e non alla voce: quella di un incognito chiuso sparisce mentre il file scende ancora.
 function percorsoPreso(p) {
-  for (const id of liveItems.keys()) {
-    const r = records.get(id);
-    if (r && r.savePath && stessoPercorso(r.savePath, p)) return true;
+  for (const item of liveItems.values()) {
+    let preso = '';
+    try { preso = item.getSavePath(); } catch (_) {}
+    if (preso && stessoPercorso(preso, p)) return true;
   }
   return false;
 }
