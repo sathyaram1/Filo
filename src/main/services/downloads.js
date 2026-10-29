@@ -1155,13 +1155,49 @@ function sessioneDi(rec) {
   } catch (_) { return null; }
 }
 
-// Il Referer che il clic sul link aveva presentato: intero dallo stesso sito, la sola origine da un altro.
-function refererPer(rec) {
-  const pagina = indirizzoPerMarca(rec._pagina);
+// Il Referer che il clic sul link presenta a `verso`: intero dallo stesso sito, la sola origine da un altro, niente da
+// https verso http.
+function refererPer(paginaDelClic, verso) {
+  const pagina = indirizzoPerMarca(paginaDelClic);
   if (!pagina) return '';
   try {
-    return new URL(pagina).origin === new URL(rec.url).origin ? pagina : `${new URL(pagina).origin}/`;
+    const da = new URL(pagina);
+    const a = new URL(verso);
+    if (da.protocol === 'https:' && a.protocol !== 'https:') return '';
+    return da.origin === a.origin ? pagina : `${da.origin}/`;
   } catch (_) { return ''; }
+}
+
+// Chromium scarta il Referer passato fra le intestazioni di downloadURL, e senza i siti che danno il file solo a chi
+// arriva dalla loro pagina rifiutano «Riprova»: lo presenta l'unico onBeforeSendHeaders della sessione (cookies.js),
+// alla richiesta di «Riprova» e ai suoi rimandi.
+const refererAttesi = new Map();   // indirizzo → [{ ses, pagina }]
+const refererInCorso = new Map();  // id della richiesta → pagina del clic
+function attendiReferer(indirizzo, ses, pagina) {
+  if (!pagina) return;
+  refererAttesi.set(indirizzo, (refererAttesi.get(indirizzo) || []).concat({ ses, pagina }));
+}
+function ritiraReferer(indirizzo, ses) {
+  const coda = refererAttesi.get(indirizzo);
+  if (!coda) return;
+  const i = coda.findIndex((x) => x.ses === ses);
+  if (i >= 0) coda.splice(i, 1);
+  if (!coda.length) refererAttesi.delete(indirizzo);
+}
+function refererDaPresentare(details, ses) {
+  if (!details || !details.url) return '';
+  let pagina = refererInCorso.get(details.id);
+  if (!pagina) {
+    const coda = refererAttesi.get(details.url);
+    const i = coda ? coda.findIndex((x) => x.ses === ses) : -1;
+    if (i < 0) return '';
+    pagina = coda.splice(i, 1)[0].pagina;
+    if (!coda.length) refererAttesi.delete(details.url);
+    // Tetto: è solo il filo fra una richiesta e i suoi rimandi.
+    if (refererInCorso.size > 64) refererInCorso.delete(refererInCorso.keys().next().value);
+    refererInCorso.set(details.id, pagina);
+  }
+  return refererPer(pagina, details.url);
 }
 
 // Chiave ambito+indirizzo → voci che aspettano il loro will-download. Un tentativo che non parte entro il tempo torna
