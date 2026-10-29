@@ -548,12 +548,19 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  on(MSG.IMAGE_BYTES, async (msg, sender) => {
+  on(MSG.IMAGE_BYTES, async (msg, sender, origin) => {
     const url = String((msg && msg.url) || '').trim();
     if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'URL non scaricabile' };
     const wc = sender && sender.wc;
     if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
-    return byteImmagineRemota({ url, referrer: String(sender?.tab?.url || sender?.url || ''), session: wc.session });
+    const remota = () => byteImmagineRemota({ url, referrer: String(sender?.tab?.url || sender?.url || ''), session: wc.session });
+    if (!daUnSito(origin, sender)) return remota();
+    const A = require('../appuntiDaiSiti');
+    const dalMenu = () => A.mittenteInVista(sender) && A.menuApertoQui(sender);
+    if (dalMenu()) return remota();
+    const estraneo = await byteImmagineDaEstraneo(url);
+    if (estraneo.ok || estraneo.tooBig) return estraneo;
+    return (await A.menuEntro(sender, A.ATTESA_DEL_MENU_MS)) && dalMenu() ? remota() : estraneo;
   });
 
   // "Salva file" su un link a un file (#410.2). A differenza di
