@@ -233,6 +233,7 @@ module.exports = {
   seedForOrigin,
   seedForHref,
   isIdentityProviderHref,
+  esentiNelSito,
   isGoogleAppSurface,
   configForHref,
   configForFrames,
