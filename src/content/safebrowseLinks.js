@@ -24,9 +24,21 @@
   let aSchermoDa = 0;
   let restoDa = 0;
 
+  // Gli altri link aspettano che l'osservatore abbia detto quali dei nuovi sono a schermo: su un computer lento il primo
+  // lotto partiva prima, nell'ordine della pagina (#1792). Una pagina nascosta non si disegna e non aspetta.
+  const ATTESA_SCHERMO_MS = 3000;
+  let nonVisti = new WeakSet();
+  let nonVistiN = 0;
+  let attesa = null;
+  const aspettaSchermo = () => nonVistiN > 0 && document.visibilityState !== 'hidden';
+
   const io = typeof IntersectionObserver === 'function'
     ? new IntersectionObserver((voci) => {
-      for (const v of voci) if (v.isIntersecting) { aSchermo.push(v.target); io.unobserve(v.target); }
+      for (const v of voci) {
+        if (nonVisti.delete(v.target) && nonVistiN > 0) nonVistiN--;
+        if (v.isIntersecting) { aSchermo.push(v.target); io.unobserve(v.target); }
+      }
+      if (!nonVistiN && attesa) { clearTimeout(attesa); attesa = null; }
       pianifica();
     }, { rootMargin: '50% 0px' })
     : null;
@@ -35,9 +47,15 @@
     try { return typeof el.href === 'string' ? el.href : ''; } catch (_) { return ''; }
   }
 
+  // Tolto e rimesso: un elemento già osservato non darebbe un primo resoconto nuovo.
   function aggiungi(el) {
     resto.push(el);
-    if (io) { try { io.observe(el); } catch (_) {} }
+    if (!io) return;
+    try {
+      io.unobserve(el);
+      io.observe(el);
+      if (!nonVisti.has(el)) { nonVisti.add(el); nonVistiN++; }
+    } catch (_) {}
   }
 
   function raccogli() {
@@ -47,6 +65,9 @@
       if (visti.has(el)) continue;
       visti.add(el);
       aggiungi(el);
+    }
+    if (nonVistiN && !attesa) {
+      attesa = setTimeout(() => { attesa = null; nonVisti = new WeakSet(); nonVistiN = 0; pianifica(); }, ATTESA_SCHERMO_MS);
     }
     pianifica();
   }
