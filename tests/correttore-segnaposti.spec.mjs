@@ -499,6 +499,23 @@ test('un controllo rapido che segna le x come errore non mette l\'onda sui segna
   await expect(page.locator('#ta')).toHaveValue("l'America l'hanno scoperta nel 1492 e la Bastiglia l'hanno presa nel 1789. ");
 });
 
+// Le X maiuscole senza cifre il codice non le prende: il segnaposto lo riconosce solo la rilettura, e vale lo stesso.
+test('le x di un segnaposto riconosciuto solo dalla rilettura non prendono l\'errore del controllo rapido', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {
+    ragionato: { XX: ['[vinto XX scudetti][vinto 36 scudetti][Scudetti vinti dalla Juventus][segnaposto]'] },
+    rapido: ['[XX][20][numero scritto a metà][errore]', '[scudeti][scudetti][refuso][errore]'],
+  });
+  await page.locator('#ta').click();
+  await page.keyboard.type('la Juve ha vinto XX scudetti, non XX scudeti. ');
+  await expect(valore(page, '36')).toBeVisible({ timeout: 8000 });
+  await expect.poll(async () => (await globale(app, '__rapide')).length, { timeout: 8000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(600);
+  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveText(['XX', 'scudeti']);
+  const menu = await tastoDestroSu(page, ocra(page, 'XX'));
+  await expect(menu.pannelli.first()).toContainText('36');
+  await expect(menu.pannelli.first()).not.toContainText('numero scritto a metà');
+});
+
 test('«Correggi tutti gli errori» riempie i segnaposti che hanno un valore', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, {
     ragionato: { '14xx': [COLOMBO, '[nel 17xx][nel 1789][La presa della Bastiglia, 14 luglio 1789][segnaposto]'] },
