@@ -130,7 +130,7 @@ function buildRiquadriVuotiSource(corpi) {
     for (var i = 0; i < cercaIn.length; i++) { try { return R(cercaIn[i], n, [OSPITI]) !== null; } catch (e) {} }
     return false;
   }
-  function inPagina(t) { try { return connesso.call(t); } catch (e) { return true; } }
+  function inPagina(t) { try { return R(connesso, t, []); } catch (e) { return true; } }
   // Una stringa che nomina un ospite; ciò che non è una stringa si converte da sé, e si guarda dopo.
   function testoConOspiti(v) { return typeof v !== 'string' || /<\s*(i?frame|object|embed)/i.test(v); }
   var tuttiIn = [Element.prototype.querySelectorAll, DocumentFragment.prototype.querySelectorAll];
