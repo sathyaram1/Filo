@@ -129,7 +129,7 @@ test('un giudizio che non arriva riordina lo stesso, lo dice all’utente e lasc
       () => tm.runAutoTriage({ trigger: 'reopen' }));
     assert.equal(esito.giudizioMancato, true);
     assert.deepEqual(ordine(tm), ['rosso', 'verde', 'blu']);
-    assert.deepEqual(tm.avvisi, ['Schede riordinate, ma non sono riuscito a valutare quali chiudere']);
+    assert.deepEqual(tm.avvisi, ['La pulizia automatica non è riuscita a valutare le schede.']);
     assert.ok(avvertito.mock.calls.some((c) => c.arguments.join(' ').includes('crediti finiti')), 'nessuna traccia del giudizio mancato');
   } finally {
     avvertito.mock.restore();
