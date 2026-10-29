@@ -41,7 +41,7 @@ test('ultimo messaggio dell’utente sotto una risposta di Filo: in fondo è pro
     { role: 'user', text: 'sì, per le otto', ts: pocoFa(2) },
   ] }]);
   const page = await openTab('filo://newtab/');
-  await expect.poll(async () => (await vista(page)).bolle.at(-1).su, { timeout: 15_000 }).toBeLessThan(110);
+  await expect.poll(async () => { const b = (await vista(page)).bolle.at(-1); return b && b.testo.includes('otto') ? b.su : 999; }, { timeout: 15_000 }).toBeLessThan(110);
   await page.waitForTimeout(500);
   const v = await vista(page);
   console.log('utente ultimo', JSON.stringify(v.bolle.slice(-2)), v.scrollTop, v.max, v.vuoto);
