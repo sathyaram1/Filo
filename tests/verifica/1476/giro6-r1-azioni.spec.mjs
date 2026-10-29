@@ -45,7 +45,7 @@ test('r1 Ctrl+Shift+T e Ctrl+L dalla barra si misurano fra le azioni, come Ctrl+
 
   await shell.keyboard.press('Control+Shift+T');
   await expect.poll(() => urls(app).then((l) => l.includes(a)), { timeout: 10_000 }).toBe(true);
-  await expect.poll(async () => (await oggi(app))['reopen-closed-tab'] || 0, {
+  await expect.configure({ soft: true }).poll(async () => (await oggi(app))['reopen-closed-tab'] || 0, {
     timeout: 10_000, message: 'la riapertura è un’azione misurata come la scheda nuova',
   }).toBe(1);
 
