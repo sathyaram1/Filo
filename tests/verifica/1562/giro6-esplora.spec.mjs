@@ -143,6 +143,8 @@ test('esplora: venti immagini in un messaggio solo', async ({ app }) => {
   const s1 = testo(c[1].messages[0]);
   let k = 0;
   while (k < s0.length && s0[k] === s1[k]) k++;
+  const forma = (m) => JSON.stringify(m, (key, v) => (typeof v === 'string' && v.length > 80 ? `${v.slice(0, 30)}…(${v.length})` : v));
+  console.log('FORMA0', forma(c[0].messages[0]), '\nFORMA1', forma(c[1].messages[0]));
   console.log('system diverge a', k, 'di', s0.length, s1.length, '\nPRIMA:', s0.slice(k - 200, k + 400), '\nDOPO:', s1.slice(k - 200, k + 400));
   console.log('1→2', JSON.stringify(primaDifferenza(c[0], c[1]), null, 1));
 });
