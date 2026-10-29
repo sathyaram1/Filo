@@ -59,7 +59,7 @@ function piena() {
   return S.documento({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-28T23', app: '9999.9999.999999', os: 'linux', dati: ora });
 }
 
-test('si legge solo da admin, si crea una volta e non si tocca più', () => {
+test('si legge solo da admin, si crea una volta con l’identità anonima e non si tocca più', () => {
   const allow = [...B.matchAll(/allow\s+([a-z,\s]+?)\s*:\s*if\s+([\s\S]*?);/g)].map((m) => ({ verbi: m[1].split(',').map((v) => v.trim()), cond: m[2].trim() }));
   const per = (v) => allow.filter((x) => x.verbi.includes(v)).map((x) => x.cond);
   assert.deepEqual(per('get'), ['isAdmin()']);
