@@ -417,6 +417,16 @@ test('sentinella: ogni campo delle sezioni elencate campo per campo è stato dec
   }
 });
 
+// Scomparti che un content script legge solo su filo://: su un sito non li chiede (#589.1 giro 5).
+const SOLO_NELLE_PAGINE_DI_FILO = new Set(['sn_feedback_client_id (src/content/feedback.js)']);
+test('il segno dei feedback, uguale su ogni sito, un sito non lo legge né lo scrive', () => {
+  assert.ok(!W.CHIAVI_STORAGE_WEB.includes('sn_feedback_client_id'));
+  assert.deepEqual(W.chiaviStoragePerOrigine(['sn_feedback_client_id', 'settings'], 'https://sito.example/'), ['settings']);
+  assert.equal(W.scritturaStorageAmmessa(['sn_feedback_client_id'], 'https://sito.example/'), false);
+  assert.match(readFileSync(join(ROOT, 'src', 'content', 'feedback.js'), 'utf8'), /location\.protocol !== 'filo:'\) return '';/,
+    'il riquadro del feedback su un sito non chiede il segno al magazzino');
+});
+
 // Gli scomparti del magazzino che i content script toccano con chrome.storage:
 // uno che manca dalla lista spegnerebbe la funzione solo sui siti.
 test('sentinella: ogni scomparto del magazzino usato dai content script è fra quelli ammessi', () => {
