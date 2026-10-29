@@ -38,7 +38,8 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   chat fisso (quattro caratteri dell'id), non «questa scheda»; il taglio per giorni si sposta a scatti (da un'ora a
   sei); oltre il tetto in token si taglia un quarto sotto e l'inizio si tiene finché basta. La domanda di un turno è già
   resa come la renderà il tratto dei turni dopo, e la risposta torna col suo giro (strumenti, esiti, seguiti) finché la
-  memoria lo tiene: un turno passato riscritto rompe la cache da lì e il ragionamento nato dentro i suoi giri. Una
+  memoria lo tiene: un turno passato riscritto rompe la cache da lì e il ragionamento nato dentro i suoi giri. Fino
+  alla prossima fotografia un messaggio mandato intero resta intero, e la riga di un'app resta com'era (#1562). Una
   conversazione ripresa da prima dei tetti riporta i suoi ultimi messaggi dentro un quarto del tetto in token, e la
   finestra si stringe di altrettanto: il tetto vale sempre.
 - **Verso Claude il ragionamento parte solo col prefisso con cui è nato** (#1552). Sui conti Anthropic nati dal
