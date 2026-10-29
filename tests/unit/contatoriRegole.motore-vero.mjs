@@ -355,6 +355,7 @@ for (const [m, d] of [['ocr', { esito: 'copiato' }], ['riscrittura', { scorciato
   C.registraRiquadro(datiRiq, v.misura, v.chiave, v.voci);
 }
 const RIQ = C.documentoRiquadri({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiRiq });
+await prova('senza identità non si creano i riquadri', () => assertFails(setDoc(doc(senzaIdentita, `${COLL_RIQ}/${idBuono}`), RIQ)));
 await prova('un anonimo crea i riquadri della sua ora', () => assertSucceeds(setDoc(doc(anon, `${COLL_RIQ}/${idBuono}`), RIQ)));
 await prova('ma non li riscrive', () => assertFails(setDoc(doc(anon, `${COLL_RIQ}/${idBuono}`), RIQ)));
 await prova('l’admin legge i riquadri', () => assertSucceeds(getDoc(doc(owner, `${COLL_RIQ}/${idBuono}`))));
