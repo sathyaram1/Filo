@@ -139,6 +139,11 @@ test('esplora: venti immagini in un messaggio solo', async ({ app }) => {
   });
   const n = (m) => (Array.isArray(m.content) ? m.content.filter((p) => p.type === 'image_url').length : 0);
   console.log('foto nel turno:', c[0].messages.map(n), 'dopo:', c[1].messages.map(n));
+  const s0 = testo(c[0].messages[0]);
+  const s1 = testo(c[1].messages[0]);
+  let k = 0;
+  while (k < s0.length && s0[k] === s1[k]) k++;
+  console.log('system diverge a', k, 'di', s0.length, s1.length, '\nPRIMA:', s0.slice(k - 200, k + 400), '\nDOPO:', s1.slice(k - 200, k + 400));
   console.log('1→2', JSON.stringify(primaDifferenza(c[0], c[1]), null, 1));
 });
 
