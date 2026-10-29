@@ -898,6 +898,8 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
     if (rec.paused && !inAttesa) {
       // Pausa volontaria dell'utente: non è un guasto, sospendi ogni timer.
       rec.state = 'paused';
+      // Alla ripresa la velocità riparte da lì, non dalla media col tempo fermo.
+      rec._campioni = [];
       clearInterruptGrace();
       if (rec._stallTimer) { clearTimeout(rec._stallTimer); rec._stallTimer = null; }
     } else if (state === 'interrupted') {
