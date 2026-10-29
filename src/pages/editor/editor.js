@@ -3372,7 +3372,7 @@
     const nome = TASTI.etichettaScritta(c.nome, TASTI.piattaforma());
     const t = TASTI_EDITOR.find((x) => prendeIlTasto(x, e));
     if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo strumento non partirebbe mai`;
-    const altro = elementiConScorciatoia({ tutti: true }).find((x) => x.id !== m.type && stessoTasto(c, x.c));
+    const altro = elementiConScorciatoia().find((x) => x.id !== m.type && stessoTasto(c, x.c));
     if (altro) return `${nome} è già la scorciatoia di «${nomeElemento(altro.id)}», e partirebbe solo quello`;
     return '';
   }
