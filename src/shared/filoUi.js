@@ -376,7 +376,10 @@
       // spostata è il sito. Rilascio, correttore e annulla mettono il testo dove dicono loro.
       const t = st.tasto;
       const sel = t && t.sel ? t.sel : (st.prima && st.prima.e === e ? st.prima.sel : null);
-      if (sel && !st.componendo && !e.isComposing && !SELEZIONE_PROPRIA.test(e.inputType) && c.value === st.buono) rimettiSelezione(c, sel);
+      // Il primo pezzo di una composizione prende il posto della selezione che c'era al suo inizio; poi la guida il browser.
+      const inizio = !!(t && t.e.type === 'compositionstart');
+      if (sel && (inizio || (!st.componendo && !e.isComposing)) && !SELEZIONE_PROPRIA.test(e.inputType) && c.value === st.buono) rimettiSelezione(c, sel);
+      if (inizio) st.tasto = null;
       let trasferito = null;
       try { if (e.dataTransfer) trasferito = e.dataTransfer.getData('text/plain'); } catch (_) {}
       const a = { e, tipo: e.inputType, dato: e.data, trasferito, valore: c.value, sel: selezioneDi(c), riga: c.tagName !== 'TEXTAREA' };
