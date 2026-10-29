@@ -378,6 +378,15 @@ html[data-chrome-compact="1"] .addr {
   /* Rimasto solo, l'avviso è la scheda: il clic la apre senza toccarne l'audio, il trascinamento la sposta (#1293). */
   .tab:not(.active) > .tab-alert { pointer-events: none; }
 }
+/* Dietro, dove nome e X in fila non ci stanno, la X compare sopra la fine del nome come senza avviso: il suo posto
+   vuoto lasciava al nome meno di una lettera appena la scheda cominciava a suonare (#1688). */
+@container tab (width < calc(68px + 2em)) {
+  .tab:not(.active):not(.misura):has(> .tab-alert) > .close { position: absolute; right: 30px; top: 7px; }
+  .tab:not(.active):has(> .tab-alert):hover > .title {
+    -webkit-mask-image: linear-gradient(to left, transparent 20px, #000 28px);
+    mask-image: linear-gradient(to left, transparent 20px, #000 28px);
+  }
+}
 
 /* Scheda stretta senza avviso, stessa priorità e stesso conto: senza, con tante schede la X usciva dalla sua
    e il clic sul suo centro cadeva sulla vicina (#945). Prova in tests/tab-scheda-stretta.spec.mjs. */
