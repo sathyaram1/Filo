@@ -160,11 +160,11 @@
     return migraConfig(app, stato, configDaModuli(app, collezione));
   }
 
-  // Le scorciatoie degli elementi che stanno nel pannello, per chi le confronta con le altre di Filo.
+  // Le scorciatoie degli elementi, dentro o fuori dal pannello (valgono comunque), per chi le confronta con le altre di Filo.
   function scorciatoie(app, stato) {
     const s = normalizza(app, stato);
     if (!s) return [];
-    return s.elementi
+    return catalogo(app).elementi.map((e) => e.id)
       .filter((id) => s.config[id] && s.config[id].shortcut)
       .map((id) => ({ id, nome: nome(app, id), shortcut: s.config[id].shortcut, tasto: s.config[id].tasto || '' }));
   }
