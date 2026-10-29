@@ -35,7 +35,7 @@ const DOMANDE_WEB = Object.freeze(new Set([
   'cookies_config', 'cookies_rule', 'cookies_banner_tokens', 'cookies_frame_banner', 'cookies_outcome',
   'safebrowse_get', 'geo_propose_accept', 'geo_propose_dismiss',
   'wallet_invite_open', 'campi_delicati', 'apri_collegamento_filo', 'key_fallback_shown', 'copy_text_to_clipboard',
-  'filo_aiuto_nuovo', 'filo_conversazione_app', 'apri_comunque', 'controlla_campo', 'aiuto_documenti_ferma',
+  'filo_aiuto_nuovo', 'filo_conversazione_app', 'apri_comunque', 'aiuto_documenti_ferma',
   'aiuto_cerca_documenti', 'filo_decidi_pagina', 'accesso_credenziali', 'riquadro_cookie_segnala',
   'riquadro_cookie_stato', 'riquadro_cookie_cambia', 'riquadro_cookie_risposta', 'ad_skip_click', 'ad_skip_config',
   'ad_skip_here', 'audio_host_check', 'spiegazione_anticipata_usata', 'image_provenance', 'image_bytes',
