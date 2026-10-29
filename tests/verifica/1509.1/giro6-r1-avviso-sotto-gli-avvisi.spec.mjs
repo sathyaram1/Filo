@@ -3,7 +3,7 @@
 // riquadro stava nella pagina; nello strato resta in fondo e finisce coperto dalla carta del download.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { nelMondoDiFilo, nelloStrato, statoDi, clicca, conta, paginaDelloStrato } from '../../helpers/riquadri.mjs';
+import { nelMondoDiFilo, nelloStrato, statoDi, clicca, conta } from '../../helpers/riquadri.mjs';
 
 test('r1 feedback inviato da un sito con un download appena finito: il grazie si vede sopra la carta del download', async ({ app, shell, avvisi, openTab, testServer }) => {
   test.setTimeout(90_000);
@@ -17,9 +17,8 @@ test('r1 feedback inviato da un sito con un download appena finito: il grazie si
 
   await nelMondoDiFilo(app, p, () => globalThis.SN_FEEDBACK_UI.open());
   await expect.poll(() => statoDi(app, p, '.sn-fb-text')).not.toBeNull();
-  const sopra = await paginaDelloStrato(app, p);
-  await clicca(app, p, '.sn-fb-text');
-  await sopra.keyboard.insertText('una prova di invio dal sito');
+  const dove = await clicca(app, p, '.sn-fb-text');
+  await dove.keyboard.insertText('una prova di invio dal sito');
   await clicca(app, p, '.sn-fb-send');
   await expect.poll(() => conta(app, p, '.sn-fb-modal'), { timeout: 15_000 }).toBe(0);
 
