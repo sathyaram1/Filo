@@ -61,14 +61,6 @@ function contaSe(metodo, ...args) {
   } catch (_) { return undefined; }
 }
 const { TURNO_MUTO } = require('./contatori');
-// Una scheda chiusa che la chat riapre col suo indirizzo si conta come quella riaperta dalla home (#1467).
-async function contaSeRiaperta(url, win) {
-  if (!url || !win || win._filoIncognito) return;
-  try {
-    const voce = await ArchivedTabs.ultimaPer(url);
-    if (voce) contaSe('riaperta', voce, { incognito: false });
-  } catch (_) {}
-}
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
