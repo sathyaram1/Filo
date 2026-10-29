@@ -64,7 +64,8 @@ node "<CANALE>" ramo-server <ramo> "$(git -C "<CLONE>" rev-parse HEAD)"
   Il server legge la punta e la scrive nel registro dei rami. Senza questa riga il ramo del server non risulta fidato
   e il lavoro non arriva su main.
 - Mai: `main` di filo-security (né push né merge), `server:fondi`, deploy (`firebase`, `server:pubblica`),
-  `.github/workflows` (GitHub rifiuta le spinte che li toccano: quel passo è dell'owner, e si chiede con una domanda).
+  `.github/workflows`. GitHub non rifiuta da sé le spinte che li toccano (#1140): è la regola dell'owner (G3) a
+  fermarti. Quel passo è suo, e si chiede con una domanda.
 
 ### Dopo la verifica
 

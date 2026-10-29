@@ -288,6 +288,15 @@
       dove: ['src/main/updater.js'], prova: "require('electron-updater')", nellaLibreria: true,
     },
     {
+      id: 'ancora-aggiornamenti', nome: 'Il server di Filo, per controllare gli aggiornamenti',
+      base: [FIRESTORE],
+      quando: 'avvio',
+      occasione: 'prima di scaricare una versione nuova, all’avvio o quando la chiedi',
+      riceve: 'niente di tuo: legge l’impronta che il server ha registrato per i file di quella versione',
+      frase: "legge l'impronta dei suoi file che il server ha registrato",
+      dove: ['src/main/ancoraRilascio.js'],
+    },
+    {
       id: 'liste-pubblicita', nome: 'EasyList, StevenBlack e le liste nazionali, per bloccare la pubblicità',
       base: [
         'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts',

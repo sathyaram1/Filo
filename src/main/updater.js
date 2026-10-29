@@ -32,6 +32,7 @@ const dip = {
   chiudi: () => electronApp().quit(),
   riapri: (execPath) => electronApp().relaunch({ execPath, args: [] }),
   avviso: mandaAvviso,
+  leggiAncora: (tag) => require('./ancoraRilascio').leggiAncora(tag),
 };
 
 // I passi degli aggiornamenti per i contatori anonimi (#1466): uno per versione e sessione, e la versione non esce (quella
@@ -71,6 +72,7 @@ function nuovoStato() {
     scaricamento: null,   // { versione, percento } finché scarica
     pronta: null,         // la versione scaricata
     agganciata: false,    // electron-updater la installerà alla chiusura (vedi regola)
+    ancora: null,         // { versione, impronte } ancorate dal server per l'ultima versione passata dal cancello
     errore: null,
     annuncia: () => {},
   };
@@ -308,13 +310,17 @@ function quandoScaricato(info) {
   stato.pronta = versione;
   let meta = null;
   try { meta = JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'update-info.json'), 'utf8')); } catch (_) {}
-  const r = R.ricordaScaricato(leggiRicordo(), {
+  const impronta = R.improntaDaRicordare({ versione, sha512: meta?.sha512 || shaDalFeed(info, file), ancora: stato.ancora });
+  const prec = leggiRicordo();
+  const r = impronta ? R.ricordaScaricato(prec, {
     versione,
     file,
-    sha512: meta?.sha512 || shaDalFeed(info, file),
+    sha512: impronta,
     amministratore: meta?.isAdminRightsRequired === true,
-  });
+  }) : null;
   if (r && r.versione === versione) scriviRicordo(r);
+  // Senza l'impronta ancorata non resta niente da installare all'avvio, nemmeno il ricordo di prima di quella versione.
+  else if (!impronta && prec && prec.versione === versione) scriviRicordo(null);
   stato.fase = 'pronto';
   stato.versione = versione;
   stato.percentuale = 100;
@@ -356,6 +362,21 @@ function rifiutoDelCancello(messaggio, info) {
   return Object.assign(new Error(messaggio), { rifiutata: String((info && info.version) || '?') });
 }
 
+// Allegati e latest.yml li riscrive chi ha un token del repo, l'àncora no (#1501). Firestore che non risponde non è
+// una release falsa: l'aggiornamento si rimanda come senza rete, senza dire all'utente che non è sicura.
+async function controllaAncora(tag, info) {
+  const ancora = await dip.leggiAncora(tag);
+  const a = R.esitoAncora({ file: R.fileDaAncorare(info), ancora });
+  if (a.esito === 'illeggibile') throw new Error(`aggiornamento rimandato: l'àncora di ${tag} adesso non si legge`);
+  if (a.esito === 'manca') throw rifiutoDelCancello(`release ${tag} rifiutata: il server non ha ancorato i suoi file`, info);
+  if (a.esito === 'diversa') {
+    const nome = String(JSON.stringify(a.nome === undefined ? null : a.nome)).slice(0, 120);
+    throw rifiutoDelCancello(`release ${tag} rifiutata: ${nome} non ha l'impronta ancorata dal server`, info);
+  }
+  if (a.esito === 'coincide') stato.ancora = { versione: info.version, impronte: { ...ancora.impronte } };
+  else console.log('[updater] nessuna àncora sul server: vale il solo latest.yml (#1501)');
+}
+
 function soloTagDiRilascio(au) {
   if (au.getUpdateInfoAndProvider && au.getUpdateInfoAndProvider.filoTag) return;
   if (!dalMotore(au)) return;
@@ -390,6 +411,7 @@ function soloTagDiRilascio(au) {
       if (!R.fileDiRilascio({ versione: info.version, urls, owner: opz.owner, repo: opz.repo, host: opz.host || 'github.com' })) {
         throw rifiutoDelCancello(`release ${info.tag} rifiutata: i suoi file non stanno sotto v${info.version}`, info);
       }
+      await controllaAncora(vero, info);
     }
     return r;
   };
@@ -967,7 +989,13 @@ function togliAvvisiSuperati(inUso) {
 }
 
 // Solo nelle prove: un autoUpdater finto guidato dallo spec, e lancio/uscita registrati invece di eseguiti.
-function perProva({ piattaforma = 'win32', versione = '0.2.233', appImage = null, cartella = null, avvisoVero = true } = {}) {
+// Le prove non vanno su Firestore: di serie nessuna àncora in tutta la raccolta, il controllo spento.
+const ANCORA_SPENTA = async () => ({ letta: true, impronte: null, altre: false });
+function ancoraPerProva(leggi) {
+  dip.leggiAncora = typeof leggi === 'function' ? leggi : ANCORA_SPENTA;
+}
+
+function perProva({ piattaforma = 'win32', versione = '0.2.233', appImage = null, cartella = null, avvisoVero = true, ancora = null } = {}) {
   const { EventEmitter } = require('node:events');
   const registro = { lanciati: [], chiusure: 0, uscite: 0, riaperture: [], installazioni: 0, controlli: 0, scaricamenti: 0, risposta: null, avvisi: [] };
   const finto = new EventEmitter();
@@ -990,6 +1018,7 @@ function perProva({ piattaforma = 'win32', versione = '0.2.233', appImage = null
   dip.riapri = (p) => { registro.riaperture.push(p); };
   dip.avviso = avvisoVero ? (t) => { registro.avvisi.push(t); mandaAvviso(t); } : (t) => { registro.avvisi.push(t); };
   dip.argv = () => registro.argv || [];
+  ancoraPerProva(ancora);
   riavvioInCorso = false;
   collega(finto, { chiesta: null, annuncia: annunciaHome });
   return { finto, registro };
@@ -1013,6 +1042,7 @@ module.exports = {
   avvisaInstallazioneFallita,
   installatoreValido,
   perProva,
+  ancoraPerProva,
   PAGINA_DOWNLOAD,
   TIPI_AVVISO,
   TIPO_DISPONIBILE,

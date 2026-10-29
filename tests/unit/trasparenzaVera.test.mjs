@@ -99,7 +99,7 @@ test('l\'Aiuto chiede al server i percorsi del sito, e il documento sulla privac
   const chiede = /ACTIONS\.HELP[\s\S]{0,600}Paths\.listByDomain\(/.test(leggi('src', 'main', 'services', 'handlers.js'));
   legame(chiede, privacy, 'Filo chiede al server i percorsi già noti per quel sito', 'lettura dei percorsi dal server');
   legame(chiede, privacy, 'il nome del sito su cui apri l\'Aiuto', 'nome del sito fra le cose che arrivano al server');
-  legame(chiede, privacy, 'Per chi usa l\'app fa cinque cose', 'i percorsi fra i compiti del server');
+  legame(chiede, privacy, 'Per chi usa l\'app fa sei cose', 'i percorsi fra i compiti del server');
 });
 
 test('cancellare le pagine visitate chiede solo un OK, e il documento sulla sicurezza lo dice', () => {

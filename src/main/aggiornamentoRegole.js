@@ -195,8 +195,65 @@ function fileDiRilascio({ versione, urls, owner, repo, host = 'github.com' } = {
   });
 }
 
+// L'àncora (#1501): per ogni tag, l'impronta di ogni file scritta una volta dal server dopo averlo riscaricato. Chi
+// riscrive allegati e latest.yml con un token del repo non la tocca. Lettura pubblica, scrittura mai da un client.
+const COLLEZIONE_ANCORE = 'ancoreRilascio';
+
+const proprio = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
+
+// Il documento come lo dà Firestore (REST): { nome: sha512 }. Una voce fuori forma non conta, e il suo file non passa.
+function impronteDellAncora(doc) {
+  const voci = doc && doc.fields && doc.fields.file && doc.fields.file.mapValue && doc.fields.file.mapValue.fields;
+  const out = Object.create(null);
+  if (!voci || typeof voci !== 'object') return out;
+  for (const nome of Object.keys(voci)) {
+    const v = voci[nome] && voci[nome].mapValue && voci[nome].mapValue.fields;
+    const sha = v && v.sha512 && v.sha512.stringValue;
+    if (typeof sha === 'string' && sha) out[nome] = sha;
+  }
+  return out;
+}
+
+// I file che electron-updater può scaricare da questo feed, coi nomi e le impronte scritti nel yml: `files`, o `path`
+// quando manca, e ogni pacchetto.
+function fileDaAncorare(info) {
+  if (!info || typeof info !== 'object') return [];
+  const voce = (f, campo) => ({ nome: f && f[campo], sha512: f && f.sha512 });
+  const lista = Array.isArray(info.files) && info.files.length ? info.files.map((f) => voce(f, 'url'))
+    : info.path != null ? [voce(info, 'path')] : [];
+  if (info.packages && typeof info.packages === 'object') {
+    for (const p of Object.values(info.packages)) lista.push(voce(p, 'path'));
+  }
+  return lista;
+}
+
+// `ancora`: { letta: false } se Firestore non ha risposto; { letta: true, impronte, altre } se sì, con `impronte` null
+// quando questa release non ha documento e `altre` vero se ne esiste almeno uno. Raccolta vuota: il server non ha
+// ancorato ancora niente. Il controllo si accende da solo alla prima àncora, e il server non ne cancella.
+// `file`: [{ nome, sha512 }], tutti quelli che il feed elenca. Esiti: coincide, spenta, manca, diversa, illeggibile.
+function esitoAncora({ file, ancora } = {}) {
+  if (!ancora || ancora.letta !== true) return { esito: 'illeggibile' };
+  if (!ancora.impronte) return ancora.altre === false ? { esito: 'spenta' } : { esito: 'manca' };
+  if (!Array.isArray(file) || !file.length) return { esito: 'diversa', nome: null };
+  for (const f of file) {
+    const nome = f && typeof f.nome === 'string' ? f.nome : null;
+    const sha = f && typeof f.sha512 === 'string' ? f.sha512 : '';
+    if (!nome || !sha || !proprio(ancora.impronte, nome) || ancora.impronte[nome] !== sha) return { esito: 'diversa', nome };
+  }
+  return { esito: 'coincide' };
+}
+
+// L'impronta che il ricordo tiene per l'installazione all'avvio: con l'àncora accesa solo una delle impronte ancorate
+// di quella versione, o niente ricordo. `ancora` null: controllo spento, vale quella del feed come prima.
+function improntaDaRicordare({ versione, sha512, ancora } = {}) {
+  if (!ancora) return sha512 || null;
+  if (!sha512 || !ancora.impronte || ancora.versione !== versione) return null;
+  return Object.values(ancora.impronte).includes(sha512) ? sha512 : null;
+}
+
 module.exports = {
-  MODI, MODO_PREDEFINITO, TENTATIVI_DA_SOLI,
+  MODI, MODO_PREDEFINITO, TENTATIVI_DA_SOLI, COLLEZIONE_ANCORE,
   confrontaVersioni, etichettaCoincide, fileDellaRelease, releaseCoerente, modoScelto, piano, sceltaNonVale, haPulsante,
   ricordaScaricato, contaTentativo, decidiAllAvvio, fraseScaricato, tagAccettato, tagDiGitHubAccettato, fileDiRilascio,
+  impronteDellAncora, fileDaAncorare, esitoAncora, improntaDaRicordare,
 };

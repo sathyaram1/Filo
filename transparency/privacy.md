@@ -73,7 +73,7 @@ A ogni risposta Filo registra chi l'ha servita davvero, e lo vedi nella Cronolog
 
 ## Il server di Filo
 
-Filo ha un server, su Firebase, cioè su infrastruttura Google (ne parlo più sotto). Per chi usa l'app fa cinque cose: tiene la configurazione condivisa (quale modello usa ogni funzione), riceve i feedback e i contatori, gestisce i crediti, ospita il red team e conserva i percorsi dell'Aiuto, cioè i passi che hanno funzionato su un sito.
+Filo ha un server, su Firebase, cioè su infrastruttura Google (ne parlo più sotto). Per chi usa l'app fa sei cose: tiene la configurazione condivisa (quale modello usa ogni funzione), riceve i feedback e i contatori, gestisce i crediti, ospita il red team, conserva i percorsi dell'Aiuto, cioè i passi che hanno funzionato su un sito, e tiene l'impronta dei file di ogni versione di Filo.
 
 Le parti del server non stanno tutte nello stesso posto:
 
@@ -82,7 +82,7 @@ Le parti del server non stanno tutte nello stesso posto:
 - **Gli allegati dei feedback** stanno negli Stati Uniti, in Carolina del Sud, nella regione us-east1 di Google. Sono gli screenshot e i file che alleghi, e partono già cifrati. Li tiene un contenitore di file separato dal database.
 - **Le identità** stanno negli Stati Uniti, e ci restano anche dopo il database. Sono l'identità anonima di ogni installazione e, se fai il login con Google, la tua email e il tuo nome. Le tiene il servizio di accesso di Firebase, che gira solo lì e non si può spostare.
 
-All'avvio Filo si presenta al server con la sua identità anonima, legge la configurazione condivisa e lo stato dei suoi crediti; il primo giorno chiede anche se c'è un invito che lo aspetta. Queste richieste non contengono niente di tuo, oltre all'indirizzo IP che ogni richiesta in rete porta con sé.
+All'avvio Filo si presenta al server con la sua identità anonima, legge la configurazione condivisa e lo stato dei suoi crediti; il primo giorno chiede anche se c'è un invito che lo aspetta. Prima di scaricare una versione nuova legge l'impronta dei suoi file che il server ha registrato quando è uscita. Queste richieste non contengono niente di tuo, oltre all'indirizzo IP che ogni richiesta in rete porta con sé.
 
 ## I feedback
 

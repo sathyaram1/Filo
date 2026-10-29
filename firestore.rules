@@ -258,6 +258,13 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+    // L'àncora delle release (#1501): l'impronta di ogni file, scritta una volta dal server dopo averlo riscaricato.
+    // Ogni Filo la legge prima di scaricare un aggiornamento (anche l'elenco: una raccolta vuota vuol dire controllo
+    // non ancora acceso). Nessun client la scrive, nemmeno l'owner: riscrivibile da una sessione, non ancorerebbe niente.
+    match /ancoreRilascio/{tag} {
+      allow read: if true;
+      allow write: if false;
+    }
     match /config/secrets {
       allow read: if isAdmin();
       allow write: if isAdmin();
