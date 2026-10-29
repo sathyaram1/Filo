@@ -285,9 +285,8 @@ html[data-chrome-compact="1"] .addr {
 .tab:hover .close,
 .tab.active .close { opacity: 1; }
 .tab .close:hover { background: color-mix(in srgb, var(--border) 60%, transparent); color: var(--fg); }
-/* Sulle schede dietro la X non tiene posto: compare al passaggio sopra la fine del nome, che sfuma sotto di lei,
-   così con la fila piena il nome arriva al bordo (#429). Con l'avviso audio sta prima di lui, sempre sul nome: il suo
-   posto vuoto, con la scheda che non si allarga quando suona, lasciava al nome meno di una lettera (#1688). */
+/* Dietro la X non tiene posto, nemmeno con l'avviso (che le sta dopo): compare al passaggio sopra la fine del nome,
+   che sfuma sotto di lei. Il suo posto vuoto toglieva il nome alla scheda che comincia a suonare (#429, #1688). */
 .tab:not(.active):not(.misura) > .close {
   position: absolute;
   right: 8px;
@@ -368,8 +367,7 @@ html[data-chrome-compact="1"] .addr {
 .tab.segni-stretti:not(.misura) .tab-permessi .segno ~ .segno { display: none; }
 
 /* Scheda stretta con l'avviso: allargandola compaiono avviso, icona, X, titolo, paese, ognuno quando ci sta con chi lo
-   precede (icone 16, X 18, paese 28, gap 6, titolo 2em), così il titolo non risparisce (#1293, tab-audio-indicator).
-   Sulle schede dietro la X non è in fila e non si conta. */
+   precede (icone 16, X 18 solo sull'attiva, paese 28, gap 6, titolo 2em), così il titolo non risparisce (#1293). */
 @container tab (width < calc(102px + 2em)) {
   .tab.active:has(> .tab-alert) > .proxy-ind { display: none; }
 }
