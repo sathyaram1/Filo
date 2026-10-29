@@ -443,6 +443,7 @@
       }
     }
     const indici = [...ripresi.indici, ...Array.from({ length: n - inizio }, (_, k) => inizio + k)];
+    const ripreseOra = [...new Set(ripresi.indici.map((i) => lista[i].chat))].sort();
     const out = [];
     const azioni = [];
     // Gli esiti che avrebbe davanti anche una conversazione nuova: quelli fra gli ultimi messaggi di tutto il filo.
