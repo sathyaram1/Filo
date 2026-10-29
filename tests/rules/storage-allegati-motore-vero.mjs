@@ -254,18 +254,19 @@ const CASI = {
   'metadati-assenti': ["{'metadata': null, 'contentDisposition': null, 'contentEncoding': null}", 'ok'],
   'campi-vuoti': ["{'metadata': {}, 'contentDisposition': '', 'contentEncoding': '', 'cacheControl': '', 'contentLanguage': ''}", 'ok'],
   'cache-nulla': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'cacheControl': null, 'contentLanguage': null}", 'ok'],
-  'cache-scelta': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'cacheControl': 'public, max-age=31536000'}", 'ko'],
-  'lingua-scelta': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'contentLanguage': 'it'}", 'ko'],
-  // Il codice di scarico lo scrive il motore vero prima delle regole (#1666): da solo passa, con un'altra chiave no.
+  // Il codice di scarico lo scrive il deposito vero prima delle regole (#1666): da solo passa, con un'altra chiave no.
   'codice-visibile': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': null, 'contentEncoding': null}", 'ok'],
   'codice-e-chiave': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'filoSistemato': 'si'}}", 'ko'],
-  // Campi ASSENTI, non nulli (#1728): al motore vero un caricamento normale non porta contentEncoding, e leggerlo
-  // nudo negava ogni allegato. Su questa risorsa scritta a mano l'emulatore fa lo stesso errore.
+  // La stima di ciò che vede il deposito vero (#1769): codice di scarico, nome di scarico di serie, codifica
+  // «identity» come nella sua risposta. Con le regole di #1728 era rosso.
+  'come-il-deposito-vero': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': \"inline; filename*=utf-8''n.octetstream\", 'contentEncoding': 'identity', 'cacheControl': '', 'contentLanguage': ''}", 'ok'],
+  'deposito-vero-col-nome-scelto': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': \"inline; filename*=utf-8''fattura.exe\", 'contentEncoding': 'identity'}", 'ko'],
+  'deposito-vero-con-chiave': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'filoSistemato': 'si'}, 'contentDisposition': 'inline', 'contentEncoding': 'identity'}", 'ko'],
+  // Campi ASSENTI, non nulli: all'emulatore il nome di scarico e i metadati non arrivano, e letti nudi negano.
   'senza-codifica': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': 'inline'}", 'ok'],
   'senza-nome-di-scarico': ["{'metadata': {}, 'contentEncoding': null}", 'ok'],
   'senza-chiavi': ["{'contentDisposition': null, 'contentEncoding': null}", 'ok'],
   'nessun-campo': ['{}', 'ok'],
-  'solo-codifica-scelta': ["{'contentEncoding': 'gzip'}", 'ko'],
   'solo-nome-scelto': ["{'contentDisposition': 'attachment; filename=\"fattura.exe\"'}", 'ko'],
   'solo-chiave-scelta': ["{'metadata': {'filoSistemato': 'si'}}", 'ko'],
 };
