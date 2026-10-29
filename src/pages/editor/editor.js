@@ -253,8 +253,8 @@
     } catch (_) {}
   }
   const contaModello = (r) => contaErroreVisto({ misura: 'errore-modello', code: String((r && (r.code || r.errorCode)) || ''), status: Number(r && r.status) || 0 });
-  // La griglia dei moduli (#1471): per tipo di modulo cosa gli succede, la griglia ridimensionata, la vista delle
-  // impostazioni, i trascinamenti. Mai il testo del documento, né quello che si scrive in un modulo.
+  // Gli strumenti del pannello (#1471, #1433): per tipo cosa gli succede, la vista delle impostazioni, i trascinamenti.
+  // Mai il testo del documento, né quello che si scrive in uno strumento.
   const contaGesto = (campi) => contaErroreVisto({ misura: 'gesto', ...campi });
   // Il titolo automatico e la chat del documento (#1465): esiti e fasce, mai il titolo né il testo.
   const contaRiquadro = (cosa, campi) => contaErroreVisto({ misura: 'riquadro', cosa, ...campi });
