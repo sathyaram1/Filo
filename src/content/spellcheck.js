@@ -1447,7 +1447,11 @@
     const valido = (x) => x.start >= 0 && x.end <= testo.length && x.end > x.start && testo.slice(x.start, x.end) === x.segment;
     // Le x di un segnaposto sono volute: un errore che ci cade sopra (rapido, ragionato, giudicato rimesso) non si vede né si
     // corregge, a prescindere dal verdetto del candidato. Il testo del rapido è misurato sul banco e non lo dice (#1448.9).
-    const xVolute = segnapostiAttivi() ? state.codice.filter((c) => c.fonte === 'segnaposto') : [];
+    // Valgono anche le x che riconosce solo la rilettura («vinto XX scudetti»): il suo segno sta già sulle sole x.
+    const xVolute = segnapostiAttivi() ? [
+      ...state.codice.filter((c) => c.fonte === 'segnaposto'),
+      ...delModello.filter((m) => m.tipo === 'segnaposto' && valido(m)),
+    ] : [];
     const sulleX = (x) => x.segno === 'errore' && xVolute.some((s) => x.start < s.end && x.end > s.start);
     const tieni = (x) => valido(x) && !sulleX(x) && !ignorato(state, x, testo)
       && !(x.segno === 'errore' && !/\s/.test(x.segment.trim()) && (isInDictionary(x.segment) || nomeNoto(x.segment)))
