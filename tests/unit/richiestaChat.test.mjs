@@ -80,13 +80,13 @@ const sezioniDi = ({ profilo = 'Si chiama Mario.', lezioni = '', schede = '1. Gm
 
 // Un turno come lo fa handlers.js (turnoFiloChat): la domanda entra nel filo, il tratto si compone, il CONTESTO si
 // fotografa, la domanda prende le sue note, la richiesta parte; la risposta entra nel filo col suo giro.
-async function turno({ chat = 'ab12', testo, minutiFa, sezioni = sezioniDi(), giro = null }) {
+async function turno({ chat = 'ab12', testo, minutiFa, sezioni = sezioniDi(), giro = null, onboarding = '' }) {
   await Chats.append(chat, { role: 'user', text: testo, ts: fa(minutiFa) });
   const componi = () => Contesto.componi({ chatId: chat, userMessage: testo, storia: [], tetti: TETTI, osserva: () => '', incognito: false });
   let c = await componi();
   const foto = Contesto.fotografa({ incognito: false, sezioni, ancora: c.ancora, durata: '1h' });
   if (foto.epoca !== c.epoca) c = await componi();
-  const domanda = c.domanda({ stato: foto.cambiate, epoca: foto.epoca });
+  const domanda = c.domanda({ stato: foto.cambiate, epoca: foto.epoca, onboarding });
   const inizio = FC.richiesta({ sistema: PROMPTS.filoChatStatic() + foto.testo, tratto: c.messaggi, domanda });
   const extra = [];
   let ultimo = null;
