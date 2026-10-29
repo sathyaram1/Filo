@@ -80,7 +80,8 @@
 //
 //   node scripts/routine-channel.mjs deliver <biglietto> <intento> [--campo valore …]
 //       → consegna una decisione. Intenti: verdict, fixed, secaudit, status,
-//         note, feedback, domanda, piano. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
+//         note, feedback, domanda, piano; su fixed il correttore aggiunge `--motivo "…"`
+//         (la forma di --record-fixed). Exit 0 = accettata, 4 = RIFIUTATA dal server (non
 //         ripiegare: il server ha guardato e ha detto no), 3 = guasto.
 //         `--notes "…"` è il report per l'owner (il server lo cifra: nessuno
 //         tranne lui lo rilegge). `--frase "…"` è la riga in chiaro per chi ha
@@ -1192,7 +1193,7 @@ if (isMain) {
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
     'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
-    'feedback', 'piano', 'fusione',
+    'feedback', 'piano', 'fusione', 'motivo',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -1218,7 +1219,7 @@ if (isMain) {
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
     'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
-    'feedback', 'piano', 'fusione',
+    'feedback', 'piano', 'fusione', 'motivo',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -1347,10 +1348,11 @@ if (isMain) {
     }
   }
 
-  // `--feedback`, `--piano` e `--fusione` hanno un comando solo ciascuno: altrove finirebbero nei dati senza effetto.
+  // `--feedback`, `--piano`, `--fusione` e `--motivo` hanno un comando solo ciascuno: altrove finirebbero nei dati senza effetto.
   {
     const intentoDi = () => [args[0], args[1]].find((a) => INTENTI_CONSEGNA.includes(a)) || '';
     const fuori = data.feedback !== undefined && cmd !== 'ticket' ? '--feedback vale solo con ticket'
+      : data.motivo !== undefined && !(cmd === 'deliver' && intentoDi() === 'fixed') ? '--motivo vale solo con deliver fixed'
       : data.piano !== undefined && !(cmd === 'deliver' && intentoDi() === 'piano') ? '--piano vale solo con deliver piano'
         : data.fusione !== undefined && !(cmd === 'deliver' && intentoDi() === 'status') ? '--fusione vale solo con deliver status --status done --reason gia_risolto'
           : '';

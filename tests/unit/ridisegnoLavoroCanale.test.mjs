@@ -226,6 +226,16 @@ test('il motivo è obbligatorio per il correttore e per nessun altro ruolo, come
   assert.equal(motivoDellaConsegna(undefined, 'fixer').ok, false, 'il correttore senza motivo non consegna');
   assert.deepEqual(motivoDellaConsegna('ripresa', 'fixer'), { ok: true, motivo: { tipo: 'ripresa' } });
   assert.equal(motivoDellaConsegna('boh', 'verifier').ok, false, 'un motivo scritto vale nella sua forma anche per gli altri ruoli');
+  assert.deepEqual(motivoDellaConsegna(undefined, 'fixer', { siFerma: true }), { ok: true, motivo: null },
+    'la fermata del correttore vale da motivo, come sul server');
+});
+
+test('il canale capisce --motivo, e solo su deliver fixed', () => {
+  let err = '';
+  try {
+    execFileSync(process.execPath, [join(REPO, 'scripts', 'routine-channel.mjs'), 'deliver', 'status', '--status', 'design', '--motivo', 'ripresa', '--ticket', 'x'.repeat(43)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) { err = String(e.stderr || ''); }
+  assert.match(err, /--motivo vale solo con deliver fixed/);
 });
 
 test('il biglietto porta l\'id della sessione cloud: quella accesa per un feedback riceve il suo dal server', async () => {

@@ -124,18 +124,32 @@ export function fileRiscritti(root, { prima, dopo = 'HEAD', base = 'origin/main'
 /**
  * I rami su origin con lavoro non ancora su `base`, toccati negli ultimi `giorni`: per ognuno i file che i suoi commit
  * toccano e i numeri di feedback citati (il più citato per primo). Per il manutentore: prima di accendere una
- * sessione si guarda chi lavora già sugli stessi file.
+ * sessione si guarda chi lavora già sugli stessi file. Sono rami di lavoro solo `worker/` e `claude/`; `fuori`, se
+ * passato, riceve quanti rami restano fuori e perché (`vecchi`, `altri`), da dire a chi legge.
  */
-export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = Date.now() } = {}) {
+export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = Date.now(), fuori = null } = {}) {
   const nomeBase = base.replace(/^origin\//, '');
+  const esclusi = fuori || {};
+  esclusi.vecchi = 0;
+  esclusi.altri = [];
+  // Di più tentativi dello stesso feedback (`worker/<id>-<ora>`) vale il più recente, fuso o no: se è arrivato su main,
+  // i tentativi prima di lui sono morti anche se non sono fusi.
+  const ultimo = new Map();
+  for (const ref of git(root, ['for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n')) {
+    const m = /^origin\/worker\/([A-Za-z0-9]+)-(\d{8}T\d{6}Z)$/.exec(ref.trim());
+    if (m && (!ultimo.has(m[1]) || ultimo.get(m[1]) < m[2])) ultimo.set(m[1], m[2]);
+  }
   // `--no-merged` toglie in una chiamata sola i rami già arrivati: sono la gran parte, e uno per uno costavano minuti.
   const righe = git(root, ['for-each-ref', `--no-merged=${base}`, '--format=%(refname:short)%09%(committerdate:iso-strict)', 'refs/remotes/origin']).split('\n');
   const rami = [];
   for (const riga of righe.filter(Boolean)) {
     const [ramo, data] = riga.split('\t');
-    // `discarded/` sono tentativi messi da parte: non lavora più nessuno.
-    if (!ramo || ramo === 'origin/HEAD' || ramo === 'origin' || ramo === `origin/${nomeBase}` || ramo.startsWith('origin/discarded/')) continue;
-    if (giorni && adesso - Date.parse(data) > giorni * 86400000) continue;
+    if (!ramo || ramo === 'origin/HEAD' || ramo === 'origin' || ramo === `origin/${nomeBase}`) continue;
+    const tentativo = /^origin\/worker\/([A-Za-z0-9]+)-(\d{8}T\d{6}Z)$/.exec(ramo);
+    if (tentativo && ultimo.get(tentativo[1]) !== tentativo[2]) continue;
+    // Riferimenti, prove, parcheggi, `discarded/`: non ci lavora una sessione, ma si contano.
+    if (!/^origin\/(worker|claude)\//.test(ramo)) { esclusi.altri.push(ramo.replace(/^origin\//, '')); continue; }
+    if (giorni && adesso - Date.parse(data) > giorni * 86400000) { esclusi.vecchi += 1; continue; }
     // Una chiamata per ramo: per ogni commit l'oggetto (riga marcata) e i file che tocca.
     const log = git(root, ['log', '--no-renames', '--format=\u0001%s', '--name-only', `${base}..${ramo}`]);
     const file = new Set();
@@ -151,16 +165,7 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
     const feedback = [...conta].sort((a, b) => b[1] - a[1]).map(([n]) => n);
     rami.push({ ramo: ramo.replace(/^origin\//, ''), data, avanti, file: [...file].sort(), feedback });
   }
-  // Di più tentativi di un worker sullo stesso feedback (`worker/<id>-<ora>`) conta l'ultimo aperto: gli altri sono morti.
-  const ultimo = new Map();
-  for (const r of rami) {
-    const m = /^worker\/([A-Za-z0-9]+)-(\d{8}T\d{6}Z)$/.exec(r.ramo);
-    if (m && (!ultimo.has(m[1]) || ultimo.get(m[1]) < m[2])) ultimo.set(m[1], m[2]);
-  }
-  return rami.filter((r) => {
-    const m = /^worker\/([A-Za-z0-9]+)-(\d{8}T\d{6}Z)$/.exec(r.ramo);
-    return !m || ultimo.get(m[1]) === m[2];
-  }).sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
+  return rami.sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
 }
 
 /**

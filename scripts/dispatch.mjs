@@ -495,10 +495,10 @@ export function leggiMotivo(testo) {
 
 /**
  * Il motivo di una consegna `fixed`: obbligatorio solo per il correttore (regola 4), come sul server; per gli altri ruoli,
- * se c'è, vale la stessa forma. PURA.
+ * se c'è, vale la stessa forma. `siFerma`: una segnalazione o una domanda che blocca, che sul server vale da motivo. PURA.
  */
-export function motivoDellaConsegna(testo, ruolo) {
-  if (testo === undefined && ruolo !== 'fixer') return { ok: true, motivo: null };
+export function motivoDellaConsegna(testo, ruolo, { siFerma = false } = {}) {
+  if (testo === undefined && (ruolo !== 'fixer' || siFerma)) return { ok: true, motivo: null };
   return leggiMotivo(testo);
 }
 
@@ -2488,7 +2488,8 @@ if (isMainModule) {
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
       const domanda = opz['--domanda'] ? await leggiDomandaDaFile(opz['--domanda']) : null;
       // Senza motivo il biglietto del correttore non si chiude (SPEC-RIDISEGNO-LAVORO.md §3, regola 4).
-      const motivo = motivoDellaConsegna(opz['--motivo'], readMarker(ROOT)?.role);
+      const siFerma = !!segnalazione.testo.trim() || !!(domanda && domanda.blocca !== false);
+      const motivo = motivoDellaConsegna(opz['--motivo'], readMarker(ROOT)?.role, { siFerma });
       if (!motivo.ok) { console.error(`${motivo.errore} Non ho consegnato niente.`); process.exit(1); }
       const s = await recordFixed(id, report, frase, segnalazione.testo, ferma, domanda, motivo.motivo);
       if (s.rejected) esciRespinto(s);

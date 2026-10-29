@@ -168,6 +168,28 @@ test('i rami in corso dicono i loro file e i feedback citati, e si incrociano co
   assert.deepEqual(ramiInCorso(dir, { giorni: 1, adesso: Date.now() + 5 * 86400000 }), [], 'un ramo fermo da giorni non conta');
 });
 
+test('un tentativo vecchio di un feedback il cui ultimo tentativo è su main non è in corso; chi resta fuori si conta', (t) => {
+  const dir = repo();
+  t.after(() => togliCartella(dir));
+  git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  git(dir, ['checkout', '-qb', 'morto']);
+  commit(dir, '#812 primo tentativo', { 'a.js': 'morto\n' });
+  git(dir, ['update-ref', 'refs/remotes/origin/worker/AbC123-20261020T100000Z', 'HEAD']);
+  git(dir, ['update-ref', 'refs/remotes/origin/prova/esperimento', 'HEAD']);
+  git(dir, ['checkout', '-q', 'main']);
+  commit(dir, 'merge-gate: #812', { 'b.js': 'buono\n' });
+  git(dir, ['update-ref', 'refs/remotes/origin/worker/AbC123-20261022T100000Z', 'HEAD']);
+  git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  const fuori = {};
+  assert.deepEqual(ramiInCorso(dir, { fuori }), [], 'il tentativo del 20 è morto: quello del 22 è già su main');
+  assert.deepEqual(fuori.altri, ['prova/esperimento'], 'un ramo che non è di lavoro resta fuori, ma si dice');
+  git(dir, ['checkout', '-qb', 'vivo']);
+  commit(dir, '#900', { 'c.js': 'c\n' });
+  git(dir, ['update-ref', 'refs/remotes/origin/claude/vivo', 'HEAD']);
+  ramiInCorso(dir, { fuori, giorni: 1, adesso: Date.now() + 5 * 86400000 });
+  assert.equal(fuori.vecchi, 1, 'il ramo fermo da giorni resta fuori, contato');
+});
+
 test('il motivo del correttore: quattro forme, e senza motivo un errore che dice come si scrive', () => {
   assert.deepEqual(R.leggiMotivoCorrettore('conflitto: src/a.js, tests/b.mjs').motivo, { tipo: 'conflitto', file: ['src/a.js', 'tests/b.mjs'] });
   assert.deepEqual(R.leggiMotivoCorrettore('Conflitto: nessuno').motivo, { tipo: 'conflitto', file: [] });

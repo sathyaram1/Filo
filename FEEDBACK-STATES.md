@@ -259,8 +259,11 @@ accendono una sessione per ciascuno fino ai posti liberi. Legano ogni sessione a
 numero con l'id che la risposta di accensione restituisce (`routine-accensioni/<sessione>`);
 per un primo lavoro la voce normale fa prima la ricerca «già risolto su main» e la lega
 anche quella. La sessione di un compito senza feedback resta libera, e una sessione libera
-con un ordine riceve la stessa scelta: niente primo lavoro fuori dall'ordine. Senza ordine
-vale la coda per priorità, come ripiego (SPEC § 4). La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
+con un ordine riceve la stessa scelta: niente primo lavoro fuori dall'ordine. Un numero
+dell'ordine chiuso o inesistente non conta, e un ordine senza feedback aperti vale come
+nessun ordine. Senza ordine vale la coda per priorità, come ripiego (SPEC § 4). Le unite di
+un pacchetto si chiudono solo sulle strade della fusione: un «fatto» consegnato da un ruolo
+non è una fusione. La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
 sempre: il comando `ticket` manda l'id della sessione (`sessione`), e il server, dopo la
 parola d'ordine, le dà il biglietto del suo feedback anche senza numero; dopo quel
 biglietto ogni altra richiesta della stessa sessione è «niente»

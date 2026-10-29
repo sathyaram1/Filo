@@ -46,21 +46,24 @@ async function documentoOrdine(metodo, corpo) {
   return { ok: true, numeri: ((j.fields?.ordine?.arrayValue?.values) || []).map((v) => v.stringValue).filter(Boolean) };
 }
 
+// Ogni campo di una scheda viene dal testo di un feedback: una riga per scheda è ciò che lo tiene un dato.
+const unaRiga = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+
 /** Una scheda in una riga, con stato e priorità dall'indice. PURA. */
 export function rigaScheda(s, f = {}) {
-  const num = String(s.numero || '').replace(/^#/, '');
+  const num = unaRiga(s.numero).replace(/^#/, '');
   const pezzi = [
     `#${num}`,
-    `[${s.area || '?'}/${s.tipo || '?'}]`,
-    f.stato || s.stato || '?',
+    `[${unaRiga(s.area) || '?'}/${unaRiga(s.tipo) || '?'}]`,
+    unaRiga(f.stato || s.stato) || '?',
     Number.isInteger(f.priorita) ? `p${f.priorita}` : 'p?',
     s.urgente ? 'URGENTE' : '',
-    `valido ${s.valido || '?'}`,
-    s.risolto_su_main ? `risolto? ${String(s.risolto_su_main).slice(0, 60)}` : '',
-    Array.isArray(s.doppione_di) && s.doppione_di.length ? `doppione di ${s.doppione_di.map((n) => `#${String(n).replace(/^#/, '')}`).join(', ')}` : '',
+    `valido ${unaRiga(s.valido) || '?'}`,
+    s.risolto_su_main ? `risolto? ${unaRiga(s.risolto_su_main).slice(0, 60)}` : '',
+    Array.isArray(s.doppione_di) && s.doppione_di.length ? `doppione di ${s.doppione_di.map((n) => `#${unaRiga(n).replace(/^#/, '')}`).join(', ')}` : '',
   ].filter(Boolean).join(' · ');
-  const file = Array.isArray(s.file_probabili) && s.file_probabili.length ? ` | file: ${s.file_probabili.join(', ')}` : '';
-  return `${pezzi} — ${s.titolo_breve || ''}: ${String(s.riassunto || '').replace(/\s+/g, ' ').trim()}${file}`;
+  const file = Array.isArray(s.file_probabili) && s.file_probabili.length ? ` | file: ${s.file_probabili.map(unaRiga).join(', ')}` : '';
+  return `${pezzi} — ${unaRiga(s.titolo_breve)}: ${unaRiga(s.riassunto)}${file}`;
 }
 
 /** I rami dei worker (`worker/<id del feedback>-<ora>`) prendono il numero dall'indice, davanti ai citati. PURA. */
@@ -74,12 +77,36 @@ export function conNumeri(rami, indice) {
 
 /** Un ramo in corso in una riga. PURA. */
 export function rigaRamo(r) {
-  const fb = r.feedback && r.feedback.length ? ` (${r.feedback.slice(0, 3).map((n) => `#${n}`).join(', ')})` : '';
+  const altri = r.feedback && r.feedback.length > 3 ? ` e altri ${r.feedback.length - 3}` : '';
+  const fb = r.feedback && r.feedback.length ? ` (${r.feedback.slice(0, 3).map((n) => `#${n}`).join(', ')}${altri})` : '';
   return `${r.ramo}${fb}, ${r.avanti} commit, ${String(r.data).slice(0, 10)}: ${r.file.join(', ') || '(nessun file)'}`;
 }
 
+/** Cosa l'elenco dei rami lascia fuori (ramiInCorso, `fuori`), in una riga; '' se niente. PURA. */
+export function rigaFuori(fuori, giorni) {
+  const f = fuori || {};
+  const pezzi = [
+    f.vecchi ? `${f.vecchi} rami fermi da più di ${giorni} giorni (--giorni N per vederli, --giorni 0 tutti)` : '',
+    f.altri && f.altri.length ? `${f.altri.length} rami che non sono di lavoro (${f.altri.slice(0, 5).join(', ')}${f.altri.length > 5 ? ', …' : ''})` : '',
+  ].filter(Boolean);
+  return pezzi.length ? `Non elencati: ${pezzi.join('; ')}.` : '';
+}
+
+/** L'ordine con lo stato di ogni numero secondo l'indice: chi non è fra gli aperti il server lo salta. PURA. */
+export function rigaOrdine(numeri, indice) {
+  if (!numeri.length) return 'Nessun ordine: il pacemaker accende per priorità, come ripiego.';
+  const perNum = new Map((indice || []).map((f) => [String(f.num), f]));
+  const conIndice = (indice || []).length > 0;
+  const voce = (n) => (!conIndice ? `#${n}` : perNum.has(n) ? `#${n} (${perNum.get(n).stato || 'aperto'})` : `#${n} (non fra gli aperti)`);
+  const vivi = conIndice ? numeri.filter((n) => perNum.has(n)).length : numeri.length;
+  const coda = !conIndice ? ' Senza l\'indice delle schede non so quali sono ancora aperti.'
+    : vivi ? (numeri.length - vivi ? ` Fuori dagli aperti: ${numeri.length - vivi}, il server li salta.` : '')
+    : ' Nessuno è fra gli aperti: il server fa come senza ordine, per priorità.';
+  return `Ordine da accendere (${numeri.length}): ${numeri.map(voce).join(', ')}. Il pacemaker accende una sessione per ciascuno che ha lavoro, una priorità 3 fuori ordine davanti; un ordine senza feedback aperti vale come nessun ordine.${coda}`.trim();
+}
+
 /** Il contesto intero, in testo. PURA rispetto ai suoi ingressi. */
-export function testoContesto({ ruolo, schede, indice, rami }) {
+export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorni = 30 }) {
   const numero = (s) => String(s.numero).replace(/^#/, '');
   const perNum = new Map((indice || []).map((f) => [f.num, f]));
   // Con l'indice valgono solo le schede dei feedback ancora aperti: le altre sono di feedback chiusi da allora.
@@ -95,6 +122,7 @@ export function testoContesto({ ruolo, schede, indice, rami }) {
     ...(chiuse ? ['', `Fuori: ${chiuse} schede di feedback che l'indice non ha più fra gli aperti.`] : []),
     '', `## Rami in corso (${rami.length})`, '',
     ...rami.map(rigaRamo),
+    ...(rigaFuori(fuori, giorni) ? ['', rigaFuori(fuori, giorni)] : []),
     '', '## Spesa', '',
     'Questo strumento non la sa: chiedi all\'owner il consumo della settimana dell\'account (Gestione → Automazioni), non la somma dei biglietti.',
   ].join('\n');
@@ -113,6 +141,9 @@ export async function main(argv, { root = ROOT } = {}) {
     return 1;
   }
   // L'ordine da accendere: il pacemaker accende una sessione per ciascun feedback che ha lavoro, in quest'ordine.
+  const cartella = resolve(opzione(argv, '--cartella') || CARTELLA_PREDEFINITA);
+  let indice = [];
+  try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente stato, priorità né numeri dei worker */ }
   if (cmd === 'ordine' || cmd === 'accendi') {
     let numeri = [];
     if (cmd === 'accendi' && arg !== '--niente') {
@@ -122,22 +153,19 @@ export async function main(argv, { root = ROOT } = {}) {
     }
     const r = cmd === 'ordine' ? await documentoOrdine('GET') : await documentoOrdine('PATCH', corpoOrdine(numeri));
     if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); return 2; }
-    console.log(r.numeri.length
-      ? `Ordine da accendere (${r.numeri.length}): ${r.numeri.map((n) => `#${n}`).join(', ')}. Il pacemaker accende una sessione per ciascuno che ha lavoro, una priorità 3 fuori ordine davanti.`
-      : 'Nessun ordine: il pacemaker accende per priorità, come ripiego.');
+    console.log(rigaOrdine(r.numeri, indice));
     return 0;
   }
-  const cartella = resolve(opzione(argv, '--cartella') || CARTELLA_PREDEFINITA);
-  const giorni = Number(opzione(argv, '--giorni')) || 30;
+  const g = opzione(argv, '--giorni');
+  const giorni = g !== undefined && Number.isFinite(Number(g)) && Number(g) >= 0 ? Number(g) : 30;
   if (!argv.includes('--senza-fetch')) {
     try { execFileSync('git', ['-C', root, 'fetch', 'origin', '--prune', '--quiet'], { stdio: 'ignore', timeout: 120_000 }); } catch (e) {
       console.error(`AVVISO: git fetch non è riuscito (${String(e.message).split('\n')[0]}): i rami sono quelli dell'ultima volta.`);
     }
   }
-  let indice = [];
-  try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente stato, priorità né numeri dei worker */ }
-  const rami = conNumeri(ramiInCorso(root, { giorni }), indice);
-  if (cmd === 'rami') { console.log(rami.map(rigaRamo).join('\n') || 'Nessun ramo in corso.'); return 0; }
+  const fuori = {};
+  const rami = conNumeri(ramiInCorso(root, { giorni, fuori }), indice);
+  if (cmd === 'rami') { console.log([rami.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', rigaFuori(fuori, giorni)].filter(Boolean).join('\n')); return 0; }
   const schede = leggiSchede(cartella);
   if (cmd === 'incroci') {
     const num = String(arg).replace(/^#/, '');
@@ -152,7 +180,7 @@ export async function main(argv, { root = ROOT } = {}) {
   if (!schede.length) console.error(`AVVISO: nessuna scheda in ${cartella}: npm run feedback:schede -- elenca, poi scrivi.`);
   const dirRuoli = join(ROOT, 'routines', 'roles');
   const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'manutentore.md'), 'utf8'), dirRuoli);
-  console.log(testoContesto({ ruolo, schede, indice, rami }));
+  console.log(testoContesto({ ruolo, schede, indice, rami, fuori, giorni }));
   return 0;
 }
 
