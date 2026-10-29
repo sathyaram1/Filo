@@ -456,6 +456,17 @@ test('ogni banco che spedisce i contatori porta la sua identità finta, mai quel
   for (const [f, t] of banchi) assert.match(t, /idToken: /, `${f}: il servizio dei contatori senza un’identità finta`);
 });
 
+// L'identità anonima la crea chiunque con la chiave web: la Privacy non promette che riconosca Filo, e lo scopo dello
+// pseudonimo resta attaccato allo pseudonimo, non alle frasi sull'identità.
+test('la Privacy dice dell’identità dei contatori solo quello che è vero, senza staccare lo pseudonimo dal suo scopo (#1547)', () => {
+  for (const f of ['transparency/privacy.md', 'site/transparency/privacy.html']) {
+    const t = readFileSync(join(ROOT, f), 'utf8');
+    assert.doesNotMatch(t, /accetta solo contatori che arrivano da una copia di Filo/, f);
+    assert.match(t, /una anonima se la può creare chiunque/, `${f}: l’identità non prova che i contatori vengano da Filo`);
+    assert.match(t, /e cambia ogni mese\. Serve a distinguere il problema di una persona sola/, `${f}: lo scopo dello pseudonimo subito dopo lo pseudonimo`);
+  }
+});
+
 test('un’ora che il server rifiuta non ferma le altre: si riprova il giorno dopo, e parte quando le regole la accettano', async () => {
   const b = banco();
   const rifiuta = new Set(['explain-deep']);
