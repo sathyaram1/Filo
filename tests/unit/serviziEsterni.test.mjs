@@ -95,6 +95,7 @@ const IMMAGINI_DAI_DATI = [
   { file: 'src/renderer/barra.js', funzione: 'disegnaAccount', testo: 'img.src = a.foto;', perche: 'la copia della foto del profilo (filo://icone/), controllata sopra' },
   { file: 'src/pages/dashboard/dashboard-carte.js', funzione: 'faviconDi', testo: 'img.src = dato', perche: 'l’icona del sito che il main consegna come data: (voce «icone-dei-siti»)' },
   { file: 'src/pages/dashboard/dashboard-attivita.js', funzione: 'iconaSitoEl', testo: 'img.src = dato', perche: 'l’icona del sito che il main consegna come data: (voce «icone-dei-siti»)' },
+  { file: 'src/pages/dashboard/dashboard-attivita.js', funzione: 'iconaDellaScheda', testo: 'img.src = dato', perche: 'l’icona appena trovata da una scheda, un data: che il main annuncia e la funzione ricontrolla' },
   { file: 'src/renderer/shell.js', funzione: 'applicaScheda', testo: 'url("${nota.dato}")', perche: 'l’icona della scheda, un data: scaricato dal main con la sessione della scheda' },
   { file: 'src/renderer/shell.js', funzione: 'fontiDelloSchermo', testo: 'img.src = f.anteprima;', perche: 'l’anteprima della fonte, un data: controllato sopra' },
   { file: 'src/renderer/anteprima.js', testo: 'img.src = d.src;', perche: 'un data: controllato sopra' },

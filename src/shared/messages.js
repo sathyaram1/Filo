@@ -69,6 +69,8 @@
     DELETE_ARCHIVED_TABS: 'delete_archived_tabs',
     // #848 — l'icona di un sito per la home e la chat, senza servizi di terzi. { url } → { ok, dato } (data:image/… o '')
     ICONA_SITO: 'icona_sito',
+    // Main → pagine di Filo dello stesso ambito: la prima icona che una scheda trova per il suo sito. { sito, dato }
+    ICONA_SCHEDA: 'icona_scheda',
     // Deck builder Commander (DECK-BUILDER-SPEC.md): CRUD dei mazzi, storage
     // locale nel main (deckStore). Usati dalla pagina filo://decks.
     DECKS_LIST: 'decks_list',

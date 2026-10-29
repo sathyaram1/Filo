@@ -8378,6 +8378,12 @@ function annunciaCarteHome(layout, sender) {
   const ambito = ambitoDellaFinestra(sender && sender.win);
   broadcastToFiloPages((a) => (a === ambito ? { type: MSG.CARTE_HOME_CAMBIATE, layout } : null));
 }
+// La prima icona trovata da una scheda, per le righe della chat disegnate prima (#848): solo al suo ambito, così
+// l'incognito non dice alla finestra normale quali siti apre.
+function annunciaIconaScheda(win, sito, dato) {
+  const ambito = ambitoDellaFinestra(win);
+  broadcastToFiloPages((a) => (a === ambito ? { type: MSG.ICONA_SCHEDA, sito, dato } : null));
+}
 
 // Configura il rilevatore di siti pericolosi (services/safebrowse) dalle
 // impostazioni SALVATE (non quelle con i default già dentro): va richiamato al
@@ -8462,6 +8468,7 @@ module.exports = {
   broadcastLiveUpdate,
   broadcastToTabs,
   broadcastToFiloPages,
+  annunciaIconaScheda,
   handleAIRequest,
   maybeCategorizeAsync,
   wireSafebrowse,

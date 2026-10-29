@@ -1820,14 +1820,34 @@
     btn.classList.add('dash-salvata-aperta');
     btn.title = `Riapri ${p.title || p.url} · non è più in «Aperti per dopo»`;
   }
-  // Il posto dell'icona resta finché il main la cerca; se non la trova resta il solo nome, come quando non si caricava.
+  // Il posto dell'icona resta finché il main la cerca; se non la trova resta il solo nome, e l'icona arriva quando una
+  // scheda di quel sito la trova (#848), senza ridisegnare la riga. Il sito si legge come nel main: www.x.it è x.it.
+  const sitoDi = (url) => {
+    try {
+      const u = new URL(String(url || ''));
+      return /^https?:$/.test(u.protocol) ? u.host.replace(/^www\./, '') : '';
+    } catch (_) { return ''; }
+  };
   function iconaSitoEl(url) {
     const img = document.createElement('img');
     img.className = 'dash-action-favicon';
     img.alt = '';
-    img.onerror = () => img.remove();
-    iconaDelSito(url).then((dato) => { if (dato) img.src = dato; else img.remove(); });
+    const sito = sitoDi(url);
+    if (sito) img.dataset.sito = sito;
+    img.onerror = () => { img.removeAttribute('src'); img.hidden = true; };
+    iconaDelSito(url).then((dato) => {
+      if (img.getAttribute('src')) return;
+      if (dato) img.src = dato; else img.hidden = true;
+    });
     return img;
+  }
+  function iconaDellaScheda(sito, dato) {
+    if (typeof sito !== 'string' || !sito || typeof dato !== 'string' || !/^data:image\//i.test(dato)) return;
+    for (const img of document.querySelectorAll('img.dash-action-favicon[data-sito]')) {
+      if (img.dataset.sito !== sito || img.getAttribute('src')) continue;
+      img.hidden = false;
+      img.src = dato;
+    }
   }
 
   function bottoneSalvata(p) {
@@ -2577,5 +2597,7 @@
     summarizeActivity,
     riordinaSchede,
     activityRowFor,
+    // Main → la prima icona di una scheda (ICONA_SCHEDA): la prendono le righe di quel sito rimaste senza.
+    iconaDellaScheda,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
