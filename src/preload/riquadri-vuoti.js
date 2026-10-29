@@ -43,7 +43,7 @@ function buildRiquadriVuotiSource(corpi) {
     if (!d || visti.has(d)) return d;
     visti.add(d);
     var u = '';
-    try { u = String(urlDi.call(d)); } catch (e) {}
+    try { u = String(R(urlDi, d, [])); } catch (e) {}
     if (!VUOTO.test(u)) return d;
     for (var i = 0; i < corpi.length; i++) { try { corpi[i](w); } catch (e) {} }
     aggancia(w, d);
