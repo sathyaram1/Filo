@@ -73,7 +73,7 @@ test('un\'attesa che non si scrive non è silenziosa: il pacchetto c\'è, e la r
 test('--pacchetto senza numeri, o con numeri storti, è un errore d\'uso; a vuoto non tocca la rete', async () => {
   const vuoto = await conRete({ lette: {} }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto']));
   assert.equal(vuoto.code, 1);
-  assert.match(vuoto.err.join('\n'), /--pacchetto vuole i numeri/);
+  assert.match(vuoto.err.join('\n'), /--pacchetto vuole un valore/);
   const storto = await conRete({ lette: {} }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', 'menu']));
   assert.equal(storto.code, 1);
   assert.match(storto.err.join('\n'), /«menu» non è un numero di feedback/);
