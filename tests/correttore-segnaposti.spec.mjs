@@ -481,21 +481,22 @@ test('col web spento un dato di adesso si cerca solo su Wikipedia, e se non c\'�
 });
 
 // #1448.9: il testo del rapido è misurato sul banco e non parla delle x; se il modello le segna, l'errore non si vede.
-test('un controllo rapido che segna le x come errore non mette l\'onda sul segnaposto, né un errore da correggere', async ({ app, openTab, testServer }) => {
+test('un controllo rapido che segna le x come errore non mette l\'onda sui segnaposti, né un errore da correggere', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, {
-    ragionato: { '14xx': [COLOMBO] }, rapido: ['[14xx][1492][anno scritto a metà][errore]'],
+    ragionato: { '14xx': [COLOMBO, '[nel 17xx][nel 1789][La presa della Bastiglia, 14 luglio 1789][segnaposto]'] },
+    rapido: ['[14xx][1492][anno scritto a metà][errore]', '[17xx][1789][anno scritto a metà][errore]'],
   });
   await page.locator('#ta').click();
-  await page.keyboard.type("l'America l'hanno scoperta nel 14xx. ");
-  await expect(valore(page, '1492')).toBeVisible({ timeout: 8000 });
+  await page.keyboard.type("l'America l'hanno scoperta nel 14xx e la Bastiglia l'hanno presa nel 17xx. ");
+  await expect(page.locator('.sn-spell-valori .sn-spell-valore')).toHaveCount(2, { timeout: 8000 });
   await expect.poll(async () => (await globale(app, '__rapide')).length, { timeout: 8000 }).toBeGreaterThan(0);
   await page.waitForTimeout(600);
   await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(0);
   await expect(ocra(page, '14xx')).toHaveCount(1);
-  const menu = await tastoDestroSu(page, ocra(page, '14xx'));
-  await expect(menu.voce('Correggi tutti gli errori (1)')).toBeVisible();
-  await menu.voce('Correggi tutti gli errori (1)').click();
-  await expect(page.locator('#ta')).toHaveValue("l'America l'hanno scoperta nel 1492. ");
+  const menu = await tastoDestroSu(page, ocra(page, '17xx'));
+  await expect(menu.voce('Correggi tutti gli errori (2)')).toBeVisible();
+  await menu.voce('Correggi tutti gli errori (2)').click();
+  await expect(page.locator('#ta')).toHaveValue("l'America l'hanno scoperta nel 1492 e la Bastiglia l'hanno presa nel 1789. ");
 });
 
 test('«Correggi tutti gli errori» riempie i segnaposti che hanno un valore', async ({ app, openTab, testServer }) => {
