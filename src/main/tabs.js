@@ -1988,6 +1988,8 @@ class TabManager {
 
   // §2.3 — l'avviso del giro, se ne va mostrato uno (la regola sta in SN_TAB_TRIAGE.testoEsito).
   _esitoTriage(esito, { trigger, valutate }) {
+    // Il giudizio mancato di un giro automatico lo dice già _dichiaraGiudizio (#1618): qui solo se c'è da offrire «Riapri».
+    if (esito.giudizioMancato && trigger !== 'manual' && !esito.archived) return esito;
     const T = globalThis.SN_TAB_TRIAGE;
     const testo = T && T.testoEsito ? T.testoEsito({
       trigger,
