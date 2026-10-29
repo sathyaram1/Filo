@@ -239,7 +239,7 @@
       try { for (const v of (definiti[id].voci ? definiti[id].voci() : [])) voci.push(v); } catch (_) {}
       if (i > 0) voci.push({ etichetta: 'Sposta su', fa: () => sposta(id, -1) });
       if (i >= 0 && i < l.length - 1) voci.push({ etichetta: 'Sposta giù', fa: () => sposta(id, 1) });
-      voci.push({ etichetta: 'Togli dal pannello', fa: () => togli(id) });
+      voci.push({ etichetta: 'Togli dal pannello', fa: () => leva(id) });
       return voci;
     }
 
