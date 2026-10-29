@@ -61,6 +61,10 @@ function scena(base, { altroveAvanti = true, stato = {} } = {}) {
   for (const d of [casa, altrove, dirStato]) mkdirSync(d, { recursive: true });
   git(base, 'init', '-q', '--bare', '-b', 'main', origin);
   git(casa, 'init', '-q', '-b', 'main');
+  // Il default di Git for Windows anche qui, e la regola del repo vero che lo batte: senza, il checkout di dispatch
+  // scrive CRLF e il contenuto confrontato sotto è rosso solo su Windows.
+  git(casa, 'config', 'core.autocrlf', 'true');
+  writeFileSync(resolve(casa, '.gitattributes'), '* text=auto eol=lf\n', 'utf8');
   cpSync(resolve(REPO, 'routines', 'roles'), resolve(casa, 'routines', 'roles'), { recursive: true });
   writeFileSync(resolve(casa, '.gitignore'), '.claude/\n', 'utf8');
   commit(casa, 'segnaposto.txt', 'x\n');
