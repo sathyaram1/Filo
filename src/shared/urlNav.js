@@ -216,18 +216,29 @@
 
   // Quello che l'assistente chiede di aprire non diventa mai una ricerca (per cercare ha la sua azione, #1318 giro 1):
   // un indirizzo di posta senza «mailto:» va al programma di posta, il resto è '' e l'assistente lo sa.
+  // Una lettura sola per l'apertura e per il bottone in chat (#1318 giro 2 e 3): un percorso o un nome di file è un file
+  // anche dove la barra vedrebbe un sito («./conto.pdf», «conto.pdf»), mai un sito inventato dato per aperto.
   const POSTA_NUDA = /^[^\s@<>()"'`,;:\\/]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}$/i;
   function indirizzoChiesto(input) {
     const s = String(input == null ? '' : input).trim();
-    const url = indirizzoDaCaricare(s);
+    if (schemaVero(s)) return s;
+    if (sembraPercorso(s)) {
+      const file = normalizeUrl(s);
+      return /^file:/i.test(file) ? file : '';
+    }
+    const url = normalizeUrl(s);
     if (url !== RICERCA + encodeURIComponent(s)) return url;
     const posta = senzaIncarti(s);
     return POSTA_NUDA.test(posta) ? `mailto:${posta}` : '';
   }
-  // Ha la forma di un percorso anche dove Filo non sa dove porta: relativo, con una variabile, con le barre di Windows.
+  // Un nome di file da solo: estensioni di documenti, che non sono domini che si visitano. Fuori quelle che sono anche
+  // siti veri (obsidian.md, bun.sh, docs.rs).
+  const NOME_DI_FILE = /^[^/\\:?#@<>"|*]+\.(?:pdf|docx?|docm|xlsx?|xlsm|pptx?|od[tspg]|rtf|txt|csv|tsv|json|xml|ya?ml|ini|log|jpe?g|png|gif|webp|heic|bmp|tiff?|svg|psd|mp3|wav|flac|m4a|ogg|mp4|mov|avi|mkv|webm|zip|rar|7z|tar|gz|exe|msi|dmg|apk|iso|epub)$/i;
+  // Ha la forma di un percorso anche dove Filo non sa dove porta: relativo, con una variabile, con le barre di Windows,
+  // o un nome di file da solo.
   function sembraPercorso(input) {
     const s = pulisciPercorso(input);
-    return /\\/.test(s) || /^(?:\.{1,2}[\\/]|[/~]|%[^%\s]+%|\$[a-z_]+)/i.test(s);
+    return /\\/.test(s) || /^(?:\.{1,2}[\\/]|[/~]|%[^%\s]+%|\$[a-z_]+)/i.test(s) || NOME_DI_FILE.test(s);
   }
 
   // Quello che diventa un indirizzo scritto da un modello o dall'interfaccia di Filo: con uno schema vero si carica com'è,
