@@ -2594,7 +2594,15 @@
     pad.querySelector('.ed-cm-nuovo').addEventListener('click', (e) => { e.stopPropagation(); contaModulo({ type: 'comment' }, 'usato'); startCommenting(); });
     pad.querySelector('.ed-cm-elenco').addEventListener('click', (e) => { e.stopPropagation(); contaModulo({ type: 'comment' }, 'usato'); showCommentsList(); });
   }
+  // Chi ha già selezionato il testo commenta quello: l'invito a selezionare è per chi non l'ha fatto.
   function startCommenting() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && sel.toString().trim() && docEl.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      commenting = false;
+      root.classList.remove('commenting');
+      promptComment(sel);
+      return;
+    }
     commenting = true;
     root.classList.add('commenting');
     flashOverlayMsg('Seleziona il testo da commentare…', 1200);
