@@ -219,7 +219,7 @@ function buildRiquadriVuotiSource(corpi) {
   function aggancia(w, d) {
     mascheraIn(w);
     ascolta(d);
-    try { new w.MutationObserver(spazza).observe(d, { childList: true, subtree: true }); } catch (e) {}
+    try { new w.MutationObserver(spazza).observe(d, { __proto__: null, childList: true, subtree: true }); } catch (e) {}
     var N = proto(w, 'Node');
     ['appendChild', 'insertBefore', 'replaceChild'].forEach(function (m) { dopo(N, m, SE.nodi); });
     var conTesto = { insertAdjacentHTML: SE.testo(1), setHTMLUnsafe: SE.testo(0), setHTML: SE.testo(0) };
