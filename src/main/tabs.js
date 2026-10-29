@@ -1457,14 +1457,17 @@ class TabManager {
   async riapriChiusa() {
     const pila = this._pilaChiuse();
     const voce = pila.prendi();
-    if (voce) return this.riapri(voce);
+    if (voce) {
+      if (voce.voceArchivio) this._contaTornata(voce.voceArchivio);
+      return this.riapri(voce);
+    }
     const e = await this._chiusaDallArchivio();
     if (e) {
-      pila.segnaRiaperta(e.id);
+      this.tornata(e);
       return this.riapri(SchedeChiuse.daArchivio(e));
     }
     try {
-      this.win.webContents.send('shell:toast', { text: 'Nessuna scheda chiusa da riaprire', opts: { unica: 'nessuna-chiusa' } });
+      this.win.webContents.send('shell:toast', { text: 'Nessuna scheda chiusa da riaprire', opts: { unica: 'nessuna-chiusa', tipo: 'nessuna_chiusa' } });
     } catch (_) {}
     return null;
   }
