@@ -458,7 +458,9 @@
       ripresi: ripresi.indici.length,
       vecchi: lista.slice(0, inizio),
       ultimo: visti.length ? visti[visti.length - 1] : null,
-      ancora: inizio < n ? { ts: lista[inizio].ts, giorni, token } : (stessaAncora ? ancora : null),
+      ancora: inizio < n
+        ? { ts: lista[inizio].ts, giorni, token, ...(fotoDa ? { foto: fotoDa } : {}) }
+        : (stessaAncora ? ancora : null),
       token: totale + ripresi.peso,
     };
   }
