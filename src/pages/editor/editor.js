@@ -2380,15 +2380,24 @@
         updateCount();
         return;
       }
-      // Esc = "ho finito di cercare": via le evidenziazioni e via le sezioni
-      // aperte solo per mostrare i risultati, il foglio torna com'era.
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        findInput.value = '';
-        runFind('', { immediate: true });
-        updateCount();
-      }
+      if (e.key === 'Escape') { e.preventDefault(); finitoDiCercare(); }
     });
+    // Esc = "ho finito di cercare": via le evidenziazioni e le sezioni aperte solo per i risultati, e si torna a
+    // scrivere nel foglio, dopo la corrispondenza su cui ci si era fermati; il pannello aperto per cercare si chiude.
+    function finitoDiCercare() {
+      const dopo = puntoDopoCorrispondenza();
+      findInput.value = '';
+      runFind('', { immediate: true });
+      updateCount();
+      if (pannello && !pannello.bloccato()) pannello.chiudi();
+      docEl.focus();
+      const r = (dopo && dopo()) || (ultimaSelezioneFoglio && ultimaSelezioneFoglio.startContainer.isConnected ? ultimaSelezioneFoglio : null);
+      if (!r) { focusDocAtEnd(); return; }
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+    replInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); finitoDiCercare(); } });
     replInput.addEventListener('click', (e) => e.stopPropagation());
     pad.querySelector('[data-sr="next"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(1); updateCount(); });
     pad.querySelector('[data-sr="prev"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(-1); updateCount(); });
