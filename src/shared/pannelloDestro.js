@@ -388,16 +388,19 @@
     function commuta(perche = 'clic') { if (aperto) chiudi(); else apri(perche); }
 
     function fermaUscita() { if (timerUscita) { clearTimeout(timerUscita); timerUscita = null; } }
-    // Sopra la pagina, chi se ne va dal pannello lo chiude dopo l'attesa; dal tasto o dalla chat resta finché si clicca fuori.
-    function programmaUscita() {
-      if (timerUscita || tiene() || motivo === 'tasto' || motivo === 'chat' || trascina || menuEl) return;
-      timerUscita = setTimeout(() => {
-        timerUscita = null;
-        if (aperto && !dentro && !tiene() && !trascina && !menuEl) chiudi();
-      }, opzioni.uscitaMs);
-    }
     const suoi = (t) => !!(t && t.nodeType === 1 && (pannello.contains(t) || (menuEl && menuEl.contains(t))
       || (opts.appartiene && opts.appartiene(t))));
+    // L'unica regola per l'uscita del puntatore: non chiude chi ci sta lavorando (dentro, un trascinamento, un menu, la
+    // tastiera in un suo campo); il tasto, la chat e il lucchetto lo tengono finché si clicca fuori.
+    const scriveQui = () => siScrive(document.activeElement) && suoi(document.activeElement);
+    const restaAperto = () => dentro || tiene() || motivo === 'tasto' || motivo === 'chat' || !!trascina || !!menuEl || scriveQui();
+    function programmaUscita() {
+      if (timerUscita || restaAperto()) return;
+      timerUscita = setTimeout(() => {
+        timerUscita = null;
+        if (aperto && !restaAperto()) chiudi();
+      }, opzioni.uscitaMs);
+    }
 
     document.addEventListener('mouseover', (e) => {
       if (!aperto) return;
