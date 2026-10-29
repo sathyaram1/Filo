@@ -37,7 +37,7 @@ function crea({ tetto = TETTO } = {}) {
   }
 
   function ricorda(voce) {
-    pila.push({ ...voce, archivio: null, riaperta: false });
+    pila.push({ ...voce, archivio: null, voceArchivio: null, riaperta: false });
     if (pila.length > tetto) pila.splice(0, pila.length - tetto);
     return pila[pila.length - 1];
   }
