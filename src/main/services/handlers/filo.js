@@ -165,7 +165,12 @@ module.exports = function register(on, ctx) {
       apri: () => {
         const tm = win?._filoTabs;
         if (!tm) return;
-        const apri = (segna) => { const id = tm.openTab(url, { origine }); if (segna) segna(tm.tabs.find((t) => t.id === id)); };
+        const apri = (segna) => {
+          const id = tm.openTab(url, { origine });
+          // Il collegamento a una scheda chiusa (il clic centrale nel filo della home, il «Riapri» della chat) la riapre.
+          if (id && typeof tm.tornataPerIndirizzo === 'function') tm.tornataPerIndirizzo(url);
+          if (segna) segna(tm.tabs.find((t) => t.id === id));
+        };
         const da = schedaDi(tm, sender);
         if (!(da && tm._sbPrimaDelClic(da, url, apri, { daFilo: true }))) apri();
       },

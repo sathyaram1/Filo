@@ -42,6 +42,16 @@
     ascoltatori.add(fn);
     return () => ascoltatori.delete(fn);
   }
+  // E ogni scheda che ne esce (cancellata, dimenticata, archivio svuotato): `null` = tutte. Chi tiene una copia
+  // delle schede chiuse (la pila di Ctrl+Shift+T) la dimentica con loro.
+  const uscite = new Set();
+  function uscita(ids) {
+    for (const fn of uscite) { try { fn(ids); } catch (_) {} }
+  }
+  function suUscite(fn) {
+    uscite.add(fn);
+    return () => uscite.delete(fn);
+  }
 
   // L'incognito non vede l'archivio e non ci scrive (la stessa garanzia che storage.json dà alle sue chiavi di navigazione).
   // Per questo si apre solo da fuori: la migrazione deve leggere storage.json vero, non la vista vuota dell'incognito.
@@ -187,6 +197,7 @@
     const icone = [];
     for (const id of via) { const t = d.prendi(id); if (t && t.url) urlVia.add(t.url); if (t) icone.push(t.favicon); }
     for (const t of d.tutti()) if (!via.has(t.id) && urlVia.has(t.url)) urlVia.delete(t.url);
+    uscita([...via]);
     const tolte = d.togli([...via], (t) => {
       if (!urlVia.size || !Array.isArray(t.coOpenUrls) || !t.coOpenUrls.some((u) => urlVia.has(u))) return t;
       const tagliati = new Set(Array.isArray(t.coOpenUrlsTagliati) ? t.coOpenUrlsTagliati : []);
@@ -250,6 +261,7 @@
     const d = await apri();
     const icone = d.tutti().map((t) => t.favicon);
     d.svuota();
+    uscita(null);
     Copie.togliSeOrfane(icone);
     return [];
   }
@@ -289,6 +301,6 @@
 
   global.SN_ARCHIVED_TABS = {
     list, listMeta, ultimaPer, archive, update, remove, removeMany, dimenticaPagine, clear, importa, aggiornaIcone,
-    suEntrate, cartella,
+    suEntrate, suUscite, cartella,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

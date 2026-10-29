@@ -403,7 +403,7 @@
   // ognuno quello che fa: lo legge chi si vede rifiutare la combinazione.
   const PRESI_OVUNQUE = [
     // La shell del browser se li prende prima della pagina, con Shift o senza (src/main/tabs.js, #545.5).
-    ['Ctrl+T', 'apre una scheda nuova'], ['Ctrl+Shift+T', 'apre una scheda nuova'],
+    ['Ctrl+T', 'apre una scheda nuova'], ['Ctrl+Shift+T', 'riapre l\'ultima scheda chiusa'],
     ['Ctrl+W', 'chiude la scheda'], ['Ctrl+Shift+W', 'chiude la scheda'],
     ['Ctrl+L', 'porta alla home per scrivere un indirizzo'], ['Ctrl+Shift+L', 'porta alla home per scrivere un indirizzo'],
     ['Ctrl+R', 'ricarica la pagina'], ['Ctrl+Shift+R', 'ricarica la pagina'],

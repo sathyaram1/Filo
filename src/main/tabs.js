@@ -56,6 +56,20 @@ const { AvvisoSchermoPieno, partiDellAvviso } = require('./avvisoSchermoPieno');
 const { PropostaEmail } = require('./propostaEmail');
 const { StratoDelMenu } = require('./stratoDelMenu');
 const Storia = require('./tabs/storia');
+const SchedeChiuse = require('./tabs/schedeChiuse');
+
+// Le finestre normali ne hanno una sola, come Chrome: una scheda chiusa in una finestra si riapre da un'altra.
+// L'incognito ne tiene una per finestra, che muore con lei; quella normale dimentica ciò che l'archivio cancella.
+const PILA_CHIUSE = SchedeChiuse.crea();
+let pilaIscritta = false;
+function pilaNormale() {
+  const A = globalThis.SN_ARCHIVED_TABS;
+  if (!pilaIscritta && A && typeof A.suUscite === 'function') {
+    pilaIscritta = true;
+    A.suUscite((ids) => PILA_CHIUSE.dimentica(ids));
+  }
+  return PILA_CHIUSE;
+}
 
 // #441 — il cursore che attraversa la pagina non è un'interazione con quella
 // scheda. Tutto il resto (clic, tasti, rotella, tocco, gesti) lo è.
@@ -1245,7 +1259,7 @@ class TabManager {
     this.annullaUscitaSchermoIntero();
     // §3.1/§4 — chiudere è archiviare: i metadati si salvano PRIMA di
     // distruggere la vista, o non c'è più niente da leggere.
-    this._archiveClosedTab(tab, 'manual', { daSola });
+    this._archiveClosedTab(tab, 'manual', { daSola, voce: this._ricordaChiusa(tab) });
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     ChiusuraConCaselle.chiudi(tab.view.webContents);
@@ -1313,7 +1327,8 @@ class TabManager {
 
   // L'ordine non tocca il layout delle viste native: conta solo per lo snapshot
   // e per la sessione salvata. Ritorna true se è cambiato.
-  moveTab(id, toIndex) {
+  // `trascinata: false` per chi sposta da sé (una scheda riaperta al suo posto): i contatori contano solo la persona.
+  moveTab(id, toIndex, { trascinata = true } = {}) {
     const from = this.tabs.findIndex((t) => t.id === id);
     if (from < 0) return false;
     let to = Math.round(Number(toIndex));
@@ -1322,7 +1337,7 @@ class TabManager {
     if (from === to) return false;
     const [tab] = this.tabs.splice(from, 1);
     this.tabs.splice(to, 0, tab);
-    ContatoriFinestra.misura('trascinata', this, Math.abs(to - from));
+    if (trascinata) ContatoriFinestra.misura('trascinata', this, Math.abs(to - from));
     this._broadcast();
     return true;
   }
@@ -1333,7 +1348,7 @@ class TabManager {
       ContatoriFinestra.misura('chiusa', tab, 'chiudi_tutto', { incognito: this.incognito });
       this._avvisaSorvegliante(tab, 'chiusa');
       this._nelFilo('schedaChiusa', tab);
-      this._archiveClosedTab(tab); // §3.1 — anche "chiudi tutto" archivia
+      this._archiveClosedTab(tab, 'manual', { voce: this._ricordaChiusa(tab) }); // §3.1 — anche "chiudi tutto" archivia
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
       ChiusuraConCaselle.chiudi(tab.view.webContents);
@@ -1345,7 +1360,7 @@ class TabManager {
 
   // §3.1 — non bloccante: la chiusura non aspetta l'archivio. NON archivia
   // incognito (§5), pagine interne e nuova scheda: non sono cose da ritrovare.
-  _archiveClosedTab(tab, reason = 'manual', { daSola = false } = {}) {
+  _archiveClosedTab(tab, reason = 'manual', { daSola = false, voce = null } = {}) {
     try {
       if (!tab || this.incognito || tab._passaggio) return;
       const Archive = globalThis.SN_ARCHIVED_TABS;
@@ -1377,12 +1392,134 @@ class TabManager {
             : null,
         }),
       ).then((entry) => {
+        if (voce && this._pilaChiuse().archiviata(voce, entry) && entry) this._contaTornata(entry);
         // §3.1/§3.2 — in sottofondo: la chiusura non deve aspettare un LLM.
         if (entry && entry.id) {
           try { globalThis.SN_TAB_ENRICH && globalThis.SN_TAB_ENRICH(entry.id, enrichPayload); } catch (_) {}
         }
       }).catch(() => {});
     } catch (_) { /* l'archiviazione non deve mai bloccare la chiusura */ }
+  }
+
+  // ─── riaprire le schede chiuse (Ctrl/Cmd+Shift+T, #1476) ─────────────────
+  _pilaChiuse() {
+    if (!this.incognito) return pilaNormale();
+    if (!this._pilaIncognito) this._pilaIncognito = SchedeChiuse.crea();
+    return this._pilaIncognito;
+  }
+
+  // Prima che la scheda esca dalla fila: il suo posto e la sua cronologia servono a riaprirla com'era.
+  _ricordaChiusa(tab) {
+    if (!tab || tab._passaggio) return null;
+    const url = typeof tab.url === 'string' ? tab.url : '';
+    let storia = null;
+    try { storia = Storia.conserva(tab.storia, this._vociDellaVista(tab), 'stessa', url); } catch (_) {}
+    if (!SchedeChiuse.daRicordare(url, storia)) return null;
+    let zoom = null;
+    try { zoom = tab.view.webContents.getZoomLevel() || null; } catch (_) {}
+    return this._pilaChiuse().ricorda({
+      url,
+      indice: this.tabs.indexOf(tab),
+      storia,
+      zoom,
+      scroll: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
+      proxy: tab.proxy && tab.proxy.country ? { country: tab.proxy.country, tier: tab.proxy.tier || null } : null,
+      colore: tab.identityColor || null,
+    });
+  }
+
+  // Riapre una scheda chiusa com'era: indirizzo, scroll, zoom e paese; dalla pila anche posto e cronologia.
+  // Una porta sola per la scorciatoia, la barra dei menu e la ricerca del filo (REOPEN_ARCHIVED_TAB).
+  async riapri(voce) {
+    const url = voce && typeof voce.url === 'string' ? voce.url : '';
+    if (!url) return null;
+    const prima = new Set(this.tabs.map((t) => t.id));
+    // Per il giudizio sui siti la riapertura è di Filo (#814).
+    const id = this.openTab(url, {
+      activate: true,
+      restoreScrollPct: typeof voce.scroll === 'number' ? voce.scroll : null,
+      restoreZoomLevel: typeof voce.zoom === 'number' && voce.zoom ? voce.zoom : null,
+      origine: { tipo: 'filo' },
+    });
+    // Una pagina di Filo già aperta riporta lì (#252): quella scheda non prende posto né cronologia della chiusa.
+    const tab = id && !prima.has(id) ? this.tabs.find((t) => t.id === id) : null;
+    if (!tab) return id;
+    const s = voce.storia;
+    if (s && (s.prima.length || s.dopo.length)) tab.storia = { prima: s.prima.slice(), dopo: s.dopo.slice() };
+    if (voce.colore) this.setTabIdentityColor(id, voce.colore);
+    if (Number.isInteger(voce.indice) && voce.indice >= 0) this.moveTab(id, voce.indice, { trascinata: false });
+    // La scheda era instradata da un altro paese: rinasce passando dallo stesso.
+    if (voce.proxy && voce.proxy.country) {
+      try { await this.setTabProxy(id, voce.proxy.country, { tier: voce.proxy.tier || undefined, conseguenza: true }); } catch (_) {}
+    }
+    return id;
+  }
+
+  // La più recente, poi quella prima; finita la pila di questa sessione si scende nell'archivio delle schede chiuse.
+  async riapriChiusa() {
+    const pila = this._pilaChiuse();
+    const voce = pila.prendi();
+    if (voce) {
+      if (voce.voceArchivio) this._contaTornata(voce.voceArchivio);
+      return this.riapri(voce);
+    }
+    const e = await this._chiusaDallArchivio();
+    if (e) {
+      this.tornata(e);
+      return this.riapri(SchedeChiuse.daArchivio(e));
+    }
+    try {
+      this.win.webContents.send('shell:toast', { text: 'Nessuna scheda chiusa da riaprire', opts: { unica: 'nessuna-chiusa', tipo: 'nessuna_chiusa' } });
+    } catch (_) {}
+    return null;
+  }
+
+  async _chiusaDallArchivio() {
+    const A = !this.incognito && globalThis.SN_ARCHIVED_TABS;
+    if (!A) return null;
+    try { return this._pilaChiuse().dallArchivio(await A.listMeta()); } catch (_) { return null; }
+  }
+
+  // Una scheda d'archivio tornata, da qualunque strada: si conta fra le riaperte, e Ctrl/Cmd+Shift+T non la ridà.
+  // Sentinella: tests/tab-browser-shortcuts.spec.mjs.
+  tornata(e) {
+    if (!e || typeof e.id !== 'string' || this.incognito) return;
+    this._pilaChiuse().segnaRiaperta(e.id);
+    this._contaTornata(e);
+  }
+
+  // Chi apre un indirizzo che è quello di una scheda chiusa (la chat, un collegamento del filo della home) la riapre.
+  async tornataPerIndirizzo(url) {
+    const A = !this.incognito && globalThis.SN_ARCHIVED_TABS;
+    if (!A || !url) return;
+    try { this.tornata(await A.ultimaPer(url)); } catch (_) {}
+  }
+
+  _contaTornata(e) {
+    ContatoriFinestra.misura('riapertaDallArchivio', e);
+    try { globalThis.SN_CONTATORI_MAIN?.riaperta(e, { incognito: false }); } catch (_) {}
+  }
+
+  // Ctrl/Cmd+L: l'indirizzo si scrive nel campo della home, la barra degli indirizzi non c'è. Già sulla home non la
+  // ricarica, che butterebbe via quello che c'è scritto: dà il fuoco al campo col testo selezionato, come un browser.
+  // Sentinella: tests/tab-browser-shortcuts.spec.mjs.
+  async vaiAScrivereUnIndirizzo(id) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) { this.openTab('filo://newtab/'); return; }
+    let sullaHome = false;
+    if (/^filo:\/\/newtab\//.test(String(tab.url || '')) && !tab.loading) {
+      try {
+        tab.view.webContents.focus();
+        sullaHome = await tab.view.webContents.executeJavaScript(
+          "(()=>{const i=document.getElementById('input');if(!i||i.disabled||!i.offsetParent)return false;i.focus();i.select();return true;})()",
+          false,
+        ) === true;
+      } catch (_) {}
+    }
+    if (sullaHome) return;
+    // Il testo scritto e non inviato vive solo in quella pagina, e Indietro non lo rimette: la home si apre accanto.
+    if (this._testoNonInviato(tab)) this.openTab('filo://newtab/');
+    else this.navigate(tab.id, 'filo://newtab/');
   }
 
   // Lo stato vive sulla SCHEDA, non sul WebContents: deve sopravvivere a una
@@ -1578,7 +1715,11 @@ class TabManager {
   // Mai chiuse dalla pulizia, qualunque cosa decida il modello: l'attiva, quella con audio,
   // quella di un sito tenuto sempre aperto, quella con testo scritto e non inviato (#824, spec §2.1).
   _intoccabileDalTriage(tab) {
-    return tab.id === this.activeId || !!tab.audible || this._sempreAperta(tab) || !!tab.formDirty || this._invioNonTenuto(tab);
+    return tab.id === this.activeId || !!tab.audible || this._sempreAperta(tab) || this._testoNonInviato(tab);
+  }
+
+  _testoNonInviato(tab) {
+    return !!tab.formDirty || this._invioNonTenuto(tab);
   }
 
   // Un modulo col testo dell'utente mandato cambiando pagina: se il sito risponde con un errore, non
@@ -1839,7 +1980,7 @@ class TabManager {
     for (const { tab, reason } of toArchive) {
       ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
       this._avvisaSorvegliante(tab, 'chiusa');
-      this._archiveClosedTab(tab, reason);
+      this._archiveClosedTab(tab, reason, { voce: this._ricordaChiusa(tab) });
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
       if (idx >= 0) {
@@ -2319,11 +2460,11 @@ class TabManager {
     if (input.type === 'keyDown' && (input.control || input.meta) && !input.alt) {
       const k = String(input.key || '').toLowerCase();
       const conta = (azione, fn) => { AzioniContate.azione(azione, fn, { incognito: !!this.win._filoIncognito }); return true; };
+      // Con Shift riapre l'ultima scheda chiusa, come in ogni browser (#1476); tenuto premuto non svuota l'archivio.
+      if (k === 't' && input.shift) return input.isAutoRepeat || conta('reopen-closed-tab', () => this.riapriChiusa().catch(() => {}));
       if (k === 't') return conta('new-tab', () => this.openTab('filo://newtab/'));
       if (k === 'w') return conta('close-tab', () => this.closeTab(tab.id, { via: 'ctrl_w' }));
-      // L'indirizzo si digita dalla home (la barra indirizzi è stata tolta):
-      // Ctrl+L apre la home di Filo, esattamente come nella shell.
-      if (k === 'l') return conta('address-bar', () => this.navigate(tab.id, 'filo://newtab/'));
+      if (k === 'l') return conta('address-bar', () => this.vaiAScrivereUnIndirizzo(tab.id).catch(() => {}));
       if (k === 'r') return conta('reload', () => this.reload(tab.id));
     }
     return false;

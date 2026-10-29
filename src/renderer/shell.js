@@ -2397,15 +2397,16 @@
     const meta = e.ctrlKey || e.metaKey;
     if (meta && e.key.toLowerCase() === 't') {
       e.preventDefault();
-      api.tabs.open('filo://newtab/');
+      // Con Shift riapre l'ultima scheda chiusa, come in ogni browser (#1476); tenuto premuto non svuota l'archivio.
+      if (e.shiftKey) { if (!e.repeat) api.tabs.riapriChiusa(); } else api.tabs.open('filo://newtab/');
     } else if (meta && e.key.toLowerCase() === 'w') {
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.close(a.id, 'ctrl_w');
     } else if (meta && e.key.toLowerCase() === 'l') {
-      // L'indirizzo si scrive dalla home, quindi Ctrl+L apre la home.
+      // L'indirizzo si digita dalla home: la stessa porta del tasto premuto in una pagina.
       e.preventDefault();
       const a = activeTab();
-      if (a) api.tabs.navigate(a.id, 'filo://newtab/');
+      if (a) api.tabs.scriviIndirizzo(a.id);
       else api.tabs.open('filo://newtab/');
     } else if (meta && e.key.toLowerCase() === 'r') {
       e.preventDefault();

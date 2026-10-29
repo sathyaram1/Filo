@@ -9,6 +9,16 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
     // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.251', date: '2026-10-29',
+      features: [
+        'Ctrl+Shift+T (Cmd+Shift+T su Mac) riapre l\'ultima scheda chiusa, come negli altri browser, invece di aprirne una nuova. Torna nello stesso posto della fila, con Indietro e Avanti com\'erano. Premendolo ancora riapre quelle chiuse prima, anche dopo aver riaperto Filo.',
+      ],
+      fixes: [
+        'Ctrl+L (Cmd+L su Mac) sulla home non cancella più quello che stavi scrivendo. Porta il cursore nel campo e seleziona il testo, come la barra degli indirizzi di un browser.',
+        'Ctrl+L (Cmd+L su Mac) su una pagina dove stai scrivendo apre la home in una scheda accanto, così il testo che hai scritto resta dov\'era.',
+      ],
+    },
+    {
       version: '0.2.250', date: '2026-10-23',
       features: [
         'Passando il mouse su una risposta di Filo, sotto compaiono Copia e Rispondi. Copia mette il testo negli appunti senza segni di formattazione. Rispondi la cita sopra la casella, come su WhatsApp, e il tuo messaggio parte con la citazione in testa. Così Filo sa a cosa stai rispondendo, e un clic sulla citazione ti riporta alla sua risposta.',

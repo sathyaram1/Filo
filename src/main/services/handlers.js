@@ -63,14 +63,6 @@ function contaSe(metodo, ...args) {
   } catch (_) { return undefined; }
 }
 const { TURNO_MUTO } = require('./contatori');
-// Una scheda chiusa che la chat riapre col suo indirizzo si conta come quella riaperta dalla home (#1467).
-async function contaSeRiaperta(url, win) {
-  if (!url || !win || win._filoIncognito) return;
-  try {
-    const voce = await ArchivedTabs.ultimaPer(url);
-    if (voce) contaSe('riaperta', voce, { incognito: false });
-  } catch (_) {}
-}
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
@@ -2943,7 +2935,8 @@ async function eseguiAzioneFilo(action, {
             const esito = typeof tm.esitoApertura === 'function' ? await tm.esitoApertura(tabId) : null;
             if (esito && esito.bloccata) return fermata(esito.bloccata.host, esito.bloccata.reason, esito.bloccata.target);
             opened = true;
-            contaSeRiaperta(url, win);
+            // Una scheda chiusa che la chat riapre col suo indirizzo è riaperta come dalla home (#1467, #1476).
+            if (typeof tm.tornataPerIndirizzo === 'function') tm.tornataPerIndirizzo(url);
           }
         } catch (e) {
           console.warn('[Filo] apertura link fallita', e?.message || e);

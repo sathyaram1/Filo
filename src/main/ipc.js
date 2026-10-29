@@ -664,6 +664,18 @@ function registerIpcHandlers() {
     const newId = await win._filoTabs.duplicateTab(id);
     return { ok: !!newId, id: newId };
   });
+  // Ctrl/Cmd+Shift+T e Ctrl/Cmd+L con la barra a fuoco (#1476): solo la cornice.
+  ipcMain.handle('tabs:riapri-chiusa', async (event) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win) return { ok: false };
+    return { ok: !!(await gesto(win, 'reopen-closed-tab', () => win._filoTabs.riapriChiusa())) };
+  });
+  ipcMain.handle('tabs:scrivi-indirizzo', async (event, { id } = {}) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win) return { ok: false };
+    await gesto(win, 'address-bar', () => win._filoTabs.vaiAScrivereUnIndirizzo(id));
+    return { ok: true };
+  });
   ipcMain.handle('tabs:help', (event, { id } = {}) => {
     const win = winFor(event);
     if (win?._filoTabs) gesto(win, 'help-sidebar', () => win._filoTabs.openHelp(id));
