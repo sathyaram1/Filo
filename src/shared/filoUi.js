@@ -423,7 +423,10 @@
   // Tasti e puntatore si guardano prima del sito (#1340): il ponte di page-preload, a document_start, chiama
   // `primaDelSito` prima di ogni suo ascolto. Dal campo, il sito in cattura sulla finestra avrebbe già spostato la selezione.
   const INIZI = ['keydown', 'pointerdown', 'mousedown', 'touchstart'];
-  const GESTI_CASELLA = [...INIZI, 'keyup', 'pointerup', 'mouseup', 'touchend', 'click'];
+  // Incolla e taglia arrivano anche senza un tasto che la pagina veda (Incolla del menu dell'app, che su Mac è la strada
+  // di Cmd+V): la selezione da cui partono è quella che hanno trovato, prima che il sito li ascolti (#1340, giro 4).
+  const APPUNTI = ['paste', 'cut'];
+  const GESTI_CASELLA = [...INIZI, 'keyup', 'pointerup', 'mouseup', 'touchend', 'click', ...APPUNTI];
   const TASTI_CHE_MUOVONO = /^(Arrow|Home$|End$|Page)/;
   // La selezione spostata mentre il sito riceve un tasto o un inserimento dell'utente (fra l'ascolto di Filo, che viene
   // prima, e la fine del giro) l'ha spostata il sito: torna. Fuori da quei giri la sposta anche la barra dei menu (Cmd+A
