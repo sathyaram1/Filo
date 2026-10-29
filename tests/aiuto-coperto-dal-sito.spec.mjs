@@ -96,6 +96,41 @@ test('il microfono dell\'Aiuto sotto il velo del sito non si accende e lo dice; 
   await expect(avvisoCoperto(page)).toBeVisible();
 });
 
+// Spostato l'Aiuto dalla testata, lo specchio del correttore restava dove stava la casella e copriva il microfono, e
+// gli avvisi tornavano nell'angolo sopra il pannello: la guardia li prendeva per un velo del sito (#1340).
+test('spostato dalla testata, il microfono dell\'Aiuto parte al primo clic e l\'avviso della guardia non lo copre', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, pagina());
+  await apriAiuto(shell, page);
+  await contaAscolti(app, page);
+  const mic = page.locator('.sn-sidebar .sn-voce-btn');
+  await expect.poll(() => pronto(app, page, '.sn-sidebar .sn-voce-btn')).toBe(true);
+  const h = await page.locator('.sn-sidebar-header').boundingBox();
+  await page.mouse.move(h.x + 30, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x - 90, h.y + h.height / 2 + 60, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => pronto(app, page, '.sn-sidebar .sn-voce-btn')).toBe(true);
+  const p = await centro(mic);
+  await page.mouse.click(p.x, p.y);
+  await expect.poll(() => ascolti(app, page)).toBe(1);
+  await expect(avvisoCoperto(page)).toHaveCount(0);
+
+  // Sotto un velo l'avviso compare a fianco del pannello: tolto il velo, il microfono si vede e risponde.
+  await page.evaluate(() => window.stendi());
+  await page.waitForTimeout(700);
+  await page.mouse.click(p.x, p.y);
+  await expect(avvisoCoperto(page)).toBeVisible();
+  const a = await avvisoCoperto(page).boundingBox();
+  const s = await page.locator('.sn-sidebar').boundingBox();
+  expect(a.x + a.width <= s.x || a.x >= s.x + s.width, 'l\'avviso sta a fianco dell\'Aiuto').toBe(true);
+  await page.evaluate(() => window.togli());
+  await expect.poll(() => pronto(app, page, '.sn-sidebar .sn-voce-btn')).toBe(true);
+  await page.mouse.click(p.x, p.y);
+  await expect.poll(() => ascolti(app, page)).toBe(2);
+  await page.screenshot({ path: 'tests/.shots/aiuto-spostato-avviso.png' });
+});
+
 test('su una pagina in grigio il microfono dell\'Aiuto risponde, e la pagina resta grigia', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, pagina('<h1 style="color:#c00">Un sito in lutto</h1>', 'filter:grayscale(1)'));

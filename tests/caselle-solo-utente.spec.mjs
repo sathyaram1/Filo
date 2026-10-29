@@ -427,3 +427,59 @@ test('caselle su un sito: la selezione spostata dal sito al clic dell\'utente to
   await s.send('Input.insertText', { text: '日本' });
   await expect(ta).toHaveValue('come si cambia la password?日本');
 });
+
+// Incolla del menu dell'app (su Mac la strada di Cmd+V) e l'inizio di una composizione non passano da un tasto che la
+// pagina veda: il sito che seleziona tutto nel suo ascolto di paste o di compositionstart faceva sparire il testo (#1340).
+test('caselle su un sito: la selezione spostata dal sito all\'incolla del menu e all\'inizio di una composizione torna (#1340)', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, pagina(`<p>Un sito</p><script>
+    window.arma = () => {
+      const tutto = () => {
+        const t = document.querySelector('.sn-sidebar-input textarea');
+        if (t && document.activeElement === t) t.setSelectionRange(0, t.value.length);
+        else document.execCommand('selectAll');
+      };
+      document.addEventListener('paste', tutto, true);
+      document.addEventListener('compositionstart', tutto, true);
+    };</script>`));
+  const incollaDalMenu = () => app.evaluate(({ webContents }, u) => {
+    webContents.getAllWebContents().find((w) => w.getURL() === u).paste();
+  }, page.url());
+  await apriAiuto(shell, page);
+  const ta = page.locator('.sn-sidebar-input textarea');
+  await ta.click();
+  await page.keyboard.insertText('dove si cambia la password ');
+  await page.evaluate(() => window.arma());
+  await app.evaluate(({ clipboard }) => clipboard.writeText('del conto'));
+  await incollaDalMenu();
+  await expect(ta).toHaveValue('dove si cambia la password del conto');
+  const s = await page.context().newCDPSession(page);
+  await s.send('Input.imeSetComposition', { text: 'に', selectionStart: 1, selectionEnd: 1 });
+  await s.send('Input.insertText', { text: '日本' });
+  await expect(ta).toHaveValue('dove si cambia la password del conto日本');
+
+  await apriFeedback(app, page);
+  const v = () => valore(app, page, '.sn-fb-text');
+  await scrivi(app, page, '.sn-fb-text', 'Il tasto indietro non va ');
+  await app.evaluate(({ clipboard }) => clipboard.writeText('su questo sito'));
+  await incollaDalMenu();
+  await expect.poll(v).toBe('Il tasto indietro non va su questo sito');
+  await s.send('Input.imeSetComposition', { text: 'に', selectionStart: 1, selectionEnd: 1 });
+  await s.send('Input.insertText', { text: '日本' });
+  await expect.poll(v).toBe('Il tasto indietro non va su questo sito日本');
+});
+
+// Annulla vale solo verso un testo che la casella ha già avuto: con un log di centomila caratteri la memoria dei testi
+// tenuti interi ne conteneva una ventina, e Ctrl+Z non tornava indietro (#1340).
+test('feedback su un sito: con un testo lunghissimo Ctrl+Z annulla ancora (#1340)', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, pagina('<p>Un sito</p>'));
+  await apriFeedback(app, page);
+  const lunghezza = async () => (await valore(app, page, '.sn-fb-text')).length;
+  await scrivi(app, page, '.sn-fb-text', 'Log: '.padEnd(100000, 'abcdefghij '));
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type('x'.repeat(60));
+  await expect.poll(lunghezza).toBe(100060);
+  await page.keyboard.press('Control+Z');
+  await expect.poll(lunghezza).toBeLessThan(100060);
+});
