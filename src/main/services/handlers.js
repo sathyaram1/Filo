@@ -2895,7 +2895,8 @@ async function eseguiAzioneFilo(action, {
             const esito = typeof tm.esitoApertura === 'function' ? await tm.esitoApertura(tabId) : null;
             if (esito && esito.bloccata) return fermata(esito.bloccata.host, esito.bloccata.reason, esito.bloccata.target);
             opened = true;
-            contaSeRiaperta(url, win);
+            // Una scheda chiusa che la chat riapre col suo indirizzo è riaperta come dalla home (#1467, #1476).
+            if (typeof tm.tornataPerIndirizzo === 'function') tm.tornataPerIndirizzo(url);
           }
         } catch (e) {
           console.warn('[Filo] apertura link fallita', e?.message || e);
