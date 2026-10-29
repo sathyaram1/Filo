@@ -304,6 +304,7 @@
       const newBottom = Math.min(maxBottom, Math.max(0, startBottom - dy));
       root.style.left = `${newLeft}px`;
       root.style.bottom = bassoPer(newBottom, newLeft, w);
+      scostaAvvisi();
     });
     window.addEventListener('mouseup', () => { dragging = false; });
   }
