@@ -36,12 +36,16 @@
 // l'emulatore non sa misurare. Al passaggio di #1518 (2026-10-23, firebase-tools
 // 15.34): 47/47 con due NOTE (Cache-Control e Content-Language non arrivano alle
 // regole; il codice di scarico scelto da chi carica l'emulatore lo toglie dai
-// metadati prima di valutarle).
+// metadati prima di valutarle). A #1728 (2026-10-29, firebase-tools 15.x):
+// 55/55 con tre NOTE; con le regole di prima 51/55, rossi i quattro casi a
+// campi assenti.
 //
-// QUEL CHE L'EMULATORE NON DICE (#1666): il motore vero scrive il codice di
-// scarico in `metadata.firebaseStorageDownloadTokens` PRIMA di valutare le
-// regole. Con `metadata.size() == 0` qui tutto era verde e in produzione ogni
-// allegato prendeva 403 dal 23/10 al 25/10. Dopo ogni pubblicazione delle
+// QUEL CHE L'EMULATORE NON DICE (#1666, #1728): il motore vero scrive il codice
+// di scarico in `metadata.firebaseStorageDownloadTokens` PRIMA di valutare le
+// regole, e a un caricamento normale non passa contentEncoding. Qui era tutto
+// verde e in produzione ogni allegato prendeva 403 (dal 23/10 al 25/10, poi dal
+// 26/10): l'emulatore riempie i campi che il motore vero lascia assenti, e un
+// campo assente letto senza `in` nega. Dopo ogni pubblicazione delle
 // regole la prova che conta è un caricamento vero dall'app (o `sealForUpload`
 // più POST al deposito): se risponde 403, il verde di questo file non vale.
 //
