@@ -13,7 +13,8 @@
 //   5) riordinare due volte di fila: la seconda è un non-fare, e lo dice;
 //   6) "/riordina" con parole in più resta un comando riconosciuto;
 //   7) i siti col favicon bianco o nero vanno alle due estremità dell'arcobaleno
-//      e quelli senza favicon in coda (#822), anche con saturazione_tab a 0.
+//      e quelli senza favicon in coda (#822), anche con saturazione_tab a 0;
+//      un rosso che tende al rosa (Netflix) sta in testa accanto al rosso (#822.1).
 //
 // I casi 3-6 stavano in uno spec a parte, nato per una verifica e finito nel
 // repo per sbaglio: cancellandolo sono spariti quattro controlli che nessun
