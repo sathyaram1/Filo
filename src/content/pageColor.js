@@ -258,17 +258,24 @@
 
     // Si parte a testa della pagina letta (c'è il corpo), dove stanno icona e theme-color: non al «load», che su un sito
     // lento arriva dopo secondi (#1456.2), e non prima, quando un sito già visto rischia di perdere il colore ricordato.
-    // I due ritentativi servono ai siti che li mettono dopo; una testa che non finisce mai si aspetta al massimo 2 s.
+    // Si guarda il parser e non un timer, che in una scheda dietro rallenta. I ritentativi servono ai siti che li mettono dopo.
+    identitaPartita = true;
     const parti = () => { send(); setTimeout(send, 800); setTimeout(send, 2000); };
     const testaLetta = () => !!document.body || document.readyState !== 'loading';
     if (testaLetta()) { parti(); return; }
-    let giri = 0;
-    const attesa = setInterval(() => {
-      if (!testaLetta() && ++giri < 40) return;
-      clearInterval(attesa);
+    let partito = false;
+    let spia = null;
+    const prova = () => {
+      if (partito || !testaLetta()) return;
+      partito = true;
+      try { spia && spia.disconnect(); } catch (_) {}
+      document.removeEventListener('readystatechange', prova);
       parti();
-    }, 50);
+    };
+    try { spia = new MutationObserver(prova); spia.observe(document, { childList: true, subtree: true }); } catch (_) {}
+    document.addEventListener('readystatechange', prova);
   }
+  let identitaPartita = false;
 
-  global.SN_PAGE_COLOR = { startTabColorSampler, reportTabIdentityColor };
+  global.SN_PAGE_COLOR = { startTabColorSampler, reportTabIdentityColor, identitaPartita: () => identitaPartita };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
