@@ -62,6 +62,17 @@ test('il rifiuto di Anthropic porta le misure come quello di OpenRouter', () => 
   assert.deepEqual(FC.troppoLungo({ status: 400, message: raw }), { max: 200000, chiesti: 214263 });
 });
 
+test('il rifiuto di Anthropic per ingresso più tetto della risposta: l\'ingresso a parte, e si toglie quanto basta', () => {
+  const raw = 'OpenRouter 400: {"error":{"message":"Provider returned error","code":400,"metadata":{"raw":"{\\"type\\":\\"error\\",\\"error\\":{\\"type\\":\\"invalid_request_error\\",\\"message\\":\\"input length and `max_tokens` exceed context limit: 188240 + 16384 > 200000, decrease input length or `max_tokens` and try again\\"}}","provider_name":"Anthropic"}}}';
+  const rifiuto = FC.troppoLungo({ status: 400, message: raw });
+  assert.deepEqual(rifiuto, { ingresso: 188240, max: 200000, chiesti: 204624 });
+  // Posto per l'ingresso: la finestra meno il tetto; si toglie la parte che sfora, col margine stretto.
+  const caratteri = 658840;
+  const e = FC.eccessoDopoRifiuto({ ...rifiuto, caratteri, risposta: 16384 });
+  const atteso = caratteri - caratteri * ((200000 - 16384) / 188240) * FC.MARGINE_PAGINE;
+  assert.ok(Math.abs(e - atteso) <= 1, `${e} invece di ${atteso}`);
+});
+
 test('dopo un rifiuto: con le misure in proporzione, con la sola finestra dalla stima, senza niente null', () => {
   const caratteri = 200000;
   const e = FC.eccessoDopoRifiuto({ max: 32768, chiesti: 65536, caratteri });
