@@ -5,9 +5,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
@@ -19,7 +19,7 @@ const { numeroFeedback, regexCitazione, fusioniCheCitano, fileRiscritti, ramiInC
   await import('../../scripts/lib/su-main.mjs');
 
 const git = (dir, args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-const scrivi = (dir, file, testo) => writeFileSync(join(dir, file), testo);
+const scrivi = (dir, file, testo) => { mkdirSync(dirname(join(dir, file)), { recursive: true }); writeFileSync(join(dir, file), testo); };
 const righe = (n, cambia = {}) => Array.from({ length: n }, (_, i) => cambia[i + 1] ?? `riga ${i + 1}`).join('\n') + '\n';
 
 function repo() {
@@ -79,8 +79,13 @@ test('un riallineamento pulito non riscrive niente, anche se main ha cambiato le
   const r = fileRiscritti(dir, { prima, dopo: 'HEAD' });
   assert.equal(r.ok, true, r.errore);
   assert.equal(r.basi.prima, base);
-  assert.deepEqual(r.file, ['PATTERNS.md'], 'solo il file di servizio, dove la riga nuova sta in un posto diverso');
+  assert.deepEqual(r.file, [], 'tenere le due righe lascia al ramo la stessa modifica');
   assert.deepEqual(R.giroDopoRiallineamento(r.file), { giro: 'nessuno', codice: [] });
+  // Un conflitto risolto riscrivendo la riga del ramo, ma in un file di servizio: niente giro nuovo lo stesso.
+  commit(dir, 'riga riscritta', { 'PATTERNS.md': '# indice\n- uno\n- di main\n- del ramo, dopo main\n' });
+  const s = fileRiscritti(dir, { prima });
+  assert.deepEqual(s.file, ['PATTERNS.md']);
+  assert.deepEqual(R.giroDopoRiallineamento(s.file), { giro: 'nessuno', codice: [] });
 });
 
 test('un conflitto risolto in un file di codice chiede la verifica intera', (t) => {

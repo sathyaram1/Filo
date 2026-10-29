@@ -604,7 +604,7 @@ test('#747 dispatch: la consegna manda alla pulizia la prova dimenticata, e la p
     t.scrivi('stato-a.txt', 'corretto\n');
     t.g('rm', '-q', bis);
     t.commit('correzione, e via anche il bis');
-    const no = await esegui('dispatch.mjs', ['--record-fixed', 'fid-747', REPORT], env, t.dir);
+    const no = await esegui('dispatch.mjs', ['--record-fixed', 'fid-747', REPORT, '--motivo', 'ripresa'], env, t.dir);
     assert.equal(no.code, 1, no.testo);
     assert.match(no.testo, /giro1-r2-bis\.spec\.mjs \(r2\)/);
     assert.match(no.testo, /node scripts\/dispatch\.mjs --record-pulizia fid-747/);
@@ -623,7 +623,7 @@ test('#747 dispatch: la consegna manda alla pulizia la prova dimenticata, e la p
     assert.equal(leggi().puliziaSha, prima, 'la base della consegna non si sposta');
     assert.deepEqual(leggi().pulizieDopo, [dopo]);
 
-    const si = await esegui('dispatch.mjs', ['--record-fixed', 'fid-747', REPORT], env, t.dir);
+    const si = await esegui('dispatch.mjs', ['--record-fixed', 'fid-747', REPORT, '--motivo', 'ripresa'], env, t.dir);
     assert.equal(si.code, 3, `superato il controllo, la consegna arriva al server (che qui è giù): ${si.testo}`);
     assert.doesNotMatch(si.testo, /Consegna respinta/);
   } finally {

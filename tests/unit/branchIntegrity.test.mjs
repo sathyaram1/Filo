@@ -655,7 +655,7 @@ describe('B — l’identità attesa esposta alla guardia', () => {
       let r;
       try {
         execFileSync(process.execPath, [resolve(ROOT, 'scripts', 'dispatch.mjs'), '--record-fixed', 'f12',
-          'Riallineato il ramo sopra main, risolto il conflitto nel file c, nessun altro cambiamento in questo giro.'],
+          'Riallineato il ramo sopra main, risolto il conflitto nel file c, nessun altro cambiamento in questo giro.', '--motivo', 'conflitto: c'],
         { encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] });
         assert.fail('durante il rebase la consegna deve essere rifiutata');
       } catch (e) {

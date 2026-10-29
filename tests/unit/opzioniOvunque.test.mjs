@@ -18,6 +18,7 @@ const { leggiOpzioniRegistrazione } = await import('../../scripts/dispatch.mjs')
 const ID = 'fid-900';
 const REPORT = 'Report per l’owner: la causa era altrove, il pulsante non veniva mai agganciato alla lista dei modelli.';
 const FRASE = 'Ora puoi rimuovere un modello dalle impostazioni.';
+const MOTIVO = 'conflitto: src/a.js';
 const CRITICA = 'Provato ad aprire la pagina e a salvare con il titolo vuoto: funziona tutto, non ho trovato niente da segnalare.';
 const SEGNALAZIONE = '## Problema\nDue strade.\n\n## Scelte\n- A: costa.\n- B: lenta.';
 const NOTA_TESTO = 'Letto il diff riga per riga: solo lettura degli argomenti e un test. Niente di sospetto.';
@@ -88,11 +89,11 @@ async function lancia(costruisci) {
 
 test('--record-fixed: frase e segnalazione arrivano uguali in ogni posizione, col ramo e l\'identificativo giusti', async () => {
   const righe = {
-    'in fondo': ({ seg }) => ['--record-fixed', ID, REPORT, '--frase', FRASE, '--segnala', seg],
-    'davanti al comando': ({ seg }) => ['--frase', FRASE, '--segnala', seg, '--record-fixed', ID, REPORT],
-    'fra comando e identificativo': ({ seg }) => ['--record-fixed', '--frase', FRASE, '--segnala', seg, ID, REPORT],
-    'fra identificativo e report': ({ seg }) => ['--record-fixed', ID, '--frase', FRASE, REPORT, '--segnala', seg],
-    'con l\'uguale': ({ seg }) => ['--record-fixed', `--frase=${FRASE}`, `--segnala=${seg}`, ID, REPORT],
+    'in fondo': ({ seg }) => ['--record-fixed', ID, REPORT, '--frase', FRASE, '--segnala', seg, '--motivo', MOTIVO],
+    'davanti al comando': ({ seg }) => ['--motivo', MOTIVO, '--frase', FRASE, '--segnala', seg, '--record-fixed', ID, REPORT],
+    'fra comando e identificativo': ({ seg }) => ['--record-fixed', '--frase', FRASE, '--motivo', MOTIVO, '--segnala', seg, ID, REPORT],
+    'fra identificativo e report': ({ seg }) => ['--record-fixed', ID, '--frase', FRASE, '--motivo', MOTIVO, REPORT, '--segnala', seg],
+    'con l\'uguale': ({ seg }) => ['--record-fixed', `--frase=${FRASE}`, `--segnala=${seg}`, `--motivo=${MOTIVO}`, ID, REPORT],
   };
   for (const [dove, riga] of Object.entries(righe)) {
     const r = await lancia(riga);
@@ -102,12 +103,13 @@ test('--record-fixed: frase e segnalazione arrivano uguali in ogni posizione, co
     assert.equal(r.dati.userNote, FRASE, `${dove}: a chi ha segnalato arriva la frase`);
     assert.equal(r.dati.branch, 'worker/900', `${dove}: la consegna porta il ramo del lavoro`);
     assert.equal(r.dati.segnalazione, SEGNALAZIONE, `${dove}: la segnalazione arriva intera`);
+    assert.ok(r.dati.motivo && r.dati.motivo.tipo, `${dove}: il motivo del correttore arriva al server`);
     assert.deepEqual(r.stati, [`${ID}.json`], `${dove}: lo stato locale resta sotto l'identificativo vero`);
   }
 });
 
 test('--record-fixed: --ferma davanti al comando vale come in fondo', async () => {
-  const r = await lancia(({ seg }) => ['--ferma', '--record-fixed', ID, REPORT, '--segnala', seg]);
+  const r = await lancia(({ seg }) => ['--ferma', '--record-fixed', ID, REPORT, '--segnala', seg, '--motivo', MOTIVO]);
   assert.equal(r.code, 0, `stderr: ${r.se}`);
   assert.equal(r.dati?.stop, true, 'la consegna porta la richiesta di fermarsi');
   assert.equal(r.dati?.report, REPORT);

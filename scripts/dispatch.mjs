@@ -81,7 +81,8 @@ import {
   writeExpectation, clearExpectation, stateDir,
   lavoroVivo, testoLavoroVivo, USCITA_LAVORO_VIVO,
 } from './lib/branch-integrity.mjs';
-import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
+import { writeRole, clearRole, readRole, readMarker } from './lib/routine-role.mjs';
+import { fileRiscritti, fusioniCheCitano, numeroFeedback } from './lib/su-main.mjs';
 import {
   baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, numeraRilievi, puliziaDelPass, rigaNumerata,
   ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero,
@@ -414,8 +415,12 @@ export const OPZIONI_REGISTRAZIONE = {
   // La domanda per l'owner nel formato di SPEC-DOMANDE §3.1 (#1358): ferma il lavoro come la segnalazione.
   '--domanda': { tipo: 'file', comandi: ['--record-verifier', '--record-fixed'] },
   '--nota': { tipo: 'file', comandi: ['--record-secaudit'] },
-  '--frase': { tipo: 'testo', comandi: ['--record-fixed'] },
+  '--frase': { tipo: 'testo', comandi: ['--record-fixed'], manca: 'la riga per chi ha segnalato' },
+  // Perché il correttore è stato chiamato (SPEC-RIDISEGNO-LAVORO.md §3, regola 4): senza, la consegna non parte.
+  '--motivo': { tipo: 'testo', comandi: ['--record-fixed'], manca: 'il motivo della correzione ("conflitto: <file>", "prove rosse: <prove>", "ripresa" o "altro: <testo>")' },
   '--ferma': { tipo: 'bandiera', comandi: ['--record-fixed'] },
+  // La sessione accesa per UN feedback (SPEC-RIDISEGNO-LAVORO.md § 2): riceve il ruolo della sessione, non dell'orchestratore.
+  '--feedback': { tipo: 'testo', comandi: ['--preflight'], manca: 'il numero del feedback' },
 };
 const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', bandiera: '' };
 
@@ -433,7 +438,7 @@ export function leggiOpzioniRegistrazione(list) {
     const a = lista[i];
     const nome = Object.keys(OPZIONI_REGISTRAZIONE).find((n) => a === n || a.startsWith(`${n}=`));
     if (!nome) { args.push(a); continue; }
-    const { tipo } = OPZIONI_REGISTRAZIONE[nome];
+    const { tipo, manca } = OPZIONI_REGISTRAZIONE[nome];
     if (tipo === 'bandiera') {
       if (a !== nome) return no(`${nome} non vuole un valore: non ho consegnato niente.`);
       valori[nome] = true;
@@ -448,7 +453,7 @@ export function leggiOpzioniRegistrazione(list) {
     } else {
       // Un'opzione al posto della frase vuol dire frase dimenticata: presa per frase, il comando o
       // l'identificativo sparivano dalla riga.
-      if (v === undefined || sembraOpzioneNelReport(v)) return no(`${nome} vuole la riga per chi ha segnalato dopo di sé — non ho consegnato niente.`);
+      if (v === undefined || sembraOpzioneNelReport(v)) return no(`${nome} vuole ${manca} dopo di sé — non ho consegnato niente.`);
       valori[nome] = v;
     }
   }
@@ -469,13 +474,44 @@ export function leggiOpzioniRegistrazione(list) {
  * Il payload della consegna «corretto», con la segnalazione se c'è. `sha`: la punta della cartella, che il registro del
  * ramo confronta con quella che troverà dopo (#1148; senza, il server segna il buco). PURA.
  */
-export function fixedPayload({ report, frase, branch, segnalazione, ferma, sha, domanda } = {}) {
+export function fixedPayload({ report, frase, branch, segnalazione, ferma, sha, domanda, motivo, riallineamento } = {}) {
   const p = { report: String(report || ''), userNote: String(frase || ''), branch: String(branch || '') };
   if (String(segnalazione || '').trim()) p.segnalazione = String(segnalazione).trim();
   if (domanda && typeof domanda === 'object') p.domanda = domanda;
   if (ferma === true) p.stop = true;
   if (/^[0-9a-f]{40}$/.test(String(sha || ''))) p.sha = String(sha);
+  if (motivo && typeof motivo === 'object' && motivo.tipo) p.motivo = motivo;
+  // Il confronto fatto qui è un'indicazione: il server rifà il suo prima di decidere se serve un giro nuovo.
+  if (riallineamento && typeof riallineamento === 'object') p.riallineamento = riallineamento;
   return p;
+}
+
+/** `--motivo` del correttore letto con la regola condivisa; senza il modulo (paracadute) passa com'è. PURA. */
+export function leggiMotivo(testo) {
+  if (typeof VERIFIER_ROUND.leggiMotivoCorrettore === 'function') return VERIFIER_ROUND.leggiMotivoCorrettore(testo);
+  const t = String(testo || '').trim();
+  return t ? { ok: true, motivo: { tipo: 'altro', testo: t } } : { ok: false, errore: 'Manca il motivo della correzione: --motivo "…".' };
+}
+
+/**
+ * Cosa dice il confronto della punta verificata con quella riallineata, accanto al motivo del correttore: la riga da
+ * stampare e il campo per il server. `confronto`: l'uscita di fileRiscritti, o null fuori da un riallineamento. PURA.
+ */
+export function esitoRiallineamento(confronto, motivo) {
+  if (!confronto) return { riallineamento: null, riga: '' };
+  if (!confronto.ok) {
+    return { riallineamento: { fileRiscritti: null, giro: 'pieno' }, riga: `Non riesco a confrontare la punta verificata con questa (${confronto.errore}): il server deciderà da sé, nel dubbio con una verifica intera.` };
+  }
+  const regola = typeof VERIFIER_ROUND.giroDopoRiallineamento === 'function' ? VERIFIER_ROUND.giroDopoRiallineamento : null;
+  if (!regola) return { riallineamento: { fileRiscritti: confronto.file, giro: 'pieno' }, riga: '' };
+  const { giro, codice } = regola(confronto.file);
+  const dichiarati = motivo && Array.isArray(motivo.file) ? motivo.file : null;
+  const taciuti = dichiarati ? codice.filter((f) => !dichiarati.includes(f)) : [];
+  const righe = [giro === 'nessuno'
+    ? `Riallineamento pulito${confronto.file.length ? ` (cambiati solo file di servizio: ${confronto.file.join(', ')})` : ''}: per la regola non serve un giro nuovo di verifica, bastano le prove del server.`
+    : `La modifica del ramo è cambiata in ${codice.length === 1 ? 'un file di codice' : `${codice.length} file di codice`} (${codice.slice(0, 5).join(', ')}${codice.length > 5 ? ', …' : ''}): serve la verifica intera.`];
+  if (taciuti.length) righe.push(`Il motivo non nomina ${taciuti.slice(0, 5).join(', ')}${taciuti.length > 5 ? ', …' : ''}: il server confronta da sé, scrivi nel report cosa hai toccato lì.`);
+  return { riallineamento: { fileRiscritti: confronto.file, giro }, riga: righe.join(' ') };
 }
 
 /** La domanda di `--domanda <file.json>`, controllata come la controlla il server; un errore ferma prima del server. */
@@ -830,6 +866,35 @@ function testoDiffVuoto({ commitPropri = null } = {}, diffServer = '') {
   return commitPropri === 0 ? `Il diff è vuoto davvero: ${perche}, quindi non porta nessuna modifica.` : `Il diff è vuoto davvero: ${perche}.`;
 }
 
+// Il piano che una sessione precedente ha scritto per questo lavoro (SPEC-RIDISEGNO-LAVORO.md § 2): chi riprende
+// riparte da lì. Lo conserva e lo rimanda il server.
+function conPiano(ctx) {
+  return typeof ctx.piano === 'string' && ctx.piano.trim() ? { piano: ctx.piano } : {};
+}
+
+/**
+ * Le fusioni su main che citano il feedback, dopo la sua nascita (regola 5): quelle che il server ha già trovato, o
+ * quelle che dice git qui. `propria`: la fusione del suo stesso lavoro, cioè un feedback riaperto dall'owner.
+ */
+function suMainDi(bucket, ctx) {
+  const num = numeroFeedback(bucket && bucket.num);
+  if (Array.isArray(ctx && ctx.suMain)) return ctx.suMain;
+  if (!num) return [];
+  try {
+    const nato = Date.parse((ctx && ctx.feedback && ctx.feedback.createdAt) || '') || 0;
+    return segnaProprie(fusioniCheCitano(ROOT, num, { dopo: nato }), num);
+  } catch (_) {
+    return [];
+  }
+}
+
+/** Segna `propria` la fusione del lavoro stesso del feedback («merge-gate: #N …»). PURA. */
+export function segnaProprie(fusioni, num) {
+  const n = numeroFeedback(num);
+  const propria = new RegExp(`^merge-gate: #${n.replace('.', '\\.')}\\b(?!\\.\\d)`);
+  return (Array.isArray(fusioni) ? fusioni : []).map((f) => (n && propria.test(String(f.oggetto || '')) ? { ...f, propria: true } : f));
+}
+
 export function buildPayload(bucket, ctx = {}) {
   switch (bucket.role) {
     case 'secaudit': {
@@ -872,7 +937,7 @@ export function buildPayload(bucket, ctx = {}) {
       if (rip) {
         return {
           case: 'ripresa', branch: bucket.branch, id: bucket.id, num: bucket.num,
-          feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx), ...conImmagini(ctx),
+          feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx), ...conImmagini(ctx), ...conPiano(ctx),
           history: Array.isArray(ctx.history) ? ctx.history : [],
           historyDropped: Number(ctx.historyDropped) || 0,
         };
@@ -896,7 +961,7 @@ export function buildPayload(bucket, ctx = {}) {
       // Chi lo ha preceduto aveva chiesto prima di avere un ramo, e l'owner ha
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
-      return out;
+      return { ...out, ...conPiano(ctx), ...(Array.isArray(ctx.suMain) && ctx.suMain.length ? { suMain: ctx.suMain } : {}) };
     }
     case 'risposta': {
       const { role: _ruolo, ...resto } = (ctx && ctx.risposta) || {};
@@ -1410,7 +1475,7 @@ export function fixedReplyText(id, reply, conSegnalazione = false) {
   if (conSegnalazione) return `stato ${id}: ATTENZIONE, la consegna portava una segnalazione ma il server non ha fermato il lavoro: è tornato in coda per la verifica. La segnalazione è consegnata lo stesso.`;
   return `stato ${id}: consegnato, torna in coda per la verifica`;
 }
-async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false, domanda = null) {
+async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false, domanda = null, motivo = null) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, altrove: !!guard.altrove && !guard.escalated, message: guard.message };
   // La consegna vale per un commit, come la critica (stessa regola, stessa
@@ -1461,7 +1526,15 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   // frase resta leggibile per chi ha mandato il feedback (spec §8).
   // La segnalazione (L3) viaggia nello stesso payload: il server la cifra e la
   // scrive in `livelli.l3`, e la appende alle note come storia della chat.
-  const sent = await deliverToChannel('fixed', fixedPayload({ report, frase, branch: next.branch || '', segnalazione, ferma, sha: puntaDellaCartella(), domanda }));
+  // In un riallineamento dispatch ha scritto nel marcatore la punta ricevuta: si confronta la modifica del ramo di
+  // allora con quella di adesso (regola 3), e lo si dice prima che decida il server.
+  const marcatore = readMarker(ROOT);
+  const confronto = marcatore && marcatore.role === 'fixer' && marcatore.dal ? fileRiscritti(ROOT, { prima: marcatore.dal }) : null;
+  const esito = esitoRiallineamento(confronto, motivo);
+  if (esito.riga) process.stderr.write(`${esito.riga}\n`);
+  const sent = await deliverToChannel('fixed', fixedPayload({
+    report, frase, branch: next.branch || '', segnalazione, ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento,
+  }));
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
   }
@@ -2203,9 +2276,12 @@ export function emit(bucket, ctx) {
   // quello del giro precedente sopravviverebbe a un giro che non ha lavorato e
   // finirebbe nella provenienza di un feedback altrui.
   const ambito = bucket.role === 'verifier' ? verifierScope(ctx && ctx.scope) : { scope: '', sconosciuto: false };
+  // `dal`: per chi verifica un riallineamento il commit verificato; per chi riallinea la punta che riceve, contro cui
+  // la consegna confronta la modifica del ramo (SPEC-RIDISEGNO-LAVORO.md §3, regola 3).
+  const riallinea = bucket.role === 'fixer' && !(ctx && ctx.ripresa && typeof ctx.ripresa === 'object');
   if (bucket.role === 'halt') { if (!bucket.lavoroVivo) clearRole(ROOT); }
-  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? ctx?.perimetro?.shaVerificato : '' });
-  const pieno = buildPayload(bucket, ctx);
+  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? ctx?.perimetro?.shaVerificato : riallinea ? puntaDellaCartella() : '' });
+  const pieno = buildPayload(bucket, bucket.role === 'new-work' ? { ...ctx, suMain: suMainDi(bucket, ctx) } : ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
   if (ambito.sconosciuto) process.stderr.write(`[dispatch] ambito di verifica sconosciuto («${unaRiga(ctx.scope).slice(0, 40)}»): consegno la verifica piena\n`);
@@ -2358,8 +2434,8 @@ if (isMainModule) {
     } else if (flag === '--record-fixed') {
       const ferma = opz['--ferma'] === true;
       const [, id, ...rest] = conBiglietto(argv);
-      if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md>] [--domanda <file.json>]'); process.exit(1); }
-      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--frase "…", --segnala <file.md> e --ferma')); process.exit(1); }
+      if (!id) { console.error('Uso: --record-fixed <id> "report" --motivo "…" [--frase "…"] [--segnala <file.md>] [--domanda <file.json>]'); process.exit(1); }
+      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--motivo "…", --frase "…", --segnala <file.md> e --ferma')); process.exit(1); }
       const senza = fermaSenzaSegnalazione(ferma, opz['--segnala'] || opz['--domanda']);
       if (senza) { console.error(senza); process.exit(1); }
       // La frase è la riga in chiaro per chi ha mandato il feedback; il resto è il report per l'owner,
@@ -2369,7 +2445,7 @@ if (isMainModule) {
       // Un'altra cosa coi trattini davanti finirebbe sepolta nel report cifrato (#565).
       const altra = rest.find((a) => sembraOpzioneNelReport(a));
       if (altra) {
-        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --frase "…", --segnala <file.md> e --ferma; il resto è il report, un testo solo fra virgolette.`);
+        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --motivo "…", --frase "…", --segnala <file.md>, --domanda <file.json> e --ferma; il resto è il report, un testo solo fra virgolette.`);
         process.exit(1);
       }
       // Anche di qui esce un esito — il lavoro torna in coda a un'altra
@@ -2383,7 +2459,10 @@ if (isMainModule) {
       const segnalazione = opz['--segnala'] ? leggiTestoLivello(opz['--segnala'], 'segnala') : { ok: true, testo: '' };
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
       const domanda = opz['--domanda'] ? await leggiDomandaDaFile(opz['--domanda']) : null;
-      const s = await recordFixed(id, report, frase, segnalazione.testo, ferma, domanda);
+      // Senza motivo il biglietto del correttore non si chiude (SPEC-RIDISEGNO-LAVORO.md §3, regola 4).
+      const motivo = leggiMotivo(opz['--motivo']);
+      if (!motivo.ok) { console.error(`${motivo.errore} Non ho consegnato niente.`); process.exit(1); }
+      const s = await recordFixed(id, report, frase, segnalazione.testo, ferma, domanda, motivo.motivo);
       if (s.rejected) esciRespinto(s);
       console.log(fixedReplyText(id, s.reply, ferma || !!segnalazione.testo.trim() || !!domanda));
       process.exit(0);
@@ -2437,6 +2516,11 @@ if (isMainModule) {
       // da sé — orchestratore ← preflight, worker ← dispatch. Il prompt salvato
       // della routine resta di due righe e non si tocca più quando si
       // ritoccano i ruoli.
+      const perFeedback = opz['--feedback'] === undefined ? '' : numeroFeedback(opz['--feedback']);
+      if (opz['--feedback'] !== undefined && !perFeedback) {
+        console.error(`--feedback vuole un numero di feedback (1680, #1680 o 1680.2), non "${String(opz['--feedback']).slice(0, 30)}". Niente è stato toccato.`);
+        process.exit(1);
+      }
       preflight().then((r) => {
         if (r.ok) {
           // GLI STRUMENTI SI FISSANO QUI, e qui soltanto: questo è l'unico
@@ -2460,11 +2544,12 @@ if (isMainModule) {
           }
           const tools = pin.dir;
           const dirRuoli = resolve(tools, 'routines', 'roles');
-          const f = resolve(dirRuoli, 'orchestrator.md');
+          const f = resolve(dirRuoli, perFeedback ? 'sessione.md' : 'orchestrator.md');
           // Anche qui i richiami ai pezzi condivisi si espandono: letto grezzo,
           // un richiamo arrivava all'orchestratore come una riga di commento
           // vuota, al posto delle regole che doveva portare.
-          const brief = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), dirRuoli) : '';
+          const letto = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), dirRuoli) : '';
+          const brief = perFeedback ? letto.split('<numero-del-feedback>').join(perFeedback) : letto;
           const da = pinnedOrigin(tools);
           console.log(`[dispatch] prontezza OK. Strumenti fissati${da ? ` da ${da}` : ''}.`);
           if (nonVerificato) {
@@ -2475,10 +2560,12 @@ if (isMainModule) {
           // Chi ha passato il preflight è l'orchestratore: da qui la sua sessione non riceve il testo dei worker
           // (lib/orchestratore-cieco.mjs). Senza gancio il giro non parte: meglio un giro saltato che uno che vede.
           // Solo in cloud: sulla macchina dell'owner le impostazioni utente valgono per tutte le sue sessioni.
-          const cieco = process.env.CLAUDE_CODE_REMOTE === 'true'
+          // La sessione di un feedback il lavoro lo fa da sé: non lancia worker, quindi niente gancio, ma il clone sì.
+          const inCloud = process.env.CLAUDE_CODE_REMOTE === 'true';
+          const cieco = inCloud && !perFeedback
             ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', clone: cartellaCloneServer() })
-            : { ok: true, saltato: true };
-          if (cieco.saltato) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
+            : { ok: true, saltato: !inCloud };
+          if (cieco.saltato && !perFeedback) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
           if (!cieco.ok) {
             console.error(`[dispatch] GUASTO (transient): gancio dell'orchestratore cieco non installato in ${cieco.file} (${cieco.why})`);
             process.exit(3);
@@ -2495,7 +2582,7 @@ if (isMainModule) {
           if (partenza) console.log(`\n${partenza}`);
           console.log('Le tue istruzioni:\n');
           console.log(absolutizeRecipe(brief, tools, ROOT)
-            || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
+            || `(routines/roles/${perFeedback ? 'sessione' : 'orchestrator'}.md mancante: segnala il guasto e fermati)`);
           process.exit(0);
         }
         if (r.kind === 'off') console.log(`[dispatch] SPENTO: ${r.message}`);

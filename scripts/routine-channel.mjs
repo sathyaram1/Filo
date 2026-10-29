@@ -36,8 +36,9 @@
 //       → c'è lavoro? Non lega niente. Exit 0 = sì, 2 = niente da fare,
 //         3 = guasto. Da chiedere PRIMA di pagare il setup dell'ambiente.
 //
-//   node scripts/routine-channel.mjs ticket <parola-d-ordine> [--json]
-//       → stampa il biglietto su stdout (una riga), oppure "niente da fare".
+//   node scripts/routine-channel.mjs ticket <parola-d-ordine> [--feedback <N>] [--json]
+//       → stampa il biglietto su stdout (una riga), oppure "niente da fare". Con `--feedback` quello del feedback
+//         per cui la sessione è stata accesa (SPEC-RIDISEGNO-LAVORO.md § 2), mai un altro.
 //         Con `--json` stampa biglietto E ruolo insieme (più `model` ed `effort` se il server li ha decisi):
 //         il ruolo serve a chi guida per scegliere il tipo di worker PRIMA di lanciarlo. In tutte e due le forme
 //         registra la decisione per il gancio dell'orchestratore cieco, che mette modello e sforzo al lancio.
@@ -79,7 +80,7 @@
 //
 //   node scripts/routine-channel.mjs deliver <biglietto> <intento> [--campo valore …]
 //       → consegna una decisione. Intenti: verdict, fixed, secaudit, status,
-//         note, feedback, domanda. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
+//         note, feedback, domanda, piano. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
 //         ripiegare: il server ha guardato e ha detto no), 3 = guasto.
 //         `--notes "…"` è il report per l'owner (il server lo cifra: nessuno
 //         tranne lui lo rilegge). `--frase "…"` è la riga in chiaro per chi ha
@@ -93,6 +94,9 @@
 //         perché nelle note: il giudizio di chi l'ha letto (Ricevuti L3).
 //         Revisione, correzione, critica e verdetto partono solo dal ramo assegnato (uscita 1 altrimenti): il ramo
 //         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo.
+//         `deliver piano --piano <file.md>`: il piano di un lavoro grosso, che riceve chi riprende.
+//         `deliver status --status done --reason gia_risolto --fusione <sha> --notes "…" --frase "…"`: già risolto
+//         su main, si chiude senza ramo (regola 5 della spec; il server ricontrolla la fusione).
 //
 //   node scripts/routine-channel.mjs sporca "<motivo>" [--ticket <biglietto>]
 //       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
@@ -235,8 +239,13 @@ export function readTicketReply(status, body) {
   return { outcome: 'fault', reason: String(b.reason || `http_${status}`) };
 }
 
+/**
+ * `opts.feedback`: il numero del feedback per cui la sessione è stata accesa (SPEC-RIDISEGNO-LAVORO.md § 2). Il server
+ * dà il biglietto di quel feedback, o risponde «niente» col motivo (già risolto su main, non in coda, posti pieni).
+ */
 export async function ticket(passphrase, opts) {
-  const { status, body } = await call('routineTicket', { passphrase, ...creditiDi(opts) }, opts);
+  const feedback = opts && opts.feedback ? { feedback: String(opts.feedback) } : {};
+  const { status, body } = await call('routineTicket', { passphrase, ...feedback, ...creditiDi(opts) }, opts);
   return readTicketReply(status, body);
 }
 
@@ -1070,7 +1079,42 @@ export function testoConsegnaRiuscita(r, data = {}, intento = '') {
   return r && r.num ? ok : 'OK: consegnato.';
 }
 
-export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda'];
+export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda', 'piano'];
+
+// Il piano di un lavoro grosso, che la sessione dopo riceve se questa muore: largo, ma con un tetto detto.
+export const MAX_PIANO_BYTES = 64 * 1024;
+
+/** Il piano letto dal file di `--piano`: { ok, testo } o { ok: false, errore } col rimedio. */
+export function leggiPiano(file) {
+  let testo = '';
+  try { testo = readFileSync(resolve(String(file || '')), 'utf8'); } catch (e) {
+    return { ok: false, errore: `Non leggo il piano in ${file} (${e.code || e.message}): non ho consegnato niente.` };
+  }
+  if (!testo.trim()) return { ok: false, errore: `Il piano in ${file} è vuoto: non ho consegnato niente.` };
+  const byte = Buffer.byteLength(testo, 'utf8');
+  if (byte > MAX_PIANO_BYTES) return { ok: false, errore: `Il piano è di ${byte} byte, il massimo è ${MAX_PIANO_BYTES}: accorcialo (le parti fatte bastano in una riga) e rilancia.` };
+  return { ok: true, testo };
+}
+
+/**
+ * «Già risolto su main» (SPEC-RIDISEGNO-LAVORO.md §3, regola 5): `--fusione` è una fusione sulla linea principale di
+ * origin/main. Il server controlla da sé che citi il feedback e sia venuta dopo; qui si ferma prima chi sbaglia sha.
+ * → { ok, sha } | { ok: false, errore }
+ */
+export function controllaFusione(root, sha, { ref = 'origin/main' } = {}) {
+  const corto = String(sha || '').trim().toLowerCase();
+  if (!/^[0-9a-f]{7,40}$/.test(corto)) return { ok: false, errore: `--fusione vuole lo sha della fusione su main che lo risolve, non "${corto.slice(0, 40)}".` };
+  const g = (args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 }).trim();
+  let intero = '';
+  try { intero = g(['rev-parse', '--verify', '--quiet', `${corto}^{commit}`]); } catch (_) { /* sotto */ }
+  if (!intero) return { ok: false, errore: `La fusione ${corto} qui non c'è: fai git fetch origin main e controlla lo sha.` };
+  let linea = [];
+  try { linea = g(['rev-list', '--first-parent', ref]).split('\n'); } catch (e) {
+    return { ok: false, errore: `Non riesco a leggere ${ref} (${String(e.stderr || e.message).trim().split('\n')[0]}).` };
+  }
+  if (!linea.includes(intero)) return { ok: false, errore: `${corto} non è una fusione sulla linea principale di ${ref}: un commit dentro un ramo non dice che il lavoro è arrivato.` };
+  return { ok: true, sha: intero };
+}
 
 // Quante parole vogliono questi comandi DOPO il biglietto (che sta sempre davanti).
 const POSIZIONALI_DOPO_BIGLIETTO = { work: 0, heartbeat: 0, release: 0, compare: 2, deliver: 1 };
@@ -1138,6 +1182,7 @@ if (isMain) {
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
     'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
+    'feedback', 'piano', 'fusione',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -1163,6 +1208,7 @@ if (isMain) {
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
     'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
+    'feedback', 'piano', 'fusione',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -1220,8 +1266,8 @@ if (isMain) {
         // `--segnala` vuole un FILE, non un testo: dirgli «un testo» lo mandava
         // a passare la segnalazione sulla riga di comando, e a sbagliare due
         // volte. Stessa frase di dispatch --record-*.
-        console.error(key === 'segnala'
-          ? '--segnala vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.'
+        console.error(key === 'segnala' || key === 'piano'
+          ? `--${key} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.`
           : `--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
         process.exit(1);
       }
@@ -1291,6 +1337,16 @@ if (isMain) {
     }
   }
 
+  // `--feedback`, `--piano` e `--fusione` hanno un comando solo ciascuno: altrove finirebbero nei dati senza effetto.
+  {
+    const intentoDi = () => [args[0], args[1]].find((a) => INTENTI_CONSEGNA.includes(a)) || '';
+    const fuori = data.feedback !== undefined && cmd !== 'ticket' ? '--feedback vale solo con ticket'
+      : data.piano !== undefined && !(cmd === 'deliver' && intentoDi() === 'piano') ? '--piano vale solo con deliver piano'
+        : data.fusione !== undefined && !(cmd === 'deliver' && intentoDi() === 'status') ? '--fusione vale solo con deliver status --status done --reason gia_risolto'
+          : '';
+    if (fuori) { console.error(`${fuori}: non ho fatto niente.`); process.exit(1); }
+  }
+
   // `--stop` resta accettato per chi lo scrive ancora, ma non serve: è la
   // segnalazione che ferma il lavoro, e senza l'owner non saprebbe cosa
   // decidere. Stessa regola di dispatch --record-fixed --ferma.
@@ -1349,7 +1405,13 @@ if (isMain) {
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'ticket') {
-    const r = await ticket(args[0]);
+    let feedback = '';
+    if (data.feedback !== undefined) {
+      const { numeroFeedback } = await import('./lib/su-main.mjs');
+      feedback = numeroFeedback(data.feedback);
+      if (!feedback) { console.error(`--feedback vuole un numero di feedback (1680, #1680 o 1680.2), non "${String(data.feedback).slice(0, 30)}": non ho chiesto niente.`); process.exit(1); }
+    }
+    const r = await ticket(args[0], feedback ? { feedback } : undefined);
     if (r.outcome === 'work') {
       // Senza la decisione registrata il gancio rifiuta il lancio: meglio fermarsi qui che con un worker rifiutato.
       const reg = registraDecisione(r);
@@ -1696,6 +1758,28 @@ if (isMain) {
         process.exit(1);
       }
       data.sha = punta;
+    }
+    // Il piano di un lavoro grosso (SPEC-RIDISEGNO-LAVORO.md § 2): da file, intero, e da solo.
+    if (intento === 'piano') {
+      const altri = Object.keys(data).filter((k) => k !== 'piano');
+      if (typeof data.piano !== 'string' || altri.length) {
+        console.error(`deliver piano vuole solo --piano <file.md>${altri.length ? ` (non ${altri.map((k) => `--${k}`).join(', ')})` : ''}: non ho consegnato niente.`);
+        process.exit(1);
+      }
+      const p = leggiPiano(data.piano);
+      if (!p.ok) { console.error(p.errore); process.exit(1); }
+      data.piano = p.testo;
+    }
+    // Già risolto su main: chiude senza ramo, con la fusione che lo prova, il report e la frase.
+    if (intento === 'status' && (data.reason === 'gia_risolto' || data.fusione !== undefined)) {
+      const manca = data.status !== 'done' || data.reason !== 'gia_risolto' ? 'va con --status done --reason gia_risolto'
+        : typeof data.fusione !== 'string' ? 'vuole --fusione <sha della fusione su main>'
+          : !String(data.notes || '').trim() ? 'vuole --notes "<cosa hai controllato>"'
+            : !String(data.userNote || '').trim() ? 'vuole --frase "<cosa trova adesso chi ha segnalato>"' : '';
+      if (manca) { console.error(`La chiusura «già risolto su main» ${manca}: non ho consegnato niente.`); process.exit(1); }
+      const f = controllaFusione(ROOT, data.fusione);
+      if (!f.ok) { console.error(`${f.errore} Non ho consegnato niente.`); process.exit(1); }
+      data.fusione = f.sha;
     }
     // Una domanda all'owner (#1149) è un oggetto: arriva da file, controllata come la controlla il server.
     if (intento === 'domanda') {
