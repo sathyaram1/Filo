@@ -422,12 +422,13 @@ describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', 
     assert.equal(r.discarded, null);
   });
 
-  test('l’interruzione riporta indietro anche origin: il punto fermo è antenato della punta pubblicata', () => {
-    const { work, origin, branch, base } = scenaConsegna();
+  test('un punto fermo antenato della punta pubblicata non riporta indietro né il ramo né origin', () => {
+    const { work, origin, branch, base, consegna } = scenaConsegna();
     const r = prepareBranch({ root: work, branch, checkpoint: base });
     assert.equal(r.ok, true, r.message);
-    assert.equal(r.rewritten, null, 'un moncone spedito dall’hook non è una riscrittura');
-    assert.equal(git(origin, ['rev-parse', `refs/heads/${branch}`]), base, 'origin torna al punto fermo come il ramo locale');
+    assert.equal(r.rewritten, null, 'una punta più avanti non è una riscrittura');
+    assert.equal(r.head, consegna);
+    assert.equal(git(origin, ['rev-parse', `refs/heads/${branch}`]), consegna, 'origin resta sull’ultima consegna');
   });
 });
 
