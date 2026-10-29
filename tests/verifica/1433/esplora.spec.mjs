@@ -120,3 +120,108 @@ test('e5 pagina web: niente striscia, niente pannello, Ctrl+\\ passa', async ({ 
   const r = await esegui(app, { type: 'PANNELLO_APP', operazione: 'apri' });
   console.log('apri su web', JSON.stringify(r));
 });
+
+test('e6 si scrive nel Cerca, il puntatore va sul foglio: il pannello resta?', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  await ed.click('#doc');
+  await ed.keyboard.type('il gatto e il cane e il topo');
+  await ed.evaluate(() => document.querySelector('.pd-striscia').click());
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.waitForTimeout(300);
+  await ed.click('.pd-elemento[data-elemento="search-replace"] [data-sr="find"]');
+  await ed.keyboard.type('il');
+  await ed.mouse.move(400, 300, { steps: 5 });
+  await ed.waitForTimeout(900);
+  console.log('aperto dopo uscita col fuoco nel campo', await aperto(ed), 'fuoco', await ed.evaluate(() => document.activeElement?.dataset?.sr || document.activeElement?.id || document.activeElement?.tagName));
+  await ed.keyboard.type(' gatto');
+  console.log('campo', await ed.locator('[data-sr="find"]').inputValue(), 'doc', await ed.locator('#doc').innerText());
+});
+
+test('e7 selezione, clic vero sulla striscia, clic vero su Grassetto e Commenta', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  await esegui(app, { type: 'PANNELLO_APP', operazione: 'aggiungi', elemento: 'bold' });
+  await ed.click('#doc');
+  await ed.keyboard.type('alfa beta gamma');
+  await ed.keyboard.press('Control+A');
+  const s = await ed.locator('.pd-striscia').boundingBox();
+  await ed.mouse.click(s.x + s.width / 2, 400);
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.waitForTimeout(300);
+  console.log('selezione dopo striscia', JSON.stringify(await ed.evaluate(() => String(getSelection()))));
+  await ed.locator('.pd-elemento[data-elemento="bold"] .pd-contenuto button').first().click();
+  await ed.waitForTimeout(300);
+  console.log('dopo grassetto', await ed.locator('#doc').innerHTML());
+  await ed.locator('.pd-elemento[data-elemento="comment"] .pd-contenuto button').first().click();
+  await ed.waitForTimeout(500);
+  console.log('overlay', await ed.evaluate(() => !document.getElementById('overlay')?.hidden), 'commenting', await ed.evaluate(() => document.querySelector('.ed-root')?.className));
+  await ed.screenshot({ path: `${SHOTS}/e7-commenta.png` });
+});
+
+test('e8 Preferenze: striscia spenta, link Regola il pannello', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  await ed.click('.pd-striscia', { button: 'right', force: true });
+  console.log('voci striscia', await ed.locator('.pd-menu .sn-select-option').allTextContents());
+  await ed.locator('.pd-menu .sn-select-option', { hasText: 'Regola il pannello' }).click();
+  await ed.waitForTimeout(1500);
+  const pr = app.windows().find((w) => { try { return w.url().startsWith('filo://preferences'); } catch (_) { return false; } });
+  console.log('preferenze aperte', !!pr, pr && pr.url());
+  if (pr) {
+    await pr.waitForSelector('#pannelloStriscia', { state: 'attached' });
+    console.log('visibile', await pr.locator('#sec-pannello').isVisible(), JSON.stringify(await pr.locator('#sec-pannello').boundingBox()));
+    await pr.screenshot({ path: `${SHOTS}/e8-preferenze.png` });
+    await pr.locator('#pannelloStriscia').uncheck();
+    await pr.locator('#pannelloAttesa').fill('5');
+    await pr.locator('#pannelloAttesa').blur();
+    await pr.waitForTimeout(800);
+    console.log('salvate', JSON.stringify(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).pannelloDestro)));
+    console.log('valore campo', await pr.locator('#pannelloAttesa').inputValue());
+  }
+  console.log('senza striscia', await ed.evaluate(() => document.documentElement.classList.contains('pd-senza-striscia')));
+});
+
+test('e9 selezione, Ctrl+\\ e clic su Grassetto; poi clic sulla striscia e A+', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  await esegui(app, { type: 'PANNELLO_APP', operazione: 'aggiungi', elemento: 'bold' });
+  await esegui(app, { type: 'PANNELLO_APP', operazione: 'aggiungi', elemento: 'align' });
+  await ed.click('#doc');
+  await ed.keyboard.type('alfa beta gamma');
+  await ed.keyboard.press('Control+A');
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
+    const wc = win._filoTabs.tabs.find((x) => x.id === win._filoTabs.activeId).view.webContents;
+    wc.sendInputEvent({ type: 'keyDown', keyCode: '\\', modifiers: ['control'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: '\\', modifiers: ['control'] });
+  });
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.waitForTimeout(300);
+  await ed.locator('.pd-elemento[data-elemento="bold"] .pd-contenuto button').first().click();
+  await ed.waitForTimeout(300);
+  console.log('tasto: dopo grassetto', await ed.locator('#doc').innerHTML());
+  await ed.mouse.click(300, 300);
+  await expect.poll(() => aperto(ed)).toBe(false);
+  await ed.locator('#doc').click();
+  await ed.keyboard.press('Control+A');
+  const s = await ed.locator('.pd-striscia').boundingBox();
+  await ed.mouse.click(s.x + s.width / 2, 400);
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.waitForTimeout(300);
+  await ed.locator('.pd-elemento[data-elemento="align"] [data-align="center"]').click();
+  await ed.waitForTimeout(300);
+  console.log('striscia: dopo centro', await ed.locator('#doc').innerHTML());
+});
+
+test('e10 selezione, pannello bloccato, clic sul numero del conteggio, poi Grassetto', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  await esegui(app, { type: 'PANNELLO_APP', operazione: 'aggiungi', elemento: 'bold' });
+  await esegui(app, { type: 'PANNELLO_APP', operazione: 'blocca' });
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.click('#doc');
+  await ed.keyboard.type('alfa beta gamma');
+  await ed.keyboard.press('Control+A');
+  await ed.locator('.pd-elemento[data-elemento="word-count"]').click();
+  await ed.waitForTimeout(200);
+  console.log('sel', JSON.stringify(await ed.evaluate(() => String(getSelection()))));
+  await ed.locator('.pd-elemento[data-elemento="bold"] .pd-contenuto button').first().click();
+  await ed.waitForTimeout(300);
+  console.log('dopo grassetto', await ed.locator('#doc').innerHTML());
+});
