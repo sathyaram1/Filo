@@ -218,8 +218,10 @@ await prova('codifica scelta (Content-Encoding: gzip): NEGATA', 'ko',
   carica(fuori, nome(), BLOB, { contentType: OPACO, contentEncoding: 'gzip' }));
 nota('Cache-Control e Content-Language scelti: l’emulatore non li passa alle regole, quindi qui passano. '
   + 'La riga c’è, e la sua espressione si prova più sotto su una risorsa scritta a mano.');
-nota('Codice di scarico scelto da chi carica: l’emulatore lo toglie dai metadati prima delle regole e lo usa come codice. '
-  + 'Se il motore vero lo lasciasse vedere, la stessa riga che vieta le chiavi personalizzate lo rifiuterebbe (provato più sotto).');
+nota('Codice di scarico: l’emulatore lo toglie dai metadati prima delle regole, il motore vero ce lo scrive (#1666). '
+  + 'Che da solo passi e con un’altra chiave no si prova più sotto.');
+nota('Campi assenti: l’emulatore riempie contentEncoding e gli altri, il motore vero no (#1728). '
+  + 'Che una risorsa senza quei campi passi si prova più sotto; la prova che conta resta un caricamento dall’app pubblicata.');
 
 // ── Nomi: il percorso deve restare non indovinabile ─────────────────────────
 await prova('nome indovinabile (screenshot.octetstream): NEGATO', 'ko',
