@@ -9,6 +9,14 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
     // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.252', date: '2026-10-29',
+      features: [],
+      fixes: [
+        'Nelle risposte di Filo un collegamento scritto come codice o in grassetto mostra il suo testo, non più uno «0» o gli asterischi, e un indirizzo seguito da un pezzo di codice porta alla pagina giusta. Una risposta piena di parentesi quadre non blocca più la pagina.',
+        'In chat la riga del sito che Filo sta aprendo prende l\'icona appena la scheda la trova. Prima a volte restava senza.',
+      ],
+    },
+    {
       version: '0.2.251', date: '2026-10-29',
       features: [
         'Ctrl+Shift+T (Cmd+Shift+T su Mac) riapre l\'ultima scheda chiusa, come negli altri browser, invece di aprirne una nuova. Torna nello stesso posto della fila, con Indietro e Avanti com\'erano. Premendolo ancora riapre quelle chiuse prima, anche dopo aver riaperto Filo.',
