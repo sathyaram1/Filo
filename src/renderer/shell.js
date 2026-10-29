@@ -1942,10 +1942,23 @@
               }).catch(() => {}),
             };
           }
+          // #1287 — lo scaricamento non riuscito riparte nella stessa voce.
+          if (a && a.riprovaDownloadId && !a.onClick && api.downloads && api.downloads.riprova) {
+            const id = a.riprovaDownloadId;
+            return { label: a.label, onClick: () => riprovaDownload(id) };
+          }
+          // #1357.2 — il nome che Filo non ha saputo dare: la casella per scriverlo, nella pagina Download.
+          if (a && a.rinominaDownloadId && !a.onClick) {
+            const id = a.rinominaDownloadId;
+            return { label: a.label, onClick: () => api.tabs.open(`filo://downloads/downloads.html?rinomina=${encodeURIComponent(id)}`) };
+          }
           return a;
         }),
       };
       if (allaChiusura) opts.alChiudere = allaChiusura;
+      // #588.8 — l'avviso di un file arrivato si trascina come il file: dove lo si lascia, arriva quello.
+      const delFile = opts.actions.find((a) => a && a.openDownloadId);
+      if (delFile && !opts.trascinaDownloadId) opts.trascinaDownloadId = info.opts.actions.find((a) => a && a.openDownloadId).openDownloadId;
     }
     NOTIFS.show(info.text, opts);
   });
