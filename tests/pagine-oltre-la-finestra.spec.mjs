@@ -25,8 +25,10 @@ ${corpo}
 // `piani`: uno per richiesta accettata; `strumenti` chiama azioni prendendo l'indirizzo dagli esiti già tornati
 // (`urlDa`, o il gruppo 1 di `gruppoDa`), `finale` risponde dicendo quali marchi ha davanti. `posto`: al posto di
 // `finestra`, i caratteri liberi oltre la prima richiesta della chat (la finestra si misura lì).
-async function modello(app, { finestra = 0, posto = 0, listino = false, misure = true, piani }) {
-  await app.evaluate(async (_e, { finestra, posto, listino, misure, piani }) => {
+// `anthropic`: il rifiuto arriva com'è dietro OpenRouter, dentro «Provider returned error», e passa dal lettore vero
+// degli errori; `pesante`: il fornitore conta il testo più pesante di come lo stima Filo.
+async function modello(app, { finestra = 0, posto = 0, listino = false, misure = true, piani, anthropic = false, pesante = false }) {
+  await app.evaluate(async (_e, { finestra, posto, listino, misure, piani, anthropic, pesante }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
