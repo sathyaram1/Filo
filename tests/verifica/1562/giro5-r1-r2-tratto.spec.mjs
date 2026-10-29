@@ -1,5 +1,5 @@
 // Verifica #1562 giro 5: la richiesta cresce solo in coda anche alternando una conversazione ripresa e quella della
-// home (r1), e quello che cambia prima di un «Continua» arriva comunque al modello (r2).
+// home (r1), e quello che cambia prima di un «Continua» o di un «Riprova» arriva comunque al modello (r2).
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -111,5 +111,31 @@ test('r2 una scheda aperta prima di «Continua» arriva al modello nel messaggio
   const ultima = chiamate[chiamate.length - 1];
   // Nel CONTESTO o in un messaggio: da qualche parte il modello deve vedere la scheda aperta.
   const tutto = ultima.messages.map(testo).join('\n');
+  expect(tutto).toContain('Orari del museo Egizio');
+});
+
+test('r2 una scheda aperta prima di un messaggio finito in errore arriva al modello anche col «Riprova»', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await preparaModello(app, [
+    { text: 'Ciao!' },
+    { errore: 'servizio non raggiungibile' },
+    { text: 'Ecco le schede.' },
+  ]);
+  const home = await openTab('filo://newtab/');
+  await expect(home.locator('#input')).toBeEditable({ timeout: 15_000 });
+  await scrivi(home, 'ciao', 'Ciao!');
+
+  const sito = await testServer.openReady(openTab, '<!doctype html><title>Orari del museo Egizio</title><p>orari</p>');
+  await expect(sito).toHaveTitle('Orari del museo Egizio');
+  await home.bringToFront();
+  await home.locator('#input').fill('quali schede ho aperto?');
+  await home.locator('#sendBtn').click();
+  const riprova = home.locator('.dash-action-btn', { hasText: 'Riprova' });
+  await expect(riprova).toBeVisible({ timeout: 15_000 });
+  await riprova.click();
+  await expect(home.locator('.dash-bubble-filo', { hasText: 'Ecco le schede.' })).toBeVisible({ timeout: 15_000 });
+
+  const chiamate = await app.evaluate(() => globalThis.__chiamate);
+  const tutto = chiamate[chiamate.length - 1].messages.map(testo).join('\n');
   expect(tutto).toContain('Orari del museo Egizio');
 });
