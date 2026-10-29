@@ -366,7 +366,7 @@
   }
   function guardaCasella(c) {
     if (caselle.has(c)) return;
-    const st = { buono: '', storia: new Set(), caratteri: 0, sel: selezioneDi(c), annuncio: null, tasto: null, componendo: false, inCorso: [], visto: false, gesto: false };
+    const st = { buono: '', storia: new Set(), sel: selezioneDi(c), annuncio: null, tasto: null, componendo: false, inCorso: [], visto: false, gesto: false };
     vale(st, c.value);
     caselle.set(c, st);
     c.addEventListener('beforeinput', (e) => {
