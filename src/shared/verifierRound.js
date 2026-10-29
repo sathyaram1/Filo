@@ -8,6 +8,7 @@
 //   all'owner. Più il formato con cui il verificatore scrive la critica
 //   (`[livello+sede] testo`: `[2i]`, `[1v]`, `[1e?]`, una riga per rilievo) e il
 //   suo parser. Contano gli interni, i vicini valgono 0, gli esterni escono a parte.
+//   In fondo il motivo del correttore e il giro dopo un riallineamento.
 //
 // PERCHÉ È CONDIVISO
 //   Le stesse regole girano in TRE posti: sul server (filo-security, che le
@@ -629,11 +630,77 @@
     return parts.join('\n');
   }
 
+  // ── Il correttore e il riallineamento (SPEC-RIDISEGNO-LAVORO.md §3, regole 3 e 4) ──
+  // Ogni lavoro aggiunge una riga a questi file: un conflitto lì è meccanico e
+  // non chiede un giro nuovo di verifica, uno in un file di codice sì.
+  const FILE_DI_SERVIZIO = ['src/shared/patchNotes.js', 'src/shared/capabilities.js', 'tests/rossi-noti.json', 'PATTERNS.md'];
+
+  // Perché il correttore è stato chiamato, e cosa scrive dopo i due punti.
+  const MOTIVI_CORRETTORE = { conflitto: 'file', 'prove-rosse': 'prove', ripresa: 'niente', altro: 'testo' };
+  const ALIAS_MOTIVO = { conflitti: 'conflitto', prove: 'prove-rosse', rosse: 'prove-rosse' };
+  const MAX_VOCI_MOTIVO = 500;
+  const MAX_TESTO_MOTIVO = 1000;
+  const FORMA_MOTIVO = 'Scrivilo così: --motivo "conflitto: <file in conflitto, separati da virgole>" (o "conflitto: nessuno" '
+    + 'se il riallineamento non ne ha trovati), "prove rosse: <prove>", "ripresa", oppure "altro: <cosa è successo>".';
+
+  /**
+   * `--motivo` del correttore → { ok: true, motivo: { tipo, file? | prove? | testo? } } o { ok: false, errore } con la
+   * forma giusta: senza motivo il biglietto non si chiude (regola 4).
+   */
+  function leggiMotivoCorrettore(raw) {
+    const t = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
+    if (!t) return { ok: false, errore: `Manca il motivo della correzione. ${FORMA_MOTIVO}` };
+    const i = t.indexOf(':');
+    const testa = (i < 0 ? t : t.slice(0, i)).toLowerCase().trim().replace(/[\s_]+/g, '-');
+    const proprio = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+    const tipo = proprio(MOTIVI_CORRETTORE, testa) ? testa : proprio(ALIAS_MOTIVO, testa) ? ALIAS_MOTIVO[testa] : '';
+    if (!tipo) return { ok: false, errore: `Motivo non capito: "${testa.slice(0, 40)}". ${FORMA_MOTIVO}` };
+    const resto = i < 0 ? '' : t.slice(i + 1).trim();
+    const elenco = (campo, voci) => {
+      if (!voci.length) return { ok: false, errore: `Il motivo «${tipo}» vuole l'elenco dopo i due punti. ${FORMA_MOTIVO}` };
+      if (voci.length > MAX_VOCI_MOTIVO) return { ok: false, errore: `${voci.length} voci nel motivo, il massimo è ${MAX_VOCI_MOTIVO}.` };
+      const lunga = voci.find((s) => s.length > 300);
+      if (lunga) return { ok: false, errore: `Una voce del motivo supera i 300 caratteri: "${lunga.slice(0, 40)}…".` };
+      return { ok: true, motivo: { tipo, [campo]: voci } };
+    };
+    const pezzi = (sep) => resto.split(sep).map((s) => s.trim()).filter(Boolean);
+    if (MOTIVI_CORRETTORE[tipo] === 'file') {
+      return /^nessuno$/i.test(resto) ? { ok: true, motivo: { tipo, file: [] } } : elenco('file', pezzi(/[,\s]+/));
+    }
+    if (MOTIVI_CORRETTORE[tipo] === 'prove') return elenco('prove', pezzi(/\s*,\s*/));
+    if (resto.length > MAX_TESTO_MOTIVO) return { ok: false, errore: `Il motivo è lungo ${resto.length} caratteri, il massimo è ${MAX_TESTO_MOTIVO}.` };
+    if (MOTIVI_CORRETTORE[tipo] === 'testo' && !resto) return { ok: false, errore: `«altro» vuole due parole su cosa è successo. ${FORMA_MOTIVO}` };
+    return { ok: true, motivo: resto ? { tipo, testo: resto } : { tipo } };
+  }
+
+  /** Il motivo come riga, nella stessa forma che `leggiMotivoCorrettore` accetta. */
+  function testoMotivo(m) {
+    if (!m || !m.tipo) return '';
+    const nome = m.tipo === 'prove-rosse' ? 'prove rosse' : m.tipo;
+    if (Array.isArray(m.file)) return `${nome}: ${m.file.length ? m.file.join(', ') : 'nessuno'}`;
+    if (Array.isArray(m.prove)) return `${nome}: ${m.prove.join(', ')}`;
+    return m.testo ? `${nome}: ${m.testo}` : nome;
+  }
+
+  /**
+   * Dopo un riallineamento, dai file in cui la modifica del ramo è cambiata e da quelli che erano in conflitto con main:
+   * tutti di servizio (o nessuno) → niente giro nuovo, bastano le prove del server; uno di codice → verifica intera,
+   * c'è logica che nessuno ha guardato. Un elenco che manca vale come codice: nel dubbio si verifica.
+   */
+  function giroDopoRiallineamento(fileRiscritti, opz) {
+    const conflitti = opz && opz.conflitti !== undefined ? opz.conflitti : [];
+    if (!Array.isArray(fileRiscritti) || !Array.isArray(conflitti)) return { giro: 'pieno', codice: null };
+    const codice = [...new Set([...fileRiscritti, ...conflitti].map((f) => String(f || '').replace(/\\/g, '/').replace(/^\.\//, '')))]
+      .filter((f) => f && !FILE_DI_SERVIZIO.includes(f)).sort();
+    return { giro: codice.length ? 'pieno' : 'nessuno', codice };
+  }
+
   global.SN_VERIFIER_ROUND = {
     LEVELS, SEDI, SPIEGAZIONE_SEDE, MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
     capKeyOf, countKeyOf, normalizeCritique, parseFindings, unparsedLevelLines, normalizeFindings, maxLevel, primaFrase,
     sedeDi, effectiveLevel, missingCaps, normalizeCaps, normalizeCounts, decideRound, derivedGroups, groupLabel,
     findingTag, formatFinding, formatFindings, hasDecision, roundNote,
+    FILE_DI_SERVIZIO, MOTIVI_CORRETTORE, FORMA_MOTIVO, leggiMotivoCorrettore, testoMotivo, giroDopoRiallineamento,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

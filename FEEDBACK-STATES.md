@@ -233,7 +233,144 @@ pianificatore non esiste più. Le chiusure manuali senza
 branch (`npm run feedback -- <id> done "…" --come-routine`) restano legali come
 CATENA di passi (`canReach` attraversa l'iter todo→working→revision_*→done). I
 sub-feedback storici (#N.x) restano visibili e lavorabili; è sparita solo la
-possibilità di crearne di nuovi.
+possibilità di crearne di nuovi. Dal ridisegno del lavoro (§3a) ci sono due porte
+dirette verso `done`, strette: `todo → done` della pipeline per una segnalazione unita a
+un pacchetto fuso, e `working → done` della routine per un feedback già risolto su main.
+Questa la tabella la permette a ogni routine, ma il server la accetta solo dal primo
+lavoro, con `--reason gia_risolto` e la fusione che controlla da sé (§3a); qualunque
+altra consegna `done` da `working` la respinge. Per una routine `todo → done` resta
+illegale.
+
+### 3a. Il ridisegno del lavoro (SPEC-RIDISEGNO-LAVORO.md, #1680)
+
+I numeri che motivano ogni regola stanno nella spec, § 1. Qui le regole come le
+applicano strumenti e server.
+
+**Una sessione per feedback.** Il manutentore scrive sul server l'ordine dei feedback da
+accendere (`npm run manutentore -- accendi N,M,…`, documento `config/manutentore`, solo
+admin; `accendi --niente` lo svuota). Con un ordine un primo lavoro parte solo per i
+feedback dell'ordine e per le priorità 3; verifica, correzione, controllo di sicurezza,
+riallineamento e risposte dell'owner li assegna il server come sempre, anche per i feedback
+fuori dall'ordine. A ogni giro le due voci del pacemaker (la normale e quella dei lavori
+server) prendono i lavori ammessi dalla scelta di sempre (fiducia, pause, crediti, attese,
+semafori) senza un'accensione già in viaggio, in quest'ordine: una priorità 3 fuori
+dall'ordine (regola 7), i feedback dell'ordine, il resto nell'ordine della coda; e
+accendono una sessione per ciascuno fino ai posti liberi. Legano ogni sessione al suo
+numero con l'id che la risposta di accensione restituisce (`routine-accensioni/<sessione>`);
+per un primo lavoro la voce normale fa prima la ricerca «già risolto su main» e la lega
+anche quella. La sessione di un compito senza feedback resta libera, e una sessione libera
+con un ordine riceve la stessa scelta: niente primo lavoro fuori dall'ordine, né un
+feedback legato a un'altra sessione accesa che non ha ancora preso il suo biglietto (entro
+la finestra d'avvio del pacemaker; dopo è nata morta e il feedback torna libero). Quando
+una sessione conta i lavori dell'altra voce per lasciarle il posto, l'ordine vale anche
+lì: un primo lavoro che il pacemaker non accenderà non chiede un posto. Un numero
+dell'ordine chiuso o inesistente non conta, e un ordine senza feedback aperti vale come
+nessun ordine. Senza ordine vale la coda per priorità, come ripiego (SPEC § 4). Le unite di
+un pacchetto si chiudono solo sulle strade della fusione: un «fatto» consegnato da un ruolo
+non è una fusione. La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
+sempre: il comando `ticket` manda l'id della sessione (`sessione`), e il server, dopo la
+parola d'ordine, le dà il biglietto del suo feedback anche senza numero; dopo quel
+biglietto ogni altra richiesta della stessa sessione è «niente»
+(`sessione_finita: …`), e un numero diverso dal suo è un rifiuto. Un feedback, una
+sessione: verifica, controllo di sicurezza e correzione li accende il pacemaker in
+sessioni nuove. Una sessione si può ancora accendere a mano per un feedback: il preflight
+con `--feedback <N>` consegna `routines/roles/sessione.md`, cieca come l'orchestratore
+(chi tiene la parola d'ordine non legge mai il testo di un feedback), che chiede il
+biglietto di QUEL feedback (`ticket <parola> --feedback <N>`) e lancia un worker. Un
+biglietto di un altro feedback lo strumento lo restituisce subito ed esce come guasto. Il
+server fa passare la scelta di sempre ristretta a quel numero e dà il ruolo che serve
+adesso; se non c'è risponde «niente» col motivo: `non_in_coda: #N <perché>`, i posti
+pieni con il codice di sempre, `feedback_inesistente`. Un numero malformato è un rifiuto
+(`bad_feedback`). Un feedback già risolto su main il biglietto lo prende: lo chiude il
+primo lavoro.
+
+**Già risolto su main.** Prima dell'accensione (pacemaker) o al primo ritiro del primo lavoro il server cerca, con l'API di
+GitHub, le fusioni sulla linea principale di main che portano un commit che cita `#N`
+(la fusione stessa o un commit del ramo fuso) dopo la nascita del feedback e la sua
+ultima riapertura (`riapertoAt`, che il server segna quando un feedback chiuso torna
+aperto), e le passa in `payload.suMain`, anche vuoto; il biglietto se le tiene. Se
+GitHub non risponde o la finestra supera i tetti, `suMain` manca e dispatch fa la
+stessa ricerca da sé (`scripts/lib/su-main.mjs`). Dispatch segna `propria` la fusione
+del lavoro stesso del feedback (vuol dire riaperto dall'owner, non risolto). La sessione
+la ricontrolla come primo passo e, se è chiuso davvero, consegna senza ramo `deliver
+status --status done --reason gia_risolto --fusione <sha>` con report e frase: `working
+→ done` (routine, `statusReason: gia_risolto`). Lo strumento rifiuta uno sha che non
+sta sulla linea principale di `origin/main`; il server lo riprova da sé e lo accetta
+solo dal primo lavoro, da `working`, se la fusione sta sulla linea principale (una
+fusione più vecchia di quanto il server rilegge di main, ~12.000 commit, basta che sia
+arrivata su main), porta una citazione del feedback, è più recente della nascita e dell'ultima riapertura e non è
+la propria. Chiude come il cancello (stato del giro azzerato) con la frase, il report
+preceduto dalla riga della fusione e la versione di `package.json` sulla fusione. Un
+rifiuto dice il motivo, e la sessione lavora il feedback come sempre.
+
+**Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
+segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce da
+`npm run feedback:apri -- … --pacchetto N,M` col campo `unisce: [{ id, num }]` (in
+chiaro, da 1 a 20, solo alla nascita e solo admin: `unisceValido` nelle regole), e ogni
+segnalazione unita prende P fra le sue attese (`waitsFor`, che resta com'era più P). Lo
+strumento controlla tutte le segnalazioni prima di aprire e dice tutti i motivi insieme:
+fuori chi non è `todo` (già in lavorazione o ferma), chi ha già un ramo (tornata in coda
+dopo una risposta o una riapertura), chi aspetta già un altro pacchetto aperto, chi è a
+priorità 3, un lavoro locale, chi ha già 20 attese, chi P stesso aspetta. Area, tetto e
+urgenti li controlla il manutentore. Senza `--priorita` P nasce con la
+priorità più alta fra le unite. Un pezzo che si blocca in verifica non si stacca: P passa
+o non passa intero. Alla fusione di P (`done`) il server chiude ogni segnalazione di
+`unisce` che lo aspetta ancora ed è `todo`: `todo → done` (pipeline,
+`statusReason: pacchetto`), con la frase di P come `userNote` (senza, una frase di
+ripiego, e le note di P lo dicono) e la versione di P se ne ha una; quelle in un altro
+stato, o che non aspettano più P, restano dove sono, e il server lo scrive nelle note di
+P. Un'unita che è a sua volta un pacchetto chiude prima le sue, allo stesso modo (così
+si aggiunge un doppione a un pacchetto già aperto: un pacchetto nuovo che unisce il
+vecchio). Le chiude PRIMA di scrivere P in `done`, così l'attesa
+sciolta non le rimette in coda; il gancio è uno solo per ogni strada che porta P a
+`done` dopo una fusione. Il messaggio della fusione di P cita anche le unite
+(`merge-gate: #P via server (unisce #N, #M)`), così la ricerca «già risolto su main» le
+trova. P archiviato senza fusione: le unite seguono l'attesa chiusa di sempre (§4,
+`attesa_chiusa`).
+
+**Il piano.** Un lavoro grosso (una spec in più fasi, un pacchetto) consegna il piano
+prima di toccare codice e a ogni parte chiusa (`deliver piano --piano <file.md>`, al più
+64 KB, oltre è un rifiuto col numero): il server lo scrive nelle note per l'owner, lo
+tiene cifrato nel feedback (l'ultimo sostituisce il precedente) e lo rimanda a chi
+riprende, nel primo lavoro e nella ripresa (`payload.piano`). Lo consegnano solo il
+primo lavoro e il correttore di una ripresa. Alla chiusura il piano si toglie: un
+feedback riaperto riparte senza il piano di un lavoro già fuso. Figli (#N.M) per spezzare un lavoro non se ne
+aprono più: il contenitore è il pacchetto.
+
+**Il motivo del correttore.** Chi corregge (fixer, nel riallineamento e nella ripresa)
+consegna `dispatch.mjs --record-fixed … --motivo "<tipo>: <dettaglio>"`: conflitto coi
+file (o «nessuno»), prove rosse con le prove, ripresa, altro col testo. Forme e parser in
+`SN_VERIFIER_ROUND.leggiMotivoCorrettore`. Senza motivo lo strumento non consegna, e il
+server rifiuta la consegna `fixed` di un correttore senza un motivo che il parser rilegga
+identico; quello valido lo scrive nel biglietto (`motivo`, più `riallineamento` del
+client) e nelle note per l'owner. Una fermata nella stessa consegna (segnalazione o
+domanda, che va in `design`) vale come motivo. Il rilascio non si blocca: terrebbe il
+semaforo a un worker morto.
+
+**La verifica dopo un riallineamento.** Dispatch scrive nel marcatore del ruolo la base
+del confronto (`dal`: lo sha verificato se il server lo manda come `shaVerificato`, sennò
+la punta che il correttore riceve). Alla consegna lo strumento guarda due cose: i file in
+cui la modifica del ramo è cambiata, senza i numeri di riga (`fileRiscritti`), e i file
+in cui la punta verificata va in conflitto con main (`git merge-tree`, `fileInConflitto`),
+più quelli che il motivo dichiara. Manda `riallineamento: { fileRiscritti,
+fileInConflitto, giro }`. Se tutti stanno fra i file di servizio (`FILE_DI_SERVIZIO`:
+`src/shared/patchNotes.js`, `src/shared/capabilities.js`, `tests/rossi-noti.json`,
+`PATTERNS.md`), o non ce n'è nessuno, niente giro nuovo di verifica: bastano le prove del
+server sulla fusione, e il controllo di sicurezza resta. Un file di codice in conflitto o
+riscritto chiede la verifica intera, perché è logica che nessuno ha guardato (anche un
+conflitto risolto tenendo le due parti, che lascia la modifica del ramo uguale). La
+regola è `giroDopoRiallineamento` in `verifierRound.js`; il server rifà il confronto da
+sé con l'API di GitHub e non si fida di quello del client: per i conflitti approssima
+`merge-tree` (zone sovrapposte o a contatto nei file toccati da tutte e due le parti;
+nel dubbio, conflitto). Per questo dispatch spinge il ramo prima di consegnare. Ogni
+guasto (GitHub giù, sha sconosciuto, main cambiato in troppi file) vale `pieno`. Un
+lavoro che tocca anche il server confronta allo stesso modo la sua parte del server,
+dalla punta verificata a quella registrata dell'ultima spinta (`realign.shaVerificatoServer`):
+lì nessun file è di servizio, quindi la parte del server deve restare identica o portare
+la stessa modifica; senza una delle due punte vale `pieno`. Con `nessuno` il server
+scrive «verifica passata» sulle punte nuove (app e server) e il lavoro va al controllo
+di sicurezza; la decisione, coi file, va nel biglietto
+(`giroDopoRiallineamento`) e nelle note.
 
 ## 4. Tab dashboard (deriva SOLO da `status`)
 

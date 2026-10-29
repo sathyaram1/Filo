@@ -176,6 +176,30 @@ test('--aspetta rifiuta inesistenti, sé stesso e giri senza scrivere niente', a
   } finally { rete.ripristina(); }
 });
 
+test('il pacchetto si aggiunge alle attese di una segnalazione unita senza togliere quelle che c\'erano', async () => {
+  const rete = reteFinta({ ...DOCS, id951: { seq: 951 }, id903: { seq: 903, status: 'todo', waitsFor: [{ id: 'id676', num: '676' }] } });
+  try {
+    const letta = await owner.segnalazioneDaUnire('903', { bearer: 'tok' });
+    assert.deepEqual({ ...letta, priorita: letta.priorita ?? null }, { ok: true, id: 'id903', num: '903', stato: 'todo', priorita: null, locale: false, attese: [{ id: 'id676', num: '676' }], ramo: '', unisce: [] });
+    assert.equal((await owner.segnalazioneDaUnire('999', { bearer: 'tok' })).inesistente, true);
+    const r = await owner.aggiungiAttesa('id903', { id: 'id951', num: '951' }, { bearer: 'tok' });
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.attese, [{ id: 'id676', num: '676' }, { id: 'id951', num: '951' }]);
+    assert.equal(rete.scritte.length, 1);
+    rete.scritte.length = 0;
+    const gia = await owner.aggiungiAttesa('id903', { id: 'id676', num: '676' }, { bearer: 'tok' });
+    assert.equal(gia.gia, true, 'un\'attesa che c\'è già non si riscrive');
+    assert.equal(rete.scritte.length, 0);
+  } finally { rete.ripristina(); }
+  const senza = reteFinta({ ...DOCS, id951: { seq: 951 }, id903: { seq: 903, waitsFor: [{ id: 'idVecchio', num: '' }] } });
+  try {
+    const r = await owner.aggiungiAttesa('id903', { id: 'id951', num: '951' }, { bearer: 'tok' });
+    assert.equal(r.ok, false, 'un\'attesa senza numero non sparisce in silenzio');
+    assert.match(r.motivo, /idVecchio, senza numero/);
+    assert.equal(senza.scritte.length, 0);
+  } finally { senza.ripristina(); }
+});
+
 test('npm run feedback:apri --aspetta: il feedback nasce con le attese; un numero inesistente non apre niente', async () => {
   const rete = reteFinta(DOCS);
   const credVera = claude.credenziale.ottieni;

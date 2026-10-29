@@ -119,6 +119,13 @@ service cloud.firestore {
         || (d.waitsFor is list && d.waitsFor.size() >= 1 && d.waitsFor.size() <= 20);
     }
 
+    // `unisce` [{ id, num }]: le segnalazioni che un pacchetto unisce (SPEC-RIDISEGNO-LAVORO.md § 2), scritte alla
+    // nascita del pacchetto; alla sua fusione il server le chiude. Stessa forma e stesso tetto di `waitsFor`.
+    function unisceValido(d) {
+      return !('unisce' in d)
+        || (d.unisce is list && d.unisce.size() >= 1 && d.unisce.size() <= 20);
+    }
+
     // `localMerges` { app?, server?, solo?, ramo? } (#915): quando ogni parte di un
     // lavoro locale è arrivata su main, in millisecondi, `solo` la parte che
     // ha chiuso dicendo che il lavoro stava tutto lì, `ramo` il ramo dell'ultima
@@ -322,6 +329,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // config/manutentore (#1680): l'ordine dei feedback da accendere, scritto dal manutentore con le credenziali
+    // dell'owner (npm run manutentore -- accendi); il pacemaker lo legge con l'Admin SDK.
+    match /config/manutentore {
+      allow read, write: if isAdmin();
+    }
+
     // config/redteam (#896) → `openToAll`: il Red Team è aperto a chi non è
     // admin? Spento, assente o illeggibile = in pausa; le callable del server lo
     // leggono con l'Admin SDK. Lettura pubblica: dentro c'è un interruttore e
@@ -381,6 +394,7 @@ service cloud.firestore {
       // tests/unit/firestoreRulesFiducia.test.mjs.
       allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
         && waitsForValido(request.resource.data)
+        && unisceValido(request.resource.data)
         // `inCoda` (#1515): il segno che la coda delle routine legge. Lo scrive solo il server, a ogni cambio di stato.
         && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda'])
         && bigliettoLocaleValido(request.resource.data)

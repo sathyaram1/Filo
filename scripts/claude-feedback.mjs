@@ -31,6 +31,7 @@
 //                                                         [--url <indirizzo>]
 //                                                         [--allega <file>]…
 //                                                         [--aspetta 676,663.2]
+//                                                         [--pacchetto 812,815]
 //                                                         [--dry-run]
 //
 //   `--allega` (ripetibile, al più 5): un documento che viaggia CON il feedback,
@@ -43,6 +44,10 @@
 //
 //   `--aspetta` (#903): nasce aspettando quei feedback; nessuna routine lo prende finché non sono tutti fusi.
 //   Numeri inesistenti e più di venti si rifiutano prima di aprire.
+//
+//   `--pacchetto` (SPEC-RIDISEGNO-LAVORO.md § 2): il feedback è un pacchetto che unisce quelle segnalazioni, e il testo
+//   è la spec. Ognuna resta aperta e aspetta il pacchetto; alla sua fusione il server le chiude con la sua frase. Si
+//   controllano prima di aprire: in coda e non ancora lavorate, non a priorità 3, non lavoro locale.
 //
 // USCITE (distinte apposta: chi lancia lo script deve poter distinguere
 // "non l'ho scritto io male" da "il server non c'è")
@@ -171,14 +176,14 @@ export { PRIORITA_AMMESSE, parsePriorita };
  * numerazione non risponde il feedback parte lo stesso, senza numero), quindi
  * qui può tornare null senza che sia un errore.
  */
-export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true, biglietto = null, attese = [] } = {}) {
+export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true, biglietto = null, attese = [], unisce = [] } = {}) {
   const name = String(titolo || '').trim();
   const text = String(testo || '').trim();
   if (!name) return { ok: false, uso: true, motivo: 'titolo mancante' };
   if (!text) return { ok: false, uso: true, motivo: 'testo mancante' };
 
   if (dryRun) {
-    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length, locale, attese };
+    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length, locale, attese, unisce };
   }
   if (!idToken) {
     return { ok: false, codice: EXIT.RIFIUTATO, motivo: 'manca il token admin: senza la prova del mittente il feedback sarebbe di un utente. Rigenera le credenziali: node scripts/admin-login.mjs' };
@@ -207,6 +212,7 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       ...(Number.isInteger(priorita) ? { priority: priorita } : {}),
       ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}),
       ...(Array.isArray(attese) && attese.length ? { waitsFor: attese } : {}),
+      ...(Array.isArray(unisce) && unisce.length ? { unisce: unisce.map(({ id, num }) => ({ id, num })) } : {}),
       // Uno sporco rimasto solo in locale il server non lo vede: senza biglietto il feedback nasce non fidato.
       ...(b && b.fp && !b.inAttesa ? { bigliettoLocale: b.fp } : {}),
     });
@@ -219,7 +225,7 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
   const caricati = ((res && res.files) || []).length + ((res && res.images) || []).length;
   return {
     ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti,
-    senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly), attese,
+    senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly), attese, unisce,
     priorita: Number.isInteger(priorita) && res && res.senderProof === 'admin' ? priorita : null,
     biglietto: b && b.fp ? (b.fiducia === 'fidato' ? 'pulito' : 'sporco') : 'assente',
   };
@@ -265,6 +271,51 @@ export const attese = {
   },
 };
 
+/**
+ * Le segnalazioni lette per `--pacchetto` → i motivi per cui non entrano (vuoto = entrano tutte). PURA.
+ * `lette`: [{ ok, num, stato, priorita, locale, attese, ramo?, motivo? }]; `aspetta`: i numeri che il pacchetto stesso
+ * aspetta; `pacchetti`: i numeri dei pacchetti aperti fra gli aspettati dalle unite.
+ */
+export function controllaUnite(lette, { aspetta = [], pacchetti = [] } = {}) {
+  const giaPacchetti = new Set(pacchetti.map((n) => String(n).replace(/^#/, '')));
+  const MAX = globalThis.SN_FB_ATTESE.MAX;
+  const motivi = [];
+  for (const u of Array.isArray(lette) ? lette : []) {
+    const n = `#${u.num}`;
+    if (!u.ok) { motivi.push(`${n}: ${u.motivo}`); continue; }
+    if (!u.stato) motivi.push(`${n}: lo stato non si legge (manca la chiave privata?), e senza non so se è già in lavorazione`);
+    else if (u.stato !== 'todo') motivi.push(`${n} è «${u.stato}»: nel pacchetto vanno solo segnalazioni in coda e non ancora lavorate`);
+    // In coda non vuol dire mai lavorata: dopo una risposta dell'owner o una riapertura il ramo resta.
+    else if (u.ramo) motivi.push(`${n} ha già un ramo con lavoro (${u.ramo}): nel pacchetto si rifarebbe da capo`);
+    const dentro = (u.attese || []).map((w) => String(w.num || '').replace(/^#/, '')).filter((x) => giaPacchetti.has(x));
+    if (dentro.length) motivi.push(`${n} è già nel pacchetto ${dentro.map((x) => `#${x}`).join(', ')}: due pacchetti farebbero lo stesso lavoro`);
+    if (u.priorita === 3) motivi.push(`${n} ha priorità 3: si lavora subito e da sola, fuori dai pacchetti`);
+    if (u.locale) motivi.push(`${n} è un lavoro locale: nessuna routine la prende, e nel pacchetto resterebbe ferma`);
+    if ((u.attese || []).length >= MAX) motivi.push(`${n} aspetta già ${MAX} feedback: un'attesa in più non ci sta`);
+    if (aspetta.includes(String(u.num))) motivi.push(`${n} è anche fra quelli che il pacchetto aspetta: si aspetterebbero a vicenda`);
+  }
+  return motivi;
+}
+
+/** La priorità del pacchetto senza `--priorita`: la più alta fra le unite, perché nessuna scenda aspettandolo. PURA. */
+export function prioritaDelPacchetto(scelta, lette) {
+  if (Number.isInteger(scelta)) return scelta;
+  const note = (Array.isArray(lette) ? lette : []).map((u) => u && u.priorita).filter(Number.isInteger);
+  return note.length ? Math.max(...note) : null;
+}
+
+/** Lettura e attese delle segnalazioni di un pacchetto. Oggetto: i test lo sostituiscono, il vero va in rete. */
+export const pacchetto = {
+  async leggi(numeri, idToken) {
+    const { segnalazioneDaUnire } = await import('./owner-feedback.mjs');
+    return Promise.all(numeri.map(async (n) => ({ num: n, ...(await segnalazioneDaUnire(n, { bearer: idToken })) })));
+  },
+  async attendi(id, voce, idToken) {
+    const { aggiungiAttesa } = await import('./owner-feedback.mjs');
+    return aggiungiAttesa(id, voce, { bearer: idToken });
+  },
+};
+
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
@@ -293,7 +344,8 @@ export const ambiente = {
 };
 
 function uso() {
-  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--dry-run]');
+  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--pacchetto 812,815] [--dry-run]');
+  console.error('     --pacchetto: il testo è la spec che unisce quelle segnalazioni; ognuna aspetta il pacchetto, che alla fusione le chiude.');
   console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
   console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
@@ -313,8 +365,8 @@ export async function main(argvIn) {
   // riga che chi l'ha scritta considera giusta.
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata, avvisoTrattinoDaNpm } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--aspetta', '--dry-run'],
-    conValore: ['--priorita', '--url', '--allega', '--aspetta'],
+    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--aspetta', '--pacchetto', '--dry-run'],
+    conValore: ['--priorita', '--url', '--allega', '--aspetta', '--pacchetto'],
     ripetibili: ['--allega'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
@@ -355,7 +407,7 @@ export async function main(argvIn) {
   // parole «uguali al valore di un'opzione», e una parola del testo scritta
   // identica all'indirizzo passato spariva dal corpo senza dire niente — un
   // taglio muto sul testo di chi segnala (feedback #565).
-  const CON_VALORE = new Set(['--priorita', '--url', '--allega', '--aspetta']);
+  const CON_VALORE = new Set(['--priorita', '--url', '--allega', '--aspetta', '--pacchetto']);
   const posizionali = [];
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -376,6 +428,10 @@ export async function main(argvIn) {
   if (argv.includes('--aspetta') && !String(aspettaRaw || '').trim()) { console.error('RIFIUTATO: --aspetta vuole i numeri (--aspetta 676,663.2). Non ho aperto niente.'); return EXIT.USO; }
   const numeriAttesa = globalThis.SN_FB_ATTESE.leggiNumeri(aspettaRaw || '');
   if (!numeriAttesa.ok) { console.error(`RIFIUTATO: --aspetta: ${numeriAttesa.motivo}. Non ho aperto niente.`); return EXIT.USO; }
+  const pacchettoRaw = flag('pacchetto');
+  if (argv.includes('--pacchetto') && !String(pacchettoRaw || '').trim()) { console.error('RIFIUTATO: --pacchetto vuole i numeri delle segnalazioni che unisce (--pacchetto 812,815). Non ho aperto niente.'); return EXIT.USO; }
+  const numeriUnite = globalThis.SN_FB_ATTESE.leggiNumeri(pacchettoRaw || '');
+  if (!numeriUnite.ok) { console.error(`RIFIUTATO: --pacchetto: ${numeriUnite.motivo.replace('un feedback ne aspetta', 'un pacchetto ne unisce')}. Non ho aperto niente.`); return EXIT.USO; }
 
   if (percorsiAllegati.length > MAX_ALLEGATI) {
     console.error(`USO: al più ${MAX_ALLEGATI} allegati`);
@@ -401,7 +457,35 @@ export async function main(argvIn) {
     if (!v.ok) { console.error(`RIFIUTATO: --aspetta: ${v.motivo}. Non ho aperto niente.`); return v.rete ? EXIT.IRRAGGIUNGIBILE : EXIT.RIFIUTATO; }
     listaAttese = v.attese;
   }
-  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken, locale, attese: listaAttese });
+  // Le segnalazioni del pacchetto si controllano tutte prima di aprire, e i motivi si dicono tutti insieme.
+  let unite = [];
+  if (deposita && numeriUnite.numeri.length) {
+    let lette;
+    try { lette = await pacchetto.leggi(numeriUnite.numeri, cred.idToken); } catch (e) {
+      console.error(`RIFIUTATO: --pacchetto: lettura delle segnalazioni fallita (${String((e && e.message) || e)}). Non ho aperto niente.`);
+      return EXIT.IRRAGGIUNGIBILE;
+    }
+    // Chi aspetta già un pacchetto aperto è già preso: si leggono gli aspettati per saperlo.
+    const attesi = [...new Set(lette.filter((u) => u && u.ok).flatMap((u) => (u.attese || []).map((w) => String(w.num || '').replace(/^#/, '')).filter(Boolean)))];
+    let pacchetti = [];
+    if (attesi.length) {
+      try {
+        pacchetti = (await pacchetto.leggi(attesi, cred.idToken))
+          .filter((p) => p && p.ok && Array.isArray(p.unisce) && p.unisce.length && !['done', 'archived'].includes(p.stato)).map((p) => String(p.num));
+      } catch (e) {
+        console.error(`RIFIUTATO: --pacchetto: lettura dei feedback aspettati fallita (${String((e && e.message) || e)}). Non ho aperto niente.`);
+        return EXIT.IRRAGGIUNGIBILE;
+      }
+    }
+    const motivi = controllaUnite(lette, { aspetta: numeriAttesa.numeri, pacchetti });
+    if (motivi.length) {
+      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${motivi.map((m) => `  - ${m}`).join('\n')}`);
+      return EXIT.RIFIUTATO;
+    }
+    unite = lette;
+  }
+  const prioritaScelta = unite.length ? prioritaDelPacchetto(p.valore, unite) : p.valore;
+  const r = await apri({ titolo, testo, url, priorita: prioritaScelta, allegati, dryRun, idToken: cred.idToken, locale, attese: listaAttese, unisce: unite });
   if (!r.ok) {
     console.error(`${r.uso ? 'USO' : 'RIFIUTATO'}: ${r.motivo}`);
     const daNpmSparito = r.uso && /mancante$/.test(r.motivo) ? avvisoTrattinoDaNpm(process.env) : '';
@@ -410,7 +494,7 @@ export async function main(argvIn) {
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }
   if (r.dryRun) {
-    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}${numeriAttesa.numeri.length ? `, che aspetta ${numeriAttesa.numeri.map((n) => `#${n}`).join(', ')}` : ''}.`);
+    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}${numeriAttesa.numeri.length ? `, che aspetta ${numeriAttesa.numeri.map((n) => `#${n}`).join(', ')}` : ''}${numeriUnite.numeri.length ? `, come pacchetto che unisce ${numeriUnite.numeri.map((n) => `#${n}`).join(', ')} (ognuna lo aspetterà)` : ''}.`);
     return EXIT.FATTO;
   }
 
@@ -428,6 +512,24 @@ export async function main(argvIn) {
       : 'Nessun biglietto della sessione: nasce non fidato (node scripts/biglietto.mjs stato).');
 
   if (r.attese && r.attese.length) console.log(`Aspetta ${globalThis.SN_FB_ATTESE.testoAttese(r.attese)}: nessuna routine lo prende finché non sono tutti fusi, poi entra in coda da solo.`);
+  // Ogni segnalazione unita aspetta il pacchetto. Una che non si scrive non è silenziosa: il pacchetto esiste già, e la
+  // riga per rimediare si stampa intera.
+  let attesaMancata = false;
+  if (unite.length && !r.seq) {
+    attesaMancata = true;
+    console.error(`ATTESE NON SCRITTE: il pacchetto è nato senza numero (la numerazione non ha risposto), e le attese si scrivono per numero. Quando ce l'ha, su ognuna di ${unite.map((u) => `#${u.num}`).join(', ')}: npm run feedback -- <segnalazione> --aspetta <le sue attese>,<numero del pacchetto>`);
+  } else if (unite.length) {
+    const voce = { id: r.id, num: String(r.seq) };
+    const esiti = await Promise.all(unite.map(async (u) => {
+      try { return { u, e: await pacchetto.attendi(u.id, voce, cred.idToken) }; } catch (e) { return { u, e: { ok: false, motivo: String((e && e.message) || e) } }; }
+    }));
+    const fatte = esiti.filter((x) => x.e.ok).map((x) => `#${x.u.num}`);
+    if (fatte.length) console.log(`Pacchetto: ${fatte.join(', ')} ${fatte.length === 1 ? 'lo aspetta' : 'lo aspettano'}, e alla sua fusione il server ${fatte.length === 1 ? 'la chiude' : 'le chiude'} con la sua frase.`);
+    for (const { u, e } of esiti.filter((x) => !x.e.ok)) {
+      attesaMancata = true;
+      console.error(`ATTESA NON SCRITTA su #${u.num} (${e.motivo}): il pacchetto c'è, ma questa segnalazione non lo aspetta. Rimedia con: npm run feedback -- ${u.num} --aspetta ${[...(u.attese || []).map((w) => w.num), voce.num].join(',')}`);
+    }
+  }
   if (r.allegati) console.log(`Allegati caricati: ${r.allegati}.`);
   for (const f of (r.falliti || [])) {
     console.error(`ALLEGATO NON CARICATO: ${f.name} (${f.reason}). Il feedback esiste ma senza questo documento.`);
@@ -439,7 +541,7 @@ export async function main(argvIn) {
   else if (!locale) console.log('Priorità: la decide il giudice di priorità, come per ogni feedback che entra in coda.');
   // Un allegato mancante è un rifiuto parziale: chi lancia lo script deve
   // accorgersene, perché il feedback senza il documento può non avere senso.
-  return (r.falliti && r.falliti.length) ? EXIT.RIFIUTATO : EXIT.FATTO;
+  return (r.falliti && r.falliti.length) || attesaMancata ? EXIT.RIFIUTATO : EXIT.FATTO;
 }
 
 if (isMain) {

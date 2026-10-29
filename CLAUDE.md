@@ -282,4 +282,5 @@ src/content/    content scripts
 
 Macchina a stati dei feedback: **`FEEDBACK-STATES.md`**; canale autenticato
 delle routine: **`ROUTINE-AUTH-SPEC.md`**; decisioni del ridisegno per il piano
-Max, chiuso: **`SPEC-RIDISEGNO-MAX.md`**.
+Max, chiuso: **`SPEC-RIDISEGNO-MAX.md`**; pacchetti, una sessione per feedback e
+manutentore: **`SPEC-RIDISEGNO-LAVORO.md`**.

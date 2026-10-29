@@ -223,7 +223,7 @@ export function trovaClaude(env = process.env, piattaforma = process.platform) {
 /** Gli argomenti di `claude -p` per un ruolo. PURA. */
 export function argomentiClaude({ model, effort, nome, addDirs = [], permessi = 'auto', budget = '' }) {
   return [
-    '-p', '--output-format', 'json', '--model', model, '--effort', effort,
+    '-p', '--output-format', 'json', '--model', model, ...(effort ? ['--effort', effort] : []),
     '--permission-mode', permessi, '-n', nome,
     ...addDirs.flatMap((d) => ['--add-dir', d]),
     ...(budget ? ['--max-budget-usd', String(budget)] : []),
@@ -274,7 +274,7 @@ export function richiestaDaLettura(testo) {
   return [pezzo('Titolo'), pezzo('Testo')].filter(Boolean).join('\n\n');
 }
 
-function esegui(cmd, args, { cwd, input, timeoutMs, env } = {}) {
+export function esegui(cmd, args, { cwd, input, timeoutMs, env } = {}) {
   return new Promise((ok) => {
     const bin = cmd === 'node' ? process.execPath : cmd;
     let stdout = '';

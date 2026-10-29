@@ -61,8 +61,10 @@ scrivi l'elenco dei test rossi dopo il rebase.
 
 ## Consegna
 
+<!-- includi: _motivo-correttore.md -->
+
 ```bash
-node scripts/dispatch.mjs --record-fixed <id> "[report]" [--frase "[la frase]"] [--domanda <file.json>]
+node scripts/dispatch.mjs --record-fixed <id> "[report]" --motivo "[il motivo]" [--frase "[la frase]"] [--domanda <file.json>]
 ```
 
 Frase e riga di changelog del primo passaggio restano valide: cambiale solo se

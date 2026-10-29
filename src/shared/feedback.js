@@ -576,7 +576,9 @@
     // `soloAdmin`: chi chiama vuole la prova o niente (lo script delle sessioni locali).
     // #903: le attese le scrive solo l'admin; da anonimo il feedback partirebbe senza, e senza dirlo.
     const attese = (opts && Array.isArray(opts.waitsFor) && opts.waitsFor.length) ? attesePerScrittura(opts.waitsFor) : [];
-    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly || attese.length);
+    // Le segnalazioni unite da un pacchetto (SPEC-RIDISEGNO-LAVORO.md § 2): stessa forma e stesso tetto delle attese.
+    const unite = (opts && Array.isArray(opts.unisce) && opts.unisce.length) ? attesePerScrittura(opts.unisce) : [];
+    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly || attese.length || unite.length);
     // `accessoOwner`: chi chiama distingue l'accesso che manca dalla rete che manca (la coda d'invio aspetta, non rinuncia).
     if (soloAdmin && !idToken) throw Object.assign(new Error('create senza token admin (401): questo feedback non parte da anonimo'), { accessoOwner: true });
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
@@ -731,6 +733,8 @@
         });
       }
       if (attese.length) doc.fields.waitsFor = toFsValue(attese);
+      // Alla fusione del pacchetto il server chiude queste, con la sua frase (FEEDBACK-STATES.md §3a).
+      if (unite.length) doc.fields.unisce = toFsValue(unite);
       // La priorità scelta da chi apre nasce col documento (#914): il server decide alla nascita se giudicarla,
       // e una scritta dopo arriverebbe quando il giudice ha già scelto. Solo admin: il create anonimo non la ammette.
       const prioritaScelta = opts && opts.priority;

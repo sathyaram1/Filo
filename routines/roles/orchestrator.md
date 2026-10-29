@@ -56,6 +56,9 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
    La parola d'ordine arriva nel prompt della schedulazione e NON va mai
    esportata nell'ambiente. exit 2 → chiudi (niente da fare); exit 3 → chiudi
    (in dubbio ci si ferma: meglio un giro saltato che un giro senza controlli).
+   Se il pacemaker ti ha acceso per un feedback scelto dal manutentore, il server
+   lo sa da sé: il biglietto è di quel feedback, e dopo il suo worker il prossimo
+   `ticket` risponde niente (`sessione_finita`). Un feedback, una sessione.
 
 ## Loop
 

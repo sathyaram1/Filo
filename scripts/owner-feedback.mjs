@@ -315,6 +315,47 @@ export async function segnaAttese(id, numeri, opts = {}) {
   return { ok: true, attese, prima, tolte, pratica };
 }
 
+/**
+ * Una segnalazione che un pacchetto vuole unire, letta per i controlli di `feedback:apri --pacchetto`
+ * (SPEC-RIDISEGNO-LAVORO.md §3, regola 1). `stato` e `priorita` restano '' e null se non si decifrano.
+ * @returns {Promise<{ ok: true, id, num, stato, priorita, locale, attese } | { ok: false, motivo, inesistente? }>}
+ */
+export async function segnalazioneDaUnire(riferimento, opts = {}) {
+  const ATT = globalThis.SN_FB_ATTESE;
+  const bearer = opts.bearer || await acquireBearer();
+  const r = await risolviFeedback(riferimento, { bearer, base: FIRESTORE_BASE });
+  if (!r.ok) return { ok: false, motivo: r.motivo, inesistente: /^nessun feedback/.test(r.motivo) };
+  const doc = await getDoc(r.id, bearer, ['seq', 'subSeq', 'status', 'priority', 'localOnly', 'branch', 'unisce', ATT.CAMPO]);
+  if (!doc) return { ok: false, motivo: `nessun feedback ${riferimento}`, inesistente: true };
+  const f = doc.fields || {};
+  const { from, leggibile } = await statoAttuale(doc);
+  return {
+    ok: true, id: r.id,
+    num: globalThis.SN_FEEDBACK.formatNum(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)) || String(riferimento),
+    stato: leggibile ? from : '', priorita: await prioritaPrecedente(doc), locale: !!f.localOnly?.mapValue,
+    attese: ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) }),
+    ramo: String(f.branch?.stringValue || '').trim(),
+    unisce: (f.unisce?.arrayValue?.values || []).map((v) => String(v?.mapValue?.fields?.num?.stringValue || '')).filter(Boolean),
+  };
+}
+
+/**
+ * `voce` ({ id, num }) in più fra le attese di `id`, tenendo quelle che c'erano: `--aspetta` invece le sostituisce.
+ * Stesse regole di segnaAttese (esistono, niente giri, al più venti).
+ */
+export async function aggiungiAttesa(id, voce, opts = {}) {
+  const ATT = globalThis.SN_FB_ATTESE;
+  const bearer = opts.bearer || await acquireBearer();
+  const doc = await getDoc(id, bearer, [ATT.CAMPO]);
+  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  const prima = ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(doc.fields?.[ATT.CAMPO]) });
+  if (prima.some((w) => w.id === voce.id)) return { ok: true, attese: prima, gia: true };
+  // Le attese si riscrivono per numero: una senza numero sparirebbe in silenzio.
+  const senzaNumero = prima.filter((w) => !String(w.num || '').trim());
+  if (senzaNumero.length) return { ok: false, motivo: `aspetta ${senzaNumero.map((w) => w.id).join(', ')}, senza numero: da qui la perderei, aggiungi l'attesa da Gestione` };
+  return segnaAttese(id, [...prima.map((w) => w.num), voce.num].join(','), { ...opts, bearer });
+}
+
 /** La risposta a `--aspetta`/`--aspetta-niente`: l'elenco nuovo, quelle che sostituisce, e cosa succede dopo per QUESTO stato. */
 export function rispostaAttese(rif, r) {
   const ATT = globalThis.SN_FB_ATTESE;

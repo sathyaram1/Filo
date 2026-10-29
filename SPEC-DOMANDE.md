@@ -529,6 +529,12 @@ preferisce un'esperienza più ferma, con le verifiche fatte poco prima.
 
 ### 4.3 Gestione del lavoro
 
+> Dal ridisegno del lavoro (SPEC-RIDISEGNO-LAVORO.md, #1680) questo compito diventa il
+> **manutentore**: in più decide l'ordine dei feedback, forma i pacchetti e sceglie cosa
+> accendere insieme, con tutte le schede in contesto e i rami in corso coi loro file
+> (`routines/roles/manutentore.md`, `npm run manutentore -- contesto`). Il resto di questa
+> sezione vale ancora dove quella spec non dice altro.
+
 Tre compiti gestiscono il lavoro delle routine: la **gestione del lavoro**, che
 decide (fino al 23/10 si chiamava monitoraggio), e il **riordino della coda**
 (§ 6.6) e la **potatura dei rami** (§ 4.7), che lavorano per lei. Lo scopo è
@@ -1150,6 +1156,11 @@ migrazione le mappa. Il codice che decide in base al prefisso
   - video e modelli pesanti.
 
 ## 12. Orchestratore
+
+> Superato da SPEC-RIDISEGNO-LAVORO.md (#1680): niente orchestratore, il server accende una
+> sessione per ogni feedback scelto dal manutentore e la sessione lavora da sé
+> (`routines/roles/sessione.md`). Questa sezione resta come storia, e descrive com'è oggi
+> finché il server non accende così.
 
 ### 12.1 Oggi
 
