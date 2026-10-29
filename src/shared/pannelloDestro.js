@@ -87,6 +87,7 @@
     }
     let accanto = 0;
     let stretto = false;
+    let aiutoSpinge = false;
     const tiene = () => opzioni.bloccato && !stretto;
     // Quanto, dal bordo destro, il puntatore attraversa (l'Aiuto accanto) per arrivare al pannello: il main lo sa.
     let transito = 0;
