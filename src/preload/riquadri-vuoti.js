@@ -58,7 +58,7 @@ function buildRiquadriVuotiSource(corpi) {
     if (v) applica(v);
   }
   function delRiquadro(t) {
-    for (var i = 0; i < finestreDi.length; i++) { try { var w = finestreDi[i].call(t); if (w) return w; } catch (e) {} }
+    for (var i = 0; i < finestreDi.length; i++) { try { var w = R(finestreDi[i], t, []); if (w) return w; } catch (e) {} }
     return null;
   }
   function aperta(w) { try { return !chiusa.call(w); } catch (e) { return false; } }
