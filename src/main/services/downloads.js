@@ -561,6 +561,13 @@ function contaProgramma(rec, evento) {
   contaNav(rec, (N) => N.programma(classe, evento));
 }
 
+// Un fallimento si dice con la strada per rimediare (#1287): «Riprova» rifà lo stesso indirizzo nella stessa voce.
+function avvisaNonRiuscito(rec) {
+  const opts = { durationSec: 8, tipo: 'download_failed', indirizzo: rec.url };
+  if (/^https?:/i.test(String(rec.url || ''))) opts.actions = [{ label: 'Riprova', riprovaDownloadId: rec.id }];
+  shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, opts, scopeOf(rec));
+}
+
 function shellToast(text, opts, scope = '') {
   try {
     for (const win of windowsOf(scope)) {
@@ -627,7 +634,7 @@ function completa(rec) {
       broadcast('error', rec);
       contaNonRiuscito(rec);
       contaFine(rec);
-      shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'download_failed', indirizzo: rec.url }, scopeOf(rec));
+      avvisaNonRiuscito(rec);
       return;
     }
   }
@@ -871,7 +878,7 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
       contaFine(rec);
       if (rec.state !== 'cancelled') {
         contaNonRiuscito(rec);
-        shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'download_failed', indirizzo: rec.url }, scopeOf(rec));
+        avvisaNonRiuscito(rec);
       }
     }
   }
@@ -1063,7 +1070,7 @@ function attachSession(ses, { scope = '' } = {}) {
       let fermo = false;
       try { fermo = typeof globalThis.SN_SB_SCARICAMENTO === 'function' && globalThis.SN_SB_SCARICAMENTO(item, webContents) === true; } catch (_) {}
       if (fermo) { e.preventDefault(); return; }
-      onWillDownload(item, webContents, scope);
+      onWillDownload(item, webContents, scope, ses);
     });
   } catch (_) {}
 }
