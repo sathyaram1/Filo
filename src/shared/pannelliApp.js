@@ -148,7 +148,7 @@
       if (Object.keys(pulita).length) config[id] = pulita;
     }
     const finale = { ...config, ...s.config };
-    // Le scorciatoie valgono per gli strumenti nel pannello: chi ne aveva data una a un vecchio modulo lo ritrova lì.
+    // Chi aveva dato una scorciatoia a un vecchio modulo ritrova lo strumento nel pannello, oltre al suo tasto.
     const elementi = s.elementi.slice();
     for (const e of catalogo(app).elementi) {
       if (config[e.id] && finale[e.id] && finale[e.id].shortcut && !elementi.includes(e.id)) elementi.push(e.id);
