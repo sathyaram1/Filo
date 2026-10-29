@@ -233,9 +233,10 @@ Tutto testabile **senza Electron**, con unit test (`npm run test:unit`,
   qualunque sia il comando che l'ha causato.
 - C: una transizione con identità non corrispondente viene **rifiutata**; una
   corretta viene accettata e **lascia il punto fermo**.
-- D: dato un branch con punto fermo di A e commit sparsi di C, il ripristino
-  riporta esattamente al punto fermo, la directory resta pulita, e i commit di C
-  **restano raggiungibili**.
+- D: dato un branch con punto fermo di A e commit sparsi di C mai spediti, il
+  ripristino riporta esattamente al punto fermo, la directory resta pulita, e i
+  commit di C **restano raggiungibili**; con una punta pubblicata più avanti del
+  punto fermo si parte da lei (`tests/unit/branchIntegrityGiroPassato.test.mjs`).
 - E: coda illeggibile → guasto, non "niente da fare"; branch inesistente → il
   feedback finisce in `design`.
 
