@@ -45,7 +45,9 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   trecento turni dimenticava il più vecchio e riscriveva il tratto a ogni messaggio. Fino
   alla prossima fotografia un messaggio mandato intero resta intero, e la riga di un'app resta com'era (#1562). Una
   conversazione ripresa da prima dei tetti riporta i suoi ultimi messaggi dentro un quarto del tetto in token, e la
-  finestra si stringe di altrettanto: il tetto vale sempre.
+  finestra si stringe di altrettanto: il tetto vale sempre. La ripresa è del tratto, non della scheda: entra una volta
+  (il tratto riparte, come per un inizio che si sposta) e resta davanti da ogni scheda finché l'inizio tiene. Due
+  turni in corso insieme fanno due richieste diverse, e quella dopo ne continua al più una: lì si paga una riscrittura.
 - **Verso Claude il ragionamento parte solo col prefisso con cui è nato** (#1552). Sui conti Anthropic nati dal
   31/08/2026 un blocco di ragionamento con davanti un system, strumenti o messaggi diversi da quelli della sua nascita
   fa rifiutare la richiesta, e via OpenRouter la chiave dell'owner ripiega in silenzio sui crediti del router. Ogni
