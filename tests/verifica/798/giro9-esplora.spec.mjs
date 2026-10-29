@@ -32,6 +32,8 @@ async function prove(urls) {
   { const f = document.createElement('iframe'); f.src = urls.toccato; document.body.appendChild(f); try { void f.contentWindow.document; } catch (e) {} out.toccato = await attendi('toccato'); out.toccato_dopo = await attendi('toccato_dopo'); }
   { const f = document.createElement('iframe'); f.src = urls.liscio; document.body.appendChild(f); out.liscio = await attendi('liscio'); }
   { const f = document.createElement('iframe'); f.src = urls.soloRif; document.body.appendChild(f); const w = f.contentWindow; out.soloRif = await attendi('soloRif'); out.soloRifW = !!w; }
+  { const f = document.createElement('iframe'); f.src = urls.perIndice; document.body.appendChild(f); const w = window[window.length - 1]; out.perIndice = await attendi('perIndice'); out.perIndiceW = !!w; }
+  { const f = document.createElement('iframe'); f.src = urls.perIndiceDoc; document.body.appendChild(f); const w = window[window.length - 1]; try { void w.document; } catch (e) {} out.perIndiceDoc = await attendi('perIndiceDoc'); }
   // 2. blob
   { const b = new Blob([urls.blobHtml], { type: 'text/html' }); const f = document.createElement('iframe'); f.src = URL.createObjectURL(b); document.body.appendChild(f); out.blob = await attendi('blob'); await new Promise((r) => setTimeout(r, 300)); out.blobDaQui = leggi(f.contentWindow); }
   // 3. document.body = nuovo body con riquadro
@@ -52,7 +54,7 @@ async function prove(urls) {
 
 test('esplora', async ({ openTab, testServer }) => {
   test.setTimeout(120_000);
-  const urls = { toccato: testServer.html(interno('toccato')), liscio: testServer.html(interno('liscio')), soloRif: testServer.html(interno('soloRif')), blobHtml: interno('blob') };
+  const urls = { toccato: testServer.html(interno('toccato')), liscio: testServer.html(interno('liscio')), soloRif: testServer.html(interno('soloRif')), perIndice: testServer.html(interno('perIndice')), perIndiceDoc: testServer.html(interno('perIndiceDoc')), blobHtml: interno('blob') };
   const pagina = testServer.html(`<!doctype html><html><head><meta charset="utf-8"><script>${IMPRONTA}</script></head><body><p>ok</p></body></html>`);
   const page = await openTab(pagina);
   await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
