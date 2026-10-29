@@ -131,7 +131,7 @@ for (const caso of [
     test.setTimeout(120_000);
     const page = await openTab(NEWTAB);
     const urls = await preparaPagine(app, testServer);
-    await modello(app, { finestra: FINESTRA, listino: caso.listino, misure: caso.misure !== false, piani: RICERCA_E_TRE_PAGINE });
+    await modello(app, { finestra: FINESTRA, listino: caso.listino, misure: caso.misure !== false, anthropic: !!caso.anthropic, pesante: !!caso.pesante, piani: RICERCA_E_TRE_PAGINE });
 
     await chiedi(page, 'confronta le tre guide che trovi');
 
