@@ -114,10 +114,8 @@ test('e4 Aiuto ridotto alla casella e pannello', async ({ app, openTab }) => {
   await ed.screenshot({ path: `${SHOTS}/e4-aiuto-ridotto-bloccato.png` });
 });
 
-test('e5 pagina web: niente striscia, niente pannello, Ctrl+\\ passa', async ({ app, openTab, server }) => {
-  const url = server ? `${server.url}/` : 'data:text/html,<p>ciao</p>';
-  const p = await openTab(url);
-  await p.waitForLoadState('domcontentloaded');
+test('e5 pagina web: niente striscia, niente pannello, Ctrl+\\ passa', async ({ app, openTab, testServer }) => {
+  const p = await testServer.openReady(openTab, '<p>ciao</p>');
   console.log('striscia web', await p.evaluate(() => !!document.querySelector('.pd-striscia, .pd-pannello')));
   const r = await esegui(app, { type: 'PANNELLO_APP', operazione: 'apri' });
   console.log('apri su web', JSON.stringify(r));
