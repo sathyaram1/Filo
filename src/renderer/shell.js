@@ -1174,6 +1174,15 @@
   const STILI_SCHEDA = ['--tab-active', '--tab-ink', '--tab-bg-eff', '--tab-bg-hover', '--tab-glow-color'];
   let firmaMisura = '';
   let attivaInVista = null;
+  // Nel posto del titolo ci sta almeno una lettera coi puntini (2em), o il titolo non si mostra, puntini compresi: mai un
+  // tratto di lettera, qualunque cosa gli stia accanto (#1293). Il posto resta, così chi gli sta dopo non si sposta.
+  const titoliStretti = typeof ResizeObserver === 'function' ? new ResizeObserver((voci) => {
+    for (const v of voci) {
+      const largo = v.contentRect.width;
+      const em = parseFloat(getComputedStyle(v.target).fontSize) || 13;
+      v.target.classList.toggle('illeggibile', largo > 0 && largo < 2 * em);
+    }
+  }) : null;
   // Colori veri del tema: leggerli forza un ricalcolo degli stili, quindi si rileggono solo al cambio di tema.
   let coloriTema;
   function coloriDelTema() {
