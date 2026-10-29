@@ -441,6 +441,29 @@ test('oltre il tetto delle foto rimandate tornano le più nuove, le più vecchie
     3 + FC.TOKEN_PER_IMMAGINE * FC.CARATTERI_PER_TOKEN);
 });
 
+test('oltre il tetto delle foto il taglio va a scatti: una foto nuova non riscrive il tratto a ogni messaggio (#1562)', () => {
+  const filo = [];
+  const memoria = {};
+  let ancora = null;
+  let prima = null;
+  const rotture = [];
+  for (let i = 0; i < 30; i++) {
+    const s = conFoto(scambio('c', 30 - i * 0.5, `foto ${i}`, `vista ${i}`), 1);
+    memoria[`c|${s[0].ts}`] = [`data:image/png;base64,${i}`];
+    filo.push(...s);
+    const f = FC.finestra(filo, { ora: ORA, ...TETTI, ancora, chatCorrente: 'c', immagini: immaginiDi(memoria) });
+    const tornate = f.messaggi.reduce((n, m) => n + fotoNel(m).length, 0);
+    assert.ok(tornate <= FC.MAX_IMMAGINI_RIMANDATE, `al turno ${i} tornano ${tornate} foto`);
+    assert.equal(fotoNel(f.messaggi[f.messaggi.length - 2]).length, 1, 'la foto dell\'ultimo messaggio deve tornare');
+    if (prima && prefissoComune(prima, f.messaggi) < prima.length) rotture.push(i);
+    prima = f.messaggi;
+    ancora = f.ancora;
+  }
+  // Trenta foto, una per messaggio: il tetto si passa due volte, e solo lì il tratto cambia.
+  assert.deepEqual(rotture, [16, 21, 26].slice(0, rotture.length));
+  assert.ok(rotture.length <= 3, `il tratto si riscrive ai turni ${rotture.join(', ')}`);
+});
+
 test('un messaggio con più foto di quante ne stiano nei tetti tiene le prime che ci stanno, e la nota dice le altre', () => {
   const pesante = (k) => `data:image/jpeg;base64,${String(k).repeat(5_400_000)}`;
   const tante = conFoto(scambio('c', 1, 'ecco la dispensa', 'Cinque scaffali.'), 5);
