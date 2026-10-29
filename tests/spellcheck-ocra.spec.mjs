@@ -276,11 +276,8 @@ test('campo modificabile su più righe: i puntini stanno sotto la parola, sulla 
     const v = await dove(parola);
     expect({ parola, dx: Math.abs(b.x - v.x) < 3, dy: Math.abs(b.y - v.y) < 3 }).toEqual({ parola, dx: true, dy: true });
   }
-  const copia = await page.locator('.sn-spell-overlay div').first().evaluate((el) => {
-    const cs = getComputedStyle(el);
-    return { colore: cs.color, bordo: cs.borderTopColor };
-  });
-  expect(copia).toEqual({ colore: 'rgba(0, 0, 0, 0)', bordo: 'rgba(0, 0, 0, 0)' });
+  const copia = await stileDelSegno(page.locator('.sn-spell-overlay div').first(), ['color', 'border-top-color']);
+  expect(copia).toEqual({ color: 'rgba(0, 0, 0, 0)', 'border-top-color': 'rgba(0, 0, 0, 0)' });
   await page.screenshot({ path: 'tests/.shots/1115-ocra-righe.png', clip: { x: 0, y: 0, width: 820, height: 340 } }).catch(() => {});
 });
 
