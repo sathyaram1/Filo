@@ -11,7 +11,8 @@ const PDF = Buffer.from('%PDF-1.4\n% finto pdf di prova\n' + 'x'.repeat(4096));
 const EXE = Buffer.from('MZ finto eseguibile di prova\n' + 'z'.repeat(2048));
 
 // /insieme/<nome>: intestazioni subito, byte dopo un attimo (tre clic restano in volo insieme).
-// /lento/<nome>?kb=&ms=: scende a pezzi nel tempo detto. /a-volte/<nome>: la prima volta 404, poi il file.
+// /lento/<nome>?kb=&ms=: scende a pezzi nel tempo detto. /a-volte/<nome>: la prima volta 404 (un link con `download`
+// fallisce subito, senza lasciare la pagina), poi il file.
 async function apriServer() {
   const visti = new Map();
   const srv = createServer((req, res) => {
@@ -38,6 +39,14 @@ async function apriServer() {
         res.write(pezzo);
         if (++n >= pezzi) { clearInterval(t); res.end(); }
       }, ms / pezzi);
+      return;
+    }
+    // Una pagina dello stesso sito coi link `download` ai file: da un altro sito Chromium il `download` lo ignora.
+    if (u.pathname.startsWith('/pagina/')) {
+      const dove = u.searchParams.get('verso') || 'a-volte';
+      const link = nome.split(',').map((n, i) => `<a id="l${i}" download href="/${dove}/${n}">${n}</a>`).join(' ');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`<!doctype html><html><body style="padding:40px">${link}</body></html>`);
       return;
     }
     if (u.pathname.startsWith('/a-volte/')) {
@@ -67,6 +76,12 @@ const voce = async (shell, prova) => (await elenco(shell)).find(prova) || null;
 const cartella = (app) => app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
 const contenuto = (dir) => (existsSync(dir) ? readdirSync(dir) : []);
 
+async function paginaDelServer(openTab, url) {
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+  return page;
+}
+
 async function pagina(testServer, openTab, corpo) {
   return testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px">${corpo}</body></html>`);
 }
@@ -76,8 +91,9 @@ test('tre scaricamenti dello stesso file avviati insieme arrivano tutti, coi nom
   const srv = await apriServer();
   try {
     const dir = await cartella(app);
-    const page = await pagina(testServer, openTab, `<a id="l" href="${srv.base}/insieme/doppio.pdf">Scarica</a>`);
-    for (let i = 0; i < 3; i++) { await page.locator('#l').click(); await page.waitForTimeout(150); }
+    // Tre clic nello stesso istante: nessuna delle tre copie è ancora sul disco quando parte la successiva.
+    const page = await paginaDelServer(openTab, `${srv.base}/pagina/doppio.pdf?verso=insieme`);
+    await page.evaluate(() => { for (let i = 0; i < 3; i++) document.getElementById('l0').click(); });
     const finiti = async () => (await elenco(shell)).filter((r) => r.url.endsWith('/insieme/doppio.pdf') && r.state === 'completed');
     await expect.poll(async () => (await finiti()).length, { timeout: 20000 }).toBe(3);
     const nomi = (await finiti()).map((r) => r.filename).sort();
@@ -119,8 +135,8 @@ test('uno scaricamento non riuscito ha «Riprova» sull’avviso: riparte nella 
   const srv = await apriServer();
   try {
     const dir = await cartella(app);
-    const page = await pagina(testServer, openTab, `<a id="l" href="${srv.base}/a-volte/fattura.pdf">Scarica</a>`);
-    await page.locator('#l').click();
+    const page = await paginaDelServer(openTab, `${srv.base}/pagina/fattura.pdf`);
+    await page.locator('#l0').click();
     let primo = null;
     await expect.poll(async () => {
       primo = await voce(shell, (x) => x.url.endsWith('/a-volte/fattura.pdf'));
@@ -129,6 +145,7 @@ test('uno scaricamento non riuscito ha «Riprova» sull’avviso: riparte nella 
     const vista = await avvisi();
     const carta = vista.locator('.shell-notif', { hasText: 'Scaricamento non riuscito' }).last();
     await expect(carta).toBeVisible({ timeout: 10000 });
+    await carta.screenshot({ path: join(SHOTS, 'download-1287-riprova-avviso.png') });
     await carta.locator('.shell-notif-action', { hasText: 'Riprova' }).click();
     await expect.poll(async () => (await voce(shell, (x) => x.id === primo.id))?.state, { timeout: 20000 }).toBe('completed');
     const lista = (await elenco(shell)).filter((x) => x.url.endsWith('/a-volte/fattura.pdf'));
@@ -142,9 +159,9 @@ test('«Riprova» sta anche sulla riga della pagina Download e sulla carta della
   test.setTimeout(60_000);
   const srv = await apriServer();
   try {
-    const page = await pagina(testServer, openTab, `<a id="a" href="${srv.base}/a-volte/uno.pdf">Uno</a><a id="b" href="${srv.base}/a-volte/due.pdf">Due</a>`);
-    await page.locator('#a').click();
-    await page.locator('#b').click();
+    const page = await paginaDelServer(openTab, `${srv.base}/pagina/uno.pdf,due.pdf`);
+    await page.locator('#l0').click();
+    await page.locator('#l1').click();
     for (const n of ['uno.pdf', 'due.pdf']) {
       await expect.poll(async () => (await voce(shell, (x) => x.url.endsWith(`/a-volte/${n}`)))?.state, { timeout: 30000 }).toBe('interrupted');
     }
@@ -154,6 +171,7 @@ test('«Riprova» sta anche sulla riga della pagina Download e sulla carta della
     await expect(riga.locator('.dl-btn', { hasText: 'Apri file' })).toBeVisible({ timeout: 20000 });
     const home = await openTab('filo://newtab/');
     const carta = home.locator('.dash-carta', { hasText: 'due.pdf' });
+    await carta.screenshot({ path: join(SHOTS, 'download-1287-riprova-carta.png') });
     await carta.locator('.dash-carta-az', { hasText: 'Riprova' }).click();
     await expect.poll(async () => (await voce(shell, (x) => x.url.endsWith('/a-volte/due.pdf')))?.state, { timeout: 20000 }).toBe('completed');
     expect((await elenco(shell)).filter((x) => /\/a-volte\/(uno|due)\.pdf$/.test(x.url)).length).toBe(2);

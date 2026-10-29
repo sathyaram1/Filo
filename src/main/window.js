@@ -52,6 +52,11 @@ function assicuraFinestraNormale() {
 
 // Wiring comune a finestra normale e incognito: carica le impostazioni di
 // sicurezza e collega i listener di resize/fullscreen al layout dei tab.
+// Una finestra in incognito con scaricamenti in corso chiede prima cosa farne (#1287, downloads.js).
+function scaricamentiTrattengono(win) {
+  try { return require('./services/downloads').trattieniChiusura(win) === true; } catch (_) { return false; }
+}
+
 function wireWindowCommon(win, tabs) {
   // Le impostazioni di sicurezza vanno applicate PRIMA del primo tab: policy
   // WebRTC e blocco dei popup devono valere già sul newtab.
@@ -68,10 +73,8 @@ function wireWindowCommon(win, tabs) {
   // caselle da spedire perdeva l'ultima modifica. Si aspetta come alla chiusura di una scheda (chiusuraConCaselle).
   let congedoChiusuraFatto = false;
   win.on('close', (e) => {
-    // Prima del congedo: se l'utente sceglie di non chiudere, le schede non devono aver già salutato.
-    let trattenuta = false;
-    try { trattenuta = require('./services/downloads').trattieniChiusura(win); } catch (_) {}
-    if (trattenuta) { e.preventDefault(); return; }
+    // Prima del congedo: chi sceglie di non chiudere trova le schede come le aveva.
+    if (scaricamentiTrattengono(win)) { e.preventDefault(); return; }
     if (congedoChiusuraFatto) return;
     congedoChiusuraFatto = true;
     const attesa = require('./tabs/chiusuraConCaselle').congedaSchede(tabs);

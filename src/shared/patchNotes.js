@@ -20,11 +20,18 @@
     {
       version: '0.2.251', date: '2026-10-29',
       features: [
+        'Mentre un file si scarica, la riga dice quanto va veloce e quanto manca alla fine, nella pagina Download e nella carta della home.',
+        'Uno scaricamento non riuscito ha «Riprova» sull\'avviso, nella pagina Download e nella carta della home: riparte nella stessa riga.',
+        'Un file appena scaricato si trascina dall\'avviso, dal pannello dei download o dalla pagina Download dove ti serve: nel campo di un sito che carica file, nella chat di Filo, sul desktop.',
+        'Se chiudi una finestra in incognito mentre un file si sta ancora scaricando, Filo ti chiede se lasciarlo finire o annullarlo. In tutti e due i casi la finestra si chiude.',
         'Ctrl+Shift+T (Cmd+Shift+T su Mac) riapre l\'ultima scheda chiusa, come negli altri browser, invece di aprirne una nuova. Torna nello stesso posto della fila, con Indietro e Avanti com\'erano. Premendolo ancora riapre quelle chiuse prima, anche dopo aver riaperto Filo.',
         'In chat Filo sa cosa è successo fra un tuo messaggio e l\'altro: il timer che ha suonato, il tema cambiato dalle Preferenze, il Wi-Fi caduto, un documento dell\'Editor scritto. E un documento o una pagina che ti ha letto restano davanti a lui anche dopo molti messaggi, finché Filo resta aperto.',
         'Nell\'Editor il foglio prende tutta la larghezza. Gli strumenti si aprono dal bordo destro: ci fermi il mouse, clicchi la striscia sottile o premi Ctrl+\\ (Cmd+\\ su Mac). Col «+» scegli quali tenere, e col lucchetto il pannello resta aperto accanto al testo. La chat del documento ora è l\'Aiuto: legge tutto il testo e ne cambia la formattazione quando glielo chiedi, e puoi aprirlo anche chiedendolo a Filo.',
       ],
       fixes: [
+        'Tre download dello stesso file avviati insieme arrivano tutti e tre, come «file», «file (2)» e «file (3)». Prima ne restava uno solo.',
+        'Col nome sensato acceso, un file scaricato che Filo non riesce a rinominare te lo dice, con «Dai un nome» per scriverlo tu. Prima restava col nome di prima senza avvisare.',
+        'I pacchetti Snap e Flatpak sono trattati come programmi: prima di scaricarli e prima di aprirli Filo te lo chiede.',
         'Ctrl+L (Cmd+L su Mac) sulla home non cancella più quello che stavi scrivendo. Porta il cursore nel campo e seleziona il testo, come la barra degli indirizzi di un browser.',
         'Ctrl+L (Cmd+L su Mac) su una pagina dove stai scrivendo apre la home in una scheda accanto, così il testo che hai scritto resta dov\'era.',
         'Se le pagine che Filo legge per risponderti sono troppe per il modello tutte insieme, Filo risponde con quelle che ci stanno e sotto la risposta ti dice quali siti ha lasciato fuori. Se ti servono, chiediglielo e le rilegge. Prima la risposta non arrivava, e l\'errore consigliava di cambiare modello.',

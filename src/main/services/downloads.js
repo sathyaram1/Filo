@@ -25,7 +25,7 @@
 // chrome.storage.local sotto STORAGE_KEYS.DOWNLOADS e sopravvive al riavvio: la
 // pagina elenco (#410.3) la leggerà da lì. Schema di una voce (`publicRecord`):
 //   { id, filename, url, mime, totalBytes, receivedBytes, state, savePath,
-//     startedAt, endedAt, paused, canResume, canPause }
+//     startedAt, endedAt, paused, canResume, canPause, velocita, restano }
 //   state ∈ 'progressing' | 'paused' | 'completed' | 'interrupted' | 'cancelled'
 //
 // Incognito (#588.2): stesso controllo, ma la voce ha l'ambito della sua
@@ -565,9 +565,10 @@ function contaProgramma(rec, evento) {
 
 // Un fallimento si dice con la strada per rimediare (#1287): «Riprova» rifà lo stesso indirizzo nella stessa voce.
 function avvisaNonRiuscito(rec) {
-  const opts = { durationSec: 8, tipo: 'download_failed', indirizzo: rec.url };
-  if (/^https?:/i.test(String(rec.url || ''))) opts.actions = [{ label: 'Riprova', riprovaDownloadId: rec.id }];
-  shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, opts, scopeOf(rec));
+  const riprova = /^https?:/i.test(String(rec.url || '')) ? [{ label: 'Riprova', riprovaDownloadId: rec.id }] : [];
+  shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, {
+    durationSec: 8, tipo: 'download_failed', indirizzo: rec.url, ...(riprova.length ? { actions: riprova } : {}),
+  }, scopeOf(rec));
 }
 
 function shellToast(text, opts, scope = '') {
@@ -1196,6 +1197,8 @@ function prendiRiprova(scope, url) {
 function riprova(id, scope = '') {
   const rec = recordIn(id, scope);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco', items: listRecords(scope) };
+  // Un secondo clic mentre il primo sta già ripartendo non è un errore da dire.
+  if (rec._riprovaTimer || (liveItems.has(rec.id) && rec.state === 'progressing')) return { ok: true, items: listRecords(scope) };
   if (rec.state !== 'interrupted' && rec.state !== 'cancelled') {
     return { ok: false, error: 'Questo scaricamento non è fallito', items: listRecords(scope) };
   }

@@ -749,7 +749,7 @@ html[data-feedback-dim="1"] .shell {
 /* #588.8 — un file arrivato si prende dalla sua riga e si lascia dove serve. */
 .dl-row[data-trascina="1"] { cursor: grab; }
 .dl-row[data-trascina="1"] .dl-row-btn { cursor: pointer; }
-/* #1287 — la finestra in incognito che si chiude chiede cosa fare degli scaricamenti: è una domanda come le righe che chiedono. */
+/* #1287 — l'incognito che si chiude chiede degli scaricamenti in corso: una domanda come le righe che chiedono. */
 .dl-chiusura {
   display: flex;
   flex-direction: column;

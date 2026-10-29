@@ -3,7 +3,7 @@
 // dagli scaricamenti, dalla chat (elenco vecchio → nuovo con conferma), da un file trascinato e da sole sugli
 // scaricamenti quando l'utente le accende. Il modello è finto: risponde con le prime righe del documento che riceve.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { existsSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -421,18 +421,22 @@ test('acceso in Preferenze, uno scaricamento col nome che non dice niente prende
 test('col nome automatico acceso, il PDF che non prende un nome lo dice con «Dai un nome»; senza modello lo dice una volta', async ({ app, shell, openTab, testServer, avvisi }) => {
   test.setTimeout(120_000);
   await modelloDeiNomi(app);
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ nomiSensati: { scaricamenti: true } }); });
+  // Il modello legge il file ma non capisce cosa sia.
+  await app.evaluate(() => {
+    const legge = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = async (o) => ({ ...(await legge(o)), text: 'NESSUN NOME' });
+  });
+  const pref = await openTab('filo://preferences/preferences.html');
+  await pref.locator('#nomiSensatiScaricamenti').check();
   await expect.poll(() => app.evaluate(async () => !!(await globalThis.SN_STORAGE.getSettings()).nomiSensati?.scaricamenti)).toBe(true);
-  // Una riga sola: il modello finto non trova cosa sia e risponde NESSUN NOME.
-  const muto = pdfConTesto(['Pagina 1 di 1']);
-  const primo = await scarica('scan_00888.pdf', muto, { shell, openTab, testServer });
+  const primo = await scarica('scan_00888.pdf', BOLLETTA, { shell, openTab, testServer });
   try {
     const vista = await avvisi();
     const carta = vista.locator('.shell-notif', { hasText: 'Nessun nome dato a scan_00888.pdf' });
     await expect(carta).toBeVisible({ timeout: 20000 });
     expect(existsSync(primo.rec.savePath)).toBe(true);
     await carta.locator('.shell-notif-action', { hasText: 'Dai un nome' }).click();
-    const dl = await openTab('filo://downloads/downloads.html');
+    const dl = await aspettaFinestra(app, (w) => w.url().startsWith('filo://downloads/'), '«Dai un nome» non ha aperto la pagina Download');
     await expect(dl.locator('.sn-rinomina-campo')).toBeVisible({ timeout: 15000 });
   } finally { await primo.chiudi(); }
 
