@@ -180,7 +180,24 @@ test('segnalazioni, guasti e risposte di fine turno dell\'addetto comunicazioni 
     assert.match(sezione(s).replace(/\s+/g, ' '), /tranne quelle dell'addetto comunicazioni|quelle dell'addetto comunicazioni vanno all'owner|sempre per l'addetto comunicazioni/, `${s} non esclude l'addetto`);
   }
   const riga = righe(sezione('### 5.2')).map(celle).find((c) => nomiFraApici(c[0]).includes('gestione_lavoro'));
-  assert.match(riga[1], /domande di guasto, tranne quelle dell'addetto comunicazioni/);
+  assert.match(riga[1], /segnalazioni, tranne quelle dell'addetto comunicazioni/);
+});
+
+// #1249.1: la gestione del lavoro gira nell'ambiente dei riservati, quindi un guasto di lì (anche suo) la ferma come
+// ha fermato chi l'ha aperto; e un guasto che anticipa l'istanza di chi l'ha aperto è una fila di accensioni senza fine.
+test('i guasti dell\'ambiente dei riservati vanno all\'owner, e un guasto non anticipa l\'istanza di chi l\'ha aperto', () => {
+  const s51 = sezione('### 5.1').replace(/\s+/g, ' ');
+  assert.match(s51.slice(s51.indexOf('per mestiere')), /^[^.]*la gestione del lavoro/, 'la regola vale finché lei gira nell\'ambiente dei riservati');
+  const s43 = sezione('### 4.3').replace(/\s+/g, ' ');
+  assert.match(s43, /non va a chi l'ha aperta né a chi gira nello stesso ambiente/);
+  assert.match(s43, /aperte da un biglietto di quell'ambiente vanno all'owner, comprese le sue/);
+  assert.match(s43, /non anticipa mai l'istanza di chi l'ha aperto/);
+  assert.match(s43, /Un guasto che va a lei le anticipa l'istanza/);
+  assert.match(sezione('### 3.1').replace(/\s+/g, ' '), /`destinatario`[^.]*altri biglietti dell'ambiente dei riservati, lei compresa: vanno all'owner/);
+  assert.match(sezione('### 3.8').replace(/\s+/g, ' '), /altri biglietti dell'ambiente dei riservati, lei compresa \(§ 4\.3\), va all'owner/);
+  const riga = righe(sezione('### 5.2')).map(celle).find((c) => nomiFraApici(c[0]).includes('gestione_lavoro'));
+  assert.match(riga[1], /domande di guasto dei biglietti fuori dall'ambiente dei riservati/);
+  assert.match(sezione('## 13').replace(/\s+/g, ' '), /`destinatario`, che manda all'owner i guasti dell'ambiente dei riservati; istanza anticipata da un guasto, mai quella di chi l'ha aperto/);
 });
 
 test('le domande di guasto vanno all\'owner finché la gestione del lavoro non c\'è', () => {
