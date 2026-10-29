@@ -1317,7 +1317,8 @@
   const TUTTE_LE_CARTE = 'tutte';
   const VOCI_SISTEMA = Object.freeze(['ora', 'batteria', 'rete', 'bluetooth', 'volume']);
   const GESTI_SISTEMA = Object.freeze(['clic', 'tasto_destro', 'tastiera', 'trascina_in_chat', 'comando_dato']);
-  // I tipi dei moduli dell'Editor, come MODULE_TYPES di src/pages/editor/editor.js (la sentinella li tiene uguali).
+  // I tipi dei moduli dell'Editor: gli strumenti del pannello di destra (src/shared/pannelliApp.js, la sentinella li
+  // tiene dentro) e quelli della vecchia griglia, che il server accetta ancora.
   const MODULI_EDITOR = Object.freeze(['switch', 'word-count', 'search-replace', 'comment', 'chat', 'bold', 'italic',
     'underline', 'undo', 'redo', 'text-size', 'align', 'font', 'settings']);
   const EVENTI_MODULO = Object.freeze(['aggiunto', 'tolto', 'spostato', 'ridimensionato', 'configurato', 'usato',
