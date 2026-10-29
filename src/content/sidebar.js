@@ -1967,10 +1967,6 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       });
       if (valutazione) valutazione.mandato = testoCampo;
     }
-    // Nell'Editor il documento viaggia intero fino al tetto (#1475), e il main lo accetta solo da una pagina di Filo.
-    const appPagina = appDellaPagina();
-    let letto = null;
-    try { letto = appPagina ? appPagina.documento() : null; } catch (_) { letto = null; }
     const conDocumento = () => {
       if (letto) payload.documento = { titolo: letto.titolo, testo: letto.testo, avviso: letto.avviso || '' };
     };
