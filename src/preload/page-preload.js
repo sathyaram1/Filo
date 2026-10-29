@@ -222,7 +222,7 @@ try {
     if (cfg && cfg.level > 0) {
       if (!unito) {
         const { buildGuardSource } = require('./fingerprint-guard.js');
-        webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level, cfg.canale, cfg.sonda), false).catch(() => {});
+        webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level, cfg.canale, cfg.sonda, cfg.esenti), false).catch(() => {});
       }
     }
   }
