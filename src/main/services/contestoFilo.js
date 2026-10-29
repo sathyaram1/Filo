@@ -403,6 +403,11 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     note,
     giro: giroDi,
     salta: (m) => m.role === 'user' && seguitiNeiGiri.has(FC().chiave(m)),
+    // La domanda parte intera nel suo turno: nei turni dopo torna intera finché la fotografia è la stessa.
+    intero: (m) => {
+      const memo = preamboli.get(FC().chiave(m));
+      return !!memo && memo.intero === epoca;
+    },
   });
   ancore[lato] = f.ancora;
   potaFoto(f.vecchi);
