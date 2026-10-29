@@ -124,7 +124,25 @@ test('esplora: cancellazione dopo che il taglio dei giorni ha fatto uno scatto',
   console.log('1→2', JSON.stringify(primaDifferenza(c[0], c[1]), null, 1));
 });
 
-test('esplora: un turno con strumenti, poi due turni, poi un Riprova e un turno',async ({ app, openTab }) => {
+test('esplora: venti immagini in un messaggio solo', async ({ app }) => {
+  test.setTimeout(120_000);
+  await preparaModello(app, [{ text: 'Viste.' }, { text: 'Ecco.' }]);
+  const c = await app.evaluate(async () => {
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const foto = Array.from({ length: 20 }, () => png);
+    await globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'guarda queste schermate', threadHistory: [], chatId: 'c-tante', images: foto });
+    await globalThis.SN_HANDLE_FILO_CHAT({
+      userMessage: 'e la quinta?', chatId: 'c-tante',
+      threadHistory: [{ role: 'user', text: 'guarda queste schermate', images: 20 }, { role: 'filo', text: 'Viste.' }],
+    });
+    return globalThis.__chiamate;
+  });
+  const n = (m) => (Array.isArray(m.content) ? m.content.filter((p) => p.type === 'image_url').length : 0);
+  console.log('foto nel turno:', c[0].messages.map(n), 'dopo:', c[1].messages.map(n));
+  console.log('1→2', JSON.stringify(primaDifferenza(c[0], c[1]), null, 1));
+});
+
+test('esplora: un turno con strumenti, poi due turni, poi un Riprova e un turno', async ({ app, openTab }) => {
   test.setTimeout(150_000);
   await preparaModello(app, [
     { text: 'Guardo.', toolCalls: [{ id: 'l1', name: 'LEGGI_IMPOSTAZIONI', arguments: JSON.stringify({ cerca: 'tema' }) }] },
