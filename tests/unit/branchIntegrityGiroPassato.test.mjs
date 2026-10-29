@@ -149,7 +149,7 @@ describe('D-207 — la cartella riusata non riporta il ramo a un giro passato', 
       assert.equal(v.code, 0, `la critica sulla punta verificata si registra senza riportare indietro il codice: ${v.se}${v.so}`);
       const verdetto = ricevuti.find((x) => x.url.includes('routineDeliver') && x.body.intent === 'verdict');
       assert.ok(verdetto, 'la critica arriva al server');
-      assert.equal(verdetto.body.sha || verdetto.body.payload?.sha, C, 'e vale per il commit verificato');
+      assert.equal((verdetto.body.data || {}).sha, C, 'e vale per il commit verificato');
     } finally {
       srv.close();
       togliCartella(base);
