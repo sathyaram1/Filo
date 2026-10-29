@@ -424,9 +424,8 @@
   // Tasti e puntatore si guardano prima del sito (#1340): il ponte di page-preload, a document_start, chiama
   // `primaDelSito` prima di ogni suo ascolto. Dal campo, il sito in cattura sulla finestra avrebbe già spostato la selezione.
   const INIZI = ['keydown', 'pointerdown', 'mousedown', 'touchstart'];
-  // Gli eventi che il browser manda prima dell'annuncio anche senza un tasto che la pagina veda (Incolla del menu
-  // dell'app, che su Mac è la strada di Cmd+V; l'inizio di una composizione): l'annuncio parte dalla selezione che hanno
-  // trovato, prima che il sito li ascolti (#1340, giro 4).
+  // Arrivano prima dell'annuncio anche senza un tasto che la pagina veda (Incolla del menu dell'app, la strada di Cmd+V su
+  // Mac): l'annuncio parte dalla selezione che hanno trovato, prima che il sito li ascolti (#1340, giro 4).
   const PRIMA_DELL_ANNUNCIO = ['paste', 'cut', 'compositionstart'];
   const GESTI_CASELLA = [...INIZI, 'keyup', 'pointerup', 'mouseup', 'touchend', 'click', ...PRIMA_DELL_ANNUNCIO];
   const TASTI_CHE_MUOVONO = /^(Arrow|Home$|End$|Page)/;
