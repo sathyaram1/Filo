@@ -504,8 +504,8 @@ export async function release(t, fault = '', opts, report = null, punta = null) 
  * arrivato al server: 'allegato', 'ridotto', 'scartato' o 'assente';
  * `esito.avviso` è la riga da stampare quando qualcosa è andato perso.
  */
-export async function releaseConRapporto(t, fault, report, opts) {
-  const tenta = (rep) => release(t, fault, opts, rep);
+export async function releaseConRapporto(t, fault, report, opts, punta = null) {
+  const tenta = (rep) => release(t, fault, opts, rep, punta);
   if (!report || typeof report !== 'object') return { ...(await tenta(null)), rapporto: 'assente' };
   const malformato = (r) => r.status === 400 && r.reason === 'report_malformed';
   // Il dettaglio è nella PRIMA risposta (quella che ha rifiutato il
