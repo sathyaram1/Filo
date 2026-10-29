@@ -219,7 +219,9 @@ function buildRiquadriVuotiSource(corpi) {
   function finestra(r) { return r && typeof r === 'object' && r === r.window; }
   function aggancia(w, d) {
     mascheraIn(w);
-    ascolta(d);
+    var su = null;
+    try { su = campo(D(w.EventTarget.prototype, 'addEventListener'), 'value'); } catch (e) {}
+    ascolta(d, su);
     try { new w.MutationObserver(spazza).observe(d, { __proto__: null, childList: true, subtree: true }); } catch (e) {}
     var N = proto(w, 'Node');
     ['appendChild', 'insertBefore', 'replaceChild'].forEach(function (m) { dopo(N, m, SE.nodi); });
