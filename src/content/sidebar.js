@@ -1752,19 +1752,12 @@
           const onAct = parsed.status === 'continue'
             ? () => onUserAction(parsed.highlight)
             : null;
-          // Il testo proposto per un campo esce verso il sito: prima passa dalla porta delle uscite (#810).
-          const fermo = act === 'fill' ? await campoFermato(parsed.highlight.value) : '';
-          if (fermo) {
-            fermata(fermo);
-            parsed.highlight = null;
-          } else {
-            Highlight.show(parsed.highlight.selector, {
-              note: parsed.highlight.note || '',
-              action: parsed.highlight.action,
-              value: parsed.highlight.value,
-              onAction: onAct,
-            });
-          }
+          Highlight.show(parsed.highlight.selector, {
+            note: parsed.highlight.note || '',
+            action: parsed.highlight.action,
+            value: parsed.highlight.value,
+            onAction: onAct,
+          });
         }
       }
 
