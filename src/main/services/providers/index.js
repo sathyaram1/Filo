@@ -102,9 +102,9 @@
   // globale per retro-compatibilità.
   // `onTentativoFallito(err, { modello, host })` arriva per OGNI tentativo fallito, anche l'ultimo: lo leggono i
   // contatori giornalieri (#969), che contano i guasti per modello e host.
-  function tentativoFallito(fn, err, aModel) {
+  function tentativoFallito(fn, err, aModel, provider = '') {
     if (typeof fn !== 'function') return;
-    try { fn(err, { modello: aModel, host: (err && err.hostFallito) || '' }); } catch (_) {}
+    try { fn(err, { modello: aModel, host: (err && err.hostFallito) || '', provider }); } catch (_) {}
   }
 
   async function completeWithFallback({ attempts, model, messages, cache, tools, toolChoice, signal, onFallback, onTentativoFallito }) {
@@ -123,7 +123,7 @@
         return { ...r, provider: a.provider, model: aModel, tentativo: i + 1 };
       } catch (err) {
         lastErr = err;
-        tentativoFallito(onTentativoFallito, err, aModel);
+        tentativoFallito(onTentativoFallito, err, aModel, a.provider);
         if (stopOnOutOfCredits(err)) throw err;
         console.warn(`[SN] provider ${a.provider} fallito (${i + 1}/${attempts.length}):`, err.message || err);
         if (onFallback && i + 1 < attempts.length) {
@@ -185,7 +185,7 @@
         if (emitted) ricominciata = true;
         // Porta le chiavi usate: non enumerabile, un errore si stampa e si serializza.
         if (broken.length && err && typeof err === 'object') Object.defineProperty(err, 'brokenAttempts', { value: broken, enumerable: false, configurable: true });
-        tentativoFallito(onTentativoFallito, err, aModel);
+        tentativoFallito(onTentativoFallito, err, aModel, a.provider);
         if (stopOnOutOfCredits(err)) throw err;
         console.warn(`[SN] provider ${a.provider} streaming fallito (${i + 1}/${attempts.length}):`, err.message || err);
         const hasNext = i + 1 < attempts.length;

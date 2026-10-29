@@ -52,7 +52,8 @@
   const FASCE_CACHE = Object.freeze(['zero', 'q25', 'q50', 'q75', 'q100', ND]);
   const FASCE_RAGIONAMENTO = Object.freeze([['r0', 0], ['r1k', K], ['r4k', 4 * K], ['r16k', 16 * K], ['oltre', Infinity]]);
   const FASCE_USCITA = Object.freeze([['o256', 256], ['o1k', K], ['o4k', 4 * K], ['o16k', 16 * K], ['oltre', Infinity]]);
-  const FINI = Object.freeze(['stop', 'length', 'tool_calls', 'filtro', 'altro']);
+  // «error»: il fornitore si è fermato a metà dopo aver già scritto qualcosa (#1472).
+  const FINI = Object.freeze(['stop', 'length', 'tool_calls', 'filtro', 'error', 'altro']);
   const TENTATIVI = Object.freeze(['t1', 't2', 't3', 't4_oltre']);
   // Il costo detto dal router, quello stimato dal listino delle Opzioni, quello chiesto dopo (voce, dettatura, una
   // risposta rotta a metà). Si somma in centomillesimi di dollaro.
@@ -1036,7 +1037,7 @@
   function fineDi(f) {
     const s = String(f == null ? '' : f).toLowerCase();
     if (s === 'content_filter') return 'filtro';
-    return ['stop', 'length', 'tool_calls'].includes(s) ? s : ALTRO;
+    return ['stop', 'length', 'tool_calls', 'error'].includes(s) ? s : ALTRO;
   }
   function tentativoDi(t) {
     const n = Number(t);

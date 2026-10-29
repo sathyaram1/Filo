@@ -79,6 +79,7 @@
       }
       if (alt && alt.key && !(await ammessoCoiCrediti(model, providerRouting))) {
         try { await K.noteOwnKeyRefusal({ status: res.status, detail, served: false }); } catch (_) {}
+        contaRipiego(res.status, 'non_ammesso');
         throw erroreCrediti(model, { chiaveRifiutata: res.status });
       }
       if (alt && alt.key && typeof ripiegoAmmesso === 'function') {
@@ -86,6 +87,7 @@
         try { ammesso = await ripiegoAmmesso(); } catch (_) { ammesso = false; }
         if (!ammesso) {
           try { await K.noteOwnKeyRefusal({ status: res.status, detail, served: false }); } catch (_) {}
+          contaRipiego(res.status, 'non_ammesso');
           alt = null;
         }
       }
@@ -97,9 +99,11 @@
           res = await fetch(url, makeInit(alt.key, { own: false }));
         } catch (e) {
           try { await K.noteOwnKeyRefusal({ ...refused, served: false }); } catch (_) {}
+          contaRipiego(refused.status, 'fallito');
           throw e;
         }
         try { await K.noteOwnKeyRefusal({ ...refused, served: res.ok }); } catch (_) {}
+        contaRipiego(refused.status, res.ok ? 'riuscito' : 'fallito');
         keyUsed = alt.key;
         keyFallback = { status: refused.status, from: 'own', to: alt.source || 'personal' };
         if (!res.ok) keyFallback.failed = res.status;
@@ -116,6 +120,11 @@
     // (e ha fallito), e chi lo racconta all'utente può dirlo per esteso.
     try { res.keySource = keySource; res.keyFallback = keyFallback; } catch (_) {}
     return { res, keyUsed, keySource, keyFallback };
+  }
+
+  // Il ripiego dalla chiave propria ai crediti, per status ed esito: lo contano i contatori del servizio (#1472).
+  function contaRipiego(status, esito) {
+    try { require('../contatoriServizio').misura('ripiegoChiave', status, esito); } catch (_) {}
   }
 
   // Chiavi che spendono i crediti di Filo. Una chiave di provenienza ignota ('') è quella dei test senza portafoglio.
