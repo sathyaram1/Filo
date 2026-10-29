@@ -459,11 +459,12 @@ export function ensureSessionExcludes(root) {
  *   create       true = lavoro NUOVO (crea il branch dalla base)
  *   base         base da cui creare (default: mainBranch)
  *   mainBranch   linea principale (default 'main')
- *   checkpoint   ultimo punto fermo (SHA) a cui riportare il branch, o null
+ *   checkpoint   ultimo punto fermo locale (SHA), o null
  *   now          per i test
  *
- * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null}}
+ * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null, superato?:string|null}}
  *          rewritten = il punto fermo lasciato perché il ramo su origin è stato riscritto
+ *          superato  = il punto fermo lasciato perché più vecchio della punta pubblicata (un giro passato altrove)
  *        | {ok:false, kind:'transient'|'permanent', message:string}
  *
  * FAIL CLOSED: se non riesce, il chiamante NON consegna il lavoro. Meglio un
