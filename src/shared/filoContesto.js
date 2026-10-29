@@ -310,7 +310,8 @@
   // adesso; `ancora` è l'inizio scelto al turno prima, che si tiene finché i tetti lo permettono.
   // `immagini(m)`: i data URL ancora in memoria del messaggio, o null. `preambolo(m)`: quello che Filo scrive in testa a
   // un messaggio dell'utente; `note(m)`: le note del suo turno. `giro(m)`: il turno di una risposta come è andato, e
-  // `salta(m)`: i seguiti che quel turno porta già dentro.
+  // `salta(m)`: i seguiti che quel turno porta già dentro. `intero(m)`: un messaggio dell'utente già mandato intero, che
+  // torna com'era invece di accorciarsi.
   function finestra(messaggi, {
     ora = Date.now(), giorni, token, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null,
     preambolo = null, note = null, giro = null, salta = null, intero = null,
