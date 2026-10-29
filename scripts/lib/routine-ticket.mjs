@@ -159,6 +159,30 @@ export function segnaBigliettoFinito(root, ticket, perche, { now = Date.now() } 
 }
 
 /**
+ * La punta salvata prima della domanda di fine sessione ({ sha, branch, ora }), o null: da lì il ramo non si spedisce
+ * più, né dal gancio di salvataggio né dal rilascio (SPEC-DOMANDE § 5.4, #1555). PURA.
+ */
+export function chiusuraDelBiglietto(marker) {
+  const c = marker && marker.chiusura;
+  if (!c || typeof c !== 'object' || !Number.isFinite(Date.parse(String(c.ora || '')))) return null;
+  return { sha: String(c.sha || ''), branch: String(c.branch || ''), ora: String(c.ora) };
+}
+
+/** Segna nel marcatore di QUEL biglietto la punta salvata prima della domanda di fine sessione. Best-effort. */
+export function segnaChiusura(root, ticket, { sha = '', branch = '' } = {}, { now = Date.now() } = {}) {
+  const t = String(ticket || '').trim();
+  const m = readMarkerFrom(root);
+  if (!t || !m || String(m.ticket || '') !== t) return false;
+  try {
+    const chiusura = { ora: new Date(now).toISOString(), sha: String(sha || ''), branch: String(branch || '') };
+    writeFileSync(ticketFile(root), JSON.stringify({ ...m, chiusura }, null, 2) + '\n', 'utf8');
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
  * Il biglietto del giro in corso, o '' se non c'è.
  *
  * Stessa precedenza del marcatore di ruolo: variabile esplicita > marcatore di
