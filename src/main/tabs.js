@@ -848,6 +848,9 @@ class TabManager {
     // `opts.webContents`: la finestra che una pagina ha aperto col clic, tenuta da lei (setWindowOpenHandler).
     // Con una finestra già nata le preferenze vanno ridate, o il preload non parte nei suoi documenti.
     const view = new WebContentsView(opts.webContents ? { webContents: opts.webContents, webPreferences } : { webPreferences });
+    // Una vista che si chiude è già fuori dalla lista delle schede mentre spedisce le ultime caselle (#1775): il segno
+    // la tiene di Filo fino all'ultimo messaggio (origine.js, vistaInterna).
+    view.webContents._filoVistaInterna = webPreferences.preload === INTERNAL_PRELOAD;
     // #410.1 — segui gli scaricamenti anche sulle sessioni NON predefinite
     // (privacy, proxy, incognito): una sessione non agganciata scarica col
     // dialogo nativo, senza barra e senza il controllo sui programmi (#588.2).
