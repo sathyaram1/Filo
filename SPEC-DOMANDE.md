@@ -610,7 +610,9 @@ server (§ 9), non in questa spec.
 
 Ogni istanza chiude con un **rapporto**: cosa ha fatto, cosa ha trovato, da
 dove deve ripartire la prossima. Resta legato al ricorrente: l'istanza
-successiva lo riceve col biglietto, con la fiducia che aveva. È così che
+successiva lo riceve col biglietto, con la fiducia che aveva. Resta quello
+dell'istanza nata per ultima: il rapporto di una più vecchia che chiude dopo
+non lo sostituisce. È così che
 l'audit sa da quale commit ripartire e la potatura quanti rami sono nuovi.
 Riordino e potatura lo scrivono anche nel taccuino della gestione del lavoro
 (§ 4.3). Un ricorrente che segue cose lunghe settimane ha anche un
