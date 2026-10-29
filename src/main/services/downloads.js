@@ -912,6 +912,7 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
       if (!inAttesa) rec.state = 'progressing';
       if (!rec._stallTimer) armWatchdog();   // ripreso dopo una pausa
     }
+    if (!rec.paused) campiona(rec);
     broadcast('progress', rec);
   });
 
