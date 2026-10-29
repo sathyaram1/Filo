@@ -95,9 +95,12 @@ test('scheda stretta: cede paese, poi titolo, poi la X sulle inattive; l\'attiva
           expect(icona, dove).toBe(true);
           expect(ha('close'), dove).toBe(s.width >= 58);
         }
-        // Il titolo vive da 6px di gap più 12 di testo dopo l'icona; sull'attiva anche la X in fila.
+        // Il posto del titolo c'è da 6px di gap più 12 dopo l'icona (sull'attiva anche la X in fila); il testo si legge
+        // quando ci sta una lettera coi puntini (2em), e il paese entra solo se al titolo restano i suoi 2em.
         expect(ha('title'), dove).toBe(s.width >= (s.active ? 64 : 52));
-        if (s.id === ids[2] || s.id === ids[3]) expect(ha('proxy-ind'), dove).toBe(s.width >= 96);
+        expect(s.titolo.largo === 0 || s.titolo.largo >= s.titolo.serve - 0.5, `${dove} titolo ${JSON.stringify(s.titolo)}`).toBe(true);
+        expect(s.titolo.largo > 0, `${dove} titolo ${JSON.stringify(s.titolo)}`).toBe(s.width >= (s.active ? 90 : 66));
+        if (s.id === ids[2] || s.id === ids[3]) expect(ha('proxy-ind'), dove).toBe(s.width >= (s.active ? 124 : 100));
         // La spinner non si schiaccia: resta un cerchio.
         const spin = s.figli.find((f) => f.cls === 'spinner');
         if (spin) expect(spin.width, dove).toBe(12);
