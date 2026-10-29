@@ -54,8 +54,8 @@ test('injectAgentStyle aggiunge lo stile alle azioni conversazionali, non a quel
   const out = await page.evaluate(() => {
     const C = window.SN_CONST;
     const style = 'Sii conciso.';
-    // Azione conversazionale senza system message → lo stile viene anteposto.
-    const userOnly = C.injectAgentStyle([{ role: 'user', content: 'ciao' }], C.ACTIONS.FILO_CHAT, style);
+    // Azione conversazionale senza system message → lo stile viene anteposto. La chat lo riceve nel suo CONTESTO (#1562).
+    const userOnly = C.injectAgentStyle([{ role: 'user', content: 'ciao' }], C.ACTIONS.EXPLAIN, style);
     // Azione conversazionale con system message → lo stile viene accodato a quello.
     const withSys = C.injectAgentStyle(
       [{ role: 'system', content: 'Sei Filo.' }, { role: 'user', content: 'x' }],
@@ -64,8 +64,9 @@ test('injectAgentStyle aggiunge lo stile alle azioni conversazionali, non a quel
     // Azione funzionale → invariata.
     const functional = C.injectAgentStyle([{ role: 'user', content: 'hello' }], C.ACTIONS.TRANSLATE_SELECTION, style);
     // Stile vuoto → invariato anche su azione conversazionale.
-    const empty = C.injectAgentStyle([{ role: 'user', content: 'ciao' }], C.ACTIONS.FILO_CHAT, '   ');
-    return { userOnly, withSys, functional, empty };
+    const empty = C.injectAgentStyle([{ role: 'user', content: 'ciao' }], C.ACTIONS.EXPLAIN, '   ');
+    const chat = C.injectAgentStyle([{ role: 'user', content: 'ciao' }], C.ACTIONS.FILO_CHAT, style);
+    return { userOnly, withSys, functional, empty, chat };
   });
 
   // userOnly: aggiunto un system message in testa con lo stile.
@@ -87,12 +88,15 @@ test('injectAgentStyle aggiunge lo stile alle azioni conversazionali, non a quel
   // empty: nessuna iniezione.
   expect(out.empty).toHaveLength(1);
   expect(out.empty[0].role).toBe('user');
+
+  // La chat non passa di qui: lo stile sta nel suo CONTESTO, dopo la parte fissa uguale per tutti.
+  expect(out.chat).toHaveLength(1);
 });
 
 // ── #592: lo stile entra in ogni conversazione e ci resta ───────────────────
 // Se lo propone il modello (magari convinto da una pagina), l'utente ne vede il
 // testo esatto e decide; oltre il tetto non si salva e lo si dice; nel prompt
-// sta imbustato, prima delle regole anti-inganno.
+// sta imbustato, e dopo di lui una frase tiene in piedi le regole anti-inganno.
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
