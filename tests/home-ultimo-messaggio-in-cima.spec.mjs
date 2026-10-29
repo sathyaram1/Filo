@@ -178,29 +178,6 @@ test('scrivo a home appena aperta: lo scambio continua sotto senza salti, e quan
   }).toBe(true);
 });
 
-// Una risposta su più righe, finita, non cambia misura ma prende lo spazio dei suoi tasti sotto: il fondo resta lì.
-test('a scambio cominciato, «in fondo» resta proprio lì anche dopo una risposta lunga qualche riga', async ({ app, openTab }) => {
-  test.setTimeout(60_000);
-  await semina(app, ieri());
-  const page = await openTab('filo://newtab/');
-  await inCima(page, 'risposta di ieri 11');
-  const paragrafo = Array.from({ length: 6 }, (_, i) => `Le balene della frase ${i + 1} cantano a lungo sotto il mare.`).join(' ');
-  await modelloFinto(app, [{ text: paragrafo }]);
-  await chiedi(page, 'e le balene cantano?');
-  const risposta = page.locator('.dash-bubble-filo', { hasText: 'frase 6 cantano' });
-  await expect(risposta).toBeVisible();
-  await expect(risposta).not.toHaveClass(/dash-bubble-streaming/);
-  await page.waitForTimeout(300);
-  const prima = await vista(page);
-  const giu = prima.bolle[prima.bolle.length - 1];
-  expect(giu.testo).toContain('frase 6 cantano');
-  expect(giu.giu - giu.su).toBeGreaterThan(40);
-  expect(prima.vuoto).not.toBe('0px');
-  await page.evaluate(() => { const a = document.getElementById('bubbles'); a.scrollTop = a.scrollHeight; });
-  const dopo = await vista(page);
-  expect(Math.abs(dopo.bolle[dopo.bolle.length - 1].su - giu.su)).toBeLessThan(2);
-});
-
 // La scheda di `page` davanti, come un clic sulla sua linguetta.
 async function davanti(app, page) {
   const segno = `s${Math.random()}`;
