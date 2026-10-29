@@ -1090,7 +1090,139 @@ function forgetScope(scope) {
   }
 }
 
+// #1287 (decisione D51) — chiudere una finestra in incognito con scaricamenti in corso chiede cosa farne, nel pannello
+// della finestra: «Lascia finire» chiude e il file arriva lo stesso, «Annulla» li ferma e chiude. Uscire da Filo no:
+// lì ogni scaricamento si ferma comunque.
+let uscendo = false;
+const attiviIn = (scope) => Array.from(records.values())
+  .filter((r) => scopeOf(r) === scope && (r.state === 'progressing' || r.state === 'paused'));
+
+// Vero se la chiusura va fermata per chiedere; la domanda è già partita verso la barra della finestra.
+function trattieniChiusura(win) {
+  if (uscendo || !win || !win._filoIncognito || win._filoChiusuraDecisa) return false;
+  const attivi = attiviIn(scopeOfWindow(win));
+  if (!attivi.length) return false;
+  // Senza una barra viva nessuno risponderebbe, e la finestra non si chiuderebbe più.
+  try { if (win.webContents.isDestroyed() || win.webContents.isCrashed() || win.webContents.isLoading()) return false; } catch (_) { return false; }
+  try { win.webContents.send('shell:download', { kind: 'chiusura', items: attivi.map(publicRecord) }); } catch (_) { return false; }
+  return true;
+}
+
+function rispondiChiusura(win, scelta) {
+  if (!win || win.isDestroyed?.() || !win._filoIncognito) return { ok: false, error: 'Questa finestra non sta chiudendo' };
+  const scope = scopeOfWindow(win);
+  for (const r of attiviIn(scope)) {
+    if (scelta === 'annulla') cancel(r.id, scope);
+    else if (r.state === 'paused') resume(r.id, scope);
+  }
+  win._filoChiusuraDecisa = true;
+  setImmediate(() => { try { if (!win.isDestroyed()) win.close(); } catch (_) {} });
+  return { ok: true };
+}
+
+// La sessione da cui riparte un «Riprova»: quella dello scaricamento, o dopo un riavvio quella del suo ambito.
+function sessioneDi(rec) {
+  if (rec._sessione) return rec._sessione;
+  try {
+    const { session } = electron();
+    const scope = scopeOf(rec);
+    return scope ? session.fromPartition(scope) : session.defaultSession;
+  } catch (_) { return null; }
+}
+
+// Il Referer che il clic sul link aveva presentato: intero dallo stesso sito, la sola origine da un altro.
+function refererPer(rec) {
+  const pagina = indirizzoPerMarca(rec._pagina);
+  if (!pagina) return '';
+  try {
+    return new URL(pagina).origin === new URL(rec.url).origin ? pagina : `${new URL(pagina).origin}/`;
+  } catch (_) { return ''; }
+}
+
+// Chiave ambito+indirizzo → voci che aspettano il loro will-download. Un tentativo che non parte entro il tempo torna
+// «non riuscito», con «Riprova» di nuovo.
+const riprove = new Map();
+const RIPROVA_MS = 30_000;
+const chiaveRiprova = (scope, url) => `${scope || ''}\n${url}`;
+
+function prendiRiprova(scope, url) {
+  const k = chiaveRiprova(scope, url);
+  const coda = riprove.get(k);
+  if (!coda || !coda.length) return null;
+  const id = coda.shift();
+  if (!coda.length) riprove.delete(k);
+  const vecchia = records.get(id);
+  if (!vecchia) return null;
+  if (vecchia._riprovaTimer) { clearTimeout(vecchia._riprovaTimer); vecchia._riprovaTimer = null; }
+  return vecchia;
+}
+
+function riprova(id, scope = '') {
+  const rec = recordIn(id, scope);
+  if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco', items: listRecords(scope) };
+  if (rec.state !== 'interrupted' && rec.state !== 'cancelled') {
+    return { ok: false, error: 'Questo scaricamento non è fallito', items: listRecords(scope) };
+  }
+  if (!/^https?:/i.test(String(rec.url || ''))) {
+    return { ok: false, error: 'Questo file non ha un indirizzo da cui riscaricarlo', items: listRecords(scope) };
+  }
+  const ses = sessioneDi(rec);
+  if (!ses || typeof ses.downloadURL !== 'function') {
+    return { ok: false, error: 'Non sono riuscito a far ripartire lo scaricamento', items: listRecords(scope) };
+  }
+  const k = chiaveRiprova(scope, rec.url);
+  riprove.set(k, (riprove.get(k) || []).concat(rec.id));
+  // La riga riparte subito: il server può metterci un attimo a rispondere, e un clic senza effetto sembra rotto.
+  Object.assign(rec, { state: 'progressing', receivedBytes: 0, totalBytes: 0, endedAt: null, paused: false, canResume: false });
+  rec._campioni = [];
+  rec._filoEsito = null;
+  rec._riprovaTimer = setTimeout(() => {
+    rec._riprovaTimer = null;
+    const coda = riprove.get(k);
+    if (coda) { const i = coda.indexOf(rec.id); if (i >= 0) coda.splice(i, 1); if (!coda.length) riprove.delete(k); }
+    if (!records.has(rec.id) || liveItems.has(rec.id) || rec.state !== 'progressing') return;
+    rec.state = 'interrupted';
+    rec.endedAt = new Date().toISOString();
+    persist();
+    broadcast('error', rec);
+    avvisaNonRiuscito(rec);
+  }, RIPROVA_MS);
+  persist();
+  broadcast('progress', rec);
+  try {
+    const referer = refererPer(rec);
+    ses.downloadURL(rec.url, referer ? { headers: { Referer: referer } } : undefined);
+  } catch (_) {
+    clearTimeout(rec._riprovaTimer); rec._riprovaTimer = null;
+    prendiRiprova(scope, rec.url);
+    rec.state = 'interrupted';
+    rec.endedAt = new Date().toISOString();
+    persist();
+    broadcast('error', rec);
+    return { ok: false, error: 'Non sono riuscito a far ripartire lo scaricamento', items: listRecords(scope) };
+  }
+  return { ok: true, items: listRecords(scope) };
+}
+
+// #588.8 — un file scaricato si trascina come da una cartella del sistema: su un campo per caricare file di un sito,
+// nella chat di Filo, sul desktop. `wc` è la superficie da cui parte il trascinamento.
+async function trascina(wc, id, scope = '') {
+  const rec = recordIn(id, scope);
+  const p = percorsoDi(id, scope);
+  if (!rec || !p) return { ok: false, error: 'Questo file non è ancora sul computer' };
+  forgetExists(p);
+  if (!fileExists(p)) { broadcast('missing', rec); return { ok: false, missing: true, error: MISSING_TEXT }; }
+  try {
+    const icon = await require('./aiutoDocumenti').iconaDi(p);
+    wc.startDrag({ file: p, icon });
+    return { ok: true };
+  } catch (_) {
+    return { ok: false, error: 'Non sono riuscito a prendere il file: aprilo dalla sua cartella e trascinalo da lì' };
+  }
+}
+
 async function init() {
+  try { electron().app.on('before-quit', () => { uscendo = true; }); } catch (_) {}
   await loadHistory();
   // Nessuna attesa sopravvive a un riavvio (loadHistory le chiude): quello che
   // resta in quarantena è orfano, e un programma orfano non deve restare su
