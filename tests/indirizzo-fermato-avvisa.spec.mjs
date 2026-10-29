@@ -293,6 +293,9 @@ for (const [scritto, avviso] of [
   ['Documenti\\conto.pdf', 'File del computer bloccato per sicurezza: Documenti/conto.pdf'],
   ['%USERPROFILE%\\Desktop\\conto.pdf', 'File del computer bloccato per sicurezza: %USERPROFILE%/Desktop/conto.pdf'],
   ['"C:\\Users\\agenti AI\\Documenti\\conto.pdf".', 'File del computer bloccato per sicurezza: C:/Users/agenti AI/Documenti/conto.pdf'],
+  // #1318 giro 5 — un percorso relativo o un nome di file non è un sito inventato dato per aperto.
+  ['../Documenti/conto.pdf', 'File del computer bloccato per sicurezza: ../Documenti/conto.pdf'],
+  ['conto.pdf', 'File del computer bloccato per sicurezza: conto.pdf'],
   ['ricetta carbonara', '«ricetta carbonara» non è un indirizzo'],
 ]) {
   test(`l'assistente non trasforma «${scritto}» in una ricerca: lo ferma e sa perché`, async ({ app, shell }) => {
