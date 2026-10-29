@@ -682,10 +682,13 @@
   function sforoDiFinestra(errText, maxTokens) {
     const s = String(errText || '');
     if (!CONTESTO.test(s)) return null;
+    const somma = SOMMA_ANTHROPIC.exec(s);
+    const nella = (i) => (somma ? numeroIn(somma[i], /([\d.,]+)/) : null);
     const finestra = numeroIn(s, /maximum context (?:length|window) (?:is|of) ([\d.,]+)/i)
-      || numeroIn(s, /limit exceeded:?\s*[\d.,]+\s*>\s*([\d.,]+)/i);
+      || numeroIn(s, /limit exceeded:?\s*[\d.,]+\s*>\s*([\d.,]+)/i) || nella(3);
     const chiesti = numeroIn(s, /requested (?:about )?([\d.,]+)/i) || numeroIn(s, /limit exceeded:?\s*([\d.,]+)\s*>/i);
-    const testo = numeroIn(s, /([\d.,]+) (?:tokens )?of (?:text )?input/i) || (chiesti && chiesti > maxTokens ? chiesti - maxTokens : null);
+    const testo = numeroIn(s, /([\d.,]+) (?:tokens )?of (?:text )?input/i) || nella(1)
+      || (chiesti && chiesti > maxTokens ? chiesti - maxTokens : null);
     return { finestra, testo };
   }
   // Il tetto è la causa quando ne prende più di metà finestra, o quando il testo da solo ci starebbe: un rifiuto per
