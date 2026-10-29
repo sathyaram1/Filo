@@ -502,7 +502,7 @@ const PROPAGAZIONE = `
 const SONDA = `
   try { defP(getProto(window), '__filoFpGuard', { __proto__: null, get: function () { return true; }, configurable: true }); } catch (e) {}`;
 
-function buildPreamboloSource({ fp, canale, sonda } = {}) {
+function buildPreamboloSource({ fp, canale, sonda, esenti } = {}) {
   const parti = [];
   if (fp && (fp.level | 0) > 0) parti.push(parteFingerprint(fp.seed));
   if (!parti.length) return '';
