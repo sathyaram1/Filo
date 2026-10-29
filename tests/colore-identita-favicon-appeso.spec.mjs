@@ -1,6 +1,6 @@
 // #1456 — Il colore identità della scheda (src/content/pageColor.js) chiede il favicon del sito: un sito che non lo
 // manda mai non deve lasciare la pagina in caricamento, e la richiesta appesa si chiude da sola. #1456.2 — su un sito
-// lento il colore arriva a testa della pagina letta, non quando la pagina finisce di caricarsi.
+// lento il colore arriva a testa della pagina letta, non quando la pagina finisce di caricarsi, nemmeno dietro uno script lento.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
@@ -77,6 +77,47 @@ test('su un sito con un\'immagine lenta la scheda prende il colore del sito ment
     expect(scheda.inCaricamento).toBe(true);
   } finally {
     for (const r of lente) { try { r.destroy(); } catch (_) {} }
+    try { server.closeAllConnections?.(); } catch (_) {}
+    await new Promise((r) => server.close(r));
+  }
+});
+
+test('su un sito rallentato da uno script a metà pagina la scheda dietro si tinge mentre la pagina si vede già', async ({ app, shell }) => {
+  const tenute = [];
+  const server = createServer((req, res) => {
+    if (req.url.startsWith('/icona.svg')) {
+      res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
+      res.end('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#e02020"/></svg>');
+      return;
+    }
+    // Uno script di pubblicità che arriva dopo 8 s: titolo e articolo sopra di lui sono già a schermo (#1701.r1).
+    if (req.url.startsWith('/lento.js')) {
+      tenute.push(res);
+      setTimeout(() => { try { res.writeHead(200, { 'Content-Type': 'text/javascript' }); res.end(''); } catch (_) {} }, 8_000);
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<title>Lento</title><link rel="icon" href="/icona.svg"><h1>Notizie</h1><p>Articolo</p><script src="/lento.js"></script><p>Fine</p>');
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    const id = await app.evaluate(({ BrowserWindow }, u) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+      return w._filoTabs.openTab(u, { activate: false });
+    }, `http://127.0.0.1:${server.address().port}/`);
+    // Un sito veloce aperto dietro si tinge in poco più di un secondo: qui si concede il triplo, ben sotto gli 8 s.
+    await expect.poll(() => shell.evaluate((tid) => {
+      const el = document.querySelector(`.tab[data-id="${tid}"]`);
+      return el ? el.style.getPropertyValue('--tab-bg-eff') || null : null;
+    }, id), { timeout: 3_500, intervals: [100] }).not.toBe(null);
+    const colore = await app.evaluate(({ BrowserWindow }, tid) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+      return w._filoTabs.tabs.find((x) => x.id === tid).identityColor;
+    }, id);
+    const [r, g, b] = colore.match(/\d+/g).map(Number);
+    expect(r).toBeGreaterThan(Math.max(g, b) + 100);
+  } finally {
+    for (const r of tenute) { try { r.destroy(); } catch (_) {} }
     try { server.closeAllConnections?.(); } catch (_) {}
     await new Promise((r) => server.close(r));
   }
