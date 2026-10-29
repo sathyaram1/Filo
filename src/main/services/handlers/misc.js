@@ -268,6 +268,33 @@ async function byteImmagineRemota({ url, referrer, session }) {
   }
 }
 
+// Per un sito Filo scarica come un estraneo: senza i cookie dell'utente e mai dalla rete di casa. Coi cookie solo dopo
+// il menu del tasto destro aperto in quel riquadro, nella scheda in vista: la richiesta l'ha fatta l'utente (#589.1 giro 5).
+const ATTESA_IMMAGINE_MS = 20000;
+async function byteImmagineDaEstraneo(url) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ATTESA_IMMAGINE_MS);
+  try {
+    const r = await safeFetch(url, { signal: ctrl.signal, headers: { Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8' } });
+    if (!r.ok) { try { r.body?.cancel?.(); } catch (_) {} return { ok: false, error: 'immagine non scaricabile' }; }
+    const parti = [];
+    let n = 0;
+    for await (const pezzo of r.body || []) {
+      n += pezzo.byteLength;
+      if (n > MAX_BYTE_PROVENIENZA) { ctrl.abort(); return { ok: false, tooBig: true, error: `immagine oltre ${MAX_BYTE_PROVENIENZA / (1024 * 1024)} MB` }; }
+      parti.push(Buffer.from(pezzo));
+    }
+    const byte = Buffer.concat(parti);
+    const tipo = tipoImmagine(byte);
+    if (!tipo) return { ok: false, notImage: true, error: 'non è un’immagine' };
+    return { ok: true, dataUrl: `data:${tipo};base64,${byte.toString('base64')}` };
+  } catch (_) {
+    return { ok: false, error: 'immagine non scaricabile' };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 function bytesDaDataUrl(dataUrl) {
   const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));
   if (!m) return null;
