@@ -62,7 +62,8 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   (`contestoDaAzioni`) e conferme (`fonteDi`) lo contano per tutte le azioni allo stesso modo.
 - **Le immagini mandate in chat tornano col loro messaggio** (#1166), finché sono in memoria, dalle più nuove: al
   più sedici e 24 milioni di caratteri per richiesta (sotto i limiti dei fornitori); per i tetti in token una pesa
-  1.500 token, non i caratteri del data URL. Stanno in memoria, mai su disco, e se ne vanno con la loro chat. Quando
+  1.500 token, non i caratteri del data URL. Oltre i tetti si scende di un quarto, come per i token, e il taglio si tiene
+  finché basta: una foto nuova non riscrive il tratto a ogni messaggio. Stanno in memoria, mai su disco, e se ne vanno con la loro chat. Quando
   non tornano (vecchie, oltre i tetti, Filo riaperto, modello che le rifiuta) al loro posto c'è una nota: quante
   erano, e che quello che il modello ne ha scritto l'aveva letto da lì. Senza, al turno dopo diceva di non vederle e
   ritrattava letture giuste. Un modello che rifiuta le immagini dei turni passati (solo testo, una per richiesta)
