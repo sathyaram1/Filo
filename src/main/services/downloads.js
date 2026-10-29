@@ -1259,6 +1259,7 @@ function riprova(id, scope = '') {
     rec._riprovaTimer = null;
     const coda = riprove.get(k);
     if (coda) { const i = coda.indexOf(rec.id); if (i >= 0) coda.splice(i, 1); if (!coda.length) riprove.delete(k); }
+    ritiraReferer(indirizzo, ses);
     if (!records.has(rec.id) || liveItems.has(rec.id) || rec.state !== 'progressing') return;
     rec.state = 'interrupted';
     rec.endedAt = new Date().toISOString();
