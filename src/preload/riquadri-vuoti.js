@@ -54,7 +54,7 @@ function buildRiquadriVuotiSource(corpi) {
     if (!r || typeof r !== 'object') return;
     if (finestra(r)) { applica(r); return; }
     var v = null;
-    try { v = vistaDi.call(r); } catch (e) {}
+    try { v = R(vistaDi, r, []); } catch (e) {}
     if (v) applica(v);
   }
   function delRiquadro(t) {
