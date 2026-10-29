@@ -38,6 +38,9 @@ async function prove(urls) {
     const idx = window.length - 1;
     f.src = 'about:blank'; await new Promise((r) => f.addEventListener('load', r, { once: true })); await new Promise((r) => setTimeout(r, 300));
     out.fuoriTornatoVuoto = leggi(window[idx]); }
+  { const t0 = performance.now(); const root = document.createElement('div'); for (let i = 0; i < 100000; i++) root.appendChild(document.createElement('i')); out.msFoglie = Math.round(performance.now() - t0); }
+  { const t0 = performance.now(); const root = document.createElement('div'); document.body.appendChild(root); for (let i = 0; i < 20000; i++) { const li = document.createElement('li'); li.appendChild(document.createElement('a')); li.appendChild(document.createElement('b')); root.appendChild(li); } root.remove(); out.msConFigli = Math.round(performance.now() - t0); }
+  { const t0 = performance.now(); const root = document.createElement('div'); document.body.appendChild(root); for (let i = 0; i < 20000; i++) { const li = document.createElement('li'); li.append('testo', document.createElement('b')); root.append(li); } root.remove(); out.msAppend = Math.round(performance.now() - t0); }
   // tempi: costruzione di un albero grande
   { const t0 = performance.now(); for (let k = 0; k < 20; k++) { const root = document.createElement('div'); let cur = root; for (let i = 0; i < 2000; i++) { const n = document.createElement('div'); n.appendChild(document.createElement('span')); cur.appendChild(n); if (i % 50 === 0) cur = n; } document.body.appendChild(root); root.remove(); } out.msAlbero = Math.round(performance.now() - t0); }
   { const t0 = performance.now(); for (let k = 0; k < 300; k++) { const d = document.createElement('div'); d.innerHTML = '<ul>' + '<li><a href="#">x</a><object></object></li>'.repeat(50) + '</ul>'; document.body.appendChild(d); d.remove(); } out.msInnerHTML = Math.round(performance.now() - t0); }
