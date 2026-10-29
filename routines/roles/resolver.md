@@ -14,9 +14,48 @@ Non richiedere quello che ha già deciso.
 
 <!-- includi: _cornice-feedback.md -->
 
-**Il feedback si lavora intero.** Se è grosso crea un piano prima di toccare
-codice. Verifica, controllo di sicurezza e cancello giudicano l'intero
-feedback: non si spezza in sotto-feedback.
+## Prima di tutto: è già risolto su main?
+
+`payload.suMain`, se c'è, elenca le fusioni su `main` che citano questo
+feedback dopo la sua nascita. Guardale prima di aprire il lavoro:
+
+- una fusione segnata `propria` è il lavoro di questo stesso feedback: se è di
+  nuovo qui l'owner l'ha riaperto perché mancava qualcosa, e non è chiuso;
+- per le altre leggi il commit (`git show --stat <sha>`) e il punto del codice
+  che il feedback nomina. Se la cosa chiesta adesso c'è, intera, chiudi senza
+  aprire il lavoro e poi rilascia il biglietto:
+
+  ```bash
+  node scripts/routine-channel.mjs deliver status --status done --reason gia_risolto --fusione <sha> \
+    --notes "[cosa hai controllato, e dove]" --frase "[cosa trova adesso chi ha segnalato]"
+  ```
+
+  Il server ricontrolla la fusione: se rifiuta (exit 4), lavora il feedback
+  come sempre e scrivi il motivo del rifiuto nel report;
+- se la fusione ne copre solo una parte, lavori il resto e lo dici nel report.
+
+**Il feedback si lavora intero.** Verifica, controllo di sicurezza e cancello
+giudicano l'intero feedback: non si spezza in sotto-feedback.
+
+## Il piano di un lavoro grosso
+
+Un lavoro grosso (una spec in più fasi, o un pacchetto) comincia da un piano:
+le parti, l'ordine, come si prova ognuna. Scrivilo in un file fuori dal repo e
+consegnalo prima di toccare codice; a ogni parte chiusa aggiornalo e
+riconsegnalo:
+
+```bash
+node scripts/routine-channel.mjs deliver piano --piano <file.md>
+```
+
+Se la sessione muore, chi viene dopo lo riceve in `payload.piano` e riparte da
+lì, dal ramo. Se `payload.piano` c'è, quello sei tu: le parti segnate fatte
+stanno già sul ramo, controllale e prosegui.
+
+Un **pacchetto** è un feedback che unisce più segnalazioni della stessa area:
+il testo è la spec, con cosa cambia per ognuna e come si verifica. Passa o non
+passa intero, e alla fusione il server chiude le segnalazioni unite con la tua
+frase: scrivila per chi ha mandato una qualunque di loro.
 
 Se è ambiguo o chiede una decisione di design prima di cominciare, fermati e
 chiedi — non è una scappatoia. Le domande diventano una domanda per l'owner,

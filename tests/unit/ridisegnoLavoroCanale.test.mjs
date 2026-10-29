@@ -160,3 +160,46 @@ test('la correzione senza motivo non parte; col motivo e in un riallineamento po
   assert.deepEqual(d.riallineamento, { fileRiscritti: [], giro: 'nessuno' });
   assert.match(r.se, /Riallineamento pulito/);
 });
+
+test('il preflight di una sessione accesa per un feedback consegna il ruolo della sessione, col numero, non l\'orchestratore', async (t) => {
+  const srv = createServer((req, res) => {
+    req.on('data', () => {}); req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(req.url.includes('config') ? { fields: { enabled: { booleanValue: true } } } : { ok: true }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const dove = cartellaTemporanea('strumenti-sessione');
+  t.after(() => { srv.close(); togliCartella(dove); });
+  const env = {
+    FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`,
+    FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${srv.address().port}/config`,
+    FILO_ROUTINES_ENABLED: '1', FILO_PREFLIGHT_ANY_BRANCH: '1', FILO_TOOLS_DIR: dove, CLAUDE_CODE_REMOTE: '',
+  };
+  const r = await esegui('dispatch.mjs', ['--preflight', '--feedback', '#1680'], env, REPO);
+  assert.equal(r.code, 0, r.se.slice(-400));
+  assert.match(r.so, /Sei stata accesa per il feedback \*\*#1680\*\*/);
+  assert.match(r.so, /ticket "<parola-d-ordine>" --feedback 1680/);
+  assert.doesNotMatch(r.so, /<numero-del-feedback>/, 'il segnaposto si riempie dappertutto');
+  assert.doesNotMatch(r.so, /Sei l'orchestratore/);
+  const storto = await esegui('dispatch.mjs', ['--preflight', '--feedback', 'tutti'], env, REPO);
+  assert.equal(storto.code, 1);
+  assert.match(storto.se, /--feedback vuole un numero di feedback/);
+  const fuori = await esegui('dispatch.mjs', ['--record-fixed', 'id1', 'report', '--feedback', '12'], env, REPO);
+  assert.equal(fuori.code, 1);
+  assert.match(fuori.se, /--feedback non vale con --record-fixed/);
+});
+
+test('il primo lavoro riceve il piano di chi l\'ha preceduto e le fusioni su main che citano il feedback', async () => {
+  const { buildPayload, segnaProprie } = await import('../../scripts/dispatch.mjs');
+  const suMain = segnaProprie([{ sha: 'a'.repeat(40), oggetto: 'merge-gate: #77 via server' }, { sha: 'b'.repeat(40), oggetto: 'merge-gate: #75 via server (anche #77)' }], '77');
+  assert.deepEqual(suMain.map((f) => !!f.propria), [true, false], 'la fusione del suo stesso lavoro vuol dire riaperto, non risolto');
+  const p = buildPayload({ role: 'new-work', id: 'x', num: '#77' }, { feedback: { text: 't' }, piano: '1. il menu', suMain });
+  assert.equal(p.piano, '1. il menu');
+  assert.equal(p.suMain.length, 2);
+  const vuoto = buildPayload({ role: 'new-work', id: 'x', num: '#77' }, { feedback: { text: 't' }, piano: '  ', suMain: [] });
+  assert.equal('piano' in vuoto, false);
+  assert.equal('suMain' in vuoto, false);
+  const ripresa = buildPayload({ role: 'fixer', id: 'x', num: '#77' }, { ripresa: { domanda: 'd' }, piano: 'p' });
+  assert.equal(ripresa.piano, 'p', 'anche chi riprende dopo una risposta riceve il piano');
+});
