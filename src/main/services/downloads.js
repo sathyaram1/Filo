@@ -58,7 +58,7 @@ let sitiFidati = [];
 // #950 — un nome sensato da solo agli scaricamenti che arrivano con un nome che non dice niente. Spento di
 // serie: il contenuto del file va a un modello senza che l'utente l'abbia chiesto per quel file.
 let nomeDaSolo = false;
-// Senza modello l'avviso arriva una volta, non a ogni scaricamento; riacceso l'interruttore, di nuovo.
+// Riacceso l'interruttore, l'avviso «senza modello» torna a dirsi (senzaNome).
 let avvisatoSenzaNome = false;
 
 function configureFromSettings(settings) {
@@ -663,26 +663,33 @@ function completa(rec) {
 
 // #950 — solo i nomi che non dicono niente («scan_00231.pdf»): un nome scelto da qualcuno resta. L'incognito
 // no: lì il contenuto di un file non parte verso un modello senza che l'utente lo chieda.
+// #1357.2 — un nome che non arriva si dice sempre, con la strada per darlo a mano: il silenzio sembra la funzione spenta.
+// Un file appena sceso può essere tenuto un attimo dall'antivirus: «occupato» si ritenta prima di arrendersi.
+const RITENTA_OCCUPATO_MS = [1500, 3000];
 async function nominaDaSolo(rec) {
   const NF = globalThis.SN_NOMI_FILE;
   if (!NF || scopeOf(rec) || rec.exe || !rec.savePath) return;
   if (!NF.tipoDi(rec.filename) || !NF.nomeSenzaSenso(rec.filename)) return;
   const Nomi = require('./nomiFile');
   const letto = rec.savePath;
-  const p = await Nomi.proponi(letto);
-  if (!records.has(rec.id) || rec.state !== 'completed') return;
   // Un nome dato dall'utente mentre il modello leggeva vince sempre su quello automatico.
-  if (rec.savePath !== letto) return;
-  if (!p.ok) {
-    // Senza modello, o col modello che non risponde, l'utente che ha acceso la funzione deve saperlo.
-    if (p.errore === 'modello' && !avvisatoSenzaNome) {
-      avvisatoSenzaNome = true;
-      shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${p.frase}`, { durationSec: 10, tipo: 'download_senza_nome', indirizzo: rec.url }, '');
-    }
-    return;
+  const superata = () => !records.has(rec.id) || rec.state !== 'completed' || rec.savePath !== letto;
+  const p = await Nomi.proponi(letto);
+  if (superata()) return;
+  if (!p.ok) { senzaNome(rec, p); return; }
+  // Il modello ha risposto: il prossimo «senza modello» torna a dirsi.
+  avvisatoSenzaNome = false;
+  const { ext } = NF.scomponi(path.basename(letto));
+  if (NF.nomeSenzaSenso(`${p.proposta}${ext}`)) { senzaNome(rec, { errore: 'nessun_nome', frase: 'Dal contenuto non si capisce cosa sia: scrivi tu il nome' }); return; }
+  let r = await Nomi.rinomina(letto, p.proposta, { daSola: 'automazione' });
+  for (const attesa of RITENTA_OCCUPATO_MS) {
+    if (r.ok || r.errore !== 'in_uso') break;
+    await new Promise((ok) => setTimeout(ok, attesa));
+    if (superata()) return;
+    r = await Nomi.rinomina(letto, p.proposta, { daSola: 'automazione' });
   }
-  const r = await Nomi.rinomina(letto, p.proposta, { daSola: 'automazione' });
-  if (!r.ok || r.invariato) return;
+  if (!r.ok) { if (!superata()) senzaNome(rec, r); return; }
+  if (r.invariato) return;
   require('./contatoriFinestra').misura('rinominato');
   shellToast(`Nome dato: ${shortName(r.nome)}`, {
     durationSec: 10,
@@ -692,6 +699,20 @@ async function nominaDaSolo(rec) {
       { label: 'Annulla', rimettiNomeDownloadId: rec.id },
       { label: 'Apri file', openDownloadId: rec.id },
     ],
+  }, '');
+}
+
+// Senza modello l'avviso arriva una volta per serie di fallimenti: ogni scaricamento ripeterebbe la stessa frase.
+function senzaNome(rec, esito) {
+  if (esito.errore === 'modello') {
+    if (avvisatoSenzaNome) return;
+    avvisatoSenzaNome = true;
+  }
+  shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${esito.frase || 'Rinomina non riuscita'}`, {
+    durationSec: 10,
+    tipo: 'download_senza_nome',
+    indirizzo: rec.url,
+    actions: [{ label: 'Dai un nome', rinominaDownloadId: rec.id }],
   }, '');
 }
 
@@ -1072,6 +1093,7 @@ function attachSession(ses, { scope = '' } = {}) {
       let fermo = false;
       try { fermo = typeof globalThis.SN_SB_SCARICAMENTO === 'function' && globalThis.SN_SB_SCARICAMENTO(item, webContents) === true; } catch (_) {}
       if (fermo) { e.preventDefault(); return; }
+      if (riprovaRitirata(scope, item)) { e.preventDefault(); return; }
       onWillDownload(item, webContents, scope, ses);
     });
   } catch (_) {}
@@ -1144,6 +1166,20 @@ function refererPer(rec) {
 const riprove = new Map();
 const RIPROVA_MS = 30_000;
 const chiaveRiprova = (scope, url) => `${scope || ''}\n${url}`;
+
+// Un «Riprova» annullato o tolto dall'elenco prima che il server rispondesse: quel will-download non scende.
+function riprovaRitirata(scope, item) {
+  let url = '';
+  try { const c = item.getURLChain(); url = (Array.isArray(c) && c[0]) || item.getURL(); } catch (_) { return false; }
+  const k = chiaveRiprova(scope, url);
+  const coda = riprove.get(k);
+  if (!coda || !coda.length) return false;
+  const rec = records.get(coda[0]);
+  if (rec && rec.state === 'progressing' && rec._riprovaTimer) return false;
+  coda.shift();
+  if (!coda.length) riprove.delete(k);
+  return true;
+}
 
 function prendiRiprova(scope, url) {
   const k = chiaveRiprova(scope, url);
@@ -1397,7 +1433,17 @@ function openFolder(id, scope = '') {
 }
 
 function cancel(id, scope = '') {
-  if (!recordIn(id, scope)) return { ok: true };
+  const rec = recordIn(id, scope);
+  if (!rec) return { ok: true };
+  // «Annulla» mentre un «Riprova» aspetta ancora la risposta del server: il tentativo non parte (riprovaRitirata).
+  if (rec._riprovaTimer) {
+    clearTimeout(rec._riprovaTimer); rec._riprovaTimer = null;
+    rec.state = 'cancelled';
+    rec.endedAt = new Date().toISOString();
+    persist();
+    broadcast('error', rec);
+    return { ok: true };
+  }
   const item = liveItems.get(id);
   if (item) { try { item.cancel(); } catch (_) {} }
   const manual = liveManual.get(id);
@@ -1445,6 +1491,10 @@ module.exports = {
   cancel,
   pause,
   resume,
+  riprova,
+  trascina,
+  trattieniChiusura,
+  rispondiChiusura,
   // per i test
   _records: records,
   _isMissing: isMissing,
