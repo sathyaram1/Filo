@@ -101,7 +101,9 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   modello perdono le conversazioni e le pagine che il filo non ha più, dal messaggio dopo e in ogni scheda (la
   rilettura dice che è stata cancellata, la ricerca quanti risultati). Una regola sola quando si compone il
   contesto, sulle copie (memoria, storia della scheda, giro di un turno, ricordi nella domanda, cose successe): vale per
-  ogni strada che cancella. Un giro con dentro qualcosa che non c'è più torna come risposta sola, ripulita.
+  ogni strada che cancella. Un giro con dentro qualcosa che non c'è più torna come risposta sola, ripulita; così
+  anche uno il cui esito la scheda ha visto cambiare dopo il turno (un sì nel popup, la pagina aperta che si sposta da
+  sé su un sito bloccato): il giro lo darebbe com'era.
 - **Il tetto in token cede alla finestra del modello**: se il fornitore rifiuta la richiesta perché supera la finestra
   del modello della chat, il tratto si stringe quanto dicono le misure del rifiuto (senza misure, a metà) e lo stesso
   giro riparte; il tetto che ha retto vale per i turni dopo con quel modello (in memoria). Si stringe prima la parte
