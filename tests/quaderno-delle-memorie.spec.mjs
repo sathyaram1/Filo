@@ -54,6 +54,9 @@ const turno = (app, chatId, userMessage) => app.evaluate(
   { chatId, userMessage },
 );
 const memoria = (app) => app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory());
+const ultimoPrompt = (app) => app.evaluate(() => globalThis.__q_prompt[globalThis.__q_prompt.length - 1]);
+// La memoria che il modello ha davanti: quella del CONTESTO e le righe arrivate dopo nei messaggi, ognuna nella sua busta.
+const memoriaNelPrompt = (prompt) => [...String(prompt).matchAll(/<<<MEMORIA_FILO>>>([\s\S]*?)<<<FINE_MEMORIA_FILO>>>/g)].map((m) => m[1]).join('\n');
 const lezioni = (app) => app.evaluate(() => globalThis.SN_FILO_MEMORY.getLessonsBuffer());
 // Una riga per il suo testo intero: «È vegetariano» è anche dentro «L’utente è vegetariano.».
 const esatto = (t) => new RegExp(`^${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
