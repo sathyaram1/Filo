@@ -83,6 +83,12 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  on(MSG.RIAPRI_PULIZIA_SCHEDE, soloFilo(async (msg, sender) => {
+    const win = winOf(sender);
+    if (!win || !win._filoTabs || !Number.isInteger(msg && msg.pulizia)) return { ok: false, error: 'scaduta' };
+    return win._filoTabs.riapriPulizia(msg.pulizia);
+  }));
+
   // Il riordino chiude schede, le manda al modello e costa una chiamata: lo chiede solo un gesto su una pagina di Filo (#589.15).
   on(MSG.RUN_TAB_TRIAGE, soloFilo(async (msg, sender) => {
     const win = winOf(sender);
