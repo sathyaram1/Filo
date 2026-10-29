@@ -162,14 +162,14 @@ const SPINTE_WEB = Object.freeze(new Set([
 const SPINTE_WEB_IN_VISTA = Object.freeze(new Set(['show_toast']));
 
 // Gli scomparti del magazzino che i content script usano. `settings` si legge
-// (ritagliato) ma non si scrive mai da un sito.
+// (ritagliato) ma non si scrive mai da un sito. Il segno dei feedback no: uguale su ogni sito,
+// riconoscerebbe l'utente ovunque; al feedback mandato da un sito lo mette il main (#589.1 giro 5).
 const CHIAVI_STORAGE_WEB = Object.freeze([
   'settings',
   'sn_personal_dict',
   'sn_autocorrect',
   'sn_icon_layout',
   'sn_qr_in_primary_migrated',
-  'sn_feedback_client_id',
 ]);
 const CHIAVI_STORAGE_WEB_SCRITTURA = Object.freeze(CHIAVI_STORAGE_WEB.filter((k) => k !== 'settings'));
 
