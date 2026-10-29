@@ -6,6 +6,8 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import '../../src/shared/capabilities.js';
+import '../../src/shared/constants.js';
 import '../../src/shared/contenutoEsterno.js';
 import '../../src/shared/chatArchive.js';
 import '../../src/shared/filoEventi.js';
@@ -77,6 +79,8 @@ test('un pezzo che il modello ha già davanti non si ripesca: tre domande sullo 
     await scrivi(f, 'scheda', 'user', domande[n], 30 - n * 10);
     const c = await componi('scheda', domande[n]);
     const ricordi = await Ricordi.cerca(domande[n], { vecchi: c.vecchi, davanti: c.visti, esiti: c.azioni });
+    // Come fa il turno (handlers.js): i ricordi entrano nella domanda, e ci restano nei turni dopo.
+    c.domanda({ turno: FC.rendiRicordi(ricordi) });
     portati.push(ricordi.length);
     ultimo = { c, ricordi };
     // Senza sapere cosa ha davanti, il pezzo tornerebbe a ogni domanda.

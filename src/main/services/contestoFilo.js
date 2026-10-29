@@ -6,6 +6,10 @@
 
 const FC = () => globalThis.SN_FILO_CONTESTO;
 const F = () => globalThis.SN_IL_FILO;
+const TV = () => {
+  if (!globalThis.SN_TRATTO_VIVO) require('../../shared/filoTrattoVivo.js');
+  return globalThis.SN_TRATTO_VIVO;
+};
 
 // Gli esiti delle azioni (pagine e documenti letti, comandi, ricerche) restano in memoria, mai su disco: quanto
 // entrano nel contesto lo decide la finestra (src/shared/filoContesto.js, #553.2, #587).
@@ -43,6 +47,7 @@ const chatIncognito = new Set();
 function dimenticaIncognito() {
   for (const c of chatIncognito) dimentica(c);
   chatIncognito.clear();
+  fotografie.incognito = null;
 }
 
 function ricordaImmagini(chat, ts, immagini) {
@@ -57,16 +62,70 @@ function ricordaImmagini(chat, ts, immagini) {
   while (caratteriFoto > MAX_CARATTERI_FOTO && foto.size > 1) togliFoto(foto.keys().next().value);
 }
 
-// Un messaggio uscito dagli ultimi della sua chat non torna più fra quelli recenti: le sue immagini non servono più.
-function potaFoto(tutti) {
+// Un messaggio uscito dal tratto non torna più davanti al modello: le sue immagini non servono più.
+function potaFoto(vecchi) {
   if (!foto.size) return;
-  const contati = new Map();
-  for (let i = tutti.length - 1; i >= 0; i--) {
-    const m = tutti[i];
-    const c = (contati.get(m.chat) || 0) + 1;
-    contati.set(m.chat, c);
-    if (c > FC().MESSAGGI_CON_ESITI) togliFoto(FC().chiave(m));
+  for (const m of vecchi) togliFoto(FC().chiave(m));
+}
+
+// ── Il tratto vivo (SPEC-CONTESTO fase 3): in memoria, mai su disco ─────────
+// Quello che Filo scrive in testa a un messaggio dell'utente, per messaggio: le cose successe prima (fisse dalla prima
+// volta, rifatte solo se una è stata cancellata), le sezioni cambiate dalla fotografia (valgono per la sua epoca), le
+// note del turno (ricordi, intervista) e quelle dopo il testo. Un messaggio passato si rimanda così com'era.
+const MAX_PREAMBOLI = 2000;
+const preamboli = new Map();
+function memoDi(k) {
+  let m = preamboli.get(k);
+  if (!m) {
+    m = {};
+    preamboli.set(k, m);
+    while (preamboli.size > MAX_PREAMBOLI) preamboli.delete(preamboli.keys().next().value);
   }
+  return m;
+}
+
+// Il turno di una risposta com'è andato (giri di strumenti, esiti, seguiti), per rimandarlo uguale ai turni dopo.
+const giri = new Map();
+function ricordaGiro(chat, ts, { messaggi, testo, reasoningDetails, azioni, seguiti } = {}) {
+  if (!chat || !ts || !Array.isArray(messaggi)) return;
+  if (require('../shim/storage').inIncognito()) chatIncognito.add(chat);
+  const k = `${chat}|${ts}`;
+  giri.delete(k);
+  giri.set(k, {
+    messaggi, testo: String(testo == null ? '' : testo), reasoningDetails: Array.isArray(reasoningDetails) ? reasoningDetails : [],
+    azioni: Array.isArray(azioni) ? azioni : [], seguiti: Array.isArray(seguiti) ? seguiti.filter(Boolean) : [],
+  });
+  while (giri.size > MAX_ESITI) giri.delete(giri.keys().next().value);
+}
+
+// La fotografia del CONTESTO dell'utente, una per lato: si rifà quando il tratto riparte (un taglio nuovo), quando la cache
+// è comunque fredda (fermo da più della sua durata), o quando un cambio non si può dire con un'aggiunta.
+const fotografie = { normale: null, incognito: null };
+const DURATE_MS = { '5m': 5 * 60 * 1000, '1h': 60 * 60 * 1000 };
+const epocaDi = (lato) => (fotografie[lato] ? fotografie[lato].epoca : 0);
+const stessaAncora = (a, b) => (!a && !b) || (!!a && !!b && a.ts === b.ts && a.giorni === b.giorni && a.token === b.token);
+
+function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', ora = Date.now() } = {}) {
+  const lato = incognito ? 'incognito' : 'normale';
+  const f = fotografie[lato];
+  const fresca = f && ora - f.usata <= (DURATE_MS[durata] || DURATE_MS['1h']) && stessaAncora(f.ancora, ancora);
+  if (fresca) {
+    const d = TV().confronta(f.viste, sezioni);
+    if (!d.rifai) {
+      f.viste = d.viste;
+      f.usata = ora;
+      return { testo: f.testo, epoca: f.epoca, cambiate: TV().rendiCambiate(d.cambiate), nuova: false };
+    }
+  }
+  const nuova = {
+    epoca: (f ? f.epoca : 0) + 1,
+    testo: TV().parteUtente(sezioni, { ts: new Date(ora).toISOString() }),
+    viste: TV().confronta(new Map(), sezioni).viste,
+    ancora,
+    usata: ora,
+  };
+  fotografie[lato] = nuova;
+  return { testo: nuova.testo, epoca: nuova.epoca, cambiate: '', nuova: true };
 }
 
 // La chat riaperta mostra le foto che il modello ha ancora davanti: quello che vede lui, l'utente lo deve vedere.
@@ -84,9 +143,13 @@ function dimentica(chat) {
     esiti.clear();
     foto.clear();
     caratteriFoto = 0;
+    preamboli.clear();
+    giri.clear();
+    fotografie.normale = null;
+    fotografie.incognito = null;
     return;
   }
-  for (const k of [...esiti.keys()]) if (k.startsWith(`${chat}|`)) esiti.delete(k);
+  for (const mappa of [esiti, preamboli, giri]) for (const k of [...mappa.keys()]) if (k.startsWith(`${chat}|`)) mappa.delete(k);
   for (const k of [...foto.keys()]) if (k.startsWith(`${chat}|`)) togliFoto(k);
 }
 
@@ -131,6 +194,7 @@ function messaggiDi(chats) {
         ...(classe > 1 ? { classeLetta: classe } : {}),
         ...(Number(m.images) > 0 ? { images: Number(m.images) } : {}),
         ...(m.role === 'user' && m.rispostaA ? { rispostaA: citata(m) } : {}),
+        ...(m.role === 'user' && m.seguito ? { seguito: true } : {}),
         _i: i,
       });
     });
@@ -213,23 +277,47 @@ async function pagineCheCiSono(incognito) {
 
 const ancore = { normale: null, incognito: null };
 
+// Le cose successe nel filo da `da`: gli accaduti e i cambi (un cambio ritoccato conta all'ora dell'ultimo ritocco).
+async function eventiDa(da, incognito) {
+  const leggi = async (fn) => { try { return (await fn()) || []; } catch (_) { return []; } };
+  const [acc, cambi] = await Promise.all([
+    leggi(() => F().accaduti({ da }, { incognito })),
+    leggi(() => F().cambi({ incognito })),
+  ]);
+  const t0 = Date.parse(da);
+  const dalCambio = (c) => ({ tipo: 'cambio', id: c.id, ts: c.agg || c.ts, cambio: c });
+  return [...acc, ...cambi.filter((c) => c && c.id && !(Date.parse(c.agg || c.ts) <= t0)).map(dalCambio)];
+}
+
+// La domanda di adesso nella lista del filo (la chat si scrive prima di rispondere): l'ultimo messaggio della sua chat.
+function domandaNelFilo(lista, chatId, userMessage) {
+  if (!chatId || userMessage == null) return null;
+  for (let i = lista.length - 1; i >= 0; i--) {
+    if (lista[i].chat !== chatId) continue;
+    return lista[i].role === 'user' && vuotoDiImmagine(lista[i].text) === vuotoDiImmagine(userMessage) ? lista[i] : null;
+  }
+  return null;
+}
+
 // `osserva(azioni)` scrive gli esiti per il modello (handlers.js). Ritorna il tratto da mandare e quello che serve alle
 // uscite: le azioni il cui esito arriva al modello, i messaggi che porta (letti, voce dell'utente), i più vecchi.
 // `immagini: false`: il modello ha rifiutato le immagini dei turni passati, al loro posto resta la nota.
+// `domanda(...)`: la domanda di adesso resa come la renderà il tratto dei turni dopo, con le note di questo turno.
 async function componi({ chatId = null, userMessage = '', storia = [], incognito = null, tetti, osserva, ora = Date.now(), immagini = true } = {}) {
   // Deciso alla richiesta, come fa il filo: dall'incognito si legge il filo in memoria, mai quello sul disco.
   if (incognito == null) incognito = require('../shim/storage').inIncognito();
+  const lato = incognito ? 'incognito' : 'normale';
   const chats = await F().chats({ incognito });
-  const tutti = senzaDomanda(messaggiDi(chats), chatId, userMessage);
-  potaFoto(tutti);
+  const conDomanda = messaggiDi(chats);
+  const tutti = senzaDomanda(conDomanda, chatId, userMessage);
+  const laDomanda = domandaNelFilo(conDomanda, chatId, userMessage);
   const chatMsgs = chatId ? tutti.filter((m) => m.chat === chatId) : [];
   const dallaScheda = esitiDellaScheda(storia, chatMsgs);
-  const lato = incognito ? 'incognito' : 'normale';
   // Quello che è stato cancellato esce anche dalle copie, dal messaggio dopo e in ogni scheda (#868.1). Senza la lista
   // delle pagine non si rischia: le pagine trovate prima restano fuori.
   const ci = new Set(chats.map((c) => c && c.id));
   const codaGrezza = codaDellaScheda(storia, chatMsgs);
-  const candidati = [...esiti.values(), ...dallaScheda.values()].flatMap((e) => (e && e.azioni) || [])
+  const candidati = [...esiti.values(), ...dallaScheda.values(), ...giri.values()].flatMap((e) => (e && e.azioni) || [])
     .concat(codaGrezza.flatMap((m) => (Array.isArray(m.actions) ? m.actions : [])));
   let pagina = null;
   if (conPagine(candidati)) {
@@ -237,6 +325,42 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
   }
   const vivi = { chat: (id) => ci.has(id), pagina };
   const senzaTolti = (azioni) => FC().senzaCancellati(azioni, vivi);
+  const daEventi = FC().inizioDi({ ora, giorni: tetti.giorni, token: tetti.token, ancora: ancore[lato] });
+  const eventi = await eventiDa(daEventi, incognito);
+  const idsVivi = new Set(eventi.map((ev) => ev && ev.id).filter(Boolean));
+  const perMessaggio = TV().eventiPerMessaggi(conDomanda, eventi, { da: daEventi, chiave: FC().chiave });
+  const epoca = epocaDi(lato);
+  // Le cose successe si scrivono la prima volta e restano quelle: un evento arrivato in ritardo non riscrive un messaggio
+  // già mandato. Si rifanno solo se una è stata cancellata, che dalle copie deve uscire.
+  const eventiDi = (m) => {
+    const k = FC().chiave(m);
+    const memo = memoDi(k);
+    if (!memo.eventi || memo.eventi.ids.some((id) => !idsVivi.has(id))) {
+      memo.eventi = TV().rendiEventi(perMessaggio.get(k) || [], { rif: m.ts });
+    }
+    return memo;
+  };
+  const preambolo = (m) => {
+    if (m.riga || m.seguito) return '';
+    const memo = eventiDi(m);
+    return TV().preambolo({
+      eventi: memo.eventi.testo,
+      stato: memo.stato && memo.stato.epoca === epoca ? memo.stato.testo : '',
+      turno: memo.turno || '',
+    });
+  };
+  const note = (m) => {
+    const memo = preamboli.get(FC().chiave(m));
+    return memo && Array.isArray(memo.dopo) ? memo.dopo : null;
+  };
+  // Un turno con dentro qualcosa che non c'è più torna come risposta sola, dove gli esiti si ripuliscono.
+  const valido = (g) => !!g && senzaTolti(g.azioni) === g.azioni;
+  const giroDi = (m) => {
+    const g = giri.get(FC().chiave(m));
+    return valido(g) ? g : null;
+  };
+  const seguitiNeiGiri = new Set();
+  for (const g of giri.values()) if (g.seguiti.length && valido(g)) for (const x of g.seguiti) seguitiNeiGiri.add(x);
   const f = FC().finestra(tutti, {
     ora,
     giorni: tetti.giorni,
@@ -252,8 +376,25 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     },
     osserva,
     immagini: immagini ? (m) => foto.get(FC().chiave(m)) || null : null,
+    preambolo,
+    note,
+    giro: giroDi,
+    salta: (m) => m.role === 'user' && seguitiNeiGiri.has(FC().chiave(m)),
   });
   ancore[lato] = f.ancora;
+  potaFoto(f.vecchi);
+  // La domanda come la vedrà il tratto dei turni dopo: le sezioni cambiate (per questa epoca), le note del turno e
+  // quelle dopo il testo si fissano qui. Senza la domanda nel filo (un turno interno, una chat senza id) resta null.
+  const domanda = ({ stato = '', epoca: ep = epoca, turno = '', dopo = null, immagini: urls = null } = {}) => {
+    if (!laDomanda) return null;
+    const memo = eventiDi(laDomanda);
+    memo.stato = stato ? { epoca: ep, testo: stato } : null;
+    memo.turno = String(turno || '');
+    memo.dopo = Array.isArray(dopo) ? dopo.filter(Boolean) : null;
+    const pre = TV().preambolo({ eventi: memo.eventi.testo, stato: stato || '', turno: memo.turno });
+    const fotoQui = foto.get(FC().chiave(laDomanda)) || (Array.isArray(urls) && urls.length ? urls : null);
+    return FC().rendiMessaggio(laDomanda, f.ultimo, { tetto: tetti.token, foto: fotoQui, preambolo: pre, dopo: memo.dopo, intero: true });
+  };
   return {
     messaggi: f.messaggi,
     visti: f.visti,
@@ -267,13 +408,19 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     nuova: !chatMsgs.length,
     tutti,
     token: f.token,
+    ancora: f.ancora,
+    epoca,
+    domanda,
+    haDomanda: !!laDomanda,
   };
 }
 
 function azzeraAncore() {
   ancore.normale = null;
   ancore.incognito = null;
+  fotografie.normale = null;
+  fotografie.incognito = null;
 }
 
-module.exports = { ricordaEsiti, ricordaImmagini, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, messaggiDi, componi, senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore };
+module.exports = { ricordaEsiti, ricordaImmagini, ricordaGiro, fotografa, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, messaggiDi, componi, senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore };
 globalThis.SN_CONTESTO_FILO = module.exports;

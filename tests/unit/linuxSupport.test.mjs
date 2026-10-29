@@ -536,7 +536,7 @@ test("su Linux l'assistente non propone comandi e percorsi di Windows", () => {
   require(join(ROOT, 'src', 'shared', 'constants.js'));
   const C = globalThis.SN_CONST;
 
-  const linux = C.PROMPTS.filoChatStatic({ capacita: '', sistema: 'linux' });
+  const linux = C.PROMPTS.filoChatComputer('linux');
   assert.ok(linux.includes('Linux'), 'su Linux il prompt non dice che sistema è');
   assert.ok(!linux.includes('C:\\'), 'su Linux il prompt mostra ancora un percorso di Windows come esempio');
   assert.ok(!/PowerShell/i.test(linux), 'su Linux il prompt propone ancora PowerShell');

@@ -558,8 +558,9 @@ test('l\'assistente sa su che computer sta girando', () => {
   require(join(ROOT, 'src', 'shared', 'constants.js'));
   const C = globalThis.SN_CONST;
 
-  const mac = C.PROMPTS.filoChatStatic({ capacita: '', sistema: 'darwin' });
-  const win = C.PROMPTS.filoChatStatic({ capacita: '', sistema: 'win32' });
+  // Il sistema sta nel CONTESTO dell'utente: la parte fissa è uguale per tutti (SPEC-CONTESTO § La richiesta).
+  const mac = C.PROMPTS.filoChatComputer('darwin');
+  const win = C.PROMPTS.filoChatComputer('win32');
 
   assert.ok(mac.includes('macOS'), 'su Mac il prompt non dice che sistema è');
   assert.ok(!mac.includes('C:\\'), 'su Mac il prompt mostra ancora un percorso di Windows come esempio');
@@ -570,8 +571,10 @@ test('l\'assistente sa su che computer sta girando', () => {
   assert.ok(win.includes('C:\\'), 'su Windows l\'esempio di percorso è sparito');
 
   // Un `platform` sconosciuto non deve lasciare il modello senza istruzioni.
-  const ignoto = C.PROMPTS.filoChatStatic({ capacita: '', sistema: 'plan9' });
+  const ignoto = C.PROMPTS.filoChatComputer('plan9');
   assert.ok(ignoto.includes("IL COMPUTER DELL'UTENTE"), 'un sistema sconosciuto lascia il prompt monco');
+  // E la parte fissa non ne dice niente: due utenti su sistemi diversi la condividono byte per byte.
+  assert.ok(!C.PROMPTS.filoChatStatic().includes("IL COMPUTER DELL'UTENTE"));
 });
 
 test('il sistema arriva al prompt dal main process', () => {

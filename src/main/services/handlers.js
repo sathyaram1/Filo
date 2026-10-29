@@ -316,34 +316,20 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     }) }];
   }
   if (action === ACTIONS.FILO_CHAT) {
-    // Il sistema (Windows / Mac / Linux) lo sa solo il main process: la pagina
-    // che manda il payload non ha `process`. Senza, il modello indovina — e
-    // indovina Windows, perché è l'unico che gli esempi del prompt gli hanno
-    // mai mostrato: su un Mac proporrebbe comandi PowerShell e percorsi `C:\`.
-    const p = { ...payload, sistema: process.platform };
-    if (!Array.isArray(payload.filoTratto)) {
-      return [{ role: 'system', content: PROMPTS.filoChat(p) }, ...(payload.threadMessages || [])];
-    }
-    // #868 — istruzioni, poi il tratto del filo (uguale da un turno all'altro: la cache lo riusa), poi tutto ciò che
-    // cambia, subito prima della domanda. Ordine e sentinella in src/shared/filoContesto.js.
+    // SPEC-CONTESTO § La richiesta: la parte fissa, uguale per tutti, poi il CONTESTO dell'utente che il turno ha
+    // fotografato (src/main/services/contestoFilo.js), poi il tratto vivo che finisce con la domanda, poi il giro.
     const FC = globalThis.SN_FILO_CONTESTO;
+    const sistema = `${PROMPTS.filoChatStatic()}${payload.parteUtente || ''}`;
+    if (!Array.isArray(payload.filoTratto)) {
+      // Senza filo la domanda non ha l'ora in testa: il turno la dice in fondo al system, con l'intervista.
+      return [
+        { role: 'system', content: `${sistema}\n\n${PROMPTS.filoChatContext({ ...payload, adesso: FC.quando(Date.now()) })}` },
+        ...(payload.threadMessages || []),
+      ];
+    }
     const giro = payload.threadMessages || [];
     const i = Math.max(0, Math.min(giro.length, Number(payload.indiceDomanda) || 0));
-    const contesto = FC.coda({
-      contesto: PROMPTS.filoChatContext({ ...p, onboarding: '' }),
-      ricordi: payload.ricordi || '',
-      chatCorrente: payload.chatCorrente || null,
-      nuova: !!payload.chatNuova,
-    });
-    return [
-      ...FC.assembla({
-        tratto: [{ role: 'system', content: PROMPTS.filoChatStatic(p) + PROMPTS.filoChatOnboarding(p) }, ...payload.filoTratto],
-        scheda: giro.slice(0, i),
-        contesto,
-        domanda: giro[i] || null,
-      }),
-      ...giro.slice(i + 1),
-    ];
+    return FC.richiesta({ sistema, tratto: payload.filoTratto, scheda: giro.slice(0, i), domanda: giro[i] || null, giro: giro.slice(i + 1) });
   }
   if (action === ACTIONS.FILO_DASHBOARD) {
     return [{ role: 'user', content: PROMPTS.filoDashboard(payload) }];
@@ -5824,6 +5810,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // Se il filo non si legge, si risponde con la conversazione della scheda come prima.
   let filo = null;
   let tettiChat = null;
+  let settingsChat = null;
   let modelloChat = '';
   // Il primo modello della catena e il tetto della risposta: con la finestra del modello misurano una rilettura (#868.7).
   let modelloPrimo = '';
@@ -5834,7 +5821,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     immagini: fotoNelTratto && !modelliSenzaFoto.has(modelloChat),
   });
   try {
-    const settingsChat = await getEffectiveSettings();
+    settingsChat = await getEffectiveSettings();
     tettiChat = globalThis.SN_FILO_CONTESTO.tetti(settingsChat.contestoFilo, Defaults.get().contestoFilo);
     try { modelloChat = String(modelForAction(settingsChat, ACTIONS.FILO_CHAT) || ''); } catch (_) {}
     try {
@@ -5877,7 +5864,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
   // Nel benvenuto delle schede aperte arriva solo il sito: un titolo scritto da una pagina non detta lo stile (#1297).
-  const { state: statoDelTurno, stateText, attese: attesePrimaDelModello } = await FiloState.assemble({
+  const { state: statoDelTurno, stateText, sezioniChat: sezioniDelTurno, attese: attesePrimaDelModello } = await FiloState.assemble({
     creditiFreschi: true, soloSiti: onbActive, finestra: winOf(sender)?.id ?? null, schedaChat: sender?.tab?.id ?? null,
   });
   // I numeri delle schede che il modello vede valgono per tutto il turno: CHIUDI_SCHEDE li legge da qui (#413).
@@ -5885,7 +5872,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
-  const fileSummaries = await editorFileSummaries();
+  const fileList = await editorFileSummariesList();
+  let fileSummaries = '';
+  try { fileSummaries = globalThis.SN_EDITOR_SUMMARY ? globalThis.SN_EDITOR_SUMMARY.renderForPrompt(fileList) : ''; } catch (_) {}
   // Finché l'intervista è aperta il prompt riceve l'elenco di ciò che resta da scoprire.
   // Per l'utente resta una chat normale: nessuna schermata a passi, nessun modulo.
   const onboardingText = onbActive ? Onboarding.renderChecklistForPrompt(onbBefore) : '';
@@ -5976,6 +5965,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const giaLetta = origineGiaLettaInChat(chatId);
   const notaCitazione = FCx.notaRisposta(citazione.citata);
   const domandaConCitazione = notaCitazione ? `${notaCitazione}\n${String(userMessage || '')}` : String(userMessage || '');
+  // Le note di questo turno sulla domanda: tornano con lei nei turni dopo (src/main/services/contestoFilo.js).
+  let origineImmagini = '';
   if (imageList.length) {
     const parts = [];
     if (domandaConCitazione) parts.push({ type: 'text', text: domandaConCitazione });
@@ -5984,6 +5975,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // risposta del tasto destro, quindi il controllo si fa SEMPRE: capire
     // dall'intento quando serve sarebbe una promessa affidata al modello.
     const origine = await noteProvenienzaImmagini(imageList);
+    origineImmagini = origine || '';
     if (origine) parts.push({ type: 'text', text: origine });
     if (giaLetta) parts.push({ type: 'text', text: giaLetta });
     threadMessages.push({ role: 'user', content: parts });
@@ -6013,13 +6005,39 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const Caps = globalThis.SN_CAPABILITIES;
   const capacita = Caps ? Caps.renderIndexForPrompt(cancelliAperti()) : '';
   const Tools = globalThis.SN_ACTION_TOOLS;
-  const tools = Tools ? Tools.definitions({ sistema: process.platform, onboarding: onbActive }) : null;
+  // Gli stessi per ogni utente, sistema e ruolo: stanno in testa alla richiesta, e un byte diverso rompe la cache da lì.
+  const tools = Tools ? Tools.definitions() : null;
   const cambi = await cambiP;
+  // SPEC-CONTESTO § La richiesta: il CONTESTO dell'utente si fotografa e resta com'era fino al prossimo taglio del
+  // tratto; quello che cambia dopo arriva nella domanda. Il sistema lo sa solo il main process (la pagina non ha
+  // `process`): senza, il modello indovina Windows e su un Mac propone PowerShell e percorsi `C:\`.
+  let nomeModello = modelloPrimo || modelloChat;
+  try {
+    const ch = buildAttemptChain(settingsChat || await getEffectiveSettings(), modelloChat, ACTIONS.FILO_CHAT);
+    if (ch[0] && ch[0].model) nomeModello = ch[0].model;
+  } catch (_) {}
+  const TV = globalThis.SN_TRATTO_VIVO;
+  const sezioniUtente = TV.sezioniUtente({
+    sistema: process.platform, capacita, stile: (settingsChat && settingsChat.agentStyle) || '', modelName: nomeModello,
+    profilo, preferenze, espansioni, lezioni, statoSezioni: sezioniDelTurno, cambi, files: fileSummaries, filesList: fileList,
+  });
+  let fotografia = null;
+  if (filo) {
+    fotografia = ContestoFilo.fotografa({
+      incognito: require('../shim/storage').inIncognito(), sezioni: sezioniUtente, ancora: filo.ancora, durata: tettiChat && tettiChat.cache,
+    });
+    // Una fotografia nuova toglie dai messaggi passati le sezioni cambiate di quella prima: ora le ha il CONTESTO.
+    if (fotografia.epoca !== filo.epoca) {
+      try {
+        filo = await componiFilo(tettiChat);
+        nascostiDellaChat = nascostiDi(filo);
+      } catch (e) { console.warn('[Filo] tratto non ricomposto dopo la fotografia:', e?.message || e); }
+    }
+  }
   const payloadBase = {
     // Non entra nel prompt (la domanda sta in threadMessages): è la domanda come l'ha scritta l'utente, per la Cronologia AI.
     userMessage: String(userMessage || ''),
-    profilo, preferenze, espansioni, lezioni, stato: stateText, capacita, cambi,
-    files: fileSummaries,
+    parteUtente: fotografia ? fotografia.testo : TV.parteUtente(sezioniUtente, { ts: new Date().toISOString() }),
     onboarding: onboardingText,
     onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
     onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
@@ -6060,6 +6078,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // dell'utente come la domanda, e lo sanno le uscite (#810, #530, #868.6), l'archivio e la scheda.
   const seguitiLetti = [];
   const testiDeiSeguiti = [];
+  // Le chiavi nel filo dei seguiti: il turno li rimanda dentro il suo giro, e il tratto non li ripete.
+  const seguitiNelFilo = [];
   const leggiSeguiti = async () => {
     for (const s of turno.seguiti.splice(0)) {
       turno.letti.add(s.id);
@@ -6072,9 +6092,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       push('filo:action', { kind: 'seguito', id: s.id });
       if (!chatId) continue;
       try {
-        const dopo = await appendToChatArchive(chatId, { role: 'user', text: s.testo });
+        const dopo = await appendToChatArchive(chatId, { role: 'user', text: s.testo, seguito: true });
         const eid = dopo && Array.isArray(dopo.eids) ? dopo.eids[dopo.eids.length - 1] : '';
         if (eid) fontiTurno.push(eid);
+        const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
+        if (ultimo && ultimo.role === 'user') seguitiNelFilo.push(`${chatId}|${ultimo.ts}`);
       } catch (e) { console.warn('[Filo] seguito non archiviato', e?.message || e); }
     }
   };
@@ -6089,6 +6111,19 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     azioniViste.push(a);
     ricordaLettoInChat([a]);
     await segnaFonteLetta(chatId, fontiLette, a);
+  }
+  // La domanda come la rende il tratto dei turni dopo (SPEC-CONTESTO: il tratto cresce solo in coda): le sezioni del
+  // CONTESTO cambiate, l'intervista, i ricordi e le note sulle immagini si fissano qui, nel messaggio dell'utente.
+  if (filo && filo.haDomanda && !internal) {
+    const turno = [
+      onbActive ? PROMPTS.filoChatOnboarding({ onboarding: onboardingText, onboardingTurns: payloadBase.onboardingTurns, onboardingMax: payloadBase.onboardingMax }) : '',
+      payloadBase.ricordi || '',
+    ].map((x) => String(x || '').trim()).filter(Boolean).join('\n\n');
+    const resa = filo.domanda({
+      stato: fotografia ? fotografia.cambiate : '', epoca: fotografia ? fotografia.epoca : filo.epoca, turno,
+      dopo: [origineImmagini, giaLetta], immagini: imageList,
+    });
+    if (resa) threadMessages[indiceDomanda] = resa;
   }
   // #868.7 — la finestra del modello che risponde: quella detta da un rifiuto, o quella del listino di OpenRouter (il
   // modello che ha servito il giro, poi il primo della catena). Null se non si sa: vale il tetto in token.
@@ -6212,6 +6247,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
   };
   let fermato = false;
+  // Il turno com'è andato, da rimandare uguale ai turni dopo (contestoFilo.ricordaGiro): l'ultimo giro che chiude da sé
+  // non entra fra i messaggi, e il formato vecchio non è un giro di strumenti.
+  let giroChiusura = null;
+  let giroReplicabile = true;
   // La risposta si è fermata al tetto di lunghezza (#1097.3): lo si dice, e «Continua» la riprende.
   let interrotta = false;
   // Il primo giro che risponde porta nella cronologia anche l'attesa prima del modello: chi aspetta la vive (#1097.1).
@@ -6373,7 +6412,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       push('filo:action', { kind: 'round', text, ...(diRisposta ? { risposta: true } : {}) });
       textReply = diRisposta ? '' : text;
       reasoningDetails = r.reasoningDetails || [];
+      if (legacy) giroReplicabile = false;
       if (chiude) {
+        giroChiusura = [
+          Tools.assistantMessage({ text, toolCalls, reasoningDetails: r.reasoningDetails }),
+          ...results.map((x) => Tools.toolMessage(x.action._callId, toolResultText(x, { risposta: diRisposta }))),
+        ];
         exhausted = false;
         interrotta = globalThis.SN_CHAT_ERRORS.troncata(r.finishReason) ? r.finishReason : false;
         break;
@@ -6412,6 +6456,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     turno.chiuso = !fermato;
     togliTurno(reasoningReqId, turno);
   }
+  const azioniNelGiro = renderedActions.length;
   if (!fermato && lasciati.size) {
     for (const a of lasciati.values()) {
       let res = null;
@@ -6562,6 +6607,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Gli esiti di questo turno restano davanti al modello anche dalle altre schede, finché il messaggio è recente.
     const risposta = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (risposta && risposta.role === 'filo') ContestoFilo.ricordaEsiti(chatId, risposta.ts, { azioni: renderedActions, reasoningDetails });
+    // I turni passati non si riscrivono (SPEC-CONTESTO § La richiesta): il giro torna com'era, e con lui il ragionamento.
+    if (risposta && risposta.role === 'filo' && !internal && giroReplicabile && filo && filo.haDomanda) {
+      const dopoIlGiro = observationsForPrompt(renderedActions.slice(azioniNelGiro));
+      ContestoFilo.ricordaGiro(chatId, risposta.ts, {
+        messaggi: [...threadMessages.slice(indiceDomanda + 1), ...(giroChiusura || [])],
+        testo: dopoIlGiro ? `${textReply}\n\n${dopoIlGiro}` : textReply,
+        reasoningDetails: giroChiusura ? [] : reasoningDetails,
+        azioni: renderedActions,
+        seguiti: seguitiNelFilo,
+      });
+    }
     const eidRisposta = risposta && risposta.role === 'filo' && dopo.eids ? dopo.eids[dopo.eids.length - 1] : '';
     if (eidRisposta) fontiTurno.push(eidRisposta);
     // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente

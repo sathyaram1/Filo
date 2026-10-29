@@ -389,6 +389,8 @@
     return Ragionamento.daRimandare(conPuntiDiCache(model, messages, cache), { strumenti: tools, controlla: daAnthropic(model) });
   }
 
+  // `caratteri` conta sul testo intero del messaggio: su un messaggio già diviso da un punto prima (la parte fissa e il
+  // CONTESTO dell'utente stanno nello stesso system) si divide la parte in cui cade.
   function partiConPunto(content, caratteri, cacheControl) {
     if (typeof content === 'string') {
       const n = Number.isInteger(caratteri) && caratteri > 0 && caratteri < content.length ? caratteri : content.length;
@@ -398,6 +400,18 @@
       return parti;
     }
     if (!Array.isArray(content)) return null;
+    if (Number.isInteger(caratteri) && caratteri > 0 && content.every((p) => p && p.type === 'text')) {
+      let fatti = 0;
+      for (let i = 0; i < content.length; i++) {
+        const t = String(content[i].text || '');
+        if (fatti + t.length < caratteri) { fatti += t.length; continue; }
+        const n = caratteri - fatti;
+        if (!content.slice(0, i).map((p) => p.text).join('').concat(t.slice(0, n)).trim()) return null;
+        if (n === t.length) return content.map((p, j) => (j === i ? { ...p, cache_control: cacheControl } : p));
+        if (n === 0) return null;
+        return [...content.slice(0, i), { ...content[i], text: t.slice(0, n), cache_control: cacheControl }, { type: 'text', text: t.slice(n) }, ...content.slice(i + 1)];
+      }
+    }
     let k = -1;
     content.forEach((p, i) => { if (p && p.type === 'text' && String(p.text || '').trim()) k = i; });
     return k < 0 ? null : content.map((p, i) => (i === k ? { ...p, cache_control: cacheControl } : p));
@@ -408,7 +422,11 @@
     const punti = piano && Array.isArray(piano.punti) ? piano.punti : [];
     if (!punti.length || !Array.isArray(messages) || !vuoleCacheEsplicita(model)) return messages;
     const out = messages.slice();
-    for (const p of punti.slice(0, MAX_PUNTI_CACHE)) {
+    // Sullo stesso messaggio le divisioni si fanno da sinistra: ognuna conta sul testo intero.
+    const ordinati = punti.slice(0, MAX_PUNTI_CACHE).map((p, i) => ({ p, i }))
+      .sort((a, b) => ((a.p && a.p.indice) - (b.p && b.p.indice)) || ((Number.isInteger(a.p && a.p.caratteri) ? a.p.caratteri : Infinity) - (Number.isInteger(b.p && b.p.caratteri) ? b.p.caratteri : Infinity)) || (a.i - b.i))
+      .map((x) => x.p);
+    for (const p of ordinati) {
       const m = out[p && p.indice];
       if (!m || typeof m !== 'object') continue;
       const cc = p.durata === '1h' ? { type: 'ephemeral', ttl: '1h' } : { type: 'ephemeral' };

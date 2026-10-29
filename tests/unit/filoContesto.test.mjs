@@ -1,5 +1,5 @@
 // #868 — il contesto della chat è la coda del filo: due turni di fila hanno lo stesso prefisso, i pezzi ripescati
-// stanno dopo gli eventi recenti, i due tetti (giorni e token) tagliano la finestra e le letture non vivono di più.
+// stanno nella domanda, i due tetti (giorni e token) tagliano la finestra e le letture vivono quanto il tratto (#1562).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,27 +44,32 @@ test('fra due turni consecutivi della stessa scheda il tratto del filo è identi
   const t2 = FC.finestra(dopo, { ora: ORA + 20 * 60 * 1000, ...TETTI, ancora: t1.ancora, chatCorrente: 'oggi-b' });
   assert.equal(prefissoComune(t1.messaggi, t2.messaggi), t1.messaggi.length, 'il secondo turno ha riscritto un pezzo del primo');
   assert.equal(t2.messaggi.length, t1.messaggi.length + 2);
-  // E la richiesta intera: il tratto viene prima di tutto ciò che cambia.
-  const r1 = FC.assembla({ tratto: t1.messaggi, contesto: FC.coda({ contesto: 'STATO: 12:00' }), domanda: { role: 'user', content: 'e domani?' } });
-  const r2 = FC.assembla({ tratto: t2.messaggi, contesto: FC.coda({ contesto: 'STATO: 12:20' }), domanda: { role: 'user', content: 'e dopodomani?' } });
-  assert.equal(prefissoComune(r1, r2), t1.messaggi.length);
+  // E la richiesta intera: system e tratto vengono prima della domanda, che è l'unica cosa nuova.
+  const r1 = FC.richiesta({ sistema: 'S', tratto: t1.messaggi, domanda: { role: 'user', content: 'e domani?' } });
+  const r2 = FC.richiesta({ sistema: 'S', tratto: t2.messaggi, domanda: { role: 'user', content: 'e dopodomani?' } });
+  assert.equal(prefissoComune(r1, r2), t1.messaggi.length + 1);
 });
 
-test('i pezzi ripescati stanno dopo gli eventi recenti, subito prima della domanda', () => {
+test('i pezzi ripescati stanno nella domanda, dopo gli eventi recenti, e i ricordi del tratto non tornano due volte', () => {
   const filo = filoDiProva();
   const f = FC.finestra(filo, { ora: ORA, ...TETTI });
   const vecchi = FC.tratti(f.vecchi);
   assert.equal(vecchi.length, 1, 'la conversazione di cinque giorni fa doveva restare fuori dal tratto');
   const ricordi = FC.rendiRicordi(FC.scegliRicordi([{ tratto: vecchi[0], score: 0.8 }]));
-  const domanda = { role: 'user', content: 'riprendi il discorso sulle orche' };
-  const msgs = FC.assembla({ tratto: f.messaggi, contesto: FC.coda({ contesto: 'STATO', ricordi }), domanda });
-  const posRicordo = msgs.findIndex((m) => String(m.content).includes('Le orche sono delfini'));
-  const ultimoRecente = msgs.findIndex((m) => String(m.content).includes('Sole.'));
+  const m = { chat: 'oggi-b', role: 'user', text: 'riprendi il discorso sulle orche', ts: fa(0.1), actions: [] };
+  const domanda = FC.rendiMessaggio(m, null, { tetto: 100000, preambolo: ricordi });
+  const msgs = FC.richiesta({ sistema: 'S', tratto: f.messaggi, domanda });
+  const posRicordo = msgs.findIndex((x) => String(x.content).includes('Le orche sono delfini'));
+  const ultimoRecente = msgs.findIndex((x) => String(x.content).includes('Sole.'));
   assert.ok(posRicordo > ultimoRecente, 'il ricordo sta prima degli eventi recenti');
-  assert.equal(posRicordo, msgs.length - 2, 'il ricordo non sta subito prima della domanda');
-  assert.equal(msgs[msgs.length - 1], domanda);
+  assert.equal(posRicordo, msgs.length - 1, 'il ricordo non sta nella domanda');
   assert.match(msgs[posRicordo].content, /RICORDI DAL FILO/);
   assert.match(msgs[posRicordo].content, /«|CONVERSAZIONE/, 'il ricordo viene dall\'archivio: va nella busta');
+  assert.ok(msgs[posRicordo].content.indexOf('RICORDI DAL FILO') < msgs[posRicordo].content.indexOf('riprendi il discorso'), 'il ricordo sta prima delle parole dell\'utente');
+  // Nel turno dopo il ricordo è ancora nella sua domanda: la risposta non lo ripete fra i suoi esiti.
+  const esito = { azioni: [FC.ricordoComeAzione(FC.scegliRicordi([{ tratto: vecchi[0], score: 0.8 }]))] };
+  const risposta = FC.rendiMessaggio({ chat: 'oggi-b', role: 'filo', text: 'Ne parlavamo lunedì.', ts: fa(0.09), actions: [] }, m, { tetto: 100000, esito, osserva: () => 'ESITO' });
+  assert.doesNotMatch(risposta.content, /ESITO/);
 });
 
 test('una conversazione in un\'altra scheda di ieri è nel tratto, con l\'ora e la sua chat; una di cinque giorni fa no', () => {
@@ -110,7 +115,7 @@ test('il taglio per giorni si muove a scatti: due turni a pochi minuti hanno lo 
   assert.ok(ORA - a <= 3 * 24 * ORE, 'il taglio va oltre i tre giorni');
 });
 
-test('le letture vivono venti messaggi del filo, non di più', () => {
+test('le letture restano nel tratto finché c\'è il loro messaggio: un turno passato non si riscrive (#1562)', () => {
   const filo = [];
   for (let i = 0; i < 15; i++) filo.push(...scambio('c', 15 - i * 0.5, `domanda ${i}`, `risposta ${i}`));
   const conLettura = (m) => (m.text === 'risposta 0' || m.text === 'risposta 14' ? { azioni: [{ type: 'LEGGI_DOCUMENTO', _output: { text: `CONTENUTO ${m.text}` } }] } : null);
@@ -118,11 +123,11 @@ test('le letture vivono venti messaggi del filo, non di più', () => {
   const f = FC.finestra(filo, { ora: ORA, ...TETTI, esiti: conLettura, osserva });
   const testo = f.messaggi.map((m) => m.content).join('\n');
   assert.match(testo, /CONTENUTO risposta 14/);
-  assert.doesNotMatch(testo, /CONTENUTO risposta 0/, 'la lettura di trenta messaggi fa è ancora nel contesto');
-  assert.deepEqual(f.azioni.map((a) => a._output.text), ['CONTENUTO risposta 14'], 'le azioni viste devono essere quelle il cui esito arriva al modello');
+  assert.match(testo, /CONTENUTO risposta 0/, 'la lettura di trenta messaggi fa è uscita: il messaggio è cambiato sotto la cache');
+  assert.deepEqual(f.azioni.map((a) => a._output.text), ['CONTENUTO risposta 0', 'CONTENUTO risposta 14'], 'le azioni viste devono essere quelle il cui esito arriva al modello');
 });
 
-test('il testo che la chat scrive da fuori (l\'esito di un comando dato in chat) è una lettura: mai nudo, venti messaggi, conta per le uscite', () => {
+test('il testo che la chat scrive da fuori (l\'esito di un comando dato in chat) è una lettura: mai nudo, resta col tratto, conta per le uscite', () => {
   const filo = [
     { chat: 'term', role: 'user', text: '/cat note.txt', ts: fa(15), actions: [] },
     { chat: 'term', role: 'filo', text: 'CODICE-DA-FUORI', ts: fa(14.9), actions: [], esterno: FC.ESTERNO_COMANDO },
@@ -137,9 +142,8 @@ test('il testo che la chat scrive da fuori (l\'esito di un comando dato in chat)
   for (let i = 0; i < 11; i++) filo.push(...scambio('altra', 14 - i * 0.5, `domanda ${i}`, `risposta ${i}`));
   const lontano = FC.finestra(filo, { ora: ORA, ...TETTI, chatCorrente: 'altra', osserva });
   const t2 = lontano.messaggi.map((m) => m.content).join('\n');
-  assert.doesNotMatch(t2, /CODICE-DA-FUORI|FILE-SCARICATO/, 'oltre venti messaggi del filo il testo di fuori è ancora davanti');
-  assert.match(t2, /non è più davanti, si rilegge con CERCA_CHAT e l'id term/);
-  assert.deepEqual(lontano.azioni, []);
+  assert.match(t2, /\[ESEGUI_COMANDO cat note\.txt\] CODICE-DA-FUORI/, 'il testo di fuori, sempre imbustato, resta col tratto');
+  assert.deepEqual(lontano.azioni.map((a) => a.type), ['ESEGUI_COMANDO', 'TESTO_DI_FUORI']);
 });
 
 test('una conversazione ripresa da prima dei tetti porta i suoi ultimi messaggi, prima del tratto', () => {
@@ -189,7 +193,7 @@ test('una lettura vive venti messaggi della SUA conversazione: dieci scambi in u
   assert.deepEqual(f.azioni.map((a) => a._output.text), ['canone 742 euro']);
 });
 
-test('in un\'altra scheda una lettura e il ragionamento vivono al più venti messaggi del filo: una conversazione ferma non li tiene per giorni', () => {
+test('in un\'altra scheda una lettura e il ragionamento restano col tratto: il messaggio passato non cambia (#1562)', () => {
   const conLettura = (m) => (m.chat === 'a' && m.role === 'filo'
     ? { azioni: [{ type: 'LEGGI_DOCUMENTO', _output: { text: 'canone 742 euro' } }], reasoningDetails: [{ type: 'reasoning.text', text: 'penso al contratto' }] }
     : null);
@@ -200,17 +204,12 @@ test('in un\'altra scheda una lettura e il ragionamento vivono al più venti mes
     return FC.finestra(filo, { ora: ORA, ...TETTI, chatCorrente: 'b', esiti: conLettura, osserva });
   };
   const presto = conScambi(9);
-  assert.match(presto.messaggi.map((m) => m.content).join('\n'), /canone 742 euro/);
-  assert.ok(presto.messaggi.some((m) => m.reasoning_details));
   const tardi = conScambi(11);
-  assert.doesNotMatch(tardi.messaggi.map((m) => m.content).join('\n'), /canone 742 euro/, 'ventidue messaggi dopo, in un\'altra scheda, la lettura è ancora davanti');
-  assert.ok(!tardi.messaggi.some((m) => m.reasoning_details), 'il ragionamento segue la stessa regola delle letture');
-  assert.deepEqual(tardi.azioni, [], 'le azioni viste devono essere quelle il cui esito arriva al modello');
-  // Nella sua conversazione la stessa lettura c'è ancora.
-  const filo = [...scambio('a', 20, 'leggi il contratto', 'Letto.')];
-  for (let i = 0; i < 11; i++) filo.push(...scambio('b', 19 - i * 0.5, `altro ${i}`, `ok ${i}`));
-  const suaScheda = FC.finestra(filo, { ora: ORA, ...TETTI, chatCorrente: 'a', esiti: conLettura, osserva });
-  assert.match(suaScheda.messaggi.map((m) => m.content).join('\n'), /canone 742 euro/);
+  for (const f of [presto, tardi]) {
+    assert.match(f.messaggi.map((m) => m.content).join('\n'), /canone 742 euro/);
+    assert.ok(f.messaggi.some((m) => m.reasoning_details));
+  }
+  assert.equal(prefissoComune(presto.messaggi, tardi.messaggi), presto.messaggi.length, 'due turni dopo il messaggio con la lettura è cambiato');
 });
 
 test('un messaggio tagliato dice con quale id si rilegge: l\'etichetta corta della chat non basta alla ricerca', () => {
@@ -407,7 +406,7 @@ test('le foto del messaggio di prima tornano attaccate a lui, e dal turno dopo i
   assert.equal(FC.tokenDi(domanda.content), FC.stimaToken(domanda.content[0].text) + 2 * FC.TOKEN_PER_IMMAGINE);
 });
 
-test('senza le foto in memoria, o venti messaggi dopo, resta la nota con quante erano', () => {
+test('senza le foto in memoria resta la nota con quante erano; finché ci sono, tornano anche venti messaggi dopo', () => {
   const primo = conFoto(scambio('c', 12, 'leggi queste etichette', 'Farina 00, scade a marzo.'), 3);
   const senza = FC.finestra(primo, { ora: ORA, ...TETTI, chatCorrente: 'c', immagini: () => null });
   const u = senza.messaggi.find((m) => m.role === 'user');
@@ -415,13 +414,12 @@ test('senza le foto in memoria, o venti messaggi dopo, resta la nota con quante 
   assert.match(u.content, /leggi queste etichette\n\(qui l'utente aveva mandato 3 immagini che non hai più davanti: quello che ne hai scritto dopo l'avevi letto da lì/);
   const una = FC.finestra(conFoto(scambio('c', 12, 'e questa?', 'Una mela.'), 1), { ora: ORA, ...TETTI, chatCorrente: 'c' });
   assert.match(una.messaggi[0].content, /un'immagine che non hai più davanti/);
-  // Ventidue messaggi dopo le foto non tornano più, nemmeno se sono ancora in memoria.
+  // Ventidue messaggi dopo le foto in memoria tornano ancora: il messaggio passato non cambia (#1562).
   const memoria = { [`c|${primo[0].ts}`]: [FOTO_A] };
   const lungo = [...primo];
   for (let i = 0; i < 11; i++) lungo.push(...scambio('c', 11 - i * 0.5, `altro ${i}`, `ok ${i}`));
   const tardi = FC.finestra(lungo, { ora: ORA, ...TETTI, chatCorrente: 'c', immagini: immaginiDi(memoria) });
-  assert.doesNotMatch(JSON.stringify(tardi.messaggi), /data:image/);
-  assert.match(tardi.messaggi[0].content, /3 immagini che non hai più davanti/);
+  assert.match(JSON.stringify(tardi.messaggi[0]), /data:image/);
 });
 
 test('oltre il tetto delle foto rimandate tornano le più nuove, le più vecchie lasciano la nota', () => {

@@ -2294,6 +2294,7 @@
     // Il system intero del ripiego senza filo: parte fissa, CONTESTO dell'utente composto adesso, poi il turno.
     filoChat: (payload) => {
       const p = payload || {};
+      if (!global.SN_TRATTO_VIVO && typeof require === 'function') require('./filoTrattoVivo.js');
       const TV = global.SN_TRATTO_VIVO;
       const utente = TV ? TV.parteUtente(TV.sezioniUtente(p), { ts: p.adessoTs }) : '';
       return `${PROMPTS.filoChatStatic()}${utente ? `${utente}\n\n` : ''}${PROMPTS.filoChatContext(p)}`;
@@ -3208,6 +3209,8 @@
     AGENT_STYLE_PRESETS,
     STYLE_AWARE_ACTIONS,
     INIZI_VARIABILI_CHAT,
+    INIZIO_ACCOGLIENZA,
+    INIZIO_CONTESTO_CHAT,
     INIZIO_PARTE_UTENTE,
     INIZIO_DA_FILO,
     INIZIO_MESSAGGIO_UTENTE,
