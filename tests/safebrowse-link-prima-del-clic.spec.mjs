@@ -40,6 +40,8 @@ async function contaLaRete(app, pagine = {}) {
     globalThis.SN_SAFEBROWSE.setProviders({
       gsb: conta('gsb'), gsbPeek: null, rdap: conta('rdap'), ct: conta('ct'), llm: conta('llm'), sandbox: conta('sandbox'),
     });
+    // Il «Continua» salva il sito fra quelli fidati (#967), e ogni salvataggio rimetterebbe i fornitori veri.
+    globalThis.SN_SAFEBROWSE.configure = () => {};
   }, pagine);
 }
 
