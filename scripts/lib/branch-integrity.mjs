@@ -527,9 +527,8 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   const tip = hasRemote ? g(['rev-parse', `origin/${branch}`]) : null;
   const remoteTip = tip && tip.ok ? tip.out : '';
   let target = commitExists(g, checkpoint) ? checkpoint : null;
-  // La punta pubblicata è l'ultima consegna, da qualunque cartella sia partita: il punto fermo locale vince solo se
-  // è lei o sta più avanti (sigillato e non spedito, #1486). Più vecchio è di un giro passato altrove (D-207), fuori
-  // dalla sua linea è di una storia riscritta da un riallineamento: in tutti e due i casi si parte dalla punta.
+  // La punta pubblicata è l'ultima consegna, da qualunque cartella: il punto fermo locale vince solo se è lei o sta
+  // più avanti (non spedito, #1486); più vecchio (un giro passato altrove, D-207) o fuori linea (riscritto) vince lei.
   let rewritten = null;
   let superato = null;
   if (target && remoteTip && target !== remoteTip && !antenato(g, remoteTip, target)) {
