@@ -40,12 +40,12 @@
 // 55/55 con tre NOTE; con le regole di prima 51/55, rossi i quattro casi a
 // campi assenti.
 //
-// QUEL CHE L'EMULATORE NON DICE (#1666, #1728): il motore vero scrive il codice
-// di scarico in `metadata.firebaseStorageDownloadTokens` PRIMA di valutare le
-// regole, e a un caricamento normale non passa contentEncoding. Qui era tutto
-// verde e in produzione ogni allegato prendeva 403 (dal 23/10 al 25/10, poi dal
-// 26/10): l'emulatore riempie i campi che il motore vero lascia assenti, e un
-// campo assente letto senza `in` nega. Dopo ogni pubblicazione delle
+// QUEL CHE L'EMULATORE NON DICE (#1666, #1769): il deposito vero, prima di
+// valutare le regole, scrive da sé il codice di scarico nei metadati, il nome di
+// scarico e (probabile) la codifica «identity»; l'emulatore alle regole li passa
+// assenti. Qui era tutto verde e dal 23/10 al 29/10 ogni allegato vero prendeva
+// 403. Il caso «come-il-deposito-vero» qui sotto è la nostra migliore stima di
+// quello che vede il deposito, non una prova. Dopo ogni pubblicazione delle
 // regole la prova che conta è un caricamento vero dall'app (o `sealForUpload`
 // più POST al deposito): se risponde 403, il verde di questo file non vale.
 //
