@@ -176,6 +176,10 @@ function sessioneEffimera(site) {
 
 const gpcState = new WeakMap(); // session → { enabled }
 
+// Chi deve presentare un Referer che Chromium non lascia passare altrove (il «Riprova» degli scaricamenti): `fn(details, ses)`.
+let refererFn = null;
+function presentaReferer(fn) { refererFn = typeof fn === 'function' ? fn : null; }
+
 // Le pagine di accesso dei provider noti (la lista dell'esenzione anti-fingerprint) non ricevono il GPC, né l'header
 // né la proprietà in tabs.js: con quel segnale Google respinge l'accesso in un profilo nuovo (#1616). Altrove resta.
 function senzaGpc(href) {
