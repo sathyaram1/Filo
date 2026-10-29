@@ -1342,7 +1342,7 @@
     }
     if (p.paese) p.paese.querySelector('.cc').textContent = d.paese;
 
-    if (p.title.textContent !== d.titolo) p.title.textContent = d.titolo;
+    if (p.title.firstChild.textContent !== d.titolo) p.title.firstChild.textContent = d.titolo;
 
     // Avviso audio dopo il titolo, come in Chrome (#431): suona o mutata stanno
     // nello stesso posto, così il clic che muta lascia lì il tasto per riattivare.
