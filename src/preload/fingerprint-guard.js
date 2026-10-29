@@ -361,7 +361,8 @@ const PROPAGAZIONE = `
 
   // Al load, che arriva al documento che contiene il riquadro e mai alla sua finestra, si prepara ogni documento della
   // stessa origine senza preload: tornato vuoto, o arrivato nella finestra iniziale che la pagina aveva preso per indice
-  // o per nome (il documento la eredita e il preload non parte). Uno col suo preload no: avrebbe due guardie.
+  // o per nome (il documento la eredita e il preload non parte). Uno col suo preload no: avrebbe due guardie. In un sito
+  // con pagine esenti (gli accessi) un documento senza preload potrebbe essere una di quelle: lì solo i vuoti.
   function segna(cw) { var r = regno(cw); if (r) R(wsAdd, conPreload, [r]); }
   function alCarico(w) {
     R(ascoltoDi(w), w.document, ['load', function (e) {
