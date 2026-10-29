@@ -9,6 +9,7 @@ const { storiaAiuto } = require('./storiaAiuto');
 const { riquadroArrivato } = require('./riquadroArrivato');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
+const { daFilo, origineDi } = require('./handlers/origine');
 const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 const SegretiLetti = require('./segretiLetti');
 const VerdettiUscite = require('./verdettiUscite');
@@ -1410,7 +1411,7 @@ function consumePendingConfirm(sender, action) {
   return rec.scade > Date.now();
 }
 function daPaginaDiFilo(sender) {
-  return String(sender?.tab?.url || sender?.url || '').startsWith('filo://');
+  return daFilo(origineDi(sender), sender);
 }
 // La richiesta in cui una finestra guardata resta approvata (#778): la scheda della chat, finché l'utente non scrive di nuovo.
 function chiaveSchermo(sender) {
@@ -2931,7 +2932,7 @@ async function eseguiAzioneFilo(action, {
             }
             // Un blocco che la pagina provoca dopo l'attesa qui sotto arriva lo stesso a chi l'ha chiesta:
             // la chat della home o l'assistente sulla pagina.
-            const seguibile = assistente || String((sender && sender.url) || '').startsWith('filo://');
+            const seguibile = assistente || daFilo(origineDi(sender), sender);
             if (sender && sender.wc && seguibile && action._callId && typeof tm.seguiApertura === 'function') {
               tm.seguiApertura(tabId, { wc: sender.wc, callId: action._callId, assistente });
             }
@@ -7181,7 +7182,7 @@ require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
 
 async function handleMessage(msg, sender = {}) {
-  const origin = sender?.tab?.url || sender?.url || '';
+  const origin = origineDi(sender);
   const fn = registry.get(msg.type);
   if (fn) return fn(msg, sender, origin);
   return { ok: false, error: `Tipo messaggio sconosciuto: ${msg.type}` };

@@ -20,6 +20,7 @@ const { hostResolves } = require('./services/hostResolve');
 const DiskStorage = require('./shim/storage');
 const { chiediConferma, ritiraConferma } = require('./confermeSopraPagina');
 const AzioniContate = require('./services/azioniContate');
+const { vistaInterna } = require('./services/handlers/origine');
 
 const inFlightStreams = new Map(); // requestId → AbortController
 // Una shell PERSISTENTE per scheda, chiavata sull'id del WebContents che la
@@ -64,11 +65,13 @@ function senderInfo(event) {
       if (r && r.possiede(wc)) { tab = { id: r.id, url: wc.getURL(), title: '' }; win = w; riserva = true; break; }
     }
   }
+  const isShell = Boolean(finestraDellaBarra(wc));
   return {
     riserva,
     tab: tab ? { id: tab.id, url: tab.url, title: tab.title, openedAt: tab.openedAt || null, paginaDal: tab.paginaDal || null } : null,
     url: wc.getURL(),
-    isShell: Boolean(finestraDellaBarra(wc)),
+    isShell,
+    interna: vistaInterna({ isShell, riserva, tab, segnata: wc._filoVistaInterna === true }),
     // Riferimento alla finestra proprietaria (in-process: l'handler è chiamato
     // direttamente, non oltre il confine IPC) + flag incognito, così i servizi
     // aprono i tab nella finestra giusta e l'IPC instrada lo storage in RAM.
@@ -96,7 +99,7 @@ function provenienzaDi(info) {
   if (info && info.isShell) return { via: 'interfaccia', dove: 'shell' };
   let u = null;
   try { u = new URL(String((info && info.url) || '')); } catch (_) { u = null; }
-  if (u && u.protocol === 'filo:') {
+  if (u && u.protocol === 'filo:' && info.interna !== false) {
     const dove = u.hostname === 'options' && /altro/.test(u.pathname) ? 'altro' : u.hostname;
     return { via: 'interfaccia', dove };
   }
