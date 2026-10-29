@@ -257,8 +257,8 @@
     }
 
     // Si parte a testa della pagina letta (c'è il corpo), dove stanno icona e theme-color: non al «load», che su un sito
-    // lento arriva dopo secondi (#1456.2), e non prima, quando la scheda di un sito già visto perderebbe il suo colore.
-    // I due ritentativi servono ai siti che li mettono dopo; una testa che non finisce mai aspetta al massimo 2 s.
+    // lento arriva dopo secondi (#1456.2), e non prima, quando un sito già visto rischia di perdere il colore ricordato.
+    // I due ritentativi servono ai siti che li mettono dopo; una testa che non finisce mai si aspetta al massimo 2 s.
     const parti = () => { send(); setTimeout(send, 800); setTimeout(send, 2000); };
     const testaLetta = () => !!document.body || document.readyState !== 'loading';
     if (testaLetta()) { parti(); return; }
