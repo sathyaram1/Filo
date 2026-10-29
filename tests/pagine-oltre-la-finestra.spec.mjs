@@ -60,6 +60,13 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
       if (!finestra) finestra = ingresso + uscita + Math.ceil(posto / 3.5);
       if (ingresso + uscita > finestra) {
         globalThis.__rifiutate++;
+        if (anthropic) {
+          const message = ingresso > finestra ? `prompt is too long: ${ingresso} tokens > ${finestra} maximum`
+            : `input length and \`max_tokens\` exceed context limit: ${ingresso} + ${uscita} > ${finestra}, decrease input length or \`max_tokens\` and try again`;
+          const raw = JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message } });
+          const body = JSON.stringify({ error: { message: 'Provider returned error', code: 400, metadata: { raw, provider_name: 'Anthropic' } } });
+          throw await globalThis.SN_PROVIDER_OPENROUTER.httpError(new Response(body, { status: 400 }), { tools: !!tools, maxTokens: uscita, model: attempts[0].model });
+        }
         const detto = misure
           ? `This endpoint's maximum context length is ${finestra} tokens. However, you requested about ${ingresso + uscita} tokens (${ingresso} of text input, ${uscita} of output). Please reduce the length of either one.`
           : 'Prompt is too long for this model.';
