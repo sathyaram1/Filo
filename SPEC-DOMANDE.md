@@ -569,9 +569,8 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
 - **Un guasto non torna a chi ci è caduto.** Una domanda di guasto non va a
   chi l'ha aperta né a chi gira nello stesso ambiente. Lei gira nell'ambiente
   dei riservati (§ 5.1): le domande di guasto aperte da un biglietto di
-  quell'ambiente vanno all'owner, comprese le sue e quelle dell'audit, della
-  revisione delle domande, di «Gestisci la risposta», del riordino e della
-  potatura. Il server non sa se si è rotto il compito o l'ambiente, e nel
+  quell'ambiente vanno all'owner, comprese le sue e quelle degli altri compiti
+  che girano lì. Il server non sa se si è rotto il compito o l'ambiente, e nel
   secondo caso lei cadrebbe sullo stesso guasto: nessuno lo curerebbe e
   all'owner non arriverebbe niente. Per la stessa ragione un guasto non
   anticipa mai l'istanza di chi l'ha aperto: la nuova cadrebbe sullo stesso
