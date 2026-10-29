@@ -493,3 +493,66 @@ test('un riquadro XML o SVG della stessa origine legge il canvas col rumore dell
   expect.soft(on.objectSvgBlob, 'toBlob da un object SVG').toBe(on.paginaBlob);
   expect.soft(off.objectSvgBlob).toBe(off.paginaBlob);
 });
+
+// Un riquadro della stessa origine che la pagina prende per indice o per nome prima del carico: il documento eredita
+// la finestra iniziale e il suo preload non parte. Dopo il load si legge col rumore della pagina, da fuori e il suo
+// canvas; uno esente per conto suo (una pagina di accesso) resta esente anche così.
+async function presiPrimaDelCarico(urls) {
+  /* global fnv, scena */
+  const { c } = scena(document);
+  const leggi = (W) => { try { return fnv(W.HTMLCanvasElement.prototype.toDataURL.call(c)); } catch (e) { return 'errore ' + e.message; } };
+  const suo = (W) => { try { return fnv(W.HTMLCanvasElement.prototype.toDataURL.call(scena(W.document).c)); } catch (e) { return 'errore ' + e.message; } };
+  const carico = (f) => new Promise((r) => f.addEventListener('load', () => r(), { once: true }));
+  const out = { pagina: fnv(c.toDataURL()) };
+  const prese = {
+    indice: () => window[window.length - 1],
+    frames: () => frames[frames.length - 1],
+    nome: (f) => window[f.name],
+    esente: () => window[window.length - 1],
+  };
+  for (const [k, prendi] of Object.entries(prese)) {
+    const f = document.createElement('iframe');
+    f.name = 'preso_' + k;
+    f.src = urls[k];
+    const fatto = carico(f);
+    document.body.appendChild(f);
+    const w = prendi(f);
+    await fatto;
+    out[k] = leggi(w);
+    out[k + 'Suo'] = suo(w);
+  }
+  const h = document.getElementById('nellHtml');
+  if (!window.__arrivato) await carico(h);
+  out.html = leggi(window.__html);
+  out.htmlSuo = suo(window.__html);
+  return out;
+}
+
+test.describe('riquadri presi prima del carico', () => {
+  test.use({ hostInPiu: ['slack.com'] });
+
+  test('un riquadro della stessa origine preso per indice o per nome prima del carico ha il rumore della pagina dopo il load', async ({ openTab, testServer }) => {
+    test.setTimeout(90_000);
+    const sito = (u) => u.replace('127.0.0.1', 'slack.com');
+    const urls = {};
+    for (const k of ['indice', 'frames', 'nome']) urls[k] = sito(testServer.html(`<!doctype html><p>${k}</p>`));
+    urls.esente = sito(testServer.origin) + '/login';
+    const pagina = sito(testServer.html(`<!doctype html><html><head><meta charset="utf-8"><script>${IMPRONTA}</script></head><body>
+      <iframe id="nellHtml" onload="window.__arrivato = true" src="${sito(testServer.html('<!doctype html><p>html</p>'))}"></iframe>
+      <script>window.__html = frames[0];</script></body></html>`));
+    const leggi = async (u) => {
+      const page = await openTab(u);
+      await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
+      return page.evaluate(presiPrimaDelCarico, urls);
+    };
+    const on = await leggi(pagina);
+    await setFpMode(openTab, 'off');
+    const off = await leggi(pagina + '?off');
+    expect(on.pagina).not.toBe(off.pagina);
+    for (const k of ['indice', 'indiceSuo', 'frames', 'framesSuo', 'nome', 'nomeSuo', 'html', 'htmlSuo']) {
+      expect.soft(on[k], `${k}: col rumore della pagina`).toBe(on.pagina);
+      expect.soft(off[k], `${k}: in Off come la pagina`).toBe(off.pagina);
+    }
+    expect.soft(on.esente, 'una pagina di accesso resta esente').toBe(off.pagina);
+  });
+});
