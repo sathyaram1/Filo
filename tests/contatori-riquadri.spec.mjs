@@ -95,7 +95,8 @@ test('nel riquadro di Traduci contano Copia e la domanda dopo la risposta; quell
   await expect.poll(() => conta(app, page, '.sn-msg-copia'), { timeout: 15_000 }).toBe(1);
   await clicca(app, page, '.sn-msg-copia');
   await scrivi(app, page, '.sn-popup-input', 'e al plurale? <b>gatti</b> 🐈');
-  await page.keyboard.press('Enter');
+  // Il riquadro sta nello strato sopra la scheda (#1509.1): la tastiera è lì, non nella pagina.
+  await (await paginaDelloStrato(app, page)).keyboard.press('Enter');
   await expect.poll(() => conta(app, page, '.sn-msg-copia'), { timeout: 15_000 }).toBe(2);
   await clicca(app, page, '.sn-popup-close');
   await expect.poll(() => voceOra(app, 'riquadro_uso', 'translate-selection'), { timeout: 10_000 }).toEqual({ copia: 1, d1: 1 });
