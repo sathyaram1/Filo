@@ -55,7 +55,7 @@ test('scrivo a home appena aperta: finita la risposta, in fondo è ancora lì', 
   test.setTimeout(60_000);
   await semina(app, ieri());
   const page = await openTab('filo://newtab/');
-  await expect.poll(async () => (await vista(page)).bolle.at(-1).su, { timeout: 15_000 }).toBeLessThan(110);
+  await expect.poll(async () => { const b = (await vista(page)).bolle.at(-1); return b ? b.su : 999; }, { timeout: 15_000 }).toBeLessThan(110);
   await modelloFinto(app, [{ text: 'Sì, anche le balene.' }]);
   await chiedi(page, 'e le balene?');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Sì, anche le balene.' })).toBeVisible();
