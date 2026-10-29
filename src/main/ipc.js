@@ -142,7 +142,7 @@ function registerIpcHandlers() {
       const F = require('./services/fingerprint');
       const ambito = ambitoIncognitoDi(senderInfo(event));
       const fr = event.senderFrame;
-      if (fr ? !fr.parent : !(opts && opts.riquadro)) { event.returnValue = conCanale(F.configForHref(href, ambito)); return; }
+      if (fr ? !fr.parent : !(opts && opts.riquadro)) { event.returnValue = conCanale(F.configForHref(href, ambito), href); return; }
       const catena = [];
       for (let f = fr; f; f = f.parent) catena.push(String(f.url || ''));
       // Anche a un riquadro esente: dice a chi lo contiene che lì il preload gira, e non va preparato da fuori.
