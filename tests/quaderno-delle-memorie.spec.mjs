@@ -54,6 +54,9 @@ const turno = (app, chatId, userMessage) => app.evaluate(
   { chatId, userMessage },
 );
 const memoria = (app) => app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory());
+// La memoria che il modello ha davanti: quella del CONTESTO e le righe arrivate dopo nei messaggi, ognuna nella sua
+// busta (#1562).
+const memoriaNelPrompt = (prompt) => [...String(prompt).matchAll(/<<<MEMORIA_FILO>>>([\s\S]*?)<<<FINE_MEMORIA_FILO>>>/g)].map((m) => m[1]).join('\n');
 const lezioni = (app) => app.evaluate(() => globalThis.SN_FILO_MEMORY.getLessonsBuffer());
 // Una riga per il suo testo intero: «È vegetariano» è anche dentro «L’utente è vegetariano.».
 const esatto = (t) => new RegExp(`^${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
@@ -205,12 +208,8 @@ test('tolgo una riga: sparisce, il prompt non la vede, non ricompare dallo stess
   await turno(app, 'chat-cena', 'cosa mi cucino?');
   // La memoria del prompt non la porta più (il messaggio di allora resta nel filo, ed è giusto che il modello lo veda).
   const ultimo = await app.evaluate(() => globalThis.__q_prompt[globalThis.__q_prompt.length - 1]);
-  // La sezione è la riga «PREFERENZE:» da sola: il nome di un'azione (PULSANTE_PREFERENZE:) la contiene già.
-  const inizio = ultimo.search(/^PREFERENZE:$/m);
-  expect(inizio).toBeGreaterThan(-1);
-  const preferenze = ultimo.slice(inizio).split('\n\n')[0];
-  expect(preferenze).toContain('Ama le spezie');
-  expect(preferenze).not.toContain('vegetariano');
+  expect(memoriaNelPrompt(ultimo)).toContain('Ama le spezie');
+  expect(memoriaNelPrompt(ultimo)).not.toContain('vegetariano');
 
   // Tasto destro sulla nascosta: rimetti.
   const voci = await vociMenu(page, 'È vegetariano');

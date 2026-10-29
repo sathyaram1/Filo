@@ -85,7 +85,7 @@ function pota(vecchi, visti, incognito) {
 // ── Il tratto vivo (SPEC-CONTESTO fase 3): in memoria, mai su disco ─────────
 // Quello che Filo scrive in testa a un messaggio dell'utente, per messaggio: le cose successe prima (fisse dalla prima
 // volta, rifatte solo se una è stata cancellata), le sezioni cambiate dalla fotografia (valgono per la sua epoca), le
-// note del turno (ricordi, intervista) e quelle dopo il testo. Un messaggio passato si rimanda così com'era.
+// note del turno (i ricordi) e quelle dopo il testo. Un messaggio passato si rimanda così com'era.
 const MAX_PREAMBOLI = 2 * MAX_ESITI;
 const preamboli = new Map();
 function memoDi(k) {
@@ -364,8 +364,9 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     return memo;
   };
   // I ricordi ripescati per un turno restano nella sua domanda, tranne le conversazioni cancellate dopo (#868.1).
-  const turnoDi = (memo) => [
-    memo.onboarding || '',
+  // L'intervista solo nel suo turno: rimandata, le sue istruzioni dirigerebbero ogni chat dopo (#1297).
+  const turnoDi = (memo, intervista = '') => [
+    intervista,
     Array.isArray(memo.ricordi) && memo.ricordi.length ? FC().rendiRicordi(memo.ricordi.filter((r) => r && r.tratto && vivi.chat(r.tratto.chat))) : '',
   ].map((x) => String(x || '').trim()).filter(Boolean).join('\n\n');
   const preambolo = (m) => {
@@ -381,20 +382,21 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     const memo = preamboli.get(FC().chiave(m));
     return memo && Array.isArray(memo.dopo) ? memo.dopo : null;
   };
-  // Un turno con dentro qualcosa che non c'è più torna come risposta sola, dove gli esiti si ripuliscono. Anche uno
-  // confermato dopo dalla scheda (un sì nel popup): il suo esito vero lo porta la risposta sola (#1396).
+  // Un turno con dentro qualcosa che non c'è più torna come risposta sola, dove gli esiti si ripuliscono. Anche uno il
+  // cui esito la scheda ha visto cambiare dopo (un sì nel popup, #1396; la pagina aperta che si sposta da sé su un sito
+  // bloccato, #590): il giro lo darebbe com'era, l'esito vero lo porta la risposta sola.
   const valido = (g) => !!g && senzaTolti(g.azioni) === g.azioni;
-  const confermataDopo = (k) => {
+  const cambiataDopo = (k) => {
     const s = dallaScheda.get(k);
-    return !!s && s.azioni.some((a) => a && a._confirmed);
+    return !!s && s.azioni.some((a) => a && (a._confirmed || (a._output && a._output.dopo)));
   };
   const giroDi = (m) => {
     const k = FC().chiave(m);
     const g = giri.get(k);
-    return valido(g) && !confermataDopo(k) ? g : null;
+    return valido(g) && !cambiataDopo(k) ? g : null;
   };
   const seguitiNeiGiri = new Set();
-  for (const [k, g] of giri) if (g.seguiti.length && valido(g) && !confermataDopo(k)) for (const x of g.seguiti) seguitiNeiGiri.add(x);
+  for (const [k, g] of giri) if (g.seguiti.length && valido(g) && !cambiataDopo(k)) for (const x of g.seguiti) seguitiNeiGiri.add(x);
   // La riga di una conversazione di un'altra app sta all'ora d'inizio e cambia mentre l'app continua (messaggi, nome del
   // documento): resta com'era fino alla prossima fotografia, o riscriverebbe il tratto da lì.
   const nelTratto = tutti.map((m) => {
@@ -440,11 +442,10 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     const prima = memo.stato && memo.stato.epoca === ep ? memo.stato.testo : '';
     memo.stato = prima || stato ? { epoca: ep, testo: [prima, stato].filter(Boolean).join('\n\n') } : null;
     stato = memo.stato ? memo.stato.testo : '';
-    memo.onboarding = String(onboarding || '');
     memo.ricordi = Array.isArray(ricordi) && ricordi.length ? ricordi : null;
     memo.dopo = Array.isArray(dopo) ? dopo.filter(Boolean) : null;
     memo.intero = ep;
-    const pre = TV().preambolo({ eventi: memo.eventi.testo, stato: stato || '', turno: turnoDi(memo) });
+    const pre = TV().preambolo({ eventi: memo.eventi.testo, stato: stato || '', turno: turnoDi(memo, onboarding) });
     const fotoQui = foto.get(FC().chiave(laDomanda)) || (Array.isArray(urls) && urls.length ? urls : null);
     return FC().rendiMessaggio(laDomanda, f.ultimo, { tetto: tetti.token, foto: fotoQui, preambolo: pre, dopo: memo.dopo, intero: true });
   };

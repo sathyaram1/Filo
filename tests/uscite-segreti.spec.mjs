@@ -669,7 +669,10 @@ test('riaperta dalla Cronologia, la chat racconta come fermata l’azione fermat
   await riaperta.locator('#input').fill('l’hai aperta la pagina?');
   await riaperta.locator('#sendBtn').click();
   await expect(riaperta.locator('.dash-bubble-filo', { hasText: 'No, non l’ho aperta.' })).toBeVisible({ timeout: 20_000 });
-  expect(JSON.stringify(await app.evaluate(() => globalThis.__visti))).toContain('NON fatte, fermate da Filo');
+  // Il turno di allora torna col suo giro, l'esito dello strumento compreso, o senza il giro in memoria come risposta
+  // sola con la nota delle fermate (#1562).
+  const domanda = (await app.evaluate(() => globalThis.__visti)).filter((m) => JSON.stringify(m).includes('l’hai aperta la pagina?')).pop();
+  expect(JSON.stringify(domanda)).toMatch(/NON fatte, fermate da Filo|NAVIGA NON eseguita, e non si può eseguire: non ho aperto l'indirizzo/);
 });
 
 // ── Quello che si apre o si scrive con un clic su una proposta di un modello (#810, giro 7) ──────────────

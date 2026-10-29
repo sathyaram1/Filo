@@ -28,7 +28,9 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   al messaggio dopo, e un «Riprova» tiene quelli del primo invio.
 - **Davanti a ogni messaggio dell'utente** Filo scrive, in un blocco suo dopo l'ora e la chat, le cose successe dal
   messaggio dell'utente prima (accaduti e cambi del filo, con l'id dei cambi per ANNULLA_CAMBIO, in una busta), le
-  sezioni cambiate, e nella domanda di quel turno i ricordi ripescati e l'intervista. Le azioni di una chat dentro il suo
+  sezioni cambiate, e nella domanda di quel turno i ricordi ripescati e l'intervista. L'intervista sta solo nella
+  domanda di adesso: rimandata nel tratto, le sue istruzioni dirigerebbero ogni chat dopo, anche in un'altra scheda
+  (#1297), e il turno che la perde si rilegge una volta. Le azioni di una chat dentro il suo
   turno non ci sono: le racconta il turno. Le pagine visitate no: entrano solo cercate. Si scrivono la prima volta e
   restano quelle (un evento in ritardo non riscrive un messaggio già mandato); dopo una cancellazione si rifanno.
 - **I punti di cache stanno sui confini dei blocchi**: fine della parte fissa e fine del CONTESTO (tutte e due della
@@ -99,7 +101,9 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   modello perdono le conversazioni e le pagine che il filo non ha più, dal messaggio dopo e in ogni scheda (la
   rilettura dice che è stata cancellata, la ricerca quanti risultati). Una regola sola quando si compone il
   contesto, sulle copie (memoria, storia della scheda, giro di un turno, ricordi nella domanda, cose successe): vale per
-  ogni strada che cancella. Un giro con dentro qualcosa che non c'è più torna come risposta sola, ripulita.
+  ogni strada che cancella. Un giro con dentro qualcosa che non c'è più torna come risposta sola, ripulita; così
+  anche uno il cui esito la scheda ha visto cambiare dopo il turno (un sì nel popup, la pagina aperta che si sposta da
+  sé su un sito bloccato): il giro lo darebbe com'era.
 - **Il tetto in token cede alla finestra del modello**: se il fornitore rifiuta la richiesta perché supera la finestra
   del modello della chat, il tratto si stringe quanto dicono le misure del rifiuto (senza misure, a metà) e lo stesso
   giro riparte; il tetto che ha retto vale per i turni dopo con quel modello (in memoria). Si stringe prima la parte
