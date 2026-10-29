@@ -275,6 +275,8 @@ test('una pagina con 5.000 link resta reattiva: esame a lotti, prima i link a sc
   // Il main misura i suoi buchi: il tempo più lungo in cui non ha potuto rispondere a nient'altro, con l'esame in corso
   // all'inizio o alla fine del buco, o partito dentro (un esame tutto in un blocco comincia e finisce nello stesso buco).
   // Aprire la scheda ferma il main per conto suo, e su una macchina carica supera il tetto senza che i link c'entrino (#1792).
+  // Un buco vale il tempo di processore speso dentro, non quello dell'orologio: un main tolto di mezzo dal sistema operativo
+  // non sta lavorando, un esame in un blocco sì.
   await app.evaluate(({ BrowserWindow }) => {
     globalThis.__buco = { max: 0, attivo: true };
     const schede = () => BrowserWindow.getAllWindows().flatMap((w) => (w._filoTabs && w._filoTabs.tabs) || []);
@@ -282,17 +284,23 @@ test('una pagina con 5.000 link resta reattiva: esame a lotti, prima i link a sc
     // Ogni esame chiesto mette in coda una promessa nuova: se una è cambiata, nel buco un esame è partito.
     const code = () => new Map(schede().map((t) => [t, t._sbLinkCoda]));
     const partito = (a, b) => [...b].some(([t, c]) => c && a.get(t) !== c);
+    const cpu = () => { const u = process.cpuUsage(); return (u.user + u.system) / 1000; };
     let prima = performance.now();
+    let cpuPrima = cpu();
     let eraInEsame = inEsame();
     let eranoCode = code();
     const giro = () => {
       const ora = performance.now();
+      const cpuOra = cpu();
       const adesso = inEsame();
-      const ora_code = code();
-      if (eraInEsame || adesso || partito(eranoCode, ora_code)) globalThis.__buco.max = Math.max(globalThis.__buco.max, ora - prima);
+      const codeOra = code();
+      if (eraInEsame || adesso || partito(eranoCode, codeOra)) {
+        globalThis.__buco.max = Math.max(globalThis.__buco.max, Math.min(ora - prima, cpuOra - cpuPrima));
+      }
       prima = ora;
+      cpuPrima = cpuOra;
       eraInEsame = adesso;
-      eranoCode = ora_code;
+      eranoCode = codeOra;
       if (globalThis.__buco.attivo) setTimeout(giro, 1);
     };
     setTimeout(giro, 1);
