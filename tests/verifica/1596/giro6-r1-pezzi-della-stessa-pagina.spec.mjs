@@ -1,8 +1,8 @@
-// Esplorazione del giro 6 su #1596: pezzi della stessa pagina, due turni di fila, ricarica, aspetto.
+// Verifica #1596 giro 6, rilievo 1: tre pezzi della stessa pagina lunghissima letti di fila su un modello a finestra
+// piccola. L'avviso sotto la risposta deve parlare di una pagina sola, non di «2 pagine».
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const NEWTAB = 'filo://newtab/';
-const URL_RE = 'http://127\\.0\\.0\\.1:\\d+/\\d+';
 const MARCHI = ['ALFA', 'BETA', 'GAMMA', 'DELTA', 'EPSILON', 'ZETA'];
 
 function paginaEnorme(nome) {
@@ -63,7 +63,6 @@ async function modello(app, { finestra = 0, posto = 0, piani }) {
       const toolCalls = piano.strumenti.map((s, i) => {
         const args = { ...(s.args || {}) };
         if (s.urlDa) args.url = (esiti.match(new RegExp(s.urlDa, 'g')) || [])[s.indice || 0] || '';
-        if (s.gruppoDa) { const m = new RegExp(s.gruppoDa).exec(esiti); args.url = m ? m[1] : ''; }
         return { id: `c${k}_${i}`, name: s.nome, arguments: JSON.stringify(args) };
       });
       for (const c of toolCalls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
@@ -87,7 +86,7 @@ async function chiedi(page, testo) {
   await page.locator('#sendBtn').click();
 }
 
-test.skip('pezzi della stessa pagina letti uno dopo l\'altro: la risposta arriva e l\'avviso conta bene', async ({ app, openTab, testServer }) => {
+test('r1 una pagina enorme letta a pezzi: l\'avviso parla di una pagina, non di tante pagine quanti i pezzi', async ({ app, openTab, testServer }) => {
   test.setTimeout(150_000);
   const page = await openTab(NEWTAB);
   const [url] = await preparaPagine(app, testServer, ['ALFA']);
@@ -102,42 +101,8 @@ test.skip('pezzi della stessa pagina letti uno dopo l\'altro: la risposta arriva
   });
   await chiedi(page, `leggi tutta ${url}`);
   const bolla = page.locator('.dash-bubble-filo', { hasText: 'PEZZI' });
-  await expect(bolla).toBeVisible({ timeout: 60_000 });
-  console.log('PEZZI:', await bolla.innerText());
-  console.log('rifiutate', await app.evaluate(() => globalThis.__rifiutate));
-  const acc = await app.evaluate(() => globalThis.__accettate);
-  for (const t of acc) {
-    const pezzi = [...t.matchAll(/\[(Pagina web[^\]]{0,300}|Letto fino[^\]]{0,300})\]/g)].map((m) => m[0].slice(0, 200));
-    console.log('RICHIESTA len', t.length, JSON.stringify(pezzi, null, 1));
-  }
-});
-
-test('due turni di fila con tre pagine ciascuno', async ({ app, openTab, testServer }) => {
-  test.setTimeout(200_000);
-  const page = await openTab(NEWTAB);
-  const urls = await preparaPagine(app, testServer, MARCHI);
-  const tre = (q, from) => [
-    { strumenti: [{ nome: 'CERCA_WEB', args: { query: q } }] },
-    { strumenti: [0, 1, 2].map((i) => ({ nome: 'LEGGI_PAGINA', args: { url: urls[i + from] } })) },
-  ];
-  await modello(app, { finestra: 72000, piani: [...tre('uno', 0), { finale: 'PRIMO' }, ...tre('due', 3), { finale: 'SECONDO' }] });
-  await chiedi(page, 'confronta le tre guide che trovi');
-  const b1 = page.locator('.dash-bubble-filo', { hasText: 'PRIMO' });
-  await expect(b1).toBeVisible({ timeout: 60_000 });
-  console.log('PRIMO:', await b1.innerText());
-  await chiedi(page, 'ora cerca le altre tre guide e confrontale');
-  const b2 = page.locator('.dash-bubble-filo', { hasText: 'SECONDO' });
-  await expect(b2).toBeVisible({ timeout: 90_000 });
-  await page.waitForTimeout(1500);
-  console.log('SECONDO:', await b2.innerText());
-  console.log('rifiutate', await app.evaluate(() => globalThis.__rifiutate));
-  const acc = await app.evaluate(() => globalThis.__accettate);
-  for (const t of acc) console.log('RICHIESTA', t.length, MARCHI.filter((x) => t.includes(`MARCHIO_${x}`)).join(','), (t.match(/lasciata fuori/g) || []).length);
-  await b2.screenshot({ path: 'tests/.shots/1596-g6-chiaro.png' });
-  await app.evaluate((_e) => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }, { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
-  await page.waitForTimeout(800);
-  await b2.screenshot({ path: 'tests/.shots/1596-g6-scuro.png' });
-  await page.reload();
-  await page.waitForTimeout(3000);
-  console.log('DOPO RICARICA:', (await page.locator('.dash-bubble-filo').allInnerTexts()).join('\n---\n'));
+  await expect(bolla).toContainText('Il modello non riusciva a leggere tutto insieme', { timeout: 60_000 });
+  await expect(bolla).toContainText('127.0.0.1');
+  // Filo ha letto una pagina sola: «2 pagine» fa credere all'utente che ne abbia lasciate fuori altre.
+  await expect(bolla).not.toContainText(/\d+ pagine|altre \d+/);
 });
