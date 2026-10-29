@@ -176,6 +176,9 @@ test('link sospetto che si apre in una scheda nuova: l\'avviso compare sulla pag
   await continua.click();
   await expect.poll(() => schedeWeb(app)).toEqual([forum, 'https://paypal-login.com/conto']);
   await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
+  // Come il «Continua» sulla pagina, quello sul link fa entrare il sito fra quelli di cui ti fidi (#967).
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.safeBrowse.trustedSites))
+    .toEqual(['paypal-login.com']);
   await verdettiFiniti(app);
   expect((await copertura(app)).coperta).toBe(false);
   // A sito aperto i controlli di rete partono: i fornitori finti delle altre prove contano davvero.
