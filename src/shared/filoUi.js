@@ -220,19 +220,31 @@
   function selezioneDi(c) {
     try { return [c.selectionStart, c.selectionEnd]; } catch (_) { return null; }
   }
-  // Annulla e rifai riportano la casella a un testo che ha già avuto: si tengono quelli buoni, fino a un tetto di caratteri
-  // largo (l'annulla del browser non va molto più indietro). Un testo che non c'è mai stato l'ha scritto il sito (#1340).
-  const TETTO_STORIA = 2_000_000;
+  // Annulla e rifai riportano la casella a un testo che ha già avuto: un testo che non c'è mai stato l'ha scritto il sito
+  // (#1340). Si tiene l'impronta di ogni testo buono, non il testo: tenuti interi, con un log di centomila caratteri ne
+  // restavano una ventina e Ctrl+Z non tornava più indietro. Il seme sta nel mondo isolato, quindi il sito non può
+  // cercare un testo con la stessa impronta. Il tetto supera di molto la pila dell'annulla del browser.
+  const TETTO_STORIA = 200_000;
+  const SEME = (() => {
+    try { const a = new Uint32Array(2); global.crypto.getRandomValues(a); return a; } catch (_) { return [Math.random() * 2 ** 32 >>> 0, Math.random() * 2 ** 32 >>> 0]; }
+  })();
+  function impronta(s) {
+    let h1 = 0xdeadbeef ^ SEME[0], h2 = 0x41c6ce57 ^ SEME[1];
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 2654435761);
+      h2 = Math.imul(h2 ^ c, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return `${s.length}:${h1 >>> 0}:${h2 >>> 0}`;
+  }
   function vale(st, v) {
     st.buono = v;
-    if (st.storia.has(v)) { st.storia.delete(v); st.storia.add(v); return; }
-    st.storia.add(v);
-    st.caratteri += v.length;
-    while (st.caratteri > TETTO_STORIA && st.storia.size > 1) {
-      const vecchio = st.storia.values().next().value;
-      st.storia.delete(vecchio);
-      st.caratteri -= vecchio.length;
-    }
+    const k = impronta(v);
+    if (st.storia.has(k)) { st.storia.delete(k); st.storia.add(k); return; }
+    st.storia.add(k);
+    while (st.storia.size > TETTO_STORIA) st.storia.delete(st.storia.values().next().value);
   }
   function scrittaDaFilo(c) {
     const st = caselle.get(c);
