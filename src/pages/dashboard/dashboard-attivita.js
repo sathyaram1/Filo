@@ -2107,8 +2107,9 @@
       // apre la scheda). Questo chip resta come riferimento per RIAPRIRLO, ma deve
       // SEMPRE avere un'etichetta leggibile: il favicon da solo, senza testo, era
       // il bottone "misterioso" del feedback. Mostriamo favicon + nome del sito.
-      // L'indirizzo che il main ha aperto, non quello scritto: «localhost:3000» o «sito.it/x» come href non riaprono niente (#1318).
-      const url = (self.SN_URL_NAV && a.url && self.SN_URL_NAV.indirizzoDaCaricare(a.url)) || a.url || '';
+      // L'indirizzo che il main ha aperto, letto come lo legge lui: «localhost:3000» o la posta senza «mailto:» scritti
+      // così come href non riaprono niente, o portano a una ricerca (#1318).
+      const url = self.SN_URL_NAV && a.url ? self.SN_URL_NAV.indirizzoChiesto(a.url) : String(a.url || '');
       let label = String(a.label || a.etichetta || '').trim();
       if (!label) {
         try {
