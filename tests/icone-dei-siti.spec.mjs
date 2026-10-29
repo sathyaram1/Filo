@@ -133,6 +133,66 @@ test('l\'icona viene dalla scheda aperta e, chiusa la scheda, dalla copia dell\'
   expect(versoTerzi(await richieste(app))).toEqual([]);
 });
 
+// #848.2 — la riga disegnata mentre la scheda del sito si apre, per un sito senza /favicon.ico: prima restava senza
+// icona anche quando la scheda, poco dopo, aveva la sua.
+test('la riga di un sito che si sta aprendo prende l\'icona appena la scheda la trova, senza ridisegnarsi', async ({ app, openTab }) => {
+  await app.evaluate(({ session, net }, blu) => {
+    session.defaultSession.protocol.handle('https', (req) => {
+      const u = new URL(req.url);
+      if (u.hostname !== 'lento.test') return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      if (u.pathname === '/icona.png') return new Response(Buffer.from(blu, 'base64'), { headers: { 'content-type': 'image/png' } });
+      if (u.pathname === '/favicon.ico') return new Response('no', { status: 404 });
+      // La pagina arriva dopo un attimo, come un sito vero: la riga della chat è già disegnata.
+      return new Promise((ok) => setTimeout(() => ok(new Response(
+        '<!doctype html><html><head><meta charset="utf-8"><title>Lento</title><link rel="icon" href="/icona.png"></head><body>s</body></html>',
+        { headers: { 'content-type': 'text/html; charset=utf-8' } })), 1500));
+    });
+  }, PNG_BLU);
+  const home = await openTab(NEWTAB);
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.openTab('https://lento.test/p', { activate: false });
+  });
+  const riga = await rigaDiChat(home, 'riga-lenta', 'https://www.lento.test/p');
+  const iconaDellaScheda = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    return (w._filoTabs.tabs.find((t) => /lento\.test/.test(t.url || '')) || {}).favicon || '';
+  });
+  expect(await iconaDellaScheda(), 'la riga va disegnata prima che la scheda abbia l\'icona').toBe('');
+  await riga.evaluate((el) => { el.__primaDellIcona = true; });
+
+  await expect(riga.locator('img')).toHaveAttribute('src', dato(PNG_BLU), { timeout: 15000 });
+  await expect(riga.locator('img')).toBeVisible();
+  expect(await iconaDellaScheda()).toBe(dato(PNG_BLU));
+  expect(await riga.evaluate((el) => el.__primaDellIcona === true && el.isConnected), 'la riga è la stessa di prima').toBe(true);
+  await expect(riga).toContainText('lento.test');
+});
+
+test('l\'icona trovata da una scheda arriva solo alle pagine di Filo del suo ambito: l\'incognito non la dice alla finestra normale', async ({ app, openTab }) => {
+  await sitiFinti(app);
+  const home = await openTab(NEWTAB);
+  const riga = await rigaDiChat(home, 'riga-ambito', 'https://senza-icona.test/x');
+  await expect(riga.locator('img')).toBeHidden({ timeout: 10000 });
+
+  await app.evaluate((_e, rosso) => globalThis.__filoHandlers.annunciaIconaScheda(
+    { _filoIncognito: true, _filoTabs: { partition: 'incognito-prova' } }, 'senza-icona.test', rosso), dato(PNG_ROSSO));
+  // Un annuncio per un altro sito, o senza un'immagine, non tocca la riga.
+  await app.evaluate(({ BrowserWindow }, rosso) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    globalThis.__filoHandlers.annunciaIconaScheda(w, 'altro.test', rosso);
+    globalThis.__filoHandlers.annunciaIconaScheda(w, 'senza-icona.test', 'https://senza-icona.test/favicon.ico');
+  }, dato(PNG_ROSSO));
+  await home.waitForTimeout(500);
+  await expect(riga.locator('img')).toBeHidden();
+  await expect(riga.locator('img')).not.toHaveAttribute('src', /./);
+
+  await app.evaluate(({ BrowserWindow }, blu) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    globalThis.__filoHandlers.annunciaIconaScheda(w, 'senza-icona.test', blu);
+  }, dato(PNG_BLU));
+  await expect(riga.locator('img')).toHaveAttribute('src', dato(PNG_BLU), { timeout: 5000 });
+  await expect(riga.locator('img')).toBeVisible();
+});
+
 test('un sito visitato non può chiedere al main l\'icona di un sito: la porta risponde solo alle pagine di Filo', async ({ app, shell }) => {
   void shell;
   await sitiFinti(app);
