@@ -9,6 +9,7 @@ import { menuDi } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 import { barraPage, comandaBarra, menuAperto, premiNellaBarra } from './helpers/barra.mjs';
+import { EDITOR, aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
 
 const SHOTS = 'tests/.shots';
 
