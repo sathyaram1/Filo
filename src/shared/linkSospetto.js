@@ -10,10 +10,14 @@
   let imitazione = null;
   let sitoNominato = null;
   let LEGIT_DOMAINS = null;
+  // Un dominio sta in più marchi (google.com anche in Gmail): lo nomina quello di cui è il sito principale.
+  const PRINCIPALI = new Map();
   try {
     if (typeof require === 'function') {
       ({ imitazione, sitoNominato } = require('../main/services/safebrowse/engine.js'));
-      ({ LEGIT_DOMAINS } = require('../main/services/safebrowse/brands.js'));
+      const marchi = require('../main/services/safebrowse/brands.js');
+      LEGIT_DOMAINS = marchi.LEGIT_DOMAINS;
+      for (const b of marchi.BRANDS) if (!PRINCIPALI.has(b.domains[0])) PRINCIPALI.set(b.domains[0], b);
     }
   } catch (e) { console.error('[linkSospetto] controllo dei marchi non caricato', e); }
 
