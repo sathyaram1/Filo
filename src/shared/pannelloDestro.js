@@ -6,6 +6,8 @@
   'use strict';
 
   const LARGHEZZA = 272;
+  // Sotto questo foglio libero il lucchetto non tiene aperto il pannello: spinto, il testo andrebbe a capo a ogni parola.
+  const MIN_FOGLIO = 320;
   // Chi parte da un elemento e si muove meno di così sta cliccando, non trascinando.
   const SOGLIA_TRASCINA = 5;
 
@@ -80,6 +82,10 @@
       return Math.max(0, Math.round(window.innerWidth - (r.left + sc.clientLeft + sc.clientWidth)));
     }
     let accanto = 0;
+    let stretto = false;
+    const tiene = () => opzioni.bloccato && !stretto;
+    // Quanto, dal bordo destro, il puntatore attraversa (l'Aiuto accanto) per arrivare al pannello: il main lo sa.
+    let transito = 0;
     function posa() {
       const barra = barraDiScorrimento();
       const aiuto = aiutoADestra();
@@ -87,11 +93,22 @@
       html.style.setProperty('--pd-barra', `${barra}px`);
       html.style.setProperty('--pd-destra', `${Math.max(barra, aiuto)}px`);
       html.classList.toggle('pd-accanto', aiuto > barra);
+      const eraStretto = stretto;
+      stretto = window.innerWidth - Math.max(barra, aiuto) - LARGHEZZA < MIN_FOGLIO;
+      if (stretto !== eraStretto && opzioni.bloccato) {
+        // Bloccato in una finestra stretta si comporta da sbloccato, e torna a tenere aperto appena c'è spazio.
+        if (stretto && aperto && motivo === 'bloccato') chiudi();
+        else if (!stretto && !aperto) apri('bloccato');
+        else disegnaStato();
+      }
       spingi();
+      const t = accanto ? Math.round(aiuto) : 0;
+      if (t !== transito) { transito = t; riferisci(); }
     }
+    const nelTransito = (t) => !!(accanto && t && t.nodeType === 1 && t.closest && t.closest('html > .sn-sidebar'));
     // Bloccato spinge il foglio fin dove il pannello comincia: accanto all'Aiuto, anche della larghezza dell'Aiuto.
     function spingi() {
-      html.style.setProperty('--pd-spinta', aperto && opzioni.bloccato ? `${LARGHEZZA + accanto}px` : '0px');
+      html.style.setProperty('--pd-spinta', aperto && tiene() ? `${LARGHEZZA + accanto}px` : '0px');
     }
     window.addEventListener('resize', posa);
     try {
@@ -321,10 +338,10 @@
 
     // ── aperto, chiuso, bloccato ────────────────────────────────────────────
     function riferisci() {
-      manda({ type: MSG().PANNELLO_APP_STATO, app, aperto, dentro, motivo });
+      manda({ type: MSG().PANNELLO_APP_STATO, app, aperto, dentro, motivo, transito });
     }
     function disegnaStato() {
-      const spinge = aperto && opzioni.bloccato;
+      const spinge = aperto && tiene();
       html.classList.toggle('pd-aperto', aperto);
       html.classList.toggle('pd-bloccato', spinge);
       html.classList.toggle('pd-senza-striscia', !opzioni.striscia);
@@ -370,10 +387,10 @@
     function fermaUscita() { if (timerUscita) { clearTimeout(timerUscita); timerUscita = null; } }
     // Sopra la pagina, chi se ne va dal pannello lo chiude dopo l'attesa; dal tasto o dalla chat resta finché si clicca fuori.
     function programmaUscita() {
-      if (timerUscita || opzioni.bloccato || motivo === 'tasto' || motivo === 'chat' || trascina || menuEl) return;
+      if (timerUscita || tiene() || motivo === 'tasto' || motivo === 'chat' || trascina || menuEl) return;
       timerUscita = setTimeout(() => {
         timerUscita = null;
-        if (aperto && !dentro && !opzioni.bloccato && !trascina && !menuEl) chiudi();
+        if (aperto && !dentro && !tiene() && !trascina && !menuEl) chiudi();
       }, opzioni.uscitaMs);
     }
     const suoi = (t) => !!(t && t.nodeType === 1 && (pannello.contains(t) || (menuEl && menuEl.contains(t))
@@ -384,6 +401,10 @@
       if (suoi(e.target)) {
         fermaUscita();
         if (!dentro) { dentro = true; riferisci(); }
+      } else if (nelTransito(e.target)) {
+        // Sopra l'Aiuto accanto si passa per andare al pannello o venirne: si chiude uscendo sul foglio o con un clic.
+        fermaUscita();
+        if (dentro) { dentro = false; riferisci(); }
       } else if (dentro || motivo === 'clic') {
         dentro = false;
         programmaUscita();
@@ -395,12 +416,12 @@
     }, true);
     // Un clic sulla pagina, barra di scorrimento compresa, chiude il pannello che non è bloccato.
     document.addEventListener('mousedown', (e) => {
-      if (!aperto || opzioni.bloccato || e.button !== 0) return;
+      if (!aperto || tiene() || e.button !== 0) return;
       if (suoi(e.target) || e.target === striscia) return;
       chiudi();
     }, true);
     document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape' || !aperto || opzioni.bloccato || e.defaultPrevented) return;
+      if (e.key !== 'Escape' || !aperto || tiene() || e.defaultPrevented) return;
       if (menuEl) { chiudiMenu(); return; }
       if (opts.riquadroAperto && opts.riquadroAperto()) return;
       chiudi();
@@ -441,7 +462,7 @@
       const prima = opzioni.bloccato;
       opzioni = opzioniDi(v);
       // Bloccato altrove (Preferenze, la chat): resta aperto e spinge anche qui.
-      if (opzioni.bloccato && !prima && !aperto) apri('bloccato');
+      if (tiene() && !prima && !aperto) apri('bloccato');
       disegnaStato();
       if (prima !== opzioni.bloccato) avvisaApp();
     }
@@ -458,7 +479,7 @@
         else if (msg.azione === 'commuta') commuta(String(msg.motivo || 'tasto'));
         else if (msg.azione === 'chiudi') {
           // Chi se ne va senza entrare lo chiude solo se non è bloccato; il tasto e la chat lo chiudono comunque.
-          if (msg.motivo === 'uscita' && (opzioni.bloccato || dentro)) return;
+          if (msg.motivo === 'uscita' && (tiene() || dentro)) return;
           chiudi();
         } else if (msg.azione === 'bordo') { bordo = !!msg.acceso; disegnaStato(); }
       } else if (msg.type === M.SETTINGS_UPDATED && msg.settings) {

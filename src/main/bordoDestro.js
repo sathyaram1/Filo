@@ -151,9 +151,10 @@ class BordoDestro {
       const { dove, punto, nellaPagina } = this._puntatore();
       const p = t.pannelloApp;
       if (p.aperto) {
-        // Aperto dal bordo: chi se ne va senza passare dal pannello lo chiude, come uscendo.
+        // Aperto dal bordo: chi se ne va senza passare dal pannello lo chiude, come uscendo. Chi attraversa l'Aiuto
+        // aperto accanto sta andando al pannello.
         if (p.motivo !== 'spinta' || p.dentro) return;
-        if (dove === 'lontano') this._programmaUscita(t);
+        if (this._puntatore(this._transito(t)).dove === 'lontano') this._programmaUscita(t);
         else { this._ferma('uscita'); this._sonda(); }
         return;
       }
@@ -183,7 +184,7 @@ class BordoDestro {
       this.timer.uscita = null;
       const p = tab.pannelloApp;
       if (!p || !p.aperto || p.dentro || p.motivo !== 'spinta') return;
-      if (this._puntatore().dove !== 'lontano') { this._sonda(); return; }
+      if (this._puntatore(this._transito(tab)).dove !== 'lontano') { this._sonda(); return; }
       this._manda(tab, { azione: 'chiudi', motivo: 'uscita' });
     }, this.opzioni.uscitaMs);
   }
@@ -206,9 +207,19 @@ class BordoDestro {
     try { return require('electron').screen.getCursorScreenPoint(); } catch (_) { return null; }
   }
 
-  // 'bordo' negli ultimi pixel a destra, 'vicino' a due passi, 'lontano' altrove: la fila delle schede (riduci,
-  // ingrandisci, chiudi), fuori dalla finestra, un altro schermo. nellaPagina: sopra la scheda.
-  _puntatore() {
+  // La fascia della pagina, dal bordo destro, che porta al pannello aperto: l'Aiuto che gli sta accanto (in pixel della
+  // finestra, la pagina li misura nei suoi).
+  _transito(tab) {
+    const px = Number(tab && tab.pannelloApp && tab.pannelloApp.transito) || 0;
+    if (!px) return 0;
+    let zoom = 1;
+    try { zoom = tab.view.webContents.getZoomFactor() || 1; } catch (_) { zoom = 1; }
+    return Math.round(px * zoom);
+  }
+
+  // 'bordo' negli ultimi pixel a destra, 'vicino' a due passi (o dentro la fascia `transito`), 'lontano' altrove: la
+  // fila delle schede (riduci, ingrandisci, chiudi), fuori dalla finestra, un altro schermo. nellaPagina: sopra la scheda.
+  _puntatore(transito = 0) {
     const via = { dove: 'lontano', punto: null, nellaPagina: false };
     if (!this._guardabile()) return via;
     let p = null;
@@ -221,7 +232,7 @@ class BordoDestro {
     const dx = cb.x + cb.width - 1 - p.x;
     const inAltezza = p.y >= alto && p.y < cb.y + cb.height;
     const nellaPagina = inAltezza && p.x >= cb.x && dx >= BORDO;
-    if (!inAltezza || dx < 0 || dx >= VICINO) return { dove: 'lontano', punto: p, nellaPagina };
+    if (!inAltezza || dx < 0 || dx >= Math.max(VICINO, transito)) return { dove: 'lontano', punto: p, nellaPagina };
     return { dove: dx < BORDO ? 'bordo' : 'vicino', punto: p, nellaPagina };
   }
 

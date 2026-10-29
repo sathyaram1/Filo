@@ -2214,14 +2214,18 @@
     $('ovClose').addEventListener('click', closeOverlay);
     overlayBox.querySelectorAll('[data-strumento]').forEach((b) => b.addEventListener('click', () => openModuleConfig(b.dataset.strumento)));
   }
+  // La stessa cornice degli altri strumenti (renderSimpleFormat): un pulsante dentro la sua scheda.
   function renderSettingsModule(host) {
+    const pad = document.createElement('div');
+    pad.className = 'ed-mod-pad ed-fmt';
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'ed-btn ed-strumenti-btn';
-    b.innerHTML = `${ICONS.options ? ICONS.options(16) : '⚙'}<span>Impostazioni degli strumenti</span>`;
+    b.className = 'ed-fmt-btn ed-fmt-largo ed-strumenti-btn';
+    b.innerHTML = `<span class="ed-fmt-glifo">${ICONS.options ? ICONS.options(16) : '⚙'}</span><span class="ed-fmt-nome">Impostazioni degli strumenti</span>`;
     b.title = 'Scorciatoie e regolazioni degli strumenti';
     b.addEventListener('click', (e) => { e.stopPropagation(); openStrumentiConfig(); });
-    host.appendChild(b);
+    pad.appendChild(b);
+    host.appendChild(pad);
   }
 
 
