@@ -33,12 +33,10 @@
 //     "node storage-allegati-motore-vero.mjs"
 //
 // Esito atteso: tutte le righe verdi, uscita 0, più le righe NOTA di ciò che
-// l'emulatore non sa misurare. Al passaggio di #1518 (2026-10-23, firebase-tools
-// 15.34): 47/47 con due NOTE (Cache-Control e Content-Language non arrivano alle
-// regole; il codice di scarico scelto da chi carica l'emulatore lo toglie dai
-// metadati prima di valutarle). A #1728 (2026-10-29, firebase-tools 15.34.2):
-// 55/55 con tre NOTE; con le regole di prima 51/55, rossi i quattro casi a
-// campi assenti.
+// l'emulatore non sa misurare. A #1769 (2026-10-29, firebase-tools 15.34.2):
+// 54/54 con tre NOTE; con le regole di prima 53/54, rosso «come-il-deposito-vero».
+// Senza le guardie `in` sui due campi letti, 43/54: l'emulatore nega ogni
+// caricamento normale, perché metadati e nome di scarico gli arrivano assenti.
 //
 // QUEL CHE L'EMULATORE NON DICE (#1666, #1769): il deposito vero, prima di
 // valutare le regole, scrive da sé il codice di scarico nei metadati, il nome di
