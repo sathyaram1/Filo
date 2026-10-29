@@ -125,7 +125,12 @@ Cinque regole quando si tocca qualcosa che vive nel content script:
   non si tocca prima**: la sua finestra vuota, toccata, la riusa il documento
   vero e il preload non gira più (niente Filo lì dentro, provato anche con la
   protezione spenta); la pagina che la tocca da sé l'ha già creata, quindi lì
-  prepararla non costa niente. Uno che va su un'altra origine sì: avrà una
+  prepararla non costa niente. Se la tocca per indice o per nome non lo si vede:
+  il documento che eredita la finestra si prepara al suo `load` se il suo preload
+  non si è fatto sentire col canale, e restano scoperti solo i suoi script che
+  girano prima del load. In un sito con accessi esenti (`esentiNelSito`) un
+  documento senza preload può essere uno di quelli: lì al load si preparano solo
+  i vuoti. Uno che va su un'altra origine sì: avrà una
   finestra nuova. Restano scoperti, per indice, solo `srcdoc` prima che carichi
   e un indirizzo della stessa origine che non arriva mai (un 204) o è lento:
   coprirli spegne Filo in quei riquadri. In Automatico restano aperti per scelta

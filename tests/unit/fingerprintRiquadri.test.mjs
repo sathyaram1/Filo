@@ -70,3 +70,12 @@ test('fuori dalle prove la guardia non lascia nessun segno che un sito possa leg
   assert.doesNotMatch(G.buildGuardSource(123, 1, 'xabc', false), /__filoFp/);
   assert.match(G.buildGuardSource(123, 1, 'xabc', true), /__filoFpGuard/);
 });
+
+test('un sito con pagine di accesso esenti lo dice alla guardia, uno qualunque no', () => {
+  assert.equal(FP.esentiNelSito('https://github.com/filo/filo'), true);
+  assert.equal(FP.esentiNelSito('http://www.linkedin.com:8080/feed'), true);
+  assert.equal(FP.esentiNelSito(PAGINA), false);
+  assert.equal(FP.esentiNelSito('https://accounts.google.com/x'), false);
+  assert.equal(FP.esentiNelSito('about:srcdoc'), false);
+  assert.equal(FP.esentiNelSito(''), false);
+});
