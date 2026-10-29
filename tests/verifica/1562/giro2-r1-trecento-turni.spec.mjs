@@ -1,4 +1,5 @@
-// Esplorazione #1562 giro 2: quanti turni restano com'erano prima che la memoria dei giri li dimentichi.
+// Verifica #1562 — giro 2, rilievo 1: oltre il trecentesimo turno nel tratto la memoria dei giri dimentica il più
+// vecchio, che torna riscritto: da lì ogni turno riscrive il tratto quasi dall'inizio (cache e ragionamento persi).
 
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
@@ -42,6 +43,7 @@ function azzera() {
 }
 const fa = (min) => new Date(Date.now() - min * 60000).toISOString();
 
+// Un turno come lo compone il main; uno su due con un'azione (un timer), tutti col loro ragionamento.
 async function turno({ chat = 'ab12', testo, minutiFa, conGiro = false }) {
   await Chats.append(chat, { role: 'user', text: testo, ts: fa(minutiFa) });
   const componi = () => Contesto.componi({ chatId: chat, userMessage: testo, storia: [], tetti: TETTI, osserva: () => '', incognito: false });
@@ -54,7 +56,7 @@ async function turno({ chat = 'ab12', testo, minutiFa, conGiro = false }) {
   const risposta = r.messages.at(-1);
   const rd = [{ type: 'reasoning.text', text: `pensiero ${testo}`, signature: `firma ${testo}`, format: 'anthropic-claude-v1', index: 0 }];
   const extra = conGiro
-    ? [Tools.assistantMessage({ text: '', toolCalls: [{ id: `c${testo}`, name: 'TIMER', arguments: '{"minuti":5}' }], reasoningDetails: rd }), Tools.toolMessage(`c${testo}`, 'timer messo')]
+    ? [Tools.assistantMessage({ text: '', toolCalls: [{ id: `c${testo}`, name: 'TIMER', arguments: '{"secondi":300}' }], reasoningDetails: rd }), Tools.toolMessage(`c${testo}`, 'timer messo')]
     : [];
   Contesto.ricordaEsiti(chat, risposta.ts, { azioni: [], reasoningDetails: rd });
   Contesto.ricordaGiro(chat, risposta.ts, { messaggi: extra, testo: risposta.text, reasoningDetails: rd, azioni: [], seguiti: [] });
@@ -65,17 +67,16 @@ function riscritto(prima, dopo) {
   return prima.findIndex((m, i) => JSON.stringify(m) !== JSON.stringify(dopo[i]));
 }
 
-test('esplora: trecentoventi turni brevi in tre giorni', async () => {
+test('r1 trecentoventi turni brevi in un giorno e mezzo, sotto i tetti: nessun turno riscrive quelli di prima', async () => {
   test.setTimeout(600000);
   azzera();
   const rotture = [];
   let prima = null;
   for (let i = 0; i < 320; i++) {
     const r = await turno({ testo: `t${i}`, minutiFa: 2000 - i * 6, conGiro: i % 2 === 0 });
-    if (prima) { const k = riscritto(prima, r); if (k !== -1) rotture.push(`${i}@${k}/${prima.length}`); }
+    if (prima) { const k = riscritto(prima, r); if (k !== -1) rotture.push(`turno ${i + 1} dal messaggio ${k} di ${prima.length}`); }
     prima = r;
   }
-  console.log('rotture', rotture.length, rotture.slice(0, 30).join(' '));
-  console.log('ultimo', prima.length, 'messaggi', Math.round(JSON.stringify(prima).length / 3.5), 'token circa');
-  expect(rotture.length).toBe(0);
+  expect(FC.caratteriDi(prima) / FC.CARATTERI_PER_TOKEN, 'la prova è uscita dal tetto in token').toBeLessThan(TETTI.token * 0.75);
+  expect(rotture, rotture.slice(0, 5).join('; ')).toEqual([]);
 });
