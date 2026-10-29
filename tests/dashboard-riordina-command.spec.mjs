@@ -150,9 +150,12 @@ async function coloriFermi(shell) {
   }, { timeout: 15_000, message: 'i colori identità continuano a cambiare' }).toBe(true);
 }
 
-test('"/riordina" con una scheda sola risponde "già in ordine", e la dashboard resta viva', async ({ openTab }) => {
+test('"/riordina" con una scheda sola risponde "già in ordine", e la dashboard resta viva', async ({ shell, openTab }) => {
   const dash = await openTab(NEWTAB);
   await expect(dash.locator('#input')).toBeVisible({ timeout: 8_000 });
+  // La scheda d'avvio è la stessa pagina: finché una sola ha già il colore, il riordino la sposterebbe davvero.
+  await expect.poll(() => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.every((t) => !!t.identityColor)),
+    { timeout: 8_000 }).toBe(true);
 
   await submit(dash, '/riordina');
 
