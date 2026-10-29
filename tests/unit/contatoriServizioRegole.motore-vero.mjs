@@ -71,6 +71,7 @@ await prova('un’ora con ogni misura del servizio parte col suo documento, e il
     piattaforma: 'linux',
     casuale: () => `${'cd'.repeat(9)}${String(++n).padStart(2, '0')}`,
     rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'chiave-di-prova' }),
+    idToken: async () => tokenAnonimo(),
     log: () => {},
   });
   const m = Misure.crea({
