@@ -361,9 +361,8 @@ html[data-chrome-compact="1"] .addr {
 /* I segni dei permessi non si mangiano il nome: sulla scheda che la fila stringe resta il primo (shell.js, misura). */
 .tab.segni-stretti:not(.misura) .tab-permessi .segno ~ .segno { display: none; }
 
-/* Scheda stretta con l'avviso audio: allargandola compaiono avviso, icona, X (sull'attiva sempre), titolo, paese, ognuno
-   quando ci sta con chi lo precede (icone 16, X 18, paese 28 col margine, gap 6, titolo 2em): così il titolo comparso
-   non sparisce più allargando (#1293). Prova in tests/tab-audio-indicator.spec.mjs. */
+/* Scheda stretta con l'avviso: allargandola compaiono avviso, icona, X, titolo, paese, ognuno quando ci sta con chi lo
+   precede (icone 16, X 18, paese 28, gap 6, titolo 2em), così il titolo non risparisce (#1293, tab-audio-indicator). */
 @container tab (width < calc(102px + 2em)) {
   .tab:has(> .tab-alert) > .proxy-ind { display: none; }
 }
