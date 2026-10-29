@@ -128,6 +128,7 @@ const piena = (() => {
 })();
 vero(S.valida(piena).ok, S.valida(piena).motivo);
 const idPiena = C.idDocumento(piena);
+await prova('senza identità non si crea', () => assertFails(setDoc(doc(senzaIdentita, `${S.COLLEZIONE}/${idPiena}`), piena)));
 await prova('il documento più carico dell’app passa', () => assertSucceeds(setDoc(doc(anon, `${S.COLLEZIONE}/${idPiena}`), piena)));
 await prova('ma non si riscrive', () => assertFails(setDoc(doc(anon, `${S.COLLEZIONE}/${idPiena}`), piena)));
 await prova('né si aggiorna', () => assertFails(updateDoc(doc(anon, `${S.COLLEZIONE}/${idPiena}`), { os: 'win' })));
