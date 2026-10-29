@@ -294,11 +294,13 @@ export function findStateIdByBranch(root, branch) {
  * L'id si trova da solo (identità attesa, poi stato per branch): chi consegna
  * non deve ricordarsi di passarlo — è la stessa scommessa già persa sul
  * biglietto e sulla firma dei feedback.
+ *
+ * `sha` sigilla un commit diverso dalla punta: il rilascio dopo la domanda di fine sessione, che non spedisce più (#1555).
  */
-export function sealCurrentWork(root, { id = '', by = 'consegna' } = {}) {
+export function sealCurrentWork(root, { id = '', by = 'consegna', sha: dichiarato = '' } = {}) {
   const branch = currentBranch(root);
   if (!branch || branch === 'HEAD' || isProtectedBranch(branch)) return { sealed: false, why: 'no_branch' };
-  const sha = headSha(root);
+  const sha = String(dichiarato || '') || headSha(root);
   if (!sha) return { sealed: false, why: 'no_head' };
   let fid = String(id || '');
   if (!fid) {
