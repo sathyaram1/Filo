@@ -68,7 +68,7 @@ test('si legge solo da admin, si crea una volta con l’identità anonima e non 
   assert.deepEqual(per('write'), []);
   assert.deepEqual(per('update'), ['false']);
   assert.deepEqual(per('delete'), ['false']);
-  assert.deepEqual(per('create'), ['contatoriHomePagina(request.resource.data)']);
+  assert.deepEqual(per('create'), ['request.auth != null && contatoriHomePagina(request.resource.data)']);
 });
 
 test('i campi sono quelli che l’app costruisce, tutti obbligatori, con la testa delle altre ore', () => {
