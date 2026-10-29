@@ -1,9 +1,9 @@
-// Verifica #1433, giro 4, rilievo 1: aperto il pannello con un clic sulla striscia, la selezione del foglio resta e
+// Verifica #1433, giro 4, rilievo 2: aperto il pannello con un clic sulla striscia, la selezione del foglio resta e
 // il Grassetto del pannello la mette in grassetto (come aprendolo col tasto).
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
-test('r1 testo selezionato, clic sulla striscia, clic su Grassetto nel pannello: il testo diventa grassetto', async ({ app, openTab }) => {
+test('r2 testo selezionato, clic sulla striscia, clic su Grassetto nel pannello: il testo diventa grassetto', async ({ app, openTab }) => {
   const ed = await openTab('filo://editor/editor.html');
   await ed.waitForFunction(() => document.querySelector('.pd-pannello') && document.querySelector('.pd-elemento[data-elemento="word-count"]'));
   await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'PANNELLO_APP', operazione: 'aggiungi', elemento: 'bold' }));
