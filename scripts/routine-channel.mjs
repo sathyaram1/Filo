@@ -1567,29 +1567,21 @@ if (isMain) {
     // contenitore. Se il push non riesce NON si rilascia: si stampa la causa e
     // si esce diverso da zero, il worker sistema e rilancia (il biglietto scade
     // da solo dopo 60 minuti se muore). `--senza-push` dove non c'è un repo.
-    if (data['senza-push'] !== true && cartellaSua && !finito) {
-      // Prima quello che è rimasto fuori dai commit (un file nato da una
-      // shell non passa dall'hook): si committa qui, e si dice.
-      const c = commitRestante(ROOT);
-      if (!c.ok) {
-        console.error(`Modifiche fuori dai commit che non riesco a committare: ${c.reason}`);
-        console.error('Non ho rilasciato niente: porta la directory a un commit e rilancia lo stesso comando.');
+    // Dopo la domanda di fine sessione l'ultima spinta c'è già stata: da lì non si spedisce più (#1555).
+    const chiusura = cartellaSua && !finito ? chiusuraDelBiglietto(marcatore) : null;
+    let punta = chiusura && chiusura.sha ? { branch: chiusura.branch, sha: chiusura.sha } : null;
+    if (chiusura) {
+      const fermo = fermoDopoLaChiusura(ROOT, chiusura.sha);
+      if (fermo) console.error(`dopo la domanda di fine sessione il ramo non si spedisce più: ${fermo} restano in questa cartella, fuori dal lavoro.`);
+    } else if (data['senza-push'] !== true && cartellaSua && !finito) {
+      const s = salvaRamoDelGiro(ROOT);
+      for (const riga of s.righe) console.error(riga);
+      if (!s.ok) {
+        console.error(s.errore);
+        console.error(`Non ho rilasciato niente: ${s.rimedio}`);
         process.exit(1);
       }
-      if (c.committed.length) {
-        console.error(`committate ${c.committed.length} modifiche rimaste fuori dai commit: ${c.committed.slice(0, 3).join(', ')}${c.committed.length > 3 ? ` (+${c.committed.length - 3} file)` : ''}`);
-      }
-      if (c.fuori && c.fuori.length) {
-        console.error(`NON committo e NON spedisco ${c.fuori.join(', ')}: ha la forma di una copia dei dati del server e il repo è pubblico. Resta nella cartella, invisibile a git: spostalo nella cartella temporanea del sistema (os.tmpdir()).`);
-      }
-      const p = pushRamoCorrente(ROOT);
-      if (!p.ok) {
-        console.error(`Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`);
-        console.error('Non ho rilasciato niente: sistema il push e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
-        process.exit(1);
-      }
-      if (p.avviso) console.error(p.avviso);
-      console.error(p.skipped ? `push saltato: ${p.reason}` : `ramo '${p.branch}' spedito su origin${p.forced ? ' (storia riscritta: --force-with-lease)' : ''}`);
+      punta = s.punta;
     }
     // Il rapporto di fine sessione lo fa uno script, non l'agente, e parte da
     // solo qui. Se lo script fallisce si rilascia comunque, con la nota.
