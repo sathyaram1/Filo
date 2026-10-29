@@ -563,6 +563,7 @@ module.exports = function register(on, ctx) {
     let soggetto = msg.soggetto;
     let dove = '';
     let recinto = 'filo';
+    let daPagina = false;
     if (isFilo(origin) || sender?.isShell) {
       const d = String(msg.dove || '');
       if (/^(?:filo|https?):\/\//i.test(d)) dove = d;
@@ -574,9 +575,10 @@ module.exports = function register(on, ctx) {
       soggetto = u.hostname.replace(/^www\./, '');
       dove = u.href;
       recinto = u.hostname;
+      daPagina = true;
     }
     const rif = app === 'aiuto' ? `${recinto}|${String(msg.rif == null ? '' : msg.rif)}` : msg.rif;
-    const chat = await globalThis.SN_CONVERSAZIONI_APP.annota({ app, rif, soggetto, dove, messaggi: msg.messaggi });
+    const chat = await globalThis.SN_CONVERSAZIONI_APP.annota({ app, rif, soggetto, dove, messaggi: msg.messaggi, daPagina });
     if (chat && app === 'aiuto') ctx.segnaChatAiuto(sender, chat.id);
     return chat ? { ok: true, id: chat.id } : { ok: false, error: 'niente da scrivere' };
   });

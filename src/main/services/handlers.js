@@ -2144,6 +2144,18 @@ function segnaLetturaAiuto(sender, action) {
   fontiPerAiuto.set(wc, fonti);
 }
 
+// La classe peggiore che il compito ha letto quando Filo risponde: la risposta la porta nell'archivio, e chi la rilegge
+// da un'altra conversazione la eredita (#1508). Gli spostamenti scelti dall'utente valgono come per lo stato.
+async function classeLettaDelCompito(sender, { contesto = null, fontiLette = null } = {}) {
+  try {
+    const A = globalThis.SN_AUTONOMIA;
+    let aut = {};
+    try { aut = (await Storage.getSettings()).autonomia || {}; } catch (_) {}
+    const fonti = fontiDelCompito(sender, contesto, fontiLette);
+    return A.stato({ fonti, livello: A.livelloAttivo(aut.livello), spostamenti: aut.fonti, manopole: aut.manopole }).classe;
+  } catch (_) { return null; }
+}
+
 // Un documento della cartella Download l'ha scritto qualcun altro: classe 5, non 4 (#530).
 function fileScaricato(p) {
   if (!p) return false;
@@ -2166,6 +2178,12 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
     elenco: ing.elenco, difesa: ing.difesa, parola: !!ing.parola, origine, dentroPerimetro, guardiano: false,
   };
   const d = A.decideDettaglio(ingressi);
+  let nuovaUguale = false;
+  const diUnaNuova = d.risposta === 'no' && Array.isArray(contesto) ? LETTURE_DI_UNA_NUOVA.get(contesto) : null;
+  if (diUnaNuova) {
+    const stNuova = A.stato({ fonti: fontiDelCompito(null, diUnaNuova), livello, spostamenti: aut.fonti, manopole: aut.manopole });
+    nuovaUguale = A.decide({ ...ingressi, stato: stNuova.stato }) === 'no';
+  }
   let perche = '';
   if (d.risposta !== 'si' && d.risposta !== 'no') {
     const daPulito = st.stato === 'contaminato' ? A.decide({ ...ingressi, stato: 'pulito' }) : d.risposta;
@@ -2173,8 +2191,10 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
     // Una difesa abbassata vuole sempre la parola: il motivo lo dice già l'`avviso` del box, una volta sola.
     else if (d.regola === 'perimetro') perche = ing.perchePerimetro || 'Te lo chiedo perché non me l\'hai chiesto tu: è una mia proposta.';
   }
-  return { ...d, livello, stato: st, perche, conCosto: (costo) => A.decide({ ...ingressi, costo }) };
+  return { ...d, livello, stato: st, perche, nuovaUguale, conCosto: (costo) => A.decide({ ...ingressi, costo }) };
 }
+// Il contesto di un turno della chat → le letture che avrebbe davanti una conversazione nuova (#1508).
+const LETTURE_DI_UNA_NUOVA = new WeakMap();
 
 // Le azioni che l'agente sulla pagina fa da sé nel content script (copia, cerca, condividi) dichiarano solo
 // il costo: la risposta è la stessa del dispatch, con la pagina web come fonte letta.
@@ -2242,6 +2262,7 @@ function fraseNo(ing, decisione, sender) {
     regola: decisione.regola, elenco: ing.elenco, segreto: ing.segreto, dove: ing.dove,
     fonte: decisione.stato && decisione.stato.fonte, livello: decisione.livello,
     daPagina: /^https?:/i.test(String(sender?.tab?.url || sender?.url || '')),
+    nuovaUguale: !!decisione.nuovaUguale,
   });
 }
 
@@ -3317,14 +3338,14 @@ async function eseguiAzioneFilo(action, {
             kind: c.kind || null,
             snippet: ChatArchive.snippetFor(c, termini.join(' ')),
           }));
-          // Un frammento preso da un testo venuto da fuori (l'esito di un comando dato in chat) resta quella lettura.
+          // Un frammento preso da un testo venuto da fuori (l'esito di un comando dato in chat, le parole scritte nell'Aiuto
+          // sopra un sito) resta quella lettura; uno preso da una risposta di Filo porta la classe che lei aveva letto (#1508).
           const daFuori = [];
+          let classeLetta = 1;
           found.forEach((c, i) => {
-            const pezzo = String(results[i].snippet || '').replace(/^…|…$/g, '').trim();
-            if (!pezzo) return;
-            for (const x of globalThis.SN_FILO_CONTESTO.daFuoriDi(c.messages)) {
-              if (x.testo.replace(/\s+/g, ' ').includes(pezzo)) { daFuori.push({ testo: pezzo, fonte: x.fonte }); break; }
-            }
+            const p = globalThis.SN_FILO_CONTESTO.provenienzaDelFrammento(c, results[i].snippet);
+            daFuori.push(...p.daFuori);
+            classeLetta = Math.max(classeLetta, p.classeLetta);
           });
           return {
             executed: true,
@@ -3335,6 +3356,7 @@ async function eseguiAzioneFilo(action, {
               allargata,
               results,
               ...(daFuori.length ? { daFuori } : {}),
+              ...(classeLetta > 1 ? { classeLetta } : {}),
               ...(pagine.length ? { pagine } : {}),
               ...(cambiTrovati.length ? { cambi: cambiTrovati } : {}),
               ...(cambiTrovati.length && cambiCercati.allargata ? { cambiCercatiCon: cambiCercati.termini } : {}),
@@ -4472,12 +4494,11 @@ async function cambiPerChat(query) {
 // La rilettura di una conversazione con CERCA_CHAT e l'id: intera fino a `cap`, oltre testa e coda, e con `da` un pezzo
 // che non supera la stessa misura. `intera`: il modello l'ha davanti tutta, e i suoi pezzi non si ripescano (#868.1).
 function rilettura(chat, { da = null, cap }) {
-  const daFuori = globalThis.SN_FILO_CONTESTO.daFuoriDi(chat.messages);
+  // Per la regola dell'indirizzo scritto (#553) contano solo le parole dell'utente: non quelle di Filo, che le ha scritte
+  // il modello, né quelle scritte nell'Aiuto sopra un sito, che le vedeva il sito (#1508).
+  const { daFuori, parole: scrittoDallUtente, classeLetta } = globalThis.SN_FILO_CONTESTO.provenienzaDellaChat(chat);
   const transcript = ChatArchive.transcriptForReading(chat.messages, { da, cap, pezzo: Math.min(ChatArchive.PEZZO_RILETTURA, cap) });
   const conDa = da != null && da !== '' && Number.isFinite(Number(da));
-  // Per la regola dell'indirizzo scritto (#553) contano solo le parole dell'utente: quelle di Filo le ha scritte il modello.
-  const scrittoDallUtente = (Array.isArray(chat.messages) ? chat.messages : [])
-    .filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || '')).join('\n');
   return {
     chatRead: chat.id,
     found: true,
@@ -4488,6 +4509,7 @@ function rilettura(chat, { da = null, cap }) {
     ...(!conDa && transcript.length <= cap ? { intera: true } : {}),
     linkUtente: PageRead.linkNelTesto(scrittoDallUtente),
     ...(daFuori.length ? { daFuori } : {}),
+    ...(classeLetta > 1 ? { classeLetta } : {}),
   };
 }
 
@@ -5886,9 +5908,16 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const fuori = FCx.letturaDaFuori(m);
     if (fuori) azioniViste.push(fuori);
   }
+  // Le risposte di altre conversazioni davanti al modello portano quello che avevano letto, anche dopo un riavvio (#1508).
+  const dalTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: chatId });
+  if (dalTratto) azioniViste.push(dalTratto);
+  // Quello che una conversazione nuova avrebbe davanti, compresa questa: decide se il «no» può consigliarla.
+  const tuttoIlTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: null });
+  LETTURE_DI_UNA_NUOVA.set(azioniViste, [...(filo ? filo.perUnaNuova || [] : []), ...(tuttoIlTratto ? [tuttoIlTratto] : [])]);
   // Le parole dell'utente che il modello ha davanti: un codice che ha scritto lui può uscire (#810). Un turno
-  // interno non è sua voce, nemmeno il testo di un suggerimento della home: lo scrive un modello.
-  let paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
+  // interno non è sua voce, nemmeno il testo di un suggerimento della home: lo scrive un modello. Né la riga di una
+  // conversazione di un'altra app, che scrive Filo, né quello che l'utente ha scritto nell'Aiuto sopra un sito (#1508).
+  let paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello && !m.riga && !m.daPagina).map((m) => String(m.text || ''))
     .concat(internal || daModello ? [] : [String(userMessage || '')]).join('\n');
   // Gli indirizzi che il modello ha davanti, per la regola dell'indirizzo scritto (#553, src/main/services/pageRead.js).
   const provenienza = PageRead.contestoChat();
@@ -6180,8 +6209,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const giaScritta = unisciTesti(risposta);
     if (!chatId || (!successe.length && !giaScritta)) return;
     const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
+    const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     // La parte già scritta non è passata dal giudizio dei collegamenti: riaperta, i suoi chiedono l'OK (#1505).
-    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, classeLetta, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
     const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
   };
@@ -6521,10 +6551,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
     const cambi = renderedActions.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
+    const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     const dopo = await appendToChatArchive(
       chatId,
       {
-        role: 'filo', text: textReply, actions: successe,
+        role: 'filo', text: textReply, actions: successe, classeLetta,
         ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
         ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
         ...(senzaVerdetto ? { senzaVerdetto } : {}),
