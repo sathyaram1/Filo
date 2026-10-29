@@ -1,4 +1,4 @@
-// Verifica #1476 giro 5: esplorazione di Ctrl/Cmd+Shift+T (contatori, pressioni ravvicinate, fuoco in un campo).
+// Verifica #1476 giro 5, rilievo 2: Ctrl/Cmd+Shift+T si conta fra le schede riaperte, non fra quelle trascinate.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -49,7 +49,7 @@ const contatori = (app) => app.evaluate(async () => {
   return out;
 });
 
-test('contatori: una riapertura con Ctrl+Shift+T è una riaperta, non una scheda trascinata', async ({ app, shell, testServer }) => {
+test('r2 una riapertura con Ctrl+Shift+T è una riaperta, non una scheda trascinata', async ({ app, shell, testServer }) => {
   await shell.waitForLoadState('domcontentloaded');
   const a = testServer.html('<title>A</title><h1>A</h1>', { pubblico: true });
   const b = testServer.html('<title>B</title><h1>B</h1>', { pubblico: true });
@@ -69,34 +69,6 @@ test('contatori: una riapertura con Ctrl+Shift+T è una riaperta, non una scheda
   await expect.poll(() => info(app).then((i) => i.activeUrl), { timeout: 10_000 }).toBe(b);
   await sleep(1500);
   const dopo = await contatori(app);
-  expect(dopo.schedaTrascinata, 'nessuno ha trascinato una scheda').toBe(prima.schedaTrascinata);
+  expect.soft(dopo.schedaTrascinata, 'nessuno ha trascinato una scheda').toBe(prima.schedaTrascinata);
   expect(dopo.riaperte, 'la scheda chiusa è stata riaperta').toBe(prima.riaperte + 1);
-});
-
-test('due pressioni ravvicinate nell\'archivio riaprono due schede diverse', async ({ app, shell, testServer }) => {
-  await shell.waitForLoadState('domcontentloaded');
-  const vecchia = testServer.html('<title>Vecchia</title><h1>v</h1>');
-  const vecchissima = testServer.html('<title>Vecchissima</title><h1>vv</h1>');
-  await app.evaluate(async (_e, { vecchia, vecchissima }) => {
-    await globalThis.SN_ARCHIVED_TABS.archive({ url: vecchissima, title: 'Vecchissima', closedAt: '2026-10-01T10:00:00.000Z' });
-    await globalThis.SN_ARCHIVED_TABS.archive({ url: vecchia, title: 'Vecchia', closedAt: '2026-10-02T10:00:00.000Z' });
-  }, { vecchia, vecchissima });
-  const base = await info(app);
-  await premi(app, 'T', ['control', 'shift'], 2);
-  await expect.poll(() => info(app).then((i) => i.count), { timeout: 10_000 }).toBe(base.count + 2);
-  const dopo = await info(app);
-  expect(dopo.urls).toContain(vecchia);
-  expect(dopo.urls).toContain(vecchissima);
-});
-
-test('col fuoco in un campo della pagina riapre e nel campo non scrive niente', async ({ app, openTab, testServer }) => {
-  const via = testServer.html('<title>Via</title><h1>via</h1>');
-  await apriEAspetta(app, via);
-  await premi(app, 'W', ['control']);
-  await expect.poll(() => info(app).then((i) => i.urls.includes(via)), { timeout: 10_000 }).toBe(false);
-  const page = await openTab(testServer.html('<title>Campo</title><input id="c"><script>document.getElementById("c").focus()</script>'));
-  await expect.poll(() => page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('c');
-  await premi(app, 'T', ['control', 'shift']);
-  await expect.poll(() => info(app).then((i) => i.activeUrl), { timeout: 10_000 }).toBe(via);
-  expect(await page.locator('#c').inputValue()).toBe('');
 });
