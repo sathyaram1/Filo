@@ -345,9 +345,8 @@
       aggiungi('TEMPO', righe);
     }
     if (state.sistema !== undefined) {
-      const righe = righeSistema(state.sistema);
-      // Non ogni punto di batteria: la sezione torna quando la batteria passa una decina, o cambia il resto.
-      aggiungi('SISTEMA', righe, righe.join('\n').replace(/Batteria: (\d+)%/, (_m, n) => `Batteria: ~${Math.round(Number(n) / 10) * 10}%`));
+      // Torna alla chat a ogni cambio, batteria compresa: la sezione dice di rispondere da qui a «quanta batteria ho?».
+      aggiungi('SISTEMA', righeSistema(state.sistema));
     }
     // CREDITI — se l'utente chiede quanti crediti gli restano, rispondi con
     // questo saldo. Senza portafoglio la ricarica è DAILY_REFILL, letta dal
@@ -369,6 +368,9 @@
       // prime due cifre, o quando il server smette (o riprende) di rispondere.
       const c = state.credits;
       const saldo = Number.isFinite(Number(c.balance)) && c.balance != null ? Number(Number(c.balance).toPrecision(2)) : null;
+      if (perChat && saldo != null && saldo !== Number(c.balance)) {
+        righe.push('Il saldo qui sopra torna solo quando cambiano le sue prime due cifre: dallo come approssimato, la cifra esatta è nella pagina Crediti.');
+      }
       aggiungi('CREDITI', righe, JSON.stringify({
         saldo, wallet: !!c.wallet, quota: c.dailyCredits ?? null, propria: !!(c.usingOwnKey || c.chiavePropria), senzaChiave: !!c.keyMissing,
         muto: !!c.nonRisponde || c.lastKnown === 'server' || c.lastKnown === 'models',

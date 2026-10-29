@@ -637,7 +637,7 @@ test('l\'esito di un comando dato in chat resta davanti alle altre schede col tr
   }
 });
 
-test('un messaggio lunghissimo incollato e tagliato nel contesto si rilegge intero; oltre il tetto, a pezzi', async ({ app }) => {
+test('un messaggio lunghissimo incollato torna intero nei turni dopo e si rilegge intero; oltre il tetto, a pezzi', async ({ app }) => {
   test.setTimeout(120_000);
   await primaScheda(app);
   const lungo = 'a'.repeat(100_000) + ' SEGNO-DEL-MEZZO-77 ' + 'b'.repeat(100_000);
@@ -654,9 +654,10 @@ test('un messaggio lunghissimo incollato e tagliato nel contesto si rilegge inte
   let tutte = await chiamate(app);
   const secondo = tutte[1];
   const tratto = secondo.slice(0, posDomanda(secondo)).map(testo).join('\n');
-  // Il tratto lo taglia e dice con quale id rileggerlo; la rilettura, col tetto di serie, lo dà intero.
-  expect(tratto).toContain('CERCA_CHAT con id "scheda-lunga"');
-  expect(tratto).not.toContain('SEGNO-DEL-MEZZO-77');
+  // Mandato intero nel suo turno, torna intero finché il CONTESTO è lo stesso (#1562): riaccorciarlo riscriverebbe il
+  // tratto da lì. La rilettura, col tetto di serie, lo dà intero.
+  expect(tratto).toContain('SEGNO-DEL-MEZZO-77');
+  expect(tratto).not.toContain('caratteri di questo messaggio non sono qui');
   expect(testo(tutte[2].find((m) => m.role === 'tool'))).toContain('SEGNO-DEL-MEZZO-77');
   // Con un tetto basso la rilettura dà testa e coda col numero da cui ripartire, e il pezzo chiesto ha il mezzo.
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ contestoFilo: { token: 20000 } }));

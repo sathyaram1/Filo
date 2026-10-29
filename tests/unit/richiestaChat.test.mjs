@@ -19,6 +19,8 @@ require('../../src/shared/filoTrattoVivo.js');
 require('../../src/shared/cambi.js');
 require('../../src/shared/actionLevels.js');
 require('../../src/shared/actionTools.js');
+require('../../src/shared/sistema.js');
+require('../../src/shared/filoState.js');
 require('../../src/main/services/providers/openrouter.js');
 globalThis.SN_CONST = { ...globalThis.SN_CONST, STORAGE_KEYS: { ...globalThis.SN_CONST.STORAGE_KEYS, FILO_CHATS: 'filo_chats' } };
 globalThis.chrome = { storage: { local: { async get(k) { return { [k]: undefined }; }, async set() {}, async remove() {} } } };
@@ -275,4 +277,53 @@ test('uno stile di scrittura nuovo o cambiato rifà la fotografia: sta nel CONTE
   assert.notEqual(due.messages[0].content, uno.messages[0].content);
   assert.match(due.messages[0].content, /<<<STILE_UTENTE>>>\nDammi del tu\./);
   assert.doesNotMatch(testoDi(due.messages.at(-1)), /STILE_UTENTE/);
+});
+
+// Le copie per rimandare un turno com'era vivono quanto il suo messaggio nel tratto, non per numero: oltre il
+// trecentesimo turno la più vecchia, dimenticata, riscriveva il tratto dall'inizio a ogni messaggio (#1562).
+test('trecentoventi turni brevi sotto i tetti: nessun turno riscrive quelli di prima', async () => {
+  azzera();
+  const sezioni = sezioniDi();
+  let prima = null;
+  const rotture = [];
+  for (let i = 0; i < 320; i++) {
+    const chat = 'ab12';
+    const testo = `t${i}`;
+    await Chats.append(chat, { role: 'user', text: testo, ts: fa(2000 - i * 6) });
+    const componi = () => Contesto.componi({ chatId: chat, userMessage: testo, storia: [], tetti: TETTI, osserva: () => '', incognito: false });
+    let c = await componi();
+    const foto = Contesto.fotografa({ incognito: false, sezioni, ancora: c.ancora, durata: '1h' });
+    if (foto.epoca !== c.epoca) c = await componi();
+    const messages = FC.richiesta({ sistema: PROMPTS.filoChatStatic() + foto.testo, tratto: c.messaggi, domanda: c.domanda({ stato: foto.cambiate, epoca: foto.epoca }) });
+    const dopo = await Chats.append(chat, { role: 'filo', text: `Fatto ${testo}.`, ts: fa(2000 - i * 6 - 0.2) });
+    const ts = dopo.messages.at(-1).ts;
+    const extra = i % 2 ? [] : [Tools.assistantMessage({ text: '', toolCalls: [{ id: `c${i}`, name: 'TIMER', arguments: '{"secondi":300}' }], reasoningDetails: [pensiero(i)] }), Tools.toolMessage(`c${i}`, 'timer messo')];
+    Contesto.ricordaEsiti(chat, ts, { azioni: [], reasoningDetails: [pensiero(i)] });
+    Contesto.ricordaGiro(chat, ts, { messaggi: extra, testo: `Fatto ${testo}.`, reasoningDetails: [pensiero(i)], azioni: [], seguiti: [] });
+    if (prima && json(messages.slice(0, prima.length)) !== json(prima)) rotture.push(i + 1);
+    prima = messages;
+  }
+  assert.ok(FC.caratteriDi(prima) / FC.CARATTERI_PER_TOKEN < TETTI.token * 0.75, 'la prova è uscita dal tetto in token');
+  assert.deepEqual(rotture, [], `i turni ${rotture.slice(0, 5).join(', ')} riscrivono quelli di prima`);
+});
+
+// Gli strumenti non mandano il modello a sezioni che la chat non riceve più (lo STATO di prima, rifatto a ogni messaggio).
+test('le sezioni dello STATO che gli strumenti nominano ci sono nello STATO della chat', () => {
+  const chiavi = globalThis.SN_FILO_STATE.sezioni({ tabs: [], timers: [], notifications: [] }, { perChat: true }).map((s) => s.chiave);
+  for (const k of ['TEMPO', 'CAMBI RECENTI', 'CONVERSAZIONI RECENTI']) {
+    if (json(STRUMENTI).includes(`${k} dello STATO`) || json(STRUMENTI).includes(`dai ${k}`)) assert.ok(chiavi.includes(k), `gli strumenti nominano ${k}, che la chat non riceve`);
+  }
+});
+
+// Il CONTESTO resta fermo: un numero che cambia di poco senza tornare non si dà per «letto adesso».
+test('la batteria scesa da 84 a 75: il modello ha davanti il 75% di adesso, non l\'84% del CONTESTO', async () => {
+  azzera();
+  const stato = (livello) => globalThis.SN_FILO_STATE.sezioni({
+    tabs: [], timers: [], notifications: [], sistema: { batteria: { livello, inCarica: false }, rete: { online: true, tipo: 'cavo' } },
+  }, { perChat: true });
+  const conBatteria = (livello) => TV.sezioniUtente({ sistema: 'linux', profilo: 'Mario', statoSezioni: stato(livello) });
+  const uno = await turno({ testo: 'ciao', minutiFa: 50, sezioni: conBatteria(84) });
+  const due = await turno({ testo: 'quanta batteria ho?', minutiFa: 0, sezioni: conBatteria(75) });
+  assert.match(testoDi(due.messages.at(-1)), /Cambiato da quando[\s\S]*Batteria: 75%/);
+  assert.equal(due.messages[0].content, uno.messages[0].content, 'la batteria ha riscritto il CONTESTO');
 });

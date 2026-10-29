@@ -12,8 +12,9 @@ const TV = () => {
 };
 
 // Gli esiti delle azioni (pagine e documenti letti, comandi, ricerche) restano in memoria, mai su disco: quanto
-// entrano nel contesto lo decide la finestra (src/shared/filoContesto.js, #553.2, #587).
-const MAX_ESITI = 300;
+// entrano nel contesto lo decide la finestra (src/shared/filoContesto.js, #553.2, #587). Le copie se ne vanno quando il
+// loro messaggio esce dal tratto (`pota`); il tetto è solo una rete, lontana da ogni tratto vero (#1562).
+const MAX_ESITI = 20000;
 const esiti = new Map();
 
 function ricordaEsiti(chat, ts, { azioni, reasoningDetails } = {}) {
@@ -68,11 +69,24 @@ function potaFoto(vecchi) {
   for (const m of vecchi) togliFoto(FC().chiave(m));
 }
 
+// Le copie dei messaggi usciti dal tratto (non ripresi): ognuno pota le chat del suo lato, l'incognito le sue.
+function pota(vecchi, visti, incognito) {
+  const davanti = new Set(visti.map((m) => FC().chiave(m)));
+  for (const m of vecchi) {
+    if (chatIncognito.has(m.chat) !== incognito) continue;
+    const k = FC().chiave(m);
+    if (davanti.has(k)) continue;
+    esiti.delete(k);
+    giri.delete(k);
+    preamboli.delete(k);
+  }
+}
+
 // ── Il tratto vivo (SPEC-CONTESTO fase 3): in memoria, mai su disco ─────────
 // Quello che Filo scrive in testa a un messaggio dell'utente, per messaggio: le cose successe prima (fisse dalla prima
 // volta, rifatte solo se una è stata cancellata), le sezioni cambiate dalla fotografia (valgono per la sua epoca), le
 // note del turno (ricordi, intervista) e quelle dopo il testo. Un messaggio passato si rimanda così com'era.
-const MAX_PREAMBOLI = 2000;
+const MAX_PREAMBOLI = 2 * MAX_ESITI;
 const preamboli = new Map();
 function memoDi(k) {
   let m = preamboli.get(k);
@@ -411,6 +425,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
   });
   ancore[lato] = f.ancora;
   potaFoto(f.vecchi);
+  pota(f.vecchi, f.visti, incognito);
   // La domanda come la vedrà il tratto dei turni dopo: le sezioni cambiate (per questa epoca), le note del turno e
   // quelle dopo il testo si fissano qui. Senza la domanda nel filo (un turno interno, una chat senza id) resta null.
   const domanda = ({ stato = '', epoca: ep = epoca, onboarding = '', ricordi = null, dopo = null, immagini: urls = null } = {}) => {
