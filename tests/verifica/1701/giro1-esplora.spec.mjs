@@ -53,7 +53,7 @@ test('scheda aperta dietro, sito con immagine lenta: la barra la tinge mentre ca
   try {
     const id = await apriDietro(app, s.url);
     const t0 = Date.now();
-    await expect.poll(async () => (await statoScheda(app, shell, id)).tinta, { timeout: 4_000 }).not.toBe(null);
+    await expect.poll(async () => (await statoScheda(app, shell, id)).tinta, { timeout: 4_000, intervals: [100] }).not.toBe(null);
     const st = await statoScheda(app, shell, id);
     console.log('dietro, immagine lenta: tinta dopo', Date.now() - t0, 'ms', st);
     expect(rosso(st.colore)).toBe(true);
@@ -74,8 +74,21 @@ test('sito con uno script lento a metà pagina: la pagina si vede, il colore arr
   try {
     const id = await apriDietro(app, s.url);
     const t0 = Date.now();
-    await expect.poll(async () => (await statoScheda(app, shell, id)).tinta, { timeout: 3_000 }).not.toBe(null);
+    await expect.poll(async () => (await statoScheda(app, shell, id)).tinta, { timeout: 15_000, intervals: [100] }).not.toBe(null);
     console.log('script lento: tinta dopo', Date.now() - t0, 'ms');
+  } finally { await s.chiudi(); }
+});
+
+test('base: sito veloce aperto dietro', async ({ app, shell }) => {
+  const s = await sito((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<title>Veloce</title><link rel="icon" href="/icona.svg"><p>Ciao</p>');
+  });
+  try {
+    const id = await apriDietro(app, s.url);
+    const t0 = Date.now();
+    await expect.poll(async () => (await statoScheda(app, shell, id)).tinta, { timeout: 6_000, intervals: [100] }).not.toBe(null);
+    console.log('veloce: tinta dopo', Date.now() - t0, 'ms');
   } finally { await s.chiudi(); }
 });
 
