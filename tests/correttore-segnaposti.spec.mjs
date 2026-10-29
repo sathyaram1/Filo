@@ -14,7 +14,8 @@ const PAGINA = `<!doctype html><meta charset="utf-8">
 </main>
 </body>`;
 
-// `ragionato`: pezzo del testo nuovo → righe che il controllo ragionato finto risponde; `estrai`: la riga del modello che
+// `ragionato`: pezzo del testo nuovo → righe che il controllo ragionato finto risponde; `rapido`: le righe del controllo
+// rapido finto, che sennò non trova niente; `estrai`: la riga del modello che
 // legge le fonti; `web` e `wiki`: le fonti che danno le ricerche finte. Con `__trattieniWeb` la ricerca aspetta.
 async function apri(app, openTab, testServer, opz = {}) {
   await app.evaluate(async (_e, opz) => {
@@ -28,7 +29,7 @@ async function apri(app, openTab, testServer, opz = {}) {
       correttore: { modelloErrori: true, ripetizioni: true, pausaRagionatoMs: 1000, segnaposti: opz.segnaposti !== false, segnapostiWeb: opz.web !== false },
     });
     Object.assign(globalThis, {
-      __ragionate: [], __estrazioni: [], __webChieste: [], __wikiChieste: [], __ragionato: opz.ragionato || {},
+      __ragionate: [], __rapide: [], __rapido: opz.rapido || [], __estrazioni: [], __webChieste: [], __wikiChieste: [], __ragionato: opz.ragionato || {},
       __estrai: opz.estrai || '[][][][nessuno]', __fontiWeb: opz.web === false ? [] : (opz.fontiWeb || []),
       __fontiWiki: opz.fontiWiki || [], __trattieniWeb: false, __inAttesaWeb: [],
     });
@@ -48,6 +49,10 @@ async function apri(app, openTab, testServer, opz = {}) {
       if (t.includes('Chi scrive ha messo delle x')) {
         globalThis.__estrazioni.push(t);
         return fine(globalThis.__estrai);
+      }
+      if (sistema.includes('Sei il controllo rapido')) {
+        globalThis.__rapide.push(t);
+        return fine(globalThis.__rapido.join('\n') || 'NIENTE');
       }
       if (sistema.includes('proponi SUGGERIMENTI')) {
         const nuovo = busta(t, 'TESTO DA RILEGGERE:\n');
@@ -473,6 +478,43 @@ test('col web spento un dato di adesso si cerca solo su Wikipedia, e se non c\'�
   await expect(menu.voce('Ignora')).toBeVisible();
   await menu.voce('Ignora').click();
   await expect(ocra(page, 'xx')).toHaveCount(0);
+});
+
+// #1448.9: il testo del rapido è misurato sul banco e non parla delle x; se il modello le segna, l'errore non si vede.
+test('un controllo rapido che segna le x come errore non mette l\'onda sui segnaposti, né un errore da correggere', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {
+    ragionato: { '14xx': [COLOMBO, '[nel 17xx][nel 1789][La presa della Bastiglia, 14 luglio 1789][segnaposto]'] },
+    rapido: ['[14xx][1492][anno scritto a metà][errore]', '[17xx][1789][anno scritto a metà][errore]'],
+  });
+  await page.locator('#ta').click();
+  await page.keyboard.type("l'America l'hanno scoperta nel 14xx e la Bastiglia l'hanno presa nel 17xx. ");
+  await expect(page.locator('.sn-spell-valori .sn-spell-valore')).toHaveCount(2, { timeout: 8000 });
+  await expect.poll(async () => (await globale(app, '__rapide')).length, { timeout: 8000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(600);
+  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(0);
+  await expect(ocra(page, '14xx')).toHaveCount(1);
+  const menu = await tastoDestroSu(page, ocra(page, '17xx'));
+  await expect(menu.voce('Correggi tutti gli errori (2)')).toBeVisible();
+  await menu.voce('Correggi tutti gli errori (2)').click();
+  await expect(page.locator('#ta')).toHaveValue("l'America l'hanno scoperta nel 1492 e la Bastiglia l'hanno presa nel 1789. ");
+});
+
+// Le X maiuscole senza cifre il codice non le prende: il segnaposto lo riconosce solo la rilettura, e vale lo stesso.
+test('le x di un segnaposto riconosciuto solo dalla rilettura non prendono l\'errore del controllo rapido', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {
+    ragionato: { XX: ['[vinot XX scudetti][vinot 36 scudetti][Scudetti vinti dalla Juventus][segnaposto]'] },
+    rapido: ['[XX][20][numero scritto a metà][errore]', '[vinot][vinto][refuso][errore]'],
+  });
+  await page.locator('#ta').click();
+  await page.keyboard.type('la Juve ha vinot XX scudetti. ');
+  await expect(valore(page, '36')).toBeVisible({ timeout: 8000 });
+  await expect.poll(async () => (await globale(app, '__rapide')).length, { timeout: 8000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(600);
+  // Protette sono le sole x: il refuso accanto, dentro il pezzo della rilettura, resta un errore.
+  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveText(['vinot']);
+  const menu = await tastoDestroSu(page, ocra(page, 'XX'));
+  await expect(menu.pannelli.first()).toContainText('36');
+  await expect(menu.pannelli.first()).not.toContainText('numero scritto a metà');
 });
 
 test('«Correggi tutti gli errori» riempie i segnaposti che hanno un valore', async ({ app, openTab, testServer }) => {

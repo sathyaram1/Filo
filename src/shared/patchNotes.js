@@ -20,6 +20,7 @@
         'Ctrl+L (Cmd+L su Mac) su una pagina dove stai scrivendo apre la home in una scheda accanto, così il testo che hai scritto resta dov\'era.',
         'Se le pagine che Filo legge per risponderti sono troppe per il modello tutte insieme, Filo risponde con quelle che ci stanno e sotto la risposta ti dice quali siti ha lasciato fuori. Se ti servono, chiediglielo e le rilegge. Prima la risposta non arrivava, e l\'errore consigliava di cambiare modello.',
         'Nell\'Editor, se hai già selezionato del testo, Commenta apre subito il commento su quello. Prima ti chiedeva di selezionarlo di nuovo.',
+        'Le x che scrivi al posto di un dato, come in «nel 14xx», non vengono più sottolineate come errore, e «Correggi tutti gli errori» le riempie col dato invece di trattarle da parola sbagliata.',
       ],
     },
     {
