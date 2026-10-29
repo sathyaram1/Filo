@@ -345,7 +345,7 @@ class BarraLaterale {
       this.tasti[chi] = false;
       this.puntoFermo = this._punto();
       this._guarda();
-      this.destro.rilascio();
+      this.destro.tastoLasciato();
     } else if (t === 'mouseMove') {
       this.tasti[chi] = Boolean(tastoPremuto(input));
     }
