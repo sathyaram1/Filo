@@ -270,9 +270,8 @@ test('scheda stretta con l\'avviso: il titolo mostra almeno una lettera coi punt
       const c = document.createElement('canvas').getContext('2d');
       return [...document.querySelectorAll('.tab')].map((tab) => {
         const t = tab.querySelector('.title');
-        const testo = t.firstElementChild || t;
         const cs = getComputedStyle(t);
-        const vede = cs.display !== 'none' && getComputedStyle(testo).visibility === 'visible';
+        const vede = cs.display !== 'none' && cs.visibility === 'visible';
         c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
         const lettera = [...(t.textContent || '')][0] || '';
         return { id: tab.dataset.id, titolo: vede ? t.getBoundingClientRect().width : 0, serve: c.measureText(lettera + '…').width,
