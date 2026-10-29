@@ -2597,5 +2597,7 @@
     summarizeActivity,
     riordinaSchede,
     activityRowFor,
+    // Main → la prima icona di una scheda (ICONA_SCHEDA): la prendono le righe di quel sito rimaste senza.
+    iconaDellaScheda,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
