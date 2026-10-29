@@ -126,7 +126,8 @@ test('i riquadri partono accanto alla loro ora, con lo stesso id; un’ora senza
   assert.equal(await b.s.controlla(), 'inviati');
   assert.equal(b.per.ore.length, 1);
   assert.equal(b.per.riquadri.length, 1);
-  const [{ url, doc }] = b.per.riquadri;
+  const [{ url, doc, auth }] = b.per.riquadri;
+  assert.equal(auth, 'Bearer token-anonimo', 'i riquadri partono con l’identità anonima, come l’ora (#1547)');
   assert.ok(url.includes(`documentId=${encodeURIComponent(C.idDocumento(b.per.ore[0].doc))}`), 'lo stesso id dell’ora');
   assert.deepEqual(Object.keys(doc), [...C.CAMPI_RIQUADRI]);
   assert.deepEqual(C.leggiRiquadri('riquadro_uso', doc.riquadro_uso['translate-selection']), [
