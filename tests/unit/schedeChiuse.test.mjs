@@ -50,6 +50,18 @@ test('una scheda ripresa dalla pila prima che l\'archivio risponda non torna dal
   assert.equal(p.dallArchivio([arch('id-lenta', 'https://lenta.example/', '2026-10-22T10:00:00Z')]), null);
 });
 
+// Chi conta le riaperte ha bisogno della voce d'archivio: con la scheda ripresa, o dopo, se l'archivio è lento.
+test('la pila ridà la voce d\'archivio con la scheda, e dice se l\'archivio ha risposto a scheda già ripresa', () => {
+  const p = SchedeChiuse.crea();
+  const e = arch('id-b', 'https://b.example/', '2026-10-22T10:00:00Z');
+  const b = p.ricorda(voce('https://b.example/'));
+  assert.equal(p.archiviata(b, e), false);
+  assert.equal(p.prendi().voceArchivio, e);
+  const lenta = p.ricorda(voce('https://lenta.example/'));
+  p.prendi();
+  assert.equal(p.archiviata(lenta, arch('id-l', 'https://lenta.example/', '2026-10-22T11:00:00Z')), true);
+});
+
 test('l\'archivio non ripropone indirizzi tagliati né pagine che non sono siti', () => {
   const p = SchedeChiuse.crea();
   const archivio = [
