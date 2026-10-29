@@ -144,6 +144,17 @@ test('le domande di un gesto dell\'utente: quali lo vogliono, e quali lo spendon
   assert.equal(W.vuoleUnGesto(MSG.CLOSE_TAB, null), false);
 });
 
+// #589.1 giro 5 — i bottoni dei file trovati dall'Aiuto: li chiede l'utente, dalla scheda che guarda.
+test('i file dell\'Aiuto da un sito si aprono, si mostrano e si trascinano col gesto, dalla scheda in vista', () => {
+  for (const t of [MSG.AIUTO_APRI_FILE, MSG.AIUTO_MOSTRA_FILE, MSG.AIUTO_TRASCINA_FILE]) {
+    assert.equal(W.domandaAmmessaDaUnSito(t, { inVista: true }), true, t);
+    assert.equal(W.vuoleUnGesto(t, { type: t }), true, t);
+  }
+  for (const t of [MSG.AIUTO_APRI_FILE, MSG.AIUTO_MOSTRA_FILE]) {
+    assert.equal(W.domandaAmmessaDaUnSito(t, { inVista: false, schedaInVista: false }), false, `${t} da una scheda di sfondo`);
+  }
+});
+
 // #589.1 giro 3 — il «Ha funzionato?» pubblica i passi per gli altri utenti di quel sito.
 test('da un sito il «Ha funzionato?» vale solo per l\'indirizzo della pagina che lo chiede', () => {
   const chiedi = (rawUrl) => ({ type: MSG.SAVE_PATH, payload: { session: { rawUrl } } });
