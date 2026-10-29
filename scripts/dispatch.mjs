@@ -2061,17 +2061,24 @@ function positionOnBranch(bucket) {
     checkpoint,
   });
   if (!res.ok) return res;
+  const parcheggio = res.discarded ? `; i commit locali restano su ${res.discarded}` : '';
   if (res.rewritten) {
-    process.stderr.write(`[dispatch] ${branch}: il ramo su origin è stato riscritto (un riallineamento): si riparte dalla sua punta ${String(res.head).slice(0, 12)}, non dal punto fermo locale ${String(res.rewritten).slice(0, 12)}${res.discarded ? `; i commit locali restano su ${res.discarded}` : ''}\n`);
+    process.stderr.write(`[dispatch] ${branch}: il ramo su origin è stato riscritto (un riallineamento): si riparte dalla sua punta ${String(res.head).slice(0, 12)}, non dal punto fermo locale ${String(res.rewritten).slice(0, 12)}${parcheggio}\n`);
+  } else if (res.superato) {
+    process.stderr.write(`[dispatch] ${branch}: lo stato locale di questa cartella era di un giro passato (punto fermo ${String(res.superato).slice(0, 12)}, più vecchio della punta pubblicata): si parte dalla punta ${String(res.head).slice(0, 12)} e lo stato vecchio si scarta${parcheggio}\n`);
   } else if (res.discarded) {
     process.stderr.write(`[dispatch] ${branch}: lavoro di un'istanza interrotta riportato all'ultimo punto fermo; i commit scartati restano su ${res.discarded}\n`);
   }
 
-  // Identità attesa del contenuto: è il valore che le transizioni (C) e il
-  // ripristino (D) confronteranno. I punti fermi di un'altra storia (un altro ramo, o questo prima di una
-  // riscrittura) se ne vanno: la pulizia dopo un «pass» li consulterebbe ancora (#1486).
-  const base = { ...defaultState(bucket.id, branch), ...(prev || {}), id: bucket.id, branch };
-  if (prev?.branch !== branch || res.rewritten) base.checkpoints = [];
+  // Identità attesa del contenuto: è il valore che le transizioni (C) e il ripristino (D) confronteranno. Lo stato di
+  // un'altra storia (un altro ramo, questo prima di una riscrittura, un giro passato da un'altra cartella) non descrive
+  // il lavoro di adesso: punti fermi, esiti e pulizie ripartono da zero (#1486, D-207).
+  const altraStoria = prev?.branch !== branch || !!res.rewritten || !!res.superato;
+  const base = altraStoria
+    ? defaultState(bucket.id, branch)
+    : { ...defaultState(bucket.id, branch), ...prev, id: bucket.id, branch };
+  base.avvio = { sha: res.head, ruolo: bucket.role, at: new Date().toISOString() };
+  delete base.criticaNelGiro;
   const state = withCheckpoint(base, res.head, `${bucket.role}:checkout`);
   writeState(state);
   // Esposta alla guardia fuori sessione (.claude/hooks/branch-guard.sh).
