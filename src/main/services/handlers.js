@@ -6554,7 +6554,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   try {
     linkDaConfermare = await linkCheChiedonoOk(textReply, {
       sender, contesto: azioniViste, provenienza, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
-      indirizzi: renderedActions.flatMap((a) => (a ? [a.url, a.percorso, a.path, a.link, a.href] : [])),
+      // Il bottone di NAVIGA apre l'indirizzo caricato («localhost:3000» → http://…): il verdetto va a quello (#1318).
+      indirizzi: renderedActions.flatMap((a) => (a ? [a.url, a.url && globalThis.SN_URL_NAV?.indirizzoDaCaricare?.(String(a.url)), a.percorso, a.path, a.link, a.href] : [])),
     });
   } catch (e) {
     senzaVerdetto = true;
