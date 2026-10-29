@@ -62,3 +62,30 @@ test('esplora caricamenti in sottofondo dopo un clic', async ({ shell, openTab, 
     console.log('AVVISI', nome, JSON.stringify(await nelModello(shell, 'bloccat')));
   }
 });
+
+test('esplora bottoni dei percorsi fermati', async ({ app }) => {
+  const nav = (id, url) => ({ id, name: 'NAVIGA', arguments: JSON.stringify({ url }) });
+  await modelloFinto(app, [{ text: 'Provo.', toolCalls: [nav('a', 'Documenti\\conto.pdf'), nav('b', './conto.pdf'), nav('c', '/data/progetti/conto.pdf'), nav('d', 'ricetta carbonara')] }, { text: 'fatto' }]);
+  const page = await home(app);
+  await chiedi(page, 'apri questi');
+  await page.waitForTimeout(5000);
+  const chip = await page.evaluate(() => [...document.querySelectorAll('.dash-bubble-filo a, .dash-bubble-filo button, .dash-action-link-chip')].map((a) => `${a.tagName}|${a.className}|${a.getAttribute('href')}|${a.textContent.trim()}`));
+  console.log('CHIP2', JSON.stringify(chip, null, 1));
+});
+
+for (const [nome, corpo] of [
+  ['xhr', "var x = new XMLHttpRequest(); x.open('GET', 'file:///C:/Intranet/dati.json'); try { x.send(); } catch (e) {}"],
+  ['audio', "var s = new Audio('file:///C:/Intranet/clic.wav'); s.play().catch(function () {});"],
+  ['fetch', "fetch('file:///C:/Intranet/dati.json').catch(function () {});"],
+  ['css', "var st = document.createElement('style'); st.textContent = 'body{background:url(file:///C:/Intranet/sfondo.png)}'; document.head.appendChild(st);"],
+]) {
+  test(`esplora sottofondo ${nome}`, async ({ shell, openTab, testServer }) => {
+    const page = await openTab(testServer.html(`<title>Intranet</title>
+      <button id="a" style="position:fixed;left:0;top:0;width:300px;height:40px">Menu</button>
+      <script>document.getElementById('a').onclick = function () { ${corpo} };</script>`));
+    await page.waitForTimeout(800);
+    await page.mouse.click(40, 20);
+    await page.waitForTimeout(2500);
+    console.log('AVVISI2', nome, JSON.stringify(await nelModello(shell, 'bloccat')));
+  });
+}
