@@ -243,10 +243,16 @@ test('scheda stretta con l\'avviso: il titolo mostra almeno una lettera coi punt
   await openPage(openTab, testServer, 'Mutata da un altro paese');
   await openPage(openTab, testServer, 'Meet - riunione');
   await openPage(openTab, testServer, 'Attiva che suona');
+  // La riunione ha avuto microfono e fotocamera: i suoi segni stanno sulla pagina, come li lascia il gestore dei permessi.
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const wc = w._filoTabs.tabs.filter((x) => /^https?:/.test(x.url || ''))[2].view.webContents;
+    wc._filoSegni = { origine: new URL(wc.getURL()).origin, usati: new Set(['audio', 'video']), negati: new Set() };
+  });
   const [suona, mutata, meet, attiva] = await patchWebTabs(app, [
     { audible: true, favicon: FAV },
     { muted: true, favicon: FAV, proxy: { country: 'us', tier: null } },
-    { audible: true, favicon: FAV, permessi: { usati: ['audio', 'video'], negati: [] } },
+    { audible: true, favicon: FAV },
     { audible: true, favicon: FAV },
   ]);
   await expect(shell.locator(`.tab[data-id="${attiva}"]`)).toHaveClass(/active/);
