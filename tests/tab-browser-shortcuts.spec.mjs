@@ -318,3 +318,69 @@ test('Ctrl+L sulla home non la ricarica: dà il fuoco al campo e tiene quello ch
     expect(await home.evaluate(() => [window.__nonRicaricata === true, document.getElementById('input').value])).toEqual([true, 'bozza da tenere']);
   }
 });
+
+// Una riapertura è una riapertura da ogni strada: si conta fra le riaperte (#1467), non come una scheda trascinata
+// (#1470), e una scheda già tornata dalla chat o da un collegamento del filo non torna di nuovo col tasto.
+const contiDiOggi = (app) => app.evaluate(async () => {
+  const s = await globalThis.SN_CONTATORI_MAIN.letto();
+  const g = globalThis.SN_CONTATORI.giornoDi(Date.now());
+  const out = { trascinate: 0, riaperte: 0 };
+  for (const [k, o] of Object.entries(s.ore || {})) {
+    if (!k.startsWith(`${g}T`)) continue;
+    out.trascinate += Object.values((o.finestra && o.finestra.schedaTrascinata) || {}).reduce((a, n) => a + n, 0);
+    out.riaperte += Object.values(o.riaperte || {}).reduce((a, n) => a + n, 0);
+  }
+  return out;
+});
+
+test('Ctrl+Shift+T si conta fra le schede riaperte, non fra quelle trascinate', async ({ app, shell, testServer }) => {
+  await shell.waitForLoadState('domcontentloaded');
+  const [a, b, c] = ['A', 'B', 'C'].map((n) => testServer.html(`<title>${n}</title><h1>${n}</h1>`, { pubblico: true }));
+  await apriEAspetta(app, a);
+  const idB = await apriEAspetta(app, b);
+  await apriEAspetta(app, c);
+  await app.evaluate(({ BrowserWindow }, id) => BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.activate(id), idB);
+  await chiudi(app);
+  await expect.poll(() => app.evaluate(async (_e, u) =>
+    (await globalThis.SN_ARCHIVED_TABS.list()).some((t) => t.url === u), b), { timeout: 8_000 }).toBe(true);
+  const prima = await contiDiOggi(app);
+
+  await riapri(app);
+  await expect.poll(() => info(app).then((i) => i.activeUrl), { timeout: 10_000 }).toBe(b);
+  await expect.poll(() => contiDiOggi(app).then((c) => c.riaperte), { timeout: 8_000 }).toBe(prima.riaperte + 1);
+  await sleep(1000);
+  expect((await contiDiOggi(app)).trascinate).toBe(prima.trascinate);
+});
+
+for (const strada of ['la chat', 'un collegamento del filo della home']) {
+  test(`una scheda chiusa e riaperta da ${strada} non torna di nuovo con Ctrl+Shift+T`, async ({ app, shell, openTab, testServer }) => {
+    await shell.waitForLoadState('domcontentloaded');
+    const prima = testServer.html('<title>Prima</title><h1>p</h1>', { pubblico: true });
+    const ricetta = testServer.html('<title>Ricetta</title><h1>r</h1>', { pubblico: true });
+    await apriEAspetta(app, prima);
+    await chiudi(app);
+    await apriEAspetta(app, ricetta);
+    await chiudi(app);
+    await expect.poll(() => app.evaluate(async (_e, u) =>
+      (await globalThis.SN_ARCHIVED_TABS.list()).some((t) => t.url === u), ricetta), { timeout: 8_000 }).toBe(true);
+
+    const conti = await contiDiOggi(app);
+    if (strada === 'la chat') {
+      const r = await app.evaluate((_e, u) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url: u, label: 'Ricetta' }), ricetta);
+      expect(r.executed).toBe(true);
+    } else {
+      const home = await openTab('filo://newtab/?prova=riapri');
+      await home.evaluate((url) => chrome.runtime.sendMessage({ type: 'filo_apri_proposta', url }), ricetta);
+    }
+    await expect.poll(() => info(app).then((i) => i.urls.filter((u) => u === ricetta).length), { timeout: 10_000 }).toBe(1);
+    // Riaperta, e contata come tale.
+    await expect.poll(() => contiDiOggi(app).then((c) => c.riaperte), { timeout: 8_000 }).toBe(conti.riaperte + 1);
+    const n = (await info(app)).count;
+
+    await riapri(app);
+    await expect.poll(() => info(app).then((i) => i.count), { timeout: 10_000 }).toBe(n + 1);
+    const dopo = await info(app);
+    expect(dopo.urls).toContain(prima);
+    expect(dopo.urls.filter((u) => u === ricetta).length).toBe(1);
+  });
+}
