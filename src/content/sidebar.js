@@ -335,6 +335,7 @@
     root.style.top = 'auto';
     root.style.bottom = bassoPer(currentBottom, newLeft, w);
     root.dataset.spostata = '1';
+    scostaAvvisi();
   }
 
   // ---------- Rendering conv ----------
