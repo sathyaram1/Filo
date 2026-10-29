@@ -3747,7 +3747,7 @@ class TabManager {
 
   // Un file: o un data: che Chromium rifiuta alla pagina prima che Filo lo veda (collegamento, script, finestra nuova):
   // dopo un clic o un tasto veri dell'utente si dice, uno per gesto; quello che la pagina tenta da sola resta muto (#1318).
-  // Chromium scrive la stessa riga per un'immagine o un riquadro della pagina: quelli non sono aperture dell'utente.
+  // Chromium scrive la stessa riga per quello che la pagina carica: solo un'apertura dell'utente fa nascere l'avviso.
   _seguiRifiutiDiChromium(wc) {
     if (!wc || wc._filoRifiutiSeguiti) return;
     wc._filoRifiutiSeguiti = true;
@@ -3755,10 +3755,10 @@ class TabManager {
       if (!e || e.level !== 'error') return;
       const url = indirizzoRifiutatoDaChromium(e.message);
       if (!url || !Permessi.gestoEntro(wc, Permessi.GESTO_MS)) return;
-      risorsaDellaPagina(e.frame || wc.mainFrame, url).then((risorsa) => {
-        if (risorsa || wc.isDestroyed() || !Permessi.gestoPerUnAvviso(wc)) return;
+      aperturaDellUtente(wc, e.frame || wc.mainFrame, url, e.message).then((apertura) => {
+        if (!apertura || wc.isDestroyed() || !Permessi.gestoPerUnAvviso(wc)) return;
         avvisaIndirizzoFermato(url, this.win, urlDellaPagina(wc));
-      });
+      }, () => {});
     });
   }
 
