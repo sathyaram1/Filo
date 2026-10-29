@@ -170,9 +170,6 @@ html, body {
   font-size: 11px; color: var(--sn-muted); white-space: nowrap;
 }
 
-/* L'ingranaggio: le regolazioni di ogni strumento. */
-.ed-strumenti-btn { width: 100%; display: inline-flex; align-items: center; gap: 8px; justify-content: flex-start; border: none; background: transparent; }
-.ed-strumenti-btn:hover { background: var(--sn-hover); }
 .ed-strumento { display: flex; align-items: center; gap: 10px; width: 100%; justify-content: flex-start; margin-bottom: 6px; text-align: left; }
 .ed-strumento-icona { display: inline-flex; color: var(--sn-accent); }
 .ed-strumento-nome { flex: 1 1 auto; }
