@@ -66,7 +66,7 @@ for (const [caso, csp] of Object.entries(CSP)) {
       const b = document.createElement('iframe'); document.body.append(b); b.contentWindow.document.body.textContent = 'vuoto';
     }, figlio);
     await page.waitForTimeout(1200);
-    await page.locator('#paragraph').click({ button: 'right' });
+    await tastoDestroSullaFrase(page.locator('#paragraph'));
     await menuCompleto(menuDi(page).locator('.sn-menu'));
   });
 }
