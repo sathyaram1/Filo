@@ -220,10 +220,8 @@
   function selezioneDi(c) {
     try { return [c.selectionStart, c.selectionEnd]; } catch (_) { return null; }
   }
-  // Annulla e rifai riportano la casella a un testo che ha già avuto: un testo che non c'è mai stato l'ha scritto il sito
-  // (#1340). Si tiene l'impronta di ogni testo buono, non il testo: tenuti interi, con un log di centomila caratteri ne
-  // restavano una ventina e Ctrl+Z non tornava più indietro. Il seme sta nel mondo isolato, quindi il sito non può
-  // cercare un testo con la stessa impronta. Il tetto supera di molto la pila dell'annulla del browser.
+  // Annulla e rifai tornano a un testo già avuto (#1340): se ne tiene l'impronta, perché interi un log di centomila caratteri
+  // ne lasciava una ventina. Il seme sta nel mondo isolato: il sito non può cercare un testo con la stessa impronta.
   const TETTO_STORIA = 200_000;
   const SEME = (() => {
     try { const a = new Uint32Array(2); global.crypto.getRandomValues(a); return a; } catch (_) { return [Math.random() * 2 ** 32 >>> 0, Math.random() * 2 ** 32 >>> 0]; }
