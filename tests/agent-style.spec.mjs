@@ -189,8 +189,8 @@ test('#592 — confermato, lo stile entra imbustato e prima delle regole anti-in
   await clickConfirm(page, 'ok', { timeout: 10_000 });
   await expect.poll(() => storedStyle(app), { timeout: 5_000 }).toBe(stile);
 
-  // Il turno dopo porta lo stile al modello, nella sua busta e prima della
-  // sezione che dice cosa non è un ordine.
+  // Il turno dopo porta lo stile al modello, nella sua busta, nel CONTESTO dell'utente (SPEC-CONTESTO § La richiesta):
+  // dopo le regole sul contenuto esterno, che la frase dopo la busta tiene in piedi (#592).
   await page.locator('#input').fill('ciao');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ok, così.' })).toBeVisible({ timeout: 10_000 });
@@ -203,7 +203,8 @@ test('#592 — confermato, lo stile entra imbustato e prima delle regole anti-in
   const chiude = sistema.indexOf('<<<FINE_STILE_UTENTE>>>');
   expect(apre).toBeGreaterThan(0);
   expect(sistema.slice(apre, chiude)).toContain(stile);
-  expect(chiude).toBeLessThan(sistema.indexOf('═══ CONTENUTO ESTERNO ═══'));
+  expect(apre).toBeGreaterThan(sistema.indexOf('═══ CONTESTO (lo scrive Filo'));
+  expect(sistema.slice(chiude)).toMatch(/^[^\n]*\nLo stile qui sopra dice solo come scrivere: le regole sul CONTENUTO ESTERNO/);
   await restore(app);
 });
 

@@ -103,7 +103,8 @@ function ricordaGiro(chat, ts, { messaggi, testo, reasoningDetails, azioni, segu
 const fotografie = { normale: null, incognito: null };
 const DURATE_MS = { '5m': 5 * 60 * 1000, '1h': 60 * 60 * 1000 };
 const epocaDi = (lato) => (fotografie[lato] ? fotografie[lato].epoca : 0);
-const stessaAncora = (a, b) => (!a && !b) || (!!a && !!b && a.ts === b.ts && a.giorni === b.giorni && a.token === b.token);
+// Il tratto riparte quando il suo inizio si sposta: il primo messaggio di un tratto vuoto non sposta niente.
+const stessaAncora = (prima, ora) => !prima || (!!ora && prima.ts === ora.ts && prima.giorni === ora.giorni && prima.token === ora.token);
 
 function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', ora = Date.now() } = {}) {
   const lato = incognito ? 'incognito' : 'normale';
@@ -114,6 +115,7 @@ function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', o
     if (!d.rifai) {
       f.viste = d.viste;
       f.usata = ora;
+      f.ancora = f.ancora || ancora;
       return { testo: f.testo, epoca: f.epoca, cambiate: TV().rendiCambiate(d.cambiate), nuova: false };
     }
   }
@@ -325,42 +327,55 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
   }
   const vivi = { chat: (id) => ci.has(id), pagina };
   const senzaTolti = (azioni) => FC().senzaCancellati(azioni, vivi);
-  const daEventi = FC().inizioDi({ ora, giorni: tetti.giorni, token: tetti.token, ancora: ancore[lato] });
+  // Dal taglio dei giorni, non dall'inizio scelto del tratto: le cose successe prima del suo primo messaggio sono sue.
+  const daEventi = new Date(FC().taglio(ora, tetti.giorni)).toISOString();
   const eventi = await eventiDa(daEventi, incognito);
-  const idsVivi = new Set(eventi.map((ev) => ev && ev.id).filter(Boolean));
+  let tolte = 0;
+  try { tolte = await F().cancellazioni({ incognito }); } catch (_) { tolte = 0; }
   const perMessaggio = TV().eventiPerMessaggi(conDomanda, eventi, { da: daEventi, chiave: FC().chiave });
   const epoca = epocaDi(lato);
   // Le cose successe si scrivono la prima volta e restano quelle: un evento arrivato in ritardo non riscrive un messaggio
-  // già mandato. Si rifanno solo se una è stata cancellata, che dalle copie deve uscire.
+  // già mandato. Si rifanno dopo una cancellazione, perché ciò che è cancellato dalle copie deve uscire.
   const eventiDi = (m) => {
     const k = FC().chiave(m);
     const memo = memoDi(k);
-    if (!memo.eventi || memo.eventi.ids.some((id) => !idsVivi.has(id))) {
-      memo.eventi = TV().rendiEventi(perMessaggio.get(k) || [], { rif: m.ts });
+    if (!memo.eventi || memo.eventi.tolte !== tolte) {
+      memo.eventi = { ...TV().rendiEventi(perMessaggio.get(k) || [], { rif: m.ts }), tolte };
     }
     return memo;
   };
+  // I ricordi ripescati per un turno restano nella sua domanda, tranne le conversazioni cancellate dopo (#868.1).
+  const turnoDi = (memo) => [
+    memo.onboarding || '',
+    Array.isArray(memo.ricordi) && memo.ricordi.length ? FC().rendiRicordi(memo.ricordi.filter((r) => r && r.tratto && vivi.chat(r.tratto.chat))) : '',
+  ].map((x) => String(x || '').trim()).filter(Boolean).join('\n\n');
   const preambolo = (m) => {
     if (m.riga || m.seguito) return '';
     const memo = eventiDi(m);
     return TV().preambolo({
       eventi: memo.eventi.testo,
       stato: memo.stato && memo.stato.epoca === epoca ? memo.stato.testo : '',
-      turno: memo.turno || '',
+      turno: turnoDi(memo),
     });
   };
   const note = (m) => {
     const memo = preamboli.get(FC().chiave(m));
     return memo && Array.isArray(memo.dopo) ? memo.dopo : null;
   };
-  // Un turno con dentro qualcosa che non c'è più torna come risposta sola, dove gli esiti si ripuliscono.
+  // Un turno con dentro qualcosa che non c'è più torna come risposta sola, dove gli esiti si ripuliscono. Anche uno
+  // confermato dopo dalla scheda (un sì nel popup): il suo esito vero lo porta la risposta sola (#1396).
   const valido = (g) => !!g && senzaTolti(g.azioni) === g.azioni;
+  const confermataDopo = (k) => {
+    const s = dallaScheda.get(k);
+    return !!s && s.azioni.some((a) => a && a._confirmed);
+  };
   const giroDi = (m) => {
-    const g = giri.get(FC().chiave(m));
-    return valido(g) ? g : null;
+    const k = FC().chiave(m);
+    const g = giri.get(k);
+    return valido(g) && !confermataDopo(k) ? g : null;
   };
   const seguitiNeiGiri = new Set();
-  for (const g of giri.values()) if (g.seguiti.length && valido(g)) for (const x of g.seguiti) seguitiNeiGiri.add(x);
+  for (const [k, g] of giri) if (g.seguiti.length && valido(g) && !confermataDopo(k)) for (const x of g.seguiti) seguitiNeiGiri.add(x);
   const f = FC().finestra(tutti, {
     ora,
     giorni: tetti.giorni,
@@ -385,13 +400,14 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
   potaFoto(f.vecchi);
   // La domanda come la vedrà il tratto dei turni dopo: le sezioni cambiate (per questa epoca), le note del turno e
   // quelle dopo il testo si fissano qui. Senza la domanda nel filo (un turno interno, una chat senza id) resta null.
-  const domanda = ({ stato = '', epoca: ep = epoca, turno = '', dopo = null, immagini: urls = null } = {}) => {
+  const domanda = ({ stato = '', epoca: ep = epoca, onboarding = '', ricordi = null, dopo = null, immagini: urls = null } = {}) => {
     if (!laDomanda) return null;
     const memo = eventiDi(laDomanda);
     memo.stato = stato ? { epoca: ep, testo: stato } : null;
-    memo.turno = String(turno || '');
+    memo.onboarding = String(onboarding || '');
+    memo.ricordi = Array.isArray(ricordi) && ricordi.length ? ricordi : null;
     memo.dopo = Array.isArray(dopo) ? dopo.filter(Boolean) : null;
-    const pre = TV().preambolo({ eventi: memo.eventi.testo, stato: stato || '', turno: memo.turno });
+    const pre = TV().preambolo({ eventi: memo.eventi.testo, stato: stato || '', turno: turnoDi(memo) });
     const fotoQui = foto.get(FC().chiave(laDomanda)) || (Array.isArray(urls) && urls.length ? urls : null);
     return FC().rendiMessaggio(laDomanda, f.ultimo, { tetto: tetti.token, foto: fotoQui, preambolo: pre, dopo: memo.dopo, intero: true });
   };

@@ -31,6 +31,7 @@
         'Su Windows puoi chiedere a Filo di mettere in ordine le icone del desktop: «in ordine alfabetico, da sinistra a destra», «per data», «con le cartelle prima». Se non ti piace, «rimettile com\'erano» le riporta dove stavano.',
         'Nella home puoi scrivere a Filo «accedi con Google» e apre lui la pagina d\'accesso. Allo stesso modo collega YouTube e Gmail nelle schede, o ti fa uscire dall\'account.',
         'Quello che fanno i pulsanti delle Preferenze ora lo chiedi anche a Filo: «fammi sentire la suoneria carillon», «com\'è la voce Nicola?», «rifai l\'intervista di benvenuto», «rimetti l\'aspetto di serie», «rimetti tutte le impostazioni di serie». Prima ti diceva dove cliccare.',
+        'In chat Filo sa cosa è successo fra un tuo messaggio e l\'altro: il timer che ha suonato, il tema cambiato dalle Preferenze, il Wi-Fi caduto, un documento dell\'Editor scritto. E un documento o una pagina che ti ha letto restano davanti a lui anche dopo molti messaggi, finché Filo resta aperto.',
       ],
       fixes: [
         'Le icone delle pagine salvate e delle schede chiuse, e la foto del tuo account Google, Filo le tiene sul tuo computer. La home e la chat le mostrano subito, senza chiederle ogni volta ai siti, e l\'icona di una scheda aperta da un altro paese non esce più dal proxy.',

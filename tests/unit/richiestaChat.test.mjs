@@ -143,8 +143,11 @@ test('la parte fissa è identica byte per byte fra due utenti diversi e fra due 
 });
 
 test('il tratto vivo di un turno è il prefisso di quello del turno dopo, e il ragionamento del turno prima torna a Claude', async () => {
-  azzera();
+  const f = azzera();
+  // Una cosa successa prima del primo messaggio: è sua, e il turno dopo (col tratto che ora parte da lì) la ritrova.
+  await f.importa(E.riga(E.crea(E.TIPI.TIMER_SCATTATO, { timer: 't0', nome: 'tè', genere: 'timer' }, { ts: fa(35), dispositivo: 'd', autore: 'automazione' })));
   const uno = await turno({ testo: 'ciao', minutiFa: 30 });
+  assert.match(testoDi(uno.messages.at(-1)), /suonato il timer «tè»/);
   const due = await turno({ testo: 'che tempo fa?', minutiFa: 20 });
   const tre = await turno({ testo: 'e domani?', minutiFa: 10 });
   assert.equal(json(due.messages.slice(0, uno.messages.length)), json(uno.messages), 'il turno 2 ha riscritto il turno 1');
@@ -181,7 +184,7 @@ test('quello che succede fra due messaggi entra davanti al messaggio dopo, e ci 
   const domanda = testoDi(due.messages.at(-1));
   assert.ok(domanda.indexOf(C.INIZIO_DA_FILO) > 0 && domanda.indexOf(C.INIZIO_MESSAGGIO_UTENTE) > domanda.indexOf(C.INIZIO_DA_FILO));
   assert.match(domanda, /suonato il timer «pasta»/);
-  assert.match(domanda, /cambio c9z8y7x6w5 \(dalle Preferenze\)/, 'il cambio arriva senza l\'id che serve ad ANNULLA_CAMBIO');
+  assert.match(domanda, /cambio dalle Preferenze c9z8y7x6w5: tema: chiaro → scuro/, 'il cambio arriva senza l\'id che serve ad ANNULLA_CAMBIO');
   assert.doesNotMatch(domanda, /CERCA_WEB/);
   assert.ok(domanda.indexOf('<<<FILO_ACCADUTI>>>') < domanda.indexOf('suonato il timer'), 'le cose successe non sono in busta');
   assert.ok(domanda.endsWith(`${C.INIZIO_MESSAGGIO_UTENTE}\ncosa è successo?`));
@@ -224,4 +227,14 @@ test('con la cache fredda (fermo più della sua durata) il CONTESTO si rifotogra
   const fredda = Contesto.fotografa({ incognito: false, sezioni: sezioniDi(), ancora: ancora.ancora, durata: '5m', ora: Date.now() + 6 * 60000 });
   assert.equal(fredda.nuova, true);
   assert.ok(fredda.epoca > uno.foto.epoca);
+});
+
+test('uno stile di scrittura nuovo o cambiato rifà la fotografia: sta nel CONTESTO, mai in un messaggio', async () => {
+  azzera();
+  const uno = await turno({ testo: 'ciao', minutiFa: 30, sezioni: TV.sezioniUtente({ sistema: 'linux', capacita: CAPS, profilo: 'Mario' }) });
+  const due = await turno({ testo: 'ok', minutiFa: 20, sezioni: TV.sezioniUtente({ sistema: 'linux', capacita: CAPS, profilo: 'Mario', stile: 'Dammi del tu.' }) });
+  assert.equal(due.foto.nuova, true);
+  assert.notEqual(due.messages[0].content, uno.messages[0].content);
+  assert.match(due.messages[0].content, /<<<STILE_UTENTE>>>\nDammi del tu\./);
+  assert.doesNotMatch(testoDi(due.messages.at(-1)), /STILE_UTENTE/);
 });

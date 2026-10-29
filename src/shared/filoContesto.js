@@ -433,8 +433,6 @@
       vecchi: lista.slice(0, inizio),
       ultimo: visti.length ? visti[visti.length - 1] : null,
       ancora: inizio < n ? { ts: lista[inizio].ts, giorni, token } : (stessaAncora ? ancora : null),
-      // Da dove partono le cose successe davanti al primo messaggio: il taglio, o il primo messaggio tenuto.
-      da: new Date(Number.isFinite(da) ? da : t0).toISOString(),
       token: totale + ripresi.peso,
     };
   }
@@ -668,13 +666,6 @@
       + blocchi.join('\n\n');
   }
 
-  // Da quando parte il tratto, prima del taglio in token: le cose successe davanti al primo messaggio partono da qui.
-  function inizioDi({ ora = Date.now(), giorni, token, ancora = null } = {}) {
-    const t0 = taglio(ora, giorni);
-    const stessaAncora = ancora && ancora.giorni === giorni && ancora.token === token && Number.isFinite(Date.parse(ancora.ts));
-    return new Date(Math.max(t0, stessaAncora ? Date.parse(ancora.ts) : -Infinity)).toISOString();
-  }
-
   // La richiesta della chat nei quattro blocchi di SPEC-CONTESTO § La richiesta: strumenti (a parte), system con la
   // parte fissa e il CONTESTO dell'utente, il tratto vivo che finisce con la domanda, il giro di strumenti di adesso.
   function richiesta({ sistema = '', tratto = [], scheda = [], domanda = null, giro = [] } = {}) {
@@ -755,7 +746,7 @@
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     ESTERNO_COMANDO, ESTERNO_AIUTO, letturaDaFuori, daFuoriDi, classeDelMessaggio, classeDelleRisposte, trattoComeAzione,
     provenienzaDellaChat, provenienzaDelFrammento, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
-    troppoLungo, tettoDopoRifiuto, rifiutaImmagini, pianoDellaCache, richiesta, indiceDellaDomanda, inizioDi, rendiMessaggio: rendi, conGiro,
+    troppoLungo, tettoDopoRifiuto, rifiutaImmagini, pianoDellaCache, richiesta, indiceDellaDomanda, rendiMessaggio: rendi, conGiro,
     RILETTURA_MIN, capRilettura, rilettureDopoRifiuto, giaDavanti, senzaCancellati, ricordoComeAzione,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

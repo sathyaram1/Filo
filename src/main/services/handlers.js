@@ -6100,11 +6100,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       } catch (e) { console.warn('[Filo] seguito non archiviato', e?.message || e); }
     }
   };
-  // I pezzi vecchi ripescati entrano in coda al contesto, e il blocco di attività lo dice come una ricerca (#868).
+  // I pezzi vecchi ripescati entrano nella domanda, e il blocco di attività lo dice come una ricerca (#868).
   const ricordi = await entroIl(ricordiP, ATTESA_RICORDI_MS, []);
   if (ricordi.length) {
     const a = globalThis.SN_FILO_CONTESTO.ricordoComeAzione(ricordi);
-    payloadBase.ricordi = globalThis.SN_FILO_CONTESTO.rendiRicordi(ricordi);
     if (onToolCall) onToolCall({ name: a.type, id: a._callId });
     push('filo:action', { kind: 'done', action: a, kept: true, executed: true });
     renderedActions.push(a);
@@ -6115,15 +6114,19 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // La domanda come la rende il tratto dei turni dopo (SPEC-CONTESTO: il tratto cresce solo in coda): le sezioni del
   // CONTESTO cambiate, l'intervista, i ricordi e le note sulle immagini si fissano qui, nel messaggio dell'utente.
   if (filo && filo.haDomanda && !internal) {
-    const turno = [
-      onbActive ? PROMPTS.filoChatOnboarding({ onboarding: onboardingText, onboardingTurns: payloadBase.onboardingTurns, onboardingMax: payloadBase.onboardingMax }) : '',
-      payloadBase.ricordi || '',
-    ].map((x) => String(x || '').trim()).filter(Boolean).join('\n\n');
     const resa = filo.domanda({
-      stato: fotografia ? fotografia.cambiate : '', epoca: fotografia ? fotografia.epoca : filo.epoca, turno,
-      dopo: [origineImmagini, giaLetta], immagini: imageList,
+      stato: fotografia ? fotografia.cambiate : '', epoca: fotografia ? fotografia.epoca : filo.epoca,
+      onboarding: onbActive ? PROMPTS.filoChatOnboarding({ onboarding: onboardingText, onboardingTurns: payloadBase.onboardingTurns, onboardingMax: payloadBase.onboardingMax }) : '',
+      ricordi, dopo: [origineImmagini, giaLetta], immagini: imageList,
     });
     if (resa) threadMessages[indiceDomanda] = resa;
+  } else if (ricordi.length && threadMessages[indiceDomanda]) {
+    // Una domanda che il filo non ha (senza chat): i ricordi le stanno in testa lo stesso.
+    const d = threadMessages[indiceDomanda];
+    const r = globalThis.SN_FILO_CONTESTO.rendiRicordi(ricordi);
+    threadMessages[indiceDomanda] = typeof d.content === 'string'
+      ? { ...d, content: `${r}\n\n${d.content}` }
+      : { ...d, content: [{ type: 'text', text: r }, ...d.content] };
   }
   // #868.7 — la finestra del modello che risponde: quella detta da un rifiuto, o quella del listino di OpenRouter (il
   // modello che ha servito il giro, poi il primo della catena). Null se non si sa: vale il tetto in token.

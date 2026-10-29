@@ -365,10 +365,14 @@
           righe.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di ${refill} ogni giorno a mezzanotte)`);
         }
       }
-      // Ogni messaggio spende qualcosa: la sezione torna quando il saldo cambia nelle prime due cifre o cambia il resto.
+      // Ogni messaggio spende qualcosa e il saldo si rilegge a ogni minuto: la sezione torna quando il saldo cambia nelle
+      // prime due cifre, o quando il server smette (o riprende) di rispondere.
       const c = state.credits;
       const saldo = Number.isFinite(Number(c.balance)) && c.balance != null ? Number(Number(c.balance).toPrecision(2)) : null;
-      aggiungi('CREDITI', righe, JSON.stringify({ ...c, balance: saldo, readAt: c.lastKnown ? c.readAt : undefined }));
+      aggiungi('CREDITI', righe, JSON.stringify({
+        saldo, wallet: !!c.wallet, quota: c.dailyCredits ?? null, propria: !!(c.usingOwnKey || c.chiavePropria), senzaChiave: !!c.keyMissing,
+        muto: !!c.nonRisponde || c.lastKnown === 'server' || c.lastKnown === 'models',
+      }));
     }
     // TAB APERTE — il titolo di una scheda lo scrive il SITO, non Filo e non
     // l'utente: è contenuto esterno come i risultati di una ricerca, e va

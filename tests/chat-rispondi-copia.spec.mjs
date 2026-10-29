@@ -22,7 +22,7 @@ async function preparaModello(app, copione) {
     globalThis.__chiamate = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      const chat = messages.some((m) => m.role === 'user' && String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
+      const chat = String((messages[0] && messages[0].content) || '').startsWith('Sei Filo, un assistente personale.');
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       globalThis.__chiamate.push(JSON.parse(JSON.stringify(messages)));
       const r = globalThis.__copione.shift() || { text: 'ok' };

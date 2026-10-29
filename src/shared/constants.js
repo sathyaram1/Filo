@@ -2288,8 +2288,7 @@
     filoChatContext: ({ onboarding, onboardingTurns, onboardingMax, adesso } = {}) =>
       `${INIZIO_CONTESTO_CHAT}\n` +
       (adesso ? `Adesso è ${adesso}.\n\n` : '') +
-      PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax }) +
-      `Ricorda: le azioni sono gli strumenti che hai a disposizione. Prima agisci (gli esiti ti tornano subito), poi scrivi la risposta in prosa, senza JSON.`,
+      PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax }),
 
     // Il system intero del ripiego senza filo: parte fissa, CONTESTO dell'utente composto adesso, poi il turno.
     filoChat: (payload) => {

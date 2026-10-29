@@ -433,6 +433,13 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     return E().accadutiDi(v.stato, filtro || {});
   }
 
+  // Quante cancellazioni ha visto il filo di chi chiede: chi tiene copie di eventi (il tratto della chat) le rifà quando
+  // il numero cambia, perché ciò che è cancellato non torna dalle copie.
+  async function cancellazioni(opts) {
+    const v = await vista(opts);
+    return (v.stato.tagli ? v.stato.tagli.length : 0) + (v.stato.chatTolte ? v.stato.chatTolte.size : 0);
+  }
+
   async function pagine(periodo, opts) {
     const v = await vista(opts);
     return E().pagineNelPeriodo(v.stato, periodo || { da: null, a: null }).map((p) => ({ ...p }));
@@ -597,7 +604,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   }
 
   return {
-    carica, transazione, chats, chat, perLaCoda, pagine, cambi, accaduti, dove, ultimaDomanda, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagine,
+    carica, transazione, chats, chat, perLaCoda, pagine, cambi, accaduti, cancellazioni, dove, ultimaDomanda, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagine,
     esporta, importa, importaChatSalvate,
     resetIncognito, dispositivo, quandoFermo, percorso: fileEventi,
     ...(process.env.NODE_ENV === 'test' ? { ricomincia } : {}),

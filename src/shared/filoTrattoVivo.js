@@ -36,7 +36,8 @@
     };
     metti('COMPUTER', P().filoChatComputer(sistema));
     metti('CAPACITA', capacita ? P().filoChatCapacita(capacita) : '', { rifai: true });
-    metti('STILE', P().filoChatStile(stile));
+    // Lo stile cambia di rado e vale per ogni risposta: cambiato, si rifà la fotografia invece di dirlo in un messaggio.
+    metti('STILE', P().filoChatStile(stile), { rifai: true });
     metti('MODELLO', C().rigaNomeModello(modelName));
     metti('MEMORIA', C().memoriaImbustata({ profilo, preferenze, espansioni, lezioni }), {
       righe: righeMemoria({ profilo, preferenze, espansioni, lezioni }),
@@ -83,8 +84,8 @@
       nuove.set(s.chiave, { confronto: conf, righe: s.righe || null, perId: s.perId || null, rifai: !!s.rifai });
       const v = prima.get(s.chiave);
       if (v && v.confronto === conf) continue;
-      if (!v) { cambiate.push({ sezione: s }); continue; }
       if (s.rifai) { rifai = true; continue; }
+      if (!v) { cambiate.push({ sezione: s }); continue; }
       if (Array.isArray(s.righe) && Array.isArray(v.righe)) {
         const ora = new Set(s.righe);
         if (v.righe.some((r) => !ora.has(r))) { rifai = true; continue; }
@@ -221,7 +222,7 @@
     const frase = K && typeof K.frase === 'function' ? K.frase(e, 6) : '';
     const da = K && typeof K.provenienza === 'function' ? K.provenienza(e) : '';
     const no = K && typeof K.annullabile === 'function' && !K.annullabile(e) ? ' (non si annulla: il valore non è conservato)' : '';
-    return `cambio ${campo(e.id, 60)}${da ? ` (${da})` : ''}${stringa(e.annulla) ? `, annulla ${campo(e.annulla, 60)}` : ''}: ${campo(frase, 400)}${no}`;
+    return `cambio ${da ? `${da} ` : ''}${campo(e.id, 60)}${stringa(e.annulla) ? ` (annulla ${campo(e.annulla, 60)})` : ''}: ${campo(frase, 400)}${no}`;
   }
 
   // Una riga per evento, ognuna con l'ora; null se l'evento non si racconta (le pagine visitate, che entrano solo
