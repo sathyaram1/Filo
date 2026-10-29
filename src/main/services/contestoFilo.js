@@ -117,8 +117,11 @@ function ricordaGiro(chat, ts, { messaggi, testo, reasoningDetails, azioni, segu
 const fotografie = { normale: null, incognito: null };
 const DURATE_MS = { '5m': 5 * 60 * 1000, '1h': 60 * 60 * 1000 };
 const epocaDi = (lato) => (fotografie[lato] ? fotografie[lato].epoca : 0);
-// Il tratto riparte quando il suo inizio si sposta: il primo messaggio di un tratto vuoto non sposta niente.
-const stessaAncora = (prima, ora) => !prima || (!!ora && prima.ts === ora.ts && prima.giorni === ora.giorni && prima.token === ora.token);
+// Il tratto riparte quando il suo inizio si sposta, anche per una conversazione ripresa che entra davanti: il primo
+// messaggio di un tratto vuoto non sposta niente.
+const riprese = (a) => (a && Array.isArray(a.riprese) ? a.riprese.join('|') : '');
+const stessaAncora = (prima, ora) => !prima || (!!ora && prima.ts === ora.ts && prima.giorni === ora.giorni && prima.token === ora.token
+  && riprese(prima) === riprese(ora));
 
 function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', ora = Date.now() } = {}) {
   const lato = incognito ? 'incognito' : 'normale';
