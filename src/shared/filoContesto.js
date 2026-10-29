@@ -313,7 +313,7 @@
   // `salta(m)`: i seguiti che quel turno porta già dentro.
   function finestra(messaggi, {
     ora = Date.now(), giorni, token, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null,
-    preambolo = null, note = null, giro = null, salta = null,
+    preambolo = null, note = null, giro = null, salta = null, intero = null,
   } = {}) {
     const lista0 = Array.isArray(messaggi) ? messaggi : [];
     const lista = typeof salta === 'function' ? lista0.filter((m) => !salta(m)) : lista0;
