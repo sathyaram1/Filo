@@ -85,7 +85,7 @@ function pota(vecchi, visti, incognito) {
 // ── Il tratto vivo (SPEC-CONTESTO fase 3): in memoria, mai su disco ─────────
 // Quello che Filo scrive in testa a un messaggio dell'utente, per messaggio: le cose successe prima (fisse dalla prima
 // volta, rifatte solo se una è stata cancellata), le sezioni cambiate dalla fotografia (valgono per la sua epoca), le
-// note del turno (ricordi, intervista) e quelle dopo il testo. Un messaggio passato si rimanda così com'era.
+// note del turno (i ricordi) e quelle dopo il testo. Un messaggio passato si rimanda così com'era.
 const MAX_PREAMBOLI = 2 * MAX_ESITI;
 const preamboli = new Map();
 function memoDi(k) {
