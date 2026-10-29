@@ -1457,7 +1457,7 @@ service cloud.firestore {
           && conti(d.coda_feedback, '^(((voci)[|](n0|n1|n5|n20|oltre)|(eta)[|](h1|h6|h24|oltre)|(rinuncia)[|](cifratura|scaduta|troppe)|(attesa_accesso)[|](assente|rifiutato))(#((voci)[|](n0|n1|n5|n20|oltre)|(eta)[|](h1|h6|h24|oltre)|(rinuncia)[|](cifratura|scaduta|troppe)|(attesa_accesso)[|](assente|rifiutato)))*)?$', 300, 200);
       }
       allow get, list: if isAdmin();
-      allow create: if contatoriServizio(request.resource.data);
+      allow create: if request.auth != null && contatoriServizio(request.resource.data);
       allow update, delete: if false;
     }
 
