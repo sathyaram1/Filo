@@ -1,6 +1,6 @@
 // Verifica #725.8 giro 6. r1: indirizzi ufficiali che l'elenco non conosce, e siti veri di altri col nome di un
-// marchio, prendono nel menu l'avviso d'imitazione (su main il menu li lasciava puliti). r2: l'avviso nomina il marchio
-// sbagliato per Google, Apple e Microsoft.
+// marchio, prendono nel menu l'avviso d'imitazione (su main il menu li lasciava puliti). Il caso di r2 (il marchio
+// sbagliato per Google, Apple e Microsoft) è uscito con la sua prova durevole nei test di logica.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
