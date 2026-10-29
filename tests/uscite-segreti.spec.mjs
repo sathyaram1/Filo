@@ -1128,3 +1128,33 @@ test('i collegamenti nella risposta dell’assistente di pagina col codice letto
   await link('la guida').first().click();
   await expect.poll(() => apertoVerso(app, 'guida.example'), { timeout: 10_000 }).toBe(true);
 });
+
+// #589.1 giro 4 — il testo per un campo lo guarda la porta nel main, sulla risposta del modello: alla pagina arriva la
+// frase, mai il segreto, e un testo pulito si propone come prima.
+test('l’assistente di pagina non propone per un campo l’IBAN letto su un’altra pagina', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const IBAN = 'IT60X0542811101000000123456';
+  const servizi = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'main', 'services');
+  await app.evaluate((_e, { dir, iban }) => {
+    process.mainModule.require(`${dir}/segretiLetti.js`).ricorda(`Coordinate per il bonifico: ${iban}`, 'dalla pagina posta.example');
+  }, { dir: servizi, iban: IBAN });
+  const page = await testServer.openReady(openTab, '<!doctype html><title>Pagamento</title><body style="padding:40px"><label>IBAN <input id="iban"></label></body>');
+  await preparaModelli(app);
+  await modelloFinto(app, {
+    aiuto: [
+      ['NON è partita', JSON.stringify({ text: 'Non l’ho scritto.', status: 'done' })],
+      ['nome', JSON.stringify({ text: 'Scrivo il nome.', highlight: { selector: '#iban', action: 'fill', value: 'Mario Rossi' }, status: 'done' })],
+      ['', JSON.stringify({ text: 'Lo scrivo io.', highlight: { selector: '#iban', action: 'fill', value: IBAN }, status: 'done' })],
+    ],
+  });
+
+  await apriAiuto(shell, page);
+  await scriviAllAiuto(page, 'compila il bonifico');
+  await expect(page.locator('.sn-sidebar-log', { hasText: 'non ho scritto nel campo' }).first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.sn-highlight-value')).toHaveCount(0);
+  expect(await page.locator('.sn-sidebar').innerText(), 'il segreto è arrivato alla pagina').not.toContain(IBAN);
+  await page.screenshot({ path: 'tests/.shots/uscite-segreti-campo.png' });
+
+  await scriviAllAiuto(page, 'allora scrivi il nome');
+  await expect(page.locator('.sn-highlight-value')).toContainText('Mario Rossi', { timeout: 20_000 });
+});
