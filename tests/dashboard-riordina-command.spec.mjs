@@ -240,7 +240,7 @@ async function riordinaBiancoNeroEColori({ shell, openTab, testServer }) {
   });
   // Ognuna col SUO colore: appena aperta, una scheda porta quello in cache per l'host, cioè della sorella.
   await expect.poll(async () => Object.fromEntries((await webTabs()).map((t) => [t.title, t.identityColor])), {
-    timeout: 15_000, message: 'le cinque schede non hanno ancora il loro colore identità',
+    timeout: 15_000, message: 'le schede non hanno ancora il loro colore identità',
   }).toEqual(Object.fromEntries(SCHEDE.map(([titolo, , identita]) => [titolo, identita])));
 
   await submit(dash, '/riordina');
