@@ -268,9 +268,8 @@ test('ogni campo dei metadati si legge solo dopo il suo `in`, e i campi letti so
       assert.match(dentro, guardia, `${r}.${campo} si legge senza aprire con !('${campo}' in ${r}) ||: ${pezzo}`);
     }
   }
-  for (const atteso of ['metadata', 'contentDisposition', 'contentEncoding', 'cacheControl', 'contentLanguage']) {
-    assert.ok(lette.has(atteso), `senzaMetadatiScelti non guarda più ${atteso}`);
-  }
+  assert.deepEqual([...lette].sort(), ['contentDisposition', 'metadata'],
+    'senzaMetadatiScelti deve leggere le chiavi e il nome di scarico, e nient’altro');
 });
 
 // ── Il nome dell'allegato: le regole e l'app devono dire la stessa cosa ──────
