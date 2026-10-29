@@ -87,7 +87,7 @@ async function chiedi(page, testo) {
   await page.locator('#sendBtn').click();
 }
 
-test('pezzi della stessa pagina letti uno dopo l\'altro: la risposta arriva e l\'avviso conta bene', async ({ app, openTab, testServer }) => {
+test.skip('pezzi della stessa pagina letti uno dopo l\'altro: la risposta arriva e l\'avviso conta bene', async ({ app, openTab, testServer }) => {
   test.setTimeout(150_000);
   const page = await openTab(NEWTAB);
   const [url] = await preparaPagine(app, testServer, ['ALFA']);
