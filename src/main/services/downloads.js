@@ -979,7 +979,9 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
     canResume: false,
     canPause: false,
     _scope: scope || '',
+    _sessione: webContents && !webContents.isDestroyed?.() ? webContents.session : null,
   };
+  campiona(rec);
   records.set(id, rec);
   const attese = [];
   rec._sblocca = (si) => { for (const r of attese.splice(0)) r(si); };
