@@ -109,7 +109,7 @@ function buildRiquadriVuotiSource(corpi) {
         }
         // Per indice si vedono anche i riquadri nelle radici ombra, ma non si sa se sono in volo.
         if (volo) continue;
-        try { k = lungo ? lungo.call(w) : w.length; } catch (e) {}
+        try { k = lungo ? R(lungo, w, []) : w.length; } catch (e) {}
         for (var i = 0; i < k && i < 4096; i++) {
           var f = null;
           try { f = w[i]; } catch (e) {}
