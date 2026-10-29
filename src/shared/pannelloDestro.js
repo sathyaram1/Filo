@@ -112,9 +112,11 @@
       if (t !== transito) { transito = t; riferisci(); }
     }
     const nelTransito = (t) => !!(accanto && t && t.nodeType === 1 && t.closest && t.closest('html > .sn-sidebar'));
-    // Bloccato spinge il foglio fin dove il pannello comincia: accanto all'Aiuto, anche della larghezza dell'Aiuto.
+    // Una regola sola: il foglio fa posto a ciò che sta fisso a destra, l'Aiuto aperto (anche ridotto, così un clic non
+    // risistema il testo) e il pannello bloccato. Sotto MIN_FOGLIO l'Aiuto torna sopra il foglio, come il lucchetto.
     function spingi() {
-      html.style.setProperty('--pd-spinta', aperto && tiene() ? `${LARGHEZZA + accanto}px` : '0px');
+      const spinta = (aperto && tiene() ? LARGHEZZA : 0) + (aiutoSpinge ? accanto : 0);
+      html.style.setProperty('--pd-spinta', `${spinta}px`);
     }
     window.addEventListener('resize', posa);
     try {
