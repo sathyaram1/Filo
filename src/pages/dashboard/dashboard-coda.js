@@ -377,7 +377,9 @@
       for (let n = a.lastElementChild; n && n !== ancora; n = n.previousElementSibling) if (aSchermo(n)) { fondo = n; break; }
       cima = sopra ? Math.max(0, Math.ceil(y(sopra.getBoundingClientRect().bottom))) : 0;
       const base = (parseFloat(getComputedStyle(a).paddingBottom) || 0) - vuoto;
-      serve = Math.max(0, Math.ceil(cima + a.clientHeight - y(fondo.getBoundingClientRect().bottom) - base));
+      // Il margine sotto l'ultima riga (lo spazio dei tasti di una risposta, #1620) allunga lo scorrimento come il vuoto.
+      const giu = y(fondo.getBoundingClientRect().bottom) + (parseFloat(getComputedStyle(fondo).marginBottom) || 0);
+      serve = Math.max(0, Math.ceil(cima + a.clientHeight - giu - base));
       // Uno scambio che ha riempito lo schermo ha consumato il vuoto: non torna se poi qualcosa si accorcia.
       if (!serve && !inApertura()) ancora = null;
     }
