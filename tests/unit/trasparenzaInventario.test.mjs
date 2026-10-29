@@ -106,6 +106,7 @@ const COLLEZIONI = {
   '/config/judgeSecrets': CONFIGURAZIONE,
   '/config/automation': CONFIGURAZIONE,
   '/config/routines': CONFIGURAZIONE,
+  '/config/manutentore': CONFIGURAZIONE,
   '/config/redteam': CONFIGURAZIONE,
   '/config/bacheca': CONFIGURAZIONE,
   '/config/mazzi': CONFIGURAZIONE,

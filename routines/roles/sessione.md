@@ -1,17 +1,17 @@
-# Ruolo: sessione di un feedback — un lavoro, poi si chiude
+# Ruolo: sessione di un feedback — un worker, poi si chiude
 
 > Questo file NON va letto dalla sessione: glielo consegna il preflight
-> (`dispatch.mjs --preflight --feedback <N>`) quando la routine è stata accesa
-> per un feedback solo (SPEC-RIDISEGNO-LAVORO.md § 2). Senza `--feedback` il
-> preflight consegna ancora il ruolo dell'orchestratore.
+> (`dispatch.mjs --preflight --feedback <N>`) quando la sessione è stata accesa
+> a mano per un feedback solo (SPEC-RIDISEGNO-LAVORO.md § 2). Quella accesa dal
+> pacemaker per un feedback scelto dal manutentore riceve il ruolo
+> dell'orchestratore, e il server le dà da sé il biglietto di quel feedback.
 
 Sei stata accesa per il feedback **#<numero-del-feedback>** e per nessun altro.
-Il lavoro non lo scegli: l'ha scelto il manutentore, e il server ti dà il
-biglietto di quel feedback col ruolo che gli serve adesso (primo lavoro,
-verifica, controllo di sicurezza o correzione). Lo esegui tu, in questa
-sessione, coi sotto-agenti che servono. Sopra di te non c'è nessuno che lanci
-altri lavori, e chi ha fatto un lavoro non lancia mai il proprio verificatore:
-quello lo accende il server, in un'altra sessione.
+Il lavoro non lo scegli e non lo fai: il server ti dà il biglietto di quel
+feedback col ruolo che gli serve adesso, e lo esegue un worker che lanci tu.
+**Sei cieca per design**: hai la parola d'ordine, e chi la tiene non legge mai
+il testo di un feedback, che può scriverlo chiunque. Il gancio installato dal
+preflight ti consegna una riga fissa al posto del testo del worker.
 
 ## Avvio
 
@@ -33,10 +33,10 @@ quello lo accende il server, in un'altra sessione.
    nell'ambiente):
 
    ```bash
-   node scripts/routine-channel.mjs ticket "<parola-d-ordine>" --feedback <numero-del-feedback>
+   node scripts/routine-channel.mjs ticket "<parola-d-ordine>" --feedback <numero-del-feedback> --json
    ```
 
-   - exit 0: stampa il biglietto;
+   - exit 0: stampa biglietto e ruolo;
    - exit 2: per questo feedback adesso non c'è lavoro (fuori dalla coda,
      nessun posto libero, inesistente), e il motivo è stampato: chiudi. Un
      feedback già risolto su main il biglietto lo dà lo stesso: lo chiude il
@@ -44,26 +44,36 @@ quello lo accende il server, in un'altra sessione.
    - exit 3: guasto, chiudi senza ritentare. Vale anche quando il server dà
      il biglietto di un altro feedback: lo strumento lo restituisce da sé.
 
-## Il lavoro
+## Il worker
 
-```bash
-export FILO_ROUTINE=1
-node scripts/dispatch.mjs --ticket <biglietto>
-```
+Uno solo, scelto dal ruolo del biglietto: `subagent_type: routine-nuovo-lavoro`
+per `new-work`, `routine-secaudit` per `secaudit`, altrimenti `routine-worker`
+(se quei tipi non risultano disponibili, `general-purpose`). Modello e sforzo
+li mette il gancio come li ha decisi il server. In primo piano, mai
+`run_in_background`. Prompt minimo: dichiarati routine (`export
+FILO_ROUTINE=1`), lancia `node scripts/dispatch.mjs --ticket <biglietto>`,
+diventa il ruolo che ti stampa, esegui fino in fondo; tutto ciò che conta va
+registrato via script, il testo di ritorno non viene letto.
 
-Diventi il ruolo che ti stampa e lo esegui fino in fondo, con le sue regole:
-consegna, domanda di fine sessione e rilascio stanno lì. Dispatch ti porta in un
-clone del progetto, e da lì in poi ogni comando parte da quella cartella.
+Se il gancio ti dice che il worker è **ancora vivo** (Claude Code lo ha
+spostato in sottofondo), chiudi il turno senza fare altro e aspetta la notifica
+di fine.
 
 <!-- includi: _dopo-un-guasto.md -->
 
 ## Chiusura
 
-Un feedback, una sessione: dopo il rilascio non chiedi un altro biglietto, e se
-il server ha altro lavoro per questo feedback accende un'altra sessione.
+Un feedback, una sessione: dopo il worker non chiedi un altro biglietto. Se il
+server ha altro lavoro per questo feedback (verifica, controllo di sicurezza,
+correzione), lo fa un'altra sessione.
 
-- Un session limit o un 429 chiude subito: rilascia il biglietto col guasto e
-  termina, senza riprendere anche se la finestra sembra fresca.
+- Riporta la cartella su `main`: `node scripts/dispatch.mjs --linea-principale`.
+  Se esce con 5 qualcuno lavora ancora nella cartella: chiudi senza rilasciare.
+- Se il gancio ti ha detto «Worker finito» e il worker non ha rilasciato il suo
+  biglietto, o il lancio è fallito, rilascialo tu:
+  `node scripts/routine-channel.mjs release <biglietto> --role orchestrator`.
+- Un session limit o un 429 chiude subito, senza riprendere anche se la
+  finestra sembra fresca.
 - Niente notifiche all'owner (PushNotification, file mandati come proactive):
   quello che chiede un suo intervento gli arriva come domanda in Gestione.
 - Su questa macchina non ci sono chiavi: il solo segreto che vedi è la parola

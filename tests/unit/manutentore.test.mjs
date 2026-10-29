@@ -73,3 +73,13 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
   assert.match(err.join('\n'), /Nessuna scheda per #99/);
   assert.equal(await M.main(['boh']), 1);
 });
+
+test('l\'ordine da accendere: numeri nell\'ordine dato, senza doppioni, col rifiuto detto; il corpo che legge il server', () => {
+  assert.deepEqual(M.leggiOrdine('812, #815,815.2 812'), { ok: true, numeri: ['812', '815', '815.2'] });
+  assert.match(M.leggiOrdine('812,menu').motivo, /non sono numeri di feedback: menu/);
+  assert.equal(M.leggiOrdine('').ok, false);
+  const tanti = Array.from({ length: M.ORDINE_MAX + 1 }, (_, i) => String(i + 1)).join(',');
+  assert.match(M.leggiOrdine(tanti).motivo, /il massimo è/, 'oltre il tetto si rifiuta col numero, non si taglia');
+  const c = M.corpoOrdine(['73', '71'], new Date(0));
+  assert.deepEqual(c.fields.ordine.arrayValue.values.map((v) => v.stringValue), ['73', '71']);
+});

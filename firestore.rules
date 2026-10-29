@@ -329,6 +329,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // config/manutentore (#1680): l'ordine dei feedback da accendere, scritto dal manutentore con le credenziali
+    // dell'owner (npm run manutentore -- accendi); il pacemaker lo legge con l'Admin SDK.
+    match /config/manutentore {
+      allow read, write: if isAdmin();
+    }
+
     // config/redteam (#896) → `openToAll`: il Red Team è aperto a chi non è
     // admin? Spento, assente o illeggibile = in pausa; le callable del server lo
     // leggono con l'Admin SDK. Lettura pubblica: dentro c'è un interruttore e

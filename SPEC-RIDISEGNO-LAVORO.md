@@ -155,8 +155,9 @@ Fatto dalla parte dell'app, con le regole in FEEDBACK-STATES.md § 3a:
 - correttore: `--motivo` obbligatorio su `--record-fixed`, e alla consegna i file in
   conflitto con main e quelli in cui la modifica del ramo è cambiata, con la regola
   dei file di servizio in `verifierRound.js`;
-- sessione per feedback: preflight `--feedback <N>` col ruolo `sessione.md`, e
-  `ticket … --feedback <N>`.
+- sessione per feedback accesa a mano: preflight `--feedback <N>` col ruolo `sessione.md`,
+  cieca come l'orchestratore (lancia un worker, non legge il feedback), e `ticket …
+  --feedback <N>`; il comando `ticket` manda anche l'id della sessione cloud.
 
 Fatto dalla parte del server (ramo omonimo di filo-security, da rideployare):
 
@@ -172,7 +173,12 @@ Fatto dalla parte del server (ramo omonimo di filo-security, da rideployare):
   correttore di un riallineamento; confronto rifatto dal server e niente giro dopo un
   riallineamento pulito.
 
-Resta: il pacemaker che accende da sé una sessione per feedback scelto dal manutentore
-(serve che il prompt salvato della routine passi il numero, passo dell'owner su
-claude.ai); poi si toglie l'orchestratore. Fase 2: la spesa dell'account per il
-manutentore e l'operazione che dà schede e testi a chi ha la chiave delle routine.
+- accensione per feedback: l'ordine del manutentore in `config/manutentore`
+  (`npm run manutentore -- accendi`), il pacemaker che accende una sessione per ciascun
+  feedback con lavoro e la lega al numero con l'id della sessione, la ricerca «già
+  risolto» prima dell'accensione, e il biglietto che quella sessione riceve per il suo
+  feedback e uno solo. Il prompt salvato della routine non cambia: la sessione accesa
+  così è l'orchestratore cieco, ristretto dal server al suo feedback.
+
+Resta: fase 2, la spesa dell'account per il manutentore e l'operazione che dà schede e
+testi a chi ha la chiave delle routine.

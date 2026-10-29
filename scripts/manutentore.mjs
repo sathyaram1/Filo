@@ -1,6 +1,6 @@
 // Il contesto del manutentore (SPEC-RIDISEGNO-LAVORO.md § 2): il suo ruolo, tutte le schede in una riga ciascuna e i rami
-// in corso coi loro file, da git e senza modello. Non decide e non scrive niente: stampa. Regole: tests/unit/manutentore.test.mjs.
-// Uso: npm run manutentore -- contesto | rami | incroci <N>   [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]
+// in corso coi loro file, da git e senza modello; scrive solo l'ordine da accendere, che il pacemaker legge. Regole:
+// tests/unit/manutentore.test.mjs. Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -11,6 +11,40 @@ import { incroci, ramiInCorso } from './lib/su-main.mjs';
 import { CARTELLA_PREDEFINITA, INDICE, leggiSchede } from './schede.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+// Lo stesso tetto del server (functions/src/routine/accensioni.js, ORDINE_MAX): oltre si rifiuta col numero.
+export const ORDINE_MAX = 2000;
+
+/** «812, #815,815.2» → { ok, numeri } senza doppioni nell'ordine dato, o { ok:false, motivo }. PURA. */
+export function leggiOrdine(testo) {
+  const pezzi = String(testo || '').split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
+  if (!pezzi.length) return { ok: false, motivo: 'accendi vuole i numeri in ordine (accendi 812,815) o --niente per svuotare l\'ordine' };
+  const storti = pezzi.filter((x) => !/^#?[1-9]\d{0,6}(?:\.[1-9]\d{0,3})?$/.test(x));
+  if (storti.length) return { ok: false, motivo: `non sono numeri di feedback: ${storti.slice(0, 5).join(', ')}` };
+  const numeri = [...new Set(pezzi.map((x) => x.replace(/^#/, '')))];
+  if (numeri.length > ORDINE_MAX) return { ok: false, motivo: `${numeri.length} numeri, il massimo è ${ORDINE_MAX}` };
+  return { ok: true, numeri };
+}
+
+/** Il corpo REST del documento `config/manutentore`. PURA. */
+export function corpoOrdine(numeri, adesso = new Date()) {
+  return { fields: {
+    ordine: { arrayValue: { values: numeri.map((n) => ({ stringValue: n })) } },
+    at: { timestampValue: adesso.toISOString() },
+  } };
+}
+
+async function documentoOrdine(metodo, corpo) {
+  const { acquireBearer, FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
+  const bearer = await acquireBearer();
+  const res = await fetch(`${FIRESTORE_BASE}/config/manutentore`, {
+    method: metodo, headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, ...(corpo ? { body: JSON.stringify(corpo) } : {}),
+  });
+  if (metodo === 'GET' && res.status === 404) return { ok: true, numeri: [] };
+  if (!res.ok) return { ok: false, motivo: `Firestore ha risposto ${res.status}: ${(await res.text()).slice(0, 200)}` };
+  const j = await res.json();
+  return { ok: true, numeri: ((j.fields?.ordine?.arrayValue?.values) || []).map((v) => v.stringValue).filter(Boolean) };
+}
 
 /** Una scheda in una riga, con stato e priorità dall'indice. PURA. */
 export function rigaScheda(s, f = {}) {
@@ -74,9 +108,24 @@ function opzione(argv, nome) {
 
 export async function main(argv, { root = ROOT } = {}) {
   const [cmd, arg] = argv;
-  if (!['contesto', 'rami', 'incroci'].includes(cmd) || (cmd === 'incroci' && !arg)) {
-    console.error('Uso: npm run manutentore -- contesto | rami | incroci <N>  [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]');
+  if (!['contesto', 'rami', 'incroci', 'ordine', 'accendi'].includes(cmd) || (cmd === 'incroci' && !arg)) {
+    console.error('Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente  [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]');
     return 1;
+  }
+  // L'ordine da accendere: il pacemaker accende una sessione per ciascun feedback che ha lavoro, in quest'ordine.
+  if (cmd === 'ordine' || cmd === 'accendi') {
+    let numeri = [];
+    if (cmd === 'accendi' && arg !== '--niente') {
+      const o = leggiOrdine(argv.slice(1).filter((a) => !a.startsWith('--')).join(','));
+      if (!o.ok) { console.error(`RIFIUTATO: ${o.motivo}. Non ho scritto niente.`); return 1; }
+      numeri = o.numeri;
+    }
+    const r = cmd === 'ordine' ? await documentoOrdine('GET') : await documentoOrdine('PATCH', corpoOrdine(numeri));
+    if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); return 2; }
+    console.log(r.numeri.length
+      ? `Ordine da accendere (${r.numeri.length}): ${r.numeri.map((n) => `#${n}`).join(', ')}. Il pacemaker accende una sessione per ciascuno che ha lavoro, una priorità 3 fuori ordine davanti.`
+      : 'Nessun ordine: il pacemaker accende per priorità, come ripiego.');
+    return 0;
   }
   const cartella = resolve(opzione(argv, '--cartella') || CARTELLA_PREDEFINITA);
   const giorni = Number(opzione(argv, '--giorni')) || 30;

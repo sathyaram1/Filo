@@ -494,8 +494,8 @@ export function leggiMotivo(testo) {
 }
 
 /**
- * Il motivo di una consegna `fixed`: obbligatorio solo per il correttore (regola 4), come sul server. Il verificatore che
- * corregge i propri rilievi non è stato chiamato per un motivo; se lo scrive, vale la stessa forma. PURA.
+ * Il motivo di una consegna `fixed`: obbligatorio solo per il correttore (regola 4), come sul server; per gli altri ruoli,
+ * se c'è, vale la stessa forma. PURA.
  */
 export function motivoDellaConsegna(testo, ruolo) {
   if (testo === undefined && ruolo !== 'fixer') return { ok: true, motivo: null };
@@ -2588,12 +2588,11 @@ if (isMainModule) {
           // Chi ha passato il preflight è l'orchestratore: da qui la sua sessione non riceve il testo dei worker
           // (lib/orchestratore-cieco.mjs). Senza gancio il giro non parte: meglio un giro saltato che uno che vede.
           // Solo in cloud: sulla macchina dell'owner le impostazioni utente valgono per tutte le sue sessioni.
-          // La sessione di un feedback il lavoro lo fa da sé: non lancia worker, quindi niente gancio, ma il clone sì.
-          const inCloud = process.env.CLAUDE_CODE_REMOTE === 'true';
-          const cieco = inCloud && !perFeedback
+          // Anche la sessione di un feedback tiene la parola d'ordine: cieca come l'orchestratore, lancia il worker (#1680 giro 1).
+          const cieco = process.env.CLAUDE_CODE_REMOTE === 'true'
             ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', clone: cartellaCloneServer() })
-            : { ok: true, saltato: !inCloud };
-          if (cieco.saltato && !perFeedback) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
+            : { ok: true, saltato: true };
+          if (cieco.saltato) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
           if (!cieco.ok) {
             console.error(`[dispatch] GUASTO (transient): gancio dell'orchestratore cieco non installato in ${cieco.file} (${cieco.why})`);
             process.exit(3);

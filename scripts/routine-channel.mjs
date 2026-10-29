@@ -244,10 +244,18 @@ export function readTicketReply(status, body) {
 /**
  * `opts.feedback`: il numero del feedback per cui la sessione è stata accesa (SPEC-RIDISEGNO-LAVORO.md § 2). Il server
  * dà il biglietto di quel feedback, o risponde «niente» col motivo (non in coda, posti pieni, inesistente).
+ * `sessione`: l'id della sessione cloud. Quella che il pacemaker ha acceso per un feedback scelto dal manutentore riceve
+ * il biglietto di quello, una volta sola, anche senza chiederlo (functions/src/routine/accensioni.js).
  */
+export function sessioneCloud(env = process.env) {
+  const s = String(env.CLAUDE_CODE_REMOTE_SESSION_ID || '').trim();
+  return /^[A-Za-z0-9_-]{8,120}$/.test(s) ? s : '';
+}
+
 export async function ticket(passphrase, opts) {
   const feedback = opts && opts.feedback ? { feedback: String(opts.feedback) } : {};
-  const { status, body } = await call('routineTicket', { passphrase, ...feedback, ...creditiDi(opts) }, opts);
+  const sessione = sessioneCloud(opts && opts.env ? opts.env : process.env);
+  const { status, body } = await call('routineTicket', { passphrase, ...feedback, ...(sessione ? { sessione } : {}), ...creditiDi(opts) }, opts);
   return readTicketReply(status, body);
 }
 

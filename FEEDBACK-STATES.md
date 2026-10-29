@@ -246,25 +246,33 @@ illegale.
 I numeri che motivano ogni regola stanno nella spec, § 1. Qui le regole come le
 applicano strumenti e server.
 
-**Una sessione per feedback.** Il server accende una sessione cloud per ogni feedback
-scelto dal manutentore, fino ai posti liberi; nessuna sessione sceglie il lavoro da
-sola. La sessione passa il numero al preflight (`dispatch.mjs --preflight --feedback
-<N>`, che consegna `routines/roles/sessione.md` al posto dell'orchestratore) e chiede il
-biglietto di QUEL feedback (`routine-channel.mjs ticket <parola> --feedback <N>`, campo
-`feedback` nel corpo, che il server rimanda nella risposta). Un biglietto di un altro
-feedback, o senza il numero, lo strumento lo restituisce subito ed esce come guasto. Il
-server fa passare la scelta di sempre ristretta a quel numero, con tutti i suoi controlli
-(fiducia, pause, crediti, priorità, attese), e dà il ruolo che serve adesso; se non c'è
-risponde «niente» col motivo: `non_in_coda: #N <perché>`, i posti pieni con il codice di
-sempre, `feedback_inesistente`. Un numero malformato è un rifiuto (`bad_feedback`). Un
-feedback già risolto su main il biglietto lo prende: lo chiude il primo lavoro.
-Verifica, controllo di sicurezza e correzione restano sessioni separate, accese dal
-server: chi ha fatto il lavoro non lancia mai il proprio verificatore. Il pacemaker non
-accende ancora da sé una sessione per feedback (serve che il prompt salvato della
-routine passi il numero, passo dell'owner): in fase 1 le accende l'owner a mano, e
-l'orchestratore resta finché il server non accende così.
+**Una sessione per feedback.** Il manutentore scrive sul server l'ordine dei feedback da
+accendere (`npm run manutentore -- accendi N,M,…`, documento `config/manutentore`, solo
+admin; `accendi --niente` lo svuota). A ogni giro il pacemaker prende, nell'ordine, i
+feedback che hanno un lavoro ammesso dalla scelta di sempre (fiducia, pause, crediti,
+attese, semafori) e non hanno già un'accensione in viaggio, più davanti una priorità 3
+fuori dall'ordine (regola 7), e accende una sessione per ciascuno fino ai posti liberi.
+Lega ogni sessione al suo numero con l'id che la risposta di accensione restituisce
+(`routine-accensioni/<sessione>`); per un primo lavoro fa prima la ricerca «già risolto
+su main» e la lega anche quella. Senza ordine vale la coda per priorità, come ripiego
+(SPEC § 4). La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
+sempre: il comando `ticket` manda l'id della sessione (`sessione`), e il server, dopo la
+parola d'ordine, le dà il biglietto del suo feedback anche senza numero; dopo quel
+biglietto ogni altra richiesta della stessa sessione è «niente»
+(`sessione_finita: …`), e un numero diverso dal suo è un rifiuto. Un feedback, una
+sessione: verifica, controllo di sicurezza e correzione li accende il pacemaker in
+sessioni nuove. Una sessione si può ancora accendere a mano per un feedback: il preflight
+con `--feedback <N>` consegna `routines/roles/sessione.md`, cieca come l'orchestratore
+(chi tiene la parola d'ordine non legge mai il testo di un feedback), che chiede il
+biglietto di QUEL feedback (`ticket <parola> --feedback <N>`) e lancia un worker. Un
+biglietto di un altro feedback lo strumento lo restituisce subito ed esce come guasto. Il
+server fa passare la scelta di sempre ristretta a quel numero e dà il ruolo che serve
+adesso; se non c'è risponde «niente» col motivo: `non_in_coda: #N <perché>`, i posti
+pieni con il codice di sempre, `feedback_inesistente`. Un numero malformato è un rifiuto
+(`bad_feedback`). Un feedback già risolto su main il biglietto lo prende: lo chiude il
+primo lavoro.
 
-**Già risolto su main.** Al primo ritiro del primo lavoro il server cerca, con l'API di
+**Già risolto su main.** Prima dell'accensione (pacemaker) o al primo ritiro del primo lavoro il server cerca, con l'API di
 GitHub, le fusioni sulla linea principale di main che portano un commit che cita `#N`
 (la fusione stessa o un commit del ramo fuso) dopo la nascita del feedback e la sua
 ultima riapertura (`riapertoAt`, che il server segna quando un feedback chiuso torna
@@ -276,8 +284,9 @@ la ricontrolla come primo passo e, se è chiuso davvero, consegna senza ramo `de
 status --status done --reason gia_risolto --fusione <sha>` con report e frase: `working
 → done` (routine, `statusReason: gia_risolto`). Lo strumento rifiuta uno sha che non
 sta sulla linea principale di `origin/main`; il server lo riprova da sé e lo accetta
-solo dal primo lavoro, da `working`, se la fusione sta sulla linea principale, porta una
-citazione del feedback, è più recente della nascita e dell'ultima riapertura e non è
+solo dal primo lavoro, da `working`, se la fusione sta sulla linea principale (una
+fusione più vecchia di quanto il server rilegge di main, ~12.000 commit, basta che sia
+arrivata su main), porta una citazione del feedback, è più recente della nascita e dell'ultima riapertura e non è
 la propria. Chiude come il cancello (stato del giro azzerato) con la frase, il report
 preceduto dalla riga della fusione e la versione di `package.json` sulla fusione. Un
 rifiuto dice il motivo, e la sessione lavora il feedback come sempre.
@@ -337,9 +346,13 @@ regola è `giroDopoRiallineamento` in `verifierRound.js`; il server rifà il con
 sé con l'API di GitHub e non si fida di quello del client: per i conflitti approssima
 `merge-tree` (zone sovrapposte o a contatto nei file toccati da tutte e due le parti;
 nel dubbio, conflitto). Per questo dispatch spinge il ramo prima di consegnare. Ogni
-guasto (GitHub giù, sha sconosciuto, main cambiato in troppi file, lavoro che tocca il
-server) vale `pieno`. Con `nessuno` il server scrive «verifica passata» sulla punta nuova
-e il lavoro va al controllo di sicurezza; la decisione, coi file, va nel biglietto
+guasto (GitHub giù, sha sconosciuto, main cambiato in troppi file) vale `pieno`. Un
+lavoro che tocca anche il server confronta allo stesso modo la sua parte del server,
+dalla punta verificata a quella registrata dell'ultima spinta (`realign.shaVerificatoServer`):
+lì nessun file è di servizio, quindi la parte del server deve restare identica o portare
+la stessa modifica; senza una delle due punte vale `pieno`. Con `nessuno` il server
+scrive «verifica passata» sulle punte nuove (app e server) e il lavoro va al controllo
+di sicurezza; la decisione, coi file, va nel biglietto
 (`giroDopoRiallineamento`) e nelle note.
 
 ## 4. Tab dashboard (deriva SOLO da `status`)
