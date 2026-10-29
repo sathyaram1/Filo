@@ -123,6 +123,9 @@ for (const caso of [
   { nome: 'senza la finestra nota, il rifiuto del fornitore', listino: false, rifiuti: (n) => expect(n).toBeGreaterThan(0) },
   { nome: 'senza le misure nel rifiuto, a metà per volta', listino: false, misure: false, rifiuti: (n) => expect(n).toBeGreaterThan(0) },
   { nome: 'con la finestra nota dal listino, prima di mandare', listino: true, rifiuti: (n) => expect(n).toBe(0) },
+  // Il testo ci starebbe, col tetto della risposta no: Anthropic lo dice con «ingresso + tetto > finestra».
+  { nome: 'Anthropic, ingresso più tetto oltre la finestra', listino: false, anthropic: true, rifiuti: (n) => expect(n).toBeGreaterThan(0) },
+  { nome: 'Anthropic, finestra nota ma testo contato più pesante', listino: true, anthropic: true, pesante: true, rifiuti: (n) => expect(n).toBeGreaterThan(0) },
 ]) {
   test(`tre pagine enormi nello stesso turno (${caso.nome}): la risposta arriva con la prima pagina e in chat c'è l'avviso delle altre`, async ({ app, openTab, testServer }) => {
     test.setTimeout(120_000);
