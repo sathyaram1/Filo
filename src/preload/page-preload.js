@@ -172,7 +172,7 @@ try {
     window.addEventListener(tipo, ascolto, { capture: true });
   }
   // Anche il puntatore e l'inserimento: la selezione che l'utente lascia in una casella di Filo la vede Filo prima del sito (#1340).
-  for (const tipo of ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'mouseup', 'touchend', 'click', 'paste', 'cut', 'beforeinput', 'input']) {
+  for (const tipo of ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'mouseup', 'touchend', 'click', 'paste', 'cut', 'compositionstart', 'beforeinput', 'input']) {
     window.addEventListener(tipo, (e) => {
       const UI = globalThis.SN_FILO_UI;
       if (UI && typeof UI.primaDelSito === 'function') UI.primaDelSito(e);
