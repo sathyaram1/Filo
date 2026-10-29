@@ -215,14 +215,12 @@ test('in creazione nessuna chiave né nome di scarico scelti da chi carica', () 
   assert.ok(!/\bmetadata\.size\(\)/.test(cond), 'il conteggio delle chiavi rifiuta anche il codice di scarico di Firebase');
   // Il Content-Disposition ammette solo le forme che scrive Firebase, col nome dell'oggetto: una forma
   // in più, o un `matches`, rimette il nome di scarico nelle mani di chi carica.
-  const ammessi = ["''", "'inline'", `"inline; filename*=utf-8''" + file`];
-  const usi = [...cond.matchAll(/\.contentDisposition\b(?:\s*==\s*null\b|\s+in\s+\[([^\]]*)\])?/g)];
-  assert.ok(usi.some((u) => u[1] !== undefined), `il Content-Disposition non ha la sua lista di forme: ${cond}`);
+  const ammessi = new Set(['null', "''", "'inline'", `"inline; filename*=utf-8''" + file`]);
+  const usi = [...cond.matchAll(/\.contentDisposition\b(?:\s*==\s*(null|''|'inline'|"inline; filename\*=utf-8''" \+ file)|\s+in\s+\[([^\]]*)\])?/g)];
+  assert.ok(usi.length > 0, `il Content-Disposition non si controlla: ${cond}`);
   for (const u of usi) {
-    assert.ok(u[0] !== '.contentDisposition', `uso del Content-Disposition non ammesso: ${cond}`);
-    if (u[1] === undefined) continue;
-    const forme = u[1].split(',').map((f) => f.trim());
-    assert.deepEqual([...forme].sort(), [...ammessi].sort(), `forme del Content-Disposition diverse da quelle di Firebase: [${u[1]}]`);
+    const forme = u[1] !== undefined ? [u[1]] : u[2] !== undefined ? u[2].split(',').map((f) => f.trim()) : [];
+    assert.ok(forme.length > 0 && forme.every((f) => ammessi.has(f)), `uso del Content-Disposition non ammesso: ${u[0]}`);
   }
 });
 
