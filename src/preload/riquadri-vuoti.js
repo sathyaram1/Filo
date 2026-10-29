@@ -164,7 +164,8 @@ function buildRiquadriVuotiSource(corpi) {
     if (w) applica(w);
     spazza();
   }
-  function ascolta(t) { try { R(suEvento, t, ['load', alLoad, true]); } catch (e) {} }
+  // Nella finestra della pagina addEventListener può essere già un sostituto di Filo: per un riquadro nuovo vale il suo.
+  function ascolta(t, su) { try { R(su || suEvento, t, ['load', alLoad, true]); } catch (e) {} }
   function mascheraIn(w) {
     try {
       var FP = w.Function.prototype, t = FP.toString;
