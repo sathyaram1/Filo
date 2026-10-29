@@ -54,7 +54,7 @@ const DOMANDE_WEB_SCHEDA_IN_VISTA = Object.freeze(new Set([
   'shell_action', 'toggle_fullscreen', 'exit_fullscreen', 'open_url', 'open_new_tab', 'open_home',
   'open_options', 'open_incognito', 'open_spellcheck_page', 'auth_signin', 'filo_run_action',
   'filo_confirm_action', 'feedback_annotate', 'feedback_clear_draw', 'tts_stop_reading',
-  'apri_collegamento_filo', 'apri_comunque', 'wallet_invite_open',
+  'apri_collegamento_filo', 'apri_comunque', 'wallet_invite_open', 'aiuto_apri_file', 'aiuto_mostra_file',
 ]));
 // Spegnere l'ombra resta libero: lo chiede anche una pagina che si chiude in secondo piano.
 const vuoleLaScheda = (type, msg) => DOMANDE_WEB_SCHEDA_IN_VISTA.has(type)
