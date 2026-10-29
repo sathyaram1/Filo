@@ -1207,7 +1207,23 @@
       const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused, maxTokens: r?.maxTokens, finishReason: r?.finishReason, reason: r?.reason }) : null;
       // Il tasto in evidenza è quello che toglie l'ostacolo (#828.1): finché c'è, «Riprova» rimanda lo stesso messaggio
       // allo stesso muro, e resta accanto per dopo, quando l'ostacolo è tolto.
-      if (pagina) {
+      // #1596 — finestra piena anche dopo i tagli: lo stesso messaggio, qui, sbatte di nuovo contro lo stesso limite; in
+      // una chat nuova no. Il messaggio torna nel campo, da accorciare o mandare.
+      if (r?.code === 'CONTESTO_PIENO' && !internal && !daModello) {
+        const nuova = document.createElement('button');
+        nuova.type = 'button';
+        nuova.className = 'dash-action-btn dash-action-btn-primary';
+        nuova.textContent = 'Chat nuova';
+        nuova.title = 'Ricomincia in una chat nuova col messaggio già scritto';
+        nuova.addEventListener('click', () => {
+          chiudiConversazione();
+          inputEl.value = String(userMessage || '');
+          autoGrowInput();
+          aggiornaTasto();
+          inputEl.focus();
+        });
+        row.appendChild(nuova);
+      } else if (pagina) {
         const via = document.createElement('button');
         via.type = 'button';
         via.className = 'dash-action-btn dash-action-btn-primary';

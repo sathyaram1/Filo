@@ -66,6 +66,21 @@ test('modello da 32 mila, testo lungo e tetto di partenza: la frase nomina il te
   assert.doesNotMatch(frase, /Riprova/);
 });
 
+// Anthropic dietro OpenRouter: l'errore dell'host arriva dentro `metadata.raw`.
+const rifiutoAnthropic = (message) => ({
+  status: 400, ok: false, headers: { get: () => null },
+  text: async () => JSON.stringify({ error: { message: 'Provider returned error', code: 400, metadata: { raw: JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message } }), provider_name: 'Anthropic' } } }),
+});
+
+test('Anthropic, ingresso più tetto oltre la finestra: la chat può ancora accorciare; un tetto da più di metà finestra resta la causa', async () => {
+  const e = await OR.httpError(rifiutoAnthropic('input length and `max_tokens` exceed context limit: 188240 + 16384 > 200000, decrease input length or `max_tokens` and try again'), { tools: true, maxTokens: 16384 });
+  assert.equal(e.finestra, 200000);
+  assert.ok(e.stringibile, 'il testo da solo ci sta: la chat accorcia pagine e conversazione');
+  const t = await OR.httpError(rifiutoAnthropic('input length and `max_tokens` exceed context limit: 50000 + 128000 > 160000, decrease input length or `max_tokens` and try again'), { tools: false, maxTokens: 128000 });
+  assert.equal(t.code, 'TETTO_RISPOSTA');
+  assert.ok(!t.stringibile);
+});
+
 test('un testo che da solo non sta nella memoria resta un rifiuto di contesto, non del tetto', async () => {
   const msg = "This endpoint's maximum context length is 32768 tokens. However, you requested about 56384 tokens (40000 of text input, 16384 in the output).";
   const e = await OR.httpError(risposta(400, msg), { tools: false, maxTokens: 16384 });

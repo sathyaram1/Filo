@@ -100,6 +100,8 @@
   // Dove chi usa Filo cambia il modello di una funzione. «Modelli predefiniti» è una scheda della Gestione: chi non
   // gestisce Filo non ce l'ha (#1344.1).
   const DOVE_ALTRO_MODELLO = 'in Opzioni → Modelli per azione';
+  const FRASE_CONTESTO_PIENO = 'c\'è più testo di quanto il modello riesca a leggere insieme: chiedimi meno pagine alla volta, '
+    + 'accorcia il messaggio o ricomincia in una chat nuova.';
 
   // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
   // codici, è un vicolo cieco (la risposta sarà identica finché non si cambia
@@ -265,6 +267,8 @@
     if (e && CODICI_GIA_SCRITTI.includes(e.code)) return raw;
 
     if (e && e.code === 'RISPOSTA_TAGLIATA') return fraseTagliata(e.finishReason, { vuota: !!e.vuota });
+    // #1596 — la chat ha già accorciato pagine e conversazione e ancora non ci sta: cambiare modello non è il rimedio.
+    if (e && e.code === 'CONTESTO_PIENO') return FRASE_CONTESTO_PIENO;
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
     if (isTransientNetwork(e)) {

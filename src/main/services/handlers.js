@@ -4854,18 +4854,36 @@ function pageReadsForPrompt(actions) {
       }
       continue;
     }
+    // #1596 — `tenuti`: quanto ne è rimasto quando le letture del turno insieme non stavano nella finestra del modello.
+    const campi = { Titolo: out.titolo || '', Indirizzo: tagliaInteri(String(out.url || ''), 500) };
+    const tenuti = Number.isFinite(out.tenuti) ? Math.max(0, Math.min(out.testo.length, out.tenuti)) : out.testo.length;
+    if (tenuti === 0) {
+      blocks.push('[Pagina web letta ma lasciata fuori: con le altre letture di questo turno non stava nella memoria del modello. '
+        + 'Restano titolo e indirizzo, il testo non lo hai davanti: non inventarlo e rispondi con quello che hai. Non rileggerla in '
+        + 'questo turno; sotto la tua risposta Filo dice all\'utente quali pagine ha lasciato fuori, e se lui lo chiede la rileggi con '
+        + `LEGGI_PAGINA e lo stesso url${da > 0 ? `, da: ${da}` : ''}.]\n`
+        + E.imbustaCampi({ tipo: 'PAGINA_WEB', campi, conIntestazione: true }));
+      continue;
+    }
+    const parziale = tenuti < out.testo.length;
+    const testo = parziale ? tagliaInteri(out.testo, tenuti) : out.testo;
+    const finoQui = parziale ? da + testo.length : fino;
     const meta = [out.fonte === 'scheda' ? 'letta dalla scheda aperta' : 'scaricata'];
     if (out.tipo === 'application/pdf') meta.push(out.pagine ? `un PDF di ${out.pagine} ${out.pagine === 1 ? 'pagina' : 'pagine'}` : 'un PDF');
-    if (da > 0 || out.troncata) meta.push(`caratteri da ${da} a ${fino} su ${totale}`);
+    if (da > 0 || out.troncata || parziale) meta.push(`caratteri da ${da} a ${finoQui} su ${totale}`);
     let blocco = `[Pagina web (${meta.join(', ')})]\n`
       + E.imbustaCampi({
         tipo: 'PAGINA_WEB',
-        campi: { Titolo: out.titolo || '', Indirizzo: tagliaInteri(String(out.url || ''), 500) },
-        corpo: out.testo,
+        campi,
+        corpo: testo,
         conIntestazione: true,
         max: PageRead.MAX_TEXT_CHARS + 4000,
       });
-    if (out.troncata) {
+    if (parziale) {
+      blocco += `\n[Letto fino al carattere ${finoQui} su ${totale}: il resto non stava nella memoria del modello insieme alle altre `
+        + 'letture di questo turno. Rispondi con quello che hai e, se il dato manca, dillo; non rileggerla in questo turno: se '
+        + `l'utente lo chiede, il seguito si legge con LEGGI_PAGINA, lo stesso url e da: ${finoQui}.]`;
+    } else if (out.troncata) {
       blocco += `\n[Letto fino al carattere ${fino} su ${totale}: la pagina continua. Se il dato che cerchi non è qui sopra, `
         + `richiama LEGGI_PAGINA con lo stesso url e da: ${fino}.]`;
     }
@@ -6141,6 +6159,59 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
     return stretta;
   };
+  // #1596 — le pagine lette in questo turno fra i messaggi per il modello: { x, i, giro, coda, round, ordine }. Quando
+  // insieme non stanno nella finestra restano le ultime chieste (nell'ordine delle chiamate), le altre si accorciano o
+  // lasciano titolo e indirizzo, e la risposta lo dice.
+  const pagineLette = [];
+  const pagineVive = () => pagineLette.filter((p) => p.x.res.output.tenuti !== 0)
+    .sort((a, b) => b.round - a.round || a.ordine - b.ordine);
+  const caratteriStrumenti = () => { try { return tools ? JSON.stringify(tools).length : 0; } catch (_) { return 0; } };
+  // `tutte`: i caratteri delle pagine ancora davanti al modello; `altre`: quanto si libera togliendo tutte meno l'ultima
+  // chiesta, che ha il posto anche a costo di stringere la conversazione (rileggere una pagina tolta deve riuscire).
+  const misuraPagine = () => {
+    const vive = pagineVive();
+    const tutte = vive.reduce((n, p) => n + lunghezzaDi(p), 0);
+    const altre = vive.length > 1 ? tutte - lunghezzaDi(vive[0]) - globalThis.SN_FILO_CONTESTO.PESO_RIMANDO * (vive.length - 1) : 0;
+    return { tutte, altre: Math.max(0, altre) };
+  };
+  const lasciaFuoriPagine = (eccesso) => {
+    const vive = pagineVive();
+    const tenere = globalThis.SN_FILO_CONTESTO.pagineDaTenere(vive.map(lunghezzaDi), eccesso);
+    let stretta = false;
+    vive.forEach((p, k) => {
+      const prima = lunghezzaDi(p);
+      if (tenere[k] >= prima) return;
+      const o = p.x.res.output;
+      const visibile = Number.isFinite(o.tenuti) ? o.tenuti : String(o.testo || '').length;
+      const resta = tenere[k] ? visibile - (prima - tenere[k]) : 0;
+      // Sotto il minimo un pezzo di pagina non serve al modello: resta il rimando.
+      o.tenuti = resta >= globalThis.SN_FILO_CONTESTO.PAGINA_MIN / 2 ? resta : 0;
+      threadMessages[p.i] = Tools.toolMessage(p.x.action._callId, `${toolResultText(p.x, p.giro)}${p.coda}`);
+      stretta = true;
+    });
+    return stretta;
+  };
+  // Con la finestra nota le pagine si accorciano prima di mandare: niente rifiuto da aspettare. Solo quando basta
+  // togliere le altre; se no decide il rifiuto, che stringe prima la conversazione.
+  const pagineNellaFinestra = async () => {
+    const { altre } = misuraPagine();
+    if (!altre) return;
+    const finestra = await finestraNota();
+    if (!finestra) return;
+    const FC = globalThis.SN_FILO_CONTESTO;
+    let caratteri = 0;
+    try { caratteri = FC.caratteriDi(await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages })); } catch (_) { return; }
+    const eccesso = FC.eccessoNellaFinestra({ finestra, caratteri: caratteri + caratteriStrumenti(), risposta: tettoRispostaChat, margine: FC.MARGINE_PAGINE });
+    if (eccesso > 0 && eccesso <= altre) lasciaFuoriPagine(eccesso);
+  };
+  // Le pagine rimaste fuori a fine turno, per la frase sotto la risposta: non quelle rilette poi per intero.
+  const pagineLasciate = () => {
+    const chiave = (o) => `${o.url || o.pageRead || ''}|${Number(o.da) || 0}`;
+    const intere = new Set(pagineLette.filter((p) => !Number.isFinite(p.x.res.output.tenuti)).map((p) => chiave(p.x.res.output)));
+    return pagineLette.map((p) => p.x.res.output)
+      .filter((o) => Number.isFinite(o.tenuti) && !intere.has(chiave(o)))
+      .map((o) => ({ url: o.url || o.pageRead || '', parziale: o.tenuti > 0 }));
+  };
   // Il modello della chat rifiuta una richiesta più lunga della sua finestra: il tratto si stringe quanto dice il
   // rifiuto e si rifà lo stesso giro. Il tetto che ha funzionato vale per i turni dopo con quel modello.
   let strette = 0;
@@ -6174,13 +6245,20 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const caratteriTratto = conTratto ? FC.caratteriDi(payloadBase.filoTratto) : 0;
     const conRiletture = riletture.length > 0 && stretteRiletture < 3;
     const caratteriRiletture = riletture.reduce((n, y) => n + lunghezzaDi(y), 0);
+    // #1596 — le pagine del turno sono arrivate dopo una richiesta che ci stava: se togliere quelle oltre l'ultima chiesta
+    // basta, si tolgono loro e la conversazione resta. Senza misure si dimezzano. Per ultima si accorcia anche quella.
+    const pagine = misuraPagine();
+    const eccesso = pagine.tutte ? FC.eccessoDopoRifiuto({ ...rifiuto, caratteri: caratteri + caratteriStrumenti(), risposta: tettoRispostaChat }) : null;
+    if (pagine.altre && (eccesso == null || eccesso <= pagine.altre)
+      && lasciaFuoriPagine(eccesso ?? Math.min(Math.ceil(pagine.tutte / 2), pagine.altre))) return true;
+    const accorciaPagine = () => pagine.tutte > 0 && lasciaFuoriPagine(eccesso ?? Math.ceil(pagine.tutte / 2));
     // Si stringe prima la parte più grossa; se non si stringe più, l'altra.
     const prima = conRiletture && caratteriRiletture >= caratteriTratto ? 'riletture' : 'tratto';
     for (const parte of prima === 'riletture' ? ['riletture', 'tratto'] : ['tratto', 'riletture']) {
       if (parte === 'riletture' && conRiletture && await stringiRiletture(rifiuto, caratteri)) { stretteRiletture++; return true; }
       if (parte === 'tratto' && conTratto && await stringiTratto(rifiuto, caratteri, caratteriTratto)) return true;
     }
-    return false;
+    return accorciaPagine();
   };
   // Un modello che non prende immagini (o non tante) rifiutava anche le domande senza: quelle dei turni passati
   // lasciano il posto alla nota e lo stesso giro riparte. Vale per i turni dopo con quel modello (#1166).
@@ -6218,6 +6296,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       if (turno.fermato) { fermato = true; break; }
       if (turno.seguiti.length) await leggiSeguiti();
+      if (pagineLette.length) await pagineNellaFinestra();
       // La scheda scrive la riga del ripiego sotto la risposta: niente avviso in più (#662).
       const giro = () => handleAIRequest({
         action: ACTIONS.FILO_CHAT,
@@ -6236,6 +6315,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
           conto.recupero('contesto_stretto');
           round--;
           continue;
+        }
+        // #1596 — più niente da accorciare: la frase dice cosa può fare l'utente, non «cambia modello».
+        if (e && e.code !== 'TETTO_RISPOSTA' && globalThis.SN_FILO_CONTESTO.troppoLungo(e)) {
+          try { e.code = 'CONTESTO_PIENO'; } catch (_) {}
         }
         throw e;
       }
@@ -6391,6 +6474,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         threadMessages.push(Tools.toolMessage(x.action._callId, `${toolResultText(x, giro)}${coda}`));
         const o = x.res && x.res.output;
         if (o && o.chatRead && o.found && typeof o.transcript === 'string') riletture.push({ x, i: threadMessages.length - 1, giro, coda });
+        if (o && 'pageRead' in o && o.ok && o.testo && String(x.action.type || '').toUpperCase() === 'LEGGI_PAGINA') {
+          pagineLette.push({ x, i: threadMessages.length - 1, giro, coda, round, ordine: i });
+        }
       });
       if (tagliataInAzione) { exhausted = false; interrotta = r.finishReason; break; }
     }
@@ -6481,6 +6567,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     senzaRisposta = { passi, interrotta: true, motivo: 'tagliato' };
     textReply = unisciTesti([globalThis.SN_CHAT_ERRORS.chiudiRecinto(textReply), globalThis.SN_CHAT_ERRORS.rispostaInterrotta(interrotta)]);
   }
+  // #1596 — le pagine lette e rimaste fuori dalla finestra: lo sa l'utente, e lo sa il modello ai turni dopo.
+  textReply = unisciTesti([textReply, globalThis.SN_FILO_CONTESTO.frasePagineLasciate(pagineLasciate())]);
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // L'esito che la persona ha davanti (#1463): lo stesso «Continua» che la scheda mette sotto, o la frase che lo sostituisce.
   const esitoTurno = senzaRisposta ? senzaRisposta.motivo : nonDisponibile ? 'non_disponibile' : textReply === '(vuoto)' ? 'vuoto' : 'risposta';

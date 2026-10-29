@@ -507,12 +507,25 @@
     const st = Number(err && err.status);
     if (Number.isFinite(st) && st > 0 && ![400, 413, 422].includes(st)) return null;
     const s = String((err && (err.message || err.error)) || err || '');
-    if (!/maximum context|context[ _-]?(length|window)|too many tokens|prompt is too long|input is too long|reduce the length of the (messages|prompt)/i.test(s)) return null;
+    if (!/maximum context|context[ _-]?(length|window)|context limit:|too many tokens|prompt is too long|input is too long|reduce the length of the (messages|prompt)/i.test(s)) return null;
+    // Anthropic ha due forme: «prompt is too long: 214263 tokens > 200000 maximum» (il solo ingresso) e, quando a far
+    // sforare è il tetto della risposta, «exceed context limit: 188240 + 21333 > 200000» (ingresso + tetto > finestra).
+    const somma = s.match(new RegExp(`context limit:?\\s*${NUMERO}\\s*\\+\\s*${NUMERO}\\s*>\\s*${NUMERO}`, 'i'));
+    if (somma) {
+      const [a, b, f] = somma.slice(1, 4).map((x) => Number(String(x).replace(/[,.']/g, '')));
+      if (a > 0 && b > 0 && f > 0) return { ingresso: a, max: f, chiesti: a + b };
+    }
+    // OpenRouter mette nel chiesto anche il tetto della risposta e dice a parte l'ingresso («69000 of text input»):
+    // solo quando c'è, `ingresso`.
+    const ingresso = numeroDa(s, new RegExp(`${NUMERO} of (?:text )?input`, 'i'));
     return {
+      ...(ingresso ? { ingresso } : {}),
       max: numeroDa(s, new RegExp(`maximum context (?:length|window) (?:is|of) ${NUMERO}`, 'i'))
-        || numeroDa(s, new RegExp(`context (?:length|window|limit)[^0-9]{0,24}${NUMERO}`, 'i')),
+        || numeroDa(s, new RegExp(`context (?:length|window|limit)[^0-9]{0,24}${NUMERO}`, 'i'))
+        || numeroDa(s, new RegExp(`tokens? > ${NUMERO} maximum`, 'i')),
       chiesti: numeroDa(s, new RegExp(`requested (?:about )?${NUMERO}`, 'i'))
-        || numeroDa(s, new RegExp(`(?:prompt|input) (?:is|has|contains) ${NUMERO}`, 'i')),
+        || numeroDa(s, new RegExp(`(?:prompt|input) (?:is|has|contains) ${NUMERO}`, 'i'))
+        || numeroDa(s, new RegExp(`too long: ${NUMERO} tokens? >`, 'i')),
     };
   }
 
@@ -563,6 +576,81 @@
       resta = Math.min(resta, capRilettura({ tetto: Infinity, finestra: max, occupati, risposta }));
     }
     return Math.max(minimo, resta);
+  }
+
+  // I caratteri da togliere perché la richiesta (strumenti compresi) stia nella finestra insieme al tetto della risposta,
+  // che il fornitore conta dentro: 0 se ci sta o se la finestra non si sa.
+  function eccessoNellaFinestra({ finestra = null, caratteri = 0, risposta = 0, margine = MARGINE_FINESTRA } = {}) {
+    const f = Number(finestra);
+    if (!Number.isFinite(f) || f <= 0) return 0;
+    const riserva = Math.min(Math.max(0, Number(risposta) || 0), f / 2);
+    return Math.max(0, Math.ceil((Number(caratteri) || 0) - (f * margine - riserva) * CARATTERI_PER_TOKEN));
+  }
+  // Le pagine si accorciano prima di mandare con un margine stretto: sbagliare la stima costa un rifiuto, che non si
+  // paga e porta le misure; un margine largo toglierebbe al modello pagine che ci stavano.
+  const MARGINE_PAGINE = 0.95;
+
+  // Dopo un rifiuto per finestra, i caratteri da togliere: in proporzione con le misure, dalla stima con la sola
+  // finestra; null se il rifiuto non dice abbastanza (chi taglia dimezza). Il tetto della risposta occupa la finestra
+  // ma non si accorcia togliendo caratteri: va fuori dalla proporzione, o le pagine si tagliano molto oltre (#1596).
+  // Margine stretto come prima di mandare: un taglio corto costa un altro rifiuto, con misure nuove.
+  function eccessoDopoRifiuto({ max = null, chiesti = null, ingresso = null, caratteri = 0, risposta = 0 } = {}) {
+    const c = Math.max(0, Number(caratteri) || 0);
+    if (max && chiesti && chiesti > max && c > 0) {
+      const dentro = ingresso && ingresso < chiesti ? ingresso : chiesti;
+      const fuori = dentro < chiesti ? chiesti - dentro : Math.min(Math.max(0, Number(risposta) || 0), max / 2);
+      const posto = max - fuori;
+      const e = posto > 0 ? Math.ceil(c - c * (posto / dentro) * MARGINE_PAGINE) : 0;
+      return e > 0 ? e : null;
+    }
+    const stimato = max ? eccessoNellaFinestra({ finestra: max, caratteri: c, risposta }) : 0;
+    return stimato > 0 ? stimato : null;
+  }
+
+  // #1596 — quanto resta, in caratteri, di ogni pagina letta nel turno perché insieme stiano nella finestra. `pagine`:
+  // le lunghezze nell'ordine in cui tenerle. Le prime restano intere, la prima che non ci sta resta a metà se ne avanza
+  // il minimo, le altre scendono a 0 (titolo e indirizzo, che costano PESO_RIMANDO ciascuna, la prima esclusa: resta
+  // quasi sempre, e il margine della finestra copre il caso in cui no).
+  const PAGINA_MIN = 4000;
+  const PESO_RIMANDO = 800;
+  function pagineDaTenere(pagine, eccesso) {
+    const lunghe = (Array.isArray(pagine) ? pagine : []).map((n) => Math.max(0, Math.floor(Number(n) || 0)));
+    const e = Math.max(0, Math.ceil(Number(eccesso) || 0));
+    if (!e) return lunghe;
+    let resta = lunghe.reduce((s, n) => s + n, 0) - e - PESO_RIMANDO * Math.max(0, lunghe.length - 1);
+    return lunghe.map((n) => {
+      if (n <= resta) { resta -= n; return n; }
+      if (resta < PAGINA_MIN) return 0;
+      const tenuti = resta;
+      resta = 0;
+      return tenuti;
+    });
+  }
+
+  // La riga sotto la risposta sulle pagine rimaste fuori (#1596): `pagine` è [{ url, parziale }]. Nomina i siti e non i
+  // titoli, perché la frase resta fra le parole di Filo e un titolo lo scrive chi possiede la pagina.
+  function sitoDi(url) {
+    try { return new URL(String(url || '')).hostname.replace(/^www\./, ''); } catch (_) { return ''; }
+  }
+  function elencoSiti(lista) {
+    const siti = [...new Set(lista.map((p) => sitoDi(p.url)).filter(Boolean))];
+    if (!siti.length) return '';
+    return ` (${siti.length === 1 ? siti[0] : `${siti.slice(0, -1).join(', ')} e ${siti[siti.length - 1]}`})`;
+  }
+  function frasePagineLasciate(pagine) {
+    const lista = (Array.isArray(pagine) ? pagine : []).filter((p) => p && typeof p === 'object');
+    if (!lista.length) return '';
+    const fuori = lista.filter((p) => !p.parziale);
+    const meta = lista.filter((p) => p.parziale);
+    const parti = [];
+    if (fuori.length) parti.push(`ho lasciato fuori ${fuori.length === 1 ? 'una pagina' : `${fuori.length} pagine`}${elencoSiti(fuori)}`);
+    if (meta.length) {
+      const quali = meta.length === 1 ? (fuori.length ? 'un\'altra' : 'una pagina') : (fuori.length ? `altre ${meta.length}` : `${meta.length} pagine`);
+      parti.push(`di ${quali}${elencoSiti(meta)} ho tenuto solo l'inizio`);
+    }
+    const piu = lista.length > 1;
+    return `Il modello non riusciva a leggere tutto insieme, così ${parti.join(' e ')}. `
+      + `Se ${piu ? 'ti servono, chiedimi di rileggerle' : 'ti serve, chiedimi di rileggerla'}.`;
   }
 
   // Quello che il modello ha già davanti dall'archivio: i pezzi ripescati nei turni prima e le conversazioni rilette
@@ -721,5 +809,6 @@
     provenienzaDellaChat, provenienzaDelFrammento, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
     coda, assembla, troppoLungo, tettoDopoRifiuto, rifiutaImmagini, INTESTAZIONE_CODA, pianoDellaCache,
     RILETTURA_MIN, capRilettura, rilettureDopoRifiuto, giaDavanti, senzaCancellati, ricordoComeAzione,
+    eccessoNellaFinestra, MARGINE_PAGINE, eccessoDopoRifiuto, PAGINA_MIN, PESO_RIMANDO, pagineDaTenere, frasePagineLasciate,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
