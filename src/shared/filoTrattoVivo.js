@@ -57,7 +57,7 @@
     return FC && typeof FC.quando === 'function' ? FC.quando(ts) : new Date(ts).toISOString();
   }
 
-  // Il testo del blocco 3: la data della fotografia in testa, lo STATO raccolto sotto il suo titolo.
+  // Il testo del blocco 3: la data della fotografia in testa, lo STATO raccolto sotto il suo titolo, il richiamo in fondo.
   function parteUtente(sezioni, { ts = null } = {}) {
     const lista = Array.isArray(sezioni) ? sezioni : [];
     const q = ts != null && Number.isFinite(Date.parse(ts) || Number(ts)) ? quando(ts) : '';
@@ -112,15 +112,23 @@
     return { cambiate, rifai, viste: nuove };
   }
 
-  const NOMI_SEZIONI = { STILE: 'Lo stile di scrittura salvato', MODELLO: 'Il nome del modello', CAMBI: 'I cambi delle valute', FILE: 'I file dell\'editor' };
-  function nomeSezione(chiave) {
-    return String(chiave).startsWith('STATO:') ? String(chiave).slice(6) : (NOMI_SEZIONI[chiave] || chiave);
+  // Una sezione che non c'è più si dice com'è adesso, non «tolta».
+  const SEZIONI_VUOTE = {
+    'STATO:SITI SEMPRE APERTI': 'SITI SEMPRE APERTI\n(nessuno)',
+    'STATO:ZOOM DELLA PAGINA': 'ZOOM DELLA PAGINA\n(la scheda davanti non lo dice)',
+    MODELLO: 'Il nome del modello che ti sta eseguendo adesso non lo sai.',
+    CAMBI: 'CAMBI:\n(i cambi delle valute adesso non ci sono: cercali con CERCA_WEB)',
+    FILE: 'FILE DELL\'EDITOR:\n(nessuno)',
+  };
+  function sezioneVuota(chiave) {
+    const k = String(chiave);
+    return SEZIONI_VUOTE[k] || `${k.startsWith('STATO:') ? k.slice(6) : k}\n(non c'è più)`;
   }
 
   function rendiCambiate(cambiate) {
     const parti = [];
     for (const c of Array.isArray(cambiate) ? cambiate : []) {
-      if (c.tolta) { parti.push(`${nomeSezione(c.tolta)}: non c'è più.`); continue; }
+      if (c.tolta) { parti.push(sezioneVuota(c.tolta)); continue; }
       const s = c.sezione;
       if (c.aggiunte) {
         parti.push(`MEMORIA, righe nuove (si aggiungono a quelle del CONTESTO):\n${E().imbusta({ tipo: 'MEMORIA_FILO', testo: c.aggiunte.join('\n'), conIntestazione: true })}`);

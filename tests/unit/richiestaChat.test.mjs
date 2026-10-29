@@ -105,6 +105,14 @@ const json = (x) => JSON.stringify(x);
 
 test('gli strumenti sono gli stessi per ogni sistema, ogni ruolo e ogni chiamata', () => {
   assert.equal(json(Tools.definitions()), json(STRUMENTI));
+  // Lo stesso computer che si dice Mac, Windows o Linux: niente nelle descrizioni dipende da lui.
+  const vero = Object.getOwnPropertyDescriptor(process, 'platform');
+  try {
+    for (const sistema of ['darwin', 'win32', 'linux']) {
+      Object.defineProperty(process, 'platform', { value: sistema, configurable: true });
+      assert.equal(json(Tools.definitions()), json(STRUMENTI), `gli strumenti cambiano su ${sistema}`);
+    }
+  } finally { Object.defineProperty(process, 'platform', vero); }
   assert.ok(STRUMENTI.some((d) => d.function.name === 'ONBOARDING'), 'lo strumento dell\'intervista manca fuori dall\'intervista');
   assert.ok(!/C:\\|\/Users\/|\/home\//.test(json(STRUMENTI)), 'negli strumenti c\'è un percorso di un sistema solo');
 });
@@ -140,6 +148,14 @@ test('la parte fissa è identica byte per byte fra due utenti diversi e fra due 
   assert.equal(json(fissa(mario)), json(fissa(mario2)));
   assert.equal(json(fissa(mario)), json(fissa(anna)));
   assert.notEqual(mario.messages[0].content, anna.messages[0].content, 'il CONTESTO di due utenti è lo stesso: la prova non prova niente');
+  // Anche su un altro sistema: la parte fissa non sa su che computer gira.
+  const vero = Object.getOwnPropertyDescriptor(process, 'platform');
+  try {
+    for (const sistema of ['darwin', 'win32', 'linux']) {
+      Object.defineProperty(process, 'platform', { value: sistema, configurable: true });
+      assert.equal(PROMPTS.filoChatStatic(), fissa(mario).text, `la parte fissa cambia su ${sistema}`);
+    }
+  } finally { Object.defineProperty(process, 'platform', vero); }
 });
 
 test('il tratto vivo di un turno è il prefisso di quello del turno dopo, e il ragionamento del turno prima torna a Claude', async () => {
