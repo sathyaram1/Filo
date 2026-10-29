@@ -7,12 +7,16 @@
 function buildRiquadriVuotiSource(corpi) {
   return `(function(){
   'use strict';
-  var D = Object.getOwnPropertyDescriptor, def = Object.defineProperty;
+  // Presi prima degli script della pagina: una pagina che riscrive call, apply o Object.prototype non deve far lanciare
+  // i sostituti né vederli passare (#798). Per questo niente .call/.apply e descrittori senza prototipo.
+  var D = Object.getOwnPropertyDescriptor, def = Object.defineProperty, R = Reflect.apply, protoDi = Object.getPrototypeOf;
+  var proprio = Object.prototype.hasOwnProperty, suEvento = EventTarget.prototype.addEventListener;
+  function campo(x, k) { return x && R(proprio, x, [k]) ? x[k] : undefined; }
   // I sostituti somigliano ai nativi a chi li ispeziona (#799): niente prototype né new, stessa lunghezza, testo nativo;
   // i corpi lo usano per i loro.
   var finti = new WeakMap();
   function comeNativo(f, v, nome) {
-    try { def(f, 'length', { value: v.length, configurable: true }); } catch (e) {}
+    try { def(f, 'length', { __proto__: null, value: v.length, configurable: true }); } catch (e) {}
     finti.set(f, 'function ' + nome + '() { [native code] }');
     return f;
   }
