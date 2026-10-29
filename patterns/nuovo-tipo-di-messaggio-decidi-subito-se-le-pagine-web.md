@@ -199,7 +199,9 @@ Un content script che comincia ad ascoltare una spinta, fare una domanda,
 leggere un campo o usare uno scomparto nuovo lo aggiunge lì: le sentinelle di
 `tests/unit/impostazioniPerOrigine.test.mjs` e `tests/unit/domandeDaiSiti.test.mjs`
 diventano rosse finché non lo fa, invece di lasciarlo spegnere in silenzio solo
-sui siti; e una domanda che nessuno fa più va tolta. La prova dal vero parla dal
+sui siti; e una domanda che nessuno fa più va tolta. La sentinella conta ogni
+`MSG.X` nominato da uno script delle pagine, anche quando il tipo arriva al
+messaggio da un argomento: i bottoni dei file dell'Aiuto erano rimasti fuori così. La prova dal vero parla dal
 mondo isolato del preload di un sito (`tests/domande-dai-siti.spec.mjs`). Un dato che un sito non
 deve vedere affatto può andare anche con `broadcastToFiloPages`, che lo dice
 esplicitamente.
