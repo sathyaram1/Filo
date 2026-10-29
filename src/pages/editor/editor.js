@@ -2406,6 +2406,31 @@
     pad.querySelector('[data-sr="one"]').addEventListener('click', (e) => { e.stopPropagation(); contaUnaVolta(); replaceOne(replInput.value); updateCount(); });
     pad.querySelector('[data-sr="all"]').addEventListener('click', (e) => { e.stopPropagation(); contaUnaVolta(); replaceAll(findInput.value, replInput.value); run(); });
   }
+  // La posizione subito dopo la corrispondenza corrente, come offset nel testo del suo blocco: smontati i mark i
+  // nodi cambiano, l'offset no. Restituisce chi la ricalcola dopo lo smontaggio.
+  function puntoDopoCorrispondenza() {
+    const cur = findState.hits[findState.idx];
+    const ultimo = cur && cur.marks[cur.marks.length - 1];
+    if (!ultimo || !ultimo.isConnected) return null;
+    const block = findBlockOf(ultimo.firstChild || ultimo);
+    let off = 0;
+    let fine = -1;
+    for (const t of findTextNodesOfBlock(block)) { off += t.nodeValue.length; if (ultimo.contains(t)) fine = off; }
+    if (fine < 0) return null;
+    return () => {
+      let cum = 0;
+      for (const t of findTextNodesOfBlock(block)) {
+        if (cum + t.nodeValue.length >= fine) { const r = document.createRange(); r.setStart(t, fine - cum); r.collapse(true); return r; }
+        cum += t.nodeValue.length;
+      }
+      return null;
+    };
+  }
+  let ultimaSelezioneFoglio = null;
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && docEl.contains(sel.anchorNode)) ultimaSelezioneFoglio = sel.getRangeAt(0).cloneRange();
+  });
   function clearFind() {
     // Uno spostamento ancora in attesa punterebbe a evidenziazioni che stiamo
     // per smontare: si annulla qui e lo ripianifica chi rilancia la ricerca.
