@@ -25,6 +25,7 @@ globalThis.chrome = { storage: { local: { async get(k) { return { [k]: undefined
 
 const { creaFilo } = require('../../src/main/services/ilFilo.js');
 require('../../src/main/services/filoChats.js');
+require('../../src/main/services/conversazioniApp.js');
 const Contesto = require('../../src/main/services/contestoFilo.js');
 
 const C = globalThis.SN_CONST;
