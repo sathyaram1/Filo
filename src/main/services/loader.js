@@ -56,6 +56,7 @@ require(path.join(SHARED, 'dominiGoogle.js')); // #1123 — i domini di Google s
 require(path.join(SHARED, 'nomiSito.js')); // #590 — quando un dominio scritto a mano è valido, e come si legge (prima di eseguibili)
 require(path.join(SHARED, 'pagineDelicate.js')); // #1004 — quali pagine non mandano testo ai modelli nei lavori automatici
 require(path.join(SHARED, 'eseguibili.js')); // #588 — quali file il sistema ESEGUE (logica pura)
+require(path.join(SHARED, 'scaricamentiAvanzamento.js')); // #1287 — velocità e tempo che resta di uno scaricamento (logica pura)
 require(path.join(SHARED, 'nomiFile.js')); // #950 — nome sensato ai file dell'utente (logica pura)
 // #585 — pulizia e incapsulamento dei percorsi condivisi. Va PRIMA di paths.js
 // (che la usa in scrittura) e di handlers.js (che la usa in lettura).
