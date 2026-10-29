@@ -3329,8 +3329,7 @@
   const TASTI_EDITOR = [
     { tasti: ['s'], cosa: 'salva il documento', fa: () => save(true) },
     { tasti: ['\\'], cosa: 'apre e chiude il pannello degli strumenti', fa: () => { if (pannello) pannello.commuta('tasto'); } },
-    { tasti: ['f'], cosa: 'porta alla ricerca', suo: 'search-replace',
-      attivo: () => !!pannello && pannello.elementi().includes('search-replace'),
+    { tasti: ['f'], cosa: 'porta alla ricerca', suo: 'search-replace', attivo: () => !!pannello,
       fa: () => triggerModuleShortcut('search-replace') },
     // Shift indifferente: su molte tastiere il "+" si fa con Shift. Il tasto lo
     // prende Filo prima di questa pagina (fa: null): qui non va dato a un modulo.
