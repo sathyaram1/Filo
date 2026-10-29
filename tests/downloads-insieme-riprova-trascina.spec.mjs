@@ -177,7 +177,7 @@ async function incognitoCheScarica(app, shell, url) {
   await app.evaluate(({ BrowserWindow }, u) => {
     BrowserWindow.getAllWindows().find((w) => w._filoIncognito)._filoTabs.openTab(u);
   }, url);
-  const sito = await trovaPagina(app, (u) => u.startsWith('http://127.0.0.1') && u.includes('/pagina'));
+  const sito = await trovaPagina(app, (u) => u.startsWith('http://127.0.0.1') && u.includes('?pagina'));
   await sito.waitForLoadState('domcontentloaded');
   return { incog, sito };
 }
