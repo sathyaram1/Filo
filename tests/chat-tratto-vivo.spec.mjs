@@ -4,8 +4,9 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
-async function preparaModello(app, copione) {
-  await app.evaluate(async (_e, copione) => {
+// Il copione: un giro per voce, con `toolCalls` per gli strumenti ed `errore` per un invio che fallisce.
+async function preparaModello(app, copione, extra = {}) {
+  await app.evaluate(async (_e, { copione, extra }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
     await globalThis.SN_STORAGE.updateSettings({
@@ -14,10 +15,11 @@ async function preparaModello(app, copione) {
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
       theme: 'light',
+      ...extra,
     });
     globalThis.__copione = copione.slice();
     globalThis.__chiamate = [];
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, tools, onDelta }) => {
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, tools, onDelta, onToolCall }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       // La chat è la richiesta che apre con la parte fissa: il messaggio della home comincia con le stesse parole.
       if (!(!!messages[0] && messages[0].role === 'system' && String(messages[0].content || '').startsWith(globalThis.SN_CONST.PROMPTS.filoChatStatic()))) {
@@ -25,10 +27,13 @@ async function preparaModello(app, copione) {
       }
       globalThis.__chiamate.push(JSON.parse(JSON.stringify({ messages, tools })));
       const r = globalThis.__copione.shift() || { text: 'ok' };
-      try { onDelta && onDelta(r.text); } catch (_) {}
-      return { ...base, text: r.text, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+      if (r.errore) throw new Error(r.errore);
+      const calls = r.toolCalls || [];
+      for (const c of calls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
+      try { if (r.text) onDelta && onDelta(r.text); } catch (_) {}
+      return { ...base, text: r.text || '', toolCalls: calls, reasoningDetails: [], finishReason: calls.length ? 'tool_calls' : 'stop' };
     };
-  }, copione);
+  }, { copione, extra });
 }
 
 async function apriHome(openTab) {
