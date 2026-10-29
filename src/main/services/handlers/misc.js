@@ -764,7 +764,7 @@ module.exports = function register(on, ctx) {
     });
   } catch (_) {}
 
-  on(MSG.SUBMIT_FEEDBACK, async (msg) => {
+  on(MSG.SUBMIT_FEEDBACK, async (msg, sender, origin) => {
     try {
       if (!globalThis.SN_FEEDBACK?.submit) {
         throw new Error('SN_FEEDBACK non caricato nel main process');
