@@ -441,7 +441,6 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     const prima = memo.stato && memo.stato.epoca === ep ? memo.stato.testo : '';
     memo.stato = prima || stato ? { epoca: ep, testo: [prima, stato].filter(Boolean).join('\n\n') } : null;
     stato = memo.stato ? memo.stato.testo : '';
-    memo.onboarding = String(onboarding || '');
     memo.ricordi = Array.isArray(ricordi) && ricordi.length ? ricordi : null;
     memo.dopo = Array.isArray(dopo) ? dopo.filter(Boolean) : null;
     memo.intero = ep;
