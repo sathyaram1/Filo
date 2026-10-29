@@ -49,7 +49,7 @@ async function menuCompleto(menu) {
 for (const [caso, csp] of Object.entries(CSP)) {
   test(`Trusted Types (${caso}): il tasto destro apre il menu di Filo, e la sua voce apre il riquadro`, async ({ app, openTab, testServer }) => {
     const page = await apri(openTab, testServer, csp);
-    await page.locator('#paragraph').click({ button: 'right' });
+    await tastoDestroSullaFrase(page.locator('#paragraph'));
     const menu = menuDi(page).locator('.sn-menu');
     await menuCompleto(menu);
     await menu.getByText('Invia feedback', { exact: true }).click();
