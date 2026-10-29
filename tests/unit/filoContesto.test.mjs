@@ -432,7 +432,8 @@ test('oltre il tetto delle foto rimandate tornano le più nuove, le più vecchie
   }
   const f = FC.finestra(filo, { ora: ORA, ...TETTI, chatCorrente: 'c', immagini: immaginiDi(memoria) });
   const tornate = f.messaggi.reduce((n, m) => n + fotoNel(m).length, 0);
-  assert.equal(tornate, FC.MAX_IMMAGINI_RIMANDATE);
+  // Oltre il tetto il taglio scende di un quarto, come per i token (#1562).
+  assert.equal(tornate, FC.MAX_IMMAGINI_RIMANDATE * 0.75);
   assert.match(f.messaggi[0].content, /^\[.*\] foto 0\n\(qui l'utente aveva mandato 4 immagini/);
   assert.equal(fotoNel(f.messaggi[f.messaggi.length - 2]).length, 4, 'le foto dell\'ultimo messaggio devono tornare');
   // Il conto dei caratteri per il rifiuto di finestra pesa la foto come i suoi token.
