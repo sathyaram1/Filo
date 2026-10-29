@@ -134,6 +134,10 @@ test('«rifai l\'intervista di benvenuto» la ricomincia in una home nuova, e la
   const chat = await homeDi(app);
   await configura(app);
   const prima = await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getOnboarding()).past?.length || 0);
+  // Rifatta dalla chat si conta come dal pulsante delle Preferenze, che conta anche come finisce.
+  const riaperte = () => app.evaluate(async () => Object.values((await globalThis.SN_CONTATORI_MAIN.letto()).ore || {})
+    .reduce((n, o) => n + (((o.homePagina || {}).intervista_rifatta || {}).riaperta || 0), 0));
+  const riapertePrima = await riaperte();
 
   await modelloFinto(app, [premi('rifai_intervista', 'Ricominciamo da capo.')]);
   await scrivi(chat, 'rifai l\'intervista di benvenuto');
