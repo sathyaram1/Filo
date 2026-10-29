@@ -128,6 +128,7 @@ test('due turni di fila con tre pagine ciascuno', async ({ app, openTab, testSer
   await chiedi(page, 'ora cerca le altre tre guide e confrontale');
   const b2 = page.locator('.dash-bubble-filo', { hasText: 'SECONDO' });
   await expect(b2).toBeVisible({ timeout: 90_000 });
+  await page.waitForTimeout(1500);
   console.log('SECONDO:', await b2.innerText());
   console.log('rifiutate', await app.evaluate(() => globalThis.__rifiutate));
   await b2.screenshot({ path: 'tests/.shots/1596-g6-chiaro.png' });
