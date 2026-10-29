@@ -670,7 +670,9 @@
 
   // Un rifiuto per il tetto della risposta: nessun host ammesso regge quel `max_tokens`. Si dice, col numero (#1097.3).
   const RIFIUTO_TETTO = /max[_ ]?(?:new[_ ])?tokens|max(?:imum)?[_ ](?:output|completion)[_ ]tokens|output token limit/i;
-  const CONTESTO = /maximum context|context[ _-]?(?:length|window)|tokens? limit exceeded/i;
+  // Anthropic, anche dietro OpenRouter: «input length and `max_tokens` exceed context limit: 188240 + 21333 > 200000».
+  const CONTESTO = /maximum context|context[ _-]?(?:length|window)|tokens? limit exceeded|context limit:/i;
+  const SOMMA_ANTHROPIC = /context limit:?\s*([\d.,]+)\s*\+\s*([\d.,]+)\s*>\s*([\d.,]+)/i;
   const numeroIn = (s, re) => {
     const m = re.exec(s);
     const n = m ? Number(String(m[1]).replace(/[.,]/g, '')) : NaN;
