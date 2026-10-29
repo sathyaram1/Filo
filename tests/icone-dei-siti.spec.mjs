@@ -80,10 +80,11 @@ test('la home e la chat mostrano l\'icona dei siti senza chiedere niente a Googl
   await expect(riga.locator('img')).toHaveAttribute('src', dato(PNG_ROSSO));
   expect((await richieste(app)).filter((r) => r === 'sito-con-icona.test/favicon.ico')).toHaveLength(1);
 
-  // Senza icona la riga resta col nome del sito.
+  // Senza icona la riga resta col nome del sito: il posto dell'icona aspetta nascosto che una scheda la trovi.
   const rigaSenza = await rigaDiChat(home, 'riga-senza-icona', 'https://senza-icona.test/x');
   await expect(rigaSenza).toContainText('senza-icona.test');
-  await expect(rigaSenza.locator('img')).toHaveCount(0, { timeout: 10000 });
+  await expect(rigaSenza.locator('img')).toBeHidden({ timeout: 10000 });
+  await expect(rigaSenza.locator('img')).not.toHaveAttribute('src', /./);
 
   const tutte = await richieste(app);
   expect(versoTerzi(tutte), 'nessuna richiesta parte verso un servizio di icone di terzi').toEqual([]);
