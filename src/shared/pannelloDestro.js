@@ -21,7 +21,8 @@
     : { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, bloccato: false });
 
   // opts: { app, elementi: { [id]: { disegna(host), icona?(size), voci?() → [{ etichetta, fa }] } }, scorrimento() → el,
-  //         appartiene?(target) → bool (riquadri dell'app aperti dal pannello), riquadroAperto?() → bool, suCambio?(api) }
+  //         appartiene?(target) → bool (riquadri dell'app aperti dal pannello), riquadroAperto?() → bool, suCambio?(api),
+  //         mossa?(evento: 'aggiunto' | 'tolto' | 'spostato', id) }
   function crea(opts) {
     const P = global.SN_PANNELLI_APP;
     const app = String(opts && opts.app || '');
@@ -185,10 +186,10 @@
         v.querySelector('.pd-voce-icona').innerHTML = ic;
         v.querySelector('.pd-voce-nome').textContent = e.nome;
         v.addEventListener('mousedown', (ev) => iniziaTrascina(ev, e.id, 'catalogo', v));
-        v.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); posa(e.id); } });
+        v.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); metti(e.id); } });
         v.addEventListener('contextmenu', (ev) => {
           ev.preventDefault();
-          apriMenu(ev.clientX, ev.clientY, [{ etichetta: 'Aggiungi al pannello', fa: () => posa(e.id) }]);
+          apriMenu(ev.clientX, ev.clientY, [{ etichetta: 'Aggiungi al pannello', fa: () => metti(e.id) }]);
         });
         catalogoEl.appendChild(v);
       }
@@ -216,7 +217,7 @@
     }
     // Le mosse dell'utente in questo pannello, per i contatori dell'app: non quelle che annuncia il main né quelle
     // che chiede l'app stessa, che le conta da sé.
-    function posa(id, primaDi = null) {
+    function metti(id, primaDi = null) {
       try { opts.mossa && opts.mossa(stato.elementi.includes(id) ? 'spostato' : 'aggiunto', id); } catch (_) {}
       return aggiungi(id, primaDi);
     }
@@ -228,8 +229,8 @@
       const l = stato.elementi;
       const i = l.indexOf(id);
       if (i < 0) return;
-      if (verso < 0 && i > 0) posa(id, l[i - 1]);
-      else if (verso > 0 && i < l.length - 1) posa(id, l[i + 2] || null);
+      if (verso < 0 && i > 0) metti(id, l[i - 1]);
+      else if (verso > 0 && i < l.length - 1) metti(id, l[i + 2] || null);
     }
 
     function vociElemento(id) {
@@ -299,11 +300,11 @@
       t.nodo.classList.remove('pd-in-volo');
       if (t.fantasma) t.fantasma.remove();
       // Un clic su una voce del catalogo la mette in fondo: chi non trascina arriva allo stesso posto.
-      if (!t.partito) { if (t.da === 'catalogo') posa(t.id); return; }
+      if (!t.partito) { if (t.da === 'catalogo') metti(t.id); return; }
       const d = t.dove || { fuori: true };
-      if (t.da === 'catalogo' && !d.fuori) posa(t.id, d.primaDi);
+      if (t.da === 'catalogo' && !d.fuori) metti(t.id, d.primaDi);
       else if (t.da === 'elenco' && d.fuori) leva(t.id);
-      else if (t.da === 'elenco') posa(t.id, d.primaDi);
+      else if (t.da === 'elenco') metti(t.id, d.primaDi);
     }
 
     // ── menu proprio (patterns/menu-contestuale-proprio-nelle-pagine-filo-preventdefault.md) ──
