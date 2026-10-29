@@ -4,7 +4,8 @@
 
 const { navigazioneVersoFilo } = require('../navigazioneVersoFilo');
 
-// Vale come Filo chi ha una vista di Filo: la barra, una scheda interna, la home pronta. L'indirizzo non basta: la
+// Vale come Filo chi ha una vista di Filo: la barra, una scheda interna, la home pronta, una vista segnata (una scheda
+// interna che si chiude, una cattura). L'indirizzo non basta: la
 // finestrella di accesso e le schede del web girano col preload delle pagine web anche su un filo:// (#1506). PURA.
 function vistaInterna({ isShell = false, riserva = false, tab = null, segnata = false } = {}) {
   if (isShell || riserva) return true;

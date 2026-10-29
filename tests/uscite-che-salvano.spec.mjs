@@ -297,7 +297,7 @@ test('Pagina dei feedback: la nota appena scritta parte anche chiudendo la sched
 });
 
 // ── Le altre uscite: ricaricare, e portare la stessa scheda su un'altra pagina ──
-async function portaAltrove(shell, frammento) {
+async function portaAltrove(shell, frammento, verso = 'filo://history/history.html') {
   const id = await shell.evaluate(async (f) => {
     const s = await window.filoShell.tabs.snapshot();
     const lista = Array.isArray(s) ? s : (s && s.tabs) || [];
@@ -305,8 +305,23 @@ async function portaAltrove(shell, frammento) {
     return t ? t.id : null;
   }, frammento);
   expect(id, `la scheda ${frammento} non compare fra quelle aperte`).toBeTruthy();
-  await shell.evaluate((i) => window.filoShell.tabs.navigate(i, 'filo://history/history.html'), id);
+  await shell.evaluate(([i, u]) => window.filoShell.tabs.navigate(i, u), [id, verso]);
 }
+
+// Verso un sito la vista di Filo si chiude e ne nasce un'altra: l'ultima spedizione arriva da una vista già fuori
+// dalle schede, e deve valere ancora come Filo (#1775).
+test('Preferenze: portando la stessa scheda su un sito subito dopo aver scritto, lo stile non si perde', async ({ app, shell, openTab, testServer }) => {
+  const page = await openTab(PREFERENZE);
+  await page.waitForSelector('#agentStyleText', { timeout: 15_000 });
+  const atteso = 'stile scritto e poi vado su un sito nella stessa scheda';
+  await page.evaluate((t) => {
+    const el = document.getElementById('agentStyleText');
+    el.value = t;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, atteso);
+  await portaAltrove(shell, 'preferences', testServer.html('<p>un sito</p>'));
+  await expect.poll(() => impostazioni(app).then((s) => s.agentStyle || ''), { timeout: 6000 }).toBe(atteso);
+});
 
 test('Preferenze: portando la stessa scheda altrove subito dopo aver scritto, lo stile non si perde', async ({ app, shell, openTab }) => {
   const page = await openTab(PREFERENZE);
