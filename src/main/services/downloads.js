@@ -375,7 +375,20 @@ function publicRecord(r) {
     servedBy: r.servedBy || '',
     // #950 — il nome con cui il file era arrivato, finché Filo l'ha cambiato: le superfici offrono di rimetterlo.
     nomeOriginale: r.nomeOriginale || '',
+    // #1287 — byte al secondo e secondi che restano, solo mentre scende (0 e null altrimenti).
+    ...velocitaDi(r),
   };
+}
+
+function AV() { return globalThis.SN_SCARICAMENTI_AVANZAMENTO; }
+function velocitaDi(r) {
+  if (!r || r.state !== 'progressing' || !AV()) return { velocita: 0, restano: null };
+  const v = AV().velocita(r._campioni, Date.now());
+  return { velocita: Math.round(v), restano: AV().restano(r.receivedBytes, r.totalBytes, v) };
+}
+function campiona(r) {
+  if (!r || !AV()) return;
+  r._campioni = AV().campiona(r._campioni, Date.now(), r.receivedBytes);
 }
 
 // Ordina per inizio decrescente (più recente prima) — così la shell e la
