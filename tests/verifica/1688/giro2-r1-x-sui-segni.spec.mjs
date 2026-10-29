@@ -41,7 +41,7 @@ for (const quale of ['meet', 'chat']) {
       const x = r(el.querySelector('.close')), s = r(el.querySelector('.tab-permessi .segno'));
       return { sovrapposti: x.left < s.right && s.left < x.right, cx: s.left + s.width / 2, cy: s.top + s.height / 2 };
     });
-    expect(g.sovrapposti, 'la X sta sopra il segno').toBe(false);
+    expect.soft(g.sovrapposti, 'la X sta sopra il segno').toBe(false);
     await shell.mouse.click(g.cx, g.cy);
     await expect(tab).toHaveClass(/active/, { timeout: 5000 });
     await expect(shell.locator('#tabs .tab')).toHaveCount(9);
