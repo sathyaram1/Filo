@@ -97,7 +97,7 @@
       stretto = window.innerWidth - Math.max(barra, aiuto) - LARGHEZZA < MIN_FOGLIO;
       if (stretto !== eraStretto && opzioni.bloccato) {
         // Bloccato in una finestra stretta si comporta da sbloccato, e torna a tenere aperto appena c'è spazio.
-        if (stretto && aperto && motivo === 'bloccato') chiudi();
+        if (stretto && aperto && !dentro) chiudi();
         else if (!stretto && !aperto) apri('bloccato');
         else disegnaStato();
       }

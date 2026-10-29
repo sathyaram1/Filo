@@ -165,3 +165,30 @@ test('bloccato, aperto dal bordo resta aperto anche uscendo, e il foglio si rest
     await chiudi();
   }
 });
+
+test('con l\'Aiuto aperto, il pannello aperto dal bordo resta aperto mentre il puntatore attraversa l\'Aiuto per arrivarci', async () => {
+  test.skip(!xtestDisponibile(), 'serve uno schermo X con XTest (contenitore Linux sotto xvfb-run)');
+  test.setTimeout(90_000);
+  const { app, ed, cb, px, destra, y, xDentro, chiudi } = await avvia();
+  try {
+    await ed.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1');
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.barra.esegui('help'));
+    await expect(ed.locator('.sn-sidebar')).toBeVisible();
+    await pausa(600);
+    puntatore(`move:${xDentro}:${y};wait:300;move:${destra - 1}:${y};wait:40;move:${destra}:${y + 1};wait:800`);
+    await expect.poll(() => aperto(ed), { timeout: 2000 }).toBe(true);
+    const pan = await ed.locator('.pd-pannello').boundingBox();
+    const xPan = px(cb.x + pan.x + pan.width / 2);
+    // Un passaggio lento, più di un secondo sopra l'Aiuto: arrivati sul pannello è ancora aperto.
+    const passi = [];
+    for (let i = 1; i <= 20; i++) passi.push(`move:${Math.round(destra + (xPan - destra) * i / 20)}:${y}`, 'wait:60');
+    passi.push('wait:600');
+    puntatore(passi.join(';'));
+    expect(await aperto(ed), 'arrivati sul pannello').toBe(true);
+    // Da lì, uscendo sul foglio, si chiude come sempre.
+    puntatore(`move:${xDentro}:${y};wait:1200`);
+    await expect.poll(() => aperto(ed), { timeout: 3000 }).toBe(false);
+  } finally {
+    await chiudi();
+  }
+});

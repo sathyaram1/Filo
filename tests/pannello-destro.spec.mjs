@@ -370,3 +370,92 @@ test('a parole: Filo apre l\'Aiuto sull\'Editor, ed è la chat del documento', a
   await ed.waitForTimeout(300);
   await expect(ed.locator('.sn-sidebar')).toBeVisible();
 });
+
+test('la modifica chiesta all\'Aiuto su un documento non tocca quello aperto mentre Filo risponde, e l\'Aiuto lo dice', async ({ app, openTab }) => {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { ...globalThis.SN_TEST_MODELS.models, [C.ACTIONS.HELP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__aiutoVisto = [];
+    const risponde = async ({ attempts, messages }) => {
+      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, finishReason: 'stop' };
+      if (!sistema.includes('# Protocollo di risposta')) return { ...base, text: 'ok' };
+      globalThis.__aiutoVisto.push(JSON.stringify(messages));
+      if (globalThis.__aiutoVisto.length === 1) await new Promise((r) => setTimeout(r, 2000));
+      return { ...base, text: JSON.stringify({ text: 'Fatto: titoli in grassetto.', formatta: [{ op: 'format', target: 'headings', style: 'bold', value: true }] }) };
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = risponde;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = risponde;
+  });
+  const ed = await apriEditor(openTab);
+  await ed.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1');
+  await ed.evaluate(() => {
+    document.getElementById('doc').innerHTML = '<h1>Capitolo A</h1><p>Testo del documento A.</p>';
+    document.getElementById('doc').dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.barra.esegui('help'));
+  await ed.fill('.sn-sidebar-input textarea', 'metti in grassetto i titoli');
+  await ed.press('.sn-sidebar-input textarea', 'Enter');
+  await expect.poll(() => app.evaluate(() => globalThis.__aiutoVisto.length)).toBe(1);
+  await ed.click('#docSwitch');
+  await ed.click('#docNew');
+  await ed.evaluate(() => {
+    document.getElementById('doc').innerHTML = '<h1>Capitolo B</h1><p>Testo del documento B.</p>';
+    document.getElementById('doc').dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(ed.locator('.sn-sidebar-msg-assistant').last()).toContainText('altro documento', { timeout: 15_000 });
+  await expect(ed.locator('#doc h1')).toContainText('Capitolo B');
+  expect(await ed.locator('#doc h1 b, #doc h1 strong').count(), 'il documento nuovo resta com\'era').toBe(0);
+  // La domanda dopo, sul documento nuovo: il modello sa che è cambiato, e la modifica lo tocca.
+  await ed.fill('.sn-sidebar-input textarea', 'metti in grassetto i titoli');
+  await ed.press('.sn-sidebar-input textarea', 'Enter');
+  await expect(ed.locator('#doc h1 b, #doc h1 strong')).toHaveCount(1);
+  expect(await app.evaluate(() => globalThis.__aiutoVisto[1])).toContain('altro documento');
+});
+
+test('finestra stretta: bloccato con l\'Aiuto aperto il pannello non stringe il foglio a poche lettere, e torna chiuso l\'Aiuto', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  await ed.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1');
+  await ed.evaluate(() => {
+    const doc = document.getElementById('doc');
+    doc.innerHTML = Array.from({ length: 6 }, () => '<p>Una riga di testo abbastanza lunga da arrivare fino al bordo destro della colonna.</p>').join('');
+    doc.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito).setBounds({ x: 0, y: 0, width: 820, height: 700 }));
+  await app.evaluate((_e) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'PANNELLO_APP', operazione: 'blocca' }));
+  await expect.poll(() => ed.evaluate(() => document.documentElement.classList.contains('pd-bloccato'))).toBe(true);
+  // Il puntatore sul foglio, non sul pannello: chi ci lavora dentro non se lo vede chiudere sotto la mano.
+  await ed.mouse.move(100, 300);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.barra.esegui('help'));
+  await expect(ed.locator('.sn-sidebar')).toBeVisible();
+  await expect.poll(() => ed.evaluate(() => document.getElementById('doc').getBoundingClientRect().width)).toBeGreaterThanOrEqual(280);
+  await expect.poll(() => aperto(ed)).toBe(false);
+  mkdirSync(SHOTS, { recursive: true });
+  await ed.screenshot({ path: `${SHOTS}/pannello-destro-stretta-con-aiuto.png` });
+  await ed.locator('.sn-sidebar-close').click();
+  await expect.poll(() => ed.evaluate(() => document.documentElement.classList.contains('pd-bloccato'))).toBe(true);
+  const m = await ed.evaluate(() => ({
+    testo: document.getElementById('doc').getBoundingClientRect().right,
+    pannello: document.querySelector('.pd-pannello').getBoundingClientRect().left,
+  }));
+  expect(m.testo).toBeLessThanOrEqual(m.pannello);
+});
+
+test('l\'Impostazioni degli strumenti nel pannello ha la cornice degli altri strumenti', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  for (const id of ['settings', 'undo']) await app.evaluate((_e, el) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'PANNELLO_APP', operazione: 'aggiungi', elemento: el }), id);
+  await app.evaluate((_e) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'PANNELLO_APP', operazione: 'apri' }));
+  await expect.poll(() => aperto(ed)).toBe(true);
+  const m = await ed.evaluate(() => Object.fromEntries(['settings', 'undo'].map((id) => {
+    const n = document.querySelector(`.pd-elemento[data-elemento="${id}"] button`);
+    const r = n.getBoundingClientRect();
+    const c = n.closest('.pd-elemento').getBoundingClientRect();
+    const cs = getComputedStyle(n);
+    return [id, { sinistra: Math.round(r.left - c.left), destra: Math.round(c.right - r.right), sfondo: cs.backgroundColor, bordo: cs.borderTopWidth }];
+  })));
+  expect(m.settings).toEqual(m.undo);
+});
