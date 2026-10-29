@@ -3,7 +3,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
@@ -36,16 +37,37 @@ test('il contesto porta il ruolo, le schede in ordine, chi non ha scheda, i rami
   assert.match(t, /consumo della settimana dell'account/);
 });
 
+test('il ramo di un worker prende il numero del suo feedback dall\'indice', () => {
+  const rami = M.conNumeri([
+    { ramo: 'worker/HNgzAr4lreN25OPInPXq-20261029T021625Z', feedback: ['12', '1680'] },
+    { ramo: 'claude/altro', feedback: ['5'] },
+  ], [{ id: 'HNgzAr4lreN25OPInPXq', num: '1680' }]);
+  assert.deepEqual(rami.map((r) => r.feedback), [['1680', '12'], ['5']]);
+});
+
 test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o che nessuno li tocca', async (t) => {
   const dir = cartellaTemporanea('manutentore');
   const out = []; const err = [];
   const [l, e] = [console.log, console.error];
   console.log = (...a) => out.push(a.join(' ')); console.error = (...a) => err.push(a.join(' '));
   t.after(() => { console.log = l; console.error = e; togliCartella(dir); });
-  writeFileSync(join(dir, '12.json'), JSON.stringify(scheda(12, { file_probabili: ['non/esiste/da/nessuna/parte.js'] })));
-  assert.equal(await M.main(['incroci', '12', '--cartella', dir, '--senza-fetch']), 0);
-  assert.match(out.join('\n'), /Nessun ramo in corso tocca i file probabili di #12 \(non\/esiste\/da\/nessuna\/parte\.js\)/);
-  assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch']), 1);
+  // Un repo con main e un ramo vivo che tocca src/a.js, al posto di quello vero.
+  const repo = cartellaTemporanea('manutentore-repo');
+  t.after(() => togliCartella(repo));
+  const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
+  g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't');
+  writeFileSync(join(repo, 'x.txt'), 'x'); g('add', '-A'); g('commit', '-qm', 'inizio');
+  g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  g('checkout', '-qb', 'lavoro'); mkdirSync(join(repo, 'src'), { recursive: true });
+  writeFileSync(join(repo, 'src', 'a.js'), 'a'); g('add', '-A'); g('commit', '-qm', 'auto: #44');
+  g('update-ref', 'refs/remotes/origin/claude/lavoro', 'HEAD');
+  writeFileSync(join(dir, '12.json'), JSON.stringify(scheda(12, { file_probabili: ['src/a.js'] })));
+  writeFileSync(join(dir, '13.json'), JSON.stringify(scheda(13, { file_probabili: ['non/esiste.js'] })));
+  assert.equal(await M.main(['incroci', '12', '--cartella', dir, '--senza-fetch'], { root: repo }), 0);
+  assert.match(out.join('\n'), /^claude\/lavoro \(#44\): src\/a\.js$/m);
+  assert.equal(await M.main(['incroci', '#13', '--cartella', dir, '--senza-fetch'], { root: repo }), 0);
+  assert.match(out.join('\n'), /Nessun ramo in corso tocca i file probabili di #13 \(non\/esiste\.js\)/);
+  assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo }), 1);
   assert.match(err.join('\n'), /Nessuna scheda per #99/);
   assert.equal(await M.main(['boh']), 1);
 });

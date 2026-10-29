@@ -132,9 +132,33 @@ main» prima dell'accensione; motivo del correttore nel biglietto, obbligatorio;
 verifica leggera dopo riallineamento pulito; spesa per account al manutentore.
 
 App e script: ruolo del manutentore (prompt, schede in contesto, file dei rami
-da git); ruolo del primo lavoro con piano nelle note; `scheda-prompt.md` e lo
+da git); ruolo del primo lavoro con piano nelle note; il ruolo della scheda e lo
 script del censimento in `scripts/`; `feedback:apri … --pacchetto N,M,…` che
 mette le attese; FEEDBACK-STATES.md per pacchetti e motivo del correttore.
 
 Ogni voce è un lavoro per le sessioni cloud di fase 1; l'ordine lo decide il
 manutentore.
+
+### 6.1 Stato (#1680)
+
+Fatto dalla parte dell'app, con le regole in FEEDBACK-STATES.md § 3a:
+
+- manutentore: `routines/roles/manutentore.md` e `npm run manutentore --
+  contesto | rami | incroci <N>` (schede in una riga, rami in corso coi file da git);
+- schede: `routines/roles/scheda.md` e `npm run feedback:schede -- elenca |
+  scrivi | rileggi | stato` (Haiku scrive, Opus rilegge chi toglie lavoro e il 10%);
+- pacchetti: `feedback:apri --pacchetto` (campo `unisce`, attese, controlli della
+  regola 1); la transizione `todo → done` della pipeline per chiudere le unite;
+- primo lavoro: «già risolto su main» come primo passo (`payload.suMain`, chiusura
+  `gia_risolto` con la fusione), piano consegnato con `deliver piano` e rimandato in
+  `payload.piano`;
+- correttore: `--motivo` obbligatorio su `--record-fixed`, e il confronto della
+  modifica del ramo prima e dopo il riallineamento, con la regola dei file di
+  servizio in `verifierRound.js`;
+- sessione per feedback: preflight `--feedback <N>` col ruolo `sessione.md`, e
+  `ticket … --feedback <N>`.
+
+Resta al server tutta la sua voce qui sopra: è lui a dare il biglietto di un
+feedback, rifiutarlo se già risolto, tenere e rimandare il piano, chiudere le unite,
+scrivere il motivo nel biglietto e saltare il giro dopo un riallineamento pulito.
+L'orchestratore si toglie quando il server accende una sessione per feedback.

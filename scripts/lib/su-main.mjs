@@ -92,28 +92,33 @@ export function fileRiscritti(root, { prima, dopo = 'HEAD', base = 'origin/main'
 }
 
 /**
- * I rami su origin con lavoro non ancora su `base`, toccati negli ultimi `giorni`: per ognuno i file che cambia e i
- * numeri di feedback citati nei suoi commit (il più citato per primo). Per il manutentore: prima di accendere una
+ * I rami su origin con lavoro non ancora su `base`, toccati negli ultimi `giorni`: per ognuno i file che i suoi commit
+ * toccano e i numeri di feedback citati (il più citato per primo). Per il manutentore: prima di accendere una
  * sessione si guarda chi lavora già sugli stessi file.
  */
 export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = Date.now() } = {}) {
   const nomeBase = base.replace(/^origin\//, '');
-  const righe = git(root, ['for-each-ref', '--format=%(refname:short)%09%(committerdate:iso-strict)', 'refs/remotes/origin']).split('\n');
+  // `--no-merged` toglie in una chiamata sola i rami già arrivati: sono la gran parte, e uno per uno costavano minuti.
+  const righe = git(root, ['for-each-ref', `--no-merged=${base}`, '--format=%(refname:short)%09%(committerdate:iso-strict)', 'refs/remotes/origin']).split('\n');
   const rami = [];
   for (const riga of righe.filter(Boolean)) {
     const [ramo, data] = riga.split('\t');
     if (!ramo || ramo === 'origin/HEAD' || ramo === 'origin' || ramo === `origin/${nomeBase}`) continue;
     if (giorni && adesso - Date.parse(data) > giorni * 86400000) continue;
-    const avanti = Number(git(root, ['rev-list', '--count', `${base}..${ramo}`]).trim());
-    if (!avanti) continue;
-    const mb = git(root, ['merge-base', base, ramo]).trim();
-    const file = git(root, ['diff', '--name-only', '--no-renames', mb, ramo]).split('\n').filter(Boolean);
+    // Una chiamata per ramo: per ogni commit l'oggetto (riga marcata) e i file che tocca.
+    const log = git(root, ['log', '--no-renames', '--format=\u0001%s', '--name-only', `${base}..${ramo}`]);
+    const file = new Set();
     const conta = new Map();
-    for (const m of git(root, ['log', '--format=%s', `${base}..${ramo}`]).matchAll(/#(\d{1,7}(?:\.\d{1,4})?)\b/g)) {
-      conta.set(m[1], (conta.get(m[1]) || 0) + 1);
+    let avanti = 0;
+    for (const r of log.split('\n')) {
+      if (r.startsWith('\u0001')) {
+        avanti += 1;
+        for (const m of r.matchAll(/#(\d{1,7}(?:\.\d{1,4})?)\b/g)) conta.set(m[1], (conta.get(m[1]) || 0) + 1);
+      } else if (r.trim()) file.add(r.trim());
     }
+    if (!avanti) continue;
     const feedback = [...conta].sort((a, b) => b[1] - a[1]).map(([n]) => n);
-    rami.push({ ramo: ramo.replace(/^origin\//, ''), data, avanti, file, feedback });
+    rami.push({ ramo: ramo.replace(/^origin\//, ''), data, avanti, file: [...file].sort(), feedback });
   }
   return rami.sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
 }

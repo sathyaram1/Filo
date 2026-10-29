@@ -72,12 +72,12 @@
       attack:   ['routine'],
       spam:     ['routine'],
       // Una segnalazione unita a un pacchetto: la chiude il server alla fusione del pacchetto, con la sua frase
-      // (FEEDBACK-STATES.md §3c). Per una routine il passo diretto todo→done resta ritirato (SPEC-RIDISEGNO-MAX.md §1).
+      // (FEEDBACK-STATES.md §3a). Per una routine il passo diretto todo→done resta ritirato (SPEC-RIDISEGNO-MAX.md §1).
       done:     ['pipeline'],
     },
     working: {
       revision_capability: ['routine'], // fix pronto su branch
-      // Già risolto su main: la sessione lo chiude senza ramo, e il server controlla la fusione che cita (§3c).
+      // Già risolto su main: la sessione lo chiude senza ramo, e il server controlla la fusione che cita (FEEDBACK-STATES.md §3a).
       done:                ['routine'],
       design:              ['routine'], // domande a metà lavorazione
       // Arenato: il ramo fermo da un'ora torna in coda da solo (FEEDBACK-STATES.md §6a).

@@ -878,7 +878,7 @@ function conPiano(ctx) {
  */
 function suMainDi(bucket, ctx) {
   const num = numeroFeedback(bucket && bucket.num);
-  if (Array.isArray(ctx && ctx.suMain)) return ctx.suMain;
+  if (Array.isArray(ctx && ctx.suMain)) return segnaProprie(ctx.suMain, num);
   if (!num) return [];
   try {
     const nato = Date.parse((ctx && ctx.feedback && ctx.feedback.createdAt) || '') || 0;

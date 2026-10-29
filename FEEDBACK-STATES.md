@@ -233,7 +233,76 @@ pianificatore non esiste più. Le chiusure manuali senza
 branch (`npm run feedback -- <id> done "…" --come-routine`) restano legali come
 CATENA di passi (`canReach` attraversa l'iter todo→working→revision_*→done). I
 sub-feedback storici (#N.x) restano visibili e lavorabili; è sparita solo la
-possibilità di crearne di nuovi.
+possibilità di crearne di nuovi. Dal ridisegno del lavoro (§3a) ci sono due porte
+dirette verso `done`, strette: `working → done` della routine per un feedback già
+risolto su main, e `todo → done` della pipeline per una segnalazione unita a un
+pacchetto fuso. Per una routine `todo → done` resta illegale.
+
+### 3a. Il ridisegno del lavoro (SPEC-RIDISEGNO-LAVORO.md, #1680)
+
+I numeri che motivano ogni regola stanno nella spec, § 1. Qui le regole come le
+applicano strumenti e server.
+
+**Una sessione per feedback.** Il server accende una sessione cloud per ogni feedback
+scelto dal manutentore, fino ai posti liberi; nessuna sessione sceglie il lavoro da
+sola. La sessione passa il numero al preflight (`dispatch.mjs --preflight --feedback
+<N>`, che consegna `routines/roles/sessione.md` al posto dell'orchestratore) e chiede il
+biglietto di QUEL feedback (`routine-channel.mjs ticket <parola> --feedback <N>`, campo
+`feedback` nel corpo). Il server risponde «niente» col motivo se il feedback non è in
+coda, se è già risolto su main o se i posti sono pieni. Verifica, controllo di sicurezza
+e correzione restano sessioni separate, accese dal server: chi ha fatto il lavoro non
+lancia mai il proprio verificatore. L'orchestratore resta finché il server accende così.
+
+**Già risolto su main.** Prima di accendere, il server cerca le fusioni sulla linea
+principale di main che citano `#N` dopo la nascita del feedback; il client fa la stessa
+ricerca (`scripts/lib/su-main.mjs`) e la passa al primo lavoro in `payload.suMain`, con
+`propria` sulla fusione del lavoro stesso del feedback (vuol dire riaperto dall'owner,
+non risolto). La sessione la ricontrolla come primo passo e, se è chiuso davvero,
+consegna senza ramo `deliver status --status done --reason gia_risolto --fusione <sha>`
+con report e frase: `working → done` (routine, `statusReason: gia_risolto`). Lo
+strumento rifiuta uno sha che non sta sulla linea principale di `origin/main`; il server
+lo accetta solo se in più cita il feedback ed è più recente della nascita e dell'ultima
+riapertura. Frase e versione come una chiusura del cancello.
+
+**Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
+segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce da
+`npm run feedback:apri -- … --pacchetto N,M` col campo `unisce: [{ id, num }]` (in
+chiaro, da 1 a 20, solo alla nascita e solo admin: `unisceValido` nelle regole), e ogni
+segnalazione unita prende P fra le sue attese (`waitsFor`, che resta com'era più P). Lo
+strumento controlla tutte le segnalazioni prima di aprire e dice tutti i motivi insieme:
+fuori chi non è `todo` (già in lavorazione o ferma), chi è a priorità 3, un lavoro
+locale, chi ha già 20 attese, chi P stesso aspetta. Senza `--priorita` P nasce con la
+priorità più alta fra le unite. Un pezzo che si blocca in verifica non si stacca: P passa
+o non passa intero. Alla fusione di P (`done`) il server chiude ogni segnalazione di
+`unisce` che lo aspetta ancora ed è `todo`: `todo → done` (pipeline,
+`statusReason: pacchetto`), con la frase di P come `userNote` e la versione di P; quelle
+in un altro stato restano dove sono, e il server lo scrive nelle note di P. P archiviato
+senza fusione: le unite seguono l'attesa chiusa di sempre (§4, `attesa_chiusa`).
+
+**Il piano.** Un lavoro grosso (una spec in più fasi, un pacchetto) consegna il piano
+prima di toccare codice e a ogni parte chiusa (`deliver piano --piano <file.md>`, al più
+64 KB): il server lo scrive nelle note per l'owner e lo rimanda a chi riprende, nel primo
+lavoro e nella ripresa (`payload.piano`). Figli (#N.M) per spezzare un lavoro non se ne
+aprono più: il contenitore è il pacchetto.
+
+**Il motivo del correttore.** Chi corregge (fixer, nel riallineamento e nella ripresa)
+consegna `dispatch.mjs --record-fixed … --motivo "<tipo>: <dettaglio>"`: conflitto coi
+file (o «nessuno»), prove rosse con le prove, ripresa, altro col testo. Forme e parser in
+`SN_VERIFIER_ROUND.leggiMotivoCorrettore`. Senza motivo lo strumento non consegna; il
+server lo scrive nel biglietto (`motivo` nella consegna `fixed`) e non chiude il
+biglietto di un correttore che non l'ha dato. I motivi di una fermata (`design` con
+`guasto`, `locale`, `clarify`) valgono come motivo.
+
+**La verifica dopo un riallineamento.** Dispatch scrive nel marcatore del ruolo la punta
+che il correttore riceve (`dal`), e la consegna confronta la modifica del ramo di allora
+con quella di adesso, file per file e senza i numeri di riga (`fileRiscritti`): la manda
+come `riallineamento: { fileRiscritti, giro }`. Se la modifica è cambiata solo nei file
+di servizio (`FILE_DI_SERVIZIO`: `src/shared/patchNotes.js`, `src/shared/capabilities.js`,
+`tests/rossi-noti.json`, `PATTERNS.md`) o in nessuno, niente giro nuovo di verifica:
+bastano le prove del server sulla fusione. Un file di codice riscritto chiede la verifica
+intera, perché è logica che nessuno ha guardato. La regola è `giroDopoRiallineamento`
+in `verifierRound.js`; il server rifà il confronto da sé e non si fida di quello del
+client.
 
 ## 4. Tab dashboard (deriva SOLO da `status`)
 

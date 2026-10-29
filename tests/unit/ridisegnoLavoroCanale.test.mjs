@@ -1,6 +1,6 @@
 // Le porte degli strumenti per il ridisegno del lavoro (SPEC-RIDISEGNO-LAVORO.md): il biglietto di UN feedback, il
 // piano che riceve chi riprende, la chiusura «già risolto su main» con la fusione che lo prova, e il motivo del
-// correttore che senza il quale la correzione non parte. Server finto: si guarda cosa gli arriva, e cosa no.
+// correttore, senza il quale la correzione non parte. Server finto: si guarda cosa gli arriva, e cosa no.
 
 import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// Preflight e biglietto scrivono nelle impostazioni utente: mai in quelle vere.
+process.env.CLAUDE_CONFIG_DIR = cartellaTemporanea('filo-claude-utente-');
 
 function fintoServer() {
   const ricevuti = [];
@@ -61,7 +63,7 @@ test('ticket --feedback chiede il biglietto di quel feedback; un numero storto s
   const { srv, ricevuti, port } = await fintoServer();
   const casa = cartellaTemporanea('ticket-feedback');
   t.after(() => { srv.close(); togliCartella(casa); });
-  const env = { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa, HOME: casa, USERPROFILE: casa };
+  const env = { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa };
   const r = await esegui('routine-channel.mjs', ['ticket', 'parola-segreta', '--feedback', '#1680', '--json'], env);
   assert.equal(r.code, 0, r.se);
   const chiesta = ricevuti.find((x) => x.url.includes('routineTicket'));

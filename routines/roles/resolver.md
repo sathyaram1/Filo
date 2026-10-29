@@ -49,7 +49,8 @@ node scripts/routine-channel.mjs deliver piano --piano <file.md>
 ```
 
 Se la sessione muore, chi viene dopo lo riceve in `payload.piano` e riparte da
-lì, dal ramo. Se `payload.piano` c'è, quello sei tu: le parti segnate fatte
+lì, dal ramo. Il piano è una rete, non un esito: se il server lo rifiuta (exit
+4), scrivi il motivo nel report e prosegui. Se `payload.piano` c'è, quello sei tu: le parti segnate fatte
 stanno già sul ramo, controllale e prosegui.
 
 Un **pacchetto** è un feedback che unisce più segnalazioni della stessa area:

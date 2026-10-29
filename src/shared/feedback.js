@@ -733,7 +733,7 @@
         });
       }
       if (attese.length) doc.fields.waitsFor = toFsValue(attese);
-      // Alla fusione del pacchetto il server chiude queste, con la sua frase (FEEDBACK-STATES.md §3c).
+      // Alla fusione del pacchetto il server chiude queste, con la sua frase (FEEDBACK-STATES.md §3a).
       if (unite.length) doc.fields.unisce = toFsValue(unite);
       // La priorità scelta da chi apre nasce col documento (#914): il server decide alla nascita se giudicarla,
       // e una scritta dopo arriverebbe quando il giudice ha già scelto. Solo admin: il create anonimo non la ammette.

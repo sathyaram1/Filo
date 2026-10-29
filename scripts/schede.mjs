@@ -1,14 +1,13 @@
-// Le schede dei feedback aperti, per il manutentore (SPEC-RIDISEGNO-LAVORO.md § 2, § 5): una per feedback, scritta da un
-// agente Haiku col ruolo routines/roles/scheda.md; Opus rilegge quelle che tolgono lavoro e un campione. Solo in locale,
-// col token e la chiave dell'owner; le schede stanno FUORI dal repo, che è pubblico. Regole: tests/unit/schede.test.mjs.
-// Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] | rileggi [--quota 0.1] | stato
-//      [--cartella <dir>] [--dry-run]. Di default le schede stanno in `filo-schede`, accanto alla cartella del repo.
+// Le schede dei feedback aperti per il manutentore (SPEC-RIDISEGNO-LAVORO.md § 2): Haiku le scrive col ruolo scheda.md, Opus
+// rilegge chi toglie lavoro e un campione. Solo in locale (token e chiave dell'owner), fuori dal repo. Test: tests/unit/schede.test.mjs.
+// Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] | rileggi [--quota 0.1] | stato [--cartella <dir>] [--dry-run]
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { espandiInclusioni } from './lib/role-text.mjs';
+import './lib/freno-letture.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const CARTELLA_PREDEFINITA = resolve(ROOT, '..', 'filo-schede');
@@ -151,7 +150,6 @@ function opzione(argv, nome) {
 
 async function elenca(cartella, dryRun) {
   const { acquireBearer } = await import('./lib/firestore-auth.mjs');
-  await import('./lib/freno-letture.mjs');
   // La pubblica prima della cifratura, come in claude-feedback.mjs.
   for (const m of ['feedbackThread.js', 'feedbackPublicKey.js', 'feedbackCrypto.js', 'feedback.js']) await import(`../src/shared/${m}`);
   const { decryptFeedbackList } = await import('./lib/decrypt-feedback-fields.mjs');
@@ -202,7 +200,8 @@ async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dry
 export async function main(argv) {
   const [cmd] = argv;
   const cartella = resolve(opzione(argv, '--cartella') || CARTELLA_PREDEFINITA);
-  if (cartella === ROOT || cartella.startsWith(`${ROOT}/`) || cartella.startsWith(`${ROOT}\\`)) {
+  const dentro = relative(ROOT, cartella);
+  if (!dentro || (!dentro.startsWith('..') && !isAbsolute(dentro))) {
     console.error('Le schede contengono il testo dei feedback: dentro il repo pubblico non le scrivo. Scegli una --cartella fuori.');
     return 1;
   }

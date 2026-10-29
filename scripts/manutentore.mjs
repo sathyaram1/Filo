@@ -29,6 +29,15 @@ export function rigaScheda(s, f = {}) {
   return `${pezzi} — ${s.titolo_breve || ''}: ${String(s.riassunto || '').replace(/\s+/g, ' ').trim()}${file}`;
 }
 
+/** I rami dei worker (`worker/<id del feedback>-<ora>`) prendono il numero dall'indice, davanti ai citati. PURA. */
+export function conNumeri(rami, indice) {
+  const perId = new Map((indice || []).map((f) => [f.id, f.num]));
+  return (rami || []).map((r) => {
+    const n = perId.get((/^worker\/([A-Za-z0-9]+)-\d{8}T\d{6}Z$/.exec(r.ramo) || [])[1]);
+    return n ? { ...r, feedback: [n, ...(r.feedback || []).filter((x) => x !== n)] } : r;
+  });
+}
+
 /** Un ramo in corso in una riga. PURA. */
 export function rigaRamo(r) {
   const fb = r.feedback && r.feedback.length ? ` (${r.feedback.slice(0, 3).map((n) => `#${n}`).join(', ')})` : '';
@@ -58,7 +67,7 @@ function opzione(argv, nome) {
   return argv[i].includes('=') ? argv[i].slice(nome.length + 1) : argv[i + 1];
 }
 
-export async function main(argv) {
+export async function main(argv, { root = ROOT } = {}) {
   const [cmd, arg] = argv;
   if (!['contesto', 'rami', 'incroci'].includes(cmd) || (cmd === 'incroci' && !arg)) {
     console.error('Uso: npm run manutentore -- contesto | rami | incroci <N>  [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]');
@@ -67,11 +76,13 @@ export async function main(argv) {
   const cartella = resolve(opzione(argv, '--cartella') || CARTELLA_PREDEFINITA);
   const giorni = Number(opzione(argv, '--giorni')) || 30;
   if (!argv.includes('--senza-fetch')) {
-    try { execFileSync('git', ['-C', ROOT, 'fetch', 'origin', '--prune', '--quiet'], { stdio: 'ignore', timeout: 120_000 }); } catch (e) {
+    try { execFileSync('git', ['-C', root, 'fetch', 'origin', '--prune', '--quiet'], { stdio: 'ignore', timeout: 120_000 }); } catch (e) {
       console.error(`AVVISO: git fetch non è riuscito (${String(e.message).split('\n')[0]}): i rami sono quelli dell'ultima volta.`);
     }
   }
-  const rami = ramiInCorso(ROOT, { giorni });
+  let indice = [];
+  try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente stato, priorità né numeri dei worker */ }
+  const rami = conNumeri(ramiInCorso(root, { giorni }), indice);
   if (cmd === 'rami') { console.log(rami.map(rigaRamo).join('\n') || 'Nessun ramo in corso.'); return 0; }
   const schede = leggiSchede(cartella);
   if (cmd === 'incroci') {
@@ -84,8 +95,6 @@ export async function main(argv) {
       : `Nessun ramo in corso tocca i file probabili di #${num} (${(s.file_probabili || []).join(', ') || 'nessuno indicato'}).`);
     return 0;
   }
-  let indice = [];
-  try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente stato né priorità */ }
   if (!schede.length) console.error(`AVVISO: nessuna scheda in ${cartella}: npm run feedback:schede -- elenca, poi scrivi.`);
   const dirRuoli = join(ROOT, 'routines', 'roles');
   const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'manutentore.md'), 'utf8'), dirRuoli);
