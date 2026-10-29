@@ -272,11 +272,8 @@ test('una pagina con 5.000 link resta reattiva: esame a lotti, prima i link a sc
     + ` for (var i = 0; i < ${N - 2}; i++) h += '<a href="https://risultato-' + i + '.esempio-' + (i % 997) + '.com/pagina/' + i + '">risultato ' + i + '</a>';`
     + ` document.getElementById('lista').innerHTML = h + '<a id="su" href="https://paypal-login.com/in-cima">in cima</a>'; })();</script>`;
 
-  // Il main misura i suoi buchi: il tempo più lungo in cui non ha potuto rispondere a nient'altro, con l'esame in corso
-  // all'inizio o alla fine del buco, o partito dentro (un esame tutto in un blocco comincia e finisce nello stesso buco).
-  // Aprire la scheda ferma il main per conto suo, e su una macchina carica supera il tetto senza che i link c'entrino (#1792).
-  // Un buco vale il tempo di processore speso dentro, non quello dell'orologio: un main tolto di mezzo dal sistema operativo
-  // non sta lavorando, un esame in un blocco sì.
+  // Il main misura i suoi buchi con un esame in corso o partito dentro (uno in un blocco solo nasce e muore nello stesso
+  // buco), in tempo di processore: aprire la scheda o un sistema carico lo fermano senza che i link c'entrino (#1792).
   await app.evaluate(({ BrowserWindow }) => {
     globalThis.__buco = { max: 0, attivo: true };
     const schede = () => BrowserWindow.getAllWindows().flatMap((w) => (w._filoTabs && w._filoTabs.tabs) || []);
