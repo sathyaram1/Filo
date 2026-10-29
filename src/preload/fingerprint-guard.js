@@ -359,11 +359,18 @@ const PROPAGAZIONE = `
     if (l) for (var i = 0, m = R(quanti, l, []); i < m; i++) fa(l[i]);
   }
 
-  // Un riquadro che torna vuoto (src about:blank, location cambiata da dentro) ha un documento nuovo senza preload:
-  // si prepara al suo load, che arriva al documento che lo contiene e mai alla sua finestra.
+  // Al load, che arriva al documento che contiene il riquadro e mai alla sua finestra, si prepara ogni documento della
+  // stessa origine senza preload: tornato vuoto, o arrivato nella finestra iniziale che la pagina aveva preso per indice
+  // o per nome (il documento la eredita e il preload non parte). Uno col suo preload no: avrebbe due guardie.
+  function segna(cw) { var r = regno(cw); if (r) R(wsAdd, conPreload, [r]); }
   function alCarico(w) {
     R(ascoltoDi(w), w.document, ['load', function (e) {
-      try { var el = R(bersaglio, e, []), tag = tagName(el); if (TAG[tag]) prepara(finestraDi(el, tag)); } catch (x) {}
+      try {
+        var el = R(bersaglio, e, []), tag = tagName(el);
+        if (!TAG[tag]) return;
+        var cw = finestraDi(el, tag), r = regno(cw);
+        if (r && !R(wsHas, conPreload, [r])) prepara(cw, true);
+      } catch (x) {}
     }, true]);
   }
 
