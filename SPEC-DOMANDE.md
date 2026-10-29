@@ -284,7 +284,9 @@ dall'owner e dal server. Campi:
   server. I guasti fermi da prima senza la loro domanda la prendono dalla
   migrazione che parte da sola col server nuovo.
 - `destinatario`: l'owner, oppure la gestione del lavoro per le domande di
-  guasto (§ 4.3), tranne quelle dell'addetto comunicazioni.
+  guasto (§ 4.3), tranne quelle dell'addetto comunicazioni e degli altri
+  biglietti dell'ambiente dei riservati, lei compresa: vanno all'owner. Lo
+  sceglie il server dall'ambiente del biglietto che la apre.
 - `soloOwner`: sulle domande dell'addetto comunicazioni (§ 4.1), che nessun
   compito legge.
 - `fiducia`: § 1.
