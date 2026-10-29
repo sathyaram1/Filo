@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import os from 'node:os';
+import { writeFileSync } from 'node:fs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/contenutoEsterno.js');
@@ -147,4 +149,29 @@ test('i bottoni di una ricerca di prima aprono ancora il loro file dopo una rice
   ascolta['did-navigate']();
   assert.equal(Aiuto.percorsoDi(wc, prima.candidati[0].chiave), '');
   assert.equal(Aiuto.percorsoDi(wc, dopo.candidati[0].chiave), '');
+});
+
+// #589.1 giro 5 — startDrag senza il tasto del mouse giù chiude Filo: il trascinamento parte solo da una pressione vera.
+test('il trascinamento di un file parte solo col tasto del mouse giù, uno per pressione', async () => {
+  const dir = cartellaTemporanea('aiuto-trascina-');
+  const file = join(dir, 'preventivo.txt');
+  writeFileSync(file, 'preventivo');
+  Aiuto.configura({
+    chiediSi: async () => true,
+    cerca: async () => ({ risultati: [{ percorso: file, nome: 'preventivo.txt', tipo: 'txt' }] }),
+    doveSta: async () => 'Documenti',
+  });
+  const trascinati = [];
+  const wc = { ...scheda(), startDrag: (x) => trascinati.push(x) };
+  const r = await Aiuto.cerca(wc, { cosa: 'preventivo', origine: 'filo://newtab/' });
+  const chiave = r.candidati[0].chiave;
+  const senza = await Aiuto.trascina(wc, chiave);
+  assert.equal(senza.ok, false);
+  assert.deepEqual(trascinati, [], 'senza il tasto giù il trascinamento non parte');
+  wc._filoTastoGiuAlle = Date.now() - 60000;
+  await Aiuto.trascina(wc, chiave);
+  assert.deepEqual(trascinati, [], 'una pressione di un minuto fa non vale');
+  wc._filoTastoGiuAlle = Date.now();
+  await Aiuto.trascina(wc, chiave);
+  assert.equal(wc._filoTastoGiuAlle, 0, 'la pressione si spende al primo trascinamento');
 });

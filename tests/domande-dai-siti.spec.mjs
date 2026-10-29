@@ -426,6 +426,9 @@ test('dall\'Aiuto di un sito il file trovato si mostra e si apre; da una scheda 
   expect((await sito(chiedi('aiuto_mostra_file', { chiave }))).risposta, '«Mostra nella cartella» dell\'Aiuto').toMatchObject({ ok: true });
   expect((await sito(chiedi('aiuto_apri_file', { chiave }))).risposta, '«Apri» dell\'Aiuto').toMatchObject({ ok: true });
   expect(await app.evaluate(() => [globalThis.__mostrati, globalThis.__aperti])).toEqual([[file], [file]]);
+  // Il trascinamento chiesto senza il tasto del mouse giù non parte, e Filo resta aperto.
+  expect((await sito(chiedi('aiuto_trascina_file', { chiave }))).risposta).toMatchObject({ ok: false });
+  expect(await app.evaluate(() => 'vivo')).toBe('vivo');
 
   await openTab(testServer.html('<h1>quella che guardo</h1>', { pubblico: true }));
   expect((await sito(chiedi('aiuto_apri_file', { chiave }))).risposta?.code, 'da una scheda di sfondo il sito apre un file').toBe('forbidden');
