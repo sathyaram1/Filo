@@ -248,6 +248,29 @@
     ? `max(${Math.round(px)}px, var(--filo-avvisi-barra, 0px))`
     : `${Math.round(px)}px`);
 
+  // Spostato, l'Aiuto lascia il suo angolo e la regola di sidebar.css per gli avvisi non vale più: gli stanno a fianco,
+  // dalla parte con più spazio, o ne coprirebbero casella e microfono e la guardia dei clic li prenderebbe per un velo
+  // (#1340, giro 4). Misure della pila in popup.css: 20px dal bordo, larga al più 420px.
+  function scostaAvvisi() {
+    const de = document.documentElement;
+    const via = () => { de.style.removeProperty('--filo-avvisi-destra'); de.style.removeProperty('--filo-avvisi-larghi'); };
+    if (!root || !root.dataset.spostata) { via(); return; }
+    const r = root.getBoundingClientRect();
+    const W = window.innerWidth;
+    if (r.right <= W - 20 - 420 || r.left >= W - 20) { via(); return; }
+    const aSinistra = r.left - 12 - 20;
+    const aDestra = W - r.right - 12 - 20;
+    const largo = (px) => `${Math.round(Math.max(200, Math.min(420, px)))}px`;
+    if (aSinistra >= aDestra) {
+      de.style.setProperty('--filo-avvisi-destra', `${Math.round(W - r.left + 12)}px`);
+      de.style.setProperty('--filo-avvisi-larghi', largo(aSinistra));
+    } else {
+      de.style.setProperty('--filo-avvisi-destra', '20px');
+      de.style.setProperty('--filo-avvisi-larghi', largo(aDestra));
+    }
+  }
+  window.addEventListener('resize', () => { if (root) scostaAvvisi(); });
+
   // Drag dall'header. Mantiene l'ancoraggio al BOTTOM (la barra input resta
   // dov'è quando il pannello si collassa, anche dopo un drag manuale).
   function makeDraggable(handleEl) {
