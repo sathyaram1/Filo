@@ -704,16 +704,38 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
     return { ok: false, skipped: false, branch: ramo, reason: `il server remoto ha rifiutato il push (una regola del repo, un pre-receive, il push protection?): ${pulisciGit(push.out)}` };
   }
   if (/rejected|non-fast-forward|fetch first|stale info/i.test(push.out)) {
-    // --force-if-includes: il lease da solo si fida del ref remoto che questa
-    // copia conosce, e dopo un `git fetch` quel ref è già il commit dell'altro
-    // — il lease combacia e il rinvio lo sovrascrive (verifica del giro 2).
-    // Con --force-if-includes git rifiuta se quel commit non è mai passato
-    // dalla storia locale di questo ramo.
-    const lease = run(['push', '--force-with-lease', '--force-if-includes', 'origin', `HEAD:refs/heads/${ramo}`]);
+    const atteso = attesoDelLease(root, ramo, exec);
+    if (!atteso.sha) return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e il rinvio con --force-with-lease non parte: ${atteso.motivo}` };
+    const lease = run(['push', `--force-with-lease=refs/heads/${ramo}:${atteso.sha}`, 'origin', `HEAD:refs/heads/${ramo}`]);
     if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true, ...avviso };
     return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
   }
   return { ok: false, skipped: false, branch: ramo, reason: pulisciGit(push.out) };
+}
+
+/**
+ * Il valore atteso del lease: la traccia remota del ramo, solo se è passata dalla storia locale del ramo (una voce
+ * del suo reflog o un antenato di una voce). Un lease nudo dopo un `git fetch` sovrascriverebbe il commit di un altro
+ * (verifica del giro 2); --force-if-includes vuole il reflog della traccia remota, che un clone appena nato non ha, e
+ * rifiutava sempre (#1776). La stessa regola sta in atteso_del_lease, nell'hook di salvataggio. → { sha } | { sha:'', motivo }
+ */
+function attesoDelLease(root, ramo, exec) {
+  const git = (args, input) => {
+    try {
+      const opz = { cwd: root, encoding: 'utf8', stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024 };
+      return { ok: true, out: String(exec('git', args, input === undefined ? opz : { ...opz, input }) || '').trim() };
+    } catch (_) { return { ok: false, out: '' }; }
+  };
+  const remoto = git(['rev-parse', '--verify', '-q', `refs/remotes/origin/${ramo}^{commit}`]).out;
+  if (!remoto) return { sha: '', motivo: `questa copia non sa a che commit è '${ramo}' su origin (git fetch origin, poi riprova)` };
+  const storia = [...new Set(git(['reflog', 'show', '--format=%H', `refs/heads/${ramo}`, '--']).out.split('\n').map((s) => s.trim()).filter(Boolean))];
+  if (storia.includes(remoto)) return { sha: remoto };
+  if (storia.length) {
+    const genitori = git(['rev-parse', `${remoto}^@`]).out.split('\n').filter(Boolean).map((p) => `^${p}`);
+    const raggiunti = git(['rev-list', '--ignore-missing', '--stdin'], `${[...storia, ...genitori].join('\n')}\n`);
+    if (raggiunti.ok && raggiunti.out.split('\n').includes(remoto)) return { sha: remoto };
+  }
+  return { sha: '', motivo: `su origin '${ramo}' è a ${remoto.slice(0, 9)}, un commit che questo ramo non ha mai avuto (qualcun altro ha spinto su '${ramo}'?)` };
 }
 
 /**
