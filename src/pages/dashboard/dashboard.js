@@ -2163,6 +2163,8 @@
       notaFermata(String(msg.frase), vicino);
     } else if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
+    } else if (msg?.type === MSG.ICONA_SCHEDA) {
+      Att.iconaDellaScheda(msg.sito, msg.dato);
     } else if (msg?.type === MSG.SISTEMA_AGGIORNATO) {
       Sistema.aggiornato(msg.stato);
     } else if (msg?.type === MSG.FILO_PARLA && msg.chat) {
