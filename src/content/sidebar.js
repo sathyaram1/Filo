@@ -2193,11 +2193,20 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       if (thinking) { thinking.stop(); thinking.el.remove(); }
       // Nell'Editor il modello cambia la formattazione del documento: la fa la pagina, col suo punto di ripristino e
       // l'«Annulla», anche a pannello chiuso a metà turno: è la modifica chiesta, non un segno sulla pagina.
-      if (appPagina && typeof appPagina.applica === 'function' && parsed.formatta && parsed.formatta.length) {
-        let toccati = 0;
-        try { toccati = appPagina.applica(parsed.formatta); } catch (_) { toccati = 0; }
-        if (!toccati) parsed.display = 'Non ho trovato testo a cui applicare la formattazione.';
+      // Era chiesta per il documento letto alla partenza: se nel frattempo ne è aperto un altro, quello non si tocca.
+      const conFormati = !!(appPagina && typeof appPagina.applica === 'function' && parsed.formatta && parsed.formatta.length);
+      let toccati = 0;
+      if (conFormati) {
+        try { toccati = appPagina.applica(parsed.formatta, (letto && letto.id) || ''); } catch (_) { toccati = 0; }
+        if (toccati === null) parsed.display = `Nel frattempo hai aperto un altro documento: la modifica era per «${(letto && letto.titolo) || 'il documento di prima'}», e non l'ho fatta. Tornaci e chiedimelo di nuovo.`;
+        else if (!toccati) parsed.display = 'Non ho trovato testo a cui applicare la formattazione.';
         else if (!parsed.display) parsed.display = 'Fatto.';
+      }
+      // Per i contatori (#1465), come contava la chat dell'Editor che c'era prima.
+      if (appPagina && typeof appPagina.conta === 'function' && letto && toccati !== null) {
+        const conta = (campi) => { try { appPagina.conta({ oltreTetto: !!letto.tagliato, ...campi }); } catch (_) {} };
+        if (scritto && scritto === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO) conta({ continua: true });
+        conta(!conFormati ? { formati: 0 } : toccati ? { formati: toccati } : { nonTrovato: true });
       }
       // Se il modello non ha messo testo ma c'è solo un highlight di routine,
       // mostriamo comunque una riga discreta in chat (es. "→ passo successivo")
