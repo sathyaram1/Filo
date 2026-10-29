@@ -144,7 +144,7 @@
     },
     {
       id: 'reorder-tabs', title: 'Riordina le schede per colore', category: 'navigation',
-      desc: 'Riordina al volo tutte le schede aperte per colore, come succede quando riapri Filo, mettendo vicine quelle dello stesso sito o tinta. L’ordine è l’arcobaleno del colore del sito: i siti bianchi in testa, quelli neri dopo l’ultimo colore, le schede senza colore in coda.',
+      desc: 'Riordina al volo tutte le schede aperte per colore, come succede quando riapri Filo, mettendo vicine quelle dello stesso sito o tinta. L’ordine è l’arcobaleno del colore del sito, dal rosso (anche quello che tende al rosa, come Netflix) al magenta: i siti bianchi in testa, quelli neri dopo l’ultimo colore, le schede senza colore in coda.',
       invoke: 'Comando /riordina dalla nuova scheda.',
       doesNot: 'Non chiude né archivia nessuna scheda: le riordina soltanto (per chiudere quelle non più utili c’è /pulisci).',
     },
