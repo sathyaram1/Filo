@@ -222,6 +222,9 @@ function seguiGesti(wc) {
   try {
     wc.on('input-event', (_e, input) => {
       const type = (input && input.type) || '';
+      // Il tasto giù che il trascinamento dei file dell'Aiuto aspetta (aiutoDocumenti.js).
+      if (type === 'mouseDown') wc._filoTastoGiuAlle = Date.now();
+      else if (type === 'mouseUp') wc._filoTastoGiuAlle = 0;
       if (!GESTI.has(type) || !tastoPerLaPagina(input)) return;
       const mouse = !/key|char/i.test(type);
       if (mouse && clicDiFiloInCorso(wc)) return;
