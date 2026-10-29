@@ -372,10 +372,9 @@ una chiamata vera.
   cambiato è un errore 400, e via OpenRouter la chiave dell'owner ripiega sui
   crediti del router. Filo manda il ragionamento a Claude solo col prefisso
   intatto (regola nel pattern del contesto), dentro un giro di strumenti
-  compreso. Col tratto di oggi i turni passati non lo riportano mai: il
-  CONTESTO DI ADESSO davanti alla domanda sparisce al turno dopo. Per riaverlo
-  serve la richiesta della fase 3, che cresce solo in coda; per i promemoria di
-  ogni turno Anthropic offre i messaggi di sistema a metà conversazione
+  compreso. Con la richiesta della fase 3 (#1562), che cresce solo in coda, lo
+  riportano anche i turni passati, giri di strumenti compresi; per i promemoria
+  di ogni turno Anthropic offre i messaggi di sistema a metà conversazione
   (`clear_at`), da provare attraverso OpenRouter.
 
 ## Da decidere (owner)
