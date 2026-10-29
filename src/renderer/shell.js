@@ -1287,6 +1287,9 @@
     const ico = document.createElement('div');
     const title = document.createElement('span');
     title.className = 'title';
+    // Il testo in un nodo suo: shell.css lo nasconde quando nel posto del titolo non sta una lettera coi puntini (#1293).
+    const testo = document.createElement('span');
+    title.append(testo);
     const close = document.createElement('span');
     close.className = 'close';
     if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
