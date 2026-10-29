@@ -593,8 +593,8 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
   modifiche in studio, i rapporti di riordino e potatura, i guasti e le
   segnalazioni che segue. Lo legge a ogni accensione.
 - **Una sessione al giorno**, che riparte dal taccuino, non un contesto che vive
-  per sempre. Un guasto le anticipa l'istanza: una sessione al giorno non basta
-  a un feedback fermo. Le indagini lunghe le fanno sotto-agenti, e il suo
+  per sempre. Un guasto che va a lei le anticipa l'istanza: una sessione al
+  giorno non basta a un feedback fermo. Le indagini lunghe le fanno sotto-agenti, e il suo
   contesto resta piccolo.
 - **Segue un problema da vicino:**
   - resta accesa quanto serve e si risveglia da sola ogni 55 minuti al
