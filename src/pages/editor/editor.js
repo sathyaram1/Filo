@@ -3674,9 +3674,13 @@
       const testo = docPlainText();
       const letto = prima ? S.rilettoDopoRifiuto(testo, prima, rifiuto, caratteri) : S.testoAlModello(testo);
       if (!letto) return null;
-      return { ...letto, titolo: (doc && doc.meta && doc.meta.title) || STORE.DEFAULT_TITLE, avviso: S.avvisoTaglio(letto), nota: S.notaTaglio(letto) };
+      return { ...letto, id: doc ? doc.id : '', titolo: (doc && doc.meta && doc.meta.title) || STORE.DEFAULT_TITLE, avviso: S.avvisoTaglio(letto), nota: S.notaTaglio(letto) };
     },
-    applica: (azioni) => applyFormatActions(azioni),
+    // `perId`: il documento letto quando è partita la domanda. Se nel frattempo ne è aperto un altro la modifica non
+    // tocca quello (null): era chiesta per l'altro.
+    applica: (azioni, perId = '') => (perId && (!doc || doc.id !== perId) ? null : applyFormatActions(azioni)),
+    // Per i contatori (#1465): il documento letto intero o no, e quante azioni di formato sono andate a segno.
+    conta: (campi) => contaRiquadro('editor_chat', { ...campi }),
     conversazione: (rif) => (doc ? {
       app: 'editor',
       rif: `${doc.id}:aiuto-${String(rif || '').slice(0, 80)}`,
