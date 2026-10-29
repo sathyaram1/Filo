@@ -76,10 +76,7 @@
         'Su Windows e Mac i file che scarichi con Filo, anche con «Salva immagine come», risultano arrivati da Internet, come da qualunque browser. Se apri un programma fuori da Filo il sistema ti avvisa prima, e Office apre i documenti in Visualizzazione protetta. «Salva immagine come» ti propone anche il nome vero del file, lo stesso che poi trovi fra i download.',
         'Le pubblicità dei video che si possono saltare Filo le salta anche quando il video suona in una scheda che non stai guardando, o con Filo ridotto a icona. Prima la sentivi tutta, finché non tornavi sul video.',
         'Un sito vede i nomi dei tuoi microfoni, fotocamere e casse solo dopo che gli hai consentito il microfono o la fotocamera, come in Chrome, e l\'elenco dei font installati sul computer non lo legge più. Prima bastava aprire la pagina, o un clic, e uno script di tracciamento poteva riconoscerti da quei nomi su ogni sito, anche in incognito.',
-<<<<<<< HEAD
         'Un colore che scrivi nelle Preferenze resta anche se subito dopo cambi il tema o chiudi la scheda. Prima a volte tornava quello di prima.',
-=======
->>>>>>> 3763b0230 (auto: src/shared/patchNotes.js)
       ],
     },
     {
