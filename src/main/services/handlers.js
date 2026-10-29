@@ -7401,6 +7401,23 @@ const riassuntoAcceso = (settings) => !(settings && settings.riassuntoSchede && 
 // riassunto spento (#1004), che resta fuori anche se il riassunto si riaccende.
 const restaQui = (it, fuori) => Boolean(it.casa || isHomeNetworkUrl(it.url) || it.senzaRiassunto || fuori.voce(it));
 
+// Alla riapertura la sessione di prima è finita e l'utente si aspetta una barra pulita (#349): il giudizio si fa deciso.
+const TRIAGE_RIAPERTURA = [
+  '',
+  'RIAPERTURA. Filo è stato chiuso e riaperto: la sessione di prima è finita e',
+  'l\'utente si aspetta di ritrovare una barra pulita. Qui sii deciso:',
+  '- ARCHIVIA feed e pagine di consumo (social, notizie, video, aggregatori),',
+  '  risultati di ricerca, pagine "dead-end", contenuti già letti, pagine di un',
+  '  compito che sembra concluso, home e impostazioni di Filo;',
+  '- TIENI solo quello che verosimilmente riprenderà: comunicazione e lavoro',
+  '  (posta, chat, editor, documenti in modifica), contenuti lasciati a metà,',
+  '  le schede di un compito ancora aperto;',
+  '- conta l\'ultimo uso, non l\'apertura: una scheda non toccata da ore o da',
+  '  giorni non è in uso;',
+  '- nel dubbio fra una pagina di consumo e una di lavoro, ARCHIVIA la prima:',
+  '  resta nel filo della home e si riapre con un clic.',
+];
+
 // §2.1 — decisione LLM di triage tab. Riceve i metadati/segnali di TUTTE le tab
 // candidate + (opz.) un estratto del contenuto; la memoria la legge da sé, così
 // nessun chiamante la dimentica (#823). Batch unico. Ritorna { decisions: [{ i, action, reason }] | null, model, provider }
@@ -7438,6 +7455,8 @@ async function runTabTriageDecision({ tabs = [], trigger = 'idle' } = {}) {
     'Di una pagina delicata (posta, banca, sanità, pubblica amministrazione, pagine',
     'con password) ricevi solo',
     'il tipo fra parentesi quadre: decidi sul tipo e sui segnali.',
+    '',
+    ...(trigger === 'reopen' ? TRIAGE_RIAPERTURA : []),
     '',
     'Rispondi SOLO con JSON: {"decisions":[{"i":<indice>,"action":"keep"|"archive",',
     '"reason":"<breve motivo in italiano>"}]} con una voce per OGNI scheda ricevuta.',

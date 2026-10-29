@@ -544,6 +544,8 @@
     // Riordino cromatico ESPLICITO della striscia: riordina le tab per colore come alla
     // riapertura, ma senza archiviare né chiudere niente (a differenza di RUN_TAB_TRIAGE).
     REORDER_TABS: 'reorder_tabs',
+    // «Riapri» dall'avviso della pulizia: { pulizia } → { ok, riaperte } | { ok:false, error:'scaduta' }.
+    RIAPRI_PULIZIA_SCHEDE: 'riapri_pulizia_schede',
 
     // Porta in primo piano una scheda già aperta (per id): serve ai riferimenti in chat quando
     // Filo ha aperto qualcosa in secondo piano, invece di aprire una seconda scheda uguale.
