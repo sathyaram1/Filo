@@ -783,6 +783,24 @@ export function salvaRamoDelGiro(root, { exec = execFileSync, env = process.env 
 }
 
 /**
+ * Prima della domanda di fine sessione di un worker: l'ultima spinta del giro, e il segno nel marcatore che da lì il
+ * ramo non si spedisce più (la domanda può sporcare il biglietto, SPEC-DOMANDE § 5.4). Chiesta di nuovo, riusa la
+ * punta già salvata invece di spedire ancora. La cartella di un altro biglietto, o di uno finito, non si tocca.
+ */
+export function salvaPerLaDomanda(root, ticket, { exec = execFileSync, env = process.env } = {}) {
+  const marcatore = leggiMarcatoreBiglietto(root);
+  if (marcatore && String(marcatore.ticket || '') !== String(ticket)) {
+    return { ok: true, righe: [`la cartella è del biglietto ${String(marcatore.ticket).slice(0, 8)}…, non di questo: non committo e non spedisco niente.`], punta: null };
+  }
+  if (bigliettoFinito(marcatore)) return { ok: true, righe: [], punta: null };
+  const gia = chiusuraDelBiglietto(marcatore);
+  if (gia) return { ok: true, righe: [], punta: gia.sha ? { branch: gia.branch, sha: gia.sha } : null };
+  const s = salvaRamoDelGiro(root, { exec, env });
+  if (s.ok) segnaChiusura(root, ticket, s.punta || {});
+  return s;
+}
+
+/**
  * Cosa è rimasto fuori dal ramo dopo la punta salvata per la domanda di fine sessione: i commit locali dopo di lei e i
  * file fuori dai commit. '' se niente. Lo dice il rilascio, che da lì non spedisce più (#1555).
  */
