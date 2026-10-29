@@ -556,6 +556,12 @@
     // crescono insieme).
     o.style.height = (r.height + SPORGENZA_SEGNI) + 'px';
     o.style.setProperty('padding-bottom', `${px('padding-bottom') + barraO + SPORGENZA_SEGNI}px`);
+    // Dentro un pezzo con un filtro (l'Aiuto ha `backdrop-filter`) `fixed` si misura dal pezzo, non dalla finestra.
+    const d = o.getBoundingClientRect();
+    if (Math.abs(d.left - r.left) > 0.5 || Math.abs(d.top - r.top) > 0.5) {
+      o.style.left = (2 * r.left - d.left) + 'px';
+      o.style.top = (2 * r.top - d.top) + 'px';
+    }
 
     renderOverlayContent(state);
   }
