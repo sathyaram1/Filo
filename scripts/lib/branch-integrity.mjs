@@ -19,8 +19,9 @@
 //   C) ogni scrittura nella macchina a stati RICALCOLA l'identità e rifiuta la
 //      transizione se non corrisponde (identityVerdict + checkDelivery); ogni
 //      transizione accettata lascia un PUNTO FERMO (withCheckpoint);
-//   D) un'interruzione riporta il branch all'ULTIMO punto fermo, spostando di
-//      lato — senza distruggerli — i commit scartati (prepareBranch);
+//   D) il branch riparte dalla punta pubblicata, o dal punto fermo locale se è
+//      quella punta o più avanti, spostando di lato — senza distruggerli — i
+//      commit scartati (prepareBranch);
 //   B) l'identità attesa viene esposta su file (writeExpectation) perché una
 //      guardia FUORI dalla sessione (.claude/hooks/branch-guard.sh) possa
 //      confrontarla dopo ogni comando.
