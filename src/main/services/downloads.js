@@ -1270,11 +1270,12 @@ function riprova(id, scope = '') {
   persist();
   broadcast('progress', rec);
   try {
-    const referer = refererPer(rec);
-    ses.downloadURL(rec.url, referer ? { headers: { Referer: referer } } : undefined);
+    attendiReferer(indirizzo, ses, rec._pagina);
+    ses.downloadURL(indirizzo);
   } catch (_) {
     clearTimeout(rec._riprovaTimer); rec._riprovaTimer = null;
-    prendiRiprova(scope, rec.url);
+    ritiraReferer(indirizzo, ses);
+    prendiRiprova(scope, indirizzo);
     rec.state = 'interrupted';
     rec.endedAt = new Date().toISOString();
     persist();
