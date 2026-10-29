@@ -1415,7 +1415,9 @@
         el._firma = firma;
         cambiata = true;
       }
-      perMisura.push([id, d.attiva, d.titolo, d.paese, d.audio, d.ferma || 0, d.permessi || null]);
+      // L'avviso audio non rimisura: la fila e il «+» restano fermi quando una scheda comincia o smette di suonare, e
+      // l'avviso prende posto dal titolo finché la fila non si rimisura per altro (#431.2).
+      perMisura.push([id, d.attiva, d.titolo, d.paese, d.ferma || 0, d.permessi || null]);
       nodi.push(el);
     }
     for (const id of [...schedeVive.keys()]) if (!visti.has(id)) schedeVive.delete(id);
