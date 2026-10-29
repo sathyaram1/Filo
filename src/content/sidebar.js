@@ -898,15 +898,6 @@
     return history.filter((h) => h && h.kind === 'real' && !h.daScelta).map((h) => String(h.content || ''));
   }
 
-  // La frase della porta delle uscite se il testo per un campo della pagina porterebbe fuori un segreto, se no ''.
-  async function campoFermato(testo) {
-    if (!String(testo || '').trim()) return '';
-    try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.CONTROLLA_CAMPO, testo: String(testo), parole: paroleUtente() });
-      return r && r.blocca ? String(r.frase || '') : '';
-    } catch (_) { return ''; }
-  }
-
   async function runFiloAction(action, { etichetta = '' } = {}) {
     const label = etichetta || filoActionLabel(action);
     if (action && String(action.type || '').toUpperCase() === 'NAVIGA' && !action._callId) {
