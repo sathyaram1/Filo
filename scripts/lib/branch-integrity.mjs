@@ -261,15 +261,11 @@ export function clearExpectation(root) {
 
 // ─── Sigillo di fine giro (#507) ─────────────────────────────────────────────
 //
-// Il ripristino D preferisce il punto fermo locale al ramo remoto, ed è giusto
-// così: l'hook di salvataggio spinge anche il lavoro di un'istanza morta a
-// metà, quindi "origin è più avanti" non distingue una consegna da un moncone.
-// A distinguere è il SIGILLO: ogni fine giro legittima deve lasciare il punto
-// fermo sul contenuto che consegna. Le consegne di verifica/correzione/audit lo
-// facevano (sealTransition in dispatch.mjs); la consegna del primo passaggio e
-// il rilascio del biglietto no — e al posizionamento successivo nello stesso
-// clone il ripristino riportava il ramo alla base, parcheggiando su discarded/
-// una consegna intera (feedback #507: due lavori interi buttati in tre giorni).
+// Ogni fine giro legittima lascia il punto fermo sul contenuto che consegna: è
+// ciò che al posizionamento dopo tiene un lavoro sigillato e non ancora spedito
+// (#1486), e che la pulizia dopo un «pass» ritrova (#880). Senza sigillo, il
+// primo passaggio e il rilascio del biglietto lasciavano il punto fermo alla
+// base, e una consegna intera finiva su discarded/ (#507).
 
 /** L'id del feedback il cui stato nomina questo branch, o ''. */
 export function findStateIdByBranch(root, branch) {
