@@ -182,36 +182,37 @@ function buildRiquadriVuotiSource(corpi) {
   }
   function dopo(o, nome, se, poi) {
     var x = o && D(o, nome);
-    if (!x || typeof x.value !== 'function') return;
-    var v = x.value;
+    var v = campo(x, 'value');
+    if (typeof v !== 'function') return;
     var m = { [nome]() {
       var giro = se(this, arguments), r;
-      try { r = v.apply(this, arguments); } finally { if (giro) spazza(); }
+      try { r = R(v, this, arguments); } finally { if (giro) spazza(); }
       if (poi) { try { poi(this, r); } catch (e) {} }
       return r;
     } }[nome];
-    try { def(o, nome, { value: comeNativo(m, v, nome), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
+    try { def(o, nome, { __proto__: null, value: comeNativo(m, v, nome), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
   }
   function prima(o, nome) {
     var x = o && D(o, nome);
     if (!x) return;
-    if (typeof x.value === 'function') {
-      var v = x.value;
-      var m = { [nome]() { spazza(); var r = v.apply(this, arguments); applicaA(r); return r; } }[nome];
-      try { def(o, nome, { value: comeNativo(m, v, nome), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
+    var v = campo(x, 'value');
+    if (typeof v === 'function') {
+      var m = { [nome]() { spazza(); var r = R(v, this, arguments); applicaA(r); return r; } }[nome];
+      try { def(o, nome, { __proto__: null, value: comeNativo(m, v, nome), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
       return;
     }
-    if (typeof x.get !== 'function') return;
-    var g = x.get;
-    var nuovo = D({ get [nome]() { spazza(); var r = g.call(this); applicaA(r); return r; } }, nome).get;
-    try { def(o, nome, { get: comeNativo(nuovo, g, 'get ' + nome), set: x.set, enumerable: x.enumerable, configurable: true }); } catch (e) {}
+    var g = campo(x, 'get');
+    if (typeof g !== 'function') return;
+    var nuovo = D({ get [nome]() { spazza(); var r = R(g, this, []); applicaA(r); return r; } }, nome).get;
+    try { def(o, nome, { __proto__: null, get: comeNativo(nuovo, g, 'get ' + nome), set: x.set, enumerable: x.enumerable, configurable: true }); } catch (e) {}
   }
   function dopoLaScrittura(o, nome) {
     var x = o && D(o, nome);
-    if (!x || typeof x.set !== 'function') return;
-    var s = x.set, se = SE.testo(0);
-    var nuovo = D({ set [nome](v) { var giro = se(this, [v]); try { s.call(this, v); } finally { if (giro) spazza(); } } }, nome).set;
-    try { def(o, nome, { get: x.get, set: comeNativo(nuovo, s, 'set ' + nome), enumerable: x.enumerable, configurable: true }); } catch (e) {}
+    var s = campo(x, 'set');
+    if (typeof s !== 'function') return;
+    var se = SE.testo(0);
+    var nuovo = D({ set [nome](v) { var giro = se(this, [v]); try { R(s, this, [v]); } finally { if (giro) spazza(); } } }, nome).set;
+    try { def(o, nome, { __proto__: null, get: x.get, set: comeNativo(nuovo, s, 'set ' + nome), enumerable: x.enumerable, configurable: true }); } catch (e) {}
   }
   function proto(w, nome) { var c = w[nome]; return c && c.prototype; }
   function finestra(r) { return r && typeof r === 'object' && r === r.window; }
