@@ -214,12 +214,22 @@
     function configura(id, config) {
       return manda({ type: MSG().PANNELLO_APP_MODIFICA, app, op: 'configura', id, config }).then(applica);
     }
+    // Le mosse dell'utente in questo pannello, per i contatori dell'app: non quelle che annuncia il main né quelle
+    // che chiede l'app stessa, che le conta da sé.
+    function posa(id, primaDi = null) {
+      try { opts.mossa && opts.mossa(stato.elementi.includes(id) ? 'spostato' : 'aggiunto', id); } catch (_) {}
+      return aggiungi(id, primaDi);
+    }
+    function leva(id) {
+      try { opts.mossa && opts.mossa('tolto', id); } catch (_) {}
+      return togli(id);
+    }
     function sposta(id, verso) {
       const l = stato.elementi;
       const i = l.indexOf(id);
       if (i < 0) return;
-      if (verso < 0 && i > 0) aggiungi(id, l[i - 1]);
-      else if (verso > 0 && i < l.length - 1) aggiungi(id, l[i + 2] || null);
+      if (verso < 0 && i > 0) posa(id, l[i - 1]);
+      else if (verso > 0 && i < l.length - 1) posa(id, l[i + 2] || null);
     }
 
     function vociElemento(id) {
