@@ -1478,9 +1478,24 @@ class TabManager {
     try { return this._pilaChiuse().dallArchivio(await A.listMeta()); } catch (_) { return null; }
   }
 
-  // Una scheda d'archivio riaperta da un'altra porta non torna anche con la scorciatoia.
-  segnaRiaperta(idArchivio) {
-    if (!this.incognito) this._pilaChiuse().segnaRiaperta(idArchivio);
+  // Una scheda d'archivio tornata, da qualunque strada: si conta fra le riaperte, e Ctrl/Cmd+Shift+T non la ridà.
+  // Sentinella: tests/tab-browser-shortcuts.spec.mjs.
+  tornata(e) {
+    if (!e || typeof e.id !== 'string' || this.incognito) return;
+    this._pilaChiuse().segnaRiaperta(e.id);
+    this._contaTornata(e);
+  }
+
+  // Chi apre un indirizzo che è quello di una scheda chiusa (la chat, un collegamento del filo della home) la riapre.
+  async tornataPerIndirizzo(url) {
+    const A = !this.incognito && globalThis.SN_ARCHIVED_TABS;
+    if (!A || !url) return;
+    try { this.tornata(await A.ultimaPer(url)); } catch (_) {}
+  }
+
+  _contaTornata(e) {
+    ContatoriFinestra.misura('riapertaDallArchivio', e);
+    try { globalThis.SN_CONTATORI_MAIN?.riaperta(e, { incognito: false }); } catch (_) {}
   }
 
   // Ctrl/Cmd+L: l'indirizzo si scrive nel campo della home, la barra degli indirizzi non c'è. Già sulla home non la
