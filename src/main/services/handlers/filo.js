@@ -149,14 +149,6 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r, avvisato };
   });
 
-  // Il testo che l'assistente di pagina propone per un campo della pagina esce verso il sito: passa dalla porta
-  // delle uscite prima di comparire (#810). Torna solo il verdetto e la frase, mai il segreto.
-  on(MSG.CONTROLLA_CAMPO, async (msg, sender) => {
-    const testo = String((msg && msg.testo) || '');
-    if (!testo.trim()) return { ok: true, blocca: false };
-    const u = await controllaUscita({ type: 'CAMPO_PAGINA', testo }, { sender, parole: paroleDa(msg) });
-    return { ok: true, blocca: !!u.blocca, frase: u.blocca ? u.frase : '' };
-  });
 
   // Anche da una pagina web, di proposito: la sidebar vive lì. Risponde solo cosa farebbe Filo; l'azione la
   // esegue comunque il codice di Filo nel content script, quindi chi lo chiama non ottiene niente di più.
