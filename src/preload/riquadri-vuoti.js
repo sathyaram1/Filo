@@ -241,7 +241,7 @@ function buildRiquadriVuotiSource(corpi) {
     dopo(Doc, 'open', SE.sempre, function (doc, r) { ascolta(doc); if (finestra(r)) applica(r); });
     var R = proto(w, 'Range');
     ['insertNode', 'surroundContents'].forEach(function (m) { dopo(R, m, SE.gamma); });
-    dopo(proto(w, 'Element'), 'attachShadow', function () { return false; }, function (el, radice) { ascolta(radice); });
+    dopo(proto(w, 'Element'), 'attachShadow', function () { return false; }, function (el, radice) { ascolta(radice, su); });
     ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'].forEach(function (c) {
       ['contentWindow', 'contentDocument'].forEach(function (p) { prima(proto(w, c), p); });
     });
