@@ -1,4 +1,5 @@
-// Verifica #1596 giro 3: esplorazione (più turni con una pagina ciascuno, aspetto dell'avviso).
+// Verifica #1596 giro 3, rilievo 1: il rifiuto per finestra nel formato di Anthropic (via OpenRouter, «Provider returned
+// error») quando il testo da solo ci sta ma col tetto della risposta no. Passa dal vero classificatore degli errori.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const NEWTAB = 'filo://newtab/';
@@ -15,8 +16,8 @@ ${corpo}
 </article></main></body></html>`;
 }
 
-async function modello(app, { finestra = 0, posto = 0, listino = false, misure = true, piani }) {
-  await app.evaluate(async (_e, { finestra, posto, listino, misure, piani }) => {
+async function modello(app, { finestra = 0, posto = 0, listino = false, misure = true, piani, formato = '', cpt = 3.5 }) {
+  await app.evaluate(async (_e, { finestra, posto, listino, misure, piani, formato, cpt }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
@@ -43,7 +44,7 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
       const chat = messages.some((m) => m.role === 'user' && String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       const testi = messages.map((m) => String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
-      const ingresso = Math.ceil((testi.reduce((s, t) => s + t.length, 0) + (tools ? JSON.stringify(tools).length : 0)) / 3.5);
+      const ingresso = Math.ceil((testi.reduce((s, t) => s + t.length, 0) + (tools ? JSON.stringify(tools).length : 0)) / cpt);
       const uscita = Number(attempts[0].maxTokens) || 16384;
       if (!finestra) finestra = ingresso + uscita + Math.ceil(posto / 3.5);
       if (ingresso + uscita > finestra) {
@@ -51,6 +52,17 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
         const detto = misure
           ? `This endpoint's maximum context length is ${finestra} tokens. However, you requested about ${ingresso + uscita} tokens (${ingresso} of text input, ${uscita} of output). Please reduce the length of either one.`
           : 'Prompt is too long for this model.';
+        if (formato === 'anthropic') {
+          const msg = ingresso > finestra ? `prompt is too long: ${ingresso} tokens > ${finestra} maximum`
+            : `input length and \`max_tokens\` exceed context limit: ${ingresso} + ${uscita} > ${finestra}, decrease input length or \`max_tokens\` and try again`;
+          const raw = JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: msg } });
+          const body = JSON.stringify({ error: { message: 'Provider returned error', code: 400, metadata: { raw, provider_name: 'Anthropic' } } });
+          throw await globalThis.SN_PROVIDER_OPENROUTER.httpError(new Response(body, { status: 400 }), { tools: !!tools, maxTokens: uscita, model: attempts[0].model });
+        }
+        if (formato === 'reale') {
+          const body = JSON.stringify({ error: { message: detto, code: 400 } });
+          throw await globalThis.SN_PROVIDER_OPENROUTER.httpError(new Response(body, { status: 400 }), { tools: !!tools, maxTokens: uscita, model: attempts[0].model });
+        }
         const e = new Error(`OpenRouter 400: {"error":{"message":"${detto}","code":400}}`);
         e.status = 400;
         e.provider = 'openrouter';
@@ -75,7 +87,7 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
       for (const c of toolCalls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
       return { ...base, text: '', toolCalls, finishReason: 'tool_calls' };
     };
-  }, { finestra, posto, listino, misure, piani });
+  }, { finestra, posto, listino, misure, piani, formato, cpt });
 }
 
 async function preparaPagine(app, testServer) {
@@ -93,41 +105,25 @@ async function chiedi(page, testo) {
   await page.locator('#sendBtn').click();
 }
 
-test('tre turni con una pagina ciascuno: ogni risposta arriva con la sua pagina', async ({ app, openTab, testServer }) => {
-  test.setTimeout(180_000);
-  const page = await openTab(NEWTAB);
-  const urls = await preparaPagine(app, testServer);
-  const leggi = (url) => ({ strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] });
-  await modello(app, { finestra: FINESTRA, piani: [leggi(urls[0]), { finale: 'T1' }, leggi(urls[1]), { finale: 'T2' }, leggi(urls[2]), { finale: 'T3' }] });
-  await chiedi(page, `leggimi ${urls[0]}`);
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'T1 (' })).toBeVisible({ timeout: 40_000 });
-  await chiedi(page, `e adesso ${urls[1]}`);
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'T2 (' })).toBeVisible({ timeout: 40_000 });
-  await chiedi(page, `e adesso ${urls[2]}`);
-  const t3 = page.locator('.dash-bubble-filo', { hasText: 'T3 (' });
-  await expect(t3).toBeVisible({ timeout: 40_000 });
-  console.log('T1', await page.locator('.dash-bubble-filo', { hasText: 'T1 (' }).innerText());
-  console.log('T2', await page.locator('.dash-bubble-filo', { hasText: 'T2 (' }).innerText());
-  console.log('T3', await t3.innerText(), 'rifiutate', await app.evaluate(() => globalThis.__rifiutate));
-  await expect(t3).toContainText('GAMMA');
-});
 
-for (const tema of ['light', 'dark']) {
-  test(`aspetto dell'avviso (${tema})`, async ({ app, openTab, testServer }) => {
+for (const caso of [
+  { nome: 'senza la finestra nota', listino: false },
+  { nome: 'con la finestra nota, contata un po\' più pesante dal fornitore', listino: true, cpt: 3.2 },
+]) {
+  test(`r1 tre pagine su un modello Anthropic che rifiuta «input + max_tokens oltre il limite» (${caso.nome}): la risposta arriva con l'avviso`, async ({ app, openTab, testServer }) => {
     test.setTimeout(120_000);
     const page = await openTab(NEWTAB);
-    await page.emulateMedia({ colorScheme: tema });
     await preparaPagine(app, testServer);
-    await modello(app, { finestra: FINESTRA, listino: true, piani: [
+    await modello(app, { finestra: FINESTRA, listino: caso.listino, formato: 'anthropic', cpt: caso.cpt || 3.5, piani: [
       { strumenti: [{ nome: 'CERCA_WEB', args: { query: 'guide' } }] },
       { strumenti: [0, 1, 2].map((indice) => ({ nome: 'LEGGI_PAGINA', urlDa: URL_RE, indice })) },
-      { finale: 'Ecco il confronto delle guide.' },
+      { finale: 'RISPOSTA PRONTA' },
     ] });
     await chiedi(page, 'confronta le tre guide che trovi');
-    const bolla = page.locator('.dash-bubble-filo', { hasText: 'Ecco il confronto' });
+    const bolla = page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA PRONTA' });
     await expect(bolla).toBeVisible({ timeout: 40_000 });
-    await page.waitForTimeout(800);
-    await page.screenshot({ path: `tests/.shots/1596-giro3-avviso-${tema}.png` });
-    console.log(await bolla.innerText());
+    await expect(bolla).toContainText('visti: ALFA');
+    await expect(bolla).toContainText('Il modello non riusciva a leggere tutto insieme');
+    await expect(page.locator('.dash-bubble-filo').last()).not.toContainText(/altro modello|tetto di/);
   });
 }
