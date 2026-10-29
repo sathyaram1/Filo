@@ -387,7 +387,7 @@
     // #947.3 — toglie dall'indice una cartella cercata per l'occasione (Preferenze). Solo da Filo.
     // { percorso } → { ok, tolta, documenti }
     DOCUMENTI_DIMENTICA: 'documenti_dimentica',
-    // #947.3 — l'Aiuto di una scheda cerca fra i documenti. APERTI AI SITI, perché l'Aiuto vive nella pagina: su un sito
+    // #947.3 — l'Aiuto di una scheda cerca fra i documenti. APERTI AI SITI, perché l'Aiuto parla come la pagina: su un sito
     // la ricerca parte solo dopo il sì nella vista di Filo sopra la scheda (confermeSopraPagina), e alla pagina tornano
     // nomi, cartelle dette coi nomi di Filo e chiavi a caso, mai percorsi. Le chiavi valgono solo per la scheda che ha
     // cercato. Regole: patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
@@ -514,8 +514,14 @@
     STRATO_MENU_CHIUSO: 'strato_menu_chiuso',        // main → content script { id }
     // I riquadri di Filo su un sito nello strato sopra la scheda (#1509.1). Aperto ai siti: chi apre è il content script
     // della scheda, e il riquadro nasce dove il sito non lo vede.
-    RIQUADRO_APRI: 'riquadro_apri',                  // { tipo: feedback|modifica|redteam|risposta, dati } → { ok, id }
+    RIQUADRO_APRI: 'riquadro_apri',                  // { tipo: feedback|modifica|redteam|risposta|aiuto, dati } → { ok, id }
     RIQUADRO_SOSTITUISCI: 'riquadro_sostituisci',    // main → content script { id, testo }: Sostituisci della Modifica
+    // L'Aiuto di un sito sta nello strato (#1509.3) e lavora sulla pagina sotto: lo strato chiede, il frame principale
+    // della pagina fa e risponde; la pagina gli manda i gesti dell'utente sui passi indicati.
+    AIUTO_ALLA_PAGINA: 'aiuto_alla_pagina',          // solo dallo strato: { op, args } → { ok, esito }
+    AIUTO_DALLO_STRATO: 'aiuto_dallo_strato',        // main → frame principale della pagina { rid, op, args }
+    AIUTO_ESITO: 'aiuto_esito',                      // solo dal frame principale della pagina: { rid, esito } → { ok }
+    AIUTO_ALLO_STRATO: 'aiuto_allo_strato',          // solo dalla pagina: { comando: passo|chiudi|evita|azione, … } → { ok }
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
     PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
     PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }

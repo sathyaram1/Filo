@@ -5,6 +5,7 @@
 
 import { test, expect } from './helpers/reteFinta.mjs';
 import { home, modelloFinto, chiamateAlModello, ripristina, chiedi } from './helpers/chatFinta.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 // Le tre pagine salvate stanno sulla rete finta: aprirle carica una pagina vera, non una d'errore.
 function pagineDi(rete) {
@@ -252,20 +253,22 @@ test('dall\'Aiuto «salvala per dopo» fa la voce del menu, senza l\'Aiuto nella
   await aiutoCheSalva(app);
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((t) => window.filoShell.tabs.help(t), id);
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
+  // Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3), con gli stessi px della pagina.
+  const aiuto = await paginaDellAiuto(app, page);
+  await expect(aiuto.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
   const chiusa = page.waitForEvent('close', { timeout: 20_000 });
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
-  await page.fill('.sn-sidebar-input textarea', 'salvala per dopo');
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  await aiuto.fill('.sn-sidebar-input textarea', 'salvala per dopo');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
 
   // L'Aiuto lo dice, la conferma è quella del menu, e la scheda si chiude (anche se il modello voleva proseguire).
-  await expect(page.locator('.sn-sidebar-log').last()).toContainText('pagina salvata in «Aperti per dopo»: chiudo la scheda', { timeout: 15_000 });
+  await expect(aiuto.locator('.sn-sidebar-log').last()).toContainText('pagina salvata in «Aperti per dopo»: chiudo la scheda', { timeout: 15_000 });
   await expect(page.locator('.sn-save-confirm')).toBeVisible();
   await expect(page.locator('.sn-save-confirm-cta')).toHaveCount(1);
   // La conferma sta a sinistra dell'Aiuto, non sopra la sua casella.
   await expect(page.locator('.sn-save-confirm.sn-save-confirm-visible')).toBeVisible();
   const conferma = await page.locator('.sn-save-confirm').boundingBox();
-  const casella = await page.locator('.sn-sidebar-input').boundingBox();
+  const casella = await aiuto.locator('.sn-sidebar-input').boundingBox();
   expect(conferma.x + conferma.width).toBeLessThanOrEqual(casella.x);
   await page.waitForTimeout(400);
   await page.screenshot({ path: 'tests/.shots/salvate-aiuto-conferma.png' });

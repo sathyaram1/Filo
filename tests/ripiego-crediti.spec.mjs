@@ -22,7 +22,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, conta, clicca, scrivi, tastoSullaScheda } from './helpers/riquadri.mjs';
+import { statoDi, conta, clicca, scrivi, tastoSullaScheda, paginaDellAiuto } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 
@@ -736,26 +736,28 @@ test('(L) l’Aiuto della pagina con la chiave propria rifiutata: la riga del ri
   const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Sito</title><p>Un sito qualunque.</p>');
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  // Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3).
+  const aiuto = await paginaDellAiuto(app, page);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
   const chiedi = async (testo) => {
-    const prima = await page.locator('.sn-sidebar-msg-assistant').count();
-    await page.fill('.sn-sidebar-input textarea', testo);
-    await page.press('.sn-sidebar-input textarea', 'Enter');
-    await expect(page.locator('.sn-sidebar-msg-assistant')).toHaveCount(prima + 1, { timeout: 30_000 });
+    const prima = await aiuto.locator('.sn-sidebar-msg-assistant').count();
+    await aiuto.fill('.sn-sidebar-input textarea', testo);
+    await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+    await expect(aiuto.locator('.sn-sidebar-msg-assistant')).toHaveCount(prima + 1, { timeout: 30_000 });
   };
-  const righe = page.locator('.sn-sidebar-log', { hasText: 'ho usato i crediti di Filo' });
+  const righe = aiuto.locator('.sn-sidebar-log', { hasText: 'ho usato i crediti di Filo' });
 
   await chiedi('dove sono le impostazioni?');
-  await expect(page.locator('.sn-sidebar-msg-assistant').last()).toContainText('RISPOSTA-DALLA-PERSONALE');
+  await expect(aiuto.locator('.sn-sidebar-msg-assistant').last()).toContainText('RISPOSTA-DALLA-PERSONALE');
   await expect(righe).toHaveCount(1);
   await expect(righe).toContainText('OpenRouter ha rifiutato la tua chiave (non la riconosce)');
-  await page.screenshot({ path: 'tests/.shots/662-aiuto.png' }).catch(() => {});
+  await aiuto.screenshot({ path: 'tests/.shots/662-aiuto.png' }).catch(() => {});
   await chiedi('e il tema scuro?');
   await expect(righe).toHaveCount(1);
   // La chiave risponde di nuovo, poi torna a essere rifiutata: la riga torna.
   ownKeyStatus = 200;
   await chiedi('grazie');
-  await expect(page.locator('.sn-sidebar-msg-assistant').last()).toContainText('RISPOSTA-DALLA-PROPRIA');
+  await expect(aiuto.locator('.sn-sidebar-msg-assistant').last()).toContainText('RISPOSTA-DALLA-PROPRIA');
   ownKeyStatus = 401;
   await chiedi('ancora una cosa');
   await expect(righe).toHaveCount(2);
@@ -894,11 +896,14 @@ test('(R) l’Aiuto della pagina con la chiave propria rifiutata: la riga sta so
   const avvisi = await osservaAvvisi(page);
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
-  await page.fill('.sn-sidebar-input textarea', 'dove sono le impostazioni?');
-  await page.press('.sn-sidebar-input textarea', 'Enter');
-  await expect(page.locator('.sn-sidebar-msg-assistant').last()).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30_000 });
-  const riga = page.locator('.sn-sidebar-log', { hasText: 'ho usato i crediti di Filo' });
+  // Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3): anche lì nessun avviso ripete la riga.
+  const aiuto = await paginaDellAiuto(app, page);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  const avvisiDelloStrato = await osservaAvvisi(aiuto);
+  await aiuto.fill('.sn-sidebar-input textarea', 'dove sono le impostazioni?');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+  await expect(aiuto.locator('.sn-sidebar-msg-assistant').last()).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30_000 });
+  const riga = aiuto.locator('.sn-sidebar-log', { hasText: 'ho usato i crediti di Filo' });
   await expect(riga).toHaveCount(1);
   const dopoLaRisposta = await riga.evaluate((el) => {
     const risposta = [...document.querySelectorAll('.sn-sidebar-msg-assistant')].pop();
@@ -907,6 +912,7 @@ test('(R) l’Aiuto della pagina con la chiave propria rifiutata: la riga sta so
   expect(dopoLaRisposta).toBe(true);
   await page.waitForTimeout(6000);
   expect(await avvisi()).not.toContain('crediti di Filo');
+  expect(await avvisiDelloStrato()).not.toContain('crediti di Filo');
 });
 
 // La spiegazione anticipata parte appena si seleziona un testo: pagata col ripiego, conta come detta

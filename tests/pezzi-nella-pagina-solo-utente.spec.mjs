@@ -3,7 +3,7 @@
 // Regola: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { nelMondoDiFilo } from './helpers/riquadri.mjs';
+import { nelMondoDiFilo, nelloStrato, paginaDelloStrato } from './helpers/riquadri.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 
 const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>Pagina ostile</title></head>
@@ -95,9 +95,13 @@ test('QR della pagina: «Scarica» e «Copia link» premuti dal codice della pag
   await expect.poll(appunti).toBe(page.url());
 });
 
+// Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3): il codice della pagina non trova nemmeno il rimedio.
 test('il rimedio sotto un errore dell\'Aiuto: premuto dal codice della pagina non apre niente, dall\'utente sì', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGINA);
-  await nelMondoDiFilo(app, page, () => {
+  await nelMondoDiFilo(app, page, () => { globalThis.SN_SIDEBAR.open(); return true; });
+  const strato = await paginaDelloStrato(app, page);
+  await strato.waitForSelector('.sn-sidebar-input textarea');
+  await nelloStrato(app, page, () => {
     window.__aperte = [];
     const M = globalThis.SN_MSG.MSG;
     const A = globalThis.SN_CONST.ACTIONS;
@@ -107,18 +111,20 @@ test('il rimedio sotto un errore dell\'Aiuto: premuto dal codice della pagina no
       if (m && m.type === M.OPEN_URL) { window.__aperte.push(m.url); return Promise.resolve({ ok: true }); }
       return orig(m, ...r);
     };
-    globalThis.SN_SIDEBAR.open();
     return true;
   });
-  const aperte = () => nelMondoDiFilo(app, page, () => window.__aperte.slice());
-  await page.waitForSelector('.sn-sidebar-input textarea');
-  await page.click('.sn-sidebar-input textarea');
-  await page.keyboard.type('aiutami');
-  await page.keyboard.press('Enter');
-  const rimedio = page.locator('.sn-sidebar-choice', { hasText: 'Apri Crediti' });
+  const aperte = () => nelloStrato(app, page, () => window.__aperte.slice());
+  await strato.click('.sn-sidebar-input textarea');
+  await strato.keyboard.type('aiutami');
+  await strato.keyboard.press('Enter');
+  const rimedio = strato.locator('.sn-sidebar-choice', { hasText: 'Apri Crediti' });
   await expect(rimedio).toBeVisible({ timeout: 10_000 });
 
-  await page.evaluate(() => [...document.querySelectorAll('.sn-sidebar-choice')].forEach((b) => b.click()));
+  expect(await page.evaluate(() => {
+    const b = [...document.querySelectorAll('.sn-sidebar-choice')];
+    b.forEach((x) => x.click());
+    return b.length;
+  })).toBe(0);
   await page.waitForTimeout(800);
   expect(await aperte()).toEqual([]);
 

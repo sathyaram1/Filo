@@ -23,6 +23,7 @@ import { createServer as createNetServer, connect as netConnect } from 'node:net
 import { createServer as createHttpServer, request as httpRequest } from 'node:http';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { nelMondoDiFilo } from './helpers/confirm.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 // Mini server SOCKS5 (no-auth) per i test: registra ogni CONNECT ricevuta
 // (tipo di indirizzo + host + porta) e instrada verso `target` — di default
@@ -375,9 +376,10 @@ test('da una scheda col proxy anteprima, immagini, «Copia immagine», Aiuto e f
     // Una domanda all'Aiuto: legge le immagini che si vedono e chiede l'llms.txt del sito, tutto dal proxy.
     const primaDellAiuto = sito.byteDalMain().length;
     await nelMondoDiFilo(app, 'pagina.filo.invalid', 'SN_SIDEBAR.open(); 1');
-    await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
-    await page.fill('.sn-sidebar-input textarea', 'riassumi la pagina');
-    await page.press('.sn-sidebar-input textarea', 'Enter');
+    const aiuto = await paginaDellAiuto(app, page);
+    await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
+    await aiuto.fill('.sn-sidebar-input textarea', 'riassumi la pagina');
+    await aiuto.press('.sn-sidebar-input textarea', 'Enter');
     await expect.poll(() => socks.connections.some((c) => c.host === 'pagina.filo.invalid' && c.port === 443), {
       timeout: 15_000, message: 'l\'llms.txt dell\'Aiuto doveva partire dal proxy della scheda',
     }).toBe(true);

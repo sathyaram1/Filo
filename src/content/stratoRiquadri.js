@@ -7,7 +7,8 @@
 
   const S = global.SN_STRATO_RIQUADRI;
   if (!S) return;
-  const RADICI = '.sn-fb-overlay, .sn-editbox-overlay, .sn-rt-overlay, .sn-popup, .sn-sidebar';
+  // L'Aiuto non c'è: Esc non lo chiude, nemmeno quando stava nella pagina, e sulla pagina sotto il tasto resta suo.
+  const RADICI = '.sn-fb-overlay, .sn-editbox-overlay, .sn-rt-overlay, .sn-popup';
   const MODALI = '.sn-fb-overlay, .sn-editbox-overlay, .sn-rt-overlay';
 
   // La pagina sotto, per il feedback e le bozze: la manda il main con ogni apertura.
@@ -44,9 +45,14 @@
       global.SN_POPUP?.openStreaming({
         action: dati.action, payload: dati.payload || {}, anchor: dati.anchor || undefined, title: dati.title || '',
       });
+    } else if (d.tipo === 'aiuto') {
+      global.SN_SIDEBAR?.open(dati.invocazione || undefined);
     }
     riferisci();
   }
+
+  // Dalla pagina sotto al suo Aiuto, che sta qui (#1509.3).
+  S.onAiuto?.((d) => global.SN_SIDEBAR?.dallaPagina?.(d));
 
   // Esc premuto sulla pagina: si chiude il riquadro più in alto, come se il tasto fosse arrivato qui.
   S.onEsc(() => {
@@ -72,16 +78,54 @@
     return false;
   }
 
+  // La zona dove c'è qualcosa (#1509.3): fuori dalla sua cornice la pagina riceve i gesti veri, trascinamenti e file
+  // compresi, che il vuoto non sa rigirare. È l'unione delle scatole dei pezzi in cima al documento; un pezzo senza
+  // scatola sua (il menu, nell'ombra) si posa dove vuole, e allora la zona è la scheda intera (null). Il margine tiene
+  // dentro l'ombra dei riquadri.
+  const MARGINE = 32;
+  const IGNORATI = /^(HEAD|BODY|SCRIPT|STYLE|LINK|META|TEMPLATE)$/;
+  // Le scatole dei pezzi, senza margine: un trascinamento che dalla pagina arriva sopra uno di loro rimette lo strato.
+  const SCATOLE_MAX = 50;
+  let scatole = [];
+  function zona() {
+    let u = null;
+    scatole = [];
+    const aggiungi = (r) => {
+      if (!(r.width > 0 && r.height > 0)) return;
+      if (scatole.length < SCATOLE_MAX) scatole.push({ x: Math.floor(r.left), y: Math.floor(r.top), width: Math.ceil(r.width), height: Math.ceil(r.height) });
+      u = u ? { l: Math.min(u.l, r.left), t: Math.min(u.t, r.top), r: Math.max(u.r, r.right), b: Math.max(u.b, r.bottom) }
+        : { l: r.left, t: r.top, r: r.right, b: r.bottom };
+    };
+    for (const el of [...document.documentElement.children, ...(document.body ? document.body.children : [])]) {
+      if (IGNORATI.test(el.tagName)) continue;
+      const display = getComputedStyle(el).display;
+      if (display === 'none') continue;
+      if (display === 'contents') {
+        if (el.firstChild || global.SN_FILO_UI?.ombraDi?.(el)) { scatole = []; return null; }
+        continue;
+      }
+      if (visibile(el)) { aggiungi(el.getBoundingClientRect()); continue; }
+      for (const c of el.querySelectorAll('*')) if (visibile(c)) aggiungi(c.getBoundingClientRect());
+    }
+    if (!u) return null;
+    const x = Math.max(0, Math.floor(u.l - MARGINE));
+    const y = Math.max(0, Math.floor(u.t - MARGINE));
+    return { x, y, width: Math.min(innerWidth, Math.ceil(u.r + MARGINE)) - x, height: Math.min(innerHeight, Math.ceil(u.b + MARGINE)) - y };
+  }
+
   let detto = '';
   function riferisci() {
     const pezzi = [...document.documentElement.children].filter((el) => el !== document.head && el !== document.body);
     const aperti = pezzi.filter(aSchermo).length;
     const riquadri = [...document.querySelectorAll(RADICI)].filter(visibile).length;
     const modale = [...document.querySelectorAll(MODALI)].some(visibile);
-    const firma = `${aperti}|${riquadri}|${modale}`;
+    // Un Aiuto nascosto mentre Filo risponde tiene vivo lo strato: la risposta resta da aprire.
+    const aiuto = !!global.SN_SIDEBAR?.isOpen?.();
+    const z = zona();
+    const firma = `${aperti}|${riquadri}|${modale}|${aiuto}|${z ? `${z.x},${z.y},${z.width},${z.height}` : ''}|${scatole.map((r) => `${r.x},${r.y},${r.width},${r.height}`).join(';')}`;
     if (firma === detto) return;
     detto = firma;
-    S.stato({ aperti, riquadri, modale });
+    S.stato({ aperti, riquadri, modale, aiuto, zona: z, scatole });
   }
   let inCoda = false;
   const presto = () => {
@@ -93,6 +137,7 @@
   // Un'animazione che finisce (la chiusura di un avviso) non muta niente: si ricontrolla anche dopo.
   document.addEventListener('animationend', presto, true);
   document.addEventListener('transitionend', presto, true);
+  window.addEventListener('resize', presto);
 
   // Fuori dai riquadri lo strato è della pagina sotto: clic, rotella e trascinamenti le tornano (src/renderer/vuoto.js).
   try {
@@ -107,7 +152,8 @@
         const t = e.target;
         return !!t && t !== document.documentElement && t !== document.body;
       },
-      versoLaPagina: () => false,
+      // Uscire dalla cornice dentro la scheda è entrare nella pagina, che da lì riceve i gesti veri.
+      versoLaPagina: (e) => e.clientX > 0 && e.clientY > 0 && e.clientX < innerWidth - 1 && e.clientY < innerHeight - 1,
       lasciaPassare: () => S.lasciaPassare(),
     });
   } catch (e) { console.error('[Filo riquadri] vuoto', e); }

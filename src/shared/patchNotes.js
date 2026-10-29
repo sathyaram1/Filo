@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
     // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.253', date: '2026-10-30',
+      features: [],
+      fixes: [
+        'Anche l\'Aiuto su un sito ora sta sopra la pagina: le domande che gli scrivi, le sue risposte e il testo che propone per un campo, finché non lo accetti, il sito non li legge più, nemmeno se li selezioni o li copi.',
+      ],
+    },
+    {
       version: '0.2.252', date: '2026-10-29',
       features: [
         'Mentre un file si scarica, la riga dice quanto va veloce e quanto manca alla fine, nella pagina Download e nella carta della home.',

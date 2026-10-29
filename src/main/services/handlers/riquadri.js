@@ -19,4 +19,18 @@ module.exports = function register(on, ctx) {
     const r = stratiDi(sender);
     return r ? r.apri(sender, msg) : { ok: false };
   });
+
+  // L'Aiuto nello strato e la pagina sotto (#1509.3): lo strato chiede, la pagina risponde e gli manda i gesti.
+  on(MSG.AIUTO_ALLA_PAGINA, async (msg, sender) => {
+    if (!sender || !sender.strato) return { ok: false, error: 'forbidden' };
+    return require('../../stratoDeiRiquadri').aiutoAllaPagina(sender.strato, msg && msg.op, msg && msg.args);
+  });
+  on(MSG.AIUTO_ESITO, async (msg, sender) => {
+    const r = stratiDi(sender);
+    return r ? r.esitoDallaPagina(sender, msg) : { ok: false };
+  });
+  on(MSG.AIUTO_ALLO_STRATO, async (msg, sender) => {
+    const r = stratiDi(sender);
+    return r ? r.comandoAiuto(sender, msg) : { ok: false };
+  });
 };
