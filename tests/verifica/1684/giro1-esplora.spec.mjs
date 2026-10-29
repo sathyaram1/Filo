@@ -12,6 +12,7 @@ async function apriServer() {
   const usati = new Set();
   let gettone = 0;
   const srv = createServer((req, res) => {
+    if (process.env.LOG_RICHIESTE) console.log("RICHIESTA", req.url, req.headers.referer || "");
     const u = new URL(req.url, 'http://x');
     const nome = decodeURIComponent(u.pathname.split('/').pop() || 'file.pdf');
     const corpo = nome.endsWith('.pdf') ? PDF : EXE;
