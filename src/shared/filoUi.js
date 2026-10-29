@@ -485,6 +485,14 @@
   }
   function gestoSu(c, st, e) {
     sciogli(c, st);
+    if (APPUNTI.includes(e.type)) {
+      // Dentro Ctrl+V la selezione buona è già quella del tasto.
+      if (st.tasto || st.componendo) return;
+      const t = { e, sel: selezioneDi(c) };
+      st.tasto = t;
+      setTimeout(() => { if (st.tasto === t) st.tasto = null; }, 0);
+      return;
+    }
     if (!INIZI.includes(e.type)) {
       st.tasto = null;
       if (e.type === 'keyup' && !st.componendo) vigila(c, st, selezioneDi(c));
