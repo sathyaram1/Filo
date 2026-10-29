@@ -1370,6 +1370,16 @@ if (isMain) {
     const a = argomentiChiusura(cmd, args, data);
     if (a.errore) { console.error(`${a.errore} — non ho mandato niente.`); process.exit(1); }
     if (cmd === 'domanda') {
+      if (a.cred.ticket) {
+        const s = salvaPerLaDomanda(ROOT, a.cred.ticket);
+        for (const riga of s.righe) console.error(riga);
+        if (!s.ok) {
+          console.error(s.errore);
+          console.error(`Non ho chiesto la domanda: la domanda arriva dopo l'ultima spinta del giro. Per salvare il ramo ${s.rimedio}`);
+          process.exit(1);
+        }
+        if (s.punta) a.cred.punta = s.punta;
+      }
       const r = await domandaChiusura(a.cred);
       if (r.esito === 'assente') { console.error(`nessuna domanda (${r.reason}): niente da rispondere, chiudi o rilascia come sempre.`); process.exit(EXIT_CHIUSURA.assente); }
       if (r.esito === 'rifiutato') { console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato); }
