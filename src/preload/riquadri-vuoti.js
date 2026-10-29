@@ -72,7 +72,7 @@ function buildRiquadriVuotiSource(corpi) {
   var raccolte = new WeakMap();
   function ospitiDi(d) {
     var r = raccolte.get(d);
-    if (!r) { r = ['iframe', 'frame', 'object', 'embed'].map(function (n) { return perNome.call(d, n); }); raccolte.set(d, r); }
+    if (!r) { r = ['iframe', 'frame', 'object', 'embed'].map(function (n) { return R(perNome, d, [n]); }); raccolte.set(d, r); }
     return r;
   }
   // Toccato prima del suo load, un riquadro che arriva a un indirizzo dello stesso sito tiene la finestra e perde il
