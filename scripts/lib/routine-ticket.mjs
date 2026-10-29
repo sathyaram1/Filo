@@ -98,8 +98,11 @@ export function writeTicket(root, ticket) {
   try {
     mkdirSync(resolve(root, '.claude'), { recursive: true });
     // Il timbro del gancio di salvataggio è del biglietto di prima: col nuovo varrebbe come suo lavoro vivo (#1480).
-    if (String((readMarkerFrom(root) || {}).ticket || '') !== t) rmSync(resolve(root, '.claude', 'routine-beat-hook.stamp'), { force: true });
+    const prima = readMarkerFrom(root);
+    if (String((prima || {}).ticket || '') !== t) rmSync(resolve(root, '.claude', 'routine-beat-hook.stamp'), { force: true });
     const marker = { ticket: t, since: new Date().toISOString() };
+    // Rilanciare dispatch dopo la domanda di fine sessione non riapre il ramo alle spinte (#1555).
+    if (prima && String(prima.ticket || '') === t && chiusuraDelBiglietto(prima)) marker.chiusura = prima.chiusura;
     writeFileSync(ticketFile(root), JSON.stringify(marker, null, 2) + '\n', 'utf8');
     return marker;
   } catch (_) {
