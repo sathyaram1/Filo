@@ -248,14 +248,19 @@ applicano strumenti e server.
 
 **Una sessione per feedback.** Il manutentore scrive sul server l'ordine dei feedback da
 accendere (`npm run manutentore -- accendi N,M,…`, documento `config/manutentore`, solo
-admin; `accendi --niente` lo svuota). A ogni giro il pacemaker prende, nell'ordine, i
-feedback che hanno un lavoro ammesso dalla scelta di sempre (fiducia, pause, crediti,
-attese, semafori) e non hanno già un'accensione in viaggio, più davanti una priorità 3
-fuori dall'ordine (regola 7), e accende una sessione per ciascuno fino ai posti liberi.
-Lega ogni sessione al suo numero con l'id che la risposta di accensione restituisce
-(`routine-accensioni/<sessione>`); per un primo lavoro fa prima la ricerca «già risolto
-su main» e la lega anche quella. Senza ordine vale la coda per priorità, come ripiego
-(SPEC § 4). La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
+admin; `accendi --niente` lo svuota). Con un ordine un primo lavoro parte solo per i
+feedback dell'ordine e per le priorità 3; verifica, correzione, controllo di sicurezza,
+riallineamento e risposte dell'owner li assegna il server come sempre, anche per i feedback
+fuori dall'ordine. A ogni giro le due voci del pacemaker (la normale e quella dei lavori
+server) prendono i lavori ammessi dalla scelta di sempre (fiducia, pause, crediti, attese,
+semafori) senza un'accensione già in viaggio, in quest'ordine: una priorità 3 fuori
+dall'ordine (regola 7), i feedback dell'ordine, il resto nell'ordine della coda; e
+accendono una sessione per ciascuno fino ai posti liberi. Legano ogni sessione al suo
+numero con l'id che la risposta di accensione restituisce (`routine-accensioni/<sessione>`);
+per un primo lavoro la voce normale fa prima la ricerca «già risolto su main» e la lega
+anche quella. La sessione di un compito senza feedback resta libera, e una sessione libera
+con un ordine riceve la stessa scelta: niente primo lavoro fuori dall'ordine. Senza ordine
+vale la coda per priorità, come ripiego (SPEC § 4). La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
 sempre: il comando `ticket` manda l'id della sessione (`sessione`), e il server, dopo la
 parola d'ordine, le dà il biglietto del suo feedback anche senza numero; dopo quel
 biglietto ogni altra richiesta della stessa sessione è «niente»

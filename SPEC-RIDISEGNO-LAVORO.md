@@ -174,10 +174,11 @@ Fatto dalla parte del server (ramo omonimo di filo-security, da rideployare):
   riallineamento pulito.
 
 - accensione per feedback: l'ordine del manutentore in `config/manutentore`
-  (`npm run manutentore -- accendi`), il pacemaker che accende una sessione per ciascun
-  feedback con lavoro e la lega al numero con l'id della sessione, la ricerca «già
-  risolto» prima dell'accensione, e il biglietto che quella sessione riceve per il suo
-  feedback e uno solo. Il prompt salvato della routine non cambia: la sessione accesa
+  (`npm run manutentore -- accendi`), che decide i primi lavori (verifica, correzione,
+  controllo e risposte restano del server, anche fuori dall'ordine); le due voci del
+  pacemaker, normale e lavori server, che accendono una sessione per ciascun lavoro e la
+  legano al numero con l'id della sessione; la ricerca «già risolto» prima
+  dell'accensione; il biglietto che quella sessione riceve per il suo feedback e uno solo. Il prompt salvato della routine non cambia: la sessione accesa
   così è l'orchestratore cieco, ristretto dal server al suo feedback.
 
 Resta: fase 2, la spesa dell'account per il manutentore e l'operazione che dà schede e
