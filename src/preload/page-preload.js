@@ -1057,9 +1057,26 @@ function startSafebrowse() {
   try { require(path.join(CONTENT_DIR, 'safebrowseLinks.js')); } catch (e) { console.error('[Filo CS] safebrowseLinks', e); } // #965
 }
 
+// Il colore del sito sulla scheda non aspetta la pagina letta per intero: uno script lento a metà pagina lo tratteneva
+// per secondi a pagina già a schermo (#1701.r1). Dopo startSafebrowse(), che carica i messaggi.
+function startColoreSito() {
+  try {
+    require(path.join(SHARED_DIR, 'tabColor.js'));
+    require(path.join(CONTENT_DIR, 'pageColor.js'));
+  } catch (e) { console.error('[Filo CS] colore del sito', e); return; }
+  let params = null;
+  const parti = () => { try { globalThis.SN_PAGE_COLOR.reportTabIdentityColor(() => params); } catch (_) {} };
+  try {
+    Promise.resolve(chrome.runtime.sendMessage({ type: globalThis.SN_MSG.MSG.GET_SETTINGS }))
+      .then((res) => { params = (res && res.settings && res.settings.tabColor) || null; }, () => {})
+      .then(parti);
+  } catch (_) { parti(); }
+}
+
 if (!IS_SUBFRAME) {
   contentScriptsStarted = true;
   startSafebrowse();
+  startColoreSito();
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', start, { once: true });
   } else {
