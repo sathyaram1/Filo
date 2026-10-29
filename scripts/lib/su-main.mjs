@@ -45,20 +45,26 @@ export function modifichePerFile(diff) {
   const mappa = new Map();
   let file = null;
   let righe = [];
-  const chiudi = () => { if (file) mappa.set(file, righe.join('\n')); };
+  let indice = '';
+  let binario = false;
+  let dentro = false;
+  // L'impronta dei blob conta solo per un binario, di cui la diff non mostra il contenuto: per un testo cambia anche
+  // quando cambia solo main.
+  const chiudi = () => { if (file) mappa.set(file, (binario ? [indice, ...righe] : righe).join('\n')); };
   for (const riga of String(diff || '').split('\n')) {
     const testa = /^diff --git a\/(.*) b\/(.*)$/.exec(riga);
-    if (testa) { chiudi(); file = testa[2]; righe = []; continue; }
-    if (!file || riga.startsWith('@@') || riga.startsWith('+++ ') || riga.startsWith('--- ')) continue;
-    // Il contenuto di un binario non c'è nella diff: vale l'impronta dei due blob.
-    if (riga.startsWith('index ') && !/^index /.test(righe[righe.length - 1] || '')) { righe.push(riga.replace(/ \d+$/, '')); continue; }
-    if (/^[-+\\]/.test(riga) || riga.startsWith('Binary files') || /^(new|deleted) file mode/.test(riga)) righe.push(riga);
+    if (testa) { chiudi(); file = testa[2]; righe = []; indice = ''; binario = false; dentro = false; continue; }
+    if (!file) continue;
+    if (riga.startsWith('@@')) { dentro = true; continue; }
+    if (!dentro) {
+      if (riga.startsWith('index ')) indice = riga.replace(/ \d+$/, '');
+      else if (riga.startsWith('Binary files')) binario = true;
+      else if (/^(new|deleted) file mode/.test(riga)) righe.push(riga);
+      continue;
+    }
+    if (/^[-+\\]/.test(riga)) righe.push(riga);
   }
   chiudi();
-  // L'impronta dei blob conta solo per i binari: per il testo cambia anche quando cambia solo main.
-  for (const [f, testo] of mappa) {
-    if (!/\nBinary files|^Binary files/.test(testo)) mappa.set(f, testo.split('\n').filter((r) => !r.startsWith('index ')).join('\n'));
-  }
   return mappa;
 }
 
