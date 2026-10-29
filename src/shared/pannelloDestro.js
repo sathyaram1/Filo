@@ -100,6 +100,7 @@
       html.classList.toggle('pd-accanto', aiuto > barra);
       const eraStretto = stretto;
       stretto = window.innerWidth - Math.max(barra, aiuto) - LARGHEZZA < MIN_FOGLIO;
+      aiutoSpinge = accanto > 0 && window.innerWidth - Math.max(barra, aiuto) >= MIN_FOGLIO;
       if (stretto !== eraStretto && opzioni.bloccato) {
         // Bloccato in una finestra stretta si comporta da sbloccato, e torna a tenere aperto appena c'è spazio.
         if (stretto && aperto && !dentro) chiudi();
