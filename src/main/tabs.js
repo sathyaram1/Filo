@@ -1445,7 +1445,7 @@ class TabManager {
     const s = voce.storia;
     if (s && (s.prima.length || s.dopo.length)) tab.storia = { prima: s.prima.slice(), dopo: s.dopo.slice() };
     if (voce.colore) this.setTabIdentityColor(id, voce.colore);
-    if (Number.isInteger(voce.indice) && voce.indice >= 0) this.moveTab(id, voce.indice);
+    if (Number.isInteger(voce.indice) && voce.indice >= 0) this.moveTab(id, voce.indice, { trascinata: false });
     // La scheda era instradata da un altro paese: rinasce passando dallo stesso.
     if (voce.proxy && voce.proxy.country) {
       try { await this.setTabProxy(id, voce.proxy.country, { tier: voce.proxy.tier || undefined, conseguenza: true }); } catch (_) {}
