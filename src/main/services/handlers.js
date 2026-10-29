@@ -2745,6 +2745,14 @@ async function eseguiAzioneFilo(action, {
     action._conBarra = action._riavvio && st.piattaforma === 'win32';
   }
 
+  // #1619 — il ripristino pesa quanto quello che cambierebbe adesso: lo legge il main, sempre, sopra qualunque
+  // valore arrivato col modello; all'OK si rilegge, e si conferma quello che poi si scrive.
+  if (type === 'PULSANTE_PREFERENZE') {
+    delete action._ripristino;
+    const P = globalThis.SN_PULSANTI_PREFERENZE;
+    if (P && P.pulsanteDi(action) === 'ripristina_tutto') action._ripristino = await anteprimaRipristino();
+  }
+
   // ── chi decide se parte (#530) ─────────────────────────────────────────────
   // Il registro dà costo, campo, elenco fisso e difesa (src/shared/actionLevels.js), mai l'LLM; la risposta
   // la dà SN_AUTONOMIA col livello scelto dall'utente e lo stato del compito. Fuori registro o senza costo:
@@ -3874,6 +3882,61 @@ async function eseguiAzioneFilo(action, {
         const chiuse = tm ? tm.chiudiSchede(action._targetIds) : [];
         return { executed: chiuse.length > 0, kept: false, output: { chiuse: chiuse.length, ...contoRestano(action._restano) } };
       }
+      case 'PULSANTE_PREFERENZE': {
+        // #1619 — i pulsanti delle Preferenze con le loro stesse funzioni: la chat li preme invece di spiegarli.
+        const P = globalThis.SN_PULSANTI_PREFERENZE;
+        const pulsante = P ? P.pulsanteDi(action) : '';
+        const no = (error, extra) => ({ executed: false, kept: false, output: { error, ...(extra || {}) } });
+        if (!pulsante) return no(`pulsante sconosciuto: si sceglie fra ${P ? P.PULSANTI.join(', ') : 'quelli delle Preferenze'}`, { rifiuto: true });
+        if (pulsante === 'ripristina_tutto') {
+          const n = action._ripristino && Array.isArray(action._ripristino.frasi) ? action._ripristino.frasi.length : 0;
+          if (!n) return no('le impostazioni sono già tutte ai valori di serie', { invariato: true });
+          await ripristinaImpostazioni();
+          return { executed: true, kept: false, output: { ripristinate: n } };
+        }
+        if (pulsante === 'ripristina_aspetto') {
+          // Il «Ripristina tutti i predefiniti» dell'aspetto: la mappa dei token si sostituisce intera, vuota.
+          const correnti = await Storage.getSettings();
+          const n = Object.keys(correnti.themeTokens || {}).length;
+          if (!n) return no('l\'aspetto è già tutto ai valori di serie', { invariato: true });
+          await applySettingsUpdate({ themeTokens: {} });
+          return { executed: true, kept: false, output: { ripristinati: n } };
+        }
+        if (pulsante === 'rifai_intervista') {
+          if (!Onboarding) return no('l\'intervista di benvenuto non è disponibile');
+          await ricominciaIntervista();
+          return apriIntervistaRifatta(sender)
+            ? { executed: true, kept: false, output: { aperta: true } }
+            : no('l\'intervista è pronta, ma non c\'è una finestra dove aprirla: la ritrovi aprendo una home nuova');
+        }
+        const settings = await getEffectiveSettings();
+        if (pulsante === 'prova_voce_sistema') {
+          const v = P.provaVoceSistema(settings);
+          const wc = sender && sender.wc;
+          if (!wc || (typeof wc.isDestroyed === 'function' && wc.isDestroyed())) return no('non c\'è una pagina dove far sentire la voce');
+          wc.send('filo:broadcast', { type: MSG.TTS_PROVA, testo: v.testo, sistema: true });
+          return { executed: true, kept: false, output: { voce: v.etichetta, sistema: true } };
+        }
+        if (pulsante === 'prova_voce') {
+          const v = P.provaVoce(action, settings);
+          if (v.rifiuto) return no(v.rifiuto, { rifiuto: true });
+          // La legge la pagina della chat, come «Leggi ad alta voce»: senza la voce naturale ripiega su quella del sistema.
+          const wc = sender && sender.wc;
+          if (!wc || (typeof wc.isDestroyed === 'function' && wc.isDestroyed())) return no('non c\'è una pagina dove far sentire la voce');
+          wc.send('filo:broadcast', { type: MSG.TTS_PROVA, testo: v.testo, voce: v.voce });
+          return { executed: true, kept: false, output: { voce: v.etichetta } };
+        }
+        const t = P.provaTono(action, settings);
+        if (t.rifiuto) return no(t.rifiuto, { rifiuto: true });
+        const win = winOf(sender);
+        if (!win || win.isDestroyed()) return no('non c\'è una finestra di Filo dove suonare');
+        win.webContents.send('shell:suona', { tono: t.tono, volume: t.volume });
+        return {
+          executed: true,
+          kept: false,
+          output: { etichetta: t.etichetta, volume: t.volume, ...(t.volume === 0 ? { muto: true } : {}), ...(t.acceso ? {} : { spento: true }) },
+        };
+      }
       case 'COMANDO_FINESTRA': {
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
         // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva
@@ -3936,6 +3999,41 @@ async function saveOnboarding(state, { via = '' } = {}) {
   contaIntervista(prima, next, via);
   try { broadcastToTabs({ type: MSG.FILO_ONBOARDING_UPDATED, onboarding: next }); } catch (_) {}
   return next;
+}
+
+// Rifare l'intervista dalle Preferenze o dalla chat riparte dal benvenuto; quella di prima resta nell'archivio (`past`).
+// `riprendi` (#1297): la stessa intervista, da dove si era fermata.
+async function ricominciaIntervista({ riprendi = false } = {}) {
+  const prev = await FiloMem.getOnboarding();
+  const base = riprendi ? Onboarding.riprendi(prev) : Onboarding.restart(prev);
+  // Rifatta da capo (#1473), dal pulsante o dalla chat: «Riprendiamola» continua quella che c'era, e non è una riapertura.
+  if (!riprendi) require('./contatoriHomePagina').misura('intervistaRiaperta');
+  return saveOnboarding(base.thread.length
+    ? base
+    : Onboarding.appendTurn(base, { role: 'filo', text: Onboarding.WELCOME_MESSAGE }));
+}
+
+// Il ripristino di tutte le impostazioni, dalla pagina e dalla chat: sostituisce l'oggetto intero invece di fonderlo.
+async function ripristinaImpostazioni() {
+  const correnti = await Storage.getSettings();
+  await Storage.setSettings(globalThis.SN_PULSANTI_PREFERENZE.impostazioniDiSerie(correnti));
+  return applySettingsUpdate({});
+}
+// Cosa cambierebbe il ripristino, letto con la regola del registro dei cambi: le sue frasi e il livello del suo annullo.
+async function anteprimaRipristino() {
+  const K = globalThis.SN_CAMBI;
+  const correnti = await Storage.getSettings();
+  const cambi = K.cambiImpostazioni(correnti, globalThis.SN_PULSANTI_PREFERENZE.impostazioniDiSerie(correnti),
+    globalThis.SN_STORAGE.normalizza);
+  const evento = { tipo: 'impostazioni', cambi };
+  return { frasi: K.frasi(evento), livello: K.livello(evento) };
+}
+// La home che ospita l'intervista rifatta: col segno, così le altre home restano il filo (#1297).
+function apriIntervistaRifatta(sender) {
+  const win = winOf(sender);
+  if (!win || !win._filoTabs) return false;
+  win._filoTabs.openTab('filo://newtab/?accoglienza=1');
+  return true;
 }
 
 // L'intervista per i contatori (#1461): le voci spuntate, come si è chiusa e, chiusa a metà, il passo dove si è fermata.
@@ -4987,6 +5085,27 @@ function esitoChiusuraPerModello(action, o) {
   return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}. ${dove}${coda}`;
 }
 
+// Quello che un pulsante delle Preferenze premuto dalla chat lascia da dire all'utente (#1619).
+function dopoPulsante(o) {
+  if (o.ripristinate) {
+    return ' Di\' in una frase che le impostazioni sono tornate di serie e che si rimettono com\'era con «annulla» sul segno '
+      + 'accanto al messaggio dell\'utente, o chiedendolo a te.';
+  }
+  if (o.ripristinati) {
+    return ' Di\' in una frase che colori, caratteri e misure dell\'aspetto sono tornati di serie e che si rimettono com\'era '
+      + 'con «annulla» sul segno accanto al messaggio dell\'utente, o chiedendolo a te.';
+  }
+  if (o.aperta) return ' L\'intervista è in una home nuova, già davanti all\'utente; questa conversazione resta qui.';
+  if (o.sistema) return ' La frase la legge adesso la pagina della chat con la voce di riserva del sistema, con velocità e tono salvati.';
+  if (o.voce) {
+    return ' La frase la legge adesso la pagina della chat; se la voce naturale non è disponibile si sente quella del '
+      + 'sistema e un avviso dice perché. Per sceglierla si usa IMPOSTA_PREFERENZA voce_modello.';
+  }
+  if (o.muto) return ' Però il volume è a zero e non si è sentito niente: dillo all\'utente e proponigli di alzarlo con IMPOSTA_PREFERENZA.';
+  if (o.spento) return ' Il suono degli avvisi però è spento: gli avvisi arrivano muti finché non lo accende (IMPOSTA_PREFERENZA suono_notifiche).';
+  return '';
+}
+
 // L'esito di UNA azione, come risposta allo strumento che il modello ha
 // chiamato. Chi ha un esito da leggere (ricerca, documento, comando) lo
 // riceve per intero; chi non ce l'ha riceve una riga: fatto, in attesa di
@@ -5199,6 +5318,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
       return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
         + `sul segno accanto al messaggio dell'utente, o chiedendolo a te.${costo}${avviso}`;
     }
+    if (type === 'PULSANTE_PREFERENZE') return `Eseguita: ${done}.${dopoPulsante(res.output || {})}`;
     return `Eseguita: ${done}.`;
   }
   if (res.output && res.output.invariato && res.output.error) {
@@ -6975,6 +7095,9 @@ const handlerCtx = {
   finishOnboarding,
   claimOnboardingResume,
   releaseOnboardingResume,
+  // I pulsanti delle Preferenze, uguali dalla pagina e dalla chat (#1619)
+  ricominciaIntervista,
+  ripristinaImpostazioni,
 };
 
 require('./handlers/nav')(on, handlerCtx);

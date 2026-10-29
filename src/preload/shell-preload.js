@@ -121,6 +121,12 @@ contextBridge.exposeInMainWorld('filoShell', {
     ipcRenderer.on('shell:toast', wrapped);
     return () => ipcRenderer.removeListener('shell:toast', wrapped);
   },
+  // #1619 — un tono suonato dalla chat («fammi sentire la suoneria»): la shell ha SN_SOUNDS, come le notifiche.
+  onSuona: (fn) => {
+    const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+    ipcRenderer.on('shell:suona', wrapped);
+    return () => ipcRenderer.removeListener('shell:suona', wrapped);
+  },
   // #588.5 — la pila degli avvisi va a schermo in una vista sopra la pagina; i suoi clic tornano qui.
   avvisi: {
     stato: (stato) => ipcRenderer.send('avvisi:stato', stato),

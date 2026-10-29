@@ -20,6 +20,7 @@
         'A schermo intero le schede compaiono quando porti il mouse sul bordo alto e lo tieni fermo un attimo, e spariscono quando torni sulla pagina. Arrivano anche mentre trascini un collegamento o un\'immagine. Se non le vuoi, le spegni in Preferenze, nella sezione «Barra laterale».',
         'Su Windows puoi chiedere a Filo di mettere in ordine le icone del desktop: «in ordine alfabetico, da sinistra a destra», «per data», «con le cartelle prima». Se non ti piace, «rimettile com\'erano» le riporta dove stavano.',
         'Nella home puoi scrivere a Filo «accedi con Google» e apre lui la pagina d\'accesso. Allo stesso modo collega YouTube e Gmail nelle schede, o ti fa uscire dall\'account.',
+        'Quello che fanno i pulsanti delle Preferenze ora lo chiedi anche a Filo: «fammi sentire la suoneria carillon», «com\'è la voce Nicola?», «rifai l\'intervista di benvenuto», «rimetti l\'aspetto di serie», «rimetti tutte le impostazioni di serie». Prima ti diceva dove cliccare.',
       ],
       fixes: [
         'Le icone delle pagine salvate e delle schede chiuse, e la foto del tuo account Google, Filo le tiene sul tuo computer. La home e la chat le mostrano subito, senza chiederle ogni volta ai siti, e l\'icona di una scheda aperta da un altro paese non esce più dal proxy.',

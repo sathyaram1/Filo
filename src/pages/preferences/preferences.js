@@ -291,7 +291,7 @@
     const text = 'Riporta TUTTE le impostazioni di Filo ai valori predefiniti: '
       + 'tema, colori e aspetto, colore delle schede, dimensione del testo, '
       + 'notifiche, gestione delle schede e ogni altra preferenza. '
-      + 'Le tue chiavi API restano salvate. L’operazione non si può annullare.';
+      + 'Le tue chiavi API e l’autonomia di Filo restano come sono. Si rimette com’era con «annulla» sulla riga del cambio nella home, o chiedendolo a Filo.';
     const ok = Ui
       ? await Ui.confirm({ title: 'Ripristina tutte le impostazioni', text, okLabel: 'Ripristina tutto' })
       : window.confirm(`${text} Procedo?`);
@@ -684,13 +684,7 @@
     syncCustomVoiceField();
   }
 
-  const MODEL_VOICE_SAMPLES = {
-    it: 'Ciao, sono Filo. Questa è la voce naturale scelta per la lettura ad alta voce.',
-    en: 'Hi, I am Filo. This is the natural voice chosen for reading aloud.',
-    es: 'Hola, soy Filo. Esta es la voz natural elegida para la lectura en voz alta.',
-    fr: 'Bonjour, je suis Filo. Voici la voix naturelle choisie pour la lecture à voix haute.',
-    pt: 'Olá, eu sou o Filo. Esta é a voz natural escolhida para a leitura em voz alta.',
-  };
+  const MODEL_VOICE_SAMPLES = window.SN_TTS_VOICES.FRASI_DI_PROVA;
 
   // PCM 16 bit mono → WAV in un blob URL (stesso incapsulamento del content script).
   function pcmBase64ToWavUrl(base64, sampleRate) {
@@ -745,7 +739,7 @@
     if (!ttsSupported()) return;
     const synth = window.speechSynthesis;
     synth.cancel();
-    const u = new SpeechSynthesisUtterance('Ciao, sono Filo. Questa è la voce scelta per la lettura ad alta voce.');
+    const u = new SpeechSynthesisUtterance(window.SN_TTS_VOICES.FRASE_DI_PROVA_SISTEMA);
     u.rate = parseFloat($('ttsRate').value) || 1;
     u.pitch = parseFloat($('ttsPitch').value) || 1;
     const voiceId = $('ttsVoice').value;

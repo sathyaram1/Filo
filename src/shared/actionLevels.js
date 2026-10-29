@@ -58,6 +58,16 @@
     return P.buildPreferencePartial(chiave, valore, { attuali: attuali || null });
   }
 
+  const pulsante = (a) => {
+    const P = global.SN_PULSANTI_PREFERENZE;
+    return P ? P.pulsanteDi(a) : '';
+  };
+  // Le frasi di cosa cambierebbe il ripristino: un elenco del main, ognuna nel suo riquadro.
+  const frasiRipristino = (a) => {
+    const f = a && a._ripristino && a._ripristino.frasi;
+    return Array.isArray(f) ? f.map(String) : [];
+  };
+
   // Lo stile proposto nell'intervista di benvenuto si imposta senza riquadro (decisione dell'owner, #592.2):
   // `_accoglienza` lo scrive solo il main, quando nel contesto non c'è testo di altri. Torna il testo, o ''.
   function stileDellAccoglienza(action) {
@@ -1100,6 +1110,65 @@
         return f ? `Rimesso com'era prima di: ${f}` : 'Cambio annullato';
       },
     },
+    // ── i pulsanti della pagina Preferenze chiesti in chat (#1619) ───────────
+    // Le prove suonano e basta: 0. Rifare l'intervista lascia quella di prima da rileggere: 1. Il ripristino si
+    // annulla dal segno sulla bolla, e pesa quanto il suo annullo: `_ripristino` (cosa cambia e a che livello) lo
+    // scrive il main prima del cancello, con la stessa funzione che poi scrive le impostazioni.
+    PULSANTE_PREFERENZE: {
+      costo: (a) => {
+        const p = pulsante(a);
+        if (p.startsWith('prova_')) return 0;
+        // L'aspetto si rimette dal segno come un IMPOSTA_ESTETICA: 1.
+        if (p !== 'ripristina_tutto') return 1;
+        return frasiRipristino(a).length ? 2 : 0;
+      },
+      campo: null,
+      difesa: (a) => pulsante(a) === 'ripristina_tutto' && frasiRipristino(a).length > 0
+        && !(a && a._ripristino && a._ripristino.livello === 1),
+      // Tutte insieme non si rimettono senza un clic, a nessun livello: un «rimetti com'era» capito male le perderebbe.
+      perimetro: (a) => !(pulsante(a) === 'ripristina_tutto' && frasiRipristino(a).length > 0),
+      perchePerimetro: 'Rimettere tutte le impostazioni di serie te lo chiedo sempre prima.',
+      describe: (a) => {
+        const p = pulsante(a);
+        if (p === 'prova_suono' || p === 'prova_suoneria') {
+          const t = global.SN_PREF && a && a.tono != null ? global.SN_PREF.tonoDa(String(a.tono)) : null;
+          const nome = t ? ` «${global.SN_PREF.TONI_ETICHETTE[t]}»` : '';
+          return p === 'prova_suono' ? `Far sentire il suono degli avvisi${nome}` : `Far sentire la suoneria di timer e sveglie${nome}`;
+        }
+        if (p === 'prova_voce') {
+          const v = String((a && a.voce) || '').trim();
+          return v ? ['Far sentire la voce della lettura ', cit(v.slice(0, 80))] : 'Far sentire la voce della lettura ad alta voce';
+        }
+        if (p === 'prova_voce_sistema') return 'Far sentire la voce di riserva del sistema';
+        if (p === 'ripristina_aspetto') {
+          return 'Riportare colori, caratteri e misure dell\'aspetto ai valori di serie. Si rimette com\'era con «annulla» sul segno accanto al tuo messaggio.';
+        }
+        if (p === 'rifai_intervista') {
+          return 'Ricominciare l\'intervista di benvenuto in una home nuova. Quella di prima resta da rileggere in Preferenze.';
+        }
+        if (p === 'ripristina_tutto') {
+          const f = frasiRipristino(a);
+          if (!f.length) return 'Riportare le impostazioni ai valori di serie: lo sono già tutte';
+          const base = [`Riportare ai valori di serie ${f.length === 1 ? 'un\'impostazione' : `${f.length} impostazioni`}:\n`, elenco(f),
+            '\n\nRestano le chiavi API, il registro dei modelli e l\'autonomia di Filo. Si rimette com\'era con «annulla» sul segno accanto al tuo messaggio.'];
+          if (a && a._ripristino && a._ripristino.livello === 1) return base;
+          return [...base, '\n\nTocca impostazioni di sicurezza, dei modelli o delle spese: conferma solo se l\'hai chiesto tu.'];
+        }
+        return 'Usare un pulsante delle Preferenze';
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const p = pulsante(a);
+        if (p === 'prova_suono') return `Suonato il suono degli avvisi${o.etichetta ? ` «${o.etichetta}»` : ''}`;
+        if (p === 'prova_suoneria') return `Suonata la suoneria${o.etichetta ? ` «${o.etichetta}»` : ''}`;
+        if (p === 'prova_voce') return 'Letta una frase con la voce della lettura';
+        if (p === 'prova_voce_sistema') return 'Letta una frase con la voce di riserva del sistema';
+        if (p === 'ripristina_aspetto') return 'Aspetto riportato ai valori di serie';
+        if (p === 'rifai_intervista') return 'Ricominciata l\'intervista di benvenuto in una home nuova';
+        if (p === 'ripristina_tutto') return 'Impostazioni riportate ai valori di serie';
+        return 'Fatto';
+      },
+    },
     // ── volume, Bluetooth e Wi-Fi del computer (#874) ───────────────────────
     // Spegnere o staccare quello che sta servendo (le cuffie, la tastiera, la rete della chat stessa) è 2; il resto
     // 1, e 1 anche ciò che è già com'è chiesto (`gia`: niente cade). Il costo legge `_richiestaSistema`, che il main scrive sempre prima del cancello con la stessa funzione che
@@ -1292,6 +1361,7 @@
     BLUETOOTH: accesaOSpenta,
     IMPOSTA_PREFERENZA: senza('costoModello', 'avviso'),
     IMPOSTA_ESTETICA: fatta,
+    PULSANTE_PREFERENZE: senza('muto', 'spento'),
     COMANDO_FINESTRA: senza('already'),
     TIENI_APERTA: fatta,
     NON_TENERE_APERTA: fatta,

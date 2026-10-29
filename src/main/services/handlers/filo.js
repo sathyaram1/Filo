@@ -6,7 +6,7 @@ module.exports = function register(on, ctx) {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard, contaHomeVista,
     executeFiloAction, controllaUscita: portaUscite, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, ricordaVerdettiArchiviati, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
-    saveOnboarding, finishOnboarding, claimOnboardingResume, chiaveConferma,
+    saveOnboarding, finishOnboarding, claimOnboardingResume, chiaveConferma, ricominciaIntervista,
   } = ctx;
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
   const controllaUscita = require('../contatoriSicurezza').contaUscite(portaUscite);
@@ -675,13 +675,7 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_RESTART_ONBOARDING, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     if (!Onboarding) return { ok: false, error: 'onboarding non disponibile' };
-    const prev = await FiloMem.getOnboarding();
-    const base = msg?.riprendi === true ? Onboarding.riprendi(prev) : Onboarding.restart(prev);
-    // Rifatta da capo (#1473): «Riprendiamola» continua quella che c'era, e non è una riapertura.
-    if (msg?.riprendi !== true) require('../contatoriHomePagina').misura('intervistaRiaperta');
-    const state = await saveOnboarding(base.thread.length
-      ? base
-      : Onboarding.appendTurn(base, { role: 'filo', text: Onboarding.WELCOME_MESSAGE }));
+    const state = await ricominciaIntervista({ riprendi: msg?.riprendi === true });
     // `altrove`: la riprende una scheda nuova, che il turno in sospeso lo prenota da sé all'apertura.
     const resume = msg?.riprendi === true && msg?.altrove !== true && Onboarding.hasPendingTurn(state) && claimOnboardingResume();
     return { ok: true, onboarding: state, ...(msg?.riprendi === true ? { resume } : {}) };

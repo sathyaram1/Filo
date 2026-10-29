@@ -2091,7 +2091,8 @@
       keys: ['autonomia', 'livello di autonomia', 'livello autonomia', 'livello_autonomia', 'quanto fa da solo'],
       costo: 3,
       elencoFisso: 'regole',
-      dove: 'Il livello di autonomia lo sceglie l\'utente in Preferenze, sotto «Autonomia di Filo».',
+      dove: 'Il livello di autonomia lo sceglie l\'utente in Preferenze, sotto «Autonomia di Filo»: aprigli la pagina lì '
+        + 'con NAVIGA filo://preferences/preferences.html#autonomia',
       build(v) {
         const A = global.SN_AUTONOMIA;
         const s = String(v == null ? '' : v).trim().toLowerCase();
@@ -2268,6 +2269,6 @@
   global.SN_PREF = {
     buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
     applicaElenco, righeDescrizione, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
-    SENZA_CHIAVE_PROPRIA,
+    SENZA_CHIAVE_PROPRIA, tonoDa, TONI_ETICHETTE,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -602,6 +602,7 @@
     SPOSTA_ICONA: () => 'spostato un\'icona',
     INSTALLA_AGGIORNAMENTO: () => 'chiesto la versione nuova di Filo',
     RIMEDIO_CREDITI: () => 'lavorato sui crediti',
+    PULSANTE_PREFERENZE: () => 'usato un pulsante delle Preferenze',
     CARTA_HOME: (n) => (n > 1 ? `sistemato ${n} carte della home` : 'sistemato una carta della home'),
     CANCELLA_PAGINE: () => 'cancellato pagine visitate',
     ZOOM_PAGINA: () => 'cambiato lo zoom',
@@ -949,6 +950,26 @@
       };
       return { icon: '◎', text: testi[`${op}:${r}`] || 'Crediti guardati' };
     },
+    // #1619 — quello che il pulsante ha fatto davvero, coi nomi che l'esito conferma.
+    PULSANTE_PREFERENZE: (a) => {
+      const o = a._output || {};
+      const p = String(a.pulsante || '').toLowerCase();
+      const coda = o.muto ? ' · volume a zero' : '';
+      if (p === 'prova_suono') return { icon: '🔔', text: `Suono degli avvisi${o.etichetta ? ` · ${o.etichetta}` : ''}${coda}` };
+      if (p === 'prova_suoneria') return { icon: '⏰', text: `Suoneria di timer e sveglie${o.etichetta ? ` · ${o.etichetta}` : ''}${coda}` };
+      if (p === 'prova_voce') return { icon: '🗣', text: `Voce della lettura${o.voce ? ` · ${o.voce}` : ''}` };
+      if (p === 'prova_voce_sistema') return { icon: '🗣', text: `Voce di riserva${o.voce ? ` · ${o.voce}` : ''}` };
+      if (p === 'ripristina_aspetto') {
+        const n = Number(o.ripristinati) || 0;
+        return { icon: '🎨', text: n ? `Aspetto di serie · ${n === 1 ? '1 valore cambiato' : `${n} valori cambiati`}` : 'Aspetto di serie' };
+      }
+      if (p === 'rifai_intervista') return { icon: '👋', text: 'Intervista di benvenuto ricominciata in una home nuova' };
+      if (p === 'ripristina_tutto') {
+        const n = Number(o.ripristinate) || 0;
+        return { icon: '↺', text: n ? `Impostazioni di serie · ${n === 1 ? '1 cambiata' : `${n} cambiate`}` : 'Impostazioni di serie' };
+      }
+      return { icon: '⚙', text: 'Pulsante delle Preferenze' };
+    },
     INSTALLA_AGGIORNAMENTO: (a) => {
       const o = a._output || {};
       if (o.aggiornamento === 'aggiornato') return { icon: '⬇', text: 'Filo è già aggiornato' };
@@ -1015,6 +1036,7 @@
     TIENI_APERTA: 'Sito non salvato', NON_TENERE_APERTA: 'Nessun sito da togliere',
     INSTALLA_AGGIORNAMENTO: 'Aggiornamento non partito',
     RIMEDIO_CREDITI: 'Rimedio dei crediti non applicato',
+    PULSANTE_PREFERENZE: 'Pulsante delle Preferenze non premuto',
     CARTA_HOME: 'Carta della home non cambiata',
     CANCELLA_PAGINE: 'Pagine non cancellate', ZOOM_PAGINA: 'Zoom non cambiato',
     EVENTO_CALENDARIO: 'Evento non proposto', ONBOARDING: 'Accoglienza non aggiornata',
@@ -1966,7 +1988,7 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'CORREGGI_MEMORIA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO', 'CHIUDI_SCHEDE'];
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'CORREGGI_MEMORIA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO', 'CHIUDI_SCHEDE', 'PULSANTE_PREFERENZE'];
       // Una difesa abbassata (#530) vuole la parola, ma non è distruttiva: il box si apre da solo come il popup.
       if (AUTO_CONFIRM_TYPES.includes(type) && (a._confirm.level === 2 || a._confirm.avviso)) {
         btn.dataset.autoConfirm = '1';

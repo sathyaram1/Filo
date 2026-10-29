@@ -498,6 +498,7 @@ module.exports = function register(on, ctx) {
     // Seam di test OPT-IN: nel CI headless non c'è né chiave né motore vocale, quindi si torna
     // PCM silenzioso. Opt-in per non alterare i test del degrado senza chiave.
     if (process.env.NODE_ENV === 'test' && globalThis.__filoTestTtsCanned) {
+      if (Array.isArray(globalThis.__filoTestTtsChieste)) globalThis.__filoTestTtsChieste.push({ text: String(msg.text || ''), voice: String(msg.voice || '') });
       const rate = 8000, seconds = 6;
       const audioBase64 = Buffer.alloc(rate * seconds * 2).toString('base64'); // PCM16 mono
       return { ok: true, audioBase64, mimeType: `audio/L16;rate=${rate}`, provider: 'test', model: 'test-tts' };

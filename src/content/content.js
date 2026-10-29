@@ -2600,7 +2600,7 @@
     }
     // Stato della lettura condiviso fra le schede: «Interrompi lettura» deve esserci anche
     // quando a leggere è un'altra.
-    if (msg?.type === MSG.TTS_GLOBAL_READING || msg?.type === MSG.TTS_STOP) {
+    if (msg?.type === MSG.TTS_GLOBAL_READING || msg?.type === MSG.TTS_STOP || msg?.type === MSG.TTS_PROVA) {
       TTS.handleBroadcast(msg);
       return;
     }
