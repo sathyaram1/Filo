@@ -46,7 +46,7 @@
     'resta_connesso_proposta', 'resta_connesso_rientro', 'resta_connesso_scelta', 'permessi_azzerati', 'aperta_da_paese',
     'indirizzo_fermato', 'riordino_schede', 'scheda_ponte_chiusa', 'sito_bloccato', 'popup_bloccato', 'aggiornamento',
     'proposta_email_spenta', 'dati_avviso', 'filo_illeggibile', 'filo_pesante', 'cancella_tutto', 'riordino_mancato',
-    'nessuna_chiusa', 'giudici_fermi',
+    'nessuna_chiusa', 'giudici_fermi', 'sito_fidato',
   ]);
   // «sostituita»: una gemella con la stessa chiave ha preso il suo posto; «ritirata»: Filo l'ha tolta perché il suo
   // stato è cambiato; «chiuse_tutte»: il «Chiudi tutti» della pila. «azione_2» vale anche per le azioni dopo la terza.

@@ -54,7 +54,7 @@ function avvisa(win, voci) {
   if (!win || win.isDestroyed() || !voci.length) return;
   const testo = t('siti_fidati_fatto', voci.map(leggibile).join(', '));
   const actions = [{ label: t('siti_fidati_annulla'), sitiFidati: { voci, fidato: false } }];
-  try { win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 12, key: 'siti-fidati', actions } }); } catch (_) {}
+  try { win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 12, key: 'siti-fidati', tipo: 'sito_fidato', actions } }); } catch (_) {}
 }
 
 // Un sito entra nell'elenco da un gesto dell'utente (il «Continua», l'«Apri comunque»). In incognito no: la scelta
