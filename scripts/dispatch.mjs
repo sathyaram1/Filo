@@ -1231,8 +1231,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '', domanda = nul
   if (stato.lines.length) {
     return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines) };
   }
-  // L'ultimo punto fermo è il checkout di questo giro. Dopo una critica già data il codice si muove di diritto.
-  const avvio = guard.state?.verifierSha ? '' : lastCheckpoint(guard.state);
+  const avvio = avvioDellaCritica(guard.state);
   if (avvio) {
     const fermo = codiceCambiatoDallAvvio(avvio, ROOT);
     if (fermo.cambiati.length) return { rejected: true, formatRejected: true, message: testoCodiceCambiato(fermo.cambiati, avvio) };
