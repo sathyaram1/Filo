@@ -142,6 +142,17 @@ function isIdentityProviderHref(href) {
   }
 }
 
+// Un sito dove solo alcune pagine sono esenti (gli accessi di github.com, x.com…): un suo documento che la guardia
+// della pagina non sa riconoscere potrebbe essere una di quelle (#798).
+function esentiNelSito(href) {
+  try {
+    const o = new URL(String(href || '')).origin;
+    return !isIdentityProviderHref(o + '/') && isIdentityProviderHref(o + '/login');
+  } catch (_) {
+    return false;
+  }
+}
+
 // App Google dove l'utente è già autenticato (#299): lì il rumore non protegge — il cookie
 // identifica comunque — e fa scattare gli avvisi. Lista CURATA, non l'eTLD+1 google.com.
 const GOOGLE_APP_HOSTS = [
