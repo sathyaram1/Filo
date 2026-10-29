@@ -342,10 +342,9 @@ describe('D — l’interruzione torna all’ultimo punto fermo', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', () => {
   // Lo scenario dell'incidente, per intero: new-work si posiziona (punto fermo
-  // = base), lavora, l'hook pusha, consegna via canale. Se la consegna NON
-  // sigilla, il posizionamento successivo nello stesso clone riporta il ramo
-  // alla base e parcheggia il lavoro su discarded/ — è quello che è successo a
-  // #502 (8 commit, 828 righe) e a #495.
+  // = base), lavora, l'hook pusha, consegna via canale. Un punto fermo rimasto
+  // alla base riportava il ramo lì e parcheggiava il lavoro su discarded/
+  // (#502: 8 commit, 828 righe; #495).
   function scenaConsegna() {
     const { work, origin } = makeRepo();
     const id = 'feed507';
