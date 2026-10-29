@@ -359,26 +359,32 @@ html[data-chrome-compact="1"] .addr {
 /* I segni dei permessi non si mangiano il nome: sulla scheda che la fila stringe resta il primo (shell.js, misura). */
 .tab.segni-stretti:not(.misura) .tab-permessi .segno ~ .segno { display: none; }
 
-/* Scheda stretta con l'avviso audio, priorità come in Chrome: avviso > icona > X (sull'attiva sempre) > paese > titolo.
-   Soglia = spazio di chi resta (icone 16, X 18, paese ~26, gap 6); prova in tests/tab-audio-indicator.spec.mjs. */
-@container tab (width < 100px) {
+/* Scheda stretta con l'avviso audio: allargandola compaiono avviso, icona, X (sull'attiva sempre), titolo, paese, ognuno
+   quando ci sta con chi lo precede (icone 16, X 18, paese ~26, gap 6; il titolo vuole 2em, sotto). Così il titolo
+   comparso non sparisce più allargando (#1293). Prova in tests/tab-audio-indicator.spec.mjs. */
+@container tab (width < calc(100px + 2em)) {
   .tab:has(> .tab-alert) > .proxy-ind { display: none; }
 }
 @container tab (width < 68px) {
   .tab:not(.active):has(> .tab-alert) > .close { display: none; }
-}
-@container tab (width < 44px) {
   .tab:has(> .tab-alert) > .title { display: none; }
+  /* Senza titolo l'avviso resta dove lo si trova sulla scheda larga: in fondo, prima della X. */
+  .tab > .tab-alert { margin-left: auto; }
 }
 @container tab (width < 38px) {
   .tab:has(> .tab-alert) > :is(.favicon, .spinner) { display: none; }
   .tab > .tab-alert { margin: 0 auto; }
+  /* Rimasto solo, l'avviso è la scheda: il clic la apre senza toccarne l'audio, il trascinamento la sposta (#1293). */
+  .tab:not(.active) > .tab-alert { pointer-events: none; }
 }
 
 /* Scheda stretta senza avviso, stessa priorità e stesso conto: senza, con tante schede la X usciva dalla sua
    e il clic sul suo centro cadeva sulla vicina (#945). Prova in tests/tab-scheda-stretta.spec.mjs. */
-@container tab (width < 78px) {
-  .tab:not(:has(> .tab-alert)) > .proxy-ind { display: none; }
+@container tab (width < calc(54px + 2em)) {
+  .tab:not(.active):not(:has(> .tab-alert)) > .proxy-ind { display: none; }
+}
+@container tab (width < calc(78px + 2em)) {
+  .tab.active:not(:has(> .tab-alert)) > .proxy-ind { display: none; }
 }
 @container tab (width < 46px) {
   .tab.active:not(:has(> .tab-alert)) > .title { display: none; }
