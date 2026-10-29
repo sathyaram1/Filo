@@ -1369,7 +1369,7 @@ service cloud.firestore {
           && chiuse(d.editor_chat, ['intero', 'oltre_tetto'], 120, '^([0-9]{1,9}(,[0-9]{1,9}){5}(#[0-9]{1,9}(,[0-9]{1,9}){5})*)?$');
       }
       allow get, list: if isAdmin();
-      allow create: if contatoriRiquadri(request.resource.data);
+      allow create: if request.auth != null && contatoriRiquadri(request.resource.data);
       allow update, delete: if false;
     }
 
