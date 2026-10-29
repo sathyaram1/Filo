@@ -1560,10 +1560,13 @@
     return classifyDetail(cmd, ctx).level;
   }
 
-  // Un percorso scritto da un modello, senza i segni di citazione in testa e in coda, anche spaiati: la stessa pulizia
-  // per chi misura il perimetro e per chi tocca il disco, o uno dei due vede un altro percorso (#1499).
+  // Un percorso scritto da un modello, sciolto dagli incarti come nella barra (apici inversi, «file://», #1318) e senza i
+  // segni di citazione in testa e in coda, anche spaiati: la stessa pulizia per chi misura il perimetro e per chi tocca
+  // il disco, o uno dei due vede un altro percorso (#1499).
   function pulisciPercorso(percorso) {
-    return String(percorso == null ? '' : percorso).trim().replace(/^["'«“‘‹]+|["'»”’›]+$/g, '').trim();
+    const U = global.SN_URL_NAV;
+    const s = U && U.pulisciPercorso ? U.pulisciPercorso(percorso) : String(percorso == null ? '' : percorso);
+    return s.trim().replace(/^["'«“‘‹]+|["'»”’›]+$/g, '').trim();
   }
 
   // Un percorso singolo (LEGGI_DOCUMENTO): '' se sta nel perimetro, altrimenti il motivo.
