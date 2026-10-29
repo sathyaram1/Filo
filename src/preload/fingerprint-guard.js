@@ -369,7 +369,7 @@ const PROPAGAZIONE = `
         var el = R(bersaglio, e, []), tag = tagName(el);
         if (!TAG[tag]) return;
         var cw = finestraDi(el, tag), r = regno(cw);
-        if (r && !R(wsHas, conPreload, [r])) prepara(cw, true);
+        if (r && !R(wsHas, conPreload, [r])) prepara(cw, !ESENTI);
       } catch (x) {}
     }, true]);
   }
