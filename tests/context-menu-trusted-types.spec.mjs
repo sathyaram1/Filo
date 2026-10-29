@@ -33,11 +33,17 @@ async function apri(openTab, testServer, csp, html = HTML) {
   return page;
 }
 
+// Su una frase selezionata, come chi la vuole spiegare: lì il menu ha «Leggi ad alta voce», una voce con l'icona.
+async function tastoDestroSullaFrase(frase) {
+  await frase.selectText();
+  await frase.click({ button: 'right', position: { x: 20, y: 8 } });
+}
+
 async function menuCompleto(menu) {
   await expect(menu).toBeVisible();
   await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
-  // Le icone sono SVG costruite da stringa: devono esserci davvero, non riquadri vuoti.
-  expect(await menu.locator('svg').count()).toBeGreaterThan(3);
+  // Le icone delle voci sono SVG costruite da stringa: devono esserci davvero, non riquadri vuoti.
+  await expect(menu.locator('.sn-menu-item-icon svg').first()).toBeVisible();
 }
 
 for (const [caso, csp] of Object.entries(CSP)) {
