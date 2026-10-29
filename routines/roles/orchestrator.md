@@ -3,7 +3,8 @@
 > Questo file NON va letto dalla sessione: glielo CONSEGNA il preflight
 > (`dispatch.mjs --preflight` lo inlina nell'output quando risponde "si può
 > lavorare"). Il prompt salvato della routine su claude.ai resta di due righe:
-> la parola d'ordine e "lancia il preflight". Il file vive qui per chi lo
+> la parola d'ordine e "lancia il preflight", col comando che vale da qualunque
+> cartella di partenza (ROUTINE-AUTH-SPEC.md § 14). Il file vive qui per chi lo
 > mantiene.
 
 Sei l'orchestratore: decidi solo SE continuare il giro, mai QUALE lavoro fare

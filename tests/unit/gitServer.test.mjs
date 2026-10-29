@@ -11,8 +11,8 @@ import { join, resolve } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
-  URL_SERVER, ambienteGitServer, chiHaRespinto, originDelServer, pianoGitServer, ramoAccettabile, senzaToken, urlConToken, urlSenzaSegreti, voceDiAccesso,
-  vociGitServer,
+  URL_SERVER, ambienteGitServer, ambienteViaProxy, chiHaRespinto, originDelServer, pianoGitServer, ramoAccettabile, senzaToken, stradaGitServer,
+  urlConToken, urlSenzaSegreti, voceDiAccesso, vociGitServer,
 } from '../../scripts/lib/git-server.mjs';
 import { eseguiGitServer } from '../../scripts/routine-channel.mjs';
 
@@ -206,6 +206,72 @@ test('eseguiGitServer: token negato, guasto, git che fallisce, origin estraneo',
   }
 });
 
+// ─── In cloud: il proxy della sessione (#1761) ──────────────────────────────
+
+test('la strada: in cloud il proxy della sessione, altrove il token del biglietto', () => {
+  assert.equal(stradaGitServer({ CLAUDE_CODE_REMOTE: 'true' }), 'proxy');
+  assert.equal(stradaGitServer({ GH_TOKEN: 'proxy-injected' }), 'proxy');
+  for (const env of [{}, { CLAUDE_CODE_REMOTE: 'false' }, { CLAUDE_CODE_REMOTE: '1' }, { GH_TOKEN: 'ghp_mio' }]) {
+    assert.equal(stradaGitServer(env), 'token', JSON.stringify(env));
+  }
+  const sessione = { GIT_ASKPASS: '/proxy/askpass', GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '!proxy' };
+  assert.deepEqual(ambienteViaProxy(sessione), { ...sessione, GIT_TERMINAL_PROMPT: '0' }, 'gli aiutanti del proxy restano');
+});
+
+test('eseguiGitServer in cloud: il sì del server si chiede, il token non arriva a git e gli aiutanti del proxy restano', async () => {
+  const casa = cartellaTemporanea('filo-git-server-cloud-');
+  const clone = join(casa, 'filo-security');
+  mkdirSync(join(clone, '.git'), { recursive: true });
+  const sessione = {
+    CLAUDE_CODE_REMOTE: 'true', GIT_ASKPASS: '/proxy/askpass',
+    GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '!proxy-helper',
+    GIT_CONFIG_KEY_1: 'url.https://github.com/.insteadOf', GIT_CONFIG_VALUE_1: 'git@github.com:',
+  };
+  const base = { cartella: clone, biglietto: 'B1', root: join(casa, 'Filo'), env: sessione };
+  try {
+    const lanciati = [];
+    const righe = [];
+    const chiesti = [];
+    const lancia = (argv, o) => {
+      lanciati.push({ argv, env: o.env });
+      return argv.includes('get-url') ? { status: 0, stdout: `${URL_SERVER}\n` } : { status: 0, stdout: '', stderr: `To ${URL_SERVER}\n` };
+    };
+    const token = async (b) => { chiesti.push(b); return { outcome: 'ok', token: TOKEN, scadeIl: 1 }; };
+    const exit = await eseguiGitServer({ ...base, azione: 'push', ramo: 'worker/f1', lancia, token, scrivi: (r) => righe.push(r), eco: () => {} });
+    assert.equal(exit, 0, righe.join('\n'));
+    assert.deepEqual(chiesti, ['B1'], 'il controllo del server resta, una volta per chiamata');
+    const spinta = lanciati[2];
+    assert.deepEqual(spinta.argv, ['-C', clone, 'push', 'origin', 'refs/heads/worker/f1:refs/heads/worker/f1']);
+    assert.deepEqual(spinta.env, { ...sessione, GIT_TERMINAL_PROMPT: '0' }, 'git parte con l’ambiente della sessione');
+    assert.ok(!JSON.stringify(lanciati).includes(TOKEN), 'il token non arriva a git, né fra gli argomenti né nell’ambiente');
+    assert.match(righe.join('\n'), /il server dà il via[^]*proxy della sessione[^]*il token non si usa/);
+    assert.doesNotMatch(righe.join('\n'), /tolti per questa chiamata/);
+
+    let lanciato = false;
+    const conta = (argv) => { if (!argv.includes('get-url')) lanciato = true; return { status: 0, stdout: URL_SERVER }; };
+    righe.length = 0;
+    const no = await eseguiGitServer({ ...base, azione: 'fetch', lancia: conta, scrivi: (r) => righe.push(r), eco: () => {},
+      token: async () => ({ outcome: 'refused', reason: 'biglietto_sporco', detail: 'niente token' }) });
+    assert.equal(no, 4);
+    assert.equal(lanciato, false, 'col no del server git non parte, anche se il proxy lo lascerebbe passare');
+    assert.match(righe.join('\n'), /RIFIUTATO dal server: niente token per filo-security \(biglietto_sporco: niente token\)/);
+
+    for (const [stderr, atteso] of [
+      ['fatal: Authentication failed for \'https://github.com/sathyaram1/filo-security.git/\'\n', /In cloud le credenziali le mette il proxy[^]*agganciati[^]*passo dell'owner/],
+      ['error: failed to push some refs\n ! [rejected] worker/f1 -> worker/f1 (non-fast-forward)\n', /In cloud il motivo è nel testo di git/],
+    ]) {
+      righe.length = 0;
+      const respinto = (argv) => (argv.includes('get-url') ? { status: 0, stdout: URL_SERVER } : { status: 128, stderr });
+      assert.equal(await eseguiGitServer({ ...base, azione: 'fetch', lancia: respinto, scrivi: (r) => righe.push(r), eco: () => {},
+        token: async () => ({ outcome: 'ok', token: TOKEN }) }), 1);
+      assert.match(righe.join('\n'), atteso, stderr);
+      assert.doesNotMatch(righe.join('\n'), /Il token c'era/);
+    }
+  } finally {
+    togliCartella(casa);
+  }
+});
+
 // ─── La prova con git vero ───────────────────────────────────────────────────
 
 const gitHttpBackend = () => {
@@ -324,6 +390,56 @@ test('git vero: con l’ambiente del proxy il clone fallisce, con quello di git-
     await assert.rejects(git(['-C', clone, 'ls-remote', 'origin'], altro));
     assert.ok(soloIl(visti, BASIC('ghs_scaduto')), JSON.stringify(visti.map((v) => v.auth)));
     assert.equal(existsSync(segno), false, 'l’aiutante del proxy non è stato chiamato');
+  } finally {
+    srv.closeAllConnections();
+    srv.close();
+    togliCartella(casa);
+  }
+});
+
+test('git vero, in cloud: dove passa solo la credenziale del proxy il token non clona, l’ambiente della sessione clona e spinge un ramo', { skip: !gitHttpBackend() && 'git http-backend non c’è' }, async () => {
+  const casa = cartellaTemporanea('filo-git-server-proxy-');
+  const radice = join(casa, 'server');
+  const globale = join(casa, 'gitconfig');
+  const macchina = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(GIT_|SSH_ASKPASS$|https?_proxy$|all_proxy$|no_proxy$)/i.test(k)));
+  Object.assign(macchina, { GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: globale, NO_PROXY: '*', no_proxy: '*', GIT_TERMINAL_PROMPT: '0' });
+  writeFileSync(globale, '');
+  const git = (args, env = macchina, cwd = casa) => new Promise((ok, ko) => {
+    execFile('git', args, { cwd, env, encoding: 'utf8', timeout: TETTO_ATTESA_MS }, (e, so, se) => (e ? ko(Object.assign(e, { se })) : ok(so)));
+  });
+  const DEL_PROXY = `Basic ${Buffer.from('proxy:giusta').toString('base64')}`;
+  const { srv, visti, port } = await servitoreGit(radice, DEL_PROXY);
+  const url = `http://127.0.0.1:${port}/filo-security.git`;
+  try {
+    mkdirSync(radice, { recursive: true });
+    await git(['init', '-q', '--bare', '-b', 'main', join(radice, 'filo-security.git')]);
+    const semina = join(casa, 'semina');
+    await git(['init', '-q', '-b', 'main', semina]);
+    writeFileSync(join(semina, 'README.md'), 'filo-security\n');
+    await git(['add', 'README.md'], macchina, semina);
+    await git(['-c', 'user.name=prova', '-c', 'user.email=prova@example.invalid', 'commit', '-q', '-m', 'primo'], macchina, semina);
+    await git(['push', '-q', join(radice, 'filo-security.git'), 'main'], macchina, semina);
+    // La sessione cloud: l'aiutante del proxy dà la sua credenziale, l'unica che il proxy accetta.
+    const sessione = {
+      ...macchina, CLAUDE_CODE_REMOTE: 'true',
+      GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '!f() { echo username=proxy; echo password=giusta; }; f',
+    };
+
+    // La strada di #1233 in cloud: il token nell'URL e l'aiutante tolto. È il «fatal: Authentication failed» della segnalazione.
+    await assert.rejects(git(['clone', '-q', url, join(casa, 'col-token')], ambienteGitServer(sessione, TOKEN, url).env));
+
+    const env = ambienteViaProxy(sessione);
+    const clone = join(casa, 'filo-security');
+    visti.length = 0;
+    await git(['clone', '-q', url, clone], env);
+    assert.ok(soloIl(visti, DEL_PROXY), JSON.stringify(visti.map((v) => v.auth)));
+    assert.equal(readFileSync(join(clone, 'README.md'), 'utf8'), 'filo-security\n');
+    await git(['checkout', '-q', '-b', 'worker/f1-prova'], macchina, clone);
+    writeFileSync(join(clone, 'README.md'), 'filo-security\nuna riga\n');
+    await git(['-c', 'user.name=prova', '-c', 'user.email=prova@example.invalid', 'commit', '-q', '-am', 'una riga'], macchina, clone);
+    await git(['-C', clone, 'push', '-q', 'origin', 'refs/heads/worker/f1-prova:refs/heads/worker/f1-prova'], env);
+    assert.match(await git(['-C', clone, 'ls-remote', 'origin', 'worker/f1-prova'], env), /refs\/heads\/worker\/f1-prova/);
+    assert.ok(!visti.some((v) => v.auth.some((a) => a.includes(Buffer.from(`x-access-token:${TOKEN}`).toString('base64')))), 'il token non è mai uscito');
   } finally {
     srv.closeAllConnections();
     srv.close();

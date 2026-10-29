@@ -99,9 +99,9 @@
 //         repo). Da lì ciò che scrivi nasce non fidato. Exit 0 = registrato, 4 = rifiutato, 3 = guasto.
 //
 //   node scripts/routine-channel.mjs git-server <clone|ls-remote|fetch|push> <cartella-del-clone> [<ramo>]
-//       → l'unica strada di git verso filo-security in un lavoro server (#1159, #1233): chiede il token del biglietto e
-//         lo dà a quella sola chiamata di git (lib/git-server.mjs). Exit 0 = fatto, 1 = uso o git fallito, 4 = token
-//         rifiutato, 3 = guasto.
+//       → l'unica strada di git verso filo-security in un lavoro server (#1159, #1233, #1761): chiede il token del
+//         biglietto e, in locale, lo dà a quella sola chiamata di git; in cloud lascia autenticare il proxy della sessione
+//         (lib/git-server.mjs). Exit 0 = fatto, 1 = uso o git fallito, 4 = token rifiutato, 3 = guasto.
 //
 //   node scripts/routine-channel.mjs ramo-server <ramo> [<sha>]
 //       → dopo il push su filo-security: il server legge la punta e la registra (registro dei rami). Exit come sporca.
@@ -138,7 +138,9 @@ import { apreUnElenco } from './lib/argomenti.mjs';
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
-import { URL_SERVER, ambienteGitServer, chiHaRespinto, originDelServer, pianoGitServer, senzaToken, urlSenzaSegreti } from './lib/git-server.mjs';
+import {
+  URL_SERVER, ambienteGitServer, ambienteViaProxy, chiHaRespinto, originDelServer, pianoGitServer, senzaToken, stradaGitServer, urlSenzaSegreti,
+} from './lib/git-server.mjs';
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 import { cloneDelBiglietto, rilancia } from './lib/worker-nel-clone.mjs';
@@ -867,11 +869,12 @@ export async function ramoServer(t, ramo, sha, opts) {
 }
 
 /**
- * `git-server <azione> <cartella> [<ramo>]`: un git verso filo-security col token del biglietto, dato a quella sola
- * chiamata. → exit: 0 fatto, 1 uso o git fallito, 3 guasto, 4 token rifiutato. `lancia`, `token` ed `eco` per le prove.
+ * `git-server <azione> <cartella> [<ramo>]`: un git verso filo-security solo dopo il sì del server al biglietto. In
+ * locale il token di quel sì va a quella sola chiamata; in cloud no, autentica il proxy della sessione (#1761).
+ * → exit: 0 fatto, 1 uso o git fallito, 3 guasto, 4 token rifiutato. `lancia`, `token` ed `eco` per le prove.
  */
 export async function eseguiGitServer({
-  azione, cartella, ramo, biglietto, root = ROOT, env = process.env,
+  azione, cartella, ramo, biglietto, root = ROOT, env = process.env, strada = stradaGitServer(env),
   lancia = (argv, o) => spawnSync('git', argv, o), token = gitToken, scrivi = (r) => console.error(r),
   eco = (dove, testo) => (dove === 'out' ? process.stdout : process.stderr).write(testo),
 } = {}) {
@@ -898,15 +901,33 @@ export async function eseguiGitServer({
     scrivi(t.outcome === 'refused' ? `RIFIUTATO dal server: niente token per filo-security (${motivo}).` : `guasto ${motivo}`);
     return t.outcome === 'refused' ? 4 : 3;
   }
-  const { env: figlio, tolte } = ambienteGitServer(env, t.token);
-  const scade = t.scadeIl ? ` (scade alle ${new Date(t.scadeIl).toISOString().slice(11, 16)} UTC)` : '';
-  scrivi(`git-server: token del biglietto ottenuto${scade}, git ${piano.argv[0] === 'clone' ? 'clone' : piano.argv[2]} su filo-security.`);
-  if (tolte.length) scrivi(`git-server: tolti per questa chiamata: ${[...new Set(tolte)].join(', ')}.`);
+  // In cloud il sì serve lo stesso: biglietto pulito, ambito e registro del ramo li decide il server a ogni chiamata,
+  // anche se il token che porta resta qui e non arriva a git.
+  const viaProxy = strada === 'proxy';
+  const segreto = viaProxy ? '' : t.token;
+  const { env: figlio, tolte } = viaProxy ? { env: ambienteViaProxy(env), tolte: [] } : ambienteGitServer(env, t.token);
+  const verbo = piano.argv[0] === 'clone' ? 'clone' : piano.argv[2];
+  if (viaProxy) {
+    scrivi(`git-server: il server dà il via al biglietto. In cloud git ${verbo} su filo-security passa dal proxy della sessione, con le sue credenziali: il token non si usa.`);
+  } else {
+    const scade = t.scadeIl ? ` (scade alle ${new Date(t.scadeIl).toISOString().slice(11, 16)} UTC)` : '';
+    scrivi(`git-server: token del biglietto ottenuto${scade}, git ${verbo} su filo-security.`);
+    if (tolte.length) scrivi(`git-server: tolti per questa chiamata: ${[...new Set(tolte)].join(', ')}.`);
+  }
   // L'URL con dentro il token può finire in un messaggio di git: l'uscita passa da qui, ripulita, mai diretta.
   const r = lancia(piano.argv, { env: figlio, stdio: ['inherit', 'pipe', 'pipe'], encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-  if (r && r.stdout) eco('out', senzaToken(r.stdout, t.token));
-  if (r && r.stderr) eco('err', senzaToken(r.stderr, t.token));
+  if (r && r.stdout) eco('out', senzaToken(r.stdout, segreto));
+  if (r && r.stderr) eco('err', senzaToken(r.stderr, segreto));
   if (r && r.error) { scrivi(`git-server: git non parte o si è fermato (${r.error.code || r.error.message}).`); return 1; }
+  if (viaProxy && (!r || r.status !== 0)) {
+    const respinto = chiHaRespinto(r && r.stderr)
+      ? 'le credenziali le mette il proxy della sessione, che serve solo i repository agganciati alla sessione: se '
+        + 'filo-security non è fra i repository della routine (claude.ai/code/routines), aggiungerlo è un passo dell\'owner. '
+        + 'Il testo esatto, sopra, è quello da riportare.'
+      : 'il motivo è nel testo di git, sopra.';
+    scrivi(`git-server: git è uscito con ${r ? (r.status ?? r.signal) : '?'}. In cloud ${respinto}`);
+    return 1;
+  }
   if (!r || r.status !== 0) {
     const chi = {
       proxy: 'a respingerlo è il proxy della sessione, non GitHub: il token non è arrivato a GitHub. Il testo esatto, sopra, è quello da riportare.',

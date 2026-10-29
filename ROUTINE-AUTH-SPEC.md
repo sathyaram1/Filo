@@ -853,3 +853,43 @@ imposta; ognuno risponde per sé (l'orchestratore non legge mai i worker).
 - `routine-channel.mjs domanda "<parola>"` | `domanda --biglietto <b>` — stampa la domanda e il comando per rispondere; exit 0 · 2 nessuna domanda (404, rete) · 4 rifiutata.
 - `routine-channel.mjs risposta "<parola>" <id>` | `risposta --biglietto <b>` — il testo da stdin (`<<'FINE'`); stessi exit.
 - `routine-domanda.mjs mostra | imposta <slot> "<testo>" | togli <slot> | risposte [--n N]` — lo strumento dell'owner; stampa i testi coi caratteri di controllo resi visibili (`\x1b`), perché le risposte vengono da sessioni che leggono testo non fidato.
+
+## 14. Lavori server: git verso filo-security su due strade (#1233, #1761)
+
+Ogni git di rete verso filo-security passa da `routine-channel.mjs git-server`,
+che prima chiede `routineGitToken` col biglietto. Il sì o il no si decide lì su
+tutte e due le strade: biglietto vivo e pulito, ambito `server`, feedback
+fidato, ramo del server in registro, tetto dei token, voce d'emissione al primo
+token.
+
+- **In locale** il token va a quella sola chiamata di git, nell'URL riscritto
+  dall'ambiente del figlio; aiutanti, askpass e intestazioni della macchina
+  per quella chiamata non valgono.
+- **In cloud** (`CLAUDE_CODE_REMOTE=true` o `GH_TOKEN=proxy-injected`) git
+  verso github.com passa dal proxy della sessione, che verifica una credenziale
+  sua e la scambia col token vero, e serve solo i repository agganciati alla
+  sessione: una credenziale nostra non è detto che arrivi a GitHub (in #1519 e
+  #1153 non ci è arrivata). Il token si chiede lo stesso, per il controllo, ma
+  non si usa: git parte con l'ambiente della sessione, aiutanti compresi.
+  Clone, fetch, ls-remote e spinta di un ramo `worker/*` passano; il proxy
+  rifiuta solo le cancellazioni di rami e tag.
+- **Il passo dell'owner**: la routine dei lavori server ha fra i suoi
+  repository sia Filo sia `sathyaram1/filo-security` (claude.ai/code/routines,
+  impostazioni avanzate). Senza, git-server dice che manca l'aggancio.
+- **La cartella di partenza.** Con due repository la sessione parte dalla
+  cartella sopra i cloni. Gli strumenti trovano Filo dal proprio percorso; se
+  la sessione non sta dentro Filo, il preflight dice all'orchestratore di
+  entrarci (`cd` col percorso intero) prima del setup e di git. Il rapporto di
+  fine sessione trova il transcript dall'id della sessione. Il comando del
+  compito programmato non nomina la cartella:
+
+  ```bash
+  export FILO_ROUTINE=1
+  node "$(ls -d scripts/dispatch.mjs */scripts/dispatch.mjs 2>/dev/null | head -n 1)" --preflight
+  ```
+
+- **Cosa non garantisce.** In cloud il proxy autentica qualunque git della
+  sessione verso i repository agganciati, non solo quelli di git-server: il
+  sì del server lo fa rispettare lo strumento, non la rete. Quello che arriva
+  su main di filo-security passa comunque dal registro dei rami e dal
+  cancello.
