@@ -284,7 +284,9 @@ dall'owner e dal server. Campi:
   server. I guasti fermi da prima senza la loro domanda la prendono dalla
   migrazione che parte da sola col server nuovo.
 - `destinatario`: l'owner, oppure la gestione del lavoro per le domande di
-  guasto (§ 4.3), tranne quelle dell'addetto comunicazioni.
+  guasto (§ 4.3), tranne quelle dell'addetto comunicazioni e degli altri
+  biglietti dell'ambiente dei riservati, lei compresa: vanno all'owner. Lo
+  sceglie il server dall'ambiente del biglietto che la apre.
 - `soloOwner`: sulle domande dell'addetto comunicazioni (§ 4.1), che nessun
   compito legge.
 - `fiducia`: § 1.
@@ -448,7 +450,7 @@ gruppo e poi per età. Un gruppo si apre come un blocco solo.
 |---|---|
 | `design` + `clarify`/`decisione`, segnalazione L3 | domanda, azione `riprendi` |
 | `design` + `locale` | nessuna domanda per il codice del server: un lavoro fidato prende il segno dei lavori server e lo fa la loro routine (#1253); uno non fidato va in Ricevuti L3 come richiesta di renderlo fidato (motivo `fidato`), e «Segna fidato» lo rimette in coda. Diventa domanda solo ciò che chiede il suo PC o un suo passo (una prova sulla sua macchina, segreti, automazioni GitHub), scritta da chi si ferma (#1358) |
-| `design` + `guasto` | domanda, azioni `riprendi` / `archivia`: la scrive chi cade sul guasto, col gruppo `guasto: <la cosa rotta>`, e la consegna con la fermata (#1577; senza, la consegna è rifiutata). Va alla gestione del lavoro, che risponde con le azioni `riprendi`, `attendi` o `archivia` (§ 4.3), dal punto 9 dell'ordine di lavoro (§ 13); fino ad allora, e sempre per l'addetto comunicazioni (§ 4.1), va all'owner |
+| `design` + `guasto` | domanda, azioni `riprendi` / `archivia`: la scrive chi cade sul guasto, col gruppo `guasto: <la cosa rotta>`, e la consegna con la fermata (#1577; senza, la consegna è rifiutata). Va alla gestione del lavoro, che risponde con le azioni `riprendi`, `attendi` o `archivia` (§ 4.3), dal punto 9 dell'ordine di lavoro (§ 13); fino ad allora, e sempre per l'addetto comunicazioni (§ 4.1) e per gli altri biglietti dell'ambiente dei riservati, lei compresa (§ 4.3), va all'owner |
 | `design` + `attesa_chiusa`, `loop`, `arenato`; `aligned` + `origine_chiusa`/`origine_mancante` | domanda, azioni `riprendi` / `archivia` |
 | `design` + `secaudit`, `l5`, `fidato`; attacchi, spam (anche segnati dal worker, L3), sospetti | Ricevuti, e nessun altro |
 
@@ -557,12 +559,21 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
 - **Le arrivano i problemi dei worker.** I worker sanno che esiste e le
   segnalano quello che non va: le segnalazioni libere (§ 5.4) e le domande di
   guasto delle routine (§ 3.8) vanno a lei, non all'owner, tranne quelle
-  dell'addetto comunicazioni, che vanno all'owner (§ 4.1). Per ciascuna cerca
-  la causa, apre il feedback della correzione, mette il feedback fermo in
-  attesa di quello e lo riprende quando la causa è sparita. Quando la
-  segnalazione o la domanda dice già la causa, il feedback della correzione lo
-  fa nascere per numero, come l'unione (§ 1.3): il testo resta di chi ha
-  segnalato, con la sua fiducia. Quello che scrive lei nasce non fidato.
+  dell'addetto comunicazioni, che vanno all'owner (§ 4.1), e i guasti che lei
+  non può curare (il punto qui sotto). Per ciascuna cerca la causa, apre il
+  feedback della correzione, mette il feedback fermo in attesa di quello e lo
+  riprende quando la causa è sparita. Quando la segnalazione o la domanda dice
+  già la causa, il feedback della correzione lo fa nascere per numero, come
+  l'unione (§ 1.3): il testo resta di chi ha segnalato, con la sua fiducia.
+  Quello che scrive lei nasce non fidato.
+- **Un guasto non torna a chi ci è caduto.** Una domanda di guasto non va a
+  chi l'ha aperta né a chi gira nello stesso ambiente. Lei gira nell'ambiente
+  dei riservati (§ 5.1), quindi le domande di guasto aperte da un biglietto di
+  quell'ambiente vanno all'owner, comprese le sue. Il server non sa se si è
+  rotto il compito o l'ambiente; nel secondo caso lei cadrebbe sullo stesso
+  guasto, e nessuno lo curerebbe. Per la stessa ragione un guasto non anticipa
+  mai l'istanza di chi l'ha aperto, che cadrebbe di nuovo e ne aprirebbe un
+  altro, in una fila di accensioni senza fine.
 - **Sulle domande di guasto risponde solo con le azioni** `riprendi`,
   `attendi` o `archivia` (§ 3.3), mai con testo, come per i lanci per numeri:
   così il feedback ripreso resta fidato. Le sue risposte si vedono in Domande →
@@ -582,9 +593,9 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
   modifiche in studio, i rapporti di riordino e potatura, i guasti e le
   segnalazioni che segue. Lo legge a ogni accensione.
 - **Una sessione al giorno**, che riparte dal taccuino, non un contesto che vive
-  per sempre. Un guasto le anticipa l'istanza: una sessione al giorno non basta
-  a un feedback fermo. Le indagini lunghe le fanno sotto-agenti, e il suo
-  contesto resta piccolo.
+  per sempre. Un guasto che va a lei le anticipa l'istanza: una sessione al
+  giorno non basta a un feedback fermo. Le indagini lunghe le fanno
+  sotto-agenti, e il suo contesto resta piccolo.
 - **Segue un problema da vicino:**
   - resta accesa quanto serve e si risveglia da sola ogni 55 minuti al
     massimo, così la cache (60 minuti) resta calda;
@@ -792,7 +803,7 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
 | `domande` | leggere le domande per l'owner, tranne quelle dell'addetto comunicazioni, e il registro; raggruppare, cambiare priorità, rispondere coi principi | rispondere senza un principio, cambiare i principi |
 | `opportunita` | cercare sul web attraverso il server; leggere la parte del suo taccuino scritta prima della casella e scriverci; aprire domande con bozze di mail, solo per l'owner; chiedere la casella, che passa il biglietto all'ambito `posta` (§ 5.1) | ricevere la casella e quello che ne è figlio (la parte del taccuino scritta dopo, il rapporto dell'istanza prima); mandare mail |
 | `posta` | ricevere dal server i messaggi della casella di Filo, con la parte del taccuino scritta dopo la casella e il rapporto dell'istanza prima; tenere il suo taccuino; aprire domande con bozze di mail, solo per l'owner; aprire feedback dalle mail degli utenti | uscire in rete, nemmeno attraverso il server; tornare all'ambito `opportunita`; mandare mail; vedere le credenziali della casella |
-| `gestione_lavoro` | leggere registri, sessioni, domande passate, feedback e rami; il suo taccuino; ricevere le segnalazioni e le domande di guasto, tranne quelle dell'addetto comunicazioni, e rispondere a queste con le azioni `riprendi`, `attendi`, `archivia`; far nascere per numero un feedback da una segnalazione o da una domanda di guasto; scrivere la curva del parallelismo (§ 4.5); anticipare riordino e potatura; lanciare esperimenti nel budget; cambiare la domanda di fine turno; spegnere, e riaccendere quello che ha spento lei; chiedere una sveglia; aprire domande e feedback | scrivere codice; cambiare feedback, priorità, criteri di verifica, prompt dei ruoli; rispondere con testo a una domanda di guasto; leggere dell'addetto comunicazioni altro che i numeri (domande, segnalazioni, sessioni, registri, taccuino, rapporti); riaccendere quello che ha spento l'owner |
+| `gestione_lavoro` | leggere registri, sessioni, domande passate, feedback e rami; il suo taccuino; ricevere le segnalazioni, tranne quelle dell'addetto comunicazioni, e le domande di guasto dei biglietti fuori dall'ambiente dei riservati (§ 4.3), e rispondere a queste con le azioni `riprendi`, `attendi`, `archivia`; far nascere per numero un feedback da una segnalazione o da una domanda di guasto; scrivere la curva del parallelismo (§ 4.5); anticipare riordino e potatura; lanciare esperimenti nel budget; cambiare la domanda di fine turno; spegnere, e riaccendere quello che ha spento lei; chiedere una sveglia; aprire domande e feedback | scrivere codice; cambiare feedback, priorità, criteri di verifica, prompt dei ruoli; rispondere con testo a una domanda di guasto; leggere dell'addetto comunicazioni altro che i numeri (domande, segnalazioni, sessioni, registri, taccuino, rapporti); riaccendere quello che ha spento l'owner |
 | `rami` | leggere rami, storia di git e feedback; aprire feedback e domande; scrivere nel taccuino della gestione del lavoro | cancellare rami: lo fa la regola del server (§ 4.7) |
 | `audit` | leggere il codice di Filo e del server, i metadati dei feedback aperti e i testi che servono; provare il codice nel contenitore; aprire feedback e domande | spingere rami, chiedere fusioni, cambiare feedback |
 | `esperimento` | lavorare dal commit indicato nell'ambiente dei riservati (§ 1.2); consegnare l'esito al server, come dati | fondere, aprire feedback o domande, spingere su GitHub, uscire in rete, leggere il `main` di oggi |
@@ -1257,8 +1268,9 @@ lavorano in locale.
    successiva, domanda di fine turno per tutti i ruoli.
 9. Gestione del lavoro (§ 4.3–4.8): taccuino, sveglie, controllo della
    gestione del lavoro, segnalazioni e domande di guasto che vanno a lei
-   (campo `destinatario`, istanza anticipata da un guasto, feedback per
-   numero, azione `attendi`), la sua domanda di fine turno consegnata dopo
+   (campo `destinatario`, che manda all'owner i guasti dell'ambiente dei
+   riservati; istanza anticipata da un guasto, mai quella di chi l'ha aperto;
+   feedback per numero, azione `attendi`), la sua domanda di fine turno consegnata dopo
    l'ultima scrittura (§ 5.4), lanci per numeri, curva del parallelismo applicata dal
    server, indicatori, ambiti `esperimento` e `giudizio` con l'esito
    consegnato al server, budget, rapporto settimanale,
