@@ -4,7 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, handleFiloGenerateDashboard,
-    executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
+    executeFiloAction, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume, autoFeedbackAnnullabili,
   } = ctx;
