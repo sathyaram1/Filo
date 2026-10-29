@@ -87,6 +87,7 @@
     stackEntry = null;
     root.remove();
     root = null;
+    scostaAvvisi();
     convFilo = '';
     history = [];
     documenti = null;
