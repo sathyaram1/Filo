@@ -33,7 +33,7 @@ function misura(shell) {
     const cs = getComputedStyle(t);
     const c = document.createElement('canvas').getContext('2d');
     c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-    const leggibile = cs.display !== 'none' && getComputedStyle(t.firstElementChild || t).visibility === 'visible';
+    const leggibile = cs.display !== 'none' && cs.visibility === 'visible';
     const titolo = { largo: leggibile ? t.offsetWidth : 0, serve: c.measureText(([...t.textContent][0] || '') + '…').width };
     return { id: tab.dataset.id, active: tab.classList.contains('active'), left: r.left, right: r.right, width: r.width, figli, titolo };
   }));
