@@ -788,6 +788,8 @@ module.exports = function register(on, ctx) {
         };
       }
       const payload = msg.payload || {};
+      // Un sito non legge il segno dell'installazione (impostazioniPerOrigine.js): il suo feedback lo prende qui.
+      if (daUnSito(origin, sender)) Object.assign(payload, await segnoDellInstallazione());
       // Se l'utente è loggato come admin (l'owner), marca il suo invio come
       // "owner:" così la dashboard lo distingue (verde) dai feedback dei tester
       // esterni (arancione). L'identità owner è nota solo qui nel main (auth
