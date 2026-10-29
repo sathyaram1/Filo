@@ -1,6 +1,6 @@
 // Verifica #725.8 giro 6. r1: indirizzi ufficiali che l'elenco non conosce, e siti veri di altri col nome di un
-// marchio, prendono nel menu l'avviso d'imitazione (su main il menu li lasciava puliti). Il caso di r2 (il marchio
-// sbagliato per Google, Apple e Microsoft) è uscito con la sua prova durevole nei test di logica.
+// marchio, prendono nel menu l'avviso d'imitazione (su main il menu li lasciava puliti). r2: l'avviso nomina il marchio
+// sbagliato per Google, Apple e Microsoft.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -46,4 +46,14 @@ async function avvisiDelMenu(openTab, testServer, urls) {
 test('r1 nel menu i siti veri non si prendono l’avviso d’imitazione', async ({ openTab, testServer }) => {
   const avvisi = await avvisiDelMenu(openTab, testServer, VERI);
   expect(VERI.map((u, i) => (avvisi[i] ? `${u} → ${avvisi[i]}` : '')).filter(Boolean)).toEqual([]);
+});
+
+test('r2 l’avviso nomina il marchio imitato, non un suo prodotto', async ({ openTab, testServer }) => {
+  const casi = [
+    ['https://google-login.xyz/', 'Google (google.com)'],
+    ['https://appleid-verify.com/', 'Apple (apple.com)'],
+    ['https://microsoft-login.xyz/', 'Microsoft (microsoft.com)'],
+  ];
+  const avvisi = await avvisiDelMenu(openTab, testServer, casi.map(([u]) => u));
+  expect(casi.map(([u, atteso], i) => (avvisi[i].includes(atteso) ? '' : `${u} → ${avvisi[i]}`)).filter(Boolean)).toEqual([]);
 });
