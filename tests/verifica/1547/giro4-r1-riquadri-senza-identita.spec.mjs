@@ -1,4 +1,4 @@
-// Verifica #1547 giro 3: i contatori dei riquadri, arrivati da main col riallineamento, non sono allineati all'identità
+// Verifica #1547 giro 4 (aperto dal giro 3): i contatori dei riquadri, arrivati da main col riallineamento, non sono allineati all'identità
 // anonima: le regole li accettano senza, e le prove del loro invio chiedono un'identità vera al server di Google.
 import { test, expect } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
