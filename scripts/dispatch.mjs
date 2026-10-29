@@ -343,6 +343,18 @@ export function applyFixed(state) {
 }
 
 /**
+ * Il commit da cui chi verifica non deve aver cambiato codice prima della critica, '' se non si controlla. PURA.
+ * È la punta consegnata a QUESTO biglietto: un punto fermo locale può essere di un giro passato da un'altra cartella
+ * (D-207). Dopo una critica data in questo biglietto il codice si muove di diritto.
+ */
+export function avvioDellaCritica(state) {
+  const avvio = state && state.avvio && typeof state.avvio === 'object' ? String(state.avvio.sha || '') : '';
+  if (avvio) return state.criticaNelGiro ? '' : avvio;
+  // Uno stato senza `avvio` l'ha posizionato una versione che non lo scriveva.
+  return state?.verifierSha ? '' : (lastCheckpoint(state) || '');
+}
+
+/**
  * La pulizia dopo la critica: le prove dei rilievi messi da parte tolte PRIMA di correggere. PURA.
  * `controllo` è l'esito di controllaPulizia; da `puliziaSha` parte il confronto di --record-fixed. Una pulizia dopo
  * le correzioni non sposta la base: va in `pulizieDopo`, e la consegna non rilancia ciò che ha tolto.
@@ -1231,8 +1243,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '', domanda = nul
   if (stato.lines.length) {
     return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines) };
   }
-  // L'ultimo punto fermo è il checkout di questo giro. Dopo una critica già data il codice si muove di diritto.
-  const avvio = guard.state?.verifierSha ? '' : lastCheckpoint(guard.state);
+  const avvio = avvioDellaCritica(guard.state);
   if (avvio) {
     const fermo = codiceCambiatoDallAvvio(avvio, ROOT);
     if (fermo.cambiati.length) return { rejected: true, formatRejected: true, message: testoCodiceCambiato(fermo.cambiati, avvio) };
@@ -1295,6 +1306,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '', domanda = nul
   next.messiDaParteGiro = outcome === 'fix'
     ? { sha: shaProvato, n: daParte.reduce((k, d) => k + d.rilievi.length, 0), numeri: daParte.flatMap((d) => d.rilievi.map((f) => f.n)).filter(Number.isInteger), avvio: avvio || '' }
     : null;
+  next.criticaNelGiro = true;
   sealTransition(next, `verifier:${outcome}`);
   next.reply = reply;
   return next;
@@ -2061,17 +2073,23 @@ function positionOnBranch(bucket) {
     checkpoint,
   });
   if (!res.ok) return res;
+  const parcheggio = res.discarded ? `; i commit locali restano su ${res.discarded}` : '';
   if (res.rewritten) {
-    process.stderr.write(`[dispatch] ${branch}: il ramo su origin è stato riscritto (un riallineamento): si riparte dalla sua punta ${String(res.head).slice(0, 12)}, non dal punto fermo locale ${String(res.rewritten).slice(0, 12)}${res.discarded ? `; i commit locali restano su ${res.discarded}` : ''}\n`);
+    process.stderr.write(`[dispatch] ${branch}: il ramo su origin è stato riscritto (un riallineamento): si riparte dalla sua punta ${String(res.head).slice(0, 12)}, non dal punto fermo locale ${String(res.rewritten).slice(0, 12)}${parcheggio}\n`);
+  } else if (res.superato) {
+    process.stderr.write(`[dispatch] ${branch}: lo stato locale di questa cartella era di un giro passato (punto fermo ${String(res.superato).slice(0, 12)}, più vecchio della punta pubblicata): si parte dalla punta ${String(res.head).slice(0, 12)} e lo stato vecchio si scarta${parcheggio}\n`);
   } else if (res.discarded) {
     process.stderr.write(`[dispatch] ${branch}: lavoro di un'istanza interrotta riportato all'ultimo punto fermo; i commit scartati restano su ${res.discarded}\n`);
   }
 
-  // Identità attesa del contenuto: è il valore che le transizioni (C) e il
-  // ripristino (D) confronteranno. I punti fermi di un'altra storia (un altro ramo, o questo prima di una
-  // riscrittura) se ne vanno: la pulizia dopo un «pass» li consulterebbe ancora (#1486).
-  const base = { ...defaultState(bucket.id, branch), ...(prev || {}), id: bucket.id, branch };
-  if (prev?.branch !== branch || res.rewritten) base.checkpoints = [];
+  // Identità attesa del contenuto, che transizioni (C) e ripristino (D) confronteranno. Lo stato di un'altra storia
+  // (altro ramo, riscrittura, giro passato da un'altra cartella) riparte da zero, esiti e pulizie compresi (D-207).
+  const altraStoria = prev?.branch !== branch || !!res.rewritten || !!res.superato;
+  const base = altraStoria
+    ? defaultState(bucket.id, branch)
+    : { ...defaultState(bucket.id, branch), ...prev, id: bucket.id, branch };
+  base.avvio = { sha: res.head, ruolo: bucket.role, at: new Date().toISOString() };
+  delete base.criticaNelGiro;
   const state = withCheckpoint(base, res.head, `${bucket.role}:checkout`);
   writeState(state);
   // Esposta alla guardia fuori sessione (.claude/hooks/branch-guard.sh).

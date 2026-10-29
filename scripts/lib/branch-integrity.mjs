@@ -19,8 +19,9 @@
 //   C) ogni scrittura nella macchina a stati RICALCOLA l'identità e rifiuta la
 //      transizione se non corrisponde (identityVerdict + checkDelivery); ogni
 //      transizione accettata lascia un PUNTO FERMO (withCheckpoint);
-//   D) un'interruzione riporta il branch all'ULTIMO punto fermo, spostando di
-//      lato — senza distruggerli — i commit scartati (prepareBranch);
+//   D) il branch riparte dalla punta pubblicata, o dal punto fermo locale se è
+//      quella punta o più avanti, spostando di lato — senza distruggerli — i
+//      commit scartati (prepareBranch);
 //   B) l'identità attesa viene esposta su file (writeExpectation) perché una
 //      guardia FUORI dalla sessione (.claude/hooks/branch-guard.sh) possa
 //      confrontarla dopo ogni comando.
@@ -260,15 +261,11 @@ export function clearExpectation(root) {
 
 // ─── Sigillo di fine giro (#507) ─────────────────────────────────────────────
 //
-// Il ripristino D preferisce il punto fermo locale al ramo remoto, ed è giusto
-// così: l'hook di salvataggio spinge anche il lavoro di un'istanza morta a
-// metà, quindi "origin è più avanti" non distingue una consegna da un moncone.
-// A distinguere è il SIGILLO: ogni fine giro legittima deve lasciare il punto
-// fermo sul contenuto che consegna. Le consegne di verifica/correzione/audit lo
-// facevano (sealTransition in dispatch.mjs); la consegna del primo passaggio e
-// il rilascio del biglietto no — e al posizionamento successivo nello stesso
-// clone il ripristino riportava il ramo alla base, parcheggiando su discarded/
-// una consegna intera (feedback #507: due lavori interi buttati in tre giorni).
+// Ogni fine giro legittima lascia il punto fermo sul contenuto che consegna: è
+// ciò che al posizionamento dopo tiene un lavoro sigillato e non ancora spedito
+// (#1486), e che la pulizia dopo un «pass» ritrova (#880). Senza sigillo, il
+// primo passaggio e il rilascio del biglietto lasciavano il punto fermo alla
+// base, e una consegna intera finiva su discarded/ (#507).
 
 /** L'id del feedback il cui stato nomina questo branch, o ''. */
 export function findStateIdByBranch(root, branch) {
@@ -462,11 +459,12 @@ export function ensureSessionExcludes(root) {
  *   create       true = lavoro NUOVO (crea il branch dalla base)
  *   base         base da cui creare (default: mainBranch)
  *   mainBranch   linea principale (default 'main')
- *   checkpoint   ultimo punto fermo (SHA) a cui riportare il branch, o null
+ *   checkpoint   ultimo punto fermo locale (SHA), o null
  *   now          per i test
  *
- * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null}}
+ * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null, superato?:string|null}}
  *          rewritten = il punto fermo lasciato perché il ramo su origin è stato riscritto
+ *          superato  = il punto fermo lasciato perché più vecchio della punta pubblicata (un giro passato altrove)
  *        | {ok:false, kind:'transient'|'permanent', message:string}
  *
  * FAIL CLOSED: se non riesce, il chiamante NON consegna il lavoro. Meglio un
@@ -524,18 +522,17 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   const co = hasLocal ? g(['checkout', branch]) : g(['checkout', '-B', branch, `origin/${branch}`]);
   if (!co.ok) return { ok: false, kind: 'transient', message: `checkout di ${branch} fallito: ${co.out.slice(0, 200)}` };
 
-  // Bersaglio del ripristino: l'ultimo punto fermo se lo conosciamo e se è
-  // raggiungibile; altrimenti lo stato remoto del branch (che È la consegna).
   // NB: senza punto fermo NON si torna a main — su un branch di revisione il
   // contenuto consegnato è tutto ciò che abbiamo.
   const tip = hasRemote ? g(['rev-parse', `origin/${branch}`]) : null;
   const remoteTip = tip && tip.ok ? tip.out : '';
   let target = commitExists(g, checkpoint) ? checkpoint : null;
-  // Un punto fermo fuori dalla linea della punta pubblicata è di una storia riscritta altrove (un riallineamento):
-  // vince la punta. Antenato della punta resta il caso dell'interruzione (#507), discendente è lavoro non spedito (#1486).
+  // La punta pubblicata è l'ultima consegna, da qualunque cartella: il punto fermo locale vince solo se è lei o sta
+  // più avanti (non spedito, #1486); più vecchio (un giro passato altrove, D-207) o fuori linea (riscritto) vince lei.
   let rewritten = null;
-  if (target && remoteTip && !sullaStessaLinea(g, target, remoteTip)) {
-    rewritten = target;
+  let superato = null;
+  if (target && remoteTip && target !== remoteTip && !antenato(g, remoteTip, target)) {
+    if (antenato(g, target, remoteTip)) superato = target; else rewritten = target;
     target = remoteTip;
   }
   if (!target) target = remoteTip || headSha(root);
@@ -543,7 +540,8 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
 
   const before = headSha(root);
   let discarded = null;
-  if (before && before !== target) {
+  // Una cartella rimasta indietro avanza e basta: di lato vanno solo i commit che il bersaglio non contiene.
+  if (before && before !== target && !antenato(g, before, target)) {
     // I commit scartati NON si distruggono: sono la traccia con cui si
     // ricostruisce cosa è successo. Si spostano di lato su un branch di
     // servizio (pushato se possibile) e solo allora si riporta indietro.
@@ -570,14 +568,16 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // lasciano residui che al checkout successivo verrebbero TRASPORTATI sul
   // branch del compito dopo, finendo nel diff che va al cancello di sicurezza.
   g(['clean', '-fd']);
-  return { ok: true, head: headSha(root), discarded, rewritten };
+  return { ok: true, head: headSha(root), discarded, rewritten, superato };
+}
+
+function antenato(g, a, b) {
+  return g(['merge-base', '--is-ancestor', a, b]).ok;
 }
 
 /** `a` e `b` stanno sulla stessa storia: uguali, o uno antenato dell'altro. */
 function sullaStessaLinea(g, a, b) {
-  return a === b
-    || g(['merge-base', '--is-ancestor', a, b]).ok
-    || g(['merge-base', '--is-ancestor', b, a]).ok;
+  return a === b || antenato(g, a, b) || antenato(g, b, a);
 }
 
 // ─── C: il controllo che ogni scrittura di stato deve fare ───────────────────
