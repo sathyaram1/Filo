@@ -74,7 +74,7 @@ test('r2 le sezioni dello STATO che gli strumenti nominano ci sono nello STATO d
   expect(mancano, `gli strumenti mandano il modello a sezioni che non riceve: ${mancano.join(', ')}`).toEqual([]);
 });
 
-test('r2 «quanta batteria ho?» un'ora dopo: il modello ha davanti la batteria di adesso, non quella del CONTESTO', async () => {
+test('r2 «quanta batteria ho?» un\'ora dopo: il modello ha davanti la batteria di adesso, non quella del CONTESTO', async () => {
   azzera();
   await turno({ testo: 'ciao', minutiFa: 50, batteria: 84 });
   const dopo = await turno({ testo: 'quanta batteria ho?', minutiFa: 0, batteria: 75 });
