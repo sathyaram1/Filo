@@ -367,9 +367,9 @@ html[data-chrome-compact="1"] .addr {
 .tab.segni-stretti:not(.misura) .tab-permessi .segno ~ .segno { display: none; }
 
 /* Scheda stretta con l'avviso audio: allargandola compaiono avviso, icona, X (sull'attiva sempre), titolo, paese, ognuno
-   quando ci sta con chi lo precede (icone 16, X 18, paese ~26, gap 6; il titolo vuole 2em, sotto). Così il titolo
-   comparso non sparisce più allargando (#1293). Prova in tests/tab-audio-indicator.spec.mjs. */
-@container tab (width < calc(100px + 2em)) {
+   quando ci sta con chi lo precede (icone 16, X 18, paese 28 col margine, gap 6, titolo 2em): così il titolo comparso
+   non sparisce più allargando (#1293). Prova in tests/tab-audio-indicator.spec.mjs. */
+@container tab (width < calc(102px + 2em)) {
   .tab:has(> .tab-alert) > .proxy-ind { display: none; }
 }
 @container tab (width < 68px) {
@@ -387,10 +387,10 @@ html[data-chrome-compact="1"] .addr {
 
 /* Scheda stretta senza avviso, stessa priorità e stesso conto: senza, con tante schede la X usciva dalla sua
    e il clic sul suo centro cadeva sulla vicina (#945). Prova in tests/tab-scheda-stretta.spec.mjs. */
-@container tab (width < calc(54px + 2em)) {
+@container tab (width < calc(56px + 2em)) {
   .tab:not(.active):not(:has(> .tab-alert)) > .proxy-ind { display: none; }
 }
-@container tab (width < calc(78px + 2em)) {
+@container tab (width < calc(80px + 2em)) {
   .tab.active:not(:has(> .tab-alert)) > .proxy-ind { display: none; }
 }
 @container tab (width < 46px) {
