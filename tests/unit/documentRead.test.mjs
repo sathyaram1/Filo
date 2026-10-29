@@ -208,6 +208,29 @@ test('un percorso fra apici inversi, fra caporali o come file:// si scioglie com
   }
 });
 
+// #1318 giro 5 — il controllo prima della lettura vede il file che la lettura leggerà: niente OK con un motivo falso per
+// un file:// di casa, e un percorso fuori casa fra apici inversi chiede l'OK invece di finire rifiutato dopo.
+test('la conferma prima della lettura giudica il percorso pulito come lo legge la lettura', () => {
+  require(join(ROOT, 'src', 'shared', 'urlNav.js'));
+  require(join(ROOT, 'src', 'shared', 'cmdClassify.js'));
+  require(join(ROOT, 'src', 'shared', 'actionLevels.js'));
+  const perimetro = { home: '/home/utente', cwd: '/home/utente', win: false, reti: [] };
+  const giudizio = (percorso) => ({
+    costo: globalThis.SN_ACTION_LEVELS.costoFor({ type: 'LEGGI_DOCUMENTO', percorso, _perimetro: perimetro }),
+    motivo: globalThis.SN_CMD_CLASSIFY.fuoriPerimetro(percorso, perimetro),
+  });
+  const casa = giudizio('/home/utente/Documenti/conto.pdf');
+  assert.equal(casa.costo, 0);
+  for (const s of ['file:///home/utente/Documenti/conto.pdf', '`/home/utente/Documenti/conto.pdf`', '"/home/utente/Documenti/conto.pdf"']) {
+    assert.deepEqual(giudizio(s), casa, s);
+  }
+  const fuori = giudizio('/srv/condivisa/conto.pdf');
+  assert.equal(fuori.costo, 2);
+  for (const s of ['`/srv/condivisa/conto.pdf`', '«/srv/condivisa/conto.pdf»', '“/srv/condivisa/conto.pdf”', 'file:///srv/condivisa/conto.pdf']) {
+    assert.deepEqual(giudizio(s), fuori, s);
+  }
+});
+
 test('un documento indicato con le virgolette si legge lo stesso', async () => {
   const p = join(TMP, 'virgolette.txt');
   writeFileSync(p, 'contenuto', 'utf8');
