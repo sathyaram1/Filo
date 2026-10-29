@@ -143,7 +143,8 @@ function registerIpcHandlers() {
       if (fr ? !fr.parent : !(opts && opts.riquadro)) { event.returnValue = conCanale(F.configForHref(href, ambito)); return; }
       const catena = [];
       for (let f = fr; f; f = f.parent) catena.push(String(f.url || ''));
-      event.returnValue = catena.length > 1 ? conCanale(F.configForFrames(catena, ambito)) : { level: 0, seed: 0 };
+      // Anche a un riquadro esente: dice a chi lo contiene che lì il preload gira, e non va preparato da fuori.
+      event.returnValue = { ...(catena.length > 1 ? conCanale(F.configForFrames(catena, ambito)) : { level: 0, seed: 0 }), canale: CANALE_FP };
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };
     }
