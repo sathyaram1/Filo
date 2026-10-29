@@ -131,6 +131,8 @@ test('due turni di fila con tre pagine ciascuno', async ({ app, openTab, testSer
   await page.waitForTimeout(1500);
   console.log('SECONDO:', await b2.innerText());
   console.log('rifiutate', await app.evaluate(() => globalThis.__rifiutate));
+  const acc = await app.evaluate(() => globalThis.__accettate);
+  for (const t of acc) console.log('RICHIESTA', t.length, MARCHI.filter((x) => t.includes(`MARCHIO_${x}`)).join(','), (t.match(/lasciata fuori/g) || []).length);
   await b2.screenshot({ path: 'tests/.shots/1596-g6-chiaro.png' });
   await app.evaluate((_e) => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }, { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
   await page.waitForTimeout(800);
