@@ -315,15 +315,12 @@ test('ogni gesto nominato nel codice è una misura, ogni origine e destinazione 
 });
 
 test('i tipi dei moduli dell’Editor sono quelli che i contatori conoscono', () => {
-  const editor = leggi('src/pages/editor/editor.js');
-  const blocco = /const MODULE_TYPES = \{([\s\S]*?)\n  \};/.exec(editor);
-  assert.ok(blocco, 'MODULE_TYPES si legge');
-  const tipi = [...blocco[1].matchAll(/^ {4}'?([a-z-]+)'?:\s+\{/gm)].map((m) => m[1]);
-  assert.deepEqual(tipi, [...C.MODULI_EDITOR]);
-  const g = /GRID_MIN_COLS = (\d+), GRID_MAX_COLS = (\d+)/.exec(editor) || /GRID_MIN_COLS = (\d+)[\s\S]*?GRID_MAX_COLS = (\d+)/.exec(editor);
-  const r = /GRID_MIN_ROWS = (\d+)[\s\S]*?GRID_MAX_ROWS = (\d+)/.exec(editor);
-  assert.deepEqual([C.COLONNE_GRIGLIA[0], C.COLONNE_GRIGLIA[C.COLONNE_GRIGLIA.length - 1]], [g[1], g[2]]);
-  assert.deepEqual([C.RIGHE_GRIGLIA[0], C.RIGHE_GRIGLIA[C.RIGHE_GRIGLIA.length - 1]], [r[1], r[2]]);
+  // Gli strumenti del pannello di destra (#1433) si contano coi nomi dei moduli della vecchia griglia, che non c'è più.
+  require(join(ROOT, 'src', 'shared', 'pannelliApp.js'));
+  const strumenti = globalThis.SN_PANNELLI_APP.catalogo('editor').elementi.map((e) => e.id);
+  assert.ok(strumenti.length >= 10, 'il catalogo dell’Editor si legge');
+  for (const id of strumenti) assert.ok(C.MODULI_EDITOR.includes(id), `«${id}» non è in SN_CONTATORI.MODULI_EDITOR`);
+  assert.doesNotMatch(leggi('src/pages/editor/editor.js'), /contaGesto\(\{[^}]*(colonne|impostazioni):/, 'la griglia non si misura più');
   assert.deepEqual([...C.VOCI_SISTEMA], JSON.parse(/const ORDINE = (\[[^\]]*\]);/.exec(leggi('src/pages/dashboard/dashboard-sistema.js'))[1].replace(/'/g, '"')));
   assert.deepEqual([...C.VOCI_BARRA].sort(), ['account', 'apps', 'history', 'redteam', 'settings']);
 });
