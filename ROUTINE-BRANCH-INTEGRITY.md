@@ -143,7 +143,16 @@ Esempio richiesto dall'owner: A lavora → B verifica e trova un problema → C
 inizia a correggere e viene interrotto → **D riparte dal branch come l'aveva
 lasciato A, più la critica di B**, non da zero.
 
-- Il ripristino riporta il branch all'**ultimo punto fermo registrato** (C).
+- Il ripristino parte dalla **punta pubblicata** del ramo: è l'ultima consegna,
+  da qualunque cartella sia partita. Il punto fermo locale (C) vince solo se è
+  quella punta o sta più avanti (lavoro sigillato e non ancora spedito).
+- **Giro passato altrove** (D-207): una cartella riusata può avere i punti fermi
+  di un giro di ore prima, mentre i giri dopo hanno consegnato da altre
+  cartelle. Un punto fermo più vecchio della punta si lascia, e con lui tutto lo
+  stato locale (punti fermi, esiti, pulizie). Quindi un moncone già spinto dal
+  salvataggio automatico resta sul ramo e lo giudica chi viene dopo; uno mai
+  spedito va di lato. Per scartare anche quello spinto servirebbe nel biglietto
+  l'ultima consegna registrata dal server.
 - **Ramo riscritto altrove** (#1486): se il punto fermo non sta sulla linea
   della punta pubblicata (né suo antenato né suo discendente), il ramo è stato
   rifatto da un riallineamento e si riparte dalla punta pubblicata; i punti
