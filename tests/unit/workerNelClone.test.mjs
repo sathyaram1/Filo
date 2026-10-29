@@ -105,8 +105,8 @@ test('il worker parte nel suo clone, sul ramo del lavoro; la cartella della sess
     assert.equal(json.role, 'fixer');
     assert.ok(json.instructions.startsWith('## La tua cartella'), json.instructions.slice(0, 200));
     assert.ok(json.instructions.includes(`cd "${clone}" && …`));
-    // Le ricette del ruolo puntano agli strumenti del clone: le consegne del worker finiscono lì. Le ricette scrivono
-    // il percorso con le barre normali anche su Windows: la forma nativa qui era rossa solo lì.
+    // Le ricette del ruolo puntano agli strumenti del clone: le consegne del worker finiscono lì. Il percorso nelle
+    // ricette ha le barre normali su ogni sistema: confrontato nella forma nativa, su Windows non si trova.
     const ricetta = `node "${pinnedDirWorker(1, s.strumenti).split('\\').join('/')}/scripts/routine-channel.mjs"`;
     assert.ok(json.instructions.includes(ricetta), `ricette dagli strumenti del clone: manca ${ricetta}`);
     assert.equal(git(clone, 'branch', '--show-current'), 'worker/1182');
