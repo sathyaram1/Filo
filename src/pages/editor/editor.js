@@ -3669,6 +3669,7 @@
     appartiene: (t) => !!(t.closest && t.closest('#overlay, .ed-font-pop, .ed-toasts')),
     riquadroAperto: () => !overlay.hidden,
     suCambio: () => { aggiornaElementi(); dichiaraCtrlZ(); },
+    mossa: (evento, id) => contaModulo({ type: id }, evento),
   }) : null;
 
   // L'Aiuto in questa pagina è la chat del documento (#1433): lo legge intero, e ne cambia la formattazione con le
