@@ -1,9 +1,9 @@
-// Verifica #1433, giro 4, rilievo 3: chi sta scrivendo in Cerca e sposta il mouse sul foglio non perde il pannello
+// Verifica #1433, giro 4, rilievo 2: chi sta scrivendo in Cerca e sposta il mouse sul foglio non perde il pannello
 // né quello che scrive.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
-test('r3 aperto dalla striscia, si scrive in Cerca e il mouse va sul foglio: il pannello resta e le lettere finiscono nel campo', async ({ openTab }) => {
+test('r2 aperto dalla striscia, si scrive in Cerca e il mouse va sul foglio: il pannello resta e le lettere finiscono nel campo', async ({ openTab }) => {
   const ed = await openTab('filo://editor/editor.html');
   await ed.waitForFunction(() => document.querySelector('.pd-pannello') && document.querySelector('.pd-elemento[data-elemento="search-replace"]'));
   await ed.click('#doc');
