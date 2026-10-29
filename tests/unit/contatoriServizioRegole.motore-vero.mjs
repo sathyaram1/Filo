@@ -30,7 +30,9 @@ const env = await initializeTestEnvironment({
 });
 await env.clearFirestore();
 await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), 'admins/owner@filo.it'), { ok: true }); });
-const anon = env.unauthenticatedContext().firestore();
+// Una copia di Filo scrive con la sua identità anonima; senza identità non si crea niente (#1547).
+const anon = env.authenticatedContext('installazione-di-prova', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+const senzaIdentita = env.unauthenticatedContext().firestore();
 const owner = env.authenticatedContext('owner', { email: 'owner@filo.it', email_verified: true }).firestore();
 const chiunque = env.authenticatedContext('x', { email: 'chiunque@filo.it', email_verified: true }).firestore();
 
