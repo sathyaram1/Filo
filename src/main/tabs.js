@@ -1326,7 +1326,8 @@ class TabManager {
 
   // L'ordine non tocca il layout delle viste native: conta solo per lo snapshot
   // e per la sessione salvata. Ritorna true se è cambiato.
-  moveTab(id, toIndex) {
+  // `trascinata: false` per chi sposta da sé (una scheda riaperta al suo posto): i contatori contano solo la persona.
+  moveTab(id, toIndex, { trascinata = true } = {}) {
     const from = this.tabs.findIndex((t) => t.id === id);
     if (from < 0) return false;
     let to = Math.round(Number(toIndex));
@@ -1335,7 +1336,7 @@ class TabManager {
     if (from === to) return false;
     const [tab] = this.tabs.splice(from, 1);
     this.tabs.splice(to, 0, tab);
-    ContatoriFinestra.misura('trascinata', this, Math.abs(to - from));
+    if (trascinata) ContatoriFinestra.misura('trascinata', this, Math.abs(to - from));
     this._broadcast();
     return true;
   }
