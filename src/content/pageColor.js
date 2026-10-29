@@ -168,6 +168,8 @@
       } catch (_) { return null; }
     }
 
+    // Il favicon si scarica con fetch e si disegna dalla copia in memoria: un'immagine chiesta alla rete tratterrebbe il
+    // «load» della pagina finché il sito non la manda, e un favicon che non arriva la lasciava in caricamento (#1456).
     function fromFavicon() {
       return new Promise((resolve) => {
         let href = '';
@@ -178,10 +180,19 @@
           href = (link && link.href) || (location.origin + '/favicon.ico');
         } catch (_) { href = ''; }
         if (!href) return resolve(null);
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
+        const ctrl = new AbortController();
         let done = false;
-        const finish = (v) => { if (!done) { done = true; resolve(v); } };
+        let copia = '';
+        const finish = (v) => {
+          if (done) return;
+          done = true;
+          ctrl.abort();
+          if (copia) { try { URL.revokeObjectURL(copia); } catch (_) {} }
+          resolve(v);
+        };
+        // Failsafe: entro 3 s o si rinuncia, e la richiesta rimasta appesa si chiude.
+        setTimeout(() => finish(null), 3000);
+        const img = new Image();
         img.onerror = () => finish(null);
         img.onload = () => {
           try {
