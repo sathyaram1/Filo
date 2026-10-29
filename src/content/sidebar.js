@@ -249,9 +249,8 @@
     ? `max(${Math.round(px)}px, var(--filo-avvisi-barra, 0px))`
     : `${Math.round(px)}px`);
 
-  // Spostato, l'Aiuto lascia il suo angolo e la regola di sidebar.css per gli avvisi non vale più: gli stanno a fianco,
-  // dalla parte con più spazio, o ne coprirebbero casella e microfono e la guardia dei clic li prenderebbe per un velo
-  // (#1340, giro 4). Misure della pila in popup.css: 20px dal bordo, larga al più 420px.
+  // Spostato, l'Aiuto ha gli avvisi a fianco, dalla parte con più spazio: sopra ne coprivano il microfono, e la guardia dei
+  // clic li prendeva per un velo (#1340, giro 4). Misure della pila da popup.css: 20px dal bordo, larga al più 420px.
   function scostaAvvisi() {
     const de = document.documentElement;
     const via = () => { de.style.removeProperty('--filo-avvisi-destra'); de.style.removeProperty('--filo-avvisi-larghi'); };
