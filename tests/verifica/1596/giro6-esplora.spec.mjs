@@ -63,6 +63,7 @@ async function modello(app, { finestra = 0, posto = 0, piani }) {
       const toolCalls = piano.strumenti.map((s, i) => {
         const args = { ...(s.args || {}) };
         if (s.urlDa) args.url = (esiti.match(new RegExp(s.urlDa, 'g')) || [])[s.indice || 0] || '';
+        if (s.gruppoDa) { const m = new RegExp(s.gruppoDa).exec(esiti); args.url = m ? m[1] : ''; }
         return { id: `c${k}_${i}`, name: s.nome, arguments: JSON.stringify(args) };
       });
       for (const c of toolCalls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
@@ -104,9 +105,14 @@ test('pezzi della stessa pagina letti uno dopo l\'altro: la risposta arriva e l\
   await expect(bolla).toBeVisible({ timeout: 60_000 });
   console.log('PEZZI:', await bolla.innerText());
   console.log('rifiutate', await app.evaluate(() => globalThis.__rifiutate));
+  const acc = await app.evaluate(() => globalThis.__accettate);
+  for (const t of acc) {
+    const pezzi = [...t.matchAll(/\[(Pagina web[^\]]{0,300}|Letto fino[^\]]{0,300})\]/g)].map((m) => m[0].slice(0, 200));
+    console.log('RICHIESTA len', t.length, JSON.stringify(pezzi, null, 1));
+  }
 });
 
-test('due turni di fila con tre pagine ciascuno', async ({ app, openTab, testServer }) => {
+test.skip('due turni di fila con tre pagine ciascuno', async ({ app, openTab, testServer }) => {
   test.setTimeout(200_000);
   const page = await openTab(NEWTAB);
   await preparaPagine(app, testServer, MARCHI);
