@@ -61,6 +61,7 @@ function tipiNominati(src) {
     const t = m[1] ? MSG[m[1]] : (m[2] || alias.get(m[3]));
     if (t) tipi.add(t);
   }
+  for (const m of src.matchAll(/\bMSG\??\.([A-Z_0-9]+)/g)) if (MSG[m[1]]) tipi.add(MSG[m[1]]);
   return tipi;
 }
 
