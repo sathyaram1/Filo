@@ -352,6 +352,40 @@ test('Ctrl+Shift+T si conta fra le schede riaperte, non fra quelle trascinate', 
   expect((await contiDiOggi(app)).trascinate).toBe(prima.trascinate);
 });
 
+const azioniDiOggi = (app) => app.evaluate(async () => {
+  const s = await globalThis.SN_CONTATORI_MAIN.letto();
+  const g = globalThis.SN_CONTATORI.giornoDi(Date.now());
+  const out = {};
+  for (const [k, o] of Object.entries(s.ore || {})) {
+    if (!k.startsWith(`${g}T`)) continue;
+    for (const [id, a] of Object.entries(o.azioni || {})) out[id] = (out[id] || 0) + ((a && a.n) || 0);
+  }
+  return out;
+});
+
+test('Ctrl+Shift+T e Ctrl+L si misurano fra le azioni dalla barra e dalla pagina, come Ctrl+T', async ({ app, shell, testServer }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const [a, b] = ['A', 'B'].map((n) => testServer.html(`<title>${n}</title><h1>${n}</h1>`, { pubblico: true }));
+  const quante = async (id) => (await azioniDiOggi(app))[id] || 0;
+  await apriEAspetta(app, a);
+  await apriEAspetta(app, b);
+  await chiudi(app);
+  await expect.poll(() => info(app).then((i) => i.urls.includes(b)), { timeout: 8_000 }).toBe(false);
+  await chiudi(app);
+  await expect.poll(() => info(app).then((i) => i.urls.includes(a)), { timeout: 8_000 }).toBe(false);
+
+  await shell.keyboard.press('Control+Shift+T');
+  await expect.poll(() => info(app).then((i) => i.activeUrl), { timeout: 10_000 }).toBe(a);
+  await expect.poll(() => quante('reopen-closed-tab'), { timeout: 10_000 }).toBe(1);
+  await riapri(app);
+  await expect.poll(() => info(app).then((i) => i.activeUrl), { timeout: 10_000 }).toBe(b);
+  await expect.poll(() => quante('reopen-closed-tab'), { timeout: 10_000 }).toBe(2);
+
+  const indirizzi = await quante('address-bar');
+  await shell.keyboard.press('Control+l');
+  await expect.poll(() => quante('address-bar'), { timeout: 10_000 }).toBe(indirizzi + 1);
+});
+
 for (const strada of ['la chat', 'un collegamento del filo della home']) {
   test(`una scheda chiusa e riaperta da ${strada} non torna di nuovo con Ctrl+Shift+T`, async ({ app, shell, openTab, testServer }) => {
     await shell.waitForLoadState('domcontentloaded');

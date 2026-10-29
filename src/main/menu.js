@@ -105,10 +105,10 @@ const nuovaScheda = contata('new-tab', () => {
   try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
 });
 
-function riapriSchedaChiusa() {
+const riapriSchedaChiusa = contata('reopen-closed-tab', () => {
   const win = finestra();
-  try { win && win._filoTabs.riapriChiusa().catch(() => {}); } catch (_) {}
-}
+  try { return win && win._filoTabs.riapriChiusa().catch(() => {}); } catch (_) { return undefined; }
+});
 
 // Dal tasto è Ctrl/Cmd+W, da un clic sulla voce un'altra strada (contatori della finestra, #1470).
 const chiudiScheda = contata('close-tab', (_voce, _win, ev) => {

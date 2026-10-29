@@ -2460,7 +2460,7 @@ class TabManager {
       const k = String(input.key || '').toLowerCase();
       const conta = (azione, fn) => { AzioniContate.azione(azione, fn, { incognito: !!this.win._filoIncognito }); return true; };
       // Con Shift riapre l'ultima scheda chiusa, come in ogni browser (#1476); tenuto premuto non svuota l'archivio.
-      if (k === 't' && input.shift) { if (!input.isAutoRepeat) this.riapriChiusa().catch(() => {}); return true; }
+      if (k === 't' && input.shift) return input.isAutoRepeat || conta('reopen-closed-tab', () => this.riapriChiusa().catch(() => {}));
       if (k === 't') return conta('new-tab', () => this.openTab('filo://newtab/'));
       if (k === 'w') return conta('close-tab', () => this.closeTab(tab.id, { via: 'ctrl_w' }));
       if (k === 'l') return conta('address-bar', () => this.vaiAScrivereUnIndirizzo(tab.id).catch(() => {}));

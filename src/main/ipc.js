@@ -665,12 +665,12 @@ function registerIpcHandlers() {
   ipcMain.handle('tabs:riapri-chiusa', async (event) => {
     const win = finestraDellaBarra(event.sender);
     if (!win) return { ok: false };
-    return { ok: !!(await win._filoTabs.riapriChiusa()) };
+    return { ok: !!(await gesto(win, 'reopen-closed-tab', () => win._filoTabs.riapriChiusa())) };
   });
   ipcMain.handle('tabs:scrivi-indirizzo', async (event, { id } = {}) => {
     const win = finestraDellaBarra(event.sender);
     if (!win) return { ok: false };
-    await win._filoTabs.vaiAScrivereUnIndirizzo(id);
+    await gesto(win, 'address-bar', () => win._filoTabs.vaiAScrivereUnIndirizzo(id));
     return { ok: true };
   });
   ipcMain.handle('tabs:help', (event, { id } = {}) => {
