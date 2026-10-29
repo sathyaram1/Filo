@@ -198,7 +198,6 @@ html, body {
 .ed-fmt-row .ed-fmt-btn { font-size: 14px; }
 .ed-align .ed-fmt-btn { color: var(--sn-muted); }
 .ed-align .ed-fmt-btn:hover { color: var(--sn-accent); }
-.ed-font { padding: 6px; }
 /* Il <select> nativo resta nel DOM come sorgente di verità e per i test; a nasconderlo è la regola
    condivisa .sn-select-wrap > select di theme.css. */
 .ed-font-wrap { display: flex; flex: 1 1 auto; min-width: 0; align-items: stretch; }
