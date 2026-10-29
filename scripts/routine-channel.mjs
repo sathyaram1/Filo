@@ -635,6 +635,30 @@ export function comandoRisposta(io, cred, id) {
 }
 
 /**
+ * Il lease del rinvio dopo un rebase. Il lease nudo si fida della traccia
+ * remota, che dopo un `git fetch` può essere il commit di un altro (verifica
+ * del giro 2): --force-if-includes rifiuta se quel commit non è mai passato
+ * dalla storia locale del ramo. Ma git lo misura dal reflog della traccia, che
+ * un clone non scrive, e senza rifiuta sempre (#1776): lì la stessa domanda la
+ * fa questa funzione, e il lease va esplicito sullo sha. Stessa regola in
+ * spedisci_ramo (.claude/hooks/auto-commit-merge.sh).
+ */
+export function argomentiLease(root, ramo, exec = execFileSync) {
+  const git = (args, input) => String(exec('git', args, { cwd: root, encoding: 'utf8', input, stdio: ['pipe', 'pipe', 'pipe'] }) || '').trim();
+  const diGit = ['--force-with-lease', '--force-if-includes'];
+  const traccia = `refs/remotes/origin/${ramo}`;
+  try {
+    try { git(['rev-parse', '-q', '--verify', `${traccia}@{0}`]); return diGit; } catch (_) { /* nessuna voce: la misura di git non c'è */ }
+    const sha = git(['rev-parse', '-q', '--verify', `${traccia}^{commit}`]);
+    let storia = [];
+    try { storia = git(['log', '-g', '--format=%H', `refs/heads/${ramo}`]).split('\n'); } catch (_) { /* ramo senza reflog: resta la punta */ }
+    const punte = new Set([git(['rev-parse', 'HEAD']), ...storia].filter(Boolean));
+    const fuori = git(['rev-list', '--ignore-missing', '--count', '--stdin'], `${[sha, ...[...punte].map((p) => `^${p}`)].join('\n')}\n`);
+    return fuori === '0' ? [`--force-with-lease=refs/heads/${ramo}:${sha}`] : diGit;
+  } catch (_) { return diGit; }
+}
+
+/**
  * Spedisce il ramo corrente su origin, prima del rilascio. L'hook di
  * salvataggio parte solo su Edit/Write: un `git commit` fatto a mano dal
  * worker restava a terra, e il contenitore moriva con lui (giro del 14/09).
