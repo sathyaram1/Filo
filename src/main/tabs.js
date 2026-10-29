@@ -2062,9 +2062,19 @@ class TabManager {
       if (!vivo()) return;
       try { tab._origineIcona = origineDi(wc.getURL()); } catch (_) {}
       if (tab.favicon === dato) return;
+      const prima = tab.favicon;
       tab.favicon = dato;
       this._broadcast();
+      // La aspetta una riga della chat disegnata mentre la scheda si apriva (#848); un'icona che poi cambia (un contatore) no.
+      if (dato && !prima) this._annunciaIcona(wc, dato);
     }, () => {});
+  }
+
+  _annunciaIcona(wc, dato) {
+    try {
+      const sito = require('./services/iconeSiti').sitoDi(wc.getURL());
+      if (sito) require('./services/handlers').annunciaIconaScheda(this.win, sito.nome, dato);
+    } catch (_) {}
   }
 
   // §1.2 — a differenza del colore campionato non cambia con lo scroll né si azzera a ogni
