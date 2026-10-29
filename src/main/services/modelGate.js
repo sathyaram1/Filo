@@ -48,6 +48,11 @@
     return e;
   }
 
+  // I contatori del servizio (#1472): nomi e numeri, mai un testo; un contatore rotto non ferma una chiamata.
+  function contaServizio(nome, ...a) {
+    try { require('./contatoriServizio').misura(nome, ...a); } catch (_) {}
+  }
+
   function providerOf(name) {
     try { return (name && providers() && providers().getProvider(name)) || null; } catch (_) { return null; }
   }
@@ -61,7 +66,11 @@
 
   async function keyInfo({ provider = 'openrouter', apiKey, signal } = {}) {
     const P = providerOf(provider);
-    if (!P || typeof P.keyInfo !== 'function') throw codeError(`Il fornitore ${provider} non dice il residuo delle chiavi`, 'NO_KEY_INFO');
+    if (!P || typeof P.keyInfo !== 'function') {
+      const e = codeError(`Il fornitore ${provider} non dice il residuo delle chiavi`, 'NO_KEY_INFO');
+      contaServizio('maiPartita', '', e);
+      throw e;
+    }
     return P.keyInfo({ apiKey, signal });
   }
 
@@ -115,14 +124,21 @@
     // I contatori giornalieri (#969): ogni chiamata è un uso della sua funzione, con l'attesa fino alla prima cosa
     // visibile e il guasto di ogni tentativo fallito; il tentativo che ha servito porta i suoi numeri (#1464), e il
     // costo chiesto dopo arriva da sé. Un contatore rotto non ferma mai una risposta.
+    // I tentativi falliti li vedono anche i contatori del servizio (#1472), che non dipendono da quelli dell'uso.
     const MUTO = { visto() {}, errore() {}, fine() {}, chiamata() {}, tardiva() {} };
     function misura(action) {
       let m = null;
       try { const c = contatore(); m = c && typeof c.apri === 'function' ? c.apri(action) : null; } catch (_) { m = null; }
-      if (!m) return MUTO;
-      const quieto = (fn) => (...a) => { try { fn.apply(m, a); } catch (_) {} };
-      return { visto: quieto(m.visto), errore: quieto(m.errore), fine: quieto(m.fine), chiamata: quieto(m.chiamata), tardiva: quieto(m.tardiva) };
+      const base = m || MUTO;
+      const quieto = (fn) => (...a) => { try { fn.apply(base, a); } catch (_) {} };
+      const errore = quieto(base.errore);
+      return {
+        visto: quieto(base.visto), fine: quieto(base.fine), chiamata: quieto(base.chiamata), tardiva: quieto(base.tardiva),
+        errore: (err, info) => { errore(err, info); contaServizio('tentativoFallito', action, err, info); },
+      };
     }
+    // Una chiamata che finisce in un errore: se è di quelle che non partono, la contano i contatori del servizio.
+    function maiPartita(action, e) { contaServizio('maiPartita', action, e); }
 
     // Quello che i contatori leggono di una risposta servita: numeri e nome del modello, mai il testo. Senza token
     // detti la risposta non dice niente del contesto; ragionamento e fine ci sono solo nelle risposte di testo.
@@ -243,6 +259,7 @@
       const s = settings || await getSettings();
       const chain = attempts || buildChain(s, modelFor(s, action), action);
       await ensureUnderLimit(s);
+      contaServizio('catena', action, chain);
       return { s, chain };
     }
 
@@ -253,6 +270,8 @@
       const { servedBy, violation } = noteServed(s, action, { ...res, model });
       const costEur = await recordCost(s, action, provider, model, res.usage);
       m.chiamata(chiamataDi(res, model, { tentativo: res.tentativo, spesa: spesaDi(s, model, res.usage) }));
+      // Testo e streaming dicono chi ha servito nella risposta, o non lo dicono più.
+      contaServizio('servita', action, { modello: model, provider, keySource: res.usage && res.usage.keySource, ignota: !servedBy });
       return { ...res, provider, model, servedBy, violation, costEur };
     }
 
@@ -262,7 +281,7 @@
         const r = await completeMisurato(opts, m);
         m.fine(true);
         return r;
-      } catch (e) { m.fine(false); throw e; }
+      } catch (e) { m.fine(false); maiPartita(opts.action, e); throw e; }
     }
 
     async function completeMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onFallback } = {}, m) {
@@ -281,6 +300,7 @@
 
     // Un tentativo rotto a metà si è già pagato: il suo costo il router lo dice solo dopo, e lo si chiede come per la voce.
     function auditBroken(s, action, list, m) {
+      if (Array.isArray(list) && list.length) contaServizio('ripiego', action, 'spezzato', list.length);
       for (const b of list || []) {
         auditLater({ s, action, provider: b.provider, model: b.model, apiKey: b.apiKey, generationId: b.generationId, withCost: true, keySource: b.keySource, m });
       }
@@ -292,7 +312,7 @@
         const r = await streamMisurato(opts, m);
         m.fine(true);
         return r;
-      } catch (e) { m.fine(false); throw e; }
+      } catch (e) { m.fine(false); maiPartita(opts.action, e); throw e; }
     }
 
     async function streamMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset } = {}, m) {
@@ -323,13 +343,20 @@
     }
 
     // Chi ha servito e quanto è costato, chiesti a posteriori: best-effort e fuori dal cammino della risposta.
-    function auditLater({ s, action, provider, model, apiKey, generationId, withCost, keySource, onServedBy, m = MUTO }) {
+    // `ignota`: una risposta servita, che a tentativi finiti senza chi l'ha servita conta fra le ignote (#1472).
+    function auditLater({ s, action, provider, model, apiKey, generationId, withCost, keySource, onServedBy, m = MUTO, ignota = false }) {
       const P = providerOf(provider);
-      if (!P || typeof P.lookupServedBy !== 'function') return;
+      if (!P || typeof P.lookupServedBy !== 'function') {
+        if (ignota) contaServizio('servitaIgnota', action, model);
+        return;
+      }
       let i = 0;
       let costDone = !withCost;
       const schedule = () => {
-        if (i >= auditDelaysMs.length) return;
+        if (i >= auditDelaysMs.length) {
+          if (ignota) contaServizio('servitaIgnota', action, model);
+          return;
+        }
         const t = setTimeout(tick, auditDelaysMs[i++]);
         if (t && typeof t.unref === 'function') t.unref();
       };
@@ -358,7 +385,7 @@
         const r = await callMisurato(opts, m);
         m.fine(true);
         return r;
-      } catch (e) { m.fine(false); throw e; }
+      } catch (e) { m.fine(false); maiPartita(opts.action, e); throw e; }
     }
 
     async function callMisurato({ action, settings, attempt, method, args, onLateServedBy } = {}, m) {
@@ -388,7 +415,7 @@
       try {
         r = (await (viaRouter ? router[method]({ ...input, provider: a.provider }) : P[method](input))) || {};
       } catch (e) {
-        m.errore(e, { modello: a.model, host: e && e.hostFallito });
+        m.errore(e, { modello: a.model, host: e && e.hostFallito, provider: a.provider });
         throw conLaFrase(e, s, action, method);
       }
       const usage = r.usage;
@@ -397,6 +424,8 @@
       const costNow = carriesCost(usage) || (!later && Boolean(usage));
       const costEur = costNow ? await recordCost(s, action, a.provider, a.model, usage) : 0;
       m.chiamata(chiamataDi(r, r.model || a.model, { spesa: costNow ? spesaDi(s, a.model, usage) : null }));
+      const keySourceUsata = r.keySource || (usage && usage.keySource) || '';
+      contaServizio('servita', action, { modello: r.model || a.model, provider: a.provider, keySource: keySourceUsata, ignota: !servedBy && !later });
       if (later) {
         auditLater({
           s, action, provider: a.provider, model: a.model,
@@ -404,9 +433,10 @@
           apiKey: r.keyUsed || a.apiKey,
           generationId: r.generationId,
           withCost: !costNow,
-          keySource: r.keySource || (usage && usage.keySource) || '',
+          keySource: keySourceUsata,
           onServedBy: onLateServedBy,
           m,
+          ignota: true,
         });
       }
       return { ...r, servedBy, violation, costEur };
@@ -429,7 +459,7 @@
         const r = await decideAllMisurato(opts, m);
         m.fine(true);
         return r;
-      } catch (e) { m.fine(false); throw e; }
+      } catch (e) { m.fine(false); maiPartita(opts.action, e); throw e; }
     }
 
     async function decideAllMisurato({ action, settings, attempts, requests, parallel, onAnswer, signal } = {}, m) {
@@ -466,6 +496,7 @@
           risposte++;
           servite.push(chiamataDi(r, r.model || a.model, { tentativo: indice + 1, spesa: spesaDi(s, a.model, r.usage) }));
           const u = r.usage || {};
+          contaServizio('servita', action, { modello: r.model || a.model, provider: a.provider, keySource: u.keySource, ignota: !r.servedBy });
           somma.promptTokens += Number(u.promptTokens) || 0;
           somma.completionTokens += Number(u.completionTokens) || 0;
           somma.costUsd += Number(u.costUsd) || 0;
@@ -475,7 +506,11 @@
         };
         const esito = await Coda.esegui(richieste, fai, {
           parallelo: parallel, signal,
-          classifica: (err, tentativo) => esitoDecisione(err, risposte > 0, tentativo, inVolo > 0),
+          classifica: (err, tentativo) => {
+            const tipo = esitoDecisione(err, risposte > 0, tentativo, inVolo > 0);
+            contaServizio('ripiego', action, tipo);
+            return tipo;
+          },
           attesa: (tentativo, err) => {
             const ms = Coda.attesaPredefinita(tentativo, err);
             return risposte > 0 || Number(err && err.status) === 429 ? ms : Math.min(ms, ATTESA_PRIMA_RISPOSTA_MS);
@@ -483,7 +518,7 @@
           suEsito: (r, _req, i) => { if (onAnswer) onAnswer(i, (r && r.answers) || {}); },
         });
         if (servite.length) m.chiamata(servite);
-        if (esito.fermo) m.errore(esito.fermo, { modello: a.model, host: servedBy || (esito.fermo && esito.fermo.hostFallito) });
+        if (esito.fermo) m.errore(esito.fermo, { modello: a.model, host: servedBy || (esito.fermo && esito.fermo.hostFallito), provider: a.provider });
         let seen = { servedBy: null, violation: false };
         let costEur = 0;
         if (risposte) {

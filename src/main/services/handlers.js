@@ -9,10 +9,12 @@ const { storiaAiuto } = require('./storiaAiuto');
 const { riquadroArrivato } = require('./riquadroArrivato');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
+const { daFilo, origineDi } = require('./handlers/origine');
 const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 const SegretiLetti = require('./segretiLetti');
 const VerdettiUscite = require('./verdettiUscite');
 const ContatoriSicurezza = require('./contatoriSicurezza');
+const ContatoriServizio = require('./contatoriServizio');
 const Registro = require('./registroCambi');
 const GiroAzioni = require('./giroAzioni');
 const ContestoFilo = require('./contestoFilo');
@@ -514,6 +516,7 @@ function buildAttemptChain(settings, modelRef, action) {
   // «Solo modelli a pesi aperti»: ogni modello proprietario è SOSTITUITO col suo equivalente
   // aperto, e chi non ne ha esce. Un ripiego su un proprietario non si costruisce proprio.
   const openWeightsOnly = settings.openWeightsOnly === true;
+  let pesiAperti = null;
   if (openWeightsOnly) {
     // Il sostituto deve saper fare QUEL mestiere, o la dettatura finisce su un modello muto.
     const pol = SN_CONST.applyOpenWeightsPolicy(usable, registry, action);
@@ -523,6 +526,7 @@ function buildAttemptChain(settings, modelRef, action) {
     }
     if (!pol.refs.length) throw openWeightsConfigError(settings, action, pol.dropped);
     usable = pol.refs;
+    pesiAperti = { sostituiti: pol.substituted.length, tolti: pol.dropped.length };
   }
 
   // Stesso ordine di fornitori di SN_CONST.canServeAction: se le due liste
@@ -551,6 +555,8 @@ function buildAttemptChain(settings, modelRef, action) {
   try { owner = Defaults.get().lunghezzaRisposte; } catch (_) {}
   const tetto = LR ? LR.perAzione(action, settings.lunghezzaRisposte, owner) : null;
   if (tetto) for (const a of out) a.maxTokens = tetto;
+  // I modelli che l'interruttore ha cambiato: li contano i contatori del servizio (#1472) quando la catena parte davvero.
+  if (pesiAperti) Object.defineProperty(out, 'pesiAperti', { value: pesiAperti, enumerable: false });
   return out;
 }
 
@@ -571,6 +577,7 @@ function openWeightsBlockReason(settings, entry) {
   const kind = SN_CONST.openWeightsBlockKind(
     settings && settings.openWeightsOnly === true, entry,
   );
+  if (kind) ContatoriServizio.misura('bloccoPesi', kind);
   if (kind === 'provider') return I18n.t('err_open_weights_only_provider_blocked');
   if (kind === 'model') {
     return I18n.t('err_open_weights_only_model_blocked', (entry && entry.model) || '—');
@@ -605,7 +612,11 @@ function noteServedProvider(settings, action, result) {
       + 'esclusione): aggiornare excludedProviders in config/models.',
     );
   }
-  if (violation) avvisaFuoriPolitica(settings, why, servedBy, model, action);
+  if (violation) {
+    avvisaFuoriPolitica(settings, why, servedBy, model, action);
+    const fonte = (result && (result.keySource || (result.usage && result.usage.keySource))) || '';
+    ContatoriServizio.misura('violazione', { action, modello: model, host: servedBy, motivo: why, fonte });
+  }
   return { servedBy, violation };
 }
 
@@ -645,6 +656,7 @@ async function trascrivi({ settings, payload, origin, signal }) {
   const model = modelForAction(settings, ACTIONS.TRANSCRIBE_AUDIO);
   const attempts = buildAttemptChain(settings, model, ACTIONS.TRANSCRIBE_AUDIO);
   await Gate.ensureUnderLimit(settings);
+  ContatoriServizio.misura('catena', ACTIONS.TRANSCRIBE_AUDIO, attempts);
   let audioBase64 = typeof p.audioBase64 === 'string' ? p.audioBase64 : '';
   let format = typeof p.format === 'string' && p.format ? p.format : 'wav';
   if (!audioBase64 && typeof p.dataUrl === 'string') {
@@ -752,7 +764,14 @@ function createAnswerStreamer(onText) {
 // `intera`: chi legge la risposta come dati (JSON, memoria, etichette) non riceve mai un pezzo tagliato, ma un errore.
 // Un taglio senza niente da mostrare è un errore per tutti: «qualcosa è andato storto» non direbbe del tetto.
 async function handleAIRequest({ intera = false, ...opts }) {
-  const r = await chiamaIlModello(opts);
+  let r;
+  try {
+    r = await chiamaIlModello(opts);
+  } catch (e) {
+    // Chiave, modello o margine di spesa mancanti fermano la chiamata prima del cancello: la conta chi l'ha chiesta (#1472).
+    ContatoriServizio.misura('maiPartita', opts.action, e);
+    throw e;
+  }
   const taglio = globalThis.SN_CHAT_ERRORS.erroreDelTaglio(r, { intera });
   if (taglio) throw taglio;
   return r;
@@ -1384,7 +1403,7 @@ function consumePendingConfirm(sender, action) {
   return rec.scade > Date.now();
 }
 function daPaginaDiFilo(sender) {
-  return String(sender?.tab?.url || sender?.url || '').startsWith('filo://');
+  return daFilo(origineDi(sender), sender);
 }
 // La richiesta in cui una finestra guardata resta approvata (#778): la scheda della chat, finché l'utente non scrive di nuovo.
 function chiaveSchermo(sender) {
@@ -2118,6 +2137,18 @@ function segnaLetturaAiuto(sender, action) {
   fontiPerAiuto.set(wc, fonti);
 }
 
+// La classe peggiore che il compito ha letto quando Filo risponde: la risposta la porta nell'archivio, e chi la rilegge
+// da un'altra conversazione la eredita (#1508). Gli spostamenti scelti dall'utente valgono come per lo stato.
+async function classeLettaDelCompito(sender, { contesto = null, fontiLette = null } = {}) {
+  try {
+    const A = globalThis.SN_AUTONOMIA;
+    let aut = {};
+    try { aut = (await Storage.getSettings()).autonomia || {}; } catch (_) {}
+    const fonti = fontiDelCompito(sender, contesto, fontiLette);
+    return A.stato({ fonti, livello: A.livelloAttivo(aut.livello), spostamenti: aut.fonti, manopole: aut.manopole }).classe;
+  } catch (_) { return null; }
+}
+
 // Un documento della cartella Download l'ha scritto qualcun altro: classe 5, non 4 (#530).
 function fileScaricato(p) {
   if (!p) return false;
@@ -2140,6 +2171,12 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
     elenco: ing.elenco, difesa: ing.difesa, parola: !!ing.parola, origine, dentroPerimetro, guardiano: false,
   };
   const d = A.decideDettaglio(ingressi);
+  let nuovaUguale = false;
+  const diUnaNuova = d.risposta === 'no' && Array.isArray(contesto) ? LETTURE_DI_UNA_NUOVA.get(contesto) : null;
+  if (diUnaNuova) {
+    const stNuova = A.stato({ fonti: fontiDelCompito(null, diUnaNuova), livello, spostamenti: aut.fonti, manopole: aut.manopole });
+    nuovaUguale = A.decide({ ...ingressi, stato: stNuova.stato }) === 'no';
+  }
   let perche = '';
   if (d.risposta !== 'si' && d.risposta !== 'no') {
     const daPulito = st.stato === 'contaminato' ? A.decide({ ...ingressi, stato: 'pulito' }) : d.risposta;
@@ -2147,8 +2184,10 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
     // Una difesa abbassata vuole sempre la parola: il motivo lo dice già l'`avviso` del box, una volta sola.
     else if (d.regola === 'perimetro') perche = ing.perchePerimetro || 'Te lo chiedo perché non me l\'hai chiesto tu: è una mia proposta.';
   }
-  return { ...d, livello, stato: st, perche, conCosto: (costo) => A.decide({ ...ingressi, costo }) };
+  return { ...d, livello, stato: st, perche, nuovaUguale, conCosto: (costo) => A.decide({ ...ingressi, costo }) };
 }
+// Il contesto di un turno della chat → le letture che avrebbe davanti una conversazione nuova (#1508).
+const LETTURE_DI_UNA_NUOVA = new WeakMap();
 
 // Le azioni che l'agente sulla pagina fa da sé nel content script (copia, cerca, condividi) dichiarano solo
 // il costo: la risposta è la stessa del dispatch, con la pagina web come fonte letta.
@@ -2216,6 +2255,7 @@ function fraseNo(ing, decisione, sender) {
     regola: decisione.regola, elenco: ing.elenco, segreto: ing.segreto, dove: ing.dove,
     fonte: decisione.stato && decisione.stato.fonte, livello: decisione.livello,
     daPagina: /^https?:/i.test(String(sender?.tab?.url || sender?.url || '')),
+    nuovaUguale: !!decisione.nuovaUguale,
   });
 }
 
@@ -2884,7 +2924,7 @@ async function eseguiAzioneFilo(action, {
             }
             // Un blocco che la pagina provoca dopo l'attesa qui sotto arriva lo stesso a chi l'ha chiesta:
             // la chat della home o l'assistente sulla pagina.
-            const seguibile = assistente || String((sender && sender.url) || '').startsWith('filo://');
+            const seguibile = assistente || daFilo(origineDi(sender), sender);
             if (sender && sender.wc && seguibile && action._callId && typeof tm.seguiApertura === 'function') {
               tm.seguiApertura(tabId, { wc: sender.wc, callId: action._callId, assistente });
             }
@@ -3292,14 +3332,14 @@ async function eseguiAzioneFilo(action, {
             kind: c.kind || null,
             snippet: ChatArchive.snippetFor(c, termini.join(' ')),
           }));
-          // Un frammento preso da un testo venuto da fuori (l'esito di un comando dato in chat) resta quella lettura.
+          // Un frammento preso da un testo venuto da fuori (l'esito di un comando dato in chat, le parole scritte nell'Aiuto
+          // sopra un sito) resta quella lettura; uno preso da una risposta di Filo porta la classe che lei aveva letto (#1508).
           const daFuori = [];
+          let classeLetta = 1;
           found.forEach((c, i) => {
-            const pezzo = String(results[i].snippet || '').replace(/^…|…$/g, '').trim();
-            if (!pezzo) return;
-            for (const x of globalThis.SN_FILO_CONTESTO.daFuoriDi(c.messages)) {
-              if (x.testo.replace(/\s+/g, ' ').includes(pezzo)) { daFuori.push({ testo: pezzo, fonte: x.fonte }); break; }
-            }
+            const p = globalThis.SN_FILO_CONTESTO.provenienzaDelFrammento(c, results[i].snippet);
+            daFuori.push(...p.daFuori);
+            classeLetta = Math.max(classeLetta, p.classeLetta);
           });
           return {
             executed: true,
@@ -3310,6 +3350,7 @@ async function eseguiAzioneFilo(action, {
               allargata,
               results,
               ...(daFuori.length ? { daFuori } : {}),
+              ...(classeLetta > 1 ? { classeLetta } : {}),
               ...(pagine.length ? { pagine } : {}),
               ...(cambiTrovati.length ? { cambi: cambiTrovati } : {}),
               ...(cambiTrovati.length && cambiCercati.allargata ? { cambiCercatiCon: cambiCercati.termini } : {}),
@@ -4447,12 +4488,11 @@ async function cambiPerChat(query) {
 // La rilettura di una conversazione con CERCA_CHAT e l'id: intera fino a `cap`, oltre testa e coda, e con `da` un pezzo
 // che non supera la stessa misura. `intera`: il modello l'ha davanti tutta, e i suoi pezzi non si ripescano (#868.1).
 function rilettura(chat, { da = null, cap }) {
-  const daFuori = globalThis.SN_FILO_CONTESTO.daFuoriDi(chat.messages);
+  // Per la regola dell'indirizzo scritto (#553) contano solo le parole dell'utente: non quelle di Filo, che le ha scritte
+  // il modello, né quelle scritte nell'Aiuto sopra un sito, che le vedeva il sito (#1508).
+  const { daFuori, parole: scrittoDallUtente, classeLetta } = globalThis.SN_FILO_CONTESTO.provenienzaDellaChat(chat);
   const transcript = ChatArchive.transcriptForReading(chat.messages, { da, cap, pezzo: Math.min(ChatArchive.PEZZO_RILETTURA, cap) });
   const conDa = da != null && da !== '' && Number.isFinite(Number(da));
-  // Per la regola dell'indirizzo scritto (#553) contano solo le parole dell'utente: quelle di Filo le ha scritte il modello.
-  const scrittoDallUtente = (Array.isArray(chat.messages) ? chat.messages : [])
-    .filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || '')).join('\n');
   return {
     chatRead: chat.id,
     found: true,
@@ -4463,6 +4503,7 @@ function rilettura(chat, { da = null, cap }) {
     ...(!conDa && transcript.length <= cap ? { intera: true } : {}),
     linkUtente: PageRead.linkNelTesto(scrittoDallUtente),
     ...(daFuori.length ? { daFuori } : {}),
+    ...(classeLetta > 1 ? { classeLetta } : {}),
   };
 }
 
@@ -5373,7 +5414,9 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
     const Caps = globalThis.SN_CAPABILITIES;
     const analysis = AF.analyzeReply(textReply, rawActions, userMessage, Caps ? Caps.all(cancelliAperti()) : []);
     if (!analysis || !analysis.kind) return null;
-    return AF.composeProposal(analysis, { userMessage, textReply: citaRisposta ? textReply : '' });
+    const proposta = AF.composeProposal(analysis, { userMessage, textReply: citaRisposta ? textReply : '' });
+    // Il segno torna con la conferma: i contatori del servizio (#1472) la distinguono da una che il modello ha scritto.
+    return proposta ? { ...proposta, _proposta: true } : null;
   } catch (e) {
     console.warn('[#360] proposta di segnalazione non composta:', e?.message || e);
     return null;
@@ -5391,24 +5434,26 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
 // utile (dice cosa aveva chiesto) di quella generica.
 async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed = false, chatId = '' }) {
   try {
-    if (proposed) return;
-    if (Array.isArray(rawActions)
-      && rawActions.some((a) => a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK')) return;
     const AF = globalThis.SN_AUTO_FEEDBACK;
     const FB = globalThis.SN_FEEDBACK;
     if (!AF || !FB || typeof FB.submit !== 'function') return;
+    const Caps = globalThis.SN_CAPABILITIES;
+    const capabilities = Caps ? Caps.all(cancelliAperti()) : [];
+    const analysis = AF.analyzeReply(textReply, rawActions, userMessage, capabilities);
+    if (!analysis || !analysis.kind) return;
+    // I contatori del servizio (#1472): il tipo, la capacità e come finisce, con l'incognito della chat da cui nasce.
+    let incognito = null;
+    try { incognito = require('../shim/storage').inIncognito(); } catch (_) { incognito = null; }
+    const esito = (e) => ContatoriServizio.misura('f4', analysis.kind, analysis.capabilityId, e, { incognito });
+    if (proposed || (Array.isArray(rawActions)
+      && rawActions.some((a) => a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK'))) { esito('sostituita'); return; }
 
     // Setting autoFeedback, default ON se non impostato dall'utente.
     const settings = await getEffectiveSettings().catch(() => ({}));
     const autoEnabled = (settings && settings.security && settings.security.autoFeedback) === undefined
       ? true
       : !!(settings && settings.security && settings.security.autoFeedback);
-    if (!autoEnabled) return;
-
-    const Caps = globalThis.SN_CAPABILITIES;
-    const capabilities = Caps ? Caps.all(cancelliAperti()) : [];
-    const analysis = AF.analyzeReply(textReply, rawActions, userMessage, capabilities);
-    if (!analysis || !analysis.kind) return;
+    if (!autoEnabled) { esito('spenta'); return; }
 
     const payload = AF.compose(analysis);
     if (!payload) return;
@@ -5438,7 +5483,7 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
       .then(nelFilo, (e) => { nelFilo({ ok: false, error: e?.message || String(e) }); throw e; });
     const Attesa = require('./autoFeedbackAttesa');
     const win = winOf(sender);
-    const biglietto = Attesa.trattieni(spedisci, win);
+    const biglietto = Attesa.trattieni(spedisci, win, { esito });
     // Filo segnala da sé (#1473): «Annulla» sull'avviso la disfa (handlers/filo.js).
     require('./contatoriHomePagina').misura('fatto', 'segnalazione_automatica', { incognito: !!(win && win._filoIncognito) });
     try {
@@ -5857,9 +5902,16 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const fuori = FCx.letturaDaFuori(m);
     if (fuori) azioniViste.push(fuori);
   }
+  // Le risposte di altre conversazioni davanti al modello portano quello che avevano letto, anche dopo un riavvio (#1508).
+  const dalTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: chatId });
+  if (dalTratto) azioniViste.push(dalTratto);
+  // Quello che una conversazione nuova avrebbe davanti, compresa questa: decide se il «no» può consigliarla.
+  const tuttoIlTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: null });
+  LETTURE_DI_UNA_NUOVA.set(azioniViste, [...(filo ? filo.perUnaNuova || [] : []), ...(tuttoIlTratto ? [tuttoIlTratto] : [])]);
   // Le parole dell'utente che il modello ha davanti: un codice che ha scritto lui può uscire (#810). Un turno
-  // interno non è sua voce, nemmeno il testo di un suggerimento della home: lo scrive un modello.
-  let paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
+  // interno non è sua voce, nemmeno il testo di un suggerimento della home: lo scrive un modello. Né la riga di una
+  // conversazione di un'altra app, che scrive Filo, né quello che l'utente ha scritto nell'Aiuto sopra un sito (#1508).
+  let paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello && !m.riga && !m.daPagina).map((m) => String(m.text || ''))
     .concat(internal || daModello ? [] : [String(userMessage || '')]).join('\n');
   // Gli indirizzi che il modello ha davanti, per la regola dell'indirizzo scritto (#553, src/main/services/pageRead.js).
   const provenienza = PageRead.contestoChat();
@@ -6151,8 +6203,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const giaScritta = unisciTesti(risposta);
     if (!chatId || (!successe.length && !giaScritta)) return;
     const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
+    const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     // La parte già scritta non è passata dal giudizio dei collegamenti: riaperta, i suoi chiedono l'OK (#1505).
-    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, classeLetta, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
     const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
   };
@@ -6455,6 +6508,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       if (res.output) rendered._output = res.output;
       renderedActions.push(rendered);
       conto.recupero('proposta_segnalazione');
+      ContatoriServizio.misura('proposta', 'mostrata');
     }
   }
   // #947 — il documento che la risposta nomina ha il suo bottone anche se il modello non l'ha mostrato con APRI_FILE:
@@ -6491,10 +6545,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
     const cambi = renderedActions.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
+    const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     const dopo = await appendToChatArchive(
       chatId,
       {
-        role: 'filo', text: textReply, actions: successe,
+        role: 'filo', text: textReply, actions: successe, classeLetta,
         ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
         ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
         ...(senzaVerdetto ? { senzaVerdetto } : {}),
@@ -7120,7 +7175,7 @@ require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
 
 async function handleMessage(msg, sender = {}) {
-  const origin = sender?.tab?.url || sender?.url || '';
+  const origin = origineDi(sender);
   const fn = registry.get(msg.type);
   if (fn) return fn(msg, sender, origin);
   return { ok: false, error: `Tipo messaggio sconosciuto: ${msg.type}` };

@@ -465,13 +465,23 @@
       },
     },
     CERCA_CHAT: {
-      // #525 — Filo rilegge le conversazioni passate con lo stesso utente per
-      // riprendere un discorso di ieri. Sola lettura di dati che sono già
-      // dell'utente e che sono già passati da questo contesto (le ha scritte
-      // lui, con Filo): niente scritture, niente cancellazioni, niente che
-      // esca dal computer → costo 0, come LEGGI_FILE. Sono di classe 1: non sporcano il compito.
+      // #525 — Filo rilegge il filo per riprendere un discorso di ieri: sola lettura, niente esce → costo 0. Le parole
+      // dell'utente e di Filo sono di classe 1; sporcano le pagine visitate, le risposte nate da testo di altri e le
+      // parole scritte nell'Aiuto sopra un sito (#1508, le ultime da `daFuori`).
       costo: 0,
       campo: null,
+      fonte: (a, out) => {
+        const pagine = Array.isArray(out.pagine) ? out.pagine.filter(Boolean) : [];
+        const viste = !pagine.length ? null : pagine.some((p) => String(p.riassunto || '').trim())
+          ? { classe: 5, campo: 'web', chiave: 'visitate:riassunti', motivo: 'ho letto il riassunto di una pagina che avevi aperto, fatto col testo del sito' }
+          : { classe: 3, campo: 'web', chiave: 'visitate:titoli', motivo: 'ho letto i titoli delle pagine che hai visitato, scritti dai siti' };
+        const c = Number(out.classeLetta);
+        // Quelle del tratto le ha davanti anche una conversazione nuova: `ereditata` toglie quella strada dal «no».
+        const risposte = Number.isInteger(c) && c > 1 && c <= 5
+          ? { classe: c, campo: null, chiave: 'filo:altra-chat', motivo: c === 2 ? 'ho riletto risposte di altre conversazioni nate dai tuoi file' : 'ho riletto risposte di altre conversazioni nate da testo scritto da altri', ...(out.tratto ? { ereditata: true } : {}) }
+          : null;
+        return viste && (!risposte || viste.classe >= risposte.classe) ? viste : risposte;
+      },
       describe: (a) => {
         const q = String((a && (a.query ?? a.testo)) || '').trim();
         if (a && a.id && !q) return 'Rileggere una conversazione passata';
@@ -496,6 +506,10 @@
     APRI_SALVATA: {
       costo: 1,
       campo: 'web',
+      // Il titolo che torna l'ha scritto il sito, come in CERCA_SALVATE.
+      fonte: (a, out) => (out.aperta
+        ? { classe: 3, campo: 'web', chiave: 'salvate:titoli', motivo: 'ho letto il titolo di una pagina che hai salvato per dopo, scritto dal sito' }
+        : null),
       describe: (a) => {
         const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
         const quale = t ? cit(t) : 'una pagina salvata per dopo';

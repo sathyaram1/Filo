@@ -38,6 +38,16 @@ function decodeJwtPayload(jwt) {
   }
 }
 
+// L'accesso con Google per i contatori del servizio (#1472): l'esito, il passaggio al browser, il rinnovo. Mai un'email.
+function contaAccesso(cosa, voce) {
+  try { require('../services/contatoriServizio').misura('accesso', cosa, voce); } catch (_) {}
+}
+function contaEsito(e) {
+  let code = 'servizio';
+  try { code = require('./esitoAccesso').spiegaErroreAccesso(e).code; } catch (_) {}
+  contaAccesso('esito', code);
+}
+
 // `code` è la causa per chi ha chiesto l'accesso (esitoAccesso.js ne fa la frase).
 function erroreAccesso(code, message) {
   const e = new Error(message);
@@ -280,11 +290,15 @@ function restore() {
 
 async function signIn() {
   if (!cfg.isConfigured()) {
-    throw erroreAccesso('non-configurato', 'Login non configurato: manca il Google OAuth Client ID (vedi src/main/auth/config.js).');
+    const e = erroreAccesso('non-configurato', 'Login non configurato: manca il Google OAuth Client ID (vedi src/main/auth/config.js).');
+    contaEsito(e);
+    throw e;
   }
   const { net } = require('electron');
   if (net && typeof net.isOnline === 'function' && !net.isOnline()) {
-    throw erroreAccesso('rete', 'nessuna connessione');
+    const e = erroreAccesso('rete', 'nessuna connessione');
+    contaEsito(e);
+    throw e;
   }
   // Un accesso alla volta: chi lo chiede mentre uno aspetta riporta davanti la
   // STESSA pagina e ne condivide l'esito, così qualunque strada completi arriva a Filo.
@@ -304,6 +318,7 @@ async function signIn() {
     f = await prossimo;
   } catch (e) {
     libera();
+    contaEsito(e);
     throw e;
   }
   f.esito.then(libera, libera);
@@ -333,6 +348,7 @@ async function mostraAccesso(f) {
       });
     } catch (_) {}
     if (scheda) { f.scheda = scheda; return; }
+    contaAccesso('browser', 'senza_scheda');
   }
   f.nelBrowser = true;
   await apriBrowser(f.url);
@@ -343,6 +359,7 @@ function passaAlBrowser(f, motivo) {
   f.scheda = null;
   f.nelBrowser = true;
   console.warn('[auth] scheda d\'accesso abbandonata (' + motivo + '): accesso nel browser di sistema');
+  contaAccesso('browser', motivo);
   // Una pagina che non si carica non è un no di Google: la riga dice il motivo vero, e l'invito a collegare resta.
   const nonCaricata = motivo === 'rete';
   if (!nonCaricata) { try { require('./prodottiGoogle').googleRifiutaLeSchede(); } catch (_) {} }
@@ -409,6 +426,8 @@ async function nuovoFlusso() {
     aggiornaFoto();
     return getProfile();
   })();
+  // Un esito per accesso: chi si accoda allo stesso flusso ne condivide la promessa, e non conta di nuovo.
+  f.esito.then(() => contaAccesso('esito', 'ok'), contaEsito);
   return f;
 }
 
@@ -446,7 +465,11 @@ async function refreshIfNeeded() {
     // Si esce solo se il servizio dice che il refresh token non vale più: un 503 o un proxy
     // che risponde 403 lasciano sessione e auth.bin come sono, e il prossimo tentativo riesce.
     const testo = await res.text().catch(() => '');
-    if (!guasti.rinnovoRifiutato(testo)) throw guasti.nonRaggiungibile(res.status);
+    if (!guasti.rinnovoRifiutato(testo)) {
+      contaAccesso('rinnovo', 'irraggiungibile');
+      throw guasti.nonRaggiungibile(res.status);
+    }
+    contaAccesso('rinnovo', 'rifiutato');
     const eraOwner = isAdmin();
     chiudiSessione();
     if (eraOwner) segnaOwnerCaduto(true);

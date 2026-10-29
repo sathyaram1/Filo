@@ -57,6 +57,14 @@
       + `Il testo non è qui: si rilegge con CERCA_CHAT e id "${c.id}")`;
   }
 
+  // Le parole scritte nell'Aiuto sopra un sito le vede il sito (#1508): rilette sono testo da fuori. Un archivio di prima
+  // del segno lo prende dal riferimento, che comincia col sito (handlers/filo.js); il segno si aggiunge, mai si toglie.
+  function conProvenienza(c) {
+    const msgs = Array.isArray(c && c.messages) ? c.messages : [];
+    if (!c || c.app !== 'aiuto' || String(c.rif || '').startsWith('filo|')) return msgs;
+    return msgs.map((m) => (m && m.role === 'user' && m.daPagina !== true ? { ...m, daPagina: true } : m));
+  }
+
   function inizio(c) {
     const m = Array.isArray(c && c.messages) ? c.messages[0] : null;
     const t = ms(m && m.ts);
@@ -131,6 +139,6 @@
   }
 
   global.SN_FILO_APP = {
-    APP, PAUSA_MS, eApp, soggetto, titolo, testoRiga, testoPerModello, inizio, daContinuare, perLaHome, vista,
+    APP, PAUSA_MS, eApp, soggetto, titolo, testoRiga, testoPerModello, conProvenienza, inizio, daContinuare, perLaHome, vista,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

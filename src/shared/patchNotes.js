@@ -9,6 +9,16 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
     // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.251', date: '2026-10-29',
+      features: [
+        'Ctrl+Shift+T (Cmd+Shift+T su Mac) riapre l\'ultima scheda chiusa, come negli altri browser, invece di aprirne una nuova. Torna nello stesso posto della fila, con Indietro e Avanti com\'erano. Premendolo ancora riapre quelle chiuse prima, anche dopo aver riaperto Filo.',
+      ],
+      fixes: [
+        'Ctrl+L (Cmd+L su Mac) sulla home non cancella più quello che stavi scrivendo. Porta il cursore nel campo e seleziona il testo, come la barra degli indirizzi di un browser.',
+        'Ctrl+L (Cmd+L su Mac) su una pagina dove stai scrivendo apre la home in una scheda accanto, così il testo che hai scritto resta dov\'era.',
+      ],
+    },
+    {
       version: '0.2.250', date: '2026-10-23',
       features: [
         'Passando il mouse su una risposta di Filo, sotto compaiono Copia e Rispondi. Copia mette il testo negli appunti senza segni di formattazione. Rispondi la cita sopra la casella, come su WhatsApp, e il tuo messaggio parte con la citazione in testa. Così Filo sa a cosa stai rispondendo, e un clic sulla citazione ti riporta alla sua risposta.',
@@ -21,17 +31,15 @@
         'Su Windows puoi chiedere a Filo di mettere in ordine le icone del desktop: «in ordine alfabetico, da sinistra a destra», «per data», «con le cartelle prima». Se non ti piace, «rimettile com\'erano» le riporta dove stavano.',
         'Nella home puoi scrivere a Filo «accedi con Google» e apre lui la pagina d\'accesso. Allo stesso modo collega YouTube e Gmail nelle schede, o ti fa uscire dall\'account.',
         'Quello che fanno i pulsanti delle Preferenze ora lo chiedi anche a Filo: «fammi sentire la suoneria carillon», «com\'è la voce Nicola?», «rifai l\'intervista di benvenuto», «rimetti l\'aspetto di serie», «rimetti tutte le impostazioni di serie». Prima ti diceva dove cliccare.',
-        'Ctrl+Shift+T (Cmd+Shift+T su Mac) riapre l\'ultima scheda chiusa, come negli altri browser, invece di aprirne una nuova. Torna nello stesso posto della fila, con Indietro e Avanti com\'erano. Premendolo ancora riapre quelle chiuse prima, anche dopo aver riaperto Filo.',
       ],
       fixes: [
-        'Ctrl+L (Cmd+L su Mac) sulla home non cancella più quello che stavi scrivendo. Porta il cursore nel campo e seleziona il testo, come la barra degli indirizzi di un browser.',
-        'Ctrl+L (Cmd+L su Mac) su una pagina dove stai scrivendo apre la home in una scheda accanto, così il testo che hai scritto resta dov\'era.',
         'Le icone delle pagine salvate e delle schede chiuse, e la foto del tuo account Google, Filo le tiene sul tuo computer. La home e la chat le mostrano subito, senza chiederle ogni volta ai siti, e l\'icona di una scheda aperta da un altro paese non esce più dal proxy.',
         'Sulla pagina di un sito che non risponde, Condividi, QR code e Salva per dopo usano l\'indirizzo del sito e non quello interno della pagina d\'errore. Su un PDF Condividi e Screenshot funzionano.',
         'La pagina sulla privacy ora dice dove sta ogni parte del server, dal codice al database alle identità. Prima diceva solo che il codice gira in Europa, e sembrava che ci stessero anche i dati, che invece per ora sono negli Stati Uniti.',
         'Un\'immagine oltre i 4 MB incollata nella chat della home ora entra rimpicciolita. Prima spariva senza dire niente.',
         'L\'accesso con Google e con gli altri provider funziona anche in un Filo appena installato, e una passkey salvata sul telefono si usa col QR.',
         'Un comando che scrivi nella home dopo la barra ora passa dagli stessi controlli dei comandi di Filo. Prima di cancellare qualcosa ti chiede un OK, o la parola «conferma» se il comando l\'hai incollato, e se annulli il comando torna nella casella com\'era. Una barra seguita da una parola che non è un programma torna a essere un messaggio per Filo.',
+        'Gli screenshot e i file che alleghi a una segnalazione arrivano di nuovo. Dal 26 ottobre venivano rifiutati e la segnalazione partiva senza.',
       ],
     },
     {

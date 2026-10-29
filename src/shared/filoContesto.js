@@ -163,9 +163,12 @@
   }
   // Lo stesso testo quando torna dall'archivio (un ricordo, una ricerca, una rilettura): l'azione che lo riporta lo
   // dichiara in `_output.daFuori`, e uscite e conferme lo contano come la lettura che era (urlExfil, actionLevels).
+  // Così le parole scritte nell'Aiuto sopra un sito (`daPagina`, src/shared/filoApp.js → conProvenienza, #1508).
+  const ESTERNO_AIUTO = "dall'Aiuto, in un messaggio scritto sopra un sito";
+  const daPaginaIl = (m) => !!m && m.role === 'user' && m.daPagina === true;
   function daFuoriDi(messaggi) {
-    return (Array.isArray(messaggi) ? messaggi : []).filter(daFuoriIl)
-      .map((m) => ({ testo: String(m.text == null ? '' : m.text), fonte: m.esterno }))
+    return (Array.isArray(messaggi) ? messaggi : []).filter((m) => daFuoriIl(m) || daPaginaIl(m))
+      .map((m) => ({ testo: String(m.text == null ? '' : m.text), fonte: daPaginaIl(m) ? ESTERNO_AIUTO : m.esterno }))
       .filter((x) => x.testo.trim());
   }
 
@@ -182,6 +185,60 @@
     }
     const t = String(r.testo == null ? '' : r.testo).trim();
     return t ? `(l'utente risponde ${di}${dove}: «${t}»)` : `(l'utente risponde ${di}${dove})`;
+  }
+
+  // Una risposta di Filo riletta altrove vale la classe peggiore che la sua chat aveva letto (#1508); una salvata prima
+  // del campo, la peggiore fra le fonti della chat. Testi da fuori e parole dell'utente li conta daFuoriDi.
+  function classeDelMessaggio(m, fontiDellaChat = null) {
+    if (!m || m.role === 'user' || daFuoriIl(m)) return 1;
+    const c = Number(m.classeLetta);
+    if (Number.isInteger(c) && c >= 1 && c <= 5) return c;
+    let peggiore = 1;
+    for (const f of Array.isArray(fontiDellaChat) ? fontiDellaChat : []) {
+      const k = Number(f && f.classe);
+      if (Number.isInteger(k) && k > peggiore && k <= 5) peggiore = k;
+    }
+    return peggiore;
+  }
+  function classeDelleRisposte(messaggi, fontiDellaChat = null) {
+    let peggiore = 1;
+    for (const m of Array.isArray(messaggi) ? messaggi : []) peggiore = Math.max(peggiore, classeDelMessaggio(m, fontiDellaChat));
+    return peggiore;
+  }
+
+  // Le risposte di altre chat nel tratto (#1508) hanno la forma di una ricerca fra le chat, come i ricordi: stato, uscite e
+  // accoglienza le contano uguali. `classeLetta` è già risolta da src/main/services/contestoFilo.js (messaggiDi).
+  function trattoComeAzione(visti, { chatCorrente = null } = {}) {
+    const altre = (Array.isArray(visti) ? visti : []).filter((m) => m && !m.riga && m.chat !== chatCorrente);
+    const classe = classeDelleRisposte(altre);
+    if (classe <= 1) return null;
+    return { type: 'CERCA_CHAT', _tratto: true, _executed: true, _output: { tratto: true, classeLetta: classe } };
+  }
+
+  // Cosa porta nel compito una conversazione dell'archivio riletta per intero (#1508): i testi da fuori, le parole
+  // dell'utente (per la regola dell'indirizzo scritto, #553) e la classe peggiore delle risposte di Filo.
+  function provenienzaDellaChat(chat) {
+    const A = global.SN_FILO_APP;
+    const msgs = A ? A.conProvenienza(chat) : (Array.isArray(chat && chat.messages) ? chat.messages : []);
+    return {
+      daFuori: daFuoriDi(msgs),
+      parole: msgs.filter((m) => m && m.role === 'user' && !m.daModello && !daPaginaIl(m)).map((m) => String(m.text || '')).join('\n'),
+      classeLetta: classeDelleRisposte(msgs, chat && chat.fonti),
+    };
+  }
+
+  // Di una conversazione trovata dalla ricerca torna solo il frammento: porta la lettura dei messaggi da cui viene. Se
+  // non si riconosce da dove, vale la chat intera.
+  function provenienzaDelFrammento(chat, frammento) {
+    const A = global.SN_FILO_APP;
+    const msgs = A ? A.conProvenienza(chat) : (Array.isArray(chat && chat.messages) ? chat.messages : []);
+    const pezzo = String(frammento || '').replace(/^…|…$/g, '').trim();
+    const da = pezzo ? msgs.filter((m) => m && String(m.text == null ? '' : m.text).replace(/\s+/g, ' ').includes(pezzo)) : [];
+    const fuori = daFuoriDi(da);
+    return {
+      daFuori: fuori.length ? [{ testo: pezzo, fonte: fuori[0].fonte }] : [],
+      classeLetta: classeDelleRisposte(da.length ? da : msgs, chat && chat.fonti),
+    };
   }
 
   // `prima`: il messaggio che precede nel blocco. Ora e conversazione stanno sui messaggi dell'utente; su quelli di
@@ -327,6 +384,8 @@
     const indici = [...ripresi.indici, ...Array.from({ length: n - inizio }, (_, k) => inizio + k)];
     const out = [];
     const azioni = [];
+    // Gli esiti che avrebbe davanti anche una conversazione nuova: quelli fra gli ultimi messaggi di tutto il filo.
+    const perUnaNuova = [];
     const visti = [];
     let prima = null;
     let cambiaGia = false;
@@ -340,6 +399,7 @@
       }
       out.push(reso);
       if (e && Array.isArray(e.azioni)) azioni.push(...e.azioni);
+      if (e && Array.isArray(e.azioni) && n - i <= MESSAGGI_CON_ESITI) perUnaNuova.push(...e.azioni);
       visti.push(m);
       prima = m;
     }
@@ -347,6 +407,7 @@
       messaggi: out,
       visti,
       azioni,
+      perUnaNuova,
       inizio,
       ripresi: ripresi.indici.length,
       vecchi: lista.slice(0, inizio),
@@ -365,13 +426,14 @@
       if (!m || !m.chat || m.riga) continue;
       let t = aperti.get(m.chat);
       if (m.role === 'user' || !t) {
-        t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], daFuori: [], titolo: (titoli ? titoli(m.chat) : m.titolo) || '' };
+        t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], daFuori: [], classeLetta: 1, titolo: (titoli ? titoli(m.chat) : m.titolo) || '' };
         aperti.set(m.chat, t);
         out.push(t);
       }
       const testo = String(m.text || '').replace(/\s+/g, ' ').trim();
       if (testo) t.righe.push(`${m.role === 'user' ? 'Utente' : 'Filo'}: ${testo}`);
       t.daFuori.push(...daFuoriDi([m]));
+      t.classeLetta = Math.max(t.classeLetta, classeDelMessaggio(m));
       t.fine = m.ts;
     }
     return out.filter((t) => t.righe.length).map((t) => ({ ...t, testo: t.righe.join('\n') }));
@@ -560,9 +622,10 @@
     // Lo stesso testo che il modello ha davanti (testa e coda), così le uscite contano tutto quello che ha letto.
     const results = lista.map((r) => ({ id: r.tratto.chat, title: r.tratto.titolo || '', date: r.tratto.ts, snippet: testoRicordo(r.tratto) }));
     const daFuori = lista.flatMap((r) => (Array.isArray(r.tratto.daFuori) ? r.tratto.daFuori : []));
+    const classeLetta = lista.reduce((c, r) => Math.max(c, Number(r.tratto.classeLetta) || 1), 1);
     return {
       type: 'CERCA_CHAT', _auto: true, _callId: `ricordo_${Number(ora).toString(36)}`, _executed: true,
-      _output: { automatica: true, results, ...(daFuori.length ? { daFuori } : {}) },
+      _output: { automatica: true, results, ...(daFuori.length ? { daFuori } : {}), ...(classeLetta > 1 ? { classeLetta } : {}) },
     };
   }
 
@@ -654,7 +717,8 @@
     TETTI_DI_SERIE, LIMITI, DURATE_CACHE, durataIn, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
     TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini, notaRisposta,
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
-    ESTERNO_COMANDO, letturaDaFuori, daFuoriDi, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
+    ESTERNO_COMANDO, ESTERNO_AIUTO, letturaDaFuori, daFuoriDi, classeDelMessaggio, classeDelleRisposte, trattoComeAzione,
+    provenienzaDellaChat, provenienzaDelFrammento, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
     coda, assembla, troppoLungo, tettoDopoRifiuto, rifiutaImmagini, INTESTAZIONE_CODA, pianoDellaCache,
     RILETTURA_MIN, capRilettura, rilettureDopoRifiuto, giaDavanti, senzaCancellati, ricordoComeAzione,
   };

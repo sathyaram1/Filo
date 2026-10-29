@@ -12,6 +12,7 @@ module.exports = function register(on, ctx) {
   const PathsCollector = globalThis.SN_PATHS_COLLECTOR;
   require('../fontiSegnaposto');
   const ContatoriSicurezza = require('../contatoriSicurezza');
+  const ContatoriServizio = require('../contatoriServizio');
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
   const controllaUscita = ContatoriSicurezza.contaUscite(portaUscite);
 
@@ -372,6 +373,7 @@ module.exports = function register(on, ctx) {
       settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
       attempts = buildAttemptChain(settings, modelForAction(settings, action), action);
     } catch (e) {
+      ContatoriServizio.misura('maiPartita', action, e);
       return { ok: false, code: (e && e.code) || 'NO_MODEL', error: fraseErrore(e) };
     }
     if (!attempts.some((a) => modelGate.supports(a.provider, 'decisions'))) {
@@ -516,6 +518,7 @@ module.exports = function register(on, ctx) {
       } catch (e) {
         // Nessun modello di sintesi configurato: si legge col browser, ma il motivo vero passa al
         // content script, così l'avviso dice cosa manca invece di un codice interno.
+        ContatoriServizio.misura('maiPartita', SN_CONST.ACTIONS.TTS, e);
         return ttsFallback(e?.message || 'no_tts_model', e?.code, e);
       }
       const Voices = globalThis.SN_TTS_VOICES;
@@ -554,6 +557,7 @@ module.exports = function register(on, ctx) {
             };
           }
         }
+        ContatoriServizio.misura('catena', SN_CONST.ACTIONS.TTS, attempts);
         try {
           // Chi ha servito e quanto è costato il router lo dice solo dopo: lo chiede il cancello, senza far aspettare la lettura.
           const r = await synthesizeWithVoiceRecovery((v) => modelGate.call({

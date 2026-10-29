@@ -36,12 +36,16 @@
 // l'emulatore non sa misurare. Al passaggio di #1518 (2026-10-23, firebase-tools
 // 15.34): 47/47 con due NOTE (Cache-Control e Content-Language non arrivano alle
 // regole; il codice di scarico scelto da chi carica l'emulatore lo toglie dai
-// metadati prima di valutarle).
+// metadati prima di valutarle). A #1728 (2026-10-29, firebase-tools 15.34.2):
+// 55/55 con tre NOTE; con le regole di prima 51/55, rossi i quattro casi a
+// campi assenti.
 //
-// QUEL CHE L'EMULATORE NON DICE (#1666): il motore vero scrive il codice di
-// scarico in `metadata.firebaseStorageDownloadTokens` PRIMA di valutare le
-// regole. Con `metadata.size() == 0` qui tutto era verde e in produzione ogni
-// allegato prendeva 403 dal 23/10 al 25/10. Dopo ogni pubblicazione delle
+// QUEL CHE L'EMULATORE NON DICE (#1666, #1728): il motore vero scrive il codice
+// di scarico in `metadata.firebaseStorageDownloadTokens` PRIMA di valutare le
+// regole, e a un caricamento normale non passa contentEncoding. Qui era tutto
+// verde e in produzione ogni allegato prendeva 403 (dal 23/10 al 25/10, poi dal
+// 26/10): l'emulatore riempie i campi che il motore vero lascia assenti, e un
+// campo assente letto senza `in` nega. Dopo ogni pubblicazione delle
 // regole la prova che conta è un caricamento vero dall'app (o `sealForUpload`
 // più POST al deposito): se risponde 403, il verde di questo file non vale.
 //
@@ -218,8 +222,10 @@ await prova('codifica scelta (Content-Encoding: gzip): NEGATA', 'ko',
   carica(fuori, nome(), BLOB, { contentType: OPACO, contentEncoding: 'gzip' }));
 nota('Cache-Control e Content-Language scelti: l’emulatore non li passa alle regole, quindi qui passano. '
   + 'La riga c’è, e la sua espressione si prova più sotto su una risorsa scritta a mano.');
-nota('Codice di scarico scelto da chi carica: l’emulatore lo toglie dai metadati prima delle regole e lo usa come codice. '
-  + 'Se il motore vero lo lasciasse vedere, la stessa riga che vieta le chiavi personalizzate lo rifiuterebbe (provato più sotto).');
+nota('Codice di scarico: l’emulatore lo toglie dai metadati prima delle regole, il motore vero ce lo scrive (#1666). '
+  + 'Che da solo passi e con un’altra chiave no si prova più sotto.');
+nota('Campi assenti: l’emulatore riempie contentEncoding e gli altri, il motore vero no (#1728). '
+  + 'Che una risorsa senza quei campi passi si prova più sotto; la prova che conta resta un caricamento dall’app pubblicata.');
 
 // ── Nomi: il percorso deve restare non indovinabile ─────────────────────────
 await prova('nome indovinabile (screenshot.octetstream): NEGATO', 'ko',
@@ -252,7 +258,18 @@ const CASI = {
   'cache-nulla': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'cacheControl': null, 'contentLanguage': null}", 'ok'],
   'cache-scelta': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'cacheControl': 'public, max-age=31536000'}", 'ko'],
   'lingua-scelta': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'contentLanguage': 'it'}", 'ko'],
-  'codice-visibile': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': null, 'contentEncoding': null}", 'ko'],
+  // Il codice di scarico lo scrive il motore vero prima delle regole (#1666): da solo passa, con un'altra chiave no.
+  'codice-visibile': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': null, 'contentEncoding': null}", 'ok'],
+  'codice-e-chiave': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'filoSistemato': 'si'}}", 'ko'],
+  // Campi ASSENTI, non nulli (#1728): al motore vero un caricamento normale non porta contentEncoding, e leggerlo
+  // nudo negava ogni allegato. Su questa risorsa scritta a mano l'emulatore fa lo stesso errore.
+  'senza-codifica': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': 'inline'}", 'ok'],
+  'senza-nome-di-scarico': ["{'metadata': {}, 'contentEncoding': null}", 'ok'],
+  'senza-chiavi': ["{'contentDisposition': null, 'contentEncoding': null}", 'ok'],
+  'nessun-campo': ['{}', 'ok'],
+  'solo-codifica-scelta': ["{'contentEncoding': 'gzip'}", 'ko'],
+  'solo-nome-scelto': ["{'contentDisposition': 'attachment; filename=\"fattura.exe\"'}", 'ko'],
+  'solo-chiave-scelta': ["{'metadata': {'filoSistemato': 'si'}}", 'ko'],
 };
 const regole = readFileSync(REGOLE_STORAGE, 'utf8');
 const coda = regole.lastIndexOf('match /{path=**}');

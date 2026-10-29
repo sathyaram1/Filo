@@ -391,6 +391,8 @@ app.whenReady().then(async () => {
               sandbox: preloadName !== 'internal-preload.js', nodeIntegration: false,
             },
           });
+          // Non è una scheda: senza il segno la pagina interna parlerebbe ai servizi come un sito (#1506).
+          captureWin.webContents._filoVistaInterna = preloadName === 'internal-preload.js';
           captureWin.loadURL(url);
           await entro(
             new Promise((res) => captureWin.webContents.once('did-stop-loading', res)),

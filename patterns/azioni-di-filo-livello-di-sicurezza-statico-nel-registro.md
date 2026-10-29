@@ -133,6 +133,13 @@ della chat (riordino delle schede, svuota archivio), che chiedono come dice la
   solo lui. La frase del popup la dà l'azione (`perchePerimetro`); un setter che vuole sempre un clic senza abbassare
   una difesa dichiara `chiede`. L'OK che risponde a una domanda rimasta aperta fa riprendere la richiesta da sola,
   dopo l'ultimo popup della fila. Sentinella: `tests/unit/vediSchermo.test.mjs`.
+- **Il testo che torna dal filo porta la lettura da cui è nato (#1508).** Una risposta di Filo salva `classeLetta`, la
+  classe peggiore che il compito aveva letto; riletta da un'altra conversazione (nel tratto, da CERCA_CHAT o da un
+  ricordo) entra nelle fonti come `filo:altra-chat`, a catena. Le pagine visitate ritrovate sono classe 3 (titoli) o 5
+  (riassunti), le parole scritte nell'Aiuto sopra un sito (`daPagina`) testo da fuori. Le risposte delle altre chat nel
+  tratto hanno la forma di una CERCA_CHAT (`trattoComeAzione`), così stato, uscite e accoglienza le leggono uguali.
+  Un tipo che le uscite trattano da non fidato dichiara una `fonte`. Sentinelle: `tests/unit/autonomia.test.mjs`,
+  `tests/unit/fontiDelFilo.test.mjs`.
 - **UI:** le conferme usano i componenti riusabili `SN_CONFIRM_UI.confirm`
   (livello 2) e `SN_CONFIRM_UI.confirmTyped` (livello 3) in
   `src/shared/confirmUi.js` — mai `window.confirm` nativo.

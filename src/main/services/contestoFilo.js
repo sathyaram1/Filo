@@ -116,6 +116,8 @@ function messaggiDi(chats) {
     }
     (c.messages || []).forEach((m, i) => {
       if (!m) return;
+      // Già risolta, anche per un archivio di prima del campo: chi rilegge non ha più le fonti della chat (#1508).
+      const classe = FC().classeDelMessaggio(m, c.fonti);
       out.push({
         chat: c.id,
         titolo: c.title || '',
@@ -126,6 +128,7 @@ function messaggiDi(chats) {
         ...(Array.isArray(m.letti) ? { letti: m.letti } : {}),
         ...(typeof m.esterno === 'string' ? { esterno: m.esterno } : {}),
         ...(m.daModello ? { daModello: true } : {}),
+        ...(classe > 1 ? { classeLetta: classe } : {}),
         ...(Number(m.images) > 0 ? { images: Number(m.images) } : {}),
         ...(m.role === 'user' && m.rispostaA ? { rispostaA: citata(m) } : {}),
         _i: i,
@@ -255,6 +258,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     messaggi: f.messaggi,
     visti: f.visti,
     azioni: f.azioni,
+    perUnaNuova: senzaTolti(f.perUnaNuova),
     vecchi: f.vecchi,
     coda: codaGrezza.map((m) => {
       const azioni = Array.isArray(m.actions) ? senzaTolti(m.actions) : m.actions;

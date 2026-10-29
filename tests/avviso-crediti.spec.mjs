@@ -26,6 +26,20 @@ let saldo = 400;
 const modelliVisti = [];
 const corpiChat = [];
 
+// Le misure del servizio dei contatori (#1472) nelle ore di oggi, sommate.
+const servizioOggi = (app) => app.evaluate(async () => {
+  const s = await globalThis.SN_CONTATORI_MAIN.letto();
+  const g = globalThis.SN_CONTATORI.giornoDi(Date.now());
+  const out = {};
+  for (const [k, ora] of Object.entries(s.ore || {})) {
+    if (!k.startsWith(`${g}T`) || !ora.servizio) continue;
+    for (const [m, conti] of Object.entries(ora.servizio)) {
+      for (const [c, n] of Object.entries(conti || {})) (out[m] = out[m] || {})[c] = ((out[m] || {})[c] || 0) + n;
+    }
+  }
+  return out;
+});
+
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(body));
@@ -327,6 +341,18 @@ test('(B) senza conversazione è una notifica che apre Crediti; lì i rimedi si 
   // «Metti la chiave» porta al campo della chiave.
   await sez.locator('.sn-crediti-rimedio[data-rimedio="chiave"] button').click();
   await expect(crediti.locator('#ownKeyInput')).toBeFocused();
+
+  // I contatori del servizio (#1472): l'avviso scattato, i rimedi scelti (anche quello che resta nella pagina), le
+  // automatiche spente, l'invito riscattato e il saldo in fasce; mai la chiave.
+  await expect.poll(async () => ((await servizioOggi(app)).avviso_crediti || {})['rimedio|chiave'] || 0, { timeout: 5_000 }).toBe(1);
+  const sv = await servizioOggi(app);
+  expect(sv.avviso_crediti['scattato|proiezione']).toBeGreaterThanOrEqual(1);
+  expect(sv.avviso_crediti['rimedio|automatiche']).toBe(1);
+  expect(sv.avviso_crediti['spenta|riassuntoSchede']).toBe(1);
+  expect(sv.avviso_crediti['spenta|spiegaAnticipata']).toBe(1);
+  expect(sv.invito).toEqual({ ok: 1 });
+  expect(sv.saldo_spesa['saldo|c500']).toBe(1);
+  expect(JSON.stringify(await app.evaluate(async () => globalThis.SN_CONTATORI_MAIN.letto()))).not.toContain(PERSONAL_KEY);
 
   // Lo stesso calo non avvisa due volte; il saldo risale (un regalo) e riscende: avvisa di nuovo.
   expect(await valuta(app)).toBe('gia-detto');

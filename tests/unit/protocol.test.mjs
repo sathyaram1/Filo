@@ -49,6 +49,8 @@ test('serve una pagina HTML interna con header CSP', async () => {
   assert.equal(csp, FILO_PAGE_CSP);
   assert.match(csp, /script-src 'self' filo:/);
   assert.match(csp, /object-src 'none'/);
+  // #1506 — un sito non incornicia una pagina di Filo.
+  assert.match(csp, /(^|; )frame-ancestors 'self' filo:(;|$)/);
 });
 
 // #830.4: le altre pagine si scrivono <host>/<host>.html, e chi scrive così l'indirizzo della home la deve trovare.

@@ -20,6 +20,7 @@ const { installCookies } = require('./tabs/tabCookies');
 const { installRestaConnesso } = require('./tabs/tabRestaConnesso');
 const Permessi = require('./services/permessiPagine');
 const { avvisoIndirizzoFermato } = require('./services/indirizzoFermato');
+const { navigazioneVersoFilo, paginaDeiBloccati } = require('./services/navigazioneVersoFilo');
 const MenuDiRiserva = require('./menuDiRiserva');
 const IconaScheda = require('./services/iconaScheda');
 const ChiusuraConCaselle = require('./tabs/chiusuraConCaselle');
@@ -2881,7 +2882,7 @@ class TabManager {
     wc.on('will-navigate', (event, url) => {
       // SICUREZZA: niente schemi non-web in cima. mailto/tel/sms non sono
       // pagine e vanno consegnati al sistema invece di fallire.
-      if (isWebUnsafeNav(url)) {
+      if (isWebUnsafeNav(url) || this._versoFiloDaFuori(tab, url)) {
         event.preventDefault();
         if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url, undefined, { navigazione: true });
         else fermaNavigazione(url, { win: this.win, wc });
@@ -2912,7 +2913,7 @@ class TabManager {
     // SICUREZZA (#309) — will-navigate NON scatta sui redirect lato server: senza questa
     // guardia un sito potrebbe rimbalzare la scheda verso uno schema non-web.
     wc.on('will-redirect', (event, url) => {
-      if (isWebUnsafeNav(url)) {
+      if (isWebUnsafeNav(url) || this._versoFiloDaFuori(tab, url)) {
         event.preventDefault();
         if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url, undefined, { navigazione: true });
         else fermaNavigazione(url, { win: this.win, wc });
@@ -2923,6 +2924,12 @@ class TabManager {
       // #590 — un redirect è un cambio d'indirizzo come gli altri: senza, un
       // accorciatore o un redirect aperto porta a un sito della lista.
       if (event.isMainFrame === false) return;
+      // La home nuda, l'unica pagina di Filo concessa a un rinvio (#1506), arriva in una vista di Filo come da un collegamento.
+      if (this._crossesTrustBoundary(tab, url)) {
+        event.preventDefault();
+        this._recreateView(tab, url, { nuova: true });
+        return;
+      }
       const fermata = this._fermaSaltoDellaScheda(tab, url);
       if (!fermata) return;
       event.preventDefault();
@@ -3334,7 +3341,7 @@ class TabManager {
       // SICUREZZA: nega l'apertura (window.open / target=_blank) verso schemi
       // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
       // mailto:/tel:/sms: vengono consegnati all'OS invece di essere ignorati.
-      if (isWebUnsafeNav(url)) {
+      if (isWebUnsafeNav(url) || this._versoFiloDaFuori(tab, url)) {
         if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url, referrer);
         else fermaNavigazione(url, { win: this.win, wc });
         return { action: 'deny' };
@@ -3558,8 +3565,9 @@ class TabManager {
       if (!mostrata) setImmediate(() => { try { win.close(); } catch (_) {} });
     };
     pwc.on('will-frame-navigate', (event) => fermaInvitoNelRiquadro(event, { win: this.win, wc: pwc }));
+    // Una pagina di Filo qui girerebbe col preload delle pagine web (#1506).
     pwc.on('will-navigate', (event, url) => {
-      if (isWebUnsafeNav(url)) {
+      if (isWebUnsafeNav(url) || navigazioneVersoFilo(url, { finestrella: true })) {
         event.preventDefault();
         this._esternoDallaPagina(pwc, origine ? origine.id : null, url, undefined, { navigazione: true });
         return;
@@ -3569,7 +3577,7 @@ class TabManager {
     // SICUREZZA (#309) — come per le schede: will-navigate non copre i redirect
     // lato server, e un fornitore d'identità ostile potrebbe rimbalzare qui.
     pwc.on('will-redirect', (event, url) => {
-      if (isWebUnsafeNav(url)) {
+      if (isWebUnsafeNav(url) || navigazioneVersoFilo(url, { finestrella: true })) {
         event.preventDefault();
         this._esternoDallaPagina(pwc, origine ? origine.id : null, url, undefined, { navigazione: true });
         return;
@@ -3578,7 +3586,7 @@ class TabManager {
       if (this._maybeBlockNavigation(origine, url)) ferma(event);
     });
     pwc.setWindowOpenHandler(({ url, referrer, features }) => {
-      if (isWebUnsafeNav(url)) {
+      if (isWebUnsafeNav(url) || navigazioneVersoFilo(url, { finestrella: true })) {
         this._esternoDallaPagina(pwc, origine ? origine.id : null, url, referrer);
         return { action: 'deny' };
       }
@@ -4018,6 +4026,22 @@ class TabManager {
       if (!NE.isBlockedPageUrl(corrente) || da !== corrente) return false;
       const bersaglio = indirizzoCanonico(NE.targetOf(corrente));
       return bersaglio === indirizzoCanonico(url) && tab._pagineBloccate.has(bersaglio);
+    } catch (_) { return false; }
+  }
+
+  // Da una scheda del web nessuna navigazione arriva su una pagina di Filo (#1506), tranne «Gestisci i siti bloccati»
+  // dalla pagina «Sito bloccato» che il main ha messo in quella scheda.
+  _versoFiloDaFuori(tab, url) {
+    if (!navigazioneVersoFilo(url, { interna: !!tab.isInternal })) return false;
+    return !(paginaDeiBloccati(url) && this._paginaBloccataDelMain(tab));
+  }
+
+  _paginaBloccataDelMain(tab) {
+    const NE = globalThis.SN_NET_ERROR;
+    if (!NE || !tab._pagineBloccate) return false;
+    try {
+      const corrente = tab.view.webContents.getURL() || '';
+      return NE.isBlockedPageUrl(corrente) && tab._pagineBloccate.has(indirizzoCanonico(NE.targetOf(corrente)));
     } catch (_) { return false; }
   }
 

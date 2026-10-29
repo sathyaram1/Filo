@@ -38,6 +38,7 @@ require(path.join(SHARED, 'contatoriGiornalieri.js')); // #969 — i contatori g
 require(path.join(SHARED, 'contatoriFinestra.js')); // #1470 — i contatori della finestra, dopo quelli che ne danno gli errori
 require(path.join(SHARED, 'contatoriSicurezza.js')); // #1474 — i contatori della sicurezza, dopo quelli che ne danno le funzioni
 require(path.join(SHARED, 'contatoriHomePagina.js')); // #1473 — i contatori della home e degli automatismi, dopo quelli che ne danno i passi
+require(path.join(SHARED, 'contatoriServizio.js')); // #1472 — i contatori del servizio, dopo quelli che ne danno funzioni e tetti
 require(path.join(SHARED, 'gestiContati.js')); // #1471 — i gesti contati: segno dei trascinamenti, nome letto su un'icona
 // Elenco delle funzioni impostabili + le loro etichette: serve al main per
 // chiamare una funzione scoperta con lo STESSO nome che l'utente legge nelle
