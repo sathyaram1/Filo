@@ -28,7 +28,14 @@ function misura(shell) {
       .filter((c) => getComputedStyle(c).display !== 'none')
       // Le misure di layout, non il riquadro a schermo: la spinner gira e il suo riquadro ruotato è più largo.
       .map((c) => ({ cls: c.className.split(' ')[0], left: r.left + c.offsetLeft, right: r.left + c.offsetLeft + c.offsetWidth, width: c.offsetWidth }));
-    return { id: tab.dataset.id, active: tab.classList.contains('active'), left: r.left, right: r.right, width: r.width, figli };
+    // Il titolo che si legge: quanto è largo e quanto vuole la sua prima lettera coi puntini (#1293).
+    const t = tab.querySelector('.title');
+    const cs = getComputedStyle(t);
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const leggibile = cs.display !== 'none' && getComputedStyle(t.firstElementChild || t).visibility === 'visible';
+    const titolo = { largo: leggibile ? t.offsetWidth : 0, serve: c.measureText(([...t.textContent][0] || '') + '…').width };
+    return { id: tab.dataset.id, active: tab.classList.contains('active'), left: r.left, right: r.right, width: r.width, figli, titolo };
   }));
 }
 
