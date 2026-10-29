@@ -266,7 +266,7 @@
   }
 
   // ------------------------------------------------------------
-  // Ordine arcobaleno della barra e della Cronologia (§1.3)
+  // Ordine arcobaleno della barra: /riordina e la riapertura (§1.3)
   // ------------------------------------------------------------
   // La chiave è il colore salvato, cioè quello estratto: l'adattamento a schermo non sposta nessuno.
   // Grigi chiari in testa e scuri in coda, dal più chiaro al più scuro; i senza colore dopo, com'erano.
