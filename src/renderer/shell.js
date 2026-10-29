@@ -1427,7 +1427,11 @@
       perMisura.push([id, d.attiva, d.titolo, d.paese, d.ferma || 0, d.permessi || null]);
       nodi.push(el);
     }
-    for (const id of [...schedeVive.keys()]) if (!visti.has(id)) schedeVive.delete(id);
+    for (const [id, el] of [...schedeVive]) {
+      if (visti.has(id)) continue;
+      if (titoliStretti) titoliStretti.unobserve(el._parti.title);
+      schedeVive.delete(id);
+    }
     if (nodi.length !== tabsEl.children.length || nodi.some((n, i) => tabsEl.children[i] !== n)) {
       allineaSchede(nodi);
       cambiata = true;
