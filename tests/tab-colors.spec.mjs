@@ -332,7 +332,7 @@ test.describe('tinta viva delle schede non attive', () => {
     const dark = await expectFormula(0.6, true);
     expect(lum(dark.bar)).toBeLessThan(0.05);
 
-    await shell.locator('.tab .title').filter({ hasText: /^Sito rosso$/ }).hover();
+    await shell.hover('.tab .title:text-is("Sito rosso")');
     await expect.poll(async () => {
       const r = await readRedTab();
       return !!r && !near(r.bg, dark.bg) && contrast(r.title, r.bg) >= 4.5;
