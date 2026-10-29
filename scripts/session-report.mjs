@@ -27,7 +27,8 @@
 //   fra la sua chiamata Agent e il risultato) e si sommano nel suo rapporto,
 //   come quelli di una sessione (figliDelSottoAgente). Da una cartella di lavoro separata (git
 //   worktree) si guarda anche la cartella del checkout principale, dove Claude
-//   Code li scrive davvero.
+//   Code li scrive davvero. E la cartella che contiene `<CLAUDE_CODE_SESSION_ID>.jsonl`: una sessione con più
+//   repository parte da quella sopra i cloni, che non è nessuna delle due (#1761).
 //   `since` (il rilascio lo prende dal marcatore del biglietto) limita il conto
 //   a quello che è successo da quel momento.
 //
@@ -387,7 +388,19 @@ export function cartelleTranscript({ env = process.env, cwd = process.cwd(), con
     const c = join(base, 'projects', slugProgetto(dir));
     if (!cartelle.includes(c)) cartelle.push(c);
   }
+  const s = cartellaDellaSessione(join(base, 'projects'), env.CLAUDE_CODE_SESSION_ID);
+  if (s && !cartelle.includes(s)) cartelle.push(s);
   return cartelle;
+}
+
+/** La cartella di progetto col transcript della sessione `id`, o ''. */
+function cartellaDellaSessione(progetti, id) {
+  const s = String(id || '').trim();
+  if (!/^[A-Za-z0-9_-]+$/.test(s)) return '';
+  let nomi = [];
+  try { nomi = readdirSync(progetti); } catch (_) { return ''; }
+  const n = nomi.find((d) => existsSync(join(progetti, d, `${s}.jsonl`)));
+  return n ? join(progetti, n) : '';
 }
 
 export function trovaTranscript({ explicit = '', env = process.env, cwd = process.cwd(), configDir = '' } = {}) {

@@ -755,6 +755,16 @@ export function cartellaCloneServer(env = process.env) {
 
 export { cloneDentroIlRepo };
 
+/**
+ * Una routine con più repository parte dalla cartella sopra i cloni (#1761): lì i passi dell'orchestratore senza
+ * percorso (git, setup) cadrebbero fuori da Filo. → la riga che lo manda nella radice, o '' se ci sta già. PURA.
+ */
+export function rigaCartellaDiPartenza(cwd, root) {
+  if (!String(cwd || '').trim() || cloneDentroIlRepo(cwd, root)) return '';
+  const radice = String(resolve(root)).split('\\').join('/');
+  return `La sessione è partita da ${cwd}, fuori dal checkout di Filo. Prima di ogni altro passo, in una chiamata da sola: cd "${radice}". I passi qui sotto partono da lì.`;
+}
+
 /** Le istruzioni del lavoro server, coi percorsi veri del clone e dello strumento delle credenziali. */
 export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs') } = {}) {
   const f = resolve(ROLES_DIR, LAVORO_SERVER_FILE);
@@ -2481,6 +2491,8 @@ if (isMainModule) {
               process.exit(3);
             }
           }
+          const partenza = rigaCartellaDiPartenza(process.cwd(), ROOT);
+          if (partenza) console.log(`\n${partenza}`);
           console.log('Le tue istruzioni:\n');
           console.log(absolutizeRecipe(brief, tools, ROOT)
             || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');

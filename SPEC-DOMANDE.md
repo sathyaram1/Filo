@@ -989,14 +989,11 @@ per fase, scrivibile in Automazioni con #1193). Il gancio che li impone è
   Un token di applicazione GitHub dura al massimo un'ora: è un limite di
   GitHub, non una scelta. Per il worker vale **finché il lavoro serve**:
   - ogni git che parla con GitHub passa da un comando fisso del canale
-    (`routine-channel.mjs git-server`, #1233), che chiede il token al server e
-    lo dà solo a quella chiamata: niente aiutante di credenziali, che il
-    controllo dei permessi della sessione cloud blocca. Il token viaggia
-    nell'URL riscritto solo per quella chiamata (scelta dell'owner su #1233),
-    perché il proxy della sessione sostituisce l'intestazione di
-    autorizzazione; se a respingerlo è il proxy e non GitHub, il comando lo
-    dice. La prova vera da una sessione cloud la fa il primo lavoro server
-    dopo la fusione (#1221);
+    (`routine-channel.mjs git-server`, #1233), che chiede il token al server:
+    il sì o il no si decide lì. In locale il token va solo a quella chiamata,
+    nell'URL riscritto; in cloud non si usa, e autentica il proxy della
+    sessione, che serve solo i repository agganciati alla routine (#1761). Le
+    due strade stanno nella sezione 14 di ROUTINE-AUTH-SPEC.md;
   - il worker non se ne accorge;
   - alla chiusura del biglietto il server revoca il token in corso.
 
@@ -1004,8 +1001,10 @@ per fase, scrivibile in Automazioni con #1193). Il gancio che li impone è
   entro l'ora, e uno chiuso subito.
 
   Il server lo dà solo a un biglietto pulito su un feedback fidato, e non lo
-  rinnova a un biglietto che si è sporcato. Il worker clona filo-security con
-  quel token e spinge il suo ramo.
+  rinnova a un biglietto che si è sporcato. In locale il worker clona
+  filo-security con quel token e spinge il suo ramo; in cloud, dove la rete
+  la apre il proxy, quel limite lo tiene git-server chiedendo il sì a ogni
+  chiamata.
 - **Una routine a parte (#1253).** Dalla cloud il clone passa solo se la routine
   ha filo-security fra i suoi repo: il proxy della sessione vede solo quelli.
   Quindi i lavori server li fa una routine dedicata, con Filo e filo-security

@@ -974,3 +974,22 @@ test('ogni rapporto porta la versione del listino, e un prezzo cambiato senza nu
   const senza = await generaRapporto({ transcript: join(cartellaTemporanea(), 'non-esiste.jsonl'), role: 'resolver' });
   assert.equal(senza.listino, LISTINO, 'anche il rapporto minimo, senza transcript');
 });
+
+test('una sessione partita sopra i cloni: il transcript si trova dall’id della sessione (#1761)', () => {
+  const casa = cartellaTemporanea('filo-rapporto-sopra-');
+  try {
+    const config = join(casa, 'claude');
+    const lavoro = join(casa, 'lavoro');
+    mkdirSync(lavoro, { recursive: true });
+    const cartella = join(config, 'projects', slugProgetto(resolve(join(casa, 'sopra'))));
+    mkdirSync(cartella, { recursive: true });
+    const id = '44c316b4-5439-5fcd-9342-9194c06de00c';
+    const file = join(cartella, `${id}.jsonl`);
+    writeFileSync(file, RIGHE.join('\n'), 'utf8');
+    assert.equal(trovaTranscript({ cwd: lavoro, configDir: config, env: {} }).file, '', 'dalla cartella di lavoro sola non si vede');
+    assert.equal(trovaTranscript({ cwd: lavoro, configDir: config, env: { CLAUDE_CODE_SESSION_ID: id } }).file, file);
+    for (const strano of ['../sopra', 'a/b', ' ', `${id}.jsonl`]) {
+      assert.equal(trovaTranscript({ cwd: lavoro, configDir: config, env: { CLAUDE_CODE_SESSION_ID: strano } }).file, '', strano);
+    }
+  } finally { togliCartella(casa); }
+});

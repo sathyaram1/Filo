@@ -1,17 +1,20 @@
 ## Lavoro server: anche filo-security
 
 Questo lavoro tocca il server, il repo privato `sathyaram1/filo-security`. Il tuo biglietto porta l'ambito
-`server`: finché resta pulito, il server ti dà un token da un'ora, solo per quel repo. Qui il codice del server lo
-tocchi: il resto di «Se il lavoro si fa solo in locale» (deploy, segreti, credenziali dell'owner) vale ancora.
+`server`: finché resta pulito, il server ti lascia parlare con quel repo, e con quello soltanto. Qui il codice del
+server lo tocchi: il resto di «Se il lavoro si fa solo in locale» (deploy, segreti, credenziali dell'owner) vale ancora.
 
 Il clone sta **fuori** dal checkout di Filo, in `<CLONE>`. L'hook di salvataggio pubblica tutto quello che sta
 dentro Filo: un file del server copiato lì finisce sul repo pubblico. Non copiare mai niente del server dentro Filo.
 
 ### Git verso filo-security: solo `git-server`
 
-Ogni comando di git che parla con GitHub (clone, ls-remote, fetch, push) passa da qui, e solo da qui. Chiede il token
-al server e lo dà a quella sola chiamata di git: non resta nel clone, non si stampa, e aiutanti e askpass del proxy
-della sessione per quella chiamata non valgono. Il resto (checkout, commit, merge, diff) è git normale nel clone.
+Ogni comando di git che parla con GitHub (clone, ls-remote, fetch, push) passa da qui, e solo da qui. Prima chiede al
+server il token del biglietto: è lì che si decide se puoi (biglietto pulito, ambito, registro del ramo). In locale il
+token va a quella sola chiamata di git: non resta nel clone, non si stampa, e aiutanti e askpass della macchina per
+quella chiamata non valgono. In cloud il token non si usa: git passa dal proxy della sessione, con le sue credenziali,
+e il proxy serve solo i repository agganciati alla routine. Il resto (checkout, commit, merge, diff) è git normale nel
+clone.
 
 ```bash
 node "<CANALE>" git-server clone "<CLONE>"
@@ -22,13 +25,14 @@ node "<CANALE>" git-server push "<CLONE>" <ramo>
 
 Uscita 4: il server non ha dato il token, e il motivo è stampato (biglietto sporco o chiuso, feedback non fidato, ramo
 del server scritto fuori registro, GitHub che non risponde). Uscita 1 dopo «git è uscito con»: l'errore di git sta
-sopra, e la riga dopo dice chi ha respinto il token: GitHub, il proxy della sessione, o un rifiuto senza firma. Nelle
-note va il testo esatto di git, con quella riga. Se è
+sopra, e la riga dopo dice chi l'ha respinto (in locale GitHub, il proxy o un rifiuto senza firma; in cloud se manca
+l'aggancio di filo-security alla routine, che è un passo dell'owner). Nelle note va il testo esatto di git, con quella
+riga. Se è
 il controllo dei permessi della sessione a bloccare il comando, copia nelle note il suo messaggio esatto. Non aggirare nessuno di questi no: niente token scritti nell'URL, niente aiutanti di credenziali, niente altre
 credenziali. La parte del server da qui non si fa, e per qualunque ruolo è un guasto da dichiarare, anche quando il no
 è per regola (biglietto sporco o chiuso, feedback non fidato, ramo del server scritto fuori registro): nessuno lo
 riprende sul PC dell'owner. Vale la sezione «Un guasto dell'ambiente si dice con una domanda» (il controllo di sicurezza
-salta la domanda), col testo esatto di git o del rifiuto e la riga su chi ha respinto il token in `notePerAgenti`. Il
+salta la domanda), col testo esatto di git o del rifiuto e la riga su chi l'ha respinto in `notePerAgenti`. Il
 gruppo è `guasto: filo-security`. Chi verifica non passa il lavoro guardando solo l'app: rilascia col guasto senza
 registrare la critica, e il lavoro torna in coda da sé per un'altra verifica quando il guasto è passato.
 
