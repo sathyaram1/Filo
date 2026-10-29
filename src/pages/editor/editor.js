@@ -3264,10 +3264,11 @@
     writeCollection();
   }
 
-  // Gli strumenti con una scorciatoia: quelli nel pannello, o tutti (chi ne sceglie una non deve rubarla a uno tolto).
-  function elementiConScorciatoia({ tutti = false } = {}) {
+  // Gli strumenti con una scorciatoia, dentro o fuori dal pannello: la scorciatoia è dello strumento, come Ctrl+B è del
+  // Grassetto anche fuori dal pannello (#1433). Sentinella: tests/editor-scorciatoie-strumenti.spec.mjs.
+  function elementiConScorciatoia() {
     if (!pannello || !PANNELLI) return [];
-    const ids = tutti ? PANNELLI.catalogo('editor').elementi.map((e) => e.id) : pannello.elementi();
+    const ids = PANNELLI.catalogo('editor').elementi.map((e) => e.id);
     return ids.filter((id) => AZIONE_SCORCIATOIA[id])
       .map((id) => ({ id, c: candidatoDi(pannello.config(id)) }))
       .filter((x) => x.c);
