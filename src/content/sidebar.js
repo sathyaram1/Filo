@@ -187,6 +187,7 @@
     passiDaSolo = 0;
     continuaAperto = null;
     valutazione = null;
+    docConversazione = '';
     session = newSession();
     // Ogni apertura è una conversazione sua anche nel filo.
     convFilo = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID()
