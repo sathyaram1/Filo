@@ -336,34 +336,60 @@
       const fuori = letturaDaFuori(lista[i], comandi[i]);
       return fuori ? { ...(e || {}), azioni: [...((e && e.azioni) || []), fuori] } : e;
     };
-    // Le immagini tornano col loro messaggio, dalle più nuove: oltre i tetti quelle prima lasciano la nota.
+    // Le immagini tornano col loro messaggio, dalle più nuove, da `ancora.foto` in poi: oltre i tetti quelle prima
+    // lasciano la nota, e il taglio scende di un quarto come per i token, così non riscrive il tratto a ogni foto nuova.
     const fotoDi = new Map();
+    let fotoDa = stessaAncora && Number.isFinite(Date.parse(ancora.foto)) ? ancora.foto : null;
     if (typeof immagini === 'function') {
-      let quante = 0;
-      let caratteri = 0;
-      for (let i = n - 1; i >= 0; i--) {
-        const m = lista[i];
-        if (m.role !== 'user' || !numeroImmagini(m)) continue;
+      const urlsDi = (m) => {
+        if (m.role !== 'user' || !numeroImmagini(m)) return [];
         const date = immagini(m);
-        const urls = (Array.isArray(date) ? date : []).filter((u) => typeof u === 'string' && u);
-        if (!urls.length) continue;
-        // Un messaggio che non ci sta intero tiene le sue prime foto che ci stanno: le altre lasciano la nota.
-        const tenute = [];
-        for (const u of urls) {
-          if (quante + 1 > MAX_IMMAGINI_RIMANDATE || caratteri + u.length > MAX_CARATTERI_IMMAGINI) break;
-          quante += 1;
-          caratteri += u.length;
-          tenute.push(u);
+        return (Array.isArray(date) ? date : []).filter((u) => typeof u === 'string' && u);
+      };
+      // `scala`: la parte dei tetti da riempire. Un messaggio che non ci sta intero tiene le prime foto che ci stanno
+      // nei tetti pieni solo se è il più nuovo con foto; altrimenti il taglio cade dopo di lui.
+      const scegli = (da, scala) => {
+        const out = new Map();
+        let quante = 0;
+        let caratteri = 0;
+        let primo = null;
+        for (let i = n - 1; i >= 0; i--) {
+          const m = lista[i];
+          if (da != null && Date.parse(m.ts) < Date.parse(da)) break;
+          const urls = urlsDi(m);
+          if (!urls.length) continue;
+          const peso = urls.reduce((k, u) => k + u.length, 0);
+          if (quante + urls.length <= MAX_IMMAGINI_RIMANDATE * scala && caratteri + peso <= MAX_CARATTERI_IMMAGINI * scala) {
+            quante += urls.length;
+            caratteri += peso;
+            out.set(i, urls);
+            primo = m.ts;
+            continue;
+          }
+          if (scala === 1 || out.size) return { out, primo, oltre: true };
+          const tenute = [];
+          for (const u of urls) {
+            if (tenute.length + 1 > MAX_IMMAGINI_RIMANDATE || caratteri + u.length > MAX_CARATTERI_IMMAGINI) break;
+            caratteri += u.length;
+            tenute.push(u);
+          }
+          if (tenute.length) out.set(i, tenute);
+          return { out, primo: tenute.length ? m.ts : primo, oltre: true };
         }
-        if (tenute.length) fotoDi.set(i, tenute);
-        if (tenute.length < urls.length) break;
+        return { out, primo, oltre: false };
+      };
+      let scelta = scegli(fotoDa, 1);
+      if (scelta.oltre) {
+        scelta = scegli(null, RIENTRO);
+        fotoDa = scelta.primo;
       }
+      for (const [i, urls] of scelta.out) fotoDi.set(i, urls);
     }
     const opzioni = (i) => {
       const m = lista[i];
       if (m.role === 'user') {
         return {
-          tetto: token, foto: fotoDi.get(i) || null,
+          tetto: token, foto: fotoDi.get(i) || null, intero: typeof intero === 'function' && !!intero(m),
           preambolo: typeof preambolo === 'function' ? preambolo(m) : '', dopo: typeof note === 'function' ? note(m) : null,
         };
       }
