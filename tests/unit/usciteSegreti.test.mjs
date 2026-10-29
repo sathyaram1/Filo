@@ -781,13 +781,20 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     assert.equal(X.verboUscita('TIMER'), '');
   });
 
+  // La porta guarda la risposta del modello nel main, prima che arrivi alla pagina: una domanda della pagina su un
+  // testo suo direbbe al sito se è un segreto letto altrove (#589.1 giro 4).
   test('l\'assistente di pagina chiede alla porta prima di proporre un testo per un campo', () => {
+    const ai = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'ai.js'), 'utf8');
+    const richiesta = corpo(ai, 'on(MSG.AI_REQUEST');
+    assert.ok(richiesta.indexOf('campoFermato(r, msg, sender)') > 0
+      && richiesta.indexOf('campoFermato(r, msg, sender)') < richiesta.lastIndexOf('return { ok: true'), 'la risposta arriva alla pagina prima della porta');
+    const fermato = corpo(ai, 'async function campoFermato(');
+    assert.match(fermato, /controllaUscita\(\{ type: 'CAMPO_PAGINA'/);
+    assert.match(fermato, /highlight: null/, 'il testo fermato arriva lo stesso alla pagina');
     const sidebar = readFileSync(join(ROOT, 'src', 'content', 'sidebar.js'), 'utf8');
-    const prima = sidebar.indexOf('await campoFermato(parsed.highlight.value)');
-    assert.ok(prima > 0, 'il testo per un campo non passa dalla porta');
-    assert.ok(prima < sidebar.indexOf('Highlight.show(parsed.highlight.selector'), 'la porta deve venire prima del riquadro «Accetta»');
-    const filo = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'), 'utf8');
-    assert.match(corpo(filo, 'on(MSG.CONTROLLA_CAMPO'), /controllaUscita\(\{ type: 'CAMPO_PAGINA'/);
+    assert.ok(sidebar.includes('if (res.campoFermato) fermata('), 'la frase del campo fermato non arriva all\'utente');
+    assert.ok(!/CONTROLLA_CAMPO|controlla_campo/.test(sidebar + readFileSync(join(ROOT, 'src', 'shared', 'messages.js'), 'utf8')),
+      'torna la domanda della pagina sul testo per un campo');
   });
 
   // Un indirizzo che una pagina di Filo apre, legge o passa al sistema l'ha scelto quasi sempre un modello: passa dalla
