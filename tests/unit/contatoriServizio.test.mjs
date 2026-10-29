@@ -77,8 +77,9 @@ function banco({ impostazioni = {}, saldo = 42, spesa = 0.5, coda = { voci: 0, p
     esclusi: async () => [],
     casuale: () => `${'7'.repeat(18)}${String(++b.n).padStart(2, '0')}`,
     rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'K' }),
+    idToken: async () => 'token-anonimo',
     fetch: async (url, opt) => {
-      const coll = /documents\/([a-z-]+)\?/.exec(url)[1];
+      const coll =/documents\/([a-z-]+)\?/.exec(url)[1];
       const doc = Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)]));
       (per[coll] || (per[coll] = [])).push({ url, doc, body: opt.body });
       return { ok: true, status: 200, json: async () => ({}) };
