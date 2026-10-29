@@ -210,3 +210,15 @@ test('#1318 indirizzoChiesto: la posta senza mailto va al programma di posta, il
   for (const s of ['Documenti\\conto.pdf', '%USERPROFILE%\\Desktop\\x.pdf', '$HOME/x.pdf', './a.txt', '/wiki/Roma']) assert.ok(sembraPercorso(s), s);
   for (const s of ['ricetta carbonara', 'mario.rossi@esempio.it', 'gatti buffi']) assert.ok(!sembraPercorso(s), s);
 });
+
+test('#1318 giro 5 indirizzoChiesto: un percorso relativo o un nome di file non diventa un sito inventato', () => {
+  const { indirizzoChiesto, sembraPercorso } = globalThis.SN_URL_NAV;
+  for (const s of ['./conto.pdf', '../Documenti/conto.pdf', 'conto.pdf', '"relazione finale.docx"', 'foto.JPG']) {
+    assert.equal(indirizzoChiesto(s), '', s);
+    assert.ok(sembraPercorso(s), s);
+  }
+  // I domini veri con un'estensione che sembra di file restano siti; un percorso assoluto resta il suo file.
+  for (const s of ['obsidian.md', 'bun.sh', 'docs.rs', 'sito.it', 'esempio.com/report.pdf']) assert.match(indirizzoChiesto(s), /^https:\/\//, s);
+  assert.equal(indirizzoChiesto('"file:///C:/x/conto.pdf"'), 'file:///C:/x/conto.pdf');
+  assert.equal(indirizzoChiesto('/run/media/mario/CHIAVETTA/conto.pdf'), 'file:///run/media/mario/CHIAVETTA/conto.pdf');
+});
