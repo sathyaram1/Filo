@@ -445,7 +445,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     memo.ricordi = Array.isArray(ricordi) && ricordi.length ? ricordi : null;
     memo.dopo = Array.isArray(dopo) ? dopo.filter(Boolean) : null;
     memo.intero = ep;
-    const pre = TV().preambolo({ eventi: memo.eventi.testo, stato: stato || '', turno: turnoDi(memo) });
+    const pre = TV().preambolo({ eventi: memo.eventi.testo, stato: stato || '', turno: turnoDi(memo, { intervista: true }) });
     const fotoQui = foto.get(FC().chiave(laDomanda)) || (Array.isArray(urls) && urls.length ? urls : null);
     return FC().rendiMessaggio(laDomanda, f.ultimo, { tetto: tetti.token, foto: fotoQui, preambolo: pre, dopo: memo.dopo, intero: true });
   };
