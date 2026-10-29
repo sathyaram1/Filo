@@ -260,7 +260,10 @@ html[data-chrome-compact="1"] .addr {
   width: 8px;
   background: radial-gradient(circle at top right, transparent 8px, var(--tab-active) 8px);
 }
+/* Il posto del titolo è un contenitore: se non ci sta almeno una lettera coi puntini (2em) il testo non si mostra,
+   qualunque cosa gli stia accanto (#1293). Misurando la scheda conta il testo intero. */
 .tab .title {
+  container: titolo / inline-size;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
