@@ -130,7 +130,7 @@ async function schedePronte(shell) {
 
 // I colori non solo ci sono: hanno anche SMESSO di cambiare. Una pagina appena
 // aperta può correggere il proprio colore identità un istante dopo averlo dato
-// (il content script lo ricalcola quando la pagina ha finito di caricare), e un
+// (il content script lo ricalcola dopo 0,8 e 2 secondi), e un
 // colore che cambia dopo un riordino rende il riordino successivo un lavoro
 // vero invece che un non-fare. Chi vuole verificare che riordinare due volte
 // non muova niente deve prima aspettare che non ci sia più niente da muovere:
