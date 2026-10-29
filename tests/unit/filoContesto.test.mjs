@@ -155,6 +155,18 @@ test('una conversazione ripresa da prima dei tetti porta i suoi ultimi messaggi,
   assert.ok(!g.messaggi.some((m) => /progetto casa/.test(m.content)));
 });
 
+test('una conversazione ripresa resta davanti da ogni scheda finché l\'inizio del tratto tiene: cambiare scheda non riscrive il tratto', () => {
+  const filo = [...scambio('vecchia', 24 * 10, 'progetto casa', 'ne parliamo'), ...scambio('oggi', 1, 'ciao', 'ciao!')];
+  const f = FC.finestra(filo, { ora: ORA, ...TETTI, chatCorrente: 'vecchia' });
+  assert.deepEqual(f.ancora.riprese, ['vecchia']);
+  const g = FC.finestra(filo, { ora: ORA, ...TETTI, ancora: f.ancora, chatCorrente: 'oggi' });
+  assert.equal(prefissoComune(f.messaggi, g.messaggi), f.messaggi.length, 'dalla scheda di oggi il tratto perde la conversazione ripresa');
+  assert.deepEqual(g.ancora, f.ancora);
+  // Quando l'inizio si sposta (il taglio dei giorni passa), la ripresa resta solo alla sua scheda.
+  const dopo = FC.finestra([...filo, ...scambio('oggi', -80, 'e domani?', 'Pioggia.')], { ora: ORA + 80 * ORE, ...TETTI, ancora: f.ancora, chatCorrente: 'oggi' });
+  assert.ok(!dopo.messaggi.some((m) => /progetto casa/.test(m.content)));
+});
+
 test('un messaggio enorme resta testa e coda, e dice dove si rilegge intero', () => {
   const filo = scambio('c', 1, 'a'.repeat(300000), 'ok');
   const f = FC.finestra(filo, { ora: ORA, giorni: 3, token: 20000 });

@@ -88,3 +88,101 @@ test('fra due messaggi: il cambio dalle Preferenze e l\'avviso arrivano davanti 
   // Lo STATO non porta più i cambi recenti: arrivano dal filo.
   expect(uno.messages[0].content).not.toContain('CAMBI RECENTI');
 });
+
+test('una conversazione ripresa dalla Cronologia e quella della home, alternate: la richiesta di un turno resta il prefisso di quella dopo', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  // Un tetto in token basso fa sì che la conversazione di stamattina cominci prima del taglio, come succede col tetto di
+  // serie a chi ha letto qualche pagina lunga negli ultimi giorni.
+  await preparaModello(app, [{ text: 'Risposta uno.' }, { text: 'Risposta due.' }, { text: 'Risposta tre.' }], { contestoFilo: { token: 4000 } });
+  const ids = await app.evaluate(async () => {
+    const Chats = globalThis.SN_FILO_CHATS;
+    const ora = Date.now();
+    const fa = (min) => new Date(ora - min * 60000).toISOString();
+    const A = 'a1a1a1a1-0000-4000-8000-000000000001';
+    const B = 'b2b2b2b2-0000-4000-8000-000000000002';
+    for (let i = 0; i < 12; i++) {
+      await Chats.append(A, { role: 'user', text: `Parte ${i} della tesi: ${'parole della tesi '.repeat(90)}`, ts: fa(300 - i * 2) });
+      await Chats.append(A, { role: 'filo', text: `Letta la parte ${i}.`, ts: fa(299 - i * 2) });
+    }
+    await Chats.append(B, { role: 'user', text: 'che tempo fa domani?', ts: fa(20) });
+    await Chats.append(B, { role: 'filo', text: 'Sole.', ts: fa(19) });
+    return { A, B };
+  });
+
+  const ripresa = await openTab(`filo://newtab/?chat=${ids.A}`);
+  await expect(ripresa.locator('#input')).toBeEditable({ timeout: 15_000 });
+  const home = await openTab('filo://newtab/');
+  await expect(home.locator('#input')).toBeEditable({ timeout: 15_000 });
+
+  await ripresa.bringToFront();
+  await scrivi(ripresa, 'riprendiamo la tesi', 'Risposta uno.');
+  await home.bringToFront();
+  await scrivi(home, 'e dopodomani?', 'Risposta due.');
+  await ripresa.bringToFront();
+  await scrivi(ripresa, 'e la conclusione?', 'Risposta tre.');
+
+  const [uno, due, tre] = await app.evaluate(() => globalThis.__chiamate);
+  expect(due.messages[0].content).toBe(uno.messages[0].content);
+  // Senza la domanda (l'ultimo messaggio), il tratto del turno prima deve stare tale e quale in testa a quello dopo.
+  const tratto = (c) => c.messages.slice(1, -1).map(testo);
+  expect(tratto(due).slice(0, tratto(uno).length)).toEqual(tratto(uno));
+  expect(tratto(tre).slice(0, tratto(due).length)).toEqual(tratto(due));
+});
+
+test('una scheda aperta prima di «Continua» arriva al modello nel messaggio dopo, come senza il Continua', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await preparaModello(app, [
+    // Un turno che legge e poi tace: sotto compare «Continua».
+    { toolCalls: [{ id: 'l1', name: 'LEGGI_IMPOSTAZIONI', arguments: JSON.stringify({ cerca: 'tema' }) }] },
+    { text: '' },
+    { text: 'Ripreso.' },
+    { text: 'Ecco le schede.' },
+  ]);
+  const home = await openTab('filo://newtab/');
+  await expect(home.locator('#input')).toBeEditable({ timeout: 15_000 });
+  await home.locator('#input').fill('che tema ho?');
+  await home.locator('#sendBtn').click();
+  const continua = home.locator('.dash-continua');
+  await expect(continua).toBeVisible({ timeout: 15_000 });
+
+  // Fra il turno e il Continua l'utente apre un sito.
+  const sito = await testServer.openReady(openTab, '<!doctype html><title>Orari del museo Egizio</title><p>orari</p>');
+  await expect(sito).toHaveTitle('Orari del museo Egizio');
+  await home.bringToFront();
+  await continua.click();
+  await expect(home.locator('.dash-bubble-filo', { hasText: 'Ripreso.' })).toBeVisible({ timeout: 15_000 });
+  await expect(home.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+
+  await scrivi(home, 'quali schede ho aperto?', 'Ecco le schede.');
+  const chiamate = await app.evaluate(() => globalThis.__chiamate);
+  const ultima = chiamate[chiamate.length - 1];
+  // Nel CONTESTO o in un messaggio: da qualche parte il modello deve vedere la scheda aperta.
+  const tutto = ultima.messages.map(testo).join('\n');
+  expect(tutto).toContain('Orari del museo Egizio');
+});
+
+test('una scheda aperta prima di un messaggio finito in errore arriva al modello anche col «Riprova»', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await preparaModello(app, [
+    { text: 'Ciao!' },
+    { errore: 'servizio non raggiungibile' },
+    { text: 'Ecco le schede.' },
+  ]);
+  const home = await openTab('filo://newtab/');
+  await expect(home.locator('#input')).toBeEditable({ timeout: 15_000 });
+  await scrivi(home, 'ciao', 'Ciao!');
+
+  const sito = await testServer.openReady(openTab, '<!doctype html><title>Orari del museo Egizio</title><p>orari</p>');
+  await expect(sito).toHaveTitle('Orari del museo Egizio');
+  await home.bringToFront();
+  await home.locator('#input').fill('quali schede ho aperto?');
+  await home.locator('#sendBtn').click();
+  const riprova = home.locator('.dash-action-btn', { hasText: 'Riprova' });
+  await expect(riprova).toBeVisible({ timeout: 15_000 });
+  await riprova.click();
+  await expect(home.locator('.dash-bubble-filo', { hasText: 'Ecco le schede.' })).toBeVisible({ timeout: 15_000 });
+
+  const chiamate = await app.evaluate(() => globalThis.__chiamate);
+  const tutto = chiamate[chiamate.length - 1].messages.map(testo).join('\n');
+  expect(tutto).toContain('Orari del museo Egizio');
+});
