@@ -25,16 +25,31 @@ export function regexCitazione(num) {
 }
 
 /**
- * Le fusioni sulla linea principale di `ref` che citano #N nel messaggio, dalla più nuova. `dopo` (ms) tiene solo
- * quelle successive: una fusione datata prima del rilievo non lo chiude.
- * → [{ sha, data, oggetto }]
+ * Le fusioni sulla linea principale di `ref` che portano un commit che cita #N (la fusione stessa, o un commit del ramo
+ * che ha fuso), dalla più nuova. `dopo` (ms) tiene solo le fusioni successive: una datata prima del rilievo non lo
+ * chiude. `citazione`: l'oggetto del commit che cita, quando non è la fusione.
+ * → [{ sha, data, oggetto, citazione? }]
  */
 export function fusioniCheCitano(root, num, { ref = 'origin/main', dopo = 0, max = 20 } = {}) {
-  const out = git(root, ['log', ref, '--first-parent', '-E', `--grep=${regexCitazione(num)}`, `-n${max}`, '--format=%H%x09%cI%x09%s']);
-  return out.split('\n').filter(Boolean).map((riga) => {
-    const [sha, data, ...oggetto] = riga.split('\t');
-    return { sha, data, oggetto: oggetto.join('\t') };
-  }).filter((f) => !dopo || Date.parse(f.data) > dopo);
+  const citanti = git(root, ['log', ref, '-E', `--grep=${regexCitazione(num)}`, `-n${max * 10}`, '--format=%H%x09%s'])
+    .split('\n').filter(Boolean).map((r) => { const [sha, ...o] = r.split('\t'); return { sha, oggetto: o.join('\t') }; });
+  if (!citanti.length) return [];
+  // La linea principale dalla più nuova: la posizione dice quale fusione è venuta prima.
+  const linea = new Map(git(root, ['rev-list', '--first-parent', ref]).split('\n').filter(Boolean).map((sha, i) => [sha, i]));
+  const perFusione = new Map();
+  for (const c of citanti) {
+    // La fusione che l'ha portato: la più vecchia della linea principale che discende da lui.
+    const fusione = linea.has(c.sha) ? c.sha
+      : git(root, ['rev-list', '--ancestry-path', `${c.sha}..${ref}`]).split('\n').filter((x) => linea.has(x))
+        .sort((a, b) => linea.get(b) - linea.get(a))[0];
+    if (!fusione || perFusione.has(fusione)) continue;
+    const [data, ...oggetto] = git(root, ['show', '-s', '--format=%cI%x09%s', fusione]).trim().split('\t');
+    const f = { sha: fusione, data, oggetto: oggetto.join('\t') };
+    if (fusione !== c.sha) f.citazione = c.oggetto;
+    perFusione.set(fusione, f);
+  }
+  return [...perFusione.values()].filter((f) => !dopo || Date.parse(f.data) > dopo)
+    .sort((a, b) => Date.parse(b.data) - Date.parse(a.data)).slice(0, max);
 }
 
 /**
@@ -75,9 +90,24 @@ export function fileDiversi(prima, dopo) {
 }
 
 /**
- * Dopo un riallineamento, i file in cui la modifica del RAMO è cambiata: la punta verificata contro la sua base, e la
- * punta nuova contro la sua. Un riallineamento pulito dà [], anche se main ha cambiato le righe accanto.
- * → { ok: true, file, basi } | { ok: false, errore }
+ * I file in cui la punta verificata `prima` va in conflitto con `base` di adesso: quelli che un riallineamento ha dovuto
+ * risolvere, comunque li abbia risolti (tenere le due parti lascia la modifica del ramo uguale, ma è logica nuova).
+ */
+export function fileInConflitto(root, { prima, base = 'origin/main' } = {}) {
+  let out = '';
+  try { out = git(root, ['merge-tree', '--write-tree', '--name-only', '--no-messages', base, prima]); } catch (e) {
+    // Uscita 1 = conflitti, coi file dopo l'albero; ogni altra uscita è un guasto.
+    if (e.status !== 1) throw e;
+    out = String(e.stdout || '');
+  }
+  return [...new Set(out.split('\n').slice(1).map((r) => r.trim()).filter(Boolean))].sort();
+}
+
+/**
+ * Dopo un riallineamento, i file in cui la modifica del RAMO è cambiata (la punta verificata contro la sua base, e la
+ * punta nuova contro la sua) e quelli che erano in conflitto con main. Un riallineamento pulito dà due elenchi vuoti,
+ * anche se main ha cambiato le righe accanto.
+ * → { ok: true, file, conflitti, basi } | { ok: false, errore }
  */
 export function fileRiscritti(root, { prima, dopo = 'HEAD', base = 'origin/main' } = {}) {
   try {
@@ -85,7 +115,7 @@ export function fileRiscritti(root, { prima, dopo = 'HEAD', base = 'origin/main'
     const baseDopo = git(root, ['merge-base', dopo, base]).trim();
     const diff = (da, a) => git(root, ['diff', '-U0', '--no-color', '--no-ext-diff', '--no-renames', '--full-index', da, a]);
     const file = fileDiversi(modifichePerFile(diff(basePrima, prima)), modifichePerFile(diff(baseDopo, dopo)));
-    return { ok: true, file, basi: { prima: basePrima, dopo: baseDopo } };
+    return { ok: true, file, conflitti: fileInConflitto(root, { prima, base }), basi: { prima: basePrima, dopo: baseDopo } };
   } catch (e) {
     return { ok: false, errore: String((e && (e.stderr || e.message)) || e).trim().split('\n')[0] };
   }
@@ -103,7 +133,8 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   const rami = [];
   for (const riga of righe.filter(Boolean)) {
     const [ramo, data] = riga.split('\t');
-    if (!ramo || ramo === 'origin/HEAD' || ramo === 'origin' || ramo === `origin/${nomeBase}`) continue;
+    // `discarded/` sono tentativi messi da parte: non lavora più nessuno.
+    if (!ramo || ramo === 'origin/HEAD' || ramo === 'origin' || ramo === `origin/${nomeBase}` || ramo.startsWith('origin/discarded/')) continue;
     if (giorni && adesso - Date.parse(data) > giorni * 86400000) continue;
     // Una chiamata per ramo: per ogni commit l'oggetto (riga marcata) e i file che tocca.
     const log = git(root, ['log', '--no-renames', '--format=\u0001%s', '--name-only', `${base}..${ramo}`]);
@@ -120,7 +151,16 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
     const feedback = [...conta].sort((a, b) => b[1] - a[1]).map(([n]) => n);
     rami.push({ ramo: ramo.replace(/^origin\//, ''), data, avanti, file: [...file].sort(), feedback });
   }
-  return rami.sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
+  // Di più tentativi di un worker sullo stesso feedback (`worker/<id>-<ora>`) conta l'ultimo aperto: gli altri sono morti.
+  const ultimo = new Map();
+  for (const r of rami) {
+    const m = /^worker\/([A-Za-z0-9]+)-(\d{8}T\d{6}Z)$/.exec(r.ramo);
+    if (m && (!ultimo.has(m[1]) || ultimo.get(m[1]) < m[2])) ultimo.set(m[1], m[2]);
+  }
+  return rami.filter((r) => {
+    const m = /^worker\/([A-Za-z0-9]+)-(\d{8}T\d{6}Z)$/.exec(r.ramo);
+    return !m || ultimo.get(m[1]) === m[2];
+  }).sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
 }
 
 /**

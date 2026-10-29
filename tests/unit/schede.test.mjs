@@ -65,6 +65,13 @@ test('Opus rilegge tutte quelle che tolgono lavoro e un campione stabile delle a
   assert.deepEqual(S.daRileggere(schede, { quota: 0.1 }).map((s) => s.numero), scelte, 'lo stesso campione a ogni giro');
 });
 
+test('una scheda che l\'agente non ha riscritto, o una rilettura senza «riletta», resta da rifare', () => {
+  assert.deepEqual(S.difettiDopoAgente({ riscritta: false, scheda: buona(12), num: '12' }), ['l\'agente non ha riscritto la scheda']);
+  assert.deepEqual(S.difettiDopoAgente({ riscritta: true, scheda: buona(12), num: '12' }), []);
+  assert.deepEqual(S.difettiDopoAgente({ riscritta: true, scheda: buona(12), num: '12', rilettura: true }), ['manca «riletta»']);
+  assert.deepEqual(S.difettiDopoAgente({ riscritta: true, scheda: buona(12, { riletta: 'confermata' }), num: '12', rilettura: true }), []);
+});
+
 test('il prompt porta il ruolo e in coda i dati del giro; la rilettura dice quale file', () => {
   const p = S.promptScheda('# Ruolo', { num: '12', cartella: '/x/schede', radice: '/x/Filo' });
   assert.match(p, /^# Ruolo\n\nFeedback: 12\nCartella delle schede: \/x\/schede\nRadice del repo: \/x\/Filo$/);

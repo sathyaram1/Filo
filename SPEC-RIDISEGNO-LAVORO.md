@@ -152,13 +152,14 @@ Fatto dalla parte dell'app, con le regole in FEEDBACK-STATES.md § 3a:
 - primo lavoro: «già risolto su main» come primo passo (`payload.suMain`, chiusura
   `gia_risolto` con la fusione), piano consegnato con `deliver piano` e rimandato in
   `payload.piano`;
-- correttore: `--motivo` obbligatorio su `--record-fixed`, e il confronto della
-  modifica del ramo prima e dopo il riallineamento, con la regola dei file di
-  servizio in `verifierRound.js`;
+- correttore: `--motivo` obbligatorio su `--record-fixed`, e alla consegna i file in
+  conflitto con main e quelli in cui la modifica del ramo è cambiata, con la regola
+  dei file di servizio in `verifierRound.js`;
 - sessione per feedback: preflight `--feedback <N>` col ruolo `sessione.md`, e
   `ticket … --feedback <N>`.
 
 Resta al server tutta la sua voce qui sopra: è lui a dare il biglietto di un
-feedback, rifiutarlo se già risolto, tenere e rimandare il piano, chiudere le unite,
+feedback, rifiutarlo se già risolto, accettare la chiusura «già risolto» (con la sua
+riga nella tabella delle transizioni), tenere e rimandare il piano, chiudere le unite,
 scrivere il motivo nel biglietto e saltare il giro dopo un riallineamento pulito.
 L'orchestratore si toglie quando il server accende una sessione per feedback.

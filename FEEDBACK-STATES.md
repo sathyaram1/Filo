@@ -233,10 +233,12 @@ pianificatore non esiste più. Le chiusure manuali senza
 branch (`npm run feedback -- <id> done "…" --come-routine`) restano legali come
 CATENA di passi (`canReach` attraversa l'iter todo→working→revision_*→done). I
 sub-feedback storici (#N.x) restano visibili e lavorabili; è sparita solo la
-possibilità di crearne di nuovi. Dal ridisegno del lavoro (§3a) ci sono due porte
-dirette verso `done`, strette: `working → done` della routine per un feedback già
-risolto su main, e `todo → done` della pipeline per una segnalazione unita a un
-pacchetto fuso. Per una routine `todo → done` resta illegale.
+possibilità di crearne di nuovi. Dal ridisegno del lavoro (§3a) c'è una porta diretta
+verso `done`, stretta: `todo → done` della pipeline per una segnalazione unita a un
+pacchetto fuso. `working → done` della routine per un feedback già risolto su main
+entra nella tabella insieme al controllo del server sulla fusione, mai prima: da sola,
+la riga lascerebbe chiudere un primo lavoro senza verifica. Per una routine
+`todo → done` resta illegale.
 
 ### 3a. Il ridisegno del lavoro (SPEC-RIDISEGNO-LAVORO.md, #1680)
 
@@ -248,21 +250,26 @@ scelto dal manutentore, fino ai posti liberi; nessuna sessione sceglie il lavoro
 sola. La sessione passa il numero al preflight (`dispatch.mjs --preflight --feedback
 <N>`, che consegna `routines/roles/sessione.md` al posto dell'orchestratore) e chiede il
 biglietto di QUEL feedback (`routine-channel.mjs ticket <parola> --feedback <N>`, campo
-`feedback` nel corpo). Il server risponde «niente» col motivo se il feedback non è in
-coda, se è già risolto su main o se i posti sono pieni. Verifica, controllo di sicurezza
+`feedback` nel corpo, che il server rimanda nella risposta). Un biglietto di un altro
+feedback, o senza il numero, lo strumento lo restituisce subito ed esce come guasto. Il
+server risponde «niente» col motivo se il feedback non è in coda, se è già risolto su
+main o se i posti sono pieni. Verifica, controllo di sicurezza
 e correzione restano sessioni separate, accese dal server: chi ha fatto il lavoro non
 lancia mai il proprio verificatore. L'orchestratore resta finché il server accende così.
 
 **Già risolto su main.** Prima di accendere, il server cerca le fusioni sulla linea
-principale di main che citano `#N` dopo la nascita del feedback; il client fa la stessa
-ricerca (`scripts/lib/su-main.mjs`) e la passa al primo lavoro in `payload.suMain`, con
-`propria` sulla fusione del lavoro stesso del feedback (vuol dire riaperto dall'owner,
-non risolto). La sessione la ricontrolla come primo passo e, se è chiuso davvero,
-consegna senza ramo `deliver status --status done --reason gia_risolto --fusione <sha>`
-con report e frase: `working → done` (routine, `statusReason: gia_risolto`). Lo
-strumento rifiuta uno sha che non sta sulla linea principale di `origin/main`; il server
-lo accetta solo se in più cita il feedback ed è più recente della nascita e dell'ultima
-riapertura. Frase e versione come una chiusura del cancello.
+principale di main che portano un commit che cita `#N` (la fusione stessa o un commit
+del ramo fuso) dopo la nascita del feedback; il client fa la stessa ricerca
+(`scripts/lib/su-main.mjs`) e la passa al primo lavoro in `payload.suMain`, con
+`citazione` quando a citare è un commit del ramo e `propria` sulla fusione del lavoro
+stesso del feedback (vuol dire riaperto dall'owner, non risolto). La sessione la
+ricontrolla come primo passo e, se è chiuso davvero, consegna senza ramo `deliver status
+--status done --reason gia_risolto --fusione <sha>` con report e frase: `working → done`
+(routine, `statusReason: gia_risolto`). Lo strumento rifiuta uno sha che non sta sulla
+linea principale di `origin/main`; il server lo accetta solo se in più porta una
+citazione del feedback ed è più recente della nascita e dell'ultima riapertura. Frase e
+versione come una chiusura del cancello. Finché il server non lo fa, la consegna è
+rifiutata e la sessione lavora il feedback come sempre.
 
 **Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
 segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce da
@@ -293,16 +300,20 @@ server lo scrive nel biglietto (`motivo` nella consegna `fixed`) e non chiude il
 biglietto di un correttore che non l'ha dato. I motivi di una fermata (`design` con
 `guasto`, `locale`, `clarify`) valgono come motivo.
 
-**La verifica dopo un riallineamento.** Dispatch scrive nel marcatore del ruolo la punta
-che il correttore riceve (`dal`), e la consegna confronta la modifica del ramo di allora
-con quella di adesso, file per file e senza i numeri di riga (`fileRiscritti`): la manda
-come `riallineamento: { fileRiscritti, giro }`. Se la modifica è cambiata solo nei file
-di servizio (`FILE_DI_SERVIZIO`: `src/shared/patchNotes.js`, `src/shared/capabilities.js`,
-`tests/rossi-noti.json`, `PATTERNS.md`) o in nessuno, niente giro nuovo di verifica:
-bastano le prove del server sulla fusione. Un file di codice riscritto chiede la verifica
-intera, perché è logica che nessuno ha guardato. La regola è `giroDopoRiallineamento`
-in `verifierRound.js`; il server rifà il confronto da sé e non si fida di quello del
-client.
+**La verifica dopo un riallineamento.** Dispatch scrive nel marcatore del ruolo la base
+del confronto (`dal`: lo sha verificato se il server lo manda come `shaVerificato`, sennò
+la punta che il correttore riceve). Alla consegna lo strumento guarda due cose: i file in
+cui la modifica del ramo è cambiata, senza i numeri di riga (`fileRiscritti`), e i file
+in cui la punta verificata va in conflitto con main (`git merge-tree`, `fileInConflitto`),
+più quelli che il motivo dichiara. Manda `riallineamento: { fileRiscritti,
+fileInConflitto, giro }`. Se tutti stanno fra i file di servizio (`FILE_DI_SERVIZIO`:
+`src/shared/patchNotes.js`, `src/shared/capabilities.js`, `tests/rossi-noti.json`,
+`PATTERNS.md`), o non ce n'è nessuno, niente giro nuovo di verifica: bastano le prove del
+server sulla fusione, e il controllo di sicurezza resta. Un file di codice in conflitto o
+riscritto chiede la verifica intera, perché è logica che nessuno ha guardato (anche un
+conflitto risolto tenendo le due parti, che lascia la modifica del ramo uguale). La
+regola è `giroDopoRiallineamento` in `verifierRound.js`; il server rifà il confronto da
+sé e non si fida di quello del client.
 
 ## 4. Tab dashboard (deriva SOLO da `status`)
 

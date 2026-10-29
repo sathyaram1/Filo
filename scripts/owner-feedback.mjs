@@ -348,6 +348,9 @@ export async function aggiungiAttesa(id, voce, opts = {}) {
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
   const prima = ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(doc.fields?.[ATT.CAMPO]) });
   if (prima.some((w) => w.id === voce.id)) return { ok: true, attese: prima, gia: true };
+  // Le attese si riscrivono per numero: una senza numero sparirebbe in silenzio.
+  const senzaNumero = prima.filter((w) => !String(w.num || '').trim());
+  if (senzaNumero.length) return { ok: false, motivo: `aspetta ${senzaNumero.map((w) => w.id).join(', ')}, senza numero: da qui la perderei, aggiungi l'attesa da Gestione` };
   return segnaAttese(id, [...prima.map((w) => w.num), voce.num].join(','), { ...opts, bearer });
 }
 

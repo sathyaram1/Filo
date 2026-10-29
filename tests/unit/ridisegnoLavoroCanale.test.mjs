@@ -16,7 +16,8 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Preflight e biglietto scrivono nelle impostazioni utente: mai in quelle vere.
 process.env.CLAUDE_CONFIG_DIR = cartellaTemporanea('filo-claude-utente-');
 
-function fintoServer() {
+/** Server finto; `ignoraFeedback`: un server vecchio, che alla richiesta per numero dà il primo della coda. */
+function fintoServer({ ignoraFeedback = false } = {}) {
   const ricevuti = [];
   const srv = createServer((req, res) => {
     let body = '';
@@ -26,7 +27,8 @@ function fintoServer() {
       try { j = body ? JSON.parse(body) : {}; } catch (_) {}
       ricevuti.push({ url: req.url, body: j });
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify(req.url.includes('routineTicket') ? { ok: true, work: true, ticket: 'b'.repeat(43), role: 'new-work' } : { ok: true }));
+      const biglietto = { ok: true, work: true, ticket: 'b'.repeat(43), role: 'new-work', ...(j.feedback && !ignoraFeedback ? { feedback: j.feedback } : {}) };
+      res.end(JSON.stringify(req.url.includes('routineTicket') ? biglietto : { ok: true }));
     });
   });
   return new Promise((r) => srv.listen(0, '127.0.0.1', () => r({ srv, ricevuti, port: srv.address().port })));
@@ -77,6 +79,18 @@ test('ticket --feedback chiede il biglietto di quel feedback; un numero storto s
   assert.equal(fuori.code, 1);
   assert.match(fuori.se, /--feedback vale solo con ticket/);
   assert.equal(ricevuti.length, prima, 'nessuna delle due è arrivata al server');
+});
+
+test('un server che alla richiesta per numero dà un altro feedback: il biglietto si restituisce e non si lavora', async (t) => {
+  const { srv, ricevuti, port } = await fintoServer({ ignoraFeedback: true });
+  const casa = cartellaTemporanea('ticket-feedback-vecchio');
+  t.after(() => { srv.close(); togliCartella(casa); });
+  const r = await esegui('routine-channel.mjs', ['ticket', 'parola-segreta', '--feedback', '1680', '--json'], { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa });
+  assert.equal(r.code, 3);
+  assert.equal(r.so.trim(), '', 'nessun biglietto stampato da usare');
+  assert.match(r.se, /chiesto il biglietto di #1680.*Biglietto restituito/);
+  const reso = ricevuti.find((x) => x.url.includes('routineRelease'));
+  assert.equal(reso && reso.body.ticket, 'b'.repeat(43));
 });
 
 test('deliver piano manda il piano intero da file; vuoto, troppo lungo o con altri campi non parte', async (t) => {
@@ -159,7 +173,7 @@ test('la correzione senza motivo non parte; col motivo e in un riallineamento po
   assert.equal(r.code, 0, r.se);
   const d = ricevuti.find((x) => x.url.includes('routineDeliver')).body.data;
   assert.deepEqual(d.motivo, { tipo: 'conflitto', file: [] });
-  assert.deepEqual(d.riallineamento, { fileRiscritti: [], giro: 'nessuno' });
+  assert.deepEqual(d.riallineamento, { fileRiscritti: [], fileInConflitto: [], giro: 'nessuno' });
   assert.match(r.se, /Riallineamento pulito/);
 });
 

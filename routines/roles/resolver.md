@@ -17,7 +17,8 @@ Non richiedere quello che ha già deciso.
 ## Prima di tutto: è già risolto su main?
 
 `payload.suMain`, se c'è, elenca le fusioni su `main` che citano questo
-feedback dopo la sua nascita. Guardale prima di aprire il lavoro:
+feedback dopo la sua nascita, nel messaggio o in un commit del ramo fuso
+(`citazione`). Guardale prima di aprire il lavoro:
 
 - una fusione segnata `propria` è il lavoro di questo stesso feedback: se è di
   nuovo qui l'owner l'ha riaperto perché mancava qualcosa, e non è chiuso;

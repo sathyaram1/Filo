@@ -25,7 +25,7 @@ test('una scheda in una riga: area, stato, priorità, i segni che contano, il ri
 test('il contesto porta il ruolo, le schede in ordine, chi non ha scheda, i rami e la spesa da chiedere', () => {
   const t = M.testoContesto({
     ruolo: '# Ruolo: manutentore',
-    schede: [scheda(20), scheda(3)],
+    schede: [scheda(20), scheda(3), scheda(99)],
     indice: [{ num: '3', stato: 'todo', priorita: 1 }, { num: '20', stato: 'design', priorita: null }, { num: '44', stato: 'todo' }],
     rami: [{ ramo: 'claude/x', feedback: ['3'], avanti: 2, data: '2026-10-28T10:00:00Z', file: ['a.js'] }],
   });
@@ -33,6 +33,8 @@ test('il contesto porta il ruolo, le schede in ordine, chi non ha scheda, i rami
   assert.ok(t.indexOf('#3 ·') < t.indexOf('#20 ·'), 'in ordine di numero');
   assert.match(t, /## Schede \(2\)/);
   assert.match(t, /Senza scheda \(1\): #44/);
+  assert.doesNotMatch(t, /#99 ·/, 'la scheda di un feedback chiuso da allora non è lavoro');
+  assert.match(t, /Fuori: 1 schede/);
   assert.match(t, /## Rami in corso \(1\)\n\nclaude\/x \(#3\), 2 commit, 2026-10-28: a\.js/);
   assert.match(t, /consumo della settimana dell'account/);
 });

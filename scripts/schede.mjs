@@ -2,7 +2,7 @@
 // rilegge chi toglie lavoro e un campione. Solo in locale (token e chiave dell'owner), fuori dal repo. Test: tests/unit/schede.test.mjs.
 // Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] | rileggi [--quota 0.1] | stato [--cartella <dir>] [--dry-run]
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,6 +75,12 @@ export function daScrivere(f, scheda) {
   if (!scheda || validaScheda(scheda, f.num).length) return true;
   const fonte = scheda._fonte || {};
   return fonte.id !== f.id || fonte.stato !== f.stato || fonte.aggiornato !== f.aggiornato;
+}
+
+/** Cosa non va nella scheda dopo il giro di un agente: non riscritta, non buona, o una rilettura senza «riletta». PURA. */
+export function difettiDopoAgente({ riscritta, scheda, num, rilettura = false }) {
+  if (!riscritta) return ['l\'agente non ha riscritto la scheda'];
+  return [...validaScheda(scheda, num), ...(rilettura && !String((scheda && scheda.riletta) || '').trim() ? ['manca «riletta»'] : [])];
 }
 
 /** Il campione stabile: lo stesso numero cade sempre dalla stessa parte. PURA. */
@@ -178,17 +184,21 @@ async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dry
   let falliti = 0;
   await aGruppi(voci, paralleli, async (v) => {
     const args = argomentiClaude({ model: modello, effort: '', nome: `scheda #${v.num}`, addDirs: [cartella] });
+    // Una scheda vecchia che l'agente non riscrive resterebbe buona e verrebbe timbrata come nuova: conta l'ora del file.
+    const prima = existsSync(fileScheda(cartella, v.num)) ? statSync(fileScheda(cartella, v.num)).mtimeMs : 0;
     const out = await esegui(bin, args, { cwd: ROOT, env, input: promptScheda(ruolo, { num: v.num, cartella, radice: ROOT, rilettura }), timeoutMs: 15 * 60_000 });
     const u = leggiUscitaClaude(out.stdout, out.stderr, out.code);
     costo += u.costo;
-    const scheda = leggiJson(fileScheda(cartella, v.num));
-    const male = validaScheda(scheda, v.num);
+    const riscritta = existsSync(fileScheda(cartella, v.num)) && statSync(fileScheda(cartella, v.num)).mtimeMs > prima;
+    const scheda = riscritta ? leggiJson(fileScheda(cartella, v.num)) : null;
+    const male = difettiDopoAgente({ riscritta, scheda, num: v.num, rilettura });
     if (!u.ok || male.length) {
       falliti += 1;
       console.error(`#${v.num}: ${u.ok ? `scheda non buona (${male.join('; ')})` : `agente fallito (${u.errore.split('\n')[0]})`}: resta da rifare.`);
       return;
     }
-    const stampata = { ...scheda, _fonte: { id: v.id, stato: v.stato, aggiornato: v.aggiornato, at: new Date().toISOString(), modello } };
+    const { _riletta: _vecchia, ...nuova } = scheda;
+    const stampata = { ...nuova, _fonte: { id: v.id, stato: v.stato, aggiornato: v.aggiornato, at: new Date().toISOString(), modello } };
     if (rilettura) stampata._riletta = { at: new Date().toISOString(), modello };
     writeFileSync(fileScheda(cartella, v.num), `${JSON.stringify(stampata, null, 1)}\n`);
     console.log(u.testo.split('\n').find((r) => r.trim()) || `#${v.num}: fatta`);

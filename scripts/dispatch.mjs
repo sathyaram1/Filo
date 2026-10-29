@@ -503,15 +503,19 @@ export function esitoRiallineamento(confronto, motivo) {
     return { riallineamento: { fileRiscritti: null, giro: 'pieno' }, riga: `Non riesco a confrontare la punta verificata con questa (${confronto.errore}): il server deciderà da sé, nel dubbio con una verifica intera.` };
   }
   const regola = typeof VERIFIER_ROUND.giroDopoRiallineamento === 'function' ? VERIFIER_ROUND.giroDopoRiallineamento : null;
-  if (!regola) return { riallineamento: { fileRiscritti: confronto.file, giro: 'pieno' }, riga: '' };
-  const { giro, codice } = regola(confronto.file);
-  const dichiarati = motivo && Array.isArray(motivo.file) ? motivo.file : null;
-  const taciuti = dichiarati ? codice.filter((f) => !dichiarati.includes(f)) : [];
+  if (!regola) return { riallineamento: { fileRiscritti: confronto.file, fileInConflitto: confronto.conflitti || [], giro: 'pieno' }, riga: '' };
+  // I conflitti dichiarati contano quanto quelli che dice git: un conflitto in un file di codice chiede la verifica.
+  const dichiarati = motivo && Array.isArray(motivo.file) ? motivo.file : [];
+  const conflitti = [...new Set([...(confronto.conflitti || []), ...dichiarati])];
+  const { giro, codice } = regola(confronto.file, { conflitti });
+  const elenco = (l) => `${l.slice(0, 5).join(', ')}${l.length > 5 ? ', …' : ''}`;
+  const toccati = [...new Set([...confronto.file, ...conflitti])];
   const righe = [giro === 'nessuno'
-    ? `Riallineamento pulito${confronto.file.length ? ` (cambiati solo file di servizio: ${confronto.file.join(', ')})` : ''}: per la regola non serve un giro nuovo di verifica, bastano le prove del server.`
-    : `La modifica del ramo è cambiata in ${codice.length === 1 ? 'un file di codice' : `${codice.length} file di codice`} (${codice.slice(0, 5).join(', ')}${codice.length > 5 ? ', …' : ''}): serve la verifica intera.`];
-  if (taciuti.length) righe.push(`Il motivo non nomina ${taciuti.slice(0, 5).join(', ')}${taciuti.length > 5 ? ', …' : ''}: il server confronta da sé, scrivi nel report cosa hai toccato lì.`);
-  return { riallineamento: { fileRiscritti: confronto.file, giro }, riga: righe.join(' ') };
+    ? `Riallineamento pulito${toccati.length ? ` (toccati solo file di servizio: ${elenco(toccati)})` : ''}: per la regola non serve un giro nuovo di verifica, bastano le prove del server.`
+    : `Il riallineamento tocca ${codice.length === 1 ? 'un file di codice' : `${codice.length} file di codice`} (${elenco(codice)}): serve la verifica intera.`];
+  const taciuti = motivo && motivo.tipo === 'conflitto' ? (confronto.conflitti || []).filter((f) => !dichiarati.includes(f)) : [];
+  if (taciuti.length) righe.push(`Git trova in conflitto anche ${elenco(taciuti)}, che il motivo non nomina: il server confronta da sé, e nel report va cosa hai toccato lì.`);
+  return { riallineamento: { fileRiscritti: confronto.file, fileInConflitto: confronto.conflitti || [], giro }, riga: righe.join(' ') };
 }
 
 /** La domanda di `--domanda <file.json>`, controllata come la controlla il server; un errore ferma prima del server. */
@@ -2168,6 +2172,11 @@ export function serverCtx(bucket, fromServer, diff = '') {
       ripresa: payload && payload.ripresa && typeof payload.ripresa === 'object' ? payload.ripresa : null,
       ...(role === 'fixer' && typeof (payload && payload.critique) === 'string' ? { critique: payload.critique } : {}),
       ...(role === 'verifier' ? { scope: payload && payload.scope, perimetro: (payload && payload.perimetro) || null } : {}),
+      // SPEC-RIDISEGNO-LAVORO.md: il piano di chi c'era prima, le fusioni su main che il server ha trovato, e per chi
+      // riallinea lo sha che aveva passato la verifica (la base del confronto alla consegna).
+      ...(role !== 'verifier' && typeof (payload && payload.piano) === 'string' ? { piano: payload.piano } : {}),
+      ...(role === 'new-work' && Array.isArray(payload && payload.suMain) ? { suMain: payload.suMain } : {}),
+      ...(role === 'fixer' && /^[0-9a-f]{40}$/i.test(String((payload && payload.shaVerificato) || '')) ? { shaVerificato: payload.shaVerificato } : {}),
       // Il lavoro tocca anche filo-security (busta del server, #1159): le istruzioni del clone si accodano al ruolo.
       ...(payload && payload.lavoroServer && typeof payload.lavoroServer === 'object' ? { lavoroServer: payload.lavoroServer } : {}),
     };
@@ -2276,11 +2285,11 @@ export function emit(bucket, ctx) {
   // quello del giro precedente sopravviverebbe a un giro che non ha lavorato e
   // finirebbe nella provenienza di un feedback altrui.
   const ambito = bucket.role === 'verifier' ? verifierScope(ctx && ctx.scope) : { scope: '', sconosciuto: false };
-  // `dal`: per chi verifica un riallineamento il commit verificato; per chi riallinea la punta che riceve, contro cui
-  // la consegna confronta la modifica del ramo (SPEC-RIDISEGNO-LAVORO.md §3, regola 3).
+  // `dal`: per chi verifica un riallineamento il commit verificato; per chi riallinea la base del confronto alla consegna
+  // (SPEC-RIDISEGNO-LAVORO.md §3, regola 3): lo sha verificato se il server lo manda, sennò la punta che riceve.
   const riallinea = bucket.role === 'fixer' && !(ctx && ctx.ripresa && typeof ctx.ripresa === 'object');
   if (bucket.role === 'halt') { if (!bucket.lavoroVivo) clearRole(ROOT); }
-  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? ctx?.perimetro?.shaVerificato : riallinea ? puntaDellaCartella() : '' });
+  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? ctx?.perimetro?.shaVerificato : riallinea ? (ctx?.shaVerificato || puntaDellaCartella()) : '' });
   const pieno = buildPayload(bucket, bucket.role === 'new-work' ? { ...ctx, suMain: suMainDi(bucket, ctx) } : ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.

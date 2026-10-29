@@ -77,8 +77,8 @@
     },
     working: {
       revision_capability: ['routine'], // fix pronto su branch
-      // Già risolto su main: la sessione lo chiude senza ramo, e il server controlla la fusione che cita (FEEDBACK-STATES.md §3a).
-      done:                ['routine'],
+      // NB: `working → done` per «già risolto su main» (FEEDBACK-STATES.md §3a) entra con il controllo del server
+      // sulla fusione, nello stesso deploy: da sola, la riga farebbe chiudere a un primo lavoro senza verifica.
       design:              ['routine'], // domande a metà lavorazione
       // Arenato: il ramo fermo da un'ora torna in coda da solo (FEEDBACK-STATES.md §6a).
       // Alla terza volta va in `design`.

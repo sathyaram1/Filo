@@ -116,12 +116,11 @@ test('il passo diretto todo→done di una routine è ritirato (era del pianifica
   // (SPEC-RIDISEGNO-MAX.md §1): nessuna routine va da todo a done in un passo.
   assert.ok(!FS.canTransition('todo', 'done', 'routine'));
   assert.ok(!FS.canTransition('todo', 'done', 'owner'));
-  // Le due porte del ridisegno del lavoro (SPEC-RIDISEGNO-LAVORO.md §3): la
+  // La porta del ridisegno del lavoro (SPEC-RIDISEGNO-LAVORO.md §3): la
   // segnalazione unita a un pacchetto la chiude il server alla fusione del
-  // pacchetto, e una sessione chiude senza ramo ciò che è già risolto su main.
+  // pacchetto. `working → done` per «già risolto» entra col controllo del server.
   assert.ok(FS.canTransition('todo', 'done', 'pipeline'));
-  assert.ok(FS.canTransition('working', 'done', 'routine'));
-  assert.ok(!FS.canTransition('working', 'done', 'owner'));
+  assert.ok(!FS.canTransition('working', 'done', 'routine'));
   // Ma la chiusura manuale di una pratica (npm run feedback --come-routine)
   // resta legale come CATENA: attraversa l'iter, non lo salta. Se questo
   // diventa rosso, lo strumento dell'owner smette di poter chiudere i fix.

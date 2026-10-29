@@ -233,6 +233,8 @@ export function readTicketReply(status, body) {
     // Modello e sforzo decisi dal server per questo lavoro (#1189): assenti vale la definizione dell'agente. Il gancio
     // dell'orchestratore li controlla e li mette (lib/orchestratore-cieco.mjs).
     for (const k of ['model', 'effort']) if (typeof b[k] === 'string' && b[k].trim()) out[k] = b[k].trim();
+    // Il feedback del biglietto, quando il server lo dice: chi l'ha chiesto per numero controlla di aver avuto quello.
+    if (typeof b.feedback === 'string' && b.feedback.trim()) out.feedback = b.feedback.trim();
     return out;
   }
   if (status === 200 && b.ok && b.work === false) return { outcome: 'nothing', reason: String(b.reason || '') };
@@ -1412,6 +1414,13 @@ if (isMain) {
       if (!feedback) { console.error(`--feedback vuole un numero di feedback (1680, #1680 o 1680.2), non "${String(data.feedback).slice(0, 30)}": non ho chiesto niente.`); process.exit(1); }
     }
     const r = await ticket(args[0], feedback ? { feedback } : undefined);
+    // Un server che non conosce la richiesta per numero dà il primo della coda: quel biglietto si restituisce subito,
+    // o la sessione accesa per un feedback lavorerebbe su un altro.
+    if (r.outcome === 'work' && feedback && String(r.feedback || '').replace(/^#/, '') !== feedback) {
+      const reso = await release(r.ticket, '');
+      console.error(`guasto: chiesto il biglietto di #${feedback}, il server ne ha dato ${r.feedback ? `uno di #${r.feedback}` : 'uno senza dire di quale feedback'} (server che non conosce ancora la richiesta per numero?). ${reso.ok ? 'Biglietto restituito' : `Biglietto NON restituito (${reso.reason}): scade da solo`}, non ho lavorato niente.`);
+      process.exit(3);
+    }
     if (r.outcome === 'work') {
       // Senza la decisione registrata il gancio rifiuta il lancio: meglio fermarsi qui che con un worker rifiutato.
       const reg = registraDecisione(r);

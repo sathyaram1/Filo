@@ -46,14 +46,19 @@ export function rigaRamo(r) {
 
 /** Il contesto intero, in testo. PURA rispetto ai suoi ingressi. */
 export function testoContesto({ ruolo, schede, indice, rami }) {
+  const numero = (s) => String(s.numero).replace(/^#/, '');
   const perNum = new Map((indice || []).map((f) => [f.num, f]));
-  const ordinate = [...schede].sort((a, b) => Number(String(a.numero).replace(/^#/, '')) - Number(String(b.numero).replace(/^#/, '')));
-  const senza = (indice || []).filter((f) => !schede.some((s) => String(s.numero).replace(/^#/, '') === f.num));
+  // Con l'indice valgono solo le schede dei feedback ancora aperti: le altre sono di feedback chiusi da allora.
+  const aperte = indice && indice.length ? schede.filter((s) => perNum.has(numero(s))) : schede;
+  const ordinate = [...aperte].sort((a, b) => Number(numero(a)) - Number(numero(b)));
+  const senza = (indice || []).filter((f) => !schede.some((s) => numero(s) === f.num));
+  const chiuse = schede.length - aperte.length;
   return [
     ruolo.trim(), '',
-    `## Schede (${schede.length})`, '',
-    ...ordinate.map((s) => rigaScheda(s, perNum.get(String(s.numero).replace(/^#/, '')))),
+    `## Schede (${aperte.length})`, '',
+    ...ordinate.map((s) => rigaScheda(s, perNum.get(numero(s)))),
     ...(senza.length ? ['', `Senza scheda (${senza.length}): ${senza.map((f) => `#${f.num}`).join(', ')}. Si scrivono con npm run feedback:schede -- scrivi.`] : []),
+    ...(chiuse ? ['', `Fuori: ${chiuse} schede di feedback che l'indice non ha più fra gli aperti.`] : []),
     '', `## Rami in corso (${rami.length})`, '',
     ...rami.map(rigaRamo),
     '', '## Spesa', '',

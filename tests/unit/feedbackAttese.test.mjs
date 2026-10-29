@@ -191,6 +191,13 @@ test('il pacchetto si aggiunge alle attese di una segnalazione unita senza togli
     assert.equal(gia.gia, true, 'un\'attesa che c\'è già non si riscrive');
     assert.equal(rete.scritte.length, 0);
   } finally { rete.ripristina(); }
+  const senza = reteFinta({ ...DOCS, id951: { seq: 951 }, id903: { seq: 903, waitsFor: [{ id: 'idVecchio', num: '' }] } });
+  try {
+    const r = await owner.aggiungiAttesa('id903', { id: 'id951', num: '951' }, { bearer: 'tok' });
+    assert.equal(r.ok, false, 'un\'attesa senza numero non sparisce in silenzio');
+    assert.match(r.motivo, /idVecchio, senza numero/);
+    assert.equal(senza.scritte.length, 0);
+  } finally { senza.ripristina(); }
 });
 
 test('npm run feedback:apri --aspetta: il feedback nasce con le attese; un numero inesistente non apre niente', async () => {

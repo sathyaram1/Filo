@@ -652,7 +652,8 @@
     if (!t) return { ok: false, errore: `Manca il motivo della correzione. ${FORMA_MOTIVO}` };
     const i = t.indexOf(':');
     const testa = (i < 0 ? t : t.slice(0, i)).toLowerCase().trim().replace(/[\s_]+/g, '-');
-    const tipo = MOTIVI_CORRETTORE[testa] ? testa : ALIAS_MOTIVO[testa];
+    const proprio = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+    const tipo = proprio(MOTIVI_CORRETTORE, testa) ? testa : proprio(ALIAS_MOTIVO, testa) ? ALIAS_MOTIVO[testa] : '';
     if (!tipo) return { ok: false, errore: `Motivo non capito: "${testa.slice(0, 40)}". ${FORMA_MOTIVO}` };
     const resto = i < 0 ? '' : t.slice(i + 1).trim();
     const elenco = (campo, voci) => {
@@ -682,14 +683,15 @@
   }
 
   /**
-   * Dopo un riallineamento, dai file in cui la modifica del ramo è cambiata: tutti di servizio (o nessuno) → niente
-   * giro nuovo, bastano le prove del server; uno di codice → verifica intera, c'è logica che nessuno ha guardato.
-   * Un elenco che manca vale come codice: nel dubbio si verifica.
+   * Dopo un riallineamento, dai file in cui la modifica del ramo è cambiata e da quelli che erano in conflitto con main:
+   * tutti di servizio (o nessuno) → niente giro nuovo, bastano le prove del server; uno di codice → verifica intera,
+   * c'è logica che nessuno ha guardato. Un elenco che manca vale come codice: nel dubbio si verifica.
    */
-  function giroDopoRiallineamento(fileRiscritti) {
-    if (!Array.isArray(fileRiscritti)) return { giro: 'pieno', codice: null };
-    const codice = fileRiscritti.map((f) => String(f || '').replace(/\\/g, '/').replace(/^\.\//, ''))
-      .filter((f) => f && !FILE_DI_SERVIZIO.includes(f));
+  function giroDopoRiallineamento(fileRiscritti, opz) {
+    const conflitti = opz && opz.conflitti !== undefined ? opz.conflitti : [];
+    if (!Array.isArray(fileRiscritti) || !Array.isArray(conflitti)) return { giro: 'pieno', codice: null };
+    const codice = [...new Set([...fileRiscritti, ...conflitti].map((f) => String(f || '').replace(/\\/g, '/').replace(/^\.\//, '')))]
+      .filter((f) => f && !FILE_DI_SERVIZIO.includes(f)).sort();
     return { giro: codice.length ? 'pieno' : 'nessuno', codice };
   }
 

@@ -15,7 +15,7 @@ const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const require = createRequire(import.meta.url);
 require(resolve(ROOT, 'src', 'shared', 'verifierRound.js'));
 const R = globalThis.SN_VERIFIER_ROUND;
-const { numeroFeedback, regexCitazione, fusioniCheCitano, fileRiscritti, ramiInCorso, incroci, modifichePerFile } =
+const { numeroFeedback, regexCitazione, fusioniCheCitano, fileRiscritti, fileInConflitto, ramiInCorso, incroci, modifichePerFile } =
   await import('../../scripts/lib/su-main.mjs');
 
 const git = (dir, args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -47,7 +47,7 @@ test('un numero di feedback si riconosce citato da solo, non dentro un altro num
   assert.throws(() => regexCitazione('niente'), /non valido/);
 });
 
-test('le fusioni che citano il feedback stanno sulla linea principale; i commit dentro un ramo e i figli no', (t) => {
+test('le fusioni che citano il feedback: la sua, e quella di un altro lavoro che lo cita in un suo commit; i figli no', (t) => {
   const dir = repo();
   t.after(() => togliCartella(dir));
   git(dir, ['checkout', '-qb', 'lavoro']);
@@ -56,12 +56,22 @@ test('le fusioni che citano il feedback stanno sulla linea principale; i commit 
   git(dir, ['merge', '-q', '--no-ff', 'lavoro', '-m', 'merge-gate: #12 via server (unit verdi)']);
   commit(dir, 'merge-gate: #12.1 via server');
   commit(dir, 'merge-gate: #120 via server');
+  git(dir, ['checkout', '-qb', 'altro']);
+  commit(dir, 'il menu: chiude anche #12', { 'a.js': righe(40, { 3: 'x', 5: 'y' }) });
+  commit(dir, 'auto: a.js');
+  git(dir, ['checkout', '-q', 'main']);
+  git(dir, ['merge', '-q', '--no-ff', 'altro', '-m', 'merge-gate: #77 via server']);
+  const fusione77 = git(dir, ['rev-parse', 'HEAD']);
   git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
   const trovate = fusioniCheCitano(dir, '#12');
-  assert.deepEqual(trovate.map((f) => f.oggetto), ['merge-gate: #12 via server (unit verdi)']);
-  assert.match(trovate[0].sha, /^[0-9a-f]{40}$/);
+  assert.deepEqual(trovate.map((f) => [f.oggetto, f.citazione || '']), [
+    ['merge-gate: #77 via server', 'il menu: chiude anche #12'],
+    ['merge-gate: #12 via server (unit verdi)', ''],
+  ]);
+  assert.equal(trovate[0].sha, fusione77, 'la fusione della linea principale, non il commit del ramo');
   assert.deepEqual(fusioniCheCitano(dir, '12', { dopo: Date.now() + 60000 }), [], 'una fusione datata prima del rilievo non conta');
   assert.deepEqual(fusioniCheCitano(dir, '12.1').map((f) => f.oggetto), ['merge-gate: #12.1 via server']);
+  assert.deepEqual(fusioniCheCitano(dir, '999'), []);
 });
 
 test('un riallineamento pulito non riscrive niente, anche se main ha cambiato le righe accanto', (t) => {
@@ -105,6 +115,24 @@ test('un conflitto risolto in un file di codice chiede la verifica intera', (t) 
   assert.equal(fileRiscritti(dir, { prima: 'non-esiste' }).ok, false);
 });
 
+test('un conflitto in un file di codice risolto tenendo le due parti chiede la verifica, anche se la modifica è uguale', (t) => {
+  const dir = repo();
+  t.after(() => togliCartella(dir));
+  git(dir, ['checkout', '-qb', 'ramo']);
+  const prima = commit(dir, 'lavoro', { 'a.js': righe(40, { 10: 'mine();' }) });
+  git(dir, ['checkout', '-q', 'main']);
+  commit(dir, 'altro lavoro', { 'a.js': righe(40, { 10: 'return 1;' }) });
+  git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  git(dir, ['checkout', '-qb', 'ramo-nuovo']);
+  commit(dir, 'tenute le due parti', { 'a.js': righe(40, { 10: 'return 1;\nmine();' }) });
+  const r = fileRiscritti(dir, { prima });
+  assert.deepEqual(r.conflitti, ['a.js'], 'git dice dove il ramo andava in conflitto con main');
+  assert.deepEqual(R.giroDopoRiallineamento(r.file, { conflitti: r.conflitti }), { giro: 'pieno', codice: ['a.js'] });
+  assert.deepEqual(fileInConflitto(dir, { prima: 'HEAD' }), [], 'la punta nuova sopra main non ha più conflitti');
+  assert.deepEqual(R.giroDopoRiallineamento([], { conflitti: ['PATTERNS.md'] }).giro, 'nessuno', 'un conflitto in un file di servizio no');
+  assert.deepEqual(R.giroDopoRiallineamento([], { conflitti: null }).giro, 'pieno', 'senza sapere dei conflitti si verifica');
+});
+
 test('una riga tolta che comincia con due trattini resta una modifica, non un\'intestazione', () => {
   const diff = [
     'diff --git a/x.sql b/x.sql', 'index 111..222 100644', '--- a/x.sql', '+++ b/x.sql',
@@ -121,10 +149,18 @@ test('i rami in corso dicono i loro file e i feedback citati, e si incrociano co
   commit(dir, 'auto: a.js #44', { 'a.js': righe(40, { 1: 'x' }) });
   commit(dir, 'verifica #44 giro 1', { 'src/pagina/b.js': 'b\n' });
   git(dir, ['update-ref', 'refs/remotes/origin/claude/uno', 'HEAD']);
+  git(dir, ['update-ref', 'refs/remotes/origin/discarded/vecchio', 'HEAD']);
+  git(dir, ['update-ref', 'refs/remotes/origin/worker/AbC123-20261001T000000Z', 'HEAD']);
   git(dir, ['checkout', '-q', 'main']);
   git(dir, ['update-ref', 'refs/remotes/origin/claude/fuso', 'main']);
+  git(dir, ['checkout', '-qb', 'secondo']);
+  commit(dir, 'secondo tentativo', { 'b.js': 'b\n' });
+  git(dir, ['update-ref', 'refs/remotes/origin/worker/AbC123-20261002T000000Z', 'HEAD']);
+  git(dir, ['checkout', '-q', 'main']);
   const rami = ramiInCorso(dir);
-  assert.deepEqual(rami.map((r) => r.ramo), ['claude/uno'], 'un ramo senza lavoro in più non è in corso');
+  assert.deepEqual(rami.map((r) => r.ramo).sort(), ['claude/uno', 'worker/AbC123-20261002T000000Z'],
+    'fuori i rami già su main, quelli messi da parte e i tentativi vecchi dello stesso worker');
+  rami.splice(rami.findIndex((r) => r.ramo.startsWith('worker/')), 1);
   assert.deepEqual(rami[0].file.sort(), ['a.js', 'src/pagina/b.js']);
   assert.deepEqual(rami[0].feedback, ['44']);
   assert.deepEqual(incroci(rami, ['src/pagina/']), [{ ramo: 'claude/uno', feedback: ['44'], comuni: ['src/pagina/b.js'] }]);
@@ -139,7 +175,7 @@ test('il motivo del correttore: quattro forme, e senza motivo un errore che dice
     { tipo: 'prove-rosse', prove: ['tests/unit/x.test.mjs', 'apertura scheda'] });
   assert.deepEqual(R.leggiMotivoCorrettore('ripresa').motivo, { tipo: 'ripresa' });
   assert.deepEqual(R.leggiMotivoCorrettore('altro: il ramo era già su main').motivo, { tipo: 'altro', testo: 'il ramo era già su main' });
-  for (const male of ['', '   ', 'boh: x', 'conflitto', 'conflitto:  ', 'prove rosse:', 'altro', `altro: ${'x'.repeat(1001)}`]) {
+  for (const male of ['', '   ', 'boh: x', 'constructor', 'toString: x', 'conflitto', 'conflitto:  ', 'prove rosse:', 'altro', `altro: ${'x'.repeat(1001)}`]) {
     const r = R.leggiMotivoCorrettore(male);
     assert.equal(r.ok, false, male.slice(0, 20));
     assert.ok(r.errore.length > 10);
