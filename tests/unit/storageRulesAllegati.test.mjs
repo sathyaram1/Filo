@@ -10,13 +10,12 @@
 //     allegato ci scriveva sopra o lo cancellava;
 //   · un bucket aperto in lettura è hosting gratuito sul dominio dell'owner.
 //
-// Perché una sentinella e non solo il motore vero. Provare le regole davvero
-// vuol dire emulatore Storage (Java, centinaia di MB, due servizi da avviare):
-// quella prova esiste, sta in `tests/rules/storage-allegati-motore-vero.mjs` e
-// si lancia a mano con le istruzioni che ha in testa. Qui il rischio non è che
-// il motore sbagli, è che qualcuno riapra la porta scrivendo un'altra riga:
-// questo test rilegge il file che si deploya e diventa rosso in millisecondi,
-// sulla macchina di chi la riga l'ha scritta.
+// Perché una sentinella. L'emulatore Storage (Java, centinaia di MB) sta in
+// `tests/rules/storage-allegati-motore-vero.mjs` e si lancia a mano, ma NON è il
+// deposito vero: non vede i campi che il deposito scrive da sé, ed è stato verde
+// su regole che negavano ogni caricamento (#1769). La prova che conta è un
+// caricamento vero dopo la pubblicazione. Qui il rischio è che qualcuno riapra la
+// porta, o rilegga un campo che il deposito riempie, scrivendo un'altra riga.
 //
 // Senza il fix è ROSSO tre volte: `allow read: if true`, `allow write` senza
 // `resource == null`, nessun vincolo sul nome. Senza #1518 è rosso sul tipo
