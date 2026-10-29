@@ -315,7 +315,7 @@
   function combacia(a, n, st) {
     const v = a.valore;
     // Annulla e rifai non si prevedono, ma tornano sempre a un testo già avuto dalla casella.
-    if (/^history(Undo|Redo)$/.test(a.tipo)) return st.storia.has(n);
+    if (/^history(Undo|Redo)$/.test(a.tipo)) return st.storia.has(impronta(n));
     if (a.tipo === 'insertFromDrop' || a.tipo === 'insertReplacementText') {
       let d = typeof a.dato === 'string' ? a.dato : a.trasferito;
       if (typeof d !== 'string') return false;
