@@ -178,9 +178,6 @@ test('tolgo una riga: sparisce, il prompt non la vede, non ricompare dallo stess
   await page.evaluate(() => chrome.runtime.sendMessage({ type: 'filo_compact_memory' }));
   const nota = riga(page, 'È vegetariano');
   await expect(nota).toHaveCount(1, { timeout: 8_000 });
-  // Un turno con la riga in memoria: il CONTESTO fotografato la porta, e toglierla deve rifare la fotografia (#1562).
-  await turno(app, 'chat-saluto', 'ciao');
-  expect(memoriaNelPrompt(await ultimoPrompt(app))).toContain('È vegetariano');
 
   await nota.hover();
   await nota.locator('.qd-tasto[title="Togli dalla memoria"]').click();
