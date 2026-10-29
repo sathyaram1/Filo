@@ -29,6 +29,7 @@
         'Se le pagine che Filo legge per risponderti sono troppe per il modello tutte insieme, Filo risponde con quelle che ci stanno e sotto la risposta ti dice quali siti ha lasciato fuori. Se ti servono, chiediglielo e le rilegge. Prima la risposta non arrivava, e l\'errore consigliava di cambiare modello.',
         'Nell\'Editor, se hai già selezionato del testo, Commenta apre subito il commento su quello. Prima ti chiedeva di selezionarlo di nuovo.',
         'Le x che scrivi al posto di un dato, come in «nel 14xx», non vengono più sottolineate come errore, e «Correggi tutti gli errori» le riempie col dato invece di trattarle da parola sbagliata.',
+        'Le schede e il «+» restano fermi quando una scheda comincia o smette di suonare. Su una scheda così stretta che resta solo l\'altoparlante, cliccarlo apre la scheda invece di silenziarla. E il titolo di una scheda stretta mostra almeno la prima lettera, o non si vede: niente più mezze lettere.',
       ],
     },
     {
