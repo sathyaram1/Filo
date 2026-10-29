@@ -245,7 +245,7 @@ async function riordinaBiancoNeroEColori({ shell, openTab, testServer }) {
 
   await submit(dash, '/riordina');
   await expect.poll(async () => (await webTabs()).map((t) => t.title), { timeout: 15_000 })
-    .toEqual(['Bianco', 'Rosso', 'Blu', 'Nero', 'Senza']);
+    .toEqual(['Bianco', 'Netflix', 'Rosso', 'Blu', 'Nero', 'Senza']);
 }
 
 test('"/riordina": il bianco in testa, il nero in fondo ai colori, senza favicon in coda', async ({ shell, openTab, testServer }) => {
