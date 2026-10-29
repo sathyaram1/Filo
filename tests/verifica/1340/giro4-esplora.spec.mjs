@@ -323,3 +323,98 @@ for (const [lung, scritti] of [[10000, 300], [5000, 100]]) {
     console.log('x6e', lung, scritti, 'lunghezze', prima, dopo);
   });
 }
+
+test('x10a microfono: clic sulla testata senza spostare, poi microfono', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina());
+  await apriAiuto(shell, page);
+  await contaAscolti(app, page);
+  await page.waitForTimeout(1500);
+  const h = await page.locator('.sn-sidebar-header').boundingBox();
+  await page.mouse.click(h.x + 30, h.y + h.height / 2);
+  await page.waitForTimeout(1500);
+  const p = await centro(page.locator('.sn-sidebar .sn-voce-btn'));
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(800);
+  console.log('x10a ascolti', await ascolti(app, page), 'avviso', await avvisoCoperto(page).count());
+});
+
+test('x10b microfono: spostato, poi clic nella casella, poi microfono', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina());
+  await apriAiuto(shell, page);
+  await contaAscolti(app, page);
+  await page.waitForTimeout(1500);
+  const h = await page.locator('.sn-sidebar-header').boundingBox();
+  await page.mouse.move(h.x + 30, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x - 90, h.y + h.height / 2 + 30, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(1000);
+  await page.locator('.sn-sidebar-input textarea').click();
+  await page.waitForTimeout(1500);
+  const p = await centro(page.locator('.sn-sidebar .sn-voce-btn'));
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(800);
+  const info = await page.evaluate(({ x, y }) => document.elementsFromPoint(x, y).slice(0, 4).map((e) => e.tagName + '.' + e.className), p);
+  console.log('x10b ascolti', await ascolti(app, page), 'avviso', await avvisoCoperto(page).count(), JSON.stringify(info));
+});
+
+test('x11 cosa copre il microfono dopo lo spostamento', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina());
+  await apriAiuto(shell, page);
+  await contaAscolti(app, page);
+  await page.waitForTimeout(1500);
+  const h = await page.locator('.sn-sidebar-header').boundingBox();
+  await page.mouse.move(h.x + 30, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x - 90, h.y + h.height / 2 + 30, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(1500);
+  const p = await centro(page.locator('.sn-sidebar .sn-voce-btn'));
+  const info = await nelMondoDiFilo(app, page, ({ x, y }) => {
+    const out = [];
+    for (const el of document.querySelectorAll('html > *, body > *')) {
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      if (r.left <= x && x <= r.right && r.top <= y && y <= r.bottom) out.push(`${el.tagName}.${el.className} z=${cs.zIndex} pe=${cs.pointerEvents} op=${cs.opacity} ${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)}x${Math.round(r.height)}`);
+    }
+    const el = document.querySelector('.sn-sidebar .sn-voce-btn');
+    const V = globalThis.SN_VISTO;
+    out.push('stato ' + JSON.stringify(V._test.stato(el)));
+    const sb = document.querySelector('.sn-sidebar');
+    out.push('sidebar style ' + sb.getAttribute('style'));
+    out.push('ordine ' + [...document.documentElement.children].map((e) => e.tagName + '.' + e.className).join(' | '));
+    return out;
+  }, p);
+  console.log('x11\n' + info.join('\n'));
+});
+
+test('x12 microfono con un avviso di Filo nell\'angolo', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina());
+  await apriAiuto(shell, page);
+  await contaAscolti(app, page);
+  await page.waitForTimeout(1500);
+  await nelMondoDiFilo(app, page, () => { globalThis.SN_POPUP.showToast('Testo copiato negli appunti', { duration: 6000 }); return true; });
+  await page.waitForTimeout(800);
+  const p = await centro(page.locator('.sn-sidebar .sn-voce-btn'));
+  const sopra = await page.evaluate(({ x, y }) => document.elementsFromPoint(x, y).slice(0, 3).map((e) => e.tagName + '.' + e.className), p);
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(800);
+  console.log('x12 ascolti', await ascolti(app, page), 'avviso', await avvisoCoperto(page).count(), JSON.stringify(sopra));
+  await page.screenshot({ path: 'tests/.shots/g4-x12.png' });
+});
+
+test('x13 correttore dopo lo spostamento', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina());
+  await apriAiuto(shell, page);
+  await page.waitForTimeout(1500);
+  const h = await page.locator('.sn-sidebar-header').boundingBox();
+  await page.mouse.move(h.x + 30, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x - 90, h.y + h.height / 2 + 30, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(800);
+  await page.locator('.sn-sidebar-input textarea').click();
+  await page.keyboard.type('dove si canbia la pasword del contto');
+  await page.waitForTimeout(3000);
+  await page.screenshot({ path: 'tests/.shots/g4-x13.png' });
+});

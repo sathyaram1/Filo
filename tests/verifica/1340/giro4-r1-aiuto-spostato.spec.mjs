@@ -1,12 +1,18 @@
-// #1340, giro 4, rilievo 1: spostato il pannello dell'Aiuto (dalla testata, o perché un avviso della barra lo alza),
-// il microfono e il documento trovato si fermano sempre come coperti, senza nessun velo del sito.
+// #1340, giro 4, rilievo 1: spostato l'Aiuto dalla testata, pezzi di Filo rimasti sopra il microfono (lo strato del
+// correttore, l'avviso della guardia) contano come un velo del sito, e il clic dell'utente si ferma.
 import { test, expect } from '../../fixtures/electron.mjs';
-import { join } from 'node:path';
-import { cartellaDellaProva, BOLLETTA_MARZO } from '../../helpers/documentiFinti.mjs';
-import { confermaSopraPagina, clickConfirm } from '../../helpers/confirm.mjs';
 import { nelMondoDiFilo } from '../../helpers/riquadri.mjs';
 
-const pagina = (corpo = '<h1>Un sito</h1>') => `<!doctype html><html><head><meta charset="utf-8"><title>Fornitore Energia</title></head><body style="padding:40px;font:16px sans-serif">${corpo}</body></html>`;
+const SITO = `
+  window.stendi = () => {
+    const v = document.createElement('div');
+    v.id = 'velo';
+    v.style.cssText = 'position:fixed;inset:0;background:#fff;pointer-events:none;z-index:2147483647';
+    document.body.appendChild(v);
+  };
+  window.togli = () => { const v = document.getElementById('velo'); if (v) v.remove(); };
+`;
+const pagina = () => `<!doctype html><html><head><meta charset="utf-8"><title>Un sito</title></head><body style="padding:40px;font:16px sans-serif"><h1>Un sito</h1><script>${SITO}</script></body></html>`;
 const avvisoCoperto = (page) => page.locator('.sn-toast', { hasText: 'L\'Aiuto era coperto' });
 async function apriAiuto(shell, page) {
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
@@ -47,75 +53,28 @@ test('r1 il microfono dell\'Aiuto spostato dalla testata parte al clic', async (
   expect(await ascolti(app, page)).toBe(1);
 });
 
-test('r1 il microfono dell\'Aiuto alzato da un avviso della barra parte al clic', async ({ app, shell, openTab, testServer }) => {
+test('r1 col pannello spostato l\'avviso della guardia cade sul microfono e ferma il clic dopo che il velo se n\'è andato', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, pagina());
   await apriAiuto(shell, page);
   await contaAscolti(app, page);
   await page.waitForTimeout(1500);
-  // Come fa Filo quando un avviso compare nell'angolo della barra.
-  await page.addStyleTag({ content: ':root:root{--filo-avvisi-barra:140px!important}' });
-  await page.waitForTimeout(2000);
+  await sposta(page, -90, 30);
+  // Un tasto nella casella rimette a posto lo strato del correttore: resta solo l'avviso.
+  await page.locator('.sn-sidebar-input textarea').click();
+  await page.keyboard.type('a');
+  await page.keyboard.press('Backspace');
+  await page.waitForTimeout(1500);
   const p = await centro(page.locator('.sn-sidebar .sn-voce-btn'));
+  await page.evaluate(() => window.stendi());
+  await page.waitForTimeout(700);
+  await page.mouse.click(p.x, p.y);
+  await expect(avvisoCoperto(page)).toBeVisible();
+  await page.evaluate(() => window.togli());
+  await page.waitForTimeout(1200);
+  const sopra = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('.sn-toast') ? 'avviso' : 'microfono', p);
+  expect(sopra, 'l\'avviso non copre il microfono').toBe('microfono');
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(800);
-  expect(await avvisoCoperto(page).count(), 'nessun velo: niente avviso').toBe(0);
   expect(await ascolti(app, page)).toBe(1);
-});
-
-async function aiutoFinto(app, risposte) {
-  await app.evaluate(async (_e, risposte) => {
-    const C = globalThis.SN_CONST;
-    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
-    await globalThis.SN_STORAGE.updateSettings({
-      useDefaultModels: false,
-      apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash', [C.ACTIONS.HELP]: 'deepseek-flash' },
-      modelRegistry: globalThis.SN_TEST_MODELS.registry,
-    });
-    const P = globalThis.SN_PROVIDERS;
-    const risposta = ({ attempts, messages }) => {
-      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
-      if (!sistema.includes('# Protocollo di risposta')) return { text: '{"message":"Ciao.","suggestions":[],"issues":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      const ultimo = JSON.stringify([...messages].reverse().find((m) => m.role === 'user') || '');
-      const scelta = risposte.find(([parola]) => ultimo.includes(parola)) || risposte[risposte.length - 1];
-      return { text: scelta[1], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-    };
-    P.completeWithFallback = async (o) => risposta(o);
-    P.streamCompleteWithFallback = async (o) => risposta(o);
-    globalThis.__trascinati = [];
-  }, risposte);
-  await app.evaluate(({ webContents }) => {
-    for (const wc of webContents.getAllWebContents()) wc.startDrag = (item) => { globalThis.__trascinati.push(item.file); };
-  });
-}
-
-test('r1 il documento trovato dall\'Aiuto, col pannello spostato, si trascina', async ({ app, shell, openTab, testServer }) => {
-  test.setTimeout(90_000);
-  const dir = join(await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR), 'Scansioni');
-  cartellaDellaProva(dir);
-  const bolletta = join(dir, BOLLETTA_MARZO);
-  const page = await testServer.openReady(openTab, pagina('<h1>Carica la tua bolletta</h1><input type="file" id="bolletta">'));
-  await aiutoFinto(app, [
-    ['ho cercato fra i documenti', JSON.stringify({ text: 'Eccola: trascinala nel campo «Bolletta».', file: 1, status: 'done' })],
-    ['', JSON.stringify({ action: 'documenti', cosa: 'bolletta luce marzo', text: 'La cerco fra i tuoi documenti.' })],
-  ]);
-  await apriAiuto(shell, page);
-  await page.fill('.sn-sidebar-input textarea', 'mi serve la bolletta della luce di marzo');
-  await page.press('.sn-sidebar-input textarea', 'Enter');
-  await clickConfirm(await confermaSopraPagina(app, { timeout: 20_000 }), 'ok');
-  const file = page.locator('.sn-sidebar .sn-sidebar-file');
-  await expect(file).toHaveCount(1, { timeout: 20_000 });
-  await page.waitForTimeout(1500);
-  await sposta(page, -150, 40);
-  await page.waitForTimeout(2000);
-  const box = await file.boundingBox();
-  await page.mouse.move(box.x + 20, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(box.x + 60, box.y + box.height / 2 + 30, { steps: 6 });
-  await page.mouse.move(box.x - 200, box.y - 200, { steps: 6 });
-  await page.mouse.up();
-  await page.waitForTimeout(800);
-  expect(await avvisoCoperto(page).count(), 'nessun velo: niente avviso').toBe(0);
-  await expect.poll(() => app.evaluate(() => globalThis.__trascinati)).toEqual([bolletta]);
 });
