@@ -44,7 +44,16 @@ test('Font scelto senza cercare, e A+, dal pannello aperto con la striscia', asy
   await ed.waitForTimeout(200);
   console.log('SIZE doc html', await ed.locator('#doc').innerHTML());
   await ed.click('.pd-elemento[data-elemento="font"] .ed-font-button');
-  await ed.locator('.ed-font-pop .sn-select-option', { hasText: 'Courier New' }).click();
+  await ed.waitForTimeout(400);
+  await ed.screenshot({ path: 'tests/.shots/v1433g5/font-pop.png' });
+  console.log('POP', await ed.evaluate(() => { const p = document.querySelector('.ed-font-pop'); const r = p.getBoundingClientRect(); return { hidden: p.hidden, r: [r.x, r.y, r.width, r.height], parent: p.parentElement.className }; }));
+  const o = ed.locator('.ed-font-pop .sn-select-option', { hasText: 'Courier New' });
+  console.log('OPT', await o.evaluate((n) => { const r = n.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; }));
+  await o.scrollIntoViewIfNeeded();
+  await ed.waitForTimeout(300);
+  console.log('POP dopo scroll', await ed.evaluate(() => document.querySelector('.ed-font-pop').hidden));
+  await ed.screenshot({ path: 'tests/.shots/v1433g5/font-pop2.png' });
+  await o.click({ timeout: 3000 });
   await ed.waitForTimeout(300);
   console.log('FONT2 doc html', await ed.locator('#doc').innerHTML(), 'aperto', await aperto(ed));
 });
