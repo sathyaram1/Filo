@@ -1905,6 +1905,17 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 
     // «Valuta» (#1449): il testo del campo, o quello cambiato da allora che una domanda dopo porta con sé.
     const testoCampo = valuta || (userMessage ? testoCambiato() : null);
+    // Nell'Editor il documento viaggia intero fino al tetto (#1475), e il main lo accetta solo da una pagina di Filo.
+    // Aperto un altro documento a metà conversazione, il modello lo sa prima della domanda nuova.
+    const appPagina = appDellaPagina();
+    let letto = null;
+    try { letto = appPagina ? appPagina.documento() : null; } catch (_) { letto = null; }
+    if (letto && letto.id) {
+      if (docConversazione && letto.id !== docConversazione) {
+        history.push({ role: 'user', kind: 'action', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_ALTRO_DOCUMENTO, perCronologia: true }) });
+      }
+      docConversazione = letto.id;
+    }
     if (userMessage || valuta) {
       fermataDetta = false;
       const bolla = valuta ? I18n.t('help_valuta_richiesta', estratto(valuta)) : scritto;
