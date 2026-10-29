@@ -138,7 +138,7 @@ function buildRiquadriVuotiSource(corpi) {
   function ripartono(n) {
     if (ospite(n)) { arrivati.delete(n); return; }
     for (var i = 0; i < tuttiIn.length; i++) {
-      try { var l = tuttiIn[i].call(n, OSPITI); for (var j = 0; j < l.length; j++) arrivati.delete(l[j]); return; } catch (e) {}
+      try { var l = R(tuttiIn[i], n, [OSPITI]); for (var j = 0; j < l.length; j++) arrivati.delete(l[j]); return; } catch (e) {}
     }
   }
   var SE = {
