@@ -542,8 +542,8 @@ ${PROPAGAZIONE}${sonda ? SONDA : ''}
 })();`;
 }
 
-function buildGuardSource(seed, level, canale, sonda) {
-  return buildPreamboloSource({ fp: { seed, level }, canale, sonda });
+function buildGuardSource(seed, level, canale, sonda, esenti) {
+  return buildPreamboloSource({ fp: { seed, level }, canale, sonda, esenti });
 }
 
 module.exports = { buildGuardSource, buildPreamboloSource };
