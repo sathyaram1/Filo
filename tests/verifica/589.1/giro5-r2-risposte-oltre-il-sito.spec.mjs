@@ -1,5 +1,5 @@
 // #589.1 giro 5, rilievo 2 — domande che la lista ammette rispondono a un sito con ciò che non è suo: il segno con cui
-// Filo firma l'utente, uguale su ogni sito e in incognito, e le immagini di un altro sito lette coi cookie dell'utente.
+// Filo firma l'utente, uguale su ogni sito, e le immagini di un altro sito lette coi cookie dell'utente.
 // Isolamento rotto: mondo 999.
 
 import { test, expect } from '../../fixtures/electron.mjs';
@@ -39,14 +39,14 @@ test('r2 un sito non legge né riscrive il segno con cui Filo riconosce l\'utent
 });
 
 test('r2 un sito non si fa portare da Filo l\'immagine di un altro sito coi cookie dell\'utente', async ({ app, openTab, testServer }) => {
-  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const FOTO = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0xff, 0xd9]);
   const altro = createServer((req, res) => {
     if (!String(req.headers.cookie || '').includes('sessione=dell-utente')) { res.writeHead(403); res.end('accedi'); return; }
-    res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': PNG.length });
-    res.end(PNG);
+    res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': FOTO.length });
+    res.end(FOTO);
   });
   await new Promise((r) => altro.listen(0, '127.0.0.1', r));
-  const foto = `http://127.0.0.1:${altro.address().port}/estratto-conto.png`;
+  const foto = `http://127.0.0.1:${altro.address().port}/estratto-conto.jpg`;
   try {
     await testServer.openReady(openTab, '<h1>sito</h1>', { pubblico: true });
     await openTab(testServer.html('<h1>quella che guardo</h1>'));
