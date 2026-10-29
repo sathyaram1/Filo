@@ -71,6 +71,6 @@ test('esplora: lettura, azione secca, risposta: ogni chiamata è il prefisso del
     if (k !== -1) rotture.push({ chiamata: i, posto: k, prima: JSON.stringify(chiamate[i - 1].messages[k]).slice(0, 400), dopo: JSON.stringify(chiamate[i].messages[k]).slice(0, 400) });
   }
   console.log(JSON.stringify(rotture, null, 1));
-  console.log(JSON.stringify(chiamate.at(-1).messages.slice(1).map((m) => ({ r: m.role, c: JSON.stringify(m.content).slice(0, 160), rd: !!m.reasoning_details, tc: !!m.tool_calls }))), null, 1));
+  console.log(JSON.stringify(chiamate.at(-1).messages.slice(1).map((m) => ({ r: m.role, c: JSON.stringify(m.content).slice(0, 160), rd: !!m.reasoning_details, tc: !!m.tool_calls })), null, 1));
   expect(rotture).toEqual([]);
 });
