@@ -90,6 +90,7 @@ const DOMANDE_WEB_COL_GESTO = Object.freeze(new Set([
   'permesso_filo', 'save_page', 'save_link', 'set_saved_page_thumb', 'update_settings',
   'submit_feedback', 'credits_award_feedback', 'redteam_submit',
   'download_image', 'download_media', 'download_link', 'geo_propose_accept', 'save_path', 'icon_layout_drop',
+  'aiuto_apri_file', 'aiuto_mostra_file', 'aiuto_trascina_file',
 ]));
 const CHIAVI_STORAGE_WEB_COL_GESTO = Object.freeze(['sn_personal_dict', 'sn_autocorrect', 'sn_icon_layout']);
 // Un gesto, una scrittura: la lista tiene le ultime mille, e un «Ha funzionato?» costa due chiamate al modello.
