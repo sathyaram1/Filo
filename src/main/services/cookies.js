@@ -805,6 +805,7 @@ module.exports = {
   partitionForUrl,
   partitionForTab,
   ensureHeaderHook,
+  presentaReferer,
   applyGpc,
   senzaGpc,
   urlDelFrame,
