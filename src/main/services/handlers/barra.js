@@ -1,8 +1,10 @@
-// Handler di dominio della barra laterale (#871): i nomi delle azioni della pagina, l'Aiuto della scheda e le sue
-// risposte da leggere. Aperti ai content script dei siti: non leggono dati, e la disposizione delle icone non passa da qui.
+// Handler della barra laterale (#871: azioni della pagina, Aiuto, risposte da leggere; aperti ai siti, non leggono
+// dati né la disposizione delle icone) e del pannello di destra delle app (#1433: solo pagine di Filo).
 // Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 const RisposteInAttesa = require('../../risposteInAttesa');
+const Pannelli = require('../pannelliApp');
+const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf } = ctx;
@@ -54,4 +56,42 @@ module.exports = function register(on, ctx) {
     if (RisposteInAttesa.segna(s.tab, String(msg?.fonte || ''), msg?.attesa === true)) s.tabs.barra?.aggiornaNav();
     return { ok: true };
   });
+
+  // ── Il pannello di destra delle app (#1433) ───────────────────────────────
+  const appDi = (msg) => {
+    const app = String(msg?.app || '');
+    return globalThis.SN_PANNELLI_APP?.catalogo(app) ? app : '';
+  };
+
+  on(MSG.PANNELLO_APP_LEGGI, soloFilo(async (msg) => {
+    const app = appDi(msg);
+    if (!app) return { ok: false, error: 'app sconosciuta' };
+    return { ok: true, stato: await Pannelli.leggi(app) };
+  }));
+
+  on(MSG.PANNELLO_APP_MODIFICA, soloFilo(async (msg) => {
+    const app = appDi(msg);
+    if (!app) return { ok: false, error: 'app sconosciuta' };
+    const esito = await Pannelli.modifica(app, {
+      op: String(msg?.op || ''), id: String(msg?.id || ''), primaDi: msg?.primaDi ? String(msg.primaDi) : null, config: msg?.config,
+    });
+    return esito ? { ok: true, stato: esito.stato, cambiato: esito.cambiato } : { ok: false, error: 'mossa non valida' };
+  }));
+
+  // La pagina dice al main che ha un pannello e com'è: il bordo destro e il tasto valgono solo lì.
+  on(MSG.PANNELLO_APP_STATO, soloFilo(async (msg, sender) => {
+    const s = schedaDi(sender);
+    if (!s) return { ok: false };
+    const app = appDi(msg);
+    s.tab.pannelloApp = app ? {
+      app,
+      aperto: msg?.aperto === true,
+      dentro: msg?.dentro === true,
+      motivo: String(msg?.motivo || '').slice(0, 20),
+      // I pixel dal bordo destro che il puntatore attraversa per arrivare al pannello: l'Aiuto aperto accanto.
+      transito: Math.max(0, Math.min(4000, Math.round(Number(msg?.transito) || 0))),
+    } : null;
+    s.tabs.barra?.destro?.statoDallaScheda(s.tab);
+    return { ok: true };
+  }));
 };

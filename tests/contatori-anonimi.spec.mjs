@@ -9,6 +9,7 @@ import { menuDi } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 import { barraPage, comandaBarra, menuAperto, premiNellaBarra } from './helpers/barra.mjs';
+import { EDITOR, aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
 
 const SHOTS = 'tests/.shots';
 
@@ -512,12 +513,10 @@ test('un’impostazione cambiata conta il valore solo se è di un elenco chiuso,
 
 test('la ricerca fra i font dell’Editor conta l’attesa e la posizione della scelta, e la chiusura senza scelta', async ({ app, openTab }) => {
   test.setTimeout(60_000);
-  const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('.ed-grid');
-  await page.locator('.ed-cell-empty').first().click();
-  await page.locator('.ed-overlay [data-add="font"]').click();
-  const mod = page.locator('.ed-module[data-type="font"]');
-  await expect(mod).toHaveCount(1);
+  const page = await openTab(EDITOR);
+  await page.waitForSelector('#doc');
+  await aggiungiStrumento(page, 'font');
+  const mod = strumento(page, 'font');
   await mod.locator('.ed-font-button').click();
   await mod.locator('.ed-font-search').fill('garam');
   await mod.locator('.ed-font-list .sn-select-option:visible').first().click();

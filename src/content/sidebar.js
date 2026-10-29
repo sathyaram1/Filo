@@ -105,9 +105,18 @@
   // «Valuta» (#1449): il campo dell'ultima valutazione e il testo che il modello ne ha visto. Da lì la conversazione
   // risponde col modello della chat, e le correzioni proposte si scrivono in quel campo.
   let valutazione = null;
+  // Il documento dell'app (l'Editor) di cui parla la conversazione: cambiato a metà, il modello lo sa.
+  let docConversazione = '';
 
   // Una pagina che si riscrive da capo porta via il pannello: staccato vale chiuso.
   function isOpen() { return !!(root && root.isConnected); }
+
+  // La pagina di Filo che ha l'Aiuto come sua chat (l'Editor, #1433): il documento che legge e le azioni che lo
+  // cambiano. Solo nelle pagine di Filo: altrove quel nome non vale niente.
+  function appDellaPagina() {
+    const a = location.protocol === 'filo:' ? global.SN_AIUTO_APP : null;
+    return a && typeof a.documento === 'function' ? a : null;
+  }
 
   // `davvero`: anche con una risposta in arrivo (l'Aiuto spento in Preferenze).
   function close({ davvero = false } = {}) {
@@ -143,6 +152,7 @@
     voce = null;
     statoVoce = 'pronto';
     valutazione = null;
+    docConversazione = '';
     cambiato();
   }
 
@@ -178,6 +188,7 @@
     passiDaSolo = 0;
     continuaAperto = null;
     valutazione = null;
+    docConversazione = '';
     session = newSession();
     // Ogni apertura è una conversazione sua anche nel filo.
     convFilo = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID()
@@ -225,7 +236,7 @@
       <div class="sn-sidebar-meta"></div>
       <div class="sn-sidebar-allegati" hidden></div>
       <form class="sn-sidebar-input" autocomplete="off">
-        <textarea rows="1" placeholder="Dimmi cosa vuoi fare sulla pagina…"></textarea>
+        <textarea rows="1" placeholder="${appDellaPagina()?.segnaposto || 'Dimmi cosa vuoi fare sulla pagina…'}"></textarea>
         <button type="submit">↵</button>
       </form>
     `;
@@ -627,9 +638,12 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   // strada nuova che risponde ci passa da sé. Errori e note dell'interfaccia no (`nelFilo: false`).
   function nelFiloAiuto(role, text) {
     if (!convFilo || !String(text || '').trim()) return;
+    // Nell'Editor la riga è del documento («nell'Editor su tesi»), come quella della chat che c'era lì prima.
+    let conv = null;
+    try { conv = appDellaPagina()?.conversazione?.(convFilo) || null; } catch (_) { conv = null; }
     try {
       chrome.runtime.sendMessage({
-        type: MSG.FILO_CONVERSAZIONE_APP, app: 'aiuto', rif: convFilo, soggetto: document.title,
+        type: MSG.FILO_CONVERSAZIONE_APP, ...(conv || { app: 'aiuto', rif: convFilo, soggetto: document.title }),
         messaggi: [{ role: role === 'user' ? 'user' : 'filo', text: String(text) }],
       }).catch(() => {});
     } catch (_) {}
@@ -1133,6 +1147,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         collapse: collapseFlag,
         file,
         correzioni,
+        // Le azioni sul documento dell'Editor (#1433): le applica la pagina, se ne ha uno.
+        formatta: Array.isArray(obj.formatta) ? obj.formatta.slice(0, 50) : null,
       };
     } catch (_) {
       return fallback;
@@ -1228,6 +1244,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   const NOTA_COLLEGAMENTO = 'l\'utente ha cliccato un collegamento della tua risposta, ma non si è aperto: avrebbe portato '
     + 'fuori un codice, una password, una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire '
     + 'a nessun livello. Non riproporlo in un\'altra forma';
+  const NOTA_ALTRO_DOCUMENTO = 'l\'utente ha aperto un altro documento: i messaggi di prima parlavano di quello di prima, '
+    + 'il documento allegato da qui in poi è quello nuovo';
   function notaFermata(frase) {
     logFermata(frase);
     history.push({ role: 'user', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_COLLEGAMENTO, perCronologia: true }), kind: 'action' });
@@ -1889,6 +1907,17 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 
     // «Valuta» (#1449): il testo del campo, o quello cambiato da allora che una domanda dopo porta con sé.
     const testoCampo = valuta || (userMessage ? testoCambiato() : null);
+    // Nell'Editor il documento viaggia intero fino al tetto (#1475), e il main lo accetta solo da una pagina di Filo.
+    // Aperto un altro documento a metà conversazione, il modello lo sa prima della domanda nuova.
+    const appPagina = appDellaPagina();
+    let letto = null;
+    try { letto = appPagina ? appPagina.documento() : null; } catch (_) { letto = null; }
+    if (letto && letto.id) {
+      if (docConversazione && letto.id !== docConversazione) {
+        history.push({ role: 'user', kind: 'action', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_ALTRO_DOCUMENTO, perCronologia: true }) });
+      }
+      docConversazione = letto.id;
+    }
     if (userMessage || valuta) {
       fermataDetta = false;
       const bolla = valuta ? I18n.t('help_valuta_richiesta', estratto(valuta)) : scritto;
@@ -1940,9 +1969,13 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       });
       if (valutazione) valutazione.mandato = testoCampo;
     }
+    const conDocumento = () => {
+      if (letto) payload.documento = { titolo: letto.titolo, testo: letto.testo, avviso: letto.avviso || '' };
+    };
+    conDocumento();
 
     try {
-      const res = await chrome.runtime.sendMessage({
+      const chiedi = () => chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.HELP,
         payload,
@@ -1951,6 +1984,16 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         // «Valuta» è una richiesta dell'utente come un messaggio scritto.
         ...(userMessage || valuta ? {} : { parteDiUnUso: true }),
       });
+      let res = await chiedi();
+      // Un modello dalla finestra più stretta rifiuta il documento intero: si rimanda più corto, e lo si dice sotto.
+      for (let giro = 0; giro < 3 && letto && !res?.ok; giro++) {
+        let corto = null;
+        try { corto = appPagina.documento(letto, res, JSON.stringify({ ...payload, screenshot: undefined }).length); } catch (_) { corto = null; }
+        if (!corto) break;
+        letto = corto;
+        conDocumento();
+        res = await chiedi();
+      }
       // Col suo codice: senza, la frase già scritta per l'utente («serve un
       // invito») diventava «qualcosa è andato storto» (#663).
       if (!res?.ok) {
@@ -2148,12 +2191,31 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       }
 
       if (thinking) { thinking.stop(); thinking.el.remove(); }
+      // Nell'Editor il modello cambia la formattazione del documento: la fa la pagina, col suo punto di ripristino e
+      // l'«Annulla», anche a pannello chiuso a metà turno: è la modifica chiesta, non un segno sulla pagina.
+      // Era chiesta per il documento letto alla partenza: se nel frattempo ne è aperto un altro, quello non si tocca.
+      const conFormati = !!(appPagina && typeof appPagina.applica === 'function' && parsed.formatta && parsed.formatta.length);
+      let toccati = 0;
+      if (conFormati) {
+        try { toccati = appPagina.applica(parsed.formatta, (letto && letto.id) || ''); } catch (_) { toccati = 0; }
+        if (toccati === null) parsed.display = `Nel frattempo hai aperto un altro documento: la modifica era per «${(letto && letto.titolo) || 'il documento di prima'}», e non l'ho fatta. Tornaci e chiedimelo di nuovo.`;
+        else if (!toccati) parsed.display = 'Non ho trovato testo a cui applicare la formattazione.';
+        else if (!parsed.display) parsed.display = 'Fatto.';
+      }
+      // Per i contatori (#1465), come contava la chat dell'Editor che c'era prima.
+      if (appPagina && typeof appPagina.conta === 'function' && letto && toccati !== null) {
+        const conta = (campi) => { try { appPagina.conta({ oltreTetto: !!letto.tagliato, ...campi }); } catch (_) {} };
+        if (scritto && scritto === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO) conta({ continua: true });
+        conta(!conFormati ? { formati: 0 } : toccati ? { formati: toccati } : { nonTrovato: true });
+      }
       // Se il modello non ha messo testo ma c'è solo un highlight di routine,
       // mostriamo comunque una riga discreta in chat (es. "→ passo successivo")
       // così l'utente sa che la chat ha avuto una risposta, anche se silenziosa.
       const daMostrare = fileDaMostrare(parsed, dopoDocumenti);
       const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : '(risposta vuota)'));
       assistantEl = appendChatMessage('assistant', displayText, { nelFilo: !!parsed.display });
+      // Quanta parte di un documento troppo lungo ha letto, sotto la risposta (#1475).
+      if (letto && letto.tagliato && letto.nota) appendActionLog(letto.nota);
       // Fermata al tetto di lunghezza (#1097.3): la riga sotto lo dice, e «Continua» chiede il seguito come nelle altre chat.
       const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
       if (interrotta) appendActionLog(interrotta);

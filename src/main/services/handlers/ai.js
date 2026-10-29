@@ -270,6 +270,9 @@ module.exports = function register(on, ctx) {
     if (msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && typeof msg.payload === 'object') {
       msg.payload.schedaApertaIl = (sender && sender.tab && sender.tab.openedAt) || null;
       msg.payload.paginaDal = (sender && sender.tab && sender.tab.paginaDal) || null;
+      // Il documento dell'Editor (#1433) entra nel prompt come testo dell'utente solo se lo manda l'Editor: da un sito
+      // sarebbe testo di fuori presentato per suo.
+      if ('documento' in msg.payload && !/^filo:\/\/editor\//i.test(String(origin || ''))) delete msg.payload.documento;
     }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
@@ -281,7 +284,9 @@ module.exports = function register(on, ctx) {
     const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
     const daSola = msg && msg.action === SN_CONST.ACTIONS.EXPLAIN && msg.suRichiesta !== true && AC && AC.comeAnticipata;
     // Il correttore ripete una volta la domanda la cui risposta era illeggibile (#1580): la cache la ridarebbe uguale.
-    const noCache = Boolean(msg && msg.riprova === true && DEL_CORRETTORE.has(msg.action));
+    // «Rigenera titolo» e «Rigenera riassunto» dell'Editor vogliono una risposta nuova anche a documento uguale (#1433).
+    const rigenera = msg && msg.rigenera === true && [SN_CONST.ACTIONS.EDITOR_TITLE, SN_CONST.ACTIONS.EDITOR_SUMMARY].includes(msg.action);
+    const noCache = Boolean(msg && ((msg.riprova === true && DEL_CORRETTORE.has(msg.action)) || rigenera));
     const valuta = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.valuta === true;
     const chiedi = daSola
       ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender }))

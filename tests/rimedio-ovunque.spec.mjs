@@ -1,13 +1,14 @@
 // #663, #828.1: quando Filo non può rispondere (senza invito, crediti finiti, modello che nessun fornitore ammesso
 // serve) la frase dice dove si rimedia, e su ogni superficie c'è il tasto che ci porta: la spiegazione del tasto
-// destro (parola, immagine, link), il riquadro «Modifica», gli avvisi di traduzione, trascrizione e dettatura, la
-// chat dell'Editor. Nella home quel tasto è il principale. Regola e sentinella: tests/unit/rimedioOvunque.test.mjs.
+// destro (parola, immagine, link), il riquadro «Modifica», gli avvisi di traduzione, trascrizione e dettatura, l'Aiuto
+// (che nell'Editor è la chat del documento, #1433). Nella home quel tasto è il principale. Regola e sentinella: tests/unit/rimedioOvunque.test.mjs.
 // La dettatura usa un microfono finto (un oscillatore): il resto, dalla trascrizione all'avviso, è quello vero.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { statoDi, clicca, scrivi, nelMondoDiFilo } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
+import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
 
 const SHOTS = 'tests/.shots';
 const PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
@@ -254,23 +255,19 @@ test('dettatura senza invito: l’avviso porta ai Crediti', async ({ app, shell 
   await siApre(app, 'filo://credits');
 });
 
-test('chat dell’Editor senza invito: la risposta mancata è segnata come errore e «Apri Crediti» porta lì', async ({ app, shell, openTab }) => {
+test('l’Aiuto nell’Editor senza invito: la risposta mancata è segnata come errore e «Apri Crediti» porta lì', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   await senzaChiave(app);
   const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('.ed-module[data-type="switch"]');
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await page.waitForSelector('.ed-module[data-type="chat"]');
-  const input = page.locator('.ed-module[data-type="chat"] [data-chat="input"]');
-  await input.click();
-  await input.fill('di cosa parla?');
-  await input.press('Enter');
-  const errore = page.locator('.ed-chat-msg.assistant.errore');
+  await page.waitForSelector('#doc');
+  await apriAiuto(app, page);
+  await chiediAllAiuto(page, 'di cosa parla?');
+  const errore = page.locator('.sn-sidebar-msg-assistant.sn-sidebar-msg-error');
   await expect(errore).toContainText(/invito|Crediti/, { timeout: 30_000 });
-  const tasto = page.locator('.ed-chat-rimedio');
-  await expect(tasto).toHaveText('Apri Crediti');
-  await page.screenshot({ path: `${SHOTS}/663-editor-chat.png` }).catch(() => {});
+  const tasto = page.locator('.sn-sidebar-choice', { hasText: 'Apri Crediti' });
+  await expect(tasto).toBeVisible();
+  await page.screenshot({ path: `${SHOTS}/663-editor-aiuto.png` }).catch(() => {});
   await tasto.click();
   await siApre(app, 'filo://credits');
 });

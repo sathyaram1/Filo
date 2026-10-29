@@ -5,6 +5,7 @@
   <title>Filo — Editor</title>
   <link rel="icon" href="filo://asset/icons/icon-32.png" />
   <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pannelloDestro.css" />
   <link rel="stylesheet" href="editor.css" />
   <link rel="stylesheet" href="filo://style/voce.css" />
   <script src="filo://shared/themeTokens.js"></script>
@@ -17,6 +18,7 @@
   <script src="filo://shared/i18n.js"></script>
   <script src="filo://shared/chatErrors.js"></script>
   <script src="filo://shared/tasti.js"></script>
+  <script src="filo://shared/pannelliApp.js"></script>
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/caselleAlSicuro.js"></script>
@@ -24,10 +26,7 @@
   <script src="filo://shared/editorVersions.js"></script>
   <script src="filo://shared/filoContesto.js"></script>
   <script src="filo://shared/editorSummary.js"></script>
-  <!-- Il tasto microfono della chat del documento: lo collega editor.js, prima che arrivino i content script. -->
-  <script src="filo://shared/dictationSegmenter.js"></script>
-  <script src="filo://shared/ascolto.js"></script>
-  <script src="filo://shared/voceChat.js"></script>
+  <script src="filo://shared/pannelloDestro.js"></script>
 </head>
 <body>
   <div class="ed-root" id="root">
@@ -44,26 +43,12 @@
       <header class="ed-topbar">
         <div class="ed-topbar-spacer"></div>
         <span class="ed-save-state" id="saveState" title="Stato salvataggio"></span>
-        <button class="ed-icon-btn" id="sidebarToggle" title="Mostra/nascondi sidebar" aria-label="Toggle sidebar"></button>
       </header>
 
       <div class="ed-doc-wrap" id="docWrap">
         <div class="ed-doc" id="doc" contenteditable="true" spellcheck="true"></div>
       </div>
-
-      <div class="ed-settings-view" id="settingsView" hidden>
-        <h2>Moduli</h2>
-        <p class="ed-settings-hint">Trascina un modulo nella griglia per aggiungerlo. Clicca un modulo nella griglia per personalizzarlo.</p>
-        <div class="ed-grid-size" id="gridSize"></div>
-        <div class="ed-palette" id="palette"></div>
-      </div>
     </section>
-
-    <div class="ed-splitter" id="splitter" title="Trascina per ridimensionare"></div>
-
-    <aside class="ed-sidebar" id="sidebar">
-      <div class="ed-grid" id="grid"></div>
-    </aside>
   </div>
 
   <div class="ed-overlay" id="overlay" hidden>

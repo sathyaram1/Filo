@@ -1,6 +1,6 @@
 // I contatori dei gesti della personalizzazione (#1471) nell'app vera: la barra laterale (perché si apre, cosa ci si
 // fa, il nome letto su un'icona, l'icona spostata dal suo tasto destro, il suo «Altro…»), le carte e il riquadro della
-// home, i moduli dell'Editor, i ripristini delle Preferenze, l'«annulla» su un cambio e i trascinamenti; l'incognito
+// home, gli strumenti dell'Editor, i ripristini delle Preferenze, l'«annulla» su un cambio e i trascinamenti; l'incognito
 // no. Forma e spedizione: tests/unit/contatoriGesti.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
@@ -8,6 +8,7 @@ import { barraPage, statoBarra, comandaBarra, pannelloFermo, menuAperto, scegliN
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
+import { EDITOR, aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
 
 const SHOTS = 'tests/.shots';
 
@@ -232,22 +233,21 @@ test('un file dal disco lasciato nella home fuori dal campo entra in chat e si c
   expect(JSON.stringify(await app.evaluate(async () => globalThis.SN_CONTATORI_MAIN.letto()))).not.toContain('foto.png');
 });
 
-test('l’Editor conta la vista delle impostazioni, la griglia ridimensionata e il modulo aggiunto, per tipo', async ({ app, openTab }) => {
+test('l’Editor conta per tipo lo strumento aggiunto, spostato e tolto dal pannello, e quello usato', async ({ app, openTab }) => {
   test.setTimeout(60_000);
-  const page = await openTab('filo://editor/editor.html');
-  await page.waitForLoadState('domcontentloaded');
-  await page.locator('.ed-module[data-type="settings"]').click();
-  await expect(page.locator('#settingsView')).toBeVisible();
-  await expect.poll(() => conto(app, 'modulo_editor', 'impostazioni'), { timeout: 8_000 }).toBe(1);
-  await page.locator('[data-gs="cols+"]').click();
-  await expect.poll(() => conto(app, 'modulo_editor', 'griglia', '8|10'), { timeout: 8_000 }).toBe(1);
-  await page.locator('.ed-cell-empty').first().click();
-  await page.locator('[data-add="word-count"]').click();
-  await expect.poll(() => conto(app, 'modulo_editor', 'word-count', 'aggiunto'), { timeout: 8_000 }).toBe(1);
-  await page.locator('.ed-module[data-type="settings"]').click();
-  await expect(page.locator('#settingsView')).toBeHidden();
-  await page.locator('.ed-module[data-type="word-count"]').first().click();
-  await expect.poll(() => conto(app, 'modulo_editor', 'word-count', 'usato'), { timeout: 8_000 }).toBe(1);
+  const page = await openTab(EDITOR);
+  await page.waitForSelector('#doc');
+  await aggiungiStrumento(page, 'settings');
+  await expect.poll(() => conto(app, 'modulo_editor', 'settings', 'aggiunto'), { timeout: 8_000 }).toBe(1);
+  await strumento(page, 'comment').locator('.pd-contenuto').click({ button: 'right' });
+  await page.locator('.pd-menu .sn-select-option', { hasText: 'Sposta su' }).click();
+  await expect.poll(() => conto(app, 'modulo_editor', 'comment', 'spostato'), { timeout: 8_000 }).toBe(1);
+  await strumento(page, 'word-count').locator('.pd-contenuto').click({ button: 'right' });
+  await page.locator('.pd-menu .sn-select-option', { hasText: 'Togli dal pannello' }).click();
+  await expect(strumento(page, 'word-count')).toHaveCount(0);
+  await expect.poll(() => conto(app, 'modulo_editor', 'word-count', 'tolto'), { timeout: 8_000 }).toBe(1);
+  await strumento(page, 'comment').locator('.ed-cm-nuovo').click();
+  await expect.poll(() => conto(app, 'modulo_editor', 'comment', 'usato'), { timeout: 8_000 }).toBe(1);
 });
 
 test('le Preferenze contano cosa si rimette di serie, per nome e mai il valore, e le avanzate arrivate sullo schermo', async ({ app, openTab }) => {

@@ -1317,7 +1317,8 @@
   const TUTTE_LE_CARTE = 'tutte';
   const VOCI_SISTEMA = Object.freeze(['ora', 'batteria', 'rete', 'bluetooth', 'volume']);
   const GESTI_SISTEMA = Object.freeze(['clic', 'tasto_destro', 'tastiera', 'trascina_in_chat', 'comando_dato']);
-  // I tipi dei moduli dell'Editor, come MODULE_TYPES di src/pages/editor/editor.js (la sentinella li tiene uguali).
+  // I tipi dei moduli dell'Editor: gli strumenti del pannello di destra (src/shared/pannelliApp.js, la sentinella li
+  // tiene dentro) e quelli della vecchia griglia, che il server accetta ancora.
   const MODULI_EDITOR = Object.freeze(['switch', 'word-count', 'search-replace', 'comment', 'chat', 'bold', 'italic',
     'underline', 'undo', 'redo', 'text-size', 'align', 'font', 'settings']);
   const EVENTI_MODULO = Object.freeze(['aggiunto', 'tolto', 'spostato', 'ridimensionato', 'configurato', 'usato',
@@ -1337,8 +1338,9 @@
     ['h1', 60 * 60 * 1000], ['oltre', Infinity]]);
   // I cambi che non sono impostazioni, per tipo: la loro chiave porta un dominio o un id, che non esce.
   const CAMBI_NON_IMPOSTAZIONI = Object.freeze({ timer: 'cambio.timer', proxy: 'cambio.proxy', zoom: 'cambio.zoom' });
-  // Accettate ma non più segnate da nessuno, come 'primary': la fila di icone del tasto destro non c'è più (#1343).
-  const RITIRATI_TRASCINA = Object.freeze(['icona_menu', 'riga_menu']);
+  // Accettate ma non più segnate da nessuno, come 'primary': la fila di icone del tasto destro non c'è più (#1343), e
+  // nemmeno la griglia dei moduli dell'Editor con la sua tavolozza e la sua chat (#1433).
+  const RITIRATI_TRASCINA = Object.freeze(['icona_menu', 'riga_menu', 'palette_editor', 'griglia_editor', 'chat_modulo_editor']);
   const ORIGINI_TRASCINA = Object.freeze(['carta_home', 'voce_sistema', 'file_da_chat', 'pagina_salvata', 'icona_barra',
     'icona_menu', 'scheda', 'modulo_editor', 'palette_editor', 'testo_pagina', 'file_disco', 'immagine']);
   const DESTINAZIONI_TRASCINA = Object.freeze(['chat_home', 'chat_aiuto', 'chat_modulo_editor', 'colonna_home', 'altro_home',

@@ -1,17 +1,10 @@
-// Editor di Filo — prototipo. Testo contenteditable serializzato in JSON compatibile
-// ProseMirror + griglia moduli configurabile con workspace/pagine e drag-and-drop.
+// Editor di Filo: testo contenteditable serializzato in JSON compatibile ProseMirror, a tutta larghezza; gli
+// strumenti stanno nel pannello di destra (#1433, src/shared/pannelloDestro.js) e la chat è l'Aiuto.
 // Formato di salvataggio in editor-spec.md.
 
 (() => {
   'use strict';
 
-  // La griglia è ridimensionabile dall'utente (impostazione nella vista moduli):
-  // per questo COLS/ROWS sono variabili, non costanti. Il default resta 7×10.
-  let GRID_COLS = 7;
-  let GRID_ROWS = 10;
-  const GRID_MIN_COLS = 3, GRID_MAX_COLS = 12;
-  const GRID_MIN_ROWS = 4, GRID_MAX_ROWS = 16;
-  const GRID_DEFAULT_COLS = 7, GRID_DEFAULT_ROWS = 10;
   // Documento singolo di migrazione: si legge una volta, non si scrive mai.
   const STORAGE_KEY = 'filo.editor.doc';
   // La COLLEZIONE su localStorage: l'autosalvataggio dev'essere sincrono e scrivere anche su
@@ -35,11 +28,7 @@
   const root = $('root');
   const docEl = $('doc');
   const saveStateEl = $('saveState');
-  const gridEl = $('grid');
-  const sidebarToggle = $('sidebarToggle');
-  const settingsView = $('settingsView');
   const docWrap = $('docWrap');
-  const paletteEl = $('palette');
   const overlay = $('overlay');
   const overlayBox = $('overlayBox');
   const docbarEl = $('docbar');
@@ -47,48 +36,30 @@
   const docTitleEl = $('docTitle');
   const docPopEl = $('docPop');
 
-  // Metadati tipi di modulo
-  const MODULE_TYPES = {
-    switch:           { label: 'Switch', icon: 'apps', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Cambia pagina/workspace della griglia.', singleton: true },
-    'word-count':     { label: 'Conteggio parole', icon: 'transcribe', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Numero di parole, aggiornato in tempo reale.' },
-    'search-replace': { label: 'Cerca e sostituisci', icon: 'reload', defaultW: 2, defaultH: 2, minW: 2, minH: 2, desc: 'Trova ed evidenzia, sostituisci nel testo.' },
-    comment:          { label: 'Commenta', icon: 'share', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Seleziona testo e aggiungi commenti.' },
-    chat:             { label: 'Chat', icon: 'filoLogo', defaultW: 3, defaultH: 3, minW: 3, minH: 3, desc: 'Chat con LLM che vede il documento.' },
-    // Moduli di formattazione (agiscono sul testo selezionato)
-    bold:             { label: 'Grassetto', glyph: '<b>B</b>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: conTasto('Grassetto sul testo selezionato', 'Ctrl+B') + '.' },
-    italic:           { label: 'Corsivo', glyph: '<i>I</i>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: conTasto('Corsivo sul testo selezionato', 'Ctrl+I') + '.' },
-    underline:        { label: 'Sottolineato', glyph: '<u>U</u>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: conTasto('Sottolineato sul testo selezionato', 'Ctrl+U') + '.' },
-    undo:             { label: 'Indietro', icon: 'back', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Annulla l\'ultima modifica.' },
-    redo:             { label: 'Avanti', icon: 'forward', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Ripeti la modifica annullata.' },
-    'text-size':      { label: 'Dimensione testo', glyph: 'A±', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Aumenta o riduci la dimensione del testo selezionato.' },
-    align:            { label: 'Allineamento', glyph: '≡', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Allinea il testo a sinistra, centro, destra o giustificato.' },
-    font:             { label: 'Font', glyph: '<span style="font-family:Georgia,serif">F</span>', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Cambia il tipo di carattere del testo selezionato.' },
-    // `fixed`: modulo di sistema. Non eliminabile, non aggiungibile dalla palette, e appuntato su
-    // tutte le pagine.
-    settings:         { label: 'Impostazioni', icon: 'options', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Apri/chiudi la modalità modifica moduli.', fixed: true },
+  // Gli strumenti del pannello: quali sono e come si chiamano lo dice il catalogo (SN_PANNELLI_APP), qui come si
+  // disegnano. `desc` è il suggerimento.
+  const PANNELLI = window.SN_PANNELLI_APP;
+  const nomeElemento = (id) => (PANNELLI && PANNELLI.nome('editor', id)) || id;
+  const ELEMENTO_META = {
+    'word-count':     { icon: 'transcribe', desc: 'Numero di parole, aggiornato in tempo reale.' },
+    'search-replace': { icon: 'reload', desc: 'Trova ed evidenzia, sostituisci nel testo.' },
+    comment:          { icon: 'share', desc: 'Seleziona testo e aggiungi commenti.' },
+    bold:             { glyph: '<b>B</b>', desc: conTasto('Grassetto sul testo selezionato', 'Ctrl+B') + '.' },
+    italic:           { glyph: '<i>I</i>', desc: conTasto('Corsivo sul testo selezionato', 'Ctrl+I') + '.' },
+    underline:        { glyph: '<u>U</u>', desc: conTasto('Sottolineato sul testo selezionato', 'Ctrl+U') + '.' },
+    undo:             { icon: 'back', desc: 'Annulla l\'ultima modifica.' },
+    redo:             { icon: 'forward', desc: 'Ripeti la modifica annullata.' },
+    'text-size':      { glyph: 'A±', desc: 'Aumenta o riduci la dimensione del testo selezionato.' },
+    align:            { glyph: '≡', desc: 'Allinea il testo a sinistra, centro, destra o giustificato.' },
+    font:             { glyph: '<span style="font-family:Georgia,serif">F</span>', desc: 'Cambia il tipo di carattere del testo selezionato.' },
+    settings:         { icon: 'options', desc: 'Scorciatoie e regolazioni degli strumenti.' },
   };
-
-  const isFixed = (m) => !!(m && MODULE_TYPES[m.type] && MODULE_TYPES[m.type].fixed);
-
-  // Appuntato = fisso, oppure lo switch: lo switch occupa la stessa cella su OGNI pagina, così
-  // si può sempre cambiare pagina e modificarlo da una vista qualunque (è unico e condiviso).
-  const isPinned = (m) => isFixed(m) || (!!m && m.type === 'switch');
-
-  // Un tipo singleton esiste in una copia sola: due switch lascerebbero un doppione ingombrante
-  // e non eliminabile. Dalla palette si aggiunge solo se non è fisso e non ne esiste già uno.
-  const canAddType = (type) => {
-    const meta = MODULE_TYPES[type];
-    if (!meta || meta.fixed) return false;
-    if (meta.singleton && doc.modules.some((mm) => mm.type === type)) return false;
-    return true;
+  const iconaElemento = (id, size = 16) => {
+    const m = ELEMENTO_META[id] || {};
+    return m.glyph ? `<span class="ed-glifo">${m.glyph}</span>` : (ICONS[m.icon] ? ICONS[m.icon](size) : '');
   };
-
-  // Icone-preset per lo switch (estetiche, non vincolano i moduli).
-  const SWITCH_PRESETS = {
-    pen:  ICONS.editor,
-    chat: ICONS.filoLogo,
-    serif: null, // reso come "A" testuale
-  };
+  // Il pannello di destra, creato all'avvio (più sotto).
+  let pannello = null;
 
   let collection = null; // { version, activeId, files:[...] } — vedi editorStore.js
   let versions = {};     // { [fileId]: { versions:[...] } } — storico, su archivio app
@@ -96,7 +67,6 @@
   let trash = [];        // documenti eliminati recuperabili (più recenti in cima)
   let doc = null;        // documento ATTIVO in memoria (vedi activateFile/blankDoc)
   let dirty = false;
-  let settingsMode = false;
   let commenting = false;
   // Snapshot manuali: `manualBaseline` è lo stato di riferimento (contenuto
   // serializzato) da cui misurare quanto l'utente ha scritto/cancellato a mano
@@ -118,81 +88,24 @@
       meta: { title: 'Documento senza titolo', created: now, modified: now, version: 1 },
       content: { type: 'doc', content: [{ type: 'paragraph', content: [] }] },
       comments: [],
-      modules: [
-        mkModule('switch', 0, 6, 2, 1, 0, {
-          activePage: 0,
-          pages: [
-            { z: 0, name: 'Scrittura', icon: 'pen' },
-            { z: 1, name: 'Revisione', icon: 'serif' },
-          ],
-        }),
-        mkModule('word-count', 0, 0, 1, 1, 0, { count: 'words' }),
-        mkModule('search-replace', 0, 1, 2, 2, 1, {}),
-        mkModule('comment', 2, 0, 1, 1, 1, {}),
-        mkModule('chat', 0, 3, 3, 3, 1, {}),
-        // Ingranaggio impostazioni: modulo fisso, in basso a destra. Un doc vuoto è sempre alla
-        // griglia di default: usa le costanti, non GRID_COLS/ROWS di un ALTRO file aperto prima.
-        mkModule('settings', GRID_DEFAULT_COLS - 1, GRID_DEFAULT_ROWS - 1, 1, 1, 0, {}),
-      ],
+      modules: [],
     };
   }
 
-  // Garantisce che esista sempre un solo modulo impostazioni fisso, anche per documenti
-  // salvati prima della sua introduzione.
-  function ensureSettingsModule() {
-    if (!doc || !Array.isArray(doc.modules)) return;
-    const existing = doc.modules.filter((m) => m.type === 'settings');
-    if (existing.length > 1) doc.modules = doc.modules.filter((m) => m.type !== 'settings').concat(existing[0]);
-    if (existing.length >= 1) return;
-    const z = activePage();
-    for (let y = GRID_ROWS - 1; y >= 0; y--) {
-      for (let x = GRID_COLS - 1; x >= 0; x--) {
-        if (fits({ x, y, w: 1, h: 1 }, z)) {
-          doc.modules.push(mkModule('settings', x, y, 1, 1, z, {}));
-          return;
-        }
-      }
-    }
-    // Nessuna cella libera: forza l'angolo (verrà comunque renderizzato sopra).
-    doc.modules.push(mkModule('settings', GRID_COLS - 1, GRID_ROWS - 1, 1, 1, z, {}));
-  }
-
-  function mkModule(type, x, y, w, h, z, data) {
-    return { id: newId('mod'), type, x, y, w, h, z, data: data || {} };
-  }
-
-  // Converte rettangolo interno {x,y,w,h,z} ↔ cells[] del formato spec.
-  function rectToCells(m) {
-    const cells = [];
-    for (let dy = 0; dy < m.h; dy++)
-      for (let dx = 0; dx < m.w; dx++)
-        cells.push({ x: m.x + dx, y: m.y + dy, z: m.z });
-    return cells;
-  }
-  function cellsToRect(cells) {
-    const xs = cells.map((c) => c.x), ys = cells.map((c) => c.y);
-    const minX = Math.min(...xs), minY = Math.min(...ys);
-    return {
-      x: minX, y: minY,
-      w: Math.max(...xs) - minX + 1,
-      h: Math.max(...ys) - minY + 1,
-      z: cells[0] ? cells[0].z || 0 : 0,
-    };
-  }
 
   // Serializza un MODELLO senza toccare il DOM (file vuoti, snapshot); il file attivo passa da
   // serialize(). COPIA PROFONDA: uno snapshot che cambia col documento non è uno snapshot.
   function serializeDocModel(d) {
     const meta = { ...(d.meta || {}) };
     if (!meta.title) meta.title = 'Documento senza titolo';
+    // La griglia dei moduli non c'è più (#1433): la sua misura e i moduli del documento si buttano.
+    delete meta.grid;
     return cloneJson({
       id: d.id,
       meta,
       content: d.content || { type: 'doc', content: [{ type: 'paragraph', content: [] }] },
       comments: Array.isArray(d.comments) ? d.comments : [],
-      modules: (d.modules || []).map((m) => ({
-        id: m.id, type: m.type, cells: rectToCells(m), data: m.data,
-      })),
+      modules: [],
     });
   }
 
@@ -205,18 +118,6 @@
     return serializeDocModel(doc);
   }
 
-  // Riparte SEMPRE dal default 7×10 e poi applica `meta.grid`: così passando da un file con
-  // griglia grande a uno senza, la griglia torna al default.
-  function loadGridSize() {
-    GRID_COLS = GRID_DEFAULT_COLS;
-    GRID_ROWS = GRID_DEFAULT_ROWS;
-    const g = doc && doc.meta && doc.meta.grid;
-    if (g && Number.isFinite(g.cols) && Number.isFinite(g.rows)) {
-      GRID_COLS = Math.max(GRID_MIN_COLS, Math.min(GRID_MAX_COLS, g.cols));
-      GRID_ROWS = Math.max(GRID_MIN_ROWS, Math.min(GRID_MAX_ROWS, g.rows));
-    }
-  }
-
   // Costruisce il modello doc in memoria (moduli come rettangoli) da un file serializzato.
   function parseStoredDoc(raw) {
     if (!raw || !raw.meta) return null;
@@ -225,10 +126,7 @@
       meta: raw.meta,
       content: raw.content || { type: 'doc', content: [] },
       comments: Array.isArray(raw.comments) ? raw.comments : [],
-      modules: (raw.modules || []).map((m) => {
-        const rect = Array.isArray(m.cells) && m.cells.length ? cellsToRect(m.cells) : { x: 0, y: 0, w: 1, h: 1, z: 0 };
-        return { id: m.id || newId('mod'), type: m.type, ...rect, data: m.data || {} };
-      }),
+      modules: [],
     };
   }
 
@@ -355,8 +253,8 @@
     } catch (_) {}
   }
   const contaModello = (r) => contaErroreVisto({ misura: 'errore-modello', code: String((r && (r.code || r.errorCode)) || ''), status: Number(r && r.status) || 0 });
-  // La griglia dei moduli (#1471): per tipo di modulo cosa gli succede, la griglia ridimensionata, la vista delle
-  // impostazioni, i trascinamenti. Mai il testo del documento, né quello che si scrive in un modulo.
+  // Gli strumenti del pannello (#1471, #1433): per tipo cosa gli succede, e i trascinamenti.
+  // Mai il testo del documento, né quello che si scrive in uno strumento.
   const contaGesto = (campi) => contaErroreVisto({ misura: 'gesto', ...campi });
   // Il titolo automatico e la chat del documento (#1465): esiti e fasce, mai il titolo né il testo.
   const contaRiquadro = (cosa, campi) => contaErroreVisto({ misura: 'riquadro', cosa, ...campi });
@@ -471,7 +369,7 @@
   }
 
   // Prima salva lo stato corrente come versione, così anche il ripristino è annullabile. Torna
-  // indietro il solo CORPO: nome, conversazione e riquadri sono del documento di adesso.
+  // indietro il solo CORPO: il nome è del documento di adesso.
   function restoreVersion(fileId, versionId) {
     if (!VERS) return false;
     const v = VERS.get(versions, fileId, versionId);
@@ -549,7 +447,7 @@
   // Che cosa tocca un ripristino: il pannello mostra solo l'anteprima del testo, quindi il
   // confine va detto prima di premere.
   const VH_SCOPE_NOTE = 'Il ripristino riporta indietro il testo e i commenti. '
-    + 'Nome del documento, conversazione con Filo e disposizione dei riquadri restano come sono adesso.';
+    + 'Il nome del documento resta com\'è adesso.';
 
   // Serve a tenerlo allineato quando lo stato cambia da fuori (per esempio annullando un
   // ripristino dall'avviso).
@@ -675,17 +573,12 @@
   // Rende attivo un file serializzato. NON persiste: chi chiama decide quando scrivere.
   function activateFile(raw) {
     doc = parseStoredDoc(raw) || parseStoredDoc(blankFileSerialized());
-    convertiScorciatoie(doc.modules);
     collection.activeId = doc.id;
-    // Stato di vista che non deve trascinarsi da un file all'altro: si torna sempre alla vista
-    // testo.
+    // Stato di vista che non deve trascinarsi da un file all'altro.
     commenting = false;
-    toggleSettingsMode(false);
-    ensureSettingsModule();
-    loadGridSize();
+    root.classList.remove('commenting');
     renderDocBody();
-    renderGrid();
-    updateWordCountModules();
+    aggiornaElementi();
     renderDocSwitcher();
     // Nuovo file attivo → nuovo riferimento per gli snapshot manuali: il testo già presente al
     // caricamento non è una modifica a mano.
@@ -935,7 +828,7 @@
       </div>`;
     }).join('');
     openOverlay(`<h3>Cestino</h3>
-      <p class="ed-vh-scope">I documenti eliminati restano qui (gli ultimi ${TRASH_MAX}) con testo, commenti, riquadri e storico versioni. Ripristinandone uno torna al suo posto nell'elenco.</p>
+      <p class="ed-vh-scope">I documenti eliminati restano qui (gli ultimi ${TRASH_MAX}) con testo, commenti e storico versioni. Ripristinandone uno torna al suo posto nell'elenco.</p>
       <div class="ed-vh-list">${rows}</div>
       <div class="ed-overlay-actions">
         <button class="ed-btn ed-tr-empty" id="trEmpty">Svuota cestino</button>
@@ -1031,20 +924,6 @@
     return t;
   }
 
-  function editorChatMessages() {
-    const out = [];
-    if (!doc || !Array.isArray(doc.modules)) return out;
-    for (const m of doc.modules) {
-      if (m.type !== 'chat' || !m.data || !Array.isArray(m.data.messages)) continue;
-      for (const msg of m.data.messages) {
-        const c = msg && typeof msg.content === 'string' ? msg.content.trim() : '';
-        if (!c || c === '…') continue;
-        out.push({ role: msg.role === 'user' ? 'user' : 'assistant', content: c.slice(0, 1000) });
-      }
-    }
-    return out.slice(-12);
-  }
-
   // La memoria arriva al modello recintata come nella chat: la scrive Filo da
   // conversazioni che possono aver letto una pagina ostile (#592).
   function memoriaImbustata(testo) {
@@ -1104,7 +983,7 @@
       writeCollection();
     }
     if (!docPerIlModello().testo) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
-    const contesto = contestoDelDocumento(editorChatMessages(), await filoMemoryText());
+    const contesto = contestoDelDocumento(await filoMemoryText());
     const conDocumento = (letto) => [
       { role: 'system', content: TITLE_SYSTEM_PROMPT },
       { role: 'user', content: [bloccoDocumento(letto), ...contesto].join('\n\n') },
@@ -1113,7 +992,8 @@
     const via = auto ? 'automatico' : 'rigenerato';
     const esito = (e) => contaRiquadro('editor_titolo', { via, esito: e });
     try {
-      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento);
+      // Rifatto a mano chiede una risposta nuova: la stessa domanda tornerebbe uguale dalla cache.
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento, auto ? {} : { rigenera: true });
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) { esito('fallito'); if (!auto) { contaModello(r); avvisoNonGenerato('il titolo', r); } return false; }
       const ok = applyGeneratedTitle(id, rawText, via);
@@ -1190,13 +1070,13 @@
     syncActiveIntoCollection();
     const id = doc.id;
     if (!docPerIlModello().testo) { if (manuale) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); return false; }
-    const contesto = contestoDelDocumento(editorChatMessages(), await filoMemoryText());
+    const contesto = contestoDelDocumento(await filoMemoryText());
     const conDocumento = (letto) => [
       { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
       { role: 'user', content: [bloccoDocumento(letto), ...contesto].join('\n\n') },
     ];
     try {
-      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento);
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento, manuale ? { rigenera: true } : {});
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) { if (manuale) avvisoNonGenerato('il riassunto', r); return false; }
       const ok = applyGeneratedSummary(id, rawText);
@@ -1718,7 +1598,7 @@
     return `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">${lines}</svg>`;
   }
   // Il preventDefault sul mousedown è intenzionale: il default farebbe perdere la selezione e il
-  // comando non agirebbe sul testo voluto. In modalità modifica moduli il click passa.
+  // comando non agirebbe sul testo voluto.
   function fmtButton(label, title, onAct) {
     const b = document.createElement('button');
     b.className = 'ed-fmt-btn';
@@ -1727,12 +1607,12 @@
     b.title = title;
     b.setAttribute('aria-label', title);
     b.addEventListener('mousedown', (e) => {
-      if (settingsMode) return;
+      if (e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
       onAct();
     });
-    b.addEventListener('click', (e) => { if (!settingsMode) e.stopPropagation(); });
+    b.addEventListener('click', (e) => e.stopPropagation());
     return b;
   }
   const SIMPLE_FORMATS = {
@@ -1742,28 +1622,27 @@
     undo:      { glyph: ICONS.back ? ICONS.back(16) : '↶', title: 'Indietro (annulla)', act: () => exec('undo') },
     redo:      { glyph: ICONS.forward ? ICONS.forward(16) : '↷', title: 'Avanti (ripeti)', act: () => exec('redo') },
   };
-  function renderSimpleFormat(cell, m) {
-    cell.classList.add('ed-fmt-mod');
+  function renderSimpleFormat(host, type) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-fmt';
-    const cfg = SIMPLE_FORMATS[m.type];
-    pad.appendChild(fmtButton(cfg.glyph, cfg.title, () => { contaModulo(m, 'usato'); cfg.act(); }));
-    cell.appendChild(pad);
+    const cfg = SIMPLE_FORMATS[type];
+    const b = fmtButton(`<span class="ed-fmt-glifo">${cfg.glyph}</span><span class="ed-fmt-nome">${escapeHtml(nomeElemento(type))}</span>`, cfg.title, () => { contaModulo({ type }, 'usato'); cfg.act(); });
+    b.classList.add('ed-fmt-largo');
+    pad.appendChild(b);
+    host.appendChild(pad);
   }
-  function renderTextSize(cell, m) {
-    cell.classList.add('ed-fmt-mod');
+  function renderTextSize(host) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-fmt ed-fmt-row';
-    const minus = fmtButton('A<small>−</small>', 'Riduci dimensione testo', () => { contaModulo(m, 'usato'); stepFontSize(-1); });
-    const plus = fmtButton('A<big>+</big>', 'Aumenta dimensione testo', () => { contaModulo(m, 'usato'); stepFontSize(1); });
+    const minus = fmtButton('A<small>−</small>', 'Riduci dimensione testo', () => { contaModulo({ type: 'text-size' }, 'usato'); stepFontSize(-1); });
+    const plus = fmtButton('A<big>+</big>', 'Aumenta dimensione testo', () => { contaModulo({ type: 'text-size' }, 'usato'); stepFontSize(1); });
     minus.dataset.size = 'down';
     plus.dataset.size = 'up';
     pad.appendChild(minus);
     pad.appendChild(plus);
-    cell.appendChild(pad);
+    host.appendChild(pad);
   }
-  function renderAlign(cell, m) {
-    cell.classList.add('ed-fmt-mod');
+  function renderAlign(host) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-fmt ed-fmt-row ed-align';
     const defs = [
@@ -1773,11 +1652,11 @@
       ['justify', 'Giustifica', 'justifyFull'],
     ];
     for (const [kind, title, cmd] of defs) {
-      const b = fmtButton(alignSvg(kind), title, () => { contaModulo(m, 'usato'); execCss(cmd); });
+      const b = fmtButton(alignSvg(kind), title, () => { contaModulo({ type: 'align' }, 'usato'); execCss(cmd); });
       b.dataset.align = kind;
       pad.appendChild(b);
     }
-    cell.appendChild(pad);
+    host.appendChild(pad);
   }
 
   // I menu nativi (il <select> del font) rubano il focus e collassano la selezione: si salva il
@@ -1834,8 +1713,7 @@
 
   // Dropdown custom (classi .sn-select-*) con ricerca; sotto resta un <select> nativo nascosto
   // come sorgente di verità, per l'accessibilità e per i test, che applica il font col `change`.
-  function renderFont(cell, m) {
-    cell.classList.add('ed-fmt-mod');
+  function renderFont(host) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-fmt ed-font';
 
@@ -2013,13 +1891,9 @@
       }
     }
 
-    button.addEventListener('mousedown', (e) => {
-      if (settingsMode) { e.preventDefault(); e.stopPropagation(); openModuleConfig(m); return; }
-      saveDocSelection();
-    });
+    button.addEventListener('mousedown', () => saveDocSelection());
     button.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (settingsMode) return;
       pop.hidden ? open() : close();
     });
     search.addEventListener('input', () => applyFilter(search.value));
@@ -2030,26 +1904,21 @@
       else if (e.key === 'Escape') { e.preventDefault(); close(); button.focus(); }
     });
 
-    // In modalità modifica moduli il click apre la configurazione (parità con gli
-    // altri moduli); altrimenti salva la selezione prima che il menu la perda.
-    sel.addEventListener('mousedown', (e) => {
-      if (settingsMode) { e.preventDefault(); e.stopPropagation(); openModuleConfig(m); return; }
-      saveDocSelection();
-    });
+    // Salva la selezione prima che il menu la perda.
+    sel.addEventListener('mousedown', () => saveDocSelection());
     sel.addEventListener('change', (e) => {
-      if (settingsMode) return;
       e.stopPropagation();
       const font = sel.value;
       sel.selectedIndex = 0; // torna al placeholder "Font…"
       valueEl.textContent = 'Font…';
       if (!font) return;
-      contaModulo(m, 'usato');
+      contaModulo({ type: 'font' }, 'usato');
       restoreDocSelection();
       execCss('fontName', font);
     });
 
     pad.appendChild(wrap);
-    cell.appendChild(pad);
+    host.appendChild(pad);
   }
 
   // Shortcut markdown a livello blocco
@@ -2199,7 +2068,7 @@
     keepRevealedAtCaret();
     refreshCollapseToggles();
     markDirty();
-    updateWordCountModules();
+    aggiornaElementi();
     maybeAutoTitle();
     maybeAutoSummary();
   }
@@ -2311,488 +2180,54 @@
 
   // GRIGLIA & MODULI
 
-  function getSwitch() { return doc.modules.find((m) => m.type === 'switch') || null; }
-  function getPages() {
-    const sw = getSwitch();
-    if (sw && Array.isArray(sw.data.pages) && sw.data.pages.length) return sw.data.pages;
-    return [{ z: 0, name: 'Pagina 1', icon: '1' }];
-  }
-  function activePage() {
-    const sw = getSwitch();
-    return sw ? (sw.data.activePage || 0) : 0;
-  }
-  function setActivePage(z) {
-    const sw = getSwitch();
-    if (sw) sw.data.activePage = z;
-    renderGrid();
-    markDirty();
-  }
-
-  function moduleAt(x, y, z) {
-    return doc.modules.find((m) => m.z === z && x >= m.x && x < m.x + m.w && y >= m.y && y < m.y + m.h) || null;
-  }
-  function fits(rect, z, ignoreId) {
-    if (rect.x < 0 || rect.y < 0 || rect.x + rect.w > GRID_COLS || rect.y + rect.h > GRID_ROWS) return false;
-    for (const m of doc.modules) {
-      if (m.id === ignoreId) continue;
-      // I moduli appuntati (impostazioni, switch) vivono su tutte le pagine:
-      // la loro cella va riservata su qualunque z.
-      if (m.z !== z && !isPinned(m)) continue;
-      const overlap = rect.x < m.x + m.w && rect.x + rect.w > m.x && rect.y < m.y + m.h && rect.y + rect.h > m.y;
-      if (overlap) return false;
-    }
-    return true;
-  }
-  // Per spostare o allargare un modulo appuntato (lo switch) deve esserci spazio su ogni
-  // pagina, non solo su quella attiva.
-  function fitsAllPages(rect, ignoreId) {
-    for (const p of getPages()) {
-      if (!fits(rect, p.z, ignoreId)) return false;
-    }
-    return true;
-  }
-  function fitsFor(m, rect, z) {
-    return isPinned(m) ? fitsAllPages(rect, m.id) : fits(rect, z, m.id);
-  }
-
-  // Il CSS ha 7×10 di default; quando l'utente cambia dimensione si applicano i template inline
-  // così la griglia segue il modello.
-  function applyGridTemplate() {
-    gridEl.style.gridTemplateColumns = `repeat(${GRID_COLS}, 1fr)`;
-    gridEl.style.gridTemplateRows = `repeat(${GRID_ROWS}, 1fr)`;
-  }
-
-  // I moduli che finirebbero fuori dai nuovi confini vengono riportati dentro, così non
-  // spariscono.
-  function setGridSize(cols, rows) {
-    cols = Math.max(GRID_MIN_COLS, Math.min(GRID_MAX_COLS, Math.round(cols)));
-    rows = Math.max(GRID_MIN_ROWS, Math.min(GRID_MAX_ROWS, Math.round(rows)));
-    if (cols === GRID_COLS && rows === GRID_ROWS) return;
-    contaGesto({ gesto: 'modulo_editor', colonne: cols, righe: rows });
-    GRID_COLS = cols;
-    GRID_ROWS = rows;
-    for (const m of doc.modules) {
-      if (m.w > GRID_COLS) m.w = GRID_COLS;
-      if (m.h > GRID_ROWS) m.h = GRID_ROWS;
-      if (m.x + m.w > GRID_COLS) m.x = Math.max(0, GRID_COLS - m.w);
-      if (m.y + m.h > GRID_ROWS) m.y = Math.max(0, GRID_ROWS - m.h);
-    }
-    if (!doc.meta) doc.meta = {};
-    doc.meta.grid = { cols: GRID_COLS, rows: GRID_ROWS };
-    applyGridTemplate();
-    renderGrid();
-    renderGridControls();
-    markDirty();
-  }
-
-  function renderGridControls() {
-    const host = $('gridSize');
-    if (!host) return;
-    host.innerHTML = `
-      <div class="ed-gs-title">Dimensione griglia</div>
-      <div class="ed-gs-row">
-        <span class="ed-gs-cap">Colonne</span>
-        <button class="ed-gs-btn" data-gs="cols-" aria-label="Meno colonne">−</button>
-        <span class="ed-gs-val" id="gsCols">${GRID_COLS}</span>
-        <button class="ed-gs-btn" data-gs="cols+" aria-label="Più colonne">+</button>
-        <span class="ed-gs-sep"></span>
-        <span class="ed-gs-cap">Righe</span>
-        <button class="ed-gs-btn" data-gs="rows-" aria-label="Meno righe">−</button>
-        <span class="ed-gs-val" id="gsRows">${GRID_ROWS}</span>
-        <button class="ed-gs-btn" data-gs="rows+" aria-label="Più righe">+</button>
-      </div>`;
-    const on = (sel, fn) => { const b = host.querySelector(sel); if (b) b.addEventListener('click', fn); };
-    on('[data-gs="cols-"]', () => setGridSize(GRID_COLS - 1, GRID_ROWS));
-    on('[data-gs="cols+"]', () => setGridSize(GRID_COLS + 1, GRID_ROWS));
-    on('[data-gs="rows-"]', () => setGridSize(GRID_COLS, GRID_ROWS - 1));
-    on('[data-gs="rows+"]', () => setGridSize(GRID_COLS, GRID_ROWS + 1));
-  }
-
-  // Fuori dai campi di testo Filo usa Ctrl+Z per tornare alla pagina precedente
-  // (src/content/content.js): se un modulo l'ha salvato, qui vince il modulo (#545).
+  // Ctrl+Z dato a un elemento del pannello: fuori dai campi il tasto va a lui, e il preload lo deve sapere.
   function dichiaraCtrlZ() {
     const annulla = TASTI_EDITOR.find((t) => t.suo === 'undo');
-    const preso = doc.modules.some((m) => AZIONE_SCORCIATOIA[m.type] && candidatoDi(m.data)
-      && prendeIlTasto(annulla, pressioneDi(candidatoDi(m.data)) || {}));
+    const preso = elementiConScorciatoia().some(({ c }) => prendeIlTasto(annulla, pressioneDi(c) || {}));
     if (preso) document.documentElement.dataset.filoCtrlZ = 'pagina';
     else delete document.documentElement.dataset.filoCtrlZ;
   }
 
-  function renderGrid() {
-    dichiaraCtrlZ();
-    const z = activePage();
-    applyGridTemplate();
-    gridEl.innerHTML = '';
-
-    const occupied = new Set();
-    const onPage = doc.modules.filter((m) => (m.z === z && !isPinned(m)) || isPinned(m));
-    for (const m of onPage) {
-      const cell = document.createElement('div');
-      cell.className = 'ed-module';
-      cell.dataset.type = m.type;
-      cell.dataset.id = m.id;
-      cell.style.gridColumn = `${m.x + 1} / span ${m.w}`;
-      cell.style.gridRow = `${m.y + 1} / span ${m.h}`;
-      renderModuleBody(cell, m);
-      attachModuleDrag(cell, m);
-      if (!isFixed(m)) attachModuleResize(cell, m);
-      cell.addEventListener('click', (e) => {
-        // I moduli fissi gestiscono il click internamente (es. ingranaggio →
-        // toggle modalità modifica); non aprono il pannello di configurazione.
-        if (settingsMode && !isFixed(m)) { e.stopPropagation(); openModuleConfig(m); }
-      });
-      gridEl.appendChild(cell);
-      for (let dy = 0; dy < m.h; dy++) for (let dx = 0; dx < m.w; dx++) occupied.add(`${m.x + dx},${m.y + dy}`);
-    }
-    for (let y = 0; y < GRID_ROWS; y++) {
-      for (let x = 0; x < GRID_COLS; x++) {
-        if (occupied.has(`${x},${y}`)) continue;
-        const empty = document.createElement('div');
-        empty.className = 'ed-cell-empty';
-        empty.style.gridColumn = `${x + 1}`;
-        empty.style.gridRow = `${y + 1}`;
-        empty.innerHTML = ICONS.plus ? ICONS.plus(16) : '+';
-        empty.addEventListener('click', () => openAddModule(x, y, z));
-        attachCellDrop(empty, x, y, z);
-        gridEl.appendChild(empty);
-      }
-    }
+  // Gli strumenti del pannello che stanno disegnati: si riempiono di nuovo quando cambia il testo o il documento.
+  function aggiornaElementi() {
+    if (!pannello) return;
+    const wc = pannello.host('word-count');
+    if (wc && wc._wcFill) wc._wcFill();
+    const cm = pannello.host('comment');
+    if (cm && cm._cmFill) cm._cmFill();
   }
 
-  // Drag dei moduli: pointer-based dall'handle ⠿. Più affidabile e scopribile del drag nativo
-  // HTML5, e tiene selezionabile il testo dei moduli chat perché parte SOLO dall'handle.
-  function attachModuleDrag(cell, m) {
-    if (isFixed(m)) return; // moduli fissi (es. ingranaggio): non si spostano
-    const handle = cell.querySelector('.ed-mod-drag');
-    if (handle) {
-      // Dall'handle ⠿ il drag parte subito (scorciatoia sempre disponibile).
-      handle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        startModuleDrag(cell, m);
-      });
-    }
-
-    // Drag da QUALSIASI punto tenendo premuto. Per non rubare i click sui controlli né la selezione
-    // del testo, si arma solo se il pulsante resta premuto ~220ms restando fermo.
-    cell.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return;
-      // I controlli interattivi e la maniglia/resize gestiscono già il proprio
-      // mousedown: lì un long-press non deve trasformarsi in drag.
-      if (e.target.closest('.ed-mod-drag, .ed-mod-resize, .ed-mod-resize-h, button, input, textarea, select, a, [contenteditable="true"]')) return;
-      const startX = e.clientX, startY = e.clientY;
-      const HOLD_MS = 220, MOVE_TOL = 6;
-      let timer = 0;
-      const cleanup = () => {
-        clearTimeout(timer);
-        document.removeEventListener('mousemove', onPreMove, true);
-        document.removeEventListener('mouseup', onPreUp, true);
-        cell.classList.remove('ed-arming');
-      };
-      const onPreMove = (ev) => {
-        // Movimento prima dell'arming = interazione normale (selezione/scroll):
-        // lascia perdere il drag.
-        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > MOVE_TOL) cleanup();
-      };
-      const onPreUp = () => cleanup();
-      timer = setTimeout(() => {
-        cleanup();
-        window.getSelection && window.getSelection().removeAllRanges();
-        startModuleDrag(cell, m);
-      }, HOLD_MS);
-      cell.classList.add('ed-arming');
-      document.addEventListener('mousemove', onPreMove, true);
-      document.addEventListener('mouseup', onPreUp, true);
-    });
-  }
-
-  function startModuleDrag(cell, m) {
-    const z = activePage();
-    cell.classList.add('dragging');
-    document.body.classList.add('ed-dragging');
-    let target = null;     // {x, y} cella valida sotto il puntatore
-    let targetEl = null;   // elemento .ed-cell-empty evidenziato
-    // Anteprima fantasma: occupa l'intera impronta del modulo dove finirà al rilascio, così si
-    // vede dove atterrerà.
-    let ghost = null;
-    const meta = MODULE_TYPES[m.type] || {};
-    const ghostLabel = meta.glyph || (ICONS[meta.icon] ? ICONS[meta.icon](20) : escapeHtml(meta.label || ''));
-    const showGhost = (x, y) => {
-      if (!ghost) {
-        ghost = document.createElement('div');
-        ghost.className = 'ed-drag-ghost';
-        ghost.innerHTML = `<span>${ghostLabel}</span>`;
-        gridEl.appendChild(ghost);
-      }
-      ghost.style.gridColumn = `${x + 1} / span ${m.w}`;
-      ghost.style.gridRow = `${y + 1} / span ${m.h}`;
-      ghost.style.display = '';
-    };
-    const hideGhost = () => { if (ghost) ghost.style.display = 'none'; };
-    const removeGhost = () => { if (ghost) { ghost.remove(); ghost = null; } };
-    const clearHighlight = () => {
-      if (targetEl) { targetEl.classList.remove('drop-target'); targetEl = null; }
-    };
-    let mosso = false;
-    const onMove = (ev) => {
-      mosso = true;
-      // La cella in drag ha pointer-events:none, così elementFromPoint vede la
-      // cella vuota sottostante.
-      const el = document.elementFromPoint(ev.clientX, ev.clientY);
-      const empty = el && el.closest ? el.closest('.ed-cell-empty') : null;
-      clearHighlight();
-      target = null;
-      if (empty && gridEl.contains(empty)) {
-        const x = parseInt(empty.style.gridColumnStart || empty.style.gridColumn, 10) - 1;
-        const y = parseInt(empty.style.gridRowStart || empty.style.gridRow, 10) - 1;
-        if (Number.isFinite(x) && Number.isFinite(y) && fitsFor(m, { x, y, w: m.w, h: m.h }, z)) {
-          empty.classList.add('drop-target');
-          targetEl = empty;
-          target = { x, y };
-          showGhost(x, y);
-        } else {
-          hideGhost();
-        }
-      } else {
-        hideGhost();
-      }
-    };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove, true);
-      document.removeEventListener('mouseup', onUp, true);
-      document.body.classList.remove('ed-dragging');
-      cell.classList.remove('dragging');
-      clearHighlight();
-      removeGhost();
-      if (target) { m.x = target.x; m.y = target.y; m.z = z; renderGrid(); markDirty(); }
-      if (target) contaModulo(m, 'spostato');
-      if (target || mosso) contaTrascinamento(window.SN_GESTI?.trascinamento('modulo_editor', target ? 'griglia_editor' : 'nessuna', target ? 'posato' : 'annullato'));
-    };
-    document.addEventListener('mousemove', onMove, true);
-    document.addEventListener('mouseup', onUp, true);
-  }
-  function attachCellDrop(empty, x, y, z) {
-    empty.addEventListener('dragover', (e) => { e.preventDefault(); empty.classList.add('drop-target'); });
-    empty.addEventListener('dragleave', () => empty.classList.remove('drop-target'));
-    empty.addEventListener('drop', (e) => {
-      e.preventDefault();
-      empty.classList.remove('drop-target');
-      const conta = (usato) => contaTrascinamento(window.SN_GESTI?.rilascio(e.dataTransfer, 'griglia_editor', usato));
-      let payload;
-      try { payload = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (_) { conta(false); return; }
-      if (payload.move) {
-        const m = doc.modules.find((mm) => mm.id === payload.move);
-        if (!m) return;
-        const target = { x, y, w: m.w, h: m.h };
-        if (fitsFor(m, target, z)) { m.x = x; m.y = y; m.z = z; renderGrid(); markDirty(); }
-      } else if (payload.add) {
-        conta(addModule(payload.add, x, y, z) === true);
-      } else conta(false);
-    });
-  }
-
-  function addModule(type, x, y, z) {
-    const meta = MODULE_TYPES[type];
-    // Guardia difensiva: non si aggiunge un modulo fisso né un secondo singleton, anche se un
-    // payload di drag arrivasse qui.
-    if (!meta || !canAddType(type)) return;
-    let w = meta.defaultW, h = meta.defaultH;
-    while (w > meta.minW && !fits({ x, y, w, h }, z)) w--;
-    while (h > meta.minH && !fits({ x, y, w, h }, z)) h--;
-    if (!fits({ x, y, w, h }, z)) { flashOverlayMsg('Spazio insufficiente per questo modulo.'); return; }
-    const data = type === 'switch'
-      ? { activePage: 0, pages: [{ z: 0, name: 'Pagina 1', icon: '1' }, { z: 1, name: 'Pagina 2', icon: '2' }] }
-      : (type === 'word-count' ? { count: 'words' } : {});
-    const nuovo = mkModule(type, x, y, w, h, z, data);
-    doc.modules.push(nuovo);
-    renderGrid();
-    markDirty();
-    contaModulo(nuovo, 'aggiunto');
-    return true;
-  }
-
-  function openAddModule(x, y, z) {
-    const items = Object.entries(MODULE_TYPES).filter(([type]) => canAddType(type)).map(([type, meta]) => `
-      <button class="ed-btn" data-add="${type}" style="display:flex;justify-content:flex-start;gap:10px;width:100%;margin-bottom:6px">
-        <span style="color:var(--sn-accent);display:inline-flex">${meta.glyph || (ICONS[meta.icon] ? ICONS[meta.icon](18) : '')}</span>
-        <span>${meta.label} <span style="color:var(--sn-muted);font-size:11px">${meta.defaultW}×${meta.defaultH}</span></span>
-      </button>`).join('');
-    openOverlay(`<h3>Aggiungi modulo</h3>${items}`);
-    overlayBox.querySelectorAll('[data-add]').forEach((b) => {
-      b.addEventListener('click', () => { closeOverlay(); addModule(b.dataset.add, x, y, z); });
-    });
-  }
-
-  // Render contenuto moduli
-  function renderModuleBody(cell, m) {
-    const handle = document.createElement('span');
-    handle.className = 'ed-mod-drag';
-    handle.textContent = '⠿';
-    cell.appendChild(handle);
-    switch (m.type) {
-      case 'switch': return renderSwitch(cell, m);
-      case 'word-count': return renderWordCount(cell, m);
-      case 'search-replace': return renderSearchReplace(cell, m);
-      case 'comment': return renderCommentModule(cell, m);
-      case 'chat': return renderChat(cell, m);
-      case 'settings': return renderSettingsModule(cell, m);
-      case 'bold':
-      case 'italic':
-      case 'underline':
-      case 'undo':
-      case 'redo': return renderSimpleFormat(cell, m);
-      case 'text-size': return renderTextSize(cell, m);
-      case 'align': return renderAlign(cell, m);
-      case 'font': return renderFont(cell, m);
-    }
-  }
-
-  // Modulo: impostazioni (ingranaggio, fisso)
-  function renderSettingsModule(cell, _m) {
-    cell.classList.add('ed-settings-mod');
-    cell.title = 'Impostazioni moduli';
-    cell.innerHTML = (ICONS.options ? ICONS.options(18) : '⚙');
-    // In capture/stopPropagation così non scatta il click generico della cella.
-    cell.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleSettingsMode();
-      if (settingsMode) contaGesto({ gesto: 'modulo_editor', impostazioni: true });
-    });
-  }
-
-  // Modulo: switch / workspace
-  function renderSwitch(cell, m) {
-    cell.classList.add('ed-switch');
-    const pages = m.data.pages || [];
-    const left = document.createElement('div');
-    left.className = 'ed-switch-arrow' + (pages.length <= (MODULE_TYPES.switch.minW) ? ' disabled' : '');
-    left.textContent = '‹';
-    left.title = 'Rimuovi pagina';
-    left.addEventListener('click', (e) => { e.stopPropagation(); shrinkSwitch(m); });
-
-    const right = document.createElement('div');
-    right.className = 'ed-switch-arrow' + (pages.length >= 4 ? ' disabled' : '');
-    right.textContent = '›';
-    right.title = 'Aggiungi pagina';
-    right.addEventListener('click', (e) => { e.stopPropagation(); if (growSwitch(m)) contaModulo(m, 'ridimensionato'); });
-
-    const icons = document.createElement('div');
-    icons.className = 'ed-switch-icons';
-    pages.forEach((p, idx) => {
-      const ic = document.createElement('div');
-      ic.className = 'ed-switch-icon' + ((m.data.activePage || 0) === p.z ? ' active' : '');
-      ic.title = p.name;
-      ic.innerHTML = switchIconHtml(p.icon, idx);
-      ic.addEventListener('click', (e) => { if (!settingsMode) { e.stopPropagation(); contaModulo(m, 'usato'); setActivePage(p.z); } });
-      icons.appendChild(ic);
-    });
-    cell.appendChild(left);
-    cell.appendChild(icons);
-    cell.appendChild(right);
-  }
-  function switchIconHtml(icon, idx) {
-    if (icon === 'pen' && ICONS.editor) return ICONS.editor(16);
-    if (icon === 'chat' && ICONS.filoLogo) return ICONS.filoLogo(16);
-    if (icon === 'serif') return '<span style="font-family:Georgia,serif;font-size:15px">A</span>';
-    return escapeHtml(icon || String(idx + 1));
-  }
-  const MAX_PAGES = 4;
-
-  // La larghezza dello switch in colonne È il numero di pagine: allargare crea pagine,
-  // rimpicciolire ne elimina.
-
-  // «Vuota» = nessun modulo oltre a quelli appuntati (switch e ingranaggio).
-  function pageHasModules(z, switchId) {
-    return doc.modules.some((mm) => mm.id !== switchId && !isPinned(mm) && mm.z === z);
-  }
-
-  // Aggiunge una pagina allargando lo switch di una colonna. Se non c'è spazio su tutte le
-  // pagine mostra un toast e ritorna false senza modificare nulla.
-  function growSwitch(m) {
-    const pages = m.data.pages;
-    if (pages.length >= MAX_PAGES) {
-      showEditorToast(`Lo switch può avere al massimo ${MAX_PAGES} pagine.`);
-      return false;
-    }
-    const newW = pages.length + 1;
-    if (m.x + newW > GRID_COLS || !fitsAllPages({ x: m.x, y: m.y, w: newW, h: m.h }, m.id)) {
-      showEditorToast('Spazio insufficiente in tutte le pagine: lo switch non può allargarsi.');
-      return false;
-    }
-    const usedZ = pages.map((p) => p.z);
-    let z = 0; while (usedZ.includes(z)) z++;
-    pages.push({ z, name: `Pagina ${pages.length + 1}`, icon: String(pages.length + 1) });
-    m.w = newW;
-    renderGrid();
-    markDirty();
-    return true;
-  }
-
-  // Rimpicciolire lo switch = eliminare una pagina: un box avverte e fa scegliere QUALE (le
-  // pagine con moduli vanno svuotate prima).
-  function shrinkSwitch(m) {
-    if (m.data.pages.length <= MODULE_TYPES.switch.minW) {
-      showEditorToast(`Lo switch deve avere almeno ${MODULE_TYPES.switch.minW} pagine.`);
-      return;
-    }
-    openDeletePageDialog(m);
-  }
-
-  function deletePage(m, z) {
-    const pages = m.data.pages;
-    if (pages.length <= MODULE_TYPES.switch.minW) return false;
-    const idx = pages.findIndex((p) => p.z === z);
-    if (idx < 0) return false;
-    if (pageHasModules(z, m.id)) {
-      showEditorToast('La pagina contiene moduli: spostali o eliminali prima.');
-      return false;
-    }
-    pages.splice(idx, 1);
-    if ((m.data.activePage || 0) === z) m.data.activePage = pages[0].z;
-    m.w = Math.max(MODULE_TYPES.switch.minW, pages.length);
-    renderGrid();
-    markDirty();
-    return true;
-  }
-
-  function openDeletePageDialog(m) {
-    const pages = m.data.pages;
-    const rows = pages.map((p, idx) => {
-      const occupied = pageHasModules(p.z, m.id);
-      const name = escapeHtml(p.name || `Pagina ${idx + 1}`);
-      return `<div class="ed-stat-row">
-        <span>${name}${occupied ? ' <em style="color:var(--sn-muted);font-style:normal">· contiene moduli</em>' : ''}</span>
-        <button class="ed-btn danger" data-del-z="${p.z}"${occupied ? ' disabled title="Svuota la pagina prima"' : ''}>Elimina</button>
-      </div>`;
+  // Impostazioni (l'ingranaggio): uno per strumento, le sue regolazioni e la sua scorciatoia.
+  function openStrumentiConfig() {
+    const ids = (PANNELLI ? PANNELLI.catalogo('editor').elementi.map((e) => e.id) : []).filter((id) => id !== 'settings');
+    const righe = ids.map((id) => {
+      const c = candidatoDi(pannello ? pannello.config(id) : {});
+      const dentro = pannello && pannello.elementi().includes(id);
+      const nota = [c ? nomeMostrato(c) : '', dentro ? '' : 'non nel pannello'].filter(Boolean).join(' · ');
+      return `<button class="ed-btn ed-strumento" data-strumento="${id}">
+        <span class="ed-strumento-icona">${iconaElemento(id, 16)}</span>
+        <span class="ed-strumento-nome">${escapeHtml(nomeElemento(id))}</span>
+        <span class="ed-strumento-nota">${escapeHtml(nota)}</span></button>`;
     }).join('');
-    openOverlay(`<h3>Rimpicciolire lo switch elimina una pagina</h3>
-      <p style="font-size:13px;color:var(--sn-muted);margin:0 0 14px">Quale pagina vuoi eliminare? Le pagine che contengono moduli vanno svuotate prima.</p>
-      ${rows}
-      <div class="ed-overlay-actions"><button class="ed-btn" id="cancelDelPage">Annulla</button></div>`);
-    const cancel = overlayBox.querySelector('#cancelDelPage');
-    if (cancel) cancel.addEventListener('click', closeOverlay);
-    overlayBox.querySelectorAll('button[data-del-z]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const ok = deletePage(m, Number(btn.dataset.delZ));
-        if (ok) { contaModulo(m, 'ridimensionato'); closeOverlay(); }
-      });
-    });
+    openOverlay(`<h3>Strumenti</h3>${righe}
+      <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
+    $('ovClose').addEventListener('click', closeOverlay);
+    overlayBox.querySelectorAll('[data-strumento]').forEach((b) => b.addEventListener('click', () => openModuleConfig(b.dataset.strumento)));
+  }
+  // La stessa cornice degli altri strumenti (renderSimpleFormat): un pulsante dentro la sua scheda.
+  function renderSettingsModule(host) {
+    const pad = document.createElement('div');
+    pad.className = 'ed-mod-pad ed-fmt';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ed-fmt-btn ed-fmt-largo ed-strumenti-btn';
+    b.innerHTML = `<span class="ed-fmt-glifo">${ICONS.options ? ICONS.options(16) : '⚙'}</span><span class="ed-fmt-nome">Impostazioni degli strumenti</span>`;
+    b.title = 'Scorciatoie e regolazioni degli strumenti';
+    b.addEventListener('click', (e) => { e.stopPropagation(); openStrumentiConfig(); });
+    pad.appendChild(b);
+    host.appendChild(pad);
   }
 
-  function reconcileSwitchPages(m, targetLen) {
-    const cur = m.data.pages.length;
-    if (targetLen > cur) {
-      while (m.data.pages.length < targetLen) {
-        if (!growSwitch(m)) break; // niente spazio / max raggiunto: toast già mostrato
-      }
-      renderGrid(); // ripristina la larghezza visiva se l'aggiunta è stata rifiutata
-    } else if (targetLen < cur) {
-      renderGrid();            // ripristina la larghezza reale prima di chiedere
-      openDeletePageDialog(m); // l'eliminazione effettiva avviene dopo la scelta
-    } else {
-      renderGrid();
-    }
-  }
 
   // docEl.textContent concatena i blocchi SENZA separatore: l'ultima parola di un blocco e la
   // prima del successivo si fondono e i conteggi calano. Si ricostruisce il testo a mano.
@@ -2838,12 +2273,8 @@
   function notaTaglio(letto, perCosa) {
     return window.SN_EDITOR_SUMMARY.notaTaglio(letto, perCosa);
   }
-  function contestoDelDocumento(chat, memory) {
+  function contestoDelDocumento(memory) {
     const parts = [];
-    if (chat.length) {
-      parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
-        + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
-    }
     if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
     return parts;
   }
@@ -2867,27 +2298,27 @@
     const readingMin = words ? Math.max(1, Math.round(words / 200)) : 0;
     return { words, chars, sentences, paragraphs, readingMin };
   }
-  function renderWordCount(cell, m) {
-    cell.classList.add('ed-wc');
-    const pad = document.createElement('div');
+  // Cosa conta lo scelgono le impostazioni dell'elemento, e si rilegge a ogni giro.
+  function renderWordCount(host) {
+    const pad = document.createElement('button');
+    pad.type = 'button';
     pad.className = 'ed-mod-pad ed-wc';
-    const num = document.createElement('div'); num.className = 'wc-num';
-    const cap = document.createElement('div'); cap.className = 'wc-cap';
+    pad.title = 'Statistiche del documento';
+    const num = document.createElement('span'); num.className = 'wc-num';
+    const cap = document.createElement('span'); cap.className = 'wc-cap';
     pad.appendChild(num); pad.appendChild(cap);
-    cell.appendChild(pad);
-    const metric = m.data.count || 'words';
+    host.appendChild(pad);
     const fill = () => {
+      const scelto = pannello ? pannello.config('word-count').count : '';
+      const metric = PANNELLI && PANNELLI.CONTI.includes(scelto) ? scelto : 'words';
       const s = textStats();
       const v = { words: s.words, chars: s.chars, sentences: s.sentences, paragraphs: s.paragraphs }[metric];
       num.textContent = v;
-      cap.textContent = { words: 'parole', chars: 'caratteri', sentences: 'frasi', paragraphs: 'paragrafi' }[metric];
+      cap.textContent = { words: v === 1 ? 'parola' : 'parole', chars: v === 1 ? 'carattere' : 'caratteri', sentences: v === 1 ? 'frase' : 'frasi', paragraphs: v === 1 ? 'paragrafo' : 'paragrafi' }[metric];
     };
     fill();
-    cell._wcFill = fill;
-    pad.addEventListener('click', (e) => { if (settingsMode) return; e.stopPropagation(); contaModulo(m, 'usato'); showStatsOverlay(); });
-  }
-  function updateWordCountModules() {
-    gridEl.querySelectorAll('.ed-module[data-type="word-count"]').forEach((c) => { if (c._wcFill) c._wcFill(); });
+    host._wcFill = fill;
+    pad.addEventListener('click', (e) => { e.stopPropagation(); contaModulo({ type: 'word-count' }, 'usato'); showStatsOverlay(); });
   }
   function showStatsOverlay() {
     const s = textStats();
@@ -2912,13 +2343,12 @@
     clearTimeout(findRevealTimer); findRevealTimer = null;
     return true;
   }
-  function renderSearchReplace(cell, m) {
+  function renderSearchReplace(host) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-sr';
     pad.innerHTML = `
-      <input type="text" placeholder="Cerca" data-sr="find" />
+      <div class="ed-sr-campo"><input type="text" placeholder="Cerca" data-sr="find" /><span class="ed-sr-count" data-sr="count"></span></div>
       <input type="text" placeholder="Sostituisci" data-sr="repl" />
-      <div class="ed-sr-count" data-sr="count"></div>
       <div class="ed-sr-row">
         <button data-sr="prev">‹ Prec</button>
         <button data-sr="next">Succ ›</button>
@@ -2927,16 +2357,16 @@
         <button data-sr="one">Sostituisci</button>
         <button data-sr="all">Tutto</button>
       </div>`;
-    cell.appendChild(pad);
+    host.appendChild(pad);
     const findInput = pad.querySelector('[data-sr="find"]');
     const replInput = pad.querySelector('[data-sr="repl"]');
     const countEl = pad.querySelector('[data-sr="count"]');
-    cell._srFocus = () => findInput.focus();
+    host._srFocus = () => { findInput.focus(); findInput.select(); };
     const updateCount = () => { countEl.textContent = findState.hits.length ? `${findState.idx + 1}/${findState.hits.length}` : (findInput.value ? 'nessun risultato' : ''); };
     const run = () => { runFind(findInput.value); updateCount(); };
     // Un uso è una ricerca, non ogni tasto né ogni sostituzione: uno per volta che il campo prende il fuoco.
     let usato = false;
-    const contaUnaVolta = () => { if (!usato) { usato = true; contaModulo(m, 'usato'); } };
+    const contaUnaVolta = () => { if (!usato) { usato = true; contaModulo({ type: 'search-replace' }, 'usato'); } };
     findInput.addEventListener('input', contaUnaVolta);
     findInput.addEventListener('focus', () => { usato = false; });
     findInput.addEventListener('input', run);
@@ -2950,15 +2380,24 @@
         updateCount();
         return;
       }
-      // Esc = "ho finito di cercare": via le evidenziazioni e via le sezioni
-      // aperte solo per mostrare i risultati, il foglio torna com'era.
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        findInput.value = '';
-        runFind('', { immediate: true });
-        updateCount();
-      }
+      if (e.key === 'Escape') { e.preventDefault(); finitoDiCercare(); }
     });
+    // Esc = "ho finito di cercare": via le evidenziazioni e le sezioni aperte solo per i risultati, e si torna a
+    // scrivere nel foglio, dopo la corrispondenza su cui ci si era fermati; il pannello aperto per cercare si chiude.
+    function finitoDiCercare() {
+      const dopo = puntoDopoCorrispondenza();
+      findInput.value = '';
+      runFind('', { immediate: true });
+      updateCount();
+      if (pannello && !pannello.bloccato()) pannello.chiudi();
+      docEl.focus();
+      const r = (dopo && dopo()) || (ultimaSelezioneFoglio && ultimaSelezioneFoglio.startContainer.isConnected ? ultimaSelezioneFoglio : null);
+      if (!r) { focusDocAtEnd(); return; }
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+    replInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); finitoDiCercare(); } });
     replInput.addEventListener('click', (e) => e.stopPropagation());
     pad.querySelector('[data-sr="next"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(1); updateCount(); });
     pad.querySelector('[data-sr="prev"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(-1); updateCount(); });
@@ -2967,6 +2406,41 @@
     pad.querySelector('[data-sr="one"]').addEventListener('click', (e) => { e.stopPropagation(); contaUnaVolta(); replaceOne(replInput.value); updateCount(); });
     pad.querySelector('[data-sr="all"]').addEventListener('click', (e) => { e.stopPropagation(); contaUnaVolta(); replaceAll(findInput.value, replInput.value); run(); });
   }
+  // La posizione subito dopo la corrispondenza corrente, come offset nel testo del suo blocco: smontati i mark i
+  // nodi cambiano, l'offset no. Restituisce chi la ricalcola dopo lo smontaggio.
+  function puntoDopoCorrispondenza() {
+    const cur = findState.hits[findState.idx];
+    const ultimo = cur && cur.marks[cur.marks.length - 1];
+    if (!ultimo || !ultimo.isConnected) return null;
+    const block = findBlockOf(ultimo.firstChild || ultimo);
+    // Qui i mark contano: è il loro testo che si misura.
+    const testi = () => {
+      const w = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
+        acceptNode: (n) => (n.parentElement && !n.parentElement.closest('.ed-collapse-toggle') && findBlockOf(n) === block
+          ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+      });
+      const out = [];
+      let n; while ((n = w.nextNode())) out.push(n);
+      return out;
+    };
+    let off = 0;
+    let fine = -1;
+    for (const t of testi()) { off += t.nodeValue.length; if (ultimo.contains(t)) fine = off; }
+    if (fine < 0) return null;
+    return () => {
+      let cum = 0;
+      for (const t of testi()) {
+        if (cum + t.nodeValue.length >= fine) { const r = document.createRange(); r.setStart(t, fine - cum); r.collapse(true); return r; }
+        cum += t.nodeValue.length;
+      }
+      return null;
+    };
+  }
+  let ultimaSelezioneFoglio = null;
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && docEl.contains(sel.anchorNode)) ultimaSelezioneFoglio = sel.getRangeAt(0).cloneRange();
+  });
   function clearFind() {
     // Uno spostamento ancora in attesa punterebbe a evidenziazioni che stiamo
     // per smontare: si annulla qui e lo ripianifica chi rilancia la ricerca.
@@ -3147,21 +2621,32 @@
   }
 
   // Modulo: commenta
-  function renderCommentModule(cell, m) {
-    cell.classList.add('ed-comment-mod');
+  function renderCommentModule(host) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-comment-mod';
-    pad.innerHTML = `<div class="cm-count">${doc.comments.filter((c) => !c.resolved).length}</div><div class="wc-cap">commenti</div>`;
-    cell.appendChild(pad);
-    pad.addEventListener('click', (e) => {
-      if (settingsMode) return;
-      e.stopPropagation();
-      contaModulo(m, 'usato');
-      if (doc.comments.length) showCommentsList();
-      else startCommenting();
-    });
+    pad.innerHTML = `<button type="button" class="ed-cm-nuovo" title="Seleziona il testo da commentare">${ICONS.share ? ICONS.share(14) : ''}<span>Commenta</span></button>
+      <button type="button" class="ed-cm-elenco" title="Tutti i commenti"><span class="cm-count"></span><span class="wc-cap"></span></button>`;
+    host.appendChild(pad);
+    const fill = () => {
+      const n = doc ? doc.comments.filter((c) => !c.resolved).length : 0;
+      pad.querySelector('.cm-count').textContent = n;
+      pad.querySelector('.wc-cap').textContent = n === 1 ? 'aperto' : 'aperti';
+      pad.querySelector('.ed-cm-elenco').hidden = !(doc && doc.comments.length);
+    };
+    fill();
+    host._cmFill = fill;
+    pad.querySelector('.ed-cm-nuovo').addEventListener('click', (e) => { e.stopPropagation(); contaModulo({ type: 'comment' }, 'usato'); startCommenting(); });
+    pad.querySelector('.ed-cm-elenco').addEventListener('click', (e) => { e.stopPropagation(); contaModulo({ type: 'comment' }, 'usato'); showCommentsList(); });
   }
+  // Chi ha già selezionato il testo commenta quello: l'invito a selezionare è per chi non l'ha fatto.
   function startCommenting() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && sel.toString().trim() && docEl.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      commenting = false;
+      root.classList.remove('commenting');
+      promptComment(sel);
+      return;
+    }
     commenting = true;
     root.classList.add('commenting');
     flashOverlayMsg('Seleziona il testo da commentare…', 1200);
@@ -3205,7 +2690,6 @@
       highlightComment(c);
       closeOverlay();
       onDocInput();
-      renderGrid();
     });
   }
   // Ancoraggio commenti { from, to, text }: offset sul testo puro più il testo scelto come
@@ -3337,12 +2821,12 @@
     $('ovNew').addEventListener('click', startCommenting);
     overlayBox.querySelectorAll('[data-resolve]').forEach((b) => b.addEventListener('click', () => {
       const c = doc.comments.find((x) => x.id === b.dataset.resolve); if (c) c.resolved = !c.resolved;
-      markDirty(); renderGrid(); showCommentsList();
+      markDirty(); aggiornaElementi(); showCommentsList();
     }));
     overlayBox.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => {
       doc.comments = doc.comments.filter((x) => x.id !== b.dataset.del);
       removeCommentSpans(b.dataset.del); // tutti gli span (multi-blocco compreso)
-      markDirty(); renderGrid();
+      markDirty(); aggiornaElementi();
       if (doc.comments.length) showCommentsList(); else closeOverlay();
     }));
   }
@@ -3578,228 +3062,9 @@
     return null;
   }
 
-  // Istruzioni date al modello: come e quando emettere le azioni di formattazione.
-  const CHAT_FORMAT_INSTRUCTIONS = [
-    'Sei un assistente di scrittura dentro un editor di testo. Oltre a rispondere a domande, puoi MODIFICARE la formattazione del documento quando l\'utente lo chiede.',
-    '',
-    'Quando l\'utente chiede di cambiare l\'estetica o la formattazione del testo (grassetto, corsivo, sottolineato, barrato, dimensione, font, allineamento), rispondi SOLO con un oggetto JSON dentro un blocco ```json con questa forma:',
-    '{"actions":[{"op":"format","target":"headings","style":"bold","value":true}],"reply":"Ho messo in grassetto tutti i titoli."}',
-    '',
-    'Campi:',
-    '- op: "format" (stile inline) oppure "align" (allineamento del blocco)',
-    '- target: "all" (tutto il documento), "headings" (tutti i titoli), "h1"/"h2"/"h3" (un livello di titolo), "paragraphs" (i paragrafi), "selection" (il testo selezionato), oppure {"contains":"testo"} per i blocchi che contengono quel testo',
-    '- style (solo per op "format"): "bold" | "italic" | "underline" | "strike" | "fontSize" | "fontFamily"',
-    '- value: per bold/italic/underline/strike usa true (applica) o false (rimuovi); per fontSize una dimensione CSS come "1.4em" o "20px" (o "large"/"small"); per fontFamily il nome del font ("Georgia","Arial","Times New Roman",...); per op "align" usa "left"|"center"|"right"|"justify"',
-    '- reply: una frase breve in italiano che conferma cosa hai fatto',
-    '',
-    'Puoi includere più operazioni in "actions". Esempio: "scrivi in grassetto tutti i titoli" → {"actions":[{"op":"format","target":"headings","style":"bold","value":true}],"reply":"Fatto: titoli in grassetto."}',
-    '',
-    'Se invece l\'utente fa una domanda o chiede un\'analisi (non una modifica di formattazione), rispondi normalmente in testo, SENZA JSON.',
-    '',
-    'Documento corrente:',
-    '',
-  ].join('\n');
-
   // Espone i motori di parsing/applicazione per i test (e per debug).
   window.__filoEditorFormat = { parseFormatActions, applyFormatActions, resolveTargets };
 
-  // Modulo: chat LLM
-  function renderChat(cell, m) {
-    if (!Array.isArray(m.data.messages)) m.data.messages = [];
-    const pad = document.createElement('div');
-    pad.className = 'ed-mod-pad ed-chat';
-    pad.innerHTML = `
-      <div class="ed-chat-log" data-chat="log"></div>
-      <div class="ed-chat-input">
-        <textarea data-chat="input" placeholder="Chiedi al documento…"></textarea>
-        <button data-chat="send">↑</button>
-      </div>`;
-    cell.appendChild(pad);
-    // Perché il turno non è riuscito, in italiano: la regola sta in
-    // SN_CHAT_ERRORS, come per ogni altra chat di Filo (#663).
-    const erroreInChat = (res, ripiego) => {
-      contaModello(res);
-      const CE = window.SN_CHAT_ERRORS;
-      if (!CE) return 'Errore: ' + ((res && res.error) || ripiego);
-      return CE.sentence(CE.fromResponse(res, ripiego));
-    };
-    const log = pad.querySelector('[data-chat="log"]');
-    const input = pad.querySelector('[data-chat="input"]');
-    // Un testo lasciato nella casella lo scrive il browser; qui si conta solo da dove veniva (#1471).
-    input.addEventListener('drop', (e) => {
-      const testo = (() => { try { return e.dataTransfer.getData('text/plain'); } catch (_) { return ''; } })();
-      contaTrascinamento(window.SN_GESTI?.rilascio(e.dataTransfer, 'chat_modulo_editor', !!testo));
-    });
-    const sendBtn = pad.querySelector('[data-chat="send"]');
-    // La riga del ripiego sui crediti di Filo (#662) resta sotto la sua risposta finché la
-    // pagina è aperta: è un fatto di quel momento, non entra nel documento.
-    const noteRipiego = new WeakMap();
-    // Allo stesso modo la riga che dice quanta parte di un documento troppo lungo ha letto la risposta (#1475).
-    const noteTaglio = new WeakMap();
-    // Una risposta che non è arrivata: segnata come errore e, finché la pagina è aperta, col tasto per la pagina
-    // dove si toglie l'ostacolo (#663). Nel documento resta la frase.
-    const errori = new WeakMap();
-    const renderLog = () => {
-      log.innerHTML = '';
-      for (const msg of m.data.messages) {
-        const b = document.createElement('div');
-        b.className = 'ed-chat-msg ' + (msg.role === 'user' ? 'user' : 'assistant');
-        // La riga «interrotta» sta nel testo salvato (il modello la rilegge), ma si mostra come nota, non come risposta.
-        const parti = String(msg.content || '').split('\n\n');
-        const interrotta = msg.role !== 'user' && parti.length > 1 && window.SN_CHAT_ERRORS?.eFraseInterrotta?.(parti[parti.length - 1]);
-        b.textContent = interrotta ? parti.slice(0, -1).join('\n\n') : msg.content;
-        const errore = errori.get(msg);
-        if (errore) b.classList.add('errore');
-        log.appendChild(b);
-        if (errore && errore.pagina) {
-          const tasto = document.createElement('button');
-          tasto.type = 'button';
-          tasto.className = 'ed-chat-continua ed-chat-rimedio';
-          tasto.textContent = errore.pagina.label;
-          if (errore.pagina.title) tasto.title = errore.pagina.title;
-          tasto.addEventListener('click', (e) => { e.stopPropagation(); sendMessage({ type: MSG.OPEN_URL, url: errore.pagina.url }); });
-          log.appendChild(tasto);
-        }
-        if (interrotta) {
-          const n = document.createElement('div');
-          n.className = 'ed-chat-note';
-          n.textContent = parti[parti.length - 1];
-          log.appendChild(n);
-        }
-        const taglio = noteTaglio.get(msg);
-        if (taglio) {
-          const n = document.createElement('div');
-          n.className = 'ed-chat-note';
-          n.textContent = taglio;
-          log.appendChild(n);
-        }
-        const nota = noteRipiego.get(msg);
-        if (nota) {
-          const n = document.createElement('div');
-          n.className = 'ed-chat-note';
-          n.textContent = nota;
-          log.appendChild(n);
-        }
-      }
-      // L'ultima risposta finisce con la riga «interrotta»: «Continua» chiede il seguito, come nelle altre chat.
-      const ultimo = m.data.messages[m.data.messages.length - 1];
-      const CE = window.SN_CHAT_ERRORS;
-      if (ultimo && ultimo.role !== 'user' && CE?.eFraseInterrotta?.(String(ultimo.content || '').split('\n\n').pop())) {
-        const tasto = document.createElement('button');
-        tasto.type = 'button';
-        tasto.className = 'ed-chat-continua';
-        tasto.textContent = 'Continua';
-        tasto.title = 'Continua la risposta da dove si è interrotta';
-        tasto.addEventListener('click', (e) => { e.stopPropagation(); input.value = CE.CHIEDI_SEGUITO; send({ continua: true }); });
-        log.appendChild(tasto);
-      }
-      log.scrollTop = log.scrollHeight;
-    };
-    // La casella che cresce stringe il registro dal fondo: chi stava leggendo l'ultima risposta la tiene in vista.
-    let logInFondo = true;
-    log.addEventListener('scroll', () => { logInFondo = log.scrollHeight - log.scrollTop - log.clientHeight < 4; });
-    if (typeof ResizeObserver === 'function') {
-      new ResizeObserver(() => { if (logInFondo) log.scrollTop = log.scrollHeight; }).observe(log);
-    }
-    renderLog();
-    // I tasti scendono sotto quando lì la richiesta si legge intera e accanto no (#256.4): una soglia di sola larghezza
-    // lasciava la casella a tre parole per riga, e scorreva, in una chat alta abbastanza per mostrarla.
-    const riga = input.parentNode;
-    // Le due misure muovono il registro: chi era in fondo ci resta.
-    const disponi = () => {
-      const fondo = logInFondo;
-      riga.classList.remove('ed-chat-sotto');
-      if (input.isConnected && input.scrollHeight > input.clientHeight) {
-        riga.classList.add('ed-chat-sotto');
-        if (input.scrollHeight > input.clientHeight) riga.classList.remove('ed-chat-sotto');
-      }
-      if (fondo) log.scrollTop = log.scrollHeight;
-    };
-    input.addEventListener('input', disponi);
-    if (typeof ResizeObserver === 'function') new ResizeObserver(disponi).observe(pad);
-    const send = async ({ continua = false } = {}) => {
-      const text = input.value.trim();
-      if (!text) return;
-      contaModulo(m, 'usato');
-      input.value = '';
-      disponi();
-      m.data.messages.push({ role: 'user', content: text });
-      renderLog();
-      // Il documento si fissa alla domanda: la risposta resta sua anche se intanto se ne apre un altro.
-      const conv = conversazioneDelModulo(m);
-      annotaNelFilo(conv, 'user', text);
-      const thinking = { role: 'assistant', content: '…' };
-      m.data.messages.push(thinking);
-      renderLog();
-      const turni = m.data.messages.filter((x) => x !== thinking).map((x) => ({ role: x.role, content: x.content }));
-      const conDocumento = (letto) => {
-        const avviso = window.SN_EDITOR_SUMMARY.avvisoTaglio(letto);
-        return [{ role: 'system', content: CHAT_FORMAT_INSTRUCTIONS + (avviso ? `${avviso}\n\n` : '') + letto.testo }, ...turni];
-      };
-      try {
-        const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_CHAT || 'editor_chat', conDocumento, { diceRipiego: true });
-        const raw = (r && r.ok && typeof r.text === 'string') ? r.text : null;
-        if (raw == null) {
-          thinking.content = erroreInChat(r, 'nessuna risposta');
-          errori.set(thinking, { pagina: window.SN_CHAT_ERRORS?.rimedioPagina?.(r) || null });
-        } else {
-          if (r.keyFallback && r.keyFallback.line) {
-            noteRipiego.set(thinking, r.keyFallback.line);
-            sendMessage({ type: MSG.KEY_FALLBACK_SHOWN });
-          }
-          if (letto.tagliato) noteTaglio.set(thinking, notaTaglio(letto));
-          // Per i contatori (#1465): il documento letto intero o no, e quante azioni di formato sono andate a segno.
-          const contaTurno = (campi) => contaRiquadro('editor_chat', { oltreTetto: !!letto.tagliato, ...campi });
-          if (continua) contaTurno({ continua: true });
-          // Se la risposta contiene azioni di formattazione, applicale al
-          // documento e mostra in chat la conferma; altrimenti è testo normale.
-          const parsed = parseFormatActions(raw);
-          if (parsed && parsed.actions.length) {
-            const n = applyFormatActions(parsed.actions);
-            contaTurno(n ? { formati: n } : { nonTrovato: true });
-            thinking.content = parsed.reply
-              || (n ? 'Fatto.' : 'Non ho trovato testo a cui applicare la formattazione.');
-            if (!n && !parsed.reply) {
-              thinking.content = 'Non ho trovato testo a cui applicare la formattazione.';
-            }
-          } else {
-            thinking.content = raw;
-            contaTurno({ formati: 0 });
-          }
-          // Fermata al tetto di lunghezza (#1097.3): lo si legge sotto, e il modello lo vede al giro dopo.
-          const interrotta = window.SN_CHAT_ERRORS?.rispostaInterrotta?.(r.finishReason);
-          if (interrotta) thinking.content = `${thinking.content}\n\n${interrotta}`;
-          annotaNelFilo(conv, 'filo', thinking.content);
-        }
-      } catch (e) {
-        thinking.content = erroreInChat({ error: e && e.message, code: e && e.code }, 'nessuna risposta');
-        errori.set(thinking, { pagina: window.SN_CHAT_ERRORS?.rimedioPagina?.({ code: e && e.code }) || null });
-      }
-      renderLog();
-      markDirty();
-    };
-    sendBtn.addEventListener('click', (e) => { e.stopPropagation(); send(); });
-    input.addEventListener('click', (e) => e.stopPropagation());
-    // Il tasto microfono: si parla, e la domanda parte come con l'invio (o resta da correggere).
-    window.SN_VOCE_CHAT?.collega({ campo: input, contenitore: input.parentNode, prima: sendBtn, invia: () => send() });
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-    });
-  }
-
-  // La chat di un modulo entra nel filo come riga ripiegata (#974): documento e modulo dicono quale conversazione.
-  function conversazioneDelModulo(m) {
-    if (!doc || !m) return null;
-    return {
-      rif: `${doc.id}:${m.id}`,
-      soggetto: (doc.meta && doc.meta.title) || STORE.DEFAULT_TITLE,
-      dove: `filo://editor/editor.html?file=${encodeURIComponent(doc.id)}`,
-    };
-  }
-  function annotaNelFilo(conv, role, text) {
-    if (!conv || !String(text || '').trim()) return;
-    sendMessage({ type: MSG.FILO_CONVERSAZIONE_APP, app: 'editor', ...conv, messaggi: [{ role, text }] });
-  }
   // Il documento rinominato (a mano o dal titolo automatico): le righe delle sue chat dicono il nome nuovo.
   function rinominaNelFilo(id, title) {
     if (!id) return;
@@ -3817,55 +3082,19 @@
     });
   }
 
-  // IMPOSTAZIONI (modulo 0) & customizzazione
-  function toggleSettingsMode(on) {
-    settingsMode = on != null ? on : !settingsMode;
-    root.classList.toggle('settings-mode', settingsMode);
-    settingsView.hidden = !settingsMode;
-    docWrap.hidden = settingsMode;
-    if (settingsMode) { renderGridControls(); renderPalette(); }
-  }
-  function renderPalette() {
-    paletteEl.innerHTML = '';
-    for (const [type, meta] of Object.entries(MODULE_TYPES)) {
-      if (!canAddType(type)) continue;
-      const item = document.createElement('div');
-      item.className = 'ed-palette-item';
-      item.setAttribute('draggable', 'true');
-      item.innerHTML = `
-        <div class="pi-title"><span class="pi-ico">${meta.glyph || (ICONS[meta.icon] ? ICONS[meta.icon](18) : '')}</span>${meta.label}</div>
-        <div class="pi-desc">${meta.desc}</div>
-        <div class="pi-size">Dimensione ${meta.defaultW}×${meta.defaultH}</div>`;
-      item.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', JSON.stringify({ add: type }));
-        e.dataTransfer.effectAllowed = 'copy';
-        window.SN_GESTI?.marca(e.dataTransfer, 'palette_editor');
-      });
-      item.addEventListener('dragend', (e) => contaTrascinamento(window.SN_GESTI?.fine(e, 'palette_editor')));
-      paletteEl.appendChild(item);
-    }
-  }
-
-  function openModuleConfig(m) {
-    const meta = MODULE_TYPES[m.type];
+  // Le regolazioni di uno strumento del pannello: la sua scorciatoia, e cosa conta il conteggio.
+  function openModuleConfig(id) {
+    if (!pannello || !PANNELLI || !PANNELLI.noto('editor', id)) return;
+    const m = { type: id, id, data: pannello.config(id) };
+    const meta = { label: nomeElemento(id) };
+    const nelPannello = pannello.elementi().includes(id);
     let specific = '';
     if (m.type === 'word-count') {
       const cur = m.data.count || 'words';
       specific = `<div class="ed-field"><label>Conta</label><select id="cfgCount">
         ${['words', 'chars', 'sentences', 'paragraphs'].map((v) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${({ words: 'Parole', chars: 'Caratteri', sentences: 'Frasi', paragraphs: 'Paragrafi' })[v]}</option>`).join('')}
       </select></div>`;
-    } else if (m.type === 'switch') {
-      specific = '<div class="ed-field"><label>Pagine</label>' + (m.data.pages || []).map((p, i) => `
-        <div style="display:flex;gap:6px;margin-bottom:6px">
-          <input type="text" value="${escapeHtml(p.name)}" data-pname="${i}" />
-          <select data-picon="${i}" style="flex:0 0 90px">
-            ${['1', '2', '3', '4', 'pen', 'chat', 'serif'].map((ic) => `<option value="${ic}" ${p.icon === ic ? 'selected' : ''}>${({ pen: '✎ Penna', chat: '◌ Chat', serif: 'A Serif' })[ic] || ic}</option>`).join('')}
-          </select>
-        </div>`).join('') + '</div>';
     }
-    // Lo switch è l'UNICO modo per navigare fra le pagine: eliminarlo lascerebbe l'utente bloccato
-    // sulla prima. Niente bottone «Elimina»: per ridurre le pagine si rimpicciolisce lo switch.
-    const deletable = !isPinned(m);
     const libera = scorciatoiaLibera(m);
     const senzaAzione = !AZIONE_SCORCIATOIA[m.type];
     const giaSalvata = candidatoDi(m.data);
@@ -3878,18 +3107,16 @@
         <div class="ed-field-hint ed-field-nota" id="cfgShortcutNota" hidden></div></div>
       ${specific}
       <div class="ed-overlay-actions">
-        ${deletable ? '<button class="ed-btn danger" id="cfgDelete">Elimina</button>' : ''}
+        <button class="ed-btn" id="cfgPannello">${nelPannello ? 'Togli dal pannello' : 'Metti nel pannello'}</button>
         <button class="ed-btn" id="cfgCancel">Annulla</button>
         <button class="ed-btn primary" id="cfgSave">Salva</button>
       </div>`);
     $('cfgCancel').addEventListener('click', closeOverlay);
-    if (deletable) $('cfgDelete').addEventListener('click', () => {
-      // Guardia difensiva: un modulo appuntato non è mai eliminabile.
-      if (isPinned(m)) { closeOverlay(); return; }
-      if (m.type === 'chat') dimenticaNelFilo({ rif: `${doc.id}:${m.id}` });
-      doc.modules = doc.modules.filter((x) => x.id !== m.id);
-      closeOverlay(); renderGrid(); markDirty();
-      contaModulo(m, 'tolto');
+    $('cfgPannello').addEventListener('click', () => {
+      closeOverlay();
+      if (nelPannello) pannello.togli(id);
+      else pannello.aggiungi(id);
+      contaModulo(m, nelPannello ? 'tolto' : 'aggiunto');
     });
     const cfgShortcut = $('cfgShortcut');
     const cfgShortcutHint = $('cfgShortcutHint');
@@ -3983,19 +3210,13 @@
       }
       const r = rifiuto(c, m);
       if (r) { mostraRifiuto(r); cfgShortcut.focus(); return; }
-      // Le scorciatoie di Filo la confrontano con quelle dei moduli salvati: un attimo dopo sarebbe già tardi (#842).
-      const prima = `${m.data.shortcut || ''}|${m.data.tasto || ''}`;
-      m.data.shortcut = c ? c.nome : '';
-      if (c && c.tasto) m.data.tasto = c.tasto;
-      else delete m.data.tasto;
-      const nuovaScorciatoia = prima !== `${m.data.shortcut}|${m.data.tasto || ''}`;
-      if (m.type === 'word-count') m.data.count = $('cfgCount').value;
-      if (m.type === 'switch') {
-        overlayBox.querySelectorAll('[data-pname]').forEach((inp) => { m.data.pages[Number(inp.dataset.pname)].name = inp.value; });
-        overlayBox.querySelectorAll('[data-picon]').forEach((sel) => { m.data.pages[Number(sel.dataset.picon)].icon = sel.value; });
-      }
-      closeOverlay(); renderGrid(); markDirty();
-      if (nuovaScorciatoia) save(false);
+      // La configurazione la conserva il main: le scorciatoie di Filo la confrontano subito con le loro (#842).
+      const config = {};
+      if (c) { config.shortcut = c.nome; if (c.tasto) config.tasto = c.tasto; }
+      if (m.type === 'word-count') config.count = $('cfgCount').value;
+      const nuovaScorciatoia = `${m.data.shortcut || ''}|${m.data.tasto || ''}` !== `${config.shortcut || ''}|${config.tasto || ''}`;
+      closeOverlay();
+      pannello.configura(id, config).then(() => { dichiaraCtrlZ(); aggiornaElementi(); });
       contaModulo(m, 'configurato');
       if (nuovaScorciatoia) contaModulo(m, c ? 'scorciatoia_si' : 'scorciatoia_no');
     });
@@ -4066,26 +3287,47 @@
   }
 
   // Le scorciatoie salvate come testo si legano al tasto appena si sa com'è fatta la tastiera; quelle che non si
-  // convertono (un simbolo senza un tasto suo) restano testo, e il pannello del modulo lo dice.
-  function convertiScorciatoie(moduli) {
-    let cambiate = 0;
-    for (const m of moduli || []) {
-      const d = m && m.data;
-      if (!d || typeof d.shortcut !== 'string' || !d.shortcut.trim() || TASTI.tastoValido(d.tasto)) continue;
+  // convertono (un simbolo senza un tasto suo) restano testo, e il pannello dello strumento lo dice.
+  function convertiPannello() {
+    if (!pannello || !PANNELLI) return;
+    for (const { id } of PANNELLI.catalogo('editor').elementi) {
+      const d = pannello.config(id);
+      if (typeof d.shortcut !== 'string' || !d.shortcut.trim() || TASTI.tastoValido(d.tasto)) continue;
       const r = TASTI.tastoFisicoDaScritta(d.shortcut, layoutTastiera, TASTI.piattaforma());
       if (!r || !r.tasto) continue;
-      d.tasto = r.tasto;
-      d.shortcut = r.nome;
-      cambiate++;
+      pannello.configura(id, { ...d, shortcut: r.nome, tasto: r.tasto });
     }
-    return cambiate;
-  }
-  function convertiCollezione() {
-    let n = doc ? convertiScorciatoie(doc.modules) : 0;
-    for (const f of (collection && collection.files) || []) n += convertiScorciatoie(f.modules);
-    if (!n) return;
-    writeCollection();
     dichiaraCtrlZ();
+  }
+
+  // I vecchi moduli (#1433) si leggono all'apertura, prima che il primo salvataggio li butti, e passano agli strumenti;
+  // senza risposta dal main restano nei documenti, e la prossima apertura ci riprova.
+  let moduliVecchi = [];
+  const conModuli = (f) => !!(f && Array.isArray(f.modules) && f.modules.length);
+  function ricordaModuli() {
+    moduliVecchi = ((collection && collection.files) || []).filter(conModuli)
+      .map((f) => ({ id: f.id, meta: { modified: f.meta && f.meta.modified }, modules: cloneJson(f.modules) }));
+  }
+  async function migraModuli() {
+    const files = (collection && collection.files) || [];
+    const fonte = { activeId: collection.activeId, files: [...moduliVecchi, ...files.filter((f) => conModuli(f) && !moduliVecchi.some((v) => v.id === f.id))] };
+    if (!fonte.files.length && !files.some((f) => f && f.meta && f.meta.grid)) return;
+    const config = PANNELLI ? PANNELLI.configDaModuli('editor', fonte) : {};
+    const r = await sendMessage({ type: MSG.PANNELLO_APP_MODIFICA, app: 'editor', op: 'migra', config });
+    if (!r || !r.ok) return;
+    moduliVecchi = [];
+    for (const f of files) { if (f) { f.modules = []; if (f.meta) delete f.meta.grid; } }
+    writeCollection();
+  }
+
+  // Gli strumenti con una scorciatoia, dentro o fuori dal pannello: la scorciatoia è dello strumento, come Ctrl+B è del
+  // Grassetto anche fuori dal pannello (#1433). Sentinella: tests/editor-scorciatoie-strumenti.spec.mjs.
+  function elementiConScorciatoia() {
+    if (!pannello || !PANNELLI) return [];
+    const ids = PANNELLI.catalogo('editor').elementi.map((e) => e.id);
+    return ids.filter((id) => AZIONE_SCORCIATOIA[id])
+      .map((id) => ({ id, c: candidatoDi(pannello.config(id)) }))
+      .filter((x) => x.c);
   }
 
   // Il campo che sta registrando una combinazione: il main gli lascia anche i tasti che si prende prima della
@@ -4142,10 +3384,9 @@
   // `suo`: il modulo per cui quel tasto fa già la sua cosa, e può averlo.
   const TASTI_EDITOR = [
     { tasti: ['s'], cosa: 'salva il documento', fa: () => save(true) },
-    { tasti: ['\\'], cosa: 'mostra e nasconde la barra laterale', fa: toggleSidebar },
-    { tasti: ['f'], cosa: 'porta alla ricerca', suo: 'search-replace',
-      attivo: () => doc.modules.some((x) => x.type === 'search-replace'),
-      fa: () => triggerModuleShortcut(doc.modules.find((x) => x.type === 'search-replace')) },
+    { tasti: ['\\'], cosa: 'apre e chiude il pannello degli strumenti', fa: () => { if (pannello) pannello.commuta('tasto'); } },
+    { tasti: ['f'], cosa: 'porta alla ricerca', suo: 'search-replace', attivo: () => !!pannello,
+      fa: () => triggerModuleShortcut('search-replace') },
     // Shift indifferente: su molte tastiere il "+" si fa con Shift. Il tasto lo
     // prende Filo prima di questa pagina (fa: null): qui non va dato a un modulo.
     { cosa: 'zooma il foglio', prende: (e) => !e.altKey && !!ZOOM_TASTI[e.key], fa: null },
@@ -4185,12 +3426,9 @@
     if (!e) return '';
     const nome = TASTI.etichettaScritta(c.nome, TASTI.piattaforma());
     const t = TASTI_EDITOR.find((x) => prendeIlTasto(x, e));
-    if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo modulo non partirebbe mai`;
-    const altro = doc.modules.find((x) => x !== m && AZIONE_SCORCIATOIA[x.type] && candidatoDi(x.data) && stessoTasto(c, candidatoDi(x.data)));
-    if (altro) {
-      const etich = (MODULE_TYPES[altro.type] && MODULE_TYPES[altro.type].label) || altro.type;
-      return `${nome} è già la scorciatoia di «${etich}», e partirebbe solo quello`;
-    }
+    if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo strumento non partirebbe mai`;
+    const altro = elementiConScorciatoia().find((x) => x.id !== m.type && stessoTasto(c, x.c));
+    if (altro) return `${nome} è già la scorciatoia di «${nomeElemento(altro.id)}», e partirebbe solo quello`;
     return '';
   }
   // Perché una scorciatoia (un candidato, vedi `candidatoDi`) non si salva su questo modulo, o null. La
@@ -4238,26 +3476,29 @@
   }
   function scorciatoiaLibera(m) { return primaLibera(ESEMPI_LIBERI, m); }
 
-  // La scorciatoia di un modulo fa quello che fa il suo clic. Un tipo che qui non
+  // La scorciatoia di uno strumento fa quello che fa il suo clic. Uno che qui non
   // c'è ha più azioni (o nessuna): il campo non gli offre una scorciatoia (#545).
   const AZIONE_SCORCIATOIA = {
     'word-count': () => showStatsOverlay(),
-    'search-replace': (cell) => cell && cell._srFocus && cell._srFocus(),
+    'search-replace': (host) => host && host._srFocus && host._srFocus(),
     comment: () => startCommenting(),
-    chat: (cell) => { const t = cell && cell.querySelector('[data-chat="input"]'); if (t) t.focus(); },
     bold: () => SIMPLE_FORMATS.bold.act(),
     italic: () => SIMPLE_FORMATS.italic.act(),
     underline: () => SIMPLE_FORMATS.underline.act(),
     undo: () => SIMPLE_FORMATS.undo.act(),
     redo: () => SIMPLE_FORMATS.redo.act(),
   };
-  function triggerModuleShortcut(m) {
-    const fa = AZIONE_SCORCIATOIA[m.type];
+  function triggerModuleShortcut(id) {
+    const fa = AZIONE_SCORCIATOIA[id];
     if (!fa) return;
-    // La chat e la ricerca prendono solo il fuoco: l'uso lo conta l'invio, o la ricerca scritta.
-    if (m.type !== 'chat' && m.type !== 'search-replace') contaModulo(m, 'usato');
-    if ((m.z || 0) !== activePage()) setActivePage(m.z);
-    fa(gridEl.querySelector(`.ed-module[data-id="${m.id}"]`));
+    // La ricerca prende solo il fuoco: l'uso lo conta la ricerca scritta.
+    if (id !== 'search-replace') { contaModulo({ type: id }, 'usato'); fa(pannello ? pannello.host(id) : null); return; }
+    if (!pannello) return;
+    // Cerca e sostituisci vuole il suo campo: il tasto apre il pannello, come farebbe chi ci va col mouse, e se lo
+    // strumento era stato tolto ce lo rimette, perché chi preme il tasto vuole cercare adesso.
+    if (!pannello.aperto()) pannello.apri('tasto');
+    if (pannello.host(id)) { fa(pannello.host(id)); return; }
+    Promise.resolve(pannello.aggiungi(id)).then(() => fa(pannello.host(id)));
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -4377,116 +3618,7 @@
     return el;
   }
 
-  // Resize moduli nella griglia
-  function attachModuleResize(cell, m) {
-    const meta = MODULE_TYPES[m.type];
-    if (!meta) return;
-    if (m.type === 'switch') {
-      // Ridimensionare lo switch = cambiare il numero di pagine. Durante il drag solo un'anteprima
-      // della larghezza; al rilascio si riconciliano le pagine.
-      const handle = document.createElement('div');
-      handle.className = 'ed-mod-resize-h';
-      handle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const startX = e.clientX;
-        const startLen = m.data.pages.length;
-        const colWidth = gridEl.clientWidth / GRID_COLS;
-        let targetLen = startLen;
-        const onMove = (ev) => {
-          const delta = Math.round((ev.clientX - startX) / colWidth);
-          targetLen = Math.max(meta.minW, Math.min(MAX_PAGES, GRID_COLS - m.x, startLen + delta));
-          cell.style.gridColumn = `${m.x + 1} / span ${targetLen}`;
-        };
-        const onUp = () => {
-          document.removeEventListener('mousemove', onMove);
-          document.removeEventListener('mouseup', onUp);
-          reconcileSwitchPages(m, targetLen);
-          // Più stretto, la pagina da togliere si sceglie nel riquadro: lì si conta.
-          if (m.data.pages.length > startLen) contaModulo(m, 'ridimensionato');
-        };
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-      });
-      cell.appendChild(handle);
-    } else {
-      const handle = document.createElement('div');
-      handle.className = 'ed-mod-resize';
-      handle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const startX = e.clientX;
-        const startY = e.clientY;
-        const startW = m.w;
-        const startH = m.h;
-        const colWidth = gridEl.clientWidth / GRID_COLS;
-        const rowHeight = gridEl.clientHeight / GRID_ROWS;
-        const onMove = (ev) => {
-          const dw = Math.round((ev.clientX - startX) / colWidth);
-          const dh = Math.round((ev.clientY - startY) / rowHeight);
-          const newW = Math.max(meta.minW, Math.min(GRID_COLS - m.x, startW + dw));
-          const newH = Math.max(meta.minH, Math.min(GRID_ROWS - m.y, startH + dh));
-          if ((newW !== m.w || newH !== m.h) && fits({ x: m.x, y: m.y, w: newW, h: newH }, m.z, m.id)) {
-            m.w = newW;
-            m.h = newH;
-            cell.style.gridColumn = `${m.x + 1} / span ${m.w}`;
-            cell.style.gridRow = `${m.y + 1} / span ${m.h}`;
-          }
-        };
-        const onUp = () => {
-          document.removeEventListener('mousemove', onMove);
-          document.removeEventListener('mouseup', onUp);
-          renderGrid();
-          markDirty();
-          if (m.w !== startW || m.h !== startH) contaModulo(m, 'ridimensionato');
-        };
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-      });
-      cell.appendChild(handle);
-    }
-  }
-
-  // Splitter text-pane ↔ sidebar
-  const splitterEl = $('splitter');
-  const sidebarEl = $('sidebar');
-  const textPaneEl = $('textPane');
-  if (splitterEl) {
-    splitterEl.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      splitterEl.classList.add('dragging');
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-      const onMove = (ev) => {
-        const rootRect = root.getBoundingClientRect();
-        const pct = ((rootRect.right - ev.clientX) / rootRect.width) * 100;
-        const clamped = Math.max(20, Math.min(60, pct));
-        sidebarEl.style.flex = `0 0 ${clamped}%`;
-        sidebarEl.style.maxWidth = `${clamped}%`;
-        textPaneEl.style.flex = `1 1 ${100 - clamped}%`;
-      };
-      const onUp = () => {
-        splitterEl.classList.remove('dragging');
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-      };
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-    });
-  }
-
-  // Toggle sidebar, scorciatoie globali, bootstrap
-  function toggleSidebar() { root.classList.toggle('sidebar-hidden'); }
-
-  sidebarToggle.addEventListener('click', toggleSidebar);
-
-  // Un tasto nell'HTML non si può scrivere: lo compone il JS (CLAUDE.md § Mac).
-  sidebarToggle.title = conTasto('Mostra/nascondi sidebar', 'Ctrl+\\');
-
-  if (ICONS.apps) sidebarToggle.innerHTML = ICONS.apps(16);
-
+  // Tasti globali, bootstrap
   window.addEventListener('keydown', (e) => {
     // A pannello aperto la tastiera è del pannello: Esc lo chiude, e nessun tasto
     // agisce sul foglio o sui moduli che stanno dietro (#545).
@@ -4504,14 +3636,13 @@
       if (t.suo && !isEditableTarget(e.target)) break;
       return;
     }
-    for (const m of doc.modules) {
-      const c = AZIONE_SCORCIATOIA[m.type] && candidatoDi(m.data);
-      if (c && colpisce(c, e)) {
+    for (const { id, c } of elementiConScorciatoia()) {
+      if (colpisce(c, e)) {
         // Difesa per le scorciatoie senza modificatore già salvate (prima della
         // validazione): mentre si scrive nel documento o in un campo di testo NON
         // devono rubare il tasto — lascia digitare normalmente la lettera.
         if (!c.tasto && !shortcutHasRealModifier(c.nome) && isEditableTarget(e.target)) continue;
-        e.preventDefault(); triggerModuleShortcut(m); return;
+        e.preventDefault(); triggerModuleShortcut(id); return;
       }
     }
   });
@@ -4559,10 +3690,70 @@
     snapshotManual: () => maybeRecordManualVersion(),
   };
 
+  // Gli strumenti del pannello di destra: quali ci sono lo sceglie l'utente, come si disegnano lo dice l'Editor.
+  const RENDER = {
+    'word-count': renderWordCount,
+    'search-replace': renderSearchReplace,
+    comment: renderCommentModule,
+    'text-size': renderTextSize,
+    align: renderAlign,
+    font: renderFont,
+    settings: renderSettingsModule,
+    bold: (h) => renderSimpleFormat(h, 'bold'),
+    italic: (h) => renderSimpleFormat(h, 'italic'),
+    underline: (h) => renderSimpleFormat(h, 'underline'),
+    undo: (h) => renderSimpleFormat(h, 'undo'),
+    redo: (h) => renderSimpleFormat(h, 'redo'),
+  };
+  const ELEMENTI = {};
+  for (const id of Object.keys(RENDER)) {
+    ELEMENTI[id] = {
+      disegna: RENDER[id],
+      icona: (n) => iconaElemento(id, n),
+      voci: () => (id === 'settings' ? [] : [{ etichetta: `Impostazioni di «${nomeElemento(id)}»…`, fa: () => openModuleConfig(id) }]),
+    };
+  }
+  pannello = window.SN_PANNELLO_DESTRO ? window.SN_PANNELLO_DESTRO.crea({
+    app: 'editor',
+    elementi: ELEMENTI,
+    scorrimento: () => docWrap,
+    // Il pannello aperto da uno strumento (impostazioni, commento) e la tendina dei font sono suoi: non lo chiudono.
+    appartiene: (t) => !!(t.closest && t.closest('#overlay, .ed-font-pop, .ed-toasts')),
+    riquadroAperto: () => !overlay.hidden,
+    suCambio: () => { aggiornaElementi(); dichiaraCtrlZ(); },
+    mossa: (evento, id) => contaModulo({ type: id }, evento),
+  }) : null;
+
+  // L'Aiuto in questa pagina è la chat del documento (#1433): lo legge intero, e ne cambia la formattazione con le
+  // azioni che la chat dell'Editor sapeva già fare (applyFormatActions, che crea il punto di ripristino).
+  window.SN_AIUTO_APP = Object.freeze({
+    app: 'editor',
+    segnaposto: 'Chiedi al documento…',
+    documento: (prima = null, rifiuto = null, caratteri = 0) => {
+      const S = window.SN_EDITOR_SUMMARY;
+      const testo = docPlainText();
+      const letto = prima ? S.rilettoDopoRifiuto(testo, prima, rifiuto, caratteri) : S.testoAlModello(testo);
+      if (!letto) return null;
+      return { ...letto, id: doc ? doc.id : '', titolo: (doc && doc.meta && doc.meta.title) || STORE.DEFAULT_TITLE, avviso: S.avvisoTaglio(letto), nota: S.notaTaglio(letto) };
+    },
+    // `perId`: il documento letto quando è partita la domanda. Se nel frattempo ne è aperto un altro la modifica non
+    // tocca quello (null): era chiesta per l'altro.
+    applica: (azioni, perId = '') => (perId && (!doc || doc.id !== perId) ? null : applyFormatActions(azioni)),
+    // Per i contatori (#1465): il documento letto intero o no, e quante azioni di formato sono andate a segno.
+    conta: (campi) => contaRiquadro('editor_chat', { ...campi }),
+    conversazione: (rif) => (doc ? {
+      app: 'editor',
+      rif: `${doc.id}:aiuto-${String(rif || '').slice(0, 80)}`,
+      soggetto: (doc.meta && doc.meta.title) || STORE.DEFAULT_TITLE,
+      dove: `filo://editor/editor.html?file=${encodeURIComponent(doc.id)}`,
+    } : null),
+  });
+
   applySavedTheme();
   loadVersions();                           // storico dall'archivio app (async)
   loadTrash();
   loadCollection();                         // da localStorage (sincrono)
+  ricordaModuli();
   // ?file=<id>: un documento scelto da fuori (la carta dell'Editor nella home, #870). Può stare solo
   // nell'archivio (un appunto scritto da Filo a editor chiuso): lo si cerca di nuovo dopo la fusione.
   const fileChiesto = (() => { try { return new URLSearchParams(location.search).get('file') || ''; } catch (_) { return ''; } })();
@@ -4572,5 +3763,5 @@
     else if (doc && STORE.findFile(collection, doc.id)) segnaAperto();
   });
   // Dopo la fusione con l'archivio: scrivere prima cancellerebbe gli appunti che Filo ci ha messo (vedi loadCollection).
-  Promise.all([archivioLetto, leggiLayout()]).then(convertiCollezione, () => {});
+  Promise.all([archivioLetto, leggiLayout()]).then(migraModuli).then(convertiPannello, () => {});
 })();

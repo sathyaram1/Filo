@@ -5,7 +5,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniAvvisoSchermoPieno, tempiCorrettore, soglieCorrettore } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniPannelloDestro, opzioniAvvisoSchermoPieno, tempiCorrettore, soglieCorrettore } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -864,6 +864,11 @@
       case 'barraLaterale.schede': return $('barraSchede').checked;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale({ attesaMs: $('barraAttesa').value }).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale({ uscitaMs: $('barraUscita').value }).uscitaMs;
+      case 'pannelloDestro.spinta': return $('pannelloSpinta').checked;
+      case 'pannelloDestro.striscia': return $('pannelloStriscia').checked;
+      case 'pannelloDestro.bloccato': return $('pannelloBloccato').checked;
+      case 'pannelloDestro.attesaMs': return opzioniPannelloDestro({ attesaMs: $('pannelloAttesa').value }).attesaMs;
+      case 'pannelloDestro.uscitaMs': return opzioniPannelloDestro({ uscitaMs: $('pannelloUscita').value }).uscitaMs;
       case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs;
       case 'notifications.soundVolume': return volumeDa('notifSoundVolume');
       case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
@@ -957,6 +962,11 @@
       case 'barraLaterale.schede': return opzioniBarraLaterale(s.barraLaterale).schede;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale(s.barraLaterale).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale(s.barraLaterale).uscitaMs;
+      case 'pannelloDestro.spinta': return opzioniPannelloDestro(s.pannelloDestro).spinta;
+      case 'pannelloDestro.striscia': return opzioniPannelloDestro(s.pannelloDestro).striscia;
+      case 'pannelloDestro.bloccato': return opzioniPannelloDestro(s.pannelloDestro).bloccato;
+      case 'pannelloDestro.attesaMs': return opzioniPannelloDestro(s.pannelloDestro).attesaMs;
+      case 'pannelloDestro.uscitaMs': return opzioniPannelloDestro(s.pannelloDestro).uscitaMs;
       case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno(s.avvisoSchermoPieno).durataMs;
       case 'notifications.soundVolume': return volumeSalvato(notif.soundVolume);
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
@@ -1128,6 +1138,12 @@
     if (vuole('barraLaterale.schede')) $('barraSchede').checked = barra.schede;
     if (vuole('barraLaterale.attesaMs')) $('barraAttesa').value = String(barra.attesaMs);
     if (vuole('barraLaterale.uscitaMs')) $('barraUscita').value = String(barra.uscitaMs);
+    const pannello = opzioniPannelloDestro(settings.pannelloDestro);
+    if (vuole('pannelloDestro.spinta')) $('pannelloSpinta').checked = pannello.spinta;
+    if (vuole('pannelloDestro.striscia')) $('pannelloStriscia').checked = pannello.striscia;
+    if (vuole('pannelloDestro.bloccato')) $('pannelloBloccato').checked = pannello.bloccato;
+    if (vuole('pannelloDestro.attesaMs')) $('pannelloAttesa').value = String(pannello.attesaMs);
+    if (vuole('pannelloDestro.uscitaMs')) $('pannelloUscita').value = String(pannello.uscitaMs);
     if (vuole('avvisoSchermoPieno.durataMs')) $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno(settings.avvisoSchermoPieno).durataMs);
 
     const terminal = settings.terminal || {};
@@ -1458,12 +1474,12 @@
   let scorciatoieSalvate = {};
   let registrando = null;
 
-  // I moduli dell'Editor tengono le loro combinazioni nei documenti: una delle quattro sopra le spegnerebbe.
-  const COLLEZIONE_EDITOR = 'filo.editor.collection';
+  // Gli elementi dei pannelli delle app tengono le loro combinazioni (#1433): una delle quattro sopra le spegnerebbe.
+  const PANNELLI = 'sn_pannelli_app';
   async function caricaModuliEditor() {
     try {
-      const r = await chrome.storage.local.get(COLLEZIONE_EDITOR);
-      window.SN_TASTI?.usaScorciatoieModuli(r && r[COLLEZIONE_EDITOR]);
+      const r = await chrome.storage.local.get(PANNELLI);
+      window.SN_TASTI?.usaScorciatoiePannelli(r && r[PANNELLI]);
     } catch (_) {}
   }
 
@@ -1901,6 +1917,11 @@
       $(id).addEventListener('change', persist);
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
       $(id).addEventListener('blur', () => { $(id).value = String(opzioniBarraLaterale({ [campo]: $(id).value })[campo]); });
+    }
+    for (const id of ['pannelloSpinta', 'pannelloStriscia', 'pannelloBloccato']) $(id).addEventListener('change', persist);
+    for (const [id, campo] of [['pannelloAttesa', 'attesaMs'], ['pannelloUscita', 'uscitaMs']]) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('blur', () => { $(id).value = String(opzioniPannelloDestro({ [campo]: $(id).value })[campo]); });
     }
     $('avvisoSchermoPienoDurata').addEventListener('change', persist);
     $('avvisoSchermoPienoDurata').addEventListener('blur', () => {

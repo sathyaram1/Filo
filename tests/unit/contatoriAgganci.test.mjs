@@ -129,9 +129,9 @@ test('gli avvisi d’errore del main e delle pagine di Filo si contano, con una 
   assert.doesNotMatch(fuori.find(([f]) => f.endsWith('dashboard-carte.js'))[1], /\bavviso\(\(?(res|r)\b[^)]*\.error/);
   // Nella barra delle schede e nei Mazzi un avviso d'errore passa dalla funzione che lo conta.
   assert.doesNotMatch(fuori.find(([f]) => f.endsWith('shell.js'))[1], /(showToast|NOTIFS\.show)\([^)]*(non riuscit|Non sono riuscito|Non è stato possibile|non c’è più)/);
-  // Nell'Editor un errore letto passa dal conto: la bolla della chat, il titolo, il salvataggio.
+  // Nell'Editor un errore letto passa dal conto: il titolo, il salvataggio. La chat del documento è l'Aiuto (#1433),
+  // che conta la sua bolla più sotto.
   const editor = fuori.find(([f]) => f.endsWith('editor.js'))[1];
-  assert.match(editor, /const erroreInChat = \(res, ripiego\) => \{\s*contaModello\(res\);/);
   const titolo = /showEditorToast\('Non sono riuscito a generare il titolo\.'\)/g;
   const contato = /(contaModello\(r\)|contaErroreVisto\(\{ misura: 'avviso', chiave: 'titolo_non_generato' \}\)); showEditorToast\('Non sono riuscito a generare il titolo\.'\)/g;
   assert.equal([...editor.matchAll(contato)].length, [...editor.matchAll(titolo)].length);

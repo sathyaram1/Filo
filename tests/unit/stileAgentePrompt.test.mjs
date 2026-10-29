@@ -39,8 +39,7 @@ function messaggiPer(action) {
     ];
     case A.FILO_DASHBOARD: return [{ role: 'user', content: P.filoDashboard({ profilo: 'Mario', salvati: 'nessuno' }) }];
     case A.EDITOR_TITLE:
-    case A.EDITOR_SUMMARY:
-    case A.EDITOR_CHAT: return [
+    case A.EDITOR_SUMMARY: return [
       { role: 'system', content: `Sei un assistente di scrittura.\n${DOC_EDITOR}` },
       { role: 'user', content: 'riassumi' },
     ];
@@ -92,7 +91,7 @@ test('uno stile non può chiudere la busta da sé né scrivere una sezione di re
 });
 
 test('il documento dell’editor non sposta lo stile: un suo «# Sicurezza» è testo dell’utente', () => {
-  const out = C.injectAgentStyle(messaggiPer(A.EDITOR_CHAT), A.EDITOR_CHAT, 'Sii breve.');
+  const out = C.injectAgentStyle(messaggiPer(A.EDITOR_SUMMARY), A.EDITOR_SUMMARY, 'Sii breve.');
   const sys = out[0].content;
   assert.ok(sys.includes(DOC_EDITOR), 'il documento arriva intero, non spezzato dallo stile');
   assert.ok(sys.indexOf(APRE) > sys.indexOf(DOC_EDITOR));
@@ -128,7 +127,7 @@ test('le domande dopo di «Spiega» rimandano i messaggi già composti: lo stile
   // Cambiato nel frattempo, vale quello nuovo.
   const nuovo = C.injectAgentStyle(seguito, A.EXPLAIN, 'Dammi del lei.');
   assert.ok(nuovo[0].content.includes('Dammi del lei.') && !nuovo[0].content.includes(stile));
-  for (const action of [A.HELP, A.EDITOR_CHAT]) {
+  for (const action of [A.HELP, A.EDITOR_SUMMARY]) {
     const una = C.injectAgentStyle(messaggiPer(action), action, stile);
     assert.deepEqual(C.injectAgentStyle(una, action, stile), una, `${action}: iniettare due volte cambia il prompt`);
   }

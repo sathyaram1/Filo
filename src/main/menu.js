@@ -168,6 +168,12 @@ function barraLaterale() {
   try { win && win._filoTabs.barra.commuta('tasto'); } catch (_) {}
 }
 
+// Il pannello degli strumenti dell'app davanti (#1433): il tasto lo ascolta la scheda, così sui siti resta loro.
+function pannelloStrumenti() {
+  const win = finestra();
+  try { win && win._filoTabs.barra.destro.comandaDavanti('commuta', 'tasto'); } catch (_) {}
+}
+
 function apriPagina(url) {
   const win = finestra();
   try { win && win._filoTabs.openTab(url, { origine: { tipo: 'filo' } }); } catch (_) {}
@@ -293,6 +299,7 @@ function template(piattaforma) {
       // Il tasto abituale di ogni sistema (F11, su Mac Control+Cmd+F): lo ascolta src/main/shortcuts.js ovunque.
       { label: 'Schermo intero', accelerator: globalThis.SN_TASTI.etichettaSchermoIntero(MAC ? 'darwin' : 'win32'), click: schermoIntero, ...SOLO_SCRITTA },
       { label: 'Barra laterale', accelerator: 'CommandOrControl+Shift+B', click: barraLaterale, ...SOLO_SCRITTA },
+      { label: 'Pannello degli strumenti', accelerator: tasto('Ctrl+\\'), click: pannelloStrumenti, registerAccelerator: false },
     ],
   };
 

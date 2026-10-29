@@ -7,6 +7,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
+import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
 
 // Le ore di oggi sommate, misura per misura.
 const oggi = (app) => app.evaluate(async () => {
@@ -161,7 +162,7 @@ test('la pagina tradotta intera e riportata all’originale entro un minuto cont
   await expect.poll(() => voceOra(app, 'traduzione_pagina', 'intera'), { timeout: 10_000 }).toEqual({ 'r10|si': 1 });
 });
 
-test('nell’Editor il titolo automatico riscritto a mano conta quando, e la chat che formatta conta le modifiche', async ({ app, openTab }) => {
+test('nell’Editor il titolo automatico riscritto a mano conta quando, e l’Aiuto che formatta conta le modifiche', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#docSwitch');
@@ -196,16 +197,13 @@ test('nell’Editor il titolo automatico riscritto a mano conta quando, e la cha
   await expect(page.locator('#docTitle')).toHaveText('Appunti di Mario');
   await expect.poll(() => voceOra(app, 'editor_titolo', 'automatico'), { timeout: 10_000 }).toEqual({ applicato: 1, riscritto_ora: 1 });
 
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await page.waitForSelector('.ed-module[data-type="chat"]');
+  // La chat dell'Editor è l'Aiuto (#1433): la sua richiesta passa dalla pagina, finta come quella del titolo.
   await page.evaluate(() => {
-    window.__risposta = '```json\n{"actions":[{"op":"format","target":"headings","style":"bold","value":true}],"reply":"Fatto."}\n```';
+    window.__risposta = JSON.stringify({ text: 'Fatto.', formatta: [{ op: 'format', target: 'headings', style: 'bold', value: true }] });
   });
-  const input = page.locator('.ed-module[data-type="chat"] [data-chat="input"]');
-  await input.click();
-  await input.fill('metti in grassetto i titoli');
-  await input.press('Enter');
-  await expect(page.locator('.ed-chat-msg.assistant').last()).toHaveText('Fatto.');
+  await apriAiuto(app, page);
+  await chiediAllAiuto(page, 'metti in grassetto i titoli');
+  await expect(page.locator('.sn-sidebar-msg-assistant').last()).toContainText('Fatto.');
   await expect.poll(() => voceOra(app, 'editor_chat', 'intero'), { timeout: 10_000 }).toEqual({ f1: 1 });
 
   const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));

@@ -785,31 +785,6 @@ test('(M) «Traduci la pagina» con la chiave propria rifiutata: al primo pezzo 
   expect((await avvisi()).split(RIGA).length - 1).toBe(1);
 });
 
-test('(N) la chat dell’Editor con la chiave propria rifiutata: sotto ogni risposta la stessa riga della chat di Filo', async ({ app, shell, openTab }) => {
-  test.setTimeout(120_000);
-  ownKeyStatus = 402;
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  await redeemWallet(openTab);
-  await prepare(app);
-  const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('.ed-module[data-type="switch"]');
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await page.waitForSelector('.ed-module[data-type="chat"]');
-  const input = page.locator('.ed-module[data-type="chat"] [data-chat="input"]');
-  await input.click();
-  await input.fill('di cosa parla?');
-  await input.press('Enter');
-  await expect(page.locator('.ed-chat-msg.assistant').last()).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30_000 });
-  const nota = page.locator('.ed-chat-note');
-  await expect(nota).toHaveText('OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.');
-  await page.screenshot({ path: 'tests/.shots/662-editor-chat.png' }).catch(() => {});
-  // Una seconda risposta pagata così ha la sua riga; la prima resta sotto la sua.
-  await input.fill('e poi?');
-  await input.press('Enter');
-  await expect(page.locator('.ed-chat-msg.assistant')).toHaveCount(2, { timeout: 30_000 });
-  await expect(nota).toHaveCount(2, { timeout: 30_000 });
-});
-
 test('(O) il «Prova» delle righe dei modelli predefiniti con la chiave propria rifiutata: dice che OpenRouter l’ha rifiutata e perché, senza ripiego', async ({ app, shell, openTab }) => {
   test.setTimeout(120_000);
   ownKeyStatus = 402;

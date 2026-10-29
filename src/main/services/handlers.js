@@ -225,8 +225,9 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     return [{ role: 'user', content: PROMPTS.translatePageChunk({ chunk: payload.chunk }) }];
   }
   if (action === ACTIONS.HELP) {
+    // L'llms.txt e i percorsi condivisi sono dei siti: una pagina di Filo (filo://editor) non ne ha.
     const domain = (() => {
-      try { return new URL(payload.url || '').hostname.toLowerCase(); }
+      try { const u = new URL(payload.url || ''); return /^https?:$/.test(u.protocol) ? u.hostname.toLowerCase() : ''; }
       catch (_) { return ''; }
     })();
     const [llmsRes, pathsRes] = await Promise.all([
@@ -238,7 +239,7 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     const sys = { role: 'system', content: PROMPTS.help({
       url: payload.url, title: payload.title, outline: payload.outline,
       viewport: payload.viewport, siteKnowledge, knownPaths,
-      apertaIl: payload.schedaApertaIl, paginaDal: payload.paginaDal, adesso: Date.now(),
+      apertaIl: payload.schedaApertaIl, paginaDal: payload.paginaDal, adesso: Date.now(), documento: payload.documento || null,
       valuta: payload.valuta === true ? await memoriaPerValuta() : null,
     }) };
     const parts = [];
@@ -1148,6 +1149,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
         w._filoTabs.setSecurity(merged.security || {});
       }
       try { w._filoTabs?.barra?.impostazioni(merged.barraLaterale); } catch (_) {}
+      try { w._filoTabs?.barra?.destro?.impostazioni(merged.pannelloDestro); } catch (_) {}
     }
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}
@@ -3868,6 +3870,37 @@ async function eseguiAzioneFilo(action, {
         if (!layout) return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
         return { executed: true, kept: false, output: { icona: id, dove, layout } };
       }
+      case 'PANNELLO_APP': {
+        // #1433 — il pannello di destra delle app a parole: le stesse porte del mouse (la pagina per aprire e chiudere,
+        // il main per gli strumenti, le Preferenze per il lucchetto).
+        const P = globalThis.SN_PANNELLI_APP;
+        const op = String(action.operazione ?? action.op ?? '').trim().toLowerCase();
+        const win = winOf(sender);
+        const tabs = win && win._filoTabs;
+        const lista = (tabs && tabs.tabs) || [];
+        const daChi = sender?.tab?.id ? lista.find((t) => t.id === sender.tab.id) : null;
+        const davanti = lista.find((t) => t.id === tabs?.activeId) || null;
+        const scheda = [daChi, davanti].find((t) => t && t.pannelloApp) || null;
+        const app = scheda ? scheda.pannelloApp.app : (P && P.catalogo(String(action.app || '')) ? String(action.app) : 'editor');
+        if (op === 'aggiungi' || op === 'togli') {
+          const id = P ? P.risolvi(app, action.elemento ?? action.id) : null;
+          if (!id) return { executed: false, kept: false, output: { elemento: 'sconosciuto', disponibili: P ? P.catalogo(app).elementi.map((e) => e.nome) : [] } };
+          const esito = await require('./pannelliApp').modifica(app, { op: op === 'aggiungi' ? 'posa' : 'togli', id });
+          const dentro = !!(esito && esito.stato && esito.stato.elementi.includes(id));
+          return { executed: true, kept: false, output: { app, elemento: id, nelPannello: dentro, giaCosi: !!(esito && !esito.cambiato) } };
+        }
+        if (op === 'blocca' || op === 'sblocca') {
+          await applySettingsUpdate({ pannelloDestro: { bloccato: op === 'blocca' } });
+          if (op === 'blocca' && scheda && tabs.barra?.destro) tabs.barra.destro.comanda(scheda, 'apri', 'chat');
+          return { executed: true, kept: false, output: { bloccato: op === 'blocca', apertoSu: scheda ? app : null } };
+        }
+        if (op === 'apri' || op === 'chiudi') {
+          if (!scheda || !tabs?.barra?.destro) return { executed: false, kept: false, output: { pannello: 'nessuna app col pannello davanti' } };
+          tabs.barra.destro.comanda(scheda, op, 'chat');
+          return { executed: true, kept: false, output: { pannello: op === 'apri' ? 'aperto' : 'chiuso', app } };
+        }
+        return { executed: false, kept: false, output: { error: 'operazione sconosciuta' } };
+      }
       case 'CARTA_HOME': {
         const op = String(action.operazione ?? action.op ?? '').trim().toLowerCase();
         const tipo = { togli: 'togli', rimetti: 'aggiungi', aggiungi: 'aggiungi', sposta: 'sposta', ripristina: 'ripristina' }[op];
@@ -3963,7 +3996,7 @@ async function eseguiAzioneFilo(action, {
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
         // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva
         // solo spiegare a parole come cliccarli. "close" è escluso di proposito.
-        const allowed = ['home', 'settings', 'apps', 'account', 'minimize', 'fullscreen', 'sidebar'];
+        const allowed = ['home', 'settings', 'apps', 'account', 'minimize', 'fullscreen', 'sidebar', 'aiuto'];
         const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim().toLowerCase();
         if (!allowed.includes(cmd)) {
           return { executed: false, kept: false, output: { window: 'invalid', command: cmd } };
@@ -3991,6 +4024,11 @@ async function eseguiAzioneFilo(action, {
           if (!win._filoTabs?.barra) return { executed: false, kept: false };
           win._filoTabs.barra.apri('chat');
           return { executed: true, kept: false, output: { window: 'sidebar' } };
+        }
+        // #1433 — l'Aiuto chiesto in chat si apre sulla scheda davanti come col suo tasto: nell'Editor è la chat del documento.
+        if (cmd === 'aiuto') {
+          require('../shortcuts').dispatch('open-help-sidebar', win);
+          return { executed: true, kept: false, output: { window: 'aiuto' } };
         }
         // home / minimize / settings / apps / account: clicca il bottone REALE
         // della shell, riusando il canale dei comandi rapidi della barra (stessa

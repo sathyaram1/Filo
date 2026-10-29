@@ -145,10 +145,14 @@
   const colorPicker =
     `<path d="M14 4l6 6l-3 3l-2-2l-9 9h-3v-3l9-9l-1-1z"/>`;
 
-  // Lucchetto: voce «Sicurezza» del menu Impostazioni.
+  // Lucchetto: voce «Sicurezza» del menu Impostazioni, e il pannello di destra bloccato aperto (#1433).
   const lock =
     `<rect x="5" y="11" width="14" height="9" rx="1.5"/>` +
     `<path d="M8 11V8a4 4 0 0 1 8 0v3"/>`;
+  // Lucchetto aperto: il pannello di destra si apre sopra la pagina e si richiude da sé.
+  const lockOpen =
+    `<rect x="5" y="11" width="14" height="9" rx="1.5"/>` +
+    `<path d="M8 11V8a4 4 0 0 1 7.6-1.7"/>`;
 
   // Trasparenza: libro APERTO — «sta scritto e lo puoi leggere».
   // Copia gemella in src/main/popup-menu.js (BrowserWindow a parte): cambiala insieme.
@@ -703,6 +707,7 @@
     options:      (size) => wrap(options, { size }),
     colorPicker:  (size) => wrap(colorPicker, { size }),
     lock:         (size) => wrap(lock, { size }),
+    lockOpen:     (size) => wrap(lockOpen, { size }),
     transparency: (size) => wrap(transparency, { size }),
     incognito:    (size) => wrap(incognito, { size }),
     user:         (size) => wrap(user, { size }),

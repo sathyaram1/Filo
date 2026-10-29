@@ -206,30 +206,31 @@ test('i moduli dell\'Editor hanno gli stessi rifiuti delle quattro: AltGr e il m
   assert.match(editor, /r\.tipo === 'altgr'/, 'l\'Editor spiega il rifiuto AltGr con le sue parole');
 });
 
-test('una combinazione di un modulo dell\'Editor, in qualunque documento, non va a una delle quattro (verifica #842)', () => {
+test('una combinazione di uno strumento del pannello dell\'Editor non va a una delle quattro (verifica #842, #1433)', () => {
+  require(join(ROOT, 'src', 'shared', 'pannelliApp.js'));
   const build = (v) => P.buildPreferencePartial('scorciatoia', v);
-  const collezione = (sc) => ({ files: [
-    { meta: { title: 'Lettera' }, modules: [{ type: 'bold', data: {} }] },
-    { meta: { title: 'Ricette' }, modules: [{ type: 'word-count', data: { shortcut: sc } }] },
-  ] });
+  const pannelli = (sc, elementi = ['word-count', 'comment']) => ({ editor: { elementi, config: { 'word-count': { shortcut: sc } } } });
   try {
-    T.usaScorciatoieModuli(collezione('Ctrl+Shift+Y'));
+    T.usaScorciatoiePannelli(pannelli('Ctrl+Shift+Y'));
     const r = T.rifiutoScorciatoiaFilo('translate-selection', 'Ctrl+Shift+Y', 'win32');
     assert.equal(r && r.tipo, 'presa');
-    assert.match(T.testoRifiutoFilo(r, 'win32'), /modulo dell'Editor nel documento «Ricette»/);
-    assert.match(build('Traduci: Ctrl+Shift+Y').rifiuto, /«Ricette»/);
-    // Il tasto di serie preso da un modulo: «tutte di serie» rimette le altre e dice perché quella resta.
+    assert.match(T.testoRifiutoFilo(r, 'win32'), /«Conteggio» fra gli strumenti dell'Editor/);
+    assert.match(build('Traduci: Ctrl+Shift+Y').rifiuto, /«Conteggio»/);
+    // Il tasto di serie preso da uno strumento: «tutte di serie» rimette le altre e dice perché quella resta.
     conScelta({ 'translate-selection': 'Ctrl+Shift+Y' }, () => {
-      T.usaScorciatoieModuli(collezione('Alt+T'));
+      T.usaScorciatoiePannelli(pannelli('Alt+T'));
       const tutte = build('tutte di serie');
       assert.deepEqual(tutte.partial.scorciatoie, { 'explain-selection': '', 'save-for-later': '', 'open-help-sidebar': '' });
       assert.match(tutte.label, /tranne «Traduci»: Alt\+T è già in uso/);
-      assert.match(build('Traduci: di serie').rifiuto, /«Ricette»/);
+      assert.match(build('Traduci: di serie').rifiuto, /«Conteggio»/);
     });
-    T.usaScorciatoieModuli(null);
-    assert.equal(T.rifiutoScorciatoiaFilo('translate-selection', 'Ctrl+Shift+Y', 'win32'), null, 'tolto il modulo, la combinazione si libera');
+    // Tolto dal pannello lo strumento parte lo stesso col suo tasto (#1433), quindi la combinazione resta sua.
+    T.usaScorciatoiePannelli(pannelli('Ctrl+Shift+Y', ['comment']));
+    assert.equal(T.rifiutoScorciatoiaFilo('translate-selection', 'Ctrl+Shift+Y', 'win32')?.tipo, 'presa', 'tolto lo strumento, la combinazione resta sua');
+    T.usaScorciatoiePannelli(null);
+    assert.equal(T.rifiutoScorciatoiaFilo('translate-selection', 'Ctrl+Shift+Y', 'win32'), null);
   } finally {
-    T.usaScorciatoieModuli(null);
+    T.usaScorciatoiePannelli(null);
   }
 });
 

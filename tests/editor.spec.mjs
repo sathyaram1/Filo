@@ -1,7 +1,15 @@
-// Verifica l'app Editor: launcher nella shell, render della griglia moduli,
-// editor di testo contenteditable e conteggio parole live.
+// Verifica l'app Editor: launcher nella shell, editor di testo contenteditable, conteggio parole live e cerca e
+// sostituisci, che stanno nel pannello di destra (#1433).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriPannello, strumento } from './helpers/strumentiEditor.mjs';
+
+const conteggio = (page) => strumento(page, 'word-count').locator('.wc-num');
+async function apriEditor(openTab) {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('.pd-elemento[data-elemento="word-count"] .wc-num', { state: 'attached' });
+  return page;
+}
 
 test('il launcher app apre l\'editor', async ({ shell, openTab }) => {
   // Il bottone app è presente nella barra indirizzi.
@@ -14,31 +22,19 @@ test('il launcher app apre l\'editor', async ({ shell, openTab }) => {
   await expect(page.locator('#doc')).toHaveAttribute('contenteditable', 'true');
 });
 
-test('la griglia moduli renderizza switch + moduli e celle vuote', async ({ openTab }) => {
-  const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('.ed-grid');
-  // Almeno lo switch + il word-count sono sulla pagina iniziale (z=0).
-  await expect(page.locator('.ed-module[data-type="switch"]')).toHaveCount(1);
-  await expect(page.locator('.ed-module[data-type="word-count"]')).toHaveCount(1);
-  // Celle vuote presenti (slot disponibili).
-  expect(await page.locator('.ed-cell-empty').count()).toBeGreaterThan(0);
-});
-
 test('conteggio parole si aggiorna in tempo reale', async ({ openTab }) => {
-  const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('.ed-module[data-type="word-count"] .wc-num');
+  const page = await apriEditor(openTab);
   await page.click('#doc');
   await page.evaluate(() => {
     const doc = document.getElementById('doc');
     doc.innerHTML = '<p>uno due tre quattro</p>';
     doc.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await expect(page.locator('.ed-module[data-type="word-count"] .wc-num')).toHaveText('4');
+  await expect(conteggio(page)).toHaveText('4');
 });
 
 test('conteggio parole non fonde parole a cavallo dei blocchi', async ({ openTab }) => {
-  const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('.ed-module[data-type="word-count"] .wc-num');
+  const page = await apriEditor(openTab);
   await page.click('#doc');
   // Documento su più paragrafi: 6 parole reali. Prima del fix textContent
   // concatenava i blocchi ("worldFoo", "barapple"…) e contava solo 3.
@@ -47,7 +43,7 @@ test('conteggio parole non fonde parole a cavallo dei blocchi', async ({ openTab
     doc.innerHTML = '<p>Hello world</p><p>Foo bar</p><p>apple</p><p>banana</p>';
     doc.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await expect(page.locator('.ed-module[data-type="word-count"] .wc-num')).toHaveText('6');
+  await expect(conteggio(page)).toHaveText('6');
 
   // Anche con elenchi puntati e <br> le parole non si fondono.
   await page.evaluate(() => {
@@ -55,14 +51,14 @@ test('conteggio parole non fonde parole a cavallo dei blocchi', async ({ openTab
     doc.innerHTML = '<ul><li>primo punto</li><li>secondo punto</li></ul><p>uno<br>due</p>';
     doc.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await expect(page.locator('.ed-module[data-type="word-count"] .wc-num')).toHaveText('6');
+  await expect(conteggio(page)).toHaveText('6');
 });
 
 test('statistiche di un documento vuoto sono tutte a zero', async ({ openTab }) => {
-  const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('.ed-module[data-type="word-count"] .wc-num');
-  // Documento vuoto: apri "Statistiche documento" cliccando il conteggio.
-  await page.click('.ed-module[data-type="word-count"] .ed-mod-pad');
+  const page = await apriEditor(openTab);
+  // Documento vuoto: apri "Statistiche documento" cliccando il conteggio nel pannello.
+  await apriPannello(page);
+  await strumento(page, 'word-count').locator('.ed-wc').click();
   const rows = page.locator('.ed-stat-row');
   await expect(rows).toHaveCount(5);
   // Ogni metrica è 0 — incluso Paragrafi (prima mostrava 1 per il <p> vuoto)
@@ -75,8 +71,7 @@ test('statistiche di un documento vuoto sono tutte a zero', async ({ openTab }) 
 });
 
 test('token di sola punteggiatura non contano come parole', async ({ openTab }) => {
-  const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('.ed-module[data-type="word-count"] .wc-num');
+  const page = await apriEditor(openTab);
   await page.click('#doc');
   // Solo punteggiatura: prima del fix ",,, ..." contava 2 parole.
   await page.evaluate(() => {
@@ -84,25 +79,14 @@ test('token di sola punteggiatura non contano come parole', async ({ openTab }) 
     doc.innerHTML = '<p>,,, ...</p>';
     doc.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await expect(page.locator('.ed-module[data-type="word-count"] .wc-num')).toHaveText('0');
+  await expect(conteggio(page)).toHaveText('0');
   // Mescolando parole e punteggiatura conta solo le parole reali.
   await page.evaluate(() => {
     const doc = document.getElementById('doc');
     doc.innerHTML = '<p>ciao , mondo ... !</p>';
     doc.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await expect(page.locator('.ed-module[data-type="word-count"] .wc-num')).toHaveText('2');
-});
-
-test('cambio pagina via switch mostra moduli della pagina 1', async ({ openTab }) => {
-  const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('.ed-module[data-type="switch"]');
-  // pagina 0 attiva: niente chat
-  await expect(page.locator('.ed-module[data-type="chat"]')).toHaveCount(0);
-  // clic sulla seconda icona dello switch → pagina 1 (Revisione)
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await expect(page.locator('.ed-module[data-type="chat"]')).toHaveCount(1);
-  await expect(page.locator('.ed-module[data-type="search-replace"]')).toHaveCount(1);
+  await expect(conteggio(page)).toHaveText('2');
 });
 
 // Feedback #310: "Sostituisci" (uno) deve avanzare alla corrispondenza
@@ -118,9 +102,7 @@ test('Sostituisci (uno) avanza alla successiva e non ri-matcha la sostituzione',
     doc.innerHTML = '<p>cat cat cat</p>';
     doc.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  // Pagina Revisione (seconda icona dello switch) → modulo cerca e sostituisci.
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await page.waitForSelector('[data-sr="find"]');
+  await apriPannello(page);
   await page.fill('[data-sr="find"]', 'cat');
   await page.fill('[data-sr="repl"]', 'cats');
   await expect(page.locator('[data-sr="count"]')).toHaveText('1/3');
@@ -148,8 +130,7 @@ test('Sostituisci (uno) a metà documento mantiene la posizione', async ({ openT
     doc.innerHTML = '<p>foo uno foo due foo tre</p>';
     doc.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await page.waitForSelector('[data-sr="find"]');
+  await apriPannello(page);
   await page.fill('[data-sr="find"]', 'foo');
   await page.fill('[data-sr="repl"]', 'bar');
   await expect(page.locator('[data-sr="count"]')).toHaveText('1/3');
@@ -183,8 +164,7 @@ test('Cerca e sostituisci trova le parole con formattazione mista (#228)', async
     doc.innerHTML = '<p>Nome: alfa, alfa e al<strong>fa</strong>.</p>';
     doc.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await page.waitForSelector('[data-sr="find"]');
+  await apriPannello(page);
   await page.fill('[data-sr="find"]', 'alfa');
   // Tutte e tre le occorrenze trovate, compresa quella spezzata dal grassetto.
   await expect(page.locator('[data-sr="count"]')).toHaveText('1/3');

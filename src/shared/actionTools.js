@@ -617,7 +617,7 @@
     },
     COMANDO_FINESTRA: {
       description: 'Aziona un controllo del browser Filo (la finestra e la barra in alto), non il sito. "fullscreen" = schermo intero immersivo (la pagina attiva copre tutta la finestra, barre nascoste, Esc esce), non il pulsante del lettore video dentro il sito. NON esiste un comando per CHIUDERE la finestra; le schede si chiudono con CHIUDI_SCHEDE. Esegue subito.',
-      properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (solo aprire il menu Account: per entrare, collegare Google o uscire c\'è ACCOUNT), sidebar (apri la barra laterale).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account', 'sidebar'] }) },
+      properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (solo aprire il menu Account: per entrare, collegare Google o uscire c\'è ACCOUNT), sidebar (apri la barra laterale), aiuto (apri l\'Aiuto sulla scheda davanti: nell\'Editor è la chat del documento).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account', 'sidebar', 'aiuto'] }) },
       required: ['comando'],
     },
     ACCOUNT: {
@@ -639,6 +639,20 @@
         };
       },
       required: ['icona', 'dove'],
+    },
+    PANNELLO_APP: {
+      description: 'Il pannello degli strumenti delle app di Filo, quello che si apre dal bordo destro dell\'Editor: aprirlo o chiuderlo sull\'app che l\'utente ha davanti, tenerlo aperto (bloccato: spinge la pagina invece di coprirla) o sbloccarlo, mettere o togliere uno strumento. Per "apri gli strumenti", "tieni aperto il pannello", "metti il grassetto nel pannello", "togli il conteggio dagli strumenti". Aprire e chiudere valgono solo se davanti c\'è un\'app di Filo col pannello: l\'esito lo dice. Esegue subito.',
+      properties: () => {
+        const P = global.SN_PANNELLI_APP;
+        const cat = P ? P.catalogo('editor') : null;
+        const ids = cat ? cat.elementi.map((e) => e.id) : [];
+        const elenco = cat ? cat.elementi.map((e) => `${e.id} (${e.nome})`).join(', ') : '';
+        return {
+          operazione: S('Cosa fare.', { enum: ['apri', 'chiudi', 'blocca', 'sblocca', 'aggiungi', 'togli'] }),
+          elemento: S(`Per aggiungi e togli: lo strumento, per id${elenco ? `: ${elenco}` : ''}.`, ids.length ? { enum: ids } : {}),
+        };
+      },
+      required: ['operazione'],
     },
     INSTALLA_AGGIORNAMENTO: {
       description: 'Aggiorna FILO STESSO all\'ultima versione quando l\'utente lo chiede ("aggiornati", "aggiorna Filo", "installa la versione nuova", "installa l\'aggiornamento", "c\'è una versione nuova di Filo?"). Se una versione nuova è già scaricata riavvia Filo per installarla: la conferma la chiede il sistema all\'utente, e le schede si riaprono da sole. Altrimenti controlla se ce n\'è una e la scarica, anche per chi ha spento «Installa gli aggiornamenti da solo». L\'esito dice com\'è: riporta quello, senza promettere di più e senza inventare numeri di versione. NON ricarica la pagina ("aggiorna la pagina" è un\'altra cosa) e non aggiorna siti o altri programmi. Per accendere o spegnere l\'installazione automatica si usa IMPOSTA_PREFERENZA.',
