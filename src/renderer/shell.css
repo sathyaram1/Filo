@@ -746,6 +746,22 @@ html[data-feedback-dim="1"] .shell {
 /* Scaricato ma non più al suo posto: la riga si attenua, così si vede prima ancora di cliccare. */
 .dl-row[data-missing="1"] .dl-row-name { color: var(--fg-soft); text-decoration: line-through; }
 .dl-row[data-missing="1"] .dl-row-meta { opacity: 0.8; }
+/* #588.8 — un file arrivato si prende dalla sua riga e si lascia dove serve. */
+.dl-row[data-trascina="1"] { cursor: grab; }
+.dl-row[data-trascina="1"] .dl-row-btn { cursor: pointer; }
+/* #1287 — la finestra in incognito che si chiude chiede cosa fare degli scaricamenti: è una domanda come le righe che chiedono. */
+.dl-chiusura {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.dl-chiusura[hidden] { display: none; }
+.dl-chiusura-testo { font: 12px/1.4 system-ui, sans-serif; color: var(--fg); overflow-wrap: anywhere; }
+.dl-chiusura-nome { font-weight: 600; }
 
 /* Domanda di permesso di una pagina (#591.1): sta nella cornice, subito sotto la fila di tab, e la pagina scende. */
 .permesso-bar {
