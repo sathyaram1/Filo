@@ -171,6 +171,7 @@ function loadContentScripts() {
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo riquadri] sidebar.js', e); }
   try { require(path.join(CONTENT_DIR, 'coerenza.js')); } catch (e) { console.error('[Filo riquadri] coerenza.js', e); }
   try { require(path.join(CONTENT_DIR, 'correttoreRegole.js')); } catch (e) { console.error('[Filo riquadri] correttoreRegole.js', e); }
+  try { require(path.join(CONTENT_DIR, 'correttoreAutomatica.js')); } catch (e) { console.error('[Filo riquadri] correttoreAutomatica.js', e); }
   try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(ipcRenderer, webFrame); } catch (e) { console.error('[Filo riquadri] dizionario', e); }
   try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo riquadri] spellcheck.js', e); }
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo riquadri] feedback.js', e); }
