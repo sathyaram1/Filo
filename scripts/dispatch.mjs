@@ -343,6 +343,18 @@ export function applyFixed(state) {
 }
 
 /**
+ * Il commit da cui chi verifica non deve aver cambiato codice prima della critica, '' se non si controlla. PURA.
+ * È la punta consegnata a QUESTO biglietto: un punto fermo locale può essere di un giro passato da un'altra cartella
+ * (D-207). Dopo una critica data in questo biglietto il codice si muove di diritto.
+ */
+export function avvioDellaCritica(state) {
+  const avvio = state && state.avvio && typeof state.avvio === 'object' ? String(state.avvio.sha || '') : '';
+  if (avvio) return state.criticaNelGiro ? '' : avvio;
+  // Uno stato senza `avvio` l'ha posizionato una versione che non lo scriveva.
+  return state?.verifierSha ? '' : (lastCheckpoint(state) || '');
+}
+
+/**
  * La pulizia dopo la critica: le prove dei rilievi messi da parte tolte PRIMA di correggere. PURA.
  * `controllo` è l'esito di controllaPulizia; da `puliziaSha` parte il confronto di --record-fixed. Una pulizia dopo
  * le correzioni non sposta la base: va in `pulizieDopo`, e la consegna non rilancia ciò che ha tolto.
