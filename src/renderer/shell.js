@@ -1930,7 +1930,7 @@
             return {
               label: a.label,
               onClick: () => api.message({ type: 'riapri_pulizia_schede', pulizia }).then((r) => {
-                if (r && r.ok === false) NOTIFS.show('Quelle schede le ritrovi nel filo della home');
+                if (r && r.ok === false) NOTIFS.show('Quelle schede le ritrovi nel filo della home', { tipo: 'riordino_schede' });
               }).catch(() => {}),
             };
           }
