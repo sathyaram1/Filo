@@ -485,7 +485,7 @@
         else if (msg.azione === 'commuta') commuta(String(msg.motivo || 'tasto'));
         else if (msg.azione === 'chiudi') {
           // Chi se ne va senza entrare lo chiude solo se non è bloccato; il tasto e la chat lo chiudono comunque.
-          if (msg.motivo === 'uscita' && (tiene() || dentro)) return;
+          if (msg.motivo === 'uscita' && restaAperto()) return;
           chiudi();
         } else if (msg.azione === 'bordo') { bordo = !!msg.acceso; disegnaStato(); }
       } else if (msg.type === M.SETTINGS_UPDATED && msg.settings) {
