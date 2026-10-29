@@ -87,13 +87,6 @@
       ],
     },
     {
-      version: '0.2.248', date: '2026-10-23',
-      features: [],
-      fixes: [
-        'Su un sito, quello che scrivi o selezioni nella spiegazione, nella traduzione, nella Modifica e nel feedback di Filo non lo legge più il sito, nemmeno cercandolo nella pagina. Questi riquadri ora stanno sopra la pagina, fuori dal sito.',
-      ],
-    },
-    {
       version: '0.2.247', date: '2026-10-22',
       features: [
         'Quando un sito si prende lo schermo intero, come il pulsante di un video, in alto compare per qualche secondo il suo nome vero con «Esc per uscire». Così sai chi hai davanti anche quando la pagina copre tutto lo schermo. Torna portando il mouse sul bordo alto, e quanto resta lo scegli in Preferenze, nelle impostazioni avanzate.',
