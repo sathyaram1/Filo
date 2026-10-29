@@ -30,9 +30,7 @@ async function porte() {
   { const f = document.createElement('iframe'); document.body.appendChild(f); const W = f.contentWindow;
     const td = W.HTMLCanvasElement.prototype.toDataURL;
     f.src = location.protocol + '//sito-pubblico.test:' + location.port + '/altro'; await carico(f);
-    try { out.navigatoAltroSito = fnv(td.call(c)); } catch (e) { out.navigatoAltroSito = 'errore ' + e.message; }
-    try { out.navigatoAltroSitoBlob = await new Promise((res) => td && W && HTMLCanvasElement && (function () {
-      const tb = f.__tb; res(tb ? 'x' : 'n/a'); })()); } catch (e) { out.navigatoAltroSitoBlob = 'errore ' + e.message; } }
+    try { out.navigatoAltroSito = fnv(td.call(c)); } catch (e) { out.navigatoAltroSito = 'errore ' + e.message; } }
   { const f = document.createElement('iframe'); document.body.appendChild(f); const W = f.contentWindow;
     const tb = W.HTMLCanvasElement.prototype.toBlob;
     f.src = location.protocol + '//sito-pubblico.test:' + location.port + '/altro'; await carico(f);
