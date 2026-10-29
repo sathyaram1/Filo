@@ -502,15 +502,16 @@ test('un controllo rapido che segna le x come errore non mette l\'onda sui segna
 // Le X maiuscole senza cifre il codice non le prende: il segnaposto lo riconosce solo la rilettura, e vale lo stesso.
 test('le x di un segnaposto riconosciuto solo dalla rilettura non prendono l\'errore del controllo rapido', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, {
-    ragionato: { XX: ['[vinto XX scudetti][vinto 36 scudetti][Scudetti vinti dalla Juventus][segnaposto]'] },
-    rapido: ['[XX][20][numero scritto a metà][errore]', '[scudeti][scudetti][refuso][errore]'],
+    ragionato: { XX: ['[vinot XX scudetti][vinot 36 scudetti][Scudetti vinti dalla Juventus][segnaposto]'] },
+    rapido: ['[XX][20][numero scritto a metà][errore]', '[vinot][vinto][refuso][errore]'],
   });
   await page.locator('#ta').click();
-  await page.keyboard.type('la Juve ha vinto XX scudetti, non XX scudeti. ');
+  await page.keyboard.type('la Juve ha vinot XX scudetti. ');
   await expect(valore(page, '36')).toBeVisible({ timeout: 8000 });
   await expect.poll(async () => (await globale(app, '__rapide')).length, { timeout: 8000 }).toBeGreaterThan(0);
   await page.waitForTimeout(600);
-  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveText(['XX', 'scudeti']);
+  // Protette sono le sole x: il refuso accanto, dentro il pezzo della rilettura, resta un errore.
+  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveText(['vinot']);
   const menu = await tastoDestroSu(page, ocra(page, 'XX'));
   await expect(menu.pannelli.first()).toContainText('36');
   await expect(menu.pannelli.first()).not.toContainText('numero scritto a metà');
