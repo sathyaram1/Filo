@@ -197,22 +197,9 @@ test('nell’Editor il titolo automatico riscritto a mano conta quando, e l’Ai
   await expect(page.locator('#docTitle')).toHaveText('Appunti di Mario');
   await expect.poll(() => voceOra(app, 'editor_titolo', 'automatico'), { timeout: 10_000 }).toEqual({ applicato: 1, riscritto_ora: 1 });
 
-  // La chat dell'Editor è l'Aiuto (#1433): la sua risposta arriva dal main, finta anche lei.
-  await app.evaluate(async () => {
-    const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.updateSettings({
-      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
-      models: { ...globalThis.SN_TEST_MODELS.models, [C.ACTIONS.HELP]: 'deepseek-flash' },
-      modelRegistry: globalThis.SN_TEST_MODELS.registry,
-    });
-    const risponde = async ({ attempts, messages }) => {
-      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
-      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, finishReason: 'stop' };
-      if (!sistema.includes('# Protocollo di risposta')) return { ...base, text: 'ok' };
-      return { ...base, text: JSON.stringify({ text: 'Fatto.', formatta: [{ op: 'format', target: 'headings', style: 'bold', value: true }] }) };
-    };
-    globalThis.SN_PROVIDERS.completeWithFallback = risponde;
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = risponde;
+  // La chat dell'Editor è l'Aiuto (#1433): la sua richiesta passa dalla pagina, finta come quella del titolo.
+  await page.evaluate(() => {
+    window.__risposta = JSON.stringify({ text: 'Fatto.', formatta: [{ op: 'format', target: 'headings', style: 'bold', value: true }] });
   });
   await apriAiuto(app, page);
   await chiediAllAiuto(page, 'metti in grassetto i titoli');

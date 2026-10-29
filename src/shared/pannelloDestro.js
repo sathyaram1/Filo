@@ -401,7 +401,8 @@
     function commuta(perche = 'clic') { if (aperto) chiudi(); else apri(perche); }
 
     function fermaUscita() { if (timerUscita) { clearTimeout(timerUscita); timerUscita = null; } }
-    const suoi = (t) => !!(t && t.nodeType === 1 && (pannello.contains(t) || (menuEl && menuEl.contains(t))
+    // La striscia è sua: aperto con un clic, il pannello scivola sotto il puntatore fermo, che resta sopra di lei.
+    const suoi = (t) => !!(t && t.nodeType === 1 && (t === striscia || pannello.contains(t) || (menuEl && menuEl.contains(t))
       || (opts.appartiene && opts.appartiene(t))));
     // L'unica regola per l'uscita del puntatore: non chiude chi ci sta lavorando (dentro, un trascinamento, un menu, la
     // tastiera in un suo campo); il tasto, la chat e il lucchetto lo tengono finché si clicca fuori.

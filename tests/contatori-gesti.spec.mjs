@@ -233,16 +233,12 @@ test('un file dal disco lasciato nella home fuori dal campo entra in chat e si c
   expect(JSON.stringify(await app.evaluate(async () => globalThis.SN_CONTATORI_MAIN.letto()))).not.toContain('foto.png');
 });
 
-test('l’Editor conta la vista delle impostazioni degli strumenti, e per tipo lo strumento aggiunto, spostato, tolto e usato', async ({ app, openTab }) => {
+test('l’Editor conta per tipo lo strumento aggiunto, spostato e tolto dal pannello, e quello usato', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const page = await openTab(EDITOR);
   await page.waitForSelector('#doc');
   await aggiungiStrumento(page, 'settings');
   await expect.poll(() => conto(app, 'modulo_editor', 'settings', 'aggiunto'), { timeout: 8_000 }).toBe(1);
-  await strumento(page, 'settings').locator('.ed-strumenti-btn').click();
-  await expect(page.locator('#overlay [data-strumento="italic"]')).toBeVisible();
-  await expect.poll(() => conto(app, 'modulo_editor', 'impostazioni'), { timeout: 8_000 }).toBe(1);
-  await page.locator('#ovClose').click();
   await strumento(page, 'comment').locator('.pd-contenuto').click({ button: 'right' });
   await page.locator('.pd-menu .sn-select-option', { hasText: 'Sposta su' }).click();
   await expect.poll(() => conto(app, 'modulo_editor', 'comment', 'spostato'), { timeout: 8_000 }).toBe(1);

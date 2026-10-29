@@ -253,7 +253,7 @@
     } catch (_) {}
   }
   const contaModello = (r) => contaErroreVisto({ misura: 'errore-modello', code: String((r && (r.code || r.errorCode)) || ''), status: Number(r && r.status) || 0 });
-  // Gli strumenti del pannello (#1471, #1433): per tipo cosa gli succede, la vista delle impostazioni, i trascinamenti.
+  // Gli strumenti del pannello (#1471, #1433): per tipo cosa gli succede, e i trascinamenti.
   // Mai il testo del documento, né quello che si scrive in uno strumento.
   const contaGesto = (campi) => contaErroreVisto({ misura: 'gesto', ...campi });
   // Il titolo automatico e la chat del documento (#1465): esiti e fasce, mai il titolo né il testo.
@@ -2209,7 +2209,6 @@
         <span class="ed-strumento-nome">${escapeHtml(nomeElemento(id))}</span>
         <span class="ed-strumento-nota">${escapeHtml(nota)}</span></button>`;
     }).join('');
-    contaGesto({ gesto: 'modulo_editor', impostazioni: true });
     openOverlay(`<h3>Strumenti</h3>${righe}
       <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
     $('ovClose').addEventListener('click', closeOverlay);

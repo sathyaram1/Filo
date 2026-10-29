@@ -459,3 +459,68 @@ test('l\'Impostazioni degli strumenti nel pannello ha la cornice degli altri str
   })));
   expect(m.settings).toEqual(m.undo);
 });
+
+// Un clic sulla striscia o sul vuoto del pannello lascia la selezione al foglio: gli strumenti di formattazione la usano.
+test('aperto con un clic sulla striscia o cliccato sul vuoto, il pannello formatta il testo selezionato nel foglio', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  for (const el of ['bold', 'align']) await app.evaluate((_e, x) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'PANNELLO_APP', operazione: 'aggiungi', elemento: x }), el);
+  await ed.waitForSelector('.pd-elemento[data-elemento="align"]', { state: 'attached' });
+  await ed.click('#doc');
+  await ed.keyboard.type('primo paragrafo');
+  await ed.keyboard.press('Enter');
+  await ed.keyboard.type('secondo paragrafo');
+  await ed.keyboard.press('Control+A');
+  const s = await ed.locator('.pd-striscia').boundingBox();
+  await ed.mouse.click(s.x + s.width / 2, 400);
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.locator('.pd-elemento[data-elemento="align"] button[data-align="right"]').click();
+  await expect.poll(() => ed.evaluate(() => [...document.querySelectorAll('#doc > *')].map((n) => getComputedStyle(n).textAlign))).toEqual(['right', 'right']);
+  const t = await ed.locator('.pd-testa').boundingBox();
+  await ed.mouse.click(t.x + 10, t.y + t.height / 2);
+  await ed.locator('.pd-elemento[data-elemento="bold"] .pd-contenuto button').first().click();
+  await expect.poll(() => ed.evaluate(() => [...document.querySelectorAll('#doc b, #doc strong')].map((n) => n.textContent).join('|'))).toBe('primo paragrafo|secondo paragrafo');
+});
+
+// Chi scrive in un campo del pannello ci sta lavorando anche col mouse sul foglio: il pannello resta, la tastiera pure.
+test('aperto dalla striscia, si scrive in Cerca col mouse sul foglio: il pannello resta aperto e le lettere vanno nel campo', async ({ openTab }) => {
+  const ed = await apriEditor(openTab);
+  await ed.click('#doc');
+  await ed.keyboard.type('il gatto e il cane e il topo');
+  const s = await ed.locator('.pd-striscia').boundingBox();
+  await ed.mouse.click(s.x + s.width / 2, 400);
+  await expect.poll(() => aperto(ed)).toBe(true);
+  const campo = ed.locator('.pd-elemento[data-elemento="search-replace"] [data-sr="find"]');
+  await campo.click();
+  await ed.keyboard.type('il');
+  await ed.mouse.move(400, 300, { steps: 5 });
+  await ed.waitForTimeout(900);
+  await ed.keyboard.type(' gatto');
+  expect(await aperto(ed)).toBe(true);
+  await expect(campo).toHaveValue('il gatto');
+  await expect(ed.locator('#doc')).toHaveText('il gatto e il cane e il topo');
+  // Un clic sul foglio lo chiude, come sempre.
+  await ed.mouse.click(300, 300);
+  await expect.poll(() => aperto(ed)).toBe(false);
+});
+
+test('con l\'Aiuto aperto la striscia sta alla sua sinistra: un clic la apre e il pannello resta sotto il puntatore', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  await ed.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1' && typeof window.SN_SIDEBAR?.open === 'function');
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.barra.esegui('help'));
+  await expect(ed.locator('.sn-sidebar')).toBeVisible();
+  // Finito di entrare, l'Aiuto non copre la striscia: sta dove si apre il pannello, a un passo da lui.
+  await expect.poll(() => ed.evaluate(() => {
+    const s = document.querySelector('.pd-striscia').getBoundingClientRect();
+    const aiuto = document.querySelector('.sn-sidebar');
+    const a = aiuto.getBoundingClientRect();
+    return !aiuto.getAnimations().length && Math.abs(s.right + 8 - a.left) < 1
+      && document.elementFromPoint(s.left + s.width / 2, 400) === document.querySelector('.pd-striscia');
+  })).toBe(true);
+  mkdirSync(SHOTS, { recursive: true });
+  await ed.screenshot({ path: `${SHOTS}/pannello-destro-striscia-con-aiuto.png` });
+  const s = await ed.locator('.pd-striscia').boundingBox();
+  await ed.mouse.click(s.x + s.width / 2, 400);
+  await expect.poll(() => aperto(ed)).toBe(true);
+  await ed.waitForTimeout(900);
+  expect(await aperto(ed), 'il puntatore fermo dove ha cliccato non lo chiude').toBe(true);
+});
