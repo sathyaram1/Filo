@@ -197,7 +197,7 @@ class BordoDestro {
     return true;
   }
 
-  rilascio() {
+  tastoLasciato() {
     this.puntoFermo = this._punto();
     this._guarda();
   }
