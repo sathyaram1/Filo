@@ -3435,11 +3435,14 @@
   function triggerModuleShortcut(id) {
     const fa = AZIONE_SCORCIATOIA[id];
     if (!fa) return;
-    // Cerca e sostituisci vuole il suo campo: il tasto apre il pannello, come farebbe chi ci va col mouse.
-    if (id === 'search-replace' && pannello && !pannello.aperto()) pannello.apri('tasto');
     // La ricerca prende solo il fuoco: l'uso lo conta la ricerca scritta.
-    if (id !== 'search-replace') contaModulo({ type: id }, 'usato');
-    fa(pannello ? pannello.host(id) : null);
+    if (id !== 'search-replace') { contaModulo({ type: id }, 'usato'); fa(pannello ? pannello.host(id) : null); return; }
+    if (!pannello) return;
+    // Cerca e sostituisci vuole il suo campo: il tasto apre il pannello, come farebbe chi ci va col mouse, e se lo
+    // strumento era stato tolto ce lo rimette, perché chi preme il tasto vuole cercare adesso.
+    if (!pannello.aperto()) pannello.apri('tasto');
+    if (pannello.host(id)) { fa(pannello.host(id)); return; }
+    Promise.resolve(pannello.aggiungi(id)).then(() => fa(pannello.host(id)));
   }
 
   // ════════════════════════════════════════════════════════════════════
