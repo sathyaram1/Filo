@@ -66,6 +66,9 @@
     html.style.setProperty('--pd-larghezza', `${LARGHEZZA}px`);
 
     const tasto = () => (global.SN_TASTI ? global.SN_TASTI.etichettaPannello() : 'Ctrl+\\');
+    const siScrive = (t) => !!(t && t.nodeType === 1 && t.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'));
+    // Un clic dove non si scrive lascia il cursore della pagina dov'è: gli strumenti lavorano sulla sua selezione.
+    for (const el of [striscia, pannello]) el.addEventListener('mousedown', (e) => { if (!siScrive(e.target)) e.preventDefault(); });
 
     // ── posa: a sinistra della barra di scorrimento, e dell'Aiuto se è aperto lì ──
     function aiutoADestra() {
