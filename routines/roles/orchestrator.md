@@ -25,7 +25,9 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
      ritentato da solo). Nei log del run scrivi il motivo: lo legge l'owner,
      nessuna macchina.
 3. **Setup** (una volta, i worker lo ereditano): install con skip del binario
-   Electron + `ensure-electron.mjs`, `apt-get install -y scrot`.
+   Electron + `ensure-electron.mjs`, `apt-get install -y scrot`. Finisce prima
+   del biglietto: un worker partito a installazione in corso non trova i
+   pacchetti e se li installa da capo nel suo clone.
    - I comandi che ricevi da qui in poi nominano gli strumenti con un percorso
      INTERO, fuori dal progetto: usali così come sono, non accorciarli in
      `scripts/…`. Appena il giro apre il ramo di un feedback, la cartella del
