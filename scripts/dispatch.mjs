@@ -883,7 +883,8 @@ export function perimetroNote(scope, perimetro) {
 export function readRoleInstructions(role, { scope, caso } = {}) {
   const name = role === 'verifier' ? VERIFIER_SCOPE_FILE[verifierScope(scope).scope]
     : role === 'fixer' ? (Object.hasOwn(FIXER_CASE_FILE, String(caso || '')) ? FIXER_CASE_FILE[String(caso)] : ROLE_FILE.fixer)
-      : ROLE_FILE[role];
+      : role === 'halt' && Object.hasOwn(HALT_KIND_FILE, String(caso || '')) ? HALT_KIND_FILE[String(caso)]
+        : ROLE_FILE[role];
   if (!name) return '';
   const f = resolve(ROLES_DIR, name);
   const base = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), ROLES_DIR) : '';
