@@ -791,6 +791,15 @@ function checkoutNonAdatto() {
   return '';
 }
 
+// Lo sha intero, accanto alla copia: chi chiede un biglietto lo confronta con main (lib/strumenti-vecchi.mjs).
+function commitDelCheckout() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch (_) {
+    return '';
+  }
+}
+
 function origineDelCheckout() {
   try {
     const ramo = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
