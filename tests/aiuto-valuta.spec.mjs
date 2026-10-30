@@ -1,10 +1,21 @@
 // #1449 — «Valuta» nel tasto destro di un campo: l'Aiuto riceve il testo intero del campo e la richiesta di giudicarlo,
 // risponde il modello della chat con quello che Filo sa dell'utente, e una correzione proposta si scrive nel campo con
 // un clic (un altro la toglie). La stessa voce sta sul suggerimento del correttore. Nessuna chiamata esce dalla macchina.
+// I contatori (#1586): la richiesta, la risposta con o senza correzioni, le correzioni viste, messe e tolte.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { voceOggi } from './helpers/riquadriOggi.mjs';
+
+const valutaOggi = async (app) => {
+  const out = {};
+  for (const e of ['chiesta', 'con_correzioni', 'senza_correzioni', 'correzione_mostrata', 'correzione_accettata', 'correzione_tolta']) {
+    const v = await voceOggi(app, 'correttore_valuta', e);
+    if (v) out[e] = v.n;
+  }
+  return out;
+};
 
 const MODELLO_CHAT = 'deepseek/deepseek-v4-pro';
 const MODELLO_AIUTO = 'deepseek/deepseek-v4-flash';
@@ -104,6 +115,11 @@ test('«Valuta» apre l’Aiuto col testo del campo, col modello della chat, e l
   await correzione.click();
   await expect(page.locator('#ta')).toHaveValue(TESTO);
   await expect(correzione).not.toHaveClass(/sn-sidebar-correzione-fatta/);
+  await expect.poll(() => valutaOggi(app), { timeout: 5000 }).toEqual({
+    chiesta: 1, con_correzioni: 1, correzione_mostrata: 1, correzione_accettata: 1, correzione_tolta: 1,
+  });
+  const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));
+  for (const x of ['mei amici', 'miei', 'refuso']) expect(disco, 'il testo valutato non esce').not.toContain(x);
 });
 
 test('dopo aver cambiato il campo, la domanda nell’Aiuto porta il testo com’è adesso, sempre col modello della chat', async ({ app, openTab, testServer }) => {
@@ -173,6 +189,7 @@ test('«Valuta» non c’è in un campo vuoto né in una password; dall’Aiuto 
   await page.press('.sn-sidebar-input textarea', 'Enter');
   await expect(page.locator('.sn-sidebar-msg-assistant', { hasText: 'Ciao.' })).toBeVisible({ timeout: 20_000 });
   expect((await chiamate(app))[0].model).toBe(MODELLO_AIUTO);
+  expect(await valutaOggi(app), 'una domanda all’Aiuto non è una valutazione').toEqual({});
 });
 
 test('sul suggerimento del correttore «Valuta» c’è una volta sola e apre l’Aiuto col testo del campo', async ({ app, openTab, testServer }) => {
@@ -216,6 +233,10 @@ test('in un editor dentro un riquadro dello stesso sito «Valuta» apre l’Aiut
     else await expect(fr.locator(sel)).toHaveText(atteso);
     expect((await chiamate(app)).at(-1).model).toBe(MODELLO_CHAT);
   }
+  // Dal riquadro la stessa misura che dalla pagina.
+  await expect.poll(() => valutaOggi(app), { timeout: 5000 }).toEqual({
+    chiesta: 2, con_correzioni: 2, correzione_mostrata: 2, correzione_accettata: 2,
+  });
 });
 
 test('in un riquadro di un altro sito «Valuta» non c’è', async ({ app, openTab, testServer }) => {

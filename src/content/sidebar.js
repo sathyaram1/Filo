@@ -385,7 +385,12 @@
     open({ source: 'valuta' });
     if (!root) return;
     valutazione = { campo, mandato: t };
+    contaValuta('chiesta');
     submit({ valuta: t, daGesto: true });
+  }
+  // «Valuta» nella famiglia del correttore (#1586): richieste, risposte e correzioni, mai il testo.
+  function contaValuta(esito) {
+    try { Popup?.conta?.({ misura: 'riquadro', cosa: 'correttore_valuta', esito }); } catch (_) {}
   }
 
   // Il testo del campo valutato, se è cambiato da quando il modello l'ha visto: la domanda dopo lo porta con sé.
@@ -737,6 +742,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     wrap.className = 'sn-sidebar-correzioni';
     for (const c of buone) wrap.appendChild(bottoneCorrezione(c, campo, Math.max(0, String(mandato || '').indexOf(c.prima))));
     afterEl.insertAdjacentElement('afterend', wrap);
+    for (let i = 0; i < buone.length; i++) contaValuta('correzione_mostrata');
     const conv = convEl();
     if (conv) conv.scrollTop = conv.scrollHeight;
   }
@@ -773,11 +779,13 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         const r = SC.sostituisciNelCampo(campo, c.prima, c.dopo, vicinoA);
         if (r.dove === undefined) { diLa(r.manca ? 'help_correzione_manca' : 'help_correzione_ferma', estratto(c.prima)); return; }
         scritta = r.dove;
+        contaValuta('correzione_accettata');
       } else {
         const r = c.dopo ? SC.sostituisciNelCampo(campo, c.dopo, c.prima, scritta) : {};
         if (r.dove === undefined) { diLa('help_correzione_non_tolta', global.SN_TASTI?.etichetta?.('Ctrl+Z') || 'Ctrl+Z'); return; }
         vicinoA = r.dove;
         scritta = null;
+        contaValuta('correzione_tolta');
       }
       stato();
     });
@@ -2235,6 +2243,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       }
       // Con delle correzioni il modello deve ritrovare nei turni dopo quali ha proposto: gli torna la sua risposta intera.
       const conCorrezioni = !!(valutazione && parsed.correzioni && parsed.correzioni.length);
+      if (valuta) contaValuta(conCorrezioni ? 'con_correzioni' : 'senza_correzioni');
       history.push({ role: 'assistant', content: conCorrezioni ? res.text : (parsed.display || res.text) });
 
       if (parsed.choices && parsed.choices.length) {

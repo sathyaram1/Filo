@@ -9,7 +9,7 @@
 // Si lancia come l'altro, con in più FILO_REPO=<repo>:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-969 "node <cartella>/contatoriRegole.motore-vero.mjs"
-// Esito atteso: 139 righe verdi, uscita 0 (#1547 su #1465, 2026-10-28; con le regole di prima 14 rosse). È l'unica prova del tetto di mille
+// Esito atteso: 143 righe verdi, uscita 0 (#1586, 2026-10-30, coi campi facoltativi dei riquadri). È l'unica prova del tetto di mille
 // espressioni che Firestore concede a una scrittura: le regole dell'ora ne valutano già circa 950, e un controllo in più
 // le fa rifiutare tutte (per questo chiamate ai modelli, chat e attività hanno il loro documento), mentre la sentinella che
 // legge il file non se ne accorge. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
@@ -362,6 +362,19 @@ await prova('l’admin legge i riquadri', () => assertSucceeds(getDoc(doc(owner,
 await prova('un anonimo non li legge', () => assertFails(getDoc(doc(anon, `${COLL_RIQ}/${idBuono}`))));
 await prova('un’istruzione scritta come chiave della riscrittura no', () => assertFails(setDoc(doc(anon, `${COLL_RIQ}/${C.idDocumento({ ...RIQ, ora: '11' })}`),
   { ...RIQ, ora: '11', riscrittura: { 'rendilo gentile': '1,0,0,0,0,0,0,0,0,0' } })));
+// #1586: le misure arrivate dopo la v1 sono campi facoltativi, con la stessa versione.
+vero(C.MISURE_RIQUADRI_FACOLTATIVE.every((c) => !(c in RIQ)), 'i riquadri di prova sono quelli di una copia vecchia');
+await prova('con una sola misura arrivata dopo (le correzioni automatiche) passano', () => {
+  const dati = JSON.parse(JSON.stringify(datiRiq));
+  C.registraRiquadro(dati, 'correttore_automatica', 'nome', ['annullata']);
+  const d = C.documentoRiquadri({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T12', app: '0.2.260', os: 'mac', dati });
+  vero('correttore_automatica' in d && !('correttore_valuta' in d), 'parte solo la facoltativa che ha conti');
+  return assertSucceeds(setDoc(doc(anon, `${COLL_RIQ}/${C.idDocumento(d)}`), d));
+});
+await prova('una misura arrivata dopo fuori forma no', () => assertFails(setDoc(doc(anon, `${COLL_RIQ}/${C.idDocumento({ ...RIQ, ora: '13' })}`),
+  { ...RIQ, ora: '13', correttore_segnaposto: { da_solo: '1,0,0' } })));
+await prova('una parola come chiave delle correzioni automatiche no', () => assertFails(setDoc(doc(anon, `${COLL_RIQ}/${C.idDocumento({ ...RIQ, ora: '14' })}`),
+  { ...RIQ, ora: '14', correttore_automatica: { Marco: '1,0,0' } })));
 await prova('i riquadri più carichi che l’app costruisce (ogni chiave di ogni misura, ai tetti) passano', () => {
   const dati = C.oraVuota();
   for (const c of C.MISURE_RIQUADRI) {

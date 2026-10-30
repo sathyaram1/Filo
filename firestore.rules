@@ -1363,9 +1363,12 @@ service cloud.firestore {
     // sito. Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle espressioni; le
     // stesse regole: sola creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella:
     // tests/unit/firestoreRulesContatori.test.mjs.
+    // Dopo la v1 (#1586), in campi facoltativi e con la stessa versione: l'anticipo che una pagina delicata non lascia
+    // partire e il gesto che costa (la spiegazione, il segnaposto), le correzioni automatiche per fonte, «Valuta» e i
+    // segnaposti del correttore. Le copie vecchie non li mandano, e un'ora che non li ha non li porta.
     match /contatori-riquadri/{docId} {
       function contatoriRiquadri(d) {
-        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'anticipo_al_gesto', 'riquadro_chiuso_prima', 'riquadro_uso', 'riscrittura', 'ocr', 'traduzione_pagina', 'editor_titolo', 'editor_chat'])
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'anticipo_al_gesto', 'riquadro_chiuso_prima', 'riquadro_uso', 'riscrittura', 'ocr', 'traduzione_pagina', 'editor_titolo', 'editor_chat', 'anticipo_privacy', 'correttore_automatica', 'correttore_valuta', 'correttore_segnaposto'])
           && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'anticipo_al_gesto', 'riquadro_chiuso_prima', 'riquadro_uso', 'riscrittura', 'ocr', 'traduzione_pagina', 'editor_titolo', 'editor_chat'])
           && d.v == 1
           && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
@@ -1383,7 +1386,11 @@ service cloud.firestore {
           && chiuse(d.ocr, ['copiato', 'vuoto', 'annullato', 'tagliato'], 40, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
           && chiuse(d.traduzione_pagina, ['intera', 'parziale', 'fermata'], 240, '^([0-9]{1,9}(,[0-9]{1,9}){7}(#[0-9]{1,9}(,[0-9]{1,9}){7})*)?$')
           && chiuse(d.editor_titolo, ['automatico', 'rigenerato'], 140, '^([0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
-          && chiuse(d.editor_chat, ['intero', 'oltre_tetto'], 120, '^([0-9]{1,9}(,[0-9]{1,9}){5}(#[0-9]{1,9}(,[0-9]{1,9}){5})*)?$');
+          && chiuse(d.editor_chat, ['intero', 'oltre_tetto'], 120, '^([0-9]{1,9}(,[0-9]{1,9}){5}(#[0-9]{1,9}(,[0-9]{1,9}){5})*)?$')
+          && (!('anticipo_privacy' in d) || chiuse(d.anticipo_privacy, ['spiega', 'segnaposto'], 40, '^([0-9]{1,9}(,[0-9]{1,9}){1}(#[0-9]{1,9}(,[0-9]{1,9}){1})*)?$'))
+          && (!('correttore_automatica' in d) || chiuse(d.correttore_automatica, ['personale', 'fisso', 'nome'], 90, '^([0-9]{1,9}(,[0-9]{1,9}){2}(#[0-9]{1,9}(,[0-9]{1,9}){2})*)?$'))
+          && (!('correttore_valuta' in d) || chiuse(d.correttore_valuta, ['chiesta', 'con_correzioni', 'senza_correzioni', 'correzione_mostrata', 'correzione_accettata', 'correzione_tolta'], 60, '^([0-9]{1,9}(#[0-9]{1,9})*)?$'))
+          && (!('correttore_segnaposto' in d) || chiuse(d.correttore_segnaposto, ['da_solo', 'su_richiesta', 'memoria'], 240, '^([0-9]{1,9}(,[0-9]{1,9}){7}(#[0-9]{1,9}(,[0-9]{1,9}){7})*)?$'));
       }
       allow get, list: if isAdmin();
       allow create: if request.auth != null && contatoriRiquadri(request.resource.data);

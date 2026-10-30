@@ -389,7 +389,12 @@
     state.automatiche = [...state.automatiche.filter((x) => !(x.start < end && x.end > c.start)), voce].slice(-AUTOMATICHE_MAX);
     state.ultimaAutomatica = { voce, testo, testoPrima, cursorePrima };
     lampo(state, c.start, end);
+    contaAutomatica(c.fonte, 'fatta');
     return true;
+  }
+  // La famiglia del correttore (#1586): fonte ed esito della correzione da sé, mai la parola.
+  function contaAutomatica(fonte, esito) {
+    try { global.SN_POPUP && global.SN_POPUP.conta({ misura: 'riquadro', cosa: 'correttore_automatica', fonte, esito }); } catch (_) {}
   }
 
   // Dal tasto destro, anche dopo aver scritto altro: la parola corretta da sé torna com'era scritta. Vero se è tornata.
@@ -406,6 +411,8 @@
       setTimeout(() => { suppressAutocorrect = false; }, 0);
     }
     if (getEditableText(el).slice(v.start, v.start + v.originale.length) !== v.originale) return false;
+    // Riscrivere la parola di chi scrive non è una correzione di Filo: un Ctrl+Z dopo non è il suo annullo.
+    try { global.SN_POPUP?.modificaDiFilo?.(null); } catch (_) {}
     seguiIlTesto(state);
     rifiutata(state, v);
     return true;
@@ -488,8 +495,10 @@
     state.ultimaAutomatica = null;
     state.rifiutateQui = [...state.rifiutateQui, { id: ++progressivo, start: v.start, end, segment: v.originale }].slice(-AUTOMATICHE_MAX);
     if (A().soloMaiuscole(v.originale, v.segment)) aggiungiStile({ minuscoli: 2, maiuscoli: 0 });
+    contaAutomatica(v.fonte, 'annullata');
     const parola = v.originale;
     impara({ passo: 'annullata', parola }, (r) => {
+      if (r && r.rifiuta) contaAutomatica(v.fonte, 'imparata');
       if (r && r.rifiuta && erroriAttivi() && parolaImparabile(parola)) return aggiungiImparata(formaDaImparare(parola, A().inizioDiFrase(getEditableText(el), v.start)));
       return null;
     });
@@ -1848,9 +1857,29 @@
   // Perché una ricerca non è partita, dal main: non è un dato che non c'è.
   const NON_PARTITA = { PAGINA_DELICATA: 'delicata', RICERCA_BLOCCATA: 'bloccata' };
 
+  // I contatori dei segnaposti (#1586): da dove viene il valore e che fine fa, mai la domanda né il valore. La ricerca
+  // che una pagina delicata non lascia partire, e quella chiesta poi col clic, sono anche il costo della privacy.
+  const ESITO_CONTATO = { trovato: 'trovato', nessuno: 'nessuno', errore: 'fallito', delicata: 'delicata', bloccata: 'bloccata' };
+  function contaSegnaposto(via, esito) {
+    try { global.SN_POPUP && global.SN_POPUP.conta({ misura: 'riquadro', cosa: 'correttore_segnaposto', via, esito }); } catch (_) {}
+  }
+  function contaPrivacySegnaposto(esito) {
+    try { global.SN_POPUP && global.SN_POPUP.conta({ misura: 'riquadro', cosa: 'anticipo_privacy', funzione: 'segnaposto', esito }); } catch (_) {}
+  }
+  // Il valore che il segno mostra viene da una ricerca (da sola o chiesta) o dalla memoria del modello, senza ricerca.
+  // Mentre una domanda rifatta cerca, il valore in vista è quello della ricerca di prima.
+  function viaDelSegno(segno) {
+    if (!segno.cerca) return 'memoria';
+    const giro = [segno.cerca.chiave, segno.cerca.prima && segno.cerca.prima.chiave].map((k) => k && ricerche.get(k)).filter(Boolean);
+    const r = giro.find((x) => x.stato === 'trovato') || giro[0];
+    return (r && r.via) || 'da_solo';
+  }
+
   async function cercaValore(state, cerca, pezzo, { suRichiesta = false } = {}) {
     const k = cerca.chiave;
-    ricerche.set(k, { stato: 'cerca' });
+    const via = suRichiesta ? 'su_richiesta' : 'da_solo';
+    ricerche.set(k, { stato: 'cerca', via });
+    contaSegnaposto(via, 'cercato');
     while (ricerche.size > RICERCHE_MAX) ricerche.delete(ricerche.keys().next().value);
     let res = null;
     try {
@@ -1865,7 +1894,10 @@
     }
     const ok = !!(res && res.ok && typeof res.text === 'string');
     const v = ok ? R().valoreTrovato(res.text) : null;
-    ricerche.set(k, v ? { stato: 'trovato', ...v } : { stato: ok ? 'nessuno' : (NON_PARTITA[res && res.code] || 'errore') });
+    const stato = v ? 'trovato' : ok ? 'nessuno' : (NON_PARTITA[res && res.code] || 'errore');
+    ricerche.set(k, { ...(v || {}), stato, via });
+    contaSegnaposto(via, ESITO_CONTATO[stato]);
+    if (stato === 'delicata') contaPrivacySegnaposto('saltato');
     if (res && !res.ok) console.warn('[SN] correttore, segnaposto:', res.code, res.error);
     if (state.attivo) renderOverlayContent(state);
     avvisaAscoltatori(state);
@@ -1898,6 +1930,11 @@
   function cercaDiNuovo(el, segno) {
     const state = el && monitored.get(el);
     if (!state || !segno || !segno.cerca || !segnapostiAttivi()) return;
+    const prima = ricerche.get(segno.cerca.chiave);
+    if (prima && prima.stato === 'delicata') {
+      contaPrivacySegnaposto('chiesto');
+      try { global.SN_POPUP && global.SN_POPUP.conta({ misura: 'chiesto', action: ACTIONS.SPELLCHECK_CONTEXT }); } catch (_) {}
+    }
     ricerche.delete(segno.cerca.chiave);
     cercaValore(state, segno.cerca, segno.segment, { suRichiesta: true });
     renderOverlayContent(state);
@@ -1910,9 +1947,14 @@
     const valore = segno && segno.tipo === 'segnaposto' && !segno.cercando && segno.correzioni && segno.correzioni[0];
     if (!state || !valore) return false;
     const prima = getEditableText(el);
+    // Il valore messo è la proposta accettata, contata prima di scrivere come le altre correzioni: la scrittura ridisegna
+    // i segni, e le x sparite la darebbero per lasciata perdere. Le x cambiate nel frattempo non si riempiono.
+    if (prima.slice(segno.start, segno.end) !== segno.segment) return false;
+    esitoSegno(el, segno, 'accettata');
     const cursore = cursoreNelCampo(el);
     applyFix(el, { start: segno.start, end: segno.end }, valore, { expectedSegment: segno.segment, cursor: 'preserve' });
     if (getEditableText(el) === prima) return false;
+    contaSegnaposto(viaDelSegno(segno), 'riempito');
     if (cursore >= 0 && !campoDiTesto(el)) {
       const dove = cursore >= segno.end ? cursore + valore.length - (segno.end - segno.start) : cursore;
       try {
@@ -2140,6 +2182,8 @@
     const ig = chiaveIgnora(segno);
     // Le x di un segnaposto si ignorano con le parole che le precedono: «di soli xx» non spegne «un p/e di xx».
     if (segno.tipo === 'segnaposto') {
+      // Un candidato ancora da giudicare non è una proposta: non ha un valore da rifiutare.
+      if (!segno.dubbio) contaSegnaposto(viaDelSegno(segno), 'rifiutato');
       const prima = getEditableText(el).slice(Math.max(0, segno.start - 40), segno.start);
       ig.segment = (/(?:\S+[^\S\n]+){0,2}$/.exec(prima) || [''])[0] + segno.segment;
     }
