@@ -411,11 +411,36 @@
     });
   }
 
+  // «Valuta» su un sito (#1449): il campo resta qui, allo strato va un numero. Da lì l'Aiuto ne rilegge il testo e ci
+  // scrive le correzioni, solo in questo campo e solo quando l'utente le preme.
+  const campiValutati = new Map();
+  const CAMPI_MAX = 20;
+  let campiSeq = 0;
+  function campoValutato(el) {
+    if (!el) return '';
+    const id = `c${++campiSeq}`;
+    campiValutati.set(id, el);
+    while (campiValutati.size > CAMPI_MAX) campiValutati.delete(campiValutati.keys().next().value);
+    return id;
+  }
+  function campo(a) {
+    const el = campiValutati.get(String(a.id || ''));
+    const SC = global.SN_SPELLCHECK;
+    if (!el || !el.isConnected || !SC) return { sparito: true };
+    if (a.cosa === 'testo') return { testo: String(SC.testoDelCampo?.(el) || '') };
+    if (a.cosa === 'sostituisci') {
+      const r = SC.sostituisciNelCampo(el, String(a.prima || ''), String(a.dopo == null ? '' : a.dopo), Number(a.vicinoA) || 0) || {};
+      return { dove: Number.isInteger(r.dove) ? r.dove : undefined, manca: !!r.manca };
+    }
+    return null;
+  }
+
   async function servi(m) {
     const args = m.args && typeof m.args === 'object' ? m.args : {};
     let esito = null;
     try {
       if (m.op === 'stato') esito = !!global.SN_SIDEBAR?.dalloStrato?.(args);
+      else if (m.op === 'campo') esito = campo(args);
       else if (m.op === 'leggi') esito = await leggi(args);
       else if (m.op === 'azione') esito = await azione(args.page);
       else if (m.op === 'evidenzia') {
