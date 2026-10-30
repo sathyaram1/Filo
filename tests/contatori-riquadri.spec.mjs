@@ -147,6 +147,7 @@ test('su una pagina delicata la spiegazione non preparata conta come costo della
   await page.keyboard.press('Escape');
   await page.waitForTimeout(500);
   expect(await voceOra(app, 'anticipo_privacy', 'spiega')).toEqual({ saltato: 1, chiesto: 1 });
+  expect(await chiestiOggi(app, 'explain'), 'riaperta non è una richiesta in più').toBe(1);
   const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));
   expect(disco, 'il sito non esce').not.toContain(new URL(page.url()).host);
 });
