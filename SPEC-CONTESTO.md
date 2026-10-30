@@ -206,7 +206,8 @@ tratto vivo, e restituisce:
 
 1. le righe del livello «ore» per il tratto più vecchio del tratto vivo;
 2. le memorie da aggiornare (chi è l'utente, preferenze, memorie per
-   argomento), se dal tratto è emerso qualcosa che merita di restare;
+   argomento), se dal tratto è emerso qualcosa che merita di restare; da un
+   tratto sospetto le propone soltanto (§ Il sospetto non passa nel riassunto);
 3. il nuovo stato del sistema per la parte dell'utente.
 
 Dopo, la parte dell'utente si riscrive e il tratto vivo riparte dagli eventi
