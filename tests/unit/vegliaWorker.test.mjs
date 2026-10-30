@@ -179,16 +179,21 @@ describe('i segni di vita, letti dove stanno', () => {
     assert.equal(segniDiVita({ root: work, ticket: B, sessione: SID, configDir: claude() }).finito, true);
   });
 
-  test('transcript di un giro prima del biglietto non contano; senza transcript contano i processi della cartella', () => {
+  test('transcript di un giro prima del biglietto non contano; un processo nella cartella tiene vivo il worker', () => {
     const { work } = clone({ prima: 30 });
-    const configDir = claude({ fa: 120 });
     const finti = (cwd) => () => [{ pid: 999001, ppid: 1, sid: 999001, stato: 'S', cwd, cmd: 'npm run finish:check' }];
-    const senza = segniDiVita({ root: work, ticket: B, sessione: SID, configDir, leggiProcessi: finti('/altrove') });
+    const vecchio = claude({ fa: 120 });
+    const senza = segniDiVita({ root: work, ticket: B, sessione: SID, configDir: vecchio, leggiProcessi: finti('/altrove') });
     assert.equal(senza.tracce.viste, false, 'il transcript di due ore fa è di un altro worker');
     assert.equal(giudica({ ...senza, adesso: Date.now() }).stato, 'fermo');
-    const con = segniDiVita({ root: work, ticket: B, sessione: SID, configDir, leggiProcessi: finti(work) });
+    // Chi aspetta una verifica lunga in sottofondo non scrive il transcript finché quella non esce: non è fermo.
+    const fermo = claude({ fa: 25 });
+    const con = segniDiVita({ root: work, ticket: B, sessione: SID, configDir: fermo, leggiProcessi: finti(work) });
+    assert.equal(con.tracce.viste, true);
     assert.equal(con.processi, 1);
     assert.equal(giudica({ ...con, adesso: Date.now() }).stato, 'lavora');
+    const battito = () => [{ pid: 999002, ppid: 1, sid: 999002, stato: 'S', cwd: work, cmd: 'node /tmp/s/scripts/routine-channel.mjs heartbeat --loop' }];
+    assert.equal(segniDiVita({ root: work, ticket: B, sessione: SID, configDir: fermo, leggiProcessi: battito }).processi, 0, 'il battito non è lavoro');
   });
 
   test('un worker che non ha ancora preso la cartella si giudica dal registro del biglietto e dai transcript', () => {
