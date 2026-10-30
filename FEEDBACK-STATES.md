@@ -311,7 +311,8 @@ segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce
 chiaro, da 1 a 20, solo alla nascita e solo admin: `unisceValido` nelle regole). Lo
 strumento controlla tutte le segnalazioni prima di aprire e dice tutti i motivi insieme:
 fuori chi non è `todo` (già in lavorazione o ferma), chi ha già un ramo (tornata in coda
-dopo una risposta o una riapertura), chi aspetta già un altro pacchetto aperto, chi è a
+dopo una risposta o una riapertura), chi aspetta già un altro pacchetto aperto o ne porta
+il rimando `unitoIn` (rimasta in coda perché l'archiviazione non è riuscita), chi è a
 priorità 3, un lavoro locale, chi ha già 20 attese, chi P stesso aspetta. Area, tetto e
 urgenti li controlla il manutentore. Senza `--priorita` P nasce con la
 priorità più alta fra le unite. Un pezzo che si blocca in verifica non si stacca: P passa

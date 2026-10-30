@@ -313,3 +313,22 @@ test('una segnalazione già in un pacchetto aperto, o con un ramo di lavoro, non
   assert.match(testo, /#815 ha già un ramo con lavoro/);
   assert.doesNotMatch(testo, /#816/, 'aspettare un feedback che non è un pacchetto non ferma');
 });
+
+test('una unita rimasta in coda col rimando a un pacchetto aperto non entra in un altro; un rimando a un pacchetto chiuso no', async () => {
+  const lette = {
+    812: seg('812', { unitoIn: 'id960' }),
+    813: seg('813', { unitoIn: 'id970' }),
+    814: seg('814', { unitoIn: 'id980' }),
+    id960: seg('960', { unisce: ['812'] }),
+    id970: seg('970', { unisce: ['813'], stato: 'archived' }),
+    id980: seg('980'),
+  };
+  const r = await conRete({ lette }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812,813,814']));
+  assert.equal(r.code, 3);
+  assert.equal(r.submit.length, 0, 'due pacchetti farebbero lo stesso lavoro su #812');
+  const testo = r.err.join('\n');
+  assert.match(testo, /#812 è già nel pacchetto #960/);
+  assert.doesNotMatch(testo, /#813|#814/, 'rimessa in coda dopo un pacchetto archiviato, o unita in un feedback che non è un pacchetto: entra');
+  assert.deepEqual(SCRIPT.controllaUnite([seg('812', { unitoIn: 'id960', attese: [{ id: 'id960', num: '960' }] })], { pacchetti: ['960'], pacchettiPerId: { id960: '960' } }),
+    ['#812 è già nel pacchetto #960: due pacchetti farebbero lo stesso lavoro'], 'attesa e rimando sullo stesso pacchetto: un motivo solo');
+});

@@ -137,6 +137,7 @@ function reteFinta(docs) {
     if (!d) return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
     const fields = { seq: { integerValue: String(d.seq) }, subSeq: { integerValue: String(d.subSeq || 0) } };
     if (d.status) fields.status = { stringValue: d.status };
+    if (d.unitoIn) fields.unitoIn = { stringValue: d.unitoIn };
     if (d.waitsFor) {
       fields.waitsFor = { arrayValue: { values: d.waitsFor.map((w) => ({ mapValue: { fields: { id: { stringValue: w.id }, num: { stringValue: w.num } } } })) } };
     }
@@ -180,10 +181,12 @@ test('chi aspettava una segnalazione unita aspetta il pacchetto, e le sue altre 
   const rete = reteFinta({
     ...DOCS, id951: { seq: 951 }, id812: { seq: 812 }, id815: { seq: 815 },
     id903: { seq: 903, status: 'todo', waitsFor: [{ id: 'id676', num: '676' }, { id: 'id812', num: '812' }, { id: 'id815', num: '815' }] },
+    id904: { seq: 904, status: 'todo', unitoIn: 'id951' },
   });
   try {
     const letta = await owner.segnalazioneDaUnire('903', { bearer: 'tok' });
-    assert.deepEqual({ ...letta, priorita: letta.priorita ?? null }, { ok: true, id: 'id903', num: '903', stato: 'todo', priorita: null, locale: false, attese: [{ id: 'id676', num: '676' }, { id: 'id812', num: '812' }, { id: 'id815', num: '815' }], ramo: '', unisce: [], fidato: false });
+    assert.deepEqual({ ...letta, priorita: letta.priorita ?? null }, { ok: true, id: 'id903', num: '903', stato: 'todo', priorita: null, locale: false, attese: [{ id: 'id676', num: '676' }, { id: 'id812', num: '812' }, { id: 'id815', num: '815' }], ramo: '', unisce: [], unitoIn: '', fidato: false });
+    assert.equal((await owner.segnalazioneDaUnire('904', { bearer: 'tok' })).unitoIn, 'id951', 'il rimando a un pacchetto si legge: senza, il controllo dei pacchetti già presi non lo vede');
     assert.equal((await owner.segnalazioneDaUnire('999', { bearer: 'tok' })).inesistente, true);
     const r = await owner.spostaAttese('id903', ['id812', 'id815'], { id: 'id951', num: '951' }, { bearer: 'tok' });
     assert.equal(r.ok, true, r.motivo);

@@ -279,9 +279,10 @@ export const attese = {
 /**
  * Le segnalazioni lette per `--pacchetto` → i motivi per cui non entrano (vuoto = entrano tutte). PURA.
  * `lette`: [{ ok, num, stato, priorita, locale, attese, ramo?, motivo? }]; `aspetta`: i numeri che il pacchetto stesso
- * aspetta; `pacchetti`: i numeri dei pacchetti aperti fra gli aspettati dalle unite.
+ * aspetta; `pacchetti`: i numeri dei pacchetti aperti fra gli aspettati dalle unite; `pacchettiPerId`: { id: num } dei
+ * pacchetti aperti nominati dal rimando `unitoIn` delle unite.
  */
-export function controllaUnite(lette, { aspetta = [], pacchetti = [] } = {}) {
+export function controllaUnite(lette, { aspetta = [], pacchetti = [], pacchettiPerId = {} } = {}) {
   const giaPacchetti = new Set(pacchetti.map((n) => String(n).replace(/^#/, '')));
   const MAX = globalThis.SN_FB_ATTESE.MAX;
   const motivi = [];
@@ -293,6 +294,9 @@ export function controllaUnite(lette, { aspetta = [], pacchetti = [] } = {}) {
     // In coda non vuol dire mai lavorata: dopo una risposta dell'owner o una riapertura il ramo resta.
     else if (u.ramo) motivi.push(`${n} ha già un ramo con lavoro (${u.ramo}): nel pacchetto si rifarebbe da capo`);
     const dentro = (u.attese || []).map((w) => String(w.num || '').replace(/^#/, '')).filter((x) => giaPacchetti.has(x));
+    // Dal #1903 le unite non aspettano il pacchetto: una rimasta in coda (archiviazione mancata) lo dice il rimando.
+    const rimando = u.unitoIn && Object.prototype.hasOwnProperty.call(pacchettiPerId, u.unitoIn) ? String(pacchettiPerId[u.unitoIn]).replace(/^#/, '') : '';
+    if (rimando && !dentro.includes(rimando)) dentro.push(rimando);
     if (dentro.length) motivi.push(`${n} è già nel pacchetto ${dentro.map((x) => `#${x}`).join(', ')}: due pacchetti farebbero lo stesso lavoro`);
     if (u.priorita === 3) motivi.push(`${n} ha priorità 3: si lavora subito e da sola, fuori dai pacchetti`);
     if (u.locale) motivi.push(`${n} è un lavoro locale: nessuna routine la prende, e nel pacchetto resterebbe ferma`);
@@ -629,19 +633,26 @@ export async function main(argvIn) {
       console.error(`RIFIUTATO: --pacchetto: lettura delle segnalazioni fallita (${String((e && e.message) || e)}). Non ho aperto niente.`);
       return EXIT.IRRAGGIUNGIBILE;
     }
-    // Chi aspetta già un pacchetto aperto è già preso: si leggono gli aspettati per saperlo.
-    const attesi = [...new Set(lette.filter((u) => u && u.ok).flatMap((u) => (u.attese || []).map((w) => String(w.num || '').replace(/^#/, '')).filter(Boolean)))];
+    // Chi aspetta già un pacchetto aperto, o ne porta il rimando, è già preso: si leggono aspettati e rimandi per saperlo.
+    const leggibili = lette.filter((u) => u && u.ok);
+    const attesi = [...new Set([
+      ...leggibili.flatMap((u) => (u.attese || []).map((w) => String(w.num || '').replace(/^#/, '')).filter(Boolean)),
+      ...leggibili.map((u) => String(u.unitoIn || '')).filter(Boolean),
+    ])];
     let pacchetti = [];
+    const pacchettiPerId = {};
     if (attesi.length) {
       try {
-        pacchetti = (await pacchetto.leggi(attesi, cred.idToken))
-          .filter((p) => p && p.ok && Array.isArray(p.unisce) && p.unisce.length && !['done', 'archived'].includes(p.stato)).map((p) => String(p.num));
+        const aperti = (await pacchetto.leggi(attesi, cred.idToken))
+          .filter((p) => p && p.ok && Array.isArray(p.unisce) && p.unisce.length && !['done', 'archived'].includes(p.stato));
+        pacchetti = aperti.map((p) => String(p.num));
+        for (const p of aperti) if (p.id) pacchettiPerId[p.id] = String(p.num);
       } catch (e) {
         console.error(`RIFIUTATO: --pacchetto: lettura dei feedback aspettati fallita (${String((e && e.message) || e)}). Non ho aperto niente.`);
         return EXIT.IRRAGGIUNGIBILE;
       }
     }
-    const motivi = controllaUnite(lette, { aspetta: numeriAttesa.numeri, pacchetti });
+    const motivi = controllaUnite(lette, { aspetta: numeriAttesa.numeri, pacchetti, pacchettiPerId });
     if (motivi.length) {
       console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${motivi.map((m) => `  - ${m}`).join('\n')}`);
       return EXIT.RIFIUTATO;
