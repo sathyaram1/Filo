@@ -45,9 +45,9 @@
 //   `--aspetta` (#903): nasce aspettando quei feedback; nessuna routine lo prende finché non sono tutti fusi.
 //   Numeri inesistenti e più di venti si rifiutano prima di aprire.
 //
-//   `--pacchetto` (SPEC-RIDISEGNO-LAVORO.md § 2): il feedback è un pacchetto che unisce quelle segnalazioni, e il testo
-//   è la spec. Ognuna resta aperta e aspetta il pacchetto; alla sua fusione il server le chiude con la sua frase. Si
-//   controllano prima di aprire: in coda e non ancora lavorate, non a priorità 3, non lavoro locale.
+//   `--pacchetto` (FEEDBACK-STATES.md § 3a, Pacchetti): il feedback è un pacchetto che unisce quelle segnalazioni, e il
+//   testo è la spec. Porta con sé i loro allegati (tutti, o non nasce) e alla nascita le archivia; chi le aspettava
+//   aspetta il pacchetto. Si controllano prima di aprire: in coda e non ancora lavorate, non a priorità 3, non lavoro locale.
 //
 // USCITE (distinte apposta: chi lancia lo script deve poter distinguere
 // "non l'ho scritto io male" da "il server non c'è")
