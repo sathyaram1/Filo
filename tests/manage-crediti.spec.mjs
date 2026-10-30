@@ -12,7 +12,7 @@ const STATO = {
   ok: true, freni: 'attivi',
   numeri: { riservaA: 10, tettoB: null, usdPer100: 2150, rinnovoA: null, rinnovoB: null },
   accounts: {
-    A: { pct: 46.5, limite: 90, passo: { spesoPct: 3, quotaPct: 12.4, giornoDaMs: Date.parse('2026-10-12T17:00:00Z') }, rinnovoAtMs: Date.parse('2026-10-13T17:00:00Z'), fermo: '', basseAperte: false },
+    A: { pct: 46.5, limite: 90, passo: { spesoPct: 3, quotaPct: 12.4, giornoDaMs: Date.parse('2026-10-12T17:00:00Z') }, rinnovoAtMs: Date.parse('2026-10-13T17:00:00Z'), fermo: '', basseAperte: false, usdSettimana: 1000, usd24h: 120, accensioniSettimana: 14, accensioni24h: 3 },
     B: { pct: 20, limite: null, passo: { spesoPct: 21, quotaPct: 20, giornoDaMs: Date.parse('2026-10-13T07:00:00Z') }, rinnovoAtMs: Date.parse('2026-10-14T07:00:00Z'), fermo: 'passo', basseAperte: false },
   },
 };
