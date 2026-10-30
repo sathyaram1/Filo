@@ -183,7 +183,7 @@ test('il comando installato, dalla shell, acceca e mette la decisione del server
   const vuota = cartellaTemporanea('filo-cieco-');
   const utente = cartellaTemporanea('filo-cieco-registro-');
   try {
-    const cmd = comando({ sessione: 's1', creato: Date.now(), registro: join(utente, FILE_REGISTRO) });
+    const cmd = comando({ sessione: 's1', creato: Date.now(), registro: join(utente, FILE_REGISTRO), strumenti: '/tmp/filo-strumenti/' });
     const run = (input) => spawnSync('bash', ['-c', cmd], { input, cwd: vuota, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: vuota } });
     const h = (input) => JSON.parse(run(JSON.stringify(input)).stdout).hookSpecificOutput;
     assert.match(h(prima(false)).permissionDecisionReason, /Dettaglio: ENOENT/, 'senza registro il lancio è rifiutato');
