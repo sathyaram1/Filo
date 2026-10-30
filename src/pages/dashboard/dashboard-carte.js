@@ -1072,7 +1072,8 @@
       else if (msg.type === MSG.DOWNLOADS_UPDATED) ricaricaDownloadsPresto();
       else if (msg.type === MSG.LAVORI_CAMBIATI && Array.isArray(msg.lavori)) { dati.lavori = msg.lavori; disegna(); }
       else if (msg.type === MSG.FILO_LIVE_UPDATED) caricaEditor().catch(() => {});
-      else if (msg.type === MSG.DATI_IMPORTATI) caricaMazzi().catch(() => {});
+      else if (msg.type === MSG.DATI_IMPORTATI) { caricaMazzi().catch(() => {}); caricaPrimoIncontro().catch(() => {}); }
+      else if (msg.type === MSG.FILO_ONBOARDING_UPDATED || msg.type === MSG.FILO_READY_CHANGED) caricaPrimoIncontro().catch(() => {});
       else if (msg.type === MSG.SETTINGS_UPDATED && msg.settings) { dati.impostazioni = msg.settings; disegna(); }
       else if (msg.type === MSG.IN_PAUSA_CAMBIATO && Object.prototype.hasOwnProperty.call(dati.aperte, msg.nome)) {
         dati.aperte = { ...dati.aperte, [msg.nome]: msg.visible === true };
