@@ -2268,9 +2268,13 @@
   }
 
   // Il documento a conti della stessa ora, accanto all'ora: stesso pseudonimo, stessa ora, stesso id.
-  function documentoAConti(tabella, v, { pseudonimo, chiave, app, os, dati }) {
+  // Una misura facoltativa senza conti non c'è: finché le regole pubblicate non la conoscono, le ore che non l'hanno
+  // passano lo stesso.
+  function documentoAConti(tabella, v, { pseudonimo, chiave, app, os, dati }, facoltative = []) {
     const d = normale(oggetto(dati) ? JSON.parse(JSON.stringify(dati)) : {});
     const [giorno, ora] = String(chiave || '').split('T');
+    const misure = Object.keys(tabella).map((c) => [c, contiDellaTabella(tabella, d[c], c)])
+      .filter(([c, conti]) => !facoltative.includes(c) || Object.keys(conti).length);
     return {
       v,
       pseudonimo: String(pseudonimo || ''),
@@ -2279,7 +2283,7 @@
       ora: String(ora || ''),
       app: versioneApp(app),
       os: OS.includes(os) ? os : ALTRO,
-      ...Object.fromEntries(Object.keys(tabella).map((c) => [c, contiDellaTabella(tabella, d[c], c)])),
+      ...Object.fromEntries(misure),
     };
   }
   const senzaConti = (tabella, doc) => Object.keys(tabella).every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length);
