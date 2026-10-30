@@ -376,6 +376,51 @@
     return tutte.find((el) => el.matches(':hover')) || tutte.find((el) => att && att !== global.document.body && el.contains(att)) || null;
   }
 
+  // Dove lo scorrimento non basta (una lista corta non scorre; in cima non si sale) la voce sotto il puntatore la tiene
+  // ferma uno spazio sopra o sotto la lista, che se ne va quando il puntatore esce dalla lista.
+  const tenute = new WeakMap();
+  function contenitoreDi(lista) {
+    for (let el = lista; el && el.nodeType === 1 && el !== global.document.body; el = el.parentElement) {
+      const o = global.getComputedStyle ? global.getComputedStyle(el).overflowY : '';
+      if (o === 'auto' || o === 'scroll') return el;
+    }
+    return null;
+  }
+  function lascia(lista) {
+    const t = tenute.get(lista);
+    if (!t) return;
+    tenute.delete(lista);
+    lista.removeEventListener('pointerleave', t.via);
+    lista.style.paddingTop = t.top0;
+    lista.style.paddingBottom = t.bottom0;
+  }
+  function tieni(lista, sc, voce, y) {
+    let resto = voce.getBoundingClientRect().top - y;
+    if (Math.abs(resto) < 0.5) return;
+    let t = tenute.get(lista);
+    if (!t) {
+      const cs = global.getComputedStyle(lista);
+      t = {
+        su: 0, giu: 0, top0: lista.style.paddingTop, bottom0: lista.style.paddingBottom,
+        base: [parseFloat(cs.paddingTop) || 0, parseFloat(cs.paddingBottom) || 0], via: () => lascia(lista),
+      };
+      tenute.set(lista, t);
+      lista.addEventListener('pointerleave', t.via);
+    }
+    if (resto < 0) t.su -= resto;
+    else {
+      const meno = Math.min(t.su, resto);
+      t.su -= meno;
+      resto -= meno;
+    }
+    lista.style.paddingTop = `${t.base[0] + t.su}px`;
+    if (resto > 0 && sc) {
+      const manca = sc.scrollTop + resto - (sc.scrollHeight - sc.clientHeight);
+      if (manca > 0) { t.giu += manca; lista.style.paddingBottom = `${t.base[1] + t.giu}px`; }
+      sc.scrollTop += resto;
+    }
+  }
+
   // Ridisegna tenendo lo scorrimento sulla prima voce visibile (non sui pixel: se ne esce una più su, la vista
   // non salta); chi è in cima resta in cima, o una voce arrivata lassù finirebbe fuori vista. La voce sotto il
   // puntatore o col fuoco invece resta dov'è sullo schermo, anche in cima: un arrivo più su non la sposta.
@@ -383,6 +428,7 @@
   function alSuoPosto({ lista, voci, scorre }, ridisegna) {
     const L = LIVE();
     const doc = global.document;
+    if (lista && tenute.has(lista) && !lista.matches(':hover')) lascia(lista);
     const radice = doc && (doc.scrollingElement || doc.documentElement);
     const righe = (sc) => {
       const cima = sc === radice ? 0 : sc.getBoundingClientRect().top;
