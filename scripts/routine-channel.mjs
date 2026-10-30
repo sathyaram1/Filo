@@ -704,12 +704,11 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
     return { ok: false, skipped: false, branch: ramo, reason: `il server remoto ha rifiutato il push (una regola del repo, un pre-receive, il push protection?): ${pulisciGit(push.out)}` };
   }
   if (/rejected|non-fast-forward|fetch first|stale info/i.test(push.out)) {
-    // --force-if-includes: il lease da solo si fida del ref remoto che questa
-    // copia conosce, e dopo un `git fetch` quel ref è già il commit dell'altro
-    // — il lease combacia e il rinvio lo sovrascrive (verifica del giro 2).
-    // Con --force-if-includes git rifiuta se quel commit non è mai passato
-    // dalla storia locale di questo ramo.
-    const lease = run(['push', '--force-with-lease', '--force-if-includes', 'origin', `HEAD:refs/heads/${ramo}`]);
+    const atteso = leaseAtteso(root, ramo, { exec });
+    if (!atteso) {
+      return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e su origin '${ramo}' ha commit che questo ramo non ha mai avuto (qualcun altro ha spinto?): il rinvio con --force-with-lease non parte, o li cancellerebbe. Integrali (git fetch origin ${ramo}, poi rebase) e rilancia` };
+    }
+    const lease = run(['push', `--force-with-lease=refs/heads/${ramo}:${atteso}`, 'origin', `HEAD:refs/heads/${ramo}`]);
     if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true, ...avviso };
     return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
   }
