@@ -268,6 +268,13 @@ test('il comando non dipende dalla macchina: niente apostrofi dentro, niente bar
   assert.ok(!cmd.includes('\\'), 'una barra rovesciata la mangia la riga di comando di Windows');
   assert.ok(cmd.includes('"sessione":"s1rm-rf"'));
   assert.ok(cmd.includes('"fileRegistro":"C:/Users/agenti AI/.claude/filo-decisioni-worker.json"'));
+  // Gli strumenti vanno senza virgolette nel comando di veglia: una cartella con spazi o apici resta fuori.
+  for (const [dove, atteso] of [['C:\\Users\\x\\filo-strumenti\\', 'C:/Users/x/filo-strumenti'], ['/tmp/filo strumenti', ''], ["/tmp/a'b", '']]) {
+    const c = comando({ sessione: 's1', creato: 1, registro: '/r.json', strumenti: dove });
+    assert.ok(c.includes(`"strumenti":"${atteso}"`), `${dove} → «${atteso}»`);
+    assert.equal((c.match(/'/g) || []).length, 2);
+    assert.ok(!c.includes('\\'));
+  }
 });
 
 test('registro: l\'impronta e mai il biglietto, ruolo modello sforzo e ora; le voci di oltre 24 ore si buttano', () => {
