@@ -129,7 +129,8 @@ import os from 'node:os';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
+import { pinnedRepoRoot, absolutizeOutput, segnaLavoroPreso } from './lib/tools-pin.mjs';
+import { sessioneDaChiudere } from './lib/strumenti-vecchi.mjs';
 import {
   isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT, lavoroVivo, testoLavoroVivo,
   USCITA_LAVORO_VIVO,
