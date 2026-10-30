@@ -354,6 +354,16 @@ export function tettoAllegati(perUnita, propri = {}) {
   return motivi;
 }
 
+/**
+ * Le unite i cui allegati il pacchetto porta e che non sono fidate, o li hanno in una conversazione scritta anche da
+ * altri (`daAltri`): con loro il pacchetto nasce non fidato, come un figlio di genitori non fidati. PURA. → ['#N']
+ */
+export function uniteNonFidate(perUnita) {
+  return (Array.isArray(perUnita) ? perUnita : [])
+    .filter(({ u, allegati }) => (allegati || []).length && (u.fidato !== true || allegati.some((a) => a.conversazione && a.daAltri)))
+    .map(({ u }) => `#${u.num}`);
+}
+
 /** Il tipo vero di un'immagine dai suoi byte, '' se non è un'immagine che Filo apre (l'SVG è attivo). PURA. */
 function tipoImmagine(byte) {
   const b = byte || [];
