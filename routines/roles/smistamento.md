@@ -125,7 +125,9 @@ node scripts/routine-channel.mjs release <biglietto> --role smistamento
 Un rilascio senza nessuno dei quattro rimette la domanda in coda per un altro
 tentativo; al terzo esce all'owner com'è, col segno «non riscritta». Se il
 server rifiuta perché la domanda è cambiata mentre lavoravi, rileggila con
-`smista mostra` e rifai la tua parte.
+`smista mostra` e rifai la tua parte. Un altro rifiuto che non sai correggere
+(il server tiene un campo che la forma vorrebbe diverso) non è un guasto:
+rilascia senza esito, e al terzo tentativo la domanda arriva all'owner com'è.
 
 ## Se si rompe qualcosa
 
