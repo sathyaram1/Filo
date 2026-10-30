@@ -625,8 +625,60 @@ export async function main(argvIn) {
     }
     unite = lette;
   }
+  // Gli allegati delle unite si contano, si scaricano e si controllano tutti prima di aprire: un pacchetto non nasce monco.
+  const msg = (e) => String((e && e.message) || e);
+  const codiceDi = (e) => (e && e.definitivo ? EXIT.RIFIUTATO : exitCodeForError(e));
+  let copie = null;
+  let attesi = [];
+  if (unite.length) {
+    let riferimenti;
+    try { riferimenti = await Promise.all(unite.map(async (u) => ({ u, allegati: await pacchetto.allegati(u, cred.idToken) }))); } catch (e) {
+      console.error(`RIFIUTATO: --pacchetto: ${msg(e)}. Non ho aperto niente.`);
+      return codiceDi(e);
+    }
+    const mieImmagini = allegati.filter((a) => a.type.startsWith('image/')).length;
+    const troppi = tettoAllegati(riferimenti, { immagini: mieImmagini, documenti: allegati.length - mieImmagini });
+    if (troppi.length) {
+      console.error(`RIFIUTATO: --pacchetto, gli allegati delle unite non ci stanno e non ho aperto niente:\n${troppi.map((m) => `  - ${m}`).join('\n')}`);
+      return EXIT.RIFIUTATO;
+    }
+    let scaricati;
+    try {
+      scaricati = await Promise.all(riferimenti.map(async ({ u, allegati: lista }) => ({
+        u,
+        allegati: await Promise.all(lista.map(async (a) => {
+          try { return { ...a, byte: await pacchetto.scarica(a) }; } catch (e) {
+            const chi = a.tipo === 'immagine' ? `l'immagine ${a.indice}` : `l'allegato «${a.nome || a.indice}»`;
+            throw Object.assign(new Error(`#${u.num}: ${chi}${a.conversazione ? ' della conversazione' : ''} non si apre (${msg(e)})`), { definitivo: !!(e && e.definitivo) });
+          }
+        })),
+      })));
+    } catch (e) {
+      console.error(`RIFIUTATO: --pacchetto: ${msg(e)}. Non ho aperto niente.`);
+      return codiceDi(e);
+    }
+    copie = copieDegliAllegati(scaricati, { primaImmagini: mieImmagini });
+    if (copie.motivi.length) {
+      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${copie.motivi.map((m) => `  - ${m}`).join('\n')}`);
+      return EXIT.RIFIUTATO;
+    }
+    // Chi aspetta una unita passerà ad aspettare il pacchetto: si sa prima di aprire, e un giro col pacchetto si dice prima.
+    try { attesi = await pacchetto.attesiDa(unite, cred.idToken); } catch (e) {
+      console.error(`RIFIUTATO: --pacchetto: non so chi aspetta le segnalazioni unite (${msg(e)}). Non ho aperto niente: rilancia.`);
+      return codiceDi(e);
+    }
+    const giri = attesi.filter((x) => numeriAttesa.numeri.includes(String(x.num)));
+    if (giri.length) {
+      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${giri.map((x) => `  - #${x.num} aspetta ${x.quali.map((n) => `#${n}`).join(', ')}, che entra nel pacchetto, e il pacchetto aspetta #${x.num}: si aspetterebbero a vicenda`).join('\n')}`);
+      return EXIT.RIFIUTATO;
+    }
+  }
   const prioritaScelta = unite.length ? prioritaDelPacchetto(p.valore, unite) : p.valore;
-  const r = await apri({ titolo, testo, url, priorita: prioritaScelta, allegati, dryRun, idToken: cred.idToken, locale, attese: listaAttese, unisce: unite });
+  const r = await apri({
+    titolo, testo: copie && copie.origine ? `${String(testo || '').trim()}\n\n${copie.origine}` : testo, url, priorita: prioritaScelta,
+    allegati: copie ? [...allegati, ...copie.immagini, ...copie.documenti] : allegati,
+    dryRun, idToken: cred.idToken, locale, attese: listaAttese, unisce: unite,
+  });
   if (!r.ok) {
     console.error(`${r.uso ? 'USO' : 'RIFIUTATO'}: ${r.motivo}`);
     const daNpmSparito = r.uso && /mancante$/.test(r.motivo) ? avvisoTrattinoDaNpm(process.env) : '';
