@@ -212,21 +212,33 @@
       { campo: problemi[0].campo, campi: problemi.map((p) => p.campo) });
   }
 
+  // Una parola ha almeno una lettera o una cifra: «:» o «·» da soli non contano, «l'owner» e «D-186» valgono una.
+  function paroleDi(testo) {
+    return String(testo || '').split(/\s+/).filter((p) => /[\p{L}\p{N}]/u.test(p)).length;
+  }
+
   /**
    * Una domanda in ingresso, controllata e normalizzata. `conOrigine` false: l'origine la mette il server (biglietto).
-   * @returns {{ ok:true, domanda:object } | { ok:false, errore:string, dettaglio:string }}
+   * `perOwner` false solo per una domanda che il server apre per il compito e non arriva all'owner (il terzo guasto
+   * uguale, §3.8): lì un'opzione sola e i pro e contro vuoti passano, perché a smistarla è il compito.
+   * @returns {{ ok:true, domanda:object } | { ok:false, errore:string, dettaglio:string, campo?:string }}
    */
-  function validaDomanda(input, { conOrigine = true } = {}) {
+  function validaDomanda(input, { conOrigine = true, perOwner = true } = {}) {
     if (!isOggetto(input)) return no('domanda_non_valida', 'la domanda deve essere un oggetto JSON');
     const ignoti = Object.keys(input).filter((k) => !CAMPI_DOMANDA.includes(k) && !CAMPI_DEL_SERVER.includes(k));
     if (ignoti.length) {
       return no('campo_sconosciuto', `campi sconosciuti: ${ignoti.slice(0, 8).map((k) => k.slice(0, 40)).join(', ')}. I campi sono ${CAMPI_DOMANDA.join(', ')}`);
     }
     const titolo = typeof input.titolo === 'string' ? input.titolo.trim() : '';
-    if (!titolo) return no('titolo_mancante', 'manca il titolo: una riga che dice cosa si chiede');
+    if (!titolo) return no('titolo_mancante', 'manca il titolo: una riga che dice di cosa si parla', { campo: 'titolo' });
     const t = lunghezzaOk(titolo, 'titolo', TETTI.titolo);
     if (t) return t;
-    if (!PRIORITA.includes(input.priorita)) return no('priorita_non_valida', `la priorità va scelta fra ${PRIORITA.join(', ')}`);
+    const parole = paroleDi(titolo);
+    if (perOwner && parole > TETTI.paroleTitolo) {
+      return no('titolo_troppo_lungo', `il titolo ha ${parole} parole, il massimo è ${TETTI.paroleTitolo}: dice di cosa si parla, il resto va nel contesto`,
+        { campo: 'titolo', lunghezza: parole, massimo: TETTI.paroleTitolo });
+    }
+    if (!PRIORITA.includes(input.priorita)) return no('priorita_non_valida', `la priorità va scelta fra ${PRIORITA.join(', ')}`, { campo: 'priorita' });
     const testi = {};
     for (const campo of ['contesto', 'problema', 'notePerAgenti', 'gruppo']) {
       const r = testoFacoltativo(input, campo, TETTI[campo]);
