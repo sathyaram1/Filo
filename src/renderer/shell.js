@@ -1610,6 +1610,8 @@
         azioni: Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || ''),
         chiusa: c.dataset.closing === '1',
         indirizzo: c.dataset.indirizzo || '',
+        // #588.8 — lo scaricamento che la carta porta con sé quando la si trascina.
+        trascina: c.dataset.trascina || '',
       }));
       const altre = tutte.filter((c) => c.dataset.attesa === '1' && c.dataset.closing !== '1').length;
       const cs = getComputedStyle(document.documentElement);
@@ -1750,6 +1752,7 @@
         if (gemella._alChiudere !== opts.alChiudere) uscita(gemella);
         gemella._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
         gemella.dataset.indirizzo = opts.indirizzo ? String(opts.indirizzo) : '';
+        gemella.dataset.trascina = opts.trascinaDownloadId ? String(opts.trascinaDownloadId) : '';
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
         gemella._durata = durata;
@@ -1768,6 +1771,7 @@
       if (opts.key) card.dataset.key = String(opts.key);
       if (chiave) card.dataset.unica = chiave;
       if (opts.indirizzo) card.dataset.indirizzo = String(opts.indirizzo);
+      if (opts.trascinaDownloadId) card.dataset.trascina = String(opts.trascinaDownloadId);
 
       const msg = document.createElement('div');
       msg.className = 'shell-notif-msg';
@@ -1848,6 +1852,14 @@
       if (!res) return;
       if (res.ok === false) { avvisoErrore(res.error || 'Non è stato possibile aprire la cartella', 'cartella_non_aperta'); return; }
       if (res.missing) avvisoErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto');
+    }).catch(() => {});
+  }
+
+  // #1287 — «Riprova» da un avviso o da una riga: lo stesso indirizzo riparte nella stessa voce.
+  function riprovaDownload(id) {
+    if (!api.downloads || !api.downloads.riprova) return Promise.resolve();
+    return api.downloads.riprova(id).then((res) => {
+      if (res && res.ok === false) avvisoErrore(res.error || 'Non sono riuscito a far ripartire lo scaricamento', 'download_failed');
     }).catch(() => {});
   }
 
@@ -1942,10 +1954,23 @@
               }).catch(() => {}),
             };
           }
+          // #1287 — lo scaricamento non riuscito riparte nella stessa voce.
+          if (a && a.riprovaDownloadId && !a.onClick && api.downloads && api.downloads.riprova) {
+            const id = a.riprovaDownloadId;
+            return { label: a.label, onClick: () => riprovaDownload(id) };
+          }
+          // #1357.2 — il nome che Filo non ha saputo dare: la casella per scriverlo, nella pagina Download.
+          if (a && a.rinominaDownloadId && !a.onClick) {
+            const id = a.rinominaDownloadId;
+            return { label: a.label, onClick: () => api.tabs.open(`filo://downloads/downloads.html?rinomina=${encodeURIComponent(id)}`) };
+          }
           return a;
         }),
       };
       if (allaChiusura) opts.alChiudere = allaChiusura;
+      // #588.8 — l'avviso di un file arrivato si trascina come il file: dove lo si lascia, arriva quello.
+      const delFile = info.opts.actions.find((a) => a && typeof a.openDownloadId === 'string');
+      if (delFile) opts.trascinaDownloadId = delFile.openDownloadId;
     }
     NOTIFS.show(info.text, opts);
   });
@@ -1979,6 +2004,8 @@
     // nella riga che li ha chiesti (id → testo).
     const domandeApri = new Map();
     const avvisiRiga = new Map();
+    // #1287 — { n, nome } mentre la finestra in incognito aspetta di sapere cosa fare degli scaricamenti in corso.
+    let chiusura = null;
     // #588 — il «sì» di una domanda sui programmi non si dà col clic che l'ha
     // fatta comparire: la riga nasce dove la pagina ha appena mandato il
     // cursore, e un doppio clic risponderebbe senza leggerla. I pulsanti che
@@ -2065,6 +2092,12 @@
       head.appendChild(clearBtn);
       head.appendChild(closeBtn);
       panel.appendChild(head);
+      const domandaChiusura = document.createElement('div');
+      domandaChiusura.className = 'dl-chiusura';
+      domandaChiusura.id = 'dl-chiusura';
+      domandaChiusura.hidden = true;
+      domandaChiusura.setAttribute('role', 'alertdialog');
+      panel.appendChild(domandaChiusura);
       const list = document.createElement('div');
       list.className = 'dl-panel-list';
       list.id = 'dl-panel-list';
@@ -2082,7 +2115,8 @@
         if (rank(a) !== rank(b)) return rank(a) - rank(b);
         return String(b.startedAt || '').localeCompare(String(a.startedAt || ''));
       });
-      const firma = all.map((r) => `${r.id}:${r.state === 'pending' ? 'p' : ''}${domandeApri.has(r.id) ? 'a' : ''}`).join('|');
+      const firma = all.map((r) => `${r.id}:${r.state === 'pending' ? 'p' : ''}${domandeApri.has(r.id) ? 'a' : ''}`).join('|')
+        + (chiusura ? `|chiusura:${chiusura.n}` : '');
       if (firma !== firmaElenco) { firmaElenco = firma; elencoFermoDa = Date.now(); }
       if (!all.length) {
         const empty = document.createElement('div');
@@ -2094,6 +2128,7 @@
       } else {
         list.replaceChildren(...all.map(renderRow));
       }
+      disegnaChiusura();
       const manca = elencoFermoDa + ARMA_MS - Date.now();
       if (manca > 0 && !timerArma) {
         timerArma = setTimeout(() => { timerArma = null; if (panelOpen) renderPanel(); }, manca + 20);
@@ -2141,9 +2176,13 @@
       meta.className = 'dl-row-meta';
       const p = pct(r);
       if (isActive(r)) {
-        meta.textContent = p != null
+        const base = p != null
           ? `${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
           : `${fmtBytes(r.receivedBytes)} scaricati`;
+        // #1287 — quanto va veloce e quanto manca, misurati dal main.
+        let corsa = '';
+        try { corsa = window.SN_SCARICAMENTI_AVANZAMENTO.velocitaEResto(r); } catch (_) {}
+        meta.textContent = corsa ? `${base} · ${corsa}` : base;
       } else if (r.missing) {
         meta.textContent = `Non più sul disco · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       } else if (r.state === 'pending') {
@@ -2212,9 +2251,21 @@
         addBtn('Apri cartella', () => openDownloadFolder(r.id));
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
       } else {
+        if (r.state === 'interrupted' && /^https?:/i.test(String(r.url || ''))) addBtn('Riprova', () => riprovaDownload(r.id));
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
       }
       row.appendChild(actions);
+      // #588.8 — un file arrivato si trascina dalla sua riga: sul campo per caricare file di un sito, nella chat.
+      if (r.state === 'completed' && !r.missing && api.downloads.trascina) {
+        row.draggable = true;
+        row.dataset.trascina = '1';
+        row.addEventListener('dragstart', (e) => {
+          e.preventDefault();
+          api.downloads.trascina(r.id).then((res) => {
+            if (res && res.ok === false && res.error) { avvisiRiga.set(r.id, res.error); if (panelOpen) renderPanel(); }
+          }).catch(() => {});
+        });
+      }
       if (r.state === 'completed' && !apri) {
         row.addEventListener('contextmenu', (e) => { e.preventDefault(); apriMenuRiga(r); });
         if (menuRiga.id === r.id && menuRiga.voci.length) {
@@ -2314,6 +2365,8 @@
     }
     function closePanel() {
       panelOpen = false;
+      // Chiuso il pannello senza rispondere, la finestra in incognito resta aperta.
+      chiusura = null;
       // Chiudere il pannello è non rispondere: «aprirlo?» si ritira, mentre un programma in attesa resta in
       // attesa, e la risposta si dà dalla pagina Download o dalla carta della home.
       domandeApri.clear();
@@ -2336,8 +2389,58 @@
       if (panelOpen) renderPanel();
     }
 
+    // #1287 (D51) — la finestra in incognito si sta chiudendo con scaricamenti in corso: la domanda sta in cima al
+    // pannello, sopra la pagina. Le due risposte chiudono la finestra; chiudere il pannello la lascia aperta.
+    function disegnaChiusura() {
+      const el = panel && panel.querySelector('#dl-chiusura');
+      if (!el) return;
+      if (!chiusura) { el.hidden = true; el.replaceChildren(); return; }
+      const testo = document.createElement('div');
+      testo.className = 'dl-chiusura-testo';
+      if (chiusura.n === 1) {
+        testo.append('Chiudo la finestra, ma ');
+        const nome = document.createElement('span');
+        nome.className = 'dl-chiusura-nome';
+        nome.textContent = `«${chiusura.nome}»`;
+        testo.append(nome, ' non ha finito di scaricarsi: lo lascio finire?');
+      } else {
+        testo.textContent = `Chiudo la finestra, ma ${chiusura.n} scaricamenti non sono finiti: li lascio finire?`;
+      }
+      const azioni = document.createElement('div');
+      azioni.className = 'dl-row-actions';
+      const spento = Date.now() - elencoFermoDa < ARMA_MS;
+      for (const [etichetta, scelta, nota] of [
+        ['Lascia finire', 'finire', 'Chiude la finestra: il file arriva lo stesso nella cartella Download'],
+        ['Annulla', 'annulla', 'Ferma lo scaricamento e chiude la finestra'],
+      ]) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'dl-row-btn';
+        b.textContent = etichetta;
+        b.dataset.scelta = scelta;
+        b.title = nota;
+        b.disabled = spento;
+        b.addEventListener('click', () => {
+          api.downloads.chiusura(scelta).then((res) => {
+            if (res && res.ok === false) { chiusura = null; if (panelOpen) renderPanel(); }
+          }).catch(() => {});
+        });
+        azioni.appendChild(b);
+      }
+      el.replaceChildren(testo, azioni);
+      el.hidden = false;
+    }
+    function chiediChiusura(items) {
+      const vive = (Array.isArray(items) ? items : []).filter((r) => r && r.id);
+      if (!vive.length) return;
+      for (const r of vive) dls.set(r.id, r);
+      chiusura = { n: vive.length, nome: vive[0].filename || 'download' };
+      if (panelOpen) renderPanel(); else openPanel();
+    }
+
     // Aggiornamenti live dal main (start/progress/done/error/removed).
     api.downloads.onEvent((info) => {
+      if (info && info.kind === 'chiusura') { chiediChiusura(info.items); return; }
       if (!info || !info.item) return;
       if (info.kind === 'removed') dls.delete(info.item.id);
       else dls.set(info.item.id, info.item);

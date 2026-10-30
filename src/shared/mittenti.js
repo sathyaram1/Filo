@@ -8,7 +8,7 @@
   const CLASSI = Object.freeze(['owner', 'utente', 'filo_per_utente', 'sessione_locale', 'routine', 'server', 'test']);
   // I ruoli che il server scrive dopo `routine:` (quelli dei biglietti più i rilievi residui). Fuori elenco (etichette
   // storiche, nomi di sessione della vecchia coda) vale `ignoto`: la statistica non inventa ruoli.
-  const RUOLI = Object.freeze(['new-work', 'fixer', 'verifier', 'secaudit', 'risposta', 'smistamento', 'prober', 'residuo']);
+  const RUOLI = Object.freeze(['new-work', 'fixer', 'verifier', 'secaudit', 'risposta', 'smistamento', 'compito', 'prober', 'residuo']);
   const RUOLO_IGNOTO = 'ignoto';
   // Le classi dell'owner e dei suoi processi: valgono solo con la prova del mittente, che un client anonimo non scrive.
   const PROCESSI = Object.freeze(['owner', 'sessione_locale', 'routine', 'server']);

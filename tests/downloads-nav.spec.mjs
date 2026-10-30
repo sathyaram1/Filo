@@ -211,7 +211,8 @@ test('una pagina web esterna non può leggere né comandare gli scaricamenti', a
 
     // Comandi: tutti negati (aprire un file scaricato = eseguirlo, su Windows).
     for (const type of ['download_open_file', 'download_open_folder', 'download_remove',
-      'download_cancel', 'download_pause', 'download_resume', 'downloads_clear']) {
+      'download_cancel', 'download_pause', 'download_resume', 'downloads_clear',
+      'download_riprova', 'download_trascina', 'download_chiusura']) {
       const r = await fromWeb({ type, id });
       expect(r.error, `${type} accessibile da una pagina web`).toBe('forbidden');
     }

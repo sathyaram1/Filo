@@ -56,6 +56,7 @@ require(path.join(SHARED, 'dominiGoogle.js')); // #1123 — i domini di Google s
 require(path.join(SHARED, 'nomiSito.js')); // #590 — quando un dominio scritto a mano è valido, e come si legge (prima di eseguibili)
 require(path.join(SHARED, 'pagineDelicate.js')); // #1004 — quali pagine non mandano testo ai modelli nei lavori automatici
 require(path.join(SHARED, 'eseguibili.js')); // #588 — quali file il sistema ESEGUE (logica pura)
+require(path.join(SHARED, 'scaricamentiAvanzamento.js')); // #1287 — velocità e tempo che resta di uno scaricamento (logica pura)
 require(path.join(SHARED, 'nomiFile.js')); // #950 — nome sensato ai file dell'utente (logica pura)
 // #585 — pulizia e incapsulamento dei percorsi condivisi. Va PRIMA di paths.js
 // (che la usa in scrittura) e di handlers.js (che la usa in lettura).
@@ -86,6 +87,7 @@ require(path.join(SHARED, 'feedbackMine.js')); // #678 — il registro dei feedb
 require(path.join(SHARED, 'feedbackLive.js')); // confronto versioni + fusione per l'aggiornamento continuo della dashboard
 require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a stati (fonte unica, SPEC-RIDISEGNO-MAX.md §7)
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro di verifica (fonte unica, feedback #561)
+require(path.join(SHARED, 'ambiti.js')); // #1153 — operazioni e ambiti dei biglietti (fonte unica, incorporata dal server); prima di domande per le etichette
 require(path.join(SHARED, 'domande.js')); // #1149 — azioni delle domande all'owner come dati (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'mittenti.js')); // #1162 — classe del mittente, solo statistica (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocabolario stati (consuma i dati qui sopra)
@@ -117,6 +119,7 @@ require(path.join(SHARED, 'routineCrediti.js'));  // #1356 — i numeri dell'own
 require(path.join(SHARED, 'routineModelli.js'));  // #1193 — modello e sforzo per fase: stesse regole in pagina e nel main
 require(path.join(SHARED, 'spesaGiudici.js'));  // #1515 — tetto di spesa dei giudici: stesse regole in pagina e nel main
 require(path.join(SHARED, 'compiti.js'));  // #1196 — i compiti delle routine: stesse regole in pagina, nel main e nello script
+require(path.join(SHARED, 'ricorrenti.js'));  // #1153 — cadenza dei compiti ricorrenti (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
 // #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
 // Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).

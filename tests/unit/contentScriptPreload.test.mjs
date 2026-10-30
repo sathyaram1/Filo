@@ -30,11 +30,21 @@ const DIFFERENZE = {
     'src/content/propostaEmail.js': 'l\'email dell\'account proposta nei campi di accesso: niente proposte sulle pagine di Filo',
     'src/shared/menuDescritto.js': 'il menu come dati per lo strato sopra la scheda: sulle pagine di Filo resta nella pagina',
     'src/content/menuNelloStrato.js': 'il menu nello strato sopra la scheda: sulle pagine di Filo resta nella pagina',
+    'src/content/riquadriSopraLaScheda.js': 'i riquadri nello strato sopra la scheda: sulle pagine di Filo restano nella pagina',
   },
   soloPagineInterne: {
     'tests/fixtures/testModels.js': 'modelli di prova, caricati solo con NODE_ENV=test',
   },
 };
+
+// Lo strato dei riquadri sopra un sito (#1509.1) carica l'elenco delle pagine interne, tranne ciò che descrive la scheda,
+// e in coda chi lo comanda.
+const FUORI_DALLO_STRATO = {
+  'src/shared/tabColor.js': 'il colore della scheda: lo strato parla come la pagina ma non la descrive',
+  'src/content/pageColor.js': 'il colore della scheda: lo strato parla come la pagina ma non la descrive',
+  'tests/fixtures/testModels.js': 'modelli di prova delle pagine interne',
+};
+const SOLO_NELLO_STRATO = ['src/content/stratoRiquadri.js'];
 
 const BASI = {
   SHARED_DIR: 'src/shared', CONTENT_DIR: 'src/content',
@@ -73,6 +83,7 @@ const pageSrc = leggi('src', 'preload', 'page-preload.js');
 const internalSrc = leggi('src', 'preload', 'internal-preload.js');
 const web = elencoScript(corpoFunzione(pageSrc, 'loadScripts'));
 const interne = elencoScript(corpoFunzione(internalSrc, 'loadContentScripts'));
+const strato = elencoScript(corpoFunzione(leggi('src', 'preload', 'riquadri-preload.js'), 'loadContentScripts'));
 
 test('i due elenchi si leggono davvero', () => {
   for (const [nome, elenco] of [['page-preload', web], ['internal-preload', interne]]) {
@@ -91,6 +102,13 @@ test('pagine web e pagine interne caricano gli stessi content script nello stess
     + 'nello stesso punto, oppure in DIFFERENZE col suo perché');
 });
 
+test('lo strato dei riquadri carica gli script delle pagine interne, senza quelli che descrivono la scheda', () => {
+  assert.deepEqual(strato, [...interne.filter((f) => !Object.hasOwn(FUORI_DALLO_STRATO, f)), ...SOLO_NELLO_STRATO],
+    'riquadri-preload.js diverge da internal-preload.js: un file va in tutti e due, nello stesso punto, '
+    + 'oppure in FUORI_DALLO_STRATO col suo perché');
+  for (const f of Object.keys(FUORI_DALLO_STRATO)) assert.ok(interne.includes(f), `${f} non è più nelle pagine interne: toglilo da FUORI_DALLO_STRATO`);
+});
+
 test('le differenze ammesse sono ancora differenze vere', () => {
   for (const f of Object.keys(DIFFERENZE.soloPagineWeb)) {
     assert.ok(web.includes(f), `${f} non è più in page-preload.js: toglilo da DIFFERENZE`);
@@ -103,7 +121,7 @@ test('le differenze ammesse sono ancora differenze vere', () => {
 });
 
 test('ogni script elencato esiste: il caricamento ne ingoia l\'assenza', () => {
-  for (const f of new Set([...web, ...interne])) {
+  for (const f of new Set([...web, ...interne, ...strato])) {
     assert.ok(existsSync(join(ROOT, f)), `${f} è elencato in un preload ma non esiste`);
   }
 });

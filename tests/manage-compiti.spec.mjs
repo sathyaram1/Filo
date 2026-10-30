@@ -36,13 +36,14 @@ const FATTO = {
 const VECCHIO = { ...FATTO, id: 'C-1', numero: 1, feedbackNum: '#650', stato: 'superato', esito: 'risolto', chiusoIl: ORA - 900 * MIN, biglietti: [] };
 
 // Un main finto con lo stato del server: `crea` e `annulla` lo cambiano come ownerCompiti.
-async function apri(openTab, { owner = true, elenco = null, falliscono = false, aperti = null } = {}) {
+async function apri(openTab, { owner = true, elenco = null, falliscono = false, aperti = [P3, IN_CORSO, MANUALE], approvati = null } = {}) {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo && window.SN_COMPITI && window.__mgCompiti);
   await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate(({ owner, elenco, falliscono, base }) => {
+  await page.evaluate(({ owner, elenco, falliscono, base, approvati }) => {
     window.__cp = { aperti: base.aperti, storico: base.storico, vecchi: base.vecchi, inviati: [], letture: 0, falliscono };
+    const ambiti = window.SN_AMBITI.elenco(approvati);
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
       const cp = window.__cp;
@@ -58,7 +59,7 @@ async function apri(openTab, { owner = true, elenco = null, falliscono = false, 
         }
         if (cp.falliscono) return { ok: false, error: 'Il server non risponde.' };
         if (msg.prima) return { ok: true, aperti: cp.aperti, storico: cp.vecchi, altri: false, adesso: Date.now() };
-        return JSON.parse(JSON.stringify(elenco || { ok: true, aperti: cp.aperti, storico: cp.storico, altri: true, adesso: Date.now() }));
+        return JSON.parse(JSON.stringify(elenco || { ok: true, aperti: cp.aperti, storico: cp.storico, altri: true, adesso: Date.now(), ambiti }));
       }
       if (msg && msg.type === 'compito_crea') {
         cp.inviati.push(msg);
@@ -75,7 +76,7 @@ async function apri(openTab, { owner = true, elenco = null, falliscono = false, 
       }
       return orig(msg);
     };
-  }, { owner, elenco, falliscono, base: { aperti: aperti || [P3, IN_CORSO, MANUALE], storico: [FATTO], vecchi: [VECCHIO] } });
+  }, { owner, elenco, falliscono, approvati, base: { aperti, storico: [FATTO], vecchi: [VECCHIO] } });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await apriScheda(page, 'compiti');
   await expect(page.locator('#panel-compiti')).toHaveClass(/mg-panel--active/);
@@ -161,7 +162,8 @@ test('nuovo compito: si rifiuta prima di mandare, si crea con le scelte, compare
   await expect(nuovo.locator('.mg-cp-nome')).toHaveText('C-9 · Rifai #813 con Sonnet 🙂');
   await expect(nuovo).toBeFocused();
   await expect(nuovo).toHaveAttribute('aria-expanded', 'true');
-  await expect(nuovo).toContainText('Nessuna chiamata: aspetta il ruolo che esegue i compiti senza feedback.');
+  await expect(nuovo).toContainText('Nessuna chiamata.');
+  await expect(nuovo).not.toContainText('Nessuna chiamata:');
   await expect(righe(page, 'inAttesa').locator('.mg-cp-nome')).toHaveText(['#1196 · primo lavoro', 'C-9 · Rifai #813 con Sonnet 🙂', 'C-7 · Guarda i log <b>di ieri</b>']);
 
   await nuovo.getByRole('button', { name: 'Annulla il compito' }).click();
@@ -319,4 +321,45 @@ test('il compito che smista una domanda si chiama dalla domanda e la apre', asyn
   await r.getByRole('button', { name: 'Apri la domanda' }).click();
   await expect(page.locator('#panel-domande')).toHaveClass(/mg-panel--active/);
   await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-20"]')).toBeVisible();
+});
+
+test('istanze dei ricorrenti e unioni col loro nome; chi aspetta dice perché; gli ambiti sono quelli del server', async ({ openTab }) => {
+  const ric = {
+    id: 'C-20', numero: 20, tipo: 'ricorrente', titolo: 'Revisione delle domande', ricorrenteId: 'rev-domande', stato: 'aperto', aperto: true,
+    urgenza: 30, modello: 'opus', sforzo: 'high', ambito: 'domande', fiducia: 'fidato', creatoIl: ORA - 5 * MIN, nonPrimaDi: ORA + 180 * MIN, attesa: '', biglietti: [],
+  };
+  const unione = {
+    id: 'C-21', numero: 21, tipo: 'unione', titolo: 'Unione di #12, #15', feedbackNums: ['#12', '#15'], stato: 'aperto', aperto: true, urgenza: 20,
+    modello: 'opus', sforzo: 'high', ambito: 'unisci', fiducia: 'fidato', creatoIl: ORA - 5 * MIN, attesa: 'aspetta l’ambiente dei riservati', biglietti: [],
+  };
+  const page = await apri(openTab, { aperti: [P3, ric, unione, { ...MANUALE, attesa: '' }], approvati: { notizie: { operazioni: ['feedback.apri'], nonPuo: 'altro' } } });
+  await expect(righe(page, 'inAttesa').locator('.mg-cp-nome')).toHaveText(['#1196 · primo lavoro', 'C-20 · Revisione delle domande', 'C-21 · Unione di #12, #15', 'C-7 · Guarda i log <b>di ieri</b>']);
+  const quando = await page.evaluate((ms) => window.SN_RICORRENTI.quandoTesto(ms), ric.nonPrimaDi);
+  const r = page.locator('.mg-cp-riga[data-id="C-20"]');
+  const u = page.locator('.mg-cp-riga[data-id="C-21"]');
+  // ORA è di quando il file è partito: i minuti d'attesa crescono con le prove prima di questa.
+  await expect(r).toContainText(new RegExp(`in attesa da \\d+ min: non prima di ${quando}`));
+  await expect(u).toContainText(/in attesa da \d+ min: aspetta l’ambiente dei riservati/);
+  await expect(u.locator('.mg-cp-urg')).toHaveAttribute('title', 'Urgenza 20, quella delle unioni di feedback');
+  await expect(righe(page, 'inAttesa').first()).not.toContainText(':');
+  await u.click();
+  await expect(u.locator('.mg-cp-chiamata')).toHaveText('Nessuna chiamata: aspetta l’ambiente dei riservati.');
+  await r.click();
+  await expect(r.locator('.mg-cp-chiamata')).toHaveText(`Nessuna chiamata: non prima di ${quando}.`);
+  await expect(r.getByRole('button', { name: 'Apri il ricorrente' })).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/manage-compiti-ricorrenti.png' });
+
+  // Un compito a mano prende ogni ambito attivo del server, anche uno approvato dall'owner; uno non ancora attivo no.
+  await page.locator('#mgCpNuovoApri').click();
+  const opzioni = await page.locator('#mgCpAmbito option').evaluateAll((os) => os.map((o) => [o.value, o.textContent]));
+  expect(opzioni.map((o) => o[0])).toContain('notizie');
+  expect(opzioni).toContainEqual(['domande', 'domande (ambiente dei riservati)']);
+  expect(opzioni.map((o) => o[0])).not.toContain('posta');
+  await expect(page.locator('#mgCpAmbito')).toHaveValue('lavoro');
+  await page.locator('#mgCpTitolo').fill('Cerca notizie');
+  await page.locator('#mgCpAmbito').selectOption('notizie');
+  await page.locator('#mgCpCrea').click();
+  await expect(page.locator('#mgCpNuovo')).toBeHidden();
+  const crea = await page.evaluate(() => window.__cp.inviati.find((m) => m.type === 'compito_crea'));
+  expect(crea.compito.ambito).toBe('notizie');
 });

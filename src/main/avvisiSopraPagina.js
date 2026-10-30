@@ -9,6 +9,7 @@ const { VuotoDellaVista } = require('./vuotoDellaVista');
 const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
 const AZIONE = /^(chiudi|\d{1,2})$/;
 const PILA = /^(apri|riduci|chiudi-tutti)$/;
+const ID_SCARICAMENTO = /^[A-Za-z0-9-]{1,64}$/;
 
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
 const lato = (v) => Math.max(0, Math.min(10000, Math.round(Number(v) || 0)));
@@ -24,6 +25,7 @@ function pulisci(stato) {
       azioni: (Array.isArray(c.azioni) ? c.azioni : []).map(testo),
       chiusa: c.chiusa === true,
       indirizzo: /^https?:\/\//i.test(testo(c.indirizzo)) ? testo(c.indirizzo) : '',
+      trascina: ID_SCARICAMENTO.test(testo(c.trascina)) ? testo(c.trascina) : '',
     }));
   const altre = Math.max(0, Math.min(100000, Math.round(Number(stato && stato.altre) || 0)));
   const aperta = !!(stato && stato.aperta === true);
@@ -294,6 +296,12 @@ class AvvisiSopraPagina {
         this._menu(dati);
       } else if (canale === 'avvisi:sopra') {
         this._sopra(!!(dati && dati.sopra));
+      } else if (canale === 'avvisi:trascina') {
+        // #588.8 — il file lo sceglie la carta che la shell ha mandato, non la vista.
+        const carta = ((this.stato && this.stato.carte) || []).find((c) => c.id === testo(dati && dati.id));
+        if (!carta || !carta.trascina) return;
+        const D = require('./services/downloads');
+        D.trascina(wc, carta.trascina, D.scopeOfWindow(this.win)).catch(() => {});
       }
     });
     wc.once('did-finish-load', () => { this.pronta = true; this._invia(); });

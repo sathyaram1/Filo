@@ -310,7 +310,7 @@ test('owner: un rifiuto bad_slot si legge, col messaggio e l\'elenco del server'
 
 test('owner: l\'aiuto elenca gli slot veri', () => {
   const e = owner.leggiArgomenti(['inventato']).errore;
-  assert.match(e, /orchestrator, worker, new-work, fixer, verifier, secaudit$/m);
+  assert.match(e, /tutti, orchestrator, worker, new-work, fixer, verifier, secaudit, compito, compito:<ricorrente>/m);
   assert.doesNotMatch(e, /resolver/);
 });
 

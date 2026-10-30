@@ -10,7 +10,8 @@
   const Disp = global.SN_DISPOSIZIONE_ICONE;
 
   // Le comandano solo la barra (via main) e il frame principale: un riquadro incorporato non ha la pagina.
-  const IS_SUBFRAME = (() => {
+  // Lo strato dei riquadri vale come lui.
+  const IS_SUBFRAME = global.SN_FILO_UI?.nelloStrato === true || (() => {
     try { return window.top !== window.self; } catch (_) { return true; }
   })();
 

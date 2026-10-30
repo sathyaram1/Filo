@@ -528,6 +528,16 @@ module.exports = function register(on, ctx) {
   on(MSG.DOWNLOAD_CANCEL, internalOnly(contata('annulla', async (msg, s) => DL().cancel(msg.id, ambito(s)))));
   on(MSG.DOWNLOAD_PAUSE, internalOnly(contata('pausa', async (msg, s) => DL().pause(msg.id, ambito(s)))));
   on(MSG.DOWNLOAD_RESUME, internalOnly(contata('riprendi', async (msg, s) => DL().resume(msg.id, ambito(s)))));
+  on(MSG.DOWNLOAD_RIPROVA, internalOnly(async (msg, s) => DL().riprova(msg.id, ambito(s))));
+  on(MSG.DOWNLOAD_TRASCINA, internalOnly(async (msg, s) => {
+    if (!s || !s.wc || s.wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
+    return DL().trascina(s.wc, msg.id, ambito(s));
+  }));
+  // Chiudere la finestra lo decide solo la sua barra: una scheda interna non risponde per lei.
+  on(MSG.DOWNLOAD_CHIUSURA, async (msg, s) => {
+    if (!s || !s.isShell || !s.win) return { ok: false, error: 'forbidden' };
+    return DL().rispondiChiusura(s.win, msg.scelta === 'annulla' ? 'annulla' : 'finire');
+  });
 
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
     // Alla shell, così l'ombra dell'annotazione copre tutto Filo e non la sola area pagina.

@@ -354,6 +354,13 @@
     DOWNLOAD_CANCEL: 'download_cancel',
     DOWNLOAD_PAUSE: 'download_pause',
     DOWNLOAD_RESUME: 'download_resume',
+    // #1287 — rifà uno scaricamento fallito nella stessa voce. { id } → { ok, items } | { ok:false, error, items }
+    DOWNLOAD_RIPROVA: 'download_riprova',
+    // #588.8 — fa partire il trascinamento di sistema del file scaricato dalla superficie che lo chiede. { id } → { ok }
+    DOWNLOAD_TRASCINA: 'download_trascina',
+    // #1287 — la risposta della finestra in incognito che si chiude con scaricamenti in corso: solo dalla sua barra.
+    // { scelta: 'finire' | 'annulla' } → { ok }
+    DOWNLOAD_CHIUSURA: 'download_chiusura',
     // #950 — rimette il nome con cui lo scaricamento era arrivato. { id } → { ok, nome } | { ok:false, frase }
     DOWNLOAD_RIMETTI_NOME: 'download_rimetti_nome',
     // #950 — nome sensato a un file dell'utente. Toccano il disco e rispondono con percorsi assoluti: solo dalle
@@ -505,6 +512,10 @@
     STRATO_MENU_ESEGUI: 'strato_menu_esegui',        // main → content script { id, n, args, chiude } | { id, inline, cammino }
     STRATO_MENU_INCOLLA: 'strato_menu_incolla',      // main → content script { id, testo, immagine } | { id, voce }
     STRATO_MENU_CHIUSO: 'strato_menu_chiuso',        // main → content script { id }
+    // I riquadri di Filo su un sito nello strato sopra la scheda (#1509.1). Aperto ai siti: chi apre è il content script
+    // della scheda, e il riquadro nasce dove il sito non lo vede.
+    RIQUADRO_APRI: 'riquadro_apri',                  // { tipo: feedback|modifica|redteam|risposta, dati } → { ok, id }
+    RIQUADRO_SOSTITUISCI: 'riquadro_sostituisci',    // main → content script { id, testo }: Sostituisci della Modifica
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
     PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
     PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }
@@ -724,6 +735,12 @@
     COMPITI_ELENCO: 'compiti_elenco',   // { storico?:<n>, prima?:<ms> } → { ok, aperti:[…], storico:[…], altri, adesso } | { ok:false, error }
     COMPITO_CREA: 'compito_crea',       // { compito:{ titolo, istruzioni?, urgenza, modello?, sforzo?, ambito? } } → { ok, id } | { ok:false, error }
     COMPITO_ANNULLA: 'compito_annulla', // { id:'C-n' } → { ok, id } | { ok:false, error }
+    // I compiti ricorrenti (SPEC-DOMANDE.md §4.1), dalla stessa callable: li scrive solo l'owner.
+    RICORRENTI_ELENCO: 'ricorrenti_elenco', // {} → { ok, adesso, ricorrenti:[…], ambiti:[…] } | { ok:false, error }
+    RICORRENTE_SALVA: 'ricorrente_salva',   // { ricorrente:{ id?, nome, testo, giorni, ora, ambito, urgenza, modello, sforzo, attivo, domandaFineTurno } } → { ok, id } | { ok:false, error }
+    RICORRENTE_TOGLI: 'ricorrente_togli',   // { id } → { ok, id } (chiude anche l'istanza in attesa) | { ok:false, error }
+    RICORRENTE_AVVIA: 'ricorrente_avvia',   // { id } → { ok, id, compitoId } | { ok:false, error }
+    AMBITO_TOGLI: 'ambito_togli',           // { nome } → { ok, nome } (solo uno approvato dall'owner, non in uso) | { ok:false, error }
     // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
     // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
     // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner

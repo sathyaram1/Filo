@@ -89,7 +89,12 @@ contextBridge.exposeInMainWorld('filoShell', {
     resume: (id) => ipcRenderer.invoke('filo:message', { type: 'download_resume', id }),
     // #950 — rimette il nome con cui il file era arrivato (l'«Annulla» dell'avviso «Nome dato»).
     rimettiNome: (id, luogo) => ipcRenderer.invoke('filo:message', { type: 'download_rimetti_nome', id, luogo }),
-    // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error'|'missing'|'removed'|'ask', item }
+    riprova: (id) => ipcRenderer.invoke('filo:message', { type: 'download_riprova', id }),
+    trascina: (id) => ipcRenderer.invoke('filo:message', { type: 'download_trascina', id }),
+    // La risposta alla domanda della finestra in incognito che si chiude: 'finire' | 'annulla'.
+    chiusura: (scelta) => ipcRenderer.invoke('filo:message', { type: 'download_chiusura', scelta }),
+    // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error'|'missing'|'removed'|'ask', item },
+    // e { kind:'chiusura', items } quando la finestra in incognito chiede prima di chiudersi.
     onEvent: (fn) => {
       const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
       ipcRenderer.on('shell:download', wrapped);

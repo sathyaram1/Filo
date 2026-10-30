@@ -246,6 +246,21 @@
     ['oltre', Infinity]]);
   const DOCUMENTO_CHAT = Object.freeze(['intero', 'oltre_tetto']);
   const FORMATI = Object.freeze([['f0', 0], ['f1', 1], ['f2_5', 5], ['oltre', Infinity]]);
+  // Il livello di privacy delle pagine delicate (D-72, #1004.1) nella famiglia degli anticipi e di «Chiedi»: l'anticipo
+  // che la pagina non lascia partire, e il gesto che costa a chi poi lo chiede (il tasto destro, «Cerca» sul segnaposto).
+  const ANTICIPI_PRIVACY = Object.freeze(['spiega', 'segnaposto']);
+  const ESITI_PRIVACY = Object.freeze(['saltato', 'chiesto']);
+  // La famiglia del correttore dopo #1461. Le fonti sono quelle di SN_CORRETTORE_AUTO.FONTI (#1447).
+  const FONTI_AUTOMATICA = Object.freeze(['personale', 'fisso', 'nome']);
+  // «imparata»: dopo i rifiuti Filo smette di correggere da sé quella parola.
+  const ESITI_AUTOMATICA = Object.freeze(['fatta', 'annullata', 'imparata']);
+  const ESITI_VALUTA = Object.freeze(['chiesta', 'con_correzioni', 'senza_correzioni', 'correzione_mostrata',
+    'correzione_accettata', 'correzione_tolta']);
+  // Da dove viene il valore di un segnaposto (#1448): una ricerca partita da sola, una chiesta col clic, la memoria del
+  // modello senza ricerca. «delicata»: la ricerca da sola non parte su una pagina delicata.
+  const VIE_SEGNAPOSTO = Object.freeze(['da_solo', 'su_richiesta', 'memoria']);
+  const ESITI_SEGNAPOSTO = Object.freeze(['cercato', 'trovato', 'nessuno', 'fallito', 'delicata', 'bloccata', 'riempito',
+    'rifiutato']);
   const RIQUADRI = Object.freeze({
     anticipo_al_gesto: misuraNav(ANTICIPATE, [STATI_ANTICIPO]),
     riquadro_chiuso_prima: misuraNav(FUNZIONI_RIQUADRO, [NOMI_FASCE]),
@@ -255,9 +270,18 @@
     traduzione_pagina: misuraNav(ESITI_TRADUZIONE, [coppie(nomi(RIMASTO), ['si', 'no'])]),
     editor_titolo: misuraNav(TITOLI, [[...ESITI_TITOLO, ...nomi(ETA_TITOLO).map((e) => `riscritto_${e}`)]]),
     editor_chat: misuraNav(DOCUMENTO_CHAT, [[...nomi(FORMATI), 'formato_non_trovato', 'continua']]),
+    anticipo_privacy: misuraNav(ANTICIPI_PRIVACY, [ESITI_PRIVACY]),
+    correttore_automatica: misuraNav(FONTI_AUTOMATICA, [ESITI_AUTOMATICA]),
+    correttore_valuta: misuraNav(ESITI_VALUTA, [UNO]),
+    correttore_segnaposto: misuraNav(VIE_SEGNAPOSTO, [ESITI_SEGNAPOSTO]),
   });
   const MISURE_RIQUADRI = Object.freeze(Object.keys(RIQUADRI));
+  // Le misure arrivate dopo la forma v1 (#1586): campi facoltativi, che partono solo se hanno qualcosa. Così le regole
+  // accettano anche le copie vecchie, e la versione non cambia.
+  const MISURE_RIQUADRI_FACOLTATIVE = Object.freeze(['anticipo_privacy', 'correttore_automatica', 'correttore_valuta',
+    'correttore_segnaposto']);
   const CAMPI_RIQUADRI = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_RIQUADRI]);
+  const CAMPI_RIQUADRI_FISSI = Object.freeze(CAMPI_RIQUADRI.filter((c) => !MISURE_RIQUADRI_FACOLTATIVE.includes(c)));
   // Tutto quello che un'ora tiene sul disco, nei sei documenti.
   const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE, ...MISURE_GESTI, ...MISURE_NAVIGAZIONE, ...MISURE_ATTIVITA,
     ...MISURE_RIQUADRI]);
@@ -1592,6 +1616,10 @@
     editor_chat: (d) => [typeof d.oltreTetto === 'boolean' ? (d.oltreTetto ? 'oltre_tetto' : 'intero') : '',
       d.continua === true ? 'continua' : d.nonTrovato === true ? 'formato_non_trovato'
         : Number.isInteger(d.formati) && d.formati >= 0 ? inFascia(FORMATI, d.formati) : ''],
+    anticipo_privacy: (d) => [nel(d.funzione, ANTICIPI_PRIVACY), nel(d.esito, ESITI_PRIVACY)],
+    correttore_automatica: (d) => [nel(d.fonte, FONTI_AUTOMATICA), nel(d.esito, ESITI_AUTOMATICA)],
+    correttore_valuta: (d) => [nel(d.esito, ESITI_VALUTA), 'n'],
+    correttore_segnaposto: (d) => [nel(d.via, VIE_SEGNAPOSTO), nel(d.esito, ESITI_SEGNAPOSTO)],
   });
   function voceRiquadro(misura, dati) {
     if (!has(RIQUADRO_DI, misura) || !oggetto(dati)) return null;
@@ -2240,9 +2268,13 @@
   }
 
   // Il documento a conti della stessa ora, accanto all'ora: stesso pseudonimo, stessa ora, stesso id.
-  function documentoAConti(tabella, v, { pseudonimo, chiave, app, os, dati }) {
+  // Una misura facoltativa senza conti non c'è: finché le regole pubblicate non la conoscono, le ore che non l'hanno
+  // passano lo stesso.
+  function documentoAConti(tabella, v, { pseudonimo, chiave, app, os, dati }, facoltative = []) {
     const d = normale(oggetto(dati) ? JSON.parse(JSON.stringify(dati)) : {});
     const [giorno, ora] = String(chiave || '').split('T');
+    const misure = Object.keys(tabella).map((c) => [c, contiDellaTabella(tabella, d[c], c)])
+      .filter(([c, conti]) => !facoltative.includes(c) || Object.keys(conti).length);
     return {
       v,
       pseudonimo: String(pseudonimo || ''),
@@ -2251,13 +2283,13 @@
       ora: String(ora || ''),
       app: versioneApp(app),
       os: OS.includes(os) ? os : ALTRO,
-      ...Object.fromEntries(Object.keys(tabella).map((c) => [c, contiDellaTabella(tabella, d[c], c)])),
+      ...Object.fromEntries(misure),
     };
   }
   const senzaConti = (tabella, doc) => Object.keys(tabella).every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length);
   const documentoNavigazione = (base) => documentoAConti(NAVIGAZIONE, VERSIONE_NAVIGAZIONE, base);
   const senzaNavigazione = (doc) => senzaConti(NAVIGAZIONE, doc);
-  const documentoRiquadri = (base) => documentoAConti(RIQUADRI, VERSIONE_RIQUADRI, base);
+  const documentoRiquadri = (base) => documentoAConti(RIQUADRI, VERSIONE_RIQUADRI, base, MISURE_RIQUADRI_FACOLTATIVE);
   const senzaRiquadri = (doc) => senzaConti(RIQUADRI, doc);
 
   // La chat della stessa ora, nel suo documento (#1463): parte solo se ha qualcosa, e l'id è quello dell'ora più «_chat».
@@ -2494,16 +2526,18 @@
     return { ok: true, motivo: '' };
   }
 
-  function validaAConti(doc, { tabella, campi, v, forme, tetti }) {
+  function validaAConti(doc, { tabella, campi, v, forme, tetti, facoltative = [] }) {
     const no = (motivo) => ({ ok: false, motivo });
     if (!oggetto(doc)) return no('non è un documento');
     const chiavi = Object.keys(doc);
-    if (chiavi.length !== campi.length || !campi.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
+    const fissi = campi.filter((k) => !facoltative.includes(k));
+    if (!chiavi.every((k) => campi.includes(k)) || !fissi.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
     if (doc.v !== v) return no('versione');
     const base = validaTesta(doc);
     if (base) return no(base);
     if (!ORA_RE.test(String(doc.ora))) return no('ora');
     for (const c of Object.keys(tabella)) {
+      if (facoltative.includes(c) && !has(doc, c)) continue;
       if (!oggetto(doc[c])) return no(c);
       for (const [k, x] of Object.entries(doc[c])) {
         if (!tabella[c].chiavi.includes(k)) return no(`${c}: chiave ${k}`);
@@ -2515,7 +2549,7 @@
   const validaNavigazione = (doc) => validaAConti(doc, { tabella: NAVIGAZIONE, campi: CAMPI_NAVIGAZIONE, v: VERSIONE_NAVIGAZIONE,
     forme: NAVIGAZIONE_RE, tetti: TETTI_VOCE_NAVIGAZIONE });
   const validaRiquadri = (doc) => validaAConti(doc, { tabella: RIQUADRI, campi: CAMPI_RIQUADRI, v: VERSIONE_RIQUADRI,
-    forme: RIQUADRI_RE, tetti: TETTI_VOCE_RIQUADRI });
+    forme: RIQUADRI_RE, tetti: TETTI_VOCE_RIQUADRI, facoltative: MISURE_RIQUADRI_FACOLTATIVE });
 
   function mappeFuoriForma(doc, mappe) {
     for (const [campo, [chiaviAmmesse, formaValore, tetto]] of Object.entries(mappe)) {
@@ -2698,7 +2732,8 @@
     TRIGGER_PULIZIA, CHIUSE_DA, ESITI_HOME,
     VERSIONE_RIQUADRI, COLLEZIONE_RIQUADRI, CAMPI_RIQUADRI, MISURE_RIQUADRI, RIQUADRI, ANTICIPATE, STATI_ANTICIPO, FUNZIONI_RIQUADRO,
     DOMANDE, USI_RIQUADRO, SCORCIATOIE, ESITI_RISCRITTURA, PROPOSTE, TAGLIATA, ESITI_OCR, ESITI_TRADUZIONE, RIMASTO, ORIGINALE_MS,
-    TITOLI, ESITI_TITOLO, ETA_TITOLO, DOCUMENTO_CHAT, FORMATI,
+    TITOLI, ESITI_TITOLO, ETA_TITOLO, DOCUMENTO_CHAT, FORMATI, MISURE_RIQUADRI_FACOLTATIVE, CAMPI_RIQUADRI_FISSI,
+    ANTICIPI_PRIVACY, ESITI_PRIVACY, FONTI_AUTOMATICA, ESITI_AUTOMATICA, ESITI_VALUTA, VIE_SEGNAPOSTO, ESITI_SEGNAPOSTO,
     voceRiquadro, registraRiquadro, documentoRiquadri, senzaRiquadri, validaRiquadri, leggiRiquadri,
     VIE, PANNELLI, TIPI_PROPOSTA, ESITI_PROPOSTA, LIVELLI_AUTONOMIA, STATI_COMPITO, COSTI, PERIMETRI, ORIGINI, RISPOSTE,
     ESITI_CONFERMA, ANNULLABILI_IN_PAGINA, DOVE_CRASH, MOTIVI_CRASH, TIPI_ERRORE_VISTO, AVVISI_ERRORE, SCELTE_INTERVISTA,

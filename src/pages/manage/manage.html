@@ -32,6 +32,8 @@
   <script src="filo://shared/feedbackAttachTypes.js"></script>
   <script src="filo://shared/feedbackAttese.js"></script>
   <script src="filo://shared/tasti.js"></script>
+  <!-- Prima delle domande e dei compiti: le une ne prendono le parole delle operazioni, gli altri gli ambiti attivi. -->
+  <script src="filo://shared/ambiti.js"></script>
   <script src="filo://shared/domande.js"></script>
   <script src="filo://shared/mittenti.js"></script>
   <script src="filo://shared/manageReview.js"></script>
@@ -52,6 +54,7 @@
   <script src="filo://shared/campoNumero.js"></script>
   <script src="filo://shared/spesaGiudici.js"></script>
   <link rel="stylesheet" href="filo://credits/credits.css" />
+  <script src="filo://shared/ricorrenti.js"></script>
   <script src="filo://shared/compiti.js"></script>
   <script src="filo://shared/righeVive.js"></script>
   <style>
@@ -122,13 +125,13 @@
       min-width: 22px; text-align: left;
     }
     .mg-switch.mg-switch--disabled { cursor: not-allowed; opacity: 0.5; }
-    /* Le funzioni in pausa, Red Team (#896), Bacheca e Deck builder (#1592): la levetta risponde al passaggio del
-       puntatore e, mentre salva, pulsa. */
-    :is(#mgRtRoot, #mgIpRoot) label.mg-switch:not(.mg-switch--disabled):hover .mg-switch-track {
+    /* Le funzioni in pausa, Red Team (#896), Bacheca e Deck builder (#1592), e i compiti ricorrenti: la levetta
+       risponde al passaggio del puntatore e, mentre salva, pulsa. */
+    :is(#mgRtRoot, #mgIpRoot, #mgRcRoot) label.mg-switch:not(.mg-switch--disabled):hover .mg-switch-track {
       box-shadow: 0 0 0 4px color-mix(in srgb, var(--sn-accent) 22%, transparent);
     }
-    :is(#mgRtRoot, #mgIpRoot) .mg-switch-track { transition: background calc(0.15s * var(--sn-motion, 1)), box-shadow calc(0.15s * var(--sn-motion, 1)); }
-    :is(#mgRtRoot, #mgIpRoot) label.mg-switch.mg-rt-salva .mg-switch-track { animation: mg-rt-pulsa calc(0.9s * var(--sn-motion, 1)) ease-in-out infinite; }
+    :is(#mgRtRoot, #mgIpRoot, #mgRcRoot) .mg-switch-track { transition: background calc(0.15s * var(--sn-motion, 1)), box-shadow calc(0.15s * var(--sn-motion, 1)); }
+    :is(#mgRtRoot, #mgIpRoot, #mgRcRoot) label.mg-switch.mg-rt-salva .mg-switch-track { animation: mg-rt-pulsa calc(0.9s * var(--sn-motion, 1)) ease-in-out infinite; }
     @keyframes mg-rt-pulsa { 50% { opacity: 0.55; } }
     .mg-rt-stato:empty { display: none; }
     .mg-rt-stato.mg-err { color: #c0392b; }
@@ -1671,6 +1674,82 @@
     .mg-cp-non-fidato { color: var(--mg-urgente-color, #c0392b); }
     .mg-cp-altri { margin-top: 10px; }
     .sn-page button.mg-cp-altri[hidden] { display: none; }
+    /* Compiti ricorrenti: una riga per ricorrente, la levetta a destra del nome. I controlli stanno in un contenitore
+       che la rilettura tiene vivo (righeVive.js): `display: contents` mette i suoi figli nella griglia della riga. */
+    .mg-rc-corpo[hidden], .mg-rc-nuovo[hidden] { display: none; }
+    .mg-rc-lista { list-style: none; margin: 0 0 32px; padding: 0; max-width: 1100px; }
+    .mg-rc-riga {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px;
+      grid-template-areas: "testa leva" "sotto leva" "quando quando" "rapporto rapporto" "azioni azioni" "esito esito" "form form";
+      padding: 9px 10px 8px; border-radius: 8px; border-left: 3px solid transparent; font-size: 13px;
+      transition: background calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-rc-riga + .mg-rc-riga { margin-top: 4px; }
+    .mg-rc-riga:hover, .mg-rc-riga--modifica { background: var(--sn-hover); }
+    .mg-rc-riga--modifica { border-left-color: var(--sn-accent); }
+    .mg-rc-riga--cercata { animation: mg-rc-cercata calc(1.2s * var(--sn-motion, 1)) ease-out; }
+    @keyframes mg-rc-cercata { from { background: color-mix(in srgb, var(--sn-accent) 24%, transparent); } }
+    .mg-rc-riga--spento .mg-cp-nome { color: var(--sn-muted); font-weight: 500; }
+    .mg-rc-testa { grid-area: testa; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+    .mg-rc-sotto { grid-area: sotto; }
+    .mg-rc-quando { grid-area: quando; }
+    .mg-rc-attesa { color: var(--sn-accent, #c8763c); }
+    .mg-rc-vivo { display: contents; }
+    .sn-page label.mg-switch.mg-rc-leva { grid-area: leva; align-self: center; gap: 8px; font-weight: 500; }
+    .mg-rc-leva .mg-switch-state { min-width: 48px; text-align: right; }
+    .mg-rc-rapporto { grid-area: rapporto; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-top: 4px; font-size: 12px; }
+    .mg-rc-rapporto-apri {
+      all: unset; cursor: pointer; color: var(--sn-fg); padding: 1px 6px; margin-left: -6px; border-radius: 6px;
+      transition: background calc(0.12s * var(--sn-motion, 1));
+    }
+    .mg-rc-rapporto-apri::before { content: '▸'; display: inline-block; margin-right: 5px; color: var(--sn-muted); transition: transform calc(0.12s * var(--sn-motion, 1)); }
+    .mg-rc-rapporto-apri[aria-expanded="true"]::before { transform: rotate(90deg); }
+    .mg-rc-rapporto-apri:hover { background: color-mix(in srgb, var(--sn-accent) 14%, transparent); }
+    .mg-rc-rapporto-apri:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    /* Il rapporto è testo d'agente: si legge com'è scritto, a capo compresi, e uno lungo scorre dentro il suo riquadro. */
+    .mg-rc-rapporto-testo {
+      flex: 1 0 100%; margin: 2px 0 0; padding: 6px 10px; max-height: 320px; overflow: auto;
+      white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12.5px; color: var(--sn-fg);
+      border-left: 2px solid color-mix(in srgb, var(--sn-accent) 45%, transparent);
+    }
+    .mg-rc-rapporto-testo[hidden] { display: none; }
+    .mg-rc-vivo > .mg-cp-azioni { grid-area: azioni; margin: 8px 0 0; }
+    /* Tasti piccoli: tre per riga su ogni ricorrente. Sul fondo della riga sotto il puntatore il grigio del passaggio
+       non si vedrebbe, quindi la tinta d'accento. */
+    .sn-page .mg-rc-vivo > .mg-cp-azioni button.sn-btn { padding: 4px 11px; font-size: 12px; }
+    .sn-page .mg-rc-riga button.sn-btn-secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--sn-accent) 14%, transparent); }
+    .mg-rc-esito { grid-area: esito; margin: 4px 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+    .mg-rc-esito[hidden] { display: none; }
+    .mg-rc-esito .mg-attesa-num { color: var(--sn-accent, #c8763c); }
+    .mg-rc-nuovo { margin: 0 0 20px; padding: 4px 12px 8px; border-radius: 8px; border-left: 3px solid var(--sn-accent); background: var(--sn-hover); max-width: 900px; }
+    .mg-rc-form { grid-area: form; display: flex; flex-direction: column; gap: 8px; margin: 10px 0 4px; max-width: 900px; cursor: auto; }
+    .mg-rc-testo { min-height: 150px; }
+    .mg-rc-cadenza { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; }
+    .mg-rc-giorni { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+    .mg-rc-giorni .mg-chip { min-width: 42px; justify-content: center; padding: 7px 8px; }
+    .mg-rc-anteprima { font-size: 12px; color: var(--sn-muted); padding-bottom: 8px; }
+    .mg-rc-anteprima--no { color: var(--sn-error); }
+    :root[data-sn-theme="dark"] .mg-rc-form input[type="time"] { color-scheme: dark; }
+    :root[data-sn-theme="light"] .mg-rc-form input[type="time"] { color-scheme: light; }
+    .mg-rc-form .mg-cp-azioni { margin: 2px 0 0; }
+    .mg-rc-form-msg:empty { display: none; }
+    .sn-page label.mg-switch.mg-rc-form-attivo { align-self: flex-end; padding-bottom: 6px; font-weight: 500; font-size: 12px; color: var(--sn-muted); }
+    .mg-rc-ambiti h2 { font-size: 15px; font-weight: 700; margin: 0 0 8px; color: var(--sn-fg); }
+    /* In colonne di giornale: un ambito lungo (gestione_lavoro) non lascia buchi accanto ai corti. */
+    .mg-rc-ambiti-lista { list-style: none; margin: 0; padding: 0; columns: 290px 4; column-gap: 28px; max-width: 1400px; }
+    .mg-rc-ambito { break-inside: avoid; margin: 0 0 14px; padding-top: 6px; border-top: 1px solid var(--sn-border); font-size: 12px; color: var(--sn-fg); }
+    .mg-rc-ambito-testa { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 0 0 4px; }
+    .mg-rc-ambito-nome { font-size: 13px; font-weight: 700; }
+    .mg-rc-ambito[data-attivo="false"] .mg-rc-ambito-nome { color: var(--sn-muted); }
+    .mg-rc-tag { font-size: 11px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--sn-border); color: var(--sn-muted); cursor: help; }
+    .mg-rc-tag--riservato { color: var(--sn-accent, #c8763c); border-color: color-mix(in srgb, var(--sn-accent, #c8763c) 45%, transparent); }
+    .mg-rc-puo { margin: 0; padding: 0 0 0 16px; display: flex; flex-direction: column; gap: 1px; }
+    .mg-rc-op--spenta { color: var(--sn-muted); opacity: 0.75; }
+    .mg-rc-op-non { font-style: italic; margin-left: 4px; }
+    .mg-rc-nonpuo, .mg-rc-usato { margin: 4px 0 0; color: var(--sn-muted); overflow-wrap: anywhere; }
+    .mg-rc-nonpuo b, .mg-rc-usato b { font-weight: 600; }
+    .sn-page .mg-rc-ambito-testa button.sn-btn { margin-left: auto; padding: 2px 10px; font-size: 11.5px; }
+    .mg-rc-ambito-esito { margin: 4px 0 0; }
     .mg-automation h2 {
       font-size: 15px; font-weight: 700; margin: 0 0 12px; color: var(--sn-fg);
     }
@@ -1927,6 +2006,8 @@
         title="Red Team, Bacheca e Deck builder: chi li vede oltre a te">In pausa</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab" hidden>Automazioni</button>
       <button type="button" class="mg-tab" data-tab="compiti" role="tab" hidden>Compiti</button>
+      <button type="button" class="mg-tab" data-tab="ricorrenti" role="tab" hidden
+        title="I compiti che il server crea da solo, alla loro ora">Compiti ricorrenti</button>
       <button type="button" class="mg-tab" data-tab="crediti" role="tab" hidden>Crediti</button>
       <button type="button" class="mg-tab" data-tab="log" role="tab" hidden>Log</button>
       <button type="button" class="mg-tab" data-tab="utenti" role="tab" hidden>Inviti e utenti</button>
@@ -2364,7 +2445,7 @@
             </label>
             <label class="mg-cp-scelta">Modello <select id="mgCpModello"></select></label>
             <label class="mg-cp-scelta">Sforzo <select id="mgCpSforzo"></select></label>
-            <label class="mg-cp-scelta" title="lavoro: apre feedback e domande; server: anche il repo del server">Ambito <select id="mgCpAmbito"></select></label>
+            <label class="mg-cp-scelta" title="Cosa può fare l’agente: il dettaglio di ogni ambito sta in Compiti ricorrenti">Ambito <select id="mgCpAmbito"></select></label>
             <button type="submit" class="sn-btn" id="mgCpCrea">Crea</button>
             <button type="button" class="sn-btn sn-btn-secondary" id="mgCpChiudi">Annulla</button>
             <span class="mg-action-msg" id="mgCpMsg" role="status"></span>
@@ -2388,6 +2469,28 @@
             <p class="mg-cp-vuoto">Nessun compito chiuso.</p>
             <ul class="mg-cp-lista"></ul>
             <button type="button" class="sn-btn sn-btn-secondary mg-cp-altri" id="mgCpAltri" hidden>Mostra i più vecchi</button>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- Routine → Compiti ricorrenti (SPEC-DOMANDE.md §4.1): letti e scritti sul server (ownerCompiti) da
+       manageRicorrenti.js, con gli ambiti in fondo. L'elenco resta nascosto finché non è letto. -->
+    <section class="mg-panel" id="panel-ricorrenti" data-panel="ricorrenti">
+      <div class="mg-compiti mg-ricorrenti" id="mgRcRoot">
+        <div class="mg-cp-testa">
+          <p class="mg-cp-stato" id="mgRcStato" role="status"></p>
+          <button type="button" class="sn-btn sn-btn-secondary" id="mgRcNuovoApri" title="Un compito che il server crea da solo alla sua ora">Nuovo compito ricorrente</button>
+        </div>
+        <div class="mg-rc-nuovo" id="mgRcNuovo" hidden></div>
+        <div class="mg-log-loading" id="mgRcCarica">Caricamento…</div>
+        <div class="mg-log-denied" id="mgRcNegato" hidden>Questa sezione è riservata all'owner.</div>
+        <div class="mg-rc-corpo" id="mgRcCorpo" hidden>
+          <p class="mg-cp-vuoto" id="mgRcVuoto">Nessun compito ricorrente.</p>
+          <ul class="mg-rc-lista" id="mgRcLista"></ul>
+          <section class="mg-rc-ambiti" aria-labelledby="mgRcAmbitiTitolo">
+            <h2 id="mgRcAmbitiTitolo">Ambiti</h2>
+            <ul class="mg-rc-ambiti-lista" id="mgRcAmbiti"></ul>
           </section>
         </div>
       </div>
@@ -3082,5 +3185,6 @@
   <script src="manageContatori.js"></script>
   <script src="managePredefiniti.js"></script>
   <script src="manageCompiti.js"></script>
+  <script src="manageRicorrenti.js"></script>
 </body>
 </html>

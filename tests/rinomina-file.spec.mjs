@@ -3,7 +3,7 @@
 // dagli scaricamenti, dalla chat (elenco vecchio → nuovo con conferma), da un file trascinato e da sole sugli
 // scaricamenti quando l'utente le accende. Il modello è finto: risponde con le prime righe del documento che riceve.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { existsSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -415,6 +415,42 @@ test('acceso in Preferenze, uno scaricamento col nome che non dice niente prende
     await annulla.click();
     await expect.poll(() => existsSync(rec.savePath) && !existsSync(nuovo), { timeout: 10000 }).toBe(true);
   } finally { await chiudi(); }
+});
+
+// #1357.2 — col nome automatico acceso, uno scaricamento che non prende il nome lo dice, con la strada per darlo a mano.
+test('col nome automatico acceso, il PDF che non prende un nome lo dice con «Dai un nome»; senza modello lo dice una volta', async ({ app, shell, openTab, testServer, avvisi }) => {
+  test.setTimeout(120_000);
+  await modelloDeiNomi(app);
+  // Il modello legge il file ma non capisce cosa sia.
+  await app.evaluate(() => {
+    const legge = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = async (o) => ({ ...(await legge(o)), text: 'NESSUN NOME' });
+  });
+  const pref = await openTab('filo://preferences/preferences.html');
+  await pref.locator('#nomiSensatiScaricamenti').check();
+  await expect.poll(() => app.evaluate(async () => !!(await globalThis.SN_STORAGE.getSettings()).nomiSensati?.scaricamenti)).toBe(true);
+  const primo = await scarica('scan_00888.pdf', BOLLETTA, { shell, openTab, testServer });
+  try {
+    const vista = await avvisi();
+    const carta = vista.locator('.shell-notif', { hasText: 'Nessun nome dato a scan_00888.pdf' });
+    await expect(carta).toBeVisible({ timeout: 20000 });
+    expect(existsSync(primo.rec.savePath)).toBe(true);
+    await carta.locator('.shell-notif-action', { hasText: 'Dai un nome' }).click();
+    const dl = await aspettaFinestra(app, (w) => w.url().startsWith('filo://downloads/'), '«Dai un nome» non ha aperto la pagina Download');
+    await expect(dl.locator('.sn-rinomina-campo')).toBeVisible({ timeout: 15000 });
+  } finally { await primo.chiudi(); }
+
+  // Il modello che non risponde: l'avviso arriva al primo file, non a ogni file della stessa serie.
+  await app.evaluate(() => { globalThis.SN_PROVIDERS.completeWithFallback = async () => { throw new Error('rete giù'); }; });
+  const secondo = await scarica('scan_00889.pdf', BOLLETTA, { shell, openTab, testServer });
+  const terzo = await scarica('scan_00890.pdf', BOLLETTA, { shell, openTab, testServer });
+  try {
+    const vista = await avvisi();
+    await expect(vista.locator('.shell-notif', { hasText: 'Nessun nome dato a scan_00889.pdf' })).toBeVisible({ timeout: 20000 });
+    await vista.waitForTimeout(3000);
+    await expect(vista.locator('.shell-notif', { hasText: 'Nessun nome dato a scan_00890.pdf' })).toHaveCount(0);
+    expect(existsSync(secondo.rec.savePath) && existsSync(terzo.rec.savePath)).toBe(true);
+  } finally { await secondo.chiudi(); await terzo.chiudi(); }
 });
 
 // Clic altrove dopo «Rinomina»: il riquadro con «Annulla» se ne va, il nome di prima resta al tasto destro.

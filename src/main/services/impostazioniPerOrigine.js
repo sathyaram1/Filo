@@ -244,6 +244,13 @@ function spingiAllaScheda(wc, message, { inVista = false, soloFrame = null } = {
       if (m) f.send('filo:broadcast', m);
     } catch (_) {}
   }
+  // I riquadri di Filo sopra la pagina (#1509.1) ricevono quello che riceve lei, ritagliato per lei; gli avvisi li
+  // mostra la pagina.
+  let strato = null;
+  try { strato = require('../stratoDeiRiquadri').stratoDellaPagina(wc); } catch (_) { strato = null; }
+  if (strato && (!soloFrame || soloFrame(pagina))) {
+    try { const m = messaggioPerDestinazione(message, pagina, pagina, { inVista, riquadro: true }); if (m) strato.send('filo:broadcast', m); } catch (_) {}
+  }
 }
 
 // Una finestra riceve solo nel frame principale: la shell, oppure una finestra

@@ -4,34 +4,11 @@
 // Forma, spedizione e regole: tests/unit/contatoriRiquadri.test.mjs e firestoreRulesContatori.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
+import { statoDi, conta, clicca, scrivi, paginaDelloStrato } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
-
-// Le ore di oggi sommate, misura per misura.
-const oggi = (app) => app.evaluate(async () => {
-  const s = await globalThis.SN_CONTATORI_MAIN.letto();
-  const g = globalThis.SN_CONTATORI.giornoDi(Date.now());
-  const out = {};
-  for (const [k, ora] of Object.entries(s.ore || {})) {
-    if (!k.startsWith(`${g}T`)) continue;
-    for (const m of globalThis.SN_CONTATORI.MISURE_RIQUADRI) {
-      for (const [chiave, conti] of Object.entries(ora[m] || {})) {
-        const a = ((out[m] = out[m] || {})[chiave] = (out[m] || {})[chiave] || conti.map(() => 0));
-        conti.forEach((n, i) => { a[i] += n; });
-      }
-    }
-  }
-  return out;
-});
-// La voce di una misura per nome, letta con l'elenco dell'app: { voce: conto }.
-const voceOra = async (app, misura, chiave) => {
-  const conti = ((await oggi(app))[misura] || {})[chiave];
-  if (!conti) return null;
-  const nomi = await app.evaluate((_e, m) => globalThis.SN_CONTATORI.RIQUADRI[m].gruppi.flat(), misura);
-  return Object.fromEntries(nomi.map((n, i) => [n, conti[i]]).filter(([, n]) => n > 0));
-};
+import { voceOggi as voceOra, chiestiOggi } from './helpers/riquadriOggi.mjs';
 
 // I modelli finti nel main: le risposte a pezzi si fermano finché la prova non le libera, se `__ferma`.
 async function modelliFinti(app) {
@@ -95,7 +72,8 @@ test('nel riquadro di Traduci contano Copia e la domanda dopo la risposta; quell
   await expect.poll(() => conta(app, page, '.sn-msg-copia'), { timeout: 15_000 }).toBe(1);
   await clicca(app, page, '.sn-msg-copia');
   await scrivi(app, page, '.sn-popup-input', 'e al plurale? <b>gatti</b> 🐈');
-  await page.keyboard.press('Enter');
+  // Il riquadro sta nello strato sopra la scheda (#1509.1): la tastiera è lì, non nella pagina.
+  await (await paginaDelloStrato(app, page)).keyboard.press('Enter');
   await expect.poll(() => conta(app, page, '.sn-msg-copia'), { timeout: 15_000 }).toBe(2);
   await clicca(app, page, '.sn-popup-close');
   await expect.poll(() => voceOra(app, 'riquadro_uso', 'translate-selection'), { timeout: 10_000 }).toEqual({ copia: 1, d1: 1 });
@@ -147,6 +125,32 @@ test('la spiegazione preparata alla selezione e aperta col tasto destro è «pro
   await clicca(app, page, '.sn-editbox-replace');
   await expect(page.locator('#campo')).toHaveValue('Gentile cliente, la riunione è spostata.');
   await expect.poll(() => voceOra(app, 'riscrittura', 'formale'), { timeout: 10_000 }).toEqual({ 'sostituito|p1': 1 });
+});
+
+test('su una pagina delicata la spiegazione non preparata conta come costo della privacy, e il tasto destro che la chiede pure', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await modelliFinti(app);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await app.evaluate(async (_e, u) => { await globalThis.SN_DELICATE.segnaCampi(u); }, page.url());
+  await page.locator('#parola').dblclick();
+  await expect.poll(() => voceOra(app, 'anticipo_privacy', 'spiega'), { timeout: 10_000 }).toEqual({ saltato: 1 });
+  expect(await app.evaluate(() => globalThis.__spiegazioni), 'da una pagina delicata non parte niente da solo').toBe(0);
+  await page.locator('#parola').click({ button: 'right' });
+  const menu = menuDi(page);
+  await expect(menu.locator('.sn-menu-inline-explain')).toContainText('Un felino', { timeout: 10_000 });
+  await expect.poll(() => voceOra(app, 'anticipo_privacy', 'spiega'), { timeout: 10_000 }).toEqual({ saltato: 1, chiesto: 1 });
+  expect(await voceOra(app, 'anticipo_al_gesto', 'spiega'), 'fermata dalla privacy, non dal tetto delle automatiche').toBeNull();
+  await expect.poll(() => chiestiOggi(app, 'explain'), { timeout: 5000 }).toBe(1);
+  // Riaperta, la stessa spiegazione non è un gesto in più.
+  await page.keyboard.press('Escape');
+  await page.locator('#parola').click({ button: 'right' });
+  await expect(menu.locator('.sn-menu-inline-explain')).toContainText('Un felino', { timeout: 10_000 });
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
+  expect(await voceOra(app, 'anticipo_privacy', 'spiega')).toEqual({ saltato: 1, chiesto: 1 });
+  expect(await chiestiOggi(app, 'explain'), 'riaperta non è una richiesta in più').toBe(1);
+  const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));
+  expect(disco, 'il sito non esce').not.toContain(new URL(page.url()).host);
 });
 
 test('la pagina tradotta intera e riportata all’originale entro un minuto conta il ritorno', async ({ app, openTab, testServer }) => {

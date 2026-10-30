@@ -204,7 +204,15 @@
   }
 
   // `testo`: una segnalazione già scritta da Filo (il falso allarme dal tasto destro sull'avviso di un sito, #813.5).
-  function open({ testo: proposta = '' } = {}) {
+  // Su un sito il box sta nello strato sopra la scheda, mai nel suo documento (#1509.1).
+  function open({ testo = '' } = {}) {
+    if (activeRoot) return;
+    const qui = () => apriQui({ testo });
+    if (global.SN_RIQUADRI_SOPRA?.apri('feedback', { testo: String(testo || '') }, qui)) return;
+    qui();
+  }
+
+  function apriQui({ testo: proposta = '' } = {}) {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-fb-overlay';
@@ -725,10 +733,12 @@
         }
         // Instradato dal main perché la CSP della pagina ospite blocca i fetch verso firestore e
         // firebasestorage dal preload; il main usa undici (Node) e non è soggetto a quella CSP.
+        // Nello strato la pagina è quella sotto, non il documento dello strato.
+        const sotto = global.SN_FILO_UI?.nelloStrato ? global.SN_PAGINA_SOTTO : null;
         const payload = {
           text,
-          url: location.href,
-          title: document.title,
+          url: sotto ? String(sotto.url || '') : location.href,
+          title: sotto ? String(sotto.titolo || '') : document.title,
           userAgent: navigator.userAgent,
           clientId,
           clientIdHash,
