@@ -2289,7 +2289,7 @@
   const senzaConti = (tabella, doc) => Object.keys(tabella).every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length);
   const documentoNavigazione = (base) => documentoAConti(NAVIGAZIONE, VERSIONE_NAVIGAZIONE, base);
   const senzaNavigazione = (doc) => senzaConti(NAVIGAZIONE, doc);
-  const documentoRiquadri = (base) => documentoAConti(RIQUADRI, VERSIONE_RIQUADRI, base);
+  const documentoRiquadri = (base) => documentoAConti(RIQUADRI, VERSIONE_RIQUADRI, base, MISURE_RIQUADRI_FACOLTATIVE);
   const senzaRiquadri = (doc) => senzaConti(RIQUADRI, doc);
 
   // La chat della stessa ora, nel suo documento (#1463): parte solo se ha qualcosa, e l'id è quello dell'ora più «_chat».
