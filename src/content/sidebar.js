@@ -385,7 +385,12 @@
     open({ source: 'valuta' });
     if (!root) return;
     valutazione = { campo, mandato: t };
+    contaValuta('chiesta');
     submit({ valuta: t, daGesto: true });
+  }
+  // «Valuta» nella famiglia del correttore (#1586): richieste, risposte e correzioni, mai il testo.
+  function contaValuta(esito) {
+    try { Popup?.conta?.({ misura: 'riquadro', cosa: 'correttore_valuta', esito }); } catch (_) {}
   }
 
   // Il testo del campo valutato, se è cambiato da quando il modello l'ha visto: la domanda dopo lo porta con sé.
