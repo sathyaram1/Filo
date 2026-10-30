@@ -426,9 +426,9 @@ function fbVivo(id, seq, status, extra = {}) {
   };
 }
 
-test('Ricevuti: un arrivo dal vivo in cima lascia ferma la riga sotto il puntatore', async ({ openTab }) => {
+for (const quante of [40, 3]) test(`Ricevuti (${quante} righe): un arrivo dal vivo in cima lascia ferma la riga sotto il puntatore`, async ({ openTab }) => {
   const docs = [fbVivo('f800', 800, 'todo')];
-  for (let n = 760; n > 720; n -= 1) docs.push(fbVivo(`f${n}`, n, 'design', { statusReason: 'clarify' }));
+  for (let n = 760; n > 760 - quante; n -= 1) docs.push(fbVivo(`f${n}`, n, 'design', { statusReason: 'clarify' }));
   const page = await openTab(MANAGE);
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
   await page.evaluate(() => window.__mgTest.whenReady());
