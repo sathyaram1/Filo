@@ -13,7 +13,8 @@
 //   5) riordinare due volte di fila: la seconda è un non-fare, e lo dice;
 //   6) "/riordina" con parole in più resta un comando riconosciuto;
 //   7) i siti col favicon bianco o nero vanno alle due estremità dell'arcobaleno
-//      e quelli senza favicon in coda (#822), anche con saturazione_tab a 0.
+//      e quelli senza favicon in coda (#822), anche con saturazione_tab a 0;
+//      un rosso che tende al rosa (Netflix) sta in testa accanto al rosso (#822.1).
 //
 // I casi 3-6 stavano in uno spec a parte, nato per una verifica e finito nel
 // repo per sbaglio: cancellandolo sono spariti quattro controlli che nessun
@@ -129,7 +130,7 @@ async function schedePronte(shell) {
 
 // I colori non solo ci sono: hanno anche SMESSO di cambiare. Una pagina appena
 // aperta può correggere il proprio colore identità un istante dopo averlo dato
-// (il content script lo ricalcola quando la pagina ha finito di caricare), e un
+// (il content script lo ricalcola dopo 0,8 e 2 secondi), e un
 // colore che cambia dopo un riordino rende il riordino successivo un lavoro
 // vero invece che un non-fare. Chi vuole verificare che riordinare due volte
 // non muova niente deve prima aspettare che non ci sia più niente da muovere:
@@ -149,9 +150,12 @@ async function coloriFermi(shell) {
   }, { timeout: 15_000, message: 'i colori identità continuano a cambiare' }).toBe(true);
 }
 
-test('"/riordina" con una scheda sola risponde "già in ordine", e la dashboard resta viva', async ({ openTab }) => {
+test('"/riordina" con una scheda sola risponde "già in ordine", e la dashboard resta viva', async ({ shell, openTab }) => {
   const dash = await openTab(NEWTAB);
   await expect(dash.locator('#input')).toBeVisible({ timeout: 8_000 });
+  // La scheda d'avvio è la stessa pagina: finché una sola ha già il colore, il riordino la sposterebbe davvero.
+  await expect.poll(() => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.every((t) => !!t.identityColor)),
+    { timeout: 8_000 }).toBe(true);
 
   await submit(dash, '/riordina');
 
@@ -224,6 +228,7 @@ const SCHEDE = [
   ['Nero', 'rgb(0,0,0)', 'rgb(0, 0, 0)'],
   ['Senza', null, null],
   ['Blu', 'rgb(0,0,255)', 'rgb(0, 0, 255)'],
+  ['Netflix', 'rgb(229,9,20)', 'rgb(255, 0, 13)'],
   ['Bianco', 'rgb(255,255,255)', 'rgb(255, 255, 255)'],
   ['Rosso', 'rgb(255,0,0)', 'rgb(255, 0, 0)'],
 ];
@@ -238,12 +243,12 @@ async function riordinaBiancoNeroEColori({ shell, openTab, testServer }) {
   });
   // Ognuna col SUO colore: appena aperta, una scheda porta quello in cache per l'host, cioè della sorella.
   await expect.poll(async () => Object.fromEntries((await webTabs()).map((t) => [t.title, t.identityColor])), {
-    timeout: 15_000, message: 'le cinque schede non hanno ancora il loro colore identità',
+    timeout: 15_000, message: 'le schede non hanno ancora il loro colore identità',
   }).toEqual(Object.fromEntries(SCHEDE.map(([titolo, , identita]) => [titolo, identita])));
 
   await submit(dash, '/riordina');
   await expect.poll(async () => (await webTabs()).map((t) => t.title), { timeout: 15_000 })
-    .toEqual(['Bianco', 'Rosso', 'Blu', 'Nero', 'Senza']);
+    .toEqual(['Bianco', 'Netflix', 'Rosso', 'Blu', 'Nero', 'Senza']);
 }
 
 test('"/riordina": il bianco in testa, il nero in fondo ai colori, senza favicon in coda', async ({ shell, openTab, testServer }) => {

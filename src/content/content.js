@@ -131,8 +131,9 @@
 
       // Colore identità del sito (§1.2): calcolato una volta (theme-color →
       // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
-      // e lo mescola col fondo della barra nelle tab inattive.
-      try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
+      // e lo mescola col fondo della barra nelle tab inattive. Sulle pagine web è già
+      // partito dalla preload, a pagina ancora in lettura (#1701.r1).
+      try { if (!PageColor.identitaPartita?.()) PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
 
       // Segnali di attività (§2.1): ultima interazione, % di scroll.
       // Servono all'LLM per decidere cosa archiviare.
