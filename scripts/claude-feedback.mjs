@@ -218,7 +218,8 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       ...(b && b.fp && !b.inAttesa ? { bigliettoLocale: b.fp } : {}),
     });
   } catch (e) {
-    return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
+    const motivo = String((e && e.message) || e);
+    return { ok: false, motivo: e && e.allegatiFalliti ? `${motivo}. Il pacchetto non è nato: rilancia` : motivo, codice: exitCodeForError(e) };
   }
   // Un allegato che non si è caricato NON è silenzioso: il feedback esiste,
   // ma senza il documento per cui magari è stato aperto. Si riporta.
