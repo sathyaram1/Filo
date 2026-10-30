@@ -14,6 +14,7 @@
       fixes: [
         'Anche l\'Aiuto su un sito ora sta sopra la pagina: le domande che gli scrivi, le sue risposte e il testo che propone per un campo, finché non lo accetti, il sito non li legge più, nemmeno se li selezioni o li copi.',
         'Quando rifai o riprendi l\'intervista di benvenuto, Filo non ti tratta più come appena arrivato e resta su quello che vi dite, senza tirare in ballo cose delle conversazioni passate.',
+        'Quando riapri Filo, i feed, le ricerche finite e le pagine che non tocchi da ore o da giorni vanno nel filo della home. Prima restavano quasi sempre aperte. Le schede che apri o riprendi appena riaperto restano dove sono. La barra si riordina per colore anche quando non si chiude niente, e un avviso dice com\'è andata: quante schede ha chiuso, che servivano tutte o che non è riuscito a valutarle. Se ne ha chiuse, «Riapri» le riporta indietro.',
       ],
     },
     {
