@@ -230,6 +230,7 @@ test('#500 letta la spiegazione fino in fondo, un giro di rotella in più non po
   // E l'ultima voce si raggiunge davvero, scorrendo.
   const ultima = menu.locator('.sn-menu-item').last();
   await ultima.hover({ timeout: 3000 });
+  await attendiUltimaVoceCliccabile(app, page);
   await ultima.click({ timeout: 3000 });
   await expect(menu).toHaveCount(0);
 });
