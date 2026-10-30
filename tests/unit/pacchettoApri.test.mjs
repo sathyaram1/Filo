@@ -181,6 +181,32 @@ test('i riferimenti agli allegati di una unita comprendono quelli della conversa
   ]);
 });
 
+test('le letture vere: allegati col documento e la conversazione, una conversazione che non si decifra ferma, una scansione a metà pure', async () => {
+  const vero = globalThis.fetch;
+  const viste = [];
+  const conversazione = (notes) => async (url) => {
+    viste.push(String(url));
+    return { ok: true, status: 200, json: async () => ({ fields: { images: { arrayValue: { values: [{ stringValue: 'https://a/1' }] } }, notes: { stringValue: notes } } }) };
+  };
+  try {
+    globalThis.fetch = conversazione(TH.serializeAttachment({ kind: 'img', url: 'https://a/2' }));
+    const refs = await SCRIPT.pacchetto.allegati({ id: 'id812', num: '812' }, 'tok');
+    assert.deepEqual(refs.map((a) => [a.url, a.conversazione]), [['https://a/1', false], ['https://a/2', true]]);
+    assert.match(viste[0], /feedback\/id812\?mask\.fieldPaths=images&mask\.fieldPaths=files&mask\.fieldPaths=notes$/, 'si chiedono solo i campi che servono');
+    const cifrata = await globalThis.SN_FEEDBACK_CRYPTO.encryptForOwner('una conversazione');
+    globalThis.fetch = conversazione(cifrata);
+    const senzaChiave = process.env.FILO_FEEDBACK_PRIVKEY;
+    process.env.FILO_FEEDBACK_PRIVKEY = '';
+    try {
+      await assert.rejects(SCRIPT.pacchetto.allegati({ id: 'id812', num: '812' }, 'tok'), (e) => e.definitivo === true && /la conversazione di #812 non si decifra/.test(e.message));
+    } finally { if (senzaChiave === undefined) delete process.env.FILO_FEEDBACK_PRIVKEY; else process.env.FILO_FEEDBACK_PRIVKEY = senzaChiave; }
+  } finally { globalThis.fetch = vero; }
+  await assert.rejects(SCRIPT.pacchetto.scarica({ url: 'https://altrove.example/x.png' }), (e) => e.definitivo === true);
+  const lista = FB.listAllPaged;
+  FB.listAllPaged = async () => ({ rows: [{ _id: 'a' }], complete: false });
+  try { await assert.rejects(SCRIPT.pacchetto.attesiDa([{ id: 'id812', num: '812' }], 'tok'), /non è completa \(1 documenti\)/); } finally { FB.listAllPaged = lista; }
+});
+
 test('chi aspetta le unite si trova per id, e le unite stesse no', () => {
   const righe = [
     { _id: 'id903', seq: 903, waitsFor: [{ id: 'id676', num: '676' }, { id: 'id812', num: '' }] },
