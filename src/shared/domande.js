@@ -8,7 +8,7 @@
   const PRIORITA = Object.freeze(['bloccante', 'importante', 'quando_puoi']);
   // `in_smistamento`: il compito «Gestisci la domanda» (§3.5) la sta smistando o riscrivendo, prima che arrivi all'owner.
   const STATI = Object.freeze(['in_smistamento', 'aperta', 'in_lavorazione', 'chiusa', 'superata']);
-  const SCHEDE = Object.freeze(['da_rispondere', 'in_lavorazione', 'risposte_automatiche', 'archivio']);
+  const SCHEDE = Object.freeze(['da_rispondere', 'in_smistamento', 'in_lavorazione', 'risposte_automatiche', 'archivio']);
   const FIDUCIA = Object.freeze(['fidato', 'non_fidato']);
   const ORIGINI = Object.freeze(['feedback', 'ramo', 'compito', 'domanda', 'locale', 'server']);
   const COLLEGAMENTI = Object.freeze(['feedback', 'ramo', 'domanda']);
@@ -445,14 +445,17 @@
     return out.map(({ priorita, gruppo, domande: ds }) => ({ priorita, gruppo, domande: ds }));
   }
 
-  /** La scheda della sezione Domande. Uno stato ignoto resta davanti all'owner. */
+  /**
+   * La scheda della sezione Domande. «Da rispondere» tiene solo le aperte (#1791): uno stato ignoto si vede fra quelle
+   * in lavorazione, senza contare come una che aspetta l'owner.
+   */
   function schedaDi(domanda) {
     const s = isOggetto(domanda) ? domanda.stato : '';
-    // Mentre il compito la smista l'owner non la deve ancora rispondere, ma la vede: niente resta nascosto.
-    if (s === 'in_lavorazione' || s === 'in_smistamento') return 'in_lavorazione';
+    if (s === 'aperta') return 'da_rispondere';
+    if (s === 'in_smistamento') return 'in_smistamento';
     if (s === 'chiusa' && isOggetto(domanda.esito) && domanda.esito.automatica === true) return 'risposte_automatiche';
     if (s === 'chiusa' || s === 'superata') return 'archivio';
-    return 'da_rispondere';
+    return 'in_lavorazione';
   }
 
   const ID_RE = /^D-([1-9]\d{0,8})$/;

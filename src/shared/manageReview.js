@@ -1795,7 +1795,7 @@
   // apre niente sembra rotto. I Modelli di supporto stanno in Automazioni (#1110). Utenti e Impostazioni predefinite sono
   // le pagine dell'owner che avevano un ingresso loro (#1414): i loro vecchi indirizzi li rigira il protocollo.
   const SEZIONI = Object.freeze([
-    { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-lavoro', 'domande-archivio'] },
+    { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-smistamento', 'domande-lavoro', 'domande-automatiche', 'domande-archivio'] },
     { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'waiting', 'resolved', 'archived', 'fbstats', 'stats'] },
     { id: 'routine', nome: 'Routine', schede: ['automation', 'compiti', 'crediti', 'log'] },
     { id: 'utenti', nome: 'Utenti', schede: ['utenti', 'contatori'] },
@@ -1837,9 +1837,9 @@
   }
 
   // La regola stato → scheda è SN_DOMANDE.schedaDi (src/shared/domande.js); qui solo il nome della scheda di Gestione.
-  // Le risposte automatiche stanno in Archivio finché la loro scheda non ha una fonte (#1154): mai fuori da ogni scheda.
   const SCHEDA_DOMANDA = Object.freeze({
-    da_rispondere: 'domande', in_lavorazione: 'domande-lavoro', risposte_automatiche: 'domande-archivio', archivio: 'domande-archivio',
+    da_rispondere: 'domande', in_smistamento: 'domande-smistamento', in_lavorazione: 'domande-lavoro',
+    risposte_automatiche: 'domande-automatiche', archivio: 'domande-archivio',
   });
   function schedaDomanda(d) {
     const D = global.SN_DOMANDE;
@@ -1847,7 +1847,7 @@
     return SCHEDA_DOMANDA[D.schedaDi(d)] || null;
   }
   function contaDomande(domande) {
-    const n = { domande: 0, 'domande-lavoro': 0, 'domande-archivio': 0 };
+    const n = Object.fromEntries(Object.values(SCHEDA_DOMANDA).map((t) => [t, 0]));
     for (const d of (Array.isArray(domande) ? domande : [])) {
       const t = schedaDomanda(d);
       if (t) n[t]++;

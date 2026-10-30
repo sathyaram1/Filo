@@ -369,8 +369,16 @@
     };
   }
 
+  // La voce sotto il puntatore, o quella col fuoco: chi sta per cliccarla non se la vede scivolare via (#1791).
+  function voceFerma(lista, voci) {
+    const att = global.document && global.document.activeElement;
+    const tutte = Array.from(lista.querySelectorAll(voci));
+    return tutte.find((el) => el.matches(':hover')) || tutte.find((el) => att && att !== global.document.body && el.contains(att)) || null;
+  }
+
   // Ridisegna tenendo lo scorrimento sulla prima voce visibile (non sui pixel: se ne esce una più su, la vista
-  // non salta); chi è in cima resta in cima, o una voce arrivata lassù finirebbe fuori vista.
+  // non salta); chi è in cima resta in cima, o una voce arrivata lassù finirebbe fuori vista. La voce sotto il
+  // puntatore o col fuoco invece resta dov'è sullo schermo, anche in cima: un arrivo più su non la sposta.
   // `voci`: selettore delle voci con `data-id`; `scorre()`: l'elemento che scorre, o null.
   function alSuoPosto({ lista, voci, scorre }, ridisegna) {
     const L = LIVE();
@@ -386,10 +394,16 @@
     };
     const sc = L && lista ? scorre() : null;
     const prima = sc ? sc.scrollTop : 0;
+    const ferma = L && lista ? voceFerma(lista, voci) : null;
+    const idFermo = ferma ? ferma.dataset.id : '';
+    const yFermo = ferma ? ferma.getBoundingClientRect().top : 0;
     const ancora = sc && prima > 0 ? L.ancoraScorrimento(righe(sc), prima) : null;
     ridisegna();
     const dopo = L && lista ? scorre() : null;
-    if (dopo) dopo.scrollTop = L.scrollDaAncora(ancora, righe(dopo), prima);
+    if (!dopo) return;
+    const ora = idFermo ? Array.from(lista.querySelectorAll(voci)).find((el) => el.dataset.id === idFermo) : null;
+    if (ora) { dopo.scrollTop += ora.getBoundingClientRect().top - yFermo; return; }
+    dopo.scrollTop = L.scrollDaAncora(ancora, righe(dopo), prima);
   }
 
   global.SN_FEEDBACK_LIVE_PAGINA = { crea, seguiPuntatore, alSuoPosto };
