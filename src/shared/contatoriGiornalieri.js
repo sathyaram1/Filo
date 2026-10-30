@@ -2526,16 +2526,18 @@
     return { ok: true, motivo: '' };
   }
 
-  function validaAConti(doc, { tabella, campi, v, forme, tetti }) {
+  function validaAConti(doc, { tabella, campi, v, forme, tetti, facoltative = [] }) {
     const no = (motivo) => ({ ok: false, motivo });
     if (!oggetto(doc)) return no('non è un documento');
     const chiavi = Object.keys(doc);
-    if (chiavi.length !== campi.length || !campi.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
+    const fissi = campi.filter((k) => !facoltative.includes(k));
+    if (!chiavi.every((k) => campi.includes(k)) || !fissi.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
     if (doc.v !== v) return no('versione');
     const base = validaTesta(doc);
     if (base) return no(base);
     if (!ORA_RE.test(String(doc.ora))) return no('ora');
     for (const c of Object.keys(tabella)) {
+      if (facoltative.includes(c) && !has(doc, c)) continue;
       if (!oggetto(doc[c])) return no(c);
       for (const [k, x] of Object.entries(doc[c])) {
         if (!tabella[c].chiavi.includes(k)) return no(`${c}: chiave ${k}`);
