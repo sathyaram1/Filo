@@ -283,7 +283,7 @@
       allega([e.detail.blob]);
     });
     const conImmagini = (e) => Array.from(e.dataTransfer?.items || []).some((it) => it.kind === 'file' && /^image\//i.test(it.type || ''));
-    const conRiferimento = (e) => Array.from(e.dataTransfer?.types || []).includes(TIPO_RIFERIMENTO);
+    const conRiferimento = (e) => riferimentiAmmessi() && Array.from(e.dataTransfer?.types || []).includes(TIPO_RIFERIMENTO);
     for (const tipo of ['dragenter', 'dragover']) {
       root.addEventListener(tipo, (e) => {
         if (!e.isTrusted || !(conImmagini(e) || conRiferimento(e))) return;
