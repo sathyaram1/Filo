@@ -124,3 +124,84 @@ test('una domanda su un programma apre il pannello da solo, la × lo chiude e la
     await srv.close();
   }
 });
+
+// #941.1 — Un file grosso che scende da una pagina: fuori dalla home un avviso breve dice che è partito, e quello di
+// fine prende il suo posto; con la home davanti nessun avviso, lì lo scaricamento si vede già.
+const GROSSO = 4 * 1024 * 1024;
+async function apriServerLento() {
+  const inCorso = [];
+  const srv = createServer((req, res) => {
+    const nome = (String(req.url || '').split('?')[0].split('/').pop()) || 'grosso.bin';
+    res.writeHead(200, {
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': GROSSO,
+      'Content-Disposition': `attachment; filename="${nome}"`,
+    });
+    res.write(Buffer.alloc(64 * 1024, 1));
+    inCorso.push(res);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  return {
+    base: `http://127.0.0.1:${srv.address().port}`,
+    finisci() { for (const res of inCorso.splice(0)) res.end(Buffer.alloc(GROSSO - 64 * 1024, 1)); },
+    async close() {
+      try { srv.closeAllConnections?.(); } catch (_) {}
+      await new Promise((r) => srv.close(r));
+    },
+  };
+}
+
+const avvisoDiVia = (dove, nome) => dove.locator('.shell-notif-msg', { hasText: `Scaricamento avviato: ${nome}` });
+
+test('un file grosso scaricato da una pagina lo dice subito, porta alla home, e a fine corsa l’avviso diventa «Scaricato»', async ({ app, shell, openTab, testServer, avvisi }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServerLento();
+  try {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagina col file</title></head><body style="padding:40px">
+      <a id="grosso" href="${srv.base}/grosso.bin">Scarica il file grosso</a></body></html>`);
+    await page.locator('#grosso').click();
+    await expect.poll(() => statoDi(shell, 'grosso.bin'), { timeout: 20_000 }).toBe('progressing');
+
+    const vista = await avvisi();
+    await expect(avvisoDiVia(vista, 'grosso.bin')).toBeVisible({ timeout: 10_000 });
+    await expect(shell.locator('#dl-panel')).toBeHidden();
+    await expect(tastoDownloadInAlto(shell)).toHaveCount(0);
+    await vista.locator('.shell-notif').screenshot({ path: join(SHOTS, 'download-941.1-avviso.png') });
+
+    await vista.locator('.shell-notif-action', { hasText: 'Vedi nella home' }).click();
+    await expect(shell.locator('#tabs .tab.active')).toContainText('Home');
+    const home = await finestraCon(app, 'filo://newtab');
+    await expect(home.locator('.dash-carta[data-tipo="download"]', { hasText: 'grosso.bin' })).toBeVisible({ timeout: 15_000 });
+    // La scheda della pagina resta: la home si apre accanto, non al suo posto.
+    await expect(shell.locator('#tabs .tab', { hasText: 'Pagina col file' })).toHaveCount(1);
+
+    srv.finisci();
+    await expect.poll(() => statoDi(shell, 'grosso.bin'), { timeout: 20_000 }).toBe('completed');
+    await expect(shell.locator('.shell-notif-msg', { hasText: 'Scaricato: grosso.bin' })).toHaveCount(1, { timeout: 8000 });
+    await expect(avvisoDiVia(shell, 'grosso.bin')).toHaveCount(0, { timeout: 4000 });
+  } finally {
+    await srv.close();
+  }
+});
+
+test('con la home davanti uno scaricamento partito da una scheda dietro non porta l’avviso di via', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServerLento();
+  try {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagina col file</title></head><body style="padding:40px">
+      <a id="grosso" href="${srv.base}/dietro.bin">Scarica il file grosso</a></body></html>`);
+    await shell.locator('#tabs .tab', { hasText: 'Home' }).click();
+    const home = await finestraCon(app, 'filo://newtab');
+    await expect(shell.locator('#tabs .tab.active')).toContainText('Home');
+
+    await page.evaluate(() => document.getElementById('grosso').click());
+    await expect.poll(() => statoDi(shell, 'dietro.bin'), { timeout: 20_000 }).toBe('progressing');
+    await expect(home.locator('.dash-carta[data-tipo="download"]', { hasText: 'dietro.bin' })).toBeVisible({ timeout: 15_000 });
+    // L'avviso nascerebbe dopo una frazione di secondo: si guarda ben oltre.
+    await page.waitForTimeout(2000);
+    await expect(avvisoDiVia(shell, 'dietro.bin')).toHaveCount(0);
+    expect(await statoDi(shell, 'dietro.bin')).toBe('progressing');
+  } finally {
+    await srv.close();
+  }
+});

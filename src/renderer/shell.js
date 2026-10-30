@@ -1940,6 +1940,16 @@
             const id = a.openDownloadId;
             return { label: a.label, onClick: () => openDownloadFile(id, false, 'notifica') };
           }
+          // #941.1 — l'avviso di via porta alla home, dove lo scaricamento avanza: una home già aperta, se c'è.
+          if (a && a.apriHome && !a.onClick) {
+            return {
+              label: a.label,
+              onClick: () => {
+                const home = state.tabs.find((t) => t.url && isHomeUrl(t.url));
+                if (home) api.tabs.activate(home.id); else api.tabs.open('filo://newtab/');
+              },
+            };
+          }
           if (a && a.revealDownloadId && !a.onClick && api.downloads) {
             const id = a.revealDownloadId;
             return { label: a.label, onClick: () => openDownloadFolder(id, 'notifica') };

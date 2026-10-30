@@ -567,7 +567,7 @@ function contaProgramma(rec, evento) {
 function avvisaNonRiuscito(rec) {
   const riprova = /^https?:/i.test(String(rec.url || '')) ? [{ label: 'Riprova', riprovaDownloadId: rec.id }] : [];
   shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, {
-    durationSec: 8, tipo: 'download_failed', indirizzo: rec.url, ...(riprova.length ? { actions: riprova } : {}),
+    ...chiaveAvviso(rec), durationSec: 8, tipo: 'download_failed', indirizzo: rec.url, ...(riprova.length ? { actions: riprova } : {}),
   }, scopeOf(rec));
 }
 
@@ -606,13 +606,44 @@ function notifyDownloadStarted(webContents, info = null) {
 function chiediNellaFinestra(webContents, rec) {
   contaProgramma(rec, 'domanda');
   try {
-    const finestre = windowsOf(scopeOf(rec)).filter((w) => w._filoTabs);
-    const tiene = (w) => (w._filoTabs.tabs || []).some((t) => {
-      try { return t.view.webContents === webContents; } catch (_) { return false; }
-    });
-    const win = finestre.find(tiene) || finestre.find((w) => w.isFocused?.()) || finestre[0];
-    if (win && !win.isDestroyed?.()) win.webContents.send('shell:download', { kind: 'ask', item: publicRecord(rec) });
+    const win = finestraDi(webContents, rec);
+    if (win) win.webContents.send('shell:download', { kind: 'ask', item: publicRecord(rec) });
   } catch (_) {}
+}
+
+function finestraDi(webContents, rec) {
+  const finestre = windowsOf(scopeOf(rec)).filter((w) => w._filoTabs);
+  const tiene = (w) => (w._filoTabs.tabs || []).some((t) => {
+    try { return t.view.webContents === webContents; } catch (_) { return false; }
+  });
+  const win = finestre.find(tiene) || finestre.find((w) => w.isFocused?.()) || finestre[0];
+  return win && !win.isDestroyed?.() ? win : null;
+}
+
+// Gli avvisi di uno stesso scaricamento hanno una chiave sola: quello di fine prende il posto di quello di via.
+const chiaveAvviso = (rec) => ({ key: `download:${rec.id}` });
+
+// #941.1 — Il via si annuncia solo fuori dalla home e dall'elenco scaricamenti, dove l'avanzamento si vede già.
+// Il ritardo lascia muto chi finisce subito (basta l'avviso di fine) e chi viene fermato appena preso.
+const ANNUNCIO_MS = 600;
+const PAGINE_CHE_LO_MOSTRANO = /^filo:\/\/(newtab|downloads)\//i;
+function annunciaPartenza(rec, webContents) {
+  const t = setTimeout(() => {
+    try {
+      if (!records.has(rec.id) || rec._final || rec.state !== 'progressing') return;
+      const win = finestraDi(webContents, rec);
+      const tm = win && win._filoTabs;
+      const attiva = tm && (tm.tabs || []).find((x) => x.id === tm.activeId);
+      let url = '';
+      try { url = (attiva && (attiva.view.webContents.getURL() || attiva.url)) || ''; } catch (_) { url = (attiva && attiva.url) || ''; }
+      if (!win || PAGINE_CHE_LO_MOSTRANO.test(url)) return;
+      win.webContents.send('shell:toast', {
+        text: `Scaricamento avviato: ${shortName(rec.filename)}`,
+        opts: { ...chiaveAvviso(rec), durationSec: 5, tipo: 'download_avviato', indirizzo: rec.url, actions: [{ label: 'Vedi nella home', apriHome: true }] },
+      });
+    } catch (_) {}
+  }, ANNUNCIO_MS);
+  t.unref?.();
 }
 
 // Chiude uno scaricamento arrivato in fondo: se veniva dalla quarantena (#588)
@@ -651,6 +682,7 @@ function completa(rec) {
   // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
   shellToast(`Scaricato: ${shortName(rec.filename)}`, {
+    ...chiaveAvviso(rec),
     durationSec: 8,
     tipo: 'download_finito',
     indirizzo: rec.url,
@@ -837,6 +869,7 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
   let chain = [];
   try { chain = item.getURLChain(); } catch (_) {}
   setImmediate(() => notifyDownloadStarted(webContents, { url, chain, filename, exe }));
+  if (!attesa) annunciaPartenza(rec, webContents);
 
   // Il segnale non è il TEMPO senza byte (un server lento veniva ucciso con un errore falso)
   // ma la caduta dichiarata da Chromium: grazia alla ripresa, poi fallisce se non avanza.

@@ -10,7 +10,9 @@
     // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
       version: '0.2.255', date: '2026-10-31',
-      features: [],
+      features: [
+        'Quando parte un download mentre sei su una pagina, in basso a destra un avviso breve ti dice che è partito, e con «Vedi nella home» lo segui mentre scende. A fine download lo stesso avviso diventa «Scaricato». Se sei già nella home l\'avviso non compare, perché lì il download lo vedi già.',
+      ],
       fixes: [
         'Anche l\'Aiuto su un sito ora sta sopra la pagina: le domande che gli scrivi, le sue risposte e il testo che propone per un campo, finché non lo accetti, il sito non li legge più, nemmeno se li selezioni o li copi.',
         'Quando rifai o riprendi l\'intervista di benvenuto, Filo non ti tratta più come appena arrivato e resta su quello che vi dite, senza tirare in ballo cose delle conversazioni passate.',
