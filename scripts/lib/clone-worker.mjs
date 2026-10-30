@@ -308,14 +308,15 @@ export function preparaClone(principale, n, {
   }
   if (pushUrl) gitIn(dir, ['remote', 'set-url', '--push', 'origin', pushUrl]);
 
-  const pacchetti = allineaPacchetti(dir, radice, { ...(npmCi ? { npmCi } : {}), ...(avvisa ? { avvisa } : {}), soloCollegati });
-  if (!pacchetti.ok) return { ok: false, dir, why: pacchetti.why, ...(pacchetti.gruppo ? { gruppo: pacchetti.gruppo } : {}) };
-
+  // Il marcatore prima dei pacchetti: un'installazione fallita lascia un clone che il giro dopo riprende.
   mkdirSync(resolve(dir, '.claude'), { recursive: true });
   writeFileSync(resolve(dir, MARCATORE_WORKER), `${JSON.stringify({ indice: i, paralleli: Number(paralleli) || 0, principale: radice })}\n`, 'utf8');
   ensureSessionExcludes(dir);
   try { installaControlloSpedizione(dir); } catch (_) { /* senza, restano i controlli delle singole strade */ }
   ensureCommentChar(dir);
+
+  const pacchetti = allineaPacchetti(dir, radice, { ...(npmCi ? { npmCi } : {}), ...(avvisa ? { avvisa } : {}), soloCollegati });
+  if (!pacchetti.ok) return { ok: false, dir, why: pacchetti.why, ...(pacchetti.gruppo ? { gruppo: pacchetti.gruppo } : {}) };
 
   const registro = registra ? cartellaRegistro(radice) : '';
   if (registro) {
