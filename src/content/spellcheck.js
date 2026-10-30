@@ -1867,10 +1867,11 @@
     try { global.SN_POPUP && global.SN_POPUP.conta({ misura: 'riquadro', cosa: 'anticipo_privacy', funzione: 'segnaposto', esito }); } catch (_) {}
   }
   // Il valore che il segno mostra viene da una ricerca (da sola o chiesta) o dalla memoria del modello, senza ricerca.
+  // Mentre una domanda rifatta cerca, il valore in vista è quello della ricerca di prima.
   function viaDelSegno(segno) {
     if (!segno.cerca) return 'memoria';
-    const r = [segno.cerca.chiave, segno.cerca.prima && segno.cerca.prima.chiave]
-      .map((k) => k && ricerche.get(k)).find((x) => x && x.stato === 'trovato');
+    const giro = [segno.cerca.chiave, segno.cerca.prima && segno.cerca.prima.chiave].map((k) => k && ricerche.get(k)).filter(Boolean);
+    const r = giro.find((x) => x.stato === 'trovato') || giro[0];
     return (r && r.via) || 'da_solo';
   }
 
