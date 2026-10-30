@@ -46,7 +46,6 @@
     {
       version: '0.2.251', date: '2026-10-29',
       features: [
-        'Sull\'avviso di un sito sospetto «Continua» adesso vale per sempre. Il sito entra fra i «Siti di cui ti fidi» e lì l\'avviso non torna, in nessuna scheda e nemmeno dopo un riavvio. Vale anche per «Apri comunque» quando Filo non trova un indirizzo. L\'elenco sta in Sicurezza, dove togli un sito con un clic, e puoi chiedere a Filo di aggiungerne o toglierne uno. L\'avviso di un sito pericoloso compare sempre.',
         'Ctrl+Shift+T (Cmd+Shift+T su Mac) riapre l\'ultima scheda chiusa, come negli altri browser, invece di aprirne una nuova. Torna nello stesso posto della fila, con Indietro e Avanti com\'erano. Premendolo ancora riapre quelle chiuse prima, anche dopo aver riaperto Filo.',
         'In chat Filo sa cosa è successo fra un tuo messaggio e l\'altro: il timer che ha suonato, il tema cambiato dalle Preferenze, il Wi-Fi caduto, un documento dell\'Editor scritto. E un documento o una pagina che ti ha letto restano davanti a lui anche dopo molti messaggi, finché Filo resta aperto.',
         'Nell\'Editor il foglio prende tutta la larghezza. Gli strumenti si aprono dal bordo destro: ci fermi il mouse, clicchi la striscia sottile o premi Ctrl+\\ (Cmd+\\ su Mac). Col «+» scegli quali tenere, e col lucchetto il pannello resta aperto accanto al testo. La chat del documento ora è l\'Aiuto: legge tutto il testo e ne cambia la formattazione quando glielo chiedi, e puoi aprirlo anche chiedendolo a Filo.',
