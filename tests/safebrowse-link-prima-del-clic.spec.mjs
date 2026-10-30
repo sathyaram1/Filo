@@ -264,21 +264,40 @@ test('una pagina con 5.000 link resta reattiva: esame a lotti, prima i link a sc
   test.setTimeout(120_000);
   await contaLaRete(app, {});
   const N = 5000;
-  // In colonna rovesciata il primo link della pagina sta in fondo, fuori schermo, e l'ultimo in cima.
-  const righe = [];
-  for (let i = 0; i < N - 2; i++) righe.push(`<a href="https://risultato-${i}.esempio-${i % 997}.com/pagina/${i}">risultato ${i}</a>`);
-  const html = '<title>Risultati</title><style>#lista{display:flex;flex-direction:column-reverse}</style><div id="lista">'
-    + '<a id="giu" href="https://paypa1.com/in-fondo">in fondo</a>' + righe.join('')
-    + '<a id="su" href="https://paypal-login.com/in-cima">in cima</a></div>';
+  // In colonna rovesciata il primo link della pagina sta in fondo, fuori schermo, e l'ultimo in cima. Compaiono tutti
+  // insieme: scritti nell'HTML, su una macchina carica arrivano a pezzi e i primi partono quando quello in cima non c'è
+  // ancora, e lì nessun ordine è sbagliato (#1792).
+  const html = '<title>Risultati</title><style>#lista{display:flex;flex-direction:column-reverse}</style><div id="lista"></div>'
+    + `<script>(function () { var h = '<a id="giu" href="https://paypa1.com/in-fondo">in fondo</a>';`
+    + ` for (var i = 0; i < ${N - 2}; i++) h += '<a href="https://risultato-' + i + '.esempio-' + (i % 997) + '.com/pagina/' + i + '">risultato ' + i + '</a>';`
+    + ` document.getElementById('lista').innerHTML = h + '<a id="su" href="https://paypal-login.com/in-cima">in cima</a>'; })();</script>`;
 
-  // Il main misura i suoi buchi: il tempo più lungo in cui non ha potuto rispondere a nient'altro.
-  await app.evaluate(() => {
+  // Il main misura i suoi buchi con un esame in corso o partito dentro (uno in un blocco solo nasce e muore nello stesso
+  // buco), in tempo di processore: aprire la scheda o un sistema carico lo fermano senza che i link c'entrino (#1792).
+  await app.evaluate(({ BrowserWindow }) => {
     globalThis.__buco = { max: 0, attivo: true };
+    const schede = () => BrowserWindow.getAllWindows().flatMap((w) => (w._filoTabs && w._filoTabs.tabs) || []);
+    const inEsame = () => schede().some((t) => (t._sbLinkInCoda || 0) > 0);
+    // Ogni esame chiesto mette in coda una promessa nuova: se una è cambiata, nel buco un esame è partito.
+    const code = () => new Map(schede().map((t) => [t, t._sbLinkCoda]));
+    const partito = (a, b) => [...b].some(([t, c]) => c && a.get(t) !== c);
+    const cpu = () => { const u = process.cpuUsage(); return (u.user + u.system) / 1000; };
     let prima = performance.now();
+    let cpuPrima = cpu();
+    let eraInEsame = inEsame();
+    let eranoCode = code();
     const giro = () => {
       const ora = performance.now();
-      globalThis.__buco.max = Math.max(globalThis.__buco.max, ora - prima);
+      const cpuOra = cpu();
+      const adesso = inEsame();
+      const codeOra = code();
+      if (eraInEsame || adesso || partito(eranoCode, codeOra)) {
+        globalThis.__buco.max = Math.max(globalThis.__buco.max, Math.min(ora - prima, cpuOra - cpuPrima));
+      }
       prima = ora;
+      cpuPrima = cpuOra;
+      eraInEsame = adesso;
+      eranoCode = codeOra;
       if (globalThis.__buco.attivo) setTimeout(giro, 1);
     };
     setTimeout(giro, 1);
