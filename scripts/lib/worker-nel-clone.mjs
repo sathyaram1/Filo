@@ -41,9 +41,12 @@ export function cloneDelGiro(root, { toolsDir = pinnedDir() } = {}) {
   return { indice: m.indice, toolsDir: resolve(toolsDir) };
 }
 
-/** Il clone pronto, con gli strumenti suoi: mai npm ci qui, chi lancia dispatch non aspetta minuti. */
-export function preparaPerIlGiro(root, giro, { prepara = preparaClone } = {}) {
-  return prepara(root, giro.indice, { strumentiDa: giro.toolsDir, basePin: giro.toolsDir, soloCollegati: true });
+// Il comando del worker ha di serie due minuti: tagliato a metà installazione, rilanciato aspetta quella in corso.
+const avvisoDelGiro = (m, { attesa = false } = {}) => process.stderr.write(`[dispatch] ${m}${attesa ? ' Se il comando ti torna per il tempo, rilancialo uguale con un timeout di dieci minuti.' : ''}\n`);
+
+/** Il clone pronto, con gli strumenti suoi: npm ci solo se non ci sono pacchetti da collegare (#1906). */
+export function preparaPerIlGiro(root, giro, { prepara = preparaClone, avvisa = avvisoDelGiro } = {}) {
+  return prepara(root, giro.indice, { strumentiDa: giro.toolsDir, basePin: giro.toolsDir, soloCollegati: true, avvisa });
 }
 
 /** Lo stesso comando, dalla copia degli strumenti del clone. Restituisce l'exit del figlio. */
@@ -88,10 +91,11 @@ export function preparaIntestazione(root, { allinea = allineaPacchetti } = {}) {
     `La shell riparte ogni volta dalla cartella della sessione: ogni comando comincia con \`cd "${dir}" && …\`,`,
     `e Read, Edit e Write vogliono percorsi sotto \`${dir}\`. Il salvataggio automatico segue il file che modifichi.`,
   ];
-  if (!p.ok) righe.push('', `Pacchetti non collegati (${p.why}): prima di provare, \`cd "${dir}" && npm ci\` in sottofondo.`);
+  if (!p.ok) righe.push('', `Pacchetti non pronti (${p.why}): prima di provare, \`cd "${dir}" && npm ci\` in sottofondo.`);
   else if (p.lockDiverso) {
-    righe.push('', `Il package-lock di questo ramo non è quello della sessione: i pacchetti sono quelli della sessione. Se ti`,
-      `servono i suoi, \`cd "${dir}" && npm ci && node scripts/ensure-electron.mjs\` in sottofondo.`);
+    righe.push('', `I pacchetti del clone non vengono dal package-lock di questo ramo. Se ti servono i suoi,`,
+      `\`cd "${dir}" && npm ci && node scripts/ensure-electron.mjs\` in sottofondo.`);
   }
+  if (p.electron) righe.push('', `Il binario di Electron non è arrivato (${p.electron}): prima delle prove che aprono Filo, \`cd "${dir}" && node scripts/ensure-electron.mjs\`.`);
   return righe.join('\n');
 }
