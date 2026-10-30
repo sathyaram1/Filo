@@ -501,6 +501,30 @@ for (const [come, campo, scrivi, valore] of [
     await page.keyboard.press('Control+V');
     await expect(page.locator('#m')).toHaveValue(LETTERA);
   }, IBAN_UTENTE],
+  // Giro 8: un valore diviso in più caselle, un campo che ci aggiunge il paese, un editor in un riquadro vuoto.
+  ['la carta scritta in quattro caselle che la pagina ricompone', `<div id="disegno">•••• •••• •••• ••••</div><label>Numero della carta</label>
+    <input id="c1" maxlength="4"><input id="c2" maxlength="4"><input id="c3" maxlength="4"><input id="c4" maxlength="4">
+    <script>var cc=[1,2,3,4].map(function(i){return document.getElementById('c'+i);});cc.forEach(function(c,i){c.addEventListener('input',function(){
+    document.getElementById('disegno').textContent=cc.map(function(x){return x.value||'••••';}).join(' ');if(c.value.length===4&&cc[i+1])cc[i+1].focus();});});</script>`,
+  async (_app, page) => {
+    await page.locator('#c1').click();
+    await page.keyboard.type(CARTA_UTENTE.replace(/ /g, ''), { delay: 20 });
+    await expect(page.locator('#disegno')).toHaveText(CARTA_UTENTE);
+  }, CARTA_UTENTE],
+  ['l’IBAN in un campo che ci mette davanti il paese mentre l’utente scrive', `<label for="i">IBAN</label><input id="i">
+    <script>var i=document.getElementById('i');i.addEventListener('input',function(){var v=i.value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(v&&!/^IT/.test(v))v='IT'+v;i.value=v;});</script>`,
+  async (_app, page) => {
+    await page.locator('#i').pressSequentially(IBAN_UTENTE.slice(2));
+    await expect(page.locator('#i')).toHaveValue(IBAN_UTENTE);
+  }, IBAN_UTENTE],
+  ['la carta scritta nell’editor di una mail che sta in un riquadro vuoto', `<iframe id="ed" style="width:600px;height:120px;border:1px solid"></iframe>
+    <script>var d=document.getElementById('ed').contentDocument;d.open();d.write('<html><body contenteditable="true"><p>Ciao Marco,</p></body></html>');d.close();</script>`,
+  async (_app, page) => {
+    await page.frameLocator('#ed').locator('body').click();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type(`la carta è ${CARTA_UTENTE}`);
+    await expect(page.frameLocator('#ed').locator('body')).toContainText(CARTA_UTENTE);
+  }, CARTA_UTENTE],
 ]) {
   test(`${come} non resta fra i segreti letti`, async ({ app, shell, openTab, testServer }) => {
     test.setTimeout(60_000);
