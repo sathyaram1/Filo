@@ -832,13 +832,16 @@ test('la chat più carica che l’app sa fare passa le regole, e una manomessa n
 });
 
 // ── I riquadri AI e l'Editor di un'ora (#1465) ─────────────────────────────
+// Una misura arrivata dopo la v1 (#1586) si controlla solo se c'è: `(!('x' in d) || chiuse(d.x, …))`.
 const MR = (() => {
   const out = {};
-  for (const m of RIQUADRI.matchAll(/chiuse\(d\.(\w+), (\[[^\]]*\]), (\d+), '([^']+)'\)/g)) {
-    out[m[1]] = { chiavi: stringhe(m[2]), tetto: Number(m[3]), valori: m[4] };
+  for (const m of RIQUADRI.matchAll(/(\(!\('(\w+)' in d\) \|\| )?chiuse\(d\.(\w+), (\[[^\]]*\]), (\d+), '([^']+)'\)/g)) {
+    assert.ok(!m[1] || m[2] === m[3], `${m[3]}: il controllo facoltativo guarda un altro campo («${m[2]}»)`);
+    out[m[3]] = { chiavi: stringhe(m[4]), tetto: Number(m[5]), valori: m[6], facoltativa: Boolean(m[1]) };
   }
   return out;
 })();
+const passaRiquadri = (doc) => passa(doc, Object.fromEntries(Object.entries(MR).filter(([c, r]) => !r.facoltativa || c in doc)));
 
 test('i riquadri: sola creazione, letti dall’admin, coi campi e la versione dell’app e lo stesso id dell’ora', () => {
   const RR = regole(BR);
