@@ -365,7 +365,7 @@ Tipi ammessi:
 Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2). Nemmeno
 l'affidare un lavoro ai lavori server: un feedback fidato col segno dei lavori
 server ci va da sé, uno non fidato aspetta in Ricevuti che l'owner lo segni
-(§ 3.8, #1576). L'azione `approva_locale` non c'è più.
+(§ 3.8, #1576). Il tipo `approva_locale` non c'è più.
 
 ### 3.4 Rispondere
 
@@ -420,6 +420,8 @@ rispondere.
   `smistamento`, Opus a sforzo alto, tre tentativi, puntatore alla domanda, le
   reti del pacemaker (una domanda `in_smistamento` senza il suo compito lo
   riceve, un compito orfano si chiude superato).
+- **Non lo apre** sulle domande dell'addetto comunicazioni (`soloOwner`,
+  § 4.1): nessun compito le legge, e arrivano all'owner come le scrive lui.
 - **Stato `in_smistamento`.** La domanda non sta fra quelle da rispondere (in
   Gestione è fra quelle in lavorazione). Il feedback legato resta fermo come
   sempre se la domanda blocca, o va avanti con la provvisoria se non blocca.
@@ -465,7 +467,9 @@ rispondere.
   Ognuna tranne `mostra` chiude il compito.
 - **Tentativi.** Un biglietto che finisce senza nessuna delle quattro rimette
   il compito in attesa; al terzo la domanda esce com'è fra quelle da
-  rispondere, con `smistamento: 'fallito'`. Niente resta nascosto.
+  rispondere, con `smistamento: 'fallito'`. Niente resta nascosto. È anche la
+  rete per un guasto che colpisce il compito stesso: un compito che non può
+  girare non trattiene una domanda per sempre.
 - **Migrazione.** Un'operazione del server idempotente (`smista_aperte`),
   lanciata una volta dal pacemaker dopo il deploy, apre il compito per ogni
   domanda oggi `aperta`, destinata all'owner e senza turni dell'owner in

@@ -1,4 +1,4 @@
-// Sentinella: le opzioni delle registrazioni (--frase, --segnala, --nota, --ferma) valgono in ogni
+// Sentinella: le opzioni delle registrazioni (--frase, --domanda, --nota, --ferma) valgono in ogni
 // posizione, come il biglietto. Scritte prima dell'identificativo, la frase finiva nel report e il suo
 // nome faceva da identificativo, con la consegna accettata (#879).
 import '../helpers/senzaSessione.mjs';
@@ -20,7 +20,15 @@ const REPORT = 'Report per l’owner: la causa era altrove, il pulsante non veni
 const FRASE = 'Ora puoi rimuovere un modello dalle impostazioni.';
 const MOTIVO = 'conflitto: src/a.js';
 const CRITICA = 'Provato ad aprire la pagina e a salvare con il titolo vuoto: funziona tutto, non ho trovato niente da segnalare.';
-const SEGNALAZIONE = '## Problema\nDue strade.\n\n## Scelte\n- A: costa.\n- B: lenta.';
+const CRITICA_COL_SEGNO = 'Provato ad aprire la pagina e a salvare con il titolo vuoto: funziona tutto.\n[1i?] Il bordo del riquadro è grigio freddo: caldo come il resto di Filo?';
+const DOMANDA = {
+  titolo: 'Bordo caldo o freddo?', priorita: 'quando_puoi',
+  opzioni: [
+    { testo: 'Caldo', pro: 'Come il resto.', contro: 'Un giro in più.', azione: { tipo: 'riprendi', feedbackId: 'fid-900' } },
+    { testo: 'Tenere com\'è', pro: 'Niente lavoro.', contro: 'Stona.', azione: { tipo: 'archivia', feedbackId: 'fid-900' } },
+  ],
+  consiglio: { opzione: 0, perche: 'Filo è caldo.' },
+};
 const NOTA_TESTO = 'Letto il diff riga per riga: solo lettura degli argomenti e un test. Niente di sospetto.';
 
 function fintoServer() {
@@ -46,7 +54,7 @@ function esegui(argv, env) {
   });
 }
 
-/** Deposito pulito sul ramo del lavoro, stato del giro fuori da git; segnalazione e nota fuori dal deposito. */
+/** Deposito pulito sul ramo del lavoro, stato del giro fuori da git; domanda e nota fuori dal deposito. */
 function preparaGiro() {
   const casa = cartellaTemporanea('filo-opzioni-');
   const fuori = cartellaTemporanea('filo-opzioni-fuori-');
@@ -63,9 +71,9 @@ function preparaGiro() {
   writeFileSync(resolve(casa, 'stato', `${ID}.json`), JSON.stringify({
     id: ID, branch: 'worker/900', loopCount: 1, verifierVerdict: 'fail',
   }), 'utf8');
-  const seg = resolve(fuori, 'segnala.md');
+  const seg = resolve(fuori, 'domanda.json');
   const nota = resolve(fuori, 'nota.md');
-  writeFileSync(seg, SEGNALAZIONE, 'utf8');
+  writeFileSync(seg, JSON.stringify(DOMANDA), 'utf8');
   writeFileSync(nota, NOTA_TESTO, 'utf8');
   return { casa, fuori, seg, nota };
 }
@@ -87,13 +95,13 @@ async function lancia(costruisci) {
   } finally { srv.close(); togliCartella(giro.casa); togliCartella(giro.fuori); }
 }
 
-test('--record-fixed: frase e segnalazione arrivano uguali in ogni posizione, col ramo e l\'identificativo giusti', async () => {
+test('--record-fixed: frase e domanda arrivano uguali in ogni posizione, col ramo e l\'identificativo giusti', async () => {
   const righe = {
-    'in fondo': ({ seg }) => ['--record-fixed', ID, REPORT, '--frase', FRASE, '--segnala', seg, '--motivo', MOTIVO],
-    'davanti al comando': ({ seg }) => ['--motivo', MOTIVO, '--frase', FRASE, '--segnala', seg, '--record-fixed', ID, REPORT],
-    'fra comando e identificativo': ({ seg }) => ['--record-fixed', '--frase', FRASE, '--motivo', MOTIVO, '--segnala', seg, ID, REPORT],
-    'fra identificativo e report': ({ seg }) => ['--record-fixed', ID, '--frase', FRASE, '--motivo', MOTIVO, REPORT, '--segnala', seg],
-    'con l\'uguale': ({ seg }) => ['--record-fixed', `--frase=${FRASE}`, `--segnala=${seg}`, `--motivo=${MOTIVO}`, ID, REPORT],
+    'in fondo': ({ seg }) => ['--record-fixed', ID, REPORT, '--frase', FRASE, '--domanda', seg, '--motivo', MOTIVO],
+    'davanti al comando': ({ seg }) => ['--motivo', MOTIVO, '--frase', FRASE, '--domanda', seg, '--record-fixed', ID, REPORT],
+    'fra comando e identificativo': ({ seg }) => ['--record-fixed', '--frase', FRASE, '--motivo', MOTIVO, '--domanda', seg, ID, REPORT],
+    'fra identificativo e report': ({ seg }) => ['--record-fixed', ID, '--frase', FRASE, '--motivo', MOTIVO, REPORT, '--domanda', seg],
+    'con l\'uguale': ({ seg }) => ['--record-fixed', `--frase=${FRASE}`, `--domanda=${seg}`, `--motivo=${MOTIVO}`, ID, REPORT],
   };
   for (const [dove, riga] of Object.entries(righe)) {
     const r = await lancia(riga);
@@ -102,14 +110,14 @@ test('--record-fixed: frase e segnalazione arrivano uguali in ogni posizione, co
     assert.equal(r.dati.report, REPORT, `${dove}: il report arriva da solo, senza frase né identificativo incollati`);
     assert.equal(r.dati.userNote, FRASE, `${dove}: a chi ha segnalato arriva la frase`);
     assert.equal(r.dati.branch, 'worker/900', `${dove}: la consegna porta il ramo del lavoro`);
-    assert.equal(r.dati.segnalazione, SEGNALAZIONE, `${dove}: la segnalazione arriva intera`);
+    assert.equal(r.dati.domanda?.titolo, DOMANDA.titolo, `${dove}: la domanda arriva intera`);
     assert.ok(r.dati.motivo && r.dati.motivo.tipo, `${dove}: il motivo del correttore arriva al server`);
     assert.deepEqual(r.stati, [`${ID}.json`], `${dove}: lo stato locale resta sotto l'identificativo vero`);
   }
 });
 
 test('--record-fixed: --ferma davanti al comando vale come in fondo', async () => {
-  const r = await lancia(({ seg }) => ['--ferma', '--record-fixed', ID, REPORT, '--segnala', seg, '--motivo', MOTIVO]);
+  const r = await lancia(({ seg }) => ['--ferma', '--record-fixed', ID, REPORT, '--domanda', seg, '--motivo', MOTIVO]);
   assert.equal(r.code, 0, `stderr: ${r.se}`);
   assert.equal(r.dati?.stop, true, 'la consegna porta la richiesta di fermarsi');
   assert.equal(r.dati?.report, REPORT);
@@ -130,20 +138,24 @@ test('--record-secaudit: la nota davanti al comando o all\'identificativo arriva
   }
 });
 
-test('--record-verifier: la segnalazione davanti al comando arriva con la critica', async () => {
-  const r = await lancia(({ seg }) => ['--segnala', seg, '--record-verifier', ID, CRITICA]);
+test('--record-verifier: la domanda davanti al comando arriva col suo rilievo col «?»', async () => {
+  const r = await lancia(({ seg }) => ['--domanda', seg, '--record-verifier', ID, CRITICA_COL_SEGNO]);
   assert.equal(r.code, 0, `stderr: ${r.se}`);
-  assert.equal(r.dati?.critique, CRITICA);
-  assert.equal(r.dati?.segnalazione, SEGNALAZIONE);
+  assert.equal(r.dati?.critique, CRITICA_COL_SEGNO);
+  assert.equal(r.dati?.findings?.[0]?.domanda?.titolo, DOMANDA.titolo);
+  assert.equal('domanda' in (r.dati || {}), false, 'la domanda viaggia col rilievo, non accanto alla critica');
   assert.equal(r.dati?.branch, 'worker/900');
 });
 
 test('righe sbagliate: si fermano col motivo, senza chiamare il server né scrivere stato', async () => {
   const casi = [
-    [({ seg }) => ['--record-fixed', '--frasi', FRASE, ID, REPORT, '--segnala', seg], /al posto dell'identificativo: --frasi/],
-    [() => ['--frase', FRASE, '--record-verifier', ID, CRITICA], /--frase non vale con --record-verifier: qui ci sono solo --segnala <file\.md>/],
-    [({ nota, seg }) => ['--record-secaudit', ID, 'pass', '--nota', nota, '--segnala', seg], /--segnala non vale con --record-secaudit/],
-    [({ seg }) => ['--segnala', seg, '--record-pulizia', ID], /qui non ci sono opzioni/],
+    [({ seg }) => ['--record-fixed', '--frasi', FRASE, ID, REPORT, '--domanda', seg], /al posto dell'identificativo: --frasi/],
+    [() => ['--frase', FRASE, '--record-verifier', ID, CRITICA], /--frase non vale con --record-verifier: qui ci sono solo --domanda <file\.json>\./],
+    [({ nota, seg }) => ['--record-secaudit', ID, 'pass', '--nota', nota, '--domanda', seg], /--domanda non vale con --record-secaudit/],
+    [({ seg }) => ['--domanda', seg, '--record-pulizia', ID], /qui non ci sono opzioni/],
+    [({ seg }) => ['--record-fixed', ID, REPORT, '--segnala', seg], /--segnala non c'è più/],
+    [({ seg }) => ['--domanda', seg, '--record-verifier', ID, CRITICA], /1 domanda per 0 rilievi col «\?»/],
+    [() => ['--record-verifier', ID, CRITICA_COL_SEGNO], /il rilievo 1 col «\?» non ha la sua domanda/],
     [() => ['--frase', '--record-fixed', ID, REPORT], /--frase vuole la riga/],
     [() => ['--record-fixed', ID, REPORT, '--frase', FRASE, '--frase', 'Un\'altra frase.'], /--frase va passato una volta sola/],
     [() => ['--ferma=si', '--record-fixed', ID, REPORT], /--ferma non vuole un valore/],
@@ -165,11 +177,11 @@ test('--help risponde anche con un\'opzione monca dopo', async () => {
 });
 
 test('leggiOpzioniRegistrazione: stesso risultato in ogni posizione; il resto resta in ordine', () => {
-  const attesi = { args: ['--record-fixed', ID, REPORT], valori: { '--frase': FRASE, '--segnala': 's.md' }, error: '' };
+  const attesi = { args: ['--record-fixed', ID, REPORT], valori: { '--frase': FRASE, '--domanda': 's.json' }, error: '' };
   for (const riga of [
-    ['--record-fixed', ID, REPORT, '--frase', FRASE, '--segnala', 's.md'],
-    ['--frase', FRASE, '--record-fixed', '--segnala', 's.md', ID, REPORT],
-    ['--record-fixed', `--frase=${FRASE}`, ID, '--segnala=s.md', REPORT],
+    ['--record-fixed', ID, REPORT, '--frase', FRASE, '--domanda', 's.json'],
+    ['--frase', FRASE, '--record-fixed', '--domanda', 's.json', ID, REPORT],
+    ['--record-fixed', `--frase=${FRASE}`, ID, '--domanda=s.json', REPORT],
   ]) {
     assert.deepEqual(leggiOpzioniRegistrazione(riga), attesi, riga.join(' '));
   }

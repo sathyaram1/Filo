@@ -420,7 +420,7 @@ export const OPZIONI_REGISTRAZIONE = {
   // Il server non compone più domande da un markdown (#1790): si riconosce per dire cosa scrivere al suo posto.
   '--segnala': { tipo: 'tolta', comandi: ['--record-verifier', '--record-fixed'] },
   // La domanda per l'owner nel formato di SPEC-DOMANDE §3.1: per chi verifica una per rilievo col `?` (un elenco JSON).
-  '--domanda': { tipo: 'file', comandi: ['--record-verifier', '--record-fixed'] },
+  '--domanda': { tipo: 'file', forma: ' <file.json>', comandi: ['--record-verifier', '--record-fixed'] },
   '--nota': { tipo: 'file', comandi: ['--record-secaudit'] },
   '--frase': { tipo: 'testo', comandi: ['--record-fixed'], manca: 'la riga per chi ha segnalato' },
   // Perché il correttore è stato chiamato (SPEC-RIDISEGNO-LAVORO.md §3, regola 4): senza, la consegna non parte.
@@ -429,7 +429,7 @@ export const OPZIONI_REGISTRAZIONE = {
   // La sessione accesa per UN feedback (SPEC-RIDISEGNO-LAVORO.md § 2): riceve il ruolo della sessione, non dell'orchestratore.
   '--feedback': { tipo: 'testo', comandi: ['--preflight'], manca: 'il numero del feedback' },
 };
-const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', bandiera: '', tolta: '' };
+const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', bandiera: '' };
 
 /**
  * Anche come `--opzione=valore`, la forma del canale. PURA. `error`: valore mancante o storto, opzione
@@ -445,7 +445,7 @@ export function leggiOpzioniRegistrazione(list) {
     const a = lista[i];
     const nome = Object.keys(OPZIONI_REGISTRAZIONE).find((n) => a === n || a.startsWith(`${n}=`));
     if (!nome) { args.push(a); continue; }
-    const { tipo, manca } = OPZIONI_REGISTRAZIONE[nome];
+    const { tipo, manca, forma } = OPZIONI_REGISTRAZIONE[nome];
     if (tipo === 'tolta') return no(SEGNALA_TOLTA);
     if (tipo === 'bandiera') {
       if (a !== nome) return no(`${nome} non vuole un valore: non ho consegnato niente.`);
@@ -456,7 +456,8 @@ export function leggiOpzioniRegistrazione(list) {
     const v = a === nome ? lista[++i] : a.slice(nome.length + 1);
     if (tipo === 'file') {
       const file = String(v ?? '').trim();
-      if (!file || SEMBRA_OPZIONE(file)) return no(`${nome} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.`);
+      const estensione = (/\.\w+(?=>)/.exec(forma || '') || ['.md'])[0];
+      if (!file || SEMBRA_OPZIONE(file)) return no(`${nome} vuole il percorso di un file subito dopo di sé (un ${estensione} scritto prima): non ho consegnato niente.`);
       valori[nome] = file;
     } else {
       // Un'opzione al posto della frase vuol dire frase dimenticata: presa per frase, il comando o
@@ -469,8 +470,8 @@ export function leggiOpzioniRegistrazione(list) {
   for (const nome of Object.keys(valori)) {
     const { comandi } = OPZIONI_REGISTRAZIONE[nome];
     if (comandi.includes(comando)) continue;
-    const qui = Object.entries(OPZIONI_REGISTRAZIONE).filter(([, o]) => o.comandi.includes(comando))
-      .map(([n, o]) => `${n}${FORMA_OPZIONE[o.tipo]}`);
+    const qui = Object.entries(OPZIONI_REGISTRAZIONE).filter(([, o]) => o.comandi.includes(comando) && o.tipo !== 'tolta')
+      .map(([n, o]) => `${n}${o.forma || FORMA_OPZIONE[o.tipo]}`);
     return no(String(comando || '').startsWith('--record-')
       ? `${nome} non vale con ${comando}: ${qui.length ? `qui ci sono solo ${qui.join(', ')}` : 'qui non ci sono opzioni'}. Niente è stato toccato.`
       : `${nome} vale solo con ${comandi.join(' e ')}. Niente è stato toccato.`);

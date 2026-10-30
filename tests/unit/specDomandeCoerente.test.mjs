@@ -154,14 +154,16 @@ test('la domanda di fine turno della gestione del lavoro è un limite scritto, e
   assert.match(sezione('### 4.1').replace(/\s+/g, ' '), /nessun altro compito le legge/);
 });
 
-// Sui guasti la gestione del lavoro risponde con azioni, mai testo: il feedback ripreso resta fidato.
-test('le domande di guasto e le segnalazioni vanno alla gestione del lavoro, che sui guasti risponde solo con azioni', () => {
+// #1790: i guasti non vanno alla gestione del lavoro né all'owner, li smista il compito «Gestisci la domanda»; le
+// segnalazioni restano a lei.
+test('le segnalazioni vanno alla gestione del lavoro; i guasti li smista il compito, e lei non smista né risponde', () => {
   const s43 = sezione('### 4.3').replace(/\s+/g, ' ');
-  assert.match(s43, /domande di guasto.{0,60}vanno a lei, non all'owner/);
-  assert.match(s43, /risponde solo con le azioni\*\* `riprendi`, `attendi` o `archivia`.{0,20}mai con testo/);
+  assert.match(s43, /segnalazioni libere \(§ 5\.4\) vanno a lei, non all'owner/);
+  assert.match(s43, /I guasti non passano da lei\*\* \(#1790\): li smista in minuti il compito «Gestisci la domanda» \(§ 3\.5\)/);
   assert.match(sezione('### 5.4').replace(/\s+/g, ' '), /consegna alla \*\*gestione del lavoro\*\*/);
   const riga = righe(sezione('### 5.2')).map(celle).find((c) => nomiFraApici(c[0]).includes('gestione_lavoro'));
-  assert.match(riga[2], /rispondere con testo a una domanda di guasto/);
+  assert.match(riga[2], /smistare o rispondere alle domande \(lo fa il compito della § 3\.5\)/);
+  assert.doesNotMatch(riga[1], /domande di guasto/);
 });
 
 // La domanda della gestione del lavoro è testo non fidato a ogni ruolo: se arrivasse prima dell'ultima scrittura,
@@ -176,31 +178,32 @@ test('la domanda di fine turno della gestione del lavoro arriva dopo l\'ultima s
 // Decisione del 23/10: la mail resta fra l'addetto comunicazioni e l'owner, nemmeno per segnalazioni e guasti.
 test('segnalazioni, guasti e risposte di fine turno dell\'addetto comunicazioni vanno all\'owner, non alla gestione del lavoro', () => {
   assert.match(sezione('### 4.1').replace(/\s+/g, ' '), /segnalazioni libere, le sue domande di guasto e le sue risposte alla domanda di fine turno vanno all'owner/);
-  for (const s of ['### 4.3', '### 5.4', '### 3.1', '### 3.8']) {
+  for (const s of ['### 4.3', '### 5.4']) {
     assert.match(sezione(s).replace(/\s+/g, ' '), /tranne quelle dell'addetto comunicazioni|quelle dell'addetto comunicazioni vanno all'owner|sempre per l'addetto comunicazioni/, `${s} non esclude l'addetto`);
   }
   const riga = righe(sezione('### 5.2')).map(celle).find((c) => nomiFraApici(c[0]).includes('gestione_lavoro'));
   assert.match(riga[1], /segnalazioni, tranne quelle dell'addetto comunicazioni/);
+  // Nessun compito legge le sue domande: nemmeno quello che smista le domande alla nascita (#1790).
+  assert.match(sezione('### 3.5').replace(/\s+/g, ' '), /Non lo apre\*\* sulle domande dell'addetto comunicazioni \(`soloOwner`, § 4\.1\)/);
 });
 
-// #1249.1: la gestione del lavoro gira nell'ambiente dei riservati, quindi un guasto di lì (anche suo) la ferma come
-// ha fermato chi l'ha aperto; e un guasto che anticipa l'istanza di chi l'ha aperto è una fila di accensioni senza fine.
-test('i guasti dell\'ambiente dei riservati vanno all\'owner, e un guasto non anticipa l\'istanza di chi l\'ha aperto', () => {
+// #1249.1: un guasto che anticipa l'istanza di chi l'ha aperto è una fila di accensioni senza fine. #1790: un guasto
+// che colpisce il compito che smista non trattiene la domanda: al terzo tentativo esce all'owner com'è.
+test('un guasto non anticipa l\'istanza di chi ci è caduto, e un compito che non gira non trattiene la domanda', () => {
   const s51 = sezione('### 5.1').replace(/\s+/g, ' ');
   assert.match(s51.slice(s51.indexOf('per mestiere')), /^[^.]*la gestione del lavoro/, 'la regola vale finché lei gira nell\'ambiente dei riservati');
   const s43 = sezione('### 4.3').replace(/\s+/g, ' ');
-  assert.match(s43, /non va a chi l'ha aperta né a chi gira nello stesso ambiente/);
-  assert.match(s43, /aperte da un biglietto di quell'ambiente vanno all'owner, comprese le sue/);
-  assert.match(s43, /non anticipa mai l'istanza di chi l'ha aperto/);
-  assert.match(s43, /Un guasto che va a lei le anticipa l'istanza/);
-  assert.match(sezione('### 3.1').replace(/\s+/g, ' '), /`destinatario`.{0,200}altri biglietti dell'ambiente dei riservati, lei compresa: vanno all'owner/);
-  assert.match(sezione('### 3.8').replace(/\s+/g, ' '), /altri biglietti dell'ambiente dei riservati, lei compresa \(§ 4\.3\), va all'owner/);
-  const riga = righe(sezione('### 5.2')).map(celle).find((c) => nomiFraApici(c[0]).includes('gestione_lavoro'));
-  assert.match(riga[1], /domande di guasto dei biglietti fuori dall'ambiente dei riservati/);
+  assert.match(s43, /Un guasto non anticipa mai l'istanza di chi ci è caduto/);
+  const s35 = sezione('### 3.5').replace(/\s+/g, ' ');
+  assert.match(s35, /al terzo la domanda esce com'è fra quelle da rispondere, con `smistamento: 'fallito'`/);
+  assert.match(s35, /un compito che non può girare non trattiene una domanda per sempre/);
   assert.match(sezione('## 13').replace(/\s+/g, ' '), /`destinatario`, che manda all'owner i guasti dell'ambiente dei riservati; istanza anticipata da un guasto, mai quella di chi l'ha aperto/);
 });
 
-test('le domande di guasto vanno all\'owner finché la gestione del lavoro non c\'è', () => {
-  assert.match(sezione('### 3.8').replace(/\s+/g, ' '), /dal punto 9 dell'ordine di lavoro \(§ 13\); fino ad allora/);
-  assert.match(sezione('## 13').replace(/\s+/g, ' '), /domande di guasto vanno all'owner fino al punto 9/);
+test('un guasto non diventa una domanda per l\'owner (#1790)', () => {
+  const s38 = sezione('### 3.8').replace(/\s+/g, ' ');
+  assert.match(s38, /guasto \(#1781\) \| nessuna domanda e nessuna fermata/);
+  assert.match(s38, /Al terzo guasto uguale di seguito sullo stesso feedback nasce UNA domanda col conteggio/);
+  assert.match(sezione('### 3.1').replace(/\s+/g, ' '), /`destinatario`: l'owner\. Le domande di guasto non arrivano a nessuno/);
+  assert.match(sezione('## 13').replace(/\s+/g, ' '), /dal #1790 non ne nascono più: § 3\.8/);
 });
