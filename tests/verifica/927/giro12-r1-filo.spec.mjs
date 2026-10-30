@@ -72,12 +72,13 @@ const SENZA_ORDINE = [
 ];
 
 for (const caso of SENZA_ORDINE) {
-  test(`r1 un titolo che nomina Filo senza dargli un ordine, ${caso.nome}: entra nel riepilogo senza box`, async ({ app, shell, avvisi, testServer }) => {
+  test(`r1 un titolo che nomina Filo senza dargli un ordine, ${caso.nome}: entra nel riepilogo senza box`, async ({ app, shell, testServer }) => {
     test.setTimeout(90_000);
     const prompt = await riepilogo({ app, shell, testServer }, caso.titolo);
     expect(prompt).toContain(caso.titolo);
-    const vista = await avvisi();
-    await vista.waitForTimeout(2_000);
-    await expect(vista.locator('.shell-notif.show', { hasText: 'sembra rivolto a Filo' })).toHaveCount(0);
+    // La vista degli avvisi nasce al primo avviso: senza box può non esserci affatto.
+    await new Promise((r) => setTimeout(r, 2_000));
+    const vista = app.windows().find((w) => w.url().startsWith('filo://shell/avvisi.html'));
+    if (vista) await expect(vista.locator('.shell-notif.show', { hasText: 'sembra rivolto a Filo' })).toHaveCount(0);
   });
 }
