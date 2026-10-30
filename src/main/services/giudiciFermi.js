@@ -41,7 +41,7 @@ function testi(stato) {
   return {
     titolo,
     // La cosa da fare per prima: la carta della home taglia le righe in fondo.
-    testo: `${fai} Dal ${quando(stato.da)} ${attesa} il giudizio e le routine non ricevono lavoro nuovo.`,
+    testo: `${fai} Dal ${quando(stato.da)}, ${attesa} il giudizio e le routine non ricevono lavoro nuovo.`,
     barra: `${titolo}: le segnalazioni nuove non vengono giudicate. ${fai}`,
     apri: credito ? 'filo://manage/manage.html#rivaluta' : 'filo://manage/manage.html#automation',
     etichetta: credito ? 'Apri Ri-valuta' : 'Apri Automazioni',

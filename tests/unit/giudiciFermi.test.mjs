@@ -119,3 +119,9 @@ test('normalizza scarta uno stato storto invece di mostrarlo', () => {
   assert.equal(G.normalizza({ causa: 'credit', da: 'ieri' }), null);
   assert.equal(G.normalizza({ causa: 'credit', da: EP1.da, inAttesa: '<b>' }).inAttesa, 0);
 });
+
+test('nella carta l\'ora d\'inizio e il conto delle segnalazioni non si leggono come un numero solo', () => {
+  const t = G.testi({ ...EP1, inAttesa: 118 });
+  assert.match(t.testo, /118 segnalazioni aspettano/);
+  assert.doesNotMatch(t.testo, /\d{2}:\d{2} \d+ segnalazioni/);
+});
