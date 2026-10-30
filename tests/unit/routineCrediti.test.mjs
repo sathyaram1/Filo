@@ -58,7 +58,20 @@ test('rigaAccount: percentuale, limite, passo di oggi, rinnovo, e perché è fer
   assert.match(RC.rigaAccount('B', { pct: 20, basseAperte: true }), /ultime 24 ore: priorità basse aperte/);
   const vuota = RC.rigaAccount('B', {});
   assert.match(vuota, /^–% della settimana|^– della settimana/);
-  assert.doesNotMatch(vuota, /0%/);
+  assert.doesNotMatch(vuota, /0%|resta|\$/);
+});
+
+// #1787: il manutentore e la scheda Crediti leggono la spesa anche in dollari, con quanto resta e le accensioni.
+test('rigaAccount: dollari della settimana e di quanto resta, ultime 24 ore e accensioni quando il server li dà', () => {
+  const riga = RC.rigaAccount('A', { pct: 40, limite: 90, usdSettimana: 860, usd24h: 123.4, accensioniSettimana: 14, accensioni24h: 3 });
+  assert.match(riga, /^40% della settimana \(≈ 860 \$\), limite 90% · resta 50% \(≈ 1\.075 \$\) · ultime 24 ore ≈ 123 \$ · accensioni: 14 in settimana, 3 nelle ultime 24 ore · rinnova /);
+  // Settimana appena rinnovata: niente spesa da cui tarare, vale la taratura dell'owner.
+  assert.match(RC.rigaAccount('B', { pct: 0, usdSettimana: 0 }, { usdPer100: 2000 }), /^0% della settimana \(≈ 0 \$\) · resta 100% \(≈ 2\.000 \$\)/);
+  assert.match(RC.rigaAccount('B', { pct: 10 }, { usdPer100: 2150 }), /^10% della settimana \(≈ 215 \$\) · resta 90% \(≈ 1\.935 \$\)/);
+  // Oltre il limite non resta un numero negativo; un conteggio storto non compare.
+  assert.match(RC.rigaAccount('B', { pct: 85, limite: 80, usdSettimana: 1700, accensioni24h: -2, accensioniSettimana: 'x' }), /resta 0% \(≈ 0 \$\)/);
+  assert.doesNotMatch(RC.rigaAccount('B', { pct: 85, accensioni24h: -2, accensioniSettimana: 'x' }), /accensioni/);
+  assert.match(RC.rigaAccount('A', { pct: 5, accensioni24h: 0 }), /accensioni: 0 nelle ultime 24 ore/);
 });
 
 // ── La porta del main ────────────────────────────────────────────────────────
