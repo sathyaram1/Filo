@@ -1,9 +1,10 @@
 // Il contesto del manutentore (SPEC-RIDISEGNO-LAVORO.md § 2): il suo ruolo, tutte le schede in una riga ciascuna e i rami
 // in corso coi loro file, da git e senza modello; scrive solo l'ordine da accendere, che il pacemaker legge. Regole:
-// tests/unit/manutentore.test.mjs. Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente
+// tests/unit/manutentore.test.mjs. Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente | spesa
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { espandiInclusioni } from './lib/role-text.mjs';
