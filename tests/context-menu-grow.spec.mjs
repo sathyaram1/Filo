@@ -89,7 +89,7 @@ async function apriMenuSu(page, selector, opts = {}) {
   return menu;
 }
 
-test('#500 la spiegazione cresce: il menu del collegamento rientra invece di farsi tagliare', async ({ openTab, testServer }) => {
+test('#500 la spiegazione cresce: il menu del collegamento rientra invece di farsi tagliare', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, paginaLink());
   const menu = await apriMenuSu(page, '#link');
 
