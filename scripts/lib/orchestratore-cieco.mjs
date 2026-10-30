@@ -180,7 +180,7 @@ export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato 
     try { s = JSON.parse(readFileSync(file, 'utf8') || '{}'); } catch (e) { return { ok: false, file, why: `impostazioni utente illeggibili: ${e.message}` }; }
     if (!s || typeof s !== 'object' || Array.isArray(s)) return { ok: false, file, why: 'impostazioni utente non sono un oggetto' };
   }
-  const cmd = comando({ sessione, creato, registro: join(dir, FILE_REGISTRO) });
+  const cmd = comando({ sessione, creato, registro: join(dir, FILE_REGISTRO), strumenti });
   const hooks = { ...(s.hooks || {}) };
   // ConfigChange senza matcher: ogni fonte arriva a decidi, che sceglie cosa fermare.
   const voci = { PreToolUse: MATCHER_PRIMA, PostToolUse: 'Agent|Task', ConfigChange: '' };
