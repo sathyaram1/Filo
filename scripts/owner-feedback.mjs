@@ -325,7 +325,7 @@ export async function segnalazioneDaUnire(riferimento, opts = {}) {
   const bearer = opts.bearer || await acquireBearer();
   const r = await risolviFeedback(riferimento, { bearer, base: FIRESTORE_BASE });
   if (!r.ok) return { ok: false, motivo: r.motivo, inesistente: /^nessun feedback/.test(r.motivo) };
-  const doc = await getDoc(r.id, bearer, ['seq', 'subSeq', 'status', 'priority', 'localOnly', 'branch', 'unisce', ATT.CAMPO]);
+  const doc = await getDoc(r.id, bearer, ['seq', 'subSeq', 'status', 'priority', 'localOnly', 'branch', 'unisce', 'fiducia', ATT.CAMPO]);
   if (!doc) return { ok: false, motivo: `nessun feedback ${riferimento}`, inesistente: true };
   const f = doc.fields || {};
   const { from, leggibile } = await statoAttuale(doc);
