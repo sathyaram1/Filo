@@ -31,6 +31,20 @@
     conversazioneByte: 300 * 1024,
     aperteBiglietto: 20,
     principio: 2000,
+    // La forma (§3.1): il titolo dice di cosa si parla, e un'opzione sola non è una domanda.
+    paroleTitolo: 10,
+    opzioniMinime: 2,
+  });
+
+  // La forma che il compito «Gestisci la domanda» dà a ciò che pubblica per l'owner (§3.5). Una riga sono
+  // `caratteriRiga` caratteri, un a capo ne apre un'altra.
+  const FORMA_OWNER = Object.freeze({
+    opzioniMassime: 4,
+    righeContesto: 5,
+    righeProblema: 3,
+    righeOpzione: 1,
+    righePerche: 1,
+    caratteriRiga: 140,
   });
 
   // Le chiavi che un'azione `automazione` può scrivere: solo booleani già in Automazioni. `spegne`: il vero spegne.
