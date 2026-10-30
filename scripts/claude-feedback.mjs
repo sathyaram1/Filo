@@ -396,16 +396,23 @@ export function copieDegliAllegati(perUnita, { primaImmagini = 0 } = {}) {
   return { immagini, documenti, origine, motivi };
 }
 
-/** Chi aspetta una delle unite, dalle righe lette → [{ id, num, togli: [id], quali: [num] }]. Le unite no: si archiviano. PURA. */
+/**
+ * Chi aspetta una delle unite, dalle righe lette → [{ id, num, togli: [id], quali: [num], tenute: [num] }]: `tenute` sono
+ * le sue altre attese. Le unite stesse no: si archiviano. PURA.
+ */
 export function chiAspetta(righe, unite) {
   const perId = new Map((Array.isArray(unite) ? unite : []).map((u) => [u.id, String(u.num)]));
   const out = [];
   for (const r of Array.isArray(righe) ? righe : []) {
     const id = String((r && r._id) || '');
     if (!id || perId.has(id)) continue;
-    const togli = globalThis.SN_FB_ATTESE.atteseDi(r).map((w) => w.id).filter((x) => perId.has(x));
+    const attese = globalThis.SN_FB_ATTESE.atteseDi(r);
+    const togli = attese.map((w) => w.id).filter((x) => perId.has(x));
     if (!togli.length) continue;
-    out.push({ id, num: FB.formatNum(Number(r.seq), Number(r.subSeq)) || id, togli, quali: togli.map((x) => perId.get(x)) });
+    out.push({
+      id, num: FB.formatNum(Number(r.seq), Number(r.subSeq)) || id, togli, quali: togli.map((x) => perId.get(x)),
+      tenute: attese.filter((w) => !perId.has(w.id)).map((w) => w.num || w.id),
+    });
   }
   return out;
 }
