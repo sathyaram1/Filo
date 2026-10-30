@@ -655,6 +655,33 @@ export function comandoRisposta(io, cred, id) {
 }
 
 /**
+ * Il valore atteso del lease dopo una storia riscritta: la punta di origin/<ramo> che questa copia conosce, solo se
+ * il ramo l'ha avuta (lei o un suo discendente) in una voce del suo reflog, altrimenti ''. Un lease senza valore si
+ * fida della traccia remota, che dopo un `git fetch` può essere il commit di un altro (verifica del giro 2); e
+ * --force-if-includes vuole il reflog della traccia, che un clone appena nato non ha: rifiutava sempre (#1776).
+ * Stessa regola di lease_atteso nell'hook di salvataggio.
+ */
+export function leaseAtteso(root, ramo, { exec = execFileSync } = {}) {
+  const git = (args, input = '') => String(exec('git', args, {
+    cwd: root, encoding: 'utf8', input, stdio: ['pipe', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024,
+  }) || '');
+  const righe = (testo) => testo.split('\n').map((l) => l.trim()).filter(Boolean);
+  try {
+    const punta = git(['rev-parse', '-q', '--verify', `refs/remotes/origin/${ramo}^{commit}`]).trim();
+    if (!punta) return '';
+    let voci = [];
+    try { voci = righe(git(['log', '-g', '--format=%H', `refs/heads/${ramo}`])); } catch (_) { /* senza reflog resta la punta del ramo */ }
+    if (voci.includes(punta)) return punta;
+    // Una riga vuota chiude la lettura di --stdin: le righe passano filtrate.
+    const genitori = righe(git(['rev-parse', `${punta}^@`])).map((p) => `^${p}`);
+    const storia = righe(git(['rev-list', '--stdin'], [...voci, `refs/heads/${ramo}`, ...genitori].join('\n') + '\n'));
+    return storia.includes(punta) ? punta : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+/**
  * Spedisce il ramo corrente su origin, prima del rilascio. L'hook di
  * salvataggio parte solo su Edit/Write: un `git commit` fatto a mano dal
  * worker restava a terra, e il contenitore moriva con lui (giro del 14/09).
