@@ -222,12 +222,52 @@ async function elenca(cartella, dryRun) {
 /** La scheda nel feedback, sulla strada del giro. → { ok, scheda?, aggiornato? } | { ok:false, motivo } */
 async function salvaNelFeedback(dati, { via, ticket }) {
   const { salvaSchedaDalServer, salvaSchedaDaOwner } = await import('./lib/feedback-cloud.mjs');
-  return via === 'cloud' ? salvaSchedaDalServer(ticket, dati) : salvaSchedaDaOwner(dati);
+  try {
+    return await (via === 'cloud' ? salvaSchedaDalServer(ticket, dati) : salvaSchedaDaOwner(dati));
+  } catch (e) {
+    return { ok: false, guasto: true, motivo: String((e && e.message) || e).slice(0, 200) };
+  }
 }
 
 /** L'indice col nuovo aggiornamento dei feedback appena toccati dalle schede: senza, le si darebbe per vecchie. PURA. */
 export function indiceAggiornato(indice, aggiornati) {
   return (indice || []).map((f) => (aggiornati.has(f.num) ? { ...f, aggiornato: aggiornati.get(f.num) } : f));
+}
+
+// Il segno di una scheda della cartella che il feedback non ha: fresca per l'agente, ma da mandare al prossimo giro.
+export const NON_SALVATA = '_nonSalvata';
+
+/** Cosa resta nella cartella dopo il salvataggio: la scheda del feedback, o quella dell'agente col segno. PURA. */
+export function schedaDopoSalvataggio(stampata, salvata) {
+  return salvata && salvata.ok && salvata.scheda ? salvata.scheda : { ...stampata, [NON_SALVATA]: true };
+}
+
+/**
+ * Manda al feedback le schede della cartella rimaste fuori (segnate NON_SALVATA) e ancora fresche: senza agente, solo il
+ * salvataggio. Quelle vecchie le riscrive l'agente. `salva(dati)` → come salvaNelFeedback. → { mandate, restano, aggiornati }
+ */
+export async function rimandaNonSalvate(cartella, indice, { salva }) {
+  const perNum = new Map((indice || []).map((f) => [f.num, f]));
+  const aggiornati = new Map();
+  let mandate = 0;
+  let restano = 0;
+  for (const s of leggiSchede(cartella)) {
+    if (!s || s[NON_SALVATA] !== true) continue;
+    const num = String(s.numero || '').replace(/^#/, '');
+    const f = perNum.get(num);
+    if (!f || daScrivere(f, s)) continue;
+    const modello = String(((s._riletta || s._fonte) || {}).modello || '');
+    const salvata = await salva({ numero: num, scheda: SS.campiDellAgente(s), rilettura: Boolean(s._riletta), modello });
+    if (salvata && salvata.ok && salvata.scheda) {
+      writeFileSync(fileScheda(cartella, num), `${JSON.stringify(salvata.scheda, null, 1)}\n`);
+      if (salvata.aggiornato) aggiornati.set(num, salvata.aggiornato);
+      mandate += 1;
+    } else {
+      restano += 1;
+      console.error(`#${num}: scheda ancora fuori dal feedback (${(salvata && salvata.motivo) || 'risposta vuota'}).`);
+    }
+  }
+  return { mandate, restano, aggiornati };
 }
 
 async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dryRun }) {
@@ -267,13 +307,12 @@ async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dry
     writeFileSync(fileScheda(cartella, v.num), `${JSON.stringify(stampata, null, 1)}\n`);
     // La fonte è il feedback: la cartella è la copia di lavoro, e il manutentore in cloud legge solo da lì.
     const salvata = await salvaNelFeedback({ numero: v.num, scheda: SS.campiDellAgente(nuova), rilettura, modello }, giro);
-    if (salvata.ok && salvata.scheda) {
-      writeFileSync(fileScheda(cartella, v.num), `${JSON.stringify(salvata.scheda, null, 1)}\n`);
-      if (salvata.aggiornato) aggiornati.set(v.num, salvata.aggiornato);
-    } else {
+    const daTenere = schedaDopoSalvataggio(stampata, salvata);
+    writeFileSync(fileScheda(cartella, v.num), `${JSON.stringify(daTenere, null, 1)}\n`);
+    if (daTenere[NON_SALVATA]) {
       nonSalvate += 1;
       console.error(`#${v.num}: scheda nella cartella ma non nel feedback (${salvata.motivo || 'risposta vuota'}).`);
-    }
+    } else if (salvata.aggiornato) aggiornati.set(v.num, salvata.aggiornato);
     console.log(u.testo.split('\n').find((r) => r.trim()) || `#${v.num}: fatta`);
   });
   if (aggiornati.size) {
@@ -295,15 +334,26 @@ export async function main(argv) {
   }
   const dryRun = argv.includes('--dry-run');
   const paralleli = Math.max(1, Math.min(20, Number(opzione(argv, '--paralleli')) || 6));
-  const indice = leggiJson(join(cartella, INDICE));
+  let indice = leggiJson(join(cartella, INDICE));
   if (cmd === 'elenca') return elenca(cartella, dryRun);
   if (!['scrivi', 'rileggi', 'stato'].includes(cmd)) {
     console.error('Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] | rileggi [--quota 0.1] | stato [--cartella <dir>] [--dry-run]');
     return 1;
   }
   if (!Array.isArray(indice)) { console.error(`Manca l'indice in ${join(cartella, INDICE)}: prima npm run feedback:schede -- elenca.`); return 1; }
+  if (cmd === 'stato') { console.log(JSON.stringify(riepilogo(indice, leggiSchede(cartella)), null, 1)); return 0; }
+  let restano = 0;
+  if (!dryRun) {
+    const giro = await strada();
+    const r = await rimandaNonSalvate(cartella, indice, { salva: (dati) => salvaNelFeedback(dati, giro) });
+    if (r.aggiornati.size) {
+      indice = indiceAggiornato(indice, r.aggiornati);
+      writeFileSync(join(cartella, INDICE), `${JSON.stringify(indice, null, 1)}\n`);
+    }
+    if (r.mandate || r.restano) console.log(`Schede rimaste fuori dal feedback: ${r.mandate} salvate adesso${r.restano ? `, ${r.restano} ancora fuori (rilancia lo stesso comando)` : ''}.`);
+    restano = r.restano;
+  }
   const schede = leggiSchede(cartella);
-  if (cmd === 'stato') { console.log(JSON.stringify(riepilogo(indice, schede), null, 1)); return 0; }
   const perNum = new Map(indice.map((f) => [f.num, f]));
   if (cmd === 'scrivi') {
     const solo = String(opzione(argv, '--solo') || '').split(/[\s,]+/).map((n) => n.replace(/^#/, '')).filter(Boolean);
@@ -311,11 +361,11 @@ export async function main(argv) {
     if (ignoti.length) { console.error(`Non sono fra gli aperti dell'indice: ${ignoti.map((n) => `#${n}`).join(', ')}. Rilancia elenca se sono nuovi.`); return 1; }
     const mappa = new Map(schede.map((s) => [String(s.numero || '').replace(/^#/, ''), s]));
     const voci = (solo.length ? solo.map((n) => perNum.get(n)) : indice).filter((f) => solo.length || daScrivere(f, mappa.get(f.num)));
-    return lanciaAgenti(voci, { cartella, modello: opzione(argv, '--modello') || 'haiku', paralleli, rilettura: false, dryRun });
+    return (await lanciaAgenti(voci, { cartella, modello: opzione(argv, '--modello') || 'haiku', paralleli, rilettura: false, dryRun })) || (restano ? 3 : 0);
   }
   const quota = Math.max(0, Math.min(1, Number(opzione(argv, '--quota') ?? 0.1)));
   const voci = daRileggere(schede, { quota }).map((s) => perNum.get(String(s.numero).replace(/^#/, ''))).filter(Boolean);
-  return lanciaAgenti(voci, { cartella, modello: opzione(argv, '--modello') || 'opus', paralleli, rilettura: true, dryRun });
+  return (await lanciaAgenti(voci, { cartella, modello: opzione(argv, '--modello') || 'opus', paralleli, rilettura: true, dryRun })) || (restano ? 3 : 0);
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
