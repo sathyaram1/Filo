@@ -17,8 +17,9 @@ Ogni chiamata dura al massimo due minuti, e l'esito dice il passo dopo:
   permesso che in cloud nessuno approva). La veglia ha già rilasciato il suo
   biglietto dichiarando il guasto: chiudi il giro come dopo un guasto, senza
   rilanciarlo e senza rilasciare niente.
-- **exit 1**: il comando è scritto male (il biglietto non è quello del worker):
-  correggilo e rilancia.
+- **exit 1**: il comando è scritto male. Ricopialo da qui sopra col biglietto
+  del worker; se esce ancora con 1, come con ogni altra uscita, chiudi il giro
+  come dopo un guasto.
 
 Il passo dopo lo decide solo la veglia. La notifica di fine del worker non fa
 ripartire niente: se arriva mentre vegli continua a vegliare, se arriva a giro
