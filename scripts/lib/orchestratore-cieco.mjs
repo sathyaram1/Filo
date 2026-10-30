@@ -93,9 +93,19 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
   }
   if (input.hook_event_name === "PostToolUse") {
     const r = input.tool_response;
-    const stato = r && typeof r === "object" && typeof r.status === "string" ? r.status : "";
+    const oggetto = !!r && typeof r === "object" && !Array.isArray(r);
+    const stato = oggetto && typeof r.status === "string" ? r.status : "";
     const finito = stato ? stato === "completed" : !/async_launched|background|sottofondo|outputFile/i.test(typeof r === "string" ? r : JSON.stringify(r || ""));
-    return { hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: finito ? AL_POSTO_DEL_TESTO : AL_POSTO_VIVO } };
+    // Claude Code scarta un updatedToolOutput che non ha la forma del ritorno di Agent (una stringa, al posto di un
+    // oggetto) e tiene il suo: il testo si sostituisce dentro la forma, e il lancio in sottofondo, che di testo non ne
+    // porta, riceve la riga come contesto in più (#1797).
+    if (!finito) {
+      const visti = [...new Set([...String(ti.prompt || "").matchAll(/--ticket[^A-Za-z0-9_-]{1,3}([A-Za-z0-9_-]{32,})/g)].map((m) => m[1]))];
+      const veglia = strumenti && visti.length === 1 ? " Comando: node " + strumenti + "/scripts/routine-channel.mjs veglia " + visti[0] : "";
+      return { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: AL_POSTO_VIVO + veglia } };
+    }
+    const sostituto = oggetto ? { ...r, content: [{ type: "text", text: AL_POSTO_DEL_TESTO }] } : AL_POSTO_DEL_TESTO;
+    return { hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: sostituto } };
   }
   return null;
 }
