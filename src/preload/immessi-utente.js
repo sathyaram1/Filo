@@ -95,14 +95,45 @@ const scrivibile = (el) => {
   try { return !!el && ((typeof el.matches === 'function' && el.matches('input, textarea')) || !!el.isContentEditable); } catch (_) { return false; }
 };
 
+// Il valore è fatto dei caratteri dell'utente salvo al più ATTACCATI ai suoi bordi: il «IT» che una maschera mette
+// davanti all'IBAN mentre lui scrive resta con lui, come quello che c'era già.
+function fattoAiBordi(valore, conti) {
+  const ch = [...String(valore || '')];
+  if (ch.length > 4 * MAX_SEGRETO) return false;
+  const conto = (i) => conta.test(ch[i]);
+  for (let a = 0, i = 0; a <= ATTACCATI; a++) {
+    for (let b = 0, j = ch.length; a + b <= ATTACCATI; b++) {
+      if (i < j && fattoDiCaratteri(ch.slice(i, j).join(''), conti)) return true;
+      do j--; while (j > i && !conto(j));
+      if (j <= i) break;
+    }
+    do i++; while (i < ch.length && !conto(i - 1));
+    if (i >= ch.length) break;
+  }
+  return false;
+}
+
 function ascoltaImmessi(invia) {
   if (typeof window === 'undefined' || typeof invia !== 'function') return;
+  const principale = ascoltaIn(window, invia);
+  // Quello che Filo mette nel campo per l'utente (incolla e cronologia degli appunti, dettatura, Accetta di una proposta)
+  // la pagina non lo vede arrivare: lo dice chi lo inserisce, PRIMA di inserirlo. Sta nel mondo di Filo, il sito no.
+  globalThis.SN_IMMESSI = Object.freeze({
+    inserisce(el, testo) { principale.inserisce(el, testo); },
+  });
+}
+
+// Una finestra: la pagina, o un riquadro vuoto (about:blank) che la pagina scrive da sé, come gli editor delle webmail,
+// dove il preload non gira. Li si segue da chi li ospita appena l'utente ci entra.
+function ascoltaIn(w, invia) {
   const testi = new WeakMap();
   const daDire = new Set();
   // Il numero di un elemento vale in questo documento: quello della pagina dopo, nella stessa scheda, non lo sostituisce.
   const documento = Math.random().toString(36).slice(2, 10);
   let numero = 0;
   let timer = null;
+  // Tutto quello che l'utente immette nel documento, in fila: un numero diviso in più caselle ci sta intero.
+  const fila = { testo: '', detto: '' };
 
   function di() {
     timer = null;
@@ -115,10 +146,16 @@ function ascoltaImmessi(invia) {
         const { nuova, estesa } = parteNuova(v, t.base);
         // Anche la fila: la chat si svuota a ogni invio, e quello che c'era resta dell'utente.
         if (fattoDiCaratteri(nuova, t.conti)) testo = `${estesa}\u0001${t.testo}`;
+        else if (fattoAiBordi(nuova, t.conti)) testo = `${nuova}\u0001${t.testo}`;
       }
       if (testo) { try { invia(`${documento}.${t.n}`, testo, t.desde); } catch (_) { /* il main è andato via */ } }
     }
     daDire.clear();
+    // Senza un inizio: toglie dal registro solo una lettura arrivata mentre questo testo era in viaggio.
+    if (fila.testo && fila.testo !== fila.detto) {
+      fila.detto = fila.testo;
+      try { invia(`${documento}.0`, fila.testo, Date.now()); } catch (_) {}
+    }
   }
   const presto = () => { if (!timer) timer = setTimeout(di, ATTESA_MS); };
   const bersaglio = (e) => {
@@ -144,13 +181,15 @@ function ascoltaImmessi(invia) {
       t.quanti++;
     }
   }
+  const taglia = (s) => (s.length > MAX_TESTO ? s.slice(-MAX_TESTO) : s);
   function aggiorna(el, fn, dati = '') {
     if (!el || typeof el !== 'object') return;
     if (el.isContentEditable) el = radiceModificabile(el);
     const t = voce(el);
     if (dati) contati(t, dati);
     const nuovo = fn ? fn(t.testo) : t.testo;
-    if (nuovo !== t.testo) t.testo = nuovo.length > MAX_TESTO ? nuovo.slice(-MAX_TESTO) : nuovo;
+    if (nuovo !== t.testo) t.testo = taglia(nuovo);
+    if (fn) fila.testo = taglia(fn(fila.testo));
     daDire.add(el);
     presto();
   }
@@ -160,7 +199,7 @@ function ascoltaImmessi(invia) {
     aggiorna(el, (s) => (suo === dati ? s + dati : `${s}\n${suo}\n`), suo);
   }
 
-  window.addEventListener('beforeinput', (e) => {
+  w.addEventListener('beforeinput', (e) => {
     if (!e.isTrusted || e.isComposing) return;
     const tipo = String(e.inputType || '');
     if (tipo === 'deleteContentBackward') { aggiorna(bersaglio(e), (s) => s.slice(0, -1)); return; }
@@ -173,14 +212,14 @@ function ascoltaImmessi(invia) {
     if (/^insertFrom(Paste|Drop|Yank)/.test(tipo)) { incollato(bersaglio(e), dati); return; }
     aggiorna(bersaglio(e), (s) => s + dati, dati);
   }, true);
-  window.addEventListener('compositionstart', (e) => {
+  w.addEventListener('compositionstart', (e) => {
     if (e.isTrusted && scrivibile(bersaglio(e))) aggiorna(bersaglio(e), null);
   }, true);
-  window.addEventListener('compositionend', (e) => {
+  w.addEventListener('compositionend', (e) => {
     if (e.isTrusted && e.data) aggiorna(bersaglio(e), (s) => s + e.data, e.data);
   }, true);
   // Un tasto conta anche se la pagina lo trattiene e scrive da sé il campo (le maschere di carte e telefoni).
-  window.addEventListener('keydown', (e) => {
+  w.addEventListener('keydown', (e) => {
     if (!e.isTrusted) return;
     if (e.key === 'Enter') { subito(e); return; }
     if (e.isComposing || typeof e.key !== 'string' || [...e.key].length !== 1) return;
@@ -189,17 +228,40 @@ function ascoltaImmessi(invia) {
     if (scrivibile(el)) aggiorna(el, null, e.key);
   }, true);
   // Un invio (Invio o un clic) porta con sé quello che l'utente ha appena scritto: il main lo sa prima di leggere la pagina.
-  function subito(e) { if (e.isTrusted && daDire.size) { if (timer) clearTimeout(timer); di(); } }
-  window.addEventListener('pointerdown', subito, true);
-  // Quello che Filo mette nel campo per l'utente (incolla e cronologia degli appunti, dettatura, Accetta di una proposta)
-  // la pagina non lo vede arrivare: lo dice chi lo inserisce, PRIMA di inserirlo. Sta nel mondo di Filo, il sito no.
-  globalThis.SN_IMMESSI = Object.freeze({
-    inserisce(el, testo) { if (scrivibile(el)) incollato(el, String(testo || '')); },
-  });
+  function subito(e) { if (e.isTrusted && (daDire.size || fila.testo !== fila.detto)) { if (timer) clearTimeout(timer); di(); } }
+  w.addEventListener('pointerdown', subito, true);
+
+  // Un riquadro vuoto si segue quando è pronto (load) e quando l'utente ci entra (la finestra perde il fuoco). Una
+  // pagina che lo riscrive con document.open toglie gli ascoltatori: chi non risponde più si rimette.
+  const seguiti = new WeakMap();
+  function segui(f) {
+    try {
+      if (!f || !/^i?frame$/i.test(f.localName || '')) return;
+      const R = globalThis.SN_RIQUADRI_IN_ARRIVO;
+      const cw = R && typeof R.finestra === 'function' ? R.finestra(f) : null;
+      if (!cw || cw.SN_IMMESSI || !cw.document) return;
+      const prima = seguiti.get(cw);
+      if (prima && prima.vivo()) return;
+      seguiti.set(cw, ascoltaIn(cw, invia));
+    } catch (_) { /* d'altra origine: il suo preload c'è */ }
+  }
+  w.addEventListener('load', (e) => segui(e.target), true);
+  w.addEventListener('blur', (e) => { if (e.target === w) segui(w.document.activeElement); });
+  const eco = `filo-immessi-${documento}`;
+  let sentito = false;
+  w.addEventListener(eco, () => { sentito = true; });
+  function vivo() {
+    sentito = false;
+    try { w.dispatchEvent(new w.Event(eco)); } catch (_) { return false; }
+    return sentito;
+  }
+
+  return { vivo, inserisce(el, testo) { if (scrivibile(el)) incollato(el, String(testo || '')); } };
 }
 
 module.exports = ascoltaImmessi;
 module.exports.fattoDiCaratteri = fattoDiCaratteri;
+module.exports.fattoAiBordi = fattoAiBordi;
 module.exports.parteNuova = parteNuova;
 module.exports.diUnIncolla = diUnIncolla;
 module.exports.MAX_INCOLLA = MAX_INCOLLA;
