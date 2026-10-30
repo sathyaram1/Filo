@@ -493,7 +493,7 @@ export const ambiente = {
 
 function uso() {
   console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--pacchetto 812,815] [--dry-run]');
-  console.error('     --pacchetto: il testo è la spec che unisce quelle segnalazioni; ognuna aspetta il pacchetto, che alla fusione le chiude.');
+  console.error('     --pacchetto: il testo è la spec che unisce quelle segnalazioni; il pacchetto ne copia gli allegati e le archivia, e chi le aspettava aspetta lui.');
   console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
   console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
