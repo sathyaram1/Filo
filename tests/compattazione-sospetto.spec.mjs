@@ -5,10 +5,8 @@ import { CONFIRM_HOST } from './helpers/confirm.mjs';
 import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs';
 
 // La porta della fase 4: chi costruisce la compattazione la scrive qui, e il segno di rosso atteso cade da sé.
-//   compatta(app, { memorie }) → { ricevuto, riassunto }: compatta il tratto con la pagina già fuori dalle ore che
-//     restano grezze; al posto del modello che compatta, uno che copia in `riassunto` tutto il testo che riceve
-//     (`ricevuto`) e propone `memorie`, come farebbe un modello convinto dalla pagina.
-//   inAttesa(app) → i testi delle memorie proposte che aspettano la conferma dell'utente.
+// compatta(app, { memorie }) → { ricevuto, riassunto }: il tratto, con la pagina fuori dalle ore grezze, a un modello che
+// copia in `riassunto` il testo ricevuto e propone `memorie`; inAttesa(app) → le proposte che aspettano l'utente.
 const FASE_4 = null;
 
 const DESTINATARIO = 'copia@raccolta.example';
