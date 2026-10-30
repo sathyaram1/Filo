@@ -1946,6 +1946,9 @@
     const cursore = cursoreNelCampo(el);
     applyFix(el, { start: segno.start, end: segno.end }, valore, { expectedSegment: segno.segment, cursor: 'preserve' });
     if (getEditableText(el) === prima) return false;
+    // Il valore messo è la proposta accettata: senza, sparite le x, la si conterebbe lasciata perdere.
+    esitoSegno(el, segno, 'accettata');
+    contaSegnaposto(viaDelSegno(segno), 'riempito');
     if (cursore >= 0 && !campoDiTesto(el)) {
       const dove = cursore >= segno.end ? cursore + valore.length - (segno.end - segno.start) : cursore;
       try {
