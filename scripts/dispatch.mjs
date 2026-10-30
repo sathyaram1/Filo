@@ -2376,7 +2376,7 @@ export function emit(bucket, ctx) {
   const serial = ambito.scope && ambito.scope !== 'pieno'
     ? perimetroNote(ambito.scope, ctx && ctx.perimetro)
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
-  const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: pieno && pieno.case });
+  const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: bucket.role === 'halt' ? bucket.kind : pieno && pieno.case });
   const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
   const corpo = server || serial ? [base.replace(/\s+$/, ''), server, serial].filter(Boolean).join('\n\n') : base;
   const cartella = preparaIntestazione(ROOT);
