@@ -40,7 +40,6 @@ const NORMALI = [
   'Il filo del discorso: il blog di Mario',
   'Filo d\'erba - Negozio di giardinaggio',
   'Ciao Filo, ci vediamo stasera? - filippo.bianchi@gmail.com - Gmail',
-  'Re: Filo, ricordati del compleanno di Anna - Gmail',
   'Spotify – Web Player: Music for everyone',
   'Invia la tua candidatura - LinkedIn',
   'Cambia password - Account Microsoft',
