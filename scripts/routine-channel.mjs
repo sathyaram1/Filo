@@ -42,7 +42,8 @@
 //         Con `--json` stampa biglietto E ruolo insieme (più `model` ed `effort` se il server li ha decisi):
 //         il ruolo serve a chi guida per scegliere il tipo di worker PRIMA di lanciarlo. In tutte e due le forme
 //         registra la decisione per il gancio dell'orchestratore cieco, che mette modello e sforzo al lancio.
-//         Exit 0 = biglietto, 2 = niente da fare, 3 = guasto (il giro si ferma).
+//         Exit 0 = biglietto, 2 = niente da fare (anche: strumenti della sessione indietro rispetto a main, dal
+//         secondo biglietto in poi, senza chiamare il server), 3 = guasto (il giro si ferma).
 //
 //   node scripts/routine-channel.mjs work <biglietto>
 //       → stampa il JSON del proprio lavoro { role, ... }.
