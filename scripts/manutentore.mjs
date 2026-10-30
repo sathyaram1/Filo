@@ -332,8 +332,8 @@ export async function main(argv, { root = ROOT } = {}) {
   if (!schede.length) console.error(`AVVISO: nessuna scheda in ${cartella}: npm run feedback:schede -- elenca, poi scrivi.`);
   const dirRuoli = join(ROOT, 'routines', 'roles');
   const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'manutentore.md'), 'utf8'), dirRuoli);
-  const ferme = await domandeFerme(indice);
-  console.log(testoContesto({ ruolo, schede, indice, rami, fuori, giorni, indiceDel, ferme }));
+  const [ferme, spesa] = await Promise.all([domandeFerme(indice), leggiSpesa(root)]);
+  console.log(testoContesto({ ruolo, schede, indice, rami, fuori, giorni, indiceDel, ferme, spesa }));
   return 0;
 }
 
