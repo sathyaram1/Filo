@@ -614,6 +614,11 @@
         entry.arrivata = true;
         // Fermata dal tetto o da una pagina delicata (#1274): al tasto destro si chiede davvero.
         if (res && (res.code === 'TROPPE_AUTOMATICHE' || res.code === 'PAGINA_DELICATA')) entry.fermata = true;
+        // Il livello di privacy nella famiglia degli anticipi (#1586): la spiegazione che la pagina delicata non lascia preparare.
+        if (res && res.code === 'PAGINA_DELICATA') {
+          entry.perPrivacy = true;
+          contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'saltato' });
+        }
         // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
         return (res?.ok && typeof res.text === 'string')
           ? { text: res.text, keyFallback: res.keyFallback || null }
@@ -648,11 +653,19 @@
     const pre = prefetchedExplain;
     const stessa = !!pre && pre.key === key;
     const primaApertura = stessa && !!pre.anticipata && !pre.aperta;
+    // Fermato da una pagina delicata, l'anticipo non è del tetto: è il gesto che il livello di privacy costa, e
+    // «Chiedi» lo conta come quello dell'anticipo spento (#1586).
+    const fermata = () => {
+      if (!pre.perPrivacy) return 'fermato_tetto';
+      contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'chiesto' });
+      Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
+      return '';
+    };
     if (stessa) pre.aperta = true;
     if (stessa && !pre.fermata) {
       const stato = !primaApertura ? '' : pre.sentence !== selInfo.sentence ? 'contesto_cambiato' : pre.arrivata ? 'pronto' : 'in_volo';
       return pre.promise.then((res) => {
-        if (pre.fermata) return chiedi(primaApertura ? 'fermato_tetto' : '');
+        if (pre.fermata) return chiedi(primaApertura ? fermata() : '');
         if (stato) anticipo(stato);
         // Preparata e aperta: per i crediti non è una chiamata sprecata (#818). Una fermata non è partita.
         const primaVolta = !!pre.anticipata && !pre.usata;
@@ -664,7 +677,7 @@
         return { ...res, giaChiesta: true, anticipata: primaVolta && !!res && !res.errore && !!res.text };
       });
     }
-    return chiedi(primaApertura ? 'fermato_tetto' : stessa ? '' : 'assente');
+    return chiedi(primaApertura ? fermata() : stessa ? '' : 'assente');
   }
 
   // Il tasto del rimedio sotto una spiegazione del menu apre un'altra scheda: il menu non resta aperto sopra il sito.

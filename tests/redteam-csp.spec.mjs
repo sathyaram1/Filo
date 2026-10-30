@@ -5,7 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { apriRedteamATutti } from './helpers/redteam.mjs';
-import { nelMondoDiFilo, statoDi } from './helpers/riquadri.mjs';
+import { statoDi, neiRiquadri, tastieraDi } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGE = `<!doctype html><html><body style="margin:0;font:16px sans-serif">
@@ -52,9 +52,10 @@ test('su un sito con CSP il pannello "Invia attacco" aperto dal tasto destro è 
   }, { timeout: 10_000 }).toBe(true);
   await voce.click();
 
-  // Sui siti il pannello sta in uno shadow root chiuso (#1071): si guarda dal mondo dei content script.
+  // Sui siti il pannello sta nello strato sopra la scheda (#1509.1): la CSP del sito non lo tocca.
   await expect.poll(async () => !!(await statoDi(app, page, '.sn-rt-overlay .sn-rt-modal'))?.visibile, { timeout: 5000 }).toBe(true);
-  const stile = await nelMondoDiFilo(app, page, () => {
+  expect(await page.evaluate(() => document.querySelectorAll('[data-sn-riquadro], .sn-rt-overlay').length), 'niente nel documento del sito').toBe(0);
+  const stile = await neiRiquadri(app, page, () => {
     const el = globalThis.SN_FILO_UI._test.trova('.sn-rt-overlay');
     const m = el.querySelector('.sn-rt-modal');
     const r = m.getBoundingClientRect();
@@ -70,6 +71,7 @@ test('su un sito con CSP il pannello "Invia attacco" aperto dal tasto destro è 
   expect(stile.sfondo).not.toBe('rgba(0, 0, 0, 0)');
   expect(stile.dentroLoSchermo, 'il pannello è finito fuori dallo schermo').toBe(true);
   // La finestra nascosta dei test non fa avanzare le animazioni: la dissolvenza d'entrata si chiude a mano per la foto.
-  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
-  await page.screenshot({ path: 'tests/.shots/600-redteam-csp.png' });
+  const strato = await tastieraDi(app, page);
+  await strato.evaluate(() => document.getAnimations().forEach((a) => a.finish())).catch(() => {});
+  await strato.screenshot({ path: 'tests/.shots/600-redteam-csp.png' });
 });

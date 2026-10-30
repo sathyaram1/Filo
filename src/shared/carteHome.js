@@ -145,6 +145,18 @@
     return sinistra(dati, { ...l, nascoste: [] }, ora).filter((v) => nascoste.has(v.chiave));
   }
 
+  // Il primo incontro (#1661): finché l'accoglienza non si è chiusa la home tiene solo la colonna di sinistra, se la
+  // strada per cominciare è una (i Crediti, o l'intervista). Senza un modello da scegliere resta intera: quella strada
+  // sta fra i suggerimenti. `onb`: lo stato dell'accoglienza; `motivo`: SN_CONST.whyCannotServe ('' se Filo risponde).
+  function primoIncontro(onb, motivo) {
+    const s = onb && typeof onb === 'object' ? onb : {};
+    return !s.done && s.rifatta !== true && (motivo === '' || motivo === 'chiave');
+  }
+  // Tolta la carta dei Crediti l'utente ha scelto la home intera, da cui la rimette. `crediti`: la carta ci sarebbe.
+  function homeRidotta(primo, layout, crediti) {
+    return !!primo && !(crediti && normalizza(layout).nascoste.includes('crediti'));
+  }
+
   const TIPI_SINISTRA = {
     timer: ['timer'], sveglia: ['sveglia', 'sveglie'], download: ['scaricamento', 'scaricamenti', 'download', 'file scaricato'],
     avviso: ['avviso', 'avvisi', 'notifica', 'notifiche'], lavoro: ['lavoro', 'lavori', 'comando'], crediti: ['crediti'],
@@ -263,6 +275,6 @@
   global.SN_CARTE_HOME = {
     CARTE, APP, IDS, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
     carta, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
-    downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra, paginaDiAvviso,
+    downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra, paginaDiAvviso, primoIncontro, homeRidotta,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

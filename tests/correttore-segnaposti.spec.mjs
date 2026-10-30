@@ -1,10 +1,24 @@
 // #1448 — i segnaposti del correttore con modello e ricerca finti: «nel 14xx» mostra 1492 sopra le x e un clic lo mette
 // col lampo; «x te», «3x4» e i baci restano senza segni; un dato di adesso passa dalla ricerca finta e il tasto destro ne
 // cita la fonte e la data; «Correggi tutti gli errori» riempie i segnaposti; spenti, niente. Nessuna chiamata esce.
+// I contatori (#1586): ogni ricerca, il suo esito, il valore messo o ignorato, e il costo della pagina delicata.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { voceOggi } from './helpers/riquadriOggi.mjs';
+
+// La proposta del correttore per i segnaposti, nell'ora di oggi: [mostrata, accettata, rifiutata, ignorata].
+const suggerimentoOggi = (app) => app.evaluate(async () => {
+  const s = await globalThis.SN_CONTATORI_MAIN.letto();
+  const g = globalThis.SN_CONTATORI.giornoDi(Date.now());
+  const tot = [0, 0, 0, 0];
+  for (const [id, ora] of Object.entries(s.ore || {})) {
+    if (!id.startsWith(`${g}T`)) continue;
+    for (const c of Object.values((ora.correttore || {}).suggerimento || {})) c.forEach((n, i) => { tot[i] += n; });
+  }
+  return tot;
+});
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:60px 20px 20px;font:16px sans-serif">
@@ -114,6 +128,8 @@ for (const campo of ['#ta', '#ce']) {
     // Il campo ha ancora il fuoco: si continua a scrivere dove si era.
     await page.keyboard.type('Bene');
     await expect.poll(testo).toBe("l'America l'hanno scoperta nel 1492. Bene");
+    // Il valore lo sapeva il modello, senza ricerca (#1586).
+    await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'memoria'), { timeout: 5000 }).toEqual({ riempito: 1 });
   });
 }
 
@@ -191,6 +207,11 @@ test('un dato di adesso passa dalla ricerca: mentre cerca respirano i puntini, p
   await expect(menu.voce('Ignora')).toBeVisible();
   await prima.locator('.sn-menu-correction-main').click();
   await expect(page.locator('#ta')).toHaveValue('Google ha un p/e di soli 27, davvero basso. ');
+  // I contatori (#1586): la ricerca partita da sola, trovata, e il valore messo, che è la proposta accettata.
+  await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'da_solo'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1, riempito: 1 });
+  await expect.poll(() => suggerimentoOggi(app), { timeout: 5000 }).toEqual([1, 1, 0, 0]);
+  const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));
+  for (const x of ['Alphabet', 'p/e', 'borsa']) expect(disco, 'la domanda, il valore e la fonte non escono').not.toContain(x);
 });
 
 test('due «xx» da cercare nella stessa frase hanno ciascuno la sua ricerca e il suo valore', async ({ app, openTab, testServer }) => {
@@ -438,11 +459,21 @@ test('in un sito delicato (accesso fatto) il dato non si cerca da solo: lo dice,
   await expect(ocra(page, 'xx')).toHaveCount(1, { timeout: 5000 });
   await expect(page.locator('.sn-spell-valori .sn-spell-valore.sn-cercando')).toHaveCount(0, { timeout: 5000 });
   expect(await globale(app, '__webChieste')).toEqual([]);
+  // Il livello di privacy (#1586): la ricerca che la pagina non lascia partire da sola, e poi il clic che la chiede.
+  await expect.poll(() => voceOggi(app, 'anticipo_privacy', 'segnaposto'), { timeout: 5000 }).toEqual({ saltato: 1 });
+  expect(await voceOggi(app, 'correttore_segnaposto', 'da_solo')).toEqual({ cercato: 1, delicata: 1 });
   const menu = await tastoDestroSu(page, ocra(page, 'xx'));
   await expect(menu.locator('.sn-menu-segno')).toHaveText('Su questa pagina non cerco da solo.', { timeout: 3000 });
   await menu.voce('Cerca il dato').click();
   await expect(valore(page, '27')).toBeVisible({ timeout: 8000 });
   expect(await globale(app, '__webChieste')).toEqual(['Alphabet P/E ratio']);
+  await expect.poll(() => voceOggi(app, 'anticipo_privacy', 'segnaposto'), { timeout: 5000 }).toEqual({ saltato: 1, chiesto: 1 });
+  await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'su_richiesta'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1 });
+  // Ignorato, il valore trovato col clic è un rifiuto di quella ricerca.
+  const sulValore = await tastoDestroSu(page, valore(page, '27'));
+  await sulValore.voce('Ignora').click();
+  await expect(valore(page, '27')).toHaveCount(0, { timeout: 5000 });
+  await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'su_richiesta'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1, rifiutato: 1 });
 });
 
 test('fonti che non rispondono: «La ricerca non è riuscita» e «Cerca di nuovo», che tornata la rete trova il valore', async ({ app, openTab, testServer }) => {
@@ -464,6 +495,9 @@ test('fonti che non rispondono: «La ricerca non è riuscita» e «Cerca di nuov
   await app.evaluate(() => { globalThis.__reteGiu = false; });
   await menu.voce('Cerca di nuovo').click();
   await expect(valore(page, '27')).toBeVisible({ timeout: 8000 });
+  await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'su_richiesta'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1 });
+  expect(await voceOggi(app, 'correttore_segnaposto', 'da_solo')).toEqual({ cercato: 1, fallito: 1 });
+  expect(await voceOggi(app, 'anticipo_privacy', 'segnaposto'), 'una rete giù non è il costo della privacy').toBeNull();
 });
 
 test('col web spento un dato di adesso si cerca solo su Wikipedia, e se non c\'è lo dice', async ({ app, openTab, testServer }) => {

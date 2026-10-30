@@ -3,7 +3,7 @@
 // menu, e il sottomenu appeso a una sua voce lo segue, o si chiude quando la voce esce dal bordo.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
 
 const LINK = 'https://example.com/articolo-lungo';
 
@@ -70,6 +70,16 @@ async function attendiRientro(page) {
   }, { timeout: 5000 }).toBeLessThanOrEqual(0);
 }
 
+// Un clic conta solo dopo che il browser ha detto che la voce si vede (src/content/vistoDavvero.js): appena il menu si
+// sposta la risposta arriva qualche fotogramma dopo, e un clic che la anticipa non parte. Una persona non è così svelta.
+async function attendiUltimaVoceCliccabile(app, page) {
+  await expect.poll(() => nelMondoDelMenu(app, page, () => {
+    const voci = document.querySelectorAll('.sn-menu:not(.sn-menu-sub) .sn-menu-item');
+    const ultima = voci[voci.length - 1];
+    return !!ultima && globalThis.SN_VISTO?._test.pronta(ultima) !== false;
+  }), { timeout: 5000, message: 'l\'ultima voce non diventa mai cliccabile' }).toBe(true);
+}
+
 async function apriMenuSu(page, selector, opts = {}) {
   await page.locator(selector).click({ button: 'right', ...opts });
   const menu = menuDi(page).locator('.sn-menu');
@@ -79,7 +89,7 @@ async function apriMenuSu(page, selector, opts = {}) {
   return menu;
 }
 
-test('#500 la spiegazione cresce: il menu del collegamento rientra invece di farsi tagliare', async ({ openTab, testServer }) => {
+test('#500 la spiegazione cresce: il menu del collegamento rientra invece di farsi tagliare', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, paginaLink());
   const menu = await apriMenuSu(page, '#link');
 
@@ -98,6 +108,7 @@ test('#500 la spiegazione cresce: il menu del collegamento rientra invece di far
   // agire su un elemento fuori dalla finestra, quindi questo è il test vero.
   const ultima = menu.locator('.sn-menu-item').last();
   await ultima.hover({ timeout: 3000 });
+  await attendiUltimaVoceCliccabile(app, page);
   await ultima.click({ timeout: 3000 });
   await expect(menu).toHaveCount(0);
 });
@@ -195,7 +206,7 @@ async function statoScorrimento(page) {
   return { ...menu, paginaY: await page.evaluate(() => Math.round(window.scrollY)) };
 }
 
-test('#500 letta la spiegazione fino in fondo, un giro di rotella in più non porta via il menu', async ({ openTab, testServer }) => {
+test('#500 letta la spiegazione fino in fondo, un giro di rotella in più non porta via il menu', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, paginaLunga());
   const menu = await apriMenuSu(page, '#link');
   await rendiScorrevole(page);
@@ -220,6 +231,7 @@ test('#500 letta la spiegazione fino in fondo, un giro di rotella in più non po
   // E l'ultima voce si raggiunge davvero, scorrendo.
   const ultima = menu.locator('.sn-menu-item').last();
   await ultima.hover({ timeout: 3000 });
+  await attendiUltimaVoceCliccabile(app, page);
   await ultima.click({ timeout: 3000 });
   await expect(menu).toHaveCount(0);
 });
@@ -312,7 +324,7 @@ test('#500 scorrendo un menu troppo alto il sottomenu segue la freccetta, e spar
 // che sopravvive apposta agli eventi di scorrimento, il menu restava esatto
 // dov'era con le ultime voci fuori dal bordo.
 
-// Cambia l'altezza della finestra e aspetta che la pagina se ne accorga.
+// Cambia l'altezza della finestra e aspetta che la pagina abbia quella finale.
 // Ritorna la funzione che rimette le misure di prima.
 async function accorciaFinestra(app, page, quanto) {
   const vhPrima = await page.evaluate(() => window.innerHeight);
@@ -322,9 +334,14 @@ async function accorciaFinestra(app, page, quanto) {
     w.setBounds({ ...b, height: Math.max(240, b.height - d) });
     return b;
   }, quanto);
-  await expect
-    .poll(async () => page.evaluate(() => window.innerHeight), { timeout: 5000 })
-    .toBeLessThan(vhPrima);
+  // In GitHub l'altezza può passare per una misura di mezzo (#1794): un rientro misurato lì non dice niente.
+  let letta = null;
+  await expect.poll(async () => {
+    const vh = await page.evaluate(() => window.innerHeight);
+    const ferma = vh < vhPrima && vh === letta;
+    letta = vh;
+    return ferma;
+  }, { timeout: 5000, intervals: [200] }).toBe(true);
   return async () => {
     await app.evaluate(async ({ BrowserWindow }, b) => {
       BrowserWindow.getAllWindows().find((x) => x._filoTabs).setBounds(b);
@@ -370,6 +387,7 @@ test('#500 la finestra si accorcia sotto al menu di una selezione: il menu rient
     // fuori dalla finestra.
     const ultima = menu.locator('.sn-menu-item').last();
     await ultima.hover({ timeout: 3000 });
+    await attendiUltimaVoceCliccabile(app, page);
     await ultima.click({ timeout: 3000 });
     await expect(menu).toHaveCount(0);
   } finally {

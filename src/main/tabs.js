@@ -15,7 +15,7 @@ const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
 const { installSafebrowse } = require('./tabs/tabSafebrowse');
 const { installGeoBlock } = require('./tabs/tabGeoBlock');
-const { installZoom } = require('./tabs/tabZoom');
+const { installZoom, zoomDaTasto } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const { installRestaConnesso } = require('./tabs/tabRestaConnesso');
 const Permessi = require('./services/permessiPagine');
@@ -54,6 +54,7 @@ const CartaAnteprima = require('./popup-anteprima');
 const { AvvisoSito } = require('./avvisoSito');
 const { AvvisoSchermoPieno, partiDellAvviso } = require('./avvisoSchermoPieno');
 const { PropostaEmail } = require('./propostaEmail');
+const { StratoDeiRiquadri } = require('./stratoDeiRiquadri');
 const { StratoDelMenu } = require('./stratoDelMenu');
 const Storia = require('./tabs/storia');
 const SchedeChiuse = require('./tabs/schedeChiuse');
@@ -483,6 +484,21 @@ class TabManager {
       },
       scheda: (wc) => { const t = this.tabs.find((x) => x.view && x.view.webContents === wc); return t ? { id: t.id, url: t.url } : null; },
       barra: () => this.barra || null,
+    });
+    // I riquadri di Filo sopra un sito (#1509.1): subito sopra la loro scheda, sotto avvisi, conferme, barra e menu.
+    this.riquadri = new StratoDeiRiquadri(window, {
+      area: (wc) => {
+        const t = schedaDavanti();
+        if (!t || !t.view || t.view.webContents !== wc || this._attivaNascosta) return null;
+        if (this.avvisoSito && this.avvisoSito.coperta() === t) return null;
+        return t.view.getBounds();
+      },
+      sopraA: (wc) => { const t = this.tabs.find((x) => x.view && x.view.webContents === wc); return (t && t.view) || null; },
+      scheda: (wc) => { const t = this.tabs.find((x) => x.view && x.view.webContents === wc); return t ? { id: t.id, url: t.url, title: t.title } : null; },
+      tastoDellaScheda: (wc, input) => {
+        const t = this.tabs.find((x) => x.view && x.view.webContents === wc);
+        return !!t && (this.barra.tasto(input) || this.tastoDelBrowser(input, t));
+      },
     });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
@@ -2223,14 +2239,15 @@ class TabManager {
     if (!tab) return null;
     const domanda = this.conferme && this.conferme.mostrata ? this.conferme.vista : null;
     const avviso = this.avvisoSito && this.avvisoSito.coperta() === tab && this.avvisoSito.webContents() ? this.avvisoSito.vista : null;
-    return domanda || avviso || tab.view || null;
+    const riquadri = this.riquadri ? this.riquadri.vistaSopra(tab.view.webContents) : null;
+    return domanda || avviso || riquadri || tab.view || null;
   }
 
   _tastieraAllaSchedaAttiva() {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (!tab || this.win.isDestroyed() || !this.win.isFocused()) return;
     const avviso = this.avvisoSito.coperta() === tab ? this.avvisoSito.webContents() : null;
-    const dest = avviso || tab.view.webContents;
+    const dest = avviso || this.riquadri.tastieraPer(tab.view.webContents) || tab.view.webContents;
     const col = require('electron').webContents.getFocusedWebContents();
     if (col === this.win.webContents || col === dest) return;
     try { dest.focus(); } catch (_) {}
@@ -2616,6 +2633,7 @@ class TabManager {
     this._attivaNascosta = !visible;
     if (visible) this.anteprime.riprendi(); else this.anteprime.interrompi();
     this.avvisoSito.nascondi(!visible);
+    this.riquadri.posa();
     this.schermoPieno.posa();
     this.propostaEmail.posa();
     this.strato.posa();
@@ -2655,6 +2673,7 @@ class TabManager {
     this.riserva.posa();
     // L'ordine conta: l'avviso del sito sta sopra la scheda, gli avvisi della barra sopra di lui.
     this.avvisoSito.posa();
+    this.riquadri.posa();
     this.avvisi.posa();
     this.schermoPieno.posa();
     this.propostaEmail.posa();
@@ -2671,13 +2690,10 @@ class TabManager {
     const shellWc = this.win && this.win.webContents;
     if (!shellWc || typeof shellWc.on !== 'function') return;
     shellWc.on('before-input-event', (event, input) => {
-      if (input.type !== 'keyDown') return;
-      const dir = globalThis.SN_ZOOM ? globalThis.SN_ZOOM.tastoZoom(input) : null;
-      if (!dir) return;
+      if (input.type !== 'keyDown' || !globalThis.SN_ZOOM || !globalThis.SN_ZOOM.tastoZoom(input)) return;
       event.preventDefault();
       const active = this.tabs.find((t) => t.id === this.activeId);
-      if (!active) return;
-      try { active.view.webContents.send('filo:zoom-key', dir); } catch (_) {}
+      if (active) zoomDaTasto(active.view.webContents, input);
     });
     // Stessa asimmetria per indietro/avanti: appena si clicca una scheda il
     // fuoco lascia la pagina e da lì il tasto non passava da nessuna parte.
@@ -2847,6 +2863,7 @@ class TabManager {
     collegaScorciatoie(wc, () => this.win);
     this._sbGuardiaTastiera(tab, wc);
     this._sbSeguiPuntatore(tab, wc);
+    this.riquadri.segui(wc);
     wc.on('before-input-event', (event, input) => {
       // #514 — si segna qui perché questo evento arriva PRIMA che il documento
       // veda il tasto, ed è dentro quel giro che la pagina chiede lo schermo.
@@ -2863,6 +2880,11 @@ class TabManager {
       }
       // Con l'email proposta sotto un campo, frecce, Invio ed Esc scelgono o la chiudono prima della pagina e della modalità.
       if (this.propostaEmail.tasto(wc, input)) {
+        event.preventDefault();
+        return;
+      }
+      // Un riquadro di Filo aperto sopra la pagina si chiude prima della modalità, come quando stava nel documento.
+      if (this.riquadri.tasto(wc, input)) {
         event.preventDefault();
         return;
       }
@@ -3629,6 +3651,19 @@ class TabManager {
   // La finestrella è una pagina del sito come una scheda: il suo menu del tasto destro sta nel suo strato (#1054), mai
   // nel documento, che è proprio quello dove si incollano le password.
   _stratoNellaFinestrella(win, pwc) {
+    // Anche i riquadri di Filo (#1509.1): fuori dal documento dove si scrive la password.
+    const riquadri = new StratoDeiRiquadri(win, {
+      area: (wc) => {
+        if (wc !== pwc || win.isDestroyed()) return null;
+        const [width, height] = win.getContentSize();
+        return { x: 0, y: 0, width, height };
+      },
+      scheda: (wc) => (wc === pwc && !pwc.isDestroyed() ? { id: `finestrella-${pwc.id}`, url: pwc.getURL(), title: pwc.getTitle() } : null),
+    });
+    win._filoRiquadri = riquadri;
+    riquadri.segui(pwc);
+    win.on('resize', () => riquadri.posa());
+    pwc.on('before-input-event', (e, input) => { if (riquadri.tasto(pwc, input)) e.preventDefault(); });
     const strato = new StratoDelMenu(win, {
       schedaAttiva: () => (pwc.isDestroyed() ? null : pwc),
       area: () => {

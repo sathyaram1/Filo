@@ -49,6 +49,48 @@ test('un sito che non manda mai il favicon finisce di caricarsi lo stesso, e la 
   }
 });
 
+// #1795 — i ritentativi e un cambio di impostazioni rileggono la copia già scaricata: con il fetch al posto
+// dell'immagine ogni calcolo riscaricava il favicon, tre volte a pagina e altre tre a ogni cambio di impostazioni.
+test('la pagina scarica il suo favicon una volta sola, anche quando ricalcola il colore con le impostazioni nuove', async ({ app, openTab }) => {
+  let dallaPagina = 0;
+  const server = createServer((req, res) => {
+    if (req.url.startsWith('/icona.svg')) {
+      // La barra lo scarica per conto suo (no-cors): qui si contano solo quelli della pagina.
+      if (req.headers['sec-fetch-mode'] === 'cors') dallaPagina++;
+      res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store' });
+      res.end('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#e02020"/></svg>');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<title>Rosso</title><link rel="icon" href="/icona.svg"><p>Ciao</p>');
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    await openTab(`http://127.0.0.1:${server.address().port}/`);
+    await expect.poll(async () => (await schedaAttiva(app)).colore, { timeout: 5_000 }).toMatch(/^rgb/);
+    const [r, g, b] = (await schedaAttiva(app)).colore.match(/\d+/g).map(Number);
+    expect(r).toBeGreaterThan(Math.max(g, b) + 100);
+    // I ritentativi partono a 0,8 e 2 s dalla testa della pagina.
+    await new Promise((ok) => setTimeout(ok, 3_000));
+    expect(dallaPagina).toBe(1);
+
+    // Una soglia di saturazione irraggiungibile rende il favicon acromatico: il grigio dice che il colore è stato
+    // ricalcolato coi parametri nuovi, dalla copia in memoria.
+    await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE(
+      { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { tabColor: { soglia_saturazione: 1.01 } } },
+      { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
+    await expect.poll(async () => {
+      const [r2, g2, b2] = ((await schedaAttiva(app)).colore || '').match(/\d+/g) || [];
+      return r2 !== undefined && r2 === g2 && g2 === b2;
+    }, { timeout: 5_000 }).toBe(true);
+    await new Promise((ok) => setTimeout(ok, 3_000));
+    expect(dallaPagina).toBe(1);
+  } finally {
+    try { server.closeAllConnections?.(); } catch (_) {}
+    await new Promise((r) => server.close(r));
+  }
+});
+
 test('su un sito con un\'immagine lenta la scheda prende il colore del sito mentre la pagina carica ancora', async ({ app, openTab }) => {
   const lente = [];
   const server = createServer((req, res) => {

@@ -17,6 +17,8 @@
   if (!root || !K) return;
 
   const PAGINA = 100;
+  // I compiti che lavorano su una domanda: nascono con la sua fiducia e si aprono sulla domanda (§3.5).
+  const DELLA_DOMANDA = Object.freeze(['risposta', 'smistamento']);
   // Mentre la scheda è a schermo i compiti cambiano a ogni biglietto: una rilettura al minuto, solo lì.
   const OGNI_MS = 60 * 1000;
   const el = {
@@ -40,6 +42,7 @@
     avviso: '',
     aperti: [],
     storico: [],
+    ambiti: [],
     altri: false,
     aperte: new Set(),
     conferma: '',
@@ -88,7 +91,11 @@
     const lista = Array.isArray(c.biglietti) ? c.biglietti : [];
     const ultima = lista[lista.length - 1];
     if (c.stato === 'in_corso') return `in corso da ${da(ultima && ultima.inizio) || 'poco'}`;
-    if (c.aperto) return c.creatoIl ? `in attesa da ${da(c.creatoIl)}` : 'in attesa';
+    if (c.aperto) {
+      const perche = K.attesaTesto(c);
+      const daQuando = c.creatoIl ? `in attesa da ${da(c.creatoIl)}` : 'in attesa';
+      return perche ? `${daQuando}: ${perche}` : daQuando;
+    }
     const esito = c.esito ? `${K.nomeStato(c)}: ${c.esito}` : K.nomeStato(c);
     return `${esito} · ${quando(c.chiusoIl)}`;
   }
@@ -128,7 +135,8 @@
     if (!lista.children.length) {
       const li = document.createElement('li');
       li.className = 'mg-cp-chiamata';
-      li.textContent = c.tipo === 'manuale' && c.aperto ? 'Nessuna chiamata: aspetta il ruolo che esegue i compiti senza feedback.' : 'Nessuna chiamata.';
+      const perche = K.attesaTesto(c);
+      li.textContent = perche ? `Nessuna chiamata: ${perche}.` : 'Nessuna chiamata.';
       lista.append(li);
     }
     box.append(lista);
@@ -142,7 +150,8 @@
     const box = document.createElement('div');
     box.className = 'mg-cp-azioni';
     if (c.tipo === 'fase' && c.feedbackId) box.append(bottone('apri', 'Apri il feedback', c.feedbackNum, () => apriFeedback(c)));
-    if (c.tipo === 'risposta' && c.domandaId) box.append(bottone('apri', 'Apri la domanda', c.domandaId, () => apriDomanda(c)));
+    if (DELLA_DOMANDA.includes(c.tipo) && c.domandaId) box.append(bottone('apri', 'Apri la domanda', c.domandaId, () => apriDomanda(c)));
+    if (c.tipo === 'ricorrente' && c.ricorrenteId) box.append(bottone('ricorrente', 'Apri il ricorrente', 'Cadenza, testo e rapporti', () => apriRicorrente(c)));
     if (annullabile(c)) {
       const conferma = stato.conferma === c.id;
       const inCorso = stato.annullando.has(c.id);
@@ -153,7 +162,7 @@
   }
 
   function provenienza(c) {
-    if (c.tipo === 'risposta') return c.fiducia === 'fidato' ? '' : 'non fidato';
+    if (DELLA_DOMANDA.includes(c.tipo)) return c.fiducia === 'fidato' ? '' : 'non fidato';
     if (c.tipo !== 'manuale') return '';
     const chi = c.creatoDa === 'sessione' ? 'da una sessione' : c.creatoDa === 'owner' ? 'tuo' : '';
     const fiducia = c.fiducia === 'fidato' ? '' : 'non fidato';
@@ -276,6 +285,10 @@
     }
     stato.errore = '';
     stato.aperti = Array.isArray(r.aperti) ? r.aperti : [];
+    if (Array.isArray(r.ambiti) && r.ambiti.length) {
+      stato.ambiti = r.ambiti;
+      riempiAmbiti();
+    }
     const primaPagina = Array.isArray(r.storico) ? r.storico : [];
     // Le pagine più vecchie già chieste restano: la prima pagina si aggiorna, il resto non sparisce.
     const giaOltre = stato.storico.length > primaPagina.length;
@@ -338,6 +351,21 @@
     if (!ok) avvisa(`La domanda ${c.domandaId} non si apre adesso: cercala nella sezione Domande.`);
   }
 
+  function apriRicorrente(c) {
+    const scheda = document.querySelector('.mg-tab[data-tab="ricorrenti"]');
+    if (!scheda || !window.__mgRicorrenti) { avvisa('La scheda dei compiti ricorrenti non è in questa pagina.'); return; }
+    scheda.click();
+    window.__mgRicorrenti.mostra(c.ricorrenteId);
+  }
+
+  /** Il compito con questo id aperto e col fuoco: ci arriva chi lo nomina da un'altra scheda (Avvia adesso). */
+  async function mostra(id) {
+    stato.aperte.add(id);
+    await carica();
+    const li = root.querySelector(`.mg-cp-riga[data-id="${CSS.escape(String(id || ''))}"]`);
+    if (li) { li.focus(); li.scrollIntoView({ block: 'nearest' }); } else avvisa(`${id} non è ancora nell'elenco.`);
+  }
+
   async function annulla(c) {
     if (stato.annullando.has(c.id)) return;
     stato.erroreAzione.delete(c.id);
@@ -377,7 +405,7 @@
     const v = K.validaNuovo({
       titolo: el.titolo.value, istruzioni: el.istruzioni.value, urgenza: el.urgenza.value,
       modello: el.modello.value, sforzo: el.sforzo.value, ambito: el.ambito.value,
-    });
+    }, K.ambitiAttivi({ ambiti: stato.ambiti }));
     if (!v.ok) { el.msg.textContent = v.testo; return; }
     stato.creando = true;
     el.crea.disabled = true;
@@ -428,7 +456,22 @@
     for (const m of K.MODELLI) el.modello.append(new Option(RM ? ((RM.SCELTE.model.find((s) => s.id === m) || {}).nome || m) : m, m));
     el.sforzo.append(new Option('dell’agente', ''));
     for (const s of K.SFORZI) el.sforzo.append(new Option(s, s));
-    for (const a of K.AMBITI) el.ambito.append(new Option(a, a));
+    riempiAmbiti();
+  }
+
+  // Gli ambiti attivi del server, con quello che ciascuno può fare nel suggerimento; la scelta fatta resta se c'è ancora.
+  function riempiAmbiti() {
+    const prima = el.ambito.value;
+    const A = window.SN_AMBITI;
+    const tutti = stato.ambiti.length ? stato.ambiti : (A ? A.elenco() : []);
+    const nomi = K.ambitiAttivi({ ambiti: stato.ambiti });
+    el.ambito.replaceChildren(...nomi.map((n) => {
+      const a = tutti.find((x) => x && x.nome === n);
+      const o = new Option(a && a.riservato ? `${n} (ambiente dei riservati)` : n, n);
+      if (a && Array.isArray(a.puo)) o.title = `Può: ${a.puo.map((p) => p.descr).join('; ')}`;
+      return o;
+    }));
+    el.ambito.value = nomi.includes(prima) ? prima : (nomi.includes('lavoro') ? 'lavoro' : nomi[0] || '');
   }
 
   root.addEventListener('click', (e) => {
@@ -454,7 +497,8 @@
     const voci = [];
     if (c) {
       if (c.tipo === 'fase' && c.feedbackId) voci.push({ testo: 'Apri il feedback', titolo: c.feedbackNum, azione: () => apriFeedback(c) });
-      if (c.tipo === 'risposta' && c.domandaId) voci.push({ testo: 'Apri la domanda', titolo: c.domandaId, azione: () => apriDomanda(c) });
+      if (DELLA_DOMANDA.includes(c.tipo) && c.domandaId) voci.push({ testo: 'Apri la domanda', titolo: c.domandaId, azione: () => apriDomanda(c) });
+      if (c.tipo === 'ricorrente' && c.ricorrenteId) voci.push({ testo: 'Apri il ricorrente', azione: () => apriRicorrente(c) });
       voci.push({ testo: stato.aperte.has(c.id) ? 'Chiudi le chiamate' : 'Mostra le chiamate', azione: () => apriChiudi(c.id) });
       if (annullabile(c)) voci.push({ testo: 'Annulla il compito', titolo: 'Chiede conferma', azione: () => { stato.conferma = ''; annulla(c); } });
       voci.push({ testo: 'Copia il nome', titolo: K.etichetta(c), azione: () => copia(K.etichetta(c)) });
@@ -480,7 +524,7 @@
   setInterval(() => { if (attiva() && !document.hidden && stato.owner) carica(); }, OGNI_MS);
 
   riempiScelte();
-  window.__mgCompiti = { carica, stato: () => stato };
+  window.__mgCompiti = { carica, mostra, stato: () => stato };
   disegna();
   // Aperta direttamente sui Compiti (scheda ricordata), la scheda può essersi mostrata prima di questo file.
   if (attiva()) carica();

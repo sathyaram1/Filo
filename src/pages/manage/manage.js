@@ -136,6 +136,19 @@
   const bozzeRisposta = new Map();
   const rispostaInVolo = new Set();
   let esitoRisposta = { text: '', kind: '' };
+  // Immagini e file incollati, trascinati o scelti nelle caselle che scrivono nella conversazione (#1331): la risposta
+  // del rombo e la riapertura, per pratica, coi tipi e i tetti dell'invio dei feedback.
+  const allegatiRisposta = window.SN_MG_ALLEGATI.crea({
+    alCambio: (id) => {
+      const vecchia = document.querySelector('.mg-liv-risposta .mg-dq-allegati');
+      if (vecchia && id === selectedId) vecchia.replaceWith(allegatiRisposta.riga(id, { disabilitata: rispostaInVolo.has(id) }));
+    },
+    alMessaggio: (id, testo) => { if (id === selectedId) setClarifyMsg(testo, testo ? 'err' : ''); },
+  });
+  const allegatiRiapertura = window.SN_MG_ALLEGATI.crea({
+    alCambio: () => disegnaAllegatiRiapertura(),
+    alMessaggio: (id, testo) => { if (id === selectedId) setActionMsg(testo, testo ? 'err' : ''); },
+  });
   // La pratica che aveva già le domande al disegno prima: il pannello si apre
   // da sé quando arrivano, non a ogni ridisegno dopo che l'owner l'ha chiuso.
   let attesaDisegnata = null;
@@ -1419,6 +1432,7 @@
     fixer:      'Correzione',
     secaudit:   'Audit sicurezza',
     risposta:   'Gestisci la risposta',
+    smistamento: 'Gestisci la domanda',
     prober:     'Esplorazione',
     idle:       'Fermo',
     off:        'Routine spente',
@@ -2565,8 +2579,11 @@
     }
   }
 
-  // Domande e le tre schede: un numero solo con le domande lette davvero (patterns/una-barra-di-sezioni-dice-quante-cose-contiene-ogni-sezione.md).
-  const DOMANDE_LABELS = { domande: 'Da rispondere', 'domande-lavoro': 'In lavorazione', 'domande-archivio': 'Archivio' };
+  // Domande e le sue schede: un numero solo con le domande lette davvero (patterns/una-barra-di-sezioni-dice-quante-cose-contiene-ogni-sezione.md).
+  const DOMANDE_LABELS = {
+    domande: 'Da rispondere', 'domande-smistamento': 'In smistamento', 'domande-lavoro': 'In lavorazione',
+    'domande-automatiche': 'Risposte automatiche', 'domande-archivio': 'Archivio',
+  };
   function updateSezioniCounts() {
     if (!mgSezioni) return;
     const scrivi = (sez, testo, titolo) => {
@@ -2591,8 +2608,8 @@
       if (!nd) continue;
       const badge = document.createElement('span');
       badge.className = 'mg-tab-count';
-      // Oltre il tetto dell'elenco l'archivio ha solo le più recenti: il numero è un minimo.
-      badge.textContent = `(${nt[tab]}${d.altre && tab === 'domande-archivio' ? '+' : ''})`;
+      // Oltre il tetto dell'elenco le chiuse sono solo le più recenti: il numero è un minimo.
+      badge.textContent = `(${nt[tab]}${d.altre && (tab === 'domande-archivio' || tab === 'domande-automatiche') ? '+' : ''})`;
       btn.appendChild(badge);
     }
 
@@ -4158,6 +4175,9 @@
     if (!mgReopen) return;
     mgReopen.hidden = true;
     if (mgReopenText) mgReopenText.value = '';
+    if (mgReopen.dataset.per) allegatiRiapertura.svuota(mgReopen.dataset.per);
+    delete mgReopen.dataset.per;
+    disegnaAllegatiRiapertura();
     // I due bottoni del modulo vivono nell'HTML: senza riaccenderli qui, una riapertura riuscita li
     // lascerebbe spenti per sempre.
     if (mgReopenConfirm) mgReopenConfirm.disabled = false;
@@ -4187,14 +4207,27 @@
     if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
     setActionMsg('', '');
     mgReopen.hidden = false;
+    mgReopen.dataset.per = fb._id;
+    disegnaAllegatiRiapertura();
     if (mgReopenText) mgReopenText.focus();
   }
+
+  function disegnaAllegatiRiapertura() {
+    const posto = document.getElementById('mgReopenAllegati');
+    if (!posto) return;
+    const id = mgReopen && mgReopen.dataset.per;
+    posto.replaceChildren(...(id ? [allegatiRiapertura.riga(id)] : []));
+  }
+  if (mgReopenText) allegatiRiapertura.collega(mgReopenText, () => (mgReopen && mgReopen.dataset.per) || '');
 
   async function confermaRiapertura() {
     // Quello che l'owner ha scritto si legge PRIMA di ogni attesa, come nella
     // gemella che risponde a un chiarimento: durante l'attesa la casella può
     // svuotarsi, e allora si riaprirebbe la segnalazione senza il motivo.
     const reason = mgReopenText ? (mgReopenText.value || '').trim() : '';
+    const per = (mgReopen && mgReopen.dataset.per) || '';
+    if (per && allegatiRiapertura.caricando(per)) { setActionMsg('Aspetta che gli allegati finiscano di caricarsi.', 'err'); return; }
+    const atts = per === selectedId ? allegatiRiapertura.di(per) : [];
     // La conversazione su cui si appende va letta PRIMA: dall'elenco arriva
     // senza note, e appenderci sopra il motivo le cancellerebbe.
     const fb = await feedbackCompleto(selectedId);
@@ -4209,11 +4242,11 @@
     const oldNotes = String(fb.notes || '');
     if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
     let extra = null;
-    if (reason) {
-      const T = window.SN_FEEDBACK_THREAD;
+    const T = window.SN_FEEDBACK_THREAD;
+    if (reason || (atts.length && T)) {
       const ts = new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
       const newNotes = T
-        ? T.appendUserTurn(oldNotes, reason, { ts, label: 'Riaperto il' })
+        ? T.appendUserTurn(oldNotes, reason, { ts, label: 'Riaperto il', attachments: atts })
         : (oldNotes ? `${oldNotes}\n\n--- Riaperto il ${ts} ---\n${reason}` : `--- Riaperto il ${ts} ---\n${reason}`);
       extra = { notes: newNotes };
     }
@@ -4553,7 +4586,9 @@
     const id = selectedId;
     if (rispostaInVolo.has(id)) return;
     const reply = (bozzeRisposta.get(id) || '').trim();
-    if (!reply) { const c = document.getElementById('mgSideRispostaText') || origine; if (c) c.focus(); return; }
+    if (allegatiRisposta.caricando(id)) { setClarifyMsg('Aspetta che gli allegati finiscano di caricarsi.', 'err'); return; }
+    const atts = allegatiRisposta.di(id);
+    if (!reply && !atts.length) { const c = document.getElementById('mgSideRispostaText') || origine; if (c) c.focus(); return; }
     // Come la riapertura: la conversazione si legge intera prima di
     // appenderci la risposta, o al suo posto resterebbe la sola risposta.
     const fb = await feedbackCompleto(id);
@@ -4575,8 +4610,9 @@
       setClarifyMsg('Lo stato di questa segnalazione è cambiato: aggiorna e riprova.', 'err');
       return;
     }
+    if (!T && !reply) { setClarifyMsg('Gli allegati da soli non si possono mandare qui: scrivi anche due parole.', 'err'); return; }
     const newNotes = T
-      ? T.appendUserTurn(oldNotes, reply, {})
+      ? T.appendUserTurn(oldNotes, reply, { attachments: atts })
       : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
 
     rispostaInVolo.add(id);
@@ -4587,6 +4623,7 @@
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       if (fb) { fb.status = 'todo'; fb.notes = newNotes; }
       bozzeRisposta.delete(id);
+      allegatiRisposta.svuota(id);
       // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
       // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
@@ -4627,6 +4664,7 @@
     t.value = bozzeRisposta.get(fb._id) || '';
     t.addEventListener('input', () => scriviBozzaRisposta(t));
     t.addEventListener('keydown', tastiRisposta);
+    allegatiRisposta.collega(t, fb._id);
     const riga = document.createElement('div');
     riga.className = 'mg-actions-row';
     const btn = document.createElement('button');
@@ -4642,7 +4680,9 @@
     msg.setAttribute('role', 'status');
     riflettiEsitoRisposta(msg);
     riga.appendChild(btn); riga.appendChild(msg);
-    box.appendChild(t); box.appendChild(riga);
+    box.appendChild(t);
+    box.appendChild(allegatiRisposta.riga(fb._id, { disabilitata: rispostaInVolo.has(fb._id) }));
+    box.appendChild(riga);
     return box;
   }
 

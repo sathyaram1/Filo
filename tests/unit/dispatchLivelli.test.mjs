@@ -4,7 +4,8 @@
 // per feedback, e due di quelle (il rombo della segnalazione di chi ha
 // lavorato, il pentagono del controllo di sicurezza) restavano grigie perché
 // nessuna consegna portava il testo. Qui si prova:
-//   - il parsing di `--segnala <file>` e `--nota <file>` (puri);
+//   - il parsing di `--nota <file>` (puro), e `--segnala` che dal #1790 si rifiuta
+//     dicendo di scrivere la domanda in JSON: il server non compone più domande;
 //   - la lettura del file: assente, vuoto, oltre il tetto (mai un taglio);
 //   - la forma del payload che parte verso il server;
 //   - il pass del controllo di sicurezza senza nota, che si ferma PRIMA di
@@ -43,12 +44,15 @@ const {
 
 // ─── Parsing delle opzioni ────────────────────────────────────────────────────
 
-test('leggiOpzioniRegistrazione: toglie --segnala <file> e lascia il resto com\'è', () => {
-  const r = leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'il report', '--segnala', 'seg.md', '--frase', 'ciao']);
-  assert.equal(r.error, '');
-  assert.equal(r.valori['--segnala'], 'seg.md');
-  assert.equal(r.valori['--frase'], 'ciao');
-  assert.deepEqual(r.args, ['--record-fixed', 'ID1', 'il report']);
+test('leggiOpzioniRegistrazione: --segnala non c\'è più, e si dice di scrivere la domanda (#1790)', () => {
+  for (const argv of [['--record-fixed', 'ID1', 'il report', '--segnala', 'seg.md', '--frase', 'ciao'], ['--record-verifier', 'ID1', 'critica', '--segnala=seg.md']]) {
+    const r = leggiOpzioniRegistrazione(argv);
+    assert.match(r.error, /--segnala non c'è più: il server non compone domande/);
+    assert.match(r.error, /--domanda <file\.json>/);
+  }
+  const ok = leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'il report', '--domanda', 'd.json', '--frase', 'ciao']);
+  assert.equal(ok.error, '');
+  assert.deepEqual(ok.args, ['--record-fixed', 'ID1', 'il report']);
 });
 
 test('leggiOpzioniRegistrazione: senza l\'opzione non cambia niente', () => {
@@ -59,13 +63,14 @@ test('leggiOpzioniRegistrazione: senza l\'opzione non cambia niente', () => {
 });
 
 test('leggiOpzioniRegistrazione: l\'opzione in fondo senza file, o con un flag al posto del file, è un errore', () => {
-  assert.match(leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--segnala']).error, /--segnala vuole il percorso/);
-  assert.match(leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--segnala', '--frase', 'x']).error, /--segnala vuole il percorso/);
+  assert.match(leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--domanda']).error, /--domanda vuole il percorso/);
+  assert.match(leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--domanda', '--frase', 'x']).error, /--domanda vuole il percorso/);
+  assert.match(leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--segnala']).error, /--segnala non c'è più/);
   assert.match(leggiOpzioniRegistrazione(['--record-secaudit', 'ID1', 'pass', '--nota', '-h']).error, /--nota vuole il percorso/);
 });
 
 test('leggiOpzioniRegistrazione: l\'opzione ripetuta è un errore, non «vince l\'ultima»', () => {
-  const r = leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--segnala', 'a.md', '--segnala', 'b.md']);
+  const r = leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--domanda', 'a.json', '--domanda', 'b.json']);
   assert.match(r.error, /una volta sola/);
 });
 
@@ -129,9 +134,11 @@ test('fixedPayload: senza segnalazione il payload è quello di sempre (nessun ca
   assert.equal('segnalazione' in fixedPayload({ report: 'R', segnalazione: '   ' }), false);
 });
 
-test('fixedPayload: con la segnalazione parte il campo `segnalazione`, che il server scrive in livelli.l3', () => {
+test('fixedPayload: la segnalazione in markdown non parte più, la domanda sì (#1790)', () => {
   const p = fixedPayload({ report: 'R', frase: '', branch: 'b', segnalazione: '## Problema\nX\n' });
-  assert.deepEqual(p, { report: 'R', userNote: '', branch: 'b', segnalazione: '## Problema\nX' });
+  assert.deepEqual(p, { report: 'R', userNote: '', branch: 'b' });
+  const d = { titolo: 'Quale strada?', priorita: 'importante' };
+  assert.deepEqual(fixedPayload({ report: 'R', frase: '', branch: 'b', domanda: d }), { report: 'R', userNote: '', branch: 'b', domanda: d });
 });
 
 test('secauditPayload: `testo` c\'è solo se la nota c\'è; lo `sha` del commit controllato c\'è sempre', () => {
@@ -163,15 +170,16 @@ test('applySecaudit: `saltato` (l\'owner ha saltato L4) si conserva com\'è e va
   assert.equal(applySecaudit(defaultState('A', 'x'), 'boh').secauditVerdict, 'fail', 'una parola ignota resta un fail');
 });
 
-test('usageText: nomina --segnala e --nota', () => {
+test('usageText: nomina --domanda e --nota, non più --segnala', () => {
   const u = usageText();
-  assert.ok(u.includes('--segnala <file.md>'));
+  assert.ok(!u.includes('--segnala'));
+  assert.ok(u.includes('--domanda <file.json>'));
   assert.ok(u.includes('--nota <file.md>'));
 });
 
 // ─── Riga di comando, per davvero ─────────────────────────────────────────────
 
-test('CLI: pass senza --nota si ferma prima del server; --segnala su un file assente si ferma; con la nota il pass parte', () => {
+test('CLI: pass senza --nota si ferma prima del server; --segnala si rifiuta; con la nota il pass parte', () => {
   const DISPATCH = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
   const sandbox = cartellaTemporanea('filo-livelli-cli-');
   // Stato e nota stanno FUORI dal deposito, come dice la ricetta del ruolo: un
@@ -240,21 +248,22 @@ test('CLI: pass senza --nota si ferma prima del server; --segnala su un file ass
     nienteScritto('verdetto con la directory sporca');
     rmSync(resolve(sandbox, 'avanzo.txt'), { force: true });
 
-    // --segnala su un file assente ferma la consegna della correzione, con la
-    // frase giusta, prima di qualunque altra cosa.
-    const segAssente = lancia(['--record-fixed', 'ID1',
+    // --segnala non c'è più (#1790): la consegna della correzione si ferma prima di
+    // qualunque altra cosa, e dice di scrivere la domanda.
+    writeFileSync(resolve(fuori, 'seg.md'), '## Problema\nDue strade.\n', 'utf8');
+    const segFixed = lancia(['--record-fixed', 'ID1',
       'Corretto il salvataggio col titolo vuoto: ora il file compare nella lista e resta dopo la riapertura.',
-      '--segnala', 'seg-manca.md']);
-    assert.equal(segAssente.status, 1);
-    assert.match(String(segAssente.stderr), /seg-manca\.md non esiste/);
-    nienteScritto('segnalazione assente');
+      '--segnala', resolve(fuori, 'seg.md')]);
+    assert.equal(segFixed.status, 1);
+    assert.match(String(segFixed.stderr), /--segnala non c'è più/);
+    nienteScritto('segnalazione');
 
     // E anche dalla critica.
     const segVer = lancia(['--record-verifier', 'ID1',
       'Provato ad aprire la pagina e a salvare con il titolo vuoto: funziona tutto, non ho trovato niente da segnalare.',
-      '--segnala', 'seg-manca.md']);
+      '--segnala', resolve(fuori, 'seg.md')]);
     assert.equal(segVer.status, 1);
-    assert.match(String(segVer.stderr), /seg-manca\.md non esiste/);
+    assert.match(String(segVer.stderr), /--segnala non c'è più/);
   } finally {
     togliCartella(sandbox);
     togliCartella(fuori);
@@ -283,52 +292,24 @@ function fintoServer() {
   return new Promise((r) => srv.listen(0, '127.0.0.1', () => r({ srv, ricevuti, port: srv.address().port })));
 }
 
-test('canale: deliver status --segnala manda `segnalazione` intera; file assente = niente parte', async () => {
+test('canale: deliver --segnala si rifiuta, con o senza file, e non parte niente (#1790)', async () => {
   const CANALE = fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url));
   const { srv, ricevuti, port } = await fintoServer();
   const casa = cartellaTemporanea('filo-livelli-canale-');
   try {
     const seg = resolve(casa, 'segnala.md');
-    writeFileSync(seg, '## Problema\r\nDue strade.\r\n\r\n## Scelte\r\n- A: costa.\r\n- B: lenta.\r\n', 'utf8');
+    writeFileSync(seg, '## Problema\r\nDue strade.\r\n', 'utf8');
     const env = { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
     // Asincrono, non spawnSync: il server finto vive in QUESTO processo, e
-    // una spawn bloccante gli toglie il ciclo degli eventi (il figlio aspetta
-    // una risposta che non arriva mai).
+    // una spawn bloccante gli toglie il ciclo degli eventi.
     const lancia = (args) => new Promise((r) => execFile(process.execPath, [CANALE, ...args], { env, cwd: casa },
       (err, so, se) => r({ status: err ? (err.code ?? 1) : 0, stdout: String(so || ''), stderr: String(se || '') })));
-
-    // `working` e non `revision_capability`: qui si prova il campo, non il
-    // controllo sui file fuori dai commit (che vale sulla directory vera).
-    const ok = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
-      '--notes', 'Preso in carico: ho trovato un trade-off vero e lo segnalo.', '--segnala', seg]);
-    assert.equal(ok.status, 0, `la consegna doveva partire (stderr: ${ok.stderr})`);
-    const consegna = ricevuti.find((x) => x.url.includes('routineDeliver'));
-    assert.ok(consegna, 'la consegna deve arrivare al server');
-    const d = consegna.body.data || {};
-    assert.equal(d.segnalazione, '## Problema\nDue strade.\n\n## Scelte\n- A: costa.\n- B: lenta.',
-      'il testo arriva intero, col nome che il server legge');
-    assert.equal(d.segnala, undefined, 'il nome dell\'opzione non viaggia: il server non lo conosce');
-
-    // File assente: si ferma prima del server, con la frase giusta.
-    const prima = ricevuti.length;
-    const assente = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
-      '--notes', 'Preso in carico.', '--segnala', 'manca.md']);
-    assert.equal(assente.status, 1);
-    assert.match(String(assente.stderr), /manca\.md non esiste/);
-    assert.equal(ricevuti.length, prima, 'niente deve partire');
-
-    // --segnala senza file dopo: errore d'uso.
-    const monco = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working', '--segnala']);
-    assert.equal(monco.status, 1);
-    // Vuole un FILE, e lo dice: «un testo» mandava a passare la segnalazione
-    // sulla riga di comando (verifica del giro 1).
-    assert.match(String(monco.stderr), /--segnala vuole il percorso di un file/);
-
-    // Su un intento che il server non legge (note) non si consegna a vuoto.
-    const altrove = await lancia(['deliver', 'biglietto-di-prova', 'note', '--notes', 'Una riga.', '--segnala', seg]);
-    assert.equal(altrove.status, 1);
-    assert.match(String(altrove.stderr), /vale solo su deliver status, fixed e verdict/);
-    assert.equal(ricevuti.length, prima, 'niente deve partire');
+    for (const coda of [['--segnala', seg], ['--segnala', 'manca.md'], ['--segnala']]) {
+      const r = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working', '--notes', 'Preso in carico.', ...coda]);
+      assert.equal(r.status, 1, coda.join(' '));
+      assert.match(r.stderr, /--segnala non c'è più: il server non compone domande/, coda.join(' '));
+    }
+    assert.equal(ricevuti.length, 0, 'niente deve partire');
   } finally {
     srv.close();
     togliCartella(casa);

@@ -31,9 +31,9 @@ riga. Se è
 il controllo dei permessi della sessione a bloccare il comando, copia nelle note il suo messaggio esatto. Non aggirare nessuno di questi no: niente token scritti nell'URL, niente aiutanti di credenziali, niente altre
 credenziali. La parte del server da qui non si fa, e per qualunque ruolo è un guasto da dichiarare, anche quando il no
 è per regola (biglietto sporco o chiuso, feedback non fidato, ramo del server scritto fuori registro): nessuno lo
-riprende sul PC dell'owner. Vale la sezione «Un guasto dell'ambiente si dice con una domanda» (il controllo di sicurezza
-salta la domanda), col testo esatto di git o del rifiuto e la riga su chi l'ha respinto in `notePerAgenti`. Il
-gruppo è `guasto: filo-security`. Chi verifica non passa il lavoro guardando solo l'app: rilascia col guasto senza
+riprende sul PC dell'owner. Vale la sezione «Un guasto dell'ambiente si dichiara nel rilascio», col testo esatto di
+git o del rifiuto e la riga su chi l'ha respinto nel messaggio del rilascio. Il gruppo è `guasto: filo-security`. Un no
+per la fiducia del feedback o per un permesso non lo chiedi tu all'owner: il server lo porta nei Ricevuti. Chi verifica non passa il lavoro guardando solo l'app: rilascia col guasto senza
 registrare la critica, e il lavoro torna in coda da sé per un'altra verifica quando il guasto è passato.
 
 ### Il ramo

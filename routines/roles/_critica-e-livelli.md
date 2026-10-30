@@ -75,7 +75,8 @@ suo feedback.
 
 **Il segno `?`** dopo la lettera (`[2i?]`, `[1v?]`, `[1e?]`) dice che il
 rilievo chiede una decisione dell'owner: un trade-off vero, una scelta di
-prodotto o di gusto. Un difetto non chiede decisioni.
+prodotto o di gusto, e porta la sua domanda (più sotto). Un difetto non chiede
+decisioni.
 
 | segnalazione e rilievo | livello e sede |
 |---|---|
@@ -186,22 +187,30 @@ Registra col testo intero, **in un pezzo solo** dentro le stesse virgolette:
 ```bash
 node scripts/dispatch.mjs --record-verifier <id> "Provato: …
 [2i] …
+[1i?] …
 [0e] …" [--domanda <file.json>]
 ```
 
 <!-- includi: _segnala.md -->
 
-Qui la domanda accompagna un rilievo col `?`: la riga nella critica resta una
-riga, le scelte e i loro costi stanno nella domanda. Un difetto non va lì: è un
-rilievo col suo livello. Sulla critica fermano il lavoro un rilievo interno
-di livello 2 o 3 col `?` e la domanda allegata, anche senza rilievi: con
-`--domanda` che blocca il lavoro aspetta l'owner in ogni esito, e i rilievi da
-correggere restano davanti a chi riprende dopo la sua risposta; con
-`"blocca": false` la critica va avanti col suo esito e la domanda resta aperta. Un rilievo col `?` senza
-domanda allegata la fa nascere dal server, coi rilievi come problema. Un 1 col
-`?`, o un esterno di qualunque livello, va avanti in un feedback derivato che
-l'owner decide a parte. Se poi il server ti manda a correggere, una domanda a
-QUELLA consegna ferma il lavoro come per chi risolve.
+**Ogni rilievo col `?` porta la sua domanda**, lo stesso JSON di
+`domanda.mjs chiedi` con almeno due opzioni: la riga nella critica resta una
+riga, le scelte e i loro costi stanno nella domanda. Con un rilievo `?` il
+file di `--domanda` ha la domanda; con più rilievi `?` ha un elenco JSON di
+domande, una per rilievo, nell'ordine in cui stanno nella critica. Un rilievo
+`?` senza la sua domanda, o una domanda senza il suo rilievo, e la critica non
+parte. Le opzioni agiscono su `payload.id`; per un rilievo che esce in un
+feedback derivato il server le sposta sul derivato, che nasce col titolo della
+domanda. Un difetto non va lì: è un rilievo col suo livello.
+
+Sulla critica fermano il lavoro i rilievi interni di livello 2 o 3 col `?`:
+con la loro domanda che blocca il lavoro aspetta l'owner in ogni esito, e i
+rilievi da correggere restano davanti a chi riprende dopo la sua risposta; con
+`"blocca": false` la critica va avanti col suo esito e la domanda resta aperta.
+Un 1 col `?`, o un esterno di qualunque livello, va avanti in un feedback
+derivato con la sua domanda, che l'owner decide a parte. Se poi il server ti
+manda a correggere, una domanda a QUELLA consegna ferma il lavoro come per chi
+risolve.
 
 La critica registrata non si modifica più.
 

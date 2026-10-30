@@ -13,8 +13,8 @@
   const AttachTypes = global.SN_FEEDBACK_ATTACH;
 
   // Vale sia per «Allega» sia per il drag & drop.
-  const ATTACH_REJECT_MSG =
-    'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
+  const ATTACH_REJECT_MSG = (AttachTypes && AttachTypes.MESSAGGIO_TIPO)
+    || 'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
 
   // Fallback prudente se il modulo condiviso non fosse caricato: si consentono solo le immagini
   // raster note.
@@ -204,7 +204,15 @@
   }
 
   // `testo`: una segnalazione già scritta da Filo (il falso allarme dal tasto destro sull'avviso di un sito, #813.5).
-  function open({ testo: proposta = '' } = {}) {
+  // Su un sito il box sta nello strato sopra la scheda, mai nel suo documento (#1509.1).
+  function open({ testo = '' } = {}) {
+    if (activeRoot) return;
+    const qui = () => apriQui({ testo });
+    if (global.SN_RIQUADRI_SOPRA?.apri('feedback', { testo: String(testo || '') }, qui)) return;
+    qui();
+  }
+
+  function apriQui({ testo: proposta = '' } = {}) {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-fb-overlay';
@@ -252,13 +260,15 @@
     const cancelBtn = root.querySelector('.sn-fb-cancel');
     const canvas = root.querySelector('.sn-fb-canvas');
     const fileInput = root.querySelector('.sn-fb-file');
+    if (AttachTypes && AttachTypes.ACCEPT) fileInput.accept = AttachTypes.ACCEPT;
 
+    const LIMITI = (AttachTypes && AttachTypes.LIMITI) || { immagini: 5, file: 5, byte: 4 * 1024 * 1024 };
     const images = [];
-    const MAX_IMAGES = 5;
+    const MAX_IMAGES = LIMITI.immagini;
     // Allegati NON immagine (pdf, txt, md, json, …): { name, type, size, dataUrl }
     const files = [];
-    const MAX_FILES = 5;
-    const MAX_ATTACH_BYTES = 4 * 1024 * 1024;
+    const MAX_FILES = LIMITI.file;
+    const MAX_ATTACH_BYTES = LIMITI.byte;
 
     // Id STABILE della composizione, condiviso da tutti i tentativi: se l'invio va in timeout
     // ma riesce sul server, ripremere «Invia» non duplica (#370). Cambia col contenuto.
@@ -723,10 +733,12 @@
         }
         // Instradato dal main perché la CSP della pagina ospite blocca i fetch verso firestore e
         // firebasestorage dal preload; il main usa undici (Node) e non è soggetto a quella CSP.
+        // Nello strato la pagina è quella sotto, non il documento dello strato.
+        const sotto = global.SN_FILO_UI?.nelloStrato ? global.SN_PAGINA_SOTTO : null;
         const payload = {
           text,
-          url: location.href,
-          title: document.title,
+          url: sotto ? String(sotto.url || '') : location.href,
+          title: sotto ? String(sotto.titolo || '') : document.title,
           userAgent: navigator.userAgent,
           clientId,
           clientIdHash,

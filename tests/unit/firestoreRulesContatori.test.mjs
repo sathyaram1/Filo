@@ -832,13 +832,16 @@ test('la chat più carica che l’app sa fare passa le regole, e una manomessa n
 });
 
 // ── I riquadri AI e l'Editor di un'ora (#1465) ─────────────────────────────
+// Una misura arrivata dopo la v1 (#1586) si controlla solo se c'è: `(!('x' in d) || chiuse(d.x, …))`.
 const MR = (() => {
   const out = {};
-  for (const m of RIQUADRI.matchAll(/chiuse\(d\.(\w+), (\[[^\]]*\]), (\d+), '([^']+)'\)/g)) {
-    out[m[1]] = { chiavi: stringhe(m[2]), tetto: Number(m[3]), valori: m[4] };
+  for (const m of RIQUADRI.matchAll(/(\(!\('(\w+)' in d\) \|\| )?chiuse\(d\.(\w+), (\[[^\]]*\]), (\d+), '([^']+)'\)/g)) {
+    assert.ok(!m[1] || m[2] === m[3], `${m[3]}: il controllo facoltativo guarda un altro campo («${m[2]}»)`);
+    out[m[3]] = { chiavi: stringhe(m[4]), tetto: Number(m[5]), valori: m[6], facoltativa: Boolean(m[1]) };
   }
   return out;
 })();
+const passaRiquadri = (doc) => passa(doc, Object.fromEntries(Object.entries(MR).filter(([c, r]) => !r.facoltativa || c in doc)));
 
 test('i riquadri: sola creazione, letti dall’admin, coi campi e la versione dell’app e lo stesso id dell’ora', () => {
   const RR = regole(BR);
@@ -848,10 +851,10 @@ test('i riquadri: sola creazione, letti dall’admin, coi campi e la versione de
   for (const v of ['update', 'delete']) assert.ok(per(v, RR).length >= 1 && per(v, RR).every((r) => r.cond === 'false'));
   assert.deepEqual(per('create', RR).map((r) => r.cond), ['request.auth != null && contatoriRiquadri(request.resource.data)']);
   assert.deepEqual(elencoDopo(RIQUADRI, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_RIQUADRI]);
-  assert.deepEqual(elencoDopo(RIQUADRI, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_RIQUADRI]);
-  assert.equal(Number(/d\.v == (\d+)/.exec(RIQUADRI)[1]), C.VERSIONE_RIQUADRI);
+  assert.deepEqual(elencoDopo(RIQUADRI, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_RIQUADRI_FISSI]);
+  assert.equal(Number(/d\.v == (\d+)/.exec(RIQUADRI)[1]), C.VERSIONE_RIQUADRI, 'i campi facoltativi non cambiano la versione');
   const doc = C.documentoRiquadri({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.249', os: 'win', dati: C.oraVuota() });
-  assert.deepEqual(Object.keys(doc), [...C.CAMPI_RIQUADRI]);
+  assert.deepEqual(Object.keys(doc), [...C.CAMPI_RIQUADRI_FISSI], 'una misura facoltativa senza conti non parte');
   assert.equal(C.idDocumento(doc), `${'a'.repeat(20)}_2026-10-15_09`, 'lo stesso id della sua ora');
   assert.ok(!/primo/.test(RIQUADRI), 'il segno del primo documento è dell’ora');
   const lunghe = [...BR.matchAll(/'(\^[^']*)'/g)].map((m) => m[1].length).filter((n) => n > 4096);
@@ -864,6 +867,7 @@ test('i riquadri: ogni misura ha le chiavi, il tetto e la forma dell’app; il d
     assert.deepEqual(MR[c].chiavi, [...C.RIQUADRI[c].chiavi], `${c}: le chiavi delle regole sono quelle dell’app`);
     assert.equal(MR[c].tetto, C.TETTI.RIQUADRI[c], `${c}: il tetto`);
     assert.equal(MR[c].valori, unite(C.FORME.RIQUADRI[c]), `${c}: la forma dei valori`);
+    assert.equal(MR[c].facoltativa, C.MISURE_RIQUADRI_FACOLTATIVE.includes(c), `${c}: facoltativa nelle regole se lo è nell’app`);
   }
   const ora = C.oraVuota();
   for (const c of C.MISURE_RIQUADRI) {
@@ -871,12 +875,16 @@ test('i riquadri: ogni misura ha le chiavi, il tetto e la forma dell’app; il d
     for (const k of C.RIQUADRI[c].chiavi) ora[c][k] = Array(n).fill(999999999);
   }
   const doc = C.documentoRiquadri({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'linux', dati: ora });
+  assert.deepEqual(Object.keys(doc), [...C.CAMPI_RIQUADRI]);
   assert.equal(C.validaRiquadri(doc).ok, true, C.validaRiquadri(doc).motivo);
-  assert.equal(passa(doc, MR), '', 'i riquadri più carichi dell’app devono passare le regole');
+  assert.equal(passaRiquadri(doc), '', 'i riquadri più carichi dell’app devono passare le regole');
   const vuoto = C.documentoRiquadri({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T00', app: '0.2.249', os: 'win', dati: C.oraVuota() });
-  assert.equal(passa(vuoto, MR), '');
+  assert.equal(passaRiquadri(vuoto), '');
   assert.equal(C.senzaRiquadri(vuoto), true, 'un’ora senza riquadri non ha il loro documento');
-  const manomesso = (campo, v) => passa({ ...doc, [campo]: v }, MR);
+  const manomesso = (campo, v) => passaRiquadri({ ...doc, [campo]: v });
+  assert.notEqual(manomesso('correttore_segnaposto', { da_solo: '1,0,0,0,0,0,0' }), '', 'un esito del segnaposto che manca');
+  assert.notEqual(manomesso('correttore_automatica', { Marco: '1,0,0' }), '', 'la parola corretta come chiave');
+  assert.notEqual(manomesso('anticipo_privacy', { 'banca.it': '1,0' }), '', 'un sito come chiave');
   assert.notEqual(manomesso('riscrittura', { 'rendilo più gentile': '1,0,0,0,0,0,0,0,0,0' }), '', 'un’istruzione scritta come chiave');
   assert.notEqual(manomesso('riquadro_uso', { explain: '1,0,0,0,0,0,0 <b>copiato</b>' }), '', 'del testo dentro il valore');
   assert.notEqual(manomesso('editor_titolo', { 'Lettera a Mario': '1,0,0,0,0,0,0' }), '', 'un titolo come chiave');

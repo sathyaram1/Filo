@@ -53,8 +53,6 @@ porta solo l'ultima.
 
 <!-- includi: _solo-in-locale.md -->
 
-<!-- includi: _guasto-in-attesa.md -->
-
 ## Consegna
 
 <!-- includi: _motivo-correttore.md -->

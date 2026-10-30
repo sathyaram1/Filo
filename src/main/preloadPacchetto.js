@@ -13,6 +13,11 @@ const INGRESSO = 'src/preload/page-preload.js';
 // Il file che il pacchetto di Filo porta con sé: lo scrive beforePack qui sotto prima che nasca l'asar. Fuori da src/,
 // perché chi legge i sorgenti (sentinelle, mappe) non trovi tutto due volte.
 const NEL_PACCHETTO = path.join(RADICE, 'generato', 'page-preload.js');
+// Ogni preload che gira in sandbox e il file che il pacchetto porta per lui: anche lo strato dei riquadri sopra un sito.
+const PACCHETTI = Object.freeze({
+  [INGRESSO]: NEL_PACCHETTO,
+  'src/preload/riquadri-preload.js': path.join(RADICE, 'generato', 'riquadri-preload.js'),
+});
 // Quelli che la sandbox dà da sé: li chiede il preload vero, a chiamata.
 const DELLA_SANDBOX = new Set(['electron', 'events', 'timers', 'url']);
 // Quelli di Node che il pacchetto rifà: `path` sui suoi percorsi, `fs` in sola lettura sui testi che porta; `url` lo completa.
@@ -315,22 +320,30 @@ function scrivi(dest, opzioni) {
   return dest;
 }
 
-let scelto = null;
+const scelti = new Map();
 // Il pacchetto di Filo usa il suo file e basta; senza (npm start, i test) si compone dai sorgenti di adesso.
-function percorsoDelPreload() {
-  if (scelto) return scelto;
+function percorsoDelPreload(ingresso = INGRESSO) {
+  if (scelti.has(ingresso)) return scelti.get(ingresso);
+  const nelPacchetto = PACCHETTI[ingresso];
+  if (!nelPacchetto) throw new Error(`[preload impacchettato] ${ingresso} non è fra i preload in sandbox`);
   const { app } = require('electron');
-  if (app.isPackaged && fs.existsSync(NEL_PACCHETTO)) return (scelto = NEL_PACCHETTO);
-  if (app.isPackaged) console.error('[preload impacchettato] manca nel pacchetto:', NEL_PACCHETTO, '— lo compongo adesso');
-  scelto = scrivi(path.join(app.getPath('userData'), 'preload-pacchetto', 'page-preload.js'));
+  let scelto = null;
+  if (app.isPackaged && fs.existsSync(nelPacchetto)) scelto = nelPacchetto;
+  else {
+    if (app.isPackaged) console.error('[preload impacchettato] manca nel pacchetto:', nelPacchetto, '— lo compongo adesso');
+    scelto = scrivi(path.join(app.getPath('userData'), 'preload-pacchetto', path.basename(nelPacchetto)), { ingresso });
+  }
+  scelti.set(ingresso, scelto);
   return scelto;
 }
 
 // build.beforePack di electron-builder, che chiama il `default` di questo modulo: scrive dai sorgenti di adesso, sempre
 // uguale a sé stesso (il Mac universale impacchetta due copie che devono coincidere).
 async function beforePack() {
-  scrivi(NEL_PACCHETTO);
-  console.log(`[preload impacchettato] scritto per il pacchetto: ${NEL_PACCHETTO}`);
+  for (const [ingresso, dest] of Object.entries(PACCHETTI)) {
+    scrivi(dest, { ingresso });
+    console.log(`[preload impacchettato] scritto per il pacchetto: ${dest}`);
+  }
 }
 
-module.exports = { componi, scrivi, percorsoDelPreload, runtime, beforePack, default: beforePack, NEL_PACCHETTO, INGRESSO };
+module.exports = { componi, scrivi, percorsoDelPreload, runtime, beforePack, default: beforePack, NEL_PACCHETTO, INGRESSO, PACCHETTI };

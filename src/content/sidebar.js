@@ -138,7 +138,7 @@
     root = null;
     convFilo = '';
     history = [];
-    allegati = { immagini: [] };
+    allegati = { immagini: [], riferimenti: [] };
     documenti = null;
     collapsed = false;
     aiPrefersOpen = false;
@@ -179,7 +179,7 @@
     if (isOpen()) { mostra(); return; }
     if (root) close({ davvero: true });
     history = [];
-    allegati = { immagini: [] };
+    allegati = { immagini: [], riferimenti: [] };
     documenti = null;
     ripiegoDetto = false;
     ripiegoDaDire = '';
@@ -260,12 +260,12 @@
     // Parte solo da un tasto o un clic veri: l'invio del modulo lo fa anche il codice del sito (#592.6).
     const invia = () => {
       const text = ta.value.trim();
-      if (!text && !allegati.immagini.length) return;
-      const immagini = allegati.immagini;
+      if (!text && !allegati.immagini.length && !allegati.riferimenti.length) return;
+      const { immagini, riferimenti } = allegati;
       ta.value = '';
-      allegati = { immagini: [] };
+      allegati = { immagini: [], riferimenti: [] };
       disegnaAllegati();
-      submit({ userMessage: text, immagini });
+      submit({ userMessage: text, immagini, riferimenti });
     };
     // Ctrl+V di un'immagine e un'immagine lasciata sul pannello entrano come quelle lasciate sulla pagina: solo dall'utente.
     ta.addEventListener('paste', (e) => {
@@ -283,16 +283,20 @@
       allega([e.detail.blob]);
     });
     const conImmagini = (e) => Array.from(e.dataTransfer?.items || []).some((it) => it.kind === 'file' && /^image\//i.test(it.type || ''));
+    const conRiferimento = (e) => riferimentiAmmessi() && Array.from(e.dataTransfer?.types || []).includes(TIPO_RIFERIMENTO);
     for (const tipo of ['dragenter', 'dragover']) {
       root.addEventListener(tipo, (e) => {
-        if (!e.isTrusted || !conImmagini(e)) return;
+        if (!e.isTrusted || !(conImmagini(e) || conRiferimento(e))) return;
         e.preventDefault();
         e.stopPropagation();
         try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {}
       });
     }
     root.addEventListener('drop', (e) => {
-      if (!e.isTrusted || !conImmagini(e)) return;
+      if (!e.isTrusted) return;
+      // Sulla casella il rilascio lo conta già il suo ascoltatore.
+      if (rilascio(e, { conta: e.target !== ta })) { e.stopPropagation(); return; }
+      if (!conImmagini(e)) return;
       e.preventDefault();
       e.stopPropagation();
       allega(e.dataTransfer.files);
@@ -385,7 +389,12 @@
     open({ source: 'valuta' });
     if (!root) return;
     valutazione = { campo, mandato: t };
+    contaValuta('chiesta');
     submit({ valuta: t, daGesto: true });
+  }
+  // «Valuta» nella famiglia del correttore (#1586): richieste, risposte e correzioni, mai il testo.
+  function contaValuta(esito) {
+    try { Popup?.conta?.({ misura: 'riquadro', cosa: 'correttore_valuta', esito }); } catch (_) {}
   }
 
   // Il testo del campo valutato, se è cambiato da quando il modello l'ha visto: la domanda dopo lo porta con sé.
@@ -478,7 +487,69 @@
   // sito: anteprime e nomi in uno Shadow DOM chiuso. Oltre il tetto si rimpiccioliscono: l'Aiuto non apre file dal
   // disco, e un percorso lo leggerebbe il sito.
   const Allegati = global.SN_CONST.ALLEGATI_CHAT;
-  let allegati = { immagini: [] };
+  let allegati = { immagini: [], riferimenti: [] };
+  // Un elemento di Filo trascinato in chat (#1331, filo_design): titolo in grassetto, contenuto in hover e per il
+  // modello. Lo scrive chi trascina (src/pages/manage/manageDomande.js).
+  const TIPO_RIFERIMENTO = 'application/x-filo-riferimento';
+  // Il riferimento è testo che l'utente porta lui, come uno incollato: oltre il tetto il taglio si scrive.
+  const RIFERIMENTO_MAX = 30000;
+  function leggiRiferimento(dt) {
+    let v = null;
+    try { v = JSON.parse(dt.getData(TIPO_RIFERIMENTO) || 'null'); } catch (_) { v = null; }
+    const titolo = v && typeof v.titolo === 'string' ? v.titolo.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+    let testo = v && typeof v.testo === 'string' ? v.testo : '';
+    if (!titolo && !testo.trim()) return null;
+    if (testo.length > RIFERIMENTO_MAX) testo = `${testo.slice(0, RIFERIMENTO_MAX)}\n[… tagliato qui: altri ${testo.length - RIFERIMENTO_MAX} caratteri]`;
+    return { titolo: titolo || 'Riferimento', testo };
+  }
+  // I riferimenti li scrivono solo le pagine di Filo.
+  function riferimentiAmmessi() {
+    try { return location.protocol === 'filo:'; } catch (_) { return false; }
+  }
+  function aggiungiRiferimento(r) {
+    if (pannelloPerAllegati() !== true) return;
+    if (!allegati.riferimenti.some((x) => x.titolo === r.titolo && x.testo === r.testo)) allegati.riferimenti.push(r);
+    disegnaAllegati();
+    root?.querySelector('.sn-sidebar-input textarea')?.focus();
+  }
+  // Un riferimento lasciato sul pannello lo prende la chat, e nella casella non si versa il suo testo. Ci arriva anche
+  // dal preload, che sul pannello tiene il sito all'oscuro del rilascio (src/preload/rilascio-file.js).
+  function rilascio(e, { conta = true } = {}) {
+    if (!e || !e.isTrusted) return false;
+    // Su un sito il riferimento si ignora: chi lo trascina potrebbe essere il sito, e un testo nascosto dietro un titolo
+    // arriverebbe al modello come parola dell'utente. Lì entra il suo testo, a vista nella casella.
+    if (!riferimentiAmmessi() || !Array.from(e.dataTransfer?.types || []).includes(TIPO_RIFERIMENTO)) {
+      // Un testo lasciato nella casella lo scrive il browser: qui si conta solo da dove veniva (#1471).
+      if (conta && e.target?.matches?.('.sn-sidebar-input textarea')) {
+        let testo = '';
+        try { testo = e.dataTransfer.getData('text/plain'); } catch (_) { testo = ''; }
+        try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!testo)); } catch (_) {}
+      }
+      return false;
+    }
+    e.preventDefault();
+    const r = leggiRiferimento(e.dataTransfer);
+    if (r) aggiungiRiferimento(r);
+    if (conta) { try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!r)); } catch (_) {} }
+    return true;
+  }
+  function testoRiferimenti(riferimenti) {
+    return riferimenti.map((r) => `Riferimento «${r.titolo}», trascinato dall'utente nella chat:\n${r.testo}`).join('\n\n');
+  }
+  // Il gettone del riferimento: il titolo in grassetto, e il contenuto in un riquadro all'hover o al fuoco.
+  function gettoneRiferimento(r) {
+    const v = document.createElement('span');
+    v.className = 'rif';
+    v.tabIndex = 0;
+    const b = document.createElement('b');
+    b.textContent = r.titolo;
+    const anteprima = document.createElement('span');
+    anteprima.className = 'anteprima';
+    anteprima.setAttribute('role', 'tooltip');
+    anteprima.textContent = r.testo;
+    v.append(b, anteprima);
+    return v;
+  }
   // Da content.js: 'sito' dove Filo è spento (il rilascio resta alla pagina), 'aiuto' con l'Aiuto spento, '' altrimenti.
   let chiusoPerche = () => 'sito';
   const chiuso = () => { try { return String(chiusoPerche() || ''); } catch (_) { return 'sito'; } };
@@ -499,6 +570,22 @@
 .riga { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 10px 2px; }
 .voce { position: relative; display: inline-flex; }
 img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display: block; }
+.rif {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  padding: 4px 10px; border-radius: 8px; border: 1px solid var(--sn-border); background: var(--sn-bg); cursor: default;
+  transition: border-color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.rif:hover, .rif:focus-visible { border-color: var(--sn-accent); outline: none; }
+.rif b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rif .togli { position: static; flex: none; }
+.anteprima {
+  display: none; position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 2;
+  width: min(320px, 80vw); max-height: 260px; overflow: auto; padding: 8px 10px; border-radius: 8px;
+  white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; font-weight: 400; line-height: 1.45;
+  background: var(--sn-bg); color: var(--sn-fg); border: 1px solid var(--sn-border); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.rif:hover .anteprima, .rif:focus-within .anteprima { display: block; }
+.bolla .rif { background: transparent; }
 .togli {
   all: unset; position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; line-height: 1;
@@ -514,11 +601,28 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   function disegnaAllegati() {
     const host = root && root.querySelector('.sn-sidebar-allegati');
     if (!host) return;
-    host.hidden = !allegati.immagini.length;
+    host.hidden = !allegati.immagini.length && !allegati.riferimenti.length;
     const o = ombraDi(host, CSS_ALLEGATI);
     for (const n of Array.from(o.childNodes)) if (n.localName !== 'style') n.remove();
     const riga = document.createElement('div');
     riga.className = 'riga';
+    for (const r of allegati.riferimenti) {
+      const v = gettoneRiferimento(r);
+      const togli = document.createElement('button');
+      togli.type = 'button';
+      togli.className = 'togli';
+      togli.textContent = '×';
+      togli.title = 'Togli';
+      togli.setAttribute('aria-label', 'Togli dal messaggio');
+      togli.addEventListener('click', (e) => {
+        if (!gestoVero(e)) return;
+        allegati.riferimenti = allegati.riferimenti.filter((x) => x !== r);
+        disegnaAllegati();
+        root?.querySelector('.sn-sidebar-input textarea')?.focus();
+      });
+      v.appendChild(togli);
+      riga.appendChild(v);
+    }
     for (const im of allegati.immagini) {
       const v = document.createElement('div');
       v.className = 'voce';
@@ -614,14 +718,15 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     return true;
   }
 
-  function immaginiNellaBolla(msg, immagini) {
-    if (!msg || !immagini.length) return;
+  function immaginiNellaBolla(msg, immagini, riferimenti = []) {
+    if (!msg || (!immagini.length && !riferimenti.length)) return;
     const box = document.createElement('div');
     box.className = 'sn-sidebar-msg-immagini';
     if (msg.textContent.trim()) box.classList.add('con-testo');
     const o = ombraDi(box, CSS_ALLEGATI);
     const bolla = document.createElement('div');
     bolla.className = 'bolla';
+    for (const r of riferimenti) bolla.appendChild(gettoneRiferimento(r));
     for (const im of immagini) {
       const img = document.createElement('img');
       img.src = im.dataUrl;
@@ -737,6 +842,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     wrap.className = 'sn-sidebar-correzioni';
     for (const c of buone) wrap.appendChild(bottoneCorrezione(c, campo, Math.max(0, String(mandato || '').indexOf(c.prima))));
     afterEl.insertAdjacentElement('afterend', wrap);
+    for (let i = 0; i < buone.length; i++) contaValuta('correzione_mostrata');
     const conv = convEl();
     if (conv) conv.scrollTop = conv.scrollHeight;
   }
@@ -773,11 +879,13 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         const r = SC.sostituisciNelCampo(campo, c.prima, c.dopo, vicinoA);
         if (r.dove === undefined) { diLa(r.manca ? 'help_correzione_manca' : 'help_correzione_ferma', estratto(c.prima)); return; }
         scritta = r.dove;
+        contaValuta('correzione_accettata');
       } else {
         const r = c.dopo ? SC.sostituisciNelCampo(campo, c.dopo, c.prima, scritta) : {};
         if (r.dove === undefined) { diLa('help_correzione_non_tolta', global.SN_TASTI?.etichetta?.('Ctrl+Z') || 'Ctrl+Z'); return; }
         vicinoA = r.dove;
         scritta = null;
+        contaValuta('correzione_tolta');
       }
       stato();
     });
@@ -1884,10 +1992,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     }
   }
 
-  async function turno({ userMessage: scritto = '', immagini = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false, valuta = '' } = {}) {
+  async function turno({ userMessage: scritto = '', immagini = [], riferimenti = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false, valuta = '' } = {}) {
     if (!root) return;
-    // Le sole immagini, senza testo, sono un messaggio dell'utente come un altro.
-    const userMessage = scritto || (immagini.length ? PROMPTS.soloAllegatiAiuto() : '');
+    // Le sole immagini, senza testo, sono un messaggio dell'utente come un altro. Un riferimento trascinato arriva
+    // al modello col suo contenuto; nella bolla resta il titolo.
+    const userMessage = [scritto || (immagini.length ? PROMPTS.soloAllegatiAiuto() : ''), testoRiferimenti(riferimenti)].filter(Boolean).join('\n\n');
     // Il contatore lo azzera solo un gesto vero: scrivere, una scelta, il clic sul passo indicato, «Continua».
     if (userMessage || daGesto) {
       passiDaSolo = 0;
@@ -1921,9 +2030,9 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (userMessage || valuta) {
       fermataDetta = false;
       const bolla = valuta ? I18n.t('help_valuta_richiesta', estratto(valuta)) : scritto;
-      immaginiNellaBolla(appendChatMessage('user', bolla, { nelFilo: false }), immagini);
+      immaginiNellaBolla(appendChatMessage('user', bolla, { nelFilo: false }), immagini, riferimenti);
       // Nel filo le immagini non si salvano, ma il messaggio c'è e dice quante erano.
-      nelFiloAiuto('user', Allegati.testoNelFilo(bolla, immagini.length));
+      nelFiloAiuto('user', [Allegati.testoNelFilo(bolla, immagini.length), ...riferimenti.map((r) => `Riferimento: ${r.titolo}`)].filter(Boolean).join('\n'));
       // Le immagini restano nel turno in cronologia: i passi che l'Aiuto fa da solo dopo le vedono ancora.
       if (testoCampo === null) {
         history.push({
@@ -2235,6 +2344,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       }
       // Con delle correzioni il modello deve ritrovare nei turni dopo quali ha proposto: gli torna la sua risposta intera.
       const conCorrezioni = !!(valutazione && parsed.correzioni && parsed.correzioni.length);
+      if (valuta) contaValuta(conCorrezioni ? 'con_correzioni' : 'senza_correzioni');
       history.push({ role: 'assistant', content: conCorrezioni ? res.text : (parsed.display || res.text) });
 
       if (parsed.choices && parsed.choices.length) {
@@ -2420,7 +2530,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   }
 
   global.SN_SIDEBAR = {
-    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato, allega, allegaDaFuori, valuta,
+    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato, allega, allegaDaFuori, valuta, rilascio,
     suCambio: (fn) => { ascoltaCambi = typeof fn === 'function' ? fn : null; },
     // Un'immagine lasciata dove la pagina non la vuole è dell'Aiuto, salvo dove Filo è spento.
     accoglieRilascio: () => chiuso() !== 'sito',
@@ -2440,6 +2550,19 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     renderFeedbackPrompt, percorsoRaccoglibile, puntoRisposta,
     // Le anteprime stanno in un'ombra chiusa: cosa c'è nella casella, e dove sta la × di una per un clic vero.
     allegati: () => allegati.immagini.map((im) => ({ nome: im.nome, byte: im.dataUrl.length })),
+    riferimenti: () => allegati.riferimenti.map((r) => ({ titolo: r.titolo, testo: r.testo })),
+    // Il gettone i-esimo nella casella: dove sta, e se il riquadro col contenuto è aperto (all'hover o al fuoco).
+    gettoneRiferimento: (i) => {
+      const host = root && root.querySelector('.sn-sidebar-allegati');
+      const o = host && ombre.get(host);
+      const v = o && o.querySelectorAll('.rif')[i];
+      if (!v) return null;
+      const r = v.getBoundingClientRect();
+      const a = v.querySelector('.anteprima');
+      return { x: r.x + 12, y: r.y + r.height / 2, aperta: getComputedStyle(a).display !== 'none', testo: a.textContent, grassetto: getComputedStyle(v.querySelector('b')).fontWeight };
+    },
+    riferimentiNelleBolle: () => Array.from(root ? root.querySelectorAll('.sn-sidebar-msg-user') : [])
+      .map((m) => { const box = m.querySelector('.sn-sidebar-msg-immagini'); const o = box && ombre.get(box); return o ? Array.from(o.querySelectorAll('.rif b')).map((b) => b.textContent) : []; }),
     puntoTogli: (i) => {
       const host = root && root.querySelector('.sn-sidebar-allegati');
       const o = host && ombre.get(host);

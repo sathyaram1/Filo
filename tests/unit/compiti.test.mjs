@@ -12,8 +12,12 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// L'ordine del loader del main: gli ambiti prima dei compiti, che ne prendono quelli attivi.
+require(join(ROOT, 'src', 'shared', 'ambiti.js'));
+require(join(ROOT, 'src', 'shared', 'ricorrenti.js'));
 require(join(ROOT, 'src', 'shared', 'compiti.js'));
 const K = globalThis.SN_COMPITI;
+const A = globalThis.SN_AMBITI;
 
 const fase = (extra) => Object.assign({ id: 'C-3', tipo: 'fase', feedbackNum: '#1196', fase: 'verifica', stato: 'aperto', aperto: true, urgenza: 38, priorita: 2, fiducia: 'fidato', figlio: false, biglietti: [] }, extra);
 
@@ -24,6 +28,53 @@ test('etichetta: «#N · fase» per un compito di un feedback, «C-n · titolo»
   assert.equal(K.etichetta({ id: 'C-12', tipo: 'manuale', titolo: '  Guarda i log  ' }), 'C-12 · Guarda i log');
   assert.equal(K.etichetta({ id: 'C-12', tipo: 'manuale', titolo: '' }), 'C-12');
   assert.equal(K.etichetta(null), '');
+});
+
+test('etichetta: l\'istanza di un ricorrente col suo nome, un\'unione coi numeri dei feedback', () => {
+  assert.equal(K.etichetta({ id: 'C-12', tipo: 'ricorrente', titolo: 'Revisione delle domande', ricorrenteId: 'r1' }), 'C-12 · Revisione delle domande');
+  assert.equal(K.etichetta({ id: 'C-13', tipo: 'unione', titolo: 'Unione di #12, #15', feedbackNums: ['#12', '#15'] }), 'C-13 · Unione di #12, #15');
+  assert.equal(K.etichetta({ id: 'C-13', tipo: 'unione', titolo: '', feedbackNums: ['#12', '#15'] }), 'C-13 · Unione di #12, #15', 'senza titolo lo dicono i numeri');
+  assert.match(K.urgenzaTesto({ tipo: 'ricorrente', urgenza: 30 }), /ricorrente/);
+  assert.match(K.urgenzaTesto({ tipo: 'unione', urgenza: 20 }), /unioni/);
+});
+
+test('perché aspetta: la frase del server, o «non prima di» in ora italiana, solo per chi è in attesa', () => {
+  const adesso = Date.UTC(2026, 9, 25, 10, 0);
+  const domani = Date.UTC(2026, 9, 26, 5, 0); // le 06:00 a Roma, ora solare
+  assert.equal(K.attesaTesto({ stato: 'aperto', aperto: true, attesa: 'aspetta l’ambiente dei riservati.' }, adesso), 'aspetta l’ambiente dei riservati');
+  assert.equal(K.attesaTesto({ stato: 'aperto', aperto: true, attesa: 'l’ambito posta non è ancora attivo', nonPrimaDi: domani }, adesso), 'l’ambito posta non è ancora attivo', 'la frase del server vince');
+  assert.equal(K.attesaTesto({ stato: 'aperto', aperto: true, attesa: '', nonPrimaDi: domani }, adesso), 'non prima di lun 26/10 06:00');
+  assert.equal(K.attesaTesto({ stato: 'aperto', aperto: true, nonPrimaDi: adesso - 1 }, adesso), '', 'un «non prima» passato non ferma niente');
+  assert.equal(K.attesaTesto({ stato: 'in_corso', aperto: true, attesa: 'x' }, adesso), '');
+  assert.equal(K.attesaTesto({ stato: 'fatto', aperto: false, attesa: 'x' }, adesso), '');
+  assert.equal(K.attesaTesto(null), '');
+});
+
+test('ambiti di un compito: quelli attivi del server; senza, quelli attivi del codice', () => {
+  assert.deepEqual([...K.AMBITI], A.attivi(), 'gli ambiti iniziali attivi, non più solo lavoro e server');
+  const r = { ambiti: A.elenco({ notizie: { operazioni: ['feedback.apri'], nonPuo: 'altro' } }) };
+  assert.deepEqual(K.ambitiAttivi(r), A.attivi({ notizie: { operazioni: ['feedback.apri'], nonPuo: 'altro' } }));
+  assert.ok(K.ambitiAttivi(r).includes('notizie'), 'un ambito approvato dall’owner si sceglie');
+  assert.equal(K.ambitiAttivi(r).includes('posta'), false, 'uno non ancora attivo no');
+  assert.deepEqual(K.ambitiAttivi({ ambiti: [] }), [...K.AMBITI]);
+  assert.deepEqual(K.ambitiAttivi(null), [...K.AMBITI]);
+});
+
+test('scelte di un compito: con l\'elenco del server vale l\'elenco; senza, il main non chiude fuori un ambito approvato', () => {
+  const base = { urgenza: 30, modello: 'opus', sforzo: 'high' };
+  assert.deepEqual(K.validaScelte({ ...base, ambito: 'domande' }), { ok: true, scelte: { urgenza: 30, modello: 'opus', sforzo: 'high', ambito: 'domande' } });
+  assert.equal(K.validaScelte({ ...base, ambito: 'notizie' }).ok, true, 'un nome che il codice non conosce lo decide il server');
+  assert.equal(K.validaScelte({ ...base, ambito: 'posta' }).ok, false, 'uno iniziale non ancora attivo no');
+  assert.equal(K.validaScelte({ ...base, ambito: 'posta' }, undefined, { spenti: true }).ok, true, 'un ricorrente può aspettarlo');
+  assert.equal(K.validaScelte({ ...base, ambito: 'Non Valido!' }, undefined, { spenti: true }).ok, false);
+  assert.equal(K.validaScelte({ ...base, ambito: 'notizie' }, ['lavoro', 'server']).testo, 'Ambito fra lavoro, server.');
+  assert.equal(K.validaScelte({ ...base, ambito: 'coda' }, ['coda']).ok, true);
+  assert.equal(K.validaScelte({ ...base, urgenza: 100, ambito: 'coda' }).ok, false);
+  assert.equal(K.validaNuovo({ titolo: 'x', urgenza: 5, ambito: 'domande' }).ok, true, 'un compito a mano prende ogni ambito attivo');
+  assert.equal(K.validaNuovo({ titolo: 'x', urgenza: 5, ambito: 'domande' }, ['lavoro']).ok, false);
+  assert.equal(K.frase('il ricorrente vuole un nome'), 'Il ricorrente vuole un nome.');
+  assert.equal(K.frase('Già detto.'), 'Già detto.');
+  assert.equal(K.frase(''), '');
 });
 
 test('costo: la somma delle chiamate che ne dichiarano uno; nessuna = non si sa, non zero', () => {
@@ -96,6 +147,7 @@ let rispondi = () => ({ status: 200, body: { result: { ok: true } } });
 let ricevute = [];
 let handlers;
 let MSG;
+let admin = true;
 
 before(async () => {
   server = createServer((req, res) => {
@@ -116,7 +168,7 @@ before(async () => {
   require.cache[authPath] = {
     id: authPath, filename: authPath, loaded: true,
     exports: {
-      isSignedIn: () => true, isAdmin: () => true, getIdToken: async () => 'token-di-prova',
+      isSignedIn: () => true, isAdmin: () => admin, getIdToken: async () => 'token-di-prova',
       getProfile: () => ({ email: 'owner@esempio' }), getUid: async () => 'uid-owner', getAccessToken: async () => '',
       onChange: () => () => {},
     },
@@ -141,11 +193,13 @@ function chiama(msg, origine = 'filo://manage/manage.html', mittente = { isShell
   return h(msg, mittente, origine);
 }
 
-test('elenco: va a ownerCompiti con la pagina chiesta e torna con aperti, storico e «altri»', async () => {
-  rispondi = () => ({ status: 200, body: { result: { ok: true, aperti: [fase()], storico: [], altri: true, adesso: 5 } } });
+test('elenco: va a ownerCompiti con la pagina chiesta e torna con aperti, storico, «altri» e ambiti', async () => {
+  const ambiti = A.elenco();
+  rispondi = () => ({ status: 200, body: { result: { ok: true, aperti: [fase()], storico: [], altri: true, adesso: 5, ambiti } } });
   const r = await chiama({ type: MSG.COMPITI_ELENCO, storico: 100, prima: 1234 });
   assert.deepEqual(ricevute.map((x) => [x.path, x.data]), [['/ownerCompiti', { op: 'elenco', storico: 100, prima: 1234 }]]);
   assert.deepEqual([r.ok, r.aperti.length, r.storico.length, r.altri, r.adesso], [true, 1, 0, true, 5]);
+  assert.deepEqual(r.ambiti, ambiti);
 });
 
 test('crea: il main rifiuta prima del server quello che il server rifiuterebbe; il resto passa ripulito', async () => {
@@ -169,10 +223,98 @@ test('annulla e gli errori del server detti per l\'owner', async () => {
   assert.match((await chiama({ type: MSG.COMPITI_ELENCO })).error, /non sono ancora pubblicati/);
 });
 
-test('le porte dei compiti rispondono solo alle pagine di Filo', async () => {
-  for (const msg of [{ type: MSG.COMPITI_ELENCO }, { type: MSG.COMPITO_CREA, compito: { titolo: 'x', urgenza: 5 } }, { type: MSG.COMPITO_ANNULLA, id: 'C-1' }]) {
+const RICORRENTE = { nome: ' Revisione delle domande ', testo: ' Leggi le domande. ', giorni: [3, 1, 1], ora: '06:00', ambito: 'domande', urgenza: '30', modello: 'opus', sforzo: 'high', attivo: true, domandaFineTurno: '', extra: 'x' };
+const PULITO = { nome: 'Revisione delle domande', testo: 'Leggi le domande.', giorni: [1, 3], ora: '06:00', ambito: 'domande', urgenza: 30, modello: 'opus', sforzo: 'high', attivo: true, domandaFineTurno: '' };
+
+test('ricorrenti: l\'elenco va a ownerCompiti e torna coi ricorrenti, gli ambiti e l\'ora del server', async () => {
+  const ambiti = A.elenco();
+  rispondi = () => ({ status: 200, body: { result: { ok: true, adesso: 7, ricorrenti: [{ id: 'r1', nome: 'x' }], ambiti } } });
+  const r = await chiama({ type: MSG.RICORRENTI_ELENCO });
+  assert.deepEqual(ricevute.map((x) => [x.path, x.data]), [['/ownerCompiti', { op: 'ricorrenti' }]]);
+  assert.deepEqual(r, { ok: true, adesso: 7, ricorrenti: [{ id: 'r1', nome: 'x' }], ambiti });
+  rispondi = () => ({ status: 200, body: { result: { ok: true } } });
+  assert.deepEqual(await chiama({ type: MSG.RICORRENTI_ELENCO }), { ok: true, adesso: 0, ricorrenti: [], ambiti: [] }, 'una risposta monca non diventa un errore della pagina');
+});
+
+test('ricorrenti: il salvataggio rifiuta prima del server quello che il server rifiuterebbe; il resto passa ripulito', async () => {
+  rispondi = () => ({ status: 200, body: { result: { ok: true, id: 'r9' } } });
+  for (const [storto, attesa] of [
+    [{ ...RICORRENTE, nome: '  ' }, /^Il ricorrente vuole un nome\.$/],
+    [{ ...RICORRENTE, testo: 'x'.repeat(40001) }, /40001.*40000/],
+    [{ ...RICORRENTE, giorni: [] }, /almeno un giorno/],
+    [{ ...RICORRENTE, ora: '6:00' }, /06:30/],
+    [{ ...RICORRENTE, urgenza: 100 }, /da 0 a 99/],
+    [{ ...RICORRENTE, modello: 'gpt-5' }, /Modello fra/],
+    [{ ...RICORRENTE, ambito: 'Non Valido!' }, /non è fra quelli/],
+    [{ ...RICORRENTE, id: '../tutti' }, /identificativo/],
+    [null, /oggetto/],
+  ]) {
+    const r = await chiama({ type: MSG.RICORRENTE_SALVA, ricorrente: storto });
+    assert.equal(r.ok, false, JSON.stringify(storto).slice(0, 80));
+    assert.match(r.error, attesa);
+    assert.equal(ricevute.length, 0, 'niente chiamata per un ricorrente storto');
+  }
+  assert.deepEqual(await chiama({ type: MSG.RICORRENTE_SALVA, ricorrente: RICORRENTE }), { ok: true, id: 'r9' });
+  assert.deepEqual(ricevute[0].data, { op: 'ricorrente_salva', ricorrente: PULITO }, 'un ricorrente nuovo va senza id');
+  rispondi = () => ({ status: 200, body: { result: { ok: true } } });
+  assert.deepEqual(await chiama({ type: MSG.RICORRENTE_SALVA, ricorrente: { ...RICORRENTE, id: 'r1', ambito: 'posta', attivo: false } }), { ok: true, id: 'r1' });
+  assert.deepEqual(ricevute[0].data, { op: 'ricorrente_salva', ricorrente: { ...PULITO, id: 'r1', ambito: 'posta', attivo: false } }, 'un ambito non ancora attivo vale: il ricorrente lo aspetta');
+});
+
+test('ricorrenti: togli e avvia portano l\'id; gli errori del server arrivano con la sua frase', async () => {
+  rispondi = () => ({ status: 200, body: { result: { ok: true } } });
+  assert.deepEqual(await chiama({ type: MSG.RICORRENTE_TOGLI, id: 'r1' }), { ok: true, id: 'r1' });
+  assert.deepEqual(ricevute[0].data, { op: 'ricorrente_togli', id: 'r1' });
+  rispondi = () => ({ status: 200, body: { result: { ok: true, compitoId: 'C-14' } } });
+  assert.deepEqual(await chiama({ type: MSG.RICORRENTE_AVVIA, id: 'r1' }), { ok: true, id: 'r1', compitoId: 'C-14' });
+  assert.deepEqual(ricevute[0].data, { op: 'ricorrente_avvia', id: 'r1' });
+  for (const t of [MSG.RICORRENTE_TOGLI, MSG.RICORRENTE_AVVIA]) {
+    assert.equal((await chiama({ type: t, id: '' })).ok, false, t);
+    assert.equal((await chiama({ type: t, id: 'a/b' })).ok, false, t);
+    assert.equal(ricevute.length, 0);
+  }
+  rispondi = () => ({ status: 400, body: { error: { status: 'FAILED_PRECONDITION', message: 'r1 ha già un’istanza al lavoro', details: { reason: 'in_corso' } } } });
+  assert.deepEqual(await chiama({ type: MSG.RICORRENTE_AVVIA, id: 'r1' }), { ok: false, error: 'r1 ha già un’istanza al lavoro' });
+  rispondi = () => ({ status: 200, body: { result: { ok: false, errore: 'ricorrente_inesistente', dettaglio: 'il ricorrente r1 non c’è più' } } });
+  assert.deepEqual(await chiama({ type: MSG.RICORRENTE_TOGLI, id: 'r1' }), { ok: false, error: 'il ricorrente r1 non c’è più' });
+  // Un server più vecchio dell'app non conosce le op dei ricorrenti: lo si dice, non «op fra elenco, crea, annulla».
+  rispondi = () => ({ status: 400, body: { error: { status: 'INVALID_ARGUMENT', message: 'op fra elenco, crea, annulla', details: { reason: 'op_sconosciuta' } } } });
+  assert.match((await chiama({ type: MSG.RICORRENTI_ELENCO })).error, /ricorrenti non sono ancora sul server/);
+  assert.match((await chiama({ type: MSG.RICORRENTE_SALVA, ricorrente: RICORRENTE })).error, /ricorrenti non sono ancora sul server/);
+  rispondi = () => ({ status: 403, body: { error: { status: 'PERMISSION_DENIED', message: 'Riservato al proprietario.' } } });
+  assert.match((await chiama({ type: MSG.RICORRENTI_ELENCO })).error, /serve quello del proprietario/);
+});
+
+test('ambiti: si toglie per nome uno approvato; un nome storto non parte; il rifiuto del server arriva con la sua frase', async () => {
+  rispondi = () => ({ status: 200, body: { result: { ok: true, nome: 'notizie' } } });
+  assert.deepEqual(await chiama({ type: MSG.AMBITO_TOGLI, nome: ' notizie ' }), { ok: true, nome: 'notizie' });
+  assert.deepEqual(ricevute.map((x) => [x.path, x.data]), [['/ownerCompiti', { op: 'ambito_togli', nome: 'notizie' }]]);
+  for (const nome of ['', 'No', 'Notizie', '1abc', 'a/b', 'x'.repeat(32), null, 7]) {
+    assert.equal((await chiama({ type: MSG.AMBITO_TOGLI, nome })).ok, false, String(nome));
+    assert.equal(ricevute.length, 0, 'niente chiamata per un nome storto');
+  }
+  rispondi = () => ({ status: 400, body: { error: { status: 'FAILED_PRECONDITION', message: 'l’ambito notizie lo usa Rassegna: cambia prima il suo ambito', details: { reason: 'ambito_in_uso' } } } });
+  assert.deepEqual(await chiama({ type: MSG.AMBITO_TOGLI, nome: 'notizie' }), { ok: false, error: 'l’ambito notizie lo usa Rassegna: cambia prima il suo ambito' });
+  rispondi = () => ({ status: 200, body: { result: { ok: false, errore: 'ambito_iniziale', dettaglio: 'gli ambiti iniziali non si tolgono' } } });
+  assert.deepEqual(await chiama({ type: MSG.AMBITO_TOGLI, nome: 'lavoro' }), { ok: false, error: 'gli ambiti iniziali non si tolgono' });
+  rispondi = () => ({ status: 400, body: { error: { status: 'INVALID_ARGUMENT', message: 'op fra elenco, crea, annulla', details: { reason: 'op_sconosciuta' } } } });
+  assert.match((await chiama({ type: MSG.AMBITO_TOGLI, nome: 'notizie' })).error, /non è ancora sul server/);
+});
+
+test('le porte dei compiti e dei ricorrenti rispondono solo alle pagine di Filo, e solo all\'owner', async () => {
+  const porte = [{ type: MSG.COMPITI_ELENCO }, { type: MSG.COMPITO_CREA, compito: { titolo: 'x', urgenza: 5 } }, { type: MSG.COMPITO_ANNULLA, id: 'C-1' },
+    { type: MSG.RICORRENTI_ELENCO }, { type: MSG.RICORRENTE_SALVA, ricorrente: RICORRENTE }, { type: MSG.RICORRENTE_TOGLI, id: 'r1' }, { type: MSG.RICORRENTE_AVVIA, id: 'r1' },
+    { type: MSG.AMBITO_TOGLI, nome: 'notizie' }];
+  for (const msg of porte) {
     const r = await chiama(msg, 'https://esempio.it/', {});
     assert.equal(r.ok, false, msg.type);
+  }
+  assert.equal(ricevute.length, 0);
+  admin = false;
+  try {
+    for (const msg of porte) assert.equal((await chiama(msg)).code, 'not_admin', msg.type);
+  } finally {
+    admin = true;
   }
   assert.equal(ricevute.length, 0);
 });

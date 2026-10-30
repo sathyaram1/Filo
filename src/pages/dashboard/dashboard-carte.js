@@ -12,6 +12,9 @@
   let altroEl = null;
 
   let layout = null;
+  // Il primo incontro (#1661) lo decide il main: legge l'accoglienza dal disco anche in incognito.
+  let primoIncontro = false;
+  let giroPrimo = 0;
   const dati = {
     timers: [],
     notifiche: [],
@@ -200,7 +203,11 @@
     };
     if (r.state === 'progressing' || r.state === 'paused') {
       const fermo = r.state === 'paused';
-      const quanto = pct != null ? `${pct}% · ${fmtBytes(r.receivedBytes)} di ${fmtBytes(r.totalBytes)}` : `${fmtBytes(r.receivedBytes)}`;
+      let quanto = pct != null ? `${pct}% · ${fmtBytes(r.receivedBytes)} di ${fmtBytes(r.totalBytes)}` : `${fmtBytes(r.receivedBytes)}`;
+      // #1287 — quanto va veloce e quanto manca, come nel pannello e nella pagina Download.
+      let corsa = '';
+      try { corsa = global.SN_SCARICAMENTI_AVANZAMENTO.velocitaEResto(r); } catch (_) {}
+      if (corsa) quanto = `${quanto} · ${corsa}`;
       const pausa = r.canPause === false ? null : (fermo
         ? { etichetta: 'Riprendi', fai: cmdDownload(MSG.DOWNLOAD_RESUME, r) }
         : { etichetta: 'Pausa', fai: cmdDownload(MSG.DOWNLOAD_PAUSE, r) });
@@ -230,7 +237,14 @@
       }),
     };
     if (r.state === 'interrupted') {
-      return { ...base, stato: 'interrotto', principale: cartella, filo: `Lo scaricamento di «${nome}» si è interrotto.` };
+      // #1287 — «Riprova» rifà lo stesso indirizzo nella stessa carta.
+      const riprova = /^https?:/i.test(String(r.url || ''))
+        ? { etichetta: 'Riprova', forte: true, fai: () => d.send({ type: MSG.DOWNLOAD_RIPROVA, id: r.id }).then((res) => {
+          if (res && res.ok === false) avvisoErrore(res.error || 'Non sono riuscito a far ripartire lo scaricamento', 'download_failed');
+          caricaDownloads();
+        }) }
+        : null;
+      return { ...base, stato: 'interrotto', principale: riprova || cartella, secondaria: riprova ? cartella : null, filo: `Lo scaricamento di «${nome}» si è interrotto.` };
     }
     if (r.missing) {
       return { ...base, stato: 'il file non c’è più', principale: cartella, filo: `Avevo scaricato «${nome}», ma il file non è più al suo posto.` };
@@ -764,6 +778,9 @@
     disegnaColonna(accadeEl, carteSinistra(), 'sinistra');
     disegnaColonna(tieniEl, carteDestra(), 'destra');
     disegnaAltro();
+    const ridotta = C.homeRidotta(primoIncontro, layout, !!suggerimentoCrediti());
+    tieniEl.hidden = ridotta;
+    altroEl.hidden = ridotta;
     accadeEl.dataset.suona = dati.timers.some((t) => t.ringing) ? '1' : '0';
   }
 
@@ -999,8 +1016,19 @@
 
   // ===== Dati che la carta chiede da sé =====
   async function caricaLayout() {
+    const giro = ++giroPrimo;
     const r = await d.send({ type: MSG.CARTE_HOME_GET });
     layout = C.normalizza(r && r.ok ? r.layout : null);
+    if (giro === giroPrimo) primoIncontro = !!(r && r.ok && r.primoIncontro);
+    disegna();
+  }
+  // Finisce con l'accoglienza e dipende da cosa manca a Filo per rispondere. La disposizione di questa risposta no:
+  // può essere più vecchia di una mossa annunciata nel frattempo.
+  async function caricaPrimoIncontro() {
+    const giro = ++giroPrimo;
+    const r = await d.send({ type: MSG.CARTE_HOME_GET });
+    if (giro !== giroPrimo || !r || !r.ok || !!r.primoIncontro === primoIncontro) return;
+    primoIncontro = !!r.primoIncontro;
     disegna();
   }
   async function caricaDownloads() {
@@ -1055,7 +1083,8 @@
       else if (msg.type === MSG.DOWNLOADS_UPDATED) ricaricaDownloadsPresto();
       else if (msg.type === MSG.LAVORI_CAMBIATI && Array.isArray(msg.lavori)) { dati.lavori = msg.lavori; disegna(); }
       else if (msg.type === MSG.FILO_LIVE_UPDATED) caricaEditor().catch(() => {});
-      else if (msg.type === MSG.DATI_IMPORTATI) caricaMazzi().catch(() => {});
+      else if (msg.type === MSG.DATI_IMPORTATI) { caricaMazzi().catch(() => {}); caricaPrimoIncontro().catch(() => {}); }
+      else if (msg.type === MSG.FILO_ONBOARDING_UPDATED || msg.type === MSG.FILO_READY_CHANGED) caricaPrimoIncontro().catch(() => {});
       else if (msg.type === MSG.SETTINGS_UPDATED && msg.settings) { dati.impostazioni = msg.settings; disegna(); }
       else if (msg.type === MSG.IN_PAUSA_CAMBIATO && Object.prototype.hasOwnProperty.call(dati.aperte, msg.nome)) {
         dati.aperte = { ...dati.aperte, [msg.nome]: msg.visible === true };
@@ -1067,6 +1096,7 @@
         caricaDownloads().catch(() => {});
         caricaLavori().catch(() => {});
         caricaAperte().catch(() => {});
+        caricaPrimoIncontro().catch(() => {});
       }
     });
     return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori(),

@@ -22,7 +22,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
+import { statoDi, conta, clicca, scrivi, tastoSullaScheda } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 
@@ -613,8 +613,8 @@ test('(I) «spiega» su una pagina con la chiave propria rifiutata: il riquadro,
     .toBe('OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.');
   await page.screenshot({ path: 'tests/.shots/662-spiega-riquadro.png' }).catch(() => {});
   // Una domanda dopo, nello stesso riquadro: anche lei pagata così, anche lei lo dice.
-  await scrivi(app, page, '.sn-popup .sn-popup-input', 'e poi?');
-  await page.keyboard.press('Enter');
+  const dove = await scrivi(app, page, '.sn-popup .sn-popup-input', 'e poi?');
+  await dove.keyboard.press('Enter');
   await expect.poll(() => conta(app, page, '.sn-popup .sn-key-fallback'), { timeout: 30000 }).toBe(2);
   await clicca(app, page, '.sn-popup .sn-popup-close');
   await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
@@ -1008,7 +1008,7 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
   prima = seen.completions.length;
   await clicca(app, page, '.sn-editbox button[data-sc="fix"]');
   await allaPersonale(prima);
-  await page.keyboard.press('Escape');
+  await tastoSullaScheda(app, page, 'Escape');
   await expect.poll(() => conta(app, page, '.sn-editbox')).toBe(0);
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
 

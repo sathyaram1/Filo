@@ -63,18 +63,18 @@ Se è ambiguo o chiede una decisione di design prima di cominciare, fermati e
 chiedi — non è una scappatoia. Le domande diventano una domanda per l'owner,
 nella sezione Domande della Gestione: scrivila tu, come dice la sezione «Una
 domanda per l'owner si scrive per lui» (titolo e priorità, contesto, problema
-in pratica, opzioni con pro e contro e l'azione `riprendi` su `<payload.id>`,
-consiglio, `notePerAgenti` con quello che hai già esplorato), in un file JSON
-fuori dal repo, e consegnala con la fermata:
+in pratica, almeno due opzioni con pro e contro, una con l'azione `riprendi`
+su `<payload.id>`, consiglio, `notePerAgenti` con quello che hai già
+esplorato), in un file JSON fuori dal repo, e consegnala con la fermata:
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status design --reason clarify \
   --notes "[le tue domande, in breve]" --domanda <file.json>
 ```
 
-Senza `--domanda` il server la compone dalle note, più povera. Poi rilascia il
-biglietto come qui sotto: il lavoro riparte quando l'owner ha risposto, e chi
-riprende riceve le domande e la risposta.
+Senza `--domanda` la fermata non parte: il server non compone domande. Poi
+rilascia il biglietto come qui sotto: il lavoro riparte quando l'owner ha
+risposto, e chi riprende riceve le domande e la risposta.
 
 Se `payload.ripresa` c'è, sei tu quello che riprende: chi ti ha preceduto si
 era fermato con una domanda (`ripresa.domanda`) e l'owner ha risposto
@@ -116,8 +116,6 @@ il rilievo che riproduce.
 <!-- includi: _segnala.md -->
 
 <!-- includi: _solo-in-locale.md -->
-
-<!-- includi: _guasto-in-attesa.md -->
 
 ## Consegna
 

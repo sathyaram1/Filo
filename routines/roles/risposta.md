@@ -51,7 +51,8 @@ Una o più di queste cose, poi chiudi o chiedi un chiarimento.
   --name "…" --text "…" --priority N`.
 - **Aprire una domanda nuova**, se la risposta apre una scelta diversa:
   `node scripts/domanda.mjs chiedi <file.json>`, col file fuori dal repo e
-  scritta come dice «Una domanda per l'owner si scrive per lui».
+  scritta come dice «Una domanda per l'owner si scrive per lui». Prima di
+  arrivargli la smista il compito «Gestisci la domanda».
 - **Aggiornare le note per gli agenti** con quello che hai scoperto:
   `node scripts/domanda.mjs note --testo -` le riscrive intere, quindi parti
   da quelle che ci sono.
@@ -60,10 +61,9 @@ Una o più di queste cose, poi chiudi o chiedi un chiarimento.
   vale oltre questo caso: finisce nel registro e la leggono i compiti dopo di
   te. Se il registro ce l'ha già, non ripeterla.
 
-Le azioni che vogliono il consenso dell'owner (approvare un lavoro server,
-accendere o spegnere le routine) il server le rifiuta: le fa solo lui, dalla
-finestra. Se la risposta le chiede, scrivigli un chiarimento che dica quale
-opzione premere.
+Le azioni che vogliono un gesto dell'owner (accendere o spegnere le routine)
+il server le rifiuta: le fa solo lui, dalla finestra. Se la risposta le
+chiede, scrivigli un chiarimento che dica quale opzione premere.
 
 ## Come finisci
 
@@ -98,7 +98,5 @@ terzo tentativo la domanda torna all'owner.
 
 ## Se si rompe qualcosa
 
-Vale la sezione sul guasto qui sotto, con una differenza: non hai un feedback
-da fermare. Nella domanda di guasto i `collegamenti` portano la tua domanda
-(`{ "tipo": "domanda", "id": "<payload.domanda.id>" }`) e le opzioni non
-riprendono niente; poi il rilascio con `--guasto`.
+Vale la sezione sul guasto qui sotto: lo dichiari nel rilascio, e la risposta
+torna in coda da sé, come un rilascio senza chiusura.

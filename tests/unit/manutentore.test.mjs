@@ -62,6 +62,30 @@ test('il contesto porta il ruolo, le schede in ordine, chi non ha scheda, i rami
   assert.match(t, /consumo della settimana dell'account/);
 });
 
+// #1790: il manutentore riceve una riga per ogni domanda che ferma un feedback; non la smista lui.
+test('le domande che fermano un feedback: una riga ciascuna, prima quelle dell\'ordine; le non bloccanti e le chiuse no', () => {
+  const indice = [{ id: 'fa', num: '1790' }, { id: 'fb', num: '812.2' }, { id: 'fc', num: '900' }];
+  const domande = [
+    { id: 'D-7', titolo: 'Guasto\nnpm', stato: 'in_smistamento', legata: 'fb', creataIl: Date.UTC(2026, 9, 29, 21, 49) },
+    { id: 'D-3', titolo: 'Bordo caldo?', stato: 'aperta', legata: 'fa', blocca: true },
+    { id: 'D-4', titolo: 'Va avanti', stato: 'aperta', legata: 'fa', blocca: false },
+    { id: 'D-5', titolo: 'Chiusa', stato: 'chiusa', legata: 'fa' },
+    { id: 'D-6', titolo: 'Senza lavoro', stato: 'aperta' },
+    { id: 'D-8', titolo: 'Di un chiuso', stato: 'aperta', legata: 'zz' },
+  ];
+  const righe = M.righeDomandeFerme(domande, { indice, ordine: ['812.2'], quando: () => 'ieri' });
+  assert.deepEqual(righe, [
+    'D-7 «Guasto npm» ferma #812.2 dal ieri (in smistamento · nell\'ordine)',
+    'D-3 «Bordo caldo?» ferma #1790 (aspetta l\'owner)',
+  ]);
+  const t = M.testoContesto({ ruolo: '# Ruolo', schede: [], indice: [], rami: [], ferme: righe });
+  assert.match(t, /## Domande che fermano un feedback \(2\)\n\nD-7 /);
+  assert.match(t, /tu non le rispondi, ma un feedback fermo non si accende/);
+  assert.match(M.testoContesto({ ruolo: '# R', schede: [], indice: [], rami: [], ferme: [] }), /Nessuna: nessun feedback aperto aspetta una domanda/);
+  assert.match(M.testoContesto({ ruolo: '# R', schede: [], indice: [], rami: [], ferme: 'Non so quali domande fermano un feedback: niente credenziali.' }),
+    /## Domande che fermano un feedback \(\?\)\n\nNon so quali/, 'senza server il contesto esce lo stesso, e lo dice');
+});
+
 test('il ramo di un worker prende il numero del suo feedback dall\'indice', () => {
   const rami = M.conNumeri([
     { ramo: 'worker/HNgzAr4lreN25OPInPXq-20261029T021625Z', feedback: ['12', '1680'] },

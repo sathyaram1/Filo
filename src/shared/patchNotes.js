@@ -9,15 +9,37 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
     // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.252', date: '2026-10-29',
+      version: '0.2.255', date: '2026-10-30',
       features: [],
       fixes: [
+        'Quando chiedi aiuto su una pagina, Filo non conserva più le password e i numeri di carta che scrivi o incolli tu, in un modulo, in un messaggio o nella chat dell\'assistente, né quelli che l\'assistente ti propone. Le password e le carte che metti in un modulo non arrivano al modello.',
+      ],
+    },
+    {
+      version: '0.2.254', date: '2026-10-30',
+      features: [],
+      fixes: [
+        'Quando alleghi un file a una segnalazione, la finestra di scelta propone solo i tipi che Filo accetta. Se ne trascini uno diverso, il messaggio elenca tutti quelli ammessi.',
+      ],
+    },
+    {
+      version: '0.2.252', date: '2026-10-29',
+      features: [
+        'Mentre un file si scarica, la riga dice quanto va veloce e quanto manca alla fine, nella pagina Download e nella carta della home.',
+        'Uno scaricamento non riuscito ha «Riprova» sull\'avviso, nella pagina Download e nella carta della home: riparte nella stessa riga.',
+        'Un file appena scaricato si trascina dall\'avviso, dal pannello dei download o dalla pagina Download dove ti serve: nel campo di un sito che carica file, nella chat di Filo, sul desktop.',
+        'Se chiudi una finestra in incognito mentre un file si sta ancora scaricando, Filo ti chiede se lasciarlo finire o annullarlo. In tutti e due i casi la finestra si chiude.',
+      ],
+      fixes: [
+        'Tre download dello stesso file avviati insieme arrivano tutti e tre, come «file», «file (2)» e «file (3)». Prima ne restava uno solo.',
+        'Col nome sensato acceso, un file scaricato che Filo non riesce a rinominare te lo dice, con «Dai un nome» per scriverlo tu. Prima restava col nome di prima senza avvisare.',
+        'I pacchetti Snap e Flatpak sono trattati come programmi: prima di scaricarli e prima di aprirli Filo te lo chiede.',
         'Nelle risposte di Filo un collegamento scritto come codice o in grassetto mostra il suo testo, non più uno «0» o gli asterischi, e un indirizzo seguito da un pezzo di codice porta alla pagina giusta. Una risposta piena di parentesi quadre non blocca più la pagina.',
         'In chat la riga del sito che Filo sta aprendo prende l\'icona appena la scheda la trova. Prima a volte restava senza.',
         'Le schede e il «+» restano fermi quando una scheda comincia o smette di suonare. Su una scheda così stretta che resta solo l\'altoparlante, cliccarlo apre la scheda invece di silenziarla. E il titolo di una scheda stretta mostra almeno la prima lettera, o non si vede: niente più mezze lettere.',
         'Sui siti lenti la scheda prende il colore del sito appena la pagina comincia a comparire. Prima aspettava che la pagina finisse di caricarsi, anche cinque secondi.',
         'Quando Filo riordina le schede per colore, i siti di un rosso che tende al rosa, come Netflix e Pinterest, stanno in testa accanto a YouTube. Prima finivano in fondo, dopo il viola. Vale anche per l\'ordine delle schede quando riapri Filo.',
-        'Quando chiedi aiuto su una pagina, Filo non conserva più le password e i numeri di carta che scrivi o incolli tu, in un modulo, in un messaggio o nella chat dell\'assistente, né quelli che l\'assistente ti propone. Le password e le carte che metti in un modulo non arrivano al modello.',
+        'Su un sito, quello che scrivi o selezioni nella spiegazione, nella traduzione, nella Modifica e nel feedback di Filo non lo legge più il sito, nemmeno cercandolo nella pagina. Questi riquadri ora stanno sopra la pagina, fuori dal sito.',
       ],
     },
     {

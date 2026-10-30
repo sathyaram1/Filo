@@ -599,6 +599,7 @@ try {
     pronta: () => globalThis.SN_SIDEBAR?.accoglieRilascio?.() === true,
     consegna: (files) => globalThis.SN_SIDEBAR.allega(files),
     pannello: (t) => globalThis.SN_SIDEBAR?.contiene?.(t) === true,
+    nelPannello: (e) => globalThis.SN_SIDEBAR?.rilascio?.(e),
   });
 } catch (e) { console.error('[Filo CS] rilascio', e); }
 
@@ -934,6 +935,7 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'extractContext.js')); } catch (e) { console.error('[Filo CS] extractContext', e); }
   try { require(path.join(CONTENT_DIR, 'gesto.js')); } catch (e) { console.error('[Filo CS] gesto', e); } // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
   try { require(path.join(SHARED_DIR, 'avvisiTempo.js')); } catch (e) { console.error('[Filo CS] avvisiTempo', e); } // tempi della pila degli avvisi: PRIMA di popup.js
+  try { require(path.join(CONTENT_DIR, 'riquadriSopraLaScheda.js')); } catch (e) { console.error('[Filo CS] riquadriSopraLaScheda', e); } // #1509.1 — i riquadri nello strato sopra la scheda: PRIMA di popup.js
   try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo CS] popup', e); }
   try { require(path.join(CONTENT_DIR, 'vistoDavvero.js')); } catch (e) { console.error('[Filo CS] vistoDavvero', e); } // #589.11 — un clic sul menu conta solo se la voce si vedeva: PRIMA di menu.js
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo CS] menu', e); }

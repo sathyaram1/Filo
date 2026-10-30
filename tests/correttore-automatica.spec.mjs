@@ -2,7 +2,8 @@
 // dopo la riporta indietro col cursore al suo posto (anche dalla barra del Mac); i nomi prendono la maiuscola dove chi
 // scrive la usa; una correzione annullata due volte non torna, e la pagina del correttore la mostra e la toglie; una
 // parola fuori dizionario scritta tre volte non si segna più, «qual'è» resta un errore; una correzione scelta tre volte
-// diventa automatica. Il testo che mette uno script non si tocca. Nessuna chiamata esce dalla macchina.
+// diventa automatica. Il testo che mette uno script non si tocca. Nessuna chiamata esce dalla macchina. I contatori
+// (#1586): ogni correzione per fonte, fatta, annullata e imparata.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { voceOggi } from './helpers/riquadriOggi.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:20px;font:16px sans-serif">
@@ -120,6 +122,7 @@ test('«perchè » diventa «perché» allo spazio col lampo, e l\'annulla subit
   expect(await valore(page)).toBe('ok perchè va bene ');
   // Annullata, resta un errore segnato.
   await expect(errore(page, 'perchè')).toHaveCount(1, { timeout: 4000 });
+  await expect.poll(() => voceOggi(app, 'correttore_automatica', 'fisso'), { timeout: 5000 }).toEqual({ fatta: 1, annullata: 1 });
 });
 
 test('un secondo annulla toglie quello che si era scritto, non rimette la correzione', async ({ app, openTab, testServer }) => {
@@ -190,6 +193,10 @@ test('una correzione annullata due volte non torna; la pagina del correttore la 
   await menu.voce('Annulla correzione').click();
   await expect(page.locator('#ce')).toHaveText('Domani vedo marco al mare. ');
   await expect.poll(async () => (await imparato(app))?.rifiutate).toEqual(['marco']);
+  // Annullate dalla tastiera e dal tasto destro, e alla seconda Filo smette: la parola non esce.
+  await expect.poll(() => voceOggi(app, 'correttore_automatica', 'nome'), { timeout: 5000 }).toEqual({ fatta: 2, annullata: 2, imparata: 1 });
+  const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));
+  expect(disco.toLowerCase()).not.toContain('marco');
   // La terza volta resta com'è scritta.
   await svuota(page, '#ce');
   await page.keyboard.type('Domani vedo marco ');

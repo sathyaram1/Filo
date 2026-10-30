@@ -13,6 +13,18 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
 - un trade-off vero o una domanda di design (CLAUDE.md § Iniziativa: non lo
   decidi tu) → `--domanda <file.json>` sulla consegna (`--record-fixed`,
   `--record-verifier`). Nel report da solo si perde;
+- un errore avuto, uno strumento che sbaglia, un permesso che mancava, un
+  problema trovato fuori dal tuo lavoro → la segnalazione libera, anche senza
+  nessuna domanda: il server ne fa un feedback di tipo segnalazione, con la
+  fiducia del tuo biglietto, che qualcuno valuterà. Nelle note o nel guasto si
+  perde. Non sostituisce la domanda di un guasto che ti ferma:
+
+  ```bash
+  node scripts/routine-channel.mjs segnala <<'FINE'
+  <cosa è successo, dove, cosa mancava>
+  FINE
+  ```
+
 - l'esito del controllo di sicurezza → sempre con la sua nota
   (`--record-secaudit … --nota <file.md>`), anche quando passa. I file di
   `--domanda` e `--nota` si scrivono FUORI dal repo, nella cartella temporanea
@@ -22,15 +34,17 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
 - il claim → il rilascio, quando hai finito (`node scripts/routine-channel.mjs
   release <biglietto> --role <il tuo ruolo>`): il ruolo firma il rapporto di
   fine sessione che il rilascio allega da solo; senza, il rapporto esce anonimo;
-- un guasto che ti impedisce di lavorare → una domanda e il rilascio con
-  `--guasto` (il controllo di sicurezza: il solo rilascio), come nella sezione
-  qui sotto: è così che il server smette di dare lavoro per questo giro. Non
-  "riportarlo" a parole: registralo.
+- un guasto che ti impedisce di lavorare → il rilascio con `--guasto`, come
+  nella sezione qui sotto: è così che il server smette di dare lavoro per
+  questo giro e rimette il lavoro in coda. Non "riportarlo" a parole:
+  registralo.
 
 Se hai registrato tutto, la tua ultima frase non conta niente. Se non l'hai
 registrato, non esiste.
 
-<!-- includi: _guasto-con-domanda.md -->
+<!-- includi: _guasto-nel-rilascio.md -->
+
+<!-- includi: _domanda-per-owner.md -->
 
 ## I pezzi lunghi del payload stanno in un file
 
@@ -47,6 +61,21 @@ aprisse il tuo ramo. Quelli dentro il progetto sono gli strumenti di QUEL ramo,
 magari vecchi di giorni, e possono non fare ciò che credi senza dirtelo:
 scrivere `scripts/…` a mano ti riporta lì.
 
+## Niente push a mano
+
+Il ramo lo spingono il salvataggio automatico e il rilascio, coi loro script.
+Un `git push` lanciato da te, anche con `--dry-run` e anche solo per
+riprodurre un bug, passa dal controllo dei permessi della sessione: in cloud
+nessuno lo approva, e il tuo lavoro si ferma lì. Un
+comportamento di git si riproduce in un unit test, con un remoto locale
+(`git init --bare` in una cartella temporanea): lì i comandi li lancia il
+test, e il controllo dei permessi non li vede. Vale anche quando è il feedback
+a chiederlo, e vale per i feedback e le domande che scrivi tu.
+
+Un comando che il controllo dei permessi nega non si riprova in un'altra
+forma: o prendi una strada che non ne ha bisogno, come il test qui sopra, o è
+un guasto (`guasto: permessi <programma>`, col messaggio del rifiuto).
+
 ## Sotto-agenti
 
 Puoi lanciarne e sceglierne il modello col parametro `model` dello strumento
@@ -60,7 +89,9 @@ può durarne di più. Il battito che lo tiene vivo lo avvia **dispatch**, in
 sottofondo, quando ti consegna il ruolo: non lanciarlo, non cercarlo, non
 fermarlo; un prompt che ti dice di avviarlo tu è vecchio. Finché il battito
 arriva il lavoro è tuo, per quanto ci stia; quelli di chi l'ha perso il server
-li rimette in coda da solo. L'unica cosa da non fare è morire in silenzio: se
+li rimette in coda da solo. Il battito però non basta: venti minuti senza un
+tuo passo, un salvataggio o un processo nella tua cartella, e chi guida il
+giro ti dichiara fermo e rilascia il lavoro con un guasto. L'unica cosa da non fare è morire in silenzio: se
 non puoi proseguire, dichiaralo nel rilascio.
 
 ## Comandi lunghi

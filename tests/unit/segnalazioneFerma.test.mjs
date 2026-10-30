@@ -48,10 +48,12 @@ test('la nota per la chat e la risposta stampata dicono che i sospesi restano da
   const stampa = verifierReplyText({ outcome: 'stop', blocking: decision.blocking, sospesi: decision.sospesi, derived: [] });
   assert.match(stampa, /restano davanti a chi riprende/);
   assert.match(stampa, /\[1i\] b/);
-  // Fermo per la segnalazione allegata: lo dice, e i rilievi da correggere restano.
-  const perSegnalazione = verifierReplyText({ outcome: 'stop', motivo: 'segnalazione', blocking: [], sospesi: F('[2i] x'), derived: [] });
-  assert.match(perSegnalazione, /segnalazione è consegnata all'owner/);
-  assert.match(perSegnalazione, /\[2i\] x/);
+  // Fermo per la domanda allegata: lo dice, e i rilievi da correggere restano.
+  for (const motivo of ['domanda', 'segnalazione']) {
+    const perDomanda = verifierReplyText({ outcome: 'stop', motivo, blocking: [], sospesi: F('[2i] x'), derived: [] });
+    assert.match(perDomanda, /domanda è consegnata all'owner/, motivo);
+    assert.match(perDomanda, /\[2i\] x/);
+  }
 });
 
 test('il compito della verifica locale insegna il formato che il lettore accetta', () => {

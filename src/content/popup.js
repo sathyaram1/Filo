@@ -1110,7 +1110,14 @@
     });
   }
 
-  function openStreaming({ action, payload, anchor, title }) {
+  // Su un sito la risposta si apre nello strato sopra la scheda, mai nel suo documento (#1509.1).
+  function openStreaming(richiesta) {
+    const qui = () => apriRisposta(richiesta);
+    if (global.SN_RIQUADRI_SOPRA?.apri('risposta', richiesta, qui)) return null;
+    return qui();
+  }
+
+  function apriRisposta({ action, payload, anchor, title }) {
     installEscOnce();
     const popup = createPopup({ title, anchor });
     popup.action = action;
