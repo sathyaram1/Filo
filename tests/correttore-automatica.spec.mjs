@@ -192,6 +192,10 @@ test('una correzione annullata due volte non torna; la pagina del correttore la 
   await menu.voce('Annulla correzione').click();
   await expect(page.locator('#ce')).toHaveText('Domani vedo marco al mare. ');
   await expect.poll(async () => (await imparato(app))?.rifiutate).toEqual(['marco']);
+  // Annullate dalla tastiera e dal tasto destro, e alla seconda Filo smette: la parola non esce.
+  await expect.poll(() => voceOggi(app, 'correttore_automatica', 'nome'), { timeout: 5000 }).toEqual({ fatta: 2, annullata: 2, imparata: 1 });
+  const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));
+  expect(disco.toLowerCase()).not.toContain('marco');
   // La terza volta resta com'è scritta.
   await svuota(page, '#ce');
   await page.keyboard.type('Domani vedo marco ');
