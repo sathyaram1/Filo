@@ -199,9 +199,9 @@
     // strato arriva qui per `accetta()`.
     const accettaIlValore = () => {
       if (!activeTarget) return false;
+      // Accettato, il testo è dell'utente anche quando poi lo ritocca: si dice prima di metterlo (#810.8).
+      try { global.SN_IMMESSI?.inserisce?.(activeTarget, fillValue); } catch (_) {}
       fillElement(activeTarget, fillValue);
-      // Accettato, il testo è dell'utente anche quando poi lo ritocca (#810.8).
-      try { global.SN_IMMESSI?.accettato?.(activeTarget, fillValue); } catch (_) {}
       const cb = onAction;
       // Disattiva subito per evitare doppi trigger su doppio click.
       if (onTargetClick === cb) onTargetClick = null;
