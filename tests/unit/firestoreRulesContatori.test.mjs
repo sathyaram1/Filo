@@ -851,10 +851,10 @@ test('i riquadri: sola creazione, letti dall’admin, coi campi e la versione de
   for (const v of ['update', 'delete']) assert.ok(per(v, RR).length >= 1 && per(v, RR).every((r) => r.cond === 'false'));
   assert.deepEqual(per('create', RR).map((r) => r.cond), ['request.auth != null && contatoriRiquadri(request.resource.data)']);
   assert.deepEqual(elencoDopo(RIQUADRI, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_RIQUADRI]);
-  assert.deepEqual(elencoDopo(RIQUADRI, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_RIQUADRI]);
-  assert.equal(Number(/d\.v == (\d+)/.exec(RIQUADRI)[1]), C.VERSIONE_RIQUADRI);
+  assert.deepEqual(elencoDopo(RIQUADRI, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_RIQUADRI_FISSI]);
+  assert.equal(Number(/d\.v == (\d+)/.exec(RIQUADRI)[1]), C.VERSIONE_RIQUADRI, 'i campi facoltativi non cambiano la versione');
   const doc = C.documentoRiquadri({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.249', os: 'win', dati: C.oraVuota() });
-  assert.deepEqual(Object.keys(doc), [...C.CAMPI_RIQUADRI]);
+  assert.deepEqual(Object.keys(doc), [...C.CAMPI_RIQUADRI_FISSI], 'una misura facoltativa senza conti non parte');
   assert.equal(C.idDocumento(doc), `${'a'.repeat(20)}_2026-10-15_09`, 'lo stesso id della sua ora');
   assert.ok(!/primo/.test(RIQUADRI), 'il segno del primo documento è dell’ora');
   const lunghe = [...BR.matchAll(/'(\^[^']*)'/g)].map((m) => m[1].length).filter((n) => n > 4096);
