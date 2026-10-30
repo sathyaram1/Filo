@@ -22,15 +22,15 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
 - il claim → il rilascio, quando hai finito (`node scripts/routine-channel.mjs
   release <biglietto> --role <il tuo ruolo>`): il ruolo firma il rapporto di
   fine sessione che il rilascio allega da solo; senza, il rapporto esce anonimo;
-- un guasto che ti impedisce di lavorare → una domanda e il rilascio con
-  `--guasto` (il controllo di sicurezza: il solo rilascio), come nella sezione
-  qui sotto: è così che il server smette di dare lavoro per questo giro. Non
-  "riportarlo" a parole: registralo.
+- un guasto che ti impedisce di lavorare → il rilascio con `--guasto`, come
+  nella sezione qui sotto: è così che il server smette di dare lavoro per
+  questo giro e rimette il lavoro in coda. Non "riportarlo" a parole:
+  registralo.
 
 Se hai registrato tutto, la tua ultima frase non conta niente. Se non l'hai
 registrato, non esiste.
 
-<!-- includi: _guasto-con-domanda.md -->
+<!-- includi: _guasto-nel-rilascio.md -->
 
 ## I pezzi lunghi del payload stanno in un file
 

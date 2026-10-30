@@ -45,8 +45,9 @@ un **livello**.
    ri-provano, non si riscoprono come nuove.
 4. **Applica i criteri qui sotto**, uno per uno. Ciò che non li regge è un
    rilievo. Un miglioramento con trade-off si scrive col segno `?` dopo la
-   sede (`[1i?] …`). Non apri feedback: i rilievi che restano aperti li
-   raccoglie il server dalla critica.
+   sede (`[1i?] …`), e porta la sua domanda in JSON (sezione «La critica»).
+   Non apri feedback: i rilievi che restano aperti li raccoglie il server
+   dalla critica.
 
 <!-- includi: _criteri-verifica.md -->
 
