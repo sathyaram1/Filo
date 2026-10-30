@@ -169,9 +169,7 @@ export function segniDiVita({ root, ticket, sessione = process.env.CLAUDE_CODE_S
   const dopoMs = partenze.length ? Math.min(...partenze) - 60 * 1000 : -Infinity;
   const tracce = tracceSottoAgenti({ dir: cartellaSottoAgenti({ sessione, configDir }), dopoMs });
   if (tracce.viste) tempi.push(tracce.ultimoMs);
-  const processi = !tracce.viste && mio
-    ? lavoroVivo(root, { cosa: ['processi'], ...(leggiProcessi ? { leggiProcessi } : {}) }).segni.length
-    : 0;
+  const processi = mio ? lavoroVivo(root, { cosa: ['processi'], ...(leggiProcessi ? { leggiProcessi } : {}) }).segni.length : 0;
   return { mio, finito: mio && bigliettoFinito(m), tempi, processi, tracce };
 }
 
