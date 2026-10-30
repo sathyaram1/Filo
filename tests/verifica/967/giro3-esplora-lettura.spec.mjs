@@ -13,11 +13,13 @@ async function miniServer() {
 
 test.describe('lettura', () => {
   test.use({ hostInPiu: ['team.com'] });
-  test('Filo legge una pagina di un sito fidato: niente «sospetto» per il modello', async ({ app }) => {
+  test('Filo legge una pagina di un sito fidato: niente «sospetto» per il modello', async ({ app, shell }) => {
     const srv = await miniServer();
     try {
       await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ security: { safeBrowse: { trustedSites: ['team.com'] } } }));
       const url = `http://team.com:${srv.porta}/legge`;
+      await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+      await shell.waitForTimeout(3000);
       const r = await app.evaluate(async (_e, u) => {
         const x = await globalThis.__filoHandlers.executeFiloAction({ type: 'LEGGI_PAGINA', url: u }, { confirmed: true, sender: { url: 'filo://newtab/' } });
         return JSON.stringify(x).slice(0, 3000);
