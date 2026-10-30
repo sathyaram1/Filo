@@ -246,6 +246,21 @@
     ['oltre', Infinity]]);
   const DOCUMENTO_CHAT = Object.freeze(['intero', 'oltre_tetto']);
   const FORMATI = Object.freeze([['f0', 0], ['f1', 1], ['f2_5', 5], ['oltre', Infinity]]);
+  // Il livello di privacy delle pagine delicate (D-72, #1004.1) nella famiglia degli anticipi e di «Chiedi»: l'anticipo
+  // che la pagina non lascia partire, e il gesto che costa a chi poi lo chiede (il tasto destro, «Cerca» sul segnaposto).
+  const ANTICIPI_PRIVACY = Object.freeze(['spiega', 'segnaposto']);
+  const ESITI_PRIVACY = Object.freeze(['saltato', 'chiesto']);
+  // La famiglia del correttore dopo #1461. Le fonti sono quelle di SN_CORRETTORE_AUTO.FONTI (#1447).
+  const FONTI_AUTOMATICA = Object.freeze(['personale', 'fisso', 'nome']);
+  // «imparata»: dopo i rifiuti Filo smette di correggere da sé quella parola.
+  const ESITI_AUTOMATICA = Object.freeze(['fatta', 'annullata', 'imparata']);
+  const ESITI_VALUTA = Object.freeze(['chiesta', 'con_correzioni', 'senza_correzioni', 'correzione_mostrata',
+    'correzione_accettata', 'correzione_tolta']);
+  // Da dove viene il valore di un segnaposto (#1448): una ricerca partita da sola, una chiesta col clic, la memoria del
+  // modello senza ricerca. «delicata»: la ricerca da sola non parte su una pagina delicata.
+  const VIE_SEGNAPOSTO = Object.freeze(['da_solo', 'su_richiesta', 'memoria']);
+  const ESITI_SEGNAPOSTO = Object.freeze(['cercato', 'trovato', 'nessuno', 'fallito', 'delicata', 'bloccata', 'riempito',
+    'rifiutato']);
   const RIQUADRI = Object.freeze({
     anticipo_al_gesto: misuraNav(ANTICIPATE, [STATI_ANTICIPO]),
     riquadro_chiuso_prima: misuraNav(FUNZIONI_RIQUADRO, [NOMI_FASCE]),
