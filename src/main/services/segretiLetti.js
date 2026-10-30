@@ -159,7 +159,9 @@ function dellUtente(x, fonte) {
   for (const r of immessi.values()) if (copre(r, x)) return true;
   return false;
 }
-function tieni(chiave, r) {
+// Un codice letto prima che l'utente cominciasse a scriverlo resta letto: riscriverlo non lo fa diventare suo (giro 5).
+const MARGINE_MS = 1000;
+function tieni(chiave, r, desde = Date.now()) {
   const prima = immessi.get(chiave);
   if (prima === r) return;
   if (prima !== undefined) { immessi.delete(chiave); caratteriImmessi -= prima.length; }
