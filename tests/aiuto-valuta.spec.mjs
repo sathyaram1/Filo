@@ -232,6 +232,10 @@ test('in un editor dentro un riquadro dello stesso sito «Valuta» apre l’Aiut
     else await expect(fr.locator(sel)).toHaveText(atteso);
     expect((await chiamate(app)).at(-1).model).toBe(MODELLO_CHAT);
   }
+  // Dal riquadro la stessa misura che dalla pagina.
+  await expect.poll(() => valutaOggi(app), { timeout: 5000 }).toEqual({
+    chiesta: 2, con_correzioni: 2, correzione_mostrata: 2, correzione_accettata: 2,
+  });
 });
 
 test('in un riquadro di un altro sito «Valuta» non c’è', async ({ app, openTab, testServer }) => {
