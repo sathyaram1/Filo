@@ -41,7 +41,6 @@
         'Sui siti lenti la scheda prende il colore del sito appena la pagina comincia a comparire. Prima aspettava che la pagina finisse di caricarsi, anche cinque secondi.',
         'Quando Filo riordina le schede per colore, i siti di un rosso che tende al rosa, come Netflix e Pinterest, stanno in testa accanto a YouTube. Prima finivano in fondo, dopo il viola. Vale anche per l\'ordine delle schede quando riapri Filo.',
         'Su un sito, quello che scrivi o selezioni nella spiegazione, nella traduzione, nella Modifica e nel feedback di Filo non lo legge più il sito, nemmeno cercandolo nella pagina. Questi riquadri ora stanno sopra la pagina, fuori dal sito.',
-        'Quando riapri Filo, i feed, le ricerche finite e le pagine che non tocchi da ore o da giorni vanno nel filo della home. Prima restavano quasi sempre aperte. Le schede che apri o riprendi appena riaperto restano dove sono. La barra si riordina per colore anche quando non si chiude niente, e un avviso dice com\'è andata: quante schede ha chiuso, che servivano tutte o che non è riuscito a valutarle. Se ne ha chiuse, «Riapri» le riporta indietro.',
       ],
     },
     {
