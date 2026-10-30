@@ -1150,9 +1150,21 @@
       btn.className = 'sn-btn-secondary';
       btn.textContent = I18n.t('options_security_fidati_remove');
       btn.addEventListener('click', async () => {
+        sbFidatiInUscita.add(voce);
         sbFidati = sbFidati.filter((x) => x !== voce);
         renderFidati();
-        try { await chrome.runtime.sendMessage({ type: MSG.SITI_FIDATI_IMPOSTA, fidato: false, voci: [voce] }); } catch (_) {}
+        let r = null;
+        try { r = await chrome.runtime.sendMessage({ type: MSG.SITI_FIDATI_IMPOSTA, fidato: false, voci: [voce] }); } catch (_) {}
+        sbFidatiInUscita.delete(voce);
+        // Non scritta: la voce torna, l'utente non deve crederla tolta.
+        if (!(r && r.ok)) {
+          try {
+            const sb = ((await Storage.getSettings()).security || {}).safeBrowse || {};
+            sbFidati = fidatiDaMostrare(Array.isArray(sb.trustedSites) ? sb.trustedSites : []);
+            renderFidati();
+          } catch (_) {}
+          return;
+        }
         const hint = $('savedHint');
         hint.classList.add('sn-show');
         clearTimeout(renderFidati._t);
