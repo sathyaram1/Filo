@@ -2,7 +2,8 @@
 // dopo la riporta indietro col cursore al suo posto (anche dalla barra del Mac); i nomi prendono la maiuscola dove chi
 // scrive la usa; una correzione annullata due volte non torna, e la pagina del correttore la mostra e la toglie; una
 // parola fuori dizionario scritta tre volte non si segna più, «qual'è» resta un errore; una correzione scelta tre volte
-// diventa automatica. Il testo che mette uno script non si tocca. Nessuna chiamata esce dalla macchina.
+// diventa automatica. Il testo che mette uno script non si tocca. Nessuna chiamata esce dalla macchina. I contatori
+// (#1586): ogni correzione per fonte, fatta, annullata e imparata.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { voceOggi } from './helpers/riquadriOggi.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:20px;font:16px sans-serif">
