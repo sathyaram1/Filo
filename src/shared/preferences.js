@@ -473,7 +473,7 @@
       costo: 2,
       costoDi: (b) => (b && b.elenco && b.elenco.op !== 'togli' && b.elenco.voci.length ? 3 : 1),
       build(v) {
-        const o = opElenco(v, voceFidataDa);
+        const o = opElenco(v, null, voceFidataDa);
         if (!o || o.rifiuto) return o;
         const lista = o.voci.map(voceFidataLeggibile).join(', ');
         const label = o.op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
