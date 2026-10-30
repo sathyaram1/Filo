@@ -2031,7 +2031,16 @@ export async function run() {
   // entrambi i casi ci si ferma: consegnare mezza busta è peggio che non
   // consegnarne nessuna, perché sembra un giro riuscito.
   const bad = checkEnvelope(w);
-  if (bad) return emitHalt('transient', bad);
+  if (bad) {
+    // Un ruolo sconosciuto a strumenti indietro rispetto a main è della sessione, non del lavoro: una sessione
+    // fresca lo sa fare. Con gli strumenti di main il server chiede un ruolo che main non ha, e resta un guasto (#1796).
+    if (!RUOLI_LAVORABILI.includes(String(w.role || ''))) {
+      const v = strumentiIndietro(ROOT);
+      if (v.indietro) return emitHalt('strumenti_vecchi', `${bad}: ${v.motivo}. Il lavoro torna in coda per una sessione con gli strumenti aggiornati`);
+      if (!v.verificato) process.stderr.write(`[dispatch] strumenti non confrontati con ${MAIN_BRANCH} (${v.motivo}): il ruolo sconosciuto resta un guasto\n`);
+    }
+    return emitHalt('transient', bad);
+  }
 
   const bucket = {
     role: w.role,
