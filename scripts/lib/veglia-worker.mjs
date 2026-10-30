@@ -88,7 +88,7 @@ export function testoGuasto({ fermoMs = 0, attesa = null, tracceViste = true } =
   return pulito(`guasto: strumento worker: worker fermo da ${minuti} minuti (${segni}), senza uno strumento in attesa: forse un permesso, forse il modello. ${coda}`);
 }
 
-/** La data di ogni riga del transcript nella coda del file, e le righe. Un file illeggibile non ha righe. */
+/** Le righe degli ultimi 512 KB di un transcript: la prima può essere tagliata, e si salta. Illeggibile: nessuna. */
 function codaDi(file) {
   let fd = null;
   try {
