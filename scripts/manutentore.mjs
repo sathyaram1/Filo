@@ -278,9 +278,15 @@ function opzione(argv, nome) {
 
 export async function main(argv, { root = ROOT } = {}) {
   const [cmd, arg] = argv;
-  if (!['contesto', 'rami', 'incroci', 'ordine', 'accendi'].includes(cmd) || (cmd === 'incroci' && !arg)) {
-    console.error('Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente  [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]');
+  if (!['contesto', 'rami', 'incroci', 'ordine', 'accendi', 'spesa'].includes(cmd) || (cmd === 'incroci' && !arg)) {
+    console.error('Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente | spesa  [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]');
     return 1;
+  }
+  if (cmd === 'spesa') {
+    const spesa = await leggiSpesa(root);
+    if (!Array.isArray(spesa)) { console.error(spesa); return 2; }
+    console.log(spesa.join('\n'));
+    return 0;
   }
   // L'ordine da accendere: il pacemaker accende una sessione per ciascun feedback che ha lavoro, in quest'ordine.
   const cartella = resolve(opzione(argv, '--cartella') || CARTELLA_PREDEFINITA);
