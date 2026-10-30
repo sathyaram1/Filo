@@ -246,13 +246,16 @@ da chi ha letto il feedback da vicino.
 Un documento a sé (collezione `domande`), cifrato come i feedback, leggibile
 dall'owner e dal server. Campi:
 
-- `titolo`: una riga.
+- `titolo`: al più 10 parole. Non è esaustivo: dice di cosa si parla.
 - `contesto`: quanto basta per decidere senza aprire altro.
 - `problema`: cosa succede in pratica. Per un buco, cosa fa un attaccante; per
   una funzione, cosa vede l'utente.
-- `opzioni`: per ciascuna testo, pro, contro e `azione` strutturata (§ 3.3).
-  Vuote in un resoconto senza niente da decidere (§ 4.8): l'owner lo chiude
-  con «letto».
+- `opzioni`: almeno due, ognuna con testo, pro, contro e `azione`
+  strutturata (§ 3.3). Un'opzione sola non è una domanda: è un feedback, o una
+  nota. Un resoconto senza niente da decidere (§ 4.8) non è una domanda: va nel
+  rapporto settimanale o nelle note del feedback. Fa eccezione la domanda che
+  il server apre al terzo guasto uguale (§ 3.8): un'opzione sola, perché non
+  arriva all'owner e la smista il compito della § 3.5 (#1790).
 - `consiglio`: l'opzione che sceglierebbe chi chiede, e perché.
 - `priorita`: `bloccante`, `importante`, `quando_puoi`.
 - `origine` e `collegamenti`: feedback, rami, compiti, altre domande.
@@ -281,19 +284,24 @@ dall'owner e dal server. Campi:
   conversazione e non lo riapre; una domanda nata su un lavoro già chiuso lo
   riapre. Finché una bloccante è aperta la fusione non parte. Una fermata
   (§ 3.8) blocca da sé. `legata`, `provvisoria` e `nataSuChiuso` le scrive il
-  server. I guasti fermi da prima senza la loro domanda la prendono dalla
-  migrazione che parte da sola col server nuovo.
-- `destinatario`: l'owner, oppure la gestione del lavoro per le domande di
-  guasto (§ 4.3), tranne quelle dell'addetto comunicazioni e degli altri
-  biglietti dell'ambiente dei riservati, lei compresa: vanno all'owner. Lo
-  sceglie il server dall'ambiente del biglietto che la apre.
+  server.
+- `destinatario`: l'owner. Le domande di guasto non arrivano a nessuno: le
+  smista il compito «Gestisci la domanda» (§ 3.5).
 - `soloOwner`: sulle domande dell'addetto comunicazioni (§ 4.1), che nessun
   compito legge.
 - `fiducia`: § 1.
 - `principio`: la regola generale che la risposta stabilisce (§ 3.6), la
   scrive il compito della § 3.5; `conPrincipio` in chiaro la fa trovare al
   registro.
-- `stato`: `aperta`, `in_lavorazione`, `chiusa`, `superata`.
+- `stato`: `in_smistamento` (appena nata: la sta smistando il compito della
+  § 3.5, e in Gestione sta fra quelle in lavorazione, non fra quelle da
+  rispondere), `aperta`, `in_lavorazione`, `chiusa`, `superata`.
+- `smistamento`: `'fallito'` quando il compito della § 3.5 non è riuscito a
+  smistarla in tre tentativi e la domanda è uscita com'era (in Gestione il
+  segno «non riscritta»). Lo scrive il server.
+- `principioContestato`: su una domanda chiusa, il suo principio che l'owner
+  ha contestato riaprendo una risposta automatica che lo usava (§ 3.6). Lo
+  scrive il server.
 - `conversazione`: i turni, con autore (owner o biglietto) e ora.
 - `creataIl` e `modificataIl`: la seconda è l'ultima volta che un agente ha
   aggiunto un turno o cambiato qualcosa.
@@ -302,8 +310,12 @@ Il formato per l'owner è quello del report delle 102 domande: contesto,
 problema in pratica, opzioni con pro e contro, scelta consigliata. Nessun nome
 di file o di funzione nel testo per l'owner. Prima di scriverla si applica
 `.claude/skills/unslop/SKILL.md`. La validazione comune, quella dello script e
-del server, rifiuta nei campi per l'owner un nome di file di codice, una
-lineetta o un pro vuoto, e dice quale campo; `notePerAgenti` resta libero.
+del server, rifiuta e dice quale campo: un titolo oltre le 10 parole, meno di
+due opzioni, un'opzione senza pro o senza contro (anche «nessuno»), e nei
+campi per l'owner un nome di file di codice o una lineetta; `notePerAgenti`
+resta libero. Quello che il compito della § 3.5 pubblica per l'owner è più
+corto ancora: da 2 a 4 opzioni, contesto al più 5 righe, problema al più 3,
+pro, contro e motivo del consiglio di una riga (una riga sono 140 caratteri).
 
 ### 3.2 Note per gli agenti
 
@@ -336,7 +348,6 @@ Tipi ammessi:
   `payload.decisioni`, come oggi);
 - `priorita`;
 - `archivia`;
-- `approva_locale`;
 - `automazione` (accendi o spegni una voce);
 - `ambito` (approva un ambito nuovo, § 5.3);
 - `attendi` (il feedback fermo aspetta il feedback indicato, che ne corregge
@@ -351,35 +362,121 @@ Tipi ammessi:
   può correggere il testo prima di approvare, e il testo corretto è suo);
 - `compito` (l'opzione richiede lavoro: nasce il compito della § 3.5).
 
-Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
+Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2). Nemmeno
+l'affidare un lavoro ai lavori server: un feedback fidato col segno dei lavori
+server ci va da sé, uno non fidato aspetta in Ricevuti che l'owner lo segni
+(§ 3.8, #1576). L'azione `approva_locale` non c'è più.
 
 ### 3.4 Rispondere
 
 1. **Scegliere un'opzione.** Il server applica l'azione, senza agenti, e le
    parole scritte partono con lei. Se è `compito`, nasce il compito della § 3.5.
-2. **Scrivere.** Le parole senza una scelta non applicano nessuna azione: nasce
-   il compito della § 3.5. Un'eccezione sola: l'owner che scrive dalla Gestione
-   a una domanda di un'attesa (§ 3.8) riprende il feedback che aspetta, con le
-   sue parole come decisione (FEEDBACK-STATES.md §5), come la casella di
-   risposta di prima. Le parole di una sessione restano parole anche lì, e la
-   domanda resta aperta: il «riprendi» si sceglie ancora, dalla sessione o
-   dalla Gestione, e porta con sé le parole già scritte, nel blocco della
-   domanda e non nel turno dell'owner (#1598). Se il lavoro riparte o cambia
-   attesa senza la scelta (la casella di risposta del feedback, un'altra
-   attesa), la domanda diventa superata e le sue parole entrano nella
-   conversazione del feedback come risposta a quella domanda, col loro segno
-   di fiducia: per qualunque strada riparta, chi riprende le legge.
+2. **Scrivere.** Le parole senza una scelta non applicano nessuna azione, da
+   nessuna strada (script e Gestione, anche su una domanda di un'attesa):
+   restano parole e nasce il compito della § 3.5 (decisione dell'owner del
+   29/10 su D-186, #1598). L'azione parte solo con la scelta: `--scelta N` o il
+   pulsante dell'opzione, che porta con sé le parole già scritte. Se il lavoro
+   riparte o cambia attesa senza la scelta (la casella di risposta del
+   feedback, un'altra attesa), la domanda diventa superata e le sue parole
+   entrano nella conversazione del feedback come risposta a quella domanda,
+   col loro segno di fiducia: per qualunque strada riparta, chi riprende le
+   legge.
 3. **Applicare il consiglio**, su una domanda sola o su tutte quelle
    selezionate.
+
+«Riprendi #N con questa scelta», scelto o applicato col consiglio, rimette in
+coda #N solo se è fermo ad aspettare l'owner (`design`), e scrive la ripresa
+sul ramo del lavoro, così chi lo prende riparte da lì (#1482). Se #N non è
+fermo lo stato non cambia: la decisione si scrive nella sua conversazione,
+accodata come per le non bloccanti, e l'esito dice «#N non era fermo: è
+<stato>, la decisione resta accodata». Una risposta a una domanda non
+bloccante di un feedback fermo su un'altra domanda, bloccante, non lo fa
+ripartire: la decisione si accoda e la bloccante resta aperta (#1577.2).
 4. **Discuterne.** Il pulsante copia una riga sola («Discutiamo la domanda
    D-123») da incollare in una sessione locale. La sessione legge la domanda con
    `domanda.mjs mostra` e risponde con `domanda.mjs rispondi`: `--scelta N` per
    l'opzione decisa (riprendere compreso), `--testo` da solo per una risposta a
    parole (punto 2). Lo script dice cosa il server ha applicato.
-5. **Letto**, su un resoconto senza opzioni (§ 3.1): la domanda si chiude,
-   senza agenti.
+5. **Letto**, sui resoconti senza opzioni nati prima di #1790: la domanda si
+   chiude, senza agenti. Di nuovi non ne nascono (§ 3.1).
 
-### 3.5 Il compito «Gestisci la risposta»
+### 3.5 I compiti «Gestisci la domanda» e «Gestisci la risposta»
+
+Due compiti stanno fra le domande e l'owner: uno alla nascita, uno alla
+risposta.
+
+#### «Gestisci la domanda» (#1790)
+
+Decisioni dell'owner del 29/10. Prima, metà delle domande aperte le aveva
+composte il server incollando pezzi, e l'altra metà erano guasti che non
+chiedevano niente: l'owner le apriva, non le capiva e le chiudeva senza
+rispondere.
+
+- **Nascita.** Il server lo apre alla nascita di ogni domanda destinata
+  all'owner, da qualunque strada: la fermata di un worker, una domanda non
+  bloccante su una consegna, `domanda.mjs chiedi` con biglietto di routine o
+  locale, il terzo guasto uguale (§ 3.8). Stesso meccanismo di «Gestisci la
+  risposta» qui sotto: `compiti/C-n` di tipo `smistamento`, ruolo
+  `smistamento`, Opus a sforzo alto, tre tentativi, puntatore alla domanda, le
+  reti del pacemaker (una domanda `in_smistamento` senza il suo compito lo
+  riceve, un compito orfano si chiude superato).
+- **Stato `in_smistamento`.** La domanda non sta fra quelle da rispondere (in
+  Gestione è fra quelle in lavorazione). Il feedback legato resta fermo come
+  sempre se la domanda blocca, o va avanti con la provvisoria se non blocca.
+- **Fascicolo.** La domanda intera, note per gli agenti comprese; il feedback
+  d'origine con conversazione e note; il registro dei principi come per il
+  compito della risposta (fuori dall'ambiente dei riservati è `assente`, e il
+  passo 2 si salta). Il compito legge testo scritto da altri: è non fidato, e
+  quello che scrive nasce non fidato. La fiducia della domanda non cambia.
+- **Cosa fa, in ordine** (`routines/roles/smistamento.md`):
+  1. **Un guasto o un difetto di uno strumento** (dal gruppo «guasto: …» o dal
+     contenuto: spinta rifiutata, permesso negato, clone che non parte,
+     strumento vecchio rispetto al server, biglietto sporco) lo tratta lui:
+     apre o riusa il feedback del difetto (chiave: nome dello strumento più la
+     prima riga del rifiuto; cerca fra gli aperti prima di aprirne uno), mette
+     al feedback fermo l'attesa su quello (#903) e lo riprende: torna in coda,
+     trattenuto dall'attesa, e riparte da solo alla fusione. La domanda si
+     chiude con `esito.smistata = 'guasto'` e un resoconto di tre righe nelle
+     note del feedback fermo. Se il guasto chiede davvero l'owner (una fiducia
+     da dare, un permesso da scrivere, una chiave da sostituire) il feedback va
+     nei Ricevuti con la richiesta giusta (il rombo azzurro per la fiducia, il
+     segno «chiede un permesso» per il resto), e la domanda si chiude lo
+     stesso (`esito.smistata = 'ricevuti'`). All'owner non arriva mai una
+     domanda di guasto.
+  2. **Il registro risponde.** Se il principio di una domanda chiusa copre il
+     caso, risponde lui: l'opzione che il principio indica, e un testo che
+     cita il principio e la domanda da cui viene. La domanda si chiude con
+     `esito.automatica = true` (§ 3.6).
+  3. **Decide l'owner.** Riscrive la domanda nella forma per l'owner (§ 3.1:
+     titolo al più 10 parole, contesto al più 5 righe, problema al più 3, da 2
+     a 4 opzioni con pro e contro di una riga e l'azione, consiglio con un
+     motivo di una riga, unslop) e la pubblica: stato `aperta`. Se chi ha
+     chiesto ha scritto un'opzione sola, aggiunge quelle che il caso ammette
+     («Archivia il feedback», «Tenere com'è» per un rilievo esterno, «Rimanda a
+     dopo il lancio») senza inventare azioni che chi riprende non può
+     eseguire. Priorità, gruppo, collegamenti e `blocca` restano di chi ha
+     chiesto, e il suo testo resta intero nelle note per gli agenti: chi
+     riprende dopo la risposta legge il problema vero (#1579, punto 1).
+- **Operazioni** (intento `smistamento` del canale, `domanda.mjs smista` col
+  biglietto): `mostra` (il fascicolo), `guasto` (`chiave`, `titolo`, `testo`,
+  `resoconto`), `ricevuti` (`richiesta`: `fiducia` o `permesso`, `testo`),
+  `automatica` (`scelta`, `principio`: la domanda chiusa, `testo`), `pubblica`
+  (`domanda`, controllata con la validazione comune e la forma per l'owner).
+  Ognuna tranne `mostra` chiude il compito.
+- **Tentativi.** Un biglietto che finisce senza nessuna delle quattro rimette
+  il compito in attesa; al terzo la domanda esce com'è fra quelle da
+  rispondere, con `smistamento: 'fallito'`. Niente resta nascosto.
+- **Migrazione.** Un'operazione del server idempotente (`smista_aperte`),
+  lanciata una volta dal pacemaker dopo il deploy, apre il compito per ogni
+  domanda oggi `aperta`, destinata all'owner e senza turni dell'owner in
+  conversazione.
+- **Il manutentore riceve, non smista**: nel suo contesto
+  (`npm run manutentore -- contesto`) c'è una riga per ogni domanda aperta o
+  in smistamento che ferma un feedback del suo ordine (numero, titolo, da
+  quando). Non passa da lui in persona: gira a orari, e una domanda va
+  smistata in minuti.
+
+#### «Gestisci la risposta»
 
 - Un compito senza feedback (§ 6), urgenza 47: passa davanti a tutto tranne i
   feedback a priorità 3.
@@ -438,19 +535,25 @@ Come funziona oggi (#1152):
   la risposta stabilisce («zero fiducia nei crediti dichiarati dal client»).
 - **Il registro** sono le domande chiuse col loro principio, interrogabili con
   `domanda.mjs`. Nessun file a parte.
-- **Prima di chiedere**, un agente cerca nel registro. Se un principio risponde,
-  lo applica e lo cita.
+- **Prima di chiedere**, un agente cerca nel registro
+  (`domanda.mjs registro <parole>`, che cerca fra i principi delle domande
+  chiuse; il registro è riservato, § 5.1, e a un biglietto che non lo può
+  leggere arriva `assente` col perché). Se un principio risponde, lo applica e
+  lo cita.
+- **Risposte automatiche.** Le scrive il compito «Gestisci la domanda» alla
+  nascita (§ 3.5, passo 2), non una revisione quotidiana: `esito.automatica`
+  le porta nella scheda «Risposte automatiche». L'owner può riaprirle: la
+  riapertura rimette la domanda fra quelle da rispondere e segna il principio
+  come da rivedere (`principioContestato` sulla domanda da cui viene), così il
+  compito non lo riusa finché l'owner non risponde. Un'opzione con un'azione
+  che esce (`invia_mail`) non si applica da una risposta automatica: la
+  sceglie solo l'owner (§ 1.4), che legge la mail prima che parta.
 - **Revisione quotidiana** (§ 4). Lavora sulle domande per l'owner, tranne
   quelle dell'addetto comunicazioni (§ 4.1). Il compito:
   - raggruppa le domande aperte;
   - assorbe in una domanda sola quelle che sono casi dello stesso problema e
     propone il ripensamento del sistema (le assorbite diventano `superata`);
-  - rivede le priorità;
-  - risponde coi principi. Queste risposte vanno nella scheda «Risposte
-    automatiche», e l'owner può riaprirle: una riapertura corregge anche il
-    principio. Un'opzione con un'azione che esce (`invia_mail`) non si
-    applica da una risposta automatica: la sceglie solo l'owner (§ 1.4), che
-    legge la mail prima che parta.
+  - rivede le priorità.
 
 ### 3.7 Ordine
 
@@ -461,10 +564,10 @@ gruppo e poi per età. Un gruppo si apre come un blocco solo.
 
 | Oggi | Dove va |
 |---|---|
-| `design` + `clarify`/`decisione`, segnalazione L3 | domanda, azione `riprendi` |
+| `design` + `clarify`/`decisione` | la domanda che scrive chi si ferma, con almeno due opzioni (`riprendi` e un'altra): il server non ne compone più, e una fermata senza domanda si rifiuta alla consegna, per ogni motivo tranne `locale` (#1790). La segnalazione in markdown (`--segnala`) non c'è più |
 | `design` + `locale` | nessuna domanda per il codice del server: un lavoro fidato prende il segno dei lavori server e lo fa la loro routine (#1253); uno non fidato va in Ricevuti L3 come richiesta di renderlo fidato (motivo `fidato`), e «Segna fidato» lo rimette in coda. Diventa domanda solo ciò che chiede il suo PC o un suo passo (una prova sulla sua macchina, segreti, automazioni GitHub), scritta da chi si ferma (#1358) |
-| `design` + `guasto` | domanda, azioni `riprendi` / `archivia`: la scrive chi cade sul guasto, col gruppo `guasto: <la cosa rotta>`, e la consegna con la fermata (#1577; senza, la consegna è rifiutata). Va alla gestione del lavoro, che risponde con le azioni `riprendi`, `attendi` o `archivia` (§ 4.3), dal punto 9 dell'ordine di lavoro (§ 13); fino ad allora, e sempre per l'addetto comunicazioni (§ 4.1) e per gli altri biglietti dell'ambiente dei riservati, lei compresa (§ 4.3), va all'owner |
-| `design` + `attesa_chiusa`, `loop`, `arenato`; `aligned` + `origine_chiusa`/`origine_mancante` | domanda, azioni `riprendi` / `archivia` |
+| guasto (#1781) | nessuna domanda e nessuna fermata: chi ci cade lo dichiara nel rilascio (`--guasto "<gruppo>: <il messaggio esatto>"`, il gruppo fisso `guasto: <la cosa rotta>`), e il feedback torna in coda sul suo ramo con la nota del guasto. Al terzo guasto uguale di seguito sullo stesso feedback nasce UNA domanda col conteggio, con un'opzione sola, che il compito della § 3.5 smista come guasto (feedback del difetto, attesa). Una consegna `design` + `guasto` si rifiuta. Una richiesta all'owner (fiducia, permesso, chiave) va in Ricevuti con la richiesta giusta, mai in una domanda |
+| `design` + `attesa_chiusa`, `loop`, `arenato`; `aligned` + `origine_chiusa`/`origine_mancante` | il server non compone una domanda: il trigger delle attese e la migrazione rimettono in coda il feedback con una nota che dice il motivo, invece di dargli una domanda vuota (#1790) |
 | `design` + `secaudit`, `l5`, `fidato`; attacchi, spam (anche segnati dal worker, L3), sospetti | Ricevuti, e nessun altro |
 
 Il feedback in attesa resta `design` (o `aligned`) col suo motivo e prende
@@ -570,27 +673,21 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
 - **Riordino e potatura le fanno rapporto:** a fine istanza scrivono nel suo
   taccuino cosa hanno fatto e cosa hanno trovato.
 - **Le arrivano i problemi dei worker.** I worker sanno che esiste e le
-  segnalano quello che non va: le segnalazioni libere (§ 5.4) e le domande di
-  guasto delle routine (§ 3.8) vanno a lei, non all'owner, tranne quelle
-  dell'addetto comunicazioni, che vanno all'owner (§ 4.1), e i guasti che lei
-  non può curare (il punto qui sotto). Per ciascuna cerca la causa, apre il
-  feedback della correzione, mette il feedback fermo in attesa di quello e lo
-  riprende quando la causa è sparita. Quando la segnalazione o la domanda dice
-  già la causa, il feedback della correzione lo fa nascere per numero, come
-  l'unione (§ 1.3): il testo resta di chi ha segnalato, con la sua fiducia.
-  Quello che scrive lei nasce non fidato.
-- **Un guasto non torna a chi ci è caduto.** Una domanda di guasto non va a
-  chi l'ha aperta né a chi gira nello stesso ambiente. Lei gira nell'ambiente
-  dei riservati (§ 5.1), quindi le domande di guasto aperte da un biglietto di
-  quell'ambiente vanno all'owner, comprese le sue. Il server non sa se si è
-  rotto il compito o l'ambiente; nel secondo caso lei cadrebbe sullo stesso
-  guasto, e nessuno lo curerebbe. Per la stessa ragione un guasto non anticipa
-  mai l'istanza di chi l'ha aperto, che cadrebbe di nuovo e ne aprirebbe un
-  altro, in una fila di accensioni senza fine.
-- **Sulle domande di guasto risponde solo con le azioni** `riprendi`,
-  `attendi` o `archivia` (§ 3.3), mai con testo, come per i lanci per numeri:
-  così il feedback ripreso resta fidato. Le sue risposte si vedono in Domande →
-  Risposte automatiche, e l'owner può riaprirle.
+  segnalano quello che non va: le segnalazioni libere (§ 5.4) vanno a lei, non
+  all'owner, tranne quelle dell'addetto comunicazioni, che vanno all'owner
+  (§ 4.1). Per ciascuna cerca la causa, apre il feedback della correzione,
+  mette il feedback fermo in attesa di quello e lo riprende quando la causa è
+  sparita. Quando la segnalazione dice già la causa, il feedback della
+  correzione lo fa nascere per numero, come l'unione (§ 1.3): il testo resta
+  di chi ha segnalato, con la sua fiducia. Quello che scrive lei nasce non
+  fidato.
+- **I guasti non passano da lei** (#1790): li smista in minuti il compito
+  «Gestisci la domanda» (§ 3.5), che fa lo stesso lavoro (causa, feedback
+  della correzione, attesa) e non li manda mai all'owner. A lei arriva, nel
+  contesto, una riga per ogni domanda aperta o in smistamento che ferma un
+  feedback del suo ordine. Un guasto non anticipa mai l'istanza di chi ci è
+  caduto, che cadrebbe di nuovo e ne aprirebbe un altro, in una fila di
+  accensioni senza fine.
 - **All'owner** arrivano solo le domande di prodotto e le sue, quando dopo
   l'indagine la scelta spetta a lui: soldi, sicurezza, permessi, gusto.
 - **Le sue leve:** ritmo e parallelismo (§ 4.5), quando lanciare riordino e
@@ -816,7 +913,7 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
 | `domande` | leggere le domande per l'owner, tranne quelle dell'addetto comunicazioni, e il registro; raggruppare, cambiare priorità, rispondere coi principi | rispondere senza un principio, cambiare i principi |
 | `opportunita` | cercare sul web attraverso il server; leggere la parte del suo taccuino scritta prima della casella e scriverci; aprire domande con bozze di mail, solo per l'owner; chiedere la casella, che passa il biglietto all'ambito `posta` (§ 5.1) | ricevere la casella e quello che ne è figlio (la parte del taccuino scritta dopo, il rapporto dell'istanza prima); mandare mail |
 | `posta` | ricevere dal server i messaggi della casella di Filo, con la parte del taccuino scritta dopo la casella e il rapporto dell'istanza prima; tenere il suo taccuino; aprire domande con bozze di mail, solo per l'owner; aprire feedback dalle mail degli utenti | uscire in rete, nemmeno attraverso il server; tornare all'ambito `opportunita`; mandare mail; vedere le credenziali della casella |
-| `gestione_lavoro` | leggere registri, sessioni, domande passate, feedback e rami; il suo taccuino; ricevere le segnalazioni, tranne quelle dell'addetto comunicazioni, e le domande di guasto dei biglietti fuori dall'ambiente dei riservati (§ 4.3), e rispondere a queste con le azioni `riprendi`, `attendi`, `archivia`; far nascere per numero un feedback da una segnalazione o da una domanda di guasto; scrivere la curva del parallelismo (§ 4.5); anticipare riordino e potatura; lanciare esperimenti nel budget; cambiare la domanda di fine turno; spegnere, e riaccendere quello che ha spento lei; chiedere una sveglia; aprire domande e feedback | scrivere codice; cambiare feedback, priorità, criteri di verifica, prompt dei ruoli; rispondere con testo a una domanda di guasto; leggere dell'addetto comunicazioni altro che i numeri (domande, segnalazioni, sessioni, registri, taccuino, rapporti); riaccendere quello che ha spento l'owner |
+| `gestione_lavoro` | leggere registri, sessioni, domande passate, feedback e rami; il suo taccuino; ricevere le segnalazioni, tranne quelle dell'addetto comunicazioni (§ 4.3), e le righe delle domande che fermano un feedback del suo ordine; far nascere per numero un feedback da una segnalazione; scrivere la curva del parallelismo (§ 4.5); anticipare riordino e potatura; lanciare esperimenti nel budget; cambiare la domanda di fine turno; spegnere, e riaccendere quello che ha spento lei; chiedere una sveglia; aprire domande e feedback | scrivere codice; cambiare feedback, priorità, criteri di verifica, prompt dei ruoli; smistare o rispondere alle domande (lo fa il compito della § 3.5); leggere dell'addetto comunicazioni altro che i numeri (domande, segnalazioni, sessioni, registri, taccuino, rapporti); riaccendere quello che ha spento l'owner |
 | `rami` | leggere rami, storia di git e feedback; aprire feedback e domande; scrivere nel taccuino della gestione del lavoro | cancellare rami: lo fa la regola del server (§ 4.7) |
 | `audit` | leggere il codice di Filo e del server, i metadati dei feedback aperti e i testi che servono; provare il codice nel contenitore; aprire feedback e domande | spingere rami, chiedere fusioni, cambiare feedback |
 | `esperimento` | lavorare dal commit indicato nell'ambiente dei riservati (§ 1.2); consegnare l'esito al server, come dati | fondere, aprire feedback o domande, spingere su GitHub, uscire in rete, leggere il `main` di oggi |
@@ -1265,7 +1362,8 @@ lavorano in locale.
 2. *server*: collezione `domande`, regole, operazioni, azioni strutturate.
 3. App: barra delle sezioni, sezione Domande, Ricevuti coi filtri L1–L5.
 4. Le attese di oggi diventano domande (§ 3.8); `domanda.mjs` per tutti.
-   Le domande di guasto vanno all'owner fino al punto 9.
+   Le domande di guasto vanno all'owner fino al punto 9 (dal #1790 non ne
+   nascono più: § 3.8).
 5. *server*: compiti (§ 6): collezione, funzione delle fasi col trigger e il
    controllo nel pacemaker, urgenza al posto dell'ordine di oggi, biglietto
    legato al compito, modello e sforzo dal compito, segno riservato che segue

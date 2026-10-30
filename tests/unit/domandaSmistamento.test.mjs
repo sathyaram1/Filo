@@ -2,6 +2,7 @@
 // prima di chiedere, `elenco` dice quante sono in smistamento e quante automatiche, `chiedi` dice il campo rifiutato.
 // I/O finto: nessuna rete.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -181,4 +182,27 @@ test('chiedi: la domanda storta si ferma col campo; quella buona dice che prima 
   assert.equal(await esegui(['chiedi', 'd.json'], buona.io), 0);
   assert.match(buona.out.join('\n'), /OK: domanda D-7 aperta: prima di arrivare all'owner la smista un agente\./);
   assert.match(formattaDomanda({ id: 'D-1', stato: 'aperta', smistamento: 'fallito' }, {}, { quando: () => 'ora' }), /non riscritta/);
+});
+
+test('il ruolo «smistamento»: testo intero, i tre passi in ordine, i comandi del compito, il rilascio col suo nome', async () => {
+  const { readRoleInstructions, checkEnvelope, buildPayload } = await import('../../scripts/dispatch.mjs');
+  const t = readRoleInstructions('smistamento');
+  assert.ok(!/<!--\s*includi:/i.test(t), 'nessun richiamo rimasto dentro');
+  assert.match(t, /Contratto comune dei worker/);
+  const passi = ['### 1. Un guasto lo tratti tu', '### 2. Se il registro risponde, rispondi tu', '### 3. Decide l\'owner: riscrivi la domanda per lui'];
+  const pos = passi.map((p) => t.indexOf(p));
+  assert.ok(pos.every((p) => p > 0) && pos[0] < pos[1] && pos[1] < pos[2], 'guasto, registro, owner: in quest\'ordine');
+  for (const cmd of ['smista guasto --chiave', 'smista ricevuti --richiesta fiducia', 'smista automatica --scelta N --principio D-<k>', 'smista pubblica <file.json>']) {
+    assert.ok(t.includes(cmd), cmd);
+  }
+  assert.match(t, /release <biglietto> --role smistamento/);
+  assert.match(t, /al terzo esce all'owner com'è, col segno «non riscritta»/);
+  assert.match(t, /Un guasto dell'ambiente si dichiara nel rilascio/);
+
+  assert.equal(checkEnvelope({ role: 'smistamento', payload: { compito: 'C-4', domanda: { id: 'D-9' } } }), null);
+  assert.match(checkEnvelope({ role: 'smistamento', payload: { domanda: { id: 'D-9' } } }), /senza il compito/);
+  assert.match(checkEnvelope({ role: 'smistamento', payload: { compito: 'C-4' } }), /con la domanda vuota/);
+  assert.equal(checkEnvelope({ role: 'smistamento', payload: { compito: 'C-4', affidata: false } }), null, 'non più affidata: si rilascia e basta');
+  const p = buildPayload({ role: 'smistamento', num: '' }, { smistamento: { role: 'x', compito: 'C-4', domanda: { id: 'D-9' }, feedback: { num: '#1790' } } });
+  assert.deepEqual(p, { compito: 'C-4', domanda: { id: 'D-9' }, feedback: { num: '#1790' }, case: 'smistamento', num: '' });
 });

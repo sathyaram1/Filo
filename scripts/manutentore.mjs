@@ -144,8 +144,30 @@ export function rigaOrdine(numeri, indice) {
   return `Ordine da accendere (${numeri.length}): ${numeri.map(voce).join(', ')}. Il pacemaker accende una sessione per ciascuno che ha lavoro, una priorità 3 fuori ordine davanti; un ordine senza feedback aperti vale come nessun ordine.${coda}`.trim();
 }
 
-/** Il contesto intero, in testo. PURA rispetto ai suoi ingressi. */
-export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorni = 30, indiceDel = '' }) {
+const STATI_CHE_FERMANO = Object.freeze({ aperta: 'aspetta l\'owner', in_smistamento: 'in smistamento' });
+
+/**
+ * Le domande aperte o in smistamento che fermano un feedback aperto (#1790), una riga ciascuna, prima quelle dei
+ * feedback dell'ordine: il manutentore le vede, non le smista (lo fa il compito «Gestisci la domanda»). PURA.
+ */
+export function righeDomandeFerme(domande, { indice = [], ordine = [], quando = (ms) => new Date(ms).toISOString().slice(0, 16).replace('T', ' ') } = {}) {
+  const numDi = new Map((indice || []).map((f) => [f.id, String(f.num)]));
+  const nellOrdine = new Set((ordine || []).map(String));
+  const voci = [];
+  for (const d of Array.isArray(domande) ? domande : []) {
+    if (!d || !STATI_CHE_FERMANO[d.stato] || d.blocca === false || !d.legata) continue;
+    const num = numDi.get(d.legata);
+    if (!num) continue;
+    const da = Number.isFinite(Number(d.creataIl)) && Number(d.creataIl) > 0 ? ` dal ${quando(Number(d.creataIl))}` : '';
+    const ordine = nellOrdine.has(num) ? ' · nell\'ordine' : '';
+    voci.push({ prima: nellOrdine.has(num) ? 0 : 1, num: Number(num.split('.')[0]) || 0,
+      riga: `${unaRiga(d.id)} «${unaRiga(d.titolo)}» ferma #${num}${da} (${STATI_CHE_FERMANO[d.stato]}${ordine})` });
+  }
+  return voci.sort((a, b) => a.prima - b.prima || a.num - b.num).map((v) => v.riga);
+}
+
+/** Il contesto intero, in testo. PURA rispetto ai suoi ingressi. `ferme`: le righe di righeDomandeFerme, o il motivo per cui mancano. */
+export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorni = 30, indiceDel = '', ferme = null }) {
   const numero = (s) => String(s.numero).replace(/^#/, '');
   const perNum = new Map((indice || []).map((f) => [f.num, f]));
   // Con l'indice valgono solo le schede dei feedback ancora aperti: le altre sono di feedback chiusi da allora.
@@ -160,12 +182,37 @@ export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorn
     ...ordinate.map((s) => rigaScheda(s, perNum.get(numero(s)))),
     ...(senza.length ? ['', `Senza scheda (${senza.length}): ${senza.map((f) => `#${f.num}`).join(', ')}. Si scrivono con npm run feedback:schede -- scrivi.`] : []),
     ...(chiuse ? ['', `Fuori: ${chiuse} schede di feedback che l'indice non ha più fra gli aperti.`] : []),
+    ...(ferme ? ['', `## Domande che fermano un feedback (${Array.isArray(ferme) ? ferme.length : '?'})`, '',
+      ...(Array.isArray(ferme) ? (ferme.length ? ferme : ['Nessuna: nessun feedback aperto aspetta una domanda.']) : [String(ferme)]),
+      'Le smista il compito «Gestisci la domanda»: tu non le rispondi, ma un feedback fermo non si accende.'] : []),
     '', `## Rami in corso (${rami.length})`, '',
     ...rami.map(rigaRamo),
     ...(rigaFuori(fuori, giorni) ? ['', rigaFuori(fuori, giorni)] : []),
     '', '## Spesa', '',
     'Questo strumento non la sa: chiedi all\'owner il consumo della settimana dell\'account (Gestione → Automazioni), non la somma dei biglietti.',
   ].join('\n');
+}
+
+/**
+ * Le righe delle domande che fermano un feedback, dal server; il motivo in parole se non si leggono: il contesto esce
+ * lo stesso. Il titolo di una domanda non fidata è testo d'altri: la sessione si sporca prima di stamparlo.
+ */
+async function domandeFerme(indice) {
+  try {
+    const { chiamaOwner, nonFidate, motivoNonFidate } = await import('./domanda.mjs');
+    const r = await chiamaOwner({ op: 'elenco' });
+    const ordine = await documentoOrdine('GET').catch(() => ({ ok: false }));
+    const righe = righeDomandeFerme(r.domande, { indice, ordine: ordine.ok ? ordine.numeri : [] });
+    const ferme = (r.domande || []).filter((d) => d && righe.some((x) => x.startsWith(`${unaRiga(d.id)} `)));
+    const nf = nonFidate(ferme);
+    if (nf.length) {
+      const { rigaSporco } = await import('./lib/biglietto-locale.mjs');
+      console.error(await rigaSporco('contesto del manutentore', [motivoNonFidate(nf)]));
+    }
+    return righe;
+  } catch (e) {
+    return `Non so quali domande fermano un feedback: ${unaRiga(e && e.message ? e.message : e).slice(0, 200)}.`;
+  }
 }
 
 const CON_VALORE = ['--cartella', '--giorni'];
@@ -237,7 +284,8 @@ export async function main(argv, { root = ROOT } = {}) {
   if (!schede.length) console.error(`AVVISO: nessuna scheda in ${cartella}: npm run feedback:schede -- elenca, poi scrivi.`);
   const dirRuoli = join(ROOT, 'routines', 'roles');
   const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'manutentore.md'), 'utf8'), dirRuoli);
-  console.log(testoContesto({ ruolo, schede, indice, rami, fuori, giorni, indiceDel }));
+  const ferme = await domandeFerme(indice);
+  console.log(testoContesto({ ruolo, schede, indice, rami, fuori, giorni, indiceDel, ferme }));
   return 0;
 }
 

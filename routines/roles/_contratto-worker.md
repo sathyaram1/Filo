@@ -32,6 +32,8 @@ registrato, non esiste.
 
 <!-- includi: _guasto-nel-rilascio.md -->
 
+<!-- includi: _domanda-per-owner.md -->
+
 ## I pezzi lunghi del payload stanno in un file
 
 Un campo del payload troppo lungo per la stampa arriva in un file fuori dal

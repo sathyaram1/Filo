@@ -48,7 +48,8 @@ test('il ruolo riceve un testo intero, col contratto dei worker e i suoi comandi
   assert.match(t, /Contratto comune dei worker/);
   assert.match(t, /domanda\.mjs" chiudi --testo -|domanda\.mjs chiudi --testo -/);
   assert.match(t, /release <biglietto> --role risposta/);
-  assert.match(t, /consenso dell'owner/);
+  assert.match(t, /un gesto dell'owner/);
+  assert.doesNotMatch(t, /approvare un lavoro server/, 'il lavoro server non si affida più da una domanda (#1576)');
 });
 
 function finto(risposte = {}) {

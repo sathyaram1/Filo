@@ -103,7 +103,8 @@ test('più campi sporchi: un rifiuto solo li elenca tutti, così si correggono i
 
 test('ogni ruolo che lavora riceve la regola una volta sola, dal pezzo condiviso, e chi scrive domande la richiama', () => {
   const ruoli = [['new-work', {}], ['fixer', {}], ['fixer', { caso: 'ripresa' }], ['fixer', { caso: 'riallineamento' }],
-    ['verifier', { scope: 'pieno' }], ['verifier', { scope: 'chiusura' }], ['verifier', { scope: 'riallineamento' }], ['secaudit', {}], ['risposta', {}]];
+    ['verifier', { scope: 'pieno' }], ['verifier', { scope: 'chiusura' }], ['verifier', { scope: 'riallineamento' }], ['secaudit', {}], ['risposta', {}],
+    ['smistamento', {}]];
   for (const [ruolo, opts] of ruoli) {
     const t = readRoleInstructions(ruolo, opts);
     assert.equal(t.split(SEZIONE).length - 1, 1, `${ruolo} ${JSON.stringify(opts)}: la regola una volta sola`);
@@ -114,22 +115,20 @@ test('ogni ruolo che lavora riceve la regola una volta sola, dal pezzo condiviso
   }
   const dove = readdirSync(RUOLI).filter((f) => f.endsWith('.md') && /unslop/.test(readFileSync(join(RUOLI, f), 'utf8')));
   assert.deepEqual(dove, ['_domanda-per-owner.md'], 'la regola vive in un pezzo solo');
-  for (const f of ['_guasto-con-domanda.md', '_guasto-in-attesa.md']) {
+  for (const f of ['_segnala.md', '_solo-in-locale.md']) {
     assert.ok(piatto(readFileSync(join(RUOLI, f), 'utf8')).includes('«Una domanda per l\'owner si scrive per lui»'), `${f} la richiama`);
   }
-  assert.match(readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8'), /<!-- includi: _domanda-per-owner\.md -->/);
+  assert.match(readFileSync(join(RUOLI, '_contratto-worker.md'), 'utf8'), /<!-- includi: _domanda-per-owner\.md -->/);
 });
 
-test('il modello della domanda di guasto: errore in parole, cosa fa l’owner, strade che sbloccano, la riparazione a parte, il messaggio nelle note', () => {
-  const pezzo = readFileSync(join(RUOLI, '_guasto-in-attesa.md'), 'utf8');
-  const d = JSON.parse(/```json\n([\s\S]*?)\n\s*```/.exec(pezzo)[1]);
-  assert.match(d.contesto, /cosa vuol dire l'errore, in parole tue/);
-  assert.doesNotMatch(d.contesto, /messaggio|esatto/i, 'il messaggio esatto non sta nel testo per l’owner');
-  assert.match(d.problema, /<cosa deve fare l'owner>/);
-  // In una fermata ogni strada sblocca il lavoro (#1577): la riparazione da un agente va in una domanda a parte.
-  assert.ok(d.opzioni.every((o) => ['riprendi', 'archivia'].includes(o.azione.tipo)), 'ogni strada riprende o archivia');
-  assert.match(piatto(pezzo), /Una riparazione che un agente col repo può fare la proponi in una domanda a parte \(`domanda\.mjs chiedi`, azione `compito`, senza `blocca`\)/);
-  assert.ok(d.opzioni.every((o) => !/^nessuno$/i.test(o.pro)), 'nessun «Nessuno» nel modello');
-  assert.match(d.notePerAgenti, /il messaggio esatto/);
-  assert.match(piatto(pezzo), /tieni quelle che per questo guasto hanno un pro vero/);
+// #1790: la forma che la validazione controlla la dice il pezzo condiviso, e la ricevono tutti quelli che chiedono.
+test('la regola dice la forma: titolo fino a 10 parole, almeno due opzioni con pro e contro, il registro prima di chiedere', () => {
+  const regola = piatto(readFileSync(join(RUOLI, '_domanda-per-owner.md'), 'utf8'));
+  assert.match(regola, /il `titolo` ha al più 10 parole/);
+  assert.match(regola, /almeno due `opzioni`, ognuna col suo pro e il suo contro\. Un'opzione sola non è una domanda/);
+  assert.match(regola, /node scripts\/domanda\.mjs registro <poche parole>/);
+  assert.match(regola, /la smista un agente/);
+  assert.equal(D.TETTI.paroleTitolo, 10);
+  assert.equal(D.TETTI.opzioniMinime, 2);
 });
+

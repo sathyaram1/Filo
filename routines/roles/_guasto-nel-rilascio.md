@@ -31,5 +31,3 @@ spetta all'owner (dare fiducia a un lavoro, scrivere un permesso, sostituire
 una chiave) non è una domanda nemmeno lei: il server la porta nei Ricevuti.
 
 <!-- includi: _dopo-un-guasto.md -->
-
-<!-- includi: _domanda-per-owner.md -->
