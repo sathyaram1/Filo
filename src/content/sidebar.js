@@ -2243,6 +2243,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       }
       // Con delle correzioni il modello deve ritrovare nei turni dopo quali ha proposto: gli torna la sua risposta intera.
       const conCorrezioni = !!(valutazione && parsed.correzioni && parsed.correzioni.length);
+      if (valuta) contaValuta(conCorrezioni ? 'con_correzioni' : 'senza_correzioni');
       history.push({ role: 'assistant', content: conCorrezioni ? res.text : (parsed.display || res.text) });
 
       if (parsed.choices && parsed.choices.length) {
