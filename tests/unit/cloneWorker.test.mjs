@@ -9,6 +9,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSyn
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { pidMorto } from '../helpers/processi.mjs';
 import { createHash } from 'node:crypto';
 import {
   MARCA_COLLEGATI, MARCA_PRIVATI, MARCATORE_WORKER, allineaPacchetti, cartellaRegistro, chiaviAccesso, concorrenzaUnit, datiWorker,
