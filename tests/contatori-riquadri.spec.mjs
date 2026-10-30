@@ -126,6 +126,30 @@ test('la spiegazione preparata alla selezione e aperta col tasto destro è «pro
   await expect.poll(() => voceOra(app, 'riscrittura', 'formale'), { timeout: 10_000 }).toEqual({ 'sostituito|p1': 1 });
 });
 
+test('su una pagina delicata la spiegazione non preparata conta come costo della privacy, e il tasto destro che la chiede pure', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await modelliFinti(app);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await app.evaluate(async (_e, u) => { await globalThis.SN_DELICATE.segnaCampi(u); }, page.url());
+  await page.locator('#parola').dblclick();
+  await expect.poll(() => voceOra(app, 'anticipo_privacy', 'spiega'), { timeout: 10_000 }).toEqual({ saltato: 1 });
+  expect(await app.evaluate(() => globalThis.__spiegazioni), 'da una pagina delicata non parte niente da solo').toBe(0);
+  await page.locator('#parola').click({ button: 'right' });
+  const menu = menuDi(page);
+  await expect(menu.locator('.sn-menu-inline-explain')).toContainText('Un felino', { timeout: 10_000 });
+  await expect.poll(() => voceOra(app, 'anticipo_privacy', 'spiega'), { timeout: 10_000 }).toEqual({ saltato: 1, chiesto: 1 });
+  expect(await voceOra(app, 'anticipo_al_gesto', 'spiega'), 'fermata dalla privacy, non dal tetto delle automatiche').toBeNull();
+  // Riaperta, la stessa spiegazione non è un gesto in più.
+  await page.keyboard.press('Escape');
+  await page.locator('#parola').click({ button: 'right' });
+  await expect(menu.locator('.sn-menu-inline-explain')).toContainText('Un felino', { timeout: 10_000 });
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
+  expect(await voceOra(app, 'anticipo_privacy', 'spiega')).toEqual({ saltato: 1, chiesto: 1 });
+  const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));
+  expect(disco).not.toContain('127.0.0.1');
+});
+
 test('la pagina tradotta intera e riportata all’originale entro un minuto conta il ritorno', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
   await modelliFinti(app);
