@@ -270,9 +270,18 @@
     traduzione_pagina: misuraNav(ESITI_TRADUZIONE, [coppie(nomi(RIMASTO), ['si', 'no'])]),
     editor_titolo: misuraNav(TITOLI, [[...ESITI_TITOLO, ...nomi(ETA_TITOLO).map((e) => `riscritto_${e}`)]]),
     editor_chat: misuraNav(DOCUMENTO_CHAT, [[...nomi(FORMATI), 'formato_non_trovato', 'continua']]),
+    anticipo_privacy: misuraNav(ANTICIPI_PRIVACY, [ESITI_PRIVACY]),
+    correttore_automatica: misuraNav(FONTI_AUTOMATICA, [ESITI_AUTOMATICA]),
+    correttore_valuta: misuraNav(ESITI_VALUTA, [UNO]),
+    correttore_segnaposto: misuraNav(VIE_SEGNAPOSTO, [ESITI_SEGNAPOSTO]),
   });
   const MISURE_RIQUADRI = Object.freeze(Object.keys(RIQUADRI));
+  // Le misure arrivate dopo la forma v1 (#1586): campi facoltativi, che partono solo se hanno qualcosa. Così le regole
+  // accettano anche le copie vecchie, e la versione non cambia.
+  const MISURE_RIQUADRI_FACOLTATIVE = Object.freeze(['anticipo_privacy', 'correttore_automatica', 'correttore_valuta',
+    'correttore_segnaposto']);
   const CAMPI_RIQUADRI = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_RIQUADRI]);
+  const CAMPI_RIQUADRI_FISSI = Object.freeze(CAMPI_RIQUADRI.filter((c) => !MISURE_RIQUADRI_FACOLTATIVE.includes(c)));
   // Tutto quello che un'ora tiene sul disco, nei sei documenti.
   const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE, ...MISURE_GESTI, ...MISURE_NAVIGAZIONE, ...MISURE_ATTIVITA,
     ...MISURE_RIQUADRI]);
