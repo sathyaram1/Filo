@@ -389,7 +389,12 @@
     state.automatiche = [...state.automatiche.filter((x) => !(x.start < end && x.end > c.start)), voce].slice(-AUTOMATICHE_MAX);
     state.ultimaAutomatica = { voce, testo, testoPrima, cursorePrima };
     lampo(state, c.start, end);
+    contaAutomatica(c.fonte, 'fatta');
     return true;
+  }
+  // La famiglia del correttore (#1586): fonte ed esito della correzione da sé, mai la parola.
+  function contaAutomatica(fonte, esito) {
+    try { global.SN_POPUP && global.SN_POPUP.conta({ misura: 'riquadro', cosa: 'correttore_automatica', fonte, esito }); } catch (_) {}
   }
 
   // Dal tasto destro, anche dopo aver scritto altro: la parola corretta da sé torna com'era scritta. Vero se è tornata.
