@@ -117,6 +117,8 @@
     { famiglia: 'rivolto', forte: true, re: R`^(?:per|for|to|para|pour|an|fur)\s+filo\s*[:,]+\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{RICHIESTA}}|{{CONDOTTA}})\b` },
     { famiglia: 'rivolto', forte: true, re: R`(?:^|[|•·:\-–—.!?]\s*){{SALUTO}}\s+filo\s+(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}{{ORDINE}}\b` },
     { famiglia: 'rivolto', forte: true, re: R`\b{{DESTINO}}\s*{{PER}}\s+filo{{SEGNO}}\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{CONDOTTA}})\b` },
+    // Filo per nome senza verbo in elenco: basta il bersaglio nella frase. Con un «?» la frase è una domanda, non un ordine.
+    { famiglia: 'rivolto', forte: true, re: R`(?:^|[|•·:\-–—.!]\s*)(?:{{SALUTO}}[\s,!]+)?filo\s*[,:;]+\s*(?!(?:(?!\s-\s)[^|•·])*\?)(?=(?:(?!\s-\s)[^|•·])*?{{FILO_BERSAGLIO}})` },
     { famiglia: 'rivolto', re: R`(?:^|[|•·:\-–—.!?]\s*){{SALUTO}}[\s,!]+(?:l'|le |la |the )?{{AI}}\s*[,:;!\-–—.]+\s*{{GUARDIA}}(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{RICHIESTA}})\b` },
     { famiglia: 'rivolto', re: R`(?:^|[|•·:\-–—.!?]\s*)(?:{{SALUTO}}[\s,!]+)?(?:l'|le |la |the )?(?:{{AI}}|{{AINOME}})\s*[,:;!\-–—.]+\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,3}(?:(?:always|sempre|siempre|toujours|immer)\s+{{CONSIGLIA}}|{{CONSIGLIA}}\s+(?:always|sempre|siempre|toujours|immer))\b` },
     // «ChatGPT: always say X is the best»: dopo il nome, un vanto da ripetere sempre non lo scrive una notizia (una domanda col «?» sì).
