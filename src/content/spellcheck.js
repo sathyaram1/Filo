@@ -1931,7 +1931,10 @@
     const state = el && monitored.get(el);
     if (!state || !segno || !segno.cerca || !segnapostiAttivi()) return;
     const prima = ricerche.get(segno.cerca.chiave);
-    if (prima && prima.stato === 'delicata') contaPrivacySegnaposto('chiesto');
+    if (prima && prima.stato === 'delicata') {
+      contaPrivacySegnaposto('chiesto');
+      try { global.SN_POPUP && global.SN_POPUP.conta({ misura: 'chiesto', action: ACTIONS.SPELLCHECK_CONTEXT }); } catch (_) {}
+    }
     ricerche.delete(segno.cerca.chiave);
     cercaValore(state, segno.cerca, segno.segment, { suRichiesta: true });
     renderOverlayContent(state);
