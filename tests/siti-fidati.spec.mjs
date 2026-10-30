@@ -199,3 +199,26 @@ test('«Apri comunque» su «Non trovo»: il sito entra fra quelli di cui ti fid
   await expect(campo).toHaveValue('', { timeout: 8000 });
   await expect(altra.locator('.dash-bubble-filo', { hasText: FINTO })).toHaveCount(0);
 });
+
+test('«Togli» di fila in Sicurezza con un salvataggio lento: ogni clic toglie il sito che l\'utente vede in cima', async ({ app, openTab }) => {
+  await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ security: { safeBrowse: { trustedSites: ['uno967.it', 'due967.it', 'tre967.it', 'quattro967.it'] } } }));
+  const sic = await openTab('filo://security/security.html');
+  const box = sic.locator('#sec-safebrowse-fidati');
+  await expect(box.locator('li')).toHaveCount(4, { timeout: 10_000 });
+  // Un disco occupato: la scrittura dura più del tempo fra due clic, e l'elenco di prima arriva a pagina già cambiata.
+  await app.evaluate(() => {
+    const S = globalThis.SN_STORAGE;
+    const vero = S.updateSettings;
+    S.updateSettings = async (...a) => { await new Promise((r) => setTimeout(r, 400)); return vero.apply(S, a); };
+  });
+  const cliccati = [];
+  for (let i = 0; i < 3; i++) {
+    const riga = box.locator('li').first();
+    cliccati.push((await riga.locator('span').textContent()).trim());
+    await riga.getByRole('button', { name: 'Togli' }).click();
+    await sic.waitForTimeout(250);
+  }
+  expect(cliccati).toEqual(['uno967.it', 'due967.it', 'tre967.it']);
+  await expect.poll(() => fidatiSalvati(app), { timeout: 8000 }).toEqual(['quattro967.it']);
+  await expect(box.locator('li')).toHaveText(['quattro967.it']);
+});
