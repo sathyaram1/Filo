@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  const VERSIONE = 'c10';
+  const VERSIONE = 'c11';
   // Oltre questa lunghezza un titolo non entra comunque intero da nessuna parte: si esamina l'inizio.
   const TETTO = 600;
   const FAMIGLIE = Object.freeze(['rivolto', 'ruolo', 'indiretto', 'memoria', 'azione', 'comportamento']);
