@@ -121,3 +121,30 @@ test('E3 bozze fra domande, invio fallito, consiglio con testo, allegati fra dom
   await expect(dq(page, 'D-53').locator('.mg-dq-testo')).toHaveValue('bozza cinquantatre');
   console.log('E3 bozze', await page.evaluate(() => localStorage.getItem('filo.gestione.bozzeDomande')));
 });
+
+test('E4 tema scuro: riscritta con «Testo originale», non riscritta, automatica, in smistamento', async ({ app, openTab }) => {
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
+  const FONTE = domanda(41, { stato: 'chiusa', titolo: 'Fonte', principio: 'Un lavoro fidato va alla corsia server.', esito: { ok: true, applicataIl: Date.now() } });
+  const AUTO = domanda(50, { stato: 'chiusa', titolo: 'Automatica', esito: { ok: true, automatica: true, principio: 'D-41', applicataIl: Date.now() },
+    conversazione: [{ autore: { tipo: 'biglietto', ruolo: 'smistamento' }, scelta: 0, testo: 'Il principio di D-41 lo copre.', ora: Date.now() }] });
+  const RISCRITTA = domanda(60, { titolo: 'Riscritta per te', notePerAgenti: 'Testo **originale** di chi chiedeva, lungo.\n\n<img src=x onerror="window.__xss=1">' });
+  const FALLITA = domanda(61, { titolo: 'Fallita <b>grassetto</b>', smistamento: 'fallito', notePerAgenti: 'note' });
+  const SMIST = domanda(62, { stato: 'in_smistamento', titolo: 'In smistamento' });
+  await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [FONTE, AUTO, RISCRITTA, FALLITA, SMIST] });
+  const page = await openTab(MANAGE);
+  await aspettaAvvio(page);
+  await page.locator('.mg-sezione[data-sezione="domande"]').click();
+  await riga(page, 'D-60').click();
+  await dq(page, 'D-60').locator('.mg-dq-originale-btn').click();
+  await page.screenshot({ path: 'tests/.shots/v1791-e4-riscritta.png' });
+  console.log('E4 xss', await page.evaluate(() => window.__xss));
+  await riga(page, 'D-61').click();
+  await page.screenshot({ path: 'tests/.shots/v1791-e4-fallita.png' });
+  await page.locator('.mg-tab[data-tab="domande-automatiche"]').click();
+  await riga(page, 'D-50').click();
+  await page.screenshot({ path: 'tests/.shots/v1791-e4-auto.png' });
+  await page.locator('.mg-tab[data-tab="domande-smistamento"]').click();
+  await riga(page, 'D-62').click();
+  await page.screenshot({ path: 'tests/.shots/v1791-e4-smist.png' });
+  console.log('E4 smist pulsanti', await dq(page, 'D-62').locator('button').allTextContents());
+});
