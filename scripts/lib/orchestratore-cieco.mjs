@@ -119,12 +119,15 @@ const PRELUDIO = `/*${ETICHETTA}*/const VALIDITA_MS=${VALIDITA_MS},DURATA_VOCE_M
   + `MOTIVO_SCONOSCIUTO=${JSON.stringify(MOTIVO_SCONOSCIUTO)},MOTIVO_IGNOTO=${JSON.stringify(MOTIVO_IGNOTO)},`
   + `MOTIVO_NOTIFICA=${JSON.stringify(MOTIVO_NOTIFICA)};`;
 
-// Le barre di Windows diventano normali (Node le accetta), così il corpo resta senza barre rovesciate.
-export function comando({ sessione = '', creato, registro = '' }) {
+// Le barre di Windows diventano normali (Node le accetta), così il corpo resta senza barre rovesciate. Gli strumenti
+// finiscono senza virgolette nel comando di veglia: una cartella con spazi o apici resta fuori, e vale il ruolo.
+export function comando({ sessione = '', creato, registro = '', strumenti = '' }) {
+  const dove = String(strumenti || '').split('\\').join('/').replace(/\/+$/, '');
   const opz = JSON.stringify({
     sessione: String(sessione).replace(/[^A-Za-z0-9-]/g, ''),
     creato: Number(creato) || 0,
     fileRegistro: String(registro).split('\\').join('/'),
+    strumenti: /^[A-Za-z0-9_.:/-]+$/.test(dove) ? dove : '',
   });
   const avvio = 'let s="";process.stdin.on("data",(d)=>{s+=d});process.stdin.on("end",()=>{let i;try{i=JSON.parse(s||"{}")}catch(_){return}'
     + `const k=${opz};let r;try{r={testo:require("fs").readFileSync(k.fileRegistro,"utf8")}}catch(e){r={errore:String((e&&e.code)||e)}}`
