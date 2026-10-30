@@ -113,6 +113,21 @@
   // correnti (settings.tabColor). Vengono passati a extractIdentityFromPixels,
   // così cambiarli (a voce o nelle Preferenze) cambia il colore estratto. Se
   // assente, l'estrazione usa i default di SN_TAB_COLOR.
+  // Un favicon si scarica una volta per pagina: ritentativi e cambi di impostazioni ridisegnano la copia (#1795). Un errore
+  // di rete o i 3 s scaduti non restano, così il calcolo dopo riprova; la richiesta rimasta appesa si chiude.
+  const iconeScaricate = new Map();
+  function scaricaIcona(href) {
+    if (iconeScaricate.has(href)) return iconeScaricate.get(href);
+    const ctrl = new AbortController();
+    const scade = setTimeout(() => ctrl.abort(), 3000);
+    const copia = fetch(href, { signal: ctrl.signal })
+      .then((res) => (res && res.ok ? res.blob() : null))
+      .catch(() => { iconeScaricate.delete(href); return null; })
+      .finally(() => clearTimeout(scade));
+    iconeScaricate.set(href, copia);
+    return copia;
+  }
+
   function reportTabIdentityColor(getParams) {
     let lastSent;
     const params = () => {
