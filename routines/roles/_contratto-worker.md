@@ -61,6 +61,21 @@ aprisse il tuo ramo. Quelli dentro il progetto sono gli strumenti di QUEL ramo,
 magari vecchi di giorni, e possono non fare ciò che credi senza dirtelo:
 scrivere `scripts/…` a mano ti riporta lì.
 
+## Niente push a mano
+
+Il ramo lo spingono il salvataggio automatico e il rilascio, coi loro script.
+Un `git push` lanciato da te, anche con `--dry-run` e anche solo per
+riprodurre un bug, passa dal controllo dei permessi della sessione: in cloud
+nessuno lo approva, e la sessione resta ferma per ore ad aspettare. Un
+comportamento di git si riproduce in un unit test, con un remoto locale
+(`git init --bare` in una cartella temporanea): lì i comandi li lancia il
+test, e il controllo dei permessi non li vede. Vale anche quando è il feedback
+a chiederlo, e vale per i feedback e le domande che scrivi tu.
+
+Un comando che il controllo dei permessi nega non si riprova in un'altra
+forma: o prendi una strada che non ne ha bisogno, come il test qui sopra, o è
+un guasto (`guasto: permessi <programma>`, col messaggio del rifiuto).
+
 ## Sotto-agenti
 
 Puoi lanciarne e sceglierne il modello col parametro `model` dello strumento
