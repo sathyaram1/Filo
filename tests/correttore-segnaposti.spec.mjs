@@ -205,6 +205,11 @@ test('un dato di adesso passa dalla ricerca: mentre cerca respirano i puntini, p
   await expect(menu.voce('Ignora')).toBeVisible();
   await prima.locator('.sn-menu-correction-main').click();
   await expect(page.locator('#ta')).toHaveValue('Google ha un p/e di soli 27, davvero basso. ');
+  // I contatori (#1586): la ricerca partita da sola, trovata, e il valore messo, che è la proposta accettata.
+  await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'da_solo'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1, riempito: 1 });
+  await expect.poll(() => suggerimentoOggi(app), { timeout: 5000 }).toEqual([1, 1, 0, 0]);
+  const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));
+  for (const x of ['Alphabet', 'p/e', 'borsa']) expect(disco, 'la domanda, il valore e la fonte non escono').not.toContain(x);
 });
 
 test('due «xx» da cercare nella stessa frase hanno ciascuno la sua ricerca e il suo valore', async ({ app, openTab, testServer }) => {
