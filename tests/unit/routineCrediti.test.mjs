@@ -139,6 +139,7 @@ test('lettura: op stato, alla pagina numeri, account e freni; le sessioni restan
   assert.deepEqual(ricevute[0].data, { op: 'stato' });
   assert.deepEqual(r.numeri, { riservaA: 10, tettoB: null, usdPer100: 2150, rinnovoA: null, rinnovoB: null });
   assert.equal(r.accounts.A.passo.quotaPct, 12);
+  assert.deepEqual([r.accounts.A.usdSettimana, r.accounts.A.usd24h, r.accounts.A.accensioniSettimana, r.accounts.A.accensioni24h], [1000, 80, 9, 2]);
   assert.equal(r.freni, 'attivi');
   assert.equal(r.sessioni, undefined);
 });
