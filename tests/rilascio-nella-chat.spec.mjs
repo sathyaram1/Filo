@@ -6,7 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
-import { nelMondoDiFilo, statoDi } from './helpers/riquadri.mjs';
+import { neiRiquadri, nelMondoDiFilo, paginaDellAiuto, statoDi } from './helpers/riquadri.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
@@ -30,7 +30,8 @@ async function lascia(page, files, { x = 200, y = 200, fasi = ['dragEnter', 'dra
   await s.detach().catch(() => {});
 }
 
-const statoAiuto = (app, page) => nelMondoDiFilo(app, page, () => ({
+// Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3), sulle pagine di Filo nella pagina.
+const statoAiuto = (app, page) => neiRiquadri(app, page, () => ({
   aperto: !!globalThis.SN_SIDEBAR?.isOpen?.(),
   allegati: globalThis.__filoSidebarTest?.allegati?.() || [],
   fuoco: document.activeElement === document.querySelector('.sn-sidebar-input textarea'),

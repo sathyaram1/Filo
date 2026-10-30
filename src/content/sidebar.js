@@ -471,10 +471,19 @@
 
   // «Valuta» del tasto destro su un campo (#1449): il testo intero del campo e la richiesta di giudicarlo, nella
   // conversazione aperta o in una nuova.
+  // Su un sito il campo resta nella pagina e l'Aiuto nello strato ne riceve il testo e un numero per ritrovarlo.
   function valuta({ campo, testo } = {}) {
     const t = String(testo || '');
     if (!campo || !t.trim()) return;
-    open({ source: 'valuta' });
+    if (!nelloStrato && !root) {
+      const id = global.SN_AIUTO_PAGINA?.campoValutato?.(campo);
+      const dati = { invocazione: { source: 'valuta' }, valuta: { campo: id, testo: t } };
+      if (id && global.SN_RIQUADRI_SOPRA?.apri('aiuto', dati, () => valutaQui(campo, t))) { facciata.attiva = true; return; }
+    }
+    valutaQui(campo, t);
+  }
+  function valutaQui(campo, t) {
+    apri({ source: 'valuta' });
     if (!root) return;
     valutazione = { campo, mandato: t };
     contaValuta('chiesta');
@@ -485,10 +494,27 @@
     try { Popup?.conta?.({ misura: 'riquadro', cosa: 'correttore_valuta', esito }); } catch (_) {}
   }
 
+  // Il campo valutato sta qui, o nella pagina sotto lo strato ({ sotto: numero }): lì lo si legge e corregge chiedendo.
+  const campoSotto = (c) => !!(c && typeof c === 'object' && typeof c.sotto === 'string');
+  async function testoDelCampo(c) {
+    if (!campoSotto(c)) return global.SN_SPELLCHECK?.testoDelCampo?.(c) || '';
+    const r = await chiediSotto('campo', { id: c.sotto, cosa: 'testo' });
+    return r && typeof r.testo === 'string' ? r.testo : '';
+  }
+  async function sostituisciNelCampo(c, prima, dopo, vicinoA) {
+    if (campoSotto(c)) {
+      const r = await chiediSotto('campo', { id: c.sotto, cosa: 'sostituisci', prima, dopo, vicinoA });
+      return !r || r.sparito ? { sparito: true } : r;
+    }
+    const SC = global.SN_SPELLCHECK;
+    if (!SC || !c.isConnected) return { sparito: true };
+    return SC.sostituisciNelCampo(c, prima, dopo, vicinoA);
+  }
+
   // Il testo del campo valutato, se è cambiato da quando il modello l'ha visto: la domanda dopo lo porta con sé.
-  function testoCambiato() {
+  async function testoCambiato() {
     if (!valutazione) return null;
-    const ora = global.SN_SPELLCHECK?.testoDelCampo?.(valutazione.campo) || '';
+    const ora = await testoDelCampo(valutazione.campo);
     return ora.trim() && ora !== valutazione.mandato ? ora : null;
   }
 
@@ -777,6 +803,14 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     const tutti = Array.from(files || []).filter(Boolean);
     const lista = tutti.filter((f) => /^image\//i.test(f.type || ''));
     if (!tutti.length) return false;
+    if (versoLoStrato()) {
+      const perche = chiusoPerAllegati();
+      if (perche !== true) return perche;
+      const conti = { grandi: 0, rotte: 0, altri: tutti.length - lista.length };
+      const buone = lista.filter((f) => f.size <= Allegati.tettoLetturaByte);
+      conti.grandi = lista.length - buone.length;
+      return mandaAlloStrato(await lette(buone.map((f) => ({ blob: f, nome: f.name || '' })), conti), conti);
+    }
     const pronto = pannelloPerAllegati();
     if (!pronto) return pronto === null;
     const conti = { grandi: 0, rotte: 0, altri: tutti.length - lista.length };
@@ -790,16 +824,65 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   }
 
   // Dal main (CHAT_ALLEGA): le immagini lasciate sulla fila delle schede, sulla barra o in un riquadro, già lette.
-  async function allegaDaFuori({ immagini = [], grandi = 0, altri = 0 } = {}) {
+  async function allegaDaFuori({ immagini = [], grandi = 0, rotte = 0, altri = 0 } = {}) {
     const buone = (Array.isArray(immagini) ? immagini : []).filter((im) => im && /^data:image\//i.test(String(im.dataUrl || '')));
-    const conti = { grandi: conta(grandi), rotte: 0, altri: conta(altri) };
-    if (!buone.length && !conti.grandi && !conti.altri) return false;
+    const conti = { grandi: conta(grandi), rotte: conta(rotte), altri: conta(altri) };
+    if (!buone.length && !conti.grandi && !conti.rotte && !conti.altri) return false;
+    if (versoLoStrato()) {
+      if (chiusoPerAllegati() !== true) return false;
+      const voci = buone.map((im) => ({ blob: Immagini?.blobDa(im.dataUrl), nome: typeof im.nome === 'string' ? im.nome : '' }));
+      return mandaAlloStrato(await lette(voci, conti), conti);
+    }
     if (!pannelloPerAllegati()) return false;
     for (const im of buone) {
       await allegaUna(Immagini?.blobDa(im.dataUrl), typeof im.nome === 'string' ? im.nome : '', conti);
       if (!root) return true;
     }
     allegatiArrivati(conti);
+    return true;
+  }
+
+  // Su un sito il pannello sta nello strato (#1509.3): le immagini si leggono qui e gli arrivano a pezzi sotto il suo
+  // tetto, coi conti di quelle che non entrano sull'ultimo, perché l'avviso le dica una volta.
+  const PEZZO_ALLO_STRATO = 6 * 1024 * 1024;
+  const versoLoStrato = () => !nelloStrato && !root && !!global.SN_RIQUADRI_SOPRA && location.protocol !== 'filo:';
+  // true se il pannello le può prendere; false dove Filo è spento; con l'Aiuto spento lo si dice, e valgono prese.
+  function chiusoPerAllegati() {
+    const perche = chiuso();
+    if (perche === 'sito') return false;
+    if (perche === 'aiuto') { Popup?.showToast?.(I18n.t('help_disabled')); return null; }
+    return true;
+  }
+  async function lette(voci, conti) {
+    const out = [];
+    for (const v of voci) {
+      const dataUrl = v.blob && Immagini ? await Immagini.perLaChat(v.blob) : '';
+      if (dataUrl) out.push({ dataUrl, nome: v.nome });
+      else conti.rotte += 1;
+    }
+    return out;
+  }
+  function mandaAlloStrato(immagini, conti) {
+    const pezzi = [[]];
+    let peso = 0;
+    for (const im of immagini) {
+      const p = im.dataUrl.length + im.nome.length;
+      if (pezzi[pezzi.length - 1].length && peso + p > PEZZO_ALLO_STRATO) { pezzi.push([]); peso = 0; }
+      pezzi[pezzi.length - 1].push(im);
+      peso += p;
+    }
+    pezzi.forEach((pezzo, i) => {
+      const ultimo = i === pezzi.length - 1;
+      const dati = { immagini: pezzo, ...(ultimo ? conti : {}) };
+      // Senza strato il pannello si apre qui, con le stesse immagini.
+      const qui = () => {
+        apri();
+        allegati.immagini.push(...pezzo);
+        allegatiArrivati(ultimo ? conti : {});
+      };
+      if (global.SN_RIQUADRI_SOPRA.apri('aiuto', { invocazione: null, allegati: dati }, qui)) facciata.attiva = true;
+      else qui();
+    });
     return true;
   }
 
@@ -955,23 +1038,28 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     };
     const diLa = (chiave, ...arg) => appendActionLog(I18n.t(chiave, ...arg))?.classList.add('sn-sidebar-log-intera');
     stato();
-    btn.addEventListener('click', (e) => {
-      if (!gestoVero(e)) return;
-      const SC = global.SN_SPELLCHECK;
-      if (!SC || !campo.isConnected) { diLa('help_correzione_sparito'); return; }
-      if (scritta === null) {
-        const r = SC.sostituisciNelCampo(campo, c.prima, c.dopo, vicinoA);
-        if (r.dove === undefined) { diLa(r.manca ? 'help_correzione_manca' : 'help_correzione_ferma', estratto(c.prima)); return; }
-        scritta = r.dove;
-        contaValuta('correzione_accettata');
-      } else {
-        const r = c.dopo ? SC.sostituisciNelCampo(campo, c.dopo, c.prima, scritta) : {};
-        if (r.dove === undefined) { diLa('help_correzione_non_tolta', global.SN_TASTI?.etichetta?.('Ctrl+Z') || 'Ctrl+Z'); return; }
-        vicinoA = r.dove;
-        scritta = null;
-        contaValuta('correzione_tolta');
-      }
-      stato();
+    // Un clic alla volta: nello strato la risposta della pagina arriva dopo, e un secondo clic scriverebbe due volte.
+    let occupato = false;
+    btn.addEventListener('click', async (e) => {
+      if (!gestoVero(e) || occupato) return;
+      occupato = true;
+      try {
+        if (scritta === null) {
+          const r = await sostituisciNelCampo(campo, c.prima, c.dopo, vicinoA);
+          if (r.sparito) { diLa('help_correzione_sparito'); return; }
+          if (r.dove === undefined) { diLa(r.manca ? 'help_correzione_manca' : 'help_correzione_ferma', estratto(c.prima)); return; }
+          scritta = r.dove;
+          contaValuta('correzione_accettata');
+        } else {
+          const r = c.dopo ? await sostituisciNelCampo(campo, c.dopo, c.prima, scritta) : {};
+          if (r.sparito) { diLa('help_correzione_sparito'); return; }
+          if (r.dove === undefined) { diLa('help_correzione_non_tolta', global.SN_TASTI?.etichetta?.('Ctrl+Z') || 'Ctrl+Z'); return; }
+          vicinoA = r.dove;
+          scritta = null;
+          contaValuta('correzione_tolta');
+        }
+        stato();
+      } finally { occupato = false; }
     });
     return btn;
   }
@@ -1799,7 +1887,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (userMessage || valuta) expand({ ai: false });
 
     // «Valuta» (#1449): il testo del campo, o quello cambiato da allora che una domanda dopo porta con sé.
-    const testoCampo = valuta || (userMessage ? testoCambiato() : null);
+    const testoCampo = valuta || (userMessage ? await testoCambiato() : null);
     // Nell'Editor il documento viaggia intero fino al tetto (#1475), e il main lo accetta solo da una pagina di Filo.
     // Aperto un altro documento a metà conversazione, il modello lo sa prima della domanda nuova.
     const appPagina = appDellaPagina();
