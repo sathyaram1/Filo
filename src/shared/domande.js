@@ -70,7 +70,6 @@
     riprendi: tipo({ feedbackId: 'feedbackId' }, { bulk: true, consenso: false, attivo: true }),
     priorita: tipo({ feedbackId: 'feedbackId', valore: 'valorePriorita' }, { bulk: true, consenso: false, attivo: true }),
     archivia: tipo({ feedbackId: 'feedbackId' }, { bulk: true, consenso: false, attivo: true }),
-    approva_locale: tipo({ feedbackId: 'feedbackId' }, { bulk: false, consenso: true, attivo: true }),
     automazione: tipo({ chiave: 'chiave', valore: 'valoreBooleano' }, { bulk: false, consenso: false, attivo: true }),
     ambito: tipo({}, { bulk: false, consenso: true, attivo: false }),
     esperimento: tipo({}, { bulk: false, consenso: true, attivo: false }),
