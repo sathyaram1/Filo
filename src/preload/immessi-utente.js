@@ -1,6 +1,6 @@
 // Il testo che l'utente immette nella pagina, in ogni frame, detto al main: un segreto che la pagina mostra ed è suo non
 // è letto da fuori (#810.8). Dell'utente è la parte del valore cambiata da quando ci scrive, se è fatta dei caratteri che
-// ci ha messo lui (tasti, incolla, inserimenti di Filo chiesti da lui); se no, solo quei caratteri in fila.
+// ci ha messo lui (tasti, incolla, inserimenti di Filo chiesti da lui); se no, solo quei caratteri in fila, nel campo e nel documento.
 
 // Largo: un documento incollato intero resta dell'utente; oltre, si tiene la coda.
 const MAX_TESTO = 1000000;
