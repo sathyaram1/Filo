@@ -779,11 +779,13 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         const r = SC.sostituisciNelCampo(campo, c.prima, c.dopo, vicinoA);
         if (r.dove === undefined) { diLa(r.manca ? 'help_correzione_manca' : 'help_correzione_ferma', estratto(c.prima)); return; }
         scritta = r.dove;
+        contaValuta('correzione_accettata');
       } else {
         const r = c.dopo ? SC.sostituisciNelCampo(campo, c.dopo, c.prima, scritta) : {};
         if (r.dove === undefined) { diLa('help_correzione_non_tolta', global.SN_TASTI?.etichetta?.('Ctrl+Z') || 'Ctrl+Z'); return; }
         vicinoA = r.dove;
         scritta = null;
+        contaValuta('correzione_tolta');
       }
       stato();
     });
