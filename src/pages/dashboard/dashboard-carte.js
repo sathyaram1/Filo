@@ -12,6 +12,9 @@
   let altroEl = null;
 
   let layout = null;
+  // Il primo incontro (#1661) lo decide il main: legge l'accoglienza dal disco anche in incognito.
+  let primoIncontro = false;
+  let giroPrimo = 0;
   const dati = {
     timers: [],
     notifiche: [],
