@@ -53,7 +53,9 @@ test('la scheda Crediti sta fra le Routine e mostra i numeri del server, uno per
   await expect(page.locator('#mgCrTettoB')).toHaveValue('', { timeout: 5000 });
   await expect(page.locator('#mgCrTaratura')).toHaveValue('2150');
   await expect(page.locator('#mgCrRinnovoA')).toHaveValue('');
-  await expect(page.locator('#mgCrRigaA')).toContainText('46,5% della settimana, limite 90% · oggi 3% su 12,4%');
+  await expect(page.locator('#mgCrRigaA')).toContainText('46,5% della settimana (≈ 1.000 $), limite 90% · resta 43,5% (≈ 935 $) · oggi 3% su 12,4% · ultime 24 ore ≈ 120 $ · accensioni: 14 in settimana, 3 nelle ultime 24 ore');
+  // B senza dollari dal server: la taratura dell'owner (2.150 $ per il 100%).
+  await expect(page.locator('#mgCrRigaB')).toContainText('20% della settimana (≈ 430 $) · resta 80% (≈ 1.720 $)');
   await expect(page.locator('#mgCrRigaB')).toContainText('fermo fino a');
   await expect(page.locator('#mgCrAvviso')).toBeHidden();
   // Nessun campo mente su una lettura: niente «non letto» se la lettura c'è.
