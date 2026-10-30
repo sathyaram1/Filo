@@ -446,15 +446,17 @@ for (const quante of [40, 3]) test(`Ricevuti (${quante} righe): un arrivo dal vi
     window.__mgTest.setSortMode('num');
     window.__mgTest.setTab('inbox');
   }, docs);
-  await expect(page.locator('#mgList .mg-item')).toHaveCount(40);
+  await expect(page.locator('#mgList .mg-item')).toHaveCount(quante);
   const bersaglio = page.locator('.mg-item[data-id="f758"]');
   const box = await bersaglio.boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const p = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await page.mouse.move(p.x, p.y);
   // Altrove la #800 si ferma e arriva nei Ricevuti, in cima.
   await page.evaluate(() => { const d = window.__srv.docs.f800; window.__srv.docs.f800 = { ...d, status: 'design', statusReason: 'l5', _updateTime: 'v2' }; });
-  await expect(page.locator('#mgList .mg-item')).toHaveCount(41, { timeout: 10_000 });
+  await expect(page.locator('#mgList .mg-item')).toHaveCount(quante + 1, { timeout: 10_000 });
   await expect(page.locator('#mgList .mg-item').first()).toHaveAttribute('data-id', 'f800');
   expect(Math.abs((await bersaglio.boundingBox()).y - box.y)).toBeLessThan(1.5);
+  expect(await sottoIlPuntatore(page, '.mg-item', p)).toBe('f758');
 });
 
 // Alla larghezza minima della finestra la colonna è di 220px: le pastiglie col numero vanno a capo senza coprire il
