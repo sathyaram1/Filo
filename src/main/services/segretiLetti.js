@@ -159,9 +159,9 @@ function dellUtente(x, fonte) {
   for (const r of immessi.values()) if (copre(r, x)) return true;
   return false;
 }
-// Un codice letto prima che l'utente cominciasse a scriverlo resta letto: riscriverlo non lo fa diventare suo (giro 5).
-const MARGINE_MS = 1000;
-function tieni(chiave, r, desde = Date.now()) {
+// `desde`: quando l'utente ha cominciato a scrivere il valore. Un codice letto prima resta letto: riscriverlo non lo fa
+// diventare suo (giro 5). Senza, come una proposta dell'assistente, vale ogni lettura.
+function tieni(chiave, r, desde = 0) {
   const prima = immessi.get(chiave);
   if (prima === r) return;
   if (prima !== undefined) { immessi.delete(chiave); caratteriImmessi -= prima.length; }
@@ -174,11 +174,10 @@ function tieni(chiave, r, desde = Date.now()) {
   }
   // Quello che una lettura ha messo da parte mentre il testo era in viaggio si toglie adesso.
   carica();
-  const da = Math.min(Number.isFinite(desde) ? desde : Date.now(), Date.now()) - MARGINE_MS;
+  const da = Number.isFinite(desde) ? desde : 0;
   letti.togli((v) => daPagina(v.fonte) && (Number(v.at) || 0) >= da && copre(r, v));
 }
-// `chiave` è l'elemento della pagina: il suo testo cresce mentre l'utente scrive, e sostituisce il precedente. `desde`:
-// quando l'utente ha cominciato il valore che ci sta adesso.
+// `chiave` è l'elemento della pagina: il suo testo cresce mentre l'utente scrive, e sostituisce il precedente.
 function immessoDallUtente(chiave, testo, desde) {
   const r = compatto(testo);
   if (r) tieni(`immesso:${chiave}`, r, Number(desde));
