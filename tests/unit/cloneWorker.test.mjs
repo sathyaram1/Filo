@@ -44,8 +44,11 @@ function scena({ pacchetti = true } = {}) {
   git(principale, ['add', '-A']);
   git(principale, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'base']);
   git(principale, ['push', '-q', 'origin', 'main']);
-  mkdirSync(resolve(principale, 'node_modules', 'pacchetto'), { recursive: true });
-  writeFileSync(resolve(principale, 'node_modules', 'pacchetto', 'canarino.txt'), 'vivo\n', 'utf8');
+  if (pacchetti) {
+    mkdirSync(resolve(principale, 'node_modules', 'pacchetto'), { recursive: true });
+    writeFileSync(resolve(principale, 'node_modules', 'pacchetto', 'canarino.txt'), 'vivo\n', 'utf8');
+    writeFileSync(resolve(principale, 'node_modules', '.package-lock.json'), '{}\n', 'utf8'); // npm lo scrive alla fine
+  }
   const strumenti = resolve(base, 'strumenti-orchestratore');
   for (const p of PINNED_PATHS) {
     if (p.endsWith('.js')) { mkdirSync(dirname(resolve(strumenti, p)), { recursive: true }); writeFileSync(resolve(strumenti, p), '', 'utf8'); } else mkdirSync(resolve(strumenti, p), { recursive: true });
