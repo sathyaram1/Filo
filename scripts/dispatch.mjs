@@ -683,6 +683,10 @@ const ROLE_FILE = {
   smistamento: 'smistamento.md',
   halt: 'halt.md',
 };
+// Un halt che non è un guasto ha il suo testo: rilasciare con `--guasto` fermerebbe le routine per niente (#1796).
+const HALT_KIND_FILE = {
+  strumenti_vecchi: 'halt-strumenti-vecchi.md',
+};
 // Il correttore ha due casi (payload.case), e la ripresa dopo la risposta
 // dell'owner non è un rebase: un caso sconosciuto vale il riallineamento.
 const FIXER_CASE_FILE = {
