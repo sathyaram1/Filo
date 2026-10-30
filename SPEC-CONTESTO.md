@@ -290,7 +290,8 @@ e supera il guardiano, torna fidata dopo un'ora di pausa.
   Il testo si legge con `memoria` → leggi. Tetto iniziale dell'indice: 2 000
   token.
 - **Chi scrive**: il modello, con `memoria` → scrivi quando lo ritiene utile,
-  e la compattazione come rete di sicurezza. Niente memorie annidate: per i
+  e la compattazione come rete di sicurezza (da un tratto sospetto propone
+  soltanto: § Il sospetto non passa nel riassunto). Niente memorie annidate: per i
   dettagli il modello legge i documenti dell'utente e annota nella memoria
   quali sono quelli importanti.
 - **Lezioni**: non sono più un tipo a parte. Una lezione è una memoria su come
