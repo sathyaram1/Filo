@@ -2683,7 +2683,7 @@ if (isMainModule) {
           // Solo in cloud: sulla macchina dell'owner le impostazioni utente valgono per tutte le sue sessioni.
           // Anche la sessione di un feedback tiene la parola d'ordine: cieca come l'orchestratore, lancia il worker (#1680 giro 1).
           const cieco = process.env.CLAUDE_CODE_REMOTE === 'true'
-            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', clone: cartellaCloneServer() })
+            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', clone: cartellaCloneServer(), strumenti: tools })
             : { ok: true, saltato: true };
           if (cieco.saltato) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
           if (!cieco.ok) {
