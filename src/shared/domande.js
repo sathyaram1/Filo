@@ -195,9 +195,10 @@
         cosa.push(lineette === 1 ? 'ha una lineetta (— o –)' : `ha ${lineette} lineette (— o –)`);
         tipi.add('lineette');
       }
-      if (/\.pro$/.test(campo) && PRO_VUOTO_RE.test(valore.trim())) {
-        cosa.push(`ha come pro «${valore.trim()}»`);
-        tipi.add('pro');
+      const lato = /\.(pro|contro)$/.exec(campo);
+      if (lato && PRO_VUOTO_RE.test(valore.trim())) {
+        cosa.push(`ha come ${lato[1]} «${valore.trim()}»`);
+        tipi.add(lato[1]);
       }
       if (cosa.length) problemi.push({ campo, testo: `«${campo}» ${cosa.join(' e ')}` });
     }
