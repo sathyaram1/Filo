@@ -457,11 +457,21 @@ test('in un sito delicato (accesso fatto) il dato non si cerca da solo: lo dice,
   await expect(ocra(page, 'xx')).toHaveCount(1, { timeout: 5000 });
   await expect(page.locator('.sn-spell-valori .sn-spell-valore.sn-cercando')).toHaveCount(0, { timeout: 5000 });
   expect(await globale(app, '__webChieste')).toEqual([]);
+  // Il livello di privacy (#1586): la ricerca che la pagina non lascia partire da sola, e poi il clic che la chiede.
+  await expect.poll(() => voceOggi(app, 'anticipo_privacy', 'segnaposto'), { timeout: 5000 }).toEqual({ saltato: 1 });
+  expect(await voceOggi(app, 'correttore_segnaposto', 'da_solo')).toEqual({ cercato: 1, delicata: 1 });
   const menu = await tastoDestroSu(page, ocra(page, 'xx'));
   await expect(menu.locator('.sn-menu-segno')).toHaveText('Su questa pagina non cerco da solo.', { timeout: 3000 });
   await menu.voce('Cerca il dato').click();
   await expect(valore(page, '27')).toBeVisible({ timeout: 8000 });
   expect(await globale(app, '__webChieste')).toEqual(['Alphabet P/E ratio']);
+  await expect.poll(() => voceOggi(app, 'anticipo_privacy', 'segnaposto'), { timeout: 5000 }).toEqual({ saltato: 1, chiesto: 1 });
+  await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'su_richiesta'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1 });
+  // Ignorato, il valore trovato col clic è un rifiuto di quella ricerca.
+  const sulValore = await tastoDestroSu(page, valore(page, '27'));
+  await sulValore.voce('Ignora').click();
+  await expect(valore(page, '27')).toHaveCount(0, { timeout: 5000 });
+  await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'su_richiesta'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1, rifiutato: 1 });
 });
 
 test('fonti che non rispondono: «La ricerca non è riuscita» e «Cerca di nuovo», che tornata la rete trova il valore', async ({ app, openTab, testServer }) => {
