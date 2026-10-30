@@ -122,8 +122,11 @@
     { famiglia: 'rivolto', forte: true, re: R`^(?:per|for|to|para|pour|an|fur)\s+filo\s*[:,]+\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{RICHIESTA}}|{{CONDOTTA}})\b` },
     { famiglia: 'rivolto', forte: true, re: R`(?:^|[|•·:\-–—.!?]\s*){{SALUTO}}\s+filo\s+(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}{{ORDINE}}\b` },
     { famiglia: 'rivolto', forte: true, re: R`\b{{DESTINO}}\s*{{PER}}\s+filo{{SEGNO}}\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{CONDOTTA}})\b` },
-    // Filo per nome senza verbo in elenco: basta il bersaglio nella frase. Con un «?» la frase è una domanda, non un ordine.
-    { famiglia: 'rivolto', forte: true, re: R`(?:^|[|•·:\-–—.!]\s*)(?:{{SALUTO}}[\s,!]+)?filo\s*[,:;]+\s*(?!(?:(?!\s-\s)[^|•·])*\?)(?=(?:(?!\s-\s)[^|•·])*?{{FILO_BERSAGLIO}})` },
+    // Filo per nome con qualunque verbo (D-142): basta che la prima parola non sia di classe chiusa e non apra un elenco
+    // («Filo, ago e filato»). Con un «?» la frase è una domanda, non un ordine.
+    { famiglia: 'rivolto', forte: true, re: R`(?:^|[|•·:\-–—.!]\s*)(?:{{SALUTO}}[\s,!]+)?filo\s*[,;!]+\s*(?!(?:(?!\s-\s)[^|•·])*\?)(?:{{FILO_RIEMPI}}[\s,]+){0,3}(?!{{NONVERBO}}(?![\w'-]))(?![a-z][\w'-]*\s+(?:e|ed|and|y|et|und|o|or|oder|ou)\s)[a-z]` },
+    // Dopo «Filo:» o «Filo —» un sottotitolo è la norma: serve un verbo col suo oggetto, o il bersaglio nella frase.
+    { famiglia: 'rivolto', forte: true, re: R`(?:^|[|•·:\-–—.!]\s*)(?:{{SALUTO}}[\s,!]+)?filo\s*(?::+|\s[-–—]+)\s*(?!(?:(?!\s-\s)[^|•·])*\?)(?:{{FILO_RIEMPI}}[\s,]+){0,3}(?!{{NONVERBO}}(?![\w'-]))(?:(?:be|sii|siate|sois|soyez|sei|se)\s|[a-z][\w'-]*\s+(?:{{OGGETTO}}(?![\w'-])|[a-z]+ing\b)|[a-z][\w'-]*\s(?=(?:(?!\s-\s)[^|•·])*?{{FILO_BERSAGLIO}}))` },
     { famiglia: 'rivolto', re: R`(?:^|[|•·:\-–—.!?]\s*){{SALUTO}}[\s,!]+(?:l'|le |la |the )?{{AI}}\s*[,:;!\-–—.]+\s*{{GUARDIA}}(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{RICHIESTA}})\b` },
     { famiglia: 'rivolto', re: R`(?:^|[|•·:\-–—.!?]\s*)(?:{{SALUTO}}[\s,!]+)?(?:l'|le |la |the )?(?:{{AI}}|{{AINOME}})\s*[,:;!\-–—.]+\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,3}(?:(?:always|sempre|siempre|toujours|immer)\s+{{CONSIGLIA}}|{{CONSIGLIA}}\s+(?:always|sempre|siempre|toujours|immer))\b` },
     // «ChatGPT: always say X is the best»: dopo il nome, un vanto da ripetere sempre non lo scrive una notizia (una domanda col «?» sì).
