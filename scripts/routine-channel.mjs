@@ -1559,6 +1559,32 @@ if (isMain) {
         await defaultSleep(RETRY_EVERY_MS);
       }
     }
+  } else if (cmd === 'veglia') {
+    if (args.length !== 1 || !looksLikeTicket(args[0]) || Object.keys(data).length) {
+      console.error('Uso: veglia <biglietto> — solo il biglietto del worker che vegli. Non ho fatto niente.');
+      process.exit(1);
+    }
+    const nelClone = cloneDelBiglietto(ROOT, args[0]);
+    if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
+    const { veglia, segniDiVita, FETTA_MS } = await import('./lib/veglia-worker.mjs');
+    const { stopBeat } = await import('./lib/routine-beat.mjs');
+    const ticket = args[0];
+    const fetta = Number(process.env.FILO_VEGLIA_FETTA_MS);
+    const esito = await veglia({
+      fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
+      leggi: () => segniDiVita({ root: ROOT, ticket }),
+      // Il rilascio è quello di sempre, dalla cartella che tiene il biglietto; della sua stampa passa solo l'esito.
+      rilascia: (guasto, mio) => {
+        const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'release', ticket, '--role', 'orchestrator', '--forza',
+          '--guasto', guasto, ...(mio ? [] : ['--senza-push'])], { encoding: 'utf8', env: process.env });
+        const ok = r.status === 0 && /OK: biglietto rilasciato/.test(String(r.stdout || ''));
+        if (!ok) stopBeat(ROOT, { ticket });
+        const motivo = ok ? '' : (String(r.stdout || '').match(/rilascio non riuscito \(([^)]{1,80})\)/) || [])[1] || `uscita ${r.status}`;
+        return { ok, motivo };
+      },
+    });
+    console.log(esito.testo);
+    process.exit(esito.uscita);
   } else if (cmd === 'release') {
     // `--guasto "motivo"`: il guasto si dichiara AL CANALE nel rilascio, non a
     // parole nel testo di ritorno (che nessuna macchina legge).
