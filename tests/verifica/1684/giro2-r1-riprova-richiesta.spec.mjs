@@ -1,5 +1,5 @@
-// Verifica #1684, giro 1, rilievo 1: «Riprova» deve rifare la richiesta che l'utente aveva fatto col clic, non
-// riprendere l'indirizzo finale dopo i rimandi né presentarsi senza la pagina da cui era partito.
+// Verifica #1684, giro 2, rilievo 1 (dal giro 1): «Riprova» deve rifare la richiesta che l'utente aveva fatto col
+// clic. Il caso del rimando firmato è chiuso; quello del sito che vuole la pagina di partenza è ancora rosso.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { existsSync, readdirSync } from 'node:fs';
