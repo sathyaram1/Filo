@@ -742,6 +742,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     wrap.className = 'sn-sidebar-correzioni';
     for (const c of buone) wrap.appendChild(bottoneCorrezione(c, campo, Math.max(0, String(mandato || '').indexOf(c.prima))));
     afterEl.insertAdjacentElement('afterend', wrap);
+    for (let i = 0; i < buone.length; i++) contaValuta('correzione_mostrata');
     const conv = convEl();
     if (conv) conv.scrollTop = conv.scrollHeight;
   }
