@@ -13,7 +13,7 @@ const PRELOAD = 'src/preload/riquadri-preload.js';
 const TIPI = new Set(['feedback', 'modifica', 'redteam', 'risposta', 'aiuto']);
 // L'Aiuto nello strato lavora sulla pagina sotto (#1509.3): cosa può chiederle e quanto aspetta la risposta. Un'azione
 // può aspettare il sì dell'utente; le altre sono letture o tocchi che finiscono in pochi secondi.
-const OP_PAGINA = Object.freeze({ stato: 5000, leggi: 60000, azione: 600000, evidenzia: 15000, accetta: 15000, auto: 15000, pulisci: 15000 });
+const OP_PAGINA = Object.freeze({ stato: 5000, leggi: 60000, azione: 600000, evidenzia: 15000, accetta: 15000, auto: 15000, pulisci: 15000, campo: 15000 });
 const COMANDI_AIUTO = new Set(['passo', 'chiudi', 'posa', 'azione']);
 const AIUTO_CHIUSO = Object.freeze({ pannello: 'chiuso', voce: 'pronto', nonLetta: false });
 // Abbondanti: una selezione da spiegare o un testo da modificare possono essere lunghi quanto la pagina. Oltre, la
@@ -75,6 +75,18 @@ function zonaValida(z) {
   if (n.some((v) => v === undefined) || n[2] <= 0 || n[3] <= 0) return null;
   const [x, y, width, height] = n.map((v) => Math.round(Math.max(-100000, Math.min(100000, v))));
   return { x, y, width, height };
+}
+
+// Le immagini date all'Aiuto dalla pagina (#1623), già lette lì: solo immagini in data URL, coi conti di quelle che
+// non entrano, perché l'avviso le dica.
+function allegatiPuliti(a) {
+  if (!a || typeof a !== 'object') return null;
+  const conta = (n) => Math.max(0, Math.min(1e6, Math.floor(Number(n) || 0)));
+  const immagini = (Array.isArray(a.immagini) ? a.immagini : [])
+    .filter((im) => im && typeof im.dataUrl === 'string' && /^data:image\//i.test(im.dataUrl))
+    .map((im) => ({ dataUrl: im.dataUrl, nome: typeof im.nome === 'string' ? im.nome.slice(0, 500) : '' }));
+  const out = { immagini, grandi: conta(a.grandi), rotte: conta(a.rotte), altri: conta(a.altri) };
+  return immagini.length || out.grandi || out.rotte || out.altri ? out : null;
 }
 
 const SCATOLE_MAX = 50;
@@ -159,7 +171,14 @@ class StratoDeiRiquadri {
     if (tipo === 'redteam') return {};
     if (tipo === 'aiuto') {
       const c = dati.invocazione && typeof dati.invocazione === 'object' ? dati.invocazione : null;
-      return { invocazione: c ? { source: testo(c.source), title: testo(c.title), url: testo(c.url) } : null };
+      const v = dati.valuta && typeof dati.valuta === 'object' ? dati.valuta : null;
+      const campo = v ? testo(v.campo) : '';
+      return {
+        invocazione: c ? { source: testo(c.source), title: testo(c.title), url: testo(c.url) } : null,
+        // «Valuta» (#1449): il testo del campo e il numero con cui lo strato lo ritrova nella pagina.
+        valuta: campo && campo.length <= ID_MAX && testo(v.testo).trim() ? { campo, testo: testo(v.testo) } : null,
+        allegati: allegatiPuliti(dati.allegati),
+      };
     }
     let zoom = 1;
     try { zoom = wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }

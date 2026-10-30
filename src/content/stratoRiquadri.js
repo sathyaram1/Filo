@@ -46,7 +46,11 @@
         action: dati.action, payload: dati.payload || {}, anchor: dati.anchor || undefined, title: dati.title || '',
       });
     } else if (d.tipo === 'aiuto') {
-      global.SN_SIDEBAR?.open(dati.invocazione || undefined);
+      const SB = global.SN_SIDEBAR;
+      // Il campo da valutare resta nella pagina sotto: qui arriva il suo testo e il numero con cui chiederle il resto.
+      if (dati.valuta) SB?.valuta({ campo: { sotto: String(dati.valuta.campo) }, testo: String(dati.valuta.testo || '') });
+      else SB?.open(dati.invocazione || undefined);
+      if (dati.allegati) Promise.resolve(SB?.allegaDaFuori?.(dati.allegati)).catch(() => {});
     }
     riferisci();
   }
