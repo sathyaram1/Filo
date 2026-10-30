@@ -207,6 +207,7 @@
     if (tipi.has('file')) rimedi.push('sposta i nomi di file in notePerAgenti, con gli altri dettagli tecnici (lì il testo è libero)');
     if (tipi.has('lineette')) rimedi.push('al posto delle lineette metti un punto o una virgola');
     if (tipi.has('pro')) rimedi.push('un\'opzione senza un pro vero si toglie, o si scrive il pro vero');
+    if (tipi.has('contro')) rimedi.push('scrivi il contro vero (cosa costa, cosa rischia, cosa lascia indietro)');
     return no('testo_non_per_owner', `nel testo per l'owner ${problemi.map((p) => p.testo).join('; ')}. Cosa fare: ${rimedi.join('; ')}`,
       { campo: problemi[0].campo, campi: problemi.map((p) => p.campo) });
   }
