@@ -109,12 +109,23 @@
     return `${host}${resto.slice(0, limite - host.length - 1)}…`;
   }
 
-  // Anti-duplicati (#370): col submissionId il documento nasce con QUELL'id, e un secondo
-  // invio uguale viene rifiutato. Id non ammesso → '', cioè nessuna idempotenza.
+  // Anti-duplicati (#370): col submissionId il documento nasce con QUELL'id, e un secondo invio uguale viene rifiutato.
+  // Id fuori dalla forma che le regole chiedono alla create anonima (#1517) → '', cioè nessuna idempotenza.
   function sanitizeDocId(id) {
     if (!id) return '';
-    const s = String(id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 200);
-    if (!s || s === '.' || s === '..' || /^__.*__$/.test(s)) return '';
+    const s = String(id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 128);
+    if (s.length < 20 || /^__.*__$/.test(s)) return '';
+    return s;
+  }
+
+  // Un id che nessuno indovina, della forma degli id automatici di Firestore: un invio che occupa un id ricavato da
+  // dati pubblici fa passare un 409 per «già scritto da me» (#1517).
+  const ALFABETO_ID = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  function idCasuale(lunghezza = 24) {
+    const byte = new Uint8Array(lunghezza);
+    global.crypto.getRandomValues(byte);
+    let s = '';
+    for (const b of byte) s += ALFABETO_ID[b % ALFABETO_ID.length];
     return s;
   }
 
@@ -677,7 +688,6 @@
       if (/^[0-9a-f]{16}$/.test(raw)) walletPseudonym = raw;
     } catch (_) {}
 
-    const nowIso = new Date().toISOString();
     const doc = {
       fields: {
         text: toFsValue(encText),
@@ -690,14 +700,11 @@
         images: toFsValue(uploaded),
         files: toFsValue(uploadedFiles),
         statusPublic: toFsValue('open'),
-        createdAt: { timestampValue: nowIso },
-        // L'ORA DELL'ULTIMA SCRITTURA, scritta da chi scrive. È il campo su cui
-        // la dashboard chiede «cosa è cambiato da allora?»: un feedback che non
-        // ce l'ha non compare più in quella domanda, quindi OGNI cammino che
-        // tocca un feedback deve rimetterlo (vedi `touchUpdatedAt`).
-        updatedAt: { timestampValue: nowIso },
       },
     };
+    // Le due date le mette Firestore (REQUEST_TIME), come le regole chiedono alla create anonima (#1517). Su `updatedAt`
+    // la dashboard chiede «cosa è cambiato da allora?»: OGNI cammino che tocca un feedback lo rimette (`touchUpdatedAt`).
+    let dateDelServer = ['createdAt', 'updatedAt'];
     if (seq) {
       doc.fields.seq = { integerValue: String(seq) };
       doc.fields.subSeq = { integerValue: '0' };
@@ -714,10 +721,23 @@
       doc.fields.capabilityGapId = toFsValue(String(capabilityGapId).slice(0, 100));
     }
 
-    // Idempotenza: vedi sanitizeDocId (#370).
-    const docId = sanitizeDocId(submissionId);
-    const idParam = docId ? `documentId=${encodeURIComponent(docId)}&` : '';
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?${idParam}key=${API_KEY}`;
+    // Idempotenza: vedi sanitizeDocId (#370). Senza un id d'invio valido il documento ne prende uno casuale: la
+    // create passa da `:commit` (le date di Firestore, sotto) e lì l'id lo sceglie chi scrive.
+    const idInvio = sanitizeDocId(submissionId);
+    const docId = idInvio || idCasuale();
+    const endpoint = `${FIRESTORE_BASE}:commit?key=${API_KEY}`;
+    // `exists: false` è la create: un id già scritto torna 409 ALREADY_EXISTS, come la POST di prima.
+    const scrivi = (headers) => fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(headers || {}) },
+      body: JSON.stringify({
+        writes: [{
+          update: { name: `projects/${PROJECT_ID}/databases/(default)/documents/${COLLECTION}/${docId}`, fields: doc.fields },
+          currentDocument: { exists: false },
+          updateTransforms: dateDelServer.map((fieldPath) => ({ fieldPath, setToServerValue: 'REQUEST_TIME' })),
+        }],
+      }),
+    });
     let res = null;
     let senderProof = '';
     let authRefused = 0;
@@ -742,11 +762,7 @@
         doc.fields.priority = { stringValue: await maybeEncrypt(String(prioritaScelta)) };
         doc.fields.priorityManual = { booleanValue: true };
       }
-      res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify(doc),
-      });
+      res = await scrivi({ Authorization: `Bearer ${idToken}` });
       // #912: un nome riservato col token rifiutato non riparte da anonimo: sarebbe un utente che nessuno può dire suo.
       if ((soloAdmin || NOME_RISERVATO_RE.test(String(clientId || ''))) && (res.status === 401 || res.status === 403)) {
         throw Object.assign(new Error(`firestore create fallito (${res.status}): token admin rifiutato, e questo feedback non parte da anonimo`), { accessoOwner: true });
@@ -768,22 +784,13 @@
       if (NOME_RISERVATO_RE.test(String(clientId || ''))) {
         doc.fields.clientId = toFsValue(await maybeEncrypt('non-provato:' + String(clientId)));
       }
-      res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(doc),
-      });
+      res = await scrivi();
     }
-    const riprova = () => fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(doc),
-    });
-    if (!senderProof && res.status === 403 && doc.fields.updatedAt) {
+    if (!senderProof && res.status === 403 && dateDelServer.includes('updatedAt')) {
       // Regole senza `updatedAt` ancora in produzione: si toglie solo quello,
       // non numero e titolo con tutto lo schema.
-      delete doc.fields.updatedAt;
-      res = await riprova();
+      dateDelServer = dateDelServer.filter((f) => f !== 'updatedAt');
+      res = await scrivi();
     }
     if (!senderProof && res.status === 403) {
       // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq/parentId/clientIdHash):
@@ -796,21 +803,20 @@
       delete doc.fields.clientIdHash; // S1.F2.2: rules vecchie potrebbero rifiutarlo
       delete doc.fields.walletPseudonym; // #652: idem, finché le regole non sono deployate
       seq = null;
-      res = await riprova();
+      res = await scrivi();
     }
-    // 409 ALREADY_EXISTS con documentId → il feedback è già stato scritto da un
+    // 409 ALREADY_EXISTS con l'id d'invio → il feedback è già stato scritto da un
     // tentativo precedente (identico submissionId). Non è un errore: successo
     // idempotente, nessun duplicato creato.
     const prova = idToken ? { senderProof, ...(authRefused ? { authRefused } : {}), ...(localOnly ? { localOnly: true } : {}) } : {};
-    if (docId && res.status === 409) {
+    if (idInvio && res.status === 409) {
       return { id: docId, seq: null, images: uploaded, files: uploadedFiles, failed, deduped: true, ...prova };
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       throw new Error(`firestore create fallito (${res.status}): ${errText.slice(0, 300)}`);
     }
-    const json = await res.json();
-    return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed, ...prova };
+    return { id: docId, seq, images: uploaded, files: uploadedFiles, failed, ...prova };
   }
 
   // È un TETTO, non un totale: oltre la soglia i più vecchi restano fuori,
@@ -1302,6 +1308,25 @@
     return out;
   }
 
+  // Quanti documenti si leggono per un numero: il padre e i suoi figli stanno larghi qui dentro. Pieno vuol dire
+  // che oltre ce ne possono essere altri, e allora non si sceglie.
+  const NUMERO_RIGHE_MAX = 200;
+
+  // Il solo documento #seq.sub fra le righe lette per quel `seq`, o null. Due o più (un numero doppio, #1517) o una
+  // lettura piena: lancia con gli id in `numeroDoppio`, invece di legare il primo che capita. PURA.
+  function unicoDelNumero(rows, seq, sub, limite = NUMERO_RIGHE_MAX) {
+    const righe = Array.isArray(rows) ? rows : [];
+    const etichetta = `#${seq}${sub ? `.${sub}` : ''}`;
+    const trovati = righe.filter((r) => r && (Number(r.subSeq) || 0) === sub).map((r) => String(r._id));
+    if (trovati.length > 1) {
+      throw Object.assign(new Error(`${etichetta} è il numero di ${trovati.length} feedback (${trovati.join(', ')}): non scelgo io quale`), { numeroDoppio: trovati });
+    }
+    if (righe.length >= limite) {
+      throw Object.assign(new Error(`${etichetta}: più di ${limite - 1} feedback col numero ${seq}, non so dire se è uno solo`), { numeroDoppio: trovati });
+    }
+    return trovati[0] || null;
+  }
+
   // L'id del feedback col numero dato («676», «#676.1»): il registro dei
   // worker porta il numero, il giro vuole l'id (#676.1). Si legge chi ha quel
   // `seq` (il padre e i suoi figli), non la lista.
@@ -1314,10 +1339,9 @@
       from: [{ collectionId: COLLECTION }],
       where: { fieldFilter: { field: { fieldPath: 'seq' }, op: 'EQUAL', value: { integerValue: String(seq) } } },
       select: selectFields(['seq', 'subSeq']),
-      limit: 200,
+      limit: NUMERO_RIGHE_MAX,
     }, { timeoutMs, idToken, what: 'numero' });
-    const trovato = rows.find((r) => (Number(r && r.subSeq) || 0) === sub);
-    return trovato ? String(trovato._id) : null;
+    return unicoDelNumero(rows, seq, sub);
   }
 
   // Quanti invii in tutto: il contatore avanza PRIMA che il documento sia
@@ -2081,7 +2105,7 @@
     listChangedDirect,
     getMany,
     versionsOf,
-    idDelNumero,
+    idDelNumero, unicoDelNumero,
     submissionCount,
     // #583 — la vista pubblica: l'unica lettura dei feedback che non chiede
     // credenziali. Ci sono dentro i soli campi pubblici dei feedback chiusi.

@@ -132,6 +132,23 @@
     return num ? 'automazione · feedback #' + num : 'automazione';
   }
 
+  // Accanto alla provenienza, cosa dice il documento con l'id della richiesta (#1517): il numero da solo può essere
+  // anche di un estraneo. `o.descriviFeedback(req)` → { testo, doppi } o null, lo dà la pagina che sa leggerlo.
+  function aggiungiInfoFeedback(head, req, o) {
+    var d = o && typeof o.descriviFeedback === 'function' ? o.descriviFeedback(req) : null;
+    if (!d) return;
+    if (d.testo) {
+      var info = el('span', 'sn-mac-fbinfo', d.testo);
+      info.title = 'Stato e mittente della segnalazione di questa richiesta, letti dal documento.';
+      head.appendChild(info);
+    }
+    if (Number(d.doppi) > 1) {
+      var doppio = el('span', 'sn-mac-fbdoppio', 'numero doppio');
+      doppio.title = 'Il numero #' + feedbackNum(req) + ' è di ' + d.doppi + ' segnalazioni: il bottone apre quella di questa richiesta.';
+      head.appendChild(doppio);
+    }
+  }
+
   function originHint(req) {
     return originOf(req) === 'routine'
       ? 'Questo ramo l’ha scritto un’automazione partendo da una segnalazione: guarda cosa è stato bloccato prima di approvarlo.'
@@ -549,6 +566,7 @@
       origin.title = originHint(req);
     }
     head.appendChild(origin);
+    aggiungiInfoFeedback(head, req, o);
     head.appendChild(el('span', 'sn-mac-branch', req.branch || '(ramo sconosciuto)'));
     var sha = linkEsterno('sn-mac-sha', shortSha(req.sha), req.diffUrl);
     sha.title = 'Il commit esaminato: ' + String(req.sha || '') + (linkGitHub(req.diffUrl) ? '\nApri il diff su GitHub' : '');
@@ -739,6 +757,7 @@
       origin.title = originHint(req);
     }
     head.appendChild(origin);
+    aggiungiInfoFeedback(head, req, o);
     head.appendChild(el('span', 'sn-mac-branch', req.branch || '(ramo sconosciuto)'));
     var sha = el('span', 'sn-mac-sha', shortSha(req.sha));
     sha.title = 'Il commit che avevi approvato: ' + String(req.sha || '');
@@ -1030,6 +1049,7 @@
       } else {
         head.appendChild(el('span', 'sn-mac-recent-origin', originLabel(r)));
       }
+      aggiungiInfoFeedback(head, r, o);
       head.appendChild(el('span', 'sn-mac-recent-branch', r.branch || '—'));
       var sha = linkEsterno('sn-mac-sha', shortSha(r.mergeSha || r.sha), r.diffUrl);
       sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '')

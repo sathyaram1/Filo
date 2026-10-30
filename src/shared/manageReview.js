@@ -1523,12 +1523,40 @@
     return Number.isInteger(sub) && sub > 0 ? `${s}.${sub}` : String(s);
   }
 
+  // Con l'id della pratica il numero non conta: può essere anche di un documento estraneo (#1517), che porterebbe la
+  // richiesta e il suo via libera nel dettaglio sbagliato. Il numero vale solo per le richieste che l'id non l'hanno.
   function richiestaDiQuesto(req, fb) {
     if (!req || !fb) return false;
     const id = String(req.feedbackId || '').trim();
-    if (id && id === String(fb._id || '')) return true;
+    if (id) return id === String(fb._id || '');
     const num = String(req.num || '').trim().replace(/^#+/, '');
     return !!num && num === numeroOf(fb);
+  }
+
+  // La classe del mittente detta accanto a un numero: al singolare, corta.
+  const CLASSE_BREVE = {
+    owner: 'owner', utente: 'utente', filo_per_utente: 'Filo per un utente', sessione_locale: 'sessione locale',
+    routine: 'routine', server: 'allarme del server', test: 'collaudo',
+  };
+
+  // Accanto al numero di una pratica nominata da una fusione o da una domanda (#1517): stato e mittente del documento
+  // `fb` (o della `riserva` del server se non è in pagina) e `doppi`, quanti documenti hanno quel numero. PURA.
+  function descriviRiferimento(fb, riserva, doppi) {
+    const n = Number(doppi) || 0;
+    const r = riserva && typeof riserva === 'object' ? riserva : {};
+    let stato = '';
+    let classe = '';
+    if (fb) {
+      stato = statusUnreadable(fb) ? publicStateLabel(fb) : ((FS().STATUSES[normalizeStatus(fb).status] || {}).label || '');
+      const MT = global.SN_MITTENTI;
+      const m = MT && MT.mittenteDi ? MT.mittenteDi(fb) : null;
+      classe = (m && CLASSE_BREVE[m.classe]) || '';
+    } else {
+      stato = (FS().STATUSES[String(r.stato || '')] || {}).label || '';
+      classe = CLASSE_BREVE[String(r.mittenteClasse || '')] || '';
+    }
+    const testo = [stato, classe].filter(Boolean).join(' · ');
+    return testo || n > 1 ? { testo, doppi: n } : null;
   }
 
   // Fermata al cancello senza una richiesta da approvare (#1556): il motivo è la nota con cui il server l'ha fermata,
@@ -1927,7 +1955,7 @@
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
-    fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
+    fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf, descriviRiferimento,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, schedaIngresso, rigiudicabile,
     aspettaRisposta, aspettaDomanda, domandeBloccantiDi, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,

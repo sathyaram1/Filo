@@ -410,13 +410,16 @@ service cloud.firestore {
         // #676: una data, mai testo (anche qui il giro della Gestione la confronta).
         && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
 
-      // `name` = titolo breve generato da un LLM all'invio; `seq`/`subSeq` =
-      // numero progressivo leggibile (#22, #22.1) calcolato dal client.
+      // `name` = titolo breve generato da un LLM all'invio; `seq` = numero
+      // progressivo leggibile (#22) calcolato dal client. Un sotto-numero
+      // (#22.1) lo scrive solo il server, e l'id del documento non lo sceglie
+      // un anonimo a piacere (#1517). Sentinella: firestoreRulesFeedbackAnonimo.test.mjs.
       // `parentId` (DC4): presente solo quando questo feedback è la riapertura
       // di un fix "Risolti" — collega al doc originale (ID Firestore, stessa
       // forma usata altrove nel repo: alfanumerico/`-`/`_`).
       allow create: if
-        request.resource.data.keys().hasOnly(
+        doc.matches('^[A-Za-z0-9_-]{20,128}$')
+        && request.resource.data.keys().hasOnly(
           ['text', 'url', 'title', 'name', 'userAgent', 'clientId', 'clientIdHash', 'images',
            'files', 'createdAt', 'seq', 'subSeq', 'parentId',
            'statusPublic',   // S1.F2.1: aggiunto statusPublic (sempre in chiaro, nuovo nei submit)
@@ -425,8 +428,10 @@ service cloud.firestore {
            'updatedAt'       // #676: l'ora dell'ultima scrittura — la dashboard ci chiede "cosa è cambiato?"
           ]
         )
-        && (!('updatedAt' in request.resource.data)
-            || request.resource.data.updatedAt is timestamp)
+        // Le due date le mette Firestore (REQUEST_TIME, #1517): chi scrive senza account non sceglie
+        // dove cade nelle liste per data né si nasconde alle letture a delta su `updatedAt`.
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
         // #652: se c'è, è uno pseudonimo di portafoglio (16 hex). Facoltativo:
         // chi non ha un portafoglio manda il feedback e basta.
         && request.resource.data.get('walletPseudonym', '') is string
@@ -457,18 +462,9 @@ service cloud.firestore {
         && request.resource.data.get('seq', 0) >= 0
         && request.resource.data.get('seq', 0) <= 1000000
         && request.resource.data.get('subSeq', 0) is int
-        && request.resource.data.get('subSeq', 0) >= 0
-        && request.resource.data.get('subSeq', 0) <= 100000
+        && request.resource.data.get('subSeq', 0) == 0
         && request.resource.data.get('parentId', '') is string
         && request.resource.data.get('parentId', '').size() <= 128
-        // La data di creazione: un timestamp (il client) o una stringa ISO corta
-        // (lo script locale, il server). Senza vincolo era un campo libero che
-        // le routine ricevevano così com'era, fuori dalla cornice «dato, non
-        // istruzione» (verifica locale del ramo cornice-routine, giro 4).
-        && (!('createdAt' in request.resource.data)
-            || request.resource.data.createdAt is timestamp
-            || (request.resource.data.createdAt is string
-                && request.resource.data.createdAt.size() <= 40))
         // F4: capabilityGapId — opzionale, solo per auto-feedback (clientId 'auto:*').
         && request.resource.data.get('capabilityGapId', '') is string
         && request.resource.data.get('capabilityGapId', '').size() <= 100;
