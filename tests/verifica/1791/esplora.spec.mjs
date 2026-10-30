@@ -71,3 +71,61 @@ test('in smistamento: sola lettura', async ({ app, openTab }) => {
   await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
   await page.screenshot({ path: 'tests/.shots/v1791-smistamento-scuro.png' });
 });
+
+test('lista corta: un arrivo sopra non sposta la riga sotto il puntatore', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  const base = [domanda(100, { creataIl: 1e12 }), domanda(101, { creataIl: 1e12 + 1000 }), domanda(102, { creataIl: 1e12 + 2000 })];
+  await page.evaluate((l) => window.__mgTest.setDomande(l, {}), base);
+  await page.locator('.mg-sezione[data-sezione="domande"]').click();
+  const bersaglio = riga(page, 'D-102');
+  const box = await bersaglio.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.evaluate((l) => window.__mgTest.setDomande(l, {}), [domanda(99, { creataIl: 1 }), ...base]);
+  await expect(riga(page, 'D-99')).toHaveCount(1);
+  const dopo = await bersaglio.boundingBox();
+  console.log('PRIMA', box.y, 'DOPO', dopo.y);
+  // Cosa c'è sotto il puntatore adesso?
+  const sotto = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('.mg-domanda')?.dataset.id, [box.x + box.width / 2, box.y + box.height / 2]);
+  console.log('SOTTO', sotto);
+  expect(sotto).toBe('D-102');
+});
+
+function fbVivo(id, seq, status, extra = {}) {
+  return {
+    _id: id, _updateTime: 'v1', seq, subSeq: 0, name: `Segnalazione ${seq}`, text: `Testo ${seq}`, status,
+    statusReason: extra.statusReason || null, clientId: 'tester@example.com',
+    createdAt: new Date(Date.UTC(2026, 7, 1) + seq * 3600e3).toISOString(), images: [], ...extra,
+  };
+}
+test('Ricevuti corti: un arrivo dal vivo in cima non sposta la riga sotto il puntatore', async ({ openTab }) => {
+  const docs = [fbVivo('f800', 800, 'todo')];
+  for (let n = 760; n > 757; n -= 1) docs.push(fbVivo(`f${n}`, n, 'design', { statusReason: 'clarify' }));
+  const page = await openTab(MANAGE);
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate((docs) => {
+    window.__srv = { docs: {} };
+    for (const d of docs) window.__srv.docs[d._id] = d;
+    const piuNuovi = (a, b) => String(b.createdAt).localeCompare(String(a.createdAt));
+    window.__mgTest.setLiveSources({
+      listVersions: async () => Object.values(window.__srv.docs).sort(piuNuovi).map((d) => ({ _id: d._id, _updateTime: d._updateTime })),
+      getMany: async (ids) => ids.map((id) => window.__srv.docs[id]).filter(Boolean).map((d) => ({ ...d })),
+    });
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setLiveTiming({ pollMs: 800, rientroMs: 300, clockMs: 200 });
+    window.__mgTest.setData(docs.map((d) => ({ ...d })), { dalVivo: true });
+    window.__mgTest.setSortMode('num');
+    window.__mgTest.setTab('inbox');
+  }, docs);
+  await expect(page.locator('#mgList .mg-item')).toHaveCount(3);
+  const bersaglio = page.locator('.mg-item[data-id="f758"]');
+  const box = await bersaglio.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.evaluate(() => { const d = window.__srv.docs.f800; window.__srv.docs.f800 = { ...d, status: 'design', statusReason: 'l5', _updateTime: 'v2' }; });
+  await expect(page.locator('#mgList .mg-item')).toHaveCount(4, { timeout: 10_000 });
+  const sotto = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('.mg-item')?.dataset.id, [box.x + box.width / 2, box.y + box.height / 2]);
+  console.log('SOTTO', sotto, 'Y', box.y, (await bersaglio.boundingBox()).y);
+  expect(sotto).toBe('f758');
+});
