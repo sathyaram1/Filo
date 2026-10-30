@@ -793,7 +793,11 @@ module.exports = function register(on, ctx) {
   }));
 
   // #870 — le carte della home. La stessa mossa arriva dalla chat (azione CARTA_HOME) e passa dallo stesso posto.
-  on(MSG.CARTE_HOME_GET, soloFilo(async () => ({ ok: true, layout: await require('../carteHome').leggi() })));
+  on(MSG.CARTE_HOME_GET, soloFilo(async () => {
+    const Carte = require('../carteHome');
+    const [layout, primoIncontro] = await Promise.all([Carte.leggi(), ctx.getEffectiveSettings().then(Carte.primoIncontro)]);
+    return { ok: true, layout, primoIncontro };
+  }));
   on(MSG.CARTE_HOME_MODIFICA, soloFilo(async (msg, sender) => {
     const esito = await require('../carteHome').modifica(msg && msg.mossa);
     if (esito.errore) return { ok: false, error: esito.errore, layout: esito.layout };
