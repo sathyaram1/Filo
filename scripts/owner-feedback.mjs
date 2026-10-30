@@ -318,7 +318,7 @@ export async function segnaAttese(id, numeri, opts = {}) {
 /**
  * Una segnalazione che un pacchetto vuole unire, letta per i controlli di `feedback:apri --pacchetto`
  * (SPEC-RIDISEGNO-LAVORO.md §3, regola 1). `stato` e `priorita` restano '' e null se non si decifrano.
- * @returns {Promise<{ ok: true, id, num, stato, priorita, locale, attese } | { ok: false, motivo, inesistente? }>}
+ * @returns {Promise<{ ok: true, id, num, stato, priorita, locale, attese, ramo, unisce, fidato } | { ok: false, motivo, inesistente? }>}
  */
 export async function segnalazioneDaUnire(riferimento, opts = {}) {
   const ATT = globalThis.SN_FB_ATTESE;
