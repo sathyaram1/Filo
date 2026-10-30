@@ -152,8 +152,8 @@ function mtime(p) {
 }
 
 /**
- * I segni di vita del worker che tiene `ticket` in `root`. Senza transcript visibili contano anche i processi della
- * cartella; con i transcript no, perché un processo orfano lascerebbe vivo per sempre un worker fermo.
+ * I segni di vita del worker che tiene `ticket` in `root`. Un processo nella sua cartella lo tiene vivo anche col
+ * transcript fermo: chi aspetta un comando in sottofondo (una verifica lunga) non scrive niente finché quello non esce.
  */
 export function segniDiVita({ root, ticket, sessione = process.env.CLAUDE_CODE_SESSION_ID, configDir = '', leggiProcessi } = {}) {
   const m = leggiMarcatoreBiglietto(root);
