@@ -322,7 +322,7 @@ test('#500 scorrendo un menu troppo alto il sottomenu segue la freccetta, e spar
 // che sopravvive apposta agli eventi di scorrimento, il menu restava esatto
 // dov'era con le ultime voci fuori dal bordo.
 
-// Cambia l'altezza della finestra e aspetta che la pagina se ne accorga.
+// Cambia l'altezza della finestra e aspetta che la pagina abbia quella finale.
 // Ritorna la funzione che rimette le misure di prima.
 async function accorciaFinestra(app, page, quanto) {
   const vhPrima = await page.evaluate(() => window.innerHeight);
@@ -332,9 +332,14 @@ async function accorciaFinestra(app, page, quanto) {
     w.setBounds({ ...b, height: Math.max(240, b.height - d) });
     return b;
   }, quanto);
-  await expect
-    .poll(async () => page.evaluate(() => window.innerHeight), { timeout: 5000 })
-    .toBeLessThan(vhPrima);
+  // In GitHub l'altezza può passare per una misura di mezzo (#1794): un rientro misurato lì non dice niente.
+  let letta = null;
+  await expect.poll(async () => {
+    const vh = await page.evaluate(() => window.innerHeight);
+    const ferma = vh < vhPrima && vh === letta;
+    letta = vh;
+    return ferma;
+  }, { timeout: 5000, intervals: [200] }).toBe(true);
   return async () => {
     await app.evaluate(async ({ BrowserWindow }, b) => {
       BrowserWindow.getAllWindows().find((x) => x._filoTabs).setBounds(b);
