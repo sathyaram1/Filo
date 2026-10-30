@@ -193,7 +193,8 @@ function bloccoVivo(f, ora) {
 
 function prendiBlocco(f, ora) {
   for (let i = 0; i < 2; i += 1) {
-    try { writeFileSync(f, `${process.pid}\n`, { flag: 'wx' }); return true; } catch (e) { if (!e || e.code !== 'EEXIST') throw e; }
+    // Una cartella dei blocchi che non si scrive non ferma l'installazione: resta solo senza blocco.
+    try { writeFileSync(f, `${process.pid}\n`, { flag: 'wx' }); return true; } catch (e) { if (!e || e.code !== 'EEXIST') return true; }
     if (bloccoVivo(f, ora)) return false;
     rmSync(f, { force: true });
   }
@@ -203,13 +204,13 @@ function prendiBlocco(f, ora) {
 function installaPrivati(clone, nm, firma, { npmCi, avvisa, perche, blocchi, ora, attendi }) {
   const f = fileBlocco(clone, blocchi);
   if (!prendiBlocco(f, ora)) {
-    avvisa('Un\'altra installazione dei pacchetti è in corso in questo clone: aspetto che finisca, non ne apro un\'altra.');
+    avvisa('Un\'altra installazione dei pacchetti è in corso in questo clone: aspetto che finisca, non ne apro un\'altra.', { attesa: true });
     for (const fine = ora() + TETTO_INSTALLAZIONE_MS; bloccoVivo(f, ora) && ora() < fine;) attendi(1000);
     if (privatiDi(nm) === firma) return { ok: true, pacchetti: 'privati', why: '' };
     if (!prendiBlocco(f, ora)) return { ok: false, pacchetti: '', gruppo: 'npm', why: `l'altra installazione nel clone non ha finito in ${TETTO_INSTALLAZIONE_MS / 60_000} minuti` };
   }
   try {
-    avvisa(`${perche}: installo i pacchetti nel clone con npm ci, ci vogliono alcuni minuti.`);
+    avvisa(`${perche}: installo i pacchetti nel clone con npm ci, ci vogliono alcuni minuti.`, { attesa: true });
     const daCollegati = eLink(nm) || collegatiVoceAVoce(nm);
     scollegaPacchetti(nm);
     if (restaUnCollegamento(nm)) return { ok: false, pacchetti: '', why: 'un collegamento a node_modules non si toglie: mi fermo' };

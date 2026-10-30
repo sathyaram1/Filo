@@ -42,7 +42,7 @@ export function cloneDelGiro(root, { toolsDir = pinnedDir() } = {}) {
 }
 
 // Il comando del worker ha di serie due minuti: tagliato a metà installazione, rilanciato aspetta quella in corso.
-const avvisoDelGiro = (m) => process.stderr.write(`[dispatch] ${m} Se il comando ti torna per il tempo, rilancialo uguale con un timeout di dieci minuti.\n`);
+const avvisoDelGiro = (m, { attesa = false } = {}) => process.stderr.write(`[dispatch] ${m}${attesa ? ' Se il comando ti torna per il tempo, rilancialo uguale con un timeout di dieci minuti.' : ''}\n`);
 
 /** Il clone pronto, con gli strumenti suoi: npm ci solo se non ci sono pacchetti da collegare (#1906). */
 export function preparaPerIlGiro(root, giro, { prepara = preparaClone, avvisa = avvisoDelGiro } = {}) {

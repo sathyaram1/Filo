@@ -258,8 +258,7 @@ test('rilanciato mentre un altro installa nel clone: aspetta quella, e un blocco
 
     // Il primo e' stato fermato dal tempo del comando: il blocco resta, col pid di un processo che non c'e' piu'.
     togliCartella(resolve(dest, 'node_modules'));
-    const morto = spawnSync(process.execPath, ['-e', '']).pid;
-    writeFileSync(f, `${morto}\n`, 'utf8');
+    writeFileSync(f, `${pidMorto()}\n`, 'utf8');
     const npmCi = npmFinto();
     const di = allineaPacchetti(dest, s.principale, {
       npmCi, soloCollegati: true, blocchi, attendi: () => { throw new Error('ha aspettato un blocco morto'); }, avvisa: () => {},
