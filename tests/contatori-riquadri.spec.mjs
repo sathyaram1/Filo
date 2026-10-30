@@ -139,6 +139,7 @@ test('su una pagina delicata la spiegazione non preparata conta come costo della
   await expect(menu.locator('.sn-menu-inline-explain')).toContainText('Un felino', { timeout: 10_000 });
   await expect.poll(() => voceOra(app, 'anticipo_privacy', 'spiega'), { timeout: 10_000 }).toEqual({ saltato: 1, chiesto: 1 });
   expect(await voceOra(app, 'anticipo_al_gesto', 'spiega'), 'fermata dalla privacy, non dal tetto delle automatiche').toBeNull();
+  await expect.poll(() => chiestiOggi(app, 'explain'), { timeout: 5000 }).toBe(1);
   // Riaperta, la stessa spiegazione non è un gesto in più.
   await page.keyboard.press('Escape');
   await page.locator('#parola').click({ button: 'right' });
