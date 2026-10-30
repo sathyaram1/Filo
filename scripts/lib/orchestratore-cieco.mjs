@@ -57,8 +57,8 @@ export function regoleGit(clone = '') {
 // commenti, niente barre rovesciate (la riga di comando di Windows le mangia), nella regex solo classi di caratteri.
 // Si ferma ogni fonte di configurazione, anche ignota: il progetto vince sull'utente, e un disableAllHooks scritto lì
 // spegnerebbe il gancio (#1182).
-// registro = { testo } del file o { errore }; impronta = sha256 esadecimale.
-export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), registro = null, impronta = null } = {}) {
+// registro = { testo } del file o { errore }; impronta = sha256 esadecimale; strumenti = la copia fissata, già ripulita.
+export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), registro = null, impronta = null, strumenti = "" } = {}) {
   if (!input || !(adesso - Number(creato) < VALIDITA_MS)) return null;
   if (sessione && input.session_id && input.session_id !== sessione) return null;
   if (input.hook_event_name === "ConfigChange") {
