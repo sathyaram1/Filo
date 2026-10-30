@@ -169,6 +169,7 @@ export function pinTools(repoRoot, { dest = pinnedDir(), origine = '', da = repo
     // un checkout non aggiornato riporterebbe indietro gli strumenti con
     // un'altra causa, e senza questa riga non si distinguerebbe.
     if (origine) writeFileSync(resolve(dest, ORIGIN_MARK), `${origine}\n`, 'utf8');
+    if (daCommit) writeFileSync(resolve(dest, COMMIT_MARK), `${daCommit}\n`, 'utf8');
     return { ok: true, dir: dest, why: 'copiati' };
   } catch (e) {
     return { ok: false, dir: '', why: String((e && e.message) || e) };
