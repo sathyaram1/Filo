@@ -1893,7 +1893,10 @@
     }
     const ok = !!(res && res.ok && typeof res.text === 'string');
     const v = ok ? R().valoreTrovato(res.text) : null;
-    ricerche.set(k, v ? { stato: 'trovato', ...v } : { stato: ok ? 'nessuno' : (NON_PARTITA[res && res.code] || 'errore') });
+    const stato = v ? 'trovato' : ok ? 'nessuno' : (NON_PARTITA[res && res.code] || 'errore');
+    ricerche.set(k, { ...(v || {}), stato, via });
+    contaSegnaposto(via, ESITO_CONTATO[stato]);
+    if (stato === 'delicata') contaPrivacySegnaposto('saltato');
     if (res && !res.ok) console.warn('[SN] correttore, segnaposto:', res.code, res.error);
     if (state.attivo) renderOverlayContent(state);
     avvisaAscoltatori(state);
