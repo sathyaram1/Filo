@@ -767,6 +767,9 @@
     disegnaColonna(accadeEl, carteSinistra(), 'sinistra');
     disegnaColonna(tieniEl, carteDestra(), 'destra');
     disegnaAltro();
+    const ridotta = C.homeRidotta(primoIncontro, layout, !!suggerimentoCrediti());
+    tieniEl.hidden = ridotta;
+    altroEl.hidden = ridotta;
     accadeEl.dataset.suona = dati.timers.some((t) => t.ringing) ? '1' : '0';
   }
 
