@@ -8,30 +8,7 @@ import { statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
-
-// Le ore di oggi sommate, misura per misura.
-const oggi = (app) => app.evaluate(async () => {
-  const s = await globalThis.SN_CONTATORI_MAIN.letto();
-  const g = globalThis.SN_CONTATORI.giornoDi(Date.now());
-  const out = {};
-  for (const [k, ora] of Object.entries(s.ore || {})) {
-    if (!k.startsWith(`${g}T`)) continue;
-    for (const m of globalThis.SN_CONTATORI.MISURE_RIQUADRI) {
-      for (const [chiave, conti] of Object.entries(ora[m] || {})) {
-        const a = ((out[m] = out[m] || {})[chiave] = (out[m] || {})[chiave] || conti.map(() => 0));
-        conti.forEach((n, i) => { a[i] += n; });
-      }
-    }
-  }
-  return out;
-});
-// La voce di una misura per nome, letta con l'elenco dell'app: { voce: conto }.
-const voceOra = async (app, misura, chiave) => {
-  const conti = ((await oggi(app))[misura] || {})[chiave];
-  if (!conti) return null;
-  const nomi = await app.evaluate((_e, m) => globalThis.SN_CONTATORI.RIQUADRI[m].gruppi.flat(), misura);
-  return Object.fromEntries(nomi.map((n, i) => [n, conti[i]]).filter(([, n]) => n > 0));
-};
+import { voceOggi as voceOra } from './helpers/riquadriOggi.mjs';
 
 // I modelli finti nel main: le risposte a pezzi si fermano finché la prova non le libera, se `__ferma`.
 async function modelliFinti(app) {
