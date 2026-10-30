@@ -701,6 +701,7 @@ export async function main(argvIn) {
     titolo, testo: copie && copie.origine ? `${String(testo || '').trim()}\n\n${copie.origine}` : testo, url, priorita: prioritaScelta,
     allegati: copie ? [...allegati, ...copie.immagini, ...copie.documenti] : allegati,
     dryRun, idToken: cred.idToken, locale, attese: listaAttese, unisce: unite,
+    nonFidato: copie && copie.nonFidate.length ? `porta allegati di ${copie.nonFidate.join(', ')}, scritti da chi non è fidato` : '',
   });
   if (!r.ok) {
     console.error(`${r.uso ? 'USO' : 'RIFIUTATO'}: ${r.motivo}`);
