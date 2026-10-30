@@ -1085,6 +1085,7 @@
         caricaDownloads().catch(() => {});
         caricaLavori().catch(() => {});
         caricaAperte().catch(() => {});
+        caricaPrimoIncontro().catch(() => {});
       }
     });
     return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori(),
