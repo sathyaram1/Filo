@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
     // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.254', date: '2026-10-30',
+      features: [],
+      fixes: [
+        'Quando alleghi un file a una segnalazione, la finestra di scelta propone solo i tipi che Filo accetta. Se ne trascini uno diverso, il messaggio elenca tutti quelli ammessi.',
+      ],
+    },
+    {
       version: '0.2.252', date: '2026-10-29',
       features: [
         'Mentre un file si scarica, la riga dice quanto va veloce e quanto manca alla fine, nella pagina Download e nella carta della home.',
