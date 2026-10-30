@@ -55,9 +55,7 @@ FILO_ROUTINE=1`), lancia `node scripts/dispatch.mjs --ticket <biglietto>`,
 diventa il ruolo che ti stampa, esegui fino in fondo; tutto ciò che conta va
 registrato via script, il testo di ritorno non viene letto.
 
-Se il gancio ti dice che il worker è **ancora vivo** (Claude Code lo ha
-spostato in sottofondo), chiudi il turno senza fare altro e aspetta la notifica
-di fine.
+<!-- includi: _veglia.md -->
 
 <!-- includi: _dopo-un-guasto.md -->
 
