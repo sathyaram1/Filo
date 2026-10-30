@@ -216,11 +216,11 @@ function registerIpcHandlers() {
   });
 
   // #810.8 — il testo che l'utente ha immesso in un elemento della pagina: lo manda il preload da eventi veri.
-  ipcMain.on('filo:immesso-utente', (event, n, testo) => {
+  ipcMain.on('filo:immesso-utente', (event, n, testo, desde) => {
     try {
       const f = event.senderFrame;
       const chiave = `${event.sender.id}:${f ? `${f.processId}-${f.routingId}` : '?'}:${String(n).slice(0, 40)}`;
-      require('./services/segretiLetti').immessoDallUtente(chiave, testo);
+      require('./services/segretiLetti').immessoDallUtente(chiave, testo, desde);
     } catch (_) {}
   });
 
