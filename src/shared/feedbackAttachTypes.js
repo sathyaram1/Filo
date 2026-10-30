@@ -1,7 +1,7 @@
 // Allowlist degli allegati ammessi: `accept` su un <input type=file> è un suggerimento
 // e non vincola né «Tutti i file» né il drop, quindi serve un gate deterministico.
-// Rifiuta i tipi ATTIVI (text/html, svg…). Elenco unico di riquadro, pagina dei feedback e riga di
-// comando; il gate L0 del server gli resta allineato. Il deposito vede solo blob cifrati (#1518).
+// Rifiuta i tipi ATTIVI (text/html, svg…). Elenco unico di riquadro, pagina dei feedback, caselle di Gestione e
+// riga di comando; il gate L0 del server gli resta allineato. Il deposito vede solo blob cifrati (#1518).
 
 (function (global) {
   'use strict';
