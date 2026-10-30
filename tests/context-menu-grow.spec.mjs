@@ -205,7 +205,7 @@ async function statoScorrimento(page) {
   return { ...menu, paginaY: await page.evaluate(() => Math.round(window.scrollY)) };
 }
 
-test('#500 letta la spiegazione fino in fondo, un giro di rotella in più non porta via il menu', async ({ openTab, testServer }) => {
+test('#500 letta la spiegazione fino in fondo, un giro di rotella in più non porta via il menu', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, paginaLunga());
   const menu = await apriMenuSu(page, '#link');
   await rendiScorrevole(page);
