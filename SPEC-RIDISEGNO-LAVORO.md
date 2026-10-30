@@ -181,5 +181,15 @@ Fatto dalla parte del server (ramo omonimo di filo-security, da rideployare):
   dell'accensione; il biglietto che quella sessione riceve per il suo feedback e uno solo. Il prompt salvato della routine non cambia: la sessione accesa
   così è l'orchestratore cieco, ristretto dal server al suo feedback.
 
-Resta: fase 2, la spesa dell'account per il manutentore e l'operazione che dà schede e
-testi a chi ha la chiave delle routine.
+Spesa per account al manutentore (#1787, decisione D-227: un freno solo, quello di
+Crediti, letto dal manutentore; niente tetti in dollari nelle Automazioni). App fatta:
+`npm run manutentore -- spesa` e la sezione «Spesa» del contesto, una riga per account
+con percentuale e dollari della settimana, quanto resta, ultime 24 ore, accensioni,
+rinnovo e perché è fermo; con le credenziali dell'owner legge `ownerCrediti` (op
+`stato`), altrimenti l'operazione `spesa` del canale col biglietto. La scheda Crediti
+mostra gli stessi campi. Server, da fare: l'operazione `spesa` di `routineOperazione`
+per l'ambito del manutentore, che rimanda `accounts` (gli stessi campi di
+`ownerCrediti`), `numeri.usdPer100` e `freni`; e per account, in entrambe, `usd24h`
+(consumo dell'account nelle ultime 24 ore) e `accensioniSettimana`/`accensioni24h`.
+
+Resta: l'operazione che dà schede e testi a chi ha la chiave delle routine.
