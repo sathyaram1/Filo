@@ -495,8 +495,10 @@
     state.ultimaAutomatica = null;
     state.rifiutateQui = [...state.rifiutateQui, { id: ++progressivo, start: v.start, end, segment: v.originale }].slice(-AUTOMATICHE_MAX);
     if (A().soloMaiuscole(v.originale, v.segment)) aggiungiStile({ minuscoli: 2, maiuscoli: 0 });
+    contaAutomatica(v.fonte, 'annullata');
     const parola = v.originale;
     impara({ passo: 'annullata', parola }, (r) => {
+      if (r && r.rifiuta) contaAutomatica(v.fonte, 'imparata');
       if (r && r.rifiuta && erroriAttivi() && parolaImparabile(parola)) return aggiungiImparata(formaDaImparare(parola, A().inizioDiFrase(getEditableText(el), v.start)));
       return null;
     });
