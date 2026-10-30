@@ -217,14 +217,11 @@
             finish(`rgb(${Math.round(acc[0] / n)}, ${Math.round(acc[1] / n)}, ${Math.round(acc[2] / n)})`);
           } catch (_) { finish(null); }
         };
-        fetch(href, { signal: ctrl.signal })
-          .then((res) => (res && res.ok ? res.blob() : null))
-          .then((blob) => {
-            if (done || !blob) return finish(null);
-            copia = URL.createObjectURL(blob);
-            img.src = copia;
-          })
-          .catch(() => finish(null));
+        scaricaIcona(href).then((blob) => {
+          if (done || !blob) return finish(null);
+          copia = URL.createObjectURL(blob);
+          img.src = copia;
+        });
       });
     }
 
