@@ -111,7 +111,8 @@
 
   // Dentro un riquadro incorporato il menu sull'ELEMENTO vale identico; ciò che riguarda
   // la PAGINA no: il riquadro conosce solo sé e parlerebbe del rettangolo sbagliato (#405).
-  const IS_SUBFRAME = (() => {
+  // Lo strato dei riquadri sopra un sito (#1509.1) parla come la pagina ma non la descrive: vale come un riquadro.
+  const IS_SUBFRAME = self.SN_FILO_UI?.nelloStrato === true || (() => {
     try { return window.top !== window.self; } catch (_) { return true; }
   })();
 

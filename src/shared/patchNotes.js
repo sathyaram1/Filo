@@ -25,6 +25,7 @@
         'Le schede e il «+» restano fermi quando una scheda comincia o smette di suonare. Su una scheda così stretta che resta solo l\'altoparlante, cliccarlo apre la scheda invece di silenziarla. E il titolo di una scheda stretta mostra almeno la prima lettera, o non si vede: niente più mezze lettere.',
         'Sui siti lenti la scheda prende il colore del sito appena la pagina comincia a comparire. Prima aspettava che la pagina finisse di caricarsi, anche cinque secondi.',
         'Quando Filo riordina le schede per colore, i siti di un rosso che tende al rosa, come Netflix e Pinterest, stanno in testa accanto a YouTube. Prima finivano in fondo, dopo il viola. Vale anche per l\'ordine delle schede quando riapri Filo.',
+        'Su un sito, quello che scrivi o selezioni nella spiegazione, nella traduzione, nella Modifica e nel feedback di Filo non lo legge più il sito, nemmeno cercandolo nella pagina. Questi riquadri ora stanno sopra la pagina, fuori dal sito.',
       ],
     },
     {
