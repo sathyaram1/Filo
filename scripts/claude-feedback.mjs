@@ -306,15 +306,153 @@ export function prioritaDelPacchetto(scelta, lette) {
   return note.length ? Math.max(...note) : null;
 }
 
-/** Lettura e attese delle segnalazioni di un pacchetto. Oggetto: i test lo sostituiscono, il vero va in rete. */
+// Lo stesso tetto di un feedback: le regole (immaginiValide, documentiValidi) e submit ne tengono 5 per tipo.
+export const TETTO_PER_TIPO = 5;
+
+/** La nota con cui una segnalazione unita si archivia alla nascita del pacchetto. PURA. */
+export function notaUnita(numPacchetto) {
+  return `Unito nel pacchetto #${numPacchetto}: il lavoro continua lì`;
+}
+
+/**
+ * I riferimenti agli allegati di una unita, dai campi grezzi e dalla conversazione in chiaro: prima quelli della
+ * segnalazione, poi quelli dei commenti. PURA. → [{ tipo: 'immagine'|'documento', nome, type, url, conversazione, indice }]
+ */
+export function riferimentiAllegati(fields, conversazione = '') {
+  const valori = (k) => (fields && fields[k] && fields[k].arrayValue && fields[k].arrayValue.values) || [];
+  const str = (v) => (v && typeof v.stringValue === 'string' ? v.stringValue : '');
+  const immagini = valori('images').map((v) => ({ url: str(v) || str(v && v.mapValue && v.mapValue.fields && v.mapValue.fields.url), conversazione: false }));
+  const documenti = valori('files').map((v) => {
+    const m = (v && v.mapValue && v.mapValue.fields) || {};
+    return { url: str(m.url), nome: str(m.name), type: str(m.type), conversazione: false };
+  });
+  for (const a of String(conversazione || '').split('\n').map((r) => THREAD.parseAttachmentLine(r)).filter(Boolean)) {
+    if (a.kind === 'file') documenti.push({ url: a.url, nome: a.name, type: a.type, conversazione: true });
+    else immagini.push({ url: a.url, conversazione: true });
+  }
+  const conIndice = (lista, tipo) => lista.filter((a) => a.url).map((a, i) => ({ tipo, nome: a.nome || '', type: a.type || '', url: a.url, conversazione: a.conversazione, indice: i + 1 }));
+  return [...conIndice(immagini, 'immagine'), ...conIndice(documenti, 'documento')];
+}
+
+/**
+ * Gli allegati delle unite ci stanno nel pacchetto, con quelli di `--allega`? I motivi del no (vuoto = sì). PURA.
+ * `perUnita`: [{ u: { num }, allegati: [{ tipo }] }]; `propri`: { immagini, documenti } contati.
+ */
+export function tettoAllegati(perUnita, propri = {}) {
+  const motivi = [];
+  for (const [tipo, parola, mie] of [['immagine', 'immagini', Number(propri.immagini) || 0], ['documento', 'documenti', Number(propri.documenti) || 0]]) {
+    const conti = (Array.isArray(perUnita) ? perUnita : []).map(({ u, allegati }) => [u.num, (allegati || []).filter((a) => a.tipo === tipo).length]).filter(([, n]) => n > 0);
+    const dalleUnite = conti.reduce((s, [, n]) => s + n, 0);
+    if (dalleUnite + mie <= TETTO_PER_TIPO) continue;
+    motivi.push(`le unite portano ${dalleUnite} ${parola} (${conti.map(([n, k]) => `#${n}: ${k}`).join(', ')})${mie ? ` e tu ne alleghi ${mie}` : ''}: un feedback ne tiene al più ${TETTO_PER_TIPO}. Dividi il pacchetto${mie ? ', o allega meno' : ''}`);
+  }
+  return motivi;
+}
+
+/** Il tipo vero di un'immagine dai suoi byte, '' se non è un'immagine che Filo apre (l'SVG è attivo). PURA. */
+function tipoImmagine(byte) {
+  const b = byte || [];
+  const t = globalThis.SN_FEEDBACK_IMAGE.sniffImageMime(b);
+  // Il riconoscitore ripiega su PNG quando non riconosce: un PNG vero comincia con la sua firma.
+  if (t === 'image/png' && !(b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47)) return '';
+  return globalThis.SN_FEEDBACK_ATTACH.classify({ name: '', type: t }) === 'image' ? t : '';
+}
+
+/**
+ * Gli allegati scaricati delle unite → quelli del pacchetto: i documenti col nome «#N — nome», le immagini (che un nome
+ * non l'hanno) con l'origine scritta in `origine`, da mettere in coda alla spec. `primaImmagini`: quante ne porta
+ * `--allega`, che vengono prima. PURA. → { immagini, documenti, origine, motivi }
+ */
+export function copieDegliAllegati(perUnita, { primaImmagini = 0 } = {}) {
+  const immagini = [];
+  const documenti = [];
+  const righe = [];
+  const motivi = [];
+  const dati = (type, byte) => `data:${type};base64,${Buffer.from(byte).toString('base64')}`;
+  for (const { u, allegati } of Array.isArray(perUnita) ? perUnita : []) {
+    for (const a of allegati || []) {
+      const dove = a.conversazione ? ' della conversazione' : '';
+      const byte = a.byte;
+      const chi = a.tipo === 'immagine' ? `l'immagine ${a.indice}${dove}` : `l'allegato${dove} «${a.nome || a.indice}»`;
+      if (!byte || !byte.length) { motivi.push(`#${u.num}: ${chi} è vuoto`); continue; }
+      if (byte.length > MAX_ALLEGATO_BYTES) { motivi.push(`#${u.num}: ${chi} supera i 4 MB`); continue; }
+      if (a.tipo === 'immagine') {
+        const type = tipoImmagine(byte);
+        if (!type) { motivi.push(`#${u.num}: ${chi} non è un'immagine che Filo apre`); continue; }
+        immagini.push({ name: `#${u.num} — immagine ${a.indice}${dove}`, type, dataUrl: dati(type, byte) });
+        righe.push(`- immagine ${primaImmagini + immagini.length}: da #${u.num}, la sua immagine ${a.indice}${dove}`);
+        continue;
+      }
+      const originale = String(a.nome || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim() || `allegato ${a.indice}`;
+      const name = `#${u.num} — ${originale}`;
+      const type = a.type || mimeDiAllegato(originale);
+      if (globalThis.SN_FEEDBACK_ATTACH.classify({ name, type }) !== 'file') { motivi.push(`#${u.num}: ${chi} ha un tipo che un feedback non ammette (${type || 'senza tipo'})`); continue; }
+      documenti.push({ name, type, dataUrl: dati(type, byte) });
+      righe.push(`- «${name}»: da #${u.num}${dove ? `, allegato${dove}` : ''}`);
+    }
+  }
+  const origine = righe.length ? ['Allegati copiati dalle segnalazioni unite:', ...righe].join('\n') : '';
+  return { immagini, documenti, origine, motivi };
+}
+
+/** Chi aspetta una delle unite, dalle righe lette → [{ id, num, togli: [id], quali: [num] }]. Le unite no: si archiviano. PURA. */
+export function chiAspetta(righe, unite) {
+  const perId = new Map((Array.isArray(unite) ? unite : []).map((u) => [u.id, String(u.num)]));
+  const out = [];
+  for (const r of Array.isArray(righe) ? righe : []) {
+    const id = String((r && r._id) || '');
+    if (!id || perId.has(id)) continue;
+    const togli = globalThis.SN_FB_ATTESE.atteseDi(r).map((w) => w.id).filter((x) => perId.has(x));
+    if (!togli.length) continue;
+    out.push({ id, num: FB.formatNum(Number(r.seq), Number(r.subSeq)) || id, togli, quali: togli.map((x) => perId.get(x)) });
+  }
+  return out;
+}
+
+/** Letture e scritture di un pacchetto. Oggetto: i test lo sostituiscono, il vero va in rete. */
 export const pacchetto = {
   async leggi(numeri, idToken) {
     const { segnalazioneDaUnire } = await import('./owner-feedback.mjs');
     return Promise.all(numeri.map(async (n) => ({ num: n, ...(await segnalazioneDaUnire(n, { bearer: idToken })) })));
   },
-  async attendi(id, voce, idToken) {
-    const { aggiungiAttesa } = await import('./owner-feedback.mjs');
-    return aggiungiAttesa(id, voce, { bearer: idToken });
+  // I riferimenti agli allegati di una unita, compresi quelli della conversazione (cifrata: senza chiave non so se ce ne sono).
+  async allegati(u, idToken) {
+    const { FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
+    const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(u.id)}?mask.fieldPaths=images&mask.fieldPaths=files&mask.fieldPaths=notes`, {
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+    if (!res.ok) throw new Error(`lettura degli allegati di #${u.num} fallita (${res.status})`);
+    const f = (await res.json()).fields || {};
+    let conversazione = f.notes?.stringValue || '';
+    if (globalThis.SN_FEEDBACK_CRYPTO.isEncrypted(conversazione)) {
+      const { decryptFeedbackFields, PLACEHOLDER } = await import('./lib/decrypt-feedback-fields.mjs');
+      conversazione = String((await decryptFeedbackFields({ _id: u.id, notes: conversazione })).notes || '');
+      if (conversazione === PLACEHOLDER || globalThis.SN_FEEDBACK_CRYPTO.isEncrypted(conversazione) || THREAD.reportUnreadable(conversazione)) {
+        throw Object.assign(new Error(`la conversazione di #${u.num} non si decifra (manca la chiave privata?): senza non so se porta allegati`), { definitivo: true });
+      }
+    }
+    return riferimentiAllegati(f, conversazione);
+  },
+  async scarica(a) {
+    if (!FB.isAttachmentUrl(a.url)) throw Object.assign(new Error('l’indirizzo non è del deposito di Filo: non lo scarico'), { definitivo: true });
+    const res = await fetch(a.url);
+    if (!res.ok) throw new Error(`download fallito (${res.status})`);
+    const { decryptAttachmentBytes } = await import('./lib/decrypt-feedback-fields.mjs');
+    try { return await decryptAttachmentBytes(new Uint8Array(await res.arrayBuffer())); } catch (e) { throw Object.assign(e, { definitivo: true }); }
+  },
+  // Una scansione con la sola proiezione delle attese: chi aspetta una unita può essere qualunque feedback.
+  async attesiDa(unite, idToken) {
+    const r = await FB.listAllPaged({ idToken, fields: ['seq', 'subSeq', globalThis.SN_FB_ATTESE.CAMPO] });
+    if (r.complete === false) throw new Error(`la lettura delle attese non è completa (${r.rows.length} documenti)`);
+    return chiAspetta(r.rows, unite);
+  },
+  async sposta(x, voce, idToken) {
+    const { spostaAttese } = await import('./owner-feedback.mjs');
+    return spostaAttese(x.id, x.togli, voce, { bearer: idToken });
+  },
+  async archivia(u, nota, idToken) {
+    const { scrivi } = await import('./owner-feedback.mjs');
+    return scrivi(u.id, 'archived', nota, { bearer: idToken, rif: `#${u.num}` });
   },
 };
 
