@@ -428,7 +428,7 @@ export function formattaElenco(domande) {
   return out.join('\n');
 }
 
-export async function chiamaOwner(data) {
+export async function chiamaOwner(data, funzione = 'ownerDomande') {
   const { findAdminRefreshToken, mintIdToken } = await import('./lib/firestore-auth.mjs');
   const refresh = findAdminRefreshToken();
   if (!refresh) throw new Error('Non trovo le credenziali del proprietario (FILO_ADMIN_REFRESH_TOKEN): mostra, elenco, rispondi e consiglio le vogliono.');
