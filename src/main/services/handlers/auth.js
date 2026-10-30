@@ -8,7 +8,7 @@ const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
 const { daFilo, soloFilo } = require('./origine');
 const { spiegaErroreAccesso } = require('../../auth/esitoAccesso');
-const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { avvisoNellaFinestra, avvisoQuandoPronta, ritiraAvviso } = require('../avvisoFinestra');
 const { consiglioPortachiavi } = require('../../portachiavi');
 require('../../../shared/routineCrediti.js');
 
@@ -258,6 +258,7 @@ async function probeServerAdmin(claims) {
 
 module.exports = function register(on, ctx) {
   const { MSG } = ctx;
+  let giudiciFermi = null;
   // L'avviso porta l'email di chi usa Filo: va alle superfici di Filo, mai a tutte le schede,
   // dove arrivano anche i content script dei siti visitati.
   const avvisaLeSuperficiDiFilo = (m) => {
@@ -333,6 +334,7 @@ module.exports = function register(on, ctx) {
       if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
       // I feedback dell'owner fermi ad aspettare la sua firma (#912) partono adesso, non al prossimo giro della coda.
       if (auth.isAdmin()) { try { globalThis.SN_FEEDBACK_OUTBOX?.accessoCambiato?.(); } catch (_) {} }
+      giudiciFermi?.colpo('accesso');
       if (!daFilo(origin, sender)) return { ok: true, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin() };
       return { ok: true, profile, isAdmin: auth.isAdmin(), remembered };
     } catch (e) {
@@ -346,6 +348,7 @@ module.exports = function register(on, ctx) {
     try {
       auth.signOut();
       avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
+      giudiciFermi?.colpo('accesso');
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
@@ -1379,6 +1382,23 @@ module.exports = function register(on, ctx) {
     });
   } catch (e) {
     console.warn('[Filo] campanello fusioni non agganciato:', e?.message || e);
+  }
+
+  // I giudici fermi (#906): barra una volta per episodio e carta nella home, solo per l'owner. Vedi services/giudiciFermi.js.
+  try {
+    giudiciFermi = require('../giudiciFermi').start({
+      isAdmin: () => auth.isAdmin(),
+      leggi: async () => Defaults.getGiudiciFermi(await auth.getIdToken()),
+      mem: () => globalThis.SN_FILO_MEMORY,
+      storage: () => globalThis.SN_STORAGE,
+      avvisa: (testo, opts) => avvisoQuandoPronta(testo, opts),
+      ritira: (chiave) => ritiraAvviso(chiave),
+      broadcast: () => ctx.broadcastLiveUpdate(),
+    });
+    // Le prove lo rileggono senza aspettare l'orologio.
+    globalThis.SN_GIUDICI_FERMI = giudiciFermi;
+  } catch (e) {
+    console.warn('[Filo] giudici fermi non agganciati:', e?.message || e);
   }
 
   on(MSG.MERGE_APPROVAL_APPROVE, ownerOnly(async (msg) => {
