@@ -28,6 +28,7 @@
     "regole:pubblica": "node scripts/regole-pubblica.mjs",
     "server:fondi": "node scripts/server-fondi-pratica.mjs",
     "orchestra": "node scripts/orchestratore-locale.mjs",
+    "pulisci:disco": "node scripts/pulisci-disco.mjs",
     "purga:percorsi-vecchi": "firebase firestore:delete paths --shallow",
     "build": "electron-builder --win --publish never",
     "release": "electron-builder --win --publish always",

@@ -22,6 +22,7 @@
 import { lstatSync, mkdtempSync, readdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path, { basename, dirname, join } from 'node:path';
+import { NOME_DEI_TEST, ORFANA_DOPO_MS, PREFISSO_CORSA, SPAZIO } from '../../scripts/lib/nomi-temporanee.mjs';
 
 // Forma canonica di un percorso ESISTENTE. Se il percorso non c'è (o il sistema
 // non sa risolverlo) torna quello che gli è stato dato: un test non deve morire
@@ -48,7 +49,8 @@ export function tempCanonico() {
 // in attesa di essere riprodotta. La suite intera (1486 casi) è stata girata su
 // percorsi spaziati prima di renderlo la regola (una volta: dal 2026-09-15 la
 // suite gira solo in GitHub Actions a ogni fusione su main, nessuno la lancia).
-export const SPAZIO = 'con spazio-';
+// I nomi stanno in scripts/lib/nomi-temporanee.mjs: li legge anche chi pulisce il disco senza aprire una corsa.
+export { ORFANA_DOPO_MS, PREFISSO_CORSA, SPAZIO };
 
 // Una cartella temporanea nuova, già canonica e con uno spazio nel nome. Da
 // usare al posto di `mkdtempSync(join(tmpdir(), prefisso))` in qualunque test:
@@ -89,7 +91,6 @@ export function cartellaInCasa(prefisso) {
 // La temporanea di una corsa intera, ereditata dai figli: ci finisce anche quello che il codice provato e Chromium
 // scrivono lì per conto loro (#717). Una sola per corsa: chi la eredita la riusa. Corta e non canonica di proposito: su
 // Mac Chromium ci mette il suo socket, che oltre 104 caratteri di percorso non nasce, e /private davanti ne costerebbe otto.
-export const PREFISSO_CORSA = 'filo-corsa-';
 const dentroUnaCorsa = (dir) => basename(dir).startsWith(PREFISSO_CORSA);
 export function temporaneaDellaCorsa() {
   if (dentroUnaCorsa(tmpdir())) return tmpdir();
@@ -117,8 +118,6 @@ function togliSenzaErrori(dir) {
 // Un processo ucciso (Ctrl+C, un timeout) non vede la sua uscita: i suoi resti li tolgono i lanciatori alla corsa dopo.
 // Si riconoscono dal nome che solo le funzioni qui sopra danno, e dall'età: nessuna corsa di prove dura un giorno.
 const fuoriDallaCorsa = (dir) => (dentroUnaCorsa(dir) ? dirname(dir) : dir);
-const NOME_DEI_TEST = new RegExp(`(${SPAZIO}|^${PREFISSO_CORSA})[A-Za-z0-9]{6}$`);
-export const ORFANA_DOPO_MS = 24 * 60 * 60 * 1000;
 
 export function cartelleOrfane({ dove = [fuoriDallaCorsa(tmpdir()), homedir()], oraMs = Date.now(), etaMs = ORFANA_DOPO_MS } = {}) {
   const orfane = [];
