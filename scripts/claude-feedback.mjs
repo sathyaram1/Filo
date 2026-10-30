@@ -215,8 +215,9 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       ...(Array.isArray(attese) && attese.length ? { waitsFor: attese } : {}),
       // Un pacchetto porta tutti gli allegati delle unite o non nasce: un caricamento mancato ferma prima del documento.
       ...(Array.isArray(unisce) && unisce.length ? { unisce: unisce.map(({ id, num }) => ({ id, num })), interi: true } : {}),
-      // Uno sporco rimasto solo in locale il server non lo vede: senza biglietto il feedback nasce non fidato.
-      ...(b && b.fp && !b.inAttesa ? { bigliettoLocale: b.fp } : {}),
+      // Uno sporco rimasto solo in locale il server non lo vede: senza biglietto il feedback nasce non fidato. Così
+      // anche con `nonFidato`: porta scritti di chi non è fidato, e un biglietto pulito non li rende fidati (SPEC-DOMANDE § 1.3).
+      ...(b && b.fp && !b.inAttesa && !nonFidato ? { bigliettoLocale: b.fp } : {}),
     });
   } catch (e) {
     const motivo = String((e && e.message) || e);
