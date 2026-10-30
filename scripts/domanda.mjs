@@ -433,7 +433,7 @@ export async function chiamaOwner(data, funzione = 'ownerDomande') {
   const refresh = findAdminRefreshToken();
   if (!refresh) throw new Error('Non trovo le credenziali del proprietario (FILO_ADMIN_REFRESH_TOKEN): mostra, elenco, rispondi e consiglio le vogliono.');
   const idToken = await mintIdToken(refresh);
-  const res = await fetch(INDIRIZZO, {
+  const res = await fetch(`${FUNZIONI}/${funzione}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
     body: JSON.stringify({ data }),
