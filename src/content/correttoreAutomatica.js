@@ -400,7 +400,7 @@
   }
 
   global.SN_CORRETTORE_AUTO = {
-    NOMI, SOGLIE, LIMITE_CONTI, chiave, conMaiuscole, fineDellaParola, parolaPrima, chiavePersonale, formaDelNome, formaAccentata,
+    NOMI, FONTI, SOGLIE, LIMITE_CONTI, chiave, conMaiuscole, fineDellaParola, parolaPrima, chiavePersonale, formaDelNome, formaAccentata,
     soloMaiuscole, correzioneAFineParola, dentroCodice, stileDi, scriveMinuscolo, scriveMinuscoloQui, STILE_MAX, sommaStile, distanza, imparabile, memoria, accettata, annullata,
     riscritta, corretta, dimentica, inizioDiFrase,
   };
