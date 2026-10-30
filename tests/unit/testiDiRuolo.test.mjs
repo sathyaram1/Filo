@@ -33,7 +33,7 @@ function cartellaConPezzi() {
 }
 
 test('ogni ruolo riceve un testo intero, senza richiami rimasti dentro', () => {
-  for (const ruolo of ['new-work', 'fixer', 'verifier', 'secaudit', 'risposta', 'halt']) {
+  for (const ruolo of ['new-work', 'fixer', 'verifier', 'secaudit', 'risposta', 'smistamento', 'halt']) {
     const testo = readRoleInstructions(ruolo);
     assert.ok(testo.length > 400, `il ruolo ${ruolo} riceve un testo vuoto`);
     assert.ok(!/<!--\s*includi:/i.test(testo), `richiamo non espanso nel testo del ruolo ${ruolo}`);
@@ -116,7 +116,7 @@ test('nessuna regola scritta due volte in due testi di ruolo', () => {
 // dentro il testo che ogni ruolo riceve davvero, quante volte viene spiegata
 // la stessa cosa: due spiegazioni sono due regole che divergeranno.
 test('dentro un testo di ruolo la stessa regola non viene spiegata due volte', () => {
-  const RUOLI_LAVORANTI = ['verifier', 'new-work', 'fixer', 'secaudit', 'risposta'];
+  const RUOLI_LAVORANTI = ['verifier', 'new-work', 'fixer', 'secaudit', 'risposta', 'smistamento'];
   // Ogni voce: il segno che riconosce la spiegazione, e cosa spiega.
   const UNA_VOLTA = [
     [/rombo/g, 'dove l\'owner apre un trade-off segnalato'],

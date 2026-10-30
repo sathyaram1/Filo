@@ -222,7 +222,7 @@ test('applica il consiglio sulla scelta: prima l’elenco delle etichette, le un
   const page = await openTab(MANAGE);
   const lista = [
     domanda(1, { opzioni: [{ testo: 'Ok', azione: { tipo: 'archivia', feedbackId: 'fb902' } }], consiglio: { opzione: 0, perche: 'Sì.' } }),
-    domanda(2, { opzioni: [{ testo: 'Locale', azione: { tipo: 'approva_locale', feedbackId: 'fb903' } }], consiglio: { opzione: 0, perche: 'Sì.' } }),
+    domanda(2, { opzioni: [{ testo: 'Spegni', azione: { tipo: 'automazione', chiave: 'routine.enabled', valore: false } }], consiglio: { opzione: 0, perche: 'Sì.' } }),
     domanda(3),
   ];
   await apriDomande(page, lista);
@@ -237,7 +237,7 @@ test('applica il consiglio sulla scelta: prima l’elenco delle etichette, le un
   await expect(box).toContainText('Applico il consiglio a una domanda:');
   await expect(box.locator('li').first()).toContainText('D-1');
   await expect(box.locator('li').first()).toContainText('Archivia #902');
-  await expect(box).toContainText('una per una: Affida #903 ai lavori server');
+  await expect(box).toContainText('una per una: Routine: spegni');
   await expect(box).toContainText('nessun consiglio');
   // Niente è partito prima del sì.
   expect(await page.evaluate(() => window.__domande)).toEqual([]);

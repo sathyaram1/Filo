@@ -205,4 +205,6 @@ test('il ruolo «smistamento»: testo intero, i tre passi in ordine, i comandi d
   assert.equal(checkEnvelope({ role: 'smistamento', payload: { compito: 'C-4', affidata: false } }), null, 'non più affidata: si rilascia e basta');
   const p = buildPayload({ role: 'smistamento', num: '' }, { smistamento: { role: 'x', compito: 'C-4', domanda: { id: 'D-9' }, feedback: { num: '#1790' } } });
   assert.deepEqual(p, { compito: 'C-4', domanda: { id: 'D-9' }, feedback: { num: '#1790' }, case: 'smistamento', num: '' });
+  const { normalizeRole } = await import('../../scripts/lib/routine-role.mjs');
+  assert.equal(normalizeRole('smistamento'), 'smistamento', 'il marcatore locale riconosce il ruolo');
 });
