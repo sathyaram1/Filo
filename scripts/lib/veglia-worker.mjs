@@ -78,7 +78,7 @@ const pulito = (t) => String(t || '').replace(/\\/g, '/').replace(/["`$]/g, "'")
 /** Il guasto da dichiarare per un worker fermo, col gruppo davanti. PURA. */
 export function testoGuasto({ fermoMs = 0, attesa = null, tracceViste = true } = {}) {
   const minuti = Math.round(fermoMs / 60000);
-  const segni = tracceViste ? 'niente commit, salvataggi o passi nel suo transcript' : 'niente commit, salvataggi o processi; transcript non visibile';
+  const segni = tracceViste ? 'niente commit, salvataggi, processi o passi nel suo transcript' : 'niente commit, salvataggi o processi; transcript non visibile';
   const coda = 'Rilasciato dalla veglia di chi guida il giro.';
   if (attesa) {
     const nome = attesa.nome === 'Bash' ? (programmaDi(attesa.comando) || 'bash') : (attesa.nome.toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'worker');
