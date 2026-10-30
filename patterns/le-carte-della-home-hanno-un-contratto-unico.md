@@ -78,4 +78,5 @@ un file scaricato) viaggia con la sua provenienza, come l'esito di un comando.
   Colori e misure passano dai token `--dash-*`
   ([Estetica: ogni variabile visiva è un token del registro, mai un valore sparso](estetica-ogni-variabile-visiva-e-un-token-del-registro.md)).
 
-Prove: `tests/unit/carteHome.test.mjs` (mosse e catalogo) e `tests/home-carte.spec.mjs` (la home vera).
+Prove: `tests/unit/carteHome.test.mjs` (mosse e catalogo), `tests/home-carte.spec.mjs` (la home vera) e
+`tests/home-primo-incontro.spec.mjs` (il primo avvio).
