@@ -308,8 +308,8 @@ export function preparaClone(principale, n, {
   }
   if (pushUrl) gitIn(dir, ['remote', 'set-url', '--push', 'origin', pushUrl]);
 
-  const pacchetti = allineaPacchetti(dir, radice, { ...(npmCi ? { npmCi } : {}), soloCollegati });
-  if (!pacchetti.ok) return { ok: false, dir, why: pacchetti.why };
+  const pacchetti = allineaPacchetti(dir, radice, { ...(npmCi ? { npmCi } : {}), ...(avvisa ? { avvisa } : {}), soloCollegati });
+  if (!pacchetti.ok) return { ok: false, dir, why: pacchetti.why, ...(pacchetti.gruppo ? { gruppo: pacchetti.gruppo } : {}) };
 
   mkdirSync(resolve(dir, '.claude'), { recursive: true });
   writeFileSync(resolve(dir, MARCATORE_WORKER), `${JSON.stringify({ indice: i, paralleli: Number(paralleli) || 0, principale: radice })}\n`, 'utf8');
