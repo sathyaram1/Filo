@@ -612,6 +612,11 @@
         entry.arrivata = true;
         // Fermata dal tetto o da una pagina delicata (#1274): al tasto destro si chiede davvero.
         if (res && (res.code === 'TROPPE_AUTOMATICHE' || res.code === 'PAGINA_DELICATA')) entry.fermata = true;
+        // Il livello di privacy nella famiglia degli anticipi (#1586): la spiegazione che la pagina delicata non lascia preparare.
+        if (res && res.code === 'PAGINA_DELICATA') {
+          entry.perPrivacy = true;
+          contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'saltato' });
+        }
         // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
         return (res?.ok && typeof res.text === 'string')
           ? { text: res.text, keyFallback: res.keyFallback || null }
