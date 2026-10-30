@@ -1929,6 +1929,8 @@
   function cercaDiNuovo(el, segno) {
     const state = el && monitored.get(el);
     if (!state || !segno || !segno.cerca || !segnapostiAttivi()) return;
+    const prima = ricerche.get(segno.cerca.chiave);
+    if (prima && prima.stato === 'delicata') contaPrivacySegnaposto('chiesto');
     ricerche.delete(segno.cerca.chiave);
     cercaValore(state, segno.cerca, segno.segment, { suRichiesta: true });
     renderOverlayContent(state);
