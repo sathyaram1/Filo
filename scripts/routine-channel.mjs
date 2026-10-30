@@ -1083,12 +1083,11 @@ export function testoConsegnaRiuscita(r, data = {}, intento = '') {
   const provv = reply && (reply.outcome === 'provvisoria' ? reply.domanda : reply.domandaProvvisoria);
   if (typeof provv === 'string' && provv) return `${r.num ? ok : 'OK: consegnato'}. La domanda ${provv} non ferma il lavoro: vale la consigliata finché l'owner non risponde.`;
   if (reply && reply.outcome === 'server') return `${ok}: passato ai lavori server, che lo riprendono dal ramo. Rilascia il biglietto.`;
-  if (conDomanda && data.domanda.blocca !== false) return `${r && r.num ? ok : 'OK: consegnato'}. ATTENZIONE: la consegna portava ${cosa} ma il server non ha fermato il lavoro (server vecchio?).`;
+  if (conDomanda) return `${r && r.num ? ok : 'OK: consegnato'}. ATTENZIONE: la consegna portava ${cosa} ma il server non ha fermato il lavoro (server vecchio?).`;
   return r && r.num ? ok : 'OK: consegnato.';
 }
 
 export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda', 'piano'];
-
 
 /**
  * Una fermata (`--status design`) senza la domanda scritta da chi si ferma non parte (#1790): il server non ne compone
