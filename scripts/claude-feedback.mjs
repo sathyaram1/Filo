@@ -231,7 +231,8 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
     ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti,
     senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly), attese, unisce,
     priorita: Number.isInteger(priorita) && res && res.senderProof === 'admin' ? priorita : null,
-    biglietto: b && b.fp ? (b.fiducia === 'fidato' ? 'pulito' : 'sporco') : 'assente',
+    biglietto: b && b.fp ? (nonFidato ? 'tolto' : b.fiducia === 'fidato' ? 'pulito' : 'sporco') : 'assente',
+    nonFidato,
   };
 }
 
