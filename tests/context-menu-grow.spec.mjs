@@ -108,6 +108,7 @@ test('#500 la spiegazione cresce: il menu del collegamento rientra invece di far
   // agire su un elemento fuori dalla finestra, quindi questo è il test vero.
   const ultima = menu.locator('.sn-menu-item').last();
   await ultima.hover({ timeout: 3000 });
+  await attendiUltimaVoceCliccabile(app, page);
   await ultima.click({ timeout: 3000 });
   await expect(menu).toHaveCount(0);
 });
