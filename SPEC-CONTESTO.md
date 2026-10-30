@@ -181,6 +181,8 @@ lo chiama già il taglio silenzioso che le regole del repo vietano.
 - Il grezzo resta sempre su disco. «Espandere» un evento vuol dire scendere di
   un livello: lo strumento `filo` → espandi legge il tratto grezzo di quella
   riga. Ogni riga dei livelli alti tiene gli id degli eventi da cui è nata.
+  Una lettura che torna così è una lettura nuova (§ Il sospetto non passa nel
+  riassunto).
 - La parte dell'utente contiene i giorni recenti e le ore dopo l'ultimo
   riassunto giornaliero. Il tratto vivo contiene il grezzo dopo l'ultima
   compattazione.
