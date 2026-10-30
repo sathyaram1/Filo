@@ -419,6 +419,17 @@ test('a finestra stretta le pastiglie col numero non coprono il nome della sched
   ], RIFERIMENTI]);
   await page.locator('.mg-sezione[data-sezione="domande"]').click();
   await page.locator('#mgDomandeTutte').check();
+  const geo = await page.evaluate(() => {
+    const r = (el) => el.getBoundingClientRect();
+    const nome = r(document.getElementById('mgDomandeTitolo'));
+    const sopra = (b) => b.left < nome.right && b.right > nome.left && b.top < nome.bottom && b.bottom > nome.top;
+    const pastiglie = ['mgDomandeFiduciaFiltro', 'mgDomandeConsiglioSel'].map((id) => r(document.getElementById(id)));
+    const titolo = r(document.querySelector('#mgDomandeLista .mg-domanda .mg-domanda-titolo'));
+    return { coperto: pastiglie.some(sopra), larghezzaTitolo: titolo.width, righeTitolo: Math.round(titolo.height / 17) };
+  });
+  expect(geo.coperto).toBe(false);
+  expect(geo.larghezzaTitolo).toBeGreaterThan(120);
+  expect(geo.righeTitolo).toBeLessThanOrEqual(2);
   await page.screenshot({ path: 'tests/.shots/manage-domande-stretta.png' });
   for (const t of ['domande-smistamento', 'domande-automatiche']) {
     await tab(page, t).click();
