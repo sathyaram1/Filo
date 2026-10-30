@@ -73,6 +73,27 @@ test('gli allegati delle unite salgono col pacchetto: documenti col nome di orig
     '- immagine 3: da #815, la sua immagine 1 della conversazione',
   ].join('\n'));
   assert.match(r.out.join('\n'), /Allegati copiati dalle unite: 3 immagini, 1 documenti/);
+  assert.match(r.out.join('\n'), /Nasce non fidato perché porta allegati di #812, #815, scritti da chi non è fidato/);
+});
+
+test('un pacchetto che porta allegati di unite non fidate nasce non fidato anche da una sessione pulita', async () => {
+  assert.deepEqual(SCRIPT.uniteNonFidate([
+    { u: { num: '1', fidato: true }, allegati: [img(1)] },
+    { u: { num: '2', fidato: false }, allegati: [img(1)] },
+    { u: { num: '3', fidato: false }, allegati: [] },
+    { u: { num: '4', fidato: true }, allegati: [img(1, { conversazione: true, daAltri: true })] },
+  ]), ['#2', '#4'], 'una unita fidata senza allegati, o con allegati suoi, non toglie niente');
+  const orig = FB.submit;
+  const visti = [];
+  FB.submit = async (payload, opts) => { visti.push(opts); return { id: 'p', seq: 1, senderProof: 'admin' }; };
+  try {
+    const pulito = { fp: 'a'.repeat(64), fiducia: 'fidato' };
+    const r = await SCRIPT.apri({ titolo: 't', testo: 'x', idToken: 'tok', biglietto: pulito, unisce: [{ id: 'id2', num: '2' }], nonFidato: 'porta allegati di #2' });
+    assert.equal(visti[0].bigliettoLocale, undefined, 'senza biglietto il server lo fa nascere non fidato');
+    assert.equal(r.biglietto, 'tolto');
+    await SCRIPT.apri({ titolo: 't', testo: 'x', idToken: 'tok', biglietto: pulito, unisce: [{ id: 'id1', num: '1' }] });
+    assert.equal(visti[1].bigliettoLocale, pulito.fp);
+  } finally { FB.submit = orig; }
 });
 
 test('oltre il tetto di un feedback il pacchetto non nasce, e il conto si dice per unita', async () => {

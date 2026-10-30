@@ -324,7 +324,10 @@ immagini (che un nome non l'hanno) nel campo delle immagini, con da dove viene o
 un blocco in coda alla spec. Il tetto è quello di un feedback, 5 immagini e 5 documenti
 compresi quelli di `--allega`: oltre, o con un allegato che non si apre o che un feedback
 non ammette, non apre niente e lo dice; un caricamento che non riesce ferma la nascita
-(`submit` con `interi`): niente pacchetto monco.
+(`submit` con `interi`): niente pacchetto monco. Con allegati di una unita non fidata, o
+della conversazione di una scritta anche da routine o sessioni, P nasce non fidato anche
+da una sessione pulita (lo strumento non manda il biglietto), come un figlio di genitori
+non fidati (SPEC-DOMANDE.md § 1.3).
 
 *Le unite si archiviano alla nascita* (decisione dell'owner del 30/10). Chi aspettava una
 unita passa ad aspettare P (le sue attese sulle unite diventano una su P, le altre

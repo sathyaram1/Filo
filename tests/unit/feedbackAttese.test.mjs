@@ -183,7 +183,7 @@ test('chi aspettava una segnalazione unita aspetta il pacchetto, e le sue altre 
   });
   try {
     const letta = await owner.segnalazioneDaUnire('903', { bearer: 'tok' });
-    assert.deepEqual({ ...letta, priorita: letta.priorita ?? null }, { ok: true, id: 'id903', num: '903', stato: 'todo', priorita: null, locale: false, attese: [{ id: 'id676', num: '676' }, { id: 'id812', num: '812' }, { id: 'id815', num: '815' }], ramo: '', unisce: [] });
+    assert.deepEqual({ ...letta, priorita: letta.priorita ?? null }, { ok: true, id: 'id903', num: '903', stato: 'todo', priorita: null, locale: false, attese: [{ id: 'id676', num: '676' }, { id: 'id812', num: '812' }, { id: 'id815', num: '815' }], ramo: '', unisce: [], fidato: false });
     assert.equal((await owner.segnalazioneDaUnire('999', { bearer: 'tok' })).inesistente, true);
     const r = await owner.spostaAttese('id903', ['id812', 'id815'], { id: 'id951', num: '951' }, { bearer: 'tok' });
     assert.equal(r.ok, true, r.motivo);
