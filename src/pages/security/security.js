@@ -1128,6 +1128,10 @@
   // I siti di cui ti fidi (#967): ci entrano dal «Continua» sull'avviso sospetto o dall'«Apri comunque» di «Non trovo»,
   // e da qui si tolgono uno per uno. La voce di una pagina ospitata porta il suo percorso.
   let sbFidati = [];
+  // Le voci tolte da qui finché il main non le ha scritte: un elenco arrivato prima della loro scrittura non le rimette,
+  // se no il clic dopo cade sulla voce già tolta invece che su quella sotto.
+  const sbFidatiInUscita = new Set();
+  const fidatiDaMostrare = (l) => l.filter((x) => !sbFidatiInUscita.has(x));
   function voceLeggibile(v) {
     const i = String(v).indexOf('/');
     return i < 0 ? leggibile(v) : leggibile(v.slice(0, i)) + v.slice(i);
