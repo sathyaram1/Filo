@@ -57,6 +57,11 @@ un file scaricato) viaggia con la sua provenienza, come l'esito di un comando.
   Un nome di destra dalla chat vale solo esatto: «lo scaricamento del file» non è l'Editor. Quello che la chat
   racconta (la riga di attività, l'esito per il modello) nomina la carta toccata davvero, dall'esito, mai dalle
   parole del modello; e l'esito che serve a riprovare arriva intero, con le chiavi e la destra com'è.
+- **Al primo incontro la home tiene solo la sinistra.** Finché l'accoglienza non si chiude e la strada per
+  cominciare è una (i Crediti, poi l'intervista), destra e «altro» non si vedono (#1661); con un modello da
+  scegliere restano, perché quella strada sta fra i suggerimenti. Lo decide il main (`primoIncontro`), che legge
+  l'accoglienza dal disco anche per l'incognito, dove la pagina la vedrebbe da rifare. Tolta la carta dei Crediti
+  la home torna intera: è da «altro» che la si rimette.
 - **Un lavoro lungo è una carta finché dura.** Il main tiene i lavori in corso (`lavoriInCorso.js`: un turno
   di Filo, un comando del terminale) e li annuncia; `lavoriAltrove` decide quali sono carte (dopo qualche
   secondo, mai quello della conversazione che guarda: per la chat la richiesta in corso non è una carta), e
