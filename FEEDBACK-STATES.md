@@ -337,10 +337,12 @@ aspettato archiviato senza fusione manda chi lo aspetta all'owner (`attesa_chius
 una unita con un'attesa che non si è spostata resta aperta, e lo strumento stampa le righe
 per rimediare, come per ogni passo che non riesce. Chi aspetta una unita ed è aspettato da
 P si rifiuta prima di aprire (si aspetterebbero a vicenda); P nato senza numero non
-archivia niente, perché nota e attese lo nominano. Il rimando `unitoIn: { id, num }` su
-ogni unita lo scrive il server alla nascita di P: ai client le regole lo vietano, come la
-fiducia. Le unite archiviate restano leggibili a chi gestisce il lavoro: `feedback:leggi`
-non filtra per stato, e dal cloud le dà `routineFeedback` (#1785), allegati compresi.
+archivia niente, perché nota e attese lo nominano. Il rimando `unitoIn` (l'id di P, come
+nell'unione) su ogni unita il cui numero corrisponde lo scrive il server alla nascita di P,
+dal trigger di creazione e prima dei giudici: ai client le regole lo vietano, come la fiducia.
+Le unite archiviate restano leggibili a chi gestisce il lavoro: `feedback:leggi` non filtra
+per stato, e dal cloud `routineFeedback` (#1785) coi numeri espliciti non esclude gli
+archiviati e ne dà gli allegati testuali; delle immagini dà il conteggio, e le porta P.
 
 Alla fusione di P (`done`) il server non ha più unite da chiudere. Resta, per i pacchetti
 nati prima (le unite `todo` che aspettano P), la chiusura di prima: `todo → done`
