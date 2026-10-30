@@ -2176,6 +2176,8 @@
     const ig = chiaveIgnora(segno);
     // Le x di un segnaposto si ignorano con le parole che le precedono: «di soli xx» non spegne «un p/e di xx».
     if (segno.tipo === 'segnaposto') {
+      // Un candidato ancora da giudicare non è una proposta: non ha un valore da rifiutare.
+      if (!segno.dubbio) contaSegnaposto(viaDelSegno(segno), 'rifiutato');
       const prima = getEditableText(el).slice(Math.max(0, segno.start - 40), segno.start);
       ig.segment = (/(?:\S+[^\S\n]+){0,2}$/.exec(prima) || [''])[0] + segno.segment;
     }
