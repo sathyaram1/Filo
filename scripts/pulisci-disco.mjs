@@ -18,7 +18,7 @@ export const FERMA_DA_GIORNI = 2;
 export const SOGLIA_LIBERO = 0.05;
 
 // Fuori da git, ma si rifanno da soli o non servono più a nessuno quando il lavoro è fuso. Tutto il resto (chiavi,
-// immagini dei feedback, copie dei dati del server, registri della verifica, biglietti) tiene in piedi la cartella.
+// immagini dei feedback, copie dei dati del server, biglietti) tiene in piedi la cartella; la verifica locale, VERIFICA_LOCALE.
 export const RIGENERABILI = Object.freeze([
   /^(functions\/)?node_modules(\/|$)/,
   /^(dist|generato|test-results|blob-report|tests\/\.report|tests\/\.shots|tests\/\.smoke|tests\/agent\/\.out)\//,
@@ -33,6 +33,17 @@ export const RIGENERABILI = Object.freeze([
   /^\.claude\/routine-state\//,
 ]);
 const rigenerabile = (p) => RIGENERABILI.some((re) => re.test(p));
+
+// Il segno che lascia ogni lavoro locale (verify-local start), mai tolto. Server:fondi lo legge per sapere quali rami di
+// una pratica mancano ancora: si butta con la cartella solo quando ogni ramo che nomina è su main o non c'è più.
+export const VERIFICA_LOCALE = '.claude/verify-local.json';
+function leggiJson(p) {
+  try { const o = JSON.parse(readFileSync(p, 'utf8')); return o && typeof o === 'object' && !Array.isArray(o) ? o : null; } catch (_) { return null; }
+}
+function ramiNonFusi(repo, rami) {
+  return rami.filter((ramo) => git(repo, ['rev-parse', '--verify', '--quiet', `refs/heads/${ramo}`]).code === 0
+    && git(repo, ['merge-base', '--is-ancestor', `refs/heads/${ramo}`, 'refs/remotes/origin/main']).code !== 0);
+}
 
 export function leggiArgomenti(argv) {
   const a = { togli: false, giorni: FERMA_DA_GIORNI };
@@ -175,8 +186,12 @@ export function giudica(v, { repo, qui, aperti, claude, adesso, giorni }) {
   if (s.modifiche.length) return { togli: false, motivo: `modifiche non salvate: ${elenca(s.modifiche)}` };
   const nuovi = s.nuovi.filter((p) => !rigenerabile(p));
   if (nuovi.length) return { togli: false, motivo: `file nuovi non salvati: ${elenca(nuovi)}` };
-  const fuori = s.ignorati.filter((p) => !rigenerabile(p));
+  const fuori = s.ignorati.filter((p) => !rigenerabile(p) && p !== VERIFICA_LOCALE);
   if (fuori.length) return { togli: false, motivo: `file fuori da git che non si rifanno da soli: ${elenca(fuori)}` };
+  if (s.ignorati.includes(VERIFICA_LOCALE)) {
+    const aperti = ramiNonFusi(repo, Object.keys(leggiJson(join(v.dir, VERIFICA_LOCALE)) || {}));
+    if (aperti.length) return { togli: false, motivo: `la verifica locale ricorda rami non ancora su main: ${elenca(aperti)}` };
+  }
   const m = misura(v.dir);
   const ultima = Math.max(m.ultima, ultimaGit, ultimaSessione(v.dir, claude));
   if (adesso - ultima < giorni * GIORNO_MS) {

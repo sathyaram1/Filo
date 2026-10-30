@@ -42,20 +42,25 @@ function albero(radice, nome, moduli = 'node_modules') {
 
 function scena() {
   const base = cartellaTemporanea('filo-pulisci-');
-  const ignora = 'node_modules\ntests/.shots/\ntests/agent/.env\n*.log\n.claude/worktrees/\n';
+  const ignora = 'node_modules\ntests/.shots/\ntests/agent/.env\n*.log\n.claude/worktrees/\n.claude/verify-local.json\n';
   const filo = repo(base, 'Filo', { '.gitignore': ignora, 'a.txt': 'a' });
   scrivi(join(filo, 'node_modules', 'segno.txt'));
   const server = repo(base, 'filo-security', { '.gitignore': ignora, 'functions/tools/server-fondi.js': '' });
   scrivi(join(server, 'functions', 'node_modules', 'segno.txt'));
 
-  const wt = Object.fromEntries(['fusa', 'avanti', 'nuova', 'modificata', 'chiave', 'recente', 'sessione', 'bloccata', 'orchestra', 'sparita']
-    .map((n) => [n, albero(filo, n)]));
+  const wt = Object.fromEntries(['fusa', 'avanti', 'nuova', 'modificata', 'chiave', 'recente', 'sessione', 'bloccata', 'orchestra', 'sparita',
+    'verificata', 'pratica'].map((n) => [n, albero(filo, n)]));
   scrivi(join(wt.fusa, 'tests', '.shots', 'x.png'), 'p'.repeat(5000));
   scrivi(join(wt.fusa, '.claude', 'settings.local.json'), '{}');
   scrivi(join(wt.fusa, 'errore.log'));
   scrivi(join(wt.avanti, 'b.txt'));
   g(wt.avanti, 'add', '-A');
   g(wt.avanti, 'commit', '-q', '-m', 'non ancora fuso');
+  // Il segno di ogni lavoro locale: se ne va con la cartella solo se i rami che nomina sono tutti su main o spariti.
+  g(filo, 'branch', 'claude/pratica-app', 'claude/avanti');
+  const segno = (dir, rami) => scrivi(join(dir, '.claude', 'verify-local.json'), JSON.stringify(Object.fromEntries(rami.map((r) => [r, { feedbackId: 'f' }]))));
+  segno(wt.verificata, ['claude/verificata', 'claude/cancellato']);
+  segno(wt.pratica, ['claude/pratica', 'claude/pratica-app']);
   scrivi(join(wt.nuova, 'appunti.txt'));
   scrivi(join(wt.modificata, 'a.txt'), 'cambiato');
   scrivi(join(wt.chiave, 'tests', 'agent', '.env'), 'OPENROUTER_API_KEY=x');
@@ -109,8 +114,9 @@ test('senza --togli elenca cosa toglierebbe e perché il resto resta, e non tocc
   for (const d of [...Object.values(s.wt).filter((d) => d !== s.wt.sparita), s.wtServer, ...s.via, ...s.restano]) {
     assert.ok(existsSync(d), `un elenco ha tolto ${d}`);
   }
-  assert.match(s.righe.join('\n'), /da togliere, 1 \(/);
+  assert.match(s.righe.join('\n'), /da togliere, 2 \(/);
   assert.match(riga(s.righe, rel('fusa')), /claude\/fusa · \d/);
+  assert.match(riga(s.righe, rel('verificata')), /claude\/verificata · \d/);
   const attesi = {
     avanti: /non ancora su main/,
     nuova: /file nuovi non salvati: appunti\.txt/,
@@ -120,6 +126,7 @@ test('senza --togli elenca cosa toglierebbe e perché il resto resta, e non tocc
     sessione: /usata il .*sessione aperta/,
     bloccata: /bloccata/,
     orchestra: /lavoro #77 dell'orchestratore non chiuso/,
+    pratica: /la verifica locale ricorda rami non ancora su main: claude\/pratica-app$/,
   };
   for (const [n, re] of Object.entries(attesi)) assert.match(riga(s.righe, rel(n)), re, `${n}:\n${s.righe.join('\n')}`);
   assert.match(riga(s.righe, '1 senza più la cartella'), /git le dimentica/);
@@ -135,9 +142,10 @@ test('con --togli toglie le cartelle fuse, pulite e ferme e i resti vecchi, senz
   const s = scena();
   assert.equal(await main(['--togli'], s.dep(DISCO_PIENO)), 0, s.righe.join('\n'));
   assert.ok(!existsSync(s.wt.fusa), 'la cartella fusa, pulita e ferma è rimasta');
+  assert.ok(!existsSync(s.wt.verificata), 'la cartella di un lavoro locale fuso è rimasta per il segno della verifica');
   assert.ok(!existsSync(s.wtServer), 'quella del server è rimasta');
   for (const d of s.via) assert.ok(!existsSync(d), `resto delle prove rimasto: ${d}`);
-  for (const d of ['avanti', 'nuova', 'modificata', 'chiave', 'recente', 'sessione', 'bloccata', 'orchestra']) {
+  for (const d of ['avanti', 'nuova', 'modificata', 'chiave', 'recente', 'sessione', 'bloccata', 'orchestra', 'pratica']) {
     assert.ok(existsSync(s.wt[d]), `tolta una cartella che doveva restare: ${d}`);
   }
   for (const d of s.restano) assert.ok(existsSync(d), `tolta una cosa che non è un resto delle prove: ${d}`);
@@ -148,7 +156,7 @@ test('con --togli toglie le cartelle fuse, pulite e ferme e i resti vecchi, senz
   const elenco = g(s.filo, 'worktree', 'list', '--porcelain');
   assert.ok(!/worktrees[\\/](fusa|sparita)\b|filo-fusione/.test(elenco), `git ricorda ancora le cartelle tolte:\n${elenco}`);
   assert.match(g(s.filo, 'branch', '--list', 'claude/fusa'), /claude\/fusa/, 'il ramo resta: si può riaprire la cartella');
-  assert.match(riga(s.righe, 'Tolti: '), /1 cartella di lavoro di Filo, 1 cartella di lavoro del server, 5 resti delle prove; liberati \d/);
+  assert.match(riga(s.righe, 'Tolti: '), /2 cartelle di lavoro di Filo, 1 cartella di lavoro del server, 5 resti delle prove; liberati \d/);
   assert.match(riga(s.righe, 'Libero alla fine'), /2 GB su 476 GB/);
   assert.match(riga(s.righe, 'Sotto il 5%:'), /il resto del disco non sono file di Filo, va liberato a mano/);
 });
