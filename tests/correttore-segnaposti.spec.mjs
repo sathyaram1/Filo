@@ -128,6 +128,8 @@ for (const campo of ['#ta', '#ce']) {
     // Il campo ha ancora il fuoco: si continua a scrivere dove si era.
     await page.keyboard.type('Bene');
     await expect.poll(testo).toBe("l'America l'hanno scoperta nel 1492. Bene");
+    // Il valore lo sapeva il modello, senza ricerca (#1586).
+    await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'memoria'), { timeout: 5000 }).toEqual({ riempito: 1 });
   });
 }
 
