@@ -152,8 +152,10 @@ Fatto dalla parte dell'app, con le regole in FEEDBACK-STATES.md § 3a:
   contesto | rami | incroci <N>` (schede in una riga, rami in corso coi file da git);
 - schede: `routines/roles/scheda.md` e `npm run feedback:schede -- elenca |
   scrivi | rileggi | stato` (Haiku scrive, Opus rilegge chi toglie lavoro e il 10%);
-- pacchetti: `feedback:apri --pacchetto` (campo `unisce`, attese, controlli della
-  regola 1); la transizione `todo → done` della pipeline per chiudere le unite;
+- pacchetti: `feedback:apri --pacchetto` (campo `unisce`, controlli della regola 1,
+  allegati delle unite copiati, unite archiviate alla nascita e attese spostate sul
+  pacchetto, #1903); la transizione `todo → done` della pipeline per chiudere le unite
+  dei pacchetti nati prima;
 - primo lavoro: «già risolto su main» come primo passo (`payload.suMain`, chiusura
   `gia_risolto` con la fusione), piano consegnato con `deliver piano` e rimandato in
   `payload.piano`;
