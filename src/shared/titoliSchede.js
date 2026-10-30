@@ -128,8 +128,8 @@
     { famiglia: 'rivolto', forte: true, re: R`^(?:per|for|to|para|pour|an|fur)\s+filo\s*[:,]+\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{RICHIESTA}}|{{CONDOTTA}})\b` },
     { famiglia: 'rivolto', forte: true, re: R`(?:^|[|•·:\-–—.!?]\s*){{SALUTO}}\s+filo\s+(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}{{ORDINE}}\b` },
     { famiglia: 'rivolto', forte: true, re: R`\b{{DESTINO}}\s*{{PER}}\s+filo{{SEGNO}}\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{CONDOTTA}})\b` },
-    // Filo per nome con qualunque verbo (D-142): basta che la prima parola non sia di classe chiusa e non apra un elenco
-    // («Filo, ago e filato»). Con un «?» la frase è una domanda, non un ordine.
+    // Filo per nome con qualunque verbo (D-142): un imperativo riconosciuto dalla forma o dall'oggetto che lo segue, non
+    // da un elenco di verbi; un nome («Filo, riunione di lunedì») no. Con un «?» la frase è una domanda.
     { famiglia: 'rivolto', forte: true, re: R`(?:^|[|•·:\-–—.!]\s*)(?:{{SALUTO}}[\s,!]+)?filo\s*[,;!]+\s*(?!(?:(?!\s-\s)[^|•·])*\?)(?:{{FILO_RIEMPI}}[\s,]+){0,3}(?!(?:{{NONVERBO}})(?:(?<=')|(?![\w'-])))(?:{{IMPERATIVO_BREVE}}|{{IMPERATIVO_SOLO}}|{{IMPERATIVO_CLITICO}}|{{VERBO_FILO}}\s+(?:{{OGGETTO}}(?![\w'-])|(?:l|un|quest|quell)'(?=[a-z])|[a-z]+ing\b)|{{VERBO_FILO}}\s(?=(?:(?!\s-\s)[^|•·])*?{{FILO_BERSAGLIO}}))` },
     // Dopo «Filo:» o «Filo —» un sottotitolo è la norma: serve un verbo col suo oggetto, o il bersaglio nella frase.
     { famiglia: 'rivolto', forte: true, re: R`(?:^|[|•·:\-–—.!]\s*)(?:{{SALUTO}}[\s,!]+)?filo\s*(?::+|\s[-–—]+)\s*(?!(?:(?!\s-\s)[^|•·])*\?)(?:{{FILO_RIEMPI}}[\s,]+){0,3}(?!(?:{{NONVERBO}})(?:(?<=')|(?![\w'-])))(?:{{IMPERATIVO_BREVE}}|(?:sii|siate|sois|soyez|sei)\s|{{VERBO_FILO}}\s+(?:{{OGGETTO}}(?![\w'-])|(?:l|un|quest|quell)'(?=[a-z])|[a-z]+ing\b)|{{VERBO_FILO}}\s(?=(?:(?!\s-\s)[^|•·])*?{{FILO_BERSAGLIO}}))` },
