@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import './lib/freno-letture.mjs';
 import '../src/shared/schede.js';
+import { RIFIUTI_DEFINITIVI } from './lib/feedback-cloud.mjs';
 
 const SS = globalThis.SN_SCHEDE;
 
@@ -35,8 +36,11 @@ export function statoIllegibile(r) {
   return st !== '' && !/^[a-z_]+$/.test(st);
 }
 
-/** Le righe lette (già decifrate) → i feedback aperti dell'indice, dal numero più basso. PURA. */
-export function apertiDaRighe(righe) {
+/**
+ * Le righe lette (già decifrate) → i feedback aperti dell'indice, dal numero più basso. `segnalati`: id → il motivo per
+ * cui il lettore non lo dà (attacco, file sospetto), che l'indice porta in `segnalato`. PURA.
+ */
+export function apertiDaRighe(righe, { segnalati = new Map() } = {}) {
   const num = (r) => {
     const s = Number(r.seq); const sub = Number(r.subSeq);
     return Number.isInteger(s) && s > 0 ? (Number.isInteger(sub) && sub > 0 ? `${s}.${sub}` : String(s)) : '';
@@ -47,6 +51,7 @@ export function apertiDaRighe(righe) {
       priorita: Number.isInteger(Number(r.priority)) && String(r.priority).trim() !== '' ? Number(r.priority) : null,
       aggiornato: String(r.updatedAt || r._updateTime || ''),
       attese: numeriDi(r.waitsFor), unisce: numeriDi(r.unisce),
+      ...(segnalati.get(String(r._id || '')) ? { segnalato: String(segnalati.get(String(r._id || ''))) } : {}),
     }))
     .filter((f) => f.id && f.num && f.stato && !STATI_CHIUSI.includes(f.stato))
     .sort((a, b) => Number(a.num) - Number(b.num));
@@ -62,7 +67,30 @@ export function daScrivere(f, scheda) {
 /** Cosa non va nella scheda dopo il giro di un agente: non riscritta, non buona, o una rilettura senza «riletta». PURA. */
 export function difettiDopoAgente({ riscritta, scheda, num, rilettura = false }) {
   if (!riscritta) return ['l\'agente non ha riscritto la scheda'];
-  return [...validaScheda(scheda, num), ...(rilettura && !String((scheda && scheda.riletta) || '').trim() ? ['manca «riletta»'] : [])];
+  return [...validaScheda(scheda, num), ...(rilettura && !String((scheda && scheda.riletta) || '').trim() ? ['manca «riletta»'] : []),
+    ...troppoGrande(scheda)];
+}
+
+// Quanto il server aggiunge alla scheda salvandola (stato, ore, modello, autore): stimato largo.
+const MARGINE_SALVATAGGIO = 1024;
+
+/** Oltre la misura che il server salva la scheda va rifatta qui, non scoperta al salvataggio. PURA. */
+export function troppoGrande(scheda) {
+  if (!scheda || typeof scheda !== 'object') return [];
+  const byte = Buffer.byteLength(JSON.stringify(SS.perIlDocumento(SS.campiDellAgente(scheda))), 'utf8') + MARGINE_SALVATAGGIO;
+  return byte > SS.MAX_BYTE ? [`la scheda è di circa ${byte} byte, il server ne salva al più ${SS.MAX_BYTE}: va accorciata`] : [];
+}
+
+/** La scheda di un feedback che per regola non si legge: senza agente, col motivo, e non va al server. PURA. */
+export function schedaDelSegnalato(f, at = new Date().toISOString()) {
+  const motivo = String(f.segnalato || 'segnalato').slice(0, 900);
+  return {
+    numero: f.num, stato: f.stato, mittente: 'altro', titolo_breve: 'Segnalato, non letto',
+    riassunto: `Per regola nessuna sessione lo legge: ${motivo}. Lo decide l'owner dai Ricevuti.`,
+    tipo: 'sicurezza', area: 'altro', file_probabili: [], urgente: false, valido: 'non letto', prova: motivo,
+    risolto_su_main: null, doppione_di: [], parole_chiave: [], note: '',
+    _fonte: { id: f.id, stato: f.stato, aggiornato: f.aggiornato, at, modello: '' }, [SEGNALATA]: true,
+  };
 }
 
 /** Il campione stabile: lo stesso numero cade sempre dalla stessa parte. PURA. */
@@ -77,7 +105,7 @@ export function nelCampione(num, quota) {
  */
 export function daRileggere(schede, { quota = 0.1 } = {}) {
   return (Array.isArray(schede) ? schede : []).filter((s) => {
-    if (!s || s._riletta) return false;
+    if (!s || s._riletta || s[SEGNALATA]) return false;
     const toglie = s.valido === 'no' || (Array.isArray(s.doppione_di) && s.doppione_di.length > 0);
     return toglie || nelCampione(String(s.numero || '').replace(/^#/, ''), quota);
   });
@@ -181,7 +209,8 @@ async function letturaLocale() {
   const r = await globalThis.SN_FEEDBACK.listAllPaged({ idToken: token, fields: [...CAMPI_LETTI, ...CAMPI_SCHEDA] });
   const righe = await decryptFeedbackList(r.rows);
   const schede = await schedeDaRighe(righe, { apri: (v) => decryptJsonField(v), vietato: vietatoLeggere });
-  return { ok: true, righe, schede, complete: r.complete !== false };
+  const segnalati = new Map(righe.map((x) => [String(x._id || ''), vietatoLeggere(String(x.status || '').trim(), x.pipeline)]).filter(([id, m]) => id && m));
+  return { ok: true, righe, schede, segnalati, complete: r.complete !== false };
 }
 
 /** Righe e schede dal server, col biglietto della routine. */
@@ -189,7 +218,10 @@ async function letturaCloud(ticket) {
   const { leggiDalServer } = await import('./lib/feedback-cloud.mjs');
   const r = await leggiDalServer(ticket, { numeri: 'aperti', schede: true, testi: false });
   if (!r.ok) return { ok: false, codice: r.guasto ? 4 : 3, motivo: r.motivo };
-  return { ok: true, righe: r.voci.filter((v) => v.riga).map((v) => v.riga), schede: r.voci.filter((v) => v.scheda).map((v) => v.scheda), complete: true };
+  return {
+    ok: true, righe: r.voci.filter((v) => v.riga).map((v) => v.riga), schede: r.voci.filter((v) => v.scheda).map((v) => v.scheda),
+    segnalati: new Map(r.voci.filter((v) => v.riga && v.rifiutato).map((v) => [String(v.riga._id || v.id || ''), String(v.rifiutato)])), complete: true,
+  };
 }
 
 async function strada() {
@@ -207,12 +239,13 @@ async function elenca(cartella, dryRun) {
   if (r.complete === false) { console.error(`RIFIUTATO: la lettura non è completa (${righe.length} documenti): indice non scritto, rilancia.`); return 1; }
   const illeggibili = righe.filter(statoIllegibile).length;
   if (illeggibili) { console.error(`RIFIUTATO: lo stato di ${illeggibili} feedback su ${righe.length} non si decifra (manca la chiave privata, o è un'altra): senza non so chi è aperto, indice non scritto.`); return 1; }
-  const indice = apertiDaRighe(righe);
+  const indice = apertiDaRighe(righe, { segnalati: r.segnalati });
   let scritte = 0;
   if (!dryRun) {
     mkdirSync(cartella, { recursive: true });
     writeFileSync(join(cartella, INDICE), `${JSON.stringify(indice, null, 1)}\n`);
     scritte = importaSchede(cartella, r.schede);
+    scriviSegnalati(cartella, indice);
   }
   const salvate = `${r.schede.length} schede salvate nei feedback${dryRun ? '' : `, ${scritte} copiate nella cartella`}`;
   console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}; ${salvate}.`);
@@ -236,10 +269,33 @@ export function indiceAggiornato(indice, aggiornati) {
 
 // Il segno di una scheda della cartella che il feedback non ha: fresca per l'agente, ma da mandare al prossimo giro.
 export const NON_SALVATA = '_nonSalvata';
+// Il server l'ha rifiutata per un motivo che rimandarla non cambia: resta nella cartella finché il feedback non cambia.
+export const RIFIUTATA = '_rifiutata';
+// La scheda di un segnalato, scritta senza agente: il server per regola non la salva, quindi non gli si manda.
+export const SEGNALATA = '_segnalata';
 
-/** Cosa resta nella cartella dopo il salvataggio: la scheda del feedback, o quella dell'agente col segno. PURA. */
+/**
+ * Cosa resta nella cartella dopo il salvataggio: la scheda del feedback; quella dell'agente col motivo del no, se il no
+ * è definitivo; altrimenti col segno da rimandare. PURA.
+ */
 export function schedaDopoSalvataggio(stampata, salvata) {
-  return salvata && salvata.ok && salvata.scheda ? salvata.scheda : { ...stampata, [NON_SALVATA]: true };
+  if (salvata && salvata.ok && salvata.scheda) return salvata.scheda;
+  const { [NON_SALVATA]: _n, [RIFIUTATA]: _r, ...base } = stampata;
+  if (salvata && !salvata.guasto && RIFIUTI_DEFINITIVI.includes(salvata.reason)) return { ...base, [RIFIUTATA]: String(salvata.motivo || salvata.reason) };
+  return { ...base, [NON_SALVATA]: true };
+}
+
+/** Scrive senza agente la scheda dei segnalati dell'indice che non ne hanno una fresca. → quante scritte. */
+export function scriviSegnalati(cartella, indice) {
+  let scritte = 0;
+  for (const f of indice || []) {
+    if (!f || !f.segnalato || !f.num) continue;
+    const qui = leggiJson(fileScheda(cartella, f.num));
+    if (qui && qui[SEGNALATA] && !daScrivere(f, qui)) continue;
+    writeFileSync(fileScheda(cartella, f.num), `${JSON.stringify(schedaDelSegnalato(f), null, 1)}\n`);
+    scritte += 1;
+  }
+  return scritte;
 }
 
 /**
@@ -251,6 +307,7 @@ export async function rimandaNonSalvate(cartella, indice, { salva }) {
   const aggiornati = new Map();
   let mandate = 0;
   let restano = 0;
+  let rifiutate = 0;
   for (const s of leggiSchede(cartella)) {
     if (!s || s[NON_SALVATA] !== true) continue;
     const num = String(s.numero || '').replace(/^#/, '');
@@ -258,16 +315,20 @@ export async function rimandaNonSalvate(cartella, indice, { salva }) {
     if (!f || daScrivere(f, s)) continue;
     const modello = String(((s._riletta || s._fonte) || {}).modello || '');
     const salvata = await salva({ numero: num, scheda: SS.campiDellAgente(s), rilettura: Boolean(s._riletta), modello });
-    if (salvata && salvata.ok && salvata.scheda) {
-      writeFileSync(fileScheda(cartella, num), `${JSON.stringify(salvata.scheda, null, 1)}\n`);
-      if (salvata.aggiornato) aggiornati.set(num, salvata.aggiornato);
-      mandate += 1;
-    } else {
+    const daTenere = schedaDopoSalvataggio(s, salvata);
+    writeFileSync(fileScheda(cartella, num), `${JSON.stringify(daTenere, null, 1)}\n`);
+    if (daTenere[RIFIUTATA]) {
+      rifiutate += 1;
+      console.error(`#${num}: il server non salva la scheda (${daTenere[RIFIUTATA]}): resta solo nella cartella.`);
+    } else if (daTenere[NON_SALVATA]) {
       restano += 1;
       console.error(`#${num}: scheda ancora fuori dal feedback (${(salvata && salvata.motivo) || 'risposta vuota'}).`);
+    } else {
+      if (salvata.aggiornato) aggiornati.set(num, salvata.aggiornato);
+      mandate += 1;
     }
   }
-  return { mandate, restano, aggiornati };
+  return { mandate, restano, rifiutate, aggiornati };
 }
 
 async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dryRun }) {
@@ -284,6 +345,7 @@ async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dry
   let costo = 0;
   let falliti = 0;
   let nonSalvate = 0;
+  let rifiutate = 0;
   const giro = await strada();
   const aggiornati = new Map();
   await aGruppi(voci, paralleli, async (v) => {
@@ -309,7 +371,10 @@ async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dry
     const salvata = await salvaNelFeedback({ numero: v.num, scheda: SS.campiDellAgente(nuova), rilettura, modello }, giro);
     const daTenere = schedaDopoSalvataggio(stampata, salvata);
     writeFileSync(fileScheda(cartella, v.num), `${JSON.stringify(daTenere, null, 1)}\n`);
-    if (daTenere[NON_SALVATA]) {
+    if (daTenere[RIFIUTATA]) {
+      rifiutate += 1;
+      console.error(`#${v.num}: il server non salva la scheda (${daTenere[RIFIUTATA]}): resta solo nella cartella.`);
+    } else if (daTenere[NON_SALVATA]) {
       nonSalvate += 1;
       console.error(`#${v.num}: scheda nella cartella ma non nel feedback (${salvata.motivo || 'risposta vuota'}).`);
     } else if (salvata.aggiornato) aggiornati.set(v.num, salvata.aggiornato);
@@ -319,7 +384,7 @@ async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dry
     const indice = leggiJson(join(cartella, INDICE));
     if (Array.isArray(indice)) writeFileSync(join(cartella, INDICE), `${JSON.stringify(indiceAggiornato(indice, aggiornati), null, 1)}\n`);
   }
-  const salvate = nonSalvate ? `, ${nonSalvate} non salvate nel feedback (rilancia lo stesso comando)` : '';
+  const salvate = `${nonSalvate ? `, ${nonSalvate} non salvate nel feedback (rilancia lo stesso comando)` : ''}${rifiutate ? `, ${rifiutate} rifiutate dal server (restano nella cartella)` : ''}`;
   console.log(`${voci.length - falliti} schede su ${voci.length}${falliti ? `, ${falliti} da rifare (rilancia lo stesso comando)` : ''}${salvate}. Costo dichiarato dagli agenti: ${costo.toFixed(2)} $.`);
   return falliti || nonSalvate ? 3 : 0;
 }
@@ -350,17 +415,23 @@ export async function main(argv) {
       indice = indiceAggiornato(indice, r.aggiornati);
       writeFileSync(join(cartella, INDICE), `${JSON.stringify(indice, null, 1)}\n`);
     }
-    if (r.mandate || r.restano) console.log(`Schede rimaste fuori dal feedback: ${r.mandate} salvate adesso${r.restano ? `, ${r.restano} ancora fuori (rilancia lo stesso comando)` : ''}.`);
+    if (r.mandate || r.restano || r.rifiutate) {
+      console.log(`Schede rimaste fuori dal feedback: ${r.mandate} salvate adesso${r.restano ? `, ${r.restano} ancora fuori (rilancia lo stesso comando)` : ''}${r.rifiutate ? `, ${r.rifiutate} rifiutate dal server (restano nella cartella)` : ''}.`);
+    }
     restano = r.restano;
+    scriviSegnalati(cartella, indice);
   }
   const schede = leggiSchede(cartella);
-  const perNum = new Map(indice.map((f) => [f.num, f]));
+  // Un segnalato non va all'agente: non lo può leggere, e la sua scheda il server non la salva.
+  const perNum = new Map(indice.filter((f) => !f.segnalato).map((f) => [f.num, f]));
   if (cmd === 'scrivi') {
     const solo = String(opzione(argv, '--solo') || '').split(/[\s,]+/).map((n) => n.replace(/^#/, '')).filter(Boolean);
-    const ignoti = solo.filter((n) => !perNum.has(n));
+    const segnalati = solo.filter((n) => indice.some((f) => f.num === n && f.segnalato));
+    if (segnalati.length) console.log(`Segnalati, senza agente: ${segnalati.map((n) => `#${n}`).join(', ')} (scheda «non letto» col motivo).`);
+    const ignoti = solo.filter((n) => !perNum.has(n) && !segnalati.includes(n));
     if (ignoti.length) { console.error(`Non sono fra gli aperti dell'indice: ${ignoti.map((n) => `#${n}`).join(', ')}. Rilancia elenca se sono nuovi.`); return 1; }
     const mappa = new Map(schede.map((s) => [String(s.numero || '').replace(/^#/, ''), s]));
-    const voci = (solo.length ? solo.map((n) => perNum.get(n)) : indice).filter((f) => solo.length || daScrivere(f, mappa.get(f.num)));
+    const voci = solo.length ? solo.filter((n) => perNum.has(n)).map((n) => perNum.get(n)) : [...perNum.values()].filter((f) => daScrivere(f, mappa.get(f.num)));
     return (await lanciaAgenti(voci, { cartella, modello: opzione(argv, '--modello') || 'haiku', paralleli, rilettura: false, dryRun })) || (restano ? 3 : 0);
   }
   const quota = Math.max(0, Math.min(1, Number(opzione(argv, '--quota') ?? 0.1)));

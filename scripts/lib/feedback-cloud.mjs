@@ -5,6 +5,8 @@
 export const INDIRIZZO_OWNER = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/ownerSchede';
 // Il freno del server conta 30 chiamate al minuto per biglietto: gli agenti delle schede in parallelo lo possono toccare.
 const ATTESE_429_MS = [10_000, 20_000, 30_000, 45_000, 60_000];
+// I no che dipendono dal feedback o dalla scheda, non dal momento: rimandare la stessa scheda avrebbe la stessa risposta.
+export const RIFIUTI_DEFINITIVI = Object.freeze(['feedback_segnalato', 'feedback_inesistente', 'scheda_non_valida']);
 
 /** 'cloud' in una routine (FILO_ROUTINE acceso) col biglietto; 'locale' altrimenti, col token dell'owner. PURA. */
 export function stradaFeedback({ env = {}, biglietto = '' } = {}) {
@@ -33,7 +35,7 @@ export async function chiamaFeedback(ticket, corpo, { chiama = null, attendi = d
     if (status === 200 && b.ok) return { ...b, ok: true };
     if (status === 404 && !b.reason) return { ok: false, guasto: true, motivo: 'routineFeedback non è ancora pubblicata sul server' };
     const motivo = `${b.reason || `http_${status}`}${b.detail ? `: ${b.detail}` : ''}`;
-    return { ok: false, guasto: status >= 500 || status === 0, motivo };
+    return { ok: false, guasto: status >= 500 || status === 0 || status === 429, motivo, reason: String(b.reason || '') };
   }
 }
 
@@ -89,7 +91,11 @@ export async function salvaSchedaDaOwner({ numero, scheda, rilettura = false, mo
     const body = await res.json().catch(() => ({}));
     if (res.ok && body.result && body.result.ok) return { ...body.result, ok: true };
     if (res.status === 404 && !body.error) return { ok: false, guasto: true, motivo: 'ownerSchede non è ancora pubblicata sul server' };
-    return { ok: false, guasto: res.status >= 500, motivo: String((body.error && body.error.message) || `errore ${res.status}`) };
+    const err = body.error || {};
+    return {
+      ok: false, guasto: res.status >= 500 || res.status === 429, motivo: String(err.message || `errore ${res.status}`),
+      reason: String((err.details && err.details.reason) || ''),
+    };
   } catch (e) {
     const motivo = String((e && e.message) || e).slice(0, 200);
     return { ok: false, guasto: true, motivo: e && e.credenziale ? `credenziali del proprietario rifiutate: ${motivo}` : `server non raggiungibile: ${motivo}` };
