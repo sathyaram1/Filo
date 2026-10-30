@@ -336,6 +336,8 @@ export async function segnalazioneDaUnire(riferimento, opts = {}) {
     attese: ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) }),
     ramo: String(f.branch?.stringValue || '').trim(),
     unisce: (f.unisce?.arrayValue?.values || []).map((v) => String(v?.mapValue?.fields?.num?.stringValue || '')).filter(Boolean),
+    // La fiducia la scrive solo il server (#1148): un pacchetto che porta i suoi allegati non è più fidato di lei.
+    fidato: MR.isFidato({ fiducia: f.fiducia?.stringValue }),
   };
 }
 
