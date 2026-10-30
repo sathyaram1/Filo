@@ -306,6 +306,37 @@
     return { ok: true, domanda };
   }
 
+  function righeDi(testo) {
+    return String(testo || '').split('\n').filter((r) => r.trim())
+      .reduce((n, r) => n + Math.ceil(r.trim().length / FORMA_OWNER.caratteriRiga), 0);
+  }
+
+  /**
+   * La forma di ciò che il compito «Gestisci la domanda» pubblica per l'owner (§3.5), sopra a `validaDomanda`: da 2 a
+   * 4 opzioni, contesto e problema corti, pro, contro e perché di una riga. null se va bene. PURA.
+   */
+  function controllaFormaOwner(domanda) {
+    const d = isOggetto(domanda) ? domanda : {};
+    const opzioni = Array.isArray(d.opzioni) ? d.opzioni : [];
+    if (opzioni.length > FORMA_OWNER.opzioniMassime) {
+      return no('troppe_opzioni', `${opzioni.length} opzioni, per l'owner al massimo ${FORMA_OWNER.opzioniMassime}: tieni le strade che hanno un pro vero`,
+        { campo: 'opzioni', lunghezza: opzioni.length, massimo: FORMA_OWNER.opzioniMassime });
+    }
+    const campi = [['contesto', d.contesto, FORMA_OWNER.righeContesto], ['problema', d.problema, FORMA_OWNER.righeProblema]];
+    opzioni.forEach((o, i) => {
+      campi.push([`opzioni[${i}].pro`, o && o.pro, FORMA_OWNER.righeOpzione], [`opzioni[${i}].contro`, o && o.contro, FORMA_OWNER.righeOpzione]);
+    });
+    if (isOggetto(d.consiglio)) campi.push(['consiglio.perche', d.consiglio.perche, FORMA_OWNER.righePerche]);
+    for (const [campo, valore, massimo] of campi) {
+      const righe = righeDi(valore);
+      if (righe <= massimo) continue;
+      const max = massimo * FORMA_OWNER.caratteriRiga;
+      return no('forma_non_per_owner', `«${campo}» occupa ${righe} righe, per l'owner al massimo ${massimo} (una riga è ${FORMA_OWNER.caratteriRiga} caratteri, `
+        + `quindi ${max} in tutto): frasi corte, i dettagli in notePerAgenti`, { campo, lunghezza: righe, massimo });
+    }
+    return null;
+  }
+
   /** Un'opzione riprende il lavoro su `feedbackId` ('' = su qualunque feedback). PURA. */
   function riprende(domanda, feedbackId = '') {
     return (isOggetto(domanda) && Array.isArray(domanda.opzioni) ? domanda.opzioni : [])
