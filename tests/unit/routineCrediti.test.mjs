@@ -128,7 +128,7 @@ function chiama(msg) {
 
 const STATO = {
   ok: true, riserva: 'attivi', numeri: { riservaA: 10, usdPer100: 2150 },
-  accounts: { A: { pct: 46.5, limite: 90, passo: { spesoPct: 3, quotaPct: 12 }, fermo: '', rinnovoAtMs: 1 }, B: { pct: 10, limite: null } },
+  accounts: { A: { pct: 46.5, limite: 90, passo: { spesoPct: 3, quotaPct: 12 }, fermo: '', rinnovoAtMs: 1, usdSettimana: 1000, usd24h: 80, accensioniSettimana: 9, accensioni24h: 2 }, B: { pct: 10, limite: null } },
   sessioni: [{ sessionId: 's1', costUsd: 3 }],
 };
 
