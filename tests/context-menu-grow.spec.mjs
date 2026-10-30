@@ -3,7 +3,7 @@
 // menu, e il sottomenu appeso a una sua voce lo segue, o si chiude quando la voce esce dal bordo.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
 
 const LINK = 'https://example.com/articolo-lungo';
 
