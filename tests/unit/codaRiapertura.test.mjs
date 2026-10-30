@@ -124,11 +124,12 @@ test('una scheda che rientra nella coda mentre parte non la fa dire finita, né 
 
   // Una scheda chiusa proprio mentre parte quella aperta dall'utente: il posto liberato non fa partire le altre.
   partite.length = 0;
-  vive = ['p', 'q', 's', 't'];
-  coda.accoda(['p', 'q', 'r', 's', 't']);
+  vive = ['p', 'q', 'r', 's', 't'];
+  coda.accoda(vive);
   coda.subito('p');
   coda.caricata('p');
   assert.deepEqual(partite, ['p', 'q', 'r']);
+  vive = ['p', 'q', 's', 't'];
   coda.subito('t');
   assert.deepEqual(partite, ['p', 'q', 'r', 't'], 'finché quella in vista carica, s aspetta');
 });
