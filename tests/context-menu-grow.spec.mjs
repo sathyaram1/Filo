@@ -385,6 +385,7 @@ test('#500 la finestra si accorcia sotto al menu di una selezione: il menu rient
     // fuori dalla finestra.
     const ultima = menu.locator('.sn-menu-item').last();
     await ultima.hover({ timeout: 3000 });
+    await attendiUltimaVoceCliccabile(app, page);
     await ultima.click({ timeout: 3000 });
     await expect(menu).toHaveCount(0);
   } finally {
