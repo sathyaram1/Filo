@@ -757,7 +757,7 @@ export async function main(argvIn) {
   else if (!locale) console.log('Priorità: la decide il giudice di priorità, come per ogni feedback che entra in coda.');
   // Un allegato mancante è un rifiuto parziale: chi lancia lo script deve
   // accorgersene, perché il feedback senza il documento può non avere senso.
-  return (r.falliti && r.falliti.length) || attesaMancata ? EXIT.RIFIUTATO : EXIT.FATTO;
+  return (r.falliti && r.falliti.length) || incompleto ? EXIT.RIFIUTATO : EXIT.FATTO;
 }
 
 if (isMain) {
