@@ -27,8 +27,8 @@ regola**.
 
 Se invece si farebbe da qui ma qualcosa è rotto (un clone, una credenziale, la
 rete, uno strumento, i permessi della sessione), non è per regola: è un
-guasto, e va nella domanda della sezione «Un guasto dell'ambiente si dice con
-una domanda».
+guasto, e si dichiara nel rilascio (sezione «Un guasto dell'ambiente si
+dichiara nel rilascio»), senza domanda.
 
 Poi rilascia il biglietto. Se manca solo un pezzo a margine, consegna il resto
 come sempre e scrivi nel report cosa resta da fare e perché.

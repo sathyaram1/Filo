@@ -51,7 +51,7 @@ const {
   clearState,
   fixedPayload,
   leggiOpzioniRegistrazione,
-  fermaSenzaSegnalazione,
+  fermaSenzaDomanda,
   fixedReplyText,
   FERMA_NOTE,
   verifierScope,
@@ -160,7 +160,8 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
   assert.match(fix, /cap2: 4 giri residui su 5/);
   assert.match(fix, /FASE 2 — correggi/);
   // Il testo della fase 2 è dell'owner e può tacerla: la regola che ferma la stampa lo strumento.
-  assert.match(fix, /--record-fixed <id> "<report>" --segnala <file\.md>/);
+  assert.match(fix, /--record-fixed <id> "<report>" --domanda <file\.json>/);
+  assert.doesNotMatch(fix, /--segnala/, 'il server non compone domande da un markdown (#1790)');
   assert.ok(fix.indexOf('FERMA il lavoro') > fix.indexOf('FASE 2 — correggi'), 'dopo le istruzioni, non al loro posto');
   assert.match(verifierReplyText({ outcome: 'pass', derived: { num: '#42.1' } }), /#42\.1/);
   assert.match(verifierReplyText({ outcome: 'stop', blocking: [{ level: 3, text: 'grave' }] }), /si ferma[\s\S]*\[3i\] grave/);
@@ -516,28 +517,29 @@ test('fixedPayload e le opzioni dei --record-*: la domanda (#1358) viaggia come 
   assert.match(leggiOpzioniRegistrazione(['--record-secaudit', 'id1', 'pass', '--domanda', 'd.json']).error, /--domanda non vale con --record-secaudit/);
 });
 
-test('--ferma senza segnalazione non parte: è la segnalazione che ferma, e senza chi decide non saprebbe cosa decidere', () => {
-  assert.match(fermaSenzaSegnalazione(true, ''), /--segnala <file\.md> che ferma il lavoro/);
-  assert.match(fermaSenzaSegnalazione(true, '   '), /non ho consegnato niente/);
-  assert.equal(fermaSenzaSegnalazione(true, 'file.md'), '');
-  assert.equal(fermaSenzaSegnalazione(false, ''), '');
+test('--ferma senza domanda non parte: è la domanda che ferma, e senza chi decide non saprebbe cosa decidere', () => {
+  assert.match(fermaSenzaDomanda(true, ''), /la domanda che blocca \(--domanda <file\.json>\) a fermare il lavoro/);
+  assert.match(fermaSenzaDomanda(true, '   '), /non ho consegnato niente/);
+  assert.equal(fermaSenzaDomanda(true, 'domanda.json'), '');
+  assert.equal(fermaSenzaDomanda(false, ''), '');
 });
 
-test('fixedReplyText: il fermo lo conferma il server; una segnalazione non fermata si dice, non si dà per fatta', () => {
+test('fixedReplyText: il fermo lo conferma il server; una domanda non fermata si dice, non si dà per fatta', () => {
   assert.match(fixedReplyText('A', { outcome: 'stop' }, true), /FERMATO/);
   assert.match(fixedReplyText('A', { outcome: 'stop' }, false), /FERMATO/, 'il server ha fermato: si dice anche se qui non lo si aspettava');
   assert.match(fixedReplyText('A', {}, true), /ATTENZIONE/);
-  assert.match(fixedReplyText('A', {}, true), /segnalazione/);
+  assert.match(fixedReplyText('A', {}, true), /domanda/);
   assert.match(fixedReplyText('A', {}, false), /torna in coda/);
 });
 
-test('la nota che lo strumento stampa dopo la critica dice che la segnalazione ferma, senza --ferma', () => {
-  assert.match(FERMA_NOTE, /--segnala <file\.md>/);
+test('la nota che lo strumento stampa dopo la critica dice che la domanda ferma, senza --ferma né --segnala', () => {
+  assert.match(FERMA_NOTE, /--domanda <file\.json>/);
+  assert.match(FERMA_NOTE, /almeno due opzioni con pro e contro/);
   assert.match(FERMA_NOTE, /FERMA il lavoro/);
-  assert.doesNotMatch(FERMA_NOTE, /--ferma/);
+  assert.doesNotMatch(FERMA_NOTE, /--ferma|--segnala/);
 });
 
-test('CLI: --record-fixed --ferma senza --segnala si ferma prima del server, e dice che a fermare è --segnala', () => {
+test('CLI: --record-fixed --ferma senza --domanda si ferma prima del server, e dice che a fermare è la domanda', () => {
   const script = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
   const report = 'Non si può correggere senza una decisione: le due strade hanno costi diversi e le spiego nel file.';
   let uscita = 0;
@@ -546,7 +548,7 @@ test('CLI: --record-fixed --ferma senza --segnala si ferma prima del server, e d
     execFileSync(process.execPath, [script, '--record-fixed', 'fid-x', report, '--ferma'], { encoding: 'utf8', stdio: 'pipe', env: { ...process.env, FILO_ROUTINE_TICKET: '' } });
   } catch (e) { uscita = e.status; testo = `${e.stdout || ''}${e.stderr || ''}`; }
   assert.equal(uscita, 1);
-  assert.match(testo, /--segnala <file\.md> che ferma il lavoro/);
+  assert.match(testo, /la domanda che blocca \(--domanda <file\.json>\) a fermare il lavoro/);
 });
 
 // ─── La ripresa dopo la risposta dell'owner ──────────────────────────────────

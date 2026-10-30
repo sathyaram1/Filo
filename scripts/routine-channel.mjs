@@ -85,13 +85,11 @@
 //         ripiegare: il server ha guardato e ha detto no), 3 = guasto.
 //         `--notes "…"` è il report per l'owner (il server lo cifra: nessuno
 //         tranne lui lo rilegge). `--frase "…"` è la riga in chiaro per chi ha
-//         mandato il feedback, che la vede nella sua bacheca. `--segnala
-//         <file.md>` (su status, fixed e verdict) è la segnalazione per
-//         l'owner — un trade-off vero, che decide lui — letta intera dal file
-//         e scritta dal server nel livello L3 del feedback. `--domanda
-//         <file.json>` (su status, fixed e verdict, #1358) è la domanda per
-//         l'owner già nel formato di SPEC-DOMANDE §3.1: ferma il lavoro come la
-//         segnalazione, e il feedback aspetta lei. `--status attack|spam` col
+//         mandato il feedback, che la vede nella sua bacheca. `--domanda
+//         <file.json>` (su status e fixed, #1358) è la domanda per l'owner nel
+//         formato di SPEC-DOMANDE §3.1: una che blocca ferma il lavoro, e il
+//         feedback aspetta lei; una fermata (`--status design`) senza domanda
+//         non parte, tranne `--reason locale` (#1790). `--status attack|spam` col
 //         perché nelle note: il giudizio di chi l'ha letto (Ricevuti L3).
 //         Revisione, correzione, critica e verdetto partono solo dal ramo assegnato (uscita 1 altrimenti): il ramo
 //         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo.
@@ -137,9 +135,9 @@ import {
   USCITA_LAVORO_VIVO,
 } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
-import { leggiTestoLivello } from './lib/livelli.mjs';
 import { bigliettoFinito, haFormaDiBigliettoVero, leggiBigliettoAMano, leggiMarcatoreBiglietto, looksLikeTicket, segnaBigliettoFinito } from './lib/routine-ticket.mjs';
 import { apreUnElenco } from './lib/argomenti.mjs';
+import { SEGNALA_TOLTA } from './lib/livelli.mjs';
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
@@ -1070,15 +1068,14 @@ export function testoConsegnaFuoriRamo(quale, g, sospesa = null) {
 
 /** Gli intenti che una consegna conosce: decidono se la prima parola di `deliver` è un intento o un biglietto. */
 /**
- * Cosa stampa una consegna registrata. Una con segnalazione o domanda ferma il lavoro: chi consegna deve saperlo
+ * Cosa stampa una consegna registrata. Una con una domanda che blocca ferma il lavoro: chi consegna deve saperlo
  * adesso, o crede di averlo mandato in verifica; una domanda con «blocca» false (#1577) non lo ferma. PURA.
  */
 export function testoConsegnaRiuscita(r, data = {}, intento = '') {
   const reply = r && r.reply && typeof r.reply === 'object' ? r.reply : null;
   const ok = r && r.num ? `OK: ${r.num}` : 'OK';
   const conDomanda = !!data.domanda && typeof data.domanda === 'object' && intento !== 'domanda';
-  const segnalata = typeof data.segnalazione === 'string' && !!data.segnalazione.trim();
-  const cosa = conDomanda ? 'la domanda' : segnalata ? 'la segnalazione' : 'la fermata';
+  const cosa = conDomanda ? 'la domanda' : 'la fermata';
   if (reply && reply.outcome === 'stop') {
     const dom = typeof reply.domanda === 'string' && reply.domanda ? `, domanda ${reply.domanda}` : '';
     return `${ok}: il lavoro è FERMO e aspetta l'owner (${cosa} è consegnata${dom}). Rilascia il biglietto.`;
@@ -1086,11 +1083,28 @@ export function testoConsegnaRiuscita(r, data = {}, intento = '') {
   const provv = reply && (reply.outcome === 'provvisoria' ? reply.domanda : reply.domandaProvvisoria);
   if (typeof provv === 'string' && provv) return `${r.num ? ok : 'OK: consegnato'}. La domanda ${provv} non ferma il lavoro: vale la consigliata finché l'owner non risponde.`;
   if (reply && reply.outcome === 'server') return `${ok}: passato ai lavori server, che lo riprendono dal ramo. Rilascia il biglietto.`;
-  if (segnalata || conDomanda) return `${r && r.num ? ok : 'OK: consegnato'}. ATTENZIONE: la consegna portava ${cosa} ma il server non ha fermato il lavoro (server vecchio?).`;
+  if (conDomanda) return `${r && r.num ? ok : 'OK: consegnato'}. ATTENZIONE: la consegna portava ${cosa} ma il server non ha fermato il lavoro (server vecchio?).`;
   return r && r.num ? ok : 'OK: consegnato.';
 }
 
 export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda', 'piano'];
+
+/**
+ * Una fermata (`--status design`) senza la domanda scritta da chi si ferma non parte (#1790): il server non ne compone
+ * più. Fa eccezione `locale`, che va ai lavori server o ai Ricevuti senza domanda; un guasto non è una fermata e si
+ * dichiara nel rilascio. Il testo del rifiuto, o ''. PURA.
+ */
+export function fermataSenzaDomanda(intento, data = {}) {
+  if (intento !== 'status' || data.status !== 'design') return '';
+  if (data.reason === 'guasto') {
+    return 'Un guasto non è una fermata e non è una domanda (#1790): il lavoro torna in coda da sé. Dichiaralo nel rilascio, '
+      + 'col gruppo e il messaggio esatto: release <biglietto> --role <il tuo ruolo> --guasto "<gruppo>: <il messaggio esatto>". Non ho consegnato niente.';
+  }
+  if (data.reason === 'locale' || (data.domanda && typeof data.domanda === 'object')) return '';
+  return `Una fermata${data.reason ? ` («${String(data.reason).slice(0, 40)}»)` : ''} senza la tua domanda non parte: il server non compone domande (#1790). `
+    + 'Scrivi la domanda in JSON (titolo fino a 10 parole, contesto, problema, almeno due opzioni con pro, contro e l\'azione, consiglio) '
+    + 'e rilancia con --domanda <file.json>. Per il codice del server: --reason locale. Non ho consegnato niente.';
+}
 
 // Il piano di un lavoro grosso, che la sessione dopo riceve se questa muore: largo, ma con un tetto detto.
 export const MAX_PIANO_BYTES = 64 * 1024;
@@ -1274,10 +1288,8 @@ if (isMain) {
       // Un campo di TESTO senza il suo testo non è un sì: è un report che
       // parte vuoto mentre la risposta dice OK (feedback #565).
       if (CAMPI_TESTO.has(key)) {
-        // `--segnala` vuole un FILE, non un testo: dirgli «un testo» lo mandava
-        // a passare la segnalazione sulla riga di comando, e a sbagliare due
-        // volte. Stessa frase di dispatch --record-*.
-        console.error(key === 'segnala' || key === 'piano'
+        // `--piano` vuole un FILE, non un testo: dirgli «un testo» lo mandava a passarlo sulla riga di comando.
+        console.error(key === 'segnala' ? SEGNALA_TOLTA : key === 'piano'
           ? `--${key} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.`
           : `--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
         process.exit(1);
@@ -1310,29 +1322,20 @@ if (isMain) {
     }
   }
 
-  // `--segnala <file.md>`: la segnalazione per l'owner (L3), letta INTERA dal
-  // file con gli stessi controlli di dispatch --record-* (assente, vuoto,
-  // oltre il tetto = errore chiaro, prima del server). Il server la legge col
-  // nome `segnalazione` su status, fixed e verdict; su un altro intento non
-  // avrebbe dove andare, e sparirebbe in silenzio.
-  if (typeof data.segnala === 'string') {
-    const intentoSeg = [args[0], args[1]].find((a) => ['status', 'fixed', 'verdict'].includes(a));
-    if (cmd !== 'deliver' || !intentoSeg) {
-      console.error('--segnala vale solo su deliver status, fixed e verdict: non ho consegnato niente.');
-      process.exit(1);
-    }
-    const seg = leggiTestoLivello(data.segnala, 'segnala');
-    if (!seg.ok) { console.error(seg.message); process.exit(1); }
-    data.segnalazione = seg.testo;
+  // `--segnala <file.md>` non c'è più (#1790): il server non compone domande da un markdown. Si riconosce per dire
+  // cosa scrivere al suo posto, invece di consegnare una fermata che il server rifiuterebbe.
+  if (data.segnala !== undefined) {
+    console.error(SEGNALA_TOLTA);
+    process.exit(1);
   }
-  delete data.segnala;
 
   // `--domanda <file.json>` accanto a una fermata (#1358): la domanda per l'owner, controllata qui come la controlla il
-  // server. L'intento `domanda` la legge più sotto, da sola; su note, secaudit e feedback non fermerebbe niente.
+  // server. L'intento `domanda` la legge più sotto, da sola; su note, secaudit e feedback non fermerebbe niente, e su
+  // una critica la domanda viaggia col suo rilievo col «?» (dispatch --record-verifier, #1790).
   if (typeof data.domanda === 'string' && cmd === 'deliver') {
-    const intentoDom = [args[0], args[1]].find((a) => ['status', 'fixed', 'verdict', 'domanda'].includes(a));
+    const intentoDom = [args[0], args[1]].find((a) => ['status', 'fixed', 'domanda'].includes(a));
     if (!intentoDom) {
-      console.error('--domanda vale solo su deliver domanda, status, fixed e verdict: non ho consegnato niente.');
+      console.error('--domanda vale solo su deliver domanda, status e fixed (su una critica la porta il rilievo col «?»: dispatch --record-verifier --domanda): non ho consegnato niente.');
       process.exit(1);
     }
     if (intentoDom !== 'domanda') {
@@ -1364,8 +1367,8 @@ if (isMain) {
   // decidere. Stessa regola di dispatch --record-fixed --ferma.
   if (data.stop !== undefined) {
     const suFixed = cmd === 'deliver' && [args[0], args[1]].includes('fixed');
-    if (data.stop !== true || !suFixed || !(data.segnalazione || (data.domanda && typeof data.domanda === 'object'))) {
-      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md> o --domanda <file.json> (che da sole fermano già il lavoro): non ho consegnato niente.');
+    if (data.stop !== true || !suFixed || !(data.domanda && typeof data.domanda === 'object')) {
+      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --domanda <file.json> (che da sola ferma già il lavoro): non ho consegnato niente.');
       process.exit(1);
     }
   }
@@ -1817,6 +1820,8 @@ if (isMain) {
       if (letta.errore) { console.error(letta.errore); process.exit(1); }
       data.domanda = letta.domanda;
     }
+    const fermata = fermataSenzaDomanda(intento, data);
+    if (fermata) { console.error(fermata); process.exit(1); }
     const r = await deliver(biglietto, intento, data);
     // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
     // stato dato. Non è un doppione dello sha appena spedito: è la memoria su

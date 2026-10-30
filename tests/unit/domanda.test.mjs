@@ -10,9 +10,9 @@ import { leggiArgomenti, leggiDomandaJson, soloDaFilo, messaggioErrore, formatta
 const DOMANDA = {
   titolo: 'Archiviare il doppione?', priorita: 'importante', contesto: 'Due feedback uguali.',
   opzioni: [
-    { testo: 'Archivia', azione: { tipo: 'archivia', feedbackId: 'f1' } },
-    { testo: 'Approva come locale', azione: { tipo: 'approva_locale', feedbackId: 'f1' } },
-    { testo: 'Spegni le routine', azione: { tipo: 'automazione', chiave: 'routine.enabled', valore: false } },
+    { testo: 'Archivia', pro: 'Un lavoro in meno.', contro: 'Si perde la nota.', azione: { tipo: 'archivia', feedbackId: 'f1' } },
+    { testo: 'Riprendi', pro: 'La nota resta.', contro: 'Un giro in più.', azione: { tipo: 'riprendi', feedbackId: 'f1' } },
+    { testo: 'Spegni le routine', pro: 'Niente spesa.', contro: 'Si ferma tutto.', azione: { tipo: 'automazione', chiave: 'routine.enabled', valore: false } },
   ],
   consiglio: { opzione: 0, perche: 'è un doppione' },
 };
@@ -81,10 +81,10 @@ test('chiedi: senza biglietto va a ownerDomande, col biglietto delle routine pas
 });
 
 test('rispondi: un’azione di consenso o da fare una per una non parte da una sessione', async () => {
-  assert.equal(soloDaFilo({ tipo: 'approva_locale', feedbackId: 'f1' }), true);
+  assert.equal(soloDaFilo({ tipo: 'approva_locale', feedbackId: 'f1' }), true, 'un tipo che non c’è più non parte da qui');
   assert.equal(soloDaFilo({ tipo: 'automazione', chiave: 'routine.enabled', valore: false }), true);
   assert.equal(soloDaFilo({ tipo: 'archivia', feedbackId: 'f1' }), false);
-  for (const scelta of ['2', '3']) {
+  for (const scelta of ['3']) {
     const f = finto({ mostra: { ok: true, domanda: { id: 'D-3', ...DOMANDA }, riferimenti: {} } });
     assert.equal(await esegui(['rispondi', 'D-3', '--scelta', scelta], f.io), 1);
     assert.deepEqual(f.chiamate.map((c) => c.op), ['mostra'], 'rispondi non è stato chiamato');
@@ -171,7 +171,7 @@ test('rispondi, consiglio, archivia e riapri dicono al server che scrive una ses
 test('consiglio: le domande col consiglio di consenso restano fuori, le altre partono', async () => {
   const domande = {
     'D-1': { id: 'D-1', ...DOMANDA },
-    'D-2': { id: 'D-2', ...DOMANDA, consiglio: { opzione: 1, perche: 'x' } },
+    'D-2': { id: 'D-2', ...DOMANDA, consiglio: { opzione: 2, perche: 'x' } },
   };
   const f = finto({
     mostra: (d) => ({ ok: true, domanda: domande[d.id] }),

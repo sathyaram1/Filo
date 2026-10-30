@@ -23,6 +23,7 @@
     if (!c || typeof c !== 'object') return '';
     if (c.tipo === 'fase') return `${c.feedbackNum || 'feedback'} · ${NOME_FASE[c.fase] || c.fase || '?'}`;
     if (c.tipo === 'risposta') return `${c.id} · Gestisci la risposta a ${testo(c.domandaId) || 'una domanda'}`;
+    if (c.tipo === 'smistamento') return `${c.id} · Gestisci la domanda ${testo(c.domandaId) || 'appena nata'}`;
     const t = testo(c.titolo).trim();
     return t ? `${c.id} · ${t}` : String(c.id || '');
   }

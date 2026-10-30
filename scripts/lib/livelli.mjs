@@ -1,6 +1,5 @@
-// Il testo di un livello (L3 la segnalazione, L4 la nota del controllo di
-// sicurezza) letto da file, per le consegne. Sta qui perché lo usano due
-// strumenti — dispatch (--record-*) e il canale (deliver status --segnala) —
+// Il testo di un livello (L4 la nota del controllo di sicurezza) letto da file, per le consegne, e il rifiuto di
+// `--segnala` (L3, tolta con #1790). Sta qui perché lo usano due strumenti, dispatch (--record-*) e il canale,
 // e dispatch importa il canale: una copia sola, senza cicli.
 //
 // Il file si legge INTERO, mai tosato: un testo oltre il tetto viene rifiutato
@@ -13,6 +12,10 @@ import { resolve } from 'node:path';
 // numero, qui, prima di chiamare il server. In BYTE: il testo finisce cifrato in
 // un campo che le regole misurano (20.000), e in cirillico 12.000 caratteri non ci stavano.
 export const MAX_LIVELLO_BYTES = 12000;
+
+// La segnalazione in markdown da cui il server componeva la domanda: tolta, e si dice cosa scrivere al suo posto.
+export const SEGNALA_TOLTA = '--segnala non c\'è più: il server non compone domande da un markdown (#1790). Scrivi la domanda in JSON (SPEC-DOMANDE §3.1: '
+  + 'titolo, almeno due opzioni con pro e contro, consiglio) e passala con --domanda <file.json>. Non ho consegnato niente.';
 
 /**
  * Legge il testo di un livello da file. Un file assente o vuoto è un errore

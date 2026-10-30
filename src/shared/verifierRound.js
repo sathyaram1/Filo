@@ -310,10 +310,30 @@
       if (!LEVELS.includes(level)) continue;
       const text = String(f.text == null ? '' : f.text).trim().slice(0, MAX_FINDING_TEXT);
       if (!text) continue;
-      out.push({ level, sede: sedeDi(f.sede), text, decision: f.decision === true });
+      const rilievo = { level, sede: sedeDi(f.sede), text, decision: f.decision === true };
+      // La domanda di un rilievo col `?` (#1790) viaggia con lui: la controlla e la adotta il server, con SN_DOMANDE.
+      if (rilievo.decision && f.domanda && typeof f.domanda === 'object' && !Array.isArray(f.domanda)) rilievo.domanda = f.domanda;
+      out.push(rilievo);
       if (out.length >= MAX_FINDINGS) break;
     }
     return out;
+  }
+
+  /**
+   * I rilievi col `?` senza la loro domanda, come campo da nominare nel rifiuto (`findings[1].domanda`): il server non
+   * compone più domande dai rilievi (#1790). Vuoto se ognuno ha la sua. PURA.
+   */
+  function domandeMancanti(findings) {
+    return (Array.isArray(findings) ? findings : []).map((f, i) => ({ f, i }))
+      .filter(({ f }) => f && f.decision === true && !(f.domanda && typeof f.domanda === 'object' && !Array.isArray(f.domanda)))
+      .map(({ i }) => `findings[${i}].domanda`);
+  }
+
+  /** Il titolo di un feedback derivato da un rilievo col `?`: quello della sua domanda, '' se non ce l'ha. PURA. */
+  function titoloDelDerivato(g) {
+    const f = g && Array.isArray(g.findings) && g.findings.length === 1 ? g.findings[0] : null;
+    const t = f && f.decision && f.domanda && typeof f.domanda.titolo === 'string' ? f.domanda.titolo.trim() : '';
+    return t;
   }
 
   /** La prima frase di un rilievo, per un titolo (al più `max` caratteri). PURA. */
@@ -699,7 +719,7 @@
     LEVELS, SEDI, SPIEGAZIONE_SEDE, MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
     capKeyOf, countKeyOf, normalizeCritique, parseFindings, unparsedLevelLines, normalizeFindings, maxLevel, primaFrase,
     sedeDi, effectiveLevel, missingCaps, normalizeCaps, normalizeCounts, decideRound, derivedGroups, groupLabel,
-    findingTag, formatFinding, formatFindings, hasDecision, roundNote,
+    findingTag, formatFinding, formatFindings, hasDecision, roundNote, domandeMancanti, titoloDelDerivato,
     FILE_DI_SERVIZIO, MOTIVI_CORRETTORE, FORMA_MOTIVO, leggiMotivoCorrettore, testoMotivo, giroDopoRiallineamento,
   };
 

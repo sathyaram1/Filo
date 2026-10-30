@@ -59,7 +59,7 @@ vero su "qualcuno ci sta lavorando ORA"), `livelli` (dal 2026-09-13: mappa con a
 più `l3` e `l4`, ognuna `{ esito, at, ruolo?, by?, testo }`; la scrive SOLO il
 server; `l3` è la segnalazione di chi ha risolto o verificato (`esito:
 segnalato`, `ruolo`), un trade-off vero che decide l'owner, arrivata con
-`--segnala`; `l4` è l'esito del controllo di sicurezza, `pass|fail|saltato`,
+`--segnala` fino al #1790 (da lì la scelta per l'owner è solo una domanda); `l4` è l'esito del controllo di sicurezza, `pass|fail|saltato`,
 scritto sempre, anche su pass, col testo di cosa è stato controllato; `saltato`
 lo mette l'owner (`by: owner`) quando, letto il fail, decide di andare avanti,
 e conserva il testo del fail; `testo` è cifrato come `notes`; in dashboard sono
@@ -143,9 +143,9 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   ferma: entra nel feedback derivato dei rimasti e il lavoro passa se non c'è altro
   (dal 2026-09-23, bilanci separati per livello); —rilievo di livello 3/2 che chiede una
   decisione→ `design` (`statusReason: decisione`); —QUALUNQUE consegna con una
-  segnalazione per l'owner (`--segnala`: di chi risolve, di chi corregge, e la critica
-  di chi verifica in ogni esito)→ `design` (`statusReason: decisione`), senza bisogno
-  di `--ferma`: un feedback che aspetta una scelta dell'owner non gira altri giri. Le
+  domanda che blocca (`--domanda`: di chi risolve, di chi corregge, e la domanda di un
+  rilievo interno di livello 3 o 2 col `?` di chi verifica, in ogni esito)→ `design`
+  (`statusReason: decisione`), senza bisogno di `--ferma`: un feedback che aspetta una scelta dell'owner non gira altri giri. Le
   consegne che non possono fermare (nota, controllo di sicurezza, apertura di un
   feedback) la RESPINGONO, mai ignorata in silenzio. Il segnalibro di ripresa porta,
   con quello che ha fermato, anche gli altri rilievi interni della stessa critica
@@ -581,10 +581,13 @@ fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
 stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
 arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
-corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): la
-consegna porta la domanda col gruppo del guasto (#1577; senza, è rifiutata).
-Non è lavoro per regola: quello è `locale`, e la sua nota dice quale regola lo
-tiene fuori dalla cloud. La risposta dell'owner appende
+corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`). Dal #1790
+un guasto non ferma più e non apre una domanda: si dichiara nel rilascio
+(`--guasto "<gruppo>: <messaggio>"`), il feedback torna `todo` sul suo ramo con
+la nota del guasto, e una consegna `design` + `guasto` si rifiuta; al terzo guasto
+uguale di seguito il server apre una domanda col conteggio, che smista il compito
+«Gestisci la domanda» (SPEC-DOMANDE §3.5, §3.8). Non è lavoro per regola: quello è
+`locale`, e la sua nota dice quale regola lo tiene fuori dalla cloud. La risposta dell'owner appende
 alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
@@ -600,15 +603,23 @@ e il pentagono propone di rimandarla in lavorazione.
 (2b), (3), (5), (6), `attesa_chiusa`, `locale` con la domanda, e `aligned` con `origine_chiusa`
 o `origine_mancante` apre una domanda per l'owner e il feedback prende `domandaId`,
 restando nello stato e col motivo di prima: la macchina a stati non cambia. Dal canale la
-domanda nasce nella stessa transazione dello stato (quella scritta da chi si ferma con
-`--domanda`, o composta dal server dalle sue parole); dalle altre porte (la pipeline per i
-derivati e per l'origine, una migrazione) la crea il trigger del server appena il feedback
-entra nell'attesa. Una domanda aperta di un'attesa lasciata per un'altra strada diventa
+domanda nasce nella stessa transazione dello stato, ed è sempre quella scritta da chi si
+ferma con `--domanda`: il server non ne compone più, e una fermata senza domanda si
+rifiuta (tranne `locale`, #1790). Un derivato nato da un rilievo col `?` prende la domanda
+del rilievo, e il suo titolo. Le fermate del server (`loop`, `arenato`, `attesa_chiusa`,
+`origine_chiusa`, `origine_mancante`) ricevono la domanda di servizio, coi fatti e le due
+strade, che il compito riscrive: rimesse in coda girerebbero senza fine. Una fermata di chi
+lavora che entra in `design` senza una domanda viva (la pipeline, una migrazione) torna
+invece in coda con una nota che dice perché. Ogni domanda nasce `in_smistamento` e
+arriva all'owner dopo il compito «Gestisci la domanda» (SPEC-DOMANDE §3.5). Una domanda aperta di un'attesa lasciata per un'altra strada diventa
 `superata`. In dashboard un `design`/`aligned` con `domandaId` e uno di quei motivi sta
 **In coda**, col segno «aspetta D-n» che apre la domanda nella sezione Domande; nel
 dettaglio la casella di risposta lascia il posto al tasto «Rispondi alla domanda»: si
-risponde in un posto solo. La risposta con l'opzione `riprendi` (o col solo testo dell'owner
-dalla Gestione; quello di una sessione resta parole, SPEC-DOMANDE §3.4) lo riporta `todo` con la decisione in `payload.decisioni`, `notePerAgenti` comprese; una
+risponde in un posto solo. La risposta con l'opzione `riprendi` lo riporta `todo` con la
+decisione in `payload.decisioni`, `notePerAgenti` comprese, e scrive la ripresa sul ramo
+del lavoro; il solo testo resta parole da ogni strada e va al compito «Gestisci la
+risposta» (SPEC-DOMANDE §3.4, #1598). Un `riprendi` su un feedback che non è fermo non ne
+cambia lo stato: la decisione si accoda; una
 domanda archiviata o superata non sblocca niente. Restano nei Ricevuti, anche con un
 `domandaId`: `secaudit`, `l5`, `fidato`, attacchi, spam e file sospetti. Le
 attese aperte prima si migrano con `ownerDomande { op: 'migra' }`, a lotti

@@ -25,6 +25,5 @@ livello), non lo chiedi. Consegna comunque tutto quello che hai fatto: è da lì
 che si riprende.
 
 Una domanda per consegna: due scelte stanno nella stessa domanda, come opzioni
-o nel problema. `--segnala <file.md>` col markdown in tre parti (Problema,
-Scelte, Cosa ho fatto nel frattempo) vale ancora, e il server ne compone la
-domanda da sé: senza pro, contro e consiglio, però.
+o nel problema (chi verifica ne scrive una per ogni rilievo col `?`). Il server
+non compone domande: una fermata senza la tua domanda in JSON si rifiuta.
