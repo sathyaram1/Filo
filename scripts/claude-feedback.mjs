@@ -453,7 +453,9 @@ export const pacchetto = {
         throw Object.assign(new Error(`la conversazione di #${u.num} non si decifra (manca la chiave privata?): senza non so se porta allegati`), { definitivo: true });
       }
     }
-    return riferimentiAllegati(f, conversazione);
+    const { motiviDiLettura } = await import('./lib/biglietto-locale.mjs');
+    const daAltri = motiviDiLettura({ fiducia: 'fidato', notes: conversazione }).length > 0;
+    return riferimentiAllegati(f, conversazione).map((a) => (a.conversazione && daAltri ? { ...a, daAltri } : a));
   },
   async scarica(a) {
     if (!FB.isAttachmentUrl(a.url)) throw Object.assign(new Error('l’indirizzo non è del deposito di Filo: non lo scarico'), { definitivo: true });
