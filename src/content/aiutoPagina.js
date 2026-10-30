@@ -465,7 +465,7 @@
   }
 
   global.SN_AIUTO_PAGINA = {
-    AZIONI, leggi, azione, evidenzia, accetta, auto, pulisci, describeElementBriefly,
+    AZIONI, leggi, azione, evidenzia, accetta, auto, pulisci, campoValutato, describeElementBriefly,
     resolveActionText, resolveImageEl, resolveLinkEl,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
