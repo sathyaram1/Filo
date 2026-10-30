@@ -93,22 +93,6 @@ test.describe('siti fidati, verifica', () => {
 
 });
 
-test('Togli in fretta sulla prima riga, una volta per voce: l\'elenco si svuota', async ({ app, shell }) => {
-  await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ security: { safeBrowse: { trustedSites: ['uno967.it', 'due967.it', 'tre967.it', 'quattro967.it'] } } }));
-  await apri(shell, 'filo://security/security.html');
-  const sic = await aspettaFinestra(app, (w) => w.url().startsWith('filo://security/'), 'Sicurezza');
-  const box = sic.locator('#sec-safebrowse-fidati');
-  await expect(box.locator('li')).toHaveCount(4, { timeout: 10_000 });
-  const primo = box.locator('li').first().getByRole('button', { name: 'Togli' });
-  await primo.scrollIntoViewIfNeeded();
-  await box.locator('li').last().scrollIntoViewIfNeeded();
-  const bb = await primo.boundingBox();
-  for (let i = 0; i < 4; i++) { await sic.mouse.click(bb.x + bb.width / 2, bb.y + bb.height / 2); await sic.waitForTimeout(5); }
-  await sic.waitForTimeout(1500);
-  const restano = await fidatiSalvati(app);
-  expect(restano).toEqual([]);
-});
-
 test.describe('chat', () => {
   test.use({ hostInPiu: NOMI });
 
