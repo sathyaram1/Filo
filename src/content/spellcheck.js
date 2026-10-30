@@ -411,6 +411,8 @@
       setTimeout(() => { suppressAutocorrect = false; }, 0);
     }
     if (getEditableText(el).slice(v.start, v.start + v.originale.length) !== v.originale) return false;
+    // Riscrivere la parola di chi scrive non è una correzione di Filo: un Ctrl+Z dopo non è il suo annullo.
+    try { global.SN_POPUP?.modificaDiFilo?.(null); } catch (_) {}
     seguiIlTesto(state);
     rifiutata(state, v);
     return true;
