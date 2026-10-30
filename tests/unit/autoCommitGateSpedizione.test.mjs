@@ -109,6 +109,8 @@ describe('la spedizione non tace: storia divergente e push fallito', () => {
       if (biglietto) {
         mkdirSync(resolve(work, '.claude'), { recursive: true });
         writeFileSync(resolve(work, '.claude', 'routine-ticket.json'), JSON.stringify({ ticket: 'x'.repeat(43), since: new Date().toISOString() }));
+        // Timbro fresco: il gancio non prova a battere per un biglietto finto.
+        writeFileSync(resolve(work, '.claude', 'routine-beat-hook.stamp'), '');
       }
       writeFileSync(resolve(work, 'lavoro.js'), 'x\n', 'utf8');
       const r = runHookRaw(work, JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: 'Write' }), env);
