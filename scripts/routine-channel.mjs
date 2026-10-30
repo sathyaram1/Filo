@@ -1427,6 +1427,10 @@ if (isMain) {
       feedback = numeroFeedback(data.feedback);
       if (!feedback) { console.error(`--feedback vuole un numero di feedback (1680, #1680 o 1680.2), non "${String(data.feedback).slice(0, 30)}": non ho chiesto niente.`); process.exit(1); }
     }
+    // Una sessione accesa prima di una fusione che ha cambiato gli strumenti non prende lavoro nuovo (#1796).
+    const vecchia = sessioneDaChiudere(ROOT);
+    if (vecchia.chiudi) { console.error(vecchia.testo); process.exit(2); }
+    if (vecchia.avviso) console.error(vecchia.avviso);
     const r = await ticket(args[0], feedback ? { feedback } : undefined);
     // Un server che non conosce la richiesta per numero dà il primo della coda: quel biglietto si restituisce subito,
     // o la sessione accesa per un feedback lavorerebbe su un altro.
