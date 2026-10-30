@@ -200,7 +200,11 @@
     };
     if (r.state === 'progressing' || r.state === 'paused') {
       const fermo = r.state === 'paused';
-      const quanto = pct != null ? `${pct}% · ${fmtBytes(r.receivedBytes)} di ${fmtBytes(r.totalBytes)}` : `${fmtBytes(r.receivedBytes)}`;
+      let quanto = pct != null ? `${pct}% · ${fmtBytes(r.receivedBytes)} di ${fmtBytes(r.totalBytes)}` : `${fmtBytes(r.receivedBytes)}`;
+      // #1287 — quanto va veloce e quanto manca, come nel pannello e nella pagina Download.
+      let corsa = '';
+      try { corsa = global.SN_SCARICAMENTI_AVANZAMENTO.velocitaEResto(r); } catch (_) {}
+      if (corsa) quanto = `${quanto} · ${corsa}`;
       const pausa = r.canPause === false ? null : (fermo
         ? { etichetta: 'Riprendi', fai: cmdDownload(MSG.DOWNLOAD_RESUME, r) }
         : { etichetta: 'Pausa', fai: cmdDownload(MSG.DOWNLOAD_PAUSE, r) });
@@ -230,7 +234,14 @@
       }),
     };
     if (r.state === 'interrupted') {
-      return { ...base, stato: 'interrotto', principale: cartella, filo: `Lo scaricamento di «${nome}» si è interrotto.` };
+      // #1287 — «Riprova» rifà lo stesso indirizzo nella stessa carta.
+      const riprova = /^https?:/i.test(String(r.url || ''))
+        ? { etichetta: 'Riprova', forte: true, fai: () => d.send({ type: MSG.DOWNLOAD_RIPROVA, id: r.id }).then((res) => {
+          if (res && res.ok === false) avvisoErrore(res.error || 'Non sono riuscito a far ripartire lo scaricamento', 'download_failed');
+          caricaDownloads();
+        }) }
+        : null;
+      return { ...base, stato: 'interrotto', principale: riprova || cartella, secondaria: riprova ? cartella : null, filo: `Lo scaricamento di «${nome}» si è interrotto.` };
     }
     if (r.missing) {
       return { ...base, stato: 'il file non c’è più', principale: cartella, filo: `Avevo scaricato «${nome}», ma il file non è più al suo posto.` };

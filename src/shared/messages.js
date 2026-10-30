@@ -354,6 +354,13 @@
     DOWNLOAD_CANCEL: 'download_cancel',
     DOWNLOAD_PAUSE: 'download_pause',
     DOWNLOAD_RESUME: 'download_resume',
+    // #1287 — rifà uno scaricamento fallito nella stessa voce. { id } → { ok, items } | { ok:false, error, items }
+    DOWNLOAD_RIPROVA: 'download_riprova',
+    // #588.8 — fa partire il trascinamento di sistema del file scaricato dalla superficie che lo chiede. { id } → { ok }
+    DOWNLOAD_TRASCINA: 'download_trascina',
+    // #1287 — la risposta della finestra in incognito che si chiude con scaricamenti in corso: solo dalla sua barra.
+    // { scelta: 'finire' | 'annulla' } → { ok }
+    DOWNLOAD_CHIUSURA: 'download_chiusura',
     // #950 — rimette il nome con cui lo scaricamento era arrivato. { id } → { ok, nome } | { ok:false, frase }
     DOWNLOAD_RIMETTI_NOME: 'download_rimetti_nome',
     // #950 — nome sensato a un file dell'utente. Toccano il disco e rispondono con percorsi assoluti: solo dalle

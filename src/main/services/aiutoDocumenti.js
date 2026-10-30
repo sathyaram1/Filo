@@ -270,4 +270,5 @@ async function trascina(wc, chiave) {
   }
 }
 
-module.exports = { configura, cerca, ferma, perIlModello, percorsoDi, apri, mostra, trascina, _domanda: domanda };
+// iconaDi la usa anche il trascinamento dei file scaricati (downloads.js).
+module.exports = { configura, cerca, ferma, perIlModello, percorsoDi, apri, mostra, trascina, iconaDi, _domanda: domanda };
