@@ -18,7 +18,8 @@ const doc = (nome, extra = {}) => ({ tipo: 'documento', nome, type: 'text/plain'
 
 async function conRete({ lette, allegati = {}, byte = () => PNG, attesi = [], sposta = async () => ({ ok: true }), archivia = async () => ({ ok: true }), seq = 900 }, fn) {
   const P = SCRIPT.pacchetto;
-  const orig = { submit: FB.submit, ...P, log: console.log, err: console.error };
+  const orig = { submit: FB.submit, risolvi: SCRIPT.attese.risolvi, ...P, log: console.log, err: console.error };
+  SCRIPT.attese.risolvi = async (numeri) => ({ ok: true, attese: numeri.map((n) => ({ id: `id${n}`, num: n })) });
   const visti = { submit: [], spostate: [], archiviate: [], out: [], err: [] };
   FB.submit = async (payload, opts) => { visti.submit.push({ payload, opts }); return { id: 'pacco', seq, senderProof: 'admin', images: payload.images, files: payload.files }; };
   P.leggi = async (numeri) => numeri.map((n) => lette[n] || { ok: false, num: n, motivo: `nessun feedback #${n}` });
