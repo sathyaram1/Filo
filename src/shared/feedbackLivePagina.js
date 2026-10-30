@@ -444,15 +444,19 @@
     const idFermo = ferma ? ferma.dataset.id : '';
     const yFermo = ferma ? ferma.getBoundingClientRect().top : 0;
     const conFuoco = !!(ferma && doc && ferma.contains(doc.activeElement));
+    const sottoIlPuntatore = !!(ferma && ferma.matches(':hover'));
     const ancora = sc && prima > 0 ? L.ancoraScorrimento(righe(sc), prima) : null;
     ridisegna();
     const ora = idFermo ? Array.from(lista.querySelectorAll(voci)).find((el) => el.dataset.id === idFermo) : null;
     // Una lista rifatta da capo ha voci nuove: il fuoco torna sulla stessa voce, o la tastiera ripartirebbe dall'inizio.
     if (ora && conFuoco && !ora.contains(doc.activeElement) && ora.tabIndex >= 0) ora.focus({ preventScroll: true });
     const dopo = L && lista ? scorre() : null;
-    if (!dopo) return;
-    if (ora) { dopo.scrollTop += ora.getBoundingClientRect().top - yFermo; return; }
-    dopo.scrollTop = L.scrollDaAncora(ancora, righe(dopo), prima);
+    if (ora) {
+      if (dopo) dopo.scrollTop += ora.getBoundingClientRect().top - yFermo;
+      if (sottoIlPuntatore) tieni(lista, dopo || contenitoreDi(lista), ora, yFermo);
+      return;
+    }
+    if (dopo) dopo.scrollTop = L.scrollDaAncora(ancora, righe(dopo), prima);
   }
 
   global.SN_FEEDBACK_LIVE_PAGINA = { crea, seguiPuntatore, alSuoPosto };
