@@ -1537,7 +1537,7 @@ export function verifierReplyText(reply, id = '<id>') {
       // Toglierle è un commit, e un commit dopo il verdetto lo farebbe decadere:
       // qui è tollerato, e dirlo serve a non lasciarle rosse per paura. Solo
       // TOGLIERE però: una riga aggiunta dopo il verdetto lo fa decadere.
-      derivati.length ? '  Poi `git add -A && git commit`, e spingi: quel commit non fa decadere il verdetto, finché lì si TOGLIE' : null,
+      derivati.length ? '  Poi `git add -A && git commit`, senza push a mano (lo spedisce il rilascio): quel commit non fa decadere il verdetto, finché lì si TOGLIE' : null,
       derivati.length ? '  e non si aggiunge niente. Una prova che copre anche un caso ancora aperto non si cancella: toglile il caso' : null,
       derivati.length ? '  che se ne va, e lascia il resto.' : null,
       'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',

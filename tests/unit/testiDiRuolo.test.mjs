@@ -221,6 +221,16 @@ test('nessun ruolo chiede un git push a mano: lo nomina solo la regola che lo vi
   assert.ok(!new RegExp(PUSH.source).test('git-server push "<CLONE>" <ramo>'), 'il push del server passa dal canale');
 });
 
+// Anche la risposta del server che dispatch stampa è un'istruzione del ruolo: la pulizia dopo un «pass» la spedisce il
+// rilascio, e un «spingi» manderebbe chi verifica sullo stesso permesso che nessuno approva (#1797).
+test('la risposta a una verifica superata con derivati non chiede un push a mano', async () => {
+  const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
+  const t = verifierReplyText({ outcome: 'pass', derived: [{ level: 1, sede: 'e', text: 'bordo freddo', priority: 1, num: '#7.1', n: 1 }] });
+  assert.match(t, /Prove del giro da TOGLIERE/);
+  assert.doesNotMatch(t, /\bspingi\b|\bgit\s+push\b/i);
+  assert.match(t, /lo spedisce il rilascio/);
+});
+
 // Il worker spostato in sottofondo si veglia: senza, chi guida chiude il turno e aspetta una notifica che da un worker
 // fermo su un permesso non arriva mai (#1797). La regola è una, in un pezzo condiviso, per le due sessioni che guidano.
 test('chi guida il giro veglia il worker in sottofondo, e la notifica di fine non decide niente', async () => {

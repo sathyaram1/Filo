@@ -1665,7 +1665,11 @@ if (isMain) {
       const p = pushRamoCorrente(ROOT);
       if (!p.ok) {
         console.error(`Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`);
-        console.error('Non ho rilasciato niente: sistema il push e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
+        // In una routine un push a mano resta fermo sul controllo dei permessi, che in cloud nessuno approva (#1797).
+        const inRoutine = (Boolean(process.env.FILO_ROUTINE) && process.env.FILO_ROUTINE !== '0') || !!marcatore;
+        console.error(inRoutine
+          ? 'Non ho rilasciato niente. Non spingere a mano: in cloud il controllo dei permessi ferma il push e la sessione resta appesa. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando, che rispedisce da sé; altrimenti è un guasto: rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push.'
+          : 'Non ho rilasciato niente: il ramo deve arrivare su origin prima del rilascio. Rimetti a posto la spedizione e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
         process.exit(1);
       }
       if (p.avviso) console.error(p.avviso);
