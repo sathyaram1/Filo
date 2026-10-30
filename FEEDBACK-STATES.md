@@ -308,27 +308,49 @@ rifiuto dice il motivo, e la sessione lavora il feedback come sempre.
 **Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
 segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce da
 `npm run feedback:apri -- … --pacchetto N,M` col campo `unisce: [{ id, num }]` (in
-chiaro, da 1 a 20, solo alla nascita e solo admin: `unisceValido` nelle regole), e ogni
-segnalazione unita prende P fra le sue attese (`waitsFor`, che resta com'era più P). Lo
+chiaro, da 1 a 20, solo alla nascita e solo admin: `unisceValido` nelle regole). Lo
 strumento controlla tutte le segnalazioni prima di aprire e dice tutti i motivi insieme:
 fuori chi non è `todo` (già in lavorazione o ferma), chi ha già un ramo (tornata in coda
 dopo una risposta o una riapertura), chi aspetta già un altro pacchetto aperto, chi è a
 priorità 3, un lavoro locale, chi ha già 20 attese, chi P stesso aspetta. Area, tetto e
 urgenti li controlla il manutentore. Senza `--priorita` P nasce con la
 priorità più alta fra le unite. Un pezzo che si blocca in verifica non si stacca: P passa
-o non passa intero. Alla fusione di P (`done`) il server chiude ogni segnalazione di
-`unisce` che lo aspetta ancora ed è `todo`: `todo → done` (pipeline,
-`statusReason: pacchetto`), con la frase di P come `userNote` (senza, una frase di
-ripiego, e le note di P lo dicono) e la versione di P se ne ha una; quelle in un altro
-stato, o che non aspettano più P, restano dove sono, e il server lo scrive nelle note di
-P. Un'unita che è a sua volta un pacchetto chiude prima le sue, allo stesso modo (così
-si aggiunge un doppione a un pacchetto già aperto: un pacchetto nuovo che unisce il
-vecchio). Le chiude PRIMA di scrivere P in `done`, così l'attesa
-sciolta non le rimette in coda; il gancio è uno solo per ogni strada che porta P a
-`done` dopo una fusione. Il messaggio della fusione di P cita anche le unite
-(`merge-gate: #P via server (unisce #N, #M)`), così la ricerca «già risolto su main» le
-trova. P archiviato senza fusione: le unite seguono l'attesa chiusa di sempre (§4,
-`attesa_chiusa`).
+o non passa intero.
+
+*Gli allegati viaggiano con P*: chi lavora un biglietto apre solo quelli del suo feedback.
+Prima di aprire lo strumento legge e decifra immagini, documenti e allegati della
+conversazione di ogni unita e li carica in P: i documenti col nome «#N — nome», le
+immagini (che un nome non l'hanno) nel campo delle immagini, con da dove viene ognuna in
+un blocco in coda alla spec. Il tetto è quello di un feedback, 5 immagini e 5 documenti
+compresi quelli di `--allega`: oltre, o con un allegato che non si apre o che un feedback
+non ammette, non apre niente e lo dice; un caricamento che non riesce ferma la nascita
+(`submit` con `interi`): niente pacchetto monco.
+
+*Le unite si archiviano alla nascita* (decisione dell'owner del 30/10). Chi aspettava una
+unita passa ad aspettare P (le sue attese sulle unite diventano una su P, le altre
+restano); poi ogni unita va `todo → archived` (owner) con la nota «Unito nel pacchetto
+#P: il lavoro continua lì», senza frase per chi l'ha segnalata. Prima le attese: un
+aspettato archiviato senza fusione manda chi lo aspetta all'owner (`attesa_chiusa`), così
+una unita con un'attesa che non si è spostata resta aperta, e lo strumento stampa le righe
+per rimediare, come per ogni passo che non riesce. Chi aspetta una unita ed è aspettato da
+P si rifiuta prima di aprire (si aspetterebbero a vicenda); P nato senza numero non
+archivia niente, perché nota e attese lo nominano. Il rimando `unitoIn: { id, num }` su
+ogni unita lo scrive il server alla nascita di P: ai client le regole lo vietano, come la
+fiducia. Le unite archiviate restano leggibili a chi gestisce il lavoro: `feedback:leggi`
+non filtra per stato, e dal cloud le dà `routineFeedback` (#1785), allegati compresi.
+
+Alla fusione di P (`done`) il server non ha più unite da chiudere. Resta, per i pacchetti
+nati prima (le unite `todo` che aspettano P), la chiusura di prima: `todo → done`
+(pipeline, `statusReason: pacchetto`) con la frase di P come `userNote` (senza, una frase
+di ripiego, e le note di P lo dicono) e la versione di P se ne ha una, PRIMA di scrivere P
+in `done`, così l'attesa sciolta non le rimette in coda, con un gancio solo per ogni
+strada che porta P a `done` dopo una fusione; un'unita che è a sua volta un pacchetto
+chiude prima le sue. Una unita archiviata col rimando a P non è un'eccezione da scrivere
+nelle note di P; una in un altro stato, o che non aspetta più P, resta dove sta e le note
+lo dicono. Il messaggio della fusione di P cita le unite (`merge-gate: #P via server
+(unisce #N, #M)`), così la ricerca «già risolto su main» le trova. P archiviato senza
+fusione: le unite restano archiviate; se il lavoro serve ancora le rimette in coda l'owner,
+da Gestione (`archived → todo`).
 
 **Il piano.** Un lavoro grosso (una spec in più fasi, un pacchetto) consegna il piano
 prima di toccare codice e a ogni parte chiusa (`deliver piano --piano <file.md>`, al più

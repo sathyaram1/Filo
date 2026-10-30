@@ -193,13 +193,9 @@ test('le letture vere: allegati col documento e la conversazione, una conversazi
     const refs = await SCRIPT.pacchetto.allegati({ id: 'id812', num: '812' }, 'tok');
     assert.deepEqual(refs.map((a) => [a.url, a.conversazione]), [['https://a/1', false], ['https://a/2', true]]);
     assert.match(viste[0], /feedback\/id812\?mask\.fieldPaths=images&mask\.fieldPaths=files&mask\.fieldPaths=notes$/, 'si chiedono solo i campi che servono');
-    const cifrata = await globalThis.SN_FEEDBACK_CRYPTO.encryptForOwner('una conversazione');
-    globalThis.fetch = conversazione(cifrata);
-    const senzaChiave = process.env.FILO_FEEDBACK_PRIVKEY;
-    process.env.FILO_FEEDBACK_PRIVKEY = '';
-    try {
-      await assert.rejects(SCRIPT.pacchetto.allegati({ id: 'id812', num: '812' }, 'tok'), (e) => e.definitivo === true && /la conversazione di #812 non si decifra/.test(e.message));
-    } finally { if (senzaChiave === undefined) delete process.env.FILO_FEEDBACK_PRIVKEY; else process.env.FILO_FEEDBACK_PRIVKEY = senzaChiave; }
+    // Un cifrato che nessuna chiave apre: la prova non dipende da quale chiave ha la macchina che la lancia.
+    globalThis.fetch = conversazione('FENC1:nessuna-chiave-lo-apre');
+    await assert.rejects(SCRIPT.pacchetto.allegati({ id: 'id812', num: '812' }, 'tok'), (e) => e.definitivo === true && /la conversazione di #812 non si decifra/.test(e.message));
   } finally { globalThis.fetch = vero; }
   await assert.rejects(SCRIPT.pacchetto.scarica({ url: 'https://altrove.example/x.png' }), (e) => e.definitivo === true);
   const lista = FB.listAllPaged;
