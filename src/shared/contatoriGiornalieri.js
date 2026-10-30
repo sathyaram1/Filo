@@ -2549,7 +2549,7 @@
   const validaNavigazione = (doc) => validaAConti(doc, { tabella: NAVIGAZIONE, campi: CAMPI_NAVIGAZIONE, v: VERSIONE_NAVIGAZIONE,
     forme: NAVIGAZIONE_RE, tetti: TETTI_VOCE_NAVIGAZIONE });
   const validaRiquadri = (doc) => validaAConti(doc, { tabella: RIQUADRI, campi: CAMPI_RIQUADRI, v: VERSIONE_RIQUADRI,
-    forme: RIQUADRI_RE, tetti: TETTI_VOCE_RIQUADRI });
+    forme: RIQUADRI_RE, tetti: TETTI_VOCE_RIQUADRI, facoltative: MISURE_RIQUADRI_FACOLTATIVE });
 
   function mappeFuoriForma(doc, mappe) {
     for (const [campo, [chiaviAmmesse, formaValore, tetto]] of Object.entries(mappe)) {
