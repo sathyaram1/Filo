@@ -115,6 +115,11 @@ test('«Valuta» apre l’Aiuto col testo del campo, col modello della chat, e l
   await correzione.click();
   await expect(page.locator('#ta')).toHaveValue(TESTO);
   await expect(correzione).not.toHaveClass(/sn-sidebar-correzione-fatta/);
+  await expect.poll(() => valutaOggi(app), { timeout: 5000 }).toEqual({
+    chiesta: 1, con_correzioni: 1, correzione_mostrata: 1, correzione_accettata: 1, correzione_tolta: 1,
+  });
+  const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));
+  for (const x of ['mei amici', 'miei', 'refuso']) expect(disco, 'il testo valutato non esce').not.toContain(x);
 });
 
 test('dopo aver cambiato il campo, la domanda nell’Aiuto porta il testo com’è adesso, sempre col modello della chat', async ({ app, openTab, testServer }) => {
