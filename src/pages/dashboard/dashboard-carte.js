@@ -12,6 +12,9 @@
   let altroEl = null;
 
   let layout = null;
+  // Il primo incontro (#1661) lo decide il main: legge l'accoglienza dal disco anche in incognito.
+  let primoIncontro = false;
+  let giroPrimo = 0;
   const dati = {
     timers: [],
     notifiche: [],
@@ -775,6 +778,9 @@
     disegnaColonna(accadeEl, carteSinistra(), 'sinistra');
     disegnaColonna(tieniEl, carteDestra(), 'destra');
     disegnaAltro();
+    const ridotta = C.homeRidotta(primoIncontro, layout, !!suggerimentoCrediti());
+    tieniEl.hidden = ridotta;
+    altroEl.hidden = ridotta;
     accadeEl.dataset.suona = dati.timers.some((t) => t.ringing) ? '1' : '0';
   }
 
@@ -1010,8 +1016,19 @@
 
   // ===== Dati che la carta chiede da sé =====
   async function caricaLayout() {
+    const giro = ++giroPrimo;
     const r = await d.send({ type: MSG.CARTE_HOME_GET });
     layout = C.normalizza(r && r.ok ? r.layout : null);
+    if (giro === giroPrimo) primoIncontro = !!(r && r.ok && r.primoIncontro);
+    disegna();
+  }
+  // Finisce con l'accoglienza e dipende da cosa manca a Filo per rispondere. La disposizione di questa risposta no:
+  // può essere più vecchia di una mossa annunciata nel frattempo.
+  async function caricaPrimoIncontro() {
+    const giro = ++giroPrimo;
+    const r = await d.send({ type: MSG.CARTE_HOME_GET });
+    if (giro !== giroPrimo || !r || !r.ok || !!r.primoIncontro === primoIncontro) return;
+    primoIncontro = !!r.primoIncontro;
     disegna();
   }
   async function caricaDownloads() {
@@ -1066,7 +1083,8 @@
       else if (msg.type === MSG.DOWNLOADS_UPDATED) ricaricaDownloadsPresto();
       else if (msg.type === MSG.LAVORI_CAMBIATI && Array.isArray(msg.lavori)) { dati.lavori = msg.lavori; disegna(); }
       else if (msg.type === MSG.FILO_LIVE_UPDATED) caricaEditor().catch(() => {});
-      else if (msg.type === MSG.DATI_IMPORTATI) caricaMazzi().catch(() => {});
+      else if (msg.type === MSG.DATI_IMPORTATI) { caricaMazzi().catch(() => {}); caricaPrimoIncontro().catch(() => {}); }
+      else if (msg.type === MSG.FILO_ONBOARDING_UPDATED || msg.type === MSG.FILO_READY_CHANGED) caricaPrimoIncontro().catch(() => {});
       else if (msg.type === MSG.SETTINGS_UPDATED && msg.settings) { dati.impostazioni = msg.settings; disegna(); }
       else if (msg.type === MSG.IN_PAUSA_CAMBIATO && Object.prototype.hasOwnProperty.call(dati.aperte, msg.nome)) {
         dati.aperte = { ...dati.aperte, [msg.nome]: msg.visible === true };
@@ -1078,6 +1096,7 @@
         caricaDownloads().catch(() => {});
         caricaLavori().catch(() => {});
         caricaAperte().catch(() => {});
+        caricaPrimoIncontro().catch(() => {});
       }
     });
     return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori(),
