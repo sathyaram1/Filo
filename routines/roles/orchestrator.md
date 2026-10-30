@@ -119,7 +119,8 @@ lo decidi SOLO così:
 2. Chiedi un biglietto nuovo al canale (come al passo "Biglietto"):
    - **exit 0** → c'è altro lavoro: spawna il prossimo worker;
    - **exit 2** → niente da fare (coda vuota, "basta per oggi", interruttore
-     spento): chiudi il giro;
+     spento, o gli strumenti di questa sessione sono indietro rispetto a
+     `main`: una sessione vecchia non prende lavoro nuovo): chiudi il giro;
    - **exit 3** → guasto (compresi i guasti che i worker dichiarano al canale
      nel rilascio): chiudi, MAI rispawnare.
 
