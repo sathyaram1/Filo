@@ -18,3 +18,13 @@ export async function voceOggi(app, misura, chiave) {
     return Object.fromEntries(nomi.map((n, i) => [n, somma[i]]).filter(([, n]) => n > 0));
   }, { misura, chiave });
 }
+
+// «Chiedi» dell'ora (#1461): quante volte la persona ha chiesto quello che Filo non prepara da solo, per funzione.
+export async function chiestiOggi(app, funzione) {
+  return app.evaluate(async (_e, f) => {
+    const s = await globalThis.SN_CONTATORI_MAIN.letto();
+    const g = globalThis.SN_CONTATORI.giornoDi(Date.now());
+    return Object.entries(s.ore || {}).filter(([id]) => id.startsWith(`${g}T`))
+      .reduce((tot, [, ora]) => tot + (Number((ora.chiedi || {})[f]) || 0), 0);
+  }, funzione);
+}
