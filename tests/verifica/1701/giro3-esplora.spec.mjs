@@ -1,13 +1,13 @@
-// Esplorazione verifica #1701 giro 3: colore del sito con una politica di sicurezza dei contenuti e icona su un altro dominio.
+// Esplorazione verifica #1701 giro 3: pagina che arriva a pezzi, e navigazione nella stessa scheda verso un sito lento.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
-const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#e02020"/></svg>';
+const svg = (c) => `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="${c}"/></svg>`;
 
 const coloreAttiva = (app) => app.evaluate(({ BrowserWindow }) => {
   const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
   const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
-  return t.identityColor || null;
+  return { c: t.identityColor || null, l: t.view.webContents.isLoading(), u: t.url };
 });
 
 async function servi(handler) {
@@ -17,36 +17,44 @@ async function servi(handler) {
 }
 async function chiudi(s) { try { s.closeAllConnections?.(); } catch (_) {} await new Promise((r) => s.close(r)); }
 
-for (const [nome, csp] of [
-  ['senza politica', ''],
-  ['img-src self', "default-src 'self'; img-src 'self'; style-src 'self' 'unsafe-inline'"],
-  ['img-src self https data', "img-src 'self' data: https:"],
-]) {
-  test(`icona dello stesso sito, ${nome}`, async ({ app, openTab }) => {
-    const s = await servi((req, res) => {
-      if (req.url.startsWith('/icona.svg')) { res.writeHead(200, { 'Content-Type': 'image/svg+xml' }); res.end(SVG); return; }
-      const h = { 'Content-Type': 'text/html; charset=utf-8' };
-      if (csp) h['Content-Security-Policy'] = csp;
-      res.writeHead(200, h);
-      res.end('<title>X</title><link rel="icon" href="/icona.svg"><p>Ciao</p>');
-    });
-    try {
-      await openTab(`http://127.0.0.1:${s.address().port}/`);
-      await expect.poll(() => coloreAttiva(app), { timeout: 6_000 }).not.toBe(null);
-    } finally { await chiudi(s); }
-  });
-}
-
-test('icona su un altro dominio con CORS e connect-src self', async ({ app, openTab }) => {
-  const cdn = await servi((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Access-Control-Allow-Origin': '*' }); res.end(SVG);
-  });
+test('pagina che arriva a pezzi: testa e articolo subito, il resto dopo 10 s', async ({ app, openTab }) => {
   const s = await servi((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': `connect-src 'self'; img-src 'self' http://localhost:${cdn.address().port}` });
-    res.end(`<title>X</title><link rel="icon" href="http://localhost:${cdn.address().port}/icona.svg"><p>Ciao</p>`);
+    if (req.url.startsWith('/icona.svg')) { res.writeHead(200, { 'Content-Type': 'image/svg+xml' }); res.end(svg('#e02020')); return; }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.write('<!doctype html><html><head><title>X</title><link rel="icon" href="/icona.svg"></head><body><h1>Titolo</h1><p>' + 'testo '.repeat(400) + '</p>');
+    setTimeout(() => { try { res.end('<p>fine</p></body></html>'); } catch (_) {} }, 10_000);
   });
   try {
-    await openTab(`http://127.0.0.1:${s.address().port}/`);
-    await expect.poll(() => coloreAttiva(app), { timeout: 6_000 }).not.toBe(null);
-  } finally { await chiudi(s); await chiudi(cdn); }
+    const t0 = Date.now();
+    await openTab(`http://127.0.0.1:${s.address().port}/`).catch(() => {});
+    await expect.poll(async () => (await coloreAttiva(app)).c, { timeout: 4_000, intervals: [100] }).not.toBe(null);
+    console.log('pezzi: colore dopo', Date.now() - t0, 'ms', JSON.stringify(await coloreAttiva(app)));
+  } finally { await chiudi(s); }
+});
+
+test('stessa scheda: da un sito rosso a uno blu lento', async ({ app, openTab }) => {
+  const a = await servi((req, res) => {
+    if (req.url.startsWith('/icona.svg')) { res.writeHead(200, { 'Content-Type': 'image/svg+xml' }); res.end(svg('#e02020')); return; }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<title>A</title><link rel="icon" href="/icona.svg"><p>A</p>');
+  });
+  const lente = [];
+  const b = await servi((req, res) => {
+    if (req.url.startsWith('/icona.svg')) { res.writeHead(200, { 'Content-Type': 'image/svg+xml' }); res.end(svg('#2040e0')); return; }
+    if (req.url.startsWith('/lento.png')) { lente.push(res); return; }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<title>B</title><link rel="icon" href="/icona.svg"><p>B</p><img src="/lento.png">');
+  });
+  try {
+    const p = await openTab(`http://127.0.0.1:${a.address().port}/`);
+    await expect.poll(async () => (await coloreAttiva(app)).c, { timeout: 5_000 }).not.toBe(null);
+    const rosso = (await coloreAttiva(app)).c;
+    const t0 = Date.now();
+    await p.evaluate((u) => { location.href = u; }, `http://localhost:${b.address().port}/`);
+    await expect.poll(async () => { const x = await coloreAttiva(app); return x.c && x.c !== rosso ? x.c : null; }, { timeout: 4_000, intervals: [100] }).not.toBe(null);
+    const x = await coloreAttiva(app);
+    console.log('nav: da', rosso, 'a', x.c, 'dopo', Date.now() - t0, 'ms, carica ancora', x.l);
+    const [r, , bl] = x.c.match(/\d+/g).map(Number);
+    expect(bl).toBeGreaterThan(r + 100);
+  } finally { for (const r of lente) { try { r.destroy(); } catch (_) {} } await chiudi(a); await chiudi(b); }
 });
