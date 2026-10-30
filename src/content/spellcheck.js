@@ -1947,11 +1947,13 @@
     const valore = segno && segno.tipo === 'segnaposto' && !segno.cercando && segno.correzioni && segno.correzioni[0];
     if (!state || !valore) return false;
     const prima = getEditableText(el);
+    // Il valore messo è la proposta accettata, contata prima di scrivere come le altre correzioni: la scrittura ridisegna
+    // i segni, e le x sparite la darebbero per lasciata perdere. Le x cambiate nel frattempo non si riempiono.
+    if (prima.slice(segno.start, segno.end) !== segno.segment) return false;
+    esitoSegno(el, segno, 'accettata');
     const cursore = cursoreNelCampo(el);
     applyFix(el, { start: segno.start, end: segno.end }, valore, { expectedSegment: segno.segment, cursor: 'preserve' });
     if (getEditableText(el) === prima) return false;
-    // Il valore messo è la proposta accettata: senza, sparite le x, la si conterebbe lasciata perdere.
-    esitoSegno(el, segno, 'accettata');
     contaSegnaposto(viaDelSegno(segno), 'riempito');
     if (cursore >= 0 && !campoDiTesto(el)) {
       const dove = cursore >= segno.end ? cursore + valore.length - (segno.end - segno.start) : cursore;
