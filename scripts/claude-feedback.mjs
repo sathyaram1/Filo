@@ -740,7 +740,8 @@ export async function main(argvIn) {
       console.error(`ARCHIVIAZIONE NON RIUSCITA su #${u.num} (${e.motivo}): resta in coda, e una routine la lavorerebbe da sola. Rimedia con: npm run feedback -- ${u.num} archived "${nota}"`);
     }
     for (const u of unite.filter((x) => ferme.has(x.id))) {
-      console.error(`#${u.num} NON ARCHIVIATA: qualcuno la aspetta ancora (sopra). Spostata quell'attesa: npm run feedback -- ${u.num} archived "${nota}"`);
+      incompleto = true;
+      console.error(`#${u.num} NON ARCHIVIATA: qualcuno la aspetta ancora (sopra). Dopo aver spostato quell'attesa: npm run feedback -- ${u.num} archived "${nota}"`);
     }
   }
   if (copie && copie.immagini.length + copie.documenti.length) {
