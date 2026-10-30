@@ -116,7 +116,8 @@ function erroreCompiti(e, nonAncora) {
 
 // Dallo stato dei crediti la scheda usa questi campi per account; le sessioni restano sul server.
 const CREDITI_CAMPI_ACCOUNT = Object.freeze(['pct', 'lettura', 'stima', 'fonte', 'limite', 'taratura', 'taraturaDa',
-  'letturaAtMs', 'usdSettimana', 'settimanaDaMs', 'rinnovoAtMs', 'passo', 'fermo', 'basseAperte']);
+  'letturaAtMs', 'usdSettimana', 'settimanaDaMs', 'rinnovoAtMs', 'passo', 'fermo', 'basseAperte',
+  'usd24h', 'accensioniSettimana', 'accensioni24h']);
 function accountsCrediti(r) {
   const out = {};
   for (const a of ['A', 'B']) {
