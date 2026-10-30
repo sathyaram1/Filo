@@ -122,6 +122,7 @@ test('«perchè » diventa «perché» allo spazio col lampo, e l\'annulla subit
   expect(await valore(page)).toBe('ok perchè va bene ');
   // Annullata, resta un errore segnato.
   await expect(errore(page, 'perchè')).toHaveCount(1, { timeout: 4000 });
+  await expect.poll(() => voceOggi(app, 'correttore_automatica', 'fisso'), { timeout: 5000 }).toEqual({ fatta: 1, annullata: 1 });
 });
 
 test('un secondo annulla toglie quello che si era scritto, non rimette la correzione', async ({ app, openTab, testServer }) => {
