@@ -1857,9 +1857,28 @@
   // Perché una ricerca non è partita, dal main: non è un dato che non c'è.
   const NON_PARTITA = { PAGINA_DELICATA: 'delicata', RICERCA_BLOCCATA: 'bloccata' };
 
+  // I contatori dei segnaposti (#1586): da dove viene il valore e che fine fa, mai la domanda né il valore. La ricerca
+  // che una pagina delicata non lascia partire, e quella chiesta poi col clic, sono anche il costo della privacy.
+  const ESITO_CONTATO = { trovato: 'trovato', nessuno: 'nessuno', errore: 'fallito', delicata: 'delicata', bloccata: 'bloccata' };
+  function contaSegnaposto(via, esito) {
+    try { global.SN_POPUP && global.SN_POPUP.conta({ misura: 'riquadro', cosa: 'correttore_segnaposto', via, esito }); } catch (_) {}
+  }
+  function contaPrivacySegnaposto(esito) {
+    try { global.SN_POPUP && global.SN_POPUP.conta({ misura: 'riquadro', cosa: 'anticipo_privacy', funzione: 'segnaposto', esito }); } catch (_) {}
+  }
+  // Il valore che il segno mostra viene da una ricerca (da sola o chiesta) o dalla memoria del modello, senza ricerca.
+  function viaDelSegno(segno) {
+    if (!segno.cerca) return 'memoria';
+    const r = [segno.cerca.chiave, segno.cerca.prima && segno.cerca.prima.chiave]
+      .map((k) => k && ricerche.get(k)).find((x) => x && x.stato === 'trovato');
+    return (r && r.via) || 'da_solo';
+  }
+
   async function cercaValore(state, cerca, pezzo, { suRichiesta = false } = {}) {
     const k = cerca.chiave;
-    ricerche.set(k, { stato: 'cerca' });
+    const via = suRichiesta ? 'su_richiesta' : 'da_solo';
+    ricerche.set(k, { stato: 'cerca', via });
+    contaSegnaposto(via, 'cercato');
     while (ricerche.size > RICERCHE_MAX) ricerche.delete(ricerche.keys().next().value);
     let res = null;
     try {
