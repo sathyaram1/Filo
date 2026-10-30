@@ -2763,7 +2763,7 @@ if (isMainModule) {
       if (giro) {
         const c = preparaPerIlGiro(ROOT, giro);
         if (!c.ok) {
-          console.error(`[dispatch] GUASTO: il clone del worker non è pronto (${c.why}). Nella cartella della sessione non si lavora: dichiaralo come guasto (gruppo «guasto: clone git»).`);
+          console.error(`[dispatch] GUASTO: il clone del worker non è pronto (${c.why}). Nella cartella della sessione non si lavora: dichiaralo come guasto (gruppo «guasto: ${c.gruppo || 'clone git'}»).`);
           process.exit(1);
         }
         process.exit(rilancia(c.strumenti, 'dispatch.mjs', ['--ticket', ticket]));

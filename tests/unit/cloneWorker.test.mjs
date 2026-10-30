@@ -27,8 +27,11 @@ const collegato = (clone) => {
   return !eLink(nm) && existsSync(resolve(nm, MARCA_COLLEGATI)) && eLink(resolve(nm, 'pacchetto'));
 };
 
-/** Origin nudo, principale clonato da lì con node_modules (e un canarino dentro), strumenti finti dell'orchestratore. */
-function scena() {
+/**
+ * Origin nudo, principale clonato da lì con node_modules installato fino in fondo (e un canarino dentro), strumenti
+ * finti dell'orchestratore. `pacchetti: false`: il principale appena nato, senza installazione.
+ */
+function scena({ pacchetti = true } = {}) {
   const base = cartellaTemporanea('filo-clone-worker-');
   const origin = resolve(base, 'origin.git');
   mkdirSync(origin);
