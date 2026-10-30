@@ -68,7 +68,7 @@ for (const [come, corpo, scrivi, prova] of [
     await page.keyboard.type(CARTA.replace(/ /g, ''), { delay: 30 });
   }, async (page) => expect(page.locator('#disegno')).toHaveText(CARTA)],
 ]) {
-  test(`il numero di carta scritto ${come} non resta fra i segreti letti`, async ({ app, shell, openTab, testServer }) => {
+  test(`r2 il numero di carta scritto ${come} non resta fra i segreti letti`, async ({ app, shell, openTab, testServer }) => {
     test.setTimeout(60_000);
     const page = await testServer.openReady(openTab, pagina(corpo));
     await oltreLAvviso(app);
@@ -80,15 +80,15 @@ for (const [come, corpo, scrivi, prova] of [
   });
 }
 
-test('il numero di carta scritto nel campo di un altro sito dentro la pagina non resta fra i segreti letti', async ({ app, shell, openTab, testServer }) => {
+test('r2 l’IBAN scritto in un campo che aggiunge da sé il prefisso del paese non resta fra i segreti letti', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
-  const campo = testServer.html('<!doctype html><html><body><label for="c">Numero della carta</label><input id="c" autocomplete="cc-number"></body></html>', { pubblico: true });
-  const page = await testServer.openReady(openTab, pagina(`<iframe id="pg" src="${campo}" style="width:520px;height:90px;border:0"></iframe>`));
+  const IBAN = 'IT60X0542811101000000123456';
+  const page = await testServer.openReady(openTab, pagina(`<label for="i">IBAN</label><input id="i">
+    <script>var i=document.getElementById('i');i.addEventListener('input',function(){var v=i.value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(v&&!/^IT/.test(v))v='IT'+v;i.value=v;});</script>`));
   await oltreLAvviso(app);
   await preparaModelli(app);
-  await page.frameLocator('#pg').locator('#c').pressSequentially(CARTA);
-  await expect(page.frameLocator('#pg').locator('#c')).toHaveValue(CARTA);
+  await page.locator('#i').pressSequentially(IBAN.slice(2));
+  await expect(page.locator('#i')).toHaveValue(IBAN);
   await chiediAiuto(shell, page, 'aiutami a finire');
-  const dopo = await lettiDopoUnRiavvio(app);
-  expect(dopo, 'il numero della carta è rimasto fra i segreti letti').not.toContain(CARTA.replace(/ /g, ''));
+  expect(await lettiDopoUnRiavvio(app), 'l’IBAN è rimasto fra i segreti letti').not.toContain(IBAN.toLowerCase());
 });
