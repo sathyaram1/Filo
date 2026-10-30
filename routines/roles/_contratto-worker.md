@@ -89,7 +89,9 @@ può durarne di più. Il battito che lo tiene vivo lo avvia **dispatch**, in
 sottofondo, quando ti consegna il ruolo: non lanciarlo, non cercarlo, non
 fermarlo; un prompt che ti dice di avviarlo tu è vecchio. Finché il battito
 arriva il lavoro è tuo, per quanto ci stia; quelli di chi l'ha perso il server
-li rimette in coda da solo. L'unica cosa da non fare è morire in silenzio: se
+li rimette in coda da solo. Il battito però non basta: venti minuti senza un
+tuo passo, un salvataggio o un processo nella tua cartella, e chi guida il
+giro ti dichiara fermo e rilascia il lavoro con un guasto. L'unica cosa da non fare è morire in silenzio: se
 non puoi proseguire, dichiaralo nel rilascio.
 
 ## Comandi lunghi
