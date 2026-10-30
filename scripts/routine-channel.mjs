@@ -491,8 +491,23 @@ export function creditiDi(opts = {}) {
   try { return (o.misureCrediti || misureCrediti)(o); } catch (_) { return {}; }
 }
 
+/**
+ * La misura del lavoro per il server (#1797): senza, un worker fermo su un permesso batte per ore e il server lo conta
+ * vivo. Best-effort come le altre misure: un errore la lascia fuori, mai il battito.
+ */
+export async function attivitaDi(t, opts = {}) {
+  const o = opts || {};
+  try {
+    if (o.attivitaDi) return o.attivitaDi(t);
+    const { segniDiVita, attivitaPerBattito } = await import('./lib/veglia-worker.mjs');
+    return attivitaPerBattito(segniDiVita({ root: o.root || ROOT, ticket: t }));
+  } catch (_) {
+    return {};
+  }
+}
+
 export async function heartbeat(t, opts = {}) {
-  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts), ...creditiDi(opts) }, opts);
+  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts), ...creditiDi(opts), ...(await attivitaDi(t, opts)) }, opts);
   if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt, avvisi: Array.isArray(body.avvisi) ? body.avvisi : [] };
   const reason = String((body && body.reason) || `http_${status}`);
   return { ok: false, reason, final: BATTITO_FINITO.has(reason) };

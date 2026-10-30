@@ -15,7 +15,7 @@ import { senzaSessione } from '../helpers/sessione.mjs';
 const REPO = resolve(import.meta.dirname, '..', '..');
 const {
   giudica, strumentoInAttesa, programmaDi, testoGuasto, tracceSottoAgenti, segniDiVita, veglia, cartellaSottoAgenti,
-  SOGLIA_FERMO_MS, USCITA_FINITO, USCITA_FERMO, USCITA_LAVORA, TESTO_FINITO,
+  attivitaPerBattito, SOGLIA_FERMO_MS, USCITA_FINITO, USCITA_FERMO, USCITA_LAVORA, TESTO_FINITO,
 } = await import('../../scripts/lib/veglia-worker.mjs');
 const { impronta, FILE_REGISTRO } = await import('../../scripts/lib/orchestratore-cieco.mjs');
 
@@ -277,5 +277,46 @@ describe('veglia da riga di comando', () => {
       const r = await cli(args, { FILO_ROUTINE_API: 'http://127.0.0.1:9', FILO_NO_BEAT: '1' });
       assert.equal(r.code, 1, `${args.join(' ')}: ${r.so}${r.se}`);
     }
+  });
+});
+
+// Il server fa da rete dopo la veglia (#1797): il battito gli porta l'ultimo segno di lavoro e lo strumento in attesa,
+// così distingue un battito vivo da un lavoro vivo. Senza misura vera non manda niente, e il server protegge come prima.
+describe('la misura per il battito', () => {
+  test('il worker fermo sul push: ultimo segno di lavoro di trenta minuti fa e il comando in attesa', () => {
+    const { work } = clone();
+    const m = attivitaPerBattito(segniDiVita({ root: work, ticket: B, sessione: SID, configDir: claude({ fa: 30 }) }));
+    assert.ok(Date.now() - m.attivitaMs >= 29 * MIN && Date.now() - m.attivitaMs < 31 * MIN, `ultimo segno ${m.attivitaMs}`);
+    assert.match(m.inAttesa, /^Bash «.*git push --dry-run --force-with-lease/);
+    assert.ok(m.inAttesa.length <= 300);
+    assert.doesNotMatch(m.inAttesa, /["`$]/, 'testo di worker ripulito come nel guasto');
+  });
+
+  test('un processo nella cartella vale adesso; un biglietto altrui, finito o senza transcript non manda niente', () => {
+    const viste = { viste: true, ultimoMs: ADESSO - 30 * MIN, attesa: null };
+    assert.deepEqual(attivitaPerBattito({ mio: true, processi: 1, tempi: [ADESSO - 90 * MIN], tracce: viste }, ADESSO), { attivitaMs: ADESSO });
+    assert.deepEqual(attivitaPerBattito({ mio: true, tempi: [ADESSO - 90 * MIN, ADESSO - 30 * MIN], tracce: viste }, ADESSO), { attivitaMs: ADESSO - 30 * MIN });
+    assert.deepEqual(attivitaPerBattito({ mio: false, tempi: [ADESSO], tracce: viste }, ADESSO), {});
+    assert.deepEqual(attivitaPerBattito({ mio: true, finito: true, tempi: [ADESSO], tracce: viste }, ADESSO), {});
+    assert.deepEqual(attivitaPerBattito({ mio: true, tempi: [ADESSO - 90 * MIN], tracce: { viste: false } }, ADESSO), {},
+      'senza transcript, un worker che aspetta in silenzio sembrerebbe fermo');
+    assert.deepEqual(attivitaPerBattito(null, ADESSO), {});
+  });
+
+  test('il battito porta la misura al server, e una misura che non si legge non lo ferma', async () => {
+    const canale = await import('../../scripts/routine-channel.mjs');
+    const corpi = [];
+    const fetchImpl = async (url, init) => {
+      corpi.push(JSON.parse(init.body));
+      return { status: 200, ok: true, text: async () => JSON.stringify({ ok: true, expiresAt: new Date(ADESSO + 60 * MIN).toISOString() }) };
+    };
+    const base = { fetchImpl, sleep: async () => {}, misureCrediti: () => ({}) };
+    const r = await canale.heartbeat(B, { ...base, attivitaDi: () => ({ attivitaMs: ADESSO - 41 * MIN, inAttesa: 'Bash «git push»' }) });
+    assert.equal(r.ok, true);
+    assert.equal(corpi[0].attivitaMs, ADESSO - 41 * MIN);
+    assert.equal(corpi[0].inAttesa, 'Bash «git push»');
+    const r2 = await canale.heartbeat(B, { ...base, attivitaDi: () => { throw new Error('transcript illeggibile'); } });
+    assert.equal(r2.ok, true);
+    assert.equal(corpi[1].attivitaMs, undefined);
   });
 });

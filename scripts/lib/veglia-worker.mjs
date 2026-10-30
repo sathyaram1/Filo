@@ -173,7 +173,26 @@ export function segniDiVita({ root, ticket, sessione = process.env.CLAUDE_CODE_S
   return { mio, finito: mio && bigliettoFinito(m), tempi, processi, tracce };
 }
 
-export const TESTO_FINITO = 'Worker finito: ha rilasciato il suo biglietto. Riparti dal passo 0 del tuo ruolo.';
+/**
+ * La misura del lavoro che il battito porta al server (#1797), dai segni già letti. PURA. Vuota quando non si misura
+ * niente di vero (biglietto non di questa cartella, finito, nessun transcript): senza, il server protegge il permesso
+ * vivo come prima. Un processo nella cartella vale «adesso».
+ */
+export function attivitaPerBattito(segni, adesso = Date.now()) {
+  const s = segni || {};
+  if (!s.mio || s.finito) return {};
+  const tracce = s.tracce || {};
+  if (!(s.processi > 0) && !tracce.viste) return {};
+  const noti = (s.tempi || []).filter((t) => Number.isFinite(t));
+  const attivitaMs = s.processi > 0 ? adesso : (noti.length ? Math.max(...noti) : NaN);
+  if (!Number.isFinite(attivitaMs)) return {};
+  const out = { attivitaMs: Math.round(attivitaMs) };
+  const a = tracce.attesa;
+  if (a && a.nome) out.inAttesa = pulito(a.comando ? `${a.nome} «${comandoLeggibile(a.comando)}»` : a.nome).slice(0, 300);
+  return out;
+}
+
+export const TESTO_FINITO ='Worker finito: ha rilasciato il suo biglietto. Riparti dal passo 0 del tuo ruolo.';
 
 /**
  * Veglia per una fetta: torna appena il worker ha finito o risulta fermo (e allora `rilascia(guasto, mio)` dichiara il
