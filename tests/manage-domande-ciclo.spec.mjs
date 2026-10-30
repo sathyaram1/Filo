@@ -3,7 +3,6 @@
 // la riga sotto la casella, la bozza che sopravvive a una ricarica, «Mandata», la lista che non si sposta sotto il
 // puntatore (anche nei Ricevuti), una riga trascinata nella chat dell'Aiuto, allegati incollati o trascinati.
 import { test, expect } from './fixtures/electron.mjs';
-import { nelMondoDiFilo } from './helpers/confirm.mjs';
 import { MANAGE, PRATICHE, RIFERIMENTI, domanda, mainFinto, aspettaAvvio } from './helpers/gestioneMainFinto.mjs';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64').toString('base64');
@@ -250,38 +249,45 @@ test('una riga trascinata nella chat dell’Aiuto arriva come riferimento in gra
   await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [APERTA] });
   const page = await openTab(MANAGE);
   await apriDomande(page);
-  await nelMondoDiFilo(app, 'manage', `(() => {
-    globalThis.__richieste = [];
+  // Sulle pagine di Filo i content script stanno nel mondo della pagina (contextIsolation spento).
+  await page.evaluate(() => {
+    window.__richieste = [];
     const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
     chrome.runtime.sendMessage = (m, ...r) => {
       if (m && m.type === SN_MSG.MSG.AI_REQUEST && m.action === SN_CONST.ACTIONS.HELP) {
-        globalThis.__richieste.push((m.payload && m.payload.userMessage) || '');
+        window.__richieste.push((m.payload && m.payload.userMessage) || '');
         return Promise.resolve({ ok: true, text: '{"text":"Visto.","status":"done"}' });
       }
       return orig(m, ...r);
     };
     SN_SIDEBAR.open();
-    return 1;
-  })()`);
+  });
   const casella = page.locator('.sn-sidebar-input textarea');
   await expect(casella).toBeVisible();
   await riga(page, 'D-52').dragTo(casella);
   // Nella casella non si versa il testo: il riferimento sta sopra, col titolo.
   await expect(casella).toHaveValue('');
-  const rif = await nelMondoDiFilo(app, 'manage', '__filoSidebarTest.riferimenti()');
+  const rif = await page.evaluate(() => window.__filoSidebarTest.riferimenti());
   expect(rif).toHaveLength(1);
   expect(rif[0].titolo).toBe('D-52 Colore del bordo');
   expect(rif[0].testo).toContain('Contesto:\nContesto.');
   expect(rif[0].testo).toContain('1. Riprendi (consigliata)');
-  await page.locator('.sn-sidebar-allegati').screenshot({ path: 'tests/.shots/manage-domande-riferimento.png' });
+  // Il titolo in grassetto; passandoci sopra si legge il contenuto.
+  const g = await page.evaluate(() => window.__filoSidebarTest.gettoneRiferimento(0));
+  expect(Number(g.grassetto)).toBeGreaterThanOrEqual(700);
+  expect(g.aperta).toBe(false);
+  await page.mouse.move(g.x, g.y);
+  await expect.poll(() => page.evaluate(() => window.__filoSidebarTest.gettoneRiferimento(0).aperta)).toBe(true);
+  expect((await page.evaluate(() => window.__filoSidebarTest.gettoneRiferimento(0))).testo).toContain('Problema:\nProblema.');
+  await page.screenshot({ path: 'tests/.shots/manage-domande-riferimento.png' });
   await casella.fill('Cosa mi consigli?');
   await casella.press('Enter');
-  await expect.poll(() => nelMondoDiFilo(app, 'manage', 'globalThis.__richieste.length')).toBe(1);
-  const mandato = await nelMondoDiFilo(app, 'manage', 'globalThis.__richieste[0]');
+  await expect.poll(() => page.evaluate(() => window.__richieste.length)).toBe(1);
+  const mandato = await page.evaluate(() => window.__richieste[0]);
   expect(mandato.startsWith('Cosa mi consigli?')).toBe(true);
   expect(mandato).toContain('Riferimento «D-52 Colore del bordo»');
   expect(mandato).toContain('Problema:\nProblema.');
-  expect(await nelMondoDiFilo(app, 'manage', '__filoSidebarTest.riferimentiNelleBolle()')).toEqual([['D-52 Colore del bordo']]);
+  expect(await page.evaluate(() => window.__filoSidebarTest.riferimentiNelleBolle())).toEqual([['D-52 Colore del bordo']]);
 });
 
 // Un file dentro un DataTransfer costruito nella pagina: incollato o lasciato sulla casella.
@@ -378,4 +384,25 @@ test('Ricevuti: un arrivo dal vivo in cima lascia ferma la riga sotto il puntato
   await expect(page.locator('#mgList .mg-item')).toHaveCount(41, { timeout: 10_000 });
   await expect(page.locator('#mgList .mg-item').first()).toHaveAttribute('data-id', 'f800');
   expect(Math.abs((await bersaglio.boundingBox()).y - box.y)).toBeLessThan(1.5);
+});
+
+test('a finestra stretta il numero della scheda non copre il titolo della colonna', async ({ app, openTab }) => {
+  await app.evaluate(async ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    if (w) w.setContentSize(720, 800);
+  });
+  const page = await openTab(MANAGE);
+  await page.setViewportSize({ width: 720, height: 800 });
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(([l, r]) => window.__mgTest.setDomande(l, { riferimenti: r }), [[
+    ...tante(300, 12, { fiducia: 'non_fidato' }), domanda(320, { stato: 'in_smistamento' }), AUTOMATICA, FONTE,
+  ], RIFERIMENTI]);
+  await page.locator('.mg-sezione[data-sezione="domande"]').click();
+  await page.locator('#mgDomandeTutte').check();
+  await page.screenshot({ path: 'tests/.shots/manage-domande-stretta.png' });
+  for (const t of ['domande-smistamento', 'domande-automatiche']) {
+    await tab(page, t).click();
+    await page.screenshot({ path: `tests/.shots/manage-domande-stretta-${t}.png` });
+  }
 });

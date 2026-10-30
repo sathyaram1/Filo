@@ -294,16 +294,8 @@
     }
     root.addEventListener('drop', (e) => {
       if (!e.isTrusted) return;
-      // Un riferimento (una riga di Gestione…) arriva come tale: niente testo versato nella casella.
-      if (conRiferimento(e)) {
-        e.preventDefault();
-        e.stopPropagation();
-        const r = leggiRiferimento(e.dataTransfer);
-        if (r) aggiungiRiferimento(r);
-        // Sulla casella lo conta già il suo ascoltatore.
-        if (e.target !== ta) { try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!r)); } catch (_) {} }
-        return;
-      }
+      // Sulla casella il rilascio lo conta già il suo ascoltatore.
+      if (rilascio(e, { conta: e.target !== ta })) { e.stopPropagation(); return; }
       if (!conImmagini(e)) return;
       e.preventDefault();
       e.stopPropagation();
@@ -510,6 +502,16 @@
     if (!allegati.riferimenti.some((x) => x.titolo === r.titolo && x.testo === r.testo)) allegati.riferimenti.push(r);
     disegnaAllegati();
     root?.querySelector('.sn-sidebar-input textarea')?.focus();
+  }
+  // Un riferimento lasciato sul pannello lo prende la chat, e nella casella non si versa il suo testo. Ci arriva anche
+  // dal preload, che sul pannello tiene il sito all'oscuro del rilascio (src/preload/rilascio-file.js).
+  function rilascio(e, { conta = true } = {}) {
+    if (!e || !e.isTrusted || !Array.from(e.dataTransfer?.types || []).includes(TIPO_RIFERIMENTO)) return false;
+    e.preventDefault();
+    const r = leggiRiferimento(e.dataTransfer);
+    if (r) aggiungiRiferimento(r);
+    if (conta) { try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!r)); } catch (_) {} }
+    return true;
   }
   function testoRiferimenti(riferimenti) {
     return riferimenti.map((r) => `Riferimento «${r.titolo}», trascinato dall'utente nella chat:\n${r.testo}`).join('\n\n');
@@ -2504,7 +2506,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   }
 
   global.SN_SIDEBAR = {
-    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato, allega, allegaDaFuori, valuta,
+    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato, allega, allegaDaFuori, valuta, rilascio,
     suCambio: (fn) => { ascoltaCambi = typeof fn === 'function' ? fn : null; },
     // Un'immagine lasciata dove la pagina non la vuole è dell'Aiuto, salvo dove Filo è spento.
     accoglieRilascio: () => chiuso() !== 'sito',
@@ -2525,6 +2527,16 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     // Le anteprime stanno in un'ombra chiusa: cosa c'è nella casella, e dove sta la × di una per un clic vero.
     allegati: () => allegati.immagini.map((im) => ({ nome: im.nome, byte: im.dataUrl.length })),
     riferimenti: () => allegati.riferimenti.map((r) => ({ titolo: r.titolo, testo: r.testo })),
+    // Il gettone i-esimo nella casella: dove sta, e se il riquadro col contenuto è aperto (all'hover o al fuoco).
+    gettoneRiferimento: (i) => {
+      const host = root && root.querySelector('.sn-sidebar-allegati');
+      const o = host && ombre.get(host);
+      const v = o && o.querySelectorAll('.rif')[i];
+      if (!v) return null;
+      const r = v.getBoundingClientRect();
+      const a = v.querySelector('.anteprima');
+      return { x: r.x + 12, y: r.y + r.height / 2, aperta: getComputedStyle(a).display !== 'none', testo: a.textContent, grassetto: getComputedStyle(v.querySelector('b')).fontWeight };
+    },
     riferimentiNelleBolle: () => Array.from(root ? root.querySelectorAll('.sn-sidebar-msg-user') : [])
       .map((m) => { const box = m.querySelector('.sn-sidebar-msg-immagini'); const o = box && ombre.get(box); return o ? Array.from(o.querySelectorAll('.rif b')).map((b) => b.textContent) : []; }),
     puntoTogli: (i) => {
