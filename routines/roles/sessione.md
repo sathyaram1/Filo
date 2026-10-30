@@ -18,7 +18,9 @@ preflight ti consegna una riga fissa al posto del testo del worker.
 1. `export FILO_ROUTINE=1`, prima di qualunque altro comando (una shell nuova,
    come `su tester -c`, la perde: lì va ripetuto).
 2. Setup, una volta: install con skip del binario Electron più
-   `ensure-electron.mjs`, poi `apt-get install -y scrot`. Gli strumenti che ti
+   `ensure-electron.mjs`, poi `apt-get install -y scrot`, finito prima del
+   biglietto (un worker partito a installazione in corso se la rifà da capo
+   nel suo clone). Gli strumenti che ti
    vengono nominati hanno un percorso intero fuori dal progetto: usali così,
    perché la cartella del progetto fra poco sarà quella di un ramo.
 3. Allinea la cartella, un comando per chiamata e senza `&&`, `cd` o `-C`:
