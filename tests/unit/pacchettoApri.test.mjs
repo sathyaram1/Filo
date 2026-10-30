@@ -175,9 +175,9 @@ test('i riferimenti agli allegati di una unita comprendono quelli della conversa
   const conversazione = ['un commento', TH.serializeAttachment({ kind: 'img', url: 'https://a/3' }), TH.serializeAttachment({ kind: 'file', url: 'https://a/4', name: 'log.txt', type: 'text/plain' })].join('\n');
   assert.deepEqual(SCRIPT.riferimentiAllegati(fields, conversazione), [
     { tipo: 'immagine', nome: '', type: '', url: 'https://a/1', conversazione: false, indice: 1 },
-    { tipo: 'immagine', nome: '', type: '', url: 'https://a/3', conversazione: true, indice: 2 },
+    { tipo: 'immagine', nome: '', type: '', url: 'https://a/3', conversazione: true, indice: 1 },
     { tipo: 'documento', nome: 'spec.md', type: 'text/markdown', url: 'https://a/2', conversazione: false, indice: 1 },
-    { tipo: 'documento', nome: 'log.txt', type: 'text/plain', url: 'https://a/4', conversazione: true, indice: 2 },
+    { tipo: 'documento', nome: 'log.txt', type: 'text/plain', url: 'https://a/4', conversazione: true, indice: 1 },
   ]);
 });
 

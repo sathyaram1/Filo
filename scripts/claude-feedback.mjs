@@ -638,7 +638,7 @@ export async function main(argvIn) {
   const msg = (e) => String((e && e.message) || e);
   const codiceDi = (e) => (e && e.definitivo ? EXIT.RIFIUTATO : exitCodeForError(e));
   let copie = null;
-  let attesi = [];
+  let aspettanti = [];
   if (unite.length) {
     let riferimenti;
     try { riferimenti = await Promise.all(unite.map(async (u) => ({ u, allegati: await pacchetto.allegati(u, cred.idToken) }))); } catch (e) {
@@ -672,11 +672,11 @@ export async function main(argvIn) {
       return EXIT.RIFIUTATO;
     }
     // Chi aspetta una unita passerà ad aspettare il pacchetto: si sa prima di aprire, e un giro col pacchetto si dice prima.
-    try { attesi = await pacchetto.attesiDa(unite, cred.idToken); } catch (e) {
+    try { aspettanti = await pacchetto.attesiDa(unite, cred.idToken); } catch (e) {
       console.error(`RIFIUTATO: --pacchetto: non so chi aspetta le segnalazioni unite (${msg(e)}). Non ho aperto niente: rilancia.`);
       return codiceDi(e);
     }
-    const giri = attesi.filter((x) => numeriAttesa.numeri.includes(String(x.num)));
+    const giri = aspettanti.filter((x) => numeriAttesa.numeri.includes(String(x.num)));
     if (giri.length) {
       console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${giri.map((x) => `  - #${x.num} aspetta ${x.quali.map((n) => `#${n}`).join(', ')}, che entra nel pacchetto, e il pacchetto aspetta #${x.num}: si aspetterebbero a vicenda`).join('\n')}`);
       return EXIT.RIFIUTATO;
@@ -715,13 +715,13 @@ export async function main(argvIn) {
 
   if (r.attese && r.attese.length) console.log(`Aspetta ${globalThis.SN_FB_ATTESE.testoAttese(r.attese)}: nessuna routine lo prende finché non sono tutti fusi, poi entra in coda da solo.`);
   // Alla nascita le unite si archiviano, e chi le aspettava aspetta il pacchetto. Un passo che non riesce non è
-  // silenzioso: il pacchetto esiste già, e la riga per rimediare si stampa intera.
+  // silenzioso: il pacchetto esiste già, e la riga per rimediare si stampa intera, nell'ordine in cui va lanciata.
   let incompleto = false;
   const cheAspetta = (x, num) => `npm run feedback -- ${x.num} --aspetta ${[...x.tenute, num].join(',')}`;
   if (unite.length && !r.seq) {
     incompleto = true;
     const passi = [
-      ...attesi.map((x) => cheAspetta(x, '<numero del pacchetto>')),
+      ...aspettanti.map((x) => cheAspetta(x, '<numero del pacchetto>')),
       ...unite.map((u) => `npm run feedback -- ${u.num} archived "${notaUnita('<numero del pacchetto>')}"`),
     ];
     console.error(`UNITE NON ARCHIVIATE: il pacchetto è nato senza numero (la numerazione non ha risposto), e attese e note lo nominano. ${unite.map((u) => `#${u.num}`).join(', ')} restano in coda. Quando ce l'ha, in quest'ordine:\n${passi.map((x) => `  ${x}`).join('\n')}`);
@@ -729,7 +729,7 @@ export async function main(argvIn) {
     const voce = { id: r.id, num: String(r.seq) };
     const nota = notaUnita(voce.num);
     // Prima le attese: una unita archiviata che qualcuno aspetta ancora manderebbe quel qualcuno all'owner (attesa chiusa).
-    const spostate = await Promise.all(attesi.map(async (x) => {
+    const spostate = await Promise.all(aspettanti.map(async (x) => {
       try { return { x, e: await pacchetto.sposta(x, voce, cred.idToken) }; } catch (e) { return { x, e: { ok: false, motivo: msg(e) } }; }
     }));
     const ferme = new Set(spostate.filter((s) => !s.e.ok).flatMap((s) => s.x.togli));
