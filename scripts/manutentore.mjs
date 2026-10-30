@@ -200,7 +200,7 @@ require('../src/shared/routineCrediti.js');
 
 /**
  * Una riga per account dallo stato dei crediti (`accounts`, `numeri`, `freni` di ownerCrediti o dell'operazione
- * `spesa` del canale). Sono solo numeri e stati noti: nessun testo d'altri arriva nel contesto. PURA.
+ * `spesa.leggi` del canale). Sono solo numeri e stati noti: nessun testo d'altri arriva nel contesto. PURA.
  */
 export function righeSpesa(stato) {
   const RC = globalThis.SN_ROUTINE_CREDITI;
@@ -214,7 +214,7 @@ export function righeSpesa(stato) {
 
 /**
  * La spesa per account: con le credenziali dell'owner da ownerCrediti, altrimenti dal canale col biglietto delle
- * routine (operazione `spesa`). Il motivo in parole se non si legge: il contesto esce lo stesso.
+ * routine (operazione `spesa.leggi`). Il motivo in parole se non si legge: il contesto esce lo stesso.
  */
 async function leggiSpesa(root) {
   const motivo = (m) => `Non so la spesa: ${unaRiga(m).slice(0, 200)}.`;
@@ -228,7 +228,7 @@ async function leggiSpesa(root) {
     const biglietto = readTicket(root);
     if (!biglietto) return motivo('mancano sia le credenziali dell\'owner sia un biglietto delle routine');
     const { operazione } = await import('./routine-channel.mjs');
-    const r = await operazione(biglietto, 'spesa', {});
+    const r = await operazione(biglietto, 'spesa.leggi', {});
     if (r.outcome === 'ok') return righeSpesa(r.body);
     return motivo(`il server ${r.outcome === 'refused' ? 'non la dà a questo biglietto' : 'non risponde'} (${r.reason}${r.detail ? `: ${r.detail}` : ''})`);
   } catch (e) {

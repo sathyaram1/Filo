@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync as leggiFile } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -70,4 +71,17 @@ test('la tabella degli ambiti di SPEC-DOMANDE § 5.2 e questi dati nominano gli 
   const sezione = spec.slice(spec.indexOf('### 5.2'), spec.indexOf('### 5.3'));
   const nomi = sezione.split('\n').map((r) => /^\| `([a-z_]+)` \|/.exec(r)).filter(Boolean).map((m) => m[1]).sort();
   assert.deepEqual(nomi, Object.keys(A.INIZIALI).sort());
+});
+
+// #1787: il manutentore chiede la spesa al canale con un'operazione che il server conosce e che il suo ambito ha; un
+// nome inventato tornava «non è un'operazione del server». Sono soli numeri: non leggono testo d'altri né riservato.
+test('l’operazione della spesa chiesta dal manutentore esiste, è della gestione del lavoro ed è di soli numeri', () => {
+  const src = leggiFile(join(ROOT, 'scripts', 'manutentore.mjs'), 'utf8');
+  const chieste = [...src.matchAll(/operazione\(biglietto, '([^']+)'/g)].map((m) => m[1]);
+  assert.deepEqual(chieste, ['spesa.leggi']);
+  for (const n of chieste) {
+    assert.ok(A.OPERAZIONI[n] && A.OPERAZIONI[n].attiva, `${n} non è un’operazione attiva`);
+    assert.ok(A.INIZIALI.gestione_lavoro.puo.includes(n), `${n} non è nell’ambito della gestione del lavoro`);
+    assert.equal(A.OPERAZIONI[n].nf || A.OPERAZIONI[n].rs, false);
+  }
 });

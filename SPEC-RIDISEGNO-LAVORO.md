@@ -182,14 +182,18 @@ Fatto dalla parte del server (ramo omonimo di filo-security, da rideployare):
   così è l'orchestratore cieco, ristretto dal server al suo feedback.
 
 Spesa per account al manutentore (#1787, decisione D-227: un freno solo, quello di
-Crediti, letto dal manutentore; niente tetti in dollari nelle Automazioni). App fatta:
-`npm run manutentore -- spesa` e la sezione «Spesa» del contesto, una riga per account
-con percentuale e dollari della settimana, quanto resta, ultime 24 ore, accensioni,
-rinnovo e perché è fermo; con le credenziali dell'owner legge `ownerCrediti` (op
-`stato`), altrimenti l'operazione `spesa` del canale col biglietto. La scheda Crediti
-mostra gli stessi campi. Server, da fare: l'operazione `spesa` di `routineOperazione`
-per l'ambito del manutentore, che rimanda `accounts` (gli stessi campi di
-`ownerCrediti`), `numeri.usdPer100` e `freni`; e per account, in entrambe, `usd24h`
-(consumo dell'account nelle ultime 24 ore) e `accensioniSettimana`/`accensioni24h`.
+Crediti, letto dal manutentore; niente tetti in dollari nelle Automazioni).
+`npm run manutentore -- spesa` e la sezione «Spesa» del contesto danno una riga per
+account con percentuale e dollari della settimana, quanto resta, ultime 24 ore,
+accensioni, rinnovo e perché è fermo; con le credenziali dell'owner legge
+`ownerCrediti` (op `stato`), altrimenti l'operazione `spesa.leggi` del canale
+(ambito `gestione_lavoro`) col biglietto. La scheda Crediti mostra gli stessi campi.
+Server (ramo omonimo di filo-security, da rideployare): `spesa.leggi` rimanda
+`accounts` (gli stessi campi di `ownerCrediti`, senza le sessioni), `numeri.usdPer100`
+e `freni`; per account, in entrambe, `usd24h` (i dollari contati sull'account nelle
+ultime 24 ore, dal rinnovo se è più vicino) e `accensioniSettimana`/`accensioni24h`
+(sessioni accese dal pacemaker, voce server compresa; mancano finché il conto, partito
+col deploy, non copre la finestra). Il freno che ferma un account resta `fermo` per
+account (`riserva`, che su B è il tetto, o `passo`).
 
 Resta: l'operazione che dà schede e testi a chi ha la chiave delle routine.
