@@ -1,5 +1,6 @@
 // I download nella home (carte a sinistra, «Download» in «altro») e nella pagina «Download»; nella fila in alto
-// nessun tasto (#941, prima #1112), e il pannello si apre solo per una domanda sui programmi.
+// nessun tasto (#941, prima #1112), e il pannello si apre solo per una domanda sui programmi. Fuori dalla home il via
+// di un download lo dice un avviso breve (#941.1).
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
