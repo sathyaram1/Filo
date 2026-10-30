@@ -48,9 +48,9 @@
 // USO (la stessa lista, per chi la chiede dal terminale: `--help`)
 //   node scripts/dispatch.mjs --ticket <biglietto>     # traduce la busta del server
 //   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
-//   node scripts/dispatch.mjs --record-verifier <id> "<critica coi livelli>" [--segnala <file.md>] [--domanda <file.json>] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-verifier <id> "<critica coi livelli>" [--domanda <file.json>] [--ticket <b>]
 //   node scripts/dispatch.mjs --record-pulizia <id> [--ticket <b>]
-//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--segnala <file.md>] [--domanda <file.json>] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--domanda <file.json>] [--ticket <b>]
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
 //
@@ -405,26 +405,21 @@ export function secauditPassato(verdict) {
 
 // ─── I livelli L3 e L4 (contratto del 2026-09-13) ─────────────────────────────
 //
-// Con la consegna viaggiano due testi in più, che il server cifra e scrive nel
-// documento del feedback (`livelli.l3`, `livelli.l4`) perché la dashboard li
-// mostri nella fila delle forme: la SEGNALAZIONE di chi risolve o verifica (un
-// trade-off vero o una domanda di design, che decide l'owner: il rombo) e la
-// NOTA del controllo di sicurezza (cosa ha controllato e cosa ha trovato: il
-// pentagono). Tutti e due arrivano da un file (`--segnala`, `--nota`): sono
-// markdown di più righe, e sulla riga di comando un testo così finisce
-// spezzato o con le virgolette sbagliate.
+// La NOTA del controllo di sicurezza (cosa ha controllato e cosa ha trovato: il pentagono, `livelli.l4`) arriva da
+// un file (`--nota`): markdown di più righe, che sulla riga di comando finirebbe spezzato. Un trade-off per l'owner
+// non è più una segnalazione in markdown (L3) ma una domanda in JSON (`--domanda`, #1790).
 
-// La lettura del file (intera, mai tosata, col tetto del server) sta in
-// lib/livelli.mjs, perché la usa anche il canale (`deliver status --segnala`).
-// Ri-esportata da qui per chi la importava da dispatch.
+// La lettura del file (intera, mai tosata, col tetto del server) sta in lib/livelli.mjs. Ri-esportata da qui per chi
+// la importava da dispatch.
 export { MAX_LIVELLO_BYTES, leggiTestoLivello };
 export const SECAUDIT_VERDICTS = ['pass', 'fail'];
 
 // Si tolgono tutte PRIMA di leggere comando, identificativo e testo, come il biglietto: rimasta fra i
 // posizionali, la frase finiva nel report e il suo nome faceva da identificativo (#879).
 export const OPZIONI_REGISTRAZIONE = {
-  '--segnala': { tipo: 'file', comandi: ['--record-verifier', '--record-fixed'] },
-  // La domanda per l'owner nel formato di SPEC-DOMANDE §3.1 (#1358): ferma il lavoro come la segnalazione.
+  // Il server non compone più domande da un markdown (#1790): si riconosce per dire cosa scrivere al suo posto.
+  '--segnala': { tipo: 'tolta', comandi: ['--record-verifier', '--record-fixed'] },
+  // La domanda per l'owner nel formato di SPEC-DOMANDE §3.1: per chi verifica una per rilievo col `?` (un elenco JSON).
   '--domanda': { tipo: 'file', comandi: ['--record-verifier', '--record-fixed'] },
   '--nota': { tipo: 'file', comandi: ['--record-secaudit'] },
   '--frase': { tipo: 'testo', comandi: ['--record-fixed'], manca: 'la riga per chi ha segnalato' },
@@ -434,7 +429,9 @@ export const OPZIONI_REGISTRAZIONE = {
   // La sessione accesa per UN feedback (SPEC-RIDISEGNO-LAVORO.md § 2): riceve il ruolo della sessione, non dell'orchestratore.
   '--feedback': { tipo: 'testo', comandi: ['--preflight'], manca: 'il numero del feedback' },
 };
-const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', bandiera: '' };
+const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', bandiera: '', tolta: '' };
+export const SEGNALA_TOLTA = '--segnala non c\'è più: il server non compone domande da un markdown (#1790). Scrivi la domanda in JSON (SPEC-DOMANDE §3.1: '
+  + 'titolo, almeno due opzioni con pro e contro, consiglio) e passala con --domanda <file.json>. Non ho consegnato niente.';
 
 /**
  * Anche come `--opzione=valore`, la forma del canale. PURA. `error`: valore mancante o storto, opzione
@@ -451,6 +448,7 @@ export function leggiOpzioniRegistrazione(list) {
     const nome = Object.keys(OPZIONI_REGISTRAZIONE).find((n) => a === n || a.startsWith(`${n}=`));
     if (!nome) { args.push(a); continue; }
     const { tipo, manca } = OPZIONI_REGISTRAZIONE[nome];
+    if (tipo === 'tolta') return no(SEGNALA_TOLTA);
     if (tipo === 'bandiera') {
       if (a !== nome) return no(`${nome} non vuole un valore: non ho consegnato niente.`);
       valori[nome] = true;
@@ -483,12 +481,11 @@ export function leggiOpzioniRegistrazione(list) {
 }
 
 /**
- * Il payload della consegna «corretto», con la segnalazione se c'è. `sha`: la punta della cartella, che il registro del
+ * Il payload della consegna «corretto», con la domanda se c'è. `sha`: la punta della cartella, che il registro del
  * ramo confronta con quella che troverà dopo (#1148; senza, il server segna il buco). PURA.
  */
-export function fixedPayload({ report, frase, branch, segnalazione, ferma, sha, domanda, motivo, riallineamento } = {}) {
+export function fixedPayload({ report, frase, branch, ferma, sha, domanda, motivo, riallineamento } = {}) {
   const p = { report: String(report || ''), userNote: String(frase || ''), branch: String(branch || '') };
-  if (String(segnalazione || '').trim()) p.segnalazione = String(segnalazione).trim();
   if (domanda && typeof domanda === 'object') p.domanda = domanda;
   if (ferma === true) p.stop = true;
   if (/^[0-9a-f]{40}$/.test(String(sha || ''))) p.sha = String(sha);
@@ -507,7 +504,7 @@ export function leggiMotivo(testo) {
 
 /**
  * Il motivo di una consegna `fixed`: obbligatorio solo per il correttore (regola 4), come sul server; per gli altri ruoli,
- * se c'è, vale la stessa forma. `siFerma`: una segnalazione o una domanda che blocca, che sul server vale da motivo. PURA.
+ * se c'è, vale la stessa forma. `siFerma`: una domanda che blocca, che sul server vale da motivo. PURA.
  */
 export function motivoDellaConsegna(testo, ruolo, { siFerma = false } = {}) {
   if (testo === undefined && (ruolo !== 'fixer' || siFerma)) return { ok: true, motivo: null };
@@ -539,17 +536,54 @@ export function esitoRiallineamento(confronto, motivo) {
   return { riallineamento: { fileRiscritti: confronto.file, fileInConflitto: confronto.conflitti || [], giro }, riga: righe.join(' ') };
 }
 
-/** La domanda di `--domanda <file.json>`, controllata come la controlla il server; un errore ferma prima del server. */
-async function leggiDomandaDaFile(file) {
+/**
+ * Le domande di `--domanda <file.json>`: una, o un elenco (chi verifica ne scrive una per rilievo col `?`), ognuna
+ * controllata come la controlla il server. → { ok, domande } | { ok:false, errore }
+ */
+export async function leggiDomandeDaFile(file, { elenco = false } = {}) {
   let testo = '';
   try { testo = readFileSync(resolve(file), 'utf8'); } catch (e) {
-    console.error(`Non leggo ${file} (${e.code || e.message}): non ho consegnato niente.`);
-    process.exit(1);
+    return { ok: false, errore: `Non leggo ${file} (${e.code || e.message}): non ho consegnato niente.` };
   }
+  let grezzo;
+  try { grezzo = JSON.parse(testo); } catch (e) {
+    return { ok: false, errore: `JSON malformato in ${file}: ${String(e?.message || e).slice(0, 200)}. Non ho consegnato niente.` };
+  }
+  if (Array.isArray(grezzo) && !elenco) return { ok: false, errore: `${file} ha un elenco di domande: qui ne va una sola. Non ho consegnato niente.` };
+  const lista = Array.isArray(grezzo) ? grezzo : [grezzo];
+  if (!lista.length) return { ok: false, errore: `${file} ha un elenco vuoto: ogni rilievo col «?» porta la sua domanda. Non ho consegnato niente.` };
   const { leggiDomandaJson } = await import('./domanda.mjs');
-  const letta = leggiDomandaJson(testo, { conOrigine: false });
-  if (letta.errore) { console.error(letta.errore); process.exit(1); }
-  return letta.domanda;
+  const domande = [];
+  for (let i = 0; i < lista.length; i++) {
+    const letta = leggiDomandaJson(JSON.stringify(lista[i]), { conOrigine: false });
+    if (letta.errore) return { ok: false, errore: `${lista.length > 1 ? `domanda ${i + 1} di ${file}: ` : ''}${letta.errore}` };
+    domande.push(letta.domanda);
+  }
+  return { ok: true, domande };
+}
+
+/**
+ * Ogni rilievo col `?` prende la sua domanda, nell'ordine della critica (#1790): il server la adotta com'è. Un rilievo
+ * senza domanda, o una domanda senza rilievo, ferma prima del server col numero del rilievo. PURA.
+ * → { ok, findings } | { ok:false, errore }
+ */
+export function rilieviConDomanda(findings, domande) {
+  const lista = Array.isArray(findings) ? findings.map((f) => ({ ...f })) : [];
+  const conSegno = lista.map((f, i) => ({ f, n: i + 1 })).filter((x) => x.f.decision);
+  const d = Array.isArray(domande) ? domande : [];
+  const riga = (x) => `[${x.f.level}${x.f.sede}?] ${VERIFIER_ROUND.primaFrase(x.f.text, 80)}`;
+  if (conSegno.length > d.length) {
+    const senza = conSegno.slice(d.length);
+    return { ok: false, errore: `${senza.length === 1 ? `il rilievo ${senza[0].n}` : `i rilievi ${senza.map((x) => x.n).join(', ')}`} col «?» `
+      + `${senza.length === 1 ? 'non ha' : 'non hanno'} la sua domanda (${senza.map(riga).join('; ')}). Ogni rilievo che chiede una decisione porta la domanda in JSON `
+      + 'con almeno due opzioni: con un rilievo «?» il file ha la domanda, con più rilievi un elenco, uno per rilievo nell\'ordine della critica. Non ho registrato niente.' };
+  }
+  if (d.length > conSegno.length) {
+    return { ok: false, errore: `${d.length} ${d.length === 1 ? 'domanda' : 'domande'} per ${conSegno.length} ${conSegno.length === 1 ? 'rilievo' : 'rilievi'} col «?»: `
+      + 'una domanda accompagna un rilievo che chiede una decisione. Segna col «?» il rilievo che la domanda decide, o togli la domanda. Non ho registrato niente.' };
+  }
+  conSegno.forEach((x, k) => { lista[x.n - 1].domanda = d[k]; });
+  return { ok: true, findings: lista };
 }
 
 /** Lo sha intero della punta della cartella, '' se git non risponde. */
@@ -562,14 +596,14 @@ function puntaDellaCartella() {
 }
 
 /**
- * `--ferma` da solo non ferma niente: è la segnalazione che ferma il lavoro, e
+ * `--ferma` da solo non ferma niente: è la domanda che blocca a fermare il lavoro, e
  * senza l'owner non saprebbe cosa decidere. Ritorna la frase che ferma, o ''. PURA.
  */
-export function fermaSenzaSegnalazione(ferma, segnalazione) {
-  if (!ferma || String(segnalazione || '').trim()) return '';
+export function fermaSenzaDomanda(ferma, domanda) {
+  if (!ferma || String(domanda || '').trim()) return '';
   return [
-    '--ferma da solo non ferma niente: è --segnala <file.md> che ferma il lavoro, e non ho consegnato niente.',
-    'Fermarsi chiama l\'owner, e senza la segnalazione non saprebbe cosa decidere: scrivi nel file il problema, le scelte e cosa hai fatto nel frattempo, poi rilancia con --segnala (--ferma puoi toglierlo).',
+    '--ferma da solo non ferma niente: è la domanda che blocca (--domanda <file.json>) a fermare il lavoro, e non ho consegnato niente.',
+    'Fermarsi chiama l\'owner, e senza la domanda non saprebbe cosa decidere: scrivila in JSON (titolo, almeno due opzioni con pro e contro, consiglio), poi rilancia con --domanda (--ferma puoi toglierlo).',
   ].join('\n');
 }
 
@@ -1219,7 +1253,7 @@ function sealTransition(state, by) {
  * per quel commit. L'ESITO lo calcola il server e torna nella risposta, che
  * si stampa intera: non sta da nessun'altra parte.
  */
-async function recordVerifier(id, critiqueText, segnalazione = '', domanda = null) {
+async function recordVerifier(id, critiqueText, domande = []) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, altrove: !!guard.altrove && !guard.escalated, message: guard.message };
   // Un livello fra parentesi quadre che non apre una riga («Rilievo [2]: …»)
@@ -1255,6 +1289,8 @@ async function recordVerifier(id, critiqueText, segnalazione = '', domanda = nul
     if (fermo.cambiati.length) return { rejected: true, formatRejected: true, message: testoCodiceCambiato(fermo.cambiati, avvio) };
   }
   const parsed = VERIFIER_ROUND.parseFindings(critiqueText);
+  const conDomande = rilieviConDomanda(parsed.findings, domande);
+  if (!conDomande.ok) return { rejected: true, formatRejected: true, message: `critica non registrata: ${conDomande.errore}` };
   const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
 
   // PRIMA il server, POI lo stato locale. L'ordine non è un dettaglio: lo stato
@@ -1270,7 +1306,8 @@ async function recordVerifier(id, critiqueText, segnalazione = '', domanda = nul
   // vorrebbe dire poter mandare al server uno sha e scriverne un altro qui.
   const shaProvato = headSha(ROOT) || '';
   const sent = await deliverToChannel('verdict', {
-    findings: parsed.findings,
+    // Ogni rilievo col «?» porta la sua domanda (#1790): il server la adotta com'è, e non ne compone.
+    findings: conDomande.findings,
     summary: parsed.summary,
     // Intero, non tosato: il server legge i rilievi dal TESTO e li confronta
     // con l'elenco (verifica del giro 6 su #561); un testo mozzato a 4000
@@ -1279,10 +1316,6 @@ async function recordVerifier(id, critiqueText, segnalazione = '', domanda = nul
     critique: critiqueNorm.trim(),
     branch: base.branch || '',
     sha: shaProvato,
-    // L3: la segnalazione per l'owner, se c'è (un trade-off vero trovato
-    // verificando). Il server la cifra in `livelli.l3`.
-    ...(String(segnalazione || '').trim() ? { segnalazione: String(segnalazione).trim() } : {}),
-    ...(domanda && typeof domanda === 'object' ? { domanda } : {}),
   });
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `critica non accettata (${motivoRifiuto(sent)})` };
@@ -1333,12 +1366,11 @@ export { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText };
 // ferma la dice lo strumento, o chi corregge non la scopre mai.
 export const FERMA_NOTE = [
   'Se un rilievo non si può correggere senza una decisione dell\'owner (un trade-off vero, una scelta di',
-  'prodotto), scrivi la domanda (o la segnalazione) e consegna quello che hai fatto:',
+  'prodotto), scrivi la domanda in JSON (titolo, almeno due opzioni con pro e contro, consiglio) e consegna',
+  'quello che hai fatto:',
   '  node scripts/dispatch.mjs --record-fixed <id> "<report>" --domanda <file.json>',
-  '  node scripts/dispatch.mjs --record-fixed <id> "<report>" --segnala <file.md>',
-  '  (dal markdown il server compone la domanda da sé, senza pro, contro e consiglio)',
-  'Una segnalazione FERMA il lavoro: non torna in verifica, aspetta l\'owner, e riprende da lì quando ha',
-  'risposto. Senza segnalazione torna in coda per un\'altra verifica. Un difetto non è una segnalazione.',
+  'Una domanda che blocca FERMA il lavoro: non torna in verifica, aspetta l\'owner, e riprende da lì quando ha',
+  'risposto. Senza domanda torna in coda per un\'altra verifica. Un difetto non è una domanda.',
 ].join('\n');
 
 /**
@@ -1449,15 +1481,15 @@ export function verifierReplyText(reply, id = '<id>') {
     ].filter((l) => l !== null).join('\n');
   }
   if (r.outcome === 'stop') {
-    // Fermo per la segnalazione allegata, o per un rilievo che decide l'owner:
+    // Fermo per la domanda allegata, o per un rilievo che decide l'owner:
     // in tutti e due i casi i rilievi non bloccanti restano davanti a chi riprende.
-    const perSegnalazione = r.motivo === 'segnalazione';
+    const perSegnalazione = r.motivo === 'segnalazione' || r.motivo === 'domanda';
     const sospesi = Array.isArray(r.sospesi) ? r.sospesi : [];
     return [
       '══ RISPOSTA DEL SERVER: il lavoro si ferma ══',
       provvRiga,
       perSegnalazione
-        ? 'La segnalazione è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
+        ? 'La domanda è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
         : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o un 3/2 che chiede una decisione): decide l\'owner.',
       perSegnalazione ? null : fmt(r.blocking),
       sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
@@ -1494,19 +1526,19 @@ export function verifierReplyText(reply, id = '<id>') {
 }
 /**
  * Cosa si stampa a consegna accettata: il lavoro si è fermato, o torna in
- * verifica. `conSegnalazione` = la consegna portava una segnalazione (o il
+ * verifica. `conDomanda` = la consegna portava una domanda (o il
  * vecchio --ferma), quindi DOVEVA fermarsi. PURA.
  */
-export function fixedReplyText(id, reply, conSegnalazione = false) {
+export function fixedReplyText(id, reply, conDomanda = false) {
   const fermato = reply && reply.outcome === 'stop';
-  if (fermato) return `stato ${id}: lavoro FERMATO, in attesa dell'owner (la segnalazione è consegnata). Rilascia il biglietto.`;
+  if (fermato) return `stato ${id}: lavoro FERMATO, in attesa dell'owner (la domanda è consegnata). Rilascia il biglietto.`;
   // «blocca»: false (#1577): la domanda è aperta e la correzione va in verifica con la consigliata.
   if (reply && reply.outcome === 'provvisoria') return `stato ${id}: consegnato, torna in coda per la verifica. La domanda ${reply.domanda || ''} non ferma il lavoro: vale la consigliata finché l'owner non risponde.`;
-  // Un server vecchio, che non ferma su una segnalazione, rimette in coda: dirlo, o chi ha segnalato crede di essersi fermato.
-  if (conSegnalazione) return `stato ${id}: ATTENZIONE, la consegna portava una segnalazione ma il server non ha fermato il lavoro: è tornato in coda per la verifica. La segnalazione è consegnata lo stesso.`;
+  // Un server che non ferma su una domanda che blocca rimette in coda: dirlo, o chi ha chiesto crede di essersi fermato.
+  if (conDomanda) return `stato ${id}: ATTENZIONE, la consegna portava una domanda ma il server non ha fermato il lavoro: è tornato in coda per la verifica. La domanda è consegnata lo stesso.`;
   return `stato ${id}: consegnato, torna in coda per la verifica`;
 }
-async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false, domanda = null, motivo = null) {
+async function recordFixed(id, report = '', frase = '', ferma = false, domanda = null, motivo = null) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, altrove: !!guard.altrove && !guard.escalated, message: guard.message };
   // La consegna vale per un commit, come la critica (stessa regola, stessa
@@ -1555,8 +1587,7 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   // Il server prima dello stato locale: vedi il commento in recordVerifier.
   // Due testi, due destinatari: il report lo cifra il server per l'owner, la
   // frase resta leggibile per chi ha mandato il feedback (spec §8).
-  // La segnalazione (L3) viaggia nello stesso payload: il server la cifra e la
-  // scrive in `livelli.l3`, e la appende alle note come storia della chat.
+  // La domanda viaggia nello stesso payload: il server la apre e la lega al lavoro.
   // In un riallineamento dispatch ha scritto nel marcatore la punta ricevuta: si confronta la modifica del ramo di
   // allora con quella di adesso (regola 3), e lo si dice prima che decida il server.
   const marcatore = readMarker(ROOT);
@@ -1574,7 +1605,7 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
     }
   }
   const sent = await deliverToChannel('fixed', fixedPayload({
-    report, frase, branch: next.branch || '', segnalazione, ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento,
+    report, frase, branch: next.branch || '', ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento,
   }));
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
@@ -1863,8 +1894,9 @@ export function usageText() {
     '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
     '  --linea-principale     dopo ogni worker, prima del biglietto (orchestratore): la cartella',
     '                         torna su main, perché il prossimo worker parta con i suoi agenti',
-    '  --record-verifier <id> "<critica>" [--segnala <file.md>] [--domanda <file.json>] [--ticket <b>]   una riga per rilievo,',
-    '                         con livello e sede davanti ([2i] …, [1v] …, [2e] …; [1i?] = chiede una decisione);',
+    '  --record-verifier <id> "<critica>" [--domanda <file.json>] [--ticket <b>]   una riga per rilievo,',
+    '                         con livello e sede davanti ([2i] …, [1v] …, [2e] …; [1i?] = chiede una decisione,',
+    '                         e porta la sua domanda: --domanda con una, o un elenco nell\'ordine dei rilievi col «?»);',
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
@@ -1872,28 +1904,23 @@ export function usageText() {
     '                         da parte: registra il commit che toglie SOLO le loro prove del giro, dopo aver',
     '                         rilanciato quelle a cui ha tolto un caso o un aiuto (un caso rosso resta rosso);',
     '                         più tardi, per una prova dimenticata, il commit è l\'ultimo e da solo',
-    '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md>] [--domanda <file.json>] [--ticket <b>]',
+    '  --record-fixed    <id> "<report>" [--frase "…"] [--domanda <file.json>] [--ticket <b>]',
     '                         il report non è facoltativo: da qui esce un esito, e l’owner legge questo',
     '  --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]',
     '                         la nota dice cosa hai controllato e cosa hai trovato;',
     '                         su pass è obbligatoria (senza, il verdetto non parte)',
     '',
-    '  --segnala <file.md>    un trade-off vero o una domanda di design trovati',
-    '                         lavorando: NON deciderlo, segnalalo (Problema / Scelte',
-    '                         col loro trade-off / Cosa ho fatto nel frattempo); è quello',
-    '                         da cui il server compone la domanda nella sezione Domande. Una',
-    '                         segnalazione FERMA il lavoro: aspetta l’owner, e riprende',
-    '                         da lì quando ha risposto. Un difetto non è una segnalazione',
-    '  --domanda <file.json>  la stessa scelta già scritta come domanda (SPEC-DOMANDE §3.1:',
-    '                         contesto, problema, opzioni con pro e contro, consiglio,',
-    '                         notePerAgenti): ferma il lavoro come --segnala, e l\'owner',
-    '                         risponde nella sezione Domande',
-    '  --ferma                accettato per chi lo scrive ancora: non serve, è --segnala',
+    '  --domanda <file.json>  un trade-off vero o una scelta di design trovati lavorando: NON',
+    '                         deciderlo, chiedilo (SPEC-DOMANDE §3.1: titolo fino a 10 parole,',
+    '                         contesto, problema, almeno due opzioni con pro e contro, consiglio,',
+    '                         notePerAgenti). Una domanda che blocca FERMA il lavoro: aspetta',
+    '                         l\'owner, e riprende da lì quando ha risposto. Un difetto non è una domanda',
+    '  --ferma                accettato per chi lo scrive ancora: non serve, è la domanda',
     '                         che ferma il lavoro; da solo non consegna niente',
     '  --clear-state     <id> rimuove la copia locale dello stato',
     '  --help                 questa schermata',
     '',
-    'Nei --record-* le opzioni (--frase, --segnala, --domanda, --nota, --ferma, --ticket) valgono in ogni',
+    'Nei --record-* le opzioni (--frase, --domanda, --nota, --ferma, --ticket) valgono in ogni',
     'posizione, anche come `--opzione=valore`, come nel canale; quello che resta, in ordine, è',
     'comando, identificativo e testo.',
     'Il biglietto si rilegge da solo dal promemoria (.claude/routine-ticket.json): `--ticket`',
@@ -2475,12 +2502,10 @@ if (isMainModule) {
         console.error('Vale anche quando promuovi: senza rilievi la verifica risulta superata, e una promozione senza motivo non dice a nessuno cosa hai provato.');
         process.exit(1);
       }
-      // Il file della segnalazione si legge qui, a critica già buona: un file
-      // assente ferma con la frase giusta, e niente parte a metà.
-      const segnalazione = opz['--segnala'] ? leggiTestoLivello(opz['--segnala'], 'segnala') : { ok: true, testo: '' };
-      if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
-      const domanda = opz['--domanda'] ? await leggiDomandaDaFile(opz['--domanda']) : null;
-      const s = await recordVerifier(id, critica, segnalazione.testo, domanda);
+      // Le domande si leggono qui, a critica già buona: un file assente ferma con la frase giusta, e niente parte a metà.
+      const lette = opz['--domanda'] ? await leggiDomandeDaFile(opz['--domanda'], { elenco: true }) : { ok: true, domande: [] };
+      if (!lette.ok) { console.error(lette.errore); process.exit(1); }
+      const s = await recordVerifier(id, critica, lette.domande);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
       console.log(verifierReplyText(s.reply, id));
@@ -2488,9 +2513,9 @@ if (isMainModule) {
     } else if (flag === '--record-fixed') {
       const ferma = opz['--ferma'] === true;
       const [, id, ...rest] = conBiglietto(argv);
-      if (!id) { console.error('Uso: --record-fixed <id> "report" [--motivo "…" (obbligatorio per il correttore)] [--frase "…"] [--segnala <file.md>] [--domanda <file.json>]'); process.exit(1); }
-      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--motivo "…", --frase "…", --segnala <file.md> e --ferma')); process.exit(1); }
-      const senza = fermaSenzaSegnalazione(ferma, opz['--segnala'] || opz['--domanda']);
+      if (!id) { console.error('Uso: --record-fixed <id> "report" [--motivo "…" (obbligatorio per il correttore)] [--frase "…"] [--domanda <file.json>]'); process.exit(1); }
+      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--motivo "…", --frase "…", --domanda <file.json> e --ferma')); process.exit(1); }
+      const senza = fermaSenzaDomanda(ferma, opz['--domanda']);
       if (senza) { console.error(senza); process.exit(1); }
       // La frase è la riga in chiaro per chi ha mandato il feedback; il resto è il report per l'owner,
       // che il server cifra.
@@ -2499,7 +2524,7 @@ if (isMainModule) {
       // Un'altra cosa coi trattini davanti finirebbe sepolta nel report cifrato (#565).
       const altra = rest.find((a) => sembraOpzioneNelReport(a));
       if (altra) {
-        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --motivo "…", --frase "…", --segnala <file.md>, --domanda <file.json> e --ferma; il resto è il report, un testo solo fra virgolette.`);
+        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --motivo "…", --frase "…", --domanda <file.json> e --ferma; il resto è il report, un testo solo fra virgolette.`);
         process.exit(1);
       }
       // Anche di qui esce un esito — il lavoro torna in coda a un'altra
@@ -2510,16 +2535,16 @@ if (isMainModule) {
         console.error('Scrivi cosa hai corretto e cosa hai lasciato stare: è quello che l\'owner legge, e non si riscrive più.');
         process.exit(1);
       }
-      const segnalazione = opz['--segnala'] ? leggiTestoLivello(opz['--segnala'], 'segnala') : { ok: true, testo: '' };
-      if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
-      const domanda = opz['--domanda'] ? await leggiDomandaDaFile(opz['--domanda']) : null;
+      const letta = opz['--domanda'] ? await leggiDomandeDaFile(opz['--domanda']) : { ok: true, domande: [] };
+      if (!letta.ok) { console.error(letta.errore); process.exit(1); }
+      const domanda = letta.domande[0] || null;
       // Senza motivo il biglietto del correttore non si chiude (SPEC-RIDISEGNO-LAVORO.md §3, regola 4).
-      const siFerma = !!segnalazione.testo.trim() || !!(domanda && domanda.blocca !== false);
+      const siFerma = !!(domanda && domanda.blocca !== false);
       const motivo = motivoDellaConsegna(opz['--motivo'], readMarker(ROOT)?.role, { siFerma });
       if (!motivo.ok) { console.error(`${motivo.errore} Non ho consegnato niente.`); process.exit(1); }
-      const s = await recordFixed(id, report, frase, segnalazione.testo, ferma, domanda, motivo.motivo);
+      const s = await recordFixed(id, report, frase, ferma, domanda, motivo.motivo);
       if (s.rejected) esciRespinto(s);
-      console.log(fixedReplyText(id, s.reply, ferma || !!segnalazione.testo.trim() || !!domanda));
+      console.log(fixedReplyText(id, s.reply, ferma || !!domanda));
       process.exit(0);
     } else if (flag === '--record-pulizia') {
       const [, id, ...avanzo] = conBiglietto(argv);
