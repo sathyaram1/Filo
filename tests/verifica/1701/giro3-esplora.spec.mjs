@@ -26,7 +26,10 @@ test('pagina che arriva a pezzi: testa e articolo subito, il resto dopo 10 s', a
   });
   try {
     const t0 = Date.now();
-    await openTab(`http://127.0.0.1:${s.address().port}/`).catch(() => {});
+    await app.evaluate(({ BrowserWindow }, u) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+      return w._filoTabs.openTab(u, { activate: true });
+    }, `http://127.0.0.1:${s.address().port}/`);
     await expect.poll(async () => (await coloreAttiva(app)).c, { timeout: 4_000, intervals: [100] }).not.toBe(null);
     console.log('pezzi: colore dopo', Date.now() - t0, 'ms', JSON.stringify(await coloreAttiva(app)));
   } finally { await chiudi(s); }
