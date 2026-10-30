@@ -704,16 +704,39 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
     return { ok: false, skipped: false, branch: ramo, reason: `il server remoto ha rifiutato il push (una regola del repo, un pre-receive, il push protection?): ${pulisciGit(push.out)}` };
   }
   if (/rejected|non-fast-forward|fetch first|stale info/i.test(push.out)) {
-    // --force-if-includes: il lease da solo si fida del ref remoto che questa
-    // copia conosce, e dopo un `git fetch` quel ref è già il commit dell'altro
-    // — il lease combacia e il rinvio lo sovrascrive (verifica del giro 2).
-    // Con --force-if-includes git rifiuta se quel commit non è mai passato
-    // dalla storia locale di questo ramo.
-    const lease = run(['push', '--force-with-lease', '--force-if-includes', 'origin', `HEAD:refs/heads/${ramo}`]);
+    const atteso = leaseAtteso(root, ramo, { exec });
+    if (!atteso) {
+      return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e il rinvio con --force-with-lease non parte: su origin '${ramo}' è a un commit che questo ramo non ha mai avuto (qualcun altro ha spinto su '${ramo}'?)` };
+    }
+    const lease = run(['push', 'origin', `HEAD:refs/heads/${ramo}`, `--force-with-lease=refs/heads/${ramo}:${atteso}`]);
     if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true, ...avviso };
     return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
   }
   return { ok: false, skipped: false, branch: ramo, reason: pulisciGit(push.out) };
+}
+
+/**
+ * Il valore atteso del lease di `ramo`: la traccia remota, solo se è passata dalla storia locale del ramo (il suo
+ * reflog), altrimenti ''. Senza valore il lease si fida di un `git fetch` (verifica del giro 2); --force-if-includes
+ * vuole il reflog della traccia remota, che un clone appena nato non ha, e rifiuta sempre (#1776).
+ */
+export function leaseAtteso(root, ramo, { exec = execFileSync } = {}) {
+  const git = (args, input) => String(exec('git', args, {
+    cwd: root, encoding: 'utf8', ...(input === undefined ? { stdio: ['ignore', 'pipe', 'pipe'] } : { input }),
+  }) || '').trim();
+  const righe = (testo) => testo.split('\n').map((s) => s.trim()).filter(Boolean);
+  try {
+    const atteso = git(['rev-parse', '-q', '--verify', `refs/remotes/origin/${ramo}^{commit}`]);
+    const passati = righe(git(['log', '-g', '--format=%H', `refs/heads/${ramo}`, '--']));
+    if (!atteso || !passati.length) return '';
+    if (passati.includes(atteso)) return atteso;
+    // Fermarsi ai genitori dell'atteso tiene corto il cammino: se un passato lo contiene, lo si incontra prima.
+    const genitori = righe(git(['rev-parse', `${atteso}^@`])).map((s) => `^${s}`);
+    const raggiunti = righe(git(['rev-list', '--stdin', '--ignore-missing'], `${[...passati, ...genitori].join('\n')}\n`));
+    return raggiunti.includes(atteso) ? atteso : '';
+  } catch (_) {
+    return '';
+  }
 }
 
 /**
