@@ -398,8 +398,9 @@ fanno ~5 $ al giorno, compattazioni comprese.
    Le pagine visitate restano fuori finché l'owner non decide (D56); il tetto
    di un esito e il budget in token al posto dei 12 giri vanno con la soglia
    della fase 4.
-4. **La compattazione** a livelli, con la soglia e la parte dell'utente
-   fotografata.
+4. **La compattazione** a livelli, con la soglia, la parte dell'utente
+   fotografata e le regole del sospetto (§ Il sospetto non passa nel
+   riassunto), la cui prova si accende qui.
 5. **Parte fissa e strumenti nuovi**, misurati sul banco allargato contro la
    fase 1.
 6. **Memorie**: indice, strumento `memoria`, via lezioni e agente delle
