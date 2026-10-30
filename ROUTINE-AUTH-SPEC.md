@@ -906,7 +906,9 @@ di decifratura, quindi li dà il server.
   sono testo riservato), altrimenti si leggono solo numeri, stati e attese. Per
   ogni numero: la riga dell'indice, la scheda salvata nel feedback e, con
   `testi`, titolo, pagina, testo, conversazione, il mittente senza identità e
-  gli allegati testuali in chiaro. Un feedback segnalato come attacco o file
+  gli allegati testuali in chiaro, decodificati come li legge l'app (un tipo
+  testuale anche fuori da UTF-8; uno testuale solo per nome solo se è UTF-8,
+  altrimenti `nonTestuale`). Un feedback segnalato come attacco o file
   sospetto ha solo la riga e `rifiutato` col motivo (la regola del lettore
   locale, provata da un gemello). Tetto: 2000 numeri, oltre `troppi_numeri`
   col conteggio; i testi a pagine da sei milioni di caratteri, il resto in
@@ -921,7 +923,8 @@ di decifratura, quindi li dà il server.
 - **`ownerSchede` (callable owner)** `{ op: 'scheda', … }`: la stessa scrittura
   dalla macchina dell'owner.
 - **Registro**: ogni lettura con schede o testi e ogni scheda scritta vanno in
-  `routine-letture` (biglietto, ruolo, numeri), che `routineLog` rimanda in `letture`.
+  `routine-letture` (biglietto, ruolo e tutti i numeri usciti con testo o scheda,
+  senza i rifiutati), che `routineLog` rimanda in `letture`.
 - **Due strade, stessa uscita**: `npm run feedback:leggi` e `npm run
   feedback:schede` passano dal server con `FILO_ROUTINE` e il biglietto, dal
   token dell'owner altrimenti (`scripts/lib/feedback-cloud.mjs`). Il server
