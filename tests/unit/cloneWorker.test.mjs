@@ -336,6 +336,10 @@ test('stessoRemoto, chiaviAccesso, datiWorker, concorrenzaUnit: le parti pure', 
   assert.equal(concorrenzaUnit(4, 16), 4);
   assert.equal(concorrenzaUnit(3, 2), 1);
   assert.equal(concorrenzaUnit(1, 16), 0, 'un worker solo: decide node');
+  const uscita = 'npm error code ENOTFOUND\nnpm error\nnpm error syscall getaddrinfo\nnpm error A complete log of this run can be found in: /x.log\n';
+  assert.equal(motivoNpm(uscita), 'npm error code ENOTFOUND / npm error syscall getaddrinfo');
+  assert.equal(motivoNpm('qualcosa\nl\'ultima riga\n'), 'l\'ultima riga', 'senza righe d\'errore di npm, l\'ultima');
+  assert.equal(motivoNpm(''), '');
 });
 
 test('il marcatore del worker e\' un file di sessione: in .gitignore e fra i marcatori esclusi', () => {
