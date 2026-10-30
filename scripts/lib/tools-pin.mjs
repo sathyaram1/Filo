@@ -134,11 +134,13 @@ export function pinnedDir() {
  *
  * @returns {{ ok: boolean, dir: string, why: string }}
  */
-export function pinTools(repoRoot, { dest = pinnedDir(), origine = '', da = repoRoot } = {}) {
+export function pinTools(repoRoot, { dest = pinnedDir(), origine = '', da = repoRoot, commit = '' } = {}) {
   const progetto = resolve(repoRoot);
   // `da` diverso dal progetto: la copia di un worker nasce dagli strumenti
   // dell'orchestratore, non dal suo clone, che è già sul ramo (#1157).
   const src = resolve(da);
+  // La copia di un worker eredita il commit di quella da cui nasce: è la stessa versione degli strumenti.
+  const daCommit = /^[0-9a-f]{40}$/i.test(String(commit)) ? String(commit) : pinnedCommit(src);
   if (resolve(dest) === src) return { ok: false, dir: '', why: 'destinazione uguale alla sorgente' };
   // NON si fissa sopra la copia che sta girando adesso. Non è prudenza: a
   // metà giro il progetto è aperto sul ramo di lavoro, quindi ricopiare da lì
