@@ -867,6 +867,7 @@ test('i riquadri: ogni misura ha le chiavi, il tetto e la forma dell’app; il d
     assert.deepEqual(MR[c].chiavi, [...C.RIQUADRI[c].chiavi], `${c}: le chiavi delle regole sono quelle dell’app`);
     assert.equal(MR[c].tetto, C.TETTI.RIQUADRI[c], `${c}: il tetto`);
     assert.equal(MR[c].valori, unite(C.FORME.RIQUADRI[c]), `${c}: la forma dei valori`);
+    assert.equal(MR[c].facoltativa, C.MISURE_RIQUADRI_FACOLTATIVE.includes(c), `${c}: facoltativa nelle regole se lo è nell’app`);
   }
   const ora = C.oraVuota();
   for (const c of C.MISURE_RIQUADRI) {
