@@ -99,6 +99,32 @@ describe('la spedizione non tace: storia divergente e push fallito', () => {
     assert.match(String(r.stderr || ''), /NON e' arrivato su origin/, 'la riga su stderr resta, per il registro di debug');
   });
 
+  // In cloud un push a mano resta fermo sul controllo dei permessi, che nessuno approva (#1797): in una routine il
+  // messaggio non lo suggerisce, e la routine si riconosce anche dal solo biglietto nella cartella.
+  test('in una routine il push fallito non chiede un push a mano: lo rispedisce il rilascio', () => {
+    for (const [come, env, biglietto] of [['FILO_ROUTINE', { FILO_ROUTINE: '1' }, false], ['biglietto nella cartella', {}, true]]) {
+      const { work } = scene();
+      git(work, ['checkout', '-q', '-b', `claude/routine-${biglietto ? 'b' : 'e'}`]);
+      git(work, ['remote', 'set-url', 'origin', resolve(work, 'non-esiste.git')]);
+      if (biglietto) {
+        mkdirSync(resolve(work, '.claude'), { recursive: true });
+        writeFileSync(resolve(work, '.claude', 'routine-ticket.json'), JSON.stringify({ ticket: 'x'.repeat(43), since: new Date().toISOString() }));
+      }
+      writeFileSync(resolve(work, 'lavoro.js'), 'x\n', 'utf8');
+      const r = runHookRaw(work, JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: 'Write' }), env);
+      const ctx = JSON.parse(String(r.stdout).split(/\r?\n/).find((l) => l.trim().startsWith('{'))).hookSpecificOutput.additionalContext;
+      assert.match(ctx, /committato in locale ma NON e' su origin/, come);
+      assert.match(ctx, /il rilascio lo rispedisce/, come);
+      assert.doesNotMatch(ctx, /git push del ramo/, `${come}: in cloud un push a mano si ferma sul controllo dei permessi`);
+    }
+    const { work } = scene();
+    git(work, ['checkout', '-q', '-b', 'claude/locale']);
+    git(work, ['remote', 'set-url', 'origin', resolve(work, 'non-esiste.git')]);
+    writeFileSync(resolve(work, 'lavoro.js'), 'x\n', 'utf8');
+    const locale = runHookRaw(work, JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: 'Write' }));
+    assert.match(String(locale.stdout), /git push del ramo/, 'in locale l\'owner il push lo approva');
+  });
+
   test('senza stdin (lanciato a mano) l\'evento è PostToolUse; quando la spedizione riesce stdout resta vuoto', () => {
     const { work } = scene();
     git(work, ['checkout', '-q', '-b', 'claude/liscio']);
