@@ -220,5 +220,5 @@ test('«Togli» di fila in Sicurezza con un salvataggio lento: ogni clic toglie 
   }
   expect(cliccati).toEqual(['uno967.it', 'due967.it', 'tre967.it']);
   await expect.poll(() => fidatiSalvati(app), { timeout: 8000 }).toEqual(['quattro967.it']);
-  await expect(box.locator('li')).toHaveText(['quattro967.it']);
+  await expect(box.locator('li span')).toHaveText(['quattro967.it']);
 });
