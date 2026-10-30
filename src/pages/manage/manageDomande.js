@@ -74,8 +74,8 @@
   });
   // Le domande riscritte di cui l'owner ha aperto il testo originale in cima.
   const originali = new Set();
-  // Le domande chiuse chieste a parte per leggerne il principio (una risposta automatica che lo cita).
-  const fontiChieste = new Set();
+  // Le domande chiuse chieste a parte per leggerne il principio (una risposta automatica che lo cita): id → esito.
+  const fontiChieste = new Map();
   const avvisi = new Map();
   const inCorso = new Set();
   let conferma = null;
@@ -679,8 +679,11 @@
     if (!fonte) chiediFonte(da);
     const box = el('div', 'mg-dq-auto');
     box.appendChild(frase);
-    const testo = fonte && fonte.principio ? md(fonte.principio)
-      : el('p', 'mg-dq-esito', fonte ? `${da} non ha più un principio scritto.` : `Leggo il principio di ${da}…`);
+    let testo;
+    if (fonte && fonte.principio) testo = md(fonte.principio);
+    else if (fonte) testo = el('p', 'mg-dq-esito', `${da} non ha più un principio scritto.`);
+    else if (fontiChieste.get(da) === 'fallita') testo = el('p', 'mg-dq-esito mg-dq-esito--err', `Non riesco a leggere il principio di ${da}: aprila dal collegamento qui sopra.`);
+    else testo = el('p', 'mg-dq-esito', `Leggo il principio di ${da}…`);
     const s = sezione('mg-dq-principio', `Principio di ${da}`, testo);
     if (fonte && fonte.principioContestato) s.querySelector('.mg-dq-h').appendChild(segnoContestato());
     box.appendChild(s);
@@ -696,9 +699,10 @@
   // Il principio citato da un'automatica sta su una domanda chiusa che l'elenco può non avere: la si chiede una volta.
   async function chiediFonte(id) {
     if (finte || fontiChieste.has(id)) return;
-    fontiChieste.add(id);
+    fontiChieste.set(id, 'in_corso');
     const m = await chiedi({ type: T.mostra, id });
-    if (!m.ok || !m.domanda) return;
+    fontiChieste.set(id, m.ok && m.domanda ? 'letta' : 'fallita');
+    if (!m.ok || !m.domanda) { firmaDettaglio = ''; disegnaDettaglio(); return; }
     aggiorna(m.domanda);
     if (m.riferimenti && typeof m.riferimenti === 'object') Object.assign(stato.riferimenti, m.riferimenti);
     cambia();

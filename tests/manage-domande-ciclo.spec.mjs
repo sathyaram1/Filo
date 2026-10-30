@@ -162,6 +162,12 @@ test('«non riscritta», «Testo originale» in cima senza scorrere, niente puls
   await expect(originale).toBeInViewport();
   await expect(r.locator('details.mg-dq-note')).toHaveCount(0);
   await page.locator('#panel-domande').screenshot({ path: 'tests/.shots/manage-domande-originale.png' });
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
+  await page.locator('#panel-domande').screenshot({ path: 'tests/.shots/manage-domande-originale-scuro.png' });
+  await riga(page, 'D-60').click();
+  await dq(page, 'D-60').screenshot({ path: 'tests/.shots/manage-domande-non-riscritta-scuro.png' });
+  await page.evaluate(() => document.documentElement.removeAttribute('data-sn-theme'));
+  await riga(page, 'D-61').click();
   await bottone.click();
   await expect(originale).toHaveCount(0);
   await expect(r.locator('details.mg-dq-note')).toHaveCount(1);
@@ -280,6 +286,9 @@ test('una riga trascinata nella chat dell’Aiuto arriva come riferimento in gra
   await expect.poll(() => page.evaluate(() => window.__filoSidebarTest.gettoneRiferimento(0).aperta)).toBe(true);
   expect((await page.evaluate(() => window.__filoSidebarTest.gettoneRiferimento(0))).testo).toContain('Problema:\nProblema.');
   await page.screenshot({ path: 'tests/.shots/manage-domande-riferimento.png' });
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
+  await page.screenshot({ path: 'tests/.shots/manage-domande-riferimento-scuro.png' });
+  await page.evaluate(() => document.documentElement.removeAttribute('data-sn-theme'));
   await casella.fill('Cosa mi consigli?');
   await casella.press('Enter');
   await expect.poll(() => page.evaluate(() => window.__richieste.length)).toBe(1);
@@ -288,6 +297,14 @@ test('una riga trascinata nella chat dell’Aiuto arriva come riferimento in gra
   expect(mandato).toContain('Riferimento «D-52 Colore del bordo»');
   expect(mandato).toContain('Problema:\nProblema.');
   expect(await page.evaluate(() => window.__filoSidebarTest.riferimentiNelleBolle())).toEqual([['D-52 Colore del bordo']]);
+  // Un testo qualunque lasciato sulla casella ci entra come testo: il pannello non lo inghiotte più.
+  const a = await casella.boundingBox();
+  const cdp = await page.context().newCDPSession(page);
+  const data = { items: [{ mimeType: 'text/plain', data: 'testo trascinato' }], dragOperationsMask: 1 };
+  for (const type of ['dragEnter', 'dragOver', 'drop']) await cdp.send('Input.dispatchDragEvent', { type, x: a.x + a.width / 2, y: a.y + a.height / 2, data });
+  await cdp.detach().catch(() => {});
+  await expect(casella).toHaveValue('testo trascinato');
+  expect(await page.evaluate(() => window.__filoSidebarTest.riferimenti())).toEqual([]);
 });
 
 // Un file dentro un DataTransfer costruito nella pagina: incollato o lasciato sulla casella.
@@ -386,7 +403,9 @@ test('Ricevuti: un arrivo dal vivo in cima lascia ferma la riga sotto il puntato
   expect(Math.abs((await bersaglio.boundingBox()).y - box.y)).toBeLessThan(1.5);
 });
 
-test('a finestra stretta il numero della scheda non copre il titolo della colonna', async ({ app, openTab }) => {
+// Alla larghezza minima della finestra la colonna è di 220px: le pastiglie col numero vanno a capo senza coprire il
+// nome della scheda, e il titolo di una riga va a capo intero sotto il numero invece di sgranarsi a sillabe.
+test('a finestra stretta le pastiglie col numero non coprono il nome della scheda, e i titoli delle righe si leggono', async ({ app, openTab }) => {
   await app.evaluate(async ({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     if (w) w.setContentSize(720, 800);

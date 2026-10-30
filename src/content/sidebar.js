@@ -506,7 +506,16 @@
   // Un riferimento lasciato sul pannello lo prende la chat, e nella casella non si versa il suo testo. Ci arriva anche
   // dal preload, che sul pannello tiene il sito all'oscuro del rilascio (src/preload/rilascio-file.js).
   function rilascio(e, { conta = true } = {}) {
-    if (!e || !e.isTrusted || !Array.from(e.dataTransfer?.types || []).includes(TIPO_RIFERIMENTO)) return false;
+    if (!e || !e.isTrusted) return false;
+    if (!Array.from(e.dataTransfer?.types || []).includes(TIPO_RIFERIMENTO)) {
+      // Un testo lasciato nella casella lo scrive il browser: qui si conta solo da dove veniva (#1471).
+      if (conta && e.target?.matches?.('.sn-sidebar-input textarea')) {
+        let testo = '';
+        try { testo = e.dataTransfer.getData('text/plain'); } catch (_) { testo = ''; }
+        try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!testo)); } catch (_) {}
+      }
+      return false;
+    }
     e.preventDefault();
     const r = leggiRiferimento(e.dataTransfer);
     if (r) aggiungiRiferimento(r);
