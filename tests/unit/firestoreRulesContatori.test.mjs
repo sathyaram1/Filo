@@ -875,12 +875,16 @@ test('i riquadri: ogni misura ha le chiavi, il tetto e la forma dell’app; il d
     for (const k of C.RIQUADRI[c].chiavi) ora[c][k] = Array(n).fill(999999999);
   }
   const doc = C.documentoRiquadri({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'linux', dati: ora });
+  assert.deepEqual(Object.keys(doc), [...C.CAMPI_RIQUADRI]);
   assert.equal(C.validaRiquadri(doc).ok, true, C.validaRiquadri(doc).motivo);
-  assert.equal(passa(doc, MR), '', 'i riquadri più carichi dell’app devono passare le regole');
+  assert.equal(passaRiquadri(doc), '', 'i riquadri più carichi dell’app devono passare le regole');
   const vuoto = C.documentoRiquadri({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T00', app: '0.2.249', os: 'win', dati: C.oraVuota() });
-  assert.equal(passa(vuoto, MR), '');
+  assert.equal(passaRiquadri(vuoto), '');
   assert.equal(C.senzaRiquadri(vuoto), true, 'un’ora senza riquadri non ha il loro documento');
-  const manomesso = (campo, v) => passa({ ...doc, [campo]: v }, MR);
+  const manomesso = (campo, v) => passaRiquadri({ ...doc, [campo]: v });
+  assert.notEqual(manomesso('correttore_segnaposto', { da_solo: '1,0,0,0,0,0,0' }), '', 'un esito del segnaposto che manca');
+  assert.notEqual(manomesso('correttore_automatica', { Marco: '1,0,0' }), '', 'la parola corretta come chiave');
+  assert.notEqual(manomesso('anticipo_privacy', { 'banca.it': '1,0' }), '', 'un sito come chiave');
   assert.notEqual(manomesso('riscrittura', { 'rendilo più gentile': '1,0,0,0,0,0,0,0,0,0' }), '', 'un’istruzione scritta come chiave');
   assert.notEqual(manomesso('riquadro_uso', { explain: '1,0,0,0,0,0,0 <b>copiato</b>' }), '', 'del testo dentro il valore');
   assert.notEqual(manomesso('editor_titolo', { 'Lettera a Mario': '1,0,0,0,0,0,0' }), '', 'un titolo come chiave');
