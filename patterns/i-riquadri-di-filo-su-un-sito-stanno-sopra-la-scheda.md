@@ -24,7 +24,11 @@ lì non c'è codice di altri.
   stanno nello strato: la pagina gli manda dove sta il bersaglio (`posa`, anche per scostare il pannello) e il clic
   dell'utente sul passo (`azione`), con `AIUTO_ALLO_STRATO`; il valore entra nel campo solo all'Accetta. Nel documento del sito resta la facciata di `SN_SIDEBAR`: apre
   lo strato e tiene lo stato che il pannello le manda, per la barra laterale e il menu. L'uscita di un'azione di pagina
-  (cercare, aprire un link) torna allo strato e passa da `runFiloAction`, con la sua conferma.
+  (cercare, aprire un link) torna allo strato e passa da `runFiloAction`, con la sua conferma. Quello che la facciata
+  riceve per il pannello lo gira allo strato con l'apertura: «Valuta» porta il testo del campo e un numero con cui lo
+  strato lo rilegge e ci scrive le correzioni (`campo`), le immagini lasciate o arrivate da fuori viaggiano già lette,
+  a pezzi sotto il tetto dello strato. Lo strato carica gli stessi script delle pagine interne
+  (`tests/unit/contentScriptPreload.test.mjs`), e la sua chiusura per gli allegati non è quella di un riquadro.
 - **Lo strato parla come la pagina sotto**, col suo frame principale (`senderInfo` in `src/main/ipc.js`): bozze per
   sito, settings ritagliati, porte aperte ai siti. Non ha un potere in più del content script della pagina, e le spinte
   che vanno alla pagina gli arrivano ritagliate per lei (`spingiAllaScheda`), tranne gli avvisi, che mostra la pagina.
