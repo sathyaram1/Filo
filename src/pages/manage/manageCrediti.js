@@ -80,7 +80,7 @@
     for (const [a, el] of Object.entries(righe)) {
       if (!el) continue;
       if (!owner) el.textContent = a === 'A' ? 'Solo l’owner vede e cambia i crediti delle routine.' : '';
-      else el.textContent = accounts && accounts[a] ? RC.rigaAccount(a, accounts[a]) : '–';
+      else el.textContent = accounts && accounts[a] ? RC.rigaAccount(a, accounts[a], { usdPer100: (numeri && numeri.usdPer100) || RC.TARATURA_PREDEFINITA }) : '–';
     }
     if (avviso) {
       avviso.hidden = !(owner && freni === 'numeri_assenti');
