@@ -2628,7 +2628,7 @@ if (isMainModule) {
             console.error(`[dispatch] GUASTO (transient): ${scomodo}`);
             process.exit(3);
           }
-          const pin = pinTools(ROOT, { origine: origineDelCheckout() });
+          const pin = pinTools(ROOT, { origine: origineDelCheckout(), commit: commitDelCheckout() });
           if (!pin.ok) {
             // FERMA IL GIRO, non prosegue. Proseguire vorrebbe dire eseguire gli
             // strumenti del ramo di lavoro, cioè esattamente il guasto che
