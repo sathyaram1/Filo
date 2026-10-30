@@ -212,7 +212,8 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       ...(Number.isInteger(priorita) ? { priority: priorita } : {}),
       ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}),
       ...(Array.isArray(attese) && attese.length ? { waitsFor: attese } : {}),
-      ...(Array.isArray(unisce) && unisce.length ? { unisce: unisce.map(({ id, num }) => ({ id, num })) } : {}),
+      // Un pacchetto porta tutti gli allegati delle unite o non nasce: un caricamento mancato ferma prima del documento.
+      ...(Array.isArray(unisce) && unisce.length ? { unisce: unisce.map(({ id, num }) => ({ id, num })), interi: true } : {}),
       // Uno sporco rimasto solo in locale il server non lo vede: senza biglietto il feedback nasce non fidato.
       ...(b && b.fp && !b.inAttesa ? { bigliettoLocale: b.fp } : {}),
     });
