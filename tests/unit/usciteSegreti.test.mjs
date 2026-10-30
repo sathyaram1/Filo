@@ -1356,3 +1356,39 @@ test('il valore di un campo è dell’utente solo se è fatto dei suoi caratteri
   assert.ok(!fattoDiCaratteri('', conti('abc')));
   assert.ok(MAX_INCOLLA >= 256 && MAX_INCOLLA <= 10000, 'un incolla lungo coprirebbe migliaia di codici');
 });
+
+// #810.8 giro 5 — conta la parte del valore cambiata da quando l'utente ci scrive: il testo che il sito aveva già messo
+// (saluto e firma, il prefisso dell'IBAN) non la sporca, e solo pochi suoi caratteri attaccati restano con lei.
+test('dell’utente è la parte del campo cambiata da quando ci scrive, coi pochi caratteri del sito attaccati', () => {
+  const { parteNuova, diUnIncolla, MAX_INCOLLA } = require(join(ROOT, 'src', 'preload', 'immessi-utente.js'));
+  assert.deepEqual(parteNuova('IT60X0542811101000000123456', 'IT'),
+    { nuova: '60X0542811101000000123456', estesa: 'IT60X0542811101000000123456' });
+  const mail = parteNuova('Ciao Marco,\nla carta è 4111 1111 1111 1111\nA presto, Giulia', 'Ciao Marco,\n\nA presto, Giulia');
+  assert.equal(mail.nuova, 'la carta è 4111 1111 1111 1111');
+  assert.equal(parteNuova('4111', '').nuova, '4111');
+  // Un campo del sito con tutti i codici: quello che l'utente aggiunge non se li porta dietro.
+  const codici = '0123456789'.repeat(10);
+  const giro2 = parteNuova(`${codici}a`, codici);
+  assert.equal(giro2.nuova, 'a');
+  assert.ok(giro2.estesa.replace(/\D/g, '').length <= 4, 'il sito attacca più di pochi caratteri suoi');
+  // Di un incolla lungo restano i pochi segreti che contiene, di una fila di codici niente.
+  const lettera = `Gentile ufficio,\n${'vi scrivo per il rimborso della fattura di marzo. '.repeat(30)}\nIl mio IBAN è IT60X0542811101000000123456.`;
+  assert.ok(lettera.length > MAX_INCOLLA);
+  assert.equal(diUnIncolla(lettera), 'IT60X0542811101000000123456');
+  assert.equal(diUnIncolla('Codice 123456'), 'Codice 123456');
+  assert.equal(diUnIncolla(Array.from({ length: 200 }, (_, i) => `IBAN IT60X05428111010000001234${String(i).padStart(2, '0')}`).join(' ')), '');
+  assert.equal(diUnIncolla('0123456789'.repeat(1000)), '');
+});
+
+// #810.8 giro 5 — un codice letto prima che l'utente cominciasse a scriverlo resta letto anche se lui lo riscrive;
+// quello letto mentre il suo testo era in viaggio si toglie.
+test('riscrivere un codice già letto non lo toglie dai segreti letti', () => {
+  SL.usaDeposito(null);
+  const letto = () => SL.tutti().some((x) => x.valore === '482913');
+  SL.ricorda('Il tuo codice monouso è 482913', 'dalla pagina banca.example');
+  SL.immessoDallUtente('1:1-1:1:7', 'il codice 482913 dove lo metto?', Date.now() + 5);
+  assert.ok(letto(), 'il codice letto prima è sparito dal registro');
+  SL.immessoDallUtente('1:1-1:1:8', 'il codice 482913 è questo', Date.now() - 60_000);
+  assert.ok(!letto(), 'il codice letto mentre l’utente lo scriveva è rimasto');
+  SL.usaDeposito(null);
+});
