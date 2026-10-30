@@ -147,7 +147,7 @@ test('su una pagina delicata la spiegazione non preparata conta come costo della
   await page.waitForTimeout(500);
   expect(await voceOra(app, 'anticipo_privacy', 'spiega')).toEqual({ saltato: 1, chiesto: 1 });
   const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));
-  expect(disco).not.toContain('127.0.0.1');
+  expect(disco, 'il sito non esce').not.toContain(new URL(page.url()).host);
 });
 
 test('la pagina tradotta intera e riportata all’originale entro un minuto conta il ritorno', async ({ app, openTab, testServer }) => {
