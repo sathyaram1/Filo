@@ -497,6 +497,10 @@
     if (testo.length > RIFERIMENTO_MAX) testo = `${testo.slice(0, RIFERIMENTO_MAX)}\n[… tagliato qui: altri ${testo.length - RIFERIMENTO_MAX} caratteri]`;
     return { titolo: titolo || 'Riferimento', testo };
   }
+  // I riferimenti li scrivono solo le pagine di Filo.
+  function riferimentiAmmessi() {
+    try { return location.protocol === 'filo:'; } catch (_) { return false; }
+  }
   function aggiungiRiferimento(r) {
     if (pannelloPerAllegati() !== true) return;
     if (!allegati.riferimenti.some((x) => x.titolo === r.titolo && x.testo === r.testo)) allegati.riferimenti.push(r);
