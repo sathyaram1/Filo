@@ -673,7 +673,7 @@
         return { ...res, giaChiesta: true, anticipata: primaVolta && !!res && !res.errore && !!res.text };
       });
     }
-    return chiedi(primaApertura ? 'fermato_tetto' : stessa ? '' : 'assente');
+    return chiedi(primaApertura ? fermata() : stessa ? '' : 'assente');
   }
 
   // Il tasto del rimedio sotto una spiegazione del menu apre un'altra scheda: il menu non resta aperto sopra il sito.
