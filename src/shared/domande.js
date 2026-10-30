@@ -246,13 +246,19 @@
       testi[campo] = campo === 'gruppo' ? r.valore.trim() : r.valore;
     }
     const grezze = input.opzioni == null ? [] : input.opzioni;
-    if (!Array.isArray(grezze)) return no('domanda_non_valida', '«opzioni» deve essere un elenco');
+    if (!Array.isArray(grezze)) return no('domanda_non_valida', '«opzioni» deve essere un elenco', { campo: 'opzioni' });
     if (grezze.length > TETTI.opzioni) {
-      return no('troppe_opzioni', `${grezze.length} opzioni, il massimo è ${TETTI.opzioni}`, { lunghezza: grezze.length, massimo: TETTI.opzioni });
+      return no('troppe_opzioni', `${grezze.length} opzioni, il massimo è ${TETTI.opzioni}`, { campo: 'opzioni', lunghezza: grezze.length, massimo: TETTI.opzioni });
+    }
+    if (perOwner && grezze.length < TETTI.opzioniMinime) {
+      const quante = grezze.length ? 'un\'opzione sola' : 'nessuna opzione';
+      return no('opzioni_insufficienti', `${quante}, ne servono almeno ${TETTI.opzioniMinime}: con una scelta sola non c'è niente da decidere `
+        + '(è un feedback o una nota). Aggiungi la strada che resta, per esempio archiviare il lavoro o tenerlo com\'è',
+      { campo: 'opzioni', lunghezza: grezze.length, minimo: TETTI.opzioniMinime });
     }
     const opzioni = [];
     for (let i = 0; i < grezze.length; i++) {
-      const r = validaOpzione(grezze[i], i);
+      const r = validaOpzione(grezze[i], i, perOwner);
       if (!r.ok) return r;
       opzioni.push(r.opzione);
     }
