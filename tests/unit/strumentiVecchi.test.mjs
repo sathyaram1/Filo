@@ -35,6 +35,9 @@ function progetto() {
   scrivi(casa, 'scripts/dispatch.mjs', 'v1\n');
   scrivi(casa, 'routines/roles/halt.md', 'v1\n');
   scrivi(casa, 'src/shared/patchNotes.js', 'v1\n');
+  // Il resto di quello che il pin copia, o la copia non si fa.
+  scrivi(casa, 'src/main/auth/config.js', 'v1\n');
+  scrivi(casa, 'src/main/services/mergeApprovalSignal.js', 'v1\n');
   git(casa, 'add', '-A');
   git(casa, 'commit', '-qm', 'base');
   git(casa, 'remote', 'add', 'origin', origin);
