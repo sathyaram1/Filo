@@ -1419,6 +1419,7 @@
     fixer:      'Correzione',
     secaudit:   'Audit sicurezza',
     risposta:   'Gestisci la risposta',
+    smistamento: 'Gestisci la domanda',
     prober:     'Esplorazione',
     idle:       'Fermo',
     off:        'Routine spente',

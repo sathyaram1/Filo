@@ -175,7 +175,7 @@ test('chiedi: la domanda storta si ferma col campo; quella buona dice che prima 
   assert.match(sola.err.join('\n'), /opzioni_insufficienti \(campo «opzioni»\): un'opzione sola, ne servono almeno 2/);
   const titolo = finto({ file: { 'd.json': JSON.stringify({ ...RISCRITTA, titolo: 'Il bordo del riquadro nuovo deve essere caldo come il resto oppure no?' }) } });
   assert.equal(await esegui(['chiedi', 'd.json'], titolo.io), 1);
-  assert.match(titolo.err.join('\n'), /titolo_troppo_lungo \(campo «titolo»\): il titolo ha 14 parole, il massimo è 10/);
+  assert.match(titolo.err.join('\n'), /titolo_troppo_lungo \(campo «titolo»\): il titolo ha 13 parole, il massimo è 10/);
 
   const buona = finto({ file: { 'd.json': JSON.stringify({ ...RISCRITTA, blocca: true }) } });
   assert.equal(await esegui(['chiedi', 'd.json'], buona.io), 0);

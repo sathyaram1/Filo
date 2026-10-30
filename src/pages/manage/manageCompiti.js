@@ -17,6 +17,8 @@
   if (!root || !K) return;
 
   const PAGINA = 100;
+  // I compiti che lavorano su una domanda: nascono con la sua fiducia e si aprono sulla domanda (§3.5).
+  const DELLA_DOMANDA = Object.freeze(['risposta', 'smistamento']);
   // Mentre la scheda è a schermo i compiti cambiano a ogni biglietto: una rilettura al minuto, solo lì.
   const OGNI_MS = 60 * 1000;
   const el = {
@@ -142,7 +144,7 @@
     const box = document.createElement('div');
     box.className = 'mg-cp-azioni';
     if (c.tipo === 'fase' && c.feedbackId) box.append(bottone('apri', 'Apri il feedback', c.feedbackNum, () => apriFeedback(c)));
-    if (c.tipo === 'risposta' && c.domandaId) box.append(bottone('apri', 'Apri la domanda', c.domandaId, () => apriDomanda(c)));
+    if (DELLA_DOMANDA.includes(c.tipo) && c.domandaId) box.append(bottone('apri', 'Apri la domanda', c.domandaId, () => apriDomanda(c)));
     if (annullabile(c)) {
       const conferma = stato.conferma === c.id;
       const inCorso = stato.annullando.has(c.id);
@@ -153,7 +155,7 @@
   }
 
   function provenienza(c) {
-    if (c.tipo === 'risposta') return c.fiducia === 'fidato' ? '' : 'non fidato';
+    if (DELLA_DOMANDA.includes(c.tipo)) return c.fiducia === 'fidato' ? '' : 'non fidato';
     if (c.tipo !== 'manuale') return '';
     const chi = c.creatoDa === 'sessione' ? 'da una sessione' : c.creatoDa === 'owner' ? 'tuo' : '';
     const fiducia = c.fiducia === 'fidato' ? '' : 'non fidato';
@@ -454,7 +456,7 @@
     const voci = [];
     if (c) {
       if (c.tipo === 'fase' && c.feedbackId) voci.push({ testo: 'Apri il feedback', titolo: c.feedbackNum, azione: () => apriFeedback(c) });
-      if (c.tipo === 'risposta' && c.domandaId) voci.push({ testo: 'Apri la domanda', titolo: c.domandaId, azione: () => apriDomanda(c) });
+      if (DELLA_DOMANDA.includes(c.tipo) && c.domandaId) voci.push({ testo: 'Apri la domanda', titolo: c.domandaId, azione: () => apriDomanda(c) });
       voci.push({ testo: stato.aperte.has(c.id) ? 'Chiudi le chiamate' : 'Mostra le chiamate', azione: () => apriChiudi(c.id) });
       if (annullabile(c)) voci.push({ testo: 'Annulla il compito', titolo: 'Chiede conferma', azione: () => { stato.conferma = ''; annulla(c); } });
       voci.push({ testo: 'Copia il nome', titolo: K.etichetta(c), azione: () => copia(K.etichetta(c)) });
