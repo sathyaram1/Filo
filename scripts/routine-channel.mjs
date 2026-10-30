@@ -807,7 +807,7 @@ export function testoRiallineamentoNonSpedito(sped) {
  */
 export function leaseAtteso(root, ramo, { exec = execFileSync } = {}) {
   const git = (args, input) => String(exec('git', args, {
-    cwd: root, encoding: 'utf8', ...(input === undefined ? { stdio: ['ignore', 'pipe', 'pipe'] } : { input }),
+    cwd: root, encoding: 'utf8', input, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
   }) || '').trim();
   const righe = (testo) => testo.split('\n').map((s) => s.trim()).filter(Boolean);
   try {
