@@ -651,11 +651,17 @@
     const pre = prefetchedExplain;
     const stessa = !!pre && pre.key === key;
     const primaApertura = stessa && !!pre.anticipata && !pre.aperta;
+    // Fermato da una pagina delicata, l'anticipo non è del tetto: è il gesto che il livello di privacy costa (#1586).
+    const fermata = () => {
+      if (!pre.perPrivacy) return 'fermato_tetto';
+      contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'chiesto' });
+      return '';
+    };
     if (stessa) pre.aperta = true;
     if (stessa && !pre.fermata) {
       const stato = !primaApertura ? '' : pre.sentence !== selInfo.sentence ? 'contesto_cambiato' : pre.arrivata ? 'pronto' : 'in_volo';
       return pre.promise.then((res) => {
-        if (pre.fermata) return chiedi(primaApertura ? 'fermato_tetto' : '');
+        if (pre.fermata) return chiedi(primaApertura ? fermata() : '');
         if (stato) anticipo(stato);
         // Preparata e aperta: per i crediti non è una chiamata sprecata (#818). Una fermata non è partita.
         const primaVolta = !!pre.anticipata && !pre.usata;
