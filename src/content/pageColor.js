@@ -106,6 +106,21 @@
   // ------------------------------------------------------------
   // Colore identità del sito (spec §1.2)
   // ------------------------------------------------------------
+  // Un favicon si scarica una volta per pagina: ritentativi e cambi di impostazioni ridisegnano la copia (#1795). Un errore
+  // di rete o i 3 s scaduti non restano, così il calcolo dopo riprova; la richiesta rimasta appesa si chiude.
+  const iconeScaricate = new Map();
+  function scaricaIcona(href) {
+    if (iconeScaricate.has(href)) return iconeScaricate.get(href);
+    const ctrl = new AbortController();
+    const scade = setTimeout(() => ctrl.abort(), 3000);
+    const copia = fetch(href, { signal: ctrl.signal })
+      .then((res) => (res && res.ok ? res.blob() : null))
+      .catch(() => { iconeScaricate.delete(href); return null; })
+      .finally(() => clearTimeout(scade));
+    iconeScaricate.set(href, copia);
+    return copia;
+  }
+
   // Si calcola UNA VOLTA per pagina (con qualche retry per i siti che settano
   // theme-color/favicon dopo il paint) e si manda al main, che lo cacha per
   // dominio. La shell lo mescola col fondo della barra nelle tab inattive.
@@ -180,17 +195,14 @@
           href = (link && link.href) || (location.origin + '/favicon.ico');
         } catch (_) { href = ''; }
         if (!href) return resolve(null);
-        const ctrl = new AbortController();
         let done = false;
         let copia = '';
         const finish = (v) => {
           if (done) return;
           done = true;
-          ctrl.abort();
           if (copia) { try { URL.revokeObjectURL(copia); } catch (_) {} }
           resolve(v);
         };
-        // Failsafe: entro 3 s o si rinuncia, e la richiesta rimasta appesa si chiude.
         setTimeout(() => finish(null), 3000);
         const img = new Image();
         img.onerror = () => finish(null);
@@ -220,14 +232,11 @@
             finish(`rgb(${Math.round(acc[0] / n)}, ${Math.round(acc[1] / n)}, ${Math.round(acc[2] / n)})`);
           } catch (_) { finish(null); }
         };
-        fetch(href, { signal: ctrl.signal })
-          .then((res) => (res && res.ok ? res.blob() : null))
-          .then((blob) => {
-            if (done || !blob) return finish(null);
-            copia = URL.createObjectURL(blob);
-            img.src = copia;
-          })
-          .catch(() => finish(null));
+        scaricaIcona(href).then((blob) => {
+          if (done || !blob) return finish(null);
+          copia = URL.createObjectURL(blob);
+          img.src = copia;
+        });
       });
     }
 
