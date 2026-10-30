@@ -31,7 +31,7 @@ async function conRete({ lette, allegati = {}, byte = () => PNG, attesi = [], sp
   console.log = (...a) => visti.out.push(a.join(' '));
   console.error = (...a) => visti.err.push(a.join(' '));
   try { return { code: await fn(), ...visti }; } finally {
-    FB.submit = orig.submit;
+    FB.submit = orig.submit; SCRIPT.attese.risolvi = orig.risolvi;
     for (const k of ['leggi', 'allegati', 'scarica', 'attesiDa', 'sposta', 'archivia']) P[k] = orig[k];
     console.log = orig.log; console.error = orig.err;
   }
