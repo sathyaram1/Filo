@@ -79,6 +79,20 @@ test('smista pubblica: la riscrittura passa la forma comune e quella corta per l
   }
 });
 
+test('smista pubblica: «provvisoria» (l\'opzione già fatta su una che non ferma) arriva al server, fuori dalla domanda', async () => {
+  const ok = finto({ file: { 'r.json': JSON.stringify({ ...RISCRITTA, provvisoria: 1 }) }, smistamento: { outcome: 'ok', reply: { id: 'D-12' } } });
+  assert.equal(await esegui(['smista', 'pubblica', 'r.json'], ok.io), 0);
+  assert.equal(ok.canale[0].data.provvisoria, 1);
+  assert.equal(ok.canale[0].data.domanda.provvisoria, undefined);
+  const senza = finto({ file: { 'r.json': JSON.stringify(RISCRITTA) }, smistamento: { outcome: 'ok', reply: { id: 'D-12' } } });
+  assert.equal(await esegui(['smista', 'pubblica', 'r.json'], senza.io), 0);
+  assert.equal('provvisoria' in senza.canale[0].data, false);
+  const fuori = finto({ stdin: JSON.stringify({ ...RISCRITTA, provvisoria: 9 }) });
+  assert.equal(await esegui(['smista', 'pubblica', '-'], fuori.io), 1);
+  assert.equal(fuori.canale.length, 0);
+  assert.match(fuori.err.join('\n'), /«provvisoria» è l'indice/);
+});
+
 test('smista guasto, ricevuti, automatica: il testo da stdin, le uscite del canale', async () => {
   const g = finto({ stdin: 'Il clone viene respinto con 403.\n', smistamento: { outcome: 'ok', reply: { difetto: '#1801', riusato: true, fermo: '#1790' } } });
   assert.equal(await esegui(['smista', 'guasto', '--chiave', 'git-server: 403', '--titolo', 'Clone respinto', '--testo', '-', '--resoconto', 'Aspetta #1801.'], g.io), 0);

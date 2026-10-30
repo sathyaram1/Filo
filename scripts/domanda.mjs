@@ -569,6 +569,14 @@ export async function esegui(argv, io = {}) {
         const letta = leggiDomandaJson(testo, { conOrigine: false, formaOwner: true });
         if (letta.errore) { errore(`RIFIUTATO: ${letta.errore}`); return 1; }
         data.domanda = letta.domanda;
+        // Su una domanda che non ferma, l'opzione riscritta che il lavoro ha già fatto (#1790 r2): la validazione la ignora.
+        const p = JSON.parse(testo).provvisoria;
+        if (p !== undefined) {
+          if (!Number.isInteger(p) || p < 0 || p >= letta.domanda.opzioni.length) {
+            errore(`RIFIUTATO: «provvisoria» è l'indice (da 0 a ${letta.domanda.opzioni.length - 1}) dell'opzione che il lavoro ha già fatto. Non ho mandato niente.`); return 1;
+          }
+          data.provvisoria = p;
+        }
       }
       for (const k of ['chiave', 'titolo', 'resoconto', 'richiesta', 'scelta', 'principio']) if (a[k] !== undefined) data[k] = a[k];
       if (a.testo !== undefined) data.testo = a.testo === '-' ? await stdin() : a.testo;

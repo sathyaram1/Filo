@@ -301,7 +301,11 @@ dall'owner e dal server. Campi:
   segno «non riscritta»). Lo scrive il server.
 - `principioContestato`: su una domanda chiusa, il suo principio che l'owner
   ha contestato riaprendo una risposta automatica che lo usava (§ 3.6). Lo
-  scrive il server.
+  scrive il server, e lo toglie quando l'owner risponde alla domanda riaperta.
+- `provvisoria`: su una domanda che non ferma, l'opzione con cui il lavoro è
+  già andato avanti. La riscrittura del compito della § 3.5 può cambiare il
+  consiglio ma non lei: la indica col campo `provvisoria` del file, o il server
+  la ritrova per azione e testo e rifiuta se non ci riesce.
 - `conversazione`: i turni, con autore (owner o biglietto) e ora.
 - `creataIl` e `modificataIl`: la seconda è l'ultima volta che un agente ha
   aggiunto un turno o cambiato qualcosa.

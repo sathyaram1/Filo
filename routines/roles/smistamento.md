@@ -98,7 +98,12 @@ caso ammette (archiviare il feedback; tenere com'è, per un rilievo di un altro
 lavoro; rimandare a dopo il lancio, cioè priorità 0), senza inventare azioni
 che chi riprende non saprebbe eseguire: le azioni restano sui feedback che la
 domanda nomina. Priorità, gruppo, collegamenti e `blocca` restano quelli di chi
-ha chiesto: il server li tiene. Il testo originale di chi ha chiesto il server
+ha chiesto: il server li tiene. Su una domanda che non ferma (`blocca` falso) il
+lavoro è già andato avanti con l'opzione `provvisoria`: il consiglio puoi
+cambiarlo, ma nel file scrivi `"provvisoria": <indice da 0>` dell'opzione
+riscritta che è quella, così una scelta diversa dell'owner fa ripartire il
+lavoro e la stessa no. Senza, il server la cerca per azione e testo, e se non la
+trova rifiuta. Il testo originale di chi ha chiesto il server
 lo tiene intero nelle note per gli agenti, così chi riprende dopo la risposta
 legge anche il problema vero.
 
