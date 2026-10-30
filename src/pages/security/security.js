@@ -920,7 +920,7 @@
     $('sec-safebrowse-llm').checked = sb.llmJudge !== false;
     $('sec-safebrowse-sandbox').checked = sb.sandbox !== false;
     syncSafebrowseEnabled();
-    sbFidati = Array.isArray(sb.trustedSites) ? sb.trustedSites.slice() : [];
+    sbFidati = fidatiDaMostrare(Array.isArray(sb.trustedSites) ? sb.trustedSites : []);
     renderFidati();
 
     const cookies = sec.cookies || {};
