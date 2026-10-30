@@ -70,6 +70,16 @@ async function attendiRientro(page) {
   }, { timeout: 5000 }).toBeLessThanOrEqual(0);
 }
 
+// Un clic conta solo dopo che il browser ha detto che la voce si vede (src/content/vistoDavvero.js): appena il menu si
+// sposta la risposta arriva qualche fotogramma dopo, e un clic che la anticipa non parte. Una persona non è così svelta.
+async function attendiUltimaVoceCliccabile(app, page) {
+  await expect.poll(() => nelMondoDelMenu(app, page, () => {
+    const voci = document.querySelectorAll('.sn-menu:not(.sn-menu-sub) .sn-menu-item');
+    const ultima = voci[voci.length - 1];
+    return !!ultima && globalThis.SN_VISTO?._test.pronta(ultima) !== false;
+  }), { timeout: 5000, message: 'l\'ultima voce non diventa mai cliccabile' }).toBe(true);
+}
+
 async function apriMenuSu(page, selector, opts = {}) {
   await page.locator(selector).click({ button: 'right', ...opts });
   const menu = menuDi(page).locator('.sn-menu');
