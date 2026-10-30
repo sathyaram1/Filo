@@ -71,11 +71,11 @@ test('la spesa: una riga per account coi dollari, quanto resta, le accensioni e 
       B: { pct: 81, limite: 80, fermo: 'riserva', accensioni24h: 0 },
     },
   };
-  const righe = M.righeSpesa(stato);
+  const righe = M.righeSpesa(stato).map((r) => r.replace(/\u00a0/g, ' '));
   assert.equal(righe.length, 2);
   assert.match(righe[0], /^A: 40% della settimana \(≈ 800 \$\), limite 90% · resta 50% \(≈ 1\.000 \$\) · ultime 24 ore ≈ 95 \$ · accensioni: 12 in settimana, 4 nelle ultime 24 ore · rinnova /);
   assert.match(righe[1], /^B: 81% della settimana \(≈ 1\.620 \$\), limite 80% · resta 0% \(≈ 0 \$\) · accensioni: 0 nelle ultime 24 ore · .*fermo: tetto raggiunto/);
-  assert.match(M.righeSpesa({ accounts: { A: { pct: 5 } }, freni: 'numeri_assenti' }).join('\n'), /≈ 108 \$.*\n.*non frenano/s, 'senza taratura vale la predefinita');
+  assert.match(M.righeSpesa({ accounts: { A: { pct: 5 } }, freni: 'numeri_assenti' }).join('\n').replace(/\u00a0/g, ' '), /≈ 108 \$.*\n.*non frenano/s, 'senza taratura vale la predefinita');
   assert.deepEqual(M.righeSpesa({}), ['Il server non ha dato numeri per gli account.']);
   const t = M.testoContesto({ ruolo: 'r', schede: [], indice: [], rami: [], spesa: righe });
   assert.match(t, /## Spesa\n\nA: 40% della settimana[^\n]*\nB: 81%[^\n]*\nÈ il consumo dell'account/);

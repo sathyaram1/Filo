@@ -62,16 +62,18 @@ test('rigaAccount: percentuale, limite, passo di oggi, rinnovo, e perché è fer
 });
 
 // #1787: il manutentore e la scheda Crediti leggono la spesa anche in dollari, con quanto resta e le accensioni.
+const piana = (...a) => RC.rigaAccount(...a).replace(/\u00a0/g, ' ');
 test('rigaAccount: dollari della settimana e di quanto resta, ultime 24 ore e accensioni quando il server li dà', () => {
-  const riga = RC.rigaAccount('A', { pct: 40, limite: 90, usdSettimana: 860, usd24h: 123.4, accensioniSettimana: 14, accensioni24h: 3 });
+  const riga = piana('A', { pct: 40, limite: 90, usdSettimana: 860, usd24h: 123.4, accensioniSettimana: 14, accensioni24h: 3 });
   assert.match(riga, /^40% della settimana \(≈ 860 \$\), limite 90% · resta 50% \(≈ 1\.075 \$\) · ultime 24 ore ≈ 123 \$ · accensioni: 14 in settimana, 3 nelle ultime 24 ore · rinnova /);
   // Settimana appena rinnovata: niente spesa da cui tarare, vale la taratura dell'owner.
-  assert.match(RC.rigaAccount('B', { pct: 0, usdSettimana: 0 }, { usdPer100: 2000 }), /^0% della settimana \(≈ 0 \$\) · resta 100% \(≈ 2\.000 \$\)/);
-  assert.match(RC.rigaAccount('B', { pct: 10 }, { usdPer100: 2150 }), /^10% della settimana \(≈ 215 \$\) · resta 90% \(≈ 1\.935 \$\)/);
+  assert.match(piana('B', { pct: 0, usdSettimana: 0 }, { usdPer100: 2000 }), /^0% della settimana \(≈ 0 \$\) · resta 100% \(≈ 2\.000 \$\)/);
+  assert.match(piana('B', { pct: 10 }, { usdPer100: 2150 }), /^10% della settimana \(≈ 215 \$\) · resta 90% \(≈ 1\.935 \$\)/);
   // Oltre il limite non resta un numero negativo; un conteggio storto non compare.
-  assert.match(RC.rigaAccount('B', { pct: 85, limite: 80, usdSettimana: 1700, accensioni24h: -2, accensioniSettimana: 'x' }), /resta 0% \(≈ 0 \$\)/);
-  assert.doesNotMatch(RC.rigaAccount('B', { pct: 85, accensioni24h: -2, accensioniSettimana: 'x' }), /accensioni/);
-  assert.match(RC.rigaAccount('A', { pct: 5, accensioni24h: 0 }), /accensioni: 0 nelle ultime 24 ore/);
+  assert.match(piana('B', { pct: 85, limite: 80, usdSettimana: 1700, accensioni24h: -2, accensioniSettimana: 'x' }), /resta 0% \(≈ 0 \$\)/);
+  assert.doesNotMatch(piana('B', { pct: 85, accensioni24h: -2, accensioniSettimana: 'x' }), /accensioni/);
+  assert.match(piana('A', { pct: 5, accensioni24h: 0 }), /accensioni: 0 nelle ultime 24 ore/);
+  assert.match(RC.rigaAccount('A', { pct: 40, usdSettimana: 860 }), /\(≈\u00a0860\u00a0\$\)/, 'una cifra non si spezza fra due righe');
 });
 
 // ── La porta del main ────────────────────────────────────────────────────────
