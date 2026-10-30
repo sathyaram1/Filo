@@ -66,7 +66,7 @@ scrivere `scripts/…` a mano ti riporta lì.
 Il ramo lo spingono il salvataggio automatico e il rilascio, coi loro script.
 Un `git push` lanciato da te, anche con `--dry-run` e anche solo per
 riprodurre un bug, passa dal controllo dei permessi della sessione: in cloud
-nessuno lo approva, e la sessione resta ferma per ore ad aspettare. Un
+nessuno lo approva, e il tuo lavoro si ferma lì. Un
 comportamento di git si riproduce in un unit test, con un remoto locale
 (`git init --bare` in una cartella temporanea): lì i comandi li lancia il
 test, e il controllo dei permessi non li vede. Vale anche quando è il feedback
