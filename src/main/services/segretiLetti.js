@@ -172,14 +172,16 @@ function tieni(chiave, r, desde = Date.now()) {
     immessi.delete(k);
     caratteriImmessi -= v.length;
   }
-  // Quello che una lettura ha già messo da parte prima che arrivasse si toglie adesso.
+  // Quello che una lettura ha messo da parte mentre il testo era in viaggio si toglie adesso.
   carica();
-  letti.togli((v) => daPagina(v.fonte) && copre(r, v));
+  const da = Math.min(Number.isFinite(desde) ? desde : Date.now(), Date.now()) - MARGINE_MS;
+  letti.togli((v) => daPagina(v.fonte) && (Number(v.at) || 0) >= da && copre(r, v));
 }
-// `chiave` è l'elemento della pagina: il suo testo cresce mentre l'utente scrive, e sostituisce il precedente.
-function immessoDallUtente(chiave, testo) {
+// `chiave` è l'elemento della pagina: il suo testo cresce mentre l'utente scrive, e sostituisce il precedente. `desde`:
+// quando l'utente ha cominciato il valore che ci sta adesso.
+function immessoDallUtente(chiave, testo, desde) {
   const r = compatto(testo);
-  if (r) tieni(`immesso:${chiave}`, r);
+  if (r) tieni(`immesso:${chiave}`, r, Number(desde));
 }
 // `maxRiga` per il testo di una proposta: lo scrive un modello, e una riga lunga di cifre coprirebbe i codici di domani.
 function valoriDellUtente(testo, { maxRiga = Infinity } = {}) {
