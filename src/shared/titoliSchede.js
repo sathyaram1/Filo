@@ -557,8 +557,9 @@
       const citata = c.espressioni.find((e) => !e.forte && letture.some((l) => e.re.test(l)));
       return citata ? fuori(citata.famiglia, false) : esito;
     }
-    // Un indirizzo lo sceglie chi attacca: «attacker@…» o «example.com» non fanno del titolo una notizia.
-    const senzaIndirizzi = pezzo.replace(INDIRIZZI, ' ');
+    // Un indirizzo lo sceglie chi attacca: «attacker@…» o «example.com» non fanno del titolo una notizia. Il «?» attaccato
+    // resta: «Ciao Filo, ci sentiamo su amazon.it?» è una domanda.
+    const senzaIndirizzi = pezzo.replace(INDIRIZZI, (m) => ` ${(m.match(/\?+$/) || [''])[0]}`);
     return fuori(trovata, !c.innocui.some((re) => re.test(senzaIndirizzi)));
   }
 
