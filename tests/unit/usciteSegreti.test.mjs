@@ -1354,6 +1354,12 @@ test('il valore di un campo è dell’utente solo se è fatto dei suoi caratteri
   assert.ok(!fattoDiCaratteri('4111 1111 1111 1111', conti('411111111111111')), 'una cifra in più è del sito');
   assert.ok(!fattoDiCaratteri('a'.repeat(5) + '731942', conti('aaaaa')), 'il testo del sito non diventa dell’utente');
   assert.ok(!fattoDiCaratteri('', conti('abc')));
+  // Giro 8: il paese che la maschera mette davanti all'IBAN resta con l'utente, come il prefisso già nel campo; di più no.
+  const { fattoAiBordi } = require(join(ROOT, 'src', 'preload', 'immessi-utente.js'));
+  assert.ok(fattoAiBordi('IT60X0542811101000000123456', conti('60X0542811101000000123456')));
+  assert.ok(!fattoAiBordi('a'.repeat(5) + '731942', conti('aaaaa')), 'il codice del sito attaccato diventa dell’utente');
+  assert.ok(!fattoAiBordi('abc12cd', conti('12')), 'più di pochi caratteri del sito ai bordi');
+  assert.ok(!fattoAiBordi('12' + '731942'.repeat(100), conti('12')), 'un campo lungo del sito');
   assert.ok(MAX_INCOLLA >= 256 && MAX_INCOLLA <= 10000, 'un incolla lungo coprirebbe migliaia di codici');
 });
 
