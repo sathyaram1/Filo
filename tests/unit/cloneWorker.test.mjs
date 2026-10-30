@@ -9,10 +9,12 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSyn
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { createHash } from 'node:crypto';
 import {
-  MARCA_COLLEGATI, MARCATORE_WORKER, allineaPacchetti, cartellaRegistro, chiaviAccesso, concorrenzaUnit, datiWorker, elencoCloni,
-  preparaClone, stessoRemoto, togliClone,
+  MARCA_COLLEGATI, MARCA_PRIVATI, MARCATORE_WORKER, allineaPacchetti, cartellaRegistro, chiaviAccesso, concorrenzaUnit, datiWorker,
+  elencoCloni, motivoNpm, preparaClone, stessoRemoto, togliClone,
 } from '../../scripts/lib/clone-worker.mjs';
+import { fileBlocco } from '../../scripts/lib/pacchetti.mjs';
 import { PINNED_PATHS, pinnedDirWorker, pinnedRepoRoot } from '../../scripts/lib/tools-pin.mjs';
 import { SESSION_MARKERS } from '../../scripts/lib/branch-integrity.mjs';
 import { carattereSicuro } from '../../scripts/lib/carattere-commento.mjs';
