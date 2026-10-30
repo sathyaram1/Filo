@@ -431,7 +431,7 @@
     const dopo = L && lista ? scorre() : null;
     if (ora) {
       if (dopo) dopo.scrollTop += ora.getBoundingClientRect().top - yFermo;
-      if (sottoIlPuntatore) tieni(lista, dopo || contenitoreDi(lista), ora, yFermo);
+      if (sottoIlPuntatore) tieni(lista, ora, yFermo);
       return;
     }
     if (dopo) dopo.scrollTop = L.scrollDaAncora(ancora, righe(dopo), prima);
