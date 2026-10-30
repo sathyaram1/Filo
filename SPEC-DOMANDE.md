@@ -355,14 +355,27 @@ Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
 
 ### 3.4 Rispondere
 
-1. **Scegliere un'opzione.** Il server applica l'azione, senza agenti. Se è
-   `compito`, nasce il compito della § 3.5.
-2. **Scrivere.** Nasce sempre il compito della § 3.5.
+1. **Scegliere un'opzione.** Il server applica l'azione, senza agenti, e le
+   parole scritte partono con lei. Se è `compito`, nasce il compito della § 3.5.
+2. **Scrivere.** Le parole senza una scelta non applicano nessuna azione: nasce
+   il compito della § 3.5. Un'eccezione sola: l'owner che scrive dalla Gestione
+   a una domanda di un'attesa (§ 3.8) riprende il feedback che aspetta, con le
+   sue parole come decisione (FEEDBACK-STATES.md §5), come la casella di
+   risposta di prima. Le parole di una sessione restano parole anche lì, e la
+   domanda resta aperta: il «riprendi» si sceglie ancora, dalla sessione o
+   dalla Gestione, e porta con sé le parole già scritte, nel blocco della
+   domanda e non nel turno dell'owner (#1598). Se il lavoro riparte o cambia
+   attesa senza la scelta (la casella di risposta del feedback, un'altra
+   attesa), la domanda diventa superata e le sue parole entrano nella
+   conversazione del feedback come risposta a quella domanda, col loro segno
+   di fiducia: per qualunque strada riparta, chi riprende le legge.
 3. **Applicare il consiglio**, su una domanda sola o su tutte quelle
    selezionate.
 4. **Discuterne.** Il pulsante copia una riga sola («Discutiamo la domanda
    D-123») da incollare in una sessione locale. La sessione legge la domanda con
-   `domanda.mjs mostra` e risponde con `domanda.mjs rispondi`.
+   `domanda.mjs mostra` e risponde con `domanda.mjs rispondi`: `--scelta N` per
+   l'opzione decisa (riprendere compreso), `--testo` da solo per una risposta a
+   parole (punto 2). Lo script dice cosa il server ha applicato.
 5. **Letto**, su un resoconto senza opzioni (§ 3.1): la domanda si chiude,
    senza agenti.
 
