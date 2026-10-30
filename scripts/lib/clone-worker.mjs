@@ -265,7 +265,7 @@ export function allineaPacchetti(clone, principale, {
  * repo nudo locale e lasciano il registro ai worker veri.
  */
 export function preparaClone(principale, n, {
-  base = baseCloni(), dest = '', paralleli = 0, pushUrl = '', strumentiDa = TOOLS_ROOT, basePin, npmCi, registra = true, soloCollegati = false,
+  base = baseCloni(), dest = '', paralleli = 0, pushUrl = '', strumentiDa = TOOLS_ROOT, basePin, npmCi, registra = true, soloCollegati = false, avvisa,
 } = {}) {
   let i;
   try { i = indiceWorker(n); } catch (e) { return { ok: false, why: e.message }; }
