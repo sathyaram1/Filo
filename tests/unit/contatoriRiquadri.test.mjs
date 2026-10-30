@@ -222,7 +222,8 @@ test('in incognito e a contatori spenti i riquadri non si contano e non partono'
 
 // ── Gli agganci nel codice ─────────────────────────────────────────────────
 const MANDANO = [['src', 'content', 'actions.js'], ['src', 'content', 'popup.js'], ['src', 'content', 'editBox.js'],
-  ['src', 'content', 'translatePage.js'], ['src', 'content', 'content.js'], ['src', 'pages', 'editor', 'editor.js']];
+  ['src', 'content', 'translatePage.js'], ['src', 'content', 'content.js'], ['src', 'pages', 'editor', 'editor.js'],
+  ['src', 'content', 'spellcheck.js'], ['src', 'content', 'sidebar.js']];
 
 test('le pagine mandano solo misure dell’elenco, e ogni misura ha chi la manda', () => {
   const viste = new Set();
