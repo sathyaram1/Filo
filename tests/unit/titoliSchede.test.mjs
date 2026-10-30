@@ -528,7 +528,8 @@ describe('la regola sui titoli: gli attacchi', () => {
     ];
     assert.deepEqual(ostili.filter((t) => !T.controlla(t).sospetto), [], 'ordini a Filo sfuggiti');
     // Il prezzo accettato dall'owner: un imperativo a un Filippo apre il box.
-    assert.equal(T.controlla('Re: Filo, ricordati del compleanno di Anna - Gmail').sospetto, true);
+    assert.equal(T.controlla('Filo, guarda su amazon.it').sospetto, true);
+    assert.equal(T.controlla('Filo, completa il tuo profilo - LinkedIn').sospetto, true);
     const senzaOrdine = [
       'Filo: il browser che organizza le tue schede', 'Filo: la newsletter sulle schede del browser', 'Filo: your memory, your browser',
       'Filo: l\'utente al centro - Medium', 'Filo: what users want from an AI browser - Medium',
@@ -538,6 +539,8 @@ describe('la regola sui titoli: gli attacchi', () => {
       'Filo, l\'app che ricorda le tue preferenze', 'Filo, ago e pazienza: corso di cucito', 'Filo — Fusioni da approvare',
       'Filo — Come si sostiene', 'Filo: Notizie - Filo Magazine', 'Filo - Wikipedia', 'Filo, ora disponibile su Mac',
       'Filo: release notes - GitHub', 'Filo, 32 anni, Milano - LinkedIn', 'Filo-russi all\'attacco della città',
+      'Filo, aggiornamento contratto - Gmail', 'Filo, riunione di lunedì - Outlook', 'Filo, documenti per il mutuo - Gmail',
+      'Filo, foto del matrimonio - Google Foto', 'Filo, che sorpresa! - Gmail', 'Filo, sono arrivato a Roma - WhatsApp',
     ];
     assert.deepEqual(senzaOrdine.filter((t) => T.controlla(t).sospetto), [], 'titoli senza ordine presi per attacchi');
   });
