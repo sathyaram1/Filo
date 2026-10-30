@@ -85,3 +85,15 @@ test('--domanda della critica: una domanda o un elenco, ognuna controllata con l
     assert.match((await leggiDomandeDaFile(join(dir, 'manca.json'))).errore, /Non leggo/);
   } finally { togliCartella(dir); }
 });
+
+// La sentinella della spec: il ruolo di chi verifica descrive il JSON della domanda di un rilievo col «?».
+test('chi verifica, in ogni giro, legge che un rilievo col «?» porta la sua domanda in JSON, e come si passa', async () => {
+  const { readRoleInstructions } = await import('../../scripts/dispatch.mjs');
+  for (const scope of ['pieno', 'chiusura', 'riallineamento']) {
+    const t = readRoleInstructions('verifier', { scope }).replace(/\s+/g, ' ');
+    assert.match(t, /Ogni rilievo col `\?` porta la sua domanda\*\*, lo stesso JSON di `domanda\.mjs chiedi` con almeno due opzioni/, scope);
+    assert.match(t, /con più rilievi `\?` ha un elenco JSON di domande, una per rilievo, nell'ordine in cui stanno nella critica/, scope);
+    assert.match(t, /--record-verifier <id> "Provato: …/, scope);
+    assert.doesNotMatch(t, /--segnala|la fa nascere dal server/, scope);
+  }
+});

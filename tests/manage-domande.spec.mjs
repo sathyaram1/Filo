@@ -301,3 +301,24 @@ test('una risposta gestita da un agente: chiarimento e resoconto nella conversaz
   expect(colori.testo).not.toBe(colori.fondo);
   await dq.screenshot({ path: 'tests/.shots/manage-domande-principio-scuro.png' });
 });
+
+// #1790: appena nata la domanda la smista un agente. Non è da rispondere e non apre Gestione da bloccante, ma si vede,
+// e chi la apre legge cosa sta succedendo; una smistata come guasto dice com'è finita.
+test('una domanda in smistamento sta fra quelle in lavorazione e lo dice; una smistata come guasto lo dice in archivio', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const nata = domanda(20, { stato: 'in_smistamento', priorita: 'bloccante', titolo: 'Bordo caldo o freddo?' });
+  const guasto = domanda(21, { stato: 'chiusa', titolo: 'Il clone del server è respinto', esito: { ok: true, smistata: 'guasto' } });
+  await apriDomande(page, [nata, guasto, IMPORTANTE]);
+  expect(await page.evaluate(() => window.__mgTest.sceltaApertura())).not.toMatchObject({ motivo: 'bloccante' });
+  await expect(page.locator('.mg-tab[data-tab="domande"]')).toHaveText('Da rispondere (1)');
+  await expect(page.locator('.mg-tab[data-tab="domande-lavoro"]')).toHaveText('In lavorazione (1)');
+  await page.locator('.mg-tab[data-tab="domande-lavoro"]').click();
+  await page.locator('#mgDomandeLista .mg-domanda').first().click();
+  const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-20"]');
+  await expect(dq.locator('.mg-dq-esito')).toHaveText('La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto o se una decisione già presa la copre.');
+  await expect(dq.locator('.mg-dq-testo')).toHaveCount(0);
+  await dq.screenshot({ path: 'tests/.shots/manage-domande-smistamento.png' });
+  await page.locator('.mg-tab[data-tab="domande-archivio"]').click();
+  await page.locator('#mgDomandeLista .mg-domanda').first().click();
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-21"] .mg-dq-esito')).toHaveText('Era un guasto: l’ha preso un feedback del difetto, e il lavoro fermo lo aspetta.');
+});

@@ -26,5 +26,4 @@ che si riprende.
 
 Una domanda per consegna: due scelte stanno nella stessa domanda, come opzioni
 o nel problema (chi verifica ne scrive una per ogni rilievo col `?`). Il server
-non compone domande: una fermata senza la tua domanda in JSON si rifiuta, e la
-segnalazione in markdown (`--segnala`) non c'è più.
+non compone domande: una fermata senza la tua domanda in JSON si rifiuta.

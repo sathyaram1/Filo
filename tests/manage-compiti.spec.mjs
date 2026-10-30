@@ -306,3 +306,17 @@ test('il compito di una risposta si chiama dalla sua domanda, dice se non è fid
   await expect(page.locator('#panel-domande')).toHaveClass(/mg-panel--active/);
   await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-12"]')).toBeVisible();
 });
+
+// #1790: «Gestisci la domanda» smista ogni domanda appena nata; si chiama dalla domanda e la apre, come la risposta.
+test('il compito che smista una domanda si chiama dalla domanda e la apre', async ({ openTab }) => {
+  const SMISTA = { ...RISPOSTA, id: 'C-14', numero: 14, tipo: 'smistamento', ruolo: 'smistamento', ambito: 'smistamento', domandaId: 'D-20' };
+  const page = await apri(openTab, { aperti: [SMISTA] });
+  await page.evaluate((d) => window.__mgTest.setDomande(d), [{ id: 'D-20', numero: 20, stato: 'in_smistamento', priorita: 'importante', titolo: 'Bordo caldo o freddo?', creataIl: ORA, fiducia: 'non_fidato', opzioni: [], conversazione: [] }]);
+  const r = righe(page, 'inAttesa').first();
+  await expect(r.locator('.mg-cp-nome')).toHaveText('C-14 · Gestisci la domanda D-20');
+  await expect(r).toContainText('non fidato');
+  await r.click();
+  await r.getByRole('button', { name: 'Apri la domanda' }).click();
+  await expect(page.locator('#panel-domande')).toHaveClass(/mg-panel--active/);
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-20"]')).toBeVisible();
+});

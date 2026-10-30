@@ -223,6 +223,12 @@ export function esitoRisposta(esito, riferimenti = {}, { conScelta = false } = {
   if (!e.azione) return { riga: 'risposta a parole, nessuna azione applicata', avviso: '' };
   const azione = D.etichettaAzione(e.azione, riferimenti) || `l'azione «${visibile(e.azione.tipo || '?')}»`;
   if (e.ok === false) return { riga: `non applicata: ${azione}${e.errore ? ` (${visibile(e.errore)})` : ''}`, avviso: '' };
+  // «Riprendi» rimette in coda solo un lavoro fermo (#1482): sugli altri la decisione si accoda e lo stato non cambia.
+  if (e.accodata) {
+    const num = riferimenti?.[e.azione.feedbackId]?.num || 'il lavoro';
+    const stato = typeof e.statoLavoro === 'string' && e.statoLavoro ? `: è ${visibile(e.statoLavoro)}` : '';
+    return { riga: `accodata: ${azione} (${visibile(num)} non era fermo${stato}, la decisione resta accodata per il giro dopo)`, avviso: '' };
+  }
   const avviso = conScelta ? ''
     : `ATTENZIONE: non hai scelto un'opzione, eppure il server ha applicato ${azione}. Le parole da sole non dovrebbero applicare niente: segnalalo.`;
   return { riga: `applicata: ${azione}`, avviso };

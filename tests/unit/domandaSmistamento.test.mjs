@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   leggiArgomenti, esegui, conteggiDi, formattaConteggi, formattaElenco, formattaFascicoloSmistamento, formattaDomanda, MAX_PAROLE_REGISTRO,
+  esitoRisposta,
 } from '../../scripts/domanda.mjs';
 
 const OPZ = (testo, tipo) => ({ testo, pro: 'Un pro.', contro: 'Un contro.', azione: { tipo, feedbackId: 'f1' } });
@@ -207,4 +208,13 @@ test('il ruolo «smistamento»: testo intero, i tre passi in ordine, i comandi d
   assert.deepEqual(p, { compito: 'C-4', domanda: { id: 'D-9' }, feedback: { num: '#1790' }, case: 'smistamento', num: '' });
   const { normalizeRole } = await import('../../scripts/lib/routine-role.mjs');
   assert.equal(normalizeRole('smistamento'), 'smistamento', 'il marcatore locale riconosce il ruolo');
+});
+
+// #1482: «Riprendi» su un lavoro che non è fermo non lo sposta: la decisione si accoda, e chi risponde lo legge.
+test('rispondi: una ripresa accodata su un lavoro non fermo lo dice, con lo stato', () => {
+  const rif = { f1: { num: '#1482' } };
+  const e = esitoRisposta({ ok: true, accodata: true, statoLavoro: 'revision_capability', azione: { tipo: 'riprendi', feedbackId: 'f1' } }, rif, { conScelta: true });
+  assert.equal(e.riga, 'accodata: Riprendi #1482 con questa scelta (#1482 non era fermo: è revision_capability, la decisione resta accodata per il giro dopo)');
+  assert.equal(e.avviso, '');
+  assert.equal(esitoRisposta({ ok: true, azione: { tipo: 'riprendi', feedbackId: 'f1' } }, rif, { conScelta: true }).riga, 'applicata: Riprendi #1482 con questa scelta');
 });
