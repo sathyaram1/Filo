@@ -358,9 +358,16 @@ test('permessi git: dopo l installazione fetch, rebase e merge restano coperti a
   } finally { togliCartella(dir); }
 });
 
-test('cablaggio: il preflight passa il clone del server a chi installa i permessi', () => {
+test('cablaggio: il preflight passa il clone del server a chi installa i permessi, e gli strumenti fissati per la veglia', () => {
   const src = readFileSync(join(RADICE, 'scripts', 'dispatch.mjs'), 'utf8');
   assert.match(src, /installaCecita\(\{[^}]*clone: cartellaCloneServer\(\)/);
+  assert.match(src, /installaCecita\(\{[^}]*strumenti: tools/);
+  const dir = cartellaTemporanea('filo-cieco-strumenti-');
+  try {
+    assert.equal(installa({ dir, sessione: 's1', strumenti: '/tmp/filo-strumenti' }).ok, true);
+    const s = JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8'));
+    assert.ok(s.hooks.PostToolUse[0].hooks[0].command.includes('"strumenti":"/tmp/filo-strumenti"'));
+  } finally { togliCartella(dir); }
 });
 
 test('installa: cartella mancante la crea; un file illeggibile non lo riscrive e lo dice', () => {
