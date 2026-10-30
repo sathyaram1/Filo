@@ -189,8 +189,50 @@ export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorn
     ...rami.map(rigaRamo),
     ...(rigaFuori(fuori, giorni) ? ['', rigaFuori(fuori, giorni)] : []),
     '', '## Spesa', '',
-    'Questo strumento non la sa: chiedi all\'owner il consumo della settimana dell\'account (Gestione → Automazioni), non la somma dei biglietti.',
+    ...(Array.isArray(spesa) ? spesa : [spesa ? String(spesa) : 'Non letta: npm run manutentore -- spesa.']),
+    'È il consumo dell\'account, non la somma dei biglietti; il freno è quello di Crediti, e un account fermo non accende.',
   ].join('\n');
+}
+
+const require = createRequire(import.meta.url);
+require('../src/shared/routineCrediti.js');
+
+/**
+ * Una riga per account dallo stato dei crediti (`accounts`, `numeri`, `freni` di ownerCrediti o dell'operazione
+ * `spesa` del canale). Sono solo numeri e stati noti: nessun testo d'altri arriva nel contesto. PURA.
+ */
+export function righeSpesa(stato) {
+  const RC = globalThis.SN_ROUTINE_CREDITI;
+  const s = stato && typeof stato === 'object' ? stato : {};
+  const acc = s.accounts && typeof s.accounts === 'object' ? s.accounts : {};
+  const usdPer100 = (s.numeri && Number(s.numeri.usdPer100) > 0 && Number(s.numeri.usdPer100)) || RC.TARATURA_PREDEFINITA;
+  const righe = ['A', 'B'].filter((a) => acc[a] && typeof acc[a] === 'object').map((a) => `${a}: ${RC.rigaAccount(a, acc[a], { usdPer100 })}`);
+  if (s.freni === 'numeri_assenti') righe.push('Senza riserva di A né tetto di B i crediti non frenano: dosa tu sulla settimana.');
+  return righe.length ? righe : ['Il server non ha dato numeri per gli account.'];
+}
+
+/**
+ * La spesa per account: con le credenziali dell'owner da ownerCrediti, altrimenti dal canale col biglietto delle
+ * routine (operazione `spesa`). Il motivo in parole se non si legge: il contesto esce lo stesso.
+ */
+async function leggiSpesa(root) {
+  const motivo = (m) => `Non so la spesa: ${unaRiga(m).slice(0, 200)}.`;
+  try {
+    const { findAdminRefreshToken } = await import('./lib/firestore-auth.mjs');
+    if (findAdminRefreshToken()) {
+      const { chiamaOwner } = await import('./domanda.mjs');
+      return righeSpesa(await chiamaOwner({ op: 'stato' }, 'ownerCrediti'));
+    }
+    const { readTicket } = await import('./lib/routine-ticket.mjs');
+    const biglietto = readTicket(root);
+    if (!biglietto) return motivo('mancano sia le credenziali dell\'owner sia un biglietto delle routine');
+    const { operazione } = await import('./routine-channel.mjs');
+    const r = await operazione(biglietto, 'spesa', {});
+    if (r.outcome === 'ok') return righeSpesa(r.body);
+    return motivo(`il server ${r.outcome === 'refused' ? 'non la dà a questo biglietto' : 'non risponde'} (${r.reason}${r.detail ? `: ${r.detail}` : ''})`);
+  } catch (e) {
+    return motivo(e && e.message ? e.message : e);
+  }
 }
 
 /**
