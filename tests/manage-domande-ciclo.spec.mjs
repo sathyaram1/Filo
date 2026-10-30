@@ -239,6 +239,43 @@ test('una rilettura con arrivi e chiusure sopra: la riga sotto il puntatore rest
   await expect(dq(page, 'D-103')).toBeVisible();
 });
 
+// Una lista corta non scorre: lì la riga sotto il puntatore la tiene ferma la lista stessa, finché il puntatore non esce.
+const sottoIlPuntatore = (page, sel, p) => page.evaluate(([x, y, s]) => document.elementFromPoint(x, y)?.closest(s)?.dataset.id || '', [p.x, p.y, sel]);
+
+test('lista corta: arrivi e chiusure sopra non spostano la riga sotto il puntatore, il clic a metà apre lei, e uscendo la lista torna com’è', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  const base = tante(100, 3);
+  await page.evaluate((l) => window.__mgTest.setDomande(l, {}), base);
+  await page.locator('.mg-sezione[data-sezione="domande"]').click();
+  const bersaglio = riga(page, 'D-102');
+  const box = await bersaglio.boundingBox();
+  const p = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await page.mouse.move(p.x, p.y);
+
+  const arrivo = domanda(99, { titolo: 'Arrivata adesso', creataIl: 1 });
+  await page.evaluate((l) => window.__mgTest.setDomande(l, {}), [arrivo, ...base]);
+  await expect(riga(page, 'D-99')).toHaveCount(1);
+  expect(await sottoIlPuntatore(page, '.mg-domanda', p)).toBe('D-102');
+  await page.screenshot({ path: 'tests/.shots/manage-domande-lista-corta-tenuta.png' });
+
+  // Se ne chiudono due sopra mentre il tasto è giù: la riga resta lì, e il clic apre lei.
+  await page.mouse.down();
+  await page.evaluate((l) => window.__mgTest.setDomande(l, {}), [base[2]]);
+  await expect(riga(page, 'D-99')).toHaveCount(0);
+  expect(await sottoIlPuntatore(page, '.mg-domanda', p)).toBe('D-102');
+  await page.mouse.up();
+  await expect(bersaglio).toHaveClass(/mg-domanda--aperta/);
+
+  // Fuori dalla lista lo spazio se ne va: la riga torna in cima, e un arrivo dopo si mette sopra come sempre.
+  await page.mouse.move(box.x + box.width + 300, p.y);
+  await expect.poll(async () => Math.round((await bersaglio.boundingBox()).y)).toBe(Math.round((await page.locator('#mgDomandeLista').boundingBox()).y));
+  await page.evaluate((l) => window.__mgTest.setDomande(l, {}), [arrivo, base[2]]);
+  await expect(page.locator('#mgDomandeLista .mg-domanda').first()).toHaveAttribute('data-id', 'D-99');
+  expect((await page.locator('#mgDomandeLista .mg-domanda').first().boundingBox()).y).toBeGreaterThanOrEqual((await page.locator('#mgDomandeLista').boundingBox()).y - 0.5);
+});
+
 test('una lettura fallita mentre le domande sono a schermo non sposta la lista: l’avviso sta sotto', async ({ app, openTab }) => {
   await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: tante(200, 30) });
   const page = await openTab(MANAGE);
