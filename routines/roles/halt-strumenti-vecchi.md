@@ -3,8 +3,8 @@
 Il server ti ha dato un lavoro con un ruolo che gli strumenti di questa
 sessione non conoscono, e quegli strumenti sono indietro rispetto a `main`
 (il motivo è nel payload: `message`). Non è un guasto: una sessione accesa
-dopo l'ultima fusione quel ruolo lo sa eseguire. Non c'è niente da eseguire e
-niente da riparare a mano, e non scegli un lavoro per conto tuo.
+dopo l'ultima fusione quel ruolo lo sa eseguire. Qui non si lavora, non si
+ripara niente e non si sceglie un altro lavoro.
 
 ## Cosa fare
 
