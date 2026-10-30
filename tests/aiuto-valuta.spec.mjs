@@ -189,6 +189,7 @@ test('«Valuta» non c’è in un campo vuoto né in una password; dall’Aiuto 
   await page.press('.sn-sidebar-input textarea', 'Enter');
   await expect(page.locator('.sn-sidebar-msg-assistant', { hasText: 'Ciao.' })).toBeVisible({ timeout: 20_000 });
   expect((await chiamate(app))[0].model).toBe(MODELLO_AIUTO);
+  expect(await valutaOggi(app), 'una domanda all’Aiuto non è una valutazione').toEqual({});
 });
 
 test('sul suggerimento del correttore «Valuta» c’è una volta sola e apre l’Aiuto col testo del campo', async ({ app, openTab, testServer }) => {
