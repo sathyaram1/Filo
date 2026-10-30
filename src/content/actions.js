@@ -651,10 +651,12 @@
     const pre = prefetchedExplain;
     const stessa = !!pre && pre.key === key;
     const primaApertura = stessa && !!pre.anticipata && !pre.aperta;
-    // Fermato da una pagina delicata, l'anticipo non è del tetto: è il gesto che il livello di privacy costa (#1586).
+    // Fermato da una pagina delicata, l'anticipo non è del tetto: è il gesto che il livello di privacy costa, e
+    // «Chiedi» lo conta come quello dell'anticipo spento (#1586).
     const fermata = () => {
       if (!pre.perPrivacy) return 'fermato_tetto';
       contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'chiesto' });
+      Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
       return '';
     };
     if (stessa) pre.aperta = true;
