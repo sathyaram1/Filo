@@ -1440,6 +1440,7 @@ if (isMain) {
       process.exit(3);
     }
     if (r.outcome === 'work') {
+      segnaLavoroPreso();
       // Senza la decisione registrata il gancio rifiuta il lancio: meglio fermarsi qui che con un worker rifiutato.
       const reg = registraDecisione(r);
       if (!reg.ok) {
