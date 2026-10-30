@@ -795,7 +795,7 @@ module.exports = function register(on, ctx) {
   // #870 — le carte della home. La stessa mossa arriva dalla chat (azione CARTA_HOME) e passa dallo stesso posto.
   on(MSG.CARTE_HOME_GET, soloFilo(async () => {
     const Carte = require('../carteHome');
-    const [layout, primoIncontro] = await Promise.all([Carte.leggi(), ctx.getEffectiveSettings().then(Carte.primoIncontro)]);
+    const [layout, primoIncontro] = await Promise.all([Carte.leggi(), ctx.getEffectiveSettings().then(Carte.primoIncontro).catch(() => false)]);
     return { ok: true, layout, primoIncontro };
   }));
   on(MSG.CARTE_HOME_MODIFICA, soloFilo(async (msg, sender) => {
