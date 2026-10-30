@@ -71,6 +71,7 @@ import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedbackClientIdHash.js';
 import '../src/shared/feedback.js';
 import '../src/shared/feedbackAttachTypes.js';
+import '../src/shared/feedbackImage.js';
 import '../src/shared/feedbackStatus.js';
 import '../src/shared/feedbackAttese.js';
 import './lib/freno-letture.mjs';
