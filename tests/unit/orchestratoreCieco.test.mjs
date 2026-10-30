@@ -198,8 +198,9 @@ test('il comando installato, dalla shell, acceca e mette la decisione del server
     assert.equal(h(avviso({ agent_id: 'w1' })).permissionDecisionReason, MOTIVO_NOTIFICA);
     assert.equal(run(JSON.stringify(avviso({ session_id: 's2' }))).stdout, '');
     assert.equal(JSON.parse(run(JSON.stringify(dopo())).stdout).hookSpecificOutput.updatedToolOutput, AL_POSTO_DEL_TESTO);
-    assert.equal(JSON.parse(run(JSON.stringify(dopo({ tool_response: SPOSTATO }))).stdout).hookSpecificOutput.updatedToolOutput, AL_POSTO_VIVO);
-    assert.equal(JSON.parse(run(JSON.stringify(dopo({ tool_response: FINITO }))).stdout).hookSpecificOutput.updatedToolOutput, AL_POSTO_DEL_TESTO);
+    assert.equal(JSON.parse(run(JSON.stringify(dopo({ tool_response: SPOSTATO, tool_input: { prompt: PROMPT } }))).stdout).hookSpecificOutput.additionalContext,
+      `${AL_POSTO_VIVO} Comando: node /tmp/filo-strumenti/scripts/routine-channel.mjs veglia ${B}`);
+    assert.equal(JSON.parse(run(JSON.stringify(dopo({ tool_response: FINITO }))).stdout).hookSpecificOutput.updatedToolOutput.content[0].text, AL_POSTO_DEL_TESTO);
     assert.equal(JSON.parse(run(JSON.stringify(cambio())).stdout).decision, 'block');
     for (const source of ['project_settings', 'local_settings', 'skills']) {
       assert.equal(JSON.parse(run(JSON.stringify(cambio({ source }))).stdout).decision, 'block', source);
