@@ -249,6 +249,7 @@ test('lista corta: arrivi e chiusure sopra non spostano la riga sotto il puntato
   const base = tante(100, 3);
   await page.evaluate((l) => window.__mgTest.setDomande(l, {}), base);
   await page.locator('.mg-sezione[data-sezione="domande"]').click();
+  const primaY = (await riga(page, 'D-100').boundingBox()).y;
   const bersaglio = riga(page, 'D-102');
   const box = await bersaglio.boundingBox();
   const p = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
@@ -270,10 +271,10 @@ test('lista corta: arrivi e chiusure sopra non spostano la riga sotto il puntato
 
   // Fuori dalla lista lo spazio se ne va: la riga torna in cima, e un arrivo dopo si mette sopra come sempre.
   await page.mouse.move(box.x + box.width + 300, p.y);
-  await expect.poll(async () => Math.round((await bersaglio.boundingBox()).y)).toBe(Math.round((await page.locator('#mgDomandeLista').boundingBox()).y));
+  await expect.poll(async () => Math.round((await bersaglio.boundingBox()).y)).toBe(Math.round(primaY));
   await page.evaluate((l) => window.__mgTest.setDomande(l, {}), [arrivo, base[2]]);
   await expect(page.locator('#mgDomandeLista .mg-domanda').first()).toHaveAttribute('data-id', 'D-99');
-  expect((await page.locator('#mgDomandeLista .mg-domanda').first().boundingBox()).y).toBeGreaterThanOrEqual((await page.locator('#mgDomandeLista').boundingBox()).y - 0.5);
+  expect(Math.abs((await riga(page, 'D-99').boundingBox()).y - primaY)).toBeLessThan(1.5);
 });
 
 test('una lettura fallita mentre le domande sono a schermo non sposta la lista: l’avviso sta sotto', async ({ app, openTab }) => {
