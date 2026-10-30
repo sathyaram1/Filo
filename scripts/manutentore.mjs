@@ -167,7 +167,7 @@ export function righeDomandeFerme(domande, { indice = [], ordine = [], quando = 
 }
 
 /** Il contesto intero, in testo. PURA rispetto ai suoi ingressi. `ferme`: le righe di righeDomandeFerme, o il motivo per cui mancano. */
-export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorni = 30, indiceDel = '', ferme = null }) {
+export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorni = 30, indiceDel = '', ferme = null, spesa = null }) {
   const numero = (s) => String(s.numero).replace(/^#/, '');
   const perNum = new Map((indice || []).map((f) => [f.num, f]));
   // Con l'indice valgono solo le schede dei feedback ancora aperti: le altre sono di feedback chiusi da allora.
