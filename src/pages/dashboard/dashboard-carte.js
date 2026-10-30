@@ -1005,8 +1005,19 @@
 
   // ===== Dati che la carta chiede da sé =====
   async function caricaLayout() {
+    const giro = ++giroPrimo;
     const r = await d.send({ type: MSG.CARTE_HOME_GET });
     layout = C.normalizza(r && r.ok ? r.layout : null);
+    if (giro === giroPrimo) primoIncontro = !!(r && r.ok && r.primoIncontro);
+    disegna();
+  }
+  // Finisce con l'accoglienza e dipende da cosa manca a Filo per rispondere. La disposizione di questa risposta no:
+  // può essere più vecchia di una mossa annunciata nel frattempo.
+  async function caricaPrimoIncontro() {
+    const giro = ++giroPrimo;
+    const r = await d.send({ type: MSG.CARTE_HOME_GET });
+    if (giro !== giroPrimo || !r || !r.ok || !!r.primoIncontro === primoIncontro) return;
+    primoIncontro = !!r.primoIncontro;
     disegna();
   }
   async function caricaDownloads() {
