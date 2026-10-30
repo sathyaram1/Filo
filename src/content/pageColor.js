@@ -106,13 +106,6 @@
   // ------------------------------------------------------------
   // Colore identità del sito (spec §1.2)
   // ------------------------------------------------------------
-  // Si calcola UNA VOLTA per pagina (con qualche retry per i siti che settano
-  // theme-color/favicon dopo il paint) e si manda al main, che lo cacha per
-  // dominio. La shell lo mescola col fondo della barra nelle tab inattive.
-  // getParams (opzionale): funzione che ritorna i parametri di estrazione
-  // correnti (settings.tabColor). Vengono passati a extractIdentityFromPixels,
-  // così cambiarli (a voce o nelle Preferenze) cambia il colore estratto. Se
-  // assente, l'estrazione usa i default di SN_TAB_COLOR.
   // Un favicon si scarica una volta per pagina: ritentativi e cambi di impostazioni ridisegnano la copia (#1795). Un errore
   // di rete o i 3 s scaduti non restano, così il calcolo dopo riprova; la richiesta rimasta appesa si chiude.
   const iconeScaricate = new Map();
@@ -128,6 +121,13 @@
     return copia;
   }
 
+  // Si calcola UNA VOLTA per pagina (con qualche retry per i siti che settano
+  // theme-color/favicon dopo il paint) e si manda al main, che lo cacha per
+  // dominio. La shell lo mescola col fondo della barra nelle tab inattive.
+  // getParams (opzionale): funzione che ritorna i parametri di estrazione
+  // correnti (settings.tabColor). Vengono passati a extractIdentityFromPixels,
+  // così cambiarli (a voce o nelle Preferenze) cambia il colore estratto. Se
+  // assente, l'estrazione usa i default di SN_TAB_COLOR.
   function reportTabIdentityColor(getParams) {
     let lastSent;
     const params = () => {
