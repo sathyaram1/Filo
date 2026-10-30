@@ -1,13 +1,19 @@
 // Il testo che l'utente immette nella pagina, in ogni frame, detto al main: un segreto che la pagina mostra ed è suo non
-// è letto da fuori (#810.8). Dell'utente è il valore vero del campo se è fatto dei caratteri che lui ci ha messo con eventi
-// veri; se no, solo quei caratteri in fila. Un sito non li produce. Regole: src/main/services/segretiLetti.js.
+// è letto da fuori (#810.8). Dell'utente è la parte del valore cambiata da quando ci scrive, se è fatta dei caratteri che
+// ci ha messo lui (tasti, incolla, inserimenti di Filo chiesti da lui); se no, solo quei caratteri in fila.
 
 // Largo: un documento incollato intero resta dell'utente; oltre, si tiene la coda.
 const MAX_TESTO = 1000000;
 const ATTESA_MS = 150;
 // Un incolla o un trascina porta testo che un sito può aver scelto (la copia riscritta): oltre questa misura non è
-// dell'utente, se no una fila con tutti i codici a sei cifre li coprirebbe tutti. Password, carte e IBAN ci stanno larghi.
+// dell'utente per intero, se no una fila con tutti i codici a sei cifre li coprirebbe tutti.
 const MAX_INCOLLA = 1000;
+// Di un incolla più lungo (una lettera con l'IBAN) restano dell'utente i segreti che contiene, se sono pochi.
+const MAX_SEGRETI_INCOLLA = 10;
+const MAX_SEGRETO = 100;
+// I caratteri del sito attaccati a quello che l'utente scrive (il «IT» già nel campo dell'IBAN) restano con lui: pochi,
+// così un sito non ci aggiunge un codice suo.
+const ATTACCATI = 4;
 
 const contaDi = (c) => c.toLowerCase();
 const conta = /[\p{L}\p{N}]/u;
@@ -28,14 +34,61 @@ function fattoDiCaratteri(valore, conti) {
   return qualcosa;
 }
 
+function attaccati(s, dallaFine) {
+  const ch = [...s];
+  if (dallaFine) ch.reverse();
+  let n = 0;
+  let i = 0;
+  for (; i < ch.length && n < ATTACCATI; i++) if (conta.test(ch[i])) n++;
+  const presi = ch.slice(0, i);
+  return (dallaFine ? presi.reverse() : presi).join('');
+}
+
+// Il valore meno l'inizio e la fine che c'erano già quando l'utente ha cominciato a scriverci (`base`): `nuova` è quello
+// che è cambiato, `estesa` lo stesso coi pochi caratteri del sito attaccati.
+function parteNuova(valore, base) {
+  const v = String(valore || '');
+  const b = String(base || '');
+  const max = Math.min(v.length, b.length);
+  let i = 0;
+  while (i < max && v[i] === b[i]) i++;
+  let j = 0;
+  while (j < max - i && v[v.length - 1 - j] === b[b.length - 1 - j]) j++;
+  const nuova = v.slice(i, v.length - j);
+  return { nuova, estesa: attaccati(v.slice(0, i), true) + nuova + attaccati(v.slice(v.length - j), false) };
+}
+
+// Quello che di un incolla è dell'utente: tutto se è corto, se no solo i suoi segreti, se sono pochi.
+function diUnIncolla(dati) {
+  const t = String(dati || '');
+  if (t.length <= MAX_INCOLLA) return t;
+  if (!globalThis.SN_GUARDIANO_STATICO) { try { require('../shared/guardianoStatico.js'); } catch (_) { return ''; } }
+  let segreti = [];
+  try { segreti = globalThis.SN_GUARDIANO_STATICO.segretiNelTesto(t); } catch (_) { return ''; }
+  if (!Array.isArray(segreti) || !segreti.length || segreti.length > MAX_SEGRETI_INCOLLA) return '';
+  return segreti.map((x) => String((x && x.valore) || '')).filter((v) => v && v.length <= MAX_SEGRETO).join('\n');
+}
+
+function radiceModificabile(el) {
+  let host = el;
+  try { while (host.parentElement && host.parentElement.isContentEditable) host = host.parentElement; } catch (_) {}
+  return host;
+}
+
 function valoreVero(el) {
   try {
     if (typeof el.matches === 'function' && el.matches('input, textarea')) return String(el.value || '');
     if (!el.isContentEditable) return null;
-    let host = el;
-    while (host.parentElement && host.parentElement.isContentEditable) host = host.parentElement;
-    return String(host.innerText || '');
+    return String(radiceModificabile(el).innerText || '');
   } catch (_) { return null; }
+}
+
+// Senza innerText, che a ogni tasto costerebbe un ricalcolo della pagina.
+function vuoto(el) {
+  try {
+    if (typeof el.matches === 'function' && el.matches('input, textarea')) return !el.value;
+    return !el.textContent;
+  } catch (_) { return false; }
 }
 
 const scrivibile = (el) => {
@@ -57,9 +110,13 @@ function ascoltaImmessi(invia) {
       const t = testi.get(el);
       if (!t) continue;
       const v = valoreVero(el);
-      // Anche la fila: la chat si svuota a ogni invio, e quello che c'era resta dell'utente.
-      const testo = v && v.length <= MAX_TESTO && fattoDiCaratteri(v, t.conti) ? `${v}\u0001${t.testo}` : t.testo;
-      if (testo) { try { invia(`${documento}.${t.n}`, testo); } catch (_) { /* il main è andato via */ } }
+      let testo = t.testo;
+      if (v && v.length <= MAX_TESTO) {
+        const { nuova, estesa } = parteNuova(v, t.base);
+        // Anche la fila: la chat si svuota a ogni invio, e quello che c'era resta dell'utente.
+        if (fattoDiCaratteri(nuova, t.conti)) testo = `${estesa}\u0001${t.testo}`;
+      }
+      if (testo) { try { invia(`${documento}.${t.n}`, testo, t.desde); } catch (_) { /* il main è andato via */ } }
     }
     daDire.clear();
   }
@@ -69,9 +126,14 @@ function ascoltaImmessi(invia) {
     return p[0] || e.target;
   };
 
+  // Si chiama PRIMA che il testo entri: `base` è quello che c'era, e a campo vuoto si riparte (la chat dopo un invio).
+  // `desde` è quando l'utente ha cominciato questo valore: il main toglie dal registro solo i segreti letti da lì in poi.
   function voce(el) {
     let t = testi.get(el);
-    if (!t) { t = { n: ++numero, testo: '', conti: new Map(), quanti: 0 }; testi.set(el, t); }
+    if (!t) {
+      t = { n: ++numero, testo: '', conti: new Map(), quanti: 0, base: valoreVero(el) || '', desde: Date.now() };
+      testi.set(el, t);
+    } else if (vuoto(el)) { t.base = ''; t.desde = Date.now(); }
     return t;
   }
   function contati(t, dati) {
@@ -84,12 +146,18 @@ function ascoltaImmessi(invia) {
   }
   function aggiorna(el, fn, dati = '') {
     if (!el || typeof el !== 'object') return;
+    if (el.isContentEditable) el = radiceModificabile(el);
     const t = voce(el);
     if (dati) contati(t, dati);
     const nuovo = fn ? fn(t.testo) : t.testo;
     if (nuovo !== t.testo) t.testo = nuovo.length > MAX_TESTO ? nuovo.slice(-MAX_TESTO) : nuovo;
     daDire.add(el);
     presto();
+  }
+  function incollato(el, dati) {
+    const suo = diUnIncolla(dati);
+    if (!suo) return;
+    aggiorna(el, (s) => (suo === dati ? s + dati : `${s}\n${suo}\n`), suo);
   }
 
   window.addEventListener('beforeinput', (e) => {
@@ -102,8 +170,11 @@ function ascoltaImmessi(invia) {
     if (dati == null && e.dataTransfer) { try { dati = e.dataTransfer.getData('text/plain'); } catch (_) { dati = ''; } }
     if (dati == null && /^insert(LineBreak|Paragraph)$/.test(tipo)) dati = '\n';
     if (!dati) return;
-    if (/^insertFrom(Paste|Drop|Yank)/.test(tipo) && dati.length > MAX_INCOLLA) return;
+    if (/^insertFrom(Paste|Drop|Yank)/.test(tipo)) { incollato(bersaglio(e), dati); return; }
     aggiorna(bersaglio(e), (s) => s + dati, dati);
+  }, true);
+  window.addEventListener('compositionstart', (e) => {
+    if (e.isTrusted && scrivibile(bersaglio(e))) aggiorna(bersaglio(e), null);
   }, true);
   window.addEventListener('compositionend', (e) => {
     if (e.isTrusted && e.data) aggiorna(bersaglio(e), (s) => s + e.data, e.data);
@@ -120,15 +191,15 @@ function ascoltaImmessi(invia) {
   // Un invio (Invio o un clic) porta con sé quello che l'utente ha appena scritto: il main lo sa prima di leggere la pagina.
   function subito(e) { if (e.isTrusted && daDire.size) { if (timer) clearTimeout(timer); di(); } }
   window.addEventListener('pointerdown', subito, true);
-  // Per l'Accetta di una proposta dell'assistente: sta nel mondo di Filo, la pagina non la raggiunge.
+  // Quello che Filo mette nel campo per l'utente (incolla e cronologia degli appunti, dettatura, Accetta di una proposta)
+  // la pagina non lo vede arrivare: lo dice chi lo inserisce, PRIMA di inserirlo. Sta nel mondo di Filo, il sito no.
   globalThis.SN_IMMESSI = Object.freeze({
-    accettato(el, testo) {
-      const dati = String(testo || '');
-      if (dati && dati.length <= MAX_INCOLLA) aggiorna(el, (s) => s + dati, dati);
-    },
+    inserisce(el, testo) { if (scrivibile(el)) incollato(el, String(testo || '')); },
   });
 }
 
 module.exports = ascoltaImmessi;
 module.exports.fattoDiCaratteri = fattoDiCaratteri;
+module.exports.parteNuova = parteNuova;
+module.exports.diUnIncolla = diUnIncolla;
 module.exports.MAX_INCOLLA = MAX_INCOLLA;
