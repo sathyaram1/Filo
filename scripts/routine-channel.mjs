@@ -662,10 +662,10 @@ export function comandoRisposta(io, cred, id) {
  * Salta (ok, skipped) con una HEAD staccata o su un ramo protetto — la stessa
  * regola dell'hook e di finish-local (lib/branch-integrity.isProtectedBranch:
  * main, master, il default dichiarato da origin). Prima un push normale; se
- * git lo rifiuta per storia divergente (un rebase), --force-with-lease, che
- * è contro il ref remoto conosciuto: se qualcun altro ha spinto nel frattempo
- * git rifiuta, ed è giusto così. Un fallimento torna con la causa: chi chiama
- * NON rilascia.
+ * git lo rifiuta per storia divergente (un rebase), --force-with-lease col
+ * valore atteso di leaseAtteso: se qualcun altro ha spinto nel frattempo il
+ * rinvio non parte, ed è giusto così. Un fallimento torna con la causa: chi
+ * chiama NON rilascia.
  */
 export function pushRamoCorrente(root, { exec = execFileSync, env = process.env } = {}) {
   const run = (args) => {
