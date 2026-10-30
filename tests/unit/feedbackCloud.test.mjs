@@ -219,4 +219,41 @@ test('la scheda dalla routine va al server col biglietto, dalla macchina dell’
   assert.deepEqual(JSON.parse(visti[0].opz.body).data.op, 'scheda');
   const nonPubblicata = await FC.salvaSchedaDaOwner({ numero: '1', scheda: {} }, { idToken: 't', fetchImpl: async () => ({ ok: false, status: 404, json: async () => ({}) }) });
   assert.equal(nonPubblicata.guasto, true);
+  // Le credenziali che non si rinnovano a metà giro sono un esito da dire, non un errore che ferma tutto.
+  const rifiutate = await FC.salvaSchedaDaOwner({ numero: '1', scheda: {} }, {
+    nuovoToken: async () => { throw Object.assign(new Error('refresh admin fallito (400)'), { credenziale: true }); },
+  });
+  assert.equal(rifiutate.ok, false);
+  assert.match(rifiutate.motivo, /credenziali del proprietario rifiutate/);
+});
+
+test('una scheda rimasta fuori dal feedback si manda al giro dopo, senza agente; una vecchia la riscrive l’agente', async () => {
+  const cartella = cartellaTemporanea('schede-rimanda-');
+  try {
+    mkdirSync(cartella, { recursive: true });
+    const fonte = (num, aggiornato) => ({ id: `f${num}`, stato: 'todo', aggiornato, at: '2026-10-29T10:00:00.000Z', modello: 'haiku' });
+    const indice = ['1', '2', '3', '4'].map((num) => ({ id: `f${num}`, num, stato: 'todo', aggiornato: 'A' }));
+    writeFileSync(join(cartella, '1.json'), JSON.stringify({ ...buona(1), _fonte: fonte(1, 'A'), [S.NON_SALVATA]: true }));
+    writeFileSync(join(cartella, '2.json'), JSON.stringify({ ...buona(2), _fonte: fonte(2, 'A'), _riletta: { at: 'R', modello: 'opus' }, [S.NON_SALVATA]: true }));
+    writeFileSync(join(cartella, '3.json'), JSON.stringify({ ...buona(3), _fonte: fonte(3, 'vecchia'), [S.NON_SALVATA]: true }));
+    writeFileSync(join(cartella, '4.json'), JSON.stringify({ ...buona(4), _fonte: fonte(4, 'A') }));
+    const mandati = [];
+    const salva = async (dati) => {
+      mandati.push(dati);
+      return dati.numero === '2' ? { ok: false, motivo: 'server giù' }
+        : { ok: true, aggiornato: 'B', scheda: { ...dati.scheda, _fonte: fonte(dati.numero, 'B'), _fiducia: 'fidato' } };
+    };
+    // Il segno lo mette il giro degli agenti quando il salvataggio non riesce.
+    const stampata = { ...buona(5), _fonte: fonte(5, 'A') };
+    assert.equal(S.schedaDopoSalvataggio(stampata, { ok: false, motivo: 'server giù' })[S.NON_SALVATA], true);
+    assert.equal(S.schedaDopoSalvataggio(stampata, { ok: true, scheda: { numero: '5' } })[S.NON_SALVATA], undefined);
+    const r = await S.rimandaNonSalvate(cartella, indice, { salva });
+    assert.deepEqual(mandati.map((d) => [d.numero, d.rilettura, d.modello]), [['1', false, 'haiku'], ['2', true, 'opus']]);
+    assert.ok(mandati.every((d) => Object.keys(d.scheda).every((k) => !k.startsWith('_'))), 'al server solo i campi dell’agente');
+    assert.deepEqual({ mandate: r.mandate, restano: r.restano, aggiornati: [...r.aggiornati] }, { mandate: 1, restano: 1, aggiornati: [['1', 'B']] });
+    const letta = (n) => JSON.parse(readFileSync(join(cartella, `${n}.json`), 'utf8'));
+    assert.equal(letta(1)[S.NON_SALVATA], undefined, 'salvata: il segno se ne va');
+    assert.equal(letta(2)[S.NON_SALVATA], true, 'ancora fuori: il segno resta per il giro dopo');
+    assert.equal(S.daScrivere(indice[2], letta(3)), true, 'la vecchia la riscrive l’agente');
+  } finally { togliCartella(cartella); }
 });

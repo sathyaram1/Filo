@@ -71,15 +71,17 @@ export function salvaSchedaDalServer(ticket, { numero, scheda, rilettura = false
 }
 
 /** La stessa scrittura dalla macchina dell'owner, con le sue credenziali (`ownerSchede`). */
-export async function salvaSchedaDaOwner({ numero, scheda, rilettura = false, modello = '' }, { fetchImpl = fetch, idToken = null } = {}) {
+export async function salvaSchedaDaOwner({ numero, scheda, rilettura = false, modello = '' }, { fetchImpl = fetch, idToken = null, nuovoToken = null } = {}) {
   let token = idToken;
-  if (!token) {
-    const { findAdminRefreshToken, mintIdToken } = await import('./firestore-auth.mjs');
-    const refresh = findAdminRefreshToken();
-    if (!refresh) return { ok: false, guasto: true, motivo: 'non trovo le credenziali del proprietario (FILO_ADMIN_REFRESH_TOKEN)' };
-    token = await mintIdToken(refresh);
-  }
   try {
+    // Anche le credenziali che non si rinnovano sono un esito: un lancio qui fermerebbe tutto il giro delle schede.
+    if (!token && nuovoToken) token = await nuovoToken();
+    if (!token) {
+      const { findAdminRefreshToken, mintIdToken } = await import('./firestore-auth.mjs');
+      const refresh = findAdminRefreshToken();
+      if (!refresh) return { ok: false, guasto: true, motivo: 'non trovo le credenziali del proprietario (FILO_ADMIN_REFRESH_TOKEN)' };
+      token = await mintIdToken(refresh);
+    }
     const res = await fetchImpl(INDIRIZZO_OWNER, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ data: { op: 'scheda', numero: String(numero), scheda, rilettura, modello } }),
@@ -89,6 +91,7 @@ export async function salvaSchedaDaOwner({ numero, scheda, rilettura = false, mo
     if (res.status === 404 && !body.error) return { ok: false, guasto: true, motivo: 'ownerSchede non è ancora pubblicata sul server' };
     return { ok: false, guasto: res.status >= 500, motivo: String((body.error && body.error.message) || `errore ${res.status}`) };
   } catch (e) {
-    return { ok: false, guasto: true, motivo: `server non raggiungibile: ${String((e && e.message) || e).slice(0, 200)}` };
+    const motivo = String((e && e.message) || e).slice(0, 200);
+    return { ok: false, guasto: true, motivo: e && e.credenziale ? `credenziali del proprietario rifiutate: ${motivo}` : `server non raggiungibile: ${motivo}` };
   }
 }
