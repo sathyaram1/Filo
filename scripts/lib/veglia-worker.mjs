@@ -10,7 +10,7 @@ import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 import { dirImpostazioniUtente, FILE_REGISTRO, impronta } from './orchestratore-cieco.mjs';
 
 // Un sotto-agente vivo scrive il suo transcript almeno a ogni chiamata, e la più lunga (un comando in primo piano) ne
-// dura dieci: il doppio è silenzio vero.
+// dura dieci: il doppio, senza processi nella sua cartella, è silenzio vero.
 export const SOGLIA_FERMO_MS = 20 * 60 * 1000;
 // Sotto i due minuti del tempo di serie di una chiamata: un timeout dimenticato non la uccide a metà rilascio.
 export const FETTA_MS = 90 * 1000;
