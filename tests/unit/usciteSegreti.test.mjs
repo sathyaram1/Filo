@@ -1383,12 +1383,16 @@ test('dell’utente è la parte del campo cambiata da quando ci scrive, coi poch
 // #810.8 giro 5 — un codice letto prima che l'utente cominciasse a scriverlo resta letto anche se lui lo riscrive;
 // quello letto mentre il suo testo era in viaggio si toglie.
 test('riscrivere un codice già letto non lo toglie dai segreti letti', () => {
-  SL.usaDeposito(null);
+  const prima = Date.now() - 60_000;
+  SL.usaDeposito({
+    leggi: () => JSON.stringify([{ valore: '482913', regola: 'codice', fonte: 'dalla pagina banca.example', lotto: 1, at: prima }]),
+    scrivi: () => {},
+  });
   const letto = () => SL.tutti().some((x) => x.valore === '482913');
-  SL.ricorda('Il tuo codice monouso è 482913', 'dalla pagina banca.example');
-  SL.immessoDallUtente('1:1-1:1:7', 'il codice 482913 dove lo metto?', Date.now() + 5);
+  assert.ok(letto());
+  SL.immessoDallUtente('1:1-1:1:7', 'il codice 482913 dove lo metto?', Date.now());
   assert.ok(letto(), 'il codice letto prima è sparito dal registro');
-  SL.immessoDallUtente('1:1-1:1:8', 'il codice 482913 è questo', Date.now() - 60_000);
+  SL.immessoDallUtente('1:1-1:1:8', 'il codice 482913 è questo', prima - 5_000);
   assert.ok(!letto(), 'il codice letto mentre l’utente lo scriveva è rimasto');
   SL.usaDeposito(null);
 });
