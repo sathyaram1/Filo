@@ -41,6 +41,7 @@
         'Sui siti lenti la scheda prende il colore del sito appena la pagina comincia a comparire. Prima aspettava che la pagina finisse di caricarsi, anche cinque secondi.',
         'Quando Filo riordina le schede per colore, i siti di un rosso che tende al rosa, come Netflix e Pinterest, stanno in testa accanto a YouTube. Prima finivano in fondo, dopo il viola. Vale anche per l\'ordine delle schede quando riapri Filo.',
         'Su un sito, quello che scrivi o selezioni nella spiegazione, nella traduzione, nella Modifica e nel feedback di Filo non lo legge più il sito, nemmeno cercandolo nella pagina. Questi riquadri ora stanno sopra la pagina, fuori dal sito.',
+        'Quando riapri Filo, i feed, le ricerche finite e le pagine che non tocchi da ore o da giorni vanno nel filo della home. Prima restavano quasi sempre aperte. Le schede che apri o riprendi appena riaperto restano dove sono. La barra si riordina per colore anche quando non si chiude niente, e un avviso dice com\'è andata: quante schede ha chiuso, che servivano tutte o che non è riuscito a valutarle. Se ne ha chiuse, «Riapri» le riporta indietro.',
       ],
     },
     {
@@ -51,7 +52,6 @@
         'Nell\'Editor il foglio prende tutta la larghezza. Gli strumenti si aprono dal bordo destro: ci fermi il mouse, clicchi la striscia sottile o premi Ctrl+\\ (Cmd+\\ su Mac). Col «+» scegli quali tenere, e col lucchetto il pannello resta aperto accanto al testo. La chat del documento ora è l\'Aiuto: legge tutto il testo e ne cambia la formattazione quando glielo chiedi, e puoi aprirlo anche chiedendolo a Filo.',
       ],
       fixes: [
-        'Quando riapri Filo, i feed, le ricerche finite e le pagine che non tocchi da ore o da giorni vanno nel filo della home. Prima restavano quasi sempre aperte. Le schede che apri o riprendi appena riaperto restano dove sono. La barra si riordina per colore anche quando non si chiude niente, e un avviso dice com\'è andata: quante schede ha chiuso, che servivano tutte o che non è riuscito a valutarle. Se ne ha chiuse, «Riapri» le riporta indietro.',
         'Ctrl+L (Cmd+L su Mac) sulla home non cancella più quello che stavi scrivendo. Porta il cursore nel campo e seleziona il testo, come la barra degli indirizzi di un browser.',
         'Ctrl+L (Cmd+L su Mac) su una pagina dove stai scrivendo apre la home in una scheda accanto, così il testo che hai scritto resta dov\'era.',
         'Se le pagine che Filo legge per risponderti sono troppe per il modello tutte insieme, Filo risponde con quelle che ci stanno e sotto la risposta ti dice quali siti ha lasciato fuori. Se ti servono, chiediglielo e le rilegge. Prima la risposta non arrivava, e l\'errore consigliava di cambiare modello.',
