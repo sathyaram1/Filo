@@ -1376,7 +1376,7 @@ test('dell’utente è la parte del campo cambiata da quando ci scrive, coi poch
   assert.ok(lettera.length > MAX_INCOLLA);
   assert.equal(diUnIncolla(lettera), 'IT60X0542811101000000123456');
   assert.equal(diUnIncolla('Codice 123456'), 'Codice 123456');
-  assert.equal(diUnIncolla(Array.from({ length: 200 }, (_, i) => `IBAN IT60X05428111010000001234${String(i).padStart(2, '0')}`).join(' ')), '');
+  assert.equal(diUnIncolla(Array.from({ length: 50 }, (_, i) => `Il tuo codice monouso è ${482900 + i}.`).join('\n')), '');
   assert.equal(diUnIncolla('0123456789'.repeat(1000)), '');
 });
 
