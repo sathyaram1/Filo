@@ -91,10 +91,11 @@ export function preparaIntestazione(root, { allinea = allineaPacchetti } = {}) {
     `La shell riparte ogni volta dalla cartella della sessione: ogni comando comincia con \`cd "${dir}" && …\`,`,
     `e Read, Edit e Write vogliono percorsi sotto \`${dir}\`. Il salvataggio automatico segue il file che modifichi.`,
   ];
-  if (!p.ok) righe.push('', `Pacchetti non collegati (${p.why}): prima di provare, \`cd "${dir}" && npm ci\` in sottofondo.`);
+  if (!p.ok) righe.push('', `Pacchetti non pronti (${p.why}): prima di provare, \`cd "${dir}" && npm ci\` in sottofondo.`);
   else if (p.lockDiverso) {
-    righe.push('', `Il package-lock di questo ramo non è quello della sessione: i pacchetti sono quelli della sessione. Se ti`,
-      `servono i suoi, \`cd "${dir}" && npm ci && node scripts/ensure-electron.mjs\` in sottofondo.`);
+    righe.push('', `I pacchetti del clone non vengono dal package-lock di questo ramo. Se ti servono i suoi,`,
+      `\`cd "${dir}" && npm ci && node scripts/ensure-electron.mjs\` in sottofondo.`);
   }
+  if (p.electron) righe.push('', `Il binario di Electron non è arrivato (${p.electron}): prima delle prove che aprono Filo, \`cd "${dir}" && node scripts/ensure-electron.mjs\`.`);
   return righe.join('\n');
 }
