@@ -680,7 +680,7 @@ export async function main(argvIn) {
       console.error(`RIFIUTATO: --pacchetto: ${msg(e)}. Non ho aperto niente.`);
       return codiceDi(e);
     }
-    copie = copieDegliAllegati(scaricati, { primaImmagini: mieImmagini });
+    copie = { ...copieDegliAllegati(scaricati, { primaImmagini: mieImmagini }), nonFidate: uniteNonFidate(riferimenti) };
     if (copie.motivi.length) {
       console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${copie.motivi.map((m) => `  - ${m}`).join('\n')}`);
       return EXIT.RIFIUTATO;
