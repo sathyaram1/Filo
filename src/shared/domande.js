@@ -266,11 +266,11 @@
     if (opzioni.length) {
       const c = input.consiglio;
       if (!isOggetto(c) || !Number.isInteger(c.opzione) || c.opzione < 0 || c.opzione >= opzioni.length) {
-        return no('consiglio_non_valido', `con le opzioni serve il consiglio: { opzione: l'indice da 0 a ${opzioni.length - 1}, perche: il motivo }`);
+        return no('consiglio_non_valido', `con le opzioni serve il consiglio: { opzione: l'indice da 0 a ${opzioni.length - 1}, perche: il motivo }`, { campo: 'consiglio' });
       }
       const ignotiC = Object.keys(c).filter((k) => k !== 'opzione' && k !== 'perche');
       if (ignotiC.length) return no('campo_sconosciuto', `il consiglio ha campi sconosciuti: ${ignotiC.map((k) => k.slice(0, 40)).join(', ')}`);
-      if (typeof c.perche !== 'string' || !c.perche.trim()) return no('consiglio_non_valido', 'il consiglio deve dire perché');
+      if (typeof c.perche !== 'string' || !c.perche.trim()) return no('consiglio_non_valido', 'il consiglio deve dire perché', { campo: 'consiglio.perche' });
       const p = lunghezzaOk(c.perche, 'consiglio.perche', TETTI.perche);
       if (p) return p;
       consiglio = { opzione: c.opzione, perche: c.perche };
