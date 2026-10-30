@@ -298,8 +298,8 @@
   // Allegati ANCORATI al turno (#190.3): righe-marcatore dentro `notes`, così non cambiano
   // schema né regole. Allowlist dei tipi UNA, condivisa col riquadro dentro i siti (#582).
   const AttachTypes = window.SN_FEEDBACK_ATTACH;
-  const ATTACH_REJECT_MSG =
-    'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
+  const ATTACH_REJECT_MSG = (AttachTypes && AttachTypes.MESSAGGIO_TIPO)
+    || 'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
 
   // Se l'allowlist condivisa non si carica il ripiego deve CHIUDERE (solo immagini raster),
   // non aprire: un gate che sparisce in silenzio quando manca un pezzo è un gate che non c'è.
@@ -311,10 +311,11 @@
     return /^image\/(png|jpe?g|gif|webp|bmp)$/.test(t) ? 'image' : null;
   }
 
-  const ATTACH_MAX_IMAGES = 5;
-  const ATTACH_MAX_FILES = 5;
-  const ATTACH_MAX_BYTES = 4 * 1024 * 1024;
-  const ATTACH_ACCEPT = 'image/*,application/pdf,application/json,text/*,.pdf,.txt,.md,.markdown,.json,.csv,.log,.yml,.yaml';
+  const ATTACH_LIMITI = (AttachTypes && AttachTypes.LIMITI) || { immagini: 5, file: 5, byte: 4 * 1024 * 1024 };
+  const ATTACH_MAX_IMAGES = ATTACH_LIMITI.immagini;
+  const ATTACH_MAX_FILES = ATTACH_LIMITI.file;
+  const ATTACH_MAX_BYTES = ATTACH_LIMITI.byte;
+  const ATTACH_ACCEPT = (AttachTypes && AttachTypes.ACCEPT) || 'image/png,image/jpeg,image/gif,image/webp,image/bmp';
 
   const FILE_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
 
@@ -579,8 +580,8 @@
 
     async function addFile(file) {
       if (!file) return;
-      // Il TIPO si guarda PRIMA di caricare: il selettore offre anche image/* e text/*, che il
-      // deposito rifiuta — e se ne leggeva il numero d'errore invece della frase giusta.
+      // Il TIPO si guarda PRIMA di caricare: «Tutti i file» del selettore e il drop passano anche quello che il
+      // deposito rifiuta, e se ne leggeva il numero d'errore invece della frase giusta.
       const kind = classificaAllegato(file);
       if (!kind) { setStatus(ATTACH_REJECT_MSG); return; }
       const isImg = kind === 'image';
