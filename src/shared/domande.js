@@ -6,7 +6,8 @@
   'use strict';
 
   const PRIORITA = Object.freeze(['bloccante', 'importante', 'quando_puoi']);
-  const STATI = Object.freeze(['aperta', 'in_lavorazione', 'chiusa', 'superata']);
+  // `in_smistamento`: il compito «Gestisci la domanda» (§3.5) la sta smistando o riscrivendo, prima che arrivi all'owner.
+  const STATI = Object.freeze(['in_smistamento', 'aperta', 'in_lavorazione', 'chiusa', 'superata']);
   const SCHEDE = Object.freeze(['da_rispondere', 'in_lavorazione', 'risposte_automatiche', 'archivio']);
   const FIDUCIA = Object.freeze(['fidato', 'non_fidato']);
   const ORIGINI = Object.freeze(['feedback', 'ramo', 'compito', 'domanda', 'locale', 'server']);
