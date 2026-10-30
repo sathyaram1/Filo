@@ -505,6 +505,9 @@ if [ -s "$FALLIMENTI_FILE" ] || [ -s "$AVVISI_FILE" ]; then
   TESTO=$(cat "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null | stringa_json)
   CODA=""
   [ -s "$FALLIMENTI_FILE" ] && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: sistemalo prima di consegnare (git push del ramo; se la storia diverge, un rebase su origin e poi il push)."
+  # In una routine un push a mano resta fermo sul controllo dei permessi, che in cloud nessuno approva (#1797).
+  is_routine_session && [ -s "$FALLIMENTI_FILE" ] \
+    && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: il salvataggio riprova al prossimo file che modifichi e il rilascio lo rispedisce da se'. Non spingere a mano: in cloud il controllo dei permessi lo ferma. Se anche il rilascio non riesce a spedirlo, e' un guasto da dichiarare."
   # Con una copia dei dati nei commit il push e' proprio cio' che non va fatto: prima la copia esce dalla storia.
   grep -q 'NON spedisco il ramo:' "$FALLIMENTI_FILE" 2>/dev/null \
     && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: prima togli la copia dalla storia come detto sopra, poi il salvataggio spedisce da solo; un push a mano viene fermato dallo stesso controllo."
