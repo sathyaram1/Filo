@@ -1616,6 +1616,10 @@
     editor_chat: (d) => [typeof d.oltreTetto === 'boolean' ? (d.oltreTetto ? 'oltre_tetto' : 'intero') : '',
       d.continua === true ? 'continua' : d.nonTrovato === true ? 'formato_non_trovato'
         : Number.isInteger(d.formati) && d.formati >= 0 ? inFascia(FORMATI, d.formati) : ''],
+    anticipo_privacy: (d) => [nel(d.funzione, ANTICIPI_PRIVACY), nel(d.esito, ESITI_PRIVACY)],
+    correttore_automatica: (d) => [nel(d.fonte, FONTI_AUTOMATICA), nel(d.esito, ESITI_AUTOMATICA)],
+    correttore_valuta: (d) => [nel(d.esito, ESITI_VALUTA), 'n'],
+    correttore_segnaposto: (d) => [nel(d.via, VIE_SEGNAPOSTO), nel(d.esito, ESITI_SEGNAPOSTO)],
   });
   function voceRiquadro(misura, dati) {
     if (!has(RIQUADRO_DI, misura) || !oggetto(dati)) return null;
