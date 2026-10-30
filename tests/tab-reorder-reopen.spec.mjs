@@ -191,7 +191,9 @@ test.describe('la riapertura vera', () => {
       await tm.restoreSession();
     }, [su('blu.test', pagina('Blu', 'rgb(40,80,200)', 'uno')), su('rosso.test', pagina('Rosso', 'rgb(200,40,40)', 'due'))]);
 
-    await expect.poll(() => avvisi(shell), { timeout: 40_000 }).toContain('Schede riordinate, ma non sono riuscito a valutare quali chiudere');
+    // Il giudizio mancato di un giro automatico lo dice l'avviso della pulizia non riuscita (#1618), uno solo.
+    await expect.poll(async () => (await avvisi(shell)).filter((t) => t.startsWith('La pulizia automatica non è riuscita a valutare le schede')).length, { timeout: 40_000 }).toBe(1);
+    expect((await avvisi(shell)).some((t) => t.startsWith('Schede riordinate'))).toBe(false);
     const titoli = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs
       .filter((t) => /\.test:/.test(t.url || '')).map((t) => t.title));
     expect(titoli).toEqual(['Rosso', 'Blu']);
