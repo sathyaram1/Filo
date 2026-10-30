@@ -116,18 +116,25 @@
   const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito', 'legata', 'provvisoria', 'principio']);
   const CAMPI_OPZIONE = Object.freeze(['testo', 'pro', 'contro', 'azione']);
 
-  function validaOpzione(o, i) {
+  function validaOpzione(o, i, perOwner) {
     const n = i + 1;
-    if (!isOggetto(o)) return no('opzione_non_valida', `l'opzione ${n} non è un oggetto con testo, pro, contro e azione`);
+    if (!isOggetto(o)) return no('opzione_non_valida', `l'opzione ${n} non è un oggetto con testo, pro, contro e azione`, { campo: `opzioni[${i}]` });
     const ignoti = Object.keys(o).filter((k) => !CAMPI_OPZIONE.includes(k));
     if (ignoti.length) return no('campo_sconosciuto', `l'opzione ${n} ha campi sconosciuti: ${ignoti.map((k) => k.slice(0, 40)).join(', ')}`);
-    if (typeof o.testo !== 'string' || !o.testo.trim()) return no('opzione_non_valida', `l'opzione ${n} non ha il testo`);
+    if (typeof o.testo !== 'string' || !o.testo.trim()) return no('opzione_non_valida', `l'opzione ${n} non ha il testo`, { campo: `opzioni[${i}].testo` });
     const troppo = lunghezzaOk(o.testo, `opzioni[${i}].testo`, TETTI.testoOpzione);
     if (troppo) return troppo;
     const pro = testoFacoltativo(o, 'pro', TETTI.pro);
     if (!pro.ok) return Object.assign(pro, { dettaglio: `opzione ${n}: ${pro.dettaglio}` });
     const contro = testoFacoltativo(o, 'contro', TETTI.contro);
     if (!contro.ok) return Object.assign(contro, { dettaglio: `opzione ${n}: ${contro.dettaglio}` });
+    if (perOwner) {
+      for (const [campo, r] of [['pro', pro], ['contro', contro]]) {
+        if (r.valore.trim()) continue;
+        return no(`${campo}_mancante`, `l'opzione ${n} non ha il ${campo}: ogni opzione dice cosa guadagna e cosa costa, in una riga ciascuno`,
+          { campo: `opzioni[${i}].${campo}` });
+      }
+    }
     if (!ha(o, 'azione')) return no('parametri_non_validi', `l'opzione ${n} non ha l'azione: ogni opzione dice cosa fa il suo pulsante`);
     const a = validaAzione(o.azione);
     if (!a.ok) return Object.assign(a, { dettaglio: `opzione ${n}: ${a.dettaglio}` });
