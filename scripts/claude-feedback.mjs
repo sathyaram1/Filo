@@ -331,7 +331,9 @@ export function riferimentiAllegati(fields, conversazione = '') {
     if (a.kind === 'file') documenti.push({ url: a.url, nome: a.name, type: a.type, conversazione: true });
     else immagini.push({ url: a.url, conversazione: true });
   }
-  const conIndice = (lista, tipo) => lista.filter((a) => a.url).map((a, i) => ({ tipo, nome: a.nome || '', type: a.type || '', url: a.url, conversazione: a.conversazione, indice: i + 1 }));
+  // L'indice conta dentro la sua fonte: «la sua immagine 1 della conversazione» è la prima dei commenti.
+  const conIndice = (lista, tipo) => [false, true].flatMap((conv) => lista.filter((a) => a.url && a.conversazione === conv)
+    .map((a, i) => ({ tipo, nome: a.nome || '', type: a.type || '', url: a.url, conversazione: conv, indice: i + 1 })));
   return [...conIndice(immagini, 'immagine'), ...conIndice(documenti, 'documento')];
 }
 
