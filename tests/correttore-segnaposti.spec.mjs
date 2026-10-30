@@ -1,10 +1,24 @@
 // #1448 — i segnaposti del correttore con modello e ricerca finti: «nel 14xx» mostra 1492 sopra le x e un clic lo mette
 // col lampo; «x te», «3x4» e i baci restano senza segni; un dato di adesso passa dalla ricerca finta e il tasto destro ne
 // cita la fonte e la data; «Correggi tutti gli errori» riempie i segnaposti; spenti, niente. Nessuna chiamata esce.
+// I contatori (#1586): ogni ricerca, il suo esito, il valore messo o ignorato, e il costo della pagina delicata.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { voceOggi } from './helpers/riquadriOggi.mjs';
+
+// La proposta del correttore per i segnaposti, nell'ora di oggi: [mostrata, accettata, rifiutata, ignorata].
+const suggerimentoOggi = (app) => app.evaluate(async () => {
+  const s = await globalThis.SN_CONTATORI_MAIN.letto();
+  const g = globalThis.SN_CONTATORI.giornoDi(Date.now());
+  const tot = [0, 0, 0, 0];
+  for (const [id, ora] of Object.entries(s.ore || {})) {
+    if (!id.startsWith(`${g}T`)) continue;
+    for (const c of Object.values((ora.correttore || {}).suggerimento || {})) c.forEach((n, i) => { tot[i] += n; });
+  }
+  return tot;
+});
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:60px 20px 20px;font:16px sans-serif">
