@@ -50,8 +50,8 @@ test('leggiNumeri: un numero assente è null, non zero', () => {
 test('rigaAccount: percentuale, limite, passo di oggi, rinnovo, e perché è fermo; un numero mancante è un trattino', () => {
   const rinnovo = new Date(2026, 9, 13, 19, 0).getTime();
   const riga = RC.rigaAccount('A', { pct: 46.5, limite: 90, passo: { spesoPct: 3, quotaPct: 12.4, giornoDaMs: rinnovo - 24 * 3600e3 }, rinnovoAtMs: rinnovo, fermo: '' });
-  assert.match(riga, /^46,5% della settimana, limite 90% · oggi 3% su 12,4% · rinnova /);
-  assert.doesNotMatch(riga, /fermo/);
+  assert.match(riga, /^46,5% della settimana, limite 90% · resta 43,5% · oggi 3% su 12,4% · rinnova /);
+  assert.doesNotMatch(riga, /fermo|\$|accensioni/, 'senza dollari né accensioni dal server non se ne inventano');
   assert.match(RC.rigaAccount('A', { pct: 91, limite: 90, fermo: 'riserva' }), /fermo: riserva raggiunta/);
   assert.match(RC.rigaAccount('B', { pct: 81, limite: 80, fermo: 'riserva' }), /fermo: tetto raggiunto/);
   assert.match(RC.rigaAccount('B', { pct: 20, passo: { spesoPct: 21, quotaPct: 20, giornoDaMs: rinnovo }, fermo: 'passo' }), /fermo fino a /);
