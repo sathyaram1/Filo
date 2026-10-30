@@ -435,6 +435,27 @@ describe('release da riga di comando', () => {
     } finally { srv.close(); }
   });
 
+  // Un push a mano in cloud resta fermo sul controllo dei permessi (#1797): in routine la strada è il guasto, e regge.
+  test('push fallito in una routine: niente push a mano, e il rilascio col guasto che suggerisce passa', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { work } = scena();
+    try {
+      g(work, ['checkout', '-q', '-b', 'worker/11b']);
+      g(work, ['remote', 'set-url', 'origin', resolve(work, 'non-esiste.git')]);
+      commitFile(work, 'lavoro.js');
+      const env = { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1', FILO_ROUTINE: '1' };
+      const r = await cli(['release', 'tkt-cli'], env);
+      assert.notEqual(r.code, 0);
+      assert.match(r.se, /Non spingere a mano/);
+      assert.doesNotMatch(r.se, /sistema il push/);
+      assert.match(r.se, /--guasto "guasto: github: [^"]*" --senza-push/);
+      const g2 = await cli(['release', 'tkt-cli', '--guasto', 'guasto: github: push rifiutato', '--senza-push'], env);
+      assert.equal(g2.code, 0, `stderr: ${g2.se}`);
+      assert.match(g2.so, /guasto dichiarato/);
+      assert.equal(ricevute.filter((x) => x.url.includes('routineRelease')).length, 1);
+    } finally { srv.close(); }
+  });
+
   test('--senza-push e --senza-rapporto: rilascio nudo, come prima', async () => {
     const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
     const { work } = scena();

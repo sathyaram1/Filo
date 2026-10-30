@@ -60,6 +60,11 @@
 //         deve succedere sempre non si chiede a chi lavora. Senza biglietto fra
 //         gli argomenti lo ritrova da solo, come le consegne.
 //
+//   node scripts/routine-channel.mjs veglia <biglietto>
+//       → chi guida il giro, su un worker spostato in sottofondo (#1797): aspetta al massimo una fetta (lib/veglia-worker.mjs).
+//         Exit 0 = ha rilasciato il biglietto, 5 = lavora ancora (si rilancia), 3 = fermo da 20 minuti senza segni di
+//         vita: biglietto già rilasciato con un guasto dichiarato, il giro si chiude.
+//
 //   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--forza]
 //       → exit 5, e niente rilasciato, se nella cartella lavora ancora qualcuno (#1480): per l'orchestratore un
 //         battito, un salvataggio recente o un processo (`--forza` solo per il worker morto davvero), per un worker
@@ -486,8 +491,23 @@ export function creditiDi(opts = {}) {
   try { return (o.misureCrediti || misureCrediti)(o); } catch (_) { return {}; }
 }
 
+/**
+ * La misura del lavoro per il server (#1797): senza, un worker fermo su un permesso batte per ore e il server lo conta
+ * vivo. Best-effort come le altre misure: un errore la lascia fuori, mai il battito.
+ */
+export async function attivitaDi(t, opts = {}) {
+  const o = opts || {};
+  try {
+    if (o.attivitaDi) return o.attivitaDi(t);
+    const { segniDiVita, attivitaPerBattito } = await import('./lib/veglia-worker.mjs');
+    return attivitaPerBattito(segniDiVita({ root: o.root || ROOT, ticket: t }));
+  } catch (_) {
+    return {};
+  }
+}
+
 export async function heartbeat(t, opts = {}) {
-  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts), ...creditiDi(opts) }, opts);
+  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts), ...creditiDi(opts), ...(await attivitaDi(t, opts)) }, opts);
   if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt, avvisi: Array.isArray(body.avvisi) ? body.avvisi : [] };
   const reason = String((body && body.reason) || `http_${status}`);
   return { ok: false, reason, final: BATTITO_FINITO.has(reason) };
@@ -1410,7 +1430,7 @@ if (isMain) {
     // la copia fissata, `scripts/…` porterebbe a quello del ramo di lavoro —
     // cioè proprio la cosa che il contratto dei worker vieta di scrivere a mano.
     const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
-    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|release|deliver|operazione|segnala|rapporto|sporca|git-server|ramo-server|compare|domanda|risposta> <segreto> [...]`);
+    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|veglia|release|deliver|operazione|segnala|rapporto|sporca|git-server|ramo-server|compare|domanda|risposta> <segreto> [...]`);
     process.exit(1);
   };
 
@@ -1559,6 +1579,32 @@ if (isMain) {
         await defaultSleep(RETRY_EVERY_MS);
       }
     }
+  } else if (cmd === 'veglia') {
+    if (args.length !== 1 || !looksLikeTicket(args[0]) || Object.keys(data).length) {
+      console.error('Uso: veglia <biglietto> — solo il biglietto del worker che vegli. Non ho fatto niente.');
+      process.exit(1);
+    }
+    const nelClone = cloneDelBiglietto(ROOT, args[0]);
+    if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
+    const { veglia, segniDiVita, FETTA_MS } = await import('./lib/veglia-worker.mjs');
+    const { stopBeat } = await import('./lib/routine-beat.mjs');
+    const ticket = args[0];
+    const fetta = Number(process.env.FILO_VEGLIA_FETTA_MS);
+    const esito = await veglia({
+      fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
+      leggi: () => segniDiVita({ root: ROOT, ticket }),
+      // Il rilascio è quello di sempre, dalla cartella che tiene il biglietto; della sua stampa passa solo l'esito.
+      rilascia: (guasto, mio) => {
+        const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'release', ticket, '--role', 'orchestrator', '--forza',
+          '--guasto', guasto, ...(mio ? [] : ['--senza-push'])], { encoding: 'utf8', env: process.env });
+        const ok = r.status === 0 && /OK: biglietto rilasciato/.test(String(r.stdout || ''));
+        if (!ok) stopBeat(ROOT, { ticket });
+        const motivo = ok ? '' : (String(r.stdout || '').match(/rilascio non riuscito \(([^)]{1,80})\)/) || [])[1] || `uscita ${r.status}`;
+        return { ok, motivo };
+      },
+    });
+    console.log(esito.testo);
+    process.exit(esito.uscita);
   } else if (cmd === 'release') {
     // `--guasto "motivo"`: il guasto si dichiara AL CANALE nel rilascio, non a
     // parole nel testo di ritorno (che nessuna macchina legge).
@@ -1619,7 +1665,11 @@ if (isMain) {
       const p = pushRamoCorrente(ROOT);
       if (!p.ok) {
         console.error(`Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`);
-        console.error('Non ho rilasciato niente: sistema il push e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
+        // In una routine un push a mano resta fermo sul controllo dei permessi, che in cloud nessuno approva (#1797).
+        const inRoutine = (Boolean(process.env.FILO_ROUTINE) && process.env.FILO_ROUTINE !== '0') || !!marcatore;
+        console.error(inRoutine
+          ? 'Non ho rilasciato niente. Non spingere a mano: in cloud il controllo dei permessi ferma il push e la sessione resta appesa. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando, che rispedisce da sé; altrimenti è un guasto: rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push.'
+          : 'Non ho rilasciato niente: il ramo deve arrivare su origin prima del rilascio. Rimetti a posto la spedizione e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
         process.exit(1);
       }
       if (p.avviso) console.error(p.avviso);

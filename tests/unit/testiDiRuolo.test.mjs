@@ -190,3 +190,56 @@ test('come si nomina una prova del giro lo spiega un testo solo, e le risposte d
     assert.match(t, /- r2 \[1i\] il bordo è freddo/);
   }
 });
+
+// Un `git push` lanciato a mano in cloud resta fermo sul controllo dei permessi, che nessuno approva: la sessione di
+// #1776 è rimasta così per ore, quattro volte (#1797). Nessun testo che un ruolo o un agente riceve lo chiede; la sola
+// riga che lo nomina è la regola che lo vieta, nel contratto dei worker.
+test('nessun ruolo chiede un git push a mano: lo nomina solo la regola che lo vieta', () => {
+  const AGENTI = join(ROOT, '.claude', 'agents');
+  const superfici = [
+    ...readdirSync(RUOLI).filter((n) => n.endsWith('.md')).map((n) => [n, join(RUOLI, n)]),
+    ...readdirSync(AGENTI).filter((n) => n.endsWith('.md')).map((n) => [`agente ${n}`, join(AGENTI, n)]),
+  ];
+  const PUSH = /\bgit\s+(?:-C\s+(?:"[^"]*"|\S+)\s+|-c\s+\S+\s+)*push\b/g;
+  const regola = (t) => t.slice(t.indexOf('## Niente push a mano'), t.indexOf('\n## ', t.indexOf('## Niente push a mano') + 1));
+  const fuori = [];
+  for (const [nome, file] of superfici) {
+    const t = readFileSync(file, 'utf8').replace(/\r/g, '');
+    const ammessa = nome === '_contratto-worker.md' ? regola(t) : '';
+    const resto = ammessa ? t.replace(ammessa, '') : t;
+    for (const m of resto.matchAll(PUSH)) fuori.push(`${nome}: …${resto.slice(Math.max(0, m.index - 40), m.index + 40).replace(/\s+/g, ' ')}…`);
+  }
+  assert.deepEqual(fuori, [], 'un push lo fanno il salvataggio e il rilascio; la riproduzione di git va in un unit test');
+  for (const ruolo of ['new-work', 'fixer', 'verifier', 'secaudit', 'risposta', 'smistamento']) {
+    const t = readRoleInstructions(ruolo).replace(/\s+/g, ' ');
+    assert.match(t, /## Niente push a mano/, `${ruolo}: manca la regola`);
+    assert.match(t, /git init --bare/, `${ruolo}: la strada al posto del push`);
+    assert.match(t, /guasto: permessi <programma>/, `${ruolo}: un comando negato è un guasto`);
+  }
+  // La sentinella vede anche le forme che un ruolo potrebbe scrivere.
+  for (const s of ['git push origin x', 'git -C "/tmp/a b" push', 'git -c x=y push --dry-run']) assert.ok(new RegExp(PUSH.source).test(s), s);
+  assert.ok(!new RegExp(PUSH.source).test('git-server push "<CLONE>" <ramo>'), 'il push del server passa dal canale');
+});
+
+// Anche la risposta del server che dispatch stampa è un'istruzione del ruolo: la pulizia dopo un «pass» la spedisce il
+// rilascio, e un «spingi» manderebbe chi verifica sullo stesso permesso che nessuno approva (#1797).
+test('la risposta a una verifica superata con derivati non chiede un push a mano', async () => {
+  const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
+  const t = verifierReplyText({ outcome: 'pass', derived: [{ level: 1, sede: 'e', text: 'bordo freddo', priority: 1, num: '#7.1', n: 1 }] });
+  assert.match(t, /Prove del giro da TOGLIERE/);
+  assert.doesNotMatch(t, /\bspingi\b|\bgit\s+push\b/i);
+  assert.match(t, /lo spedisce il rilascio/);
+});
+
+// Il worker spostato in sottofondo si veglia: senza, chi guida chiude il turno e aspetta una notifica che da un worker
+// fermo su un permesso non arriva mai (#1797). La regola è una, in un pezzo condiviso, per le due sessioni che guidano.
+test('chi guida il giro veglia il worker in sottofondo, e la notifica di fine non decide niente', async () => {
+  const { espandiInclusioni: espandi } = await import('../../scripts/lib/role-text.mjs');
+  for (const f of ['orchestrator.md', 'sessione.md']) {
+    const t = espandi(readFileSync(join(RUOLI, f), 'utf8'), RUOLI).replace(/\s+/g, ' ');
+    assert.match(t, /node scripts\/routine-channel\.mjs veglia <biglietto>/, `${f}: il comando della veglia`);
+    assert.match(t, /\*\*exit 3\*\*: era fermo da venti minuti/, f);
+    assert.match(t, /La notifica di fine del worker non fa ripartire niente/, f);
+    assert.doesNotMatch(t, /aspetta la notifica di fine|la notifica di fine del worker ti risveglia/i, `${f}: la regola vecchia è rimasta`);
+  }
+});

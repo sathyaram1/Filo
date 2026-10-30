@@ -1537,7 +1537,7 @@ export function verifierReplyText(reply, id = '<id>') {
       // Toglierle è un commit, e un commit dopo il verdetto lo farebbe decadere:
       // qui è tollerato, e dirlo serve a non lasciarle rosse per paura. Solo
       // TOGLIERE però: una riga aggiunta dopo il verdetto lo fa decadere.
-      derivati.length ? '  Poi `git add -A && git commit`, e spingi: quel commit non fa decadere il verdetto, finché lì si TOGLIE' : null,
+      derivati.length ? '  Poi `git add -A && git commit`, senza push a mano (lo spedisce il rilascio): quel commit non fa decadere il verdetto, finché lì si TOGLIE' : null,
       derivati.length ? '  e non si aggiunge niente. Una prova che copre anche un caso ancora aperto non si cancella: toglile il caso' : null,
       derivati.length ? '  che se ne va, e lascia il resto.' : null,
       'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
@@ -2683,7 +2683,7 @@ if (isMainModule) {
           // Solo in cloud: sulla macchina dell'owner le impostazioni utente valgono per tutte le sue sessioni.
           // Anche la sessione di un feedback tiene la parola d'ordine: cieca come l'orchestratore, lancia il worker (#1680 giro 1).
           const cieco = process.env.CLAUDE_CODE_REMOTE === 'true'
-            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', clone: cartellaCloneServer() })
+            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', clone: cartellaCloneServer(), strumenti: tools })
             : { ok: true, saltato: true };
           if (cieco.saltato) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
           if (!cieco.ok) {

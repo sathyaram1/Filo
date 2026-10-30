@@ -19,8 +19,9 @@ export const MODELLI = Object.freeze(['opus', 'sonnet', 'haiku', 'fable']);
 export const SFORZI = Object.freeze(['low', 'medium', 'high', 'xhigh', 'max']);
 export const AL_POSTO_DEL_TESTO = 'Worker finito. Il suo testo di ritorno non ti arriva: sei cieco per design. Il passo dopo lo decidi solo dal canale, come dice il tuo ruolo.';
 // Claude Code sposta in sottofondo un sotto-agente che dura troppo (CLAUDE_AUTO_BACKGROUND_TASKS, circa due minuti) e
-// lo strumento torna con status async_launched: il worker lavora ancora (#1480, D-90).
-export const AL_POSTO_VIVO = 'Worker ANCORA VIVO: Claude Code lo ha spostato in sottofondo mentre lavorava, non è finito. Non rilasciare il suo biglietto, non toccare la cartella, non chiedere biglietti e non lanciare altri worker: chiudi il turno senza fare altro e aspetta la notifica di fine del worker. Quando arriva, riparti dal passo 0 del tuo ruolo, come dopo un worker finito.';
+// lo strumento torna con status async_launched: il worker lavora ancora (#1480, D-90). Un worker fermo su un permesso
+// non manda mai la notifica di fine: decide la veglia (#1797).
+export const AL_POSTO_VIVO = 'Worker ANCORA VIVO: Claude Code lo ha spostato in sottofondo mentre lavorava, non è finito. Non rilasciare il suo biglietto, non toccare la cartella, non chiedere biglietti e non lanciare altri worker: veglialo col comando veglia del tuo ruolo, in primo piano. Con 5 lavora ancora: rilancia la veglia. Con 0 ha finito: vai avanti come dopo un worker finito. Con 3 era fermo e la veglia ha già rilasciato il biglietto col guasto: chiudi il giro. La notifica di fine del worker non decide niente.';
 export const MOTIVO_SOTTOFONDO = 'Il worker si lancia in primo piano (senza run_in_background): in sottofondo il suo testo ti arriverebbe nella notifica.';
 export const MOTIVO_LANCIO = 'Worker in primo piano, con modello e sforzo decisi dal server (quelli della sua definizione se il server non ne ha detti).';
 export const MOTIVO_IMPOSTAZIONI = 'Durante il giro impostazioni e skill restano quelle di partenza: un worker non deve poter spegnere o affiancare il gancio che rende cieco chi guida il giro.';
@@ -56,8 +57,8 @@ export function regoleGit(clone = '') {
 // commenti, niente barre rovesciate (la riga di comando di Windows le mangia), nella regex solo classi di caratteri.
 // Si ferma ogni fonte di configurazione, anche ignota: il progetto vince sull'utente, e un disableAllHooks scritto lì
 // spegnerebbe il gancio (#1182).
-// registro = { testo } del file o { errore }; impronta = sha256 esadecimale.
-export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), registro = null, impronta = null } = {}) {
+// registro = { testo } del file o { errore }; impronta = sha256 esadecimale; strumenti = la copia fissata, già ripulita.
+export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), registro = null, impronta = null, strumenti = "" } = {}) {
   if (!input || !(adesso - Number(creato) < VALIDITA_MS)) return null;
   if (sessione && input.session_id && input.session_id !== sessione) return null;
   if (input.hook_event_name === "ConfigChange") {
@@ -92,9 +93,19 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
   }
   if (input.hook_event_name === "PostToolUse") {
     const r = input.tool_response;
-    const stato = r && typeof r === "object" && typeof r.status === "string" ? r.status : "";
+    const oggetto = !!r && typeof r === "object" && !Array.isArray(r);
+    const stato = oggetto && typeof r.status === "string" ? r.status : "";
     const finito = stato ? stato === "completed" : !/async_launched|background|sottofondo|outputFile/i.test(typeof r === "string" ? r : JSON.stringify(r || ""));
-    return { hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: finito ? AL_POSTO_DEL_TESTO : AL_POSTO_VIVO } };
+    // Claude Code scarta un updatedToolOutput che non ha la forma del ritorno di Agent (una stringa, al posto di un
+    // oggetto) e tiene il suo: il testo si sostituisce dentro la forma, e il lancio in sottofondo, che di testo non ne
+    // porta, riceve la riga come contesto in più (#1797).
+    if (!finito) {
+      const visti = [...new Set([...String(ti.prompt || "").matchAll(/--ticket[^A-Za-z0-9_-]{1,3}([A-Za-z0-9_-]{32,})/g)].map((m) => m[1]))];
+      const veglia = strumenti && visti.length === 1 ? " Comando: node " + strumenti + "/scripts/routine-channel.mjs veglia " + visti[0] : "";
+      return { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: AL_POSTO_VIVO + veglia } };
+    }
+    const sostituto = oggetto ? { ...r, content: [{ type: "text", text: AL_POSTO_DEL_TESTO }] } : AL_POSTO_DEL_TESTO;
+    return { hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: sostituto } };
   }
   return null;
 }
@@ -108,12 +119,15 @@ const PRELUDIO = `/*${ETICHETTA}*/const VALIDITA_MS=${VALIDITA_MS},DURATA_VOCE_M
   + `MOTIVO_SCONOSCIUTO=${JSON.stringify(MOTIVO_SCONOSCIUTO)},MOTIVO_IGNOTO=${JSON.stringify(MOTIVO_IGNOTO)},`
   + `MOTIVO_NOTIFICA=${JSON.stringify(MOTIVO_NOTIFICA)};`;
 
-// Le barre di Windows diventano normali (Node le accetta), così il corpo resta senza barre rovesciate.
-export function comando({ sessione = '', creato, registro = '' }) {
+// Le barre di Windows diventano normali (Node le accetta), così il corpo resta senza barre rovesciate. Gli strumenti
+// finiscono senza virgolette nel comando di veglia: una cartella con spazi o apici resta fuori, e vale il ruolo.
+export function comando({ sessione = '', creato, registro = '', strumenti = '' }) {
+  const dove = String(strumenti || '').split('\\').join('/').replace(/\/+$/, '');
   const opz = JSON.stringify({
     sessione: String(sessione).replace(/[^A-Za-z0-9-]/g, ''),
     creato: Number(creato) || 0,
     fileRegistro: String(registro).split('\\').join('/'),
+    strumenti: /^[A-Za-z0-9_.:/-]+$/.test(dove) ? dove : '',
   });
   const avvio = 'let s="";process.stdin.on("data",(d)=>{s+=d});process.stdin.on("end",()=>{let i;try{i=JSON.parse(s||"{}")}catch(_){return}'
     + `const k=${opz};let r;try{r={testo:require("fs").readFileSync(k.fileRegistro,"utf8")}}catch(e){r={errore:String((e&&e.code)||e)}}`
@@ -159,14 +173,14 @@ export function registraDecisione({ ticket, role = '', model = '', effort = '' }
 const nostro = (gruppo) => (gruppo?.hooks || []).some((h) => String(h?.command || '').includes(ETICHETTA));
 
 // Unisce senza toccare il resto delle impostazioni dell'utente; un file illeggibile non si riscrive.
-export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato = Date.now(), clone = '' } = {}) {
+export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato = Date.now(), clone = '', strumenti = '' } = {}) {
   const file = join(dir, 'settings.json');
   let s = {};
   if (existsSync(file)) {
     try { s = JSON.parse(readFileSync(file, 'utf8') || '{}'); } catch (e) { return { ok: false, file, why: `impostazioni utente illeggibili: ${e.message}` }; }
     if (!s || typeof s !== 'object' || Array.isArray(s)) return { ok: false, file, why: 'impostazioni utente non sono un oggetto' };
   }
-  const cmd = comando({ sessione, creato, registro: join(dir, FILE_REGISTRO) });
+  const cmd = comando({ sessione, creato, registro: join(dir, FILE_REGISTRO), strumenti });
   const hooks = { ...(s.hooks || {}) };
   // ConfigChange senza matcher: ogni fonte arriva a decidi, che sceglie cosa fermare.
   const voci = { PreToolUse: MATCHER_PRIMA, PostToolUse: 'Agent|Task', ConfigChange: '' };
