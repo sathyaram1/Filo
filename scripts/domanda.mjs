@@ -14,7 +14,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 require(join(HERE, '..', 'src', 'shared', 'domande.js'));
 const D = globalThis.SN_DOMANDE;
 
-const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/ownerDomande';
+const FUNZIONI = 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 const USO = [
   'Uso: node scripts/domanda.mjs <comando>',
   '  chiedi <file.json | ->                apre una domanda (JSON da file o da stdin): prima la smista un agente',
