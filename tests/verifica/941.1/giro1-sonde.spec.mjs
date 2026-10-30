@@ -60,8 +60,10 @@ test('tre file insieme: tre avvisi leggibili, nel tema scuro', async ({ shell, o
     const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagina coi file</title></head><body style="padding:40px">
       <a id="a" href="${srv.base}/uno-con-un-nome-molto-lungo-per-vedere-come-si-taglia-nell-avviso-di-filo.bin">1</a>
       <a id="b" href="${srv.base}/due.bin">2</a><a id="c" href="${srv.base}/tre.bin">3</a></body></html>`);
-    await page.evaluate(() => { for (const id of ['a', 'b', 'c']) document.getElementById(id).click(); });
-    await expect.poll(() => statoDi(shell, 'tre.bin'), { timeout: 20_000 }).toBe('progressing');
+    for (const [id, nome] of [['a', 'uno-con-un-nome-molto-lungo-per-vedere-come-si-taglia-nell-avviso-di-filo.bin'], ['b', 'due.bin'], ['c', 'tre.bin']]) {
+      await page.locator(`#${id}`).click();
+      await expect.poll(() => statoDi(shell, nome), { timeout: 20_000 }).toBe('progressing');
+    }
     const vista = await avvisi();
     await expect(avvisoDiVia(vista, 'due.bin')).toBeVisible({ timeout: 10_000 });
     await vista.waitForTimeout(800);
