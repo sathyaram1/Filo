@@ -507,7 +507,9 @@
   // dal preload, che sul pannello tiene il sito all'oscuro del rilascio (src/preload/rilascio-file.js).
   function rilascio(e, { conta = true } = {}) {
     if (!e || !e.isTrusted) return false;
-    if (!Array.from(e.dataTransfer?.types || []).includes(TIPO_RIFERIMENTO)) {
+    // Su un sito il riferimento si ignora: chi lo trascina potrebbe essere il sito, e un testo nascosto dietro un titolo
+    // arriverebbe al modello come parola dell'utente. Lì entra il suo testo, a vista nella casella.
+    if (!riferimentiAmmessi() || !Array.from(e.dataTransfer?.types || []).includes(TIPO_RIFERIMENTO)) {
       // Un testo lasciato nella casella lo scrive il browser: qui si conta solo da dove veniva (#1471).
       if (conta && e.target?.matches?.('.sn-sidebar-input textarea')) {
         let testo = '';
