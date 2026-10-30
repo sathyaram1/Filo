@@ -10,8 +10,16 @@
     // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
       version: '0.2.252', date: '2026-10-29',
-      features: [],
+      features: [
+        'Mentre un file si scarica, la riga dice quanto va veloce e quanto manca alla fine, nella pagina Download e nella carta della home.',
+        'Uno scaricamento non riuscito ha «Riprova» sull\'avviso, nella pagina Download e nella carta della home: riparte nella stessa riga.',
+        'Un file appena scaricato si trascina dall\'avviso, dal pannello dei download o dalla pagina Download dove ti serve: nel campo di un sito che carica file, nella chat di Filo, sul desktop.',
+        'Se chiudi una finestra in incognito mentre un file si sta ancora scaricando, Filo ti chiede se lasciarlo finire o annullarlo. In tutti e due i casi la finestra si chiude.',
+      ],
       fixes: [
+        'Tre download dello stesso file avviati insieme arrivano tutti e tre, come «file», «file (2)» e «file (3)». Prima ne restava uno solo.',
+        'Col nome sensato acceso, un file scaricato che Filo non riesce a rinominare te lo dice, con «Dai un nome» per scriverlo tu. Prima restava col nome di prima senza avvisare.',
+        'I pacchetti Snap e Flatpak sono trattati come programmi: prima di scaricarli e prima di aprirli Filo te lo chiede.',
         'Nelle risposte di Filo un collegamento scritto come codice o in grassetto mostra il suo testo, non più uno «0» o gli asterischi, e un indirizzo seguito da un pezzo di codice porta alla pagina giusta. Una risposta piena di parentesi quadre non blocca più la pagina.',
         'In chat la riga del sito che Filo sta aprendo prende l\'icona appena la scheda la trova. Prima a volte restava senza.',
         'Le schede e il «+» restano fermi quando una scheda comincia o smette di suonare. Su una scheda così stretta che resta solo l\'altoparlante, cliccarlo apre la scheda invece di silenziarla. E il titolo di una scheda stretta mostra almeno la prima lettera, o non si vede: niente più mezze lettere.',
