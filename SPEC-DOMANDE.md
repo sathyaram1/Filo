@@ -128,6 +128,14 @@ Il figlio è fidato se e solo se lo sono tutti i genitori. Lo stesso schema vale
 ogni volta che un agente sporco deve far nascere qualcosa che può restare
 fidato: passa numeri e ruoli, mai testo.
 
+Dal #1153 il biglietto di unione è un compito senza feedback (§ 6.1) con l'ambito
+`unisci` e i soli numeri dei genitori: lo chiede `coda.unione`, su 2–12 feedback
+in coda non ancora iniziati, e finché è aperto nessun altro lavoro prende i
+genitori. Il figlio lo scrive `unisci.scrivi`; i genitori diventano `archived`
+col rimando `unitoIn`. Immagini, documenti, pagina e decisioni dell'owner dei
+genitori li porta il server nel figlio, insieme al segno di chi ha scritto le
+domande di quelle decisioni: l'unione non perde niente.
+
 ### 1.4 Le parole dell'owner
 
 Una risposta dell'owner è un **turno a sé**, scritto col suo token e
@@ -513,13 +521,15 @@ Come funziona oggi (#1152):
   `esito.compito.id`. Il pacemaker tiene la rete: una domanda in lavorazione
   senza il suo compito lo riceve (le risposte di prima di #1152 comprese), un
   compito la cui domanda non lo aspetta più si chiude `superato`.
-- **Biglietto.** La coda dà i compiti senza feedback con la loro urgenza e
+- **Biglietto.** La coda dà i compiti di risposta con la loro urgenza e
   li conta come una priorità 3: non aspettano nessuno, e li passa solo chi ha
-  urgenza più alta. Né il giro su un solo feedback né la chiave dei lavori
+  urgenza più alta (gli altri compiti senza feedback non hanno priorità,
+  § 6.3). Né il giro su un solo feedback né la chiave dei lavori
   server li prendono. Il semaforo è sul compito (`compito:C-n`); il biglietto
-  ha il ruolo `risposta`, nasce pulito solo con compito e domanda fidati e la
-  chiave a rete limitata, e la domanda non fidata lo sporca prima che il testo
-  esca.
+  ha il ruolo `risposta` e l'ambito `lavoro` (§ 5.2: le sue operazioni sulla
+  domanda sono quelle del ruolo), nasce pulito solo con compito e domanda
+  fidati e la chiave a rete limitata, e la domanda non fidata lo sporca prima
+  che il testo esca.
 - **Fascicolo.** La domanda intera (conversazione coi turni dell'owner, i suoi
   allegati aperti dal server, `notePerAgenti`), numero, stato e priorità dei
   feedback che nomina. Il registro (§ 3.6) è testo di altre domande, cioè
@@ -562,7 +572,9 @@ Come funziona oggi (#1152):
   quelle dell'addetto comunicazioni (§ 4.1). Il compito:
   - raggruppa le domande aperte;
   - assorbe in una domanda sola quelle che sono casi dello stesso problema e
-    propone il ripensamento del sistema (le assorbite diventano `superata`);
+    propone il ripensamento del sistema (le assorbite diventano `superata`).
+    Una domanda che ferma un lavoro non si assorbe, perché solo la sua
+    risposta lo riprende: si raggruppa con le altre del suo caso;
   - rivede le priorità.
 
 ### 3.7 Ordine
@@ -597,13 +609,22 @@ All'ora giusta il server ne crea un'istanza: un compito fidato (§ 6) con
 ancora iniziata quando nasce la successiva si chiude come «superata»: le
 istanze non si accumulano.
 
+Un ricorrente lavora con un'istanza alla volta, qualunque porta l'abbia fatta
+nascere. Se all'ora giusta una sua istanza è al lavoro, la cadenza salta quel
+giro: vale quella al lavoro, come per «Avvia adesso», che in quel caso
+rifiuta. Un'istanza nata da un'altra porta (la gestione del lavoro, la risposta
+che anticipa l'addetto comunicazioni) aspetta in coda che quella al lavoro
+chiuda: la coda non dà mai due istanze dello stesso ricorrente insieme.
+
 Un ruolo generico `compito` esegue il testo del ricorrente. I permessi li dà
 l'ambito, non il ruolo. I testi dei ricorrenti stanno nel repo privato del
 server (§ 9), non in questa spec.
 
 Ogni istanza chiude con un **rapporto**: cosa ha fatto, cosa ha trovato, da
 dove deve ripartire la prossima. Resta legato al ricorrente: l'istanza
-successiva lo riceve col biglietto, con la fiducia che aveva. È così che
+successiva lo riceve col biglietto, con la fiducia che aveva. Resta quello
+dell'istanza nata per ultima: il rapporto di una più vecchia che chiude dopo
+non lo sostituisce. È così che
 l'audit sa da quale commit ripartire e la potatura quanti rami sono nuovi.
 Riordino e potatura lo scrivono anche nel taccuino della gestione del lavoro
 (§ 4.3). Un ricorrente che segue cose lunghe settimane ha anche un
@@ -642,6 +663,24 @@ Lo sforzo parte da `high`, come nelle fasi di un feedback dopo il primo lavoro
 (§ 6.4), perché nessun ricorrente costruisce codice da zero. Modello e sforzo si
 vedono e si cambiano su ciascuno, in Routine → Compiti ricorrenti. La gestione
 del lavoro (§ 4.3) può lanciare riordino e potatura anche fuori cadenza.
+
+Com'è fatto dal #1153:
+
+- il server semina la tabella una volta, coi testi di `ruoli/` del suo repo; da
+  lì un ricorrente si cambia, si spegne, si toglie o si aggiunge solo in Routine
+  → Compiti ricorrenti, e uno tolto non torna. Le ore della tabella: revisione
+  delle domande 07:00, gestione del lavoro 06:00, addetto comunicazioni 09:00,
+  riordino lunedì 01:00, potatura lunedì 02:00, audit domenica 00:30;
+- nascono spenti la gestione del lavoro e l'addetto comunicazioni, i cui
+  strumenti arrivano coi punti 9 e 14 (§ 13): un'istanza senza i suoi strumenti
+  spende e basta;
+- il pacemaker fa nascere l'istanza quando l'ora è venuta, con `nonPrimaDi` uguale
+  a quell'ora; dopo un fermo ne nasce una sola, e la prossima ora si conta da
+  adesso. «Avvia adesso» ne fa nascere una subito;
+- il rapporto (`rapporto`) chiude l'istanza e resta sul ricorrente, cifrato, con
+  la fiducia e il segno riservato del biglietto che lo scrive. Un compito senza
+  esito torna in coda; dopo tre tentativi il server lo ferma;
+- la domanda di fine turno di un ricorrente è il suo slot (§ 5.4).
 
 ### 4.2 Due canali di aggiornamento
 
@@ -930,6 +969,23 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
 | `giudizio` | ricevere dal server l'esito di un esperimento e quello dell'originale, senza sapere quale sia quale; consegnare il verdetto | tutto il resto, uscire in rete compreso |
 | `server` | come `lavoro`, più spingere un ramo su filo-security (§ 7) | — solo per biglietti puliti |
 
+L'elenco chiuso delle operazioni e questa tabella vivono come dati in
+`src/shared/ambiti.js` (#1153), che il server incorpora al deploy; una sentinella
+la confronta con questa tabella. Ogni operazione dice quale gamba della triade
+tocca, e una sentinella la controlla su ogni ambito. Un'operazione dell'ambito
+che il server non fa ancora (il taccuino, la curva, i principi) è rifiutata col
+suo nome, come una fuori ambito; `opportunita`, `posta`, `esperimento` e
+`giudizio` non si possono ancora dare a un compito. Le operazioni passano dal
+canale (`routine-channel.mjs operazione`, `segnala`, `rapporto`).
+
+L'ambiente dei riservati lo dichiara la chiave della sua routine
+(`routine-keys.mjs ambiente <nome> riservati`): i suoi biglietti ricevono solo
+compiti, e soltanto loro il testo riservato. Finché nessuna chiave lo dichiara,
+i compiti che lo leggono aspettano, e la Gestione lo dice. Il pacemaker conta il
+lavoro di ogni account con rete e ambiente delle sue chiavi: un'istanza pronta
+accende la routine dei riservati anche a coda vuota, e un feedback non la
+accende mai.
+
 ### 5.3 Ambiti nuovi
 
 Un agente che ne ha bisogno apre una domanda con la proposta: le operazioni,
@@ -968,6 +1024,13 @@ vale per tutti i compiti di quel tipo.
   (§ 5.3), che decide l'owner.
 - **Gli esperimenti** non hanno né l'una né l'altra: scrivono tutto nell'esito
   (§ 4.6).
+
+Dal #1153 la segnalazione libera è `segnala`, che ogni biglietto delle routine
+può fare: un feedback con `tipo: 'segnalazione'`, priorità 0 e la fiducia del
+biglietto, finché il punto 9 non la manda alla gestione del lavoro. Conta nel
+tetto delle consegne del biglietto, come un feedback aperto. La domanda di
+fine turno ha gli slot `tutti`, `orchestrator`, `worker`, uno per ruolo
+(`compito` compreso) e `compito:<ricorrente>`; vale il più preciso.
 
 ## 6. Feedback e compiti
 

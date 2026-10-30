@@ -735,6 +735,12 @@
     COMPITI_ELENCO: 'compiti_elenco',   // { storico?:<n>, prima?:<ms> } → { ok, aperti:[…], storico:[…], altri, adesso } | { ok:false, error }
     COMPITO_CREA: 'compito_crea',       // { compito:{ titolo, istruzioni?, urgenza, modello?, sforzo?, ambito? } } → { ok, id } | { ok:false, error }
     COMPITO_ANNULLA: 'compito_annulla', // { id:'C-n' } → { ok, id } | { ok:false, error }
+    // I compiti ricorrenti (SPEC-DOMANDE.md §4.1), dalla stessa callable: li scrive solo l'owner.
+    RICORRENTI_ELENCO: 'ricorrenti_elenco', // {} → { ok, adesso, ricorrenti:[…], ambiti:[…] } | { ok:false, error }
+    RICORRENTE_SALVA: 'ricorrente_salva',   // { ricorrente:{ id?, nome, testo, giorni, ora, ambito, urgenza, modello, sforzo, attivo, domandaFineTurno } } → { ok, id } | { ok:false, error }
+    RICORRENTE_TOGLI: 'ricorrente_togli',   // { id } → { ok, id } (chiude anche l'istanza in attesa) | { ok:false, error }
+    RICORRENTE_AVVIA: 'ricorrente_avvia',   // { id } → { ok, id, compitoId } | { ok:false, error }
+    AMBITO_TOGLI: 'ambito_togli',           // { nome } → { ok, nome } (solo uno approvato dall'owner, non in uso) | { ok:false, error }
     // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
     // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
     // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner

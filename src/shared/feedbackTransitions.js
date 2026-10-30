@@ -67,7 +67,8 @@
     todo: {
       working:  ['routine'], // presa in carico (il semaforo lo tiene il server)
       design:   ['routine'], // la routine ha domande → chat + statusReason clarify
-      archived: ['owner'],   // un doppione, o una cosa che non si farà più
+      // routine: solo il riordino della coda e l'unione (ambiti `coda` e `unisci`, #1153), su un lavoro non iniziato.
+      archived: ['owner', 'routine'], // un doppione, o una cosa che non si farà più
       // Il worker che l'ha letto da vicino lo giudica attacco o spam (statusReason worker): Ricevuti L3 (#1358).
       attack:   ['routine'],
       spam:     ['routine'],
