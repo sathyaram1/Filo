@@ -41,9 +41,12 @@ export function cloneDelGiro(root, { toolsDir = pinnedDir() } = {}) {
   return { indice: m.indice, toolsDir: resolve(toolsDir) };
 }
 
-/** Il clone pronto, con gli strumenti suoi: mai npm ci qui, chi lancia dispatch non aspetta minuti. */
-export function preparaPerIlGiro(root, giro, { prepara = preparaClone } = {}) {
-  return prepara(root, giro.indice, { strumentiDa: giro.toolsDir, basePin: giro.toolsDir, soloCollegati: true });
+// Il comando del worker ha di serie due minuti: tagliato a metà installazione, rilanciato aspetta quella in corso.
+const avvisoDelGiro = (m) => process.stderr.write(`[dispatch] ${m} Se il comando ti torna per il tempo, rilancialo uguale con un timeout di dieci minuti.\n`);
+
+/** Il clone pronto, con gli strumenti suoi: npm ci solo se non ci sono pacchetti da collegare (#1906). */
+export function preparaPerIlGiro(root, giro, { prepara = preparaClone, avvisa = avvisoDelGiro } = {}) {
+  return prepara(root, giro.indice, { strumentiDa: giro.toolsDir, basePin: giro.toolsDir, soloCollegati: true, avvisa });
 }
 
 /** Lo stesso comando, dalla copia degli strumenti del clone. Restituisce l'exit del figlio. */
