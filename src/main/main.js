@@ -283,7 +283,7 @@ app.whenReady().then(async () => {
   // I tre in background non bloccano l'avvio: finché la config remota non
   // arriva valgono i default del codice, e senza chiavi resta l'analisi locale.
   try { require('./services/defaultsStore').refresh().catch(() => {}); } catch (_) {}
-  // I siti fidati (#967) devono valere prima che si apra la prima scheda: le impostazioni già lette.
+  // Le impostazioni già lette: i siti fidati (#967) devono valere prima che si apra la prima scheda.
   try { require('./services/handlers').wireSafebrowse(impostazioniAvvio).catch(() => {}); } catch (_) {}
   try { require('./services/downloads').init().catch(() => {}); } catch (_) {}
 
