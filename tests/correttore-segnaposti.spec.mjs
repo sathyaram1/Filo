@@ -493,6 +493,9 @@ test('fonti che non rispondono: «La ricerca non è riuscita» e «Cerca di nuov
   await app.evaluate(() => { globalThis.__reteGiu = false; });
   await menu.voce('Cerca di nuovo').click();
   await expect(valore(page, '27')).toBeVisible({ timeout: 8000 });
+  await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'su_richiesta'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1 });
+  expect(await voceOggi(app, 'correttore_segnaposto', 'da_solo')).toEqual({ cercato: 1, fallito: 1 });
+  expect(await voceOggi(app, 'anticipo_privacy', 'segnaposto'), 'una rete giù non è il costo della privacy').toBeNull();
 });
 
 test('col web spento un dato di adesso si cerca solo su Wikipedia, e se non c\'è lo dice', async ({ app, openTab, testServer }) => {
