@@ -1,10 +1,21 @@
 // #1449 — «Valuta» nel tasto destro di un campo: l'Aiuto riceve il testo intero del campo e la richiesta di giudicarlo,
 // risponde il modello della chat con quello che Filo sa dell'utente, e una correzione proposta si scrive nel campo con
 // un clic (un altro la toglie). La stessa voce sta sul suggerimento del correttore. Nessuna chiamata esce dalla macchina.
+// I contatori (#1586): la richiesta, la risposta con o senza correzioni, le correzioni viste, messe e tolte.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { voceOggi } from './helpers/riquadriOggi.mjs';
+
+const valutaOggi = async (app) => {
+  const out = {};
+  for (const e of ['chiesta', 'con_correzioni', 'senza_correzioni', 'correzione_mostrata', 'correzione_accettata', 'correzione_tolta']) {
+    const v = await voceOggi(app, 'correttore_valuta', e);
+    if (v) out[e] = v.n;
+  }
+  return out;
+};
 
 const MODELLO_CHAT = 'deepseek/deepseek-v4-pro';
 const MODELLO_AIUTO = 'deepseek/deepseek-v4-flash';
