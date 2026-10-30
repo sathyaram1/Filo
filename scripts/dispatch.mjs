@@ -1945,9 +1945,10 @@ export function usageText() {
  */
 // `vivo`: un altro lavora nella cartella, e i suoi marcatori (ruolo compreso) non si toccano (#1480).
 function emitHalt(kind, message, { vivo = false } = {}) {
-  process.stderr.write(`[dispatch] ${vivo ? 'LAVORO VIVO' : `GUASTO (${kind})`}: ${message}\n`);
+  const vecchi = kind === 'strumenti_vecchi';
+  process.stderr.write(`[dispatch] ${vivo ? 'LAVORO VIVO' : vecchi ? 'STRUMENTI VECCHI, non è un guasto' : `GUASTO (${kind})`}: ${message}\n`);
   emit({ role: 'halt', kind, message, ...(vivo ? { lavoroVivo: true } : {}) }, {});
-  return { exit: vivo ? USCITA_LAVORO_VIVO : 3 };
+  return { exit: vivo ? USCITA_LAVORO_VIVO : vecchi ? 2 : 3 };
 }
 
 /** Il motivo di un errore imprevisto, da ricopiare dentro `--guasto "…"`: una riga, senza virgolette né `$`. PURA. */
