@@ -1605,7 +1605,8 @@
         loadDelicateCampi();
         // Un «Continua» in un'altra scheda, o la chat, cambia l'elenco mentre la pagina è aperta.
         const f = msg.settings.security && msg.settings.security.safeBrowse && msg.settings.security.safeBrowse.trustedSites;
-        if (Array.isArray(f) && f.join('\n') !== sbFidati.join('\n')) { sbFidati = f.slice(); renderFidati(); }
+        const g = Array.isArray(f) ? fidatiDaMostrare(f) : null;
+        if (g && g.join('\n') !== sbFidati.join('\n')) { sbFidati = g; renderFidati(); }
       }
       const c = msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings && msg.settings.security && msg.settings.security.cookies;
       if (!c) return;
