@@ -300,6 +300,14 @@
     .mg-domanda-titolo { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
     .mg-domanda-prio { flex: 0 0 auto; font-size: 11.5px; color: var(--sn-muted); }
     .mg-domanda-data { font-size: 11.5px; }
+    .mg-domanda-sotto { display: block; margin-top: 2px; font-size: 11.5px; color: var(--sn-muted); }
+    .mg-domanda[draggable="true"] { -webkit-user-drag: element; }
+    /* Con le righe a schermo l'avviso sta in fondo e resta in vista: sotto la lista non la sposta. */
+    .mg-domande-lista:not([hidden]) + .mg-domande-avviso:has(#mgDomandeStato:not([hidden])) {
+      position: sticky; bottom: 0; margin-top: 6px; padding-bottom: 6px;
+      background: var(--sn-bg); border-top: 1px solid var(--sn-border);
+    }
+    .mg-domande-lista:not([hidden]) + .mg-domande-avviso #mgDomandeStato { margin: 8px 4px 6px; }
 
     /* «Applica il consiglio» sulla scelta: prima di partire l'elenco delle etichette, poi l'esito al suo posto. */
     .mg-dom-conferma {
@@ -327,6 +335,20 @@
     .mg-dq-fiducia--no { color: var(--mg-nonfidata-color); border-color: color-mix(in srgb, var(--mg-nonfidata-color) 55%, transparent); }
     /* Cosa fa la domanda al suo lavoro (#1577): ferma si legge come l'urgenza, va avanti resta tenue. */
     .mg-dq-ferma { cursor: help; }
+    /* «non riscritta», «da rivedere»: segni che chiedono un'occhiata, non un allarme. */
+    .mg-dq-segno {
+      padding: 0 6px; border-radius: 999px; cursor: help; font-size: 11.5px; font-weight: 600; text-transform: none; letter-spacing: 0;
+      color: var(--mg-attenzione-color, #b9770e); border: 1px solid color-mix(in srgb, var(--mg-attenzione-color, #b9770e) 55%, transparent);
+    }
+    .mg-dq-h .mg-dq-segno { margin-left: 8px; }
+    .mg-dq-originale-btn {
+      all: unset; cursor: pointer; padding: 0 8px; border-radius: 999px; font-size: 12px;
+      color: var(--sn-accent); border: 1px solid color-mix(in srgb, var(--sn-accent) 45%, transparent);
+      transition: background calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-dq-originale-btn:hover, .mg-dq-originale-btn[aria-expanded="true"] { background: color-mix(in srgb, var(--sn-accent) 14%, transparent); }
+    .mg-dq-originale-btn:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    .mg-dq-originale { padding: 8px 12px; border-left: 2px solid color-mix(in srgb, var(--sn-accent) 45%, var(--sn-border)); }
     .mg-dq-ferma--si { color: var(--mg-urgente-color, #c0392b); font-weight: 600; }
     .mg-dq-legami { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
     .mg-dq-legami-pre { margin-right: 2px; }
@@ -382,6 +404,9 @@
       background: var(--sn-input-bg, transparent); color: var(--sn-fg); font: inherit; font-size: 13.5px;
     }
     .mg-dq-testo:focus { outline: none; border-color: var(--sn-accent); }
+    .mg-dq-parole { margin: -4px 0 0; font-size: 12px; color: var(--sn-muted); }
+    /* Un file trascinato sopra una casella di risposta: la casella dice che lo prende. */
+    .mg-allegati-sopra { border-color: var(--sn-accent) !important; background: color-mix(in srgb, var(--sn-accent) 6%, transparent) !important; }
     .mg-dq-tasti { display: flex; flex-wrap: wrap; gap: 8px; }
     /* Gli allegati della risposta: i nomi in pillole, la × per toglierli, il tasto per aggiungerne. */
     .mg-dq-allegati { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -1886,7 +1911,9 @@
 
     <nav class="mg-tabs" id="mgTabs" role="tablist">
       <button type="button" class="mg-tab" data-tab="domande" role="tab" hidden>Da rispondere</button>
+      <button type="button" class="mg-tab" data-tab="domande-smistamento" role="tab" hidden>In smistamento</button>
       <button type="button" class="mg-tab" data-tab="domande-lavoro" role="tab" hidden>In lavorazione</button>
+      <button type="button" class="mg-tab" data-tab="domande-automatiche" role="tab" hidden>Risposte automatiche</button>
       <button type="button" class="mg-tab" data-tab="domande-archivio" role="tab" hidden>Archivio</button>
       <button type="button" class="mg-tab mg-tab--active" data-tab="inbox" role="tab">Ricevuti</button>
       <button type="button" class="mg-tab" data-tab="queue" role="tab">In coda</button>
@@ -2052,6 +2079,7 @@
                 <label class="mg-usernote-label" for="mgReopenText">Cosa non va / cosa manca</label>
                 <textarea id="mgReopenText" class="mg-accept-comment" rows="3"
                   placeholder="Spiega meglio il problema, indica i passi per riprodurre…"></textarea>
+                <div id="mgReopenAllegati"></div>
                 <div class="mg-actions-row">
                   <button type="button" class="sn-btn sn-btn-secondary" id="mgReopenCancelBtn">Annulla</button>
                   <button type="button" class="sn-btn" id="mgReopenConfirmBtn">Conferma riapertura</button>
@@ -2108,7 +2136,7 @@
       </div>
     </section>
 
-    <!-- Le tre schede di Domande condividono questo pannello; lo disegna manageDomande.js. -->
+    <!-- Le schede di Domande condividono questo pannello; lo disegna manageDomande.js. -->
     <section class="mg-panel" id="panel-domande" data-panel="domande">
       <div class="mg-dom">
         <div class="mg-col" id="mgDomandeCol">
@@ -2121,10 +2149,13 @@
             <button type="button" class="mg-dom-consiglio" id="mgDomandeConsiglioSel" hidden>Applica il consiglio</button>
           </div>
           <div class="mg-col-body">
-            <p class="mg-domande-stato" id="mgDomandeStato" role="status">Caricamento…</p>
-            <button type="button" class="sn-btn sn-btn-secondary" id="mgDomandeRiprova" hidden>Riprova</button>
             <div class="mg-dom-conferma" id="mgDomandeConferma" role="status" hidden></div>
             <ol class="mg-domande-lista" id="mgDomandeLista" hidden></ol>
+            <!-- Sotto la lista: un avviso di lettura fallita non la spinge giù sotto il puntatore (#1331). -->
+            <div class="mg-domande-avviso">
+              <p class="mg-domande-stato" id="mgDomandeStato" role="status">Caricamento…</p>
+              <button type="button" class="sn-btn sn-btn-secondary" id="mgDomandeRiprova" hidden>Riprova</button>
+            </div>
             <p class="mg-domande-stato" id="mgDomandeAltre" hidden></p>
           </div>
         </div>
@@ -3039,6 +3070,7 @@
 
   <div class="mg-lightbox" id="mgLightbox"><img id="mgLightboxImg" alt=""></div>
 
+  <script src="manageAllegati.js"></script>
   <script src="manageDomande.js"></script>
   <script src="manage.js"></script>
   <script src="manageRedteam.js"></script>

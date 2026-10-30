@@ -18,12 +18,23 @@
   const D = window.SN_DOMANDE;
   const $ = (id) => document.getElementById(id);
 
-  const NOMI_SCHEDA = { domande: 'Da rispondere', 'domande-lavoro': 'In lavorazione', 'domande-archivio': 'Archivio' };
+  const NOMI_SCHEDA = {
+    domande: 'Da rispondere', 'domande-smistamento': 'In smistamento', 'domande-lavoro': 'In lavorazione',
+    'domande-automatiche': 'Risposte automatiche', 'domande-archivio': 'Archivio',
+  };
   const VUOTO = {
     domande: 'Nessuna domanda da rispondere.',
+    'domande-smistamento': 'Nessuna domanda in smistamento.',
     'domande-lavoro': 'Nessuna domanda in lavorazione.',
+    'domande-automatiche': 'Nessuna risposta automatica.',
     'domande-archivio': 'Nessuna domanda in archivio.',
   };
+  // Le schede delle chiuse: dalla più recente, senza gruppi, e oltre il tetto dell'elenco ce ne sono altre.
+  const CHIUSE = ['domande-automatiche', 'domande-archivio'];
+  // Una riga trascinata in una chat con Filo arriva come riferimento: lo legge la chat dell'Aiuto (src/content/sidebar.js).
+  const TIPO_RIFERIMENTO = 'application/x-filo-riferimento';
+  // Il riferimento porta la domanda intera; oltre questo tetto la chat riceve il taglio scritto, mai un testo mozzato muto.
+  const RIFERIMENTO_MAX = 30000;
   const PRIORITA = { bloccante: 'Bloccante', importante: 'Importante', quando_puoi: 'Quando puoi' };
   const PRIORITA_PLURALE = { bloccante: 'Bloccanti', importante: 'Importanti', quando_puoi: 'Quando puoi' };
   const TITOLO_NON_FIDATA = 'Chi l’ha scritta ha letto testo che non viene da te: le parole possono essere manipolate. '
@@ -46,14 +57,25 @@
   // La domanda appena risposta: resta nel dettaglio finché non si cambia scheda o se ne apre un'altra.
   let tieni = null;
   const scelte = new Set();
-  const bozze = new Map();
+  // La risposta scritta e non mandata resta come bozza della sua domanda anche a una ricarica (#1331), come la frase
+  // per chi ha segnalato: si toglie solo all'invio riuscito.
+  const CHIAVE_BOZZE = 'filo.gestione.bozzeDomande';
+  const BOZZE_MAX = 200;
+  const bozze = leggiBozze();
   // Gli allegati della risposta, per domanda: partono col testo come righe d'allegato, che il server apre per chi
   // riprende (immagini `rK.j`), come quelli della risposta dalla pagina dei feedback.
-  const allegati = new Map();
-  const caricando = new Map();
-  const ALLEGATI_MAX = { img: 5, file: 5 };
-  const ALLEGATO_MAX_BYTE = 4 * 1024 * 1024;
-  const ALLEGATI_ACCETTA = 'image/*,application/pdf,application/json,text/*,.pdf,.txt,.md,.markdown,.json,.csv,.log,.yml,.yaml';
+  const allegati = window.SN_MG_ALLEGATI.crea({
+    alCambio: () => disegnaDettaglio(),
+    alMessaggio: (id, testo) => {
+      if (testo) avvisi.set(id, { testo, tipo: 'err' });
+      else if (avvisi.has(id) && avvisi.get(id).tipo === 'err') avvisi.delete(id);
+      disegnaDettaglio();
+    },
+  });
+  // Le domande riscritte di cui l'owner ha aperto il testo originale in cima.
+  const originali = new Set();
+  // Le domande chiuse chieste a parte per leggerne il principio (una risposta automatica che lo cita).
+  const fontiChieste = new Set();
   const avvisi = new Map();
   const inCorso = new Set();
   let conferma = null;
@@ -75,6 +97,28 @@
   // Messaggio che il main non conosce ancora, o funzione del server non pubblicata: non è un guasto da riprovare.
   function nonPubblicata(err) {
     return /sconosciut|ancora pubblicat|not[ _-]?found/i.test(String(err || ''));
+  }
+
+  function leggiBozze() {
+    try {
+      const v = JSON.parse(localStorage.getItem(CHIAVE_BOZZE) || '{}');
+      const voci = v && typeof v === 'object' && !Array.isArray(v) ? Object.entries(v) : [];
+      return new Map(voci.filter(([id, t]) => D && D.numeroDi(id) !== null && typeof t === 'string' && t.trim()));
+    } catch (_) { return new Map(); }
+  }
+  function salvaBozze() {
+    // Oltre il tetto restano le più recenti: una Map ricorda l'ordine in cui sono state toccate.
+    while (bozze.size > BOZZE_MAX) bozze.delete(bozze.keys().next().value);
+    try {
+      const piene = [...bozze].filter(([, t]) => String(t || '').trim());
+      if (piene.length) localStorage.setItem(CHIAVE_BOZZE, JSON.stringify(Object.fromEntries(piene)));
+      else localStorage.removeItem(CHIAVE_BOZZE);
+    } catch (_) {}
+  }
+  function scriviBozza(id, testo) {
+    bozze.delete(id);
+    if (String(testo || '').trim()) bozze.set(id, testo);
+    salvaBozze();
   }
 
   function cambia() {
@@ -158,14 +202,16 @@
   function tutteDiScheda(tab) { return stato.domande.filter((d) => MR.schedaDomanda(d) === tab); }
   function diScheda(tab) { return MR.filtraFiducia(tutteDiScheda(tab), soloNonFidate()); }
 
-  // Le schede che aspettano seguono §3.7 (priorità, gruppo, età); l'archivio va dal più recente.
+  // Le schede che aspettano seguono §3.7 (priorità, gruppo, età); le chiuse vanno dalla più recente. In smistamento
+  // l'ordine è lo stesso ma senza gruppi: lì non si risponde, e un gruppo serve a rispondere insieme.
   function blocchi(tab) {
     const mie = diScheda(tab);
-    if (tab === 'domande-archivio') {
+    if (CHIUSE.includes(tab)) {
       const t = (d) => Number(d.modificataIl) || Number(d.creataIl) || 0;
       return mie.slice().sort((a, b) => (t(b) - t(a)) || ((b.numero || 0) - (a.numero || 0)))
         .map((d) => ({ priorita: '', gruppo: '', domande: [d] }));
     }
+    if (tab === 'domande-smistamento') return D.ordina(mie).map((d) => ({ priorita: d.priorita, gruppo: '', domande: [d] }));
     return D.raggruppa(mie);
   }
   function inOrdine(tab) { return blocchi(tab).flatMap((b) => b.domande); }
@@ -205,21 +251,98 @@
     return span;
   }
 
+  // Il numero del lavoro che la domanda tiene fermo, o '' se non ne ferma nessuno.
+  function lavoroFermo(d) {
+    if (!d.blocca || !d.legata || d.attesa) return '';
+    const r = stato.riferimenti && stato.riferimenti[d.legata];
+    return r && typeof r.num === 'string' && r.num ? r.num : 'un lavoro';
+  }
+
   function riga(d, tab, nelGruppo) {
     const li = el('li', `mg-domanda mg-fiducia--${MR.segnoFiducia(d).classe}`);
     li.dataset.id = idDi(d);
     li.dataset.priorita = String(d.priorita || '');
     li.tabIndex = 0;
+    li.draggable = true;
     if (nelGruppo) li.classList.add('mg-domanda--gruppo');
     if (aperta && aperta.ids.includes(li.dataset.id)) li.classList.add('mg-domanda--aperta');
     if (tab === 'domande') li.appendChild(casella([li.dataset.id], `Scegli ${li.dataset.id} per «Applica il consiglio»`));
     li.appendChild(el('span', 'mg-domanda-num', li.dataset.id));
-    li.appendChild(el('span', 'mg-domanda-titolo', d.illeggibile ? 'Non si legge' : String(d.titolo || '(senza titolo)')));
-    if (tab === 'domande-archivio') li.appendChild(el('span', 'mg-domanda-prio', PRIORITA[d.priorita] || ''));
-    const data = quando(tab === 'domande-archivio' ? (d.modificataIl || d.creataIl) : d.creataIl);
-    if (data) li.appendChild(el('span', 'mg-domanda-data', data));
+    const titolo = el('span', 'mg-domanda-titolo', d.illeggibile ? 'Non si legge' : String(d.titolo || '(senza titolo)'));
+    // Sotto il titolo quello che la scheda deve dire senza aprire: la scelta e il principio di un'automatica,
+    // il lavoro che una in smistamento tiene fermo.
+    const sotto = [];
+    if (tab === 'domande-automatiche') {
+      const o = (d.opzioni || [])[sceltaFatta(d)];
+      if (o && o.testo) sotto.push(`scelta: ${o.testo}`);
+      const da = principioUsato(d);
+      if (da) sotto.push(`principio di ${da}`);
+    } else if (tab === 'domande-smistamento') {
+      const fermo = lavoroFermo(d);
+      if (fermo) sotto.push(`ferma ${fermo}`);
+    }
+    if (sotto.length) titolo.appendChild(el('span', 'mg-domanda-sotto', sotto.join(' · ')));
+    li.appendChild(titolo);
+    if (CHIUSE.includes(tab)) li.appendChild(el('span', 'mg-domanda-prio', PRIORITA[d.priorita] || ''));
+    // In smistamento conta da quanto: un agente la tiene minuti, non giorni.
+    const data = CHIUSE.includes(tab) ? quando(d.modificataIl || d.creataIl) : quando(d.creataIl, tab === 'domande-smistamento');
+    if (data) {
+      const t = el('span', 'mg-domanda-data', tab === 'domande-smistamento' ? `da ${data}` : data);
+      if (tab === 'domande-smistamento') t.title = `Nata ${quando(d.creataIl, true)}`;
+      li.appendChild(t);
+    }
     li.appendChild(scudo(d));
     return li;
+  }
+
+  // La lista si aggiorna al suo posto (#1331): una riga che c'era resta lo stesso nodo, così un clic a metà (giù sulla
+  // riga di prima, su sulla rifatta), il fuoco e il puntatore sopra non si perdono a una rilettura.
+  function morfa(v, n) {
+    if (v.nodeType !== n.nodeType || v.nodeName !== n.nodeName) { v.replaceWith(n); return n; }
+    if (v.nodeType === 3) { if (v.nodeValue !== n.nodeValue) v.nodeValue = n.nodeValue; return v; }
+    if (v.nodeType !== 1) return v;
+    for (const a of Array.from(v.attributes)) if (!n.hasAttribute(a.name)) v.removeAttribute(a.name);
+    for (const a of Array.from(n.attributes)) if (v.getAttribute(a.name) !== a.value) v.setAttribute(a.name, a.value);
+    if (v.nodeName === 'INPUT') { v.checked = n.checked; v.indeterminate = n.indeterminate; }
+    const vf = Array.from(v.childNodes);
+    const nf = Array.from(n.childNodes);
+    nf.forEach((x, i) => { if (vf[i]) morfa(vf[i], x); else v.appendChild(x); });
+    for (const x of vf.slice(nf.length)) x.remove();
+    return v;
+  }
+  function chiaveNodo(n) {
+    if (n.dataset.id) return `d:${n.dataset.id}`;
+    if (n.dataset.gruppo) return `g:${n.dataset.gruppo}`;
+    return `p:${n.textContent}`;
+  }
+  function rimetti(lista, nuove) {
+    const prima = Array.from(lista.children);
+    const att = document.activeElement;
+    const conFuoco = att && att !== lista && lista.contains(att) ? prima.findIndex((n) => n.contains(att)) : -1;
+    const voluti = new Set(nuove.map(chiaveNodo));
+    const vecchie = new Map();
+    for (const n of prima) {
+      const k = chiaveNodo(n);
+      if (voluti.has(k) && !vecchie.has(k)) vecchie.set(k, n); else n.remove();
+    }
+    let cursore = lista.firstElementChild;
+    for (const n of nuove) {
+      const v = vecchie.get(chiaveNodo(n));
+      const nodo = v && v.nodeName === n.nodeName ? morfa(v, n) : n;
+      if (nodo === cursore) cursore = cursore.nextElementSibling;
+      else lista.insertBefore(nodo, cursore);
+    }
+    // Chiusa la riga che aveva il fuoco, lo prende quella venuta al suo posto: la tastiera non riparte dall'inizio.
+    if (conFuoco >= 0 && !lista.contains(document.activeElement)) {
+      const ora = Array.from(lista.children);
+      const da = Math.min(conFuoco, ora.length - 1);
+      const vicina = ora.slice(da).concat(ora.slice(0, da).reverse()).find((n) => n.tabIndex >= 0);
+      if (vicina) vicina.focus({ preventScroll: true });
+    }
+  }
+  function listaCheScorre() {
+    const lista = $('mgDomandeLista');
+    return [lista && lista.parentElement, lista].find((x) => x && x.scrollHeight > x.clientHeight) || null;
   }
 
   function disegnaLista() {
@@ -227,15 +350,16 @@
     if (!lista) return;
     const bl = blocchi(scheda);
     const firma = JSON.stringify([scheda, aperta && aperta.ids, [...scelte],
-      bl.map((b) => [b.priorita, b.gruppo, b.domande.map((d) => [d.id, d.titolo, d.stato, d.modificataIl, d.illeggibile, d.fiducia])])]);
+      bl.map((b) => [b.priorita, b.gruppo, b.domande.map((d) => [d.id, d.titolo, d.stato, d.modificataIl, d.illeggibile, d.fiducia,
+        d.priorita, d.blocca, d.legata, lavoroFermo(d), principioUsato(d), sceltaFatta(d)])])]);
     if (firma === firmaLista && !lista.hidden) return;
     firmaLista = firma;
-    lista.replaceChildren();
+    const nuove = [];
     let prio = null;
     for (const b of bl) {
-      if (scheda !== 'domande-archivio' && b.priorita !== prio) {
+      if (!CHIUSE.includes(scheda) && b.priorita !== prio) {
         prio = b.priorita;
-        lista.appendChild(el('li', 'mg-domande-prio', PRIORITA_PLURALE[prio] || 'Senza priorità'));
+        nuove.push(el('li', 'mg-domande-prio', PRIORITA_PLURALE[prio] || 'Senza priorità'));
       }
       const gruppo = b.gruppo && b.domande.length > 1;
       if (gruppo) {
@@ -249,10 +373,14 @@
         if (scheda === 'domande') g.appendChild(casella(ids, `Scegli tutto il gruppo «${b.gruppo}»`));
         g.appendChild(el('span', 'mg-domande-gruppo-nome', b.gruppo));
         g.appendChild(el('span', 'mg-domande-gruppo-n', b.domande.length));
-        lista.appendChild(g);
+        nuove.push(g);
       }
-      for (const d of b.domande) lista.appendChild(riga(d, scheda, gruppo));
+      for (const d of b.domande) nuove.push(riga(d, scheda, gruppo));
     }
+    // La riga sotto il puntatore, o col fuoco, resta dov'è anche se ne arriva o se ne chiude una più su.
+    const PAG = window.SN_FEEDBACK_LIVE_PAGINA;
+    if (PAG && typeof PAG.alSuoPosto === 'function') PAG.alSuoPosto({ lista, voci: '.mg-domanda', scorre: listaCheScorre }, () => rimetti(lista, nuove));
+    else rimetti(lista, nuove);
   }
 
   function disegnaTesta() {
@@ -279,7 +407,7 @@
       filtro.setAttribute('aria-pressed', soloNonFidate() ? 'true' : 'false');
       filtro.title = soloNonFidate() ? 'Mostra anche le domande fidate' : 'Mostra solo le domande non fidate';
       const c = filtro.querySelector('.mg-livello-count');
-      if (c) c.textContent = stato.lette ? ` (${MR.contaNonFidate(tutteDiScheda(scheda))}${stato.altre && scheda === 'domande-archivio' ? '+' : ''})` : '';
+      if (c) c.textContent = stato.lette ? ` (${MR.contaNonFidate(tutteDiScheda(scheda))}${stato.altre && CHIUSE.includes(scheda) ? '+' : ''})` : '';
     }
   }
 
@@ -386,15 +514,37 @@
     }
     const ferma = fermaIlLavoro(d);
     if (ferma) meta.appendChild(ferma);
+    if (d.smistamento === 'fallito') {
+      const s = el('span', 'mg-dq-segno', 'non riscritta');
+      s.title = 'L’agente che la smista non è riuscito a riscriverla: la leggi come l’ha scritta chi chiedeva.';
+      meta.appendChild(s);
+    }
+    if (riscritta(d)) {
+      const aperto = originali.has(d.id);
+      const b = el('button', 'mg-dq-originale-btn', 'Testo originale');
+      b.type = 'button';
+      b.dataset.fai = 'originale';
+      b.setAttribute('aria-expanded', aperto ? 'true' : 'false');
+      b.title = aperto ? 'Chiudi il testo di chi aveva chiesto' : 'Il testo di chi aveva chiesto, prima che un agente lo riscrivesse per te';
+      meta.appendChild(b);
+    }
     const h = el('h2', 'mg-dq-titolo', d.illeggibile ? 'Questa domanda non si legge' : String(d.titolo || '(senza titolo)'));
     const head = el('header', 'mg-dq-testa');
     head.append(meta, h);
     return head;
   }
 
-  // Cosa fa al suo lavoro una domanda aperta (#1577): lo ferma, o lo lascia andare con la consigliata.
+  // Riscritta per l'owner dal compito che la smista (§3.5): il testo di chi chiedeva resta intero nelle note per gli
+  // agenti. Non lo è una uscita com'era (smistamento fallito), né una chiusa prima di arrivare all'owner.
+  function riscritta(d) {
+    const e = d.esito && typeof d.esito === 'object' ? d.esito : {};
+    return !!String(d.notePerAgenti || '').trim() && !d.illeggibile && d.stato !== 'in_smistamento' && d.smistamento !== 'fallito'
+      && !d.soloOwner && !e.automatica && !e.smistata;
+  }
+
+  // Cosa fa al suo lavoro una domanda aperta o in smistamento (#1577): lo ferma, o lo lascia andare con la consigliata.
   function fermaIlLavoro(d) {
-    if (d.stato !== 'aperta' || !d.legata || d.attesa) return null;
+    if ((d.stato !== 'aperta' && d.stato !== 'in_smistamento') || !d.legata || d.attesa) return null;
     const r = stato.riferimenti && stato.riferimenti[d.legata];
     const num = r && typeof r.num === 'string' && r.num ? r.num : 'il lavoro';
     const s = el('span', `mg-dq-ferma${d.blocca ? ' mg-dq-ferma--si' : ''}`, d.blocca ? `ferma ${num}` : `${num} va avanti`);
@@ -404,11 +554,23 @@
     return s;
   }
 
-  // L'ultima scelta fatta su questa domanda, per segnarla nell'archivio.
+  // L'ultima scelta fatta su questa domanda, per segnarla nell'archivio: dalla conversazione, o dall'esito.
   function sceltaFatta(d) {
     const turni = Array.isArray(d.conversazione) ? d.conversazione : [];
     for (let i = turni.length - 1; i >= 0; i--) if (Number.isInteger(turni[i].scelta)) return turni[i].scelta;
-    return null;
+    return d.esito && Number.isInteger(d.esito.scelta) ? d.esito.scelta : null;
+  }
+
+  // La domanda chiusa di cui una risposta automatica ha usato il principio (§3.6): dall'esito, o dal testo che la cita.
+  function principioUsato(d) {
+    const e = d.esito && typeof d.esito === 'object' ? d.esito : null;
+    if (!e || !e.automatica) return '';
+    if (typeof e.principio === 'string' && D.numeroDi(e.principio) !== null) return e.principio.trim();
+    const turni = Array.isArray(d.conversazione) ? d.conversazione : [];
+    for (let i = turni.length - 1; i >= 0; i--) {
+      for (const m of String(turni[i].testo || '').matchAll(/\bD-[1-9]\d{0,8}\b/g)) if (m[0] !== d.id) return m[0];
+    }
+    return '';
   }
 
   function etichettaDi(o) { return o ? D.etichettaAzione(o.azione, stato.riferimenti) : null; }
@@ -467,7 +629,9 @@
     corpo.appendChild(el('span', 'mg-dq-consiglio-n', `Opzione ${d.consiglio.opzione + 1}`));
     if (d.consiglio.perche) corpo.appendChild(md(d.consiglio.perche));
     const s = sezione('mg-dq-consiglio', 'Consiglio', corpo);
-    const etichetta = d.stato === 'aperta' ? etichettaDi(o) : null;
+    // Con un'opzione sola il pulsante dell'opzione è già il consiglio: due pulsanti uguali non servono (#1640).
+    const doppio = (d.opzioni || []).length === 1;
+    const etichetta = d.stato === 'aperta' && !doppio ? etichettaDi(o) : null;
     if (etichetta) {
       const b = el('button', 'sn-btn mg-dq-applica', `Applica il consiglio: ${etichetta}`);
       b.type = 'button';
@@ -488,7 +652,7 @@
     else if (e && e.smistata === 'guasto') testo = 'Era un guasto: l’ha preso un feedback del difetto, e il lavoro fermo lo aspetta.';
     else if (e && e.smistata === 'ricevuti') testo = 'Era una richiesta per te: il lavoro è nei Ricevuti.';
     else if (e && e.archiviata) testo = `Archiviata senza azioni${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
-    else if (e && e.automatica) testo = 'Risposta automatica.';
+    else if (e && e.automatica) return null;
     else if (e && e.ok === false && e.errore === 'in_corso') testo = 'Risposta in corso sul server…';
     else if (e && e.ok === false) { testo = 'L’ultima risposta non è stata applicata: il motivo è nella conversazione.'; tipo = 'err'; }
     else if (d.stato === 'in_lavorazione') testo = e && e.compito && e.compito.da ? `Affidata a un agente ${ilGiorno(e.compito.da)}.` : 'Affidata a un agente.';
@@ -501,6 +665,43 @@
     else if (e && e.ok && d.stato === 'chiusa') testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
     if (!testo) return null;
     return el('p', `mg-dq-esito${tipo ? ` mg-dq-esito--${tipo}` : ''}`, testo);
+  }
+
+  // Una risposta automatica dice quale principio ha usato e lo fa leggere; la riapertura lo segna da rivedere (§3.6).
+  function automatica(d) {
+    if (!(d.esito && d.esito.automatica)) return null;
+    const da = principioUsato(d);
+    const frase = el('p', 'mg-dq-esito');
+    if (da) frase.append('Risposta automatica col principio di ', legame('domanda', da), '.');
+    else frase.textContent = 'Risposta automatica.';
+    if (!da) return frase;
+    const fonte = trova(da);
+    if (!fonte) chiediFonte(da);
+    const box = el('div', 'mg-dq-auto');
+    box.appendChild(frase);
+    const testo = fonte && fonte.principio ? md(fonte.principio)
+      : el('p', 'mg-dq-esito', fonte ? `${da} non ha più un principio scritto.` : `Leggo il principio di ${da}…`);
+    const s = sezione('mg-dq-principio', `Principio di ${da}`, testo);
+    if (fonte && fonte.principioContestato) s.querySelector('.mg-dq-h').appendChild(segnoContestato());
+    box.appendChild(s);
+    return box;
+  }
+
+  function segnoContestato() {
+    const c = el('span', 'mg-dq-segno', 'da rivedere');
+    c.title = 'L’hai contestato riaprendo una risposta automatica: nessuno lo riusa finché non rispondi alla domanda riaperta.';
+    return c;
+  }
+
+  // Il principio citato da un'automatica sta su una domanda chiusa che l'elenco può non avere: la si chiede una volta.
+  async function chiediFonte(id) {
+    if (finte || fontiChieste.has(id)) return;
+    fontiChieste.add(id);
+    const m = await chiedi({ type: T.mostra, id });
+    if (!m.ok || !m.domanda) return;
+    aggiorna(m.domanda);
+    if (m.riferimenti && typeof m.riferimenti === 'object') Object.assign(stato.riferimenti, m.riferimenti);
+    cambia();
   }
 
   function autoreDi(a) {
@@ -539,6 +740,8 @@
     const box = el('div', 'mg-dq-risposta');
     const occupata = inCorso.has(d.id);
     const rispondibile = d.stato === 'aperta' || d.stato === 'in_lavorazione';
+    // In smistamento la tiene un agente: si legge e basta, e l'unica cosa che si può fare è archiviarla.
+    const inSmistamento = d.stato === 'in_smistamento';
     if (rispondibile && !d.illeggibile) {
       const ta = el('textarea', 'mg-dq-testo');
       ta.rows = 3;
@@ -546,8 +749,13 @@
       ta.value = bozze.get(d.id) || '';
       ta.dataset.id = d.id;
       ta.disabled = occupata;
+      allegati.collega(ta, d.id);
       box.appendChild(ta);
-      box.appendChild(rigaAllegati(d.id, occupata));
+      // D-186: l'azione parte solo dal pulsante di un'opzione, le parole le legge un agente.
+      if (d.stato === 'aperta' && (d.opzioni || []).length) {
+        box.appendChild(el('p', 'mg-dq-parole', 'Le parole non riprendono il lavoro: per riprenderlo scegli un’opzione'));
+      }
+      box.appendChild(allegati.riga(d.id, { disabilitata: occupata }));
     }
     const tasti = el('div', 'mg-dq-tasti');
     const tasto = (testo, fai, cls, titolo) => {
@@ -559,9 +767,9 @@
       tasti.appendChild(b);
     };
     if (rispondibile && !d.illeggibile) tasto(d.stato === 'aperta' ? 'Rispondi' : 'Aggiungi', 'testo', '', TASTO_MANDA ? `Manda il testo (${TASTO_MANDA})` : 'Manda il testo');
-    tasto('Discutiamone', 'discuti', 'sn-btn-secondary', `Copia «Discutiamo la domanda ${idDi(d)}» da incollare in una sessione locale`);
-    if (rispondibile) tasto('Archivia', 'chiudi', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
-    else if (d.esito && d.esito.archiviata) tasto('Riapri', 'riapri', 'sn-btn-secondary', 'Rimettila fra quelle da rispondere');
+    if (!inSmistamento) tasto('Discutiamone', 'discuti', 'sn-btn-secondary', `Copia «Discutiamo la domanda ${idDi(d)}» da incollare in una sessione locale`);
+    if (rispondibile || inSmistamento) tasto('Archivia', 'chiudi', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
+    else if (riapribile(d)) tasto('Riapri', 'riapri', 'sn-btn-secondary', titoloRiapri(d));
     box.appendChild(tasti);
     const a = avvisi.get(d.id);
     const msg = el('p', `mg-dq-msg${a && a.tipo ? ` mg-dq-msg--${a.tipo}` : ''}`, a ? a.testo : '');
@@ -570,69 +778,14 @@
     return box;
   }
 
-  function etichettaAllegato(a, i) {
-    return a.kind === 'img' ? `Immagine ${i + 1}` : (a.name || 'allegato');
+  // Si riapre un'archiviata senza azioni, e una risposta automatica che non torna (§3.6).
+  function riapribile(d) {
+    return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica));
   }
-
-  function rigaAllegati(id, occupata) {
-    const riga = el('div', 'mg-dq-allegati');
-    const lista = allegati.get(id) || [];
-    let immagini = 0;
-    lista.forEach((a, i) => {
-      if (a.kind === 'img') immagini += 1;
-      const chip = el('span', 'mg-dq-allegato', a.kind === 'img' ? `Immagine ${immagini}` : (a.name || 'allegato'));
-      chip.title = a.name || '';
-      const x = el('button', 'mg-dq-allegato-x', '×');
-      x.type = 'button';
-      x.dataset.fai = 'togli-allegato';
-      x.dataset.indice = String(i);
-      x.title = 'Togli';
-      x.setAttribute('aria-label', `Togli ${a.name || 'l’allegato'}`);
-      x.disabled = occupata;
-      chip.appendChild(x);
-      riga.appendChild(chip);
-    });
-    const b = el('button', 'sn-btn sn-btn-secondary mg-dq-allega', caricando.get(id) ? 'Caricamento…' : '+ Allega');
-    b.type = 'button';
-    b.dataset.fai = 'allega';
-    b.title = 'Immagini o file per chi riprende il lavoro; puoi anche incollarli nel testo';
-    b.disabled = occupata || !!caricando.get(id);
-    const input = el('input', 'mg-dq-file');
-    input.type = 'file';
-    input.multiple = true;
-    input.accept = ALLEGATI_ACCETTA;
-    input.hidden = true;
-    input.dataset.id = id;
-    riga.append(b, input);
-    return riga;
-  }
-
-  async function aggiungiAllegati(id, files) {
-    const AT = window.SN_FEEDBACK_ATTACH;
-    const FB = window.SN_FEEDBACK;
-    for (const file of files) {
-      const lista = allegati.get(id) || [];
-      const tipo = AT && typeof AT.classify === 'function' ? AT.classify(file) : (/^image\/(png|jpe?g|gif|webp|bmp)$/i.test(file.type || '') ? 'image' : null);
-      let errore = '';
-      if (!tipo) errore = 'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
-      else if (lista.filter((a) => (a.kind === 'img') === (tipo === 'image')).length >= ALLEGATI_MAX[tipo === 'image' ? 'img' : 'file']) errore = `Massimo ${ALLEGATI_MAX.img} immagini e ${ALLEGATI_MAX.file} file per risposta.`;
-      else if (file.size > ALLEGATO_MAX_BYTE) errore = `«${file.name || 'file'}» è troppo grande (massimo 4 MB).`;
-      else if (!FB || typeof FB.uploadAttachment !== 'function') errore = 'Il caricamento degli allegati non è disponibile qui.';
-      if (errore) { avvisi.set(id, { testo: errore, tipo: 'err' }); disegnaDettaglio(); continue; }
-      caricando.set(id, (caricando.get(id) || 0) + 1);
-      disegnaDettaglio();
-      try {
-        const att = await FB.uploadAttachment(file, file.name);
-        if (att && att.url) allegati.set(id, (allegati.get(id) || []).concat([att]));
-        if (avvisi.has(id) && avvisi.get(id).tipo === 'err') avvisi.delete(id);
-      } catch (e) {
-        avvisi.set(id, { testo: `Allegato non caricato: ${(e && e.message) || e}`, tipo: 'err' });
-      } finally {
-        const n = (caricando.get(id) || 1) - 1;
-        if (n > 0) caricando.set(id, n); else caricando.delete(id);
-        disegnaDettaglio();
-      }
-    }
+  function titoloRiapri(d) {
+    if (!(d.esito && d.esito.automatica)) return 'Rimettila fra quelle da rispondere';
+    const da = principioUsato(d);
+    return `Rimettila fra quelle da rispondere: ${da ? `il principio di ${da}` : 'il principio usato'} resta da rivedere finché non rispondi`;
   }
 
   // Il turno dell'owner porta gli allegati come righe-marcatore: a schermo diventano i loro nomi.
@@ -663,6 +816,9 @@
     const art = el('article', 'mg-dq');
     art.dataset.id = idDi(d);
     art.appendChild(testata(d));
+    // «Testo originale» lo apre qui, sotto il titolo: chi lo chiede non deve scorrere fino in fondo.
+    const originaleInCima = riscritta(d) && originali.has(d.id);
+    if (originaleInCima) art.appendChild(sezione('mg-dq-originale', 'Testo originale', md(d.notePerAgenti)));
     if (d.illeggibile) {
       art.appendChild(el('p', 'mg-dq-esito mg-dq-esito--err', 'Il server non riesce ad aprire il testo di questa domanda.'));
       art.appendChild(risposta(d));
@@ -672,8 +828,9 @@
     if (d.problema) art.appendChild(sezione('', 'Problema', md(d.problema)));
     // Il principio (§3.6) lo scrive chi ha gestito la risposta: è la regola che entra nel registro, e l'owner la vede.
     const principio = d.principio ? sezione('mg-dq-principio', 'Principio', md(d.principio)) : null;
-    for (const parte of [opzioni(d), consiglio(d), esito(d), principio, conversazione(d), risposta(d)]) if (parte) art.appendChild(parte);
-    if (d.notePerAgenti) {
+    if (principio && d.principioContestato) principio.querySelector('.mg-dq-h').appendChild(segnoContestato());
+    for (const parte of [opzioni(d), consiglio(d), esito(d), automatica(d), principio, conversazione(d), risposta(d)]) if (parte) art.appendChild(parte);
+    if (d.notePerAgenti && !originaleInCima) {
       const det = el('details', 'mg-dq-note');
       det.appendChild(el('summary', '', 'Note per gli agenti'));
       det.appendChild(md(d.notePerAgenti));
@@ -686,9 +843,10 @@
     const box = $('mgDomandaDettaglio');
     if (!box) return;
     const ds = aperta ? aperta.ids.map(trova).filter(Boolean) : [];
-    const firma = JSON.stringify([ds.map((d) => [d.id, d.stato, d.modificataIl, d.esito, d.titolo, d.illeggibile,
-      ...(d.opzioni || []).map((o) => etichettaDi(o)), firmaLegami(d)]), [...inCorso], [...avvisi], stato.lette,
-      [...allegati].map(([k, v]) => [k, v.map((a) => a.url)]), [...caricando]]);
+    const fonti = ds.map((d) => principioUsato(d)).filter(Boolean).map((id) => { const f = trova(id); return f ? [id, f.principio, f.principioContestato] : [id]; });
+    const firma = JSON.stringify([ds.map((d) => [d.id, d.stato, d.modificataIl, d.esito, d.titolo, d.illeggibile, d.smistamento,
+      d.principioContestato, ...(d.opzioni || []).map((o) => etichettaDi(o)), firmaLegami(d), lavoroFermo(d),
+      allegati.di(d.id).map((a) => a.url), allegati.caricando(d.id), originali.has(d.id)]), [...inCorso], [...avvisi], stato.lette, fonti]);
     if (firma === firmaDettaglio) return;
     firmaDettaglio = firma;
     // Chi stava scrivendo ritrova il cursore dov'era: il dettaglio si ridisegna anche per un esito altrui.
@@ -824,13 +982,12 @@
   }
 
   async function rispondi(id, scelta) {
-    if (caricando.get(id)) {
+    if (allegati.caricando(id)) {
       avvisi.set(id, { testo: 'Aspetta che gli allegati finiscano di caricarsi.', tipo: 'err' });
       disegnaDettaglio();
       return;
     }
-    const righe = window.SN_FEEDBACK_THREAD ? window.SN_FEEDBACK_THREAD.attachmentsBlock(allegati.get(id) || []) : '';
-    const testo = [(bozze.get(id) || '').trim(), righe].filter(Boolean).join('\n');
+    const testo = [(bozze.get(id) || '').trim(), allegati.righe(id)].filter(Boolean).join('\n');
     const req = { type: T.rispondi, id };
     if (Number.isInteger(scelta)) req.scelta = scelta;
     if (testo) req.testo = testo;
@@ -841,15 +998,15 @@
     }
     const r = await manda(id, req, 'Invio…');
     if (!r) return;
-    if (r.ok) { bozze.delete(id); allegati.delete(id); }
+    if (r.ok) { scriviBozza(id, ''); allegati.svuota(id); }
     const d = r.domanda || trova(id);
-    dopo(id, r, d && d.stato === 'in_lavorazione' ? 'Mandata: la prende un agente.' : 'Fatto.');
+    dopo(id, r, d && d.stato === 'in_lavorazione' ? 'Mandata: la prende un agente.' : 'Mandata.');
   }
 
   async function consiglioUna(id) {
     // Col testo scritto il consiglio è una scelta come le altre: le parole partono con lei.
     const d = trova(id);
-    if (((bozze.get(id) || '').trim() || (allegati.get(id) || []).length) && d && d.consiglio) return rispondi(id, d.consiglio.opzione);
+    if (((bozze.get(id) || '').trim() || allegati.di(id).length) && d && d.consiglio) return rispondi(id, d.consiglio.opzione);
     if (inCorso.has(id)) return;
     inCorso.add(id);
     avvisi.set(id, { testo: 'Applico il consiglio…', tipo: '' });
@@ -867,7 +1024,7 @@
       fine = { ok: true, domanda: m.ok ? m.domanda : null };
     }
     inCorso.delete(id);
-    dopo(id, fine, 'Fatto.');
+    dopo(id, fine, 'Mandata.');
   }
 
   async function discuti(id) {
@@ -883,7 +1040,7 @@
 
   async function archivia(id, riapri) {
     const r = await manda(id, { type: riapri ? T.riapri : T.archivia, id }, riapri ? 'Riapro…' : 'Archivio…');
-    if (r) dopo(id, r, riapri ? 'Riaperta.' : 'Archiviata.');
+    if (r) dopo(id, r, riapri ? 'Riaperta: ora è fra quelle da rispondere.' : 'Archiviata.');
   }
 
   // ── Disegno e scelta di cosa mostrare ─────────────────────────────────────
@@ -942,13 +1099,43 @@
     el0.hidden = !el0.textContent;
     lista.hidden = !n;
     disegnaLista();
-    if (altre && stato.altre && scheda === 'domande-archivio') {
+    if (altre && stato.altre && CHIUSE.includes(scheda)) {
       altre.hidden = false;
-      altre.textContent = 'In archivio ci sono altre domande, più vecchie: qui si vedono le più recenti.';
+      altre.textContent = scheda === 'domande-archivio' ? 'In archivio ci sono altre domande, più vecchie: qui si vedono le più recenti.'
+        : 'Ci sono altre risposte automatiche, più vecchie: qui si vedono le più recenti.';
     }
     disegnaTesta();
     disegnaConferma();
     disegnaDettaglio();
+  }
+
+  // La domanda come la vede l'owner, in testo: è quello che Filo legge di una riga trascinata in chat.
+  function riferimentoDi(d) {
+    const id = idDi(d);
+    const righe = [`Domanda ${id} (${[PRIORITA[d.priorita], NOMI_SCHEDA[MR.schedaDomanda(d)]].filter(Boolean).join(', ').toLowerCase()})`];
+    if (d.illeggibile) righe.push('Il server non riesce ad aprire il testo di questa domanda.');
+    if (d.contesto) righe.push('', 'Contesto:', String(d.contesto));
+    if (d.problema) righe.push('', 'Problema:', String(d.problema));
+    const ops = Array.isArray(d.opzioni) ? d.opzioni : [];
+    if (ops.length) {
+      righe.push('', 'Opzioni:');
+      ops.forEach((o, i) => {
+        const segni = [d.consiglio && d.consiglio.opzione === i ? 'consigliata' : '', sceltaFatta(d) === i && d.stato !== 'aperta' ? 'scelta' : ''].filter(Boolean);
+        righe.push(`${i + 1}. ${o.testo}${segni.length ? ` (${segni.join(', ')})` : ''}`);
+        if (o.pro) righe.push(`   Pro: ${o.pro}`);
+        if (o.contro) righe.push(`   Contro: ${o.contro}`);
+      });
+    }
+    if (d.consiglio && d.consiglio.perche) righe.push('', `Consiglio: opzione ${d.consiglio.opzione + 1}, ${d.consiglio.perche}`);
+    const e = esito(d);
+    if (e) righe.push('', `Esito: ${e.textContent}`);
+    const da = principioUsato(d);
+    if (da) righe.push('', `Risposta automatica col principio di ${da}${trova(da) && trova(da).principio ? `: ${trova(da).principio}` : ''}`);
+    if (d.principio) righe.push('', `Principio: ${d.principio}`);
+    if (d.notePerAgenti) righe.push('', riscritta(d) ? 'Testo originale di chi aveva chiesto:' : 'Note per gli agenti:', String(d.notePerAgenti));
+    let testo = righe.join('\n');
+    if (testo.length > RIFERIMENTO_MAX) testo = `${testo.slice(0, RIFERIMENTO_MAX)}\n[… tagliato qui: altri ${testo.length - RIFERIMENTO_MAX} caratteri]`;
+    return { titolo: `${id} ${d.illeggibile ? '' : String(d.titolo || '')}`.trim(), testo };
   }
 
   // ── Eventi ────────────────────────────────────────────────────────────────
@@ -996,10 +1183,20 @@
       const voci = [{ testo: 'Apri', azione: () => { apri([d.id]); disegna(); } }];
       const et = d.stato === 'aperta' ? etichettaDi(consigliata(d)) : null;
       if (et) voci.push({ testo: `Applica il consiglio: ${et}`, azione: () => { apri([d.id]); disegna(); consiglioUna(d.id); } });
-      voci.push({ testo: `Copia «Discutiamo la domanda ${d.id}»`, azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
-      if (d.stato === 'aperta' || d.stato === 'in_lavorazione') voci.push({ testo: 'Archivia senza azioni', azione: () => { apri([d.id]); disegna(); archivia(d.id, false); } });
-      else if (d.esito && d.esito.archiviata) voci.push({ testo: 'Riapri', azione: () => { apri([d.id]); disegna(); archivia(d.id, true); } });
+      if (d.stato !== 'in_smistamento') voci.push({ testo: `Copia «Discutiamo la domanda ${d.id}»`, azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
+      if (['aperta', 'in_lavorazione', 'in_smistamento'].includes(d.stato)) voci.push({ testo: 'Archivia senza azioni', azione: () => { apri([d.id]); disegna(); archivia(d.id, false); } });
+      else if (riapribile(d)) voci.push({ testo: 'Riapri', titolo: titoloRiapri(d), azione: () => { apri([d.id]); disegna(); archivia(d.id, true); } });
       menu.apri(e.clientX, e.clientY, voci);
+    });
+    lista.addEventListener('dragstart', (e) => {
+      const r = e.target.closest && e.target.closest('.mg-domanda[data-id]');
+      const d = r && trova(r.dataset.id);
+      if (!d || !e.dataTransfer) return;
+      const rif = riferimentoDi(d);
+      e.dataTransfer.setData(TIPO_RIFERIMENTO, JSON.stringify(rif));
+      // Una chat che non conosce il riferimento riceve il testo: anche lì Filo ne legge il contenuto.
+      e.dataTransfer.setData('text/plain', `${rif.titolo}\n\n${rif.testo}`);
+      e.dataTransfer.effectAllowed = 'copy';
     });
   }
 
@@ -1040,7 +1237,7 @@
       if (!ta) return;
       const pieno = !!ta.value.trim();
       const prima = !!(bozze.get(ta.dataset.id) || '').trim();
-      bozze.set(ta.dataset.id, ta.value);
+      scriviBozza(ta.dataset.id, ta.value);
       if (avvisi.has(ta.dataset.id) && avvisi.get(ta.dataset.id).tipo === 'err') avvisi.delete(ta.dataset.id);
       // Il titolo dei pulsanti delle opzioni dice se il testo parte con la scelta.
       if (pieno !== prima) {
@@ -1071,31 +1268,10 @@
       else if (fai === 'discuti') discuti(id);
       else if (fai === 'chiudi') archivia(id, false);
       else if (fai === 'riapri') archivia(id, true);
-      else if (fai === 'allega') { const f = b.closest('.mg-dq-allegati').querySelector('.mg-dq-file'); if (f) f.click(); }
-      else if (fai === 'togli-allegato') {
-        const lista = (allegati.get(id) || []).slice();
-        lista.splice(Number(b.dataset.indice), 1);
-        if (lista.length) allegati.set(id, lista); else allegati.delete(id);
+      else if (fai === 'originale') {
+        if (originali.has(id)) originali.delete(id); else originali.add(id);
         disegnaDettaglio();
       }
-    });
-    det.addEventListener('change', (e) => {
-      const f = e.target.closest('.mg-dq-file');
-      if (!f) return;
-      const files = Array.from(f.files || []);
-      f.value = '';
-      if (files.length) aggiungiAllegati(f.dataset.id, files);
-    });
-    // Incolla: un'immagine negli appunti diventa un allegato, il testo resta testo.
-    det.addEventListener('paste', (e) => {
-      const ta = e.target.closest('.mg-dq-testo');
-      const items = ta && e.clipboardData && e.clipboardData.items;
-      if (!items) return;
-      const files = [];
-      for (const it of items) if (it.kind === 'file') { const b = it.getAsFile(); if (b) files.push(b); }
-      if (!files.length) return;
-      e.preventDefault();
-      aggiungiAllegati(ta.dataset.id, files);
     });
   }
 
