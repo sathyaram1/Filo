@@ -502,7 +502,7 @@ rispondere.
 Come funziona oggi (#1152):
 
 - **Nascita.** La risposta presa (in lavorazione) fa nascere il compito
-  `risposta` (`compiti/C-n`, uno aperto per domanda, puntatore `dq:<id>`) con
+  `risposta` (`compiti/C-n`, uno aperto per domanda, puntatore `dq:<id>`; quello dello smistamento ha `ds:<id>`) con
   la fiducia della domanda dopo il turno dell'owner, e la domanda lo nomina in
   `esito.compito.id`. Il pacemaker tiene la rete: una domanda in lavorazione
   senza il suo compito lo riceve (le risposte di prima di #1152 comprese), un
@@ -571,7 +571,7 @@ gruppo e poi per età. Un gruppo si apre come un blocco solo.
 | `design` + `clarify`/`decisione` | la domanda che scrive chi si ferma, con almeno due opzioni (`riprendi` e un'altra): il server non ne compone più, e una fermata senza domanda si rifiuta alla consegna, per ogni motivo tranne `locale` (#1790). La segnalazione in markdown (`--segnala`) non c'è più |
 | `design` + `locale` | nessuna domanda per il codice del server: un lavoro fidato prende il segno dei lavori server e lo fa la loro routine (#1253); uno non fidato va in Ricevuti L3 come richiesta di renderlo fidato (motivo `fidato`), e «Segna fidato» lo rimette in coda. Diventa domanda solo ciò che chiede il suo PC o un suo passo (una prova sulla sua macchina, segreti, automazioni GitHub), scritta da chi si ferma (#1358) |
 | guasto (#1781) | nessuna domanda e nessuna fermata: chi ci cade lo dichiara nel rilascio (`--guasto "<gruppo>: <il messaggio esatto>"`, il gruppo fisso `guasto: <la cosa rotta>`), e il feedback torna in coda sul suo ramo con la nota del guasto. Al terzo guasto uguale di seguito sullo stesso feedback nasce UNA domanda col conteggio, con un'opzione sola, che il compito della § 3.5 smista come guasto (feedback del difetto, attesa). Una consegna `design` + `guasto` si rifiuta. Una richiesta all'owner (fiducia, permesso, chiave) va in Ricevuti con la richiesta giusta, mai in una domanda |
-| `design` + `attesa_chiusa`, `loop`, `arenato`; `aligned` + `origine_chiusa`/`origine_mancante` | il server non compone una domanda: il trigger delle attese e la migrazione rimettono in coda il feedback con una nota che dice il motivo, invece di dargli una domanda vuota (#1790) |
+| `design` + `attesa_chiusa`, `loop`, `arenato`; `aligned` + `origine_chiusa`/`origine_mancante` | sono fermate del server, non di chi lavora: rimesse in coda girerebbero senza fine (altri giri di correzione, altri arenamenti). Il server apre la domanda di servizio coi fatti e le due strade (riprendi, archivia), che non arriva all'owner così: la riscrive il compito della § 3.5 (#1790). Una fermata di chi lavora rimasta senza domanda viva (da un'altra porta: pipeline, migrazione) torna invece in coda con una nota che dice perché |
 | `design` + `secaudit`, `l5`, `fidato`; attacchi, spam (anche segnati dal worker, L3), sospetti | Ricevuti, e nessun altro |
 
 Il feedback in attesa resta `design` (o `aligned`) col suo motivo e prende

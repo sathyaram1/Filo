@@ -606,9 +606,11 @@ restando nello stato e col motivo di prima: la macchina a stati non cambia. Dal 
 domanda nasce nella stessa transazione dello stato, ed è sempre quella scritta da chi si
 ferma con `--domanda`: il server non ne compone più, e una fermata senza domanda si
 rifiuta (tranne `locale`, #1790). Un derivato nato da un rilievo col `?` prende la domanda
-del rilievo, e il suo titolo. Dalle altre porte (la pipeline per l'origine, una
-migrazione) il trigger non compone: un feedback che entra in un'attesa senza una domanda
-viva torna in coda con una nota che dice perché. Ogni domanda nasce `in_smistamento` e
+del rilievo, e il suo titolo. Le fermate del server (`loop`, `arenato`, `attesa_chiusa`,
+`origine_chiusa`, `origine_mancante`) ricevono la domanda di servizio, coi fatti e le due
+strade, che il compito riscrive: rimesse in coda girerebbero senza fine. Una fermata di chi
+lavora che entra in `design` senza una domanda viva (la pipeline, una migrazione) torna
+invece in coda con una nota che dice perché. Ogni domanda nasce `in_smistamento` e
 arriva all'owner dopo il compito «Gestisci la domanda» (SPEC-DOMANDE §3.5). Una domanda aperta di un'attesa lasciata per un'altra strada diventa
 `superata`. In dashboard un `design`/`aligned` con `domandaId` e uno di quei motivi sta
 **In coda**, col segno «aspetta D-n» che apre la domanda nella sezione Domande; nel
