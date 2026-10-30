@@ -14,6 +14,7 @@
       fixes: [
         'Nelle risposte di Filo un collegamento scritto come codice o in grassetto mostra il suo testo, non più uno «0» o gli asterischi, e un indirizzo seguito da un pezzo di codice porta alla pagina giusta. Una risposta piena di parentesi quadre non blocca più la pagina.',
         'In chat la riga del sito che Filo sta aprendo prende l\'icona appena la scheda la trova. Prima a volte restava senza.',
+        'Le schede e il «+» restano fermi quando una scheda comincia o smette di suonare. Su una scheda così stretta che resta solo l\'altoparlante, cliccarlo apre la scheda invece di silenziarla. E il titolo di una scheda stretta mostra almeno la prima lettera, o non si vede: niente più mezze lettere.',
       ],
     },
     {

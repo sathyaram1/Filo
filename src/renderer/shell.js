@@ -1174,6 +1174,15 @@
   const STILI_SCHEDA = ['--tab-active', '--tab-ink', '--tab-bg-eff', '--tab-bg-hover', '--tab-glow-color'];
   let firmaMisura = '';
   let attivaInVista = null;
+  // Nel posto del titolo ci sta almeno una lettera coi puntini (2em), o il titolo non si mostra, puntini compresi: mai un
+  // tratto di lettera, qualunque cosa gli stia accanto (#1293). Il posto resta, così chi gli sta dopo non si sposta.
+  const titoliStretti = typeof ResizeObserver === 'function' ? new ResizeObserver((voci) => {
+    for (const v of voci) {
+      const largo = v.contentRect.width;
+      const em = parseFloat(getComputedStyle(v.target).fontSize) || 13;
+      v.target.classList.toggle('illeggibile', largo > 0 && largo < 2 * em);
+    }
+  }) : null;
   // Colori veri del tema: leggerli forza un ricalcolo degli stili, quindi si rileggono solo al cambio di tema.
   let coloriTema;
   function coloriDelTema() {
@@ -1287,6 +1296,7 @@
     const ico = document.createElement('div');
     const title = document.createElement('span');
     title.className = 'title';
+    if (titoliStretti) titoliStretti.observe(title);
     const close = document.createElement('span');
     close.className = 'close';
     if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
@@ -1412,10 +1422,16 @@
         el._firma = firma;
         cambiata = true;
       }
-      perMisura.push([id, d.attiva, d.titolo, d.paese, d.audio, d.ferma || 0, d.permessi || null]);
+      // L'avviso audio non rimisura: la fila e il «+» restano fermi quando una scheda comincia o smette di suonare, e
+      // l'avviso prende posto dal titolo finché la fila non si rimisura per altro (#431.2).
+      perMisura.push([id, d.attiva, d.titolo, d.paese, d.ferma || 0, d.permessi || null]);
       nodi.push(el);
     }
-    for (const id of [...schedeVive.keys()]) if (!visti.has(id)) schedeVive.delete(id);
+    for (const [id, el] of [...schedeVive]) {
+      if (visti.has(id)) continue;
+      if (titoliStretti) titoliStretti.unobserve(el._parti.title);
+      schedeVive.delete(id);
+    }
     if (nodi.length !== tabsEl.children.length || nodi.some((n, i) => tabsEl.children[i] !== n)) {
       allineaSchede(nodi);
       cambiata = true;

@@ -31,7 +31,7 @@ function misura(shell) {
       .filter((c) => getComputedStyle(c).display !== 'none')
       .map((c) => {
         const q = c.getBoundingClientRect();
-        return { cls: c.className, left: q.left, right: q.right, width: q.width };
+        return { cls: c.className, left: q.left, right: q.right, width: q.width, fuori: getComputedStyle(c).position === 'absolute' };
       });
     return { id: tab.dataset.id, active: tab.classList.contains('active'), left: r.left, right: r.right, width: r.width, figli };
   }));
@@ -136,16 +136,163 @@ test('scheda stretta: l\'avviso audio resta sempre, la favicon cede solo quando 
         expect(f.left, dove).toBeGreaterThanOrEqual(s.left - 0.5);
         expect(f.right, dove).toBeLessThanOrEqual(s.right + 0.5);
       }
-      const piene = s.figli.filter((f) => f.width > 0);
+      // La X fuori fila delle schede dietro sta sopra la fine del nome, mai sopra l'avviso (#1688).
+      const piene = s.figli.filter((f) => f.width > 0 && !f.fuori);
       for (let i = 1; i < piene.length; i++) expect(piene[i].left, dove).toBeGreaterThanOrEqual(piene[i - 1].right - 0.5);
 
       const avviso = s.figli.find((f) => f.cls.includes('tab-alert'));
+      const xFuori = s.figli.find((f) => f.cls === 'close' && f.fuori);
+      if (xFuori) expect(xFuori.right, dove).toBeLessThanOrEqual(avviso.left + 0.5);
       const favicon = s.figli.find((f) => f.cls === 'favicon' || f.cls === 'spinner');
       expect(avviso && avviso.width, dove).toBe(16);
       // La favicon cede solo sotto i 56px: 10+8 di margini, 16+6+16 per le due icone.
       expect(!!favicon, dove).toBe(s.width >= 56);
       if (!favicon) expect(Math.abs((avviso.left + avviso.right) / 2 - (s.left + s.right) / 2), dove).toBeLessThanOrEqual(2);
       if (s.width >= 200) expect(s.figli.map((f) => f.cls.split(' ')[0]).slice(-2), dove).toEqual(['tab-alert', 'close']);
+    }
+  }
+});
+
+// Bordi di ogni scheda e del «+», arrotondati: quello che l'occhio vede spostarsi.
+const posti = (shell) => shell.evaluate(() => [...document.querySelectorAll('.tab, .tab-new')]
+  .map((el) => { const r = el.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; }));
+const dueFotogrammi = (shell) => shell.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+
+test('audio che parte e si ferma: le schede e il «+» restano dove sono, e il nome torna intero alla prima occasione (#431.2)', async ({ app, shell, openTab, testServer }) => {
+  for (const t of ['Gmail', 'Wikipedia', 'YouTube']) await openPage(openTab, testServer, t);
+  await expect(shell.locator('.tab .title')).toHaveText(['Home', 'Gmail', 'Wikipedia', 'YouTube'], { timeout: 10_000 });
+  await expect(shell.locator('.tab .spinner')).toHaveCount(0, { timeout: 10_000 });
+  // Il puntatore sulla pagina: fuori dalla fila nessuno trattiene le larghezze.
+  await shell.mouse.move(600, 400);
+  await shell.waitForTimeout(300);
+  const prima = await posti(shell);
+
+  const passi = [
+    ['YouTube (davanti) comincia a suonare', [null, null, { audible: true }], 1],
+    ['Gmail (dietro) comincia a suonare', [{ audible: true }, null, null], 2],
+    ['Gmail viene mutata', [{ muted: true }, null, null], 2],
+    ['YouTube smette di suonare', [null, null, { audible: false }], 1],
+    ['Gmail smette e torna udibile', [{ audible: false, muted: false }, null, null], 0],
+    ['Wikipedia suona e smette subito', [null, { audible: true }, null], 1],
+    ['Wikipedia ha smesso', [null, { audible: false }, null], 0],
+  ];
+  for (const [quando, patch, avvisi] of passi) {
+    await patchWebTabs(app, patch);
+    await expect(shell.locator('.tab .tab-alert'), quando).toHaveCount(avvisi, { timeout: 10_000 });
+    await dueFotogrammi(shell);
+    expect(await posti(shell), quando).toEqual(prima);
+  }
+
+  // L'avviso prende il posto dal nome finché la fila non si ridispone per altro: allora il nome torna intero.
+  const [gmail] = await patchWebTabs(app, [{ audible: true }]);
+  await expect(shell.locator(`.tab[data-id="${gmail}"] .audio-ind`)).toHaveCount(1, { timeout: 10_000 });
+  await dueFotogrammi(shell);
+  expect(await posti(shell)).toEqual(prima);
+  await shell.locator('.tab', { hasText: 'Wikipedia' }).click();
+  await expect(shell.locator('.tab', { hasText: 'Wikipedia' })).toHaveClass(/active/);
+  await expect.poll(() => shell.evaluate((id) => {
+    const t = document.querySelector(`.tab[data-id="${id}"] .title`);
+    return !!t && getComputedStyle(t).display !== 'none' && getComputedStyle(t).visibility === 'visible'
+      && t.scrollWidth <= t.clientWidth;
+  }, gmail), { timeout: 5000, message: 'nome intero di Gmail dopo il riordino' }).toBe(true);
+});
+
+// Scheda stretta del caso #1293: 25 schede, così l'avviso resta il solo segno visibile.
+async function filaPiena(app, shell, openTab, testServer, patch) {
+  for (let i = 0; i < 25; i++) await openTab(testServer.html(`<title>Video ${i}</title>`));
+  await expect(shell.locator('.tab')).toHaveCount(26, { timeout: 30_000 });
+  const ids = await patchWebTabs(app, patch);
+  await expect(shell.locator('.tab .spinner')).toHaveCount(0, { timeout: 15_000 });
+  await shell.mouse.move(600, 400);
+  return ids;
+}
+const statoScheda = (app, id) => app.evaluate(({ BrowserWindow }, id) => {
+  const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+  const t = w._filoTabs.tabs.find((x) => x.id === id);
+  return { muted: !!t.muted, attiva: w._filoTabs.activeId === id };
+}, id);
+
+test('scheda stretta che suona o è mutata: il clic sull\'avviso rimasto solo apre la scheda senza toccarne l\'audio (#1293)', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  const [suona, , muta] = await filaPiena(app, shell, openTab, testServer, [{ audible: true, loading: false }, null, { muted: true, loading: false }]);
+  for (const [id, muted] of [[suona, false], [muta, true]]) {
+    const tab = shell.locator(`.tab[data-id="${id}"]`);
+    await expect(tab.locator('.tab-alert')).toBeVisible({ timeout: 10_000 });
+    await expect(tab.locator('.favicon')).toBeHidden();
+    await shell.waitForTimeout(300);
+    const centro = await shell.evaluate((id) => {
+      const el = document.querySelector(`.tab[data-id="${id}"]`);
+      el.scrollIntoView({ inline: 'nearest' });
+      const r = el.getBoundingClientRect();
+      const x = r.x + r.width / 2, y = r.y + r.height / 2;
+      const sotto = document.elementFromPoint(x, y);
+      return { x, y, width: r.width, sottoAvviso: !!(sotto && sotto.closest('.tab-alert')), sottoScheda: !!(sotto && sotto.closest(`.tab[data-id="${id}"]`)) };
+    }, id);
+    expect(centro.width).toBeLessThan(56);
+    // Al centro risponde la scheda: clic, trascinamento e suggerimento sono i suoi.
+    expect(centro).toMatchObject({ sottoAvviso: false, sottoScheda: true });
+    await shell.mouse.click(centro.x, centro.y);
+    await expect(tab).toHaveClass(/active/, { timeout: 5000 });
+    expect(await statoScheda(app, id)).toEqual({ muted, attiva: true });
+  }
+  // Aperta, la scheda è larga di nuovo e l'avviso torna un tasto.
+  await shell.locator(`.tab[data-id="${muta}"] .mute-ind`).click();
+  await expect.poll(async () => (await statoScheda(app, muta)).muted, { timeout: 10_000 }).toBe(false);
+});
+
+test('scheda stretta con l\'avviso: il titolo mostra almeno una lettera coi puntini o non c\'è, e allargandola non torna a sparire (#1293)', async ({ app, shell, openTab, testServer }) => {
+  await openPage(openTab, testServer, 'Wikipedia - Suona');
+  await openPage(openTab, testServer, 'Mutata da un altro paese');
+  await openPage(openTab, testServer, 'Meet - riunione');
+  await openPage(openTab, testServer, 'Attiva che suona');
+  // La riunione ha avuto microfono e fotocamera: i suoi segni stanno sulla pagina, come li lascia il gestore dei permessi.
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const wc = w._filoTabs.tabs.filter((x) => /^https?:/.test(x.url || ''))[2].view.webContents;
+    wc._filoSegni = { origine: new URL(wc.getURL()).origin, usati: new Set(['audio', 'video']), negati: new Set() };
+  });
+  const [suona, mutata, meet, attiva] = await patchWebTabs(app, [
+    { audible: true, favicon: FAV },
+    { muted: true, favicon: FAV, proxy: { country: 'us', tier: null } },
+    { audible: true, favicon: FAV },
+    { audible: true, favicon: FAV },
+  ]);
+  await expect(shell.locator(`.tab[data-id="${attiva}"]`)).toHaveClass(/active/);
+  await expect(shell.locator('.tab .tab-alert')).toHaveCount(4, { timeout: 10_000 });
+  await expect(shell.locator('.tab .tab-permessi')).toHaveCount(1, { timeout: 10_000 });
+
+  const visto = new Map([[suona, []], [mutata, []], [meet, []], [attiva, []]]);
+  for (let w = 40; w <= 220; w += 1) {
+    await shell.evaluate((w) => {
+      let st = document.getElementById('larghezze-1293');
+      if (!st) { st = document.createElement('style'); st.id = 'larghezze-1293'; document.head.appendChild(st); }
+      st.textContent = `.tab{flex:0 0 ${w}px!important;min-width:${w}px!important;max-width:${w}px!important}`;
+    }, w);
+    await dueFotogrammi(shell);
+    const schede = await shell.evaluate(() => {
+      const c = document.createElement('canvas').getContext('2d');
+      return [...document.querySelectorAll('.tab')].map((tab) => {
+        const t = tab.querySelector('.title');
+        const cs = getComputedStyle(t);
+        const vede = cs.display !== 'none' && cs.visibility === 'visible';
+        c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        const lettera = [...(t.textContent || '')][0] || '';
+        return { id: tab.dataset.id, titolo: vede ? t.getBoundingClientRect().width : 0, serve: c.measureText(lettera + '…').width,
+          testo: t.textContent, paese: !!tab.querySelector('.proxy-ind') && getComputedStyle(tab.querySelector('.proxy-ind')).display !== 'none' };
+      });
+    });
+    for (const s of schede) if (visto.has(s.id)) visto.get(s.id).push({ w, ...s });
+  }
+  for (const [, righe] of visto) {
+    const dove = `${righe[0].testo}: ${JSON.stringify(righe.map((r) => [r.w, Math.round(r.titolo)]))}`;
+    // Un tratto di lettera, o i soli puntini: mai.
+    for (const r of righe) expect(r.titolo === 0 || r.titolo >= r.serve - 0.5, `larga ${r.w}px, ${dove}`).toBe(true);
+    // Comparso, il titolo resta; senza il paese che entra dopo di lui, non si accorcia nemmeno.
+    const primo = righe.findIndex((r) => r.titolo > 0);
+    expect(primo, dove).toBeGreaterThanOrEqual(0);
+    for (let i = primo + 1; i < righe.length; i++) {
+      expect(righe[i].titolo, `larga ${righe[i].w}px, ${dove}`).toBeGreaterThan(0);
+      if (righe[i].paese === righe[i - 1].paese) expect(righe[i].titolo, `larga ${righe[i].w}px, ${dove}`).toBeGreaterThanOrEqual(righe[i - 1].titolo - 0.5);
     }
   }
 });
@@ -278,4 +425,43 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
     await expect.poll(() => scritte(app), { timeout: 3000, message: `${cls} senza anteprima` })
       .toEqual({ carta: null, suggerimento: atteso });
   }
+});
+
+test('scheda dietro di larghezza media che comincia a suonare: il nome resta leggibile e la X compare sopra la sua fine (#1688)', async ({ app, shell, openTab, testServer }) => {
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setSize(1280, 800));
+  for (let i = 0; i < 8; i++) await openPage(openTab, testServer, `Sito numero ${i} con un titolo abbastanza lungo da tagliare`);
+  await expect(shell.locator('.tab .spinner')).toHaveCount(0, { timeout: 15_000 });
+  await shell.mouse.move(600, 400);
+  const [, suona] = await patchWebTabs(app, [null, { audible: true }]);
+  const tab = shell.locator(`.tab[data-id="${suona}"]`);
+  await expect(tab.locator('.audio-ind')).toHaveCount(1, { timeout: 10_000 });
+  await dueFotogrammi(shell);
+  const leggi = () => tab.evaluate((el) => {
+    const t = el.querySelector('.title');
+    const cs = getComputedStyle(t);
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const r = (q) => el.querySelector(q).getBoundingClientRect();
+    return {
+      largo: el.getBoundingClientRect().width,
+      leggibile: cs.display !== 'none' && cs.visibility === 'visible' && t.offsetWidth >= c.measureText(t.textContent[0] + '…').width,
+      xPrimaDellAvviso: r('.close').right <= r('.tab-alert').left + 0.5,
+    };
+  });
+  const s = await leggi();
+  // La larghezza del caso: tra quella in cui il nome non ci sta più nemmeno senza X e quella in cui ci sta con la X in fila.
+  expect(s.largo).toBeGreaterThan(88);
+  expect(s.largo).toBeLessThan(112);
+  expect(s).toMatchObject({ leggibile: true, xPrimaDellAvviso: true });
+
+  // Al passaggio la X si vede e si prende; l'altoparlante resta dov'era e muta.
+  const prima = await tab.locator('.audio-ind').boundingBox();
+  await tab.locator('.title').hover();
+  await expect(tab.locator('.close')).toHaveCSS('opacity', '1');
+  const x = await tab.locator('.close').boundingBox();
+  const sotto = await shell.evaluate(([cx, cy]) => document.elementFromPoint(cx, cy)?.closest('.close') != null, [x.x + x.width / 2, x.y + x.height / 2]);
+  expect(sotto).toBe(true);
+  expect(await tab.locator('.audio-ind').boundingBox()).toEqual(prima);
+  await tab.locator('.audio-ind').click();
+  await expect(tab.locator('.mute-ind')).toHaveCount(1, { timeout: 5000 });
 });

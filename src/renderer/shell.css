@@ -266,6 +266,8 @@ html[data-chrome-compact="1"] .addr {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Nel suo posto non sta una lettera coi puntini: la classe la mette shell.js (#1293). */
+.tab .title.illeggibile { visibility: hidden; }
 .tab .close {
   /* La larghezza oltre alla base: la scheda misurata col contenuto conta la larghezza, non la base (#429). */
   flex: 0 0 18px;
@@ -283,12 +285,17 @@ html[data-chrome-compact="1"] .addr {
 .tab:hover .close,
 .tab.active .close { opacity: 1; }
 .tab .close:hover { background: color-mix(in srgb, var(--border) 60%, transparent); color: var(--fg); }
-/* Sulle schede dietro la X non tiene posto: compare al passaggio sopra la fine del nome, che sfuma sotto di lei,
-   così con la fila piena il nome arriva al bordo (#429). Con l'avviso audio resta in fila: gli starebbe sopra. */
-.tab:not(.active):not(.misura):not(:has(> .tab-alert)) > .close {
+/* Dietro la X non tiene posto, nemmeno con l'avviso (che le sta dopo): compare al passaggio sopra la fine del nome,
+   che sfuma sotto di lei. Il suo posto vuoto toglieva il nome alla scheda che comincia a suonare (#429, #1688). */
+.tab:not(.active):not(.misura) > .close {
   position: absolute;
   right: 8px;
   top: 7px;
+}
+.tab:not(.active):not(.misura):has(> .tab-alert) > .close { right: 30px; }
+.tab:not(.active):has(> .tab-alert):hover > .title {
+  -webkit-mask-image: linear-gradient(to left, transparent 20px, #000 28px);
+  mask-image: linear-gradient(to left, transparent 20px, #000 28px);
 }
 .tab .favicon {
   width: 16px; height: 16px;
@@ -359,26 +366,34 @@ html[data-chrome-compact="1"] .addr {
 /* I segni dei permessi non si mangiano il nome: sulla scheda che la fila stringe resta il primo (shell.js, misura). */
 .tab.segni-stretti:not(.misura) .tab-permessi .segno ~ .segno { display: none; }
 
-/* Scheda stretta con l'avviso audio, priorità come in Chrome: avviso > icona > X (sull'attiva sempre) > paese > titolo.
-   Soglia = spazio di chi resta (icone 16, X 18, paese ~26, gap 6); prova in tests/tab-audio-indicator.spec.mjs. */
-@container tab (width < 100px) {
-  .tab:has(> .tab-alert) > .proxy-ind { display: none; }
+/* Scheda stretta con l'avviso: allargandola compaiono avviso, icona, X, titolo, paese, ognuno quando ci sta con chi lo
+   precede (icone 16, X 18 solo sull'attiva, paese 28, gap 6, titolo 2em), così il titolo non risparisce (#1293). */
+@container tab (width < calc(102px + 2em)) {
+  .tab.active:has(> .tab-alert) > .proxy-ind { display: none; }
+}
+@container tab (width < calc(78px + 2em)) {
+  .tab:not(.active):has(> .tab-alert) > .proxy-ind { display: none; }
 }
 @container tab (width < 68px) {
   .tab:not(.active):has(> .tab-alert) > .close { display: none; }
-}
-@container tab (width < 44px) {
   .tab:has(> .tab-alert) > .title { display: none; }
+  /* Senza titolo l'avviso resta dove lo si trova sulla scheda larga: in fondo, prima della X. */
+  .tab > .tab-alert { margin-left: auto; }
 }
 @container tab (width < 38px) {
   .tab:has(> .tab-alert) > :is(.favicon, .spinner) { display: none; }
   .tab > .tab-alert { margin: 0 auto; }
+  /* Rimasto solo, l'avviso è la scheda: il clic la apre senza toccarne l'audio, il trascinamento la sposta (#1293). */
+  .tab:not(.active) > .tab-alert { pointer-events: none; }
 }
 
 /* Scheda stretta senza avviso, stessa priorità e stesso conto: senza, con tante schede la X usciva dalla sua
    e il clic sul suo centro cadeva sulla vicina (#945). Prova in tests/tab-scheda-stretta.spec.mjs. */
-@container tab (width < 78px) {
-  .tab:not(:has(> .tab-alert)) > .proxy-ind { display: none; }
+@container tab (width < calc(56px + 2em)) {
+  .tab:not(.active):not(:has(> .tab-alert)) > .proxy-ind { display: none; }
+}
+@container tab (width < calc(80px + 2em)) {
+  .tab.active:not(:has(> .tab-alert)) > .proxy-ind { display: none; }
 }
 @container tab (width < 46px) {
   .tab.active:not(:has(> .tab-alert)) > .title { display: none; }
