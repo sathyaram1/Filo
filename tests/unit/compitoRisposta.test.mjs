@@ -71,7 +71,7 @@ test('argomenti dei comandi del compito: forme ammesse, consenso rifiutato prima
   assert.deepEqual(leggiArgomenti(['chiarimento', '--testo', '-']), { cmd: 'chiarimento', testo: '-' });
   assert.deepEqual(leggiArgomenti(['chiudi', '--testo=fatto', '--principio', 'Una regola.']), { cmd: 'chiudi', testo: 'fatto', principio: 'Una regola.' });
   assert.deepEqual(leggiArgomenti(['azione', '{"tipo":"riprendi","feedbackId":"f1"}', '--testo', 'nota']), { cmd: 'azione', azione: { tipo: 'riprendi', feedbackId: 'f1' }, testo: 'nota' });
-  assert.match(leggiArgomenti(['azione', '{"tipo":"approva_locale","feedbackId":"f1"}']).errore, /azione_di_consenso/);
+  assert.match(leggiArgomenti(['azione', '{"tipo":"approva_locale","feedbackId":"f1"}']).errore, /tipo_sconosciuto/, 'il lavoro server non si affida più da una domanda (#1576)');
   assert.match(leggiArgomenti(['azione', '{"tipo":"automazione","chiave":"routine.enabled","valore":false}']).errore, /azione_non_del_compito/);
   assert.match(leggiArgomenti(['azione', '{tipo:']).errore, /non è JSON valido/);
   assert.ok(leggiArgomenti(['chiarimento']).errore, 'senza testo');
@@ -79,7 +79,7 @@ test('argomenti dei comandi del compito: forme ammesse, consenso rifiutato prima
   assert.ok(leggiArgomenti(['chiudi', '--testo', 'x', '--principio', '-']).errore);
 });
 
-test('col canale finto: il chiarimento parte col testo da stdin; il vuoto e il consenso non partono', async () => {
+test('col canale finto: il chiarimento parte col testo da stdin; il vuoto e un\'azione che non c\'è non partono', async () => {
   const f = finto({ stdin: 'Vuoi i test anche su Mac?\n', canale: { outcome: 'ok', reply: { outcome: 'chiarimento' } } });
   assert.equal(await esegui(['chiarimento', '--testo', '-'], f.io), 0);
   assert.deepEqual(f.consegne, [{ t: 'biglietto-del-giro', data: { op: 'chiarimento', testo: 'Vuoi i test anche su Mac?\n' } }]);
@@ -89,10 +89,10 @@ test('col canale finto: il chiarimento parte col testo da stdin; il vuoto e il c
   assert.equal(await esegui(['chiarimento', '--testo', '-'], vuoto.io), 1);
   assert.equal(vuoto.consegne.length, 0);
 
-  const consenso = finto();
-  assert.equal(await esegui(['azione', '{"tipo":"approva_locale","feedbackId":"f1"}'], consenso.io), 1);
-  assert.equal(consenso.consegne.length, 0, 'un’azione di consenso non arriva nemmeno al canale');
-  assert.match(consenso.err.join('\n'), /consenso dell'owner/);
+  const tolta = finto();
+  assert.equal(await esegui(['azione', '{"tipo":"approva_locale","feedbackId":"f1"}'], tolta.io), 1);
+  assert.equal(tolta.consegne.length, 0, 'un’azione che non c’è più non arriva nemmeno al canale');
+  assert.match(tolta.err.join('\n'), /sconosciuto/);
 });
 
 test('col canale finto: azione e chiusura col principio, rifiuti e guasti con le loro uscite', async () => {

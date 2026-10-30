@@ -76,7 +76,7 @@ test('una lineetta lunga, anche nella forma breve, si rifiuta col campo e il num
   assert.match(una.dettaglio, /«problema» ha una lineetta/);
 });
 
-test('un pro vuoto come «Nessuno» si rifiuta; un pro assente resta ammesso', () => {
+test('un pro o un contro vuoto come «Nessuno» si rifiuta, e anche assente (#1790)', () => {
   for (const vuoto of ['Nessuno', 'nessuno.', ' niente ', 'N/A', '-']) {
     const r = D.validaDomanda(pulita({ opzioni: [pulita().opzioni[0], { ...pulita().opzioni[1], pro: vuoto }] }), { conOrigine: false });
     assert.equal(r.errore, 'testo_non_per_owner', vuoto);
@@ -84,9 +84,12 @@ test('un pro vuoto come «Nessuno» si rifiuta; un pro assente resta ammesso', (
     assert.match(r.dettaglio, /senza un pro vero si toglie/);
   }
   const { pro: _p, ...senzaPro } = pulita().opzioni[1];
-  assert.ok(D.validaDomanda(pulita({ opzioni: [pulita().opzioni[0], senzaPro] }), { conOrigine: false }).ok);
-  assert.ok(D.validaDomanda(pulita({ opzioni: [{ ...pulita().opzioni[0], contro: 'Nessuno' }, pulita().opzioni[1]] }), { conOrigine: false }).ok,
-    'il contro non è il pro');
+  const assente = D.validaDomanda(pulita({ opzioni: [pulita().opzioni[0], senzaPro] }), { conOrigine: false });
+  assert.equal(assente.errore, 'pro_mancante');
+  assert.equal(assente.campo, 'opzioni[1].pro');
+  const contro = D.validaDomanda(pulita({ opzioni: [{ ...pulita().opzioni[0], contro: 'Nessuno' }, pulita().opzioni[1]] }), { conOrigine: false });
+  assert.equal(contro.campo, 'opzioni[0].contro');
+  assert.match(contro.dettaglio, /scrivi il contro vero/);
 });
 
 test('più campi sporchi: un rifiuto solo li elenca tutti, così si correggono insieme', () => {

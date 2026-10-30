@@ -113,7 +113,8 @@
 
   const CAMPI_DOMANDA = Object.freeze(['titolo', 'contesto', 'problema', 'opzioni', 'consiglio', 'priorita', 'origine', 'collegamenti', 'notePerAgenti', 'gruppo', 'blocca']);
   // Li decide il server: nell'ingresso si ignorano, così un «fidato» scritto da chi chiede non vale niente.
-  const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito', 'legata', 'provvisoria', 'principio']);
+  const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito', 'legata', 'provvisoria', 'principio',
+    'smistamento', 'principioContestato']);
   const CAMPI_OPZIONE = Object.freeze(['testo', 'pro', 'contro', 'azione']);
 
   function validaOpzione(o, i, perOwner) {
@@ -398,7 +399,6 @@
     if (!r) return null;
     if (a.tipo === 'riprendi') return `Riprendi ${r.num} con questa scelta`;
     if (a.tipo === 'archivia') return `Archivia ${r.num}`;
-    if (a.tipo === 'approva_locale') return `Affida ${r.num} ai lavori server`;
     if (a.tipo === 'priorita') return Number.isInteger(r.priorita) ? `Priorità di ${r.num}: ${r.priorita} → ${a.valore}` : null;
     return null;
   }
@@ -448,7 +448,8 @@
   /** La scheda della sezione Domande. Uno stato ignoto resta davanti all'owner. */
   function schedaDi(domanda) {
     const s = isOggetto(domanda) ? domanda.stato : '';
-    if (s === 'in_lavorazione') return 'in_lavorazione';
+    // Mentre il compito la smista l'owner non la deve ancora rispondere, ma la vede: niente resta nascosto.
+    if (s === 'in_lavorazione' || s === 'in_smistamento') return 'in_lavorazione';
     if (s === 'chiusa' && isOggetto(domanda.esito) && domanda.esito.automatica === true) return 'risposte_automatiche';
     if (s === 'chiusa' || s === 'superata') return 'archivio';
     return 'da_rispondere';
@@ -462,8 +463,8 @@
   }
 
   global.SN_DOMANDE = {
-    PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
-    validaAzione, validaDomanda, controllaTestoOwner, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca,
+    PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
+    validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca,
     DEL_COMPITO, vietataAlCompito,
   };
 
