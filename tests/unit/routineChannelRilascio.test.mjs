@@ -231,6 +231,84 @@ test('troppo grande e poi malformato sul listino: arriva quello snello senza lis
   assert.match(r.avviso, /9000.*8000/);
 });
 
+// SPEC-MANUTENTORE § 6: falliti e attese viaggiano nel rapporto; un server che non li conosce riceve tutto il resto.
+const conDati = {
+  ...RAPPORTO, listino: '2026-10-06', falliti: [{ strumento: 'Bash', errore: 'exit 1', dopo: 'riprovato uguale' }],
+  attese: [{ strumento: 'Bash', cosa: 'Run unit tests', s: 240 }], atteseOltre30: 1,
+};
+const DATI = ['falliti', 'attese', 'atteseOltre30'];
+
+test('un server che accetta falliti e attese li riceve al primo colpo', async () => {
+  const corpi = [];
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl: async (u, init) => { corpi.push(JSON.parse(init.body)); return reply(200, { ok: true }); }, ...quiet });
+  assert.equal(r.rapporto, 'allegato');
+  assert.equal(corpi.length, 1);
+  assert.deepEqual(corpi[0].report.falliti, conDati.falliti);
+  assert.deepEqual(corpi[0].report.attese, conDati.attese);
+  assert.equal(corpi[0].report.atteseOltre30, 1);
+});
+
+test('400 report_malformed su falliti e attese: il rapporto parte senza di loro, listino compreso, e lo si dice', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report && DATI.some((k) => k in b.report) ? reply(400, { ok: false, reason: 'report_malformed', detail: 'campo falliti' }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl, ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 2);
+  for (const k of DATI) assert.equal(k in corpi[1].report, false, k);
+  assert.equal(corpi[1].report.listino, '2026-10-06', 'il listino, che il server conosce, resta');
+  assert.deepEqual(corpi[1].report.tools.byName, { Bash: 2 });
+  assert.match(r.avviso, /strumenti falliti e attese \(report_malformed: campo falliti\): allegato senza/);
+  assert.equal(conDati.falliti.length, 1, 'l\'originale non viene mutilato');
+});
+
+test('malformato anche senza falliti e attese: poi senza listino, poi senza rapporto, col dettaglio del primo rifiuto', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report ? reply(400, { ok: false, reason: 'report_malformed', detail: `campo ${corpi.length}` }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl, ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'scartato');
+  assert.equal(corpi.length, 4);
+  assert.equal('listino' in corpi[2].report, false);
+  assert.equal('report' in corpi[3], false);
+  assert.match(r.avviso, /report_malformed: campo 1\): rilasciato SENZA rapporto/);
+});
+
+test('413 con falliti e attese: prima si tolgono loro, e l\'elenco degli strumenti resta', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report && 'falliti' in b.report ? reply(413, { ok: false, reason: 'report_too_big', bytes: 9000, max: 8192 }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl, ...quiet });
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 2);
+  assert.deepEqual(corpi[1].report.tools.byName, { Bash: 2 });
+  assert.deepEqual(corpi[1].report.notes, ['una nota']);
+  assert.match(r.avviso, /9000 byte, massimo 8192\): allegato senza strumenti falliti e attese/);
+});
+
+test('413 anche senza falliti e attese: l\'ultimo tentativo è quello snello, senza nessuno dei due elenchi', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report && b.report.tools && b.report.tools.byName ? reply(413, { ok: false, reason: 'report_too_big', bytes: 9000, max: 8192 }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl, ...quiet });
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 3);
+  const ultimo = corpi[2].report;
+  assert.equal('byName' in ultimo.tools, false);
+  for (const k of DATI) assert.equal(k in ultimo, false, k);
+  assert.match(r.avviso, /senza l'elenco degli strumenti e le note, né falliti e attese/);
+});
+
 test('un altro rifiuto del server NON viene ritentato senza rapporto: il no è una risposta', async () => {
   let n = 0;
   const fetchImpl = async () => { n += 1; return reply(401, { ok: false, reason: 'dead_ticket' }); };
