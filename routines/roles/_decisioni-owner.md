@@ -6,7 +6,8 @@ rimette in discussione, e non è un rilievo.
 `payload.provvisorie`, se c'è, sono le domande su questo feedback che non lo
 fermano e aspettano ancora l'owner: `domanda` è il numero, `testo` la riga con
 l'opzione che vale intanto, e `titolo`, `nataIl`, `stato`, `contesto`,
-`problema` e `opzioni` sono il testo che legge l'owner. Il lavoro è andato
+`problema`, `opzioni` (ognuna col suo pro e contro) e `consiglio` sono il
+testo che legge l'owner. Il lavoro è andato
 avanti con la consigliata, che vale come decisione finché lui non risponde.
 Non è un rilievo e non si richiede; se risponde altro, il lavoro torna da sé
 con la sua scelta.
