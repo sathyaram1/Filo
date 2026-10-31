@@ -300,9 +300,11 @@
   async function leggiPorte() {
     const [mie, auth] = await Promise.all([
       send({ type: MSG.SEGNALAZIONI_MIE_LIST }),
-      send({ type: MSG.AUTH_STATUS }),
+      send({ type: MSG.AUTH_STATUS, senzaRete: true }),
     ]);
-    porte.mie = new Set(((mie && mie.voci) || []).map((v) => Number(v.num)).filter((n) => Number.isInteger(n) && n > 0));
+    // Il numero della copia locale è «#1956»; una parte di un pacchetto («#1509.3») non è la segnalazione intera.
+    const numeri = ((mie && mie.voci) || []).map((v) => /^#?(\d+)$/.exec(String(v.num || '').trim())).filter(Boolean);
+    porte.mie = new Set(numeri.map((m) => Number(m[1])));
     porte.owner = !!(auth && auth.ok && auth.signedIn && auth.isAdmin);
   }
 
