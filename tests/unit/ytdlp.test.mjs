@@ -1,5 +1,5 @@
 // #1488 — la logica pura del salvataggio dei video in streaming: argomenti per yt-dlp, lettura dell'avanzamento,
-// i perché di un errore, quale programma prendere per ogni computer.
+// i perché di un errore, quale programma scaricare per ogni computer.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
