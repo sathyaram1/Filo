@@ -37,6 +37,25 @@ test('fra le prove scritte, si tolgono prima solo quelle coi soli numeri di rili
   assert.deepEqual(fuori.map((f) => f.prova), ['tests/verifica/42/giro1-r2-esterno.spec.mjs', 'tests/verifica/42/giro1-r3-domanda.spec.mjs']);
 });
 
+test('a lavoro fermo di sicuro i `?` restano a chi riprende con la loro prova: escono prima solo gli esterni', () => {
+  const require = createRequire(import.meta.url);
+  require('../../src/shared/feedbackTransitions.js');
+  require('../../src/shared/verifierRound.js');
+  const V = globalThis.SN_VERIFIER_ROUND;
+  const caps = { cap3: 10, cap2: 10, cap1: 1, cap0: 0 };
+  for (const critica of [
+    'Provato.\n[2i?] Il riquadro è freddo?\n[1i?] Il bordo è grigio?\n[1e] Fuori.',
+    'Provato.\n[3i?] I dati escono?\n[2v?] Il titolo accanto è tagliato?\n[1e] Fuori.',
+  ]) {
+    const { findings } = V.parseFindings(critica);
+    const esito = V.decideRound({ findings, caps, counts: {} });
+    assert.equal(esito.stop, true);
+    assert.equal(esito.sospesi.length, 1, 'il secondo rilievo resta al lavoro');
+    const fuori = proveDaToglierePrimaDelVerdetto(['tests/verifica/42/giro1-r2-sospeso.spec.mjs', 'tests/verifica/42/giro1-r3-esterno.spec.mjs'], findings);
+    assert.deepEqual(fuori.map((f) => f.prova), ['tests/verifica/42/giro1-r3-esterno.spec.mjs'], critica);
+  }
+});
+
 /** Un ramo con un punto fermo all'avvio della verifica e, dopo, le prove della critica. */
 function ramoConProve(prove) {
   const casa = cartellaTemporanea('filo-pulizia-prima-');
