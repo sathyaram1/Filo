@@ -1924,6 +1924,11 @@
               onClick: () => api.message({ type: 'filo_spento_imposta', siti: Array.isArray(siti) ? siti : [], spento: spento === true }).catch(() => {}),
             };
           }
+          // #967 — «Annulla» dopo un «Continua»: il sito esce dai fidati e l'avviso torna sulla pagina.
+          if (a && a.sitiFidati && !a.onClick) {
+            const voci = Array.isArray(a.sitiFidati.voci) ? a.sitiFidati.voci : [];
+            return { label: a.label, onClick: () => api.message({ type: 'siti_fidati_imposta', fidato: false, voci }).catch(() => {}) };
+          }
           // #1123 — «Collega»: l'accesso a Google in una scheda, come la voce del menu dell'account.
           if (a && a.collegaGoogle && !a.onClick) return { label: a.label, onClick: () => collegaGoogle() };
           // #1039 — «Riavvia e aggiorna»: se l'installatore non parte Filo resta aperto, e lo dice.

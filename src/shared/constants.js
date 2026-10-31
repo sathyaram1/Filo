@@ -2727,6 +2727,9 @@
         networkSignals: true,
         llmJudge: true,
         sandbox: true,
+        // #967 — i siti di cui l'utente si fida («Continua» sul sospetto, «Apri comunque» su «Non trovo»), con la
+        // chiave di SN_SAFEBROWSE.scopeOf: lì l'avviso «sospetto» non torna. Il «pericoloso» sì.
+        trustedSites: [],
       },
       // Gestione cookie / consenso. Un solo interruttore a 3 stati che l'utente
       // vede davvero (vedi src/main/services/cookies.js):

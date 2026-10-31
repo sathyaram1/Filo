@@ -571,12 +571,41 @@ function scopeOf(url) {
   return whitelist.hostedPlatform(norm.host, pathOf(norm, url)) ? norm.host + pathOf(norm, url) : norm.registrable;
 }
 
+// I siti di cui l'utente si fida (#967), con la chiave di scopeOf: lì il «sospetto» tace, il «pericoloso» no.
+// La fonte è security.safeBrowse.trustedSites; chi la scrive chiama impostaFidati, che dice cosa è cambiato.
+let fidati = new Set();
+function impostaFidati(elenco) {
+  const nuovi = new Set((Array.isArray(elenco) ? elenco : [])
+    .filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim().toLowerCase()));
+  const aggiunti = [...nuovi].filter((x) => !fidati.has(x));
+  const tolti = [...fidati].filter((x) => !nuovi.has(x));
+  fidati = nuovi;
+  return { aggiunti, tolti };
+}
+function fidato(scope) {
+  return !!scope && fidati.has(String(scope).toLowerCase());
+}
+// La voce dell'elenco per quello che l'utente scrive o incolla («login.Team.com», «https://team.com/x», un IP): la
+// stessa chiave che darebbe il «Continua» su quella pagina; null se non è un sito (una parola sola, un suffisso).
+function voceFidata(scritto) {
+  const s = String(scritto == null ? '' : scritto).trim();
+  if (!s || /\s/.test(s)) return null;
+  const url = /^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`;
+  const norm = normalizeMod.normalize(url);
+  if (!norm || !norm.ok || norm.single || norm.suffixOnly) return null;
+  const v = scopeOf(url);
+  return v && !/^\.|\.\./.test(v) ? v : null;
+}
+
 const API = {
   checkSync,
   // #965 — il verdetto locale di un link non ancora aperto ({ url, level, message, scope } o null), e i link a fette.
   checkLink: (url, nome) => links.esaminaLink(url, checkSync, nome),
   checkLinks: (urls, opts = {}) => links.esaminaAFette(urls, { ...opts, checkSync }),
   scopeOf,
+  impostaFidati,
+  fidato,
+  voceFidata,
   origineLink,
   ownerOf,
   createOwnerBudget,

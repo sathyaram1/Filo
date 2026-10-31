@@ -53,6 +53,7 @@ const COMPOSTI = [
   { file: 'src/main/services/handlers.js', testo: 'sito ? `https://${sito}/`', perche: 'l’indirizzo mostrato al posto di una pagina delicata' },
   { file: 'src/main/services/permessiPagine.js', testo: '`http://${t}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/main/services/safebrowse/normalize.js', testo: "new URL('http://' + s)", perche: 'normalizza l’indirizzo da controllare' },
+  { file: 'src/main/services/safebrowse/index.js', testo: 's : `https://${s}`', perche: 'la voce dei siti fidati per un sito scritto senza schema' },
   { file: 'src/main/preloadPacchetto.js', testo: "new URL('http://' + d).hostname", perche: 'il domainToASCII del preload in sandbox: ne estrae il nome del sito' },
   { file: 'src/main/services/siteBlock.js', testo: 'new URL(`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/main/tabs.js', testo: '? src : `https://${src}`', perche: 'il nome del sito delle regole del proxy' },

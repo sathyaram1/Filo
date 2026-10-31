@@ -559,6 +559,11 @@ function registerIpcHandlers() {
   ipcMain.handle('net:resolves', async (event, { host } = {}) => {
     const url = event.sender.getURL() || '';
     if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
+    // Un sito che l'utente ha già aperto comunque, o di cui si fida, non si rimette in dubbio (#967).
+    try {
+      const SB = globalThis.SN_SAFEBROWSE;
+      if (SB && SB.fidato(SB.voceFidata(String(host || '').slice(0, 300)))) return { ok: true, resolves: true, fidato: true };
+    } catch (_) {}
     try {
       const resolves = await hostResolves(host);
       return { ok: true, resolves };

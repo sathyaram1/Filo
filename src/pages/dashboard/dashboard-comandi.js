@@ -609,9 +609,10 @@
       btn.disabled = true;
       if (unresolvedLine && unresolvedLine.el === bubble) unresolvedLine = null;
       if (nonRisoltoInAttesa === bubble) { nonRisoltoInAttesa = null; contaComando('sito_non_risolto', 'apri_lo_stesso'); }
-      // L'utente ha deciso: da qui in poi quell'host non viene più messo in
-      // dubbio (niente rosso, niente avviso al prossimo invio).
+      // L'utente ha deciso: da qui in poi quel sito non viene più messo in dubbio, in ogni scheda e dopo un
+      // riavvio: entra fra i siti di cui si fida (#967).
       siteResolveCache.set(host, true);
+      send({ type: MSG.SITI_FIDATI_IMPOSTA, fidato: true, indirizzo: host, avvisa: true });
       send({ type: MSG.OPEN_URL, url: siteUrlOf(text), parole: [text] });
       if (inputEl.value.trim() === text) { inputEl.value = ''; autoGrowInput(); }
       updateInputClass();

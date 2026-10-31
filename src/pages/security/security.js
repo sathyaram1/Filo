@@ -65,6 +65,8 @@
     $('sec-safebrowse-sandbox-label').textContent = I18n.t('options_security_safebrowse_sandbox');
     $('sec-safebrowse-sandbox-desc').textContent = I18n.t('options_security_safebrowse_sandbox_desc');
     $('sec-safebrowse-key-managed').textContent = I18n.t('options_security_safebrowse_key_managed');
+    $('sec-safebrowse-fidati-title').textContent = I18n.t('options_security_fidati_title');
+    $('sec-safebrowse-fidati-desc').textContent = I18n.t('options_security_fidati_desc');
     $('sec-cookies-title').textContent = I18n.t('options_cookies_title');
     $('sec-site-perms-title').textContent = I18n.t('options_site_perms_title');
     $('sec-cookies-desc').textContent = I18n.t('options_cookies_desc');
@@ -918,6 +920,8 @@
     $('sec-safebrowse-llm').checked = sb.llmJudge !== false;
     $('sec-safebrowse-sandbox').checked = sb.sandbox !== false;
     syncSafebrowseEnabled();
+    sbFidati = fidatiDaMostrare(Array.isArray(sb.trustedSites) ? sb.trustedSites : []);
+    renderFidati();
 
     const cookies = sec.cookies || {};
     const mode = ['manual', 'default', 'privacy'].includes(cookies.mode) ? cookies.mode : 'default';
@@ -1114,6 +1118,57 @@
         cookieEmbedSites = cookieEmbedSites.filter((d) => d !== domain);
         renderEmbedSites();
         saveCookies();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  // I siti di cui ti fidi (#967): ci entrano dal «Continua» sull'avviso sospetto o dall'«Apri comunque» di «Non trovo»,
+  // e da qui si tolgono uno per uno. La voce di una pagina ospitata porta il suo percorso.
+  let sbFidati = [];
+  // Le voci tolte da qui finché il main non le ha scritte: un elenco arrivato prima della loro scrittura non le rimette,
+  // se no il clic dopo cade sulla voce già tolta invece che su quella sotto.
+  const sbFidatiInUscita = new Set();
+  const fidatiDaMostrare = (l) => l.filter((x) => !sbFidatiInUscita.has(x));
+  function voceLeggibile(v) {
+    const i = String(v).indexOf('/');
+    return i < 0 ? leggibile(v) : leggibile(v.slice(0, i)) + v.slice(i);
+  }
+  function renderFidati() {
+    const box = $('sec-safebrowse-fidati');
+    const list = $('sec-safebrowse-fidati-list');
+    list.innerHTML = '';
+    box.hidden = !sbFidati.length;
+    for (const voce of sbFidati) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = voceLeggibile(voce);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_security_fidati_remove');
+      btn.addEventListener('click', async () => {
+        sbFidatiInUscita.add(voce);
+        sbFidati = sbFidati.filter((x) => x !== voce);
+        renderFidati();
+        let r = null;
+        try { r = await chrome.runtime.sendMessage({ type: MSG.SITI_FIDATI_IMPOSTA, fidato: false, voci: [voce] }); } catch (_) {}
+        sbFidatiInUscita.delete(voce);
+        // Non scritta: la voce torna, l'utente non deve crederla tolta.
+        if (!(r && r.ok)) {
+          try {
+            const sb = ((await Storage.getSettings()).security || {}).safeBrowse || {};
+            sbFidati = fidatiDaMostrare(Array.isArray(sb.trustedSites) ? sb.trustedSites : []);
+            renderFidati();
+          } catch (_) {}
+          return;
+        }
+        const hint = $('savedHint');
+        hint.classList.add('sn-show');
+        clearTimeout(renderFidati._t);
+        renderFidati._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
       });
       li.appendChild(span);
       li.appendChild(btn);
@@ -1548,6 +1603,10 @@
         mostraCaselleChiavi(msg.settings);
         riallinea(msg.settings);
         loadDelicateCampi();
+        // Un «Continua» in un'altra scheda, o la chat, cambia l'elenco mentre la pagina è aperta.
+        const f = msg.settings.security && msg.settings.security.safeBrowse && msg.settings.security.safeBrowse.trustedSites;
+        const g = Array.isArray(f) ? fidatiDaMostrare(f) : null;
+        if (g && g.join('\n') !== sbFidati.join('\n')) { sbFidati = g; renderFidati(); }
       }
       const c = msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings && msg.settings.security && msg.settings.security.cookies;
       if (!c) return;

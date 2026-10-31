@@ -2418,7 +2418,7 @@ async function eseguiAzioneFilo(action, {
       const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
       const setter = global.SN_PREF.setterDellaChiave(chiave);
       if (setter && (setter.scrive.includes('security.pagineDelicate.siti') || setter.scrive.includes('menuDelSito.siti')
-        || setter.scrive.includes('blocklist'))) {
+        || setter.scrive.includes('blocklist') || setter.scrive.includes('security.safeBrowse.trustedSites'))) {
         // Dall'Aiuto di un sito «questo sito» è lui, e le altre schede non si nominano (#843).
         const daSito = /^https?:/i.test(sender?.tab?.url || sender?.url || '');
         const { tm, tab } = daSito ? { tm: null, tab: { url: sender?.tab?.url || sender?.url } } : targetWebTab(sender);
@@ -8401,6 +8401,11 @@ async function wireSafebrowse(settingsArg) {
   }
   settings = settings || {};
   const sb = (settings.security && settings.security.safeBrowse) || {};
+  // I siti fidati valgono anche col rilevatore spento: l'analisi locale resta, e l'elenco è dell'utente (#967).
+  const fidati = SB.impostaFidati ? SB.impostaFidati(sb.trustedSites) : { aggiunti: [], tolti: [] };
+  if (fidati.aggiunti.length || fidati.tolti.length) {
+    for (const w of BrowserWindow.getAllWindows()) { try { w._filoTabs?._sbFidatiCambiati?.(fidati); } catch (_) {} }
+  }
   if (sb.enabled === false) {
     SB.configure({ gsbKey: '', runLlm: null, enableSandbox: false, enableNetwork: false });
     return;
