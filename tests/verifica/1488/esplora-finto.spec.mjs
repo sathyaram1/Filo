@@ -25,7 +25,7 @@ test('riquadro incorporato', async ({ openTab, testServer }) => {
   const fr = page.frames().find((x) => x.url().includes('8765'));
   await expect.poll(() => fr.evaluate(() => document.getElementById('v').src.startsWith('blob:'))).toBe(true);
   await f.locator('#v').click({ button: 'right', position: { x: 40, y: 40 } });
-  const voce = menuDi(page).locator('.sn-menu button', { hasText: 'Salva video come' });
+  const voce = menuDi(fr).locator('.sn-menu button', { hasText: 'Salva video come' });
   await expect(voce).toBeVisible();
   await voce.click();
   await expect.poll(ultimoUrl, { timeout: 15000 }).not.toBe('');
