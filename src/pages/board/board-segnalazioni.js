@@ -288,9 +288,15 @@
     voci = Array.isArray(r.voci) ? r.voci : [];
     precedenti = !!r.precedenti;
     disegna();
-    if (location.hash === '#segnalazioni' && !carica.portata) {
+    if (chiestoElenco() && !carica.portata) {
       carica.portata = true;
-      sezione.scrollIntoView({ block: 'start' });
+      const n = numeroChiesto();
+      const v = n && voci.find((x) => String(x.num || '').trim().replace(/^#/, '') === n);
+      const r = v && righe.get(v.id);
+      if (!r) { sezione.scrollIntoView({ block: 'start' }); return; }
+      r.apri();
+      r.el.scrollIntoView({ block: 'center' });
+      r.testa.focus({ preventScroll: true });
     }
   }
 
