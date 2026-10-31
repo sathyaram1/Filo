@@ -41,13 +41,20 @@ disponibili: con dieci account, o con un modello piccolo al livello di Opus,
 molti 0 diventano 1 e molti 1 diventano 2. Lo decide il manutentore, e lo
 scrive nel taccuino quando cambia il criterio.
 
-**Tetti.** I tetti per priorità di oggi (6 lavori a priorità 3 insieme, 4 a
-priorità 2) spariscono: li sostituiscono le priorità 3 che partono sempre e il
-**parallelismo N** scritto dal manutentore per il resto. Resta un solo freno
-d'emergenza dell'owner in Gestione → Automazioni: il massimo di sessioni
-insieme (default 20), che il manutentore non può alzare. Restano la pausa
-crescente del pacemaker sulle accensioni nate morte e il tetto sulle richieste
-al minuto.
+**Quanti insieme.** Oggi non c'è un tetto per priorità: il pacemaker accende
+fino ai posti liberi, con la coda per priorità o l'ordine del manutentore. Da
+ora: le priorità 3 partono sempre, il resto segue l'ordine e il **parallelismo
+N** scritto dal manutentore. Resta un solo freno d'emergenza dell'owner in
+Gestione → Automazioni: il massimo di sessioni insieme (default 20), che il
+manutentore non può alzare. Restano la pausa crescente del pacemaker sulle
+accensioni nate morte e il tetto sulle richieste al minuto.
+
+**I giri di verifica non c'entrano con la priorità del lavoro.** I bilanci del
+verificatore (quante correzioni per un rilievo di livello 3, 2, 1, 0: cap3,
+cap2, cap1, cap0, scritti dall'owner in Gestione → Automazioni) sono un altro
+parametro, sensibile perché cambia la qualità. Il manutentore può ottimizzarli
+con prove fuori da main (§ 6, esperimenti non dal vivo); un cambio dal vivo lo
+chiede prima all'owner.
 
 **Transizione.** Le centinaia di priorità 2 in coda oggi scendono a 1 in un
 colpo; la prima mattina il manutentore promuove la rosa. Nessuna segnalazione
