@@ -83,6 +83,14 @@ test('senza i pesi dei pezzi la barra non promette una percentuale finché un pe
   assert.deepEqual(Y.leggiPezzi(''), { pezzi: 1, pesoTutti: 0 });
 });
 
+test('senza il file dei pezzi il primo pezzo non promette un 100% che poi torna indietro', () => {
+  const av = Y.creaAvanzamento();
+  av.leggi({ tipo: 'avanza', stato: 'finished', scaricati: 9000, totale: 9000, formato: '137' });
+  assert.equal(av.stato().totale, 0, 'dopo il video può arrivare l\'audio');
+  av.leggi({ tipo: 'avanza', stato: 'downloading', scaricati: 500, totale: 1000, formato: '140' });
+  assert.deepEqual(av.stato(), { ricevuti: 9500, totale: 10000 });
+});
+
 test('un elenco di video (canale, ricerca, home) si ferma alla prima voce, e lo si dice', () => {
   const a = Y.argomenti({ url: 'https://www.youtube.com/@canale', cartella: '/c' });
   assert.equal(a[a.indexOf('--break-match-filters') + 1], '!playlist_id');
