@@ -79,17 +79,18 @@ export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo, 
   if (scope === 'riallineamento') {
     const sha = soloSha(p.shaVerificato);
     const report = String(p.reportRebase ?? '').trim();
+    const conDiff = !!sha && scartato !== 'punta';
     return [
       '## Perimetro di questo giro',
       '',
-      sha
-        ? `Commit che aveva passato la verifica: \`${sha}\` — il diff da leggere è \`git diff ${sha}..HEAD\`.`
-        : 'Commit che aveva passato la verifica: non comunicato.',
+      rigaVerificato(sha, scartato),
       '',
       'Cosa ha scritto chi ha rifatto la base (dove c\'erano i conflitti, se ha toccato la logica, quali unit erano rossi dopo il rebase):',
       report
         ? report.split('\n').map((l) => `> ${l}`).join('\n')
-        : '  (nessun report: le zone in conflitto le ricavi dal diff; senza nemmeno quello, dichiaralo nella critica)',
+        : conDiff
+          ? '  (nessun report: le zone in conflitto le ricavi dal diff; senza nemmeno quello, dichiaralo nella critica)'
+          : '  (nessun report e nessun confronto: cerca le zone fra i file del lavoro, `git diff --stat origin/main...HEAD`, e nella critica dichiara che il confronto mancava)',
     ].join('\n');
   }
   return '';
