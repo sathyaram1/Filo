@@ -2277,6 +2277,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
     return {
       feedback: (payload && payload.feedback) || null,
       decisioni: Array.isArray(payload && payload.decisioni) ? payload.decisioni : [],
+      provvisorie: Array.isArray(payload && payload.provvisorie) ? payload.provvisorie : [],
       immagini: Array.isArray(payload && payload.immagini) ? payload.immagini : [],
       history: Array.isArray(payload && payload.history) ? payload.history : [],
       // Quante critiche più vecchie il server ha tolto dalla serie: si stampa
