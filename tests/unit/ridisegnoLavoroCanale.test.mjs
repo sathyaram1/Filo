@@ -153,7 +153,12 @@ test('già risolto su main: parte solo con una fusione della linea principale, i
 test('la correzione senza motivo non parte; col motivo e in un riallineamento porta motivo e confronto', async (t) => {
   const { srv, ricevuti, port } = await fintoServer();
   const { casa } = deposito();
-  t.after(() => { srv.close(); togliCartella(casa); });
+  // Il riallineamento si consegna solo spedito su origin (#1964).
+  const origin = cartellaTemporanea('ridisegno-lavoro-origin');
+  git(origin, ['init', '--bare', '-q', '--initial-branch=main']);
+  git(casa, ['remote', 'add', 'origin', origin]);
+  git(casa, ['push', '-q', 'origin', 'main']);
+  t.after(() => { srv.close(); togliCartella(casa); togliCartella(origin); });
   const stato = join(casa, 'stato');
   mkdirSync(stato, { recursive: true });
   writeFileSync(join(stato, 'fid-77.json'), JSON.stringify({ id: 'fid-77', branch: 'worker/77', loopCount: 1, verifierVerdict: 'pass' }));
