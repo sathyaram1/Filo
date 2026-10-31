@@ -1585,7 +1585,7 @@
       type: 'item',
       azione: 'copy-download-video',
       label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'),
-      onClick: () => downloadMedia(el),
+      onClick: () => downloadMedia(el, link),
     });
     return items;
   }
