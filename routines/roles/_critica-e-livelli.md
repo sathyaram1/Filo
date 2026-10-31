@@ -148,9 +148,13 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   fallisce non è un rilievo nuovo, se passa («Expected to fail, but passed») la
   porta è chiusa e le togli il segno. Una prova che era solo esplorazione
   (dipende dall'ambiente, non asserisce niente) si cancella. Si cancella anche
-  quella di un rilievo **esterno**, nello stesso commit: quel rilievo esce di
-  qui dentro un feedback suo, col suo testo, e la prova lasciata indietro
-  sarebbe solo un rosso da rispiegare per sempre.
+  quella di un rilievo **esterno**, o di uno col `?` di livello 0 o 1 (o vicino),
+  nello stesso commit: quel rilievo esce di qui dentro un feedback suo in ogni
+  esito, e la prova lasciata indietro sarebbe solo un rosso da rispiegare per
+  sempre. **La pulizia che non dipende dall'esito si fa prima del verdetto**:
+  dopo, ogni commit è una spinta che il registro della fiducia non vede, e un
+  lavoro fidato finisce fermo alla fusione. La registrazione rifiuta una critica
+  che ha ancora nel ramo una prova di questi, e dice quale.
 - **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
   critica che registri, contando da 1 le righe con livello e sede, interne ed
   esterne, nell'ordine in cui le scrivi. Una prova che ne copre più d'uno li
