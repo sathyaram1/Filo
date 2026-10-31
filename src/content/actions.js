@@ -1537,7 +1537,8 @@
     };
   }
 
-  function buildMediaItems(el) {
+  // `link`: il collegamento a cui il menu lega il filmato (l'anteprima stesa sopra la scheda di una home).
+  function buildMediaItems(el, link = null) {
     const audio = isAudioEl(el);
     const items = [];
     items.push({
