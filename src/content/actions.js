@@ -1477,7 +1477,7 @@
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => { try { URL.revokeObjectURL(objUrl); } catch (_) {} }, 20000);
       } catch (_) {
-        if (/^blob:/i.test(src)) await salvaInStreaming(audio);
+        if (/^blob:/i.test(src)) await salvaInStreaming(audio, indirizzoDelVideo(el, link));
         else Popup.toastErrore('toast_media_stream_only');
       }
       return;
