@@ -2034,7 +2034,7 @@ class TabManager {
     let pulizia = null;
     if (riapribili.length) {
       pulizia = (this._ultimaPulizia ? this._ultimaPulizia.id : 0) + 1;
-      this._ultimaPulizia = { id: pulizia, schede: riapribili };
+      this._ultimaPulizia = { id: pulizia, schede: riapribili, riordina, alle: Date.now() };
     }
 
     for (const { tab, reason } of toArchive) {
@@ -2080,7 +2080,9 @@ class TabManager {
       aperte.add(chiave(s.url));
       if (s.proxy) { try { await this.setTabProxy(nuova, s.proxy.country, { tier: s.proxy.tier || undefined }); } catch (_) {} }
     }
-    if (this.reorderTabsByColor() || riaperte) this._broadcast();
+    // Come il giro che le ha chiuse: un ordine scelto a mano non si rimescola.
+    const riordina = p.riordina !== false && !(this._spostataAManoAlle >= p.alle);
+    if ((riordina && this.reorderTabsByColor()) || riaperte) this._broadcast();
     return { ok: true, riaperte };
   }
 
