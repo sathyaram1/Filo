@@ -614,7 +614,9 @@ arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
 corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`). Dal #1790
 un guasto non ferma più e non apre una domanda: si dichiara nel rilascio
 (`--guasto "<gruppo>: <messaggio>"`), il feedback torna `todo` sul suo ramo con
-la nota del guasto, e una consegna `design` + `guasto` si rifiuta; al terzo guasto
+la nota del guasto e resta fermo, lui solo, finché una nota del manutentore o la
+correzione della causa non lo sblocca (#1950: niente più pausa di un'ora per
+tutti), e una consegna `design` + `guasto` si rifiuta; al terzo guasto
 uguale di seguito il server apre una domanda col conteggio, che smista il compito
 «Gestisci la domanda» (SPEC-DOMANDE §3.5, §3.8). Non è lavoro per regola: quello è
 `locale`, e la sua nota dice quale regola lo tiene fuori dalla cloud. La risposta dell'owner appende
