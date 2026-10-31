@@ -16,10 +16,10 @@ const BIGLIETTO = 'b'.repeat(43);
 const ROUTINE = 'claude-routine <claude@routine>';
 const LOCALE = 'claude-local <claude@local>';
 const autore = (work, ref = 'HEAD') => git(work, ['log', '-1', '--format=%an <%ae>', ref]);
-// Come nei giri veri: il marcatore sta fuori dai commit.
+// Come nei giri veri: il marcatore e il timbro del battito che il gancio accende stanno fuori dai commit.
 function marcatore(dir, dati = { ticket: BIGLIETTO, since: new Date().toISOString() }) {
   mkdirSync(resolve(dir, '.claude'), { recursive: true });
-  try { appendFileSync(resolve(dir, '.git', 'info', 'exclude'), '\n.claude/routine-ticket.json\n'); } catch (_) { /* non è un repo */ }
+  try { appendFileSync(resolve(dir, '.git', 'info', 'exclude'), '\n.claude/routine-ticket.json\n.claude/routine-beat-hook.stamp\n'); } catch (_) { /* non è un repo */ }
   writeFileSync(resolve(dir, '.claude', 'routine-ticket.json'), JSON.stringify(dati));
 }
 const cartelle = [];
