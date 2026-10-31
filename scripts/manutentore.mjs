@@ -527,7 +527,7 @@ export function primoMessaggioChat(file) {
 export const SOTTOCOMANDI = Object.freeze([
   'contesto', 'sveglia', 'stato', 'schede', 'leggi', 'rapporti', 'rami', 'incroci', 'ordine', 'accendi', 'parallelo',
   'priorita', 'attesa', 'pacchetto', 'nota', 'sblocca', 'archivia', 'taccuino', 'indicazione', 'sveglia-tra',
-  'sveglia-togli', 'segnali-letti', 'account', 'routine', 'recap', 'novita', 'chat',
+  'sveglia-togli', 'segnali-letti', 'account', 'routine', 'recap', 'novita', 'chat', 'transizione',
 ]);
 
 const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
@@ -540,7 +540,8 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   sveglia-tra <minuti> [--perche "…"] | sveglia-togli | segnali-letti
   account <A|B> spento|acceso | account primo <A|B|alterna> | routine spente|accese
   recap [giorno] | recap scrivi - [--giorno YYYY-MM-DD]
-  novita | novita consegna <file.json> | chat [--stampa]`;
+  novita | novita consegna <file.json> | chat [--stampa]
+  transizione [--applica]                  (solo l'owner: le priorità 2 scendono a 1; senza --applica conta e basta)`;
 
 async function leggiStdin() {
   if (process.stdin.isTTY) return '';
@@ -590,6 +591,17 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
   const { readTicket } = await import('./lib/routine-ticket.mjs');
   const { readRole } = await import('./lib/routine-role.mjs');
   const cred = credenziale({ argv, env, bigliettoDelGiro: readTicket(root), ruoloDelGiro: readRole(root) });
+  // La discesa delle 2 a 1 (SPEC-MANUTENTORE § 2) è dell'owner, una volta: a secco finché non dice --applica.
+  if (cmd === 'transizione') {
+    const { chiamaOwner } = await import('./domanda.mjs');
+    try {
+      const r = await chiamaOwner({ op: 'transizione', applica: argv.includes('--applica') }, { funzione: 'ownerManutentore' });
+      console.log(r.applicata
+        ? `Scese a 1: ${r.scesi} priorità 2.${r.illeggibili ? ` ${r.illeggibili} non si sono lette e sono rimaste com'erano.` : ''}`
+        : `A secco: scenderebbero a 1 ${r.scesi} priorità 2${r.illeggibili ? ` (${r.illeggibili} illeggibili)` : ''}. Con --applica si scrivono.`);
+      return 0;
+    } catch (e) { console.error(`RIFIUTATO: ${e.message}`); return 2; }
+  }
   // Lo sblocco dell'owner (#1961) resta: senza la chiave del manutentore passa dal canale dell'owner.
   if (cmd === 'sblocca' && !cred) {
     const q = richiestaSblocca(argv.slice(1));
