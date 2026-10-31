@@ -161,6 +161,14 @@
     `<path d="M12 6.6C10.4 5.1 8.3 4.6 4 4.6v12.6c4.3 0 6.4.5 8 2 1.6-1.5 3.7-2 8-2V4.6c-4.3 0-6.4.5-8 2z"/>` +
     `<path d="M12 6.6v14.6"/>`;
 
+  // Novità: un pacchetto col fiocco, quello che arriva con ogni versione. Copia gemella in src/main/popup-menu.js.
+  const novita =
+    `<rect x="3.5" y="8" width="17" height="4" rx="1"/>` +
+    `<path d="M5 12v8h14v-8"/>` +
+    `<path d="M12 8v12"/>` +
+    `<path d="M12 8c-1.4-2.8-5-3.4-5-1.3C7 8 9.6 8 12 8z"/>` +
+    `<path d="M12 8c1.4-2.8 5-3.4 5-1.3C17 8 14.4 8 12 8z"/>`;
+
   // Incognito: tesa del cappello e due lenti tonde. Menu Impostazioni e menu secondario.
   const incognito =
     `<path d="M3 13h18"/>` +
@@ -710,6 +718,7 @@
     lock:         (size) => wrap(lock, { size }),
     lockOpen:     (size) => wrap(lockOpen, { size }),
     transparency: (size) => wrap(transparency, { size }),
+    novita:       (size) => wrap(novita, { size }),
     incognito:    (size) => wrap(incognito, { size }),
     user:         (size) => wrap(user, { size }),
     plus:         (size) => wrap(plus, { size }),
