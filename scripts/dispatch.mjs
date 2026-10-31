@@ -873,8 +873,28 @@ export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts
 
 // L'ambito della verifica (payload.scope) sceglie il testo: lib/verifier-scope.mjs.
 export { verifierScope };
-export function perimetroNote(scope, perimetro) {
-  return perimetroNoteBase(scope, perimetro, (l) => VERIFIER_ROUND.formatFindings(l));
+export function perimetroNote(scope, perimetro, opzioni = {}) {
+  return perimetroNoteBase(scope, perimetro, (l) => VERIFIER_ROUND.formatFindings(l), opzioni);
+}
+
+/**
+ * Se il commit verificato del perimetro fa da base al confronto di chi verifica un riallineamento (#1968): 'punta' se è
+ * la punta stessa del ramo, 'assente' se qui non c'è nemmeno dopo averlo chiesto a origin (un rebase lo toglie dai rami),
+ * '' se va bene o se git qui non risponde: non aver potuto guardare non scarta niente.
+ */
+export function esaminaShaVerificato(sha, root = ROOT) {
+  const s = String(sha || '').trim().toLowerCase();
+  if (!/^[0-9a-f]{7,40}$/.test(s)) return '';
+  const g = (args, timeout = 30000) => {
+    try { return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout }).trim().toLowerCase(); } catch (_) { return null; }
+  };
+  const punta = g(['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']);
+  if (!punta) return '';
+  const intero = () => g(['rev-parse', '--verify', '--quiet', `${s}^{commit}`]);
+  let c = intero();
+  if (!c && s.length === 40 && g(['fetch', '--quiet', 'origin', s], 120000) !== null) c = intero();
+  if (!c) return 'assente';
+  return c === punta ? 'punta' : '';
 }
 
 export function readRoleInstructions(role, { scope, caso } = {}) {
