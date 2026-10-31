@@ -69,16 +69,19 @@ function comandoDiProva() {
 }
 
 // yt-dlp per Windows e macOS è un lanciatore che apre un secondo processo: si ferma tutto l'albero, ffmpeg compreso.
-function fermaAlbero(figlio) {
+// `subito`: Filo sta uscendo, e la cartella si toglie appena il comando torna.
+function fermaAlbero(figlio, { subito = false } = {}) {
   if (!figlio || figlio.exitCode !== null || figlio.signalCode) return;
   if (process.platform === 'win32') {
-    try { spawn('taskkill', ['/pid', String(figlio.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); } catch (_) {}
+    const a = ['/pid', String(figlio.pid), '/T', '/F'];
+    try { (subito ? spawnSync : spawn)('taskkill', a, { windowsHide: true, stdio: 'ignore' }); } catch (_) {}
   } else {
-    try { process.kill(-figlio.pid, 'SIGTERM'); } catch (_) { try { figlio.kill('SIGTERM'); } catch (_) {} }
+    const segnale = subito ? 'SIGKILL' : 'SIGTERM';
+    try { process.kill(-figlio.pid, segnale); } catch (_) { try { figlio.kill(segnale); } catch (_) {} }
   }
 }
 
-function eseguiYtdlp(comando, argomenti, { suEvento, fermato }) {
+function eseguiYtdlp(comando, argomenti, { suEvento, fermato, cartella }) {
   return new Promise((risolvi) => {
     let figlio;
     try {
