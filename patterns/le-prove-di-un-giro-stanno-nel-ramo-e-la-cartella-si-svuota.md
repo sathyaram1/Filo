@@ -30,7 +30,8 @@ la cartella.
   registro della fiducia non vede: la pratica fidata perde la fiducia e la fusione aspetta
   l'owner. Dopo il verdetto restano da togliere solo le prove dei rilievi che il bilancio
   mette da parte, che la risposta del server elenca per numero: quelle non si possono
-  sapere prima.
+  sapere prima. Una critica con un interno di livello 2 o 3 col `?` ferma di sicuro il
+  lavoro, e lì i `?` restano a chi riprende con la loro prova: esce solo quella degli esterni.
 - Si cancella anche quella di un rilievo corretto, nello stesso commit in cui si scrive la
   prova durevole che lo tiene chiuso. Se una prova durevole non c'è, la prova del giro
   resta.
