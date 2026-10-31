@@ -207,3 +207,11 @@ test('un guasto non diventa una domanda per l\'owner (#1790)', () => {
   assert.match(sezione('### 3.1').replace(/\s+/g, ' '), /`destinatario`: l'owner\. Le domande di guasto non arrivano a nessuno/);
   assert.match(sezione('## 13').replace(/\s+/g, ' '), /dal #1790 non ne nascono più: § 3\.8/);
 });
+
+// D-254 (#1961.1): lo spegnimento della gestione del lavoro non tiene ferme le urgenze, che un feedback scritto bene
+// potrebbe fermare ingannandola; la spesa la frena l'owner.
+test('lo spegnimento in emergenza della gestione del lavoro non ferma le priorità 3', () => {
+  const s43 = sezione('### 4.3').replace(/\s+/g, ' ');
+  assert.match(s43, /\*\*Spegne in emergenza\*\* routine o account[^-]*\*\*Le priorità 3 partono lo stesso\*\* \(D-254\)/);
+  assert.match(s43, /freno della spesa resta all'owner, con l'interruttore delle routine/);
+});
