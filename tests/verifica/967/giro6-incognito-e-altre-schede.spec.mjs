@@ -2,7 +2,7 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
-const NOMI = ['team.com'];
+const NOMI = ['team.com', 'login.team.com'];
 
 async function miniServer() {
   const server = createServer((req, res) => {
