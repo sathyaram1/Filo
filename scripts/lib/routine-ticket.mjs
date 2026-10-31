@@ -98,11 +98,8 @@ export function writeTicket(root, ticket) {
   try {
     mkdirSync(resolve(root, '.claude'), { recursive: true });
     // Il timbro del gancio di salvataggio è del biglietto di prima: col nuovo varrebbe come suo lavoro vivo (#1480).
-    const prima = readMarkerFrom(root);
-    if (String((prima || {}).ticket || '') !== t) rmSync(resolve(root, '.claude', 'routine-beat-hook.stamp'), { force: true });
+    if (String((readMarkerFrom(root) || {}).ticket || '') !== t) rmSync(resolve(root, '.claude', 'routine-beat-hook.stamp'), { force: true });
     const marker = { ticket: t, since: new Date().toISOString() };
-    // Rilanciare dispatch dopo la domanda di fine sessione non riapre il ramo alle spinte (#1555).
-    if (prima && String(prima.ticket || '') === t && chiusuraDelBiglietto(prima)) marker.chiusura = prima.chiusura;
     writeFileSync(ticketFile(root), JSON.stringify(marker, null, 2) + '\n', 'utf8');
     return marker;
   } catch (_) {
@@ -152,30 +149,6 @@ export function segnaBigliettoFinito(root, ticket, perche, { now = Date.now() } 
   if (bigliettoFinito(m)) return true;
   try {
     writeFileSync(ticketFile(root), JSON.stringify({ ...m, morto: { ora: new Date(now).toISOString(), perche: String(perche || '') } }, null, 2) + '\n', 'utf8');
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-/**
- * La punta salvata prima della domanda di fine sessione ({ sha, branch, ora }), o null: da lì il ramo non si spedisce
- * più, né dal gancio di salvataggio né dal rilascio (SPEC-DOMANDE § 5.4, #1555). PURA.
- */
-export function chiusuraDelBiglietto(marker) {
-  const c = marker && marker.chiusura;
-  if (!c || typeof c !== 'object' || !Number.isFinite(Date.parse(String(c.ora || '')))) return null;
-  return { sha: String(c.sha || ''), branch: String(c.branch || ''), ora: String(c.ora) };
-}
-
-/** Segna nel marcatore di QUEL biglietto la punta salvata prima della domanda di fine sessione. Best-effort. */
-export function segnaChiusura(root, ticket, { sha = '', branch = '' } = {}, { now = Date.now() } = {}) {
-  const t = String(ticket || '').trim();
-  const m = readMarkerFrom(root);
-  if (!t || !m || String(m.ticket || '') !== t) return false;
-  try {
-    const chiusura = { ora: new Date(now).toISOString(), sha: String(sha || ''), branch: String(branch || '') };
-    writeFileSync(ticketFile(root), JSON.stringify({ ...m, chiusura }, null, 2) + '\n', 'utf8');
     return true;
   } catch (_) {
     return false;

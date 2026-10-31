@@ -147,10 +147,7 @@ import {
   USCITA_LAVORO_VIVO,
 } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
-import {
-  bigliettoFinito, chiusuraDelBiglietto, haFormaDiBigliettoVero, leggiBigliettoAMano, leggiMarcatoreBiglietto, looksLikeTicket,
-  segnaBigliettoFinito, segnaChiusura,
-} from './lib/routine-ticket.mjs';
+import { bigliettoFinito, haFormaDiBigliettoVero, leggiBigliettoAMano, leggiMarcatoreBiglietto, looksLikeTicket, segnaBigliettoFinito } from './lib/routine-ticket.mjs';
 import { apreUnElenco } from './lib/argomenti.mjs';
 import { SEGNALA_TOLTA } from './lib/livelli.mjs';
 import { scriviImmagine } from './lib/consegna-file.mjs';
@@ -528,16 +525,12 @@ export async function heartbeat(t, opts = {}) {
  * `report`, se presente, è il rapporto di fine sessione (session-report.mjs):
  * viaggia nel corpo col nome `report`. Per la ritentata quando il server lo
  * rifiuta c'è releaseConRapporto, qui sotto.
- *
- * `punta` ({ branch, sha }) è quella che il rilascio ha appena spedito: il server la registra per il biglietto se è
- * ancora la punta del ramo, così una spinta dello stesso giro dopo la consegna non resta un buco nel registro (#1555).
  */
-export async function release(t, fault = '', opts, report = null, punta = null) {
+export async function release(t, fault = '', opts, report = null) {
   const payload = { ticket: t };
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
   if (report && typeof report === 'object') payload.report = report;
-  Object.assign(payload, campiPunta(punta));
   Object.assign(payload, creditiDi(opts));
   const { status, body } = await call('routineRelease', payload, opts);
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
@@ -553,8 +546,8 @@ export async function release(t, fault = '', opts, report = null, punta = null) 
  * arrivato al server: 'allegato', 'ridotto', 'scartato' o 'assente';
  * `esito.avviso` è la riga da stampare quando qualcosa è andato perso.
  */
-export async function releaseConRapporto(t, fault, report, opts, punta = null) {
-  const tenta = (rep) => release(t, fault, opts, rep, punta);
+export async function releaseConRapporto(t, fault, report, opts) {
+  const tenta = (rep) => release(t, fault, opts, rep);
   if (!report || typeof report !== 'object') return { ...(await tenta(null)), rapporto: 'assente' };
   const malformato = (r) => r.status === 400 && r.reason === 'report_malformed';
   // Il dettaglio è nella PRIMA risposta (quella che ha rifiutato il
@@ -599,22 +592,11 @@ export async function releaseConRapporto(t, fault, report, opts, punta = null) {
 
 // ─── Domanda di fine sessione (endpoint routineClosing) ─────────────────────
 
-/** I campi `branch` e `sha` di una punta appena spedita, o niente. PURA. */
-export function campiPunta(punta) {
-  const sha = String((punta && punta.sha) || '').trim().toLowerCase();
-  const branch = String((punta && punta.branch) || '').trim();
-  return /^[0-9a-f]{40}$/.test(sha) && branch ? { branch, sha } : {};
-}
-
-/**
- * Il corpo della richiesta: una credenziale sola, il server ne rifiuta due o nessuna. PURA.
- * La domanda di un worker porta la punta salvata prima di lei: il server la registra prima del testo che sporca (#1555).
- */
-export function corpoChiusura(op, { passphrase = '', ticket = '', id = '', answer, requestId = '', punta = null } = {}) {
+/** Il corpo della richiesta: una credenziale sola, il server ne rifiuta due o nessuna. PURA. */
+export function corpoChiusura(op, { passphrase = '', ticket = '', id = '', answer, requestId = '' } = {}) {
   if (!passphrase === !ticket) throw new Error('serve esattamente una fra parola d\'ordine e biglietto');
   const corpo = passphrase ? { passphrase: String(passphrase), op } : { ticket: String(ticket), op };
   if (op === 'question' && passphrase && requestId) corpo.requestId = String(requestId);
-  if (op === 'question' && ticket) Object.assign(corpo, campiPunta(punta));
   if (op === 'answer') {
     if (passphrase) corpo.id = String(id || '');
     corpo.answer = String(answer ?? '');
@@ -869,60 +851,6 @@ export function commitRestante(root, { exec = execFileSync, env = process.env } 
   const commit = run(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m', `auto: rilascio — ${elenco}`]);
   if (!commit.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(commit.out) };
   return { ok: true, skipped: false, committed: restano, fuori, reason: '' };
-}
-
-/**
- * L'ultima spinta del giro: quello rimasto fuori dai commit si committa, poi il ramo va su origin. La fanno il rilascio
- * e, prima di lui, la domanda di fine sessione; la `punta` spedita va al server, che la registra per il biglietto (#1555).
- * → { ok, righe: string[], punta: { branch, sha } | null, errore?, rimedio? }: un `ok` falso ferma chi chiama.
- */
-export function salvaRamoDelGiro(root, { exec = execFileSync, env = process.env } = {}) {
-  const righe = [];
-  const c = commitRestante(root, { exec, env });
-  if (!c.ok) return { ok: false, righe, punta: null, errore: `Modifiche fuori dai commit che non riesco a committare: ${c.reason}`, rimedio: 'porta la directory a un commit e rilancia lo stesso comando.' };
-  if (c.committed.length) righe.push(`committate ${c.committed.length} modifiche rimaste fuori dai commit: ${c.committed.slice(0, 3).join(', ')}${c.committed.length > 3 ? ` (+${c.committed.length - 3} file)` : ''}`);
-  if (c.fuori && c.fuori.length) righe.push(`NON committo e NON spedisco ${c.fuori.join(', ')}: ha la forma di una copia dei dati del server e il repo è pubblico. Resta nella cartella, invisibile a git: spostalo nella cartella temporanea del sistema (os.tmpdir()).`);
-  const p = pushRamoCorrente(root, { exec, env });
-  if (!p.ok) return { ok: false, righe, punta: null, errore: `Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`, rimedio: 'sistema il push e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).', pushFallito: true };
-  if (p.avviso) righe.push(p.avviso);
-  righe.push(p.skipped ? `push saltato: ${p.reason}` : `ramo '${p.branch}' spedito su origin${p.forced ? ' (storia riscritta: --force-with-lease)' : ''}`);
-  const sha = p.skipped ? '' : headSha(root);
-  return { ok: true, righe, punta: sha ? { branch: p.branch, sha } : null };
-}
-
-/**
- * Prima della domanda di fine sessione di un worker: l'ultima spinta del giro, e il segno nel marcatore che da lì il
- * ramo non si spedisce più (la domanda può sporcare il biglietto, SPEC-DOMANDE § 5.4). Chiesta di nuovo, riusa la
- * punta già salvata invece di spedire ancora. La cartella di un altro biglietto, o di uno finito, non si tocca.
- */
-export function salvaPerLaDomanda(root, ticket, { exec = execFileSync, env = process.env } = {}) {
-  const marcatore = leggiMarcatoreBiglietto(root);
-  if (marcatore && String(marcatore.ticket || '') !== String(ticket)) {
-    return { ok: true, righe: [`la cartella è del biglietto ${String(marcatore.ticket).slice(0, 8)}…, non di questo: non committo e non spedisco niente.`], punta: null };
-  }
-  if (bigliettoFinito(marcatore)) return { ok: true, righe: [], punta: null };
-  const gia = chiusuraDelBiglietto(marcatore);
-  if (gia) return { ok: true, righe: [], punta: gia.sha ? { branch: gia.branch, sha: gia.sha } : null };
-  const s = salvaRamoDelGiro(root, { exec, env });
-  if (s.ok) segnaChiusura(root, ticket, s.punta || {});
-  return s;
-}
-
-/**
- * Cosa è rimasto fuori dal ramo dopo la punta salvata per la domanda di fine sessione: i commit locali dopo di lei e i
- * file fuori dai commit. '' se niente. Lo dice il rilascio, che da lì non spedisce più (#1555).
- */
-export function fermoDopoLaChiusura(root, sha, { exec = execFileSync } = {}) {
-  const run = (args) => {
-    try { return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() }; } catch (_) { return { ok: false, out: '' }; }
-  };
-  const parti = [];
-  const dopo = sha ? run(['rev-list', '--count', `${sha}..HEAD`]) : { ok: false };
-  const n = dopo.ok ? Number(dopo.out) || 0 : 0;
-  if (n) parti.push(`${n} commit`);
-  const st = statoDirectory(root);
-  if (st.ok && st.lines.length) parti.push(`${st.lines.length} file fuori dai commit`);
-  return parti.join(' e ');
 }
 
 /**
@@ -1575,16 +1503,6 @@ if (isMain) {
     const a = argomentiChiusura(cmd, args, data);
     if (a.errore) { console.error(`${a.errore} — non ho mandato niente.`); process.exit(1); }
     if (cmd === 'domanda') {
-      if (a.cred.ticket) {
-        const s = salvaPerLaDomanda(ROOT, a.cred.ticket);
-        for (const riga of s.righe) console.error(riga);
-        if (!s.ok) {
-          console.error(s.errore);
-          console.error(`Non ho chiesto la domanda: la domanda arriva dopo l'ultima spinta del giro. Per salvare il ramo ${s.rimedio}`);
-          process.exit(1);
-        }
-        if (s.punta) a.cred.punta = s.punta;
-      }
       const r = await domandaChiusura(a.cred);
       if (r.esito === 'assente') { console.error(`nessuna domanda (${r.reason}): niente da rispondere, chiudi o rilascia come sempre.`); process.exit(EXIT_CHIUSURA.assente); }
       if (r.esito === 'rifiutato') { console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato); }
@@ -1790,25 +1708,33 @@ if (isMain) {
     // contenitore. Se il push non riesce NON si rilascia: si stampa la causa e
     // si esce diverso da zero, il worker sistema e rilancia (il biglietto scade
     // da solo dopo 60 minuti se muore). `--senza-push` dove non c'è un repo.
-    // Dopo la domanda di fine sessione l'ultima spinta c'è già stata: da lì non si spedisce più (#1555).
-    const chiusura = cartellaSua && !finito ? chiusuraDelBiglietto(marcatore) : null;
-    let punta = chiusura && chiusura.sha ? { branch: chiusura.branch, sha: chiusura.sha } : null;
-    if (chiusura) {
-      const fermo = fermoDopoLaChiusura(ROOT, chiusura.sha);
-      if (fermo) console.error(`dopo la domanda di fine sessione il ramo non si spedisce più: ${fermo} restano in questa cartella, fuori dal lavoro.`);
-    } else if (data['senza-push'] !== true && cartellaSua && !finito) {
-      const s = salvaRamoDelGiro(ROOT);
-      for (const riga of s.righe) console.error(riga);
-      if (!s.ok) {
-        console.error(s.errore);
+    if (data['senza-push'] !== true && cartellaSua && !finito) {
+      // Prima quello che è rimasto fuori dai commit (un file nato da una
+      // shell non passa dall'hook): si committa qui, e si dice.
+      const c = commitRestante(ROOT);
+      if (!c.ok) {
+        console.error(`Modifiche fuori dai commit che non riesco a committare: ${c.reason}`);
+        console.error('Non ho rilasciato niente: porta la directory a un commit e rilancia lo stesso comando.');
+        process.exit(1);
+      }
+      if (c.committed.length) {
+        console.error(`committate ${c.committed.length} modifiche rimaste fuori dai commit: ${c.committed.slice(0, 3).join(', ')}${c.committed.length > 3 ? ` (+${c.committed.length - 3} file)` : ''}`);
+      }
+      if (c.fuori && c.fuori.length) {
+        console.error(`NON committo e NON spedisco ${c.fuori.join(', ')}: ha la forma di una copia dei dati del server e il repo è pubblico. Resta nella cartella, invisibile a git: spostalo nella cartella temporanea del sistema (os.tmpdir()).`);
+      }
+      const p = pushRamoCorrente(ROOT);
+      if (!p.ok) {
+        console.error(`Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`);
         // In una routine un push a mano resta fermo sul controllo dei permessi, che in cloud nessuno approva (#1797).
         const inRoutine = isRoutineInstance(ROOT) || !!marcatore;
-        console.error(!s.pushFallito ? `Non ho rilasciato niente: ${s.rimedio}` : inRoutine
+        console.error(inRoutine
           ? 'Non ho rilasciato niente. Non spingere a mano: in cloud il controllo dei permessi ferma il push e la sessione resta appesa. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando, che rispedisce da sé; altrimenti è un guasto: rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push.'
           : 'Non ho rilasciato niente: il ramo deve arrivare su origin prima del rilascio. Rimetti a posto la spedizione e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
         process.exit(1);
       }
-      punta = s.punta;
+      if (p.avviso) console.error(p.avviso);
+      console.error(p.skipped ? `push saltato: ${p.reason}` : `ramo '${p.branch}' spedito su origin${p.forced ? ' (storia riscritta: --force-with-lease)' : ''}`);
     }
     // Il rapporto di fine sessione lo fa uno script, non l'agente, e parte da
     // solo qui. Se lo script fallisce si rilascia comunque, con la nota.
@@ -1828,7 +1754,7 @@ if (isMain) {
         rapporto = { v: 3, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
       }
     }
-    const r = await releaseConRapporto(args[0], guasto, rapporto, undefined, punta);
+    const r = await releaseConRapporto(args[0], guasto, rapporto);
     if (r.avviso) console.error(r.avviso);
     // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo
     // (il server risponde `dead_ticket` e il ciclo esce), ma spegnerlo adesso
@@ -1850,8 +1776,7 @@ if (isMain) {
         const { readRole } = await import('./lib/routine-role.mjs');
         // Il ruolo nel sigillo: dopo un «pass» vale come pulizia solo quello del verificatore (#880).
         const chi = readRole(ROOT);
-        // Dopo la domanda il punto fermo è la punta salvata: un commit rimasto qui non lo spedisce chi viene dopo.
-        sealCurrentWork(ROOT, { by: chi ? `release:${chi}` : 'release', sha: chiusura ? chiusura.sha : '' });
+        sealCurrentWork(ROOT, { by: chi ? `release:${chi}` : 'release' });
       } catch (_) { /* best-effort: il rilascio è già andato */ }
     }
     // Un biglietto che il server dice morto non ha più niente da tenere vivo: il battito si spegne e la fine si segna,
