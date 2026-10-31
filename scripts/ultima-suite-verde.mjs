@@ -171,7 +171,7 @@ const eAntenato = (a, b) => { try { git('merge-base', '--is-ancestor', a, b); re
 const soloCodice = (da, a) => Number(gitForse('rev-list', '--count', '--first-parent', '--invert-grep', '--grep=^release: v[0-9]', `${da}..${a}`) || 0);
 
 function leggiCorse(repo, filtro) {
-  const j = ghApi(`repos/${repo}/actions/workflows/suite.yml/runs?branch=main&${filtro}`);
+  const j = ghApi(`repos/${repo}/actions/workflows/suite.yml/runs?branch=main&${filtro}`, SOLO_CORSE);
   return Array.isArray(j?.workflow_runs) ? j.workflow_runs : [];
 }
 
