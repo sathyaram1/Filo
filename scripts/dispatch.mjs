@@ -1488,7 +1488,8 @@ export function verifierReplyText(reply, id = '<id>') {
   // Un rilievo diventato un feedback suo non lascia una prova rossa nel ramo:
   // il testo vive nel feedback, e la cartella del giro si svuota invece di
   // crescere. Le righe sono pronte da spuntare, col numero di ciascuno.
-  const daTogliere = derivati.flatMap((d) => d.rilievi.map((f) => `  · ${Number.isInteger(f.n) ? `le prove con r${f.n} nel nome` : 'nessuna prova (il rilievo non si ritrova nella critica)'}, per ${d.num || '(numero non comunicato)'}: ${frase(f)}`)).join('\n');
+  // Quelle dei rilievi che escono in ogni esito sono già uscite prima della critica (#1555): qui restano le altre.
+  const daTogliere = derivati.flatMap((d) => d.rilievi.filter((f) => !esceInOgniEsito(f)).map((f) => `  · ${Number.isInteger(f.n) ? `le prove con r${f.n} nel nome` : 'nessuna prova (il rilievo non si ritrova nella critica)'}, per ${d.num || '(numero non comunicato)'}: ${frase(f)}`)).join('\n');
   if (r.outcome === 'fix' && r.phase2) {
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
