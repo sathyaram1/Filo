@@ -1499,13 +1499,35 @@
     }
   }
 
+  // L'indirizzo del filmato cliccato quando la pagina non è lui (#1488): il collegamento a cui il menu lo lega, quello
+  // che il lettore di YouTube dà al suo video, o il permalink col <time> del post che lo contiene. '' = la pagina.
+  function indirizzoDelVideo(el, link) {
+    const di = (a) => {
+      const h = a && (typeof a.href === 'string' ? a.href : a.href?.baseVal);
+      try { const u = new URL(String(h || ''), location.href); return /^https?:$/.test(u.protocol) ? u.href : ''; } catch (_) { return ''; }
+    };
+    const delLink = di(link);
+    if (delLink) return delLink;
+    const lettore = el.closest?.('.html5-video-player, #movie_player');
+    const titolo = di(lettore && lettore.querySelector('a.ytp-title-link[href]'));
+    if (titolo) return titolo;
+    // Il post più piccolo che contiene il filmato e un solo permalink; un contenitore con un altro filmato è troppo.
+    for (let n = el.parentElement, i = 0; n && n !== document.body && i < 25; n = n.parentElement, i++) {
+      if (n.querySelectorAll('video, audio').length > 1) break;
+      const permalink = new Set(Array.from(n.querySelectorAll('a[href] time'), (t) => di(t.closest('a'))).filter(Boolean));
+      if (permalink.size === 1) return [...permalink][0];
+      if (permalink.size > 1) break;
+    }
+    return '';
+  }
+
   // La risposta arriva a video salvato, anche dopo minuti: se tarda, un avviso dice subito che è partito.
-  async function salvaInStreaming(audio) {
+  async function salvaInStreaming(audio, indirizzo = '') {
     let partito = null;
     const avviso = setTimeout(() => { partito = Popup.showToast(I18n.t(audio ? 'toast_audio_streaming_started' : 'toast_video_streaming_started')); }, 700);
     let res = null;
     try {
-      res = await chrome.runtime.sendMessage({ type: MSG.SAVE_STREAMING_VIDEO, kind: audio ? 'audio' : 'video', titolo: document.title || '' });
+      res = await chrome.runtime.sendMessage({ type: MSG.SAVE_STREAMING_VIDEO, kind: audio ? 'audio' : 'video', titolo: document.title || '', indirizzo });
     } catch (_) { res = null; }
     clearTimeout(avviso);
     try { if (partito && partito.close) partito.close(); } catch (_) {}
