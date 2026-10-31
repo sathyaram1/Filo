@@ -164,4 +164,39 @@ test('dispatch --record-fixed e deliver fixed non registrano un riallineamento c
   assert.equal(suOrigin(s.origin, 'worker/77'), punta, 'chi verifica dopo trova il rebase su origin');
   assert.equal(consegne().length, 1);
   assert.equal(consegne()[0].body.data.sha, punta);
+  const canaleSi = await esegui('routine-channel.mjs', ['deliver', 'b'.repeat(43), 'fixed', '--notes', REPORT, '--motivo', 'conflitto: nessuno'], env, s.work);
+  assert.equal(canaleSi.code, 0, canaleSi.se);
+  assert.equal(consegne().length, 2);
+  assert.equal(consegne()[1].body.data.sha, punta);
+});
+
+test('chi riallinea e si ferma con una domanda che blocca consegna anche senza rebase: non registra un riallineamento', async (t) => {
+  const { srv, ricevuti, port } = await fintoServer();
+  t.after(() => srv.close());
+  const s = scena();
+  const stato = join(s.work, 'stato');
+  mkdirSync(stato, { recursive: true });
+  writeFileSync(join(stato, 'fid-77.json'), JSON.stringify({ id: 'fid-77', branch: 'worker/77', loopCount: 1, verifierVerdict: 'pass' }));
+  mkdirSync(join(s.work, '.claude'), { recursive: true });
+  writeFileSync(join(s.work, '.claude', 'routine-role.json'), JSON.stringify({ role: 'fixer', since: new Date().toISOString(), dal: s.verificato }));
+  const domanda = join(stato, 'domanda.json');
+  writeFileSync(domanda, JSON.stringify({
+    titolo: 'Quale delle due versioni del menu tenere',
+    priorita: 'importante',
+    contesto: 'Il lavoro e la linea principale cambiano lo stesso menu in due modi diversi.',
+    problema: 'Le due versioni non stanno insieme. Scegli quale tenere.',
+    opzioni: [
+      { testo: 'Tenere quella del lavoro', pro: 'Resta quello che hai chiesto', contro: 'Si perde la modifica arrivata dopo', azione: { tipo: 'riprendi', feedbackId: 'fid-77' } },
+      { testo: 'Tenere quella arrivata dopo', pro: 'Resta la versione più nuova', contro: 'Il lavoro va rifatto sopra', azione: { tipo: 'riprendi', feedbackId: 'fid-77' } },
+    ],
+    consiglio: { opzione: 0, perche: 'È quello che hai chiesto.' },
+  }));
+  const env = {
+    FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: s.work, FILO_DISPATCH_STATE_DIR: stato,
+    FILO_ROUTINES_ENABLED: '1', FILO_ROUTINE_TICKET: 'b'.repeat(43), FILO_ROUTINE: '',
+  };
+  const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-77', 'Rebase annullato: il conflitto sul menu chiede una scelta.', '--domanda', domanda], env, s.work);
+  assert.equal(r.code, 0, r.se);
+  assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 1);
+  assert.equal(suOrigin(s.origin, 'worker/77'), s.verificato);
 });
