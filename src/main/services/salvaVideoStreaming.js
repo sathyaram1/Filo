@@ -6,7 +6,7 @@
 
 const path = require('node:path');
 const fs = require('node:fs');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const Y = require('./ytdlp');
 
 const t = (k, ...a) => { try { return globalThis.SN_I18N.t(k, ...a); } catch (_) { return k; } };
