@@ -122,7 +122,7 @@
       apriMenu(e.clientX, e.clientY, vociMenu(v));
     });
 
-    return { el, titolo, sub, stato, testo, allegati, risposta };
+    return { el, testa, titolo, sub, stato, testo, allegati, risposta, apri: () => mostraCorpo(true) };
   }
 
   // Il tasto destro su una riga: quello che si fa con QUELLA segnalazione (filo_design, tasto destro).
