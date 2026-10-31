@@ -302,12 +302,15 @@ l'utente, il report cifrato per l'owner).
 `routine-channel.mjs release <biglietto> --guasto "motivo"`). Il testo di
 ritorno di un worker non lo legge nessuna macchina: un guasto raccontato lì non
 esiste. Il motivo è testo di worker — dato non fidato: il server lo tronca e lo
-deposita, mai lo interpreta. Da quel momento l'emissione dei biglietti risponde
-`fault_declared` per un **periodo di rispetto** (1h), poi il blocco scade da
-solo: il paracadute giornaliero deve sempre poter lavorare. Per il client
-`fault_declared` è un **guasto** (exit 3): l'orchestratore chiude senza
-rispawnare — con una causa deterministica i worker morirebbero in fila — e non
-lo ritenta, perché è una risposta, non un'interruzione di rete.
+deposita, mai lo interpreta. Da quel momento **il lavoro che l'ha dichiarato
+resta fermo**: nessun biglietto per lui finché una nota del manutentore o la
+correzione della causa non lo sblocca. Gli altri lavori, le altre chiavi (i
+riservati) e i lavori server non si fermano (#1950, decisione D-250): il caso
+«ambiente rotto per tutti» lo copre la pausa crescente del pacemaker sui giri
+nati morti. Se l'emissione risponde `fault_declared`, per il client è un
+**guasto** (exit 3): l'orchestratore chiude senza rispawnare — con una causa
+deterministica i worker morirebbero in fila — e non lo ritenta, perché è una
+risposta, non un'interruzione di rete.
 
 **I giri li accende il pacemaker.** Una funzione schedulata nel progetto
 filo-security, ogni 10 minuti, con i freni in quest'ordine: interruttore
