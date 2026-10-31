@@ -26,11 +26,33 @@ const url = argv[argv.length - 1];
 const pausa = Number(caso.pausaMs) || 60;
 const passi = Number(caso.passi) || 8;
 
+// Giro 2: come il vero, `--print-to-file before_dl:` scrive l'elenco dei pezzi; nel `.:.` il vero salta i valori
+// che mancano, quindi la lista dei pesi esatti si accorcia (provato su yt-dlp 2026.10.26). `caso.pesi`:
+// { '137': { esatto, circa }, '140': {…} }, `caso.stima`: pezzi a frammenti, col solo peso stimato che cambia.
+const PEZZI = [['137', 300 * 1024], ['140', 60 * 1024]];
+const pesoDi = (f) => (caso.pesi && caso.pesi[f]) || { esatto: PEZZI.find((p) => p[0] === f)[1] };
+function stampaPezzi() {
+  const i = argv.indexOf('--print-to-file');
+  if (i < 0 || !String(argv[i + 1]).startsWith('before_dl:')) return;
+  const lista = (k) => JSON.stringify(PEZZI.map(([f]) => pesoDi(f)[k]).filter((v) => v !== undefined));
+  const riga = argv[i + 1].slice('before_dl:'.length)
+    .replace('%(requested_formats.:.format_id)j', JSON.stringify(PEZZI.map(([f]) => f)))
+    .replace('%(requested_formats.:.filesize)j', lista('esatto'))
+    .replace('%(requested_formats.:.filesize_approx)j', lista('circa'));
+  const file = argv[i + 2].replace(/%%/g, '%');
+  mkdirSync(dirname(file), { recursive: true });
+  appendFileSync(file, `${riga}\n`);
+}
+
 async function pezzo(formato, peso, titolo) {
   for (let k = 1; k <= passi; k++) {
+    const scaricati = Math.round((peso * k) / passi);
+    // A frammenti il vero stima il totale dai frammenti scesi: all'inizio è piccolo, poi oscilla.
+    const stima = caso.stima ? Math.round(scaricati * (k % 2 ? 1.6 : 0.9) + peso * (k / passi) * 0.2) : undefined;
     process.stdout.write(`${riempi(modello('download'), {
-      'progress.status': 'downloading', 'progress.downloaded_bytes': Math.round((peso * k) / passi),
-      'progress.total_bytes': peso, 'info.format_id': formato, 'info.title': titolo,
+      'progress.status': 'downloading', 'progress.downloaded_bytes': scaricati,
+      'progress.total_bytes': caso.stima ? undefined : peso, 'progress.total_bytes_estimate': stima,
+      'info.format_id': formato, 'info.title': titolo,
     })}\n`);
     await attesa(pausa);
   }
