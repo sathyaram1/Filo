@@ -43,6 +43,19 @@ test('ogni ruolo che lavora dichiara il guasto nel rilascio, col gruppo e il mes
   }
 });
 
+// D-250: la pausa di un'ora per tutti dopo un guasto è tolta. Un testo che la promette ancora fa aspettare chi non c'entra.
+test('un guasto ferma il lavoro che l’ha dichiarato, non gli altri: nessun testo promette più la pausa per tutti', () => {
+  const FERMO = /fermo finché una nota del manutentore o la correzione della causa non lo sblocca/;
+  for (const f of readdirSync(RUOLI).filter((x) => x.endsWith('.md'))) {
+    assert.doesNotMatch(piatto(readFileSync(join(RUOLI, f), 'utf8')), /periodo di rispetto|smette di dare lavoro/i, f);
+  }
+  assert.doesNotMatch(piatto(readFileSync(join(ROOT, 'ROUTINE-AUTH-SPEC.md'), 'utf8')), /periodo di rispetto/i, 'la spec del canale');
+  assert.match(piatto(readFileSync(join(RUOLI, '_dopo-un-guasto.md'), 'utf8')), /gli altri lavori vanno avanti/);
+  for (const [ruolo, opts] of [...CHI_RISOLVE, ...GLI_ALTRI, ['halt', {}]]) {
+    assert.match(piatto(readRoleInstructions(ruolo, opts)), FERMO, `${ruolo} ${JSON.stringify(opts)}`);
+  }
+});
+
 // La sentinella della spec: i modelli di guasto non hanno più «Riprendere quando…» come unica opzione, da nessuna parte.
 test('nessun pezzo di ruolo porta il modello di una domanda di guasto', () => {
   const file = readdirSync(RUOLI).filter((f) => f.endsWith('.md'));
