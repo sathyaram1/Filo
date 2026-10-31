@@ -51,9 +51,14 @@ function leggiSomme(testo) {
 const SEP = '\t';
 const MARCA = 'FILO-DL';
 const MARCA_PP = 'FILO-PP';
+// Prima di scaricare yt-dlp scrive qui quali pezzi chiederà: nelle righe d'avanzamento di un pezzo l'elenco non c'è.
+const FILE_PEZZI = 'pezzi.txt';
 
 // `cartella` è dove yt-dlp lavora: i suoi file escono come «video.<ext>», il nome vero lo dà Filo spostandolo.
 function argomenti({ url, cartella, audio = false, ffmpeg = '', nodo = '' }) {
+  const path = require('node:path');
+  // Un «%» nel percorso della cartella è testo, non un campo del modello del nome.
+  const qui = String(cartella || '').replace(/%/g, '%%');
   const a = [
     // Una configurazione dell'utente (per esempio coi cookie del browser) o un plugin non entrano mai:
     // il programma fa solo quello che chiede Filo, e senza l'account Google (decisione dell'owner, #1488).
@@ -61,6 +66,8 @@ function argomenti({ url, cartella, audio = false, ffmpeg = '', nodo = '' }) {
     '--no-playlist', '--newline', '--no-colors', '--no-mtime',
     // Una diretta non finisce mai: si dice, invece di scaricare per ore.
     '--match-filter', '!is_live',
+    // Un canale, una ricerca, una home sono elenchi: ci si ferma alla prima voce invece di leggerli tutti.
+    '--break-match-filters', '!playlist_id',
   ];
   if (nodo) a.push('--js-runtimes', `node:${nodo}`);
   if (ffmpeg) a.push('--ffmpeg-location', ffmpeg);
