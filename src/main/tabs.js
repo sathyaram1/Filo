@@ -1887,6 +1887,9 @@ class TabManager {
       return { archived: 0, giaInCorso: true };
     }
     this._triageRunning = true;
+    // Un ordine scelto a mano mentre il giro aspettava (alla riapertura: da quando Filo si è riaperto) vince sul colore (#349).
+    const dal = trigger === 'reopen' && this._riapertaAlle ? this._riapertaAlle : Date.now();
+    const opzioni = () => ({ via: da === 'chat' ? 'chat' : 'riordino_automatico', riordina: !(this._spostataAManoAlle >= dal) });
     try {
       await this._ricontrollaModuli();
       await this._caricaSempreAperte();
