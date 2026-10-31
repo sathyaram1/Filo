@@ -72,8 +72,8 @@ function argomenti({ url, cartella, audio = false, ffmpeg = '', nodo = '' }) {
   } else {
     a.push('-f', 'b[ext=mp4]/b');
   }
-  const dir = String(cartella || '').replace(/%/g, '%%');
-  a.push('-o', `${dir}${dir.endsWith('/') || dir.endsWith('\\') ? '' : require('node:path').sep}video.%(ext)s`);
+  // Un «%» nel percorso della cartella è testo, non un campo del modello del nome.
+  a.push('-o', require('node:path').join(String(cartella || '').replace(/%/g, '%%'), 'video.%(ext)s'));
   a.push('--progress-template', `download:${[MARCA, '%(progress.status)s', '%(progress.downloaded_bytes)s',
     '%(progress.total_bytes)s', '%(progress.total_bytes_estimate)s', '%(info.format_id)s', '%(info.title)s'].join(SEP)}`);
   a.push('--progress-template', `postprocess:${[MARCA_PP, '%(progress.status)s', '%(progress.postprocessor)s'].join(SEP)}`);
