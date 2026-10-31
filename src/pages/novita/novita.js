@@ -170,11 +170,12 @@
       avviso.replaceChildren();
       simili.forEach((t, i) => {
         if (i) avviso.appendChild(document.createTextNode(' '));
-        avviso.appendChild(document.createTextNode(`Nessuna riga contiene ${virgolette(t.termine)}: queste hanno `));
-        t.simili.slice(0, 3).forEach((p, j) => {
-          if (j) avviso.appendChild(document.createTextNode(j === Math.min(3, t.simili.length) - 1 ? ' o ' : ', '));
+        avviso.appendChild(document.createTextNode(`Nessuna riga contiene ${virgolette(t.termine)}: ecco quelle con `));
+        const vicine = t.simili.slice(0, 3);
+        vicine.forEach((p, j) => {
+          if (j) avviso.appendChild(document.createTextNode(j === vicine.length - 1 ? ' o ' : ', '));
           const b = document.createElement('b');
-          b.textContent = p;
+          b.textContent = virgolette(p);
           avviso.appendChild(b);
         });
         avviso.appendChild(document.createTextNode('.'));
