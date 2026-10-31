@@ -2254,10 +2254,15 @@
 
     // Parte VARIABILE della chat, sempre dopo `filoChatStatic`, o il blocco di istruzioni si
     // ripaga a ogni messaggio. Anche l'onboarding (#524) sta qui: vale solo nei primi minuti.
-    filoChatOnboarding: ({ onboarding, onboardingTurns, onboardingMax }) =>
+    // #1398: rifatta o ripresa, l'intervista ha davanti memoria e filo di un utente noto; dirgli «è appena arrivato»
+    // lasciava al modello indovinare perché fosse lì (un «test» che nessuno aveva nominato).
+    filoChatOnboarding: ({ onboarding, onboardingTurns, onboardingMax, onboardingRifatta }) =>
       (!onboarding ? '' :
         `${INIZIO_ACCOGLIENZA} (intervista in corso) ═══\n`
-        + `È appena arrivato su Filo e questa è la sua prima conversazione. Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
+        + (onboardingRifatta
+          ? `Non è il primo avvio: l'intervista di benvenuto l'ha riaperta lui, e la memoria e le conversazioni passate qui intorno parlano di lui. Fai comunque le domande che restano nell'elenco, perché quello che risponde oggi vale più di quello che hai salvato, e non tirare in ballo cose delle conversazioni passate che qui non ha nominato. `
+          : `È appena arrivato su Filo e questa è la sua prima conversazione. `)
+        + `Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
         + `Regole:\n`
         + `- UNA cosa per volta. Mai due domande nello stesso messaggio, mai una domanda e un annuncio insieme.\n`
         + `- L'ordine lo decide la conversazione, non l'elenco: aggancia quello che l'utente ha appena detto.\n`
@@ -2305,10 +2310,10 @@
     filoChatRicorda: () => `Ricorda: le azioni sono gli strumenti che hai a disposizione. Prima agisci (gli esiti ti tornano subito), poi scrivi la risposta in prosa, senza JSON.`,
 
     // Quello che vale solo per questo turno quando il filo non si legge (ripiego senza tratto): l'ora e l'intervista.
-    filoChatContext: ({ onboarding, onboardingTurns, onboardingMax, adesso } = {}) =>
+    filoChatContext: ({ onboarding, onboardingTurns, onboardingMax, onboardingRifatta, adesso } = {}) =>
       `${INIZIO_CONTESTO_CHAT}\n` +
       (adesso ? `Adesso è ${adesso}.\n\n` : '') +
-      PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax }),
+      PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax, onboardingRifatta }),
 
     // Il system intero del ripiego senza filo: parte fissa, CONTESTO dell'utente composto adesso, poi il turno.
     filoChat: (payload) => {

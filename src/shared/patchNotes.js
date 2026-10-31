@@ -13,6 +13,7 @@
       features: [],
       fixes: [
         'Anche l\'Aiuto su un sito ora sta sopra la pagina: le domande che gli scrivi, le sue risposte e il testo che propone per un campo, finché non lo accetti, il sito non li legge più, nemmeno se li selezioni o li copi.',
+        'Quando rifai o riprendi l\'intervista di benvenuto, Filo non ti tratta più come appena arrivato e resta su quello che vi dite, senza tirare in ballo cose delle conversazioni passate.',
       ],
     },
     {

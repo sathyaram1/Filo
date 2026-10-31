@@ -582,6 +582,19 @@ test('rifatta o ripresa, l’intervista porta il segno che la lega alle pagine c
   assert.equal(O.normalize({ rifatta: 'si' }).rifatta, undefined);
 });
 
+test('#1398 — rifatta o ripresa, il prompt non dice al modello che l’utente è appena arrivato', () => {
+  const checklist = O.renderChecklistForPrompt(O.emptyState());
+  const primo = C.PROMPTS.filoChatOnboarding({ onboarding: checklist, onboardingTurns: 1, onboardingMax: 5 });
+  assert.match(primo, /appena arrivato su Filo/);
+  const rifatta = C.PROMPTS.filoChatOnboarding({ onboarding: checklist, onboardingTurns: 1, onboardingMax: 5, onboardingRifatta: true });
+  assert.doesNotMatch(rifatta, /appena arrivato|prima conversazione/, 'con memoria e filo davanti, «appena arrivato» è falso');
+  assert.match(rifatta, /Non è il primo avvio/);
+  assert.match(rifatta, /non tirare in ballo cose delle conversazioni passate/);
+  assert.ok(rifatta.includes(checklist), 'l’elenco arriva lo stesso');
+  const intero = C.PROMPTS.filoChat({ capacita: 'x', onboarding: checklist, onboardingRifatta: true });
+  assert.match(intero, /Non è il primo avvio/, 'anche dal prompt in un pezzo solo');
+});
+
 test('#1592 — l’intervista di benvenuto non lega l’accesso Google al voto né nomina la Bacheca', () => {
   // La Bacheca è in pausa per chi non è owner: l'intervista non può promettere una cosa che il nuovo utente non vede.
   for (const i of O.ITEMS) {
