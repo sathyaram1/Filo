@@ -45,7 +45,7 @@ test('ogni ruolo che lavora dichiara il guasto nel rilascio, col gruppo e il mes
 
 // D-250: la pausa di un'ora per tutti dopo un guasto è tolta. Un testo che la promette ancora fa aspettare chi non c'entra.
 test('un guasto ferma il lavoro che l’ha dichiarato, non gli altri: nessun testo promette più la pausa per tutti', () => {
-  const FERMO = /fermo finché una nota del manutentore o la correzione della causa non lo sblocca/;
+  const FERMO = /Il feedback che l'ha dichiarato resta fermo sul suo ramo finché una nota del manutentore o la correzione della causa non lo sblocca/;
   for (const f of readdirSync(RUOLI).filter((x) => x.endsWith('.md'))) {
     assert.doesNotMatch(piatto(readFileSync(join(RUOLI, f), 'utf8')), /periodo di rispetto|smette di dare lavoro/i, f);
   }
