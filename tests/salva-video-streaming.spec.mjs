@@ -44,7 +44,7 @@ const elenco = async (shell) => ((await shell.evaluate(() => window.filoShell.do
 
 test.beforeAll(() => { mkdirSync(base, { recursive: true }); mkdirSync(SHOTS, { recursive: true }); });
 
-test('dal tasto destro il video in streaming arriva nella cartella, col titolo del video', async ({ app, shell, openTab, testServer }) => {
+test('dal tasto destro il video in streaming arriva nella cartella, col titolo del video', async ({ app, shell, openTab, testServer, avvisi }) => {
   test.setTimeout(60_000);
   ilCaso({ titolo: 'Canzone della segnalazione', pausaMs: 120, passi: 12 });
   const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
@@ -59,7 +59,12 @@ test('dal tasto destro il video in streaming arriva nella cartella, col titolo d
 
   await expect.poll(() => (existsSync(dir) ? readdirSync(dir) : []), { timeout: 30000 }).toContain('Canzone della segnalazione.mp4');
   expect(statSync(join(dir, 'Canzone della segnalazione.mp4')).size).toBe(360 * 1024);
-  await expect(page.locator('.sn-toast', { hasText: 'Video salvato' })).toBeVisible({ timeout: 15000 });
+  // La fine si dice nella finestra, con «Apri file», dovunque sia l'utente; la pagina non la ripete.
+  const vista = await avvisi();
+  const fatto = vista.locator('.shell-notif', { hasText: 'Scaricato: Canzone della segnalazione.mp4' }).last();
+  await expect(fatto).toBeVisible({ timeout: 15000 });
+  await expect(fatto.locator('.shell-notif-action', { hasText: 'Apri file' })).toBeVisible();
+  await expect(page.locator('.sn-toast', { hasText: 'Video salvato' })).toHaveCount(0);
   const v = (await elenco(shell)).find((x) => x.filename === 'Canzone della segnalazione.mp4');
   expect(v.state).toBe('completed');
   expect(v.via).toBe('streaming');
@@ -69,17 +74,21 @@ test('dal tasto destro il video in streaming arriva nella cartella, col titolo d
   expect(readdirSync(dir).filter((n) => n.startsWith('.filo-video-'))).toEqual([]);
 });
 
-test('un video con limite d\'età dice perché non si salva, e da «Riprova» riparte nella stessa riga', async ({ app, shell, openTab, testServer }) => {
+test('un video con limite d\'età dice perché non si salva, e da «Riprova» riparte nella stessa riga', async ({ app, shell, openTab, testServer, avvisi }) => {
   test.setTimeout(60_000);
   ilCaso({ errore: 'Sign in to confirm your age. This video may be inappropriate for some users. Use --cookies-from-browser or --cookies for the authentication.' });
   const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
   const page = await testServer.openReady(openTab, PAGINA);
   await salvaDalMenu(page);
-  const avviso = page.locator('.sn-toast', { hasText: 'limite d\'età' });
+  const vista = await avvisi();
+  const avviso = vista.locator('.shell-notif', { hasText: 'limite d\'età' }).last();
   await expect(avviso).toBeVisible({ timeout: 15000 });
   await expect(avviso).toContainText('non usa il tuo account');
   await expect(avviso).toContainText('Google');
-  await page.screenshot({ path: join(SHOTS, 'salva-video-streaming-eta.png') });
+  // Ripetere non toglie un limite d'età: l'avviso non propone «Riprova».
+  await expect(avviso.locator('.shell-notif-action', { hasText: 'Riprova' })).toHaveCount(0);
+  await avviso.screenshot({ path: join(SHOTS, 'salva-video-streaming-eta.png') });
+  await expect(page.locator('.sn-toast', { hasText: 'limite d\'età' })).toHaveCount(0);
 
   const dl = await openTab('filo://downloads/downloads.html');
   const riga = dl.locator('.dl-item', { has: dl.locator('.dl-name', { hasText: 'Canzone della segnalazione' }) });
@@ -109,4 +118,20 @@ test('«Annulla» dai Download ferma il salvataggio e non lascia file', async ({
   await expect.poll(() => readdirSync(dir).filter((n) => n.startsWith('.filo-video-') || n.startsWith('Video lunghissimo')), { timeout: 10000 }).toEqual([]);
   // Nessun avviso d'errore per un annullo voluto.
   await expect(page.locator('.sn-toast', { hasText: 'Non sono riuscito' })).toHaveCount(0);
+});
+
+test('se la rete cade a metà, «Riprova» sull\'avviso salva il video nella stessa riga', async ({ app, shell, openTab, testServer, avvisi }) => {
+  test.setTimeout(60_000);
+  ilCaso({ errore: 'Unable to download API page: <urlopen error [Errno -3] Temporary failure in name resolution>' });
+  const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await salvaDalMenu(page);
+  const vista = await avvisi();
+  const avviso = vista.locator('.shell-notif', { hasText: 'La connessione non risponde' }).last();
+  await expect(avviso).toBeVisible({ timeout: 15000 });
+  ilCaso({ titolo: 'Canzone della segnalazione', pausaMs: 20 });
+  await avviso.locator('.shell-notif-action', { hasText: 'Riprova' }).click();
+  await expect.poll(() => (existsSync(dir) ? readdirSync(dir) : []), { timeout: 20000 }).toContain('Canzone della segnalazione.mp4');
+  const righe = (await elenco(shell)).filter((x) => x.via === 'streaming');
+  expect(righe.map((x) => x.state)).toEqual(['completed']);
 });

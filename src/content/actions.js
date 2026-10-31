@@ -1509,8 +1509,9 @@
     } catch (_) { res = null; }
     clearTimeout(avviso);
     try { if (partito && partito.close) partito.close(); } catch (_) {}
+    // La fine di un salvataggio lungo la dice la finestra, dovunque sia l'utente: qui non si ripete.
+    if (res?.cancelled || res?.annunciato) return;
     if (res?.ok) { Popup.showToast(I18n.t(audio ? 'toast_audio_saved' : 'toast_video_saved')); return; }
-    if (res?.cancelled) return;
     // Una build senza la funzione (quelle da negozio) dice com'era prima: lo streaming non ha un file.
     if (res?.spento) { Popup.toastErrore('toast_media_stream_only'); return; }
     const chiave = `streaming_${res?.motivo || 'generico'}`;

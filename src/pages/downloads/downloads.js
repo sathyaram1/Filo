@@ -322,7 +322,7 @@
       // Il perché di un salvataggio non riuscito resta sulla riga, per chi non ha visto l'avviso.
       if (r.state === 'interrupted' && r.nota) {
         meta.textContent = `${label} · ${r.nota} · ${formatDate(r.startedAt)}`;
-        meta.title = r.nota;
+        meta.classList.add('dl-perche');
       } else {
         meta.textContent = `${label} · ${size} · ${formatDate(r.startedAt)}`;
       }

@@ -983,8 +983,25 @@ function finalizeManual(rec, state, savePath) {
   persist();
   broadcast(state === 'completed' ? 'done' : 'error', rec);
   contaFine(rec);
-  // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina.
+  // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina. Un video in streaming fa
+  // eccezione (#1488): ci mette minuti, e la fine si dice nella finestra, dovunque sia l'utente in quel momento.
+  if (rec.via === 'streaming') annunciaStreaming(rec, state);
   return marca;
+}
+
+function annunciaStreaming(rec, state) {
+  if (state === 'completed') {
+    shellToast(`Scaricato: ${shortName(rec.filename)}`, {
+      durationSec: 8, tipo: 'download_finito', indirizzo: rec.url,
+      actions: [{ label: 'Apri file', openDownloadId: rec.id }, { label: 'Apri cartella', revealDownloadId: rec.id }],
+    }, scopeOf(rec));
+  } else if (state === 'interrupted') {
+    // «Riprova» solo dove riprovare può servire: un limite d'età non cambia ripetendo.
+    shellToast(rec.nota || `Video non salvato: ${shortName(rec.filename)}`, {
+      durationSec: 12, tipo: 'download_failed', indirizzo: rec.url,
+      ...(rec._riprovabile ? { actions: [{ label: 'Riprova', riprovaDownloadId: rec.id }] } : {}),
+    }, scopeOf(rec));
+  }
 }
 
 // `webContents`: la scheda da cui parte, per aprire la domanda nella sua finestra.
@@ -1095,8 +1112,21 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
       if (azzera) { rec.receivedBytes = 0; rec.totalBytes = 0; rec._campioni = []; lastPush = 0; }
       broadcast('progress', rec);
     },
+    // Il nome vero arriva dopo la partenza (il titolo del video, #1488): la riga lo prende appena c'è.
+    nomina(nome) {
+      if (rec._final || !nome) return;
+      const n = safeName(nome);
+      if (n === rec.filename) return;
+      rec.filename = n;
+      rec.exe = marca(() => ESE().eEseguibile(n), rec.exe);
+      broadcast('progress', rec);
+    },
     // `perche`: la frase che resta sulla riga chiusa, per chi non ha visto l'avviso.
-    fail(perche = '') { rec.nota = String(perche || ''); finalizeManual(rec, 'interrupted'); },
+    fail(perche = '', { riprovabile = true } = {}) {
+      rec.nota = String(perche || '');
+      rec._riprovabile = riprovabile;
+      finalizeManual(rec, 'interrupted');
+    },
     cancel: requestCancel,
   };
 }

@@ -15,6 +15,8 @@ const t = (k, ...a) => { try { return globalThis.SN_I18N.t(k, ...a); } catch (_)
 const MOTIVI = Object.freeze(['eta', 'accesso', 'robot', 'protetto', 'spazio', 'diretta', 'sito', 'non_disponibile',
   'rete', 'aggiornare', 'programma', 'firma', 'piattaforma', 'generico']);
 const frase = (motivo) => t(`streaming_${MOTIVI.includes(motivo) ? motivo : 'generico'}`);
+// Quelli che ripetere non cambia: il video resta com'è.
+const DEFINITIVI = Object.freeze(['eta', 'accesso', 'protetto', 'sito', 'piattaforma']);
 
 // In prova il programma è uno finto: `FILO_YTDLP_COMANDO` è il comando come JSON, `FILO_FFMPEG` il percorso.
 function comandoDiProva() {
@@ -94,8 +96,9 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
   const fallisci = (motivo, dettaglio) => {
     if (dettaglio) console.warn('[Filo video] salvataggio non riuscito:', motivo, String(dettaglio).slice(0, 400));
     if (voce.cancelled()) return { ok: false, cancelled: true };
-    voce.fail(frase(motivo));
-    return { ok: false, motivo, frase: frase(motivo) };
+    voce.fail(frase(motivo), { riprovabile: !DEFINITIVI.includes(motivo) });
+    // `annunciato`: l'avviso con il perché l'ha già dato la finestra (downloads.js), la pagina non lo ripete.
+    return { ok: false, motivo, frase: frase(motivo), annunciato: true };
   };
 
   let programmi;
@@ -155,7 +158,7 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
           return;
         }
         avanzamento.leggi(ev);
-        if (ev.titolo) titoloVero = ev.titolo;
+        if (ev.titolo && ev.titolo !== titoloVero) { titoloVero = ev.titolo; voce.nomina(nomeSicuro(titoloVero, ext)); }
         // I primi byte vogliono dire che il video c'è: da qui si chiede dove salvarlo, intanto continua a scendere.
         if (!destinazione) {
           voce.nota('');
@@ -201,7 +204,7 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
       return fallisci(Y.motivoErrore(e && e.message) === 'spazio' ? 'spazio' : 'generico', e && e.message);
     }
     voce.done(finale);
-    return { ok: true, path: finale, filename: path.basename(finale) };
+    return { ok: true, path: finale, filename: path.basename(finale), annunciato: true };
   } finally {
     pulisci();
   }
