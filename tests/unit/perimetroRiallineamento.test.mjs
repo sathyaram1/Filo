@@ -81,7 +81,7 @@ function consegna(perimetro) {
 test('il commit «verificato» che è la punta riallineata non promette un diff, e non va nel marcatore', () => {
   const r = consegna({ shaVerificato: RIALLINEATO, reportRebase: 'conflitto in b.js' });
   assert.match(r.instructions, /# verifica dopo il riallineamento/);
-  assert.match(r.instructions, /è la punta di questo ramo, già riallineata/);
+  assert.match(r.instructions, /è la punta di questo ramo: il diff da lì a `HEAD` è vuoto/);
   assert.match(r.instructions, /Il confronto manca: dichiaralo nella critica/);
   assert.ok(!r.instructions.includes(`git diff ${RIALLINEATO}..HEAD`), 'un diff vuoto non si consegna come confronto');
   assert.match(r.instructions, /> conflitto in b\.js/);
