@@ -2058,6 +2058,12 @@ class TabManager {
     if (!this.tabs.length) this.openTab('filo://newtab/');
     else if (!this.tabs.some((t) => t.id === this.activeId)) this.activate(this.tabs[0].id);
 
+    let pulizia = null;
+    if (riapribili.length) {
+      pulizia = (this._ultimaPulizia ? this._ultimaPulizia.id : 0) + 1;
+      this._ultimaPulizia = { id: pulizia, schede: riapribili, riordina, alle: Date.now() };
+    }
+
     // §1.3 — a OGNI giro, non solo quando si è archiviato qualcosa: all'apertura
     // la barra dev'essere riordinata comunque.
     const reordered = riordina && this.reorderTabsByColor();
