@@ -1504,7 +1504,8 @@
   function indirizzoDelVideo(el, link) {
     const di = (a) => {
       const h = a && (typeof a.href === 'string' ? a.href : a.href?.baseVal);
-      try { const u = new URL(String(h || ''), location.href); return /^https?:$/.test(u.protocol) ? u.href : ''; } catch (_) { return ''; }
+      if (!h) return '';
+      try { const u = new URL(String(h), location.href); return /^https?:$/.test(u.protocol) ? u.href : ''; } catch (_) { return ''; }
     };
     const delLink = di(link);
     if (delLink) return delLink;
