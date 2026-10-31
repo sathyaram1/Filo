@@ -39,8 +39,8 @@ function lineaServer(ramo, sha) {
 function rigaVerificato(sha, scartato) {
   if (!sha) return 'Commit che aveva passato la verifica: non comunicato.';
   if (scartato === 'punta') {
-    return `Commit che aveva passato la verifica: il server ha mandato \`${sha}\`, che è la punta di questo ramo, già riallineata, `
-      + 'non il commit di prima: il diff da lì a `HEAD` è vuoto e non mostra cosa ha cambiato il riallineamento. Il confronto manca: dichiaralo nella critica.';
+    return `Commit che aveva passato la verifica: il server ha mandato \`${sha}\`, che è la punta di questo ramo: `
+      + 'il diff da lì a `HEAD` è vuoto e non mostra cosa ha cambiato il riallineamento. Il confronto manca: dichiaralo nella critica.';
   }
   if (scartato === 'assente') {
     return `Commit che aveva passato la verifica: \`${sha}\`, ma in questa copia non c'è e da origin non è arrivato. `
