@@ -773,15 +773,17 @@ export function spedisciRiallineamento(root, { exec = execFileSync, env = proces
   const p = pushRamoCorrente(root, { exec, env });
   if (!p.ok) return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `il ramo${p.branch ? ` '${p.branch}'` : ''} non arriva su origin: ${p.reason}` };
   if (p.skipped) return { ok: false, tipo: 'ramo', branch: p.branch, reason: `il ramo non parte: ${p.reason}` };
+  // La spedizione può rifare i commit per togliere una copia dei dati: si confronta la punta di adesso.
+  const dopo = run(['rev-parse', '--verify', 'HEAD^{commit}']);
   const ref = `refs/heads/${p.branch}`;
   const remoto = run(['ls-remote', 'origin', ref]);
   if (!remoto.ok) return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `spedito, ma non riesco a rileggere '${p.branch}' su origin: ${pulisciGit(remoto.out)}` };
   const riga = remoto.out.split('\n').map((l) => l.trim().split(/\s+/)).find((c) => c[1] === ref);
   const su = riga ? riga[0].toLowerCase() : '';
-  if (su !== punta.out.toLowerCase()) {
-    return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `su origin '${p.branch}' ${su ? `è a ${su.slice(0, 9)}` : 'non c\'è'}, non alla punta della cartella ${punta.out.slice(0, 9)}` };
+  if (!dopo.ok || su !== dopo.out.toLowerCase()) {
+    return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `su origin '${p.branch}' ${su ? `è a ${su.slice(0, 9)}` : 'non c\'è'}, non alla punta della cartella ${dopo.out.slice(0, 9)}` };
   }
-  return { ok: true, branch: p.branch, punta: punta.out, main: main.out, forced: !!p.forced, ...(p.avviso ? { avviso: p.avviso } : {}) };
+  return { ok: true, branch: p.branch, punta: dopo.out, main: main.out, forced: !!p.forced, ...(p.avviso ? { avviso: p.avviso } : {}) };
 }
 
 /** Il rifiuto di un riallineamento non spedito, uguale dalle due strade di consegna. PURA. */
