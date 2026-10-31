@@ -591,7 +591,7 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // lasciano residui che al checkout successivo verrebbero TRASPORTATI sul
   // branch del compito dopo, finendo nel diff che va al cancello di sicurezza.
   g(['clean', '-fd']);
-  return { ok: true, head: headSha(root), discarded, rewritten, superato };
+  return { ok: true, head: headSha(root), discarded, rewritten, superato, ...avviso };
 }
 
 function antenato(g, a, b) {
