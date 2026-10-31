@@ -527,6 +527,9 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   const modelli = new Set();
   const sconosciuti = new Map();
   const velocitaIgnote = new Map();
+  // Nome, descrizione e forma di ogni chiamata, per i falliti e le attese; i falliti che aspettano la chiamata dopo.
+  const chiamate = new Map();
+  let senzaSeguito = [];
   // `since`: solo quello che è successo da quel momento (il biglietto di
   // questo giro): quando l'orchestratore rilascia il biglietto di un worker
   // morto, il suo transcript è quello scelto, e senza finestra ci finirebbero
