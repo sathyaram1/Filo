@@ -13,6 +13,7 @@ async function apriServer() {
       res.end('<!doctype html><html><head><title>Pagina col file</title></head><body style="padding:40px"><a id="l0" download href="/file/lungo.bin">lungo</a></body></html>');
       return;
     }
+    if (!u.pathname.startsWith('/file/')) { res.writeHead(404); res.end(); return; }
     if (++volte === 1) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('non ancora'); return; }
     res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': GROSSO, 'Content-Disposition': 'attachment; filename="lungo.bin"' });
     res.write(Buffer.alloc(64 * 1024, 1));
