@@ -180,6 +180,7 @@ test('la correzione senza motivo non parte; col motivo e in un riallineamento po
   assert.deepEqual(d.motivo, { tipo: 'conflitto', file: [] });
   assert.deepEqual(d.riallineamento, { fileRiscritti: [], fileInConflitto: [], giro: 'nessuno' });
   assert.match(r.se, /Riallineamento pulito/);
+  assert.equal(git(origin, ['rev-parse', 'refs/heads/worker/77']), git(casa, ['rev-parse', 'HEAD']));
 });
 
 test('il preflight di una sessione accesa per un feedback consegna il ruolo della sessione, col numero, non l\'orchestratore', async (t) => {
