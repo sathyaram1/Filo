@@ -538,6 +538,10 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
     // chiamante porta il feedback fuori dal giro automatico (`design`).
     return { ok: false, kind: 'permanent', message: `il branch ${branch} non esiste più (né in locale né su origin)` };
   }
+  // Prima del checkout: --force-if-includes cerca la punta remota solo fra le voci del ramo locale scritte dopo
+  // l'ultima del reflog remoto, e la voce che la porta la scrive il checkout (o il reset) qui sotto.
+  const reflog = hasRemote ? assicuraReflogTracciamento(root, branch) : { ok: true };
+  const avviso = reflog.ok ? {} : { avviso: `origin/${branch} resta senza reflog (${reflog.motivo}): dopo un rebase il rinvio del ramo verrà rifiutato` };
   const co = hasLocal ? g(['checkout', branch]) : g(['checkout', '-B', branch, `origin/${branch}`]);
   if (!co.ok) return { ok: false, kind: 'transient', message: `checkout di ${branch} fallito: ${co.out.slice(0, 200)}` };
 
