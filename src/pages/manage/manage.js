@@ -252,6 +252,7 @@
   }
   // Il filtro per livello non si ricorda: un L4 lasciato acceso nasconderebbe un L1 arrivato dopo.
   let livelliScelti = [];
+  let rivalutaChiesto = false; // #906: aperta da `#rivaluta`, il tasto dei non filtrati va messo in vista appena c'è
   // «Solo non fidate» (#1575) vale per le schede dei feedback e per le Domande; non si ricorda, per lo stesso motivo.
   let soloNonFidate = false;
   const mgFiduciaFiltro = document.getElementById('mgFiduciaFiltro');
@@ -2992,6 +2993,10 @@
     const show = isAdmin && currentTab === 'inbox' && l2Visibili() && whites.length > 0;
     mgReevalBar.hidden = !show;
     if (show && mgReevalBtn) mgReevalBtn.textContent = `Ri-valuta i non filtrati (${whites.length})`;
+    if (rivalutaChiesto && dataLoaded) {
+      rivalutaChiesto = false;
+      if (show && mgReevalBtn) { mgReevalBtn.scrollIntoView({ block: 'nearest' }); mgReevalBtn.focus(); }
+    }
   }
 
   // ── Approvazione in blocco degli allineati (macchina a stati) ─────────────
@@ -8293,6 +8298,15 @@
   // Un indirizzo che nomina una scheda o una sezione la apre, come un clic (#1414: è così che arrivano i vecchi indirizzi
   // delle pagine dell'owner). Poi torna pulito: riaprendo la scheda scavalcherebbe ogni volta la scelta d'apertura.
   function apriDaIndirizzo() {
+    // #906 — `#rivaluta` arriva dall'avviso dei giudici fermi: Ricevuti senza filtri, e il tasto dei non filtrati in vista.
+    if (/^#rivaluta$/i.test(String(location.hash || ''))) {
+      rivalutaChiesto = true;
+      if (livelliScelti.length) { livelliScelti = []; renderList(); }
+      selectTab('inbox');
+      try { history.replaceState(history.state, '', location.pathname + location.search); } catch (_) {}
+      updateReevalBar();
+      return;
+    }
     const tab = MR.schedaDaIndirizzo(location.hash);
     if (!tab) return;
     selectTab(tab);

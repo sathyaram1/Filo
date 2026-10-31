@@ -1874,6 +1874,7 @@
   });
 
   if (api.onToast) api.onToast((info) => {
+    if (info && typeof info.ritira === 'string') { NOTIFS.dismissKey(info.ritira); return; }
     if (!info || !info.text) return;
     let annullata = false;
     let allaChiusura = null;
@@ -1958,6 +1959,11 @@
           if (a && a.riprovaDownloadId && !a.onClick && api.downloads && api.downloads.riprova) {
             const id = a.riprovaDownloadId;
             return { label: a.label, onClick: () => riprovaDownload(id) };
+          }
+          // #906 — una pagina di Filo (i giudici fermi aprono Gestione): solo indirizzi filo://.
+          if (a && typeof a.apriFilo === 'string' && !a.onClick && /^filo:\/\/[a-z0-9-]+\/\S*$/i.test(a.apriFilo)) {
+            const url = a.apriFilo;
+            return { label: a.label, onClick: () => api.tabs.open(url) };
           }
           // #1357.2 — il nome che Filo non ha saputo dare: la casella per scriverlo, nella pagina Download.
           if (a && a.rinominaDownloadId && !a.onClick) {

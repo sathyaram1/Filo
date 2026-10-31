@@ -284,6 +284,8 @@
       togli: chiudi, etichettaTogli: 'Chiudi l’avviso',
       filo: n.text,
     };
+    // #906 — i giudici fermi: la carta dice uno stato del server e se ne va da sola quando il server lo azzera.
+    if (tipo === 'giudici-fermi') return { ...carta, secondaria: null, togli: null, etichettaTogli: null };
     return n.action && n.action.tipo === 'aggiornamento-disponibile' ? cartaAggiornamento(n, carta, chiudi) : carta;
   }
   // #786 — la versione nuova che aspetta il «Installa» dell'utente; cosa le sta succedendo lo dice il main.
