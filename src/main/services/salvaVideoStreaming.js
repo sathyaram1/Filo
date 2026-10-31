@@ -96,7 +96,7 @@ function eseguiYtdlp(comando, argomenti, { suEvento, fermato, cartella }) {
       risolvi({ codice: -1, avvio: e });
       return;
     }
-    if (cartella) { lavori.set(cartella, figlio); scriviLavori(); }
+    if (cartella && lavori.has(cartella)) lavori.set(cartella, figlio);
     const leggi = (flusso) => {
       let resto = '';
       flusso.setEncoding('utf8');
