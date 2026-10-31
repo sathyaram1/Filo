@@ -89,7 +89,7 @@ test('r1 con la domanda del 2 col ? che non blocca, il lavoro va avanti: la prov
 test('r1 con la segnalazione allegata il lavoro si ferma: la prova del 1 col ? resta a chi riprende', async () => {
   const { casa } = ramoConProva('tests/verifica/901/giro2-r1-bordo.spec.mjs');
   try {
-    const critica = 'Provato il riquadro in tema chiaro e scuro.\n[1i?] Il bordo è grigio: più caldo?';
+    const critica = 'Provato il riquadro in tema chiaro e scuro, col mouse e da tastiera.\n[1i?] Il bordo è grigio: più caldo?';
     const file = resolve(casa, 'fuori', 'segnala.md');
     writeFileSync(file, 'Il riquadro tocca una scelta che spetta all\'owner: va deciso prima di continuare.\n', 'utf8');
     const { srv, port } = await fintoServer({
