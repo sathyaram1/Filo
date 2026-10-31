@@ -284,6 +284,7 @@
       { label: 'Sicurezza', icon: 'lock', url: 'filo://security/security.html' },
       // Con "Modelli" e "Sicurezza": stesse domande, dal lato del perché.
       { label: 'Trasparenza', icon: 'transparency', url: 'filo://transparency/transparency.html' },
+      { label: 'Novità', icon: 'novita', url: 'filo://novita/novita.html' },
       { type: 'separator' },
       { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
     ];
