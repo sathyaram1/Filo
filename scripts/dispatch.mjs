@@ -1621,15 +1621,13 @@ async function recordFixed(id, report = '', frase = '', ferma = false, domanda =
   const confronto = marcatore && marcatore.role === 'fixer' && marcatore.dal ? fileRiscritti(ROOT, { prima: marcatore.dal }) : null;
   const esito = esitoRiallineamento(confronto, motivo);
   if (esito.riga) process.stderr.write(`${esito.riga}\n`);
-  // Il server rifà il confronto sulla punta presa da GitHub: se non c'è ancora (si spinge al rilascio) sceglie il giro pieno.
-  if (confronto && process.env.FILO_ROUTINE && process.env.FILO_ROUTINE !== '0') {
-    try {
-      const ch = await import('./routine-channel.mjs');
-      const spinta = ch.pushRamoCorrente(ROOT);
-      if (!spinta.ok) process.stderr.write(`Il ramo non è partito prima della consegna (${spinta.reason}): il server rifarà la verifica intera.\n`);
-    } catch (e) {
-      process.stderr.write(`Il ramo non è partito prima della consegna (${e?.message || e}): il server rifarà la verifica intera.\n`);
-    }
+  // Il server rifà il confronto sulla punta presa da GitHub, e chi verifica dopo legge il ramo da lì: prima la spedizione.
+  const ch = await import('./routine-channel.mjs');
+  if (confronto && ch.consegnaDiRiallineamento(marcatore, { ferma, domanda })) {
+    const sped = ch.spedisciRiallineamento(ROOT);
+    if (!sped.ok) return { rejected: true, nonSpedito: true, message: ch.testoRiallineamentoNonSpedito(sped) };
+    if (sped.avviso) process.stderr.write(`${sped.avviso}\n`);
+    process.stderr.write(`Ramo '${sped.branch}' su origin a ${sped.punta.slice(0, 9)}, sopra origin/main ${sped.main.slice(0, 9)}.\n`);
   }
   const sent = await deliverToChannel('fixed', fixedPayload({
     report, frase, branch: next.branch || '', ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento,
