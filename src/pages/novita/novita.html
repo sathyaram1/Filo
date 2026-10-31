@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Novità</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/politicaModelli.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/storage.js"></script>
+  <script src="filo://shared/icons.js"></script>
+  <script src="filo://shared/novita.js"></script>
+  <style>
+    /* Una versione per fascia, dalla più recente: a sinistra numero e data, che restano in vista mentre scorrono le
+       sue righe; a destra nuove funzioni e correzioni coi colori del recap all'avvio. */
+    .nv-page { max-width: 1080px; }
+    .nv-head {
+      position: sticky; top: 0; z-index: 2;
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      padding: 14px 0 12px; margin: -14px 0 0;
+      background: var(--sn-bg);
+      border-bottom: 1px solid var(--sn-border);
+    }
+    .sn-page .nv-head h1 { margin: 0; }
+    .sn-page .nv-head input[type="search"] { flex: 1 1 260px; width: auto; max-width: 440px; }
+    .nv-conta { font-size: 12px; color: var(--sn-muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+    .nv-avviso { margin: 14px 0 0; font-size: 13px; color: var(--sn-muted); }
+    .nv-avviso b { color: var(--sn-fg); font-weight: 600; }
+
+    .nv-versione {
+      display: grid; grid-template-columns: 150px 1fr; column-gap: 28px;
+      padding: 22px 0; border-bottom: 1px solid var(--sn-border);
+    }
+    .nv-versione:last-child { border-bottom: none; }
+    .nv-intesta {
+      position: sticky; top: 76px; align-self: start;
+      display: flex; flex-direction: column; gap: 3px;
+      border-radius: var(--sn-radius); padding: 2px 6px; margin: -2px -6px;
+      transition: background calc(0.12s * var(--sn-motion, 1)) ease;
+    }
+    .nv-intesta:hover { background: var(--sn-hover); }
+    .nv-numero { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+    .nv-data { font-size: 12px; color: var(--sn-muted); }
+    .nv-tua {
+      align-self: flex-start; margin-top: 4px; padding: 1px 8px;
+      border-radius: 999px; font-size: 11px; font-weight: 600;
+      color: var(--sn-accent);
+      background: color-mix(in srgb, var(--sn-accent) 14%, transparent);
+    }
+
+    .nv-gruppo + .nv-gruppo { margin-top: 14px; }
+    .nv-gruppo-titolo {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 6px; color: var(--sn-muted);
+    }
+    .nv-features .nv-gruppo-titolo { color: var(--sn-accent); }
+    .nv-fixes .nv-gruppo-titolo { color: var(--sn-green, #3f8f5a); }
+    .nv-righe { list-style: none; margin: 0; padding: 0; }
+    .nv-riga {
+      position: relative;
+      padding: 5px 8px 5px 22px; margin: 0 -8px;
+      font-size: 14px; line-height: 1.5;
+      border-radius: var(--sn-radius);
+      transition: background calc(0.1s * var(--sn-motion, 1)) ease;
+    }
+    .nv-riga:hover { background: var(--sn-hover); }
+    .nv-riga:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: -2px; }
+    .nv-riga::before {
+      content: ""; position: absolute; left: 9px; top: 13px;
+      width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.45;
+    }
+    .nv-features .nv-riga::before { background: var(--sn-accent); opacity: 0.7; }
+    .nv-fixes .nv-riga::before { background: var(--sn-green, #3f8f5a); opacity: 0.7; }
+    /* La porta fissa della segnalazione: il tasto destro non è l'unica. */
+    .nv-segn {
+      margin-left: 6px; padding: 0 6px;
+      border: 1px solid var(--sn-border); border-radius: 999px;
+      background: none; color: var(--sn-muted);
+      font: inherit; font-size: 11px; font-variant-numeric: tabular-nums;
+      cursor: pointer; vertical-align: 1px;
+      transition: color calc(0.12s * var(--sn-motion, 1)) ease, border-color calc(0.12s * var(--sn-motion, 1)) ease;
+    }
+    .nv-segn:hover { color: var(--sn-fg); border-color: var(--sn-accent); }
+    .nv-segn:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+
+    ::highlight(nv-trovato) { background-color: color-mix(in srgb, var(--sn-accent) 32%, transparent); color: inherit; }
+
+    @media (max-width: 680px) {
+      .nv-versione { grid-template-columns: 1fr; row-gap: 10px; }
+      .nv-intesta { position: static; flex-direction: row; align-items: baseline; gap: 10px; }
+      .nv-tua { margin-top: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="sn-page nv-page">
+    <header class="nv-head">
+      <h1>Novità</h1>
+      <input type="search" id="cerca" placeholder="Cerca fra le novità…" aria-label="Cerca fra le novità" autocomplete="off" spellcheck="false" />
+      <span id="conta" class="nv-conta" aria-live="polite"></span>
+    </header>
+    <p id="avviso" class="nv-avviso" hidden></p>
+    <div id="elenco" class="nv-elenco"></div>
+    <div id="vuoto" class="sn-empty" hidden></div>
+  </main>
+
+  <script src="novita.js"></script>
+</body>
+</html>
