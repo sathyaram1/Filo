@@ -7,8 +7,7 @@
 
   const NOTES = [
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
-    // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione si scrive { testo, segnalazione: <num> },
-    // col numero intero (di #1509.3 il 1509): la pagina Novità la apre dal tasto destro.
+    // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
       version: '0.2.255', date: '2026-10-31',
       features: [
