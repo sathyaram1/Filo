@@ -154,7 +154,7 @@ export function testoFermoDopoIlVerde({ tag, oreDallUltima, commitDopoTag, verde
 }
 
 /** Il tetto di una risposta di `gh api`: quello di Node (1 MB) le cento corse intere l'hanno superato, ENOBUFS (#1989). */
-export const GH_TETTO_BYTE = 64 * 1024 * 1024;
+const GH_TETTO_BYTE = 64 * 1024 * 1024;
 /** I soli campi di corse e lavori che la scelta e i testi leggono: la risposta non cresce coi campi che GitHub aggiunge. */
 export const CAMPI_CORSA = ['id', 'head_sha', 'conclusion', 'status', 'event', 'head_branch', 'html_url', 'created_at', 'updated_at'];
 export const CAMPI_LAVORO = ['name', 'conclusion'];
