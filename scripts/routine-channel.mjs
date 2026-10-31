@@ -545,23 +545,34 @@ export async function release(t, fault = '', opts, report = null) {
  * Rilascio col rapporto allegato, e le due ritentate che il server prevede:
  *   - 413 `report_too_big` → una volta senza `tools.byName` e `notes`; se è
  *     ancora troppo, senza rapporto, e lo si dice;
- *   - 400 `report_malformed` → senza `listino`, se c'era (la versione passa
- *     nelle note); poi senza rapporto, e lo si dice.
+ *   - 400 `report_malformed` → senza strumenti falliti e attese, se c'erano;
+ *     poi senza `listino`, se c'era (la versione passa nelle note); poi senza
+ *     rapporto, e lo si dice.
+ *   - 413: prima senza strumenti falliti e attese, poi come sopra.
  * Il rilascio è idempotente: riprovare è sicuro. `esito.rapporto` dice cosa è
  * arrivato al server: 'allegato', 'ridotto', 'scartato' o 'assente';
  * `esito.avviso` è la riga da stampare quando qualcosa è andato perso.
  */
+// I dati del § 6 di SPEC-MANUTENTORE: un server che non li conosce ancora riceve il resto del rapporto, e lo si dice.
+export const CAMPI_FALLITI_E_ATTESE = Object.freeze(['falliti', 'attese', 'atteseOltre30']);
+
 export async function releaseConRapporto(t, fault, report, opts) {
   const tenta = (rep) => release(t, fault, opts, rep);
   if (!report || typeof report !== 'object') return { ...(await tenta(null)), rapporto: 'assente' };
   const malformato = (r) => r.status === 400 && r.reason === 'report_malformed';
+  const troppoGrande = (r) => r.status === 413 && r.reason === 'report_too_big';
   // Il dettaglio è nella PRIMA risposta (quella che ha rifiutato il
   // rapporto), non nella seconda: letto dopo la ritentata si perdeva.
   const dettaglioDi = (r) => (r.body && r.body.detail ? `: ${r.body.detail}` : '');
   const avvisi = [];
+  const haDati = (rep) => CAMPI_FALLITI_E_ATTESE.some((k) => Object.prototype.hasOwnProperty.call(rep, k));
+  const senzaDati = (rep) => {
+    const out = { ...rep };
+    for (const k of CAMPI_FALLITI_E_ATTESE) delete out[k];
+    return out;
+  };
   // Un server che non conosce ancora `listino` (#882) non deve costare il rapporto intero a ogni rilascio.
-  const tentaRapporto = async (rep) => {
-    const r = await tenta(rep);
+  const conListino = async (rep, r) => {
     if (!malformato(r) || !Object.prototype.hasOwnProperty.call(rep, 'listino')) return r;
     const { listino, ...senza } = rep;
     if (Array.isArray(rep.notes)) senza.notes = [...rep.notes, `listino ${listino}`];
@@ -570,14 +581,30 @@ export async function releaseConRapporto(t, fault, report, opts) {
     if (r2.ok) avvisi.push(`il server non accetta il campo listino (report_malformed${dettaglioDi(r)}): ${senza.notes ? 'la versione è nelle note' : 'allegato senza la versione del listino'}.`);
     return r2;
   };
+  const tentaRapporto = async (rep) => {
+    const r = await tenta(rep);
+    if (!malformato(r) || !haDati(rep)) return conListino(rep, r);
+    const senza = senzaDati(rep);
+    const r2 = await conListino(senza, await tenta(senza));
+    if (malformato(r2)) return r;
+    if (r2.ok) avvisi.push(`il server non accetta ancora strumenti falliti e attese (report_malformed${dettaglioDi(r)}): allegato senza.`);
+    return r2;
+  };
   const conAvvisi = (r, rapporto, avviso) => {
     const righe = [...avvisi, ...(avviso ? [avviso] : [])];
     return { ...r, rapporto: rapporto === 'allegato' && avvisi.length ? 'ridotto' : rapporto, ...(righe.length ? { avviso: righe.join(' ') } : {}) };
   };
   let r = await tentaRapporto(report);
-  if (r.status === 413 && r.reason === 'report_too_big') {
+  if (troppoGrande(r)) {
     const misura = `${r.body && r.body.bytes ? r.body.bytes : '?'} byte, massimo ${r.body && r.body.max ? r.body.max : '?'}`;
-    const snello = { ...report, tools: { ...(report.tools || {}) } };
+    if (haDati(report)) {
+      r = await tentaRapporto(senzaDati(report));
+      if (!troppoGrande(r) && !malformato(r)) return conAvvisi(r, 'ridotto', `rapporto troppo grande (${misura}): allegato senza strumenti falliti e attese.`);
+    }
+  }
+  if (troppoGrande(r)) {
+    const misura = `${r.body && r.body.bytes ? r.body.bytes : '?'} byte, massimo ${r.body && r.body.max ? r.body.max : '?'}`;
+    const snello = { ...senzaDati(report), tools: { ...(report.tools || {}) } };
     delete snello.tools.byName;
     delete snello.notes;
     r = await tentaRapporto(snello);
