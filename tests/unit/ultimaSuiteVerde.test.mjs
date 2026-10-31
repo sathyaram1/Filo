@@ -332,12 +332,27 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
         execFile(process.execPath, [SCRIPT], { cwd: repo, env }, (err) => ok(err ? (err.code ?? 1) : 0));
       });
       return { codice, ricevute, output: readFileSync(join(tmp, 'output.txt'), 'utf8'), verde: sha[1],
-        riassunto: readFileSync(join(tmp, 'riassunto.md'), 'utf8') };
+        riassunto: readFileSync(join(tmp, 'riassunto.md'), 'utf8'),
+        chiamate: readFileSync(join(tmp, 'argv.log'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) };
     } finally {
       await new Promise((ok) => srv.close(ok));
       togliCartella(tmp, { tentativi: 10 });
     }
   }
+
+  test('#1989: le corse della suite pesano più del tetto di Node (1 MB): si leggono lo stesso e il verde si pubblica', async () => {
+    const r = await scegli({ oreVersione: 30, oreVerde: 3, zavorra: 1.5 * 1024 * 1024 });
+    assert.doesNotMatch(r.riassunto, /non si sono lette/, 'una risposta grossa di gh api non deve far sparire tutte le corse');
+    assert.equal(r.output.trim(), `sha=${r.verde}`);
+    assert.equal(r.codice, 0);
+    const filtro = (frammento) => r.chiamate.filter((a) => a.some((x) => x.includes(frammento)))
+      .map((a) => (a.includes('--jq') ? a[a.indexOf('--jq') + 1] : ''));
+    const corse = filtro('/actions/workflows/suite.yml/runs');
+    const lavori = filtro('/jobs');
+    assert.ok(corse.length && lavori.length, `chiamate a gh: ${JSON.stringify(r.chiamate)}`);
+    for (const jq of corse) for (const c of CAMPI_CORSA) assert.ok(jq.includes(c), `alle corse si chiede solo il necessario, ${c} compreso: «${jq}»`);
+    for (const jq of lavori) for (const c of CAMPI_LAVORO) assert.ok(jq.includes(c), `«${jq}»`);
+  });
 
   test('ultima versione di 100 ore fa, un verde di 68 ore fa mai uscito: allarme, e il verde si prova lo stesso', async () => {
     const r = await scegli({ oreVersione: 100, oreVerde: 68 });
