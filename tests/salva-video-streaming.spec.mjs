@@ -1,7 +1,6 @@
 // #1488 — «Salva video come…» su un video in streaming (un <video> che legge da MediaSource, come YouTube) salva il
 // video invece di dire che non c'è un file. Il programma è un yt-dlp finto (tests/helpers/ytdlpFinto.mjs): quello
-// vero non gira nelle prove, e non si è potuto provare su YouTube vero. Logica e programmi: tests/unit/ytdlp.test.mjs,
-// strumentiVideo.test.mjs, salvaVideoStreaming.test.mjs, firmaPgp.test.mjs.
+// vero non gira nelle prove. Logica, programmi e firma: ytdlp, strumentiVideo, salvaVideoStreaming in tests/unit/.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createRequire } from 'node:module';
