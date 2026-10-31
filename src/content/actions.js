@@ -1455,7 +1455,7 @@
     copyUrlToClipboard(src);
   }
 
-  async function downloadMedia(el) {
+  async function downloadMedia(el, link = null) {
     const audio = isAudioEl(el);
     const failToast = audio ? 'toast_audio_save_failed' : 'toast_video_save_failed';
     const src = mediaSrc(el);
