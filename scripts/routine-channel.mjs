@@ -607,7 +607,7 @@ export async function releaseConRapporto(t, fault, report, opts) {
       r = await tenta(null);
       return conAvvisi(r, 'scartato', `rapporto troppo grande anche senza l'elenco degli strumenti (${misura}): rilasciato SENZA rapporto.`);
     }
-    if (!malformato(r)) return conAvvisi(r, 'ridotto', `rapporto troppo grande (${misura}): allegato senza l'elenco degli strumenti e le note.`);
+    if (!malformato(r)) return conAvvisi(r, 'ridotto', `rapporto troppo grande (${misura}): allegato senza l'elenco degli strumenti e le note${haDati(report) ? ', né falliti e attese' : ''}.`);
   }
   if (malformato(r)) {
     const dettaglio = dettaglioDi(r);
