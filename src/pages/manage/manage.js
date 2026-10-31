@@ -8283,8 +8283,20 @@
     await domandePronte;
     sceltaApertura();
     apriDomandaDallIndirizzo();
+    apriFeedbackDallIndirizzo();
     startLive();
   }
+
+  // `#feedback=1956`: arriva dalla riga delle Novità nata da quella segnalazione.
+  function apriFeedbackDallIndirizzo() {
+    const m = /^#feedback=([1-9]\d{0,8}(?:\.\d{1,4})?)$/.exec(String(location.hash || ''));
+    if (!m || !allFeedbacks.length) return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+    if (!apriFeedbackDi(null, m[1]) && feedbacksColNumero(m[1]).length === 0) {
+      setManageMsg(`La segnalazione #${m[1]} non è fra quelle caricate: cercala nella casella in alto.`, 'err');
+    }
+  }
+  window.addEventListener('hashchange', apriFeedbackDallIndirizzo);
 
   // `#domanda=D-12`: arriva dal segno «aspetta D-12» della pagina dei feedback, che porta dove si risponde.
   function apriDomandaDallIndirizzo() {
