@@ -91,6 +91,27 @@ test('r1 con la domanda del 2 col ? che non blocca, il lavoro va avanti: la prov
   } finally { togliCartella(casa); }
 });
 
+test('r2 la prova che copre un interno e un esterno: il caso dell\'esterno va tolto prima, o chiesto dopo', async () => {
+  const prova = 'tests/verifica/901/giro2-r1-r2-misto.spec.mjs';
+  const { casa } = ramoConProva(prova);
+  try {
+    const critica = 'Provato il salvataggio da menu e da scorciatoia, col titolo vuoto e lungo.\n[2i] Col titolo vuoto il salvataggio non parte.\n[1e] Il menu delle schede si chiude da solo.';
+    const { srv, port } = await fintoServer({
+      outcome: 'fix',
+      phase2: {
+        findings: [{ level: 2, sede: 'i', text: 'Col titolo vuoto il salvataggio non parte.' }],
+        derived: [{ level: 1, sede: 'e', text: 'Il menu delle schede si chiude da solo.', num: '#901.1' }],
+      },
+    });
+    try {
+      const r = await esegui(['--record-verifier', 'fid-901', critica], casa, port);
+      const chiestaPrima = r.code !== 0 && r.out.includes('giro2-r1-r2-misto');
+      const chiestaDopo = r.code === 0 && /r2 nel nome/.test(r.out);
+      expect(chiestaPrima || chiestaDopo, r.out).toBe(true);
+    } finally { srv.close(); }
+  } finally { togliCartella(casa); }
+});
+
 test('r1 con la segnalazione allegata il lavoro si ferma: la prova del 1 col ? resta a chi riprende', async () => {
   const { casa } = ramoConProva('tests/verifica/901/giro2-r1-bordo.spec.mjs');
   try {
