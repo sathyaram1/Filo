@@ -388,9 +388,9 @@ function commitExists(g, sha) {
 }
 
 /**
- * Il ref di tracciamento di `branch` con un reflog suo. `git clone` scrive quelli di origin senza, e senza reflog
- * --force-if-includes rifiuta ogni rinvio dopo un rebase (#1930). Si toglie e si rimette uguale: un aggiornamento allo
- * stesso valore git non lo registra. Torna { ok, creato, motivo }; ok falso se resta senza.
+ * Il ref di tracciamento di `branch` con un reflog suo. `git clone` scrive quelli di origin senza, e lì
+ * --force-if-includes confronta con un'ora mai scritta: il rinvio dopo un rebase viene rifiutato (#1930). Si toglie e si
+ * rimette uguale, perché un aggiornamento allo stesso valore git non lo registra. ok falso se resta senza.
  */
 export function assicuraReflogTracciamento(root, branch) {
   const g = gitIn(root);
