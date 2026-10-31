@@ -576,9 +576,10 @@
       doesNot: 'Senza un codice di invito puoi leggere regole e classifica ma non accumulare punteggi. La creazione dei codici di invito è riservata a chi gestisce Filo.',
     },
     {
-      id: 'patch-notes', title: 'Recap degli aggiornamenti', category: 'pages',
-      desc: 'All’avvio di una nuova versione, un riquadro riassume le novità e le correzioni in parole semplici.',
-      invoke: 'Compare da solo all’avvio dopo un aggiornamento.',
+      id: 'patch-notes', title: 'Novità delle versioni', category: 'pages',
+      desc: 'All’avvio di una nuova versione, un riquadro riassume le novità e le correzioni in parole semplici. Le novità di tutte le versioni uscite, dalla più recente, stanno nella pagina Novità: per ognuna numero, data, nuove funzioni e correzioni. La casella in alto filtra mentre scrivi, senza badare a maiuscole e accenti, anche col numero di una versione o il nome di un mese; una parola sbagliata di una lettera trova lo stesso, e la pagina lo dice. Col tasto destro su una riga: «Copia il testo», «Copia tutta la versione» e, quando la riga nasce da una segnalazione che puoi aprire, «Apri la tua segnalazione» (chi gestisce i feedback: «Apri la segnalazione»); lo stesso fa il numero accanto alla riga.',
+      invoke: 'Il recap compare da solo all’avvio dopo un aggiornamento, e il suo «Tutte le novità» apre la pagina. La pagina filo://novita/novita.html si apre anche dal menu Impostazioni (ingranaggio) → «Novità», da Preferenze → Aggiornamenti → «Novità», dalla barra dei menu su Mac (Filo → Novità) o chiedendo a Filo «apri le novità».',
+      doesNot: 'La pagina mostra solo le versioni già uscite fino a quella installata, non quella in preparazione. Non mostra le modifiche interne che un utente non vede.',
     },
     {
       id: 'segnalazioni-mie', title: 'Le tue segnalazioni', category: 'pages',
