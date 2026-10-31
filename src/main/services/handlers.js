@@ -2914,7 +2914,7 @@ async function eseguiAzioneFilo(action, {
             // la chat della home o l'assistente sulla pagina.
             const seguibile = assistente || daFilo(origineDi(sender), sender);
             if (sender && sender.wc && seguibile && action._callId && typeof tm.seguiApertura === 'function') {
-              tm.seguiApertura(tabId, { wc: sender.wc, callId: action._callId, assistente });
+              tm.seguiApertura(tabId, { wc: sender.wc, verso: sender.strato || sender.wc, callId: action._callId, assistente });
             }
             // Prima dell'attesa qui sotto: un rinvio della pagina arriva durante, e la rilettura deve conoscerlo (#553).
             const t = (tm.tabs || []).find((x) => x && x.id === tabId);

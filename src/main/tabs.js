@@ -499,6 +499,9 @@ class TabManager {
         const t = this.tabs.find((x) => x.view && x.view.webContents === wc);
         return !!t && (this.barra.tasto(input) || this.tastoDelBrowser(input, t));
       },
+      // L'Aiuto nello strato (#1509.3) sale sopra la pila degli avvisi della barra come nella pagina.
+      pronta: (v, wc) => this.avvisi.nelloStrato(v, wc),
+      input: (wc, input) => { if (this.barra) this.barra.inputDa(wc, input); },
     });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
@@ -2237,10 +2240,19 @@ class TabManager {
   vistaSottoIlVuoto() {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (!tab) return null;
+    return this._copertaDa(tab) || (this.riquadri ? this.riquadri.vistaSopra(tab.view.webContents) : null) || tab.view || null;
+  }
+
+  // La vista che nasconde la pagina all'utente (la conferma aperta, l'avviso del sito pericoloso), o null. I riquadri di
+  // Filo sopra la pagina non la nascondono: la pagina resta lei, con i suoi comandi e il suo Aiuto (#1509.3).
+  _copertaDa(tab) {
     const domanda = this.conferme && this.conferme.mostrata ? this.conferme.vista : null;
     const avviso = this.avvisoSito && this.avvisoSito.coperta() === tab && this.avvisoSito.webContents() ? this.avvisoSito.vista : null;
-    const riquadri = this.riquadri ? this.riquadri.vistaSopra(tab.view.webContents) : null;
-    return domanda || avviso || riquadri || tab.view || null;
+    return domanda || avviso || null;
+  }
+
+  paginaScoperta(tab) {
+    return !!tab && !this._copertaDa(tab);
   }
 
   _tastieraAllaSchedaAttiva() {
@@ -3904,11 +3916,12 @@ class TabManager {
 
   // La chat che ha chiesto l'apertura di `id`, con l'id dell'azione: dopo l'attesa di esitoApertura,
   // un blocco che la pagina provoca da sé le arriva lo stesso. `assistente`: l'assistente sulla pagina,
-  // che ascolta coi content script invece che sul canale della home.
-  seguiApertura(id, { wc, callId, assistente = false } = {}) {
+  // che ascolta coi content script invece che sul canale della home. `verso`: dove ascolta, se non è `wc` (l'Aiuto
+  // nello strato sopra il sito, #1509.3); il permesso di «Apri comunque» resta della pagina `wc`.
+  seguiApertura(id, { wc, verso = wc, callId, assistente = false } = {}) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || !wc || !callId) return;
-    tab._aperturaChat = { wc, callId, assistente: !!assistente, da: Date.now() };
+    tab._aperturaChat = { wc, verso: verso || wc, callId, assistente: !!assistente, da: Date.now() };
   }
 
   // «Apri comunque» dell'assistente sulla pagina: una pagina web lo può chiedere solo per un
@@ -3935,7 +3948,8 @@ class TabManager {
       if (c.wc.isDestroyed()) return;
       if (c.assistente) {
         this.ricordaApribile(c.wc, dati.url);
-        c.wc.send('filo:broadcast', { type: globalThis.SN_MSG?.MSG?.APERTURA_FERMATA || 'apertura_fermata', ...dati });
+        const verso = c.verso && !c.verso.isDestroyed() ? c.verso : c.wc;
+        verso.send('filo:broadcast', { type: globalThis.SN_MSG?.MSG?.APERTURA_FERMATA || 'apertura_fermata', ...dati });
       } else {
         c.wc.send('filo:apertura-fermata', dati);
       }

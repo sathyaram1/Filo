@@ -19,6 +19,7 @@ const APERTURE = [
   ['src/content/redteamAttack.js', 'function open(', 'redteam'],
   ['src/content/editBox.js', 'function openEditBox(', 'modifica'],
   ['src/content/popup.js', 'function openStreaming(', 'risposta'],
+  ['src/content/sidebar.js', 'function open(', 'aiuto'],
 ];
 
 test('ogni riquadro, aperto su un sito, lo chiede prima allo strato', () => {
@@ -45,4 +46,45 @@ test('l\'ancora di una risposta passa dai px della pagina a quelli della vista',
   assert.deepEqual(ancoraNellaVista({ x: 10, y: 'boh' }, 1), { x: 10 });
   assert.equal(ancoraNellaVista(null, 1), null);
   assert.equal(ancoraNellaVista({}, 2), null);
+});
+
+// Mentre lo strato nasce si trattengono per lui solo i tasti che scrivono (#1509.3): una scorciatoia trattenuta e poi
+// rigiocata nello strato agirebbe due volte.
+test('mentre lo strato nasce si trattengono i tasti che scrivono, mai le scorciatoie', () => {
+  const { scrive } = require(join(ROOT, 'src', 'main', 'stratoDeiRiquadri.js'));
+  const k = (key, m = {}) => ({ type: 'keyDown', key, ...m });
+  for (const p of ['win32', 'linux', 'darwin']) {
+    for (const t of [k('a'), k('A', { shift: true }), k(' '), k('è'), k('Backspace'), k('Enter'), { type: 'keyUp', key: 'a' }]) {
+      assert.equal(scrive(t, p), true, `${p}: ${JSON.stringify(t)}`);
+    }
+    for (const t of [k('w', { control: true }), k('l', { meta: true }), k('Escape'), k('F5'), k('Tab'), k('Shift'), k('a', { isComposing: true }), { type: 'char', key: 'a' }]) {
+      assert.equal(scrive(t, p), false, `${p}: ${JSON.stringify(t)}`);
+    }
+    // AltGr arriva come Ctrl+Alt: scrive i simboli, mentre Ctrl+Alt+lettera resta una scorciatoia.
+    assert.equal(scrive(k('@', { control: true, alt: true }), p), true);
+    assert.equal(scrive(k('h', { control: true, alt: true }), p), false);
+  }
+  // Su Mac Opzione scrive; altrove Alt+lettera è una scorciatoia di Filo.
+  assert.equal(scrive(k('å', { alt: true }), 'darwin'), true);
+  assert.equal(scrive(k('h', { alt: true }), 'linux'), false);
+  assert.equal(scrive(k('h', { alt: true }), 'win32'), false);
+});
+
+// L'Aiuto nello strato lavora sulla pagina sotto (#1509.3): chiede solo quello che il main lascia passare, e la pagina
+// sa rispondere a tutto quello che passa.
+test('l\'Aiuto nello strato chiede alla pagina solo operazioni che il main conosce e la pagina serve', () => {
+  const { OP_PAGINA } = require(join(ROOT, 'src', 'main', 'stratoDeiRiquadri.js'));
+  const ops = Object.keys(OP_PAGINA).sort();
+  const aiuto = leggi('src', 'content', 'sidebar.js');
+  const chieste = [...aiuto.matchAll(/chiediSotto\('([a-z]+)'/g)].map((m) => m[1]);
+  assert.ok(chieste.length >= ops.length, 'l\'Aiuto chiede alla pagina con chiediSotto');
+  for (const op of chieste) assert.ok(ops.includes(op), `il main non lascia passare «${op}»`);
+  const pagina = leggi('src', 'content', 'aiutoPagina.js');
+  for (const op of ops) assert.match(pagina, new RegExp(`m\\.op === '${op}'`), `la pagina non serve «${op}»`);
+  // Lo stato del pannello lo manda solo lo strato, e la risposta solo il frame principale della pagina.
+  const handler = leggi('src', 'main', 'services', 'handlers', 'riquadri.js');
+  assert.match(handler, /on\(MSG\.AIUTO_ALLA_PAGINA[\s\S]{0,120}if \(!sender \|\| !sender\.strato\) return/);
+  const strato = leggi('src', 'main', 'stratoDeiRiquadri.js');
+  assert.match(strato, /esitoDallaPagina\(sender, d\) \{\s*const s = sender && !sender\.strato \?/);
+  assert.match(strato, /comandoAiuto\(sender, d\) \{\s*const s = sender && !sender\.strato \?/);
 });

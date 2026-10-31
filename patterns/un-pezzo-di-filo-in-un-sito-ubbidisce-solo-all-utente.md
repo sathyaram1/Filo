@@ -32,7 +32,8 @@ il clic sul pulsante del sito.
      cartellino dello zoom (`gestoVero` in `src/preload/wheel-zoom.js`);
    - un pezzo che sta nel documento senza cancello sulla radice (la pila degli
      avvisi con la conferma di «Salva per dopo», il riquadro da scegliere per
-     catturare o trascrivere, il QR, i bottoni sotto le risposte dell'Aiuto)
+     catturare o trascrivere, il QR, i bottoni sotto le risposte dell'Aiuto dove
+     resta nel documento: una pagina di Filo, o un sito senza strato)
      chiede `SN_FILO_UI.gestoVero(e)` in **ogni** ascoltatore che fa avanzare
      (#592.16): `tests/pezzi-nella-pagina-solo-utente.spec.mjs`.
 

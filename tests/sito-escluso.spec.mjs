@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 const SITO = 'filo-843.test';
 const DOCS = 'docs.filo-843.test';
@@ -201,13 +202,14 @@ test('all\'Aiuto della pagina: «spegni Filo su questo sito» lo spegne lì, sen
   const page = await apriSu(openTab, testServer, DOCS);
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  const casella = page.locator('.sn-sidebar-input textarea');
+  const aiuto = await paginaDellAiuto(app, page);
+  const casella = aiuto.locator('.sn-sidebar-input textarea');
   await expect(casella).toBeVisible({ timeout: 8000 });
 
   await casella.fill('spegni Filo su questo sito');
   await casella.press('Enter');
   await expect.poll(() => esclusi(app), { timeout: 10_000 }).toEqual(['banca-843.test', DOCS]);
-  await expect(page.locator('.sn-sidebar-log', { hasText: `Filo spento su ${DOCS}` })).toBeVisible({ timeout: 5000 });
+  await expect(aiuto.locator('.sn-sidebar-log', { hasText: `Filo spento su ${DOCS}` })).toBeVisible({ timeout: 5000 });
   await page.locator('#testo').click({ button: 'right' });
   await expect.poll(() => finestraDiRiserva(app), { timeout: 5000 }).toContain('Riaccendi Filo su questo sito');
   await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
@@ -216,5 +218,5 @@ test('all\'Aiuto della pagina: «spegni Filo su questo sito» lo spegne lì, sen
   await casella.fill('riaccendilo');
   await casella.press('Enter');
   await expect.poll(() => esclusi(app), { timeout: 10_000 }).toEqual(['banca-843.test']);
-  await expect(page.locator('.sn-sidebar-log', { hasText: `Filo riacceso su ${DOCS}` })).toBeVisible({ timeout: 5000 });
+  await expect(aiuto.locator('.sn-sidebar-log', { hasText: `Filo riacceso su ${DOCS}` })).toBeVisible({ timeout: 5000 });
 });

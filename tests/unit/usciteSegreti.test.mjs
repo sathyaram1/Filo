@@ -996,7 +996,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     const sidebar = readFileSync(join(ROOT, 'src', 'content', 'sidebar.js'), 'utf8');
     const prima = sidebar.indexOf('await campoFermato(parsed.highlight.value)');
     assert.ok(prima > 0, 'il testo per un campo non passa dalla porta');
-    assert.ok(prima < sidebar.indexOf('Highlight.show(parsed.highlight.selector'), 'la porta deve venire prima del riquadro «Accetta»');
+    assert.ok(prima < sidebar.indexOf('await Pagina.evidenzia('), 'la porta deve venire prima del riquadro «Accetta»');
     const filo = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'), 'utf8');
     assert.match(corpo(filo, 'on(MSG.CONTROLLA_CAMPO'), /controllaUscita\(\{ type: 'CAMPO_PAGINA'/);
   });

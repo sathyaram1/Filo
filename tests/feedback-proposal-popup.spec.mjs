@@ -9,7 +9,8 @@
 //   3. la selezione del testo usa la palette di Filo, non il blu di sistema.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, staccoDelFilo, confermaSopraPagina, nelMondoDiFilo } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, staccoDelFilo, nelMondoDiFilo } from './helpers/confirm.mjs';
+import { confermaNelloStrato, nelloStrato, paginaDelloStrato } from './helpers/riquadri.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -115,18 +116,24 @@ const FOGLI = {
   'testo, sfondo e accento scelti insieme': '.sn-confirm-host{--sn-fg:#000;--sn-overlay-bg:#808080;--sn-accent:#fff;--sn-font:monospace}',
 };
 
-// Lo stesso sito prima e dopo aver aggiunto il suo foglio: il popup dei siti sta sopra la
-// scheda (#592.6), e il foglio della pagina non lo deve raggiungere.
+// Lo stesso sito prima e dopo aver aggiunto il suo foglio: sui siti l'Aiuto e il suo popup stanno nello strato sopra
+// la scheda (#1509.3), e il foglio della pagina non li deve raggiungere.
 async function chiediDalSito(app, page) {
   const host = new URL(page.url()).hostname;
-  await expect.poll(() => nelMondoDiFilo(app, host, 'typeof window.__filoSidebarTest?.runFiloAction'), { timeout: 8000 }).toBe('function');
-  await nelMondoDiFilo(app, host, `window.__esito = 'in corso'; window.SN_SIDEBAR.open();
-    window.__filoSidebarTest.runFiloAction(${JSON.stringify({ type: 'INVIA_FEEDBACK', testo: TESTO })}).then((v) => { window.__esito = v; }); 1`);
-  const vista = await confermaSopraPagina(app, { timeout: 15_000 });
+  await expect.poll(() => nelMondoDiFilo(app, host, 'typeof window.SN_SIDEBAR?.open'), { timeout: 8000 }).toBe('function');
+  await nelMondoDiFilo(app, host, 'window.SN_SIDEBAR.open(); 1');
+  const strato = await paginaDelloStrato(app, page);
+  await strato.waitForSelector('.sn-sidebar-input textarea');
+  await nelloStrato(app, page, (a) => {
+    window.__esito = 'in corso';
+    window.__filoSidebarTest.runFiloAction(a).then((v) => { window.__esito = v; });
+    return 1;
+  }, { type: 'INVIA_FEEDBACK', testo: TESTO });
+  const vista = await confermaNelloStrato(app, page, { timeout: 15_000 });
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   const annulla = async () => {
     await clickConfirm(vista, 'cancel');
-    await expect.poll(() => nelMondoDiFilo(app, host, 'window.__esito')).toBe(false);
+    await expect.poll(() => nelloStrato(app, page, () => window.__esito)).toBe(false);
   };
   return { vista, annulla };
 }

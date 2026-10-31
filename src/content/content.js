@@ -2490,8 +2490,10 @@
     if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.open(context);
   }
-  // Le immagini lasciate sulla pagina (#1623): il pannello vive nel frame principale.
-  Sidebar?.suChiusura?.(() => (IS_SUBFRAME || motivoBlocco() ? 'sito' : aiutoAcceso() ? '' : 'aiuto'));
+  // Le immagini lasciate sulla pagina (#1623): il pannello vive nel frame principale, o nello strato sopra il sito, che
+  // nasce solo dove Filo è acceso.
+  const nelloStratoQui = self.SN_FILO_UI?.nelloStrato === true;
+  Sidebar?.suChiusura?.(() => ((IS_SUBFRAME && !nelloStratoQui) || (!nelloStratoQui && motivoBlocco()) ? 'sito' : aiutoAcceso() ? '' : 'aiuto'));
 
   // L'icona Aiuto della barra laterale: apre, poi detta, poi ferma (#1432).
   function aiutoPasso() {

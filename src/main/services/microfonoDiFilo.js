@@ -67,7 +67,10 @@ function seguiFinestra(win) {
 }
 
 async function apri(wc, BrowserWindow) {
-  const win = finestraDellaScheda(wc, BrowserWindow);
+  // Lo strato dei riquadri sopra una scheda (l'Aiuto di un sito, #1509.3) ascolta con la cornice della sua scheda.
+  let sotto = null;
+  try { sotto = require('../stratoDeiRiquadri').paginaDelloStrato(wc); } catch (_) { sotto = null; }
+  const win = finestraDellaScheda(sotto ? sotto.wc : wc, BrowserWindow);
   const c = cornice(win);
   if (!c) return { ok: false, errore: 'NotAllowedError' };
   const suoi = [...aperti].filter(([, a]) => a.wc === wc);

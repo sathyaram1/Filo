@@ -66,7 +66,10 @@ test('i gesti contati nelle pagine mandano solo nomi da elenchi chiusi e numeri'
       'suggerimento', 'in-corso', 'riquadro', 'comando-home', 'risali', 'risali-fine', 'automatismo'].includes(m[1]), m[1]);
     assert.match(leggi('src', 'main', 'services', 'handlers', 'contatori.js'), new RegExp(`case '${m[1]}':|misura === '${m[1]}'`), `il main riceve «${m[1]}»`);
   }
-  for (const m of tutto.matchAll(/pannello: '([a-z-]+)'/g)) assert.ok(C.PANNELLI.includes(m[1]), m[1]);
+  // Solo negli oggetti che partono come gesto contato: lo stato del pannello dell'Aiuto («chiuso») non è un pannello contato.
+  const pannelli = [...tutto.matchAll(/\{[^{}]*\bmisura: [^{}]*\}/g)].flatMap((o) => [...o[0].matchAll(/pannello: '([a-z-]+)'/g)]);
+  assert.ok(pannelli.length >= 5, `pannelli contati trovati: ${pannelli.length}`);
+  for (const m of pannelli) assert.ok(C.PANNELLI.includes(m[1]), m[1]);
   // La ricerca porta l'esito, l'attesa e la posizione: mai la query.
   for (const s of [leggi('src', 'pages', 'dashboard', 'dashboard-cerca.js'), leggi('src', 'shared', 'comboBox.js'), leggi('src', 'pages', 'editor', 'editor.js')]) {
     for (const m of s.matchAll(/contaRicerca\(\{([^}]*)\}\)/g)) assert.doesNotMatch(m[1], /\bq\b|value|testo|query|search\.value/, m[1]);

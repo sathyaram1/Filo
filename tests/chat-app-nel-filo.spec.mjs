@@ -9,6 +9,7 @@ import { clickConfirm } from './helpers/confirm.mjs';
 import { mkdirSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 const SHOTS = 'tests/.shots';
 
@@ -152,15 +153,18 @@ test('una conversazione con l’Aiuto sopra un sito: la riga col nome del sito, 
   await prepara(app);
   const casa = await home(app);
   const sito = await testServer.openReady(openTab, '<!doctype html><title>Iscrizioni</title><h1>Iscriviti</h1><button>Iscriviti</button>');
+  // Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3).
+  let aiuto = null;
   const apri = async () => {
     const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
     await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-    await sito.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+    aiuto = await paginaDellAiuto(app, sito);
+    await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
   };
   await apri();
-  await sito.fill('.sn-sidebar-input textarea', 'dove mi iscrivo?');
-  await sito.press('.sn-sidebar-input textarea', 'Enter');
-  await expect(sito.locator('.sn-sidebar-msg-assistant').last()).toContainText('Iscriviti è in alto', { timeout: 10_000 });
+  await aiuto.fill('.sn-sidebar-input textarea', 'dove mi iscrivo?');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+  await expect(aiuto.locator('.sn-sidebar-msg-assistant').last()).toContainText('Iscriviti è in alto', { timeout: 10_000 });
 
   await attiva(shell, 'filo://newtab');
   const righe = casa.locator('#bubbles .dash-riga-app');
@@ -175,11 +179,11 @@ test('una conversazione con l’Aiuto sopra un sito: la riga col nome del sito, 
 
   // Chiusa e riaperta, l'Aiuto comincia un'altra conversazione: una riga sua.
   await attiva(shell, 'http://127.0.0.1');
-  await sito.locator('.sn-sidebar-close').click();
-  await expect(sito.locator('.sn-sidebar')).toHaveCount(0);
+  await aiuto.locator('.sn-sidebar-close').click();
+  await expect(aiuto.locator('.sn-sidebar')).toHaveCount(0);
   await apri();
-  await sito.fill('.sn-sidebar-input textarea', 'e il modulo?');
-  await sito.press('.sn-sidebar-input textarea', 'Enter');
+  await aiuto.fill('.sn-sidebar-input textarea', 'e il modulo?');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
   await expect.poll(async () => (await righeFilo(app)).length, { timeout: 10_000 }).toBe(2);
 });
 
@@ -327,10 +331,11 @@ test('le risposte di Filo nello scambio aperto restano formattate, e il loro lin
   const sito = await testServer.openReady(openTab, '<!doctype html><title>Iscrizioni</title><h1>Iscriviti</h1><button>Iscriviti</button>');
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await sito.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
-  await sito.fill('.sn-sidebar-input textarea', 'dove mi iscrivo?');
-  await sito.press('.sn-sidebar-input textarea', 'Enter');
-  await expect(sito.locator('.sn-sidebar-msg-assistant strong').last()).toHaveText('Iscriviti', { timeout: 10_000 });
+  const aiuto = await paginaDellAiuto(app, sito);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  await aiuto.fill('.sn-sidebar-input textarea', 'dove mi iscrivo?');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+  await expect(aiuto.locator('.sn-sidebar-msg-assistant strong').last()).toHaveText('Iscriviti', { timeout: 10_000 });
 
   await attiva(shell, 'filo://newtab');
   const riga = casa.locator('#bubbles .dash-riga-app');

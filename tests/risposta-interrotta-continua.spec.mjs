@@ -3,6 +3,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { home } from './helpers/chatFinta.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 import { mkdirSync } from 'node:fs';
 
 const SHOTS = 'tests/.shots';
@@ -77,15 +78,16 @@ test('Aiuto: la risposta interrotta offre «Continua», che chiede il seguito', 
   const sito = await testServer.openReady(openTab, '<!doctype html><title>Iscrizioni</title><h1>Iscriviti</h1><button>Iscriviti</button>');
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await sito.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
-  await sito.fill('.sn-sidebar-input textarea', 'come mi iscrivo?');
-  await sito.press('.sn-sidebar-input textarea', 'Enter');
-  await expect(sito.locator('.sn-sidebar-msg-assistant').last()).toContainText('apri il modulo e', { timeout: 10_000 });
-  await expect(sito.locator('.sn-sidebar-msg-assistant').last()).not.toContainText('{');
-  const continua = sito.locator('.sn-sidebar-choice', { hasText: 'Continua' });
+  const aiuto = await paginaDellAiuto(app, sito);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  await aiuto.fill('.sn-sidebar-input textarea', 'come mi iscrivo?');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+  await expect(aiuto.locator('.sn-sidebar-msg-assistant').last()).toContainText('apri il modulo e', { timeout: 10_000 });
+  await expect(aiuto.locator('.sn-sidebar-msg-assistant').last()).not.toContainText('{');
+  const continua = aiuto.locator('.sn-sidebar-choice', { hasText: 'Continua' });
   await expect(continua).toBeVisible();
   await continua.click();
-  await expect(sito.locator('.sn-sidebar-msg-assistant').last()).toContainText('poi premi Invia.', { timeout: 10_000 });
+  await expect(aiuto.locator('.sn-sidebar-msg-assistant').last()).toContainText('poi premi Invia.', { timeout: 10_000 });
 });
 
 test('Home: la riga «interrotta» dentro la bolla ha l\'aspetto di una nota, in chiaro e in scuro', async ({ app }) => {

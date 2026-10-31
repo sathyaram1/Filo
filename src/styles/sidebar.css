@@ -311,7 +311,8 @@
 
 /* Gli avvisi in basso a destra stanno a sinistra dell'Aiuto rimasto nel suo angolo: sopra ne coprivano la casella
    e l'invio, anche col pannello collassato (la conferma di «Salva per dopo» chiesta all'Aiuto, #845). */
-html:has(> .sn-sidebar:not([data-spostata])) > .sn-toasts {
+html:has(> .sn-sidebar:not([data-spostata])) > .sn-toasts,
+.sn-toasts.sn-toasts-accanto-aiuto {
   right: calc(16px + 360px + 12px);
   max-width: max(200px, calc(100vw - 408px));
 }
