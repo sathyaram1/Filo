@@ -151,7 +151,9 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   quella di un rilievo **esterno**, o di uno col `?` di livello 0 o 1 (o vicino),
   nello stesso commit: quel rilievo esce di qui dentro un feedback suo in ogni
   esito, e la prova lasciata indietro sarebbe solo un rosso da rispiegare per
-  sempre. **La pulizia che non dipende dall'esito si fa prima del verdetto**:
+  sempre. Se la critica ha un interno di livello 2 o 3 col `?`, il lavoro si
+  ferma e i `?` restano a chi riprende: lì esce solo la prova degli esterni.
+  **La pulizia che non dipende dall'esito si fa prima del verdetto**:
   dopo, ogni commit è una spinta che il registro della fiducia non vede, e un
   lavoro fidato finisce fermo alla fusione. La registrazione rifiuta una critica
   che ha ancora nel ramo una prova di questi, e dice quale.
