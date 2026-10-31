@@ -84,8 +84,8 @@ import {
 import { writeRole, clearRole, readRole, readMarker, isRoutineInstance } from './lib/routine-role.mjs';
 import { fileRiscritti, fusioniCheCitano, numeroFeedback } from './lib/su-main.mjs';
 import {
-  baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, numeraRilievi, puliziaDelPass, rigaNumerata,
-  ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero,
+  baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, esceInOgniEsito, numeraRilievi, proveDaToglierePrimaDelVerdetto,
+  proveScritteDa, puliziaDelPass, rigaNumerata, ROSSO_ATTESO_CHIUSO, testoProvePrimaDelVerdetto, testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
