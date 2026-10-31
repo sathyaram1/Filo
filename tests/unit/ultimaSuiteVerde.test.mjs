@@ -319,10 +319,11 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
         head_branch: 'main', created_at: oreFa(ore + 1), updated_at: oreFa(ore), html_url: `https://github.com/o/r/actions/runs/${ore}` });
       writeFileSync(join(tmp, 'stato.json'), JSON.stringify({
         pubblicata: oreFa(oreVersione), runs: [corsaDi(sha[2], 'failure', 0.5), corsaDi(sha[1], 'success', oreVerde)],
-        senzaWindows: senzaWindows ? [oreVerde * 10] : [],
+        senzaWindows: senzaWindows ? [oreVerde * 10] : [], zavorra,
       }));
       const env = {
         ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}`, FAKE_GH_STATO: join(tmp, 'stato.json'),
+        FAKE_GH_ARGV: join(tmp, 'argv.log'),
         GITHUB_REPOSITORY: 'o/r', GITHUB_OUTPUT: join(tmp, 'output.txt'), GITHUB_STEP_SUMMARY: join(tmp, 'riassunto.md'),
         FILO_BUILD_PASSPHRASE: 'prova', FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`,
         NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost',
