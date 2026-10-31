@@ -268,29 +268,31 @@
 
   // ── Tasto destro: le voci vanno nel menu di Filo, accanto a Spiega, Traduci e le altre ──
 
+  const copiaVersione = (v) => ({
+    type: 'item', icon: icona('copy', 16), label: 'Copia tutta la versione', azione: 'patch-notes',
+    onClick: () => copia(N.testoVersione(v), `Novità della ${v.version} copiate`),
+  });
   function vociMenu(target) {
     const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
     if (!el || !el.closest) return [];
     const li = el.closest('.nv-riga');
     if (li && datiDi.has(li)) {
       const { riga, versione } = datiDi.get(li);
-      const voci = [{ type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => copia(riga.testo, 'Riga copiata') }];
-      if (apribile(riga.segnalazione)) {
-        voci.push({
-          type: 'item', icon: icona('feedback', 16),
-          label: porte.mie.has(riga.segnalazione) ? `Apri la tua segnalazione #${riga.segnalazione}` : `Apri la segnalazione #${riga.segnalazione}`,
-          onClick: () => apriSegnalazione(riga.segnalazione),
-        });
+      const voci = [{
+        type: 'item', icon: icona('copy', 16), label: 'Copia il testo', azione: 'patch-notes',
+        onClick: () => copia(riga.testo, 'Riga copiata'),
+      }];
+      const n = riga.segnalazione;
+      if (apribile(n)) {
+        voci.push(porte.mie.has(n)
+          ? { type: 'item', icon: icona('feedback', 16), label: 'Apri la tua segnalazione', azione: 'patch-notes', onClick: () => apriSegnalazione(n) }
+          : { type: 'item', icon: icona('feedback', 16), label: 'Apri la segnalazione', azione: 'patch-notes', onClick: () => apriSegnalazione(n) });
       }
-      voci.push({ type: 'item', icon: icona('copy', 16), label: `Copia tutta la ${versione.version}`, onClick: () => copia(N.testoVersione(versione), `Novità della ${versione.version} copiate`) });
+      voci.push(copiaVersione(versione));
       return voci;
     }
     const testa = el.closest('.nv-intesta');
-    if (testa && datiDi.has(testa)) {
-      const { versione } = datiDi.get(testa);
-      return [{ type: 'item', icon: icona('copy', 16), label: `Copia tutta la ${versione.version}`, onClick: () => copia(N.testoVersione(versione), `Novità della ${versione.version} copiate`) }];
-    }
-    return [];
+    return testa && datiDi.has(testa) ? [copiaVersione(datiDi.get(testa).versione)] : [];
   }
   window.SN_VOCI_PAGINA = Array.isArray(window.SN_VOCI_PAGINA) ? window.SN_VOCI_PAGINA : [];
   if (!window.SN_VOCI_PAGINA.includes(vociMenu)) window.SN_VOCI_PAGINA.push(vociMenu);
