@@ -9,10 +9,17 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
     // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.254', date: '2026-10-30',
+      version: '0.2.255', date: '2026-10-31',
       features: [],
       fixes: [
         'Anche l\'Aiuto su un sito ora sta sopra la pagina: le domande che gli scrivi, le sue risposte e il testo che propone per un campo, finché non lo accetti, il sito non li legge più, nemmeno se li selezioni o li copi.',
+      ],
+    },
+    {
+      version: '0.2.254', date: '2026-10-30',
+      features: [],
+      fixes: [
+        'Quando alleghi un file a una segnalazione, la finestra di scelta propone solo i tipi che Filo accetta. Se ne trascini uno diverso, il messaggio elenca tutti quelli ammessi.',
       ],
     },
     {

@@ -45,10 +45,10 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   await page.waitForLoadState('domcontentloaded');
 
   // «Statistiche feedback» (#496) in più, «Modelli di supporto» dentro Automazioni (#1110), i lavori server nella
-  // scheda del loro stato (#1575); più le tre della sezione Domande (#1150), «Aspettano» (#903), «Crediti» (#1356) e
-  // «Compiti» (#1196) fra le Routine, le pagine dell'owner entrate in Gestione, «Inviti e utenti» e «Modelli
-  // predefiniti» (#1414), «Contatori» accanto a «Inviti e utenti» (#1462) e «Compiti ricorrenti» (#1153).
-  await expect(page.locator('.mg-tab')).toHaveCount(18);
+  // scheda del loro stato (#1575); più le cinque della sezione Domande (#1150, #1791), «Aspettano» (#903), «Crediti»
+  // (#1356) e «Compiti» (#1196) fra le Routine, le pagine dell'owner entrate in Gestione, «Inviti e utenti» e
+  // «Modelli predefiniti» (#1414), «Contatori» accanto a «Inviti e utenti» (#1462) e «Compiti ricorrenti» (#1153).
+  await expect(page.locator('.mg-tab')).toHaveCount(20);
   // Con i feedback caricati (qui: nessuno) le sei schede-lista dicono
   // quante ne contengono, le altre no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);

@@ -1908,7 +1908,7 @@ test('conteggi per livello: lunghezza della lista filtrata, e la scheda Ricevuti
 
 test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta fuori', () => {
   const attese = {
-    domande: 'domande', 'domande-lavoro': 'domande', 'domande-archivio': 'domande',
+    domande: 'domande', 'domande-smistamento': 'domande', 'domande-lavoro': 'domande', 'domande-automatiche': 'domande', 'domande-archivio': 'domande',
     inbox: 'feedback', queue: 'feedback', waiting: 'feedback', resolved: 'feedback', archived: 'feedback',
     fbstats: 'feedback', stats: 'feedback',
     automation: 'routine', compiti: 'routine', ricorrenti: 'routine', crediti: 'routine', log: 'routine',
@@ -1969,24 +1969,27 @@ test('apertura: bloccante aperta > Ricevuti non vuoto > ultima sezione > Feedbac
 
 test('domande: la scheda di ogni stato viene da SN_DOMANDE.schedaDi, e ogni sua scheda ha un posto in Gestione', () => {
   assert.equal(MR.schedaDomanda({ stato: 'aperta' }), 'domande');
+  assert.equal(MR.schedaDomanda({ stato: 'in_smistamento' }), 'domande-smistamento');
   assert.equal(MR.schedaDomanda({ stato: 'in_lavorazione' }), 'domande-lavoro');
   assert.equal(MR.schedaDomanda({ stato: 'chiusa' }), 'domande-archivio');
   assert.equal(MR.schedaDomanda({ stato: 'superata' }), 'domande-archivio');
-  // Uno stato ignoto resta davanti all'owner, come dice il modulo delle domande.
-  assert.equal(MR.schedaDomanda({ stato: 'boh' }), 'domande');
-  assert.equal(MR.schedaDomanda({ stato: 'chiusa', esito: { automatica: true } }), 'domande-archivio');
+  // #1791: «Da rispondere» tiene solo le aperte; uno stato ignoto si vede, fra quelle in lavorazione.
+  assert.equal(MR.schedaDomanda({ stato: 'boh' }), 'domande-lavoro');
+  assert.equal(MR.schedaDomanda({ stato: 'chiusa', esito: { automatica: true } }), 'domande-automatiche');
   assert.equal(MR.schedaDomanda(null), null);
   const schedeDomande = MR.SEZIONI.find((s) => s.id === 'domande').schede;
   for (const s of globalThis.SN_DOMANDE.SCHEDE) {
-    const d = { da_rispondere: { stato: 'aperta' }, in_lavorazione: { stato: 'in_lavorazione' },
+    const d = { da_rispondere: { stato: 'aperta' }, in_smistamento: { stato: 'in_smistamento' }, in_lavorazione: { stato: 'in_lavorazione' },
       risposte_automatiche: { stato: 'chiusa', esito: { automatica: true } }, archivio: { stato: 'superata' } }[s];
     assert.ok(d, `la prova non conosce la scheda «${s}» di SN_DOMANDE`);
     assert.ok(schedeDomande.includes(MR.schedaDomanda(d)), `«${s}» non ha una scheda in Gestione`);
   }
+  const zero = { domande: 0, 'domande-smistamento': 0, 'domande-lavoro': 0, 'domande-automatiche': 0, 'domande-archivio': 0 };
   assert.deepEqual(MR.contaDomande([
     { stato: 'aperta' }, { stato: 'aperta' }, { stato: 'in_lavorazione' }, { stato: 'superata' }, { stato: 'boh' },
-  ]), { domande: 3, 'domande-lavoro': 1, 'domande-archivio': 1 });
-  assert.deepEqual(MR.contaDomande(null), { domande: 0, 'domande-lavoro': 0, 'domande-archivio': 0 });
+    { stato: 'in_smistamento' }, { stato: 'chiusa', esito: { automatica: true } },
+  ]), Object.assign({}, zero, { domande: 2, 'domande-smistamento': 1, 'domande-lavoro': 2, 'domande-automatiche': 1, 'domande-archivio': 1 }));
+  assert.deepEqual(MR.contaDomande(null), zero);
 });
 
 test('attesaServer: le due attese di un lavoro server passato, solo in revisione (#1222)', () => {

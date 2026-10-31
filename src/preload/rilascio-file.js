@@ -16,10 +16,11 @@ const bersaglio = (e) => {
 const campoFile = (t) => !!t && t.localName === 'input' && String(t.type || '').toLowerCase() === 'file';
 
 // `pronta()`: c'è una chat che lo prende; `consegna(files)`: le dà tutti i file lasciati, e lei dice cosa non entra;
-// `pannello(t)`: il nodo sta nel pannello di Filo, e quello che gli si dà non passa dalla pagina.
+// `pannello(t)`: il nodo sta nel pannello di Filo, e quello che gli si dà non passa dalla pagina; `nelPannello(e)`: il
+// rilascio di qualcosa che non è un file, consegnato al pannello.
 // Il drop arriva alla pagina solo se lei ha accettato il passaggio, come in ogni browser (anche sopra una casella:
 // un file non è testo); poi decide il drop, perché una pagina può accettare il passaggio e non prenderlo.
-module.exports = function osservaRilascio(win, { pronta, consegna, pannello = () => false }) {
+module.exports = function osservaRilascio(win, { pronta, consegna, pannello = () => false, nelPannello = () => {} }) {
   // '' non è nostro, 'subito' lo prende Filo prima della pagina, 'dopo' solo se la pagina al drop non lo vuole.
   let nostro = '';
   let inAttesa = null;
@@ -57,9 +58,12 @@ module.exports = function osservaRilascio(win, { pronta, consegna, pannello = ()
     nostro = '';
     inAttesa = null;
     if (!e.isTrusted) return;
+    // Sul pannello il sito non vede niente: i file li prende Filo, il resto (un riferimento trascinato, #1791) il
+    // pannello. Un testo senza segni lo scrive il browser nella casella, come sempre.
     if (delPannello(e)) {
       e.stopImmediatePropagation();
-      prendi(e);
+      if (Array.from((e.dataTransfer && e.dataTransfer.types) || []).includes('Files')) prendi(e);
+      else { try { nelPannello(e); } catch (_) {} }
       return;
     }
     if (!mio) return;

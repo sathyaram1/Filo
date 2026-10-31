@@ -118,12 +118,17 @@ test('ordine §3.7: priorità, poi gruppo dal più vecchio, poi età; raggruppa 
 test('schedaDi e gli id D-n', () => {
   assert.equal(D.schedaDi({ stato: 'aperta' }), 'da_rispondere');
   assert.equal(D.schedaDi({ stato: 'in_lavorazione' }), 'in_lavorazione');
-  assert.equal(D.schedaDi({ stato: 'in_smistamento' }), 'in_lavorazione', 'mentre il compito la smista non è da rispondere, ma si vede');
+  assert.equal(D.schedaDi({ stato: 'in_smistamento' }), 'in_smistamento', 'mentre il compito la smista non è da rispondere, ma si vede');
   assert.ok(D.STATI.includes('in_smistamento'));
   assert.equal(D.schedaDi({ stato: 'chiusa', esito: { automatica: true } }), 'risposte_automatiche');
   assert.equal(D.schedaDi({ stato: 'chiusa' }), 'archivio');
   assert.equal(D.schedaDi({ stato: 'superata' }), 'archivio');
-  assert.equal(D.schedaDi({ stato: '???' }), 'da_rispondere');
+  // #1791: «Da rispondere» tiene solo le aperte; uno stato ignoto si vede ma non conta come da rispondere.
+  assert.equal(D.schedaDi({ stato: '???' }), 'in_lavorazione');
+  assert.equal(D.schedaDi(null), 'in_lavorazione');
+  // Ogni stato ha la sua scheda, e ogni scheda la tiene almeno uno stato.
+  for (const s of D.STATI) assert.ok(D.SCHEDE.includes(D.schedaDi({ stato: s, esito: {} })), s);
+  assert.deepEqual(D.STATI.filter((s) => D.schedaDi({ stato: s }) === 'da_rispondere'), ['aperta']);
   assert.equal(D.idDi(12), 'D-12');
   assert.equal(D.numeroDi('D-12'), 12);
   assert.equal(D.numeroDi('D-0'), null);

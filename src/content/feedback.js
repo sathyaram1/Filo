@@ -13,8 +13,8 @@
   const AttachTypes = global.SN_FEEDBACK_ATTACH;
 
   // Vale sia per «Allega» sia per il drag & drop.
-  const ATTACH_REJECT_MSG =
-    'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
+  const ATTACH_REJECT_MSG = (AttachTypes && AttachTypes.MESSAGGIO_TIPO)
+    || 'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
 
   // Fallback prudente se il modulo condiviso non fosse caricato: si consentono solo le immagini
   // raster note.
@@ -260,13 +260,15 @@
     const cancelBtn = root.querySelector('.sn-fb-cancel');
     const canvas = root.querySelector('.sn-fb-canvas');
     const fileInput = root.querySelector('.sn-fb-file');
+    if (AttachTypes && AttachTypes.ACCEPT) fileInput.accept = AttachTypes.ACCEPT;
 
+    const LIMITI = (AttachTypes && AttachTypes.LIMITI) || { immagini: 5, file: 5, byte: 4 * 1024 * 1024 };
     const images = [];
-    const MAX_IMAGES = 5;
+    const MAX_IMAGES = LIMITI.immagini;
     // Allegati NON immagine (pdf, txt, md, json, …): { name, type, size, dataUrl }
     const files = [];
-    const MAX_FILES = 5;
-    const MAX_ATTACH_BYTES = 4 * 1024 * 1024;
+    const MAX_FILES = LIMITI.file;
+    const MAX_ATTACH_BYTES = LIMITI.byte;
 
     // Id STABILE della composizione, condiviso da tutti i tentativi: se l'invio va in timeout
     // ma riesce sul server, ripremere «Invia» non duplica (#370). Cambia col contenuto.
