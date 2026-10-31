@@ -195,7 +195,7 @@ test('chi riallinea e si ferma con una domanda che blocca consegna anche senza r
     FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: s.work, FILO_DISPATCH_STATE_DIR: stato,
     FILO_ROUTINES_ENABLED: '1', FILO_ROUTINE_TICKET: 'b'.repeat(43), FILO_ROUTINE: '',
   };
-  const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-77', 'Rebase annullato: il conflitto sul menu chiede una scelta.', '--domanda', domanda], env, s.work);
+  const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-77', 'Rebase annullato: il conflitto sul menu chiede una scelta fra le due versioni, e la domanda la porta all\'owner.', '--domanda', domanda], env, s.work);
   assert.equal(r.code, 0, r.se);
   assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 1);
   assert.equal(suOrigin(s.origin, 'worker/77'), s.verificato);
