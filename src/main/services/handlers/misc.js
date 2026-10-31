@@ -742,6 +742,14 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // Le note sono pubbliche, ma a un sito non servono: la porta resta di Filo.
+  on(MSG.NOVITA_ELENCO, require('./origine').soloFilo(async () => {
+    const current = appVersion();
+    const N = globalThis.SN_NOVITA;
+    if (!N || !globalThis.SN_PATCH_NOTES) return { ok: false, error: 'note non caricate', current, versioni: [] };
+    return { ok: true, current, versioni: N.uscite(null, current) };
+  }));
+
   // L'anteprima di un link è una visita al suo sito: mai a un indirizzo che l'avviso giudica sospetto, mai a un sito della
   // lista dei bloccati, nemmeno a metà dei rinvii (#1307). Per il bloccato si dice chi lo ferma, e il menu lo scrive.
   function anteprimaFerma(url) {
