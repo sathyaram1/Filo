@@ -266,8 +266,10 @@ describe('la scelta vera, contro un main finto', () => {
 const fs = require('fs');
 const p = process.argv.find((a) => a.startsWith('repos/')) || '';
 const s = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATO, 'utf8'));
+fs.appendFileSync(process.env.FAKE_GH_ARGV, JSON.stringify(process.argv) + '\\n');
 if (p.includes('/actions/workflows/suite.yml/runs')) {
-  const runs = s.runs.filter((r) => !p.includes('status=success') || r.conclusion === 'success');
+  const runs = s.runs.filter((r) => !p.includes('status=success') || r.conclusion === 'success')
+    .map((r) => (s.zavorra ? { ...r, head_commit: { message: 'z'.repeat(s.zavorra) } } : r));
   process.stdout.write(JSON.stringify({ workflow_runs: runs }));
 } else if (/actions[/]runs[/][^/]+[/]jobs/.test(p)) {
   const id = p.match(/actions[/]runs[/]([^/]+)[/]jobs/)[1];
