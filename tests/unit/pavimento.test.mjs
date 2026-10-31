@@ -19,6 +19,16 @@ test('una password annunciata, una carta e il suo CVV diventano il segnaposto', 
   assert.ok(t.includes('scade 12/28'), 'il resto della frase resta');
 });
 
+test('il CVV si toglie anche in una cella, dopo una parentesi o con altre parole prima del separatore; la frase che lo nomina resta', () => {
+  for (const [riga, v] of [
+    ['CVV | 592', '592'], ['CVV\t592', '592'], ['Codice di sicurezza (CVV): 847', '847'], ['CVV code: 739', '739'],
+    ['Il codice CVV della carta è 615', '615'], ['CVV (3 cifre): 123', '123'], ['Security code (CVC): 456', '456'],
+    ['CVV/CVC (sul retro): 321', '321'], ['Codice di sicurezza della carta 318', '318'],
+  ]) assert.ok(!P.oscura(riga).includes(v), riga);
+  for (const riga of ['CVV: le 3 cifre sul retro della carta', 'Inserisci il CVV, le ultime tre cifre. Ordine 4829 confermato',
+    'The security code review found 120 issues']) assert.equal(P.oscura(riga), riga);
+});
+
 test('un codice usa e getta e una chiave col suo prefisso non escono', () => {
   const t = P.oscura('Il tuo codice OTP è 482913. Chiave: sk-abcdefghijklmnop1234567890');
   assert.ok(!t.includes('482913'));
