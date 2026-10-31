@@ -33,7 +33,9 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
 <!-- includi: _domanda-fine-sessione.md -->
 - il claim → il rilascio, quando hai finito (`node scripts/routine-channel.mjs
   release <biglietto> --role <il tuo ruolo>`): il ruolo firma il rapporto di
-  fine sessione che il rilascio allega da solo; senza, il rapporto esce anonimo;
+  fine sessione che il rilascio allega da solo; senza, il rapporto esce anonimo.
+  Il rapporto porta già gli strumenti falliti (con cosa hai fatto dopo) e le
+  attese sopra i 30 secondi, letti dal transcript: non riportarli a parole;
 - un guasto che ti impedisce di lavorare → il rilascio con `--guasto`, come
   nella sezione qui sotto: è così che il server smette di dare lavoro per
   questo giro e rimette il lavoro in coda. Non "riportarlo" a parole:
