@@ -186,10 +186,11 @@ biglietto_finito() {
 # sicurezza — che nel frattempo esaminava un gemello abbandonato.
 #
 # Ora al ramo principale non pubblica niente, mai (piu' sotto). La routine si
-# riconosce per dire nella storia da dove arriva un commit (l'autore), con la
-# regola di isRoutineInstance (scripts/lib/routine-role.mjs): l'export di
-# FILO_ROUTINE non arriva al gancio, che Claude Code lancia col suo ambiente
-# (#1966), quindi vale anche il biglietto che dispatch scrive nella cartella.
+# riconosce per dire nella storia da dove arriva un commit (l'autore): e' la
+# domanda di isRoutineInstance (scripts/lib/routine-role.mjs), nella forma che
+# non costa un processo. L'export di FILO_ROUTINE non arriva al gancio, che
+# Claude Code lancia col suo ambiente (#1966): vale il biglietto che dispatch
+# scrive nella cartella.
 is_routine_session() {
   { [ -n "$FILO_ROUTINE" ] && [ "$FILO_ROUTINE" != "0" ]; } || [ -f "$CARTELLA/.claude/routine-ticket.json" ]
 }
