@@ -65,6 +65,7 @@ async function pezzo(formato, peso, titolo) {
 async function unVideo(titolo) {
   const file = uscita.replace('%(ext)s', 'mp4');
   if (existsSync(file)) { process.stdout.write(`[download] ${file} has already been downloaded\n`); return false; }
+  stampaPezzi();
   await pezzo('137', 300 * 1024, titolo);
   await attesa(Number(caso.pausaFraPezzi) || 0);
   await pezzo('140', 60 * 1024, titolo);
