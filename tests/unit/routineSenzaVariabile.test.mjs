@@ -88,3 +88,32 @@ test('la spedizione che toglie una copia dei dati firma da routine col solo bigl
   assert.ok(!git(origin, ['ls-tree', '-r', '--name-only', 'worker/1966']).split('\n').includes('dati.json'), 'la copia non parte');
   assert.equal(autore(origin, 'worker/1966'), ROUTINE);
 });
+
+// Chi legge la variabile da sola sbaglia in cloud: un lettore nuovo chiede a isRoutineInstance. Qui i soli ammessi.
+const SALTO_LOCALE = 'biglietto della sessione locale: senza la credenziale dell\'owner tace da sé, la variabile risparmia solo un processo';
+const LETTORI_AMMESSI = {
+  'scripts/lib/routine-role.mjs': [1, 'la regola'],
+  '.claude/hooks/auto-commit-merge.sh': [1, 'la stessa regola senza processi, col biglietto della cartella'],
+  'scripts/routine-channel.mjs': [1, 'il ripiego sul transcript più recente vuole la cartella di un worker, non una routine qualunque'],
+  'scripts/dispatch.mjs': [1, 'la spinta prima di un riallineamento, che il #1964 toglie'],
+  'scripts/lib/biglietto-locale.mjs': [3, SALTO_LOCALE],
+  'scripts/lib/letture-esterne.mjs': [1, SALTO_LOCALE],
+  '.claude/hooks/session-start.sh': [1, SALTO_LOCALE],
+  '.claude/hooks/session-end.sh': [1, SALTO_LOCALE],
+  '.claude/hooks/letture-esterne.sh': [1, SALTO_LOCALE],
+};
+
+test('nessuno strumento decide da FILO_ROUTINE da sola fuori dai lettori ammessi', () => {
+  const file = [
+    ...readdirSync(join(ROOT, 'scripts'), { recursive: true }).map((f) => `scripts/${String(f).replace(/\\/g, '/')}`).filter((f) => /\.(mjs|js|cjs)$/.test(f)),
+    ...readdirSync(join(ROOT, '.claude', 'hooks')).filter((f) => f.endsWith('.sh')).map((f) => `.claude/hooks/${f}`),
+  ];
+  const lettura = /env\.FILO_ROUTINE\b(?!_)|\$\{?FILO_ROUTINE\b(?!_)/;
+  const troppi = [];
+  for (const f of file) {
+    const n = readFileSync(join(ROOT, f), 'utf8').split('\n').filter((r) => lettura.test(r)).length;
+    const [max, perche] = LETTORI_AMMESSI[f] || [0, ''];
+    if (n > max) troppi.push(`${f}: ${n} righe leggono FILO_ROUTINE, ne valgono ${max}${perche ? ` (${perche})` : ''}`);
+  }
+  assert.deepEqual(troppi, [], 'in cloud l\'export non arriva alla chiamata dopo: chiedi a isRoutineInstance (scripts/lib/routine-role.mjs)');
+});
