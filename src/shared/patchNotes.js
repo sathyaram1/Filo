@@ -1645,5 +1645,5 @@
       .filter((n) => n.features.length || n.fixes.length);
   }
 
-  global.SN_PATCH_NOTES = { NOTES, cmpVersion, since, countBehind, latestVersion, impronta, fotografia, recap };
+  global.SN_PATCH_NOTES = { NOTES, cmpVersion, since, countBehind, latestVersion, riga, testo, impronta, fotografia, recap };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
