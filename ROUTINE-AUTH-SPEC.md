@@ -316,9 +316,9 @@ risposta, non un'interruzione di rete.
 filo-security, ogni 10 minuti, con i freni in quest'ordine: interruttore
 (`config/routines.enabled`) acceso? nessun **battito di sistema** fresco
 (qualcuno sta già lavorando)? l'account non è in pausa (un'accensione rifiutata
-da claude.ai la mette, crescente; nessun tetto giornaliero, #996)? l'ultimo giro non è **nato morto** e
-nessun guasto è stato dichiarato (periodo di rispetto ≥ 1h)? c'è lavoro (stessa
-domanda del sondaggio di prontezza, fatta dentro il server)? Solo se tutto dice
+da claude.ai la mette, crescente; nessun tetto giornaliero, #996)? l'ultimo giro non è **nato morto**?
+c'è lavoro (stessa domanda del sondaggio di prontezza, fatta dentro il server;
+un lavoro fermo per un guasto non conta)? Solo se tutto dice
 sì, una POST accende la routine su claude.ai (id in
 `config/routines.routineId`, token nei Secret delle functions — mai negli
 ambienti delle sessioni). Il battito di sistema lo scrivono gli ingressi del
