@@ -32,6 +32,8 @@ function giroConRamoVecchio() {
   git(semina, 'config', 'user.name', 't');
   agente(semina, 'routine-worker', 'xhigh');
   agente(semina, 'routine-secaudit', 'xhigh');
+  // Come il repo vero: senza, su Windows (autocrlf=true) il checkout di dispatch scrive CRLF.
+  writeFileSync(join(semina, '.gitattributes'), '* text=auto eol=lf\n');
   writeFileSync(join(semina, 'codice.txt'), 'uno\n');
   git(semina, 'add', '-A');
   git(semina, 'commit', '-qm', 'agenti vecchi');
