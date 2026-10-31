@@ -800,30 +800,7 @@ export function testoRiallineamentoNonSpedito(sped) {
   ].join('\n');
 }
 
-/**
- * Il valore atteso del lease di `ramo`: la traccia remota, solo se è passata dalla storia locale del ramo (il suo
- * reflog), altrimenti ''. Senza valore il lease si fida di un `git fetch` (verifica del giro 2); --force-if-includes
- * vuole il reflog della traccia remota, che un clone appena nato non ha, e rifiuta sempre (#1776).
- */
-export function leaseAtteso(root, ramo, { exec = execFileSync } = {}) {
-  const git = (args) => String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim();
-  try {
-    const atteso = git(['rev-parse', '-q', '--verify', `refs/remotes/origin/${ramo}^{commit}`]);
-    const passati = [...new Set(git(['log', '-g', '--format=%H', `refs/heads/${ramo}`, '--']).split('\n').map((s) => s.trim()).filter(Boolean))];
-    if (!atteso || !passati.length) return '';
-    if (passati.includes(atteso)) return atteso;
-    // --independent tiene solo i commit che nessun altro della lista contiene: se l'atteso sparisce, un passato lo
-    // contiene. Un rev-list fra rami lontani supererebbe il buffer dell'uscita (decine di migliaia di commit); a
-    // blocchi, perché un reflog di salvataggi automatici sfora la riga di comando di Windows.
-    for (let i = 0; i < passati.length; i += 200) {
-      const indipendenti = git(['merge-base', '--independent', atteso, ...passati.slice(i, i + 200)]).split('\n').map((s) => s.trim());
-      if (!indipendenti.includes(atteso)) return atteso;
-    }
-    return '';
-  } catch (_) {
-    return '';
-  }
-}
+export { leaseAtteso };
 
 /**
  * Committa quello che è rimasto fuori dai commit, prima di spedire. L'hook di
