@@ -525,7 +525,7 @@
       for (const x of G.segretiNelTesto(s)) if (REGOLE_GUARDIANO.has(x.regola)) out.push(x);
     }
     passwordAccanto(s, out);
-    for (const m of s.matchAll(CVV)) out.push({ valore: m[1], regola: 'cvv' });
+    for (const re of [CVV, CVV_DOPO]) for (const m of s.matchAll(re)) out.push({ valore: m[1], regola: 'cvv' });
     for (const re of [CODICE_ACCESSO, CODICE_ACCESSO_EN]) {
       for (const m of s.matchAll(re)) if (!FINE_DI_UN_NUMERO.test(m[0].slice(0, -m[1].length))) out.push({ valore: m[1], regola: 'codice' });
     }
