@@ -146,9 +146,25 @@ sospetto lo richiede.
 
 **Esperimenti dal vivo**, quattro paletti: dichiarato nel taccuino prima di
 partire, con la misura che deciderà; uno alla volta; reversibile con un
-comando; raccontato nel recap del mattino. Niente esperimenti sui modelli che
-fanno il lavoro (provare un modello piccolo dal vivo no; cambiare un
-parametro di cache sì).
+comando; raccontato nel recap del mattino. Niente esperimenti dal vivo sui
+modelli che fanno il lavoro né sui bilanci dei giri di verifica (§ 2) senza il
+sì dell'owner; cambiare un parametro di cache sì.
+
+**Esperimenti non dal vivo.** Rifare un feedback già fuso con altri modelli,
+altro sforzo di ragionamento o altri prompt, solo per confrontare costo e
+qualità: il lavoro non si pubblica. Se il risultato è migliore, le aggiunte
+possono andare su main per la via normale (un feedback, con i suoi controlli).
+Qui il manutentore è libero, anche sui modelli e sui giri di verifica.
+
+**Compiti che non sono feedback.** Il sistema di priorità dei compiti
+ricorrenti è superato: li programma il manutentore. Una revisione chiesta
+dall'owner (cosa si può rendere più veloce), una verifica sistematica di ogni
+feedback aperto (è ancora attuale? già risolto?), un censimento: il manutentore
+decide quando ha senso farli (la revisione della velocità va dopo i problemi di
+velocità già noti, o li ritroverebbe) e li lancia come compiti suoi, non come
+feedback con verifica e controllo di sicurezza: un compito con Opus che guida
+molti Haiku e poi verifica dove serve, come nel censimento del 27/10. Quello
+che il compito trova diventa feedback, priorità o taccuino.
 
 **Primo filone: la cache.** I worker girano già a cinque minuti. Da misurare
 coi dati dei biglietti: quanti turni arrivano dopo un buco sopra i cinque
