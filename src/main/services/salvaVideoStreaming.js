@@ -196,12 +196,14 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
 
   const tentativo = async () => {
     const avanzamento = Y.creaAvanzamento();
+    let pezziLetti = false;
     let motivo = '';
     let dettaglio = '';
     voce.nota(t('streaming_fase_leggo'), { azzera: true });
     const esito = await eseguiYtdlp(programmi.comando, Y.argomenti({
       url, cartella: lavoro, audio, ffmpeg: programmi.ffmpeg, nodo: comandoDiProva() ? '' : process.execPath,
     }), {
+      cartella: lavoro,
       fermato: () => voce.cancelled() || noAlDialogo,
       suEvento: (ev, riga) => {
         if (ev.tipo === 'errore') {
