@@ -6,12 +6,13 @@
   'use strict';
 
   const NOTES = [
-    // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
-    // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
+    // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
+    // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione si scrive { testo, segnalazione: <num> }.
     {
       version: '0.2.255', date: '2026-10-31',
       features: [
         'Sull\'avviso di un sito sospetto «Continua» adesso vale per sempre. Il sito entra fra i «Siti di cui ti fidi» e lì l\'avviso non torna, in nessuna scheda e nemmeno dopo un riavvio. Vale anche per «Apri comunque» quando Filo non trova un indirizzo. L\'elenco sta in Sicurezza, dove togli un sito con un clic, e puoi chiedere a Filo di aggiungerne o toglierne uno. L\'avviso di un sito pericoloso compare sempre.',
+        { testo: 'Le novità di tutte le versioni stanno in una pagina, dalla più recente: la apri dal menu dell\'ingranaggio, dalle Preferenze, da «Tutte le novità» nel riquadro dopo un aggiornamento o chiedendola a Filo. La casella in alto le filtra mentre scrivi, anche se sbagli una lettera, e col tasto destro copi una riga.', segnalazione: 1956 },
       ],
       fixes: [
         'Anche l\'Aiuto su un sito ora sta sopra la pagina: le domande che gli scrivi, le sue risposte e il testo che propone per un campo, finché non lo accetti, il sito non li legge più, nemmeno se li selezioni o li copi.',
