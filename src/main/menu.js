@@ -233,6 +233,7 @@ function template(piattaforma) {
     label: 'Filo',
     submenu: [
       { role: 'about', label: 'Informazioni su Filo' },
+      { label: 'Novità', click: () => apriPagina('filo://novita/novita.html') },
       { type: 'separator' },
       { label: 'Preferenze', click: () => apriPagina('filo://preferences/preferences.html') },
       { label: 'Opzioni', click: () => apriPagina('filo://options/options.html') },
