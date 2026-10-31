@@ -2029,8 +2029,11 @@ class TabManager {
     // doppione da una riapertura dopo. `riserva` per quelle che la pila non tiene (una home vuota).
     const riapribili = [];
     for (const { tab, reason } of toArchive) {
+      ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
+      // Prima della voce: una scheda che Filo seguiva diventa un passaggio, e non si riapre.
+      this._avvisaSorvegliante(tab, 'chiusa');
       const voce = this._ricordaChiusa(tab);
-      if (typeof tab.url === 'string' && tab.url) {
+      if (!tab._passaggio && typeof tab.url === 'string' && tab.url) {
         riapribili.push({
           voce,
           riserva: {
