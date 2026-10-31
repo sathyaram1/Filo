@@ -34,10 +34,13 @@ export function corpoOrdine(numeri, adesso = new Date()) {
   } };
 }
 
+// Nello stesso documento il server tiene anche N, sveglia e account del manutentore (#1961): si scrivono solo i campi propri.
+export const MASCHERA_ORDINE = '?updateMask.fieldPaths=ordine&updateMask.fieldPaths=at';
+
 async function documentoOrdine(metodo, corpo) {
   const { acquireBearer, FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
   const bearer = await acquireBearer();
-  const res = await fetch(`${FIRESTORE_BASE}/config/manutentore`, {
+  const res = await fetch(`${FIRESTORE_BASE}/config/manutentore${metodo === 'PATCH' ? MASCHERA_ORDINE : ''}`, {
     method: metodo, headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, ...(corpo ? { body: JSON.stringify(corpo) } : {}),
   });
   if (metodo === 'GET' && res.status === 404) return { ok: true, numeri: [] };
