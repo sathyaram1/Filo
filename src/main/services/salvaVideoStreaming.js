@@ -18,6 +18,23 @@ const frase = (motivo) => t(`streaming_${MOTIVI.includes(motivo) ? motivo : 'gen
 // Quelli che ripetere non cambia: il video resta com'è.
 const DEFINITIVI = Object.freeze(['eta', 'accesso', 'protetto', 'sito', 'elenco', 'piattaforma']);
 
+// Il video cliccato può avere un indirizzo suo (l'anteprima di una home, il post di una bacheca): vale quello se è
+// dello stesso sito della pagina, perché il programma parla solo col sito che l'utente sta guardando.
+function indirizzoDaSalvare(pagina, delVideo) {
+  const sito = (h) => {
+    const p = String(h || '').toLowerCase().replace(/\.+$/, '').split('.');
+    // «bbc.co.uk», «abc.com.au»: il nome del sito è il terzo pezzo da destra.
+    const n = p.length >= 3 && p[p.length - 1].length === 2 && p[p.length - 2].length <= 3 ? 3 : 2;
+    return p.slice(-n).join('.');
+  };
+  try {
+    const da = new URL(pagina);
+    const v = new URL(delVideo, pagina);
+    if (/^https?:$/.test(v.protocol) && sito(v.hostname) === sito(da.hostname)) return v.href;
+  } catch (_) {}
+  return pagina;
+}
+
 // Una cartella di lavoro sta fra i Download dell'utente col video a metà: non sopravvive al salvataggio. Uscendo da
 // Filo si ferma il programma e la si toglie; quelle di un'uscita brusca le toglie l'avvio dopo, dall'elenco su disco.
 const lavori = new Map();
