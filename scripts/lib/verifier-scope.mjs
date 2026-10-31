@@ -35,12 +35,26 @@ function lineaServer(ramo, sha) {
     : `Il ramo del server ${ramo} è nato con la correzione: nel checkout di filo-security il diff è \`git diff origin/main...${ramo}\`.`];
 }
 
+// Il commit «verificato» di un riallineamento che non fa da confronto (#1968): lo decide chi ha git sotto mano.
+function rigaVerificato(sha, scartato) {
+  if (!sha) return 'Commit che aveva passato la verifica: non comunicato.';
+  if (scartato === 'punta') {
+    return `Commit che aveva passato la verifica: il server ha mandato \`${sha}\`, che è la punta di questo ramo, già riallineata, `
+      + 'non il commit di prima: il diff da lì a `HEAD` è vuoto e non mostra cosa ha cambiato il riallineamento. Il confronto manca: dichiaralo nella critica.';
+  }
+  if (scartato === 'assente') {
+    return `Commit che aveva passato la verifica: \`${sha}\`, ma in questa copia non c'è e da origin non è arrivato. `
+      + `Riprova con \`git fetch origin ${sha}\`, poi il diff da leggere è \`git diff ${sha}..HEAD\`; se non arriva, il confronto manca: dichiaralo nella critica.`;
+  }
+  return `Commit che aveva passato la verifica: \`${sha}\` — il diff da leggere è \`git diff ${sha}..HEAD\`.`;
+}
+
 /**
  * Il perimetro di un giro stretto, scritto come testo in coda al compito: un
  * JSON nel payload si può non guardare, un'istruzione no. '' per il giro
- * pieno. PURA.
+ * pieno. `scartato`: perché il commit verificato non fa da confronto ('punta', 'assente'). PURA.
  */
-export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo) {
+export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo, { scartato = '' } = {}) {
   const p = perimetro && typeof perimetro === 'object' ? perimetro : {};
   if (scope === 'chiusura') {
     const rilievi = Array.isArray(p.rilievi) ? p.rilievi.filter((r) => r && unaRiga(r.text)) : [];
