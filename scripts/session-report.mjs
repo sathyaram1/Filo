@@ -581,6 +581,13 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
           if (Array.isArray(finestreAgent) && Number.isFinite(ms)) finestreAgent.push({ id: bid, inizio: ms, fine: Infinity });
         }
         if (Number.isFinite(ms)) inCorso.set(bid, ms);
+        const input = b.input && typeof b.input === 'object' ? b.input : {};
+        let firma = '';
+        try { firma = JSON.stringify(input); } catch (_) { firma = ''; }
+        const info = { nome, cosa: rigaPulita(typeof input.description === 'string' ? input.description : '', RIGA_COSA_MAX), firma };
+        chiamate.set(bid, info);
+        for (const f of senzaSeguito) f.voce.dopo = rigaDopo(f.chiamata, info);
+        senzaSeguito = [];
       }
     } else if (e.type === 'user') {
       const blocchi = Array.isArray(msg.content) ? msg.content : [];
