@@ -1320,6 +1320,9 @@ async function recordVerifier(id, critiqueText, domande = []) {
   const parsed = VERIFIER_ROUND.parseFindings(critiqueText);
   const conDomande = rilieviConDomanda(parsed.findings, domande);
   if (!conDomande.ok) return { rejected: true, formatRejected: true, message: `critica non registrata: ${conDomande.errore}` };
+  // La pulizia che non dipende dall'esito si fa prima del verdetto: dopo, il commit è una spinta fuori registro (#1555).
+  const primaDelVerdetto = avvio ? proveDaToglierePrimaDelVerdetto(proveScritteDa(avvio, ROOT), parsed.findings) : [];
+  if (primaDelVerdetto.length) return { rejected: true, formatRejected: true, message: testoProvePrimaDelVerdetto(primaDelVerdetto, parsed.findings) };
   const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
 
   // PRIMA il server, POI lo stato locale. L'ordine non è un dettaglio: lo stato
