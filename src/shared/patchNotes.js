@@ -1637,7 +1637,7 @@
     if (!lastSeen || !foto || foto.versione !== String(lastSeen) || !Array.isArray(foto.righe)) return since(lastSeen, current);
     if (cmpVersion(current, lastSeen) <= 0) return [];
     const viste = new Set(foto.righe);
-    const nuove = (righe) => (righe || []).filter((r) => !viste.has(impronta(r)));
+    const nuove = (righe) => (righe || []).filter((r) => !viste.has(impronta(r))).map(testo);
     return NOTES
       .filter((n) => cmpVersion(n.version, current) <= 0)
       .sort((x, y) => cmpVersion(y.version, x.version))
