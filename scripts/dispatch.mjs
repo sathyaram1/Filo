@@ -2493,6 +2493,7 @@ if (isMainModule) {
     // errore d'uso). Il server non è stato chiamato e niente è stato scritto.
     if (s.formatRejected) { console.error(`[dispatch] ${s.message}\nNiente è stato registrato: sistema le righe e rilancia lo stesso comando.`); process.exit(1); }
     if (s.rebase) { console.error(rebaseRejectionText(s.message)); process.exit(1); }
+    if (s.nonSpedito) { console.error(`[dispatch] ${s.message}`); process.exit(1); }
     if (s.altrove) { console.error(lavoroAltroveText(s.message)); process.exit(1); }
     if (s.serverDown) { console.error(serverDownText(s.message)); process.exit(3); }
     console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message));
