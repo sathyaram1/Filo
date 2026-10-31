@@ -2415,7 +2415,7 @@ export function emit(bucket, ctx) {
   // Nei giri stretti la serie non si consegna: inviterebbe alla ricerca larga
   // che il testo del ruolo dice di non rifare.
   const serial = ambito.scope && ambito.scope !== 'pieno'
-    ? perimetroNote(ambito.scope, ctx && ctx.perimetro)
+    ? perimetroNote(ambito.scope, ctx && ctx.perimetro, { scartato })
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
   const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: pieno && pieno.case });
   const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
