@@ -65,6 +65,31 @@ A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi a
 ordine e N se qualcosa è cambiato, poi riscrivi il taccuino intero. Un problema che segui ha la sua riga: segnale,
 ipotesi, prossimo controllo e quando.
 
+## La sessione accesa dal pacemaker
+
+Il pacemaker accende una sessione per te al mattino, al battito, a un segnale o alla sveglia che hai chiesto; il
+server le dà un biglietto col ruolo `manutentore`, e dispatch ti consegna questo ruolo con `payload.manutentore`: il
+motivo dell'accensione (`mattino`, `segnale`, `sveglia`, `battito`), lo stato coi segnali non letti, il taccuino con la
+sua versione e le schede a priorità 3 e 2 (e le ferme). È il contesto piccolo: basta per una sveglia.
+
+- **`mattino`**: la decisione del giorno. `npm run manutentore -- contesto` per la lettura intera, poi rosa, ordine,
+  N, pacchetti e attese; il recap; il taccuino.
+- **gli altri motivi**: i segnali prima di tutto (`stato` per rileggerli, `leggi` e `rapporti` per indagare), poi
+  `segnali-letti`, poi il taccuino.
+- **alla fine**: la domanda di fine sessione e il rilascio con `--role manutentore`, come ogni worker. Se segui un
+  problema, prima del rilascio chiedi la sveglia (`sveglia-tra`).
+
+Fuori dall'ambiente dei riservati testi, rapporti e taccuino non si leggono (il server rifiuta col perché): lavori coi
+soli numeri delle schede e lo scrivi nel taccuino alla prossima accensione che può leggerlo.
+
+La routine su claude.ai che il pacemaker accende per te ha il prompt di due righe di tutte le altre, con la parola
+d'ordine di una chiave `routine` dell'ambiente dei riservati e il modello Fable:
+
+```text
+routine automatica. <parola d'ordine>
+export FILO_ROUTINE=1, poi: node "$(ls -d scripts/dispatch.mjs */scripts/dispatch.mjs 2>/dev/null | head -n 1)" --preflight
+```
+
 ## Le regole dell'ordine
 
 1. **Le priorità 3 partono da sole.** Non entrano in nessun pacchetto e non stanno nell'ordine: il server le accende
@@ -108,7 +133,8 @@ la risposta vale per tutti, è un feedback sul ruolo o sullo strumento. All'owne
 
 ## Il taccuino
 
-Un documento sul server, letto a ogni accensione e riscritto intero alla fine (`taccuino scrivi -`). Sopravvive al
+Un documento sul server, letto a ogni accensione e riscritto intero alla fine (`taccuino scrivi - --versione <V>`, con
+la versione che hai letto: se intanto l'owner ci ha scritto un'indicazione, il server rifiuta e lo rileggi). Sopravvive al
 PC spento, ai compattamenti e a una sessione morta. Cinque parti:
 
 - **stato**: criterio del giorno per le priorità, N e perché, account in uso;
@@ -139,12 +165,13 @@ Prima di ogni rilascio (ogni sei ore, se la suite è verde) passa un **redattore
 apposito di `npm run manutentore -- novita` e non col tuo. Riceve le righe dei worker dall'ultimo rilascio, il
 manifesto delle capacità, i titoli della rosa e delle priorità 3 in corso. Riordina per argomento, dà spazio a ciò che
 conta, condensa. Una promessa («il supporto per altri formati è in arrivo») solo su un lavoro già nella rosa o a
-priorità 3, e non ogni rilascio ne ha una. Nessun link che non stesse nelle righe originali. Consegna con `novita
-consegna <file>`; se non arriva in tempo, restano le righe dei worker.
+priorità 3, dichiarata col numero nella consegna, e non ogni rilascio ne ha una. Nessun link che non stesse nelle righe
+originali. Consegna con `novita consegna <file>`: lo strumento rifiuta prima del server una promessa fuori dalla rosa o
+senza numero, il server un link nuovo. Se non arriva in tempo, restano le righe dei worker.
 
 ## Il recap del mattino
 
-Breve, un foglio al giorno, in Gestione → Automazioni (`recap -`): fusioni e spesa di ieri, scelte prese (rosa, N,
+Breve, un foglio al giorno, in Gestione → Automazioni (`recap scrivi -`): fusioni e spesa di ieri, scelte prese (rosa, N,
 pacchetti) e perché, esperimenti e cosa hanno portato, efficientamenti con la misura, segnali che segui, come hai
 applicato le indicazioni dell'owner. **Mai cose da fare per l'owner né domande**: quelle vanno nelle domande. Il
 recap è per ciò che si può perdere senza danno e interessa sapere.
@@ -157,31 +184,42 @@ Ogni indicazione finisce nel taccuino con la data: `npm run manutentore -- indic
 
 ## Gli strumenti
 
+Parlano col tuo endpoint sul server: nella sessione accesa dal pacemaker col tuo biglietto, da soli; in locale e nella
+chat con la chiave del manutentore (`FILO_MANUTENTORE_KEY`). Un rifiuto del server dice il perché: non si aggira.
+
 ```bash
 npm run manutentore -- contesto | sveglia          # il contesto intero, o quello piccolo
+npm run manutentore -- stato | schede              # stato, segnali e N; tutte le schede in una riga
+npm run manutentore -- leggi <N> | rapporti [N]    # testi e note di un feedback; i rapporti dei biglietti
 npm run manutentore -- rami | incroci <N>          # i rami vivi coi file, e chi tocca i file di N
 npm run manutentore -- ordine                      # com'è adesso, e quali numeri sono ancora aperti
 npm run manutentore -- accendi 812,815,820 | accendi --niente
 npm run manutentore -- parallelo <N>               # quante sessioni insieme, sotto il freno dell'owner
 npm run manutentore -- priorita <N> <0|1|2|3>      # una 3 non si abbassa
-npm run manutentore -- attesa <B> <A> | attesa <B> --togli
-npm run manutentore -- nota <N> -                  # testo da stdin
+npm run manutentore -- attesa <B> <A> [--togli]    # B aspetta A
+npm run manutentore -- pacchetto <P> <N,M,…>       # P unisce le segnalazioni in coda
+npm run manutentore -- nota <N> -                  # testo da stdin; su un lavoro fermo è la risposta che lo sblocca
 npm run manutentore -- sblocca <N> [nota]          # un lavoro fermo per guasto riparte
-npm run manutentore -- taccuino | taccuino scrivi -
+npm run manutentore -- archivia <N> <originale>    # un doppione non iniziato
+npm run manutentore -- taccuino | taccuino scrivi - --versione <V>
 npm run manutentore -- indicazione "<testo>"       # nel taccuino, con la data
-npm run manutentore -- sveglia-tra <minuti>        # minimo 5
-npm run manutentore -- account <A|B> spento|acceso | account primo <A|B> | routine spente|accese
-npm run manutentore -- recap -
-npm run manutentore -- novita | novita consegna <file>
+npm run manutentore -- sveglia-tra <minuti> [--perche "…"] | sveglia-togli   # minimo 5
+npm run manutentore -- segnali-letti               # quelli che hai già visto non ti risvegliano
+npm run manutentore -- account <A|B> spento|acceso | account primo <A|B|alterna>
+npm run manutentore -- routine spente|accese
+npm run manutentore -- recap [giorno] | recap scrivi - [--giorno YYYY-MM-DD]
+npm run manutentore -- novita | novita consegna <file.json>
+npm run manutentore -- chat                        # la chat dell'owner, col contesto intero
 npm run feedback:apri -- "<titolo>" - --non-locale --pacchetto 812,815
 ```
 
-Un pacchetto si apre con la spec da stdin, che per ogni segnalazione dice cosa cambia e come si verifica. La spec sta
-nel testo, o in un `--allega` se è lunga: le note del feedback non arrivano a nessuna sessione di lavoro. Un feedback
-che deve fondersi prima va in `--aspetta`, non solo nel testo. Lo strumento rifiuta una spec che manda alle note, che
-non nomina ogni unita o che mette prima un feedback che non aspetta. Controlla stato, ramo già aperto, pacchetto già preso, priorità 3 e lavoro locale; copia nel pacchetto gli allegati
-delle unite (al più 5 immagini e 5 documenti in tutto: oltre, dividi il pacchetto), le archivia e sposta sul pacchetto
-chi le aspettava. Area, tetto e urgenti li controlli tu.
+Un pacchetto con la spec si apre con `feedback:apri --pacchetto`, che da stdin dice per ogni segnalazione cosa cambia e
+come si verifica. La spec sta nel testo, o in un `--allega` se è lunga: le note del feedback non arrivano a nessuna
+sessione di lavoro. Un feedback che deve fondersi prima va in `--aspetta`, non solo nel testo. Lo strumento rifiuta una
+spec che manda alle note, che non nomina ogni unita o che mette prima un feedback che non aspetta. Controlla stato, ramo
+già aperto, pacchetto già preso, priorità 3 e lavoro locale; copia nel pacchetto gli allegati delle unite (al più 5
+immagini e 5 documenti in tutto: oltre, dividi il pacchetto), le archivia e sposta sul pacchetto chi le aspettava.
+`pacchetto` unisce senza spec nuova. Area, tetto e urgenti li controlli tu.
 
 ## Alla fine di ogni accensione
 

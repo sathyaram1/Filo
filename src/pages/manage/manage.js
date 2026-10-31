@@ -62,6 +62,8 @@
   const mgAccountA        = document.getElementById('mgAccountA');
   const mgAccountB        = document.getElementById('mgAccountB');
   const mgAccountsMsg     = document.getElementById('mgAccountsMsg');
+  const mgManutentoreAcceso = document.getElementById('mgManutentoreAcceso');
+  const mgManutentoreMsg  = document.getElementById('mgManutentoreMsg');
   const mgAccountsWarn    = document.getElementById('mgAccountsWarn');
   const mgPriorityWarn    = document.getElementById('mgPriorityWarn');
   // Modello e sforzo per fase: le tendine le crea buildRoleModels, una per `${ruolo}.${campo}`.
@@ -666,7 +668,7 @@
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
       mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
-      mgAccountA, mgAccountB, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
+      mgAccountA, mgAccountB, mgManutentoreAcceso, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
       ...Object.values(mgJudgeCampi).flatMap(([input, salva, rimetti]) => [input, salva, rimetti])]) {
       if (el) el.disabled = !isAdmin;
     }
@@ -887,7 +889,7 @@
   // Righe che dicono di non aver riletto il resto, col testo che resta quando
   // un documento intero arriva: da lì in poi l'avviso sarebbe falso (#675).
   const avvisiLettura = new Map();
-  const righeSessions = [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']]];
+  const righeSessions = [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']], [mgManutentoreMsg, ['manutentoreAcceso']]];
   // Ultimo esito di ogni riga; l'avviso «non letto» non è un esito: lo decide mostraSessionsMsg.
   const esitiSessions = new Map();
   const sceltePendenti = () => Object.assign({}, ...sessionsInAttesa.map((s) => s.valori));
@@ -947,6 +949,7 @@
     for (const r of mgPriorityRadios) r.checked = noto('priorityAccount') && r.value === vista.priorityAccount;
     if (mgAccountA) mgAccountA.checked = !vista.accountAOff;
     if (mgAccountB) mgAccountB.checked = !vista.accountBOff;
+    if (mgManutentoreAcceso) mgManutentoreAcceso.checked = noto('manutentoreAcceso') && vista.manutentoreAcceso;
     // Esclusi tutti e due non parte niente; escluso il solo prioritario si
     // lavora sull'altro. Due stati che a guardare gli interruttori non si
     // capiscono, quindi si scrivono.
@@ -1058,6 +1061,10 @@
       if (!radio.checked) return;
       saveSessions({ priorityAccount: radio.value }, mgPriorityAccountMsg);
     });
+  }
+
+  if (mgManutentoreAcceso) {
+    mgManutentoreAcceso.addEventListener('change', () => saveSessions({ manutentoreAcceso: mgManutentoreAcceso.checked }, mgManutentoreMsg));
   }
 
   for (const [el, campo] of [[mgAccountA, 'accountAOff'], [mgAccountB, 'accountBOff']]) {

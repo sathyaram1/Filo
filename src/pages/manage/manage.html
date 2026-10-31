@@ -1767,6 +1767,24 @@
     .mg-auto-block-desc {
       font-size: 12px; color: var(--sn-muted); margin: 8px 0 0;
     }
+    /* Il recap del manutentore: un foglio da leggere, a tutta larghezza sopra le colonne; i giorni si sfogliano. */
+    .mg-recap[hidden] { display: none; }
+    .mg-recap-testa { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .mg-recap-giorni { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+    .mg-recap-giorno { font-size: 13px; color: var(--sn-muted); min-width: 9em; text-align: center; font-variant-numeric: tabular-nums; }
+    .sn-page .mg-recap-freccia {
+      width: 28px; height: 28px; padding: 0; border-radius: 8px; border: 1px solid transparent;
+      background: transparent; color: var(--sn-fg); font-size: 18px; line-height: 1; cursor: pointer;
+      transition: background calc(140ms * var(--sn-motion, 1)) ease, border-color calc(140ms * var(--sn-motion, 1)) ease;
+    }
+    .sn-page .mg-recap-freccia:hover:not(:disabled) { background: rgba(var(--sn-accent-rgb), 0.12); border-color: var(--sn-border); }
+    .sn-page .mg-recap-freccia:disabled { opacity: 0.35; cursor: default; }
+    .mg-recap-testo {
+      margin-top: 12px; font-size: 13.5px; line-height: 1.55; color: var(--sn-fg);
+      white-space: pre-wrap; overflow-wrap: anywhere; max-height: 420px; overflow: auto;
+    }
+    .mg-recap-testo:empty { display: none; }
+    .mg-man-n:empty { display: none; }
     /* `.sn-page` davanti: le regole generiche di pages.css su label e input vincerebbero per specificità. */
     .sn-page .mg-auto-field-label {
       display: block; margin: 0; font-size: 14px; font-weight: 600; color: var(--sn-fg);
@@ -2511,6 +2529,20 @@
 
         <div class="mg-auto-main">
           <h2>Automazioni</h2>
+          <!-- Il recap del manutentore (SPEC-MANUTENTORE § 9), un foglio al giorno: lo legge manageManutentore.js. È testo
+             suo, scritto leggendo testo di chiunque: si mostra come testo, mai come markup. -->
+          <section class="mg-auto-block mg-recap" id="mgRecap" hidden>
+            <div class="mg-recap-testa">
+              <span class="mg-auto-field-label" id="mgRecapTitolo">Recap del manutentore</span>
+              <div class="mg-recap-giorni" role="group" aria-label="Giorno del recap">
+                <button type="button" class="mg-recap-freccia" id="mgRecapPrima" title="Il giorno prima" aria-label="Il giorno prima">‹</button>
+                <span class="mg-recap-giorno" id="mgRecapGiorno" aria-live="polite"></span>
+                <button type="button" class="mg-recap-freccia" id="mgRecapDopo" title="Il giorno dopo" aria-label="Il giorno dopo">›</button>
+              </div>
+            </div>
+            <div class="mg-recap-testo" id="mgRecapTesto" role="document" aria-labelledby="mgRecapTitolo"></div>
+            <p class="mg-auto-block-desc" id="mgRecapMsg" role="status"></p>
+          </section>
           <div class="mg-auto-cols">
             <div class="mg-auto-col">
               <!-- Interruttore master delle routine autonome. -->
@@ -2571,13 +2603,23 @@
                 <div class="mg-auto-pause" id="mgServerPausa" role="status" hidden></div>
               </section>
 
-              <!-- Le tre scelte su COME partono le sessioni. Restano manovrabili anche a routine spente: escludere un
-                 account è una cosa che si decide PRIMA di riaccendere. -->
+              <!-- Il manutentore acceso dal pacemaker (SPEC-MANUTENTORE § 4): spento, l'ordine resta quello che ha scritto. -->
+              <section class="mg-auto-block" id="mgManutentoreBlock">
+                <label class="mg-switch" id="mgManutentoreSwitch" title="Il pacemaker lo accende ogni mattina, al battito e ai segnali: sceglie cosa lavorare, quanto in parallelo, e scrive il recap">
+                  <span class="mg-switch-text">Manutentore</span>
+                  <input type="checkbox" id="mgManutentoreAcceso" />
+                  <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                </label>
+                <span class="mg-action-msg" id="mgManutentoreMsg" role="status"></span>
+              </section>
+
+              <!-- Le tre scelte su COME partono le sessioni, manovrabili anche a routine spente. Il freno sta sopra la N
+                 del manutentore (SPEC-MANUTENTORE § 2), che scrive accanto manageManutentore.js. -->
               <section class="mg-auto-block" id="mgMaxSessionsBlock">
-                <label class="mg-auto-field-label" for="mgMaxSessions">Sessioni in parallelo</label>
+                <label class="mg-auto-field-label" for="mgMaxSessions">Freno d'emergenza</label>
                 <p class="mg-auto-block-desc">
-                  Quante sessioni possono lavorare insieme. Più sessioni svuotano la
-                  coda prima e consumano crediti più in fretta.
+                  Il massimo di sessioni insieme. Quante ne lavorano lo decide il
+                  manutentore, mai oltre questo numero.
                 </p>
                 <div class="mg-auto-field-row">
                   <input type="number" id="mgMaxSessions" class="mg-auto-number"
@@ -2585,6 +2627,8 @@
                   <button type="button" class="sn-btn" id="mgMaxSessionsSave">Salva</button>
                   <span class="mg-action-msg" id="mgMaxSessionsMsg" role="status"></span>
                 </div>
+                <p class="mg-auto-block-desc mg-man-n" id="mgManutentoreN" role="status"
+                  title="Le sessioni che il manutentore fa lavorare insieme: le priorità 3 partono anche oltre"></p>
               </section>
 
               <section class="mg-auto-block" id="mgPriorityAccountBlock">
@@ -3186,6 +3230,7 @@
   <script src="manageRedteam.js"></script>
   <script src="manageInPausa.js"></script>
   <script src="manageCrediti.js"></script>
+  <script src="manageManutentore.js"></script>
   <script src="manageUtenti.js"></script>
   <script src="manageContatori.js"></script>
   <script src="managePredefiniti.js"></script>

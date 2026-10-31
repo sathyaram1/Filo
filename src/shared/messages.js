@@ -679,19 +679,23 @@
     AUTOMATION_CAPS_GET: 'automation_caps_get',    // → { ok, cap3, cap2, cap1, cap0, fixInstructions, giroStretto } | { ok:false, error }
     AUTOMATION_CAPS_SET: 'automation_caps_set',    // { cap3?, cap2?, cap1?, cap0?, fixInstructions?, giroStretto? } → come GET | { ok:false, error }
     // Come partono le sessioni delle routine (doc config/routines):
-    //   maxSessions      quante sessioni lavorano insieme (intero 1–20;
-    //                    campo assente = 1);
+    //   maxSessions      il freno d'emergenza: il massimo di sessioni insieme
+    //                    (intero 1–20; campo assente = 20), sopra la N del manutentore;
     //   priorityAccount  da quale account si parte sempre finché regge:
     //                    'A', 'B', oppure '' = si alternano (campo assente);
     //   accountAOff / accountBOff  account escluso: da lì non parte nessuna
     //                    sessione nuova (campo assente = in uso).
     // Le legge il SERVER quando accende le sessioni. Owner-only.
-    AUTOMATION_SESSIONS_GET: 'automation_sessions_get', // → { ok, maxSessions, priorityAccount, accountAOff, accountBOff } | { ok:false, error }
-    AUTOMATION_SESSIONS_SET: 'automation_sessions_set', // { maxSessions?, priorityAccount?, accountAOff?, accountBOff? } → come sopra | { ok:false, error }
+    //   manutentoreAcceso il pacemaker accende il manutentore (campo assente = spento).
+    AUTOMATION_SESSIONS_GET: 'automation_sessions_get', // → { ok, maxSessions, priorityAccount, accountAOff, accountBOff, manutentoreAcceso } | { ok:false, error }
+    AUTOMATION_SESSIONS_SET: 'automation_sessions_set', // { maxSessions?, priorityAccount?, accountAOff?, accountBOff?, manutentoreAcceso? } → come sopra | { ok:false, error }
     // I numeri dell'owner sui crediti delle routine (ownerCrediti sul server, regole in src/shared/routineCrediti.js):
     // riserva di A, tetto di B, taratura, rinnovi; `null` toglie un numero. Lo stato dice per account percentuale,
     // limite, passo del giorno e rinnovo. Owner-only.
     // `freni`: 'attivi', o 'numeri_assenti' (senza riserva di A né tetto di B i crediti non frenano niente).
+    // Il recap del manutentore, un foglio al giorno dal più nuovo, e la sua N sotto il freno (ownerManutentore,
+    // SPEC-MANUTENTORE § 9). Sola lettura, owner-only. `stato: null` = N non letta (il recap resta).
+    MANUTENTORE_RECAP_GET: 'manutentore_recap_get', // → { ok, recap: [{ giorno, testo, at }], stato: { parallelismo, parallelismoEffettivo, freno } | null } | { ok:false, error }
     ROUTINE_CREDITI_GET: 'routine_crediti_get', // → { ok, numeri, accounts: { A, B }, freni } | { ok:false, error }
     ROUTINE_CREDITI_SET: 'routine_crediti_set', // { riservaA?, tettoB?, usdPer100?, rinnovoA?, rinnovoB? } → { ok, numeri, accounts?, freni? } | { ok:false, error }
     // Le pause in corso di A, B e della routine server, col motivo del rifiuto (#996): sola lettura, dal server

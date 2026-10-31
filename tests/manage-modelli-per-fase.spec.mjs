@@ -133,8 +133,8 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
   let page = await apri(openTab);
 
   // Tutte le fasi, ognuna con le sue due tendine; quello che c'è già sul server si vede.
-  await expect(page.locator('#mgRoleModels select')).toHaveCount(8);
-  await expect(page.locator('#mgRoleModels .mg-role-name')).toHaveText(['Primo lavoro', 'Verifica', 'Correzione', 'Controllo cieco']);
+  await expect(page.locator('#mgRoleModels select')).toHaveCount(10);
+  await expect(page.locator('#mgRoleModels .mg-role-name')).toHaveText(['Primo lavoro', 'Verifica', 'Correzione', 'Controllo cieco', 'Manutentore']);
   await expect(tendina(page, 'secaudit', 'effort').locator('.sn-select-value')).toHaveText('high');
   await expect(tendina(page, 'verifier', 'model').locator('.sn-select-value')).toHaveText('Definizione dell\'agente');
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('');
