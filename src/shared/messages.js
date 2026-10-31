@@ -134,6 +134,9 @@
     GET_UPDATE_RECAP: 'get_update_recap',
     // L'utente ha chiuso il recap: salva app.getVersion() come ultima vista, con la fotografia delle sue novità.
     MARK_UPDATE_SEEN: 'mark_update_seen',
+    // Pagina Novità (#1956): tutte le versioni uscite fino a quella installata. Solo da Filo.
+    // { } → { ok, current, versioni:[{ version, date, features:[{ testo, segnalazione }], fixes }] }.
+    NOVITA_ELENCO: 'novita_elenco',
     // Feedback dell'utente passati a `done` da quando non guardava (C5): il main
     // cerca su Firestore i feedback inviati da questo client, accredita la
     // ricompensa per priorità (50/100/200/300) una volta sola per feedback, e
