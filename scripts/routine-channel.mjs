@@ -806,19 +806,16 @@ export function testoRiallineamentoNonSpedito(sped) {
  * vuole il reflog della traccia remota, che un clone appena nato non ha, e rifiuta sempre (#1776).
  */
 export function leaseAtteso(root, ramo, { exec = execFileSync } = {}) {
-  const git = (args, input) => String(exec('git', args, {
-    cwd: root, encoding: 'utf8', input, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
-  }) || '').trim();
-  const righe = (testo) => testo.split('\n').map((s) => s.trim()).filter(Boolean);
+  const git = (args) => String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim();
   try {
     const atteso = git(['rev-parse', '-q', '--verify', `refs/remotes/origin/${ramo}^{commit}`]);
-    const passati = righe(git(['log', '-g', '--format=%H', `refs/heads/${ramo}`, '--']));
+    const passati = [...new Set(git(['log', '-g', '--format=%H', `refs/heads/${ramo}`, '--']).split('\n').map((s) => s.trim()).filter(Boolean))];
     if (!atteso || !passati.length) return '';
     if (passati.includes(atteso)) return atteso;
-    // Fermarsi ai genitori dell'atteso tiene corto il cammino: se un passato lo contiene, lo si incontra prima.
-    const genitori = righe(git(['rev-parse', `${atteso}^@`])).map((s) => `^${s}`);
-    const raggiunti = righe(git(['rev-list', '--stdin', '--ignore-missing'], `${[...passati, ...genitori].join('\n')}\n`));
-    return raggiunti.includes(atteso) ? atteso : '';
+    // --independent tiene solo i commit che nessun altro della lista contiene: se l'atteso sparisce, un passato lo
+    // contiene. Un rev-list fra rami lontani supererebbe il buffer dell'uscita (decine di migliaia di commit).
+    const indipendenti = git(['merge-base', '--independent', atteso, ...passati]).split('\n').map((s) => s.trim());
+    return indipendenti.includes(atteso) ? '' : atteso;
   } catch (_) {
     return '';
   }
