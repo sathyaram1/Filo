@@ -817,10 +817,15 @@ export function sommaSottoAgente(rep, sub) {
   rep.longestToolS = Math.max(rep.longestToolS, Number(sub.longestToolS) || 0);
   for (const m of Array.isArray(sub.models) ? sub.models : []) if (!rep.models.includes(m)) rep.models.push(m);
   for (const n of Array.isArray(sub.notes) ? sub.notes : []) {
+    // Le note sui tagli degli elenchi si rifanno qui sotto sui conti sommati.
+    if (/^(strumenti falliti|attese oltre)/.test(n)) continue;
     const nota = `sotto-agente: ${n}`;
     if (!rep.notes.includes(nota)) rep.notes.push(nota);
   }
-  return rep;
+  rep.falliti = [...(rep.falliti || []), ...(Array.isArray(sub.falliti) ? sub.falliti : [])];
+  rep.attese = [...(rep.attese || []), ...(Array.isArray(sub.attese) ? sub.attese : [])];
+  rep.atteseOltre30 = (Number(rep.atteseOltre30) || 0) + (Number(sub.atteseOltre30) || 0);
+  return stringiElenchi(rep);
 }
 
 /**
