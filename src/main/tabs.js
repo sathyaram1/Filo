@@ -2082,13 +2082,17 @@ class TabManager {
     const chiave = (u) => (T ? T.normalizeForDedup(u) : String(u || ''));
     const aperte = new Set(this.tabs.map((t) => chiave(t.url)));
     let riaperte = 0;
-    for (const s of p.schede) {
-      if (aperte.has(chiave(s.url))) continue;
-      const nuova = this.openTab(s.url, { activate: false, restoreScrollPct: s.scrollPct, origine: { tipo: 'filo' } });
+    const pila = this._pilaChiuse();
+    for (const { voce, riserva } of p.schede) {
+      if (aperte.has(chiave(riserva.url))) continue;
+      // Già riaperta da un'altra porta (Ctrl/Cmd+Shift+T, il filo della home) e poi richiusa: non torna due volte.
+      if (voce && voce.riaperta) continue;
+      const presa = voce ? pila.riprendi(voce) : null;
+      if (presa && presa.voceArchivio) this._contaTornata(presa.voceArchivio);
+      const nuova = await this.riapri(presa || riserva, { activate: false });
       if (!nuova) continue;
       riaperte += 1;
-      aperte.add(chiave(s.url));
-      if (s.proxy) { try { await this.setTabProxy(nuova, s.proxy.country, { tier: s.proxy.tier || undefined }); } catch (_) {} }
+      aperte.add(chiave(riserva.url));
     }
     // Come il giro che le ha chiuse: un ordine scelto a mano non si rimescola.
     const riordina = p.riordina !== false && !(this._spostataAManoAlle >= p.alle);
