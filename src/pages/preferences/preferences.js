@@ -1269,6 +1269,9 @@
   function apriQuaderno() {
     try { chrome.tabs.create({ url: 'filo://quaderno/quaderno.html' }); } catch (_) {}
   }
+  function apriNovita() {
+    try { chrome.tabs.create({ url: 'filo://novita/novita.html' }); } catch (_) {}
+  }
 
   // ── Ricerca nei documenti (#947) ─────────────────────────────────────────
   // L'elenco delle cartelle si salva a ogni gesto, fuori dai campi in sospeso. Le tre di sistema tolte restano
@@ -1824,6 +1827,7 @@
     } catch (_) {}
     load();
     $('apriQuaderno').addEventListener('click', apriQuaderno);
+    $('apriNovita').addEventListener('click', apriNovita);
     $('documentiAggiungi').addEventListener('click', aggiungiCartella);
     window.addEventListener('keydown', tastoRegistrato, true);
     window.addEventListener('keyup', (e) => {

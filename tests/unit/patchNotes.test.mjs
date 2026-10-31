@@ -37,7 +37,8 @@ function problemiInCima(manifesto, notes) {
       : `. Un salto di versione si dichiara nel manifesto, col campo «${CAMPO}»`)];
 }
 
-const righe = (n) => [...(n.features || []), ...(n.fixes || [])];
+// Una riga può essere { testo, segnalazione }: le guardie confrontano il testo.
+const righe = (n) => [...(n.features || []), ...(n.fixes || [])].map(PN.testo);
 const righeDi = (notes) => notes.flatMap(righe);
 
 // Il registro com'era a un commit: serve la storia del repo, che in un clone parziale può mancare.

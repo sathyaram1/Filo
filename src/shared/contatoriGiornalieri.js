@@ -649,7 +649,7 @@
     'filo://downloads/': 'downloads-list', 'filo://board/': 'board', 'filo://redteam/': 'red-team',
     'filo://home/': 'open-for-later', 'filo://credits/': 'credits', 'filo://quaderno/': 'filo-memory',
     'filo://decks/': 'deck-builder', 'filo://security/': 'security', 'filo://transparency/': 'transparency-docs',
-    'filo://spellcheck/': 'spellcheck-manage',
+    'filo://spellcheck/': 'spellcheck-manage', 'filo://novita/': 'patch-notes',
   });
   function azioneDiPagina(url) {
     const u = String(url || '');
