@@ -101,7 +101,7 @@ function crea({ tetto = TETTO } = {}) {
   }
 
   return {
-    ricorda, archiviata, prendi, segnaRiaperta, dimentica, dallArchivio,
+    ricorda, archiviata, prendi, riprendi, segnaRiaperta, dimentica, dallArchivio,
     get quante() { return pila.length; },
   };
 }
