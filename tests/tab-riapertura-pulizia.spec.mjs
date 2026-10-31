@@ -154,6 +154,10 @@ test('l’avviso della riapertura che ha chiuso delle schede le riapre con un cl
     await vista.screenshot({ path: join(SHOTS, 'riapertura-pulizia-riapri.png') });
     await riapri.click();
     await expect.poll(() => titoliTest(shell), { timeout: 15_000 }).toContain('Vecchia');
+    // Riportata dall'avviso è riaperta come dalla scorciatoia (e dalla voce di menu): riaprire l'ultima chiusa non la duplica.
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.riapriChiusa());
+    await new Promise((r) => setTimeout(r, 3000));
+    expect((await titoliTest(shell)).filter((t) => t === 'Vecchia'), 'la scheda riportata da «Riapri» torna una seconda volta').toHaveLength(1);
     await chiudiApp(app);
   } finally {
     server.close();
