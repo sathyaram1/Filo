@@ -118,3 +118,10 @@ test('una parte vera delle righe uscite si apre sulla sua segnalazione', () => {
   const collegate = righe.filter((r) => r.segnalazione);
   assert.ok(collegate.length >= Math.ceil(righe.length / 10), `${collegate.length} righe collegate su ${righe.length}`);
 });
+
+// Le righe nuove prendono il numero solo se chi scrive il changelog lo sa (decisione D-252 sul #1956).
+test('le istruzioni comuni, dove spiegano la riga di changelog, chiedono il numero della segnalazione', () => {
+  const consegna = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8').split('## Consegna')[1].split('\n## ')[0];
+  const punto = consegna.slice(consegna.indexOf('**Riga di changelog**'));
+  assert.match(punto.split('\n\n')[0], /segnalazione: <num>/);
+});
