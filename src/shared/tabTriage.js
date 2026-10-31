@@ -109,18 +109,17 @@
     if (n) {
       const una = n === 1;
       if (giudizioMancato) {
-        return `${ordineTuo ? '' : 'Schede riordinate e '}${n} ${una ? 'doppione chiuso, lo' : 'doppioni chiusi, li'} ritrovi nel filo della home. `
+        return `${ordineTuo ? 'Schede lasciate come le hai messe e ' : 'Schede riordinate e '}${n} ${una ? 'doppione chiuso, lo' : 'doppioni chiusi, li'} ritrovi nel filo della home. `
           + 'Le altre non sono riuscito a valutarle';
       }
-      if (ordineTuo) return `${n} ${una ? 'scheda chiusa. La' : 'schede chiuse. Le'} ritrovi nel filo della home`;
-      return `Schede riordinate, ${n} ${una ? 'chiusa. La' : 'chiuse. Le'} ritrovi nel filo della home`;
+      return `${ordineTuo ? 'Schede lasciate come le hai messe' : 'Schede riordinate'}, ${n} ${una ? 'chiusa. La' : 'chiuse. Le'} ritrovi nel filo della home`;
     }
     if (giudizioMancato) {
       return riordinate
         ? 'Schede riordinate, ma non sono riuscito a valutare quali chiudere'
         : 'Non sono riuscito a valutare quali schede chiudere';
     }
-    if (ordineTuo) return 'Nessuna scheda da chiudere';
+    if (ordineTuo) return 'Schede lasciate come le hai messe, nessuna da chiudere';
     return riordinate ? 'Schede riordinate, nessuna da chiudere' : 'Schede già in ordine, nessuna da chiudere';
   }
 

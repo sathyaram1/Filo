@@ -198,6 +198,34 @@ test.describe('la riapertura vera', () => {
       .filter((t) => /\.test:/.test(t.url || '')).map((t) => t.title));
     expect(titoli).toEqual(['Rosso', 'Blu']);
   });
+
+  test('una scheda spostata a mano mentre la riapertura finisce resta dove l’ha messa l’utente (#349)', async ({ app, shell, testServer }) => {
+    const su = (host, html) => testServer.html(html).replace('127.0.0.1', host);
+    const nome = { blu: 'Blu', verde: 'Verde', rosso: 'Rosso' };
+    const barra = async () => (await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs
+      .map((t) => ({ id: t.id, url: t.url || '' }))))
+      .filter((t) => /\.test:/.test(t.url)).map((t) => ({ id: t.id, nome: nome[new URL(t.url).hostname.split('.')[0]] }));
+    await app.evaluate(async ({ BrowserWindow }, urls) => {
+      await globalThis.SN_STORAGE.updateSettings({ autoArchive: { enabled: true, onClose: true, onIdle: false, idleHours: 6 } });
+      // Il modello tiene tutto, col tempo di una risposta vera.
+      globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => {
+        await new Promise((r) => setTimeout(r, 1500));
+        return { decisions: tabs.map((_, i) => ({ i, action: 'keep', reason: 'test' })) };
+      };
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+      await globalThis.SN_STORAGE.setRaw(tm._sessionKey(), { tabs: urls, colors: ['rgb(40, 80, 200)', 'rgb(40, 200, 80)', 'rgb(200, 40, 40)'], activeIndex: 0 });
+      await tm.restoreSession();
+    }, [su('blu.test', pagina('Blu', 'rgb(40,80,200)', 'uno')), su('verde.test', pagina('Verde', 'rgb(40,200,80)', 'due')), su('rosso.test', pagina('Rosso', 'rgb(200,40,40)', 'tre'))]);
+
+    const prima = await barra();
+    expect(prima.map((t) => t.nome)).toEqual(['Blu', 'Verde', 'Rosso']);
+    await shell.evaluate(async (id) => window.filoShell.tabs.move(id, (await window.filoShell.tabs.snapshot()).tabs.length - 1),
+      prima.find((t) => t.nome === 'Verde').id);
+    await expect.poll(async () => (await barra()).map((t) => t.nome)).toEqual(['Blu', 'Rosso', 'Verde']);
+
+    await expect.poll(() => avvisi(shell), { timeout: 40_000 }).toContain('Schede lasciate come le hai messe, nessuna da chiudere');
+    expect((await barra()).map((t) => t.nome)).toEqual(['Blu', 'Rosso', 'Verde']);
+  });
 });
 
 test('la sessione salva e ripristina il colore identità delle schede', async ({ app, shell, openTab, testServer }) => {
