@@ -418,15 +418,18 @@ module.exports = function register(on, ctx) {
   on(MSG.DOWNLOAD_MEDIA, handleDownload);
 
   // #1488 — un video in streaming non ha un file: lo salva yt-dlp dalla pagina. L'indirizzo è quello del riquadro
-  // che chiede, mai uno scritto nel messaggio; una build da negozio non ha la funzione (funzioniBuild.js).
+  // che chiede, o quello del video cliccato se è dello stesso sito; una build da negozio non ha la funzione
+  // (funzioniBuild.js).
   const Streaming = require('../salvaVideoStreaming');
+  setImmediate(() => { try { Streaming.pulisciAvanzi(); } catch (_) {} });
   on(MSG.SAVE_STREAMING_VIDEO, async (msg, sender) => {
     if (!require('../funzioniBuild').salvaVideoInStreaming) return { ok: false, spento: true };
     const wc = sender && sender.wc;
     if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
-    let url = '';
-    try { url = String((sender.frame && sender.frame.url) || sender.url || ''); } catch (_) { url = String(sender.url || ''); }
-    if (!/^https?:\/\//i.test(url)) return { ok: false, motivo: 'sito', frase: Streaming.frase('sito') };
+    let pagina = '';
+    try { pagina = String((sender.frame && sender.frame.url) || sender.url || ''); } catch (_) { pagina = String(sender.url || ''); }
+    if (!/^https?:\/\//i.test(pagina)) return { ok: false, motivo: 'sito', frase: Streaming.frase('sito') };
+    const url = Streaming.indirizzoDaSalvare(pagina, typeof msg.indirizzo === 'string' ? msg.indirizzo.slice(0, 4000) : '');
     return Streaming.salva({
       url,
       titolo: typeof msg.titolo === 'string' ? msg.titolo.slice(0, 400) : '',
