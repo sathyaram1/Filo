@@ -112,12 +112,13 @@
       }
     }
     const esatto = (t) => voci.some((x) => x.testo.includes(t) || x.intestazione.includes(t));
+    let vocabolario = null;
     const regole = ts.map((t) => {
       if (esatto(t) || !tolleranza(t)) return { t, simili: null };
+      // Le parole diverse del registro sono poche migliaia: la somiglianza si misura su quelle, non riga per riga.
+      if (!vocabolario) vocabolario = new Set(voci.flatMap((x) => paroleDi(x.testo)));
       const simili = new Set();
-      for (const x of voci) {
-        for (const p of paroleDi(x.testo)) if (somiglia(t, p, tolleranza(t))) simili.add(p);
-      }
+      for (const p of vocabolario) if (somiglia(t, p, tolleranza(t))) simili.add(p);
       return { t, simili };
     });
     const prende = (x, reg) => (reg.simili
