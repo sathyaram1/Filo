@@ -313,7 +313,7 @@
     altre.addEventListener('click', () => { tutte = !tutte; disegna(); });
 
     window.addEventListener('hashchange', () => {
-      if (location.hash !== '#segnalazioni') return;
+      if (!chiestoElenco()) return;
       tutte = true;
       carica.portata = false;
       carica();
