@@ -1360,7 +1360,10 @@ class TabManager {
     if (from === to) return false;
     const [tab] = this.tabs.splice(from, 1);
     this.tabs.splice(to, 0, tab);
-    if (trascinata) ContatoriFinestra.misura('trascinata', this, Math.abs(to - from));
+    if (trascinata) {
+      ContatoriFinestra.misura('trascinata', this, Math.abs(to - from));
+      this._spostataAManoAlle = Date.now();
+    }
     this._broadcast();
     return true;
   }
