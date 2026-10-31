@@ -754,7 +754,11 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
   domanda. Così non può migliorare i suoi indicatori verificando di meno o
   gonfiando le priorità.
 - **Spegne in emergenza** routine o account, e riaccende solo quello che ha
-  spento lei, mai quello che ha spento l'owner.
+  spento lei, mai quello che ha spento l'owner. **Le priorità 3 partono lo
+  stesso** (D-254): il suo contesto non è fidato, e un feedback scritto bene
+  non deve poter tenere ferme le urgenze. Spegnere sceglie da dove si lavora;
+  il freno della spesa resta all'owner, con l'interruttore delle routine, gli
+  account che spegne lui e il massimo di sessioni.
 - **Taccuino**, persistente sul server: appunti da ricontrollare, ipotesi,
   modifiche in studio, i rapporti di riordino e potatura, i guasti e le
   segnalazioni che segue. Lo legge a ogni accensione.
