@@ -5,7 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 
@@ -135,4 +135,85 @@ test('se la rete cade a metà, «Riprova» sull\'avviso salva il video nella ste
   await expect.poll(() => (existsSync(dir) ? readdirSync(dir) : []), { timeout: 20000 }).toContain('Canzone della segnalazione.mp4');
   const righe = (await elenco(shell)).filter((x) => x.via === 'streaming');
   expect(righe.map((x) => x.state)).toEqual(['completed']);
+});
+
+const righe = () => (existsSync(registro) ? readFileSync(registro, 'utf8').trim().split('\n').filter(Boolean).map((r) => JSON.parse(r)) : []);
+const nuovoCaso = (c) => { ilCaso(c); writeFileSync(registro, ''); };
+const conIlLettore = (dentro, fuori = '') => `<!doctype html><html><head><title>Una pagina - YouTube</title></head>
+  <body style="margin:0;padding:24px;font:16px sans-serif">${fuori}
+  <script>addEventListener('DOMContentLoaded', () => { const ms = new MediaSource(); document.getElementById('v').src = URL.createObjectURL(ms); });</script>
+  ${dentro}</body></html>`;
+
+test('la percentuale di un video a pezzi separati sale soltanto, anche fra il video e l\'audio', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  nuovoCaso({ titolo: 'Canzone della segnalazione', pausaMs: 100, passi: 10, pausaFraPezzi: 1200 });
+  const page = await testServer.openReady(openTab, PAGINA);
+  await salvaDalMenu(page);
+  const viste = [];
+  for (const fine = Date.now() + 40_000; Date.now() < fine;) {
+    const v = (await elenco(shell)).find((x) => x.via === 'streaming');
+    if (v && v.state === 'completed') break;
+    if (v && v.totalBytes > 0 && v.state === 'progressing') viste.push(Math.round((100 * v.receivedBytes) / v.totalBytes));
+    await page.waitForTimeout(60);
+  }
+  expect(viste.length).toBeGreaterThan(10);
+  expect(viste.filter((p, i) => i > 0 && p < viste[i - 1] - 1), `percentuali viste: ${viste.join(' ')}`).toEqual([]);
+  // Finito il video l'audio manca ancora: la pausa fra i due pezzi si vede sotto il 100%.
+  expect(viste.filter((p) => p >= 80 && p < 90).length, `percentuali viste: ${viste.join(' ')}`).toBeGreaterThan(5);
+});
+
+test('chiudere Filo mentre un video in streaming scende non lascia la cartella di lavoro fra i Download', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  nuovoCaso({ titolo: 'Video lunghissimo', pausaMs: 200, passi: 300 });
+  const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await salvaDalMenu(page);
+  await expect.poll(async () => (await elenco(shell)).find((x) => x.via === 'streaming')?.receivedBytes || 0, { timeout: 15000 }).toBeGreaterThan(0);
+  expect(readdirSync(dir).filter((n) => n.startsWith('.filo-video-')).length).toBe(1);
+  const pid = righe().find((r) => r.pid)?.pid;
+  await app.close();
+  try {
+    expect(readdirSync(dir).filter((n) => n.startsWith('.filo-video-'))).toEqual([]);
+    await expect.poll(() => { try { process.kill(pid, 0); return true; } catch (_) { return false; } }, { timeout: 8000 }).toBe(false);
+  } finally {
+    try { process.kill(pid, 'SIGKILL'); } catch (_) {}
+  }
+});
+
+for (const [nome, percorso, html, atteso] of [
+  ['il video di presentazione di un canale', '/@canale',
+    conIlLettore('<div class="html5-video-player"><video id="v" width="480" height="270" style="background:#222"></video><a class="ytp-title-link" href="/watch?v=TRAILER">Il trailer</a></div>'),
+    '/watch?v=TRAILER'],
+  ['l\'anteprima di una home, stesa dentro la sua scheda', '/',
+    conIlLettore('<a href="/watch?v=ANTEPRIMA" style="display:inline-block"><video id="v" width="480" height="270" style="background:#222"></video><span>Titolo</span></a>'),
+    '/watch?v=ANTEPRIMA'],
+  ['un post di una bacheca, col suo permalink sull\'ora', '/home',
+    conIlLettore('<article style="width:520px"><a href="/utente">utente</a><div><video id="v" width="480" height="270" style="background:#222"></video></div><a href="/utente/status/123"><time>2 h</time></a></article><article><a href="/altro/status/9"><time>3 h</time></a></article>'),
+    '/utente/status/123'],
+]) {
+  test(`${nome}: al programma va l'indirizzo del video cliccato, non quello della pagina`, async ({ shell, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    nuovoCaso({ titolo: 'Il video cliccato', pausaMs: 20, lista: 30 });
+    const page = await testServer.openReady(openTab, html);
+    await page.evaluate((p) => history.pushState({}, '', p), percorso);
+    await salvaDalMenu(page);
+    await expect.poll(async () => (await elenco(shell)).find((x) => x.via === 'streaming')?.state, { timeout: 20000 }).toBe('completed');
+    const v = (await elenco(shell)).find((x) => x.via === 'streaming');
+    expect(v.url).toBe(`${testServer.origin}${atteso}`);
+    expect(v.filename).toBe('Il video cliccato.mp4');
+    expect(righe().filter((r) => r.voce)).toEqual([]);
+  });
+}
+
+test('una pagina che è un elenco di video non viene scaricata tutta: si ferma e dice di aprire il video', async ({ shell, openTab, testServer, avvisi }) => {
+  test.setTimeout(60_000);
+  nuovoCaso({ pausaMs: 20, lista: 30 });
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.evaluate(() => history.pushState({}, '', '/results?search_query=canzone'));
+  await salvaDalMenu(page);
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif', { hasText: 'elenco di video' }).last()).toBeVisible({ timeout: 15000 });
+  expect(righe().filter((r) => r.voce).length).toBe(1);
+  const v = (await elenco(shell)).find((x) => x.via === 'streaming');
+  expect(v.state).not.toBe('completed');
 });
