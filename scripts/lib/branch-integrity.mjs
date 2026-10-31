@@ -481,9 +481,10 @@ export function ensureSessionExcludes(root) {
  *   checkpoint   ultimo punto fermo locale (SHA), o null
  *   now          per i test
  *
- * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null, superato?:string|null}}
+ * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null, superato?:string|null, avviso?:string}}
  *          rewritten = il punto fermo lasciato perché il ramo su origin è stato riscritto
  *          superato  = il punto fermo lasciato perché più vecchio della punta pubblicata (un giro passato altrove)
+ *          avviso    = origin/<branch> senza reflog: il rinvio dopo un rebase verrà rifiutato
  *        | {ok:false, kind:'transient'|'permanent', message:string}
  *
  * FAIL CLOSED: se non riesce, il chiamante NON consegna il lavoro. Meglio un
