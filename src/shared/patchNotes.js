@@ -1600,9 +1600,21 @@
     return NOTES.length ? NOTES[0].version : '0.0.0';
   }
 
+  // Una riga è il suo testo, o { testo, segnalazione } quando nasce da una segnalazione (il suo numero): la pagina
+  // Novità la apre dal tasto destro. Recap e impronte vedono solo il testo.
+  function riga(r) {
+    if (r && typeof r === 'object') {
+      const n = Number(String(r.segnalazione == null ? '' : r.segnalazione).replace(/^#/, ''));
+      return { testo: String(r.testo || ''), segnalazione: Number.isInteger(n) && n > 0 ? n : null };
+    }
+    return { testo: String(r == null ? '' : r), segnalazione: null };
+  }
+  function testo(r) { return riga(r).testo; }
+  function soloTesto(n) { return { ...n, features: (n.features || []).map(testo), fixes: (n.fixes || []).map(testo) }; }
+
   // FNV-1a: riconosce una riga già mostrata senza doverne salvare il testo.
-  function impronta(riga) {
-    const s = String(riga);
+  function impronta(r) {
+    const s = testo(r);
     let h = 0x811c9dc5;
     for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
     return h.toString(16).padStart(8, '0');
