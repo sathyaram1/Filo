@@ -153,11 +153,13 @@ function creaAvanzamento() {
   const pezzi = new Map();
   let attesi = 1;
   let pesoTutti = 0;
+  let elenco = false;
   let titolo = '';
   return {
     // Quanti pezzi e quanto pesano tutti insieme, da leggiPezzi.
     pezzi(p) {
       if (!p) return;
+      elenco = true;
       attesi = Math.max(attesi, Number(p.pezzi) || 1);
       if (p.pesoTutti > 0) pesoTutti = p.pesoTutti;
     },
