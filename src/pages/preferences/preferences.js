@@ -1827,6 +1827,7 @@
     } catch (_) {}
     load();
     $('apriQuaderno').addEventListener('click', apriQuaderno);
+    $('apriNovita').addEventListener('click', apriNovita);
     $('documentiAggiungi').addEventListener('click', aggiungiCartella);
     window.addEventListener('keydown', tastoRegistrato, true);
     window.addEventListener('keyup', (e) => {
