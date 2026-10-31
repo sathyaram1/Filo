@@ -209,9 +209,7 @@ riscrive. Sono TRE testi distinti:
 3. **Riga di changelog** in `src/shared/patchNotes.js`: solo se un utente
    qualunque può usare la cosa (superfici owner e parti interne no); una
    riga, orientata al beneficio, nel blocco in cima (vedi § Fonti di verità
-   singole). Nata da una segnalazione, si scrive `{ testo, segnalazione: <num> }`
-   (il numero intero, senza la parte dopo il punto): la pagina Novità la apre
-   dal tasto destro.
+   singole).
 
 Prima di mandare un testo destinato a un umano, compresa ogni risposta in chat
 anche di tre righe, applica **`.claude/skills/unslop/SKILL.md`**.
