@@ -1962,7 +1962,7 @@ class TabManager {
       for (const i of dupIdx) {
         byIndex.set(i, { i, action: 'archive', reason: 'duplicato' });
       }
-      const esito = this.applyTriageDecisions(cands, [...byIndex.values()], { via: da === 'chat' ? 'chat' : 'riordino_automatico' });
+      const esito = this.applyTriageDecisions(cands, [...byIndex.values()], opzioni());
       ContatoriFinestra.misura('giroRiordino', trigger, { duplicati: esito.duplicati, modello: esito.archived - esito.duplicati, giudizioMancato });
       contaGiro(esito.archived, dupIdx.size, giudizioMancato);
       return this._esitoTriage(giudizioMancato ? { ...esito, giudizioMancato: true } : esito, { trigger, valutate: cands.length });
