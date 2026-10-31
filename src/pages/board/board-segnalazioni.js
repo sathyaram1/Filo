@@ -17,7 +17,10 @@
     chiusa: { testo: 'chiusa', hover: 'Chiusa senza modifiche' },
   };
 
-  let tutte = location.hash === '#segnalazioni';
+  // `#segnalazione=1956` porta a quella riga, aperta (ci arriva la pagina Novità); `#segnalazioni` all'elenco intero.
+  const chiestoElenco = () => /^#segnalazion(i|e=\d+)$/.test(location.hash);
+  const numeroChiesto = () => { const m = /^#segnalazione=(\d+)$/.exec(location.hash); return m ? m[1] : null; };
+  let tutte = chiestoElenco();
   // Con la Bacheca in pausa (#1592) la pagina è solo questa: tutte le righe, sempre, col titolo della pagina.
   const soloLoro = () => document.body.dataset.bachecaPausa === '1';
   let voci = [];
