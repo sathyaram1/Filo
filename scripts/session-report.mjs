@@ -3,7 +3,7 @@
 // PERCHÉ ESISTE (giro del 14/09/2026)
 //   Di come è andata una sessione di routine — quanto è durata, quanto è
 //   costata, quante volte ha ricominciato da freddo, quali strumenti hanno
-//   sforato — il server non sapeva niente: il worker "riportava" a parole, e
+//   sforato o sono falliti, quanto si è aspettato — il server non sapeva niente: il worker "riportava" a parole, e
 //   le parole non si sommano. Il transcript JSONL di Claude Code contiene già
 //   tutti i numeri: qui si leggono e si impacchettano in un oggetto che
 //   `routine-channel.mjs release` allega da solo al rilascio.
