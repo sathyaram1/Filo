@@ -1930,6 +1930,16 @@
             const voci = Array.isArray(a.sitiFidati.voci) ? a.sitiFidati.voci : [];
             return { label: a.label, onClick: () => api.message({ type: 'siti_fidati_imposta', fidato: false, voci }).catch(() => {}) };
           }
+          // #349 — «Riapri» dopo la pulizia delle schede: riporta quelle chiuse da quel giro.
+          if (a && Number.isInteger(a.riapriPulizia) && !a.onClick) {
+            const pulizia = a.riapriPulizia;
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'riapri_pulizia_schede', pulizia }).then((r) => {
+                if (r && r.ok === false) NOTIFS.show('Quelle schede le ritrovi nel filo della home', { tipo: 'riordino_schede' });
+              }).catch(() => {}),
+            };
+          }
           // #1123 — «Collega»: l'accesso a Google in una scheda, come la voce del menu dell'account.
           if (a && a.collegaGoogle && !a.onClick) return { label: a.label, onClick: () => collegaGoogle() };
           // #1039 — «Riavvia e aggiorna»: se l'installatore non parte Filo resta aperto, e lo dice.

@@ -318,15 +318,15 @@ function fermaInvitoNelRiquadro(event, ctx) {
 // né verso la pagina «Sito bloccato» né fuori. La seguono quando la lista sta ferma per questo tempo, o quando l'utente le guarda.
 const LISTA_FERMA_MS = 3000;
 
-// Il riordino della riapertura parte non prima di questo dall'apertura, e un attimo dopo che la coda ha caricato
-// tutto: i siti a pagina unica riempiono il testo dopo la fine del caricamento.
-const TRIAGE_RIAPERTURA_MS = 4000;
+// Il riordino della riapertura parte un attimo dopo che la coda ha caricato tutto (i siti a pagina unica riempiono
+// il testo dopo la fine del caricamento) e quando le pagine hanno detto il loro colore: il favicon può metterci 3 s.
 const TRIAGE_DOPO_CODA_MS = 1500;
 // Una pagina bloccata non risponde mai alla lettura del testo: la pulizia va avanti senza il suo estratto (#1618).
 const ESTRATTO_TETTO_MS = 1500;
 // Lettura delle pagine più giudizio del modello: oltre, il giro finisce come giudizio mancato e la pulizia si sblocca.
 const GIUDIZIO_TETTO_MS = 5 * 60_000;
 const GESTI_DELLA_BARRA = new Set(['mouseDown', 'rawKeyDown', 'keyDown', 'mouseWheel', 'touchStart']);
+const COLORI_TETTO_MS = 8000;
 // Oltre, la pagina che arriva non è più la risposta all'invio di un modulo (#824).
 const INVIO_PAGINA_MS = 120_000;
 const PAGINA_DI_ACCESSO = /(?:^|[^a-z])(?:log-?in|sign-?in|accedi|accesso|auth|anmelden|connexion|iniciar-sesion)(?:[^a-z]|$)/i;
@@ -539,6 +539,7 @@ class TabManager {
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
     // aspettare che il content script ricalcoli.
     this._identityColorCache = new Map();
+    this._attesaColori = [];
     // §2.1 — l'auto-archiviazione misura l'inattività dell'APP INTERA da qui: gesti nelle schede, scheda attivata, barra.
     this._lastAppInteractionAt = Date.now();
     try {
@@ -1359,7 +1360,10 @@ class TabManager {
     if (from === to) return false;
     const [tab] = this.tabs.splice(from, 1);
     this.tabs.splice(to, 0, tab);
-    if (trascinata) ContatoriFinestra.misura('trascinata', this, Math.abs(to - from));
+    if (trascinata) {
+      ContatoriFinestra.misura('trascinata', this, Math.abs(to - from));
+      this._spostataAManoAlle = Date.now();
+    }
     this._broadcast();
     return true;
   }
@@ -1452,13 +1456,14 @@ class TabManager {
 
   // Riapre una scheda chiusa com'era: indirizzo, scroll, zoom e paese; dalla pila anche posto e cronologia.
   // Una porta sola per la scorciatoia, la barra dei menu e la ricerca del filo (REOPEN_ARCHIVED_TAB).
-  async riapri(voce) {
+  // `activate: false` per chi ne riporta più d'una insieme (il «Riapri» della pulizia).
+  async riapri(voce, { activate = true } = {}) {
     const url = voce && typeof voce.url === 'string' ? voce.url : '';
     if (!url) return null;
     const prima = new Set(this.tabs.map((t) => t.id));
     // Per il giudizio sui siti la riapertura è di Filo (#814).
     const id = this.openTab(url, {
-      activate: true,
+      activate,
       restoreScrollPct: typeof voce.scroll === 'number' ? voce.scroll : null,
       restoreZoomLevel: typeof voce.zoom === 'number' && voce.zoom ? voce.zoom : null,
       origine: { tipo: 'filo' },
@@ -1808,10 +1813,12 @@ class TabManager {
   // scheda, impostazioni). Prima erano esclusi TUTTI i filo:// interni, quindi
   // il riordino poteva chiudere un sito (es. YouTube) ma mai le impostazioni
   // aperte o le home duplicate. (Incognito è escluso a monte.)
-  _triageCandidates() {
+  _triageCandidates(trigger) {
     const T = globalThis.SN_TAB_TRIAGE;
     return this.tabs.filter((t) => {
       if (this._intoccabileDalTriage(t)) return false;
+      // La pulizia decisa della riapertura è per la sessione di prima: una scheda nata o usata dopo è del lavoro di adesso (#349).
+      if (trigger === 'reopen' && !(t._dallaSessione && !(t.lastInteractionAt >= this._riapertaAlle))) return false;
       if (T) return T.isTriageableUrl(t.url);
       return !t.isInternal && /^https?:\/\//i.test(t.url || '');
     });
@@ -1855,7 +1862,7 @@ class TabManager {
         ageMin: minutiDa(Date.parse(t.openedAt)),
         // Mai toccata da quando c'è: inattiva da quando è arrivata la sua pagina (#1618).
         idleMin: minutiDa(t.lastInteractionAt || Date.parse(t.paginaDal) || Date.parse(t.openedAt)),
-        scrollPct: typeof t.scrollPct === 'number' ? t.scrollPct : null,
+        scrollPct: typeof t.scrollPct === 'number' && !t._scrollIgnoto ? t.scrollPct : null,
         formDirty: !!t.formDirty,
         audible: !!t.audible,
         coOpenUrls: this.tabs
@@ -1881,10 +1888,13 @@ class TabManager {
       return { archived: 0, giaInCorso: true };
     }
     this._triageRunning = true;
+    // Un ordine scelto a mano mentre il giro aspettava (alla riapertura: da quando Filo si è riaperto) vince sul colore (#349).
+    const dal = trigger === 'reopen' && this._riapertaAlle ? this._riapertaAlle : Date.now();
+    const opzioni = () => ({ via: da === 'chat' ? 'chat' : 'riordino_automatico', riordina: !(this._spostataAManoAlle >= dal) });
     try {
       await this._ricontrollaModuli();
       await this._caricaSempreAperte();
-      const cands = this._triageCandidates();
+      const cands = this._triageCandidates(trigger);
       // Un giro si conta coi suoi numeri, mai con le schede (#1467): quante candidate, archiviate, duplicate.
       const contaGiro = (archiviate, duplicati, giudizioMancato) => {
         try {
@@ -1894,7 +1904,8 @@ class TabManager {
       if (!cands.length) {
         ContatoriFinestra.misura('giroRiordino', trigger, {});
         contaGiro(0, 0, false);
-        return { archived: 0 };
+        // Niente da giudicare non vuol dire niente da fare: alla riapertura la barra si riordina comunque (#349).
+        return this._esitoTriage(this.applyTriageDecisions([], [], opzioni()), { trigger, valutate: 0 });
       }
       // 1) Duplicati esatti: decisione deterministica e affidabile.
       const T = globalThis.SN_TAB_TRIAGE;
@@ -1952,10 +1963,10 @@ class TabManager {
       for (const i of dupIdx) {
         byIndex.set(i, { i, action: 'archive', reason: 'duplicato' });
       }
-      const esito = this.applyTriageDecisions(cands, [...byIndex.values()], { via: da === 'chat' ? 'chat' : 'riordino_automatico' });
+      const esito = this.applyTriageDecisions(cands, [...byIndex.values()], opzioni());
       ContatoriFinestra.misura('giroRiordino', trigger, { duplicati: esito.duplicati, modello: esito.archived - esito.duplicati, giudizioMancato });
       contaGiro(esito.archived, dupIdx.size, giudizioMancato);
-      return giudizioMancato ? { ...esito, giudizioMancato: true } : esito;
+      return this._esitoTriage(giudizioMancato ? { ...esito, giudizioMancato: true } : esito, { trigger, valutate: cands.length });
     } finally {
       this._triageRunning = false;
     }
@@ -1982,10 +1993,26 @@ class TabManager {
     try { this.win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 0, unica: 'pulizia-schede-mancata', tipo: 'riordino_mancato', actions } }); } catch (_) {}
   }
 
+  // §2.3 — l'avviso del giro, se ne va mostrato uno (la regola sta in SN_TAB_TRIAGE.testoEsito).
+  _esitoTriage(esito, { trigger, valutate }) {
+    // Il giudizio mancato di un giro automatico lo dice già _dichiaraGiudizio (#1618): qui solo se c'è da offrire «Riapri».
+    if (esito.giudizioMancato && trigger !== 'manual' && !esito.archived) return esito;
+    const T = globalThis.SN_TAB_TRIAGE;
+    const testo = T && T.testoEsito ? T.testoEsito({
+      trigger,
+      valutate,
+      archiviate: esito.archived,
+      riordinate: !!esito.reordered,
+      ordineTuo: !!esito.ordineTuo,
+      giudizioMancato: !!esito.giudizioMancato,
+    }) : '';
+    if (testo) this._showTriageToast(testo, esito.archived ? esito.pulizia : null);
+    return esito;
+  }
+
   // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive', poi
-  // riordina cromaticamente i superstiti (§1.3) e mostra il toast (§2.3).
-  // `cands` è l'elenco indicizzato passato all'LLM.
-  applyTriageDecisions(cands, decisions, { via = 'riordino_automatico' } = {}) {
+  // riordina cromaticamente i superstiti (§1.3). `cands` è l'elenco indicizzato passato all'LLM.
+  applyTriageDecisions(cands, decisions, { via = 'riordino_automatico', riordina = true } = {}) {
     const byIndex = new Map();
     for (const d of (decisions || [])) {
       if (d && typeof d.i === 'number') byIndex.set(d.i, d);
@@ -1999,10 +2026,26 @@ class TabManager {
       toArchive.push({ tab, reason: d.reason || 'auto' });
     });
 
+    // Il «Riapri» dell'avviso le riporta dalla voce della pila, come Ctrl/Cmd+Shift+T: cronologia, zoom, e niente
+    // doppione da una riapertura dopo. `riserva` per quelle che la pila non tiene (una home vuota).
+    const riapribili = [];
     for (const { tab, reason } of toArchive) {
       ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
+      // Prima della voce: una scheda che Filo seguiva diventa un passaggio, e non si riapre.
       this._avvisaSorvegliante(tab, 'chiusa');
-      this._archiveClosedTab(tab, reason, { voce: this._ricordaChiusa(tab) });
+      const voce = this._ricordaChiusa(tab);
+      if (!tab._passaggio && typeof tab.url === 'string' && tab.url) {
+        riapribili.push({
+          voce,
+          riserva: {
+            url: tab.url,
+            scroll: typeof tab.scrollPct === 'number' && !tab._scrollIgnoto ? tab.scrollPct : null,
+            proxy: tab.proxy && tab.proxy.country ? { country: tab.proxy.country, tier: tab.proxy.tier || null } : null,
+            colore: tab.identityColor || null,
+          },
+        });
+      }
+      this._archiveClosedTab(tab, reason, { voce });
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
       if (idx >= 0) {
@@ -2017,13 +2060,45 @@ class TabManager {
     if (!this.tabs.length) this.openTab('filo://newtab/');
     else if (!this.tabs.some((t) => t.id === this.activeId)) this.activate(this.tabs[0].id);
 
+    let pulizia = null;
+    if (riapribili.length) {
+      pulizia = (this._ultimaPulizia ? this._ultimaPulizia.id : 0) + 1;
+      this._ultimaPulizia = { id: pulizia, schede: riapribili, riordina, alle: Date.now() };
+    }
+
     // §1.3 — a OGNI giro, non solo quando si è archiviato qualcosa: all'apertura
     // la barra dev'essere riordinata comunque.
-    const reordered = this.reorderTabsByColor();
+    const reordered = riordina && this.reorderTabsByColor();
     if (reordered) ContatoriFinestra.misura('riordinatoPerColore', this);
     if (toArchive.length || reordered) this._broadcast();
-    if (toArchive.length) this._showTriageToast(toArchive.length);
-    return { archived: toArchive.length, duplicati: toArchive.filter((x) => x.reason === 'duplicato').length };
+    return { archived: toArchive.length, duplicati: toArchive.filter((x) => x.reason === 'duplicato').length, reordered, ordineTuo: !riordina, pulizia };
+  }
+
+  // «Riapri» dall'avviso della pulizia: solo l'ultima, e senza doppioni di una già riaperta dal filo della home.
+  async riapriPulizia(id) {
+    const p = this._ultimaPulizia;
+    if (!p || p.id !== id) return { ok: false, error: 'scaduta' };
+    this._ultimaPulizia = null;
+    const T = globalThis.SN_TAB_TRIAGE;
+    const chiave = (u) => (T ? T.normalizeForDedup(u) : String(u || ''));
+    const aperte = new Set(this.tabs.map((t) => chiave(t.url)));
+    let riaperte = 0;
+    const pila = this._pilaChiuse();
+    for (const { voce, riserva } of p.schede) {
+      if (aperte.has(chiave(riserva.url))) continue;
+      // Già riaperta da un'altra porta (Ctrl/Cmd+Shift+T, il filo della home) e poi richiusa: non torna due volte.
+      if (voce && voce.riaperta) continue;
+      const presa = voce ? pila.riprendi(voce) : null;
+      if (presa && presa.voceArchivio) this._contaTornata(presa.voceArchivio);
+      const nuova = await this.riapri(presa || riserva, { activate: false });
+      if (!nuova) continue;
+      riaperte += 1;
+      aperte.add(chiave(riserva.url));
+    }
+    // Come il giro che le ha chiuse: un ordine scelto a mano non si rimescola.
+    const riordina = p.riordina !== false && !(this._spostataAManoAlle >= p.alle);
+    if ((riordina && this.reorderTabsByColor()) || riaperte) this._broadcast();
+    return { ok: true, riaperte };
   }
 
   // §1.3 — riordina la striscia per colore con la stessa regola della Cronologia (compareRainbow).
@@ -2047,12 +2122,10 @@ class TabManager {
     return { reordered };
   }
 
-  _showTriageToast(_n) {
+  _showTriageToast(text, pulizia = null) {
+    const actions = pulizia ? [{ label: 'Riapri', riapriPulizia: pulizia }] : undefined;
     try {
-      this.win.webContents.send('shell:toast', {
-        text: 'Schede riordinate. Quelle chiuse restano nel filo della home',
-        opts: { tipo: 'riordino_schede' },
-      });
+      this.win.webContents.send('shell:toast', { text, opts: { tipo: 'riordino_schede', unica: 'riordino-schede', actions } });
     } catch (_) {}
   }
 
@@ -2104,9 +2177,29 @@ class TabManager {
     const next = color || null;
     const host = hostOf(tab.url);
     if (next && host) this._identityColorCache.set(host, next);
+    // Anche «nessun colore» è una risposta: il riordino della riapertura aspetta di averla da ogni pagina.
+    tab._identitaNota = true;
+    for (const avvisa of [...(this._attesaColori || [])]) avvisa();
     if (tab.identityColor === next) return;
     tab.identityColor = next;
     if (this.tabs.includes(tab)) this._broadcast();
+  }
+
+  // Il riordino ordina per colore del sito (#349): parte quando ogni pagina web caricata ha detto il suo, o al tetto.
+  _coloriPronti(tetto = COLORI_TETTO_MS) {
+    const pronti = () => this.tabs.every((t) => t._identitaNota || t._rinviata || !/^https?:\/\//i.test(t.url || ''));
+    if (pronti()) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      let timer = null;
+      const fine = (ok) => {
+        clearTimeout(timer);
+        this._attesaColori = this._attesaColori.filter((f) => f !== controlla);
+        resolve(ok);
+      };
+      const controlla = () => { if (pronti()) fine(true); };
+      timer = setTimeout(() => fine(false), tetto);
+      this._attesaColori = [...(this._attesaColori || []), controlla];
+    });
   }
 
   // Copia anche zoom e scroll, non solo l'URL: "duplica" deve dare una scheda
@@ -2275,6 +2368,7 @@ class TabManager {
       const adesso = Date.now();
       tab.lastInteractionAt = Math.min(activity.lastInteractionAt, adesso);
       this._lastAppInteractionAt = adesso;
+      tab._scrollIgnoto = false;
     }
     if (typeof activity.scrollPct === 'number') tab.scrollPct = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
     if (typeof activity.formDirty === 'boolean') {
@@ -3224,6 +3318,7 @@ class TabManager {
       // Il colore campionato (§1.1) muore con la pagina; quello identità (§1.2)
       // dipende dal DOMINIO, quindi su un host già visto si riapplica subito.
       const cachedIdentity = this._identityColorCache.get(hostOf(url)) || null;
+      tab._identitaNota = !!cachedIdentity;
       tab._moduli = null;
       this._dopoInvio(tab, url, httpResponseCode);
       tab._improntePrima = [...(tab._impronte ? tab._impronte.values() : [])].flat().slice(-50);
@@ -4370,6 +4465,7 @@ class TabManager {
     }
 
     this._restoring = true;
+    this._riapertaAlle = Date.now();
     const nate = [];
     let target = null;
     try {
@@ -4389,8 +4485,11 @@ class TabManager {
         // cache per host, così una did-navigate sullo stesso dominio lo conserva.
         if (colors[i]) this.setTabIdentityColor(id, colors[i]);
         if (aperte[i]) nata.openedAt = aperte[i];
-        nata.paginaDal = pagine[i] || null;
         if (usate[i]) nata.lastInteractionAt = Date.parse(usate[i]);
+        // Riaperta parte dall'inizio della pagina: «scroll 0%» direbbe al riordino «letta a metà», e la terrebbe.
+        nata._scrollIgnoto = true;
+        nata._dallaSessione = true;
+        nata.paginaDal = pagine[i] || null;
         nate.push(nata);
         return nata;
       });
@@ -4422,16 +4521,18 @@ class TabManager {
   }
 
   async _maybeTriageOnReopen() {
-    const inizio = Date.now();
     try {
       const s = await this._readSettings();
       const aa = s && s.autoArchive;
       if (!aa || !aa.enabled || !aa.onClose) return;
       // Il riordino legge il contenuto delle pagine: parte quando la coda della riapertura le ha caricate tutte.
       await this.codaRiapertura.finita();
-      const attesa = Math.max(TRIAGE_DOPO_CODA_MS, TRIAGE_RIAPERTURA_MS - (Date.now() - inizio));
-      setTimeout(() => { this.runAutoTriage({ trigger: 'reopen' }).catch(() => {}); }, attesa);
-    } catch (_) {}
+      await Promise.all([new Promise((r) => setTimeout(r, TRIAGE_DOPO_CODA_MS)), this._coloriPronti()]);
+      if (!this.win || this.win.isDestroyed()) return;
+      await this.runAutoTriage({ trigger: 'reopen' });
+    } catch (e) {
+      console.warn('[Filo] riordino delle schede alla riapertura:', e?.message || e);
+    }
   }
 }
 
