@@ -2402,8 +2402,12 @@ export function emit(bucket, ctx) {
   // `dal`: per chi verifica un riallineamento il commit verificato; per chi riallinea la base del confronto alla consegna
   // (SPEC-RIDISEGNO-LAVORO.md §3, regola 3): lo sha verificato se il server lo manda, sennò la punta che riceve.
   const riallinea = bucket.role === 'fixer' && !(ctx && ctx.ripresa && typeof ctx.ripresa === 'object');
+  // Un commit «verificato» che è già la punta darebbe a finish:check e a chi verifica un confronto vuoto (#1968).
+  const verificato = ambito.scope === 'riallineamento' ? String(ctx?.perimetro?.shaVerificato || '') : '';
+  const scartato = verificato ? esaminaShaVerificato(verificato) : '';
+  if (scartato) process.stderr.write(`[dispatch] il commit verificato del perimetro (${unaRiga(verificato).slice(0, 12)}) ${scartato === 'punta' ? 'è la punta del ramo' : 'qui non c\'è'}: chi verifica il riallineamento non ha il confronto\n`);
   if (bucket.role === 'halt') { if (!bucket.lavoroVivo) clearRole(ROOT); }
-  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? ctx?.perimetro?.shaVerificato : riallinea ? (ctx?.shaVerificato || puntaDellaCartella()) : '' });
+  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? (scartato === 'punta' ? '' : verificato) : riallinea ? (ctx?.shaVerificato || puntaDellaCartella()) : '' });
   const pieno = buildPayload(bucket, bucket.role === 'new-work' ? { ...ctx, suMain: suMainDi(bucket, ctx) } : ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
