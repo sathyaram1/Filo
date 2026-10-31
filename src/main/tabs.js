@@ -2044,8 +2044,6 @@ class TabManager {
           },
         });
       }
-      ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
-      this._avvisaSorvegliante(tab, 'chiusa');
       this._archiveClosedTab(tab, reason, { voce });
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
