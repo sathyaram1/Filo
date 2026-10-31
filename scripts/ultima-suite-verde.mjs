@@ -153,9 +153,19 @@ export function testoFermoDopoIlVerde({ tag, oreDallUltima, commitDopoTag, verde
   return { titolo: `Pubblicazione ferma${tag ? ` alla ${tag}` : ''} da ${giorni} giorni: c'è un commit verde ma la versione non esce`, testo: righe.join('\n') };
 }
 
+/** Il tetto di una risposta di `gh api`: quello di Node (1 MB) le cento corse intere l'hanno superato, ENOBUFS (#1989). */
+export const GH_TETTO_BYTE = 64 * 1024 * 1024;
+/** I soli campi di corse e lavori che la scelta e i testi leggono: la risposta non cresce coi campi che GitHub aggiunge. */
+export const CAMPI_CORSA = ['id', 'head_sha', 'conclusion', 'status', 'event', 'head_branch', 'html_url', 'created_at', 'updated_at'];
+export const CAMPI_LAVORO = ['name', 'conclusion'];
+const SOLO_CORSE = `{workflow_runs: [(.workflow_runs // [])[] | {${CAMPI_CORSA.join(', ')}}]}`;
+const SOLO_LAVORI = `{jobs: [(.jobs // [])[] | {${CAMPI_LAVORO.join(', ')}}]}`;
+
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const gitForse = (...a) => { try { return git(...a); } catch { return ''; } };
-const ghApi = (percorso) => JSON.parse(execFileSync('gh', ['api', percorso], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+const ghApi = (percorso, jq = '') => JSON.parse(execFileSync('gh', ['api', percorso, ...(jq ? ['--jq', jq] : [])], {
+  encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: GH_TETTO_BYTE,
+}));
 const eAntenato = (a, b) => { try { git('merge-base', '--is-ancestor', a, b); return true; } catch { return false; } };
 // Le fusioni su main, non i commit dei rami fusi; il commit del numero di versione non è codice.
 const soloCodice = (da, a) => Number(gitForse('rev-list', '--count', '--first-parent', '--invert-grep', '--grep=^release: v[0-9]', `${da}..${a}`) || 0);
