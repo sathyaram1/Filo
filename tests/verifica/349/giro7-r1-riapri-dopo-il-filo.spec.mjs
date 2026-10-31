@@ -3,8 +3,6 @@
 
 import { test, expect, aspettaFinestra } from '../../fixtures/electron.mjs';
 
-const tm = (BrowserWindow) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
-
 test('r1 una scheda riaperta dal filo della home e richiusa non torna due volte fra «Riapri» e la scorciatoia', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const titoli = () => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.title));
@@ -33,17 +31,17 @@ test('r1 una scheda riaperta dal filo della home e richiusa non torna due volte 
   await home.evaluate((id) => chrome.runtime.sendMessage({ type: 'reopen_archived_tab', id }), voce.id);
   await expect.poll(titoli, { timeout: 15_000 }).toContain('Uno');
   await app.evaluate(({ BrowserWindow }) => {
-    const t = tm(BrowserWindow);
+    const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
     t.closeTab(t.tabs.find((x) => /Uno/.test(x.title || '')).id, { via: 'x' });
   }, null);
   await expect.poll(titoli, { timeout: 10_000 }).not.toContain('Uno');
 
   // «Riapri» sull'avviso (con la durata degli avvisi a «finché non lo chiudo» resta lì), poi la scorciatoia.
   await app.evaluate(async ({ BrowserWindow }) => {
-    const t = tm(BrowserWindow);
+    const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
     return t.riapriPulizia(t._ultimaPulizia && t._ultimaPulizia.id);
   }, null);
-  await app.evaluate(({ BrowserWindow }) => tm(BrowserWindow).riapriChiusa(), null);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.riapriChiusa(), null);
   await new Promise((r) => setTimeout(r, 3000));
   expect((await titoli()).filter((t) => t === 'Uno'), 'la scheda torna due volte: «Riapri» non sa che era già stata riaperta dal filo').toHaveLength(1);
 });
