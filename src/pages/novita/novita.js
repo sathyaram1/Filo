@@ -13,7 +13,6 @@
 
   let versioni = [];
   let current = '';
-  let mostrato = null;
   // Le segnalazioni che questo computer sa aprire: le sue, e tutte per l'owner.
   const porte = { mie: new Set(), owner: false };
   const datiDi = new WeakMap();
@@ -151,7 +150,6 @@
   function disegna() {
     const q = $('cerca').value;
     const ris = N.filtra(versioni, q);
-    mostrato = ris;
     const elenco = $('elenco');
     const frag = document.createDocumentFragment();
     for (const v of ris.versioni) frag.appendChild(nuovaVersione(v));
@@ -190,7 +188,8 @@
       vuoto.textContent = 'Non c’è ancora nessuna novità da leggere.';
       vuoto.hidden = false;
     } else if (!ris.righe) {
-      vuoto.replaceChildren(document.createTextNode(`Nessuna novità contiene ${virgolette(q.trim().slice(0, 80))}. `));
+      const detto = q.trim();
+      vuoto.replaceChildren(document.createTextNode(`Nessuna novità contiene ${virgolette(detto.length > 80 ? `${detto.slice(0, 79)}…` : detto)}. `));
       const togli = document.createElement('button');
       togli.type = 'button';
       togli.className = 'sn-btn sn-btn-secondary';
@@ -305,11 +304,21 @@
       send({ type: MSG.SEGNALAZIONI_MIE_LIST }),
       send({ type: MSG.AUTH_STATUS, senzaRete: true }),
     ]);
-    // Il numero della copia locale è «#1956»; una parte di un pacchetto («#1509.3») non è la segnalazione intera.
+    // Il numero della copia locale è «1956» o «#1956»; una parte di un pacchetto («1509.3») non è la segnalazione intera.
     const numeri = ((mie && mie.voci) || []).map((v) => /^#?(\d+)$/.exec(String(v.num || '').trim())).filter(Boolean);
     porte.mie = new Set(numeri.map((m) => Number(m[1])));
     porte.owner = !!(auth && auth.ok && auth.signedIn && auth.isAdmin);
   }
+
+  // Una segnalazione mandata, o un accesso fatto, a pagina aperta: il numero accanto alla riga compare senza ricaricare.
+  const firma = () => `${porte.owner}|${[...porte.mie].sort().join(',')}`;
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || (msg.type !== MSG.SEGNALAZIONI_MIE_CAMBIATE && msg.type !== MSG.AUTH_CHANGED)) return;
+      const prima = firma();
+      leggiPorte().then(() => { if (versioni.length && firma() !== prima) disegna(); }).catch(() => {});
+    });
+  } catch (_) {}
 
   (async function avvia() {
     try {

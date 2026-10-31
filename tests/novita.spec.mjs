@@ -52,6 +52,7 @@ test('sul registro vero: almeno due versioni dalla più recente, e una parola tr
   await expect(page.locator('#conta')).toHaveText(`${versioni.length} versioni`);
 
   await page.locator('#cerca').fill('ultima scheda chiusa');
+  await expect(page.locator('#conta')).toContainText(' in ');
   const trovata = riga(page, 'riapre l\'ultima scheda chiusa');
   await expect(trovata).toBeVisible();
   await expect(trovata.locator('xpath=ancestor::section[1]')).toHaveAttribute('data-versione', '0.2.251');
@@ -99,7 +100,7 @@ test('solo le versioni uscite, la propria segnata; il filtro regge accenti e let
 test('tasto destro su una riga: «Copia il testo» la copia; la segnalazione si apre solo se è tua, e porta alla sua riga', async ({ app, openTab }) => {
   await noteFinte(app);
   await app.evaluate(() => globalThis.SN_SEGNALAZIONI_MIE.svuota());
-  let page = await apriNovita(openTab);
+  const page = await apriNovita(openTab);
   await page.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
   await expect(page.locator('.nv-segn')).toHaveCount(0);
 
@@ -118,11 +119,10 @@ test('tasto destro su una riga: «Copia il testo» la copia; la segnalazione si 
     + '• L\'aggiornamento non chiude più le finestre aperte.');
 
   // Questo computer ha mandato la #4242: la riga si apre su «Le tue segnalazioni», con la segnalazione aperta.
-  await app.evaluate(() => globalThis.SN_SEGNALAZIONI_MIE.importa([{
-    id: 'fb-4242', testo: 'Vorrei cercare fra le novità', creataIl: '2026-10-20T10:00:00Z', stato: 'risolta', num: '4242',
-  }]));
-  page = await apriNovita(openTab);
-  await page.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
+  await app.evaluate(() => globalThis.SN_SEGNALAZIONI_MIE.registra({
+    id: 'fb-4242', testo: 'Vorrei cercare fra le novità', creataIl: '2026-10-20T10:00:00Z', stato: 'inviata', num: '4242',
+  }));
+  // A pagina aperta: il numero compare senza ricaricare.
   await expect(page.locator('.nv-segn')).toHaveText('#4242');
   await riga(page, 'Le novità si cercano').click({ button: 'right' });
   await menuDi(page).voce('Apri la tua segnalazione').click();
@@ -162,14 +162,28 @@ test('ci si arriva dal recap all\'avvio, dal menu Impostazioni e dalle Preferenz
   const vista = await app.evaluate(() => globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.LAST_SEEN_VERSION, null));
   expect(vista).toBe(await app.evaluate(({ app }) => app.getVersion()));
 
-  const quante = () => app.windows().filter((w) => { try { return w.url() === NOVITA; } catch (_) { return false; } }).length;
-  const prima = quante();
+  // Una pagina già aperta Filo non la duplica: la porta davanti. Si chiude, così ogni strada deve aprirla da sé.
+  const inPrimoPiano = () => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().map((w) => w._filoTabs).find(Boolean);
+    const t = tm && tm.tabs.find((x) => x.id === tm.activeId);
+    return t ? t.view.webContents.getURL() : '';
+  });
+  const chiudiNovita = () => app.evaluate(({ BrowserWindow }, url) => {
+    for (const tm of BrowserWindow.getAllWindows().map((w) => w._filoTabs).filter(Boolean)) {
+      for (const t of tm.tabs.filter((x) => x.view.webContents.getURL() === url)) tm.closeTab(t.id);
+    }
+  }, NOVITA);
+  await expect.poll(inPrimoPiano).toBe(NOVITA);
+
+  await chiudiNovita();
+  await expect.poll(inPrimoPiano).not.toBe(NOVITA);
   await shell.evaluate(() => document.getElementById('nav-settings').click());
   const popup = await aspettaFinestra(app, (w) => w.url().startsWith('data:text/html') && !w.isClosed(), 'il menu Impostazioni non si è aperto');
   await popup.locator('.item', { hasText: 'Novità' }).click();
-  await expect.poll(quante, { message: 'il menu Impostazioni non ha aperto la pagina Novità' }).toBe(prima + 1);
+  await expect.poll(inPrimoPiano, { message: 'il menu Impostazioni non ha aperto la pagina Novità' }).toBe(NOVITA);
 
+  await chiudiNovita();
   const pref = await openTab('filo://preferences/preferences.html');
   await pref.locator('#apriNovita').click();
-  await expect.poll(quante, { message: 'le Preferenze non hanno aperto la pagina Novità' }).toBe(prima + 2);
+  await expect.poll(inPrimoPiano, { message: 'le Preferenze non hanno aperto la pagina Novità' }).toBe(NOVITA);
 });
