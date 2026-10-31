@@ -379,7 +379,14 @@ semaforo a un worker morto.
 
 **La verifica dopo un riallineamento.** Dispatch scrive nel marcatore del ruolo la base
 del confronto (`dal`: lo sha verificato se il server lo manda come `shaVerificato`, sennò
-la punta che il correttore riceve). Alla consegna lo strumento guarda due cose: i file in
+la punta che il correttore riceve). A chi verifica il riallineamento il perimetro arriva
+con lo sha verificato del server: se in copia manca dispatch lo scarica da origin (un rebase
+lo toglie dai rami), e se è la punta stessa del ramo non va nel marcatore e il compito dice
+che il confronto manca, invece di dare un diff vuoto (#1968). Quello sha il server lo tiene
+sul commit che un verificatore ha approvato: un salto dopo un riallineamento pulito marca
+passata la punta nuova per il cancello, ma il riallineamento dopo riparte dall'approvato,
+anche nel confronto che decide il giro: per questo anche a chi riallinea dispatch scarica lo
+sha verificato che manca in copia. Alla consegna lo strumento guarda due cose: i file in
 cui la modifica del ramo è cambiata, senza i numeri di riga (`fileRiscritti`), e i file
 in cui la punta verificata va in conflitto con main (`git merge-tree`, `fileInConflitto`),
 più quelli che il motivo dichiara. Manda `riallineamento: { fileRiscritti,

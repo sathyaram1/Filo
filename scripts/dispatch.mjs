@@ -873,8 +873,28 @@ export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts
 
 // L'ambito della verifica (payload.scope) sceglie il testo: lib/verifier-scope.mjs.
 export { verifierScope };
-export function perimetroNote(scope, perimetro) {
-  return perimetroNoteBase(scope, perimetro, (l) => VERIFIER_ROUND.formatFindings(l));
+export function perimetroNote(scope, perimetro, opzioni = {}) {
+  return perimetroNoteBase(scope, perimetro, (l) => VERIFIER_ROUND.formatFindings(l), opzioni);
+}
+
+/**
+ * Se il commit verificato del perimetro fa da base al confronto di chi verifica un riallineamento (#1968): 'punta' se è
+ * la punta stessa del ramo, 'assente' se qui non c'è nemmeno dopo averlo chiesto a origin (un rebase lo toglie dai rami),
+ * '' se va bene o se git qui non risponde: non aver potuto guardare non scarta niente.
+ */
+export function esaminaShaVerificato(sha, root = ROOT) {
+  const s = String(sha || '').trim().toLowerCase();
+  if (!/^[0-9a-f]{7,40}$/.test(s)) return '';
+  const g = (args, timeout = 30000) => {
+    try { return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout }).trim().toLowerCase(); } catch (_) { return null; }
+  };
+  const punta = g(['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']);
+  if (!punta) return '';
+  const intero = () => g(['rev-parse', '--verify', '--quiet', `${s}^{commit}`]);
+  let c = intero();
+  if (!c && s.length === 40 && g(['fetch', '--quiet', 'origin', s], 120000) !== null) c = intero();
+  if (!c) return 'assente';
+  return c === punta ? 'punta' : '';
 }
 
 export function readRoleInstructions(role, { scope, caso } = {}) {
@@ -2402,8 +2422,17 @@ export function emit(bucket, ctx) {
   // `dal`: per chi verifica un riallineamento il commit verificato; per chi riallinea la base del confronto alla consegna
   // (SPEC-RIDISEGNO-LAVORO.md §3, regola 3): lo sha verificato se il server lo manda, sennò la punta che riceve.
   const riallinea = bucket.role === 'fixer' && !(ctx && ctx.ripresa && typeof ctx.ripresa === 'object');
+  // Un commit «verificato» che è già la punta darebbe a finish:check e a chi verifica un confronto vuoto (#1968).
+  const verificato = ambito.scope === 'riallineamento' ? String(ctx?.perimetro?.shaVerificato || '') : '';
+  const scartato = verificato ? esaminaShaVerificato(verificato) : '';
+  if (scartato) process.stderr.write(`[dispatch] il commit verificato del perimetro (${unaRiga(verificato).slice(0, 12)}) ${scartato === 'punta' ? 'è la punta del ramo' : 'qui non c\'è'}: chi verifica il riallineamento non ha il confronto\n`);
+  // Dopo un salto il server rimanda a chi riallinea il commit approvato, che un rebase ha già tolto dai rami: si scarica
+  // come per chi verifica, o il confronto alla consegna fallisce.
+  if (riallinea && ctx?.shaVerificato && esaminaShaVerificato(ctx.shaVerificato) === 'assente') {
+    process.stderr.write(`[dispatch] il commit verificato (${unaRiga(ctx.shaVerificato).slice(0, 12)}) qui non c'è e da origin non è arrivato: alla consegna il confronto lo rifà il server\n`);
+  }
   if (bucket.role === 'halt') { if (!bucket.lavoroVivo) clearRole(ROOT); }
-  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? ctx?.perimetro?.shaVerificato : riallinea ? (ctx?.shaVerificato || puntaDellaCartella()) : '' });
+  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? (scartato === 'punta' ? '' : verificato) : riallinea ? (ctx?.shaVerificato || puntaDellaCartella()) : '' });
   const pieno = buildPayload(bucket, bucket.role === 'new-work' ? { ...ctx, suMain: suMainDi(bucket, ctx) } : ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
@@ -2411,7 +2440,7 @@ export function emit(bucket, ctx) {
   // Nei giri stretti la serie non si consegna: inviterebbe alla ricerca larga
   // che il testo del ruolo dice di non rifare.
   const serial = ambito.scope && ambito.scope !== 'pieno'
-    ? perimetroNote(ambito.scope, ctx && ctx.perimetro)
+    ? perimetroNote(ambito.scope, ctx && ctx.perimetro, { scartato })
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
   const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: pieno && pieno.case });
   const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
