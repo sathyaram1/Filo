@@ -64,6 +64,16 @@ function crea({ tetto = TETTO } = {}) {
     return voce;
   }
 
+  // Come `prendi`, ma per una voce precisa (il «Riapri» dell'avviso della pulizia): esce dalla pila e conta fra le
+  // riaperte. Null se un'altra porta l'ha già riaperta.
+  function riprendi(voce) {
+    if (!voce || voce.riaperta) return null;
+    togliDove((v) => v === voce);
+    voce.riaperta = true;
+    if (voce.archivio) riaperte.add(voce.archivio);
+    return voce;
+  }
+
   function segnaRiaperta(id) {
     if (!id) return;
     riaperte.add(id);
