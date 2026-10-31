@@ -17,9 +17,15 @@ test('esplora aspetto e stress', async ({ app, openTab }) => {
   const page = await apri(openTab);
   await page.screenshot({ path: `${SHOTS}/v1956-chiaro.png` });
   await app.evaluate(async () => {
-    await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' });
+    const { MSG } = globalThis.SN_MSG;
+    await globalThis.SN_HANDLE_MESSAGE({ type: MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }, { url: 'filo://preferences/preferences.html' });
   });
-  const scura = await apri(openTab);
+  await page.waitForTimeout(500);
+  console.log('tema dal vivo', await page.evaluate(() => document.documentElement.dataset.snTheme));
+  await page.reload();
+  const scura = page;
+  await scura.waitForFunction(() => document.body.dataset.pronto === '1');
+  console.log('tema dopo reload', await page.evaluate(() => document.documentElement.dataset.snTheme));
   await scura.screenshot({ path: `${SHOTS}/v1956-scuro.png` });
   await scura.locator('#cerca').fill('tradzione');
   await expect(scura.locator('#avviso')).toBeVisible();
@@ -82,4 +88,26 @@ test('esplora recap', async ({ app, openTab }) => {
   await expect(home.locator('#recapOverlay')).toBeVisible();
   await home.waitForTimeout(600);
   await home.screenshot({ path: `${SHOTS}/v1956-recap-scuro.png` });
+});
+
+test('esplora chat ?q', async ({ app, shell, openTab }) => {
+  const nov = await apri(openTab);
+  const home = await openTab('filo://newtab/');
+  const r = await home.evaluate(() => chrome.runtime.sendMessage({
+    type: window.SN_MSG.MSG.FILO_RUN_ACTION,
+    action: { type: 'NAVIGA', url: 'filo://novita/novita.html?q=traduzione', etichetta: 'Novità' },
+  }));
+  console.log('esito', JSON.stringify(r).slice(0, 200));
+  await new Promise((res) => setTimeout(res, 2500));
+  const urls = app.windows().map((w) => w.url()).filter((u) => u.startsWith('filo://novita'));
+  console.log('pagine novita', urls);
+  for (const w of app.windows().filter((w) => w.url().startsWith('filo://novita'))) {
+    console.log(w.url(), '->', await w.locator('#cerca').inputValue(), await w.locator('#conta').textContent());
+  }
+  const attiva = await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().map((w) => w._filoTabs).find(Boolean);
+    const t = tm && tm.tabs.find((x) => x.id === tm.activeId);
+    return t ? t.view.webContents.getURL() : '';
+  });
+  console.log('attiva', attiva);
 });
