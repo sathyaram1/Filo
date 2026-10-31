@@ -214,6 +214,11 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
           if (ev.stato === 'started' && /Merger/i.test(ev.chi)) voce.nota(t('streaming_fase_unisco'));
           return;
         }
+        // Il programma scrive i pezzi prima del primo byte: alla prima riga d'avanzamento ci sono già.
+        if (!pezziLetti) {
+          pezziLetti = true;
+          try { avanzamento.pezzi(Y.leggiPezzi(fs.readFileSync(path.join(lavoro, Y.FILE_PEZZI), 'utf8'))); } catch (_) {}
+        }
         avanzamento.leggi(ev);
         if (ev.titolo && ev.titolo !== titoloVero) { titoloVero = ev.titolo; voce.nomina(nomeSicuro(titoloVero, ext)); }
         // I primi byte vogliono dire che il video c'è: da qui si chiede dove salvarlo, intanto continua a scendere.
