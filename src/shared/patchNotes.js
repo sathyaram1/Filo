@@ -1587,7 +1587,8 @@
     return NOTES
       .filter((n) => cmpVersion(n.version, current) <= 0
         && (!lastSeen || cmpVersion(n.version, lastSeen) > 0))
-      .sort((x, y) => cmpVersion(y.version, x.version));
+      .sort((x, y) => cmpVersion(y.version, x.version))
+      .map(soloTesto);
   }
 
   // Quante "patch" (versioni con note) separano lastSeen da current.
