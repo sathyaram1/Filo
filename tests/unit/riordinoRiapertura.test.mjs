@@ -164,19 +164,19 @@ test('una scheda spostata a mano dopo la riapertura resta dove l’ha messa l’
     () => tm.runAutoTriage({ trigger: 'reopen' }));
   assert.equal(esito.reordered, false);
   assert.deepEqual(ordine(tm), ['rosso', 'blu']);
-  assert.deepEqual(tm.avvisi, ['1 scheda chiusa. La ritrovi nel filo della home']);
+  assert.deepEqual(tm.avvisi, ['Schede lasciate come le hai messe, 1 chiusa. La ritrovi nel filo della home']);
   tm.tabs.reverse();
   await tm.riapriPulizia(tm.azioni[0][0].riapriPulizia);
   assert.deepEqual(ordine(tm), ['blu', 'rosso', 'riaperta']);
 });
 
-test('alla riapertura con l’ordine scelto a mano e niente da chiudere, l’avviso non parla di riordino', async () => {
+test('alla riapertura con l’ordine scelto a mano e niente da chiudere, l’avviso dice che la barra è rimasta com’era', async () => {
   const tm = gestore();
   tm.moveTab('blu', 2);
   await conDecisione(async ({ tabs }) => ({ decisions: tabs.map((_, i) => ({ i, action: 'keep' })) }),
     () => tm.runAutoTriage({ trigger: 'reopen' }));
   assert.deepEqual(ordine(tm), ['verde', 'rosso', 'blu']);
-  assert.deepEqual(tm.avvisi, ['Nessuna scheda da chiudere']);
+  assert.deepEqual(tm.avvisi, ['Schede lasciate come le hai messe, nessuna da chiudere']);
 });
 
 test('uno spostamento a mano della sessione di prima non ferma il riordino della riapertura', async () => {
@@ -188,9 +188,9 @@ test('uno spostamento a mano della sessione di prima non ferma il riordino della
 });
 
 test('testoEsito: un avviso per ogni esito, e niente quando non c’è niente da dire', () => {
-  assert.equal(T.testoEsito({ trigger: 'reopen', valutate: 3, archiviate: 2, ordineTuo: true }), '2 schede chiuse. Le ritrovi nel filo della home');
+  assert.equal(T.testoEsito({ trigger: 'reopen', valutate: 3, archiviate: 2, ordineTuo: true }), 'Schede lasciate come le hai messe, 2 chiuse. Le ritrovi nel filo della home');
   assert.equal(T.testoEsito({ trigger: 'reopen', valutate: 3, archiviate: 1, ordineTuo: true, giudizioMancato: true }),
-    '1 doppione chiuso, lo ritrovi nel filo della home. Le altre non sono riuscito a valutarle');
+    'Schede lasciate come le hai messe e 1 doppione chiuso, lo ritrovi nel filo della home. Le altre non sono riuscito a valutarle');
   assert.equal(T.testoEsito({ trigger: 'reopen', valutate: 3, archiviate: 2, riordinate: true }), 'Schede riordinate, 2 chiuse. Le ritrovi nel filo della home');
   assert.equal(T.testoEsito({ trigger: 'idle', valutate: 3, archiviate: 1 }), 'Schede riordinate, 1 chiusa. La ritrovi nel filo della home');
   assert.equal(T.testoEsito({ trigger: 'reopen', valutate: 3, archiviate: 1, giudizioMancato: true }),
