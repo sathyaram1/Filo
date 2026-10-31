@@ -96,16 +96,9 @@ const numero = (s) => { const n = Number(s); return Number.isFinite(n) && n >= 0
 function leggiRiga(riga) {
   const r = String(riga || '').replace(/\r$/, '');
   if (r.startsWith(MARCA + SEP)) {
-    const [, stato, scaricati, totale, stima, formato, parti, pesi, stime, ...titolo] = r.split(SEP);
-    const lista = (x) => { try { const v = JSON.parse(x); return Array.isArray(v) ? v : []; } catch (_) { return []; } };
-    const ids = lista(parti);
-    const esatti = lista(pesi);
-    const circa = lista(stime);
-    // Il peso di tutti i pezzi si sa prima che scendano solo se ognuno ne ha uno.
-    const pesiPezzi = ids.map((_, i) => numero(esatti[i]) || numero(circa[i]));
+    const [, stato, scaricati, totale, stima, formato, ...titolo] = r.split(SEP);
     return {
       tipo: 'avanza', stato, scaricati: numero(scaricati), totale: numero(totale) || numero(stima),
-      pezzi: ids.length || 1, pesoTutti: pesiPezzi.length && pesiPezzi.every((n) => n > 0) ? pesiPezzi.reduce((a, b) => a + b, 0) : 0,
       formato: formato === 'NA' ? '' : formato, titolo: titolo.join(SEP) === 'NA' ? '' : titolo.join(SEP),
     };
   }
@@ -114,8 +107,9 @@ function leggiRiga(riga) {
     return { tipo: 'post', stato, chi: chi || '' };
   }
   if (/^\[Merger\]/.test(r)) return { tipo: 'post', stato: 'started', chi: 'Merger' };
-  // Il filtro sulle dirette non è un errore per yt-dlp: salta il video ed esce con 0.
+  // I filtri non sono un errore per yt-dlp: una diretta la salta ed esce con 0, un elenco lo ferma alla prima voce.
   if (/does not pass filter/i.test(r) && /is_live/.test(r)) return { tipo: 'errore', motivo: 'diretta', testo: r };
+  if (/does not pass filter/i.test(r) && /playlist_id/.test(r)) return { tipo: 'errore', motivo: 'elenco', testo: r };
   if (/^ERROR:/.test(r)) return { tipo: 'errore', motivo: motivoErrore(r), testo: r };
   return null;
 }
