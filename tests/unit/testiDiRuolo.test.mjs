@@ -225,7 +225,8 @@ test('nessun ruolo chiede un git push a mano: lo nomina solo la regola che lo vi
 // rilascio, e un «spingi» manderebbe chi verifica sullo stesso permesso che nessuno approva (#1797).
 test('la risposta a una verifica superata con derivati non chiede un push a mano', async () => {
   const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
-  const t = verifierReplyText({ outcome: 'pass', derived: [{ level: 1, sede: 'e', text: 'bordo freddo', priority: 1, num: '#7.1', n: 1 }] });
+  // Un interno messo da parte: le prove degli esterni escono prima del verdetto e qui non lasciano righe (#1555).
+  const t = verifierReplyText({ outcome: 'pass', derived: [{ level: 1, sede: 'i', text: 'bordo freddo', priority: 1, num: '#7.1', n: 1 }] });
   assert.match(t, /Prove del giro da TOGLIERE/);
   assert.doesNotMatch(t, /\bspingi\b|\bgit\s+push\b/i);
   assert.match(t, /lo spedisce il rilascio/);
