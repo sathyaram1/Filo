@@ -1,5 +1,5 @@
 // #1790 (#1781): un guasto dell'ambiente non è una domanda. Ogni ruolo che lavora lo dichiara nel rilascio col gruppo
-// fisso e il messaggio esatto, e il lavoro torna in coda da sé; nessun modello di domanda di guasto resta nei testi, e
+// fisso e il messaggio esatto, e ferma solo quel lavoro (#1950); nessun modello di domanda di guasto resta nei testi, e
 // il canale rifiuta la vecchia fermata `design` + `guasto` prima del server. Canale finto su HTTP locale.
 
 import '../helpers/senzaSessione.mjs';
