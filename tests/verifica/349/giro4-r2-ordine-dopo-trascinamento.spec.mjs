@@ -9,7 +9,7 @@ const avvisi = (shell) => shell.evaluate(() => [...document.querySelectorAll('.s
   .map((el) => el.textContent));
 
 const titoli = (shell) => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs
-  .filter((t) => /\.test:/.test(t.url || '')).map((t) => ({ id: t.id, title: t.title })));
+  .filter((t) => /\.test:/.test(t.url || '')).map((t) => ({ id: t.id, title: { blu: 'Blu', verde: 'Verde', rosso: 'Rosso' }[new URL(t.url).hostname.split('.')[0]] })));
 
 test.describe('riapertura e trascinamento', () => {
   test.use({ hostInPiu: ['blu.test', 'verde.test', 'rosso.test'] });
@@ -40,7 +40,10 @@ test.describe('riapertura e trascinamento', () => {
     // Appena riaperto, l'utente trascina Verde in fondo: Blu, Rosso, Verde.
     const prima = await titoli(shell);
     expect(prima.map((t) => t.title)).toEqual(['Blu', 'Verde', 'Rosso']);
-    await shell.evaluate((id) => window.filoShell.tabs.move(id, 2), prima.find((t) => t.title === 'Verde').id);
+    await shell.evaluate(async (id) => {
+      const tutte = (await window.filoShell.tabs.snapshot()).tabs;
+      return window.filoShell.tabs.move(id, tutte.length - 1);
+    }, prima.find((t) => t.title === 'Verde').id);
     await expect.poll(async () => (await titoli(shell)).map((t) => t.title)).toEqual(['Blu', 'Rosso', 'Verde']);
 
     await expect.poll(async () => (await avvisi(shell)).some((t) => t.startsWith('Schede')), { timeout: 40_000 }).toBe(true);
