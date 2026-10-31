@@ -74,8 +74,11 @@ function argomenti({ url, cartella, audio = false, ffmpeg = '', nodo = '' }) {
   }
   // Un «%» nel percorso della cartella è testo, non un campo del modello del nome.
   a.push('-o', require('node:path').join(String(cartella || '').replace(/%/g, '%%'), 'video.%(ext)s'));
+  // Video e audio scendono uno dopo l'altro, ognuno col suo formato: l'elenco dei pezzi dice quanti aspettarne.
   a.push('--progress-template', `download:${[MARCA, '%(progress.status)s', '%(progress.downloaded_bytes)s',
-    '%(progress.total_bytes)s', '%(progress.total_bytes_estimate)s', '%(info.format_id)s', '%(info.title)s'].join(SEP)}`);
+    '%(progress.total_bytes)s', '%(progress.total_bytes_estimate)s', '%(info.format_id)s',
+    '%(info.requested_formats.:.format_id)j', '%(info.requested_formats.:.filesize)j',
+    '%(info.requested_formats.:.filesize_approx)j', '%(info.title)s'].join(SEP)}`);
   a.push('--progress-template', `postprocess:${[MARCA_PP, '%(progress.status)s', '%(progress.postprocessor)s'].join(SEP)}`);
   // Dopo `--` l'indirizzo è solo un indirizzo, anche se comincia con un trattino.
   a.push('--', String(url));
@@ -87,9 +90,16 @@ const numero = (s) => { const n = Number(s); return Number.isFinite(n) && n >= 0
 function leggiRiga(riga) {
   const r = String(riga || '').replace(/\r$/, '');
   if (r.startsWith(MARCA + SEP)) {
-    const [, stato, scaricati, totale, stima, formato, ...titolo] = r.split(SEP);
+    const [, stato, scaricati, totale, stima, formato, parti, pesi, stime, ...titolo] = r.split(SEP);
+    const lista = (x) => { try { const v = JSON.parse(x); return Array.isArray(v) ? v : []; } catch (_) { return []; } };
+    const ids = lista(parti);
+    const esatti = lista(pesi);
+    const circa = lista(stime);
+    // Il peso di tutti i pezzi si sa prima che scendano solo se ognuno ne ha uno.
+    const pesiPezzi = ids.map((_, i) => numero(esatti[i]) || numero(circa[i]));
     return {
       tipo: 'avanza', stato, scaricati: numero(scaricati), totale: numero(totale) || numero(stima),
+      pezzi: ids.length || 1, pesoTutti: pesiPezzi.length && pesiPezzi.every((n) => n > 0) ? pesiPezzi.reduce((a, b) => a + b, 0) : 0,
       formato: formato === 'NA' ? '' : formato, titolo: titolo.join(SEP) === 'NA' ? '' : titolo.join(SEP),
     };
   }
@@ -126,31 +136,31 @@ function motivoErrore(testo) {
 function creaAvanzamento() {
   const pezzi = new Map();
   let attesi = 1;
+  let pesoTutti = 0;
   let titolo = '';
   return {
     leggi(ev) {
       if (!ev || ev.tipo !== 'avanza') return;
       if (ev.titolo) titolo = ev.titolo;
       const id = ev.formato || '?';
-      if (ev.formato && ev.formato.includes('+')) attesi = Math.max(attesi, ev.formato.split('+').length);
+      attesi = Math.max(attesi, Number(ev.pezzi) || 1);
+      if (ev.pesoTutti > 0) pesoTutti = ev.pesoTutti;
       const p = pezzi.get(id) || { scaricati: 0, totale: 0, finito: false };
       p.scaricati = Math.max(p.scaricati, ev.scaricati);
       if (ev.totale) p.totale = ev.totale;
       if (ev.stato === 'finished') { p.finito = true; if (!p.totale) p.totale = p.scaricati; p.scaricati = p.totale || p.scaricati; }
       pezzi.set(id, p);
     },
-    // yt-dlp dice il formato del pezzo, «137» poi «140»: se sono due, se ne aspettano almeno due.
-    pezziAttesi(n) { attesi = Math.max(attesi, Number(n) || 1); },
     titolo: () => titolo,
     stato() {
       let ricevuti = 0; let totale = 0; let noti = 0;
       for (const p of pezzi.values()) { ricevuti += p.scaricati; totale += p.totale; if (p.totale) noti++; }
+      if (pesoTutti) return { ricevuti, totale: Math.max(pesoTutti, ricevuti) };
       // Un pezzo che non ha ancora un peso rende la percentuale una promessa falsa: meglio la barra senza numero.
       if (noti < pezzi.size || !pezzi.size) return { ricevuti, totale: 0 };
       if (pezzi.size < attesi) return { ricevuti, totale: 0 };
       return { ricevuti, totale: Math.max(totale, ricevuti) };
     },
-    tuttiFiniti: () => pezzi.size >= attesi && [...pezzi.values()].every((p) => p.finito),
   };
 }
 

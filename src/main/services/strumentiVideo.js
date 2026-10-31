@@ -22,7 +22,9 @@ function errore(motivo, messaggio) {
 }
 
 // `scarica(url)` → { totale, corpo: AsyncIterable<Uint8Array> }; in Electron la dà netFetch qui sotto.
-function crea({ cartella, scarica, platform = process.platform, arch = process.arch, ora = Date.now }) {
+// `verificaFirma` e `hashFfmpeg` si cambiano solo nelle prove, che non hanno la chiave privata degli autori.
+function crea({ cartella, scarica, platform = process.platform, arch = process.arch, ora = Date.now,
+  verificaFirma = Firma.verifica, hashFfmpeg = Y.FFMPEG_SHA256 }) {
   const fileStato = path.join(cartella, 'stato.json');
   const exe = platform === 'win32' ? '.exe' : '';
   let inCorso = null;
@@ -85,7 +87,7 @@ function crea({ cartella, scarica, platform = process.platform, arch = process.a
     const [somme, firma] = await Promise.all([
       piccolo(`${Y.RILASCIO_YTDLP}SHA2-256SUMS`), piccolo(`${Y.RILASCIO_YTDLP}SHA2-256SUMS.sig`),
     ]);
-    if (!Firma.verifica(somme, firma)) throw errore('firma', 'SHA2-256SUMS di yt-dlp senza una firma valida');
+    if (!verificaFirma(somme, firma)) throw errore('firma', 'SHA2-256SUMS di yt-dlp senza una firma valida');
     return Y.leggiSomme(somme.toString('utf8'));
   }
 
@@ -120,7 +122,8 @@ function crea({ cartella, scarica, platform = process.platform, arch = process.a
   async function ffmpeg(stato, avanza) {
     const asset = Y.assetFfmpeg(platform, arch);
     if (!asset) return '';
-    const hash = Y.FFMPEG_SHA256[asset];
+    const hash = hashFfmpeg[asset];
+    if (!hash) return '';
     const file = `ffmpeg-${Y.FFMPEG_VERSIONE}${exe}`;
     if (stato.ffmpeg && stato.ffmpeg.sha256 === hash && esiste(dentro(file))) return dentro(file);
     await grande(`${Y.RILASCIO_FFMPEG}${asset}`, dentro(file), hash, { gzip: true, avanza });
