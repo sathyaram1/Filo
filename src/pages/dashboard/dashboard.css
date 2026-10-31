@@ -2170,6 +2170,13 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   color: #fff;
 }
 .dash-recap-done:hover { opacity: 0.9; }
+.dash-recap-tutte {
+  background: transparent;
+  color: var(--dash-ink-soft);
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.dash-recap-tutte:hover { background: var(--dash-line); color: var(--dash-ink); }
 @media (prefers-reduced-motion: reduce) {
   .dash-recap-overlay, .dash-recap-box { animation: none; }
 }
