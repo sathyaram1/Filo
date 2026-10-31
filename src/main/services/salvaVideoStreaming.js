@@ -181,7 +181,10 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
   } catch (e) {
     return fallisci(Y.motivoErrore(e && e.message) === 'spazio' ? 'spazio' : 'generico', e && e.message);
   }
-  const pulisci = () => { try { fs.rmSync(lavoro, { recursive: true, force: true }); } catch (_) {} };
+  agganciaUscita();
+  lavori.set(lavoro, null);
+  scriviLavori();
+  const pulisci = () => { togli(lavoro); lavori.delete(lavoro); scriviLavori(); };
 
   let destinazione = null;
   let noAlDialogo = false;
