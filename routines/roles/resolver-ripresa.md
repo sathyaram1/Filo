@@ -26,6 +26,8 @@ giri passati, dalla più vecchia: le porte già trovate si tengono chiuse.
 `payload.decisioni` tiene TUTTE le risposte dell'owner su questo feedback, in
 ordine e con la loro domanda, anche quelle di fermate precedenti: `ripresa`
 porta solo l'ultima.
+
+<!-- includi: _decisioni-owner.md -->
 <!-- includi: _note-per-agenti.md -->
 
 <!-- includi: _immagini.md -->
