@@ -153,6 +153,9 @@ function crea({ cartella, scarica, platform = process.platform, arch = process.a
           try {
             const [y, f] = await Promise.all([ytdlp(stato, forza, somma('y')), ffmpeg(stato, somma('f'))]);
             return { ytdlp: y, ffmpeg: f };
+          } catch (e) {
+            // Una rete che cade a metà non ha un motivo suo: per l'utente è il programma che non è arrivato.
+            throw e && e.motivo ? e : errore('programma', e && e.message);
           } finally {
             try { scriviStato(stato); } catch (_) {}
           }
