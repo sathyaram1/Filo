@@ -517,8 +517,7 @@ export async function heartbeat(t, opts = {}) {
  * Fine lavoro. `fault`, se presente, è il GUASTO DICHIARATO: il motivo per cui
  * questo giro non può lavorare, registrato AL CANALE invece che raccontato a
  * parole (il testo di ritorno di un worker non lo legge nessuna macchina). Il
- * server lo tronca e non lo interpreta; da lì in poi l'emissione dei biglietti
- * risponde `fault_declared` per il periodo di rispetto.
+ * server lo tronca e non lo interpreta, e ferma quel lavoro, non gli altri.
  *
  * `report`, se presente, è il rapporto di fine sessione (session-report.mjs):
  * viaggia nel corpo col nome `report`. Per la ritentata quando il server lo
