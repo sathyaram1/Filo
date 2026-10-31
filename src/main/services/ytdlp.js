@@ -79,13 +79,12 @@ function argomenti({ url, cartella, audio = false, ffmpeg = '', nodo = '' }) {
   } else {
     a.push('-f', 'b[ext=mp4]/b');
   }
-  // Un «%» nel percorso della cartella è testo, non un campo del modello del nome.
-  a.push('-o', require('node:path').join(String(cartella || '').replace(/%/g, '%%'), 'video.%(ext)s'));
+  a.push('-o', path.join(qui, 'video.%(ext)s'));
   // Video e audio scendono uno dopo l'altro, ognuno col suo formato: l'elenco dei pezzi dice quanti aspettarne.
+  a.push('--print-to-file', `before_dl:${['%(requested_formats.:.format_id)j', '%(requested_formats.:.filesize)j',
+    '%(requested_formats.:.filesize_approx)j'].join(SEP)}`, path.join(qui, FILE_PEZZI));
   a.push('--progress-template', `download:${[MARCA, '%(progress.status)s', '%(progress.downloaded_bytes)s',
-    '%(progress.total_bytes)s', '%(progress.total_bytes_estimate)s', '%(info.format_id)s',
-    '%(info.requested_formats.:.format_id)j', '%(info.requested_formats.:.filesize)j',
-    '%(info.requested_formats.:.filesize_approx)j', '%(info.title)s'].join(SEP)}`);
+    '%(progress.total_bytes)s', '%(progress.total_bytes_estimate)s', '%(info.format_id)s', '%(info.title)s'].join(SEP)}`);
   a.push('--progress-template', `postprocess:${[MARCA_PP, '%(progress.status)s', '%(progress.postprocessor)s'].join(SEP)}`);
   // Dopo `--` l'indirizzo è solo un indirizzo, anche se comincia con un trattino.
   a.push('--', String(url));
