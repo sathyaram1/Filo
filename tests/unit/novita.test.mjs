@@ -110,3 +110,11 @@ test('ogni riga del registro è testo, o un oggetto con testo e numero di segnal
     }
   }
 });
+
+// Le righe uscite portano il numero ritrovato nelle fusioni del registro: senza, «Apri la segnalazione» non
+// comparirebbe su nessuna riga vera. Una riscrittura del registro che perde i numeri si ferma qui.
+test('una parte vera delle righe uscite si apre sulla sua segnalazione', () => {
+  const righe = N.uscite(null, pkg.version).flatMap((v) => [...v.features, ...v.fixes]);
+  const collegate = righe.filter((r) => r.segnalazione);
+  assert.ok(collegate.length >= Math.ceil(righe.length / 10), `${collegate.length} righe collegate su ${righe.length}`);
+});
