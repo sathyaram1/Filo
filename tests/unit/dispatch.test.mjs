@@ -138,7 +138,9 @@ test('la risposta del server si stampa coi numeri dei rilievi nella critica', as
   const t = verifierReplyText(r, 'X');
   assert.match(t, /- r1 \[2i\] la cosa a non funziona/);
   assert.match(t, /- r3 \[1e\] un altro lavoro/);
-  assert.match(t, /le prove con r2 nel nome, per #9\.2/);
+  // Un `?` di livello 1 esce in ogni esito: la sua prova è già uscita col commit della critica (#1555).
+  assert.match(t, /\[1i\?\] il bordo è freddo\?\n {2}→ feedback #9\.2/);
+  assert.doesNotMatch(t, /le prove con r2 nel nome/);
 });
 
 test('VERIFIER_ROUND: il parser della critica coi livelli arriva dagli strumenti (fonte unica)', async () => {
