@@ -66,7 +66,8 @@ function scena(t) {
   const p = prepareBranch({ root: clone, branch: RAMO });
   assert.equal(p.ok, true, p.message);
   assert.equal(p.avviso, undefined, p.avviso);
-  // Senza reflog git 2.43 legge un'ora indefinita: il rifiuto dipende dal processo (nell'hook c'era sempre).
+  // Senza reflog git 2.43 confronta con un'ora mai scritta: il rifiuto cambia da processo a processo (dall'hook c'è
+  // sempre, da qui no), quindi la condizione si guarda anche da sé.
   assert.equal(haReflog(clone, `refs/remotes/origin/${RAMO}`), true, 'dopo il posizionamento il ref di tracciamento ha il suo reflog');
 
   commitFile(principale, 'main-avanti.js');
