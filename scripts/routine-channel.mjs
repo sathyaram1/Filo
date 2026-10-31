@@ -1927,6 +1927,7 @@ if (isMain) {
           const sped = spedisciRiallineamento(ROOT);
           if (!sped.ok) { console.error(testoRiallineamentoNonSpedito(sped)); process.exit(1); }
           if (sped.avviso) console.error(sped.avviso);
+          data.sha = sped.punta;
         }
       }
     }
