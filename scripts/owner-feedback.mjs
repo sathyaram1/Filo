@@ -318,14 +318,14 @@ export async function segnaAttese(id, numeri, opts = {}) {
 /**
  * Una segnalazione che un pacchetto vuole unire, letta per i controlli di `feedback:apri --pacchetto`
  * (SPEC-RIDISEGNO-LAVORO.md §3, regola 1). `stato` e `priorita` restano '' e null se non si decifrano.
- * @returns {Promise<{ ok: true, id, num, stato, priorita, locale, attese } | { ok: false, motivo, inesistente? }>}
+ * @returns {Promise<{ ok: true, id, num, stato, priorita, locale, attese, ramo, unisce, unitoIn, fidato } | { ok: false, motivo, inesistente? }>}
  */
 export async function segnalazioneDaUnire(riferimento, opts = {}) {
   const ATT = globalThis.SN_FB_ATTESE;
   const bearer = opts.bearer || await acquireBearer();
   const r = await risolviFeedback(riferimento, { bearer, base: FIRESTORE_BASE });
   if (!r.ok) return { ok: false, motivo: r.motivo, inesistente: /^nessun feedback/.test(r.motivo) };
-  const doc = await getDoc(r.id, bearer, ['seq', 'subSeq', 'status', 'priority', 'localOnly', 'branch', 'unisce', ATT.CAMPO]);
+  const doc = await getDoc(r.id, bearer, ['seq', 'subSeq', 'status', 'priority', 'localOnly', 'branch', 'unisce', 'unitoIn', 'fiducia', ATT.CAMPO]);
   if (!doc) return { ok: false, motivo: `nessun feedback ${riferimento}`, inesistente: true };
   const f = doc.fields || {};
   const { from, leggibile } = await statoAttuale(doc);
@@ -336,24 +336,31 @@ export async function segnalazioneDaUnire(riferimento, opts = {}) {
     attese: ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) }),
     ramo: String(f.branch?.stringValue || '').trim(),
     unisce: (f.unisce?.arrayValue?.values || []).map((v) => String(v?.mapValue?.fields?.num?.stringValue || '')).filter(Boolean),
+    // Il rimando che il server scrive alla nascita di un pacchetto: una unita rimasta in coda lo porta senza attesa.
+    unitoIn: String(f.unitoIn?.stringValue || '').trim(),
+    // La fiducia la scrive solo il server (#1148): un pacchetto che porta i suoi allegati non è più fidato di lei.
+    fidato: MR.isFidato({ fiducia: f.fiducia?.stringValue }),
   };
 }
 
 /**
- * `voce` ({ id, num }) in più fra le attese di `id`, tenendo quelle che c'erano: `--aspetta` invece le sostituisce.
- * Stesse regole di segnaAttese (esistono, niente giri, al più venti).
+ * Le attese di `id` sulle segnalazioni `togli` (id) diventano una sola su `voce` ({ id, num }), le altre restano: chi
+ * aspettava una segnalazione unita in un pacchetto aspetta il pacchetto. Stesse regole di segnaAttese.
  */
-export async function aggiungiAttesa(id, voce, opts = {}) {
+export async function spostaAttese(id, togli, voce, opts = {}) {
   const ATT = globalThis.SN_FB_ATTESE;
   const bearer = opts.bearer || await acquireBearer();
   const doc = await getDoc(id, bearer, [ATT.CAMPO]);
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
   const prima = ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(doc.fields?.[ATT.CAMPO]) });
-  if (prima.some((w) => w.id === voce.id)) return { ok: true, attese: prima, gia: true };
+  const via = new Set(Array.isArray(togli) ? togli : []);
+  if (!prima.some((w) => via.has(w.id))) return { ok: true, attese: prima, gia: true };
+  const tenute = prima.filter((w) => !via.has(w.id));
   // Le attese si riscrivono per numero: una senza numero sparirebbe in silenzio.
-  const senzaNumero = prima.filter((w) => !String(w.num || '').trim());
-  if (senzaNumero.length) return { ok: false, motivo: `aspetta ${senzaNumero.map((w) => w.id).join(', ')}, senza numero: da qui la perderei, aggiungi l'attesa da Gestione` };
-  return segnaAttese(id, [...prima.map((w) => w.num), voce.num].join(','), { ...opts, bearer });
+  const senzaNumero = tenute.filter((w) => !String(w.num || '').trim());
+  if (senzaNumero.length) return { ok: false, motivo: `aspetta anche ${senzaNumero.map((w) => w.id).join(', ')}, senza numero: da qui la perderei, sposta l'attesa da Gestione` };
+  const numeri = [...new Set([...tenute.map((w) => w.num), String(voce.num)])];
+  return segnaAttese(id, numeri.join(','), { ...opts, bearer });
 }
 
 /** La risposta a `--aspetta`/`--aspetta-niente`: l'elenco nuovo, quelle che sostituisce, e cosa succede dopo per QUESTO stato. */
