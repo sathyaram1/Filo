@@ -613,7 +613,14 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         const inizio = inCorso.get(b.tool_use_id);
         if (inizio !== undefined) {
           inCorso.delete(b.tool_use_id);
-          if (Number.isFinite(ms)) rep.longestToolS = Math.max(rep.longestToolS, Math.round(((ms - inizio) / 1000) * 10) / 10);
+          if (Number.isFinite(ms)) {
+            const s = Math.round(((ms - inizio) / 1000) * 10) / 10;
+            rep.longestToolS = Math.max(rep.longestToolS, s);
+            if (s > ATTESA_MIN_S) {
+              rep.atteseOltre30 += 1;
+              rep.attese.push({ strumento: chiamata.nome, cosa: chiamata.cosa, s: Math.round(s) });
+            }
+          }
         }
       }
     }
