@@ -1904,7 +1904,7 @@ class TabManager {
         ContatoriFinestra.misura('giroRiordino', trigger, {});
         contaGiro(0, 0, false);
         // Niente da giudicare non vuol dire niente da fare: alla riapertura la barra si riordina comunque (#349).
-        return this._esitoTriage(this.applyTriageDecisions([], [], { via: da === 'chat' ? 'chat' : 'riordino_automatico' }), { trigger, valutate: 0 });
+        return this._esitoTriage(this.applyTriageDecisions([], [], opzioni()), { trigger, valutate: 0 });
       }
       // 1) Duplicati esatti: decisione deterministica e affidabile.
       const T = globalThis.SN_TAB_TRIAGE;
