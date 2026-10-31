@@ -813,9 +813,13 @@ export function leaseAtteso(root, ramo, { exec = execFileSync } = {}) {
     if (!atteso || !passati.length) return '';
     if (passati.includes(atteso)) return atteso;
     // --independent tiene solo i commit che nessun altro della lista contiene: se l'atteso sparisce, un passato lo
-    // contiene. Un rev-list fra rami lontani supererebbe il buffer dell'uscita (decine di migliaia di commit).
-    const indipendenti = git(['merge-base', '--independent', atteso, ...passati]).split('\n').map((s) => s.trim());
-    return indipendenti.includes(atteso) ? '' : atteso;
+    // contiene. Un rev-list fra rami lontani supererebbe il buffer dell'uscita (decine di migliaia di commit); a
+    // blocchi, perché un reflog di salvataggi automatici sfora la riga di comando di Windows.
+    for (let i = 0; i < passati.length; i += 200) {
+      const indipendenti = git(['merge-base', '--independent', atteso, ...passati.slice(i, i + 200)]).split('\n').map((s) => s.trim());
+      if (!indipendenti.includes(atteso)) return atteso;
+    }
+    return '';
   } catch (_) {
     return '';
   }
