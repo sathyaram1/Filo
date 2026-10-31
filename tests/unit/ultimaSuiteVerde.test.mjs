@@ -279,7 +279,7 @@ if (p.includes('/actions/workflows/suite.yml/runs')) {
 else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
 `;
 
-  async function scegli({ oreVersione, oreVerde, senzaWindows = false }) {
+  async function scegli({ oreVersione, oreVerde, senzaWindows = false, zavorra = 0 }) {
     const tmp = cartellaTemporanea('filo-scelta-vera-');
     const repo = join(tmp, 'main');
     const ricevute = [];
