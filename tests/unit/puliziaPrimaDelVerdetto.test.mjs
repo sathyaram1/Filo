@@ -9,6 +9,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { esceInOgniEsito, proveDaToglierePrimaDelVerdetto, proveScritteDa } from '../../scripts/lib/prove-tolte.mjs';
 import { verifierReplyText } from '../../scripts/dispatch.mjs';
