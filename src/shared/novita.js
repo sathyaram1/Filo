@@ -83,18 +83,43 @@
     return prev[b.length];
   }
 
-  // Una parola del testo somiglia al termine se lo somiglia lei o il suo inizio: «aggiorament» trova «aggiornamento».
-  function somiglia(termine, parola, max) {
-    if (parola.length < termine.length - max) return false;
+  // Quanto una parola del testo dista dal termine, lei o il suo inizio: «aggiorament» trova «aggiornamento».
+  function scarto(termine, parola, max) {
+    let meglio = max + 1;
     for (let l = termine.length - max; l <= termine.length + max; l++) {
       if (l < 1 || l > parola.length) continue;
-      if (distanza(termine, parola.slice(0, l), max) <= max) return true;
+      meglio = Math.min(meglio, distanza(termine, parola.slice(0, l), max));
     }
-    return false;
+    return meglio;
   }
 
   function paroleDi(testo) {
-    return testo.match(/[\p{L}\p{N}']+/gu) || [];
+    return testo.match(/[\p{L}\p{N}]+/gu) || [];
+  }
+
+  // Il testo piegato di ogni riga si calcola una volta per elenco: il filtro riparte a ogni lettera.
+  const cacheVoci = new WeakMap();
+  function vociDi(lista) {
+    let voci = cacheVoci.get(lista);
+    if (voci) return voci;
+    voci = [];
+    for (const v of lista) {
+      const intestazione = piega(`${v.version} ${dataLeggibile(v.date)}`);
+      for (const tipo of ['features', 'fixes']) {
+        for (const r of v[tipo]) {
+          const testo = piega(r.testo);
+          voci.push({ r, testo, parole: paroleDi(testo), intestazione });
+        }
+      }
+    }
+    voci.vocabolario = null;
+    cacheVoci.set(lista, voci);
+    return voci;
+  }
+  function vocabolarioDi(lista) {
+    const voci = vociDi(lista);
+    if (!voci.vocabolario) voci.vocabolario = new Set(voci.flatMap((x) => x.parole));
+    return voci.vocabolario;
   }
 
   // Le versioni filtrate, con le sole righe che contengono tutti i termini. Un termine che nel registro non c'è mai
@@ -104,25 +129,25 @@
     const ts = termini(query);
     if (!ts.length) return { versioni: lista, righe: contaRighe(lista), termini: [], approssimati: [] };
 
-    const voci = [];
-    for (const v of lista) {
-      const intestazione = piega(`${v.version} ${dataLeggibile(v.date)}`);
-      for (const tipo of ['features', 'fixes']) {
-        for (const r of v[tipo]) voci.push({ v, tipo, r, testo: piega(r.testo), intestazione });
-      }
-    }
+    const voci = vociDi(lista);
     const esatto = (t) => voci.some((x) => x.testo.includes(t) || x.intestazione.includes(t));
-    let vocabolario = null;
     const regole = ts.map((t) => {
-      if (esatto(t) || !tolleranza(t)) return { t, simili: null };
-      // Le parole diverse del registro sono poche migliaia: la somiglianza si misura su quelle, non riga per riga.
-      if (!vocabolario) vocabolario = new Set(voci.flatMap((x) => paroleDi(x.testo)));
-      const simili = new Set();
-      for (const p of vocabolario) if (somiglia(t, p, tolleranza(t))) simili.add(p);
-      return { t, simili };
+      const max = tolleranza(t);
+      if (!max || esatto(t)) return { t, simili: null };
+      // Le parole diverse del registro sono poche migliaia: la somiglianza si misura su quelle, non riga per riga, e
+      // si tengono solo le più vicine, così «agiornamento» non pesca anche «ragionamento».
+      let migliore = max + 1;
+      const per = new Map();
+      for (const p of vocabolarioDi(lista)) {
+        const d = scarto(t, p, max);
+        if (d > max) continue;
+        per.set(p, d);
+        if (d < migliore) migliore = d;
+      }
+      return { t, simili: new Set([...per].filter(([, d]) => d === migliore).map(([p]) => p)) };
     });
     const prende = (x, reg) => (reg.simili
-      ? paroleDi(x.testo).some((p) => reg.simili.has(p))
+      ? x.parole.some((p) => reg.simili.has(p))
       : x.testo.includes(reg.t) || x.intestazione.includes(reg.t));
 
     const tenute = new Set(voci.filter((x) => regole.every((reg) => prende(x, reg))).map((x) => x.r));
@@ -147,7 +172,7 @@
     const out = [];
     for (const reg of ts || []) {
       if (reg.simili) {
-        const re = /[\p{L}\p{N}']+/gu;
+        const re = /[\p{L}\p{N}]+/gu;
         let m;
         while ((m = re.exec(p))) if (reg.simili.includes(m[0])) out.push([m.index, m.index + m[0].length]);
       } else if (reg.termine) {
