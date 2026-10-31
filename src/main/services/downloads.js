@@ -1026,7 +1026,7 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
   records.set(id, rec);
   const attese = [];
   rec._sblocca = (si) => { for (const r of attese.splice(0)) r(si); };
-  const requestCancel = () => { rec._cancelled = true; finalizeManual(rec, 'cancelled'); };
+  const requestCancel = () => { rec._cancelled = true; if (!rec._final) rec.nota = ''; finalizeManual(rec, 'cancelled'); };
   // La risposta alla domanda «scaricarlo?», da confirmDownload: un no chiude la voce come «Annulla».
   const rispondi = (si) => {
     if (!si) { requestCancel(); return; }
@@ -1085,6 +1085,7 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
       // L'ultimo progress() può essere caduto nel freno: a file completo i byte ricevuti SONO
       // il totale, e la riga non deve restare ferma al 95% a scaricamento finito.
       if (rec.totalBytes > 0) rec.receivedBytes = rec.totalBytes;
+      rec.nota = '';
       return finalizeManual(rec, 'completed', savePath);
     },
     // Cosa sta facendo, quando non sono byte del file («Preparo il programma…»); `azzera` riparte da zero byte.

@@ -13,6 +13,8 @@ import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 require(join(ROOT, 'src', 'shared', 'i18n.js'));
+// Come nell'app: senza l'elenco dei tipi eseguibili ogni nome conterebbe come un programma da confermare.
+require(join(ROOT, 'src', 'shared', 'eseguibili.js'));
 const DL = require(join(ROOT, 'src', 'main', 'services', 'downloads.js'));
 const SV = require(join(ROOT, 'src', 'main', 'services', 'salvaVideoStreaming.js'));
 
