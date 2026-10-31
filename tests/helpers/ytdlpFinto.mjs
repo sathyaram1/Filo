@@ -87,7 +87,7 @@ if (caso.diretta) {
 
 // Un indirizzo che non è di un video (un canale, una ricerca) è un elenco: il vero lo scorre tutto, e lo ferma alla
 // prima voce solo --break-match-filters sul playlist_id.
-if (caso.lista && !/[?&]v=/.test(url)) {
+if (caso.lista && !/[?&]v=|\/status\//.test(url)) {
   const ferma = argv.some((a, i) => (a === '--break-match-filters' || a === '--break-match-filter') && /playlist_id/.test(argv[i + 1] || ''));
   for (let i = 1; i <= Number(caso.lista); i++) {
     registra({ voce: i });
