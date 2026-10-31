@@ -81,7 +81,7 @@ import {
   writeExpectation, clearExpectation, stateDir,
   lavoroVivo, testoLavoroVivo, USCITA_LAVORO_VIVO,
 } from './lib/branch-integrity.mjs';
-import { writeRole, clearRole, readRole, readMarker } from './lib/routine-role.mjs';
+import { writeRole, clearRole, readRole, readMarker, isRoutineInstance } from './lib/routine-role.mjs';
 import { fileRiscritti, fusioniCheCitano, numeroFeedback } from './lib/su-main.mjs';
 import {
   baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, numeraRilievi, puliziaDelPass, rigaNumerata,
@@ -2081,8 +2081,8 @@ export async function run() {
 // impostazioni e copioni dei ganci dalla cartella, e quello che un worker ci ha lasciato (un ramo, un file in .claude)
 // non deve arrivare al prossimo. Scarta le modifiche non salvate (il lavoro di un worker morto si butta): solo nelle routine.
 export function tornaAllaLineaPrincipale() {
-  if (process.env.FILO_ROUTINE !== '1') {
-    return { ok: false, uso: true, message: 'solo nelle routine (FILO_ROUTINE=1): scarta le modifiche non salvate della cartella' };
+  if (!isRoutineInstance(ROOT)) {
+    return { ok: false, uso: true, message: 'solo nelle routine (FILO_ROUTINE=1, il biglietto del giro nella cartella o gli strumenti del preflight): scarta le modifiche non salvate della cartella' };
   }
   const vivo = lavoroVivo(ROOT);
   if (vivo.vivo) return { ok: false, vivo: true, message: testoLavoroVivo(vivo, `riportato la cartella su ${MAIN_BRANCH}`) };

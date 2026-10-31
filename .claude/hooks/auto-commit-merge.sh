@@ -185,16 +185,13 @@ biglietto_finito() {
 # lavoro ha pubblicato il proprio codice direttamente, saltando il cancello di
 # sicurezza — che nel frattempo esaminava un gemello abbandonato.
 #
-# Ora la sessione si DICHIARA. `FILO_ROUTINE=1` (lo esporta l'orchestratore, e
-# lo eredita ogni worker) significa: nessuna pubblicazione automatica, mai,
-# qualunque sia il nome del ramo. Al ramo principale le porta solo il server,
-# dopo verifica e controllo di sicurezza.
-#
-# È anche la risposta alla domanda "questo commit da dove è arrivato?": senza
-# marcatura, nella storia il lavoro di una routine e quello di una sessione
-# locale sono indistinguibili (stesso autore, stesso ramo, stesso aspetto).
+# Ora al ramo principale non pubblica niente, mai (piu' sotto). La routine si
+# riconosce per dire nella storia da dove arriva un commit (l'autore), con la
+# regola di isRoutineInstance (scripts/lib/routine-role.mjs): l'export di
+# FILO_ROUTINE non arriva al gancio, che Claude Code lancia col suo ambiente
+# (#1966), quindi vale anche il biglietto che dispatch scrive nella cartella.
 is_routine_session() {
-  [ -n "$FILO_ROUTINE" ] && [ "$FILO_ROUTINE" != "0" ]
+  { [ -n "$FILO_ROUTINE" ] && [ "$FILO_ROUTINE" != "0" ]; } || [ -f "$CARTELLA/.claude/routine-ticket.json" ]
 }
 
 # I prefissi restano come RETE, non più come regola primaria: proteggono anche

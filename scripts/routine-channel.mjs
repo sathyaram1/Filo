@@ -158,6 +158,7 @@ import {
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 import { cloneDelBiglietto, rilancia } from './lib/worker-nel-clone.mjs';
+import { isRoutineInstance } from './lib/routine-role.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -711,7 +712,7 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
   // come nell'hook: una sentinella negli unit test la cerca lì.
   // Come l'hook: una copia dei dati del server nei commit da spedire si toglie dalla loro storia, o il ramo non parte (#1108).
   let copie = { stato: 'pulito', avviso: '' };
-  const routine = Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0';
+  const routine = isRoutineInstance(root, { env });
   try {
     copie = spedibileSenzaCopie(root, routine ? { nome: 'claude-routine', email: 'claude@routine' } : {});
   } catch (_) { /* senza elenco si spedisce come prima: la sentinella resta la seconda rete */ }
@@ -783,7 +784,7 @@ export function commitRestante(root, { exec = execFileSync, env = process.env } 
     restano = run(['diff', '--cached', '--name-only']).out.split('\n').filter(Boolean);
     if (!restano.length) return { ok: true, skipped: false, committed: [], fuori, reason: '' };
   }
-  const routine = Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0';
+  const routine = isRoutineInstance(root, { env });
   const nome = routine ? 'claude-routine' : 'claude-local';
   const email = routine ? 'claude@routine' : 'claude@local';
   const elenco = `${restano.slice(0, 3).join(', ')}${restano.length > 3 ? ` (+${restano.length - 3} file)` : ''}`;
@@ -1666,7 +1667,7 @@ if (isMain) {
       if (!p.ok) {
         console.error(`Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`);
         // In una routine un push a mano resta fermo sul controllo dei permessi, che in cloud nessuno approva (#1797).
-        const inRoutine = (Boolean(process.env.FILO_ROUTINE) && process.env.FILO_ROUTINE !== '0') || !!marcatore;
+        const inRoutine = isRoutineInstance(ROOT) || !!marcatore;
         console.error(inRoutine
           ? 'Non ho rilasciato niente. Non spingere a mano: in cloud il controllo dei permessi ferma il push e la sessione resta appesa. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando, che rispedisce da sé; altrimenti è un guasto: rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push.'
           : 'Non ho rilasciato niente: il ramo deve arrivare su origin prima del rilascio. Rimetti a posto la spedizione e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
