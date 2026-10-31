@@ -392,7 +392,10 @@ conflitto risolto tenendo le due parti, che lascia la modifica del ramo uguale).
 regola è `giroDopoRiallineamento` in `verifierRound.js`; il server rifà il confronto da
 sé con l'API di GitHub e non si fida di quello del client: per i conflitti approssima
 `merge-tree` (zone sovrapposte o a contatto nei file toccati da tutte e due le parti;
-nel dubbio, conflitto). Per questo dispatch spinge il ramo prima di consegnare. Ogni
+nel dubbio, conflitto). Per questo dispatch spinge il ramo prima di consegnare, e se la
+punta non contiene `origin/main`, non parte o su origin non risulta uguale, non consegna
+(#1964: altrimenti chi verifica dopo legge il commit già verificato). Vale anche per
+`deliver fixed`; una consegna che si ferma con una domanda non riallinea e passa. Ogni
 guasto (GitHub giù, sha sconosciuto, main cambiato in troppi file) vale `pieno`. Un
 lavoro che tocca anche il server confronta allo stesso modo la sua parte del server,
 dalla punta verificata a quella registrata dell'ultima spinta (`realign.shaVerificatoServer`):

@@ -97,7 +97,8 @@
 //         non parte, tranne `--reason locale` (#1790). `--status attack|spam` col
 //         perché nelle note: il giudizio di chi l'ha letto (Ricevuti L3).
 //         Revisione, correzione, critica e verdetto partono solo dal ramo assegnato (uscita 1 altrimenti): il ramo
-//         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo.
+//         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo. La correzione di un riallineamento
+//         parte solo col ramo spedito su origin, alla punta della cartella e sopra origin/main (#1964).
 //         `deliver piano --piano <file.md>`: il piano di un lavoro grosso, che riceve chi riprende.
 //         `deliver status --status done --reason gia_risolto --fusione <sha> --notes "…" --frase "…"`: già risolto
 //         su main, si chiude senza ramo (regola 5 della spec; il server ricontrolla la fusione).
@@ -739,6 +740,65 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
     return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
   }
   return { ok: false, skipped: false, branch: ramo, reason: pulisciGit(push.out) };
+}
+
+/**
+ * La consegna di un riallineamento: il marcatore del correttore porta in `dal` il commit verificato. Una che si ferma
+ * con una domanda che blocca non riallinea niente. Regola unica per dispatch --record-fixed e deliver fixed. PURA.
+ */
+export function consegnaDiRiallineamento(marcatore, { ferma = false, domanda = null } = {}) {
+  const siFerma = ferma === true || !!(domanda && typeof domanda === 'object' && domanda.blocca !== false);
+  return !!(marcatore && marcatore.role === 'fixer' && marcatore.dal) && !siFerma;
+}
+
+/**
+ * Un riallineamento si registra solo se su origin c'è (#1964): registrato col ramo remoto fermo al commit verificato,
+ * chi verificava dopo trovava un diff vuoto. La punta contiene la linea principale, parte, e origin la rilegge uguale.
+ * → { ok, branch, punta, main, forced } | { ok:false, tipo: 'base'|'ramo'|'spedizione', reason }
+ */
+export function spedisciRiallineamento(root, { exec = execFileSync, env = process.env, base = 'refs/remotes/origin/main' } = {}) {
+  const run = (args) => {
+    try {
+      return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
+    } catch (e) {
+      return { ok: false, out: String((e && (e.stderr || e.stdout)) || (e && e.message) || '').trim() };
+    }
+  };
+  const punta = run(['rev-parse', '--verify', 'HEAD^{commit}']);
+  if (!punta.ok || !punta.out) return { ok: false, tipo: 'ramo', reason: `stato di git illeggibile: ${pulisciGit(punta.out)}` };
+  const nomeMain = base.replace(/^refs\/remotes\//, '');
+  const main = run(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
+  if (!main.ok || !main.out) return { ok: false, tipo: 'base', reason: `qui non c'è ${nomeMain}, la linea principale su cui si rifà la base` };
+  if (!run(['merge-base', '--is-ancestor', main.out, punta.out]).ok) {
+    return { ok: false, tipo: 'base', reason: `la punta ${punta.out.slice(0, 9)} non contiene ${nomeMain} (${main.out.slice(0, 9)}): il rebase non c'è, o è partito da una linea principale più vecchia di quella scaricata` };
+  }
+  const p = pushRamoCorrente(root, { exec, env });
+  if (!p.ok) return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `il ramo${p.branch ? ` '${p.branch}'` : ''} non arriva su origin: ${p.reason}` };
+  if (p.skipped) return { ok: false, tipo: 'ramo', branch: p.branch, reason: `il ramo non parte: ${p.reason}` };
+  // La spedizione può rifare i commit per togliere una copia dei dati: si confronta la punta di adesso.
+  const dopo = run(['rev-parse', '--verify', 'HEAD^{commit}']);
+  const ref = `refs/heads/${p.branch}`;
+  const remoto = run(['ls-remote', 'origin', ref]);
+  if (!remoto.ok) return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `spedito, ma non riesco a rileggere '${p.branch}' su origin: ${pulisciGit(remoto.out)}` };
+  const riga = remoto.out.split('\n').map((l) => l.trim().split(/\s+/)).find((c) => c[1] === ref);
+  const su = riga ? riga[0].toLowerCase() : '';
+  if (!dopo.ok || su !== dopo.out.toLowerCase()) {
+    return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `su origin '${p.branch}' ${su ? `è a ${su.slice(0, 9)}` : 'non c\'è'}, non alla punta della cartella ${dopo.out.slice(0, 9)}` };
+  }
+  return { ok: true, branch: p.branch, punta: dopo.out, main: main.out, forced: !!p.forced, ...(p.avviso ? { avviso: p.avviso } : {}) };
+}
+
+/** Il rifiuto di un riallineamento non spedito, uguale dalle due strade di consegna. PURA. */
+export function testoRiallineamentoNonSpedito(sped) {
+  return [
+    `Riallineamento NON consegnato: ${sped.reason}.`,
+    'Il server non ha registrato niente: chi verifica dopo di te legge il ramo da origin, e senza il rebase lì troverebbe il commit già verificato.',
+    sped.tipo === 'spedizione'
+      ? 'Non spingere a mano: in cloud il controllo dei permessi ferma il push. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando; altrimenti è un guasto: fai la domanda di fine sessione e rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push. Il lavoro torna in coda sul suo ramo.'
+      : sped.tipo === 'base'
+        ? 'Rifai la base sulla linea principale (`git fetch origin main`, poi `git rebase origin/main`), poi rilancia lo stesso comando.'
+        : 'Riporta la cartella sul ramo del lavoro, a rebase finito, poi rilancia lo stesso comando.',
+  ].join('\n');
 }
 
 /**
@@ -1863,6 +1923,15 @@ if (isMain) {
         process.exit(1);
       }
       data.sha = punta;
+      if (intento === 'fixed') {
+        const { readMarker } = await import('./lib/routine-role.mjs');
+        if (consegnaDiRiallineamento(readMarker(ROOT), { ferma: data.stop, domanda: data.domanda })) {
+          const sped = spedisciRiallineamento(ROOT);
+          if (!sped.ok) { console.error(testoRiallineamentoNonSpedito(sped)); process.exit(1); }
+          if (sped.avviso) console.error(sped.avviso);
+          data.sha = sped.punta;
+        }
+      }
     }
     // Il piano di un lavoro grosso (SPEC-RIDISEGNO-LAVORO.md § 2): da file, intero, e da solo.
     if (intento === 'piano') {
