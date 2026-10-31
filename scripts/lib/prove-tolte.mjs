@@ -343,7 +343,7 @@ export function numeriDelNome(percorso) {
 }
 
 /**
- * Vero se il rilievo esce dal giro qualunque sia l'esito: un esterno, o un `?` che conta al più 1 (un vicino conta 0).
+ * Vero se il rilievo esce dal giro in un pass o in una correzione: un esterno, o un `?` che conta al più 1 (un vicino conta 0).
  * La sua prova esce PRIMA del verdetto: dopo, un commit è una spinta che il registro della fiducia non vede (#1555). PURA.
  */
 export function esceInOgniEsito(f) {
@@ -352,11 +352,21 @@ export function esceInOgniEsito(f) {
   return !!(f && f.decision) && (sede === 'v' ? 0 : Number(f.level)) <= 1;
 }
 
-/** Fra `prove`, quelle che nel nome portano solo numeri di rilievi che escono in ogni esito. PURA. */
+/** Vero se la critica ferma di sicuro il lavoro: un interno di livello 2 o 3 col `?`. PURA. */
+export function fermaDiSicuro(findings) {
+  return (Array.isArray(findings) ? findings : [])
+    .some((f) => f && f.decision && String(f.sede || 'i').toLowerCase() === 'i' && Number(f.level) >= 2);
+}
+
+/**
+ * Fra `prove`, quelle che nel nome portano solo numeri di rilievi che escono comunque. PURA.
+ * A lavoro fermo i `?` restano a chi riprende fra i sospesi: lì escono prima solo le prove degli esterni.
+ */
 export function proveDaToglierePrimaDelVerdetto(prove, findings) {
   const tutti = Array.isArray(findings) ? findings : [];
+  const esce = fermaDiSicuro(tutti) ? (f) => String(f.sede || 'i').toLowerCase() === 'e' : esceInOgniEsito;
   return percorsi(prove).filter((p) => PROVA.test(p) && nelGiro(p)).map((p) => ({ prova: p, numeri: numeriDelNome(p) }))
-    .filter(({ numeri }) => numeri.length && numeri.every((n) => tutti[n - 1] && esceInOgniEsito(tutti[n - 1])));
+    .filter(({ numeri }) => numeri.length && numeri.every((n) => tutti[n - 1] && esce(tutti[n - 1])));
 }
 
 /** Le prove del giro aggiunte o rinominate da `avvio` a HEAD: quelle scritte in questa verifica. [] se git non risponde. */
