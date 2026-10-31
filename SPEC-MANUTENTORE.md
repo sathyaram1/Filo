@@ -227,7 +227,10 @@ si può perdere senza danno e interessa sapere.
 - SPEC-DOMANDE § 4.3–4.8: sostituite da questa spec per il manutentore; il
   riordino della coda (§ 6.6) e la potatura (§ 4.7) restano compiti suoi.
 - #1155 (monitoraggio, taccuino, sveglie): assorbito qui.
-- Tetti per priorità, fermo globale dopo un guasto, riserva su A: tolti.
+- Fermo globale dopo un guasto e riserva su A: tolti. I bilanci dei giri di
+  verifica restano dell'owner (§ 2).
+- Il sistema di priorità dei compiti ricorrenti: superato, li programma il
+  manutentore (§ 6).
 - Scala delle priorità: `patterns/` e la scala del 03/09 si riscrivono con il
   § 2; i giudici assegnano 3 o lasciano 1 (la 2 è del manutentore).
 
