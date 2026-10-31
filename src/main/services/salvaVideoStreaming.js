@@ -12,11 +12,54 @@ const Y = require('./ytdlp');
 const t = (k, ...a) => { try { return globalThis.SN_I18N.t(k, ...a); } catch (_) { return k; } };
 
 // Le frasi dei motivi stanno in i18n.js come `streaming_<motivo>`; le pagine le mostrano tali e quali.
-const MOTIVI = Object.freeze(['eta', 'accesso', 'robot', 'protetto', 'spazio', 'diretta', 'sito', 'non_disponibile',
-  'rete', 'aggiornare', 'programma', 'firma', 'piattaforma', 'generico']);
+const MOTIVI = Object.freeze(['eta', 'accesso', 'robot', 'protetto', 'spazio', 'diretta', 'sito', 'elenco',
+  'non_disponibile', 'rete', 'aggiornare', 'programma', 'firma', 'piattaforma', 'generico']);
 const frase = (motivo) => t(`streaming_${MOTIVI.includes(motivo) ? motivo : 'generico'}`);
 // Quelli che ripetere non cambia: il video resta com'è.
-const DEFINITIVI = Object.freeze(['eta', 'accesso', 'protetto', 'sito', 'piattaforma']);
+const DEFINITIVI = Object.freeze(['eta', 'accesso', 'protetto', 'sito', 'elenco', 'piattaforma']);
+
+// Una cartella di lavoro sta fra i Download dell'utente col video a metà: non sopravvive al salvataggio. Uscendo da
+// Filo si ferma il programma e la si toglie; quelle di un'uscita brusca le toglie l'avvio dopo, dall'elenco su disco.
+const lavori = new Map();
+function fileLavori() {
+  try { return path.join(require('electron').app.getPath('userData'), 'programmi-video', 'lavori.json'); } catch (_) {}
+  return process.env.FILO_USER_DATA ? path.join(process.env.FILO_USER_DATA, 'programmi-video', 'lavori.json') : '';
+}
+function scriviLavori() {
+  const f = fileLavori();
+  if (!f) return;
+  try {
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, JSON.stringify([...lavori.keys()]));
+  } catch (_) {}
+}
+const togli = (dir) => { try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {} };
+
+// All'avvio nessun salvataggio è vivo: quello che l'elenco ricorda è rimasto da un'uscita che non ha pulito.
+function pulisciAvanzi() {
+  const f = fileLavori();
+  if (!f) return;
+  let rimasti = [];
+  try { rimasti = JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) { return; }
+  for (const dir of Array.isArray(rimasti) ? rimasti : []) {
+    // Solo una cartella di lavoro di Filo: l'elenco sta su disco, e un nome qualunque non si cancella.
+    if (typeof dir === 'string' && path.isAbsolute(dir) && /^\.filo-video-[A-Za-z0-9]+$/.test(path.basename(dir)) && !lavori.has(dir)) togli(dir);
+  }
+  scriviLavori();
+}
+
+let uscitaAgganciata = false;
+function agganciaUscita() {
+  if (uscitaAgganciata) return;
+  uscitaAgganciata = true;
+  try {
+    require('electron').app.on('will-quit', () => {
+      for (const [dir, figlio] of lavori) { fermaAlbero(figlio, { subito: true }); togli(dir); }
+      lavori.clear();
+      scriviLavori();
+    });
+  } catch (_) {}
+}
 
 // In prova il programma è uno finto: `FILO_YTDLP_COMANDO` è il comando come JSON, `FILO_FFMPEG` il percorso.
 function comandoDiProva() {
