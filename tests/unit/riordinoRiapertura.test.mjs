@@ -36,6 +36,7 @@ function gestore() {
   tm._riapertaAlle = Date.now() - 1000;
   tm.incognito = false;
   tm._sempreAperte = [];
+  tm._identityColorCache = new Map();
   tm.avvisi = [];
   tm.azioni = [];
   tm.win = { webContents: { send: (canale, dati) => { if (canale === 'shell:toast') { tm.avvisi.push(dati.text); tm.azioni.push((dati.opts && dati.opts.actions) || []); } } } };
@@ -167,7 +168,8 @@ test('una scheda spostata a mano dopo la riapertura resta dove l’ha messa l’
   assert.deepEqual(tm.avvisi, ['Schede lasciate come le hai messe, 1 chiusa. La ritrovi nel filo della home']);
   tm.tabs.reverse();
   await tm.riapriPulizia(tm.azioni[0][0].riapriPulizia);
-  assert.deepEqual(ordine(tm), ['blu', 'rosso', 'riaperta']);
+  // Torna al posto che aveva, come con Ctrl/Cmd+Shift+T; per colore sarebbe rosso, riaperta, blu.
+  assert.deepEqual(ordine(tm), ['riaperta', 'blu', 'rosso']);
 });
 
 test('alla riapertura con l’ordine scelto a mano e niente da chiudere, l’avviso dice che la barra è rimasta com’era', async () => {

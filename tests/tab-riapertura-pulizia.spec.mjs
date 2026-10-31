@@ -164,3 +164,32 @@ test('l’avviso della riapertura che ha chiuso delle schede le riapre con un cl
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   }
 });
+
+test('la scheda riportata da «Riapri» dopo «Riordina e archivia» torna con la sua pagina precedente', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const titoli = () => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.title));
+  const prima = testServer.html('<!doctype html><title>Prima</title><h1>Prima</h1>');
+  const dopo = testServer.html('<!doctype html><title>Dopo</title><h1>Dopo</h1>');
+  await openTab(prima);
+  await app.evaluate(({ BrowserWindow }, u) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm.navigate(tm.tabs.find((t) => /Prima/.test(t.title || '')).id, u);
+  }, dopo);
+  await expect.poll(titoli, { timeout: 15_000 }).toContain('Dopo');
+  await openTab(testServer.html('<!doctype html><title>Altra</title><h1>Altra</h1>'));
+  const esito = await app.evaluate(async ({ BrowserWindow }) => {
+    globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({ decisions: tabs.map((t, i) => ({ i, action: /Dopo/.test(t.title || '') ? 'archive' : 'keep', reason: 'test' })) });
+    return BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.runAutoTriage({ trigger: 'manual' });
+  });
+  expect(esito.archived).toBe(1);
+  const vista = await aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/avvisi.html'), 'la vista degli avvisi non è nata');
+  const riapri = vista.locator('.shell-notif.show', { hasText: 'chiusa' }).locator('.shell-notif-action', { hasText: 'Riapri' });
+  await expect(riapri).toBeEnabled({ timeout: 10_000 });
+  await riapri.click();
+  await expect.poll(titoli, { timeout: 15_000 }).toContain('Dopo');
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm.goBack(tm.tabs.find((t) => /Dopo/.test(t.title || '')).id);
+  });
+  await expect.poll(titoli, { timeout: 10_000, message: 'Indietro sulla scheda riportata da «Riapri» non torna alla pagina di prima' }).toContain('Prima');
+});
