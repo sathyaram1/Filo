@@ -741,6 +741,61 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
 }
 
 /**
+ * La consegna di un riallineamento: il marcatore del correttore porta in `dal` il commit verificato. Una che si ferma
+ * con una domanda che blocca non riallinea niente. Regola unica per dispatch --record-fixed e deliver fixed. PURA.
+ */
+export function consegnaDiRiallineamento(marcatore, { ferma = false, domanda = null } = {}) {
+  const siFerma = ferma === true || !!(domanda && typeof domanda === 'object' && domanda.blocca !== false);
+  return !!(marcatore && marcatore.role === 'fixer' && marcatore.dal) && !siFerma;
+}
+
+/**
+ * Un riallineamento si registra solo se su origin c'è (#1964): registrato col ramo remoto fermo al commit verificato,
+ * chi verificava dopo trovava un diff vuoto. La punta contiene la linea principale, parte, e origin la rilegge uguale.
+ * → { ok, branch, punta, main, forced } | { ok:false, spedizione, reason } (spedizione: è il push a non riuscire)
+ */
+export function spedisciRiallineamento(root, { exec = execFileSync, env = process.env, base = 'refs/remotes/origin/main' } = {}) {
+  const run = (args) => {
+    try {
+      return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
+    } catch (e) {
+      return { ok: false, out: String((e && (e.stderr || e.stdout)) || (e && e.message) || '').trim() };
+    }
+  };
+  const punta = run(['rev-parse', '--verify', 'HEAD^{commit}']);
+  if (!punta.ok || !punta.out) return { ok: false, spedizione: false, reason: `stato di git illeggibile: ${pulisciGit(punta.out)}` };
+  const nomeMain = base.replace(/^refs\/remotes\//, '');
+  const main = run(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
+  if (!main.ok || !main.out) return { ok: false, spedizione: false, reason: `qui non c'è ${nomeMain}, la linea principale su cui si rifà la base` };
+  if (!run(['merge-base', '--is-ancestor', main.out, punta.out]).ok) {
+    return { ok: false, spedizione: false, reason: `la punta ${punta.out.slice(0, 9)} non contiene ${nomeMain} (${main.out.slice(0, 9)}): il rebase non c'è, o è partito da una linea principale più vecchia di quella scaricata` };
+  }
+  const p = pushRamoCorrente(root, { exec, env });
+  if (!p.ok) return { ok: false, spedizione: true, branch: p.branch, reason: `il ramo${p.branch ? ` '${p.branch}'` : ''} non arriva su origin: ${p.reason}` };
+  if (p.skipped) return { ok: false, spedizione: false, branch: p.branch, reason: `il ramo non parte: ${p.reason}` };
+  const ref = `refs/heads/${p.branch}`;
+  const remoto = run(['ls-remote', 'origin', ref]);
+  if (!remoto.ok) return { ok: false, spedizione: true, branch: p.branch, reason: `spedito, ma non riesco a rileggere '${p.branch}' su origin: ${pulisciGit(remoto.out)}` };
+  const riga = remoto.out.split('\n').map((l) => l.trim().split(/\s+/)).find((c) => c[1] === ref);
+  const su = riga ? riga[0].toLowerCase() : '';
+  if (su !== punta.out.toLowerCase()) {
+    return { ok: false, spedizione: true, branch: p.branch, reason: `su origin '${p.branch}' ${su ? `è a ${su.slice(0, 9)}` : 'non c\'è'}, non alla punta della cartella ${punta.out.slice(0, 9)}` };
+  }
+  return { ok: true, branch: p.branch, punta: punta.out, main: main.out, forced: !!p.forced, ...(p.avviso ? { avviso: p.avviso } : {}) };
+}
+
+/** Il rifiuto di un riallineamento non spedito, uguale dalle due strade di consegna. PURA. */
+export function testoRiallineamentoNonSpedito(sped) {
+  return [
+    `Riallineamento NON consegnato: ${sped.reason}.`,
+    'Il server non ha registrato niente: chi verifica dopo di te legge il ramo da origin, e senza il rebase lì troverebbe il commit già verificato.',
+    sped.spedizione
+      ? 'Non spingere a mano: in cloud il controllo dei permessi ferma il push. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando; altrimenti è un guasto: fai la domanda di fine sessione e rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push. Il lavoro torna in coda sul suo ramo.'
+      : 'Rifai la base sulla linea principale (`git fetch origin main`, poi `git rebase origin/main`), poi rilancia lo stesso comando.',
+  ].join('\n');
+}
+
+/**
  * Committa quello che è rimasto fuori dai commit, prima di spedire. L'hook di
  * salvataggio parte solo su Edit/Write: un file nato da una shell (rm, mv, un
  * generatore) al rilascio non era in nessun commit, il rilascio spediva HEAD,
