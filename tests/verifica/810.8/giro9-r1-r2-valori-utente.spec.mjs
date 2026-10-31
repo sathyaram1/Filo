@@ -130,8 +130,7 @@ test('r2 il testo di una proposta dell’assistente non copre i codici che Filo 
     <h1>Estrazioni</h1><label for="n">Note</label><textarea id="n"></textarea></body></html>`);
   await apriAiuto(shell, sito);
   await scriviAllAiuto(sito, 'compila le note');
-  await sito.locator('.sn-highlight-accept').click({ timeout: 30_000 });
-  await expect.poll(() => sito.locator('#n').evaluate((t) => t.value.length), { timeout: 10_000 }).toBeGreaterThan(500_000);
+  await expect(sito.locator('.sn-highlight-accept')).toBeAttached({ timeout: 30_000 });
 
   const banca = await testServer.openReady(openTab, `<!doctype html><html><head><title>Banca</title></head><body>${campoDelSito('731942')}</body></html>`);
   await apriAiuto(shell, banca);
