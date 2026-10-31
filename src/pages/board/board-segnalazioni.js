@@ -82,12 +82,12 @@
 
     el.append(testa, stato, togli, corpo);
 
-    testa.addEventListener('click', () => {
-      const aperta = corpo.hidden;
+    function mostraCorpo(aperta) {
       corpo.hidden = !aperta;
       testa.setAttribute('aria-expanded', String(aperta));
       el.classList.toggle('bd-mia-aperta', aperta);
-    });
+    }
+    testa.addEventListener('click', () => mostraCorpo(corpo.hidden));
 
     // Togliere non si annulla: il pulsante chiede conferma sul posto e torna com'era da solo.
     let timer = null;
