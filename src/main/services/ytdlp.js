@@ -98,7 +98,8 @@ function leggiRiga(riga) {
     return { tipo: 'post', stato, chi: chi || '' };
   }
   if (/^\[Merger\]/.test(r)) return { tipo: 'post', stato: 'started', chi: 'Merger' };
-  if (/does not pass filter \(!is_live\)|skipping/i.test(r) && /is_live/.test(r)) return { tipo: 'errore', motivo: 'diretta' };
+  // Il filtro sulle dirette non è un errore per yt-dlp: salta il video ed esce con 0.
+  if (/does not pass filter/i.test(r) && /is_live/.test(r)) return { tipo: 'errore', motivo: 'diretta', testo: r };
   if (/^ERROR:/.test(r)) return { tipo: 'errore', motivo: motivoErrore(r), testo: r };
   return null;
 }
