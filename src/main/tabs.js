@@ -2057,10 +2057,10 @@ class TabManager {
 
     // §1.3 — a OGNI giro, non solo quando si è archiviato qualcosa: all'apertura
     // la barra dev'essere riordinata comunque.
-    const reordered = this.reorderTabsByColor();
+    const reordered = riordina && this.reorderTabsByColor();
     if (reordered) ContatoriFinestra.misura('riordinatoPerColore', this);
     if (toArchive.length || reordered) this._broadcast();
-    return { archived: toArchive.length, duplicati: toArchive.filter((x) => x.reason === 'duplicato').length, reordered, pulizia };
+    return { archived: toArchive.length, duplicati: toArchive.filter((x) => x.reason === 'duplicato').length, reordered, ordineTuo: !riordina, pulizia };
   }
 
   // «Riapri» dall'avviso della pulizia: solo l'ultima, e senza doppioni di una già riaperta dal filo della home.
