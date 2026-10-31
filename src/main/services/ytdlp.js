@@ -181,6 +181,8 @@ function creaAvanzamento() {
       // Un pezzo che non ha ancora un peso rende la percentuale una promessa falsa: meglio la barra senza numero.
       if (noti < pezzi.size || !pezzi.size) return { ricevuti, totale: 0 };
       if (pezzi.size < attesi) return { ricevuti, totale: 0 };
+      // Senza l'elenco dei pezzi, dopo il primo può arrivarne un altro: il suo 100% tornerebbe indietro.
+      if (!elenco && pezzi.size < 2) return { ricevuti, totale: 0 };
       return { ricevuti, totale: Math.max(totale, ricevuti) };
     },
   };
