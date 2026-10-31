@@ -663,7 +663,8 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     rep.notes.push(`velocità «${v.speed}» non a listino per «${v.model || '(senza modello)'}»: ${turni} ${tariffa}`);
   }
   if (illeggibili) rep.notes.push(`${illeggibili} righe del transcript non erano JSON e sono state saltate`);
-  return rep;
+  for (const f of senzaSeguito) f.voce.dopo = rigaDopo(f.chiamata, null);
+  return stringiElenchi(rep);
 }
 
 /** Le righe di un file, una alla volta. */
