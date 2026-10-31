@@ -78,7 +78,7 @@ test('solo le versioni uscite, la propria segnata; il filtro regge accenti e let
 
   await page.locator('#cerca').fill('agiornamento');
   await expect(page.locator('.nv-riga')).toHaveText(['L\'aggiornamento non chiude più le finestre aperte.']);
-  await expect(page.locator('#avviso')).toHaveText('Nessuna riga contiene «agiornamento»: queste hanno aggiornamento.');
+  await expect(page.locator('#avviso')).toHaveText('Nessuna riga contiene «agiornamento»: ecco quelle con «aggiornamento».');
 
   // Il filtro resta nell'indirizzo: ricaricando, la ricerca è ancora lì.
   await expect.poll(() => page.url()).toContain('?q=agiornamento');
@@ -119,7 +119,7 @@ test('tasto destro su una riga: «Copia il testo» la copia; la segnalazione si 
 
   // Questo computer ha mandato la #4242: la riga si apre su «Le tue segnalazioni», con la segnalazione aperta.
   await app.evaluate(() => globalThis.SN_SEGNALAZIONI_MIE.importa([{
-    id: 'fb-4242', testo: 'Vorrei cercare fra le novità', creataIl: '2026-10-20T10:00:00Z', stato: 'risolta', num: '#4242',
+    id: 'fb-4242', testo: 'Vorrei cercare fra le novità', creataIl: '2026-10-20T10:00:00Z', stato: 'risolta', num: '4242',
   }]));
   page = await apriNovita(openTab);
   await page.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
