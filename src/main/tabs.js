@@ -2025,22 +2025,25 @@ class TabManager {
       toArchive.push({ tab, reason: d.reason || 'auto' });
     });
 
-    // Quello che serve per riportarle com'erano dal «Riapri» dell'avviso.
-    const riapribili = toArchive.map(({ tab }) => ({
-      url: tab.url,
-      scrollPct: typeof tab.scrollPct === 'number' && !tab._scrollIgnoto ? tab.scrollPct : null,
-      proxy: tab.proxy && tab.proxy.country ? { country: tab.proxy.country, tier: tab.proxy.tier || null } : null,
-    })).filter((x) => typeof x.url === 'string' && x.url);
-    let pulizia = null;
-    if (riapribili.length) {
-      pulizia = (this._ultimaPulizia ? this._ultimaPulizia.id : 0) + 1;
-      this._ultimaPulizia = { id: pulizia, schede: riapribili, riordina, alle: Date.now() };
-    }
-
+    // Il «Riapri» dell'avviso le riporta dalla voce della pila, come Ctrl/Cmd+Shift+T: cronologia, zoom, e niente
+    // doppione da una riapertura dopo. `riserva` per quelle che la pila non tiene (una home vuota).
+    const riapribili = [];
     for (const { tab, reason } of toArchive) {
+      const voce = this._ricordaChiusa(tab);
+      if (typeof tab.url === 'string' && tab.url) {
+        riapribili.push({
+          voce,
+          riserva: {
+            url: tab.url,
+            scroll: typeof tab.scrollPct === 'number' && !tab._scrollIgnoto ? tab.scrollPct : null,
+            proxy: tab.proxy && tab.proxy.country ? { country: tab.proxy.country, tier: tab.proxy.tier || null } : null,
+            colore: tab.identityColor || null,
+          },
+        });
+      }
       ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
       this._avvisaSorvegliante(tab, 'chiusa');
-      this._archiveClosedTab(tab, reason, { voce: this._ricordaChiusa(tab) });
+      this._archiveClosedTab(tab, reason, { voce });
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
       if (idx >= 0) {
