@@ -130,6 +130,35 @@ describe('verde vuol dire anche unit test passati su Windows, come il cancello d
   });
 });
 
+// #1989: a gh api si chiedono solo questi campi; uno letto e non chiesto arriverebbe sempre vuoto.
+describe('di corse e lavori si leggono solo i campi chiesti a GitHub', () => {
+  const spia = (letti) => (o) => new Proxy(o, {
+    get(t, k, r) { if (typeof k === 'string') letti.add(k); return Reflect.get(t, k, r); },
+  });
+  const intera = (sha, conclusion, id) => ({ ...corsa(sha, conclusion), id, updated_at: '2026-09-28T11:00:00Z',
+    run_number: id, display_title: 'merge-gate', repository: { full_name: 'o/r' }, head_commit: { message: 'm' } });
+
+  test('scelta, età del verde e testi dei due fermi leggono di una corsa solo CAMPI_CORSA', () => {
+    const letti = new Set();
+    const runs = [intera('c5', 'failure', 5), intera('c4', 'success', 4), intera('c3', 'success', 3)].map(spia(letti));
+    const valida = (r) => r.id !== 4;
+    const verde = scegliUltimoVerde(runs, MAIN, valida);
+    assert.equal(verde, 'c3');
+    assert.ok(Number.isFinite(oreDalPrimoVerde(runs, MAIN, 'c1', () => true, Date.now(), valida)));
+    const v = corseVerdi(runs);
+    testoRilascioFermo({ tag: 'v1', oreDallUltima: 100, commitDopoTag: 3, verde, corsaVerde: v.get('c3'), scartata: v.get('c4'), corse: runs });
+    testoFermoDopoIlVerde({ tag: 'v1', oreDallUltima: 100, commitDopoTag: 3, verde, corsaVerde: v.get('c3'), oreDalVerde: 20, pubblicazioni: runs });
+    assert.deepEqual([...letti].filter((k) => !CAMPI_CORSA.includes(k)), [], 'un campo nuovo va aggiunto a CAMPI_CORSA');
+  });
+
+  test('il cancello su Windows legge di un lavoro solo CAMPI_LAVORO', () => {
+    const letti = new Set();
+    const lavori = [{ id: 1, name: 'suite (1)', conclusion: 'success', steps: [] }, { id: 2, name: LAVORO_UNIT_WINDOWS, conclusion: 'success', steps: [] }];
+    assert.equal(passaIlCancello(lavori.map(spia(letti))), true);
+    assert.deepEqual([...letti].filter((k) => !CAMPI_LAVORO.includes(k)), []);
+  });
+});
+
 describe('la pubblicazione ferma', () => {
   test(`ferma: più di ${SOGLIA_ORE} ore, codice nuovo dopo l'ultima versione, niente di verde dopo di lei`, () => {
     assert.equal(rilascioFermo({ oreDallUltima: 49, commitDopoTag: 3, verdeDopoTag: false }), 'senza-verde');
