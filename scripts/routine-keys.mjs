@@ -20,7 +20,7 @@
 //
 // USO
 //   node scripts/routine-keys.mjs elenco
-//   node scripts/routine-keys.mjs crea <nome> <routine|build> ["a cosa serve"]
+//   node scripts/routine-keys.mjs crea <nome> <routine|build|manutentore> ["a cosa serve"]
 //   node scripts/routine-keys.mjs revoca <nome>
 //   node scripts/routine-keys.mjs account <nome> <A|B>
 //   node scripts/routine-keys.mjs rete <nome> <limitata|aperta>
@@ -103,7 +103,7 @@ async function main() {
 
   if (cmd === 'crea') {
     if (!nome || !potere) {
-      console.error('Uso: node scripts/routine-keys.mjs crea <nome> <routine|build> ["a cosa serve"]');
+      console.error('Uso: node scripts/routine-keys.mjs crea <nome> <routine|build|manutentore> ["a cosa serve"]');
       process.exit(1);
     }
     const r = await chiama({ op: 'issue', slug: nome, scope: potere, label: resto.join(' ') });
@@ -113,6 +113,9 @@ async function main() {
     console.log('Copiala ADESSO dove serve: non si potrà più rileggere.');
     console.log(potere === 'build'
       ? "Va nell'ambiente «rilascio» del repo (Settings → Environments → rilascio), come FILO_BUILD_PASSPHRASE: fra i segreti del repo non la legge nessuno."
+      // La chiave del manutentore (SPEC-MANUTENTORE § 3) serve alla chat e alla sessione locale: sta solo su quel PC.
+      : potere === 'manutentore'
+      ? 'Va nell\'ambiente di QUESTO PC, come FILO_MANUTENTORE_KEY: la usano npm run manutentore e la sua chat. La sessione che il pacemaker accende per il manutentore non la vuole: ha il suo biglietto.'
       // Una parola d'ordine di routine NON va nell'ambiente: l'ambiente lo
       // eredita ogni lavoratore che parte da lì. Sta solo nel prompt della
       // routine schedulata, che è l'unica cosa che l'orchestratore tiene per sé.

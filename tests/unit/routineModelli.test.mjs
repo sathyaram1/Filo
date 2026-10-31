@@ -21,7 +21,7 @@ async function conFetch(finto, fn) {
 }
 
 test('le fasi e le scelte sono quelle che il server legge', () => {
-  assert.deepEqual(RM.RUOLI.map((r) => r.id), ['new-work', 'verifier', 'fixer', 'secaudit']);
+  assert.deepEqual(RM.RUOLI.map((r) => r.id), ['new-work', 'verifier', 'fixer', 'secaudit', 'manutentore']);
   assert.deepEqual(RM.SCELTE.model.map((s) => s.id), ['opus', 'sonnet', 'haiku', 'fable']);
   assert.deepEqual(RM.SCELTE.effort.map((s) => s.id), ['low', 'medium', 'high', 'xhigh', 'max']);
   assert.equal(RM.CAMPO, 'roleModels');

@@ -27,6 +27,9 @@ sulle tre settimane 8.000 $ per 505 fusioni su main.
 
 ## 2. Gli oggetti
 
+Il manutentore, la scala delle priorità, i tetti e il fermo dopo un guasto li rivede SPEC-MANUTENTORE.md
+(31/10/2026): dove le due dicono cose diverse vale quella.
+
 **Scheda.** Per ogni feedback aperto: titolo di 3–5 parole, riassunto sotto i
 200 token, tipo, area, file probabili, se è ancora valido con la prova, di chi è
 doppione, se è già risolto su main. La scrive un agente Haiku dal testo del

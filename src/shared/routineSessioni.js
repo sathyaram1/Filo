@@ -5,7 +5,8 @@
 (function (global) {
   'use strict';
 
-  const CHIAVI = Object.freeze(['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff']);
+  // `manutentoreAcceso`: il pacemaker accende il manutentore (SPEC-MANUTENTORE § 4) solo se l'owner l'ha acceso.
+  const CHIAVI = Object.freeze(['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff', 'manutentoreAcceso']);
   // Vuoto = si alternano, che è il comportamento senza il campo.
   const ACCOUNT = Object.freeze(['', 'A', 'B']);
 
@@ -14,7 +15,7 @@
     return {
       min: Number.isFinite(A.MAX_SESSIONS_MIN) ? A.MAX_SESSIONS_MIN : 1,
       max: Number.isFinite(A.MAX_SESSIONS_MAX) ? A.MAX_SESSIONS_MAX : 20,
-      predefinito: Number.isFinite(A.MAX_SESSIONS_DEFAULT) ? A.MAX_SESSIONS_DEFAULT : 1,
+      predefinito: Number.isFinite(A.MAX_SESSIONS_DEFAULT) ? A.MAX_SESSIONS_DEFAULT : 20,
     };
   }
 
@@ -28,6 +29,7 @@
       priorityAccount: ACCOUNT.includes(d.priorityAccount) ? d.priorityAccount : '',
       accountAOff: d.accountAOff === true,
       accountBOff: d.accountBOff === true,
+      manutentoreAcceso: d.manutentoreAcceso === true,
     };
   }
 
@@ -45,7 +47,7 @@
       const scritto = String(p.maxSessions).trim().replace(',', '.');
       const n = scritto === '' ? NaN : Number(scritto);
       if (!Number.isInteger(n) || n < min || n > max) {
-        return { ok: false, testo: `Sessioni in parallelo: ci vuole un numero intero da ${min} a ${max}. Non salvato.` };
+        return { ok: false, testo: `Freno d'emergenza: ci vuole un numero intero da ${min} a ${max}. Non salvato.` };
       }
       valori.maxSessions = n;
     }
@@ -55,7 +57,7 @@
       }
       valori.priorityAccount = p.priorityAccount;
     }
-    for (const chiave of ['accountAOff', 'accountBOff']) {
+    for (const chiave of ['accountAOff', 'accountBOff', 'manutentoreAcceso']) {
       if (p[chiave] == null) continue;
       if (typeof p[chiave] !== 'boolean') {
         return { ok: false, testo: `${chiave}: ci vuole vero o falso. Non salvato.` };

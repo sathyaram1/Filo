@@ -175,7 +175,9 @@
     // uno zero sarebbe un interruttore master di nascosto, e quello esiste già.
     MAX_SESSIONS_MIN: 1,
     MAX_SESSIONS_MAX: 20,
-    MAX_SESSIONS_DEFAULT: 1,
+    // Il freno d'emergenza dell'owner (SPEC-MANUTENTORE § 2): il server, senza il campo, ne lascia 20; quante ne
+    // lavorano davvero lo sceglie il manutentore sotto questo numero.
+    MAX_SESSIONS_DEFAULT: 20,
     // Il testo della fase 2 (istruzioni per chi corregge): stesso tetto del
     // server, che oltre taglia. La dashboard rifiuta il testo più lungo invece
     // di salvarlo mozzato in silenzio.

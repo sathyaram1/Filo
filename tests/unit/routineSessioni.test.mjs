@@ -15,14 +15,14 @@ const A = globalThis.SN_CONST.AUTOMATION;
 test('l\'intervallo delle sessioni è suo, non quello dei bilanci', () => {
   assert.equal(A.MAX_SESSIONS_MIN, 1, 'zero sarebbe un interruttore master di nascosto');
   assert.equal(A.MAX_SESSIONS_MAX, 20);
-  assert.equal(A.MAX_SESSIONS_DEFAULT, 1);
+  assert.equal(A.MAX_SESSIONS_DEFAULT, 20, 'lo stesso del server (policy.MAX_SESSIONS_DEFAULT): il freno, non il lavoro');
   assert.notEqual(A.MAX_SESSIONS_MIN, A.CAP_MIN, 'i bilanci partono da 0, le sessioni no');
   assert.notEqual(A.MAX_SESSIONS_MAX, A.CAP_MAX);
 });
 
 test('un documento senza i campi vale come il comportamento di oggi', () => {
   assert.deepEqual(RS.leggiDoc({}), {
-    maxSessions: 1, priorityAccount: '', accountAOff: false, accountBOff: false,
+    maxSessions: 20, priorityAccount: '', accountAOff: false, accountBOff: false, manutentoreAcceso: false,
   });
   assert.deepEqual(RS.leggiDoc(null), RS.leggiDoc({}));
   assert.deepEqual(RS.leggiDoc(undefined), RS.leggiDoc({}));
@@ -31,12 +31,16 @@ test('un documento senza i campi vale come il comportamento di oggi', () => {
 test('il documento si legge com\'è, e un valore storto non fa esplodere la pagina', () => {
   assert.deepEqual(RS.leggiDoc({
     maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false,
-  }), { maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false });
+  }), { maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false, manutentoreAcceso: false });
+  assert.equal(RS.leggiDoc({ manutentoreAcceso: true }).manutentoreAcceso, true);
+  assert.equal(RS.leggiDoc({ manutentoreAcceso: 'sì' }).manutentoreAcceso, false, 'solo un vero booleano lo accende');
+  assert.deepEqual(RS.valida({ manutentoreAcceso: true }), { ok: true, valori: { manutentoreAcceso: true } });
+  assert.equal(RS.valida({ manutentoreAcceso: 'sì' }).ok, false);
   // Firestore rende gli interi come stringhe: «5» è cinque, non un guasto.
   assert.equal(RS.leggiDoc({ maxSessions: '5' }).maxSessions, 5);
   assert.equal(RS.leggiDoc({ maxSessions: 99 }).maxSessions, 20, 'in lettura si riporta nell\'intervallo');
   assert.equal(RS.leggiDoc({ maxSessions: 0 }).maxSessions, 1);
-  assert.equal(RS.leggiDoc({ maxSessions: 'tante' }).maxSessions, 1);
+  assert.equal(RS.leggiDoc({ maxSessions: 'tante' }).maxSessions, 20, 'come il server: un valore storto vale il predefinito');
   assert.equal(RS.leggiDoc({ priorityAccount: 'C' }).priorityAccount, '');
   assert.equal(RS.leggiDoc({ accountAOff: 'sì' }).accountAOff, false, 'solo un vero booleano esclude');
 });

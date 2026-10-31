@@ -37,7 +37,7 @@ export const MAX_AGE_MS = 12 * 60 * 60 * 1000;
 // I ruoli che il dispatcher può consegnare. Un valore fuori da qui viene
 // scartato: il marcatore finisce nell'identità pubblica del feedback, quindi
 // non deve poter contenere testo arbitrario.
-export const KNOWN_ROLES = ['verifier', 'secaudit', 'fixer', 'new-work', 'risposta', 'smistamento', 'compito'];
+export const KNOWN_ROLES = ['verifier', 'secaudit', 'fixer', 'new-work', 'risposta', 'smistamento', 'compito', 'manutentore'];
 
 export function roleFile(root) {
   return resolve(root, '.claude', 'routine-role.json');

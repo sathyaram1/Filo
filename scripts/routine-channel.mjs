@@ -65,7 +65,9 @@
 //         Exit 0 = ha rilasciato il biglietto, 5 = lavora ancora (si rilancia), 3 = fermo da 20 minuti senza segni di
 //         vita: biglietto già rilasciato con un guasto dichiarato, il giro si chiude.
 //
-//   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--forza]
+//   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--processo "domanda"] [--forza]
+//       → `--processo`: un dubbio di processo (strumento, ordine, cosa fare di un rilievo) per il manutentore, non per
+//         l'owner: il lavoro resta fermo finché lui non risponde con una nota (SPEC-MANUTENTORE § 4).
 //       → exit 5, e niente rilasciato, se nella cartella lavora ancora qualcuno (#1480): per l'orchestratore un
 //         battito, un salvataggio recente o un processo (`--forza` solo per il worker morto davvero), per un worker
 //         i suoi processi.
@@ -530,7 +532,9 @@ export async function release(t, fault = '', opts, report = null) {
   const payload = { ticket: t };
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
-  if (report && typeof report === 'object') payload.report = report;
+  if (report && typeof report === 'object') Object.assign(payload, registrazioniDelRapporto(report));
+  const processo = String((opts && opts.processo) || '').trim();
+  if (processo) payload.domandaProcesso = processo;
   Object.assign(payload, creditiDi(opts));
   const { status, body } = await call('routineRelease', payload, opts);
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
@@ -550,6 +554,28 @@ export async function release(t, fault = '', opts, report = null) {
  */
 // I dati del § 6 di SPEC-MANUTENTORE: un server che non li conosce ancora riceve il resto del rapporto, e lo si dice.
 export const CAMPI_FALLITI_E_ATTESE = Object.freeze(['falliti', 'attese', 'atteseOltre30']);
+// Il server (manutentoreRegole.RILASCIO) tiene sul biglietto solo le attese sopra i 30 s, e rifiuta le altre.
+const ATTESA_SOPRA_S = 30;
+// Il tetto della domanda di processo sul server: oltre, il rilascio si rifiuta prima di partire.
+export const PROCESSO_MAX = 4000;
+
+/**
+ * Il corpo del rilascio dal rapporto: falliti e attese escono dal rapporto e vanno nei campi che il server conserva sul
+ * biglietto per il manutentore (`strumentiFalliti` { nome, errore, poi }, `attese` { cosa, secondi }). PURA.
+ */
+export function registrazioniDelRapporto(report) {
+  const { falliti, attese, ...resto } = report || {};
+  const out = { report: resto };
+  if (Array.isArray(falliti) && falliti.length) {
+    out.strumentiFalliti = falliti.filter((f) => f && f.strumento && f.errore)
+      .map((f) => ({ nome: String(f.strumento), errore: String(f.errore), ...(f.dopo ? { poi: String(f.dopo) } : {}) }));
+  }
+  if (Array.isArray(attese) && attese.length) {
+    out.attese = attese.filter((a) => a && a.strumento && Number(a.s) > ATTESA_SOPRA_S)
+      .map((a) => ({ cosa: a.cosa ? `${a.strumento}: ${a.cosa}` : String(a.strumento), secondi: Math.round(Number(a.s)) }));
+  }
+  return out;
+}
 
 export async function releaseConRapporto(t, fault, report, opts) {
   const tenta = (rep) => release(t, fault, opts, rep);
@@ -1347,7 +1373,7 @@ if (isMain) {
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
     'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
-    'feedback', 'piano', 'fusione', 'motivo',
+    'feedback', 'piano', 'fusione', 'motivo', 'processo',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -1373,7 +1399,7 @@ if (isMain) {
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
     'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
-    'feedback', 'piano', 'fusione', 'motivo',
+    'feedback', 'piano', 'fusione', 'motivo', 'processo',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -1704,6 +1730,16 @@ if (isMain) {
       process.exit(1);
     }
     const guasto = typeof data.guasto === 'string' ? data.guasto : '';
+    // Un dubbio di processo va al manutentore (SPEC-MANUTENTORE § 4): il server ferma il lavoro e sveglia lui.
+    const processo = typeof data.processo === 'string' ? data.processo.trim() : '';
+    if (data.processo !== undefined && !processo) {
+      console.error('--processo vuole il testo della domanda: --processo "…". Non ho rilasciato niente.');
+      process.exit(1);
+    }
+    if (processo.length > PROCESSO_MAX) {
+      console.error(`--processo ha ${processo.length} caratteri, il massimo è ${PROCESSO_MAX}: accorcialo. Non ho rilasciato niente.`);
+      process.exit(1);
+    }
     // Il rilascio di un worker morto chiesto dall'orchestratore: ramo, promemoria e battito stanno nel clone (#1182).
     const nelClone = cloneDelBiglietto(ROOT, args[0]);
     if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
@@ -1781,7 +1817,7 @@ if (isMain) {
         rapporto = { v: 3, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
       }
     }
-    const r = await releaseConRapporto(args[0], guasto, rapporto);
+    const r = await releaseConRapporto(args[0], guasto, rapporto, processo ? { processo } : undefined);
     if (r.avviso) console.error(r.avviso);
     // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo
     // (il server risponde `dead_ticket` e il ciclo esce), ma spegnerlo adesso
