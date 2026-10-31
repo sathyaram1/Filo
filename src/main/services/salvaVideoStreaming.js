@@ -27,6 +27,7 @@ function indirizzoDaSalvare(pagina, delVideo) {
     const n = p.length >= 3 && p[p.length - 1].length === 2 && p[p.length - 2].length <= 3 ? 3 : 2;
     return p.slice(-n).join('.');
   };
+  if (!delVideo) return pagina;
   try {
     const da = new URL(pagina);
     const v = new URL(delVideo, pagina);
