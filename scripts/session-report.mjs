@@ -600,6 +600,12 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         // nessun comando fosse scaduto.
         if (b.is_error === true && /timed out/i.test(testoDi(b.content).split('\n')[0])) rep.tools.timeouts += 1;
         if (b.is_error === true) rep.tools.errors += 1;
+        const chiamata = chiamate.get(b.tool_use_id) || { nome: '_', cosa: '', firma: '' };
+        if (b.is_error === true) {
+          const voce = { strumento: chiamata.nome, errore: rigaErrore(b.content), dopo: '' };
+          rep.falliti.push(voce);
+          senzaSeguito.push({ voce, chiamata });
+        }
         if (Array.isArray(finestreAgent) && Number.isFinite(ms)) {
           const f = finestreAgent.find((x) => x.id === b.tool_use_id);
           if (f) f.fine = ms;
