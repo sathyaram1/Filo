@@ -71,10 +71,10 @@
 //         i suoi processi.
 //       → fine lavoro: il biglietto muore e il semaforo si libera. Con
 //         `--guasto` DICHIARI un guasto al server (SPEC-RIDISEGNO-MAX.md §12):
-//         è così che il server smette di dare lavoro per il giro — le
-//         richieste di biglietto successive escono con 3 — e il pacemaker
-//         rispetta una pausa prima di riaccendere. Non "riportarlo" a parole:
-//         il tuo testo di ritorno non lo legge nessuna macchina.
+//         è così che il server ferma quel lavoro, e solo quello, finché una
+//         nota del manutentore o la correzione della causa non lo sblocca
+//         (#1950). Non "riportarlo" a parole: il tuo testo di ritorno non lo
+//         legge nessuna macchina.
 //         Prima di parlare col server committa quello che è rimasto fuori
 //         dai commit (un file nato da una shell non passa dall'hook) e
 //         spedisce il ramo corrente su origin (--force-with-lease se la
