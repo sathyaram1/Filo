@@ -272,7 +272,7 @@ async function main() {
   if (fermo === 'dopo-il-verde') {
     let pubblicazioni = [];
     try {
-      const j = ghApi(`repos/${repo}/actions/workflows/release.yml/runs?branch=main&per_page=8`);
+      const j = ghApi(`repos/${repo}/actions/workflows/release.yml/runs?branch=main&per_page=8`, SOLO_CORSE);
       pubblicazioni = Array.isArray(j?.workflow_runs) ? j.workflow_runs : [];
     } catch { /* il testo lo dice: nessuna letta */ }
     const { titolo, testo } = testoFermoDopoIlVerde({
