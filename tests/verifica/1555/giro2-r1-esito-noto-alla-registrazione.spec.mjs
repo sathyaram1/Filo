@@ -78,7 +78,12 @@ test('r1 con la domanda del 2 col ? che non blocca, il lavoro va avanti: la prov
       },
     });
     try {
-      const r = await esegui(['--record-verifier', 'fid-901', critica, '--domanda', file], casa, port);
+      let r = await esegui(['--record-verifier', 'fid-901', critica, '--domanda', file], casa, port);
+      // Un ramo senza l'elenco di domande ne prende una sola: il caso da provare è lo stesso.
+      if (/deve essere un oggetto JSON/.test(r.out)) {
+        writeFileSync(file, JSON.stringify(domanda('Colore del riquadro')), 'utf8');
+        r = await esegui(['--record-verifier', 'fid-901', critica, '--domanda', file], casa, port);
+      }
       const chiestaPrima = r.code !== 0 && r.out.includes('giro2-r2-bordo');
       const chiestaDopo = r.code === 0 && /le prove con r2 nel nome/.test(r.out);
       expect(chiestaPrima || chiestaDopo, r.out).toBe(true);
