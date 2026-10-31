@@ -129,21 +129,36 @@ function crea({ cartella, scarica, platform = process.platform, arch = process.a
   }
 
   // → { ytdlp, ffmpeg } (ffmpeg '' dove non c'è una build). `avanza({ ricevuti, totale })` solo se scende qualcosa.
-  async function pronti({ forza = false, avanza = () => {} } = {}) {
-    if (inCorso) return inCorso;
-    inCorso = (async () => {
-      fs.mkdirSync(cartella, { recursive: true });
-      const stato = leggiStato();
-      const pezzi = { y: [0, 0], f: [0, 0] };
-      const somma = (k) => (r, t) => {
-        pezzi[k] = [r, t];
-        avanza({ ricevuti: pezzi.y[0] + pezzi.f[0], totale: pezzi.y[1] && (pezzi.f[1] || !Y.assetFfmpeg(platform, arch)) ? pezzi.y[1] + pezzi.f[1] : 0 });
-      };
-      const [y, f] = await Promise.all([ytdlp(stato, forza, somma('y')), ffmpeg(stato, somma('f'))]);
-      scriviStato(stato);
-      return { ytdlp: y, ffmpeg: f };
-    })();
-    try { return await inCorso; } finally { inCorso = null; }
+  // Due salvataggi insieme aspettano lo stesso scaricamento, e lo vedono avanzare tutti e due.
+  const ascolta = new Set();
+  async function pronti({ forza = false, avanza = null } = {}) {
+    if (avanza) ascolta.add(avanza);
+    try {
+      if (!inCorso) {
+        inCorso = (async () => {
+          fs.mkdirSync(cartella, { recursive: true });
+          const stato = leggiStato();
+          const pezzi = new Map();
+          const somma = (k) => (r, t) => {
+            pezzi.set(k, [r, t]);
+            const v = [...pezzi.values()];
+            const ricevuti = v.reduce((s, p) => s + p[0], 0);
+            // Un peso ignoto rende falsa la percentuale: la barra gira senza numero.
+            const totale = v.every((p) => p[1] > 0) ? v.reduce((s, p) => s + p[1], 0) : 0;
+            for (const f of ascolta) { try { f({ ricevuti, totale }); } catch (_) {} }
+          };
+          try {
+            const [y, f] = await Promise.all([ytdlp(stato, forza, somma('y')), ffmpeg(stato, somma('f'))]);
+            return { ytdlp: y, ffmpeg: f };
+          } finally {
+            try { scriviStato(stato); } catch (_) {}
+          }
+        })().finally(() => { inCorso = null; });
+      }
+      return await inCorso;
+    } finally {
+      if (avanza) ascolta.delete(avanza);
+    }
   }
 
   return { pronti };
