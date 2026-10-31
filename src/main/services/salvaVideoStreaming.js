@@ -1,0 +1,209 @@
+// «Salva video come…» su un video in streaming (#1488): yt-dlp lo scarica dalla pagina dentro una voce dei Download,
+// con avanzamento, «Annulla» e «Riprova». Mai l'account dell'utente: niente cookie al programma (decisione dell'owner).
+// Logica pura in ytdlp.js, programmi in strumentiVideo.js. Prove: tests/salva-video-streaming.spec.mjs.
+
+'use strict';
+
+const path = require('node:path');
+const fs = require('node:fs');
+const { spawn } = require('node:child_process');
+const Y = require('./ytdlp');
+
+const t = (k, ...a) => { try { return globalThis.SN_I18N.t(k, ...a); } catch (_) { return k; } };
+
+// Le frasi dei motivi stanno in i18n.js come `streaming_<motivo>`; le pagine le mostrano tali e quali.
+const MOTIVI = Object.freeze(['eta', 'accesso', 'robot', 'protetto', 'spazio', 'diretta', 'sito', 'non_disponibile',
+  'rete', 'aggiornare', 'programma', 'firma', 'piattaforma', 'generico']);
+const frase = (motivo) => t(`streaming_${MOTIVI.includes(motivo) ? motivo : 'generico'}`);
+
+// In prova il programma è uno finto: `FILO_YTDLP_COMANDO` è il comando come JSON, `FILO_FFMPEG` il percorso.
+function comandoDiProva() {
+  const c = process.env.FILO_YTDLP_COMANDO;
+  if (!c) return null;
+  try { const a = JSON.parse(c); return Array.isArray(a) && a.length ? a.map(String) : null; } catch (_) { return null; }
+}
+
+// yt-dlp per Windows e macOS è un lanciatore che apre un secondo processo: si ferma tutto l'albero, ffmpeg compreso.
+function fermaAlbero(figlio) {
+  if (!figlio || figlio.exitCode !== null || figlio.signalCode) return;
+  if (process.platform === 'win32') {
+    try { spawn('taskkill', ['/pid', String(figlio.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); } catch (_) {}
+  } else {
+    try { process.kill(-figlio.pid, 'SIGTERM'); } catch (_) { try { figlio.kill('SIGTERM'); } catch (_) {} }
+  }
+}
+
+function eseguiYtdlp(comando, argomenti, { suEvento, fermato }) {
+  return new Promise((risolvi) => {
+    let figlio;
+    try {
+      figlio = spawn(comando[0], [...comando.slice(1), ...argomenti], {
+        // L'Electron di Filo fa da runtime JavaScript per le sfide di YouTube: nessun Node o Deno da installare.
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
+        windowsHide: true,
+        detached: process.platform !== 'win32',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (e) {
+      risolvi({ codice: -1, avvio: e });
+      return;
+    }
+    const leggi = (flusso) => {
+      let resto = '';
+      flusso.setEncoding('utf8');
+      flusso.on('data', (pezzo) => {
+        const righe = (resto + pezzo).split(/\r?\n/);
+        resto = righe.pop();
+        for (const r of righe) { const ev = Y.leggiRiga(r); if (ev) suEvento(ev, r); }
+      });
+      flusso.on('end', () => { if (resto) { const ev = Y.leggiRiga(resto); if (ev) suEvento(ev, resto); } });
+    };
+    leggi(figlio.stdout);
+    leggi(figlio.stderr);
+    const controlla = setInterval(() => { if (fermato()) fermaAlbero(figlio); }, 300);
+    figlio.on('error', (e) => { clearInterval(controlla); risolvi({ codice: -1, avvio: e }); });
+    figlio.on('close', (codice) => { clearInterval(controlla); risolvi({ codice }); });
+  });
+}
+
+// Il file prodotto: l'unico «video.*» che non è un pezzo a metà.
+function fileUscito(cartella) {
+  let migliore = null;
+  for (const nome of fs.readdirSync(cartella)) {
+    if (!/^video\./.test(nome) || /\.(part|ytdl|temp|tmp)$|\.part-Frag|\.f\d+\./i.test(nome)) continue;
+    const p = path.join(cartella, nome);
+    const peso = fs.statSync(p).size;
+    if (peso > 0 && (!migliore || peso > migliore.peso)) migliore = { p, peso, ext: path.extname(nome) };
+  }
+  return migliore;
+}
+
+function nomeSicuro(titolo, ext) {
+  const pulito = String(titolo || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim()
+    .replace(/^\.+/, '').slice(0, 150).trim();
+  return `${pulito || 'video'}${ext}`;
+}
+
+// `scegli(nome)` → { filePath } | { cancelled } | { error }: la domanda su dove salvare, come per gli altri file.
+// `sposta(da, a)`: la consegna nel posto scelto.
+async function salva({ url, titolo = '', audio = false, scope = '', webContents = null, riusa = '', scegli, sposta,
+  downloads = require('./downloads'), strumenti = () => require('./strumentiVideo').strumenti() }) {
+  const ext = audio ? '.m4a' : '.mp4';
+  const proposto = nomeSicuro(Y.titoloDaPagina(titolo), ext);
+  const voce = downloads.beginManual({ url, filename: proposto, totalBytes: 0, scope, webContents, via: 'streaming', riusa });
+  const fallisci = (motivo, dettaglio) => {
+    if (dettaglio) console.warn('[Filo video] salvataggio non riuscito:', motivo, String(dettaglio).slice(0, 400));
+    if (voce.cancelled()) return { ok: false, cancelled: true };
+    voce.fail(frase(motivo));
+    return { ok: false, motivo, frase: frase(motivo) };
+  };
+
+  let programmi;
+  const prendi = async (forza) => {
+    const prova = comandoDiProva();
+    if (prova) return { comando: prova, ffmpeg: process.env.FILO_FFMPEG || '' };
+    const p = await strumenti().pronti({
+      forza,
+      avanza: ({ ricevuti, totale }) => {
+        if (voce.cancelled()) return;
+        if (!prendi.annunciato) { prendi.annunciato = true; voce.nota(t('streaming_fase_programma'), { azzera: true }); }
+        voce.progress(ricevuti, totale);
+      },
+    });
+    return { comando: [p.ytdlp], ffmpeg: p.ffmpeg };
+  };
+  try {
+    programmi = await prendi(false);
+  } catch (e) {
+    return fallisci(e && e.motivo ? e.motivo : 'programma', e && e.message);
+  }
+  if (voce.cancelled()) return { ok: false, cancelled: true };
+
+  // La cartella di lavoro sta accanto a dove finirà il file: la consegna è una rinomina, non la copia di un film.
+  let lavoro;
+  try {
+    lavoro = fs.mkdtempSync(path.join(voce.cartella(), '.filo-video-'));
+  } catch (e) {
+    return fallisci('spazio', e && e.message);
+  }
+  const pulisci = () => { try { fs.rmSync(lavoro, { recursive: true, force: true }); } catch (_) {} };
+
+  let destinazione = null;
+  let titoloVero = '';
+  const chiedi = () => {
+    if (!destinazione) destinazione = scegli(nomeSicuro(titoloVero || Y.titoloDaPagina(titolo), ext));
+    return destinazione;
+  };
+
+  const tentativo = async () => {
+    const avanzamento = Y.creaAvanzamento();
+    let motivo = '';
+    let dettaglio = '';
+    voce.nota(t('streaming_fase_leggo'), { azzera: true });
+    const esito = await eseguiYtdlp(programmi.comando, Y.argomenti({
+      url, cartella: lavoro, audio, ffmpeg: programmi.ffmpeg, nodo: comandoDiProva() ? '' : process.execPath,
+    }), {
+      fermato: () => voce.cancelled() || !!(destinazione && destinazione.annullato),
+      suEvento: (ev, riga) => {
+        if (ev.tipo === 'errore') {
+          if (!motivo || motivo === 'generico') { motivo = ev.motivo; dettaglio = riga; }
+          return;
+        }
+        if (ev.tipo === 'post') {
+          if (ev.stato === 'started' && /Merger/i.test(ev.chi)) voce.nota(t('streaming_fase_unisco'));
+          return;
+        }
+        avanzamento.leggi(ev);
+        if (ev.titolo) titoloVero = ev.titolo;
+        // I primi byte vogliono dire che il video c'è: da qui si chiede dove salvarlo, intanto continua a scendere.
+        if (!destinazione) {
+          voce.nota('');
+          chiedi().then((d) => { if (d && (d.cancelled || d.error)) { destinazione.annullato = true; voce.cancel(); } });
+        }
+        const s = avanzamento.stato();
+        voce.progress(s.ricevuti, s.totale);
+      },
+    });
+    if (esito.avvio) return { motivo: 'programma', dettaglio: esito.avvio.message };
+    if (voce.cancelled()) return { annullato: true };
+    const uscito = fileUscito(lavoro);
+    if (esito.codice === 0 && uscito && !motivo) return { uscito };
+    return { motivo: motivo || (esito.codice === 0 ? 'generico' : 'generico'), dettaglio: dettaglio || `codice ${esito.codice}` };
+  };
+
+  try {
+    let r = await tentativo();
+    // Un errore da programma vecchio: se ne cerca uno nuovo, e se c'è si riprova una volta sola.
+    if (r.motivo === 'aggiornare' && !comandoDiProva()) {
+      const prima = programmi.comando[0];
+      try { programmi = await prendi(true); } catch (_) {}
+      if (programmi.comando[0] !== prima && !voce.cancelled()) {
+        for (const n of fs.readdirSync(lavoro)) { try { fs.rmSync(path.join(lavoro, n), { force: true, recursive: true }); } catch (_) {} }
+        r = await tentativo();
+      }
+    }
+    if (r.annullato || voce.cancelled()) return { ok: false, cancelled: true };
+    if (!r.uscito) return fallisci(r.motivo, r.dettaglio);
+
+    const d = await chiedi();
+    if (!d || d.cancelled || voce.cancelled()) { if (!voce.cancelled()) voce.cancel(); return { ok: false, cancelled: true }; }
+    if (d.error || !d.filePath) return fallisci('generico', d.error || 'destinazione non disponibile');
+    // Il contenitore lo decide il sito (un audio può essere .webm): l'estensione segue il file vero.
+    let finale = d.filePath;
+    if (path.extname(finale).toLowerCase() !== r.uscito.ext.toLowerCase()) {
+      finale = downloads.uniquePath(path.dirname(finale), `${path.basename(finale, path.extname(finale))}${r.uscito.ext}`);
+    }
+    if (!(await voce.permesso(path.basename(finale)))) return { ok: false, cancelled: true };
+    try {
+      await sposta(r.uscito.p, finale);
+    } catch (e) {
+      return fallisci('spazio', e && e.message);
+    }
+    voce.done(finale);
+    return { ok: true, path: finale, filename: path.basename(finale) };
+  } finally {
+    pulisci();
+  }
+}
+
+module.exports = { salva, MOTIVI, frase, nomeSicuro, fileUscito };
