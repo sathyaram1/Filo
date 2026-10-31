@@ -185,16 +185,14 @@ biglietto_finito() {
 # lavoro ha pubblicato il proprio codice direttamente, saltando il cancello di
 # sicurezza — che nel frattempo esaminava un gemello abbandonato.
 #
-# Ora la sessione si DICHIARA. `FILO_ROUTINE=1` (lo esporta l'orchestratore, e
-# lo eredita ogni worker) significa: nessuna pubblicazione automatica, mai,
-# qualunque sia il nome del ramo. Al ramo principale le porta solo il server,
-# dopo verifica e controllo di sicurezza.
-#
-# È anche la risposta alla domanda "questo commit da dove è arrivato?": senza
-# marcatura, nella storia il lavoro di una routine e quello di una sessione
-# locale sono indistinguibili (stesso autore, stesso ramo, stesso aspetto).
+# Ora al ramo principale non pubblica niente, mai (piu' sotto). La routine si
+# riconosce per dire nella storia da dove arriva un commit (l'autore): e' la
+# domanda di isRoutineInstance (scripts/lib/routine-role.mjs), nella forma che
+# non costa un processo. L'export di FILO_ROUTINE non arriva al gancio, che
+# Claude Code lancia col suo ambiente (#1966): vale il biglietto che dispatch
+# scrive nella cartella.
 is_routine_session() {
-  [ -n "$FILO_ROUTINE" ] && [ "$FILO_ROUTINE" != "0" ]
+  { [ -n "$FILO_ROUTINE" ] && [ "$FILO_ROUTINE" != "0" ]; } || [ -f "$CARTELLA/.claude/routine-ticket.json" ]
 }
 
 # I prefissi restano come RETE, non più come regola primaria: proteggono anche
@@ -505,9 +503,8 @@ if [ -s "$FALLIMENTI_FILE" ] || [ -s "$AVVISI_FILE" ]; then
   TESTO=$(cat "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null | stringa_json)
   CODA=""
   [ -s "$FALLIMENTI_FILE" ] && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: sistemalo prima di consegnare (git push del ramo; se la storia diverge, un rebase su origin e poi il push)."
-  # In una routine un push a mano resta fermo sul controllo dei permessi, che in cloud nessuno approva (#1797). Il
-  # biglietto nella cartella la riconosce anche quando FILO_ROUTINE non arriva fino al gancio.
-  { is_routine_session || [ -f "$TICKET_FILE" ]; } && [ -s "$FALLIMENTI_FILE" ] \
+  # In una routine un push a mano resta fermo sul controllo dei permessi, che in cloud nessuno approva (#1797).
+  is_routine_session && [ -s "$FALLIMENTI_FILE" ] \
     && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: il salvataggio riprova al prossimo file che modifichi e il rilascio lo rispedisce da se'. Non spingere a mano: in cloud il controllo dei permessi lo ferma. Se anche il rilascio non riesce a spedirlo, e' un guasto da dichiarare."
   # Con una copia dei dati nei commit il push e' proprio cio' che non va fatto: prima la copia esce dalla storia.
   grep -q 'NON spedisco il ramo:' "$FALLIMENTI_FILE" 2>/dev/null \
