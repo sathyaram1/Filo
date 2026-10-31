@@ -4,7 +4,7 @@
 import '../helpers/senzaSessione.mjs';
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendFileSync, copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { ROOT, git, scene, togliScene, runHookRaw, stdinEdit } from '../helpers/scenaHook.mjs';
