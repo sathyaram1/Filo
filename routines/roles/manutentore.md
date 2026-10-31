@@ -210,6 +210,7 @@ npm run manutentore -- routine spente|accese
 npm run manutentore -- recap [giorno] | recap scrivi - [--giorno YYYY-MM-DD]
 npm run manutentore -- novita | novita consegna <file.json>
 npm run manutentore -- chat                        # la chat dell'owner, col contesto intero
+npm run manutentore -- transizione [--applica]     # solo l'owner, una volta: le 2 di prima scendono a 1
 npm run feedback:apri -- "<titolo>" - --non-locale --pacchetto 812,815
 ```
 
