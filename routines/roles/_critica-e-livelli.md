@@ -179,7 +179,9 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   a cui hai tolto un caso si rilancia: quello che resta, se è rosso, la ferma.
   Una che la pulizia ha dimenticato esce con un'altra, anche dopo le correzioni:
   un commit a parte che toglie solo lei, registrato finché è l'ultimo.
-  Se la risposta dice che il lavoro passa, le togli seguendola.
+  Se la risposta dice che il lavoro passa, togli solo le prove che lei elenca
+  (i rilievi che il bilancio ha messo da parte); se non ne elenca, dopo il
+  verdetto il ramo non si tocca più.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il
   salvataggio automatico parte solo da un Edit o da un Write, non da un `rm` o
