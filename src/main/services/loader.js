@@ -145,6 +145,7 @@ if (process.env.NODE_ENV === 'test') {
   try { require(path.join(__dirname, '..', '..', '..', 'tests', 'fixtures', 'testModels.js')); } catch (e) { console.warn('[loader] testModels non caricato:', e.message); }
 }
 require(path.join(SHARED, 'patchNotes.js'));
+require(path.join(SHARED, 'novita.js'));  // #1956 — la pagina Novità: versioni uscite e filtro (logica pura)
 require(path.join(SHARED, 'capabilities.js'));
 require(path.join(SHARED, 'serviziEsterni.js'));  // #849 — i servizi esterni che Filo contatta, come dati
 // Documenti di trasparenza (generati da transparency/*.md): servono all'agente
