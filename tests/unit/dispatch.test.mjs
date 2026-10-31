@@ -303,6 +303,8 @@ test('ogni ruolo che riceve le provvisorie sa che una domanda aperta è la conse
     assert.match(t, /Una domanda aperta è la consegna della parte che chiede all'owner/, `${chi}: la domanda vale come consegna`);
     assert.match(t, /la misura sta lì e non si rifà/, `${chi}: la misura non si rifà`);
     assert.match(t, /Una seconda domanda sulla stessa scelta è un doppione/, `${chi}: niente doppioni`);
+    assert.match(t, /non porta i numeri che la segnalazione chiede: allora è un rilievo/, `${chi}: una domanda senza i numeri resta un rilievo`);
+    assert.match(t, /`contesto`, `problema` e `opzioni` sono il testo che legge l'owner/, `${chi}: i campi col testo della domanda`);
   }
 });
 
