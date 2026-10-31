@@ -129,13 +129,17 @@ export function readRole(root, { now = Date.now() } = {}) {
 }
 
 /**
- * Questa istanza è una routine? Si dichiara con FILO_ROUTINE=1; il biglietto o il ruolo scritti da dispatch la
- * riconoscono anche se se n'è dimenticata. Serve agli strumenti che una routine non deve usare (#914).
+ * Questa istanza è una routine? L'unica regola: chi deve saperlo chiede qui, mai a FILO_ROUTINE da sola. In cloud ogni
+ * chiamata della shell riparte senza l'export (#1966): valgono anche biglietto e ruolo che dispatch scrive nella
+ * cartella, e gli strumenti che girano dalla copia fissata dal preflight, che esiste solo in un giro.
  */
-export function isRoutineInstance(root, { env = process.env, now = Date.now() } = {}) {
+export function isRoutineInstance(root, { env = process.env, now = Date.now(), copiaDelGiro = () => !!pinnedRepoRoot() } = {}) {
   const dichiarata = String((env && env.FILO_ROUTINE) || '').trim();
   if (dichiarata && dichiarata !== '0') return true;
   if (String((env && env.FILO_ROUTINE_TICKET) || '').trim()) return true;
   if (normalizeRole(env && env.FILO_ROUTINE_ROLE)) return true;
-  return !!readMarker(root, { now });
+  const biglietto = leggiMarcatoreBiglietto(root);
+  if (biglietto && String(biglietto.ticket || '').trim()) return true;
+  if (readMarker(root, { now })) return true;
+  return !!copiaDelGiro();
 }
