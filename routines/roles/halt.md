@@ -13,8 +13,7 @@ Se hai un biglietto, registra due cose, in quest'ordine:
   ```bash
   node scripts/routine-channel.mjs release <biglietto> --role halt --guasto "<message del payload>"
   ```
-  È così che il server ferma questo lavoro, e solo questo, finché una nota
-  del manutentore o la correzione della causa non lo sblocca. Il tuo testo di
+  È così che il server ferma questo lavoro, e solo questo. Il tuo testo di
   ritorno non viene letto da nessuno: quello che non hai registrato non esiste.
 
 Poi termina la sessione.
