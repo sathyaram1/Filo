@@ -193,3 +193,10 @@ test('accendi prende i numeri, non le opzioni né i loro valori', () => {
   assert.deepEqual(M.numeriDiAccendi(['812', '--giorni', '30', '--cartella', '/dir', '815,820', '--senza-fetch']), ['812', '815,820']);
   assert.deepEqual(M.numeriDiAccendi(['--cartella', '/dir']), []);
 });
+
+test('sblocca vuole il numero del feedback fermo; il resto è la nota dell\'owner', () => {
+  assert.deepEqual(M.richiestaSblocca(['#812', 'riparato', 'il', 'registro']), { ok: true, numero: '812', testo: 'riparato il registro' });
+  assert.deepEqual(M.richiestaSblocca(['812.2']), { ok: true, numero: '812.2', testo: '' });
+  assert.equal(M.richiestaSblocca([]).ok, false);
+  assert.equal(M.richiestaSblocca(['dodici']).ok, false);
+});

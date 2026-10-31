@@ -428,12 +428,12 @@ export function formattaElenco(domande) {
   return out.join('\n');
 }
 
-export async function chiamaOwner(data) {
+export async function chiamaOwner(data, { funzione = '' } = {}) {
   const { findAdminRefreshToken, mintIdToken } = await import('./lib/firestore-auth.mjs');
   const refresh = findAdminRefreshToken();
   if (!refresh) throw new Error('Non trovo le credenziali del proprietario (FILO_ADMIN_REFRESH_TOKEN): mostra, elenco, rispondi e consiglio le vogliono.');
   const idToken = await mintIdToken(refresh);
-  const res = await fetch(INDIRIZZO, {
+  const res = await fetch(funzione ? INDIRIZZO.replace(/ownerDomande$/, funzione) : INDIRIZZO, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
     body: JSON.stringify({ data }),

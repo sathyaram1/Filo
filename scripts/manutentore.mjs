@@ -1,6 +1,7 @@
 // Il contesto del manutentore (SPEC-RIDISEGNO-LAVORO.md § 2): il suo ruolo, tutte le schede in una riga ciascuna e i rami
 // in corso coi loro file, da git e senza modello; scrive solo l'ordine da accendere, che il pacemaker legge. Regole:
 // tests/unit/manutentore.test.mjs. Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente
+// | sblocca <N> [nota] (il lavoro fermo per guasto riparte, con la nota dell'owner)
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
@@ -237,11 +238,29 @@ function opzione(argv, nome) {
   return argv[i].includes('=') ? argv[i].slice(nome.length + 1) : argv[i + 1];
 }
 
+/** `sblocca 812 riparato il registro` → { ok, numero, testo } (testo '' = quello di default del server). PURA. */
+export function richiestaSblocca(args) {
+  const [n, ...resto] = args || [];
+  if (!/^#?[1-9]\d{0,6}(?:\.[1-9]\d{0,3})?$/.test(String(n || ''))) return { ok: false, motivo: 'sblocca vuole il numero del feedback fermo (sblocca 812 [nota])' };
+  return { ok: true, numero: String(n).replace(/^#/, ''), testo: resto.join(' ').trim() };
+}
+
 export async function main(argv, { root = ROOT } = {}) {
   const [cmd, arg] = argv;
-  if (!['contesto', 'rami', 'incroci', 'ordine', 'accendi'].includes(cmd) || (cmd === 'incroci' && !arg)) {
-    console.error('Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente  [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]');
+  if (!['contesto', 'rami', 'incroci', 'ordine', 'accendi', 'sblocca'].includes(cmd) || (cmd === 'incroci' && !arg)) {
+    console.error('Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente | sblocca <N> [nota]  [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]');
     return 1;
+  }
+  // Un lavoro fermo per guasto riparte solo con una nota (SPEC-MANUTENTORE §7): questa è quella dell'owner.
+  if (cmd === 'sblocca') {
+    const q = richiestaSblocca(argv.slice(1));
+    if (!q.ok) { console.error(`RIFIUTATO: ${q.motivo}. Non ho scritto niente.`); return 1; }
+    const { chiamaOwner } = await import('./domanda.mjs');
+    try {
+      await chiamaOwner({ op: 'sblocca', numero: q.numero, ...(q.testo ? { testo: q.testo } : {}) }, { funzione: 'ownerManutentore' });
+    } catch (e) { console.error(`RIFIUTATO: ${e.message}`); return 2; }
+    console.log(`#${q.numero} sbloccato: lo riprende chi arriva dopo.`);
+    return 0;
   }
   // L'ordine da accendere: il pacemaker accende una sessione per ciascun feedback che ha lavoro, in quest'ordine.
   const cartella = resolve(opzione(argv, '--cartella') || CARTELLA_PREDEFINITA);
