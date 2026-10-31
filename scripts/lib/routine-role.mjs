@@ -27,6 +27,8 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { leggiMarcatoreBiglietto } from './routine-ticket.mjs';
+import { pinnedRepoRoot } from './tools-pin.mjs';
 
 // Oltre questa età il marcatore non è più credibile (una sessione di routine
 // dura ore, non giorni): meglio "automazione" generica che l'etichetta sbagliata.
