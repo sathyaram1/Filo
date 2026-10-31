@@ -1622,8 +1622,8 @@ async function recordFixed(id, report = '', frase = '', ferma = false, domanda =
   const esito = esitoRiallineamento(confronto, motivo);
   if (esito.riga) process.stderr.write(`${esito.riga}\n`);
   // Il server rifà il confronto sulla punta presa da GitHub, e chi verifica dopo legge il ramo da lì: prima la spedizione.
-  const ch = await import('./routine-channel.mjs');
-  if (confronto && ch.consegnaDiRiallineamento(marcatore, { ferma, domanda })) {
+  const ch = confronto ? await import('./routine-channel.mjs') : null;
+  if (ch && ch.consegnaDiRiallineamento(marcatore, { ferma, domanda })) {
     const sped = ch.spedisciRiallineamento(ROOT);
     if (!sped.ok) return { rejected: true, nonSpedito: true, message: ch.testoRiallineamentoNonSpedito(sped) };
     if (sped.avviso) process.stderr.write(`${sped.avviso}\n`);
