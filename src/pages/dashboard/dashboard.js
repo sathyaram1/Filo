@@ -2501,7 +2501,18 @@
     doneBtn.className = 'dash-recap-btn dash-recap-done';
     doneBtn.textContent = 'Fatto';
     doneBtn.addEventListener('click', close);
-    footer.append(shareBtn, doneBtn);
+    // Il recap dice solo cosa è arrivato adesso: le versioni di prima stanno nella pagina Novità.
+    const tutteBtn = document.createElement('button');
+    tutteBtn.type = 'button';
+    tutteBtn.className = 'dash-recap-btn dash-recap-tutte';
+    tutteBtn.id = 'recapTutte';
+    tutteBtn.textContent = 'Tutte le novità';
+    tutteBtn.title = 'Le novità di tutte le versioni, da cercare';
+    tutteBtn.addEventListener('click', () => {
+      send({ type: MSG.OPEN_URL, url: 'filo://novita/novita.html' });
+      close();
+    });
+    footer.append(shareBtn, tutteBtn, doneBtn);
     box.appendChild(footer);
 
     document.body.appendChild(overlay);
