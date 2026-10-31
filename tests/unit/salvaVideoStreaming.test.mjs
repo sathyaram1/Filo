@@ -162,3 +162,24 @@ test('«Riprova» su una riga fallita rifà il salvataggio dalla stessa pagina, 
     DL.quandoRiprovaStreaming(null);
   }
 });
+
+test('il titolo del sito diventa un nome di file valido su ogni sistema', () => {
+  assert.equal(SV.nomeSicuro('a/b:c?<>|"*\\d', '.mp4'), 'a b c d.mp4');
+  assert.equal(SV.nomeSicuro('  ..nascosto.. ', '.mp4'), 'nascosto.mp4');
+  assert.equal(SV.nomeSicuro('CON', '.mp4'), 'video CON.mp4');
+  assert.equal(SV.nomeSicuro('', '.mp4'), 'video.mp4');
+  assert.equal(SV.nomeSicuro('🎵 canzone 🎵', '.m4a'), '🎵 canzone 🎵.m4a');
+  const lungo = SV.nomeSicuro('日本語'.repeat(60), '.mp4');
+  assert.ok(Buffer.byteLength(lungo, 'utf8') <= 255, 'sta nel limite di Linux e macOS');
+  assert.ok(lungo.endsWith('語.mp4'), 'nessuna lettera spezzata a metà');
+});
+
+test('un nome che il sito cambia a metà non lascia la riga col nome della pagina', async () => {
+  ilCaso({ titolo: 'Titolo vero dal sito', pausaMs: 30 });
+  const nomi = new Set();
+  const t = setInterval(() => { const v = ultima(); if (v && v.state === 'progressing') nomi.add(v.filename); }, 5);
+  const r = await SV.salva({ url: URL_SEGNALATO, titolo: 'Titolo della pagina - YouTube', scegli: async (n) => dentro(n), sposta });
+  clearInterval(t);
+  assert.equal(r.filename, 'Titolo vero dal sito.mp4');
+  assert.ok(nomi.has('Titolo vero dal sito.mp4'), 'la riga prende il titolo vero mentre scende');
+});

@@ -80,9 +80,14 @@ function fileUscito(cartella) {
   return migliore;
 }
 
+// Il titolo è del sito: niente separatori né caratteri vietati da Windows, e al massimo 180 byte, perché Linux e
+// macOS fermano un nome a 255 byte e un titolo giapponese ne usa tre per lettera.
 function nomeSicuro(titolo, ext) {
-  const pulito = String(titolo || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim()
-    .replace(/^\.+/, '').slice(0, 150).trim();
+  let pulito = String(titolo || '').replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim()
+    .replace(/^\.+/, '');
+  while (Buffer.byteLength(pulito, 'utf8') > 180) pulito = Array.from(pulito).slice(0, -1).join('');
+  pulito = pulito.replace(/[\s.]+$/, '');
+  if (/^(con|prn|aux|nul|com\d|lpt\d)$/i.test(pulito)) pulito = `video ${pulito}`;
   return `${pulito || 'video'}${ext}`;
 }
 
