@@ -23,6 +23,14 @@ la cartella.
 - La prova di un rilievo che esce dal giro in un feedback suo (esterno, o interno lasciato
   fuori) si CANCELLA: il testo del rilievo viaggia nel feedback, e una prova rossa lasciata
   indietro è un rosso da rispiegare a ogni giro.
+- **La pulizia che non dipende dall'esito sta prima del verdetto** (#1555). Gli esterni e i
+  `?` che contano al più 1 escono in ogni esito: le loro prove si tolgono nel commit della
+  critica, e la registrazione (`dispatch.mjs --record-verifier`) rifiuta la critica che ne
+  ha ancora una scritta in questa verifica. Un commit dopo il verdetto è una spinta che il
+  registro della fiducia non vede: la pratica fidata perde la fiducia e la fusione aspetta
+  l'owner. Dopo il verdetto restano da togliere solo le prove dei rilievi che il bilancio
+  mette da parte, che la risposta del server elenca per numero: quelle non si possono
+  sapere prima.
 - Si cancella anche quella di un rilievo corretto, nello stesso commit in cui si scrive la
   prova durevole che lo tiene chiuso. Se una prova durevole non c'è, la prova del giro
   resta.
