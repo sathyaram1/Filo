@@ -97,7 +97,8 @@
 //         non parte, tranne `--reason locale` (#1790). `--status attack|spam` col
 //         perché nelle note: il giudizio di chi l'ha letto (Ricevuti L3).
 //         Revisione, correzione, critica e verdetto partono solo dal ramo assegnato (uscita 1 altrimenti): il ramo
-//         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo.
+//         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo. La correzione di un riallineamento
+//         parte solo col ramo spedito su origin, alla punta della cartella e sopra origin/main (#1964).
 //         `deliver piano --piano <file.md>`: il piano di un lavoro grosso, che riceve chi riprende.
 //         `deliver status --status done --reason gia_risolto --fusione <sha> --notes "…" --frase "…"`: già risolto
 //         su main, si chiude senza ramo (regola 5 della spec; il server ricontrolla la fusione).
