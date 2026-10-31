@@ -47,28 +47,48 @@ test('un «%» nel percorso della cartella non diventa un campo del nome', () =>
 
 test('le righe d\'avanzamento si leggono, video e audio insieme fanno un totale solo', () => {
   const a = Y.argomenti({ url: 'https://x.test/v', cartella: '/c', ffmpeg: '/f' });
+  const riempi = (m, campi) => m.replace(/%\(([^)]+)\)([sj])/g, (_, k, c) => (campi[k] === undefined ? 'NA' : (c === 'j' ? JSON.stringify(campi[k]) : String(campi[k]))));
   const modello = a[a.indexOf('--progress-template') + 1].slice('download:'.length);
-  const riga = (campi) => modello.replace(/%\(([^)]+)\)([sj])/g, (_, k, c) => (campi[k] === undefined ? 'NA' : (c === 'j' ? JSON.stringify(campi[k]) : String(campi[k]))));
-  const comuni = { 'info.title': 'Canzone\tcon tab', 'info.requested_formats.:.format_id': ['137', '140'], 'info.requested_formats.:.filesize': [9000, 1000] };
+  // Come il vero: l'elenco dei pezzi non sta nella riga di un pezzo, arriva prima nel file dei pezzi.
+  assert.doesNotMatch(modello, /requested_formats/);
+  const i = a.indexOf('--print-to-file');
+  assert.match(a[i + 1], /^before_dl:/);
+  assert.equal(a[i + 2], join('/c', Y.FILE_PEZZI));
+  const pezzi = Y.leggiPezzi(`${riempi(a[i + 1].slice('before_dl:'.length), { 'requested_formats.:.format_id': ['137', '140'], 'requested_formats.:.filesize': [9000, 1000] })}\n`);
+  assert.deepEqual(pezzi, { pezzi: 2, pesoTutti: 10000 });
+  const riga = (campi) => riempi(modello, { 'info.title': 'Canzone\tcon tab', ...campi });
   const av = Y.creaAvanzamento();
-  const e1 = Y.leggiRiga(riga({ ...comuni, 'progress.status': 'downloading', 'progress.downloaded_bytes': 4500, 'progress.total_bytes': 9000, 'info.format_id': '137' }));
+  av.pezzi(pezzi);
+  const e1 = Y.leggiRiga(riga({ 'progress.status': 'downloading', 'progress.downloaded_bytes': 4500, 'progress.total_bytes': 9000, 'info.format_id': '137' }));
   assert.equal(e1.tipo, 'avanza');
   assert.equal(e1.titolo, 'Canzone\tcon tab');
-  assert.equal(e1.pezzi, 2);
   av.leggi(e1);
   assert.deepEqual(av.stato(), { ricevuti: 4500, totale: 10000 });
-  av.leggi(Y.leggiRiga(riga({ ...comuni, 'progress.status': 'finished', 'progress.downloaded_bytes': 9000, 'progress.total_bytes': 9000, 'info.format_id': '137' })));
-  av.leggi(Y.leggiRiga(riga({ ...comuni, 'progress.status': 'downloading', 'progress.downloaded_bytes': 500, 'progress.total_bytes': 1000, 'info.format_id': '140' })));
+  av.leggi(Y.leggiRiga(riga({ 'progress.status': 'finished', 'progress.downloaded_bytes': 9000, 'progress.total_bytes': 9000, 'info.format_id': '137' })));
+  assert.deepEqual(av.stato(), { ricevuti: 9000, totale: 10000 }, 'finito il video la barra non dice 100%');
+  av.leggi(Y.leggiRiga(riga({ 'progress.status': 'downloading', 'progress.downloaded_bytes': 500, 'progress.total_bytes': 1000, 'info.format_id': '140' })));
   assert.deepEqual(av.stato(), { ricevuti: 9500, totale: 10000 });
   assert.equal(av.titolo(), 'Canzone\tcon tab');
 });
 
 test('senza i pesi dei pezzi la barra non promette una percentuale finché un pezzo manca', () => {
   const av = Y.creaAvanzamento();
-  av.leggi({ tipo: 'avanza', stato: 'downloading', scaricati: 100, totale: 200, formato: '137', pezzi: 2, pesoTutti: 0 });
+  av.pezzi(Y.leggiPezzi('["137", "140"]\t[]\t[]\n'));
+  av.leggi({ tipo: 'avanza', stato: 'downloading', scaricati: 100, totale: 200, formato: '137' });
   assert.equal(av.stato().totale, 0, 'col secondo pezzo ancora ignoto il totale non si sa');
-  av.leggi({ tipo: 'avanza', stato: 'downloading', scaricati: 10, totale: 50, formato: '140', pezzi: 2, pesoTutti: 0 });
+  av.leggi({ tipo: 'avanza', stato: 'downloading', scaricati: 10, totale: 50, formato: '140' });
   assert.deepEqual(av.stato(), { ricevuti: 110, totale: 250 });
+  // Un formato solo (l'audio, o un file unico): il file dei pezzi dice NA, e il pezzo è uno.
+  assert.deepEqual(Y.leggiPezzi('NA\tNA\tNA\n'), { pezzi: 1, pesoTutti: 0 });
+  assert.deepEqual(Y.leggiPezzi(''), { pezzi: 1, pesoTutti: 0 });
+});
+
+test('un elenco di video (canale, ricerca, home) si ferma alla prima voce, e lo si dice', () => {
+  const a = Y.argomenti({ url: 'https://www.youtube.com/@canale', cartella: '/c' });
+  assert.equal(a[a.indexOf('--break-match-filters') + 1], '!playlist_id');
+  const ev = Y.leggiRiga('[download] entry does not pass filter (!playlist_id), skipping ..');
+  assert.equal(ev.tipo, 'errore');
+  assert.equal(ev.motivo, 'elenco');
 });
 
 test('i perché di un errore di yt-dlp', () => {
