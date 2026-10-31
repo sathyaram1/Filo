@@ -19,7 +19,7 @@ const ghExeFinto = (bin) => copyFileSync(process.execPath, join(bin, 'gh.exe'));
 const {
   scegliUltimoVerde, corseVerdi, rilascioFermo, testoRilascioFermo, rigaCorsa, verdePiuNuovoDelTag, SOGLIA_ORE, CHIAVE_FERMO,
   oreDalPrimoVerde, testoFermoDopoIlVerde, SOGLIA_VERDE_ORE, CHIAVE_FERMO_DOPO_VERDE, chiaveDelFermo,
-  passaIlCancello, LAVORO_UNIT_WINDOWS,
+  passaIlCancello, LAVORO_UNIT_WINDOWS, CAMPI_CORSA, CAMPI_LAVORO,
 } = await import('../../scripts/ultima-suite-verde.mjs');
 
 // main dal più nuovo: c5 è la punta, c1 il più vecchio.
