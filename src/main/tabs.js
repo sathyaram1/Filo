@@ -2002,6 +2002,7 @@ class TabManager {
       valutate,
       archiviate: esito.archived,
       riordinate: !!esito.reordered,
+      ordineTuo: !!esito.ordineTuo,
       giudizioMancato: !!esito.giudizioMancato,
     }) : '';
     if (testo) this._showTriageToast(testo, esito.archived ? esito.pulizia : null);
