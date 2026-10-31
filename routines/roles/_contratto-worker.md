@@ -36,8 +36,8 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
   fine sessione che il rilascio allega da solo; senza, il rapporto esce anonimo;
 - un guasto che ti impedisce di lavorare → il rilascio con `--guasto`, come
   nella sezione qui sotto: è così che il server ferma questo lavoro, e solo
-  questo, finché il manutentore non lo sblocca. Non "riportarlo" a parole:
-  registralo.
+  questo, finché una nota del manutentore o la correzione della causa non lo
+  sblocca. Non "riportarlo" a parole: registralo.
 
 Se hai registrato tutto, la tua ultima frase non conta niente. Se non l'hai
 registrato, non esiste.
