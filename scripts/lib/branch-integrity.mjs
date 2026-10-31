@@ -388,6 +388,25 @@ function commitExists(g, sha) {
 }
 
 /**
+ * Il ref di tracciamento di `branch` con un reflog suo. `git clone` scrive quelli di origin senza, e senza reflog
+ * --force-if-includes rifiuta ogni rinvio dopo un rebase (#1930). Si toglie e si rimette uguale: un aggiornamento allo
+ * stesso valore git non lo registra. Torna { ok, creato, motivo }; ok falso se resta senza.
+ */
+export function assicuraReflogTracciamento(root, branch) {
+  const g = gitIn(root);
+  const ref = `refs/remotes/origin/${branch}`;
+  const sha = g(['rev-parse', '--verify', '--quiet', ref]);
+  if (!sha.ok || !sha.out) return { ok: false, creato: false, motivo: `${ref} non c'è` };
+  if (g(['reflog', 'exists', ref]).ok) return { ok: true, creato: false, motivo: '' };
+  const via = g(['update-ref', '-d', ref, sha.out]);
+  if (!via.ok) return { ok: false, creato: false, motivo: via.out.slice(0, 200) };
+  const rimesso = g(['update-ref', '--create-reflog', '-m', 'filo: tracciamento col suo reflog', ref, sha.out, '']);
+  if (rimesso.ok) return { ok: true, creato: true, motivo: '' };
+  g(['update-ref', ref, sha.out]);
+  return { ok: false, creato: false, motivo: rimesso.out.slice(0, 200) };
+}
+
+/**
  * I marcatori di sessione: biglietto, battito, ruolo, identità attesa, stato
  * locale. Vivono in `.claude/` DENTRO il progetto, quindi hanno due nemici che
  * il `.gitignore` del ramo GIUSTO tiene a bada, ma quello di un ramo VECCHIO
