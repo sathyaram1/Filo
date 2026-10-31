@@ -82,6 +82,37 @@ test('fuori dalle routine non scarta niente', () => {
   }
 });
 
+// In cloud l'export di FILO_ROUTINE non arriva alla chiamata dopo (#1966): l'orchestratore lancia gli strumenti fissati
+// dal preflight, e una cartella di lavoro ha il biglietto del giro.
+test('senza FILO_ROUTINE nella shell la routine la riconoscono gli strumenti del preflight', () => {
+  const { casa, clone } = giroConRamoVecchio();
+  try {
+    const pin = join(casa, 'strumenti');
+    mkdirSync(pin);
+    writeFileSync(join(pin, '.filo-repo-root'), clone);
+    const r = lancia(clone, { FILO_TOOLS_ROOT: pin, FILO_REPO_ROOT: '' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(git(clone, 'branch', '--show-current'), 'main');
+    assert.equal(readFileSync(join(clone, 'codice.txt'), 'utf8'), 'uno\n');
+  } finally {
+    togliCartella(casa);
+  }
+});
+
+test('senza FILO_ROUTINE nella shell la routine la riconosce il biglietto del giro nella cartella', () => {
+  const { casa, clone } = giroConRamoVecchio();
+  try {
+    appendFileSync(join(clone, '.git', 'info', 'exclude'), '\n.claude/routine-ticket.json\n');
+    const ora = new Date().toISOString();
+    writeFileSync(join(clone, '.claude', 'routine-ticket.json'), JSON.stringify({ ticket: 'b'.repeat(43), since: ora, morto: { ora, perche: 'rilasciato' } }));
+    const r = lancia(clone, {});
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(git(clone, 'branch', '--show-current'), 'main');
+  } finally {
+    togliCartella(casa);
+  }
+});
+
 test("l'orchestratore riporta la cartella su main dopo ogni worker, prima del biglietto", () => {
   const testo = readFileSync(resolve(dirname(DISPATCH), '..', 'routines', 'roles', 'orchestrator.md'), 'utf8');
   const loop = testo.slice(testo.indexOf('## Loop'), testo.indexOf('## Chiusura'));
