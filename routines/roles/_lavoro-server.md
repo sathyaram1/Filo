@@ -34,7 +34,8 @@ credenziali. La parte del server da qui non si fa, e per qualunque ruolo è un g
 riprende sul PC dell'owner. Vale la sezione «Un guasto dell'ambiente si dichiara nel rilascio», col testo esatto di
 git o del rifiuto e la riga su chi l'ha respinto nel messaggio del rilascio. Il gruppo è `guasto: filo-security`. Un no
 per la fiducia del feedback o per un permesso non lo chiedi tu all'owner: il server lo porta nei Ricevuti. Chi verifica non passa il lavoro guardando solo l'app: rilascia col guasto senza
-registrare la critica, e il lavoro torna in coda da sé per un'altra verifica quando il guasto è passato.
+registrare la critica: il lavoro resta fermo finché una nota del manutentore o la correzione della causa non lo sblocca,
+poi torna a un'altra verifica.
 
 ### Il ramo
 
