@@ -32,7 +32,9 @@ scrivi l'elenco dei test rossi dopo il rebase.
    quella arrivata su `main`. Per capire la seconda leggi il commit di `main`
    che ha toccato quel punto, non indovinarla. Risolto un file, `git add
    <file>`; risolti tutti, `git rebase --continue`. Il push forzato non tocca a
-   te: lo fa il salvataggio automatico.
+   te: lo fa la consegna, che registra il riallineamento solo se su origin il
+   ramo è alla tua punta e contiene `main`. Se rifiuta, ti dice perché e cosa
+   fare.
 
    Niente `&&`, niente `cd … &&` davanti, niente `git -C`: un comando
    composto o scritto in un'altra forma il controllo dei permessi lo giudica
