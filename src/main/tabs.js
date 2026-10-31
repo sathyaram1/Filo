@@ -2011,7 +2011,7 @@ class TabManager {
 
   // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive', poi
   // riordina cromaticamente i superstiti (§1.3). `cands` è l'elenco indicizzato passato all'LLM.
-  applyTriageDecisions(cands, decisions, { via = 'riordino_automatico' } = {}) {
+  applyTriageDecisions(cands, decisions, { via = 'riordino_automatico', riordina = true } = {}) {
     const byIndex = new Map();
     for (const d of (decisions || [])) {
       if (d && typeof d.i === 'number') byIndex.set(d.i, d);
