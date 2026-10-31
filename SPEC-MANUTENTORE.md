@@ -246,7 +246,11 @@ Il minimo di feedback; chi li prende usa sotto-agenti per area.
   di decifratura, solo sul PC dell'owner);
 - taccuino (§ 5) e recap (§ 9) come documenti del server; ordine, N, priorità,
   attese, account scritti dalla chiave manutentore; freno d'emergenza
-  dell'owner; via i tetti per priorità e la riserva su A;
+  dell'owner; via la riserva su A; i bilanci dei giri (cap3…cap0) non si
+  toccano;
+- compiti del manutentore (§ 6): un compito programmato da lui, con un
+  biglietto suo, senza verifica né controllo di sicurezza, e senza il sistema
+  di priorità dei ricorrenti;
 - sveglie (§ 4): segnali che accendono il manutentore, sveglia richiesta,
   tetto suo nel pacemaker; compito ricorrente quotidiano per la decisione;
 - guasti (§ 7): via il rispetto globale; lavoro guasto fermo finché una nota del
