@@ -1502,7 +1502,7 @@
   // La risposta arriva a video salvato, anche dopo minuti: se tarda, un avviso dice subito che è partito.
   async function salvaInStreaming(audio) {
     let partito = null;
-    const avviso = setTimeout(() => { partito = Popup.showToast(I18n.t('toast_video_streaming_started')); }, 700);
+    const avviso = setTimeout(() => { partito = Popup.showToast(I18n.t(audio ? 'toast_audio_streaming_started' : 'toast_video_streaming_started')); }, 700);
     let res = null;
     try {
       res = await chrome.runtime.sendMessage({ type: MSG.SAVE_STREAMING_VIDEO, kind: audio ? 'audio' : 'video', titolo: document.title || '' });

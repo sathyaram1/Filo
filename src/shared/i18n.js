@@ -85,6 +85,7 @@
     toast_media_stream_only: 'Questo contenuto arriva in streaming: non c\'è un file da salvare',
     // #1488 — il video in streaming lo salva un programma (yt-dlp): le fasi sulla riga dei Download, e i perché di un no.
     toast_video_streaming_started: 'Salvo il video: l\'avanzamento è nei Download',
+    toast_audio_streaming_started: 'Salvo l\'audio: l\'avanzamento è nei Download',
     streaming_non_riuscito: '%s',
     streaming_fase_programma: 'Preparo il programma per i video (solo la prima volta)',
     streaming_fase_leggo: 'Leggo il video',

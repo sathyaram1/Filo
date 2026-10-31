@@ -1,13 +1,14 @@
 // #1488 — «Salva video come…» su un video in streaming (un <video> che legge da MediaSource, come YouTube) salva il
 // video invece di dire che non c'è un file. Il programma è un yt-dlp finto (tests/helpers/ytdlpFinto.mjs): quello
-// vero non gira nelle prove, e non si è potuto provare su YouTube vero. Logica e programmi: tests/unit/ytdlp*.mjs.
+// vero non gira nelle prove, e non si è potuto provare su YouTube vero. Logica e programmi: tests/unit/ytdlp.test.mjs,
+// strumentiVideo.test.mjs, salvaVideoStreaming.test.mjs, firmaPgp.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const SHOTS = join(process.cwd(), 'tests', '.shots');
@@ -43,6 +44,7 @@ async function salvaDalMenu(page) {
 const elenco = async (shell) => ((await shell.evaluate(() => window.filoShell.downloads.list())) || {}).items || [];
 
 test.beforeAll(() => { mkdirSync(base, { recursive: true }); mkdirSync(SHOTS, { recursive: true }); });
+test.afterAll(() => { togliCartella(base); });
 
 test('dal tasto destro il video in streaming arriva nella cartella, col titolo del video', async ({ app, shell, openTab, testServer, avvisi }) => {
   test.setTimeout(60_000);

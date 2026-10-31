@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -28,7 +28,7 @@ process.env.FILO_DOWNLOAD_DIR = scaricati;
 process.env.FILO_YTDLP_COMANDO = JSON.stringify([process.execPath, join(ROOT, 'tests', 'helpers', 'ytdlpFinto.mjs')]);
 process.env.FILO_YTDLP_FINTO_REGISTRO = registro;
 process.env.FILO_YTDLP_FINTO_CASO = caso;
-process.on('exit', () => { try { rmSync(base, { recursive: true, force: true }); } catch (_) {} });
+process.on('exit', () => { try { togliCartella(base); } catch (_) {} });
 
 const ilCaso = (c) => { writeFileSync(caso, JSON.stringify(c)); try { rmSync(registro, { force: true }); } catch (_) {} };
 const voce = (id) => DL.list().find((r) => r.id === id);

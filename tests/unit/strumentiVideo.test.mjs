@@ -7,10 +7,10 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -66,7 +66,7 @@ test('al primo salvataggio scendono yt-dlp e ffmpeg, controllati, con un avanzam
     const ultimo = visti.at(-1);
     assert.ok(ultimo.totale > 0 && ultimo.ricevuti === ultimo.totale, JSON.stringify(ultimo));
     assert.ok(visti.some((a) => a.ricevuti < a.totale), 'c\'è un avanzamento intermedio');
-  } finally { rmSync(sc.cartella, { recursive: true, force: true }); }
+  } finally { togliCartella(sc.cartella); }
 });
 
 test('la seconda volta non si scarica niente; dopo un giorno si guarda solo l\'elenco firmato', async () => {
@@ -81,7 +81,7 @@ test('la seconda volta non si scarica niente; dopo un giorno si guarda solo l\'e
     await sc.s.pronti();
     const nuove = sc.r.chiesti.slice(n).map((u) => u.split('/').pop()).sort();
     assert.deepEqual(nuove, ['SHA2-256SUMS', 'SHA2-256SUMS.sig'], 'stessa versione: solo l\'elenco');
-  } finally { rmSync(sc.cartella, { recursive: true, force: true }); }
+  } finally { togliCartella(sc.cartella); }
 });
 
 test('una versione nuova prende un file nuovo e toglie il vecchio', async () => {
@@ -95,7 +95,7 @@ test('una versione nuova prende un file nuovo e toglie il vecchio', async () => 
     assert.notEqual(p2.ytdlp, p1.ytdlp);
     assert.deepEqual(readFileSync(p2.ytdlp), nuovo);
     assert.equal(existsSync(p1.ytdlp), false);
-  } finally { rmSync(sc.cartella, { recursive: true, force: true }); }
+  } finally { togliCartella(sc.cartella); }
 });
 
 test('senza rete basta il programma che c\'è; senza programma e senza rete è un errore detto', async () => {
@@ -105,12 +105,12 @@ test('senza rete basta il programma che c\'è; senza programma e senza rete è u
     sc.file.giu = true;
     const p2 = await sc.s.pronti({ forza: true });
     assert.equal(p2.ytdlp, p1.ytdlp);
-  } finally { rmSync(sc.cartella, { recursive: true, force: true }); }
+  } finally { togliCartella(sc.cartella); }
   const vuota = scena();
   try {
     vuota.file.giu = true;
     await assert.rejects(vuota.s.pronti(), (e) => e.motivo === 'programma');
-  } finally { rmSync(vuota.cartella, { recursive: true, force: true }); }
+  } finally { togliCartella(vuota.cartella); }
 });
 
 test('un elenco senza firma valida o un file che non torna con l\'hash non entra', async () => {
@@ -118,13 +118,13 @@ test('un elenco senza firma valida o un file che non torna con l\'hash non entra
   try {
     await assert.rejects(sc.s.pronti(), (e) => e.motivo === 'firma');
     assert.ok(!readdirSync(sc.cartella).some((n) => n.startsWith('yt-dlp')), 'nessun yt-dlp sul disco');
-  } finally { rmSync(sc.cartella, { recursive: true, force: true }); }
+  } finally { togliCartella(sc.cartella); }
   const manomesso = scena();
   try {
     manomesso.file.contenuti['yt-dlp_linux'] = Buffer.from('#!/bin/sh\nrm -rf ~\n');
     await assert.rejects(manomesso.s.pronti(), (e) => e.motivo === 'firma');
     assert.ok(!readdirSync(manomesso.cartella).some((n) => n.startsWith('yt-dlp')), 'il file manomesso non resta, nemmeno a metà');
-  } finally { rmSync(manomesso.cartella, { recursive: true, force: true }); }
+  } finally { togliCartella(manomesso.cartella); }
 });
 
 test('due salvataggi insieme aspettano lo stesso scaricamento', async () => {
@@ -133,7 +133,7 @@ test('due salvataggi insieme aspettano lo stesso scaricamento', async () => {
     const [a, b] = await Promise.all([sc.s.pronti(), sc.s.pronti()]);
     assert.deepEqual(a, b);
     assert.equal(sc.r.chiesti.filter((u) => u.endsWith('/yt-dlp_linux')).length, 1);
-  } finally { rmSync(sc.cartella, { recursive: true, force: true }); }
+  } finally { togliCartella(sc.cartella); }
 });
 
 test('su un computer senza una build di yt-dlp lo dice', async () => {
@@ -141,6 +141,6 @@ test('su un computer senza una build di yt-dlp lo dice', async () => {
   try {
     const s = S.crea({ cartella, scarica: async () => { throw new Error('non deve scaricare'); }, platform: 'freebsd', arch: 'x64' });
     await assert.rejects(s.pronti(), (e) => e.motivo === 'piattaforma');
-  } finally { rmSync(cartella, { recursive: true, force: true }); }
+  } finally { togliCartella(cartella); }
   assert.ok(Y.RILASCIO_YTDLP.startsWith('https://github.com/yt-dlp/yt-dlp/releases/'));
 });
