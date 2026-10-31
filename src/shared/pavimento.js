@@ -10,8 +10,14 @@
   // nemmeno: il guardiano la cerca fra le parole vicine all'etichetta (indirizzi di campo, codice), qui conta il suo posto.
   const REGOLE_GUARDIANO = new Set(['chiave', 'codice', 'carta']);
 
-  // «CVV 123», «CVC: 4821», «Codice di sicurezza 318»: tre o quattro cifre annunciate dal nome del codice della carta.
-  const CVV = /\b(?:cvv2?|cvc2?|csc|cid|(?:card\s+)?security\s+code|codice\s+(?:di\s+)?sicurezza(?:\s+della\s+carta)?)\b\s*(?:[:=]|è|e'|is)?\s*(\d{3,4})(?![\d/]|[.,:-]\d)/gi;
+  // «CVV 123», «CVC: 4821», «Codice di sicurezza 318»: tre o quattro cifre al posto del valore del codice della carta,
+  // come per la password: anche dopo una parentesi, nella cella accanto o sotto, e dopo altre parole («CVV code: 739»,
+  // «Il codice CVV della carta è 615») solo col separatore o il verbo davanti, perché una frase che nomina il CVV non è il valore.
+  const NOME_CVV = '\\b(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|codice\\s+(?:di\\s+)?sicurezza)\\b';
+  const PARENTESI = '(?:\\([^)\\n]{0,30}\\)[ \\t]*)?';
+  const CIFRE_CVV = '(\\d{3,4})(?![\\d/]|[.,:-]\\d)';
+  const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|è|e'|is)?\\s*${CIFRE_CVV}`, 'gi');
+  const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*[:=|\\t]|\\s+(?:è|e'|is|was)(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
   // Il codice che una mail o un SMS manda per entrare: il guardiano riconosce solo i marchi del monouso, perché lì un
   // falso allarme ferma un'azione; qui un falso allarme toglie un numero, e il codice di verifica non esce.
   // Le cifre in coda a una parola («Girasole2024») non sono il codice: è la password intera, e la toglie la regola delle
