@@ -580,6 +580,80 @@ test('qualcun altro ha spinto E questa copia lo ha già scaricato con un fetch: 
   assert.equal(remoteSha(origin, 'worker/9'), b, 'il commit dell\'altro resta su origin');
 });
 
+// ─── #1776: il clone delle routine nasce senza reflog delle tracce remote ────
+// --force-if-includes lo rifiutava sempre («remote ref updated since checkout»): il riallineamento non arrivava.
+function cloneDelGiro(base, origin, ramo, nome) {
+  const copia = resolve(base, nome);
+  g(base, ['clone', '-q', origin, copia]);
+  g(copia, ['checkout', '-q', ramo]);
+  return copia;
+}
+function ramoSuOriginEMainAvanti(nome) {
+  const { base, origin, work } = scena();
+  g(work, ['checkout', '-q', '-b', nome]);
+  commitFile(work, 'lavoro.js');
+  g(work, ['push', '-q', 'origin', nome]);
+  g(work, ['checkout', '-q', 'main']);
+  commitFile(work, 'main-avanti.js');
+  g(work, ['push', '-q', 'origin', 'main']);
+  return { base, origin, work };
+}
+
+test('#1776 clone appena nato, ramo riallineato a main: il rilascio lo spedisce', () => {
+  const { base, origin } = ramoSuOriginEMainAvanti('worker/11');
+  const copia = cloneDelGiro(base, origin, 'worker/11', 'giro');
+  assert.throws(() => g(copia, ['reflog', 'exists', 'refs/remotes/origin/worker/11']),
+    'la condizione del difetto: la traccia remota non ha reflog');
+  g(copia, ['fetch', '-q', 'origin', 'main']);
+  g(copia, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'rebase', '-q', 'origin/main']);
+  const r = pushRamoCorrente(copia);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.forced, true);
+  assert.equal(remoteSha(origin, 'worker/11'), g(copia, ['rev-parse', 'HEAD']), 'su origin c\'è il ramo riallineato');
+  assert.ok(g(origin, ['ls-tree', '--name-only', 'worker/11']).includes('main-avanti.js'));
+});
+
+test('#1776 clone appena nato, e qualcun altro ha spinto sul ramo prima del fetch: il suo commit resta', () => {
+  const { base, origin } = ramoSuOriginEMainAvanti('worker/12');
+  const copia = cloneDelGiro(base, origin, 'worker/12', 'giro');
+  const altro = cloneDelGiro(base, origin, 'worker/12', 'altro');
+  commitFile(altro, 'di-un-altro.js');
+  g(altro, ['push', '-q', 'origin', 'worker/12']);
+  const suo = g(altro, ['rev-parse', 'HEAD']);
+  g(copia, ['fetch', '-q', 'origin']);
+  g(copia, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'rebase', '-q', 'origin/main']);
+  const r = pushRamoCorrente(copia);
+  assert.equal(r.ok, false, JSON.stringify(r));
+  assert.match(r.reason, /qualcun altro ha spinto/);
+  assert.equal(remoteSha(origin, 'worker/12'), suo, 'il commit dell\'altro resta su origin');
+});
+
+test('#1776 la traccia remota è un antenato di un commit passato dal ramo, anche oltre i primi 200 del reflog: si spedisce', () => {
+  const { origin, work } = scena();
+  const radice = g(work, ['rev-parse', 'main']);
+  g(work, ['checkout', '-q', '--detach']);
+  commitFile(work, 'a.js');
+  const a = g(work, ['rev-parse', 'HEAD']);
+  commitFile(work, 'b.js');
+  const b = g(work, ['rev-parse', 'HEAD']);
+  g(work, ['push', '-q', 'origin', `${a}:refs/heads/worker/13`]);
+  g(work, ['fetch', '-q', 'origin']);
+  g(work, ['checkout', '-q', '-b', 'worker/13', b]);
+  // 250 commit distinti che non contengono a: il passato che lo contiene finisce nel secondo blocco.
+  const flusso = Array.from({ length: 250 }, (_, i) => `commit refs/heads/riempitivo\ncommitter t <t@t> ${1700000000 + i} +0000\ndata ${String(i).length}\n${i}\n${i ? '' : `from ${radice}\n`}\n`).join('');
+  execFileSync('git', ['fast-import', '--quiet'], { cwd: work, input: flusso, stdio: ['pipe', 'pipe', 'pipe'] });
+  const riempitivi = g(work, ['rev-list', 'riempitivo', `^${radice}`]).split('\n');
+  assert.equal(riempitivi.length, 250);
+  const log = resolve(work, '.git', 'logs', 'refs', 'heads', 'worker', '13');
+  writeFileSync(log, readFileSync(log, 'utf8') + riempitivi.map((s) => `${b} ${s} t <t@t> 1700000000 +0000\triempitivo\n`).join(''), 'utf8');
+  g(work, ['reset', '-q', '--hard', radice]);
+  commitFile(work, 'c.js');
+  assert.equal(mod.leaseAtteso(work, 'worker/13'), a);
+  const r = pushRamoCorrente(work);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(remoteSha(origin, 'worker/13'), g(work, ['rev-parse', 'HEAD']));
+});
+
 // ─── commitRestante nel mezzo di un conflitto ────────────────────────────────
 //
 // Stessa regola dell'hook (giro del 14/09, terza verifica): con un rebase o
