@@ -113,8 +113,10 @@ export const test = base.extend({
   // Bacheca e Deck builder (#1592) sono in pausa per chi non è owner: le loro prove li trovano aperti a tutti.
   // Chi prova la pausa e l'interruttore passa `test.use({ inPausaAperte: false })`.
   inPausaAperte: [true, { option: true }],
+  // Variabili d'ambiente in più per l'app, come il programma finto dei video in streaming (#1488).
+  envInPiu: [{}, { option: true }],
 
-  app: async ({ accoglienzaFatta, riservaNuovaScheda, stratoDelMenu, argomentiInPiu, hostInPiu, inPausaAperte }, use, testInfo) => {
+  app: async ({ accoglienzaFatta, riservaNuovaScheda, stratoDelMenu, argomentiInPiu, hostInPiu, inPausaAperte, envInPiu }, use, testInfo) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
     // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
     // il percorso che l'app riporta.
@@ -159,6 +161,7 @@ export const test = base.extend({
         // anche per la cinquantina di spec che lancia Electron senza passare da
         // questa fixture. Qui la eredita e basta (`...process.env` sopra).
         NODE_ENV: 'test',
+        ...envInPiu,
       },
     });
     const usciteApp = registraUsciteApp(app);

@@ -2187,9 +2187,11 @@
       meta.className = 'dl-row-meta';
       const p = pct(r);
       if (isActive(r)) {
-        const base = p != null
+        let base = p != null
           ? `${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
           : `${fmtBytes(r.receivedBytes)} scaricati`;
+        // #1488 — un video in streaming dice cosa sta facendo quando non sono byte del file.
+        if (r.nota) base = p != null || r.receivedBytes ? `${r.nota} · ${base}` : r.nota;
         // #1287 — quanto va veloce e quanto manca, misurati dal main.
         let corsa = '';
         try { corsa = window.SN_SCARICAMENTI_AVANZAMENTO.velocitaEResto(r); } catch (_) {}
@@ -2201,6 +2203,9 @@
         // solo nell'avviso che l'utente può aver già chiuso.
         const da = provenienza(r);
         meta.textContent = da ? `${stateLabel(r)} · ${da}` : stateLabel(r);
+      } else if (r.state === 'interrupted' && r.nota) {
+        meta.textContent = `${stateLabel(r)} · ${r.nota}`;
+        meta.title = r.nota;
       } else {
         meta.textContent = `${stateLabel(r)} · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       }

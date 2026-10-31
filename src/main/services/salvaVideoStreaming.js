@@ -124,11 +124,12 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
   try {
     lavoro = fs.mkdtempSync(path.join(voce.cartella(), '.filo-video-'));
   } catch (e) {
-    return fallisci('spazio', e && e.message);
+    return fallisci(Y.motivoErrore(e && e.message) === 'spazio' ? 'spazio' : 'generico', e && e.message);
   }
   const pulisci = () => { try { fs.rmSync(lavoro, { recursive: true, force: true }); } catch (_) {} };
 
   let destinazione = null;
+  let noAlDialogo = false;
   let titoloVero = '';
   const chiedi = () => {
     if (!destinazione) destinazione = scegli(nomeSicuro(titoloVero || Y.titoloDaPagina(titolo), ext));
@@ -143,7 +144,7 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
     const esito = await eseguiYtdlp(programmi.comando, Y.argomenti({
       url, cartella: lavoro, audio, ffmpeg: programmi.ffmpeg, nodo: comandoDiProva() ? '' : process.execPath,
     }), {
-      fermato: () => voce.cancelled() || !!(destinazione && destinazione.annullato),
+      fermato: () => voce.cancelled() || noAlDialogo,
       suEvento: (ev, riga) => {
         if (ev.tipo === 'errore') {
           if (!motivo || motivo === 'generico') { motivo = ev.motivo; dettaglio = riga; }
@@ -158,7 +159,7 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
         // I primi byte vogliono dire che il video c'è: da qui si chiede dove salvarlo, intanto continua a scendere.
         if (!destinazione) {
           voce.nota('');
-          chiedi().then((d) => { if (d && (d.cancelled || d.error)) { destinazione.annullato = true; voce.cancel(); } });
+          chiedi().then((d) => { if (d && (d.cancelled || d.error)) { noAlDialogo = true; voce.cancel(); } });
         }
         const s = avanzamento.stato();
         voce.progress(s.ricevuti, s.totale);
@@ -168,7 +169,7 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
     if (voce.cancelled()) return { annullato: true };
     const uscito = fileUscito(lavoro);
     if (esito.codice === 0 && uscito && !motivo) return { uscito };
-    return { motivo: motivo || (esito.codice === 0 ? 'generico' : 'generico'), dettaglio: dettaglio || `codice ${esito.codice}` };
+    return { motivo: motivo || 'generico', dettaglio: dettaglio || `codice ${esito.codice}` };
   };
 
   try {
@@ -197,7 +198,7 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
     try {
       await sposta(r.uscito.p, finale);
     } catch (e) {
-      return fallisci('spazio', e && e.message);
+      return fallisci(Y.motivoErrore(e && e.message) === 'spazio' ? 'spazio' : 'generico', e && e.message);
     }
     voce.done(finale);
     return { ok: true, path: finale, filename: path.basename(finale) };

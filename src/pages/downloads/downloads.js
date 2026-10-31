@@ -136,6 +136,8 @@
   }
   async function redownload(r) {
     if (!isHttp(r.url)) { flash('Sorgente non disponibile per il ri-scaricamento'); return; }
+    // L'indirizzo di un video in streaming è la sua pagina: lo rifà chi l'aveva salvato, non un download del link.
+    if (r.via === 'streaming') { await riprova(r); return; }
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_LINK, url: r.url });
     if (res && res.ok === false) flash('Ri-scaricamento non avviato');
     else flash('Ri-scaricamento avviato');
@@ -300,9 +302,11 @@
     meta.className = 'dl-meta';
     const p = pct(r);
     if (isActive(r)) {
+      // #1488 — un video in streaming dice cosa sta facendo quando non sono byte del file («Unisco video e audio»).
+      const stato = r.nota || stateLabel(r);
       const base = p != null
-        ? `${stateLabel(r)} · ${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
-        : `${stateLabel(r)} · ${fmtBytes(r.receivedBytes)} scaricati`;
+        ? `${stato} · ${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
+        : (r.receivedBytes ? `${stato} · ${fmtBytes(r.receivedBytes)} scaricati` : stato);
       let corsa = '';
       try { corsa = window.SN_SCARICAMENTI_AVANZAMENTO.velocitaEResto(r); } catch (_) {}
       meta.textContent = corsa ? `${base} · ${corsa}` : base;
@@ -315,7 +319,13 @@
     } else {
       const size = fmtBytes(r.totalBytes || r.receivedBytes);
       const label = r.missing ? 'Non più sul disco' : stateLabel(r);
-      meta.textContent = `${label} · ${size} · ${formatDate(r.startedAt)}`;
+      // Il perché di un salvataggio non riuscito resta sulla riga, per chi non ha visto l'avviso.
+      if (r.state === 'interrupted' && r.nota) {
+        meta.textContent = `${label} · ${r.nota} · ${formatDate(r.startedAt)}`;
+        meta.title = r.nota;
+      } else {
+        meta.textContent = `${label} · ${size} · ${formatDate(r.startedAt)}`;
+      }
     }
     row.appendChild(meta);
 

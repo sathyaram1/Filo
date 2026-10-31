@@ -324,6 +324,9 @@
     // decide il nome di ripiego e l'header Accept.
     // { url, kind:'video'|'audio' } → { ok, path?, filename? } | { ok:false, cancelled?, error? }
     DOWNLOAD_MEDIA: 'download_media',
+    // #1488 — «Salva video come…» su un video in streaming: lo scarica yt-dlp dall'indirizzo del riquadro che chiede.
+    // { kind:'video'|'audio', titolo } → { ok, path, filename } | { ok:false, cancelled? , motivo?, frase?, spento? }
+    SAVE_STREAMING_VIDEO: 'save_streaming_video',
     // "Salva file" dal menu contestuale su un link a un file (#410.2). NON
     // scarica byte a mano come DOWNLOAD_IMAGE/MEDIA: fa partire il download
     // NATIVO della scheda (webContents.downloadURL), così passa per

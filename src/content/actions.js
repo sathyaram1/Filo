@@ -1462,7 +1462,7 @@
     if (!src) { Popup.toastErrore(failToast); return; }
 
     // Come in downloadImage, blob: e data: restano sul cammino anchor. Un blob: di
-    // MediaSource non è leggibile: lì non esiste nessun file da salvare.
+    // MediaSource non è leggibile: il file non esiste, e lo ricompone yt-dlp dalla pagina (#1488).
     if (/^(blob:|data:)/i.test(src)) {
       try {
         const r = await fetch(src);
@@ -1477,7 +1477,8 @@
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => { try { URL.revokeObjectURL(objUrl); } catch (_) {} }, 20000);
       } catch (_) {
-        Popup.toastErrore('toast_media_stream_only');
+        if (/^blob:/i.test(src)) await salvaInStreaming(audio);
+        else Popup.toastErrore('toast_media_stream_only');
       }
       return;
     }
@@ -1496,6 +1497,25 @@
     } catch (_) {
       Popup.toastErrore(failToast);
     }
+  }
+
+  // La risposta arriva a video salvato, anche dopo minuti: se tarda, un avviso dice subito che è partito.
+  async function salvaInStreaming(audio) {
+    let partito = null;
+    const avviso = setTimeout(() => { partito = Popup.showToast(I18n.t('toast_video_streaming_started')); }, 700);
+    let res = null;
+    try {
+      res = await chrome.runtime.sendMessage({ type: MSG.SAVE_STREAMING_VIDEO, kind: audio ? 'audio' : 'video', titolo: document.title || '' });
+    } catch (_) { res = null; }
+    clearTimeout(avviso);
+    try { if (partito && partito.close) partito.close(); } catch (_) {}
+    if (res?.ok) { Popup.showToast(I18n.t(audio ? 'toast_audio_saved' : 'toast_video_saved')); return; }
+    if (res?.cancelled) return;
+    // Una build senza la funzione (quelle da negozio) dice com'era prima: lo streaming non ha un file.
+    if (res?.spento) { Popup.toastErrore('toast_media_stream_only'); return; }
+    const chiave = `streaming_${res?.motivo || 'generico'}`;
+    const frase = I18n.t(chiave) !== chiave ? I18n.t(chiave) : I18n.t('streaming_generico');
+    Popup.toastErrore('streaming_non_riuscito', { duration: 9000 }, frase);
   }
 
   // Il corpo accelera di uno scatto, la freccetta apre l'elenco completo. L'etichetta

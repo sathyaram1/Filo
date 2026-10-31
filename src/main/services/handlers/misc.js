@@ -227,6 +227,31 @@ async function immagineNegliAppunti() {
   return null;
 }
 
+// Dove mettere il file: in test si salva diretto (il dialogo nativo non è automatizzabile), altrimenti «Salva come…»
+// pre-compilato con la cartella Download e il nome dedotto. Non rigetta MAI: l'esito è nel valore.
+async function scegliDestinazione(wc, sender, winOf, filename) {
+  const path = require('node:path');
+  const fs = require('node:fs');
+  const { dialog, app, BrowserWindow } = require('electron');
+  const testDir = process.env.FILO_DOWNLOAD_DIR;
+  if (testDir) {
+    try { fs.mkdirSync(testDir, { recursive: true }); } catch (_) {}
+    return { filePath: path.join(testDir, filename) };
+  }
+  try {
+    // Dopo la domanda sul programma la scheda può essere già chiusa; un «Riprova» dai Download non ha una scheda.
+    const win = (wc && !wc.isDestroyed() && BrowserWindow.fromWebContents(wc)) || (sender && winOf(sender))
+      || BrowserWindow.getFocusedWindow() || null;
+    const opts = { defaultPath: path.join(app.getPath('downloads'), filename) };
+    const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
+    // Annullato dall'utente: non è un errore, nessun toast.
+    if (res.canceled || !res.filePath) return { cancelled: true };
+    return { filePath: res.filePath };
+  } catch (e) {
+    return { error: e?.message || 'dialogo non disponibile' };
+  }
+}
+
 module.exports = function register(on, ctx) {
   const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita: portaUscite, apriDaFilo, contattabilePrimaDelClic } = ctx;
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
@@ -294,30 +319,10 @@ module.exports = function register(on, ctx) {
     if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
     const path = require('node:path');
     const fs = require('node:fs');
-    const { dialog, app, BrowserWindow } = require('electron');
     const downloads = require('../downloads');
     const fallbackName = kind === 'video' ? 'video' : (kind === 'audio' ? 'audio' : 'immagine');
 
-    // In test si salva diretto: il dialogo nativo non è automatizzabile. Non rigetta MAI,
-    // l'esito sta nel valore.
-    const pickDestination = async (filename) => {
-      const testDir = process.env.FILO_DOWNLOAD_DIR;
-      if (testDir) {
-        try { fs.mkdirSync(testDir, { recursive: true }); } catch (_) {}
-        return { filePath: path.join(testDir, filename) };
-      }
-      try {
-        // Dopo la domanda sul programma la scheda può essere già chiusa.
-        const win = (!wc.isDestroyed() && BrowserWindow.fromWebContents(wc)) || winOf(sender) || null;
-        const opts = { defaultPath: path.join(app.getPath('downloads'), filename) };
-        const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
-        // Annullato dall'utente: non è un errore, nessun toast.
-        if (res.canceled || !res.filePath) return { cancelled: true };
-        return { filePath: res.filePath };
-      } catch (e) {
-        return { error: e?.message || 'dialogo non disponibile' };
-      }
-    };
+    const pickDestination = (filename) => scegliDestinazione(wc, sender, winOf, filename);
 
     let entry = null;        // voce nella barra scaricamenti
     let partPath = '';       // file che cresce mentre i byte arrivano
@@ -411,6 +416,35 @@ module.exports = function register(on, ctx) {
 
   on(MSG.DOWNLOAD_IMAGE, handleDownload);
   on(MSG.DOWNLOAD_MEDIA, handleDownload);
+
+  // #1488 — un video in streaming non ha un file: lo salva yt-dlp dalla pagina. L'indirizzo è quello del riquadro
+  // che chiede, mai uno scritto nel messaggio; una build da negozio non ha la funzione (funzioniBuild.js).
+  const Streaming = require('../salvaVideoStreaming');
+  on(MSG.SAVE_STREAMING_VIDEO, async (msg, sender) => {
+    if (!require('../funzioniBuild').salvaVideoInStreaming) return { ok: false, spento: true };
+    const wc = sender && sender.wc;
+    if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
+    let url = '';
+    try { url = String((sender.frame && sender.frame.url) || sender.url || ''); } catch (_) { url = String(sender.url || ''); }
+    if (!/^https?:\/\//i.test(url)) return { ok: false, motivo: 'sito', frase: Streaming.frase('sito') };
+    return Streaming.salva({
+      url,
+      titolo: typeof msg.titolo === 'string' ? msg.titolo.slice(0, 400) : '',
+      audio: msg.kind === 'audio',
+      scope: require('../downloads').scopeOfWindow(sender.win),
+      webContents: wc,
+      scegli: (nome) => scegliDestinazione(wc, sender, winOf, nome),
+      sposta: moveInto,
+    });
+  });
+  require('../downloads').quandoRiprovaStreaming(({ id, url, filename, scope }) => {
+    if (!require('../funzioniBuild').salvaVideoInStreaming) return;
+    const audio = /\.(m4a|opus|mp3|ogg|weba)$/i.test(String(filename || ''));
+    Streaming.salva({
+      url, titolo: String(filename || '').replace(/\.[a-z0-9]{2,5}$/i, ''), audio, scope, riusa: id,
+      scegli: (nome) => scegliDestinazione(null, null, winOf, nome), sposta: moveInto,
+    }).catch((e) => console.warn('[Filo video] «Riprova» non riuscito:', e?.message || e));
+  });
 
   // #711 — le etichette di origine di un'immagine, lette dai suoi byte. Nessun
   // gate d'origine: la risposta parla solo dei byte che il chiamante ha mandato.
