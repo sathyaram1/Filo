@@ -255,7 +255,7 @@
     const n = tutteLe.length;
     conto.textContent = n ? String(n) : '';
     // Chi ha segnalazioni di prima la trova anche aprendo la Bacheca dal menu, con la frase che spiega il vuoto.
-    const mostra = n > 0 || precedenti || location.hash === '#segnalazioni' || soloLoro();
+    const mostra = n > 0 || precedenti || chiestoElenco() || soloLoro();
     sezione.hidden = !mostra;
     titoloSezione.classList.toggle('bd-h2-pagina', soloLoro());
     if (titoloMigliorie) titoloMigliorie.hidden = !mostra;
