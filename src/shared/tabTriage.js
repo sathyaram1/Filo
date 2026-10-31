@@ -101,16 +101,18 @@
 
   // L'avviso dopo un giro di pulizia, o '' se non se ne mostra. Alla riapertura c'è sempre (#349): senza, «ho
   // guardato e tenuto tutto» e «non sono partito» si confondevano. Negli altri giri solo se si è chiuso qualcosa.
-  function testoEsito({ trigger = '', archiviate = 0, riordinate = false, giudizioMancato = false, valutate = 0 } = {}) {
+  // `ordineTuo`: la barra non si è riordinata perché nel frattempo l'utente l'ha sistemata a mano.
+  function testoEsito({ trigger = '', archiviate = 0, riordinate = false, ordineTuo = false, giudizioMancato = false, valutate = 0 } = {}) {
     const n = Math.max(0, Number(archiviate) || 0);
     const riapertura = trigger === 'reopen';
     if (!n && !(riapertura && (valutate > 0 || riordinate))) return '';
     if (n) {
       const una = n === 1;
       if (giudizioMancato) {
-        return `Schede riordinate e ${n} ${una ? 'doppione chiuso, lo' : 'doppioni chiusi, li'} ritrovi nel filo della home. `
+        return `${ordineTuo ? '' : 'Schede riordinate e '}${n} ${una ? 'doppione chiuso, lo' : 'doppioni chiusi, li'} ritrovi nel filo della home. `
           + 'Le altre non sono riuscito a valutarle';
       }
+      if (ordineTuo) return `${n} ${una ? 'scheda chiusa. La' : 'schede chiuse. Le'} ritrovi nel filo della home`;
       return `Schede riordinate, ${n} ${una ? 'chiusa. La' : 'chiuse. Le'} ritrovi nel filo della home`;
     }
     if (giudizioMancato) {
@@ -118,6 +120,7 @@
         ? 'Schede riordinate, ma non sono riuscito a valutare quali chiudere'
         : 'Non sono riuscito a valutare quali schede chiudere';
     }
+    if (ordineTuo) return 'Nessuna scheda da chiudere';
     return riordinate ? 'Schede riordinate, nessuna da chiudere' : 'Schede già in ordine, nessuna da chiudere';
   }
 
