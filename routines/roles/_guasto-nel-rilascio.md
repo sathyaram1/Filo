@@ -9,7 +9,7 @@ Un rifiuto di una tua consegna (exit 4) o il canale giù (exit 3) non lo sono.
 Un guasto non è una domanda: non c'è niente da decidere, e l'owner non lo
 vede. Non scrivi una domanda e non ti fermi con una consegna: lo dichiari nel
 rilascio, col gruppo e il messaggio esatto. Ferma il tuo lavoro, non quello
-degli altri (l'ultimo paragrafo dice fino a quando).
+degli altri.
 
 1. La domanda di fine sessione, come sempre.
 2. `node scripts/routine-channel.mjs release <biglietto> --role <il tuo ruolo>
