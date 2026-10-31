@@ -236,8 +236,80 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
     subagentRuns: 0,
     subagentCostUsd: 0,
     longestToolS: 0,
+    // SPEC-MANUTENTORE § 6: quali strumenti falliscono e cosa è successo dopo, e le attese sopra i 30 s. Dal
+    // transcript, non dal worker; elenchi a budget di byte (ELENCO_MAX_BYTE), i conti interi in tools.errors e qui.
+    falliti: [],
+    attese: [],
+    atteseOltre30: 0,
     notes: [],
   };
+}
+
+// Il rapporto viaggia sotto il tetto del server (8 KB, report_too_big): i due elenchi insieme non ne prendono metà.
+export const ATTESA_MIN_S = 30;
+export const ELENCO_MAX_BYTE = 2000;
+const RIGA_ERRORE_MAX = 120;
+const RIGA_COSA_MAX = 60;
+
+/**
+ * Una riga da mettere nel rapporto: una riga sola, corta, senza le stringhe lunghe che potrebbero essere un biglietto o
+ * una chiave (anche un errore può citarli). PURA.
+ */
+export function rigaPulita(s, max) {
+  const t = String(s == null ? '' : s)
+    .replace(/<\/?tool_use_error>/g, '')
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    .replace(/[A-Za-z0-9_-]{32,}/g, '[…]')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+}
+
+/** La riga che dice perché uno strumento è fallito: «exit 1: <prima riga utile>». PURA. */
+export function rigaErrore(content) {
+  const righe = testoDi(content).split('\n').map((r) => r.replace(/<\/?tool_use_error>/g, '').trim()).filter(Boolean);
+  let codice = '';
+  const m = righe.length ? /^Exit code (\d+)$/i.exec(righe[0]) : null;
+  if (m) { codice = `exit ${m[1]}`; righe.shift(); }
+  return rigaPulita([codice, righe[0] || ''].filter(Boolean).join(': '), RIGA_ERRORE_MAX) || '(senza testo)';
+}
+
+/** Cosa ha fatto chi lavorava subito dopo un fallimento, dalla chiamata che segue. PURA. */
+export function rigaDopo(fallita, seguente) {
+  if (!seguente) return 'niente: la sessione finisce lì';
+  if (seguente.nome === fallita.nome && seguente.firma === fallita.firma) return 'riprovato uguale';
+  if (seguente.nome === fallita.nome) return rigaPulita(`riprovato diverso${seguente.cosa ? `: ${seguente.cosa}` : ''}`, RIGA_COSA_MAX + 20);
+  return rigaPulita(`${seguente.nome}${seguente.cosa ? `: ${seguente.cosa}` : ''}`, RIGA_COSA_MAX + 20);
+}
+
+/** Le voci che stanno in `max` byte di JSON, nell'ordine dato. PURA. */
+export function dentroBudget(voci, max = ELENCO_MAX_BYTE) {
+  const out = [];
+  let byte = 2;
+  for (const v of voci) {
+    const n = Buffer.byteLength(JSON.stringify(v), 'utf8') + 1;
+    if (byte + n > max) break;
+    out.push(v);
+    byte += n;
+  }
+  return out;
+}
+
+/**
+ * Gli elenchi dentro il budget, e la nota quando ne resta fuori qualcosa: i falliti in ordine di tempo, le attese dalla
+ * più lunga. Muta `rep`. PURA.
+ */
+export function stringiElenchi(rep) {
+  const falliti = Array.isArray(rep.falliti) ? rep.falliti : [];
+  const attese = (Array.isArray(rep.attese) ? rep.attese : []).slice().sort((a, b) => (Number(b.s) || 0) - (Number(a.s) || 0));
+  rep.falliti = dentroBudget(falliti);
+  rep.attese = dentroBudget(attese);
+  rep.notes = (rep.notes || []).filter((n) => !/^(strumenti falliti|attese oltre)/.test(n));
+  const errori = Math.max(Number(rep.tools && rep.tools.errors) || 0, falliti.length);
+  if (errori > rep.falliti.length) rep.notes.push(`strumenti falliti ${errori}, elencati i primi ${rep.falliti.length}`);
+  const lunghe = Math.max(Number(rep.atteseOltre30) || 0, attese.length);
+  if (lunghe > rep.attese.length) rep.notes.push(`attese oltre ${ATTESA_MIN_S} s ${lunghe}, elencate le ${rep.attese.length} più lunghe`);
+  return rep;
 }
 
 /**
