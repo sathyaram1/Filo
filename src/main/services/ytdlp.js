@@ -131,6 +131,22 @@ function motivoErrore(testo) {
   return 'generico';
 }
 
+// Il file dei pezzi (FILE_PEZZI): l'ultima riga è del video che sta per scendere. → { pezzi, pesoTutti }, con
+// pesoTutti 0 se anche un solo pezzo non ha un peso.
+function leggiPezzi(testo) {
+  const righe = String(testo || '').split(/\r?\n/).filter((r) => r.trim());
+  const [parti, pesi, stime] = (righe[righe.length - 1] || '').split(SEP);
+  const lista = (x) => { try { const v = JSON.parse(x); return Array.isArray(v) ? v : []; } catch (_) { return []; } };
+  const ids = lista(parti);
+  const esatti = lista(pesi);
+  const circa = lista(stime);
+  const pesiPezzi = ids.map((_, i) => numero(esatti[i]) || numero(circa[i]));
+  return {
+    pezzi: ids.length || 1,
+    pesoTutti: pesiPezzi.length && pesiPezzi.every((n) => n > 0) ? pesiPezzi.reduce((a, b) => a + b, 0) : 0,
+  };
+}
+
 // L'avanzamento complessivo di un salvataggio a più pezzi (video e audio arrivano separati): per pezzo si tiene
 // l'ultimo dato, e il totale è la somma dei pezzi visti, più una stima per quelli che devono ancora cominciare.
 function creaAvanzamento() {
@@ -139,12 +155,16 @@ function creaAvanzamento() {
   let pesoTutti = 0;
   let titolo = '';
   return {
+    // Quanti pezzi e quanto pesano tutti insieme, da leggiPezzi.
+    pezzi(p) {
+      if (!p) return;
+      attesi = Math.max(attesi, Number(p.pezzi) || 1);
+      if (p.pesoTutti > 0) pesoTutti = p.pesoTutti;
+    },
     leggi(ev) {
       if (!ev || ev.tipo !== 'avanza') return;
       if (ev.titolo) titolo = ev.titolo;
       const id = ev.formato || '?';
-      attesi = Math.max(attesi, Number(ev.pezzi) || 1);
-      if (ev.pesoTutti > 0) pesoTutti = ev.pesoTutti;
       const p = pezzi.get(id) || { scaricati: 0, totale: 0, finito: false };
       p.scaricati = Math.max(p.scaricati, ev.scaricati);
       if (ev.totale) p.totale = ev.totale;
