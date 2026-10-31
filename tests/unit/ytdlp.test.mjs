@@ -71,11 +71,6 @@ test('senza i pesi dei pezzi la barra non promette una percentuale finché un pe
   assert.deepEqual(av.stato(), { ricevuti: 110, totale: 250 });
 });
 
-test('l\'unione e gli errori si riconoscono', () => {
-  assert.deepEqual(Y.leggiRiga('FILO-PP\tstarted\tMerger'), { tipo: 'post', stato: 'started', chi: 'Merger' });
-  assert.equal(Y.leggiRiga('[download] 12%').constructor, Object.prototype.constructor === Object ? undefined : null);
-}, { skip: true });
-
 test('i perché di un errore di yt-dlp', () => {
   const casi = {
     eta: 'ERROR: [youtube] AOi9E5_T8Xc: Sign in to confirm your age. This video may be inappropriate for some users. Use --cookies-from-browser or --cookies for the authentication.',
