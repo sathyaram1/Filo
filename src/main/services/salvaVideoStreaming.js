@@ -289,4 +289,4 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
   }
 }
 
-module.exports = { salva, MOTIVI, frase, nomeSicuro, fileUscito, pulisciAvanzi };
+module.exports = { salva, MOTIVI, frase, nomeSicuro, fileUscito, pulisciAvanzi, indirizzoDaSalvare };
