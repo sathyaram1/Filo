@@ -385,7 +385,8 @@ lo toglie dai rami), e se è la punta stessa del ramo non va nel marcatore e il 
 che il confronto manca, invece di dare un diff vuoto (#1968). Quello sha il server lo tiene
 sul commit che un verificatore ha approvato: un salto dopo un riallineamento pulito marca
 passata la punta nuova per il cancello, ma il riallineamento dopo riparte dall'approvato,
-anche nel confronto che decide il giro. Alla consegna lo strumento guarda due cose: i file in
+anche nel confronto che decide il giro: per questo anche a chi riallinea dispatch scarica lo
+sha verificato che manca in copia. Alla consegna lo strumento guarda due cose: i file in
 cui la modifica del ramo è cambiata, senza i numeri di riga (`fileRiscritti`), e i file
 in cui la punta verificata va in conflitto con main (`git merge-tree`, `fileInConflitto`),
 più quelli che il motivo dichiara. Manda `riallineamento: { fileRiscritti,
