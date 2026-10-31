@@ -272,4 +272,4 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
   }
 }
 
-module.exports = { salva, MOTIVI, frase, nomeSicuro, fileUscito };
+module.exports = { salva, MOTIVI, frase, nomeSicuro, fileUscito, pulisciAvanzi };
