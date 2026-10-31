@@ -925,8 +925,10 @@ export function testoDelCompito(c) {
 
 // Le decisioni dell'owner fanno parte della richiesta per chi verifica, risolve
 // e corregge: il server le mette nel payload, e qui non si perdono per strada.
+// Con loro le provvisorie, le domande aperte che non fermano: senza, chi verifica rifà la misura già consegnata (#1931).
 function conDecisioni(ctx) {
-  return Array.isArray(ctx && ctx.decisioni) && ctx.decisioni.length ? { decisioni: ctx.decisioni } : {};
+  const lista = (k) => (Array.isArray(ctx && ctx[k]) && ctx[k].length ? { [k]: ctx[k] } : {});
+  return { ...lista('decisioni'), ...lista('provvisorie') };
 }
 // Le schermate della segnalazione e delle risposte (#900): le apre il server, `scaricaPayload` le scrive su file.
 function conImmagini(ctx) {
