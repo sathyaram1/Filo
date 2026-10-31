@@ -560,7 +560,7 @@ describe('release da riga di comando', () => {
 // ─── Giro 2 della verifica (16/09/2026): il lease dopo un fetch ─────────────
 // --force-with-lease senza valore atteso si fida del ref remoto che la copia
 // conosce: dopo un `git fetch` quel ref è già il commit dell'altro, il lease
-// combacia e il rinvio lo sovrascrive. --force-if-includes lo rifiuta.
+// combacia e il rinvio lo sovrascrive. Il valore atteso, che deve essere passato dal reflog del ramo, lo rifiuta.
 test('qualcun altro ha spinto E questa copia lo ha già scaricato con un fetch: il rinvio NON sovrascrive il suo commit', () => {
   const { base, origin, work } = scena();
   g(work, ['checkout', '-q', '-b', 'worker/9']);
