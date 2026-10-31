@@ -4,7 +4,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync, chmodSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, chmodSync, copyFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   ROOT, HOOKS, git, scene, runHook, runHookStderr, runHookRaw, rigaJson, LIMITE, shaOf, filesOnMain, commitFile,
@@ -166,5 +166,63 @@ describe('il rinvio dopo un rebase non calpesta il lavoro degli altri nemmeno do
     assert.equal(git(work, ['ls-remote', origin, 'refs/heads/claude/fetch']).split(/\s/)[0], b,
       'il commit dell\'altro deve restare su origin anche se questa copia lo aveva già scaricato');
     assert.match(stderr, /claude\/fetch.*NON e' arrivato su origin/);
+  });
+});
+
+// ─── #1776: il clone delle routine nasce senza reflog delle tracce remote ────
+// --force-if-includes rifiutava sempre il rinvio: dopo un riallineamento a main nessun salvataggio arrivava.
+describe('clone appena nato e ramo riallineato a main: il salvataggio lo spedisce', () => {
+  function cloneRiallineato(nome, { altroSpinge = false } = {}) {
+    const { base, origin, work } = scene();
+    git(work, ['checkout', '-q', '-b', nome]);
+    commitFile(work, 'lavoro.js');
+    git(work, ['push', '-q', 'origin', nome]);
+    git(work, ['checkout', '-q', 'main']);
+    commitFile(work, 'main-avanti.js');
+    git(work, ['push', '-q', 'origin', 'main']);
+    const copia = resolve(base, 'giro');
+    git(base, ['clone', '-q', origin, copia]);
+    git(copia, ['checkout', '-q', nome]);
+    mkdirSync(resolve(copia, '.claude', 'hooks'), { recursive: true });
+    for (const h of HOOKS) copyFileSync(resolve(ROOT, '.claude', 'hooks', h), resolve(copia, '.claude', 'hooks', h));
+    mkdirSync(resolve(copia, 'scripts', 'lib'), { recursive: true });
+    copyFileSync(resolve(ROOT, 'scripts', 'lib', 'lease-atteso.mjs'), resolve(copia, 'scripts', 'lib', 'lease-atteso.mjs'));
+    writeFileSync(resolve(copia, '.git', 'info', 'exclude'), '.claude/\nscripts/\n', 'utf8');
+    let suo = '';
+    if (altroSpinge) {
+      const altro = resolve(base, 'altro');
+      git(base, ['clone', '-q', origin, altro]);
+      git(altro, ['checkout', '-q', nome]);
+      commitFile(altro, 'di-un-altro.js');
+      git(altro, ['push', '-q', 'origin', nome]);
+      suo = git(altro, ['rev-parse', 'HEAD']);
+    }
+    git(copia, ['fetch', '-q', 'origin', ...(altroSpinge ? [] : ['main'])]);
+    git(copia, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'rebase', '-q', 'origin/main']);
+    return { origin, copia, suo };
+  }
+
+  test('il ramo riallineato arriva su origin, senza allarmi', () => {
+    const { origin, copia } = cloneRiallineato('claude/riallineo');
+    assert.throws(() => git(copia, ['reflog', 'exists', 'refs/remotes/origin/claude/riallineo']),
+      'la condizione del difetto: la traccia remota non ha reflog');
+    writeFileSync(resolve(copia, 'dopo.js'), 'dopo il riallineamento\n', 'utf8');
+
+    const stderr = runHookStderr(copia);
+
+    assert.doesNotMatch(stderr, /NON e' arrivato/);
+    assert.equal(git(copia, ['ls-remote', origin, 'refs/heads/claude/riallineo']).split(/\s/)[0], git(copia, ['rev-parse', 'HEAD']));
+    const suOrigin = git(copia, ['ls-tree', '-r', '--name-only', 'HEAD']);
+    assert.ok(suOrigin.includes('main-avanti.js') && suOrigin.includes('dopo.js'));
+  });
+
+  test('qualcun altro aveva spinto e il fetch lo ha portato qui: il suo commit resta, e l\'hook lo dice', () => {
+    const { origin, copia, suo } = cloneRiallineato('claude/riallineo-conteso', { altroSpinge: true });
+    writeFileSync(resolve(copia, 'dopo.js'), 'dopo il riallineamento\n', 'utf8');
+
+    const stderr = runHookStderr(copia);
+
+    assert.equal(git(copia, ['ls-remote', origin, 'refs/heads/claude/riallineo-conteso']).split(/\s/)[0], suo);
+    assert.match(stderr, /claude\/riallineo-conteso.*NON e' arrivato su origin.*non ha mai avuto/);
   });
 });
