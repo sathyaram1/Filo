@@ -178,7 +178,7 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
   assert.doesNotMatch(fix, /test\.fail\(true/, 'il marcatore non è più la strada principale');
   const passConFigli = verifierReplyText({
     outcome: 'pass',
-    derived: [{ level: 2, sede: 'e', text: 'la pagina non si apre. Passi: aprila.', priority: 2, num: '#42.3' }],
+    derived: [{ level: 2, sede: 'i', text: 'la pagina non si apre. Passi: aprila.', priority: 2, num: '#42.3' }],
   });
   assert.match(passConFigli, /Prove del giro da TOGLIERE adesso/);
   assert.match(passConFigli, /#42\.3/);
