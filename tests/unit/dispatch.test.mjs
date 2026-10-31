@@ -265,6 +265,47 @@ test('le decisioni dell\'owner arrivano a chi verifica, risolve, riprende e rial
   assert.equal(buildPayload(b, serverCtx(b, { payload: { feedback: { text: 's' } } })).decisioni, undefined);
 });
 
+// #1931: la domanda aperta coi numeri del confronto non arrivava a chi verifica, che bocciava «nessuno ha misurato».
+test('le domande aperte che non fermano arrivano a chi verifica, risolve, riprende e riallinea; non al controllo di sicurezza', () => {
+  const provvisorie = [{ domanda: 'D-244', testo: 'la domanda «Quale modello per le risposte brevi» non ferma il lavoro. Finché l\'owner non risponde vale l\'opzione 1, «Il più economico».' }];
+  const busta = (extra = {}) => ({ payload: { feedback: { text: 's', num: '#7' }, history: [], provvisorie, ...extra } });
+  const compito = (role, extra) => {
+    const b = { role, id: 'A', num: '#7', branch: 'worker/A' };
+    return buildPayload(b, serverCtx(b, busta(extra), role === 'secaudit' ? 'DIFF' : ''));
+  };
+  assert.deepEqual(compito('verifier').provvisorie, provvisorie, 'chi verifica sa che la scelta è già davanti all\'owner');
+  assert.deepEqual(compito('verifier', { scope: 'chiusura' }).provvisorie, provvisorie);
+  assert.deepEqual(compito('new-work').provvisorie, provvisorie);
+  assert.deepEqual(compito('fixer', { ripresa: { domanda: 'q', risposta: 'r', rilievi: [] } }).provvisorie, provvisorie);
+  assert.deepEqual(compito('fixer').provvisorie, provvisorie);
+  assert.equal(compito('secaudit').provvisorie, undefined);
+  const conTutte = compito('verifier', { decisioni: [{ domanda: 'A o B?', risposta: 'A.' }] });
+  assert.equal(conTutte.decisioni.length, 1, 'le provvisorie stanno accanto alle decisioni, non al loro posto');
+  assert.deepEqual(conTutte.provvisorie, provvisorie);
+  const b = { role: 'verifier', id: 'A', num: '#7', branch: 'worker/A' };
+  assert.equal(buildPayload(b, serverCtx(b, { payload: { feedback: { text: 's' }, provvisorie: [] } })).provvisorie, undefined);
+  assert.equal(buildPayload(b, serverCtx(b, { payload: { feedback: { text: 's' }, provvisorie: 'D-1' } })).provvisorie, undefined);
+});
+
+test('ogni ruolo che riceve le provvisorie sa che una domanda aperta è la consegna di quella parte, e non la riapre', () => {
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  const casi = [
+    ['verifier', {}], ['verifier', { scope: 'chiusura' }], ['verifier', { scope: 'riallineamento' }],
+    ['new-work', {}], ['fixer', { caso: 'riallineamento' }], ['fixer', { caso: 'ripresa' }],
+  ];
+  for (const [role, opz] of casi) {
+    const t = readRoleInstructions(role, opz).replace(/\s+/g, ' ');
+    const chi = `${role} ${JSON.stringify(opz)}`;
+    assert.match(t, /`payload\.provvisorie`/, `${chi}: il campo è spiegato`);
+    assert.match(t, /Una domanda aperta è la consegna della parte che chiede all'owner/, `${chi}: la domanda vale come consegna`);
+    assert.match(t, /la misura sta lì e non si rifà/, `${chi}: la misura non si rifà`);
+    assert.match(t, /Una seconda domanda sulla stessa scelta è un doppione/, `${chi}: niente doppioni`);
+  }
+});
+
 // ─── Lo storico delle critiche (caso #502: sei giri per un difetto da due) ────
 
 test('buildPayload: lo storico delle critiche arriva a chi verifica, e a nessun altro', () => {
