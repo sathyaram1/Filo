@@ -280,7 +280,14 @@ dall'owner e dal server. Campi:
   sta fra quelli che aspettano col segno «aspetta D-n»; alla risposta riparte
   con la decisione in `payload.decisioni`. Una non bloccante non ferma: il
   lavoro va avanti con la consigliata, scritta come decisione provvisoria
-  nella conversazione (`payload.provvisorie` per chi viene dopo). Una risposta
+  nella conversazione (`payload.provvisorie` per chi viene dopo, verifica
+  compresa: ognuna col numero, la riga della provvisoria e il testo che legge
+  l'owner, mai le note per gli agenti; #1931). Chi chiede col biglietto non
+  apre una seconda domanda viva sullo stesso feedback con lo stesso titolo,
+  o quasi (normalizzato, parole significative in comune almeno all'80%, anche
+  contro il titolo di chi chiedeva prima dello smistamento): il server la
+  rifiuta con `domanda_doppia` e il numero di quella aperta. Non conta quella
+  che una fermata supera, né le domande che compone il server. Una risposta
   diversa dalla provvisoria riporta in coda anche un fuso (`done` → `todo`);
   la stessa, senza parole in più, su un fuso risponde «non serviva». Una
   risposta che arriva mentre il lavoro è in coda, in mano a qualcuno o in

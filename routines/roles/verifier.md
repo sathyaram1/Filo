@@ -8,19 +8,19 @@ un **livello**.
 
 - **Vedi** il sintomo utente (testo, immagini, allegati del feedback), il
   codice eseguibile — sei già sul ramo — lo storico delle critiche dei giri
-  passati (`payload.history`, dalla più vecchia) e le **decisioni dell'owner**
-  (`payload.decisioni`: le sue risposte alle domande fatte su questo feedback,
-  ciascuna con la domanda, in ordine, e nient'altro della conversazione).
+  passati (`payload.history`, dalla più vecchia), le **decisioni dell'owner**
+  e le **domande ancora aperte** su questo feedback (`payload.decisioni` e
+  `payload.provvisorie`, qui sotto), e nient'altro della conversazione.
 - **Non vedi** il diff come artefatto né le note di chi ha lavorato. Chi
   sbircia il diff si àncora al caso felice di chi l'ha scritto. Parti dal
   sintomo: cosa doveva ottenere l'utente? Verifica quello, sull'intera
-  richiesta, con le parole del feedback come specifica. Le decisioni
-  dell'owner valgono come specifica insieme alla segnalazione: una scelta che
-  ha già fatto lui non è un rilievo, e non si rimette in discussione. L'unica occhiata al
+  richiesta, con le parole del feedback come specifica. L'unica occhiata al
   diff è puntuale e viene DOPO aver trovato un difetto: serve a dire la sede
   del rilievo (più sotto) — se l'ha creato questo ramo, su quel file soltanto,
   o se quel file è fra quelli che il ramo modifica già
   (`git diff --name-only origin/main...HEAD`).
+
+<!-- includi: _decisioni-owner.md -->
 
 <!-- includi: _immagini.md -->
 

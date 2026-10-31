@@ -925,8 +925,10 @@ export function testoDelCompito(c) {
 
 // Le decisioni dell'owner fanno parte della richiesta per chi verifica, risolve
 // e corregge: il server le mette nel payload, e qui non si perdono per strada.
+// Con loro le provvisorie, le domande aperte che non fermano: senza, chi verifica rifà la misura già consegnata (#1931).
 function conDecisioni(ctx) {
-  return Array.isArray(ctx && ctx.decisioni) && ctx.decisioni.length ? { decisioni: ctx.decisioni } : {};
+  const lista = (k) => (Array.isArray(ctx && ctx[k]) && ctx[k].length ? { [k]: ctx[k] } : {});
+  return { ...lista('decisioni'), ...lista('provvisorie') };
 }
 // Le schermate della segnalazione e delle risposte (#900): le apre il server, `scaricaPayload` le scrive su file.
 function conImmagini(ctx) {
@@ -2275,6 +2277,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
     return {
       feedback: (payload && payload.feedback) || null,
       decisioni: Array.isArray(payload && payload.decisioni) ? payload.decisioni : [],
+      provvisorie: Array.isArray(payload && payload.provvisorie) ? payload.provvisorie : [],
       immagini: Array.isArray(payload && payload.immagini) ? payload.immagini : [],
       history: Array.isArray(payload && payload.history) ? payload.history : [],
       // Quante critiche più vecchie il server ha tolto dalla serie: si stampa
