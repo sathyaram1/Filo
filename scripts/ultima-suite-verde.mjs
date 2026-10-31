@@ -192,7 +192,7 @@ async function main() {
     if (!passate.has(r?.id)) {
       let ok = false;
       try {
-        ok = r?.id != null && passaIlCancello(ghApi(`repos/${repo}/actions/runs/${r.id}/jobs?per_page=100`)?.jobs);
+        ok = r?.id != null && passaIlCancello(ghApi(`repos/${repo}/actions/runs/${r.id}/jobs?per_page=100`, SOLO_LAVORI)?.jobs);
       } catch (e) {
         erroreLavori ||= `lavori della corsa ${r?.id}: ${String(e.stderr || e.message || e).trim().split('\n')[0]}`;
         ok = null;
