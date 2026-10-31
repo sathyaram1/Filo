@@ -183,3 +183,45 @@ test('un nome che il sito cambia a metà non lascia la riga col nome della pagin
   assert.equal(r.filename, 'Titolo vero dal sito.mp4');
   assert.ok(nomi.has('Titolo vero dal sito.mp4'), 'la riga prende il titolo vero mentre scende');
 });
+
+test('al programma va l\'indirizzo del video cliccato se è dello stesso sito della pagina, altrimenti la pagina', () => {
+  const da = SV.indirizzoDaSalvare;
+  assert.equal(da('https://www.youtube.com/@canale', '/watch?v=TRAILER'), 'https://www.youtube.com/watch?v=TRAILER');
+  assert.equal(da('https://www.youtube.com/', 'https://m.youtube.com/watch?v=X'), 'https://m.youtube.com/watch?v=X');
+  assert.equal(da('https://x.com/home', 'https://x.com/utente/status/123'), 'https://x.com/utente/status/123');
+  assert.equal(da('https://www.youtube.com/', 'https://altro.test/v'), 'https://www.youtube.com/', 'un altro sito no');
+  assert.equal(da('https://www.bbc.co.uk/news', 'https://www.altro.co.uk/v'), 'https://www.bbc.co.uk/news', '«co.uk» non è un sito');
+  assert.equal(da('https://x.com/home', 'javascript:alert(1)'), 'https://x.com/home');
+  assert.equal(da('https://x.com/home', 'file:///etc/passwd'), 'https://x.com/home');
+  assert.equal(da('https://www.youtube.com/watch?v=A#t=3', ''), 'https://www.youtube.com/watch?v=A#t=3');
+});
+
+test('mentre lavora la cartella di lavoro è nell\'elenco su disco, e quelle rimaste da un\'uscita brusca se ne vanno all\'avvio', async () => {
+  const dati = join(base, 'dati');
+  const elenco = join(dati, 'programmi-video', 'lavori.json');
+  process.env.FILO_USER_DATA = dati;
+  try {
+    ilCaso({ titolo: 'Video in corso', pausaMs: 40 });
+    const visti = new Set();
+    const t = setInterval(() => { try { for (const d of JSON.parse(readFileSync(elenco, 'utf8'))) visti.add(d); } catch (_) {} }, 5);
+    const r = await SV.salva({ url: URL_SEGNALATO, titolo: 'X', scegli: async (n) => dentro(n), sposta });
+    clearInterval(t);
+    assert.equal(r.ok, true, JSON.stringify(r));
+    assert.ok([...visti].some((d) => d.startsWith(join(scaricati, '.filo-video-'))), 'la cartella è stata nell\'elenco');
+    assert.deepEqual(JSON.parse(readFileSync(elenco, 'utf8')), [], 'finito il salvataggio l\'elenco è vuoto');
+
+    // Un'uscita che non ha pulito: la cartella resta, e l'elenco la ricorda.
+    const rimasta = join(scaricati, '.filo-video-AbC123');
+    mkdirSync(rimasta, { recursive: true });
+    writeFileSync(join(rimasta, 'video.f137.mp4.part'), 'mezzo video');
+    const estranea = join(scaricati, 'Le mie foto');
+    mkdirSync(estranea, { recursive: true });
+    writeFileSync(elenco, JSON.stringify([rimasta, estranea, 'relativo/.filo-video-x']));
+    SV.pulisciAvanzi();
+    assert.equal(existsSync(rimasta), false, 'la cartella di lavoro rimasta se ne va');
+    assert.equal(existsSync(estranea), true, 'un nome che non è una cartella di lavoro di Filo non si tocca');
+    assert.deepEqual(JSON.parse(readFileSync(elenco, 'utf8')), []);
+  } finally {
+    delete process.env.FILO_USER_DATA;
+  }
+});
