@@ -1148,7 +1148,8 @@ export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note
 export function fermataSenzaDomanda(intento, data = {}) {
   if (intento !== 'status' || data.status !== 'design') return '';
   if (data.reason === 'guasto') {
-    return 'Un guasto non è una fermata e non è una domanda (#1790): il lavoro torna in coda da sé. Dichiaralo nel rilascio, '
+    return 'Un guasto non è una fermata e non è una domanda (#1790): il lavoro resta fermo finché una nota del manutentore '
+      + 'o la correzione della causa non lo sblocca. Dichiaralo nel rilascio, '
       + 'col gruppo e il messaggio esatto: release <biglietto> --role <il tuo ruolo> --guasto "<gruppo>: <il messaggio esatto>". Non ho consegnato niente.';
   }
   if (data.reason === 'locale' || (data.domanda && typeof data.domanda === 'object')) return '';
