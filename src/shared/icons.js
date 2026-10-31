@@ -717,6 +717,7 @@
     lock:         (size) => wrap(lock, { size }),
     lockOpen:     (size) => wrap(lockOpen, { size }),
     transparency: (size) => wrap(transparency, { size }),
+    novita:       (size) => wrap(novita, { size }),
     incognito:    (size) => wrap(incognito, { size }),
     user:         (size) => wrap(user, { size }),
     plus:         (size) => wrap(plus, { size }),
