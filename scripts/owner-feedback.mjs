@@ -328,7 +328,7 @@ export async function segnaAttese(id, numeri, opts = {}) {
     body: JSON.stringify({ fields }),
   });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true, attese, prima, tolte, pratica };
+  return { ok: true, attese, prima, tolte, aggiunte, pratica };
 }
 
 /**
