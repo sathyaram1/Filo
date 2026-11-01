@@ -1,7 +1,8 @@
 // #1096 — aprire e chiudere «Invia feedback» (e il pannello red-team) non lascia tele né ascoltatori in memoria.
 // Ogni apertura agganciava window, documento, visualViewport e i messaggi senza staccarli: ognuno teneva viva la
 // tela a tutto schermo con immagini e allegati, e lo strato sopra un sito vive quanto la scheda.
-// Si misura dal motore (CDP): tele vive dopo il GC e ascoltatori registrati, prima e dopo cinque giri.
+// Si misura dal motore (CDP): tele vive dopo il GC e ascoltatori registrati. Il motore tiene da sé l'ultimo nodo
+// sotto il puntatore o cliccato, e dopo i primi giri il conto si ferma: si confrontano due misure a regime.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -16,17 +17,18 @@ async function newtabPage(app) {
 async function misuratore(page) {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Runtime.enable');
-  const oggetto = async (expr) => (await cdp.send('Runtime.evaluate', { expression: expr })).result.objectId;
+  const objectGroup = 'misura-1096';
+  const oggetto = async (expr) => (await cdp.send('Runtime.evaluate', { expression: expr, objectGroup })).result.objectId;
   const vivi = async (proto) => {
-    const { objects } = await cdp.send('Runtime.queryObjects', { prototypeObjectId: await oggetto(proto) });
-    const { result } = await cdp.send('Runtime.callFunctionOn', { objectId: objects.objectId, functionDeclaration: 'function () { return this.length; }', returnByValue: true });
+    const { objects } = await cdp.send('Runtime.queryObjects', { prototypeObjectId: await oggetto(proto), objectGroup });
+    const { result } = await cdp.send('Runtime.callFunctionOn', { objectId: objects.objectId, functionDeclaration: 'function () { return this.length; }', returnByValue: true, objectGroup });
     return result.value;
   };
   const ascoltatori = async (expr) => (await cdp.send('DOMDebugger.getEventListeners', { objectId: await oggetto(expr) })).listeners.length;
   return async () => {
     await cdp.send('HeapProfiler.collectGarbage');
     await cdp.send('HeapProfiler.collectGarbage');
-    return {
+    const m = {
       tele: await vivi('HTMLCanvasElement.prototype'),
       mediaQuery: await vivi('MediaQueryList.prototype'),
       window: await ascoltatori('window'),
@@ -34,6 +36,8 @@ async function misuratore(page) {
       viewport: await ascoltatori('visualViewport'),
       messaggi: await page.evaluate(() => chrome.runtime.onMessage._listeners?.size ?? -1),
     };
+    await cdp.send('Runtime.releaseObjectGroup', { objectGroup });
+    return m;
   };
 }
 
@@ -45,13 +49,7 @@ test('cinque aperture e chiusure del riquadro «Invia feedback» lasciano la mem
     await page.evaluate(() => window.SN_FEEDBACK_UI.open());
     await expect(page.locator('.sn-fb-modal')).toBeVisible();
   };
-  // Un giro di riscaldamento: gli ascoltatori globali che nascono una volta sola non contano.
-  await apri();
-  await page.keyboard.press('Escape');
-  await expect(page.locator('.sn-fb-modal')).toHaveCount(0);
-  const prima = await misura();
-
-  for (let giro = 0; giro < 5; giro++) {
+  const cinqueGiri = async () => { for (let giro = 0; giro < 5; giro++) {
     await apri();
     // Un'apertura usata davvero: un tratto sulla tela e una miniatura incollata.
     const tela = page.locator('.sn-fb-canvas');
@@ -70,10 +68,18 @@ test('cinque aperture e chiusure del riquadro «Invia feedback» lasciano la mem
     else if (giro % 3 === 1) await page.keyboard.press('Escape');
     else await page.evaluate(() => window.SN_FEEDBACK_UI.close());
     await expect(page.locator('.sn-fb-modal')).toHaveCount(0);
-  }
+  } };
 
-  const dopo = await misura();
-  expect(dopo, 'dopo cinque giri tele e ascoltatori sono quelli di prima').toEqual(prima);
+  // I primi giri fanno nascere ciò che nasce una volta sola (ascoltatori globali, cache del motore).
+  await cinqueGiri();
+  const prima = await misura();
+  await cinqueGiri();
+  await cinqueGiri();
+  const { tele, ...ascolto } = await misura();
+  const { tele: telePrima, ...ascoltoPrima } = prima;
+  expect(ascolto, 'altri dieci giri non lasciano ascoltatori').toEqual(ascoltoPrima);
+  // Prima del fix ogni giro ne lasciava una: dieci giri, dieci tele in più.
+  expect(tele - telePrima, 'le tele non crescono coi giri (al più una, che il motore tiene per sé)').toBeLessThanOrEqual(1);
 });
 
 test('la bozza scritta subito prima di chiudere resta, anche senza aspettare il salvataggio', async ({ app, shell }) => {
@@ -94,16 +100,15 @@ test('cinque aperture e chiusure del pannello red-team lasciano gli ascoltatori 
     await page.evaluate(() => window.SN_REDTEAM_ATTACK_UI.open());
     await expect(page.locator('.sn-rt-modal')).toBeVisible();
   };
-  await apri();
-  await page.locator('.sn-rt-cancel').click();
-  await expect(page.locator('.sn-rt-modal')).toHaveCount(0);
-  const prima = await misura();
-  for (let giro = 0; giro < 5; giro++) {
+  const cinqueGiri = async () => { for (let giro = 0; giro < 5; giro++) {
     await apri();
     await page.locator('.sn-rt-attack').fill(`tentativo ${giro}`);
     if (giro % 2) await page.locator('.sn-rt-cancel').click();
     else await page.locator('.sn-rt-attack').press('Escape');
     await expect(page.locator('.sn-rt-modal')).toHaveCount(0);
-  }
+  } };
+  await cinqueGiri();
+  const prima = await misura();
+  await cinqueGiri();
   expect(await misura()).toEqual(prima);
 });
