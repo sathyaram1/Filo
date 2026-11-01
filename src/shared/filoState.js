@@ -397,7 +397,10 @@
         const elenco = [];
         top.forEach((t, i) => {
           const focus = `${t.active ? '[FOCUS] ' : ''}${t.chat ? '[QUESTA CHAT] ' : ''}`;
-          const rel = !perChat && t.lastAccessed ? ` (ultima attività: ${formatRelativeTime(new Date(t.lastAccessed))})` : '';
+          // Alla chat l'ordine è quello della barra: «l'ultima che ho usato» si legge dall'ora, che non scade ogni minuto.
+          const rel = !t.lastAccessed ? ''
+            : !perChat ? ` (ultima attività: ${formatRelativeTime(new Date(t.lastAccessed))})`
+              : t.active ? '' : ` (davanti l'ultima volta: ${oraAssoluta(t.lastAccessed)})`;
           if (t.delicata || soloSiti) {
             const sito = sitoDellaScheda(t.url);
             elenco.push(`${i + 1}. ${focus}${t.delicata ? '[pagina delicata] ' : ''}${E.neutralizza(sito || 'sito', { unaRiga: true })}${rel}`);
