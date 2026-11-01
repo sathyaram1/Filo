@@ -122,8 +122,8 @@
     const ctrl = !!(i.control || i.ctrlKey || i.meta || i.metaKey);
     const alt = !!(i.alt || i.altKey);
     const shift = !!(i.shift || i.shiftKey);
-    if (T && typeof T.comandoNavigazione === 'function'
-      && (T.comandoNavigazione(i, piattaforma) || T.comandoNavigazioneFuoriDalCampo(i, piattaforma))) return 'alt_freccia';
+    // Cmd+freccia su Mac muove il cursore nei campi: la conta chi la vede tornare dalla pagina inusata.
+    if (T && typeof T.comandoNavigazione === 'function' && T.comandoNavigazione(i, piattaforma)) return 'alt_freccia';
     if (!ctrl || alt) return '';
     if (key === 'Tab' || code === 'Tab') return shift ? 'ctrl_shift_tab' : 'ctrl_tab';
     if (!shift && (/^[1-9]$/.test(key) || /^Digit[1-9]$/.test(code))) return 'salto_scheda';
