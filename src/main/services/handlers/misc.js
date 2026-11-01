@@ -615,7 +615,8 @@ module.exports = function register(on, ctx) {
     Outbox.init({
       // Titolo breve generato al momento reale dell'invio (offline → fallback).
       prepare: (payload) => generateFeedbackName(payload?.text),
-      // Allegato non caricato: si avvisa con un toast, il feedback è comunque partito col resto.
+      // Allegato non caricato: il feedback è partito col resto, e quale file è saltato e perché lo dice la cornice della
+      // finestra (#1667), dove resta finché non lo si chiude; il toast di una pagina lo vede solo quella a fuoco.
       onDone: (_item, result) => {
         // #678 — l'id resta scritto qui: è così che il popup delle ricompense
         // può chiedere LE PROPRIE schede invece di scaricare la bacheca intera
