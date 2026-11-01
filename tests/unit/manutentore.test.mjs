@@ -238,7 +238,12 @@ test('contesto piccolo oltre il tetto: rifiutato col numero, non tagliato', () =
   const tutte2 = ottocento().map((s) => ({ ...s, priorita: 2, titolo: s.titolo.repeat(3) }));
   const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: '', versione: 0 }, schede: tutte2 });
   assert.equal(p.ok, false);
-  assert.match(p.motivo, new RegExp(`stima ${p.token} token, il tetto è ${M.PICCOLO_TETTO_TOKEN}: 800 schede`));
+  assert.match(p.motivo, new RegExp(`stima ${p.token} token, il tetto è ${M.PICCOLO_TETTO_TOKEN}: pesa di più le 800 schede a priorità 3 e 2 \\(\\d+ token\\)\\. Riporta a 1`));
+  // Un taccuino lungo con una scheda sola: il rimedio è il taccuino, non abbassare lavori che non c'entrano.
+  const lungo = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'appunto '.repeat(16000), versione: 3 }, schede: [tutte2[0]] });
+  assert.equal(lungo.ok, false);
+  assert.match(lungo.motivo, /pesa di più il taccuino \(\d+ token\)\. Riscrivi il taccuino più corto/);
+  assert.doesNotMatch(lungo.motivo, /Riporta a 1/);
 });
 
 test('contesto intero: tutte le schede coi conti per priorità, la parte delle schede locali, taccuino, rami, registro', () => {
