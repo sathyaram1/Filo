@@ -244,8 +244,11 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
 .sn-spell-valori .sn-spell-valore {
   all: initial;
   --sn-segno: var(--sn-spell-suggerimento, #b07a14);
+  /* Dove sta rispetto alle x, e verso dove si stacca da loro all'hover e all'arrivo. */
+  --sn-valore-y: calc(-100% - 1px);
+  --sn-valore-via: -1;
   position: fixed;
-  transform: translate(-50%, calc(-100% - 1px));
+  transform: translate(-50%, var(--sn-valore-y));
   box-sizing: border-box;
   padding: 0 4px;
   min-width: 1.6em;
