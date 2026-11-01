@@ -207,7 +207,7 @@ export function applicaNovita(sorgente, tutte) {
 }
 
 /** La domanda al server, sempre con un esito e mai un'eccezione. */
-export async function chiediNovita({ passphrase, versione, fetchImpl = fetch, url = RELEASE_NOVITA_URL, attesaMs = ATTESA_MS } = {}) {
+export async function chiediNovita({ passphrase, versione, scarta = false, fetchImpl = fetch, url = RELEASE_NOVITA_URL, attesaMs = ATTESA_MS } = {}) {
   if (!passphrase) return { outcome: 'no_passphrase' };
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), attesaMs);
@@ -215,7 +215,7 @@ export async function chiediNovita({ passphrase, versione, fetchImpl = fetch, ur
     const res = await fetchImpl(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ passphrase, versione }),
+      body: JSON.stringify({ passphrase, versione, ...(scarta ? { scarta: true } : {}) }),
       signal: ac.signal,
     });
     let body = {};
