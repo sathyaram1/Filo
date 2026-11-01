@@ -990,8 +990,8 @@ if (isMain) {
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
     opzioni: ['--branch', '--reason', '--frase', '--priorita', '--dry-run', '--come-routine', '--starred', '--unstar',
-      '--solo-locale', '--non-locale', '--serve-locale', '--aspetta', '--aspetta-niente'],
-    conValore: ['--branch', '--reason', '--frase', '--priorita', '--aspetta'],
+      '--solo-locale', '--non-locale', '--serve-locale', '--aspetta', '--aspetta-anche', '--aspetta-niente', '--sostituisci'],
+    conValore: ['--branch', '--reason', '--frase', '--priorita', '--aspetta', '--aspetta-anche'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
   const storpiata = opzioneStorpiata(process.env, OPZ.opzioni);
