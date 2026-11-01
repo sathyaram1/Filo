@@ -520,9 +520,6 @@ test('Mac: un dato che il Finder non dà in blocco si chiede voce per voce, e l\
   assert.deepEqual(filaDelFinder(perDimensione), ['film.mov', 'contratto.pdf', 'appunti.txt', 'Zeta']);
 
   const senzaClassi = finderFinto(scrivania, { arrangement: 'not arranged' });
-  senzaClassi.stato.voci.forEach((v) => { v.classe = v.classe; });
-  const bloccoRotto = Object.getOwnPropertyDescriptor(senzaClassi.Application().desktop.items, 'class');
-  assert.ok(bloccoRotto);
   senzaClassi.Application().desktop.items.class = () => { throw new Error('classe non data in blocco'); };
   const c = await conDesktop(computerDelFinder(senzaClassi), () => D.ordinaIcone({ ordine: 'nome', verso: 'righe', cartelle_prima: true }));
   assert.equal(c.ok, true, JSON.stringify(c));
