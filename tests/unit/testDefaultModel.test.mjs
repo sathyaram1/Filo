@@ -176,7 +176,9 @@ test('rifiuto del router: il «Prova» dice la causa come la chat, non il messag
     [rifiuto('DATA_POLICY', 'No endpoints found matching your data policy.'), /privacy/],
     [rifiuto('INGRESSO_NON_LETTO', 'No endpoints found that support input audio', { ingresso: 'audio' }), /non ascolta l'audio/],
     [rifiuto('NO_TOOL_HOST', 'No endpoints found that support tool use'), /nessun fornitore ammesso sa usare gli strumenti/],
-    [Object.assign(new Error(CE.fraseNessunHost({ modello: 'finto/modello', motivo: CE.motivoHostEsclusi(['DeepSeek']) })), { code: 'NO_ALLOWED_HOST' }), /Lo serve solo DeepSeek, che Filo esclude/],
+    [Object.assign(new Error(CE.fraseNessunHost({ modello: 'finto/modello', motivo: CE.motivoHostEsclusi(['DeepSeek']) })), {
+      code: 'NO_ALLOWED_HOST', reason: 'excluded', model: 'finto/modello', hosts: ['DeepSeek'],
+    }), /Lo serve solo DeepSeek, che Filo esclude/],
   ];
   state.admin = true;
   state.defaults.apiKeys = { openrouter: 'sk-or-default' };
