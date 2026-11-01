@@ -192,6 +192,7 @@ test('arrivata mentre si è in un’altra applicazione: l’avviso aspetta, comp
   await fuoco(app, page.url(), true);
   await expect(toastDi(page, 'Google Vertex')).toHaveCount(1, { timeout: 5_000 });
   await expect(toastDi(page, 'Google Vertex')).toContainText('un fornitore che Filo esclude');
+  await page.waitForTimeout(400);
   await page.screenshot({ path: `${SHOTS}/1478.1-avviso-al-ritorno.png` }).catch(() => {});
 
   // Visto adesso: la stessa violazione subito dopo resta nella pausa, e un altro ritorno non lo ripete.
