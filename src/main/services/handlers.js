@@ -7359,7 +7359,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   // #1596 — le pagine lette e rimaste fuori dalla finestra: lo sa l'utente, e lo sa il modello ai turni dopo.
   textReply = unisciTesti([textReply, globalThis.SN_FILO_CONTESTO.frasePagineLasciate(pagineLasciate())]);
-  textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
+  // #1373 — dopo l'OK il modello riprende sempre: a lavoro finito non ha niente da aggiungere, e il silenzio è la risposta.
+  const mutoDopoOk = dopoOk && !String(textReply || '').trim() && !rawActions.length;
+  textReply = String(textReply || '').trim() || (rawActions.length || mutoDopoOk ? '' : '(vuoto)');
   // L'esito che la persona ha davanti (#1463): lo stesso «Continua» che la scheda mette sotto, o la frase che lo sostituisce.
   const esitoTurno = senzaRisposta ? senzaRisposta.motivo : nonDisponibile ? 'non_disponibile' : textReply === '(vuoto)' ? 'vuoto' : 'risposta';
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
