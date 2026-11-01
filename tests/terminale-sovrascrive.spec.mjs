@@ -28,14 +28,15 @@ function dueFile() {
   return { dir, nuovo, vecchio };
 }
 
-const copia = (da, a) => (process.platform === 'win32' ? `Copy-Item "${da}" "${a}"` : `cp "${da}" "${a}"`);
+// `cp` è anche l'alias di Copy-Item in PowerShell: lo stesso comando vale su ogni sistema.
+const copia = (da, a) => `cp "${da}" "${a}"`;
 
 test('scritto a mano: la copia sopra un file che c\'è già chiede, quella su un file nuovo parte', async ({ app }) => {
   const { dir, nuovo, vecchio } = dueFile();
   const page = await newtabPage(app);
   const input = page.locator('#input');
 
-  await input.fill(`/${process.platform === 'win32' ? `cp "${nuovo}" "${vecchio}"` : copia(nuovo, vecchio)}`);
+  await input.fill(`/${copia(nuovo, vecchio)}`);
   await input.press('Enter');
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
   const st = await confirmState(page);
@@ -45,13 +46,13 @@ test('scritto a mano: la copia sopra un file che c\'è già chiede, quella su un
   expect(readFileSync(vecchio, 'utf8'), 'col no il file resta com\'era').toBe('testo da tenere');
 
   const terzo = path.join(dir, 'copia.txt');
-  await input.fill(`/${process.platform === 'win32' ? `cp "${nuovo}" "${terzo}"` : copia(nuovo, terzo)}`);
+  await input.fill(`/${copia(nuovo, terzo)}`);
   await input.press('Enter');
   await expect.poll(() => existsSync(terzo), { timeout: 12_000 }).toBe(true);
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 
   // Il comando sopra, col sì: sovrascrive davvero.
-  await input.fill(`/${process.platform === 'win32' ? `cp "${nuovo}" "${vecchio}"` : copia(nuovo, vecchio)}`);
+  await input.fill(`/${copia(nuovo, vecchio)}`);
   await input.press('Enter');
   await clickConfirm(page, 'ok', { timeout: 10_000 });
   await expect.poll(() => readFileSync(vecchio, 'utf8'), { timeout: 12_000 }).toBe('testo nuovo');
