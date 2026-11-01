@@ -47,6 +47,11 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
   la bolla mostra quelle righe e i bottoni dei file, e il modello le legge; un OK dato dopo si aggiunge come voce nella
   conversazione dove era nato il bottone. Un turno senza niente da dire non va al modello. Sentinella:
   `tests/unit/esitiInArchivio.test.mjs`.
+- **La conferma è una pausa del lavoro, non la sua fine** (#1373, decisione dell'owner: come gli harness di Anthropic,
+  su cui i modelli Claude sono addestrati). Dopo un sì, riuscito o no, l'esito torna al modello in un turno interno
+  (le voci di `esiti`, scritte dal main), e il modello continua coi passi che mancano o chiude muto: nessuna bolla e
+  niente in archivio. Non c'è un caso per tipo e nessun campo che il modello dichiara. Un no non richiama il modello:
+  lo legge al messaggio dopo e non ripropone. Un segreto fermato non riprende.
 - **All'apertura l'ultimo messaggio sta in cima** (#1487), col segno del suo giorno, e sotto è vuoto: chi apre una home
   non vuole rivedere ieri, che resta sopra a una rotella. Vale per la scheda nuova, la home ricaricata e la riserva alla
   consegna. Il vuoto è un margine in fondo al filo misurato apposta, così «in fondo» vuol dire proprio quel punto e

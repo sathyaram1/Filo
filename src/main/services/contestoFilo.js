@@ -424,12 +424,12 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     return memo && Array.isArray(memo.dopo) ? memo.dopo : null;
   };
   // Un turno con dentro qualcosa che non c'è più torna come risposta sola, dove gli esiti si ripuliscono. Anche uno il
-  // cui esito la scheda ha visto cambiare dopo (un sì nel popup, #1396; la pagina aperta che si sposta da sé su un sito
+  // cui esito la scheda ha visto cambiare dopo (un sì o un no nel popup, #1396, #1373; la pagina aperta che si sposta da sé su un sito
   // bloccato, #590): il giro lo darebbe com'era, l'esito vero lo porta la risposta sola.
   const valido = (g) => !!g && senzaTolti(g.azioni) === g.azioni;
   const cambiataDopo = (k) => {
     const s = dallaScheda.get(k);
-    return !!s && s.azioni.some((a) => a && (a._confirmed || (a._output && a._output.dopo)));
+    return !!s && s.azioni.some((a) => a && (a._confirmed || a._rifiutata || (a._output && a._output.dopo)));
   };
   const giroDi = (m) => {
     const k = FC().chiave(m);
