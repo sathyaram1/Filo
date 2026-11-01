@@ -686,6 +686,8 @@ class BarraLaterale {
       trascinamento: !!this.trascinamento,
       // Una risposta di Filo da leggere nella scheda davanti (#1432).
       risposta: this._nav().risposta,
+      // A tutto schermo la striscia non resta sopra il film (#871.6, D-11): spenta come da Preferenze, il bordo vivo.
+      schermoIntero: !!this.tabs.contentFullscreen,
       strisciaPx: this.strisciaPx || STRISCIA,
       opzioni: { spinta: this.opzioni.spinta, attesaMs: this.opzioni.attesaMs, striscia: this.opzioni.striscia },
     };
