@@ -1082,11 +1082,26 @@
     mgManutentoreAcceso.addEventListener('change', () => saveSessions({ manutentoreAcceso: mgManutentoreAcceso.checked }, mgManutentoreMsg));
   }
 
-  for (const [el, campo] of [[mgAccountA, 'accountAOff'], [mgAccountB, 'accountBOff']]) {
+  for (const [el, campo, msg] of [[mgAccountA, 'accountAOff', mgAccountsMsg], [mgAccountB, 'accountBOff', mgAccountsMsg], [mgReteAperta, 'reteApertaOff', mgReteApertaMsg]]) {
     if (!el) continue;
     el.addEventListener('change', () => {
       // Acceso = in uso, quindi l'interruttore e il campo dicono l'opposto.
-      saveSessions({ [campo]: !el.checked }, mgAccountsMsg);
+      saveSessions({ [campo]: !el.checked }, msg);
+    });
+  }
+
+  if (mgReteApertaTetto) {
+    const letto = () => (mgReteApertaTetto.validity && mgReteApertaTetto.validity.badInput ? 'NaN' : mgReteApertaTetto.value);
+    const salva = () => saveSessions({ reteApertaTetto: letto() }, mgReteApertaTettoMsg);
+    if (mgReteApertaTettoSave) mgReteApertaTettoSave.addEventListener('click', salva);
+    mgReteApertaTetto.addEventListener('input', () => {
+      tettoInScrittura = true;
+      setSessionsMsg(mgReteApertaTettoMsg, '', null);
+    });
+    mgReteApertaTetto.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || mgReteApertaTetto.disabled) return;
+      e.preventDefault();
+      salva();
     });
   }
 
