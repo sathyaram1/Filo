@@ -160,6 +160,7 @@ import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSp
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 import { cloneDelBiglietto, rilancia } from './lib/worker-nel-clone.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
+import { leaseAtteso } from './lib/lease-atteso.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -688,10 +689,10 @@ export function comandoRisposta(io, cred, id) {
  * Salta (ok, skipped) con una HEAD staccata o su un ramo protetto — la stessa
  * regola dell'hook e di finish-local (lib/branch-integrity.isProtectedBranch:
  * main, master, il default dichiarato da origin). Prima un push normale; se
- * git lo rifiuta per storia divergente (un rebase), --force-with-lease, che
- * è contro il ref remoto conosciuto: se qualcun altro ha spinto nel frattempo
- * git rifiuta, ed è giusto così. Un fallimento torna con la causa: chi chiama
- * NON rilascia.
+ * git lo rifiuta per storia divergente (un rebase), --force-with-lease col
+ * valore atteso di leaseAtteso: se qualcun altro ha spinto nel frattempo il
+ * rinvio non parte, ed è giusto così. Un fallimento torna con la causa: chi
+ * chiama NON rilascia.
  */
 export function pushRamoCorrente(root, { exec = execFileSync, env = process.env } = {}) {
   const run = (args) => {
@@ -730,12 +731,11 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
     return { ok: false, skipped: false, branch: ramo, reason: `il server remoto ha rifiutato il push (una regola del repo, un pre-receive, il push protection?): ${pulisciGit(push.out)}` };
   }
   if (/rejected|non-fast-forward|fetch first|stale info/i.test(push.out)) {
-    // --force-if-includes: il lease da solo si fida del ref remoto che questa
-    // copia conosce, e dopo un `git fetch` quel ref è già il commit dell'altro
-    // — il lease combacia e il rinvio lo sovrascrive (verifica del giro 2).
-    // Con --force-if-includes git rifiuta se quel commit non è mai passato
-    // dalla storia locale di questo ramo.
-    const lease = run(['push', '--force-with-lease', '--force-if-includes', 'origin', `HEAD:refs/heads/${ramo}`]);
+    const atteso = leaseAtteso(root, ramo, { exec });
+    if (!atteso) {
+      return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e il rinvio con --force-with-lease non parte: su origin '${ramo}' è a un commit che questo ramo non ha mai avuto (qualcun altro ha spinto su '${ramo}'?)` };
+    }
+    const lease = run(['push', 'origin', `HEAD:refs/heads/${ramo}`, `--force-with-lease=refs/heads/${ramo}:${atteso}`]);
     if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true, ...avviso };
     return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
   }
@@ -800,6 +800,8 @@ export function testoRiallineamentoNonSpedito(sped) {
         : 'Riporta la cartella sul ramo del lavoro, a rebase finito, poi rilancia lo stesso comando.',
   ].join('\n');
 }
+
+export { leaseAtteso };
 
 /**
  * Committa quello che è rimasto fuori dai commit, prima di spedire. L'hook di

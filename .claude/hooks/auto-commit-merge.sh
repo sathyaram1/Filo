@@ -235,12 +235,19 @@ spedisci_ramo() {
       segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Il server remoto ha RIFIUTATO il push (una regola del repo, un pre-receive, il push protection?): $(motivo_git "$esito")"
       return 1 ;;
     *rejected*|*non-fast-forward*|*"fetch first"*|*"stale info"*)
-      # --force-if-includes: il lease da solo si fida del ref remoto che questa
-      # copia conosce, e dopo un `git fetch` quel ref e' gia' il commit
-      # dell'altro: il lease combacia e il rinvio lo sovrascrive (verifica del
-      # giro 2). Con --force-if-includes git rifiuta se quel commit non e' mai
-      # passato dalla storia locale di questo ramo.
-      esito2=$(git push --force-with-lease="refs/heads/$ramo" --force-if-includes origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
+      # Il lease col valore atteso di lease-atteso.mjs, stessa regola del rilascio (#1776). Senza node resta
+      # --force-if-includes: in un clone appena nato rifiuta sempre, ma non calpesta nessuno.
+      local regola="$dove/scripts/lib/lease-atteso.mjs" atteso
+      [ -f "$regola" ] || regola="$HOOK_SCRIPTS/lib/lease-atteso.mjs"
+      if [ -f "$regola" ] && command -v node >/dev/null 2>&1; then
+        if ! atteso=$(node "$regola" "$dove" "$ramo" 2>/dev/null); then
+          segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e il rinvio con --force-with-lease non parte: su origin '$ramo' e' a un commit che questo ramo non ha mai avuto (qualcun altro ha spinto su questo ramo?)"
+          return 1
+        fi
+        esito2=$(git push --force-with-lease="refs/heads/$ramo:$atteso" origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
+      else
+        esito2=$(git push --force-with-lease="refs/heads/$ramo" --force-if-includes origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
+      fi
       segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e anche il rinvio con --force-with-lease e' stato rifiutato (qualcun altro ha spinto su questo ramo?): $(motivo_git "$esito2")"
       return 1 ;;
   esac
