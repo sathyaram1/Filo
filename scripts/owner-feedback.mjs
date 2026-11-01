@@ -972,7 +972,8 @@ if (isMain) {
     console.error('     node scripts/owner-feedback.mjs <numero|id> --priorita <0-3>              (solo la priorità, decisa a mano: stato invariato, anche nei Ricevuti)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --serve-locale ["perché"]       (feedback di un utente → Ricevuti, «richiede lavoro locale»)');
-    console.error('     node scripts/owner-feedback.mjs <numero|id> --aspetta 676,663.2 | --aspetta-niente   (l’elenco intero delle attese, stato invariato)');
+    console.error('     node scripts/owner-feedback.mjs <numero|id> --aspetta-anche 676,663.2      (aggiunge attese a quelle che ci sono, stato invariato)');
+    console.error('     node scripts/owner-feedback.mjs <numero|id> --aspetta 676,663.2 [--sostituisci] | --aspetta-niente   (l’elenco intero delle attese, stato invariato; togliere attese non fuse vuole --sostituisci)');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
