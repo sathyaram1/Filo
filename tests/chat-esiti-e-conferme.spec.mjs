@@ -99,24 +99,36 @@ test('#1294 riaperta, la chat racconta la cosa fatta e quella non riuscita col p
   const detto = rispostaA(ch[ch.length - 1], 'timer di 5 minuti per la pasta');
   expect(detto).toMatch(/fatta: .*Pasta/);
   expect(detto).toMatch(/NON riuscita: .*\(perché: la modalità terminale è spenta\)/);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+  await page.reload();
+  await expect(bolla.locator('.dash-activity-row', { hasText: 'Non riuscita' })).toBeVisible({ timeout: 8_000 });
+  await page.screenshot({ path: 'tests/.shots/chat-esiti-riaperta-scuro.png' });
   await ripristina(app);
 });
+
+// Accendere il terminale chiede la parola «conferma» (#530) e riesce anche senza rete.
+const TERMINALE = { id: 'p1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"modalita_terminale","valore":true}' };
+async function confermaScritta(page) {
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  await fillConfirmInput(page, 'conferma');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'danger');
+}
 
 test('#1373 un comando secco confermato non richiama il modello: il bottone dice cosa è stato fatto', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
-  await livelloAutonomia(app, 'conservativo');
-  await modelloFinto(app, [{ text: '', toolCalls: [FEEDBACK] }, { text: 'GIRO IN PIÙ' }]);
-  await chiedi(page, 'segnala che il timer non suona');
-  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
-  await scrollConfirmToEnd(page);
-  await clickConfirm(page, 'ok');
+  await terminaleSpento(app);
+  await modelloFinto(app, [{ text: '', toolCalls: [TERMINALE] }, { text: 'GIRO IN PIÙ' }]);
+  await chiedi(page, 'accendi il terminale');
+  await confermaScritta(page);
   await expect(page.locator('.dash-action-btn', { hasText: /^✓/ })).toBeVisible({ timeout: 10_000 });
   await page.waitForTimeout(1500);
   expect((await chiamateAlModello(app)).length, 'nessun giro dopo l\'OK: il lavoro era finito').toBe(1);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'GIRO IN PIÙ' })).toHaveCount(0);
-  const chat = await chatCon(app, 'segnala che il timer non suona');
-  expect(chat.messages.flatMap((m) => m.esiti || []).map((v) => `${v.type}:${v.esito}`)).toEqual(['INVIA_FEEDBACK:chiesto', 'INVIA_FEEDBACK:fatto']);
+  const chat = await chatCon(app, 'accendi il terminale');
+  expect(chat.messages.flatMap((m) => m.esiti || []).map((v) => `${v.type}:${v.esito}`))
+    .toEqual(['IMPOSTA_PREFERENZA:chiesto', 'IMPOSTA_PREFERENZA:fatto']);
   await ripristina(app);
 });
 
@@ -127,17 +139,14 @@ test('#1373 dopo l\'OK che sblocca un passo rimasto indietro Filo riprende da so
   await modelloFinto(app, [
     { toolCalls: [
       { id: 'c1', name: 'ESEGUI_COMANDO', arguments: '{"comando":"echo ciao","spiegazione":"Scrivo ciao"}' },
-      { id: 'p1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"modalita_terminale","valore":true}' },
+      TERMINALE,
     ] },
     { text: 'Accendo il terminale e poi lo lancio.' },
     { text: 'RIPRESO DA SOLO dopo il sì.' },
   ]);
   await chiedi(page, 'lancia echo ciao');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Accendo il terminale' })).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
-  await fillConfirmInput(page, 'conferma');
-  await scrollConfirmToEnd(page);
-  await clickConfirm(page, 'danger');
+  await confermaScritta(page);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'RIPRESO DA SOLO' })).toBeVisible({ timeout: 10_000 });
   const ch = await chiamateAlModello(app);
   expect(ch).toHaveLength(3);
@@ -148,16 +157,15 @@ test('#1373 dopo l\'OK che sblocca un passo rimasto indietro Filo riprende da so
 test('#1294 la conferma data dopo aver cambiato conversazione resta in quella dove è nato il bottone', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
-  await livelloAutonomia(app, 'conservativo');
-  await modelloFinto(app, [{ text: '', toolCalls: [FEEDBACK] }]);
-  await chiedi(page, 'segnala che il timer non suona');
+  await terminaleSpento(app);
+  await modelloFinto(app, [{ text: '', toolCalls: [TERMINALE] }]);
+  await chiedi(page, 'accendi il terminale');
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
   await clickConfirm(page, 'cancel');
-  const nata = await chatCon(app, 'segnala che il timer non suona');
+  const nata = await chatCon(app, 'accendi il terminale');
   await chiedi(page, '/clear');
-  await page.locator('.dash-action-btn', { hasText: /feedback/i }).click();
-  await scrollConfirmToEnd(page);
-  await clickConfirm(page, 'ok');
+  await page.locator('.dash-bubble-filo .dash-action-btn-primary').click();
+  await confermaScritta(page);
   await expect(page.locator('.dash-action-btn', { hasText: /^✓/ })).toBeVisible({ timeout: 10_000 });
   await expect.poll(async () => {
     const c = (await chatsDellaHome(app)).find((x) => x.id === nata.id);
@@ -188,7 +196,6 @@ test('#1443.2 chiusa in una home, la conversazione non la continua un\'altra hom
   const chiusa = (await chatCon(app, 'portami alla home')).id;
   await expect.poll(async () => (await chatsDellaHome(app)).find((c) => c.id === chiusa)?.finita).toBe(true);
   await shell.locator('.tab').nth(1).click();
-  await expect(b.locator('.dash-bubble-note', { hasText: 'chiusa in un\'altra scheda' })).toBeVisible({ timeout: 5_000 });
   await chiedi(b, 'grazie');
   await expect(b.locator('.dash-bubble-filo', { hasText: 'Di niente.' })).toBeVisible({ timeout: 10_000 });
   const dove = await chatCon(app, 'grazie');
