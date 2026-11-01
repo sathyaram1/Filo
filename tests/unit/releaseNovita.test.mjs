@@ -12,12 +12,14 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { applicaNovita, chiediNovita, impronta, intervalloDelBlocco, leggiNote, main } from '../../scripts/release-novita.mjs';
+import { applicaNovita, chiediNovita, impronta, leggiNote, main } from '../../scripts/release-novita.mjs';
+
+const note = (testo) => (leggiNote(testo) || {}).note;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FILE = join(ROOT, 'src', 'shared', 'patchNotes.js');
 const SORGENTE = readFileSync(FILE, 'utf8');
-const NOTE = leggiNote(SORGENTE);
+const NOTE = note(SORGENTE);
 const TOP = NOTE[0];
 const VECCHIO = NOTE[5];
 const righeDi = (b) => [...(b.features || []), ...(b.fixes || [])];
@@ -41,7 +43,7 @@ describe('applicaNovita sul registro vero', () => {
     }]);
     assert.equal(r.ok, true, r.reason);
     assert.deepEqual(r.applicate, [TOP.version]);
-    const dopo = leggiNote(r.testo);
+    const dopo = note(r.testo);
     assert.equal(dopo.length, NOTE.length);
     const tardivaIn = TOP.features.includes(tardiva) ? 'features' : 'fixes';
     assert.deepEqual(dopo[0][tardivaIn].at(-1), tardiva, 'la riga che il redattore non ha visto resta in coda');
@@ -54,7 +56,7 @@ describe('applicaNovita sul registro vero', () => {
   test('le versioni vecchie tornano riscritte a ogni costruzione; senza impronte la riscrittura copre il blocco', () => {
     const r = applicaNovita(SORGENTE, [{ versione: VECCHIO.version, features: ['Vecchia, riscritta.'], fixes: [] }]);
     assert.equal(r.ok, true, r.reason);
-    const dopo = leggiNote(r.testo);
+    const dopo = note(r.testo);
     assert.deepEqual({ features: dopo[5].features, fixes: dopo[5].fixes }, { features: ['Vecchia, riscritta.'], fixes: [] });
     assert.deepEqual(dopo.filter((_, i) => i !== 5), NOTE.filter((_, i) => i !== 5));
   });
@@ -75,9 +77,21 @@ describe('applicaNovita sul registro vero', () => {
     assert.match(r.saltate[0].perche, /non c’è in questo albero/);
   });
 
-  test('un registro che non si legge non si tocca', () => {
-    assert.equal(applicaNovita('const x = ;', [{ versione: TOP.version, fixes: ['x'] }]).ok, false);
-    assert.equal(intervalloDelBlocco("const N = [{ version: '1.0.0', features: ['}'] /* } */ }];", '1.0.0')[1], "const N = [{ version: '1.0.0', features: ['}'] /* } */ }".length);
+  test('il registro si legge come dato, senza eseguirlo: uguale a quello che carica l’app, e niente oltre ai letterali', () => {
+    createRequire(import.meta.url)(FILE);
+    assert.deepEqual(NOTE, JSON.parse(JSON.stringify(globalThis.SN_PATCH_NOTES.NOTES)));
+    const letti = note("const NOTES = [\n  // c\n  { version: '1.0.0', 'date': \"x\", features: ['}', '\\u00e8\\x41\\u{1F600}\\n'], /* } */ fixes: [`t`, -1.5, true, null], },\n];");
+    assert.deepEqual(letti, [{ version: '1.0.0', date: 'x', features: ['}', 'èA😀\n'], fixes: ['t', -1.5, true, null] }]);
+    for (const cattivo of [
+      "const NOTES = [{ version: '1.0.0', features: [process.env.FILO_BUILD_PASSPHRASE] }];",
+      "const NOTES = [{ version: '1.0.0', features: [`${process.env.X}`] }];",
+      "const NOTES = [{ version: '1.0.0', features: ['a' + 'b'] }];",
+      "const NOTES = [{ version: '1.0.0', features: [(() => 'x')()] }];",
+      "const NOTES = [{ __proto__: { version: '1.0.0' } }];",
+      "const NOTES = [{ version: '1.0.0', features: ['aperta] }];",
+      'const ALTRO = [];',
+    ]) assert.equal(leggiNote(cattivo), null, cattivo);
+    assert.equal(applicaNovita('const NOTES = [;', [{ versione: TOP.version, fixes: ['x'] }]).ok, false);
   });
 });
 
@@ -131,7 +145,7 @@ describe('come la lancia la pubblicazione', () => {
         cwd: dir, env: { ...process.env, FILO_ROUTINE_API: s.url, FILO_BUILD_PASSPHRASE: 'parola' },
       });
       assert.deepEqual(s.corpi, [{ passphrase: 'parola', versione: TOP.version }]);
-      const dopo = leggiNote(readFileSync(join(dir, 'src', 'shared', 'patchNotes.js'), 'utf8'));
+      const dopo = note(readFileSync(join(dir, 'src', 'shared', 'patchNotes.js'), 'utf8'));
       assert.deepEqual({ features: dopo[0].features, fixes: dopo[0].fixes }, { features: ['Tutto nuovo.'], fixes: [] });
       assert.match(stdout, /riscritte dal redattore/);
     } finally { await s.chiudi(); togliCartella(dir); togliCartella(strumenti); }
