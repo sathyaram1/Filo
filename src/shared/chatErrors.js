@@ -315,6 +315,10 @@
           ? `nessun fornitore di questo modello rispetta le impostazioni sulla privacy del tuo account OpenRouter: allentale su openrouter.ai/settings/privacy, o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`
           : `nessun fornitore di questo modello rispetta le regole sulla privacy dei dati: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
+      // #1345: non è la politica sui fornitori, è il modello che non legge quel contenuto.
+      const ingresso = e && (e.code === 'INGRESSO_NON_LETTO' || (!e.code && [400, 404, 415, 422].includes(st)))
+        ? (e.ingresso || ingressoRifiutato(raw)) : '';
+      if (ingresso || (e && e.code === 'INGRESSO_NON_LETTO')) return FRASI_INGRESSO[ingresso] || FRASE_INGRESSO_IGNOTO;
       // #700: gli altri «nessun host» del router hanno ciascuno il suo rimedio, e nessuno riguarda gli strumenti.
       if (e && e.code === 'NO_PROVIDER_ALLOWED') {
         return e.keySource === 'own'
