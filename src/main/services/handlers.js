@@ -4201,6 +4201,7 @@ function cancelliAperti() {
   const aperti = {};
   try { aperti.redteam = require('./redteamGate').visibile(); } catch (_) {}
   try { Object.assign(aperti, require('./inPausa').aperti()); } catch (_) {}
+  try { aperti.streaming = require('./funzioniBuild').salvaVideoInStreaming; } catch (_) {}
   return aperti;
 }
 

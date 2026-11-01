@@ -2346,10 +2346,10 @@
     // Video/audio cliccato direttamente: le sue azioni vengono prima (un filmato
     // dentro una scheda-link resta soprattutto un filmato)…
     if (mediaEl) {
-      for (const it of Actions.buildMediaItems(mediaEl)) items.push(it);
       // Un media dentro un <a> è ANCHE un collegamento e spesso è il link che si vuole (#434).
       // Non è sempre un antenato: nelle home l'anteprima si stende sopra il link (#444).
       const link = linkEl || linkUnder;
+      for (const it of Actions.buildMediaItems(mediaEl, link)) items.push(it);
       if (link) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(link)) items.push(it);
@@ -2399,7 +2399,7 @@
       // caso un link sopra non deve intrufolarsi nel menu di quel link.
       const mediaInLink = belongsTo(mediaUnder, linkEl, layers) ? mediaUnder : null;
       if (mediaInLink) {
-        for (const it of Actions.buildMediaItems(mediaInLink)) items.push(it);
+        for (const it of Actions.buildMediaItems(mediaInLink, linkEl)) items.push(it);
         items.push({ type: 'separator' });
       }
       // Stessa storia con la copertina ferma: le schede la coprono con un velo che regge il
@@ -2429,10 +2429,11 @@
     // Nessun altro contesto, ma sotto al punto cliccato c'è un filmato coperto
     // dall'overlay del player: sono comunque le sue azioni che l'utente cerca.
     if (mediaUnder) {
-      for (const it of Actions.buildMediaItems(mediaUnder)) items.push(it);
       // Due cose prese entrambe da sotto devono stare insieme anche fra loro, o il menu
       // unirebbe due schede diverse (#444).
-      if (belongsTo(mediaUnder, linkUnder, layers)) {
+      const linkDelMedia = belongsTo(mediaUnder, linkUnder, layers) ? linkUnder : null;
+      for (const it of Actions.buildMediaItems(mediaUnder, linkDelMedia)) items.push(it);
+      if (linkDelMedia) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkUnder)) items.push(it);
         items.push({ type: 'separator' });

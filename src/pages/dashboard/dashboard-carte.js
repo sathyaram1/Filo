@@ -204,6 +204,8 @@
     if (r.state === 'progressing' || r.state === 'paused') {
       const fermo = r.state === 'paused';
       let quanto = pct != null ? `${pct}% · ${fmtBytes(r.receivedBytes)} di ${fmtBytes(r.totalBytes)}` : `${fmtBytes(r.receivedBytes)}`;
+      // #1488 — un video in streaming dice cosa sta facendo quando non sono byte del file.
+      if (r.nota) quanto = pct != null || r.receivedBytes ? `${r.nota.toLowerCase()} · ${quanto}` : r.nota.toLowerCase();
       // #1287 — quanto va veloce e quanto manca, come nel pannello e nella pagina Download.
       let corsa = '';
       try { corsa = global.SN_SCARICAMENTI_AVANZAMENTO.velocitaEResto(r); } catch (_) {}
@@ -244,7 +246,9 @@
           caricaDownloads();
         }) }
         : null;
-      return { ...base, stato: 'interrotto', principale: riprova || cartella, secondaria: riprova ? cartella : null, filo: `Lo scaricamento di «${nome}» si è interrotto.` };
+      // Il perché di un video non salvato (#1488) sta sulla carta e nel filo, non solo nell'avviso.
+      const perche = r.nota ? ` ${r.nota}.` : '';
+      return { ...base, stato: r.nota ? `interrotto · ${r.nota}` : 'interrotto', principale: riprova || cartella, secondaria: riprova ? cartella : null, filo: `Lo scaricamento di «${nome}» si è interrotto.${perche}` };
     }
     if (r.missing) {
       return { ...base, stato: 'il file non c’è più', principale: cartella, filo: `Avevo scaricato «${nome}», ma il file non è più al suo posto.` };

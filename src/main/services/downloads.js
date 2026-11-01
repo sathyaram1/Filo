@@ -377,6 +377,9 @@ function publicRecord(r) {
     servedBy: r.servedBy || '',
     // #950 — il nome con cui il file era arrivato, finché Filo l'ha cambiato: le superfici offrono di rimetterlo.
     nomeOriginale: r.nomeOriginale || '',
+    // #1488 — `via` dice chi rifà lo scaricamento, `nota` cosa sta facendo o perché non è riuscito.
+    via: r.via || '',
+    nota: r.nota || '',
     // #1287 — byte al secondo e secondi che restano, solo mentre scende (0 e null altrimenti).
     ...velocitaDi(r),
   };
@@ -426,7 +429,7 @@ function daDisco(raw) {
   } else if (NON_TERMINAL.has(rec.state)) {
     // Un download che risultava "in corso" alla chiusura non può più
     // proseguire: il suo DownloadItem è morto. Lo marchiamo interrotto.
-    rec.state = 'interrupted'; rec.paused = false; rec.canResume = false;
+    rec.state = 'interrupted'; rec.paused = false; rec.canResume = false; rec.nota = '';
   }
   return rec;
 }
@@ -980,13 +983,33 @@ function finalizeManual(rec, state, savePath) {
   persist();
   broadcast(state === 'completed' ? 'done' : 'error', rec);
   contaFine(rec);
-  // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina.
+  // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina. Un video in streaming fa
+  // eccezione (#1488): ci mette minuti, e la fine si dice nella finestra, dovunque sia l'utente in quel momento.
+  if (rec.via === 'streaming') annunciaStreaming(rec, state);
   return marca;
 }
 
+function annunciaStreaming(rec, state) {
+  if (state === 'completed') {
+    shellToast(`Scaricato: ${shortName(rec.filename)}`, {
+      durationSec: 8, tipo: 'download_finito', indirizzo: rec.url,
+      actions: [{ label: 'Apri file', openDownloadId: rec.id }, { label: 'Apri cartella', revealDownloadId: rec.id }],
+    }, scopeOf(rec));
+  } else if (state === 'interrupted') {
+    // «Riprova» solo dove riprovare può servire: un limite d'età non cambia ripetendo.
+    shellToast(rec.nota || `Video non salvato: ${shortName(rec.filename)}`, {
+      durationSec: 12, tipo: 'download_failed', indirizzo: rec.url,
+      ...(rec._riprovabile ? { actions: [{ label: 'Riprova', riprovaDownloadId: rec.id }] } : {}),
+    }, scopeOf(rec));
+  }
+}
+
 // `webContents`: la scheda da cui parte, per aprire la domanda nella sua finestra.
-function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents } = {}) {
-  const id = uuid();
+// `via: 'streaming'` (#1488): la voce la riempie salvaVideoStreaming.js, e «Riprova» passa da lui. `riusa`: l'id della
+// voce chiusa da riempire di nuovo, quella su cui l'utente ha premuto «Riprova».
+function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents, via = '', riusa = '' } = {}) {
+  const vecchia = riusa ? records.get(riusa) : null;
+  const id = vecchia && !NON_TERMINAL.has(vecchia.state) && !liveManual.has(riusa) && !liveItems.has(riusa) ? vecchia.id : uuid();
   const nome = safeName(filename || 'download');
   const indirizzo = String(url || '');
   const marca = (fn, ripiego) => { try { return fn(); } catch (_) { return ripiego; } };
@@ -1013,12 +1036,14 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
     canPause: false,
     _scope: scope || '',
     _sessione: webContents && !webContents.isDestroyed?.() ? webContents.session : null,
+    via: via === 'streaming' ? 'streaming' : '',
+    nota: '',
   };
   campiona(rec);
   records.set(id, rec);
   const attese = [];
   rec._sblocca = (si) => { for (const r of attese.splice(0)) r(si); };
-  const requestCancel = () => { rec._cancelled = true; finalizeManual(rec, 'cancelled'); };
+  const requestCancel = () => { rec._cancelled = true; if (!rec._final) rec.nota = ''; finalizeManual(rec, 'cancelled'); };
   // La risposta alla domanda «scaricarlo?», da confirmDownload: un no chiude la voce come «Annulla».
   const rispondi = (si) => {
     if (!si) { requestCancel(); return; }
@@ -1077,9 +1102,31 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
       // L'ultimo progress() può essere caduto nel freno: a file completo i byte ricevuti SONO
       // il totale, e la riga non deve restare ferma al 95% a scaricamento finito.
       if (rec.totalBytes > 0) rec.receivedBytes = rec.totalBytes;
+      rec.nota = '';
       return finalizeManual(rec, 'completed', savePath);
     },
-    fail() { finalizeManual(rec, 'interrupted'); },
+    // Cosa sta facendo, quando non sono byte del file («Preparo il programma…»); `azzera` riparte da zero byte.
+    nota(testo, { azzera = false } = {}) {
+      if (rec._final) return;
+      rec.nota = String(testo || '');
+      if (azzera) { rec.receivedBytes = 0; rec.totalBytes = 0; rec._campioni = []; lastPush = 0; }
+      broadcast('progress', rec);
+    },
+    // Il nome vero arriva dopo la partenza (il titolo del video, #1488): la riga lo prende appena c'è.
+    nomina(nome) {
+      if (rec._final || !nome) return;
+      const n = safeName(nome);
+      if (n === rec.filename) return;
+      rec.filename = n;
+      rec.exe = marca(() => ESE().eEseguibile(n), rec.exe);
+      broadcast('progress', rec);
+    },
+    // `perche`: la frase che resta sulla riga chiusa, per chi non ha visto l'avviso.
+    fail(perche = '', { riprovabile = true } = {}) {
+      rec.nota = String(perche || '');
+      rec._riprovabile = riprovabile;
+      finalizeManual(rec, 'interrupted');
+    },
     cancel: requestCancel,
   };
 }
@@ -1232,11 +1279,23 @@ function prendiRiprova(scope, url) {
   return vecchia;
 }
 
+let rifaiStreaming = null;
+function quandoRiprovaStreaming(fn) { rifaiStreaming = typeof fn === 'function' ? fn : null; }
+
 function riprova(id, scope = '') {
   const rec = recordIn(id, scope);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco', items: listRecords(scope) };
   // Un secondo clic mentre il primo sta già ripartendo non è un errore da dire.
   if (rec._riprovaTimer || (liveItems.has(rec.id) && rec.state === 'progressing')) return { ok: true, items: listRecords(scope) };
+  // Un video in streaming non ha un file da riscaricare: si rifà il salvataggio dalla pagina (#1488), anche da una
+  // voce riuscita («Ri-scarica»), che resta com'è mentre ne nasce una nuova.
+  if (rec.via === 'streaming' && !NON_TERMINAL.has(rec.state)) {
+    if (!rifaiStreaming || !/^https?:/i.test(String(rec.url || ''))) {
+      return { ok: false, error: 'Questo video non ha un indirizzo da cui salvarlo di nuovo', items: listRecords(scope) };
+    }
+    rifaiStreaming({ id: rec.state === 'completed' ? '' : rec.id, url: rec.url, filename: rec.filename, scope: rec._scope || scope || '' });
+    return { ok: true, items: listRecords(scope) };
+  }
   if (rec.state !== 'interrupted' && rec.state !== 'cancelled') {
     return { ok: false, error: 'Questo scaricamento non è fallito', items: listRecords(scope) };
   }
@@ -1538,6 +1597,7 @@ module.exports = {
   pause,
   resume,
   riprova,
+  quandoRiprovaStreaming,
   trascina,
   trattieniChiusura,
   rispondiChiusura,

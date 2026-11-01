@@ -52,6 +52,7 @@ const CARTELLA_DATI = {
   quarantena: { frase: 'i download' },
   adblock: { frase: 'le liste per bloccare la pubblicità' },
   'firmatari-c2pa': { frase: 'l\'elenco dei firmatari riconosciuti delle credenziali sulle immagini' },
+  'programmi-video': { frase: 'i programmi per salvare i video in streaming' },
   Dictionaries: { frase: 'i dizionari del correttore ortografico' },
 };
 
