@@ -13,7 +13,9 @@ nella pagina, in uno Shadow DOM chiuso.
   le variabili del tema attraversano lo shadow root, e un `--sn-fg: transparent` sul suo `<html>`
   cancella il testo. Ci si arriva dall'Aiuto, che legge la pagina: la stessa pagina che convince il
   modello a proporre un'azione copre il testo esatto con uno innocuo (#592.6). Nessuna pezza nel
-  documento regge (riportare l'opacità, sorvegliare lo stile): il sito arriva sempre dopo.
+  documento regge (riportare l'opacità, sorvegliare lo stile): il sito arriva sempre dopo. Nemmeno
+  il mezzo secondo d'attesa: un velo che lascia passare il mouse, steso sopra un OK nel documento,
+  resta lì quanto vuole (#589.17). Fuori dal documento il velo sta sotto la domanda.
 - **Una porta sola.** Chi chiede un sì chiama `SN_CONFIRM_UI` come sempre. Su una pagina web il
   preload (`page-preload.js`) dà `SN_CONFERMA_FUORI`, e `confirmUi.js` manda lì la domanda invece di
   disegnarla: nessun chiamante sceglie la strada, quindi nessuno la sbaglia. Un content script nuovo
