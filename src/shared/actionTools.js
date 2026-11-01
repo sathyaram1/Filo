@@ -424,6 +424,26 @@
       },
       required: [],
     },
+    // #884 — le schede chiuse o archiviate: si cercano per contenuto, data e motivo, poi si riaprono per id.
+    SCHEDE_CHIUSE: {
+      description: 'Cerca fra le schede CHIUSE o ARCHIVIATE dell\'utente, per contenuto, data e motivo: "quella pagina sulle orche che ho chiuso ieri", "cosa ha archiviato la pulizia stamattina?", "le schede che mi hai chiuso tu", "le schede chiuse la settimana scorsa". Ti tornano id, titolo, sito, quando e perché è stata chiusa e il suo riassunto, le più pertinenti (o, senza `cerca`, le più recenti) prima. Per riaprirne una usa RIAPRI_SCHEDA con l\'id: non NAVIGA. Sola lettura.',
+      properties: {
+        cerca: S('Di cosa parlava la pagina, o il suo titolo o sito ("orche", "ricetta del pane", "youtube"). Vuoto per averle in ordine di chiusura.'),
+        da: S('Chiuse da questo momento: istante ISO con l\'ora locale, o giorno AAAA-MM-GG (dalla sua mezzanotte).'),
+        a: S('Chiuse fino a questo momento, come `da` (un giorno vale fino alla sua fine).'),
+        motivo: S('Solo quelle chiuse così: "mano" dall\'utente, "filo" da te su richiesta in chat, "pulizia" archiviate dal riordino o dall\'inattività, "doppione" chiuse perché aperte due volte, "pagina" chiuse dalla pagina stessa.', { enum: ['mano', 'filo', 'pulizia', 'doppione', 'pagina'] }),
+      },
+      required: [],
+      risultato: true,
+    },
+    RIAPRI_SCHEDA: {
+      description: 'RIAPRE una scheda chiusa o archiviata trovata con SCHEDE_CHIUSE, com\'era (stesso indirizzo, punto della pagina e paese): "riaprila", "riapri la seconda". Passa l\'id; per più schede chiamalo una volta per scheda. Se la pagina non c\'è più o non risponde, l\'esito te lo dice e l\'utente vede il riassunto salvato: raccontaglielo da lì.',
+      properties: {
+        id: S('L\'id della scheda, preso dall\'esito di SCHEDE_CHIUSE.'),
+      },
+      required: ['id'],
+      risultato: true,
+    },
     CANCELLA_ARCHIVIO: {
       description: 'Cerca nell\'archivio le schede pertinenti a `query` e mostra un pannello di conferma per eliminarle DEFINITIVAMENTE. È distruttiva e permanente: spiega in una frase che è un\'eliminazione definitiva.',
       properties: { query: S('Descrizione di cosa cancellare.') },
@@ -588,6 +608,14 @@
       properties: {
         percentuale: I('Livello esatto in percentuale (100 = dimensione reale). Da 25 a 500: oltre, il sistema si ferma al limite e te lo dice.'),
         verso: S('Un passo per volta, come i tasti: "in" più grande, "out" più piccolo, "reset" torna al 100%.', { enum: ['in', 'out', 'reset'] }),
+      },
+      required: [],
+    },
+    // #1397 — «rimettimi la musica» riprende quella che suonava, non ne cerca una nuova.
+    RIPRENDI_AUDIO: {
+      description: 'Fa RIPARTIRE l\'audio che l\'utente stava ascoltando ("rimettimi la musica", "fai ripartire la canzone", "riprendi il podcast", "rimetti il video di prima"): la scheda che suonava riparte da dove era; se è stata chiusa si riapre lo stesso indirizzo e riparte. Senza `scheda` prende l\'ultima che ha suonato (in TAB APERTE è segnata [AUDIO FERMO], oppure una chiusa); con `scheda` quella col suo numero in TAB APERTE. Non cerca niente di nuovo: se l\'esito dice che non c\'è niente da riprendere, chiedi all\'utente cosa vuole ascoltare o cercalo con NAVIGA. La scheda resta dietro; esegue subito.',
+      properties: {
+        scheda: I('Il numero in TAB APERTE della scheda da far ripartire; ometti per l\'ultima che ha suonato.'),
       },
       required: [],
     },

@@ -126,6 +126,16 @@
     return ultima;
   }
 
+  // Chi l'ha chiusa (#884): 'mano', 'pagina' (la pagina stessa o un crash), 'filo' (chiesto in chat), 'pulizia' (il
+  // riordino o l'inattività), 'doppione'. Le voci di prima non lo hanno: si legge dal `reason` di allora.
+  const MOTIVI = ['mano', 'pagina', 'filo', 'pulizia', 'doppione'];
+  function motivoDi(t) {
+    if (t && MOTIVI.includes(t.motivo)) return t.motivo;
+    const r = t && t.reason;
+    if (!r || r === 'manual') return t && t.chiusaDaSola ? 'pagina' : 'mano';
+    return r === 'duplicato' ? 'doppione' : 'pulizia';
+  }
+
   // Archivia una tab chiusa. `meta` contiene i campi catturati al momento della
   // chiusura (vedi tabs.js _archiveClosedTab). Ritorna l'entry creata, o null se
   // la tab non è archiviabile (manca l'URL, o la chiamata arriva dall'incognito).
@@ -156,6 +166,11 @@
       reason: meta.reason || 'manual',
       // Chiusa dalla pagina stessa o da un crash: né la persona né la pulizia (i contatori delle riaperte, #1467).
       ...(meta.chiusaDaSola === true ? { chiusaDaSola: true } : {}),
+      motivo: motivoDi(meta),
+      // Il giro della pulizia che l'ha archiviata: 'idle' (inattività), 'reopen' (riapertura), 'manual', 'chat'.
+      ...(meta.giro && /^[a-z]{1,12}$/.test(String(meta.giro)) ? { giro: String(meta.giro) } : {}),
+      // L'ultima volta che ha suonato (#1397): «rimettimi la musica» la riapre anche chiusa.
+      ...(Date.parse(meta.audioAt) > 0 ? { audioAt: new Date(Date.parse(meta.audioAt)).toISOString() } : {}),
       // URL delle altre tab aperte nello stesso momento (contesto di lavoro).
       coOpenUrls: insieme.map((x) => x.testo),
       ...(insiemeTagliati.length ? { coOpenUrlsTagliati: insiemeTagliati } : {}),
@@ -301,6 +316,6 @@
 
   global.SN_ARCHIVED_TABS = {
     list, listMeta, ultimaPer, archive, update, remove, removeMany, dimenticaPagine, clear, importa, aggiornaIcone,
-    suEntrate, suUscite, cartella,
+    suEntrate, suUscite, cartella, motivoDi, MOTIVI,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

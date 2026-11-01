@@ -564,6 +564,9 @@
     CERCA_DOCUMENTI: (n) => (n > 1 ? `cercato fra i tuoi documenti ${n} volte` : 'cercato fra i tuoi documenti'),
     CERCA_SALVATE: (n) => (n > 1 ? `cercato fra le pagine salvate ${n} volte` : 'cercato fra le pagine salvate'),
     APRI_SALVATA: (n) => (n > 1 ? `aperto ${n} pagine salvate` : 'aperto una pagina salvata'),
+    SCHEDE_CHIUSE: (n) => (n > 1 ? `cercato fra le schede chiuse ${n} volte` : 'cercato fra le schede chiuse'),
+    RIAPRI_SCHEDA: (n) => (n > 1 ? `riaperto ${n} schede chiuse` : 'riaperto una scheda chiusa'),
+    RIPRENDI_AUDIO: () => 'fatto ripartire la musica',
     RINOMINA_FILE: () => 'dato un nome ai file',
     ELIMINA_FILE: () => 'tolto dei file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
@@ -806,6 +809,24 @@
       const t = pulito(o.titolo) || 'una pagina salvata';
       return { icon: '↗', text: `Aperta «${t}»${o.tolta ? ' · tolta da «Aperti per dopo»' : ' · resta in «Aperti per dopo»'}` };
     },
+    SCHEDE_CHIUSE: (a) => {
+      const o = a._output || {};
+      const n = Array.isArray(o.schede) ? o.schede.length : 0;
+      const q = pulito(a.cerca || '');
+      const cosa = q ? ` · «${q}»` : '';
+      return { icon: '🗂', text: n ? `${n === 1 ? 'Trovata una scheda chiusa' : `Trovate ${n} schede chiuse`}${cosa}` : `Nessuna scheda chiusa trovata${cosa}` };
+    },
+    RIAPRI_SCHEDA: (a) => {
+      const o = a._output || {};
+      const t = pulito(o.titolo || a._titolo) || 'la scheda';
+      return { icon: '↺', text: o.nonRaggiungibile ? `«${t}» non risponde più · sotto c'è il riassunto` : `Riaperta «${t}»` };
+    },
+    RIPRENDI_AUDIO: (a) => {
+      const o = a._output || {};
+      const t = pulito(o.titolo) || 'la musica';
+      if (o.nonPartita) return { icon: '🎵', text: `${o.riaperta ? 'Riaperta' : 'Trovata'} «${t}» · non è ripartita da sola` };
+      return { icon: '🎵', text: `${o.riaperta ? 'Riaperta e ripartita' : 'Ripartita'} «${t}»` };
+    },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a), title: indirizzoLetto(a) }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
@@ -1033,6 +1054,8 @@
     CERCA_DOCUMENTI: 'Ricerca nei documenti non riuscita', APRI_FILE: 'File non mostrato',
     CERCA_SALVATE: 'Ricerca fra le pagine salvate non riuscita',
     APRI_SALVATA: 'Pagina salvata non aperta',
+    SCHEDE_CHIUSE: 'Ricerca fra le schede chiuse non riuscita', RIAPRI_SCHEDA: 'Scheda non riaperta',
+    RIPRENDI_AUDIO: 'Musica non ripartita',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
     TOGLI_PERMESSO_SITO: 'Permesso non tolto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
@@ -1986,6 +2009,7 @@
     if (permessoDaConcedere(a)) return bottonePermesso(a);
     if (type === 'PULISCI_TAB') return renderBottoneRiordino(a, activity);
     if (type === 'CANCELLA_ARCHIVIO') return renderDeleteArchivePanel(a, activity);
+    if (type === 'RIAPRI_SCHEDA' && a._output && a._output.nonRaggiungibile) return cartaRiassunto(a._output);
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
     // (livello 2 o 3) e ha allegato spiegazione + livello. Il bottone apre il
     // popup OK/Annulla (2) o il box "digita conferma" (3); solo dopo il sì
@@ -2399,6 +2423,29 @@
     if (activity && row) activity.addRow(a.type, row.icon, row.text, true, null, a, row.title || '');
     btn.textContent = `✗ ${row ? row.text : 'Non eseguita'}`;
     if (permessoDaConcedere(a)) btn.after(bottonePermesso(a));
+  }
+
+  // #884 — una scheda riaperta la cui pagina non c'è più: resta quello che Filo ne aveva salvato. Testo del sito e del
+  // modello che l'ha riassunto: solo come testo, mai come markup.
+  function cartaRiassunto(o) {
+    const carta = document.createElement('div');
+    carta.className = 'dash-riassunto-chiusa';
+    const titolo = document.createElement('div');
+    titolo.className = 'dash-riassunto-chiusa-titolo';
+    titolo.textContent = pulito(o.titolo) || 'Pagina chiusa';
+    carta.appendChild(titolo);
+    const quando = Date.parse(o.chiusa || '');
+    const sotto = document.createElement('div');
+    sotto.className = 'dash-riassunto-chiusa-quando';
+    const sito = (() => { try { return new URL(o.url || '').hostname.replace(/^www\./, ''); } catch (_) { return ''; } })();
+    const data = Number.isFinite(quando) ? new Date(quando).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    sotto.textContent = [sito, data ? `chiusa il ${data}` : '', 'la pagina non risponde più'].filter(Boolean).join(' · ');
+    carta.appendChild(sotto);
+    const testo = document.createElement('div');
+    testo.className = 'dash-riassunto-chiusa-testo';
+    testo.textContent = String(o.riassunto || '').trim() || 'Di questa pagina Filo non aveva salvato un riassunto.';
+    carta.appendChild(testo);
+    return carta;
   }
 
   // Il riordino che la regola non fa partire da solo parte al clic, e chiede come dice `_domanda` (#530).

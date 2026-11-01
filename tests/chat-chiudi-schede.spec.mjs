@@ -70,16 +70,16 @@ test('per numero e per sito, e a «tutte» il testo non inviato resta aperto e i
   await expect.poll(async () => (await schede(shell)).find((t) => t.title === 'Bozza')?.formDirty, { timeout: 8_000 }).toBe(true);
   await tornaAllaHome(shell);
 
-  // L'elenco del modello va dalla più recente: 1 la home, 2 Bozza, 3 Gamma, 4 Beta, 5 Alfa. Un comando riuscito
+  // L'elenco del modello segue la barra (#413.2): 1 la home, 2 Alfa, 3 Beta, 4 Gamma, 5 Bozza. Un comando riuscito
   // chiude il turno con una chiamata: il giro di testo serve solo all'ultimo, che lascia aperta la bozza.
   await modelloFinto(app, [
-    { text: '', toolCalls: [{ id: 'n1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ schede: [5] }) }] },
+    { text: '', toolCalls: [{ id: 'n1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ schede: [2] }) }] },
     { text: '', toolCalls: [{ id: 's1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ sito: 'sito-pubblico.test' }) }] },
     { text: '', toolCalls: [{ id: 't1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ tutte: true }) }] },
     { text: 'Ho lasciato aperta la bozza.' },
   ]);
   const fermo = () => expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
-  await chiedi(page, 'chiudi la quinta');
+  await chiedi(page, 'chiudi la seconda');
   await expect.poll(() => pagineWeb(shell), { timeout: 10_000 }).toEqual(['Beta', 'Bozza', 'Gamma']);
   await fermo();
 
@@ -109,7 +109,7 @@ test('«chiudi questa scheda» detto nella home la chiude: si torna alla pagina 
   await openTab(testServer.html('<title>Lettura</title><p>lettura'));
   const idHome = await tornaAllaHome(shell);
 
-  // [QUESTA CHAT] è la più recente: numero 1. Nominata col suo numero si chiude.
+  // [QUESTA CHAT] è la prima della barra: numero 1. Nominata col suo numero si chiude.
   await modelloFinto(app, [
     { text: '', toolCalls: [{ id: 'q1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ schede: [1] }) }] },
     { text: 'Questa frase arriva solo da un secondo giro.' },
@@ -154,6 +154,36 @@ test('quando chiede conferma, il popup elenca le schede e all\'OK chiude proprio
   await scrollConfirmToEnd(page).catch(() => {});
   await clickConfirm(page, 'ok');
   await expect.poll(() => pagineWeb(shell), { timeout: 10_000 }).toEqual(['Aperta dopo']);
+  await ripristina(app);
+});
+
+// #413.2 — «la seconda scheda» è la seconda della barra anche quando un'altra è stata usata dopo, e «tutte le schede di
+// un sito» detto con `tutte` e `sito` chiude solo quelle del sito.
+test('«chiudi la seconda scheda» chiude la seconda della barra, «tutte quelle di un sito» solo quelle', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  await openTab(testServer.html('<title>Alfa</title><p>alfa'));
+  await openTab(testServer.html('<title>Beta</title><p>beta', { pubblico: true }));
+  await openTab(testServer.html('<title>Gamma</title><p>gamma', { pubblico: true }));
+  const delta = await openTab(testServer.html('<title>Delta</title><p>delta'));
+  await delta.locator('p').click();
+  await tornaAllaHome(shell);
+
+  // Dalla più recente la seconda sarebbe Delta: nella barra è Alfa.
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'b1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ schede: [2] }) }] },
+    { text: '', toolCalls: [{ id: 'b2', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ tutte: true, sito: 'sito-pubblico.test' }) }] },
+    { text: 'Fatto.' },
+  ]);
+  await chiedi(page, 'chiudi la seconda scheda');
+  await expect.poll(() => pagineWeb(shell), { timeout: 10_000 }).toEqual(['Beta', 'Delta', 'Gamma']);
+  const prompt = JSON.stringify((await chiamateAlModello(app))[0]);
+  expect(prompt).toMatch(/\\n2\. Alfa/);
+  expect(prompt).toContain('posizione nella barra');
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+
+  await chiedi(page, 'chiudi tutte le schede di sito-pubblico');
+  await expect.poll(() => pagineWeb(shell), { timeout: 10_000 }).toEqual(['Delta']);
   await ripristina(app);
 });
 

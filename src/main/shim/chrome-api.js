@@ -101,6 +101,9 @@ const chromeShim = {
         // #686 — lo zoom della pagina entra nello stato della chat: senza, a
         // «ingrandisci un po'» Filo non sapeva da dove partire.
         zoomPercent: zoomDi(t),
+        // #1397 — chi suona e chi ha suonato: «rimettimi la musica» riprende quella, non ne cerca una nuova.
+        audible: !!t.audible,
+        audioAt: t.audioAt || null,
       }));
     },
     async remove(id) {
