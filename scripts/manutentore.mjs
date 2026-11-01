@@ -516,10 +516,22 @@ export function controllaNovita(consegna, { blocco, schede = [] }) {
   for (const k of ['features', 'fixes']) {
     if (c[k] !== undefined && !Array.isArray(c[k])) errori.push(`${k} è una lista di righe`);
     if (righe(k).some((r) => typeof testoRiga(r) !== 'string' || !testoRiga(r).trim())) errori.push(`${k} ha una riga vuota o che non è testo`);
-    for (const r of righe(k).filter((x) => x && typeof x === 'object')) {
+    for (const r of righe(k).filter((x) => x && typeof x === 'object' && x.segnalazione != null)) {
       const n = segnalazioneRiga(r);
       if (!n) errori.push(`«${unaRiga(r.testo).slice(0, 80)}»: segnalazione è il numero intero di una segnalazione (1956)`);
       else if (!segnalazioni.has(n)) errori.push(`la segnalazione ${n} non sta fra le righe dei worker`);
+    }
+  }
+  const copiate = new Set(lette.map((r) => unaRiga(testoRiga(r))));
+  const conFonte = (r) => {
+    const da = r && typeof r === 'object' ? r.da : undefined;
+    if (Array.isArray(da) && da.length && da.every((n) => Number.isInteger(n) && n >= 1 && n <= lette.length)) return true;
+    return copiate.has(unaRiga(testoRiga(r)));
+  };
+  for (const r of [...righe('features'), ...righe('fixes')]) {
+    const da = r && typeof r === 'object' ? r.da : undefined;
+    if (da !== undefined && !(Array.isArray(da) && da.length && da.every((n) => Number.isInteger(n) && n >= 1 && n <= lette.length))) {
+      errori.push(`«${unaRiga(testoRiga(r)).slice(0, 80)}»: da sono i numeri delle righe dei worker da cui nasce, da 1 a ${lette.length}`);
     }
   }
   const tutte = [...righe('features'), ...righe('fixes')].map(testoRiga).filter((r) => typeof r === 'string');
