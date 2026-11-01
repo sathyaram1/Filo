@@ -669,12 +669,8 @@
       if (!e.isTrusted) return;
       const items = e.clipboardData?.items;
       if (!items) return;
-      for (const it of items) {
-        if (it.type?.startsWith('image/')) {
-          const blob = it.getAsFile();
-          if (blob) await addImageFromBlob(blob);
-        }
-      }
+      const blobs = Array.from(items).filter((it) => it.type?.startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+      if (blobs.length) await allega(blobs, addImageFromBlob);
     });
 
     // Immagini incollate col tasto destro: evento su misura da content.js.
