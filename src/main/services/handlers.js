@@ -2412,6 +2412,7 @@ async function eseguiAzioneFilo(action, {
   if (sender && !azioneAmmessaDa(action, sender?.tab?.url || sender?.url || '')) {
     return { executed: false, kept: false, rejected: true, code: 'forbidden' };
   }
+  if (type === 'INVIA_FEEDBACK') await segnalazioneSenzaPersona(action);
 
   // IMPOSTA_ESTETICA: il livello dipende dallo stato risultante, che solo il main conosce.
   // `_illegible` si inietta PRIMA del gate, mai dall'LLM (#146.4).
