@@ -52,5 +52,162 @@
       .filter((v) => v.type);
   }
 
-  global.SN_ESITO = { esitoAzione, conta, valido, voci, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO };
+  // Un testo scritto dal modello o da un sito, in una riga: senza caratteri di controllo.
+  function pulito(v) {
+    return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  const breve = (v, max) => {
+    const s = pulito(v);
+    return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+  };
+
+  // Perché qualche scheda non si è chiusa (#413): dopo «tutte» l'utente non ne ha indicata nessuna, e deve sapere il motivo.
+  const PERCHE_RESTANO = {
+    testo: (n) => (n === 1 ? 'una resta aperta col testo non inviato' : `${n} restano aperte col testo non inviato`),
+    sempre: (n) => (n === 1 ? 'una resta aperta, è di un sito tenuto sempre aperto' : `${n} restano aperte, sono di siti tenuti sempre aperti`),
+    nuova: (n) => (n === 1 ? 'una aperta dopo la richiesta resta' : `${n} aperte dopo la richiesta restano`),
+    chiusa: (n) => (n === 1 ? 'una era già chiusa' : `${n} erano già chiuse`),
+  };
+  function restanoAperte(o) {
+    const r = Number(o && o.restano) || 0;
+    if (!r) return '';
+    const per = o.restanoPer && typeof o.restanoPer === 'object' ? o.restanoPer : null;
+    const parti = per ? Object.keys(PERCHE_RESTANO).filter((k) => Number(per[k]) > 0).map((k) => PERCHE_RESTANO[k](Number(per[k]))) : [];
+    return parti.length ? parti.join(', ') : (r === 1 ? 'una resta aperta' : `${r} restano aperte`);
+  }
+
+  // Il perché di un'azione non riuscita, quando Filo lo sa: lo dicono il diario in diretta e la chat riaperta.
+  function motivo(a) {
+    const o = a && a._output;
+    if (!o) return '';
+    const tipo = String((a && a.type) || '').toUpperCase();
+    if (o.blocked === 'disabled') return 'la modalità terminale è spenta';
+    if (o.blocked === 'empty') return 'comando vuoto';
+    if (o.event === 'invalid') return o.error ? pulito(o.error) : 'data o ora non valide';
+    if (tipo === 'VEDI_SCHERMO') {
+      if (o.spenta) return 'è spento in Preferenze';
+      if (o.permesso === 'mac') return 'serve il permesso «Registrazione schermo»';
+      if (o.nessuna) return `nessuna finestra «${pulito(o.richiesta)}»`;
+      if (o.errore) return `${o.finestra ? `«${pulito(o.finestra)}»: ` : ''}${pulito(o.errore)}`;
+    }
+    if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    if (o.cartellaDiRete) return 'la cartella sta su un altro computer della rete';
+    if (o.errore === 'fuori_perimetro') return 'la cartella sta fuori dalla tua cartella personale';
+    if (o.blocked === 'site') {
+      const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
+      return `${o.host || 'il sito'} è fra i siti ${quali}`;
+    }
+    if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
+    if (o.proxy === 'non_disponibile') return 'non ancora disponibile';
+    if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';
+    if (o.found === false) return 'non trovato';
+    if (o.ok === false && o.errore && o.frase) return String(o.frase);
+    if (o.ok === false && o.detail) return String(o.detail);
+    if (o.ok === false && o.dettaglio) return String(o.dettaglio);
+    if (tipo === 'CHIUDI_SCHEDE') {
+      if (o.error) return 'schede non riconosciute';
+      if (o.restano) return restanoAperte(o);
+      if (o.nessuna === 'sito') return 'nessuna di quel sito';
+      if (o.nessuna === 'niente') return 'c\'è solo questa';
+    }
+    if (o.error) return String(o.error);
+    if (o.frase) return String(o.frase);
+    return '';
+  }
+
+  // ── La voce d'archivio (#1294) ─────────────────────────────────────────────
+  // Di ogni azione di un turno l'archivio della chat tiene com'è andata e la riga che lo racconta (la cosa fatta coi
+  // numeri veri, il perché di un no, la proposta che aspettava il sì): riaperta, la chat e il modello leggono quella.
+  const MAX_RIGA = 300;
+  const MAX_MOTIVO = 200;
+  const MAX_PERCORSO = 2000;
+  const TIPO = /^[A-Z_]{2,40}$/;
+  const primaRiga = (s) => String(s || '').split('\n')[0].replace(/\s*:\s*$/, '').trim();
+  function frase(fn, a) {
+    try { return primaRiga(fn(a)); } catch (_) { return ''; }
+  }
+  // Il file che il bottone apriva: riaperta, la chat lo ridisegna (solo un percorso del computer).
+  function fileDi(x) {
+    const p = String((x && (x.percorso || x.path)) || '');
+    const N = global.SN_NOMI_FILE;
+    if (!p || p.length > MAX_PERCORSO || /[\u0000-\u001f\u007f]/.test(p) || (N && !N.percorsoLocale(p))) return null;
+    const etichetta = breve(x.etichetta || x.label || '', 200);
+    return { percorso: p, ...(etichetta ? { etichetta } : {}) };
+  }
+  function senzaVuoti(v) {
+    const out = { type: v.type, esito: v.esito };
+    if (v.riga) out.riga = v.riga;
+    if (v.motivo) out.motivo = v.motivo;
+    if (v.file) out.file = v.file;
+    return out;
+  }
+  // `x`: l'azione del turno (coi campi `_` che Filo le scrive) o una voce già fatta, che torna ripulita.
+  function voceArchivio(x) {
+    if (!x || typeof x !== 'object') return null;
+    const type = String(x.type || '').toUpperCase();
+    if (!TIPO.test(type)) return null;
+    const giaFatta = valido(x.esito) && !Object.keys(x).some((k) => k.startsWith('_'));
+    if (giaFatta) {
+      const f = type === 'APRI_FILE' && x.file ? fileDi(x.file) : null;
+      return senzaVuoti({
+        type, esito: x.esito, riga: breve(x.riga, MAX_RIGA), motivo: breve(x.motivo, MAX_MOTIVO), file: f,
+      });
+    }
+    const o = x._output || {};
+    if (o.blocked === 'segreto') return senzaVuoti({ type: 'FERMATA', esito: FALLITO, riga: breve(o.frase || '', MAX_RIGA) });
+    const esito = esitoAzione(x);
+    const L = global.SN_ACTION_LEVELS;
+    let riga = '';
+    if (esito === CHIESTO) riga = primaRiga(x._confirm && x._confirm.text) || (L ? frase(L.describe, x) : '');
+    else if (esito === FALLITO) riga = L ? frase(L.describe, x) : '';
+    else riga = L ? frase(L.describeDone, x) : '';
+    if (!riga && x._domanda && L) riga = frase(L.describe, x);
+    const file = type === 'APRI_FILE' && esito !== FALLITO && esito !== CHIESTO ? fileDi(x) : null;
+    return senzaVuoti({
+      type, esito, riga: breve(riga, MAX_RIGA), motivo: esito === FALLITO ? breve(motivo(x), MAX_MOTIVO) : '', file,
+    });
+  }
+  // Tutte, senza tetto: un turno con cento letture le racconta tutte.
+  function vociArchivio(lista) {
+    return (Array.isArray(lista) ? lista : []).map(voceArchivio).filter(Boolean);
+  }
+
+  // La riga che la chat riaperta mostra per una voce: la stessa forma del diario in diretta.
+  function rigaDellaVoce(v) {
+    if (!v || !v.type) return null;
+    const riga = pulito(v.riga);
+    if (v.type === 'FERMATA') return { icona: '🔒', testo: riga || 'Fermata: avrebbe portato fuori un segreto', fallita: true };
+    if (v.esito === CHIESTO) return { icona: '❔', testo: `Conferma chiesta${riga ? ` · ${riga}` : ''}`, fallita: true };
+    if (v.esito === FALLITO) {
+      const perche = pulito(v.motivo);
+      return { icona: '⚠', testo: ['Non riuscita', riga, perche].filter(Boolean).join(' · '), fallita: true };
+    }
+    if (!riga) return null;
+    return { icona: '✓', testo: riga, fallita: false };
+  }
+
+  // Le voci di un turno come le legge il modello nei turni dopo. Le righe possono ripetere testi scritti da un sito o da
+  // un modello: una riga sola ciascuna, ripulite, e dette come registro di Filo.
+  function perModello(voci) {
+    const E = global.SN_ESTERNO;
+    const campo = (s, max = 200) => {
+      const t = E ? E.neutralizza(String(s || ''), { unaRiga: true }) : pulito(s);
+      return t.length > max ? `${t.slice(0, max)}…` : t;
+    };
+    const righe = (Array.isArray(voci) ? voci : []).map((v) => {
+      if (!v || !v.type) return '';
+      const cosa = campo(v.riga) || v.type;
+      if (v.type === 'FERMATA') return `- NON fatta, fermata da Filo (un segreto non esce): ${cosa}`;
+      if (v.esito === CHIESTO) return `- NON fatta: chiesta la conferma all'utente, che allora non l'aveva ancora data: ${cosa}`;
+      if (v.esito === FALLITO) return `- NON riuscita: ${cosa}${v.motivo ? ` (perché: ${campo(v.motivo)})` : ''}`;
+      if (v.esito === PROPOSTO) return `- proposta col bottone sotto la risposta: ${cosa}`;
+      return `- fatta: ${cosa}`;
+    }).filter(Boolean);
+    return righe.length ? `(com'è andata, dal registro di Filo:\n${righe.join('\n')})` : '';
+  }
+
+  global.SN_ESITO = {
+    esitoAzione, conta, valido, voci, motivo, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
+    CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
