@@ -1875,6 +1875,7 @@ if (isMain) {
       }
       if (p.avviso) console.error(p.avviso);
       console.error(p.skipped ? `push saltato: ${p.reason}` : `ramo '${p.branch}' spedito su origin${p.forced ? ' (storia riscritta: --force-with-lease)' : ''}`);
+      if (!p.skipped && p.punta) spedito = { branch: p.branch, sha: p.punta };
     }
     // Il rapporto di fine sessione lo fa uno script, non l'agente, e parte da
     // solo qui. Se lo script fallisce si rilascia comunque, con la nota.
