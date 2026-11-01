@@ -2099,7 +2099,8 @@
 
   // Il valore sta sopra le x e non esce dal campo: fuori coprirebbe e prenderebbe il clic a ciò che la pagina ha lì
   // (#1448.12), quindi sulla prima riga va sotto. Sulle parole di un'altra riga resta velato (#1448): lascia il clic al
-  // testo e si sveglia (pieno, cliccabile) col puntatore sulle x. Senza posto nel campo, sopra e velato.
+  // testo e si sveglia (pieno, cliccabile) col puntatore sulle x. Senza posto né sopra né sotto (un campo alto una riga)
+  // sta accanto alle x, sulla loro riga: sopra il campo, sveglio, prenderebbe il clic diretto alla pagina (#1690).
   function postoDelValore(state, b, x, tr) {
     const w = b.offsetWidth;
     const h = b.offsetHeight;
