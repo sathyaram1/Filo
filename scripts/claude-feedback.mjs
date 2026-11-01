@@ -744,7 +744,7 @@ export async function main(argvIn) {
   // Alla nascita le unite si archiviano, e chi le aspettava aspetta il pacchetto. Un passo che non riesce non è
   // silenzioso: il pacchetto esiste già, e la riga per rimediare si stampa intera, nell'ordine in cui va lanciata.
   let incompleto = false;
-  const cheAspetta = (x, num) => `npm run feedback -- ${x.num} --aspetta ${[...x.tenute, num].join(',')}`;
+  const cheAspetta = (x, num) => `npm run feedback -- ${x.num} --aspetta ${[...x.tenute, num].join(',')} --sostituisci`;
   if (unite.length && !r.seq) {
     incompleto = true;
     const passi = [
