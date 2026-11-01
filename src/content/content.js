@@ -355,6 +355,12 @@
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
     });
+    // Tornati su Filo da un'altra applicazione, o arrivati in una scheda dopo un sito spento: gli avvisi rimasti in coda
+    // arrivano qui (#1478.1).
+    if (!IS_SUBFRAME) {
+      window.addEventListener('focus', () => { prendiAvvisiInCoda(); });
+      prendiAvvisiInCoda();
+    }
 
     // Marker per i test: `filoReady` dice solo che i moduli sono caricati, questo che i
     // listener sono attivi, spellcheck compreso. Innocuo a runtime.
