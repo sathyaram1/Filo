@@ -4,6 +4,7 @@
 
 const { BrowserWindow } = require('electron');
 require('../shared/tasti');
+const Strade = require('./services/contatoriStrade');
 
 // I tasti di serie, combinazione → comando: la scelta dell'utente la tiene SN_TASTI.
 const COMMANDS = Object.freeze(Object.fromEntries(globalThis.SN_TASTI.AZIONI_FILO.map((a) => [a.serie, a.id])));
@@ -74,6 +75,7 @@ function tastoSchermoIntero(wc, event, input, finestra) {
   event.preventDefault();
   // Tenuto premuto non lampeggia: entra una volta sola. È la stessa azione contata della voce di menu (#1461).
   if (!input.isAutoRepeat) {
+    Strade.misura('azione', 'fullscreen', 'scorciatoia', { incognito: !!(tabs.win && tabs.win._filoIncognito) });
     require('./services/azioniContate').azione('fullscreen', () => tabs.toggleContentFullscreen(), { incognito: !!(tabs.win && tabs.win._filoIncognito) });
   }
   return true;
@@ -98,12 +100,26 @@ function finestraDiFilo(ripiego) {
 
 // L'Aiuto laterale e Salva per dopo si contano qui, dove arrivano il tasto, la barra dei menu e chi altro li chiede
 // (#1461): la stessa azione dell'icona del tasto destro.
+// `via`: la strada del gesto (#1468), il tasto, la barra dei menu o la chat.
 const AZIONE_DEL_COMANDO = { 'open-help-sidebar': 'help-sidebar', 'save-for-later': 'save-for-later' };
-function dispatch(command, window) {
+function dispatch(command, window, via = 'scorciatoia') {
+  const win = finestraDiFilo(window);
+  contaStrada(command, via, win);
   const azione = AZIONE_DEL_COMANDO[command];
   if (!azione) return dispatchOra(command, window);
-  const win = finestraDiFilo(window);
   return require('./services/azioniContate').azione(azione, () => dispatchOra(command, window), { incognito: !!(win && win._filoIncognito) });
+}
+
+// Sotto l'avviso del sito l'Aiuto è la domanda dell'avviso, da qualunque strada lo si chieda.
+function contaStrada(command, via, win) {
+  if (!globalThis.SN_TASTI.AZIONI_FILO.some((a) => a.id === command)) return;
+  const incognito = !!(win && win._filoIncognito);
+  Strade.misura('azione', command, via, { incognito });
+  if (command !== 'open-help-sidebar') return;
+  const tm = win && win._filoTabs;
+  const active = tm && tm.tabs.find((t) => t.id === tm.activeId);
+  const coperta = !!(active && tm.avvisoSito && tm.avvisoSito.coperta() === active);
+  Strade.misura('aiuto', coperta ? 'avviso_sito' : via, { incognito });
 }
 
 function dispatchOra(command, window) {
@@ -117,13 +133,17 @@ function dispatchOra(command, window) {
   if (command === 'save-for-later') {
     // Una pagina filo:// non va salvata né chiusa: l'uscita è esplicita perché questo comando,
     // a differenza degli altri, agisce comunque.
-    if (isInternalTab(active)) return;
+    if (isInternalTab(active)) {
+      Strade.misura('aVuoto', command, 'pagina_interna', { incognito: !!win._filoIncognito });
+      return;
+    }
     return saveForLater(win, active).catch((e) => console.warn('[Filo] save-for-later failed', e));
   }
   // Sotto l'avviso del sito pericoloso un pannello della pagina non si vedrebbe: l'Aiuto lì è la domanda a Filo (#813.5).
   const tm = win._filoTabs;
   if (tm.avvisoSito && tm.avvisoSito.coperta() === active) {
     if (command === 'open-help-sidebar') require('./services/interruttoreAiuto').seAcceso(win, () => tm._sbScelta(active, 'chiedi'));
+    else Strade.misura('aVuoto', command, 'avviso_sito', { incognito: !!win._filoIncognito });
     return;
   }
   const wc = active.view.webContents;

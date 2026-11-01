@@ -1,4 +1,4 @@
-// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1465, #1467, #1471, #1472, #1473, #1474): crea il servizio, segue le impostazioni,
+// Handler di dominio dei contatori anonimi (#969, #1461, #1462, #1465, #1467, #1468, #1471, #1472, #1473, #1474): crea il servizio, segue le impostazioni,
 // riceve i gesti contati nelle pagine e dà all'owner le somme, mai sotto le cinque copie. Cosa si conta: src/main/services/contatori.js.
 // Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
 
@@ -9,6 +9,7 @@ const Finestra = require('../contatoriFinestra');
 const Sicurezza = require('../contatoriSicurezza');
 const HomePagina = require('../contatoriHomePagina');
 const MisureServizio = require('../contatoriServizio');
+const Strade = require('../contatoriStrade');
 const Somme = require('../contatoriSomme');
 const Disco = require('../../shim/storage');
 const Registro = require('../registroCambi');
@@ -95,6 +96,9 @@ module.exports = function register(on, ctx) {
   // La home e quello che Filo fa da sé sulla pagina (#1473).
   const homePagina = HomePagina.crea({ contatori });
   globalThis.SN_CONTATORI_HOME_PAGINA_MAIN = homePagina;
+  // Le strade (#1468): da dove parte ogni azione, i tasti dei browser, il tasto destro, la cronologia, le pagine e l'Aiuto.
+  const strade = Strade.crea({ contatori });
+  globalThis.SN_CONTATORI_STRADE_MAIN = strade;
   // Il servizio (#1472): politica dei modelli, chiavi, crediti, identità, accesso e segnalazioni; quello che è arrivato
   // prima, all'avvio, entra adesso.
   MisureServizio.avvia(MisureServizio.crea({ contatori }));

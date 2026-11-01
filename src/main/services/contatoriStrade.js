@@ -36,6 +36,12 @@ function crea(dip = {}) {
     scrivi((ora) => T.registraTasto(ora, id), incognito);
     return id;
   }
+  // Il tasto già riconosciuto da altri: su Mac la barra dei menu lo vede prima della pagina.
+  function tastoNome(id, { incognito = false } = {}) {
+    if (!T.TASTI.includes(id) || !nuovo(`tasto|${id}`)) return '';
+    scrivi((ora) => T.registraTasto(ora, id), incognito);
+    return id;
+  }
 
   function aVuoto(comando, motivo, { incognito = false } = {}) {
     if (!T.chiaveVuoto(comando, motivo)) return false;
