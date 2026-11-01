@@ -62,7 +62,7 @@ for (const shell of ['bash', 'sh']) {
     const dir = cartellaTemporanea('filo-1683-g2-');
     writeFileSync(path.join(dir, 'bozza.txt'), 'nuovo');
     writeFileSync(path.join(dir, 'lettera.txt'), 'vecchio');
-    await app.evaluate(async (_e, s) => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true, shell: s } }), shell);
+    await app.evaluate(async (_e, s) => globalThis.__filoHandlers.handleMessage({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { terminal: { enabled: true, shell: s } } }, { url: 'filo://preferences/preferences.html' }), shell);
     const page = await newtabPage(app);
     const input = page.locator('#input');
     const ultimaUscita = () => page.locator('.dash-term-out').last();
@@ -85,6 +85,7 @@ for (const shell of ['bash', 'sh']) {
 
     await input.fill('/read x; echo "letto=$x"');
     await input.press('Enter');
+    await clickConfirm(page, 'ok', { timeout: 10_000 });
     await expect(page.locator('.dash-term-stdin').last()).toBeVisible({ timeout: 8_000 });
     await page.waitForTimeout(300);
     await page.locator('.dash-term-stdin').last().fill('ciao 🙂');
@@ -112,7 +113,7 @@ for (const shell of ['bash', 'sh']) {
 test('tema scuro: la barra del comando, schermata', async ({ app }) => {
   const page = await newtabPage(app);
   for (const t of ['dark', 'light']) {
-    await app.evaluate(async (_e, v) => globalThis.SN_STORAGE.updateSettings({ theme: v }), t);
+    await app.evaluate(async (_e, v) => globalThis.__filoHandlers.handleMessage({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: v } }, { url: 'filo://preferences/preferences.html' }), t);
     await expect(page.locator('html')).toHaveAttribute('data-sn-theme', t, { timeout: 5_000 });
     await page.locator('#input').fill(`/echo tema-${t}`);
     await page.locator('#input').press('Enter');
