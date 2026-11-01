@@ -228,6 +228,8 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
     else elenco.immagini.push(a.url);
   }
   const dove = cartella || join(tmpdir(), 'filo-feedback', `${numero}-${s}`);
+  const ATT = globalThis.SN_FB_ATTESE;
+  const attese = statiInRete(ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) }), { bearer, base, fetchImpl, decifra });
   const allegati = await righeAllegati(elenco, {
     fetchImpl, segno: s,
     apriByte: apriByte || (async (b) => (await import('./lib/decrypt-feedback-fields.mjs')).decryptAttachmentBytes(b)),
