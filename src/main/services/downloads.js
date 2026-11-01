@@ -1663,4 +1663,6 @@ module.exports = {
   _publicRecord: publicRecord,
   _testoZoneIdentifier: testoZoneIdentifier,
   _valoreQuarantena: valoreQuarantena,
+  _daRaccontare: daRaccontare,
+  DOWNLOAD_LUNGO_MS,
 };
