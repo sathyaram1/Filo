@@ -510,6 +510,14 @@ export function prepareBranch({ root, branch, create = false, createIfMissing = 
   try { installaControlloSpedizione(root); } catch (_) { /* senza, restano i controlli delle singole strade */ }
   ensureCommentChar(root);
 
+  // «Su origin non c'è» va saputo, non dedotto da un fetch fallito: con la rete giù il ramo del biglietto
+  // rinascerebbe da main accanto al lavoro già spinto (#1632).
+  if (createIfMissing) {
+    const remoto = ramoSuOrigin(root, branch);
+    if (remoto.errore) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin se ${branch} c'è: ${remoto.errore}` };
+    create = !remoto.presente && !refExists(g, `refs/heads/${branch}`);
+  }
+
   if (create) {
     const wanted = base || mainBranch;
     g(['fetch', 'origin', wanted]);
