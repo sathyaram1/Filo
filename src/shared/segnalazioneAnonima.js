@@ -42,15 +42,16 @@
 
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/['’]/g, '[\'’]').replace(/\s+/g, '\\s+');
 
-  // Il nome intero vale in ogni grafia; un suo pezzo solo con la maiuscola, come lo si scrive in una frase.
-  function formeDelNome(nomi) {
+  // Email e nome intero valgono in ogni grafia; una parola sola solo con la maiuscola e da tre lettere in su, o un
+  // account «Al» toglierebbe ogni «al» del testo.
+  function formeDelNome(nomi, email) {
     const forme = new Map();
+    for (const e of email) forme.set(e, { testo: e, pezzo: false });
     for (const grezzo of nomi || []) {
       const nome = String(grezzo || '').replace(/\s+/g, ' ').trim();
       if (!/\p{L}/u.test(nome) || NON_NOMI.has(nome.toLowerCase())) continue;
-      forme.set(nome.toLowerCase(), { testo: nome, pezzo: false });
       const pezzi = nome.split(' ');
-      if (pezzi.length < 2) continue;
+      if (pezzi.length > 1) forme.set(nome.toLowerCase(), { testo: nome, pezzo: false });
       for (const p of pezzi) {
         const k = p.toLowerCase();
         if ([...p].length < 3 || PARTICELLE.has(k) || NON_NOMI.has(k) || forme.has(k)) continue;
