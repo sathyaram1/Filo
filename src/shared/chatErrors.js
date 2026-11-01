@@ -122,10 +122,10 @@
     return hit ? hit[0] : '';
   }
   const FRASI_INGRESSO = {
-    immagini: `il modello scelto non legge le immagini, e questa richiesta ne porta: scegline uno che le legga ${DOVE_ALTRO_MODELLO}, o riprova senza immagini.`,
+    immagini: `il modello scelto non legge le immagini, e questa richiesta ne porta: scegline uno che le legga ${DOVE_ALTRO_MODELLO}.`,
     audio: `il modello scelto non ascolta l'audio, e questa richiesta ne porta: scegline uno che lo ascolti ${DOVE_ALTRO_MODELLO}.`,
-    pdf: `il modello scelto non legge i PDF, e questa richiesta ne porta: scegline uno che li legga ${DOVE_ALTRO_MODELLO}, o riprova senza il PDF.`,
-    video: `il modello scelto non guarda i video, e questa richiesta ne porta: scegline uno che li guardi ${DOVE_ALTRO_MODELLO}, o riprova senza il video.`,
+    pdf: `il modello scelto non legge i PDF, e questa richiesta ne porta: scegline uno che li legga ${DOVE_ALTRO_MODELLO}.`,
+    video: `il modello scelto non guarda i video, e questa richiesta ne porta: scegline uno che li guardi ${DOVE_ALTRO_MODELLO}.`,
   };
   const FRASE_INGRESSO_IGNOTO = `il modello scelto non legge un tipo di contenuto che questa richiesta porta: scegline un altro ${DOVE_ALTRO_MODELLO}.`;
 
