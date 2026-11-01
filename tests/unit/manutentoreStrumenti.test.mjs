@@ -34,6 +34,12 @@ test('con la sola chiave il manutentore apre feedback e domande e scrive la doma
   const vuoto = lancia(['feedback', 'Titolo', '-']);
   assert.notEqual(vuoto.status, 0);
   assert.deepEqual(vuoto.inviati, []);
+  // Una priorità che non è un intero da 0 a 3 non parte: arriverebbe come null, e il feedback nascerebbe a 0.
+  for (const p of ['alta', '', '7', '2.5']) {
+    const storta = lancia(['feedback', 'Titolo', '-', '--priorita', p], {}, 'Testo.');
+    assert.notEqual(storta.status, 0, `--priorita «${p}»`);
+    assert.deepEqual(storta.inviati, [], `--priorita «${p}»`);
+  }
 
   const file = join(cartellaTemporanea('filo-domanda-'), 'd.json');
   writeFileSync(file, JSON.stringify({ titolo: 'Quale account prima', priorita: 'quando_puoi' }));
