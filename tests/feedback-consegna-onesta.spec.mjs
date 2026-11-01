@@ -224,7 +224,7 @@ test('un allegato lasciato fuori dal riquadro si dice col suo nome e il motivo, 
   await page.screenshot({ path: 'tests/.shots/1681-allegati-fuori.png' });
 });
 
-test('con cinque immagini lo screenshot chiesto non resta fuori in silenzio: il riquadro lo dice e non parte niente', async ({ app, shell }) => {
+test('con cinque immagini la schermata chiesta che non ci sta non resta fuori in silenzio: l’avviso d’invio lo dice', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await reteFinta(app);
@@ -234,16 +234,10 @@ test('con cinque immagini lo screenshot chiesto non resta fuori in silenzio: il 
   await page.locator('.sn-fb-text').fill('Guarda lo schermo');
   await page.locator('.sn-fb-clear').click();
   await page.locator('.sn-fb-send').click();
-  await expect(page.locator('.sn-fb-status')).toContainText('le immagini sarebbero 6, il massimo è 5');
-  await expect(page.locator('.sn-fb-modal')).toBeVisible();
-  expect(await app.evaluate(() => globalThis.__rete.payload.length)).toBe(0);
-  // Tolta un'immagine, parte con lo screenshot.
-  await page.locator('.sn-fb-thumb-x').first().click();
-  await page.locator('.sn-fb-send').click();
   await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 15_000 });
+  await expect(toast(page, 'La schermata annotata non è partita: c\'erano già 5 immagini')).toHaveCount(1);
   const nomi = await app.evaluate(() => globalThis.__rete.payload[0].images.map((i) => i.name));
-  expect(nomi).toHaveLength(5);
-  expect(nomi).toContain('schermata annotata');
+  expect(nomi).toEqual(['foto1.png', 'foto2.png', 'foto3.png', 'foto4.png', 'foto5.png']);
 });
 
 test('il feedback vuoto che non parte lo dice il riquadro aperto, senza un secondo avviso nella finestra né una voce vuota fra le mie', async ({ app, shell }) => {
