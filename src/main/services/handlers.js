@@ -609,6 +609,7 @@ function noteServedProvider(settings, action, result) {
 
 // Un avviso per host e motivo, in coda finché la pagina in vista lo prende: la pausa di dieci minuti parte da lì (#1478.1).
 const AvvisiFuoriPolitica = require('./avvisiFuoriPolitica').crea({ manda: (m) => broadcastToTabs(m) });
+try { require('electron').app.on('browser-window-focus', () => AvvisiFuoriPolitica.riproponi()); } catch (_) {}
 function avvisaFuoriPolitica(settings, why, servedBy, model, action) {
   const chiave = `${why}|${SN_CONST.normalizeProviderName(servedBy)}`;
   AvvisiFuoriPolitica.avvisa(chiave, () => {
