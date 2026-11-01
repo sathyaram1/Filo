@@ -549,11 +549,14 @@ export function controllaNovita(consegna, { blocco, schede = [] }) {
     if (!tutte.some((r) => unaRiga(r) === unaRiga(p.riga))) errori.push(`la promessa su #${n} non è fra le righe consegnate`);
   }
   const dichiarate = new Set(promesse.map((p) => unaRiga(p && p.riga)));
-  for (const r of tutte) {
-    if (PROMESSA_RE.test(r) && !dichiarate.has(unaRiga(r))) errori.push(`«${unaRiga(r).slice(0, 80)}» promette qualcosa senza dire su quale lavoro (promesse)`);
+  for (const r of [...righe('features'), ...righe('fixes')].filter((x) => typeof testoRiga(x) === 'string' && testoRiga(x).trim())) {
+    const t = unaRiga(testoRiga(r));
+    if (dichiarate.has(t)) continue;
+    if (!conFonte(r)) errori.push(`«${t.slice(0, 80)}» non dice da quali righe dei worker nasce ("da": [numeri]): se annuncia una cosa che non c'è ancora è una promessa, da dichiarare in promesse col numero del lavoro`);
+    else if (PROMESSA_RE.test(t)) errori.push(`«${t.slice(0, 80)}» promette qualcosa senza dire su quale lavoro (promesse)`);
   }
   if (errori.length) return { ok: false, errori };
-  const pulita = (r) => (typeof r === 'string' ? r.trim() : { testo: r.testo.trim(), segnalazione: segnalazioneRiga(r) });
+  const pulita = (r) => (typeof r === 'string' ? r.trim() : segnalazioneRiga(r) ? { testo: r.testo.trim(), segnalazione: segnalazioneRiga(r) } : r.testo.trim());
   return {
     ok: true,
     novita: {
