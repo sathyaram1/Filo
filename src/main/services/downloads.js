@@ -649,6 +649,24 @@ function annunciaPartenza(rec, webContents) {
   t.unref?.();
 }
 
+// #1654 — Filo scrive da sé di un download solo se l'utente non lo sa già: finito mentre non guardava Filo, e lungo o
+// partito senza di lui. Un file nato nella pagina (uno screenshot è un `data:`) l'ha appena fatto lui: mai.
+const DOWNLOAD_LUNGO_MS = 60_000;
+const ASSENTE_DOPO_S = 120;
+function utenteDavanti() {
+  try {
+    const { BrowserWindow, powerMonitor } = electron();
+    if (!BrowserWindow.getFocusedWindow()) return false;
+    return !(powerMonitor.getSystemIdleTime() >= ASSENTE_DOPO_S);
+  } catch (_) { return true; }
+}
+function daRaccontare(rec, davanti, adesso = Date.now()) {
+  if (!rec || davanti || !/^https?:/i.test(String(rec.url || ''))) return false;
+  if (rec._partitoDavanti === false) return true;
+  const inizio = Date.parse(rec.startedAt || '');
+  return Number.isFinite(inizio) && adesso - inizio >= DOWNLOAD_LUNGO_MS;
+}
+
 // Chiude uno scaricamento arrivato in fondo: se veniva dalla quarantena (#588)
 // il file entra ORA nella cartella Download, e solo se ci entra davvero la voce
 // dice "completato".
@@ -681,7 +699,7 @@ function completa(rec) {
   persist();
   broadcast('done', rec);
   contaFine(rec);
-  if (!scopeOf(rec)) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'download', testo: rec.filename }); } catch (_) {} }
+  if (!scopeOf(rec) && daRaccontare(rec, utenteDavanti())) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'download', testo: rec.filename }); } catch (_) {} }
   // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
   shellToast(`Scaricato: ${shortName(rec.filename)}`, {
@@ -854,6 +872,7 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
     siteUncertain: incerto,
     servedBy: servito,
     _pagina: paginaDi(webContents) || (ripresa ? ripresa._pagina || '' : ''),
+    _partitoDavanti: utenteDavanti(),
     // L'indirizzo cliccato, prima dei rimandi: «Riprova» riparte da qui, perché quello finale può essere firmato e scaduto.
     _primo: primo,
     _quarantena: attesa,
@@ -1644,4 +1663,6 @@ module.exports = {
   _publicRecord: publicRecord,
   _testoZoneIdentifier: testoZoneIdentifier,
   _valoreQuarantena: valoreQuarantena,
+  _daRaccontare: daRaccontare,
+  DOWNLOAD_LUNGO_MS,
 };

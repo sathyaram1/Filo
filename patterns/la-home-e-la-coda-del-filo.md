@@ -48,7 +48,8 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
   (il saluto della giornata) prende la cima.
 - **Le righe che arrivano dopo** (`allinea`): i messaggi della conversazione di questa scheda li ha già disegnati il
   turno; tornano solo quando la scheda era nascosta e li ha scritti un'altra. Il resto entra al suo posto nel tempo.
-- **Filo parla per primo** (`src/main/services/filoParla.js`): timer e sveglie che suonano, download finiti, avvisi,
+- **Filo parla per primo** (`src/main/services/filoParla.js`): timer e sveglie che suonano, download finiti che
+  l'utente non sa già (finiti mentre non guarda Filo, e lunghi o partiti senza di lui: mai uno screenshot, #1654), avvisi,
   la prima apertura della giornata (dopo le cinque, se oggi nella home non si è detto niente), la fine
   dell'accoglienza. Eventi vicini fanno un giro solo. Il suo turno va nella conversazione che una scheda nuova
   continuerebbe; **due suoi messaggi sono uno solo se vicini** (mezz'ora, stesso giorno) **e senza niente in mezzo nel
