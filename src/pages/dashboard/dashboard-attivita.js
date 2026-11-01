@@ -2659,10 +2659,42 @@
     if (deps.prosegui) prosegui = deps.prosegui;
   }
 
+  // #1294 — com'è andata ogni azione di una risposta riletta dall'archivio: una riga per voce (la cosa fatta coi numeri,
+  // il perché di un no, la conferma che era stata chiesta) e il bottone dei file. Oltre `RIGHE_VISTE` voci le riuscite
+  // stanno nella frase riassunto, che le elenca al passaggio del mouse. Ritorna { righe, nota }: ognuno può mancare.
+  const RIGHE_VISTE = 4;
+  function esitiArchiviati(voci) {
+    const E = global.SN_ESITO;
+    const lista = (Array.isArray(voci) ? voci : []).filter((v) => v && v.type);
+    if (!lista.length) return { righe: null, nota: null };
+    const tutte = lista.length <= RIGHE_VISTE;
+    const wrap = document.createElement('div');
+    wrap.className = 'dash-bubble-actions dash-esiti-archiviati';
+    const riuscite = [];
+    for (const v of lista) {
+      const riga = E.rigaDellaVoce(v);
+      if (riga && (tutte || riga.fallita)) wrap.appendChild(makeActivityRow(riga.icona, riga.testo));
+      else if (riga) riuscite.push(riga.testo);
+      if (v.type === 'APRI_FILE' && v.file && percorsoLocale(v.file.percorso)) {
+        wrap.appendChild(bottoneFile({ type: 'APRI_FILE', percorso: v.file.percorso, etichetta: v.file.etichetta || '', _executed: true }));
+      }
+    }
+    let nota = null;
+    if (riuscite.length) {
+      nota = document.createElement('div');
+      nota.className = 'dash-bubble-note';
+      nota.dataset.replay = '1';
+      nota.textContent = summarizeActivity(lista, false);
+      nota.title = riuscite.join('\n');
+    }
+    return { righe: wrap.childElementCount ? wrap : null, nota };
+  }
+
   global.SN_DASH_ATTIVITA = {
     init,
     // Il contratto: un blocco di attività appeso a `container`.
     create: createActivity,
+    esitiArchiviati,
     renderActions,
     aperturaFermata,
     tellActionInActivity,
