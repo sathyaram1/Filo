@@ -314,7 +314,13 @@ export async function segnaAttese(id, numeri, opts = {}) {
     attese = v.attese;
   }
   const tolte = prima.filter((w) => !attese.some((a) => a.id === w.id));
-  if (opts.dryRun) return { ok: true, dryRun: true, attese, prima, tolte, pratica };
+  const aggiunte = attese.filter((a) => !prima.some((w) => w.id === a.id));
+  if (opts.aggiungi && !aggiunte.length) return { ok: true, invariato: true, ...(opts.dryRun ? { dryRun: true } : {}), attese, prima, tolte, aggiunte, pratica };
+  if (tolte.length && !opts.sostituisci) {
+    const vive = (await statiInRete(tolte, { bearer })).filter((w) => w.stato !== ATT.STATO.FUSO);
+    if (vive.length) return { ok: false, vive, motivo: `toglierebbe ${vive.length === 1 ? 'l’attesa' : 'le attese'} su ${vive.map(rigaAttesa).join('; ')}` };
+  }
+  if (opts.dryRun) return { ok: true, dryRun: true, attese, prima, tolte, aggiunte, pratica };
   const fields = attese.length ? { [ATT.CAMPO]: toFsValue(attese), updatedAt: firmaOra() } : { updatedAt: firmaOra() };
   const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=${ATT.CAMPO}&updateMask.fieldPaths=updatedAt`, {
     method: 'PATCH',
