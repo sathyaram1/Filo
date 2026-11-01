@@ -86,3 +86,39 @@ test('a parole: «non aprire la barra spingendo sul bordo» la spegne, «strisci
   await pannelloFermo(barra);
   expect((await statoBarra(app)).aperta).toBe(true);
 });
+
+// #871.6 (D-11, opzione 1): col video a tutto schermo la striscia non resta sopra il film; il bordo e il tasto aprono ancora.
+test('a tutto schermo la striscia del bordo è spenta, e la barra si apre lo stesso dal bordo e col tasto', async ({ app, openTab, testServer }) => {
+  const url = testServer.html('<!doctype html><title>Film</title><body style="margin:0;background:#000"><div id="v" style="width:100vw;height:100vh;background:#050505"></div><script>document.getElementById("v").addEventListener("click",()=>document.getElementById("v").requestFullscreen())</script></body>');
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
+  const barra = await barraPage(app);
+  const accesa = () => barra.evaluate(() => {
+    const s = document.getElementById('striscia');
+    return s.getBoundingClientRect().width > 0 && Number(getComputedStyle(s, '::before').opacity) > 0;
+  });
+  expect(await accesa()).toBe(true);
+  await page.locator('#v').click();
+  await expect.poll(async () => (await statoBarra(app)).schermoIntero, { timeout: 8000 }).toBe(true);
+  await expect.poll(accesa, { timeout: 3000 }).toBe(false);
+
+  await puntatoreCheSegue(app);
+  await barra.mouse.move(1, 300);
+  await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 3000 }).toBe(true);
+  expect((await statoBarra(app)).motivo).toBe('spinta');
+  await comandaBarra(app, 'chiudi');
+  await expect.poll(async () => (await statoBarra(app)).aperta).toBe(false);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    t.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'B', modifiers: ['control', 'shift'] });
+    t.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'B', modifiers: ['control', 'shift'] });
+  });
+  await expect.poll(async () => (await statoBarra(app)).aperta).toBe(true);
+  await comandaBarra(app, 'chiudi');
+
+  // Uscendo dallo schermo intero la striscia torna.
+  await page.evaluate(() => document.exitFullscreen());
+  await expect.poll(async () => (await statoBarra(app)).schermoIntero, { timeout: 8000 }).toBe(false);
+  await expect.poll(accesa, { timeout: 3000 }).toBe(true);
+});

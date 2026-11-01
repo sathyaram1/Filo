@@ -96,6 +96,19 @@ html.aperta .pannello {
   transition: transform calc(var(--dur) * var(--sn-motion, 1)) cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
 }
 
+/* Bloccata accanto alla pagina (#1431): una colonna della finestra a tutta altezza, senza ombra né angoli. */
+html.accanto .pannello {
+  top: 0;
+  bottom: 0;
+  border-radius: 0;
+  border-top: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+/* Il lucchetto in cima, piccolo: chi non lo cerca legge prima le icone. */
+.testa { flex: none; display: flex; justify-content: center; padding: 0 0 2px; }
+.lucchetto { height: 24px; }
+
 .gruppo {
   display: flex;
   flex-direction: column;

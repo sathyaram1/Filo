@@ -914,6 +914,17 @@
       },
     },
     {
+      scrive: ['barraLaterale.bloccata'],
+      costo: 1,
+      aiuto: 'true | false (la barra laterale resta aperta e spinge la pagina invece di coprirla)',
+      keys: ['barra_bloccata', 'barra bloccata', 'blocca la barra', 'tieni aperta la barra', 'lucchetto della barra', 'barra laterale fissa'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { barraLaterale: { bloccata: b } }, label: `Barra laterale → ${b ? 'bloccata aperta' : 'si apre sopra la pagina'}` };
+      },
+    },
+    {
       scrive: ['pannelloDestro.spinta'],
       costo: 1,
       aiuto: 'true | false (il pannello degli strumenti delle app di Filo si apre spingendo il mouse sul bordo destro)',

@@ -623,6 +623,7 @@ const TASTI_DI_FILO = {
   'CommandOrControl+-': 'rimpicciolisci la PAGINA',
   'CommandOrControl+0': 'riporta la PAGINA al 100%',
   'CommandOrControl+Shift+B': 'apre e chiude la barra laterale',
+  'CommandOrControl+Alt+Shift+B': 'tiene aperta la barra laterale accanto alla pagina, o la sblocca (#1431)',
   // Il pannello degli strumenti delle app (#1433): lo ascolta la scheda (src/main/bordoDestro.js), e la barra lo scrive
   // senza prenderselo, così sui siti il tasto resta loro.
   'Ctrl+\\': 'apre e chiude il pannello degli strumenti delle app di Filo',

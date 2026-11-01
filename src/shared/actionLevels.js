@@ -1056,6 +1056,10 @@
           apps: 'Aprire il menu App',
           account: 'Aprire il menu Account',
           aiuto: 'Aprire l\'Aiuto sulla scheda davanti',
+          sidebar: 'Aprire la barra laterale',
+          sidebar_close: 'Chiudere la barra laterale',
+          sidebar_lock: 'Tenere aperta la barra laterale accanto alla pagina',
+          sidebar_unlock: 'Sbloccare la barra laterale',
         };
         return labels[cmd] || 'Azionare un comando della finestra di Filo';
       },

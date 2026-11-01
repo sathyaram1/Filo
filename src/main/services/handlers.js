@@ -4045,7 +4045,8 @@ async function eseguiAzioneFilo(action, {
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
         // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva
         // solo spiegare a parole come cliccarli. "close" è escluso di proposito.
-        const allowed = ['home', 'settings', 'apps', 'account', 'minimize', 'fullscreen', 'sidebar', 'aiuto'];
+        const { COMANDI_CHAT } = require('../barraLaterale');
+        const allowed = ['home', 'settings', 'apps', 'account', 'minimize', 'fullscreen', 'aiuto', ...Object.keys(COMANDI_CHAT)];
         const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim().toLowerCase();
         if (!allowed.includes(cmd)) {
           return { executed: false, kept: false, output: { window: 'invalid', command: cmd } };
@@ -4073,11 +4074,12 @@ async function eseguiAzioneFilo(action, {
           }
           return { executed: true, kept: false, output: { window: 'fullscreen' } };
         }
-        // #871 — la barra laterale chiesta in chat resta aperta finché la si chiude, come da tastiera.
-        if (cmd === 'sidebar') {
+        // #871, #1292 — la barra laterale chiesta in chat resta aperta finché la si chiude, come da tastiera; la chat la
+        // chiude anche bloccata, e la blocca o la sblocca (#1431).
+        if (COMANDI_CHAT[cmd]) {
           if (!win._filoTabs?.barra) return { executed: false, kept: false };
-          win._filoTabs.barra.apri('chat');
-          return { executed: true, kept: false, output: { window: 'sidebar' } };
+          const r = await win._filoTabs.barra.comandoChat(cmd);
+          return { executed: true, kept: false, output: { window: cmd, ...(r && r.gia ? { gia: true } : {}) } };
         }
         // #1433 — l'Aiuto chiesto in chat si apre sulla scheda davanti come col suo tasto: nell'Editor è la chat del documento.
         if (cmd === 'aiuto') {

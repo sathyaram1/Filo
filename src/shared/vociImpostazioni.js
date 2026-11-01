@@ -53,6 +53,7 @@
         barraSchede: 'barraLaterale.schede',
         barraAttesa: 'barraLaterale.attesaMs',
         barraUscita: 'barraLaterale.uscitaMs',
+        barraBloccata: 'barraLaterale.bloccata',
         pannelloSpinta: 'pannelloDestro.spinta',
         pannelloStriscia: 'pannelloDestro.striscia',
         pannelloBloccato: 'pannelloDestro.bloccato',

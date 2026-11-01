@@ -88,11 +88,7 @@ class RiservaNuovaScheda {
   posa() {
     const vista = this.vista;
     if (!vista || !this.webContents()) return;
-    try {
-      const [w, h] = this.m.win.getContentSize();
-      const top = this.m._altezzaCornice();
-      vista.setBounds({ x: 0, y: top, width: w, height: Math.max(0, h - top) });
-    } catch (_) {}
+    try { vista.setBounds(this.m._areaPagina()); } catch (_) {}
   }
 
   // La riserva per una scheda su `url` nella sessione `ses`, staccata e pronta a diventarlo; null se non c'è.

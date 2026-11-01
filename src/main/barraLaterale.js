@@ -59,6 +59,8 @@ const PAGINA_DELL_ICONA = {
   openOptions: 'filo://options/options.html', editorApp: 'filo://editor/editor.html', feedbackApp: 'filo://feedback/feedback.html',
   home: 'filo://newtab/', newTab: 'filo://newtab/',
 };
+// I comandi della barra che mandano le chat (COMANDO_FINESTRA della home, l'azione «shell» dell'Aiuto), e cosa fanno.
+const COMANDI_CHAT = Object.freeze({ sidebar: 'apri', sidebar_close: 'chiudi', sidebar_lock: 'blocca', sidebar_unlock: 'sblocca' });
 const PAGINE_DAL_MENU = {
   ai: 'filo://history/history.html',
   preferenze: 'filo://preferences/preferences.html',
@@ -69,7 +71,7 @@ const numero = (v, min = -10000, max = 10000) => Math.max(min, Math.min(max, Mat
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
 const opzioniDi = (v) => (globalThis.SN_CONST && globalThis.SN_CONST.opzioniBarraLaterale
   ? globalThis.SN_CONST.opzioniBarraLaterale(v)
-  : { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true });
+  : { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, bloccata: false });
 
 class BarraLaterale {
   constructor(win, tabs, { alto = () => 0 } = {}) {
@@ -103,6 +105,9 @@ class BarraLaterale {
     this.comandoInAttesa = null;
     this.ultimaPagina = '';
     this.strisciaPx = STRISCIA;
+    // Quanto la pagina si sposta a destra per la barra bloccata aperta (#1431), e se il lucchetto valeva all'ultimo sguardo.
+    this.spazioPagina = 0;
+    this.teneva = false;
     // Il bordo destro delle pagine di Filo col pannello (#1433): stessi gesti, gli stessi feed della pagina e della shell.
     this.destro = new BordoDestro(this);
     this.vuoto = new VuotoDellaVista({
@@ -137,6 +142,67 @@ class BarraLaterale {
   impostazioni(v) {
     this.opzioni = opzioniDi(v);
     if (!this.opzioni.spinta) { this._ferma('sonda'); this._segnaBordo(false); } else this._guarda();
+    this._seguiLucchetto();
+    this._invia();
+  }
+
+  // ── il lucchetto (#1431) ─────────────────────────────────────────────────
+  // Bloccata, la barra resta aperta e spinge la pagina; a tutto schermo vale da sbloccata, come il pannello di destra
+  // in una finestra stretta. Il tasto e la chat la chiudono lo stesso; si riapre bloccata col gesto dopo o al riavvio.
+
+  _tiene() { return !!this.opzioni.bloccata && !this.tabs.contentFullscreen; }
+
+  // Il margine sinistro della pagina, letto da tabs._areaPagina.
+  spazio() { return this.spazioPagina; }
+
+  // true se la pagina è stata ridisposta (la ridisposizione ha già riposato la barra).
+  _spingi() {
+    const s = this.aperta && this._tiene() ? PANNELLO : 0;
+    if (s === this.spazioPagina) return false;
+    this.spazioPagina = s;
+    try { this.tabs.layout(); } catch (_) { return false; }
+    return true;
+  }
+
+  // Appena il lucchetto vale la barra si apre; quando smette chiude, ma non sotto il puntatore né alla tastiera.
+  _seguiLucchetto() {
+    const t = this._tiene();
+    if (t === this.teneva) return;
+    this.teneva = t;
+    if (t) {
+      this._ferma('uscita');
+      if (!this.aperta) this.apri('bloccata');
+      else if (this.motivo !== 'tasto') this.motivo = 'bloccata';
+      return;
+    }
+    if (!this.aperta || this.motivo === 'tasto') return;
+    if (this.dentro) this.motivo = 'clic';
+    else this.chiudi();
+  }
+
+  blocca(v) { return this._scriviOpzioni({ bloccata: !!v }); }
+
+  // Da ogni chat (#1292): chiudere vale anche bloccata, come il tasto. Il lucchetto si scrive nel registro di chi chiama
+  // (la chat, l'Aiuto). null se il comando non è della barra; `gia`: era già così.
+  async comandoChat(comando) {
+    const op = COMANDI_CHAT[String(comando || '')];
+    if (!op) return null;
+    if (op === 'apri') { const gia = this.aperta; this.apri('chat'); return { op, gia }; }
+    if (op === 'chiudi') { const gia = !this.aperta; this.chiudi({ forza: true }); return { op, gia }; }
+    const v = op === 'blocca';
+    const gia = !!this.opzioni.bloccata === v;
+    await this._scriviOpzioni({ bloccata: v }, null);
+    this.impostazioni({ ...this.opzioni, bloccata: v });
+    // Già bloccata ma chiusa col tasto: chiederlo a parole la riapre.
+    if (v && this._tiene() && !this.aperta) this.apri('bloccata');
+    return { op, gia };
+  }
+
+  // Bloccata, finita una scelta da tastiera: la tastiera torna alla pagina e la barra resta.
+  _lasciaTastiera() {
+    if (this.motivo !== 'tasto') return;
+    this.motivo = 'bloccata';
+    this._restituisciTastiera();
     this._invia();
   }
 
@@ -155,20 +221,24 @@ class BarraLaterale {
     if (!giaAperta) this._apertaRicerca();
     // Il perché dell'apertura, per i contatori (#1471): resta quello del primo gesto anche se poi ne arriva un altro.
     if (!giaAperta) this.apertura = { motivo, t0: Date.now(), esito: '' };
-    if (!giaAperta || motivo === 'tasto') this.motivo = motivo;
+    // Bloccata resta aperta qualunque gesto l'abbia aperta: solo la tastiera tiene il suo motivo, per il fuoco.
+    const come = this._tiene() && motivo !== 'tasto' ? 'bloccata' : motivo;
+    if (!giaAperta || come === 'tasto') this.motivo = come;
     if (!giaAperta) this.dentro = false;
-    this.posa();
-    this._invia({ fuoco: motivo === 'tasto' });
-    if (motivo === 'tasto' && this.vista) { try { this.vista.webContents.focus(); } catch (_) {} }
+    if (!this._spingi()) this.posa();
+    this._invia({ fuoco: come === 'tasto' });
+    if (come === 'tasto' && this.vista) { try { this.vista.webContents.focus(); } catch (_) {} }
     if (!giaAperta) this._chiediEtichette();
     // Aperta dal bordo che la vista non vede: la sonda resta a guardare dove va il puntatore.
-    if (motivo === 'spinta' && !giaAperta) this._sonda();
+    if (come === 'spinta' && !giaAperta) this._sonda();
   }
 
-  chiudi() {
+  // `forza`: il tasto, la chat, una voce «Chiudi». Senza, la barra bloccata resta (uscita, clic sulla pagina, una scelta).
+  chiudi({ forza = false } = {}) {
     this._ferma('uscita');
     this._ferma('fine');
     if (!this.aperta) return;
+    if (!forza && this._tiene()) { this._lasciaTastiera(); return; }
     // Da tastiera il fuoco l'ha preso lei: torna alla scheda anche se il sistema non lo dice ancora.
     const avevaFuoco = this._haFuoco() || this.motivo === 'tasto';
     if (this.ricerca && !this.ricerca.scelta) this._contaRicerca({ esito: 'vuota' });
@@ -179,6 +249,7 @@ class BarraLaterale {
     this.dentro = false;
     this.mira = null;
     this._nascondiSuggerimento();
+    this._spingi();
     this._invia();
     this._ferma('stringi');
     this.timer.stringi = setTimeout(() => { this.timer.stringi = null; if (!this.aperta) this.posa(); }, require('./movimento').ms(CHIUSURA_MS));
@@ -236,7 +307,7 @@ class BarraLaterale {
   // `via`: da quale strada il gesto, per le strade delle azioni (#1468); lo spunto dal bordo e la maniglia no.
   commuta(motivo = 'clic', via = '') {
     if (via) Strade.misura('azione', 'barra_laterale', via, { incognito: this._incognito() });
-    if (this.aperta) { this.chiudi(); return; }
+    if (this.aperta) { this.chiudi({ forza: true }); return; }
     // Aperta da un gesto (tasto, clic, barra dei menu): un'azione contata (#1461). Lo spunto dal bordo no.
     AzioniContate.azione('sidebar', () => this.apri(motivo), { incognito: !!(this.win && this.win._filoIncognito) });
   }
@@ -249,8 +320,14 @@ class BarraLaterale {
       if (!input.isAutoRepeat) this.commuta('tasto', 'scorciatoia');
       return true;
     }
+    if (T && T.comandoLucchettoBarra && T.comandoLucchettoBarra(input)) {
+      if (!input.isAutoRepeat) this.blocca(!this.opzioni.bloccata);
+      return true;
+    }
     if (this.destro.tasto(input)) return true;
     if (this.aperta && String(input.key || '') === 'Escape') {
+      // Bloccata, l'Esc è della pagina; dalla barra presa da tastiera rende la tastiera alla pagina.
+      if (this._tiene() && this.motivo !== 'tasto') return false;
       this.chiudi();
       return true;
     }
@@ -296,7 +373,7 @@ class BarraLaterale {
   }
 
   _programmaUscita() {
-    if (this.timer.uscita || this.trascinamento) return;
+    if (this.timer.uscita || this.trascinamento || this._tiene()) return;
     this.timer.uscita = setTimeout(() => {
       this.timer.uscita = null;
       if (!this.dentro && !this.trascinamento) this.chiudi();
@@ -437,6 +514,8 @@ class BarraLaterale {
 
   posa() {
     if (!this.win || this.win.isDestroyed()) return;
+    this._seguiLucchetto();
+    if (this._spingi()) return;
     const vista = this._vista();
     if (!vista) return;
     const [, H] = this.win.getContentSize();
@@ -449,7 +528,8 @@ class BarraLaterale {
     this.cimaAperta = this.aperta && !ferma ? { y, schermoIntero } : c;
     const largo = this.aperta || this.timer.stringi;
     const chiusa = this._larghezzaChiusa();
-    const w = largo ? PANNELLO + OMBRA : chiusa;
+    // Bloccata accanto alla pagina non le sta sopra: niente ombra, e la vista finisce dove lei comincia.
+    const w = largo ? PANNELLO + (this.spazioPagina ? 0 : OMBRA) : chiusa;
     vista.setBounds({ x: 0, y, width: w, height: Math.max(0, H - y) });
     this._inCima();
     vista.setVisible(true);
@@ -689,6 +769,9 @@ class BarraLaterale {
       // A tutto schermo la striscia non resta sopra il film (#871.6, D-11): spenta come da Preferenze, il bordo vivo.
       schermoIntero: !!this.tabs.contentFullscreen,
       strisciaPx: this.strisciaPx || STRISCIA,
+      bloccata: !!this.opzioni.bloccata,
+      spinge: this.spazioPagina > 0,
+      tastoLucchetto: T && T.etichettaLucchettoBarra ? T.etichettaLucchettoBarra() : '',
       opzioni: { spinta: this.opzioni.spinta, attesaMs: this.opzioni.attesaMs, striscia: this.opzioni.striscia },
     };
   }
@@ -821,7 +904,7 @@ class BarraLaterale {
     const d = dati && typeof dati === 'object' ? dati : {};
     let voci = null;
     let scegli = null;
-    if (d.striscia) {
+    if (d.striscia || d.lucchetto) {
       ({ voci, scegli } = this._vociDelBordo());
     } else if (d.ora) {
       ({ voci, scegli } = this._vociDellOra());
@@ -863,7 +946,7 @@ class BarraLaterale {
       };
     }
     if (!voci || !voci.length) return;
-    if (this.aperta && !d.striscia) { this._esito('tasto_destro'); this._lettura().via(); }
+    if (this.aperta && !d.striscia && !d.lucchetto) { this._esito('tasto_destro'); this._lettura().via(); }
     const b = this.vista.getBounds();
     this._nascondiSuggerimento();
     this._ferma('uscita');
@@ -890,7 +973,8 @@ class BarraLaterale {
   _vociDelBordo() {
     const o = this.opzioni;
     const voci = [
-      { label: 'Apri la barra laterale', action: 'barra:apri' },
+      this.aperta ? { label: 'Chiudi la barra laterale', action: 'barra:chiudi' } : { label: 'Apri la barra laterale', action: 'barra:apri' },
+      { label: o.bloccata ? 'Sblocca la barra laterale' : 'Tieni aperta la barra laterale', action: 'barra:lucchetto' },
       { type: 'separator' },
       { label: o.striscia ? 'Nascondi la striscia sul bordo' : 'Mostra la striscia sul bordo', action: 'barra:striscia' },
       { label: o.spinta ? 'Non aprirla spingendo sul bordo' : 'Aprila spingendo sul bordo', action: 'barra:spinta' },
@@ -898,6 +982,8 @@ class BarraLaterale {
     ];
     const scegli = (a) => {
       if (a === 'barra:apri') this.apri('clic');
+      else if (a === 'barra:chiudi') this.chiudi({ forza: true });
+      else if (a === 'barra:lucchetto') this.blocca(!this.opzioni.bloccata);
       else if (a === 'barra:striscia') this._scriviOpzioni({ striscia: !this.opzioni.striscia });
       else if (a === 'barra:spinta') this._scriviOpzioni({ spinta: !this.opzioni.spinta });
       else if (a === 'barra:regola') this._apriPagina('regola');
@@ -953,12 +1039,14 @@ class BarraLaterale {
   }
 
   // Un gesto della persona (via `interfaccia`), e in incognito resta all'incognito, come dalle Preferenze aperte lì.
-  _scriviOpzioni(parziale) {
+  // `prov` null: la scrittura entra nel registro dei cambi di chi chiama (una chat).
+  _scriviOpzioni(parziale, prov = { via: 'interfaccia', dove: 'barra' }) {
     try {
       const { applySettingsUpdate } = require('./services/handlers');
-      const scrivi = () => require('./services/registroCambi').con({ via: 'interfaccia', dove: 'barra' }, () => applySettingsUpdate({ barraLaterale: parziale }));
-      Promise.resolve(this._incognito() ? require('./shim/storage').runIncognito(scrivi) : scrivi()).catch(() => {});
-    } catch (_) {}
+      const aggiorna = () => applySettingsUpdate({ barraLaterale: parziale });
+      const scrivi = () => (prov ? require('./services/registroCambi').con(prov, aggiorna) : aggiorna());
+      return Promise.resolve(this._incognito() ? require('./shim/storage').runIncognito(scrivi) : scrivi()).catch(() => {});
+    } catch (_) { return Promise.resolve(); }
   }
 
   _mostraSuggerimento(dati) {
@@ -1102,11 +1190,12 @@ class BarraLaterale {
       case 'barra:spinta': if (!this.aperta) this.apri('spinta'); break;
       case 'barra:apri': if (!this.aperta) this.apri('clic'); break;
       case 'barra:chiudi': this.chiudi(); break;
+      case 'barra:lucchetto': this._esito('sistema'); this.blocca(!this.opzioni.bloccata); break;
       case 'barra:dentro':
         this.dentro = true;
         this._ferma('uscita');
         this._ferma('fine');
-        if (this.motivo === 'tasto' && !this._haFuoco()) this.motivo = 'clic';
+        if (this.motivo === 'tasto' && !this._haFuoco()) this.motivo = this._tiene() ? 'bloccata' : 'clic';
         break;
       case 'barra:fuori':
         this.dentro = false;
@@ -1207,8 +1296,10 @@ class BarraLaterale {
     this.aperta = false;
     this.motivo = null;
     this.apertura = null;
+    this.teneva = false;
+    if (this.spazioPagina) { this.spazioPagina = 0; try { if (this.win && !this.win.isDestroyed()) this.tabs.layout(); } catch (_) {} }
     if (rinasci && this.win && !this.win.isDestroyed()) setTimeout(() => this.posa(), 0);
   }
 }
 
-module.exports = { BarraLaterale, STRISCIA, PANNELLO };
+module.exports = { BarraLaterale, STRISCIA, PANNELLO, COMANDI_CHAT };

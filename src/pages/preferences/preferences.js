@@ -862,6 +862,7 @@
       case 'barraLaterale.spinta': return $('barraSpinta').checked;
       case 'barraLaterale.striscia': return $('barraStriscia').checked;
       case 'barraLaterale.schede': return $('barraSchede').checked;
+      case 'barraLaterale.bloccata': return $('barraBloccata').checked;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale({ attesaMs: $('barraAttesa').value }).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale({ uscitaMs: $('barraUscita').value }).uscitaMs;
       case 'pannelloDestro.spinta': return $('pannelloSpinta').checked;
@@ -960,6 +961,7 @@
       case 'barraLaterale.spinta': return opzioniBarraLaterale(s.barraLaterale).spinta;
       case 'barraLaterale.striscia': return opzioniBarraLaterale(s.barraLaterale).striscia;
       case 'barraLaterale.schede': return opzioniBarraLaterale(s.barraLaterale).schede;
+      case 'barraLaterale.bloccata': return opzioniBarraLaterale(s.barraLaterale).bloccata;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale(s.barraLaterale).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale(s.barraLaterale).uscitaMs;
       case 'pannelloDestro.spinta': return opzioniPannelloDestro(s.pannelloDestro).spinta;
@@ -1136,6 +1138,7 @@
     if (vuole('barraLaterale.spinta')) $('barraSpinta').checked = barra.spinta;
     if (vuole('barraLaterale.striscia')) $('barraStriscia').checked = barra.striscia;
     if (vuole('barraLaterale.schede')) $('barraSchede').checked = barra.schede;
+    if (vuole('barraLaterale.bloccata')) $('barraBloccata').checked = barra.bloccata;
     if (vuole('barraLaterale.attesaMs')) $('barraAttesa').value = String(barra.attesaMs);
     if (vuole('barraLaterale.uscitaMs')) $('barraUscita').value = String(barra.uscitaMs);
     const pannello = opzioniPannelloDestro(settings.pannelloDestro);
@@ -1917,6 +1920,7 @@
     $('barraSpinta').addEventListener('change', persist);
     $('barraStriscia').addEventListener('change', persist);
     $('barraSchede').addEventListener('change', persist);
+    $('barraBloccata').addEventListener('change', persist);
     for (const [id, campo] of [['barraAttesa', 'attesaMs'], ['barraUscita', 'uscitaMs']]) {
       $(id).addEventListener('change', persist);
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.

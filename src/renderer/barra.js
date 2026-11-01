@@ -15,6 +15,7 @@
   const nav = $('nav');
   const fisse = $('fisse');
   const ora = $('ora');
+  const testa = $('testa');
 
   const SUGGERIMENTO_MS = 350;
   const SOGLIA_TRASCINA = 4;
@@ -266,6 +267,27 @@
     misura();
   }, { passive: true });
 
+  // ── il lucchetto (#1431): bloccata, resta aperta accanto alla pagina ─────
+  const lucchetto = bottone('ico piccola lucchetto');
+  lucchetto.addEventListener('click', (e) => { if (e.isTrusted) api.lucchetto(); });
+  menuDi(lucchetto, { lucchetto: true });
+  testa.appendChild(lucchetto);
+  let firmaLucchetto = '';
+  function disegnaLucchetto(s) {
+    const b = s.bloccata === true;
+    const f = `${b}|${s.tastoLucchetto || ''}`;
+    if (f === firmaLucchetto) return;
+    firmaLucchetto = f;
+    const nome = b ? 'Sblocca: si apre sopra la pagina' : 'Tieni aperta accanto alla pagina';
+    lucchetto.setAttribute('aria-label', nome);
+    lucchetto.dataset.sugg = s.tastoLucchetto ? `${nome} (${s.tastoLucchetto})` : nome;
+    lucchetto.setAttribute('aria-pressed', b ? 'true' : 'false');
+    lucchetto.classList.toggle('accesa', b);
+    lucchetto.innerHTML = svg(b ? 'lock' : 'lockOpen', 16);
+    // Il clic ha cambiato cosa fa: il puntatore ancora sopra lo legge subito.
+    if (lucchetto.matches(':hover') && !trascina) programmaSuggerimento(lucchetto, { ridetto: true });
+  }
+
   // ── il sistema: ora e voci fisse ─────────────────────────────────────────
   const FISSE = [
     { comando: 'history', icona: 'memory', etichetta: 'Memorie' },
@@ -475,6 +497,9 @@
     stato = s || { aperta: false, icone: [] };
     applicaTema(stato.tema);
     root.classList.toggle('aperta', !!stato.aperta);
+    // Bloccata accanto alla pagina: una colonna della finestra, non una carta sopra la pagina.
+    root.classList.toggle('accanto', !!stato.spinge);
+    disegnaLucchetto(stato);
     // «Altro…» si richiude con la barra: alla riapertura, così mentre scivola via non cambia sotto gli occhi.
     if (stato.aperta && !eraAperta && altroAperto) { altroAperto = false; firma = null; }
     root.classList.toggle('senza-striscia', opzioni().striscia === false || stato.schermoIntero === true);
@@ -490,7 +515,7 @@
     disegnaAccount(stato.account || null);
     fissi.redteam.hidden = stato.redteam !== true;
     if (stato.fuoco) {
-      const primo = tuttiIBottoni().find((b) => b.getAttribute('aria-disabled') !== 'true');
+      const primo = tuttiIBottoni().find((b) => b !== lucchetto && b.getAttribute('aria-disabled') !== 'true');
       if (primo) primo.focus();
     }
     if (stato.aperta && !eraAperta) requestAnimationFrame(misura);
