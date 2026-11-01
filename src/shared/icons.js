@@ -623,6 +623,35 @@
     `<path d="M9 17l-5-5 5-5"/>` +
     `<path d="M20 18v-2a4 4 0 0 0-4-4H4"/>`;
 
+  // --- La fila del tasto destro sul testo (#1434): formattazione, collegamento, evidenziatore, forbici.
+  const bold =
+    `<path d="M7 5h5.5a3.5 3.5 0 0 1 0 7H7z"/>` +
+    `<path d="M7 12h6.5a3.5 3.5 0 0 1 0 7H7z"/>`;
+  const italic =
+    `<path d="M10 5h8"/>` +
+    `<path d="M6 19h8"/>` +
+    `<path d="M14 5l-4 14"/>`;
+  const underline =
+    `<path d="M7 4v7a5 5 0 0 0 10 0V4"/>` +
+    `<path d="M5 20h14"/>`;
+  const strike =
+    `<path d="M16.5 7.5c-.6-1.8-2.3-3-4.5-3-2.6 0-4.5 1.5-4.5 3.5 0 1.2.6 2.1 1.6 2.8"/>` +
+    `<path d="M14.5 13c1.2.7 2 1.6 2 3 0 2-2 3.5-4.5 3.5-2.4 0-4.2-1.2-4.8-3"/>` +
+    `<path d="M4 12h16"/>`;
+  const link =
+    `<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/>` +
+    `<path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>`;
+  // Evidenziatore: il corpo inclinato, la punta a scalpello e il segno che lascia.
+  const highlight =
+    `<path d="M14 4.5l5.5 5.5-8 8-5.5-5.5z"/>` +
+    `<path d="M6 12.5l-2 5.5 2 2 5.5-2"/>` +
+    `<path d="M14 20h6"/>`;
+  const cut =
+    `<circle cx="6" cy="17" r="3"/>` +
+    `<circle cx="18" cy="17" r="3"/>` +
+    `<path d="M8.2 14.8L19 4"/>` +
+    `<path d="M15.8 14.8L5 4"/>`;
+
   // PREVISTE: copia (due fogli sovrapposti).
   const copy =
     `<rect x="9" y="9" width="11" height="11" rx="2"/>` +
@@ -792,6 +821,13 @@
     mic:          (size) => wrap(mic, { size }),
     memory:       (size) => wrap(memory, { size }),
     copy:         (size) => wrap(copy, { size }),
+    bold:         (size) => wrap(bold, { size }),
+    italic:       (size) => wrap(italic, { size }),
+    underline:    (size) => wrap(underline, { size }),
+    strike:       (size) => wrap(strike, { size }),
+    link:         (size) => wrap(link, { size }),
+    highlight:    (size) => wrap(highlight, { size }),
+    cut:          (size) => wrap(cut, { size }),
     reply:        (size) => wrap(reply, { size }),
     bell:         (size) => wrap(bell, { size }),
     repeat:       (size) => wrap(repeat, { size }),
