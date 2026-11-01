@@ -4,7 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
-    providerRouting, openWeightsBlockReason, modelGate,
+    providerRouting, openWeightsBlockReason, modelGate, avvisiFuoriPolitica,
     Defaults, isAdmin, broadcastToTabs, controllaUscita: portaUscite, ricordaLettoDallAiuto, segnaLetturaAiuto, winOf,
   } = ctx;
   const { SN_CONST } = globalThis;
