@@ -3,7 +3,7 @@
 // che nella pagina restano, vanno avanti solo per un gesto vero dell'utente (giro 3).
 
 import { test, expect } from './fixtures/electron.mjs';
-import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, mouseClickConfirm, CONFIRM_HOST, staccoDelFilo } from './helpers/confirm.mjs';
+import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, mouseClickConfirm, aspettaConfermaPronta, CONFIRM_HOST, staccoDelFilo } from './helpers/confirm.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, puntatoreCheSegue } from './helpers/barra.mjs';
 import { nelloStrato, paginaDelloStrato } from './helpers/riquadri.mjs';
 
