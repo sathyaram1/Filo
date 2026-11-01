@@ -514,6 +514,16 @@
     if (!SC || !c.isConnected) return { sparito: true };
     return SC.sostituisciNelCampo(c, prima, dopo, vicinoA);
   }
+  // Il pezzo che una correzione aveva tolto torna fra il testo che gli era rimasto attorno (#1449.3).
+  async function rimettiNelCampo(c, pezzo, { sx, dx }, vicinoA) {
+    if (campoSotto(c)) {
+      const r = await chiediSotto('campo', { id: c.sotto, cosa: 'rimetti', pezzo, sx, dx, vicinoA });
+      return !r || r.sparito ? { sparito: true } : r;
+    }
+    const SC = global.SN_SPELLCHECK;
+    if (!SC || !c.isConnected) return { sparito: true };
+    return SC.rimettiNelCampo(c, pezzo, sx, dx, vicinoA);
+  }
 
   // Il testo del campo valutato, se è cambiato da quando il modello l'ha visto: la domanda dopo lo porta con sé.
   async function testoCambiato() {
