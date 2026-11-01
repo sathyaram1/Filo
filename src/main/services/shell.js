@@ -466,6 +466,7 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
 
   function kill() {
     session.dead = true;
+    if (inAttesa) { clearTimeout(inAttesa.timer); inAttesa = null; }
     try {
       if (process.platform === 'win32' && proc.pid) {
         // /T termina anche i figli (npm, build…) che kill() lascerebbe orfani.
