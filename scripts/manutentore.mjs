@@ -556,8 +556,21 @@ export function controllaNovita(consegna, { blocco, schede = [] }) {
     if (!conFonte(r)) errori.push(`«${t.slice(0, 80)}» non dice da quali righe dei worker nasce ("da": [numeri]): se annuncia una cosa che non c'è ancora è una promessa, da dichiarare in promesse col numero del lavoro`);
     else if (PROMESSA_RE.test(t)) errori.push(`«${t.slice(0, 80)}» promette qualcosa senza dire su quale lavoro (promesse)`);
   }
+  // Una riga nata da righe con la segnalazione la tiene: senza, nella pagina Novità il tasto destro non la apre più.
+  const fontiDi = (r) => (daValido(daDi(r)) ? daDi(r).map((n) => lette[n - 1])
+    : lette.filter((l) => unaRiga(testoRiga(l)) === unaRiga(testoRiga(r))));
+  const segnalazioneDa = new Map();
+  for (const r of [...righe('features'), ...righe('fixes')].filter((x) => typeof testoRiga(x) === 'string' && !segnalazioneRiga(x))) {
+    const daFonti = [...new Set(fontiDi(r).map(segnalazioneRiga).filter(Boolean))];
+    if (daFonti.length === 1) segnalazioneDa.set(r, daFonti[0]);
+    else if (daFonti.length > 1) errori.push(`«${unaRiga(testoRiga(r)).slice(0, 80)}» nasce da righe con segnalazioni diverse (${daFonti.join(', ')}) e una riga ne porta una: dividila, o scrivi quale tiene in segnalazione`);
+  }
   if (errori.length) return { ok: false, errori };
-  const pulita = (r) => (typeof r === 'string' ? r.trim() : segnalazioneRiga(r) ? { testo: r.testo.trim(), segnalazione: segnalazioneRiga(r) } : r.testo.trim());
+  const pulita = (r) => {
+    const t = typeof r === 'string' ? r.trim() : r.testo.trim();
+    const n = segnalazioneRiga(r) || segnalazioneDa.get(r);
+    return n ? { testo: t, segnalazione: n } : t;
+  };
   return {
     ok: true,
     novita: {
