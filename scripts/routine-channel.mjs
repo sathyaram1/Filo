@@ -787,8 +787,13 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
   if (copie.stato === 'fermo') return { ok: false, skipped: false, branch: ramo, reason: copie.avviso };
   try { installaControlloSpedizione(root); } catch (_) { /* il controllo qui sopra c'è già stato */ }
   const avviso = copie.avviso ? { avviso: copie.avviso } : {};
+  // La punta spinta va al rilascio: senza, il registro della fiducia vede un commit fuori registro (#2021).
+  const spinta = () => {
+    const h = run(['rev-parse', 'HEAD']);
+    return h.ok && /^[0-9a-f]{40}$/.test(h.out) ? { punta: h.out } : {};
+  };
   const push = run(['push', 'origin', `HEAD:refs/heads/${ramo}`]);
-  if (push.ok) return { ok: true, skipped: false, branch: ramo, ...avviso };
+  if (push.ok) return { ok: true, skipped: false, branch: ramo, ...spinta(), ...avviso };
   // «! [remote rejected]» è il SERVER che dice di no (un pre-receive, una
   // regola del repo, il push protection): non è storia divergente, un rebase
   // non lo cura e il lease non si tenta (verifica del giro 4, stessa regola
