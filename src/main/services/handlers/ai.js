@@ -155,6 +155,17 @@ module.exports = function register(on, ctx) {
     }
   }
 
+  // Gli avvisi fuori politica in coda (#1478.1) li prende solo la pagina davanti agli occhi: il frame principale della
+  // scheda attiva. Un riquadro, una scheda dietro o la home pronta in riserva li toglierebbero a chi li deve vedere.
+  on(MSG.AVVISI_IN_CODA, async (msg, sender) => {
+    const tm = sender && sender.win && sender.win._filoTabs;
+    const principale = !(sender && sender.frame && sender.frame.parent);
+    const attiva = !!(tm && sender.tab && !sender.riserva && !sender.strato && tm.activeId === sender.tab.id);
+    if (!attiva || !principale || !avvisiFuoriPolitica) return { ok: true, avvisi: [] };
+    const id = typeof (msg && msg.id) === 'string' ? msg.id : '';
+    return { ok: true, avvisi: avvisiFuoriPolitica.prendi(id) };
+  });
+
   const tettoAutomatiche = require('../tettoAutomatiche').crea();
   const { spingiAllaScheda } = require('../impostazioniPerOrigine');
   // Il tetto avvisa una volta per pausa, nella scheda che l'ha toccato: chi legge sa perché qualcosa si è fermato.
