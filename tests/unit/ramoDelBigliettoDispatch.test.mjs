@@ -118,8 +118,8 @@ test('server di oggi (la busta non porta il ramo): il secondo dispatch sullo ste
     assert.match(legato, new RegExp(`^worker/${ID}-\\d{8}T\\d{6}Z$`), 'busta senza ramo: nome nuovo per tentativo (#378)');
     assert.equal(mondo.legato, legato, 'la presa in carico ha legato il biglietto a quel ramo');
 
-    // Il nome per tentativo ha la risoluzione del secondo: la sessione ripresa riparte almeno un secondo dopo.
-    await new Promise((r) => setTimeout(r, 1100));
+    // Il nome per tentativo ha la risoluzione del secondo: la sessione ripresa riparte quando il nome è già un altro.
+    await aspettaChe(() => newWorkBranch(ID) !== legato, { cosa: 'un nome per tentativo diverso dal primo' });
     const secondo = await giro(casa, port);
     const nuovo = git(casa, 'rev-parse', '--abbrev-ref', 'HEAD');
     assert.notEqual(nuovo, legato);
