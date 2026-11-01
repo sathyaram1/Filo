@@ -7415,14 +7415,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     senzaVerdetto = true;
     console.warn('[Filo] collegamenti della risposta non controllati', e?.message || e);
   }
-  // #1373 — dopo l'OK il lavoro riprende da solo se qualcosa aspetta quel sì: un'azione rimasta indietro nel turno
-  // (guardare lo schermo spento in Preferenze), o un passo dopo che il modello ha dichiarato (`poi`).
-  const restaIndietro = renderedActions.some((x) => x && !x._confirm && !x._domanda && x._executed === false && !(x._output && x._output.blocked === 'segreto'));
-  for (const x of renderedActions) if (x && x._confirm && (restaIndietro || x.poi === true || x.poi === 'true')) x._riprende = true;
   // #525 — la risposta di Filo raggiunge l'archivio insieme al messaggio che
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
-  if (chatId) {
+  // Una ripresa dopo l'OK chiusa muta non lascia niente nella conversazione (#1373).
+  if (chatId && !mutoDopoOk) {
     // `actions`: ciò che è successo, più le azioni fermate (#810). `esiti`: com'è andata ognuna, anche la fallita e quella
     // ferma sulla conferma (#1294, #1130.2). Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
