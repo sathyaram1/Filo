@@ -738,9 +738,6 @@
 
   // Formato che OpenRouter (stile OpenAI) capisce. Niente argomenti: stessi strumenti per ogni utente, sistema e ruolo,
   // o la cache si rompe dal primo byte (sentinella tests/unit/richiestaChat.test.mjs).
-  // #1373 — chi propone un'azione che aspetta il sì dice se dopo ha altro da fare: solo così, dato il sì, il lavoro
-  // riprende da solo quando serve e tace quando era finito.
-  const POI = B('true se la richiesta dell\'utente ha altri passi da fare dopo questa azione: se l\'azione aspetta il suo sì, dopo il sì riprendi da solo.');
   function definitions() {
     const ctx = {};
     const out = [];
@@ -758,7 +755,7 @@
             // `description`: serve a chi deve dichiarare un elenco che il
             // codice conosce solo a runtime (i documenti di trasparenza che
             // esistono davvero) invece di ricopiarlo a mano.
-            properties: { ...((typeof t.properties === 'function' ? t.properties(ctx) : t.properties) || {}), poi: POI },
+            properties: (typeof t.properties === 'function' ? t.properties(ctx) : t.properties) || {},
             required: Array.isArray(t.required) ? t.required : [],
           },
         },
