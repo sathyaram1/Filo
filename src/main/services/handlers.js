@@ -8185,6 +8185,8 @@ async function chiudiEClassifica(chatId, { fine = false, via = '' } = {}) {
   if (via) { try { prima = await FiloChats.get(chatId); } catch (_) {} }
   const chat = await FiloChats.close(chatId, { fine });
   if (!chat) { if (via === 'uscita') contaSe('uscitaFinita', chatId); return null; } // chat vuota o inesistente
+  // #1443.2 — chiusa apposta in una home: le altre che la stavano continuando la lasciano subito, non a classificazione finita.
+  if (fine && chat.finita) { try { broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED, finita: chat.id }); } catch (_) {} }
   const contata = !!via && !chat.app && ((prima && !prima.closedAt) || via === 'risposta_tardiva')
     && !!(await contaSe('chatChiusa', chat.id, { via, ...misuraDellaChat(chat) }));
   if (via === 'uscita' && !contata) contaSe('uscitaFinita', chat.id);
