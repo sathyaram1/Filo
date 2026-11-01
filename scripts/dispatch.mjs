@@ -2147,7 +2147,7 @@ function positionOnBranch(bucket) {
   // Un punto fermo registrato per un ALTRO ramo non deve guidare il ripristino
   // di questo: lo sha esiste nel repo, quindi prepareBranch lo prenderebbe per
   // buono e riporterebbe il ramo al contenuto di un tentativo diverso.
-  const checkpoint = prev?.branch === branch ? lastCheckpoint(prev) : null;
+  const checkpoint = (prev?.branch === branch) ? lastCheckpoint(prev) : null;
 
   const res = prepareBranch({
     root: ROOT,
