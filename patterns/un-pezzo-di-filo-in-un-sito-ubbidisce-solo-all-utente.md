@@ -152,6 +152,14 @@ Restano qui, valide anche lì:
   regole di prima tornano tutte: `SN_FILO_UI.bersaglio(e)` per il nodo vero, `SN_FILO_UI.tastoNelRiquadro` per i tasti,
   `SN_FILO_UI.nostro(ev)` per gli eventi che fabbrica Filo.
 
+**Le caselle e i bottoni dell'Aiuto non hanno una guardia loro** (#1340). Nel documento il sito spostava la selezione
+nelle caselle un attimo prima del tasto dell'utente (al clic, all'incolla dal menu dell'app, all'inizio di una
+composizione, con un timer), e un velo che lascia passare il mouse copriva il microfono e il documento trovato
+dall'Aiuto. Una guardia per ogni momento non si chiudeva mai: ogni giro di verifica ne trovava uno nuovo. L'owner ha
+scelto lo strato (D-205): microfono, documento e caselle di Aiuto, feedback e spiegazione stanno lì, sopra il velo e
+fuori dalla portata dello script, e la guardia della regola 3 resta del menu. Nel ripiego senza strato tornano
+scoperti, come il testo nel limite noto qui sotto.
+
 ## Provarlo
 
 Il velo, il velo tolto all'ultimo istante, il foglio che abbassa il menu e i
@@ -176,7 +184,9 @@ il testo, che l'utente intanto vede e incolla.
 
 I riquadri si guardano con `tests/helpers/riquadri.mjs` (lo stesso hook, `SN_FILO_UI._test.trova`, nella scheda o
 nello strato sopra di lei); la prova dell'attacco sta in `tests/riquadri-solo-utente.spec.mjs`, quella del testo che il
-sito non legge in `tests/riquadri-fuori-dal-sito.spec.mjs`.
+sito non legge in `tests/riquadri-fuori-dal-sito.spec.mjs`. Il sito che seleziona, scrive e cancella di continuo
+mentre l'utente scrive, e il velo sopra microfono e documento dell'Aiuto spostato, stanno in
+`tests/sito-ostile-sotto-aiuto-e-caselle.spec.mjs` (il velo coi gesti veri del sistema, `tests/helpers/gestiVeri.mjs`).
 
 ## Limite noto
 
