@@ -2116,10 +2116,12 @@
     for (const b of state.badge.values()) {
       if (!b.classList.contains('sn-sopra-testo')) continue;
       // Sveglio resta per tutta la fascia fra le x e il valore: sotto, i puntini li separano di qualche pixel.
-      const v = b.getBoundingClientRect();
       const s = b._snX;
-      const fascia = s && { left: Math.min(s.left, v.left), right: Math.max(s.right, v.right), top: Math.min(s.top, v.top), bottom: Math.max(s.bottom, v.bottom) };
-      const sveglio = dentro(s, 2) || (b.classList.contains('sn-sveglio') && dentro(fascia, 4));
+      let sveglio = dentro(s, 2);
+      if (!sveglio && s && b.classList.contains('sn-sveglio')) {
+        const v = b.getBoundingClientRect();
+        sveglio = dentro({ left: Math.min(s.left, v.left), right: Math.max(s.right, v.right), top: Math.min(s.top, v.top), bottom: Math.max(s.bottom, v.bottom) }, 4);
+      }
       b.classList.toggle('sn-sveglio', sveglio);
     }
   }
