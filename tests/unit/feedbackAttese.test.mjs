@@ -358,7 +358,6 @@ test('--aspetta che toglierebbe attese non fuse rifiuta senza scrivere; passa co
       assert.deepEqual(ok.tolte.map((w) => w.num), ['567', '600'], 'done, e archived con la versione: fuse tutte e due');
       assert.deepEqual(scrittiIn(soloFusa.scritte[0]), ['1741', '1756']);
     } finally { soloFusa.ripristina(); }
-    globalThis.fetch = reteFinta(CASO_1294).ripristina && globalThis.fetch;
 
     const chiusa = reteFinta({ ...CASO_1294, id1294: { seq: 1294, status: 'todo', waitsFor: [{ id: 'id601', num: '601' }] } });
     try {
