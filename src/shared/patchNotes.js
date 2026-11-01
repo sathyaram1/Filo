@@ -9,6 +9,17 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.256', date: '2026-11-01',
+      features: [],
+      fixes: [
+        { testo: 'Un comando che sovrascrive o svuota un file che c\'è già chiede prima di partire, che lo scriva tu nel terminale della home o che lo proponga Filo. Il riquadro dice perché.', segnalazione: 892 },
+        { testo: 'Nel terminale della home un comando con un apostrofo o una virgoletta non chiusa finisce subito col suo errore. Prima restava in corso per sempre e si prendeva i comandi scritti dopo. Ogni errore compare sotto il comando che l\'ha dato.', segnalazione: 892 },
+        { testo: 'Su Linux una frase dopo la barra che comincia col percorso di un documento o di una cartella, o con una faccina come :), va a Filo e non al terminale.', segnalazione: 892 },
+        { testo: 'Un comando incollato nella home, cancellato e riportato con Annulla conta ancora come incollato: se cancella dei file chiede di scrivere «conferma».', segnalazione: 892 },
+        { testo: '«/riordina» non scambia più di posto due schede della stessa pagina, come due home, quando una si è appena aperta: dice che erano già in ordine.', segnalazione: 1561 },
+      ],
+    },
+    {
       version: '0.2.255', date: '2026-10-31',
       features: [
         '«Salva video come…» funziona anche sui video in streaming, come quelli di YouTube: il video arriva in MP4 fino a 1080p e lo segui nei Download. Il primo salvataggio scarica il programma che lo ricompone.',
