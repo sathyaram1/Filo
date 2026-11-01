@@ -7149,7 +7149,7 @@ function schedeWebAperte() {
 // scrivono altri, e restano imbustati come ogni testo salvato (#592.4).
 const COSA_E_SUCCESSO = {
   timer: 'è suonato',
-  download: 'è finito il download di',
+  download: 'mentre l\'utente non era davanti a Filo è finito il download di',
   avviso: 'è arrivato un avviso:',
   giornata: 'è l\'inizio della giornata: l\'utente apre Filo per la prima volta oggi',
   accoglienza: 'l\'utente ha appena finito di presentarsi a te: da qui comincia la vostra conversazione di tutti i giorni',
