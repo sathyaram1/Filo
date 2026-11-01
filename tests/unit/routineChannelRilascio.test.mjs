@@ -364,7 +364,7 @@ describe('pushRamoCorrente', () => {
     g(work, ['checkout', '-q', '-b', 'worker/7']);
     commitFile(work, 'a.js');
     const primo = pushRamoCorrente(work);
-    assert.deepEqual(primo, { ok: true, skipped: false, branch: 'worker/7' });
+    assert.deepEqual(primo, { ok: true, skipped: false, branch: 'worker/7', punta: g(work, ['rev-parse', 'HEAD']) });
     assert.equal(remoteSha(origin, 'worker/7'), g(work, ['rev-parse', 'HEAD']));
     // Rebase: A sparisce, al suo posto C. Origin ha A.
     g(work, ['reset', '-q', '--hard', 'HEAD~1']);
