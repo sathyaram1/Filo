@@ -19,7 +19,8 @@ export const FORMATO = 'filo-conta-documenti/1';
 // Solo nomi: cinquemila stanno in un MB di risposta.
 export const PAGINA = 5000;
 // L'id più basso che una raccolta possa avere: l'intervallo [raccolta/ID_MINIMO, raccolta\0/ID_MINIMO) prende la
-// raccolta e tutti i suoi discendenti, documenti mancanti compresi. È la domanda di firebase-tools quando svuota un database.
+// raccolta e tutti i suoi discendenti, anche quelli sotto un documento che non esiste. È la domanda di firebase-tools
+// quando svuota un database: il percorso provato dal server vero.
 export const ID_MINIMO = '__id-9223372036854775808__';
 const RITENTABILI = new Set([429, 500, 502, 503, 504]);
 const ATTESE_MS = [1000, 2000, 4000, 8000, 16000];
