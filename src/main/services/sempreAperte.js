@@ -23,6 +23,11 @@ function voceDa(input, { daScheda = false } = {}) {
   return sotto && sotto.registrable === `a.${host}` ? '' : host;
 }
 
+function conPorta(input) {
+  const s = String(input == null ? '' : input).trim();
+  try { return !!new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `http://${s}`).port; } catch (_) { return false; }
+}
+
 async function voci() {
   return Object.keys(await FM().listKeepOpen());
 }
