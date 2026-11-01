@@ -366,18 +366,24 @@ export function testoPiccolo({ ruolo, stato, taccuino, schede, rami = [] }) {
     || Number(String(a.num).split('.')[0]) - Number(String(b.num).split('.')[0]));
   const numeri = new Set(scelte.map((s) => String(s.num)));
   const suoi = (rami || []).filter((r) => (r.feedback || []).some((n) => numeri.has(String(n))));
-  const testo = [
-    String(ruolo || '').trim(), '',
-    '## Stato', '', ...righeStato(stato), '',
-    '## Taccuino', '', ...testoTaccuino(taccuino), '',
-    `## Schede a priorità 3 e 2, e le ferme (${scelte.length} di ${(schede || []).length})`, '',
-    ...scelte.map((s) => rigaSchedaServer(s)),
-    '', `## Rami di questi lavori (${suoi.length} di ${(rami || []).length} in corso)`, '',
-    ...suoi.map(rigaRamo),
-  ].join('\n');
+  const parti = [
+    ['il ruolo', [String(ruolo || '').trim(), '']],
+    ['lo stato coi segnali', ['## Stato', '', ...righeStato(stato), '']],
+    ['il taccuino', ['## Taccuino', '', ...testoTaccuino(taccuino), '']],
+    [`le ${scelte.length} schede a priorità 3 e 2`, [`## Schede a priorità 3 e 2, e le ferme (${scelte.length} di ${(schede || []).length})`, '',
+      ...scelte.map((s) => rigaSchedaServer(s))]],
+    ['i rami', ['', `## Rami di questi lavori (${suoi.length} di ${(rami || []).length} in corso)`, '', ...suoi.map(rigaRamo)]],
+  ];
+  const testo = parti.flatMap(([, righe]) => righe).join('\n');
   const token = stimaToken(testo);
   if (token > PICCOLO_TETTO_TOKEN) {
-    return { ok: false, token, motivo: `il contesto piccolo stima ${token} token, il tetto è ${PICCOLO_TETTO_TOKEN}: ${scelte.length} schede a priorità 3 e 2. Riporta a 1 quelle che oggi non contano, o leggi il contesto intero` };
+    // Il consiglio segue la parte che pesa di più: riportare a 1 delle schede non alleggerisce un taccuino lungo.
+    const pesi = parti.map(([nome, righe]) => [nome, stimaToken(righe.join('\n'))]).sort((a, b) => b[1] - a[1]);
+    const [nome, peso] = pesi[0];
+    const rimedio = nome === 'il taccuino' ? 'Riscrivi il taccuino più corto'
+      : nome === 'lo stato coi segnali' ? 'Segna letti i segnali che hai già visto'
+        : nome.startsWith('le ') ? 'Riporta a 1 le schede che oggi non contano' : 'Leggi il contesto intero';
+    return { ok: false, token, motivo: `il contesto piccolo stima ${token} token, il tetto è ${PICCOLO_TETTO_TOKEN}: pesa di più ${nome} (${peso} token). ${rimedio}, o leggi il contesto intero` };
   }
   return { ok: true, testo, token };
 }

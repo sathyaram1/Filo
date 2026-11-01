@@ -249,7 +249,7 @@ test('falliti e attese arrivano coi nomi del server, fuori dal rapporto; le atte
   assert.equal('falliti' in corpi[0].report, false);
   assert.equal('attese' in corpi[0].report, false);
   assert.equal(corpi[0].report.atteseOltre30, 1, 'il conto resta nel rapporto');
-  assert.equal(conDati.falliti.length, 1, 'l\'originale non viene mutilato');
+  assert.equal(conDati.falliti.length, 2, 'l\'originale non viene mutilato');
 });
 
 test('la domanda di processo viaggia nel rilascio come domandaProcesso', async () => {

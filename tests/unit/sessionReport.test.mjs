@@ -1017,9 +1017,9 @@ test('i falliti dicono strumento, errore in una riga e cosa è successo dopo; le
     result('a5', 'Permission denied', T('04:47'), true),
   ], { role: 'resolver' });
   assert.deepEqual(rep.falliti, [
-    { strumento: 'Bash', errore: 'exit 1: not ok 3 - il biglietto […] scaduto', dopo: 'riprovato uguale' },
+    { strumento: 'Bash', cosa: 'Run unit tests', errore: 'exit 1: not ok 3 - il biglietto […] scaduto', dopo: 'riprovato uguale' },
     { strumento: 'Read', errore: 'File does not exist.', dopo: 'Bash: List files' },
-    { strumento: 'Bash', errore: 'Permission denied', dopo: 'niente: la sessione finisce lì' },
+    { strumento: 'Bash', cosa: 'git push', errore: 'Permission denied', dopo: 'niente: la sessione finisce lì' },
   ]);
   assert.deepEqual(rep.attese, [
     { strumento: 'Bash', cosa: 'Run unit tests', s: 240 },
@@ -1035,7 +1035,7 @@ test('i falliti dicono strumento, errore in una riga e cosa è successo dopo; le
     result('b1', 'Exit code 2', T('00:01'), true),
     chiama('b2', T('00:02'), 'Bash', { command: 'npm run test:unit -- --solo x', description: 'Run one unit test' }),
   ]);
-  assert.deepEqual(diverso.falliti, [{ strumento: 'Bash', errore: 'exit 2', dopo: 'riprovato diverso: Run one unit test' }]);
+  assert.deepEqual(diverso.falliti, [{ strumento: 'Bash', cosa: 'Run unit tests', errore: 'exit 2', dopo: 'riprovato diverso: Run one unit test' }]);
 });
 
 test('gli elenchi stanno nel budget e il taglio si dice coi conti interi; i sotto-agenti si sommano', async () => {
