@@ -52,6 +52,19 @@ test('un nome corto o di una parola sola non mangia le parole comuni', () => {
   assert.equal(A.ripulisci('La luce resta accesa, Luce lo ha notato.', { nomi: ['Luce'], email: [] }), 'La luce resta accesa, l\'utente lo ha notato.');
 });
 
+test('dentro un percorso il nome esce anche in minuscolo, e la cartella diventa «utente»', () => {
+  assert.equal(A.ripulisci('Il file C:\\Users\\giulia\\Documents\\fattura.pdf non si apre.', ID), 'Il file C:\\Users\\utente\\Documents\\fattura.pdf non si apre.');
+  assert.equal(A.ripulisci('Non trova /Users/Giulia/Desktop/foto.png', ID), 'Non trova /Users/utente/Desktop/foto.png');
+  assert.equal(A.ripulisci('La cartella /home/ferraris/progetti resta vuota.', ID), 'La cartella /home/utente/progetti resta vuota.');
+  assert.equal(A.ripulisci('Il bottone rosa non si vede in /tmp/x', { nomi: ['Rosa Bianchi'], email: [] }), 'Il bottone rosa non si vede in /tmp/x');
+});
+
+test('un cognome col trattino esce intero e a metà', () => {
+  const id = { nomi: ['José Núñez-García'], email: [] };
+  assert.equal(A.ripulisci('Núñez dice che il tema scuro non si applica.', id), 'L\'utente dice che il tema scuro non si applica.');
+  assert.equal(A.ripulisci('Ho scritto a Núñez-García e a García.', id), 'Ho scritto all\'utente e all\'utente.');
+});
+
 test('l\'email dell\'account diventa «l\'utente», le altre si tolgono', () => {
   const t = A.ripulisci('Scrivere a Giulia.Ferraris@example.com o a marco@posta.it per i dettagli.', ID);
   assert.equal(t, 'Scrivere all\'utente o a [email] per i dettagli.');
