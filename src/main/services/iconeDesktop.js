@@ -833,7 +833,7 @@ function sulDesktop(fn) {
     try {
       // Una prova che si è dimenticata il computer finto non sposta le icone di chi la lancia.
       if (!computerFinto && process.env.NODE_ENV === 'test') return fallito('prove');
-      if (!computerFinto && process.platform !== 'win32') return fallito(process.platform === 'darwin' ? 'mac' : 'linux');
+      if (!computerFinto && !PIATTAFORME.includes(process.platform)) return fallito('linux');
       return await fn();
     } catch (e) {
       console.warn('[Filo] icone del desktop non spostate', e && e.message ? e.message : e);
