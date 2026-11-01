@@ -47,6 +47,17 @@ test('un pezzo del nome scritto minuscolo è una parola qualunque e resta', () =
   assert.equal(A.ripulisci('Il bottone rosa non si vede. Rosa lo ha chiesto.', id), 'Il bottone rosa non si vede. L\'utente lo ha chiesto.');
 });
 
+test('chi si presenta col nome in minuscolo lo perde; «sono» in mezzo alla frase resta un verbo', () => {
+  const id = { nomi: ['Luca Moretti'], email: [] };
+  assert.equal(A.ripulisci('ciao sono luca, quanti crediti ho?', id), 'ciao sono l\'utente, quanti crediti ho?');
+  assert.equal(A.ripulisci('mi chiamo luca e non vedo i crediti', id), 'mi chiamo l\'utente e non vedo i crediti');
+  assert.equal(A.ripulisci('Ciao, sono luca! Il tema non va.', id), 'Ciao, sono l\'utente! Il tema non va.');
+  assert.equal(A.ripulisci('L\'utente ha scritto «sono luca, aiuto»', id), 'L\'utente ha scritto «sono l\'utente, aiuto»');
+  const rosa = { nomi: ['Rosa Bianchi'], email: [] };
+  assert.equal(A.ripulisci('le icone sono rosa', rosa), 'le icone sono rosa');
+  assert.equal(A.ripulisci('ciao sono rosa, le icone sono rosa', rosa), 'ciao sono l\'utente, le icone sono rosa');
+});
+
 test('un nome corto o di una parola sola non mangia le parole comuni', () => {
   assert.equal(A.ripulisci('Al momento il tema va al contrario.', { nomi: ['Al'], email: [] }), 'Al momento il tema va al contrario.');
   assert.equal(A.ripulisci('La luce resta accesa, Luce lo ha notato.', { nomi: ['Luce'], email: [] }), 'La luce resta accesa, l\'utente lo ha notato.');
