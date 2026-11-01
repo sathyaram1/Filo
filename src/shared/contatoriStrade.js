@@ -161,12 +161,13 @@
   }
 
   // L'indirizzo di una pagina di Filo → il suo nome nell'elenco; '' per tutto quello che non è filo://.
+  // Senza file è <host>/<host>.html, come lo carica il protocollo: filo://preferences/ sono le Preferenze.
   function paginaDi(url) {
     const m = /^filo:\/\/([a-z0-9_-]+)\/?([^?#]*)/i.exec(testo(url));
     if (!m) return '';
     const host = m[1].toLowerCase();
-    const file = m[2].replace(/\/+$/, '').toLowerCase();
-    const chiave = file ? `${host}/${file}` : host;
+    const file = m[2].replace(/\/+$/, '').toLowerCase() || `${host}.html`;
+    const chiave = `${host}/${file}`;
     if (ETICHETTE.includes(chiave)) return idDellaChiave(chiave);
     if (ETICHETTE.includes(host) || IN_PIU.includes(host)) return host;
     return ALTRO;
