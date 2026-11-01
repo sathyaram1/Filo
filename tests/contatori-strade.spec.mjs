@@ -216,6 +216,6 @@ test('la barra laterale: indietro dall\'icona, avanti dall\'elenco col posto del
   const prima = await attiva(app);
   await premiNellaBarra(app, 'closeTab');
   await expect.poll(() => attiva(app).then((x) => x.n)).toBe(prima.n - 1);
-  await page.waitForTimeout(300);
+  await new Promise((r) => setTimeout(r, 300));
   expect(await voce(app, 'via_azione', 'closeTab:barra')).toBe(1);
 });
