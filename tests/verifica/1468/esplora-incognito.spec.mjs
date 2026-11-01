@@ -42,8 +42,16 @@ test('in incognito i tasti e il tasto destro non contano', async ({ app, openTab
   expect(await totale(app)).toBe(prima);
 
   // Controllo: gli stessi gesti nella finestra normale contano.
-  const page = await testServer.openReady(openTab, '<!doctype html><body style="margin:0;height:600px">testo</body>', { pubblico: true });
-  await page.keyboard.press('Control+J');
-  await page.mouse.click(200, 300, { button: 'right' });
-  await expect.poll(() => totale(app), { timeout: 5000 }).toBeGreaterThanOrEqual(prima + 2);
+  await testServer.openReady(openTab, '<!doctype html><body style="margin:0;height:600px">testo</body>', { pubblico: true });
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => !w._filoIncognito && w._filoTabs)._filoTabs;
+    const wc = tm.tabs.find((x) => x.id === tm.activeId).view.webContents;
+    for (const [kc, mod] of [['J', ['control']], ['D', ['control']], ['F5', []]]) {
+      wc.sendInputEvent({ type: 'keyDown', keyCode: kc, modifiers: mod });
+      wc.sendInputEvent({ type: 'keyUp', keyCode: kc, modifiers: mod });
+    }
+    wc.sendInputEvent({ type: 'mouseDown', x: 200, y: 300, button: 'right', clickCount: 1 });
+    wc.sendInputEvent({ type: 'mouseUp', x: 200, y: 300, button: 'right', clickCount: 1 });
+  });
+  await expect.poll(() => totale(app), { timeout: 5000 }).toBeGreaterThanOrEqual(prima + 4);
 });
