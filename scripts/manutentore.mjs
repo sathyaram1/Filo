@@ -528,7 +528,14 @@ export function controllaNovita(consegna, { blocco, schede = [] }) {
     if (PROMESSA_RE.test(r) && !dichiarate.has(unaRiga(r))) errori.push(`«${unaRiga(r).slice(0, 80)}» promette qualcosa senza dire su quale lavoro (promesse)`);
   }
   if (errori.length) return { ok: false, errori };
-  return { ok: true, novita: { versione: String(c.versione), features: righe('features').map((r) => r.trim()), fixes: righe('fixes').map((r) => r.trim()) } };
+  const pulita = (r) => (typeof r === 'string' ? r.trim() : { testo: r.testo.trim(), segnalazione: segnalazioneRiga(r) });
+  return {
+    ok: true,
+    novita: {
+      versione: String(c.versione), features: righe('features').map(pulita), fixes: righe('fixes').map(pulita),
+      originali: [...new Set(lette.map(impronta))],
+    },
+  };
 }
 
 async function bloccoInCima(root) {
