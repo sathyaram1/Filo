@@ -172,8 +172,9 @@ export function registraDecisione({ ticket, role = '', model = '', effort = '' }
 
 const nostro = (gruppo) => (gruppo?.hooks || []).some((h) => String(h?.command || '').includes(ETICHETTA));
 
-// Unisce senza toccare il resto delle impostazioni dell'utente; un file illeggibile non si riscrive.
-export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato = Date.now(), clone = '', strumenti = '' } = {}) {
+// Unisce senza toccare il resto delle impostazioni dell'utente; un file illeggibile non si riscrive. I ganci del checkout
+// `progetto` entrano nella stessa scrittura: dopo, la ConfigChange qui sotto ferma ogni altra modifica (#1967).
+export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato = Date.now(), clone = '', strumenti = '', progetto = '' } = {}) {
   const file = join(dir, 'settings.json');
   let s = {};
   if (existsSync(file)) {
