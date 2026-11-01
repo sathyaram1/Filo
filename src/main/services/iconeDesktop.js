@@ -874,5 +874,6 @@ const _perProve = {
 
 module.exports = {
   ordinaIcone, rimetti, esitoPerModello, normalizzaRichiesta, comeDetto, _perProve,
-  SCRIPT, CS_DESKTOP, PEZZO_MAX, costruisci, ambienteDisponi, interpretaLettura, ordina, griglia, piano, verifica, spiega,
+  SCRIPT, CS_DESKTOP, JXA_DESKTOP, PEZZO_MAX, PIATTAFORME, DISPOSIZIONI_FINDER,
+  costruisci, ambienteDisponi, interpretaLettura, ordina, griglia, piano, verifica, inOrdine, spiega,
 };
