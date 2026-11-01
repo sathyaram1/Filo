@@ -186,6 +186,20 @@ test('con l\'apice tipografico nel testo o nella risposta il segno sta sulla sol
   }
 });
 
+// #1690: la correzione del modello arriva con apici dritti, o curvi, e si scrive con quelli di chi scrive.
+test('la correzione applicata tiene gli apici e le virgolette di chi scrive', () => {
+  for (const [testo, riga, atteso] of [
+    ['vedo l’albro alto', "[l’albro][l'albero][refuso][errore]", 'vedo l’albero alto'],
+    ["vedo l'albro alto", '[l’albro][l’albero][refuso][errore]', "vedo l'albero alto"],
+    ['un amica mia, l’altra', "[un amica][un'amica][apostrofo][errore]", 'un’amica mia, l’altra'],
+    ['un amica mia', "[un amica][un'amica][apostrofo][errore]", "un'amica mia"],
+    ['ho detto “ciao” a tutti e basta', '[a tutti e basta][a tutti, e basta][virgola][errore]', 'ho detto “ciao” a tutti, e basta'],
+    ['ho detto “ciao” e un po’ a tutti e basta', '[“ciao” e un po\' a tutti e basta]["ciao" e un po\' a tutti, e basta][virgola][errore]', 'ho detto “ciao” e un po’ a tutti, e basta'],
+    ['ha detto “ciao e basta', '[ciao e basta][ciao" e basta][virgolette][errore]', 'ha detto “ciao” e basta'],
+    ["l’uno e l'altro e bello", "[l'altro e bello][l'altro è bello][verbo][errore]", "l’uno e l'altro è bello"],
+  ]) assert.equal(corretto(testo, riga), atteso, `${testo} ${riga}`);
+});
+
 test('il valore di un segnaposto citato con uno spazio in più sta sulle sole x', () => {
   const testo = 'scoperta nel 14xx da Colombo';
   const { segni } = C.segniDaRisposta('[nel  14xx][nel 1492][Colombo][segnaposto]', testo, { tipi: ['segnaposto'] });
