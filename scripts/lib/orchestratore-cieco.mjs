@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { ganciDelProgetto, unisciGanci } from './ganci-del-progetto.mjs';
 
 export const ETICHETTA = 'filo-orchestratore-cieco';
 // Un preflight lanciato a mano non deve accecare per sempre le sessioni di questa macchina.
@@ -172,8 +173,9 @@ export function registraDecisione({ ticket, role = '', model = '', effort = '' }
 
 const nostro = (gruppo) => (gruppo?.hooks || []).some((h) => String(h?.command || '').includes(ETICHETTA));
 
-// Unisce senza toccare il resto delle impostazioni dell'utente; un file illeggibile non si riscrive.
-export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato = Date.now(), clone = '', strumenti = '' } = {}) {
+// Unisce senza toccare il resto delle impostazioni dell'utente; un file illeggibile non si riscrive. I ganci del checkout
+// `progetto` entrano nella stessa scrittura: dopo, la ConfigChange qui sotto ferma ogni altra modifica (#1967).
+export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato = Date.now(), clone = '', strumenti = '', progetto = '' } = {}) {
   const file = join(dir, 'settings.json');
   let s = {};
   if (existsSync(file)) {
@@ -181,7 +183,7 @@ export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato 
     if (!s || typeof s !== 'object' || Array.isArray(s)) return { ok: false, file, why: 'impostazioni utente non sono un oggetto' };
   }
   const cmd = comando({ sessione, creato, registro: join(dir, FILE_REGISTRO), strumenti });
-  const hooks = { ...(s.hooks || {}) };
+  const hooks = unisciGanci(s.hooks, progetto ? ganciDelProgetto(progetto).hooks : {});
   // ConfigChange senza matcher: ogni fonte arriva a decidi, che sceglie cosa fermare.
   const voci = { PreToolUse: MATCHER_PRIMA, PostToolUse: 'Agent|Task', ConfigChange: '' };
   for (const [ev, matcher] of Object.entries(voci)) {

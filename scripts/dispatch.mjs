@@ -2714,8 +2714,9 @@ if (isMainModule) {
           // (lib/orchestratore-cieco.mjs). Senza gancio il giro non parte: meglio un giro saltato che uno che vede.
           // Solo in cloud: sulla macchina dell'owner le impostazioni utente valgono per tutte le sue sessioni.
           // Anche la sessione di un feedback tiene la parola d'ordine: cieca come l'orchestratore, lancia il worker (#1680 giro 1).
+          // Coi ganci di Filo: una sessione partita sopra i cloni non legge le impostazioni del progetto (#1967).
           const cieco = process.env.CLAUDE_CODE_REMOTE === 'true'
-            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', clone: cartellaCloneServer(), strumenti: tools })
+            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', clone: cartellaCloneServer(), strumenti: tools, progetto: ROOT })
             : { ok: true, saltato: true };
           if (cieco.saltato) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
           if (!cieco.ok) {
