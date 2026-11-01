@@ -64,6 +64,19 @@ function mostraFinestraNormale() {
   return win;
 }
 
+// Su Mac riaprire Filo acceso (Dock, Launchpad, Finder) arriva come `activate`, non come seconda copia: chi clicca
+// l'icona vuole le sue schede anche con la finestrella di accesso aperta (#1606.1). Con la normale viva e qualcosa a
+// schermo il sistema porta davanti da sé.
+function riaperturaDaSistema(visibili) {
+  if (visibili && finestraNormaleViva()) return null;
+  return mostraFinestraNormale();
+}
+
+// Gli init che la prima scheda deve trovare fatti (ad-blocker, impronta, permessi…) li aspetta qualunque finestra
+// normale nata durante l'avvio, prima di riaprire le schede: la finestra intanto si apre e la barra si carica (#1092).
+let avvioPronto = Promise.resolve();
+function attendiAvvio(pronti) { avvioPronto = Promise.resolve(pronti).catch(() => {}); }
+
 // Wiring comune a finestra normale e incognito: carica le impostazioni di
 // sicurezza e collega i listener di resize/fullscreen al layout dei tab.
 // Una finestra in incognito con scaricamenti in corso chiede prima cosa farne (#1287, downloads.js).
