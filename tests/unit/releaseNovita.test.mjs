@@ -19,7 +19,12 @@ const note = (testo) => (leggiNote(testo) || {}).note;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FILE = join(ROOT, 'src', 'shared', 'patchNotes.js');
-const SORGENTE = readFileSync(FILE, 'utf8');
+// In cima un blocco della prova, con tre righe: quello di main appena aperto ne ha una o nessuna, e senza righe
+// già lette non c'è riscrittura parziale da provare (verifica #1959 giro 6).
+const VERO = readFileSync(FILE, 'utf8');
+const IN_CIMA = `{\n      version: '99.0.1', date: '2026-11-02',\n      features: ['Prima riga della prova.', { testo: 'Seconda, con la sua segnalazione.', segnalazione: 1956 }],\n      fixes: ['Una correzione della prova.'],\n    },\n    `;
+const PRIMO = VERO.indexOf('{', VERO.indexOf('const NOTES = ['));
+const SORGENTE = VERO.slice(0, PRIMO) + IN_CIMA + VERO.slice(PRIMO);
 const NOTE = note(SORGENTE);
 const TOP = NOTE[0];
 const VECCHIO = NOTE[5];
