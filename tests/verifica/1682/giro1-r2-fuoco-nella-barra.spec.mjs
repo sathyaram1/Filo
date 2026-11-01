@@ -23,26 +23,21 @@ const spiega = (app, testo) => app.evaluate(async (_e, t) => {
   return { ok: Boolean(r && !r.error) };
 }, testo);
 
-// Playwright finge il fuoco in ogni pagina: quello vero, col fuoco nella barra delle schede, la pagina non ce l'ha.
-const paginaSenzaFuoco = (app, url) => app.evaluate(async ({ webContents }, u) => {
+// Il contenitore non dà il fuoco vero a nessuna finestra, e Playwright lo finge in ogni pagina. Qui si rifà lo stato
+// di chi ha cliccato la barra delle schede: la finestra di Filo davanti, la pagina senza fuoco (ce l'ha la shell).
+const filoDavantiFuocoNellaBarra = (app, url) => app.evaluate(async ({ BrowserWindow, webContents }, u) => {
+  const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+  win.isFocused = () => true;
   const wc = webContents.getAllWebContents().find((w) => w.getURL() === u);
-  return wc.executeJavaScriptInIsolatedWorld(999, [{ code: 'Document.prototype.hasFocus = () => false; 1' }]);
+  await wc.executeJavaScriptInIsolatedWorld(999, [{ code: 'Document.prototype.hasFocus = () => false; window.dispatchEvent(new Event(\'blur\')); 1' }]);
+  return true;
 }, url);
 
-test('r2 Filo davanti col fuoco sulla barra delle schede: l’avviso sull’host escluso compare senza dover cliccare nella pagina', async ({ app, shell, openTab, testServer }) => {
+test('r2 Filo davanti col fuoco sulla barra delle schede: l’avviso sull’host escluso compare senza dover cliccare nella pagina', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await testServer.openReady(openTab, '<!doctype html><html><body><p>Una pagina qualunque.</p></body></html>');
   await fintoServitoDa(app, 'Google Vertex');
-  // L'utente clicca la scheda nella barra: la tastiera va alla shell, la finestra di Filo resta davanti.
-  await shell.locator('.tab').first().click();
-  await paginaSenzaFuoco(app, page.url());
-  const stato = await app.evaluate(({ BrowserWindow, webContents }) => {
-    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    const col = webContents.getFocusedWebContents();
-    return { finestra: Boolean(win && win.isFocused()), shell: Boolean(col && win && col === win.webContents) };
-  });
-  console.log('STATO r2:', JSON.stringify(stato));
-  expect(stato.shell, 'la tastiera è nella barra delle schede').toBe(true);
+  await filoDavantiFuocoNellaBarra(app, page.url());
 
   expect((await spiega(app, 'ghiaccio1682')).ok).toBe(true);
   await expect(page.locator('.sn-toast', { hasText: '«Google Vertex»' }), 'Filo è davanti: l’avviso si vede subito').toHaveCount(1, { timeout: 5_000 });
