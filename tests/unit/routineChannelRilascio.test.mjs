@@ -661,7 +661,7 @@ describe('release da riga di comando', () => {
   // lo trovava col ripiego del «più recente». Qui la si ricrea anche fuori da una routine.
   test('una routine che lancia le prove non entra nel rilascio provato: né il suo consumo nel corpo, né il suo stato nella cartella', async () => {
     const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
-    const { base, work } = scena();
+    const { base, origin, work } = scena();
     const config = resolve(base, 'claude-di-chi-lancia');
     const progetto = resolve(config, 'projects', slugProgetto(process.cwd()));
     mkdirSync(progetto, { recursive: true });
