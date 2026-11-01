@@ -219,7 +219,8 @@ function ordinato(voci) {
   return Object.fromEntries([...voci].sort((x, y) => perNome(x[0], y[0])));
 }
 
-/** Tutto il database, una raccolta di primo livello alla volta. */
+// Si visita ogni documento, solo il nome: è l'unico modo di trovare tutte le sottoraccolte, e la visita è già il conto.
+// Un COUNT per raccolta in più costerebbe senza dire niente di nuovo.
 export async function contaRaccolte(cliente, { quanti = PAGINA, avanzamento = () => {} } = {}) {
   const raccolte = new Map();
   let totale = 0;
