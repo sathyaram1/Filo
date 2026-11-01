@@ -290,6 +290,12 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
 
   const META_PREFIX = `FILO_META_${sid}:`;
   const RDY_LINE = `FILO_RDY_${sid}`;
+  const ERR_PREFIX = `FILO_EFINE_${sid}:`;
+  const ERR_RE = new RegExp(`${ERR_PREFIX}(\\d+)\\n`);
+  let numero = 0;
+  let errBuf = '';
+  // Il marcatore è arrivato, lo stderr del comando non ancora: { code, cwd, timer }.
+  let inAttesa = null;
 
   let proc;
   try {
