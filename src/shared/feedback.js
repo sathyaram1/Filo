@@ -286,6 +286,73 @@
   }
   function isEncryptionError(e) { return !!(e && e.cifratura === true); }
 
+  // Un feedback senza testo e senza nessun allegato salito non nasce (#1667): per chi lo legge sarebbe una scheda
+  // vuota. `permanente`: riprovare non cambia niente (troppo grande, vuoto, rifiutato dal deposito).
+  const TETTO_ALLEGATO = 4 * 1024 * 1024;
+  const TROPPO_GRANDE = 'troppo grande (max 4 MB)';
+  class ErroreVuoto extends Error {
+    constructor(failed) {
+      const elenco = fraseAllegatiSaltati(failed);
+      super(elenco
+        ? `Il tuo feedback non è partito: non c'era testo e nessun allegato è salito (${elenco}).`
+        : 'Il tuo feedback non è partito: era vuoto.');
+      this.name = 'ErroreVuoto';
+      this.vuoto = true;
+      this.allegatiFalliti = Array.isArray(failed) ? failed : [];
+      this.permanente = this.allegatiFalliti.every((f) => f && f.permanente);
+    }
+  }
+
+  /** «nome»: motivo; «nome»: motivo. PURA. */
+  function fraseAllegatiSaltati(failed) {
+    return (Array.isArray(failed) ? failed : [])
+      .map((f) => `«${String((f && f.name) || 'allegato')}»: ${String((f && f.reason) || 'caricamento non riuscito')}`)
+      .join('; ');
+  }
+
+  /** I byte di un data URL base64, senza decodificarlo. PURA. */
+  function byteDiDataUrl(dataUrl) {
+    const s = String(dataUrl || '');
+    const corpo = s.slice(s.indexOf(',') + 1);
+    const pad = corpo.endsWith('==') ? 2 : (corpo.endsWith('=') ? 1 : 0);
+    return Math.max(0, Math.floor((corpo.length * 3) / 4) - pad);
+  }
+
+  /** Gli allegati che non saliranno comunque, decisi senza rete: lo stesso vaglio per chi accoda e per submit. PURA. */
+  function vagliaAllegati(images, files) {
+    const failed = [];
+    const immagini = [];
+    (Array.isArray(images) ? images.slice(0, 5) : []).forEach((img, i) => {
+      if (!img || !img.dataUrl) return;
+      const name = String(img.name || `immagine ${i + 1}`);
+      if (byteDiDataUrl(img.dataUrl) > TETTO_ALLEGATO) failed.push({ name, reason: TROPPO_GRANDE, permanente: true });
+      else immagini.push({ name, dataUrl: img.dataUrl });
+    });
+    const documenti = [];
+    for (const f of (Array.isArray(files) ? files.slice(0, 5) : [])) {
+      const name = String((f && f.name) || 'allegato');
+      if (!f || !f.dataUrl) failed.push({ name, reason: 'file vuoto', permanente: true });
+      else if (byteDiDataUrl(f.dataUrl) > TETTO_ALLEGATO) failed.push({ name, reason: TROPPO_GRANDE, permanente: true });
+      else documenti.push({ name, type: f.type, dataUrl: f.dataUrl });
+    }
+    return { immagini, documenti, failed };
+  }
+
+  /** null se il feedback avrebbe qualcosa dentro, altrimenti gli allegati che già si sa che non saliranno. PURA. */
+  function vuotoInPartenza({ text, images, files } = {}) {
+    if (String(text || '').trim()) return null;
+    const v = vagliaAllegati(images, files);
+    return v.immagini.length || v.documenti.length ? null : v.failed;
+  }
+
+  // Un 4xx del deposito (tranne attesa e troppe richieste) è un no: riprovare dà lo stesso no.
+  function motivoCaricamento(e) {
+    const s = Number(e && e.status) || 0;
+    return s >= 400 && s < 500 && s !== 408 && s !== 429
+      ? { reason: 'rifiutato dal deposito', permanente: true }
+      : { reason: 'caricamento non riuscito', permanente: false };
+  }
+
   // Cifra i byte di un allegato prima dell'upload su Storage. Ritorna un Blob
   // con contentType application/octet-stream (il contenuto è opaco: ciphertext
   // Uint8Array). Se non si può cifrare LANCIA un ErroreCifratura: il blob
