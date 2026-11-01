@@ -374,6 +374,7 @@ describe('pushRamoCorrente', () => {
     assert.equal(secondo.forced, true);
     assert.equal(remoteSha(origin, 'worker/7'), g(work, ['rev-parse', 'HEAD']),
       'il commit finale del worker deve essere su origin: il contenitore muore dopo il rilascio');
+    assert.equal(secondo.punta, remoteSha(origin, 'worker/7'), 'anche dopo il lease la punta è quella spinta');
   });
 
   test('qualcun altro ha spinto nel frattempo: il lease rifiuta e il push non riesce, con la causa', () => {
