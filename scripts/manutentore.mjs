@@ -433,9 +433,8 @@ async function indicazioneConChiave(cred, testo) {
 
 // ── Le novità (§ 8) ─────────────────────────────────────────────────────────
 
-// Le parole che fanno di una riga una promessa: una cosa che non c'è ancora. Larghe di proposito: un falso allarme si
-// dichiara o si riscrive, una promessa passata senza numero arriva a tutti gli utenti. Il futuro in terza persona
-// («verrà», «arriveranno») scatta su circa una riga dei worker su cento: è il prezzo di non dipendere da un elenco.
+// La regola sulle promesse è la fonte (controllaNovita): una riga senza righe dei worker da cui nasce è una promessa.
+// Queste parole sono solo la rete in più sulle righe che una fonte la dichiarano.
 const PROMESSA_RE = new RegExp([
   '\\p{L}+(?:rà|ranno)', 'lavoriamo (?:per|a|su)', 'domani', 'prossim[aoie] (?:settiman[ae]|mes[ei]|giorn[oi])',
   'in cantiere', 'in programma',
