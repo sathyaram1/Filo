@@ -399,7 +399,7 @@ export function rispostaAttese(rif, r) {
   if (r.invariato) {
     return `${r.dryRun ? '[dry-run] ' : ''}${rif}: aspettava già ${ATT.testoAttese(r.attese)}: non ${r.dryRun ? 'scriverei' : 'ho scritto'} niente.`;
   }
-  if (r.dryRun && aggiunte) return `[dry-run] ${rif}: aggiungerei ${aggiunte}, e aspetterebbe ${ATT.testoAttese(r.attese)}, stato invariato`;
+  if (r.dryRun && aggiunte && !tolte) return `[dry-run] ${rif}: aggiungerei ${aggiunte}, e aspetterebbe ${ATT.testoAttese(r.attese)}, stato invariato`;
   if (r.dryRun) {
     const cosa = r.attese.length ? `scriverei «aspetta ${ATT.testoAttese(r.attese)}»` : (tolte ? 'toglierei le attese' : 'non c’è nessuna attesa da togliere');
     return `[dry-run] ${rif}: ${cosa}${r.attese.length && tolte ? ` e toglierei ${una ? "quella" : "quelle"} su ${tolte}, che c’${una ? "era" : "erano"} prima` : ''}${!r.attese.length && tolte ? ` (${tolte})` : ''}, stato invariato`;
