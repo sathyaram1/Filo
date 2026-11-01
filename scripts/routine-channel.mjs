@@ -1852,6 +1852,7 @@ if (isMain) {
     // contenitore. Se il push non riesce NON si rilascia: si stampa la causa e
     // si esce diverso da zero, il worker sistema e rilancia (il biglietto scade
     // da solo dopo 60 minuti se muore). `--senza-push` dove non c'è un repo.
+    let spedito = null;
     if (data['senza-push'] !== true && cartellaSua && !finito) {
       // Prima quello che è rimasto fuori dai commit (un file nato da una
       // shell non passa dall'hook): si committa qui, e si dice.
