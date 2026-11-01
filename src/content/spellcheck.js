@@ -2117,7 +2117,15 @@
     // Sotto, il valore lascia vedere i puntini delle x, che scendono oltre la riga.
     const sotto = x.bottom + SPORGENZA_SEGNI;
     if (sotto + h <= q.top + q.height) return { sotto: true, velato: copre(sotto, tr.b, tr.b + 1000) };
-    return { sotto: false, velato: true };
+    // Accanto, prima dopo le x e poi prima; velato se copre parole della riga. Senza posto nemmeno lì, sulle x.
+    const cy = x.top + x.height / 2;
+    const tocca = (c, da, a) => rettangoliDi(state, da, a).some((r) => r.right > c - w / 2 && r.left < c + w / 2
+      && r.bottom > cy - h / 2 + 1 && r.top < cy + h / 2 - 1);
+    const dopo = x.right + 3 + w / 2;
+    if (dopo + w / 2 <= q.left + q.width) return { sotto: false, accanto: dopo, velato: tocca(dopo, tr.b, tr.b + 1000) };
+    const prima = x.left - 3 - w / 2;
+    if (prima - w / 2 >= q.left) return { sotto: false, accanto: prima, velato: tocca(prima, Math.max(0, tr.a - 1000), tr.a) };
+    return { sotto: false, accanto: cx, velato: true };
   }
 
   function svegliaValori(e) {
