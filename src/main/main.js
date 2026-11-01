@@ -478,9 +478,8 @@ app.whenReady().then(async () => {
     setTimeout(checkReady, 500);
   }
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) assicuraFinestraNormale();
-  });
+  // Su Mac la riapertura di Filo acceso arriva qui, non come seconda copia: stessa regola (#1606.1).
+  app.on('activate', (_e, visibili) => { riaperturaDaSistema(visibili !== false); });
 });
 
 // Salvataggio SINCRONO delle schede aperte: quello normale ha un debounce, e
