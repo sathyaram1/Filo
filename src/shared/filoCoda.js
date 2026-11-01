@@ -23,7 +23,7 @@
   function haContenuto(m) {
     if (!m || typeof m !== 'object') return false;
     return !!(String(m.text == null ? '' : m.text).trim() || (Array.isArray(m.actions) && m.actions.length)
-      || Number(m.images) > 0 || (Array.isArray(m.guardate) && m.guardate.length));
+      || Number(m.images) > 0 || (Array.isArray(m.guardate) && m.guardate.length) || (Array.isArray(m.esiti) && m.esiti.length));
   }
 
   // `trovaChat(id)`: la chat del filo con quell'id, per la risposta citata da un messaggio (#1620).
