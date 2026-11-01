@@ -853,14 +853,15 @@ function ordinaIcone(richiesta) {
 function rimetti(d) {
   const voci = d && Array.isArray(d.voci) ? d.voci.filter((v) => Array.isArray(v) && typeof v[0] === 'string' && Number.isInteger(v[1]) && Number.isInteger(v[2])) : [];
   const auto = !!(d && d.auto);
+  const finder = d && DISPOSIZIONI_FINDER.includes(d.finder) ? { disposizione: d.finder } : {};
   return sulDesktop(async () => {
     const letto = await computer().leggi();
     if (!letto.ok) return fallito(letto.errore);
     const ci = new Set(letto.voci.map((v) => v.id));
     const posizioni = voci.filter((v) => ci.has(v[0])).map(([id, x, y]) => ({ id, x, y }));
     const sparite = voci.length - posizioni.length;
-    const fatto = await computer().disponi(posizioni, { auto });
-    if (!fatto.ok) return fallito(fatto.errore);
+    const fatto = await computer().disponi(posizioni, { auto, ...finder });
+    if (!fatto.ok) return nonRiuscito(letto, null, fatto.errore);
     const evento = registraCambio(letto, fatto, null);
     return { ok: true, cosa: 'desktop', rimesse: posizioni.length, sparite, ...(evento ? { cambio: evento.id } : {}) };
   });
