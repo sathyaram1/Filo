@@ -243,13 +243,15 @@ test('il confronto dice cosa manca, cosa è cambiato e cosa è in più', () => {
   assert.equal(esito.mancano, 2, 'i quattro in più altrove non coprono i due che mancano');
   assert.equal(esito.inPiu, 4);
   assert.deepEqual(righeConfronto(esito), [
-    'DIVERSO: 3 su 11 raccolte non tornano: mancano 2 documenti, 4 in più (15 prima, 17 dopo).',
+    'DIVERSO: 3 raccolte su 11 non tornano: mancano 2 documenti, 4 in più (15 prima, 17 dopo).',
     '  config: 2 → 1 (-1)',
     '  feedback/*/note: 1 → 4 (+3), in 2 raccolte',
     'Le sottoraccolte che non tornano:',
     '  feedback/c/note: manca (prima 1)',
     '  feedback/zz/note: in più (4, prima non c\'era)',
   ]);
+  assert.equal(righeConfronto(confronta({ raccolte: { a: 2 } }, { raccolte: { a: 1 } }))[0],
+    'DIVERSO: 1 raccolta su 1 non torna: manca 1 documento, 0 in più (2 prima, 1 dopo).');
   const molte = {};
   for (let i = 0; i < 40; i++) molte[`paths/d${String(i).padStart(2, '0')}/entries`] = 1;
   const tante = confronta({ raccolte: molte }, { raccolte: {} });
@@ -312,7 +314,7 @@ test('prima dell\'export e dopo l\'import: UGUALE se non manca niente, DIVERSO e
   const manca = uscita();
   const ridotto = serverFinto(DOCUMENTI.filter((d) => d !== 'feedback/c/note/1' && d !== 'config/secrets'));
   assert.equal(await main(['--progetto', PROGETTO, '--confronta'], deps(ridotto, manca, '2026-11-01T12:00:00Z')), 1);
-  assert.ok(manca.righe.includes('DIVERSO: 2 su 10 raccolte non tornano: mancano 2 documenti, 0 in più (15 prima, 13 dopo).'), manca.righe.join('\n'));
+  assert.ok(manca.righe.includes('DIVERSO: 2 raccolte su 10 non tornano: mancano 2 documenti, 0 in più (15 prima, 13 dopo).'), manca.righe.join('\n'));
   assert.ok(manca.righe.includes('  feedback/c/note: manca (prima 1)'));
   assert.ok(manca.righe.includes('  config: 2 → 1 (-1)'));
 
