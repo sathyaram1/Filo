@@ -376,14 +376,30 @@ export async function spostaAttese(id, togli, voce, opts = {}) {
   const senzaNumero = tenute.filter((w) => !String(w.num || '').trim());
   if (senzaNumero.length) return { ok: false, motivo: `aspetta anche ${senzaNumero.map((w) => w.id).join(', ')}, senza numero: da qui la perderei, sposta l'attesa da Gestione` };
   const numeri = [...new Set([...tenute.map((w) => w.num), String(voce.num)])];
-  return segnaAttese(id, numeri.join(','), { ...opts, bearer });
+  // Le unite tolte sono ancora aperte di proposito: si archiviano subito dopo.
+  return segnaAttese(id, numeri.join(','), { ...opts, bearer, sostituisci: true });
 }
 
-/** La risposta a `--aspetta`/`--aspetta-niente`: l'elenco nuovo, quelle che sostituisce, e cosa succede dopo per QUESTO stato. */
+/** Il rifiuto di `--aspetta` che toglierebbe attese non fuse, con le due righe per proseguire. PURA. */
+export function rifiutoSostituzione(rif, numeri, r) {
+  const n = String(rif).replace(/^#+/, '');
+  const valore = (Array.isArray(numeri) ? numeri : [numeri]).join(',');
+  return [`RIFIUTATO: --aspetta sostituisce l’elenco intero, e ${r.motivo}: non ho toccato niente.`,
+    `  per aggiungere senza togliere: npm run feedback -- ${n} --aspetta-anche ${valore}`,
+    `  per sostituire davvero:        npm run feedback -- ${n} --aspetta ${valore} --sostituisci`].join('\n');
+}
+
+/** La risposta a `--aspetta`/`--aspetta-anche`/`--aspetta-niente`: l'elenco nuovo, cosa cambia, e cosa succede dopo per QUESTO stato. */
 export function rispostaAttese(rif, r) {
   const ATT = globalThis.SN_FB_ATTESE;
   const tolte = (r.tolte || []).length ? ATT.testoAttese(r.tolte) : '';
   const una = (r.tolte || []).length === 1;
+  const aggiunte = (r.aggiunte || []).length && (r.prima || []).length ? ATT.testoAttese(r.aggiunte) : '';
+  const unaAggiunta = (r.aggiunte || []).length === 1;
+  if (r.invariato) {
+    return `${r.dryRun ? '[dry-run] ' : ''}${rif}: aspettava già ${ATT.testoAttese(r.attese)}: non ${r.dryRun ? 'scriverei' : 'ho scritto'} niente.`;
+  }
+  if (r.dryRun && aggiunte) return `[dry-run] ${rif}: aggiungerei ${aggiunte}, e aspetterebbe ${ATT.testoAttese(r.attese)}, stato invariato`;
   if (r.dryRun) {
     const cosa = r.attese.length ? `scriverei «aspetta ${ATT.testoAttese(r.attese)}»` : (tolte ? 'toglierei le attese' : 'non c’è nessuna attesa da togliere');
     return `[dry-run] ${rif}: ${cosa}${r.attese.length && tolte ? ` e toglierei ${una ? "quella" : "quelle"} su ${tolte}, che c’${una ? "era" : "erano"} prima` : ''}${!r.attese.length && tolte ? ` (${tolte})` : ''}, stato invariato`;
