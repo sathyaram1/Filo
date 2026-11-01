@@ -499,11 +499,9 @@
   const SINTASSI = Symbol('sintassi');
   function programmaDi(t) {
     let s = String(t).trim().slice(1).trimStart();
-    let aperte = false;
     for (let prima = null; prima !== s;) {
       prima = s;
-      const o = s.match(/^[({!&]+\s*/);
-      if (o) { if (o[0].includes('(')) aperte = true; s = s.slice(o[0].length); }
+      s = s.replace(/^[({!&]+\s*/, '');
       const a = s.match(/^[\p{L}_][\p{L}\p{N}_]*=("[^"]*"|'[^']*'|\S*)(\s+|$)/u);
       if (a) { s = s.slice(a[0].length); if (!s) return SINTASSI; }
     }
