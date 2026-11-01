@@ -1,12 +1,14 @@
-// Come partono le sessioni delle routine (doc config/routines): quante insieme,
-// da quale account per prima, quali account sono esclusi, e le pause in corso a parole.
+// Come partono le sessioni delle routine (doc config/routines): quante insieme, da quale account per prima, quali
+// account sono esclusi, la routine a rete aperta (#2013), e le pause in corso a parole.
 // Logica pura: la pagina di gestione e il main rifiutano gli stessi valori.
 
 (function (global) {
   'use strict';
 
   // `manutentoreAcceso`: il pacemaker accende il manutentore (SPEC-MANUTENTORE § 4) solo se l'owner l'ha acceso.
-  const CHIAVI = Object.freeze(['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff', 'manutentoreAcceso']);
+  const CHIAVI = Object.freeze(['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff', 'manutentoreAcceso', 'reteApertaOff', 'reteApertaTetto']);
+  // La routine a rete aperta: una sessione finché l'owner non sceglie altro, come il server (policy.tettoReteApertaOf).
+  const RETE_APERTA_TETTO_DEFAULT = 1;
   // Vuoto = si alternano, che è il comportamento senza il campo.
   const ACCOUNT = Object.freeze(['', 'A', 'B']);
 
@@ -30,7 +32,14 @@
       accountAOff: d.accountAOff === true,
       accountBOff: d.accountBOff === true,
       manutentoreAcceso: d.manutentoreAcceso === true,
+      reteApertaOff: d.reteApertaOff === true,
+      reteApertaTetto: tettoDi(d.reteApertaTetto, max),
     };
+  }
+
+  function tettoDi(raw, max) {
+    const n = Math.floor(Number(raw));
+    return Number.isFinite(n) && n >= 1 ? Math.min(n, max) : RETE_APERTA_TETTO_DEFAULT;
   }
 
   /**
@@ -51,13 +60,22 @@
       }
       valori.maxSessions = n;
     }
+    if (p.reteApertaTetto != null) {
+      const { max } = limiti();
+      const scritto = String(p.reteApertaTetto).trim().replace(',', '.');
+      const n = scritto === '' ? NaN : Number(scritto);
+      if (!Number.isInteger(n) || n < 1 || n > max) {
+        return { ok: false, testo: `Sessioni della routine a rete aperta: ci vuole un numero intero da 1 a ${max}. Non salvato.` };
+      }
+      valori.reteApertaTetto = n;
+    }
     if (p.priorityAccount != null) {
       if (!ACCOUNT.includes(p.priorityAccount)) {
         return { ok: false, testo: 'Account prioritario: vale «A», «B», oppure niente (si alternano). Non salvato.' };
       }
       valori.priorityAccount = p.priorityAccount;
     }
-    for (const chiave of ['accountAOff', 'accountBOff', 'manutentoreAcceso']) {
+    for (const chiave of ['accountAOff', 'accountBOff', 'manutentoreAcceso', 'reteApertaOff']) {
       if (p[chiave] == null) continue;
       if (typeof p[chiave] !== 'boolean') {
         return { ok: false, testo: `${chiave}: ci vuole vero o falso. Non salvato.` };
@@ -107,10 +125,11 @@
 
   /**
    * Una pausa in corso (pauseDa del server) in parole: `testo` per la riga, `dettaglio` per il suo hover. Null se la
-   * voce non è una pausa leggibile o è già scaduta a `nowMs`.
+   * voce non è una pausa leggibile o è già scaduta a `nowMs`. `contoDi: 'routine'` per una voce che conta le sue
+   * accensioni, non quelle del suo account (la rete aperta).
    * @param {string} chi «Account A», «La routine server»…
    */
-  function pausaInParole(chi, voce, nowMs) {
+  function pausaInParole(chi, voce, nowMs, { contoDi = 'account' } = {}) {
     const v = voce && typeof voce === 'object' ? voce : null;
     const fino = v ? Number(v.finoMs) : NaN;
     if (!Number.isFinite(fino) || fino <= nowMs) return null;
@@ -132,11 +151,46 @@
         : `La pausa raddoppia a ogni ${uno} di fila, fino a un giorno.`,
     ];
     // La routine server senza un account noto non ha un conto del giorno da dire.
-    if (v.account === undefined || v.account === 'A' || v.account === 'B') righe.push(`Accensioni di oggi su quell'account: ${oggi}.`);
+    if (contoDi === 'routine') righe.push(`Accensioni di oggi di questa routine: ${oggi}.`);
+    else if (v.account === undefined || v.account === 'A' || v.account === 'B') righe.push(`Accensioni di oggi su quell'account: ${oggi}.`);
     return { testo, dettaglio: righe.join(' ') };
   }
 
+  // Perché la routine a rete aperta non parte, dall'ultima decisione del pacemaker (pacemaker.decideReteAperta).
+  const STATI_RETE_APERTA = Object.freeze({
+    rete_work: 'accesa',
+    off: 'ferma: routine spente',
+    off_manutentore: 'ferma: routine spente dal manutentore',
+    rete_off: 'spenta',
+    rete_no_routine_id: 'ferma: manca l’id della routine su claude.ai',
+    rete_no_token: 'ferma: manca il segreto per accenderla',
+    rete_no_key: 'ferma: nessuna parola d’ordine a rete aperta',
+    rete_account_off: 'ferma: il suo account è escluso',
+    rete_crediti_riserva: 'ferma: il suo account ha i crediti in riserva',
+    rete_paused: 'in pausa',
+    rete_tetto: 'al suo tetto di sessioni',
+    sessions_full: 'ferma: sessioni in parallelo al completo',
+    parallelismo_pieno: 'ferma: il parallelismo del manutentore è al completo',
+    rete_awaiting_probe: 'sta partendo',
+    no_rete_work: 'nessun compito per lei',
+  });
+
+  /**
+   * Lo stato della routine a rete aperta in una riga (vociDa del server): cosa ha deciso il pacemaker all'ultimo giro e
+   * quante volte l'ha accesa oggi. '' se il pacemaker non ne ha ancora scritto niente.
+   */
+  function statoReteAperta(voce) {
+    const v = voce && typeof voce === 'object' ? voce : {};
+    const perche = typeof v.perche === 'string' ? v.perche : '';
+    if (!perche) return '';
+    const stato = STATI_RETE_APERTA[perche] || 'ferma: stato non leggibile';
+    const oggi = Math.max(0, Math.floor(Number(v.oggi) || 0));
+    const accese = oggi === 0 ? 'mai accesa oggi' : oggi === 1 ? 'accesa una volta oggi' : `accesa ${oggi} volte oggi`;
+    return perche === 'rete_work' ? `${accese[0].toUpperCase()}${accese.slice(1)}.` : `${stato[0].toUpperCase()}${stato.slice(1)}; ${accese}.`;
+  }
+
   global.SN_ROUTINE_SESSIONI = {
-    CHIAVI, ACCOUNT, limiti, leggiDoc, valida, nessunAccount, prioritarioIgnorato, motivoPausa, pausaInParole,
+    CHIAVI, ACCOUNT, RETE_APERTA_TETTO_DEFAULT, limiti, leggiDoc, valida, nessunAccount, prioritarioIgnorato, motivoPausa,
+    pausaInParole, statoReteAperta,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
