@@ -602,7 +602,18 @@ export function prepareBranch({ root, branch, create = false, createIfMissing = 
   // lasciano residui che al checkout successivo verrebbero TRASPORTATI sul
   // branch del compito dopo, finendo nel diff che va al cancello di sicurezza.
   g(['clean', '-fd']);
-  return { ok: true, head: headSha(root), discarded, rewritten, superato, ...avviso };
+  return { ok: true, head: headSha(root), discarded, rewritten, superato, ...avviso, ...(createIfMissing ? { ripreso: true } : {}) };
+}
+
+/** `ls-remote --exit-code` esce 2 quando il ramo non c'è: ogni altro no (rete, permessi) è un «non so». */
+function ramoSuOrigin(root, branch) {
+  try {
+    execFileSync('git', ['ls-remote', '--exit-code', 'origin', `refs/heads/${branch}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return { presente: true };
+  } catch (e) {
+    if (e.status === 2) return { presente: false };
+    return { errore: `${e.stderr || ''}`.trim().split('\n').slice(-1)[0] || e.message };
+  }
 }
 
 function antenato(g, a, b) {
