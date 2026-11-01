@@ -22,7 +22,7 @@
       version: '0.2.256', date: '2026-11-01',
       features: [
         { testo: 'Anche sul Mac Filo mette in ordine le icone della Scrivania come gli chiedi, per nome, tipo, data o dimensione, e «annulla» le rimette dov\'erano. Ti dice che è fatto solo dopo aver controllato che siano davvero in ordine.', segnalazione: 1617 },
-        { testo: 'In cima al menu del tasto destro c\'è una fila di icone con quello che fai più spesso su quell\'elemento: grassetto, corsivo, collegamento ed evidenziatore sul testo che scrivi, Traduci e Cerca sul testo di una pagina, Salva e Chiedi a Filo su un\'immagine. Il «+» tiene le altre, e le icone le sposti trascinandole, anche dalla barra laterale.', segnalazione: 1434 },
+        { testo: 'In cima al menu del tasto destro c\'è una fila di icone con le azioni dell\'elemento che hai sotto il mouse: grassetto, corsivo, collegamento ed evidenziatore sul testo che scrivi, Traduci e Cerca sul testo di una pagina, Salva e Chiedi a Filo su un\'immagine. Il «+» tiene le altre, e le icone le sposti trascinandole, anche dalla barra laterale.', segnalazione: 1434 },
       ],
       fixes: [
         { testo: 'Filo non ti scrive più per uno screenshot o per un file che hai appena scaricato. Lo fa solo quando un download lungo finisce mentre non sei davanti a Filo, o quando ne parte uno mentre non c\'eri, e dice solo quale file è arrivato.', segnalazione: 1654 },
