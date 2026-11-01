@@ -1012,7 +1012,14 @@
       }
       return lo;
     };
-    return { testo, riporta, verso };
+    // Il punto del documento dove scrivere alla posizione `p` del testo, se lì non c'è un carattere da riscrivere: la riga
+    // vuota (il suo <br>) o il campo vuoto. null altrimenti.
+    const punto = (p) => {
+      const br = aCapi.get(p);
+      if (br && br.parentNode) return { node: br.parentNode, offset: Array.prototype.indexOf.call(br.parentNode.childNodes, br) };
+      return !testo && p === 0 ? { node: el, offset: 0 } : null;
+    };
+    return { testo, riporta, verso, punto };
   }
 
   function renderOverlayContent(state) {
