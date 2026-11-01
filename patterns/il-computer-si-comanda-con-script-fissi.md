@@ -104,6 +104,10 @@ regola degli altri comandi, con qualche punto in più:
   nella stessa casella) l'esito è un fallimento detto. Il desktop però è cambiato:
   quel cambio si registra comunque e l'esito dà l'annullo. Fermo del tutto è
   «non spostate»; uno script che si rompe a metà rilegge e registra allo stesso modo.
+  La rilettura conferma il piano, non il criterio: un dato che manca diventa in
+  silenzio l'ordine per nome. Per questo il Finder, se rifiuta un dato in blocco,
+  si interroga voce per voce, e per data o dimensione senza il dato per nessuna
+  icona l'esito è «senza-dati», non «fatto».
 - **Troppe per lo schermo: niente.** Fuori dallo schermo un'icona non si raggiunge
   più; si rifiuta coi due numeri e la strada (icone piccole).
 - **Ogni disposizione è un cambio del filo** (`tipo: 'desktop'`, prima e dopo con
