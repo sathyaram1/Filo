@@ -986,6 +986,7 @@
       if (n.nodeType !== 1) return;
       if (n.tagName === 'BR') {
         if (serveACapo && testo && !testo.endsWith('\n')) aCapo();
+        aCapi.set(testo.length, n);
         aCapo();
         return;
       }
