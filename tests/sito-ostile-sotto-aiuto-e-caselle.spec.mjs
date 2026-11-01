@@ -212,8 +212,14 @@ test('nell\'Aiuto su un sito lo script che seleziona, scrive e cancella non tocc
 
 test('nel feedback e nella domanda della spiegazione su un sito lo script non cambia il testo: parte quello dell\'utente', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
-  await prepara(app);
-  await app.evaluate(() => {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash', [C.ACTIONS.FOLLOWUP || 'followup']: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
     globalThis.__spiegazioni = [];
     const orig = globalThis.SN_PROVIDER_OPENROUTER;
     globalThis.SN_PROVIDER_OPENROUTER = {
