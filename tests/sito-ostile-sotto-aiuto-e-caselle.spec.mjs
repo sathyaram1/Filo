@@ -212,7 +212,7 @@ test('nell\'Aiuto su un sito lo script che seleziona, scrive e cancella non tocc
   expect(await sito.evaluate(() => !!document.querySelector('textarea')), 'la casella non sta nel documento del sito').toBe(false);
 });
 
-test('nel feedback e nella domanda della spiegazione su un sito lo script non cambia il testo: parte quello dell\'utente, e Ctrl+Z su un testo lunghissimo annulla', async ({ app, openTab, testServer }) => {
+test('nel feedback e nella domanda della spiegazione su un sito lo script non cambia il testo: parte quello dell\'utente', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   await prepara(app);
   await app.evaluate(() => {
