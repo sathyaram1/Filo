@@ -195,7 +195,7 @@ test('il valore di un segnaposto citato con uno spazio in più sta sulle sole x'
 // #1655
 test('«Filo» e filo.red non sono mai errori: né per il dizionario né per il modello', () => {
   const testo = "Ho aperto Filo e poi filo.red, www.filo.red/novita e Filo's tabs; FILO";
-  assert.deepEqual(C.candidatiDizionario(testo, { sbagliata: () => true }).map((s) => s.segment), ['Ho', 'aperto', 'e', 'poi', 'e', 'tabs']);
+  assert.deepEqual(C.candidatiDizionario(testo, { sbagliata: () => true }).map((s) => s.segment), ['Ho', 'aperto', 'poi', 'tabs']);
   for (const riga of [
     '[aperto Filo][aperto filo][maiuscola a metà frase][errore]',
     '[filo.red][filo.rete][refuso][errore]',

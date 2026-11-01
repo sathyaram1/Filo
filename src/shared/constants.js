@@ -1291,6 +1291,8 @@
   // riconoscere «rupie» come INR ovunque gli si chieda un cambio (#724.1).
   const NOMI_VALUTE = 'rupie = INR, real = BRL, zloty = PLN, won = KRW, rand = ZAR, baht = THB, lira turca = TRY, fiorino = HUF, corona ceca = CZK, peso messicano = MXN, dollari = USD, sterline = GBP, franchi svizzeri = CHF, yen = JPY, yuan = CNY';
   const FATTORI_UNITA = '1 mi = 1.609 km, 1 ft = 0.3048 m, 1 in = 2.54 cm, 1 yd = 0.9144 m, 1 mi² = 2.59 km², 1 acre = 4046.86 m², 1 lb = 0.4536 kg, 1 oz = 28.35 g, 1 gal (US) = 3.785 L, 1 fl oz (US) = 29.57 mL, °C = (°F-32)*5/9';
+  // Per i due controlli del correttore (#1655): il nome dell'app, che a metà frase sembra il filo da cucire scritto maiuscolo.
+  const NOME_DI_FILO = 'Filo è il nome del browser in cui la persona scrive, e filo.red il suo sito: «Filo» con la maiuscola e filo.red non sono errori.';
 
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
   const PROMPTS = {

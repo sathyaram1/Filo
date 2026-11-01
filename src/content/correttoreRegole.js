@@ -55,15 +55,15 @@
     /(?<![\p{L}\p{N}._-])(?:[\p{L}\p{N}-]+\.)*filo\.red(?:\/\S*)?(?![\p{L}\p{N}_-])/giu,
   ];
   // Indirizzi, email, menzioni, etichette e codice fra apici inversi: lì una «parola» non è una parola da correggere.
-  // Anche un dominio senza indirizzo intorno («amazon.it», #1655), col suffisso minuscolo: «andato.Poi» è uno spazio
-  // dimenticato, e le sue parole restano da guardare.
+  // Anche un dominio senza indirizzo intorno («amazon.it», #1655), col suffisso minuscolo e non di sole x: «andato.Poi»
+  // è uno spazio dimenticato, «x.xxx» un numero da cercare.
   const ZONE = [
     /\b(?:https?:\/\/|www\.)[^\s<>"]+/giu,
     /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/gu,
     /(?<![\p{L}\p{N}])[@#][\p{L}\p{N}_]+/gu,
     /`[^`\n]+`/g,
     /(?<![\p{L}\p{N}@])[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+\/\S*/gu,
-    /(?<![\p{L}\p{N}@._%+-])(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+\p{Ll}{2,}(?![\p{L}\p{N}_-]|\.[\p{L}\p{N}])/gu,
+    /(?<![\p{L}\p{N}@._%+-])(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+(?!x+(?![\p{L}\p{N}]))\p{Ll}{2,}(?![\p{L}\p{N}_-]|\.[\p{L}\p{N}])/gu,
     ...ZONE_DI_FILO,
   ];
   function zoneDi(testo, lista) {
