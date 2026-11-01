@@ -10,6 +10,8 @@ import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { aspettaChe } from '../helpers/attese.mjs';
+import { newWorkBranch } from '../../scripts/lib/branch-integrity.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ID = 'fid-1632';
