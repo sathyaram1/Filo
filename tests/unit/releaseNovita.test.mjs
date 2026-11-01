@@ -94,7 +94,7 @@ describe('applicaNovita sul registro vero', () => {
 
   test('il registro si legge come dato, senza eseguirlo: uguale a quello che carica l’app, e niente oltre ai letterali', () => {
     createRequire(import.meta.url)(FILE);
-    assert.deepEqual(NOTE, JSON.parse(JSON.stringify(globalThis.SN_PATCH_NOTES.NOTES)));
+    assert.deepEqual(note(VERO), JSON.parse(JSON.stringify(globalThis.SN_PATCH_NOTES.NOTES)));
     const letti = note("const NOTES = [\n  // c\n  { version: '1.0.0', 'date': \"x\", features: ['}', '\\u00e8\\x41\\u{1F600}\\n'], /* } */ fixes: [`t`, -1.5, true, null], },\n];");
     assert.deepEqual(letti, [{ version: '1.0.0', date: 'x', features: ['}', 'èA😀\n'], fixes: ['t', -1.5, true, null] }]);
     for (const cattivo of [
