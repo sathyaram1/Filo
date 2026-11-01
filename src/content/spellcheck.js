@@ -2949,10 +2949,11 @@
     pezzo = String(pezzo || '');
     sx = String(sx || '');
     dx = String(dx || '');
-    if (!pezzo || !(sx + dx)) return { manca: true };
-    const { testo, riporta } = testoDaControllare(el);
+    if (!pezzo) return { manca: true };
+    const { testo, riporta, punto } = testoDaControllare(el);
     const posti = [];
-    for (let i = testo.indexOf(sx + dx); i >= 0; i = testo.indexOf(sx + dx, i + 1)) posti.push(i + sx.length);
+    if (sx + dx) for (let i = testo.indexOf(sx + dx); i >= 0; i = testo.indexOf(sx + dx, i + 1)) posti.push(i + sx.length);
+    else if (!testo) posti.push(0);
     if (!posti.length) return { manca: true };
     const vicino = Number(vicinoA) || 0;
     const p = posti.reduce((m, q) => (Math.abs(q - vicino) < Math.abs(m - vicino) ? q : m));
