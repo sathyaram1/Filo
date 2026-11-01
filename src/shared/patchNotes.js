@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.256', date: '2026-11-01',
+      features: [],
+      fixes: [
+        { testo: 'Filo non ti scrive più per uno screenshot o per un file che hai appena scaricato. Lo fa solo quando un download lungo finisce mentre non sei davanti a Filo, o quando ne parte uno mentre non c\'eri, e dice solo quale file è arrivato.', segnalazione: 1654 },
+      ],
+    },
+    {
       version: '0.2.255', date: '2026-10-31',
       features: [
         '«Salva video come…» funziona anche sui video in streaming, come quelli di YouTube: il video arriva in MP4 fino a 1080p e lo segui nei Download. Il primo salvataggio scarica il programma che lo ricompone.',
