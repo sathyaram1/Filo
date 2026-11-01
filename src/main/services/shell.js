@@ -609,8 +609,8 @@ function programmaPosixAlPercorso(cmd, cwd) {
   try {
     if (!fs.statSync(p).isFile()) return false;
     fs.accessSync(p, fs.constants.X_OK);
-    return true;
   } catch (_) { return false; }
+  return contenutoEseguibile(p);
 }
 
 // true esiste, false non esiste di certo, null non si è potuto sapere (la dashboard lo lascia senza colore).
