@@ -1540,12 +1540,13 @@
         const qui = !chat || chat === chatAttuale();
         const chiesta = primaRigaConferma(a);
         const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a, parole: qui ? paroleUtente() : [], chatId: chat || chatAttuale() || '' });
-        // #1373 — l'esito che va letto, o il sì che sblocca un passo rimasto indietro: Filo riprende da solo, una volta.
-        const riprende = !!(r && !r.rejected && (r.riprendi || (a._riprende && r.executed)));
+        // #1373 — la conferma è una pausa del lavoro, non la sua fine: com'è andata (fatta o no) torna al modello, che
+        // continua o chiude. Un segreto fermato non torna: il modello cercherebbe un'altra strada per farlo uscire.
+        const riprende = !!(r && !r.rejected && !(r.output && r.output.blocked === 'segreto'));
         try {
           esitoDellaConferma(r, { chiesta, chat });
         } finally {
-          if (riprende) proseguiQuandoLibero(chat);
+          if (riprende) proseguiQuandoLibero(chat, voceDellaConferma(a));
         }
       }
       // Il resto della conferma, dopo la risposta del main: diario, bottone, archivio.
