@@ -326,5 +326,5 @@ function createIncognitoWindow() {
 
 module.exports = {
   createMainWindow, createIncognitoWindow, revealWindow, SHELL_HEIGHT,
-  assicuraFinestraNormale, mostraFinestraNormale, onFinestraNormale,
+  assicuraFinestraNormale, mostraFinestraNormale, onFinestraNormale, riaperturaDaSistema, attendiAvvio,
 };
