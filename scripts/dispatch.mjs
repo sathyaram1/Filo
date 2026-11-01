@@ -2147,12 +2147,13 @@ function positionOnBranch(bucket) {
   // Un punto fermo registrato per un ALTRO ramo non deve guidare il ripristino
   // di questo: lo sha esiste nel repo, quindi prepareBranch lo prenderebbe per
   // buono e riporterebbe il ramo al contenuto di un tentativo diverso.
-  const checkpoint = (!isNew && prev?.branch === branch) ? lastCheckpoint(prev) : null;
+  const checkpoint = prev?.branch === branch ? lastCheckpoint(prev) : null;
 
   const res = prepareBranch({
     root: ROOT,
     branch,
-    create: isNew,
+    create: isNew && !dalBiglietto,
+    createIfMissing: dalBiglietto,
     // Un lavoro nuovo nasce SEMPRE dalla linea principale: le basi feature/N
     // erano il Modello B dei sotto-feedback, abolito (SPEC-RIDISEGNO-MAX.md §1).
     base: '',
