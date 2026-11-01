@@ -167,7 +167,8 @@
   // `conversazioni`: i messaggi del filo, per chi non li ha già davanti (vedi conversazioniRecenti).
   // `soloSiti`: delle schede aperte arriva il nome del sito, non il titolo che scrive la pagina (#1297, benvenuto).
   // `creditiFreschi`: la chiede un turno di chat, che non aspetta il saldo ma ne fa rileggere uno vecchio (#1353).
-  // `finestra` e `schedaChat` (#413): le schede elencate sono quelle della finestra della chat, e la sua è segnata.
+  // `finestra` e `schedaChat` (#413): le schede elencate sono quelle della finestra della chat, e la sua è segnata;
+  // alla chat arrivano nell'ordine della barra, il solo in cui «la seconda» vuol dire quello che intende l'utente.
   async function assemble({ creditiFreschi = false, sistema: conSistema = true, conversazioni = null, soloSiti = false, finestra = null, schedaChat = null } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
