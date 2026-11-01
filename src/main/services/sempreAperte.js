@@ -24,8 +24,7 @@ function voceDa(input, { daScheda = false } = {}) {
 }
 
 function conPorta(input) {
-  const s = String(input == null ? '' : input).trim();
-  try { return !!new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `http://${s}`).port; } catch (_) { return false; }
+  return /^(?:[a-z][a-z0-9+.-]*:\/\/)?[^\s/?#:@]+:\d{1,5}(?:[/?#]|$)/i.test(String(input == null ? '' : input).trim());
 }
 
 async function voci() {
