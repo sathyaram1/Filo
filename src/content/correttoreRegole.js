@@ -480,12 +480,12 @@
   function segnoDelSegnaposto(r, testo, dove, fonte) {
     const base = { segno: 'suggerimento', dubbio: false, fonte, tipo: 'segnaposto', citazione: '' };
     const pezzo = r.pezzo.trim();
-    const pos = posizioniNelTesto(pezzo, testo.slice(dove.start, dove.end));
+    const visto = testo.slice(dove.start, dove.end);
     if (r.tipo === 'segnaposto') {
-      const stretto = r.correzione.trim() ? restringi(pezzo, r.correzione.trim()) : null;
+      const stretto = r.correzione.trim() ? restringiNelTesto(pezzo, r.correzione, visto) : null;
       if (!stretto) return null;
-      const start = dove.start + pos[stretto.da];
-      const end = dove.start + pos[stretto.a];
+      const start = dove.start + stretto.da;
+      const end = dove.start + stretto.a;
       const valore = stretto.sostituto.trim();
       if (end <= start || !/x/i.test(testo.slice(start, end)) || !valore || /xx/i.test(valore)) return null;
       return { ...base, start, end, segment: testo.slice(start, end), motivo: corta(r.motivo, MOTIVO_MAX), correzioni: [valore] };
