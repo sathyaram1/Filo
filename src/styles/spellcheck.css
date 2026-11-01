@@ -244,8 +244,11 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
 .sn-spell-valori .sn-spell-valore {
   all: initial;
   --sn-segno: var(--sn-spell-suggerimento, #b07a14);
+  /* Dove sta rispetto alle x, e verso dove si stacca da loro all'hover e all'arrivo. */
+  --sn-valore-y: calc(-100% - 1px);
+  --sn-valore-via: -1;
   position: fixed;
-  transform: translate(-50%, calc(-100% - 1px));
+  transform: translate(-50%, var(--sn-valore-y));
   box-sizing: border-box;
   padding: 0 4px;
   min-width: 1.6em;
@@ -271,17 +274,27 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
   background: #2b2520;
   box-shadow: 0 1px 3px rgba(0, 0, 0, calc(0.4 * var(--sn-ombra, 1)));
 }
+/* Sulla prima riga di un campo senza margine sopra il valore sta sotto le x, dentro il campo (#1448.12). */
+.sn-spell-valori .sn-spell-valore.sn-sotto {
+  --sn-valore-y: 0px;
+  --sn-valore-via: 1;
+}
+/* In un campo alto una riga sta accanto alle x, centrato sulla loro riga: fuori dal campo coprirebbe la pagina. */
+.sn-spell-valori .sn-spell-valore.sn-accanto {
+  --sn-valore-y: -50%;
+  --sn-valore-via: 0;
+}
 .sn-spell-valori .sn-spell-valore:hover {
   background: color-mix(in srgb, var(--sn-segno) 20%, #fffaf1);
-  transform: translate(-50%, calc(-100% - 3px));
+  transform: translate(-50%, calc(var(--sn-valore-y) + var(--sn-valore-via) * 2px));
 }
 .sn-spell-valori[data-sn-theme="dark"] .sn-spell-valore:hover {
   background: color-mix(in srgb, var(--sn-segno) 24%, #2b2520);
 }
 .sn-spell-valori .sn-spell-valore:active {
-  transform: translate(-50%, calc(-100% - 1px)) scale(0.96);
+  transform: translate(-50%, var(--sn-valore-y)) scale(0.96);
 }
-/* Sopra le parole della riga prima il valore è velato e lascia il clic al testo; il puntatore sulle x lo sveglia. */
+/* Sulle parole di un'altra riga il valore è velato e lascia il clic al testo; il puntatore sulle x lo sveglia. */
 .sn-spell-valori .sn-spell-valore.sn-sopra-testo:not(.sn-sveglio) {
   pointer-events: none;
   opacity: var(--sn-spell-valore-velato, 0.45);
@@ -298,8 +311,8 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
   animation: sn-valore-cerca calc(1100ms * var(--sn-motion, 1)) ease-in-out infinite;
 }
 @keyframes sn-valore-arriva {
-  from { opacity: 0; transform: translate(-50%, calc(-100% + 2px)); }
-  to { opacity: 1; transform: translate(-50%, calc(-100% - 1px)); }
+  from { opacity: 0; transform: translate(-50%, calc(var(--sn-valore-y) - var(--sn-valore-via) * 3px)); }
+  to { opacity: 1; transform: translate(-50%, var(--sn-valore-y)); }
 }
 @keyframes sn-valore-cerca {
   0%, 100% { opacity: 0.35; }

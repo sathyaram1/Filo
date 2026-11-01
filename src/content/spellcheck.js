@@ -972,6 +972,7 @@
     let pos = 0;
     let serveACapo = false;
     const bordi = [0];
+    const aCapi = new Map();
     const aCapo = () => { testo += '\n'; bordi.push(pos); serveACapo = false; };
     const visita = (n) => {
       if (n.nodeType === 3) {
@@ -986,6 +987,7 @@
       if (n.nodeType !== 1) return;
       if (n.tagName === 'BR') {
         if (serveACapo && testo && !testo.endsWith('\n')) aCapo();
+        aCapi.set(testo.length, n);
         aCapo();
         return;
       }
@@ -1011,7 +1013,14 @@
       }
       return lo;
     };
-    return { testo, riporta, verso };
+    // Il punto del documento dove scrivere alla posizione `p` del testo, se lì non c'è un carattere da riscrivere: la riga
+    // vuota (il suo <br>) o il campo vuoto. null altrimenti.
+    const punto = (p) => {
+      const br = aCapi.get(p);
+      if (br && br.parentNode) return { node: br.parentNode, offset: Array.prototype.indexOf.call(br.parentNode.childNodes, br) };
+      return !testo && p === 0 ? { node: el, offset: 0 } : null;
+    };
+    return { testo, riporta, verso, punto };
   }
 
   function renderOverlayContent(state) {
@@ -1984,21 +1993,27 @@
     return v;
   }
 
-  // I riquadri delle righe di [da, a): nello specchio per una casella, sulle parole vere per un campo modificabile.
+  // I riquadri delle righe di [da, a): nello specchio per una casella, sulle parole vere per un campo modificabile. Un
+  // `a` oltre la fine del testo vale la fine.
   function rettangoliDi(state, da, a) {
     const radice = campoDiTesto(state.el) ? state.overlay : state.el;
     if (!radice || a <= da) return [];
     const w = document.createTreeWalker(radice, NodeFilter.SHOW_TEXT);
     const range = document.createRange();
+    const rettangoli = () => [...range.getClientRects()].filter((r) => r.width || r.height);
     let tot = 0;
     let iniziato = false;
+    let ultimo = null;
     for (let n = w.nextNode(); n; n = w.nextNode()) {
       const len = n.nodeValue.length;
       if (!iniziato && da < tot + len) { range.setStart(n, da - tot); iniziato = true; }
-      if (iniziato && a <= tot + len) { range.setEnd(n, a - tot); return [...range.getClientRects()].filter((r) => r.width || r.height); }
+      if (iniziato && a <= tot + len) { range.setEnd(n, a - tot); return rettangoli(); }
       tot += len;
+      ultimo = n;
     }
-    return [];
+    if (!iniziato || !ultimo) return [];
+    range.setEnd(ultimo, ultimo.nodeValue.length);
+    return rettangoli();
   }
 
   const dentroAlCampo = (state, r) => {
@@ -2061,8 +2076,13 @@
       b.title = s.cercando ? t('spell_segnaposto_cerco') : t('spell_segnaposto_metti', s.correzioni[0]);
       b.style.left = `${r.left + r.width / 2}px`;
       b._snX = r;
-      b.style.top = `${r.top}px`;
-      b.classList.toggle('sn-sopra-testo', copreIlTesto(state, b, r, tr.a));
+      const posto = postoDelValore(state, b, r, tr);
+      const accanto = posto.accanto != null;
+      if (accanto) b.style.left = `${posto.accanto}px`;
+      b.style.top = `${accanto ? r.top + r.height / 2 : posto.sotto ? r.bottom + SPORGENZA_SEGNI : r.top}px`;
+      b.classList.toggle('sn-sotto', posto.sotto);
+      b.classList.toggle('sn-accanto', accanto);
+      b.classList.toggle('sn-sopra-testo', posto.velato);
     }
     for (const [k, b] of state.badge) if (!usati.has(k)) { b.remove(); state.badge.delete(k); }
     for (const l of v.querySelectorAll('.sn-spell-lampo')) l.remove();
@@ -2077,19 +2097,35 @@
     }
   }
 
-  // Sopra le x di una riga che non è la prima il valore cadrebbe sulle parole della riga prima (#1448): lì resta velato,
-  // lascia il clic al testo e si sveglia (pieno, cliccabile) col puntatore sulle x, finché resta su x o valore.
-  function copreIlTesto(state, b, x, da) {
+  // Il valore sta sopra le x e non esce dal campo: fuori coprirebbe e prenderebbe il clic a ciò che la pagina ha lì
+  // (#1448.12), quindi sulla prima riga va sotto. Sulle parole di un'altra riga resta velato (#1448): lascia il clic al
+  // testo e si sveglia (pieno, cliccabile) col puntatore sulle x. Senza posto né sopra né sotto (un campo alto una riga)
+  // sta accanto alle x, sulla loro riga: sopra il campo, sveglio, prenderebbe il clic diretto alla pagina (#1690).
+  function postoDelValore(state, b, x, tr) {
     const w = b.offsetWidth;
     const h = b.offsetHeight;
-    if (!w || !h) return false;
+    const q = state.riquadro;
+    if (!w || !h || !q) return { sotto: false, velato: false };
     const cx = x.left + x.width / 2;
-    const top = x.top - 1 - h;
-    return rettangoliDi(state, Math.max(0, da - 1000), da).some((r) => {
+    const copre = (top, da, a) => rettangoliDi(state, da, a).some((r) => {
       const mezzo = r.top + r.height / 2;
       if (mezzo >= x.top && mezzo <= x.bottom) return false;
       return r.bottom > top + 1 && r.top < top + h - 1 && r.right > cx - w / 2 && r.left < cx + w / 2;
     });
+    const sopra = x.top - 1 - h;
+    if (sopra >= q.top) return { sotto: false, velato: copre(sopra, Math.max(0, tr.a - 1000), tr.a) };
+    // Sotto, il valore lascia vedere i puntini delle x, che scendono oltre la riga.
+    const sotto = x.bottom + SPORGENZA_SEGNI;
+    if (sotto + h <= q.top + q.height) return { sotto: true, velato: copre(sotto, tr.b, tr.b + 1000) };
+    // Accanto, prima dopo le x e poi prima; velato se copre parole della riga. Senza posto nemmeno lì, sulle x.
+    const cy = x.top + x.height / 2;
+    const tocca = (c, da, a) => rettangoliDi(state, da, a).some((r) => r.right > c - w / 2 && r.left < c + w / 2
+      && r.bottom > cy - h / 2 + 1 && r.top < cy + h / 2 - 1);
+    const dopo = x.right + 3 + w / 2;
+    if (dopo + w / 2 <= q.left + q.width) return { sotto: false, accanto: dopo, velato: tocca(dopo, tr.b, tr.b + 1000) };
+    const prima = x.left - 3 - w / 2;
+    if (prima - w / 2 >= q.left) return { sotto: false, accanto: prima, velato: tocca(prima, Math.max(0, tr.a - 1000), tr.a) };
+    return { sotto: false, accanto: cx, velato: true };
   }
 
   function svegliaValori(e) {
@@ -2100,7 +2136,13 @@
     const dentro = (r, m) => r && x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m;
     for (const b of state.badge.values()) {
       if (!b.classList.contains('sn-sopra-testo')) continue;
-      const sveglio = dentro(b._snX, 2) || (b.classList.contains('sn-sveglio') && (dentro(b._snX, 4) || dentro(b.getBoundingClientRect(), 4)));
+      // Sveglio resta per tutta la fascia fra le x e il valore: sotto, i puntini li separano di qualche pixel.
+      const s = b._snX;
+      let sveglio = dentro(s, 2);
+      if (!sveglio && s && b.classList.contains('sn-sveglio')) {
+        const v = b.getBoundingClientRect();
+        sveglio = dentro({ left: Math.min(s.left, v.left), right: Math.max(s.right, v.right), top: Math.min(s.top, v.top), bottom: Math.max(s.bottom, v.bottom) }, 4);
+      }
       b.classList.toggle('sn-sveglio', sveglio);
     }
   }
@@ -2884,19 +2926,97 @@
 
   // Scrive `dopo` al posto di `prima` come la correzione del menu (Ctrl+Z la annulla). `{ dove }` è l'inizio del pezzo
   // nuovo nel testo del campo; `{ manca }` se `prima` non c'è più, `{ fermo }` se il campo non si è lasciato scrivere.
+  // Un pezzo tolto senza niente al suo posto torna anche com'era (`tolto`) e col testo che gli resta attorno (`sx`, `dx`):
+  // è da lì che rimettiNelCampo lo rimette (#1449.3).
   function sostituisciNelCampo(el, prima, dopo, vicinoA = 0) {
     if (!el || !el.isConnected) return { manca: true };
     const pezzo = String(prima || '');
     if (!pezzo) return { manca: true };
+    const nuovo = String(dopo == null ? '' : dopo);
     const { testo, riporta } = testoDaControllare(el);
     const trovato = cercaPezzo(testo, pezzo, Number(vicinoA) || 0);
     const r = trovato ? riporta([trovato])[0] : null;
     if (!r) return { manca: true };
     const campo = getEditableText(el);
+    const tolto = campo.slice(r.start, r.end);
     // Il fuoco sta nell'Aiuto: la selezione di un campo modificabile vale per il browser solo nel campo a fuoco.
     if (!campoDiTesto(el)) { try { el.focus({ preventScroll: true }); } catch (_) {} }
-    applyFix(el, r, String(dopo == null ? '' : dopo), { expectedSegment: campo.slice(r.start, r.end) });
-    return getEditableText(el) !== campo ? { dove: trovato.start } : { fermo: true };
+    applyFix(el, r, nuovo, { expectedSegment: tolto });
+    if (getEditableText(el) === campo) return { fermo: true };
+    if (nuovo) return { dove: trovato.start };
+    const ora = testoDaControllare(el).testo;
+    const p = trovato.start;
+    return { dove: p, tolto, sx: ora.slice(Math.max(0, p - INTORNO_TOLTO), p), dx: ora.slice(p, p + INTORNO_TOLTO) };
+  }
+
+  // Abbastanza da ritrovare il punto anche se il campo è cambiato altrove, poco da fallire se si è scritto proprio lì.
+  const INTORNO_TOLTO = 16;
+  const altoSurrogato = (c) => /[\uD800-\uDBFF]/.test(c || '');
+  const bassoSurrogato = (c) => /[\uDC00-\uDFFF]/.test(c || '');
+
+  // Rimette `pezzo` fra `sx` e `dx` nel punto più vicino a `vicinoA` (#1449.3): una correzione che aveva tolto un pezzo
+  // si toglie come le altre. Si riscrive un solo carattere accanto, così il resto del campo, e la sua forma, non si tocca.
+  function rimettiNelCampo(el, pezzo, sx, dx, vicinoA = 0) {
+    if (!el || !el.isConnected) return { manca: true };
+    pezzo = String(pezzo || '');
+    sx = String(sx || '');
+    dx = String(dx || '');
+    if (!pezzo) return { manca: true };
+    const { testo, riporta, punto } = testoDaControllare(el);
+    const posti = [];
+    if (sx + dx) for (let i = testo.indexOf(sx + dx); i >= 0; i = testo.indexOf(sx + dx, i + 1)) posti.push(i + sx.length);
+    else if (!testo) posti.push(0);
+    if (!posti.length) return { manca: true };
+    const vicino = Number(vicinoA) || 0;
+    const p = posti.reduce((m, q) => (Math.abs(q - vicino) < Math.abs(m - vicino) ? q : m));
+    const campo = getEditableText(el);
+    const accanto = [];
+    if (p < testo.length) accanto.push({ start: p, end: p + (altoSurrogato(testo[p]) ? 2 : 1), dopo: true });
+    if (p > 0) accanto.push({ start: p - (bassoSurrogato(testo[p - 1]) ? 2 : 1), end: p, dopo: false });
+    for (const a of accanto) {
+      const r = riporta([{ start: a.start, end: a.end }])[0];
+      if (!r) continue;
+      const c = campo.slice(r.start, r.end);
+      if (!campoDiTesto(el)) { try { el.focus({ preventScroll: true }); } catch (_) {} }
+      applyFix(el, r, a.dopo ? pezzo + c : c + pezzo, { expectedSegment: c });
+      return getEditableText(el) !== campo ? { dove: p } : { fermo: true };
+    }
+    // Il pezzo stava da solo sulla sua riga di un editor ricco, o era tutto il campo: accanto non c'è un carattere da
+    // riscrivere, e si scrive nel punto (#1690).
+    const dove = campoDiTesto(el) ? p : punto(p);
+    if (dove === null) return { fermo: true };
+    return scriviNelPunto(el, dove, pezzo) ? { dove: p } : { fermo: true };
+  }
+
+  // Scrive `pezzo` in un punto, come una battuta: `dove` è la posizione in una casella, il punto del documento in un
+  // campo modificabile.
+  function scriviNelPunto(el, dove, pezzo) {
+    const prima = getEditableText(el);
+    const doc = el.ownerDocument || document;
+    const input = () => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
+    try {
+      if (campoDiTesto(el)) {
+        if (!sostituisciComeBattuta(el, { start: dove, end: dove }, pezzo, 'end')) {
+          el.setRangeText(pezzo, dove, dove, 'end');
+          el.dispatchEvent(input());
+        }
+      } else {
+        el.focus({ preventScroll: true });
+        const sel = (doc.defaultView || window).getSelection();
+        const r = doc.createRange();
+        r.setStart(dove.node, dove.offset);
+        r.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(r);
+        if (!doc.execCommand('insertText', false, pezzo) || getEditableText(el) === prima) {
+          r.insertNode(doc.createTextNode(pezzo));
+          el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: pezzo }));
+        }
+      }
+    } catch (_) {}
+    const fatto = getEditableText(el) !== prima;
+    if (fatto) { try { global.SN_POPUP?.modificaDiFilo?.(el, 'correzione'); } catch (_) {} }
+    return fatto;
   }
 
   // ============================================================================
@@ -2995,6 +3115,7 @@
     chiaveSegno,
     testoDelCampo,
     sostituisciNelCampo,
+    rimettiNelCampo,
     sostituisciComeBattuta,
     riallineaIssues,
     addToDictionary,

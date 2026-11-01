@@ -86,7 +86,7 @@ async function apri(app, openTab, testServer, opz = {}) {
       return globalThis.__fontiWeb;
     };
   }, opz);
-  const page = await testServer.openReady(openTab, PAGINA, { pubblico: true });
+  const page = await testServer.openReady(openTab, opz.html || PAGINA, { pubblico: true });
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   return page;
 }
@@ -160,6 +160,98 @@ test('sopra le parole della riga prima il valore è velato e il clic va al testo
   await expect(v).toHaveClass(/sn-sveglio/);
   await page.mouse.click(sopra.x + sopra.width / 2, sopra.y + sopra.height / 2);
   await expect(page.locator('#ta')).toHaveValue(scritto.replace('14xx', '1492'));
+});
+
+// #1448.12: un collegamento attaccato sopra campi senza margine, dove il valore sopra le x della prima riga cadrebbe.
+const SENZA_MARGINE = `<!doctype html><meta charset="utf-8"><body style="margin:0;padding:60px 20px;font:14px sans-serif">
+<a id="lnk" href="#cliccato" style="display:block;width:760px;height:30px">Rispondi a tutti</a>
+<textarea id="ta" lang="it" style="display:block;width:760px;height:100px;font:16px sans-serif;padding:2px;margin:0"></textarea>
+<a id="lnk2" href="#cliccato2" style="display:block;width:760px;height:30px;margin-top:20px">Inoltra</a>
+<div id="ce" contenteditable="true" lang="it" style="width:760px;font:16px sans-serif;padding:2px;border:1px solid #999"></div></body>`;
+const SCRITTO_1 = "l'America l'hanno scoperta nel 14xx, e allora abbiamo discusso. ";
+
+test('sulla prima riga di un campo senza margine il valore sta dentro il campo, sotto le x, e il clic sopra il campo resta della pagina', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, { ragionato: { '14xx': [COLOMBO] }, html: SENZA_MARGINE });
+  await page.locator('#ta').click();
+  await page.keyboard.type(SCRITTO_1);
+  const v = valore(page, '1492');
+  await expect(v).toBeVisible({ timeout: 8000 });
+  await expect(v).toHaveClass(/sn-sotto/);
+  await expect(v).not.toHaveClass(/sn-sopra-testo/);
+  const [x, b, ta] = [await riquadroDelSegno(ocra(page, '14xx')), await v.boundingBox(), await page.locator('#ta').boundingBox()];
+  expect(b.y, 'sotto le x').toBeGreaterThanOrEqual(x.y + x.height - 2);
+  expect(b.y + b.height, 'dentro il campo').toBeLessThanOrEqual(ta.y + ta.height);
+  expect(Math.abs((b.x + b.width / 2) - (x.x + x.width / 2))).toBeLessThan(6);
+  await expect.poll(() => v.evaluate((el) => Number(getComputedStyle(el).opacity))).toBeGreaterThan(0.9);
+  await page.screenshot({ path: 'tests/.shots/1448-12-valore-sotto.png', clip: { x: 0, y: 40, width: 820, height: 180 } }).catch(() => {});
+
+  // Chi scrive clicca sul collegamento appena sopra le x: va al collegamento, e il testo resta com'era.
+  await page.mouse.click(x.x + x.width / 2, ta.y - 6);
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#cliccato');
+  await expect(page.locator('#ta')).toHaveValue(SCRITTO_1);
+
+  await page.locator('#ta').focus();
+  await expect(v).toBeVisible();
+  await v.click();
+  await expect(page.locator('#ta')).toHaveValue(SCRITTO_1.replace('14xx', '1492'));
+});
+
+test('sulla prima riga con parole sotto il valore sta sotto velato; in un campo alto una riga accanto alle x: il clic resta al testo e alla pagina', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, { ragionato: { '14xx': [COLOMBO] }, html: SENZA_MARGINE });
+  const scritto = "Scoperta nel 14xx dagli spagnoli.\nSotto ci sono altre parole lunghe abbastanza da stare sotto le x del segnaposto. ";
+  await page.locator('#ta').click();
+  await page.keyboard.type(scritto);
+  const v = valore(page, '1492');
+  await expect(v).toBeVisible({ timeout: 8000 });
+  await expect(v).toHaveClass(/sn-sotto/);
+  await expect(v).toHaveClass(/sn-sopra-testo/);
+  const x = await riquadroDelSegno(ocra(page, '14xx'));
+  const sotto = await v.boundingBox();
+  await page.screenshot({ path: 'tests/.shots/1448-12-valore-sotto-velato.png', clip: { x: 0, y: 40, width: 820, height: 180 } }).catch(() => {});
+  // Il clic sulla parola della seconda riga, dove sta il valore velato, mette lì il cursore e non scrive il valore.
+  await page.mouse.move(sotto.x + sotto.width / 2, sotto.y + 60);
+  await page.mouse.click(sotto.x + sotto.width / 2, sotto.y + sotto.height / 2);
+  await page.waitForTimeout(300);
+  const stato = await testoDi(page);
+  expect(stato.testo).toBe(scritto);
+  expect(stato.cursore).toBeGreaterThan(scritto.indexOf('\n'));
+  // Dalle x il puntatore scende sul valore, che si è svegliato: un clic lo mette.
+  await page.mouse.move(x.x + x.width / 2, x.y + x.height / 2);
+  await expect(v).toHaveClass(/sn-sveglio/);
+  await page.mouse.move(sotto.x + sotto.width / 2, sotto.y + sotto.height / 2, { steps: 4 });
+  await expect(v).toHaveClass(/sn-sveglio/);
+  await page.mouse.click(sotto.x + sotto.width / 2, sotto.y + sotto.height / 2);
+  await expect(page.locator('#ta')).toHaveValue(scritto.replace('14xx', '1492'));
+
+  // Un campo alto una riga non ha posto né sopra né sotto: il valore sta accanto alle x, dentro il campo, velato sulle
+  // parole che copre. Dalle x il puntatore sale dritto al collegamento sopra il campo, e il clic è del collegamento (#1690).
+  await page.locator('#ce').click();
+  await page.keyboard.type(SCRITTO_1);
+  const w = valore(page, '1492');
+  await expect(w).toBeVisible({ timeout: 8000 });
+  await expect(w).toHaveClass(/sn-accanto/);
+  await expect(w).toHaveClass(/sn-sopra-testo/);
+  await expect(w).not.toHaveClass(/sn-sotto/);
+  const [xi, ce] = [await riquadroDelSegno(ocra(page, '14xx')), await page.locator('#ce').boundingBox()];
+  const bw = await w.boundingBox();
+  expect(bw.y, 'dentro il campo').toBeGreaterThanOrEqual(ce.y);
+  expect(bw.y + bw.height, 'dentro il campo').toBeLessThanOrEqual(ce.y + ce.height);
+  expect(bw.x, 'dopo le x').toBeGreaterThanOrEqual(xi.x + xi.width);
+  await page.screenshot({ path: 'tests/.shots/1690-valore-accanto.png', clip: { x: 0, y: ce.y - 40, width: 820, height: 80 } }).catch(() => {});
+  await page.mouse.move(xi.x + xi.width / 2, xi.y + xi.height / 2);
+  await expect(w).toHaveClass(/sn-sveglio/);
+  await page.mouse.move(xi.x + xi.width / 2, ce.y - 6, { steps: 6 });
+  await page.mouse.click(xi.x + xi.width / 2, ce.y - 6);
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#cliccato2');
+  await expect(page.locator('#ce')).toHaveText(/scoperta nel 14xx, e allora abbiamo discusso\./);
+  // Dalle x il puntatore va sul valore accanto, sveglio: un clic lo mette.
+  await page.locator('#ce').focus();
+  await page.mouse.move(xi.x + xi.width / 2, xi.y + xi.height / 2);
+  await expect(w).toHaveClass(/sn-sveglio/);
+  await page.mouse.move(bw.x + bw.width / 2, bw.y + bw.height / 2, { steps: 4 });
+  await expect(w).toHaveClass(/sn-sveglio/);
+  await page.mouse.click(bw.x + bw.width / 2, bw.y + bw.height / 2);
+  await expect(page.locator('#ce')).toHaveText(/scoperta nel 1492, e allora abbiamo discusso\./);
 });
 
 test('«x te», «3x4» e i baci non hanno segni, e non arrivano al modello come segnaposti', async ({ app, openTab, testServer }) => {

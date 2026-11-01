@@ -232,6 +232,12 @@ test('il prompt del controllo rapido: il testo del banco nel system, prima, nuov
   assert.ok(!uno.includes('Segnala tutto ciò che è sicuramente sbagliato'), 'le regole non si ripetono nel messaggio');
   // La voce sui nomi propri scritti in minuscolo arriva con #1447.
   assert.ok(!/nomi propri[^.;]*minuscol/i.test(sistema));
+  // #1655: i due controlli sanno che Filo è il nome dell'app; il rapido lo legge nel messaggio, fuori dal testo misurato.
+  assert.ok(!sistema.includes('filo.red'));
+  for (const p of [uno, due, PROMPTS.spellcheckSuggerimentiSistema({}), PROMPTS.spellcheckSuggerimentiSistema({ soloSegnaposti: true })]) {
+    assert.match(p, /Filo è il nome del browser[^\n]*filo\.red[^\n]*non sono errori/);
+  }
+  assert.ok(uno.indexOf('</candidati>') < uno.indexOf('Filo è il nome'), 'fuori dalla busta del testo della pagina');
 });
 
 test('il prompt regge una pagina ostile', () => {

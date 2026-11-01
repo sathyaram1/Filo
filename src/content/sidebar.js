@@ -514,6 +514,16 @@
     if (!SC || !c.isConnected) return { sparito: true };
     return SC.sostituisciNelCampo(c, prima, dopo, vicinoA);
   }
+  // Il pezzo che una correzione aveva tolto torna fra il testo che gli era rimasto attorno (#1449.3).
+  async function rimettiNelCampo(c, pezzo, { sx, dx }, vicinoA) {
+    if (campoSotto(c)) {
+      const r = await chiediSotto('campo', { id: c.sotto, cosa: 'rimetti', pezzo, sx, dx, vicinoA });
+      return !r || r.sparito ? { sparito: true } : r;
+    }
+    const SC = global.SN_SPELLCHECK;
+    if (!SC || !c.isConnected) return { sparito: true };
+    return SC.rimettiNelCampo(c, pezzo, sx, dx, vicinoA);
+  }
 
   // Il testo del campo valutato, se è cambiato da quando il modello l'ha visto: la domanda dopo lo porta con sé.
   async function testoCambiato() {
@@ -1129,8 +1139,10 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (c.dopo) riga.append(pezzo('sn-sidebar-correzione-freccia', '→'), pezzo('sn-sidebar-correzione-dopo', c.dopo));
     btn.appendChild(riga);
     if (c.perche) btn.appendChild(pezzo('sn-sidebar-correzione-perche', c.perche));
-    // Dove comincia, nel testo del campo, il pezzo scritto da questo bottone; null finché non l'ha scritto.
+    // Dove comincia, nel testo del campo, il pezzo scritto da questo bottone; null finché non l'ha scritto. Una
+    // correzione che toglie senza scrivere tiene il pezzo tolto e il testo che gli è rimasto attorno.
     let scritta = null;
+    let tolto = null;
     const stato = () => {
       btn.classList.toggle('sn-sidebar-correzione-fatta', scritta !== null);
       btn.setAttribute('aria-pressed', scritta !== null ? 'true' : 'false');
@@ -1149,9 +1161,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
           if (r.sparito) { diLa('help_correzione_sparito'); return; }
           if (r.dove === undefined) { diLa(r.manca ? 'help_correzione_manca' : 'help_correzione_ferma', estratto(c.prima)); return; }
           scritta = r.dove;
+          tolto = c.dopo ? null : { pezzo: r.tolto || c.prima, sx: r.sx || '', dx: r.dx || '' };
           contaValuta('correzione_accettata');
         } else {
-          const r = c.dopo ? await sostituisciNelCampo(campo, c.dopo, c.prima, scritta) : {};
+          const r = c.dopo ? await sostituisciNelCampo(campo, c.dopo, c.prima, scritta)
+            : tolto ? await rimettiNelCampo(campo, tolto.pezzo, tolto, scritta) : {};
           if (r.sparito) { diLa('help_correzione_sparito'); return; }
           if (r.dove === undefined) { diLa('help_correzione_non_tolta', global.SN_TASTI?.etichetta?.('Ctrl+Z') || 'Ctrl+Z'); return; }
           vicinoA = r.dove;
