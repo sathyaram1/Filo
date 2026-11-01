@@ -176,10 +176,13 @@ test('a parole, dalla home e dall\'Aiuto: apri, chiudi, blocca e sblocca', async
 });
 
 test('a tutto schermo bloccata vale da sbloccata: si chiude e la pagina prende tutto; uscendo torna accanto', async ({ app, openTab, testServer }) => {
-  await testServer.openReady(openTab, SITO);
+  const page = await testServer.openReady(openTab, SITO);
   await barraPage(app);
   await app.evaluate((_e) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'COMANDO_FINESTRA', comando: 'sidebar_lock' }));
   await expect.poll(async () => (await pagina(app)).x).toBe(56);
+  // Il puntatore sulla pagina: quello vero dello schermo virtuale può essere rimasto sul bordo, sopra la barra.
+  await page.mouse.move(600, 300);
+  await page.mouse.move(610, 305);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.setContentFullscreen(true));
   await expect.poll(async () => (await statoBarra(app)).schermoIntero).toBe(true);
   await expect.poll(async () => (await statoBarra(app)).aperta).toBe(false);
@@ -213,6 +216,8 @@ test('bloccata resta bloccata dopo il riavvio: si apre da sola accanto alla pagi
   try {
     let { app } = await avvia();
     await barraPage(app);
+    // Appena avviato, le azioni di Filo arrivano un attimo dopo la finestra.
+    await expect.poll(() => app.evaluate(() => typeof globalThis.SN_EXECUTE_FILO_ACTION), { timeout: 15_000 }).toBe('function');
     await app.evaluate((_e) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'COMANDO_FINESTRA', comando: 'sidebar_lock' }));
     await expect.poll(() => bloccata(app)).toBe(true);
     await expect.poll(async () => (await statoBarra(app)).aperta).toBe(true);

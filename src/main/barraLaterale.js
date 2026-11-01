@@ -1215,7 +1215,12 @@ class BarraLaterale {
     const d = dati && typeof dati === 'object' ? dati : {};
     switch (canale) {
       case 'barra:pronta': this.pronta = true; this._invia(); break;
-      case 'barra:spinta': if (!this.aperta) this.apri('spinta'); break;
+      // La pagina conta l'attesa scelta: dove vale quella più lunga (#1292) decide la sonda, con la stessa regola.
+      case 'barra:spinta':
+        if (this.aperta) break;
+        if (this._attesaSulBordo(this._punto()) > this.opzioni.attesaMs) this._guarda();
+        else this.apri('spinta');
+        break;
       case 'barra:apri': if (!this.aperta) this.apri('clic'); break;
       case 'barra:chiudi': this.chiudi(); break;
       case 'barra:lucchetto': this._esito('sistema'); this.blocca(!this.opzioni.bloccata); break;
