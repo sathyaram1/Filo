@@ -1040,31 +1040,31 @@ test('i falliti dicono strumento, errore in una riga e cosa è successo dopo; le
 
 test('gli elenchi stanno nel budget e il taglio si dice coi conti interi; i sotto-agenti si sommano', async () => {
   const righe = [];
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 260; i++) {
     const ora = `2026-09-16T1${Math.floor(i / 60)}:${String(i % 60).padStart(2, '0')}`;
     righe.push(chiama(`f${i}`, `${ora}:00.000Z`, 'Bash', { command: `x${i}`, description: `passo ${i}` }));
     righe.push(result(`f${i}`, `errore numero ${i} ${'parola '.repeat(40)}`, `${ora}:${String(31 + (i % 28)).padStart(2, '0')}.000Z`, true));
   }
   const rep = await analizzaRighe(righe);
-  assert.equal(rep.tools.errors, 200);
-  assert.equal(rep.atteseOltre30, 200);
-  assert.ok(rep.falliti.length > 0 && rep.falliti.length < 200);
+  assert.equal(rep.tools.errors, 260);
+  assert.equal(rep.atteseOltre30, 260);
+  assert.equal(rep.falliti.length, 200, 'il tetto del server, non uno più stretto');
   assert.ok(Buffer.byteLength(JSON.stringify(rep.falliti)) <= ELENCO_MAX_BYTE);
   assert.ok(Buffer.byteLength(JSON.stringify(rep.attese)) <= ELENCO_MAX_BYTE);
   assert.ok(rep.falliti.every((f) => f.errore.length <= 120), 'un errore resta una riga corta');
   assert.equal(rep.falliti[0].errore.startsWith('errore numero 0 '), true, 'i falliti in ordine di tempo');
   assert.equal(rep.attese[0].s, 58, 'le attese dalla più lunga');
-  assert.ok(rep.notes.includes(`strumenti falliti 200, elencati i primi ${rep.falliti.length}`));
-  assert.ok(rep.notes.includes(`attese oltre 30 s 200, elencate le ${rep.attese.length} più lunghe`));
+  assert.ok(rep.notes.includes(`strumenti falliti 260, elencati i primi ${rep.falliti.length}`));
+  assert.ok(rep.notes.includes(`attese oltre 30 s 260, elencate le ${rep.attese.length} più lunghe`));
 
   const madre = rapportoVuoto();
   madre.attese = [{ strumento: 'Bash', cosa: 'corta', s: 31 }];
   madre.atteseOltre30 = 1;
   sommaSottoAgente(madre, rep);
-  assert.equal(madre.atteseOltre30, 201);
+  assert.equal(madre.atteseOltre30, 261);
   assert.equal(madre.attese[0].s, 58);
   assert.equal(madre.notes.filter((n) => /^attese oltre/.test(n)).length, 1, 'una nota sola, coi conti sommati');
-  assert.ok(madre.notes.includes(`attese oltre 30 s 201, elencate le ${madre.attese.length} più lunghe`));
+  assert.ok(madre.notes.includes(`attese oltre 30 s 261, elencate le ${madre.attese.length} più lunghe`));
   assert.equal(madre.notes.some((n) => /^sotto-agente: (strumenti falliti|attese oltre)/.test(n)), false);
 });
 

@@ -276,7 +276,7 @@
     verifier: { icon: '🧪', label: 'Claude (verifica)' },
     // I rilievi rimasti fuori dal giro di correzione (feedback #561:
     // esterni al lavoro, o interni messi da parte dal bilancio), aperti dal
-    // server uno per rilievo, figli #N.k, priorità = livello: categoria
+    // server uno per rilievo, figli #N.k, priorità dal livello (un 2 nasce a 1): categoria
     // propria, così leggendo la coda si vede che nasce da una verifica, non da
     // un'esplorazione.
     residuo:  { icon: '🧹', label: 'Claude (rilievi derivati da una verifica)' },
@@ -679,7 +679,7 @@
   //   cap3  giri di correzione per i rilievi di livello 3 (a bilancio finito
   //         un 3 ferma la pratica e chiama l'owner);
   //   cap2  giri per i rilievi di livello 2 (a bilancio finito escono come
-  //         feedback a priorità 2, il lavoro non si ferma);
+  //         feedback a priorità 1, la 2 è del manutentore; il lavoro non si ferma);
   //   cap1  giri per i rilievi di livello 1 (a bilancio finito vanno nel
   //         feedback derivato);
   //   cap0  giri per i soli rilievi di livello 0 (0 = mai da soli);

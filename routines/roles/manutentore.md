@@ -82,13 +82,11 @@ sua versione e le schede a priorità 3 e 2 (e le ferme). È il contesto piccolo:
 Fuori dall'ambiente dei riservati testi, rapporti e taccuino non si leggono (il server rifiuta col perché): lavori coi
 soli numeri delle schede e lo scrivi nel taccuino alla prossima accensione che può leggerlo.
 
-La routine su claude.ai che il pacemaker accende per te ha il prompt di due righe di tutte le altre, con la parola
-d'ordine di una chiave `routine` dell'ambiente dei riservati e il modello Fable:
-
-```text
-routine automatica. <parola d'ordine>
-export FILO_ROUTINE=1, poi: node "$(ls -d scripts/dispatch.mjs */scripts/dispatch.mjs 2>/dev/null | head -n 1)" --preflight
-```
+Una routine tua su claude.ai non c'è e non serve: il pacemaker accende le stesse routine dei worker (quelle
+dell'ambiente dei riservati, col loro prompt di due righe), e l'orchestratore ti passa al sotto-agente del
+manutentore, che è quello col modello Fable. La decisione del mattino è il compito quotidiano del pacemaker (alle 7,
+ora di Roma), il battito lo accende ogni 55 minuti; tutti e due solo con l'interruttore del manutentore acceso in
+Gestione → Automazioni.
 
 ## Le regole dell'ordine
 
@@ -144,7 +142,7 @@ PC spento, ai compattamenti e a una sessione morta. Cinque parti:
   le legge, il recap dice come le hai applicate; le togli tu, o l'owner, quando sono esaurite;
 - **misure** che tieni d'occhio: fusioni al giorno, costo per fusione, riallineamenti, guasti per famiglia.
 
-Il registro delle decisioni (i principi delle domande chiuse) sta a parte e si legge insieme.
+Il registro delle decisioni (i principi delle domande chiuse) sta a parte e si legge insieme (`registro <parole>`).
 
 ## Dati ed esperimenti
 
@@ -210,15 +208,18 @@ npm run manutentore -- routine spente|accese
 npm run manutentore -- recap [giorno] | recap scrivi - [--giorno YYYY-MM-DD]
 npm run manutentore -- novita | novita consegna <file.json>
 npm run manutentore -- chat                        # la chat dell'owner, col contesto intero
+npm run manutentore -- feedback "<titolo>" - [--priorita P]   # un feedback nuovo, testo da stdin (di norma a 1)
+npm run manutentore -- domanda <file.json>         # una domanda all'owner, coi campi di SPEC-DOMANDE § 3.1
+npm run manutentore -- domanda-fine <ruolo> - | --togli   # la domanda di fine turno di un ruolo, da stdin
+npm run manutentore -- registro <parole>           # i principi delle domande chiuse, prima di chiedere
+npm run manutentore -- spesa                       # la spesa della settimana per account
 npm run manutentore -- transizione [--applica]     # solo l'owner, una volta: le 2 di prima scendono a 1
-npm run feedback:apri -- "<titolo>" - --non-locale --pacchetto 812,815
 ```
 
-Un pacchetto con la spec si apre con `feedback:apri --pacchetto`, che da stdin dice per ogni segnalazione cosa cambia e
-come si verifica. Lo strumento controlla stato, ramo già aperto, pacchetto già preso, priorità 3 e lavoro locale; copia
-nel pacchetto gli allegati delle unite (al più 5 immagini e 5 documenti in tutto: oltre, dividi il pacchetto), le
-archivia e sposta sul pacchetto chi le aspettava. `pacchetto` unisce senza spec nuova. Area, tetto e urgenti li
-controlli tu.
+Un pacchetto con la spec è un `feedback` nuovo che dice per ogni segnalazione cosa cambia e come si verifica, seguito
+da `pacchetto <nuovo> <N,M,…>`; `pacchetto` da solo unisce senza spec nuova. Area, tetto e urgenti li controlli tu.
+Nella sessione locale c'è anche `npm run feedback:apri -- "<titolo>" - --non-locale --pacchetto 812,815`, che copia nel
+pacchetto gli allegati delle unite (al più 5 immagini e 5 documenti in tutto).
 
 ## Alla fine di ogni accensione
 

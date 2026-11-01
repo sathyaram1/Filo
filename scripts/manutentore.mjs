@@ -178,10 +178,11 @@ export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorn
  * Le righe delle domande che fermano un feedback, dal server; il motivo in parole se non si leggono: il contesto esce
  * lo stesso. Il titolo di una domanda non fidata è testo d'altri: la sessione si sporca prima di stamparlo.
  */
-async function domandeFerme(indice, ordine = []) {
+async function domandeFerme(cred, indice, ordine = []) {
   try {
-    const { chiamaOwner, nonFidate, motivoNonFidate } = await import('./domanda.mjs');
-    const r = await chiamaOwner({ op: 'elenco' });
+    const { nonFidate, motivoNonFidate } = await import('./domanda.mjs');
+    const r = await chiama(cred, 'domande');
+    if (r.ok === false) return `Non so quali domande fermano un feedback: ${rifiuto(r)}.`;
     const righe = righeDomandeFerme(r.domande, { indice, ordine });
     const ferme = (r.domande || []).filter((d) => d && righe.some((x) => x.startsWith(`${unaRiga(d.id)} `)));
     const nf = nonFidate(ferme);
@@ -197,8 +198,8 @@ async function domandeFerme(indice, ordine = []) {
 
 const CON_VALORE = ['--cartella', '--giorni', '--ticket', '--versione', '--giorno', '--priorita', '--perche'];
 
-/** Gli argomenti di `accendi` che sono numeri: né le opzioni né i loro valori. PURA. */
-export function numeriDiAccendi(args) {
+/** Gli argomenti senza le opzioni né i loro valori: un `--ticket X` non deve finire in un testo scritto. PURA. */
+export function senzaOpzioni(args) {
   const out = [];
   for (let i = 0; i < (args || []).length; i++) {
     const a = String(args[i]);
@@ -207,6 +208,7 @@ export function numeriDiAccendi(args) {
   }
   return out;
 }
+export const numeriDiAccendi = senzaOpzioni;
 
 function opzione(argv, nome) {
   const i = argv.findIndex((a) => a === nome || a.startsWith(`${nome}=`));
@@ -219,7 +221,7 @@ const numeroDi = (v) => (NUMERO_RE.test(String(v || '').trim()) ? String(v).trim
 
 /** `sblocca 812 riparato il registro` → { ok, numero, testo } (testo '' = quello di default del server). PURA. */
 export function richiestaSblocca(args) {
-  const [n, ...resto] = args || [];
+  const [n, ...resto] = senzaOpzioni(args);
   if (!numeroDi(n)) return { ok: false, motivo: 'sblocca vuole il numero del feedback fermo (sblocca 812 [nota])' };
   return { ok: true, numero: numeroDi(n), testo: resto.join(' ').trim() };
 }
@@ -313,7 +315,7 @@ const testoTaccuino = (t) => (t && typeof t.testo === 'string'
   : [String(t || 'Non letto.')]);
 
 /** Il contesto intero della decisione del mattino e della chat (§ 4, § 9). PURA rispetto ai suoi ingressi. */
-export function testoIntero({ ruolo, stato, taccuino, schede, locali = [], rami = [], fuori = null, giorni = 30, ferme = null }) {
+export function testoIntero({ ruolo, stato, taccuino, schede, locali = [], rami = [], fuori = null, giorni = 30, ferme = null, spesa = null }) {
   const perNum = new Map((locali || []).map((s) => [String(s.numero).replace(/^#/, ''), s]));
   const elenco = [...(schede || [])].sort((a, b) => Number(String(a.num).split('.')[0]) - Number(String(b.num).split('.')[0]));
   const conteggio = [3, 2, 1, 0].map((p) => `${elenco.filter((s) => s.priorita === p).length} a ${p}`).join(', ');
@@ -328,9 +330,21 @@ export function testoIntero({ ruolo, stato, taccuino, schede, locali = [], rami 
     '', `## Rami in corso (${rami.length})`, '',
     ...rami.map(rigaRamo),
     ...(rigaFuori(fuori, giorni) ? ['', rigaFuori(fuori, giorni)] : []),
-    '', '## Registro delle decisioni e spesa', '',
-    'I principi delle domande chiuse: node scripts/domanda.mjs registro <poche parole>. La spesa della settimana per account la vedi in Gestione → Automazioni (il consumo dell\'account, non la somma dei biglietti).',
+    '', '## Spesa della settimana', '', ...righeSpesa(spesa),
+    '', '## Registro delle decisioni', '',
+    'I principi delle domande chiuse: npm run manutentore -- registro <poche parole>, prima di chiedere all\'owner.',
   ].join('\n');
+}
+
+/** La spesa della settimana per account, dal server; il motivo in parole se non si legge. PURA. */
+export function righeSpesa(spesa) {
+  if (!spesa || spesa.ok === false || !spesa.accounts) return [`Non letta${spesa && spesa.ok === false ? `: ${unaRiga(spesa.detail || spesa.reason || '')}` : ''}: decidi senza, e dillo nel recap.`];
+  const usd = (v) => (Number.isFinite(Number(v)) ? `${Number(v).toFixed(2)} $` : '?');
+  const quando = (ms) => (Number.isFinite(Number(ms)) && Number(ms) > 0 ? new Date(Number(ms)).toISOString().slice(0, 16).replace('T', ' ') : '?');
+  return Object.entries(spesa.accounts).sort(([a], [b]) => a.localeCompare(b)).map(([a, x]) => {
+    const p = x && Number.isFinite(Number(x.pct)) ? `, ${Math.round(Number(x.pct))}% della quota` : '';
+    return `- ${unaRiga(a)}: ${usd(x && x.usdSettimana)} dal ${quando(x && x.settimanaDaMs)}${p}, rinnovo ${quando(x && x.rinnovoAtMs)}${x && x.fermo ? `, fermo: ${unaRiga(x.fermo)}` : ''}.`;
+  });
 }
 
 // Il contesto piccolo di una sveglia (§ 4) sta sui ~25k token: questo è il tetto col margine. Oltre, la rosa è larga.
@@ -415,8 +429,14 @@ async function indicazioneConChiave(cred, testo) {
 
 // ── Le novità (§ 8) ─────────────────────────────────────────────────────────
 
-// Le parole che fanno di una riga una promessa: una cosa che non c'è ancora.
-const PROMESSA_RE = /\b(in arrivo|arriv\w* presto|presto|prossimamente|a breve|stiamo lavorando|in preparazione|sta per arrivare|nelle prossime versioni|in una prossima versione)\b/i;
+// Le parole che fanno di una riga una promessa: una cosa che non c'è ancora. Larghe di proposito: un falso allarme si
+// dichiara o si riscrive, una promessa passata senza numero arriva a tutti gli utenti.
+const PROMESSA_RE = new RegExp([
+  'in arrivo', 'presto', 'prossimamente', 'a breve', 'in futuro', 'più avanti', 'coming soon', 'soon',
+  'arriver\\w*', 'sarà disponibil\\w*', 'saranno disponibil\\w*', 'sta per', 'stanno per',
+  'stiamo (?:lavorando|preparando|costruendo|sviluppando)', 'in (?:preparazione|lavorazione|sviluppo)',
+  '(?:nella|nelle|in una|con la|col|con il|nel) prossim[aoie] (?:versione|versioni|aggiornament[oi]|rilasci[o]?)',
+].map((p) => `(?<![\\p{L}])${p}(?![\\p{L}])`).join('|'), 'iu');
 // Gli stessi link che conta il server (manutentoreRegole.linkDi): un falso allarme si riscrive, un link passato no.
 const LINK_RE = new RegExp([
   '\\b[a-z][a-z0-9+.-]{1,20}:\\/\\/[^\\s<>"\'`)\\]]+',
@@ -528,6 +548,7 @@ export const SOTTOCOMANDI = Object.freeze([
   'contesto', 'sveglia', 'stato', 'schede', 'leggi', 'rapporti', 'rami', 'incroci', 'ordine', 'accendi', 'parallelo',
   'priorita', 'attesa', 'pacchetto', 'nota', 'sblocca', 'archivia', 'taccuino', 'indicazione', 'sveglia-tra',
   'sveglia-togli', 'segnali-letti', 'account', 'routine', 'recap', 'novita', 'chat', 'transizione',
+  'feedback', 'domanda', 'domanda-fine', 'registro', 'spesa',
 ]);
 
 const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
@@ -541,6 +562,8 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   account <A|B> spento|acceso | account primo <A|B|alterna> | routine spente|accese
   recap [giorno] | recap scrivi - [--giorno YYYY-MM-DD]
   novita | novita consegna <file.json> | chat [--stampa]
+  feedback "<titolo>" - [--priorita P]     (testo da stdin) | domanda <file.json> | domanda-fine <ruolo> - | --togli
+  registro [parole] | spesa
   transizione [--applica]                  (solo l'owner: le priorità 2 scendono a 1; senza --applica conta e basta)`;
 
 async function leggiStdin() {
@@ -554,7 +577,7 @@ const stampaJson = (o) => console.log(JSON.stringify(o, null, 2));
 
 export async function main(argv, { root = ROOT, env = process.env } = {}) {
   const [cmd, arg] = argv;
-  if (!SOTTOCOMANDI.includes(cmd) || (['incroci', 'leggi', 'parallelo', 'priorita', 'nota', 'archivia', 'sveglia-tra', 'account', 'routine', 'pacchetto', 'attesa', 'indicazione'].includes(cmd) && !arg)) {
+  if (!SOTTOCOMANDI.includes(cmd) || (['incroci', 'leggi', 'parallelo', 'priorita', 'nota', 'archivia', 'sveglia-tra', 'account', 'routine', 'pacchetto', 'attesa', 'indicazione', 'feedback', 'domanda', 'domanda-fine'].includes(cmd) && !arg)) {
     console.error(USO);
     return 1;
   }
@@ -614,7 +637,7 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
   }
   // L'indicazione dell'owner dalla chat: col suo canale se c'è, se no con la chiave (stessa riga datata).
   if (cmd === 'indicazione' && !cred) {
-    const testo = argv.slice(1).filter((a) => !a.startsWith('--')).join(' ').trim();
+    const testo = senzaOpzioni(argv.slice(1)).join(' ').trim();
     const { chiamaOwner } = await import('./domanda.mjs');
     try { const r = await chiamaOwner({ op: 'indicazione', testo }, { funzione: 'ownerManutentore' }); console.log(`Nel taccuino (versione ${r.versione}).`); return 0; } catch (e) { console.error(`RIFIUTATO: ${e.message}`); return 2; }
   }
@@ -646,8 +669,8 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
         console.log(p.testo);
         return 0;
       }
-      const ferme = await domandeFerme(indiceDalServer(sc.schede), stato.ordine || []);
-      const testo = testoIntero({ ruolo, stato, taccuino, schede: sc.schede, locali: leggiSchede(cartella), rami: lista, fuori: r.fuori, giorni, ferme });
+      const [ferme, spesa] = await Promise.all([domandeFerme(cred, indiceDalServer(sc.schede), stato.ordine || []), chiama(cred, 'spesa')]);
+      const testo = testoIntero({ ruolo, stato, taccuino, schede: sc.schede, locali: leggiSchede(cartella), rami: lista, fuori: r.fuori, giorni, ferme, spesa });
       if (cmd === 'contesto') { console.log(testo); return 0; }
       const dir = join(tmpdir(), 'filo-manutentore');
       mkdirSync(dir, { recursive: true });
@@ -687,7 +710,7 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
     case 'attesa': {
       const togli = argv.includes('--togli');
       const r = await chiama(cred, togli ? 'attesa.togli' : 'attesa', { numero: numeroDi(arg), aspetta: numeroDi(argv[2]) });
-      return esito(r, (x) => (togli ? `#${x.numero} non aspetta più #${x.tolta}.` : x.gia ? `#${x.numero} aspettava già #${x.aspetta}.` : `#${x.numero} aspetta #${x.aspetta}${x.sbloccato ? ': il lavoro fermo riparte quando arriva' : ''}.`));
+      return esito(r, (x) => (togli ? `#${x.numero} non aspetta più #${x.tolta}.` : x.gia ? `#${numeroDi(arg)} aspettava già #${numeroDi(argv[2])}.` : `#${x.numero} aspetta #${x.aspetta}${x.sbloccato ? ': il lavoro fermo riparte quando arriva' : ''}.`));
     }
     case 'pacchetto': {
       const r = await chiama(cred, 'pacchetto', { numero: numeroDi(arg), unisce: leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).numeri });
@@ -703,6 +726,7 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
     case 'taccuino': {
       if (arg === 'scrivi') {
         const testo = await leggiStdin();
+        if (!testo.trim()) { console.error('RIFIUTATO: il taccuino da stdin è vuoto, e riscriverlo così lo cancellerebbe tutto (taccuino scrivi - --versione V <<\'FINE\' … FINE). Non ho scritto niente.'); return 1; }
         const r = await chiama(cred, 'taccuino.scrivi', { testo, versione: Number(opzione(argv, '--versione')) });
         return esito(r, (x) => `Taccuino riscritto (versione ${x.versione}).`);
       }
@@ -710,7 +734,7 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
       return esito(r, (x) => testoTaccuino(x).join('\n'));
     }
     case 'indicazione': {
-      const r = await indicazioneConChiave(cred, argv.slice(1).filter((a) => !a.startsWith('--')).join(' '));
+      const r = await indicazioneConChiave(cred, senzaOpzioni(argv.slice(1)).join(' '));
       return esito(r, (x) => `Nel taccuino, con la data (versione ${x.versione}).`);
     }
     case 'sveglia-tra': {
@@ -746,8 +770,38 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
       const c = controllaNovita(consegna, { blocco, schede: sc.schede });
       if (!c.ok) { console.error(`RIFIUTATO, non consegnato:\n- ${c.errori.join('\n- ')}`); return 1; }
       const r = await chiama(cred, 'novita', c.novita);
-      return esito(r, (x) => `Novità della ${x.versione} consegnate (${x.righe} righe): il rilascio pubblica queste al posto di quelle dei worker.`);
+      return esito(r, (x) => `Novità della ${x.versione} accettate dal server (${x.righe} righe). Finché il rilascio non le legge escono le righe dei worker: dove entrano lo decide l\'owner (#1959).`);
     }
+    case 'feedback': {
+      const testo = (await leggiStdin()).trim();
+      if (!testo) { console.error('RIFIUTATO: il feedback vuole il testo da stdin (feedback "<titolo>" - <<\'FINE\' … FINE). Non ho scritto niente.'); return 1; }
+      const p = opzione(argv, '--priorita');
+      const r = await chiama(cred, 'feedback', { titolo: senzaOpzioni(argv.slice(1)).filter((a) => a !== '-').join(' '), testo, ...(p !== undefined ? { priorita: Number(p) } : {}) });
+      return esito(r, (x) => `Aperto #${x.numero}${x.fiducia ? ` (${x.fiducia})` : ''}.`);
+    }
+    case 'domanda': {
+      let domanda;
+      try { domanda = JSON.parse(readFileSync(resolve(String(arg)), 'utf8')); } catch (e) { console.error(`RIFIUTATO: il file della domanda non si legge come JSON (${e.message}). Non ho scritto niente.`); return 1; }
+      const r = await chiama(cred, 'domanda', { domanda });
+      return esito(r, (x) => `Domanda ${x.domanda} aperta: la smista l'agente prima che arrivi all'owner.`);
+    }
+    case 'domanda-fine': {
+      const togli = argv.includes('--togli');
+      const testo = togli ? null : (await leggiStdin()).trim();
+      if (!togli && !testo) { console.error('RIFIUTATO: la domanda di fine turno vuole il testo da stdin, o --togli. Non ho scritto niente.'); return 1; }
+      const r = await chiama(cred, 'domanda.fine', { slot: String(arg), testo });
+      return esito(r, (x) => (togli ? `Domanda di fine turno di ${x.slot} tolta.` : `Domanda di fine turno di ${x.slot} scritta.`));
+    }
+    case 'registro': {
+      const r = await chiama(cred, 'registro', { parole: senzaOpzioni(argv.slice(1)).join(' ') });
+      if (r.ok === false) return esito(r);
+      const voci = Array.isArray(r.voci) ? r.voci : [];
+      if (r.assente || r.errore) console.error(`AVVISO: ${unaRiga(r.assente || r.errore)}`);
+      console.log(voci.map((v) => `- ${unaRiga(v.id || '')} «${unaRiga(v.titolo || '')}»: ${unaRiga(v.principio || '')}`).join('\n') || 'Nessun principio trovato.');
+      if (r.altre) console.log(`(e altri ${r.altre}: restringi le parole)`);
+      return 0;
+    }
+    case 'spesa': { const r = await chiama(cred, 'spesa'); return esito(r, (x) => righeSpesa(x).join('\n')); }
     default: console.error(USO); return 1;
   }
 }
@@ -770,7 +824,9 @@ export function controlliLocali(cmd, argv) {
     case 'account': return a === 'primo' ? (['A', 'B', 'alterna'].includes(b) ? '' : 'account primo A, B o alterna')
       : (['A', 'B'].includes(a) && ['spento', 'acceso'].includes(b) ? '' : 'account <A|B> spento|acceso');
     case 'routine': return ['spente', 'accese'].includes(a) ? '' : 'routine spente oppure accese';
-    case 'indicazione': return argv.slice(1).filter((x) => !x.startsWith('--')).join(' ').trim() ? '' : 'l\'indicazione è un testo non vuoto';
+    case 'indicazione': return senzaOpzioni(argv.slice(1)).join(' ').trim() ? '' : 'l\'indicazione è un testo non vuoto';
+    case 'feedback': return senzaOpzioni(argv.slice(1)).filter((x) => x !== '-').join(' ').trim() ? '' : 'feedback vuole il titolo, poi - e il testo da stdin';
+    case 'domanda-fine': return /^[a-z][a-z0-9-]{1,40}$/.test(String(a)) ? '' : 'domanda-fine vuole il ruolo (per esempio verifier), poi - e il testo da stdin, o --togli';
     case 'novita': return a === 'consegna' && !b ? 'novita consegna vuole il file JSON della riscrittura' : '';
     default: return '';
   }
