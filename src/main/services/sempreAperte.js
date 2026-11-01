@@ -11,12 +11,14 @@ const FM = () => globalThis.SN_FILO_MEMORY;
 
 // La voce per `input` (dominio o indirizzo), o '' se non è un sito. Un suffisso pubblico («co.uk», «github.io»)
 // terrebbe aperto mezzo web: lo è se un nome subito sotto di lui è già un sito a sé.
-function voceDa(input) {
+// `daScheda`: `input` è l'indirizzo di una scheda aperta, quindi di una macchina che esiste.
+function voceDa(input, { daScheda = false } = {}) {
   const host = T().hostTenuto(input);
   if (!host) return '';
   if (host.startsWith('[')) return host;
-  // Una macchina senza punto (localhost, il NAS) sì; un dominio di primo livello («https://com») terrebbe aperto mezzo web.
-  if (!host.includes('.')) return dominioDiPrimoLivello(host) ? '' : host;
+  // Una macchina senza punto (localhost, il NAS) sì; un dominio di primo livello detto nudo («https://com») no. Con la
+  // porta o da una scheda aperta è una macchina di casa che si chiama così («casa:8123»), e la voce copre solo lei.
+  if (!host.includes('.')) return dominioDiPrimoLivello(host) && !daScheda && !conPorta(input) ? '' : host;
   const sotto = getDomainInfo(`a.${host}`, { soloPsl: true });
   return sotto && sotto.registrable === `a.${host}` ? '' : host;
 }
