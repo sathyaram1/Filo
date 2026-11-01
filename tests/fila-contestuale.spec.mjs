@@ -1,7 +1,7 @@
 // #1434 — la fila in cima al tasto destro è contestuale: sul testo che si scrive grassetto e corsivo (e il clic li
 // mette), su un'immagine le sue azioni, nessuna azione della pagina intera di partenza; il «+» tiene le altre, un'icona
-// portata dal «+» alla fila resta dopo il riavvio e «rimetti come prima» la riporta indietro; dalla barra si porta
-// un'icona nella fila e dalla fila alla barra.
+// portata dal «+» alla fila resta dopo il riavvio e «rimetti come prima» la riporta indietro; fra barra e fila si
+// trascina nei due versi, anche col menu nello strato, e a parole.
 
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
@@ -61,7 +61,7 @@ async function selezionaTesto(page, sel) {
   }, sel);
 }
 
-test('nell\'Editor sul testo selezionato la fila ha grassetto e corsivo, e il clic li mette e restano', async ({ app, openTab }) => {
+test('nell\'Editor sul testo selezionato la fila ha grassetto e corsivo, e il clic li mette', async ({ app, openTab }) => {
   const editor = await openTab('filo://editor/editor.html');
   await editor.waitForSelector('#doc');
   await editor.locator('#doc').click();
