@@ -395,6 +395,12 @@ test('il redattore: una riga tiene la segnalazione delle righe lette, e la conse
   assert.match(senzaNumero.errori.join('\n'), /segnalazione è il numero intero/);
   assert.equal(M.controllaNovita({ ...base, features: [{ testo: '   ', segnalazione: 1956 }] }, { blocco, schede: [] }).ok, false);
   assert.match(M.contestoRedattore({ blocco, schede: [] }), /1\. \[segnalazione 1956\] Le novità in una pagina\./);
+  // Dimenticata dal redattore, la segnalazione viene dalle righe d'origine (citate in da, o copiate uguali).
+  const dimenticata = M.controllaNovita({ ...base, features: [{ testo: 'Novità e menu.', da: [1, 2] }, 'Le novità in una pagina.'] }, { blocco, schede: [] });
+  assert.deepEqual(dimenticata.novita.features, [{ testo: 'Novità e menu.', segnalazione: 1956 }, { testo: 'Le novità in una pagina.', segnalazione: 1956 }]);
+  const due = { version: '0.2.255', features: [{ testo: 'A.', segnalazione: 1956 }, { testo: 'B.', segnalazione: 1960 }], fixes: [] };
+  assert.match(M.controllaNovita({ versione: '0.2.255', features: [{ testo: 'A e B.', da: [1, 2] }] }, { blocco: due, schede: [] }).errori.join('\n'), /segnalazioni diverse \(1956, 1960\)/);
+  assert.equal(M.controllaNovita({ versione: '0.2.255', features: [{ testo: 'A e B.', da: [1, 2], segnalazione: 1960 }] }, { blocco: due, schede: [] }).ok, true);
 });
 
 test('il ruolo nomina solo sottocomandi che lo script accetta, e lo script li elenca tutti nel ruolo', () => {
