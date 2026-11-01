@@ -245,6 +245,111 @@ namespace FiloDesktop {
 }
 `;
 
+// La Scrivania del Mac vista dal Finder, in JavaScript for Automation: stesse righe di Windows, stessa codifica \uXXXX
+// (un nome con un a capo resta un nome). `pos` è il centro dell'icona; l'area è lo schermo con la barra dei menu,
+// senza barra e Dock, contata dall'alto come conta il Finder. Uno spostamento che si rompe rimette l'ordine automatico.
+const JXA_DESKTOP = String.raw`ObjC.import('Foundation');
+ObjC.import('AppKit');
+function run() {
+  var ambiente = $.NSProcessInfo.processInfo.environment;
+  function parametro(k) { var v = ambiente.objectForKey(k); return v.isNil() ? '' : ObjC.unwrap(v); }
+  var righe = [];
+  function dice(k, v) {
+    righe.push('FILO:' + k + '=' + String(v).replace(/[^ -~]|\\/g, function (c) { return '\\u' + ('000' + c.charCodeAt(0).toString(16)).slice(-4); }));
+  }
+  function tutti(fn, n) { try { var v = fn(); if (Array.isArray(v) && v.length === n) return v; } catch (e) {} return null; }
+  function elenca(scrivania) {
+    var finestra = scrivania.containerWindow;
+    try { dice('finder', finestra.iconViewOptions.arrangement()); } catch (e) {}
+    try { dice('dimensione-icone', finestra.iconViewOptions.iconSize()); } catch (e) {}
+    try {
+      var schermo = $.NSScreen.screens.objectAtIndex(0);
+      var tutto = schermo.frame;
+      var libero = schermo.visibleFrame;
+      var alto = tutto.size.height - (libero.origin.y + libero.size.height);
+      dice('area', [libero.origin.x, alto, libero.origin.x + libero.size.width, alto + libero.size.height].map(Math.round).join(','));
+    } catch (e) {
+      try {
+        var b = finestra.bounds();
+        if (Array.isArray(b)) dice('area', b.map(Math.round).join(','));
+        else dice('area', [b.x, b.y, b.x + b.width, b.y + b.height].map(Math.round).join(','));
+      } catch (e2) {}
+    }
+    var voci = scrivania.items;
+    var url = voci.url();
+    var n = url.length;
+    dice('totale', n);
+    var nomi = tutti(function () { return voci.displayedName(); }, n) || tutti(function () { return voci.name(); }, n);
+    var pos = tutti(function () { return voci.desktopPosition(); }, n);
+    var classi = tutti(function () { return voci.class(); }, n);
+    var est = tutti(function () { return voci.nameExtension(); }, n);
+    var date = tutti(function () { return voci.modificationDate(); }, n);
+    var dim = tutti(function () { return voci.size(); }, n);
+    for (var i = 0; i < n; i++) {
+      var p = pos ? pos[i] : null;
+      if (!p) { try { p = voci[i].desktopPosition(); } catch (e) { continue; } }
+      var x = Array.isArray(p) ? p[0] : p.x;
+      var y = Array.isArray(p) ? p[1] : p.y;
+      dice('voce', url[i]);
+      dice('nome', nomi ? nomi[i] : url[i]);
+      dice('pos', Math.round(x) + ',' + Math.round(y));
+      var classe = classi ? String(classi[i]) : '';
+      dice('cartella', classe === 'folder' || classe === 'disk' ? '1' : '0');
+      if (est && est[i]) dice('tipo', String(est[i]).toLowerCase());
+      if (date && date[i] instanceof Date) dice('data', date[i].getTime());
+      if (dim && typeof dim[i] === 'number') dice('dimensione', Math.round(dim[i]));
+    }
+  }
+  try {
+    var scrivania = Application('Finder').desktop;
+    if (parametro('FILO_SIS_COMANDO') === 'disponi') {
+      var volute = Object.create(null);
+      for (var k = 0; k < 4096; k++) {
+        var pezzo = parametro('FILO_SIS_POS_' + k);
+        if (!pezzo) break;
+        pezzo.split('\n').forEach(function (riga) {
+          var c = riga.split('\t');
+          if (c.length === 3 && c[2] && /^-?[0-9]+$/.test(c[0]) && /^-?[0-9]+$/.test(c[1])) volute[c[2]] = [Number(c[0]), Number(c[1])];
+        });
+      }
+      var opzioni = scrivania.containerWindow.iconViewOptions;
+      var prima = opzioni.arrangement();
+      var voluta = parametro('FILO_SIS_DISPOSIZIONE');
+      if (Object.keys(volute).length && /^arranged by /.test(prima)) opzioni.arrangement = 'not arranged';
+      var voci = scrivania.items;
+      var url = voci.url();
+      var spostate = 0;
+      try {
+        for (var i = 0; i < url.length; i++) {
+          if (!(url[i] in volute)) continue;
+          voci[i].desktopPosition = volute[url[i]];
+          spostate++;
+        }
+      } catch (e) {
+        try { if (opzioni.arrangement() !== prima) opzioni.arrangement = prima; } catch (e2) {}
+        throw e;
+      }
+      if (voluta && opzioni.arrangement() !== voluta) opzioni.arrangement = voluta;
+      delay(0.3);
+      dice('spostate', spostate);
+    }
+    elenca(scrivania);
+  } catch (e) {
+    var numero = e && e.errorNumber;
+    righe = [];
+    dice('errore', numero === -1743 ? 'permesso-automazione' : numero === -600 ? 'finder' : 'eccezione');
+    dice('dettaglio', (e && e.message) || String(e));
+  }
+  return righe.join('\n');
+}
+`;
+
+// Il testo arriva a osascript da un heredoc fra apici: la shell non lo espande, i parametri stanno nell'ambiente.
+const SH_JXA = SH_INIZIO + String.raw`if ! command -v osascript >/dev/null 2>&1; then dice errore eccezione; dice dettaglio 'osascript non trovato'; exit 0; fi
+osascript -l JavaScript <<'FILO_JXA'
+` + JXA_DESKTOP + `FILO_JXA
+`;
+
 const SCRIPT = {
   win32: {
     'desktop-leggi': PS_INIZIO + psCompila(CS_DESKTOP) + String.raw`foreach ($r in [FiloDesktop.Desktop]::Leggi()) { Dice $r[0] $r[1] }
@@ -252,12 +357,20 @@ const SCRIPT = {
     'desktop-disponi': PS_INIZIO + psCompila(CS_DESKTOP) + String.raw`foreach ($r in [FiloDesktop.Desktop]::Disponi()) { Dice $r[0] $r[1] }
 `,
   },
+  darwin: {
+    'desktop-leggi': SH_JXA,
+    'desktop-disponi': SH_JXA,
+  },
 };
 
 // ── Richiesta → script + ambiente ────────────────────────────────────────────
 
-function ambienteDisponi({ posizioni, auto } = {}) {
-  const env = { FILO_SIS_AUTO: auto ? '1' : '0' };
+function ambienteDisponi({ posizioni, auto, disposizione } = {}, piattaforma = 'win32') {
+  const env = piattaforma === 'darwin' ? { FILO_SIS_COMANDO: 'disponi' } : { FILO_SIS_AUTO: auto ? '1' : '0' };
+  if (piattaforma === 'darwin' && disposizione != null && disposizione !== '') {
+    if (!DISPOSIZIONI_FINDER.includes(disposizione)) throw new Error('ordine del Finder sconosciuto');
+    env.FILO_SIS_DISPOSIZIONE = disposizione;
+  }
   let pezzo = '';
   let n = 0;
   for (const p of Array.isArray(posizioni) ? posizioni : []) {
