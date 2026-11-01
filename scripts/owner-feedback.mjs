@@ -39,7 +39,8 @@
 //   node scripts/owner-feedback.mjs <n|id> --solo-locale    (segno «solo in locale»)
 //   node scripts/owner-feedback.mjs <n|id> --non-locale
 //   node scripts/owner-feedback.mjs <n|id> --serve-locale ["perché"]
-//   node scripts/owner-feedback.mjs <n|id> --aspetta 676,663.2   (l'elenco intero: sostituisce quello di prima, e dice cosa toglie)
+//   node scripts/owner-feedback.mjs <n|id> --aspetta-anche 676,663.2   (le aggiunge a quelle che ci sono)
+//   node scripts/owner-feedback.mjs <n|id> --aspetta 676,663.2 [--sostituisci]   (l'elenco intero; se toglie attese non fuse rifiuta, a meno di --sostituisci)
 //   node scripts/owner-feedback.mjs <n|id> --aspetta-niente
 //
 //   <n|id>: il numero del feedback (910, #910, 22.1) o il suo id.
