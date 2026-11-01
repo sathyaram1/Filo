@@ -17,6 +17,7 @@
         { testo: 'Una correzione del correttore non attacca più la parola a quella prima, come in «oggisono». Con l\'apostrofo curvo, come in «l’amico», il segno sta solo sulla parola sbagliata, e la correzione lascia l’apostrofo come l’hai scritto.', segnalazione: 1580 },
         { testo: 'Il dato che il correttore trova al posto delle x, sulla prima riga di un campo, compare sotto le x quando sopra non c\'è posto, e accanto alle x in un campo alto una riga. Non copre più quello che sta sopra il campo, e un clic lì va alla pagina.', segnalazione: 1448 },
         { testo: 'In «Valuta» anche una correzione che toglie delle parole, o una riga intera, si annulla col secondo clic: le parole tornano al loro posto.', segnalazione: 1449 },
+        { testo: 'Le segnalazioni che Filo scrive per te in chat non riportano più il tuo nome né la tua email: lo vedi già nell\'anteprima, prima di inviarle.', segnalazione: 1669 },
       ],
     },
     {
