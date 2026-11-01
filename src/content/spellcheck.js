@@ -2077,8 +2077,11 @@
       b.style.left = `${r.left + r.width / 2}px`;
       b._snX = r;
       const posto = postoDelValore(state, b, r, tr);
-      b.style.top = `${posto.sotto ? r.bottom + SPORGENZA_SEGNI : r.top}px`;
+      const accanto = posto.accanto != null;
+      if (accanto) b.style.left = `${posto.accanto}px`;
+      b.style.top = `${accanto ? r.top + r.height / 2 : posto.sotto ? r.bottom + SPORGENZA_SEGNI : r.top}px`;
       b.classList.toggle('sn-sotto', posto.sotto);
+      b.classList.toggle('sn-accanto', accanto);
       b.classList.toggle('sn-sopra-testo', posto.velato);
     }
     for (const [k, b] of state.badge) if (!usati.has(k)) { b.remove(); state.badge.delete(k); }
