@@ -494,6 +494,7 @@
     const dc = DOVE_CERCARE.exec(r.citazione.toLowerCase());
     const domanda = corta(r.motivo, 200);
     if (!x || !dc || !domanda) return null;
+    const pos = posizioniNelTesto(pezzo, visto);
     const start = dove.start + pos[x.da];
     const end = dove.start + pos[x.a];
     return {
