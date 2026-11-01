@@ -687,6 +687,9 @@ module.exports = function register(on, ctx) {
     });
   } catch (_) {}
 
+  // Il primo tentativo di solito chiude in pochi secondi (titolo, allegati, scrittura): oltre, il riquadro si chiude
+  // dicendo «in partenza» e la coda finisce da sola.
+  const ATTESA_CONSEGNA_MS = 12000;
   on(MSG.SUBMIT_FEEDBACK, async (msg) => {
     try {
       if (!globalThis.SN_FEEDBACK?.submit) {
