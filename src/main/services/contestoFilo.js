@@ -209,9 +209,8 @@ function messaggiDi(chats) {
         text: String(m.text == null ? '' : m.text),
         ts: m.ts,
         actions: Array.isArray(m.actions) ? m.actions : [],
-        // Com'è andata ogni azione e le finestre guardate: riletta, la risposta le racconta al modello (#1294, #778).
+        // Com'è andata ogni azione: riletta, la risposta la racconta al modello (#1294).
         ...(Array.isArray(m.esiti) && m.esiti.length ? { esiti: m.esiti } : {}),
-        ...(Array.isArray(m.guardate) && m.guardate.length ? { guardate: m.guardate } : {}),
         ...(Array.isArray(m.letti) ? { letti: m.letti } : {}),
         ...(typeof m.esterno === 'string' ? { esterno: m.esterno } : {}),
         ...(m.daModello ? { daModello: true } : {}),
