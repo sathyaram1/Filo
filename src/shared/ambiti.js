@@ -33,7 +33,7 @@
     'domande.priorita': op('cambiare la priorità di una domanda'),
     'domande.raggruppa': op('raggruppare le domande per tema'),
     'domande.supera': op('chiudere come superate le domande assorbite in un’altra'),
-    'domande.principio': op('rispondere coi principi del registro', NON_ANCORA),
+    'domande.principio': op('rispondere coi principi del registro'),
     'taccuino.scrivi': op('scrivere nel taccuino della gestione del lavoro', NON_ANCORA),
     'registri.leggi': op('leggere registri e sessioni delle routine', { nf: true, rs: true, attiva: false }),
     'curva.scrivi': op('scrivere la curva del parallelismo', NON_ANCORA),
