@@ -312,7 +312,7 @@ test('prima dell\'export e dopo l\'import: UGUALE se non manca niente, DIVERSO e
   const manca = uscita();
   const ridotto = serverFinto(DOCUMENTI.filter((d) => d !== 'feedback/c/note/1' && d !== 'config/secrets'));
   assert.equal(await main(['--progetto', PROGETTO, '--confronta'], deps(ridotto, manca, '2026-11-01T12:00:00Z')), 1);
-  assert.ok(manca.righe.includes('DIVERSO: 2 su 10 raccolte non tornano. Documenti: 15 prima, 13 dopo.'), manca.righe.join('\n'));
+  assert.ok(manca.righe.includes('DIVERSO: 2 su 10 raccolte non tornano: mancano 2 documenti, 0 in più (15 prima, 13 dopo).'), manca.righe.join('\n'));
   assert.ok(manca.righe.includes('  feedback/c/note: manca (prima 1)'));
   assert.ok(manca.righe.includes('  config: 2 → 1 (-1)'));
 
