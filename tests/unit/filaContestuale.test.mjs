@@ -95,7 +95,7 @@ test('a parole: le zone della fila si dicono col contesto', () => {
   assert.equal(D.zonaDaDove('fila'), '', 'la fila senza contesto non è un posto');
   assert.equal(D.zonaDaDove('fila', 'nonEsiste'), '');
   assert.match(L.describeDone({ type: 'SPOSTA_ICONA', icona: 'scrivibile:strike', dove: 'fila' }), /nella fila del tasto destro sul testo selezionato mentre scrivi/);
-  assert.match(L.describeDone({ type: 'SPOSTA_ICONA', icona: 'translate', dove: 'fila', contesto: 'pagina' }), /«Traduci la pagina» ora sta nella fila del tasto destro sulla pagina/);
+  assert.equal(L.describeDone({ type: 'SPOSTA_ICONA', icona: 'translate', dove: 'fila', contesto: 'pagina' }), `«${D.nome('translate')}» ora sta nella fila del tasto destro sulla pagina`);
 });
 
 test('il collegamento scritto nella fila: solo indirizzi del web e della posta', () => {
