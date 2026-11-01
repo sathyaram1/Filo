@@ -388,12 +388,16 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
   const perMessaggio = TV().eventiPerMessaggi(conDomanda, eventi, { da: daEventi, chiave: FC().chiave });
   const epoca = epocaDi(lato);
   // Le cose successe si scrivono la prima volta e restano quelle: un evento arrivato in ritardo non riscrive un messaggio
-  // già mandato. Si rifanno dopo una cancellazione, perché ciò che è cancellato dalle copie deve uscire.
+  // già mandato. Si rifanno dopo una cancellazione, e quando una sua pagina diventa delicata o della rete di casa (un
+  // sito segnato dopo, un campo password): quello che il modello non deve avere esce anche dalle copie.
+  const riservate = (lista) => lista.filter((ev) => ev && ev.tipo === 'navigazione' && (ev.casa || ev.delicata)).map((ev) => ev.id).join(',');
   const eventiDi = (m) => {
     const k = FC().chiave(m);
     const memo = memoDi(k);
-    if (!memo.eventi || memo.eventi.tolte !== tolte) {
-      memo.eventi = { ...TV().rendiEventi(perMessaggio.get(k) || [], { rif: m.ts }), tolte };
+    const suoi = perMessaggio.get(k) || [];
+    const fuori = riservate(suoi);
+    if (!memo.eventi || memo.eventi.tolte !== tolte || memo.eventi.fuori !== fuori) {
+      memo.eventi = { ...TV().rendiEventi(suoi, { rif: m.ts }), tolte, fuori };
     }
     return memo;
   };
