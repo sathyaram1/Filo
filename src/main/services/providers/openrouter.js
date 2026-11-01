@@ -787,6 +787,9 @@
       else if (maxTokens && colpa !== false) err.code = 'TETTO_RISPOSTA';
       if (maxTokens && colpa !== false) err.maxTokens = maxTokens;
     } else if (refusal) err.code = refusal;
+    // Un host che dice di non leggere quel contenuto è lo stesso rifiuto del router (#1345).
+    if (!err.code && [400, 415, 422].includes(res.status) && ingressoDi(errText)) err.code = 'INGRESSO_NON_LETTO';
+    if (err.code === 'INGRESSO_NON_LETTO') err.ingresso = ingressoDi(errText);
     produttoreNonRisponde(err, model, errText);
     return err;
   }
