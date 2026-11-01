@@ -52,7 +52,8 @@
       if (!/\p{L}/u.test(nome) || NON_NOMI.has(nome.toLowerCase())) continue;
       const pezzi = nome.split(' ');
       if (pezzi.length > 1) forme.set(nome.toLowerCase(), { testo: nome, pezzo: false });
-      for (const p of pezzi) {
+      // Un cognome col trattino vale intero e a metà: «Núñez» da solo dice chi è quanto «Núñez-García».
+      for (const p of pezzi.flatMap((x) => (x.includes('-') ? [x, ...x.split('-')] : [x]))) {
         const k = p.toLowerCase();
         if ([...p].length < 3 || PARTICELLE.has(k) || NON_NOMI.has(k) || forme.has(k)) continue;
         forme.set(k, { testo: p, pezzo: true });
