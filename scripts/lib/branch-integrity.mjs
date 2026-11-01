@@ -476,6 +476,7 @@ export function ensureSessionExcludes(root) {
  *   root         directory del repo
  *   branch       branch su cui posizionarsi (per `create` è il nome da creare)
  *   create       true = lavoro NUOVO (crea il branch dalla base)
+ *   createIfMissing  true = il nome è già deciso (il ramo del biglietto): si riprende se c'è, sennò nasce dalla base
  *   base         base da cui creare (default: mainBranch)
  *   mainBranch   linea principale (default 'main')
  *   checkpoint   ultimo punto fermo locale (SHA), o null
