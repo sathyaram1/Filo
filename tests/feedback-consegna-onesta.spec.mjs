@@ -43,7 +43,8 @@ test('«inviato» arriva solo quando la consegna è avvenuta; senza rete il riqu
   const page = await newtabPage(app);
   await reteFinta(app);
 
-  // La consegna è in viaggio: il riquadro aspetta, con la rotella, e non dice «inviato».
+  // La consegna è in viaggio: il riquadro aspetta, con la rotella, e non dice «inviato». In tema scuro, per guardarla.
+  await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
   await esito(app, 'lento');
   await scriviEInvia(page, 'Il tasto Salva non risponde');
   await expect(page.locator('.sn-fb-status.sn-fb-status--attesa')).toContainText('Invio in corso');
