@@ -28,6 +28,12 @@ const AzioniContate = require('./services/azioniContate');
 const ContatoriFinestra = require('./services/contatoriFinestra');
 const ContatoriHomePagina = require('./services/contatoriHomePagina');
 const ContatoriSicurezza = require('./services/contatoriSicurezza');
+const Strade = require('./services/contatoriStrade');
+// Come si chiude una scheda (#1470) → da quale strada parte la chiusura (#1468); le altre vie non sono un gesto su una scheda.
+const STRADA_DELLA_CHIUSURA = Object.freeze({
+  pulsante_x: 'pulsante_scheda', clic_centrale: 'clic_centrale', ctrl_w: 'scorciatoia', barra: 'barra',
+  tasto_destro_riga: 'tasto_destro_riga', tasto_destro_scheda: 'menu_scheda',
+});
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -505,7 +511,11 @@ class TabManager {
     });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
-      scegli: (tab, scelta, dati) => this._sbScelta(tab, scelta, dati),
+      scegli: (tab, scelta, dati) => {
+        // «Chiedi a Filo» sull'avviso apre l'Aiuto dall'avviso (#1468).
+        if (scelta === 'chiedi') Strade.misura('aiuto', 'avviso_sito', { incognito: this.incognito });
+        return this._sbScelta(tab, scelta, dati);
+      },
       menu: (tab) => this._sbVociMenu(tab),
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
       inCima: () => { if (this.barra) this.barra._inCima(); },
@@ -1214,11 +1224,14 @@ class TabManager {
 
   // `via`: come la si chiude, per i contatori della finestra (#1470). `daSola`: chiusa senza che la persona o la pulizia
   // l'abbiano chiesto (la pagina stessa, un'estensione, un crash).
-  closeTab(id, { via = 'altro', daSola = false } = {}) {
+  // `strada`: da dove parte la chiusura fra le strade delle azioni (#1468), quando `via` non lo dice.
+  closeTab(id, { via = 'altro', daSola = false, strada = '' } = {}) {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
     const tab = this.tabs[idx];
     ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
+    const s = strada || STRADA_DELLA_CHIUSURA[via];
+    if (s) Strade.misura('azione', 'closeTab', s, { incognito: this.incognito });
     this._smontaScheda(tab, { daSola });
     this.tabs.splice(idx, 1);
     if (this.activeId === id) {
@@ -1238,6 +1251,7 @@ class TabManager {
     const chiuse = this.tabs.filter((t) => via.has(t.id));
     if (!chiuse.length) return [];
     const eraAttiva = chiuse.some((t) => t.id === this.activeId);
+    Strade.misura('azione', 'closeTab', 'chat', { incognito: this.incognito });
     for (const tab of chiuse) {
       ContatoriFinestra.misura('chiusa', tab, 'chat', { incognito: this.incognito });
       this._smontaScheda(tab);
@@ -1266,6 +1280,7 @@ class TabManager {
   // Quello che ogni chiusura chiesta fa a una scheda prima di toglierla dall'elenco.
   _smontaScheda(tab, { daSola = false } = {}) {
     const id = tab.id;
+    Strade.misura('chiusa', this, tab);
     this._avvisaSorvegliante(tab, 'chiusa');
     ContatoriHomePagina.misura('proposteVia', tab._proposte);
     this._nelFilo('schedaChiusa', tab);
@@ -1483,17 +1498,23 @@ class TabManager {
   }
 
   // La più recente, poi quella prima; finita la pila di questa sessione si scende nell'archivio delle schede chiuse.
-  async riapriChiusa() {
+  // `tasto`: il tasto che l'ha chiesta (#1468), per sapere se la scheda riaperta era quella che si voleva.
+  async riapriChiusa({ tasto = '' } = {}) {
+    const attendi = async (p) => {
+      const id = await p;
+      if (tasto && id) Strade.misura('attesa', this.tabs.find((t) => t.id === id), tasto, { incognito: this.incognito });
+      return id;
+    };
     const pila = this._pilaChiuse();
     const voce = pila.prendi();
     if (voce) {
       if (voce.voceArchivio) this._contaTornata(voce.voceArchivio);
-      return this.riapri(voce);
+      return attendi(this.riapri(voce));
     }
     const e = await this._chiusaDallArchivio();
     if (e) {
       this.tornata(e);
-      return this.riapri(SchedeChiuse.daArchivio(e));
+      return attendi(this.riapri(SchedeChiuse.daArchivio(e)));
     }
     try {
       this.win.webContents.send('shell:toast', { text: 'Nessuna scheda chiusa da riaprire', opts: { unica: 'nessuna-chiusa', tipo: 'nessuna_chiusa' } });
@@ -1530,9 +1551,16 @@ class TabManager {
   // Ctrl/Cmd+L: l'indirizzo si scrive nel campo della home, la barra degli indirizzi non c'è. Già sulla home non la
   // ricarica, che butterebbe via quello che c'è scritto: dà il fuoco al campo col testo selezionato, come un browser.
   // Sentinella: tests/tab-browser-shortcuts.spec.mjs.
-  async vaiAScrivereUnIndirizzo(id) {
+  // `tasto`: Ctrl/Cmd+L premuto (#1468), per sapere se la home era quella che si voleva. Rende la scheda della home.
+  async vaiAScrivereUnIndirizzo(id, { tasto = '' } = {}) {
+    const home = await this._vaiAScrivere(id);
+    if (tasto && home) Strade.misura('attesa', this.tabs.find((t) => t.id === home), tasto, { incognito: this.incognito });
+    return home;
+  }
+
+  async _vaiAScrivere(id) {
     const tab = this.tabs.find((t) => t.id === id);
-    if (!tab) { this.openTab('filo://newtab/'); return; }
+    if (!tab) return this.openTab('filo://newtab/');
     let sullaHome = false;
     if (/^filo:\/\/newtab\//.test(String(tab.url || '')) && !tab.loading) {
       try {
@@ -1543,10 +1571,11 @@ class TabManager {
         ) === true;
       } catch (_) {}
     }
-    if (sullaHome) return;
+    if (sullaHome) return tab.id;
     // Il testo scritto e non inviato vive solo in quella pagina, e Indietro non lo rimette: la home si apre accanto.
-    if (this._testoNonInviato(tab)) this.openTab('filo://newtab/');
-    else this.navigate(tab.id, 'filo://newtab/');
+    if (this._testoNonInviato(tab)) return this.openTab('filo://newtab/');
+    this.navigate(tab.id, 'filo://newtab/');
+    return tab.id;
   }
 
   // Lo stato vive sulla SCHEDA, non sul WebContents: deve sopravvivere a una
@@ -2260,6 +2289,7 @@ class TabManager {
     this.anteprime.mostrata(tab);
     this.activeId = id;
     if (cambiata && !this._restoring) this._nelFilo('schedaDavanti', tab);
+    Strade.misura('inVista', this, tab, tab.url, { incognito: this.incognito });
     // §2.1 — una scheda che diventa attiva è "usata adesso". Approssimazione
     // grossolana: il content script la raffina con gli eventi veri.
     const now = Date.now();
@@ -2524,8 +2554,15 @@ class TabManager {
     try {
       if (await require('./menu').staScrivendo(wc)) return false;
     } catch (_) { return false; }
+    this._cronologiaDaTasto(verso);
     this.navigaCronologia(verso, id);
     return true;
+  }
+
+  // Indietro e avanti da tastiera (#1468): il tasto del browser e la sua strada.
+  _cronologiaDaTasto(verso) {
+    Strade.misura('tastoNome', 'alt_freccia', { incognito: this.incognito });
+    Strade.misura('cronologia', verso, 'alt_freccia', { incognito: this.incognito });
   }
 
   // Cmd+freccia che la pagina non ha usato (src/preload/cmd-freccia.js). Vale solo
@@ -2536,13 +2573,17 @@ class TabManager {
     if (!visto || visto.verso !== verso || Date.now() - visto.t > 3000) return;
     wc._filoCmdFreccia = null;
     const tab = this.tabs.find((t) => t.view && t.view.webContents === wc);
-    if (tab) this.navigaCronologia(verso, tab.id);
+    if (!tab) return;
+    this._cronologiaDaTasto(verso);
+    this.navigaCronologia(verso, tab.id);
   }
 
   // I tasti del browser (#404, #685) da qualunque vista della finestra abbia il fuoco: la scheda, e la barra
   // laterale aperta da tastiera (#871 giro 9). `tab` è la scheda su cui agire. true = preso.
   tastoDelBrowser(input, tab) {
     if (!input || !tab) return false;
+    // I tasti di chi arriva da un altro browser, per nome (#1468): anche quelli che Filo non usa.
+    if (input.type === 'keyDown') Strade.misura('tasto', input, { incognito: this.incognito });
     // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
     // Mac (lì Opzione+cifra scrive un simbolo, e prendercela impediva di
     // digitarlo). Quale combinazione sia, e come si chiama nell'elenco delle
@@ -2577,6 +2618,7 @@ class TabManager {
     if (input.type === 'keyDown') {
       const verso = comandoNavigazione(input);
       if (verso) {
+        Strade.misura('cronologia', verso, 'alt_freccia', { incognito: this.incognito });
         AzioniContate.azione('navigate-back-forward', () => this.navigaCronologia(verso, tab.id), { incognito: !!this.win._filoIncognito });
         return true;
       }
@@ -2597,11 +2639,12 @@ class TabManager {
       const k = String(input.key || '').toLowerCase();
       const conta = (azione, fn) => { AzioniContate.azione(azione, fn, { incognito: !!this.win._filoIncognito }); return true; };
       // Con Shift riapre l'ultima scheda chiusa, come in ogni browser (#1476); tenuto premuto non svuota l'archivio.
-      if (k === 't' && input.shift) return input.isAutoRepeat || conta('reopen-closed-tab', () => this.riapriChiusa().catch(() => {}));
-      if (k === 't') return conta('new-tab', () => this.openTab('filo://newtab/'));
+      const strada = (azione) => Strade.misura('azione', azione, 'scorciatoia', { incognito: this.incognito });
+      if (k === 't' && input.shift) return input.isAutoRepeat || conta('reopen-closed-tab', () => this.riapriChiusa({ tasto: 'ctrl_shift_t' }).catch(() => {}));
+      if (k === 't') { strada('newTab'); return conta('new-tab', () => this.openTab('filo://newtab/')); }
       if (k === 'w') return conta('close-tab', () => this.closeTab(tab.id, { via: 'ctrl_w' }));
-      if (k === 'l') return conta('address-bar', () => this.vaiAScrivereUnIndirizzo(tab.id).catch(() => {}));
-      if (k === 'r') return conta('reload', () => this.reload(tab.id));
+      if (k === 'l') return conta('address-bar', () => this.vaiAScrivereUnIndirizzo(tab.id, { tasto: 'ctrl_l' }).catch(() => {}));
+      if (k === 'r') { strada('reload'); return conta('reload', () => this.reload(tab.id)); }
     }
     return false;
   }
@@ -2805,9 +2848,12 @@ class TabManager {
     // fuoco lascia la pagina e da lì il tasto non passava da nessuna parte.
     shellWc.on('before-input-event', (event, input) => {
       if (input.type !== 'keyDown') return;
+      // Col fuoco sulla barra i tasti del browser li fa la shell (src/renderer/shell.js): qui si contano e basta (#1468).
+      Strade.misura('tasto', input, { incognito: this.incognito });
       const verso = comandoNavigazione(input);
       if (verso) {
         event.preventDefault();
+        Strade.misura('cronologia', verso, 'alt_freccia', { incognito: this.incognito });
         this.navigaCronologia(verso);
         return;
       }
@@ -2974,6 +3020,7 @@ class TabManager {
       // #514 — si segna qui perché questo evento arriva PRIMA che il documento
       // veda il tasto, ed è dentro quel giro che la pagina chiede lo schermo.
       tab._ultimoInputEsc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
+      Strade.misura('inputScheda', tab, input);
       if (staRegistrandoTasti(wc)) return;
       if (this.strato.tasto(input)) {
         event.preventDefault();
@@ -3041,6 +3088,12 @@ class TabManager {
       if (this._sbPrimaDelClic(tab, url, (segna) => { segna(tab); this._sbRifaiDallaPagina(tab, 'SN_RIFAI_INVIO', url, () => this.navigate(tab.id, url)); })) {
         event.preventDefault();
         return;
+      }
+      // Un collegamento da una pagina di Filo a un'altra (#1468).
+      const da = String(wc.getURL() || '');
+      const paginaDi = (u) => (globalThis.SN_CONTATORI_STRADE ? globalThis.SN_CONTATORI_STRADE.paginaDi(u) : '');
+      if (/^filo:/i.test(da) && /^filo:/i.test(String(url || '')) && paginaDi(url) !== paginaDi(da)) {
+        Strade.misura('pagina', url, 'collegamento_interno', { finestra: this, incognito: this.incognito });
       }
       if (this._needsRecreate(tab, url)) {
         event.preventDefault();
@@ -3239,6 +3292,7 @@ class TabManager {
         this.anteprime.caricata(tab);
         this.codaRiapertura.caricata(tab);
         if (tab._sessioneVista) { const vista = tab._sessioneVista; tab._sessioneVista = null; vista(); }
+        Strade.misura('caricata', tab);
       }
       this.visite.caricata(wc);
       // §3.2 — cattura un estratto del contenuto (best-effort) da usare per la
@@ -3299,6 +3353,11 @@ class TabManager {
       }
       this._assestaEsito(tab);
       this.visite.navigata(wc, tab.id, url, { gesto: gestoPerIlFilo(tab), chiave: tab });
+      // La pagina davanti è cambiata; una scheda riaperta col tasto ora la usa chi l'ha chiesta (#1468).
+      if (tab.view && tab.view.webContents === wc) {
+        Strade.misura('navigata', tab);
+        if (tab.id === this.activeId) Strade.misura('inVista', this, tab, url, { incognito: this.incognito });
+      }
       // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
       // vale più (#686).
       tab.zoomProprio = null;
@@ -3477,6 +3536,8 @@ class TabManager {
       if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
         const gesto = Permessi.gestoRecente(wc);
         globalThis.SN_USCITA_DA_FILO(url, wc, () => {
+          // Un collegamento da una pagina di Filo a un'altra, in una scheda nuova (#1468).
+          if (/^filo:/i.test(String(url || ''))) Strade.misura('pagina', url, 'collegamento_interno', { finestra: this, incognito: this.incognito });
           this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab', daScheda: this.tabs.includes(tab) ? tab : null, gesto });
         }).catch(() => {});
         return { action: 'deny' };
@@ -3923,6 +3984,7 @@ class TabManager {
   _dropTab(tab) {
     const idx = this.tabs.findIndex((t) => t.id === tab.id);
     if (idx < 0) return false;
+    Strade.misura('chiusa', this, tab);
     this._avvisaSorvegliante(tab, 'chiusa');
     ContatoriHomePagina.misura('proposteVia', tab._proposte);
     this._nelFilo('schedaChiusa', tab, { come: 'servizio' });
@@ -4478,6 +4540,7 @@ class TabManager {
         const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true, rinvia: true, origine: { tipo: 'filo' }, idRimessa: ids[i] });
         const nata = id ? this.tabs.find((t) => t.id === id) : null;
         if (!nata) return null;
+        Strade.misura('pagina', url, 'sessione_ripristinata', { incognito: this.incognito });
         this.visite.giaVista(nata.view.webContents, url);
         // §1.2/§1.3 — ripristina subito il colore identità salvato: la barra
         // riparte già tinta e il riordino cromatico alla riapertura ha i dati

@@ -20,6 +20,7 @@ const { hostResolves } = require('./services/hostResolve');
 const DiskStorage = require('./shim/storage');
 const { chiediConferma, ritiraConferma } = require('./confermeSopraPagina');
 const AzioniContate = require('./services/azioniContate');
+const Strade = require('./services/contatoriStrade');
 const { vistaInterna } = require('./services/handlers/origine');
 
 const inFlightStreams = new Map(); // requestId → AbortController
@@ -601,9 +602,13 @@ function registerIpcHandlers() {
   };
   // I gesti della barra delle schede sono azioni contate (#1461): fino alla pagina visibile e caricata.
   const gesto = (win, azione, fn) => AzioniContate.azione(azione, fn, { incognito: !!(win && win._filoIncognito) });
-  ipcMain.handle('tabs:open', (event, { url } = {}) => {
+  // `via` (#1468): la shell dice se la scheda nuova viene dal suo pulsante o dal tasto.
+  ipcMain.handle('tabs:open', (event, { url, via } = {}) => {
     const win = winFor(event);
     if (!win || !win._filoTabs) return { ok: false };
+    if ((!url || url === 'filo://newtab/') && ['pulsante_scheda', 'scorciatoia'].includes(via) && finestraDellaBarra(event.sender)) {
+      Strade.misura('azione', 'newTab', via, { incognito: !!win._filoIncognito });
+    }
     // Per il giudizio sui siti «aperta da Filo» lo dice solo la barra di Filo.
     const daShell = Boolean(finestraDellaBarra(event.sender));
     const apri = () => win._filoTabs.openTab(url || 'filo://newtab/', daShell ? { origine: { tipo: 'filo' } } : {});
@@ -653,8 +658,9 @@ function registerIpcHandlers() {
     if (win?._filoTabs) gesto(win, 'navigate-back-forward', () => win._filoTabs.goForward(id));
     return { ok: true };
   });
-  ipcMain.handle('tabs:reload', (event, { id }) => {
+  ipcMain.handle('tabs:reload', (event, { id, via } = {}) => {
     const win = winFor(event);
+    if (via === 'scorciatoia' && win && finestraDellaBarra(event.sender)) Strade.misura('azione', 'reload', via, { incognito: !!win._filoIncognito });
     if (win?._filoTabs) gesto(win, 'reload', () => win._filoTabs.reload(id));
     return { ok: true };
   });
@@ -677,16 +683,24 @@ function registerIpcHandlers() {
   ipcMain.handle('tabs:riapri-chiusa', async (event) => {
     const win = finestraDellaBarra(event.sender);
     if (!win) return { ok: false };
-    return { ok: !!(await gesto(win, 'reopen-closed-tab', () => win._filoTabs.riapriChiusa())) };
+    return { ok: !!(await gesto(win, 'reopen-closed-tab', () => win._filoTabs.riapriChiusa({ tasto: 'ctrl_shift_t' }))) };
   });
   ipcMain.handle('tabs:scrivi-indirizzo', async (event, { id } = {}) => {
     const win = finestraDellaBarra(event.sender);
     if (!win) return { ok: false };
-    await gesto(win, 'address-bar', () => win._filoTabs.vaiAScrivereUnIndirizzo(id));
+    await gesto(win, 'address-bar', () => win._filoTabs.vaiAScrivereUnIndirizzo(id, { tasto: 'ctrl_l' }));
     return { ok: true };
   });
   ipcMain.handle('tabs:help', (event, { id } = {}) => {
     const win = winFor(event);
+    if (win?._filoTabs) {
+      // La voce «Aiuto» del menu della scheda (#1468); sotto l'avviso del sito è la domanda dell'avviso.
+      const tm = win._filoTabs;
+      const tab = tm.tabs.find((t) => t.id === id);
+      const incognito = !!win._filoIncognito;
+      Strade.misura('azione', 'help', 'menu_scheda', { incognito });
+      if (tab) Strade.misura('aiuto', tm.avvisoSito && tm.avvisoSito.coperta() === tab ? 'avviso_sito' : 'menu_scheda', { incognito });
+    }
     if (win?._filoTabs) gesto(win, 'help-sidebar', () => win._filoTabs.openHelp(id));
     return { ok: true };
   });

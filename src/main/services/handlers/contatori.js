@@ -21,6 +21,16 @@ const numero = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const RISPOSTE_RESTA_CONNESSO = Object.freeze({
   azione_0: 'accettata', chiusa_x: 'rifiutata', scaduta: 'ignorata', sostituita: 'ignorata', chiuse_tutte: 'ignorata', ritirata: 'ignorata',
 });
+const sitiDelMenu = (s) => {
+  const l = s && s.menuDelSito && s.menuDelSito.siti;
+  return Array.isArray(l) ? [...new Set(l.filter((x) => typeof x === 'string' && x))] : [];
+};
+// Dalle pagine arrivano le sole strade che vede soltanto la pagina (#1468): il box del tasto destro, la scorciatoia
+// muta, il menu nativo. Il resto lo conta il main dove arriva il gesto.
+const STRADE_DELLE_PAGINE = Object.freeze({
+  azioni: ['help', 'zoom_reset', 'explain-selection'], vie: ['tasto_destro_altro'],
+  vuoti: ['filo_spento_sul_sito', 'pagina_interna'], nativo: ['shift_tasto_destro', 'menu_del_sito:voce'],
+});
 const sitiCoiBanner = (s) => {
   const l = s && s.security && s.security.cookies && s.security.cookies.bannerSites;
   return Array.isArray(l) ? [...new Set(l.filter((x) => typeof x === 'string' && x))] : [];
@@ -122,6 +132,13 @@ module.exports = function register(on, ctx) {
     }
     const prov = Registro.corrente();
     if (prov && prov.via === 'migrazione') return;
+    // «Sempre su questo sito» acceso o spento, da qualunque strada scelta da una persona (#1468): mai il sito.
+    if (['mano', 'chat'].includes(C.viaDi(prov))) {
+      const prima = sitiDelMenu(c.oldValue);
+      const dopo = sitiDelMenu(c.newValue);
+      for (const x of dopo) if (!prima.includes(x)) strade.nativo('menu_del_sito:sempre_acceso', { incognito });
+      for (const x of prima) if (!dopo.includes(x)) strade.nativo('menu_del_sito:sempre_spento', { incognito });
+    }
     contatori.impostazioniCambiate(c.oldValue, c.newValue, {
       via: C.viaDi(prov), incognito, normalizza: globalThis.SN_STORAGE && globalThis.SN_STORAGE.normalizza,
     });
@@ -249,6 +266,19 @@ module.exports = function register(on, ctx) {
       case 'risali-fine': ok = homePagina.fineInCorso(chiaveInCorso(sender, 'risali', 'home')); break;
       // Dalle pagine web arriva solo quello che vede soltanto la pagina: la pubblicità saltata.
       case 'automatismo': ok = testo(m.tipo) === 'pubblicita_saltata' && homePagina.fatto('pubblicita_saltata'); break;
+      // Le strade (#1468): una voce del box del tasto destro, l'Aiuto aperto da lì.
+      case 'strada': {
+        const azione = testo(m.azione);
+        const via = testo(m.via);
+        ok = STRADE_DELLE_PAGINE.azioni.includes(azione) && STRADE_DELLE_PAGINE.vie.includes(via) && strade.azione(azione, via);
+        if (ok && azione === 'help') strade.aiuto('tasto_destro');
+        break;
+      }
+      // Muta nella pagina: conta solo se l'ultima consegnata è quella, e partiva dal tasto.
+      case 'a-vuoto': ok = STRADE_DELLE_PAGINE.vuoti.includes(testo(m.motivo)) && require('../../shortcuts').daTastoDaPoco(testo(m.comando))
+        && strade.aVuoto(testo(m.comando), testo(m.motivo)); break;
+      case 'menu-nativo': ok = STRADE_DELLE_PAGINE.nativo.includes(testo(m.voce)) && strade.nativo(testo(m.voce)); break;
+      case 'contesto-box': ok = Array.isArray(m.bandiere) && strade.contesto(m.bandiere.filter((b) => typeof b === 'string').slice(0, 12)); break;
       default: ok = false;
     }
     return { ok: Boolean(ok) };

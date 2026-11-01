@@ -781,7 +781,7 @@
     // in chat come suo, non come parole dell'utente né come comando con la barra.
     // Una pagina di Filo non è un'uscita: la porta delle uscite la rifiuterebbe e il clic non farebbe niente.
     if (type === 'NAVIGA' && /^filo:\/\//i.test(String(a.url || ''))) {
-      send({ type: MSG.OPEN_URL, url: a.url });
+      send({ type: MSG.OPEN_URL, url: a.url, via: 'chat' });
     } else if (type === 'NAVIGA' && a.url) {
       apriProposta(a.url, vicino, s.chiedeOk || '');
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
@@ -902,7 +902,7 @@
     if (!url) return;
     e.preventDefault();
     e.stopPropagation();
-    send({ type: MSG.OPEN_URL, url });
+    send({ type: MSG.OPEN_URL, url, via: 'chat' });
   });
 
   // ===== Invio messaggio =====

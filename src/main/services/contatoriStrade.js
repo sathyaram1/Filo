@@ -87,8 +87,7 @@ function crea(dip = {}) {
   const attese = new WeakMap();
 
   function pagina(url, via, { finestra = null, incognito = false } = {}) {
-    const k = T.chiavePagina(url, via);
-    if (!k || !nuovo(`pagina|${k}`)) return false;
+    if (!T.chiavePagina(url, via)) return false;
     scrivi((ora) => T.registraPagina(ora, url, via), incognito);
     if (finestra && typeof finestra === 'object') aperture.set(finestra, { pagina: T.paginaDi(url), t: adesso() });
     return true;

@@ -19,8 +19,9 @@
   // Le quattro di SN_TASTI.AZIONI_FILO: Salva per dopo e Aiuto hanno anche un'icona, e una cosa sola ha un nome solo.
   const AZIONI_FILO = Object.freeze(['explain-selection', 'translate-selection', 'save-for-later', 'open-help-sidebar']);
   const STESSA_DI = Object.freeze({ 'save-for-later': 'saveForLater', 'open-help-sidebar': 'help' });
-  const AZIONI = Object.freeze([...ICONE, ...AZIONI_FILO.filter((a) => !STESSA_DI[a]),
-    'zoom_piu', 'zoom_meno', 'zoom_reset', 'barra_laterale', ALTRO]);
+  // I versi dello zoom di SN_ZOOM.VERSI.
+  const ZOOM = Object.freeze({ in: 'zoom_piu', out: 'zoom_meno', reset: 'zoom_reset' });
+  const AZIONI = Object.freeze([...ICONE, ...AZIONI_FILO.filter((a) => !STESSA_DI[a]), ...Object.values(ZOOM), 'barra_laterale', ALTRO]);
   // «tasto_destro_riga»: la riga di icone del tasto destro, che non c'è più (#1246); «tasto_destro_altro»: una voce del box.
   const VIE_AZIONE = Object.freeze(['scorciatoia', 'barra', 'tasto_destro_riga', 'tasto_destro_altro', 'menu_scheda',
     'menu_app', 'pulsante_scheda', 'clic_centrale', 'tasto_mouse', 'swipe', 'comando_slash', 'carta_home', 'chat']);
@@ -71,6 +72,8 @@
   };
   const PAGINE = Object.freeze([...ETICHETTE.map(idDellaChiave), ...IN_PIU, ALTRO]);
   const VIE_PAGINA = Object.freeze(['barra', 'menu_app', 'comando_slash', 'carta_home', 'collegamento_interno', 'chat', 'sessione_ripristinata']);
+  // Le pagine che un'icona della barra apre: aprirle da un'altra strada è la stessa azione.
+  const AZIONE_DELLA_PAGINA = Object.freeze({ options: 'openOptions', editor: 'editorApp', feedback: 'feedbackApp', newtab: 'newTab' });
   const VISTA = 'vista';
   // Le fasce dei contatori dell'ora (SN_CONTATORI.FASCE): sotto i 2 s non era la pagina cercata.
   const FASCE_VISTA = Object.freeze([
@@ -317,9 +320,9 @@
 
   global.SN_CONTATORI_STRADE = {
     VERSIONE, COLLEZIONE, ALTRO, CAMPI, MAPPE, FORME, TETTI, CHIAVI_FORMA,
-    ICONE, NON_CONTATE, AZIONI_FILO, STESSA_DI, AZIONI, VIE_AZIONE, TASTI, MANCATA, MANCATE, MANCATA_MS, MOTIVI_A_VUOTO,
+    ICONE, NON_CONTATE, AZIONI_FILO, STESSA_DI, ZOOM, AZIONI, VIE_AZIONE, TASTI, MANCATA, MANCATE, MANCATA_MS, MOTIVI_A_VUOTO,
     VOCI_NATIVO, BANDIERE, COMBINAZIONI, MISTO, VERSI, VIE_CRONOLOGIA, FASCE_LISTA, AZIONE_DELLA_VIA, ETICHETTE, IN_PIU,
-    PAGINE, VIE_PAGINA, FASCE_VISTA, APERTURA_MS, VIE_AIUTO,
+    PAGINE, VIE_PAGINA, AZIONE_DELLA_PAGINA, FASCE_VISTA, APERTURA_MS, VIE_AIUTO,
     fasciaIn, azioneDi, chiaveAzione, tastoDaBrowser, chiaveVuoto, chiaveContesto, chiaveCronologia, paginaDi, chiavePagina,
     chiaveVista, chiaviDi, vuota, dati,
     registraAzione, registraTasto, registraMancata, registraVuoto, registraNativo, registraContesto, registraCronologia,

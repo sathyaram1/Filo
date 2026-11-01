@@ -2299,6 +2299,24 @@ async function eseguiAccount(action, sender) {
   }
 }
 
+// Lo zoom chiesto in chat fra le strade dello zoom (#1468): il verso chiesto, o quello del numero rispetto a prima.
+function contaZoomDallaChat(esito, verso, win) {
+  const Z = globalThis.SN_CONTATORI_STRADE && globalThis.SN_CONTATORI_STRADE.ZOOM;
+  if (!Z || !esito) return;
+  let v = verso;
+  if (!v && Number.isFinite(esito.percentuale)) {
+    const prima = Number(esito.prima);
+    if (Math.round(esito.percentuale) === 100) v = 'reset';
+    else if (Number.isFinite(prima)) v = esito.percentuale > prima ? 'in' : esito.percentuale < prima ? 'out' : '';
+  }
+  if (Z[v] && dallaChat()) require('./contatoriStrade').misura('azione', Z[v], 'chat', { incognito: !!(win && win._filoIncognito) });
+}
+// Un tasto della home che usa la porta dell'Aiuto (#1561) è un gesto dell'utente, non la chat.
+function dallaChat() {
+  const p = Registro.corrente();
+  return !p || p.via !== 'interfaccia';
+}
+
 async function executeFiloAction(action, opzioni = {}) {
   const raccolti = [];
   // Chi è stato lo dice chi manda (#1561): un tasto della home che usa la porta dell'Aiuto resta un gesto dell'utente.
@@ -3835,6 +3853,7 @@ async function eseguiAzioneFilo(action, {
         const esito = await tm.applicaZoom(perc != null ? { percentuale: perc } : { verso });
         if (!esito) return { executed: false, kept: false, output: { zoom: 'no-tab' } };
         if (esito.muto) return { executed: false, kept: false, output: { zoom: 'muto' } };
+        contaZoomDallaChat(esito, perc != null ? '' : verso, win);
         // `sconosciuto`: la pagina zooma da sé (l'editor scala il foglio) e la
         // percentuale la sa solo lei. Fatto sì, numero no.
         if (esito.sconosciuto) return { executed: true, kept: false, output: { zoom: 'propria' } };
@@ -4009,6 +4028,11 @@ async function eseguiAzioneFilo(action, {
         if (cmd === 'home' && /^filo:\/\/(newtab|dashboard)\b/i.test(String(sender?.tab?.url || sender?.url || ''))) {
           return { executed: true, kept: true, output: { window: 'home', already: true } };
         }
+        // Da quale strada (#1468): l'Aiuto lo conta chi lo apre.
+        const Strade = require('./contatoriStrade');
+        const azioneStrada = dallaChat() ? { fullscreen: 'fullscreen', home: 'home', sidebar: 'barra_laterale' }[cmd] : '';
+        if (azioneStrada) Strade.misura('azione', azioneStrada, 'chat', { incognito: !!win._filoIncognito });
+        if (azioneStrada === 'home') Strade.misura('pagina', 'filo://newtab/', 'chat', { finestra: win._filoTabs, incognito: !!win._filoIncognito });
         if (cmd === 'fullscreen') {
           // Schermo intero «immersivo»: la view attiva copre la finestra e le barre spariscono.
           // NON preme il pulsante del lettore video: Filo non ha accesso ai comandi del sito.
@@ -4027,7 +4051,7 @@ async function eseguiAzioneFilo(action, {
         }
         // #1433 — l'Aiuto chiesto in chat si apre sulla scheda davanti come col suo tasto: nell'Editor è la chat del documento.
         if (cmd === 'aiuto') {
-          require('../shortcuts').dispatch('open-help-sidebar', win);
+          require('../shortcuts').dispatch('open-help-sidebar', win, dallaChat() ? 'chat' : '');
           return { executed: true, kept: false, output: { window: 'aiuto' } };
         }
         // home / minimize / settings / apps / account: clicca il bottone REALE

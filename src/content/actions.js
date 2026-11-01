@@ -707,6 +707,8 @@
             e.stopPropagation();
             approfondita = true;
             contaRiquadro('riquadro_uso', { action: ACTIONS.EXPLAIN, uso: 'approfondisci' });
+            // Approfondisci è Spiega della scorciatoia, dal box del tasto destro (#1468).
+            Popup.conta({ misura: 'strada', azione: 'explain-selection', via: 'tasto_destro_altro' });
             try { global.SN_MENU?.close?.(); } catch (_) {}
             triggerExplainDeep(selInfo, deps.getLastMouseEvent());
           });

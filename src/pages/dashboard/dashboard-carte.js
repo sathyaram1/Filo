@@ -53,7 +53,8 @@
     s.innerHTML = typeof ICONS[nome] === 'function' ? ICONS[nome](size) : '';
     return s;
   }
-  function apri(url) { d.send({ type: MSG.OPEN_URL, url }); }
+  // La strada la sa il main (#1468): una pagina di Filo aperta da una carta.
+  function apri(url) { d.send({ type: MSG.OPEN_URL, url, via: 'carta_home' }); }
   function fmtBytes(n) {
     n = Number(n) || 0;
     if (n < 1024) return `${n} B`;

@@ -111,8 +111,15 @@ function dispatch(command, window, via = 'scorciatoia') {
 }
 
 // Sotto l'avviso del sito l'Aiuto è la domanda dell'avviso, da qualunque strada lo si chieda.
+// L'ultima consegnata e da dove: la pagina che la trova muta lo dice (#1468), e conta solo se era il tasto.
+let ultima = null;
+function daTastoDaPoco(command, entroMs = 5000) {
+  return !!ultima && ultima.command === command && ultima.via === 'scorciatoia' && Date.now() - ultima.t <= entroMs;
+}
+
 function contaStrada(command, via, win) {
   if (!globalThis.SN_TASTI.AZIONI_FILO.some((a) => a.id === command)) return;
+  ultima = { command, via, t: Date.now() };
   const incognito = !!(win && win._filoIncognito);
   Strade.misura('azione', command, via, { incognito });
   if (command !== 'open-help-sidebar') return;
@@ -249,6 +256,6 @@ async function confermaSullaSchedaDavanti(win, entry, { tentativoMs = 800, total
 }
 
 module.exports = {
-  collegaScorciatoie, comandoDaTasto, configura, seguiPannelli, registraTasti, staRegistrandoTasti, dispatch, saveForLater,
+  collegaScorciatoie, comandoDaTasto, configura, seguiPannelli, registraTasti, staRegistrandoTasti, dispatch, saveForLater, daTastoDaPoco,
   consegnaConRicevuta, riceviRicevuta, confermaSullaSchedaDavanti, isInternalTab, COMMANDS,
 };

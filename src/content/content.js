@@ -1059,6 +1059,7 @@
 
   // Dopo il clic sulla voce, non dentro: il clic che risale al documento chiuderebbe il menu appena aperto.
   function apriMenuDelSito(sito) {
+    Popup.conta({ misura: 'menu-nativo', voce: 'menu_del_sito:voce' });
     setTimeout(async () => {
       let esito = null;
       try { esito = await self.__snMenuDelSito.apri(sito); } catch (_) { esito = null; }
@@ -1074,7 +1075,10 @@
   // `conMaiusc`: sui siti dove il tasto destro apre il loro menu, Shift porta qui (#975).
   async function onContextMenu(e, opzioni) {
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch); Shift+F10 è la tastiera che chiede il nostro.
-    if (e.shiftKey && !(opzioni && opzioni.conMaiusc) && !(Menu.daTastiera && Menu.daTastiera())) return;
+    if (e.shiftKey && !(opzioni && opzioni.conMaiusc) && !(Menu.daTastiera && Menu.daTastiera())) {
+      if (e.isTrusted) Popup.conta({ misura: 'menu-nativo', voce: 'shift_tasto_destro' });
+      return;
+    }
     // Prima di ogni attesa: dopo, il cammino dell'evento non c'è più.
     const sito = statoMenuDelSito(e, opzioni);
 
@@ -1083,10 +1087,10 @@
     e.stopPropagation();
 
     const avviso = self.SN_AVVISI?.avvisoSotto?.(realTarget(e));
-    if (avviso) { openAvvisoMenu(avviso, e); return; }
+    if (avviso) { contaContesto(['avviso']); openAvvisoMenu(avviso, e); return; }
     // Il documento trovato dall'Aiuto (#947.3): le azioni di un file, non quelle della pagina.
     const file = self.SN_SIDEBAR?.fileSotto?.(realTarget(e));
-    if (file) { Menu.open({ x: e.clientX, y: e.clientY, items: file.map((a) => ({ type: 'item', label: a.label, onClick: () => a.fn() })) }); return; }
+    if (file) { contaContesto(['file']); Menu.open({ x: e.clientX, y: e.clientY, items: file.map((a) => ({ type: 'item', label: a.label, onClick: () => a.fn() })) }); return; }
 
     // Il correttore (#1446): su un segno, il menu del segno; nelle caselle di una riga, che Filo non segna, la parola
     // sotto il cursore. Il resto è il menu normale, che sul campo porta «Correggi tutti gli errori».
@@ -1096,6 +1100,7 @@
         // Il valore sopra un segnaposto (#1448) ha il menu del suo segnaposto.
         const valore = SpellCheck.valoreSotto(rt);
         if (valore) {
+          contaContesto(['campo']);
           await openSpellMarksMenu(valore.el, { errore: null, suggerimento: valore.segno }, e, sito);
           return;
         }
@@ -1103,6 +1108,7 @@
         if (editableEl) {
           const sotto = SpellCheck.segniSotto(editableEl, e.clientX, e.clientY);
           if (sotto.errore || sotto.suggerimento) {
+            contaContesto(['campo']);
             await openSpellMarksMenu(editableEl, sotto, e, sito);
             return;
           }
@@ -1111,6 +1117,7 @@
           const wordCtx = SpellCheck.erroriAttivi() ? SpellCheck.getWordAt(editableEl, e.clientX, e.clientY) : null;
           if (wordCtx && !SpellCheck.parolaGiusta(editableEl, wordCtx.word)
             && (SpellCheck.getNativeSuggestions(wordCtx.word).length || SpellCheck.sbagliataPerIlBrowser(wordCtx.word))) {
+            contaContesto(['campo']);
             await openSpellWordMenu(editableEl, wordCtx, e, sito);
             return;
           }
@@ -1119,6 +1126,7 @@
         if (inputEl && isTextLikeInput(inputEl) && !SpellCheck.campoEscluso(inputEl)) {
           const wordCtx = SpellCheck.getInputWordAt?.(inputEl, e.clientX, e.clientY);
           if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
+            contaContesto(['campo']);
             await openSpellWordMenu(inputEl, wordCtx, e, sito);
             return;
           }
@@ -1129,6 +1137,20 @@
     }
 
     await openNormalMenuAt(e, sito);
+  }
+
+  // Su che cosa si apre il box (#1468): bandiere da un elenco chiuso; la chiave, o «misto», la fa il main.
+  function contaContesto(bandiere) { Popup.conta({ misura: 'contesto-box', bandiere }); }
+  // «livelli»: l'elemento trovato sotto un altro che lo copre (i `*Under` ci sono solo senza quello diretto).
+  function bandiereDelContesto({ selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable }) {
+    const b = [];
+    if (selInfo) b.push('selezione');
+    if (linkEl || linkUnder) b.push('collegamento');
+    if (imgEl || imgUnder) b.push('immagine');
+    if (mediaEl || mediaUnder) b.push('media');
+    if (editable) b.push('campo');
+    if (linkUnder || imgUnder || mediaUnder) b.push('livelli');
+    return b.length ? b : ['pagina'];
   }
 
   // Le azioni dell'avviso e «Chiudi», nello stesso ordine del menu degli avvisi della barra.
@@ -1179,6 +1201,7 @@
     const {
       linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable,
     } = detectContext(target, e.clientX, e.clientY);
+    contaContesto(bandiereDelContesto({ selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable }));
     if (editable) capturePasteContext(target);
     else pasteContext = null;
     const clipboardHistory = await Actions.getClipboardHistory();
@@ -2145,7 +2168,10 @@
       // cosa non si chiamano in due modi.
       label: `Dimensione reale (ora ${p}%)`,
       shortcut: Tasti.etichetta('Ctrl+0'),
-      onClick: () => { try { zoomPagina()?.azzera(); } catch (_) {} },
+      onClick: () => {
+        Popup.conta({ misura: 'strada', azione: 'zoom_reset', via: 'tasto_destro_altro' });
+        try { zoomPagina()?.azzera(); } catch (_) {}
+      },
     };
   }
 
@@ -2205,7 +2231,10 @@
       type: 'item',
       label: I18n.t('menu_help'),
       shortcut: Tasti.etichettaFilo(Tasti.scorciatoiaFilo('open-help-sidebar')),
-      onClick: () => openSurface('help', () => openHelpSidebar()),
+      onClick: () => {
+        Popup.conta({ misura: 'strada', azione: 'help', via: 'tasto_destro_altro' });
+        openSurface('help', () => openHelpSidebar());
+      },
     };
   }
 
@@ -2630,7 +2659,11 @@
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
       // Alt+S è un gesto rivolto a Filo: salva anche dove Filo è spento (#839); le altre scorciatoie lì tacciono.
       if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
-      if (isBlocked()) return;
+      if (isBlocked()) {
+        // La scorciatoia che qui tace, e perché (#1468): Filo spento sul sito, o una pagina dove Filo non c'è.
+        Popup.conta({ misura: 'a-vuoto', comando: String(msg.command || ''), motivo: motivoBlocco() === 'sito' ? 'filo_spento_sul_sito' : 'pagina_interna' });
+        return;
+      }
       handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }

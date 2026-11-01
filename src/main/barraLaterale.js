@@ -9,6 +9,7 @@ const Layout = require('./services/layoutIcone');
 const Registro = require('./services/registroCambi');
 const RedteamGate = require('./services/redteamGate');
 const AzioniContate = require('./services/azioniContate');
+const Strade = require('./services/contatoriStrade');
 const { tastoPremuto } = require('./tastoDelMouse');
 const RisposteInAttesa = require('./risposteInAttesa');
 const RilascioNellaChat = require('./rilascioNellaChat');
@@ -50,6 +51,11 @@ const MOTIVI_AZIONI_SPENTE = { sito: 'aiuto_spento_sito', pagina: 'azioni_spente
 const AZIONI_CON_INDIRIZZO = new Set(['share', 'qrCode', 'saveForLater']);
 // Quanto un'azione premuta su una pagina in arrivo aspetta che Filo ci sia dentro: oltre, il clic è vecchio.
 const ATTESA_DELLA_PAGINA_MS = 20_000;
+// Le icone che aprono una pagina di Filo, per le strade delle pagine (#1468).
+const PAGINA_DELL_ICONA = {
+  openOptions: 'filo://options/options.html', editorApp: 'filo://editor/editor.html', feedbackApp: 'filo://feedback/feedback.html',
+  home: 'filo://newtab/', newTab: 'filo://newtab/',
+};
 const PAGINE_DAL_MENU = {
   ai: 'filo://history/history.html',
   preferenze: 'filo://preferences/preferences.html',
@@ -217,7 +223,9 @@ class BarraLaterale {
     return i < 0 ? 0 : this._icone().length + i + 1;
   }
 
-  commuta(motivo = 'clic') {
+  // `via`: da quale strada il gesto, per le strade delle azioni (#1468); lo spunto dal bordo e la maniglia no.
+  commuta(motivo = 'clic', via = '') {
+    if (via) Strade.misura('azione', 'barra_laterale', via, { incognito: this._incognito() });
     if (this.aperta) { this.chiudi(); return; }
     // Aperta da un gesto (tasto, clic, barra dei menu): un'azione contata (#1461). Lo spunto dal bordo no.
     AzioniContate.azione('sidebar', () => this.apri(motivo), { incognito: !!(this.win && this.win._filoIncognito) });
@@ -228,7 +236,7 @@ class BarraLaterale {
     if (!input || input.type !== 'keyDown') return false;
     const T = globalThis.SN_TASTI;
     if (T && T.comandoBarra(input)) {
-      if (!input.isAutoRepeat) this.commuta('tasto');
+      if (!input.isAutoRepeat) this.commuta('tasto', 'scorciatoia');
       return true;
     }
     if (this.destro.tasto(input)) return true;
@@ -682,10 +690,12 @@ class BarraLaterale {
     this._sceltaRicerca(this._icone().findIndex((i) => i.id === id) + 1);
     const tabs = this.tabs;
     const attiva = this._attiva();
+    const incognito = this._incognito();
     if (d.tipo === 'aiuto') { this._passoAiuto(attiva); return; }
     if (d.tipo === 'pagina') {
       const nav = this._nav();
       if (!attiva || !nav.pagina || this._motivoAzione(id, nav)) return;
+      Strade.misura('azione', id, 'barra', { incognito });
       this.chiudi();
       this._restituisciTastiera();
       const scelto = id === 'colorPicker' && /^#[0-9a-f]{6}$/i.test(testo(colore)) ? testo(colore) : undefined;
@@ -715,6 +725,10 @@ class BarraLaterale {
       return true;
     };
     const azione = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.AZIONE_DI_ICONA[id];
+    // Le strade (#1468): indietro e avanti contano anche nella cronologia, e un'icona che apre una pagina anche fra le pagine.
+    if (id === 'back' || id === 'forward') Strade.misura('cronologia', id === 'back' ? 'indietro' : 'avanti', 'barra', { incognito });
+    else Strade.misura('azione', id, 'barra', { incognito });
+    if (PAGINA_DELL_ICONA[id]) Strade.misura('pagina', PAGINA_DELL_ICONA[id], 'barra', { finestra: tabs, incognito });
     const fatto = azione ? AzioniContate.azione(azione, fai, { incognito: !!this.win._filoIncognito }) : fai();
     if (!fatto) return;
     // Da tastiera si torna a chi scriveva; col mouse la barra resta finché il puntatore ci sta sopra.
@@ -745,7 +759,10 @@ class BarraLaterale {
     const a = this._aiuto(attiva);
     if (a.spenta) return;
     const daTastiera = this.motivo === 'tasto';
-    if (!this.tabs.paginaScoperta(attiva)) {
+    const scoperta = this.tabs.paginaScoperta(attiva);
+    Strade.misura('azione', 'help', 'barra', { incognito: this._incognito() });
+    Strade.misura('aiuto', scoperta ? 'barra' : 'avviso_sito', { incognito: this._incognito() });
+    if (!scoperta) {
       require('./services/interruttoreAiuto').seAcceso(this.win, () => this.tabs._sbScelta(attiva, 'chiedi'));
       if (daTastiera) this.chiudi();
       return;
@@ -763,6 +780,7 @@ class BarraLaterale {
     this._sceltaRicerca(this._posizioneFissa(comando));
     if (PAGINE_FISSE[comando]) {
       // L'azione della pagina la conta l'apertura della scheda (src/main/tabs.js).
+      Strade.misura('pagina', PAGINE_FISSE[comando], 'barra', { finestra: this.tabs, incognito: this._incognito() });
       this.tabs.openTab(PAGINE_FISSE[comando]);
       if (this.motivo === 'tasto') this.chiudi();
       return;
@@ -811,7 +829,11 @@ class BarraLaterale {
         else if (a === 'barra:in-altro') this._posa({ id, target: 'secondary', beforeId: null }, { via: 'rimessa_nel_menu' });
         else if (a === 'barra:in-vista') this._posa({ id, target: 'bar', beforeId: null }, { via: 'rimessa_nel_menu' });
         else if (a.startsWith('barra:voce:') && scheda) {
-          this.tabs.vaiAllaVoce(scheda.id, Number(a.slice('barra:voce:'.length)));
+          const indice = Number(a.slice('barra:voce:'.length));
+          // Il posto della pagina nell'elenco, dalla più vicina (#1468): dice se le quindici servono.
+          const posto = pagine.findIndex((p) => p.indice === indice) + 1;
+          Strade.misura('cronologia', id === 'back' ? 'indietro' : 'avanti', 'barra_lista', { posizione: posto, incognito: this._incognito() });
+          this.tabs.vaiAllaVoce(scheda.id, indice);
           if (this.motivo === 'tasto') this.chiudi();
         }
       };
@@ -902,6 +924,7 @@ class BarraLaterale {
   _apriPagina(chiave) {
     const url = PAGINE_DAL_MENU[chiave];
     if (!url) return;
+    Strade.misura('pagina', url, 'barra', { finestra: this.tabs, incognito: this._incognito() });
     try { this.tabs.openTab(url); } catch (_) {}
   }
 
