@@ -272,6 +272,7 @@
             try { idToken = (tokenOwnerFn && await tokenOwnerFn()) || ''; } catch (e) {
               it.attempts = (it.attempts || 0) + 1;
               anyFail = true;
+              rispondi(it.id, { esito: 'in_coda' });
               logFn('token dell\'owner non ottenuto (rete, riprovo):', it.id, e?.message || e);
               continue;
             }
