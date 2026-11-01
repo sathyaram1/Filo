@@ -317,7 +317,9 @@
   function shortTitle(userMessage, fallback) {
     const words = String(userMessage || '')
       .replace(/\s+/g, ' ')
-      .replace(/["“”'`]/g, '')
+      .replace(/["“”`]/g, '')
+      // L'apostrofo dentro una parola resta: «l'utente» della rete non diventa «lutente».
+      .replace(/(^|[^\p{L}])['’]+|['’]+(?![\p{L}])/gu, '$1')
       .trim()
       .split(' ')
       .filter(Boolean)
@@ -328,15 +330,23 @@
     return t.charAt(0).toUpperCase() + t.slice(1);
   }
 
+  function anonima() {
+    if (!global.SN_SEGNALAZIONE_ANONIMA && typeof require === 'function') require('./segnalazioneAnonima.js');
+    return global.SN_SEGNALAZIONE_ANONIMA;
+  }
+
   function composeProposal(analysis, options) {
     if (!analysis || !analysis.kind) return null;
     const opts = options || {};
-    const userMessage = String(opts.userMessage || '').replace(/\s+/g, ' ').trim();
+    const grezzo = String(opts.userMessage || '').replace(/\s+/g, ' ').trim();
     // Senza la richiesta dell'utente la segnalazione non dice niente di azionabile: meglio
     // nessuna proposta che una vuota.
-    if (!userMessage) return null;
+    if (!grezzo) return null;
+    // Chi è l'utente esce prima di tagliare, o un'email tagliata a metà sfuggirebbe alla rete (#1669).
+    const pulito = (s) => anonima().ripulisci(s, opts.identita);
+    const userMessage = pulito(grezzo);
     const asked = userMessage.length > 400 ? `${userMessage.slice(0, 399).trimEnd()}…` : userMessage;
-    const admitted = firstSentence(opts.textReply, 260);
+    const admitted = firstSentence(pulito(opts.textReply || ''), 260);
 
     if (analysis.kind === 'capability-gap') {
       const parts = [`Ho chiesto a Filo: "${asked}"`];

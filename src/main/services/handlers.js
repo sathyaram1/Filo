@@ -2074,6 +2074,34 @@ function segnalazioneConfermataPulita(sender, action) {
   return !!scade && scade > Date.now();
 }
 
+// Chi è l'utente per la rete delle segnalazioni (#1669): l'account Google e il nome che la memoria ricorda.
+async function identitaDellUtente() {
+  const nomi = [];
+  const email = [];
+  try {
+    const p = require('../auth/google-auth').getProfile();
+    if (p && p.name) nomi.push(p.name);
+    if (p && p.email) email.push(p.email);
+  } catch (_) {}
+  try {
+    const mem = await FiloMem.getMemory();
+    const lezioni = await FiloMem.getLessonsBuffer();
+    const ricordo = [mem.PROFILO, mem.PREFERENZE, ...(Array.isArray(lezioni) ? lezioni.map((l) => l && l.text) : [])];
+    nomi.push(...globalThis.SN_SEGNALAZIONE_ANONIMA.nomiDalRicordo(ricordo.filter((t) => typeof t === 'string').join('\n')));
+  } catch (_) {}
+  return { nomi, email };
+}
+// Riscrive la segnalazione PRIMA del riquadro: l'utente approva il testo che parte, e la richiesta e la conferma la
+// riscrivono uguale, così la firma della conferma combacia anche quando il client rimanda il testo del modello.
+async function segnalazioneSenzaPersona(action) {
+  if (!action || typeof action !== 'object' || String(action.type || '').toUpperCase() !== 'INVIA_FEEDBACK') return action;
+  const identita = await identitaDellUtente();
+  for (const k of ['testo', 'text', 'messaggio', 'titolo', 'title', 'name']) {
+    if (typeof action[k] === 'string') action[k] = globalThis.SN_SEGNALAZIONE_ANONIMA.ripulisci(action[k], identita);
+  }
+  return action;
+}
+
 // Ciò che una chat ha letto resta suo anche fuori dallo storico che la pagina rimanda a ogni turno (riaperta
 // dall'archivio, oltre gli ultimi venti messaggi): lo tiene il main, per la sessione e nell'archivio (#530).
 const fontiPerChat = new Map();   // chatId → fonti lette dalla chat
