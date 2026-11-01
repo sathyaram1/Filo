@@ -179,3 +179,43 @@ test('se niente ha suonato non apre niente e il modello deve chiedere', async ({
   expect(esito).toContain('Chiedi all\'utente');
   await ripristina(app);
 });
+
+test('la musica chiusa mentre suonava vince su un video fermato dopo che lei era partita', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const chat = await home(app);
+  const inCorsa = (titolo) => app.evaluate(({ BrowserWindow }, t) => !!BrowserWindow.getAllWindows()
+    .find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.title === t)?._mediaInCorso, titolo);
+  const musica = await openTab(testServer.html(MUSICA));
+  const url = musica.url();
+  await musica.evaluate(() => document.getElementById('a').play());
+  await expect.poll(() => inCorsa('Musica')).toBe(true);
+  await suona(app, 'Musica', true);
+
+  // Mentre la musica va, un video con l'audio in un'altra scheda, sentito e fermato.
+  await chat.waitForTimeout(1500);
+  const video = await openTab(testServer.html(MUSICA.replace('<title>Musica</title>', '<title>Video</title>')));
+  await video.evaluate(() => document.getElementById('a').play());
+  await expect.poll(() => inCorsa('Video')).toBe(true);
+  await suona(app, 'Video', true);
+  await video.evaluate(() => document.getElementById('a').pause());
+  await suona(app, 'Video', false);
+  await expect.poll(() => video.evaluate(() => window.__statoAudio().pausa)).toBe(true);
+
+  // La scheda della musica si chiude mentre suona ancora.
+  await chat.waitForTimeout(1500);
+  await shell.evaluate((x) => window.filoShell.tabs.close(x), (await schede(shell)).tabs.find((t) => t.url === url).id);
+  await expect.poll(async () => (await schede(shell)).tabs.some((t) => t.url === url)).toBe(false);
+  await tornaAllaHome(shell);
+
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'r5', name: 'RIPRENDI_AUDIO', arguments: '{}' }] },
+    { text: 'Questa frase arriva solo da un secondo giro.' },
+  ]);
+  await chiedi(chat, 'rimettimi la musica');
+
+  await expect(chat.locator('.dash-activity').last()).toContainText('Riaperta e ripartita', { timeout: 20_000 });
+  await expect(chat.locator('.dash-activity').last()).toContainText('Musica');
+  expect((await schede(shell)).tabs.filter((t) => t.url === url).length).toBe(1);
+  expect(await video.evaluate(() => window.__statoAudio().pausa)).toBe(true);
+  await ripristina(app);
+});
