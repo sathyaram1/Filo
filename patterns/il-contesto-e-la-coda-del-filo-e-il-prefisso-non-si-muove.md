@@ -31,8 +31,11 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   sezioni cambiate, e nella domanda di quel turno i ricordi ripescati e l'intervista. L'intervista sta solo nella
   domanda di adesso: rimandata nel tratto, le sue istruzioni dirigerebbero ogni chat dopo, anche in un'altra scheda
   (#1297), e il turno che la perde si rilegge una volta. Le azioni di una chat dentro il suo
-  turno non ci sono: le racconta il turno. Le pagine visitate no: entrano solo cercate. Si scrivono la prima volta e
-  restano quelle (un evento in ritardo non riscrive un messaggio già mandato); dopo una cancellazione si rifanno.
+  turno non ci sono: le racconta il turno. Le pagine visitate entrano ripiegate per sito (decisione dell'owner, D-202),
+  in una busta DATI_PAGINA sotto le altre: quante, quando, le ricerche fatte sul sito e gli ultimi tre titoli; di una
+  delicata solo il sito, di una della rete di casa solo il numero, deciso nel main prima di scrivere il blocco. Oltre
+  trenta siti si dice quante pagine mancano. Si scrivono la prima volta e restano quelle (un evento in ritardo, un
+  titolo che arriva dopo, non riscrive un messaggio già mandato); dopo una cancellazione si rifanno.
 - **I punti di cache stanno sui confini dei blocchi**: fine della parte fissa e fine del CONTESTO (tutte e due della
   durata scelta, un'ora di serie), fine del tratto prima della domanda, ultimo messaggio: quattro, il massimo di
   Anthropic. Il piano lo fa il cancello dei modelli sui messaggi già oscurati; lo scrive nel corpo solo il fornitore, e

@@ -270,12 +270,14 @@
   const MAX_TITOLI = 3;
   const CASA = '\u0000casa';
   const FILE = '\u0000file';
+  const ALTRO = '\u0000altro';
+  const NOMI = { [FILE]: 'file del computer', [ALTRO]: 'pagine senza sito' };
   function rendiPagine(pagine, { rif = null } = {}) {
     const gruppi = new Map();
     for (const p of Array.isArray(pagine) ? pagine : []) {
       const t = Date.parse(p && p.ts);
       if (!Number.isFinite(t)) continue;
-      const k = p.casa ? CASA : (p.file ? FILE : (stringa(p.sito) ? p.sito.toLowerCase() : FILE));
+      const k = p.casa ? CASA : (p.file ? FILE : (stringa(p.sito) ? p.sito.toLowerCase() : ALTRO));
       let g = gruppi.get(k);
       if (!g) { g = { k, n: 0, delicate: 0, primo: p.ts, ultimo: p.ts, tUltimo: t, titoli: [], cercati: [] }; gruppi.set(k, g); }
       g.n++;
@@ -303,14 +305,17 @@
       const a = oraDi(g.primo, rif);
       const b = oraDi(g.ultimo, rif);
       const ora = a === b ? a : `${a}–${b}`;
-      if (g.k === CASA) return `- ${ora} rete di casa: ${pagineN(g.n)} (di queste pagine qui non arriva altro)`;
-      const nome = g.k === FILE ? 'file del computer' : campo(g.k, 80);
+      if (g.k === CASA) return `- ${ora} ${pagineN(g.n)} della rete di casa (qui solo il numero)`;
+      const nome = NOMI[g.k] || campo(g.k, 80);
       const pezzi = [pagineN(g.n)];
       if (g.delicate) pezzi[0] += g.delicate === g.n ? ` (delicat${g.n === 1 ? 'a' : 'e'}: qui solo il sito)` : ` (${g.delicate} delicat${g.delicate === 1 ? 'a' : 'e'}: di quell${g.delicate === 1 ? 'a' : 'e'} solo il sito)`;
       const cercati = ultimiDistinti(g.cercati);
       if (cercati.length) pezzi.push(`cercato ${cercati.map((c) => `«${c}»`).join(', ')}`);
       const titoli = ultimiDistinti(g.titoli);
-      if (titoli.length) pezzi.push(`${titoli.length < g.titoli.length ? 'fra cui ' : ''}${titoli.map((c) => `«${c}»`).join(', ')}`);
+      // «fra cui» solo se resta fuori qualcosa: un titolo oltre i tre, o una pagina senza titolo.
+      const diversi = new Set(g.titoli.map((t) => campo(t, 120).toLowerCase())).size;
+      const senzaTitolo = g.n - g.delicate - g.cercati.length - g.titoli.length;
+      if (titoli.length) pezzi.push(`${titoli.length < diversi || senzaTitolo > 0 ? 'fra cui ' : ''}${titoli.map((c) => `«${c}»`).join(', ')}`);
       return `- ${ora} ${nome}: ${pezzi.join('; ')}`;
     });
     if (fuori.length) {
