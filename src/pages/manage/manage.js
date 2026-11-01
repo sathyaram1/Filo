@@ -1106,12 +1106,14 @@
   }
 
   // ── Le pause in corso (#996) ───────────────────────────────────────────────
-  // Sola lettura dal server: A, B o la routine server fermi dopo un'accensione rifiutata, col motivo. Nessun tetto
-  // giornaliero: è la pausa a fermare un account, quindi si vede qui, accanto a chi la subisce.
+  // Sola lettura dal server: A, B, le routine server o quella a rete aperta fermi dopo un'accensione rifiutata, col
+  // motivo. Nessun tetto giornaliero: è la pausa a fermare un account, quindi si vede qui, accanto a chi la subisce.
   const PAUSE_GET = (window.SN_MSG?.MSG?.AUTOMATION_PAUSE_GET) || 'automation_pause_get';
   const mgAccountsPausa = document.getElementById('mgAccountsPausa');
   const mgServerPausa = document.getElementById('mgServerPausa');
-  // null = non chiesto o non per te; { errore } = non letto; { pause, scartoMs } = letto (scarto: orologio locale − server).
+  const mgReteApertaPausa = document.getElementById('mgReteApertaPausa');
+  const mgReteApertaStato = document.getElementById('mgReteApertaStato');
+  // null = non chiesto o non per te; { errore } = non letto; { pause, voci, scartoMs } = letto (scarto: orologio locale − server).
   let pauseLette = null;
   let pauseTick = 0;
   let pauseTimer = null;
@@ -1130,11 +1132,12 @@
     const ora = Date.now();
     const righe = [];
     const righeServer = [];
+    const righeRete = [];
     let prossima = Infinity;
-    const leggi = (chi, voce) => {
+    const leggi = (chi, voce, opzioni) => {
       if (!voce || typeof voce !== 'object') return null;
       const v = Object.assign({}, voce, { finoMs: Number(voce.finoMs) + pauseLette.scartoMs });
-      const p = RS.pausaInParole(chi, v, ora);
+      const p = RS.pausaInParole(chi, v, ora, opzioni);
       if (p) prossima = Math.min(prossima, v.finoMs);
       return p;
     };
@@ -1150,6 +1153,15 @@
         const p = leggi(`La routine server dell'account ${k}`, pauseLette.pause[`server${k}`]);
         if (p) righeServer.push(rigaPausa('mg-auto-warn', p.testo, p.dettaglio));
       }
+      // La routine a rete aperta (#2013) conta le accensioni sue, non quelle di un account.
+      const p = leggi('La routine a rete aperta', pauseLette.pause.reteAperta, { contoDi: 'routine' });
+      if (p) righeRete.push(rigaPausa('mg-auto-warn', p.testo, p.dettaglio));
+    }
+    // Cosa ha deciso il pacemaker su di lei all'ultimo giro: senza, «accesa» sull'interruttore non dice se parte.
+    if (mgReteApertaStato) {
+      const stato = pauseLette && !pauseLette.errore ? RS.statoReteAperta(pauseLette.voci.reteAperta) : '';
+      mgReteApertaStato.textContent = stato;
+      mgReteApertaStato.hidden = !stato;
     }
     if (mgAccountsPausa) {
       mgAccountsPausa.replaceChildren(...righe);
@@ -1158,6 +1170,10 @@
     if (mgServerPausa) {
       mgServerPausa.replaceChildren(...righeServer);
       mgServerPausa.hidden = righeServer.length === 0;
+    }
+    if (mgReteApertaPausa) {
+      mgReteApertaPausa.replaceChildren(...righeRete);
+      mgReteApertaPausa.hidden = righeRete.length === 0;
     }
     // Una pausa che scade sparisce da sola, senza ricaricare la pagina.
     if (prossima < Infinity) pauseTimer = setTimeout(reflectPause, Math.min(Math.max(0, prossima - ora) + 1000, 2 ** 31 - 1));
@@ -1177,6 +1193,7 @@
         const oraServer = Number(r.oraMs);
         pauseLette = {
           pause: r.pause && typeof r.pause === 'object' ? r.pause : {},
+          voci: r.voci && typeof r.voci === 'object' ? r.voci : {},
           scartoMs: Number.isFinite(oraServer) && oraServer > 0 ? Date.now() - oraServer : 0,
         };
       }
