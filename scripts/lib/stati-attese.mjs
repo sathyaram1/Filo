@@ -41,8 +41,8 @@ export async function statiInRete(attese, { bearer, base = FIRESTORE_BASE, fetch
   }));
 }
 
-/** «#1741, non ancora fuso». PURA. */
+/** «#1741 (non ancora fuso)». PURA. */
 export function rigaAttesa(w) {
   const ATT = globalThis.SN_FB_ATTESE;
-  return `${ATT.etichetta(w)}, ${ATT.ETICHETTA[w && w.stato] || ATT.ETICHETTA.ignoto}`;
+  return `${ATT.etichetta(w)} (${ATT.ETICHETTA[w && w.stato] || ATT.ETICHETTA.ignoto})`;
 }
