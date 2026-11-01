@@ -357,13 +357,13 @@ test('indicazione con la chiave: se il taccuino cambia in mezzo lo rilegge e ris
 test('il redattore: una promessa su un lavoro che non è nella rosa né a 3 si rifiuta, come un link nuovo', () => {
   const blocco = { version: '0.2.255', features: ['Le schede si trascinano. Guida su https://filo.app/guida'], fixes: ['Il menu si apre.'] };
   const schede = [schedaServer(812, 2), schedaServer(900, 1), schedaServer(950, 3)];
-  const base = { versione: '0.2.255', features: ['Le schede si trascinano (guida su https://filo.app/guida).'], fixes: ['Il menu si apre.'] };
+  const base = { versione: '0.2.255', features: [{ testo: 'Le schede si trascinano (guida su https://filo.app/guida).', da: [1] }], fixes: ['Il menu si apre.'] };
   assert.equal(M.controllaNovita(base, { blocco, schede }).ok, true);
   const fuoriRosa = M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: '900', riga: 'Altri formati in arrivo.' }] }, { blocco, schede });
   assert.equal(fuoriRosa.ok, false);
   assert.match(fuoriRosa.errori.join('\n'), /promessa su #900, che non è nella rosa né a priorità 3/);
   const taciuta = M.controllaNovita({ ...base, features: [...base.features, 'Il supporto per i PDF è in arrivo.'] }, { blocco, schede });
-  assert.match(taciuta.errori.join('\n'), /promette qualcosa senza dire su quale lavoro/);
+  assert.match(taciuta.errori.join('\n'), /non dice da quali righe dei worker nasce/);
   for (const n of ['812', '950']) {
     assert.equal(M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: n, riga: 'Altri formati in arrivo.' }] }, { blocco, schede }).ok, true, `#${n}`);
   }
@@ -379,7 +379,7 @@ test('il redattore: una promessa su un lavoro che non è nella rosa né a 3 si r
 test('il redattore: una riga tiene la segnalazione delle righe lette, e la consegna porta le impronte di quelle righe', async () => {
   const { impronta } = await import('../../scripts/release-novita.mjs');
   const blocco = { version: '0.2.255', features: [{ testo: 'Le novità in una pagina.', segnalazione: 1956 }, 'Il menu si apre.'], fixes: ['Download più veloci.'] };
-  const base = { versione: '0.2.255', features: [{ testo: 'Tutte le novità in una pagina, e il menu si apre.', segnalazione: 1956 }], fixes: ['Download più veloci.'] };
+  const base = { versione: '0.2.255', features: [{ testo: 'Tutte le novità in una pagina, e il menu si apre.', segnalazione: 1956, da: [1, 2] }], fixes: ['Download più veloci.'] };
   const buona = M.controllaNovita(base, { blocco, schede: [] });
   assert.equal(buona.ok, true, (buona.errori || []).join('\n'));
   assert.deepEqual(buona.novita.features, [{ testo: 'Tutte le novità in una pagina, e il menu si apre.', segnalazione: 1956 }]);
@@ -389,7 +389,7 @@ test('il redattore: una riga tiene la segnalazione delle righe lette, e la conse
   const senzaNumero = M.controllaNovita({ ...base, features: [{ testo: 'Altro.', segnalazione: 'tanti' }] }, { blocco, schede: [] });
   assert.match(senzaNumero.errori.join('\n'), /segnalazione è il numero intero/);
   assert.equal(M.controllaNovita({ ...base, features: [{ testo: '   ', segnalazione: 1956 }] }, { blocco, schede: [] }).ok, false);
-  assert.match(M.contestoRedattore({ blocco, schede: [] }), /- \[segnalazione 1956\] Le novità in una pagina\./);
+  assert.match(M.contestoRedattore({ blocco, schede: [] }), /1\. \[segnalazione 1956\] Le novità in una pagina\./);
 });
 
 test('il ruolo nomina solo sottocomandi che lo script accetta, e lo script li elenca tutti nel ruolo', () => {

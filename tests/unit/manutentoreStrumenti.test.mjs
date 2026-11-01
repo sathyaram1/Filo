@@ -105,7 +105,7 @@ test('una promessa scritta con parole comuni senza il suo lavoro nella rosa si r
     assert.equal(prova(riga, [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nella rosa)`);
     assert.equal(prova(riga, [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nella rosa)`);
   }
-  assert.equal(prova('Ora il prossimo video parte da solo.').ok, true);
+  assert.equal(prova({ testo: 'Ora il prossimo video parte da solo.', da: [1] }).ok, true);
 });
 
 test('una domanda di processo da un ruolo senza feedback si rifiuta prima di rilasciare, invece di perdersi', () => {
@@ -129,7 +129,33 @@ test('una promessa al futuro non dichiarata si riconosce anche fuori dall\'elenc
   for (const riga of ['Verrà aggiunto il supporto ai PDF.', 'Lavoriamo per portare le schede sul telefono.', 'Domani arriva la chat condivisa.']) {
     assert.equal(M.controllaNovita({ versione: '0.2.256', features: [riga] }, { blocco, schede: [] }).ok, false, riga);
   }
-  assert.equal(M.controllaNovita({ versione: '0.2.256', features: ['Le schede ora si trascinano fra le finestre.'] }, { blocco, schede: [] }).ok, true);
+  assert.equal(M.controllaNovita({ versione: '0.2.256', features: [{ testo: 'Le schede ora si trascinano fra le finestre.', da: [1] }] }, { blocco, schede: [] }).ok, true);
+});
+
+test('una promessa si riconosce dal non avere fonte, non dalle parole: ogni riga dice da quali righe dei worker nasce', () => {
+  const blocco = { version: '0.2.256', features: ['Le schede si trascinano fra le finestre.', 'Il menu si apre più in fretta.'], fixes: ['Il download non si blocca.'] };
+  const schede = [{ num: '812', priorita: 2 }, { num: '900', priorita: 1 }];
+  const prova = (righe, promesse) => M.controllaNovita({ versione: '0.2.256', features: righe, ...(promesse ? { promesse } : {}) }, { blocco, schede });
+  for (const riga of ['Tra poco potrai allegare i PDF.', 'Stiamo per portare la chat sul telefono.', 'Il supporto ai PDF è quasi pronto.',
+    'I PDF sono il prossimo passo.', 'Tra qualche giorno anche i PDF.', 'Potremo leggere i PDF nel prossimo giro.']) {
+    const r = prova([riga]);
+    assert.equal(r.ok, false, riga);
+    assert.match(r.errori.join('\n'), /non dice da quali righe dei worker nasce/, riga);
+    assert.equal(prova([riga], [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nella rosa)`);
+    assert.equal(prova([riga], [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nella rosa)`);
+  }
+  // Una riga copiata uguale ha già la sua fonte; una riscritta la cita, features e fixes contati di seguito.
+  assert.equal(prova(['Il menu si apre più in fretta.']).ok, true);
+  const buona = prova([{ testo: 'Schede trascinabili fra le finestre, e un download che non si blocca.', da: [1, 3] }]);
+  assert.equal(buona.ok, true, (buona.errori || []).join('\n'));
+  assert.deepEqual(buona.novita.features, ['Schede trascinabili fra le finestre, e un download che non si blocca.']);
+  for (const da of [[], [0], [4], ['1'], 1.5]) {
+    assert.match(prova([{ testo: 'Schede trascinabili.', da }]).errori.join('\n'), /da sono i numeri delle righe dei worker da cui nasce, da 1 a 3/, JSON.stringify(da));
+  }
+  // La rete delle parole resta sulle righe con la fonte.
+  assert.equal(prova([{ testo: 'Le schede si trascinano, e presto anche fra i dispositivi.', da: [1] }]).ok, false);
+  const ctx = M.contestoRedattore({ blocco, schede: [] });
+  assert.match(ctx, /Novità:\n1\. Le schede si trascinano fra le finestre\.\n2\. Il menu si apre più in fretta\.\n\nCorrezioni:\n3\. Il download non si blocca\./);
 });
 
 test('il redattore legge le righe del commit che la pubblicazione costruirà, non quelle di un main più avanti', async () => {
