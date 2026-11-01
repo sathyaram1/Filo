@@ -18,6 +18,7 @@ import '../src/shared/feedback.js';
 import '../src/shared/feedbackImage.js';
 import '../src/shared/feedbackStatus.js';
 import '../src/shared/manageReview.js';
+import { atteseDaCampo, rigaAttesa, statiInRete } from './lib/stati-attese.mjs';
 
 const FS = globalThis.SN_FB_STATUS;
 const MR = globalThis.SN_MANAGE_REVIEW;
