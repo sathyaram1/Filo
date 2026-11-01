@@ -301,8 +301,8 @@ function createIncognitoWindow() {
 
   win.webContents.once('did-finish-load', async () => {
     await avvioPronto;
-    // Niente restore in incognito. Una scheda aperta qui prima che la barra finisse di caricarsi resta davanti.
     if (win.isDestroyed()) return;
+    // Niente restore in incognito. Una scheda aperta qui prima che la barra finisse di caricarsi resta davanti.
     if (!tabs.tabs.length) tabs.openTab('filo://newtab/');
     revealWindow(win);
   });
