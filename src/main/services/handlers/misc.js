@@ -632,15 +632,11 @@ module.exports = function register(on, ctx) {
         } catch (_) {}
         const failed = Array.isArray(result?.failed) ? result.failed : [];
         if (!failed.length) return;
-        const names = failed.map((f) => f?.name || 'allegato').join(', ');
-        try {
-          broadcastToTabs({
-            type: MSG.SHOW_TOAST,
-            text: `Feedback inviato, ma non sono riuscito a caricare: ${names}`,
-            duration: 6000,
-          });
-        } catch (_) {}
-        try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:allegati_non_caricati'); } catch (_) {}
+        const elenco = globalThis.SN_FEEDBACK?.fraseAllegatiSaltati?.(failed) || failed.map((f) => f?.name || 'allegato').join(', ');
+        avvisoNellaFinestra(`Il tuo feedback è partito, ma senza ${failed.length === 1 ? 'un allegato' : `${failed.length} allegati`}: ${elenco}.`, {
+          chiave: `feedback-allegati-saltati-${String(_item?.id || '')}`,
+          errore: 'allegati_non_caricati',
+        });
       },
       // #602 — la coda rinuncia perché non si può cifrare. Chi ha mandato la
       // segnalazione ha già letto «inviato» e ha già preso i crediti: se non
