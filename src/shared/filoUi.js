@@ -68,8 +68,10 @@
   function mark(el) {
     try { if (el && el.setAttribute) el.setAttribute(ATTR, '1'); } catch (_) {}
     try {
-      if (el) {
-        nostre.add(el);
+      if (el && typeof el === 'object') {
+        let r = rifDi.get(el);
+        if (!r) { r = debole(el); rifDi.set(el, r); }
+        nostre.add(r);
         while (nostre.size > TETTO) nostre.delete(nostre.values().next().value);
       }
     } catch (_) {}
