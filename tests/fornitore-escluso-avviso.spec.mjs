@@ -154,19 +154,18 @@ test('una risposta servita da un fornitore escluso: avviso sulla pagina e segno 
 });
 
 // #1478.1 — una risposta che arriva quando nessuno guarda Filo: l'avviso aspetta, e la pausa parte da quando si vede.
-async function fintoServitoDa(app, host, extra = {}) {
-  await app.evaluate(async (_e, { host: h, x }) => {
+async function fintoServitoDa(app, host) {
+  await app.evaluate(async (_e, h) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.setSettings({
       useDefaultModels: false, openWeightsOnly: false, apiKeys: { openrouter: 'k-test' },
       modelRegistry: { ...globalThis.SN_TEST_MODELS.registry, 'mio-aperto': { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash' } },
       models: { [C.ACTIONS.EXPLAIN]: 'mio-aperto' },
-      ...x,
     });
     globalThis.SN_PROVIDERS.completeWithFallback = async () => ({
       text: 'r', model: 'deepseek/deepseek-v4-flash', provider: 'openrouter', servedBy: h, usage: { promptTokens: 1, completionTokens: 1 },
     });
-  }, { host, x: extra });
+  }, host);
 }
 
 // Playwright finge sempre il fuoco: lo si toglie nel mondo dei content script (999), come quando si passa a un'altra app.
