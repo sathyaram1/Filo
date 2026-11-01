@@ -128,10 +128,10 @@ test('la segnalazione che Filo propone da sé toglie il nome che la memoria rico
   await expect.poll(() => page.evaluate(() => (window.__confirmSeen || []).join('\n')), { timeout: 10_000 }).toMatch(/quanti crediti ho/i);
   const visto = await page.evaluate(() => window.__confirmSeen.join('\n'));
   expect(visto).toContain('sono l\'utente, quanti crediti ho?');
-  expect(visto).not.toMatch(/Luca|Moretti/);
+  expect(visto).not.toMatch(/luca|moretti/i);
   await expect.poll(() => app.evaluate(() => globalThis.__submitted.length), { timeout: 10_000 }).toBe(1);
   const inviato = await app.evaluate(() => globalThis.__submitted[0]);
-  expect(`${inviato.text}\n${inviato.name}`).not.toMatch(/Luca|Moretti/);
+  expect(`${inviato.text}\n${inviato.name}`).not.toMatch(/luca|moretti/i);
 });
 
 // Dall'Aiuto su un sito la conferma rimanda il testo del modello: la riscrittura deve combaciare, o l'OK sarebbe respinto.
