@@ -439,7 +439,8 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
     if (!next) return;
     session.current = next;
     session._pendingBlank = 0;
-    try { proc.stdin.write(cfg.wrap(next.command)); }
+    next.n = ++numero;
+    try { proc.stdin.write(cfg.wrap(next.command, next.n)); }
     catch (err) {
       session.current = null;
       next.cb.onError && next.cb.onError({ message: err.message || String(err) });
