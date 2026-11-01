@@ -220,8 +220,8 @@ app.whenReady().then(async () => {
   try { impostazioniAvvio = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
   passo('impostazioni_lette', t);
   try { if (await installaAllAvvioSeServe(impostazioniAvvio)) return; } catch (_) {}
-  // Com'era finita la volta prima e il segno di questa: solo la copia che tiene il lucchetto, e dopo l'installatore.
-  if (app.hasSingleInstanceLock()) { try { contatori()?.avvioProcesso().catch(() => {}); } catch (_) {} }
+  // Com'era finita la volta prima e il segno di questa: dopo l'installatore (il lucchetto è già in cima al file).
+  try { contatori()?.avvioProcesso().catch(() => {}); } catch (_) {}
   t = Date.now();
   await registerFiloProtocol();
   registerIpcHandlers();
