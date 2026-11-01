@@ -2135,7 +2135,10 @@ function positionOnBranch(bucket) {
   // macchina e può descrivere un tentativo precedente. Con la precedenza
   // invertita, uno stato vecchio posizionava il lavoratore sul ramo di un
   // giro passato ignorando quello assegnato dal server (#507, seconda porta).
-  const branch = isNew ? newWorkBranch(bucket.id) : (bucket.branch || prev?.branch || '');
+  // Un lavoro nuovo ripartito sullo stesso biglietto riceve il ramo a cui il server l'ha già legato, e resta lì:
+  // con un nome nuovo la consegna verrebbe rifiutata (#1632). Senza ramo nella busta, nome nuovo per tentativo (#378).
+  const dalBiglietto = isNew && !!bucket.branch;
+  const branch = isNew ? (bucket.branch || newWorkBranch(bucket.id)) : (bucket.branch || prev?.branch || '');
   if (!branch) return { ok: false, kind: 'permanent', message: `nessun branch assegnato per ${bucket.id}` };
   // Il resto l'ha guardato il giro prima di scrivere i marcatori; qui resta un battito acceso nel frattempo da un altro.
   const vivo = lavoroVivo(ROOT, { mio: readRoutineTicket(ROOT), cosa: ['battito'] });
