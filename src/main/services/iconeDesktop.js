@@ -699,13 +699,15 @@ function esitoPerModello(o) {
   if (!o || !o.ok) {
     if (o && o.errore === 'richiesta') return `Non fatto: ${o.frase}. Correggi i parametri e riprova.`;
     const s = o || spiega('sconosciuto');
+    const apri = s.apri ? ' Sotto la tua risposta l\'utente trova il tasto che apre quelle impostazioni: diglielo.' : '';
     const resto = s.cambio ? ` Qualcosa sul desktop è cambiato lo stesso: si rimette com'era con ANNULLA_CAMBIO, id ${s.cambio}.` : '';
-    return `Non fatto: ${s.frase}${s.dove ? ` ${s.dove}` : ''} Riporta all'utente queste parole; non riprovare uguale.${resto}`;
+    return `Non fatto: ${s.frase}${s.dove ? ` ${s.dove}` : ''}${apri} Riporta all'utente queste parole; non riprovare uguale.${resto}`;
   }
   if (o.vuoto) return 'Sul desktop non ci sono icone: niente da mettere in ordine.';
   if (o.gia) return `Le ${o.totale} icone del desktop erano già ${comeDetto(o)}: niente spostato.`;
-  const parti = [`Icone del desktop ${comeDetto(o)}: ${o.spostate} icone su ${o.righe} ${o.righe === 1 ? 'riga' : 'righe'} e ${o.colonne} ${o.colonne === 1 ? 'colonna' : 'colonne'}, sullo schermo principale.`];
-  if (o.autoTolto) parti.push('Era acceso «Disponi automaticamente», che le rimette in colonna: Filo l\'ha spento, dillo all\'utente.');
+  const parti = [`Icone del desktop ${comeDetto(o)}: ${o.spostate} icone su ${o.righe} ${o.righe === 1 ? 'riga' : 'righe'} e ${o.colonne} ${o.colonne === 1 ? 'colonna' : 'colonne'}, sullo schermo principale. Rilette dopo lo spostamento: sono nell'ordine chiesto.`];
+  if (o.autoTolto && o.mac) parti.push('Il Finder le teneva in ordine da sé («Ordina per» della Scrivania) e le avrebbe rimesse nel suo: Filo l\'ha tolto, dillo all\'utente.');
+  else if (o.autoTolto) parti.push('Era acceso «Disponi automaticamente», che le rimette in colonna: Filo l\'ha spento, dillo all\'utente.');
   if (o.fuoriPosto) parti.push(`${o.fuoriPosto} icone non sono finite al loro posto: dillo all'utente.`);
   if (o.mancanti) parti.push(`${o.mancanti} icone sono sparite dal desktop durante lo spostamento.`);
   if (o.nascoste) parti.push('Le icone del desktop sono nascoste: si vedono rimettendo la spunta su «Mostra icone del desktop» (tasto destro sul desktop → Visualizza). Diglielo.');
