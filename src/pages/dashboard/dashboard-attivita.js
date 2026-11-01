@@ -34,11 +34,12 @@
   let prosegui = () => {};
   // #778 — mentre i popup di una risposta si aprono in fila, la ripresa aspetta l'ultimo: un turno partito a metà
   // fila troverebbe le altre richieste ancora senza risposta, e le rifarebbe.
+  // `chat`: la conversazione in cui è nato il bottone; la pagina riprende solo se è ancora quella a schermo (#1373).
   let filaPopup = 0;
-  let riprendiDopoFila = false;
-  function proseguiQuandoLibero() {
-    if (filaPopup > 0) riprendiDopoFila = true;
-    else prosegui();
+  let riprendiDopoFila = null;
+  function proseguiQuandoLibero(chat = '') {
+    if (filaPopup > 0) riprendiDopoFila = { chat };
+    else prosegui(chat);
   }
 
   function isType(a, t) {
@@ -1365,15 +1366,12 @@
 
   // `shown`: gli id delle chiamate già raccontate in diretta nel blocco di
   // attività (evento 'done'): a fine turno non si ripetono.
-  function renderActions(container, actions, { onAck, autoConfirm = false, activity = null, shown = null } = {}) {
+  // `chat`: la conversazione del turno. Un OK dato dopo resta lì, anche se intanto la scheda è passata a un'altra (#1294).
+  function renderActions(container, actions, { onAck, autoConfirm = false, activity = null, shown = null, chat = '' } = {}) {
     if (!actions || !actions.length) return;
     for (const a of actions) {
       const f = a && a._callId && isType(a, 'NAVIGA') ? fermateInAttesa.get(a._callId) : null;
       if (f) { fermateInAttesa.delete(a._callId); segnaFermata(a, f); }
-    }
-    // #778 — l'impostazione proposta perché guardare lo schermo era spento: col suo OK la richiesta riprende.
-    if (actions.some((a) => isType(a, 'VEDI_SCHERMO') && a._output && a._output.spenta)) {
-      for (const a of actions) if (isType(a, 'IMPOSTA_PREFERENZA') && a._confirm) a._riprende = true;
     }
     const wrap = document.createElement('div');
     wrap.className = 'dash-bubble-actions';
@@ -1409,7 +1407,7 @@
       // «fallita»: non è ancora partita, e il suo bottone è tutto il punto.
       if (!aspettaUtente(a) && !apribileComunque(a) && !permessoDaConcedere(a) && !rigaEBottone(a)
         && ((a._traccia && !anche) || a._executed === false)) continue;
-      const btn = renderActionButton(a, { onAck, activity });
+      const btn = renderActionButton(a, { onAck, activity, chat });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
     }
@@ -1441,7 +1439,7 @@
             }
           } finally {
             filaPopup -= 1;
-            if (!filaPopup && riprendiDopoFila) { riprendiDopoFila = false; prosegui(); }
+            if (!filaPopup && riprendiDopoFila) { const { chat: c } = riprendiDopoFila; riprendiDopoFila = null; prosegui(c); }
           }
         }, 0);
       }
@@ -1901,9 +1899,9 @@
 
   // Quel che l'utente finisce col bottone (l'evento aggiunto al calendario) vale come una conferma data nel
   // popup: lo sanno il diario, l'archivio e il modello al turno dopo. Un secondo click non lo conta due volte.
-  function segnaCompiuta(a, activity, esito = {}) {
+  function segnaCompiuta(a, activity, esito = {}, chat = '') {
     if (!a || (a._output && a._output.fatto)) return;
-    segnaConfermata(a, { ...(a._output || {}), ...esito, proposta: false, fatto: true }, activity);
+    segnaConfermata(a, { ...(a._output || {}), ...esito, proposta: false, fatto: true }, activity, null, { chat });
   }
 
   // Chiude la conversazione una volta sola, e lo dice: il filo resta a schermo, quindi senza il segno il clic non si vede.
@@ -1923,13 +1921,13 @@
     return btn;
   }
 
-  function renderActionButton(a, { onAck, activity = null } = {}) {
+  function renderActionButton(a, { onAck, activity = null, chat = '' } = {}) {
     const type = String(a.type || '').toUpperCase();
     // In attesa di conferma come le altre, ma la si dà dalla loro UI: il
     // bottone del riordino, il pannello con l'elenco da eliminare.
     if (permessoDaConcedere(a)) return bottonePermesso(a);
-    if (type === 'PULISCI_TAB') return renderBottoneRiordino(a, activity);
-    if (type === 'CANCELLA_ARCHIVIO') return renderDeleteArchivePanel(a, activity);
+    if (type === 'PULISCI_TAB') return renderBottoneRiordino(a, activity, chat);
+    if (type === 'CANCELLA_ARCHIVIO') return renderDeleteArchivePanel(a, activity, chat);
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
     // (livello 2 o 3) e ha allegato spiegazione + livello. Il bottone apre il
     // popup OK/Annulla (2) o il box "digita conferma" (3); solo dopo il sì
@@ -2001,7 +1999,20 @@
         btn.disabled = true;
         // Catturare e far leggere una finestra prende qualche secondo: il bottone dice che Filo ci sta lavorando.
         if (type === 'VEDI_SCHERMO') btn.textContent = 'Guardo la finestra…';
-        const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a, parole: paroleUtente(), chatId: chatAttuale() || '' });
+        // Le parole di un'altra conversazione non sbloccano niente in questa (#810).
+        const qui = !chat || chat === chatAttuale();
+        const chiesta = primaRigaConferma(a);
+        const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a, parole: qui ? paroleUtente() : [], chatId: chat || chatAttuale() || '' });
+        // #1373 — l'esito che va letto, o il sì che sblocca un passo rimasto indietro: Filo riprende da solo, una volta.
+        const riprende = !!(r && !r.rejected && (r.riprendi || (a._riprende && r.executed)));
+        try {
+          esitoDellaConferma(r, { chiesta, chat });
+        } finally {
+          if (riprende) proseguiQuandoLibero(chat);
+        }
+      }
+      // Il resto della conferma, dopo la risposta del main: diario, bottone, archivio.
+      function esitoDellaConferma(r, { chiesta, chat: c }) {
         // Nemmeno l'OK fa uscire un segreto (#810): la riga dice cosa è stato fermato.
         if (r && r.output && r.output.blocked === 'segreto') {
           a._output = r.output;
@@ -2010,6 +2021,7 @@
           const row = activityRowFor(a);
           if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '');
           btn.textContent = `🔒 ${row ? row.text : 'Fermata'}`;
+          archiviaEsito(a, { chat: c });
           return;
         }
         // L'utente ha detto sì: da qui in poi l'azione è FATTA. Lo deve sapere
@@ -2017,22 +2029,14 @@
         // il MODELLO al turno dopo — l'oggetto è lo stesso che sta nello
         // storico della conversazione, quindi basta segnarlo qui. Senza,
         // a «l'hai attivato?» il modello poteva solo tirare a indovinare.
-        if (r && r.executed) segnaConfermata(a, r.output, activity, r.cambi);
-        // #778 — l'OK a guardare una finestra, o ad accendere la funzione che lo permette, risponde a una domanda
-        // rimasta in sospeso: Filo riprende da solo, anche per dire che non è riuscito.
-        if (type === 'VEDI_SCHERMO' && r && !r.rejected) {
-          if (!r.executed) segnaNonRiuscita(a, r.output, activity, btn);
-          proseguiQuandoLibero();
-          if (!r.executed) return;
+        if (r && r.executed) segnaConfermata(a, r.output, activity, r.cambi, { chat: c, fatto: r.fatto });
+        // #778, #553 — guardare una finestra o leggere una pagina dopo l'OK: anche non riuscita, la riga lo dice e Filo
+        // riprende da solo per rispondere (la ripresa la decide chi ha chiamato).
+        if ((type === 'VEDI_SCHERMO' || type === 'LEGGI_PAGINA') && r && !r.rejected && !r.executed && (type === 'VEDI_SCHERMO' || r.output)) {
+          segnaNonRiuscita(a, r.output, activity, btn, { chat: c, chiesta });
+          return;
         }
-        // #553 — dopo l'OK a leggere una pagina il testo serve al modello: Filo riprende da solo, anche se non è riuscito.
-        if (type === 'LEGGI_PAGINA' && r && !r.rejected && r.output) {
-          if (!r.executed) segnaNonRiuscita(a, r.output, activity, btn);
-          proseguiQuandoLibero();
-          if (!r.executed) return;
-        }
-        if (type === 'IMPOSTA_PREFERENZA' && a._riprende && r && r.executed) proseguiQuandoLibero();
-        if (!(r && r.executed)) nonRiuscita(a, r, activity);
+        if (!(r && r.executed)) nonRiuscita(a, r, activity, { chat: c, chiesta });
         const row = activityRowFor(a);
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
@@ -2238,7 +2242,7 @@
         btn.disabled = true;
         btn.textContent = '📅 Aggiungo…';
         const r = await send({ type: MSG.CALENDAR_ADD, evento: ev });
-        if (r && r.ok) segnaCompiuta(a, activity, { evento: ev });
+        if (r && r.ok) segnaCompiuta(a, activity, { evento: ev }, chat);
         if (r && r.ok && r.aperto) {
           btn.textContent = '✓ Aperto nel calendario';
           // Riapribile: chi chiude per sbaglio la finestra del calendario deve
@@ -2298,19 +2302,46 @@
     };
   }
 
+  // Cosa chiedeva la conferma, prima che il sì la tolga: riaperta, la chat dice cosa non è riuscito.
+  function primaRigaConferma(a) {
+    return String((a && a._confirm && a._confirm.text) || '').split('\n')[0].replace(/\s*:\s*$/, '').trim();
+  }
+
+  // Com'è andata un'azione decisa dopo il turno entra nell'archivio, nella conversazione dove è nato il bottone (#1294):
+  // la cosa fatta coi numeri veri, o il perché del no.
+  function archiviaEsito(a, { chat = '', fatto = '', chiesta = '', cambi = [] } = {}) {
+    const E = global.SN_ESITO;
+    const type = String((a && a.type) || '').toUpperCase();
+    const esito = E.esitoAzione(a);
+    const row = activityRowFor(a);
+    const voce = esito === E.FALLITO
+      ? { type, esito, riga: chiesta, motivo: E.motivo(a) || (row && row.failed ? row.text : '') }
+      : { type, esito, riga: fatto || (row && !row.failed ? row.text : '') };
+    if (a && a._output && a._output.blocked === 'segreto') {
+      voce.type = 'FERMATA';
+      voce.riga = String(a._output.frase || '');
+      delete voce.motivo;
+    }
+    if (type === 'APRI_FILE' && esito !== E.FALLITO && (a.percorso || a.path)) {
+      voce.file = { percorso: String(a.percorso || a.path), ...(a.etichetta || a.label ? { etichetta: String(a.etichetta || a.label) } : {}) };
+    }
+    try { archiviaAzione(type, cambi, a, { chat, voce }); } catch (_) {}
+  }
+
   // L'OK è arrivato ma non è successo niente: la riga «Conferma chiesta» diventa il perché, e il riassunto non la
   // conta.
-  function nonRiuscita(a, r, activity) {
+  function nonRiuscita(a, r, activity, { chat = '', chiesta = '' } = {}) {
     delete a._confirm;
     a._executed = false;
     if (r && r.output) a._output = r.output;
     const row = activityRowFor(a);
     if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, true, row.cambi, a);
+    archiviaEsito(a, { chat, chiesta });
   }
 
   // Confermata e fatta: lo sanno il diario e, al turno dopo, il modello (è lo
   // stesso oggetto che sta nello storico della conversazione).
-  function segnaConfermata(a, output, activity, cambi) {
+  function segnaConfermata(a, output, activity, cambi, { chat = '', fatto = '' } = {}) {
     a._confirmed = true;
     a._executed = true;
     delete a._confirm;
@@ -2324,23 +2355,24 @@
     }
     const row = activityRowFor(a);
     if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '');
-    // L'archivio delle chat ha salvato il turno senza le azioni in attesa: questa adesso è successa.
-    try { archiviaAzione(String(a.type || '').toUpperCase(), ids.map((c) => c.id), a); } catch (_) {}
+    // Il turno l'aveva archiviata come chiesta: adesso è successa.
+    archiviaEsito(a, { chat, fatto, cambi: ids.map((c) => c.id) });
   }
 
   // Confermata ma non riuscita (la finestra si è chiusa, il modello non ha risposto): il diario e il bottone lo dicono.
-  function segnaNonRiuscita(a, output, activity, btn) {
+  function segnaNonRiuscita(a, output, activity, btn, { chat = '', chiesta = '' } = {}) {
     a._output = output || {};
     a._executed = false;
     delete a._confirm;
     const row = activityRowFor(a);
     if (activity && row) activity.addRow(a.type, row.icon, row.text, true, null, a, row.title || '');
+    archiviaEsito(a, { chat, chiesta });
     btn.textContent = `✗ ${row ? row.text : 'Non eseguita'}`;
     if (permessoDaConcedere(a)) btn.after(bottonePermesso(a));
   }
 
   // Il riordino che la regola non fa partire da solo parte al clic, e chiede come dice `_domanda` (#530).
-  function renderBottoneRiordino(a, activity) {
+  function renderBottoneRiordino(a, activity, chat = '') {
     const btn = document.createElement('button');
     btn.className = 'dash-action-btn dash-action-btn-primary';
     btn.type = 'button';
@@ -2359,7 +2391,7 @@
         return;
       }
       btn.textContent = `✓ ${e.testo}`;
-      segnaConfermata(a, { archived: r.archived || 0 }, activity);
+      segnaConfermata(a, { archived: r.archived || 0 }, activity, null, { chat });
     });
     return btn;
   }
@@ -2397,7 +2429,7 @@
   // §5 — pannello di cancellazione retroattiva: propone TUTTE e SOLE le schede
   // archiviate pertinenti (le sceglie il main) e le elimina DEFINITIVAMENTE
   // dopo conferma esplicita.
-  function renderDeleteArchivePanel(a, activity) {
+  function renderDeleteArchivePanel(a, activity, chat = '') {
     const query = String(a.query || a.testo || '').trim();
     const panel = document.createElement('div');
     panel.className = 'dash-delete-panel';
@@ -2512,7 +2544,7 @@
         note.textContent = removed === 1
           ? '✓ Eliminata definitivamente 1 scheda.'
           : `✓ Eliminate definitivamente ${quante(removed)}.`;
-        segnaConfermata(a, { eliminate: removed }, activity);
+        segnaConfermata(a, { eliminate: removed }, activity, null, { chat });
       });
       panel.appendChild(del);
     }

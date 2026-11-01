@@ -505,7 +505,10 @@ module.exports = function register(on, ctx) {
     // Un'azione confermata dopo il turno (bottone, pannello): la riga senza testo che la racconta.
     const actions = (Array.isArray(msg.actions) ? msg.actions : [])
       .filter((t) => typeof t === 'string' && /^[A-Z_]{2,40}$/.test(t)).slice(0, 20).map((type) => ({ type }));
-    if (!id || (!text.trim() && !actions.length)) return { ok: false, error: 'niente da archiviare' };
+    // Com'è andata, anche quando non è riuscita (#1294): la forma la rifà toStoredMessage.
+    const esiti = (Array.isArray(msg.esiti) ? msg.esiti : []).slice(0, 20)
+      .map((v) => (v && typeof v === 'object' ? globalThis.SN_ESITO.voceArchivio(v) : null)).filter(Boolean);
+    if (!id || (!text.trim() && !actions.length && !esiti.length)) return { ok: false, error: 'niente da archiviare' };
     // La scheda che scrive questa riga sta vivendo la chat: quando sparisce,
     // la chat è finita — come per un turno normale.
     if (sender && sender.wc) ctx.affidaChat(id, sender.wc);
