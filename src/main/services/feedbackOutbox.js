@@ -349,6 +349,7 @@
       queue = []; loaded = false; flushing = false; ancora = false; auto = true;
       prepareFn = null; onDoneFn = null; onGiveUpFn = null; tokenOwnerFn = null; onAttesaOwnerFn = null; onScadutaFn = null; backoff = backoffMin;
       if (timer) { clearTimeout(timer); timer = null; }
+      for (const id of [...attese.keys()]) rispondi(id, { esito: 'in_coda' });
     },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
