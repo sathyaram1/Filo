@@ -78,7 +78,7 @@
     const { nomi = [], email = [] } = identita || {};
     const proprie = new Set((email || []).map((e) => String(e || '').trim().toLowerCase()).filter(Boolean));
     t = t.replace(EMAIL, (m) => (proprie.has(m.toLowerCase()) ? m : EMAIL_ALTRUI));
-    for (const forma of formeDelNome([...nomi, ...proprie])) {
+    for (const forma of formeDelNome(nomi, proprie)) {
       const re = new RegExp(`(?<![\\p{L}\\p{N}'’])(?:([Aa]d?|[Dd][ai]|[Ii][nl]|[Ss]u|[Ll][ao])\\s+)?(${esc(forma.testo)})(?![\\p{L}\\p{N}])`, 'giu');
       t = t.replace(re, (intero, prep, nome, pos, tutto) => {
         if (forma.pezzo && !/^\p{Lu}/u.test(nome)) return intero;
