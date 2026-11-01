@@ -66,6 +66,27 @@ for (const shell of ['sh', 'bash']) {
     } finally { s.kill(); }
   });
 
+  // Verifica #1683 — bash legge lo stdin un byte per volta: un comando che chiede si prendeva le righe dei marcatori al
+  // posto della risposta, e il terminale restava in corso. La risposta scritta sotto l'uscita deve arrivare a lui.
+  test(`${shell}: un comando che chiede riceve la risposta scritta dopo, e finisce`, { skip: process.platform === 'win32' && 'su Windows la shell POSIX è WSL' }, async () => {
+    const s = createSession({ shell, cwd: TMP });
+    const rispondi = (comando, risposta) => {
+      const p = esegui(s, comando);
+      setTimeout(() => s.write(risposta), 300);
+      return p;
+    };
+    try {
+      const letto = await rispondi('read x; echo "letto=$x"', 'ciao\n');
+      assert.equal(letto.out, 'letto=ciao\n');
+      writeFileSync(join(TMP, 'bozza.txt'), 'nuovo');
+      writeFileSync(join(TMP, 'lettera.txt'), 'vecchio');
+      const copia = await rispondi('cp -i bozza.txt lettera.txt', 'y\n');
+      assert.equal(copia.code, 0, JSON.stringify(copia));
+      assert.equal(readFileSync(join(TMP, 'lettera.txt'), 'utf8'), 'nuovo', 'il sì è arrivato alla domanda');
+      assert.equal((await esegui(s, 'echo dopo')).out, 'dopo\n');
+    } finally { s.kill(); }
+  });
+
   test(`${shell}: lo stderr di un comando resta suo anche chiuso a metà riga`, { skip: process.platform === 'win32' && 'su Windows la shell POSIX è WSL' }, async () => {
     const s = createSession({ shell, cwd: TMP });
     try {
