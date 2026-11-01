@@ -524,7 +524,8 @@ module.exports = function register(on, ctx) {
       ? (Array.isArray(msg.guardate) ? msg.guardate : []).filter((n) => typeof n === 'string') : [];
     // Una riga di Filo scritta dalla pagina non è passata dal giudizio dei collegamenti (#1505): riaperta, non ne ha.
     await FiloChats.append(id, {
-      role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
+      role, text, ...(actions.length ? { actions } : {}), ...(role === 'filo' && esiti.length ? { esiti } : {}),
+      ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
       ...(guardate.length ? { guardate } : {}), ...(role === 'filo' && msg.tardiva === true ? { tardiva: true } : {}),
       ...(role === 'filo' ? { senzaVerdetto: true } : {}),
     });
