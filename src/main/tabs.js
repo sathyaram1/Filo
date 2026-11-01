@@ -56,6 +56,7 @@ const { AnteprimeSchede } = require('./tabs/anteprime');
 const { RiservaNuovaScheda, vistePerAnnunci } = require('./tabs/riservaNuovaScheda');
 const { VisiteSchede } = require('./tabs/visite');
 const { CodaRiapertura, perVicinanza } = require('./tabs/codaRiapertura');
+const { recuperaScheda } = require('./tabs/recuperoCrash');
 const CartaAnteprima = require('./popup-anteprima');
 const { AvvisoSito } = require('./avvisoSito');
 const { AvvisoSchermoPieno, partiDellAvviso } = require('./avvisoSchermoPieno');
