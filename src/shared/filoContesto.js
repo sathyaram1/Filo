@@ -308,7 +308,10 @@
   // la risposta segue la sua domanda: con un'altra conversazione in mezzo il giro non è più quello che il modello ha visto.
   function conGiro(m, prima, giro) {
     if (!giro || !Array.isArray(giro.messaggi) || !prima || prima.chat !== m.chat || prima.role !== 'user') return null;
-    const finale = { role: 'assistant', content: String(giro.testo == null ? '' : giro.testo) || '(nessun testo)' };
+    const testo = String(giro.testo == null ? '' : giro.testo).trim();
+    // Chiuso sugli esiti senza una frase (#1130): il giro finisce con loro, senza un turno vuoto dopo.
+    if (!testo && giro.messaggi.length) return giro.messaggi.slice();
+    const finale = { role: 'assistant', content: testo || '(nessun testo)' };
     if (Array.isArray(giro.reasoningDetails) && giro.reasoningDetails.length) finale.reasoning_details = giro.reasoningDetails;
     return [...giro.messaggi, finale];
   }
