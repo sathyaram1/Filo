@@ -129,14 +129,18 @@ function wireWindowCommon(win, tabs) {
   //     nelle impostazioni di sistema; se è spento l'evento non arriva e basta).
   // Dove andare lo decide tabs.navigaCronologia: senza cronologia è un no-op.
   // Indietro e avanti da qui sono la stessa azione contata della barra e dei tasti (#1461).
-  // `via`: da quale strada (#1468), i tasti laterali del mouse o lo scorrimento.
-  const naviga = (verso, via) => {
-    require('./services/contatoriStrade').misura('cronologia', verso, via, { incognito: !!win._filoIncognito });
-    require('./services/azioniContate').azione('navigate-back-forward', () => tabs.navigaCronologia(verso), { incognito: !!win._filoIncognito });
-  };
+  const naviga = (verso) => require('./services/azioniContate').azione('navigate-back-forward', () => tabs.navigaCronologia(verso), { incognito: !!win._filoIncognito });
+  // Da quale strada (#1468): accanto alla porta unica, i tasti laterali del mouse e lo scorrimento.
+  const strada = (verso, via) => require('./services/contatoriStrade').misura('cronologia', verso, via, { incognito: !!win._filoIncognito });
+  win.on('app-command', (_e, comando) => {
+    if (comando === 'browser-backward' || comando === 'browser-forward') strada(comando === 'browser-backward' ? 'indietro' : 'avanti', 'tasto_mouse');
+  });
+  win.on('swipe', (_e, direzione) => {
+    if (direzione === 'right' || direzione === 'left') strada(direzione === 'right' ? 'indietro' : 'avanti', 'swipe');
+  });
   win.on('app-command', (event, comando) => {
-    if (comando === 'browser-backward') naviga('indietro', 'tasto_mouse');
-    else if (comando === 'browser-forward') naviga('avanti', 'tasto_mouse');
+    if (comando === 'browser-backward') naviga('indietro');
+    else if (comando === 'browser-forward') naviga('avanti');
     else return;
     // Senza questo Windows lascia agire anche il comportamento di serie.
     try { event.preventDefault(); } catch (_) {}
@@ -144,8 +148,8 @@ function wireWindowCommon(win, tabs) {
   // La direzione è quella delle dita: si spinge la pagina a destra per tornare
   // indietro, come in ogni browser su Mac.
   win.on('swipe', (event, direzione) => {
-    if (direzione === 'right') naviga('indietro', 'swipe');
-    else if (direzione === 'left') naviga('avanti', 'swipe');
+    if (direzione === 'right') naviga('indietro');
+    else if (direzione === 'left') naviga('avanti');
   });
 }
 

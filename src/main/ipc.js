@@ -600,6 +600,13 @@ function registerIpcHandlers() {
     }
     return BrowserWindow.fromWebContents(wc) || BrowserWindow.getAllWindows()[0];
   };
+  function contaPaginaDallaBarra(url, win) {
+    const T = globalThis.SN_CONTATORI_STRADE;
+    const incognito = !!win._filoIncognito;
+    Strade.misura('pagina', url, 'barra', { finestra: win._filoTabs, incognito });
+    const azione = T && T.AZIONE_DELLA_PAGINA[T.paginaDi(url)];
+    if (azione) Strade.misura('azione', azione, 'barra', { incognito });
+  }
   // I gesti della barra delle schede sono azioni contate (#1461): fino alla pagina visibile e caricata.
   const gesto = (win, azione, fn) => AzioniContate.azione(azione, fn, { incognito: !!(win && win._filoIncognito) });
   // `via` (#1468): la shell dice se la scheda nuova viene dal suo pulsante o dal tasto.
@@ -800,6 +807,8 @@ function registerIpcHandlers() {
       if (typeof value === 'string' && value.startsWith('@action:')) {
         try { event.sender.send('shell:menu-action', value.slice('@action:'.length)); } catch (_) {}
       } else if (value) {
+        // I menu App e Impostazioni stanno nella barra laterale: una pagina di Filo scelta lì parte dalla barra (#1468).
+        if (/^filo:/i.test(value) && finestraDellaBarra(event.sender)) contaPaginaDallaBarra(value, win);
         win._filoTabs.openTab(value, finestraDellaBarra(event.sender) ? { origine: { tipo: 'filo' } } : {});
       }
     });

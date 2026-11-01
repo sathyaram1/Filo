@@ -268,7 +268,7 @@ module.exports = function register(on, ctx) {
       case 'automatismo': ok = testo(m.tipo) === 'pubblicita_saltata' && homePagina.fatto('pubblicita_saltata'); break;
       // Le strade (#1468): una voce del box del tasto destro, l'Aiuto aperto da lì.
       case 'strada': {
-        const azione = testo(m.azione);
+        const azione = testo(m.id);
         const via = testo(m.via);
         ok = STRADE_DELLE_PAGINE.azioni.includes(azione) && STRADE_DELLE_PAGINE.vie.includes(via) && strade.azione(azione, via);
         if (ok && azione === 'help') strade.aiuto('tasto_destro');

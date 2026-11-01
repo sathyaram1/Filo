@@ -2169,7 +2169,7 @@
       label: `Dimensione reale (ora ${p}%)`,
       shortcut: Tasti.etichetta('Ctrl+0'),
       onClick: () => {
-        Popup.conta({ misura: 'strada', azione: 'zoom_reset', via: 'tasto_destro_altro' });
+        Popup.conta({ misura: 'strada', id: 'zoom_reset', via: 'tasto_destro_altro' });
         try { zoomPagina()?.azzera(); } catch (_) {}
       },
     };
@@ -2232,7 +2232,7 @@
       label: I18n.t('menu_help'),
       shortcut: Tasti.etichettaFilo(Tasti.scorciatoiaFilo('open-help-sidebar')),
       onClick: () => {
-        Popup.conta({ misura: 'strada', azione: 'help', via: 'tasto_destro_altro' });
+        Popup.conta({ misura: 'strada', id: 'help', via: 'tasto_destro_altro' });
         openSurface('help', () => openHelpSidebar());
       },
     };

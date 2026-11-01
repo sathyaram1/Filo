@@ -1,9 +1,10 @@
 // Le strade dei contatori (#1468) nell'app vera: da quale strada parte un'azione (tasto, pulsante della scheda, barra
-// dei menu, menu della scheda, comando della home), i tasti dei browser e Ctrl+Shift+T o Ctrl+L tornati indietro subito,
-// il tasto destro e il menu nativo, la scorciatoia muta su un sito spento. Forma e regole: tests/unit/contatoriStrade.test.mjs.
+// dei menu, menu della scheda, comando della home, barra laterale), i tasti dei browser e Ctrl+Shift+T o Ctrl+L tornati
+// indietro subito, il tasto destro e il menu nativo, la scorciatoia muta. Forma e regole: tests/unit/contatoriStrade.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { barraPage, comandaBarra, pannelloFermo, premiNellaBarra, menuAperto, scegliNelMenu } from './helpers/barra.mjs';
 
 const SPENTO = 'spento-1468.test';
 test.use({ hostInPiu: [SPENTO] });
@@ -176,7 +177,38 @@ test('una scorciatoia muta dove Filo è spento conta il perché, e solo se è pa
   await expect.poll(() => voce(app, 'scorciatoia_a_vuoto', 'explain-selection:filo_spento_sul_sito')).toBe(1);
   expect(await voce(app, 'via_azione', 'explain-selection:scorciatoia')).toBe(1);
   // La stessa pagina che dice «muta» senza un tasto vero davanti non conta.
-  await page.evaluate(() => chrome.runtime.sendMessage({ type: 'contatori_evento', misura: 'a-vuoto', comando: 'translate-selection', motivo: 'filo_spento_sul_sito' }).catch(() => {}));
-  await page.waitForTimeout(300);
+  const r = await app.evaluate((_e, url) => globalThis.SN_HANDLE_MESSAGE({
+    type: globalThis.SN_MSG.MSG.CONTATORI_EVENTO, misura: 'a-vuoto', comando: 'translate-selection', motivo: 'filo_spento_sul_sito',
+  }, { url, interna: false }), page.url());
+  expect(r && r.ok).toBe(false);
   expect(await voce(app, 'scorciatoia_a_vuoto', 'translate-selection:filo_spento_sul_sito')).toBe(0);
+});
+
+test('la barra laterale: indietro dall\'icona, avanti dall\'elenco col posto della pagina, l\'Aiuto dall\'icona', async ({ app, openTab, testServer }) => {
+  const a = testServer.html('<title>Pagina A</title><h1>a</h1>');
+  const b = testServer.html('<title>Pagina B</title><h1>b</h1>');
+  const page = await openTab(a);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
+  await page.evaluate((u) => { location.href = u; }, b);
+  await page.waitForURL(b);
+  await premiNellaBarra(app, 'back');
+  await expect.poll(() => attiva(app).then((x) => x.url)).toBe(a);
+  await expect.poll(() => voce(app, 'navigazione_cronologia', 'indietro:barra')).toBe(1);
+  expect(await voce(app, 'via_azione', 'back:barra')).toBe(1);
+
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await barra.locator('#nav .ico[data-id="forward"]').click({ button: 'right' });
+  const menu = await menuAperto(app);
+  expect(menu).not.toBeNull();
+  await scegliNelMenu(menu, 'Pagina B');
+  await expect.poll(() => attiva(app).then((x) => x.url)).toBe(b);
+  await expect.poll(() => voce(app, 'navigazione_cronologia', 'avanti:barra_lista:p1')).toBe(1);
+  expect(await voce(app, 'via_azione', 'forward:barra'), 'l\'elenco non è il pulsante Avanti').toBe(0);
+
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
+  await premiNellaBarra(app, 'help');
+  await expect.poll(() => voce(app, 'aiuto_aperto', 'barra')).toBe(1);
+  expect(await voce(app, 'via_azione', 'help:barra')).toBe(1);
 });

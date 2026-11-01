@@ -1081,6 +1081,8 @@ class TabManager {
     if (activate) {
       this.anteprime.congeda(this.tabs.find((t) => t.id === this.activeId));
       this.activeId = id;
+      // Davanti senza passare da activate(): la home già pronta non naviga, e chi c'era se ne va adesso (#1468).
+      Strade.misura('inVista', this, tab, url, { incognito: this.incognito });
       tab.activateSeq = this._nextActivationSeq();
       this.layout();
     } else {
@@ -2554,8 +2556,8 @@ class TabManager {
     try {
       if (await require('./menu').staScrivendo(wc)) return false;
     } catch (_) { return false; }
-    this._cronologiaDaTasto(verso);
     this.navigaCronologia(verso, id);
+    this._cronologiaDaTasto(verso);
     return true;
   }
 
@@ -3536,8 +3538,6 @@ class TabManager {
       if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
         const gesto = Permessi.gestoRecente(wc);
         globalThis.SN_USCITA_DA_FILO(url, wc, () => {
-          // Un collegamento da una pagina di Filo a un'altra, in una scheda nuova (#1468).
-          if (/^filo:/i.test(String(url || ''))) Strade.misura('pagina', url, 'collegamento_interno', { finestra: this, incognito: this.incognito });
           this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab', daScheda: this.tabs.includes(tab) ? tab : null, gesto });
         }).catch(() => {});
         return { action: 'deny' };
@@ -4029,6 +4029,10 @@ class TabManager {
     if (isWebUnsafeNav(url)) return fermaNavigazione(url, { win: this.win });
     if (this._maybeBlockNavigation(null, url)) return false;
     const origine = /^https?:/i.test(String(fromUrl || '')) ? { tipo: 'link', da: String(fromUrl), gesto: !!gesto } : { tipo: 'filo', gesto: !!gesto };
+    // Un collegamento da una pagina di Filo a un'altra, in una scheda nuova (#1468).
+    if (/^filo:/i.test(String(url || '')) && daScheda && /^filo:/i.test(String(daScheda.url || ''))) {
+      Strade.misura('pagina', url, 'collegamento_interno', { finestra: this, incognito: this.incognito });
+    }
     const apri = (segna) => {
       const id = this.openTab(url, { activate: !sfondo, openedByLink: true, origine });
       if (segna) segna(this.tabs.find((t) => t.id === id));
