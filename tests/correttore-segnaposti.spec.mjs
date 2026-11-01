@@ -86,7 +86,7 @@ async function apri(app, openTab, testServer, opz = {}) {
       return globalThis.__fontiWeb;
     };
   }, opz);
-  const page = await testServer.openReady(openTab, PAGINA, { pubblico: true });
+  const page = await testServer.openReady(openTab, opz.html || PAGINA, { pubblico: true });
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   return page;
 }
