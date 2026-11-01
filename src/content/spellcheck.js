@@ -2898,19 +2898,61 @@
 
   // Scrive `dopo` al posto di `prima` come la correzione del menu (Ctrl+Z la annulla). `{ dove }` è l'inizio del pezzo
   // nuovo nel testo del campo; `{ manca }` se `prima` non c'è più, `{ fermo }` se il campo non si è lasciato scrivere.
+  // Un pezzo tolto senza niente al suo posto torna anche com'era (`tolto`) e col testo che gli resta attorno (`sx`, `dx`):
+  // è da lì che rimettiNelCampo lo rimette (#1449.3).
   function sostituisciNelCampo(el, prima, dopo, vicinoA = 0) {
     if (!el || !el.isConnected) return { manca: true };
     const pezzo = String(prima || '');
     if (!pezzo) return { manca: true };
+    const nuovo = String(dopo == null ? '' : dopo);
     const { testo, riporta } = testoDaControllare(el);
     const trovato = cercaPezzo(testo, pezzo, Number(vicinoA) || 0);
     const r = trovato ? riporta([trovato])[0] : null;
     if (!r) return { manca: true };
     const campo = getEditableText(el);
+    const tolto = campo.slice(r.start, r.end);
     // Il fuoco sta nell'Aiuto: la selezione di un campo modificabile vale per il browser solo nel campo a fuoco.
     if (!campoDiTesto(el)) { try { el.focus({ preventScroll: true }); } catch (_) {} }
-    applyFix(el, r, String(dopo == null ? '' : dopo), { expectedSegment: campo.slice(r.start, r.end) });
-    return getEditableText(el) !== campo ? { dove: trovato.start } : { fermo: true };
+    applyFix(el, r, nuovo, { expectedSegment: tolto });
+    if (getEditableText(el) === campo) return { fermo: true };
+    if (nuovo) return { dove: trovato.start };
+    const ora = testoDaControllare(el).testo;
+    const p = trovato.start;
+    return { dove: p, tolto, sx: ora.slice(Math.max(0, p - INTORNO_TOLTO), p), dx: ora.slice(p, p + INTORNO_TOLTO) };
+  }
+
+  // Abbastanza da ritrovare il punto anche se il campo è cambiato altrove, poco da fallire se si è scritto proprio lì.
+  const INTORNO_TOLTO = 16;
+  const altoSurrogato = (c) => /[\uD800-\uDBFF]/.test(c || '');
+  const bassoSurrogato = (c) => /[\uDC00-\uDFFF]/.test(c || '');
+
+  // Rimette `pezzo` fra `sx` e `dx` nel punto più vicino a `vicinoA` (#1449.3): una correzione che aveva tolto un pezzo
+  // si toglie come le altre. Si riscrive un solo carattere accanto, così il resto del campo, e la sua forma, non si tocca.
+  function rimettiNelCampo(el, pezzo, sx, dx, vicinoA = 0) {
+    if (!el || !el.isConnected) return { manca: true };
+    pezzo = String(pezzo || '');
+    sx = String(sx || '');
+    dx = String(dx || '');
+    if (!pezzo || !(sx + dx)) return { manca: true };
+    const { testo, riporta } = testoDaControllare(el);
+    const posti = [];
+    for (let i = testo.indexOf(sx + dx); i >= 0; i = testo.indexOf(sx + dx, i + 1)) posti.push(i + sx.length);
+    if (!posti.length) return { manca: true };
+    const vicino = Number(vicinoA) || 0;
+    const p = posti.reduce((m, q) => (Math.abs(q - vicino) < Math.abs(m - vicino) ? q : m));
+    const campo = getEditableText(el);
+    const accanto = [];
+    if (p < testo.length) accanto.push({ start: p, end: p + (altoSurrogato(testo[p]) ? 2 : 1), dopo: true });
+    if (p > 0) accanto.push({ start: p - (bassoSurrogato(testo[p - 1]) ? 2 : 1), end: p, dopo: false });
+    for (const a of accanto) {
+      const r = riporta([{ start: a.start, end: a.end }])[0];
+      if (!r) continue;
+      const c = campo.slice(r.start, r.end);
+      if (!campoDiTesto(el)) { try { el.focus({ preventScroll: true }); } catch (_) {} }
+      applyFix(el, r, a.dopo ? pezzo + c : c + pezzo, { expectedSegment: c });
+      return getEditableText(el) !== campo ? { dove: p } : { fermo: true };
+    }
+    return { fermo: true };
   }
 
   // ============================================================================
