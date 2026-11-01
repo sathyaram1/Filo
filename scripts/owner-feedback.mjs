@@ -1083,18 +1083,27 @@ if (isMain) {
     id = r.id;
   }
 
-  // Le attese (#903): da sole, senza stato. Il valore di --aspetta è uno solo: «676,663.2» (o fra virgolette, con gli spazi).
-  const attese = ['--aspetta', '--aspetta-niente'].filter((o) => argv.includes(o));
+  // Le attese (#903): da sole, senza stato. Il valore è uno solo: «676,663.2» (o fra virgolette, con gli spazi).
+  const attese = ['--aspetta', '--aspetta-anche', '--aspetta-niente'].filter((o) => argv.includes(o));
   if (attese.length) {
     if (!id) { uso(); process.exit(1); }
-    if (attese.length > 1) { console.error('RIFIUTATO: --aspetta e --aspetta-niente insieme — non ho toccato niente.'); process.exit(1); }
+    if (attese.length > 1) { console.error(`RIFIUTATO: ${attese.join(' e ')} insieme — non ho toccato niente.`); process.exit(1); }
+    const [cmd] = attese;
     if (status) {
-      console.error(`RIFIUTATO: ${attese[0]} va da solo, senza stato né nota — non ho toccato niente.`);
+      console.error(`RIFIUTATO: ${cmd} va da solo, senza stato né nota — non ho toccato niente.`);
       process.exit(1);
     }
-    const valore = attese[0] === '--aspetta' ? String(flag('aspetta') || '') : '';
-    if (attese[0] === '--aspetta' && !valore.trim()) { console.error('RIFIUTATO: --aspetta vuole i numeri (--aspetta 676,663.2); per toglierle --aspetta-niente.'); process.exit(1); }
-    const r = await segnaAttese(id, valore, { dryRun, bearer });
+    const valore = cmd === '--aspetta-niente' ? '' : String(flag(cmd.slice(2)) || '');
+    if (cmd !== '--aspetta-niente' && !valore.trim()) { console.error(`RIFIUTATO: ${cmd} vuole i numeri (${cmd} 676,663.2); per toglierle --aspetta-niente.`); process.exit(1); }
+    const r = await segnaAttese(id, valore, {
+      dryRun, bearer, aggiungi: cmd === '--aspetta-anche',
+      // «Niente» è già la richiesta esplicita di toglierle tutte.
+      sostituisci: cmd === '--aspetta-niente' || argv.includes('--sostituisci'),
+    });
+    if (!r.ok && r.vive) {
+      console.error(rifiutoSostituzione(riferimento, globalThis.SN_FB_ATTESE.leggiNumeri(valore).numeri, r));
+      process.exit(3);
+    }
     if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
     console.log(rispostaAttese(riferimento, r));
     process.exit(0);
