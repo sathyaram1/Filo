@@ -369,9 +369,10 @@ function intestazioneConfronto(prima, dopo, filePrima) {
 }
 
 function avanzamentoSu(err) {
+  const riga = (id, n) => `  ${id}: ${n} ${n === 1 ? 'documento' : 'documenti'}, sottoraccolte comprese`;
   return ({ id, visti, finita }) => {
-    if (err.isTTY) err.write(`\r  ${id}: ${visti} documenti${finita ? '\n' : '…'}`);
-    else if (finita) err.write(`  ${id}: ${visti} documenti\n`);
+    if (err.isTTY) err.write(`\r${riga(id, visti)}${finita ? '\n' : '…'}`);
+    else if (finita) err.write(`${riga(id, visti)}\n`);
   };
 }
 
