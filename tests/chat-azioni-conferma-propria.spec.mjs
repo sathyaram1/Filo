@@ -102,6 +102,7 @@ test('«fai pulizia delle schede»: il bottone del riordino c\'è, e confermato 
   await fakeChat(app, [
     { toolCalls: [{ id: 'p1', name: 'PULISCI_TAB', arguments: '{}' }] },
     { text: 'Valuto le schede e archivio quelle che non servono.' },
+    { text: '' }, // dopo l'OK il modello riparte con l'esito e, a lavoro finito, tace (#1373)
     { text: 'Fatto.' },
   ]);
   await app.evaluate(({ BrowserWindow }) => {
@@ -130,6 +131,9 @@ test('«fai pulizia delle schede»: il bottone del riordino c\'è, e confermato 
   expect(await app.evaluate(() => globalThis.__triage)).toBe(1);
   await expect(body.locator('.dash-activity-row', { hasText: 'Schede riordinate · 2 archiviate' })).toHaveCount(1);
 
+  await expect.poll(() => app.evaluate(() => globalThis.__chatCalls.length), { timeout: 8_000 }).toBe(3);
+  expect(await app.evaluate(() => JSON.stringify(globalThis.__chatCalls[2]))).toMatch(/fatta: Schede riordinate/);
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
   // Al turno dopo il modello sa che è fatto, invece di crederlo in attesa.
   await chiedi(page, 'grazie');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 10_000 });
@@ -373,6 +377,7 @@ test('chat riaperta dall\'archivio: racconta la cancellazione confermata, non il
   await fakeChat(app, [
     { toolCalls: [{ id: 'p6', name: 'PULISCI_TAB', arguments: '{}' }, { id: 'c6', name: 'CANCELLA_ARCHIVIO', arguments: '{"query":"gatti"}' }] },
     { text: 'Ecco.' },
+    { text: '' }, // la ripresa dopo l'OK chiude muta: niente bolla, niente in archivio (#1373)
   ]);
 
   await chiedi(page, 'fai pulizia delle schede e cancella dall\'archivio le pagine sui gatti');

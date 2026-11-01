@@ -355,10 +355,13 @@ for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) tes
       }
       globalThis.__calls.push(JSON.parse(JSON.stringify(messages)));
       const testo = (m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content || ''));
+      const ultima = messages[messages.length - 1];
       const t = messages.some((m) => m.role === 'user' && testo(m).includes(domandaDopo)) ? 'Va bene.'
-        : messages.some((m) => m.role === 'tool' && m.tool_call_id === 'l1') ? 'Me lo segno, se mi dai l\'OK.'
-          : null;
-      if (!t) {
+        // Dopo l'OK il modello riparte con l'esito (#1373): la lezione era tutto, e tace.
+        : ultima && ultima.role === 'user' && testo(ultima).includes('richiesta di conferma qui sopra') ? ''
+          : messages.some((m) => m.role === 'tool' && m.tool_call_id === 'l1') ? 'Me lo segno, se mi dai l\'OK.'
+            : null;
+      if (t == null) {
         try { if (testoDelGiro) onDelta && onDelta(testoDelGiro); } catch (_) {}
         return {
           ...base, text: testoDelGiro, finishReason: 'tool_calls',
@@ -405,7 +408,7 @@ for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) tes
 
   const calls = await app.evaluate(() => globalThis.__calls);
   expect(calls, rivedeEsito ? 'col testo scritto insieme il modello rivede l\'esito «in attesa»' : 'la lezione da sola chiude il turno sul popup')
-    .toHaveLength(rivedeEsito ? 3 : 2);
+    .toHaveLength(rivedeEsito ? 4 : 3);
   const nota = /«voce 1» è un segnaposto tuo[^\n]*l'utente non lo vede da nessuna parte[^\n]*non scriverlo mai/;
   if (rivedeEsito) {
     // Nell'esito «in attesa»: il modello sa che nel popup l'utente legge il testo vero.
