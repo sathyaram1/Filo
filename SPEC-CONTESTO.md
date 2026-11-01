@@ -395,7 +395,7 @@ fanno ~5 $ al giorno, compattazioni comprese.
    Fatta con #1562. Finché manca la fase 4 la parte dell'utente si rifotografa
    quando l'inizio del tratto si sposta, a cache fredda o per un cambio che non
    si dice con un'aggiunta (una riga di memoria tolta, lo stile, le capacità).
-   Le pagine visitate restano fuori finché l'owner non decide (D56); il tetto
+   Le pagine visitate entrano ripiegate per sito (D-202, ripresa di #1562); il tetto
    di un esito e il budget in token al posto dei 12 giri vanno con la soglia
    della fase 4.
 4. **La compattazione** a livelli, con la soglia, la parte dell'utente
