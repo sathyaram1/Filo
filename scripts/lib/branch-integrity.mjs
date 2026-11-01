@@ -492,7 +492,7 @@ export function ensureSessionExcludes(root) {
  * FAIL CLOSED: se non riesce, il chiamante NON consegna il lavoro. Meglio un
  * giro a vuoto che un giro sull'albero sbagliato.
  */
-export function prepareBranch({ root, branch, create = false, base = '', mainBranch = 'main', checkpoint = null, now = Date.now() }) {
+export function prepareBranch({ root, branch, create = false, createIfMissing = false, base = '', mainBranch = 'main', checkpoint = null, now = Date.now() }) {
   const g = gitIn(root);
   if (!branch) return { ok: false, kind: 'transient', message: 'nessun branch da preparare' };
   // Sulla linea principale non si LAVORA: il cancello fonde un ramo, quindi un
