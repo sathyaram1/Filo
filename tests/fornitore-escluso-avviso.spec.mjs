@@ -153,6 +153,73 @@ test('una risposta servita da un fornitore escluso: avviso sulla pagina e segno 
   await storia.screenshot({ path: `${SHOTS}/1478-cronologia-scuro.png` }).catch(() => {});
 });
 
+// #1478.1 — una risposta che arriva quando nessuno guarda Filo: l'avviso aspetta, e la pausa parte da quando si vede.
+async function fintoServitoDa(app, host, extra = {}) {
+  await app.evaluate(async (_e, { host: h, x }) => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.setSettings({
+      useDefaultModels: false, openWeightsOnly: false, apiKeys: { openrouter: 'k-test' },
+      modelRegistry: { ...globalThis.SN_TEST_MODELS.registry, 'mio-aperto': { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash' } },
+      models: { [C.ACTIONS.EXPLAIN]: 'mio-aperto' },
+      ...x,
+    });
+    globalThis.SN_PROVIDERS.completeWithFallback = async () => ({
+      text: 'r', model: 'deepseek/deepseek-v4-flash', provider: 'openrouter', servedBy: h, usage: { promptTokens: 1, completionTokens: 1 },
+    });
+  }, { host, x: extra });
+}
+
+// Playwright finge sempre il fuoco: lo si toglie nel mondo dei content script (999), come quando si passa a un'altra app.
+// Tornando, la pagina riceve il fuoco come quando si torna su Filo.
+const fuoco = (app, url, si) => app.evaluate(async ({ webContents }, { u, s }) => {
+  const wc = webContents.getAllWebContents().find((w) => w.getURL() === u);
+  const torna = s ? 'window.dispatchEvent(new Event(\'focus\'));' : '';
+  return wc.executeJavaScriptInIsolatedWorld(999, [{ code: `Document.prototype.hasFocus = () => ${s}; ${torna} 1` }]);
+}, { u: url, s: si });
+
+const toastDi = (page, host) => page.locator('.sn-toast', { hasText: `«${host}»` });
+
+test('arrivata mentre si è in un’altra applicazione: l’avviso aspetta, compare al ritorno, e la pausa parte da lì', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body><p>Una pagina qualunque.</p></body></html>');
+  await page.mouse.click(5, 5);
+  await fintoServitoDa(app, 'Google Vertex');
+  await fuoco(app, page.url(), false);
+  expect((await spiega(app, 'EXPLAIN', 'mare1478')).ok).toBe(true);
+  expect((await spiega(app, 'EXPLAIN', 'neve1478')).ok).toBe(true);
+  await page.waitForTimeout(1000);
+  await expect(toastDi(page, 'Google Vertex'), 'senza fuoco l’avviso non si mostra').toHaveCount(0);
+
+  await fuoco(app, page.url(), true);
+  await expect(toastDi(page, 'Google Vertex')).toHaveCount(1, { timeout: 5_000 });
+  await expect(toastDi(page, 'Google Vertex')).toContainText('un fornitore che Filo esclude');
+  await page.screenshot({ path: `${SHOTS}/1478.1-avviso-al-ritorno.png` }).catch(() => {});
+
+  // Visto adesso: la stessa violazione subito dopo resta nella pausa, e un altro ritorno non lo ripete.
+  expect((await spiega(app, 'EXPLAIN', 'monte1478')).ok).toBe(true);
+  await fuoco(app, page.url(), true);
+  await page.waitForTimeout(1200);
+  await expect(toastDi(page, 'Google Vertex')).toHaveCount(1);
+});
+
+test('arrivata su un sito dove Filo è spento: l’avviso compare nella scheda dopo, senza aspettare un’altra risposta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body><p>Una pagina qualunque.</p></body></html>');
+  await page.mouse.click(5, 5);
+  await fintoServitoDa(app, 'Google AI Studio', { blocklist: ['127.0.0.1'] });
+  await page.waitForTimeout(800);
+  expect((await spiega(app, 'EXPLAIN', 'pioggia1478')).ok).toBe(true);
+  await page.waitForTimeout(1000);
+  await expect(toastDi(page, 'Google AI Studio'), 'sul sito spento l’avviso non si mostra').toHaveCount(0);
+
+  const home = await openTab('filo://newtab/');
+  await expect(toastDi(home, 'Google AI Studio')).toBeVisible({ timeout: 8_000 });
+  await expect(toastDi(home, 'Google AI Studio').locator('.sn-msg-rimedio')).toHaveText('Segnala');
+  expect((await spiega(app, 'EXPLAIN', 'grandine1478')).ok).toBe(true);
+  await home.waitForTimeout(1200);
+  await expect(toastDi(home, 'Google AI Studio')).toHaveCount(1);
+});
+
 test('«Segnala» nell’avviso apre «Invia feedback» già scritto, e in Cronologia l’host si trova cercandolo', async ({ app, shell, openTab }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
