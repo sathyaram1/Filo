@@ -50,14 +50,13 @@ async function modelloHome(app) {
     globalThis.__home = [];
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
       const tutto = messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
-      let text = '{}';
-      if (tutto.includes('preparare la dashboard')) {
-        globalThis.__home.push(tutto);
-        const i = tutto.indexOf('PERCHÉ SCRIVI ADESSO:');
-        const perche = i >= 0 ? tutto.slice(i, tutto.indexOf('\n\n', i)) : '';
-        const file = (perche.match(/[\w-]+\.(?:pdf|png)/) || [''])[0];
-        text = JSON.stringify({ message: file ? `È arrivato ${file}.` : '', suggestions: [] });
-      }
+      // Il nome dello screenshot resta quello con data e ora: qui conta solo la home.
+      if (!tutto.includes('preparare la dashboard')) throw new Error('solo la home ha un modello finto');
+      globalThis.__home.push(tutto);
+      const i = tutto.indexOf('PERCHÉ SCRIVI ADESSO:');
+      const perche = i >= 0 ? tutto.slice(i, tutto.indexOf('\n\n', i)) : '';
+      const file = (perche.match(/[\w-]+\.(?:pdf|png)/) || [''])[0];
+      const text = JSON.stringify({ message: file ? `È arrivato ${file}.` : '', suggestions: [] });
       return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
   });
@@ -69,11 +68,11 @@ const davanti = (app, si) => app.evaluate(({ BrowserWindow, powerMonitor }, si) 
   powerMonitor.getSystemIdleTime = () => (si ? 0 : 600);
 }, si);
 
-const voce = (shell, prova) => shell.evaluate(async (src) => {
+// Lo stato del download il cui nome finisce così, come lo vede la finestra.
+const statoDi = (shell, fine) => shell.evaluate(async (f) => {
   const r = await window.filoShell.downloads.list();
-  const ok = new Function('it', `return (${src})(it)`);
-  return ((r && r.items) || []).find((it) => ok(it)) || null;
-}, prova.toString());
+  return (((r && r.items) || []).find((it) => String(it.filename || '').endsWith(f)) || {}).state ?? null;
+}, fine);
 
 const chiamateHome = (app) => app.evaluate(() => (globalThis.__home || []).length);
 const spontanei = (app) => app.evaluate(async () => (await globalThis.SN_IL_FILO.chats())
@@ -90,11 +89,10 @@ test('uno screenshot e un file scaricato davanti a Filo non lo fanno scrivere pe
       <body style="padding:40px;background:#f6efe6"><h1>Una pagina</h1><a id="pdf" href="${srv.base}/report.pdf">Scarica il report</a></body></html>`);
 
     await premiNellaBarra(app, 'screenshot');
-    await expect.poll(async () => (await voce(shell, (it) => /\.png$/i.test(it.filename)))?.state ?? null, { timeout: 30_000 }).toBe('completed');
-    await page.bringToFront().catch(() => {});
+    await expect.poll(() => statoDi(shell, '.png'), { timeout: 30_000 }).toBe('completed');
     await page.locator('#pdf').click();
-    await expect.poll(async () => (await voce(shell, (it) => it.filename === 'report.pdf'))?.state ?? null, { timeout: 20_000 }).toBe('completed');
-    await expect(shell.locator('.shell-notif-msg', { hasText: 'Scaricato' }).first()).toBeVisible({ timeout: 8_000 });
+    await expect.poll(() => statoDi(shell, 'report.pdf'), { timeout: 20_000 }).toBe('completed');
+    await expect(shell.locator('.shell-notif-msg', { hasText: 'Scaricato: report.pdf' })).not.toHaveCount(0, { timeout: 8_000 });
 
     // Il giro di Filo parte 1,2 s dopo l'ultimo evento: qui ne passano tre.
     await new Promise((r) => setTimeout(r, 3_000));
@@ -117,7 +115,7 @@ test('un download lungo finito mentre l\'utente non c\'era: Filo scrive una volt
     const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagina con link</title></head>
       <body style="padding:40px"><a id="pdf" href="${srv.base}/lento-archivio.pdf">Scarica l'archivio</a></body></html>`);
     await page.locator('#pdf').click();
-    await expect.poll(async () => (await voce(shell, (it) => it.filename === 'lento-archivio.pdf'))?.state ?? null, { timeout: 20_000 }).toBe('progressing');
+    await expect.poll(() => statoDi(shell, 'lento-archivio.pdf'), { timeout: 20_000 }).toBe('progressing');
 
     // Partito tre minuti fa, e intanto l'utente è andato altrove.
     await app.evaluate(() => {
@@ -127,7 +125,7 @@ test('un download lungo finito mentre l\'utente non c\'era: Filo scrive una volt
     });
     await davanti(app, false);
     srv.rilascia();
-    await expect.poll(async () => (await voce(shell, (it) => it.filename === 'lento-archivio.pdf'))?.state ?? null, { timeout: 20_000 }).toBe('completed');
+    await expect.poll(() => statoDi(shell, 'lento-archivio.pdf'), { timeout: 20_000 }).toBe('completed');
 
     await expect.poll(() => spontanei(app), { timeout: 15_000 }).toEqual(['È arrivato lento-archivio.pdf.']);
     expect(await chiamateHome(app)).toBe(1);
