@@ -768,7 +768,7 @@
           root.style.visibility = '';
           const full = (shot || topbarShot) ? await schermataAnnotata(shot, topbarShot) : null;
           if (full) {
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: full, name: 'schermata annotata' });
+            outImages.push({ dataUrl: full, name: 'schermata annotata' });
           } else {
             senzaSchermata = (shot || topbarShot)
               ? 'Non sono riuscito a preparare la schermata annotata.'
