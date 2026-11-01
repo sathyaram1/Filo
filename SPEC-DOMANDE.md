@@ -1018,6 +1018,23 @@ lavoro di ogni account con rete e ambiente delle sue chiavi: un'istanza pronta
 accende la routine dei riservati anche a coda vuota, e un feedback non la
 accende mai.
 
+L'ambiente a rete aperta (§ 1.2, #2013) lo dichiara allo stesso modo la chiave
+(`routine-keys.mjs ambiente <nome> rete_aperta`), e il segno vince su `rete` e
+`lavori`: biglietti sempre sporchi, mai una chiave server. Riceve un compito
+solo se lo sporco non gli toglie niente: generico (scritto a mano o istanza di
+un ricorrente; unione, risposta e smistamento devono poter restare puliti),
+già non fidato, non riservato, con un ambito che non vede dati privati (la
+rete aperta porta già testo non fidato e un'uscita). Un compito scritto dal
+manutentore con la sua chiave o dall'ambiente dei riservati nasce riservato,
+perché il testo porta quello che ha letto: resta ai riservati, come i suoi
+esperimenti. La accende una voce sua del pacemaker: `routineIdReteAperta` e il
+segreto `CC_ROUTINE_FIRE_TOKEN_RETE_APERTA`, spenta da `reteApertaOff`, col suo
+tetto `reteApertaTetto` (assente = 1) dentro quello comune delle sessioni, con
+la pausa e i freni degli account della sua chiave. Decide dopo le voci server
+e prima di A/B, che quando lei può accendere non contano i suoi compiti.
+Gestione → Automazioni la mostra (ultima decisione, accensioni di oggi,
+pausa) e la spegne.
+
 ### 5.3 Ambiti nuovi
 
 Un agente che ne ha bisogno apre una domanda con la proposta: le operazioni,
