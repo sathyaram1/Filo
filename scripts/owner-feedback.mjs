@@ -85,7 +85,6 @@ import { avvisoDaCampi, parseRiferimento, risolviFeedback } from './lib/pratica-
 import { PARTI, RAMO_RE, partiDaCampi } from './lib/parti-lavoro.mjs';
 import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
 import { PRIORITA_AMMESSE, parsePriorita } from './lib/priorita.mjs';
-import { atteseDaCampo, rigaAttesa, statiInRete } from './lib/stati-attese.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
 // La PUBBLICA va caricata PRIMA della cifratura: senza, il gate risulta spento e
