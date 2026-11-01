@@ -666,8 +666,11 @@ test('riaperta dalla Cronologia, la chat racconta come fermata l’azione fermat
   }, { timeout: 10_000 }).toBeTruthy();
   await openTab(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(id)}`);
   const riaperta = await newtab(app, 'filo://dashboard/dashboard.html?chat=');
-  const nota = riaperta.locator('.dash-bubble-note[data-replay]').first();
-  await expect(nota).toHaveText("Ha eseguito un comando e fermato un'azione", { timeout: 10_000 });
+  // Riaperta, ogni azione ha la sua riga (#1294): il comando fatto e l'apertura fermata, mai raccontata come fatta.
+  const righe = riaperta.locator('.dash-bubble-filo .dash-activity-row');
+  await expect(righe.filter({ hasText: 'Comando eseguito' })).toHaveCount(1, { timeout: 10_000 });
+  await expect(righe.filter({ hasText: '🔒' })).toHaveCount(1);
+  await expect(righe.filter({ hasText: /^✓.*Aperta/ })).toHaveCount(0);
 
   await modelloFinto(app, { giri: [{ text: 'No, non l’ho aperta.' }] });
   await riaperta.locator('#input').fill('l’hai aperta la pagina?');
