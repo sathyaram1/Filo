@@ -24,13 +24,24 @@ async function manda(page, testo) {
   await input.press('Enter');
 }
 
+// Invia e, se Filo chiede, dice sì: qui conta cosa succede DOPO che il comando parte.
+async function eseguiSi(page, testo) {
+  await manda(page, testo);
+  try { await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 2_500 }); } catch (_) { return false; }
+  await clickConfirm(page, 'ok');
+  return true;
+}
+
 const finito = (page) => expect(page.locator('.dash-term-controls')).toHaveCount(0, { timeout: 12_000 });
 
 for (const shell of ['sh', 'bash']) {
   test(`892.4 ${shell}: righe che non si chiudono finiscono e non si mangiano il comando dopo`, async ({ app }) => {
     const page = await newtabPage(app);
     if (shell === 'bash') {
-      await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true, shell: 'bash' } }));
+      await app.evaluate(async () => globalThis.__filoHandlers.handleMessage(
+        { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { terminal: { enabled: true, shell: 'bash' } } },
+        { url: 'filo://preferences/preferences.html' },
+      ));
       await expect.poll(() => page.evaluate(() => window.SN_DASH_TERMINALE.getShell()), { timeout: 5_000 }).toBe('bash');
     }
     const casi = [
@@ -46,7 +57,8 @@ for (const shell of ['sh', 'bash']) {
       '/for i in 1 2; do echo $i',
     ];
     for (const [i, c] of casi.entries()) {
-      await manda(page, c);
+      await eseguiSi(page, c);
+      await expect(page.locator('.dash-term-cmd').last(), `${c}: è partito`).toContainText(c.slice(1).split(' ')[0]);
       await finito(page);
       const segno = `dopo-${i}-ok`;
       await manda(page, `/echo ${segno}`);
@@ -67,7 +79,7 @@ test('892.4: comandi su più righe e cd restano come in un terminale', async ({ 
   await manda(page, '/pwd');
   await expect(page.locator('.dash-term-out').last()).toContainText(path.basename(dir), { timeout: 12_000 });
   await finito(page);
-  await manda(page, '/X1683=valore; export X1683');
+  await eseguiSi(page, '/X1683=valore; export X1683');
   await finito(page);
   await manda(page, '/echo "v=$X1683"');
   await expect(page.locator('.dash-term-out').last()).toContainText('v=valore', { timeout: 12_000 });
