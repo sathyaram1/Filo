@@ -422,7 +422,7 @@ function interpretaLettura(u) {
     } else if (cur && k === 'cartella') cur.cartella = v === '1';
     // Data, dimensione ed estensione le dice il Finder; su Windows le chiede poi il disco.
     else if (cur && k === 'tipo') cur.tipo = String(v).replace(/^\./, '').toLowerCase();
-    else if (cur && k === 'data') { const n = intero(v); if (n != null) cur.data = n; } else if (cur && k === 'dimensione') { const n = intero(v); if (n != null) cur.dimensione = n; }
+    else if (cur && (k === 'data' || k === 'dimensione') && intero(v) != null) cur[k] = intero(v);
   }
   for (const x of voci) if (!x.nome) x.nome = String(x.id).split(/[\\/]/).filter(Boolean).pop() || x.id;
   const a = /^(-?\d+),(-?\d+),(-?\d+),(-?\d+)$/.exec(String(u.primo('area') || '').trim());
