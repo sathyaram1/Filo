@@ -6,7 +6,7 @@
 import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { existsSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { cartellaTemporanea, cartellaInCasa } from './helpers/percorsi.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { confirmText, clickConfirm } from './helpers/confirm.mjs';
@@ -407,14 +407,17 @@ test('acceso in Preferenze, uno scaricamento col nome che non dice niente prende
   await pref.locator('#sec-nomi-file').screenshot({ path: join(SHOTS, 'rinomina-preferenze.png') });
   const { rec, chiudi } = await scarica('scan_00999.pdf', BOLLETTA, { shell, openTab, testServer });
   try {
-    const nuovo = join(rec.savePath, '..', NOME_NUOVO);
+    // La voce segue il file: su una macchina carica la rinomina arriva prima che la prova legga la voce, che porta già
+    // il nome nuovo. I due percorsi si contano dalla cartella, mai dalla voce.
+    const vecchio = join(dirname(rec.savePath), 'scan_00999.pdf');
+    const nuovo = join(dirname(rec.savePath), NOME_NUOVO);
     // Il nome nuovo nasce un attimo prima che il vecchio sparisca (mai sovrascrivere): si aspetta l'insieme.
-    await expect.poll(() => existsSync(nuovo) && !existsSync(rec.savePath), { timeout: 20000 }).toBe(true);
+    await expect.poll(() => existsSync(nuovo) && !existsSync(vecchio), { timeout: 20000 }).toBe(true);
     const vista = await avvisi();
     const annulla = vista.locator('.shell-notif-action', { hasText: 'Annulla' }).last();
     await expect(annulla).toBeVisible({ timeout: 10000 });
     await annulla.click();
-    await expect.poll(() => existsSync(rec.savePath) && !existsSync(nuovo), { timeout: 10000 }).toBe(true);
+    await expect.poll(() => existsSync(vecchio) && !existsSync(nuovo), { timeout: 10000 }).toBe(true);
   } finally { await chiudi(); }
 });
 
