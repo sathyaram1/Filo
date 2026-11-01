@@ -889,6 +889,14 @@ token.
   node "$(ls -d scripts/dispatch.mjs */scripts/dispatch.mjs 2>/dev/null | head -n 1)" --preflight
   ```
 
+  Il `cd` non basta per le impostazioni: Claude Code legge quelle del
+  progetto solo dalla cartella di partenza, e da sopra i cloni i ganci di Filo
+  (salvataggio automatico, guardia del ramo) non partirebbero, nemmeno per i
+  worker (#1967). Il preflight li porta nelle impostazioni utente insieme al
+  gancio dell'orchestratore cieco, con la cartella del progetto fissata al
+  checkout; ognuno tace dove il progetto della sessione ha già il suo script,
+  così dentro Filo non gira due volte (`scripts/lib/ganci-del-progetto.mjs`).
+
 - **Cosa non garantisce.** In cloud il proxy autentica qualunque git della
   sessione verso i repository agganciati, non solo quelli di git-server: il
   sì del server lo fa rispettare lo strumento, non la rete. Quello che arriva
