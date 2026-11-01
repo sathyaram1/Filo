@@ -37,8 +37,9 @@ test('un\'azione fatta si archivia con la riga del diario in diretta, e una non 
     const a = { type, _executed: true, _output: {} };
     const diretta = RA.rigaArchivio(a);
     const v = E.voceArchivio(a);
-    if (!diretta || diretta.failed || !v || v.esito !== 'fatto') continue;
-    assert.equal(v.riga, String(diretta.text).split('\n')[0].trim(), type);
+    // Il titolo di un'altra conversazione non resta scritto in questa: lì la riga è generica apposta.
+    if (!diretta || diretta.failed || !v || v.esito !== 'fatto' || /_CHAT$/.test(type)) continue;
+    assert.equal(v.riga, String(diretta.text).split('\n')[0].replace(/\s*:\s*$/, '').trim(), type);
   }
   const sveglia = E.voceArchivio({ type: 'SVEGLIA', ora: '07:30', _executed: false, _output: {} });
   assert.equal(E.rigaDellaVoce(sveglia).testo, 'Sveglia non impostata');
@@ -97,8 +98,7 @@ test('toStoredMessage tiene i nomi delle successe in `actions` e com\'è andata 
 test('le righe della chat riaperta dicono fatto, non riuscito col perché, e conferma chiesta', () => {
   const righe = E.vociArchivio(TURNO).map((v) => E.rigaDellaVoce(v));
   assert.equal(righe[0].icona, '✓');
-  assert.equal(righe[1].testo.startsWith('Non riuscita · '), true);
-  assert.match(righe[1].testo, /la modalità terminale è spenta$/);
+  assert.equal(righe[1].testo, 'Comando non eseguito · la modalità terminale è spenta', 'l\'etichetta del diario in diretta');
   assert.equal(righe[2].testo, 'Conferma chiesta · Inviare questo feedback agli sviluppatori');
   assert.equal(righe[2].fallita, true);
 });
