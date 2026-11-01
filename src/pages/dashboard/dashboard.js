@@ -1663,7 +1663,7 @@
     const testi = tornati.map((c) => c.scritto.trim()).filter(Boolean);
     const bozza = inputEl.value.trim() ? [inputEl.value] : [];
     inputEl.value = [...testi, ...bozza].join('\n');
-    if (tornati.some((c) => c.incollato)) testoDaFuori = true;
+    if (tornati.some((c) => c.incollato)) { testoDaFuori = true; ricordaDaFuori(inputEl.value); }
     for (const c of tornati) {
       for (const d of c.immagini) addPendingImage(d, c.percorsi.get(d));
       for (const f of c.file) addPendingFile(f.percorso);
