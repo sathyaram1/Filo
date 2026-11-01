@@ -3277,6 +3277,7 @@
     descriviSistema,
     unaRigaDiDati,
     PROMPTS,
+    SEGNALAZIONE_SENZA_PERSONA,
     FILO_CHAT_TRIAGE_CHARS,
     SAVED_PAGES_LIMIT,
     CATEGORY_NAME_MAX,
