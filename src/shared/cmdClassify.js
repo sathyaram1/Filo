@@ -1336,7 +1336,7 @@
       if (i === 0 && /^[A-Za-z]+$/.test(t)) { lettere(t, false); continue; }
     }
     if (modo === 'c') return archivio && archivio !== '-' ? copiaSovrascrive([], archivio, c, { maiDentro: true }) : '';
-    if (modo === 'x') return tiene || archivio === '-' && false ? '' : PUO_SOVRASCRIVERE;
+    if (modo === 'x') return tiene ? '' : PUO_SOVRASCRIVERE;
     return '';
   }
 
