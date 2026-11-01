@@ -627,6 +627,7 @@
       }
       if (inScrittura && start < inScrittura.end && end > inScrittura.start) continue;
       if (diFilo.some(([a, b]) => start >= a && end <= b)) continue;
+      if (correzioni.length) correzioni = [comeGliApici(correzioni[0], testo.slice(start, end), testo, testo[start - 1])];
       // Una minuscola dove la correzione vuole la maiuscola non è un errore: un nome scritto minuscolo o si corregge
       // da sé (correttoreAutomatica.js) o si lascia stare (#1447).
       if (errore && correzioni.length && soloPiuMaiuscole(testo.slice(start, end), correzioni[0])) continue;
