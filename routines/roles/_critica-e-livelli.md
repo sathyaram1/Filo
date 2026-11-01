@@ -148,9 +148,15 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   fallisce non è un rilievo nuovo, se passa («Expected to fail, but passed») la
   porta è chiusa e le togli il segno. Una prova che era solo esplorazione
   (dipende dall'ambiente, non asserisce niente) si cancella. Si cancella anche
-  quella di un rilievo **esterno**, nello stesso commit: quel rilievo esce di
-  qui dentro un feedback suo, col suo testo, e la prova lasciata indietro
-  sarebbe solo un rosso da rispiegare per sempre.
+  quella di un rilievo **esterno**, o di uno col `?` di livello 0 o 1 (o vicino),
+  nello stesso commit: quel rilievo esce di qui dentro un feedback suo in ogni
+  esito, e la prova lasciata indietro sarebbe solo un rosso da rispiegare per
+  sempre. Se la critica ha un interno di livello 2 o 3 col `?`, il lavoro si
+  ferma e i `?` restano a chi riprende: lì esce solo la prova degli esterni.
+  **La pulizia che non dipende dall'esito si fa prima del verdetto**:
+  dopo, ogni commit è una spinta che il registro della fiducia non vede, e un
+  lavoro fidato finisce fermo alla fusione. La registrazione rifiuta una critica
+  che ha ancora nel ramo una prova di questi, e dice quale.
 - **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
   critica che registri, contando da 1 le righe con livello e sede, interne ed
   esterne, nell'ordine in cui le scrivi. Una prova che ne copre più d'uno li
@@ -175,7 +181,9 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   a cui hai tolto un caso si rilancia: quello che resta, se è rosso, la ferma.
   Una che la pulizia ha dimenticato esce con un'altra, anche dopo le correzioni:
   un commit a parte che toglie solo lei, registrato finché è l'ultimo.
-  Se la risposta dice che il lavoro passa, le togli seguendola.
+  Se la risposta dice che il lavoro passa, togli solo le prove che lei elenca
+  (i rilievi che il server ha messo da parte); se non ne elenca, dopo il
+  verdetto il ramo non si tocca più.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il
   salvataggio automatico parte solo da un Edit o da un Write, non da un `rm` o

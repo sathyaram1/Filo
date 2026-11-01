@@ -138,7 +138,9 @@ test('la risposta del server si stampa coi numeri dei rilievi nella critica', as
   const t = verifierReplyText(r, 'X');
   assert.match(t, /- r1 \[2i\] la cosa a non funziona/);
   assert.match(t, /- r3 \[1e\] un altro lavoro/);
-  assert.match(t, /le prove con r2 nel nome, per #9\.2/);
+  // Un `?` di livello 1 esce in ogni esito: la sua prova è già uscita col commit della critica (#1555).
+  assert.match(t, /\[1i\?\] il bordo è freddo\?\n {2}→ feedback #9\.2/);
+  assert.doesNotMatch(t, /le prove con r2 nel nome/);
 });
 
 test('VERIFIER_ROUND: il parser della critica coi livelli arriva dagli strumenti (fonte unica)', async () => {
@@ -178,7 +180,7 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
   assert.doesNotMatch(fix, /test\.fail\(true/, 'il marcatore non è più la strada principale');
   const passConFigli = verifierReplyText({
     outcome: 'pass',
-    derived: [{ level: 2, sede: 'e', text: 'la pagina non si apre. Passi: aprila.', priority: 2, num: '#42.3' }],
+    derived: [{ level: 2, sede: 'i', text: 'la pagina non si apre. Passi: aprila.', priority: 2, num: '#42.3' }],
   });
   assert.match(passConFigli, /Prove del giro da TOGLIERE adesso/);
   assert.match(passConFigli, /#42\.3/);

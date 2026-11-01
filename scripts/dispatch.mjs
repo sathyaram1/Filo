@@ -84,8 +84,8 @@ import {
 import { writeRole, clearRole, readRole, readMarker, isRoutineInstance } from './lib/routine-role.mjs';
 import { fileRiscritti, fusioniCheCitano, numeroFeedback } from './lib/su-main.mjs';
 import {
-  baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, numeraRilievi, puliziaDelPass, rigaNumerata,
-  ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero,
+  baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, esceInOgniEsito, numeraRilievi, proveDaToglierePrimaDelVerdetto,
+  proveScritteDa, puliziaDelPass, rigaNumerata, ROSSO_ATTESO_CHIUSO, testoProvePrimaDelVerdetto, testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
@@ -1340,6 +1340,9 @@ async function recordVerifier(id, critiqueText, domande = []) {
   const parsed = VERIFIER_ROUND.parseFindings(critiqueText);
   const conDomande = rilieviConDomanda(parsed.findings, domande);
   if (!conDomande.ok) return { rejected: true, formatRejected: true, message: `critica non registrata: ${conDomande.errore}` };
+  // La pulizia che non dipende dall'esito si fa prima del verdetto: dopo, il commit è una spinta fuori registro (#1555).
+  const primaDelVerdetto = avvio ? proveDaToglierePrimaDelVerdetto(proveScritteDa(avvio, ROOT), parsed.findings) : [];
+  if (primaDelVerdetto.length) return { rejected: true, formatRejected: true, message: testoProvePrimaDelVerdetto(primaDelVerdetto, parsed.findings) };
   const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
 
   // PRIMA il server, POI lo stato locale. L'ordine non è un dettaglio: lo stato
@@ -1505,7 +1508,8 @@ export function verifierReplyText(reply, id = '<id>') {
   // Un rilievo diventato un feedback suo non lascia una prova rossa nel ramo:
   // il testo vive nel feedback, e la cartella del giro si svuota invece di
   // crescere. Le righe sono pronte da spuntare, col numero di ciascuno.
-  const daTogliere = derivati.flatMap((d) => d.rilievi.map((f) => `  · ${Number.isInteger(f.n) ? `le prove con r${f.n} nel nome` : 'nessuna prova (il rilievo non si ritrova nella critica)'}, per ${d.num || '(numero non comunicato)'}: ${frase(f)}`)).join('\n');
+  // Quelle dei rilievi che escono in ogni esito sono già uscite prima della critica (#1555): qui restano le altre.
+  const daTogliere = derivati.flatMap((d) => d.rilievi.filter((f) => !esceInOgniEsito(f)).map((f) => `  · ${Number.isInteger(f.n) ? `le prove con r${f.n} nel nome` : 'nessuna prova (il rilievo non si ritrova nella critica)'}, per ${d.num || '(numero non comunicato)'}: ${frase(f)}`)).join('\n');
   if (r.outcome === 'fix' && r.phase2) {
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
@@ -1514,9 +1518,9 @@ export function verifierReplyText(reply, id = '<id>') {
       fmt(r.phase2.findings),
       'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu):',
       derivatiRighe(derivati),
-      derivati.length ? 'Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione, in un commit che toglie solo queste (quelle dei rilievi esterni sono già uscite col commit della critica: se non ci sono più, vai avanti). Una prova che porta anche il numero di un rilievo da correggere resta: le si toglie solo il caso di questi, e il suo caso resta rosso (la registrazione la rilancia, e anche quelle che usano un aiuto a cui hai tolto righe).' : null,
-      derivati.length ? daTogliere : null,
-      derivati.length ? `  Se ne hai tolte, poi \`git add -A && git commit -m "pulizia del giro"\` e \`node scripts/dispatch.mjs --record-pulizia ${id}\`: da quel commit parte il confronto della consegna.` : null,
+      daTogliere ? 'Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione, in un commit che toglie solo queste (quelle degli esterni e delle domande sono già uscite col commit della critica). Una prova che porta anche il numero di un rilievo da correggere resta: le si toglie solo il caso di questi, e il suo caso resta rosso (la registrazione la rilancia, e anche quelle che usano un aiuto a cui hai tolto righe).' : null,
+      daTogliere || null,
+      daTogliere ? `  Se ne hai tolte, poi \`git add -A && git commit -m "pulizia del giro"\` e \`node scripts/dispatch.mjs --record-pulizia ${id}\`: da quel commit parte il confronto della consegna.` : null,
       'Una prova del giro ancora rossa non si toglie e non si cambia mai: la consegna la rilancia com\'era e si ferma. Si toglie solo verde, insieme alla prova durevole che la sostituisce.',
       ROSSO_ATTESO_CHIUSO,
       dueRiga,
@@ -1554,14 +1558,14 @@ export function verifierReplyText(reply, id = '<id>') {
       derivati.length ? `Rilievi non corretti, diventati feedback derivati (esterni e domande uno per rilievo, gli altri insieme nel feedback dei rimasti):\n${derivatiRighe(derivati)}` : 'Nessun rilievo da mettere da parte.',
       dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
-      derivati.length ? 'Prove del giro da TOGLIERE adesso, prima di rilasciare il biglietto:' : null,
-      derivati.length ? daTogliere : null,
-      // Toglierle è un commit, e un commit dopo il verdetto lo farebbe decadere:
-      // qui è tollerato, e dirlo serve a non lasciarle rosse per paura. Solo
-      // TOGLIERE però: una riga aggiunta dopo il verdetto lo fa decadere.
-      derivati.length ? '  Poi `git add -A && git commit`, senza push a mano (lo spedisce il rilascio): quel commit non fa decadere il verdetto, finché lì si TOGLIE' : null,
-      derivati.length ? '  e non si aggiunge niente. Una prova che copre anche un caso ancora aperto non si cancella: toglile il caso' : null,
-      derivati.length ? '  che se ne va, e lascia il resto.' : null,
+      daTogliere ? 'Prove del giro da TOGLIERE adesso, prima di rilasciare il biglietto (quelle degli esterni e delle domande sono già uscite col commit della critica):' : null,
+      daTogliere || null,
+      // Solo TOGLIERE: una riga aggiunta dopo il verdetto lo fa decadere.
+      daTogliere ? '  Poi `git add -A && git commit`, senza push a mano (lo spedisce il rilascio): quel commit non fa decadere il verdetto, finché lì si TOGLIE' : null,
+      daTogliere ? '  e non si aggiunge niente. Una prova che copre anche un caso ancora aperto non si cancella: toglile il caso' : null,
+      daTogliere ? '  che se ne va, e lascia il resto.' : null,
+      // Ogni altro commit dopo il verdetto è una spinta che il registro della fiducia non vede (#1555).
+      daTogliere ? null : 'Dopo il verdetto il ramo non si tocca più: niente commit e niente file nuovi nella cartella.',
       'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
     ].filter((l) => l !== null).join('\n');
   }
