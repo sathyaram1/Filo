@@ -3676,7 +3676,11 @@ async function eseguiAzioneFilo(action, {
         let r = null;
         if (!String(url || '').trim() && Number.isInteger(numero) && numero > 0) {
           let schede = [];
-          try { schede = await globalThis.SN_FILO_STATE.listTabs(); } catch (_) {}
+          try {
+            const tutte = await globalThis.SN_FILO_STATE.listTabs({ windowId: winOf(sender)?.id ?? null });
+            // In chat l'elenco è quello del turno, nell'ordine della barra (#413.2).
+            schede = Array.isArray(schedeViste) ? schedeViste.map((id) => tutte.find((x) => x.id === id) || null) : tutte;
+          } catch (_) {}
           const t = schede[numero - 1];
           if (!t) r = { pageRead: `scheda ${numero}`, ok: false, errore: 'scheda', dettaglio: `nessuna scheda numero ${numero}`, testo: '' };
           else url = t.url || '';
