@@ -134,6 +134,30 @@
     if (timer && typeof timer.unref === 'function') timer.unref(); // non tenere vivo il processo
   }
 
+  // Chi ha premuto «Invia» aspetta il primo tentativo della sua voce, così dice «inviato» solo a consegna avvenuta
+  // (#1667). Esito: 'consegnato' | 'in_coda' | 'rinuncia'; allo scadere di `entroMs` è 'in_coda'.
+  const attese = new Map(); // id -> [risolvi]
+  function rispondi(id, esito) {
+    const l = attese.get(id);
+    if (!l) return;
+    attese.delete(id);
+    for (const r of l) r(esito);
+  }
+  function attendiTentativo(id, entroMs) {
+    // Senza giri automatici (le prove) nessun tentativo è in arrivo.
+    if (!auto) return Promise.resolve({ esito: 'in_coda' });
+    return new Promise((resolve) => {
+      const t = setTimeout(() => {
+        const l = (attese.get(id) || []).filter((r) => r !== fine);
+        if (l.length) attese.set(id, l); else attese.delete(id);
+        resolve({ esito: 'in_coda' });
+      }, entroMs);
+      if (typeof t.unref === 'function') t.unref();
+      function fine(esito) { clearTimeout(t); resolve(esito); }
+      attese.set(id, (attese.get(id) || []).concat(fine));
+    });
+  }
+
   async function enqueue(payload, opts) {
     await load();
     const id = (payload && payload.submissionId)
