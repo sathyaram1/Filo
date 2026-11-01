@@ -50,13 +50,18 @@ function filtra(voci, { periodo = { da: null, a: null }, motivo = '' } = {}) {
     .sort((x, y) => (Date.parse(y.closedAt) || 0) - (Date.parse(x.closedAt) || 0));
 }
 
-// La voce come la vede il modello. `nascosta`: una pagina di casa o delicata, di cui il riassunto non esce (#1004).
-function perModello(v, { nascosta = false } = {}) {
-  const riassunto = nascosta ? '' : String(v.summary || '').replace(/\s+/g, ' ').trim();
+// La voce come la vede il modello. `delicata`: una pagina delicata o di casa, di cui escono solo il sito e il quando
+// (#1004); un indirizzo tagliato alla misura (#1525) porterebbe altrove, e va solo il sito.
+function perModello(v, { delicata = false } = {}) {
+  let origine = '';
+  try { origine = new URL(v.url).origin; } catch (_) {}
+  const sito = origine.replace(/^https?:\/\/(www\.)?/, '');
+  const riassunto = delicata ? '' : String(v.summary || '').replace(/\s+/g, ' ').trim();
   return {
     id: v.id,
-    titolo: String(v.title || '').slice(0, 200),
-    url: v.url,
+    titolo: delicata ? (sito || 'sito') : String(v.title || '').slice(0, 200),
+    url: delicata || v.urlTagliato ? (origine ? `${origine}/` : '') : v.url,
+    ...(delicata ? { delicata: true } : {}),
     chiusa: v.closedAt || null,
     motivo: motivoDi(v),
     ...(v.giro ? { giro: v.giro } : {}),

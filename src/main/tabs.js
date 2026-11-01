@@ -10,6 +10,7 @@ const Sito = require('../shared/stessoSito');
 const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
 const { testoDellaRichiesta, corpoDa, LIMITE_CORPO } = require('./services/testoInviato');
 const ProxyTab = require('./services/proxyTab');
+const { riquadroArrivato } = require('./services/riquadroArrivato');
 const { registerFiloProtocolForSession } = require('./protocol');
 const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
@@ -5016,14 +5017,16 @@ const PREMI_PLAY_JS = `(async () => {
   try { await m.play(); return m.paused ? 'bloccato' : 'suona'; } catch (_) { return 'bloccato'; }
 })()`;
 
+// Senza il gesto dell'utente (#737.1): play() non ne ha bisogno, l'autoplay delle schede è libero.
 async function premiPlay(wc) {
   if (!wc || wc.isDestroyed()) return 'nessuno';
   let riquadri = [];
   try { riquadri = wc.mainFrame ? wc.mainFrame.framesInSubtree : []; } catch (_) {}
   let esito = 'nessuno';
   for (const f of riquadri) {
+    if (!riquadroArrivato(f)) continue;
     let r = 'nessuno';
-    try { r = await f.executeJavaScript(PREMI_PLAY_JS, true); } catch (_) {}
+    try { r = await f.executeJavaScript(PREMI_PLAY_JS, false); } catch (_) {}
     if (r === 'suona') return r;
     if (r === 'bloccato') esito = r;
   }

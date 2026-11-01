@@ -25,6 +25,8 @@ const Schermo = require('./schermo').crea();
 const Foto = require('./fotoDellaPagina');
 const SempreAperte = require('./sempreAperte');
 const ChiudiSchede = require('./chiudiSchede');
+const CercaChiuse = require('./cercaSchedeChiuse');
+const { daArchivio: voceDaArchivio } = require('../tabs/schedeChiuse');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -2678,6 +2680,19 @@ async function eseguiAzioneFilo(action, {
     action.tieni = action.tieni === true || /^(true|1|si|sì|yes)$/i.test(String(action.tieni ?? ''));
   }
 
+  // #884 — una scheda chiusa si riapre con l'indirizzo dell'archivio, mai con uno scritto dal modello: il popup la nomina.
+  if (type === 'RIAPRI_SCHEDA') {
+    const v = await voceChiusa(action.id);
+    if (!v.voce) return { executed: false, kept: true, output: { riaperta: false, trovata: false } };
+    action._titolo = v.perModello.titolo;
+  }
+  // #1397 — cosa farà ripartire «rimettimi la musica»: il popup lo nomina, e l'esecuzione rifà la stessa scelta.
+  if (type === 'RIPRENDI_AUDIO') {
+    const tm = winOf(sender)?._filoTabs;
+    const b = tm ? await bersaglioAudio(tm, action, schedeViste) : null;
+    if (b && (b.tab || b.chiusa)) action._titolo = (await nomeDellaScheda())(b.tab || { url: b.chiusa.url, title: b.chiusa.titolo });
+  }
+
   // «Cerca X sul sito Y» (#553): l'indirizzo lo costruisce Filo, dall'elenco dei siti o dal modulo di ricerca della home.
   if ((type === 'NAVIGA' || type === 'LEGGI_PAGINA') && provenienza && !confirmed && !soloConferma) {
     const esito = await ricercaNelSito(action, { provenienza, contesto, parole, sender });
@@ -3569,6 +3584,44 @@ async function eseguiAzioneFilo(action, {
         } catch (e) {
           return { executed: false, kept: true, output: { cercato, pagine: [], errore: e?.message || String(e) } };
         }
+      }
+      case 'SCHEDE_CHIUSE': {
+        const r = await schedeChiusePerChat(action);
+        if (r.errore) return { executed: false, kept: true, output: { error: r.errore } };
+        return { executed: true, kept: true, output: r };
+      }
+      case 'RIAPRI_SCHEDA': {
+        const tm = winOf(sender)?._filoTabs;
+        if (!tm) return { executed: false, kept: true, output: { riaperta: false, error: 'nessuna finestra con schede' } };
+        const v = await voceChiusa(action.id);
+        if (!v.voce) return { executed: false, kept: true, output: { riaperta: false, trovata: false } };
+        const base = { titolo: v.perModello.titolo, url: v.perModello.url, chiusa: v.perModello.chiusa };
+        // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: resta il riassunto, come per una pagina sparita.
+        if (v.voce.urlTagliato) return { executed: false, kept: true, output: { ...base, riaperta: false, tagliato: true, riassunto: v.perModello.riassunto } };
+        const id = await tm.riapri(voceDaArchivio(v.voce));
+        if (!id) return { executed: false, kept: true, output: { ...base, riaperta: false } };
+        tm.tornata(v.voce);
+        const esito = await tm.esitoRiapertura(id);
+        if (esito === 'sparita') return { executed: true, kept: true, output: { ...base, riaperta: true, nonRaggiungibile: true, riassunto: v.perModello.riassunto } };
+        return { executed: true, kept: true, output: { ...base, riaperta: true } };
+      }
+      case 'RIPRENDI_AUDIO': {
+        const tm = winOf(sender)?._filoTabs;
+        if (!tm) return { executed: false, kept: true, output: { error: 'nessuna finestra con schede' } };
+        const b = await bersaglioAudio(tm, action, schedeViste);
+        const nome = await nomeDellaScheda();
+        if (b.errore) return { executed: false, kept: true, output: { error: b.errore } };
+        if (b.giaSuona) return { executed: false, kept: true, output: { giaSuona: true, titolo: nome(b.giaSuona) } };
+        if (b.nessuna) return { executed: false, kept: true, output: { nessuna: true } };
+        const id = b.tab ? b.tab.id : await tm.riapriCheSuonava(b.chiusa);
+        if (!id) return { executed: false, kept: true, output: { nessuna: true } };
+        const titolo = nome(b.tab || { url: b.chiusa.url, title: b.chiusa.titolo });
+        const esito = await tm.riprendiAudio(id);
+        const numero = tm.tabs.findIndex((t) => t.id === id) + 1;
+        return {
+          executed: true, kept: true,
+          output: { titolo, riaperta: !b.tab, ...(numero > 0 ? { numero } : {}), ...(esito !== 'suona' ? { nonPartita: true, perche: esito } : {}) },
+        };
       }
       case 'APRI_SALVATA': {
         // La porta delle uscite l'ha già guardata prima del gate, con l'indirizzo dell'elenco.
@@ -4693,12 +4746,84 @@ async function paginePerChat(query) {
     const tagliata = !!(p._voce && p._voce.urlTagliato);
     let origine = '';
     try { origine = new URL(p.url).origin; } catch (_) {}
+    // Una scheda chiusa porta il suo id d'archivio: RIAPRI_SCHEDA la riapre com'era (#884).
+    const idChiusa = p.chiusa && p._voce && typeof p._voce.id === 'string' ? { id: p._voce.id } : {};
     out.push(delicata
-      ? { url: sito ? `https://${sito}/` : '', title: sito || 'sito', date: p.date, chiusa: !!p.chiusa, delicata: true }
-      : { url: tagliata ? (origine ? `${origine}/` : '') : p.url, title: p.title, date: p.date, chiusa: !!p.chiusa,
+      ? { url: sito ? `https://${sito}/` : '', title: sito || 'sito', date: p.date, chiusa: !!p.chiusa, delicata: true, ...idChiusa }
+      : { url: tagliata ? (origine ? `${origine}/` : '') : p.url, title: p.title, date: p.date, chiusa: !!p.chiusa, ...idChiusa,
         ...(tagliata ? { tagliata: true } : {}), ...(p.riassunto ? { riassunto: String(p.riassunto).slice(0, 400) } : {}) });
   }
   return out.filter((p) => p.url);
+}
+
+// #884 — le schede chiuse per SCHEDE_CHIUSE: nel periodo e col motivo chiesti, poi per parole e per senso come
+// paginePerChat; senza parole dalla più recente. Al modello le prime fino al tetto, e il numero vero.
+async function schedeChiusePerChat(action) {
+  const r = CercaChiuse.richiesta(action);
+  if (r.errore) return r;
+  const settings = await getEffectiveSettings();
+  const fuori = await filtroDelicate(settings);
+  const archivio = await ArchivedTabs.list().catch(() => []);
+  const nelFiltro = CercaChiuse.filtra(archivio, r);
+  const delicata = (it) => !!fuori(it.url) || restaQui(it, fuori);
+  let scelte = nelFiltro;
+  if (r.cerca) {
+    const CA = ChatArchive;
+    const candidati = nelFiltro.map((it) => ({ it, testo: [it.title, delicata(it) ? '' : it.summary, it.url].filter(Boolean).join(' ') }));
+    const perParole = CA.searchWide(candidati, r.cerca, { testo: (c) => c.testo }).results.map((c) => c.it);
+    const presi = new Set(perParole.map((it) => it.id));
+    let emb = null;
+    try { emb = nelFiltro.length ? await embedTexts([r.cerca], settings) : null; } catch (_) { emb = null; }
+    const qv = emb && emb.vectors && emb.vectors[0] && emb.vectors[0].length ? quantizeEmbedding(emb.vectors[0]) : null;
+    const perSenso = [];
+    if (qv) {
+      for (const it of nelFiltro) {
+        if (presi.has(it.id) || delicata(it) || !conVettoreDi(it, emb.model)) continue;
+        const sc = cosineInt(qv, it.embedding);
+        if (sc >= SOGLIA_PAGINA) perSenso.push({ it, sc });
+      }
+      perSenso.sort((a, b) => b.sc - a.sc);
+    }
+    scelte = [...perParole, ...perSenso.map((x) => x.it)];
+  }
+  return {
+    schede: scelte.slice(0, CercaChiuse.TETTO).map((it) => CercaChiuse.perModello(it, { delicata: delicata(it) })),
+    trovate: scelte.length,
+    totale: archivio.length,
+    cercato: r.cerca,
+    ...(r.motivo ? { motivo: r.motivo } : {}),
+    ...(r.periodo.da || action.a ? { periodo: r.periodo } : {}),
+  };
+}
+
+// La voce d'archivio di `id`, e come la vede il modello (una pagina delicata solo col sito).
+async function voceChiusa(id) {
+  const chiave = String(id ?? '').trim();
+  let voce = null;
+  try { voce = chiave ? (await ArchivedTabs.listMeta()).find((t) => t && t.id === chiave) || null : null; } catch (_) {}
+  if (!voce) return {};
+  const fuori = await filtroDelicate(await getEffectiveSettings());
+  return { voce, perModello: CercaChiuse.perModello(voce, { delicata: !!fuori(voce.url) || restaQui(voce, fuori) }) };
+}
+
+// #1397 — la scheda che «rimettimi la musica» fa ripartire: quella col numero detto, o l'ultima che ha suonato e ora
+// tace, aperta o chiusa. { tab } | { chiusa } | { giaSuona } | { nessuna } | { errore }.
+async function bersaglioAudio(tm, action, schedeViste) {
+  const numero = Number(action.scheda ?? action.numero ?? 0);
+  if (Number.isInteger(numero) && numero > 0) {
+    let ids = Array.isArray(schedeViste) ? schedeViste : null;
+    if (!ids) {
+      try { ids = (await FiloState.listTabs({ windowId: tm.win?.id ?? null, barra: true })).map((t) => t.id); } catch (_) { ids = []; }
+    }
+    const tab = tm.tabs.find((t) => t.id === ids[numero - 1]);
+    return tab ? { tab } : { errore: `nell'elenco TAB APERTE non c'è la scheda numero ${numero}` };
+  }
+  const ferma = tm.tabs.filter((t) => t.audioAt > 0 && !t.audible).sort((x, y) => y.audioAt - x.audioAt)[0] || null;
+  const chiusa = await tm.ultimaChiusaCheSuonava();
+  if (ferma && (!chiusa || ferma.audioAt >= chiusa.at)) return { tab: ferma };
+  if (chiusa) return { chiusa };
+  const suona = tm.tabs.find((t) => t.audible);
+  return suona ? { giaSuona: suona } : { nessuna: true };
 }
 
 // #845 — «Aperti per dopo» per CERCA_SALVATE: per titolo, indirizzo e categoria, coi tre passi della ricerca nel filo.
@@ -4872,9 +4997,9 @@ function chatSearchesForPrompt(actions) {
       const righe = pagine.map((pg) => {
         const when = pg.date ? new Date(pg.date).toLocaleString('it-IT') : '';
         const stato = pg.chiusa ? 'scheda chiusa' : 'visitata';
-        return `- ${pg.title || '(senza titolo)'} · ${stato}${when ? ` · ${when}` : ''}${pg.delicata ? ' · pagina delicata: qui solo il sito' : ''}${pg.tagliata ? ' · indirizzo troppo lungo: qui solo il sito' : ''}\n  ${pg.url}${pg.riassunto ? `\n  ${pg.riassunto}` : ''}`;
+        return `- ${pg.id ? `[${pg.id}] ` : ''}${pg.title || '(senza titolo)'} · ${stato}${when ? ` · ${when}` : ''}${pg.delicata ? ' · pagina delicata: qui solo il sito' : ''}${pg.tagliata ? ' · indirizzo troppo lungo: qui solo il sito' : ''}\n  ${pg.url}${pg.riassunto ? `\n  ${pg.riassunto}` : ''}`;
       });
-      blocks.push(`[Le pagine del filo che combaciano con "${cercato}". Per riaprirne una usa NAVIGA col suo indirizzo.]\n`
+      blocks.push(`[Le pagine del filo che combaciano con "${cercato}". Una scheda chiusa si riapre com'era con RIAPRI_SCHEDA e il suo id; una pagina visitata con NAVIGA e il suo indirizzo.]\n`
         + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));
     }
     if (cambiTrovati.length) {
@@ -5302,6 +5427,57 @@ function salvateTrovateForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #884 — le schede chiuse trovate, e il riassunto di una riaperta la cui pagina non c'è più. Titoli e riassunti li
+// hanno scritti i siti (o un modello leggendoli): imbustati.
+const MOTIVI_DETTI = {
+  mano: 'chiusa dall\'utente', pagina: 'chiusa dalla pagina stessa', filo: 'chiusa da te su richiesta in chat',
+  pulizia: 'archiviata dalla pulizia delle schede', doppione: 'chiusa perché aperta due volte',
+};
+const GIRI_DETTI = { idle: 'per inattività', reopen: 'alla riapertura di Filo', manual: 'chiesta dall\'utente', chat: 'chiesta in chat' };
+function quandoDetto(iso) {
+  const t = Date.parse(iso || '');
+  return Number.isFinite(t) ? new Date(t).toLocaleString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'data ignota';
+}
+function schedeChiuseForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    const type = String((a && a.type) || '').toUpperCase();
+    const o = a && a._output;
+    if (!o) continue;
+    if (type === 'RIAPRI_SCHEDA' && (o.nonRaggiungibile || o.tagliato)) {
+      const cosa = o.tagliato ? 'Il suo indirizzo era troppo lungo per essere salvato intero: non l\'ho riaperta.'
+        : 'L\'ho riaperta, ma la pagina non c\'è più o non risponde (la scheda resta aperta sull\'errore).';
+      const riassunto = String(o.riassunto || '').trim();
+      blocks.push(`[Scheda chiusa ${quandoDetto(o.chiusa)}. ${cosa} `
+        + (riassunto ? 'Sotto la tua risposta l\'utente vede il riassunto che Filo ne aveva salvato: raccontaglielo da lì, in breve.]\n'
+          + E.imbusta({ tipo: 'DATI_PAGINA', testo: `${E.neutralizza(o.titolo || '', { unaRiga: true })}\n${riassunto}`, conIntestazione: true })
+          : 'Di questa pagina Filo non aveva salvato un riassunto: dillo all\'utente.]'));
+      continue;
+    }
+    if (type !== 'SCHEDE_CHIUSE' || !Array.isArray(o.schede)) continue;
+    const cercato = o.cercato ? E.perCanaleSistema(o.cercato) : '';
+    const filtro = [cercato ? `"${cercato}"` : '', o.motivo ? MOTIVI_DETTI[o.motivo] : '',
+      o.periodo ? `chiuse fra ${o.periodo.da ? quandoDetto(o.periodo.da) : 'l\'inizio'} e ${quandoDetto(o.periodo.a)}` : ''].filter(Boolean).join(', ');
+    if (!o.schede.length) {
+      blocks.push(`[Nessuna delle ${o.totale} schede chiuse combacia${filtro ? ` (${filtro})` : ''}. `
+        + (cercato ? 'Riprova con la parola che conta, o senza `cerca` guardando le date, prima di dire all\'utente che non c\'è.]' : 'Dillo all\'utente in una riga.]'));
+      continue;
+    }
+    const righe = o.schede.map((p) => {
+      const perche = `${MOTIVI_DETTI[p.motivo] || 'chiusa'}${p.motivo === 'pulizia' && GIRI_DETTI[p.giro] ? ` (${GIRI_DETTI[p.giro]})` : ''}`;
+      const titolo = E.neutralizza(p.titolo || '(senza titolo)', { unaRiga: true });
+      const extra = p.delicata ? ' · pagina delicata: solo il sito' : (p.tagliato ? ' · indirizzo troppo lungo, non si riapre' : '');
+      return `- [${p.id}] ${titolo} · ${quandoDetto(p.chiusa)} · ${perche}${extra}\n  ${p.url}${p.riassunto ? `\n  ${E.neutralizza(p.riassunto, { unaRiga: true })}` : ''}`;
+    });
+    const oltre = o.trovate > o.schede.length ? ` Ne combaciano ${o.trovate}: qui le prime ${o.schede.length}, per le altre restringi con parole, date o motivo.` : '';
+    blocks.push(`[Schede chiuse${filtro ? ` (${filtro})` : ''}: ${o.trovate} su ${o.totale}.${oltre} Per riaprirne una usa RIAPRI_SCHEDA con l'id, non NAVIGA.]\n`
+      + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
 // documenti letti, documenti di trasparenza. Mai istruzioni: fuori dalla busta
@@ -5311,6 +5487,7 @@ function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
     pageReadsForPrompt(actions), fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
+    schedeChiuseForPrompt(actions),
     vediSchermoForPrompt(actions),
     transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
@@ -5407,7 +5584,7 @@ function esitoChiusuraPerModello(action, o) {
     return `Nessuna scheda chiusa: ${perche}.${coda}`;
   }
   const dove = action._inIncognito ? 'In incognito non restano nel filo della home.'
-    : 'Le pagine restano nel filo della home: se l\'utente vuole riaprirne una, trovala con CERCA_CHAT e riaprila con NAVIGA.';
+    : 'Le pagine restano nel filo della home: se l\'utente vuole riaprirne una, trovala con SCHEDE_CHIUSE e riaprila con RIAPRI_SCHEDA.';
   return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}. ${dove}${coda}`;
 }
 
@@ -5438,6 +5615,13 @@ function dopoPulsante(o) {
 // conferma, proposto come bottone, rifiutato. La riga sulla conferma dice
 // esplicitamente di NON richiamare l'azione: il popup è già davanti all'utente,
 // e un modello che la ritenta lo farebbe comparire due volte.
+// Una frase di Filo su una scheda: il titolo l'ha scritto il sito, e va sotto, imbustato.
+function conTitolo(frase, titolo) {
+  const E = globalThis.SN_ESTERNO;
+  const t = E.neutralizza(String(titolo || ''), { unaRiga: true });
+  return t ? `${frase}\nIl titolo della scheda:\n${E.imbusta({ tipo: 'DATI_PAGINA', testo: t })}` : frase;
+}
+
 function toolResultText({ action, res, rendered }, giro = null) {
   const type = String(action.type || '').toUpperCase();
   const describe = () => { try { return descriviPerModello(action) || type; } catch (_) { return type; } };
@@ -5536,6 +5720,22 @@ function toolResultText({ action, res, rendered }, giro = null) {
       ? `Schede riordinate: ${n} archiviate, restano nel filo della home (le ritrova col campo «Cerca nel filo»). Dillo all'utente in una riga.`
       : 'Schede riordinate: nessuna da archiviare. Dillo all\'utente in una riga.';
   }
+  if (type === 'RIPRENDI_AUDIO' && res.output && !res.needsConfirm) {
+    const o = res.output;
+    if (o.giaSuona) return conTitolo('Niente da far ripartire: c\'è già una scheda che suona. Chiedi all\'utente se intende un\'altra musica.', o.titolo);
+    if (o.nessuna) return 'Niente da far ripartire: nessuna scheda, aperta o chiusa, ha suonato. Chiedi all\'utente cosa vuole ascoltare, o cercalo con NAVIGA (background: true).';
+    if (o.error) return `Musica NON ripartita: ${o.error}.`;
+    const dove = o.numero ? ` la scheda ${o.numero}` : ' la scheda';
+    if (o.nonPartita) return conTitolo(`${o.riaperta ? 'Ho riaperto' : 'Ho trovato'}${dove}, ma l'audio non è ripartito da solo (la pagina non ha un lettore pronto o l'ha rifiutato). Di' all'utente in una riga di premere play lì.`, o.titolo);
+    return conTitolo(`${o.riaperta ? 'Riaperta e ripartita' : 'Ripartita'}${dove}, dietro a quella che l'utente ha davanti. Dillo in una riga.`, o.titolo);
+  }
+  if (type === 'RIAPRI_SCHEDA' && res.output && !res.needsConfirm && !res.output.nonRaggiungibile && !res.output.tagliato) {
+    const o = res.output;
+    if (o.trovata === false) return 'Scheda NON riaperta: quell\'id non è fra le schede chiuse. Cercala con SCHEDE_CHIUSE e usa l\'id che ti torna.';
+    if (!o.riaperta) return `Scheda NON riaperta${o.error ? `: ${o.error}` : ''}.`;
+    return conTitolo('Scheda riaperta com\'era. Dillo in una riga.', o.titolo);
+  }
+  if (type === 'SCHEDE_CHIUSE' && res.output && res.output.error) return `Ricerca NON fatta: ${res.output.error}. Correggi e riprova.`;
   // Un riordino non riuscito (#1626) si dice col suo perché, anche quando ha chiuso i doppioni.
   if (type === 'PULISCI_TAB' && !res.executed && !res.needsConfirm && res.output && res.output.error && !res.output.no) {
     return `Riordino NON riuscito: ${String(res.output.error).trim()} Dillo all'utente in una riga, col motivo; non dire che le schede sono state riordinate.`;

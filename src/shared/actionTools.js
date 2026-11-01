@@ -209,7 +209,7 @@
     // Chiedere subito il testo intero di otto chat riempirebbe il contesto di
     // roba che non serve.
     CERCA_CHAT: {
-      description: 'Cerca in tutto il filo, salvato sul computer dell\'utente: le conversazioni con te di ogni scheda e di ogni giorno (anche quelle nell\'Editor, nei Mazzi e nell\'Aiuto sopra un sito), le pagine visitate (anche il contenuto delle schede chiuse) e i cambi di impostazioni, aspetto, sveglie e zoom. Usalo per ciò che non hai già davanti: una chat di giorni fa ("riprendi la discussione di lunedì sulla coscienza", "cosa mi avevi detto su X?"), una pagina ("quella pagina sulle orche che ho chiuso ieri": poi la riapri con NAVIGA e il suo indirizzo), un cambio da rimettere com\'era (ANNULLA_CAMBIO con l\'id). Due passi per le chat: con `query` ti tornano chat, pagine e cambi che combaciano; poi, se ti serve leggere una chat per intero, richiamalo con `id`. Le conversazioni che l\'utente ha nascosto tornano a parte, solo col nome: quelle che combaciano, o tutte se la `query` è vuota o le chiede («quali chat ho nascosto?»). Sola lettura: non modifica e non cancella niente.',
+      description: 'Cerca in tutto il filo, salvato sul computer dell\'utente: le conversazioni con te di ogni scheda e di ogni giorno (anche quelle nell\'Editor, nei Mazzi e nell\'Aiuto sopra un sito), le pagine visitate (anche il contenuto delle schede chiuse) e i cambi di impostazioni, aspetto, sveglie e zoom. Usalo per ciò che non hai già davanti: una chat di giorni fa ("riprendi la discussione di lunedì sulla coscienza", "cosa mi avevi detto su X?"), una pagina ("quel sito di ricette che ho visto lunedì": poi la apri con NAVIGA e il suo indirizzo; una scheda chiusa si riapre com\'era con RIAPRI_SCHEDA e il suo id, e si cerca anche per data e motivo con SCHEDE_CHIUSE), un cambio da rimettere com\'era (ANNULLA_CAMBIO con l\'id). Due passi per le chat: con `query` ti tornano chat, pagine e cambi che combaciano; poi, se ti serve leggere una chat per intero, richiamalo con `id`. Le conversazioni che l\'utente ha nascosto tornano a parte, solo col nome: quelle che combaciano, o tutte se la `query` è vuota o le chiede («quali chat ho nascosto?»). Sola lettura: non modifica e non cancella niente.',
       properties: {
         query: S('Le parole da cercare nel filo (argomento, nomi, titolo o sito di una pagina, frasi). Ometti solo quando passi `id`.'),
         id: S('L\'id di una chat trovata prima: la fa tornare per intero.'),
@@ -406,7 +406,7 @@
       risultato: true,
     },
     PULISCI_TAB: {
-      description: 'Valuta le schede aperte e archivia quelle non più utili (restano nel filo della home, dove l\'utente le ritrova cercandole). Se il livello di autonomia lo consente parte subito e ti torna quante ne ha archiviate; se no compare un bottone che l\'utente conferma. Usalo solo se l\'utente chiede di riordinare le schede e lascia a Filo la scelta; per chiudere quelle che dice lui c\'è CHIUDI_SCHEDE.',
+      description: 'Valuta le schede aperte e archivia quelle non più utili (restano nel filo della home, dove l\'utente le ritrova cercandole). Se il livello di autonomia lo consente parte subito e ti torna quante ne ha archiviate, o perché non è riuscito a valutarle; se no compare un bottone che l\'utente conferma. Usalo solo se l\'utente chiede di riordinare le schede e lascia a Filo la scelta; per chiudere quelle che dice lui c\'è CHIUDI_SCHEDE.',
       properties: {},
       required: [],
     },
@@ -419,7 +419,7 @@
       properties: {
         schede: { type: 'array', items: { type: 'integer' }, description: 'I numeri delle schede da chiudere, presi da TAB APERTE.' },
         sito: S('Chiude tutte le schede di questo sito ("youtube.com", o il nome "youtube").'),
-        tutte: B('true per chiudere tutte le schede della finestra tranne [QUESTA CHAT] e quelle in `tranne`.'),
+        tutte: B('true per chiudere tutte le schede della finestra tranne [QUESTA CHAT] e quelle in `tranne`. Con `sito` non serve: chiude solo le schede di quel sito.'),
         tranne: { type: 'array', items: { type: 'integer' }, description: 'Con `tutte` o `sito`: i numeri (da TAB APERTE) delle schede da lasciare aperte.' },
       },
       required: [],

@@ -354,6 +354,8 @@ test('ogni tipo che urlExfil.contestoDaAzioni tratta come non fidato ha una font
     CERCA_SALVATE: { _output: { pagine: [{ url: 'https://x.example/', title: 'x' }] } },
     APRI_SALVATA: { _output: { aperta: true, titolo: 'x', url: 'https://x.example/' } },
     CERCA_WEB: { query: 'x', _output: { results: [{ url: 'https://x.example/', title: 'x' }] } },
+    SCHEDE_CHIUSE: { _output: { schede: [{ id: 'a', url: 'https://x.example/', titolo: 'x', riassunto: 'y' }] } },
+    RIAPRI_SCHEDA: { _output: { riaperta: true, titolo: 'x', url: 'https://x.example/' } },
   };
   for (const t of tipi) {
     assert.ok(esempi[t], `manca l'esempio di ${t} in questa sentinella`);

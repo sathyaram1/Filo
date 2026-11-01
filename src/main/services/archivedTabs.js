@@ -10,6 +10,8 @@
   const { MISURA, taglia } = require('./misurePagine');
   const Disco = require('../shim/storage');
   const Copie = require('./copieIcone');
+  // Chi l'ha chiusa (#884): la regola sta in cercaSchedeChiuse.js.
+  const { motivoDi } = require('./cercaSchedeChiuse');
 
   // La chiave dove l'archivio stava in storage.json: serve solo a migrarlo.
   const CHIAVE_VECCHIA = global.SN_CONST.STORAGE_KEYS.ARCHIVED_TABS;
@@ -124,16 +126,6 @@
       if (!ultima || (Date.parse(t.closedAt) || 0) > (Date.parse(ultima.closedAt) || 0)) ultima = t;
     }
     return ultima;
-  }
-
-  // Chi l'ha chiusa (#884): 'mano', 'pagina' (la pagina stessa o un crash), 'filo' (chiesto in chat), 'pulizia' (il
-  // riordino o l'inattività), 'doppione'. Le voci di prima non lo hanno: si legge dal `reason` di allora.
-  const MOTIVI = ['mano', 'pagina', 'filo', 'pulizia', 'doppione'];
-  function motivoDi(t) {
-    if (t && MOTIVI.includes(t.motivo)) return t.motivo;
-    const r = t && t.reason;
-    if (!r || r === 'manual') return t && t.chiusaDaSola ? 'pagina' : 'mano';
-    return r === 'duplicato' ? 'doppione' : 'pulizia';
   }
 
   // Archivia una tab chiusa. `meta` contiene i campi catturati al momento della
@@ -316,6 +308,6 @@
 
   global.SN_ARCHIVED_TABS = {
     list, listMeta, ultimaPer, archive, update, remove, removeMany, dimenticaPagine, clear, importa, aggiornaIcone,
-    suEntrate, suUscite, cartella, motivoDi, MOTIVI,
+    suEntrate, suUscite, cartella,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
