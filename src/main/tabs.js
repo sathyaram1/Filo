@@ -438,6 +438,8 @@ class TabManager {
     // Incognito: sessione effimera e nessun ripristino su disco. Lo storage
     // filo:// è già coperto a monte dall'overlay in RAM dello shim.
     this.incognito = !!incognito;
+    // Finché non ha letto la sessione salvata non la scrive: chiuso Filo all'avvio, le schede di ieri si perdevano.
+    this._sessioneDaLeggere = !this.incognito;
     this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
