@@ -416,6 +416,28 @@ test('le pagine cancellate escono dai messaggi già mandati, dal messaggio dopo'
   assert.match(tutto, /Orcinus orca - Wikipedia/, 'con la pagina cancellata se ne sono andate anche le altre');
 }));
 
+test('un sito diventato delicato dopo il messaggio: dal messaggio dopo i suoi titoli escono anche da quelli già mandati', async () => {
+  const prima = globalThis.SN_DELICATE;
+  const delicati = new Set();
+  globalThis.SN_DELICATE = { filtro: async () => (url) => (delicati.has(new URL(url).hostname) ? 'utente' : null) };
+  try {
+    const f = azzera();
+    await turno({ testo: 'ciao', minutiFa: 30 });
+    await f.registraVisita({ url: 'https://clinica.example/esito', titolo: 'ESITO-ESAME', ts: fa(27) });
+    await f.registraVisita({ url: 'https://it.wikipedia.org/wiki/Orcinus_orca', titolo: 'Orcinus orca - Wikipedia', ts: fa(26) });
+    const due = await turno({ testo: 'cosa vuol dire?', minutiFa: 20 });
+    assert.match(testoDi(due.messages.at(-1)), /ESITO-ESAME/);
+    const tre = await turno({ testo: 'ok', minutiFa: 15 });
+    assert.equal(json(tre.messages.slice(0, due.messages.length)), json(due.messages), 'senza cambi il messaggio di prima si riscrive');
+    delicati.add('clinica.example');
+    const quattro = await turno({ testo: 'grazie', minutiFa: 10 });
+    const tutto = quattro.messages.filter((m) => m.role !== 'system').map(testoDi).join('\n');
+    assert.doesNotMatch(tutto, /ESITO-ESAME/, 'il titolo della pagina delicata resta davanti al modello');
+    assert.match(tutto, /clinica\.example: 1 pagina \(delicata: qui solo il sito\)/);
+    assert.match(tutto, /Orcinus orca - Wikipedia/);
+  } finally { globalThis.SN_DELICATE = prima; }
+});
+
 test('il blocco delle pagine: tre titoli per sito, «fra cui» se ne restano fuori, oltre i trenta siti il numero di quelle che mancano', () => {
   const t0 = Date.parse('2026-10-31T10:00:00Z');
   const ts = (min) => new Date(t0 + min * 60000).toISOString();
