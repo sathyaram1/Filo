@@ -1056,7 +1056,7 @@ if (isMain) {
       console.error(`RIFIUTATO: ${soloConStato.join(' ')} vale solo insieme a uno stato (<n> <stato> "nota"): senza, non lo scriverei — non ho toccato niente.`);
       process.exit(1);
     }
-    const comandi = [['--frase'], ['--solo-locale', '--non-locale', '--serve-locale'], ['--aspetta', '--aspetta-niente']]
+    const comandi = [['--frase'], ['--solo-locale', '--non-locale', '--serve-locale'], ['--aspetta', '--aspetta-anche', '--aspetta-niente']]
       .map((g) => g.find((o) => argv.includes(o))).filter(Boolean);
     if (comandi.length > 1) {
       console.error(`RIFIUTATO: ${comandi.join(' e ')} sono due comandi: lancia un comando per ciascuno — non ho toccato niente.`);
