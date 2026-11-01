@@ -320,7 +320,7 @@
     if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
     try {
       if (DRAFT_KEY) chrome.storage.local.get([DRAFT_KEY]).then((r) => {
-        const saved = r?.[DRAFT_KEY];
+        const saved = inVolo.has(r?.[DRAFT_KEY]) ? '' : r?.[DRAFT_KEY];
         if (activeRoot !== root) return;
         if (saved && !textEl.value) textEl.value = saved;
         else if (saved && proposta && textEl.value === proposta && !saved.includes(proposta)) {
