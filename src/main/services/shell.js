@@ -419,9 +419,9 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
       const code = codeStr === '' ? 0 : (parseInt(codeStr, 10) || 0);
       if (cwdStr) session.cwd = cwdStr;
       const cur = session.current;
-      session.current = null;
-      if (cur && cur.cb.onExit) cur.cb.onExit({ code, cwd: session.cwd });
-      pump();
+      inAttesa = { code, cwd: session.cwd, timer: null };
+      if (cfg.fineErr && cur && !cur.errFinito) inAttesa.timer = setTimeout(chiudiComando, ATTESA_ERR_MS);
+      else chiudiComando();
       return;
     }
 
