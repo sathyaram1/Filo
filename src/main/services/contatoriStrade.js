@@ -111,7 +111,8 @@ function crea(dip = {}) {
     davanti.set(finestra, { scheda, pagina: pag, t0: adesso(), misura, incognito: !!incognito });
   }
   function lasciata(v) {
-    if (v.misura) scrivi((ora) => T.registraVista(ora, v.pagina, adesso() - v.t0), v.incognito);
+    const ms = adesso() - v.t0;
+    if (v.misura) scrivi((ora) => T.registraVista(ora, v.pagina, ms), v.incognito);
     const a = attese.get(v.scheda);
     if (a && a.tasto === 'ctrl_l' && v.pagina === 'newtab') fineAttesa(v.scheda, !a.scritto);
   }

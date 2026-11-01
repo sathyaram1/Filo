@@ -353,7 +353,7 @@ test('il tempo in vista vale per la pagina appena aperta, la prima volta che sta
 test('le pagine e il main mandano solo nomi: nessun campo porta un indirizzo, un testo o un host', () => {
   const content = leggi('src/content/content.js') + leggi('src/content/actions.js') + leggi('src/preload/page-preload.js');
   for (const m of content.matchAll(/misura: '(strada|a-vuoto|menu-nativo|contesto-box)'([^}]*)\}/g)) {
-    const campi = [...m[2].matchAll(/(\w+):/g)].map((x) => x[1]);
+    const campi = [...m[2].matchAll(/(\w+): /g)].map((x) => x[1]);
     for (const c of campi) assert.ok(['azione', 'via', 'comando', 'motivo', 'voce', 'bandiere'].includes(c), `${m[1]}: ${c}`);
   }
   const handler = leggi('src/main/services/handlers/contatori.js');
