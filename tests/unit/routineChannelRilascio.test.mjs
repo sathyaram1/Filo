@@ -234,7 +234,7 @@ test('troppo grande e poi malformato sul listino: arriva quello snello senza lis
 // SPEC-MANUTENTORE § 6: falliti e attese escono dal rapporto e vanno nei campi che il server tiene sul biglietto
 // (strumentiFalliti, attese); un server che non li conosce riceve tutto il resto.
 const conDati = {
-  ...RAPPORTO, listino: '2026-10-06', falliti: [{ strumento: 'Bash', errore: 'exit 1', dopo: 'riprovato uguale' }],
+  ...RAPPORTO, listino: '2026-10-06', falliti: [{ strumento: 'Bash', errore: 'exit 1', dopo: 'riprovato uguale' }, { strumento: 'Bash', cosa: 'Run spec salva', errore: 'exit 1: ✘ salva' }],
   attese: [{ strumento: 'Bash', cosa: 'Run unit tests', s: 240 }, { strumento: 'Read', cosa: '', s: 30 }], atteseOltre30: 1,
 };
 const conCampi = (b) => 'strumentiFalliti' in b || 'attese' in b;
