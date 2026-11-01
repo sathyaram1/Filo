@@ -703,8 +703,8 @@
     attachBtn.addEventListener('click', (e) => { if (e.isTrusted) { try { fileInput.click(); } catch (_) {} } });
     fileInput.addEventListener('change', async () => {
       const picked = Array.from(fileInput.files || []);
-      for (const f of picked) await addAttachment(f);
       fileInput.value = '';
+      await allega(picked);
     });
 
     // Invio: solo dal clic dell'utente sul tasto (#1071).
