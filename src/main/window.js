@@ -37,14 +37,14 @@ function onFinestraNormale(cb) { if (typeof cb === 'function') osservatoriFinest
 let inChiusura = false;
 try { require('electron').app.on('before-quit', () => { inChiusura = true; }); } catch (_) {}
 
-// Suono e pulsante che ferma vivono in una finestra che la scadenza la vede, e
-// non è detto che ce ne sia una: senza garanzia il timer resta vivo e muto.
 function finestraNormaleViva() {
   return BrowserWindow.getAllWindows().find((w) => {
     try { return !w.isDestroyed() && !!w._filoTabs && !w._filoIncognito; } catch (_) { return false; }
   }) || null;
 }
 
+// Suono e pulsante che ferma vivono in una finestra che la scadenza la vede, e
+// non è detto che ce ne sia una: senza garanzia il timer resta vivo e muto.
 function assicuraFinestraNormale() {
   const esistente = finestraNormaleViva();
   if (esistente) return esistente;
