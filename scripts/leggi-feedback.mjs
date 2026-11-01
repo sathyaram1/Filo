@@ -242,7 +242,7 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
 }
 
 async function main(argv) {
-  if (argv.length !== 1 || argv[0].startsWith('--')) { console.error('USO: npm run feedback:leggi -- <numero|id>'); return 1; }
+  if (argv.length !== 1 || argv[0].startsWith('--')) { console.error('USO: npm run feedback:leggi -- <numero|id>   (testo, allegati e attese, ognuna col suo stato)'); return 1; }
   try {
     const bearer = await acquireBearer();
     const r = await risolviFeedback(argv[0], { bearer, base: FIRESTORE_BASE });
