@@ -92,6 +92,13 @@ lo vede:
   sul repo pubblico a ogni modifica. Quello che produce lo consegna al server
   come dati. Un canale che non passa dal server resta chiuso, anche uno nuovo.
   È l'unico ambiente a cui il server consegna testo riservato (§ 5.1);
+- **in cloud, l'ambiente a rete aperta** (#2013, decisione dell'owner del
+  01/11: «filo compiti», separato dalle sue sedi e senza i suoi segreti) ha
+  la rete aperta, quindi il server non sa cosa entra: i suoi biglietti
+  nascono sporchi per costruzione e prendono solo i compiti a cui lo sporco
+  non toglie niente (§ 5.2). Mai un lavoro su un feedback, nemmeno la
+  verifica o il controllo di sicurezza, mai un lavoro server, mai testo
+  riservato, compresa la domanda di fine turno del manutentore;
 - **in locale:** un gancio sporca il biglietto dopo ogni strumento, tranne un
   elenco chiuso di quelli che non portano dentro niente da fuori (la shell, le
   ricerche nel disco, le scritture, i sotto-agenti locali, i compiti); uno
