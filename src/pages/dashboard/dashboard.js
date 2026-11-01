@@ -509,13 +509,19 @@
       const isUser = m.role === 'user';
       const text = String(m.text || '');
       const types = Array.isArray(m.actions) ? m.actions : [];
+      // #778 — di una finestra guardata l'archivio tiene il nome: l'immagine e quello che c'era non si conservano.
+      const guardate = !isUser && Array.isArray(m.guardate) ? m.guardate.filter((n) => typeof n === 'string' && n.trim()) : [];
+      // #1294 — com'è andata ogni azione: le righe e i bottoni dei file stanno nella bolla, come nella risposta in diretta.
+      const esiti = !isUser && Array.isArray(m.esiti) ? m.esiti.filter((v) => !(v && v.type === 'VEDI_SCHERMO' && guardate.length)) : [];
+      const archiviati = esiti.length ? Att.esitiArchiviati(esiti) : { righe: null, nota: null };
       // Finché Filo resta aperto le foto mandate stanno in memoria per il modello (#1166): tornano anche a schermo.
       const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
-      if (text.trim() || fotoViste.length) {
+      if (text.trim() || fotoViste.length || archiviati.righe) {
         const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
         if (isUser && Array.isArray(m.schede) && m.schede.length && window.SN_SCHEDE_IN_CHAT) {
           window.SN_SCHEDE_IN_CHAT.nellaBolla(b, text, m.schede, azioniGettone);
         }
+        if (archiviati.righe) b.appendChild(archiviati.righe);
         if (m.spontaneo) b.dataset.spontaneo = '1';
         fotoViste.forEach((src, i) => {
           const img = document.createElement('img');
@@ -550,15 +556,14 @@
           : `${perse} ${altre ? 'altre ' : ''}immagini, non conservate`;
         metti(nota);
       }
-      if (!isUser && types.length) {
+      if (archiviati.nota) metti(archiviati.nota);
+      else if (!isUser && types.length && !m.esiti) {
         const note = document.createElement('div');
         note.className = 'dash-bubble-note';
         note.dataset.replay = '1';
         note.textContent = Att.summarizeActivity(types, false);
         metti(note);
       }
-      // #778 — di una finestra guardata l'archivio tiene il nome: l'immagine e quello che c'era non si conservano.
-      const guardate = !isUser && Array.isArray(m.guardate) ? m.guardate.filter((n) => typeof n === 'string' && n.trim()) : [];
       for (const nome of guardate) {
         const nota = document.createElement('div');
         nota.className = 'dash-bubble-note';
@@ -577,12 +582,12 @@
         if (m.chat) n.dataset.chat = m.chat;
       }
       if (m.key && nodi[0]) nodi[0].dataset.key = m.key;
-      if (storia) storia.push(rigaDiStoria(m, { quante, guardate, types }));
+      if (storia) storia.push(rigaDiStoria(m, { quante, guardate, types, esiti: Array.isArray(m.esiti) ? m.esiti : [] }));
     }
   }
 
   // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
-  function rigaDiStoria(m, { quante, guardate, types }) {
+  function rigaDiStoria(m, { quante, guardate, types, esiti = [] }) {
     const text = String(m.text || '');
     if (m.role === 'user') {
       return {
@@ -596,6 +601,7 @@
       ...(Array.isArray(m.linkDaConfermare) && m.linkDaConfermare.length ? { linkDaConfermare: m.linkDaConfermare } : {}),
       ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
       ...(m.spontaneo ? { spontaneo: true } : {}),
+      ...(esiti.length ? { esiti } : {}),
       actions: [...types.filter((t) => !(t === 'VEDI_SCHERMO' && guardate.length)).map((t) => ({ type: t })),
         ...guardate.map((nome) => ({ type: 'VEDI_SCHERMO', _output: { finestra: nome, nonConservata: true } }))],
     };
@@ -611,6 +617,7 @@
       quante: Number(m.images) || 0,
       guardate: m.role !== 'user' && Array.isArray(m.guardate) ? m.guardate.filter((n) => typeof n === 'string' && n.trim()) : [],
       types: Array.isArray(m.actions) ? m.actions : [],
+      esiti: m.role !== 'user' && Array.isArray(m.esiti) ? m.esiti : [],
     }));
     chiudiRipresa();
     aggiornaTasto();
