@@ -2802,7 +2802,7 @@ async function eseguiAzioneFilo(action, {
     const detto = String(action.dominio ?? action.domain ?? action.sito ?? '').trim();
     const davanti = detto ? '' : ((targetWebTab(sender).tab || {}).url || '');
     try {
-      if (type === 'TIENI_APERTA') action._voce = SempreAperte.voceDa(detto || davanti);
+      if (type === 'TIENI_APERTA') action._voce = SempreAperte.voceDa(detto || davanti, { daScheda: !detto });
       else action._voci = await SempreAperte.daTogliere(detto || davanti);
     } catch (_) {}
     action._detto = detto || davanti;
