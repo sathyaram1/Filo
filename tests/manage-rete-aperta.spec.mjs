@@ -63,6 +63,8 @@ test('si vede: accesa, il suo tetto, cosa ha deciso il pacemaker e la sua pausa 
     await page.locator('#mgReteApertaBlock').scrollIntoViewIfNeeded();
     await page.locator('#mgReteApertaBlock').screenshot({ path: path.join('tests', '.shots', `rete-aperta-${tema}.png`) });
   }
+  // Il posto: fra le routine server e le sessioni in parallelo, nella stessa colonna.
+  await page.locator('#mgReteApertaBlock').locator('xpath=..').screenshot({ path: path.join('tests', '.shots', 'rete-aperta-colonna.png') });
 });
 
 test('si spegne e si riaccende dall’interruttore, e il tetto si salva da Salva e da Invio', async ({ openTab }) => {
