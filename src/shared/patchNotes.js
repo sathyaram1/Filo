@@ -94,6 +94,14 @@
       version: '0.2.259', date: '2026-11-02',
       features: [
         { testo: 'In cima al menu del tasto destro c\'è una fila di icone con le azioni dell\'elemento che hai sotto il mouse: grassetto, corsivo, collegamento ed evidenziatore sul testo che scrivi, Traduci e Cerca sul testo di una pagina, Salva e Chiedi a Filo su un\'immagine. Il «+» tiene le altre, e le icone le sposti trascinandole, anche dalla barra laterale.', segnalazione: 1434 },
+        { testo: '«Svuota l\'archivio» detto a Filo propone tutte le schede chiuse da togliere, senza doverle descrivere.', segnalazione: 1294 },
+      ],
+      fixes: [
+        { testo: 'Riaprendo una conversazione vedi com\'è andata ogni cosa che Filo ha fatto: cosa è riuscito, coi numeri, cosa no e perché. Tornano anche i bottoni dei file.', segnalazione: 1294 },
+        { testo: 'Una proposta che aspetta il tuo OK resta nella conversazione anche quando la riapri, e Filo si ricorda di averla fatta.', segnalazione: 1130 },
+        { testo: 'Se dai l\'OK a un\'azione che serviva per finire il lavoro, Filo va avanti da solo, senza aspettare che glielo scriva tu.', segnalazione: 1373 },
+        { testo: 'L\'OK dato a un bottone rimasto in una conversazione precedente resta in quella conversazione.', segnalazione: 1294 },
+        { testo: 'Chiusa una conversazione in una scheda, un\'altra scheda che la mostrava non ci scrive più dentro: il messaggio dopo ne apre una nuova.', segnalazione: 1443 },
       ],
     },
     {

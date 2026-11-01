@@ -30,6 +30,9 @@ function rispostaA(storia, testo) {
 const turniVuoti = (storia) => storia.filter((m) => m.role === 'assistant' && !(Array.isArray(m.tool_calls) && m.tool_calls.length)
   && (!String(typeof m.content === 'string' ? m.content : '').trim() || m.content === '(nessun testo)'));
 
+// Senza modalità terminale un comando non parte: un'azione che non riesce, col suo perché.
+const terminaleSpento = (app) => app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: false } }));
+
 const FEEDBACK = { id: 'f1', name: 'INVIA_FEEDBACK', arguments: '{"testo":"Il timer non suona.","titolo":"Timer muto"}' };
 
 test('#1130.2 una proposta ferma sulla conferma, senza testo, resta nella chat riaperta e nel contesto dopo un riavvio', async ({ app }) => {
@@ -69,6 +72,7 @@ test('#1130.2 una proposta ferma sulla conferma, senza testo, resta nella chat r
 test('#1294 riaperta, la chat racconta la cosa fatta e quella non riuscita col perché, e il modello lo legge', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
+  await terminaleSpento(app);
   await modelloFinto(app, [
     { toolCalls: [
       { id: 't1', name: 'TIMER', arguments: '{"secondi":300,"etichetta":"Pasta"}' },
@@ -119,6 +123,7 @@ test('#1373 un comando secco confermato non richiama il modello: il bottone dice
 test('#1373 dopo l\'OK che sblocca un passo rimasto indietro Filo riprende da solo, senza un «vai avanti»', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
+  await terminaleSpento(app);
   await modelloFinto(app, [
     { toolCalls: [
       { id: 'c1', name: 'ESEGUI_COMANDO', arguments: '{"comando":"echo ciao","spiegazione":"Scrivo ciao"}' },
