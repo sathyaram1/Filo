@@ -42,7 +42,8 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
   continuano da qui; una scheda che si chiude o si ricarica non è una chiusura voluta. La scheda la adotta (storico per il turno dopo), ma le bolle le ha già disegnate la coda.
   Chiusa apposta in una home, le altre che la stavano continuando la lasciano subito (l'annuncio `finita`, #1443.2).
 - **Com'è andata ogni azione** (#1294): la risposta archiviata porta `esiti`, una voce per azione (fatta coi numeri,
-  non riuscita col perché, ferma sulla conferma, il file del bottone), scritta da `src/shared/esitoAzione.js`. Riletta,
+  non riuscita col perché, ferma sulla conferma, il file del bottone), scritta da `src/shared/esitoAzione.js` con le
+  parole del diario in diretta (`src/shared/righeAttivita.js`, una tabella sola per la home e per l'archivio). Riletta,
   la bolla mostra quelle righe e i bottoni dei file, e il modello le legge; un OK dato dopo si aggiunge come voce nella
   conversazione dove era nato il bottone. Un turno senza niente da dire non va al modello. Sentinella:
   `tests/unit/esitiInArchivio.test.mjs`.
