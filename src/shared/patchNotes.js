@@ -28,8 +28,13 @@
       version: '0.2.256', date: '2026-11-01',
       features: [
         { testo: 'Anche sul Mac Filo mette in ordine le icone della Scrivania come gli chiedi, per nome, tipo, data o dimensione, e «annulla» le rimette dov\'erano. Ti dice che è fatto solo dopo aver controllato che siano davvero in ordine.', segnalazione: 1617 },
+        { testo: 'La barra laterale ha un lucchetto in cima: chiuso, la barra resta aperta accanto alla pagina, che si stringe per farle posto, anche dopo un riavvio. Lo trovi anche col tasto destro sulla barra, nelle Preferenze, con Ctrl+Alt+Shift+B (Cmd+Alt+Shift+B su Mac) o chiedendolo a Filo.', segnalazione: 1431 },
+        { testo: 'Puoi aprire e chiudere la barra laterale chiedendolo a Filo da qualunque chat, anche dall\'Aiuto su una pagina.', segnalazione: 1292 },
       ],
       fixes: [
+        { testo: 'Con la finestra non accostata al bordo dello schermo, chi si ferma sul suo bordo sinistro per allargarla non apre più la barra laterale: lì l\'attesa è un po\' più lunga.', segnalazione: 1292 },
+        { testo: 'A schermo intero la striscia sul bordo sinistro non resta più sopra il video. La barra si apre lo stesso fermandoti sul bordo o con la scorciatoia.', segnalazione: 871 },
+        { testo: 'Il primo suggerimento che compare passando sulle icone dopo l\'avvio arriva subito, come gli altri.', segnalazione: 871 },
         { testo: 'Filo non ti scrive più per uno screenshot o per un file che hai appena scaricato. Lo fa solo quando un download lungo finisce mentre non sei davanti a Filo, o quando ne parte uno mentre non c\'eri, e dice solo quale file è arrivato.', segnalazione: 1654 },
         { testo: 'Il correttore non segna più «Filo» e filo.red come errori, e nemmeno un indirizzo scritto senza https, come amazon.it.', segnalazione: 1655 },
         { testo: 'Una correzione del correttore non attacca più la parola a quella prima, come in «oggisono». Con l\'apostrofo curvo, come in «l’amico», il segno sta solo sulla parola sbagliata, e la correzione lascia l’apostrofo come l’hai scritto.', segnalazione: 1580 },

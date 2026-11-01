@@ -69,6 +69,8 @@ function ensureWin(parentWin) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Da nascosta risponde come da visibile: il primo fumetto non aspetta un processo in secondo piano (#871.4).
+      backgroundThrottling: false,
     },
   });
   // Il fumetto compare sotto il puntatore: se prendesse lui il mouse, la barra non saprebbe che il
@@ -79,9 +81,9 @@ function ensureWin(parentWin) {
   tipWin.webContents.once('did-finish-load', () => {
     tipReady = true;
     if (pendingShow) {
-      const { text, x, y } = pendingShow;
+      const { madre, text, x, y } = pendingShow;
       pendingShow = null;
-      doShow(parentWin, text, x, y);
+      if (madre && !madre.isDestroyed()) doShow(madre, text, x, y);
     }
   });
   // Col processo morto il fumetto non comparirebbe più: si butta, e il prossimo ne fa uno nuovo.
@@ -123,7 +125,7 @@ function showTooltip(parentWin, text, x, y) {
     if (mio !== giro || !parentWin || parentWin.isDestroyed()) return;
     ensureWin(parentWin);
     if (!tipReady) {
-      pendingShow = { text, x, y };
+      pendingShow = { madre: parentWin, text, x, y };
       return;
     }
     doShow(parentWin, text, x, y);
@@ -136,4 +138,10 @@ function hideTooltip() {
   pendingShow = null;
 }
 
-module.exports = { showTooltip, hideTooltip };
+// La finestra madre è pronta: il fumetto nasce adesso, così il primo passaggio dopo l'avvio non aspetta un processo
+// nuovo e compare come i successivi (#871.4, la regola del menu: #1090).
+function preparaSuggerimento(parentWin) {
+  if (parentWin && !parentWin.isDestroyed()) ensureWin(parentWin);
+}
+
+module.exports = { showTooltip, hideTooltip, preparaSuggerimento };

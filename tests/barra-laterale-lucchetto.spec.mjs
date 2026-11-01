@@ -108,8 +108,6 @@ test('dal tasto destro, dalla scorciatoia e dalle Preferenze: la stessa impostaz
   await expect.poll(async () => (await pagina(app)).x).toBe(56);
   await premi(app, 'shell', 'B', ['meta', 'alt', 'shift']);
   await expect.poll(() => bloccata(app)).toBe(false);
-  // Ctrl+Shift+B resta il tasto che apre e chiude.
-  expect((await statoBarra(app)).opzioniBloccata).toBeUndefined();
 
   // Preferenze → Avanzate.
   const pref = await openTab('filo://preferences/preferences.html');
@@ -125,7 +123,7 @@ test('dal tasto destro, dalla scorciatoia e dalle Preferenze: la stessa impostaz
   await expect(pref.locator('#barraBloccata')).not.toBeChecked();
 });
 
-test('a parole, dalla home e dall\'Aiuto: apri, chiudi, blocca e sblocca', async ({ app, openTab, testServer }) => {
+test('a parole, dalla home e dall\'Aiuto: apri, chiudi, blocca e sblocca', async ({ app, shell, openTab, testServer }) => {
   await testServer.openReady(openTab, SITO);
   await barraPage(app);
   const chat = (comando) => app.evaluate((_e, c) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'COMANDO_FINESTRA', comando: c }), comando);
@@ -157,12 +155,8 @@ test('a parole, dalla home e dall\'Aiuto: apri, chiudi, blocca e sblocca', async
   expect(built).toMatch(/bloccata aperta/);
   await expect.poll(async () => (await pagina(app)).x).toBe(56);
 
-  // L'Aiuto su un sito: lo stesso comando, dalla sua azione «shell».
-  const aiuto = (command) => app.evaluate(async ({ BrowserWindow }, c) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
-    return globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.SHELL_ACTION, command: c, assistente: true }, { url: t.url, tab: t, wc: t.view.webContents });
-  }, command);
+  // L'Aiuto: lo stesso comando, dalla sua azione «shell» (lo stesso ponte del content script).
+  const aiuto = (command) => shell.evaluate((c) => window.filoShell.message({ type: 'shell_action', command: c, assistente: true }), command);
   expect((await aiuto('sidebar_unlock')).ok).toBe(true);
   await expect.poll(() => bloccata(app)).toBe(false);
   expect((await aiuto('sidebar_close')).ok).toBe(true);

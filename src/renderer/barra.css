@@ -62,7 +62,7 @@ html, body {
 .striscia:hover::before, .striscia.spinge::before, .striscia.bordo::before { opacity: 1; width: 4px; }
 /* Filo ha risposto a pannello chiuso o ridotto (#1432): accesa e ferma, piena d'accento, finché la risposta non si apre. */
 .striscia.risposta::before { opacity: 1; width: 4px; background: var(--accent); }
-/* Nascosta da Preferenze, o a tutto schermo (#871.6): il bordo resta vivo, e la striscia si accende solo mentre la si spinge o c'è una risposta. */
+/* Nascosta da Preferenze o a tutto schermo (#871.6): il bordo resta vivo, e si accende solo spinta o con una risposta. */
 html.senza-striscia .striscia:not(.spinge):not(.bordo):not(.risposta)::before { opacity: 0; }
 html.aperta .striscia { pointer-events: none; }
 html.aperta .striscia::before { opacity: 0; }

@@ -32,6 +32,9 @@ const SONDA_LONTANO_MS = 150;
 const QUIETE_MS = 600;
 // Dopo un trascinamento dal menu la barra resta un attimo, per vedere dove è finita l'icona.
 const DOPO_POSA_MS = 900;
+// A finestra staccata dal bordo dello schermo la fascia è la presa per ridimensionarla (#1292): chi ci si ferma
+// la sta prendendo, e la spinta aspetta di più. Contro il bordo dello schermo resta l'attesa scelta.
+const ATTESA_STACCATA_MS = 450;
 // Le pagine elencate dal tasto destro su Indietro e Avanti; le altre si contano in fondo, non spariscono.
 const PAGINE_NEL_MENU = 15;
 
@@ -66,6 +69,15 @@ const PAGINE_DAL_MENU = {
   preferenze: 'filo://preferences/preferences.html',
   regola: 'filo://preferences/preferences.html#sec-barra',
 };
+
+// Staccata: subito a sinistra del suo bordo, all'altezza del puntatore, c'è ancora uno schermo dove il puntatore va.
+function staccataDalBordo(xBordo, y, schermi) {
+  const x = xBordo - 1;
+  return (Array.isArray(schermi) ? schermi : []).some((d) => {
+    const b = d && d.bounds;
+    return !!b && x >= b.x && x < b.x + b.width && y >= b.y && y < b.y + b.height;
+  });
+}
 
 const numero = (v, min = -10000, max = 10000) => Math.max(min, Math.min(max, Math.round(Number(v) || 0)));
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
@@ -161,6 +173,7 @@ class BarraLaterale {
     if (s === this.spazioPagina) return false;
     this.spazioPagina = s;
     try { this.tabs.layout(); } catch (_) { return false; }
+    this._invia();
     return true;
   }
 
@@ -171,13 +184,15 @@ class BarraLaterale {
     this.teneva = t;
     if (t) {
       this._ferma('uscita');
-      if (!this.aperta) this.apri('bloccata');
-      else if (this.motivo !== 'tasto') this.motivo = 'bloccata';
+      if (!this.aperta) { this.apri('bloccata'); return; }
+      if (this.motivo !== 'tasto') this.motivo = 'bloccata';
+    } else if (this.aperta && this.motivo !== 'tasto' && !this.dentro) {
+      this.chiudi();
       return;
+    } else if (this.aperta && this.motivo !== 'tasto') {
+      this.motivo = 'clic';
     }
-    if (!this.aperta || this.motivo === 'tasto') return;
-    if (this.dentro) this.motivo = 'clic';
-    else this.chiudi();
+    this._spingi();
   }
 
   blocca(v) { return this._scriviOpzioni({ bloccata: !!v }); }
@@ -423,7 +438,7 @@ class BarraLaterale {
       if (dove === 'bordo' && !fermo && this._mosso(punto)) {
         if (!this.bordoDal) this.bordoDal = Date.now();
         this._segnaBordo(true);
-        if (Date.now() - this.bordoDal >= this.opzioni.attesaMs) { this.apri('spinta'); return; }
+        if (Date.now() - this.bordoDal >= this._attesaSulBordo(punto)) { this.apri('spinta'); return; }
       } else {
         this._segnaBordo(false);
       }
@@ -431,6 +446,16 @@ class BarraLaterale {
       if (dove === 'lontano' && nellaPagina) return;
       this._sonda(dove === 'lontano' ? SONDA_LONTANO_MS : SONDA_MS);
     }, dopo);
+  }
+
+  // Solo dove la fascia è del sistema (finestra non massimizzata): lì si ridimensiona.
+  _attesaSulBordo(punto) {
+    const base = this.opzioni.attesaMs;
+    if (!punto || this._larghezzaChiusa() === STRISCIA) return base;
+    try {
+      const cb = this.win.getContentBounds();
+      return staccataDalBordo(cb.x, punto.y, require('electron').screen.getAllDisplays()) ? base + ATTESA_STACCATA_MS : base;
+    } catch (_) { return base; }
   }
 
   // Dopo un rilascio o una chiusura il bordo conta solo quando il puntatore si muove: chi finisce lì una
@@ -1302,4 +1327,4 @@ class BarraLaterale {
   }
 }
 
-module.exports = { BarraLaterale, STRISCIA, PANNELLO, COMANDI_CHAT };
+module.exports = { BarraLaterale, STRISCIA, PANNELLO, COMANDI_CHAT, ATTESA_STACCATA_MS, staccataDalBordo };

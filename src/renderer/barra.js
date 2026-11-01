@@ -97,6 +97,13 @@
     });
   }
   menuDi(striscia, { striscia: true });
+  // Il vuoto del pannello fra le icone dà le scelte della barra stessa (chiudi, lucchetto, regola), come la striscia.
+  pannello.addEventListener('contextmenu', (e) => {
+    if (!e.isTrusted || (e.target.closest && e.target.closest('.ico, .ora'))) return;
+    e.preventDefault();
+    nascondiSuggerimento();
+    api.menu({ striscia: true, x: Math.round(e.clientX), y: Math.round(e.clientY) });
+  });
 
   // ── suggerimenti ─────────────────────────────────────────────────────────
   // L'etichetta vive quanto il puntatore sull'icona, a barra aperta e con l'icona ferma (#1201):

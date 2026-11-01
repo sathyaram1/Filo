@@ -154,6 +154,14 @@ test('il tasto della barra è di Filo: riservato, con Cmd su Mac, e mai Ctrl+B',
   assert.equal(T.comandoBarra({ control: true, key: 'b', code: 'KeyB' }), false);
   assert.equal(T.comandoBarra({ control: true, shift: true, alt: true, key: 'B', code: 'KeyB' }), false);
   assert.equal(T.comandoBarra({ shift: true, key: 'B', code: 'KeyB' }), false);
+  // Il lucchetto (#1431): lo stesso tasto con Alt, mai confuso con quello che apre e chiude.
+  assert.equal(T.etichettaLucchettoBarra('darwin'), 'Cmd+Alt+Shift+B');
+  assert.equal(T.etichettaLucchettoBarra('win32'), 'Ctrl+Alt+Shift+B');
+  assert.equal(T.comandoLucchettoBarra({ control: true, shift: true, alt: true, key: 'B', code: 'KeyB' }), true);
+  assert.equal(T.comandoLucchettoBarra({ meta: true, shift: true, alt: true, key: '∫', code: 'KeyB' }), true);
+  assert.equal(T.comandoLucchettoBarra({ control: true, shift: true, key: 'B', code: 'KeyB' }), false);
+  assert.equal(T.comandoLucchettoBarra({ alt: true, shift: true, key: 'B', code: 'KeyB' }), false);
+  assert.ok(T.riservato('Ctrl+Alt+Shift+B', 'win32') && T.riservato('Cmd+Alt+Shift+B', 'darwin'));
 });
 
 // ── le regolazioni della barra (Preferenze → Avanzate, IMPOSTA_PREFERENZA, tasto destro sulla striscia) ──
@@ -163,10 +171,12 @@ const C = globalThis.SN_CONST;
 const P = globalThis.SN_PREF;
 
 test('le regolazioni della barra: un valore fuori dai limiti torna dentro, uno mancante prende il predefinito', () => {
-  assert.deepEqual(C.opzioniBarraLaterale(undefined), { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, schede: true });
-  assert.deepEqual(C.DEFAULT_SETTINGS.barraLaterale, { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, schede: true });
-  const o = C.opzioniBarraLaterale({ spinta: false, attesaMs: 5, uscitaMs: '99999', striscia: false, schede: false });
-  assert.deepEqual(o, { spinta: false, attesaMs: 100, uscitaMs: 5000, striscia: false, schede: false });
+  assert.deepEqual(C.opzioniBarraLaterale(undefined), { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, schede: true, bloccata: false });
+  assert.deepEqual(C.DEFAULT_SETTINGS.barraLaterale, { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, schede: true, bloccata: false });
+  const o = C.opzioniBarraLaterale({ spinta: false, attesaMs: 5, uscitaMs: '99999', striscia: false, schede: false, bloccata: true });
+  assert.deepEqual(o, { spinta: false, attesaMs: 100, uscitaMs: 5000, striscia: false, schede: false, bloccata: true });
+  // Il lucchetto (#1431) vale solo se scritto vero: un valore strano non spinge la pagina.
+  assert.equal(C.opzioniBarraLaterale({ bloccata: 'sì' }).bloccata, false);
   assert.equal(C.opzioniBarraLaterale({ attesaMs: 'boh' }).attesaMs, 250);
 });
 
@@ -174,6 +184,8 @@ test('a parole: le regolazioni della barra si scrivono, e un tempo fuori dai lim
   assert.deepEqual(P.buildPreferencePartial('barra_spinta', 'no').partial, { barraLaterale: { spinta: false } });
   assert.deepEqual(P.buildPreferencePartial('barra_striscia', 'nascondi').partial, { barraLaterale: { striscia: false } });
   assert.deepEqual(P.buildPreferencePartial('barra_schede', 'no').partial, { barraLaterale: { schede: false } });
+  assert.deepEqual(P.buildPreferencePartial('barra_bloccata', 'sì').partial, { barraLaterale: { bloccata: true } });
+  assert.deepEqual(P.buildPreferencePartial('tieni aperta la barra', 'no').partial, { barraLaterale: { bloccata: false } });
   assert.deepEqual(P.buildPreferencePartial('barra_attesa', '0,5 secondi').partial, { barraLaterale: { attesaMs: 500 } });
   assert.deepEqual(P.buildPreferencePartial('barra_uscita', '800 ms').partial, { barraLaterale: { uscitaMs: 800 } });
   assert.match(P.buildPreferencePartial('barra_attesa', '10 secondi').rifiuto, /10\.000 ms.*100 a 3\.000/);
@@ -182,7 +194,7 @@ test('a parole: le regolazioni della barra si scrivono, e un tempo fuori dai lim
   assert.deepEqual(P.buildPreferencePartial('barra_attesa', '1').partial, { barraLaterale: { attesaMs: 1000 } });
   // L'elenco che legge il modello le nomina tutte.
   const righe = P.righeDescrizione({ sistema: 'win32', shellPref: '' }).join('\n');
-  for (const k of ['barra_spinta', 'barra_striscia', 'barra_attesa', 'barra_uscita', 'barra_schede']) assert.ok(righe.includes(`• ${k}: `), k);
+  for (const k of ['barra_spinta', 'barra_striscia', 'barra_attesa', 'barra_uscita', 'barra_schede', 'barra_bloccata']) assert.ok(righe.includes(`• ${k}: `), k);
 });
 
 test('il manifesto non manda più l\'utente dove le voci della barra non ci sono più', () => {
@@ -275,4 +287,36 @@ test('una risposta da leggere: per scheda e per fonte, solo dalle fonti note, e 
   assert.equal(R.dimentica(tab), true);
   assert.equal(R.inAttesa(tab), false);
   assert.equal(R.segna(null, 'aiuto', true), false);
+});
+
+// #1292 — la fascia del sistema a finestra staccata dal bordo dello schermo è la presa per ridimensionarla: lì si aspetta
+// di più. Contro il bordo dello schermo (o al confine con niente) resta l'attesa scelta.
+test('staccata dal bordo dello schermo: a sinistra della finestra, all\'altezza del puntatore, c\'è ancora uno schermo', () => {
+  const { staccataDalBordo, ATTESA_STACCATA_MS } = require(join(ROOT, 'src', 'main', 'barraLaterale.js'));
+  const uno = [{ bounds: { x: 0, y: 0, width: 1920, height: 1080 } }];
+  assert.equal(staccataDalBordo(0, 500, uno), false, 'contro il bordo dello schermo');
+  assert.equal(staccataDalBordo(80, 500, uno), true, 'in mezzo allo schermo');
+  // Due schermi affiancati: sul secondo, contro il confine, il puntatore passa al primo.
+  const due = [...uno, { bounds: { x: 1920, y: 0, width: 1280, height: 720 } }];
+  assert.equal(staccataDalBordo(1920, 300, due), true);
+  // Il secondo schermo più alto del primo: sopra il primo, a sinistra non c'è niente.
+  const alti = [{ bounds: { x: 0, y: 200, width: 1920, height: 1080 } }, { bounds: { x: 1920, y: 0, width: 1280, height: 1600 } }];
+  assert.equal(staccataDalBordo(1920, 100, alti), false);
+  assert.equal(staccataDalBordo(80, 500, []), false);
+  assert.equal(staccataDalBordo(80, 500, null), false);
+  assert.ok(ATTESA_STACCATA_MS >= 300 && ATTESA_STACCATA_MS <= 1000);
+});
+
+test('ogni chat comanda la barra con gli stessi quattro comandi: la home, l\'Aiuto e il suo canale li conoscono tutti', () => {
+  const { COMANDI_CHAT } = require(join(ROOT, 'src', 'main', 'barraLaterale.js'));
+  assert.deepEqual(Object.keys(COMANDI_CHAT).sort(), ['sidebar', 'sidebar_close', 'sidebar_lock', 'sidebar_unlock']);
+  require(join(ROOT, 'src', 'shared', 'actionTools.js'));
+  const enumHome = globalThis.SN_ACTION_TOOLS.TOOLS.COMANDO_FINESTRA.properties.comando.enum;
+  const aiuto = readFileSync(join(ROOT, 'src', 'content', 'sidebar.js'), 'utf8');
+  const prompt = readFileSync(join(ROOT, 'src', 'shared', 'constants.js'), 'utf8');
+  for (const c of Object.keys(COMANDI_CHAT)) {
+    assert.ok(enumHome.includes(c), `la home non conosce ${c}`);
+    assert.match(aiuto, new RegExp(`'${c}'`), `l'Aiuto scarta ${c}`);
+    assert.match(prompt, new RegExp(`"${c}"`), `il prompt dell'Aiuto non nomina ${c}`);
+  }
 });
