@@ -313,19 +313,61 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
   proc.stderr && proc.stderr.on('data', (chunk) => {
     // stderr non passa dal protocollo a righe: si inoltra grezzo al comando corrente,
     // normalizzando solo i fine riga.
-    if (session.current && session.current.cb.onData) {
-      session.current.cb.onData({ chunk: String(chunk).replace(/\r\n/g, '\n'), stream: 'stderr' });
+    const testo = String(chunk).replace(/\r\n/g, '\n');
+    if (!cfg.fineErr) { emitErr(testo); return; }
+    errBuf += testo;
+    let m;
+    while ((m = ERR_RE.exec(errBuf))) {
+      emitErr(errBuf.slice(0, m.index));
+      errBuf = errBuf.slice(m.index + m[0].length);
+      stderrFinito(Number(m[1]));
     }
+    const tieni = segnoAMeta(errBuf);
+    emitErr(errBuf.slice(0, errBuf.length - tieni));
+    errBuf = errBuf.slice(errBuf.length - tieni);
   });
   proc.on('error', (err) => fatal(err.message || String(err)));
   proc.on('close', (uscita) => {
     session.dead = true;
     if (cfg.pulisci) cfg.pulisci();
+    const attesa = inAttesa;
+    if (attesa) { clearTimeout(attesa.timer); inAttesa = null; }
     const cur = session.current;
     session.current = null;
-    if (cur && cur.cb.onExit) cur.cb.onExit({ code: 0, cwd: session.cwd, chiusa: true, uscita });
+    if (cur && cur.cb.onExit) cur.cb.onExit(attesa ? { code: attesa.code, cwd: attesa.cwd } : { code: 0, cwd: session.cwd, chiusa: true, uscita });
     drainQueueErr('shell terminata');
   });
+
+  function emitErr(text) {
+    if (text && session.current && session.current.cb.onData) session.current.cb.onData({ chunk: text, stream: 'stderr' });
+  }
+
+  // Quanto della coda di stderr può essere l'inizio del segno: si trattiene finché non arriva il resto.
+  function segnoAMeta(buf) {
+    for (let k = Math.max(0, buf.length - ERR_PREFIX.length - 16); k < buf.length; k++) {
+      const t = buf.slice(k);
+      if (ERR_PREFIX.startsWith(t) || (t.startsWith(ERR_PREFIX) && /^\d*$/.test(t.slice(ERR_PREFIX.length)))) return buf.length - k;
+    }
+    return 0;
+  }
+
+  function stderrFinito(n) {
+    const cur = session.current;
+    if (!cur || cur.n !== n) return;
+    cur.errFinito = true;
+    if (inAttesa) chiudiComando();
+  }
+
+  function chiudiComando() {
+    const attesa = inAttesa;
+    if (!attesa) return;
+    clearTimeout(attesa.timer);
+    inAttesa = null;
+    const cur = session.current;
+    session.current = null;
+    if (cur && cur.cb.onExit) cur.cb.onExit({ code: attesa.code, cwd: attesa.cwd });
+    pump();
+  }
 
   // Quando la riga di "pronto" torna in output la sessione è operativa e si svuota la coda.
   try { proc.stdin.write(cfg.ready); } catch (_) {}
