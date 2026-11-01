@@ -41,14 +41,14 @@ const testo = (m) => (typeof m.content === 'string' ? m.content : (m.content || 
 
 test('r1 una pagina che finisce di caricarsi dopo il messaggio arriva al modello col messaggio dopo', async ({ app, openTab }) => {
   test.setTimeout(150_000);
-  // Una pagina col titolo subito e un'immagine che arriva dopo dieci secondi: il caricamento finisce dopo il messaggio.
+  // Una pagina col titolo subito e un riquadro che risponde dopo quaranta secondi: il caricamento finisce dopo il messaggio.
   const server = createServer((req, res) => {
-    if (req.url.startsWith('/lenta')) {
-      setTimeout(() => { res.writeHead(200, { 'Content-Type': 'image/gif' }); res.end(Buffer.from('R0lGODlhAQABAAAAACw=', 'base64')); }, 10_000);
+    if (req.url.startsWith('/lento')) {
+      setTimeout(() => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<p>fine</p>'); }, 40_000);
       return;
     }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end('<!doctype html><title>Orche che cacciano le foche</title><p>orche</p><img src="/lenta.gif">');
+    res.end('<!doctype html><title>Orche che cacciano le foche</title><p>orche</p><iframe src="/lento"></iframe>');
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   try {
