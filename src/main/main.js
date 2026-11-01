@@ -95,7 +95,7 @@ if (process.env.NODE_ENV === 'test') {
 try { require('./test-servizi-chiusi').chiudiServiziNeiTest(); } catch (_) {}
 
 const {
-  createMainWindow, revealWindow, assicuraFinestraNormale, onFinestraNormale,
+  createMainWindow, mostraFinestraNormale, onFinestraNormale, attendiAvvio, finestraNormaleViva,
 } = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
