@@ -265,7 +265,7 @@ test('Filo davanti col fuoco sulla barra delle schede: l’avviso compare subito
   await expect(home.locator('#input')).toBeVisible({ timeout: 10_000 });
   const idHome = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   const spento = await testServer.openReady(openTab, '<!doctype html><html><body><p>Un sito spento.</p></body></html>');
-  await fintoServitoDa(app, 'Azure');
+  await fintoServitoDa(app, 'DeepSeek');
   await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
     { type: 'update_settings', settings: { blocklist: ['127.0.0.1'] } },
     { tab: { id: 5, url: 'filo://preferences/preferences.html' }, url: 'filo://preferences/preferences.html' },
@@ -275,10 +275,10 @@ test('Filo davanti col fuoco sulla barra delle schede: l’avviso compare subito
   await finestraDavanti(app, true);
   expect((await spiega(app, 'EXPLAIN', 'nebbia1478')).ok).toBe(true);
   await spento.waitForTimeout(1000);
-  await expect(toastDi(spento, 'Azure'), 'sul sito spento l’avviso non si mostra').toHaveCount(0);
+  await expect(toastDi(spento, 'DeepSeek'), 'sul sito spento l’avviso non si mostra').toHaveCount(0);
   await paginaSenzaFuoco(app, home.url());
   await shell.evaluate((i) => window.filoShell.tabs.activate(i), idHome);
-  await expect(toastDi(home, 'Azure'), 'nella scheda scelta dalla barra').toHaveCount(1, { timeout: 5_000 });
+  await expect(toastDi(home, 'DeepSeek'), 'nella scheda scelta dalla barra').toHaveCount(1, { timeout: 5_000 });
 });
 
 test('«Segnala» nell’avviso apre «Invia feedback» già scritto, e in Cronologia l’host si trova cercandolo', async ({ app, shell, openTab }) => {
