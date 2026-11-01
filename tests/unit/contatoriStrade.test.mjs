@@ -113,6 +113,13 @@ test('le pagine sono quelle di FILO_TAB_LABELS più quelle del feedback, e le fa
   assert.equal(S.paginaDi('filo://newtab/?accoglienza=1'), 'newtab');
   assert.equal(S.paginaDi('filo://board/board.html#segnalazioni'), 'board');
   assert.equal(S.paginaDi('filo://redteam/redteam.html'), 'altro');
+  // Senza file il protocollo carica <host>/<host>.html: l'indirizzo corto è la stessa pagina.
+  assert.equal(S.paginaDi('filo://preferences/'), 'preferences');
+  assert.equal(S.paginaDi('filo://options'), 'options');
+  assert.equal(S.paginaDi('filo://editor/#doc'), 'editor');
+  assert.equal(S.paginaDi('filo://newtab'), 'newtab');
+  assert.equal(S.paginaDi('filo://newtab/newtab.html'), 'newtab');
+  assert.equal(S.paginaDi('filo://downloads/'), 'downloads');
   assert.equal(S.paginaDi(`https://${SITO}/`), '', 'un sito non è una pagina di Filo');
 });
 
