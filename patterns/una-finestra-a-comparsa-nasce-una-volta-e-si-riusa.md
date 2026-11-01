@@ -47,4 +47,7 @@ documento.
   con le schede si cerca con `w._filoTabs`, mai con `[0]`.
 - **Negli spec il menu aperto è quello con `.menu` dentro** (vuoto quando è
   chiuso) o quello visibile: che esista una finestra `data:` non vuol dire niente.
-  Prova: `tests/menu-a-comparsa-riusato.spec.mjs`.
+  Prova: `tests/menu-a-comparsa-riusato.spec.mjs`. Le altre finestre a comparsa
+  nate presto (fumetto, carta d'anteprima) si caricano da `filo://shell`: le prove
+  vecchie che prendono la prima `data:text/html` hanno rotto quando il fumetto ne
+  era una (#1722 giro 1).

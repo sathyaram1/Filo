@@ -99,7 +99,7 @@ test('un’etichetta tolta nell’istante in cui compariva non resta appesa', as
 // prima di qualunque passaggio, e la stessa finestra serve il primo e il secondo senza ricaricarsi.
 const fumetto = (app) => app.evaluate(({ BrowserWindow }) => {
   const f = BrowserWindow.getAllWindows().find((w) => !w._filoTabs && !w.isDestroyed()
-    && decodeURIComponent(w.webContents.getURL()).includes('window.fumetto'));
+    && w.webContents.getURL() === 'filo://shell/fumetto.html');
   if (!f) return null;
   if (!f.__contaCarichi) {
     f.__contaCarichi = true;
@@ -131,4 +131,14 @@ test('il primo suggerimento dopo l’avvio usa il fumetto già pronto, come i su
   await expect.poll(() => etichetta(app), { timeout: 4000 }).toBe(nome);
   // La stessa finestra, mai ricaricata, comparsa due volte.
   expect(await fumetto(app)).toMatchObject({ id: prima.id, carichi: 0, comparse: 2 });
+});
+
+// #1722 giro 1 — il fumetto nato all'avvio non si confonde col menu a comparsa: le prove dei menu cercano la finestra
+// «data:text/html», e aperto il menu App deve essercene una sola, il menu.
+test('aperto il menu App con il fumetto già pronto, l’unica finestra del menu è il menu', async ({ app, shell }) => {
+  await expect.poll(() => fumetto(app), { timeout: 8000 }).toMatchObject({ carica: false });
+  const dati = () => app.windows().filter((w) => { try { return !w.isClosed() && w.url().startsWith('data:text/html'); } catch (_) { return false; } });
+  await shell.evaluate(() => document.getElementById('nav-apps').click());
+  await expect.poll(async () => { const w = dati()[0]; return w ? w.locator('.item').count() : 0; }, { timeout: 5000 }).toBeGreaterThan(0);
+  expect(dati()).toHaveLength(1);
 });
