@@ -1294,6 +1294,9 @@
   // Per i due controlli del correttore (#1655): il nome dell'app, che a metà frase sembra il filo da cucire scritto maiuscolo.
   const NOME_DI_FILO = 'Filo è il nome del browser in cui la persona scrive, e filo.red il suo sito: «Filo» con la maiuscola e filo.red non sono errori.';
 
+  // Un feedback lo leggono giudici, routine e chi lavora sul codice (#1669): una frase sola per chat, Aiuto e strumento.
+  const SEGNALAZIONE_SENZA_PERSONA = 'Scrivi la segnalazione in terza persona, parlando dell\'«utente»: niente nome, email o città dell\'utente, niente nomi di altre persone né di dispositivi, niente percorsi o nomi di file che contengano un nome, niente contenuti di note o appunti. Descrivi il problema, non la persona.';
+
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
   const PROMPTS = {
     // #593 — selezione e frase sono testo di una pagina web: chi possiede il

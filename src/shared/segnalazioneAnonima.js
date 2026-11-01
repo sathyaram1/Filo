@@ -16,7 +16,7 @@
   const NOME = '(\\p{Lu}[\\p{L}\'’-]*(?:[ ]\\p{Lu}[\\p{L}\'’-]*){0,2})';
   // Come la memoria scrive chi è l'utente: con lui come soggetto, mai «si chiama» di un cane o di un'azienda.
   const NEL_RICORDO = [
-    new RegExp(`(?:^|[.;:!?\\n(]\\s*|[Uu]tente\\s+)[Ss]i\\s+chiama\\s+${NOME}`, 'gu'),
+    new RegExp(`(?:^|[.;:!?\\n(\\]•-]\\s*|[Uu]tente\\s+)[Ss]i\\s+chiama\\s+${NOME}`, 'gu'),
     new RegExp(`[Nn]ome(?:\\s+(?:dell['’]\\s?utente|completo))?\\s*(?:è|e'|:)\\s*${NOME}`, 'gu'),
     new RegExp(`[Ee]ssere\\s+chiamat[oa]\\s+${NOME}`, 'gu'),
     new RegExp(`(?:[Ll]o|[Ll]a)\\s+(?:si\\s+)?chiam(?:a|i|ano|ino)\\s+${NOME}`, 'gu'),
@@ -66,9 +66,9 @@
 
   function ricuci(t) {
     return t
-      .replace(/([Ll]'utente)\s*\(\s*(?:l'utente|\[email\])\s*\)/g, '$1')
-      .replace(/([Ll]'utente)\s*,\s*l'utente\s*,\s*/g, '$1 ')
-      .replace(/([Ll]'utente)\s+l'utente(?![\p{L}\p{N}])/gu, '$1');
+      .replace(/([Ll]['’]utente)\s*\(\s*(?:l'utente|\[email\])\s*\)/g, '$1')
+      .replace(/([Ll]['’]utente)\s*,\s*l'utente\s*,\s*/g, '$1 ')
+      .replace(/([Ll]['’]utente)\s+l'utente(?![\p{L}\p{N}])/gu, '$1');
   }
 
   function ripulisci(testo, identita) {
@@ -76,8 +76,8 @@
     if (!t) return t;
     const { nomi = [], email = [] } = identita || {};
     const proprie = new Set((email || []).map((e) => String(e || '').trim().toLowerCase()).filter(Boolean));
-    t = t.replace(EMAIL, (m) => (proprie.has(m.toLowerCase()) ? UTENTE : EMAIL_ALTRUI));
-    for (const forma of formeDelNome(nomi)) {
+    t = t.replace(EMAIL, (m) => (proprie.has(m.toLowerCase()) ? m : EMAIL_ALTRUI));
+    for (const forma of formeDelNome([...nomi, ...proprie])) {
       const re = new RegExp(`(?<![\\p{L}\\p{N}'’])(?:([Aa]d?|[Dd][ai]|[Ii][nl]|[Ss]u|[Ll][ao])\\s+)?(${esc(forma.testo)})(?![\\p{L}\\p{N}])`, 'giu');
       t = t.replace(re, (intero, prep, nome, pos, tutto) => {
         if (forma.pezzo && !/^\p{Lu}/u.test(nome)) return intero;
