@@ -1139,8 +1139,10 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (c.dopo) riga.append(pezzo('sn-sidebar-correzione-freccia', '→'), pezzo('sn-sidebar-correzione-dopo', c.dopo));
     btn.appendChild(riga);
     if (c.perche) btn.appendChild(pezzo('sn-sidebar-correzione-perche', c.perche));
-    // Dove comincia, nel testo del campo, il pezzo scritto da questo bottone; null finché non l'ha scritto.
+    // Dove comincia, nel testo del campo, il pezzo scritto da questo bottone; null finché non l'ha scritto. Una
+    // correzione che toglie senza scrivere tiene il pezzo tolto e il testo che gli è rimasto attorno.
     let scritta = null;
+    let tolto = null;
     const stato = () => {
       btn.classList.toggle('sn-sidebar-correzione-fatta', scritta !== null);
       btn.setAttribute('aria-pressed', scritta !== null ? 'true' : 'false');
