@@ -807,7 +807,12 @@ async function ordinaOra(q) {
   const sistema = piattaformaDi();
   const come = { ordine: q.ordine, verso: q.verso, alContrario: q.alContrario, cartellePrima: q.cartellePrima };
   if (!letto.voci.length) return { ok: true, cosa: 'desktop', ...come, detto: comeDetto(come), vuoto: true, totale: 0, spostate: 0 };
-  if (q.ordine === 'data' || q.ordine === 'dimensione') await arricchisci(letto.voci);
+  if (q.ordine === 'data' || q.ordine === 'dimensione') {
+    await arricchisci(letto.voci);
+    // Senza il dato per nessuna icona il piano è l'ordine per nome, e la rilettura lo confermerebbe come «fatto».
+    const chi = letto.voci.filter((v) => q.ordine === 'data' || !v.cartella);
+    if (chi.length && !chi.some((v) => Number.isFinite(v[q.ordine]))) return fallito('senza-dati', { criterio: q.ordine });
+  }
   const p = piano(letto, q, sistema);
   if (p.errore) return fallito(p.errore, p.errore === 'non-ci-stanno' ? { totale: p.totale, posti: p.posti } : {});
   const base = {
