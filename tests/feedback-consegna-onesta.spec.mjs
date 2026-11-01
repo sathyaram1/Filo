@@ -177,3 +177,91 @@ test('la schermata annotata di uno schermo grande scende sotto i 4 MB, coi tratt
   expect(verifica.barH, 'la barra in alto sta sopra la pagina').toBeGreaterThan(0);
   expect(verifica.rossiInBarra, 'col suo tratto').toBeGreaterThan(0);
 });
+
+// #1681 — chi chiude con Esc mentre l'invio aspetta e riapre per scrivere altro: la consegna del primo non chiude il
+// riquadro nuovo, non ne cancella la bozza e non gli ripropone il testo già in viaggio.
+test('la consegna di un feedback partito non chiude il riquadro riaperto per scriverne un altro', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await reteFinta(app);
+  await esito(app, 'lento');
+  await scriviEInvia(page, 'Il tasto Salva non risponde');
+  await expect(page.locator('.sn-fb-status')).toContainText('Invio in corso');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.sn-fb-modal')).toHaveCount(0);
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await expect(page.locator('.sn-fb-modal')).toBeVisible();
+  await page.waitForTimeout(400);
+  await expect(page.locator('.sn-fb-text'), 'il testo in viaggio non torna come bozza').toHaveValue('');
+  await page.locator('.sn-fb-text').fill('Secondo problema: la barra sparisce');
+  await page.waitForTimeout(800);
+
+  await app.evaluate(() => globalThis.__rete.sblocca());
+  await expect(toast(page, 'Grazie! Feedback inviato.')).toHaveCount(1, { timeout: 8_000 });
+  await expect(page.locator('.sn-fb-modal')).toBeVisible();
+  await expect(page.locator('.sn-fb-text')).toHaveValue('Secondo problema: la barra sparisce');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await expect(page.locator('.sn-fb-text')).toHaveValue('Secondo problema: la barra sparisce');
+});
+
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+
+test('un allegato lasciato fuori dal riquadro si dice col suo nome e il motivo, anche in mezzo a uno entrato', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await page.locator('.sn-fb-file').setInputFiles([
+    { name: 'registro-enorme.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(5 * 1024 * 1024, 65) },
+    { name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('ciao') },
+  ]);
+  await expect(page.locator('.sn-fb-file-chip')).toHaveCount(1);
+  await expect(page.locator('.sn-fb-status')).toHaveText('Non allegato «registro-enorme.pdf»: troppo grande (max 4 MB).');
+  // Oltre le cinque immagini: si nominano quelle rimaste fuori.
+  await page.locator('.sn-fb-file').setInputFiles([1, 2, 3, 4, 5, 6, 7].map((i) => ({ name: `foto${i}.png`, mimeType: 'image/png', buffer: PNG })));
+  await expect(page.locator('.sn-fb-thumb')).toHaveCount(5);
+  await expect(page.locator('.sn-fb-status')).toContainText('Non allegati «foto6.png»: oltre le 5 immagini ammesse; «foto7.png»');
+  await page.screenshot({ path: 'tests/.shots/1681-allegati-fuori.png' });
+});
+
+test('con cinque immagini lo screenshot chiesto non resta fuori in silenzio: il riquadro lo dice e non parte niente', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await reteFinta(app);
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await page.locator('.sn-fb-file').setInputFiles([1, 2, 3, 4, 5].map((i) => ({ name: `foto${i}.png`, mimeType: 'image/png', buffer: PNG })));
+  await expect(page.locator('.sn-fb-thumb')).toHaveCount(5);
+  await page.locator('.sn-fb-text').fill('Guarda lo schermo');
+  await page.locator('.sn-fb-clear').click();
+  await page.locator('.sn-fb-send').click();
+  await expect(page.locator('.sn-fb-status')).toContainText('le immagini sarebbero 6, il massimo è 5');
+  await expect(page.locator('.sn-fb-modal')).toBeVisible();
+  expect(await app.evaluate(() => globalThis.__rete.payload.length)).toBe(0);
+  // Tolta un'immagine, parte con lo screenshot.
+  await page.locator('.sn-fb-thumb-x').first().click();
+  await page.locator('.sn-fb-send').click();
+  await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 15_000 });
+  const nomi = await app.evaluate(() => globalThis.__rete.payload[0].images.map((i) => i.name));
+  expect(nomi).toHaveLength(5);
+  expect(nomi).toContain('schermata annotata');
+});
+
+test('il feedback vuoto che non parte lo dice il riquadro aperto, senza un secondo avviso nella finestra né una voce vuota fra le mie', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  // La spedizione vera: finta è solo la rete, dove il deposito rifiuta e il resto non risponde.
+  await app.evaluate(() => {
+    globalThis.fetch = async (u) => {
+      if (/firebasestorage/.test(String(u))) return new Response('no', { status: 403 });
+      throw new Error('fetch failed');
+    };
+  });
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await page.locator('.sn-fb-file').setInputFiles([{ name: 'foto.png', mimeType: 'image/png', buffer: PNG }]);
+  await page.locator('.sn-fb-send').click();
+  await expect(page.locator('.sn-fb-status')).toContainText('«foto.png»: rifiutato dal deposito', { timeout: 10_000 });
+  await expect(page.locator('.sn-fb-modal')).toBeVisible();
+  await page.waitForTimeout(1500);
+  await expect(shell.locator('.shell-notif').filter({ hasText: 'non è partito' })).toHaveCount(0);
+  expect(await app.evaluate(async () => (await globalThis.SN_SEGNALAZIONI_MIE.elenco()).length)).toBe(0);
+});

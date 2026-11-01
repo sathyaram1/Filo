@@ -5,6 +5,7 @@
 // sotto il puntatore o cliccato, e dopo i primi giri il conto si ferma: si confrontano due misure a regime.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { nelMondoDiFilo, paginaDelloStrato } from './helpers/riquadri.mjs';
 
 async function newtabPage(app) {
   await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://newtab')), { timeout: 10_000 }).toBe(true);
@@ -34,7 +35,8 @@ async function misuratore(page) {
       window: await ascoltatori('window'),
       documento: await ascoltatori('document'),
       viewport: await ascoltatori('visualViewport'),
-      messaggi: await page.evaluate(() => chrome.runtime.onMessage._listeners?.size ?? -1),
+      // Nello strato i moduli di Filo vivono nel mondo isolato: da qui il conto dei messaggi non si legge.
+      messaggi: await page.evaluate(() => globalThis.chrome?.runtime?.onMessage?._listeners?.size ?? -1),
     };
     await cdp.send('Runtime.releaseObjectGroup', { objectGroup });
     return m;
@@ -111,4 +113,36 @@ test('cinque aperture e chiusure del pannello red-team lasciano gli ascoltatori 
   const prima = await misura();
   await cinqueGiri();
   expect(await misura()).toEqual(prima);
+});
+
+// Su un sito il riquadro sta nello strato sopra la scheda, che resta vivo fra un'apertura e l'altra: aperto dalla
+// pagina come lo apre l'utente, chiuso dal suo tasto o con Esc.
+test('aperto e chiuso dieci volte su un sito, lo strato non tiene tele né ascoltatori in più', async ({ app, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  const p = await testServer.openReady(openTab, '<!doctype html><html><head><meta charset="utf-8"></head><body><p>Una pagina qualunque.</p></body></html>');
+  await nelMondoDiFilo(app, p, () => globalThis.SN_FEEDBACK_UI.open());
+  const strato = await paginaDelloStrato(app, p);
+  await expect(strato.locator('.sn-fb-modal')).toBeVisible();
+  await strato.locator('.sn-fb-cancel').click();
+  await expect(strato.locator('.sn-fb-modal')).toHaveCount(0);
+  const misura = await misuratore(strato);
+  const giri = async (n) => { for (let i = 0; i < n; i++) {
+    await nelMondoDiFilo(app, p, () => globalThis.SN_FEEDBACK_UI.open());
+    await expect(strato.locator('.sn-fb-modal')).toBeVisible();
+    await strato.locator('.sn-fb-text').fill(`giro ${i}`);
+    const box = await strato.locator('.sn-fb-canvas').boundingBox();
+    await strato.mouse.move(box.x + 30, box.y + 30);
+    await strato.mouse.down();
+    await strato.mouse.move(box.x + 120, box.y + 60);
+    await strato.mouse.up();
+    if (i % 2) await strato.locator('.sn-fb-cancel').click();
+    else await strato.keyboard.press('Escape');
+    await expect(strato.locator('.sn-fb-modal')).toHaveCount(0);
+  } };
+  await giri(4);
+  const { tele: telePrima, ...prima } = await misura();
+  await giri(10);
+  const { tele, ...dopo } = await misura();
+  expect(dopo).toEqual(prima);
+  expect(tele - telePrima).toBeLessThanOrEqual(1);
 });

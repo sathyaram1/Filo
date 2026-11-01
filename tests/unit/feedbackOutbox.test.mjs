@@ -480,3 +480,24 @@ test('#1667 il primo tentativo dice com’è andata: consegnato, in coda, rinunc
   const fermo = await OB.enqueue({ submissionId: 'fermo', text: 'd' }, { attendiMs: 5000 });
   assert.deepEqual(await fermo.tentativo, { esito: 'in_coda' });
 });
+
+// #1681 — la rinuncia al primo tentativo la dice il riquadro che aspetta: la coda non la ripete nella cornice. Senza
+// nessuno che aspetta (attesa scaduta, invio da un'altra strada) l'avviso della coda resta.
+test('#1681 rinuncia con qualcuno che aspetta: niente secondo avviso; senza nessuno: avviso', async () => {
+  const { OB } = setup();
+  const avvisi = [];
+  OB.init({ onGiveUp: (item) => { avvisi.push(item.id); return true; }, backoffMin: 999999 });
+  globalThis.SN_FEEDBACK.isEncryptionError = (e) => !!(e && e.cifratura === true);
+  globalThis.SN_FEEDBACK.submit = async () => { throw erroreVuoto(true); };
+  OB._setAuto(true);
+  const vivo = setInterval(() => {}, 1000);
+  try {
+    const atteso = await OB.enqueue({ submissionId: 'atteso', text: '' }, { attendiMs: 5000 });
+    assert.equal((await atteso.tentativo).esito, 'rinuncia');
+  } finally { OB._setAuto(false); clearInterval(vivo); }
+  assert.deepEqual(avvisi, [], 'chi aspettava lo dice lui');
+  assert.equal(OB.size(), 0, 'e la voce non resta in coda');
+  await OB.enqueue({ submissionId: 'da-solo', text: '' });
+  await OB.flush();
+  assert.deepEqual(avvisi, ['da-solo']);
+});
