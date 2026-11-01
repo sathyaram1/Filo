@@ -1,5 +1,5 @@
 // #1294, #1130.2 — l'archivio di una chat tiene com'è andata ogni azione (fatta coi numeri, non riuscita col perché,
-// ferma sulla conferma), la chat riaperta e il modello leggono quella, e al modello non va mai un turno vuoto.
+// ferma sulla conferma): la chat riaperta e il modello leggono quella, e al modello non va mai un turno vuoto.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
