@@ -4,7 +4,7 @@
 const siteBlock = require('../siteBlock');
 require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l'avviso sui link, lo stesso del menu
 const { perContoDellaScheda } = require('../perContoDellaScheda');
-const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { avvisoNellaFinestra, avvisoQuandoPronta } = require('../avvisoFinestra');
 const { luogoDownload } = require('../contatoriFinestra');
 const { campiSegretiFuoriPagina } = require('../campiNeiRiquadri');
 const Foto = require('../fotoDellaPagina');
@@ -253,7 +253,7 @@ async function scegliDestinazione(wc, sender, winOf, filename) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita: portaUscite, apriDaFilo, contattabilePrimaDelClic } = ctx;
+  const { MSG, winOf, modelGate, controllaUscita: portaUscite, apriDaFilo, contattabilePrimaDelClic } = ctx;
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
   const controllaUscita = require('../contatoriSicurezza').contaUscite(portaUscite);
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
@@ -633,7 +633,7 @@ module.exports = function register(on, ctx) {
         const failed = Array.isArray(result?.failed) ? result.failed : [];
         if (!failed.length) return;
         const elenco = globalThis.SN_FEEDBACK?.fraseAllegatiSaltati?.(failed) || failed.map((f) => f?.name || 'allegato').join(', ');
-        avvisoNellaFinestra(`Il tuo feedback è partito, ma senza ${failed.length === 1 ? 'un allegato' : `${failed.length} allegati`}: ${elenco}.`, {
+        avvisoQuandoPronta(`Il tuo feedback è partito, ma senza ${failed.length === 1 ? 'un allegato' : `${failed.length} allegati`}: ${elenco}.`, {
           chiave: `feedback-allegati-saltati-${String(_item?.id || '')}`,
           errore: 'allegati_non_caricati',
         });
@@ -723,18 +723,23 @@ module.exports = function register(on, ctx) {
         images: (payload.images || []).length,
         url: payload.url,
       });
-      // Accoda e prova a inviare subito, ma NON aspettare la rete: l'ack torna
-      // appena il feedback è al sicuro in coda (persistito). Il titolo lo genera
-      // la coda al momento dell'invio (anche offline, col fallback).
-      const r = await Outbox.enqueue(payload, { dallOwner });
-      // #986 — la copia per chi l'ha mandata nasce adesso, «in partenza»; dall'incognito non nasce.
+      // Un feedback che partirebbe vuoto non si accoda (#1667): il riquadro resta aperto e dice cosa non sale e perché.
+      const saltati = globalThis.SN_FEEDBACK.vuotoInPartenza?.(payload);
+      if (saltati) return { ok: false, frase: true, error: globalThis.SN_FEEDBACK.messaggioVuoto(saltati) };
+      if (!payload.submissionId) payload.submissionId = globalThis.crypto?.randomUUID?.() || `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      // #986 — la copia per chi l'ha mandata nasce «in partenza» prima del primo tentativo, che la trova già scritta;
+      // dall'incognito non nasce.
       try {
         const Mie = globalThis.SN_SEGNALAZIONI_MIE;
-        if (Mie && r?.id) {
-          await Mie.registra({ id: r.id, testo: payload.text, allegati: Mie.nomiAllegati(payload) });
-        }
+        if (Mie) await Mie.registra({ id: String(payload.submissionId), testo: payload.text, allegati: Mie.nomiAllegati(payload) });
       } catch (e) { console.warn('[Filo feedback] copia locale non scritta:', e?.message || e); }
-      return { ok: true, queued: true, id: r?.id };
+      // Accoda (persistito) e prova subito. Il riquadro dice «inviato» solo se il primo tentativo consegna entro
+      // l'attesa (#1667); altrimenti la coda finisce da sola e ritenta. Il titolo lo genera la coda all'invio.
+      const r = await Outbox.enqueue(payload, { dallOwner, attendiMs: ATTESA_CONSEGNA_MS });
+      const esito = r?.tentativo ? await r.tentativo : { esito: 'in_coda' };
+      if (esito.esito === 'rinuncia') return { ok: false, frase: true, error: String(esito.motivo || 'Il tuo feedback non è partito.') };
+      const consegnato = esito.esito === 'consegnato';
+      return { ok: true, queued: !consegnato, consegnato, id: r?.id };
     } catch (e) {
       console.error('[Filo feedback] submit failed', e);
       return { ok: false, error: e?.message || String(e) };
