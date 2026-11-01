@@ -1333,7 +1333,7 @@
   // delle impostazioni dove si concede (l'indirizzo lo sceglie il main da un elenco suo, qui passa solo la chiave).
   function permessoDaConcedere(a) {
     const o = a && a._output;
-    return (isType(a, 'VOLUME') || isType(a, 'BLUETOOTH') || isType(a, 'WIFI') || isType(a, 'VEDI_SCHERMO')) && a._executed === false
+    return (isType(a, 'VOLUME') || isType(a, 'BLUETOOTH') || isType(a, 'WIFI') || isType(a, 'VEDI_SCHERMO') || isType(a, 'ORDINA_DESKTOP')) && a._executed === false
       && !!o && typeof o.apri === 'string' && !!o.apri;
   }
 

@@ -547,9 +547,9 @@
     },
     {
       id: 'desktop-icons', title: 'Icone del desktop in ordine', category: 'assistant',
-      desc: 'Su Windows Filo mette in ordine le icone del desktop come gli chiedi: per nome, per tipo, per data o per dimensione, a righe da sinistra a destra oppure a colonne dall’alto in basso, al contrario o con le cartelle prima. Le dispone nella griglia dello schermo principale; se è acceso «Disponi automaticamente», che le rimetterebbe in colonna, lo spegne e te lo dice. Ogni riordino si annulla: le icone tornano dov’erano, e «Disponi automaticamente» com’era.',
+      desc: 'Su Windows e sul Mac Filo mette in ordine le icone del desktop (sul Mac la Scrivania) come gli chiedi: per nome, per tipo, per data o per dimensione, a righe da sinistra a destra oppure a colonne dall’alto in basso, al contrario o con le cartelle prima. Le dispone nella griglia dello schermo principale; se è acceso «Disponi automaticamente» (sul Mac «Ordina per» del Finder), che le rimetterebbe nel suo ordine, lo spegne e te lo dice. Dice «fatto» solo dopo aver riletto il desktop e trovato le icone nell’ordine chiesto. Ogni riordino si annulla: le icone tornano dov’erano, e l’ordine automatico com’era.',
       invoke: 'In chat: «metti in ordine alfabetico le icone del desktop, da sinistra a destra», «ordina il desktop per data, le più recenti in alto», «metti prima le cartelle». Per tornare indietro: «rimetti le icone del desktop com’erano», oppure «annulla» sotto la risposta o sulla riga del cambio nel filo della home.',
-      doesNot: 'Su Mac e Linux non le sposta ancora: lo dice e ti indica come ordinarle dal sistema. Usa solo lo schermo principale: le icone sugli altri schermi le porta lì. Se le icone sono più di quante lo schermo ne tiene in griglia non le sposta, e ti dice quante ce ne stanno.',
+      doesNot: 'Su Linux non le sposta ancora: lo dice e ti indica come ordinarle dal sistema. Sul Mac chiede al Finder, quindi la prima volta macOS ti chiede il permesso (Privacy e sicurezza → Automazione), e con le pile accese le icone non si ordinano. Usa solo lo schermo principale: le icone sugli altri schermi le porta lì. Se le icone sono più di quante lo schermo ne tiene in griglia non le sposta, e ti dice quante ce ne stanno.',
     },
 
     {

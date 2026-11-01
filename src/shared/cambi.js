@@ -371,7 +371,7 @@
     return l;
   }
 
-  // Le icone del desktop del computer (#1621): `prima` e `dopo` sono { auto, voci: [[id, x, y]] }, `come` l'ordine chiesto.
+  // Le icone del desktop del computer (#1621): `prima` e `dopo` sono { auto, voci: [[id, x, y]], finder? (Mac) }, `come` l'ordine chiesto.
   const ORDINI_DESKTOP = new Map([['nome', 'in ordine alfabetico'], ['tipo', 'per tipo'], ['data', 'per data'], ['dimensione', 'per dimensione']]);
   function fraseOrdineDesktop(come) {
     const c = come || {};
@@ -475,7 +475,8 @@
       const n = spostateSulDesktop(c);
       const auto = !!(c.prima && c.prima.auto) !== !!(c.dopo && c.dopo.auto);
       const parti = [n === 1 ? 'spostata 1' : `spostate ${n}`];
-      if (auto) parti.push(`«Disponi automaticamente» ${c.dopo && c.dopo.auto ? 'acceso' : 'spento'}`);
+      const mac = !!((c.prima && c.prima.finder) || (c.dopo && c.dopo.finder));
+      if (auto) parti.push(`${mac ? '«Ordina per» del Finder' : '«Disponi automaticamente»'} ${c.dopo && c.dopo.auto ? 'acceso' : 'spento'}`);
       return `icone del desktop: ${parti.join(', ')}`;
     }
     const v = voce(k);

@@ -1,6 +1,6 @@
-// #1621 — le icone del desktop in ordine (src/main/services/iconeDesktop.js): richiesta, ordine, griglia, ambiente,
-// uscita, cammino intero sopra un desktop finto e annullo. Lo script di Windows lo analizza PowerShell, su Windows;
-// che le icone si spostino su un Windows vero lo dice il report.
+// #1621, #1617 — le icone del desktop in ordine (src/main/services/iconeDesktop.js): richiesta, ordine, griglia, ambiente,
+// uscita, ordine riletto, cammino intero sopra un desktop finto e annullo. Lo script del Mac gira su un Finder finto;
+// quello di Windows lo analizza PowerShell, su Windows. Che spostino le icone di un desktop vero lo dice il report.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,6 +8,8 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync } from 'node:fs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -149,7 +151,7 @@ test('le posizioni arrivano nell\'ambiente intere e a pezzi che una variabile di
 
   assert.throws(() => D.ambienteDisponi({ posizioni: [{ id: 'C:\\a\nb', x: 1, y: 1 }] }), /nome valido/);
   assert.throws(() => D.ambienteDisponi({ posizioni: [{ id: 'C:\\a', x: 1.5, y: 1 }] }), /posizione/);
-  assert.throws(() => D.costruisci('desktop-leggi', {}, 'darwin'), /sconosciuto/);
+  assert.throws(() => D.costruisci('desktop-leggi', {}, 'linux'), /sconosciuto/);
 });
 
 test('l\'uscita di Windows: barre, accenti ed emoji tornano com\'erano, un nome che finge una riga di Filo resta un nome', () => {
@@ -261,12 +263,12 @@ test('Windows che non sposta niente lo si dice, e un errore del desktop diventa 
   assert.match(D.esitoPerModello(await D.ordinaIcone({ ordine: 'colore' })), /Correggi i parametri/);
 });
 
-test('su Mac e Linux una frase con la strada del sistema; durante le prove il desktop vero non si tocca', async () => {
-  assert.match(D.spiega('mac').frase, /Mac/);
-  assert.match(D.spiega('mac').dove, /Ordina per/);
+test('su Linux una frase con la strada del sistema; durante le prove il desktop vero non si tocca', async () => {
   assert.match(D.spiega('linux').frase, /Linux/);
-  const fonte = require('node:fs').readFileSync(join(SERVIZI, 'iconeDesktop.js'), 'utf8');
-  assert.match(fonte, /process\.platform === 'darwin' \? 'mac' : 'linux'/);
+  assert.match(D.spiega('linux', { piattaforma: 'darwin' }).frase, /Linux/);
+  assert.deepEqual(D.PIATTAFORME, ['win32', 'darwin']);
+  const fonte = readFileSync(join(SERVIZI, 'iconeDesktop.js'), 'utf8');
+  assert.match(fonte, /!PIATTAFORME\.includes\(process\.platform\)\) return fallito\('linux'\)/);
   const prima = process.env.NODE_ENV;
   process.env.NODE_ENV = 'test';
   try {

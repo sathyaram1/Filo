@@ -558,25 +558,25 @@ function passoMac(letto) {
 
 // La griglia dello schermo principale. Con «Allinea alla griglia» (o «Disponi automaticamente») le icone stanno già
 // sulla griglia di Windows: le nuove posizioni ne prendono l'allineamento, così riaccendendola nessuna salta di posto.
-// Su Mac la posizione è il centro dell'icona: la prima casella comincia mezzo passo dentro l'area.
+// Su Mac la posizione è il centro dell'icona, col nome sotto: il centro sta almeno mezza icona dentro l'area, mezzo
+// passo dai lati quando si parte dall'angolo (il nome è largo quanto la casella).
 function griglia(letto, piattaforma = 'win32') {
   const a = letto && letto.area;
   const centro = piattaforma === 'darwin';
   const p = letto && (letto.passo || (centro && a ? passoMac(letto) : null));
   if (!a || !p || !(p.x >= 8 && p.y >= 8)) return { errore: 'griglia' };
   if (a.destra - a.sinistra < p.x || a.basso - a.alto < p.y) return { errore: 'griglia' };
-  const mezzoX = centro ? Math.round(p.x / 2) : 0;
-  const mezzoY = centro ? Math.round(p.y / 2) : 0;
   const dentro = (letto.voci || []).filter((v) => v.x >= a.sinistra && v.x < a.destra && v.y >= a.alto && v.y < a.basso);
   const allineate = (letto.griglia || letto.auto) && dentro.length;
-  const lx = a.sinistra + mezzoX;
-  const ly = a.alto + mezzoY;
+  const icona = Math.round((Number.isFinite(letto.dimensioneIcone) && letto.dimensioneIcone > 0 ? letto.dimensioneIcone : 64) / 2);
+  const lx = a.sinistra + (!centro ? 0 : allineate ? icona : Math.round(p.x / 2));
+  const ly = a.alto + (centro ? icona : 0);
   const ox = allineate ? piuFrequente(dentro.map((v) => resto(v.x, p.x))) : resto(lx, p.x);
   const oy = allineate ? piuFrequente(dentro.map((v) => resto(v.y, p.y))) : resto(ly, p.y);
   const x0 = lx + resto(ox - lx, p.x);
   const y0 = ly + resto(oy - ly, p.y);
-  const colonne = Math.floor((a.destra - (x0 - mezzoX)) / p.x);
-  const righe = Math.floor((a.basso - (y0 - mezzoY)) / p.y);
+  const colonne = centro ? Math.floor((a.destra - Math.round(p.x / 2) - x0) / p.x) + 1 : Math.floor((a.destra - x0) / p.x);
+  const righe = centro ? Math.floor((a.basso - (p.y - icona) - y0) / p.y) + 1 : Math.floor((a.basso - y0) / p.y);
   if (colonne < 1 || righe < 1) return { errore: 'griglia' };
   return { x0, y0, passoX: p.x, passoY: p.y, colonne, righe };
 }

@@ -98,18 +98,29 @@ regola degli altri comandi, con qualche punto in più:
   automaticamente» e «Allinea alla griglia» si spengono (la prima rimette tutto in
   colonna, la seconda sposta chi trova la casella ancora occupata); la griglia
   torna com'era, la disposizione automatica resta spenta e l'esito lo dice.
-- **Si rilegge.** Dopo lo spostamento si confrontano le posizioni vere con quelle
-  volute: un desktop che non si è mosso (una regola dell'azienda) è un fallimento
-  detto, non un «fatto».
+- **«Fatto» lo dice l'ordine riletto (#1617).** Dopo lo spostamento si rilegge il
+  desktop e si guarda l'ordine in cui l'occhio legge le icone, casella per casella:
+  se non è quello chiesto (un programma come Fences, le pile del Mac, due icone
+  nella stessa casella) l'esito è un fallimento detto. Il desktop però è cambiato:
+  quel cambio si registra comunque e l'esito dà l'annullo. Fermo del tutto è
+  «non spostate»; uno script che si rompe a metà rilegge e registra allo stesso modo.
 - **Troppe per lo schermo: niente.** Fuori dallo schermo un'icona non si raggiunge
   più; si rifiuta coi due numeri e la strada (icone piccole).
 - **Ogni disposizione è un cambio del filo** (`tipo: 'desktop'`, prima e dopo con
   tutte le posizioni e «Disponi automaticamente»): l'annullo di ANNULLA_CAMBIO e
   del segno sulla bolla rimette ogni icona ancora presente, e rifarlo rimette
   l'ordine. Al modello vanno numeri e frasi di Filo, mai i nomi dei file.
-- **Mac e Linux** per ora lo dicono, con la strada del sistema: il Finder non dà il
-  passo della griglia, e su Linux ogni ambiente grafico tiene le posizioni a modo
-  suo.
+- **Mac (#1617)**: JavaScript for Automation sul Finder, mandato a `osascript` da un
+  heredoc fra apici; stesse righe e stessa codifica `\uXXXX` di Windows, l'id è
+  l'indirizzo `file://` dell'elemento. La posizione è il centro dell'icona (la
+  prima casella comincia mezzo passo dentro l'area) e il Finder non dice il passo:
+  si ricava dalle icone, o dalla loro dimensione. «Ordina per» (`arranged by …`) si
+  toglie prima di spostare e l'annullo lo rimette col suo valore (`finder` nel
+  cambio). Il permesso è quello di Automazione: senza, errore -1743, la frase e il
+  tasto che apre le impostazioni; la frase per macOS sta in
+  `NSAppleEventsUsageDescription`.
+- **Linux** lo dice, con la strada del sistema: ogni ambiente grafico tiene le
+  posizioni a modo suo.
 
 ## Dove vive
 
