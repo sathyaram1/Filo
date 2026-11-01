@@ -828,11 +828,15 @@ module.exports = function register(on, ctx) {
     return K && typeof K.senzaRipiego === 'function' ? K.senzaRipiego(call) : call();
   }
 
-  // L'errore di una prova, detto all'utente: un rifiuto della chiave col suo perché.
+  // L'errore di una prova, detto all'utente: un rifiuto della chiave col suo perché, un rifiuto del router con la stessa
+  // causa che direbbe la chat (#1345). Il resto col messaggio del servizio, che a chi prova un modello serve.
+  const RIFIUTI_DEL_ROUTER = new Set(['NO_ALLOWED_HOST', 'DATA_POLICY', 'NO_PROVIDER_ALLOWED', 'MODEL_UNAVAILABLE', 'NO_TOOL_HOST', 'TETTO_RISPOSTA', 'INGRESSO_NON_LETTO']);
   function provaFallita(e) {
     const W = globalThis.SN_WALLET;
     const st = W ? W.keyRefusalOf(e) : 0;
     if (st) return `OpenRouter ha rifiutato questa chiave (${W.keyRefusalReason(st)}).`;
+    const CE = globalThis.SN_CHAT_ERRORS;
+    if (CE && e && RIFIUTI_DEL_ROUTER.has(e.code)) return CE.sentence(e);
     return e?.message || String(e);
   }
 
