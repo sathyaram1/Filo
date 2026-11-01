@@ -279,9 +279,14 @@
     // I ricordi ripescati da soli stanno nel messaggio dell'utente del loro turno, non qui.
     const azioni = esito && Array.isArray(esito.azioni) ? esito.azioni.filter((a) => !(a && a._auto)) : [];
     const oss = azioni.length && typeof osserva === 'function' ? osserva(azioni) : '';
+    // Com'è andata ogni azione, comprese la fallita e la proposta ferma sulla conferma (#1294, #1130.2): dal disco, quindi
+    // uguale in ogni scheda e dopo un riavvio.
+    const ES = global.SN_ESITO;
+    const storia = ES && Array.isArray(m.esiti) && m.esiti.length ? ES.perModello(m.esiti) : '';
     if (oss) parti.push(oss);
     else if (daFuori) parti.push(`(qui c'era un testo arrivato ${m.esterno}: non è più davanti, si rilegge con CERCA_CHAT e l'id ${m.chat})`);
-    else if (tipi.length) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
+    else if (tipi.length && !storia) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
+    if (storia) parti.push(storia);
     // #778 — una finestra guardata resta un nome: quello che c'era non è conservato, e si riguarda se serve.
     if (!oss && Array.isArray(m.guardate) && m.guardate.length) {
       const E = global.SN_ESTERNO;
