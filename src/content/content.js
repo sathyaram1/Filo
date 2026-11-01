@@ -908,8 +908,7 @@
   }
 
   // Un avviso che il main tiene in coda (#1478.1) si prende prima di mostrarlo: chi lo prende l'ha davanti, e nessun'altra
-  // pagina lo ripete. Senza `id` si chiedono quelli rimasti in coda mentre l'utente era altrove. Se la finestra è davanti
-  // lo sa il main: col fuoco sulla barra delle schede la pagina non ce l'ha, ma l'utente la guarda.
+  // pagina lo ripete. Senza `id` quelli rimasti in coda. Se la finestra è davanti lo dice il main: il fuoco può stare sulla barra.
   async function prendiAvvisiInCoda(id) {
     if (IS_SUBFRAME || document.visibilityState !== 'visible' || isBlocked()) return;
     let r = null;
