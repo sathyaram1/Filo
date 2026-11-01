@@ -2224,7 +2224,7 @@ async function decisioneComandoAMano({ comando, cwd = '', shell = '', daFuori = 
   const cmd = String(comando || '').trim();
   let impostazioni = {};
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
-  const action = { type: 'ESEGUI_COMANDO', comando: cmd, _perimetro: { ...perimetroLettura(null, cwd), shell } };
+  const action = { type: 'ESEGUI_COMANDO', comando: cmd, _perimetro: Object.assign(perimetroLettura(null, cwd), { shell }) };
   const ing = Levels ? Levels.ingressi(action, { impostazioni }) : null;
   if (!cmd || !ing) return { risposta: 'no', digita: false, no: 'Questo comando non lo lancio.' };
   const d = decisioneAutonomia(ing, { impostazioni, fontiLette: daFuori === true ? [FONTE_COMANDO_DA_FUORI] : null });
