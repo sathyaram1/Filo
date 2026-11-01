@@ -56,5 +56,7 @@ test('r2 la musica chiusa e già riaperta riparte lì, senza una seconda scheda 
 
   expect((await schede(shell)).tabs.filter((t) => t.url === url).length, 'una sola scheda della musica').toBe(1);
   expect((await schede(shell)).tabs.length).toBe(prima);
+  const pagina = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } });
+  await expect.poll(() => pagina.evaluate(() => window.__statoAudio().pausa), { timeout: 10_000 }).toBe(false);
   await ripristina(app);
 });
