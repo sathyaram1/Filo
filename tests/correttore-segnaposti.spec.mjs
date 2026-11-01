@@ -196,7 +196,7 @@ test('sulla prima riga di un campo senza margine il valore sta dentro il campo, 
   await expect(page.locator('#ta')).toHaveValue(SCRITTO_1.replace('14xx', '1492'));
 });
 
-test('sulla prima riga con parole sotto il valore sta sotto velato; in un campo alto una riga sopra velato: il clic resta al testo e alla pagina', async ({ app, openTab, testServer }) => {
+test('sulla prima riga con parole sotto il valore sta sotto velato; in un campo alto una riga accanto alle x: il clic resta al testo e alla pagina', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, { ragionato: { '14xx': [COLOMBO] }, html: SENZA_MARGINE });
   const scritto = "Scoperta nel 14xx dagli spagnoli.\nSotto ci sono altre parole lunghe abbastanza da stare sotto le x del segnaposto. ";
   await page.locator('#ta').click();
@@ -237,7 +237,7 @@ test('sulla prima riga con parole sotto il valore sta sotto velato; in un campo 
   expect(bw.y, 'dentro il campo').toBeGreaterThanOrEqual(ce.y);
   expect(bw.y + bw.height, 'dentro il campo').toBeLessThanOrEqual(ce.y + ce.height);
   expect(bw.x, 'dopo le x').toBeGreaterThanOrEqual(xi.x + xi.width);
-  await page.screenshot({ path: 'tests/.shots/1690-valore-accanto.png', clip: { x: 0, y: 160, width: 820, height: 80 } }).catch(() => {});
+  await page.screenshot({ path: 'tests/.shots/1690-valore-accanto.png', clip: { x: 0, y: ce.y - 40, width: 820, height: 80 } }).catch(() => {});
   await page.mouse.move(xi.x + xi.width / 2, xi.y + xi.height / 2);
   await expect(w).toHaveClass(/sn-sveglio/);
   await page.mouse.move(xi.x + xi.width / 2, ce.y - 6, { steps: 6 });
