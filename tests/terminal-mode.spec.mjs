@@ -445,11 +445,14 @@ test('la bolla del comando si legge, col tema chiaro e scuro e riaprendo la chat
   await tema('light');
   await submitInput(page, '/echo leggibile-635');
   await expect(page.locator('.dash-term-out').last()).toContainText('leggibile-635', { timeout: 12_000 });
+  // Il cambio di tema ha una transizione: si misura quando è finita.
+  const leggibile = (sel, msg) => expect.poll(async () => {
+    const c = await contrasto(sel);
+    return c.pieno && c.rapporto > 4.5;
+  }, { timeout: 3_000, message: msg }).toBe(true);
   for (const t of ['light', 'dark']) {
     await tema(t);
-    const c = await contrasto('.dash-term-cmd');
-    expect(c.pieno, `${t}: la bolla del comando ha un fondo`).toBe(true);
-    expect(c.rapporto, `${t}: il comando si distingue dal suo fondo`).toBeGreaterThan(4.5);
+    await leggibile('.dash-term-cmd', `${t}: il comando si legge sul suo fondo`);
     await page.screenshot({ path: `tests/.shots/635-1-comando-${t}.png` }).catch(() => {});
   }
 
@@ -457,10 +460,6 @@ test('la bolla del comando si legge, col tema chiaro e scuro e riaprendo la chat
   await tema('light');
   await page.reload();
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
-  const riga = page.locator('.dash-bubble-user', { hasText: 'echo leggibile-635' });
-  await expect(riga.last()).toBeVisible({ timeout: 10_000 });
-  const c = await contrasto('.dash-bubble-user:has-text("echo leggibile-635")');
-  expect(c.pieno).toBe(true);
-  expect(c.rapporto).toBeGreaterThan(4.5);
-  await page.screenshot({ path: 'tests/.shots/635-1-riaperta.png' }).catch(() => {});
+  await expect(page.locator('.dash-bubble-user', { hasText: 'echo leggibile-635' }).last()).toBeAttached({ timeout: 10_000 });
+  await leggibile('.dash-bubble-user:has-text("echo leggibile-635")', 'riaperta: il comando si legge');
 });
