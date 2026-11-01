@@ -607,26 +607,28 @@ function noteServedProvider(settings, action, result) {
   return { servedBy, violation };
 }
 
-// Un avviso per host e motivo ogni dieci minuti: una pagina tradotta a pezzi dallo stesso host non ne impila cinquanta.
-const AVVISO_FUORI_POLITICA_MS = 10 * 60 * 1000;
-const avvisatiFuoriPolitica = new Map();
+// Un avviso per host e motivo, in coda finché la pagina in vista lo prende: la pausa di dieci minuti parte da lì (#1478.1).
+const AvvisiFuoriPolitica = require('./avvisiFuoriPolitica').crea({ manda: (m) => broadcastToTabs(m) });
+// Tornati su Filo dalla barra delle schede, o su una scheda scelta da lì, la pagina non riceve il fuoco: li si ripropone.
+globalThis.SN_AVVISI_FUORI_POLITICA = AvvisiFuoriPolitica;
+try { require('electron').app.on('browser-window-focus', () => AvvisiFuoriPolitica.riproponi()); } catch (_) {}
 function avvisaFuoriPolitica(settings, why, servedBy, model, action) {
   const chiave = `${why}|${SN_CONST.normalizeProviderName(servedBy)}`;
-  const ora = Date.now();
-  if (ora - (avvisatiFuoriPolitica.get(chiave) || 0) < AVVISO_FUORI_POLITICA_MS) return;
-  avvisatiFuoriPolitica.set(chiave, ora);
-  let text;
-  if (why === 'not-producer') {
-    const regola = SN_CONST.producerOnlyRule(model);
-    text = I18n.t('toast_served_not_producer', servedBy, (regola && regola.nome) || 'il suo produttore');
-  } else {
-    text = I18n.t(settings && settings.openWeightsOnly === true ? 'toast_open_weights_violated' : 'toast_served_excluded', servedBy);
-  }
-  const segnala = I18n.t('segnala_fuori_politica', actionLabelForSettings(action), model || '—', servedBy);
-  try { broadcastToTabs({ type: MSG.SHOW_TOAST, text, duration: 8000, segnala }); } catch (_) {}
-  if (why !== 'not-producer' && settings && settings.openWeightsOnly === true) {
-    try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:pesi_aperti_violati'); } catch (_) {}
-  }
+  AvvisiFuoriPolitica.avvisa(chiave, () => {
+    let text;
+    if (why === 'not-producer') {
+      const regola = SN_CONST.producerOnlyRule(model);
+      text = I18n.t('toast_served_not_producer', servedBy, (regola && regola.nome) || 'il suo produttore');
+    } else {
+      text = I18n.t(settings && settings.openWeightsOnly === true ? 'toast_open_weights_violated' : 'toast_served_excluded', servedBy);
+    }
+    const segnala = I18n.t('segnala_fuori_politica', actionLabelForSettings(action), model || '—', servedBy);
+    const pesiAperti = why !== 'not-producer' && settings && settings.openWeightsOnly === true;
+    return {
+      messaggio: { type: MSG.SHOW_TOAST, text, duration: 8000, segnala },
+      alMostrare: pesiAperti ? () => globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:pesi_aperti_violati') : null,
+    };
+  });
 }
 
 // ─── Dettatura ───────────────────────────────────────────────────────────────
@@ -7291,6 +7293,7 @@ const handlerCtx = {
   buildAttemptChain,
   providerRouting,
   openWeightsBlockReason,
+  avvisiFuoriPolitica: AvvisiFuoriPolitica,
   modelGate: Gate,
   handleAIRequest,
   maybeCategorizeAsync,

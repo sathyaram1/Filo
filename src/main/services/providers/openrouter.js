@@ -255,12 +255,19 @@
   function routerRefusal(text) {
     const t = String(text || '');
     if (/data policy|settings\/privacy/i.test(t)) return 'DATA_POLICY';
+    // Il modello non legge quel contenuto (#1345): non c'entrano né i fornitori ammessi né gli strumenti.
+    if (ingressoDi(t)) return 'INGRESSO_NON_LETTO';
     if (/requested parameters|tool/i.test(t)) return 'PARAMS';
     if (/no endpoints found for\b/i.test(t)) return 'MODEL_UNAVAILABLE';
     if (/no allowed providers|no endpoints (found|available)/i.test(t)) return 'NO_PROVIDER_ALLOWED';
     return null;
   }
   const isParamsRefusal = (text) => routerRefusal(text) === 'PARAMS';
+  // La regola sta in SN_CHAT_ERRORS, che la usa anche per gli errori senza codice.
+  function ingressoDi(text) {
+    const CE = global.SN_CHAT_ERRORS;
+    return CE && typeof CE.ingressoRifiutato === 'function' ? CE.ingressoRifiutato(text) : '';
+  }
 
   // Una chiamata di chat (con o senza streaming). `require_parameters` scarta anche gli host che non
   // conoscono `reasoning`, e per un modello che non ragiona non ne resterebbe nessuno: il ragionamento
@@ -780,6 +787,9 @@
       else if (maxTokens && colpa !== false) err.code = 'TETTO_RISPOSTA';
       if (maxTokens && colpa !== false) err.maxTokens = maxTokens;
     } else if (refusal) err.code = refusal;
+    // Un host che dice di non leggere quel contenuto è lo stesso rifiuto del router (#1345).
+    if (!err.code && [400, 415, 422].includes(res.status) && ingressoDi(errText)) err.code = 'INGRESSO_NON_LETTO';
+    if (err.code === 'INGRESSO_NON_LETTO') err.ingresso = ingressoDi(errText);
     produttoreNonRisponde(err, model, errText);
     return err;
   }

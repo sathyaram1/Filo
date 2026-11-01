@@ -355,6 +355,12 @@
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
     });
+    // Tornati su Filo da un'altra applicazione, o arrivati in una scheda dopo un sito spento: gli avvisi rimasti in coda
+    // arrivano qui (#1478.1).
+    if (!IS_SUBFRAME) {
+      window.addEventListener('focus', () => { prendiAvvisiInCoda(); });
+      prendiAvvisiInCoda();
+    }
 
     // Marker per i test: `filoReady` dice solo che i moduli sono caricati, questo che i
     // listener sono attivi, spellcheck compreso. Innocuo a runtime.
@@ -887,6 +893,29 @@
 
   // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).
   const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
+
+  // Gli avvisi di sistema li mostra solo la pagina che si sta guardando: in un'altra applicazione nessuno li vedrebbe.
+  function inVistaAdesso() {
+    return !IS_SUBFRAME && document.visibilityState === 'visible' && document.hasFocus();
+  }
+
+  function mostraAvviso(msg) {
+    // `rimedio` sceglie solo fra le pagine note di SN_CHAT_ERRORS: l'indirizzo non viaggia nel messaggio.
+    Popup?.showToast?.(String(msg.text || ''), {
+      duration: Number(msg.duration) || 2800, rimedio: msg.rimedio || null, segnala: typeof msg.segnala === 'string' ? msg.segnala : '',
+    });
+  }
+
+  // Un avviso che il main tiene in coda (#1478.1) si prende prima di mostrarlo: chi lo prende l'ha davanti, e nessun'altra
+  // pagina lo ripete. Senza `id` quelli rimasti in coda. Se la finestra è davanti lo dice il main: il fuoco può stare sulla barra.
+  async function prendiAvvisiInCoda(id) {
+    if (IS_SUBFRAME || document.visibilityState !== 'visible' || isBlocked()) return;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.AVVISI_IN_CODA, fuoco: document.hasFocus(), ...(id ? { id } : {}) }); } catch (_) { return; }
+    for (const m of (r && Array.isArray(r.avvisi) ? r.avvisi : [])) {
+      try { mostraAvviso(m); } catch (_) {}
+    }
+  }
 
   // Il segno che legge il ponte del tasto destro (page-preload.js) a ogni clic, rifatto a ogni cambio dell'elenco.
   // Spegnendosi se ne va il menu di Filo già aperto; l'Aiuto aperto resta, perché ci si sta parlando.
@@ -2594,12 +2623,8 @@
       // ogni riquadro incorporato li duplicherebbe (#405).
       if (IS_SUBFRAME) return;
       try {
-        if (document.visibilityState === 'visible' && document.hasFocus()) {
-          // `rimedio` sceglie solo fra le pagine note di SN_CHAT_ERRORS: l'indirizzo non viaggia nel messaggio.
-          Popup?.showToast?.(String(msg.text || ''), {
-            duration: Number(msg.duration) || 2800, rimedio: msg.rimedio || null, segnala: typeof msg.segnala === 'string' ? msg.segnala : '',
-          });
-        }
+        if (typeof msg.avviso === 'string' && msg.avviso) prendiAvvisiInCoda(msg.avviso);
+        else if (inVistaAdesso()) mostraAvviso(msg);
       } catch (_) {}
       return;
     }
