@@ -7496,7 +7496,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   } catch (_) {}
   if (onboardingClosed) {
     finishOnboarding({ userMessage, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno });
-  } else {
+  } else if (!mutoDopoOk) {
     // I seguiti letti sono parte della domanda a cui la risposta risponde.
     const domandaIntera = [String(userMessage || ''), ...testiDeiSeguiti].filter(Boolean).join('\n');
     lezioniAutomaticheConsentite({ sender, contesto: azioniViste, fontiLette })
