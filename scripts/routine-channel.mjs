@@ -807,7 +807,7 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
       return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e il rinvio con --force-with-lease non parte: su origin '${ramo}' è a un commit che questo ramo non ha mai avuto (qualcun altro ha spinto su '${ramo}'?)` };
     }
     const lease = run(['push', 'origin', `HEAD:refs/heads/${ramo}`, `--force-with-lease=refs/heads/${ramo}:${atteso}`]);
-    if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true, ...avviso };
+    if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true, ...spinta(), ...avviso };
     return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
   }
   return { ok: false, skipped: false, branch: ramo, reason: pulisciGit(push.out) };
