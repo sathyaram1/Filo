@@ -678,7 +678,7 @@
       if (!global.SN_FILO_UI?.veroONostro?.(e)) return;
       if (e.detail?.blob) {
         e.preventDefault();
-        await addImageFromBlob(e.detail.blob);
+        await allega([e.detail.blob], addImageFromBlob);
       }
     });
 
