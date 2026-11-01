@@ -495,6 +495,54 @@ test('Mac: lo script del Finder legge la Scrivania, sposta solo le icone chieste
   assert.throws(() => D.costruisci('desktop-disponi', { posizioni: [], disposizione: 'qualunque' }, 'darwin'), /sconosciuto/);
 });
 
+// Il Finder finto come computer: lettura e spostamento passano dallo script vero.
+function computerDelFinder(finder) {
+  const via = (comando, p) => D.interpretaLettura(C.leggiUscita(eseguiJxa(finder, D.costruisci(comando, p, 'darwin').env)));
+  return {
+    piattaforma: 'darwin',
+    async leggi() { return via('desktop-leggi', {}); },
+    async disponi(posizioni, o) { return via('desktop-disponi', { posizioni, ...o }); },
+  };
+}
+const filaDelFinder = (finder) => finder.stato.voci.slice().sort((a, b) => a.pos[1] - b.pos[1] || a.pos[0] - b.pos[0]).map((v) => v.nome);
+
+test('Mac: un dato che il Finder non dà in blocco si chiede voce per voce, e l\'ordine chiesto resta quello', async () => {
+  const scrivania = [
+    { url: 'file:///Users/josh/Desktop/appunti.txt', nome: 'appunti.txt', pos: [1380, 60], classe: 'documentFile', est: 'txt', dim: 10, data: new Date(1) },
+    { url: 'file:///Users/josh/Desktop/film.mov', nome: 'film.mov', pos: [1380, 160], classe: 'documentFile', est: 'mov', dim: 9000000, data: new Date(2) },
+    { url: 'file:///Users/josh/Desktop/contratto.pdf', nome: 'contratto.pdf', pos: [1380, 260], classe: 'documentFile', est: 'pdf', dim: 5000, data: new Date(3) },
+    { url: 'file:///Users/josh/Desktop/Zeta/', nome: 'Zeta', pos: [1380, 360], classe: 'folder', est: '', data: new Date(4) },
+  ];
+  // La cartella fa fallire le dimensioni in blocco (come nel Finder finto di sopra).
+  const perDimensione = finderFinto(scrivania, { arrangement: 'not arranged' });
+  const r = await conDesktop(computerDelFinder(perDimensione), () => D.ordinaIcone({ ordine: 'dimensione', verso: 'righe' }));
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(filaDelFinder(perDimensione), ['film.mov', 'contratto.pdf', 'appunti.txt', 'Zeta']);
+
+  const senzaClassi = finderFinto(scrivania, { arrangement: 'not arranged' });
+  senzaClassi.stato.voci.forEach((v) => { v.classe = v.classe; });
+  const bloccoRotto = Object.getOwnPropertyDescriptor(senzaClassi.Application().desktop.items, 'class');
+  assert.ok(bloccoRotto);
+  senzaClassi.Application().desktop.items.class = () => { throw new Error('classe non data in blocco'); };
+  const c = await conDesktop(computerDelFinder(senzaClassi), () => D.ordinaIcone({ ordine: 'nome', verso: 'righe', cartelle_prima: true }));
+  assert.equal(c.ok, true, JSON.stringify(c));
+  assert.equal(filaDelFinder(senzaClassi)[0], 'Zeta');
+});
+
+test('per data o per dimensione senza il dato per nessuna icona: non è «fatto» in ordine alfabetico, e si dice perché', async () => {
+  for (const [piattaforma, finto] of [['win32', desktopFinto()], ['darwin', { ...scrivaniaFinta(), piattaforma: 'darwin' }]]) {
+    for (const ordine of ['data', 'dimensione']) {
+      const r = await conDesktop(finto, () => D.ordinaIcone({ ordine }));
+      assert.equal(r.errore, 'senza-dati', `${piattaforma} ${ordine}: ${JSON.stringify(r)}`);
+      assert.ok(!finto.chiamate || !finto.chiamate.some((x) => x[0] === 'disponi'), 'niente spostato');
+      assert.match(D.esitoPerModello(r), new RegExp(`^Non fatto: .*in ordine ${ordine === 'data' ? 'per data' : 'per dimensione'}, in ordine alfabetico sì`));
+    }
+  }
+  // Solo le icone di sistema (il Cestino) non hanno date: non c'è niente da chiedere al disco, e l'ordine si fa.
+  const sistema = desktopFinto({ voci: [voce(['::{645FF040-5081-101B-9F08-00AA002F954E}', 'Cestino', 903, 402])] });
+  assert.equal((await conDesktop(sistema, () => D.ordinaIcone({ ordine: 'data' }))).ok, true);
+});
+
 test('Mac: se il Finder rifiuta una posizione, «Ordina per» torna com\'era e lo script lo dice', () => {
   const finder = finderFinto([{ url: 'file:///Users/josh/Desktop/Alfa/', nome: 'Alfa', pos: [1380, 60], classe: 'folder', est: '' }], { rotto: true });
   const r = D.interpretaLettura(C.leggiUscita(eseguiJxa(finder, D.costruisci('desktop-disponi', { posizioni: [{ id: 'file:///Users/josh/Desktop/Alfa/', x: 80, y: 60 }] }, 'darwin').env)));
