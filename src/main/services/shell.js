@@ -578,6 +578,17 @@ function programmaWindowsAlPercorso(p, shell) {
   return [...est].some((e) => file(p + e));
 }
 
+// #892.5 — dash (il /bin/sh di Debian e Ubuntu) risponde sì a `command -v` per qualunque percorso che c'è, documento o
+// cartella: la regola la tiene Node, uguale per ogni shell POSIX. Il `~` lo espande la shell anche davanti a un programma.
+function programmaPosixAlPercorso(cmd, cwd) {
+  const p = /^~(?=\/|$)/.test(cmd) ? path.join(os.homedir(), cmd.slice(1)) : path.resolve(cwd || defaultCwd(), cmd);
+  try {
+    if (!fs.statSync(p).isFile()) return false;
+    fs.accessSync(p, fs.constants.X_OK);
+    return true;
+  } catch (_) { return false; }
+}
+
 // true esiste, false non esiste di certo, null non si è potuto sapere (la dashboard lo lascia senza colore).
 async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS } = {}) {
   const cmd = String(command == null ? '' : command).trim();
