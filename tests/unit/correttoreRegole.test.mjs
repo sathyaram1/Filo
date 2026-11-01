@@ -280,5 +280,5 @@ test('i tipi che un controllo non dà si ignorano; una contraddizione vale solo 
 test('le virgolette tipografiche del modello ritrovano quelle dritte del testo, alla stessa posizione', () => {
   const testo = "Dov'e il libro";
   const { segni } = C.segniDaRisposta("[Dov’e][Dov’è][accento][errore]", testo);
-  assert.deepEqual(segni.map((s) => [s.segment, s.correzioni[0]]), [["Dov'e", 'Dov’è']]);
+  assert.deepEqual(segni.map((s) => [s.segment, s.correzioni[0]]), [["Dov'e", "Dov'è"]], 'la correzione tiene l’apice di chi scrive (#1690)');
 });
