@@ -678,7 +678,8 @@ describe('release da riga di comando', () => {
       });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
-      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true }, 'il consumo di chi lancia non è del rilascio provato');
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true, branch: 'worker/14', sha: remoteSha(origin, 'worker/14') },
+        'il consumo di chi lancia non è del rilascio provato');
       assert.equal(g(work, ['status', '--porcelain']), '', 'niente di chi lancia resta nella cartella di prova');
       assert.equal(g(work, ['log', '-1', '--format=%an']), 'claude-local', 'chi committa è la prova, non la routine che la lancia');
     } finally {
