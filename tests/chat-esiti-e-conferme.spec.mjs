@@ -102,7 +102,7 @@ test('#1294 riaperta, la chat racconta la cosa fatta e quella non riuscita col p
   await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBeGreaterThan(prima);
   const ch = await chiamateAlModello(app);
   const detto = rispostaA(ch[ch.length - 1], 'timer di 5 minuti per la pasta');
-  expect(detto).toMatch(/fatta: .*Pasta/);
+  expect(detto).toMatch(/fatta: Timer avviato · Pasta · 5 min/);
   expect(detto).toMatch(/NON riuscita: .*\(perché: la modalità terminale è spenta\)/);
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
   await page.reload();
