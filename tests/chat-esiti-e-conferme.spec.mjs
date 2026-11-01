@@ -187,6 +187,22 @@ test('#1373 dopo l\'OK che sblocca un passo rimasto indietro Filo riprende da so
   await ripristina(app);
 });
 
+// Che dopo il sì ci sia altro da fare lo sa solo il modello: lo dichiara sull'azione (`poi`), e il lavoro riprende.
+test('#1373 chiesti due passi, il modello propone il primo e dichiara il seguito: dopo l\'OK Filo riprende da solo', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await terminaleSpento(app);
+  const conSeguito = { ...TERMINALE, arguments: '{"chiave":"modalita_terminale","valore":true,"poi":true}' };
+  await modelloFinto(app, [{ text: '', toolCalls: [conSeguito] }, { text: 'RIPRESO DA SOLO: ora lancio ls.' }]);
+  await chiedi(page, 'accendi il terminale e poi lancia ls');
+  await confermaScritta(page);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RIPRESO DA SOLO' })).toBeVisible({ timeout: 10_000 });
+  const ch = await chiamateAlModello(app);
+  expect(ch).toHaveLength(2);
+  expect(JSON.stringify(ch[1])).toContain('ha CONFERMATO');
+  await ripristina(app);
+});
+
 test('#1294 la conferma data dopo aver cambiato conversazione resta in quella dove è nato il bottone', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
