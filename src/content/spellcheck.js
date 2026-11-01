@@ -2079,19 +2079,25 @@
     }
   }
 
-  // Sopra le x di una riga che non è la prima il valore cadrebbe sulle parole della riga prima (#1448): lì resta velato,
-  // lascia il clic al testo e si sveglia (pieno, cliccabile) col puntatore sulle x, finché resta su x o valore.
-  function copreIlTesto(state, b, x, da) {
+  // Il valore sta sopra le x e non esce dal campo: fuori coprirebbe e prenderebbe il clic a ciò che la pagina ha lì
+  // (#1448.12), quindi sulla prima riga va sotto. Sulle parole di un'altra riga resta velato (#1448): lascia il clic al
+  // testo e si sveglia (pieno, cliccabile) col puntatore sulle x. Senza posto nel campo, sopra e velato.
+  function postoDelValore(state, b, x, tr) {
     const w = b.offsetWidth;
     const h = b.offsetHeight;
-    if (!w || !h) return false;
+    const q = state.riquadro;
+    if (!w || !h || !q) return { sotto: false, velato: false };
     const cx = x.left + x.width / 2;
-    const top = x.top - 1 - h;
-    return rettangoliDi(state, Math.max(0, da - 1000), da).some((r) => {
+    const copre = (top, da, a) => rettangoliDi(state, da, a).some((r) => {
       const mezzo = r.top + r.height / 2;
       if (mezzo >= x.top && mezzo <= x.bottom) return false;
       return r.bottom > top + 1 && r.top < top + h - 1 && r.right > cx - w / 2 && r.left < cx + w / 2;
     });
+    const sopra = x.top - 1 - h;
+    if (sopra >= q.top) return { sotto: false, velato: copre(sopra, Math.max(0, tr.a - 1000), tr.a) };
+    const sotto = x.bottom + 1;
+    if (sotto + h <= q.top + q.height) return { sotto: true, velato: copre(sotto, tr.b, tr.b + 1000) };
+    return { sotto: false, velato: true };
   }
 
   function svegliaValori(e) {
