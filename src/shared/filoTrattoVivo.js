@@ -348,12 +348,13 @@
       const pezzi = [schede.aperte ? `${schede.aperte} apert${schede.aperte === 1 ? 'a' : 'e'}` : '', schede.chiuse ? `${schede.chiuse} chius${schede.chiuse === 1 ? 'a' : 'e'}` : ''].filter(Boolean);
       righe.push(`- schede dei siti: ${pezzi.join(', ')} (quelle aperte adesso le dice TAB APERTE)`);
     }
-    if (!righe.length) return { testo: '', ids };
+    const visite = rendiPagine(pagine, { rif });
+    if (!righe.length) return { testo: visite, ids };
     const tenute = righe.slice(-MAX_RIGHE_EVENTI);
     const fuori = righe.length - tenute.length;
     const testa = fuori ? [`- (prima di queste, altre ${fuori} cose successe dal messaggio prima: qui non ci sono)`] : [];
     const busta = E().imbusta({ tipo: 'FILO_ACCADUTI', conIntestazione: true, testo: [...testa, ...tenute].join('\n') });
-    return { testo: `Successo dal messaggio prima:\n${busta}`, ids };
+    return { testo: [`Successo dal messaggio prima:\n${busta}`, visite].filter(Boolean).join('\n\n'), ids };
   }
 
   // Il blocco che Filo scrive in un messaggio dell'utente, dopo l'ora e la chat: vuoto se non c'è niente da dire.
