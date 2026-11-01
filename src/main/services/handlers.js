@@ -7650,6 +7650,7 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   contaHomeVista,
   executeFiloAction,
+  observationsForPrompt,
   chiaveConferma: pendingConfirmKey,
   controllaUscita,
   apriDaFilo,
