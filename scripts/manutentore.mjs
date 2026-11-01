@@ -500,8 +500,9 @@ export function contestoRedattore({ blocco, capacita = '', schede = [], commit =
 }
 
 /**
- * La riscrittura del redattore, prima di consegnarla: versione del blocco, nessun link né segnalazione nuovi, ogni
- * promessa su un lavoro della rosa o a priorità 3 e dichiarata col numero. Le impronte delle righe lette vanno col resto:
+ * La riscrittura del redattore, prima di consegnarla: versione del blocco, nessun link né segnalazione nuovi, ogni riga
+ * nata da righe dei worker (`da`, o copiata uguale) oppure promessa dichiarata col numero di un lavoro della rosa o a
+ * priorità 3: una promessa si riconosce dal non avere fonte, non dalle parole. Le impronte delle righe lette vanno col resto:
  * una riga fusa dopo resta accanto alla riscrittura (scripts/release-novita.mjs). → { ok, novita } | { ok:false, errori }. PURA.
  */
 export function controllaNovita(consegna, { blocco, schede = [] }) {
