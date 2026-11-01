@@ -106,7 +106,7 @@ test('#1294 riaperta, la chat racconta la cosa fatta e quella non riuscita col p
   expect(detto).toMatch(/NON riuscita: .*\(perché: la modalità terminale è spenta\)/);
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
   await page.reload();
-  await expect(bolla.locator('.dash-activity-row', { hasText: 'Non riuscita' })).toBeVisible({ timeout: 8_000 });
+  await expect(bolla.locator('.dash-activity-row', { hasText: 'Comando non eseguito' })).toBeVisible({ timeout: 8_000 });
   await page.screenshot({ path: 'tests/.shots/chat-esiti-riaperta-scuro.png' });
   await ripristina(app);
 });
