@@ -173,8 +173,10 @@ function comandoPerPosix(command) {
 
 // stdout e stderr sono due tubi: l'errore di un comando poteva arrivare dopo il suo marcatore e finire sotto il comando
 // dopo. Il segno su stderr chiude anche quel tubo; chi ha chiuso lo stderr della shell lo aspetta al più ATTESA_ERR_MS.
+// Tutto su una riga: bash legge lo stdin un byte per volta, e un comando che chiede (`cp -i`, `read`) si prendeva la
+// riga dei marcatori al posto della risposta scritta sotto l'uscita. Una riga la shell la legge intera prima di lanciarla.
 function righePosix(command, sid, n) {
-  return `${comandoPerPosix(command)}\n__filo_s=$?; printf 'FILO_EFINE_${sid}:${n}\\n' >&2; `
+  return `${comandoPerPosix(command)}; __filo_s=$?; printf 'FILO_EFINE_${sid}:${n}\\n' >&2; `
     + `printf 'FILO_META_${sid}:%s:%s\\n' "$__filo_s" "$PWD"\n`;
 }
 const ATTESA_ERR_MS = 800;
