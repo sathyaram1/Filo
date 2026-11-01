@@ -253,7 +253,7 @@
           try { onScadutaFn && onScadutaFn(it); } catch (_) {}
           continue;
         }
-        if (it.tokenRifiutato) continue;
+        if (it.tokenRifiutato) { rispondi(it.id, { esito: 'in_coda' }); continue; }
         const fb = feedback();
         if (!fb || typeof fb.submit !== 'function') { anyFail = true; break; }
         try {
