@@ -454,6 +454,13 @@ function buildNativeContextMenu(wc, params) {
   return menu.items.length ? menu : null;
 }
 
+// L'ultima volta che la scheda ha suonato (#1397): se suona ancora è adesso, non quando è partita. Chi la chiude o salva
+// la sessione mentre suona la legge da qui, o perderebbe contro un video fermato dopo l'inizio della musica.
+function ultimoSuono(tab) {
+  if (!tab) return 0;
+  return tab.audible && tab._suonaOra ? Date.now() : (tab.audioAt || 0);
+}
+
 class TabManager {
   constructor(window, shellView, { shellHeight = 88, incognito = false, partition = null } = {}) {
     this.win = window;
