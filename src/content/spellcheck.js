@@ -972,6 +972,7 @@
     let pos = 0;
     let serveACapo = false;
     const bordi = [0];
+    const aCapi = new Map();
     const aCapo = () => { testo += '\n'; bordi.push(pos); serveACapo = false; };
     const visita = (n) => {
       if (n.nodeType === 3) {
