@@ -4756,6 +4756,16 @@ function hostOf(url) {
   } catch (_) { return null; }
 }
 
+// Le schede che il riordino tiene insieme: lo stesso sito, o la stessa pagina di Filo (la home, le Preferenze).
+function chiaveColore(url) {
+  const host = hostOf(url);
+  if (host) return host;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'filo:' && u.host ? `filo://${u.host}` : null;
+  } catch (_) { return null; }
+}
+
 function canGoBack(wc) {
   if (wc.navigationHistory?.canGoBack) return wc.navigationHistory.canGoBack();
   if (typeof wc.canGoBack === 'function') return wc.canGoBack();
