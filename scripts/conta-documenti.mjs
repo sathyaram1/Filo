@@ -206,7 +206,7 @@ export function raccoltaDi(nome, radice) {
   return pezzi.slice(0, -1).join('/');
 }
 
-/** `feedback/abc/note` → `feedback/*\/note`: le sottoraccolte con lo stesso nome sotto lo stesso genere di documento. PURA. */
+// feedback/abc/note → feedback/*/note: le sottoraccolte con lo stesso nome sotto lo stesso genere di documento. PURA.
 export function gruppoDi(raccolta) {
   return String(raccolta).split('/').map((p, i) => (i % 2 ? '*' : p)).join('/');
 }
