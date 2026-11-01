@@ -167,6 +167,46 @@ test('in un campo modificabile su più righe il modello vede le righe e la corre
   await expect(page.locator('#ce')).toHaveText(/Prima riga con un errore\.\s*Seconda riga\./);
 });
 
+// #1449.3
+test('una correzione che toglie un pezzo senza scrivere niente: il secondo clic lo rimette, anche se il campo è cambiato altrove', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const TA = 'Ieri sono proprio andato al mare con i miei amici.';
+  const togli = (prima, perche) => JSON.stringify({ text: 'Una parte è di troppo.', correzioni: [{ prima, dopo: '', perche }], status: 'done' });
+  const page = await apri(app, openTab, testServer, { risposte: [['erore', togli(' con un erore', 'superfluo')], ['', togli(' proprio', 'di troppo')]] });
+  await page.fill('#ta', TA);
+
+  await valutaSu(page, '#ta');
+  const A = await paginaDellAiuto(app, page);
+  const correzione = A.locator('.sn-sidebar-correzione', { hasText: 'proprio' });
+  await expect(correzione).toHaveCount(1, { timeout: 20_000 });
+  await correzione.click();
+  await expect(page.locator('#ta')).toHaveValue('Ieri sono andato al mare con i miei amici.');
+  await expect(correzione).toHaveClass(/sn-sidebar-correzione-fatta/);
+  // Chi scrive aggiunge qualcosa in testa: il pezzo torna lo stesso dov'era.
+  await page.locator('#ta').evaluate((el) => { el.value = `Sì. ${el.value}`; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await correzione.click();
+  await expect(page.locator('#ta')).toHaveValue(`Sì. ${TA}`);
+  await expect(correzione).not.toHaveClass(/sn-sidebar-correzione-fatta/);
+  await expect(A.locator('.sn-sidebar-log-intera')).toHaveCount(0);
+  // E si toglie di nuovo.
+  await correzione.click();
+  await expect(page.locator('#ta')).toHaveValue('Sì. Ieri sono andato al mare con i miei amici.');
+  await correzione.click();
+  await expect(page.locator('#ta')).toHaveValue(`Sì. ${TA}`);
+  await expect.poll(() => valutaOggi(app), { timeout: 5000 }).toMatchObject({ correzione_accettata: 2, correzione_tolta: 2 });
+
+  // In un campo modificabile su più righe il pezzo torna nella sua riga, e le righe restano due.
+  await valutaSu(page, '#ce');
+  const riga = A.locator('.sn-sidebar-correzione', { hasText: 'erore' });
+  await expect(riga).toHaveCount(1, { timeout: 20_000 });
+  await riga.click();
+  await expect(page.locator('#ce')).toHaveText(/^Prima riga\.\s*Seconda riga\.$/);
+  await riga.click();
+  await expect(page.locator('#ce')).toHaveText(/^Prima riga con un erore\.\s*Seconda riga\.$/);
+  expect(await page.locator('#ce > div').count()).toBe(2);
+  await expect(A.locator('.sn-sidebar-log-intera')).toHaveCount(0);
+});
+
 test('un modello della chat che non vede le immagini risponde lo stesso, senza la foto della pagina', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await apri(app, openTab, testServer, { risposte: [['', PARERE]], senzaFoto: true });
