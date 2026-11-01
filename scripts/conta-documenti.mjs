@@ -134,8 +134,11 @@ function messaggioGoogle(testo) {
 function erroreHttp(status, testo, progetto, database) {
   const detto = messaggioGoogle(testo);
   const coda = detto ? ` Risposta: ${detto}` : '';
-  if (status === 401 || status === 403) {
-    return new Error(`Firestore ha detto no (${status}) sul progetto ${progetto}: l'account attivo di gcloud non può leggerlo, `
+  if (status === 401) {
+    return new Error(`Firestore non riconosce le credenziali di gcloud (401): accedi di nuovo con «gcloud auth login» e rilancia.${coda}`);
+  }
+  if (status === 403) {
+    return new Error(`Firestore ha detto no (403) sul progetto ${progetto}: l'account attivo di gcloud non può leggerlo, `
       + `o l'API di Firestore lì non è attiva. «gcloud auth list» dice quale account è attivo.${coda}`);
   }
   if (status === 404) return new Error(`il database ${database} del progetto ${progetto} non esiste (404).${coda}`);

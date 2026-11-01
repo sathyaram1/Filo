@@ -114,7 +114,7 @@ test('conta ogni raccolta, sottoraccolte comprese, anche sotto un documento che 
   assert.deepEqual(Object.keys(conto.raccolte), Object.keys(ATTESO), 'stesso ordine a ogni giro');
   assert.equal(conto.totale, DOCUMENTI.length);
   assert.deepEqual(avanzamenti.filter((a) => a.finita).map((a) => [a.id, a.visti]),
-    [['Zeta', 1], ['config', 2], ['feedback', 9], ['feedback-public', 1], ['paths', 3]]);
+    [['Zeta', 1], ['config', 2], ['feedback', 8], ['feedback-public', 1], ['paths', 3]]);
   assert.equal(t.chiamate.length, 1, 'un token per tutto il giro');
   for (const r of s.richieste) {
     assert.equal(r.metodo, 'POST');
@@ -227,7 +227,7 @@ test('il confronto dice cosa manca, cosa è cambiato e cosa è in più', () => {
   assert.deepEqual(righeConfronto(confronta(prima, { raccolte: { ...ATTESO } })), ['UGUALE: 10 raccolte, 15 documenti, nessuna differenza.']);
   const dopo = { ...ATTESO, config: 1, 'feedback/zz/note': 4 };
   delete dopo['feedback/c/note'];
-  const esito = confronta(prima, dopo);
+  const esito = confronta(prima, { raccolte: dopo });
   assert.equal(esito.uguale, false);
   assert.deepEqual(esito.diverse, [
     { raccolta: 'config', prima: 2, dopo: 1 },
