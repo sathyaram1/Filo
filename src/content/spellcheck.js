@@ -2969,7 +2969,42 @@
       applyFix(el, r, a.dopo ? pezzo + c : c + pezzo, { expectedSegment: c });
       return getEditableText(el) !== campo ? { dove: p } : { fermo: true };
     }
-    return { fermo: true };
+    // Il pezzo stava da solo sulla sua riga di un editor ricco, o era tutto il campo: accanto non c'è un carattere da
+    // riscrivere, e si scrive nel punto (#1690).
+    const dove = campoDiTesto(el) ? p : punto(p);
+    if (dove === null) return { fermo: true };
+    return scriviNelPunto(el, dove, pezzo) ? { dove: p } : { fermo: true };
+  }
+
+  // Scrive `pezzo` in un punto, come una battuta: `dove` è la posizione in una casella, il punto del documento in un
+  // campo modificabile.
+  function scriviNelPunto(el, dove, pezzo) {
+    const prima = getEditableText(el);
+    const doc = el.ownerDocument || document;
+    const input = () => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
+    try {
+      if (campoDiTesto(el)) {
+        if (!sostituisciComeBattuta(el, { start: dove, end: dove }, pezzo, 'end')) {
+          el.setRangeText(pezzo, dove, dove, 'end');
+          el.dispatchEvent(input());
+        }
+      } else {
+        el.focus({ preventScroll: true });
+        const sel = (doc.defaultView || window).getSelection();
+        const r = doc.createRange();
+        r.setStart(dove.node, dove.offset);
+        r.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(r);
+        if (!doc.execCommand('insertText', false, pezzo) || getEditableText(el) === prima) {
+          r.insertNode(doc.createTextNode(pezzo));
+          el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: pezzo }));
+        }
+      }
+    } catch (_) {}
+    const fatto = getEditableText(el) !== prima;
+    if (fatto) { try { global.SN_POPUP?.modificaDiFilo?.(el, 'correzione'); } catch (_) {} }
+    return fatto;
   }
 
   // ============================================================================
