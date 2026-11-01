@@ -11,7 +11,7 @@ import { pinnedDir, pinnedDirWorker, pinnedRepoRoot } from './tools-pin.mjs';
 import { ticketFile } from './routine-ticket.mjs';
 
 export const MARCA_GIRO = '.filo-clone-del-giro.json';
-// Un worker alla volta per ora: i worker in parallelo (#1158) useranno gli indici dopo.
+// Un worker per sessione: il parallelismo sono sessioni diverse, ognuna nel suo contenitore (SPEC-RIDISEGNO-LAVORO § 3).
 export const INDICE_GIRO = 1;
 // Il figlio deve ricavare cartella e strumenti dalla SUA copia: queste due li sovrascriverebbero.
 const AMBIENTE_TOLTO = ['FILO_REPO_ROOT', 'FILO_TOOLS_ROOT'];

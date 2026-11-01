@@ -1362,6 +1362,13 @@ migrazione le mappa. Il codice che decide in base al prefisso
 > sessione per ogni feedback scelto dal manutentore e la sessione lavora da sé
 > (`routines/roles/sessione.md`). Questa sezione resta come storia, e descrive com'è oggi
 > finché il server non accende così.
+>
+> Di § 12.2 resta, in questa forma (#1158): la sessione che lancia e aspetta gira su Haiku
+> (il modello delle routine su claude.ai), i worker sui loro modelli; i posti li conta solo
+> il server, sui lavori vivi di tutte le sessioni, e abbassarli non chiude niente
+> (`functions/test/posti-contati-1158.test.js` del server). Cadono la vita di 4 ore, il tetto K
+> per sessione, l'accensione ogni 4 ore e i compiti figli: una sessione tiene un worker, e il
+> worker divide il lavoro coi suoi sotto-agenti (fino a tre livelli).
 
 ### 12.1 Oggi
 
@@ -1374,9 +1381,9 @@ migrazione le mappa. Il codice che decide in base al prefisso
 - Il pacemaker ne riaccende un altro dai battiti. Nessun tetto giornaliero
   (#996): un'accensione che claude.ai rifiuta mette l'account in pausa, e
   Gestione → Automazioni ne dice il motivo.
-- L'orchestratore gira col modello della sessione, e la sua rilettura del
-  contesto fra un biglietto e l'altro è buona parte del 40% di consumo che i
-  biglietti non contano.
+- L'orchestratore gira col modello della routine, oggi Haiku 5.5. La sua
+  rilettura del contesto, fra un biglietto e l'altro e mentre veglia il worker,
+  non sta nei rapporti dei biglietti (§ 8.1).
 
 ### 12.2 Domani
 
@@ -1477,8 +1484,8 @@ lavorano in locale.
     `soloOwner` con le risposte scritte che tornano all'addetto.
 15. Mittenti normalizzati (§ 10).
 16. Cartella padre per le sessioni cloud (§ 11).
-17. Orchestratore Haiku con worker in parallelo (§ 12): prima la misura di K e
-    il salvataggio per cartella.
+17. Orchestratore Haiku con worker in parallelo (§ 12): chiuso da #1158 nella
+    forma del ridisegno, una sessione per lavoro (vedi la nota in testa a § 12).
 
 I punti 1–4 danno già il risultato principale: un posto solo, con le domande
 ordinate per priorità e i blocchi di sicurezza letti sul testo originale.
