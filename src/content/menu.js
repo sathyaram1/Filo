@@ -1249,11 +1249,10 @@
     global.SN_FILO_UI?.mark(sub);
     global.SN_FILO_UI?.soloGestiVeri(sub);
     sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
-    sub.style.setProperty('--sn-icon-cols', String(cols));
     if (opts.dropTarget) sub.dataset.snDropTarget = opts.dropTarget;
     keepPageFocus(sub);
 
-    populateGrid(sub, items, { dropTarget: opts.dropTarget });
+    populateGrid(sub, items, { dropTarget: opts.dropTarget, cols });
     if (opts.dropTarget) attachDropZone(sub, { target: opts.dropTarget, onDrop: opts.onDrop });
 
     monta(sub);
@@ -1309,9 +1308,10 @@
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
     activeMenu.subAnchor = anchorEl;
-    activeMenu.subMode = 'anchor';
+    // Attaccato al bordo del menu, all'altezza della fila: accanto all'icona coprirebbe le altre della fila.
+    activeMenu.subMode = 'edge';
     activeMenu.subLocked = true;
-    placeSub(sub, anchorEl, 'anchor');
+    placeSub(sub, anchorEl, 'edge');
     sorveglia(sub);
     attachSubmenuHover(sub);
     try { campo.focus({ preventScroll: true }); campo.select(); } catch (_) {}
@@ -1476,6 +1476,8 @@
   function populateGrid(sub, items, opts = {}) {
     sub.innerHTML = '';
     sub.__snGridOpts = opts;
+    // Larga quanto le icone che ha, fino a `cols` per riga: con due icone non resta un pannello mezzo vuoto.
+    sub.style.setProperty('--sn-icon-cols', String(Math.max(1, Math.min(opts.cols || 4, (items && items.length) || 1))));
     if (!items || items.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'sn-menu-empty sn-menu-grid-vuota';

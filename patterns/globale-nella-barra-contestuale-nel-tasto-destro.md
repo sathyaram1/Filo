@@ -5,9 +5,10 @@
 Ciò che riguarda la finestra o il sistema (indietro, avanti, ricarica, home,
 incognito, schermo intero, chiudi scheda) e le azioni sulla pagina intera (traduci,
 screenshot, condividi, salva per dopo, QR…) stanno nella barra laterale che si apre
-dal bordo sinistro; il tasto destro resta per l'elemento sotto il mouse e non ha
-icone (#1246). La disposizione salvata ha due zone, le icone in vista e quelle
-tenute da parte nel cassetto «Altro…» in fondo alla barra: un'icona sta in un
+dal bordo sinistro (#1246); il tasto destro resta per l'elemento sotto il mouse, e
+in cima ha la fila delle sue azioni più probabili (#1434, sezione sotto). La
+disposizione salvata ha le zone della barra (le icone in vista e il cassetto
+«Altro…» in fondo) e, per ogni contesto, la fila e il suo «+»: un'icona sta in un
 posto solo, e spostarla la toglie dall'altro.
 
 ## Perché

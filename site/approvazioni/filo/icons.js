@@ -642,11 +642,11 @@
   const link =
     `<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/>` +
     `<path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>`;
-  // Evidenziatore: il corpo inclinato, la punta a scalpello e il segno che lascia.
+  // Evidenziatore: il pennarello inclinato con la punta a scalpello, e sotto la riga che lascia.
   const highlight =
-    `<path d="M14 4.5l5.5 5.5-8 8-5.5-5.5z"/>` +
-    `<path d="M6 12.5l-2 5.5 2 2 5.5-2"/>` +
-    `<path d="M14 20h6"/>`;
+    `<path d="M16.5 2.5l4.5 4.5-7.5 7.5-4.5-4.5z"/>` +
+    `<path d="M9 10l-3 5.5 2 2 5.5-3"/>` +
+    `<path d="M3.5 21h9"/>`;
   const cut =
     `<circle cx="6" cy="17" r="3"/>` +
     `<circle cx="18" cy="17" r="3"/>` +

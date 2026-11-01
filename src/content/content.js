@@ -2589,17 +2589,24 @@
     try { gia = coloreUguale(document.queryCommandValue('hiliteColor'), COLORE_EVIDENZIA); } catch (_) {}
     formatta('hiliteColor', gia ? 'transparent' : COLORE_EVIDENZIA);
   }
+  // Il campo vuoto toglie il collegamento che c'era: è quello che vuole chi cancella l'indirizzo e preme Invio.
   function collega(scritto) {
+    if (!String(scritto || '').trim()) { formatta('unlink'); return; }
     const url = self.SN_URL_NAV?.collegamentoScritto?.(scritto) || '';
     if (!url) { Popup.showToast(I18n.t('fila_link_non_valido')); return; }
     formatta('createLink', url);
   }
-  // Il collegamento proposto: la selezione stessa se è un indirizzo, se no l'ultima cosa copiata se lo è.
+  // Il collegamento proposto: quello che c'è già, la selezione stessa se è un indirizzo, o l'ultima cosa copiata se lo
+  // è. Gli appunti solo nelle pagine di Filo: il campo sta nel documento della pagina, e un sito lo leggerebbe.
   function collegamentoProposto(selInfo, clipboardHistory) {
     const U = self.SN_URL_NAV;
     if (!U?.collegamentoScritto) return '';
+    const g = window.getSelection && window.getSelection();
+    const nodo = g && g.anchorNode ? (g.anchorNode.nodeType === 1 ? g.anchorNode : g.anchorNode.parentElement) : null;
+    const gia = nodo && nodo.closest ? nodo.closest('a[href]') : null;
+    if (gia) return U.collegamentoScritto(gia.getAttribute('href')) || '';
     const dallaSelezione = U.collegamentoScritto(selInfo && selInfo.selection);
-    if (dallaSelezione) return dallaSelezione;
+    if (dallaSelezione || !PAGINA_DI_FILO) return dallaSelezione;
     const ultima = Array.isArray(clipboardHistory) ? clipboardHistory.find((e) => e && e.type === 'text') : null;
     return (ultima && U.collegamentoScritto(ultima.text)) || '';
   }
