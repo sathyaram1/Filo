@@ -297,6 +297,11 @@ app.whenReady().then(async () => {
   // farsi sentire ne apre una): senza aggiornarlo, questo punta a una chiusa.
   onFinestraNormale((w) => { mainWindow = w; });
   mainWindow = createMainWindow();
+  // Nelle prove, quando è nata la finestra e quando la prima scheda ha potuto partire (tests/seconda-apertura.spec.mjs).
+  if (process.env.NODE_ENV === 'test') {
+    globalThis.__filoAvvio = { finestra: Date.now(), pronti: null };
+    pronti.then(() => { globalThis.__filoAvvio.pronti = Date.now(); });
+  }
 
   // Dopo la prima scheda: niente di questo cambia come si apre.
   pronti.then(() => {
