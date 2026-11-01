@@ -12,7 +12,10 @@ documento.
 
 - **Nasce prima del clic.** Il menu nasce nascosto quando la barra della
   finestra ha finito di caricarsi (`preparaMenu` in `src/main/window.js`), col
-  documento e il preload già caricati. Chi lo distrugge (uno spec, la chiusura
+  documento e il preload già caricati. Il fumetto, uno per l'app, nasce lì con
+  lui (`preparaSuggerimento`): il primo suggerimento dopo l'avvio aspettava un
+  processo nuovo e arrivava tardi (#871.4). Tutti e due senza
+  `backgroundThrottling`: nascosti rispondono come visibili. Chi lo distrugge (uno spec, la chiusura
   della madre) non rompe niente: la prossima apertura lo ricrea.
 - **Col processo morto si butta e rinasce.** Riusata, una finestra il cui
   renderer è morto lascerebbe la madre senza menu (o fumetto, o carta) fino al

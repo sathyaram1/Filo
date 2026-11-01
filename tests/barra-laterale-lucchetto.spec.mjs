@@ -76,6 +76,13 @@ test('il lucchetto tiene aperta la barra e spinge la pagina; il mouse, i clic e 
   await expect.poll(async () => (await pagina(app)).x).toBe(0);
   await expect(lucchetto).toHaveAttribute('aria-pressed', 'false');
   expect((await statoBarra(app)).aperta).toBe(true);
+
+  // Due clic di fila: bloccata e di nuovo sbloccata, non due volte la stessa scelta.
+  await lucchetto.click();
+  await lucchetto.click();
+  await pausa(400);
+  expect(await bloccata(app)).toBe(false);
+  expect((await pagina(app)).x).toBe(0);
 });
 
 test('dal tasto destro, dalla scorciatoia e dalle Preferenze: la stessa impostazione', async ({ app, openTab, testServer }) => {

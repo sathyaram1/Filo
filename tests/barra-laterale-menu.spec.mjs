@@ -59,7 +59,7 @@ test('tasto destro sulla striscia e sulla linguetta: nascondere la striscia e sp
   await barra.locator('#striscia').click({ button: 'right', position: { x: 1, y: 200 } });
   let menu = await menuAperto(app);
   expect(menu, 'il menu della striscia non si è aperto').toBeTruthy();
-  expect(await vociDelMenu(menu)).toEqual(['Apri la barra laterale', 'Nascondi la striscia sul bordo', 'Non aprirla spingendo sul bordo', 'Regola la barra laterale…']);
+  expect(await vociDelMenu(menu)).toEqual(['Apri la barra laterale', 'Tieni aperta la barra laterale', 'Nascondi la striscia sul bordo', 'Non aprirla spingendo sul bordo', 'Regola la barra laterale…']);
   await scegliNelMenu(menu, 'Nascondi la striscia sul bordo');
   await expect.poll(async () => (await opzioni(app)).striscia).toBe(false);
   await expect(barra.locator('html.senza-striscia')).toHaveCount(1);

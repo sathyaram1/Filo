@@ -195,7 +195,11 @@ class BarraLaterale {
     this._spingi();
   }
 
-  blocca(v) { return this._scriviOpzioni({ bloccata: !!v }); }
+  // Subito qui, poi su disco: due clic di fila sul lucchetto non leggono lo stesso valore vecchio.
+  blocca(v, prov) {
+    this.impostazioni({ ...this.opzioni, bloccata: !!v });
+    return this._scriviOpzioni({ bloccata: !!v }, prov);
+  }
 
   // Da ogni chat (#1292): chiudere vale anche bloccata, come il tasto. Il lucchetto si scrive nel registro di chi chiama
   // (la chat, l'Aiuto). null se il comando non è della barra; `gia`: era già così.
@@ -206,8 +210,7 @@ class BarraLaterale {
     if (op === 'chiudi') { const gia = !this.aperta; this.chiudi({ forza: true }); return { op, gia }; }
     const v = op === 'blocca';
     const gia = !!this.opzioni.bloccata === v;
-    await this._scriviOpzioni({ bloccata: v }, null);
-    this.impostazioni({ ...this.opzioni, bloccata: v });
+    await this.blocca(v, null);
     // Già bloccata ma chiusa col tasto: chiederlo a parole la riapre.
     if (v && this._tiene() && !this.aperta) this.apri('bloccata');
     return { op, gia };
