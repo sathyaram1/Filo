@@ -113,7 +113,7 @@ module.exports = function register(on, ctx) {
       const tipo = String((a && a.type) || '').toUpperCase();
       try {
         riprendi = Levels.diSolaLettura(tipo)
-          || !!(r.output && ctx.observationsForPrompt([{ ...msg.action, _output: r.output, _executed: !!r.executed }]));
+          || !!(r.output && ctx.observationsForPrompt([{ ...msg.action, _confirm: undefined, _output: r.output, _executed: !!r.executed }]));
       } catch (_) { riprendi = false; }
     }
     return { ok: true, ...r, ...(fatto ? { fatto } : {}), ...(riprendi ? { riprendi: true } : {}) };
