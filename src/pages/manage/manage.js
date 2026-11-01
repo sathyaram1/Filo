@@ -961,6 +961,8 @@
     if (mgAccountA) mgAccountA.checked = !vista.accountAOff;
     if (mgAccountB) mgAccountB.checked = !vista.accountBOff;
     if (mgManutentoreAcceso) mgManutentoreAcceso.checked = noto('manutentoreAcceso') && vista.manutentoreAcceso;
+    if (mgReteAperta) mgReteAperta.checked = !vista.reteApertaOff;
+    if (mgReteApertaTetto && !tettoInScrittura) mgReteApertaTetto.value = noto('reteApertaTetto') ? String(vista.reteApertaTetto) : '';
     // Esclusi tutti e due non parte niente; escluso il solo prioritario si
     // lavora sull'altro. Due stati che a guardare gli interruttori non si
     // capiscono, quindi si scrivono.
