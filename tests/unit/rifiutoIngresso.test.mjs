@@ -38,6 +38,9 @@ test('il tipo di contenuto si legge dal rifiuto del router e da quello di un hos
     'At most 1 image(s) may be provided in one request.',
     'Image is too large: maximum 5 MB.',
     'Request payload too large',
+    // Una foto che un modello che legge le immagini non riesce ad aprire: cambiare modello non è il rimedio.
+    'Unable to process input image. Please retry or report in https://developers.generativeai.google/guide/troubleshooting',
+    'Provider returned error: Unable to read image',
     '',
   ]) assert.equal(CE.ingressoRifiutato(testo), '', testo);
 });
