@@ -308,6 +308,7 @@
     function clearDraft(inviata) {
       if (!DRAFT_KEY) return;
       try {
+        if (inviata === undefined) { chrome.storage.local.remove([DRAFT_KEY]); return; }
         chrome.storage.local.get([DRAFT_KEY]).then((r) => {
           if (r?.[DRAFT_KEY] === inviata) chrome.storage.local.remove([DRAFT_KEY]);
         }).catch(() => {});
