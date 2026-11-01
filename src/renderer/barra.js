@@ -477,7 +477,7 @@
     root.classList.toggle('aperta', !!stato.aperta);
     // «Altro…» si richiude con la barra: alla riapertura, così mentre scivola via non cambia sotto gli occhi.
     if (stato.aperta && !eraAperta && altroAperto) { altroAperto = false; firma = null; }
-    root.classList.toggle('senza-striscia', opzioni().striscia === false);
+    root.classList.toggle('senza-striscia', opzioni().striscia === false || stato.schermoIntero === true);
     // Il puntatore fermo nella fascia del bordo che la vista non vede: la sorveglia il main, e la striscia lo mostra.
     striscia.classList.toggle('bordo', !stato.aperta && !!stato.bordo);
     striscia.classList.toggle('risposta', !!stato.risposta);
