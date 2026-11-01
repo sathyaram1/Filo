@@ -81,7 +81,8 @@
 //         dai commit (un file nato da una shell non passa dall'hook) e
 //         spedisce il ramo corrente su origin (--force-with-lease se la
 //         storia è stata riscritta): se il push fallisce NON rilascia ed
-//         esce diverso da zero. `--senza-push` dove non c'è un repo. Allega da solo il rapporto di fine sessione
+//         esce diverso da zero; riuscito, ramo e punta spinti viaggiano col rilascio, per il registro del ramo
+//         (#2021). `--senza-push` dove non c'è un repo. Allega da solo il rapporto di fine sessione
 //         (session-report.mjs; `--role <ruolo>` per firmarlo; `--senza-rapporto`
 //         per saltarlo).
 //
