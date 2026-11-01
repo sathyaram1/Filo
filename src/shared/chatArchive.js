@@ -494,6 +494,11 @@
       // Mai passata dal giudizio dei collegamenti (risposta interrotta, riga scritta dalla pagina), o con più collegamenti
       // da confermare di quanti se ne tengano: riaperta, quelli che mancano non passano per controllati.
       if (turn.senzaVerdetto === true || daConfermare.length > linkDaConfermare.length) out.senzaVerdetto = true;
+      // Com'è andata ogni azione del turno, comprese le fallite e quelle ferme sulla conferma (#1294, #1130.2): `actions`
+      // resta il nome di quelle successe, per chi lo legge già così.
+      const E = global.SN_ESITO;
+      const esiti = E && Array.isArray(turn.esiti) ? E.vociArchivio(turn.esiti) : [];
+      if (esiti.length) out.esiti = esiti;
     }
     return out;
   }
