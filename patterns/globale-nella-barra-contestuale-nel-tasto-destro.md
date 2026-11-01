@@ -51,7 +51,11 @@ per le azioni sulla pagina intera, che stavano in una fila in cima al menu (#124
   schermo, il puntatore lì non si spinge contro niente: chi si ferma sulla fascia
   sta per ridimensionare, e la spinta aspetta `ATTESA_STACCATA_MS` in più. Contro
   il bordo dello schermo (o massimizzata) vale l'attesa scelta. Regola pura:
-  `staccataDalBordo` in `src/main/barraLaterale.js`.
+  `staccataDalBordo` in `src/main/barraLaterale.js`. La spinta che vede la pagina
+  della barra conta l'attesa scelta: dove vale quella lunga decide la sonda.
+- **Bloccata, la barra nasce all'avvio**, a volte prima che la fila delle schede
+  si annunci: una prova che riavvia Filo bloccato apre la scheda dal main, non
+  dalla prima finestra.
 - **Il gruppo che scorre lo dice**: senza barra di scorrimento, sfuma dal lato
   dove ci sono altre icone, e l'icona appena arrivata si porta in vista.
 - **Tutto si regola** (Preferenze → Avanzate, a parole, tasto destro sulla

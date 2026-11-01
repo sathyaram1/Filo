@@ -22,6 +22,7 @@ const pagina = (app) => app.evaluate(({ BrowserWindow }) => {
   const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
   return t.view.getBounds();
 });
+const finestraIntera = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito).isFullScreen());
 const bloccata = (app) => app.evaluate(async () => !!(await globalThis.SN_STORAGE.getSettings()).barraLaterale?.bloccata);
 
 test('il lucchetto tiene aperta la barra e spinge la pagina; il mouse, i clic e l\'Esc sulla pagina non la chiudono, il tasto sì', async ({ app, openTab, testServer }) => {
@@ -185,6 +186,8 @@ test('a tutto schermo bloccata vale da sbloccata: si chiude e la pagina prende t
   await page.mouse.move(610, 305);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.setContentFullscreen(true));
   await expect.poll(async () => (await statoBarra(app)).schermoIntero).toBe(true);
+  // Lo schermo intero del sistema arriva dopo: uscirne prima lo farebbe rientrare quando arriva.
+  await expect.poll(() => finestraIntera(app), { timeout: 10_000 }).toBe(true);
   await expect.poll(async () => (await statoBarra(app)).aperta).toBe(false);
   expect((await pagina(app)).x).toBe(0);
   // Il tasto la apre sopra la pagina, che non si sposta.
@@ -193,6 +196,7 @@ test('a tutto schermo bloccata vale da sbloccata: si chiude e la pagina prende t
   expect((await pagina(app)).x).toBe(0);
   await comandaBarra(app, 'chiudi');
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.setContentFullscreen(false));
+  await expect.poll(() => finestraIntera(app), { timeout: 10_000 }).toBe(false);
   await expect.poll(async () => (await statoBarra(app)).schermoIntero).toBe(false);
   await expect.poll(async () => (await statoBarra(app)).aperta).toBe(true);
   await expect.poll(async () => (await pagina(app)).x).toBe(56);
@@ -223,9 +227,10 @@ test('bloccata resta bloccata dopo il riavvio: si apre da sola accanto alla pagi
     await expect.poll(async () => (await statoBarra(app)).aperta).toBe(true);
     await chiudiApp(app);
 
-    let shell;
-    ({ app, shell } = await avvia());
-    await shell.evaluate((u) => window.filoShell.tabs.open(u), `${indirizzo}?giro=2`);
+    // Bloccata, la barra nasce già all'avvio, e la prima pagina che si annuncia può essere la sua: la scheda si apre dal main.
+    ({ app } = await avvia());
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => !!BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)), { timeout: 15_000 }).toBe(true);
+    await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.openTab(u), `${indirizzo}?giro=2`);
     const barra = await barraPage(app);
     await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 10_000 }).toBe(true);
     await expect.poll(async () => (await pagina(app)).x, { timeout: 10_000 }).toBe(56);
