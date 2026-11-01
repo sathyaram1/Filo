@@ -211,4 +211,11 @@ test('la barra laterale: indietro dall\'icona, avanti dall\'elenco col posto del
   await premiNellaBarra(app, 'help');
   await expect.poll(() => voce(app, 'aiuto_aperto', 'barra')).toBe(1);
   expect(await voce(app, 'via_azione', 'help:barra')).toBe(1);
+
+  // La chiusura dalla barra conta una volta, dalla scheda che si chiude.
+  const prima = await attiva(app);
+  await premiNellaBarra(app, 'closeTab');
+  await expect.poll(() => attiva(app).then((x) => x.n)).toBe(prima.n - 1);
+  await page.waitForTimeout(300);
+  expect(await voce(app, 'via_azione', 'closeTab:barra')).toBe(1);
 });
