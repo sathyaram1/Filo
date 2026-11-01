@@ -2156,6 +2156,7 @@
 
   global.SN_FEEDBACK = {
     submit,
+    vuotoInPartenza, fraseAllegatiSaltati, byteDiDataUrl, TETTO_ALLEGATO,
     list,
     listResolved,
     listAll,
