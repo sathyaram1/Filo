@@ -76,3 +76,16 @@ test('la pagina prende l’avviso prima di mostrarlo, e al fuoco chiede quelli i
   assert.match(avvisa, /AvvisiFuoriPolitica\.avvisa\(/);
   assert.doesNotMatch(avvisa, /broadcastToTabs/, 'nessuna spinta che salti la coda');
 });
+
+test('tornati su Filo dalla barra delle schede: quelli in coda si offrono di nuovo, quelli presi no', () => {
+  const { a, mandati, componi } = banco();
+  a.avvisa('excluded|deepseek', componi('DeepSeek'));
+  a.avvisa('excluded|google', componi('Google'));
+  a.prendi('id2');
+  mandati.length = 0;
+  a.riproponi();
+  assert.deepEqual(mandati.map((m) => m.text), ['da DeepSeek']);
+  a.prendi('');
+  a.riproponi();
+  assert.equal(mandati.length, 1);
+});
