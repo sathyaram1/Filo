@@ -5,6 +5,9 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, chiamateAlModello, ripristina } from './helpers/chatFinta.mjs';
 
+// Su un nome di rete pubblico: una pagina di 127.0.0.1 è della rete di casa, e al modello ne arriva solo il sito.
+const PUBBLICO = { pubblico: true };
+
 const schede = (shell) => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs);
 
 async function tornaAllaHome(shell) {
@@ -54,10 +57,10 @@ async function modelloCheRiapre(app, giri) {
 test('si ritrovano per chi le ha chiuse e per contenuto, e si riaprono com\'erano', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const chat = await home(app);
-  await openTab(testServer.html('<title>Le orche del Mediterraneo</title><p>orche'));
-  await openTab(testServer.html('<title>Ricetta del pane</title><p>pane'));
-  await openTab(testServer.html('<title>Notizie di ieri</title><p>notizie'));
-  await openTab(testServer.html('<title>Lettura</title><p>resta'));
+  await openTab(testServer.html('<title>Le orche del Mediterraneo</title><p>orche', PUBBLICO));
+  await openTab(testServer.html('<title>Ricetta del pane</title><p>pane', PUBBLICO));
+  await openTab(testServer.html('<title>Notizie di ieri</title><p>notizie', PUBBLICO));
+  await openTab(testServer.html('<title>Lettura</title><p>resta', PUBBLICO));
   await tornaAllaHome(shell);
   const perTitolo = async (t) => (await schede(shell)).find((x) => x.title === t);
   const urlOrche = (await perTitolo('Le orche del Mediterraneo')).url;
@@ -93,7 +96,7 @@ test('si ritrovano per chi le ha chiuse e per contenuto, e si riaprono com\'eran
   await modelloCheRiapre(app, [
     { call: { id: 'c1', name: 'SCHEDE_CHIUSE', args: { cerca: 'orche' } } },
     { call: { id: 'c2', name: 'RIAPRI_SCHEDA' }, riapri: true },
-    { text: 'Questa frase arriva solo da un terzo giro.' },
+    { text: 'Ho riaperto la pagina sulle orche.' },
   ]);
   await chiedi(chat, 'riaprimi la pagina sulle orche che ho chiuso');
   await expect.poll(async () => (await schede(shell)).filter((t) => t.url === urlOrche).length, { timeout: 15_000 }).toBe(1);
@@ -101,15 +104,14 @@ test('si ritrovano per chi le ha chiuse e per contenuto, e si riaprono com\'eran
   const riga = chat.locator('.dash-activity').last();
   await expect(riga).toContainText('Riaperta', { timeout: 10_000 });
   await expect(riga).toContainText('Le orche del Mediterraneo');
-  // Riaperta parla da sé: niente terzo giro.
-  expect((await chiamateAlModello(app)).length).toBe(2);
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Ho riaperto la pagina sulle orche.' })).toBeVisible({ timeout: 10_000 });
   await ripristina(app);
 });
 
 test('una pagina che non c\'è più si riapre sull\'errore e sotto la risposta resta il riassunto', async ({ app, testServer }) => {
   test.setTimeout(90_000);
   const chat = await home(app);
-  const sparita = `${testServer.origin}/pagina-che-non-esiste-piu`;
+  const sparita = `${testServer.originPubblico}/pagina-che-non-esiste-piu`;
   const RIASSUNTO = 'Le orche cacciano in gruppo e comunicano con fischi diversi per ogni branco.';
   await app.evaluate(async (_e, [url, riassunto]) => {
     const e = await globalThis.SN_ARCHIVED_TABS.archive({

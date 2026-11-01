@@ -4769,7 +4769,7 @@ async function schedeChiusePerChat(action) {
   let scelte = nelFiltro;
   if (r.cerca) {
     const CA = ChatArchive;
-    const candidati = nelFiltro.map((it) => ({ it, testo: [it.title, delicata(it) ? '' : it.summary, it.url].filter(Boolean).join(' ') }));
+    const candidati = nelFiltro.map((it) => ({ id: it.id, it, testo: [it.title, delicata(it) ? '' : it.summary, it.url].filter(Boolean).join(' ') }));
     const perParole = CA.searchWide(candidati, r.cerca, { testo: (c) => c.testo }).results.map((c) => c.it);
     const presi = new Set(perParole.map((it) => it.id));
     let emb = null;

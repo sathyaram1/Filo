@@ -1422,6 +1422,8 @@
     if (ROW_AND_BUTTON.includes(type) && a._executed !== false) return true;
     if (type === 'ESEGUI_COMANDO' && a._output && a._output.blocked) return true;
     if (type === 'COMANDO_FINESTRA' && a._output && a._output.already) return true;
+    // Una scheda riaperta la cui pagina non c'è più (#884): la riga lo dice, sotto resta il riassunto salvato.
+    if (type === 'RIAPRI_SCHEDA' && a._output && a._output.nonRaggiungibile) return true;
     // Ciò che Filo lascia finire all'UTENTE (l'evento): la riga dice che l'ha
     // proposto, il bottone è come si accetta. Senza il bottone non si raggiunge.
     if (a._output && a._output.proposta) return true;

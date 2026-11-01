@@ -3734,9 +3734,16 @@ class TabManager {
     // versione di Electron all'altra: audibleFromEvent le normalizza tutte.
     wc.on('audio-state-changed', (e, arg) => {
       const audible = audibleFromEvent(e, arg);
-      // L'ultima volta che ha suonato: «rimettimi la musica» riprende questa, anche dopo un riavvio o chiusa (#1397).
-      if (audible) tab.audioAt = Date.now();
+      // Quando ha suonato un lettore della pagina: «rimettimi la musica» riprende questa, anche chiusa o dopo un riavvio
+      // (#1397). Un suono di notifica o un video muto non contano: serve un lettore in corsa che si sente.
+      if (audible && tab._mediaInCorso) { tab.audioAt = Date.now(); tab._suonaOra = true; }
       if (tab.audible !== audible) { tab.audible = audible; this._broadcast(); }
+    });
+    wc.on('media-started-playing', () => { tab._mediaInCorso = true; });
+    wc.on('media-paused', () => {
+      if (tab._suonaOra) tab.audioAt = Date.now();
+      tab._mediaInCorso = false;
+      tab._suonaOra = false;
     });
 
     // #151 — un video via proxy brucia GB in fretta: dopo un po' una nota discreta, una volta
