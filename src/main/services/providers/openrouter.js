@@ -263,6 +263,11 @@
     return null;
   }
   const isParamsRefusal = (text) => routerRefusal(text) === 'PARAMS';
+  // La regola sta in SN_CHAT_ERRORS, che la usa anche per gli errori senza codice.
+  function ingressoDi(text) {
+    const CE = global.SN_CHAT_ERRORS;
+    return CE && typeof CE.ingressoRifiutato === 'function' ? CE.ingressoRifiutato(text) : '';
+  }
 
   // Una chiamata di chat (con o senza streaming). `require_parameters` scarta anche gli host che non
   // conoscono `reasoning`, e per un modello che non ragiona non ne resterebbe nessuno: il ragionamento
