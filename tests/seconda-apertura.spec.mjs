@@ -155,6 +155,38 @@ test('un link d\'invito aperto da fuori con Filo senza finestra apre Crediti, da
   expect((await stato(app, accesso)).errori).toEqual([]);
 });
 
+// La finestra ora c'è mentre gli init lavorano: chi la chiude subito non deve trovare la sessione svuotata.
+test('chiuso appena compare la finestra, prima che le schede tornino, Filo non perde le schede salvate', async () => {
+  const userData = cartellaTemporanea('filo-avvio-');
+  // Una porta chiusa del loopback: se la riapertura arrivasse prima dell'uscita, niente rete.
+  const salvate = ['http://127.0.0.1:9/a', 'http://127.0.0.1:9/b'];
+  const storage = join(userData, 'storage.json');
+  writeFileSync(storage, JSON.stringify({ sn_open_tabs: { tabs: salvate, activeIndex: 1 } }));
+  const app = await electron.launch({
+    args: [...argomentiScala, '.'],
+    cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test', FILO_TEST_ACCOLTO: '1' },
+  });
+  try {
+    const chiusa = app.waitForEvent('close', { timeout: 20000 });
+    const schedeAllUscita = await app.evaluate(async ({ app: a, BrowserWindow }) => {
+      for (let i = 0; i < 5000; i++) {
+        const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+        if (w) { const n = w._filoTabs.tabs.length; a.quit(); return n; }
+        await new Promise((r) => setTimeout(r, 2));
+      }
+      return -1;
+    });
+    expect(schedeAllUscita, 'la prova doveva uscire con la finestra nata e le schede non ancora riaperte').toBe(0);
+    await chiusa;
+    expect(JSON.parse(readFileSync(storage, 'utf8')).sn_open_tabs, 'uscendo all\'avvio Filo ha cancellato le schede salvate')
+      .toMatchObject({ tabs: salvate, activeIndex: 1 });
+  } finally {
+    await chiudiApp(app);
+    togliCartella(userData);
+  }
+});
+
 // #1092 — Un profilo usato: una cache dell'ad-blocker grande e una scheda salvata che chiede una pubblicità.
 test('avvio con una cache dell\'ad-blocker grande: la finestra non aspetta gli init, la prima scheda è già filtrata', async () => {
   const richieste = [];
