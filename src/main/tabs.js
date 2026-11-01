@@ -2276,6 +2276,8 @@ class TabManager {
     this._tastieraAllaSchedaAttiva();
     if (tab._listaTimer) this._seguiLista(tab, { ora: true });
     if (cambiata) this._avvisaSchermoPieno();
+    // Scelta dalla barra la scheda non prende il fuoco: gli avvisi fuori politica in coda glieli si offre (#1478.1).
+    if (cambiata && !this._restoring) { try { globalThis.SN_AVVISI_FUORI_POLITICA?.riproponi(); } catch (_) {} }
     this._broadcast();
   }
 
