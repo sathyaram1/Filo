@@ -440,27 +440,30 @@ test('le pagine della rete di casa si propongono per parole, senza passare dal m
   expect(alGiudice).not.toContain('Telecamera');
 });
 
-test('«svuota tutto l\'archivio»: il pannello propone anche le pagine di casa, senza mandarle al modello', async ({ app, shell }) => {
+// #1294 — «svuota tutto l'archivio» lo dice il modello (`tutto`), non un elenco di parole vuote nella sua richiesta: tutte
+// le schede, comprese quelle di casa e quelle su cui il giudice non direbbe di sì, e nessuna va al modello.
+test('«svuota tutto l\'archivio»: il pannello propone tutte le schede, anche quelle di casa, senza mandarne nessuna al modello', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configure(app);
-  // Il giudice finto prende i titoli sui gatti: qui sono tutte le pagine web, come per una richiesta di tutto.
   await seedArchive(app, [
     { title: 'Gatti persiani', gatto: true },
-    { title: 'Gattini in adozione', gatto: true },
+    { title: 'Ricetta della carbonara', gatto: false },
     { title: 'Pannello del router', gatto: false, url: 'http://192.168.1.1/' },
   ]);
   await fakeChat(app, [
-    { toolCalls: [{ id: 'c9', name: 'CANCELLA_ARCHIVIO', arguments: '{"query":"tutte le schede archiviate"}' }] },
+    { toolCalls: [{ id: 'c9', name: 'CANCELLA_ARCHIVIO', arguments: '{"tutto":true}' }] },
     { text: 'Ecco tutto l\'archivio.' },
   ]);
 
-  await chiedi(page, 'svuota tutto l\'archivio delle schede');
+  await chiedi(page, 'svuota completamente il mio archivio delle schede chiuse');
   const panel = page.locator('.dash-delete-panel');
-  await expect(panel.locator('.dash-delete-list li')).toHaveText(['Gatti persiani', 'Gattini in adozione', 'Pannello del router'], { timeout: 15_000 });
-  expect(await app.evaluate(() => globalThis.__giudice.testi.join('\n'))).not.toContain('192.168');
+  await expect(panel.locator('.dash-delete-query')).toHaveText('Tutto l’archivio');
+  await expect(panel.locator('.dash-delete-note')).toHaveText(/Nell’archivio ci sono 3 schede/, { timeout: 15_000 });
+  await expect(panel.locator('.dash-delete-list li')).toHaveText(['Gatti persiani', 'Ricetta della carbonara', 'Pannello del router']);
+  expect(await app.evaluate(() => globalThis.__giudice.chiamate), 'svuotare non chiede niente al giudice').toBe(0);
   await panel.locator('.dash-action-btn-danger').click();
   await clickConfirm(page, 'ok'); // a Normale, col compito pulito, costo 3 chiede un OK (#530)
   await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminate definitivamente 3 schede.', { timeout: 5_000 });

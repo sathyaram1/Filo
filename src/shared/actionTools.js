@@ -447,8 +447,11 @@
     },
     CANCELLA_ARCHIVIO: {
       description: 'Cerca nell\'archivio le schede pertinenti a `query` e mostra un pannello di conferma per eliminarle DEFINITIVAMENTE. È distruttiva e permanente: spiega in una frase che è un\'eliminazione definitiva.',
-      properties: { query: S('Descrizione di cosa cancellare.') },
-      required: ['query'],
+      properties: {
+        query: S('Descrizione di cosa cancellare; ometti con `tutto`.'),
+        tutto: B('true quando l\'utente vuole svuotare l\'archivio intero ("svuota l\'archivio", "cancella tutte le schede archiviate"): niente ricerca, il pannello le propone tutte.'),
+      },
+      required: [],
     },
     CANCELLA_PAGINE: {
       description: 'Cancella le pagine visitate che Filo ricorda ("cancella le pagine dell\'ultima ora", "togli la cronologia di oggi", "cancella tutta la cronologia", "cancella le pagine di YouTube"). Il sistema mostra all\'utente quante sono e le toglie solo col suo OK: non chiederlo tu a parole. Non tocca le chat né le schede chiuse.',

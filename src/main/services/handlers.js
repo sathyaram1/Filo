@@ -8920,7 +8920,9 @@ async function giudicaBlocco(query, items) {
 
 // `avanzamento(fatte, totali)`: schede giudicate su quelle da giudicare. Il
 // totale cala quando la parte ordinata per somiglianza si ferma prima della fine.
-async function archivioDaCancellare(query, { avanzamento = () => {} } = {}) {
+// `tutto`: «svuota l'archivio», detto dal modello (#1294): tutte, senza giudice e senza indovinarlo dalle parole.
+async function archivioDaCancellare(query, { avanzamento = () => {}, tutto = false } = {}) {
+  if (tutto) return { ok: true, tutto: true, results: (await ArchivedTabs.list()).map(({ embedding, ...meta }) => meta) };
   const q = String(query == null ? '' : query).trim();
   if (!q) return { ok: true, results: [] };
   const settings = await getEffectiveSettings();
@@ -8971,10 +8973,9 @@ async function archivioDaCancellare(query, { avanzamento = () => {} } = {}) {
   } catch (e) {
     return { ok: false, error: 'giudizio', detail: e?.message || String(e) };
   }
-  // «Svuota l'archivio» non ha parole da confrontare: le pagine di casa seguono il giudice, che ha preso tutte le altre.
+  // Le pagine che non vanno al giudice si confrontano per parole: «svuota l'archivio» arriva con `tutto`, non da qui.
   const parole = paroleDellaRichiesta(q);
-  const tutto = !parole.length && trovate.length === scored.length + senzaVettore.length;
-  const casaPresa = diCasa.filter((it) => tutto || casaPertinente(parole, it));
+  const casaPresa = diCasa.filter((it) => casaPertinente(parole, it));
   return { ok: true, results: [...trovate, ...casaPresa].map(({ embedding, ...meta }) => meta) };
 }
 

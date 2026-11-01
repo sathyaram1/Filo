@@ -835,11 +835,15 @@
     CANCELLA_ARCHIVIO: {
       costo: 3,
       campo: null,
-      describe: (a) => ["Eliminare dall'archivio le schede su ", cit(a.query || a.testo || ''),
-        '.\nVengono eliminate DEFINITIVAMENTE: non si possono recuperare.'],
+      describe: (a) => (a && a.tutto === true
+        ? ["Svuotare l'archivio: tutte le schede chiuse.\nVengono eliminate DEFINITIVAMENTE: non si possono recuperare."]
+        : ["Eliminare dall'archivio le schede su ", cit(a.query || a.testo || ''),
+          '.\nVengono eliminate DEFINITIVAMENTE: non si possono recuperare.']),
       describeDone: (a) => {
         const n = Number(a && a._output && a._output.eliminate) || 0;
-        return `Eliminate DEFINITIVAMENTE dall'archivio ${n} ${n === 1 ? 'scheda' : 'schede'} su “${a.query || a.testo || ''}”`;
+        const quante = `${n} ${n === 1 ? 'scheda' : 'schede'}`;
+        return a && a.tutto === true ? `Archivio svuotato: eliminate DEFINITIVAMENTE ${quante}`
+          : `Eliminate DEFINITIVAMENTE dall'archivio ${quante} su “${a.query || a.testo || ''}”`;
       },
     },
     // #866 — come in ogni browser: il popup dice quante pagine e di quale periodo, il conto lo fa il main (`_n`).
