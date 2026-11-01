@@ -130,6 +130,14 @@ function wireWindowCommon(win, tabs) {
   // Dove andare lo decide tabs.navigaCronologia: senza cronologia è un no-op.
   // Indietro e avanti da qui sono la stessa azione contata della barra e dei tasti (#1461).
   const naviga = (verso) => require('./services/azioniContate').azione('navigate-back-forward', () => tabs.navigaCronologia(verso), { incognito: !!win._filoIncognito });
+  // Da quale strada (#1468): accanto alla porta unica, i tasti laterali del mouse e lo scorrimento.
+  const strada = (verso, via) => require('./services/contatoriStrade').misura('cronologia', verso, via, { incognito: !!win._filoIncognito });
+  win.on('app-command', (_e, comando) => {
+    if (comando === 'browser-backward' || comando === 'browser-forward') strada(comando === 'browser-backward' ? 'indietro' : 'avanti', 'tasto_mouse');
+  });
+  win.on('swipe', (_e, direzione) => {
+    if (direzione === 'right' || direzione === 'left') strada(direzione === 'right' ? 'indietro' : 'avanti', 'swipe');
+  });
   win.on('app-command', (event, comando) => {
     if (comando === 'browser-backward') naviga('indietro');
     else if (comando === 'browser-forward') naviga('avanti');

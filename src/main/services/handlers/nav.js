@@ -3,6 +3,20 @@
 const { app } = require('electron');
 const { soloFilo, filoNegatoAllaPagina } = require('./origine');
 const { azione: contata } = require('../azioniContate');
+const Strade = require('../contatoriStrade');
+
+// Una pagina di Filo aperta da un'altra pagina di Filo (#1468): la strada la dice chi manda (un comando, una carta della
+// home, la chat), sennò è un collegamento; aperta da una strada che è anche un'icona, è anche la sua azione.
+const VIE_DICHIARATE = ['comando_slash', 'carta_home', 'chat'];
+function contaPagina(url, via, win) {
+  const T = globalThis.SN_CONTATORI_STRADE;
+  if (!T || !win) return;
+  const v = VIE_DICHIARATE.includes(via) ? via : 'collegamento_interno';
+  const incognito = !!win._filoIncognito;
+  Strade.misura('pagina', url, v, { finestra: win._filoTabs, incognito });
+  const azione = T.AZIONE_DELLA_PAGINA[T.paginaDi(url)];
+  if (azione && v !== 'collegamento_interno') Strade.misura('azione', azione, v, { incognito });
+}
 
 // Un'icona della home dice dove sta in px della sua pagina; il menu della shell lo vuole in px della finestra.
 // Il punto resta dentro la vista: una pagina non apre il menu fuori da sé.
@@ -52,8 +66,9 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.OPEN_OPTIONS, async (msg, sender) => {
+  on(MSG.OPEN_OPTIONS, async (msg, sender, origin) => {
     const win = winOf(sender);
+    if (win?._filoTabs && isFilo(origin)) contaPagina('filo://options/options.html', msg && msg.via, win);
     if (win?._filoTabs) contata('options-models', () => win._filoTabs.openTab('filo://options/options.html'));
     return { ok: true };
   });
@@ -98,6 +113,7 @@ module.exports = function register(on, ctx) {
     if (filoNegatoAllaPagina(url, sender, origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
     const daPagina = /^https?:/i.test(String(sender?.url || ''));
     const gesto = require('../permessiPagine').gestoDellUtente(sender?.wc);
+    if (/^filo:/i.test(url) && isFilo(origin)) contaPagina(url, msg.via, win);
     win._filoTabs.openTab(url, daPagina ? { origine: { tipo: 'link', da: sender.url, gesto } } : {});
     return { ok: true };
   });

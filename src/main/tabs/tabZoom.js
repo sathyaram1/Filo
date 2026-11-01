@@ -5,6 +5,7 @@
 const { clipboard } = require('electron');
 require('../../shared/zoomPagina');
 const { staRegistrandoTasti } = require('../shortcuts');
+const Strade = require('../services/contatoriStrade');
 
 // Ctrl +/-/0 per la pagina `wc`, da dove arriva il tasto: la pagina stessa o un riquadro di Filo sopra di lei
 // (#1509.1). true = preso.
@@ -13,6 +14,7 @@ function zoomDaTasto(wc, input) {
   const verso = Z && input && input.type === 'keyDown' ? Z.tastoZoom(input) : null;
   if (!verso) return false;
   try { wc.send('filo:zoom-key', verso); } catch (_) {}
+  if (!input.isAutoRepeat) Strade.misura('azione', globalThis.SN_CONTATORI_STRADE?.ZOOM[verso] || '', 'scorciatoia', { incognito: Strade.incognitoDi(wc) });
   return true;
 }
 

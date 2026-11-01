@@ -77,6 +77,9 @@ const SCRITTURE_ANONIME_DICHIARATE = {
   'contatori-home-pagina':
     'la home e gli automatismi sulla pagina di un’ora dei contatori (#1473), accanto all’ora e con lo stesso id: stesse ' +
     'ragioni, e solo numeri sotto chiavi di elenchi chiusi (comandi, fasce, tipi, passi, esiti), mai un testo, un sito o un paese.',
+  'contatori-strade':
+    'le strade di un’ora dei contatori (#1468), accanto all’ora e con lo stesso id: stesse ragioni, e solo numeri sotto ' +
+    'chiavi di elenchi chiusi (azioni, strade, tasti per nome, pagine di Filo, fasce), mai un testo, un indirizzo o un sito.',
 };
 
 const VERBI_SCRITTURA = ['write', 'create', 'update', 'delete'];

@@ -2537,7 +2537,7 @@
     api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
   }
 
-  newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/'));
+  newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/', 'pulsante_scheda'));
   backBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.back(a.id); });
   fwdBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.forward(a.id); });
   reloadBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.reload(a.id); });
@@ -2554,7 +2554,7 @@
     if (meta && e.key.toLowerCase() === 't') {
       e.preventDefault();
       // Con Shift riapre l'ultima scheda chiusa, come in ogni browser (#1476); tenuto premuto non svuota l'archivio.
-      if (e.shiftKey) { if (!e.repeat) api.tabs.riapriChiusa(); } else api.tabs.open('filo://newtab/');
+      if (e.shiftKey) { if (!e.repeat) api.tabs.riapriChiusa(); } else api.tabs.open('filo://newtab/', e.repeat ? '' : 'scorciatoia');
     } else if (meta && e.key.toLowerCase() === 'w') {
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.close(a.id, 'ctrl_w');
@@ -2566,7 +2566,7 @@
       else api.tabs.open('filo://newtab/');
     } else if (meta && e.key.toLowerCase() === 'r') {
       e.preventDefault();
-      const a = activeTab(); if (a) api.tabs.reload(a.id);
+      const a = activeTab(); if (a) api.tabs.reload(a.id, e.repeat ? '' : 'scorciatoia');
     } else {
       // Salto alla N-esima scheda, o alla vicina con Ctrl+Tab, col fuoco sulla barra (per le pagine ci pensa il main). La
       // combinazione la decide src/shared/tasti.js: regola in CLAUDE.md § Mac.

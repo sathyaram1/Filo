@@ -121,7 +121,12 @@ try {
     const prima = typeof contextMenuHandler === 'function' && sitoPrima();
     // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser. Sui siti dove il tasto
     // destro apre il loro menu, Shift è la strada per quello di Filo.
-    if (e.shiftKey && !prima) { riservaSeLaPaginaTace(e, clic); return; }
+    if (e.shiftKey && !prima) {
+      // Chi scavalca il menu di Filo (#1468): solo il conto, mai il sito.
+      try { Promise.resolve(filoMessage({ type: 'contatori_evento', misura: 'menu-nativo', voce: 'shift_tasto_destro' })).catch(() => {}); } catch (_) {}
+      riservaSeLaPaginaTace(e, clic);
+      return;
+    }
     if (prima && !e.shiftKey) {
       MenuDelSito.lasciaAllaPagina(e, (copia) => apriMenuDiFilo(copia, clic));
       return;
