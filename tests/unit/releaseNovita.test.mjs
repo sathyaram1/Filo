@@ -61,6 +61,15 @@ describe('applicaNovita sul registro vero', () => {
     assert.deepEqual(dopo.filter((_, i) => i !== 5), NOTE.filter((_, i) => i !== 5));
   });
 
+  test('una riscrittura che ha letto righe che questo albero non ha (fuse dopo il commit provato) non si mette', () => {
+    const r = applicaNovita(SORGENTE, [{ versione: TOP.version, fixes: ['Racconta anche la riga che qui non c’è.'], originali: [...righeDi(TOP), 'Riga fusa dopo il commit provato.'].map(impronta) }]);
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.applicate, []);
+    assert.equal(r.testo, SORGENTE);
+    assert.equal(r.saltate[0].copreAltro, true);
+    assert.match(r.saltate[0].perche, /copre 1 righe che questo albero non ha/);
+  });
+
   test('una versione che l’albero non ha, o una riscrittura malformata, si salta e il testo resta quello', () => {
     const r = applicaNovita(SORGENTE, [
       { versione: '9.9.9', fixes: ['Futura.'] },
