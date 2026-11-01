@@ -46,7 +46,7 @@ test('r1 il nome scritto in minuscolo dall\'utente non arriva nella segnalazione
     };
   });
 
-  await page.locator('#input').fill('ciao sono luca moretti, quanti crediti ho?');
+  await page.locator('#input').fill('ciao sono luca, quanti crediti ho?');
   await page.locator('#sendBtn').click();
 
   await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary', { hasText: /Inviare questo feedback/i })).toBeVisible({ timeout: 20_000 });
