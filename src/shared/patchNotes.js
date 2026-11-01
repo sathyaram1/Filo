@@ -14,6 +14,7 @@
         '«Salva video come…» funziona anche sui video in streaming, come quelli di YouTube: il video arriva in MP4 fino a 1080p e lo segui nei Download. Il primo salvataggio scarica il programma che lo ricompone.',
         'Sull\'avviso di un sito sospetto «Continua» adesso vale per sempre. Il sito entra fra i «Siti di cui ti fidi» e lì l\'avviso non torna, in nessuna scheda e nemmeno dopo un riavvio. Vale anche per «Apri comunque» quando Filo non trova un indirizzo. L\'elenco sta in Sicurezza, dove togli un sito con un clic, e puoi chiedere a Filo di aggiungerne o toglierne uno. L\'avviso di un sito pericoloso compare sempre.',
         { testo: 'Le novità di tutte le versioni stanno in una pagina, dalla più recente: la apri dal menu dell\'ingranaggio, dalle Preferenze, da «Tutte le novità» nel riquadro dopo un aggiornamento o chiedendola a Filo. La casella in alto le filtra mentre scrivi, anche se sbagli una lettera, e col tasto destro copi una riga.', segnalazione: 1956 },
+        'Quando parte un download mentre sei su una pagina, in basso a destra un avviso breve ti dice che è partito, e con «Vedi nella home» lo segui mentre scende. A fine download lo stesso avviso diventa «Scaricato». Se sei già nella home l\'avviso non compare, perché lì il download lo vedi già.',
       ],
       fixes: [
         'Anche l\'Aiuto su un sito ora sta sopra la pagina: le domande che gli scrivi, le sue risposte e il testo che propone per un campo, finché non lo accetti, il sito non li legge più, nemmeno se li selezioni o li copi.',
