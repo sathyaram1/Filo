@@ -838,6 +838,8 @@
         console.error('[SN feedback] submit', e);
         root.style.visibility = '';
         riprova(e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e)));
+      } finally {
+        inVolo.delete(testoInviato);
       }
     });
 
