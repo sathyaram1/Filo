@@ -207,6 +207,7 @@ test('sulla prima riga con parole sotto il valore sta sotto velato; in un campo 
   await expect(v).toHaveClass(/sn-sopra-testo/);
   const x = await riquadroDelSegno(ocra(page, '14xx'));
   const sotto = await v.boundingBox();
+  await page.screenshot({ path: 'tests/.shots/1448-12-valore-sotto-velato.png', clip: { x: 0, y: 40, width: 820, height: 180 } }).catch(() => {});
   // Il clic sulla parola della seconda riga, dove sta il valore velato, mette lì il cursore e non scrive il valore.
   await page.mouse.move(sotto.x + sotto.width / 2, sotto.y + 60);
   await page.mouse.click(sotto.x + sotto.width / 2, sotto.y + sotto.height / 2);

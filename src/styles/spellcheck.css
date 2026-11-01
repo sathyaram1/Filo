@@ -276,7 +276,7 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
 }
 /* Sulla prima riga di un campo senza margine sopra il valore sta sotto le x, dentro il campo (#1448.12). */
 .sn-spell-valori .sn-spell-valore.sn-sotto {
-  --sn-valore-y: 1px;
+  --sn-valore-y: 0px;
   --sn-valore-via: 1;
 }
 .sn-spell-valori .sn-spell-valore:hover {
@@ -289,7 +289,7 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
 .sn-spell-valori .sn-spell-valore:active {
   transform: translate(-50%, var(--sn-valore-y)) scale(0.96);
 }
-/* Sopra le parole della riga prima il valore è velato e lascia il clic al testo; il puntatore sulle x lo sveglia. */
+/* Sulle parole di un'altra riga il valore è velato e lascia il clic al testo; il puntatore sulle x lo sveglia. */
 .sn-spell-valori .sn-spell-valore.sn-sopra-testo:not(.sn-sveglio) {
   pointer-events: none;
   opacity: var(--sn-spell-valore-velato, 0.45);

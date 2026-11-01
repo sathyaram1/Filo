@@ -2068,7 +2068,7 @@
       b.style.left = `${r.left + r.width / 2}px`;
       b._snX = r;
       const posto = postoDelValore(state, b, r, tr);
-      b.style.top = `${posto.sotto ? r.bottom : r.top}px`;
+      b.style.top = `${posto.sotto ? r.bottom + SPORGENZA_SEGNI : r.top}px`;
       b.classList.toggle('sn-sotto', posto.sotto);
       b.classList.toggle('sn-sopra-testo', posto.velato);
     }
@@ -2101,7 +2101,8 @@
     });
     const sopra = x.top - 1 - h;
     if (sopra >= q.top) return { sotto: false, velato: copre(sopra, Math.max(0, tr.a - 1000), tr.a) };
-    const sotto = x.bottom + 1;
+    // Sotto, il valore lascia vedere i puntini delle x, che scendono oltre la riga.
+    const sotto = x.bottom + SPORGENZA_SEGNI;
     if (sotto + h <= q.top + q.height) return { sotto: true, velato: copre(sotto, tr.b, tr.b + 1000) };
     return { sotto: false, velato: true };
   }
@@ -2114,7 +2115,11 @@
     const dentro = (r, m) => r && x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m;
     for (const b of state.badge.values()) {
       if (!b.classList.contains('sn-sopra-testo')) continue;
-      const sveglio = dentro(b._snX, 2) || (b.classList.contains('sn-sveglio') && (dentro(b._snX, 4) || dentro(b.getBoundingClientRect(), 4)));
+      // Sveglio resta per tutta la fascia fra le x e il valore: sotto, i puntini li separano di qualche pixel.
+      const v = b.getBoundingClientRect();
+      const s = b._snX;
+      const fascia = s && { left: Math.min(s.left, v.left), right: Math.max(s.right, v.right), top: Math.min(s.top, v.top), bottom: Math.max(s.bottom, v.bottom) };
+      const sveglio = dentro(s, 2) || (b.classList.contains('sn-sveglio') && dentro(fascia, 4));
       b.classList.toggle('sn-sveglio', sveglio);
     }
   }

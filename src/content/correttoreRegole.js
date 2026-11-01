@@ -72,7 +72,6 @@
     return out;
   }
   const zoneEscluse = (testo) => zoneDi(testo, ZONE);
-  const suFilo = (testo, start, end) => zoneDi(testo, ZONE_DI_FILO).some(([a, b]) => start >= a && end <= b);
 
   function parole(testo) {
     const out = [];
@@ -568,6 +567,7 @@
     const ammessi = new Set(tipi);
     const segni = [];
     const giusti = [];
+    const diFilo = zoneDi(testo, ZONE_DI_FILO);
     for (const r of leggiRighe(raw)) {
       const tipo = r.tipo || senzaTipo;
       if (!ammessi.has(tipo) && tipo !== 'giusto') continue;
@@ -602,7 +602,7 @@
         if (correzioni.length) correzioni = [unSoloSpazio(correzione)];
       }
       if (inScrittura && start < inScrittura.end && end > inScrittura.start) continue;
-      if (suFilo(testo, start, end)) continue;
+      if (diFilo.some(([a, b]) => start >= a && end <= b)) continue;
       // Una minuscola dove la correzione vuole la maiuscola non è un errore: un nome scritto minuscolo o si corregge
       // da sé (correttoreAutomatica.js) o si lascia stare (#1447).
       if (errore && correzioni.length && soloPiuMaiuscole(testo.slice(start, end), correzioni[0])) continue;
@@ -624,6 +624,6 @@
     REGIONE_MAX, TESTO_INTERO_MAX, FISSI, chiudeVirgolette, ossatura, comeScritto, zoneEscluse, parole, candidatiDizionario, ripetizioni, erroriFissi,
     senzaSovrapposti, parolaAlCursore, regioneNuova, daGiudicare, aFrasiIntere, ultimaFineFrase, testoDaRileggere,
     leggiRighe, senzaRighe, trovaPezzo, restringi, segniDaRisposta, chiaveVerdetto, GRAMMATICALI, CERTO, segnaposti, xDelPezzo,
-    valoreTrovato, chiaveRicerca, stessaFrase, suFilo,
+    valoreTrovato, chiaveRicerca, stessaFrase,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

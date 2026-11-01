@@ -13,6 +13,10 @@
       features: [],
       fixes: [
         { testo: 'Filo non ti scrive più per uno screenshot o per un file che hai appena scaricato. Lo fa solo quando un download lungo finisce mentre non sei davanti a Filo, o quando ne parte uno mentre non c\'eri, e dice solo quale file è arrivato.', segnalazione: 1654 },
+        { testo: 'Il correttore non segna più «Filo» e filo.red come errori, e nemmeno un indirizzo scritto senza https, come amazon.it.', segnalazione: 1655 },
+        { testo: 'Una correzione del correttore non attacca più la parola a quella prima, come in «oggisono». Con l\'apostrofo curvo, come in «l’amico», il segno sta solo sulla parola sbagliata.', segnalazione: 1580 },
+        { testo: 'Il dato che il correttore trova al posto delle x, sulla prima riga di un campo, compare sotto le x quando sopra non c\'è posto. Non copre più quello che sta sopra il campo, e un clic lì va alla pagina.', segnalazione: 1448 },
+        { testo: 'In «Valuta» anche una correzione che toglie delle parole si annulla col secondo clic: le parole tornano al loro posto.', segnalazione: 1449 },
       ],
     },
     {
