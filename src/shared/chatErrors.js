@@ -107,8 +107,10 @@
   // that support image input») o un host che dice di non accettarlo. '' per ogni altro rifiuto, «troppe immagini» compreso.
   const INGRESSI = [['immagini', /imag|vision/i], ['audio', /audio/i], ['video', /video/i], ['pdf', /pdf|file|document/i]];
   const ROUTER_INGRESSO = /no endpoints? found that supports? ([^.,;]+)/i;
+  // «Unable to process input image» è una foto che quel modello, che le legge, non è riuscito ad aprire: non è un rifiuto.
   const HOST_INGRESSO = new RegExp([
-    /(?:does ?n[o']t|do not|cannot|can ?not|unable to) (?:support|accept|process|handle|read)s? (?:the |an? )?(?:input )?(image_url|input_audio|input_file|images?|vision|audio|video|pdfs?|files?|documents?)/,
+    /(?:does ?n[o']t|do not|can ?not) (?:support|accept|process|handle|read)s? (?:the |an? )?(?:input )?(image_url|input_audio|input_file|images?|vision|audio|video|pdfs?|files?|documents?)/,
+    /unable to (?:support|accept) (?:the |an? )?(?:input )?(image_url|input_audio|input_file|images?|vision|audio|video|pdfs?|files?|documents?)/,
     /(image_url|input_audio|input_file|images?|audio|video|pdfs?|files?|documents?)(?: inputs?| content)? (?:is|are) (?:not|only) supported/,
     /unsupported (?:content type|input|modality)[^.]{0,30}?(image|audio|video|pdf|file)/,
   ].map((r) => r.source).join('|'), 'i');
