@@ -263,9 +263,67 @@
     }
   }
 
+  // Le pagine visitate ripiegate per sito, come nella home («14 pagine, fra cui YouTube: orche»): quante, quando, le
+  // ricerche e gli ultimi titoli. Delicate e della rete di casa arrivano già senza titolo (contestoFilo.js, vociDiPagine)
+  // e qui non lo prenderebbero comunque. Oltre il tetto dei siti si dice quante ne mancano: si trovano con CERCA_CHAT.
+  const MAX_SITI = 30;
+  const MAX_TITOLI = 3;
+  const CASA = '\u0000casa';
+  const FILE = '\u0000file';
+  function rendiPagine(pagine, { rif = null } = {}) {
+    const gruppi = new Map();
+    for (const p of Array.isArray(pagine) ? pagine : []) {
+      const t = Date.parse(p && p.ts);
+      if (!Number.isFinite(t)) continue;
+      const k = p.casa ? CASA : (p.file ? FILE : (stringa(p.sito) ? p.sito.toLowerCase() : FILE));
+      let g = gruppi.get(k);
+      if (!g) { g = { k, n: 0, delicate: 0, primo: p.ts, ultimo: p.ts, tUltimo: t, titoli: [], cercati: [] }; gruppi.set(k, g); }
+      g.n++;
+      if (t >= g.tUltimo) { g.ultimo = p.ts; g.tUltimo = t; }
+      if (p.casa) continue;
+      if (p.delicata) { g.delicate++; continue; }
+      if (stringa(p.cercato)) g.cercati.push(p.cercato);
+      else if (stringa(p.titolo)) g.titoli.push(p.titolo);
+    }
+    if (!gruppi.size) return '';
+    const ultimiDistinti = (lista) => {
+      const visti = new Set();
+      const out = [];
+      for (let i = lista.length - 1; i >= 0 && out.length < MAX_TITOLI; i--) {
+        const c = campo(lista[i], 120);
+        if (c && !visti.has(c.toLowerCase())) { visti.add(c.toLowerCase()); out.unshift(c); }
+      }
+      return out;
+    };
+    const tutti = [...gruppi.values()].sort((a, b) => a.tUltimo - b.tUltimo);
+    const tenuti = tutti.slice(-MAX_SITI);
+    const fuori = tutti.slice(0, tutti.length - tenuti.length);
+    const pagineN = (n) => `${n} pagin${n === 1 ? 'a' : 'e'}`;
+    const righe = tenuti.map((g) => {
+      const a = oraDi(g.primo, rif);
+      const b = oraDi(g.ultimo, rif);
+      const ora = a === b ? a : `${a}–${b}`;
+      if (g.k === CASA) return `- ${ora} rete di casa: ${pagineN(g.n)} (di queste pagine qui non arriva altro)`;
+      const nome = g.k === FILE ? 'file del computer' : campo(g.k, 80);
+      const pezzi = [pagineN(g.n)];
+      if (g.delicate) pezzi[0] += g.delicate === g.n ? ` (delicat${g.n === 1 ? 'a' : 'e'}: qui solo il sito)` : ` (${g.delicate} delicat${g.delicate === 1 ? 'a' : 'e'}: di quell${g.delicate === 1 ? 'a' : 'e'} solo il sito)`;
+      const cercati = ultimiDistinti(g.cercati);
+      if (cercati.length) pezzi.push(`cercato ${cercati.map((c) => `«${c}»`).join(', ')}`);
+      const titoli = ultimiDistinti(g.titoli);
+      if (titoli.length) pezzi.push(`${titoli.length < g.titoli.length ? 'fra cui ' : ''}${titoli.map((c) => `«${c}»`).join(', ')}`);
+      return `- ${ora} ${nome}: ${pezzi.join('; ')}`;
+    });
+    if (fuori.length) {
+      const n = fuori.reduce((s, g) => s + g.n, 0);
+      righe.unshift(`- (prima di queste, altre ${pagineN(n)} su ${fuori.length} sit${fuori.length === 1 ? 'o' : 'i'}: qui non ci sono)`);
+    }
+    const busta = E().imbusta({ tipo: 'DATI_PAGINA', conIntestazione: true, testo: righe.join('\n'), max: Infinity });
+    return `Pagine aperte dal messaggio prima, per sito (gli indirizzi, e le pagine che qui non ci sono, li trova CERCA_CHAT):\n${busta}`;
+  }
+
   // Le righe degli eventi di un messaggio, dentro una busta: con l'ora (e il giorno se non è quello del messaggio) e,
-  // oltre il tetto, il numero di quelle più vecchie che non ci sono. `ids`: gli eventi raccontati, per sapere se uno è
-  // stato cancellato dopo.
+  // oltre il tetto, il numero di quelle più vecchie che non ci sono; sotto, le pagine visitate. `ids`: gli eventi
+  // raccontati, per sapere se uno è stato cancellato dopo.
   function rendiEventi(eventi, { rif = null } = {}) {
     const lista = Array.isArray(eventi) ? eventi : [];
     const ultimiDownload = new Map();
@@ -273,9 +331,11 @@
     let schede = { aperte: 0, chiuse: 0 };
     const righe = [];
     const ids = [];
+    const pagine = [];
     lista.forEach((ev, i) => {
       if (!ev) return;
       if (ev.id) ids.push(ev.id);
+      if (ev.tipo === 'navigazione') { pagine.push(ev); return; }
       if (ev.tipo === 'download' && ultimiDownload.get(ev.scaricamento) !== i) return;
       if ((ev.tipo === 'scheda.aperta' || ev.tipo === 'scheda.chiusa') && !stringa(ev.interna)) {
         schede = { ...schede, [ev.tipo === 'scheda.aperta' ? 'aperte' : 'chiuse']: schede[ev.tipo === 'scheda.aperta' ? 'aperte' : 'chiuse'] + 1 };
