@@ -1008,6 +1008,7 @@
       return Promise.resolve(false);
     }
     if ('maxSessions' in esito.valori) maxInScrittura = false;
+    if ('reteApertaTetto' in esito.valori) tettoInScrittura = false;
     const scelta = { valori: esito.valori, msgEl };
     sessionsInAttesa.push(scelta);
     // In coda dietro un'altra richiesta può aspettare: si vede che è partita.
