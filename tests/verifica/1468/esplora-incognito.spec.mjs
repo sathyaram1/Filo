@@ -40,4 +40,10 @@ test('in incognito i tasti e il tasto destro non contano', async ({ app, openTab
   });
   await new Promise((r) => setTimeout(r, 2000));
   expect(await totale(app)).toBe(prima);
+
+  // Controllo: gli stessi gesti nella finestra normale contano.
+  const page = await testServer.openReady(openTab, '<!doctype html><body style="margin:0;height:600px">testo</body>', { pubblico: true });
+  await page.keyboard.press('Control+J');
+  await page.mouse.click(200, 300, { button: 'right' });
+  await expect.poll(() => totale(app), { timeout: 5000 }).toBeGreaterThanOrEqual(prima + 2);
 });
