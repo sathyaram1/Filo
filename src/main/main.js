@@ -13,6 +13,13 @@ if (process.env.FILO_USER_DATA) {
   try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
 }
 
+// Il lucchetto vale per la cartella dei dati, quindi dopo userData e prima di ogni require pesante: la seconda copia
+// esce senza caricare shim e loader (#1092). Sentinella: tests/unit/secondaApertura.test.mjs.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  return;
+}
+
 // «Cancella tutti i dati di Filo» chiesto prima del riavvio (#850): prima che chiunque apra un file della cartella dei dati.
 try { require('./cancellaTutto').allAvvio(app); } catch (e) { console.error('[Filo] cancella tutto:', e?.message || e); }
 
