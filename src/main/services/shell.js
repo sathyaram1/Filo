@@ -163,9 +163,6 @@ function randSid() {
   return 'F' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-5);
 }
 
-// Config per shell: come avviare il processo persistente, la riga di "pronto"
-// da inviare all'avvio, e come "incartare" un comando utente perché stampi il
-// marcatore di fine (exit code + cwd) su una riga propria.
 // #892.4 — nudo sullo stdin, un comando che non si chiude (un apostrofo, un `if` senza `fi`) si prende come testo la
 // riga del marcatore e i comandi dopo: la sessione resta «in corso» per sempre. Fra apici il testo è sempre chiuso, e
 // l'errore di sintassi lo dà `eval`; `command` davanti tiene viva dash, che a un errore di `eval` uscirebbe.
@@ -181,6 +178,9 @@ function righePosix(command, sid, n) {
 }
 const ATTESA_ERR_MS = 800;
 
+// Config per shell: come avviare il processo persistente, la riga di "pronto"
+// da inviare all'avvio, e come "incartare" un comando utente perché stampi il
+// marcatore di fine (exit code + cwd) su una riga propria.
 function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
   const ambiente = { env: ambienteComandi(env || process.env) };
   // Fuori da Windows (Linux, macOS): shell POSIX persistente, letta da pipe →
