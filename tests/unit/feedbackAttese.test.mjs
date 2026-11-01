@@ -289,12 +289,12 @@ test('--aspetta da riga di comando: dice quelle che sostituisce e cosa succede d
   } finally { rete.ripristina(); }
   rete = reteFinta(conAttesa('todo'));
   try {
-    const r = await owner.segnaAttese('id903', '676', { bearer: 'tok', dryRun: true });
+    const r = await owner.segnaAttese('id903', '676', { bearer: 'tok', dryRun: true, sostituisci: true });
     assert.deepEqual(rete.scritte, []);
     assert.match(owner.rispostaAttese('903', r), /scriverei «aspetta #676» e toglierei quelle su #663\.2, #951, che c’erano prima/);
-    const scritta = await owner.segnaAttese('id903', '676', { bearer: 'tok' });
+    const scritta = await owner.segnaAttese('id903', '676', { bearer: 'tok', sostituisci: true });
     assert.match(owner.rispostaAttese('903', scritta), /Tolte le attese su #663\.2, #951.*poi entra in coda da solo/);
-    assert.match(owner.rispostaAttese('903', await owner.segnaAttese('id903', '', { bearer: 'tok' })), /non aspetta più niente \(tolte le attese su #663\.2, #951\)/);
+    assert.match(owner.rispostaAttese('903', await owner.segnaAttese('id903', '', { bearer: 'tok', sostituisci: true })), /non aspetta più niente \(tolte le attese su #663\.2, #951\)/);
   } finally { rete.ripristina(); }
 });
 
