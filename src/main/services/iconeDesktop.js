@@ -530,28 +530,60 @@ function piuFrequente(valori) {
   return meglio;
 }
 
+// La distanza più piccola fra due icone sulla stessa fila: il passo del Finder, che il Mac non dice.
+function passoVisto(voci, asse) {
+  const altro = asse === 'x' ? 'y' : 'x';
+  let min = Infinity;
+  for (let i = 0; i < voci.length; i++) {
+    for (let j = i + 1; j < voci.length; j++) {
+      if (Math.abs(voci[i][altro] - voci[j][altro]) > 8) continue;
+      const d = Math.abs(voci[i][asse] - voci[j][asse]);
+      if (d > 24 && d < min) min = d;
+    }
+  }
+  return Number.isFinite(min) ? min : null;
+}
+
+// Il passo del Mac: quello delle icone se è almeno un'icona (due icone lasciate vicine a mano non sono la griglia),
+// altrimenti uno ricavato dalla dimensione delle icone.
+function passoMac(letto) {
+  const icona = Number.isFinite(letto.dimensioneIcone) && letto.dimensioneIcone > 0 ? letto.dimensioneIcone : 64;
+  const base = Math.max(80, Math.round(icona * 1.6));
+  const voci = letto.voci || [];
+  const buono = (d) => (d && d >= Math.max(48, icona) ? d : null);
+  const x = buono(passoVisto(voci, 'x'));
+  const y = buono(passoVisto(voci, 'y'));
+  return { x: x || y || base, y: y || x || base };
+}
+
 // La griglia dello schermo principale. Con «Allinea alla griglia» (o «Disponi automaticamente») le icone stanno già
 // sulla griglia di Windows: le nuove posizioni ne prendono l'allineamento, così riaccendendola nessuna salta di posto.
-function griglia(letto) {
+// Su Mac la posizione è il centro dell'icona: la prima casella comincia mezzo passo dentro l'area.
+function griglia(letto, piattaforma = 'win32') {
   const a = letto && letto.area;
-  const p = letto && letto.passo;
+  const centro = piattaforma === 'darwin';
+  const p = letto && (letto.passo || (centro && a ? passoMac(letto) : null));
   if (!a || !p || !(p.x >= 8 && p.y >= 8)) return { errore: 'griglia' };
   if (a.destra - a.sinistra < p.x || a.basso - a.alto < p.y) return { errore: 'griglia' };
+  const mezzoX = centro ? Math.round(p.x / 2) : 0;
+  const mezzoY = centro ? Math.round(p.y / 2) : 0;
   const dentro = (letto.voci || []).filter((v) => v.x >= a.sinistra && v.x < a.destra && v.y >= a.alto && v.y < a.basso);
   const allineate = (letto.griglia || letto.auto) && dentro.length;
-  const ox = allineate ? piuFrequente(dentro.map((v) => resto(v.x, p.x))) : resto(a.sinistra, p.x);
-  const oy = allineate ? piuFrequente(dentro.map((v) => resto(v.y, p.y))) : resto(a.alto, p.y);
-  const x0 = a.sinistra + resto(ox - a.sinistra, p.x);
-  const y0 = a.alto + resto(oy - a.alto, p.y);
-  const colonne = Math.floor((a.destra - x0) / p.x);
-  const righe = Math.floor((a.basso - y0) / p.y);
+  const lx = a.sinistra + mezzoX;
+  const ly = a.alto + mezzoY;
+  const ox = allineate ? piuFrequente(dentro.map((v) => resto(v.x, p.x))) : resto(lx, p.x);
+  const oy = allineate ? piuFrequente(dentro.map((v) => resto(v.y, p.y))) : resto(ly, p.y);
+  const x0 = lx + resto(ox - lx, p.x);
+  const y0 = ly + resto(oy - ly, p.y);
+  const colonne = Math.floor((a.destra - (x0 - mezzoX)) / p.x);
+  const righe = Math.floor((a.basso - (y0 - mezzoY)) / p.y);
   if (colonne < 1 || righe < 1) return { errore: 'griglia' };
   return { x0, y0, passoX: p.x, passoY: p.y, colonne, righe };
 }
 
 // Dove va ogni icona: in fila da sinistra a destra e poi la riga sotto, o dall'alto in basso e poi la colonna a destra.
-function piano(letto, q) {
-  const g = griglia(letto);
+function piano(letto, q, piattaforma = 'win32') {
+  const g = griglia(letto, piattaforma);
   if (g.errore) return g;
   const voci = ordina(letto.voci || [], q);
   const posti = g.colonne * g.righe;
