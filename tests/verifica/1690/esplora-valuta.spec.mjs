@@ -29,6 +29,8 @@ const TA = (t) => `<textarea id="f" style="display:block;width:520px;height:90px
 const CE = (h) => `<div id="f" contenteditable="true" style="width:520px;min-height:60px;border:1px solid #999">${h}</div>`;
 
 const CASI = [
+  ['ce grassetto sostituito', CE('<div>Ciao a <b>proprio</b> tutti.</div>'), [{ prima: 'a proprio tutti', dopo: 'a davvero tutti' }]],
+  ['ce grassetto sostituito2', CE('<div>Ciao a <b>proprio</b> tutti.</div>'), [{ prima: 'proprio', dopo: 'davvero' }]],
   ['ta doppione', TA('Era molto molto bello, davvero.'), [{ prima: 'molto ', dopo: '' }]],
   ['ta in testa', TA('Allora, ieri sono andato al mare.'), [{ prima: 'Allora, ', dopo: '' }]],
   ['ta in coda', TA('Ieri sono andato al mare, insomma.'), [{ prima: ', insomma', dopo: '' }]],
