@@ -47,6 +47,11 @@ test('un pezzo del nome scritto minuscolo è una parola qualunque e resta', () =
   assert.equal(A.ripulisci('Il bottone rosa non si vede. Rosa lo ha chiesto.', id), 'Il bottone rosa non si vede. L\'utente lo ha chiesto.');
 });
 
+test('un nome corto o di una parola sola non mangia le parole comuni', () => {
+  assert.equal(A.ripulisci('Al momento il tema va al contrario.', { nomi: ['Al'], email: [] }), 'Al momento il tema va al contrario.');
+  assert.equal(A.ripulisci('La luce resta accesa, Luce lo ha notato.', { nomi: ['Luce'], email: [] }), 'La luce resta accesa, l\'utente lo ha notato.');
+});
+
 test('l\'email dell\'account diventa «l\'utente», le altre si tolgono', () => {
   const t = A.ripulisci('Scrivere a Giulia.Ferraris@example.com o a marco@posta.it per i dettagli.', ID);
   assert.equal(t, 'Scrivere all\'utente o a [email] per i dettagli.');
