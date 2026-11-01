@@ -1381,9 +1381,9 @@ migrazione le mappa. Il codice che decide in base al prefisso
 - Il pacemaker ne riaccende un altro dai battiti. Nessun tetto giornaliero
   (#996): un'accensione che claude.ai rifiuta mette l'account in pausa, e
   Gestione → Automazioni ne dice il motivo.
-- L'orchestratore gira col modello della routine, Haiku 5.5; la sua rilettura
-  del contesto, fra un biglietto e l'altro e mentre veglia, prima su Opus era
-  buona parte del 40% di consumo che i biglietti non contano.
+- L'orchestratore gira col modello della routine, oggi Haiku 5.5. La sua
+  rilettura del contesto, fra un biglietto e l'altro e mentre veglia il worker,
+  non sta nei rapporti dei biglietti (§ 8.1).
 
 ### 12.2 Domani
 
