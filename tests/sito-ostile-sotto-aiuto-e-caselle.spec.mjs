@@ -189,7 +189,6 @@ test('nell\'Aiuto su un sito lo script che seleziona, scrive e cancella non tocc
   // Un clic in mezzo alla domanda e una lettera lì, come nel rilievo del giro 3.
   await ta.click({ position: { x: 4, y: 8 } });
   await strato.keyboard.press('Control+End');
-  await strato.keyboard.press('ArrowLeft');
   for (let i = 0; i < 'password'.length; i++) await strato.keyboard.press('ArrowLeft');
   await strato.keyboard.type('la ');
   await strato.keyboard.press('Control+End');
