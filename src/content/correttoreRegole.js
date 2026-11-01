@@ -452,6 +452,20 @@
     return { da: p, a: pezzo.length - s, sostituto: correzione.slice(p, correzione.length - s) };
   }
 
+  // `restringi` sul pezzo com'è nel testo (`visto`): pezzo e correzione si confrontano a spazi compressi e apici dritti,
+  // così uno spazio citato in più non incolla due parole («oggisono») e un apice curvo non allarga il segno a tutto il
+  // pezzo (#1580.2). Le posizioni sono in `visto`; il sostituto tiene gli apici della correzione.
+  const unSoloSpazio = (s) => String(s ?? '').trim().replace(/\s+/g, ' ');
+  const apiciDritti = (s) => s.replace(/[‘’‚‛]/g, "'").replace(/[“”„]/g, '"');
+  function restringiNelTesto(pezzo, correzione, visto) {
+    const p = unSoloSpazio(pezzo);
+    const c = unSoloSpazio(correzione);
+    const stretto = restringi(apiciDritti(p), apiciDritti(c));
+    if (!stretto) return null;
+    const pos = posizioniNelTesto(p, String(visto ?? ''));
+    return { da: pos[stretto.da], a: pos[stretto.a], sostituto: c.slice(stretto.da, c.length - (p.length - stretto.a)) };
+  }
+
   // Le x dentro il pezzo che il modello ha copiato («di soli xx» → «xx»): { da, a } nel pezzo, o null.
   function xDelPezzo(pezzo) {
     for (const m of String(pezzo).matchAll(GRUPPO_X)) {
