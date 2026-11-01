@@ -899,7 +899,8 @@
   // Righe che dicono di non aver riletto il resto, col testo che resta quando
   // un documento intero arriva: da lì in poi l'avviso sarebbe falso (#675).
   const avvisiLettura = new Map();
-  const righeSessions = [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']], [mgManutentoreMsg, ['manutentoreAcceso']]];
+  const righeSessions = [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']], [mgManutentoreMsg, ['manutentoreAcceso']],
+    [mgReteApertaMsg, ['reteApertaOff']], [mgReteApertaTettoMsg, ['reteApertaTetto']]];
   // Ultimo esito di ogni riga; l'avviso «non letto» non è un esito: lo decide mostraSessionsMsg.
   const esitiSessions = new Map();
   const sceltePendenti = () => Object.assign({}, ...sessionsInAttesa.map((s) => s.valori));
