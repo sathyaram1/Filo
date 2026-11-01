@@ -509,6 +509,8 @@ module.exports = function register(on, ctx) {
     const esiti = (Array.isArray(msg.esiti) ? msg.esiti : []).slice(0, 20)
       .map((v) => (v && typeof v === 'object' ? globalThis.SN_ESITO.voceArchivio(v) : null)).filter(Boolean);
     if (!id || (!text.trim() && !actions.length && !esiti.length)) return { ok: false, error: 'niente da archiviare' };
+    // Un OK dato dopo resta nella conversazione del bottone, ma non la fa rinascere se intanto è stata cancellata.
+    if (esiti.length && !(await FiloChats.get(id))) return { ok: false, error: 'chat inesistente' };
     // La scheda che scrive questa riga sta vivendo la chat: quando sparisce,
     // la chat è finita — come per un turno normale.
     if (sender && sender.wc) ctx.affidaChat(id, sender.wc);
@@ -524,7 +526,7 @@ module.exports = function register(on, ctx) {
       ? (Array.isArray(msg.guardate) ? msg.guardate : []).filter((n) => typeof n === 'string') : [];
     // Una riga di Filo scritta dalla pagina non è passata dal giudizio dei collegamenti (#1505): riaperta, non ne ha.
     await FiloChats.append(id, {
-      role, text, ...(actions.length ? { actions } : {}), ...(role === 'filo' && esiti.length ? { esiti } : {}),
+      role, text, ...(actions.length ? { actions } : {}), ...(role === 'filo' && esiti.length ? { esiti, confermaDopo: true } : {}),
       ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
       ...(guardate.length ? { guardate } : {}), ...(role === 'filo' && msg.tardiva === true ? { tardiva: true } : {}),
       ...(role === 'filo' ? { senzaVerdetto: true } : {}),

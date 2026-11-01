@@ -493,6 +493,8 @@
       const E = global.SN_ESITO;
       const esiti = E && Array.isArray(turn.esiti) ? E.vociArchivio(turn.esiti) : [];
       if (esiti.length) out.esiti = esiti;
+      // Un OK dato dopo il turno: al modello lo racconta il filo (l'azione e il suo esito), qui resta per chi rilegge.
+      if (esiti.length && turn.confermaDopo === true) out.confermaDopo = true;
     }
     return out;
   }
