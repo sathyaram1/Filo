@@ -244,7 +244,7 @@ test('falliti e attese arrivano coi nomi del server, fuori dal rapporto; le atte
   const r = await releaseConRapporto('t', '', conDati, { fetchImpl: async (u, init) => { corpi.push(JSON.parse(init.body)); return reply(200, { ok: true }); }, ...quiet });
   assert.equal(r.rapporto, 'allegato');
   assert.equal(corpi.length, 1);
-  assert.deepEqual(corpi[0].strumentiFalliti, [{ nome: 'Bash', errore: 'exit 1', poi: 'riprovato uguale' }]);
+  assert.deepEqual(corpi[0].strumentiFalliti, [{ nome: 'Bash', errore: 'exit 1', poi: 'riprovato uguale' }, { nome: 'Bash: Run spec salva', errore: 'exit 1: ✘ salva' }]);
   assert.deepEqual(corpi[0].attese, [{ cosa: 'Bash: Run unit tests', secondi: 240 }]);
   assert.equal('falliti' in corpi[0].report, false);
   assert.equal('attese' in corpi[0].report, false);
