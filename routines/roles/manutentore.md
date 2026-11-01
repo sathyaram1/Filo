@@ -166,9 +166,10 @@ conta, condensa. Una promessa («il supporto per altri formati è in arrivo») s
 priorità 3, dichiarata col numero nella consegna, e non ogni rilascio ne ha una. Nessun link che non stesse nelle righe
 originali; una riga nata da righe con la segnalazione ne tiene il numero. Consegna con `novita consegna <file>`: lo
 strumento rifiuta prima del server una promessa fuori dalla rosa o senza numero, il server un link o una segnalazione
-nuovi. La pubblicazione mette la riscrittura al posto delle righe lette (una riga fusa dopo resta accanto); se il commit
-che costruisce non ha tutte le righe che hai letto, escono quelle dei worker, perché la riscrittura racconterebbe cose
-che quella versione non ha. Dalla prima lettura della pubblicazione, o uscita la versione, la riscrittura non si
+nuovi. Le righe del contesto sono quelle dell'ultimo commit di main con la suite verde, che la pubblicazione costruisce
+o supera, e la consegna porta il suo `commit`: la pubblicazione mette la riscrittura al posto delle righe lette (una
+riga fusa dopo resta accanto). Se il contesto dice che quel commit non si è trovato, le righe sono quelle della
+cartella: una pubblicazione che non le ha tutte fa uscire quelle dei worker. Dalla prima lettura della pubblicazione, o uscita la versione, la riscrittura non si
 cambia più. Se non arriva in tempo, restano le righe dei worker.
 
 ## Il recap del mattino

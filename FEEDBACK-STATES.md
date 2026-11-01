@@ -261,7 +261,7 @@ all'owner, il freno.
 - **Guasti.** Niente fermo globale: il lavoro che dichiara un guasto resta fermo (`fermoManutentore`) finché una
   nota del manutentore o dell'owner (`sblocca`) o un'attesa sulla correzione non lo sbloccano; gli altri lavori
   vanno avanti. Una **domanda di processo** nel rilascio (`--processo`) ferma il lavoro allo stesso modo e sveglia
-  il manutentore, non l'owner.
+  il manutentore, non l'owner; col manutentore spento resta nelle note e il lavoro non si ferma.
 - **Rilascio.** Ogni worker registra da sé, dal transcript, gli strumenti falliti (`strumentiFalliti`: nome,
   errore in una riga, cosa è successo dopo) e le attese sopra 30 s (`attese`: cosa, secondi), sul biglietto.
 - **Account.** Il manutentore spegne e riaccende A e B e sceglie il primo (di norma B); le esclusioni dell'owner

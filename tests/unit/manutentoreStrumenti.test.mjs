@@ -114,3 +114,50 @@ test('una domanda di processo da un ruolo senza feedback si rifiuta prima di ril
   assert.equal(r.status, 1);
   assert.match(r.stderr, /--processo vale per chi lavora un feedback: il ruolo compito non ne ha uno/);
 });
+
+test('le domande che fermano arrivano dal server col numero del feedback: le schede non portano l\'id', () => {
+  const indice = M.indiceDalServer([{ num: '812', stato: 'todo', priorita: 2 }, { num: '815', stato: 'todo', priorita: 1 }]);
+  const domande = [
+    { id: 'D-7', titolo: 'Quale modello?', stato: 'aperta', blocca: true, legata: 'abc', num: '812', creataIl: 0 },
+    { id: 'D-8', titolo: 'Chiuso nel frattempo', stato: 'aperta', blocca: true, legata: 'def', num: '999', creataIl: 0 },
+  ];
+  assert.deepEqual(M.righeDomandeFerme(domande, { indice, ordine: ['812'] }), ['D-7 «Quale modello?» ferma #812 (aspetta l\'owner · nell\'ordine)']);
+});
+
+test('una promessa al futuro non dichiarata si riconosce anche fuori dall\'elenco di parole', () => {
+  const blocco = { version: '0.2.256', features: ['Le schede si trascinano fra le finestre.'], fixes: [] };
+  for (const riga of ['Verrà aggiunto il supporto ai PDF.', 'Lavoriamo per portare le schede sul telefono.', 'Domani arriva la chat condivisa.']) {
+    assert.equal(M.controllaNovita({ versione: '0.2.256', features: [riga] }, { blocco, schede: [] }).ok, false, riga);
+  }
+  assert.equal(M.controllaNovita({ versione: '0.2.256', features: ['Le schede ora si trascinano fra le finestre.'] }, { blocco, schede: [] }).ok, true);
+});
+
+test('il redattore legge le righe del commit che la pubblicazione costruirà, non quelle di un main più avanti', async () => {
+  const dir = cartellaTemporanea('filo-redattore-verde-');
+  const g = (...a) => spawnSync('git', ['-C', dir, ...a], { encoding: 'utf8' }).stdout.trim();
+  g('init', '-q', '-b', 'main');
+  g('config', 'user.email', 't@t'); g('config', 'user.name', 't');
+  const { mkdirSync } = await import('node:fs');
+  mkdirSync(join(dir, 'src', 'shared'), { recursive: true });
+  const notes = (righe) => `(function (g) { const NOTES = [\n  { version: '0.2.256', date: '', features: ${JSON.stringify(righe)}, fixes: [] },\n]; g.SN_PATCH_NOTES = { NOTES }; })(globalThis);\n`;
+  writeFileSync(join(dir, 'src', 'shared', 'patchNotes.js'), notes(['Riga uno.']));
+  g('add', '-A'); g('commit', '-qm', 'verde');
+  const verde = g('rev-parse', 'HEAD');
+  writeFileSync(join(dir, 'src', 'shared', 'patchNotes.js'), notes(['Riga uno.', 'Riga fusa dopo, ancora in prova.']));
+  g('add', '-A'); g('commit', '-qm', 'in prova');
+  const testa = g('rev-parse', 'HEAD');
+
+  const git = (...a) => (a[0] === 'fetch' ? '' : a[0] === 'remote' ? 'https://github.com/esempio/Filo' : a[0] === 'rev-list' ? `${testa}\n${verde}` : '');
+  const gh = async (percorso) => (/\/jobs/.test(percorso)
+    ? { jobs: [{ name: 'unit-windows', conclusion: 'success' }] }
+    : { workflow_runs: [{ id: 7, head_sha: verde, conclusion: 'success', status: 'completed', event: 'push', head_branch: 'main' }] });
+  assert.deepEqual(await M.ultimoVerde({ root: dir, git, gh }), { sha: verde });
+  assert.deepEqual(M.bloccoAlCommit(dir, verde).features, ['Riga uno.']);
+  const ctx = M.contestoRedattore({ blocco: M.bloccoAlCommit(dir, verde), schede: [], commit: verde });
+  assert.match(ctx, new RegExp(`"commit": "${verde}"`));
+  assert.doesNotMatch(ctx, /ancora in prova/);
+  // Senza GitHub lo dice, invece di far credere che le righe siano quelle che usciranno.
+  const senza = await M.ultimoVerde({ root: dir, git, gh: async () => { throw new Error('GitHub 403'); } });
+  assert.match(senza.motivo, /GitHub 403/);
+  assert.match(M.contestoRedattore({ blocco: { version: '0.2.256', features: [], fixes: [] }, schede: [], motivo: senza.motivo }), /Non so quale commit costruirà la pubblicazione/);
+});

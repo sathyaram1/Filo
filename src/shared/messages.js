@@ -671,7 +671,7 @@
     //   cap3  giri per i rilievi di livello 3 (a bilancio finito la pratica si
     //         ferma e chiama l'owner);
     //   cap2  giri per i rilievi di livello 2 (a bilancio finito escono come
-    //         feedback a priorità 2, il lavoro non si ferma);
+    //         feedback a priorità 1, il lavoro non si ferma);
     //   cap1  giri per i rilievi di livello 1 (a bilancio finito vanno nel
     //         feedback derivato);
     //   cap0  giri per i soli rilievi di livello 0.

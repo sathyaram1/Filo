@@ -411,7 +411,7 @@
    *     finito ferma il lavoro (è l'unico livello che ferma per bilancio);
    *   - un 2 si corregge se nello stesso giro si corregge anche un 3 (il giro
    *     lo paga il 3) oppure se il bilancio dei 2 ha ancora giri; a bilancio
-   *     finito NON ferma: va nel feedback derivato, a priorità 2, e il giro
+   *     finito NON ferma: va nel feedback derivato, a priorità 1, e il giro
    *     passa se non c'è altro (decisione dell'owner del 2026-09-23);
    *   - un 1 si corregge se nello stesso giro si corregge anche un 3/2 (il
    *     giro lo paga già il livello più alto, e un altro verificatore arriva
@@ -432,10 +432,10 @@
    * che parte comunque, da soli la fanno partire solo col bilancio `cap0`, e
    * un `v?` va da parte come uno 0 col `?`. Gli esterni non entrano in
    * nessuna delle regole sopra: tornano a parte in `external`, ciascuno con
-   * `priority` uguale al livello, in ogni esito (anche a lavoro fermo: sono
+   * `priority` del livello (un 2 nasce a 1), in ogni esito (anche a lavoro fermo: sono
    * di un altro lavoro, ed escono in un feedback loro). Un esterno col `?`
    * non ferma niente: la domanda viaggia nel suo feedback. Anche i rilievi
-   * messi da parte (`derived`) portano `priority` = livello SCRITTO; come
+   * messi da parte (`derived`) portano la `priority` del livello SCRITTO; come
    * diventano feedback lo dice derivedGroups.
    *
    * @param {object} p { findings, caps:{cap3,cap2,cap1,cap0}, counts:{count3,count2,count1,count0} }
@@ -482,7 +482,7 @@
     }
     // I 2: con un 3 da correggere nello stesso giro si correggono pure loro
     // (il giro lo paga il 3); da soli seguono il loro bilancio, e a bilancio
-    // finito non fermano: vanno da parte, ciascuno un feedback a priorità 2.
+    // finito non fermano: vanno da parte, ciascuno un feedback a priorità 1.
     const withThree = fixable.length > 0;
     for (const f of twos) {
       if (withThree || left('cap2') > 0) fixable.push(f);
@@ -536,7 +536,7 @@
    *     viaggia nel suo feedback), così un esterno di livello 3 nasce subito;
    *   - `decisione`: un interno o vicino col `?`, da solo;
    *   - `rimasti`: TUTTI gli altri (interni messi da parte dal bilancio, vicini
-   *     non corretti) in un feedback solo, a priorità = il livello scritto più alto.
+   *     non corretti) in un feedback solo, alla priorità più alta fra i loro livelli scritti (un 2 nasce a 1).
    * Accetta un elenco di rilievi o una decisione di decideRound (`external` +
    * `derived`). I rilievi escono con i campi che avevano (anche `num`, `id`),
    * più `sede`, `level`, `priority` e `decision` canonici. Ordine: i gruppi da
@@ -644,7 +644,7 @@
       const voci = rimasti.findings.map((f) => `${findingTag(f)} ${primaFrase(f.text, 80)}`).join('; ');
       parts.push(n === 1
         ? `Il rilievo non corretto in questo giro esce in un feedback derivato, a priorità ${rimasti.priority}: ${voci}`
-        : `I ${n} rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità ${rimasti.priority} (il livello più alto fra loro): ${voci}`);
+        : `I ${n} rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità ${rimasti.priority} (la più alta fra loro): ${voci}`);
     }
     if (dueDaParte) {
       parts.push(`Il bilancio delle correzioni di livello 2 è finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra' : `i ${dueDaParte} rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano`} nel feedback dei rimasti.`);

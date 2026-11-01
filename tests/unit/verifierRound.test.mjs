@@ -163,7 +163,7 @@ test('livello 3 con cap3 esaurito → stop, decide l\'owner; un 2 a cap2 esaurit
   assert.equal(d.counts.count3, 5, 'fermarsi non paga un giro');
   const due = decide([f(2, 'rotto')], { count2: 5 });
   assert.equal(due.stop, false);
-  assert.deepEqual(due.derived.map((x) => x.priority), [2]);
+  assert.deepEqual(due.derived.map((x) => x.priority), [1], 'un 2 nasce a 1: la 2 la mette solo il manutentore');
 });
 
 test('il segno ? → stop ai livelli 3/2, derivato ai livelli 1 e 0', () => {

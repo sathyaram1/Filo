@@ -155,7 +155,7 @@
   //         chiama l'owner (statusReason `loop`): è l'unico che ferma.
   //   cap2: giri per i rilievi di livello 2 (la cosa chiesta non si ottiene nel
   //         caso normale). A bilancio finito un 2 NON ferma: diventa un
-  //         feedback a parte a priorità 2, e il lavoro passa (2026-09-23).
+  //         feedback a parte a priorità 1, e il lavoro passa (2026-09-23).
   //   cap1: giri per i rilievi di livello 1 (di rado, cosmetica evidente). A
   //         bilancio finito un 1 va nel feedback derivato.
   //   cap0: giri per i soli rilievi di livello 0 (casi rari). Con 0 gli 0 da

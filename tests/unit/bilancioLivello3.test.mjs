@@ -45,7 +45,7 @@ test('un 3 interno paga il bilancio dei 3; a bilancio finito ferma il lavoro, co
   assert.equal(decide([f(3, 'i', 'x')], {}, { ...CAPS, cap3: 0 }).stop, true, 'cap3 a zero: il primo 3 ferma subito');
 });
 
-test('un 2 interno paga il bilancio dei 2; a bilancio finito NON ferma: va da parte a priorità 2 e il giro passa', () => {
+test('un 2 interno paga il bilancio dei 2; a bilancio finito NON ferma: va da parte a priorità 1 (la 2 è del manutentore) e il giro passa', () => {
   const d = decide([f(2, 'i', 'non salva')]);
   assert.deepEqual(livelli(d.fix), ['2i']);
   assert.equal(d.consume, 'cap2');
@@ -55,7 +55,7 @@ test('un 2 interno paga il bilancio dei 2; a bilancio finito NON ferma: va da pa
   assert.equal(finito.stop, false, 'un 2 a bilancio finito non ferma');
   assert.deepEqual(finito.blocking, []);
   assert.deepEqual(finito.fix, []);
-  assert.deepEqual(finito.derived.map((x) => [x.level, x.sede, x.priority]), [[2, 'i', 2], [2, 'i', 2]]);
+  assert.deepEqual(finito.derived.map((x) => [x.level, x.sede, x.priority]), [[2, 'i', 1], [2, 'i', 1]]);
   assert.equal(finito.consume, null, 'niente corretto, niente pagato');
   assert.equal(finito.counts.count2, 4);
   // Anche a cap2 = 0: il primo 2 esce come feedback, il lavoro non si ferma.
@@ -66,11 +66,11 @@ test('un 2 interno paga il bilancio dei 2; a bilancio finito NON ferma: va da pa
   const nota = R.roundNote({ summary: 'il resto regge', findings: [f(2, 'i', 'non salva'), f(2, 'i', 'nemmeno la scorciatoia')], decision: finito });
   assert.match(nota, /Nessun rilievo interno da correggere adesso/);
   assert.match(nota, /Il bilancio delle correzioni di livello 2 è finito: i 2 rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano nel feedback dei rimasti\./);
-  assert.match(nota, /I 2 rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità 2/);
+  assert.match(nota, /I 2 rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità 1/);
   assert.doesNotMatch(nota, /Il lavoro si ferma/);
   const uno = R.roundNote({ summary: '', findings: [f(2, 'i', 'non salva')], decision: zero });
   assert.match(uno, /il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra nel feedback dei rimasti\./);
-  assert.match(uno, /Il rilievo non corretto in questo giro esce in un feedback derivato, a priorità 2: \[2i\] non salva/);
+  assert.match(uno, /Il rilievo non corretto in questo giro esce in un feedback derivato, a priorità 1: \[2i\] non salva/);
 });
 
 test('un 2 interno col segno ? ferma ancora: la decisione dell\'owner non dipende dal bilancio', () => {
@@ -106,12 +106,12 @@ test('gli 1 e gli 0 come prima: con un 2 corretto entrano; con un 2 messo da par
   assert.deepEqual(livelli(daParte.derived), ['2i']);
   const tuttoFinito = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(0, 'i', 'c')], { count2: 4, count1: 1 });
   assert.deepEqual(tuttoFinito.fix, []);
-  assert.deepEqual(tuttoFinito.derived.map((x) => x.priority), [2, 1, 0]);
+  assert.deepEqual(tuttoFinito.derived.map((x) => x.priority), [1, 1, 0]);
   assert.equal(tuttoFinito.consume, null);
-  // Gli esterni come prima: fuori dal conto, con la priorità uguale al livello.
+  // Gli esterni come prima: fuori dal conto, con la priorità del livello (un 2 nasce a 1).
   const conEsterno = decide([f(2, 'e', 'altrove'), f(3, 'e', 'grave altrove')], { count2: 4 });
   assert.equal(conEsterno.stop, false);
-  assert.deepEqual(conEsterno.external.map((x) => x.priority), [2, 3]);
+  assert.deepEqual(conEsterno.external.map((x) => x.priority), [1, 3]);
 });
 
 test('senza uno dei quattro bilanci si ferma e dice quale manca: nessun default', () => {

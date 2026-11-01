@@ -560,7 +560,7 @@ test('derivatiDaAprire: raggruppati come sul server, e mai due volte', () => {
   ];
   const d = derivatiDaAprire(p, der);
   assert.deepEqual(d.map((x) => x.titolo), ['esterno uno', 'scelta C?', 'Rilievi rimasti del lavoro locale #7']);
-  assert.deepEqual(d.map((x) => x.priorita), [2, 1, 1]);
+  assert.deepEqual(d.map((x) => x.priorita), [1, 1, 1], 'un 2 nasce a 1: la 2 la mette solo il manutentore');
   assert.match(d[0].testo, /lavoro locale #7 \(ramo claude\/sette\)/);
   p.derivatiAperti.push({ chiave: d[0].chiave });
   assert.equal(derivatiDaAprire(p, der).length, 2);

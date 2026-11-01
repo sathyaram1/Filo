@@ -104,7 +104,7 @@ test('derivedGroups accetta un elenco piatto e tiene i campi in più (numero, id
   assert.equal(g[1].findings[0].num, '#7.1');
   assert.equal(g[1].findings[0].id, 'x');
   assert.equal(g[1].findings[1].sede, 'i');
-  assert.equal(g[1].priority, 2);
+  assert.equal(g[1].priority, 1);
   assert.deepEqual(R.derivedGroups([]), []);
   assert.deepEqual(R.derivedGroups(null), []);
 });
@@ -120,7 +120,7 @@ test('roundNote parla per gruppi: il feedback dei rimasti coi suoi rilievi, i vi
   const list = [f(2, 'i', 'Non salva. Passi: …'), f(1, 'v', 'Etichetta tagliata.'), f(0, 'i', 'Bordo storto.'), f(1, 'e', 'Altrove.')];
   const r = decide(list, { count2: 5 });
   const nota = R.roundNote({ summary: 'provato', findings: list, decision: r });
-  assert.match(nota, /I 3 rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità 2 \(il livello più alto fra loro\): \[2i\] Non salva\.; \[1v\] Etichetta tagliata\.; \[0i\] Bordo storto\./);
+  assert.match(nota, /I 3 rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità 1 \(la più alta fra loro\): \[2i\] Non salva\.; \[1v\] Etichetta tagliata\.; \[0i\] Bordo storto\./);
   assert.match(nota, /il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra nel feedback dei rimasti/);
   assert.doesNotMatch(nota, /escono come feedback a parte/);
   const fix = decide([f(2, 'i', 'qui'), f(3, 'v', 'vicino')]);
