@@ -506,43 +506,34 @@
       return `${(b / (1024 * 1024)).toFixed(1)} MB`;
     }
 
+    // Un allegato lasciato fuori si dice col suo nome e il perché, anche in mezzo ad altri entrati (#1681). Ritornano
+    // null se l'allegato è entrato, sennò { name, reason, tipo }.
+    const TIPO_NO = 'tipo non supportato';
+    const scarto = (f, reason, ripiego) => ({ name: String(f?.name || ripiego), reason });
     async function addImageFromBlob(blob) {
       // Solo immagini raster note: esclude image/svg+xml, che è un documento attivo, e ogni altro
       // tipo che si spacci per immagine.
-      if (!blob || classifyAttachment(blob) !== 'image') return;
-      if (images.length >= MAX_IMAGES) {
-        statusEl.textContent = `Massimo ${MAX_IMAGES} immagini.`;
-        return;
-      }
-      if (blob.size > 4 * 1024 * 1024) {
-        statusEl.textContent = 'Immagine troppo grande (max 4 MB).';
-        return;
-      }
+      if (!blob) return null;
+      if (classifyAttachment(blob) !== 'image') return scarto(blob, TIPO_NO, 'immagine');
+      if (images.length >= MAX_IMAGES) return scarto(blob, `oltre le ${MAX_IMAGES} immagini ammesse`, 'immagine incollata');
+      if (blob.size > MAX_ATTACH_BYTES) return scarto(blob, 'troppo grande (max 4 MB)', 'immagine incollata');
       const dataUrl = await blobToDataUrl(blob);
       // Il nome resta sul computer: lo leggono l'avviso degli allegati non partiti e l'elenco delle segnalazioni.
       images.push({ dataUrl, name: String(blob.name || '') });
       bumpSubmissionId();
       renderThumbs();
+      return null;
     }
 
     async function addAttachment(file) {
-      if (!file) return;
+      if (!file) return null;
       // Stesso filtro per «Allega» e per il drop: `accept` non vincola né il drop né la scelta
       // «Tutti i file», quindi la whitelist va applicata qui, sul tipo reale.
       const kind = classifyAttachment(file);
-      if (!kind) {
-        statusEl.textContent = ATTACH_REJECT_MSG;
-        return;
-      }
-      if (kind === 'image') { await addImageFromBlob(file); return; }
-      if (files.length >= MAX_FILES) {
-        statusEl.textContent = `Massimo ${MAX_FILES} file.`;
-        return;
-      }
-      if (file.size > MAX_ATTACH_BYTES) {
-        statusEl.textContent = 'File troppo grande (max 4 MB).';
-        return;
-      }
+      if (!kind) return scarto(file, TIPO_NO, 'allegato');
+      if (kind === 'image') return addImageFromBlob(file);
+      if (files.length >= MAX_FILES) return scarto(file, `oltre i ${MAX_FILES} file ammessi`, 'allegato');
+      if (file.size > MAX_ATTACH_BYTES) return scarto(file, 'troppo grande (max 4 MB)', 'allegato');
       const dataUrl = await blobToDataUrl(file);
       files.push({
         name: file.name || 'allegato',
@@ -551,8 +542,23 @@
         dataUrl,
       });
       bumpSubmissionId();
-      statusEl.textContent = '';
       renderThumbs();
+      return null;
+    }
+
+    // Tutti gli allegati di un gesto (una scelta, un rilascio, un incolla), poi un messaggio solo per quelli rimasti fuori.
+    async function allega(lista, aggiungi = addAttachment) {
+      const fuori = [];
+      for (const f of lista) {
+        const no = await aggiungi(f);
+        if (no) fuori.push(no);
+      }
+      if (!fuori.length) { if (lista.length) statusEl.textContent = ''; return; }
+      const elenco = Feedback?.fraseAllegatiSaltati ? Feedback.fraseAllegatiSaltati(fuori)
+        : fuori.map((f) => `«${f.name}»: ${f.reason}`).join('; ');
+      const tipi = fuori.some((f) => f.reason === TIPO_NO)
+        ? ` ${(AttachTypes && AttachTypes.AMMESSI) ? `Ammessi: ${AttachTypes.AMMESSI}.` : ATTACH_REJECT_MSG}` : '';
+      statusEl.textContent = `${fuori.length === 1 ? 'Non allegato' : 'Non allegati'} ${elenco}.${tipi}`;
     }
 
     function caricaImmagine(src) {
