@@ -167,7 +167,7 @@ const SENZA_MARGINE = `<!doctype html><meta charset="utf-8"><body style="margin:
 <a id="lnk" href="#cliccato" style="display:block;width:760px;height:30px">Rispondi a tutti</a>
 <textarea id="ta" lang="it" style="display:block;width:760px;height:100px;font:16px sans-serif;padding:2px;margin:0"></textarea>
 <a id="lnk2" href="#cliccato2" style="display:block;width:760px;height:30px;margin-top:20px">Inoltra</a>
-<input id="in" lang="it" style="display:block;width:760px;font:16px sans-serif;padding:2px;margin:0"></body>`;
+<div id="ce" contenteditable="true" lang="it" style="width:760px;font:16px sans-serif;padding:2px;border:1px solid #999"></div></body>`;
 const SCRITTO_1 = "l'America l'hanno scoperta nel 14xx, e allora abbiamo discusso. ";
 
 test('sulla prima riga di un campo senza margine il valore sta dentro il campo, sotto le x, e il clic sopra il campo resta della pagina', async ({ app, openTab, testServer }) => {
@@ -182,8 +182,7 @@ test('sulla prima riga di un campo senza margine il valore sta dentro il campo, 
   expect(b.y, 'sotto le x').toBeGreaterThanOrEqual(x.y + x.height - 2);
   expect(b.y + b.height, 'dentro il campo').toBeLessThanOrEqual(ta.y + ta.height);
   expect(Math.abs((b.x + b.width / 2) - (x.x + x.width / 2))).toBeLessThan(6);
-  expect(await v.evaluate((el) => Number(getComputedStyle(el).opacity))).toBeGreaterThan(0.9);
-  await page.waitForTimeout(250);
+  await expect.poll(() => v.evaluate((el) => Number(getComputedStyle(el).opacity))).toBeGreaterThan(0.9);
   await page.screenshot({ path: 'tests/.shots/1448-12-valore-sotto.png', clip: { x: 0, y: 40, width: 820, height: 180 } }).catch(() => {});
 
   // Chi scrive clicca sul collegamento appena sopra le x: va al collegamento, e il testo resta com'era.
@@ -197,7 +196,7 @@ test('sulla prima riga di un campo senza margine il valore sta dentro il campo, 
   await expect(page.locator('#ta')).toHaveValue(SCRITTO_1.replace('14xx', '1492'));
 });
 
-test('sulla prima riga con parole sotto il valore sta sotto velato; in una casella di una riga sopra velato: il clic resta al testo e alla pagina', async ({ app, openTab, testServer }) => {
+test('sulla prima riga con parole sotto il valore sta sotto velato; in un campo alto una riga sopra velato: il clic resta al testo e alla pagina', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, { ragionato: { '14xx': [COLOMBO] }, html: SENZA_MARGINE });
   const scritto = "Scoperta nel 14xx dagli spagnoli.\nSotto ci sono altre parole lunghe abbastanza da stare sotto le x del segnaposto. ";
   await page.locator('#ta').click();
@@ -223,19 +222,19 @@ test('sulla prima riga con parole sotto il valore sta sotto velato; in una casel
   await page.mouse.click(sotto.x + sotto.width / 2, sotto.y + sotto.height / 2);
   await expect(page.locator('#ta')).toHaveValue(scritto.replace('14xx', '1492'));
 
-  // Una casella di una riga non ha posto né sopra né sotto: il valore resta sopra, velato, e il collegamento si clicca.
-  await page.locator('#in').click();
+  // Un campo alto una riga non ha posto né sopra né sotto: il valore resta sopra, velato, e il collegamento si clicca.
+  await page.locator('#ce').click();
   await page.keyboard.type(SCRITTO_1);
   const w = valore(page, '1492');
   await expect(w).toBeVisible({ timeout: 8000 });
   await expect(w).toHaveClass(/sn-sopra-testo/);
   await expect(w).not.toHaveClass(/sn-sotto/);
-  const [xi, inp] = [await riquadroDelSegno(ocra(page, '14xx')), await page.locator('#in').boundingBox()];
+  const [xi, ce] = [await riquadroDelSegno(ocra(page, '14xx')), await page.locator('#ce').boundingBox()];
   const bw = await w.boundingBox();
   await page.mouse.move(xi.x + xi.width / 2, bw.y - 40);
-  await page.mouse.click(xi.x + xi.width / 2, inp.y - 6);
+  await page.mouse.click(xi.x + xi.width / 2, ce.y - 6);
   await expect.poll(() => page.evaluate(() => location.hash)).toBe('#cliccato2');
-  await expect(page.locator('#in')).toHaveValue(SCRITTO_1);
+  await expect(page.locator('#ce')).toHaveText(/scoperta nel 14xx, e allora abbiamo discusso\./);
 });
 
 test('«x te», «3x4» e i baci non hanno segni, e non arrivano al modello come segnaposti', async ({ app, openTab, testServer }) => {

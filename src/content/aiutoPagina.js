@@ -428,8 +428,13 @@
     const SC = global.SN_SPELLCHECK;
     if (!el || !el.isConnected || !SC) return { sparito: true };
     if (a.cosa === 'testo') return { testo: String(SC.testoDelCampo?.(el) || '') };
+    const testo = (v) => (typeof v === 'string' ? v : undefined);
     if (a.cosa === 'sostituisci') {
       const r = SC.sostituisciNelCampo(el, String(a.prima || ''), String(a.dopo == null ? '' : a.dopo), Number(a.vicinoA) || 0) || {};
+      return { dove: Number.isInteger(r.dove) ? r.dove : undefined, manca: !!r.manca, tolto: testo(r.tolto), sx: testo(r.sx), dx: testo(r.dx) };
+    }
+    if (a.cosa === 'rimetti') {
+      const r = SC.rimettiNelCampo?.(el, String(a.pezzo || ''), String(a.sx || ''), String(a.dx || ''), Number(a.vicinoA) || 0) || {};
       return { dove: Number.isInteger(r.dove) ? r.dove : undefined, manca: !!r.manca };
     }
     return null;
