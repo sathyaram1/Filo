@@ -159,6 +159,61 @@ test('una correzione che cambia solo spazi o apostrofi non è un errore, e nessu
   assert.equal(corretto('io penso dire di sì', '[penso dire][penso di dire][manca «di»][errore]'), 'io penso di dire di sì');
 });
 
+// #1580.2: il modello cita il pezzo con più spazi del testo, o con l'apice dell'altra forma.
+test('uno spazio citato in più non incolla due parole, e la correzione lascia gli spazi del testo', () => {
+  for (const [testo, riga, atteso] of [
+    ['oggi sonno andato al mare', '[oggi  sonno andato][oggi sono andato][verbo][errore]', 'oggi sono andato al mare'],
+    ['va bene ma sonno qui', '[va  bene  ma sonno][va bene ma sono][verbo][errore]', 'va bene ma sono qui'],
+    ['oggi sonno', '[oggi   sonno][oggi sono][verbo][errore]', 'oggi sono'],
+    ['oggi sonno', '[oggi sonno][oggi  sono][verbo][errore]', 'oggi sono'],
+    ['oggi  sonno', '[oggi sonno][oggi sono][verbo][errore]', 'oggi  sono'],
+  ]) {
+    assert.equal(corretto(testo, riga), atteso, riga);
+    assert.deepEqual(segnati(testo, C.segniDaRisposta(riga, testo).segni), ['sonno'], riga);
+  }
+});
+
+test('con l\'apice tipografico nel testo o nella risposta il segno sta sulla sola parola sbagliata', () => {
+  for (const [testo, riga] of [
+    ['l’amico sonno qui', "[l'amico sonno][l'amico sono][verbo][errore]"],
+    ['l’amico sonno qui', "[l’amico sonno][l'amico sono][verbo][errore]"],
+    ["l'amico sonno qui", '[l’amico sonno][l’amico sono][verbo][errore]'],
+    ['dall’altra parte sonno andato', "[dall'altra parte sonno][dall’altra parte sono][verbo][errore]"],
+  ]) {
+    const { segni } = C.segniDaRisposta(riga, testo);
+    assert.deepEqual(segni.map((s) => [s.segment, s.correzioni[0]]), [['sonno', 'sono']], `${testo} ${riga}`);
+    assert.equal(corretto(testo, riga), testo.replace('sonno', 'sono'), 'l\'apice di chi scrive resta il suo');
+  }
+});
+
+test('il valore di un segnaposto citato con uno spazio in più sta sulle sole x', () => {
+  const testo = 'scoperta nel 14xx da Colombo';
+  const { segni } = C.segniDaRisposta('[nel  14xx][nel 1492][Colombo][segnaposto]', testo, { tipi: ['segnaposto'] });
+  assert.deepEqual(segni.map((s) => [s.segment, s.correzioni[0]]), [['14xx', '1492']]);
+});
+
+// #1655
+test('«Filo» e filo.red non sono mai errori: né per il dizionario né per il modello', () => {
+  const testo = "Ho aperto Filo e poi filo.red, www.filo.red/novita e Filo's tabs; FILO";
+  assert.deepEqual(C.candidatiDizionario(testo, { sbagliata: () => true }).map((s) => s.segment), ['Ho', 'aperto', 'e', 'poi', 'e', 'tabs']);
+  for (const riga of [
+    '[aperto Filo][aperto filo][maiuscola a metà frase][errore]',
+    '[filo.red][filo.rete][refuso][errore]',
+    "[Filo's][Filo][x][errore]",
+    '[FILO][FILM][refuso][errore]',
+  ]) assert.deepEqual(C.segniDaRisposta(riga, testo).segni, [], riga);
+  // Accanto al nome il resto si corregge come sempre; il filo da cucire resta una parola.
+  assert.deepEqual(segnati('Filo e andato', C.segniDaRisposta('[Filo e andato][Filo è andato][verbo][errore]', 'Filo e andato').segni), ['e']);
+  assert.deepEqual(C.candidatiDizionario('il filo rosso', { sbagliata: (w) => w === 'filo' }).map((s) => s.segment), ['filo']);
+});
+
+test('un dominio senza indirizzo intorno non è fatto di parole; uno spazio dimenticato prima di una maiuscola sì', () => {
+  const zone = (t) => C.zoneEscluse(t).map(([a, b]) => t.slice(a, b));
+  assert.deepEqual(zone('preso su amazon.it, poi index.html'), ['amazon.it', 'index.html']);
+  assert.deepEqual(zone('la dott.ssa Rossi'), ['dott.ssa']);
+  for (const t of ['andato.Poi sono', 'e.g. questo', 'la 1.5 va', 'fine. poi']) assert.deepEqual(zone(t), [], t);
+});
+
 test('un pezzo ripetuto vale nell\'occorrenza che tocca il testo nuovo di quella chiamata', () => {
   const testo = 'ho sonno, ma oggi sonno andato al mare';
   const nuovo = { start: testo.indexOf('oggi'), end: testo.length };
