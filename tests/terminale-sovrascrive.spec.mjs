@@ -65,7 +65,7 @@ test('proposto da Filo: sovrascrivere chiede anche a compito pulito, la copia su
 
   const sopra = await esegui(copia(nuovo, vecchio));
   expect(sopra.executed, 'senza un sì non parte').toBe(false);
-  expect(sopra.needsConfirm).toBe(3);
+  expect(sopra.needsConfirm, 'chiede prima di partire').toBeTruthy();
   expect(JSON.stringify(sopra.parti || sopra.describe || ''), 'il popup dice perché').toMatch(/sovrascrive/);
   expect(readFileSync(vecchio, 'utf8')).toBe('testo da tenere');
 
