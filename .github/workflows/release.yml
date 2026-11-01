@@ -370,6 +370,7 @@ jobs:
       # § 8), in locale come il numero. Non ferma mai la pubblicazione: senza
       # risposta escono le righe dei worker, con l'avviso.
       - name: Le novita' del redattore (in locale)
+        id: novita
         if: steps.check.outputs.should_release == 'true'
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
@@ -613,6 +614,7 @@ jobs:
       # ha fermate alla prima lettura. Dallo strumento di questa corsa, perche'
       # una versione vecchia non ce l'ha.
       - name: Le novita' del redattore (in locale)
+        id: novita
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
         shell: bash
@@ -880,6 +882,7 @@ jobs:
       # ha fermate alla prima lettura. Dallo strumento di questa corsa, perche'
       # una versione vecchia non ce l'ha.
       - name: Le novita' del redattore (in locale)
+        id: novita
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
         shell: bash
