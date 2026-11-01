@@ -180,6 +180,24 @@ describe('come la lancia la pubblicazione', () => {
       assert.match(righe[2], /manca FILO_BUILD_PASSPHRASE/);
     } finally { togliCartella(dir); }
   });
+
+  test('la riscrittura della versione che esce non si mette e il server lo sa, così non torna in una costruzione dopo', async () => {
+    const coprealtro = { versione: TOP.version, fixes: ['Anche una riga che qui non c’è.'], originali: [impronta('Fusa dopo.')] };
+    const vecchia = { versione: VECCHIO.version, features: ['Vecchia, riscritta.'], fixes: [] };
+    const s = await server(() => [200, { ok: true, novita: coprealtro, tutte: [coprealtro, vecchia] }]);
+    const dir = progetto();
+    const log = console.log;
+    console.log = () => {};
+    try {
+      assert.equal(await main([`v${TOP.version}`], { cwd: dir, env: { FILO_BUILD_PASSPHRASE: 'p' }, url: s.url }), 0);
+    } finally { console.log = log; await s.chiudi(); }
+    try {
+      assert.deepEqual(s.corpi, [{ passphrase: 'p', versione: TOP.version }, { passphrase: 'p', versione: TOP.version, scarta: true }]);
+      const dopo = note(readFileSync(join(dir, 'src', 'shared', 'patchNotes.js'), 'utf8'));
+      assert.deepEqual(dopo[0], TOP, 'la versione che esce resta con le righe dei worker');
+      assert.deepEqual(dopo[5].features, ['Vecchia, riscritta.'], 'le altre si mettono lo stesso');
+    } finally { togliCartella(dir); }
+  });
 });
 
 describe('release.yml', () => {
