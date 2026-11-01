@@ -52,3 +52,31 @@ test('r1 chiusa la scheda durante «Invio in corso», il feedback consegnato non
   await altra.waitForTimeout(1200);
   await expect(altra.locator('.sn-fb-text'), 'il testo consegnato non si ripropone come bozza').toHaveValue('');
 });
+
+test('r1 durante «Invio in corso» il riquadro aperto in un’altra scheda non ripropone il testo che sta partendo', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await app.evaluate(() => {
+    globalThis.__rete = { payload: [], sblocca: null };
+    globalThis.SN_FEEDBACK.submit = async (p) => {
+      globalThis.__rete.payload.push(p);
+      await new Promise((r) => { globalThis.__rete.sblocca = r; });
+      return { id: 'fb-1', seq: 1, failed: [] };
+    };
+  });
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await page.locator('.sn-fb-text').fill('Il tasto Salva non risponde');
+  await page.waitForTimeout(600);
+  await page.locator('.sn-fb-send').click();
+  await expect(page.locator('.sn-fb-status')).toContainText('Invio in corso');
+
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  await expect(shell.locator('.tab')).toHaveCount(2, { timeout: 8_000 });
+  const altra = await newtabPage(app, page);
+  await altra.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await expect(altra.locator('.sn-fb-modal')).toBeVisible();
+  await altra.waitForTimeout(1200);
+  await expect(altra.locator('.sn-fb-text'), 'il testo in viaggio non è una bozza da rimandare').toHaveValue('');
+  await expect.poll(() => app.evaluate(() => typeof globalThis.__rete.sblocca === 'function')).toBe(true);
+  await app.evaluate(() => globalThis.__rete.sblocca());
+});
