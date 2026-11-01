@@ -12,7 +12,8 @@
 //
 // PROTOCOLLO marcatori (powershell/cmd/sh):
 //   - FILO_RDY_<sid>            riga di "pronto" (e prompt da rimuovere, con cmd);
-//   - FILO_META_<sid>:<code>:<cwd>  fine comando, con exit code e directory.
+//   - FILO_META_<sid>:<code>:<cwd>  fine comando, con exit code e directory;
+//   - FILO_EFINE_<sid>:<n>      su stderr, fine dello stderr del comando n (solo sh/bash).
 // I comandi vengono serializzati in coda: ne parte uno alla volta e l'output
 // in arrivo è instradato alle callback del comando corrente fino al suo META.
 //
