@@ -303,7 +303,8 @@ function differenza({ prima, dopo }) {
 export function righeConfronto(esito, { dettaglio = false, max = 30 } = {}) {
   if (esito.uguale) return [`UGUALE: ${raccolteParola(esito.raccolte)}, ${esito.totaleDopo} documenti, nessuna differenza.`];
   const mancano = esito.mancano === 1 ? 'manca 1 documento' : `mancano ${esito.mancano} documenti`;
-  const righe = [`DIVERSO: ${esito.diverse.length} su ${raccolteParola(esito.raccolte)} non tornano: ${mancano}, ${esito.inPiu} in più `
+  const n = esito.diverse.length;
+  const righe = [`DIVERSO: ${raccolteParola(n)} su ${esito.raccolte} non ${n === 1 ? 'torna' : 'tornano'}: ${mancano}, ${esito.inPiu} in più `
     + `(${esito.totalePrima} prima, ${esito.totaleDopo} dopo).`];
   const gruppi = new Map();
   for (const d of esito.diverse) {
