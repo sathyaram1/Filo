@@ -235,8 +235,8 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
       args,
       options: { windowsHide: true, ...ambiente },
       ready: `printf 'FILO_RDY_${sid}\\n'\n`,
-      wrap: (command) =>
-        `${comandoPerPosix(command)}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
+      wrap: (command, n) => righePosix(command, sid, n),
+      fineErr: true,
     };
   }
   // PowerShell (default). `-Command -` legge ed esegue da stdin in modo
