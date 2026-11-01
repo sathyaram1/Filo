@@ -275,12 +275,13 @@
               logFn('token dell\'owner non ottenuto (rete, riprovo):', it.id, e?.message || e);
               continue;
             }
-            if (!idToken) { attendiAccesso(it, 'nessun accesso valido', 'assente'); anyFail = true; continue; }
+            if (!idToken) { attendiAccesso(it, 'nessun accesso valido', 'assente'); rispondi(it.id, { esito: 'in_coda' }); anyFail = true; continue; }
           }
           // #912: la voce dell'owner parte con la prova o non parte; da anonima diventerebbe un utente che nessuno riprende.
           const result = idToken ? await fb.submit(payload, { idToken, soloAdmin: true }) : await fb.submit(payload);
           remove(it.id);
           logFn('inviato:', it.id);
+          rispondi(it.id, { esito: 'consegnato', id: result && result.id });
           try { onDoneFn && onDoneFn(it, result); } catch (_) {}
           backoff = backoffMin; // successo → azzera il backoff
         } catch (e) {
@@ -288,12 +289,14 @@
           // Riprovare non cambia niente finché quella copia di Filo resta com'è,
           // e intanto chi ha mandato la segnalazione ha già letto «inviato»:
           // restava in coda un giorno intero e poi spariva senza una parola.
-          // Qui si smette subito e glielo si dice.
-          if (fb.isEncryptionError && fb.isEncryptionError(e)) {
-            logFn('rinuncio, la cifratura non si può fare:', it.id, e?.message || e);
-            conta('rinuncia', 'cifratura');
+          // Qui si smette subito e glielo si dice. Lo stesso per un feedback rimasto vuoto per sempre (#1667).
+          const vuotoPerSempre = !!(e && e.vuoto && e.permanente);
+          if ((fb.isEncryptionError && fb.isEncryptionError(e)) || vuotoPerSempre) {
+            logFn('rinuncio, non partirà mai:', it.id, e?.message || e);
+            if (!vuotoPerSempre) conta('rinuncia', 'cifratura');
             it.rinuncia = true;
             it.motivoRinuncia = e?.message || String(e);
+            rispondi(it.id, { esito: 'rinuncia', motivo: it.motivoRinuncia });
             if (annunciaRinuncia(it)) remove(it.id);
             else anyFail = true; // nessuno a cui dirlo: si riprova, non si butta
             continue;
@@ -301,11 +304,13 @@
           if (it.dallOwner && e && e.accessoOwner) {
             it.tokenRifiutato = true;
             attendiAccesso(it, e.message || 'token rifiutato', 'rifiutato');
+            rispondi(it.id, { esito: 'in_coda' });
             continue;
           }
           it.attesaAccesso = false;
           it.attempts = (it.attempts || 0) + 1;
           anyFail = true;
+          rispondi(it.id, { esito: 'in_coda' });
           logFn('invio fallito (riprovo):', it.id, e?.message || e);
         }
       }
