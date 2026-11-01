@@ -36,6 +36,8 @@
     const citata = m.rispostaA && R ? R.risolvi(m.rispostaA, trovaChat) : null;
     if (citata) v.rispostaA = citata;
     if (Array.isArray(m.actions) && m.actions.length) v.actions = m.actions.slice();
+    // Com'è andata ogni azione (#1294): riaperta, la chat la racconta riga per riga, coi bottoni dei file.
+    if (Array.isArray(m.esiti) && m.esiti.length) v.esiti = m.esiti.slice();
     if (Array.isArray(m.cambi) && m.cambi.length) v.cambi = m.cambi.slice();
     if (Number(m.images) > 0) v.images = Number(m.images);
     if (Array.isArray(m.fotoInMemoria) && m.fotoInMemoria.length) v.fotoInMemoria = m.fotoInMemoria.slice();
