@@ -268,9 +268,13 @@ export function rigaPulita(s, max) {
 }
 
 // Le righe che dicono l'errore. La prima dell'uscita è spesso l'intestazione di npm («> filo@… test:unit») o il remoto di
-// git («To github.com:…»): il manutentore deve leggere perché è fallito, non cosa si stava lanciando.
+// git («To github.com:…»): il manutentore deve leggere perché è fallito, non cosa si stava lanciando. Prima i segni di
+// un fallimento (TAP «not ok», ✖ ✘, «XxxError:», git «! [rejected]»), poi le parole: il nome di una prova PASSATA che
+// contiene «errore» è la prima riga con una parola d'errore in quasi ogni uscita delle prove di logica.
+const RIGA_DI_FALLIMENTO = /^not ok\b|^[✖✘×]|^!\s*\[[a-z ]*rejected\]|^(?:npm ERR!|npm error\b|fatal:|error:|remote: error\b)|(?:^|[\s(])(?:[A-Z][A-Za-z]*)?Error(?:\s*\[[A-Z_]+\])?:\s/;
 const RIGA_DI_ERRORE = /\b(error|errore|fatal|failed|failure|rejected|refused|denied|not ok|exception|cannot|can't|unable|timed? ?out|no such|not found|ENOENT|EACCES|ERR!|RIFIUTATO|✘)\b|^\s*[!✘×]/i;
 const RIGA_DI_CONTORNO = /^(>\s|To\s\S+$|npm (notice|warn)\b|\$\s)/i;
+const RIGA_PASSATA = /^(#\s*Subtest:|ok\s+\d+\b|[✔✓]\s)/;
 
 /** La riga che dice perché uno strumento è fallito: «exit 1: <la riga d'errore, o la prima utile>». PURA. */
 export function rigaErrore(content) {
