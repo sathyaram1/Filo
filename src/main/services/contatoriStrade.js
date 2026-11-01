@@ -160,7 +160,7 @@ function crea(dip = {}) {
   }
 
   return {
-    azione, tasto, aVuoto, nativo, contesto, cronologia, aiuto, pagina, inVista, attesa, inputScheda, caricata, navigata, chiusa,
+    azione, tasto, tastoNome, aVuoto, nativo, contesto, cronologia, aiuto, pagina, inVista, attesa, inputScheda, caricata, navigata, chiusa,
   };
 }
 
