@@ -438,6 +438,27 @@ test('un sito diventato delicato dopo il messaggio: dal messaggio dopo i suoi ti
   } finally { globalThis.SN_DELICATE = prima; }
 });
 
+test('una scheda aperta che diventa delicata dopo il messaggio: il suo titolo esce dal CONTESTO e dai messaggi già mandati', async () => {
+  const S = globalThis.SN_FILO_STATE;
+  const stato = (tabs) => S.sezioni({ time: { humanNow: '', timeSinceLastInteractionMin: null, session: null }, tabs, timers: [], notifications: [], dashboard: null }, { perChat: true });
+  const sezioni = (tabs) => TV.sezioniUtente({ sistema: 'linux', capacita: CAPS, profilo: 'Si chiama Mario.', statoSezioni: stato(tabs) });
+  const gmail = { url: 'https://mail.example/', title: 'Gmail', active: false };
+  const clinica = { url: 'https://clinica.example/esito#su', title: 'ESITO-ESAME', active: true };
+  azzera();
+  await turno({ testo: 'ciao', minutiFa: 30, sezioni: sezioni([gmail]) });
+  const due = await turno({ testo: 'cosa vuol dire?', minutiFa: 20, sezioni: sezioni([gmail, clinica]) });
+  assert.match(testoDi(due.messages.at(-1)), /ESITO-ESAME/);
+  // Una scheda delicata nuova non rifà niente: il messaggio di prima resta il prefisso.
+  const tre = await turno({ testo: 'ok', minutiFa: 15, sezioni: sezioni([gmail, clinica, { url: 'https://banca.example/', title: 'x', delicata: 'banca' }]) });
+  assert.equal(json(tre.messages.slice(0, due.messages.length)), json(due.messages), 'una scheda delicata nuova ha riscritto il tratto');
+  const quattro = await turno({ testo: 'grazie', minutiFa: 10, sezioni: sezioni([gmail, { ...clinica, delicata: 'utente' }]) });
+  const tutto = quattro.messages.map(testoDi).join('\n');
+  assert.doesNotMatch(tutto, /ESITO-ESAME/, 'il titolo della scheda diventata delicata resta davanti al modello');
+  assert.match(tutto, /\[pagina delicata\] clinica\.example/);
+  const cinque = await turno({ testo: 'ciao ancora', minutiFa: 5, sezioni: sezioni([gmail, { ...clinica, delicata: 'utente' }]) });
+  assert.equal(json(cinque.messages.slice(0, quattro.messages.length)), json(quattro.messages), 'la fotografia si rifà a ogni turno');
+});
+
 test('il blocco delle pagine: tre titoli per sito, «fra cui» se ne restano fuori, oltre i trenta siti il numero di quelle che mancano', () => {
   const t0 = Date.parse('2026-10-31T10:00:00Z');
   const ts = (min) => new Date(t0 + min * 60000).toISOString();

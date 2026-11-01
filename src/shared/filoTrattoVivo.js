@@ -44,7 +44,9 @@
     });
     const sezStato = Array.isArray(statoSezioni) ? statoSezioni : (stato ? [{ chiave: 'STATO', testo: stato }] : []);
     for (const x of sezStato) {
-      if (x && stringa(x.chiave)) metti(`STATO:${x.chiave}`, x.testo, { stato: true, ...(x.confronto != null ? { confronto: x.confronto } : {}) });
+      if (x && stringa(x.chiave)) {
+        metti(`STATO:${x.chiave}`, x.testo, { stato: true, ...(x.confronto != null ? { confronto: x.confronto } : {}), ...(x.riservate ? { riservate: x.riservate } : {}) });
+      }
     }
     metti('CAMBI', P().filoChatCambiValute(cambi));
     const lista = Array.isArray(filesList) ? filesList.filter((f) => f && stringa(String(f.id || ''))) : null;
@@ -73,7 +75,8 @@
 
   // Cosa è cambiato dalle sezioni già viste (`viste`: Map chiave → { confronto, righe, perId, rifai }). `rifai`: un
   // cambio che non si dice con un'aggiunta (una riga di memoria tolta, le capacità), e la fotografia si rifà: una riga
-  // dimenticata non deve restare davanti al modello con accanto «tolta».
+  // dimenticata non deve restare davanti al modello con accanto «tolta». Così anche una pagina mostrata col titolo che
+  // adesso è delicata (`riservate`): il titolo deve uscire anche dai messaggi già mandati.
   function confronta(viste, sezioni) {
     const prima = viste instanceof Map ? viste : new Map();
     const nuove = new Map();
@@ -81,8 +84,12 @@
     let rifai = false;
     for (const s of Array.isArray(sezioni) ? sezioni : []) {
       const conf = s.confronto != null ? s.confronto : s.testo;
-      nuove.set(s.chiave, { confronto: conf, righe: s.righe || null, perId: s.perId || null, rifai: !!s.rifai });
       const v = prima.get(s.chiave);
+      const ris = s.riservate || null;
+      const giaVisti = v && v.riservate ? v.riservate.visibili : [];
+      const visibili = ris ? [...new Set([...giaVisti, ...(ris.visibili || [])])] : null;
+      nuove.set(s.chiave, { confronto: conf, righe: s.righe || null, perId: s.perId || null, rifai: !!s.rifai, ...(ris ? { riservate: { visibili } } : {}) });
+      if (ris && (ris.nascosti || []).some((u) => giaVisti.includes(u))) { rifai = true; continue; }
       if (v && v.confronto === conf) continue;
       if (s.rifai) { rifai = true; continue; }
       if (!v) { cambiate.push({ sezione: s }); continue; }
