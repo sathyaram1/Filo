@@ -52,14 +52,32 @@ const esitoPerIlModello = async (app, id) => {
   return '';
 };
 
-// Ha suonato e poi si è fermata: l'utente l'ha messa in pausa.
+const lettoreInCorsa = (app) => app.evaluate(({ BrowserWindow }) => !!BrowserWindow.getAllWindows()
+  .find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.title === 'Musica')._mediaInCorso);
+
+// Ha suonato e poi si è fermata: l'utente l'ha messa in pausa. Il lettore parte davvero (media-started-playing):
+// solo dopo il motore lo sente.
 async function ascoltataEFermata(app, page, url) {
   await page.evaluate(() => document.getElementById('a').play());
+  await expect.poll(() => lettoreInCorsa(app)).toBe(true);
   await suona(app, 'Musica', true);
   await page.evaluate(() => document.getElementById('a').pause());
   await suona(app, 'Musica', false);
   await expect.poll(() => inPausa(app, url)).toBe(true);
 }
+
+test('un suono senza lettore in corsa (una notifica, un video muto) non fa di una scheda la musica da riprendere', async ({ app, openTab, testServer }) => {
+  await home(app);
+  await openTab(testServer.html('<title>Posta</title><p>posta'));
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const wc = tm.tabs.find((x) => x.title === 'Posta').view.webContents;
+    wc.emit('audio-state-changed', { audible: true });
+    wc.emit('audio-state-changed', { audible: false });
+  });
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.title === 'Posta').audioAt || null)).toBeNull();
+});
 
 test('la scheda in pausa riparte, dietro, senza aprirne una nuova; il modello la vede segnata', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
