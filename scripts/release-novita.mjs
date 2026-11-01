@@ -85,6 +85,9 @@ function testoDelBlocco(blocco, rientro) {
   return `{\n${r1}${[`version: ${JSON.stringify(blocco.version)}`, ...altre].join(', ')},\n${lista('features', blocco.features)}${lista('fixes', blocco.fixes)}${rientro}}`;
 }
 
+const canonico = (v) => JSON.stringify(v, (_, x) => (x && typeof x === 'object' && !Array.isArray(x)
+  ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x));
+
 /**
  * Il testo di patchNotes.js con le riscritture `tutte` messe nei loro blocchi. Il risultato si rilegge: se il registro
  * non torna esattamente quello atteso, non si scrive niente. → { ok, testo, applicate, saltate } | { ok:false, reason }. PURA.
@@ -98,8 +101,9 @@ export function applicaNovita(sorgente, tutte) {
   const saltate = [];
   for (const t of Array.isArray(tutte) ? tutte : []) {
     const versione = String((t && t.versione) || '');
-    const features = Array.isArray(t && t.features) ? t.features.map(rigaValida) : [null];
-    const fixes = Array.isArray(t && t.fixes) ? t.fixes.map(rigaValida) : [null];
+    const righe = (k) => (t && t[k] === undefined ? [] : Array.isArray(t && t[k]) ? t[k].map(rigaValida) : [null]);
+    const features = righe('features');
+    const fixes = righe('fixes');
     if (!VERSIONE_RE.test(versione) || features.includes(null) || fixes.includes(null) || !(features.length + fixes.length)) {
       saltate.push({ versione, perche: 'riscrittura malformata' });
       continue;
@@ -115,8 +119,7 @@ export function applicaNovita(sorgente, tutte) {
     applicate.push(versione);
   }
   if (!applicate.length) return { ok: true, testo: String(sorgente), applicate, saltate };
-  const dopo = leggiNote(testo);
-  if (JSON.stringify(dopo) !== JSON.stringify(attese)) return { ok: false, reason: 'riscritto, il registro non torna quello atteso' };
+  if (canonico(leggiNote(testo)) !== canonico(attese)) return { ok: false, reason: 'riscritto, il registro non torna quello atteso' };
   return { ok: true, testo, applicate, saltate };
 }
 

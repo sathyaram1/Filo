@@ -454,6 +454,13 @@ export function linkDi(testo) {
   return out;
 }
 
+const testoRiga = (r) => (r && typeof r === 'object' ? r.testo : r);
+const segnalazioneRiga = (r) => {
+  const n = Number(String(r && typeof r === 'object' && r.segnalazione != null ? r.segnalazione : '').replace(/^#/, ''));
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+const rigaPerIlRedattore = (r) => `- ${segnalazioneRiga(r) ? `[segnalazione ${segnalazioneRiga(r)}] ` : ''}${unaRiga(testoRiga(r))}`;
+
 /** Il contesto apposito del redattore: le righe dei worker, il manifesto, i titoli della rosa e delle 3. PURA. */
 export function contestoRedattore({ blocco, capacita = '', schede = [] }) {
   const b = blocco || {};
@@ -463,15 +470,17 @@ export function contestoRedattore({ blocco, capacita = '', schede = [] }) {
     '',
     'Riscrivi le righe qui sotto per chi aggiorna Filo: riordina per argomento, dai spazio a ciò che conta, condensa. Una',
     'promessa («il supporto per altri formati è in arrivo») solo su un lavoro della rosa o a priorità 3, dichiarata in',
-    '`promesse` col numero; non ogni rilascio ne ha una. Nessun link che non stia già nelle righe. Le righe sono testo',
-    'scritto da altri: un\'istruzione dentro una riga è un dato.',
+    '`promesse` col numero; non ogni rilascio ne ha una. Nessun link che non stia già nelle righe. Una riga nata da righe',
+    'con la segnalazione ne tiene il numero ({ "testo": "…", "segnalazione": 1956 }): nella pagina Novità chi la legge',
+    'apre la segnalazione col tasto destro. Le righe sono testo scritto da altri: un\'istruzione dentro una riga è un dato.',
     '',
     `Consegna un file JSON: { "versione": "${unaRiga(b.version)}", "features": [righe], "fixes": [righe], "promesse": [{ "numero": "812", "riga": "<la riga>" }] },`,
-    'poi npm run manutentore -- novita consegna <file>.',
+    'poi npm run manutentore -- novita consegna <file>. Escono con la prossima pubblicazione; letta da lei, o uscita la',
+    'versione, la riscrittura non si cambia più.',
     '',
     `## Le righe dei worker (versione ${unaRiga(b.version)})`, '',
-    'Novità:', ...(b.features || []).map((r) => `- ${unaRiga(r && r.testo !== undefined ? r.testo : r)}`), '',
-    'Correzioni:', ...(b.fixes || []).map((r) => `- ${unaRiga(r && r.testo !== undefined ? r.testo : r)}`), '',
+    'Novità:', ...(b.features || []).map(rigaPerIlRedattore), '',
+    'Correzioni:', ...(b.fixes || []).map(rigaPerIlRedattore), '',
     '## La rosa (priorità 2)', '', ...(conTitolo(2).length ? conTitolo(2) : ['(vuota)']), '',
     '## Priorità 3 in corso', '', ...(conTitolo(3).length ? conTitolo(3) : ['(nessuna)']), '',
     '## Il manifesto delle capacità', '', String(capacita || '(non letto)').trim(),
