@@ -273,8 +273,8 @@ function esitiDellaScheda(storia, chatMsgs) {
     while (k >= 0 && !stesso(m, chatMsgs[k])) k--;
     if (k < 0) continue;
     // Un sì dato nel popup è un esito anche senza `_output` (una lezione fissata non ne ha): senza, il modello non sapeva
-    // che l'utente aveva confermato (#1396).
-    const conEsiti = Array.isArray(m.actions) && m.actions.some((a) => a && (a._output || a._confirmed));
+    // che l'utente aveva confermato (#1396). Un no anche (#1373).
+    const conEsiti = Array.isArray(m.actions) && m.actions.some((a) => a && (a._output || a._confirmed || a._rifiutata));
     const rd = Array.isArray(m.reasoningDetails) && m.reasoningDetails.length ? m.reasoningDetails : null;
     if (conEsiti || rd) out.set(FC().chiave(chatMsgs[k]), { azioni: conEsiti ? m.actions : [], ...(rd ? { reasoningDetails: rd } : {}) });
     j = k - 1;

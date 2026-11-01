@@ -23,7 +23,9 @@
   const GLIFO_RIPRENDI = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
   // Il messaggio con cui riparte un turno fermato: non è voce dell'utente, e il main lo sa (`internal`).
   const RIPRENDI = '[L\'utente ti ha chiesto di riprendere il lavoro da dove ti eri fermato.]';
-  const DOPO_OK = '[L\'utente ha dato l\'OK qui sopra: riprendi la sua richiesta da lì e rispondigli.]';
+  // Dopo l'OK il modello riparte sempre (#1373): l'esito glielo accoda il main, e a lavoro finito il silenzio va bene.
+  const DOPO_OK = '[L\'utente ha risposto alla tua richiesta di conferma qui sopra: com\'è andata è scritto sotto. Se la sua '
+    + 'richiesta ha altri passi, continua con quelli che mancano. Se è già compiuta non scrivere niente, o al massimo una riga.]';
   // Dopo un turno finito senza risposta (#557) i passi fatti bastano spesso già: rifarli rimetterebbe Filo nello stesso giro.
   const CONTINUA = '[L\'utente ti ha chiesto di continuare il lavoro che si era fermato senza una risposta. Gli esiti dei passi già fatti '
     + 'sono qui sopra: non rifarli, fai solo quelli che mancano e arriva alla risposta.]';
@@ -154,12 +156,12 @@
     },
     // #778, #1373 — dopo l'OK la richiesta riprende da sola: un turno interno, come «Riprendi». Solo nella conversazione
     // dove è nato il bottone, se è ancora quella di questa scheda.
-    prosegui: (chat = '') => {
+    prosegui: (chat = '', voci = []) => {
       if (sending || (chat && chat !== chatId)) return;
       sending = true;
       aggiornaTasto();
       threadHistory.push({ role: 'user', text: DOPO_OK, interno: true });
-      runTurnAndContinue({ userMessage: DOPO_OK, internal: true }).catch(() => {});
+      runTurnAndContinue({ userMessage: DOPO_OK, internal: true, dopoOk: Array.isArray(voci) ? voci : [] }).catch(() => {});
     },
   });
   // #867 — il segno sulla bolla dell'utente per i cambi di stato che il suo messaggio ha chiesto.
@@ -1039,7 +1041,7 @@
   }
 
   // `composizione`: quello che l'utente aveva nella casella, per rimetterlo com'era se il messaggio non può partire.
-  async function runFiloTurn({ userMessage, images = [], internal = false, daModello = false, daFuori = false, rispostaA = null, activity = null, composizione = null }) {
+  async function runFiloTurn({ userMessage, images = [], internal = false, dopoOk = null, daModello = false, daFuori = false, rispostaA = null, activity = null, composizione = null }) {
     // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
     const pending = activity || Att.create(bubblesEl);
@@ -1167,6 +1169,7 @@
       threadHistory: historyWithout(userMessage),
       reasoningReqId,
       internal,
+      ...(internal && Array.isArray(dopoOk) ? { dopoOk } : {}),
       ...(daModello ? { daModello: true } : {}),
       ...(daFuori ? { daFuori: true } : {}),
       // La risposta di Filo che il messaggio cita (#1620): il main ne ritrova il posto nel filo.
@@ -1246,7 +1249,7 @@
       retry.className = 'dash-action-btn';
       retry.textContent = '↻ Riprova';
       retry.title = 'Rimanda lo stesso messaggio';
-      retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal, ...(rispostaA ? { rispostaA } : {}), composizione }));
+      retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal, ...(dopoOk ? { dopoOk } : {}), ...(rispostaA ? { rispostaA } : {}), composizione }));
       // #598 — senza nessuna chiave «Riprova» non porta da nessuna parte: la
       // strada è la pagina Crediti, e sta qui sotto, non in un menu. Lo stesso
       // quando il servizio ha rifiutato la chiave (#629): è lì che si cambia.
