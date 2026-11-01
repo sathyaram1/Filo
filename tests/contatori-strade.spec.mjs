@@ -124,6 +124,20 @@ test('il comando della home apre la pagina di Filo dalla sua strada, ed è anche
   expect(Object.keys(s.pagina_di_filo_aperta).some((k) => k.includes('collegamento_interno')), 'il comando non è un collegamento').toBe(false);
 });
 
+// L'azione che il prompt della chat fa emettere per «apri le preferenze»: la chat apre la pagina da sola.
+test('la chat che apre da sola una pagina di Filo conta la strada «chat», per la pagina e per l\'icona che la apre', async ({ app, openTab }) => {
+  const home = await openTab('filo://newtab/');
+  const naviga = (url) => home.evaluate((u) => chrome.runtime.sendMessage({
+    type: window.SN_MSG.MSG.FILO_RUN_ACTION, action: { type: 'NAVIGA', url: u },
+  }), url);
+  expect((await naviga('filo://preferences/preferences.html')).ok).toBe(true);
+  await expect.poll(() => attiva(app).then((a) => a.url)).toMatch(/^filo:\/\/preferences\//);
+  await expect.poll(() => voce(app, 'pagina_di_filo_aperta', 'preferences:chat')).toBe(1);
+  expect((await naviga('filo://options/options.html')).ok).toBe(true);
+  await expect.poll(() => voce(app, 'pagina_di_filo_aperta', 'options:chat')).toBe(1);
+  expect(await voce(app, 'via_azione', 'openOptions:chat')).toBe(1);
+});
+
 test('il tasto destro: su che cosa si apre, Shift che lo scavalca, il menu del sito e «sempre» acceso e spento', async ({ app, openTab, testServer }) => {
   const MENU_SUO = `<!doctype html><html><head><meta charset="utf-8"><meta property="og:site_name" content="Sito di prova">
 <script>document.addEventListener('contextmenu', function (e) {
