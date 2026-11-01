@@ -293,10 +293,10 @@
       const nomi = m.guardate.map((n) => `«${E ? E.perCanaleSistema(n) : String(n)}»`).join(', ');
       parti.push(`(qui avevo guardato ${nomi}: quello che c'era non è conservato)`);
     }
-    const rd = esito && Array.isArray(esito.reasoningDetails) && esito.reasoningDetails.length ? esito.reasoningDetails : null;
     // Un turno di Filo senza niente da dire non va al modello (#1294): un «(nessun testo)» gli insegnava a rispondere a vuoto.
-    if (parti.length === (cambia ? 1 : 0) && !rd) return null;
+    if (parti.length === (cambia ? 1 : 0)) return null;
     const out = { role: 'assistant', content: parti.join('\n\n') };
+    const rd = esito && Array.isArray(esito.reasoningDetails) && esito.reasoningDetails.length ? esito.reasoningDetails : null;
     // Il ragionamento vive quanto gli esiti, su ogni risposta e in ogni scheda. Verso Claude parte solo col prefisso con
     // cui è nato (src/main/services/providers/ragionamentoRimandato.js).
     if (rd) out.reasoning_details = rd;
