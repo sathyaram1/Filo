@@ -567,7 +567,8 @@ test('ogni passo dell’avvio, ogni canale sincrono e ogni passo degli aggiornam
     assert.ok(storage.includes(`contaDisco('${e}')`), `nessuno conta «${e}»`);
   }
   const tabs = leggi('src', 'main', 'tabs.js');
-  assert.match(tabs, /processoMorto\('scheda_in_recupero'/);
+  assert.match(tabs, /recuperaScheda\(tab,/);
+  assert.match(leggi('src', 'main', 'tabs', 'recuperoCrash.js'), /processoMorto\('scheda_in_recupero'/);
   for (const e of C.ESITI_SESSIONE) assert.ok(tabs.includes(`'${e}'`), `la sessione «${e}» non si conta`);
   assert.match(leggi('src', 'main', 'services', 'handlers', 'contatori.js'), /processoMorto\(details\.type, details\.reason\)/);
   assert.match(finestra, /seguiFinestra\(win\)/);
