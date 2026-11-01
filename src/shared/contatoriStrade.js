@@ -205,7 +205,7 @@
     via_azione: `${alternative(AZIONI)}[:]${alternative(VIE_AZIONE)}`,
     tasto_da_browser: `(${alternative(TASTI)}|${MANCATA}[:]${alternative(MANCATE)})`,
     scorciatoia_a_vuoto: `${alternative(AZIONI_FILO)}[:]${alternative(MOTIVI_A_VUOTO)}`,
-    menu_nativo_scelto: alternative(VOCI_NATIVO.map((v) => v.replace(':', '\u0000'))).replace(/\u0000/g, '[:]'),
+    menu_nativo_scelto: alternative(VOCI_NATIVO).replace(/:/g, '[:]'),
     contesto_box: alternative([...BANDIERE, ...COMBINAZIONI, MISTO]),
     navigazione_cronologia: `${alternative(VERSI)}[:](${alternative(SENZA_LISTA)}|${LISTA}[:]${alternative(nomi(FASCE_LISTA))})`,
     pagina_di_filo_aperta: `(${alternative(PAGINE)}[:]${alternative(VIE_PAGINA)}|${VISTA}[:]${alternative(PAGINE)}[:]${alternative(nomi(FASCE_VISTA))})`,
@@ -218,8 +218,8 @@
   });
   // I tetti di caratteri delle chiavi unite e dei conti uniti, per misura: almeno il doppio dell'elenco intero di oggi.
   const TETTI = Object.freeze({
-    via_azione: [16000, 7000], tasto_da_browser: [500, 200], scorciatoia_a_vuoto: [600, 150], menu_nativo_scelto: [200, 50],
-    contesto_box: [500, 200], navigazione_cronologia: [800, 300], pagina_di_filo_aperta: [8000, 3200], aiuto_aperto: [200, 100],
+    via_azione: [16000, 7000], tasto_da_browser: [500, 400], scorciatoia_a_vuoto: [1000, 300], menu_nativo_scelto: [200, 100],
+    contesto_box: [500, 400], navigazione_cronologia: [1000, 400], pagina_di_filo_aperta: [11000, 5500], aiuto_aperto: [200, 150],
   });
 
   // ── L'ora, in memoria ─────────────────────────────────────────────────
