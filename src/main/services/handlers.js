@@ -7081,15 +7081,15 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
   if (chatId) {
-    // Nell'archivio solo ciò che è successo, più le azioni fermate (#810) che riaperta racconta come tali.
-    // Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
+    // `actions`: ciò che è successo, più le azioni fermate (#810). `esiti`: com'è andata ognuna, anche la fallita e quella
+    // ferma sulla conferma (#1294, #1130.2). Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
     const cambi = renderedActions.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
     const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     const dopo = await appendToChatArchive(
       chatId,
       {
-        role: 'filo', text: textReply, actions: successe, classeLetta,
+        role: 'filo', text: textReply, actions: successe, esiti: renderedActions, classeLetta,
         ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
         ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
         ...(senzaVerdetto ? { senzaVerdetto } : {}),
