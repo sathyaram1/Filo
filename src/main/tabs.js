@@ -3744,6 +3744,7 @@ class TabManager {
       // Quando ha suonato un lettore della pagina: «rimettimi la musica» riprende questa, anche chiusa o dopo un riavvio
       // (#1397). Un suono di notifica o un video muto non contano: serve un lettore in corsa che si sente.
       if (audible && tab._mediaInCorso) { tab.audioAt = Date.now(); tab._suonaOra = true; }
+      else if (!audible && tab._suonaOra) tab.audioAt = Date.now();
       if (tab.audible !== audible) { tab.audible = audible; this._broadcast(); }
     });
     wc.on('media-started-playing', () => { tab._mediaInCorso = true; });
