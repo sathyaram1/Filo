@@ -93,7 +93,7 @@ test('il gancio riportato passa stdin ed esito, e regge una cartella con spazi e
 
   const r = lancia(gruppo.hooks[0].command, { partenza: sopra, input: '{"tool_name":"Bash"}' });
   assert.equal(r.status, 2, 'un gancio che blocca (exit 2) blocca anche riportato');
-  assert.equal(readFileSync(segno, 'utf8'), `${progetto}\n{"tool_name":"Bash"}\n`);
+  assert.equal(readFileSync(segno, 'utf8'), `${progetto}\n{"tool_name":"Bash"}`);
 
   togliCartella(segno);
   assert.equal(lancia(gruppo.hooks[0].command, { partenza: progetto }).status, 0);
