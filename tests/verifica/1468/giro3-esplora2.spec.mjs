@@ -26,7 +26,9 @@ test('collegamenti fra pagine di Filo', async ({ app, openTab }) => {
   await expect.poll(() => attiva(app).then((a) => a.url), { timeout: 8000 }).toMatch(/transparency/);
   await sleep(800);
   console.log('A', JSON.stringify(await strade(app)));
-  await pref.evaluate(() => document.getElementById('correttoreModelli').click());
+  const pref2 = await openTab('filo://preferences/preferences.html');
+  await pref2.waitForSelector('#correttoreModelli', { state: 'attached' });
+  await pref2.evaluate(() => document.getElementById('correttoreModelli').click());
   await expect.poll(() => attiva(app).then((a) => a.url), { timeout: 8000 }).toMatch(/options/);
   await sleep(1000);
   // lasciata subito: un'altra scheda davanti
