@@ -279,6 +279,11 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
   --sn-valore-y: 0px;
   --sn-valore-via: 1;
 }
+/* In un campo alto una riga sta accanto alle x, centrato sulla loro riga: fuori dal campo coprirebbe la pagina. */
+.sn-spell-valori .sn-spell-valore.sn-accanto {
+  --sn-valore-y: -50%;
+  --sn-valore-via: 0;
+}
 .sn-spell-valori .sn-spell-valore:hover {
   background: color-mix(in srgb, var(--sn-segno) 20%, #fffaf1);
   transform: translate(-50%, calc(var(--sn-valore-y) + var(--sn-valore-via) * 2px));
