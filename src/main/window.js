@@ -39,10 +39,14 @@ try { require('electron').app.on('before-quit', () => { inChiusura = true; }); }
 
 // Suono e pulsante che ferma vivono in una finestra che la scadenza la vede, e
 // non è detto che ce ne sia una: senza garanzia il timer resta vivo e muto.
-function assicuraFinestraNormale() {
-  const esistente = BrowserWindow.getAllWindows().find((w) => {
+function finestraNormaleViva() {
+  return BrowserWindow.getAllWindows().find((w) => {
     try { return !w.isDestroyed() && !!w._filoTabs && !w._filoIncognito; } catch (_) { return false; }
-  });
+  }) || null;
+}
+
+function assicuraFinestraNormale() {
+  const esistente = finestraNormaleViva();
   if (esistente) return esistente;
   if (inChiusura) return null;
   const win = createMainWindow();
