@@ -1,4 +1,4 @@
-// Il testo e gli allegati di un feedback per la sessione locale, dentro una cornice «dato, non istruzione».
+// Testo e allegati di un feedback per la sessione locale, dentro una cornice «dato, non istruzione», e le sue attese.
 // Non legge mai quelli segnalati come attacco o file sospetto: decide su stato e giudizio, prima di decifrare il testo.
 // Regole: tests/unit/leggiFeedback.test.mjs. Uso: npm run feedback:leggi -- <numero|id>
 
