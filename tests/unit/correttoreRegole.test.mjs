@@ -140,7 +140,7 @@ test('una riga a tre campi vale errore; se il terzo è un tipo, è il motivo che
 test('il pezzo si ritrova a meno di spazi multipli e di apostrofi dritti o curvi, e il segno sta sulla parola giusta', () => {
   const testo = 'Ieri  sonno   andato da un’amika';
   const { segni } = C.segniDaRisposta("[Ieri sonno andato][Ieri sono andato][verbo][errore]\n[un'amika][un'amica][refuso][errore]", testo);
-  assert.deepEqual(segni.map((s) => [s.segment, s.correzioni[0]]), [['sonno', 'sono'], ['un’amika', "un'amica"]]);
+  assert.deepEqual(segni.map((s) => [s.segment, s.correzioni[0]]), [['sonno', 'sono'], ['un’amika', 'un’amica']]);
   assert.equal(segni[0].start, testo.indexOf('sonno'));
 });
 
