@@ -798,12 +798,17 @@
         }
         statusEl.textContent = '';
         statusEl.classList.remove('sn-fb-status--attesa');
-        clearTimeout(saveTimer);
-        saveTimer = null;
-        clearDraft();
         // Posizione del box PRIMA di chiuderlo: da lì partono le monete.
         const originRect = modal.getBoundingClientRect();
-        close();
+        // Chiuso con Esc durante l'attesa, il riquadro aperto adesso è un altro, con un altro testo: resta (#1681).
+        if (activeRoot === root) {
+          clearTimeout(saveTimer);
+          saveTimer = null;
+          clearDraft();
+          close();
+        } else {
+          clearDraft(testoInviato);
+        }
         // Ricompensa C3: +5 crediti subito all'invio. Best-effort, non blocca;
         // l'importo effettivo lo decide il main (CREDIT.FEEDBACK_SEND). Con un
         // portafoglio (#816) il premio lo dà il server dopo i controlli: qui
