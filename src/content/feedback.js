@@ -37,6 +37,8 @@
   // Stacca ciò che l'apertura ha agganciato fuori dal riquadro (#1096).
   let pulizia = null;
   let clientIdCache = null;
+  // I testi in viaggio verso il server: un riquadro riaperto mentre aspettano non li ripropone come bozza (#1681).
+  const inVolo = new Set();
 
   // Avvisa la shell dell'ingresso in annotazione, così l'ombra copre TUTTO Filo e non la sola area
   // pagina.

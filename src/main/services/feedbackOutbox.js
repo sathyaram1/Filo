@@ -140,9 +140,10 @@
   const attese = new Map(); // id -> [risolvi]
   function rispondi(id, esito) {
     const l = attese.get(id);
-    if (!l) return;
+    if (!l || !l.length) return false;
     attese.delete(id);
     for (const r of l) r(esito);
+    return true;
   }
   function attendiTentativo(id, entroMs) {
     // Senza giri automatici (le prove) nessun tentativo è in arrivo.
@@ -300,7 +301,9 @@
             if (!vuotoPerSempre) conta('rinuncia', 'cifratura');
             it.rinuncia = true;
             it.motivoRinuncia = e?.message || String(e);
-            rispondi(it.id, { esito: 'rinuncia', motivo: it.motivoRinuncia });
+            // Chi aspetta il primo tentativo (il riquadro) lo dice lui e lo annuncia se nessuno lo legge più: un
+            // secondo avviso nella cornice ripeterebbe la stessa frase (#1681).
+            if (rispondi(it.id, { esito: 'rinuncia', motivo: it.motivoRinuncia })) { remove(it.id); continue; }
             if (annunciaRinuncia(it)) remove(it.id);
             else anyFail = true; // nessuno a cui dirlo: si riprova, non si butta
             continue;

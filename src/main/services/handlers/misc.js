@@ -688,7 +688,7 @@ module.exports = function register(on, ctx) {
   // Il primo tentativo di solito chiude in pochi secondi (titolo, allegati, scrittura): oltre, il riquadro si chiude
   // dicendo «in partenza» e la coda finisce da sola.
   const ATTESA_CONSEGNA_MS = 12000;
-  on(MSG.SUBMIT_FEEDBACK, async (msg) => {
+  on(MSG.SUBMIT_FEEDBACK, async (msg, sender) => {
     try {
       if (!globalThis.SN_FEEDBACK?.submit) {
         throw new Error('SN_FEEDBACK non caricato nel main process');
@@ -712,6 +712,8 @@ module.exports = function register(on, ctx) {
         };
       }
       const payload = msg.payload || {};
+      let allApertura = '';
+      try { allApertura = (sender?.strato || sender?.wc)?.getURL?.() || ''; } catch (_) {}
       // Il mittente lo decide il main, non il payload: il content script non sa di essere dell'owner (#595).
       let dallOwner = false;
       try {
@@ -738,7 +740,21 @@ module.exports = function register(on, ctx) {
       // l'attesa (#1667); altrimenti la coda finisce da sola e ritenta. Il titolo lo genera la coda all'invio.
       const r = await Outbox.enqueue(payload, { dallOwner, attendiMs: ATTESA_CONSEGNA_MS });
       const esito = r?.tentativo ? await r.tentativo : { esito: 'in_coda' };
-      if (esito.esito === 'rinuncia') return { ok: false, frase: true, error: String(esito.motivo || 'Il tuo feedback non è partito.') };
+      if (esito.esito === 'rinuncia') {
+        const motivo = String(esito.motivo || 'Il tuo feedback non è partito.');
+        // La rinuncia l'ha passata la coda a chi aspettava: il riquadro, se c'è ancora, la dice e resta aperto (niente
+        // voce «non partita» nell'elenco); se la sua pagina non c'è più, la dice la cornice.
+        const chi = sender?.strato || sender?.wc;
+        let vivo = false;
+        try { vivo = !!(chi && !chi.isDestroyed() && chi.getURL() === allApertura); } catch (_) {}
+        if (vivo) {
+          try { globalThis.SN_SEGNALAZIONI_MIE?.togli?.(String(payload.submissionId))?.catch?.(() => {}); } catch (_) {}
+        } else {
+          try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(String(payload.submissionId))?.catch?.(() => {}); } catch (_) {}
+          avvisoNellaFinestra(motivo, { errore: 'segnalazione_non_partita' });
+        }
+        return { ok: false, frase: true, error: motivo };
+      }
       const consegnato = esito.esito === 'consegnato';
       return { ok: true, queued: !consegnato, consegnato, id: r?.id };
     } catch (e) {
