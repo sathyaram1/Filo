@@ -2574,9 +2574,8 @@
     if (deps.prosegui) prosegui = deps.prosegui;
   }
 
-  // #1294 — com'è andata ogni azione di una risposta riletta dall'archivio: una riga per voce (la cosa fatta coi numeri,
-  // il perché di un no, la conferma che era stata chiesta) e il bottone dei file. Oltre `RIGHE_VISTE` voci le riuscite
-  // stanno nella frase riassunto, che le elenca al passaggio del mouse. Ritorna { righe, nota }: ognuno può mancare.
+  // #1294 — una risposta riletta dall'archivio racconta ogni azione con la sua riga, e i file col loro bottone. Oltre
+  // `RIGHE_VISTE` voci le riuscite stanno nella frase riassunto, che le elenca al passaggio del mouse.
   const RIGHE_VISTE = 4;
   function esitiArchiviati(voci) {
     const E = global.SN_ESITO;
