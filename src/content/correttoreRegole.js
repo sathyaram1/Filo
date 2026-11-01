@@ -453,7 +453,7 @@
 
   // `restringi` sul pezzo com'è nel testo (`visto`): pezzo e correzione si confrontano a spazi compressi e apici dritti,
   // così uno spazio citato in più non incolla due parole («oggisono») e un apice curvo non allarga il segno a tutto il
-  // pezzo (#1580.2). Le posizioni sono in `visto`; il sostituto tiene gli apici della correzione.
+  // pezzo (#1580.2). Le posizioni sono in `visto`.
   const unSoloSpazio = (s) => String(s ?? '').trim().replace(/\s+/g, ' ');
   const apiciDritti = (s) => s.replace(/[‘’‚‛]/g, "'").replace(/[“”„]/g, '"');
   function restringiNelTesto(pezzo, correzione, visto) {
@@ -463,6 +463,30 @@
     if (!stretto) return null;
     const pos = posizioniNelTesto(p, String(visto ?? ''));
     return { da: pos[stretto.da], a: pos[stretto.a], sostituto: c.slice(stretto.da, c.length - (p.length - stretto.a)) };
+  }
+
+  // La correzione con gli apici e le virgolette di chi scrive, non con quelli del modello: «l’albro» diventa «l’albero»
+  // (#1690). Lo stile è quello del pezzo segnato; se lì non ce n'è, quello del campo; misto, la correzione resta com'è.
+  function comeGliApici(sostituto, scritto, testo, primaDelPezzo = '') {
+    const stile = (dritto, curvo) => {
+      for (const s of [scritto, testo]) {
+        const d = dritto.test(s);
+        const c = curvo.test(s);
+        if (d !== c) return c ? 'curvo' : 'dritto';
+        if (d) return '';
+      }
+      return '';
+    };
+    let out = String(sostituto ?? '');
+    const apice = stile(/'/, /[‘’]/);
+    if (apice === 'curvo') out = out.replace(/'/g, '’');
+    else if (apice === 'dritto') out = out.replace(/[‘’]/g, "'");
+    const virgolette = stile(/"/, /[“”]/);
+    if (virgolette === 'dritto') out = out.replace(/[“”]/g, '"');
+    else if (virgolette === 'curvo') {
+      out = out.replace(/"/g, (_m, i, s) => (/^$|[\s([{«“‘]/.test(i ? s[i - 1] : String(primaDelPezzo || '')) ? '“' : '”'));
+    }
+    return out;
   }
 
   // Le x dentro il pezzo che il modello ha copiato («di soli xx» → «xx»): { da, a } nel pezzo, o null.
