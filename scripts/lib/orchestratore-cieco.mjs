@@ -182,7 +182,7 @@ export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato 
     if (!s || typeof s !== 'object' || Array.isArray(s)) return { ok: false, file, why: 'impostazioni utente non sono un oggetto' };
   }
   const cmd = comando({ sessione, creato, registro: join(dir, FILE_REGISTRO), strumenti });
-  const hooks = { ...(s.hooks || {}) };
+  const hooks = unisciGanci(s.hooks, progetto ? ganciDelProgetto(progetto).hooks : {});
   // ConfigChange senza matcher: ogni fonte arriva a decidi, che sceglie cosa fermare.
   const voci = { PreToolUse: MATCHER_PRIMA, PostToolUse: 'Agent|Task', ConfigChange: '' };
   for (const [ev, matcher] of Object.entries(voci)) {
