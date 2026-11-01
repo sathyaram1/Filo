@@ -1565,7 +1565,7 @@ class TabManager {
       scroll: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
       proxy: tab.proxy && tab.proxy.country ? { country: tab.proxy.country, tier: tab.proxy.tier || null } : null,
       colore: tab.identityColor || null,
-      ...(tab.audioAt > 0 ? { audioAt: tab.audioAt, titolo: tab.title || '' } : {}),
+      ...(ultimoSuono(tab) > 0 ? { audioAt: ultimoSuono(tab), titolo: tab.title || '' } : {}),
     });
   }
 
