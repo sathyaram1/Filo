@@ -1063,6 +1063,10 @@ if (isMain) {
       process.exit(1);
     }
   }
+  if (argv.includes('--sostituisci') && !argv.includes('--aspetta')) {
+    console.error('RIFIUTATO: --sostituisci vale solo con --aspetta <numeri>, l’elenco intero — non ho toccato niente.');
+    process.exit(1);
+  }
 
   // #914: le routine non aprono lavoro locale; quello che si fa solo in locale lo rimandano dal canale.
   if (argv.includes('--solo-locale') && isRoutineInstance(ROOT)) {
