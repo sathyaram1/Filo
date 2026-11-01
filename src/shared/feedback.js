@@ -166,7 +166,7 @@
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`upload storage fallito (${res.status}): ${text.slice(0, 200)}`);
+      throw Object.assign(new Error(`upload storage fallito (${res.status}): ${text.slice(0, 200)}`), { status: res.status });
     }
     const json = await res.json();
     const token = json.downloadTokens || (json.metadata?.downloadTokens) || '';
