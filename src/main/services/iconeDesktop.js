@@ -286,25 +286,26 @@ function run() {
     var url = voci.url();
     var n = url.length;
     dice('totale', n);
-    var nomi = tutti(function () { return voci.displayedName(); }, n) || tutti(function () { return voci.name(); }, n);
-    var pos = tutti(function () { return voci.desktopPosition(); }, n);
-    var classi = tutti(function () { return voci.class(); }, n);
-    var est = tutti(function () { return voci.nameExtension(); }, n);
-    var date = tutti(function () { return voci.modificationDate(); }, n);
-    var dim = tutti(function () { return voci.size(); }, n);
+    var nomi = tutti(voci, 'displayedName', n);
+    var nomiFile = tutti(voci, 'name', n);
+    var pos = tutti(voci, 'desktopPosition', n);
+    var classi = tutti(voci, 'class', n);
+    var est = tutti(voci, 'nameExtension', n);
+    var date = tutti(voci, 'modificationDate', n);
+    var dim = tutti(voci, 'size', n);
     for (var i = 0; i < n; i++) {
-      var p = pos ? pos[i] : null;
-      if (!p) { try { p = voci[i].desktopPosition(); } catch (e) { continue; } }
+      var p = pos[i];
+      if (!p) continue;
       var x = Array.isArray(p) ? p[0] : p.x;
       var y = Array.isArray(p) ? p[1] : p.y;
       dice('voce', url[i]);
-      dice('nome', nomi ? nomi[i] : url[i]);
+      dice('nome', nomi[i] || nomiFile[i] || url[i]);
       dice('pos', Math.round(x) + ',' + Math.round(y));
-      var classe = classi ? String(classi[i]) : '';
+      var classe = classi[i] ? String(classi[i]) : '';
       dice('cartella', classe === 'folder' || classe === 'disk' ? '1' : '0');
-      if (est && est[i]) dice('tipo', String(est[i]).toLowerCase());
-      if (date && date[i] instanceof Date) dice('data', date[i].getTime());
-      if (dim && typeof dim[i] === 'number') dice('dimensione', Math.round(dim[i]));
+      if (est[i]) dice('tipo', String(est[i]).toLowerCase());
+      if (date[i] instanceof Date) dice('data', date[i].getTime());
+      if (typeof dim[i] === 'number') dice('dimensione', Math.round(dim[i]));
     }
   }
   try {
