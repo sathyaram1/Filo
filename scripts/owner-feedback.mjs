@@ -414,14 +414,8 @@ export function rispostaAttese(rif, r) {
   else if (s === 'working') dopo = 'Una routine ci sta lavorando adesso: le attese contano dal giro dopo, finché non sono tutti fusi.';
   else if (s === 'todo') dopo = 'Nessuna routine lo prende finché non sono tutti fusi; poi entra in coda da solo.';
   else dopo = 'Nessuna routine lo riprende finché non sono tutti fusi; poi il giro riparte da solo.';
-  return `${rif}: aspetta ${ATT.testoAttese(r.attese)}.${tolte ? ` ${una ? "Tolta l’attesa" : "Tolte le attese"} su ${tolte}, che c’${una ? "era" : "erano"} prima.` : ''} ${dopo}`;
-}
-
-/** Il campo `waitsFor` letto dall'API REST: [{ id, num }]. */
-function atteseDaCampo(v) {
-  return (v?.arrayValue?.values || []).map((x) => ({
-    id: x?.mapValue?.fields?.id?.stringValue || '', num: x?.mapValue?.fields?.num?.stringValue || '',
-  }));
+  const novita = aggiunte ? ` ${unaAggiunta ? 'Aggiunta l’attesa' : 'Aggiunte le attese'} su ${aggiunte}.` : '';
+  return `${rif}: aspetta ${ATT.testoAttese(r.attese)}.${novita}${tolte ? ` ${una ? "Tolta l’attesa" : "Tolte le attese"} su ${tolte}, che c’${una ? "era" : "erano"} prima.` : ''} ${dopo}`;
 }
 
 /**
