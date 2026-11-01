@@ -146,11 +146,10 @@ test('sotto il velo di un sito il documento trovato dall\'Aiuto si apre e si tra
       JSON.stringify({ action: 'documenti', cosa: 'bolletta luce energia elettrica marzo', text: 'La cerco fra i tuoi documenti.' }),
       JSON.stringify({ text: 'Eccola: trascinala nella pagina.', file: 1, status: 'done' }),
     ]);
-    await app.evaluate(({ shell: s, webContents }) => {
+    await app.evaluate(({ shell: s }) => {
       globalThis.__aperti = [];
       globalThis.__trascinati = [];
       s.openPath = async (p) => { globalThis.__aperti.push(p); return ''; };
-      for (const wc of webContents.getAllWebContents()) wc.startDrag = (item) => { globalThis.__trascinati.push(item.file); };
     });
     const sito = await testServer.openReady(openTab, PAGINA);
     await Gesti.finestraASchermo(app);
