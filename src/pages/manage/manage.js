@@ -31,6 +31,13 @@
   const mgLavoriServer       = document.getElementById('mgLavoriServer');
   const mgLavoriServerSwitch = document.getElementById('mgLavoriServerSwitch');
   const mgLavoriServerMsg    = document.getElementById('mgLavoriServerMsg');
+  // La routine a rete aperta (#2013): accesa o spenta, quante sessioni sue, e lo stato che scrive il pacemaker.
+  const mgReteAperta          = document.getElementById('mgReteAperta');
+  const mgReteApertaSwitch    = document.getElementById('mgReteApertaSwitch');
+  const mgReteApertaMsg       = document.getElementById('mgReteApertaMsg');
+  const mgReteApertaTetto     = document.getElementById('mgReteApertaTetto');
+  const mgReteApertaTettoSave = document.getElementById('mgReteApertaTettoSave');
+  const mgReteApertaTettoMsg  = document.getElementById('mgReteApertaTettoMsg');
   // I bilanci dei giri di correzione, uno per livello (feedback #561): cap3 =
   // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1, cap0 =
   // per i soli 0; più il testo in coda alla risposta (fixInstructions).
