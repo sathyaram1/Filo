@@ -406,6 +406,8 @@ describe('pushRamoCorrente', () => {
     g(work, ['checkout', '-q', '--detach', 'HEAD']);
     const staccata = pushRamoCorrente(work);
     assert.equal(staccata.ok, true); assert.equal(staccata.skipped, true); assert.match(staccata.reason, /staccata/);
+    assert.equal(suMain.punta, undefined, 'niente spinto, niente punta da registrare');
+    assert.equal(staccata.punta, undefined);
   });
 
   test('origin irraggiungibile: ok falso con il motivo di git', () => {
