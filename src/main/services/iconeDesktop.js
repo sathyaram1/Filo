@@ -489,7 +489,9 @@ const percorsoDiFile = (id) => /^[a-z]:\\|^\\\\/i.test(String(id || ''));
 // L'estensione raggruppa i tipi come li raggruppa Windows: i collegamenti con i collegamenti, i PDF coi PDF.
 // Cartelle e icone di sistema (Cestino, Questo PC) non hanno estensione: stanno davanti.
 function chiaveTipo(v) {
-  if (v.cartella || !percorsoDiFile(v.id)) return '';
+  if (v.cartella) return '';
+  if (typeof v.tipo === 'string') return v.tipo;
+  if (!percorsoDiFile(v.id)) return '';
   const nome = String(v.id).split('\\').pop();
   const m = /\.([^.]+)$/.exec(nome);
   return m ? m[1].toLowerCase() : '';
