@@ -568,21 +568,14 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Single instance: la seconda apertura ridà focus all'esistente.
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) {
-  app.quit();
-} else {
-  app.on('second-instance', (_event, argv) => {
-    try { contatori()?.secondaIstanza(); } catch (_) {}
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
-    // Su Windows e Linux un `filo://…` aperto mentre Filo è già acceso arriva
-    // qui, fra gli argomenti della seconda istanza. La posizione non è fissa
-    // (in sviluppo il secondo argomento è `.`, nei test `.` è l'ultimo):
-    // l'indirizzo si CERCA, mai si prende per indice.
-    apriInvitoDaArgv(argv);
-  });
-}
+// La seconda apertura porta davanti la finestra normale, e la rifà se Filo è rimasto acceso senza (#1606).
+app.on('second-instance', (_event, argv) => {
+  try { contatori()?.secondaIstanza(); } catch (_) {}
+  // Prima che l'avvio abbia la sua finestra non si crea niente: la farà l'avvio.
+  if (mainWindow) mostraFinestraNormale();
+  // Su Windows e Linux un `filo://…` aperto mentre Filo è già acceso arriva
+  // qui, fra gli argomenti della seconda istanza. La posizione non è fissa
+  // (in sviluppo il secondo argomento è `.`, nei test `.` è l'ultimo):
+  // l'indirizzo si CERCA, mai si prende per indice.
+  apriInvitoDaArgv(argv);
+});
