@@ -1899,7 +1899,7 @@ if (isMain) {
       ...(chiRilascia !== 'orchestrator' && cartellaSua ? { domandaAlRilascio: true } : {}),
       ...(processo ? { processo } : {}),
     };
-    const r = await releaseConRapporto(args[0], guasto, rapporto, Object.keys(opzioniRilascio).length ? opzioniRilascio : undefined);
+    const r = await releaseConRapporto(args[0], guasto, rapporto, Object.keys(opzioniRilascio).length ? opzioniRilascio : undefined, spedito);
     if (r.avviso) console.error(r.avviso);
     // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo
     // (il server risponde `dead_ticket` e il ciclo esce), ma spegnerlo adesso
