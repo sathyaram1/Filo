@@ -137,6 +137,7 @@ function reteFinta(docs) {
     if (!d) return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
     const fields = { seq: { integerValue: String(d.seq) }, subSeq: { integerValue: String(d.subSeq || 0) } };
     if (d.status) fields.status = { stringValue: d.status };
+    if (d.resolvedInVersion) fields.resolvedInVersion = { stringValue: d.resolvedInVersion };
     if (d.unitoIn) fields.unitoIn = { stringValue: d.unitoIn };
     if (d.waitsFor) {
       fields.waitsFor = { arrayValue: { values: d.waitsFor.map((w) => ({ mapValue: { fields: { id: { stringValue: w.id }, num: { stringValue: w.num } } } })) } };
