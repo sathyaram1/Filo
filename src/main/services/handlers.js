@@ -1458,6 +1458,9 @@ function perimetroLettura(sender, cartella = null) {
 
 // 'file', 'cartella', null se non c'è, 'ignoto' se il disco non risponde. I percorsi di rete li scarta prima chi chiede.
 function statoSulDisco(p) {
+  // Un'unità che porta a un altro computer non si guarda nemmeno (#1072): resta da chiedere.
+  const u = /^([A-Za-z]):/.exec(String(p || ''));
+  try { if (u && require('./shell').unitaDiRete(p).includes(`${u[1].toLowerCase()}:`)) return 'ignoto'; } catch (_) { return 'ignoto'; }
   try { return require('node:fs').statSync(p).isDirectory() ? 'cartella' : 'file'; } catch (e) {
     return e && (e.code === 'ENOENT' || e.code === 'ENOTDIR') ? null : 'ignoto';
   }
