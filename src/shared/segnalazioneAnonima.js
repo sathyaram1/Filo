@@ -67,7 +67,7 @@
   const inizioFrase = (prima) => /(?:^|[.!?…]\s+|\n)\s*[«"“]?$/.test(prima);
   // Chi si presenta scrive il suo nome anche in minuscolo («ciao sono luca»), e lì non è mai la parola comune.
   // «sono» vale solo in apertura o dopo un saluto: «le icone sono rosa» resta un colore.
-  const PRESENTAZIONE = /(?:(?:^|[^\p{L}])(?:mi\s+chiamo|io\s+sono|chiamami|my\s+name\s+is|i\s+am|i['’]m)|(?:^|[.!?…\n]|(?:^|[^\p{L}])(?:ciao|salve|buongiorno|buonasera|hey|hi|hello)[\s,!]*)\s*(?:sono|son))\s+$/iu;
+  const PRESENTAZIONE = /(?:(?:^|[^\p{L}])(?:mi\s+chiamo|io\s+sono|chiamami|my\s+name\s+is|i\s+am|i['’]m)|(?:^|[.!?…\n«"“(]|(?:^|[^\p{L}])(?:ciao|salve|buongiorno|buonasera|hey|hi|hello)[\s,!]*)\s*(?:sono|son))\s+$/iu;
 
   function ricuci(t) {
     return t
