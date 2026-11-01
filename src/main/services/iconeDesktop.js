@@ -810,7 +810,7 @@ async function ordinaOra(q) {
   if (q.ordine === 'data' || q.ordine === 'dimensione') {
     await arricchisci(letto.voci);
     // Senza il dato per nessuna icona il piano è l'ordine per nome, e la rilettura lo confermerebbe come «fatto».
-    const chi = letto.voci.filter((v) => q.ordine === 'data' || !v.cartella);
+    const chi = letto.voci.filter((v) => (sistema === 'darwin' || percorsoDiFile(v.id)) && (q.ordine === 'data' || !v.cartella));
     if (chi.length && !chi.some((v) => Number.isFinite(v[q.ordine]))) return fallito('senza-dati', { criterio: q.ordine });
   }
   const p = piano(letto, q, sistema);
