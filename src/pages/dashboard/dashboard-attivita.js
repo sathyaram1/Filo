@@ -565,7 +565,6 @@
     CERCA_SALVATE: (n) => (n > 1 ? `cercato fra le pagine salvate ${n} volte` : 'cercato fra le pagine salvate'),
     APRI_SALVATA: (n) => (n > 1 ? `aperto ${n} pagine salvate` : 'aperto una pagina salvata'),
     RINOMINA_FILE: () => 'dato un nome ai file',
-    ELIMINA_FILE: () => 'tolto dei file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
     CAPACITA_DETTAGLIO: () => 'verificato cosa sa fare',
@@ -688,11 +687,7 @@
   function pulito(v) {
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   }
-  // Perché qualche scheda non si è chiusa (#413): dopo «tutte» l'utente non ne ha indicata nessuna, e deve sapere il motivo.
-  function restanoAperte(o) {
-    const R = global.SN_RESTANO_APERTE;
-    return R ? R.frase(o) : '';
-  }
+  const restanoAperte = (o) => global.SN_ESITO.restanoAperte(o);
   // «lunedì 28 set»: il giorno di una conversazione senza titolo.
   function quandoBreve(ts) {
     const d = new Date(ts);
@@ -809,7 +804,6 @@
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a), title: indirizzoLetto(a) }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
-    ELIMINA_FILE: (a) => ({ icon: '🗑', text: testoEliminati(a._output) }),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
     // del tutto, e l'utente non sapeva dove fosse finito il suo appunto.
     SALVA_APPUNTO: (a) => {
@@ -977,8 +971,7 @@
       const labels = {
         fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
         settings: 'Impostazioni aperte', apps: 'Menu App aperto', account: 'Menu Account aperto',
-        sidebar: 'Barra laterale aperta', sidebar_close: 'Barra laterale chiusa',
-        sidebar_lock: 'Barra laterale bloccata aperta', sidebar_unlock: 'Barra laterale sbloccata', aiuto: 'Aiuto aperto',
+        sidebar: 'Barra laterale aperta', aiuto: 'Aiuto aperto',
       };
       const cmd = String(a.comando || a.command || a.cmd || '').toLowerCase();
       // La home chiesta dalla home non ricarica niente (butterebbe via lavoro e
@@ -1025,7 +1018,6 @@
     TOGLI_CHAT: 'Conversazione non trovata', RIMETTI_CHAT: 'Conversazione nascosta non trovata',
     CORREGGI_MEMORIA: 'Niente da correggere',
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
-    ELIMINA_FILE: 'Niente cancellato',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     LEGGI_PAGINA: 'Pagina non letta',
@@ -1075,7 +1067,7 @@
   // Detto di un'azione che la regola ha fermato prima di cominciare: dove l'etichetta di sopra parla di un esito.
   const NO_LABELS = {
     ESEGUI_COMANDO: 'Comando non eseguito', DIMENTICA: 'Non dimenticato', CORREGGI_MEMORIA: 'Non corretto',
-    TOGLI_CHAT: 'Conversazione non tolta', RIMETTI_CHAT: 'Conversazione non rimessa', ELIMINA_FILE: 'Non cancellato',
+    TOGLI_CHAT: 'Conversazione non tolta', RIMETTI_CHAT: 'Conversazione non rimessa',
     CANCELLA_SVEGLIA: 'Non cancellata', MODIFICA_SVEGLIA: 'Non spostata',
     CANCELLA_MEMORIA: 'Memoria non cancellata', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
@@ -1903,20 +1895,6 @@
     const quanti = n === 1 ? 'Rinominato un file' : `Rinominati ${n} file`;
     return no ? `${quanti} · ${no} non riusciti` : quanti;
   }
-  // #1909 — i nomi vengono dal disco: entrano solo come testo.
-  function testoEliminati(o) {
-    const fatti = o && Array.isArray(o.eliminati) ? o.eliminati.map(pulito) : [];
-    const no = o && Array.isArray(o.falliti) ? o.falliti.length : 0;
-    const per = !!(o && o.perSempre);
-    const quanti = fatti.length === 1
-      ? `${per ? 'Cancellato per sempre' : 'Nel cestino'} «${fatti[0]}»`
-      : `${per ? 'Cancellati per sempre' : 'Nel cestino'} ${fatti.length} elementi`;
-    return no ? `${quanti} · ${no} non riusciti` : quanti;
-  }
-  function motivoNessunaEliminazione(o) {
-    const f = o && Array.isArray(o.falliti) && o.falliti[0];
-    return f && f.perche ? `Non cancellato: ${pulito(f.perche)}` : 'Non cancellato';
-  }
   function motivoNessunaRinomina(o) {
     const f = o && Array.isArray(o.falliti) && o.falliti[0];
     return f && f.perche ? `Non rinominati: ${f.perche}` : 'Non rinominati';
@@ -2032,7 +2010,7 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'CORREGGI_MEMORIA', 'RINOMINA_FILE', 'ELIMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO', 'CHIUDI_SCHEDE', 'PULSANTE_PREFERENZE'];
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'CORREGGI_MEMORIA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO', 'CHIUDI_SCHEDE', 'PULSANTE_PREFERENZE'];
       // Una difesa abbassata (#530) vuole la parola, ma non è distruttiva: il box si apre da solo come il popup.
       if (AUTO_CONFIRM_TYPES.includes(type) && (a._confirm.level === 2 || a._confirm.avviso)) {
         btn.dataset.autoConfirm = '1';
@@ -2117,9 +2095,6 @@
         if (type === 'RINOMINA_FILE') {
           btn.textContent = (r && r.executed) ? `✓ ${testoRinominati(r.output)}` : `✗ ${motivoNessunaRinomina(r && r.output)}`;
           if (r && r.executed) btn.after(bottoneRimettiNomi(a));
-        }
-        if (type === 'ELIMINA_FILE') {
-          btn.textContent = (r && r.executed) ? `✓ ${testoEliminati(r.output)}` : `✗ ${motivoNessunaEliminazione(r && r.output)}`;
         }
         // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
         // applicata, offriamo subito il box per correggere il valore.
