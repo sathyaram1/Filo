@@ -1151,42 +1151,8 @@
   function esitoDiComando(a) {
     return isType(a, 'ESEGUI_COMANDO') && !a._confirm && !!a._output && !a._output.blocked && !rifiutataDallaRegola(a);
   }
-  // La ragione del fallimento, quando il main la conosce.
-  function motivoFallimento(a) {
-    const o = a && a._output;
-    if (!o) return '';
-    if (o.blocked === 'disabled') return 'la modalità terminale è spenta';
-    if (o.blocked === 'empty') return 'comando vuoto';
-    if (o.event === 'invalid') return o.error ? pulito(o.error) : 'data o ora non valide';
-    if (isType(a, 'VEDI_SCHERMO')) {
-      if (o.spenta) return 'è spento in Preferenze';
-      if (o.permesso === 'mac') return 'serve il permesso «Registrazione schermo»';
-      if (o.nessuna) return `nessuna finestra «${pulito(o.richiesta)}»`;
-      if (o.errore) return `${o.finestra ? `«${pulito(o.finestra)}»: ` : ''}${pulito(o.errore)}`;
-    }
-    if (o.blocked === 'scheme') return 'indirizzo non ammesso';
-    if (o.cartellaDiRete) return 'la cartella sta su un altro computer della rete';
-    if (o.errore === 'fuori_perimetro') return 'la cartella sta fuori dalla tua cartella personale';
-    if (o.blocked === 'site') {
-      const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
-      return `${o.host || 'il sito'} è fra i siti ${quali}`;
-    }
-    if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
-    if (o.proxy === 'non_disponibile') return 'non ancora disponibile';
-    if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';
-    if (o.found === false) return 'non trovato';
-    if (o.ok === false && o.errore && o.frase) return String(o.frase);
-    if (o.ok === false && o.detail) return String(o.detail);
-    if (o.ok === false && o.dettaglio) return String(o.dettaglio);
-    if (isType(a, 'CHIUDI_SCHEDE')) {
-      if (o.error) return 'schede non riconosciute';
-      if (o.restano) return restanoAperte(o);
-      if (o.nessuna === 'sito') return 'nessuna di quel sito';
-      if (o.nessuna === 'niente') return 'c\'è solo questa';
-    }
-    if (o.error) return String(o.error);
-    return '';
-  }
+  // La ragione del fallimento: la stessa che racconta la chat riaperta (src/shared/esitoAzione.js).
+  const motivoFallimento = (a) => global.SN_ESITO.motivo(a);
 
   // Una riga o un esito di comando nel blocco di attività, per un'azione già
   // eseguita dal main. Ritorna true se l'azione è stata raccontata così (e
