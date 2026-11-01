@@ -85,7 +85,7 @@
         // Dentro un percorso la cartella personale porta il nome anche in minuscolo («/Users/giulia/»), e lì non è
         // mai una parola comune.
         if (!prep && /[\\/]/.test(tutto.charAt(pos - 1))) return 'utente';
-        if (forma.pezzo && !/^\p{Lu}/u.test(nome)) return intero;
+        if (forma.pezzo && !/^\p{Lu}/u.test(nome) && (prep || !PRESENTAZIONE.test(tutto.slice(0, pos)))) return intero;
         if (prep) {
           const al = PREPOSIZIONI[prep.toLowerCase()];
           return /^\p{Lu}/u.test(prep) ? maiuscola(al) : al;
