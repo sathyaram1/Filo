@@ -95,7 +95,7 @@ if (process.env.NODE_ENV === 'test') {
 try { require('./test-servizi-chiusi').chiudiServiziNeiTest(); } catch (_) {}
 
 const {
-  createMainWindow, mostraFinestraNormale, onFinestraNormale, attendiAvvio, finestraNormaleViva,
+  createMainWindow, mostraFinestraNormale, onFinestraNormale, attendiAvvio, riaperturaDaSistema,
 } = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
@@ -231,36 +231,22 @@ app.whenReady().then(async () => {
   // PRIMA di qualsiasi finestra: su Mac la barra vince sui tasti delle pagine.
   installaMenuApplicazione();
 
-  const Storage = globalThis.SN_STORAGE;
+  // Le scelte che valgono dal primo istante si fissano qui, sincrone; gli init che leggono il disco partono dopo, insieme.
+  let s = impostazioniAvvio;
+  try { s = (await globalThis.SN_STORAGE.getSettings()) || impostazioniAvvio; } catch (_) {}
   try {
-    const s = await Storage.getSettings();
     syncNativeTheme(s.theme);
     try { require('./movimento').segui(s); } catch (_) {}
     // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
-    const Cookies = require('./services/cookies');
-    Cookies.configureFromSettings(s);
+    require('./services/cookies').configureFromSettings(s);
     // Cookie dei contenuti incorporati di terzi (#758): va agganciato prima della prima scheda, è lui che vede
     // nascere i cookie dei riquadri.
     try { require('./services/cookieIncorporati').init(s); } catch (_) {}
     try { require('./services/accessoGoogle').init(); } catch (_) {}
     try { require('./services/riquadriRotti').init(s); } catch (_) {}
-    // Anti-fingerprinting: carica/genera il master secret persistente e fissa
-    // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
-    t = Date.now();
-    try { await require('./services/fingerprint').init(s); } catch (_) {}
-    passo('fingerprint', t);
-    try { await Cookies.wipeTrackerCookies(s); } catch (_) {}
-    t = Date.now();
-    try { await require('./services/adblock').init(s); } catch (_) {}
-    passo('adblock', t);
     try { require('./services/adSkip').configureFromSettings(s); } catch (_) {}
     // EasyList Cookie (banner da nascondere): cache su disco e aggiornamento settimanale in sottofondo.
     require('./services/cookieBanners').init(s).catch(() => {});
-    // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.
-    try { await require('./tabs/tabCookies').loadRemembered(); } catch (_) {}
-    // #711 — l'elenco ufficiale dei firmatari C2PA: rilegge la copia su disco e
-    // la rinfresca in sottofondo quando è vecchia. Non blocca l'avvio.
-    try { await require('./services/firmatariC2pa').init(); } catch (_) {}
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
@@ -270,13 +256,6 @@ app.whenReady().then(async () => {
     // #588 — conferma prima di scaricare/aprire un programma: la config va
     // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
     try { require('./services/downloads').configureFromSettings(s); } catch (_) {}
-    // Le risposte date ai siti vanno lette prima della prima scheda: il controllo dei permessi è sincrono.
-    t = Date.now();
-    try { await require('./services/permessiPagine').carica(); } catch (_) {}
-    passo('permessi', t);
-    // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
-    // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
-    try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}
     // Le miniature grandi di «Aperti per dopo» (#839), qualche secondo dopo: l’avvio non le aspetta.
     setTimeout(() => { globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {}); }, 3000);
     // Le icone delle voci rimaste senza copia (#1273), una volta sola e dopo l'avvio.
@@ -289,17 +268,46 @@ app.whenReady().then(async () => {
   try { require('./auth/google-auth').restore(); } catch (_) {}
   try { require('./auth/anon-auth').restore(); } catch (_) {}
 
-  // I tre in background non bloccano l'avvio: finché la config remota non
+  // I due in background non bloccano l'avvio: finché la config remota non
   // arriva valgono i default del codice, e senza chiavi resta l'analisi locale.
   try { require('./services/defaultsStore').refresh().catch(() => {}); } catch (_) {}
   // Le impostazioni già lette: i siti fidati (#967) devono valere prima che si apra la prima scheda.
   try { require('./services/handlers').wireSafebrowse(impostazioniAvvio).catch(() => {}); } catch (_) {}
-  try { require('./services/downloads').init().catch(() => {}); } catch (_) {}
+
+  // Quello che la prima scheda deve trovare pronto, insieme e mentre la finestra si apre (#1092, #1479): la riapertura
+  // delle schede li aspetta (attendiAvvio in window.js). Nessuno legge quello che scrive un altro.
+  const init = (nome, fn) => {
+    const t0 = Date.now();
+    return Promise.resolve().then(fn).catch(() => {}).then(() => { if (nome) passo(nome, t0); });
+  };
+  const pronti = Promise.all([
+    // Anti-fingerprinting: il master secret persistente e la modalità (off/default/privacy).
+    init('fingerprint', () => require('./services/fingerprint').init(s)),
+    init('adblock', () => require('./services/adblock').init(s)),
+    // Le risposte date ai siti: il controllo dei permessi è sincrono e una pagina riaperta chiede subito.
+    init('permessi', () => require('./services/permessiPagine').carica()),
+    // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.
+    init(null, () => require('./tabs/tabCookies').loadRemembered()),
+    // Lo storico e l'aggancio di will-download: uno scaricamento della prima scheda passa da Filo.
+    init(null, () => require('./services/downloads').init()),
+  ]);
+  attendiAvvio(pronti);
 
   // Una finestra normale può nascere anche senza di noi (la scadenza che deve
   // farsi sentire ne apre una): senza aggiornarlo, questo punta a una chiusa.
   onFinestraNormale((w) => { mainWindow = w; });
   mainWindow = createMainWindow();
+
+  // Dopo la prima scheda: niente di questo cambia come si apre.
+  pronti.then(() => {
+    // I cookie dei tracker rimasti da una chiusura brusca (quella normale li toglie uscendo).
+    try { require('./services/cookies').wipeTrackerCookies(s).catch(() => {}); } catch (_) {}
+    // #711 — l'elenco ufficiale dei firmatari C2PA: rilegge la copia su disco e la rinfresca quando è vecchia.
+    try { require('./services/firmatariC2pa').init().catch(() => {}); } catch (_) {}
+    // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
+    // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
+    try { require('./services/editorFiles').migrateNotesToEditor().catch(() => {}); } catch (_) {}
+  });
   try { require('./cancellaTutto').annuncia(); } catch (_) {}
   // Chi è entrato in Filo quando l'accesso passava dal browser trova una volta l'invito a collegare YouTube, Gmail e
   // Drive nelle schede (#1123). Nei test no: comparirebbe in mezzo agli avvisi che gli spec contano.
