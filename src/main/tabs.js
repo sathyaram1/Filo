@@ -4742,7 +4742,7 @@ class TabManager {
     // Riaperta, la scheda resta quella di prima anche per il filo (#1561): le sue visite portano questo id.
     const ids = kept.map((t) => t.id);
     // Quando ha suonato l'ultima volta, al minuto come `usate`: dopo un riavvio «rimettimi la musica» la ritrova (#1397).
-    const audio = kept.map((t) => (t.audioAt > 0 ? new Date(Math.floor(t.audioAt / 60_000) * 60_000).toISOString() : null));
+    const audio = kept.map((t) => (ultimoSuono(t) > 0 ? new Date(Math.floor(ultimoSuono(t) / 60_000) * 60_000).toISOString() : null));
     let activeIndex = kept.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
     return { tabs, colors, aperte, pagine, usate, ids, audio, activeIndex };
