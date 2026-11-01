@@ -116,9 +116,9 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   davanti: una conversazione ripresa o lunga ha un inizio che si cerca), pagine visitate (e il contenuto
   delle schede chiuse, coi vettori della Cronologia), cambi annullabili. Pagine, chat e cambi si cercano per parole
   con gli stessi tre passi (tutte, quelle che distinguono, almeno una): una parola in più nella domanda non fa
-  sparire la pagina o il cambio mentre la chat si trova. Le pagine non entrano mai da sole nel
-  contesto: solo cercate (decisione dell'owner, D56 la cambierà con un interruttore). Una pagina delicata dice solo
-  il sito; gli indirizzi trovati si riaprono senza conferma, come i link di una ricerca.
+  sparire la pagina o il cambio mentre la chat si trova. Da sole le pagine entrano solo ripiegate davanti al messaggio
+  (sopra): indirizzi e pagine più vecchie si cercano. Una pagina delicata dice solo il sito; gli indirizzi trovati si
+  riaprono senza conferma, come i link di una ricerca.
 
 - **Le chat delle app entrano come una riga** all'ora in cui sono cominciate, mai lo scambio: vedi
   [Il filo cresce solo in coda](il-filo-cresce-solo-in-coda-e-cancellare-e-un-evento.md), § chat delle altre app.
