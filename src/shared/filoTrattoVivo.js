@@ -233,8 +233,8 @@
     return `cambio ${da ? `${da} ` : ''}${campo(e.id, 60)}${stringa(e.annulla) ? ` (annulla ${campo(e.annulla, 60)})` : ''}: ${campo(frase, 400)}${no}`;
   }
 
-  // Una riga per evento, ognuna con l'ora; null se l'evento non si racconta (le pagine visitate, che entrano solo
-  // cercate; la scheda portata davanti, che dice TAB APERTE).
+  // Una riga per evento, ognuna con l'ora; null se l'evento non si racconta qui: le pagine visitate e le ricerche fatte su
+  // un sito (le ripiega rendiPagine), la scheda portata davanti (la dice TAB APERTE).
   function rigaDi(ev) {
     switch (ev.tipo) {
       case 'azione': return rigaAzione(ev);
