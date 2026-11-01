@@ -613,7 +613,25 @@ function verifica(posizioni, letto, g) {
   return { fuoriPosto, mancanti };
 }
 
-const disposizione = (letto) => ({ auto: !!letto.auto, voci: (letto.voci || []).map((v) => [v.id, v.x, v.y]) });
+// L'ordine che legge chi guarda, riletto dopo lo spostamento: è l'unica prova che il sistema le ha lasciate in fila.
+// Due icone nella stessa casella non si leggono in nessun ordine: l'ordine non c'è.
+function inOrdine(posizioni, letto, g, verso) {
+  const dove = new Map((letto.voci || []).map((v) => [v.id, v]));
+  const presenti = posizioni.filter((p) => dove.has(p.id));
+  if (!presenti.length) return false;
+  const viste = presenti.map((p) => {
+    const v = dove.get(p.id);
+    return { id: p.id, col: Math.round((v.x - g.x0) / g.passoX), riga: Math.round((v.y - g.y0) / g.passoY) };
+  }).sort((a, b) => (verso === 'colonne' ? (a.col - b.col) || (a.riga - b.riga) : (a.riga - b.riga) || (a.col - b.col)));
+  for (let i = 1; i < viste.length; i++) if (viste[i].col === viste[i - 1].col && viste[i].riga === viste[i - 1].riga) return false;
+  return viste.every((v, i) => v.id === presenti[i].id);
+}
+
+const disposizione = (letto) => ({
+  auto: !!letto.auto,
+  voci: (letto.voci || []).map((v) => [v.id, v.x, v.y]),
+  ...(typeof letto.finder === 'string' ? { finder: letto.finder } : {}),
+});
 const stessaDisposizione = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 // ── Le frasi ────────────────────────────────────────────────────────────────
