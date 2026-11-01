@@ -48,7 +48,10 @@
 
   // L'attributo risponde a «questo pezzo lo salto?» e se lo può scrivere anche il sito;
   // a «l'ho disegnato IO?» risponde solo questo elenco, nel mondo isolato (#514).
+  // Riferimenti deboli (#1096): un riquadro chiuso non resta vivo per l'elenco, con la tela e gli allegati che tiene.
   const nostre = new Set();
+  const rifDi = new WeakMap();
+  const debole = (el) => (typeof WeakRef === 'function' ? new WeakRef(el) : { deref: () => el });
   // `mark()` arriva anche prima che l'elemento sia attaccato: qui `isConnected` non si guarda.
   // Si buttano le più vecchie: una radice dimenticata vale «non è successo niente».
   const TETTO = 256;
