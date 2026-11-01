@@ -756,7 +756,7 @@
             if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: full, name: 'schermata annotata' });
           } else {
             senzaSchermata = (shot || topbarShot)
-              ? 'La schermata annotata non scende sotto i 4 MB.'
+              ? 'Non sono riuscito a preparare la schermata annotata.'
               : 'Screenshot non disponibile su questa pagina.';
           }
         }

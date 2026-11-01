@@ -1,6 +1,6 @@
 // #1667 — il riquadro «Invia feedback» dice «inviato» solo a consegna avvenuta; un allegato che non sale non fa
 // partire un feedback vuoto e chi l'ha mandato legge nella finestra quale file è saltato e perché; la schermata
-// annotata di uno schermo grande scende sotto i 4 MB e parte. La rete è finta nel main (la submit), il resto è vero.
+// annotata di uno schermo grande scende sotto i 4 MB e parte. Finta è solo la rete (la submit nel main).
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -109,7 +109,7 @@ test('senza testo e con uno screenshot che non si può fare non parte niente: il
   expect(await app.evaluate(() => globalThis.__rete.payload.length), 'nessun feedback vuoto è partito').toBe(0);
 });
 
-test('la schermata annotata di uno schermo grande scende sotto i 4 MB, col disegno, e parte', async ({ app, shell }) => {
+test('la schermata annotata di uno schermo grande scende sotto i 4 MB, coi tratti della pagina e della barra, e parte', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await reteFinta(app);
@@ -137,6 +137,15 @@ test('la schermata annotata di uno schermo grande scende sotto i 4 MB, col diseg
   await page.mouse.down();
   for (let x = 110; x <= 400; x += 10) await page.mouse.move(x, 120);
   await page.mouse.up();
+  // E uno sulla barra in alto, che vive nella shell: la schermata le mette una sopra l'altra.
+  await expect(shell.locator('#feedback-draw')).toBeVisible({ timeout: 4_000 });
+  const barra = await shell.locator('#feedback-draw').boundingBox();
+  const yb = Math.min(15, (barra?.height || 40) / 2);
+  await shell.mouse.move(160, yb);
+  await shell.mouse.down();
+  await shell.mouse.move(360, yb, { steps: 12 });
+  await shell.mouse.up();
+  await expect(page.locator('.sn-fb-clear')).toHaveText(/Cancella/, { timeout: 4_000 });
   await page.locator('.sn-fb-send').click();
   await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 15_000 });
   await expect(toast(page, 'Grazie! Feedback inviato.')).toHaveCount(1);
@@ -152,13 +161,18 @@ test('la schermata annotata di uno schermo grande scende sotto i 4 MB, col diseg
     c.width = im.naturalWidth; c.height = im.naturalHeight;
     const cx = c.getContext('2d');
     cx.drawImage(im, 0, 0);
-    const sx = im.naturalWidth / innerWidth;
-    const sy = im.naturalHeight / innerHeight;
-    const [r, g, b] = cx.getImageData(Math.round(250 * sx), Math.round(120 * sy), 1, 1).data;
-    return { byte: window.SN_FEEDBACK.byteDiDataUrl(u), w: im.naturalWidth, h: im.naturalHeight, r, g, b };
+    const k = im.naturalWidth / innerWidth;
+    const barH = Math.round(im.naturalHeight - innerHeight * k);
+    const [r, g, b] = cx.getImageData(Math.round(250 * k), barH + Math.round(120 * k), 1, 1).data;
+    const fascia = cx.getImageData(0, 0, im.naturalWidth, Math.max(1, barH)).data;
+    let rossiInBarra = 0;
+    for (let i = 0; i < fascia.length; i += 4) if (fascia[i] > 200 && fascia[i + 1] < 90 && fascia[i + 2] < 90) rossiInBarra++;
+    return { byte: window.SN_FEEDBACK.byteDiDataUrl(u), w: im.naturalWidth, barH, r, g, b, rossiInBarra };
   }, immagine[0].dataUrl);
   expect(verifica.byte, 'sotto il tetto del deposito').toBeLessThan(4 * 1024 * 1024);
   expect(verifica.w).toBeGreaterThan(0);
-  expect(verifica.r, 'il tratto rosso c’è ancora').toBeGreaterThan(170);
+  expect(verifica.r, 'il tratto rosso sulla pagina c’è ancora').toBeGreaterThan(170);
   expect(verifica.g).toBeLessThan(110);
+  expect(verifica.barH, 'la barra in alto sta sopra la pagina').toBeGreaterThan(0);
+  expect(verifica.rossiInBarra, 'col suo tratto').toBeGreaterThan(0);
 });

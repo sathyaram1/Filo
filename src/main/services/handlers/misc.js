@@ -633,10 +633,8 @@ module.exports = function register(on, ctx) {
         const failed = Array.isArray(result?.failed) ? result.failed : [];
         if (!failed.length) return;
         const elenco = globalThis.SN_FEEDBACK?.fraseAllegatiSaltati?.(failed) || failed.map((f) => f?.name || 'allegato').join(', ');
-        avvisoQuandoPronta(`Il tuo feedback è partito, ma senza ${failed.length === 1 ? 'un allegato' : `${failed.length} allegati`}: ${elenco}.`, {
-          chiave: `feedback-allegati-saltati-${String(_item?.id || '')}`,
-          errore: 'allegati_non_caricati',
-        });
+        const testo = `Il tuo feedback è partito, ma senza ${failed.length === 1 ? 'un allegato' : `${failed.length} allegati`}: ${elenco}.`;
+        avvisoQuandoPronta(testo, { chiave: `feedback-allegati-saltati-${String(_item?.id || '')}`, errore: 'allegati_non_caricati' });
       },
       // #602 — la coda rinuncia perché non si può cifrare. Chi ha mandato la
       // segnalazione ha già letto «inviato» e ha già preso i crediti: se non
