@@ -163,6 +163,12 @@ test('ritenta quando Firestore è occupato, rinnova il token scaduto, e un no si
   const sempre = serverFinto(DOCUMENTI, { guasti: Array.from({ length: 10 }, () => ({ status: 503 })) });
   await assert.rejects(contaRaccolte(clienteFirestore({ progetto: PROGETTO, token: async () => 't', fetchImpl: sempre.fetchImpl, attendi: senzaAttese })), /503/);
   assert.equal(sempre.richieste.length, 6, 'cinque tentativi in più, poi si ferma');
+
+  const scaduto = serverFinto(DOCUMENTI, { guasti: [{ status: 401 }, { status: 401 }] });
+  const t2 = tokenFinto();
+  await assert.rejects(contaRaccolte(clienteFirestore({ progetto: PROGETTO, token: t2.token, fetchImpl: scaduto.fetchImpl, attendi: senzaAttese })),
+    (e) => /401/.test(e.message) && /gcloud auth login/.test(e.message));
+  assert.equal(t2.chiamate.length, 2, 'un token nuovo, una volta sola');
 });
 
 test('il token si chiede a gcloud: da cmd.exe su Windows, diretto su Mac e Linux', () => {
