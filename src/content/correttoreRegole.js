@@ -48,19 +48,31 @@
     };
   }
 
+  // Il nome dell'app e il suo sito non sono mai errori, nemmeno per il modello (#1655): «Filo» a metà frase non è il
+  // filo da cucire scritto maiuscolo.
+  const ZONE_DI_FILO = [
+    /(?<![\p{L}\p{N}'’-])(?:Filo|FILO)(?:['’]s)?(?![\p{L}\p{N}'’-])/gu,
+    /(?<![\p{L}\p{N}._-])(?:[\p{L}\p{N}-]+\.)*filo\.red(?:\/\S*)?(?![\p{L}\p{N}_-])/giu,
+  ];
   // Indirizzi, email, menzioni, etichette e codice fra apici inversi: lì una «parola» non è una parola da correggere.
+  // Anche un dominio senza indirizzo intorno («amazon.it», #1655), col suffisso minuscolo: «andato.Poi» è uno spazio
+  // dimenticato, e le sue parole restano da guardare.
   const ZONE = [
     /\b(?:https?:\/\/|www\.)[^\s<>"]+/giu,
     /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/gu,
     /(?<![\p{L}\p{N}])[@#][\p{L}\p{N}_]+/gu,
     /`[^`\n]+`/g,
     /(?<![\p{L}\p{N}@])[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+\/\S*/gu,
+    /(?<![\p{L}\p{N}@._%+-])(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+\p{Ll}{2,}(?![\p{L}\p{N}_-]|\.[\p{L}\p{N}])/gu,
+    ...ZONE_DI_FILO,
   ];
-  function zoneEscluse(testo) {
+  function zoneDi(testo, lista) {
     const out = [];
-    for (const re of ZONE) for (const m of testo.matchAll(re)) out.push([m.index, m.index + m[0].length]);
+    for (const re of lista) for (const m of String(testo ?? '').matchAll(re)) out.push([m.index, m.index + m[0].length]);
     return out;
   }
+  const zoneEscluse = (testo) => zoneDi(testo, ZONE);
+  const suFilo = (testo, start, end) => zoneDi(testo, ZONE_DI_FILO).some(([a, b]) => start >= a && end <= b);
 
   function parole(testo) {
     const out = [];
