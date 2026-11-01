@@ -101,6 +101,7 @@
     if (o.proxy === 'non_disponibile') return 'non ancora disponibile';
     if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
+    if (o.already) return 'era già così';
     if (o.ok === false && o.errore && o.frase) return String(o.frase);
     if (o.ok === false && o.detail) return String(o.detail);
     if (o.ok === false && o.dettaglio) return String(o.dettaglio);
