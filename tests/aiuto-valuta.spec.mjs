@@ -207,6 +207,40 @@ test('una correzione che toglie un pezzo senza scrivere niente: il secondo clic 
   await expect(A.locator('.sn-sidebar-log-intera')).toHaveCount(0);
 });
 
+// #1690: un pezzo tolto senza niente accanto da riscrivere, cioè da solo sulla sua riga o tutto il campo.
+test('una correzione che toglie una riga intera di un editor ricco, o tutto il testo, si rimette col secondo clic', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const togli = (...pezzi) => JSON.stringify({ text: 'Di troppo.', correzioni: pezzi.map((prima) => ({ prima, dopo: '', perche: 'di troppo' })), status: 'done' });
+  const page = await apri(app, openTab, testServer, { risposte: [['Seconda riga', togli('Seconda riga.', 'Prima riga con un erore.')], ['', togli(TESTO)]] });
+  const ce = page.locator('#ce');
+  const com0 = await ce.innerHTML();
+
+  await valutaSu(page, '#ce');
+  const A = await paginaDellAiuto(app, page);
+  for (const riga of ['Seconda riga.', 'Prima riga con un erore.']) {
+    const b = A.locator('.sn-sidebar-correzione', { hasText: riga });
+    await expect(b).toHaveCount(1, { timeout: 20_000 });
+    await b.click();
+    await expect(b).toHaveClass(/sn-sidebar-correzione-fatta/);
+    await expect(ce).not.toContainText(riga);
+    await b.click();
+    await expect(b).not.toHaveClass(/sn-sidebar-correzione-fatta/);
+    await expect(ce, 'la riga torna al suo posto, e le righe restano due').toHaveText(/^Prima riga con un erore\.\s*Seconda riga\.$/);
+    expect(await ce.locator(':scope > div').allInnerTexts()).toEqual(['Prima riga con un erore.', 'Seconda riga.']);
+  }
+  expect(await ce.innerHTML()).toBe(com0);
+
+  await valutaSu(page, '#ta');
+  const tutto = A.locator('.sn-sidebar-correzione', { hasText: 'Ieri sono andato' });
+  await expect(tutto).toHaveCount(1, { timeout: 20_000 });
+  await tutto.click();
+  await expect(page.locator('#ta')).toHaveValue('');
+  await tutto.click();
+  await expect(page.locator('#ta')).toHaveValue(TESTO);
+  await expect(tutto).not.toHaveClass(/sn-sidebar-correzione-fatta/);
+  await expect(A.locator('.sn-sidebar-log-intera')).toHaveCount(0);
+});
+
 test('un modello della chat che non vede le immagini risponde lo stesso, senza la foto della pagina', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await apri(app, openTab, testServer, { risposte: [['', PARERE]], senzaFoto: true });
