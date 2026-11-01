@@ -588,8 +588,8 @@ export function registrazioniDelRapporto(report) {
   return out;
 }
 
-export async function releaseConRapporto(t, fault, report, opts) {
-  const tenta = (rep) => release(t, fault, opts, rep);
+export async function releaseConRapporto(t, fault, report, opts, spedito = null) {
+  const tenta = (rep) => release(t, fault, opts, rep, spedito);
   if (!report || typeof report !== 'object') return { ...(await tenta(null)), rapporto: 'assente' };
   const malformato = (r) => r.status === 400 && r.reason === 'report_malformed';
   const troppoGrande = (r) => r.status === 413 && r.reason === 'report_too_big';
