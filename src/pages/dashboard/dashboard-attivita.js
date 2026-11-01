@@ -35,11 +35,22 @@
   // #778 — mentre i popup di una risposta si aprono in fila, la ripresa aspetta l'ultimo: un turno partito a metà
   // fila troverebbe le altre richieste ancora senza risposta, e le rifarebbe.
   // `chat`: la conversazione in cui è nato il bottone; la pagina riprende solo se è ancora quella a schermo (#1373).
+  // `voci`: com'è andata ogni conferma della fila, che la ripresa porta al modello tutte insieme.
   let filaPopup = 0;
   let riprendiDopoFila = null;
-  function proseguiQuandoLibero(chat = '') {
+  let vociDopoOk = [];
+  function proseguiQuandoLibero(chat = '', voce = null) {
+    if (voce) vociDopoOk.push(voce);
     if (filaPopup > 0) riprendiDopoFila = { chat };
-    else prosegui(chat);
+    else riprendiOra(chat);
+  }
+  function riprendiOra(chat) {
+    const voci = vociDopoOk;
+    vociDopoOk = [];
+    prosegui(chat, voci);
+  }
+  function voceDellaConferma(a) {
+    try { return global.SN_ESITO.voceArchivio(a); } catch (_) { return null; }
   }
 
   function isType(a, t) {
