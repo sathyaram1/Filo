@@ -43,7 +43,8 @@
     "manutentore": "node scripts/manutentore.mjs",
     "fiducia:migra": "node scripts/fiducia-migra.mjs",
     "domande:migra": "node scripts/domande-migra.mjs",
-    "mittenti:migra": "node scripts/mittenti-migra.mjs"
+    "mittenti:migra": "node scripts/mittenti-migra.mjs",
+    "db:conta": "node scripts/conta-documenti.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
