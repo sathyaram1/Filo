@@ -81,8 +81,8 @@ Se quei tipi di agente non risultano disponibili (cartella caricata solo al
 riavvio della sessione), ripiega su `general-purpose`.
 Il worker non lavora in questa cartella: dispatch lo porta nel suo clone, che
 il preflight ha acceso, così quello che scrive non arriva alle impostazioni di
-questa sessione. MAI worker in parallelo: il clone è uno solo (gli altri li
-accende il #1158).
+questa sessione. MAI worker in parallelo: i lavori in parallelo sono sessioni
+diverse, e i posti li conta solo il server.
 
 Prompt del worker (minimo): dichiarati routine (`export FILO_ROUTINE=1`),
 lancia `node scripts/dispatch.mjs --ticket <biglietto>`, diventa il ruolo che
