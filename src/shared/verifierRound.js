@@ -34,8 +34,11 @@
   // segnalazione, o l'ha creato il ramo), `e` esterno (un altro lavoro), `v`
   // vicino (un altro lavoro, ma in un file che il ramo modifica già: decisione
   // del 2026-09-27). Il giro conta gli interni, e i vicini come livello 0; ogni
-  // esterno esce subito in un feedback suo con la priorità del livello (il server fa nascere un 2 a 1).
+  // esterno esce subito in un feedback suo con la priorità del livello, salvo il 2 che nasce a 1.
   const SEDI = ['i', 'e', 'v'];
+  // La 2 è la rosa del giorno e la mette solo il manutentore (SPEC-MANUTENTORE § 2): un rilievo di livello 2 messo
+  // da parte nasce a 1. Il livello resta quello scritto; cambia solo la priorità del feedback che nasce.
+  const prioritaDiNascita = (level) => (Number(level) === 2 ? 1 : Number(level));
   const SPIEGAZIONE_SEDE = 'manca la sede dopo il livello: «i» se tocca a questo lavoro, «v» se è di un altro lavoro ma sta in un file che il ramo modifica già, «e» se è un altro lavoro (per esempio [2i], [1v], [1e?])';
 
   // Tetto ai rilievi di una critica: oltre non è una critica, è un elenco generato.
