@@ -7077,6 +7077,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     senzaVerdetto = true;
     console.warn('[Filo] collegamenti della risposta non controllati', e?.message || e);
   }
+  // #1373 — un'azione rimasta indietro nel turno (guardare lo schermo spento in Preferenze) può aspettare proprio il sì
+  // chiesto qui: dopo l'OK il lavoro riprende da solo. Un turno chiuso sulla conferma (#1130) non ne ha.
+  if (renderedActions.some((x) => x && !x._confirm && !x._domanda && x._executed === false && !(x._output && x._output.blocked === 'segreto'))) {
+    for (const x of renderedActions) if (x && x._confirm) x._riprende = true;
+  }
   // #525 — la risposta di Filo raggiunge l'archivio insieme al messaggio che
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
