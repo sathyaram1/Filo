@@ -6365,6 +6365,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       // col prefisso con cui è nato (providers/ragionamentoRimandato.js).
       if (Array.isArray(m.reasoningDetails) && m.reasoningDetails.length) msg.reasoning_details = m.reasoningDetails;
     }
+    // Un turno senza niente da dire non va al modello (#1294).
+    if (!String(msg.content || '').trim()) continue;
     threadMessages.push(msg);
   }
   const indiceDomanda = threadMessages.length;
