@@ -84,7 +84,11 @@
   function aperti() {
     const vive = [];
     try {
-      for (const el of nostre) if (el && el.isConnected) vive.push(el);
+      for (const r of nostre) {
+        const el = r.deref();
+        if (!el) nostre.delete(r);
+        else if (el.isConnected) vive.push(el);
+      }
     } catch (_) {}
     return vive;
   }
