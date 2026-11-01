@@ -82,6 +82,9 @@
     for (const forma of formeDelNome(nomi, proprie)) {
       const re = new RegExp(`(?<![\\p{L}\\p{N}'’])(?:([Aa]d?|[Dd][ai]|[Ii][nl]|[Ss]u|[Ll][ao])\\s+)?(${esc(forma.testo)})(?![\\p{L}\\p{N}])`, 'giu');
       t = t.replace(re, (intero, prep, nome, pos, tutto) => {
+        // Dentro un percorso la cartella personale porta il nome anche in minuscolo («/Users/giulia/»), e lì non è
+        // mai una parola comune.
+        if (!prep && /[\\/]/.test(tutto.charAt(pos - 1))) return 'utente';
         if (forma.pezzo && !/^\p{Lu}/u.test(nome)) return intero;
         if (prep) {
           const al = PREPOSIZIONI[prep.toLowerCase()];
