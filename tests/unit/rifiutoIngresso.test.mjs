@@ -58,6 +58,8 @@ test('la frase dice cosa il modello non legge e dove sceglierne un altro, con il
   assert.match(CE.sentence(err('No endpoints found that support image input')), /non legge le immagini/);
   assert.match(CE.sentence(Object.assign(new Error('OpenRouter 400: {"error":{"message":"This model does not support image input"}}'), { status: 400, provider: 'openrouter' })), /non legge le immagini/);
   assert.doesNotMatch(CE.sentence(err('No endpoints found that support tool use')), /immagini/);
+  const illeggibile = Object.assign(new Error('OpenRouter 400: {"error":{"message":"Provider returned error","metadata":{"raw":"Unable to process input image. Please retry or report"}}}'), { status: 400, provider: 'openrouter' });
+  assert.doesNotMatch(CE.sentence(illeggibile), /non legge le immagini|scegline uno che le legga/);
   assert.deepEqual(CE.rimedioPagina({ code: 'INGRESSO_NON_LETTO' }).url, 'filo://options/options.html');
   // Dalla risposta dell'IPC (codice e messaggio grezzo) la frase è la stessa.
   const ipc = CE.sentence(CE.fromResponse({ error: 'OpenRouter 404: {"error":{"message":"No endpoints found that support image input","code":404}}', code: 'INGRESSO_NON_LETTO', status: 404, provider: 'openrouter' }));
