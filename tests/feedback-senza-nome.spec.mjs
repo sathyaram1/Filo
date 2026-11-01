@@ -120,7 +120,8 @@ test('la segnalazione che Filo propone da sé toglie il nome che la memoria rico
   });
   await catturaConferme(page);
 
-  await page.locator('#input').fill('sono Luca, quanti crediti ho?');
+  // In minuscolo, come si scrive in chat: chi si presenta perde il nome anche senza la maiuscola.
+  await page.locator('#input').fill('sono luca, quanti crediti ho?');
   await page.locator('#sendBtn').click();
 
   await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary', { hasText: /Inviare questo feedback/i })).toBeVisible({ timeout: 20_000 });
