@@ -749,7 +749,10 @@
         })();
         const outImages = images.slice();
         let senzaSchermata = '';
-        if (wantShot) {
+        // Il deposito tiene cinque immagini: la schermata che non ci sta si dice, non sparisce (#1681).
+        if (wantShot && outImages.length >= MAX_IMAGES) {
+          senzaSchermata = `La schermata annotata non è partita: c'erano già ${MAX_IMAGES} immagini, il massimo.`;
+        } else if (wantShot) {
           // Overlay nascosto (box + ombra) per non finire dentro lo scatto.
           root.style.visibility = 'hidden';
           await new Promise((r) => setTimeout(r, 60));
