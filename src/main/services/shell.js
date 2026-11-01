@@ -571,10 +571,31 @@ async function esitoDeiProbe(probes, cwd, attesaMs = ATTESA_PROBE_MS) {
   return incerto ? null : false;
 }
 
-// PATHEXT più gli script di PowerShell e gli installatori; in WSL decide il bit d'esecuzione, che da qui non si vede.
+// Su un disco NTFS o exFAT (e in WSL sotto /mnt) ogni documento ha il permesso d'esecuzione: un programma si riconosce
+// dai primi byte, `#!` di uno script o il segno di un eseguibile (ELF, Mach-O, il PE di Windows che WSL lancia). Un
+// file che non si lascia leggere resta un programma, come diceva il permesso.
+const SEGNI_ESEGUIBILE = [[0x23, 0x21], [0x7f, 0x45, 0x4c, 0x46], [0xfe, 0xed, 0xfa, 0xce], [0xfe, 0xed, 0xfa, 0xcf],
+  [0xce, 0xfa, 0xed, 0xfe], [0xcf, 0xfa, 0xed, 0xfe], [0xca, 0xfe, 0xba, 0xbe]].map((s) => Buffer.from(s));
+const SEGNO_PE = Buffer.from('MZ');
+function contenutoEseguibile(p, { pe = false } = {}) {
+  let fd = null;
+  try {
+    fd = fs.openSync(p, 'r');
+    const testa = Buffer.alloc(4);
+    const letti = fs.readSync(fd, testa, 0, 4, 0);
+    const segni = pe ? [...SEGNI_ESEGUIBILE, SEGNO_PE] : SEGNI_ESEGUIBILE;
+    return segni.some((s) => letti >= s.length && testa.subarray(0, s.length).equals(s));
+  } catch (_) {
+    return true;
+  } finally {
+    if (fd != null) { try { fs.closeSync(fd); } catch (_) {} }
+  }
+}
+
+// PATHEXT più gli script di PowerShell e gli installatori; in WSL il bit d'esecuzione non si vede da qui: decide il contenuto.
 function programmaWindowsAlPercorso(p, shell) {
   const file = (f) => { try { return fs.statSync(f).isFile(); } catch (_) { return false; } };
-  if (shell === 'bash') return file(p);
+  if (shell === 'bash') return file(p) && contenutoEseguibile(p, { pe: true });
   const est = new Set(String(process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC')
     .toLowerCase().split(';').filter(Boolean).concat(['.ps1', '.msi']));
   if (est.has(path.extname(p).toLowerCase())) return file(p);
