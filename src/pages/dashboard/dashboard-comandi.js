@@ -509,9 +509,8 @@
     const V = global.SN_VIRGOLETTE;
     if (V && /^["']/.test(s)) return V.primoComando(s);
     const nome = s.split(/[\s|<>;&(){}`]/)[0] || '';
-    // «:)» e «:(» sono faccine, non il `:` della shell seguito da una parentesi: nessuna shell le esegue (#892.5).
-    const dopo = s.charAt(nome.length);
-    if ((dopo === ')' && !aperte) || (dopo === '(' && s.charAt(nome.length + 1) !== ')')) return '';
+    // «:)» e «:(» sono faccine, non il `:` della shell attaccato a una parentesi (#892.5).
+    if (!/[\p{L}\p{N}]/u.test(nome) && /[()]/.test(s.charAt(nome.length))) return '';
     return nome;
   }
 
