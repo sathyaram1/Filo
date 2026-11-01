@@ -176,7 +176,7 @@
     const attese = {};
     const cronometra = (nome, p) => { const t = Date.now(); return p.finally(() => { attese[nome] = Date.now() - t; }); };
     const [tabsLette, session, timers, notifications, dashboardCache, credits, cambi, sistema, autonomia, sempreAperte] = await Promise.all([
-      listTabs({ windowId: finestra }),
+      listTabs({ windowId: finestra, barra: schedaChat != null }),
       Mem.getSession(),
       Mem.listTimers(),
       Mem.listNotifications(),
