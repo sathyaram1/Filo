@@ -1,5 +1,6 @@
-// Verifica #1683 giro 1, rilievo 2: un comando che aspetta una risposta (qui la domanda di `cp -i`) la riceve dalla
-// casella sotto l'uscita, finisce, e il comando dopo parte. Prima si mangiava le righe di fine e restava in corso.
+// Verifica #1683 giro 1, rilievo 2: con Bash (scelta nelle Preferenze; su Mac è anche la shell di sistema) un comando
+// che aspetta una risposta, qui la domanda di `cp -i`, la riceve dalla casella sotto l'uscita, finisce, e il comando
+// dopo parte. Ora si prende le righe di fine al posto della risposta e il terminale resta in corso.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { CONFIRM_HOST, clickConfirm } from '../../helpers/confirm.mjs';
@@ -22,6 +23,11 @@ test('r2 la risposta scritta sotto il comando arriva a lui, e il terminale non r
   await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
   await expect.poll(() => page.evaluate(() => window.SN_DASH_TERMINALE?.isEnabled?.() === true), { timeout: 8_000 }).toBe(true);
+  await app.evaluate(async () => globalThis.__filoHandlers.handleMessage(
+    { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { terminal: { enabled: true, shell: 'bash' } } },
+    { url: 'filo://preferences/preferences.html' },
+  ));
+  await expect.poll(() => page.evaluate(() => window.SN_DASH_TERMINALE.getShell()), { timeout: 5_000 }).toBe('bash');
   const input = page.locator('#input');
   await input.fill(`/cd "${dir}"`);
   await input.press('Enter');

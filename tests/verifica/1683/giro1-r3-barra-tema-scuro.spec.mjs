@@ -30,8 +30,11 @@ test('r3 la barra del comando si legge col tema chiaro e con quello scuro', asyn
       { url: 'filo://preferences/preferences.html' },
     ), t);
     await expect(page.locator('html')).toHaveAttribute('data-sn-theme', t, { timeout: 5_000 });
-    // Testo grande e in grassetto: basta il minimo per i segni grafici, 3 a 1.
-    await expect.poll(contrasto, { timeout: 3_000, message: `${t}: la barra si legge sul fondo della bolla` }).toBeGreaterThan(3);
+    // Il cambio di tema ha una transizione: si misura a transizione finita.
+    await expect.poll(() => page.locator('.dash-term-cmd').last().evaluate((el) => el.getAnimations({ subtree: true }).length),
+      { timeout: 3_000 }).toBe(0);
+    // Un segno solo, in grassetto: basta il minimo per i segni grafici, 3 a 1.
+    expect(await contrasto(), `${t}: la barra si legge sul fondo della bolla`).toBeGreaterThan(3);
     await page.screenshot({ path: `tests/.shots/1683-r3-${t}.png` }).catch(() => {});
   }
 });
