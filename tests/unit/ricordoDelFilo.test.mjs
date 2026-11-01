@@ -166,6 +166,7 @@ test('una conversazione cancellata non arriva più al modello: né dal ricordo n
 test('più pezzi della stessa conversazione: il blocco di attività la nomina una volta', async () => {
   await import('../../src/shared/messages.js');
   await import('../../src/shared/esitoAzione.js');
+  await import('../../src/shared/righeAttivita.js');
   await import('../../src/pages/dashboard/dashboard-attivita.js');
   const D = globalThis.SN_DASH_ATTIVITA;
   const pezzo = (chat, titolo, ts, testo) => ({ tratto: { chat, titolo, ts, testo, daFuori: [] }, score: 1 });

@@ -164,18 +164,24 @@
     const o = x._output || {};
     if (o.blocked === 'segreto') return senzaVuoti({ type: 'FERMATA', esito: FALLITO, riga: breve(o.frase || '', MAX_RIGA) });
     // Un pannello che aspetta il clic dell'utente (il riordino, l'elenco da eliminare) non è un'azione fallita.
-    const esito = x._domanda && x._executed === false && !x._confirm ? CHIESTO : esitoAzione(x);
+    let esito = x._domanda && x._executed === false && !x._confirm ? CHIESTO : esitoAzione(x);
     const L = global.SN_ACTION_LEVELS;
+    // La riga del diario in diretta, coi suoi numeri: riaperta, la chat e il modello leggono la stessa frase.
+    const diretta = esito === CHIESTO || esito === FALLITO ? null : rigaDelDiario(x);
+    if (diretta && diretta.failed) esito = FALLITO;
     let riga = '';
     if (esito === CHIESTO) riga = primaRiga(x._confirm && x._confirm.text) || (L ? frase(L.describe, x) : '');
     else if (esito === FALLITO) riga = L ? frase(L.describe, x) : '';
-    else riga = L ? frase(L.describeDone, x) : '';
+    else riga = (diretta && primaRiga(diretta.text)) || (L ? frase(L.describeDone, x) : '');
     if (!riga && x._domanda && L) riga = frase(L.describe, x);
     if (SENZA_TITOLO[type]) riga = SENZA_TITOLO[type][esito === CHIESTO || esito === FALLITO ? 0 : 1];
     const file = type === 'APRI_FILE' && esito !== FALLITO && esito !== CHIESTO ? fileDi(x) : null;
-    return senzaVuoti({
-      type, esito, riga: breve(riga, MAX_RIGA), motivo: esito === FALLITO ? breve(motivo(x), MAX_MOTIVO) : '', file,
-    });
+    const perche = esito === FALLITO ? motivo(x) || (diretta ? diretta.text : '') : '';
+    return senzaVuoti({ type, esito, riga: breve(riga, MAX_RIGA), motivo: breve(perche, MAX_MOTIVO), file });
+  }
+  function rigaDelDiario(x) {
+    const R = global.SN_RIGHE_ATTIVITA;
+    try { return R ? R.rigaArchivio(x) : null; } catch (_) { return null; }
   }
   // Tutte, senza tetto: un turno con cento letture le racconta tutte.
   function vociArchivio(lista) {
@@ -190,7 +196,10 @@
     if (v.esito === CHIESTO) return { icona: '❔', testo: `Conferma chiesta${riga ? ` · ${riga}` : ''}`, fallita: true };
     if (v.esito === FALLITO) {
       const perche = pulito(v.motivo);
-      return { icona: '⚠', testo: ['Non riuscita', riga, perche].filter(Boolean).join(' · '), fallita: true };
+      // Detta come la dice il diario in diretta («Sveglia non impostata»); senza etichetta, la cosa tentata.
+      const R = global.SN_RIGHE_ATTIVITA;
+      const etichetta = R && Object.hasOwn(R.FAILED_LABELS, v.type) ? R.FAILED_LABELS[v.type] : '';
+      return { icona: '⚠', testo: [etichetta || 'Non riuscita', etichetta ? '' : riga, perche].filter(Boolean).join(' · '), fallita: true };
     }
     if (!riga) return null;
     return { icona: '✓', testo: riga, fallita: false };

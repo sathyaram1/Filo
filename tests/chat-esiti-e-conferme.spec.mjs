@@ -92,8 +92,9 @@ test('#1294 riaperta, la chat racconta la cosa fatta e quella non riuscita col p
   await riapri(app, page, chat.id);
   const bolla = page.locator('.dash-bubble-filo', { hasText: 'Il timer è partito' });
   await expect(bolla).toBeVisible({ timeout: 8_000 });
-  await expect(bolla.locator('.dash-activity-row', { hasText: 'Pasta' })).toBeVisible();
-  await expect(bolla.locator('.dash-activity-row', { hasText: /Non riuscita · .*la modalità terminale è spenta/ })).toBeVisible();
+  // Le parole e i numeri del diario in diretta, mai la frase della proposta («Avviare il timer»).
+  await expect(bolla.locator('.dash-activity-row', { hasText: 'Pasta' })).toHaveText(/Timer avviato · Pasta · 5 min/);
+  await expect(bolla.locator('.dash-activity-row', { hasText: /Comando non eseguito · la modalità terminale è spenta/ })).toBeVisible();
   await page.screenshot({ path: 'tests/.shots/chat-esiti-riaperta.png' });
 
   const prima = (await chiamateAlModello(app)).length;
