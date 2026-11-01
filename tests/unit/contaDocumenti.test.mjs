@@ -240,8 +240,10 @@ test('il confronto dice cosa manca, cosa è cambiato e cosa è in più', () => {
     { raccolta: 'feedback/c/note', prima: 1, dopo: 0 },
     { raccolta: 'feedback/zz/note', prima: 0, dopo: 4 },
   ]);
+  assert.equal(esito.mancano, 2, 'i quattro in più altrove non coprono i due che mancano');
+  assert.equal(esito.inPiu, 4);
   assert.deepEqual(righeConfronto(esito), [
-    'DIVERSO: 3 su 11 raccolte non tornano. Documenti: 15 prima, 17 dopo.',
+    'DIVERSO: 3 su 11 raccolte non tornano: mancano 2 documenti, 4 in più (15 prima, 17 dopo).',
     '  config: 2 → 1 (-1)',
     '  feedback/*/note: 1 → 4 (+3), in 2 raccolte',
     'Le sottoraccolte che non tornano:',
