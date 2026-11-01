@@ -206,8 +206,14 @@ test('arrivata su un sito dove Filo è spento: l’avviso compare nella scheda d
   test.setTimeout(90_000);
   const page = await testServer.openReady(openTab, '<!doctype html><html><body><p>Una pagina qualunque.</p></body></html>');
   await page.mouse.click(5, 5);
-  await fintoServitoDa(app, 'Google AI Studio', { blocklist: ['127.0.0.1'] });
-  await page.waitForTimeout(800);
+  await fintoServitoDa(app, 'Google AI Studio');
+  // Spento come dalle Preferenze: il cambio arriva alla pagina aperta.
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
+    { type: 'update_settings', settings: { blocklist: ['127.0.0.1'] } },
+    { tab: { id: 5, url: 'filo://preferences/preferences.html' }, url: 'filo://preferences/preferences.html' },
+  ));
+  await expect.poll(() => app.evaluate(async ({ webContents }, u) => webContents.getAllWebContents().find((w) => w.getURL() === u)
+    .executeJavaScriptInIsolatedWorld(999, [{ code: 'self.__snFiloSpento === true' }]), page.url()), { timeout: 5_000 }).toBe(true);
   expect((await spiega(app, 'EXPLAIN', 'pioggia1478')).ok).toBe(true);
   await page.waitForTimeout(1000);
   await expect(toastDi(page, 'Google AI Studio'), 'sul sito spento l’avviso non si mostra').toHaveCount(0);
