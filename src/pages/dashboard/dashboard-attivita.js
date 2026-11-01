@@ -1010,7 +1010,7 @@
             }
           } finally {
             filaPopup -= 1;
-            if (!filaPopup && riprendiDopoFila) { const { chat: c } = riprendiDopoFila; riprendiDopoFila = null; prosegui(c); }
+            if (!filaPopup && riprendiDopoFila) { const { chat: c } = riprendiDopoFila; riprendiDopoFila = null; riprendiOra(c); }
           }
         }, 0);
       }
