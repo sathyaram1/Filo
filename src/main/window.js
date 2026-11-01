@@ -241,6 +241,7 @@ function createMainWindow() {
     const passo = (nome, t0) => { if (avvio) { try { contatori()?.passoAvvio(nome, Date.now() - t0); } catch (_) {} } };
     passo('finestra_creata', tCrea);
     await avvioPronto;
+    if (win.isDestroyed()) return;
     const tSessione = Date.now();
     let restored = false;
     try { restored = await tabs.restoreSession(); } catch (_) { restored = false; }
