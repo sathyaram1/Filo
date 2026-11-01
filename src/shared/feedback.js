@@ -697,16 +697,17 @@
     // Nome e tipo originali si conservano: in dashboard diventano link scaricabili.
     const uploadedFiles = [];
     for (const f of vaglio.documenti) {
+      const fname = f.name;
       try {
         // S1.2: cifra anche gli allegati non-immagine.
         const rawBlob = dataUrlToBlob(f.dataUrl);
         const blobToUpload = await sealForUpload(rawBlob);
         const u = await uploadImage(blobToUpload); // upload generico (usa blob.type)
-        uploadedFiles.push(voceDocumento(u.url, f.name, f.type || rawBlob.type || ''));
+        uploadedFiles.push(voceDocumento(u.url, fname, f.type || rawBlob.type || ''));
       } catch (e) {
         if (isEncryptionError(e)) throw e; // come sopra: si ferma tutto
         console.warn('[SN feedback] upload file fallito:', e);
-        failed.push({ name: f.name, ...motivoCaricamento(e) });
+        failed.push({ name: fname, ...motivoCaricamento(e) });
       }
     }
     // `interi`: chi chiama vuole tutti gli allegati o niente feedback (un pacchetto non nasce monco, FEEDBACK-STATES.md
