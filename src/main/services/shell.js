@@ -570,9 +570,8 @@ async function esitoDeiProbe(probes, cwd, attesaMs = ATTESA_PROBE_MS) {
   return incerto ? null : false;
 }
 
-// Su un disco NTFS o exFAT (e in WSL sotto /mnt) ogni documento ha il permesso d'esecuzione: un programma si riconosce
-// dai primi byte, `#!` di uno script o il segno di un eseguibile (ELF, Mach-O, il PE di Windows che WSL lancia). Un
-// file che non si lascia leggere resta un programma, come diceva il permesso.
+// Su NTFS, exFAT e /mnt di WSL ogni documento ha il permesso d'esecuzione: un programma lo dicono i primi byte (`#!`,
+// ELF, Mach-O, il PE che WSL lancia). Un file che non si lascia leggere resta quello che diceva il permesso.
 const SEGNI_ESEGUIBILE = [[0x23, 0x21], [0x7f, 0x45, 0x4c, 0x46], [0xfe, 0xed, 0xfa, 0xce], [0xfe, 0xed, 0xfa, 0xcf],
   [0xce, 0xfa, 0xed, 0xfe], [0xcf, 0xfa, 0xed, 0xfe], [0xca, 0xfe, 0xba, 0xbe]].map((s) => Buffer.from(s));
 const SEGNO_PE = Buffer.from('MZ');
