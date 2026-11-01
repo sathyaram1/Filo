@@ -527,11 +527,12 @@ test('Mac: un dato che il Finder non dà in blocco si chiede voce per voce, e l\
 });
 
 test('per data o per dimensione senza il dato per nessuna icona: non è «fatto» in ordine alfabetico, e si dice perché', async () => {
-  for (const [piattaforma, finto] of [['win32', desktopFinto()], ['darwin', { ...scrivaniaFinta(), piattaforma: 'darwin' }]]) {
+  // Sul computer delle prove (Linux) il disco non dà le date dei percorsi di Windows: è il caso del dato che manca.
+  for (const [piattaforma, finto] of [['win32', desktopFinto()], ['darwin', scrivaniaFinta()]]) {
     for (const ordine of ['data', 'dimensione']) {
       const r = await conDesktop(finto, () => D.ordinaIcone({ ordine }));
       assert.equal(r.errore, 'senza-dati', `${piattaforma} ${ordine}: ${JSON.stringify(r)}`);
-      assert.ok(!finto.chiamate || !finto.chiamate.some((x) => x[0] === 'disponi'), 'niente spostato');
+      assert.ok(!finto.chiamate.some((x) => x[0] === 'disponi'), 'niente spostato');
       assert.match(D.esitoPerModello(r), new RegExp(`^Non fatto: .*in ordine ${ordine === 'data' ? 'per data' : 'per dimensione'}, in ordine alfabetico sì`));
     }
   }
