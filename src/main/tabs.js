@@ -4477,7 +4477,7 @@ class TabManager {
   // caricamento non cambiano la sessione: se è uguale a quella scritta non si riscrive (#1089).
   _persistSession() {
     if (this.incognito) return; // incognito: nessuna sessione salvata su disco
-    if (this._restoring) return; // non sovrascrivere mentre stiamo ripristinando
+    if (this._restoring || this._sessioneDaLeggere) return; // non sovrascrivere prima o durante il ripristino
     clearTimeout(this._sessionTimer);
     this._sessionTimer = null;
     if (JSON.stringify(this.sessionState()) === sessioneScritta) return;
