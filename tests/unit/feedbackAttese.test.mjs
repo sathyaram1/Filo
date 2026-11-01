@@ -278,7 +278,7 @@ test('--aspetta da riga di comando: dice quelle che sostituisce e cosa succede d
   const conAttesa = (status) => ({ ...DOCS, id903: { seq: 903, status, waitsFor: [{ id: 'id663-2', num: '663.2' }, { id: 'via951', num: '951' }] } });
   let rete = reteFinta(conAttesa('design'));
   try {
-    const r = await owner.segnaAttese('id903', '676,951', { bearer: 'tok' });
+    const r = await owner.segnaAttese('id903', '676,951', { bearer: 'tok', sostituisci: true });
     assert.equal(r.ok, true, r.motivo);
     assert.deepEqual(r.attese.map((w) => w.num), ['676', '951'], 'il cancellato #951, già scritto, non si rifiuta');
     assert.deepEqual(r.tolte, [{ id: 'id663-2', num: '663.2' }]);
