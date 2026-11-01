@@ -260,6 +260,7 @@
       if (inputEl.value.trim()) return;
       inputEl.value = testo;
       testoDaFuori = !!incollato;
+      if (incollato) ricordaDaFuori(testo);
       autoGrowInput();
       Comandi.updateInputClass();
       inputEl.focus();
