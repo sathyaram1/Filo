@@ -257,7 +257,14 @@ function run() {
   function dice(k, v) {
     righe.push('FILO:' + k + '=' + String(v).replace(/[^ -~]|\\/g, function (c) { return '\\u' + ('000' + c.charCodeAt(0).toString(16)).slice(-4); }));
   }
-  function tutti(fn, n) { try { var v = fn(); if (Array.isArray(v) && v.length === n) return v; } catch (e) {} return null; }
+  // In blocco è un evento solo; se il Finder lo rifiuta (basta un elemento che non ha il dato) si chiede voce per voce,
+  // o l'ordine chiesto diventerebbe in silenzio quello per nome.
+  function tutti(voci, k, n) {
+    try { var v = voci[k](); if (Array.isArray(v) && v.length === n) return v; } catch (e) {}
+    var uno = [];
+    for (var i = 0; i < n; i++) { try { uno.push(voci[i][k]()); } catch (e) { uno.push(null); } }
+    return uno;
+  }
   function elenca(scrivania) {
     var finestra = scrivania.containerWindow;
     try { dice('finder', finestra.iconViewOptions.arrangement()); } catch (e) {}
