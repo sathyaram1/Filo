@@ -152,6 +152,8 @@
         type, esito: x.esito, riga: breve(x.riga, MAX_RIGA), motivo: breve(x.motivo, MAX_MOTIVO), file: f,
       });
     }
+    // Un ricordo ripescato da solo sta col messaggio dell'utente, non fra le azioni di Filo.
+    if (x._auto) return null;
     const o = x._output || {};
     if (o.blocked === 'segreto') return senzaVuoti({ type: 'FERMATA', esito: FALLITO, riga: breve(o.frase || '', MAX_RIGA) });
     const esito = esitoAzione(x);
