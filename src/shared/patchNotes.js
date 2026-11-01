@@ -18,7 +18,9 @@
     },
     {
       version: '0.2.256', date: '2026-11-01',
-      features: [],
+      features: [
+        { testo: 'In chat Filo sa quali pagine hai aperto dall\'ultimo messaggio, raccolte per sito. Dopo un video sulle orche puoi chiedergli «quanto vivono?» senza dirgli di cosa parli. Di una pagina delicata, come la posta o la banca, gli arriva solo il nome del sito.', segnalazione: 1562 },
+      ],
       fixes: [
         { testo: 'Filo non ti scrive più per uno screenshot o per un file che hai appena scaricato. Lo fa solo quando un download lungo finisce mentre non sei davanti a Filo, o quando ne parte uno mentre non c\'eri, e dice solo quale file è arrivato.', segnalazione: 1654 },
         { testo: 'Il correttore non segna più «Filo» e filo.red come errori, e nemmeno un indirizzo scritto senza https, come amazon.it.', segnalazione: 1655 },
