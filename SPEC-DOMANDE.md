@@ -1484,8 +1484,8 @@ lavorano in locale.
     `soloOwner` con le risposte scritte che tornano all'addetto.
 15. Mittenti normalizzati (§ 10).
 16. Cartella padre per le sessioni cloud (§ 11).
-17. Orchestratore Haiku con worker in parallelo (§ 12): prima la misura di K e
-    il salvataggio per cartella.
+17. Orchestratore Haiku con worker in parallelo (§ 12): chiuso da #1158 nella
+    forma del ridisegno, una sessione per lavoro (vedi la nota in testa a § 12).
 
 I punti 1–4 danno già il risultato principale: un posto solo, con le domande
 ordinate per priorità e i blocchi di sicurezza letti sul testo originale.
