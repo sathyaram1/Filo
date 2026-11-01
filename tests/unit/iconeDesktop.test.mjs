@@ -428,9 +428,16 @@ function finderFinto(voci, { arrangement = 'arranged by name', negato = false, r
     url: blocco('url'), displayedName: blocco('nome'), name: blocco('nome'), desktopPosition: () => stato.voci.map((v) => v.pos.slice()),
     class: blocco('classe'), nameExtension: blocco('est'), modificationDate: blocco('data'), size: () => { throw new Error('una cartella non ha dimensione'); },
   };
+  // Voce per voce il Finder risponde: solo la cartella non ha dimensione.
+  const una = (v, campo) => () => {
+    if (campo === 'dim' && v.classe === 'folder') throw new Error('una cartella non ha dimensione');
+    return v[campo];
+  };
   stato.voci.forEach((v, i) => {
     Object.defineProperty(items, i, {
       get: () => ({
+        url: una(v, 'url'), displayedName: una(v, 'nome'), name: una(v, 'nome'), class: una(v, 'classe'),
+        nameExtension: una(v, 'est'), modificationDate: una(v, 'data'), size: una(v, 'dim'),
         get desktopPosition() { return () => v.pos.slice(); },
         set desktopPosition(p) { if (rotto) throw new Error('posizione rifiutata'); stato.scritte.push([v.url, p]); v.pos = p.slice(); },
       }),
