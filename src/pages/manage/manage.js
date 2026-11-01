@@ -1018,6 +1018,7 @@
     const confermaSessions = (testo, dopoLettura) => {
       if (sessionsInAttesa.some((s) => s.msgEl === msgEl)) return;
       if ('maxSessions' in esito.valori && mgMaxSessions && mgMaxSessions.value !== String(esito.valori.maxSessions)) return;
+      if ('reteApertaTetto' in esito.valori && mgReteApertaTetto && mgReteApertaTetto.value !== String(esito.valori.reteApertaTetto)) return;
       setSessionsMsg(msgEl, testo, 'ok', dopoLettura);
     };
     const scritti = Object.keys(esito.valori);
