@@ -1319,8 +1319,8 @@
 
   // ── I gesti della personalizzazione (#1471) ─────────────────────────────
   // Ogni misura è una mappa: per chiave (un'icona, una carta, un'origine…) le voci di elenco chiuso e il loro conto.
-  // Le zone che il server accetta. 'primary' (la fila del tasto destro, #1343) non si scrive più ma resta accettata per le
-  // copie non aggiornate; la disposizione si misura sulle zone che ha davvero (sentinella negli unit).
+  // Le zone che il server accetta. 'primary' è la fila del tasto destro: dal #1434 una per contesto, che si contano
+  // tutte come lei; la disposizione si misura sulle zone della barra (sentinella negli unit).
   const ZONE_ICONE = Object.freeze(['primary', 'secondary', 'bar']);
   // La posa: trascinata, spostata dal tasto destro su un'icona della barra (fra «Altro…» e le icone in vista), o chiesta a Filo.
   const VIE_POSA = Object.freeze(['trascina', 'rimessa_nel_menu', 'chat']);
@@ -1362,9 +1362,9 @@
     ['h1', 60 * 60 * 1000], ['oltre', Infinity]]);
   // I cambi che non sono impostazioni, per tipo: la loro chiave porta un dominio o un id, che non esce.
   const CAMBI_NON_IMPOSTAZIONI = Object.freeze({ timer: 'cambio.timer', proxy: 'cambio.proxy', zoom: 'cambio.zoom' });
-  // Accettate ma non più segnate da nessuno, come 'primary': la fila di icone del tasto destro non c'è più (#1343), e
-  // nemmeno la griglia dei moduli dell'Editor con la sua tavolozza e la sua chat (#1433).
-  const RITIRATI_TRASCINA = Object.freeze(['icona_menu', 'riga_menu', 'palette_editor', 'griglia_editor', 'chat_modulo_editor']);
+  // Accettate ma non più segnate da nessuno: la griglia dei moduli dell'Editor con la sua tavolozza e la sua chat (#1433).
+  // La fila del tasto destro è tornata contestuale (#1434), e con lei 'icona_menu', 'riga_menu' e la zona 'primary'.
+  const RITIRATI_TRASCINA = Object.freeze(['palette_editor', 'griglia_editor', 'chat_modulo_editor']);
   const ORIGINI_TRASCINA = Object.freeze(['carta_home', 'voce_sistema', 'file_da_chat', 'pagina_salvata', 'icona_barra',
     'icona_menu', 'scheda', 'modulo_editor', 'palette_editor', 'testo_pagina', 'file_disco', 'immagine']);
   const DESTINAZIONI_TRASCINA = Object.freeze(['chat_home', 'chat_aiuto', 'chat_modulo_editor', 'colonna_home', 'altro_home',

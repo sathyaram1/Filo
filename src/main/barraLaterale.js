@@ -30,6 +30,8 @@ const SONDA_MS = 50;
 const SONDA_LONTANO_MS = 150;
 // Dopo un ridimensionamento o uno spostamento della finestra il bordo non spinge: era il sistema al lavoro.
 const QUIETE_MS = 600;
+// Dopo un trascinamento dal menu la barra resta un attimo, per vedere dove è finita l'icona.
+const DOPO_POSA_MS = 900;
 // Le pagine elencate dal tasto destro su Indietro e Avanti; le altre si contano in fondo, non spariscono.
 const PAGINE_NEL_MENU = 15;
 
@@ -41,6 +43,7 @@ const PAGINE_FISSE = {
   redteam: 'filo://redteam/redteam.html',
 };
 const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
+const FASI_FUORI = new Set(['muovi', 'rilascia', 'annulla']);
 // Le icone che un'azione della pagina può cambiare (lo stesso bottone traduce o riporta all'originale).
 const ICONE_DELLA_PAGINA = { translate: new Set(['translate', 'showOriginal']) };
 // Perché l'icona Aiuto è spenta, nel suggerimento: chiavi i18n per i motivi che la pagina riferisce.
@@ -83,7 +86,11 @@ class BarraLaterale {
     this.tema = {};
     this.account = null;
     this.suggerimento = false;
-    this.timer = { uscita: null, stringi: null, fine: null, sonda: null };
+    // Un'icona trascinata dalla fila del tasto destro verso la barra (#1434): dove cadrebbe, e le misure per saperlo.
+    this.misure = [];
+    this.mira = null;
+    this.trascinamento = null;
+    this.timer = { uscita: null, stringi: null, fine: null, sonda: null, trascina: null };
     this.ultimoNav = '';
     this.opzioni = opzioniDi(null);
     this.bordo = false;
@@ -137,7 +144,7 @@ class BarraLaterale {
 
   // ── apertura e chiusura ──────────────────────────────────────────────────
 
-  // motivo: 'spinta' | 'clic' | 'tasto' | 'chat'. Da tastiera la barra prende il fuoco.
+  // motivo: 'spinta' | 'clic' | 'tasto' | 'chat' | 'trascina'. Da tastiera la barra prende il fuoco.
   apri(motivo = 'clic') {
     RedteamGate.aggiorna();
     this._ferma('stringi');
@@ -170,6 +177,7 @@ class BarraLaterale {
     this.aperta = false;
     this.motivo = null;
     this.dentro = false;
+    this.mira = null;
     this._nascondiSuggerimento();
     this._invia();
     this._ferma('stringi');
@@ -198,6 +206,8 @@ class BarraLaterale {
   // Un'apertura della barra (#1471): perché, cosa ci si è fatto (la prima cosa: un'azione, una voce di sistema, il
   // tasto destro) e quanto è rimasta aperta. Chiusa senza niente è «a vuoto».
   _esito(esito) { if (this.apertura && !this.apertura.esito) this.apertura.esito = esito; }
+  // Un'icona portata fuori dalla barra e presa dal menu della pagina: l'apertura è servita a qualcosa.
+  iconaPresaFuori() { this._esito('azione'); }
   _contaApertura() {
     this._lettura().via();
     const a = this.apertura;
@@ -261,6 +271,15 @@ class BarraLaterale {
     if (!input) return;
     this._tasti('scheda', input);
     this.destro.input(input);
+    // Il rilascio di un trascinamento dal menu arriva sempre qui: se la pagina non dice più «fine» (ha navigato, è
+    // caduta), la barra non resta ferma ad aspettarla.
+    if (this.trascinamento) {
+      if (input.type === 'mouseUp') {
+        this._ferma('trascina');
+        this.timer.trascina = setTimeout(() => { this.timer.trascina = null; this._fineTrascinamento(); }, 500);
+      }
+      return;
+    }
     if (!this.aperta) {
       // Uscendo dalla pagina il puntatore può andare dove la pagina non lo vede più (la fascia del sistema,
       // fuori dalla finestra): da lì lo guarda il main, anche arrivando di corsa.
@@ -277,10 +296,10 @@ class BarraLaterale {
   }
 
   _programmaUscita() {
-    if (this.timer.uscita) return;
+    if (this.timer.uscita || this.trascinamento) return;
     this.timer.uscita = setTimeout(() => {
       this.timer.uscita = null;
-      if (!this.dentro) this.chiudi();
+      if (!this.dentro && !this.trascinamento) this.chiudi();
     }, this.opzioni.uscitaMs);
   }
 
@@ -323,7 +342,7 @@ class BarraLaterale {
       const quiete = Date.now() < this.quieteFino;
       // Finito un ridimensionamento dal bordo il puntatore è ancora lì: conta solo quando si muove di nuovo.
       if (quiete && punto) this.puntoFermo = punto;
-      const fermo = this.tasti.scheda || this.tasti.shell || quiete;
+      const fermo = !!this.trascinamento || this.tasti.scheda || this.tasti.shell || quiete;
       if (dove === 'bordo' && !fermo && this._mosso(punto)) {
         if (!this.bordoDal) this.bordoDal = Date.now();
         this._segnaBordo(true);
@@ -663,6 +682,8 @@ class BarraLaterale {
       tema: this.tema,
       tasto: T ? T.etichettaBarra() : 'Ctrl+Shift+B',
       bordo: this.bordo,
+      mira: this.mira,
+      trascinamento: !!this.trascinamento,
       // Una risposta di Filo da leggere nella scheda davanti (#1432).
       risposta: this._nav().risposta,
       strisciaPx: this.strisciaPx || STRISCIA,
@@ -962,6 +983,107 @@ class BarraLaterale {
 
   // ── trascinamenti ────────────────────────────────────────────────────────
 
+  // Dalla fila del tasto destro di una scheda verso la barra (#1434). La scheda ha il puntatore per tutto il
+  // trascinamento, quindi le coordinate arrivano da lei (px della pagina). `zoom`: dallo strato del menu sopra la
+  // scheda (#1054) i px sono già della vista, non della pagina.
+  dallaScheda(msg, tabId, { zoom: zoomDato = null } = {}) {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    const fase = testo(msg.fase);
+    const attiva = this._attiva();
+    if (!attiva || attiva.id !== tabId) return { ok: false };
+    let zoom = 1;
+    try { zoom = zoomDato || attiva.view.webContents.getZoomFactor() || 1; } catch (_) { zoom = 1; }
+    const yLocale = (y) => {
+      const tb = attiva.view.getBounds();
+      const vb = this.vista ? this.vista.getBounds() : { y: tb.y };
+      return Math.round(tb.y + Number(y || 0) * zoom - vb.y);
+    };
+    if (fase === 'inizio') {
+      const id = testo(msg.id);
+      // Solo le icone della barra: un'azione dell'elemento (grassetto, salva immagine) qui non avrebbe su cosa agire.
+      if (!D || !D.noto(id)) return { ok: false };
+      this._ferma('fine');
+      const piena = Math.ceil((PANNELLO + 8) / zoom);
+      const sinistra = msg.menuSinistra == null ? NaN : Number(msg.menuSinistra);
+      // Il menu sta dove si aprirebbe la barra: aperta subito coprirebbe i posti in cui si riordina. Si apre quando il
+      // puntatore va al bordo, a sinistra del menu, e si richiude se ci torna sopra.
+      const rimandata = !this.aperta && Number.isFinite(sinistra) && sinistra < piena;
+      this.trascinamento = { id, tabId, rimandata };
+      if (!rimandata && !this.aperta) this.apri('trascina');
+      else this._invia();
+      const stretta = Math.max(Math.ceil(12 / zoom), Math.floor(sinistra) - 4);
+      return { ok: true, larghezza: rimandata ? Math.min(piena, stretta) : piena };
+    }
+    if (!this.trascinamento || this.trascinamento.tabId !== tabId) return { ok: false };
+    if (fase === 'sopra') {
+      if (this.trascinamento.rimandata) {
+        if (msg.y != null && !this.aperta) this.apri('trascina');
+        else if (msg.y == null && this.aperta && this.motivo === 'trascina') this.chiudi();
+      }
+      this.mira = msg.y == null ? null : { y: yLocale(msg.y) };
+      this._invia();
+      return { ok: true };
+    }
+    if (fase === 'posa') {
+      const id = this.trascinamento.id;
+      const beforeId = this._primaDi(yLocale(msg.y), id);
+      this.mira = null;
+      this.trascinamento.posata = true;
+      this._esito('azione');
+      // Il gesto è cominciato nel menu del tasto destro: il cambio viene da lì.
+      Promise.resolve().then(() => Registro.con({ via: 'interfaccia', dove: 'tasto-destro' },
+        () => Layout.posa({ id, target: 'bar', beforeId }, { incognito: this._incognito(), origine: 'icona_menu' }))).catch(() => {});
+      return { ok: true };
+    }
+    if (fase === 'fine') {
+      this._fineTrascinamento();
+      return { ok: true };
+    }
+    return { ok: false };
+  }
+
+  _fineTrascinamento() {
+    this._ferma('trascina');
+    if (!this.trascinamento) return;
+    const posata = !!this.trascinamento.posata;
+    this.trascinamento = null;
+    this.mira = null;
+    this._invia();
+    if (this.motivo === 'trascina' && !this.dentro) {
+      this._ferma('fine');
+      this.timer.fine = setTimeout(() => { this.timer.fine = null; if (!this.dentro) this.chiudi(); }, posata ? DOPO_POSA_MS : 0);
+    }
+  }
+
+  // L'icona in vista davanti alla quale posare, dalle misure che la barra ha mandato (px della vista).
+  _primaDi(y, escluso) {
+    for (const m of this.misure) {
+      if (m.id === escluso) continue;
+      if (y < (m.alto + m.basso) / 2) return m.id;
+    }
+    return null;
+  }
+
+  // Dalla barra: un'icona trascinata fuori dal pannello, sopra la pagina. La barra ha il puntatore per tutto il gesto,
+  // e la scheda davanti ne riceve le coordinate per il suo menu aperto, che la posa nella fila.
+  _fuori(dati) {
+    const fase = testo(dati && dati.fase);
+    const id = testo(dati && dati.id);
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    const attiva = this._attiva();
+    if (!FASI_FUORI.has(fase) || !D || !D.noto(id) || !attiva || !this.vista) return;
+    let zoom = 1;
+    try { zoom = attiva.view.webContents.getZoomFactor() || 1; } catch (_) { zoom = 1; }
+    const vb = this.vista.getBounds();
+    const tb = attiva.view.getBounds();
+    const x = (vb.x + numero(dati.x) - tb.x) / zoom;
+    const y = (vb.y + numero(dati.y) - tb.y) / zoom;
+    const tipo = globalThis.SN_MSG?.MSG?.BARRA_FUORI || 'barra_fuori';
+    // Col menu nello strato (#1054) la posa è una voce dello strato: vale per il gesto fatto qui.
+    try { this.tabs.strato?.gestoDallaBarra?.(); } catch (_) {}
+    try { attiva.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, fase, id, x, y }); } catch (_) {}
+  }
+
   // Un gesto della persona nella barra: diventa un cambio del filo «dalla barra laterale» (#867.1).
   // `opzioni`: `via` e `origine` per i contatori (#1471).
   _posa(drop, opzioni = {}) {
@@ -1011,6 +1133,12 @@ class BarraLaterale {
         if (D && D.noto(testo(d.id))) this._contaGesto('trascinamento', { da: 'icona_barra', a: 'nessuna', esito: 'annullato' });
         break;
       }
+      case 'barra:misure':
+        this.misure = (Array.isArray(d.icone) ? d.icone : []).slice(0, 200)
+          .map((m) => ({ id: testo(m && m.id), alto: numero(m && m.alto), basso: numero(m && m.basso) }))
+          .filter((m) => m.id);
+        break;
+      case 'barra:trascina-fuori': this._fuori(d); break;
       case 'barra:inoltra': this.vuoto.inoltra(d); break;
       // #1623 — un'immagine lasciata sulla barra va alla chat della scheda davanti.
       case 'barra:rilascio': RilascioNellaChat.consegna(this.win, d.voci).catch(() => {}); break;

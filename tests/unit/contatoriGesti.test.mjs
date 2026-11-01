@@ -326,9 +326,15 @@ test('i tipi dei moduli dell’Editor sono quelli che i contatori conoscono', ()
 });
 
 test('ogni posa delle icone passa da una porta sola, e ognuna dice la sua via', () => {
-  // Le icone stanno solo nella barra laterale: la posa dell'utente passa da `_posa` (registro dei cambi), quella chiesta da `posa` del gestore della chat.
+  // La posa dell'utente nella barra passa da `_posa` (registro dei cambi), quella nella fila del tasto destro dal gestore
+  // della barra con la stessa porta (#1434), quella chiesta da `posa` del gestore della chat.
   const pose = [...sorgenti()].flatMap(([f, s]) => [...s.matchAll(/(?:Layout|require\('\.\/layoutIcone'\))\.posa\(/g)].map(() => f));
-  assert.deepEqual([...new Set(pose)].sort(), ['src/main/barraLaterale.js', 'src/main/services/handlers.js'], 'nessun’altra porta scrive la disposizione');
+  assert.deepEqual([...new Set(pose)].sort(), ['src/main/barraLaterale.js', 'src/main/services/handlers.js', 'src/main/services/handlers/barra.js'],
+    'nessun’altra porta scrive la disposizione');
+  // Dal menu del tasto destro: un cambio «dal menu del tasto destro», e da dove viene l'icona per i contatori.
+  const dalMenu = leggi('src/main/services/handlers/barra.js');
+  assert.match(dalMenu, /Registro\.con\(\{ via: 'interfaccia', dove: 'tasto-destro' \},\s*\(\) => Layout\.posa\([^;]*origine \}\)\)/);
+  assert.match(dalMenu, /'icona_barra' : 'icona_menu'/);
   const barra = leggi('src/main/barraLaterale.js');
   const viaBarra = [...barra.matchAll(/this\._posa\(([^;]*)\);/g)].map((m) => m[1]).join('\n');
   assert.match(viaBarra, /via: 'rimessa_nel_menu'/);

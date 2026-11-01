@@ -253,6 +253,12 @@
   function misura() {
     nav.classList.toggle('altre-sopra', nav.scrollTop > 1);
     nav.classList.toggle('altre-sotto', nav.scrollTop + nav.clientHeight < nav.scrollHeight - 1);
+    // Dove sono le icone in vista: un'icona portata dalla fila del tasto destro si posa davanti a una di queste (#1434).
+    const icone = [...nav.querySelectorAll('.ico[data-id]:not(.riserva)')].map((b) => {
+      const r = b.getBoundingClientRect();
+      return { id: b.dataset.id, alto: Math.round(r.top), basso: Math.round(r.bottom) };
+    });
+    api.misure({ icone });
   }
   window.addEventListener('resize', misura);
   nav.addEventListener('scroll', () => {
@@ -350,6 +356,10 @@
     let fantasma = null;
     let segno = null;
     let cassetto = null;
+    // Fuori dal pannello l'icona va al menu del tasto destro aperto sulla scheda, che la posa nella sua fila (#1434).
+    let fuori = false;
+    let raf = 0;
+    let ultimo = null;
     try { b.setPointerCapture(e.pointerId); } catch (_) {}
 
     const dentroPannello = (x) => x <= pannello.getBoundingClientRect().right;
@@ -392,10 +402,15 @@
       const r = b.getBoundingClientRect();
       fantasma.style.left = `${ev.clientX - r.width / 2}px`;
       fantasma.style.top = `${ev.clientY - r.height / 2}px`;
-      // Fuori dal pannello non c'è dove posarla: rilasciata lì, resta dov'era.
+      // Fuori dal pannello la posa la decide il menu aperto sulla scheda; senza menu, rilasciata lì resta dov'era.
       const esce = !dentroPannello(ev.clientX);
       fantasma.classList.toggle('fuori', esce);
       if (esce) { togliSegno(); cassetto?.classList.remove('mira'); } else mostraSegno(ev.clientY);
+      if (esce || fuori) {
+        ultimo = { fase: esce ? 'muovi' : 'annulla', id, x: Math.round(ev.clientX), y: Math.round(ev.clientY) };
+        if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (ultimo) api.trascinaFuori(ultimo); ultimo = null; });
+      }
+      fuori = esce;
     };
 
     const fine = (ev, annullato) => {
@@ -404,6 +419,7 @@
       b.removeEventListener('pointercancel', annulla);
       try { b.releasePointerCapture(e.pointerId); } catch (_) {}
       if (!trascina) return;
+      if (raf) { cancelAnimationFrame(raf); raf = 0; ultimo = null; }
       const prima = segno ? segno.nextElementSibling : null;
       const nelCassetto = !!(cassetto && cassetto.classList.contains('mira'));
       togliSegno();
@@ -411,12 +427,20 @@
       if (fantasma) { fantasma.remove(); fantasma = null; }
       b.classList.remove('trascinata');
       trascina = null;
+      const x = Math.round(ev.clientX);
+      const y = Math.round(ev.clientY);
       if (!annullato && dentroPannello(ev.clientX)) {
         const dove = nelCassetto ? { target: 'secondary', beforeId: null } : meta(prima);
         const giaLi = dove.beforeId === id
           || (b.nextElementSibling === prima && dove.target === (b.classList.contains('riserva') ? 'secondary' : 'bar'));
         if (!giaLi) api.posa({ id, target: dove.target, beforeId: dove.beforeId });
-      } else api.annullato({ id });
+      } else if (!annullato) {
+        // Il menu aperto la prende, o il main la conta come lasciata nel vuoto.
+        api.trascinaFuori({ fase: 'rilascia', id, x, y });
+      } else {
+        if (fuori) api.trascinaFuori({ fase: 'annulla', id, x, y });
+        api.annullato({ id });
+      }
       // Il clic che segue il rilascio non è un clic sull'icona.
       const ingoia = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
       window.addEventListener('click', ingoia, { capture: true, once: true });
@@ -428,6 +452,22 @@
     b.addEventListener('pointermove', muovi);
     b.addEventListener('pointerup', su);
     b.addEventListener('pointercancel', annulla);
+  }
+
+  // Un'icona trascinata dalla fila del tasto destro (#1434): dove cadrebbe.
+  let segnoMira = null;
+  function disegnaMira(mira, attivo) {
+    nav.classList.toggle('mira', !!attivo);
+    if (!attivo || !mira) { if (segnoMira) { segnoMira.remove(); segnoMira = null; } return; }
+    if (!segnoMira) { segnoMira = document.createElement('div'); segnoMira.className = 'segno'; }
+    let prima = null;
+    for (const b of nav.querySelectorAll('.ico[data-id]:not(.riserva)')) {
+      const r = b.getBoundingClientRect();
+      if (mira.y < r.top + r.height / 2) { prima = b; break; }
+    }
+    if (!prima) prima = nav.querySelector('[data-altro]');
+    if (prima) nav.insertBefore(segnoMira, prima);
+    else nav.appendChild(segnoMira);
   }
 
   // ── lo stato dal main ────────────────────────────────────────────────────
@@ -446,6 +486,7 @@
     striscia.setAttribute('aria-label', `Barra laterale (${stato.tasto || ''})`);
     striscia.style.width = `${Number(stato.strisciaPx) || LINEA}px`;
     disegnaIcone(Array.isArray(stato.icone) ? stato.icone : [], eraAperta);
+    disegnaMira(stato.mira, stato.trascinamento);
     disegnaAccount(stato.account || null);
     fissi.redteam.hidden = stato.redteam !== true;
     if (stato.fuoco) {

@@ -2128,6 +2128,7 @@
     isAddress,
     cutSelection,
     blobToDataUrl,
+    blobDaDataUrl,
     pasteFromClipboard,
     pasteHistoryEntry,
     insertTextAtSelection,

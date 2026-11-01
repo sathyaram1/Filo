@@ -536,6 +536,7 @@
     'proposta-accesso': 'dalla proposta dopo un accesso',
     zoom: 'con un gesto sulla pagina',
     barra: 'dalla barra laterale',
+    'tasto-destro': 'dal menu del tasto destro',
   };
   function provenienza(evento) {
     const e = evento || {};

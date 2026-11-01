@@ -457,6 +457,12 @@
     // azioni della pagina. La disposizione delle icone la scrive il main, uno solo.
     BARRA_ETICHETTE_CHIEDI: 'barra_etichette_chiedi', // spinta alla scheda davanti → { ids }: come si chiamano adesso le sue azioni nella barra
     BARRA_ETICHETTE: 'barra_etichette',             // dalla scheda davanti { voci: [{ id, etichetta, icona }] } → { ok }
+    // La fila del tasto destro (#1434): il menu di una scheda legge e sposta le icone, solo per id e zona.
+    ICON_LAYOUT_GET: 'icon_layout_get',             // → { ok, layout }
+    ICON_LAYOUT_DROP: 'icon_layout_drop',           // { id, target, beforeId, source: menu|bar } → { ok, layout }
+    ICON_LAYOUT_CHANGED: 'icon_layout_changed',     // spinta alle schede → { layout }
+    BARRA_TRASCINA: 'barra_trascina',               // dal menu della scheda davanti { fase: inizio|sopra|posa|fine, id, menuSinistra, y } → { ok, larghezza }
+    BARRA_FUORI: 'barra_fuori',                     // spinta alla scheda davanti → { fase: muovi|rilascia|annulla, id, x, y }
     // Aperti ai siti (#1432): ci scrive il content script dell'Aiuto, e toccano solo la scheda che li manda.
     AIUTO_STATO: 'aiuto_stato',                     // { pannello: chiuso|ridotto|aperto, voce, spento: ''|aiuto|sito|pagina } → { ok }
     RISPOSTA_IN_ATTESA: 'risposta_in_attesa',       // { fonte: aiuto|app, attesa } → { ok }: la striscia della barra si accende

@@ -73,7 +73,8 @@ test('una disposizione già nella forma di adesso non si tocca, e la migrazione 
 
 test('niente di salvato: la disposizione di serie, senza riscriverla', () => {
   const r = D.migra(undefined);
-  assert.deepEqual(r.layout, { bar: [...D.DEFAULT.bar], secondary: [...D.DEFAULT.secondary] });
+  assert.deepEqual(r.layout, Object.fromEntries(D.TUTTE.map((z) => [z, [...D.DEFAULT[z]]])));
+  assert.deepEqual(r.layout.bar, [...D.DEFAULT.bar]);
   assert.equal(r.scrivi, false);
 });
 
@@ -126,7 +127,9 @@ test('chi si è spostato: l\'icona mossa anche fra due vicine scambiate, e la po
 });
 
 test('le azioni della pagina nella barra si chiamano e si disegnano come nel registro della pagina', () => {
-  const src = readFileSync(join(ROOT, 'src', 'content', 'menuIcons.js'), 'utf8');
+  // Il registro della pagina: le icone della finestra portate nella fila del tasto destro (#1434) stanno nel loro.
+  const tutto = readFileSync(join(ROOT, 'src', 'content', 'menuIcons.js'), 'utf8');
+  const src = /\n {2}function registro\(\) \{\n([\s\S]*?)\n {2}\}\n/.exec(tutto)[1];
   for (const [id, d] of Object.entries(D.ICONE)) {
     const riga = src.split('\n').find((l) => new RegExp(`\\bid:\\s*'${id}'`).test(l));
     // Quelle della finestra e l'Aiuto le esegue il main dalla barra: nel registro della pagina non ci sono.
@@ -201,8 +204,9 @@ test('SPOSTA_ICONA: lo strumento elenca le icone vere col nome del menu, e dice 
   const def = globalThis.SN_ACTION_TOOLS.definitions().find((d) => d.function.name === 'SPOSTA_ICONA');
   assert.ok(def, 'strumento SPOSTA_ICONA assente');
   const p = def.function.parameters.properties;
-  assert.deepEqual(p.icona.enum, Object.keys(D.ICONE));
+  assert.deepEqual(p.icona.enum, [...Object.keys(D.ICONE), ...Object.keys(D.AZIONI)]);
   assert.deepEqual(p.dove.enum, Object.keys(D.DOVE));
+  assert.deepEqual(p.contesto.enum, Object.keys(D.CONTESTI));
   assert.match(p.icona.description, /screenshot \([^)]+\)/);
   assert.equal(D.nome('closeTab') !== 'closeTab', true, 'il nome del menu, non l\'id');
   const L = globalThis.SN_ACTION_LEVELS;

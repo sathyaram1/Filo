@@ -626,15 +626,18 @@
       required: ['cosa'],
     },
     SPOSTA_ICONA: {
-      description: 'Sposta o riordina un\'icona della barra laterale (bordo sinistro): fra quelle in vista e quelle tenute in «Altro…» in fondo alla barra. È la stessa cosa che l\'utente fa trascinandola, e resta anche dopo un riavvio. Il menu del tasto destro non ha icone. Per "metti Screenshot in cima alla barra", "togli Chiudi scheda dalla barra", "riporta il QR nella barra". Togliere dalla barra = "altro". Esegue subito.',
+      description: 'Sposta o riordina un\'icona: nella barra laterale (bordo sinistro) fra quelle in vista e quelle tenute in «Altro…» in fondo alla barra, oppure nella fila di icone in cima al menu del tasto destro e nel suo «Altro…» (il «+»). La fila cambia con quello che c\'è sotto il mouse (il contesto): ogni contesto ha le sue azioni, che restano nel loro contesto; un\'icona della barra può andare nella fila di un contesto, e lì lascia la barra. È la stessa cosa che l\'utente fa trascinandola, e resta anche dopo un riavvio. Per "metti Screenshot in cima alla barra", "togli Chiudi scheda dalla barra", "metti il barrato nella fila del testo", "togli Cerca dalla fila dell\'immagine", "metti Traduci la pagina nel tasto destro". Togliere dalla barra = "altro"; togliere dalla fila = "altro_fila". Esegue subito.',
       properties: () => {
         const D = global.SN_DISPOSIZIONE_ICONE;
-        const ids = D ? Object.keys(D.ICONE) : [];
+        const ids = D ? [...Object.keys(D.ICONE), ...Object.keys(D.AZIONI || {})] : [];
         const elenco = ids.map((id) => `${id} (${D.nome(id)})`).join(', ');
         const icona = ids.length ? { enum: ids } : {};
+        const contesti = D && D.CONTESTI ? Object.keys(D.CONTESTI) : [];
+        const descrContesti = contesti.map((c) => `${c} = ${D.CONTESTI[c].su}`).join('; ');
         return {
-          icona: S(`L'icona, per id${elenco ? `: ${elenco}` : ''}.`, icona),
-          dove: S('"barra" = in vista nella barra laterale; "altro" = dentro «Altro…» della barra, che si apre in fondo alle icone.', { enum: ['barra', 'altro'] }),
+          icona: S(`L'icona, per id${elenco ? `: ${elenco}` : ''}. Un id «contesto:azione» è un'azione della fila di quel contesto.`, icona),
+          dove: S('"barra" = in vista nella barra laterale; "altro" = dentro «Altro…» della barra; "fila" = nella fila in cima al menu del tasto destro; "altro_fila" = nel «+» della fila.', { enum: D ? Object.keys(D.DOVE) : ['barra', 'altro'] }),
+          contesto: S(`Solo per "fila" e "altro_fila": di quale contesto${descrContesti ? ` (${descrContesti})` : ''}. Per un'azione «contesto:azione» è il suo, e si può omettere.`, contesti.length ? { enum: contesti } : {}),
           prima_di: S('Facoltativo: l\'id dell\'icona davanti alla quale metterla; senza, va in fondo.', icona),
         };
       },

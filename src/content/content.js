@@ -30,6 +30,12 @@
     getLastMouseEvent: () => lastMouseEvent,
     spiegaAnticipata: () => !(settings && settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false),
   });
+  MenuIcons.init({
+    isContentFullscreen: () => contentFullscreen,
+    aiutoPasso: () => aiutoPasso(),
+    aiutoStato: () => Sidebar?.stato?.(),
+    aiutoAcceso: () => aiutoAcceso(),
+  });
   TTS.init({
     getSettings: () => settings,
     restorePasteContext: () => restorePasteContext(),
@@ -226,6 +232,9 @@
     } catch (_) {}
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement) restituisciEsc();
+      // Il nome dell'icona guarda anche lo schermo pieno della PAGINA: l'annuncio del main arriva mentre il documento
+      // sta ancora uscendo, e l'icona si ridisegnerebbe identica.
+      try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
     });
 
     // Il tasto si rimette in circolo com'era, ma non è «fidato»: una pagina non può usarlo
@@ -892,7 +901,7 @@
   }
 
   // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).
-  const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
+  const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_FUORI, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
 
   // Gli avvisi di sistema li mostra solo la pagina che si sta guardando: in un'altra applicazione nessuno li vedrebbe.
   function inVistaAdesso() {
@@ -2064,6 +2073,8 @@
     senzaValuta = false,
   }) {
     const items = [];
+    // La fila in cima (#1434): il contesto lo decide lo stesso ramo che sceglie le voci, qui sotto.
+    const contesto = {};
     // Il separatore sta solo fra due sezioni che hanno qualcosa: mai in cima al menu.
     const sezione = (voci) => {
       if (!voci.length) return;
@@ -2106,6 +2117,7 @@
       ...vociDellaPagina(target),
       ...buildContextualItems({
         selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, senzaValuta,
+        contesto,
       }),
       ...vociRiquadro,
     ];
@@ -2119,6 +2131,8 @@
     refreshRedteamVisibile();
     if (redteamVisibile) items.push(buildRedteamAttackItem());
 
+    const fila = filaContestuale(contesto, { selInfo, target, clipboardHistory });
+    if (fila) items.unshift(fila);
     return items;
   }
 
@@ -2270,28 +2284,55 @@
   // Azioni sull'immagine, senza la sezione «Spiega»: la compone il chiamante, così quando
   // l'immagine è anche un link non partono due box AI a ogni apertura.
   function buildImageActionItems(imgEl) {
+    const a = azioniDellImmagine(imgEl);
     return [
-      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_copy_image'), onClick: () => Actions.copyImage(imgEl) },
-      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_save_image_as'), onClick: () => Actions.downloadImage(imgEl) },
-      {
-        type: 'item',
-        azione: 'copy-download-image',
-        label: I18n.t('menu_copy_image_link'),
-        onClick: () => Actions.copyUrlToClipboard(imgEl.currentSrc || imgEl.src),
-      },
-      {
-        type: 'item',
-        azione: 'search-image',
-        label: I18n.t('menu_search_image'),
-        onClick: () => Actions.searchImageOnWeb(imgEl),
-      },
+      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_copy_image'), onClick: a.copy },
+      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_save_image_as'), onClick: a.save },
+      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_copy_image_link'), onClick: a.copyLink },
+      { type: 'item', azione: 'search-image', label: I18n.t('menu_search_image'), onClick: a.search },
     ];
   }
 
-  function buildLinkActionItems(linkEl) {
+  // Le azioni di un'immagine e di un collegamento, una volta sola: le voci del menu e le icone della fila (#1434) fanno
+  // la stessa cosa.
+  function azioniDellImmagine(imgEl) {
+    return {
+      copy: () => Actions.copyImage(imgEl),
+      save: () => Actions.downloadImage(imgEl),
+      copyLink: () => Actions.copyUrlToClipboard(imgEl.currentSrc || imgEl.src),
+      search: () => Actions.searchImageOnWeb(imgEl),
+      ask: () => chiediDellImmagine(imgEl),
+    };
+  }
+  function azioniDelLink(linkEl) {
     // Un collegamento scritto da un modello di Filo si apre e si scarica solo dal main, dopo la porta delle uscite (#810).
     const diFilo = !!(linkEl.classList && linkEl.classList.contains('filo-md-link') && Popup && Popup.apriCollegamento);
     const indirizzo = Actions.indirizzoDelLink(linkEl);
+    return {
+      diFilo,
+      indirizzo,
+      openTab: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(indirizzo)),
+      download: () => (diFilo ? Popup.scaricaCollegamento(linkEl) : Actions.downloadLink(linkEl)),
+      copy: () => Actions.copyUrlToClipboard(indirizzo),
+      saveForLater: () => Actions.saveLink(linkEl),
+      share: () => Actions.shareLink(linkEl),
+    };
+  }
+
+  // «Chiedi a Filo» su un'immagine: l'Aiuto si apre con l'immagine allegata, e la domanda la scrive la persona.
+  async function chiediDellImmagine(imgEl) {
+    if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
+    const src = imgEl.currentSrc || imgEl.src;
+    let blob = null;
+    try { blob = Actions.blobDaDataUrl(await Actions.scaricaImmagine(src, imgEl)); } catch (_) {}
+    if (!blob || !/^image\//i.test(blob.type || '')) { Popup.showToast(I18n.t('menu_image_unreadable')); return; }
+    const nome = (() => { try { return decodeURIComponent(new URL(src).pathname.split('/').pop() || ''); } catch (_) { return ''; } })();
+    try { await Sidebar.allega([new File([blob], nome || 'immagine', { type: blob.type })]); } catch (_) {}
+  }
+
+  function buildLinkActionItems(linkEl) {
+    const a = azioniDelLink(linkEl);
+    const indirizzo = a.indirizzo;
     const out = [];
     // Un link d'invito esiste per portare l'invito dentro Filo: è la sua prima voce (#664).
     if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(indirizzo)) {
@@ -2301,13 +2342,7 @@
         onClick: () => { chrome.runtime.sendMessage({ type: MSG.WALLET_INVITE_OPEN, link: indirizzo }).catch(() => {}); },
       });
     }
-    out.push(
-      {
-        type: 'item',
-        label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(indirizzo)),
-      },
-    );
+    out.push({ type: 'item', label: I18n.t('menu_open_in_new_tab'), onClick: a.openTab });
     // "Salva file" — gemello di "Salva immagine come" per i link a un file
     // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
     // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
@@ -2317,28 +2352,13 @@
         type: 'item',
         azione: 'download-progress',
         label: I18n.t('menu_save_file'),
-        onClick: () => (diFilo ? Popup.scaricaCollegamento(linkEl) : Actions.downloadLink(linkEl)),
+        onClick: a.download,
       });
     }
     out.push(
-      {
-        type: 'item',
-        azione: 'share-copy-link',
-        label: I18n.t('menu_copy_link'),
-        onClick: () => Actions.copyUrlToClipboard(indirizzo),
-      },
-      {
-        type: 'item',
-        azione: 'save-link',
-        label: I18n.t('menu_save_link_for_later'),
-        onClick: () => Actions.saveLink(linkEl),
-      },
-      {
-        type: 'item',
-        azione: 'share-copy-link',
-        label: I18n.t('menu_share_link'),
-        onClick: () => Actions.shareLink(linkEl),
-      },
+      { type: 'item', azione: 'share-copy-link', label: I18n.t('menu_copy_link'), onClick: a.copy },
+      { type: 'item', azione: 'save-link', label: I18n.t('menu_save_link_for_later'), onClick: a.saveForLater },
+      { type: 'item', azione: 'share-copy-link', label: I18n.t('menu_share_link'), onClick: a.share },
     );
     return out;
   }
@@ -2360,15 +2380,20 @@
   // Costruisce gli item della zona contestuale in base a cosa è stato cliccato.
   // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
   // casella input / niente.
+  // `contesto` (#1434): qui si scrive per quale elemento è il menu, per la fila in cima: lo decide lo stesso ramo che
+  // sceglie le voci, così fila e voci parlano sempre della stessa cosa.
   function buildContextualItems({
     selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
-    senzaValuta = false,
+    senzaValuta = false, contesto = {},
   }) {
     const items = [];
+    const di = (nome, campi = {}) => Object.assign(contesto, { nome, ...campi });
     const valutaQui = editable && !senzaValuta ? campoDaValutare(target) : null;
     const copia = () => { Actions.copyToClipboard(selInfo.selection); copiatoNellaPagina(target); };
 
     if (selInfo && editable) {
+      const ricco = campoRicco(target);
+      di(ricco && !selInfo.segreto ? 'scrivibile' : 'campo', { segreto: !!selInfo.segreto });
       items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
       items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: copia });
       items.push(Actions.buildPasteItem(clipboardHistory));
@@ -2387,6 +2412,7 @@
     }
 
     if (selInfo) {
+      di('testo', { segreto: !!selInfo.segreto });
       items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: copia });
       if (selInfo.segreto) return items;
       items.push({
@@ -2424,6 +2450,7 @@
       // Un'immagine dentro un <a> è ANCHE un collegamento e le due famiglie di voci vanno
       // insieme (#401). La copertina può essere STESA SOPRA il link invece che dentro (#444).
       const linkOfImg = linkEl || linkUnder;
+      di('immagine', { img: imgEl });
       if (linkOfImg) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkOfImg)) items.push(it);
@@ -2439,6 +2466,7 @@
       // La zona di una mappa d'immagine è il collegamento cliccato, disegnato su un'immagine (#725.6): prima le sue voci,
       // poi quelle dell'immagine, e la sezione parla del collegamento, col suo avviso.
       const immagineZona = immagineDellaZona(linkEl, layers);
+      di('link', { link: linkEl });
       if (immagineZona) {
         for (const it of buildLinkActionItems(linkEl)) items.push(it);
         items.push({ type: 'separator' });
@@ -2464,6 +2492,7 @@
       // titolo, e il clic arriva lì invece che sull'<img> (#444).
       const imgInLink = (!mediaInLink && belongsTo(imgUnder, linkEl, layers)) ? imgUnder : null;
       if (imgInLink) {
+        di('immagine', { img: imgInLink });
         for (const it of buildImageActionItems(imgInLink)) items.push(it);
         items.push({ type: 'separator' });
       }
@@ -2503,6 +2532,7 @@
     // Stessa scheda con l'anteprima ferma: senza questo ramo lo stesso pixel dava menu
     // completo mentre il filmatino suonava e menu vuoto un istante dopo (#444).
     if (imgUnder) {
+      di('immagine', { img: imgUnder });
       for (const it of buildImageActionItems(imgUnder)) items.push(it);
       const linkOfCover = belongsTo(imgUnder, linkUnder, layers) ? linkUnder : null;
       if (linkOfCover) {
@@ -2517,13 +2547,113 @@
     // Un velo trasparente sopra una scheda-link basta a far sparire le voci del collegamento
     // (#444). Barre fisse, modali e manti li ha già scartati `linkUnder`.
     if (linkUnder) {
+      di('link', { link: linkUnder });
       for (const it of buildLinkActionItems(linkUnder)) items.push(it);
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplainLink(linkUnder));
       return items;
     }
 
+    // Niente sotto il mouse: la fila della pagina, vuota di partenza, dove la persona può portare un'icona della barra.
+    di('pagina');
     return items;
+  }
+
+  // Il campo dove si scrive con la formattazione (il foglio dell'Editor, un campo ricco di un sito): lì la fila mette
+  // grassetto e corsivo. Un campo «solo testo» non ne ha, e resta una casella.
+  function campoRicco(target) {
+    let el = target && (target.nodeType === 1 ? target : target.parentElement);
+    if (!el || !el.isContentEditable) return null;
+    while (el.parentElement && el.parentElement.isContentEditable) el = el.parentElement;
+    return String(el.getAttribute('contenteditable') || '').toLowerCase() === 'plaintext-only' ? null : el;
+  }
+
+  // Un comando di formattazione sulla selezione catturata al tasto destro: il clic sulla fila non sposta il fuoco, il
+  // campo del collegamento sì, e la selezione si rimette da lì.
+  const COLORE_EVIDENZIA = 'rgba(255, 196, 0, 0.42)';
+  const coloreUguale = (a, b) => String(a || '').replace(/\s+/g, '') === String(b || '').replace(/\s+/g, '');
+  function formatta(comando, valore) {
+    restorePasteContext();
+    const conCss = comando === 'hiliteColor';
+    try {
+      if (conCss) document.execCommand('styleWithCSS', false, true);
+      document.execCommand(comando, false, valore);
+    } catch (_) {
+    } finally {
+      if (conCss) { try { document.execCommand('styleWithCSS', false, false); } catch (_) {} }
+    }
+  }
+  function evidenzia() {
+    restorePasteContext();
+    let gia = false;
+    try { gia = coloreUguale(document.queryCommandValue('hiliteColor'), COLORE_EVIDENZIA); } catch (_) {}
+    formatta('hiliteColor', gia ? 'transparent' : COLORE_EVIDENZIA);
+  }
+  function collega(scritto) {
+    const url = self.SN_URL_NAV?.collegamentoScritto?.(scritto) || '';
+    if (!url) { Popup.showToast(I18n.t('fila_link_non_valido')); return; }
+    formatta('createLink', url);
+  }
+  // Il collegamento proposto: la selezione stessa se è un indirizzo, se no l'ultima cosa copiata se lo è.
+  function collegamentoProposto(selInfo, clipboardHistory) {
+    const U = self.SN_URL_NAV;
+    if (!U?.collegamentoScritto) return '';
+    const dallaSelezione = U.collegamentoScritto(selInfo && selInfo.selection);
+    if (dallaSelezione) return dallaSelezione;
+    const ultima = Array.isArray(clipboardHistory) ? clipboardHistory.find((e) => e && e.type === 'text') : null;
+    return (ultima && U.collegamentoScritto(ultima.text)) || '';
+  }
+
+  // La fila in cima al menu (#1434): per il contesto scelto da buildContextualItems, chi esegue le sue azioni.
+  // Le azioni che qui non hanno senso (una selezione segreta non si cerca) mancano, e la fila non le mostra.
+  function filaContestuale(contesto, { selInfo, target, clipboardHistory }) {
+    const nome = contesto && contesto.nome;
+    if (!nome || !MenuIcons?.fila) return null;
+    const testo = selInfo ? selInfo.selection : '';
+    const copia = () => { Actions.copyToClipboard(testo); copiatoNellaPagina(target); };
+    const cerca = contesto.segreto ? null : { onClick: () => Actions.searchTextOnWeb(testo) };
+    const azioni = {};
+    if (nome === 'scrivibile') {
+      Object.assign(azioni, {
+        bold: { onClick: () => formatta('bold') },
+        italic: { onClick: () => formatta('italic') },
+        underline: { onClick: () => formatta('underline') },
+        strike: { onClick: () => formatta('strikeThrough') },
+        highlight: { onClick: () => evidenzia() },
+        clear: { onClick: () => { formatta('removeFormat'); formatta('unlink'); } },
+        link: {
+          tieneAperto: true,
+          onClick: (ancora) => Menu.openLinkSubmenu(ancora, { valore: collegamentoProposto(selInfo, clipboardHistory), onApplica: (v) => collega(v) }),
+        },
+        cut: { onClick: () => Actions.cutSelection() },
+        copy: { onClick: copia },
+        search: cerca,
+      });
+    } else if (nome === 'campo') {
+      Object.assign(azioni, {
+        cut: { onClick: () => Actions.cutSelection() },
+        copy: { onClick: copia },
+        paste: { onClick: () => Actions.pasteFromClipboard() },
+        search: cerca,
+      });
+    } else if (nome === 'testo') {
+      Object.assign(azioni, { copy: { onClick: copia } });
+      if (!contesto.segreto) {
+        azioni.search = cerca;
+        azioni.translate = { onClick: () => Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, selectionAnchor()) };
+        const leggi = TTS.buildReadAloudItem(testo);
+        if (leggi) azioni.readAloud = { onClick: leggi.onClick };
+      }
+    } else if (nome === 'immagine' && contesto.img) {
+      Object.assign(azioni, azioniDellImmagine(contesto.img));
+      for (const k of Object.keys(azioni)) azioni[k] = { onClick: azioni[k] };
+      if (!aiutoAcceso()) delete azioni.ask;
+    } else if (nome === 'link' && contesto.link) {
+      const a = azioniDelLink(contesto.link);
+      for (const k of ['openTab', 'copy', 'saveForLater', 'share']) azioni[k] = { onClick: a[k] };
+    }
+    for (const k of Object.keys(azioni)) if (!azioni[k]) delete azioni[k];
+    return MenuIcons.fila(nome, azioni);
   }
 
 
@@ -2601,6 +2731,15 @@
   }
 
   function onRuntimeMessage(msg, sender, sendResponse) {
+    // #871, #1434 — la disposizione delle icone è cambiata altrove, o un'icona arriva dalla barra laterale.
+    if (msg?.type === MSG.ICON_LAYOUT_CHANGED) {
+      try { MenuIcons.layoutCambiato?.(msg.layout); } catch (_) {}
+      return;
+    }
+    if (msg?.type === MSG.BARRA_FUORI) {
+      try { MenuIcons.dallaBarra?.(msg); } catch (_) {}
+      return;
+    }
     // Le immagini lasciate sulla fila delle schede o sulla barra (#1623): quelle per la home le prende la home.
     if (msg?.type === MSG.CHAT_ALLEGA) {
       if (msg.dove === 'aiuto' && !IS_SUBFRAME) { try { Promise.resolve(Sidebar?.allegaDaFuori?.(msg)).catch(() => {}); } catch (_) {} }
@@ -2613,6 +2752,8 @@
     if (msg?.type === MSG.FULLSCREEN_CHANGED) {
       fullscreenAnnunciato = true;
       contentFullscreen = !!msg.fullscreen;
+      // Un'icona dello schermo intero portata nella fila mentirebbe fino alla chiusura del menu (#514).
+      try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
       return;
     }
     // L'Esc consegnato dal main (schermo pieno del sito) si rimette in circolo, e il giro di

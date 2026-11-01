@@ -244,6 +244,22 @@
     if (!m || !d || d.id !== m.id) return;
     if (d.cosa === 'inline' && Number.isInteger(d.n)) applicaInline(d.n, d);
     else if (d.cosa === 'correzione' && Number.isInteger(d.n)) applicaCorrezione(d.n, d);
+    else if (d.cosa === 'riga') Menu.refreshIconRow(costruisci(d.items, []), { vuota: d.vuota === true });
+    else if (d.cosa === 'griglia') Menu.refreshIconGrid(costruisci(d.items, []));
+    else if (d.cosa === 'fuori') {
+      // L'anteprima finisce in innerHTML: passa solo un SVG ripulito, il resto come testo.
+      const ic = pulisciIcona(String(d.svg || ''));
+      const icon = /^<svg[\s>]/.test(ic) ? ic : ic.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+      Menu.trascinaDaFuori({ fase: String(d.fase || ''), id: String(d.icona || ''), x: Number(d.x) || 0, y: Number(d.y) || 0, icon });
+    } else if (d.cosa === 'griglia-apri' || d.cosa === 'collegamento-apri') {
+      m.inVolo.clear();
+      const el = m.ancore.get(String(d.ancora || ''));
+      // Arrivata tardi, con un altro pannello già aperto dall'utente: vale quello.
+      if (!el || !el.isConnected) return;
+      const opts = D.ricostruisci(d.opts || {}, { funzione: chiamata });
+      if (d.cosa === 'collegamento-apri') Menu.openLinkSubmenu(el, { valore: String(opts.valore || ''), onApplica: opts.onApplica });
+      else if (!Menu.isSubMenuOpen()) Menu.openIconGridSubmenu(el, costruisci(d.items, []), opts);
+    }
   });
 
   api.onVia(() => {
@@ -253,13 +269,47 @@
     ancora.hidden = true;
   });
 
-  // La cronologia degli appunti si cerca scrivendo: aperta, lo strato prende la tastiera.
+  // La cronologia degli appunti si cerca scrivendo, e l'indirizzo di un collegamento si scrive (#1434): aperte, lo strato
+  // prende la tastiera.
   let cerca = null;
   new MutationObserver(() => {
-    const c = m ? document.querySelector('.sn-menu-history-search-input') : null;
+    const c = m ? document.querySelector('.sn-menu-history-search-input, .sn-menu-link-campo') : null;
     if (c && c !== cerca) chiedi('tastiera');
     cerca = c;
   }).observe(document.documentElement, { childList: true });
+
+  // Le icone trascinate dalla fila verso la barra laterale: i px dello strato sono quelli della scheda (#871, #1434).
+  let barra = null;
+  let mira = null;
+  let inVolo = false;
+  const trascina = (d) => Promise.resolve(api.barra(d)).catch(() => null);
+  Menu.setPonteBarra({
+    inizio(id, menuSinistra) {
+      barra = null;
+      mira = null;
+      // Un'azione dell'elemento (grassetto, salva immagine) nella barra non avrebbe su cosa agire.
+      inVolo = !/:/.test(String(id || ''));
+      if (!inVolo) return;
+      trascina({ fase: 'inizio', id, menuSinistra }).then((r) => { if (r && r.ok) barra = { larghezza: Number(r.larghezza) || 0 }; });
+    },
+    sopra(x, y) {
+      const dentro = !!barra && x <= barra.larghezza;
+      const nuova = dentro ? Math.round(y) : null;
+      if (nuova !== mira) { mira = nuova; trascina({ fase: 'sopra', y: nuova }); }
+      return dentro;
+    },
+    posa(id, x, y) {
+      if (!barra || x > barra.larghezza) return false;
+      trascina({ fase: 'posa', id, x: Math.round(x), y: Math.round(y) });
+      return true;
+    },
+    fine() {
+      barra = null;
+      mira = null;
+      if (inVolo) trascina({ fase: 'fine' });
+      inVolo = false;
+    },
+  });
 
   // Fuori dal menu c'è solo lo strato vuoto: chiude, e un tasto destro lì apre il menu nuovo sulla scheda (il Ctrl+clic
   // del Mac arriva già come tasto destro).

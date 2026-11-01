@@ -152,8 +152,15 @@ class StratoDelMenu {
   aggiornaDa(sender, d) {
     if (!d || !idValido(d.id) || pesa(d) > AGGIORNA_MAX_BYTE) return { ok: false };
     const cosa = String(d.cosa || '');
-    if (!['correzione', 'inline'].includes(cosa)) return { ok: false };
+    if (!['correzione', 'inline', 'riga', 'griglia', 'griglia-apri', 'collegamento-apri', 'fuori'].includes(cosa)) return { ok: false };
     const { type: _t, ...dati } = d;
+    // L'icona dalla barra arriva in px della pagina: lo strato, a zoom 1, li vuole della vista.
+    if (cosa === 'fuori') {
+      let zoom = 1;
+      try { zoom = (sender && sender.wc && sender.wc.getZoomFactor()) || 1; } catch (_) { zoom = 1; }
+      dati.x = (Number(dati.x) || 0) * zoom;
+      dati.y = (Number(dati.y) || 0) * zoom;
+    }
     const di = (r) => r && r.id === d.id && r.wc === (sender && sender.wc) && r.nodo === nodoDi(sender && sender.frame);
     if (di(this.inArrivo)) { this.inArrivo.coda.push(dati); return { ok: true }; }
     const m = this.menu;
@@ -308,6 +315,24 @@ class StratoDelMenu {
       wc.sendInputEvent({ type: 'mouseDown', x: q.x, y: q.y, button: 'right', clickCount: 1 });
       wc.sendInputEvent({ type: 'mouseUp', x: q.x, y: q.y, button: 'right', clickCount: 1 });
     } catch (_) {}
+  }
+
+  // Un'icona trascinata dalla fila dello strato verso la barra laterale (#1434): i px dello strato sono quelli della scheda.
+  _versoLaBarra(d) {
+    const m = this.menu;
+    const barra = this.barra();
+    const s = m && this.scheda(m.wc);
+    if (!m || !m.pronto || !barra || !s || !d || Date.now() - this.gestoAlle > GESTO_MS) return { ok: false };
+    const fase = String(d.fase || '');
+    if (!['inizio', 'sopra', 'posa', 'fine'].includes(fase)) return { ok: false };
+    const num = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+    const dati = { fase, id: String(d.id || ''), menuSinistra: num(d.menuSinistra), x: num(d.x), y: num(d.y) };
+    try { return barra.dallaScheda(dati, s.id, { zoom: 1 }); } catch (_) { return { ok: false }; }
+  }
+
+  // Un'icona trascinata dalla barra verso il menu aperto: un gesto dell'utente che il main ha visto, nella barra.
+  gestoDallaBarra() {
+    if (this.aperto) this.gestoAlle = Date.now();
   }
 
   mostra(wc, punto, dati = {}) {
@@ -492,6 +517,7 @@ class StratoDelMenu {
       }
       if (/^strato:(esegui|incolla|scegli|togli|svuota|tastiera|rotella)$/.test(canale)) this._dalloStrato(canale, dati).catch(() => {});
     });
+    try { wc.ipc.handle('strato:barra', (_e, dati) => this._versoLaBarra(dati)); } catch (_) {}
     wc.once('did-finish-load', () => {
       // I px dello strato devono essere quelli del punto: uno zoom rimasto sull'host «menu» li sposterebbe.
       try { wc.setZoomFactor(1); } catch (_) {}
