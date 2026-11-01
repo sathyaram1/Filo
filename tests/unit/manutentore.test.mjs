@@ -248,7 +248,7 @@ test('contesto intero: tutte le schede coi conti per priorità, la parte delle s
   assert.equal((t.match(/^#\d+ · p/gm) || []).length, 800);
   assert.match(t, /^#40 · p0 · todo — Titolo del feedback numero 40 .* \[browser-schede\/bug\] Il menu non si apre\. \| file: src\/a\.js$/m);
   assert.match(t, /Indicazione dell'owner \(2026-10-31\): grafica/);
-  assert.match(t, /domanda\.mjs registro/);
+  assert.match(t, /npm run manutentore -- registro/);
   assert.ok(t.startsWith('# Ruolo: manutentore'));
 });
 

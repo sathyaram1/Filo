@@ -245,9 +245,11 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
   };
 }
 
-// Il rapporto viaggia sotto il tetto del server (8 KB, report_too_big): i due elenchi insieme non ne prendono metà.
+// Gli elenchi viaggiano fuori dal rapporto, nei campi che il server tiene sul biglietto fino a 200 voci
+// (manutentoreRegole.RILASCIO): il tetto qui è il suo, con un margine in byte che una sessione vera non tocca.
 export const ATTESA_MIN_S = 30;
-export const ELENCO_MAX_BYTE = 2000;
+export const ELENCO_MAX_VOCI = 200;
+export const ELENCO_MAX_BYTE = 60_000;
 const RIGA_ERRORE_MAX = 120;
 const RIGA_COSA_MAX = 60;
 
@@ -265,13 +267,20 @@ export function rigaPulita(s, max) {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
-/** La riga che dice perché uno strumento è fallito: «exit 1: <prima riga utile>». PURA. */
+// Le righe che dicono l'errore. La prima dell'uscita è spesso l'intestazione di npm («> filo@… test:unit») o il remoto di
+// git («To github.com:…»): il manutentore deve leggere perché è fallito, non cosa si stava lanciando.
+const RIGA_DI_ERRORE = /\b(error|errore|fatal|failed|failure|rejected|refused|denied|not ok|exception|cannot|can't|unable|timed? ?out|no such|not found|ENOENT|EACCES|ERR!|RIFIUTATO|✘)\b|^\s*[!✘×]/i;
+const RIGA_DI_CONTORNO = /^(>\s|To\s\S+$|npm (notice|warn)\b|\$\s)/i;
+
+/** La riga che dice perché uno strumento è fallito: «exit 1: <la riga d'errore, o la prima utile>». PURA. */
 export function rigaErrore(content) {
   const righe = testoDi(content).split('\n').map((r) => r.replace(/<\/?tool_use_error>/g, '').trim()).filter(Boolean);
   let codice = '';
   const m = righe.length ? /^Exit code (\d+)$/i.exec(righe[0]) : null;
   if (m) { codice = `exit ${m[1]}`; righe.shift(); }
-  return rigaPulita([codice, righe[0] || ''].filter(Boolean).join(': '), RIGA_ERRORE_MAX) || '(senza testo)';
+  const utili = righe.filter((r) => !RIGA_DI_CONTORNO.test(r));
+  const scelta = utili.find((r) => RIGA_DI_ERRORE.test(r)) || utili[0] || righe[0] || '';
+  return rigaPulita([codice, scelta].filter(Boolean).join(': '), RIGA_ERRORE_MAX) || '(senza testo)';
 }
 
 /** Cosa ha fatto chi lavorava subito dopo un fallimento, dalla chiamata che segue. PURA. */
@@ -282,13 +291,13 @@ export function rigaDopo(fallita, seguente) {
   return rigaPulita(`${seguente.nome}${seguente.cosa ? `: ${seguente.cosa}` : ''}`, RIGA_COSA_MAX + 20);
 }
 
-/** Le voci che stanno in `max` byte di JSON, nell'ordine dato. PURA. */
-export function dentroBudget(voci, max = ELENCO_MAX_BYTE) {
+/** Le voci che stanno in `max` byte di JSON e nel numero che il server accetta, nell'ordine dato. PURA. */
+export function dentroBudget(voci, max = ELENCO_MAX_BYTE, maxVoci = ELENCO_MAX_VOCI) {
   const out = [];
   let byte = 2;
   for (const v of voci) {
     const n = Buffer.byteLength(JSON.stringify(v), 'utf8') + 1;
-    if (byte + n > max) break;
+    if (byte + n > max || out.length >= maxVoci) break;
     out.push(v);
     byte += n;
   }

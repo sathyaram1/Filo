@@ -69,8 +69,8 @@ con main: il suo messaggio nomina la base del ramo e il main su cui riprovarlo.
 La sede non cambia il livello che scrivi: un 3 esterno resta un 3, un 3 vicino
 resta un 3. Il giro continua per i rilievi interni; un vicino può essere
 corretto insieme a loro, perché il suo file è già aperto, ma non ferma questo
-lavoro; ogni esterno esce subito in un feedback suo, con la priorità uguale al
-livello, e non ferma questo lavoro — nemmeno col `?`: la domanda viaggia nel
+lavoro; ogni esterno esce subito in un feedback suo, con la priorità del suo
+livello (un 2 nasce a 1: la 2 la mette solo il manutentore), e non ferma questo lavoro — nemmeno col `?`: la domanda viaggia nel
 suo feedback.
 
 **Il segno `?`** dopo la lettera (`[2i?]`, `[1v?]`, `[1e?]`) dice che il

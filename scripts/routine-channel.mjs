@@ -563,6 +563,8 @@ export const CAMPI_FALLITI_E_ATTESE = Object.freeze(['falliti', 'attese', 'attes
 const ATTESA_SOPRA_S = 30;
 // Il tetto della domanda di processo sul server: oltre, il rilascio si rifiuta prima di partire.
 export const PROCESSO_MAX = 4000;
+// I ruoli il cui biglietto non porta un feedback (server: guasti.domandaDiProcesso lo vuole).
+export const RUOLI_SENZA_FEEDBACK = Object.freeze(['compito', 'risposta', 'smistamento', 'manutentore', 'orchestrator']);
 
 /**
  * Il corpo del rilascio dal rapporto: falliti e attese escono dal rapporto e vanno nei campi che il server conserva sul
@@ -1803,6 +1805,11 @@ if (isMain) {
     }
     if (processo.length > PROCESSO_MAX) {
       console.error(`--processo ha ${processo.length} caratteri, il massimo è ${PROCESSO_MAX}: accorcialo. Non ho rilasciato niente.`);
+      process.exit(1);
+    }
+    // Il server lega la domanda al feedback del biglietto: da un ruolo che non ne lavora uno non sveglierebbe nessuno.
+    if (processo && RUOLI_SENZA_FEEDBACK.includes(String(data.role || ''))) {
+      console.error(`--processo vale per chi lavora un feedback: il ruolo ${data.role} non ne ha uno, e la domanda non arriverebbe al manutentore. Scrivila con «segnala». Non ho rilasciato niente.`);
       process.exit(1);
     }
     // Il rilascio di un worker morto chiesto dall'orchestratore: ramo, promemoria e battito stanno nel clone (#1182).
