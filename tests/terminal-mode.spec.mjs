@@ -415,3 +415,52 @@ test('se quella cartella sparisce, Filo continua a eseguire e il popup dice dove
     rmSync(dopo, { recursive: true, force: true });
   }
 });
+
+// #635.1 — il comando mandato col terminale acceso si legge: scatola piena col colore della bolla dell'utente e testo
+// a contrasto, col tema chiaro e con quello scuro, e anche rileggendo la chat dopo un ricaricamento.
+test('la bolla del comando si legge, col tema chiaro e scuro e riaprendo la chat', async ({ app }) => {
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
+  await terminaleAcceso(page);
+  const contrasto = (sel) => page.locator(sel).last().evaluate((el) => {
+    const rgb = (s) => (String(s).match(/[\d.]+/g) || []).map(Number);
+    const lum = ([r, g, b]) => {
+      const c = [r, g, b].map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    };
+    const st = getComputedStyle(el);
+    const fondo = rgb(st.backgroundColor);
+    const testo = rgb(st.color);
+    const [a, b] = [lum(fondo), lum(testo)].sort((x, y) => y - x);
+    return { pieno: fondo.length === 3 || fondo[3] === 1, rapporto: (a + 0.05) / (b + 0.05) };
+  });
+  const tema = async (t) => {
+    await app.evaluate(async (_e, v) => globalThis.__filoHandlers.handleMessage(
+      { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: v } },
+      { url: 'filo://preferences/preferences.html' },
+    ), t);
+    await expect(page.locator('html')).toHaveAttribute('data-sn-theme', t, { timeout: 5_000 });
+  };
+
+  await tema('light');
+  await submitInput(page, '/echo leggibile-635');
+  await expect(page.locator('.dash-term-out').last()).toContainText('leggibile-635', { timeout: 12_000 });
+  for (const t of ['light', 'dark']) {
+    await tema(t);
+    const c = await contrasto('.dash-term-cmd');
+    expect(c.pieno, `${t}: la bolla del comando ha un fondo`).toBe(true);
+    expect(c.rapporto, `${t}: il comando si distingue dal suo fondo`).toBeGreaterThan(4.5);
+    await page.screenshot({ path: `tests/.shots/635-1-comando-${t}.png` }).catch(() => {});
+  }
+
+  // Ricaricata la home, la chat si rilegge dal filo: la riga del comando resta una bolla dell'utente leggibile.
+  await tema('light');
+  await page.reload();
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
+  const riga = page.locator('.dash-bubble-user', { hasText: 'echo leggibile-635' });
+  await expect(riga.last()).toBeVisible({ timeout: 10_000 });
+  const c = await contrasto('.dash-bubble-user:has-text("echo leggibile-635")');
+  expect(c.pieno).toBe(true);
+  expect(c.rapporto).toBeGreaterThan(4.5);
+  await page.screenshot({ path: 'tests/.shots/635-1-riaperta.png' }).catch(() => {});
+});
