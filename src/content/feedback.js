@@ -304,9 +304,14 @@
       if (!DRAFT_KEY) return;
       try { chrome.storage.local.set({ [DRAFT_KEY]: textEl.value }); } catch (_) {}
     }
-    function clearDraft() {
+    // Solo se la bozza è ancora quella partita: un riquadro riaperto intanto può averne scritta un'altra (#1681).
+    function clearDraft(inviata) {
       if (!DRAFT_KEY) return;
-      try { chrome.storage.local.remove([DRAFT_KEY]); } catch (_) {}
+      try {
+        chrome.storage.local.get([DRAFT_KEY]).then((r) => {
+          if (r?.[DRAFT_KEY] === inviata) chrome.storage.local.remove([DRAFT_KEY]);
+        }).catch(() => {});
+      } catch (_) {}
     }
     textEl.addEventListener('input', () => {
       // Contenuto cambiato → composizione nuova, id di invio fresco.
