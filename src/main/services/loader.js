@@ -152,7 +152,8 @@ require(path.join(SHARED, 'serviziEsterni.js'));  // #849 — i servizi esterni 
 // per rispondere quando l'utente chiede conto di una scelta. Il gemello
 // transparencyUi.js NON si carica qui: è codice di pagina, tocca il DOM.
 require(path.join(SHARED, 'transparency.js'));
-require(path.join(SHARED, 'autoFeedback.js'));  // F4 — dipende da capabilities
+require(path.join(SHARED, 'segnalazioneAnonima.js'));  // #1669 — chi è l'utente non entra nelle segnalazioni scritte da Filo
+require(path.join(SHARED, 'autoFeedback.js'));  // F4 — dipende da capabilities e da segnalazioneAnonima
 require(path.join(SHARED, 'feedbackPublicKey.js'));
 require(path.join(SHARED, 'feedbackCrypto.js'));
 require(path.join(SHARED, 'feedbackImage.js'));
