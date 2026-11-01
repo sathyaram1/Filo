@@ -2262,6 +2262,18 @@
           bubblesEl.scrollTop = bubblesEl.scrollHeight;
         }
       }
+    } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.finita) {
+      // #1443.2 — chiusa apposta in un'altra home: qui non si continua, il messaggio dopo ne apre una nuova.
+      if (msg.finita === chatId) {
+        lasciaLaChat();
+        if (body.dataset.state === 'thread') {
+          const nota = document.createElement('div');
+          nota.className = 'dash-bubble-note';
+          nota.textContent = 'Questa conversazione è stata chiusa in un\'altra scheda. Quello che scrivi da adesso apre una chat nuova.';
+          bubblesEl.appendChild(nota);
+          bubblesEl.scrollTop = bubblesEl.scrollHeight;
+        }
+      }
     } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.cancellata) {
       Coda.togliChat(msg.cancellata);
       // #525 — qualcuno ha tolto dal filo (un'altra scheda, la chat) la conversazione che
