@@ -76,7 +76,7 @@ test('#1373 un no nel popup arriva al modello come non fatto, col testo salvato 
     { type: 'SALVA_LEZIONE', testo: LEZIONE, _confirm: { level: 2 }, _rifiutata: true },
     { type: 'SALVA_LEZIONE', testo: 'ancora in attesa', _confirm: { level: 2 } },
   ]);
-  assert.match(r, /^\[L'utente ha detto NO alla conferma[^\n]*non è stato fatto\.\n- [^\n]*«voce 1»/);
+  assert.match(r, /^\[L'utente ha detto NO alla conferma[^\n]*non è stato fatto\.\n- Filo vuole ricordare[\s\S]*«voce 1»/);
   assert.match(r, /Non riproporlo da te/);
   assert.ok(r.includes(APRE) && r.includes(LEZIONE), 'il testo salvato sta nel recinto');
   assert.ok(!r.includes('ancora in attesa'), 'una proposta senza risposta non è un no');
