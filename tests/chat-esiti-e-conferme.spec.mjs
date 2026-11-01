@@ -1,5 +1,5 @@
 // #1685 — la chat della home racconta com'è andata ogni azione e cosa aspetta il sì: riaperta, dopo un riavvio, in
-// un'altra conversazione (#1130.2, #1294); dopo l'OK riprende da sola solo se il lavoro non era finito (#1373); una
+// un'altra conversazione (#1130.2, #1294); dopo l'OK l'esito torna al modello, che continua o chiude muto (#1373); una
 // conversazione chiusa in una home non la continua un'altra (#1443.2). Modello finto e nessuna rete.
 
 import { test, expect } from './fixtures/electron.mjs';
@@ -148,20 +148,30 @@ async function confermaScritta(page) {
   await clickConfirm(page, 'danger');
 }
 
-test('#1373 un comando secco confermato non richiama il modello: il bottone dice cosa è stato fatto', async ({ app }) => {
+// Dopo l'OK il modello riparte sempre con l'esito, come negli harness di Anthropic: a lavoro finito chiude muto.
+test('#1373 un comando secco confermato: Filo riparte con l\'esito e, a lavoro finito, chiude senza una bolla in più', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
   await terminaleSpento(app);
-  await modelloFinto(app, [{ text: '', toolCalls: [TERMINALE] }, { text: 'GIRO IN PIÙ' }]);
+  await modelloFinto(app, [{ text: '', toolCalls: [TERMINALE] }, { text: '' }]);
   await chiedi(page, 'accendi il terminale');
   await confermaScritta(page);
   await expect(page.locator('.dash-action-btn', { hasText: /^✓/ })).toBeVisible({ timeout: 10_000 });
-  await page.waitForTimeout(1500);
-  expect((await chiamateAlModello(app)).length, 'nessun giro dopo l\'OK: il lavoro era finito').toBe(1);
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'GIRO IN PIÙ' })).toHaveCount(0);
+  await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 8_000, message: 'dopo l\'OK l\'esito torna al modello' }).toBe(2);
+  const ch = await chiamateAlModello(app);
+  const ultima = ch[1][ch[1].length - 1];
+  expect(ultima.role).toBe('user');
+  expect(String(ultima.content), 'il modello legge com\'è andata, non solo «riprendi»').toMatch(/conferma[\s\S]*fatta: [^\n]*terminale/i);
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  await page.waitForTimeout(500);
+  await expect(page.locator('.dash-bubble-filo'), 'nessuna bolla vuota né «(vuoto)» dopo il sì').toHaveCount(1);
+  await expect(page.locator('.dash-bubble-filo', { hasText: '(vuoto)' })).toHaveCount(0);
+  await expect(page.locator('.dash-activity')).toHaveCount(1);
   const chat = await chatCon(app, 'accendi il terminale');
   expect(chat.messages.flatMap((m) => m.esiti || []).map((v) => `${v.type}:${v.esito}`))
     .toEqual(['IMPOSTA_PREFERENZA:chiesto', 'IMPOSTA_PREFERENZA:fatto']);
+  expect(chat.messages.filter((m) => m.role === 'filo' && !String(m.text || '').trim() && !(m.esiti || []).length),
+    'la ripresa muta non lascia un messaggio vuoto nella conversazione').toEqual([]);
   await ripristina(app);
 });
 
@@ -187,19 +197,35 @@ test('#1373 dopo l\'OK che sblocca un passo rimasto indietro Filo riprende da so
   await ripristina(app);
 });
 
-// Che dopo il sì ci sia altro da fare lo sa solo il modello: lo dichiara sull'azione (`poi`), e il lavoro riprende.
-test('#1373 chiesti due passi, il modello propone il primo e dichiara il seguito: dopo l\'OK Filo riprende da solo', async ({ app }) => {
+test('#1373 chiesti due passi, il modello propone il primo e aspetta l\'OK: dopo l\'OK Filo riprende da solo', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
   await terminaleSpento(app);
-  const conSeguito = { ...TERMINALE, arguments: '{"chiave":"modalita_terminale","valore":true,"poi":true}' };
-  await modelloFinto(app, [{ text: '', toolCalls: [conSeguito] }, { text: 'RIPRESO DA SOLO: ora lancio ls.' }]);
+  await modelloFinto(app, [{ text: '', toolCalls: [TERMINALE] }, { text: 'RIPRESO DA SOLO: ora lancio ls.' }]);
   await chiedi(page, 'accendi il terminale e poi lancia ls');
   await confermaScritta(page);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'RIPRESO DA SOLO' })).toBeVisible({ timeout: 10_000 });
   const ch = await chiamateAlModello(app);
   expect(ch).toHaveLength(2);
   expect(JSON.stringify(ch[1])).toContain('ha CONFERMATO');
+  expect(JSON.stringify(ch[0]), 'nessun campo da dichiarare sulle azioni').not.toContain('"poi"');
+  await ripristina(app);
+});
+
+test('#1373 un no alla conferma non richiama il modello, e al messaggio dopo il modello sa che non è stato fatto', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await terminaleSpento(app);
+  await modelloFinto(app, [{ text: '', toolCalls: [TERMINALE] }, { text: 'Va bene.' }]);
+  await chiedi(page, 'accendi il terminale');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  await clickConfirm(page, 'cancel');
+  await page.waitForTimeout(1500);
+  expect((await chiamateAlModello(app)).length, 'dopo un no Filo aspetta l\'utente').toBe(1);
+  await chiedi(page, 'lascia stare, dimmi l\'ora');
+  await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBe(2);
+  const ch = await chiamateAlModello(app);
+  expect(rispostaA(ch[1], 'accendi il terminale'), 'il modello sa del no').toMatch(/detto NO alla conferma[\s\S]*terminale/i);
   await ripristina(app);
 });
 

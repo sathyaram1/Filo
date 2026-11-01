@@ -5307,7 +5307,7 @@ function observationsForPrompt(actions) {
     pageReadsForPrompt(actions), fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
     vediSchermoForPrompt(actions),
     transparencyDocsForPrompt(actions),
-    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
+    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), rifiutateForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
     fermateForPrompt(actions), testiDiFuoriForPrompt(actions),
   ].filter(Boolean).join('\n\n');
@@ -5348,6 +5348,7 @@ function proxyUnavailableForPrompt(actions) {
 const descriviPerModello = (...a) => globalThis.SN_AZIONI_PER_MODELLO.descrivi(...a);
 const interruptedActionsForPrompt = (...a) => globalThis.SN_AZIONI_PER_MODELLO.interrotte(...a);
 const confirmedActionsForPrompt = (...a) => globalThis.SN_AZIONI_PER_MODELLO.confermate(...a);
+const rifiutateForPrompt = (...a) => globalThis.SN_AZIONI_PER_MODELLO.rifiutate(...a);
 
 // Le pagine aperte con NAVIGA che si sono spostate da sé su un sito bloccato quando il turno era
 // già finito (la scheda le ha segnate `_output.dopo`): il modello le aveva date per aperte.

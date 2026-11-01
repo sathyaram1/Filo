@@ -1914,6 +1914,7 @@
       }
       btn.textContent = `✓ ${e.testo}`;
       segnaConfermata(a, { archived: r.archived || 0 }, activity, null, { chat });
+      proseguiQuandoLibero(chat, voceDellaConferma(a));
     });
     return btn;
   }
@@ -2075,6 +2076,7 @@
           ? '✓ Eliminata definitivamente 1 scheda.'
           : `✓ Eliminate definitivamente ${quante(removed)}.`;
         segnaConfermata(a, { eliminate: removed }, activity, null, { chat });
+        proseguiQuandoLibero(chat, voceDellaConferma(a));
       });
       panel.appendChild(del);
     }

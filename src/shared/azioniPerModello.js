@@ -107,5 +107,24 @@
       : '';
   }
 
-  global.SN_AZIONI_PER_MODELLO = { CAMPI_SALVATI, descrivi, interrotte, confermate };
+  // Il no dato nel popup (#1373): l'azione non è partita, e il modello non la ripropone come se aspettasse ancora.
+  function rifiutate(actions) {
+    if (!Array.isArray(actions)) return '';
+    const righe = [];
+    for (const a of actions) {
+      if (!a || !a._rifiutata || !a._confirm) continue;
+      let cosa = String(a.type || '').toUpperCase();
+      try {
+        const d = descrivi(a);
+        if (d) cosa = d.replace(/\.+\s*$/, '');
+      } catch (_) {}
+      righe.push(`- ${cosa}`);
+    }
+    return righe.length
+      ? `[L'utente ha detto NO alla conferma, dopo la tua risposta: non è stato fatto.\n${righe.join('\n')}\n`
+        + 'Non riproporlo da te: se ne riparla solo se lo chiede lui.]'
+      : '';
+  }
+
+  global.SN_AZIONI_PER_MODELLO = { CAMPI_SALVATI, descrivi, interrotte, confermate, rifiutate };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
