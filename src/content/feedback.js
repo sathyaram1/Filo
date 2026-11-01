@@ -34,6 +34,8 @@
 
   let activeRoot = null;
   let activeStack = null;
+  // Stacca ciò che l'apertura ha agganciato fuori dal riquadro (#1096).
+  let pulizia = null;
   let clientIdCache = null;
 
   // Avvisa la shell dell'ingresso in annotazione, così l'ombra copre TUTTO Filo e non la sola area
@@ -62,6 +64,9 @@
 
   function close() {
     if (!activeRoot) return;
+    const stacca = pulizia;
+    pulizia = null;
+    try { stacca?.(); } catch (_) {}
     try { activeStack?.unregister?.(); } catch (_) {}
     activeStack = null;
     if (Popup?.togliRiquadro) Popup.togliRiquadro(activeRoot);
@@ -240,11 +245,20 @@
     `;
     document.documentElement.appendChild(Popup?.riquadro ? Popup.riquadro(root) : root);
     activeRoot = root;
+    // Ciò che si aggancia fuori dal riquadro (window, documento, messaggi) si stacca alla chiusura (#1096): un
+    // ascoltatore rimasto tiene in memoria tela, immagini e allegati di ogni apertura, e lo strato sopra un sito vive a lungo.
+    const stacchi = [];
+    const aggancia = (bersaglio, tipo, fn, opz) => {
+      bersaglio.addEventListener(tipo, fn, opz);
+      stacchi.push(() => bersaglio.removeEventListener(tipo, fn, opz));
+    };
+    pulizia = () => { for (const s of stacchi.splice(0).reverse()) { try { s(); } catch (_) {} } };
     setShellDim(true);
     // Abbandonando la pagina senza close() il content script muore e il velo della shell resterebbe
     // appeso: va chiesto di toglierlo.
-    window.addEventListener('pagehide', () => setShellDim(false), { once: true });
-    Popup?.attachZoomCompensation?.(root);
+    aggancia(window, 'pagehide', () => setShellDim(false), { once: true });
+    const staccaZoom = Popup?.attachZoomCompensation?.(root);
+    if (typeof staccaZoom === 'function') stacchi.push(staccaZoom);
     // Stacking dei popup: sopra i box aperti prima, sotto quelli dopo. Il menu del tasto destro ha
     // z-index più alto e resta sempre sopra.
     activeStack = Popup?.registerStack?.(root) || null;
@@ -282,6 +296,8 @@
     function bumpSubmissionId() { submissionId = newSubmissionId(); }
 
     let saveTimer = null;
+    // Chiudendo entro i 250 ms la bozza si scrive subito, non da un timer che sopravvive al riquadro.
+    stacchi.push(() => { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; saveDraft(); } });
     function saveDraft() {
       if (!DRAFT_KEY) return;
       try { chrome.storage.local.set({ [DRAFT_KEY]: textEl.value }); } catch (_) {}
@@ -294,7 +310,7 @@
       // Contenuto cambiato → composizione nuova, id di invio fresco.
       bumpSubmissionId();
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveDraft, 250);
+      saveTimer = setTimeout(() => { saveTimer = null; saveDraft(); }, 250);
     });
     // Ripristina l'eventuale bozza salvata (solo se l'utente non ha già scritto). Il testo proposto da Filo si
     // aggiunge alla bozza, non la sostituisce: la bozza è dell'utente.
@@ -385,8 +401,10 @@
     }
     canvas.addEventListener('pointerup', endStroke);
     canvas.addEventListener('pointercancel', endStroke);
-    window.addEventListener('resize', sizeCanvas);
+    aggancia(window, 'resize', sizeCanvas);
     sizeCanvas();
+    // La tela a tutto schermo pesa larghezza × altezza × dpr²: si libera alla chiusura, non quando passa il GC.
+    stacchi.push(() => { canvas.width = 0; canvas.height = 0; });
 
     // «Cancella disegno» pulisce i tratti della pagina E quelli della barra in alto, che vivono
     // nella shell: un bottone solo cancella tutto.
@@ -406,23 +424,25 @@
     // La shell dice se c'è o non c'è più un disegno sulla barra, così «Cancella disegno» compare
     // anche quando si è disegnato SOLO lassù.
     function onBroadcast(message) {
-      // Auto-rimozione quando il box non è più questo (chiuso e riaperto).
-      if (activeRoot !== root) {
-        try { chrome.runtime.onMessage.removeListener(onBroadcast); } catch (_) {}
-        return;
-      }
+      if (activeRoot !== root) return;
       if (message?.type === MSG.FEEDBACK_DRAW_STATE) {
         topbarHasDrawing = !!message.topbar;
         refreshClear();
       }
     }
-    try { chrome.runtime.onMessage.addListener(onBroadcast); } catch (_) {}
+    try {
+      chrome.runtime.onMessage.addListener(onBroadcast);
+      stacchi.push(() => chrome.runtime.onMessage.removeListener(onBroadcast));
+    } catch (_) {}
 
-    function renderThumbs() {
-      // Revoca eventuali object URL precedenti per evitare leak
+    function revocaMiniature() {
       thumbsEl.querySelectorAll('img[data-sn-objurl="1"]').forEach((img) => {
         try { URL.revokeObjectURL(img.src); } catch (_) {}
       });
+    }
+    stacchi.push(revocaMiniature);
+    function renderThumbs() {
+      revocaMiniature();
       thumbsEl.innerHTML = '';
       images.forEach((img, i) => {
         const wrap = document.createElement('div');
@@ -527,67 +547,75 @@
       renderThumbs();
     }
 
-    function composeAnnotated(shotDataUrl) {
+    function caricaImmagine(src) {
       return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          try {
-            const w = img.naturalWidth || window.innerWidth;
-            const h = img.naturalHeight || window.innerHeight;
-            const c = document.createElement('canvas');
-            c.width = w; c.height = h;
-            const cx = c.getContext('2d');
-            cx.drawImage(img, 0, 0, w, h);
-            const sx = w / Math.max(1, window.innerWidth);
-            const sy = h / Math.max(1, window.innerHeight);
-            cx.lineCap = 'round';
-            cx.lineJoin = 'round';
-            for (const s of strokes) {
-              if (s.points.length < 1) continue;
-              cx.strokeStyle = s.color;
-              cx.lineWidth = s.width * Math.max(sx, sy);
-              cx.beginPath();
-              s.points.forEach((p, i) => (i ? cx.lineTo(p.x * sx, p.y * sy) : cx.moveTo(p.x * sx, p.y * sy)));
-              if (s.points.length === 1) cx.lineTo(s.points[0].x * sx + 0.1, s.points[0].y * sy + 0.1);
-              cx.stroke();
-            }
-            resolve(c.toDataURL('image/png'));
-          } catch (_) {
-            resolve(shotDataUrl);
-          }
-        };
-        img.onerror = () => resolve(shotDataUrl);
-        img.src = shotDataUrl;
+        if (!src) { resolve(null); return; }
+        const im = new Image();
+        im.onload = () => resolve(im);
+        im.onerror = () => resolve(null);
+        im.src = src;
       });
     }
 
-    // Impila lo scatto della barra sopra quello della pagina: un'unica immagine di tutta l'app coi
-    // tratti di entrambe; senza, resta la sola pagina.
-    function stackTopbar(pageDataUrl, topbarDataUrl) {
-      return new Promise((resolve) => {
-        if (!topbarDataUrl) { resolve(pageDataUrl); return; }
-        const pageImg = new Image();
-        pageImg.onload = () => {
-          const barImg = new Image();
-          barImg.onload = () => {
-            try {
-              const w = pageImg.naturalWidth;
-              const barH = Math.round(barImg.naturalHeight * (w / Math.max(1, barImg.naturalWidth)));
-              const c = document.createElement('canvas');
-              c.width = w;
-              c.height = barH + pageImg.naturalHeight;
-              const cx = c.getContext('2d');
-              cx.drawImage(barImg, 0, 0, w, barH);
-              cx.drawImage(pageImg, 0, barH, w, pageImg.naturalHeight);
-              resolve(c.toDataURL('image/png'));
-            } catch (_) { resolve(pageDataUrl); }
-          };
-          barImg.onerror = () => resolve(pageDataUrl);
-          barImg.src = topbarDataUrl;
-        };
-        pageImg.onerror = () => resolve(pageDataUrl);
-        pageImg.src = pageDataUrl;
-      });
+    // La schermata sale solo sotto il tetto degli allegati (#1667): PNG se ci sta, poi WebP più leggero, poi più
+    // piccola. Un PNG di uno schermo grande ad alta densità passa facilmente i 4 MB, e il deposito lo rifiuterebbe.
+    function entroIlTetto(c) {
+      const sotto = (u) => Feedback.byteDiDataUrl(u) < MAX_ATTACH_BYTES;
+      let u = c.toDataURL('image/png');
+      if (sotto(u)) return u;
+      for (const q of [0.92, 0.8, 0.65]) {
+        u = c.toDataURL('image/webp', q);
+        if (sotto(u)) return u;
+      }
+      let w = c.width;
+      let h = c.height;
+      for (let i = 0; i < 8 && w > 64 && h > 64; i++) {
+        w = Math.round(w * 0.75);
+        h = Math.round(h * 0.75);
+        const r = document.createElement('canvas');
+        r.width = w; r.height = h;
+        r.getContext('2d').drawImage(c, 0, 0, w, h);
+        u = r.toDataURL('image/webp', 0.8);
+        r.width = 0; r.height = 0;
+        if (sotto(u)) return u;
+      }
+      return null;
+    }
+
+    // Un'immagine sola di tutta l'app: la barra in alto (se ci si è disegnato) sopra la pagina coi suoi tratti.
+    async function schermataAnnotata(shotDataUrl, topbarDataUrl) {
+      const [pagina, barra] = await Promise.all([caricaImmagine(shotDataUrl), caricaImmagine(topbarDataUrl)]);
+      if (!pagina && !barra) return null;
+      const c = document.createElement('canvas');
+      try {
+        const w = pagina ? (pagina.naturalWidth || window.innerWidth) : barra.naturalWidth;
+        const barH = barra ? Math.round(barra.naturalHeight * (w / Math.max(1, barra.naturalWidth))) : 0;
+        const pagH = pagina ? (pagina.naturalHeight || window.innerHeight) : 0;
+        c.width = w; c.height = barH + pagH;
+        const cx = c.getContext('2d');
+        if (barra) cx.drawImage(barra, 0, 0, w, barH);
+        if (pagina) {
+          cx.drawImage(pagina, 0, barH, w, pagH);
+          const sx = w / Math.max(1, window.innerWidth);
+          const sy = pagH / Math.max(1, window.innerHeight);
+          cx.lineCap = 'round';
+          cx.lineJoin = 'round';
+          for (const s of strokes) {
+            if (s.points.length < 1) continue;
+            cx.strokeStyle = s.color;
+            cx.lineWidth = s.width * Math.max(sx, sy);
+            cx.beginPath();
+            s.points.forEach((p, i) => (i ? cx.lineTo(p.x * sx, barH + p.y * sy) : cx.moveTo(p.x * sx, barH + p.y * sy)));
+            if (s.points.length === 1) cx.lineTo(s.points[0].x * sx + 0.1, barH + s.points[0].y * sy + 0.1);
+            cx.stroke();
+          }
+        }
+        return entroIlTetto(c);
+      } catch (_) {
+        return null;
+      } finally {
+        c.width = 0; c.height = 0;
+      }
     }
 
     cancelBtn.addEventListener('click', close);
@@ -598,7 +626,7 @@
       lb.remove();
     }
     function openLightbox(dataUrl) {
-      const prev = activeRoot.querySelector('.sn-fb-lightbox');
+      const prev = root.querySelector('.sn-fb-lightbox');
       if (prev) closeLightbox(prev);
       const lb = document.createElement('div');
       lb.className = 'sn-fb-lightbox';
@@ -607,24 +635,18 @@
       im.alt = '';
       lb.appendChild(im);
       lb.addEventListener('click', () => closeLightbox(lb));
-      activeRoot.appendChild(lb);
+      root.appendChild(lb);
     }
+    stacchi.push(() => { const lb = root.querySelector('.sn-fb-lightbox'); if (lb) closeLightbox(lb); });
 
-    document.addEventListener('keydown', function onKey(e) {
-      if (!activeRoot) { document.removeEventListener('keydown', onKey, true); return; }
-      if (e.key === 'Escape') {
-        // Se è aperta la lightbox di uno screenshot, ESC chiude prima quella.
-        const lb = activeRoot.querySelector('.sn-fb-lightbox');
-        if (lb) {
-          e.stopImmediatePropagation();
-          closeLightbox(lb);
-          return;
-        }
-        // Evita che lo stesso ESC inneschi anche la chiusura del topmost gestita dal modulo Popup.
-        e.stopImmediatePropagation();
-        close();
-        document.removeEventListener('keydown', onKey, true);
-      }
+    aggancia(document, 'keydown', (e) => {
+      if (activeRoot !== root || e.key !== 'Escape') return;
+      // Se è aperta la lightbox di uno screenshot, ESC chiude prima quella.
+      const lb = root.querySelector('.sn-fb-lightbox');
+      // Evita che lo stesso ESC inneschi anche la chiusura del topmost gestita dal modulo Popup.
+      e.stopImmediatePropagation();
+      if (lb) closeLightbox(lb);
+      else close();
     }, true);
 
     // Paste immagini nel modal. Allegare è dell'utente: un incolla fabbricato non porta niente (il trascinamento
@@ -684,9 +706,17 @@
         statusEl.textContent = 'Scrivi qualcosa, allega un file/immagine o annota lo schermo.';
         return;
       }
+      // Un esito che arriva col riquadro già chiuso (Esc durante l'invio) si legge in un avviso.
+      const dici = (testo) => {
+        statusEl.classList.remove('sn-fb-status--attesa');
+        if (activeRoot === root) statusEl.textContent = testo;
+        else Popup?.showToast?.(testo, { duration: 6000 });
+      };
+      const riprova = (testo) => { dici(testo); sendBtn.disabled = false; cancelBtn.disabled = false; };
       sendBtn.disabled = true;
       cancelBtn.disabled = true;
       statusEl.textContent = 'Invio in corso…';
+      statusEl.classList.add('sn-fb-status--attesa');
       try {
         const clientId = await getClientId();
         // S1.F2.2: hash deterministico del clientId per il match C5. Il confronto lo fa il main,
@@ -706,6 +736,7 @@
           } catch (_) { return ''; }
         })();
         const outImages = images.slice();
+        let senzaSchermata = '';
         if (wantShot) {
           // Overlay nascosto (box + ombra) per non finire dentro lo scatto.
           root.style.visibility = 'hidden';
@@ -720,16 +751,19 @@
             } catch (_) {}
           }
           root.style.visibility = '';
-          if (shot) {
-            const annotated = await composeAnnotated(shot);
-            const full = await stackTopbar(annotated, topbarShot);
+          const full = (shot || topbarShot) ? await schermataAnnotata(shot, topbarShot) : null;
+          if (full) {
             if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: full, name: 'schermata annotata' });
-          } else if (topbarShot) {
-            // La pagina non si lascia catturare ma la barra sì: allega almeno quella.
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: topbarShot, name: 'schermata annotata' });
           } else {
-            statusEl.textContent = 'Screenshot non disponibile su questa pagina.';
+            senzaSchermata = (shot || topbarShot)
+              ? 'La schermata annotata non scende sotto i 4 MB.'
+              : 'Screenshot non disponibile su questa pagina.';
           }
+        }
+        // Senza testo né allegati partirebbe un feedback vuoto (#1667): il riquadro resta aperto e dice perché.
+        if (!text && outImages.length === 0 && files.length === 0) {
+          riprova(senzaSchermata || 'Scrivi qualcosa, allega un file/immagine o annota lo schermo.');
+          return;
         }
         // Instradato dal main perché la CSP della pagina ospite blocca i fetch verso firestore e
         // firebasestorage dal preload; il main usa undici (Node) e non è soggetto a quella CSP.
@@ -749,12 +783,15 @@
         const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload });
         if (!res?.ok) {
           const err = new Error(res?.error || 'invio fallito');
-          // #602 — quando il no arriva dalla cifratura, il main manda già la
-          // frase intera per chi legge: mostrarla così com'è.
-          err.fraseGiaPronta = !!res?.cifratura;
+          // #602 — quando il no arriva dalla cifratura (o è un feedback che partirebbe vuoto), il main manda già
+          // la frase intera per chi legge: mostrarla così com'è.
+          err.fraseGiaPronta = !!(res?.cifratura || res?.frase);
           throw err;
         }
         statusEl.textContent = '';
+        statusEl.classList.remove('sn-fb-status--attesa');
+        clearTimeout(saveTimer);
+        saveTimer = null;
         clearDraft();
         // Posizione del box PRIMA di chiuderlo: da lì partono le monete.
         const originRect = modal.getBoundingClientRect();
@@ -771,24 +808,17 @@
           else if (ar?.ok && Number(ar.credits) > 0) awarded = Number(ar.credits);
         } catch (_) {}
         if (!premio) flyCredits(originRect, awarded);
-        // Se qualche allegato non è riuscito a caricarsi, il feedback parte
-        // comunque (testo + allegati ok) ma avvisiamo l'utente di QUALI file
-        // sono andati persi, così non resta convinto che siano stati inviati.
-        const failed = Array.isArray(res.failed) ? res.failed : [];
+        // «Inviato» solo a consegna avvenuta (#1667); gli allegati saltati li dice l'avviso nella finestra.
+        const detto = res.consegnato ? 'Grazie! Feedback inviato.' : 'Feedback in partenza: arriva da solo appena c’è rete.';
         const dopo = premio?.inArrivo ? ' Il premio arriva sul tuo saldo dopo i controlli.'
           : (premio?.senzaPremio ? ` ${premio.senzaPremio}` : '');
-        if (failed.length) {
-          const names = failed.map((f) => f?.name || 'allegato').join(', ');
-          const inviato = premio ? 'Feedback inviato' : `Feedback inviato (+${awarded} crediti)`;
-          Popup?.showToast?.(`${inviato}, ma non sono riuscito a caricare: ${names}${dopo ? `.${dopo}` : ''}`, { duration: 6000 });
-        } else {
-          Popup?.showToast?.(premio ? `Grazie! Feedback inviato.${dopo}` : `Grazie! Feedback inviato. +${awarded} crediti.`, { duration: premio?.senzaPremio ? 5500 : (premio ? 4000 : 2800) });
-        }
+        const conSchermata = senzaSchermata ? ` ${senzaSchermata}` : '';
+        Popup?.showToast?.(premio ? `${detto}${dopo}${conSchermata}` : `${detto} +${awarded} crediti.${conSchermata}`,
+          { duration: (premio?.senzaPremio || senzaSchermata) ? 5500 : (premio || !res.consegnato ? 4000 : 2800) });
       } catch (e) {
         console.error('[SN feedback] submit', e);
-        statusEl.textContent = e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e));
-        sendBtn.disabled = false;
-        cancelBtn.disabled = false;
+        root.style.visibility = '';
+        riprova(e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e)));
       }
     });
 

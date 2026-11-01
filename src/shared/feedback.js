@@ -290,12 +290,15 @@
   // vuota. `permanente`: riprovare non cambia niente (troppo grande, vuoto, rifiutato dal deposito).
   const TETTO_ALLEGATO = 4 * 1024 * 1024;
   const TROPPO_GRANDE = 'troppo grande (max 4 MB)';
+  function messaggioVuoto(failed) {
+    const elenco = fraseAllegatiSaltati(failed);
+    return elenco
+      ? `Il feedback non è partito: senza testo, e nessun allegato è salito (${elenco}).`
+      : 'Il feedback non è partito: era vuoto.';
+  }
   class ErroreVuoto extends Error {
     constructor(failed) {
-      const elenco = fraseAllegatiSaltati(failed);
-      super(elenco
-        ? `Il tuo feedback non è partito: non c'era testo e nessun allegato è salito (${elenco}).`
-        : 'Il tuo feedback non è partito: era vuoto.');
+      super(messaggioVuoto(failed));
       this.name = 'ErroreVuoto';
       this.vuoto = true;
       this.allegatiFalliti = Array.isArray(failed) ? failed : [];
@@ -2156,7 +2159,7 @@
 
   global.SN_FEEDBACK = {
     submit,
-    vuotoInPartenza, fraseAllegatiSaltati, byteDiDataUrl, TETTO_ALLEGATO,
+    vuotoInPartenza, messaggioVuoto, fraseAllegatiSaltati, byteDiDataUrl, TETTO_ALLEGATO,
     list,
     listResolved,
     listAll,
