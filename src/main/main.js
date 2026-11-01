@@ -492,7 +492,8 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   try { contatori()?.inizioChiusura(); } catch (_) {}
   try {
-    const tm = mainWindow?._filoTabs;
+    // Una finestra che non ha ancora riaperto la sessione salvata non la riscrive (la regola sta in tabs.js).
+    const tm = mainWindow?._filoTabs?._sessioneDaLeggere ? null : mainWindow?._filoTabs;
     const Storage = require('./shim/storage');
     // L'ora dei contatori viaggia con le schede: dopo questa scrittura non ne parte un'altra (#1466).
     let contati = {};
