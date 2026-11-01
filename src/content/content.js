@@ -888,6 +888,29 @@
   // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).
   const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
 
+  // Gli avvisi di sistema li mostra solo la pagina che si sta guardando: in un'altra applicazione nessuno li vedrebbe.
+  function inVistaAdesso() {
+    return !IS_SUBFRAME && document.visibilityState === 'visible' && document.hasFocus();
+  }
+
+  function mostraAvviso(msg) {
+    // `rimedio` sceglie solo fra le pagine note di SN_CHAT_ERRORS: l'indirizzo non viaggia nel messaggio.
+    Popup?.showToast?.(String(msg.text || ''), {
+      duration: Number(msg.duration) || 2800, rimedio: msg.rimedio || null, segnala: typeof msg.segnala === 'string' ? msg.segnala : '',
+    });
+  }
+
+  // Un avviso che il main tiene in coda (#1478.1) si prende prima di mostrarlo: chi lo prende l'ha davanti, e nessun'altra
+  // pagina lo ripete. Senza `id` si chiedono quelli rimasti in coda mentre l'utente era altrove.
+  async function prendiAvvisiInCoda(id) {
+    if (!inVistaAdesso() || isBlocked()) return;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.AVVISI_IN_CODA, ...(id ? { id } : {}) }); } catch (_) { return; }
+    for (const m of (r && Array.isArray(r.avvisi) ? r.avvisi : [])) {
+      try { mostraAvviso(m); } catch (_) {}
+    }
+  }
+
   // Il segno che legge il ponte del tasto destro (page-preload.js) a ogni clic, rifatto a ogni cambio dell'elenco.
   // Spegnendosi se ne va il menu di Filo già aperto; l'Aiuto aperto resta, perché ci si sta parlando.
   function seguiSpento() {
