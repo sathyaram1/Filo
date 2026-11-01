@@ -599,8 +599,8 @@ async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS }
     return true;
   }
   // Un programma dato col percorso (anche fra virgolette, #968): `where.exe` rifiuta i percorsi e cmd resterebbe
-  // rosso. Fuori da Windows `command -v` qui sotto risolve già un percorso, e controlla anche che sia eseguibile.
-  // Lì un documento esistente non è un programma (#892.1): conta solo un'estensione che si esegue, scritta o sottintesa.
+  // rosso. Lì un documento esistente non è un programma (#892.1): conta solo un'estensione che si esegue, scritta o
+  // sottintesa. Fuori da Windows decide il bit d'esecuzione (programmaPosixAlPercorso).
   if (process.platform === 'win32' && /[\\/]/.test(cmd)) return programmaWindowsAlPercorso(path.resolve(cwd || defaultCwd(), cmd), shell);
   if (process.platform !== 'win32' && cmd.includes('/')) return programmaPosixAlPercorso(cmd, cwd);
   return esitoDeiProbe(existenceProbes({ shell, cmd }), cwd, attesaMs);
