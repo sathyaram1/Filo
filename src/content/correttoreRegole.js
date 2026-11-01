@@ -587,11 +587,11 @@
       let correzioni = [];
       const correzione = r.correzione.trim();
       if (correzione || errore) {
-        const stretto = correzione && formaLetta(correzione) === formaLetta(pezzo) ? null : restringi(pezzo, correzione ? r.correzione : '');
+        const stretto = correzione && formaLetta(correzione) === formaLetta(pezzo) ? null
+          : restringiNelTesto(pezzo, correzione, testo.slice(dove.start, dove.end));
         if (stretto) {
-          const pos = posizioniNelTesto(pezzo, testo.slice(dove.start, dove.end));
-          start = dove.start + pos[stretto.da];
-          end = dove.start + pos[stretto.a];
+          start = dove.start + stretto.da;
+          end = dove.start + stretto.a;
           correzioni = [stretto.sostituto];
         } else if (errore) continue;
       }
@@ -599,9 +599,10 @@
       if (end <= start || !testo.slice(start, end).trim()) {
         start = dove.start;
         end = dove.end;
-        if (correzioni.length) correzioni = [correzione];
+        if (correzioni.length) correzioni = [unSoloSpazio(correzione)];
       }
       if (inScrittura && start < inScrittura.end && end > inScrittura.start) continue;
+      if (suFilo(testo, start, end)) continue;
       // Una minuscola dove la correzione vuole la maiuscola non è un errore: un nome scritto minuscolo o si corregge
       // da sé (correttoreAutomatica.js) o si lascia stare (#1447).
       if (errore && correzioni.length && soloPiuMaiuscole(testo.slice(start, end), correzioni[0])) continue;
