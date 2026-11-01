@@ -64,8 +64,8 @@ async function ascoltataEFermata(app, page, url) {
 test('la scheda in pausa riparte, dietro, senza aprirne una nuova; il modello la vede segnata', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const chat = await home(app);
-  const url = testServer.html(MUSICA);
   const musica = await testServer.openReady(openTab, MUSICA);
+  const url = musica.url();
   await ascoltataEFermata(app, musica, url);
   await openTab(testServer.html('<title>Lettura</title><p>lettura'));
   const idHome = await tornaAllaHome(shell);
@@ -95,8 +95,8 @@ test('la scheda in pausa riparte, dietro, senza aprirne una nuova; il modello la
 test('chiusa, la scheda che suonava si riapre allo stesso indirizzo e riparte', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const chat = await home(app);
-  const url = testServer.html(MUSICA);
   const musica = await testServer.openReady(openTab, MUSICA);
+  const url = musica.url();
   await ascoltataEFermata(app, musica, url);
   const id = (await schede(shell)).tabs.find((t) => t.url === url).id;
   await shell.evaluate((x) => window.filoShell.tabs.close(x), id);
