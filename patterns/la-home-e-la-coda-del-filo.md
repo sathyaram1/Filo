@@ -40,6 +40,12 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
   silenzio, o se l'ultima parola è di Filo che ha scritto da sé. L'accoglienza, le chat delle altre app e quella che
   l'utente ha chiuso apposta (il bottone sotto la risposta, `/clear`: il segno `fine` sulla chiusura) non si
   continuano da qui; una scheda che si chiude o si ricarica non è una chiusura voluta. La scheda la adotta (storico per il turno dopo), ma le bolle le ha già disegnate la coda.
+  Chiusa apposta in una home, le altre che la stavano continuando la lasciano subito (l'annuncio `finita`, #1443.2).
+- **Com'è andata ogni azione** (#1294): la risposta archiviata porta `esiti`, una voce per azione (fatta coi numeri,
+  non riuscita col perché, ferma sulla conferma, il file del bottone), scritta da `src/shared/esitoAzione.js`. Riletta,
+  la bolla mostra quelle righe e i bottoni dei file, e il modello le legge; un OK dato dopo si aggiunge come voce nella
+  conversazione dove era nato il bottone. Un turno senza niente da dire non va al modello. Sentinella:
+  `tests/unit/esitiInArchivio.test.mjs`.
 - **All'apertura l'ultimo messaggio sta in cima** (#1487), col segno del suo giorno, e sotto è vuoto: chi apre una home
   non vuole rivedere ieri, che resta sopra a una rotella. Vale per la scheda nuova, la home ricaricata e la riserva alla
   consegna. Il vuoto è un margine in fondo al filo misurato apposta, così «in fondo» vuol dire proprio quel punto e

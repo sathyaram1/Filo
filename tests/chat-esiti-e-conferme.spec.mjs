@@ -3,6 +3,8 @@
 // conversazione chiusa in una home non la continua un'altra (#1443.2). Modello finto, nessuna rete.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { join } from 'node:path';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { home, modelloFinto, chiedi, chiamateAlModello, ripristina } from './helpers/chatFinta.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
 import { clickConfirm, scrollConfirmToEnd, fillConfirmInput, CONFIRM_HOST } from './helpers/confirm.mjs';
@@ -104,6 +106,34 @@ test('#1294 riaperta, la chat racconta la cosa fatta e quella non riuscita col p
   await expect(bolla.locator('.dash-activity-row', { hasText: 'Non riuscita' })).toBeVisible({ timeout: 8_000 });
   await page.screenshot({ path: 'tests/.shots/chat-esiti-riaperta-scuro.png' });
   await ripristina(app);
+});
+
+test('#1294 riaperta, la chat ridà il bottone del file che la risposta mostrava', async ({ app }) => {
+  test.setTimeout(60_000);
+  const dir = join(await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR), 'Ricevute');
+  const file = join(dir, 'ricevuta-assicurazione.pdf');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(file, '%PDF-1.4\n');
+  try {
+    const page = await home(app);
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: file, etichetta: 'La ricevuta' }) }] },
+      { text: 'Eccola.' },
+    ]);
+    await chiedi(page, 'dov\'è la ricevuta dell\'assicurazione?');
+    await expect(page.locator('.dash-file-btn')).toHaveCount(1, { timeout: 10_000 });
+    const chat = await chatCon(app, 'dov\'è la ricevuta dell\'assicurazione?');
+    await dimenticaLaMemoria(app, chat.id);
+    await riapri(app, page, chat.id);
+    const btn = page.locator('.dash-bubble-filo', { hasText: 'Eccola.' }).locator('.dash-file-btn');
+    await expect(btn).toHaveCount(1, { timeout: 8_000 });
+    await expect(btn).toHaveAttribute('data-percorso', file);
+    await expect(btn.locator('.dash-file-btn-nome')).toHaveText('ricevuta-assicurazione.pdf');
+    await expect(btn.locator('.dash-file-btn-etichetta')).toHaveText('La ricevuta');
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // Accendere il terminale chiede la parola «conferma» (#530) e riesce anche senza rete.
