@@ -1363,7 +1363,11 @@
       case 'tar':
         return tarSovrascrive(testi, c);
       case 'zip': {
-        const ops = testi.filter((t) => !t.startsWith('-'));
+        const ops = [];
+        for (let i = 0; i < testi.length; i++) {
+          if (/^-(b|n|t|tt|P|O|x|i)$/.test(testi[i])) i += 1;
+          else if (!testi[i].startsWith('-')) ops.push(testi[i]);
+        }
         return ops.length ? copiaSovrascrive([], /\.[^\\/]+$/.test(ops[0]) ? ops[0] : `${ops[0]}.zip`, c, { maiDentro: true }) : '';
       }
       case 'unzip':
