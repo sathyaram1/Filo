@@ -465,7 +465,8 @@ const segnalazioneRiga = (r) => {
   const n = Number(String(r && typeof r === 'object' && r.segnalazione != null ? r.segnalazione : '').replace(/^#/, ''));
   return Number.isInteger(n) && n > 0 ? n : null;
 };
-const rigaPerIlRedattore = (r) => `- ${segnalazioneRiga(r) ? `[segnalazione ${segnalazioneRiga(r)}] ` : ''}${unaRiga(testoRiga(r))}`;
+// Il numero è quello che la riga riscritta cita in `da`: features e fixes contati di seguito, come in controllaNovita.
+const rigaPerIlRedattore = (r, n) => `${n}. ${segnalazioneRiga(r) ? `[segnalazione ${segnalazioneRiga(r)}] ` : ''}${unaRiga(testoRiga(r))}`;
 
 /** Il contesto apposito del redattore: le righe dei worker, il manifesto, i titoli della rosa e delle 3. PURA. */
 export function contestoRedattore({ blocco, capacita = '', schede = [], commit = '', motivo = '' }) {
