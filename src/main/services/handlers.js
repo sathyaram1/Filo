@@ -7290,6 +7290,7 @@ const handlerCtx = {
   buildAttemptChain,
   providerRouting,
   openWeightsBlockReason,
+  avvisiFuoriPolitica: AvvisiFuoriPolitica,
   modelGate: Gate,
   handleAIRequest,
   maybeCategorizeAsync,
