@@ -190,8 +190,9 @@
       required: ['testo'],
     },
     INVIA_FEEDBACK: {
+      // Nel main SN_CONST c'è sempre (loader); manca solo agli unit test che caricano questo file da solo.
       description: () => 'Invia un feedback agli sviluppatori di Filo a nome dell\'utente. Se serve il suo OK il sistema glielo chiede da sé, con l\'anteprima: tu prepara il testo e basta. '
-        + global.SN_CONST.SEGNALAZIONE_SENZA_PERSONA,
+        + ((global.SN_CONST && global.SN_CONST.SEGNALAZIONE_SENZA_PERSONA) || ''),
       properties: {
         testo: S('La segnalazione completa, in terza persona e senza dati dell\'utente.'),
         titolo: S('Un riassunto di 2-6 parole, senza nomi.'),

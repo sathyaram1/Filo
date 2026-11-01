@@ -4,6 +4,8 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
+import { confirmText, clickConfirm, nelMondoDiFilo } from './helpers/confirm.mjs';
+import { confermaNelloStrato, nelloStrato, paginaDelloStrato } from './helpers/riquadri.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -129,4 +131,35 @@ test('la segnalazione che Filo propone da sé toglie il nome che la memoria rico
   await expect.poll(() => app.evaluate(() => globalThis.__submitted.length), { timeout: 10_000 }).toBe(1);
   const inviato = await app.evaluate(() => globalThis.__submitted[0]);
   expect(`${inviato.text}\n${inviato.name}`).not.toMatch(/Luca|Moretti/);
+});
+
+// Dall'Aiuto su un sito la conferma rimanda il testo del modello: la riscrittura deve combaciare, o l'OK sarebbe respinto.
+test('dall\'Aiuto su un sito il riquadro mostra il testo senza il nome, e l\'OK lo spedisce così', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body><h1>Ricette</h1></body></html>');
+  await registraInvii(app);
+  await app.evaluate(() => {
+    const M = process.getBuiltinModule('module');
+    const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
+    M._cache[k].exports.getProfile = () => ({ email: 'giulia.ferraris@example.com', name: 'Giulia Ferraris', picture: '' });
+  });
+  const host = new URL(page.url()).hostname;
+  await expect.poll(() => nelMondoDiFilo(app, host, 'typeof window.SN_SIDEBAR?.open'), { timeout: 8000 }).toBe('function');
+  await nelMondoDiFilo(app, host, 'window.SN_SIDEBAR.open(); 1');
+  const strato = await paginaDelloStrato(app, page);
+  await strato.waitForSelector('.sn-sidebar-input textarea');
+  await nelloStrato(app, page, (a) => {
+    window.__esito = 'in corso';
+    window.__filoSidebarTest.runFiloAction(a).then((v) => { window.__esito = v; });
+    return 1;
+  }, { type: 'INVIA_FEEDBACK', testo: 'Giulia non trova la ricetta salvata ieri.', titolo: 'Ricetta di Giulia sparita' });
+  const vista = await confermaNelloStrato(app, page, { timeout: 15_000 });
+  const visto = await confirmText(vista);
+  expect(visto).toContain('L\'utente non trova la ricetta salvata ieri.');
+  expect(visto).not.toMatch(/Giulia|Ferraris/);
+  await clickConfirm(vista, 'ok');
+  await expect.poll(() => nelloStrato(app, page, () => window.__esito)).toBe(true);
+  const inviato = await app.evaluate(() => globalThis.__submitted[0]);
+  expect(inviato.text).toBe('L\'utente non trova la ricetta salvata ieri.');
+  expect(inviato.name).toBe('Ricetta dell\'utente sparita');
 });
