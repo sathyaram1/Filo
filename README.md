@@ -1,5 +1,7 @@
 # Filo
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sathyaram1/Filo/badge)](https://scorecard.dev/viewer/?uri=github.com/sathyaram1/Filo)
+
 > **Non ancora pronto.** Questo repository è il dietro le quinte di un progetto
 > in costruzione, non un prodotto da usare. I documenti di trasparenza sono
 > incompleti e ci sono problemi di sicurezza noti in corso di risoluzione.
