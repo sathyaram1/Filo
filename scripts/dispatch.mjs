@@ -2396,7 +2396,12 @@ async function finalizeBucket(bucket, fromServer) {
   // «in coda» per tutta la lavorazione.
   const ripresa = !!(fromServer && fromServer.payload && fromServer.payload.ripresa);
   if (bucket.id && (bucket.role === 'new-work' || (bucket.role === 'fixer' && ripresa))) {
-    await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
+    const presa = await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
+    // Il biglietto è legato a un altro ramo: la consegna da questo verrebbe rifiutata a lavoro finito (#1632).
+    if (presa.outcome === 'refused' && presa.reason === 'branch_mismatch') {
+      const motivo = unaRiga(motivoRifiuto(presa)).replace(/["`$\\]/g, "'");
+      return emitHalt('transient', `il server ha legato questo biglietto a un altro ramo e rifiuta la presa in carico su ${bucket.branch} (${motivo}): la consegna da qui verrebbe rifiutata, non si lavora`);
+    }
   }
 
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
