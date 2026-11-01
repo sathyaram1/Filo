@@ -1522,7 +1522,7 @@ class TabManager {
           ...(daSola ? { chiusaDaSola: true } : {}),
           ...(motivo ? { motivo } : {}),
           ...(giro ? { giro } : {}),
-          ...(tab.audioAt > 0 ? { audioAt: new Date(tab.audioAt).toISOString() } : {}),
+          ...(ultimoSuono(tab) > 0 ? { audioAt: new Date(ultimoSuono(tab)).toISOString() } : {}),
           coOpenUrls,
           scrollPosition: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
           // La location si salva, o riaprendo dall'archivio la scheda
