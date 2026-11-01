@@ -2137,8 +2137,16 @@ class TabManager {
   // ribroadcastare alla shell).
   reorderTabsByColor() {
     const before = this.tabs;
-    const withIdx = before.map((t, i) => ({ t, i }));
-    withIdx.sort((a, b) => compareRainbow(a.t.identityColor, b.t.identityColor) || a.i - b.i);
+    // #1561.5 — una scheda che non ha ancora detto il suo colore prende quello di una dello stesso sito, o della stessa
+    // pagina di Filo: due home aperte una dopo l'altra non si scambiano di posto. «Nessun colore» detto resta in coda.
+    const noti = new Map();
+    for (const t of before) {
+      const k = chiaveColore(t.url);
+      if (k && t.identityColor && !noti.has(k)) noti.set(k, t.identityColor);
+    }
+    const colore = (t) => t.identityColor || (!t._identitaNota && noti.get(chiaveColore(t.url))) || null;
+    const withIdx = before.map((t, i) => ({ t, i, c: colore(t) }));
+    withIdx.sort((a, b) => compareRainbow(a.c, b.c) || a.i - b.i);
     const next = withIdx.map((x) => x.t);
     const changed = next.some((t, i) => t !== before[i]);
     this.tabs = next;
@@ -4745,6 +4753,16 @@ function hostOf(url) {
     const u = new URL(url);
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
     return u.host || null;
+  } catch (_) { return null; }
+}
+
+// Le schede che il riordino tiene insieme: lo stesso sito, o la stessa pagina di Filo (la home, le Preferenze).
+function chiaveColore(url) {
+  const host = hostOf(url);
+  if (host) return host;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'filo:' && u.host ? `filo://${u.host}` : null;
   } catch (_) { return null; }
 }
 

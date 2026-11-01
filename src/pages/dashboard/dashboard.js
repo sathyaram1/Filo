@@ -83,6 +83,18 @@
   let pendingFiles = [];
   // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
   let testoDaFuori = false;
+  // #892.5 — le righe che il campo ha avuto da fuori: svuotato e riportato con Annulla, un testo incollato lo resta.
+  // Si tengono le impronte, non i testi; un'impronta uguale per caso chiede di più, mai di meno.
+  const righeDaFuori = new Set();
+  const impronta = (s) => {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return `${s.length}:${h >>> 0}`;
+  };
+  const ricordaDaFuori = (s) => {
+    righeDaFuori.add(impronta(s));
+    if (righeDaFuori.size > 2000) righeDaFuori.delete(righeDaFuori.values().next().value);
+  };
   // Il testo del Ctrl+V nativo: l'evento `input` che segue non lo porta con sé (#968).
   let testoIncollato = null;
   const percorsiImmagini = new Map();
@@ -248,6 +260,7 @@
       if (inputEl.value.trim()) return;
       inputEl.value = testo;
       testoDaFuori = !!incollato;
+      if (incollato) ricordaDaFuori(testo);
       autoGrowInput();
       Comandi.updateInputClass();
       inputEl.focus();
@@ -1650,7 +1663,7 @@
     const testi = tornati.map((c) => c.scritto.trim()).filter(Boolean);
     const bozza = inputEl.value.trim() ? [inputEl.value] : [];
     inputEl.value = [...testi, ...bozza].join('\n');
-    if (tornati.some((c) => c.incollato)) testoDaFuori = true;
+    if (tornati.some((c) => c.incollato)) { testoDaFuori = true; ricordaDaFuori(inputEl.value); }
     for (const c of tornati) {
       for (const d of c.immagini) addPendingImage(d, c.percorsi.get(d));
       for (const f of c.file) addPendingFile(f.percorso);
@@ -2064,6 +2077,8 @@
   inputEl.addEventListener('input', (e) => {
     if (!inputEl.value) testoDaFuori = false;
     else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDaFuori = true;
+    else if ((e.inputType === 'historyUndo' || e.inputType === 'historyRedo') && righeDaFuori.has(impronta(inputEl.value))) testoDaFuori = true;
+    if (testoDaFuori && inputEl.value) ricordaDaFuori(inputEl.value);
     Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); preparaSaldo(); aggiornaTasto();
     // Ctrl+V porta il testo nell'evento `paste`, l'Incolla del menu di Filo in `data`.
     if (e.inputType === 'insertFromPaste') {

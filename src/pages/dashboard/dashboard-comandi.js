@@ -508,7 +508,10 @@
     if (/^\$[\p{L}_{(]/u.test(s) || s.startsWith('`') || /^\[[\p{L}\p{N}_.]+\]::/u.test(s)) return SINTASSI;
     const V = global.SN_VIRGOLETTE;
     if (V && /^["']/.test(s)) return V.primoComando(s);
-    return s.split(/[\s|<>;&(){}`]/)[0] || '';
+    const nome = s.split(/[\s|<>;&(){}`]/)[0] || '';
+    // «:)» e «:(» sono faccine, non il `:` della shell attaccato a una parentesi (#892.5).
+    if (!/[\p{L}\p{N}]/u.test(nome) && /[()]/.test(s.charAt(nome.length))) return '';
+    return nome;
   }
 
   // Verifica (con debounce) se il primo token è un comando shell esistente e

@@ -1450,7 +1450,20 @@ function perimetroLettura(sender, cartella = null) {
   try { cwd = cartellaDelComando(cartella == null ? getAssistantCwd(sender) : cartella) || ''; } catch (_) {}
   let reti = [];
   try { reti = require('./shell').unitaDiRete(cwd); } catch (_) {}
-  return { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
+  const perimetro = { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
+  // #892.2 — il classificatore chiede qui se un bersaglio c'è già. Non enumerabile: il perimetro resta un dato.
+  Object.defineProperty(perimetro, 'esiste', { value: statoSulDisco });
+  return perimetro;
+}
+
+// 'file', 'cartella', null se non c'è, 'ignoto' se il disco non risponde. I percorsi di rete li scarta prima chi chiede.
+function statoSulDisco(p) {
+  // Un'unità che porta a un altro computer non si guarda nemmeno (#1072): resta da chiedere.
+  const u = /^([A-Za-z]):/.exec(String(p || ''));
+  try { if (u && require('./shell').unitaDiRete(p).includes(`${u[1].toLowerCase()}:`)) return 'ignoto'; } catch (_) { return 'ignoto'; }
+  try { return require('node:fs').statSync(p).isDirectory() ? 'cartella' : 'file'; } catch (e) {
+    return e && (e.code === 'ENOENT' || e.code === 'ENOTDIR') ? null : 'ignoto';
+  }
 }
 
 // La shell delle Preferenze che eseguirà i comandi dell'assistente, già risolta per questo sistema.
@@ -2214,7 +2227,7 @@ async function decisioneComandoAMano({ comando, cwd = '', shell = '', daFuori = 
   const cmd = String(comando || '').trim();
   let impostazioni = {};
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
-  const action = { type: 'ESEGUI_COMANDO', comando: cmd, _perimetro: { ...perimetroLettura(null, cwd), shell } };
+  const action = { type: 'ESEGUI_COMANDO', comando: cmd, _perimetro: Object.assign(perimetroLettura(null, cwd), { shell }) };
   const ing = Levels ? Levels.ingressi(action, { impostazioni }) : null;
   if (!cmd || !ing) return { risposta: 'no', digita: false, no: 'Questo comando non lo lancio.' };
   const d = decisioneAutonomia(ing, { impostazioni, fontiLette: daFuori === true ? [FONTE_COMANDO_DA_FUORI] : null });

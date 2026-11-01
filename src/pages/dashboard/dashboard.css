@@ -1902,6 +1902,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   border-radius: 3px;
 }
 .dash-term-prompt { color: var(--dash-accent-2); font-weight: 700; }
+/* Col tema scuro la bolla del comando è chiara: la sabbia ci spariva sopra, la terracotta si legge. */
+[data-sn-theme="dark"] .dash-term-cmd .dash-term-prompt { color: var(--dash-accent); }
 
 /* Bolla output: monospace, scrollabile, con i controlli sotto. Anche la
    risposta del terminale è QUADRATA, in coppia con la riga di comando. */
