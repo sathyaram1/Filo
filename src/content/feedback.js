@@ -507,7 +507,7 @@
     }
 
     // Un allegato lasciato fuori si dice col suo nome e il perché, anche in mezzo ad altri entrati (#1681). Ritornano
-    // null se l'allegato è entrato, sennò { name, reason, tipo }.
+    // null se l'allegato è entrato, sennò { name, reason }.
     const TIPO_NO = 'tipo non supportato';
     const scarto = (f, reason, ripiego) => ({ name: String(f?.name || ripiego), reason });
     async function addImageFromBlob(blob) {
