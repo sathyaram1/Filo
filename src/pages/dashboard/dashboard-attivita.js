@@ -2587,12 +2587,14 @@
     wrap.className = 'dash-bubble-actions dash-esiti-archiviati';
     const riuscite = [];
     for (const v of lista) {
+      // Il file si racconta col suo bottone, come nella risposta in diretta.
+      if (v.type === 'APRI_FILE' && v.file && percorsoLocale(v.file.percorso)) {
+        wrap.appendChild(bottoneFile({ type: 'APRI_FILE', percorso: v.file.percorso, etichetta: v.file.etichetta || '', _executed: true }));
+        continue;
+      }
       const riga = E.rigaDellaVoce(v);
       if (riga && (tutte || riga.fallita)) wrap.appendChild(makeActivityRow(riga.icona, riga.testo));
       else if (riga) riuscite.push(riga.testo);
-      if (v.type === 'APRI_FILE' && v.file && percorsoLocale(v.file.percorso)) {
-        wrap.appendChild(bottoneFile({ type: 'APRI_FILE', percorso: v.file.percorso, etichetta: v.file.etichetta || '', _executed: true }));
-      }
     }
     let nota = null;
     if (riuscite.length) {

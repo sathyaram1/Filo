@@ -1,6 +1,6 @@
 // #1685 — la chat della home racconta com'è andata ogni azione e cosa aspetta il sì: riaperta, dopo un riavvio, in
 // un'altra conversazione (#1130.2, #1294); dopo l'OK riprende da sola solo se il lavoro non era finito (#1373); una
-// conversazione chiusa in una home non la continua un'altra (#1443.2). Modello finto, nessuna rete.
+// conversazione chiusa in una home non la continua un'altra (#1443.2). Modello finto e nessuna rete.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { join } from 'node:path';
@@ -85,6 +85,8 @@ test('#1294 riaperta, la chat racconta la cosa fatta e quella non riuscita col p
   ]);
   await chiedi(page, 'timer di 5 minuti per la pasta e lancia ls');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Il timer è partito' })).toBeVisible({ timeout: 10_000 });
+  // Il testo scorre prima che il turno finisca: la memoria si dimentica dopo che il main l'ha scritta.
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
   const chat = await chatCon(app, 'timer di 5 minuti per la pasta e lancia ls');
   await dimenticaLaMemoria(app, chat.id);
   await riapri(app, page, chat.id);
@@ -116,16 +118,16 @@ test('#1294 riaperta, la chat ridà il bottone del file che la risposta mostrava
   writeFileSync(file, '%PDF-1.4\n');
   try {
     const page = await home(app);
+    // Mostrare un file parla da sé (#1130): il turno si chiude col bottone, senza frase.
     await modelloFinto(app, [
       { toolCalls: [{ id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: file, etichetta: 'La ricevuta' }) }] },
-      { text: 'Eccola.' },
     ]);
     await chiedi(page, 'dov\'è la ricevuta dell\'assicurazione?');
     await expect(page.locator('.dash-file-btn')).toHaveCount(1, { timeout: 10_000 });
     const chat = await chatCon(app, 'dov\'è la ricevuta dell\'assicurazione?');
     await dimenticaLaMemoria(app, chat.id);
     await riapri(app, page, chat.id);
-    const btn = page.locator('.dash-bubble-filo', { hasText: 'Eccola.' }).locator('.dash-file-btn');
+    const btn = page.locator('.dash-bubble-filo .dash-file-btn');
     await expect(btn).toHaveCount(1, { timeout: 8_000 });
     await expect(btn).toHaveAttribute('data-percorso', file);
     await expect(btn.locator('.dash-file-btn-nome')).toHaveText('ricevuta-assicurazione.pdf');
