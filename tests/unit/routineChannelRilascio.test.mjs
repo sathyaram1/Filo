@@ -511,6 +511,43 @@ describe('release da riga di comando', () => {
       assert.equal(rilascio.body.report.role, 'resolver');
       assert.equal(rilascio.body.report.ticket, 'tkt-cli');
       assert.ok(Array.isArray(rilascio.body.report.notes) && rilascio.body.report.notes.length >= 1, 'senza transcript: la nota c\'è');
+      // #2021: la punta lasciata dal rilascio arriva al server, che la scrive nel registro del ramo.
+      assert.equal(rilascio.body.branch, 'worker/10');
+      assert.equal(rilascio.body.sha, remoteSha(origin, 'worker/10'));
+    } finally { srv.close(); }
+  });
+
+  // #2021: la pulizia dopo il verdetto la committa e la spinge il rilascio; se la sua punta non arriva al server, il
+  // registro del ramo trova all'emissione dopo un commit che nessuna voce copre e segna il buco per sempre.
+  test('il commit fatto dopo l\'ultima consegna parte col rilascio, e il rilascio porta la sua punta', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { origin, work } = scena();
+    try {
+      g(work, ['checkout', '-q', '-b', 'worker/10b']);
+      commitFile(work, 'prova-del-giro.spec.mjs');
+      g(work, ['push', '-q', 'origin', 'HEAD:refs/heads/worker/10b']);
+      const consegnato = g(work, ['rev-parse', 'HEAD']);
+      g(work, ['rm', '-q', 'prova-del-giro.spec.mjs']);
+      g(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'via le prove dei rilievi messi da parte']);
+      const r = await cli(['release', 'tkt-cli', '--role', 'verifier', '--senza-rapporto'], {
+        FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1',
+      });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      const punta = remoteSha(origin, 'worker/10b');
+      assert.notEqual(punta, consegnato, 'la pulizia è arrivata su origin');
+      const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', branch: 'worker/10b', sha: punta });
+    } finally { srv.close(); }
+  });
+
+  test('push saltato (ramo protetto): il rilascio non dichiara nessuna punta', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { work } = scena();
+    try {
+      const r = await cli(['release', 'tkt-cli', '--senza-rapporto'], { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1' });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      assert.match(r.se, /push saltato/);
+      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli' });
     } finally { srv.close(); }
   });
 
