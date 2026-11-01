@@ -575,7 +575,7 @@ export function registrazioniDelRapporto(report) {
   const out = { report: resto };
   if (Array.isArray(falliti) && falliti.length) {
     out.strumentiFalliti = falliti.filter((f) => f && f.strumento && f.errore)
-      .map((f) => ({ nome: String(f.strumento), errore: String(f.errore), ...(f.dopo ? { poi: String(f.dopo) } : {}) }));
+      .map((f) => ({ nome: f.cosa ? `${f.strumento}: ${f.cosa}` : String(f.strumento), errore: String(f.errore), ...(f.dopo ? { poi: String(f.dopo) } : {}) }));
   }
   if (Array.isArray(attese) && attese.length) {
     out.attese = attese.filter((a) => a && a.strumento && Number(a.s) > ATTESA_SOPRA_S)

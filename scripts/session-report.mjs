@@ -597,7 +597,9 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         const input = b.input && typeof b.input === 'object' ? b.input : {};
         let firma = '';
         try { firma = JSON.stringify(input); } catch (_) { firma = ''; }
-        const info = { nome, cosa: rigaPulita(typeof input.description === 'string' ? input.description : '', RIGA_COSA_MAX), firma };
+        // Senza descrizione, la prima riga del comando: quaranta prove fallite non devono diventare quaranta «Bash» uguali.
+        const comando = typeof input.command === 'string' ? input.command.split('\n')[0] : '';
+        const info = { nome, cosa: rigaPulita(typeof input.description === 'string' && input.description.trim() ? input.description : comando, RIGA_COSA_MAX), firma };
         chiamate.set(bid, info);
         for (const f of senzaSeguito) f.voce.dopo = rigaDopo(f.chiamata, info);
         senzaSeguito = [];
@@ -615,7 +617,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         if (b.is_error === true) rep.tools.errors += 1;
         const chiamata = chiamate.get(b.tool_use_id) || { nome: '_', cosa: '', firma: '' };
         if (b.is_error === true) {
-          const voce = { strumento: chiamata.nome, errore: rigaErrore(b.content), dopo: '' };
+          const voce = { strumento: chiamata.nome, ...(chiamata.cosa ? { cosa: chiamata.cosa } : {}), errore: rigaErrore(b.content), dopo: '' };
           rep.falliti.push(voce);
           senzaSeguito.push({ voce, chiamata });
         }

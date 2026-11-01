@@ -1077,3 +1077,13 @@ test('una riga del rapporto: niente a capo, niente stringhe lunghe come un bigli
   const vuoto = stringiElenchi(rapportoVuoto());
   assert.deepEqual([vuoto.falliti, vuoto.attese, vuoto.atteseOltre30, vuoto.notes], [[], [], 0, []]);
 });
+
+test('la riga d\'errore è quella del fallimento: mai una prova passata che si chiama «errore», mai la posizione nel sorgente', () => {
+  const npm = 'Exit code 1\n\n> filo@0.9.0 test:unit\n> node scripts/run-unit-tests.mjs\n\nTAP version 13\n# Subtest: senza transcript: mai un errore\nok 1 - senza transcript: mai un errore\n# Subtest: la somma\nnot ok 2 - la somma\n  error: |-\n    Expected values to be strictly equal:';
+  assert.equal(rigaErrore(npm), 'exit 1: not ok 2 - la somma');
+  assert.equal(rigaErrore('Exit code 1\n✔ il rilascio non perde errore (0.9ms)\n✖ la somma (1.2ms)\n  AssertionError [ERR_ASSERTION]: Expected'), 'exit 1: ✖ la somma (1.2ms)');
+  assert.equal(rigaErrore('Exit code 1\n[eval]:1\nx()\n^\n\nReferenceError: x is not defined\n    at [eval]:1:1'), 'exit 1: ReferenceError: x is not defined');
+  assert.equal(rigaErrore("Exit code 1\n/tmp/x.mjs:3\n  throw new Error('boom');\n  ^\n\nError: boom\n    at file:///tmp/x.mjs:3:9"), 'exit 1: Error: boom');
+  assert.equal(rigaErrore('Exit code 1\nTo https://github.com/o/r.git\n ! [rejected]        claude/x -> claude/x (non-fast-forward)\nerror: failed to push some refs'), 'exit 1: ! [rejected] claude/x -> claude/x (non-fast-forward)');
+  assert.equal(rigaErrore('Exit code 1\n  ✓  1 tests/a.spec.mjs:3:1 › apre (1s)\n  ✘  2 tests/b.spec.mjs:22:3 › salva (5s)'), 'exit 1: ✘ 2 tests/b.spec.mjs:22:3 › salva (5s)');
+});
