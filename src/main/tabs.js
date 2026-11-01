@@ -4543,6 +4543,7 @@ class TabManager {
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
       }
     } catch (_) { letturaFallita = true; }
+    this._sessioneDaLeggere = false;
     // L'esito della riapertura e i suoi tempi vanno ai contatori anonimi (#1466).
     if (!urls.length) {
       try { contatori?.sessione({ esito: letturaFallita ? 'lettura_fallita' : 'niente' }); } catch (_) {}
