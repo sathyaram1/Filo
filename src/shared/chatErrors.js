@@ -103,6 +103,32 @@
   const FRASE_CONTESTO_PIENO = 'c\'è più testo di quanto il modello riesca a leggere insieme: chiedimi meno pagine alla volta, '
     + 'accorcia il messaggio o ricomincia in una chat nuova.';
 
+  // Il tipo di contenuto che il modello non legge (#1345), dal testo del rifiuto: il 404 del router («No endpoints found
+  // that support image input») o un host che dice di non accettarlo. '' per ogni altro rifiuto, «troppe immagini» compreso.
+  const INGRESSI = [['immagini', /imag|vision/i], ['audio', /audio/i], ['video', /video/i], ['pdf', /pdf|file|document/i]];
+  const ROUTER_INGRESSO = /no endpoints? found that supports? ([^.,;]+)/i;
+  const HOST_INGRESSO = new RegExp([
+    /(?:does ?n[o']t|do not|cannot|can ?not|unable to) (?:support|accept|process|handle|read)s? (?:the |an? )?(?:input )?(image_url|input_audio|input_file|images?|vision|audio|video|pdfs?|files?|documents?)/,
+    /(image_url|input_audio|input_file|images?|audio|video|pdfs?|files?|documents?)(?: inputs?| content)? (?:is|are) (?:not|only) supported/,
+    /unsupported (?:content type|input|modality)[^.]{0,30}?(image|audio|video|pdf|file)/,
+  ].map((r) => r.source).join('|'), 'i');
+  function ingressoRifiutato(testo) {
+    const t = String(testo || '');
+    const router = ROUTER_INGRESSO.exec(t);
+    const parola = router
+      ? (/tool|parameter/i.test(router[1]) ? '' : router[1])
+      : ((HOST_INGRESSO.exec(t) || []).slice(1).find(Boolean) || '');
+    const hit = parola ? INGRESSI.find(([, re]) => re.test(parola)) : null;
+    return hit ? hit[0] : '';
+  }
+  const FRASI_INGRESSO = {
+    immagini: `il modello scelto non legge le immagini, e questa richiesta ne porta: scegline uno che le legga ${DOVE_ALTRO_MODELLO}, o riprova senza immagini.`,
+    audio: `il modello scelto non ascolta l'audio, e questa richiesta ne porta: scegline uno che lo ascolti ${DOVE_ALTRO_MODELLO}.`,
+    pdf: `il modello scelto non legge i PDF, e questa richiesta ne porta: scegline uno che li legga ${DOVE_ALTRO_MODELLO}, o riprova senza il PDF.`,
+    video: `il modello scelto non guarda i video, e questa richiesta ne porta: scegline uno che li guardi ${DOVE_ALTRO_MODELLO}, o riprova senza il video.`,
+  };
+  const FRASE_INGRESSO_IGNOTO = `il modello scelto non legge un tipo di contenuto che questa richiesta porta: scegline un altro ${DOVE_ALTRO_MODELLO}.`;
+
   // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
   // codici, è un vicolo cieco (la risposta sarà identica finché non si cambia
   // qualcosa), quindi accanto ci va il collegamento al posto giusto.
