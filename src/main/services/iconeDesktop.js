@@ -637,8 +637,27 @@ const stessaDisposizione = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 // ── Le frasi ────────────────────────────────────────────────────────────────
 
 const IMPOSTAZIONI_WINDOWS = 'tasto destro sul desktop → Visualizza';
-function spiega(errore, { totale = 0, posti = 0 } = {}) {
-  const T = {
+const IMPOSTAZIONI_FINDER = 'tasto destro sulla Scrivania → Mostra opzioni Vista';
+const PILE = 'Se la Scrivania usa le pile vanno tolte (tasto destro sulla Scrivania → Usa pile), poi Filo riprova.';
+function spiega(errore, { totale = 0, posti = 0, piattaforma = 'win32' } = {}) {
+  const mac = piattaforma === 'darwin';
+  const T = mac ? {
+    'nessun-desktop': { frase: 'Il Finder non ha fatto vedere a Filo le icone della Scrivania.' },
+    'permesso-automazione': {
+      frase: 'macOS non lascia a Filo comandare il Finder, che tiene le icone della Scrivania.',
+      dove: 'Si concede in Impostazioni di Sistema → Privacy e sicurezza → Automazione: sotto Filo, accendi Finder.',
+      apri: 'mac-automazione',
+    },
+    finder: { frase: 'Il Finder non risponde: senza il Finder le icone della Scrivania non si spostano.' },
+    griglia: { frase: 'Il Finder non ha detto quanto è grande la Scrivania, e senza quel numero Filo non sa dove mettere le icone.' },
+    'non-ci-stanno': {
+      frase: `Sulla Scrivania ci sono ${totale} icone e lo schermo, in griglia, ne tiene ${posti}: in ordine non ci stanno tutte.`,
+      dove: `Con le icone più piccole ci stanno (${IMPOSTAZIONI_FINDER} → Dimensione icone): poi Filo le rimette in ordine.`,
+    },
+    'non-spostate': { frase: 'Il Finder non ha spostato le icone della Scrivania.', dove: PILE },
+    'fuori-ordine': { frase: 'Il Finder ha spostato le icone, ma rileggendo la Scrivania non sono nell\'ordine chiesto.', dove: PILE },
+    'tempo-comando': { frase: 'Il Finder non ha risposto in tempo.' },
+  } : {
     'nessun-desktop': {
       frase: 'Windows non ha dato a Filo il desktop: succede se Esplora risorse è fermo, o se il desktop lo disegna un altro programma.',
       dove: 'Esplora risorse si riavvia da Gestione attività: clic destro su «Esplora risorse» → Riavvia.',
@@ -649,23 +668,25 @@ function spiega(errore, { totale = 0, posti = 0 } = {}) {
       dove: `Con le icone più piccole ci stanno (${IMPOSTAZIONI_WINDOWS} → Icone piccole): poi Filo le rimette in ordine.`,
     },
     'non-spostate': { frase: 'Windows non ha spostato le icone: può impedirlo una regola dell\'azienda o un programma che tiene in ordine il desktop.' },
+    'fuori-ordine': {
+      frase: 'Windows ha spostato le icone, ma rileggendo il desktop non sono nell\'ordine chiesto: qualcosa le ha rimesse altrove.',
+      dove: 'Di solito è un programma che organizza il desktop (come Fences): chiuso quello, Filo riprova.',
+    },
     'tempo-comando': { frase: 'Windows non ha risposto in tempo dal desktop.' },
-    mac: {
-      frase: 'Su Mac Filo non sa ancora spostare le icone della Scrivania.',
-      dove: 'Il Finder le mette in ordine da sé, a colonne partendo da destra: tasto destro sulla Scrivania → Ordina per → Nome.',
-    },
-    linux: {
-      frase: 'Su Linux le icone del desktop le dispone l\'ambiente grafico (GNOME, KDE, XFCE…), e Filo non sa ancora spostarle.',
-      dove: 'Di solito si mettono in ordine col tasto destro sul desktop.',
-    },
-    prove: { frase: 'Durante le prove automatiche Filo non tocca il desktop vero.' },
   };
-  const voce = Object.prototype.hasOwnProperty.call(T, errore) ? T[errore] : { frase: 'Windows non ha spostato le icone del desktop.' };
-  return { errore, frase: voce.frase, ...(voce.dove ? { dove: voce.dove } : {}) };
+  T.linux = {
+    frase: 'Su Linux le icone del desktop le dispone l\'ambiente grafico (GNOME, KDE, XFCE…), e Filo non sa ancora spostarle.',
+    dove: 'Di solito si mettono in ordine col tasto destro sul desktop.',
+  };
+  T.prove = { frase: 'Durante le prove automatiche Filo non tocca il desktop vero.' };
+  const ignoto = { frase: mac ? 'Il Finder non ha spostato le icone della Scrivania.' : 'Windows non ha spostato le icone del desktop.' };
+  const voce = Object.prototype.hasOwnProperty.call(T, errore) ? T[errore] : ignoto;
+  const apri = voce.apri && Sistema.uriImpostazioni(voce.apri) ? { apri: voce.apri } : {};
+  return { errore, frase: voce.frase, ...(voce.dove ? { dove: voce.dove } : {}), ...apri };
 }
 
 function fallito(errore, extra = {}) {
-  return { ok: false, cosa: 'desktop', ...spiega(errore, extra), ...extra };
+  return { ok: false, cosa: 'desktop', ...spiega(errore, { piattaforma: piattaformaDi(), ...extra }), ...extra };
 }
 
 function comeDetto(come) {
