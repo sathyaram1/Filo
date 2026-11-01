@@ -410,7 +410,9 @@
     const rendiIl = (i, prima) => {
       const m = lista[i];
       const g = m.role !== 'user' && typeof giro === 'function' ? conGiro(m, prima, giro(m)) : null;
-      return g || [rendi(m, prima, opzioni(i))];
+      if (g) return g;
+      const r = rendi(m, prima, opzioni(i));
+      return r ? [r] : [];
     };
     const memo = new Map();
     const pesa = (i) => {

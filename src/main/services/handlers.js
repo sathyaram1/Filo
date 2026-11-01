@@ -6675,6 +6675,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       }
       const obs = observationsForPrompt(fuori ? [...(Array.isArray(m.actions) ? m.actions : []), fuori] : m.actions);
       if (obs) parts.push(obs);
+      // Com'è andata (#1294): dall'archivio se la storia viene da lì, se no le proposte ancora ferme sulla conferma, che
+      // gli esiti da leggere non dicono (#1130.2).
+      const ES = globalThis.SN_ESITO;
+      const voci = Array.isArray(m.esiti) && m.esiti.length ? m.esiti
+        : ES.vociArchivio((Array.isArray(m.actions) ? m.actions : []).filter((a) => a && a._confirm));
+      const storia = ES.perModello(voci);
+      if (storia) parts.push(storia);
       const extra = parts.join('\n\n');
       if (extra) msg.content = content ? `${content}\n\n${extra}` : extra;
       // Il ragionamento del turno passato torna al modello così com'era
