@@ -5471,7 +5471,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
 //
 // Deterministico di proposito: il prompt chiede al modello di farlo da sé, ma un
 // invariante come questo non può dipendere dall'umore di un LLM.
-function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory, citaRisposta = true }) {
+async function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory, citaRisposta = true }) {
   try {
     const AF = globalThis.SN_AUTO_FEEDBACK;
     if (!AF || typeof AF.composeProposal !== 'function') return null;
@@ -5488,7 +5488,7 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
     const Caps = globalThis.SN_CAPABILITIES;
     const analysis = AF.analyzeReply(textReply, rawActions, userMessage, Caps ? Caps.all(cancelliAperti()) : []);
     if (!analysis || !analysis.kind) return null;
-    const proposta = AF.composeProposal(analysis, { userMessage, textReply: citaRisposta ? textReply : '' });
+    const proposta = AF.composeProposal(analysis, { userMessage, textReply: citaRisposta ? textReply : '', identita: await identitaDellUtente() });
     // Il segno torna con la conferma: i contatori del servizio (#1472) la distinguono da una che il modello ha scritto.
     return proposta ? { ...proposta, _proposta: true } : null;
   } catch (e) {
@@ -6698,7 +6698,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // scritta nella stessa bolla invece di doverla chiedere.
   let proposal = internal
     ? null // turno di prosecuzione automatica: il "messaggio utente" è un nudge nostro
-    : maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
+    : await maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
   if (proposal) {
     // La proposta è un'uscita come le altre: passa dalla porta con quello che la chat ha letto (#810).
     // Se la risposta citata porta un segreto letto da fuori, la proposta parte senza citarla.
@@ -6706,7 +6706,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const conContesto = { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta, dentroPerimetro: false };
     let res = await executeFiloAction(proposal, conContesto);
     if (res.output && res.output.blocked === 'segreto') {
-      proposal = maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory, citaRisposta: false });
+      proposal = await maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory, citaRisposta: false });
       res = proposal ? await executeFiloAction(proposal, conContesto) : { kept: false };
       if (res.output && res.output.blocked === 'segreto') { proposal = null; res = { kept: false }; }
     }
@@ -7332,7 +7332,8 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   contaHomeVista,
   executeFiloAction,
-  chiaveConferma: pendingConfirmKey,
+  // Il no dell'Aiuto rimanda la segnalazione come l'ha scritta il modello: la chiave è quella del testo ripulito.
+  chiaveConferma: async (sender, action) => pendingConfirmKey(sender, await segnalazioneSenzaPersona(action)),
   controllaUscita,
   apriDaFilo,
   sitoDaConfermare,

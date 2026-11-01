@@ -115,7 +115,7 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_CONFIRM_RIFIUTATA, async (msg, sender) => {
     const action = msg && msg.action;
     if (!action || typeof action !== 'object' || !contatori()) return { ok: true, contata: false };
-    return { ok: true, contata: Boolean(contatori().confermaRisposta(chiaveConferma(sender, action), 'rifiutata')) };
+    return { ok: true, contata: Boolean(contatori().confermaRisposta(await chiaveConferma(sender, action), 'rifiutata')) };
   });
 
   // #867 — il segno sulla bolla chiede come stanno i suoi cambi, e il suo «annulla» li rimette com'erano.
