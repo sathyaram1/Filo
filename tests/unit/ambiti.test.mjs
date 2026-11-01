@@ -39,6 +39,8 @@ test('fuori ambito, sconosciuta e non ancora attiva sono rifiuti diversi; le uni
   assert.equal(A.consente(['coda'], 'coda.scrivi').errore, 'operazione_sconosciuta');
   assert.equal(A.consente(['coda'], 'taccuino.scrivi').errore, 'operazione_non_attiva');
   assert.equal(A.consente(['posta'], 'posta.leggi').errore, 'fuori_ambito', 'un ambito non ancora attivo non dà niente');
+  assert.deepEqual(A.consente(['domande'], 'domande.principio'), { ok: true }, 'la revisione risponde coi principi (#2003)');
+  assert.equal(A.consente(['coda'], 'domande.principio').errore, 'fuori_ambito');
   assert.deepEqual(A.consente([], 'segnala'), { ok: true });
   assert.deepEqual(A.consente(['lavoro'], 'rapporto'), { ok: true });
 });

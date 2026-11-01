@@ -980,7 +980,7 @@ L'elenco chiuso delle operazioni e questa tabella vivono come dati in
 `src/shared/ambiti.js` (#1153), che il server incorpora al deploy; una sentinella
 la confronta con questa tabella. Ogni operazione dice quale gamba della triade
 tocca, e una sentinella la controlla su ogni ambito. Un'operazione dell'ambito
-che il server non fa ancora (il taccuino, la curva, i principi) è rifiutata col
+che il server non fa ancora (per esempio il taccuino o la curva) è rifiutata col
 suo nome, come una fuori ambito; `opportunita`, `posta`, `esperimento` e
 `giudizio` non si possono ancora dare a un compito. Le operazioni passano dal
 canale (`routine-channel.mjs operazione`, `segnala`, `rapporto`).
