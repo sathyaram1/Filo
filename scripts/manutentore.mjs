@@ -523,16 +523,11 @@ export function controllaNovita(consegna, { blocco, schede = [] }) {
     }
   }
   const copiate = new Set(lette.map((r) => unaRiga(testoRiga(r))));
-  const conFonte = (r) => {
-    const da = r && typeof r === 'object' ? r.da : undefined;
-    if (Array.isArray(da) && da.length && da.every((n) => Number.isInteger(n) && n >= 1 && n <= lette.length)) return true;
-    return copiate.has(unaRiga(testoRiga(r)));
-  };
+  const daDi = (r) => (r && typeof r === 'object' ? r.da : undefined);
+  const daValido = (da) => Array.isArray(da) && da.length > 0 && da.every((n) => Number.isInteger(n) && n >= 1 && n <= lette.length);
+  const conFonte = (r) => daValido(daDi(r)) || copiate.has(unaRiga(testoRiga(r)));
   for (const r of [...righe('features'), ...righe('fixes')]) {
-    const da = r && typeof r === 'object' ? r.da : undefined;
-    if (da !== undefined && !(Array.isArray(da) && da.length && da.every((n) => Number.isInteger(n) && n >= 1 && n <= lette.length))) {
-      errori.push(`«${unaRiga(testoRiga(r)).slice(0, 80)}»: da sono i numeri delle righe dei worker da cui nasce, da 1 a ${lette.length}`);
-    }
+    if (daDi(r) !== undefined && !daValido(daDi(r))) errori.push(`«${unaRiga(testoRiga(r)).slice(0, 80)}»: da sono i numeri delle righe dei worker da cui nasce, da 1 a ${lette.length}`);
   }
   const tutte = [...righe('features'), ...righe('fixes')].map(testoRiga).filter((r) => typeof r === 'string');
   if (!tutte.length) errori.push('la riscrittura vuole almeno una riga');
