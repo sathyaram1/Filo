@@ -135,22 +135,27 @@
     // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
     allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
     // L'azione confermata dopo il turno entra nel filo con la sua chat, e se ne va con lei (#1561).
-    chatAttuale: () => chatDellaRiga(),
-    archiviaAzione: (type, cambi, a) => {
-      const id = chatDellaRiga();
+    chatAttuale: () => chatId || '',
+    // `chat`: la conversazione dove è nato il bottone (#1294); `voce`: com'è andata, per la chat riaperta.
+    archiviaAzione: (type, cambi, a, { chat = '', voce = null } = {}) => {
+      const id = chat || chatDellaRiga();
       const ids = Array.isArray(cambi) ? cambi : [];
+      const riuscita = !voce || (voce.esito !== 'fallito' && voce.esito !== 'chiesto' && voce.type !== 'FERMATA');
       // Di una finestra guardata resta il nome e basta (#778).
-      const guardata = type === 'VEDI_SCHERMO' && a && a._output && typeof a._output.finestra === 'string' ? a._output.finestra : '';
+      const guardata = riuscita && type === 'VEDI_SCHERMO' && a && a._output && typeof a._output.finestra === 'string' ? a._output.finestra : '';
       if (id) {
         try {
-          send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}), ...(guardata ? { guardate: [guardata] } : {}) })
-            .then(() => Coda.allinea()).catch(() => {});
+          send({
+            type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: riuscita ? [type] : [],
+            ...(voce ? { esiti: [voce] } : {}), ...(ids.length ? { cambi: ids } : {}), ...(guardata ? { guardate: [guardata] } : {}),
+          }).then(() => Coda.allinea()).catch(() => {});
         } catch (_) {}
       }
     },
-    // #778 — dopo l'OK a guardare una finestra la richiesta riprende da sola: un turno interno, come «Riprendi».
-    prosegui: () => {
-      if (sending) return;
+    // #778, #1373 — dopo l'OK la richiesta riprende da sola: un turno interno, come «Riprendi». Solo nella conversazione
+    // dove è nato il bottone, se è ancora quella di questa scheda.
+    prosegui: (chat = '') => {
+      if (sending || (chat && chat !== chatId)) return;
       sending = true;
       aggiornaTasto();
       threadHistory.push({ role: 'user', text: DOPO_OK, interno: true });
@@ -1177,7 +1182,7 @@
     if (turno.fermato) {
       const chiusa = apriTurnoFermato({ pending, streamBubble, streamedText: unisci(rispostaPrima, streamedText) });
       turno.voce = chiusa.entry;
-      const chiusura = inviato.then((rr) => { fineDiretta(rr); chiudiTurnoFermato(rr, chiusa, { pending, shown }); });
+      const chiusura = inviato.then((rr) => { fineDiretta(rr); chiudiTurnoFermato(rr, chiusa, { pending, shown, chat: msg.chatId }); });
       return { ok: true, stopped: true, actions: [], _notaFermato: chiusa.nota, _chiusura: chiusura, _chat: msg.chatId };
     }
     fineDiretta(r);
@@ -1189,7 +1194,7 @@
       if (rispostaPrima && streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
         setBubbleText(streamBubble, rispostaPrima, true);
-        Att.renderActions(streamBubble, Array.isArray(r?.actions) ? r.actions : [], { onAck: chiudiConversazione, activity: pending, shown });
+        Att.renderActions(streamBubble, Array.isArray(r?.actions) ? r.actions : [], { onAck: chiudiConversazione, activity: pending, shown, chat: msg.chatId });
         streamBubble = null;
       }
       pending.endTurn();
@@ -1301,7 +1306,7 @@
       // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
       // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
       // replay storico.
-      Att.renderActions(filoBubble, r.actions || [], { onAck: chiudiConversazione, autoConfirm: true, activity: pending, shown });
+      Att.renderActions(filoBubble, r.actions || [], { onAck: chiudiConversazione, autoConfirm: true, activity: pending, shown, chat: msg.chatId });
       // Un turno di sole azioni raccontate nel blocco (un timer avviato, e
       // niente da dire) non lascia una bolla vuota sotto.
       if (!(r.text || '').trim() && !filoBubble.querySelector('.dash-bubble-actions') && !(filoBubble.textContent || '').trim()) {
@@ -1809,7 +1814,7 @@
     return { entry, host, nota, parziale };
   }
   // Il main ha finito il turno fermato: le azioni fatte restano (righe e bottoni) e lo storico le sa.
-  function chiudiTurnoFermato(r, { entry, host, nota, parziale }, { pending, shown }) {
+  function chiudiTurnoFermato(r, { entry, host, nota, parziale }, { pending, shown, chat = '' }) {
     const azioni = Array.isArray(r?.actions) ? r.actions : [];
     entry.actions = azioni;
     // La risposta era già finita quando è arrivato lo stop: c'è, e lo schermo non dice il contrario.
@@ -1824,7 +1829,7 @@
       if (ripresa && ripresa.nota === nota) { ripresa = null; aggiornaTasto(); }
     }
     // Nessun popup di conferma che si apre da solo: l'utente ha appena detto di smettere.
-    Att.renderActions(host, azioni, { onAck: chiudiConversazione, autoConfirm: false, activity: pending, shown });
+    Att.renderActions(host, azioni, { onAck: chiudiConversazione, autoConfirm: false, activity: pending, shown, chat });
     if (host.querySelector('.dash-bubble-actions')) host.hidden = false;
     else if (!parziale && host.hidden) host.remove();
     Term.applyCommandCwd(azioni);
