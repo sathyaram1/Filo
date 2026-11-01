@@ -184,7 +184,9 @@ il testo, che l'utente intanto vede e incolla.
 
 I riquadri si guardano con `tests/helpers/riquadri.mjs` (lo stesso hook, `SN_FILO_UI._test.trova`, nella scheda o
 nello strato sopra di lei); la prova dell'attacco sta in `tests/riquadri-solo-utente.spec.mjs`, quella del testo che il
-sito non legge in `tests/riquadri-fuori-dal-sito.spec.mjs`.
+sito non legge in `tests/riquadri-fuori-dal-sito.spec.mjs`. Il sito che seleziona, scrive e cancella di continuo
+mentre l'utente scrive, e il velo sopra microfono e documento dell'Aiuto spostato, stanno in
+`tests/sito-ostile-sotto-aiuto-e-caselle.spec.mjs` (il velo coi gesti veri del sistema, `tests/helpers/gestiVeri.mjs`).
 
 ## Limite noto
 
