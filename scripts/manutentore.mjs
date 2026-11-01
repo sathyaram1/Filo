@@ -488,8 +488,9 @@ export function contestoRedattore({ blocco, capacita = '', schede = [] }) {
 }
 
 /**
- * La riscrittura del redattore, prima di consegnarla: versione del blocco, nessun link nuovo, ogni promessa su un lavoro
- * della rosa o a priorità 3 e dichiarata col numero. → { ok, novita } | { ok:false, errori }. PURA.
+ * La riscrittura del redattore, prima di consegnarla: versione del blocco, nessun link né segnalazione nuovi, ogni
+ * promessa su un lavoro della rosa o a priorità 3 e dichiarata col numero. Le impronte delle righe lette vanno col resto:
+ * una riga fusa dopo resta accanto alla riscrittura (scripts/release-novita.mjs). → { ok, novita } | { ok:false, errori }. PURA.
  */
 export function controllaNovita(consegna, { blocco, schede = [] }) {
   const c = consegna && typeof consegna === 'object' ? consegna : {};
@@ -497,13 +498,20 @@ export function controllaNovita(consegna, { blocco, schede = [] }) {
   const errori = [];
   if (String(c.versione || '') !== String(b.version || '')) errori.push(`versione «${unaRiga(c.versione)}»: il blocco in cima è ${unaRiga(b.version)}`);
   const righe = (k) => (Array.isArray(c[k]) ? c[k] : []);
+  const lette = [...(b.features || []), ...(b.fixes || [])];
+  const segnalazioni = new Set(lette.map(segnalazioneRiga).filter(Boolean));
   for (const k of ['features', 'fixes']) {
     if (c[k] !== undefined && !Array.isArray(c[k])) errori.push(`${k} è una lista di righe`);
-    if (righe(k).some((r) => typeof r !== 'string' || !r.trim())) errori.push(`${k} ha una riga vuota o che non è testo`);
+    if (righe(k).some((r) => typeof testoRiga(r) !== 'string' || !testoRiga(r).trim())) errori.push(`${k} ha una riga vuota o che non è testo`);
+    for (const r of righe(k).filter((x) => x && typeof x === 'object')) {
+      const n = segnalazioneRiga(r);
+      if (!n) errori.push(`«${unaRiga(r.testo).slice(0, 80)}»: segnalazione è il numero intero di una segnalazione (1956)`);
+      else if (!segnalazioni.has(n)) errori.push(`la segnalazione ${n} non sta fra le righe dei worker`);
+    }
   }
-  const tutte = [...righe('features'), ...righe('fixes')].filter((r) => typeof r === 'string');
+  const tutte = [...righe('features'), ...righe('fixes')].map(testoRiga).filter((r) => typeof r === 'string');
   if (!tutte.length) errori.push('la riscrittura vuole almeno una riga');
-  const originali = [...(b.features || []), ...(b.fixes || [])].map((r) => (r && r.testo !== undefined ? r.testo : r)).join('\n');
+  const originali = lette.map(testoRiga).join('\n');
   const prima = linkDi(originali);
   const nuovi = [...linkDi(tutte.join('\n'))].filter((l) => !prima.has(l));
   if (nuovi.length) errori.push(`link che le righe dei worker non avevano: ${nuovi.slice(0, 10).join(', ')}`);
