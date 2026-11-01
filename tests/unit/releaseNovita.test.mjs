@@ -1,6 +1,7 @@
 // Le novità del redattore entrano nel registro dell'albero che si pubblica (SPEC-MANUTENTORE § 8): la riscrittura al
 // posto delle righe che ha letto, quelle fuse dopo accanto, le versioni vecchie ogni volta; senza server la
-// pubblicazione va avanti con le righe dei worker. In fondo, i tre lavori di release.yml che la chiedono.
+// pubblicazione va avanti con le righe dei worker. In fondo, i tre lavori di release.yml che la chiedono (il numero
+// entra come variabile, perché quel passo ha la parola della costruzione).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -208,10 +209,10 @@ describe('release.yml', () => {
     return YML.slice(i, fine < 0 ? undefined : i + 1 + fine);
   };
 
-  for (const [nome, versione, costruzione, lancio] of [
-    ['release', 'name: Applica il numero al commit provato', 'name: Build e upload su GitHub Releases', 'node scripts/release-novita.mjs "${{ steps.bump.outputs.version }}"'],
-    ['release-mac', "name: Il codice qui e' davvero quello di questa versione", 'name: Build e upload sulla release esistente', 'node "${{ runner.temp }}/strumenti/release-novita.mjs" "${{ steps.bersaglio.outputs.versione }}"'],
-    ['release-linux', "name: Il codice qui e' davvero quello di questa versione", 'name: Build e upload sulla release esistente', 'node "${{ runner.temp }}/strumenti/release-novita.mjs" "${{ steps.bersaglio.outputs.versione }}"'],
+  for (const [nome, versione, costruzione, lancio, numero] of [
+    ['release', 'name: Applica il numero al commit provato', 'name: Build e upload su GitHub Releases', 'node scripts/release-novita.mjs "$VERSIONE"', 'steps.bump.outputs.version'],
+    ['release-mac', "name: Il codice qui e' davvero quello di questa versione", 'name: Build e upload sulla release esistente', 'node "${{ runner.temp }}/strumenti/release-novita.mjs" "$VERSIONE"', 'steps.bersaglio.outputs.versione'],
+    ['release-linux', "name: Il codice qui e' davvero quello di questa versione", 'name: Build e upload sulla release esistente', 'node "${{ runner.temp }}/strumenti/release-novita.mjs" "$VERSIONE"', 'steps.bersaglio.outputs.versione'],
   ]) {
     test(`${nome}: le novità del redattore dopo il numero e prima della costruzione, con la parola della costruzione`, () => {
       const l = lavoro(nome);
@@ -221,6 +222,8 @@ describe('release.yml', () => {
       const corpo = l.slice(passo, l.indexOf('- name:', passo + 1));
       assert.ok(corpo.includes(lancio), corpo);
       assert.match(corpo, /FILO_BUILD_PASSPHRASE: \$\{\{ secrets\.FILO_BUILD_PASSPHRASE \}\}/);
+      assert.ok(corpo.includes(`VERSIONE: \${{ ${numero} }}`), 'il numero entra come variabile');
+      assert.doesNotMatch(corpo.slice(corpo.indexOf('run:')).replaceAll('${{ runner.temp }}', ''), /\$\{\{/, 'nello script non si incolla niente: un numero scritto a mano diventerebbe un comando, accanto alla parola');
       if (nome !== 'release') assert.match(l, /cp [^\n]*scripts\/release-novita\.mjs[^\n]*"\$\{\{ runner\.temp \}\}\/strumenti\/"/);
     });
   }

@@ -374,8 +374,9 @@ jobs:
         if: steps.check.outputs.should_release == 'true'
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          VERSIONE: ${{ steps.bump.outputs.version }}
         shell: bash
-        run: node scripts/release-novita.mjs "${{ steps.bump.outputs.version }}" || echo "::warning::novita' del redattore non messe"
+        run: node scripts/release-novita.mjs "$VERSIONE" || echo "::warning::novita' del redattore non messe"
 
       - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'
@@ -529,7 +530,8 @@ jobs:
           set -e
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
           cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs scripts/release-impronte.mjs "${{ runner.temp }}/allarme/scripts/"
-          cp scripts/npm-ci-ritenta.mjs scripts/release-novita.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/release-novita.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
       # Il numero della versione e il codice da costruire vengono da due posti
@@ -617,8 +619,10 @@ jobs:
         id: novita
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          # Il numero di un avvio a mano lo scrive una persona: entra come variabile, mai dentro lo script.
+          VERSIONE: ${{ steps.bersaglio.outputs.versione }}
         shell: bash
-        run: node "${{ runner.temp }}/strumenti/release-novita.mjs" "${{ steps.bersaglio.outputs.versione }}" || echo "::warning::novita' del redattore non messe"
+        run: node "${{ runner.temp }}/strumenti/release-novita.mjs" "$VERSIONE" || echo "::warning::novita' del redattore non messe"
 
       # Stesso passo dell'altra meta', e per lo stesso motivo: senza le chiavi
       # incastonate l'app arriva muta. Va rifatto qui perche' il file generato
@@ -797,7 +801,8 @@ jobs:
           set -e
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
           cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs scripts/release-impronte.mjs "${{ runner.temp }}/allarme/scripts/"
-          cp scripts/npm-ci-ritenta.mjs scripts/release-novita.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/release-novita.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
       # Il numero della versione e il codice da costruire vengono da due posti
@@ -885,8 +890,10 @@ jobs:
         id: novita
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          # Il numero di un avvio a mano lo scrive una persona: entra come variabile, mai dentro lo script.
+          VERSIONE: ${{ steps.bersaglio.outputs.versione }}
         shell: bash
-        run: node "${{ runner.temp }}/strumenti/release-novita.mjs" "${{ steps.bersaglio.outputs.versione }}" || echo "::warning::novita' del redattore non messe"
+        run: node "${{ runner.temp }}/strumenti/release-novita.mjs" "$VERSIONE" || echo "::warning::novita' del redattore non messe"
 
       # Senza le chiavi incastonate l'app arriva muta. Va rifatto anche qui
       # perche' il file generato non sta nel repo: vive solo dentro la macchina
