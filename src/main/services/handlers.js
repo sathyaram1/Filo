@@ -6436,7 +6436,7 @@ async function handleFiloChat(richiesta) {
   }
 }
 
-async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, rispostaA = null, schede = null, sender = null }, volo) {
+async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, dopoOk = null, daModello = false, daFuori = false, chatId = null, rispostaA = null, schede = null, sender = null }, volo) {
   const inizioTurno = Date.now();
   // #2085 — le schede lasciate nel campo: valgono solo quelle il cui gettone è ancora nel testo.
   const gettoni = internal || !globalThis.SN_SCHEDE_IN_CHAT ? []
@@ -6698,7 +6698,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const indiceDomanda = threadMessages.length;
   const giaLetta = origineGiaLettaInChat(chatId);
   const notaCitazione = FCx.notaRisposta(citazione.citata);
-  const domandaConCitazione = notaCitazione ? `${notaCitazione}\n${String(userMessage || '')}` : String(userMessage || '');
+  // #1373 — la ripresa dopo l'OK porta com'è andata, come il risultato di uno strumento: il registro lo scrive, non la scheda.
+  const esitoDopoOk = dopoOk ? globalThis.SN_ESITO.perModello(globalThis.SN_ESITO.vociArchivio(dopoOk)) : '';
+  const domandaConCitazione = [notaCitazione, String(userMessage || ''), esitoDopoOk].filter(Boolean).join('\n');
   const gettoniLetti = notaDeiGettoni(lettureGettoni);
   // Le note di questo turno sulla domanda: tornano con lei nei turni dopo (src/main/services/contestoFilo.js).
   let origineImmagini = '';
@@ -7991,7 +7993,6 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   contaHomeVista,
   executeFiloAction,
-  observationsForPrompt,
   chiaveConferma: pendingConfirmKey,
   controllaUscita,
   apriDaFilo,

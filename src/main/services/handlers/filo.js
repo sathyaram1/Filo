@@ -56,7 +56,7 @@ module.exports = function register(on, ctx) {
       // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
       const chatId = msg.chatId || null;
       fineLavoro = require('../lavoriInCorso').inizia({ tipo: 'risposta', chat: chatId, testo: msg.userMessage, wc: sender && sender.wc, ambito: ctx.ambitoDellaFinestra(sender && sender.win) });
-      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, daFuori: msg.daFuori === true, chatId, rispostaA: msg.rispostaA || null, schede: msg.schede, sender });
+      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, dopoOk: msg.internal && Array.isArray(msg.dopoOk) ? msg.dopoOk.slice(0, 100) : null, daModello: !!msg.daModello, daFuori: msg.daFuori === true, chatId, rispostaA: msg.rispostaA || null, schede: msg.schede, sender });
       return { ok: true, ...r };
     } catch (e) {
       // La chat non è un log: a turno fallito l'utente deve leggere cosa non ha funzionato, non il
@@ -106,17 +106,7 @@ module.exports = function register(on, ctx) {
     const Levels = globalThis.SN_ACTION_LEVELS;
     const fatto = r && r.executed && Levels && Levels.describeDone
       ? String(Levels.describeDone({ ...msg.action, _output: r.output }) || '').split('\n')[0].trim() : '';
-    // #1373 — dopo l'OK il lavoro riprende da solo quando l'esito va letto (una lettura, l'uscita di un comando): è la
-    // stessa regola per cui un giro non chiude il turno (giroAzioni.js). Un'azione che parla da sé non richiama nessuno.
-    let riprendi = false;
-    if (r && !r.rejected && !(r.output && r.output.blocked === 'segreto') && Levels) {
-      const tipo = String((a && a.type) || '').toUpperCase();
-      try {
-        riprendi = Levels.diSolaLettura(tipo)
-          || !!(r.output && ctx.observationsForPrompt([{ ...msg.action, _confirm: undefined, _output: r.output, _executed: !!r.executed }]));
-      } catch (_) { riprendi = false; }
-    }
-    return { ok: true, ...r, ...(fatto ? { fatto } : {}), ...(riprendi ? { riprendi: true } : {}) };
+    return { ok: true, ...r, ...(fatto ? { fatto } : {}) };
   });
 
   // L'utente ha detto no a una conferma: l'azione non parte e non lo sa nessuno, se non i contatori (#1461).
