@@ -543,7 +543,8 @@ test('storage.json: un salvataggio fallito per codice, il ritorno, la chiave che
 test('ogni passo dell’avvio, ogni canale sincrono e ogni passo degli aggiornamenti ha il suo aggancio nel codice', () => {
   const main = leggi('src', 'main', 'main.js');
   const finestra = leggi('src', 'main', 'window.js');
-  for (const p of C.PASSI_AVVIO) assert.ok(new RegExp(`passo(AvvioFino)?\\('${p}'`).test(main + finestra), `nessuno misura il passo «${p}»`);
+  // Gli init dell'avvio che partono insieme si misurano ognuno da sé, col nome dato a init() in main.js.
+  for (const p of C.PASSI_AVVIO) assert.ok(new RegExp(`(passo(AvvioFino)?|init)\\('${p}'`).test(main + finestra), `nessuno misura il passo «${p}»`);
   assert.match(main, /process\.on\('uncaughtExceptionMonitor'/, 'il monitor, non un gestore: un gestore toglierebbe l’avviso di Electron');
   assert.ok(!/process\.on\('uncaughtException'/.test(main));
   assert.match(main, /process\.on\('unhandledRejection'[\s\S]{0,120}console\.warn/, 'il rifiuto resta scritto come prima');
