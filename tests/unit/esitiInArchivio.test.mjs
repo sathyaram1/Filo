@@ -9,10 +9,42 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-for (const f of ['contenutoEsterno.js', 'nomiFile.js', 'actionLevels.js', 'esitoAzione.js', 'chatArchive.js', 'filoContesto.js']) {
+for (const f of ['contenutoEsterno.js', 'nomiFile.js', 'timeFormat.js', 'actionLevels.js', 'esitoAzione.js', 'righeAttivita.js', 'chatArchive.js', 'filoContesto.js']) {
   require(join(ROOT, 'src', 'shared', f));
 }
 const E = globalThis.SN_ESITO;
+const RA = globalThis.SN_RIGHE_ATTIVITA;
+
+// Riaperta, la chat dice di un'azione fatta quello che diceva il diario in diretta, coi numeri: mai la frase della
+// proposta all'infinito («Avviare il timer»), che con la spunta sembra una cosa ancora da fare.
+test('un\'azione fatta si archivia con la riga del diario in diretta, e una non riuscita con la sua etichetta', () => {
+  const casi = [
+    [{ type: 'TIMER', secondi: 300, etichetta: 'Pasta', _executed: true }, /^Timer avviato · Pasta · 5 min$/],
+    [{ type: 'SVEGLIA', orario: '07:30', etichetta: 'Lavoro', _executed: true }, /^Sveglia impostata · 07:30 · Lavoro$/],
+    [{ type: 'ZOOM_PAGINA', _executed: true, _output: { percentuale: 150 } }, /^Zoom al 150%$/],
+    [{ type: 'VOLUME', _executed: true, _output: { volume: 30 } }, /^Volume al 30%$/],
+    [{ type: 'NAVIGA', url: 'https://esempio.test/', _executed: true }, /^Aperta · https:\/\/esempio\.test\/$/],
+    [{ type: 'ESEGUI_COMANDO', comando: 'ls', _executed: true, _output: {} }, /^Comando eseguito · ls$/],
+  ];
+  for (const [a, atteso] of casi) {
+    const v = E.voceArchivio(a);
+    assert.equal(v.esito, 'fatto', a.type);
+    assert.match(E.rigaDellaVoce(v).testo, atteso, a.type);
+    assert.match(E.perModello([v]), new RegExp(`- fatta: ${atteso.source.slice(1, -1)}`), `${a.type}: il modello legge gli stessi numeri`);
+  }
+  // Tutte le azioni del registro: fatta, la riga archiviata è quella del diario (o la sua al passato, per i soli bottoni).
+  for (const type of Object.keys(globalThis.SN_ACTION_LEVELS.REGISTRY)) {
+    const a = { type, _executed: true, _output: {} };
+    const diretta = RA.rigaArchivio(a);
+    const v = E.voceArchivio(a);
+    if (!diretta || diretta.failed || !v || v.esito !== 'fatto') continue;
+    assert.equal(v.riga, String(diretta.text).split('\n')[0].trim(), type);
+  }
+  const sveglia = E.voceArchivio({ type: 'SVEGLIA', ora: '07:30', _executed: false, _output: {} });
+  assert.equal(E.rigaDellaVoce(sveglia).testo, 'Sveglia non impostata');
+  const vuota = E.voceArchivio({ type: 'CHIUDI_SCHEDE', _executed: true, _output: { chiuse: 0, nessuna: 'niente' } });
+  assert.equal(E.rigaDellaVoce(vuota).testo, 'Nessuna scheda chiusa · c\'è solo questa', 'niente chiuso non si racconta come fatto');
+});
 const CA = globalThis.SN_CHAT_ARCHIVE;
 const FC = globalThis.SN_FILO_CONTESTO;
 
