@@ -527,8 +527,11 @@ export async function heartbeat(t, opts = {}) {
  * `report`, se presente, è il rapporto di fine sessione (session-report.mjs):
  * viaggia nel corpo col nome `report`. Per la ritentata quando il server lo
  * rifiuta c'è releaseConRapporto, qui sotto.
+ *
+ * `spedito` ({ branch, sha }) è la punta che il rilascio ha appena spinto: il server la confronta con quella vera e la
+ * scrive nel registro del ramo con la fiducia del biglietto (#2021). Solo dopo una spinta riuscita.
  */
-export async function release(t, fault = '', opts, report = null) {
+export async function release(t, fault = '', opts, report = null, spedito = null) {
   const payload = { ticket: t };
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
@@ -537,6 +540,10 @@ export async function release(t, fault = '', opts, report = null) {
   if (opts && opts.domandaAlRilascio === true) payload.domandaAlRilascio = true;
   const processo = String((opts && opts.processo) || '').trim();
   if (processo) payload.domandaProcesso = processo;
+  if (spedito && typeof spedito.branch === 'string' && spedito.branch && /^[0-9a-f]{40}$/.test(String(spedito.sha || ''))) {
+    payload.branch = spedito.branch;
+    payload.sha = spedito.sha;
+  }
   Object.assign(payload, creditiDi(opts));
   const { status, body } = await call('routineRelease', payload, opts);
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
