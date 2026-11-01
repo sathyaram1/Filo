@@ -97,7 +97,7 @@ test('#823.1 — una macchina senza punto salvata («nas») si toglie dicendone 
 });
 
 test('#823.1 — un dominio di primo livello non diventa una regola, una macchina della rete di casa sì', () => {
-  for (const v of ['https://com', 'http://com/', 'https://com.', 'com:8080', 'http://it/', 'https://museum', 'https://shop/', 'https://xn--p1ai/']) {
+  for (const v of ['https://com', 'http://com/', 'https://com.', 'http://it/', 'https://museum', 'https://shop/', 'https://xn--p1ai/', 'http://casa/']) {
     assert.equal(SempreAperte.voceDa(v), '', v);
   }
   assert.equal(SempreAperte.voceDa('com'), '');
@@ -106,6 +106,18 @@ test('#823.1 — un dominio di primo livello non diventa una regola, una macchin
     assert.equal(SempreAperte.voceDa(v), voce, v);
   }
   assert.equal(SempreAperte.voceDa('example.com'), 'example.com');
+});
+
+test('#823.1 — una macchina di casa che si chiama come un dominio di primo livello si tiene aperta con la porta o dalla sua scheda, e copre solo sé', () => {
+  for (const [v, voce] of [['http://casa:8123', 'casa'], ['media:8096', 'media'], ['http://cloud:5000/', 'cloud']]) {
+    assert.equal(SempreAperte.voceDa(v), voce, v);
+  }
+  assert.equal(SempreAperte.voceDa('http://box/', { daScheda: true }), 'box');
+  // Anche una voce nata così («com:8080») non tiene aperto mezzo web: una voce senza punto copre solo la sua macchina.
+  assert.equal(T.voceTenuta('https://www.example.com/', ['com']), null);
+  assert.equal(T.voceTenuta('http://casa:8123/lovelace', ['casa']), 'casa');
+  assert.equal(T.voceTenuta('https://negozio.casa/', ['casa']), null);
+  assert.deepEqual(T.vociDaTogliere('http://casa:8123', ['casa', 'example.com']), ['casa']);
 });
 
 test('un suffisso pubblico non si salva: terrebbe aperto mezzo web', () => {
