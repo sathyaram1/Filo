@@ -2430,15 +2430,17 @@
   // archiviate pertinenti (le sceglie il main) e le elimina DEFINITIVAMENTE
   // dopo conferma esplicita.
   function renderDeleteArchivePanel(a, activity, chat = '') {
-    const query = String(a.query || a.testo || '').trim();
+    // «Svuota l'archivio» (#1294): lo dice il modello con `tutto`, e il pannello propone tutte le schede senza cercare.
+    const tutto = a.tutto === true;
+    const query = tutto ? '' : String(a.query || a.testo || '').trim();
     const panel = document.createElement('div');
     panel.className = 'dash-delete-panel';
     // La richiesta la scrive il modello: sta nel suo riquadro, sopra le parole di Filo, dove non
     // può chiudere le virgolette e continuare con la voce di Filo (#592.7).
-    if (query) {
+    if (query || tutto) {
       const chiesta = document.createElement('div');
       chiesta.className = 'dash-delete-query';
-      chiesta.textContent = query;
+      chiesta.textContent = tutto ? 'Tutto l’archivio' : query;
       panel.appendChild(chiesta);
     }
     const note = document.createElement('div');
@@ -2447,12 +2449,12 @@
 
     async function cerca() {
       panel.querySelectorAll('.dash-delete-list, .dash-action-btn').forEach((el) => el.remove());
-      if (!query) {
+      if (!query && !tutto) {
         note.textContent = 'Non so quali schede eliminare: dimmi di cosa parlano.';
         return;
       }
       note.dataset.cerco = '1';
-      const cercoTesto = 'Cerco nell’archivio le schede su questa richiesta…';
+      const cercoTesto = tutto ? 'Leggo l’archivio…' : 'Cerco nell’archivio le schede su questa richiesta…';
       note.textContent = cercoTesto;
       // Con un archivio grande il giudizio dura: il main dice quante schede ha già guardato.
       const richiesta = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -2464,7 +2466,7 @@
       try { chrome.runtime.onMessage.addListener(suAvanzamento); } catch (_) {}
       let r = null;
       try {
-        r = await send({ type: MSG.ARCHIVIO_DA_CANCELLARE, query, richiesta });
+        r = await send({ type: MSG.ARCHIVIO_DA_CANCELLARE, query, ...(tutto ? { tutto: true } : {}), richiesta });
       } finally {
         try { chrome.runtime.onMessage.removeListener(suAvanzamento); } catch (_) {}
         delete note.dataset.cerco;
@@ -2483,13 +2485,19 @@
         return;
       }
       if (!results.length) {
-        note.textContent = 'Nessuna scheda archiviata riguarda questa richiesta.';
+        note.textContent = tutto ? 'L’archivio è già vuoto.' : 'Nessuna scheda archiviata riguarda questa richiesta.';
         return;
       }
       const quante = (n) => `${n} ${n === 1 ? 'scheda' : 'schede'}`;
-      note.textContent = results.length === 1
-        ? 'Trovata 1 scheda pertinente a questa richiesta. Verrà eliminata DEFINITIVAMENTE:'
-        : `Trovate ${results.length} schede pertinenti a questa richiesta. Verranno eliminate DEFINITIVAMENTE:`;
+      if (tutto) {
+        note.textContent = results.length === 1
+          ? 'Nell’archivio c’è 1 scheda. Verrà eliminata DEFINITIVAMENTE:'
+          : `Nell’archivio ci sono ${results.length} schede. Verranno eliminate DEFINITIVAMENTE:`;
+      } else {
+        note.textContent = results.length === 1
+          ? 'Trovata 1 scheda pertinente a questa richiesta. Verrà eliminata DEFINITIVAMENTE:'
+          : `Trovate ${results.length} schede pertinenti a questa richiesta. Verranno eliminate DEFINITIVAMENTE:`;
+      }
       // Le sceglie un modello: chi conferma deve poter togliere quella presa per sbaglio.
       const ul = document.createElement('ul');
       ul.className = 'dash-delete-list';
