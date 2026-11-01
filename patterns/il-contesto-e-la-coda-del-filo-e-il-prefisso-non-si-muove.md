@@ -35,7 +35,9 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   in una busta DATI_PAGINA sotto le altre: quante, quando, le ricerche fatte sul sito e gli ultimi tre titoli; di una
   delicata solo il sito, di una della rete di casa solo il numero, deciso nel main prima di scrivere il blocco. Oltre
   trenta siti si dice quante pagine mancano. Si scrivono la prima volta e restano quelle (un evento in ritardo, un
-  titolo che arriva dopo, non riscrive un messaggio già mandato); dopo una cancellazione si rifanno.
+  titolo che arriva dopo, non riscrive un messaggio già mandato); si rifanno dopo una cancellazione e quando una
+  loro pagina diventa delicata o della rete di casa. Una scheda mostrata col titolo che diventa delicata rifà la
+  fotografia: il titolo esce dal CONTESTO e dai messaggi già mandati.
 - **I punti di cache stanno sui confini dei blocchi**: fine della parte fissa e fine del CONTESTO (tutte e due della
   durata scelta, un'ora di serie), fine del tratto prima della domanda, ultimo messaggio: quattro, il massimo di
   Anthropic. Il piano lo fa il cancello dei modelli sui messaggi già oscurati; lo scrive nel corpo solo il fornitore, e
