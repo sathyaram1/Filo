@@ -3051,6 +3051,7 @@
     chiaveSegno,
     testoDelCampo,
     sostituisciNelCampo,
+    rimettiNelCampo,
     sostituisciComeBattuta,
     riallineaIssues,
     addToDictionary,
