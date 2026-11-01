@@ -1499,10 +1499,13 @@
           ? await (a._confirm.level >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : window.confirm(opts.text); // fallback se il modulo non è caricato
         if (!ok) {
-          // Il no non fa partire niente: lo sanno solo i contatori (#1461).
+          // Il no non fa partire niente e non richiama il modello (come negli harness di Anthropic): lo leggerà al
+          // messaggio dopo, per non riproporla (#1373). I contatori lo contano (#1461).
+          a._rifiutata = true;
           try { Promise.resolve(send({ type: MSG.FILO_CONFIRM_RIFIUTATA, action: a })).catch(() => {}); } catch (_) {}
           return;
         }
+        delete a._rifiutata;
         btn.disabled = true;
         // Catturare e far leggere una finestra prende qualche secondo: il bottone dice che Filo ci sta lavorando.
         if (type === 'VEDI_SCHERMO') btn.textContent = 'Guardo la finestra…';

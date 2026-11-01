@@ -6115,7 +6115,7 @@ async function handleFiloChat(richiesta) {
   }
 }
 
-async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, rispostaA = null, sender = null }, volo) {
+async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, dopoOk = null, daModello = false, daFuori = false, chatId = null, rispostaA = null, sender = null }, volo) {
   const inizioTurno = Date.now();
   // Un messaggio vero dell'utente è una richiesta nuova: le finestre guardate prima tornano a chiedere (#778).
   if (!internal) Schermo.nuovoTurno(chiaveSchermo(sender));
@@ -6372,7 +6372,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const indiceDomanda = threadMessages.length;
   const giaLetta = origineGiaLettaInChat(chatId);
   const notaCitazione = FCx.notaRisposta(citazione.citata);
-  const domandaConCitazione = notaCitazione ? `${notaCitazione}\n${String(userMessage || '')}` : String(userMessage || '');
+  // #1373 — la ripresa dopo l'OK porta com'è andata, come il risultato di uno strumento: il registro lo scrive, non la scheda.
+  const esitoDopoOk = dopoOk ? globalThis.SN_ESITO.perModello(globalThis.SN_ESITO.vociArchivio(dopoOk)) : '';
+  const domandaConCitazione = [notaCitazione, String(userMessage || ''), esitoDopoOk].filter(Boolean).join('\n');
   // Le note di questo turno sulla domanda: tornano con lei nei turni dopo (src/main/services/contestoFilo.js).
   let origineImmagini = '';
   if (imageList.length) {
@@ -7662,7 +7664,6 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   contaHomeVista,
   executeFiloAction,
-  observationsForPrompt,
   chiaveConferma: pendingConfirmKey,
   controllaUscita,
   apriDaFilo,
