@@ -1,5 +1,5 @@
-// Le icone del desktop del computer in ordine a comando (#1621): uno script fisso le legge e le sposta, l'ordine e la
-// griglia li decide JavaScript, e ogni disposizione è un cambio che si annulla. Solo Windows: su Mac e Linux lo dice.
+// Le icone del desktop del computer in ordine a comando (#1621, #1617): uno script fisso le legge e le sposta, l'ordine
+// e la griglia li decide JavaScript, «fatto» lo dice solo l'ordine riletto, e ogni disposizione si annulla. Windows e Mac.
 // Regole: patterns/il-computer-si-comanda-con-script-fissi.md (§ Le icone del desktop); prove: tests/unit/iconeDesktop.test.mjs.
 
 'use strict';
@@ -8,13 +8,18 @@ const fsp = require('node:fs/promises');
 const terminale = require('./terminal');
 const Sistema = require('./comandiSistema');
 
-const { PS_INIZIO, psCompila } = Sistema._interni;
+const { PS_INIZIO, SH_INIZIO, psCompila } = Sistema._interni;
 
+const PIATTAFORME = ['win32', 'darwin'];
+// Su Mac l'ordine automatico è un valore del Finder, e l'annullo lo rimette solo se è uno di questi.
+const DISPOSIZIONI_FINDER = ['not arranged', 'snap to grid', 'arranged by name', 'arranged by modification date',
+  'arranged by creation date', 'arranged by size', 'arranged by kind', 'arranged by label'];
 // Una variabile d'ambiente di Windows tiene 32.767 caratteri: le posizioni si dividono in pezzi che ci stanno.
 const PEZZO_MAX = 30000;
 // L'elenco intero si legge col codice: 300 icone coi percorsi interi stanno in poche decine di migliaia di caratteri.
 const TETTO_USCITA = 8 * 1024 * 1024;
-const TEMPO_MS = 60000;
+// Il Finder sposta un'icona per volta: centinaia di icone possono chiedere ben più di un minuto.
+const TEMPO_MS = 180000;
 const TEMPO_STAT_MS = 3000;
 
 // Le icone del desktop di Windows viste dalla Shell (IFolderView2 della finestra del desktop): nomi, posizioni,
