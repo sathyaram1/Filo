@@ -120,7 +120,10 @@ Un guasto non ferma nessun altro lavoro. Il lavoro che l'ha dichiarato resta fer
 nota, o finché una correzione non lo riguarda: indaghi la causa, apri o riusi il feedback che la corregge (con
 l'attesa del lavoro fermo su di lui), e sblocchi quando la causa è passata, dicendo nella nota cosa è cambiato. Lo
 stesso guasto ripetuto su un lavoro è un segnale da seguire nel taccuino, non da sbloccare alla cieca. Il caso
-«ambiente rotto per tutti» lo copre la pausa del pacemaker sulle accensioni nate morte.
+«ambiente rotto per tutti» lo copre la pausa del pacemaker sulle accensioni nate morte. Il fermo vale solo a
+manutentore acceso: spento in Automazioni, nessuno lo toglierebbe, quindi un guasto non lo mette e quelli già messi
+non trattengono (il lavoro torna in coda, e al terzo guasto uguale nasce la domanda); riacceso, i fermi rimasti tornano
+a valere e li trovi fra le ferme.
 
 ## Domande di processo dei worker
 
