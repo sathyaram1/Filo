@@ -111,7 +111,6 @@
       if (o.nessuna === 'niente') return 'c\'è solo questa';
     }
     if (o.error) return String(o.error);
-    if (o.frase) return String(o.frase);
     return '';
   }
 
