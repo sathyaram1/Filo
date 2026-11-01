@@ -1362,6 +1362,13 @@ migrazione le mappa. Il codice che decide in base al prefisso
 > sessione per ogni feedback scelto dal manutentore e la sessione lavora da sé
 > (`routines/roles/sessione.md`). Questa sezione resta come storia, e descrive com'è oggi
 > finché il server non accende così.
+>
+> Di § 12.2 resta, in questa forma (#1158): la sessione che lancia e aspetta gira su Haiku
+> (il modello delle routine su claude.ai), i worker sui loro modelli; i posti li conta solo
+> il server, sui lavori vivi di tutte le sessioni, e abbassarli non chiude niente
+> (`functions/test/posti-contati-1158.test.js` del server). Cadono la vita di 4 ore, il tetto K
+> per sessione, l'accensione ogni 4 ore e i compiti figli: una sessione tiene un worker, e il
+> worker divide il lavoro coi suoi sotto-agenti (fino a tre livelli).
 
 ### 12.1 Oggi
 
