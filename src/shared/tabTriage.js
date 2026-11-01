@@ -93,10 +93,14 @@
 
   // Le voci che «non tenere più aperto X» toglie: quelle che coprono X e quelle che X copre
   // (salvato web.whatsapp.com, l'utente dice whatsapp.com).
+  // Una macchina salvata senza punto («nas») si toglie anche detta col nome nudo, che per aggiungerla non basterebbe:
+  // togliere tocca solo voci che l'utente ha già.
   function vociDaTogliere(input, voci) {
+    const elenco = Array.isArray(voci) ? voci : [];
     const host = hostTenuto(input);
-    if (!host) return [];
-    return (Array.isArray(voci) ? voci : []).filter((v) => copreHost(v, host) || copreHost(host, v));
+    if (host) return elenco.filter((v) => copreHost(v, host) || copreHost(host, v));
+    const nudo = String(input == null ? '' : input).trim().toLowerCase().replace(/\.$/, '').replace(/^www\./, '');
+    return /^[a-z0-9-]+$/.test(nudo) ? elenco.filter((v) => v === nudo) : [];
   }
 
   // L'avviso dopo un giro di pulizia, o '' se non se ne mostra. Alla riapertura c'è sempre (#349): senza, «ho
@@ -123,6 +127,19 @@
     return riordinate ? 'Schede riordinate, nessuna da chiudere' : 'Schede già in ordine, nessuna da chiudere';
   }
 
+  // Perché un riordino chiesto (chat, bottone, /pulisci) non è riuscito, o '' (#1626). Senza giudizio non è riuscito
+  // anche se ha chiuso i doppioni: chi l'ha chiesto voleva le schede valutate, e il motivo gli dice cosa fare.
+  function riordinoNonRiuscito(r) {
+    if (!r || r.ok === false) return 'Filo non è riuscito a valutare le schede.';
+    if (r.incognito) return 'In una finestra in incognito Filo non riordina le schede.';
+    if (r.giaInCorso) return 'Un riordino è già in corso.';
+    if (!r.giudizioMancato) return '';
+    const n = Math.max(0, Number(r.archived) || 0);
+    const motivo = String(r.motivo || '').replace(/\s+/g, ' ').trim();
+    const doppioni = n ? `: ha chiuso solo ${n === 1 ? 'un doppione' : `${n} doppioni`} (stessa pagina aperta due volte)` : '';
+    return `Filo non è riuscito a valutare le schede${doppioni}.${motivo ? ` ${/[.!?]$/.test(motivo) ? motivo : `${motivo}.`}` : ''}`;
+  }
+
   global.SN_TAB_TRIAGE = {
     isEphemeralInternalUrl,
     isTriageableUrl,
@@ -133,5 +150,6 @@
     voceTenuta,
     vociDaTogliere,
     testoEsito,
+    riordinoNonRiuscito,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

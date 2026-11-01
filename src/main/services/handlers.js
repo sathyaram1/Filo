@@ -3758,10 +3758,12 @@ async function eseguiAzioneFilo(action, {
           try {
             const r = await tm.runAutoTriage({ trigger: 'manual', da: 'chat' });
             const archived = (r && r.archived) || 0;
-            // Un riordino mai partito (già in corso, o senza giudizio e niente archiviato) non si racconta come riuscito.
-            if (!archived && r && (r.giaInCorso || r.giudizioMancato)) {
-              const error = r.giaInCorso ? 'un riordino è già in corso' : 'Filo non è riuscito a valutare le schede';
-              return { executed: false, kept: false, output: { archived: 0, giaInCorso: !!r.giaInCorso, giudizioMancato: !!r.giudizioMancato, error } };
+            const error = globalThis.SN_TAB_TRIAGE.riordinoNonRiuscito({ ...(r || {}), ok: !!r });
+            if (error) {
+              return {
+                executed: false, kept: false,
+                output: { archived, giaInCorso: !!r?.giaInCorso, giudizioMancato: !!r?.giudizioMancato, incognito: !!r?.incognito, error },
+              };
             }
             return { executed: true, kept: confirmed, output: { archived } };
           } catch (e) {
@@ -5533,6 +5535,10 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return n > 0
       ? `Schede riordinate: ${n} archiviate, restano nel filo della home (le ritrova col campo «Cerca nel filo»). Dillo all'utente in una riga.`
       : 'Schede riordinate: nessuna da archiviare. Dillo all\'utente in una riga.';
+  }
+  // Un riordino non riuscito (#1626) si dice col suo perché, anche quando ha chiuso i doppioni.
+  if (type === 'PULISCI_TAB' && !res.executed && !res.needsConfirm && res.output && res.output.error && !res.output.no) {
+    return `Riordino NON riuscito: ${String(res.output.error).trim()} Dillo all'utente in una riga, col motivo; non dire che le schede sono state riordinate.`;
   }
   if (type === 'CHIUDI_SCHEDE' && res.output && !res.needsConfirm) return esitoChiusuraPerModello(action, res.output);
   if (type === 'VEDI_SCHERMO') {

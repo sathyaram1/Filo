@@ -94,7 +94,8 @@ module.exports = function register(on, ctx) {
   on(MSG.RUN_TAB_TRIAGE, soloFilo(async (msg, sender) => {
     const win = winOf(sender);
     if (win && win._filoTabs) {
-      const res = await win._filoTabs.runAutoTriage({ trigger: 'manual' });
+      // Il bottone del riordino in chat dice `da: 'chat'`, come la stessa azione partita senza chiedere.
+      const res = await win._filoTabs.runAutoTriage({ trigger: 'manual', da: msg && msg.da === 'chat' ? 'chat' : '' });
       return {
         ok: true,
         archived: (res && res.archived) || 0,
@@ -102,6 +103,8 @@ module.exports = function register(on, ctx) {
         // da archiviare» da «il riordino non è partito».
         giudizioMancato: !!(res && res.giudizioMancato),
         giaInCorso: !!(res && res.giaInCorso),
+        incognito: !!(res && res.incognito),
+        error: globalThis.SN_TAB_TRIAGE ? globalThis.SN_TAB_TRIAGE.riordinoNonRiuscito({ ...(res || {}), ok: !!res }) : '',
       };
     }
     return { ok: false, archived: 0 };

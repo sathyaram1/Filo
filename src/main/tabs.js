@@ -2047,7 +2047,8 @@ class TabManager {
   // deve funzionare anche senza modello. All'LLM restano i casi di giudizio.
   // `da`: 'chat' quando l'ha chiesto la chat, per i contatori della finestra (#1470).
   async runAutoTriage({ trigger = 'idle', da = '' } = {}) {
-    if (this.incognito) return { archived: 0 };
+    // In incognito il riordino non parte: chi l'ha chiesto lo sa, invece di leggere «nessuna da archiviare».
+    if (this.incognito) return { archived: 0, incognito: true };
     // Chi chiede il riordino mentre ne gira già uno non ha ottenuto niente:
     // rispondergli «nessuna scheda da archiviare» è la frase di un riordino
     // riuscito, e i due casi si confondono.
@@ -2134,7 +2135,9 @@ class TabManager {
       const esito = this.applyTriageDecisions(cands, [...byIndex.values()], opzioni());
       ContatoriFinestra.misura('giroRiordino', trigger, { duplicati: esito.duplicati, modello: esito.archived - esito.duplicati, giudizioMancato });
       contaGiro(esito.archived, dupIdx.size, giudizioMancato);
-      return this._esitoTriage(giudizioMancato ? { ...esito, giudizioMancato: true } : esito, { trigger, valutate: cands.length });
+      const motivo = giudizioMancato ? percheGiudizioMancato(errore).perche : '';
+      const conGiudizio = giudizioMancato ? { ...esito, giudizioMancato: true, ...(motivo ? { motivo } : {}) } : esito;
+      return this._esitoTriage(conGiudizio, { trigger, valutate: cands.length });
     } finally {
       this._triageRunning = false;
     }
@@ -2147,13 +2150,7 @@ class TabManager {
     if (!mancato) { this._giudizioMancatoDetto = null; return; }
     console.warn(`[Filo] pulizia delle schede (${trigger}) senza giudizio del modello:`, errore ? (errore.message || errore) : 'nessuna funzione di giudizio');
     if (trigger === 'manual') return;
-    let perche = '';
-    let pagina = null;
-    try {
-      const CE = globalThis.SN_CHAT_ERRORS;
-      perche = String((errore && errore.userMessage) || (errore && CE ? CE.sentence(errore) : '') || '');
-      pagina = errore && CE ? CE.rimedioPagina(errore) : null;
-    } catch (_) {}
+    const { perche, pagina } = percheGiudizioMancato(errore);
     if (this._giudizioMancatoDetto === perche) return;
     this._giudizioMancatoDetto = perche;
     const testo = `La pulizia automatica non è riuscita a valutare le schede.${perche ? ` ${perche}` : ''}`;
@@ -4920,6 +4917,18 @@ function segnaPagina(tab, url) {
 }
 
 // Una pulizia senza giudizio che Filo sa spiegare da sé: la frase va all'utente così com'è, il codice dice dove si rimedia.
+// Perché il giudizio sulle schede non è arrivato, detto all'utente, e la pagina dove si rimedia.
+function percheGiudizioMancato(errore) {
+  let perche = '';
+  let pagina = null;
+  try {
+    const CE = globalThis.SN_CHAT_ERRORS;
+    perche = String((errore && errore.userMessage) || (errore && CE ? CE.sentence(errore) : '') || '');
+    pagina = errore && CE ? CE.rimedioPagina(errore) : null;
+  } catch (_) {}
+  return { perche, pagina };
+}
+
 function erroreDiPulizia(frase, code = '') {
   const e = new Error(frase);
   e.userMessage = frase;

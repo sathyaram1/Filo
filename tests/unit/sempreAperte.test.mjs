@@ -83,6 +83,31 @@ test('una macchina senza punto si tiene aperta se è detta come indirizzo (#823 
   assert.deepEqual(T.vociDaTogliere('http://localhost:3000/', ['localhost', 'example.org']), ['localhost']);
 });
 
+test('#823.1 — una macchina senza punto salvata («nas») si toglie dicendone il nome, e solo lei', () => {
+  const voci = ['nas', 'example.org', 'nas.example.org'];
+  assert.deepEqual(T.vociDaTogliere('nas', voci), ['nas']);
+  assert.deepEqual(T.vociDaTogliere('NAS', voci), ['nas']);
+  assert.deepEqual(T.vociDaTogliere(' nas. ', voci), ['nas']);
+  assert.deepEqual(T.vociDaTogliere('http://nas:5000/', voci), ['nas']);
+  assert.deepEqual(T.vociDaTogliere('localhost', ['localhost']), ['localhost']);
+  // Un nome nudo che non è una voce non toglie niente, nemmeno i siti che lo contengono.
+  assert.deepEqual(T.vociDaTogliere('whatsapp', ['web.whatsapp.com']), []);
+  assert.deepEqual(T.vociDaTogliere('com', ['example.com']), []);
+  assert.deepEqual(T.vociDaTogliere('nas', []), []);
+});
+
+test('#823.1 — un dominio di primo livello non diventa una regola, una macchina della rete di casa sì', () => {
+  for (const v of ['https://com', 'http://com/', 'https://com.', 'com:8080', 'http://it/', 'https://museum', 'https://shop/', 'https://xn--p1ai/']) {
+    assert.equal(SempreAperte.voceDa(v), '', v);
+  }
+  assert.equal(SempreAperte.voceDa('com'), '');
+  assert.equal(SempreAperte.voceDa('.it'), '');
+  for (const [v, voce] of [['http://nas:5000/', 'nas'], ['http://intranet/', 'intranet'], ['http://home:8123/', 'home'], ['localhost:3000', 'localhost']]) {
+    assert.equal(SempreAperte.voceDa(v), voce, v);
+  }
+  assert.equal(SempreAperte.voceDa('example.com'), 'example.com');
+});
+
 test('un suffisso pubblico non si salva: terrebbe aperto mezzo web', () => {
   assert.equal(SempreAperte.voceDa('example.org'), 'example.org');
   assert.equal(SempreAperte.voceDa('https://web.whatsapp.com/'), 'web.whatsapp.com');

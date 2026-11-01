@@ -122,12 +122,12 @@
     } catch (_) { return null; }
   }
 
-  // «Tieni sempre aperto X» (#823): a «quali siti tieni aperti?» il modello risponde col dato. Solo host: una voce
-  // arrivata da un backup con altro dentro non entra nel prompt.
+  // «Tieni sempre aperto X» (#823): a «quali siti tieni aperti?» il modello risponde col dato. Solo host, anche senza
+  // punto («nas»): una voce arrivata da un backup con altro dentro non entra nel prompt.
   async function readSempreAperte(Mem) {
     try {
       const voci = Mem && typeof Mem.listKeepOpen === 'function' ? Object.keys(await Mem.listKeepOpen()) : [];
-      return voci.filter((h) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(h)).sort();
+      return voci.filter((h) => /^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(h) || /^\[[0-9a-f:.]+\]$/.test(h)).sort();
     } catch (_) { return []; }
   }
 

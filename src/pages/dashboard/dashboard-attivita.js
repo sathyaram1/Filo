@@ -2331,12 +2331,12 @@
     return null;
   }
 
-  // Perché il riordino non è potuto partire, o '' se è andato. Un riordino che
-  // ha comunque archiviato qualcosa è riuscito, anche se il giudizio è mancato:
-  // i doppioni li decide Filo da sé.
-  function motivoRiordinoMancato(r, archiviate) {
+  // Perché il riordino non è riuscito, o '' se è andato. La frase la compone il main (SN_TAB_TRIAGE.riordinoNonRiuscito):
+  // un giudizio mancato è un riordino non riuscito anche se i doppioni li ha chiusi (#1626).
+  function motivoRiordinoMancato(r) {
     if (!r || r.ok === false) return 'Filo non è riuscito a valutare le schede.';
-    if (archiviate > 0) return '';
+    if (r.error) return `${String(r.error).trim().replace(/\.+$/, '')}.`;
+    if (r.incognito) return 'In una finestra in incognito Filo non riordina le schede.';
     if (r.giaInCorso) return 'Un riordino è già in corso.';
     if (r.giudizioMancato) return 'Filo non è riuscito a valutare le schede.';
     return '';
@@ -2348,8 +2348,11 @@
   // a quello riuscito su due strade su tre.
   function esitoRiordino(r) {
     const n = (r && r.archived) || 0;
-    const motivo = motivoRiordinoMancato(r, n);
-    if (motivo) return { ok: false, testo: 'Riordino non riuscito', motivo };
+    const motivo = motivoRiordinoMancato(r);
+    if (motivo) {
+      const testo = n ? `Chiusi solo ${n === 1 ? 'un doppione' : `${n} doppioni`}` : 'Riordino non riuscito';
+      return { ok: false, testo, motivo };
+    }
     return {
       ok: true,
       motivo: '',
@@ -2409,14 +2412,23 @@
       if (!(await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche, 'PULISCI_TAB'))) return;
       btn.disabled = true;
       btn.textContent = '🧹 Riordino in corso…';
-      const r = await send({ type: MSG.RUN_TAB_TRIAGE });
+      const r = await send({ type: MSG.RUN_TAB_TRIAGE, da: 'chat' });
       const e = esitoRiordino(r);
+      let nota = btn.nextElementSibling && btn.nextElementSibling.classList.contains('dash-riordino-motivo') ? btn.nextElementSibling : null;
       if (!e.ok) {
         btn.disabled = false;
-        btn.textContent = '🧹 Riordino non riuscito · riprova';
+        btn.textContent = `🧹 ${e.testo} · riprova`;
         btn.title = e.motivo;
+        // Il perché si legge senza cercarlo sotto il puntatore: dice cosa fare prima di riprovare.
+        if (!nota) {
+          nota = document.createElement('div');
+          nota.className = 'dash-bubble-note dash-riordino-motivo';
+          btn.after(nota);
+        }
+        nota.textContent = e.motivo;
         return;
       }
+      if (nota) nota.remove();
       btn.textContent = `✓ ${e.testo}`;
       segnaConfermata(a, { archived: r.archived || 0 }, activity);
     });
@@ -2444,7 +2456,7 @@
     if (r && r.executed) return esitoRiordino({ ok: true, ...(r.output || {}) });
     if (!r || !r.kept) {
       const o = (r && r.output) || {};
-      if (o.giaInCorso || o.giudizioMancato) return esitoRiordino(o);
+      if (o.giaInCorso || o.giudizioMancato || o.incognito) return esitoRiordino(o);
       return { ok: false, testo: 'Riordino non riuscito', motivo: `${String(o.error || 'non è partito').replace(/\.+$/, '')}.` };
     }
     // Chiesto come assistente (#825.3) torna dal popup generico, che dice `needsConfirm` invece di `domanda`.
