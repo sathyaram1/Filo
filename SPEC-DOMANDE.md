@@ -1167,7 +1167,9 @@ per fase, scrivibile in Automazioni con #1193). Il gancio che li impone è
 - Il riordino del lunedì lavora tutta la coda insieme:
   - unisce i doppioni;
   - archivia gli stantii e i già fatti;
-  - rivede le priorità con la scala 3/2/1/0.
+  - rivede le priorità con la scala 3/2/1/0, dentro i limiti di
+    SPEC-MANUTENTORE § 3: può portare un feedback a 3, ma una 3 non la
+    abbassa e non la archivia, chiunque l'abbia messa (la toglie solo l'owner).
 
   Quelli che aspettano una scelta li segnala alla revisione delle domande. Il
   rapporto va alla gestione del lavoro, che può anche lanciare il riordino

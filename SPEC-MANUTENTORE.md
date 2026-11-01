@@ -66,7 +66,9 @@ Può, da solo e senza passare dall'owner:
 
 - scrivere l'**ordine** dei feedback e il **parallelismo N**; il server accende
   una sessione per feedback nell'ordine, fino a N, come in #1680;
-- cambiare le **priorità** (0, 1, 2; creare 3; mai abbassare una 3);
+- cambiare le **priorità** (0, 1, 2; creare 3; mai abbassare né archiviare una 3:
+  la toglie solo l'owner, e il limite vale per ogni automazione, riordino del
+  lunedì compreso, SPEC-DOMANDE § 6.6);
 - comporre **pacchetti** (SPEC-RIDISEGNO-LAVORO § 3.1) e mettere **attese**
   fra feedback;
 - aprire feedback e domande; archiviare doppioni e mettere note; **sbloccare
