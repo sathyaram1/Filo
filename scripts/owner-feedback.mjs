@@ -318,7 +318,7 @@ export async function segnaAttese(id, numeri, opts = {}) {
   if (opts.aggiungi && !aggiunte.length) return { ok: true, invariato: true, ...(opts.dryRun ? { dryRun: true } : {}), attese, prima, tolte, aggiunte, pratica };
   if (tolte.length && !opts.sostituisci) {
     const vive = (await statiInRete(tolte, { bearer })).filter((w) => w.stato !== ATT.STATO.FUSO);
-    if (vive.length) return { ok: false, vive, motivo: `toglierebbe ${vive.length === 1 ? 'l’attesa' : 'le attese'} su ${vive.map(rigaAttesa).join('; ')}` };
+    if (vive.length) return { ok: false, vive, motivo: `toglierebbe ${vive.length === 1 ? 'l’attesa' : 'le attese'} su ${vive.map(rigaAttesa).join(', ')}` };
   }
   if (opts.dryRun) return { ok: true, dryRun: true, attese, prima, tolte, aggiunte, pratica };
   const fields = attese.length ? { [ATT.CAMPO]: toFsValue(attese), updatedAt: firmaOra() } : { updatedAt: firmaOra() };
