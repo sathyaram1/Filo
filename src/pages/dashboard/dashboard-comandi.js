@@ -499,16 +499,22 @@
   const SINTASSI = Symbol('sintassi');
   function programmaDi(t) {
     let s = String(t).trim().slice(1).trimStart();
+    let aperte = false;
     for (let prima = null; prima !== s;) {
       prima = s;
-      s = s.replace(/^[({!&]+\s*/, '');
+      const o = s.match(/^[({!&]+\s*/);
+      if (o) { if (o[0].includes('(')) aperte = true; s = s.slice(o[0].length); }
       const a = s.match(/^[\p{L}_][\p{L}\p{N}_]*=("[^"]*"|'[^']*'|\S*)(\s+|$)/u);
       if (a) { s = s.slice(a[0].length); if (!s) return SINTASSI; }
     }
     if (/^\$[\p{L}_{(]/u.test(s) || s.startsWith('`') || /^\[[\p{L}\p{N}_.]+\]::/u.test(s)) return SINTASSI;
     const V = global.SN_VIRGOLETTE;
     if (V && /^["']/.test(s)) return V.primoComando(s);
-    return s.split(/[\s|<>;&(){}`]/)[0] || '';
+    const nome = s.split(/[\s|<>;&(){}`]/)[0] || '';
+    // «:)» e «:(» sono faccine, non il `:` della shell seguito da una parentesi: nessuna shell le esegue (#892.5).
+    const dopo = s.charAt(nome.length);
+    if ((dopo === ')' && !aperte) || (dopo === '(' && s.charAt(nome.length + 1) !== ')')) return '';
+    return nome;
   }
 
   // Verifica (con debounce) se il primo token è un comando shell esistente e
