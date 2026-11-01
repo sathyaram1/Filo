@@ -2311,6 +2311,17 @@ function contaZoomDallaChat(esito, verso, win) {
   }
   if (Z[v] && dallaChat()) require('./contatoriStrade').misura('azione', Z[v], 'chat', { incognito: !!(win && win._filoIncognito) });
 }
+// Una pagina di Filo che la chat apre da sola (#1468): la strada della pagina, e quella dell'icona che apre la stessa.
+// Prima dell'apertura, perché il tempo in vista parte quando la scheda arriva davanti.
+function contaPaginaDallaChat(url, win) {
+  const T = globalThis.SN_CONTATORI_STRADE;
+  if (!T || !win || !/^filo:/i.test(String(url || '')) || !dallaChat()) return;
+  const Strade = require('./contatoriStrade');
+  const incognito = !!win._filoIncognito;
+  Strade.misura('pagina', url, 'chat', { finestra: win._filoTabs, incognito });
+  const azione = T.AZIONE_DELLA_PAGINA[T.paginaDi(url)];
+  if (azione) Strade.misura('azione', azione, 'chat', { incognito });
+}
 // Un tasto della home che usa la porta dell'Aiuto (#1561) è un gesto dell'utente, non la chat.
 function dallaChat() {
   const p = Registro.corrente();
