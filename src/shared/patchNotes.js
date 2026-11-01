@@ -22,7 +22,7 @@
       fixes: [
         { testo: 'Quando mandi un feedback, il riquadro dice «inviato» solo quando è arrivato davvero. Se un allegato non parte, un avviso di Filo dice quale e perché, e resta finché non lo chiudi, e un feedback senza testo i cui allegati non sono partiti non arriva vuoto. Un file che il riquadro non può allegare viene nominato, col motivo. La schermata annotata di uno schermo grande ora parte: Filo la alleggerisce sotto i 4 MB.', segnalazione: 1667 },
         { testo: 'Aprire e chiudere tante volte il riquadro «Invia feedback» non fa più crescere la memoria usata da Filo.', segnalazione: 1096 },
-        { testo: 'All\'avvio la finestra di Filo compare prima. Se Filo è già aperto e lo riapri dalla sua icona, viene davanti subito invece che dopo un secondo o due.', segnalazione: 1092 },
+        { testo: 'All\'avvio la finestra di Filo compare prima, e chiuderla subito non cancella più le schede da riaprire. Se Filo è già aperto e lo riapri dalla sua icona, viene davanti subito invece che dopo un secondo o due.', segnalazione: 1092 },
         { testo: 'Se chiudi la finestra di Filo mentre resta aperta un\'altra sua finestra, come quella dell\'accesso a Google, riaprendo Filo torna la finestra con le tue schede, anche col clic sul Dock su Mac. Prima compariva un errore di JavaScript e Filo restava bloccato.', segnalazione: 1606 },
       ],
     },
