@@ -21,6 +21,8 @@ require('../../src/shared/actionLevels.js');
 require('../../src/shared/actionTools.js');
 require('../../src/shared/sistema.js');
 require('../../src/shared/filoState.js');
+require('../../src/shared/filoAccaduti.js');
+require('../../src/shared/urlNav.js');
 require('../../src/main/services/providers/openrouter.js');
 globalThis.SN_CONST = { ...globalThis.SN_CONST, STORAGE_KEYS: { ...globalThis.SN_CONST.STORAGE_KEYS, FILO_CHATS: 'filo_chats' } };
 globalThis.chrome = { storage: { local: { async get(k) { return { [k]: undefined }; }, async set() {}, async remove() {} } } };
