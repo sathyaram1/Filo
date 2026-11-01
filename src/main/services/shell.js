@@ -479,6 +479,7 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
 
   function fatal(message) {
     session.dead = true;
+    if (inAttesa) { clearTimeout(inAttesa.timer); inAttesa = null; }
     const cur = session.current;
     session.current = null;
     if (cur && cur.cb.onError) cur.cb.onError({ message });
