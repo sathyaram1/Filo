@@ -894,6 +894,7 @@
   const sessionsInAttesa = [];
   // Numero scritto e non ancora salvato: una risposta su un altro campo non lo cancella.
   let maxInScrittura = false;
+  let tettoInScrittura = false;
 
   // Righe che dicono di non aver riletto il resto, col testo che resta quando
   // un documento intero arriva: da lì in poi l'avviso sarebbe falso (#675).
