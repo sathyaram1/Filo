@@ -721,6 +721,12 @@
         else Popup?.showToast?.(testo, { duration: 6000 });
       };
       const riprova = (testo) => { dici(testo); sendBtn.disabled = false; cancelBtn.disabled = false; };
+      if (wantShot && images.length >= MAX_IMAGES) {
+        statusEl.textContent = `Con lo screenshot le immagini sarebbero ${MAX_IMAGES + 1}, il massimo è ${MAX_IMAGES}: togline una o rinuncia allo screenshot.`;
+        return;
+      }
+      const testoInviato = textEl.value;
+      inVolo.add(testoInviato);
       sendBtn.disabled = true;
       cancelBtn.disabled = true;
       statusEl.textContent = 'Invio in corso…';
