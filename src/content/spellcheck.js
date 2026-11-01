@@ -1984,21 +1984,27 @@
     return v;
   }
 
-  // I riquadri delle righe di [da, a): nello specchio per una casella, sulle parole vere per un campo modificabile.
+  // I riquadri delle righe di [da, a): nello specchio per una casella, sulle parole vere per un campo modificabile. Un
+  // `a` oltre la fine del testo vale la fine.
   function rettangoliDi(state, da, a) {
     const radice = campoDiTesto(state.el) ? state.overlay : state.el;
     if (!radice || a <= da) return [];
     const w = document.createTreeWalker(radice, NodeFilter.SHOW_TEXT);
     const range = document.createRange();
+    const rettangoli = () => [...range.getClientRects()].filter((r) => r.width || r.height);
     let tot = 0;
     let iniziato = false;
+    let ultimo = null;
     for (let n = w.nextNode(); n; n = w.nextNode()) {
       const len = n.nodeValue.length;
       if (!iniziato && da < tot + len) { range.setStart(n, da - tot); iniziato = true; }
-      if (iniziato && a <= tot + len) { range.setEnd(n, a - tot); return [...range.getClientRects()].filter((r) => r.width || r.height); }
+      if (iniziato && a <= tot + len) { range.setEnd(n, a - tot); return rettangoli(); }
       tot += len;
+      ultimo = n;
     }
-    return [];
+    if (!iniziato || !ultimo) return [];
+    range.setEnd(ultimo, ultimo.nodeValue.length);
+    return rettangoli();
   }
 
   const dentroAlCampo = (state, r) => {
