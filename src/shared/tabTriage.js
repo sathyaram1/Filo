@@ -76,8 +76,9 @@
     return /^[a-z0-9-]+$/.test(host) && (host === 'localhost' || conSchema || porta) ? host : '';
   }
 
+  // Una voce senza punto è una macchina («nas», «casa»), non un dominio: copre solo sé stessa, mai «*.casa».
   function copreHost(voce, host) {
-    return !!voce && !!host && (host === voce || host.endsWith(`.${voce}`));
+    return !!voce && !!host && (host === voce || (voce.includes('.') && host.endsWith(`.${voce}`)));
   }
 
   // La voce salvata che tiene aperta `url`, o null.
