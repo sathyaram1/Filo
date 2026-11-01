@@ -175,8 +175,10 @@
       }
       await persist();
     }
+    const entroMs = Number(opts && opts.attendiMs) || 0;
+    const tentativo = entroMs > 0 ? attendiTentativo(id, entroMs) : null;
     scheduleFlush(0);
-    return { id, queued: true };
+    return tentativo ? { id, queued: true, tentativo } : { id, queued: true };
   }
 
   function remove(id) { queue = queue.filter((it) => it.id !== id); }
