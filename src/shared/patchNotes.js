@@ -14,6 +14,7 @@
       fixes: [
         { testo: 'Un comando che sovrascrive o svuota un file che c\'è già chiede prima di partire, che lo scriva tu nel terminale della home o che lo proponga Filo. Il riquadro dice perché.', segnalazione: 892 },
         { testo: 'Nel terminale della home un comando con un apostrofo o una virgoletta non chiusa finisce subito col suo errore. Prima restava in corso per sempre e si prendeva i comandi scritti dopo. Ogni errore compare sotto il comando che l\'ha dato.', segnalazione: 892 },
+        { testo: 'Con Bash, e su Mac, un comando del terminale della home che fa una domanda riceve la risposta che scrivi sotto la sua uscita. Prima la perdeva e il terminale restava in corso.', segnalazione: 892 },
         { testo: 'Su Linux una frase dopo la barra che comincia col percorso di un documento o di una cartella, o con una faccina come :), va a Filo e non al terminale.', segnalazione: 892 },
         { testo: 'Un comando incollato nella home, cancellato e riportato con Annulla conta ancora come incollato: se cancella dei file chiede di scrivere «conferma».', segnalazione: 892 },
         { testo: '«/riordina» non scambia più di posto due schede della stessa pagina, come due home, quando una si è appena aperta: dice che erano già in ordine.', segnalazione: 1561 },
