@@ -3598,11 +3598,13 @@ async function eseguiAzioneFilo(action, {
         const base = { titolo: v.perModello.titolo, url: v.perModello.url, chiusa: v.perModello.chiusa };
         // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: resta il riassunto, come per una pagina sparita.
         if (v.voce.urlTagliato) return { executed: false, kept: true, output: { ...base, riaperta: false, tagliato: true, riassunto: v.perModello.riassunto } };
-        const id = await tm.riapri(voceDaArchivio(v.voce));
+        // Dietro finché non si sa se la pagina c'è: se non c'è più, l'utente resta in chat, dove vede il riassunto.
+        const id = await tm.riapri(voceDaArchivio(v.voce), { activate: false });
         if (!id) return { executed: false, kept: true, output: { ...base, riaperta: false } };
         tm.tornata(v.voce);
-        const esito = await tm.esitoRiapertura(id);
+        const esito = await tm.esitoRiapertura(id, { tetto: 8_000 });
         if (esito === 'sparita') return { executed: true, kept: true, output: { ...base, riaperta: true, nonRaggiungibile: true, riassunto: v.perModello.riassunto } };
+        tm.activate(id);
         return { executed: true, kept: true, output: { ...base, riaperta: true } };
       }
       case 'RIPRENDI_AUDIO': {

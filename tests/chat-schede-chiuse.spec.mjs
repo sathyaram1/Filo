@@ -1,5 +1,5 @@
 // #884 — in chat si ritrovano le schede chiuse o archiviate per contenuto e per chi le ha chiuse (a mano, dalla chat,
-// dalla pulizia), e si riaprono com'erano; se la pagina non c'è più, sotto la risposta resta il riassunto salvato.
+// dalla pulizia), e si riaprono com'erano; se la pagina non c'è più, la chat resta davanti col riassunto salvato.
 // Il modello è finto e prende l'id dall'esito che riceve, come farebbe uno vero. Regole: tests/unit/cercaSchedeChiuse.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
@@ -100,6 +100,8 @@ test('si ritrovano per chi le ha chiuse e per contenuto, e si riaprono com\'eran
   ]);
   await chiedi(chat, 'riaprimi la pagina sulle orche che ho chiuso');
   await expect.poll(async () => (await schede(shell)).filter((t) => t.url === urlOrche).length, { timeout: 15_000 }).toBe(1);
+  // La pagina c'è: riaperta davanti, come dalla ricerca del filo.
+  await expect.poll(async () => { const x = await shell.evaluate(async () => window.filoShell.tabs.snapshot()); return x.tabs.find((t) => t.id === x.activeId).url; }).toBe(urlOrche);
   expect(await esitoPerIlModello(app, 'c1')).toContain('chiusa dall\'utente');
   const riga = chat.locator('.dash-activity').last();
   await expect(riga).toContainText('Riaperta', { timeout: 10_000 });
@@ -108,7 +110,7 @@ test('si ritrovano per chi le ha chiuse e per contenuto, e si riaprono com\'eran
   await ripristina(app);
 });
 
-test('una pagina che non c\'è più si riapre sull\'errore e sotto la risposta resta il riassunto', async ({ app, testServer }) => {
+test('una pagina che non c\'è più si riapre dietro, sull\'errore, e in chat resta il riassunto', async ({ app, shell, testServer }) => {
   test.setTimeout(90_000);
   const chat = await home(app);
   const sparita = `${testServer.originPubblico}/pagina-che-non-esiste-piu`;
@@ -132,6 +134,10 @@ test('una pagina che non c\'è più si riapre sull\'errore e sotto la risposta r
   await expect(carta).toContainText('Orche: come cacciano');
   await expect(carta).toContainText(RIASSUNTO);
   await expect(carta).toContainText('non risponde più');
+  // L'utente resta nella chat, dove c'è il riassunto; la scheda sull'errore è dietro, per riprovare.
+  const s = await shell.evaluate(async () => window.filoShell.tabs.snapshot());
+  expect(String(s.tabs.find((t) => t.id === s.activeId).url)).toMatch(/^filo:\/\/newtab/);
+  expect(s.tabs.some((t) => t.url === sparita)).toBe(true);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'parlava di come cacciano' })).toBeVisible({ timeout: 10_000 });
   const esito = await esitoPerIlModello(app, 's2');
   expect(esito).toContain('non c\'è più');

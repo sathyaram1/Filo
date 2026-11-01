@@ -1423,7 +1423,7 @@
     if (type === 'ESEGUI_COMANDO' && a._output && a._output.blocked) return true;
     if (type === 'COMANDO_FINESTRA' && a._output && a._output.already) return true;
     // Una scheda riaperta la cui pagina non c'è più (#884): la riga lo dice, sotto resta il riassunto salvato.
-    if (type === 'RIAPRI_SCHEDA' && a._output && a._output.nonRaggiungibile) return true;
+    if (type === 'RIAPRI_SCHEDA' && a._output && (a._output.nonRaggiungibile || a._output.tagliato)) return true;
     // Ciò che Filo lascia finire all'UTENTE (l'evento): la riga dice che l'ha
     // proposto, il bottone è come si accetta. Senza il bottone non si raggiunge.
     if (a._output && a._output.proposta) return true;
@@ -2011,7 +2011,7 @@
     if (permessoDaConcedere(a)) return bottonePermesso(a);
     if (type === 'PULISCI_TAB') return renderBottoneRiordino(a, activity);
     if (type === 'CANCELLA_ARCHIVIO') return renderDeleteArchivePanel(a, activity);
-    if (type === 'RIAPRI_SCHEDA' && a._output && a._output.nonRaggiungibile) return cartaRiassunto(a._output);
+    if (type === 'RIAPRI_SCHEDA' && a._output && (a._output.nonRaggiungibile || a._output.tagliato)) return cartaRiassunto(a._output);
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
     // (livello 2 o 3) e ha allegato spiegazione + livello. Il bottone apre il
     // popup OK/Annulla (2) o il box "digita conferma" (3); solo dopo il sì
@@ -2441,7 +2441,8 @@
     sotto.className = 'dash-riassunto-chiusa-quando';
     const sito = (() => { try { return new URL(o.url || '').hostname.replace(/^www\./, ''); } catch (_) { return ''; } })();
     const data = Number.isFinite(quando) ? new Date(quando).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
-    sotto.textContent = [sito, data ? `chiusa il ${data}` : '', 'la pagina non risponde più'].filter(Boolean).join(' · ');
+    const perche = o.tagliato ? 'indirizzo troppo lungo per riaprirla' : 'la pagina non risponde più';
+    sotto.textContent = [sito, data ? `chiusa il ${data}` : '', perche].filter(Boolean).join(' · ');
     carta.appendChild(sotto);
     const testo = document.createElement('div');
     testo.className = 'dash-riassunto-chiusa-testo';
