@@ -1272,7 +1272,10 @@
     // Con un operando solo la copia arriva nella cartella di lavoro, col suo nome.
     if (ops.length === 1) return prog === 'move' ? '' : copiaSovrascrive(ops, '.', c, { inCartella: true });
     const sorgenti = ops.slice(0, -1).flatMap((s) => s.split('+')).filter(Boolean);
-    return copiaSovrascrive(sorgenti, ops[ops.length - 1], c);
+    const dest = ops[ops.length - 1];
+    // cmd copia il CONTENUTO di una cartella dentro l'altra: quali nomi, non si sa.
+    if (sorgenti.some((s) => statoDi(s, c) === 'cartella') && statoDi(dest, c) === 'cartella') return PUO_SOVRASCRIVERE;
+    return copiaSovrascrive(sorgenti, dest, c);
   }
 
   // `-Path` e `-LiteralPath` le sorgenti, `-Destination` la meta; il resto con un valore cambia quali file: non si sa.
