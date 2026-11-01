@@ -17,6 +17,8 @@
         { testo: 'Una correzione del correttore non attacca più la parola a quella prima, come in «oggisono». Con l\'apostrofo curvo, come in «l’amico», il segno sta solo sulla parola sbagliata, e la correzione lascia l’apostrofo come l’hai scritto.', segnalazione: 1580 },
         { testo: 'Il dato che il correttore trova al posto delle x, sulla prima riga di un campo, compare sotto le x quando sopra non c\'è posto, e accanto alle x in un campo alto una riga. Non copre più quello che sta sopra il campo, e un clic lì va alla pagina.', segnalazione: 1448 },
         { testo: 'In «Valuta» anche una correzione che toglie delle parole, o una riga intera, si annulla col secondo clic: le parole tornano al loro posto.', segnalazione: 1449 },
+        { testo: 'Se il modello scelto non legge le immagini, l\'audio o i PDF che gli mandi, la chat te lo dice e ti porta alle Opzioni per sceglierne un altro. Prima dava la colpa ai fornitori. Anche «Prova» nelle Opzioni dice perché il servizio rifiuta un modello, con le parole della chat e non col messaggio tecnico.', segnalazione: 1345 },
+        { testo: 'L\'avviso su una risposta arrivata da un fornitore che Filo esclude non si perde più se eri in un\'altra applicazione o su un sito dove Filo è spento. Compare quando torni su Filo, o nella prima pagina dove Filo è acceso.', segnalazione: 1478 },
       ],
     },
     {
