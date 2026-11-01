@@ -255,6 +255,8 @@
   function routerRefusal(text) {
     const t = String(text || '');
     if (/data policy|settings\/privacy/i.test(t)) return 'DATA_POLICY';
+    // Il modello non legge quel contenuto (#1345): non c'entrano né i fornitori ammessi né gli strumenti.
+    if (ingressoDi(t)) return 'INGRESSO_NON_LETTO';
     if (/requested parameters|tool/i.test(t)) return 'PARAMS';
     if (/no endpoints found for\b/i.test(t)) return 'MODEL_UNAVAILABLE';
     if (/no allowed providers|no endpoints (found|available)/i.test(t)) return 'NO_PROVIDER_ALLOWED';
