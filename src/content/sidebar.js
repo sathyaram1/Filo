@@ -1161,9 +1161,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
           if (r.sparito) { diLa('help_correzione_sparito'); return; }
           if (r.dove === undefined) { diLa(r.manca ? 'help_correzione_manca' : 'help_correzione_ferma', estratto(c.prima)); return; }
           scritta = r.dove;
+          tolto = c.dopo ? null : { pezzo: r.tolto || c.prima, sx: r.sx || '', dx: r.dx || '' };
           contaValuta('correzione_accettata');
         } else {
-          const r = c.dopo ? await sostituisciNelCampo(campo, c.dopo, c.prima, scritta) : {};
+          const r = c.dopo ? await sostituisciNelCampo(campo, c.dopo, c.prima, scritta)
+            : tolto ? await rimettiNelCampo(campo, tolto.pezzo, tolto, scritta) : {};
           if (r.sparito) { diLa('help_correzione_sparito'); return; }
           if (r.dove === undefined) { diLa('help_correzione_non_tolta', global.SN_TASTI?.etichetta?.('Ctrl+Z') || 'Ctrl+Z'); return; }
           vicinoA = r.dove;
