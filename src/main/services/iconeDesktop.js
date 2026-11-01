@@ -736,15 +736,23 @@ async function eseguiScript(comando, p) {
   const u = Sistema.leggiUscita(r.stdout);
   if (r.timedOut && !u.voci.length) u.voci.push({ k: 'errore', v: 'tempo-comando', righe: [] });
   if (r.truncated) u.troncato = true;
+  // Uno script morto prima di scrivere non è un desktop vuoto.
+  if (!u.voci.length) u.voci.push({ k: 'errore', v: 'eccezione', righe: [] }, { k: 'dettaglio', v: String(r.stderr || '').slice(0, 500), righe: [] });
   return u;
 }
 
 // Il computer vero, oppure quello delle prove: stessa forma, dati già interpretati.
 const COMPUTER = {
   async leggi() { return interpretaLettura(await eseguiScript('desktop-leggi', {})); },
-  async disponi(posizioni, { auto = false } = {}) { return interpretaLettura(await eseguiScript('desktop-disponi', { posizioni, auto })); },
+  async disponi(posizioni, { auto = false, disposizione } = {}) {
+    return interpretaLettura(await eseguiScript('desktop-disponi', { posizioni, auto, disposizione }));
+  },
 };
 const computer = () => computerFinto || COMPUTER;
+// Il desktop finto dice da sé di che sistema è (`piattaforma`); senza, è un Windows.
+function piattaformaDi() {
+  return computerFinto ? computerFinto.piattaforma || 'win32' : process.platform;
+}
 
 // Data e dimensione le dice il disco: le icone di sistema non ne hanno, e un disco che non risponde non ferma le altre.
 async function arricchisci(voci) {
