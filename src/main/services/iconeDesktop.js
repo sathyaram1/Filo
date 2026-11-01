@@ -420,9 +420,19 @@ function interpretaLettura(u) {
       const p = coppia(v);
       if (p) { cur.x = p.x; cur.y = p.y; }
     } else if (cur && k === 'cartella') cur.cartella = v === '1';
+    // Data, dimensione ed estensione le dice il Finder; su Windows le chiede poi il disco.
+    else if (cur && k === 'tipo') cur.tipo = String(v).replace(/^\./, '').toLowerCase();
+    else if (cur && k === 'data') { const n = intero(v); if (n != null) cur.data = n; } else if (cur && k === 'dimensione') { const n = intero(v); if (n != null) cur.dimensione = n; }
   }
   for (const x of voci) if (!x.nome) x.nome = String(x.id).split(/[\\/]/).filter(Boolean).pop() || x.id;
   const a = /^(-?\d+),(-?\d+),(-?\d+),(-?\d+)$/.exec(String(u.primo('area') || '').trim());
+  const finder = u.primo('finder');
+  const mac = finder != null ? {
+    finder,
+    auto: /^arranged by /.test(finder),
+    griglia: finder === 'snap to grid',
+    dimensioneIcone: intero(u.primo('dimensione-icone')),
+  } : {};
   return {
     ok: true,
     voci: voci.filter((x) => x.x != null && x.y != null),
@@ -433,6 +443,7 @@ function interpretaLettura(u) {
     nascoste: u.primo('nascoste') === '1',
     totale: intero(u.primo('totale')),
     spostate: intero(u.primo('spostate')),
+    ...mac,
   };
 }
 
