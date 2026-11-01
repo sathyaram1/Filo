@@ -786,26 +786,38 @@ function registraCambio(prima, dopo, come) {
   }
 }
 
+// Uno spostamento che si ferma a metà lascia il desktop cambiato: quel cambio si registra, e l'esito dà l'annullo.
+async function nonRiuscito(letto, dopo, errore) {
+  const ora = dopo && dopo.ok ? dopo : await computer().leggi().catch(() => null);
+  const evento = ora && ora.ok ? registraCambio(letto, ora, null) : null;
+  return { ...fallito(errore), ...(evento ? { cambio: evento.id } : {}) };
+}
+
 async function ordinaOra(q) {
   const letto = await computer().leggi();
   if (!letto.ok) return fallito(letto.errore);
+  const sistema = piattaformaDi();
   const come = { ordine: q.ordine, verso: q.verso, alContrario: q.alContrario, cartellePrima: q.cartellePrima };
   if (!letto.voci.length) return { ok: true, cosa: 'desktop', ...come, detto: comeDetto(come), vuoto: true, totale: 0, spostate: 0 };
   if (q.ordine === 'data' || q.ordine === 'dimensione') await arricchisci(letto.voci);
-  const p = piano(letto, q);
+  const p = piano(letto, q, sistema);
   if (p.errore) return fallito(p.errore, p.errore === 'non-ci-stanno' ? { totale: p.totale, posti: p.posti } : {});
   const base = {
     ok: true, cosa: 'desktop', ...come, detto: comeDetto(come), totale: letto.voci.length, righe: p.righe, colonne: p.colonne, nascoste: letto.nascoste,
+    ...(sistema === 'darwin' ? { mac: true } : {}),
   };
   const ora = new Map(letto.voci.map((v) => [v.id, v]));
   if (!letto.auto && p.posizioni.every((x) => ora.get(x.id).x === x.x && ora.get(x.id).y === x.y)) {
     return { ...base, gia: true, spostate: 0 };
   }
   const fatto = await computer().disponi(p.posizioni, { auto: false });
-  if (!fatto.ok) return fallito(fatto.errore);
+  if (!fatto.ok) return nonRiuscito(letto, null, fatto.errore);
   const { fuoriPosto, mancanti } = verifica(p.posizioni, fatto, p.griglia);
+  if (!inOrdine(p.posizioni, fatto, p.griglia, q.verso)) {
+    const mosso = !stessaDisposizione(disposizione(letto), disposizione(fatto));
+    return nonRiuscito(letto, fatto, mosso ? 'fuori-ordine' : 'non-spostate');
+  }
   const evento = registraCambio(letto, fatto, come);
-  if (fuoriPosto && fuoriPosto + mancanti >= p.posizioni.length) return { ...fallito('non-spostate'), ...(evento ? { cambio: evento.id } : {}) };
   return {
     ...base,
     spostate: p.posizioni.length - fuoriPosto - mancanti,
