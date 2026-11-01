@@ -450,9 +450,23 @@ test('la bolla del comando si legge, col tema chiaro e scuro e riaprendo la chat
     const c = await contrasto(sel);
     return c.pieno && c.rapporto > 4.5;
   }, { timeout: 3_000, message: msg }).toBe(true);
+  // La barra davanti al comando, un segno solo in grassetto: il minimo dei segni grafici, 3 a 1, sul fondo della bolla.
+  const barra = () => page.locator('.dash-term-cmd .dash-term-prompt').last().evaluate((el) => {
+    const rgb = (s) => (String(s).match(/[\d.]+/g) || []).map(Number);
+    const lum = ([r, g, b]) => {
+      const c = [r, g, b].map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    };
+    const [a, b] = [lum(rgb(getComputedStyle(el.parentElement).backgroundColor)), lum(rgb(getComputedStyle(el).color))].sort((x, y) => y - x);
+    return (a + 0.05) / (b + 0.05);
+  });
   for (const t of ['light', 'dark']) {
     await tema(t);
+    // A metà transizione i colori di mezzo passerebbero per buoni: si misura a bolla ferma.
+    await expect.poll(() => page.locator('.dash-term-cmd').last().evaluate((el) => el.getAnimations({ subtree: true }).length),
+      { timeout: 3_000 }).toBe(0);
     await leggibile('.dash-term-cmd', `${t}: il comando si legge sul suo fondo`);
+    expect(await barra(), `${t}: la barra davanti al comando si legge`).toBeGreaterThan(3);
     await page.screenshot({ path: `tests/.shots/635-1-comando-${t}.png` }).catch(() => {});
   }
 
