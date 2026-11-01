@@ -105,6 +105,11 @@ async function calendarioFinto(app, esito = '') {
   }, esito);
 }
 const consegnati = (app) => app.evaluate(() => globalThis.__calAperti || []);
+// Dopo l'OK il modello riparte con l'esito (#1373): la prova aspetta che quel turno, muto, sia chiuso prima di guardare il diario.
+async function ripresaChiusa(app, page, nome, chiamate) {
+  await expect.poll(() => app.evaluate((_e, n) => (globalThis[`${n}_calls`] || []).length, nome), { timeout: 10_000 }).toBe(chiamate);
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+}
 
 test('A — appunto e lezione hanno la loro riga nel diario, e il riassunto le conta', async ({ app, shell }) => {
   test.setTimeout(60_000);
@@ -274,6 +279,7 @@ test('C — un\'impostazione confermata entra nel diario e il modello lo sa al t
     // Col testo insieme a una conferma il modello riparte (#1130): la frase arriva dal giro che ha letto l'esito.
     { text: 'Accendo il terminale.', toolCalls: [{ id: 'c1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"modalita_terminale","valore":true}' }] },
     { text: 'Ti chiedo conferma.' },
+    { text: '' },
     { text: 'Sì, la modalità terminale è attiva.' },
   ], '__fakeC');
 
@@ -289,6 +295,7 @@ test('C — un\'impostazione confermata entra nel diario e il modello lo sa al t
   await scrollConfirmToEnd(page);
   await clickConfirm(page, 'danger');
   await expect(host).toHaveCount(0, { timeout: 5_000 });
+  await ripresaChiusa(app, page, '__fakeC', 3);
 
   // La conferma lascia la sua riga nel diario (prima: niente), e la riga dice
   // l'impostazione in italiano, non la chiave interna col valore grezzo.
@@ -891,6 +898,7 @@ test('H — l\'azione confermata lascia la sua riga, e il bottone diventa una ri
   await fakeProvider(app, [
     { text: 'Me lo ricordo, se mi dici di sì.', toolCalls: [{ id: 'h1', name: 'SALVA_LEZIONE', arguments: JSON.stringify({ testo: 'L\'utente non beve caffè' }) }] },
     { text: 'Me lo ricordo, se mi dici di sì.' },
+    { text: '' },
   ], '__fakeH');
 
   await page.locator('#input').fill('ricordati che non bevo caffè');
@@ -900,6 +908,7 @@ test('H — l\'azione confermata lascia la sua riga, e il bottone diventa una ri
   await expect(btn).toBeVisible();
   // Il popup si apre da solo: l'utente legge e conferma.
   await clickConfirm(page, 'ok', { timeout: 10_000 });
+  await ripresaChiusa(app, page, '__fakeH', 3);
 
   // Il diario lo dice in cima e nella riga: prima restava «Conferma chiesta»
   // sotto un titolo «Come ha lavorato».
@@ -932,6 +941,7 @@ test('I — quello che l\'utente finisce col bottone si raggiunge e finisce nel 
   await fakeProvider(app, [
     { toolCalls: [{ id: 'i1', name: 'PULISCI_TAB', arguments: '{}' }] },
     { text: 'Valuto le schede aperte.' },
+    { text: '' },
   ], '__fakeI');
 
   await page.locator('#input').fill('riordina le schede e archivia quelle che non servono');
@@ -947,6 +957,7 @@ test('I — quello che l\'utente finisce col bottone si raggiunge e finisce nel 
   await expect(btn).toBeVisible();
   await btn.click();
   await clickConfirm(page, 'ok', { timeout: 10_000 });
+  await ripresaChiusa(app, page, '__fakeI', 3);
 
   // Finito il riordino, il diario racconta l'esito e il riassunto lo conta:
   // «Ha proposto di riordinare le schede» a cose fatte era una mezza verità.
@@ -961,6 +972,7 @@ test('I — quello che l\'utente finisce col bottone si raggiunge e finisce nel 
   await fakeProvider(app, [
     { text: 'Creo la cartella.', toolCalls: [{ id: 'i2', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `mkdir ${cartella}` }) }] },
     { text: 'Creo la cartella.' },
+    { text: '' },
   ], '__fakeI2');
   await page.locator('#input').fill('crea la cartella');
   await page.locator('#sendBtn').click();
@@ -970,6 +982,7 @@ test('I — quello che l\'utente finisce col bottone si raggiunge e finisce nel 
   await cmdBtn.click();
   await clickConfirm(page, 'ok', { timeout: 10_000 });
   await expect(cmdBtn).toContainText('✓', { timeout: 15_000 });
+  await ripresaChiusa(app, page, '__fakeI2', 3);
 
   const ultimo = page.locator('.dash-activity').last();
   await ultimo.locator('.dash-activity-head').click();
