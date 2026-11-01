@@ -1450,7 +1450,17 @@ function perimetroLettura(sender, cartella = null) {
   try { cwd = cartellaDelComando(cartella == null ? getAssistantCwd(sender) : cartella) || ''; } catch (_) {}
   let reti = [];
   try { reti = require('./shell').unitaDiRete(cwd); } catch (_) {}
-  return { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
+  const perimetro = { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
+  // #892.2 — il classificatore chiede qui se un bersaglio c'è già. Non enumerabile: il perimetro resta un dato.
+  Object.defineProperty(perimetro, 'esiste', { value: statoSulDisco });
+  return perimetro;
+}
+
+// 'file', 'cartella', null se non c'è, 'ignoto' se il disco non risponde. I percorsi di rete li scarta prima chi chiede.
+function statoSulDisco(p) {
+  try { return require('node:fs').statSync(p).isDirectory() ? 'cartella' : 'file'; } catch (e) {
+    return e && (e.code === 'ENOENT' || e.code === 'ENOTDIR') ? null : 'ignoto';
+  }
 }
 
 // La shell delle Preferenze che eseguirà i comandi dell'assistente, già risolta per questo sistema.
