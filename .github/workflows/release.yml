@@ -366,6 +366,16 @@ jobs:
             fi
           fi
 
+      # Le novita' riscritte dal redattore del manutentore (SPEC-MANUTENTORE
+      # § 8), in locale come il numero. Non ferma mai la pubblicazione: senza
+      # risposta escono le righe dei worker, con l'avviso.
+      - name: Le novita' del redattore (in locale)
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+        shell: bash
+        run: node scripts/release-novita.mjs "${{ steps.bump.outputs.version }}" || echo "::warning::novita' del redattore non messe"
+
       - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'
         env:

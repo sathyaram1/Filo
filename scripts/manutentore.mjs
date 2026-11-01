@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { incroci, ramiInCorso } from './lib/su-main.mjs';
 import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './schede.mjs';
+import { impronta } from './release-novita.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -794,7 +795,7 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
       const c = controllaNovita(consegna, { blocco, schede: sc.schede });
       if (!c.ok) { console.error(`RIFIUTATO, non consegnato:\n- ${c.errori.join('\n- ')}`); return 1; }
       const r = await chiama(cred, 'novita', c.novita);
-      return esito(r, (x) => `Novità della ${x.versione} accettate dal server (${x.righe} righe). Finché il rilascio non le legge escono le righe dei worker: dove entrano lo decide l\'owner (#1959).`);
+      return esito(r, (x) => `Novità della ${x.versione} accettate dal server (${x.righe} righe): escono con la prossima pubblicazione, al posto delle righe che hai letto.`);
     }
     case 'feedback': {
       const testo = (await leggiStdin()).trim();
