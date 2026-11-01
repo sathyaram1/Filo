@@ -137,6 +137,7 @@ function reteFinta(docs) {
     if (!d) return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
     const fields = { seq: { integerValue: String(d.seq) }, subSeq: { integerValue: String(d.subSeq || 0) } };
     if (d.status) fields.status = { stringValue: d.status };
+    if (d.resolvedInVersion) fields.resolvedInVersion = { stringValue: d.resolvedInVersion };
     if (d.unitoIn) fields.unitoIn = { stringValue: d.unitoIn };
     if (d.waitsFor) {
       fields.waitsFor = { arrayValue: { values: d.waitsFor.map((w) => ({ mapValue: { fields: { id: { stringValue: w.id }, num: { stringValue: w.num } } } })) } };
@@ -277,7 +278,7 @@ test('--aspetta da riga di comando: dice quelle che sostituisce e cosa succede d
   const conAttesa = (status) => ({ ...DOCS, id903: { seq: 903, status, waitsFor: [{ id: 'id663-2', num: '663.2' }, { id: 'via951', num: '951' }] } });
   let rete = reteFinta(conAttesa('design'));
   try {
-    const r = await owner.segnaAttese('id903', '676,951', { bearer: 'tok' });
+    const r = await owner.segnaAttese('id903', '676,951', { bearer: 'tok', sostituisci: true });
     assert.equal(r.ok, true, r.motivo);
     assert.deepEqual(r.attese.map((w) => w.num), ['676', '951'], 'il cancellato #951, già scritto, non si rifiuta');
     assert.deepEqual(r.tolte, [{ id: 'id663-2', num: '663.2' }]);
@@ -288,13 +289,125 @@ test('--aspetta da riga di comando: dice quelle che sostituisce e cosa succede d
   } finally { rete.ripristina(); }
   rete = reteFinta(conAttesa('todo'));
   try {
-    const r = await owner.segnaAttese('id903', '676', { bearer: 'tok', dryRun: true });
+    const r = await owner.segnaAttese('id903', '676', { bearer: 'tok', dryRun: true, sostituisci: true });
     assert.deepEqual(rete.scritte, []);
     assert.match(owner.rispostaAttese('903', r), /scriverei «aspetta #676» e toglierei quelle su #663\.2, #951, che c’erano prima/);
-    const scritta = await owner.segnaAttese('id903', '676', { bearer: 'tok' });
+    const scritta = await owner.segnaAttese('id903', '676', { bearer: 'tok', sostituisci: true });
     assert.match(owner.rispostaAttese('903', scritta), /Tolte le attese su #663\.2, #951.*poi entra in coda da solo/);
-    assert.match(owner.rispostaAttese('903', await owner.segnaAttese('id903', '', { bearer: 'tok' })), /non aspetta più niente \(tolte le attese su #663\.2, #951\)/);
+    assert.match(owner.rispostaAttese('903', await owner.segnaAttese('id903', '', { bearer: 'tok', sostituisci: true })), /non aspetta più niente \(tolte le attese su #663\.2, #951\)/);
   } finally { rete.ripristina(); }
+});
+
+// ── #1756: aggiungere senza sostituire, e sostituire solo dicendolo ─────────
+
+const CASO_1294 = {
+  ...DOCS, id1741: { seq: 1741, status: 'todo' }, id1756: { seq: 1756, status: 'todo' }, id567: { seq: 567, status: 'done' },
+  id600: { seq: 600, status: 'archived', resolvedInVersion: '0.2.200' }, id601: { seq: 601, status: 'archived' },
+  id1294: { seq: 1294, status: 'todo', waitsFor: [{ id: 'id1741', num: '1741' }, { id: 'idVecchio', num: '' }, { id: 'id567', num: '567' }] },
+};
+const scrittiIn = (w) => w.body.fields.waitsFor.arrayValue.values.map((v) => v.mapValue.fields.num.stringValue || v.mapValue.fields.id.stringValue);
+
+test('--aspetta-anche unisce alle attese che ci sono, senza doppioni, e non perde quelle senza numero', async () => {
+  const rete = reteFinta(CASO_1294);
+  try {
+    const r = await owner.segnaAttese('id1294', '1756,1741,#1756', { bearer: 'tok', aggiungi: true });
+    assert.equal(r.ok, true, r.motivo);
+    assert.deepEqual(r.attese.map((w) => w.num || w.id), ['1741', '567', '1756', 'idVecchio']);
+    assert.deepEqual(r.aggiunte, [{ id: 'id1756', num: '1756' }]);
+    assert.deepEqual(r.tolte, []);
+    assert.equal(rete.scritte.length, 1);
+    assert.deepEqual(scrittiIn(rete.scritte[0]).sort(), ['1741', '1756', '567', 'idVecchio']);
+    assert.match(owner.rispostaAttese('1294', r), /^1294: aspetta #1741, #567, #1756, un feedback senza numero\. Aggiunta l’attesa su #1756\. Nessuna routine/);
+
+    rete.scritte.length = 0;
+    const gia = await owner.segnaAttese('id1294', '1741', { bearer: 'tok', aggiungi: true });
+    assert.equal(gia.invariato, true);
+    assert.equal(rete.scritte.length, 0, 'niente di nuovo, niente scritto');
+    assert.match(owner.rispostaAttese('1294', gia), /aspettava già #1741, #567, un feedback senza numero: non ho scritto niente/);
+    assert.match(owner.rispostaAttese('1294', await owner.segnaAttese('id1294', '1756', { bearer: 'tok', aggiungi: true, dryRun: true })),
+      /^\[dry-run\] 1294: aggiungerei #1756, e aspetterebbe #1741, #567, #1756, un feedback senza numero, stato invariato$/);
+    assert.equal(rete.scritte.length, 0);
+
+    // Le regole di sempre valgono sull'elenco unito: il tetto conta anche quelle che c'erano.
+    assert.match((await owner.segnaAttese('id1294', '1294', { bearer: 'tok', aggiungi: true })).motivo, /stesso feedback/);
+    const diciotto = Array.from({ length: 18 }, (_, i) => String(1000 + i)).join(',');
+    assert.match((await owner.segnaAttese('id1294', diciotto, { bearer: 'tok', aggiungi: true })).motivo, /sono 21 numeri: un feedback ne aspetta al più 20, togline 1/);
+    assert.equal(rete.scritte.length, 0);
+  } finally { rete.ripristina(); }
+});
+
+test('--aspetta che toglierebbe attese non fuse rifiuta senza scrivere; passa con sostituisci, o se toglie solo fuse', async () => {
+  const rete = reteFinta(CASO_1294);
+  try {
+    // Il caso del 28/10: chi metteva l'attesa sul pacchetto nuovo cancellava quelle che c'erano.
+    const r = await owner.segnaAttese('id1294', '1756', { bearer: 'tok' });
+    assert.equal(r.ok, false);
+    assert.deepEqual(r.vive.map((w) => [w.num || w.id, w.stato]), [['1741', 'aperto'], ['idVecchio', 'cancellato']], 'la fusa #567 non conta');
+    const testo = owner.rifiutoSostituzione('#1294', ['1756'], r);
+    assert.match(testo, /^RIFIUTATO: --aspetta sostituisce l’elenco intero, e toglierebbe le attese su #1741 \(non ancora fuso\), un feedback senza numero \(cancellato\): non ho toccato niente\./);
+    assert.match(testo, /npm run feedback -- 1294 --aspetta-anche 1756\n/);
+    assert.match(testo, /npm run feedback -- 1294 --aspetta 1756 --sostituisci$/);
+    assert.equal((await owner.segnaAttese('id1294', '1756', { bearer: 'tok', dryRun: true })).ok, false, 'anche a vuoto lo dice');
+    assert.deepEqual(rete.scritte, []);
+
+    // Toglie solo la fusa #567 (e tiene le altre): passa.
+    const soloFusa = reteFinta({ ...CASO_1294, id1294: { seq: 1294, status: 'todo', waitsFor: [{ id: 'id1741', num: '1741' }, { id: 'id567', num: '567' }, { id: 'id600', num: '600' }] } });
+    try {
+      const ok = await owner.segnaAttese('id1294', '1741,1756', { bearer: 'tok' });
+      assert.equal(ok.ok, true, ok.motivo);
+      assert.deepEqual(ok.tolte.map((w) => w.num), ['567', '600'], 'done, e archived con la versione: fuse tutte e due');
+      assert.deepEqual(scrittiIn(soloFusa.scritte[0]), ['1741', '1756']);
+    } finally { soloFusa.ripristina(); }
+
+    const chiusa = reteFinta({ ...CASO_1294, id1294: { seq: 1294, status: 'todo', waitsFor: [{ id: 'id601', num: '601' }] } });
+    try {
+      const no = await owner.segnaAttese('id1294', '1756', { bearer: 'tok' });
+      assert.deepEqual(no.vive.map((w) => [w.num, w.stato]), [['601', 'chiuso']], 'archiviato senza fusione non è fuso');
+    } finally { chiusa.ripristina(); }
+
+    const conSostituisci = reteFinta(CASO_1294);
+    try {
+      const si = await owner.segnaAttese('id1294', '1756', { bearer: 'tok', sostituisci: true });
+      assert.equal(si.ok, true, si.motivo);
+      assert.deepEqual(scrittiIn(conSostituisci.scritte[0]), ['1756']);
+      assert.match(owner.rispostaAttese('1294', si), /Tolte le attese su #1741, un feedback senza numero, #567, che c’erano prima/);
+    } finally { conSostituisci.ripristina(); }
+  } finally { rete.ripristina(); }
+});
+
+test('uno stato che non si decifra o non si legge conta da non fuso: l\'attesa non si toglie senza dirlo', async () => {
+  const rete = reteFinta({ ...CASO_1294, id1741: { seq: 1741, status: 'FENC1:illeggibile' } });
+  try {
+    const { statiInRete } = await import(pathToFileURL(join(ROOT, 'scripts', 'lib', 'stati-attese.mjs')).href);
+    const stati = await statiInRete([{ id: 'id1741', num: '1741' }, { id: 'id567', num: '' }, { id: 'id601', num: '601' }],
+      { bearer: 'tok', decifra: async (g) => (g.status.startsWith('FENC1:') ? { status: '[cifrato — chiave privata non configurata]' } : g) });
+    assert.deepEqual(stati, [{ id: 'id1741', num: '1741', stato: 'ignoto' }, { id: 'id567', num: '567', stato: 'fuso' }, { id: 'id601', num: '601', stato: 'chiuso' }],
+      'il numero mancante si prende dal documento');
+    const giu = await statiInRete([{ id: 'id1741', num: '1741' }], { bearer: 'tok', fetchImpl: async () => { throw new Error('ECONNRESET'); } });
+    assert.deepEqual(giu, [{ id: 'id1741', num: '1741', stato: 'ignoto' }]);
+  } finally { rete.ripristina(); }
+});
+
+test('npm run feedback: le forme nuove delle attese si rifiutano male accoppiate, prima delle credenziali', () => {
+  const lancia = (...args) => spawnSync(process.execPath, [join(ROOT, 'scripts', 'owner-feedback.mjs'), 'fid', ...args, '--dry-run'],
+    { encoding: 'utf8', timeout: TETTO_ATTESA_MS, env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: '' } });
+  for (const [args, atteso] of [
+    [['--sostituisci'], /--sostituisci vale solo con --aspetta <numeri>/],
+    [['--aspetta-anche', '676', '--sostituisci'], /--sostituisci vale solo con --aspetta <numeri>/],
+    [['--aspetta-niente', '--sostituisci'], /--sostituisci vale solo con --aspetta <numeri>/],
+    [['--aspetta', '676', '--aspetta-anche', '12'], /--aspetta e --aspetta-anche insieme/],
+    [['--aspetta-anche', '676', '--frase', 'ciao'], /sono due comandi/],
+    [['todo', 'nota', '--aspetta-anche', '676'], /--aspetta-anche va da solo, senza stato né nota/],
+    [['--aspetta-anche', '676', '--priorita', '2'], /--priorita senza stato va da sola, non con --aspetta-anche/],
+  ]) {
+    const r = lancia(...args);
+    assert.equal(r.status, 1, `${args.join(' ')}: ${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, atteso, args.join(' '));
+    assert.match(r.stderr, /RIFIUTATO/);
+  }
+  const aiuto = spawnSync(process.execPath, [join(ROOT, 'scripts', 'owner-feedback.mjs'), '--help'], { encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+  assert.match(aiuto.stderr, /--aspetta-anche 676,663\.2 +\(aggiunge attese a quelle che ci sono/);
+  assert.match(aiuto.stderr, /--aspetta 676,663\.2 \[--sostituisci\] \| --aspetta-niente/);
 });
 
 // La priorità risale le attese (#1630): se B aspetta A, A vale almeno B, lungo la catena e solo verso l'alto.
