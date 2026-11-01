@@ -670,22 +670,15 @@
     // Allegati che NON sono riusciti a caricarsi: li riportiamo al chiamante
     // così la UI può avvisare l'utente (un upload fallito veniva ingoiato in
     // silenzio e il feedback partiva senza il file, senza alcun segnale).
-    const failed = [];
-    const imgs = Array.isArray(images) ? images.slice(0, 5) : [];
+    // Il limite si misura sul raw: la cifratura aggiunge una novantina di byte fissi.
+    const vaglio = vagliaAllegati(images, files);
+    const failed = vaglio.failed.slice();
     const uploaded = [];
-    for (let i = 0; i < imgs.length; i++) {
-      const img = imgs[i];
-      if (!img?.dataUrl) continue;
-      const rawBlob = dataUrlToBlob(img.dataUrl);
-      // Limite misurato sul raw: la cifratura aggiunge una novantina di byte fissi.
-      if (rawBlob.size > 4 * 1024 * 1024) {
-        failed.push({ name: String(img.name || `immagine ${i + 1}`), reason: 'troppo grande (max 4 MB)' });
-        continue;
-      }
+    for (const img of vaglio.immagini) {
       try {
         // S1.2: cifra i byte prima dell'upload. Da #602 `sealForUpload` lancia
         // invece di ripiegare sul blob in chiaro.
-        const blobToUpload = await sealForUpload(rawBlob);
+        const blobToUpload = await sealForUpload(dataUrlToBlob(img.dataUrl));
         const u = await uploadImage(blobToUpload);
         uploaded.push(u.url);
       } catch (e) {
@@ -694,27 +687,23 @@
         // immagini già caricate sono cifrate, e il documento non esiste ancora.
         if (isEncryptionError(e)) throw e;
         console.warn('[SN feedback] upload immagine fallito:', e);
-        failed.push({ name: String(img.name || `immagine ${i + 1}`), reason: 'caricamento non riuscito' });
+        failed.push({ name: img.name, ...motivoCaricamento(e) });
       }
     }
 
     // Nome e tipo originali si conservano: in dashboard diventano link scaricabili.
-    const docs = Array.isArray(files) ? files.slice(0, 5) : [];
     const uploadedFiles = [];
-    for (const f of docs) {
-      const fname = String(f?.name || 'allegato');
-      if (!f?.dataUrl) { failed.push({ name: fname, reason: 'file vuoto' }); continue; }
-      const rawBlob = dataUrlToBlob(f.dataUrl);
-      if (rawBlob.size > 4 * 1024 * 1024) { failed.push({ name: fname, reason: 'troppo grande (max 4 MB)' }); continue; }
+    for (const f of vaglio.documenti) {
       try {
         // S1.2: cifra anche gli allegati non-immagine.
+        const rawBlob = dataUrlToBlob(f.dataUrl);
         const blobToUpload = await sealForUpload(rawBlob);
         const u = await uploadImage(blobToUpload); // upload generico (usa blob.type)
-        uploadedFiles.push(voceDocumento(u.url, fname, f.type || rawBlob.type || ''));
+        uploadedFiles.push(voceDocumento(u.url, f.name, f.type || rawBlob.type || ''));
       } catch (e) {
         if (isEncryptionError(e)) throw e; // come sopra: si ferma tutto
         console.warn('[SN feedback] upload file fallito:', e);
-        failed.push({ name: fname, reason: 'caricamento non riuscito' });
+        failed.push({ name: f.name, ...motivoCaricamento(e) });
       }
     }
     // `interi`: chi chiama vuole tutti gli allegati o niente feedback (un pacchetto non nasce monco, FEEDBACK-STATES.md
@@ -722,6 +711,7 @@
     if (opts && opts.interi && failed.length) {
       throw Object.assign(new Error(`allegati non caricati: ${failed.map((f) => `${f.name} (${f.reason})`).join(', ')}`), { allegatiFalliti: failed });
     }
+    if (!String(text || '').trim() && !uploaded.length && !uploadedFiles.length) throw new ErroreVuoto(failed);
 
     // Best-effort: il feedback parte anche senza numero, invece di bloccare l'invio.
     let seq = null;
