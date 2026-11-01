@@ -150,7 +150,8 @@ test('chi aspettava una unita passa al pacchetto prima che lei si archivi; se no
   assert.deepEqual(r.archiviate.map((a) => a.id), ['id812'], '#815 la aspetta ancora #904: non si archivia');
   assert.match(r.out.join('\n'), /Attese spostate sul pacchetto: #903 \(aspettava #812\)/);
   const err = r.err.join('\n');
-  assert.match(err, /ATTESA NON SPOSTATA su #904 \(scrittura fallita \(503\)\): aspetta ancora #815\. Rimedia con: npm run feedback -- 904 --aspetta 900/);
+  assert.match(err, /ATTESA NON SPOSTATA su #904 \(scrittura fallita \(503\)\): aspetta ancora #815\. Rimedia con: npm run feedback -- 904 --aspetta 900 --sostituisci$/m,
+    'l’unita tolta è ancora aperta: senza --sostituisci la riga per rimediare si rifiuterebbe (#1756)');
   assert.match(err, /#815 NON ARCHIVIATA.*npm run feedback -- 815 archived "Unito nel pacchetto #900: il lavoro continua lì"/);
 });
 
