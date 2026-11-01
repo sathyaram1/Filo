@@ -647,9 +647,11 @@ const stessaDisposizione = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const IMPOSTAZIONI_WINDOWS = 'tasto destro sul desktop → Visualizza';
 const IMPOSTAZIONI_FINDER = 'tasto destro sulla Scrivania → Mostra opzioni Vista';
 const PILE = 'Se la Scrivania usa le pile vanno tolte (tasto destro sulla Scrivania → Usa pile), poi Filo riprova.';
-function spiega(errore, { totale = 0, posti = 0, piattaforma = 'win32' } = {}) {
+function spiega(errore, { totale = 0, posti = 0, piattaforma = 'win32', criterio = 'data' } = {}) {
   const mac = piattaforma === 'darwin';
+  const dato = criterio === 'dimensione' ? 'quanto sono grandi i file' : 'quando sono stati modificati i file';
   const T = mac ? {
+    'senza-dati': { frase: `Il Finder non ha detto a Filo ${dato} della Scrivania: senza quel dato non le mette in ordine ${criterio === 'dimensione' ? 'per dimensione' : 'per data'}. Per nome sì.` },
     'nessun-desktop': { frase: 'Il Finder non ha fatto vedere a Filo le icone della Scrivania.' },
     'permesso-automazione': {
       frase: 'macOS non lascia a Filo comandare il Finder, che tiene le icone della Scrivania.',
