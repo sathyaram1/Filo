@@ -376,6 +376,22 @@ test('il redattore: una promessa su un lavoro che non è nella rosa né a 3 si r
   assert.doesNotMatch(ctx, /#900/);
 });
 
+test('il redattore: una riga tiene la segnalazione delle righe lette, e la consegna porta le impronte di quelle righe', async () => {
+  const { impronta } = await import('../../scripts/release-novita.mjs');
+  const blocco = { version: '0.2.255', features: [{ testo: 'Le novità in una pagina.', segnalazione: 1956 }, 'Il menu si apre.'], fixes: ['Download più veloci.'] };
+  const base = { versione: '0.2.255', features: [{ testo: 'Tutte le novità in una pagina, e il menu si apre.', segnalazione: 1956 }], fixes: ['Download più veloci.'] };
+  const buona = M.controllaNovita(base, { blocco, schede: [] });
+  assert.equal(buona.ok, true, (buona.errori || []).join('\n'));
+  assert.deepEqual(buona.novita.features, [{ testo: 'Tutte le novità in una pagina, e il menu si apre.', segnalazione: 1956 }]);
+  assert.deepEqual(buona.novita.originali, ['Le novità in una pagina.', 'Il menu si apre.', 'Download più veloci.'].map(impronta));
+  const estranea = M.controllaNovita({ ...base, features: [{ testo: 'Altro.', segnalazione: 42 }] }, { blocco, schede: [] });
+  assert.match(estranea.errori.join('\n'), /la segnalazione 42 non sta fra le righe dei worker/);
+  const senzaNumero = M.controllaNovita({ ...base, features: [{ testo: 'Altro.', segnalazione: 'tanti' }] }, { blocco, schede: [] });
+  assert.match(senzaNumero.errori.join('\n'), /segnalazione è il numero intero/);
+  assert.equal(M.controllaNovita({ ...base, features: [{ testo: '   ', segnalazione: 1956 }] }, { blocco, schede: [] }).ok, false);
+  assert.match(M.contestoRedattore({ blocco, schede: [] }), /- \[segnalazione 1956\] Le novità in una pagina\./);
+});
+
 test('il ruolo nomina solo sottocomandi che lo script accetta, e lo script li elenca tutti nel ruolo', () => {
   const nominati = [...RUOLO.matchAll(/npm run manutentore -- ([a-z-]+)/g)].map((m) => m[1]);
   const fuori = nominati.filter((c) => !M.SOTTOCOMANDI.includes(c));
