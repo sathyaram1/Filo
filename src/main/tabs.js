@@ -3225,13 +3225,7 @@ class TabManager {
       if (!NE || reason === 'clean-exit') return;
       const current = tab.url || '';
       if (!NE.isRetriableTarget(current) || NE.isErrorPageUrl(current)) return;
-      // Se muore di nuovo mentre stiamo recuperando, non si insiste a raffica; lo sanno i contatori anonimi (#1466).
-      const now = Date.now();
-      if (tab._crashRecoveryAt && now - tab._crashRecoveryAt < 2000) {
-        try { globalThis.SN_CONTATORI_MAIN?.processoMorto('scheda_in_recupero', reason, { incognito: !!this.incognito }); } catch (_) {}
-        return;
-      }
-      tab._crashRecoveryAt = now;
+      if (!recuperaScheda(tab, { motivo: reason, incognito: !!this.incognito })) return;
       // Si RICREA la vista: un loadURL sul processo appena morto fa crashare anche il renderer
       // nuovo quando c'è un preload, e si entra in un giro senza fine.
       setTimeout(() => {
