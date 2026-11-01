@@ -575,7 +575,17 @@ Come funziona oggi (#1152):
     propone il ripensamento del sistema (le assorbite diventano `superata`).
     Una domanda che ferma un lavoro non si assorbe, perché solo la sua
     risposta lo riprende: si raggruppa con le altre del suo caso;
-  - rivede le priorità.
+  - rivede le priorità;
+  - legge i lavori fusi dall'ultima revisione (lo stesso riassunto dei
+    feedback che usa il manutentore) e chiude le domande, aperte o in
+    lavorazione, che quelle fusioni attuano, col principio e il numero del
+    lavoro; dove il riassunto non basta, legge il feedback. Una decisione
+    presa in chat e già fusa non deve restare aperta (è successo a D-250).
+- **Risposte registrate da una sessione.** Una risposta che una sessione
+  locale registra con `domanda.mjs rispondi` vale come dell'owner: viene
+  dalla chat, che usa solo lui. «Gestisci la risposta» la applica come le sue
+  e la segna «registrata da una sessione»; l'owner può annullarla da Gestione,
+  come riapre una risposta automatica. Oggi la rifiuta e gli richiede un «sì».
 
 ### 3.7 Ordine
 
