@@ -42,8 +42,13 @@ function crea({ manda, ora = Date.now, nuovoId = () => crypto.randomUUID() } = {
     return presi;
   }
 
+  // Tornati su Filo da una parte che non dà il fuoco alla pagina (la barra delle schede): si offrono di nuovo.
+  function riproponi() {
+    for (const voce of inCoda.values()) { try { manda(voce.messaggio); } catch (_) {} }
+  }
+
   const inAttesa = () => [...inCoda.values()].map((v) => v.messaggio);
-  return { avvisa, prendi, inAttesa };
+  return { avvisa, prendi, inAttesa, riproponi };
 }
 
 module.exports = { crea, PAUSA_MS };
