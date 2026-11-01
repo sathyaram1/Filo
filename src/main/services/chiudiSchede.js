@@ -48,7 +48,8 @@ function risolvi(action, { schede = [], viste = [], numerate = 12, chat = null, 
           + ' «tutte»: se l\'utente vuole tenerla aperta non usare «tutte», diglielo' : ''),
     };
   }
-  const tutte = r.tutte || (r.tranne.length > 0 && !r.sito && !r.schede.length);
+  // «Chiudi tutte le schede di YouTube» arriva anche come `tutte` più `sito`: il sito restringe, non allarga a tutto.
+  const tutte = !r.sito && (r.tutte || (r.tranne.length > 0 && !r.schede.length));
   if (!r.schede.length && !tutte && !r.sito) {
     return { errore: 'indica quali schede chiudere: i numeri dell\'elenco TAB APERTE, un sito, oppure tutte' };
   }
