@@ -278,12 +278,18 @@ export function confronta(prima, dopo) {
   const b = (dopo && dopo.raccolte) || {};
   const chiavi = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort(perNome);
   const diverse = [];
+  // Raccolta per raccolta, non dai totali: dieci mancanti e dieci in più altrove danno lo stesso totale.
+  let mancano = 0;
+  let inPiu = 0;
   for (const k of chiavi) {
     const x = proprio(a, k) ? a[k] : 0;
     const y = proprio(b, k) ? b[k] : 0;
-    if (x !== y) diverse.push({ raccolta: k, prima: x, dopo: y });
+    if (x === y) continue;
+    diverse.push({ raccolta: k, prima: x, dopo: y });
+    if (x > y) mancano += x - y;
+    else inPiu += y - x;
   }
-  return { uguale: diverse.length === 0, diverse, raccolte: chiavi.length, totalePrima: somma(a), totaleDopo: somma(b) };
+  return { uguale: diverse.length === 0, diverse, raccolte: chiavi.length, mancano, inPiu, totalePrima: somma(a), totaleDopo: somma(b) };
 }
 
 function differenza({ prima, dopo }) {
