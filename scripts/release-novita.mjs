@@ -250,6 +250,11 @@ export async function main(argv = process.argv.slice(2), { cwd = process.cwd(), 
   const a = applicaNovita(sorgente, r.tutte);
   if (!a.ok) { avviso(a.reason); return 0; }
   for (const s of a.saltate) console.log(`::warning::novità della ${s.versione || '?'} non messe: ${s.perche}.`);
+  // Quella di questa versione, non messa, non deve uscire dopo: chi aggiorna adesso legge le righe dei worker.
+  if (a.saltate.some((s) => s.copreAltro && s.versione === versione)) {
+    const sc = await chiediNovita({ passphrase: env.FILO_BUILD_PASSPHRASE, versione, scarta: true, fetchImpl, url });
+    if (sc.outcome !== 'done') console.log(`::warning::novità della ${versione}: il server non ha saputo che non sono uscite (${sc.reason || sc.outcome}); una costruzione dopo le metterebbe.`);
+  }
   if (a.applicate.length) writeFileSync(file, a.testo);
   console.log(`[release-novita] ${versione}: ${r.novita ? 'riscritte dal redattore' : 'le righe dei worker (nessuna riscrittura)'}; blocchi riscritti in questo albero: ${a.applicate.length ? a.applicate.join(', ') : 'nessuno'} (niente commit).`);
   return 0;
