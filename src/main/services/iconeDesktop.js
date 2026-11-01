@@ -392,7 +392,9 @@ function ambienteDisponi({ posizioni, auto, disposizione } = {}, piattaforma = '
 function costruisci(comando, p, piattaforma = process.platform) {
   const script = SCRIPT[piattaforma] && SCRIPT[piattaforma][comando];
   if (!script) throw new Error(`comando sconosciuto su ${piattaforma}: ${comando}`);
-  return { shell: 'powershell', script, env: comando === 'desktop-disponi' ? ambienteDisponi(p) : {} };
+  const mac = piattaforma === 'darwin';
+  const env = comando === 'desktop-disponi' ? ambienteDisponi(p, piattaforma) : mac ? { FILO_SIS_COMANDO: 'leggi' } : {};
+  return { shell: mac ? 'sh' : 'powershell', script, env };
 }
 
 // ── Uscita → dati ────────────────────────────────────────────────────────────
