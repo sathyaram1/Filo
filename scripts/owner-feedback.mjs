@@ -269,12 +269,16 @@ async function togliScheda(id, bearer) {
 /**
  * Le attese (#903), stato invariato: `numeri` come li scrive l'owner («676,663.2»), '' per toglierle. Le regole sono
  * quelle di Gestione (SN_FB_ATTESE.valida): numeri inesistenti, sé stesso, giri e più di venti si rifiutano col motivo.
- * @returns {Promise<{ ok: true, attese: Array<{id,num}>, dryRun?: true } | { ok: false, motivo: string }>}
+ * `aggiungi`: li unisce a quelle che ci sono. Senza, è l'elenco intero, e togliere un'attesa non fusa vuole `sostituisci`
+ * (#1756: chi ne metteva una senza aver letto l'elenco cancellava le altre): il rifiuto porta `vive`.
+ * @returns {Promise<{ ok: true, attese: Array<{id,num}>, prima, tolte, aggiunte, invariato?: true, dryRun?: true }
+ *   | { ok: false, motivo: string, vive?: Array<{id,num,stato}> }>}
  */
 export async function segnaAttese(id, numeri, opts = {}) {
   const ATT = globalThis.SN_FB_ATTESE;
   const letti = ATT.leggiNumeri(numeri || '');
   if (!letti.ok) return letti;
+  if (opts.aggiungi && !letti.numeri.length) return { ok: false, motivo: 'per aggiungere servono i numeri' };
   const bearer = opts.bearer || await acquireBearer();
   // Anche le attese di adesso e lo stato: la risposta dice cosa sostituisce e cosa succede dopo, non lo presume.
   const doc = await getDoc(id, bearer, ['seq', 'subSeq', 'status', 'localOnly', ATT.CAMPO]);
@@ -284,13 +288,17 @@ export async function segnaAttese(id, numeri, opts = {}) {
   const prima = ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) });
   const { from, leggibile } = await statoAttuale(doc);
   const pratica = { stato: leggibile ? from : '', locale: !!f.localOnly?.mapValue };
+  // L'aggiunta riscrive quelle di adesso per numero (senza rete) e per id quelle senza numero, che altrimenti sparirebbero.
+  const daScrivere = opts.aggiungi ? [...new Set([...prima.map((w) => w.num).filter(Boolean), ...letti.numeri])] : letti.numeri;
+  const tieni = opts.aggiungi ? prima.filter((w) => !w.num).map((w) => w.id) : [];
   let attese = [];
-  if (letti.numeri.length) {
+  if (daScrivere.length || tieni.length) {
     const v = await ATT.valida({
       id,
       num: globalThis.SN_FEEDBACK.formatNum(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)),
-      numeri: letti.numeri,
+      numeri: daScrivere,
       gia: prima,
+      tieni,
       risolvi: async (n) => {
         const r = await risolviFeedback(n, { bearer, base: FIRESTORE_BASE });
         if (r.ok) return r.id;
