@@ -4,7 +4,7 @@
 const siteBlock = require('../siteBlock');
 require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l'avviso sui link, lo stesso del menu
 const { perContoDellaScheda } = require('../perContoDellaScheda');
-const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { avvisoNellaFinestra, avvisoQuandoPronta } = require('../avvisoFinestra');
 const { luogoDownload } = require('../contatoriFinestra');
 const { campiSegretiFuoriPagina } = require('../campiNeiRiquadri');
 const Foto = require('../fotoDellaPagina');
@@ -253,7 +253,7 @@ async function scegliDestinazione(wc, sender, winOf, filename) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita: portaUscite, apriDaFilo, contattabilePrimaDelClic } = ctx;
+  const { MSG, winOf, modelGate, controllaUscita: portaUscite, apriDaFilo, contattabilePrimaDelClic } = ctx;
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
   const controllaUscita = require('../contatoriSicurezza').contaUscite(portaUscite);
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
@@ -615,7 +615,8 @@ module.exports = function register(on, ctx) {
     Outbox.init({
       // Titolo breve generato al momento reale dell'invio (offline → fallback).
       prepare: (payload) => generateFeedbackName(payload?.text),
-      // Allegato non caricato: si avvisa con un toast, il feedback è comunque partito col resto.
+      // Allegato non caricato: il feedback è partito col resto, e quale file è saltato e perché lo dice la cornice della
+      // finestra (#1667), dove resta finché non lo si chiude; il toast di una pagina lo vede solo quella a fuoco.
       onDone: (_item, result) => {
         // #678 — l'id resta scritto qui: è così che il popup delle ricompense
         // può chiedere LE PROPRIE schede invece di scaricare la bacheca intera
@@ -631,15 +632,9 @@ module.exports = function register(on, ctx) {
         } catch (_) {}
         const failed = Array.isArray(result?.failed) ? result.failed : [];
         if (!failed.length) return;
-        const names = failed.map((f) => f?.name || 'allegato').join(', ');
-        try {
-          broadcastToTabs({
-            type: MSG.SHOW_TOAST,
-            text: `Feedback inviato, ma non sono riuscito a caricare: ${names}`,
-            duration: 6000,
-          });
-        } catch (_) {}
-        try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:allegati_non_caricati'); } catch (_) {}
+        const elenco = globalThis.SN_FEEDBACK?.fraseAllegatiSaltati?.(failed) || failed.map((f) => f?.name || 'allegato').join(', ');
+        const testo = `Il tuo feedback è partito, ma senza ${failed.length === 1 ? 'un allegato' : `${failed.length} allegati`}: ${elenco}.`;
+        avvisoQuandoPronta(testo, { chiave: `feedback-allegati-saltati-${String(_item?.id || '')}`, errore: 'allegati_non_caricati' });
       },
       // #602 — la coda rinuncia perché non si può cifrare. Chi ha mandato la
       // segnalazione ha già letto «inviato» e ha già preso i crediti: se non
@@ -690,7 +685,10 @@ module.exports = function register(on, ctx) {
     });
   } catch (_) {}
 
-  on(MSG.SUBMIT_FEEDBACK, async (msg) => {
+  // Il primo tentativo di solito chiude in pochi secondi (titolo, allegati, scrittura): oltre, il riquadro si chiude
+  // dicendo «in partenza» e la coda finisce da sola.
+  const ATTESA_CONSEGNA_MS = 12000;
+  on(MSG.SUBMIT_FEEDBACK, async (msg, sender) => {
     try {
       if (!globalThis.SN_FEEDBACK?.submit) {
         throw new Error('SN_FEEDBACK non caricato nel main process');
@@ -714,6 +712,8 @@ module.exports = function register(on, ctx) {
         };
       }
       const payload = msg.payload || {};
+      let allApertura = '';
+      try { allApertura = (sender?.strato || sender?.wc)?.getURL?.() || ''; } catch (_) {}
       // Il mittente lo decide il main, non il payload: il content script non sa di essere dell'owner (#595).
       let dallOwner = false;
       try {
@@ -726,18 +726,37 @@ module.exports = function register(on, ctx) {
         images: (payload.images || []).length,
         url: payload.url,
       });
-      // Accoda e prova a inviare subito, ma NON aspettare la rete: l'ack torna
-      // appena il feedback è al sicuro in coda (persistito). Il titolo lo genera
-      // la coda al momento dell'invio (anche offline, col fallback).
-      const r = await Outbox.enqueue(payload, { dallOwner });
-      // #986 — la copia per chi l'ha mandata nasce adesso, «in partenza»; dall'incognito non nasce.
+      // Un feedback che partirebbe vuoto non si accoda (#1667): il riquadro resta aperto e dice cosa non sale e perché.
+      const saltati = globalThis.SN_FEEDBACK.vuotoInPartenza?.(payload);
+      if (saltati) return { ok: false, frase: true, error: globalThis.SN_FEEDBACK.messaggioVuoto(saltati) };
+      if (!payload.submissionId) payload.submissionId = globalThis.crypto?.randomUUID?.() || `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      // #986 — la copia per chi l'ha mandata nasce «in partenza» prima del primo tentativo, che la trova già scritta;
+      // dall'incognito non nasce.
       try {
         const Mie = globalThis.SN_SEGNALAZIONI_MIE;
-        if (Mie && r?.id) {
-          await Mie.registra({ id: r.id, testo: payload.text, allegati: Mie.nomiAllegati(payload) });
-        }
+        if (Mie) await Mie.registra({ id: String(payload.submissionId), testo: payload.text, allegati: Mie.nomiAllegati(payload) });
       } catch (e) { console.warn('[Filo feedback] copia locale non scritta:', e?.message || e); }
-      return { ok: true, queued: true, id: r?.id };
+      // Accoda (persistito) e prova subito. Il riquadro dice «inviato» solo se il primo tentativo consegna entro
+      // l'attesa (#1667); altrimenti la coda finisce da sola e ritenta. Il titolo lo genera la coda all'invio.
+      const r = await Outbox.enqueue(payload, { dallOwner, attendiMs: ATTESA_CONSEGNA_MS });
+      const esito = r?.tentativo ? await r.tentativo : { esito: 'in_coda' };
+      if (esito.esito === 'rinuncia') {
+        const motivo = String(esito.motivo || 'Il tuo feedback non è partito.');
+        // La rinuncia l'ha passata la coda a chi aspettava: il riquadro, se c'è ancora, la dice e resta aperto (niente
+        // voce «non partita» nell'elenco); se la sua pagina non c'è più, la dice la cornice.
+        const chi = sender?.strato || sender?.wc;
+        let vivo = false;
+        try { vivo = !!(chi && !chi.isDestroyed() && chi.getURL() === allApertura); } catch (_) {}
+        if (vivo) {
+          try { globalThis.SN_SEGNALAZIONI_MIE?.togli?.(String(payload.submissionId))?.catch?.(() => {}); } catch (_) {}
+        } else {
+          try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(String(payload.submissionId))?.catch?.(() => {}); } catch (_) {}
+          avvisoNellaFinestra(motivo, { errore: 'segnalazione_non_partita' });
+        }
+        return { ok: false, frase: true, error: motivo };
+      }
+      const consegnato = esito.esito === 'consegnato';
+      return { ok: true, queued: !consegnato, consegnato, id: r?.id };
     } catch (e) {
       console.error('[Filo feedback] submit failed', e);
       return { ok: false, error: e?.message || String(e) };
