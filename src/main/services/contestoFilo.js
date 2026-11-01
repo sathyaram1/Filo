@@ -211,6 +211,7 @@ function messaggiDi(chats) {
         actions: Array.isArray(m.actions) ? m.actions : [],
         // Com'è andata ogni azione: riletta, la risposta la racconta al modello (#1294).
         ...(Array.isArray(m.esiti) && m.esiti.length ? { esiti: m.esiti } : {}),
+        ...(m.confermaDopo === true ? { confermaDopo: true } : {}),
         ...(Array.isArray(m.letti) ? { letti: m.letti } : {}),
         ...(typeof m.esterno === 'string' ? { esterno: m.esterno } : {}),
         ...(m.daModello ? { daModello: true } : {}),

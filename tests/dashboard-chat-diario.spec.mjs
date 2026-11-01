@@ -1066,8 +1066,9 @@ test('L2 — l’evento aggiunto col bottone resta aggiunto anche nella chat ria
 
   const chat = await chatConAzione(app, 'EVENTO_CALENDARIO');
   const racconto = await raccontoRiaperto(openTab, chat.id);
+  // Il bottone premuto dopo il turno è una riga sua, con l'evento vero (#1294).
   expect(racconto, `l’evento è nel calendario, e la chat riaperta racconta: ${racconto}`)
-    .toContain('aggiunto un evento al calendario');
+    .toContain('Evento aggiunto al calendario · Cena con Anna');
   await restore(app, '__fakeL3');
 });
 

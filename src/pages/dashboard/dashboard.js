@@ -513,7 +513,9 @@
       const guardate = !isUser && Array.isArray(m.guardate) ? m.guardate.filter((n) => typeof n === 'string' && n.trim()) : [];
       // #1294 — com'è andata ogni azione: le righe e i bottoni dei file stanno nella bolla, come nella risposta in diretta.
       const esiti = !isUser && Array.isArray(m.esiti) ? m.esiti.filter((v) => !(v && v.type === 'VEDI_SCHERMO' && guardate.length)) : [];
-      const archiviati = esiti.length ? Att.esitiArchiviati(esiti) : { righe: null, nota: null };
+      // Un OK dato dopo il turno non è una risposta nuova: una riga discreta sotto, come nel diario.
+      const dopo = !!m.confermaDopo;
+      const archiviati = esiti.length && !dopo ? Att.esitiArchiviati(esiti) : { righe: null, nota: null };
       // Finché Filo resta aperto le foto mandate stanno in memoria per il modello (#1166): tornano anche a schermo.
       const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
       if (text.trim() || fotoViste.length || archiviati.righe) {
@@ -556,8 +558,19 @@
           : `${perse} ${altre ? 'altre ' : ''}immagini, non conservate`;
         metti(nota);
       }
-      if (archiviati.nota) metti(archiviati.nota);
-      else if (!isUser && types.length && !m.esiti) {
+      if (archiviati.nota) {
+        metti(archiviati.nota);
+      } else if (dopo) {
+        for (const v of esiti) {
+          const riga = window.SN_ESITO.rigaDellaVoce(v);
+          if (!riga) continue;
+          const nota = document.createElement('div');
+          nota.className = 'dash-bubble-note';
+          nota.dataset.replay = '1';
+          nota.textContent = `${riga.icona} ${riga.testo}`;
+          metti(nota);
+        }
+      } else if (!isUser && types.length && !m.esiti) {
         const note = document.createElement('div');
         note.className = 'dash-bubble-note';
         note.dataset.replay = '1';
@@ -602,6 +615,7 @@
       ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
       ...(m.spontaneo ? { spontaneo: true } : {}),
       ...(esiti.length ? { esiti } : {}),
+      ...(m.confermaDopo ? { confermaDopo: true } : {}),
       actions: [...types.filter((t) => !(t === 'VEDI_SCHERMO' && guardate.length)).map((t) => ({ type: t })),
         ...guardate.map((nome) => ({ type: 'VEDI_SCHERMO', _output: { finestra: nome, nonConservata: true } }))],
     };
