@@ -282,8 +282,8 @@ export function rigaErrore(content) {
   let codice = '';
   const m = righe.length ? /^Exit code (\d+)$/i.exec(righe[0]) : null;
   if (m) { codice = `exit ${m[1]}`; righe.shift(); }
-  const utili = righe.filter((r) => !RIGA_DI_CONTORNO.test(r));
-  const scelta = utili.find((r) => RIGA_DI_ERRORE.test(r)) || utili[0] || righe[0] || '';
+  const utili = righe.filter((r) => !RIGA_DI_CONTORNO.test(r) && !RIGA_PASSATA.test(r));
+  const scelta = utili.find((r) => RIGA_DI_FALLIMENTO.test(r)) || utili.find((r) => RIGA_DI_ERRORE.test(r)) || utili[0] || righe[0] || '';
   return rigaPulita([codice, scelta].filter(Boolean).join(': '), RIGA_ERRORE_MAX) || '(senza testo)';
 }
 
