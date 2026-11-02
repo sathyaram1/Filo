@@ -282,6 +282,7 @@
       if (fermo) sotto.push(`ferma ${fermo}`);
     }
     if (rispostaDaChiave(d)) sotto.push(`risposta da «${rispostaDaChiave(d).slug}»`);
+    else if (rispostaDaSessione(d)) sotto.push('risposta da una sessione');
     if (sotto.length) titolo.appendChild(el('span', 'mg-domanda-sotto', sotto.join(' · ')));
     li.appendChild(titolo);
     if (CHIUSE.includes(tab)) li.appendChild(el('span', 'mg-domanda-prio', PRIORITA[d.priorita] || ''));
@@ -724,7 +725,18 @@
     return r && typeof r === 'object' && typeof r.slug === 'string' ? r : null;
   }
 
+  // Il segno della risposta registrata da una sessione locale con la sua parola d'ordine (#1924), o null.
+  function rispostaDaSessione(d) {
+    const r = d && d.registrataDa === 'sessione' ? d.rispostaDaSessione : null;
+    return r && typeof r === 'object' ? r : null;
+  }
+
   function daChiave(d) {
+    if (rispostaDaSessione(d)) {
+      const p = el('p', 'mg-dq-esito mg-dq-esito--chiave', 'Risposta registrata da una sessione locale, non da qui.');
+      p.title = 'L’ha registrata una sessione dalla chat. Se non è quello che volevi, riaprila: il lavoro torna fermo sulla domanda.';
+      return p;
+    }
     const r = rispostaDaChiave(d);
     if (!r) return null;
     // La data la dice già l'esito sopra: qui solo chi, e che non è passata da qui.
@@ -800,12 +812,13 @@
     return box;
   }
 
-  // Si riapre un'archiviata senza azioni, una risposta automatica che non torna (§3.6) e una data dalla chiave
-  // owner-non-fidato (#2011).
+  // Si riapre un'archiviata senza azioni, una risposta automatica che non torna (§3.6), una data dalla chiave
+  // owner-non-fidato (#2011) e una registrata da una sessione locale (#1924).
   function riapribile(d) {
-    return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica || rispostaDaChiave(d)));
+    return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica || rispostaDaChiave(d) || rispostaDaSessione(d)));
   }
   function titoloRiapri(d) {
+    if (rispostaDaSessione(d)) return 'Rimettila fra quelle da rispondere: un lavoro che la domanda ferma torna fermo finché non rispondi';
     const r = rispostaDaChiave(d);
     if (r && !r.archiviata) return `Rimettila fra quelle da rispondere: quello che la risposta da «${r.slug}» ha applicato resta finché non rispondi`;
     if (!(d.esito && d.esito.automatica)) return 'Rimettila fra quelle da rispondere';
