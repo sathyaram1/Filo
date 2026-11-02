@@ -129,6 +129,30 @@ test('cloud: la lettura per numero col biglietto, il rifiuto di un segnalato e i
   assert.equal(id.codice, 3);
 });
 
+test('cloud: le attese escono come in locale, coi loro stati dalla lettura dei soli numeri', async () => {
+  const v = voceDelServer({ clientId: 'utente', senderProof: '' });
+  v.riga.waitsFor = [{ id: 'id1741', num: '1741' }, { id: 'id567', num: '567' }, { id: 'id601', num: '601' }];
+  const srv = serverFinto([
+    { status: 200, body: { ok: true, voci: [v], resto: [] } },
+    { status: 200, body: { ok: true, resto: [], voci: [
+      { num: '1741', id: 'id1741', riga: { status: 'archived', resolvedInVersion: '0.9.1' } },
+      { num: '567', inesistente: true },
+      { num: '601', id: 'id601', riga: { status: 'in_progress' } },
+    ] } },
+  ]);
+  const r = await L.leggiDalCloud('812', { ticket: 'tk', segno: 'q', cartella: cartellaTemporanea('cloud-attese-'), opz: { chiama: srv.chiama } });
+  assert.equal(r.codice, 0, r.errore);
+  assert.deepEqual(srv.chiesti[1].corpo, { ticket: 'tk', op: 'leggi', numeri: ['1741', '567', '601'], testi: false, schede: false });
+  const attese = L.righeAttese([{ id: 'id1741', num: '1741', stato: 'fuso' }, { id: 'id567', num: '567', stato: 'cancellato' },
+    { id: 'id601', num: '601', stato: 'aperto' }], '812');
+  assert.ok(r.testo.startsWith(['#812, da un utente, stato «todo».', ...attese].join('\n')), r.testo.slice(0, 400));
+
+  const giu = serverFinto([{ status: 200, body: { ok: true, voci: [v], resto: [] } }, { status: 503, body: {} }]);
+  const g = await L.leggiDalCloud('812', { ticket: 'tk', segno: 'q', cartella: cartellaTemporanea('cloud-attese-giu-'), opz: { chiama: giu.chiama } });
+  assert.equal(g.codice, 0, 'un guasto sulle attese non toglie il testo');
+  assert.match(g.testo, /#1741 \(stato non letto\)/);
+});
+
 test('cloud: le pagine si chiedono fino in fondo, gli allegati rinviati uno per uno, e il freno del server si aspetta', async () => {
   const v1 = voceDelServer({ clientId: 'utente', senderProof: '' });
   v1.testi.allegati = [{ name: 'grande.md', type: 'text/markdown', rinviato: true }];
