@@ -628,6 +628,47 @@
     return { rileggi };
   }
 
+  // Le pagine che si rileggono dal server quando i crediti si muovono (#2059): fuori vista (`inVista()` falso) un
+  // avviso segna solo la vista vecchia, e `mostrata()` la rilegge subito. In vista una lettura alla volta, e fra due
+  // partite per un avviso almeno `ogniMs`: gli avvisi arrivati in mezzo fanno UNA lettura dopo, che vede l'ultimo stato.
+  const VISTA_OWNER_OGNI_MS = 60 * 1000;
+  function rilettoreVista({ leggi, inVista = () => true, ogniMs = 0, now = () => Date.now(), timer = null } = {}) {
+    const T = timer || { set: (fn, ms) => setTimeout(fn, ms), clear: (t) => clearTimeout(t) };
+    let passo = Math.max(0, Number(ogniMs) || 0);
+    let vecchia = false;
+    let inVolo = false;
+    let partita = -Infinity;
+    let attesa = null;
+    function ferma() { if (attesa) { T.clear(attesa); attesa = null; } }
+    function prova(subito) {
+      if (!vecchia || inVolo || !inVista()) return;
+      const resta = subito ? 0 : partita + passo - now();
+      if (resta > 0) {
+        if (!attesa) attesa = T.set(() => { attesa = null; prova(false); }, resta);
+        return;
+      }
+      ferma();
+      vecchia = false;
+      inVolo = true;
+      partita = now();
+      let p;
+      try { p = Promise.resolve(leggi()); } catch (e) { p = Promise.reject(e); }
+      p.catch(() => {}).then(() => { inVolo = false; prova(false); });
+    }
+    return {
+      cambiato() { vecchia = true; prova(false); },
+      mostrata() { prova(true); },
+      // Per gli spec, che non aspettano un minuto.
+      tempi({ ogniMs: ms } = {}) {
+        if (!Number.isFinite(Number(ms)) || Number(ms) < 0) return;
+        passo = Number(ms);
+        ferma();
+        prova(false);
+      },
+      vecchia: () => vecchia,
+    };
+  }
+
   // Il conteggio locale sta a schermo come saldo solo senza portafoglio e con una chiave che parte davvero, la
   // propria o quella di fabbrica (#1138). Chi lo vedeva, al riscatto sente dire dove va (#1353).
   function conteggioLocaleInVista({ hasWallet = false, keySource = '', identityLost = false } = {}) {
