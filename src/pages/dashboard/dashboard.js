@@ -154,14 +154,22 @@
     },
     // #778, #1373 — dopo l'OK la richiesta riprende da sola: un turno interno, come «Riprendi». Solo nella conversazione
     // dove è nato il bottone, se è ancora quella di questa scheda.
+    // Un OK dato mentre Filo sta rispondendo riprende a turno finito (#1685).
     prosegui: (chat = '', voci = []) => {
-      if (sending || (chat && chat !== chatId)) return;
-      sending = true;
-      aggiornaTasto();
-      threadHistory.push({ role: 'user', text: DOPO_OK, interno: true });
-      runTurnAndContinue({ userMessage: DOPO_OK, internal: true, dopoOk: Array.isArray(voci) ? voci : [] }).catch(() => {});
+      if (chat && chat !== chatId) return;
+      const tutte = [...(ripresaInAttesa ? ripresaInAttesa.voci : []), ...(Array.isArray(voci) ? voci : [])];
+      if (sending) { ripresaInAttesa = { chat, voci: tutte }; return; }
+      ripresaInAttesa = null;
+      riprendiDopoOk(tutte);
     },
   });
+  let ripresaInAttesa = null;
+  function riprendiDopoOk(voci) {
+    sending = true;
+    aggiornaTasto();
+    threadHistory.push({ role: 'user', text: DOPO_OK, interno: true });
+    runTurnAndContinue({ userMessage: DOPO_OK, internal: true, dopoOk: voci }).catch(() => {});
+  }
   // #867 — il segno sulla bolla dell'utente per i cambi di stato che il suo messaggio ha chiesto.
   const Cambi = self.SN_DASH_CAMBI;
   Cambi.init({ send });
