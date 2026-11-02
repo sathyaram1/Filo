@@ -3,7 +3,7 @@
 // critica pretende. Non scrive mai nel repo. Regole: tests/unit/letturaDiff.test.mjs.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaConsegna } from './consegna-file.mjs';
 import { assicuraStoria } from './unit-sulla-fusione.mjs';
