@@ -139,6 +139,7 @@ test('tempi: un passo più corto vale subito anche per la lettura che stava aspe
   b.r.tempi({ ogniMs: 'x' });
   await b.chiudi();
   b.r.cambiato();
+  b.avanza(500);
   assert.equal(b.letture.length, 3, 'valori non validi lasciano il passo com\'era');
 });
 
