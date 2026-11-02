@@ -1,5 +1,6 @@
 // Le schede dei feedback aperti per il manutentore (SPEC-RIDISEGNO-LAVORO.md § 2): Haiku le scrive col ruolo scheda.md, Opus
-// rilegge chi toglie lavoro e un campione. Solo in locale (token e chiave dell'owner), fuori dal repo. Test: tests/unit/schede.test.mjs.
+// rilegge chi toglie lavoro e un campione. Solo in locale (token e chiave dell'owner), fuori dal repo; mai nella sede owner
+// (SPEC-DOMANDE.md §1.2). Test: tests/unit/schede.test.mjs.
 // Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] | rileggi [--quota 0.1] | stato [--cartella <dir>] [--dry-run]
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
@@ -7,6 +8,8 @@ import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { espandiInclusioni } from './lib/role-text.mjs';
+import { sedeRifiuta } from './lib/biglietto-locale.mjs';
+import { elencoIds, rigaRifiuto } from './lib/sede.mjs';
 import './lib/freno-letture.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -181,9 +184,17 @@ async function elenca(cartella, dryRun) {
   return 0;
 }
 
-async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dryRun }) {
+/** Il rifiuto della sede owner per gli agenti delle schede, '' fuori da lì. PURA. */
+export function rifiutoSchede(voci, rifiuta) {
+  if (!rifiuta || !voci.length) return '';
+  return rigaRifiuto(`schede di ${elencoIds(voci.map((v) => `#${v.num}`))}`, ['gli agenti delle schede leggono feedback scritti da chiunque e il loro esito torna qui, e il manutentore non gira nella sede owner']);
+}
+
+async function lanciaAgenti(voci, { cartella, modello, paralleli, rilettura, dryRun, rifiuta = false }) {
   if (!voci.length) { console.log('Niente da fare.'); return 0; }
   if (dryRun) { console.log(`(prova a vuoto) ${voci.length} agenti ${modello}, ${paralleli} alla volta: ${voci.map((v) => `#${v.num}`).join(', ')}`); return 0; }
+  const rifiuto = rifiutoSchede(voci, rifiuta);
+  if (rifiuto) { console.error(rifiuto); return 1; }
   const { trovaClaude, argomentiClaude, leggiUscitaClaude, envFiglio, accessoDaStatus, SENZA_ACCESSO, esegui } = await import('./orchestratore-locale.mjs');
   const bin = trovaClaude();
   if (!bin) { console.error('Non trovo Claude Code da riga di comando (FILO_CLAUDE_BIN, o `claude` nel PATH). Non ho lanciato niente.'); return 3; }
@@ -245,11 +256,11 @@ export async function main(argv) {
     if (ignoti.length) { console.error(`Non sono fra gli aperti dell'indice: ${ignoti.map((n) => `#${n}`).join(', ')}. Rilancia elenca se sono nuovi.`); return 1; }
     const mappa = new Map(schede.map((s) => [String(s.numero || '').replace(/^#/, ''), s]));
     const voci = (solo.length ? solo.map((n) => perNum.get(n)) : indice).filter((f) => solo.length || daScrivere(f, mappa.get(f.num)));
-    return lanciaAgenti(voci, { cartella, modello: opzione(argv, '--modello') || 'haiku', paralleli, rilettura: false, dryRun });
+    return lanciaAgenti(voci, { cartella, modello: opzione(argv, '--modello') || 'haiku', paralleli, rilettura: false, dryRun, rifiuta: sedeRifiuta() });
   }
   const quota = Math.max(0, Math.min(1, Number(opzione(argv, '--quota') ?? 0.1)));
   const voci = daRileggere(schede, { quota }).map((s) => perNum.get(String(s.numero).replace(/^#/, ''))).filter(Boolean);
-  return lanciaAgenti(voci, { cartella, modello: opzione(argv, '--modello') || 'opus', paralleli, rilettura: true, dryRun });
+  return lanciaAgenti(voci, { cartella, modello: opzione(argv, '--modello') || 'opus', paralleli, rilettura: true, dryRun, rifiuta: sedeRifiuta() });
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));

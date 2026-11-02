@@ -1,13 +1,16 @@
 // Il contesto del manutentore (SPEC-RIDISEGNO-LAVORO.md § 2): il suo ruolo, tutte le schede in una riga ciascuna e i rami
 // in corso coi loro file, da git e senza modello; scrive solo l'ordine da accendere, che il pacemaker legge. Regole:
 // tests/unit/manutentore.test.mjs. Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente
-// | sblocca <N> [nota] (il lavoro fermo per guasto riparte, con la nota dell'owner)
+// | sblocca <N> [nota] (il lavoro fermo per guasto riparte, con la nota dell'owner). Nella sede owner contesto e incroci
+// si rifiutano: le schede riassumono feedback di chiunque (SPEC-DOMANDE.md §1.2).
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { espandiInclusioni } from './lib/role-text.mjs';
+import { primaDiStampare, sedeRifiuta } from './lib/biglietto-locale.mjs';
+import { elencoIds, rigaRifiuto } from './lib/sede.mjs';
 import { incroci, ramiInCorso } from './lib/su-main.mjs';
 import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './schede.mjs';
 
@@ -209,11 +212,9 @@ async function domandeFerme(indice) {
     const righe = righeDomandeFerme(r.domande, { indice, ordine: ordine.ok ? ordine.numeri : [] });
     const ferme = (r.domande || []).filter((d) => d && righe.some((x) => x.startsWith(`${unaRiga(d.id)} `)));
     const nf = nonFidate(ferme);
-    if (nf.length) {
-      const { rigaSporco } = await import('./lib/biglietto-locale.mjs');
-      console.error(await rigaSporco('contesto del manutentore', [motivoNonFidate(nf)]));
-    }
-    return righe;
+    const g = await primaDiStampare('contesto del manutentore', nf.length ? [motivoNonFidate(nf)] : []);
+    if (g.riga) console.error(g.riga);
+    return g.stampa ? righe : righe.filter((x) => !nf.some((id) => x.startsWith(`${unaRiga(id)} `)));
   } catch (e) {
     return `Non so quali domande fermano un feedback: ${unaRiga(e && e.message ? e.message : e).slice(0, 200)}.`;
   }
@@ -245,7 +246,10 @@ export function richiestaSblocca(args) {
   return { ok: true, numero: String(n).replace(/^#/, ''), testo: resto.join(' ').trim() };
 }
 
-export async function main(argv, { root = ROOT } = {}) {
+// Perché contesto e incroci non escono nella sede owner: l'indice delle schede non porta la fiducia dei feedback.
+export const MOTIVO_SEDE = 'le schede riassumono feedback scritti da chiunque, e il manutentore non gira nella sede owner';
+
+export async function main(argv, { root = ROOT, rifiuta = () => sedeRifiuta() } = {}) {
   const [cmd, arg] = argv;
   if (!['contesto', 'rami', 'incroci', 'ordine', 'accendi', 'sblocca'].includes(cmd) || (cmd === 'incroci' && !arg)) {
     console.error('Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente | sblocca <N> [nota]  [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]');
@@ -270,6 +274,11 @@ export async function main(argv, { root = ROOT } = {}) {
     indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8'));
     indiceDel = statSync(join(cartella, INDICE)).mtime.toISOString().slice(0, 16).replace('T', ' ');
   } catch (_) { /* senza indice niente stato, priorità né numeri dei worker */ }
+  if ((cmd === 'contesto' || cmd === 'incroci') && rifiuta()) {
+    const numeri = cmd === 'incroci' ? [String(arg).replace(/^#/, '')] : leggiSchede(cartella).map((s) => unaRiga(s.numero).replace(/^#/, ''));
+    console.error(rigaRifiuto(cmd === 'incroci' ? `scheda #${numeri[0]}` : `contesto del manutentore (${numeri.length} schede: ${elencoIds(numeri.map((n) => `#${n}`)) || 'nessuna'})`, [MOTIVO_SEDE]));
+    return 1;
+  }
   if (cmd === 'ordine' || cmd === 'accendi') {
     let numeri = [];
     if (cmd === 'accendi' && arg !== '--niente') {

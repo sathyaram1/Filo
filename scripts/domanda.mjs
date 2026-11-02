@@ -1,5 +1,6 @@
 // domanda.mjs — le domande all'owner (#1149, SPEC-DOMANDE.md §3). Col biglietto delle routine `chiedi` passa dal canale;
-// il resto va a ownerDomande col segreto del biglietto locale (#1148, la fiducia), e chi stampa una non fidata si sporca.
+// il resto va a ownerDomande col segreto del biglietto locale (#1148, la fiducia), e chi stampa una non fidata si sporca
+// (nella sede owner la rifiuta, SPEC-DOMANDE.md §1.2).
 // Le azioni di consenso e quelle `bulk:false` non partono da qui: solo dalla finestra di Filo (regola, non muro).
 
 import { readFileSync } from 'node:fs';
@@ -8,6 +9,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { visibile } from './routine-domanda.mjs';
 import { absolutizeOutput } from './lib/tools-pin.mjs';
+import { chiRifiuta, elencoIds, rigaRifiuto } from './lib/sede.mjs';
 
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -483,15 +485,28 @@ async function sporcaSessione(cosa, motivi) {
   return rigaSporco(cosa, motivi);
 }
 
+async function sedeDellaSessione() {
+  const { sedeRifiuta } = await import('./lib/biglietto-locale.mjs');
+  return sedeRifiuta();
+}
+
 /** Gli id delle domande il cui testo non è fidato (fiducia assente compresa). PURA. */
 export function nonFidate(domande) {
   return (Array.isArray(domande) ? domande : []).filter((d) => d && d.fiducia !== 'fidato').map((d) => String(d.id || '?'));
 }
 
+const fidata = (d) => !!d && d.fiducia === 'fidato';
+const testoDiNonFidate = (n) => (n === 1 ? 'testo di una domanda non fidata' : `testo di ${n} domande non fidate`);
+
+/** La riga del rifiuto nella sede owner: tutti gli id, non i primi dieci come nel motivo per il server. PURA. */
+export function rifiutoNonFidate(cosa, ids) {
+  return rigaRifiuto(`${cosa} (${elencoIds(ids)})`, [testoDiNonFidate(ids.length)]);
+}
+
 /** Il motivo per cui chi stampa queste domande si sporca, entro i 300 caratteri del server. PURA. */
 export function motivoNonFidate(ids) {
   const primi = ids.slice(0, 10).map((x) => visibile(x).slice(0, 20));
-  return `${ids.length === 1 ? 'testo di una domanda non fidata' : `testo di ${ids.length} domande non fidate`} (${primi.join(', ')}${ids.length > primi.length ? ', …' : ''})`;
+  return `${testoDiNonFidate(ids.length)} (${primi.join(', ')}${ids.length > primi.length ? ', …' : ''})`;
 }
 
 async function leggiStdin() {
@@ -509,7 +524,7 @@ export async function esegui(argv, io = {}) {
   const {
     chiama = chiamaOwner, consegna = consegnaDomanda, risposta = consegnaRisposta, smistamento = consegnaSmistamento,
     registroCanale = consegnaRegistro, biglietto = bigliettoDelGiro,
-    bigliettoLocale = segretoLocale, sporca = sporcaSessione,
+    bigliettoLocale = segretoLocale, sporca = sporcaSessione, rifiuta = sedeDellaSessione,
     leggiFile = (p) => readFileSync(p, 'utf8'), stdin = leggiStdin,
     scrivi = (s) => console.log(s), errore = (s) => console.error(s),
   } = io;
@@ -528,7 +543,7 @@ export async function esegui(argv, io = {}) {
       if (t) {
         const r = await consegna(t, letta.domanda);
         if (r.outcome === 'ok') { scrivi(`OK: domanda ${visibile(r.num || r.id || '')} aperta${inSmistamento(r.reply)}.`); return 0; }
-        if (r.outcome === 'refused') { errore(`RIFIUTATO dal server: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
+        if (r.outcome === 'refused') { errore(`${chiRifiuta(r.reason)}: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
         errore(`guasto del canale delle routine (${visibile(r.reason)}): la domanda non è partita.`); return 3;
       }
       const segreto = await bigliettoLocale();
@@ -550,7 +565,7 @@ export async function esegui(argv, io = {}) {
       if (TESTO_SERVE.includes(a.cmd) && !String(data.testo || '').trim()) { errore(`RIFIUTATO: ${a.cmd} vuole un testo che non sia vuoto. Non ho mandato niente.`); return 1; }
       const r = await risposta(t, data);
       if (r.outcome === 'ok') { scrivi(a.delCompito ? formattaFascicolo(r.reply) : testoDelCompito(a.cmd, r.reply || {})); return 0; }
-      if (r.outcome === 'refused') { errore(`RIFIUTATO dal server: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
+      if (r.outcome === 'refused') { errore(`${chiRifiuta(r.reason)}: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
       errore(`guasto del canale delle routine (${visibile(r.reason)}): non è arrivato niente.`); return 3;
     }
     // Il compito che smista una domanda appena nata (#1790): come quello della risposta, la domanda la dice il biglietto.
@@ -586,7 +601,7 @@ export async function esegui(argv, io = {}) {
       }
       const r = await smistamento(t, data);
       if (r.outcome === 'ok') { scrivi(a.op === 'mostra' ? formattaFascicoloSmistamento(r.reply) : testoDelloSmistamento(a.op, r.reply || {})); return 0; }
-      if (r.outcome === 'refused') { errore(`RIFIUTATO dal server: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
+      if (r.outcome === 'refused') { errore(`${chiRifiuta(r.reason)}: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
       errore(`guasto del canale delle routine (${visibile(r.reason)}): non è arrivato niente.`); return 3;
     }
     // Il registro (§3.6): col biglietto delle routine passa dal canale, che lo dà solo a chi lo può leggere.
@@ -595,12 +610,18 @@ export async function esegui(argv, io = {}) {
       if (t) {
         const r = await registroCanale(t, { parole: a.parole });
         if (r.outcome === 'ok') { scrivi(formattaRegistro(r.reply, { titolo: `Principi per «${visibile(a.parole)}»`, vuoto: 'nessun principio copre queste parole' })); return 0; }
-        if (r.outcome === 'refused') { errore(`RIFIUTATO dal server: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
+        if (r.outcome === 'refused') { errore(`${chiRifiuta(r.reason)}: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
         errore(`guasto del canale delle routine (${visibile(r.reason)}): non è arrivato niente.`); return 3;
       }
       const r = await chiama({ op: 'registro', parole: a.parole });
       const nf = nonFidate(r.voci);
-      if (nf.length) errore(await sporca(`registro per «${visibile(a.parole).slice(0, 60)}»`, [motivoNonFidate(nf)]));
+      const cosa = `registro per «${visibile(a.parole).slice(0, 60)}»`;
+      if (nf.length && await rifiuta()) {
+        scrivi(formattaRegistro({ ...r, voci: r.voci.filter(fidata), nonFidateTolte: (Number(r.nonFidateTolte) || 0) + nf.length }, { titolo: `Principi per «${visibile(a.parole)}»`, vuoto: 'nessun principio fidato copre queste parole' }));
+        errore(rifiutoNonFidate(cosa, nf));
+        return 0;
+      }
+      if (nf.length) errore(await sporca(cosa, [motivoNonFidate(nf)]));
       scrivi(formattaRegistro(r, { titolo: `Principi per «${visibile(a.parole)}»`, vuoto: 'nessun principio copre queste parole' }));
       return 0;
     }
@@ -608,6 +629,7 @@ export async function esegui(argv, io = {}) {
     if (a.cmd === 'mostra') {
       const r = await chiama({ op: 'mostra', id: a.id });
       const nf = nonFidate([r.domanda]);
+      if (nf.length && await rifiuta()) { errore(rifiutoNonFidate('domanda', nf)); return 1; }
       if (nf.length) errore(await sporca(`letta ${visibile(a.id)}`, [motivoNonFidate(nf)]));
       scrivi(formattaDomanda(r.domanda, r.riferimenti));
       return 0;
@@ -615,11 +637,15 @@ export async function esegui(argv, io = {}) {
     if (a.cmd === 'elenco') {
       const r = await chiama(a.tutte ? { op: 'elenco', tutte: true } : { op: 'elenco' });
       const nf = nonFidate(r.domande);
-      if (nf.length) errore(await sporca('elenco delle domande', [motivoNonFidate(nf)]));
+      // Nella sede owner i titoli non fidati restano fuori; i conteggi sono numeri e valgono per tutte.
+      const fuori = nf.length && await rifiuta();
+      if (nf.length && !fuori) errore(await sporca('elenco delle domande', [motivoNonFidate(nf)]));
       scrivi(formattaConteggi(conteggiDi(r.domande, r.conteggi)));
       scrivi('');
-      scrivi(formattaElenco(r.domande));
+      const lista = fuori ? (r.domande || []).filter(fidata) : r.domande;
+      scrivi(fuori && !lista.length ? 'Nessuna domanda fidata.' : formattaElenco(lista));
       if (r.altre) scrivi(`\nCe ne sono altre oltre le prime ${(r.domande || []).length}: il server non le ha mandate tutte.`);
+      if (fuori) errore(rifiutoNonFidate('elenco delle domande', nf));
       return 0;
     }
     // Col token del proprietario il server non distingue una sessione dall'owner: la sessione lo dice, col suo biglietto,

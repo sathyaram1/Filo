@@ -1,11 +1,13 @@
 // compito.mjs — i compiti delle routine da una sessione locale (#1196, SPEC-DOMANDE.md §6.1): crea un compito senza
 // feedback, li elenca, annulla uno scritto a mano. Va a ownerCompiti col segreto del biglietto locale (#1148): la
-// sessione si dichiara, e il compito prende la fiducia del suo biglietto. Regole: src/shared/compiti.js.
+// sessione si dichiara, e il compito prende la fiducia del suo biglietto; nella sede owner i titoli non fidati restano
+// fuori (SPEC-DOMANDE.md §1.2). Regole: src/shared/compiti.js.
 
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { visibile } from './routine-domanda.mjs';
+import { elencoIds, rigaRifiuto } from './lib/sede.mjs';
 
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -47,8 +49,10 @@ export function leggiArgomenti(argv) {
 }
 
 /** I compiti scritti a mano non fidati: il loro titolo è testo esterno per chi lo stampa. PURA. */
+const nonFidato = (c) => !!c && c.tipo === 'manuale' && c.fiducia !== 'fidato';
+
 export function nonFidati(compiti) {
-  return (Array.isArray(compiti) ? compiti : []).filter((c) => c && c.tipo === 'manuale' && c.fiducia !== 'fidato').map((c) => String(c.id || '?'));
+  return (Array.isArray(compiti) ? compiti : []).filter(nonFidato).map((c) => String(c.id || '?'));
 }
 
 /** L'elenco per il terminale, coi caratteri di controllo resi visibili. PURA. */
@@ -105,6 +109,11 @@ async function sporcaSessione(cosa, motivi) {
   return rigaSporco(cosa, motivi);
 }
 
+async function sedeDellaSessione() {
+  const { sedeRifiuta } = await import('./lib/biglietto-locale.mjs');
+  return sedeRifiuta();
+}
+
 async function leggiStdin() {
   if (process.stdin.isTTY) return '';
   const pezzi = [];
@@ -115,7 +124,7 @@ async function leggiStdin() {
 /** Il comando intero, con l'I/O iniettabile per le prove. @returns {Promise<number>} 0 fatto, 1 rifiutato. */
 export async function esegui(argv, io = {}) {
   const {
-    chiama = chiamaOwner, bigliettoLocale = segretoLocale, sporca = sporcaSessione, stdin = leggiStdin,
+    chiama = chiamaOwner, bigliettoLocale = segretoLocale, sporca = sporcaSessione, rifiuta = sedeDellaSessione, stdin = leggiStdin,
     scrivi = (s) => console.log(s), errore = (s) => console.error(s),
   } = io;
   if (argv.some((x) => x === '--help' || x === '-h')) { scrivi(USO); return 0; }
@@ -138,6 +147,12 @@ export async function esegui(argv, io = {}) {
     if (a.cmd === 'elenco') {
       const r = await chiama({ op: 'elenco' });
       const nf = nonFidati([].concat(r.aperti || [], r.storico || []));
+      if (nf.length && await rifiuta()) {
+        const via = (l) => (Array.isArray(l) ? l.filter((c) => !nonFidato(c)) : l);
+        scrivi(formattaElenco({ ...r, aperti: via(r.aperti), storico: via(r.storico) }));
+        errore(rigaRifiuto(`elenco dei compiti (${elencoIds(nf)})`, [nf.length === 1 ? 'titolo di un compito non fidato' : `titoli di ${nf.length} compiti non fidati`]));
+        return 0;
+      }
       if (nf.length) errore(await sporca('elenco dei compiti', [`titoli di compiti non fidati (${nf.slice(0, 10).join(', ')}${nf.length > 10 ? ', …' : ''})`]));
       scrivi(formattaElenco(r));
       return 0;
