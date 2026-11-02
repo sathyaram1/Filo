@@ -1039,6 +1039,16 @@ tetto delle consegne del biglietto, come un feedback aperto. La domanda di
 fine turno ha gli slot `tutti`, `orchestrator`, `worker`, uno per ruolo
 (`compito` compreso) e `compito:<ricorrente>`; vale il più preciso.
 
+Dal #1961.2 la gestione del lavoro è il manutentore, e la regola del segno vale
+anche per lui: nell'ambiente dei riservati (e con la sua chiave) quello che
+scrive porta il segno. La sua nota che sblocca un lavoro resta fuori dalla
+conversazione, e chi riprende legge solo che è sbloccato; feedback, domande,
+compiti e il perché di una sveglia nascono riservati; le novità riscritte, che
+arrivano a tutti gli utenti, da lì si rifiutano. La sua domanda di fine turno
+la stampa il rilascio, a ramo spedito, e chi la riceve prende lì il segno
+riservato e lo sporco. Cosa salva ogni sua operazione lo dice un elenco chiuso
+sul server: un'operazione che non c'è si rifiuta.
+
 ## 6. Feedback e compiti
 
 Due oggetti, decisi dall'owner il 12/10:
