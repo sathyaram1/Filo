@@ -1406,8 +1406,10 @@ async function recordVerifier(id, critiqueText, domande = []) {
   const conDomande = rilieviConDomanda(parsed.findings, domande);
   if (!conDomande.ok) return { rejected: true, formatRejected: true, message: `critica non registrata: ${conDomande.errore}` };
   // La pulizia che non dipende dall'esito esce col commit della critica (#1555): dopo, conta solo se la spinge il rilascio (#2021).
-  const primaDelVerdetto = avvio ? proveDaToglierePrimaDelVerdetto(proveScritteDa(avvio, ROOT), parsed.findings) : [];
-  if (primaDelVerdetto.length) return { rejected: true, formatRejected: true, message: testoProvePrimaDelVerdetto(primaDelVerdetto, parsed.findings) };
+  // Se il lavoro si ferma lo dicono anche le domande (una che non blocca non lo ferma), e un caso conta quanto il file.
+  const scritte = avvio ? proveScritteDa(avvio, ROOT) : [];
+  const primaDelVerdetto = scritte.length ? proveDaToglierePrimaDelVerdetto(scritte, conDomande.findings, testiDelleProve(scritte, ROOT)) : [];
+  if (primaDelVerdetto.length) return { rejected: true, formatRejected: true, message: testoProvePrimaDelVerdetto(primaDelVerdetto, conDomande.findings) };
   const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
 
   // PRIMA il server, POI lo stato locale. L'ordine non è un dettaglio: lo stato
