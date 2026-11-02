@@ -1551,6 +1551,7 @@
           // messaggio dopo, per non riproporla (#1373). I contatori lo contano (#1461).
           a._rifiutata = true;
           try { Promise.resolve(send({ type: MSG.FILO_CONFIRM_RIFIUTATA, action: a })).catch(() => {}); } catch (_) {}
+          proseguiQuandoLibero(chat, null, gruppo, a);
           return;
         }
         delete a._rifiutata;
