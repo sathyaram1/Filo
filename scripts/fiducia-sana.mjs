@@ -1,0 +1,71 @@
+// fiducia-sana.mjs — la sanatoria di un registro dei rami bucato (#2021), con le credenziali dell'owner. Regola e scrittura
+// le fa il server (ownerFiducia {op:'sana'}): qui solo la richiesta, a secco di default.
+// Uso: npm run fiducia:sana -- <ramo> [--server] [--dal-vero]. Prove: tests/unit/fiduciaSana.test.mjs.
+
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+
+const BASE = process.env.FILO_FUNCTIONS_BASE || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
+export const OWNER_FIDUCIA_URL = `${BASE}/ownerFiducia`;
+const USO = 'Uso: npm run fiducia:sana -- <ramo> [--server] [--dal-vero]';
+
+/** Le parole della riga di comando. PURA. @returns {{ ramo, repo: 'app'|'server', dalVero } | { errore }} */
+export function leggiArgomenti(argv) {
+  const a = (Array.isArray(argv) ? argv : []).map(String);
+  const opzioni = a.filter((x) => x.startsWith('--'));
+  const strana = opzioni.find((x) => x !== '--server' && x !== '--dal-vero');
+  if (strana) return { errore: `"${strana}" non vale qui. ${USO}` };
+  const rami = a.filter((x) => !x.startsWith('--'));
+  if (rami.length !== 1 || !rami[0].trim()) return { errore: `serve un ramo, uno solo. ${USO}` };
+  return { ramo: rami[0].trim(), repo: a.includes('--server') ? 'server' : 'app', dalVero: a.includes('--dal-vero') };
+}
+
+/** Cosa chiedere al server: a secco (`prova`) finché non si dice --dal-vero. PURA. */
+export function richiesta({ ramo, repo, dalVero }) {
+  return Object.assign({ op: 'sana', repo, ramo }, dalVero ? {} : { prova: true });
+}
+
+/** Una riga per l'owner dalla risposta del server. PURA. */
+export function rigaEsito(r, { dalVero } = {}) {
+  if (!r || r.ok !== true) return `Non si sana: ${(r && (r.detail || r.reason)) || 'risposta senza esito'}.`;
+  const conto = `${Number(r.commits) || 0} commit oltre main, tutti dentro una voce registrata`;
+  return dalVero
+    ? `Sanato: il buco è tolto, la punta ${String(r.punta || '').slice(0, 12)} resta l'ultima registrata (${conto}).`
+    : `Si può sanare (${conto}). Rilancia con --dal-vero per togliere il buco.`;
+}
+
+async function chiamaServer(data, { fetchImpl = fetch, url = OWNER_FIDUCIA_URL } = {}) {
+  const { findAdminRefreshToken, mintIdToken } = await import('./lib/firestore-auth.mjs');
+  const refresh = findAdminRefreshToken();
+  if (!refresh) throw new Error('nessuna credenziale admin su questa macchina: node scripts/admin-login.mjs');
+  const idToken = await mintIdToken(refresh);
+  const res = await fetchImpl(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ data }),
+  });
+  let body = {};
+  try { body = await res.json(); } catch (_) { body = {}; }
+  if (res.status === 404) throw new Error('la funzione ownerFiducia non è ancora pubblicata sul server');
+  if (!res.ok) throw new Error((body.error && body.error.message) || `errore ${res.status}`);
+  return body.result || {};
+}
+
+/** deps: { chiama(data) → risultato della callable, scrivi(riga) }. → codice d'uscita. */
+export async function sana(argv, { chiama = chiamaServer, scrivi = console.log } = {}) {
+  const args = leggiArgomenti(argv);
+  if (args.errore) { scrivi(args.errore); return 2; }
+  let r;
+  try {
+    r = await chiama(richiesta(args));
+  } catch (e) {
+    scrivi(`Non si sana: ${String((e && e.message) || e)}.`);
+    return 1;
+  }
+  scrivi(rigaEsito(r, args));
+  return r && r.ok === true ? 0 : 1;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  sana(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (e) => { console.error(`fiducia-sana: ${String((e && e.message) || e)}`); process.exitCode = 1; });
+}
