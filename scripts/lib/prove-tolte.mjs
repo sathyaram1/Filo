@@ -440,11 +440,24 @@ export function testoProvePrimaDelVerdetto(fuori, findings) {
   const tutti = Array.isArray(findings) ? findings : [];
   const perche = (n) => (String((tutti[n - 1] || {}).sede || 'i').toLowerCase() === 'e'
     ? `il rilievo ${n} è esterno` : `il rilievo ${n} chiede una decisione e conta al più 1`);
+  const r = (l) => l.map((n) => `r${n}`).join(', ');
+  const rimedio = (x) => {
+    if (x.intera) return 'toglila (`git rm`)';
+    const casi = Array.isArray(x.casi) && x.casi.length
+      ? `${x.casi.length === 1 ? 'il caso' : 'i casi'} ${x.casi.map((t) => `«${t}»`).join(', ')}`
+      : `il caso di ${r(numeriDelNome(x.prova).filter((n) => !(x.restano || []).includes(n)))}`;
+    return x.rinomina
+      ? `copre anche ${r(x.restano)}, che resta: togli ${casi} e il numero dal nome (\`git mv ${x.prova} ${x.rinomina}\`)`
+      : `togli ${casi}`;
+  };
+  // Senza questa riga chi ha un 2 col `?` crede, come la regola di prima, che il lavoro si fermi e i `?` restino.
+  const aperte = tutti.map((f, i) => ({ f, n: i + 1 })).filter((x) => nonBlocca(x.f)).map((x) => x.n);
   return [
-    'critica non registrata: queste prove sono di rilievi che escono dal giro in ogni esito, e vanno tolte PRIMA della critica,',
+    'critica non registrata: queste prove portano rilievi che escono dal giro in ogni esito, e vanno tolti PRIMA della critica,',
     'nel suo commit: dopo il verdetto il ramo si muove solo col rilascio, che registra la punta per la fiducia del lavoro (#1555, #2021).',
-    ...fuori.map(({ prova, numeri }) => `  · ${prova}: ${numeri.map(perche).join(', ')}`),
-    'Toglile (`git rm`), poi `git commit` e registra la stessa critica. Una prova che copre anche un rilievo da correggere resta: le togli solo il caso di questi.',
+    ...(aperte.length ? [`${aperte.length === 1 ? `La domanda del rilievo ${aperte[0]} non blocca` : `Le domande dei rilievi ${aperte.join(', ')} non bloccano`}: il lavoro non si ferma, e i rilievi col \`?\` che contano al più 1 escono in un feedback loro.`] : []),
+    ...fuori.map((x) => `  · ${x.prova}: ${x.numeri.map(perche).join(', ')}; ${rimedio(x)}`),
+    'Poi `git add -A && git commit` e registra la stessa critica. Il caso di un rilievo che resta non si tocca.',
   ].join('\n');
 }
 
