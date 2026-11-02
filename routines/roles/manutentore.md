@@ -124,8 +124,9 @@ Gestione → Automazioni.
 L'ordine decide i primi lavori: un feedback già consegnato non ce lo rimetti, perché verifica, correzione, controllo
 e risposte dell'owner li accende il server da sé. Un numero chiuso o non aperto il server lo salta.
 
-Le schede stanno nei feedback: `npm run feedback:schede -- elenca` scrive l'indice e le copia nella cartella (in
-una routine passa dal server col tuo biglietto, che deve girare fra i riservati).
+Le schede stanno nei feedback: `npm run feedback:schede -- elenca` scrive l'indice, le copia nella cartella e manda
+ai feedback le schede buone della cartella che loro non hanno (in una routine passa dal server col tuo biglietto, che
+deve girare fra i riservati). Se chiude con «ancora fuori», l'indice c'è lo stesso: rilancia quando il server risponde.
 
 Le schede: `aspetta #P` e `pacchetto di …` dicono chi è già in un pacchetto. Una scheda «non riletta» non basta per
 togliere lavoro; una «SCHEDA VECCHIA» o «NON BUONA» va rifatta prima di decidere su di lei
