@@ -226,9 +226,14 @@ export function esitoRisposta(esito, riferimenti = {}, { conScelta = false } = {
   // «Riprendi» rimette in coda solo un lavoro fermo (#1482): sugli altri la decisione si accoda e lo stato non cambia.
   if (e.accodata) {
     const num = riferimenti?.[e.azione.feedbackId]?.num || 'il lavoro';
+    const aspetta = Array.isArray(e.aspetta) ? e.aspetta.map(visibile).join(', ') : '';
+    if (aspetta) return { riga: `accodata: ${azione} (${visibile(num)} resta fermo anche su ${aspetta}, e riparte con la risposta a quella)`, avviso: '' };
     const stato = typeof e.statoLavoro === 'string' && e.statoLavoro ? `: è ${visibile(e.statoLavoro)}` : '';
     return { riga: `accodata: ${azione} (${visibile(num)} non era fermo${stato}, la decisione resta accodata per il giro dopo)`, avviso: '' };
   }
+  if (e.nonServiva) return { riga: `non serviva: ${azione} (il lavoro è già fuso con questa scelta)`, avviso: '' };
+  if (e.lavoroArchiviato) return { riga: `scritta: ${azione} (il lavoro è archiviato, la risposta non lo riapre)`, avviso: '' };
+  if (e.rimandata) return { riga: `applicata: ${azione} (il lavoro torna in verifica)`, avviso: '' };
   const avviso = conScelta ? ''
     : `ATTENZIONE: non hai scelto un'opzione, eppure il server ha applicato ${azione}. Le parole da sole non dovrebbero applicare niente: segnalalo.`;
   return { riga: `applicata: ${azione}`, avviso };
@@ -661,9 +666,11 @@ export async function esegui(argv, io = {}) {
     }
     if (a.cmd === 'consiglio') {
       const daMandare = [];
+      const riferimentiDi = {};
       let rifiutate = 0;
       for (const id of a.ids) {
-        const { domanda } = await chiama({ op: 'mostra', id });
+        const { domanda, riferimenti } = await chiama({ op: 'mostra', id });
+        riferimentiDi[id] = riferimenti || {};
         const c = domanda && domanda.consiglio;
         const o = c && Array.isArray(domanda.opzioni) ? domanda.opzioni[c.opzione] : null;
         if (!o) { errore(`${id}: nessun consiglio da applicare.`); rifiutate++; continue; }
@@ -672,8 +679,10 @@ export async function esegui(argv, io = {}) {
       }
       if (!daMandare.length) { errore('RIFIUTATO: nessun consiglio applicabile da qui.'); return 1; }
       const r = await chiama(Object.assign({ op: 'consiglio', ids: daMandare }, await daSessione()));
+      // Ogni esito si dice come quello della risposta singola (#1790.1): una ripresa accodata non è «fatto».
       for (const e of Array.isArray(r.esiti) ? r.esiti : []) {
-        scrivi(`${visibile(e.id)}: ${e.ok ? `fatto${e.etichetta ? `, ${visibile(e.etichetta)}` : ''}` : `non applicato (${visibile(e.errore || '?')})`}`);
+        const detto = e.ok && e.esito && typeof e.esito === 'object' ? esitoRisposta(e.esito, riferimentiDi[e.id] || {}, { conScelta: true }).riga : '';
+        scrivi(`${visibile(e.id)}: ${e.ok ? (detto || `fatto${e.etichetta ? `, ${visibile(e.etichetta)}` : ''}`) : `non applicato (${visibile(e.errore || '?')})`}`);
       }
       return rifiutate ? 1 : 0;
     }

@@ -248,6 +248,36 @@ test('applica il consiglio sulla scelta: prima l’elenco delle etichette, le un
   await expect(btn).toHaveText('Applica il consiglio (2)');
 });
 
+// #1790.1: in blocco, una ripresa su un lavoro che non era fermo non si dice «fatto»: sta a parte, col perché del server.
+test('applica il consiglio in blocco: la ripresa accodata sta a parte, con lo stato del lavoro', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const riprendi = (fid) => ({ opzioni: [{ testo: 'Riprendi', azione: { tipo: 'riprendi', feedbackId: fid } }], consiglio: { opzione: 0, perche: 'Sì.' } });
+  await apriDomande(page, [domanda(21, riprendi('fb901')), domanda(22, riprendi('fb902'))]);
+  await mainFinto(page);
+  await page.evaluate(() => {
+    const prima = window.filo.message;
+    window.filo.message = async (msg) => {
+      if (!msg || msg.type !== 'domande_consiglio') return prima(msg);
+      window.__domande.push(msg);
+      return { ok: true, esiti: [
+        { id: 'D-21', ok: true, etichetta: 'Riprendi #901', esito: { ok: true, azione: { tipo: 'riprendi', feedbackId: 'fb901' } } },
+        { id: 'D-22', ok: true, etichetta: 'Riprendi #902', esito: { ok: true, azione: { tipo: 'riprendi', feedbackId: 'fb902' }, accodata: true, statoLavoro: 'todo' } },
+      ] };
+    };
+  });
+  await page.locator('#mgDomandeTutte').check();
+  await page.locator('#mgDomandeConsiglioSel').click();
+  const box = page.locator('#mgDomandeConferma');
+  await box.locator('button', { hasText: 'Applica' }).click();
+  await expect(box).toContainText('Applicato a una domanda:');
+  await expect(box).toContainText('Decisione accodata per una domanda, il lavoro resta dov\'è:');
+  const accodata = box.locator('li', { hasText: 'D-22' });
+  await expect(accodata).toContainText('non era fermo: è in coda, la decisione resta accodata');
+  await expect(box.locator('.mg-dom-conferma-ok + ul li')).toHaveCount(1);
+  await expect(box.locator('.mg-dom-conferma-ok + ul li')).toContainText('D-21');
+  await page.screenshot({ path: 'tests/.shots/manage-domande-consiglio-accodata.png' });
+});
+
 test('un gruppo si apre come un blocco solo', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apriDomande(page, [
