@@ -86,10 +86,12 @@ test('un prerequisito scritto nel testo mette il pacchetto in attesa, o il pacch
 });
 
 test('rimandi alle note: si riconosce chi manda a leggerle, non chi ne parla', () => {
-  for (const f of ['spec nelle note del feedback', 'La spec è nelle note', 'Vedi le note', 'i dettagli stanno nelle sue note', 'leggi la nota', 'il resto in nota', 'istruzioni complete nelle note, da seguire']) {
+  for (const f of ['spec nelle note del feedback', 'La spec è nelle note', 'Vedi le note', 'i dettagli stanno nelle sue note', 'leggi la nota', 'il resto in nota', 'istruzioni complete nelle note, da seguire',
+    // Gli altri verbi e modi (#2033 giro 1): il controllo non riconosceva che la frase del caso.
+    'Pacchetto di #812 e #815: vedere le note', 'Leggere le note del feedback', 'consulta le note per la spec', 'Tutto nelle note', 'come da note', 'Spec: note del feedback', 'la spec completa è nel campo note']) {
     assert.equal(SPEC.rimandiAlleNote(f).length, 1, f);
   }
-  for (const f of ['#815: nelle note manca la data', '#812: le note del feedback non si vedono in Gestione', 'la nota di archiviazione cambia', 'un risultato notevole', 'la spec: notare il colore']) {
+  for (const f of ['#815: nelle note manca la data', '#812: le note del feedback non si vedono in Gestione', 'la nota di archiviazione cambia', 'un risultato notevole', 'la spec: notare il colore', '#812: le note si vedono solo dopo il riavvio']) {
     assert.deepEqual(SPEC.rimandiAlleNote(f), [], f);
   }
 });
