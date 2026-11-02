@@ -1389,6 +1389,13 @@
     try { it.onClick && it.onClick(); } catch (er) { console.error(er); }
   }
 
+  // Un'icona che mette e toglie (Grassetto) dice se la selezione ce l'ha già: chi preme sa cosa farà.
+  function segnaAcceso(b, it) {
+    if (typeof it.acceso !== 'boolean') return;
+    b.setAttribute('aria-pressed', String(it.acceso));
+    b.classList.toggle('sn-menu-btn-acceso', it.acceso);
+  }
+
   function makeRowButton(sub, opts = {}) {
     const b = document.createElement('button');
     b.type = 'button';
