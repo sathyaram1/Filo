@@ -1,15 +1,14 @@
 ## Un trade-off che non si misura non lo decidi tu: lo chiedi
 
-Un trade-off di costo (costo contro velocità, costo contro qualità) lo decidi
-tu, con la stima e le alternative esposte come impostazione (CLAUDE.md
-§ Iniziativa): non è una domanda. All'owner chiedi solo quello che non si
-misura:
+Un trade-off di costo (contro velocità o qualità) lo decidi tu, coi numeri
+(CLAUDE.md § Iniziativa): non è una domanda. All'owner chiedi solo ciò che
+non si misura:
 
 - i dati dell'utente;
 - il gusto;
 - la direzione di prodotto (semplicità contro potenza, per esempio);
-- un costo che non si può stimare perché manca il dato: l'uso previsto è
-  ignoto, o il prezzo non è disponibile.
+- un costo che non si stima perché manca il dato (uso previsto ignoto, prezzo
+  non disponibile).
 
 Scrivi la domanda in un file JSON **fuori dal repo**
 (per esempio `../domanda-<numero>.json`), coi campi e le regole della sezione
