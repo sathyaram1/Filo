@@ -36,25 +36,33 @@ async function apri(page, lista = LISTA) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
   await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate(({ ids, tenute }) => {
+  await page.evaluate((ids) => {
     window.__updates = [];
+    window.__sulServer = {};
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
       const t = msg && msg.type;
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
       if (t === 'feedback_update') {
         window.__updates.push(msg);
-        if (msg.waitsFor === undefined) return { ok: true };
-        const numeri = String(msg.waitsFor).split(/[\s,]+/).filter(Boolean).map((n) => n.replace('#', ''));
+        if (msg.waitsAggiungi === undefined && msg.waitsTogli === undefined) return { ok: true };
+        const numeri = String(msg.waitsAggiungi || '').split(/[\s,]+/).filter(Boolean).map((n) => n.replace('#', ''));
         const ignoto = numeri.find((n) => !ids[n]);
         if (ignoto) return { ok: false, error: `#${ignoto} non esiste` };
-        const tenuti = (msg.waitsTieni || []).filter((id) => tenute[id]).map((id) => ({ id, num: tenute[id] }));
-        return { ok: true, waitsFor: [...tenuti, ...numeri.map((n) => ({ id: ids[n], num: n }))] };
+        const via = msg.waitsTogli || [];
+        const ora = (window.__sulServer[msg.id] || []).filter((w) => !via.includes(w.id));
+        for (const n of numeri) if (!ora.some((w) => w.id === ids[n])) ora.push({ id: ids[n], num: n });
+        window.__sulServer[msg.id] = ora;
+        return { ok: true, waitsFor: ora.map((w) => ({ ...w })) };
       }
       return orig(msg);
     };
-  }, { ids: ID_DEL_NUMERO, tenute: TENUTE });
-  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, lista);
+  }, ID_DEL_NUMERO);
+  await page.evaluate((l) => {
+    for (const f of l) if (f.waitsFor) window.__sulServer[f._id] = f.waitsFor.map((w) => ({ ...w }));
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData(l);
+  }, lista);
   await page.evaluate(() => window.__mgTest.setTab('queue'));
 }
 
