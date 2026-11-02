@@ -8,7 +8,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { decidiLockfile } from '../../scripts/lib/lockfile-del-commit.mjs';
+import { decidiLockfile, sporcoSoloDalLockfile } from '../../scripts/lib/lockfile-del-commit.mjs';
 import { espandiInclusioni } from '../../scripts/lib/role-text.mjs';
 
 const RADICE = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
