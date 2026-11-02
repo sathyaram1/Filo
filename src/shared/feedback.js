@@ -1987,6 +1987,7 @@
     }
     // Le attese (#903): [{ id, num }] già controllate da SN_FB_ATTESE.valida; vuota o null le toglie (campo cancellato).
     if (waitsFor !== undefined) {
+      if (!opts.versione) throw new Error('attese non scritte: si scrivono solo sulla versione letta (SN_FB_ATTESE.scriviSullaLettura)');
       const lista = attesePerScrittura(waitsFor);
       if (lista.length) fields.waitsFor = toFsValue(lista);
       mask.push('waitsFor');
