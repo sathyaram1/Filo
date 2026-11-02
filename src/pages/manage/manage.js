@@ -3901,29 +3901,23 @@
     }).join('');
   }
 
-  // Le attese da riscrivere, tranne `salvo`: per numero quelle di un aspettato che la pagina vede, per id le altre
-  // (cancellato, non letto, senza numero), che il main tiene come sono invece di rifiutarle cercandone il numero.
-  function atteseDaTenere(fb, salvo = '') {
-    return ATT.atteseDi(fb).filter((w) => w.id !== salvo).map((w) => {
-      const doc = trovaAtteso(w.id);
-      const n = doc && !doc.missing ? (w.num || numeroDi(doc)) : '';
-      return n || { id: w.id };
-    });
-  }
+  // Il gesto «togli tutte» toglie quelle che la pagina mostra: un'attesa scritta intanto da altri resta (#1756.1).
+  const togliTutte = (fb) => ({ togli: ATT.atteseDi(fb).map((w) => w.id) });
 
-  async function scriviAttese(id, voci) {
+  // Si manda il gesto, non l'elenco: il main lo applica alle attese di adesso, che la pagina può vedere in ritardo.
+  async function scriviAttese(id, gesto) {
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb || !ATT) return false;
     const num = numeroDi(fb);
     const chi = num ? `#${num}` : 'Il feedback';
-    const tieni = voci.filter((v) => v && typeof v === 'object').map((v) => v.id);
-    const lette = ATT.leggiNumeri(voci.filter((v) => typeof v === 'string'));
-    if (!lette.ok) { setManageMsg(`Attese non scritte: ${lette.motivo}.`, 'err'); return false; }
-    const vuoto = !lette.numeri.length && !tieni.length;
+    const aggiungi = (gesto && gesto.aggiungi) || [];
+    const togli = (gesto && gesto.togli) || [];
+    const vuoto = !aggiungi.length && ATT.atteseDi(fb).every((w) => togli.includes(w.id));
     for (const b of [mgAtteseToggle, mgAtteseAggiungi, mgAtteseTogliTutte]) if (b) b.disabled = true;
     setManageMsg(vuoto ? 'Tolgo le attese…' : 'Scrivo le attese…', '');
     try {
-      const r = await sendToMain(Object.assign({ type: 'feedback_update', id, waitsFor: lette.numeri.join(', ') }, tieni.length ? { waitsTieni: tieni } : {}));
+      const r = await sendToMain(Object.assign({ type: 'feedback_update', id },
+        aggiungi.length ? { waitsAggiungi: aggiungi.join(', ') } : { waitsTogli: togli }));
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.waitsFor = Array.isArray(r.waitsFor) && r.waitsFor.length ? r.waitsFor : undefined;
       // Si chiude col gesto che toglie l'ultima, non con la risposta: un'attesa tenuta per id resta da guardare.
