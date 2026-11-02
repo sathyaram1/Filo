@@ -209,6 +209,6 @@ la finestra). Il freno che ferma un account resta `fermo` per account (`riserva`
 B è il tetto, o `passo`).
 
 Fatto in #1785 (server da rideployare): `routineFeedback`, che dà schede e testi a un
-biglietto con l'ambito `gestione_lavoro` nell'ambiente dei riservati e salva le schede nel
+biglietto con l'ambito `gestione_lavoro`, o al manutentore, nell'ambiente dei riservati e salva le schede nel
 feedback (ROUTINE-AUTH-SPEC.md § 15); `feedback:leggi` e `feedback:schede` lo usano in
 una routine, il token dell'owner in locale.

@@ -198,25 +198,35 @@ export function importaSchede(cartella, schede) {
   return scritte;
 }
 
-/** Righe e schede dalla strada locale: token e chiave dell'owner. → { ok, righe, schede, complete } | { ok:false, codice, motivo } */
-async function letturaLocale() {
-  const { acquireBearer } = await import('./lib/firestore-auth.mjs');
-  // La pubblica prima della cifratura, come in claude-feedback.mjs.
-  for (const m of ['feedbackThread.js', 'feedbackPublicKey.js', 'feedbackCrypto.js', 'feedback.js']) await import(`../src/shared/${m}`);
-  const { decryptFeedbackList, decryptJsonField } = await import('./lib/decrypt-feedback-fields.mjs');
+/**
+ * Righe e schede dalla strada locale: token e chiave dell'owner. `dip` (le prove): `leggiRighe()` → { rows già decifrate,
+ * complete }, `apri(v)` → la scheda in chiaro. → { ok, righe, schede, segnalati, complete }
+ */
+export async function letturaLocale(dip = {}) {
   const { vietatoLeggere } = await import('./leggi-feedback.mjs');
-  const token = await acquireBearer();
-  const r = await globalThis.SN_FEEDBACK.listAllPaged({ idToken: token, fields: [...CAMPI_LETTI, ...CAMPI_SCHEDA] });
-  const righe = await decryptFeedbackList(r.rows);
-  const schede = await schedeDaRighe(righe, { apri: (v) => decryptJsonField(v), vietato: vietatoLeggere });
+  let { leggiRighe, apri } = dip;
+  if (!leggiRighe || !apri) {
+    const { acquireBearer } = await import('./lib/firestore-auth.mjs');
+    // La pubblica prima della cifratura, come in claude-feedback.mjs.
+    for (const m of ['feedbackThread.js', 'feedbackPublicKey.js', 'feedbackCrypto.js', 'feedback.js']) await import(`../src/shared/${m}`);
+    const { decryptFeedbackList, decryptJsonField } = await import('./lib/decrypt-feedback-fields.mjs');
+    leggiRighe = leggiRighe || (async () => {
+      const r = await globalThis.SN_FEEDBACK.listAllPaged({ idToken: await acquireBearer(), fields: [...CAMPI_LETTI, ...CAMPI_SCHEDA] });
+      return { rows: await decryptFeedbackList(r.rows), complete: r.complete };
+    });
+    apri = apri || ((v) => decryptJsonField(v));
+  }
+  const r = await leggiRighe();
+  const righe = r.rows;
+  const schede = await schedeDaRighe(righe, { apri, vietato: vietatoLeggere });
   const segnalati = new Map(righe.map((x) => [String(x._id || ''), vietatoLeggere(String(x.status || '').trim(), x.pipeline)]).filter(([id, m]) => id && m));
   return { ok: true, righe, schede, segnalati, complete: r.complete !== false };
 }
 
-/** Righe e schede dal server, col biglietto della routine. */
-async function letturaCloud(ticket) {
+/** Righe e schede dal server, col biglietto della routine. `opz` passa a leggiDalServer (le prove ci mettono la rete finta). */
+export async function letturaCloud(ticket, opz = {}) {
   const { leggiDalServer } = await import('./lib/feedback-cloud.mjs');
-  const r = await leggiDalServer(ticket, { numeri: 'aperti', schede: true, testi: false });
+  const r = await leggiDalServer(ticket, { numeri: 'aperti', schede: true, testi: false }, opz);
   if (!r.ok) return { ok: false, codice: r.guasto ? 4 : 3, motivo: r.motivo };
   return {
     ok: true, righe: r.voci.filter((v) => v.riga).map((v) => v.riga), schede: r.voci.filter((v) => v.scheda).map((v) => v.scheda),

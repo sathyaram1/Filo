@@ -963,7 +963,8 @@ per scriverle, i testi dei feedback: dal cloud non ci sono token admin né chiav
 di decifratura, quindi li dà il server.
 
 - **`routineFeedback` `{ ticket, op: 'leggi', numeri: [...] | 'aperti', schede?, testi?, allegato? }`**
-  → `{ ok, voci, resto }`. Solo un biglietto con l'ambito `gestione_lavoro`;
+  → `{ ok, voci, resto }`. Solo un biglietto con l'ambito `gestione_lavoro` o quello
+  del manutentore (che il server emette senza ambiti);
   schede e testi solo se gira nell'ambiente dei riservati (SPEC-DOMANDE § 5.1:
   sono testo riservato), altrimenti si leggono solo numeri, stati e attese. Per
   ogni numero: la riga dell'indice, la scheda salvata nel feedback e, con
