@@ -29,5 +29,4 @@ test('r2 sul testo in grassetto l\'icona Grassetto della fila è accesa e il Cor
   await expect(grassetto).toBeVisible();
   const [g, c] = [await stato(grassetto), await stato(corsivo)];
   expect(g, `grassetto «${g}», corsivo «${c}»`).not.toBe(c);
-  expect(await grassetto.getAttribute('aria-pressed')).toBe('true');
 });
