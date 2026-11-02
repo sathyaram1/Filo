@@ -191,3 +191,23 @@ test('la consegna di una verifica piena lascia la richiesta al lettore; la chius
   assert.equal(leggiRichiesta(radice), null, 'nella chiusura il diff lo legge chi verifica: la lettura non è dovuta');
   assert.ok(!existsSync(join(cartellaConsegna(radice), 'lettura-richiesta.json')));
 });
+
+test('i testi: la verifica piena lancia la lettura, chiusura e chi risolve si fanno le due domande, il lettore non scrive', async () => {
+  const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
+  const dir = join(REPO, 'routines', 'roles');
+  const ruolo = (n) => espandiInclusioni(readFileSync(join(dir, n), 'utf8'), dir).replace(/\s+/g, ' ');
+  const verifica = ruolo('verifier.md');
+  assert.match(verifica, /## La lettura del diff, dopo il tuo verdetto/);
+  assert.match(verifica, /`subagent_type: routine-lettura`/);
+  assert.match(verifica, /> Lancia `node scripts\/lettura-diff\.mjs`/, 'il comando si riscrive verso gli strumenti fissati');
+  assert.match(verifica, /Il diff tu continui a non vederlo/);
+  for (const n of ['verifier-chiusura.md', 'resolver.md', 'resolver-ripresa.md', 'lettura-diff.md']) {
+    assert.match(ruolo(n), /\*\*Un conto, un posto\.\*\*[\s\S]*\*\*Prove che bastano\.\*\*/, n);
+  }
+  for (const n of ['verifier-riallineamento.md', 'secaudit.md']) assert.doesNotMatch(ruolo(n), /Un conto, un posto/, n);
+  const lettore = ruolo('lettura-diff.md');
+  assert.match(lettore, /non modifichi file e non fai commit/);
+  assert.match(lettore, /## Il livello dei tuoi rilievi[\s\S]*Il metro è la frequenza/);
+  const agente = readFileSync(join(REPO, '.claude', 'agents', 'routine-lettura.md'), 'utf8');
+  assert.match(agente, /^tools: Bash, Read, Grep, Glob$/m, 'il lettore non ha strumenti per scrivere');
+});

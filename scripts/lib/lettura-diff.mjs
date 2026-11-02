@@ -50,8 +50,9 @@ export function estremiDelLavoro(root, { base = '', head = '', main = 'main' } =
   return { base: comune.out.split('\n')[0], head: punta.out, ...(f.ok ? {} : { avviso: `origin/${main} non si aggiorna (${primaRiga(f.out)}): base calcolata sull'ultima copia scaricata` }) };
 }
 
-/** `git diff --name-status -M -z` → [{ stato, percorso, prima }]. PURA. */
-export function vociNameStatus(out) {
+// A differenza di solo-tolte, uno spostamento resta una voce sola col percorso di prima: la prova spostata si confronta
+// con sé stessa, non conta come nuova. `git diff --name-status -M -z` → [{ stato, percorso, prima }]. PURA.
+export function vociConPercorsoPrima(out) {
   const p = String(out || '').split('\u0000');
   const voci = [];
   for (let i = 0; i < p.length - 1;) {
