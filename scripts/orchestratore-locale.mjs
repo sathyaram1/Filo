@@ -14,7 +14,7 @@ import {
   OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, oraLocale, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
-import { ENV_FILE as ENV_BIGLIETTO, attesePcConStato, fineAttesa, fondiApp, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
+import { ENV_FILE as ENV_BIGLIETTO, attesePcConStato, fineAttesa, fondiApp, percorsoDiChiLancia, primaDiStampare } from './lib/biglietto-locale.mjs';
 import { fusioniServer } from './lib/fusioni-server.mjs';
 import { MODELLI, SFORZI } from './lib/orchestratore-cieco.mjs';
 import { ensureCommentChar } from './lib/carattere-commento.mjs';
@@ -520,10 +520,12 @@ async function main(argv) {
     const pid = inCorso();
     console.log(pid ? `Orchestratore in corso (pid ${pid}).` : 'Orchestratore fermo.');
     if (!(s.coda || []).length) console.log('Coda vuota.');
-    // Le domande le scrivono i lavoratori, che leggono testo d'utente: chi le legge si sporca prima (#1148).
+    // Le domande le scrivono i lavoratori, che leggono testo d'utente: chi le legge si sporca prima (#1148); nella sede owner restano fuori.
     const conDomande = (s.coda || []).filter((n) => s.pratiche[n] && s.pratiche[n].fermo && s.pratiche[n].fermo.domanda);
-    if (conDomande.length) console.log(await rigaSporco(`stato dei lavori locali (${conDomande.map((n) => `#${n}`).join(', ')})`, ['domande scritte dai lavoratori']));
-    for (const n of s.coda || []) if (s.pratiche[n]) console.log(rigaStato(s.pratiche[n]));
+    const g = await primaDiStampare(`domande dei lavori locali (${conDomande.map((n) => `#${n}`).join(', ')})`, conDomande.length ? ['domande scritte dai lavoratori'] : []);
+    if (g.riga) console.log(g.riga);
+    const senzaDomanda = (p) => (p.fermo && p.fermo.domanda ? { ...p, fermo: { ...p.fermo, domanda: '' } } : p);
+    for (const n of s.coda || []) if (s.pratiche[n]) console.log(rigaStato(g.stampa ? s.pratiche[n] : senzaDomanda(s.pratiche[n])));
     return 0;
   }
 

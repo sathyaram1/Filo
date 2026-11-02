@@ -161,6 +161,7 @@ import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 import { cloneDelBiglietto, rilancia } from './lib/worker-nel-clone.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
 import { leaseAtteso } from './lib/lease-atteso.mjs';
+import { MOTIVO_SEDE_OWNER, chiRifiuta, rifiutaNonFidati } from './lib/sede.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -189,14 +190,41 @@ const LEASE_TTL_MS = 60 * 60 * 1000;
 // tentativi, abbastanza per attraversare un buco di rete senza perdere il lavoro.
 const RETRY_EVERY_MS = 2 * 60 * 1000;
 
+// Le chiamate che non portano testo scritto da altri: nella sede owner (SPEC-DOMANDE.md §1.2) partono solo queste, perché
+// il server sporca il biglietto quando consegna e da qui non si rifiuta dopo. Elenco chiuso: una nuova si rifiuta finché
+// non sta qui o in testoAltruiDi (sentinella: tests/unit/sedeFidata.test.mjs).
+export const CHIAMATE_SENZA_TESTO_ALTRUI = Object.freeze(['routineTicket', 'routineHeartbeat', 'routineRelease', 'routineSporca',
+  'routineRamoServer', 'routineGitToken', 'routineCompare', 'routineClosing']);
+// Le chiamate che portano testo d'altri solo in certi casi, decise da testoAltruiDi.
+export const CHIAMATE_A_SECONDA = Object.freeze(['routineWork', 'routineOperazione', 'routineDeliver']);
+const OPERAZIONI_SENZA_TESTO_ALTRUI = ['segnala', 'rapporto'];
+
+/** Perché la chiamata porta testo scritto da altri (lavoro, immagini, posta, fascicoli), '' se non ne porta. PURA. */
+export function testoAltruiDi(path, payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const nome = (x) => String(x || '').replace(/[^\w-]/g, '').slice(0, 40) || '?';
+  if (CHIAMATE_SENZA_TESTO_ALTRUI.includes(path)) return '';
+  if (path === 'routineWork') return p.immagine ? `l'immagine ${nome(p.immagine)} viene da un feedback` : 'il lavoro di una routine porta il testo e gli allegati di un feedback';
+  if (path === 'routineOperazione') return OPERAZIONI_SENZA_TESTO_ALTRUI.includes(p.op) ? '' : `l'operazione ${nome(p.op)} può consegnare testi scritti da altri (la posta, i feedback)`;
+  if (path === 'routineDeliver') {
+    const op = p.data && typeof p.data === 'object' ? p.data.op : '';
+    if (INTENTI_CONSEGNA.includes(p.intent) || p.intent === 'domanda') return '';
+    if ((p.intent === 'risposta' || p.intent === 'smistamento') && op !== 'mostra') return '';
+    return `la consegna ${nome(p.intent)}${op ? ` ${nome(op)}` : ''} risponde con testi scritti da altri`;
+  }
+  return `${nome(path)} non è fra le chiamate che non portano testo d'altri`;
+}
+
 /**
  * Una chiamata al canale. Ritenta solo sui guasti che possono passare da soli
  * (rete, 5xx): un rifiuto è una risposta, non un guasto, e ritentarlo
- * significherebbe solo consumare il tetto.
+ * significherebbe solo consumare il tetto. Nella sede owner quella che porterebbe testo d'altri non parte.
  *
  * @returns {Promise<{ status: number, body: object }>}
  */
-export async function call(path, payload, { attempts = 3, baseDelayMs = 1500, fetchImpl = fetch, sleep = defaultSleep } = {}) {
+export async function call(path, payload, { attempts = 3, baseDelayMs = 1500, fetchImpl = fetch, sleep = defaultSleep, env = process.env } = {}) {
+  const altrui = rifiutaNonFidati(env) ? testoAltruiDi(path, payload) : '';
+  if (altrui) return { status: 403, body: { ok: false, reason: MOTIVO_SEDE_OWNER, detail: `${altrui}, e il server consegnandolo sporcherebbe il biglietto` } };
   let last = null;
   for (let i = 1; i <= attempts; i++) {
     try {
@@ -317,7 +345,7 @@ export async function work(t, opts) {
   }
   // Una risposta "riuscita" ma senza ruolo non è un lavoro: è una busta vuota,
   // e va trattata come guasto invece di essere consegnata a qualcuno.
-  return { ok: false, reason: String((body && body.reason) || (status === 200 ? 'busta_incompleta' : `http_${status}`)) };
+  return { ok: false, reason: String((body && body.reason) || (status === 200 ? 'busta_incompleta' : `http_${status}`)), ...(body && body.detail ? { detail: String(body.detail) } : {}) };
 }
 
 // Gli id delle immagini del contratto #900: `sN` della segnalazione, `rK.j` della risposta K.
@@ -348,7 +376,7 @@ export async function immagine(t, id, opts) {
   }
   // Un 200 senza voce è un server che non conosce la domanda (prima del deploy): non è un no.
   const outcome = classifyReply(status, body);
-  return { outcome: outcome === 'ok' ? 'fault' : outcome, reason: String((body && body.reason) || (outcome === 'ok' ? 'risposta_senza_immagine' : `http_${status}`)) };
+  return { outcome: outcome === 'ok' ? 'fault' : outcome, reason: String((body && body.reason) || (outcome === 'ok' ? 'risposta_senza_immagine' : `http_${status}`)), detail: String((body && body.detail) || '') };
 }
 
 // I motivi per cui il battito NON va ritentato: il server ha guardato il
@@ -1567,6 +1595,7 @@ if (isMain) {
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'work') {
     const r = await work(args[0]);
+    if (!r.ok && r.reason === MOTIVO_SEDE_OWNER) { console.error(`${chiRifiuta(r.reason)}: ${r.detail}.`); process.exit(4); }
     if (!r.ok) { console.error(`guasto ${r.reason}`); process.exit(3); }
     console.log(JSON.stringify(r.payload, null, 2));
   } else if (cmd === 'immagine') {
@@ -1585,7 +1614,7 @@ if (isMain) {
     if (r.outcome === 'refused') {
       console.error(r.reason === 'no_image'
         ? `Nessuna immagine «${a.id}» per il tuo lavoro: usa un id che c'è in «immagini».`
-        : `RIFIUTATO dal server (${r.reason}).`);
+        : `${chiRifiuta(r.reason)} (${r.reason}${r.detail ? `: ${r.detail}` : ''}).`);
       process.exit(4);
     }
     if (r.outcome !== 'ok') { console.error(`guasto ${r.reason}`); process.exit(3); }
@@ -2011,7 +2040,7 @@ if (isMain) {
       console.log(testoConsegnaRiuscita(r, data, intento));
       process.exit(0);
     }
-    if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
+    if (r.outcome === 'refused') { console.error(`${chiRifiuta(r.reason)}: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'operazione' || cmd === 'segnala' || cmd === 'rapporto') {
     // Il testo da stdin (heredoc): sulla riga gli apostrofi italiani romperebbero la shell. Da un terminale senza tubo
@@ -2047,7 +2076,7 @@ if (isMain) {
       else console.log(JSON.stringify(r.body, null, 2));
       process.exit(0);
     }
-    if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
+    if (r.outcome === 'refused') { console.error(`${chiRifiuta(r.reason)}: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'sporca') {
     // Il biglietto è quello del giro (il marcatore lo scrive dispatch): sulla riga c'è solo il motivo.
@@ -2077,7 +2106,7 @@ if (isMain) {
       console.log(`Ramo del server registrato: ${ramo} a ${r.sha.slice(0, 12)}${r.ramoFidato ? '' : ' (il registro dice: non fidato)'}.`);
       process.exit(0);
     }
-    if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
+    if (r.outcome === 'refused') { console.error(`${chiRifiuta(r.reason)}: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'compare') {
     // Senza biglietto il ruolo scalava al suo posto e partiva verso il server come biglietto (#878).

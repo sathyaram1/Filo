@@ -4,7 +4,7 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rigaSporco } from './lib/biglietto-locale.mjs';
+import { primaDiStampare } from './lib/biglietto-locale.mjs';
 
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineClosingAdmin';
 // Gli slot li decide il server (gli altri li rifiuta con `bad_slot`): qui servono solo all'aiuto.
@@ -169,8 +169,11 @@ async function main() {
   }
   const n = a.n || 50;
   const risposte = await chiama({ op: 'answers', limit: n });
-  // Le risposte le scrivono le routine, che leggono testo d'utente: chi le stampa si sporca prima (#1148).
-  console.error(await rigaSporco('risposte delle routine alla domanda di fine sessione', ['testo scritto dalle routine']));
+  // Le risposte le scrivono le routine, che leggono testo d'utente: chi le stampa si sporca prima (#1148), o nella sede owner non le stampa.
+  const quante = (risposte?.orchestrator || []).length + (risposte?.workers || []).filter((w) => w && w.closing).length;
+  const g = await primaDiStampare(`risposte delle routine alla domanda di fine sessione (${quante})`, quante ? ['testo scritto dalle routine'] : []);
+  if (g.riga) console.error(g.riga);
+  if (!g.stampa) process.exit(1);
   console.log(formattaRisposte(risposte, { n }));
 }
 

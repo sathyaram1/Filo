@@ -2066,6 +2066,8 @@ export async function run() {
     return emitHalt('transient', `canale non utilizzabile: ${e?.message || e}`);
   }
   if (!w.ok) {
+    // Nella sede owner il lavoro non si chiede: il server sporcherebbe il biglietto consegnandolo (SPEC-DOMANDE.md §1.2).
+    if (w.reason === 'sede_owner') return emitHalt('permanent', `nella sede owner le routine non lavorano: ${w.detail || 'il lavoro porta testo scritto da altri'}`);
     // In dubbio ci si ferma: un biglietto che non apre il proprio lavoro non
     // è una giornata tranquilla, è un giro che non deve partire.
     return emitHalt('transient', `il canale non consegna il lavoro (${w.reason})`);
