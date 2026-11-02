@@ -1239,11 +1239,8 @@
     const {
       linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable,
     } = detectContext(target, e.clientX, e.clientY);
-<<<<<<< HEAD
-    contaContesto(bandiereDelContesto({ selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable }));
-=======
     selInfo = selezioneSottoIlMouse(selInfo, e, { imgEl, linkEl, mediaEl });
->>>>>>> 3be5f9a65 (auto: src/content/content.js)
+    contaContesto(bandiereDelContesto({ selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable }));
     if (editable) capturePasteContext(target);
     else pasteContext = null;
     const clipboardHistory = await Actions.getClipboardHistory();
