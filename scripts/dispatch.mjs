@@ -742,7 +742,7 @@ function checkoutNonAdatto() {
     // modifica non salvata) può stare esattamente sul commit giusto e avere i
     // file rotti. Controllandolo dopo, la copia si portava dentro i segni del
     // conflitto e la ricetta consegnata al giro arrivava corrotta.
-    // Un install fatto prima del preflight (un container ripreso) non è roba di nessuno: si rimette (#2040).
+    // Un install fatto prima del preflight (dall'ambiente, o in una sessione ripresa) non è roba di nessuno (#2040).
     if (rimettiLockfile(ROOT).rimesso) console.error(`[dispatch] ${LOCKFILE} riscritto da npm: rimesso com'è nel commit.`);
     const sporco = g(['status', '--porcelain']);
     if (sporco) {
