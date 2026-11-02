@@ -282,7 +282,7 @@ rispettare.
   che ha letto la parola d'ordine può presentarsi con l'id di una sessione
   inventata, e il server non lo distingue ancora da una vera: la fiducia per
   sessione (§ 2, principio 6) ferma chi usa la propria sessione o la toglie,
-  non chi la inventa.
+  non chi la inventa. Aperto in #2044.
 
 ---
 
