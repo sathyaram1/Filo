@@ -1078,6 +1078,18 @@ export async function eseguiGitServer({
     scrivi(t.outcome === 'refused' ? `RIFIUTATO dal server: niente token per filo-security (${motivo}).` : `guasto ${motivo}`);
     return t.outcome === 'refused' ? 4 : 3;
   }
+  // Dopo il sì del server, che dice il biglietto vivo: il ramo dell'app non si spedisce per un biglietto chiuso.
+  if (azione === 'push') {
+    const a = app(root, biglietto);
+    for (const riga of a.righe || []) scrivi(`git-server: ${riga}`);
+    if (!a.ok) {
+      scrivi(`git-server: il ramo dell'app${a.branch ? ` '${a.branch}'` : ''} NON è arrivato su origin (${a.reason}), quindi quello del server non parte: la sua suite proverebbe l'app com'era prima. Non spingere a mano: se la causa sta nel ramo dell'app sistemala e rilancia lo stesso comando, che rispedisce da sé; altrimenti è un guasto.`);
+      return 1;
+    }
+    scrivi(a.skipped
+      ? `git-server: ramo dell'app non spedito (${a.reason}).`
+      : `git-server: ramo dell'app '${a.branch}' su origin${a.forced ? ' (storia riscritta: --force-with-lease)' : ''}, prima di quello del server.`);
+  }
   // In cloud il sì serve lo stesso: biglietto pulito, ambito e registro del ramo li decide il server a ogni chiamata,
   // anche se il token che porta resta qui e non arriva a git.
   const viaProxy = strada === 'proxy';
