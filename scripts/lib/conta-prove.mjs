@@ -71,7 +71,7 @@ export function mascheraCodice(src) {
       }
       m[j] = 1;
       if (!/\s/.test(c)) {
-        if (ID.test(c)) parola = ID.test(prec) && j > 0 && m[j - 1] ? parola + c : c;
+        if (ID.test(c)) parola = j > 0 && m[j - 1] && ID.test(s[j - 1]) ? parola + c : c;
         else parola = '';
         prec = c;
       }
