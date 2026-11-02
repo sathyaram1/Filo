@@ -10,7 +10,9 @@
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
       version: '0.2.257', date: '2026-11-01',
-      features: [],
+      features: [
+        { testo: 'In chat Filo sa quali pagine hai aperto dall\'ultimo messaggio, raccolte per sito. Dopo un video sulle orche puoi chiedergli «quanto vivono?» senza dirgli di cosa parli. Di una pagina delicata, come la posta o la banca, gli arriva solo il nome del sito.', segnalazione: 1562 },
+      ],
       fixes: [
         { testo: 'Quando mandi un feedback, il riquadro dice «inviato» solo quando è arrivato davvero. Se un allegato non parte, un avviso di Filo dice quale e perché, e resta finché non lo chiudi, e un feedback senza testo i cui allegati non sono partiti non arriva vuoto. Un file che il riquadro non può allegare viene nominato, col motivo. La schermata annotata di uno schermo grande ora parte: Filo la alleggerisce sotto i 4 MB.', segnalazione: 1667 },
         { testo: 'Aprire e chiudere tante volte il riquadro «Invia feedback» non fa più crescere la memoria usata da Filo.', segnalazione: 1096 },
