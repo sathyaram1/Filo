@@ -2526,7 +2526,7 @@
       // titolo, e il clic arriva lì invece che sull'<img> (#444).
       const imgInLink = (!mediaInLink && belongsTo(imgUnder, linkEl, layers)) ? imgUnder : null;
       if (imgInLink) {
-        di('immagine', { img: imgInLink });
+        di('immagine', { img: imgInLink, link: linkEl });
         for (const it of buildImageActionItems(imgInLink)) items.push(it);
         items.push({ type: 'separator' });
       }
