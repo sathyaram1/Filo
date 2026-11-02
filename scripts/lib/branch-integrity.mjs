@@ -476,12 +476,14 @@ export function ensureSessionExcludes(root) {
  *   root         directory del repo
  *   branch       branch su cui posizionarsi (per `create` è il nome da creare)
  *   create       true = lavoro NUOVO (crea il branch dalla base)
+ *   createIfMissing  true = il nome è già deciso (il ramo del biglietto): si riprende se c'è, sennò nasce dalla base
  *   base         base da cui creare (default: mainBranch)
  *   mainBranch   linea principale (default 'main')
  *   checkpoint   ultimo punto fermo locale (SHA), o null
  *   now          per i test
  *
- * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null, superato?:string|null, avviso?:string}}
+ * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null, superato?:string|null, avviso?:string, ripreso?:boolean}}
+ *          ripreso   = con createIfMissing, il ramo c'era già ed è stato ripreso
  *          rewritten = il punto fermo lasciato perché il ramo su origin è stato riscritto
  *          superato  = il punto fermo lasciato perché più vecchio della punta pubblicata (un giro passato altrove)
  *          avviso    = origin/<branch> senza reflog: il rinvio dopo un rebase verrà rifiutato
@@ -490,7 +492,7 @@ export function ensureSessionExcludes(root) {
  * FAIL CLOSED: se non riesce, il chiamante NON consegna il lavoro. Meglio un
  * giro a vuoto che un giro sull'albero sbagliato.
  */
-export function prepareBranch({ root, branch, create = false, base = '', mainBranch = 'main', checkpoint = null, now = Date.now() }) {
+export function prepareBranch({ root, branch, create = false, createIfMissing = false, base = '', mainBranch = 'main', checkpoint = null, now = Date.now() }) {
   const g = gitIn(root);
   if (!branch) return { ok: false, kind: 'transient', message: 'nessun branch da preparare' };
   // Sulla linea principale non si LAVORA: il cancello fonde un ramo, quindi un
@@ -507,6 +509,14 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // Prima del ramo di scarto spedito più sotto: i commit locali di una sessione morta possono portare una copia dei dati (#1108).
   try { installaControlloSpedizione(root); } catch (_) { /* senza, restano i controlli delle singole strade */ }
   ensureCommentChar(root);
+
+  // «Su origin non c'è» va saputo, non dedotto da un fetch fallito: con la rete giù il ramo del biglietto
+  // rinascerebbe da main accanto al lavoro già spinto (#1632).
+  if (createIfMissing) {
+    const remoto = ramoSuOrigin(root, branch);
+    if (remoto.errore) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin se ${branch} c'è: ${remoto.errore}` };
+    create = !remoto.presente && !refExists(g, `refs/heads/${branch}`);
+  }
 
   if (create) {
     const wanted = base || mainBranch;
@@ -592,7 +602,18 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // lasciano residui che al checkout successivo verrebbero TRASPORTATI sul
   // branch del compito dopo, finendo nel diff che va al cancello di sicurezza.
   g(['clean', '-fd']);
-  return { ok: true, head: headSha(root), discarded, rewritten, superato, ...avviso };
+  return { ok: true, head: headSha(root), discarded, rewritten, superato, ...avviso, ...(createIfMissing ? { ripreso: true } : {}) };
+}
+
+/** `ls-remote --exit-code` esce 2 quando il ramo non c'è: ogni altro no (rete, permessi) è un «non so». */
+function ramoSuOrigin(root, branch) {
+  try {
+    execFileSync('git', ['ls-remote', '--exit-code', 'origin', `refs/heads/${branch}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return { presente: true };
+  } catch (e) {
+    if (e.status === 2) return { presente: false };
+    return { errore: `${e.stderr || ''}`.trim().split('\n').slice(-1)[0] || e.message };
+  }
 }
 
 function antenato(g, a, b) {

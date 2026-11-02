@@ -208,7 +208,7 @@ diventa un **muro**.
 
 | Ruolo | Riceve | NON riceve |
 |---|---|---|
-| `new-work` | il testo del suo feedback | — |
+| `new-work` | il testo del suo feedback; il ramo, se il biglietto ne ha già uno (lavoro ripartito sullo stesso biglietto, #1632) | — |
 | `fixer` | il feedback e la critica di riallineamento che il server scrive a ogni fusione fermata (un conflitto, o gli unit rossi sul risultato della fusione con il loro elenco: chi riallinea li elenca nel report e non li corregge, #1204) | i rilievi di una verifica: li corregge chi li ha scritti |
 | `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver registrato la critica, la risposta del server (feedback #561) | il diff, il report di chi ha risolto, la risposta del server prima della critica |
 | `secaudit` | **solo ramo e diff** | qualunque campo del feedback |

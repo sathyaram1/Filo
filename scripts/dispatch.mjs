@@ -2135,7 +2135,10 @@ function positionOnBranch(bucket) {
   // macchina e può descrivere un tentativo precedente. Con la precedenza
   // invertita, uno stato vecchio posizionava il lavoratore sul ramo di un
   // giro passato ignorando quello assegnato dal server (#507, seconda porta).
-  const branch = isNew ? newWorkBranch(bucket.id) : (bucket.branch || prev?.branch || '');
+  // Un lavoro nuovo ripartito sullo stesso biglietto riceve il ramo a cui il server l'ha già legato, e resta lì:
+  // con un nome nuovo la consegna verrebbe rifiutata (#1632). Senza ramo nella busta, nome nuovo per tentativo (#378).
+  const dalBiglietto = isNew && !!bucket.branch;
+  const branch = isNew ? (bucket.branch || newWorkBranch(bucket.id)) : (bucket.branch || prev?.branch || '');
   if (!branch) return { ok: false, kind: 'permanent', message: `nessun branch assegnato per ${bucket.id}` };
   // Il resto l'ha guardato il giro prima di scrivere i marcatori; qui resta un battito acceso nel frattempo da un altro.
   const vivo = lavoroVivo(ROOT, { mio: readRoutineTicket(ROOT), cosa: ['battito'] });
@@ -2144,12 +2147,13 @@ function positionOnBranch(bucket) {
   // Un punto fermo registrato per un ALTRO ramo non deve guidare il ripristino
   // di questo: lo sha esiste nel repo, quindi prepareBranch lo prenderebbe per
   // buono e riporterebbe il ramo al contenuto di un tentativo diverso.
-  const checkpoint = (!isNew && prev?.branch === branch) ? lastCheckpoint(prev) : null;
+  const checkpoint = (prev?.branch === branch) ? lastCheckpoint(prev) : null;
 
   const res = prepareBranch({
     root: ROOT,
     branch,
-    create: isNew,
+    create: isNew && !dalBiglietto,
+    createIfMissing: dalBiglietto,
     // Un lavoro nuovo nasce SEMPRE dalla linea principale: le basi feature/N
     // erano il Modello B dei sotto-feedback, abolito (SPEC-RIDISEGNO-MAX.md §1).
     base: '',
@@ -2166,6 +2170,11 @@ function positionOnBranch(bucket) {
     process.stderr.write(`[dispatch] ${branch}: lavoro di un'istanza interrotta riportato all'ultimo punto fermo; i commit scartati restano su ${res.discarded}\n`);
   }
   if (res.avviso) process.stderr.write(`[dispatch] ${res.avviso}\n`);
+  if (dalBiglietto) {
+    process.stderr.write(res.ripreso
+      ? `[dispatch] ${branch}: il biglietto era già legato a questo ramo, si riprende dalla sua punta ${String(res.head).slice(0, 12)} (il lavoro di prima sta nei suoi commit)\n`
+      : `[dispatch] ${branch}: il biglietto era già legato a questo ramo, che non c'è da nessuna parte: nasce adesso con quel nome, dalla linea principale\n`);
+  }
 
   // Identità attesa del contenuto, che transizioni (C) e ripristino (D) confronteranno. Lo stato di un'altra storia
   // (altro ramo, riscrittura, giro passato da un'altra cartella) riparte da zero, esiti e pulizie compresi (D-207).
@@ -2387,7 +2396,12 @@ async function finalizeBucket(bucket, fromServer) {
   // «in coda» per tutta la lavorazione.
   const ripresa = !!(fromServer && fromServer.payload && fromServer.payload.ripresa);
   if (bucket.id && (bucket.role === 'new-work' || (bucket.role === 'fixer' && ripresa))) {
-    await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
+    const presa = await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
+    // Il biglietto è legato a un altro ramo: la consegna da questo verrebbe rifiutata a lavoro finito (#1632).
+    if (presa.outcome === 'refused' && presa.reason === 'branch_mismatch') {
+      const motivo = unaRiga(motivoRifiuto(presa)).replace(/["`$\\]/g, "'");
+      return emitHalt('transient', `il server ha legato questo biglietto a un altro ramo e rifiuta la presa in carico su ${bucket.branch} (${motivo}): la consegna da qui verrebbe rifiutata, non si lavora`);
+    }
   }
 
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
