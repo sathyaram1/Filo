@@ -2553,6 +2553,7 @@
       // Due cose prese entrambe da sotto devono stare insieme anche fra loro, o il menu
       // unirebbe due schede diverse (#444).
       const linkDelMedia = belongsTo(mediaUnder, linkUnder, layers) ? linkUnder : null;
+      di('media', { media: mediaUnder, link: linkDelMedia });
       for (const it of Actions.buildMediaItems(mediaUnder, linkDelMedia)) items.push(it);
       if (linkDelMedia) {
         items.push({ type: 'separator' });
