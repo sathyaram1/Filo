@@ -1714,6 +1714,26 @@
     return { selection, sentence: value.trim() || selection };
   }
 
+  // Una selezione rimasta altrove non decide il menu di un'immagine, un collegamento o un filmato sotto il mouse: vale
+  // solo se il clic le sta sopra. Senza, una frase selezionata prima dava a una foto la fila e le voci del testo.
+  function selezioneSottoIlMouse(selInfo, punto, { imgEl, linkEl, mediaEl }) {
+    if (!selInfo || !(imgEl || linkEl || mediaEl)) return selInfo;
+    try {
+      const g = window.getSelection();
+      if (!g || !g.rangeCount) return selInfo;
+      const x = punto.clientX;
+      const y = punto.clientY;
+      for (let i = 0; i < g.rangeCount; i++) {
+        for (const r of g.getRangeAt(i).getClientRects()) {
+          if (x >= r.left - 2 && x <= r.right + 2 && y >= r.top - 2 && y <= r.bottom + 2) return selInfo;
+        }
+      }
+      return null;
+    } catch (_) {
+      return selInfo;
+    }
+  }
+
   async function buildBaseItemsAt(mouseEvent, { senzaValuta = false } = {}) {
     const target = realTarget(mouseEvent);
     let selInfo = Extract.getSelectionWithSentence(target);
