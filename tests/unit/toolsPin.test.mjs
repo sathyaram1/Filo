@@ -739,6 +739,10 @@ async function laboratorioGit() {
   g(['init', '-q', '-b', 'main']);
   g(['config', 'user.email', 't@t']);
   g(['config', 'user.name', 't']);
+  // Come Windows di serie, così il suo rosso si vede anche dal cancello su Linux; la fine riga la decide
+  // `.gitattributes` del repo, come nel progetto vero: senza, un file rimesso dal commit usciva CRLF (#2056).
+  g(['config', 'core.autocrlf', 'true']);
+  cpSync(resolve(REPO, '.gitattributes'), resolve(casa, '.gitattributes'));
   // Gli strumenti veri: la guardia gira dentro dispatch, non da sola.
   // Tutto quello che la copia pretende: enumerarlo a mano qui vorrebbe dire
   // ricostruire lo stesso elenco in due posti, e vederli divergere.
