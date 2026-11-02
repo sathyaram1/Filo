@@ -38,7 +38,7 @@ const comeScritto = (p) => resolve(p).split('\\').join('/');
 
 import {
   PINNED_PATHS, TOOLS_ROOT, pinTools, pinnedRepoRoot, absolutizeRecipe, pinWorkerTools, pinnedDirWorker,
-  absolutizeOutput, absolutizePrinted,
+  absolutizeOutput, absolutizePrinted, pinnedCommit, lavoroGiaPreso,
 } from '../../scripts/lib/tools-pin.mjs';
 
 function progettoFinto() {
