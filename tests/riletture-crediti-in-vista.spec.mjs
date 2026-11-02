@@ -193,7 +193,7 @@ test('Crediti dietro un\'altra scheda non chiede il saldo al server; tornarci lo
   const page = await openTab('filo://credits/credits.html');
   const id = await schedaAttiva(app);
   await expect(page.locator('#balance')).toHaveText('4.990', { timeout: 15_000 });
-  await expect.poll(async () => (await fermo(() => conta.state, 1500)).reduce((a, b) => b - a), { timeout: 15_000 }).toBe(0);
+  await letturePartiteDaSole(app, () => conta.state);
 
   await openTab('filo://history/history.html');
   const base = conta.state;
