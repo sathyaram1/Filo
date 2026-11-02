@@ -53,14 +53,15 @@ test('i ruoli che chiedono o verificano ricevono la regola, e nessuno manda a ch
     assert.ok(!CHIEDE_IL_COSTO.test(t), `${chi}: manda ancora all'owner la velocità contro il costo`);
     if (/## Un trade-off/.test(t)) {
       const chiedi = sezione(t, '## Un trade-off che non si misura non lo decidi tu: lo chiedi', 'Scrivi la domanda');
-      assert.match(chiedi, /Un trade-off di costo \(costo contro velocità, costo contro qualità\) lo decidi tu/, chi);
+      assert.match(chiedi, /Un trade-off di costo \(contro velocità o qualità\) lo decidi tu, coi numeri/, chi);
       assert.match(chiedi, /i dati dell'utente; - il gusto; - la direzione di prodotto/, `${chi}: l'elenco di cosa si chiede`);
-      assert.match(chiedi, /un costo che non si può stimare perché manca il dato/, chi);
+      assert.match(chiedi, /un costo che non si stima perché manca il dato/, chi);
     }
   }
   const nw = piatto(readRoleInstructions('new-work', {}));
   assert.match(nw, /## Un trade-off che non si misura non lo decidi tu: lo chiedi/, 'chi lavora sa cosa chiedere');
-  assert.match(nw, /un trade-off di costo invece sì, coi numeri/, 'il contratto dei worker è allineato');
+  assert.match(nw, /un trade-off che non si misura o una domanda di design \(CLAUDE\.md § Iniziativa: non lo decidi tu\)/,
+    'il contratto dei worker è allineato');
 });
 
 test('chi verifica: un trade-off di costo con stima e opzioni non è un rilievo, uno senza è un rilievo senza «?»', () => {
