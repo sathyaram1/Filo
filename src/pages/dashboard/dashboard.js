@@ -1023,6 +1023,8 @@
   // La chat di adesso è stata nascosta o cancellata (da qui, a parole o altrove): la scheda non se ne porta dietro niente,
   // né la targa né la memoria dei messaggi, che al turno dopo tornerebbero al modello e nel registro delle richieste (#1295).
   function lasciaLaChat() {
+    // Lasciata mentre qui si rispondeva: le bolle a schermo sono le sue, il filo non le ridisegna (#1685).
+    if (chatId) lasciateConRighe.add(chatId);
     chatId = null;
     threadHistory = [];
   }
