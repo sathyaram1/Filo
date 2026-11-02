@@ -11,7 +11,9 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { esceInOgniEsito, fermaDiSicuro, proveDaToglierePrimaDelVerdetto, proveScritteDa } from '../../scripts/lib/prove-tolte.mjs';
+import {
+  esceInOgniEsito, fermaDiSicuro, proveDaToglierePrimaDelVerdetto, proveScritteDa, testoProvePrimaDelVerdetto, titoliDeiCasi,
+} from '../../scripts/lib/prove-tolte.mjs';
 import { verifierReplyText } from '../../scripts/dispatch.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
