@@ -178,6 +178,15 @@ describe('A — posizionarsi sul branch (prepareBranch)', () => {
     assert.equal(git(work, ['branch', '--list', 'worker/*']), '');
   });
 
+  test('rigaDiErrore: la riga del motivo, senza credenziali, ricopiabile dentro --guasto "…"', () => {
+    const stderr = 'warning: redirecting\nfatal: unable to access \'https://x-access-token:segreto@github.com/o/r.git/\': Could not resolve host: github.com\n';
+    const riga = rigaDiErrore(stderr);
+    assert.match(riga, /^fatal: unable to access/);
+    assert.ok(!riga.includes('segreto'), riga);
+    assert.equal(rigaDiErrore('fatal: \'C:\\Users\\agenti AI\\o.git\' "x" `y` $z'), 'fatal: \'C:/Users/agenti AI/o.git\' \'x\' \'y\' \'z');
+    assert.equal(rigaDiErrore('\n\n', 'fetch fallito'), 'fetch fallito');
+  });
+
   test('lavoro nuovo da una base che su origin non c\'è: si ripiega sulla linea principale come prima', () => {
     const { work } = makeRepo();
     const branch = newWorkBranch('feed-base');
