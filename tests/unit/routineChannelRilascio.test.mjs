@@ -547,7 +547,7 @@ describe('release da riga di comando', () => {
       const r = await cli(['release', 'tkt-cli', '--senza-rapporto'], { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1' });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
       assert.match(r.se, /push saltato/);
-      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli' });
+      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli', domandaAlRilascio: true });
     } finally { srv.close(); }
   });
 
