@@ -26,7 +26,8 @@ test('nessuna prova riconosce una finestra da un prefisso che il fumetto, il men
   const trovati = [];
   for (const f of fileDiTest()) {
     const rel = relative(TESTS, f);
-    if (rel === QUESTO || rel.startsWith('unit' + (rel.includes('\\') ? '\\' : '/'))) continue;
+    // Gli unit test non aprono finestre: un `'data:'` lì è un indirizzo dentro un HTML.
+    if (rel.split(/[\\/]/)[0] === 'unit') continue;
     readFileSync(f, 'utf8').split('\n').forEach((riga, i) => {
       if (PREFISSO_CONDIVISO.test(riga)) trovati.push(`${rel}:${i + 1}: ${riga.trim()}`);
     });
