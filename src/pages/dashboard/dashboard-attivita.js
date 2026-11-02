@@ -39,8 +39,16 @@
   let filaPopup = 0;
   let riprendiDopoFila = null;
   let vociDopoOk = [];
-  function proseguiQuandoLibero(chat = '', voce = null) {
-    if (voce) vociDopoOk.push(voce);
+  // `gruppo`: i bottoni di conferma di una stessa risposta (#1685). Come negli harness di Anthropic, il lavoro riprende
+  // quando ognuno ha avuto la sua risposta, con gli esiti di tutti; se sono stati solo no, non riprende.
+  function proseguiQuandoLibero(chat = '', voce = null, gruppo = null, a = null) {
+    if (gruppo) {
+      if (a) gruppo.pendenti.delete(a);
+      if (voce) gruppo.voci.push(voce);
+      if (gruppo.pendenti.size || !gruppo.voci.length) return;
+      vociDopoOk.push(...gruppo.voci);
+      gruppo.voci = [];
+    } else if (voce) vociDopoOk.push(voce);
     if (filaPopup > 0) riprendiDopoFila = { chat };
     else riprendiOra(chat);
   }
