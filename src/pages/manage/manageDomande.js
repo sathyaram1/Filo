@@ -713,7 +713,23 @@
     const t = a && a.tipo;
     if (t === 'owner') return 'Tu';
     if (t === 'server') return 'Server';
+    // La chiave owner-non-fidato (#2011): tu da una sede che legge testo di chiunque, non da qui.
+    if (t === 'chiave') return a.chiave ? `Tu, da «${a.chiave}»` : 'Tu, da fuori';
     return a && a.ruolo ? `Agente (${a.ruolo})` : 'Agente';
+  }
+
+  // Il segno della risposta registrata dalla chiave owner-non-fidato (#2011), o null.
+  function rispostaDaChiave(d) {
+    const r = d && d.rispostaDaChiave;
+    return r && typeof r === 'object' && typeof r.slug === 'string' ? r : null;
+  }
+
+  function daChiave(d) {
+    const r = rispostaDaChiave(d);
+    if (!r) return null;
+    const p = el('p', 'mg-dq-esito mg-dq-esito--chiave', `${r.archiviata ? 'Archiviata' : 'Risposta registrata'} da «${r.slug}»${r.il ? ` ${ilGiorno(r.il)}` : ''}, non da qui.`);
+    p.title = `L’ha registrata una sessione con la chiave «${r.slug}», che legge testo di chiunque. Se non la ricordi, riaprila.`;
+    return p;
   }
 
   function conversazione(d) {
