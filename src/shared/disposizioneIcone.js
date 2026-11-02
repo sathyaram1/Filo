@@ -38,6 +38,16 @@
       fila: Object.freeze(['openTab', 'copy']),
       altro: Object.freeze(['saveForLater', 'share']),
     }),
+    media: Object.freeze({
+      su: 'su un filmato o un audio',
+      fila: Object.freeze(['playPause', 'mute', 'save']),
+      altro: Object.freeze(['loop', 'pip', 'copyLink']),
+    }),
+    cursore: Object.freeze({
+      su: 'in un campo dove scrivi, senza selezione',
+      fila: Object.freeze(['paste', 'dictate']),
+      altro: Object.freeze([]),
+    }),
     pagina: Object.freeze({ su: 'sulla pagina', fila: Object.freeze([]), altro: Object.freeze([]) }),
   });
 
