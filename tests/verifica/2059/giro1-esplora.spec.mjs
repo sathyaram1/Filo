@@ -115,6 +115,15 @@ test('risposte della chiave propria vere, Utenti davanti e Gestione su un\'altra
   expect(conta.overview - prima).toBe(0);
 });
 
+test('controllo: un movimento qualunque con Utenti davanti rilegge una volta', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await apriUtenti(app, openTab);
+  const prima = conta.overview;
+  await app.evaluate(() => { for (let i = 0; i < 5; i++) globalThis.SN_BROADCAST_FILO({ type: globalThis.SN_MSG.MSG.CREDITS_CHANGED }); });
+  await pausa(4000);
+  expect(conta.overview - prima).toBe(1);
+});
+
 test('un regalo dalla scheda Utenti rilegge la vista una volta sola', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   const page = await apriUtenti(app, openTab);
