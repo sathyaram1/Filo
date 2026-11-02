@@ -814,9 +814,10 @@
   // Si riapre un'archiviata senza azioni, una risposta automatica che non torna (§3.6) e una data dalla chiave
   // owner-non-fidato (#2011).
   function riapribile(d) {
-    return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica || rispostaDaChiave(d)));
+    return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica || rispostaDaChiave(d) || rispostaDaSessione(d)));
   }
   function titoloRiapri(d) {
+    if (rispostaDaSessione(d)) return 'Rimettila fra quelle da rispondere: un lavoro che la domanda ferma torna fermo finché non rispondi';
     const r = rispostaDaChiave(d);
     if (r && !r.archiviata) return `Rimettila fra quelle da rispondere: quello che la risposta da «${r.slug}» ha applicato resta finché non rispondi`;
     if (!(d.esito && d.esito.automatica)) return 'Rimettila fra quelle da rispondere';
