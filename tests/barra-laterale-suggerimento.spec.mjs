@@ -99,7 +99,7 @@ test('un’etichetta tolta nell’istante in cui compariva non resta appesa', as
 // prima di qualunque passaggio, e la stessa finestra serve il primo e il secondo senza ricaricarsi.
 const fumetto = (app) => app.evaluate(({ BrowserWindow }) => {
   const f = BrowserWindow.getAllWindows().find((w) => !w._filoTabs && !w.isDestroyed()
-    && w.webContents.getURL() === 'filo://shell/fumetto.html');
+    && w.webContents.getURL() === 'filo://src/renderer/fumetto.html');
   if (!f) return null;
   if (!f.__contaCarichi) {
     f.__contaCarichi = true;
