@@ -139,9 +139,10 @@ export function riepilogo(indice, schede) {
   const per = (k) => schede.reduce((m, s) => ({ ...m, [s[k] ?? '?']: (m[s[k] ?? '?'] || 0) + 1 }), {});
   const mappa = new Map(schede.map((s) => [String(s.numero || '').replace(/^#/, ''), s]));
   const daFare = (indice || []).filter((f) => daScrivere(f, mappa.get(f.num)));
+  const fuori = (indice || []).filter((f) => fuoriDalFeedback(f, mappa.get(f.num)));
   return {
     aperti: (indice || []).length, schede: schede.length, daScrivere: daFare.length, daRileggere: daRileggere(schede).length,
-    nonSalvate: schede.filter((s) => s && s[NON_SALVATA] === true).length, valido: per('valido'), area: per('area'),
+    fuoriDalFeedback: fuori.length, valido: per('valido'), area: per('area'),
   };
 }
 
@@ -180,22 +181,19 @@ export function censimentoMancante({ via, indice, schede }) {
   ].join(' ');
 }
 
+/** L'indice con l'ora della scheda che ogni feedback ha davvero (`nelFeedback`, '' se nessuna), dalla lettura di elenca. PURA. */
+export function conSchedeNelFeedback(indice, schede) {
+  const at = new Map((schede || []).map((s) => [String(s.numero || '').replace(/^#/, ''), String((s._fonte || {}).at || '')]));
+  return (indice || []).map((f) => ({ ...f, nelFeedback: at.get(f.num) || '' }));
+}
+
 /**
- * Le schede della cartella buone e fresche che il feedback non ha (il censimento della fase 0, o un salvataggio perso):
- * si segnano da mandare, e il prossimo `scrivi` le salva senza agente. `salvate`: i numeri che la lettura ha portato con
- * la scheda. → quante segnate.
+ * Una scheda buona e fresca della cartella che non è quella del feedback va mandata. Si confronta con l'indice, mai con un
+ * segno: una scheda scritta prima di #1785, o lasciata da un comando interrotto, non ne porta. PURA.
  */
-export function segnaNonSalvate(cartella, indice, salvate) {
-  const perNum = new Map((indice || []).filter((f) => f && !f.segnalato).map((f) => [f.num, f]));
-  let segnate = 0;
-  for (const s of leggiSchede(cartella)) {
-    const num = String(s.numero || '').replace(/^#/, '');
-    const f = perNum.get(num);
-    if (!f || salvate.has(num) || s[NON_SALVATA] || s[RIFIUTATA] || s[SEGNALATA] || daScrivere(f, s)) continue;
-    writeFileSync(fileScheda(cartella, num), `${JSON.stringify({ ...s, [NON_SALVATA]: true }, null, 1)}\n`);
-    segnate += 1;
-  }
-  return segnate;
+export function fuoriDalFeedback(f, s) {
+  if (!f || !s || f.segnalato || s[SEGNALATA] || s[RIFIUTATA] || daScrivere(f, s)) return false;
+  return String((s._fonte || {}).at || '') !== String(f.nelFeedback || '');
 }
 
 /** Lancia gli agenti al più `paralleli` alla volta; `lavora(voce)` → esito. */
