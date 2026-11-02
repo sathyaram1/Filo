@@ -55,5 +55,5 @@ export function elencoIds(ids, max = 50) {
 /** La riga di un rifiuto: cosa (col numero) e perché. `motivi` = quelli che altrove sporcherebbero. PURA. */
 export function rigaRifiuto(cosa, motivi) {
   const perche = (Array.isArray(motivi) ? motivi : [motivi]).map((m) => String(m || '').trim()).filter(Boolean).join('; ') || 'testo non fidato';
-  return `RIFIUTATO nella sede owner: ${cosa}, ${perche}. Non lo stampo e il biglietto resta pulito: si legge da una sede ricerca o compiti, o dalla finestra di Filo.`;
+  return `RIFIUTATO nella sede owner: ${cosa}, ${perche}. Non stampato, e il biglietto resta pulito: si legge da una sede ricerca o compiti, o dalla finestra di Filo.`;
 }
