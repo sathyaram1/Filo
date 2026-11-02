@@ -467,7 +467,7 @@ describe('release da riga di comando', () => {
       });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
-      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo' });
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true });
     } finally { srv.close(); }
   });
 
@@ -483,7 +483,7 @@ describe('release da riga di comando', () => {
     try {
       const r = await cli(nudo, env, { ...process.env, FILO_ROUTINE: '1', FILO_TRANSCRIPT: transcript });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
-      assert.deepEqual(rilasci()[0].body, { ticket: 'tkt-cli', fault: 'motivo' });
+      assert.deepEqual(rilasci()[0].body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true });
       const d = await cli(nudo, { ...env, FILO_TRANSCRIPT: transcript });
       assert.equal(d.code, 0, `stderr: ${d.se}`);
       assert.equal(rilasci()[1].body.consumo.sessionId, 'sessione-viva', 'il transcript finto si misura: la prova sopra distingue');
@@ -518,7 +518,7 @@ describe('release da riga di comando', () => {
         FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1',
       });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
-      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli' });
+      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli', domandaAlRilascio: true });
       assert.equal(g(work, ['status', '--porcelain']), '');
     } finally {
       for (const [k, v] of Object.entries(prima)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
@@ -547,7 +547,7 @@ describe('release da riga di comando', () => {
       });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
-      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo' }, 'il consumo di chi lancia non è del rilascio provato');
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true }, 'il consumo di chi lancia non è del rilascio provato');
       assert.equal(g(work, ['status', '--porcelain']), '', 'niente di chi lancia resta nella cartella di prova');
       assert.equal(g(work, ['log', '-1', '--format=%an']), 'claude-local', 'chi committa è la prova, non la routine che la lancia');
     } finally {
