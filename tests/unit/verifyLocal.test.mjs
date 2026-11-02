@@ -979,7 +979,10 @@ test('CLI giro stretto: dopo «corretto», start consegna la chiusura solo con l
   try {
     const casa = depositoUsaEGetta();
     const env = { ...process.env, FILO_REPO_ROOT: casa, FILO_ROUTINE_CONFIG_URL: acceso.url };
-    const lancia = (...args) => spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env });
+    const lancia = (...args) => {
+      if (args[0] === 'critica') faiLaLettura(casa);
+      return spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env });
+    };
     const primo = lancia('start', 'richiesta di prova');
     assert.equal(primo.status, 0, primo.stderr);
     assert.doesNotMatch(primo.stdout, /Perimetro di questo giro/, 'il primo giro è pieno anche a interruttore acceso');
