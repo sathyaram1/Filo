@@ -61,13 +61,14 @@ export function idDelFile(sessionId, nowMs = Date.now()) {
   return ID_RE.test(s) ? s : `manuale-${Math.round(Number(nowMs) || Date.now())}`;
 }
 
-/** { ticket, fp, natoIl, trascrizione?, path } o null se il file non c'è o non ha la forma giusta. */
+/** { ticket, fp, natoIl, trascrizione?, sede?, path } o null se il file non c'è o non ha la forma giusta. */
 export function leggiFile(path) {
   try {
     const d = JSON.parse(readFileSync(path, 'utf8'));
     if (!d || typeof d.ticket !== 'string' || d.ticket.length < 32 || !FP_RE.test(String(d.fp || ''))) return null;
     const b = { ticket: d.ticket, fp: d.fp, natoIl: Number(d.natoIl) || 0, path };
     if (typeof d.trascrizione === 'string' && d.trascrizione) b.trascrizione = d.trascrizione;
+    if (typeof d.sede === 'string' && d.sede) b.sede = d.sede;
     return b;
   } catch (_) {
     return null;
@@ -75,10 +76,27 @@ export function leggiFile(path) {
 }
 
 // `trascrizione`: la trascrizione della sessione che porta il nome del file, il suo segno di vita per la scadenza.
-export function scriviFile(path, { ticket, fp, natoIl, trascrizione }) {
+// `sede`: quella in cui è nata la sessione (FILO_SEDE), il registro che gli strumenti rileggono accanto alla variabile.
+export function scriviFile(path, { ticket, fp, natoIl, trascrizione, sede }) {
   mkdirSync(resolve(path, '..'), { recursive: true });
-  const dati = Object.assign({ ticket, fp, natoIl }, trascrizione ? { trascrizione: String(trascrizione) } : {});
+  const dati = Object.assign({ ticket, fp, natoIl }, trascrizione ? { trascrizione: String(trascrizione) } : {}, sede ? { sede: String(sede) } : {});
   writeFileSync(path, `${JSON.stringify(dati, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+}
+
+/** Scrive la sede di `env` nel file del biglietto; una sede owner già scritta resta (vale la più severa). Mai un'eccezione. */
+export function registraSede(path, env = process.env) {
+  try {
+    const b = leggiFile(path);
+    if (!b || b.sede === 'owner') return;
+    const sede = nomeSede(env);
+    if (b.sede !== sede) scriviFile(path, Object.assign({}, b, { sede }));
+  } catch (_) { /* resta la variabile */ }
+}
+
+/** La sede scritta accanto al biglietto di questa sessione, '' senza. */
+export function sedeRegistrata({ env = process.env, cwd = process.cwd() } = {}) {
+  const [b] = trovaBiglietti({ env, cwd });
+  return (b && b.sede) || '';
 }
 
 // Lo sporco che il server non ha ancora ricevuto (#1211): una voce per lettura accanto al biglietto, per impronta (la
