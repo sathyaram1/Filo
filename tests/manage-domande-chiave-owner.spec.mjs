@@ -66,7 +66,7 @@ test('la risposta della chiave owner-non-fidato si distingue da quella data qui,
   // Nel dettaglio: il segno sotto l'esito, il turno «Tu, da …» non fidato, e «Riapri».
   await riga(page, 'D-60').click();
   const k = dq(page, 'D-60');
-  await expect(k.locator('.mg-dq-esito--chiave')).toHaveText(/^Risposta registrata da «filo-ricerca» (il|l’) .+, non da qui\.$/);
+  await expect(k.locator('.mg-dq-esito--chiave')).toHaveText('Risposta registrata da «filo-ricerca», non da qui.');
   await expect(k.locator('.mg-dq-esito--chiave')).toHaveAttribute('title', /Se non la ricordi, riaprila/);
   const turno = k.locator('.mg-dq-turno').first();
   await expect(turno).toHaveAttribute('data-autore', 'chiave');
@@ -88,7 +88,7 @@ test('la risposta della chiave owner-non-fidato si distingue da quella data qui,
 
   // L'archiviata dalla chiave lo dice, e si riapre come ogni archiviata.
   await riga(page, 'D-62').click();
-  await expect(dq(page, 'D-62').locator('.mg-dq-esito--chiave')).toHaveText(/^Archiviata da «filo-ricerca» /);
+  await expect(dq(page, 'D-62').locator('.mg-dq-esito--chiave')).toHaveText('Archiviata da «filo-ricerca», non da qui.');
 
   // «Riapri» sulla risposta della chiave: torna fra quelle da rispondere, senza più il segno.
   await riga(page, 'D-60').click();

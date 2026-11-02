@@ -727,7 +727,8 @@
   function daChiave(d) {
     const r = rispostaDaChiave(d);
     if (!r) return null;
-    const p = el('p', 'mg-dq-esito mg-dq-esito--chiave', `${r.archiviata ? 'Archiviata' : 'Risposta registrata'} da «${r.slug}»${r.il ? ` ${ilGiorno(r.il)}` : ''}, non da qui.`);
+    // La data la dice già l'esito sopra: qui solo chi, e che non è passata da qui.
+    const p = el('p', 'mg-dq-esito mg-dq-esito--chiave', `${r.archiviata ? 'Archiviata' : 'Risposta registrata'} da «${r.slug}», non da qui.`);
     p.title = `L’ha registrata una sessione con la chiave «${r.slug}», che legge testo di chiunque. Se non la ricordi, riaprila.`;
     return p;
   }
