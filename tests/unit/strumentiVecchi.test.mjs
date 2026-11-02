@@ -223,7 +223,9 @@ async function giroCon(p, busta) {
 
 const BUSTA_NUOVA = { ok: true, role: 'capo', id: '', num: '', branch: '', payload: { compito: 'D-121' } };
 
-test('dispatch: ruolo sconosciuto con strumenti indietro → halt «strumenti_vecchi», rilascio SENZA guasto', async () => {
+// Il server riconosce il rilascio di una sessione vecchia dal motivo `strumenti_vecchi:` o dal testo del dispatch di prima
+// («ruolo che questa versione non sa eseguire»): rimette il lavoro in coda senza fermo e chiude la sessione (#1796, lato server).
+test('dispatch: ruolo sconosciuto con strumenti indietro → halt «strumenti_vecchi», rilascio col motivo che il server riconosce', async () => {
   const p = progetto();
   p.fondi('routines/roles/capo.md', 'il ruolo nuovo\n');
   const r = await giroCon(p, BUSTA_NUOVA);
@@ -232,8 +234,7 @@ test('dispatch: ruolo sconosciuto con strumenti indietro → halt «strumenti_ve
   assert.equal(r.json.payload.kind, 'strumenti_vecchi');
   assert.match(r.json.payload.message, /non sa eseguire \("capo"\).*sono cambiati.*torna in coda/);
   const t = r.json.instructions.replace(/\s+/g, ' ');
-  assert.match(t, /release <biglietto> --role halt ```/, 'il rilascio senza niente dopo il ruolo');
-  assert.doesNotMatch(t, /--role halt --guasto/, 'un guasto dichiarato fermerebbe per un\'ora tutte le routine');
+  assert.match(t, /release <biglietto> --role halt --guasto "strumenti_vecchi: <message del payload>"/, 'il motivo che il server non ferma');
   assert.ok(t.indexOf('domanda --biglietto <biglietto>') < t.indexOf('release <biglietto> --role halt'), 'la domanda di fine sessione prima del rilascio');
   assert.ok(!/<!--\s*includi:/.test(r.json.instructions));
   assert.match(r.se, /STRUMENTI VECCHI, non è un guasto/);
@@ -246,7 +247,8 @@ test('dispatch: ruolo sconosciuto con gli strumenti di main resta un guasto (il 
   assert.equal(r.code, 3, r.se);
   assert.equal(r.json.role, 'halt');
   assert.equal(r.json.payload.kind, 'transient');
-  assert.match(r.json.payload.message, /non sa eseguire \("capo"\)/);
+  assert.match(r.json.payload.message, /nemmeno main conosce \("capo"\)/);
+  assert.doesNotMatch(r.json.payload.message, /questa versione non sa eseguire|strumenti_vecchi/, 'il server lo prenderebbe per una sessione vecchia e non lo fermerebbe');
   assert.match(r.json.instructions.replace(/\s+/g, ' '), /release <biglietto> --role halt --guasto/);
 });
 
