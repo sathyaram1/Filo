@@ -4,13 +4,14 @@
 
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pinnedRepoRoot } from './lib/tools-pin.mjs';
+import { absolutizeOutput, pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { testoDelConto } from './lib/conta-prove.mjs';
 import { contaDelLavoro, estremiDelLavoro } from './lib/lettura-diff.mjs';
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
   const root = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : (pinnedRepoRoot() || resolve(dirname(fileURLToPath(import.meta.url)), '..'));
+  absolutizeOutput(root);
   const argv = process.argv.slice(2);
   const o = { json: false };
   for (let i = 0; i < argv.length; i++) {
