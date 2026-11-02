@@ -1172,6 +1172,7 @@
       toastHostEl = document.createElement('div');
       toastHostEl.className = 'sn-toasts';
       toastHostEl.classList.toggle('sn-toasts-sotto-menu', pilaSottoMenu);
+      toastHostEl.classList.toggle('sn-toasts-accanto-aiuto', pilaAccantoAiuto);
       global.SN_FILO_UI?.mark(toastHostEl);
       document.documentElement.appendChild(toastHostEl);
     }
@@ -1184,6 +1185,14 @@
   function sottoIlMenu(on) {
     pilaSottoMenu = !!on;
     if (toastHostEl) toastHostEl.classList.toggle('sn-toasts-sotto-menu', pilaSottoMenu);
+  }
+
+  // Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3) e la regola di sidebar.css non lo vede: è lui a dire
+  // quando è nel suo angolo, e la pila gli si mette a sinistra come nel documento (#845).
+  let pilaAccantoAiuto = false;
+  function accantoAllAiuto(on) {
+    pilaAccantoAiuto = !!on;
+    if (toastHostEl) toastHostEl.classList.toggle('sn-toasts-accanto-aiuto', pilaAccantoAiuto);
   }
 
   // Sfratta subito (senza attendere il timeout) gli avvisi più vecchi oltre il
@@ -1371,6 +1380,7 @@
     mountToast,
     unmountToast,
     sottoIlMenu,
+    accantoAllAiuto,
     tempoAvviso,
     attachZoomCompensation,
     renderMarkdown,

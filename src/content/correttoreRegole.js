@@ -48,19 +48,30 @@
     };
   }
 
+  // Il nome dell'app e il suo sito non sono mai errori, nemmeno per il modello (#1655): «Filo» a metà frase non è il
+  // filo da cucire scritto maiuscolo.
+  const ZONE_DI_FILO = [
+    /(?<![\p{L}\p{N}'’-])(?:Filo|FILO)(?:['’]s)?(?![\p{L}\p{N}'’-])/gu,
+    /(?<![\p{L}\p{N}._-])(?:[\p{L}\p{N}-]+\.)*filo\.red(?:\/\S*)?(?![\p{L}\p{N}_-])/giu,
+  ];
   // Indirizzi, email, menzioni, etichette e codice fra apici inversi: lì una «parola» non è una parola da correggere.
+  // Anche un dominio senza indirizzo intorno («amazon.it», #1655), col suffisso minuscolo e non di sole x: «andato.Poi»
+  // è uno spazio dimenticato, «x.xxx» un numero da cercare.
   const ZONE = [
     /\b(?:https?:\/\/|www\.)[^\s<>"]+/giu,
     /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/gu,
     /(?<![\p{L}\p{N}])[@#][\p{L}\p{N}_]+/gu,
     /`[^`\n]+`/g,
     /(?<![\p{L}\p{N}@])[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+\/\S*/gu,
+    /(?<![\p{L}\p{N}@._%+-])(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+(?!x+(?![\p{L}\p{N}]))\p{Ll}{2,}(?![\p{L}\p{N}_-]|\.[\p{L}\p{N}])/gu,
+    ...ZONE_DI_FILO,
   ];
-  function zoneEscluse(testo) {
+  function zoneDi(testo, lista) {
     const out = [];
-    for (const re of ZONE) for (const m of testo.matchAll(re)) out.push([m.index, m.index + m[0].length]);
+    for (const re of lista) for (const m of String(testo ?? '').matchAll(re)) out.push([m.index, m.index + m[0].length]);
     return out;
   }
+  const zoneEscluse = (testo) => zoneDi(testo, ZONE);
 
   function parole(testo) {
     const out = [];
@@ -440,6 +451,44 @@
     return { da: p, a: pezzo.length - s, sostituto: correzione.slice(p, correzione.length - s) };
   }
 
+  // `restringi` sul pezzo com'è nel testo (`visto`): pezzo e correzione si confrontano a spazi compressi e apici dritti,
+  // così uno spazio citato in più non incolla due parole («oggisono») e un apice curvo non allarga il segno a tutto il
+  // pezzo (#1580.2). Le posizioni sono in `visto`.
+  const unSoloSpazio = (s) => String(s ?? '').trim().replace(/\s+/g, ' ');
+  const apiciDritti = (s) => s.replace(/[‘’‚‛]/g, "'").replace(/[“”„]/g, '"');
+  function restringiNelTesto(pezzo, correzione, visto) {
+    const p = unSoloSpazio(pezzo);
+    const c = unSoloSpazio(correzione);
+    const stretto = restringi(apiciDritti(p), apiciDritti(c));
+    if (!stretto) return null;
+    const pos = posizioniNelTesto(p, String(visto ?? ''));
+    return { da: pos[stretto.da], a: pos[stretto.a], sostituto: c.slice(stretto.da, c.length - (p.length - stretto.a)) };
+  }
+
+  // La correzione con gli apici e le virgolette di chi scrive, non con quelli del modello: «l’albro» diventa «l’albero»
+  // (#1690). Lo stile è quello del pezzo segnato; se lì non ce n'è, quello del campo; misto, la correzione resta com'è.
+  function comeGliApici(sostituto, scritto, testo, primaDelPezzo = '') {
+    const stile = (dritto, curvo) => {
+      for (const s of [scritto, testo]) {
+        const d = dritto.test(s);
+        const c = curvo.test(s);
+        if (d !== c) return c ? 'curvo' : 'dritto';
+        if (d) return '';
+      }
+      return '';
+    };
+    let out = String(sostituto ?? '');
+    const apice = stile(/'/, /[‘’]/);
+    if (apice === 'curvo') out = out.replace(/'/g, '’');
+    else if (apice === 'dritto') out = out.replace(/[‘’]/g, "'");
+    const virgolette = stile(/"/, /[“”]/);
+    if (virgolette === 'dritto') out = out.replace(/[“”]/g, '"');
+    else if (virgolette === 'curvo') {
+      out = out.replace(/"/g, (_m, i, s) => (/^$|[\s([{«“‘]/.test(i ? s[i - 1] : String(primaDelPezzo || '')) ? '“' : '”'));
+    }
+    return out;
+  }
+
   // Le x dentro il pezzo che il modello ha copiato («di soli xx» → «xx»): { da, a } nel pezzo, o null.
   function xDelPezzo(pezzo) {
     for (const m of String(pezzo).matchAll(GRUPPO_X)) {
@@ -454,12 +503,12 @@
   function segnoDelSegnaposto(r, testo, dove, fonte) {
     const base = { segno: 'suggerimento', dubbio: false, fonte, tipo: 'segnaposto', citazione: '' };
     const pezzo = r.pezzo.trim();
-    const pos = posizioniNelTesto(pezzo, testo.slice(dove.start, dove.end));
+    const visto = testo.slice(dove.start, dove.end);
     if (r.tipo === 'segnaposto') {
-      const stretto = r.correzione.trim() ? restringi(pezzo, r.correzione.trim()) : null;
+      const stretto = r.correzione.trim() ? restringiNelTesto(pezzo, r.correzione, visto) : null;
       if (!stretto) return null;
-      const start = dove.start + pos[stretto.da];
-      const end = dove.start + pos[stretto.a];
+      const start = dove.start + stretto.da;
+      const end = dove.start + stretto.a;
       const valore = stretto.sostituto.trim();
       if (end <= start || !/x/i.test(testo.slice(start, end)) || !valore || /xx/i.test(valore)) return null;
       return { ...base, start, end, segment: testo.slice(start, end), motivo: corta(r.motivo, MOTIVO_MAX), correzioni: [valore] };
@@ -468,6 +517,7 @@
     const dc = DOVE_CERCARE.exec(r.citazione.toLowerCase());
     const domanda = corta(r.motivo, 200);
     if (!x || !dc || !domanda) return null;
+    const pos = posizioniNelTesto(pezzo, visto);
     const start = dove.start + pos[x.da];
     const end = dove.start + pos[x.a];
     return {
@@ -541,6 +591,7 @@
     const ammessi = new Set(tipi);
     const segni = [];
     const giusti = [];
+    const diFilo = zoneDi(testo, ZONE_DI_FILO);
     for (const r of leggiRighe(raw)) {
       const tipo = r.tipo || senzaTipo;
       if (!ammessi.has(tipo) && tipo !== 'giusto') continue;
@@ -560,11 +611,11 @@
       let correzioni = [];
       const correzione = r.correzione.trim();
       if (correzione || errore) {
-        const stretto = correzione && formaLetta(correzione) === formaLetta(pezzo) ? null : restringi(pezzo, correzione ? r.correzione : '');
+        const stretto = correzione && formaLetta(correzione) === formaLetta(pezzo) ? null
+          : restringiNelTesto(pezzo, correzione, testo.slice(dove.start, dove.end));
         if (stretto) {
-          const pos = posizioniNelTesto(pezzo, testo.slice(dove.start, dove.end));
-          start = dove.start + pos[stretto.da];
-          end = dove.start + pos[stretto.a];
+          start = dove.start + stretto.da;
+          end = dove.start + stretto.a;
           correzioni = [stretto.sostituto];
         } else if (errore) continue;
       }
@@ -572,9 +623,11 @@
       if (end <= start || !testo.slice(start, end).trim()) {
         start = dove.start;
         end = dove.end;
-        if (correzioni.length) correzioni = [correzione];
+        if (correzioni.length) correzioni = [unSoloSpazio(correzione)];
       }
       if (inScrittura && start < inScrittura.end && end > inScrittura.start) continue;
+      if (diFilo.some(([a, b]) => start >= a && end <= b)) continue;
+      if (correzioni.length) correzioni = [comeGliApici(correzioni[0], testo.slice(start, end), testo, testo[start - 1])];
       // Una minuscola dove la correzione vuole la maiuscola non è un errore: un nome scritto minuscolo o si corregge
       // da sé (correttoreAutomatica.js) o si lascia stare (#1447).
       if (errore && correzioni.length && soloPiuMaiuscole(testo.slice(start, end), correzioni[0])) continue;

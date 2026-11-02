@@ -83,6 +83,18 @@
   let pendingFiles = [];
   // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
   let testoDaFuori = false;
+  // #892.5 — le righe che il campo ha avuto da fuori: svuotato e riportato con Annulla, un testo incollato lo resta.
+  // Si tengono le impronte, non i testi; un'impronta uguale per caso chiede di più, mai di meno.
+  const righeDaFuori = new Set();
+  const impronta = (s) => {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return `${s.length}:${h >>> 0}`;
+  };
+  const ricordaDaFuori = (s) => {
+    righeDaFuori.add(impronta(s));
+    if (righeDaFuori.size > 2000) righeDaFuori.delete(righeDaFuori.values().next().value);
+  };
   // Il testo del Ctrl+V nativo: l'evento `input` che segue non lo porta con sé (#968).
   let testoIncollato = null;
   const percorsiImmagini = new Map();
@@ -248,6 +260,7 @@
       if (inputEl.value.trim()) return;
       inputEl.value = testo;
       testoDaFuori = !!incollato;
+      if (incollato) ricordaDaFuori(testo);
       autoGrowInput();
       Comandi.updateInputClass();
       inputEl.focus();
@@ -781,7 +794,7 @@
     // in chat come suo, non come parole dell'utente né come comando con la barra.
     // Una pagina di Filo non è un'uscita: la porta delle uscite la rifiuterebbe e il clic non farebbe niente.
     if (type === 'NAVIGA' && /^filo:\/\//i.test(String(a.url || ''))) {
-      send({ type: MSG.OPEN_URL, url: a.url });
+      send({ type: MSG.OPEN_URL, url: a.url, via: 'chat' });
     } else if (type === 'NAVIGA' && a.url) {
       apriProposta(a.url, vicino, s.chiedeOk || '');
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
@@ -902,7 +915,7 @@
     if (!url) return;
     e.preventDefault();
     e.stopPropagation();
-    send({ type: MSG.OPEN_URL, url });
+    send({ type: MSG.OPEN_URL, url, via: 'chat' });
   });
 
   // ===== Invio messaggio =====
@@ -1650,7 +1663,7 @@
     const testi = tornati.map((c) => c.scritto.trim()).filter(Boolean);
     const bozza = inputEl.value.trim() ? [inputEl.value] : [];
     inputEl.value = [...testi, ...bozza].join('\n');
-    if (tornati.some((c) => c.incollato)) testoDaFuori = true;
+    if (tornati.some((c) => c.incollato)) { testoDaFuori = true; ricordaDaFuori(inputEl.value); }
     for (const c of tornati) {
       for (const d of c.immagini) addPendingImage(d, c.percorsi.get(d));
       for (const f of c.file) addPendingFile(f.percorso);
@@ -2064,6 +2077,8 @@
   inputEl.addEventListener('input', (e) => {
     if (!inputEl.value) testoDaFuori = false;
     else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDaFuori = true;
+    else if ((e.inputType === 'historyUndo' || e.inputType === 'historyRedo') && righeDaFuori.has(impronta(inputEl.value))) testoDaFuori = true;
+    if (testoDaFuori && inputEl.value) ricordaDaFuori(inputEl.value);
     Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); preparaSaldo(); aggiornaTasto();
     // Ctrl+V porta il testo nell'evento `paste`, l'Incolla del menu di Filo in `data`.
     if (e.inputType === 'insertFromPaste') {
@@ -2501,7 +2516,18 @@
     doneBtn.className = 'dash-recap-btn dash-recap-done';
     doneBtn.textContent = 'Fatto';
     doneBtn.addEventListener('click', close);
-    footer.append(shareBtn, doneBtn);
+    // Il recap dice solo cosa è arrivato adesso: le versioni di prima stanno nella pagina Novità.
+    const tutteBtn = document.createElement('button');
+    tutteBtn.type = 'button';
+    tutteBtn.className = 'dash-recap-btn dash-recap-tutte';
+    tutteBtn.id = 'recapTutte';
+    tutteBtn.textContent = 'Tutte le novità';
+    tutteBtn.title = 'Le novità di tutte le versioni, da cercare';
+    tutteBtn.addEventListener('click', () => {
+      send({ type: MSG.OPEN_URL, url: 'filo://novita/novita.html' });
+      close();
+    });
+    footer.append(shareBtn, tutteBtn, doneBtn);
     box.appendChild(footer);
 
     document.body.appendChild(overlay);

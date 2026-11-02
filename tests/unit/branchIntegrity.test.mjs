@@ -142,6 +142,29 @@ describe('A — posizionarsi sul branch (prepareBranch)', () => {
     assert.equal(r.ok, false, 'riusare un nome riporterebbe il guasto che il nome unico elimina');
   });
 
+  // Il ramo del biglietto (#1632): il nome è già deciso, si riprende se c'è e nasce solo se non c'è da nessuna parte.
+  test('ramo del biglietto solo in locale: si riprende, non si rifà da main', () => {
+    const { work } = makeRepo();
+    git(work, ['checkout', '-q', '-b', 'worker/del-biglietto']);
+    const sha = commit(work, 'locale.txt', 'non spinto\n');
+    git(work, ['checkout', '-q', 'main']);
+    const r = prepareBranch({ root: work, branch: 'worker/del-biglietto', createIfMissing: true, checkpoint: sha });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.ripreso, true);
+    assert.equal(currentBranch(work), 'worker/del-biglietto');
+    assert.equal(r.head, sha);
+  });
+
+  test('ramo del biglietto con origin che non risponde: guasto temporaneo, niente ramo nato da main', () => {
+    const { work, base } = makeRepo();
+    git(work, ['remote', 'set-url', 'origin', resolve(base, 'non-esiste.git')]);
+    const r = prepareBranch({ root: work, branch: 'worker/del-biglietto', createIfMissing: true });
+    assert.equal(r.ok, false);
+    assert.equal(r.kind, 'transient', 'con la rete giù non si sa se il ramo c\'è: si riprova, non si rifà');
+    assert.equal(currentBranch(work), 'main');
+    assert.equal(git(work, ['branch', '--list', 'worker/*']), '');
+  });
+
   // Gli endpoint di fusione del server rifiutano già `main`; qui il controllo
   // mancava, e la directory poteva essere posizionata sulla linea principale
   // per PRODURRE. Il lavoro fatto lì non ha modo di arrivare agli utenti (il

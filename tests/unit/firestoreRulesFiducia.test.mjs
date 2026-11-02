@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
-const VIETATI = ['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo'];
+const VIETATI = ['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'riservato', 'tipo', 'unitoIn'];
 
 function bloccoFeedback() {
   const da = RULES.indexOf('match /feedback/{');

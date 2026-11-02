@@ -49,12 +49,12 @@
     '/clear': () => { goHome({ nuova: true }); },
     '/clear all': () => { send({ type: MSG.CLOSE_ALL_TABS }); },
     '/kill': () => { send({ type: MSG.QUIT_APP }); },
-    '/newtab': () => { send({ type: MSG.OPEN_URL, url: 'filo://newtab/' }); },
-    '/models': () => { send({ type: MSG.OPEN_OPTIONS }); },
-    '/modelli': () => { send({ type: MSG.OPEN_OPTIONS }); },
-    '/sicurezza': () => { send({ type: MSG.OPEN_URL, url: 'filo://security/security.html' }); },
-    '/preferenze': () => { send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html' }); },
-    '/editor': () => { send({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }); },
+    '/newtab': () => { send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://newtab/' }); },
+    '/models': () => { send({ type: MSG.OPEN_OPTIONS, via: 'comando_slash' }); },
+    '/modelli': () => { send({ type: MSG.OPEN_OPTIONS, via: 'comando_slash' }); },
+    '/sicurezza': () => { send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://security/security.html' }); },
+    '/preferenze': () => { send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://preferences/preferences.html' }); },
+    '/editor': () => { send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://editor/editor.html' }); },
     // #583 — apre la POSTA delle segnalazioni, che legge solo chi le gestisce:
     // a chiunque altro darebbe una pagina vuota. Chi vuole MANDARE un feedback
     // lo fa dal menu del tasto destro → "Invia feedback", oppure chiedendolo a
@@ -63,10 +63,10 @@
       if (!isOwner) {
         // #986 — chi cerca le sue segnalazioni ci arriva, non legge solo dove sono.
         showFiloLine('I feedback li vede chi li gestisce: ti apro quelli che hai mandato tu. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
-        send({ type: MSG.OPEN_URL, url: 'filo://board/board.html#segnalazioni' });
+        send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://board/board.html#segnalazioni' });
         return;
       }
-      send({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' });
+      send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://feedback/feedback.html' });
     },
     '/incognito': () => { send({ type: MSG.OPEN_INCOGNITO }); },
     '/pulisci': (text, chat) => { runTabCleanup(chat); },
@@ -319,7 +319,7 @@
   // basta, senza riportare a schermo una chat che l'utente aveva chiuso.
   async function handleInviteCommand(text, chat) {
     const resto = String(text || '').trim().replace(/^\/invito/i, '').trim();
-    if (!resto) { send({ type: MSG.OPEN_URL, url: 'filo://credits/credits.html' }); return; }
+    if (!resto) { send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://credits/credits.html' }); return; }
     let r = null;
     try { r = await send({ type: MSG.WALLET_REDEEM, code: resto }); } catch (_) { r = null; }
     showFiloLine((r && r.message) || 'Non ci sono riuscito: riprova.', chat);
@@ -508,7 +508,10 @@
     if (/^\$[\p{L}_{(]/u.test(s) || s.startsWith('`') || /^\[[\p{L}\p{N}_.]+\]::/u.test(s)) return SINTASSI;
     const V = global.SN_VIRGOLETTE;
     if (V && /^["']/.test(s)) return V.primoComando(s);
-    return s.split(/[\s|<>;&(){}`]/)[0] || '';
+    const nome = s.split(/[\s|<>;&(){}`]/)[0] || '';
+    // «:)» e «:(» sono faccine, non il `:` della shell attaccato a una parentesi (#892.5).
+    if (!/[\p{L}\p{N}]/u.test(nome) && /[()]/.test(s.charAt(nome.length))) return '';
+    return nome;
   }
 
   // Verifica (con debounce) se il primo token è un comando shell esistente e
@@ -609,9 +612,10 @@
       btn.disabled = true;
       if (unresolvedLine && unresolvedLine.el === bubble) unresolvedLine = null;
       if (nonRisoltoInAttesa === bubble) { nonRisoltoInAttesa = null; contaComando('sito_non_risolto', 'apri_lo_stesso'); }
-      // L'utente ha deciso: da qui in poi quell'host non viene più messo in
-      // dubbio (niente rosso, niente avviso al prossimo invio).
+      // L'utente ha deciso: da qui in poi quel sito non viene più messo in dubbio, in ogni scheda e dopo un
+      // riavvio: entra fra i siti di cui si fida (#967).
       siteResolveCache.set(host, true);
+      send({ type: MSG.SITI_FIDATI_IMPOSTA, fidato: true, indirizzo: host, avvisa: true });
       send({ type: MSG.OPEN_URL, url: siteUrlOf(text), parole: [text] });
       if (inputEl.value.trim() === text) { inputEl.value = ''; autoGrowInput(); }
       updateInputClass();

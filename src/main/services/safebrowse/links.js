@@ -37,7 +37,7 @@ function esaminaLink(url, checkSync, nome = '') {
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
   const v = checkSync(u.href, { urlPath: percorsoDi(u, nome) });
   if (!v || !LIVELLI.has(v.level)) return null;
-  return { url: u.href, level: v.level, message: v.message || null, scope: v.scope || (v.norm && v.norm.registrable) || null };
+  return { url: u.href, level: v.level, message: v.message || null, scope: v.scope || (v.norm && v.norm.registrable) || null, diPagina: !!v.diPagina };
 }
 
 // Un lotto da `da` in poi, finché `scaduto()` lo permette (almeno un link a giro, così si va sempre avanti).

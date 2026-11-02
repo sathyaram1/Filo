@@ -8,7 +8,7 @@ import { rigaSporco } from './lib/biglietto-locale.mjs';
 
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineClosingAdmin';
 // Gli slot li decide il server (gli altri li rifiuta con `bad_slot`): qui servono solo all'aiuto.
-const SLOT = 'orchestrator, worker, new-work, fixer, verifier, secaudit';
+const SLOT = 'tutti, orchestrator, worker, new-work, fixer, verifier, secaudit, compito, compito:<ricorrente> (per esempio compito:riordino)';
 const USO = 'Uso: node scripts/routine-domanda.mjs [mostra | imposta <slot> "<testo>" (o il testo da stdin) | togli <slot> | risposte [--n N]]'
   + `\nslot: ${SLOT}`;
 
@@ -116,7 +116,7 @@ export function formattaDomande(result) {
   const nomi = Object.keys(slots).sort();
   const righe = nomi.map((s) => `${visibile(s)}\n  ${visibile((slots[s] && slots[s].text) || '').replace(/\n/g, '\n  ')}`);
   if (!nomi.length) righe.push('Nessuna domanda impostata: vale per tutti il ripiego.');
-  righe.push(`ripiego (orchestratore senza slot suo; worker senza slot del ruolo né «worker»)\n  ${visibile(r.default || '?').replace(/\n/g, '\n  ')}`);
+  righe.push(`ripiego (orchestratore senza slot suo; worker senza slot del ricorrente, del ruolo, «worker»; poi «tutti»)\n  ${visibile(r.default || '?').replace(/\n/g, '\n  ')}`);
   return righe.join('\n\n');
 }
 

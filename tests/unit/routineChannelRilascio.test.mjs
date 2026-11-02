@@ -435,6 +435,27 @@ describe('release da riga di comando', () => {
     } finally { srv.close(); }
   });
 
+  // Un push a mano in cloud resta fermo sul controllo dei permessi (#1797): in routine la strada è il guasto, e regge.
+  test('push fallito in una routine: niente push a mano, e il rilascio col guasto che suggerisce passa', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { work } = scena();
+    try {
+      g(work, ['checkout', '-q', '-b', 'worker/11b']);
+      g(work, ['remote', 'set-url', 'origin', resolve(work, 'non-esiste.git')]);
+      commitFile(work, 'lavoro.js');
+      const env = { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1', FILO_ROUTINE: '1' };
+      const r = await cli(['release', 'tkt-cli'], env);
+      assert.notEqual(r.code, 0);
+      assert.match(r.se, /Non spingere a mano/);
+      assert.doesNotMatch(r.se, /sistema il push/);
+      assert.match(r.se, /--guasto "guasto: github: [^"]*" --senza-push/);
+      const g2 = await cli(['release', 'tkt-cli', '--guasto', 'guasto: github: push rifiutato', '--senza-push'], env);
+      assert.equal(g2.code, 0, `stderr: ${g2.se}`);
+      assert.match(g2.so, /guasto dichiarato/);
+      assert.equal(ricevute.filter((x) => x.url.includes('routineRelease')).length, 1);
+    } finally { srv.close(); }
+  });
+
   test('--senza-push e --senza-rapporto: rilascio nudo, come prima', async () => {
     const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
     const { work } = scena();
@@ -446,7 +467,7 @@ describe('release da riga di comando', () => {
       });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
-      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo' });
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true });
     } finally { srv.close(); }
   });
 
@@ -462,7 +483,7 @@ describe('release da riga di comando', () => {
     try {
       const r = await cli(nudo, env, { ...process.env, FILO_ROUTINE: '1', FILO_TRANSCRIPT: transcript });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
-      assert.deepEqual(rilasci()[0].body, { ticket: 'tkt-cli', fault: 'motivo' });
+      assert.deepEqual(rilasci()[0].body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true });
       const d = await cli(nudo, { ...env, FILO_TRANSCRIPT: transcript });
       assert.equal(d.code, 0, `stderr: ${d.se}`);
       assert.equal(rilasci()[1].body.consumo.sessionId, 'sessione-viva', 'il transcript finto si misura: la prova sopra distingue');
@@ -497,7 +518,7 @@ describe('release da riga di comando', () => {
         FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1',
       });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
-      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli' });
+      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli', domandaAlRilascio: true });
       assert.equal(g(work, ['status', '--porcelain']), '');
     } finally {
       for (const [k, v] of Object.entries(prima)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
@@ -526,7 +547,7 @@ describe('release da riga di comando', () => {
       });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
-      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo' }, 'il consumo di chi lancia non è del rilascio provato');
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true }, 'il consumo di chi lancia non è del rilascio provato');
       assert.equal(g(work, ['status', '--porcelain']), '', 'niente di chi lancia resta nella cartella di prova');
       assert.equal(g(work, ['log', '-1', '--format=%an']), 'claude-local', 'chi committa è la prova, non la routine che la lancia');
     } finally {
@@ -539,7 +560,7 @@ describe('release da riga di comando', () => {
 // ─── Giro 2 della verifica (16/09/2026): il lease dopo un fetch ─────────────
 // --force-with-lease senza valore atteso si fida del ref remoto che la copia
 // conosce: dopo un `git fetch` quel ref è già il commit dell'altro, il lease
-// combacia e il rinvio lo sovrascrive. --force-if-includes lo rifiuta.
+// combacia e il rinvio lo sovrascrive. Il valore atteso, che deve essere passato dal reflog del ramo, lo rifiuta.
 test('qualcun altro ha spinto E questa copia lo ha già scaricato con un fetch: il rinvio NON sovrascrive il suo commit', () => {
   const { base, origin, work } = scena();
   g(work, ['checkout', '-q', '-b', 'worker/9']);
@@ -557,6 +578,80 @@ test('qualcun altro ha spinto E questa copia lo ha già scaricato con un fetch: 
   const r = pushRamoCorrente(work);
   assert.equal(r.ok, false, `il push doveva essere rifiutato: ${JSON.stringify(r)}`);
   assert.equal(remoteSha(origin, 'worker/9'), b, 'il commit dell\'altro resta su origin');
+});
+
+// ─── #1776: il clone delle routine nasce senza reflog delle tracce remote ────
+// --force-if-includes lo rifiutava sempre («remote ref updated since checkout»): il riallineamento non arrivava.
+function cloneDelGiro(base, origin, ramo, nome) {
+  const copia = resolve(base, nome);
+  g(base, ['clone', '-q', origin, copia]);
+  g(copia, ['checkout', '-q', ramo]);
+  return copia;
+}
+function ramoSuOriginEMainAvanti(nome) {
+  const { base, origin, work } = scena();
+  g(work, ['checkout', '-q', '-b', nome]);
+  commitFile(work, 'lavoro.js');
+  g(work, ['push', '-q', 'origin', nome]);
+  g(work, ['checkout', '-q', 'main']);
+  commitFile(work, 'main-avanti.js');
+  g(work, ['push', '-q', 'origin', 'main']);
+  return { base, origin, work };
+}
+
+test('#1776 clone appena nato, ramo riallineato a main: il rilascio lo spedisce', () => {
+  const { base, origin } = ramoSuOriginEMainAvanti('worker/11');
+  const copia = cloneDelGiro(base, origin, 'worker/11', 'giro');
+  assert.throws(() => g(copia, ['reflog', 'exists', 'refs/remotes/origin/worker/11']),
+    'la condizione del difetto: la traccia remota non ha reflog');
+  g(copia, ['fetch', '-q', 'origin', 'main']);
+  g(copia, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'rebase', '-q', 'origin/main']);
+  const r = pushRamoCorrente(copia);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.forced, true);
+  assert.equal(remoteSha(origin, 'worker/11'), g(copia, ['rev-parse', 'HEAD']), 'su origin c\'è il ramo riallineato');
+  assert.ok(g(origin, ['ls-tree', '--name-only', 'worker/11']).includes('main-avanti.js'));
+});
+
+test('#1776 clone appena nato, e qualcun altro ha spinto sul ramo prima del fetch: il suo commit resta', () => {
+  const { base, origin } = ramoSuOriginEMainAvanti('worker/12');
+  const copia = cloneDelGiro(base, origin, 'worker/12', 'giro');
+  const altro = cloneDelGiro(base, origin, 'worker/12', 'altro');
+  commitFile(altro, 'di-un-altro.js');
+  g(altro, ['push', '-q', 'origin', 'worker/12']);
+  const suo = g(altro, ['rev-parse', 'HEAD']);
+  g(copia, ['fetch', '-q', 'origin']);
+  g(copia, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'rebase', '-q', 'origin/main']);
+  const r = pushRamoCorrente(copia);
+  assert.equal(r.ok, false, JSON.stringify(r));
+  assert.match(r.reason, /qualcun altro ha spinto/);
+  assert.equal(remoteSha(origin, 'worker/12'), suo, 'il commit dell\'altro resta su origin');
+});
+
+test('#1776 la traccia remota è un antenato di un commit passato dal ramo, anche oltre i primi 200 del reflog: si spedisce', () => {
+  const { origin, work } = scena();
+  const radice = g(work, ['rev-parse', 'main']);
+  g(work, ['checkout', '-q', '--detach']);
+  commitFile(work, 'a.js');
+  const a = g(work, ['rev-parse', 'HEAD']);
+  commitFile(work, 'b.js');
+  const b = g(work, ['rev-parse', 'HEAD']);
+  g(work, ['push', '-q', 'origin', `${a}:refs/heads/worker/13`]);
+  g(work, ['fetch', '-q', 'origin']);
+  g(work, ['checkout', '-q', '-b', 'worker/13', b]);
+  // 250 commit distinti che non contengono a: il passato che lo contiene finisce nel secondo blocco.
+  const flusso = Array.from({ length: 250 }, (_, i) => `commit refs/heads/riempitivo\ncommitter t <t@t> ${1700000000 + i} +0000\ndata ${String(i).length}\n${i}\n${i ? '' : `from ${radice}\n`}\n`).join('');
+  execFileSync('git', ['fast-import', '--quiet'], { cwd: work, input: flusso, stdio: ['pipe', 'pipe', 'pipe'] });
+  const riempitivi = g(work, ['rev-list', 'riempitivo', `^${radice}`]).split('\n');
+  assert.equal(riempitivi.length, 250);
+  const log = resolve(work, '.git', 'logs', 'refs', 'heads', 'worker', '13');
+  writeFileSync(log, readFileSync(log, 'utf8') + riempitivi.map((s) => `${b} ${s} t <t@t> 1700000000 +0000\triempitivo\n`).join(''), 'utf8');
+  g(work, ['reset', '-q', '--hard', radice]);
+  commitFile(work, 'c.js');
+  assert.equal(mod.leaseAtteso(work, 'worker/13'), a);
+  const r = pushRamoCorrente(work);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(remoteSha(origin, 'worker/13'), g(work, ['rev-parse', 'HEAD']));
 });
 
 // ─── commitRestante nel mezzo di un conflitto ────────────────────────────────

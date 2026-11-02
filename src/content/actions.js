@@ -612,6 +612,11 @@
         entry.arrivata = true;
         // Fermata dal tetto o da una pagina delicata (#1274): al tasto destro si chiede davvero.
         if (res && (res.code === 'TROPPE_AUTOMATICHE' || res.code === 'PAGINA_DELICATA')) entry.fermata = true;
+        // Il livello di privacy nella famiglia degli anticipi (#1586): la spiegazione che la pagina delicata non lascia preparare.
+        if (res && res.code === 'PAGINA_DELICATA') {
+          entry.perPrivacy = true;
+          contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'saltato' });
+        }
         // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
         return (res?.ok && typeof res.text === 'string')
           ? { text: res.text, keyFallback: res.keyFallback || null }
@@ -646,11 +651,19 @@
     const pre = prefetchedExplain;
     const stessa = !!pre && pre.key === key;
     const primaApertura = stessa && !!pre.anticipata && !pre.aperta;
+    // Fermato da una pagina delicata, l'anticipo non è del tetto: è il gesto che il livello di privacy costa, e
+    // «Chiedi» lo conta come quello dell'anticipo spento (#1586).
+    const fermata = () => {
+      if (!pre.perPrivacy) return 'fermato_tetto';
+      contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'chiesto' });
+      Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
+      return '';
+    };
     if (stessa) pre.aperta = true;
     if (stessa && !pre.fermata) {
       const stato = !primaApertura ? '' : pre.sentence !== selInfo.sentence ? 'contesto_cambiato' : pre.arrivata ? 'pronto' : 'in_volo';
       return pre.promise.then((res) => {
-        if (pre.fermata) return chiedi(primaApertura ? 'fermato_tetto' : '');
+        if (pre.fermata) return chiedi(primaApertura ? fermata() : '');
         if (stato) anticipo(stato);
         // Preparata e aperta: per i crediti non è una chiamata sprecata (#818). Una fermata non è partita.
         const primaVolta = !!pre.anticipata && !pre.usata;
@@ -662,7 +675,7 @@
         return { ...res, giaChiesta: true, anticipata: primaVolta && !!res && !res.errore && !!res.text };
       });
     }
-    return chiedi(primaApertura ? 'fermato_tetto' : stessa ? '' : 'assente');
+    return chiedi(primaApertura ? fermata() : stessa ? '' : 'assente');
   }
 
   // Il tasto del rimedio sotto una spiegazione del menu apre un'altra scheda: il menu non resta aperto sopra il sito.
@@ -694,6 +707,8 @@
             e.stopPropagation();
             approfondita = true;
             contaRiquadro('riquadro_uso', { action: ACTIONS.EXPLAIN, uso: 'approfondisci' });
+            // Approfondisci è Spiega della scorciatoia, dal box del tasto destro (#1468).
+            Popup.conta({ misura: 'strada', id: 'explain-selection', via: 'tasto_destro_altro' });
             try { global.SN_MENU?.close?.(); } catch (_) {}
             triggerExplainDeep(selInfo, deps.getLastMouseEvent());
           });
@@ -1442,14 +1457,14 @@
     copyUrlToClipboard(src);
   }
 
-  async function downloadMedia(el) {
+  async function downloadMedia(el, link = null) {
     const audio = isAudioEl(el);
     const failToast = audio ? 'toast_audio_save_failed' : 'toast_video_save_failed';
     const src = mediaSrc(el);
     if (!src) { Popup.toastErrore(failToast); return; }
 
     // Come in downloadImage, blob: e data: restano sul cammino anchor. Un blob: di
-    // MediaSource non è leggibile: lì non esiste nessun file da salvare.
+    // MediaSource non è leggibile: il file non esiste, e lo ricompone yt-dlp dalla pagina (#1488).
     if (/^(blob:|data:)/i.test(src)) {
       try {
         const r = await fetch(src);
@@ -1464,7 +1479,8 @@
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => { try { URL.revokeObjectURL(objUrl); } catch (_) {} }, 20000);
       } catch (_) {
-        Popup.toastErrore('toast_media_stream_only');
+        if (/^blob:/i.test(src)) await salvaInStreaming(audio, indirizzoDelVideo(el, link));
+        else Popup.toastErrore('toast_media_stream_only');
       }
       return;
     }
@@ -1485,6 +1501,52 @@
     }
   }
 
+  // L'indirizzo del filmato cliccato quando la pagina non è lui (#1488): il collegamento a cui il menu lo lega, quello
+  // che il lettore di YouTube dà al suo video, o il permalink col <time> del post che lo contiene. '' = la pagina.
+  function indirizzoDelVideo(el, link) {
+    const di = (a) => {
+      const h = a && (typeof a.href === 'string' ? a.href : a.href?.baseVal);
+      if (!h) return '';
+      try { const u = new URL(String(h), location.href); return /^https?:$/.test(u.protocol) ? u.href : ''; } catch (_) { return ''; }
+    };
+    const delLink = di(link);
+    if (delLink) return delLink;
+    const lettore = el.closest?.('.html5-video-player, #movie_player');
+    const titolo = di(lettore && lettore.querySelector('a.ytp-title-link[href]'));
+    if (titolo) return titolo;
+    // Il post più piccolo che contiene il filmato e un solo permalink. Un contenitore con un altro filmato, o molto
+    // più grande del filmato, è la pagina e non il post: il suo <time> può essere una data qualunque.
+    const area = (x) => { const r = x.getBoundingClientRect(); return r.width * r.height; };
+    const delFilmato = area(el);
+    for (let n = el.parentElement, i = 0; n && n !== document.body && i < 25; n = n.parentElement, i++) {
+      if (n.querySelectorAll('video, audio').length > 1 || !(delFilmato > 0) || area(n) > 8 * delFilmato) break;
+      const permalink = new Set(Array.from(n.querySelectorAll('a[href] time'), (t) => di(t.closest('a'))).filter(Boolean));
+      if (permalink.size === 1) return [...permalink][0];
+      if (permalink.size > 1) break;
+    }
+    return '';
+  }
+
+  // La risposta arriva a video salvato, anche dopo minuti: se tarda, un avviso dice subito che è partito.
+  async function salvaInStreaming(audio, indirizzo = '') {
+    let partito = null;
+    const avviso = setTimeout(() => { partito = Popup.showToast(I18n.t(audio ? 'toast_audio_streaming_started' : 'toast_video_streaming_started')); }, 700);
+    let res = null;
+    try {
+      res = await chrome.runtime.sendMessage({ type: MSG.SAVE_STREAMING_VIDEO, kind: audio ? 'audio' : 'video', titolo: document.title || '', indirizzo });
+    } catch (_) { res = null; }
+    clearTimeout(avviso);
+    try { if (partito && partito.close) partito.close(); } catch (_) {}
+    // La fine di un salvataggio lungo la dice la finestra, dovunque sia l'utente: qui non si ripete.
+    if (res?.cancelled || res?.annunciato) return;
+    if (res?.ok) { Popup.showToast(I18n.t(audio ? 'toast_audio_saved' : 'toast_video_saved')); return; }
+    // Una build senza la funzione (quelle da negozio) dice com'era prima: lo streaming non ha un file.
+    if (res?.spento) { Popup.toastErrore('toast_media_stream_only'); return; }
+    const chiave = `streaming_${res?.motivo || 'generico'}`;
+    const frase = I18n.t(chiave) !== chiave ? I18n.t(chiave) : I18n.t('streaming_generico');
+    Popup.toastErrore('streaming_non_riuscito', { duration: 9000 }, frase);
+  }
+
   // Il corpo accelera di uno scatto, la freccetta apre l'elenco completo. L'etichetta
   // porta la velocità corrente, così il menu dice anche in che stato è il filmato.
   function buildMediaSpeedItem(el) {
@@ -1503,7 +1565,8 @@
     };
   }
 
-  function buildMediaItems(el) {
+  // `link`: il collegamento a cui il menu lega il filmato (l'anteprima stesa sopra la scheda di una home).
+  function buildMediaItems(el, link = null) {
     const audio = isAudioEl(el);
     const items = [];
     items.push({
@@ -1550,7 +1613,7 @@
       type: 'item',
       azione: 'copy-download-video',
       label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'),
-      onClick: () => downloadMedia(el),
+      onClick: () => downloadMedia(el, link),
     });
     return items;
   }

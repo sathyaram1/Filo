@@ -74,6 +74,12 @@ nome viene creato una volta sola e mai riusato: la classe di guasto sparisce
 invece di essere gestita. Il nome vero vive già nello stato e nel campo `branch`
 del feedback, quindi non serve poterlo ricalcolare.
 
+Il tentativo è il **biglietto**, non il lancio di dispatch: il server lega il
+biglietto al primo ramo dichiarato e rifiuta ogni altro. Un lavoro nuovo
+ripartito sullo stesso biglietto (una sessione ripresa) riceve quel ramo nella
+busta e lo riprende, o lo crea con quel nome se non c'è; una presa in carico
+rifiutata per il ramo ferma dispatch prima del lavoratore (#1632).
+
 ### Niente worktree separati nelle routine
 
 `routines/roles/new-work.md` istruisce oggi `git worktree add … -b worker/<id>`:

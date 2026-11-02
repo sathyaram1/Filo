@@ -103,6 +103,34 @@
   const FRASE_CONTESTO_PIENO = 'c\'è più testo di quanto il modello riesca a leggere insieme: chiedimi meno pagine alla volta, '
     + 'accorcia il messaggio o ricomincia in una chat nuova.';
 
+  // Il tipo di contenuto che il modello non legge (#1345), dal testo del rifiuto: il 404 del router («No endpoints found
+  // that support image input») o un host che dice di non accettarlo. '' per ogni altro rifiuto, «troppe immagini» compreso.
+  const INGRESSI = [['immagini', /imag|vision/i], ['audio', /audio/i], ['video', /video/i], ['pdf', /pdf|file|document/i]];
+  const ROUTER_INGRESSO = /no endpoints? found that supports? ([^.,;]+)/i;
+  // «Unable to process input image» è una foto che quel modello, che le legge, non è riuscito ad aprire: non è un rifiuto.
+  const HOST_INGRESSO = new RegExp([
+    /(?:does ?n[o']t|do not|can ?not) (?:support|accept|process|handle|read)s? (?:the |an? )?(?:input )?(image_url|input_audio|input_file|images?|vision|audio|video|pdfs?|files?|documents?)/,
+    /unable to (?:support|accept) (?:the |an? )?(?:input )?(image_url|input_audio|input_file|images?|vision|audio|video|pdfs?|files?|documents?)/,
+    /(image_url|input_audio|input_file|images?|audio|video|pdfs?|files?|documents?)(?: inputs?| content)? (?:is|are) (?:not|only) supported/,
+    /unsupported (?:content type|input|modality)[^.]{0,30}?(image|audio|video|pdf|file)/,
+  ].map((r) => r.source).join('|'), 'i');
+  function ingressoRifiutato(testo) {
+    const t = String(testo || '');
+    const router = ROUTER_INGRESSO.exec(t);
+    const parola = router
+      ? (/tool|parameter/i.test(router[1]) ? '' : router[1])
+      : ((HOST_INGRESSO.exec(t) || []).slice(1).find(Boolean) || '');
+    const hit = parola ? INGRESSI.find(([, re]) => re.test(parola)) : null;
+    return hit ? hit[0] : '';
+  }
+  const FRASI_INGRESSO = {
+    immagini: `il modello scelto non legge le immagini, e questa richiesta ne porta: scegline uno che le legga ${DOVE_ALTRO_MODELLO}.`,
+    audio: `il modello scelto non ascolta l'audio, e questa richiesta ne porta: scegline uno che lo ascolti ${DOVE_ALTRO_MODELLO}.`,
+    pdf: `il modello scelto non legge i PDF, e questa richiesta ne porta: scegline uno che li legga ${DOVE_ALTRO_MODELLO}.`,
+    video: `il modello scelto non guarda i video, e questa richiesta ne porta: scegline uno che li guardi ${DOVE_ALTRO_MODELLO}.`,
+  };
+  const FRASE_INGRESSO_IGNOTO = `il modello scelto non legge un tipo di contenuto che questa richiesta porta: scegline un altro ${DOVE_ALTRO_MODELLO}.`;
+
   // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
   // codici, è un vicolo cieco (la risposta sarà identica finché non si cambia
   // qualcosa), quindi accanto ci va il collegamento al posto giusto.
@@ -117,6 +145,7 @@
     MODEL_UNAVAILABLE: 'opzioni',
     DATA_POLICY: 'opzioni',
     NO_PROVIDER_ALLOWED: 'opzioni',
+    INGRESSO_NON_LETTO: 'opzioni',
     ALTRO_MODELLO: 'opzioni',
     TETTO_RISPOSTA: 'preferenze',
     RISPOSTA_TAGLIATA: 'preferenze',
@@ -288,6 +317,10 @@
           ? `nessun fornitore di questo modello rispetta le impostazioni sulla privacy del tuo account OpenRouter: allentale su openrouter.ai/settings/privacy, o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`
           : `nessun fornitore di questo modello rispetta le regole sulla privacy dei dati: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
+      // #1345: non è la politica sui fornitori, è il modello che non legge quel contenuto.
+      const ingresso = e && (e.code === 'INGRESSO_NON_LETTO' || (!e.code && [400, 404, 415, 422].includes(st)))
+        ? (e.ingresso || ingressoRifiutato(raw)) : '';
+      if (ingresso || (e && e.code === 'INGRESSO_NON_LETTO')) return FRASI_INGRESSO[ingresso] || FRASE_INGRESSO_IGNOTO;
       // #700: gli altri «nessun host» del router hanno ciascuno il suo rimedio, e nessuno riguarda gli strumenti.
       if (e && e.code === 'NO_PROVIDER_ALLOWED') {
         return e.keySource === 'own'
@@ -467,7 +500,7 @@
   global.SN_CHAT_ERRORS = {
     friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
     fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
-    MOTIVO_CREDITI, motivoCrediti, rimedioCrediti, DOVE_ALTRO_MODELLO,
+    MOTIVO_CREDITI, motivoCrediti, rimedioCrediti, DOVE_ALTRO_MODELLO, ingressoRifiutato,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

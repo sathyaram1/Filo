@@ -30,6 +30,7 @@ if (IS_FILO_ORIGIN) {
       pronta: () => globalThis.SN_SIDEBAR?.accoglieRilascio?.() === true,
       consegna: (files) => globalThis.SN_SIDEBAR.allega(files),
       pannello: (t) => globalThis.SN_SIDEBAR?.contiene?.(t) === true,
+      nelPannello: (e) => globalThis.SN_SIDEBAR?.rilascio?.(e),
     });
   } catch (e) { console.error('[Filo internal] rilascio', e); }
 }
@@ -328,6 +329,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'vistoDavvero.js')); // #589.11 — sulle pagine di Filo resta spento: nessun sito può coprire il menu
   safe(path.join(CONTENT, 'menu.js'));
   safe(path.join(CONTENT, 'highlight.js'));
+  safe(path.join(CONTENT, 'aiutoPagina.js')); // #1509.3 — quello che l'Aiuto fa sulla pagina: DOPO highlight.js
   safe(path.join(CONTENT, 'sidebar.js'));
   safe(path.join(CONTENT, 'coerenza.js')); // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'correttoreRegole.js')); // #1446 — candidati e risposte del correttore: PRIMA di spellcheck.js

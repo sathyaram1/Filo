@@ -12,6 +12,9 @@
   let altroEl = null;
 
   let layout = null;
+  // Il primo incontro (#1661) lo decide il main: legge l'accoglienza dal disco anche in incognito.
+  let primoIncontro = false;
+  let giroPrimo = 0;
   const dati = {
     timers: [],
     notifiche: [],
@@ -50,7 +53,8 @@
     s.innerHTML = typeof ICONS[nome] === 'function' ? ICONS[nome](size) : '';
     return s;
   }
-  function apri(url) { d.send({ type: MSG.OPEN_URL, url }); }
+  // La strada la sa il main (#1468): una pagina di Filo aperta da una carta.
+  function apri(url) { d.send({ type: MSG.OPEN_URL, url, via: 'carta_home' }); }
   function fmtBytes(n) {
     n = Number(n) || 0;
     if (n < 1024) return `${n} B`;
@@ -201,6 +205,8 @@
     if (r.state === 'progressing' || r.state === 'paused') {
       const fermo = r.state === 'paused';
       let quanto = pct != null ? `${pct}% · ${fmtBytes(r.receivedBytes)} di ${fmtBytes(r.totalBytes)}` : `${fmtBytes(r.receivedBytes)}`;
+      // #1488 — un video in streaming dice cosa sta facendo quando non sono byte del file.
+      if (r.nota) quanto = pct != null || r.receivedBytes ? `${r.nota.toLowerCase()} · ${quanto}` : r.nota.toLowerCase();
       // #1287 — quanto va veloce e quanto manca, come nel pannello e nella pagina Download.
       let corsa = '';
       try { corsa = global.SN_SCARICAMENTI_AVANZAMENTO.velocitaEResto(r); } catch (_) {}
@@ -241,7 +247,9 @@
           caricaDownloads();
         }) }
         : null;
-      return { ...base, stato: 'interrotto', principale: riprova || cartella, secondaria: riprova ? cartella : null, filo: `Lo scaricamento di «${nome}» si è interrotto.` };
+      // Il perché di un video non salvato (#1488) sta sulla carta e nel filo, non solo nell'avviso.
+      const perche = r.nota ? ` ${r.nota}.` : '';
+      return { ...base, stato: r.nota ? `interrotto · ${r.nota}` : 'interrotto', principale: riprova || cartella, secondaria: riprova ? cartella : null, filo: `Lo scaricamento di «${nome}» si è interrotto.${perche}` };
     }
     if (r.missing) {
       return { ...base, stato: 'il file non c’è più', principale: cartella, filo: `Avevo scaricato «${nome}», ma il file non è più al suo posto.` };
@@ -281,6 +289,8 @@
       togli: chiudi, etichettaTogli: 'Chiudi l’avviso',
       filo: n.text,
     };
+    // #906 — i giudici fermi: la carta dice uno stato del server e se ne va da sola quando il server lo azzera.
+    if (tipo === 'giudici-fermi') return { ...carta, secondaria: null, togli: null, etichettaTogli: null };
     return n.action && n.action.tipo === 'aggiornamento-disponibile' ? cartaAggiornamento(n, carta, chiudi) : carta;
   }
   // #786 — la versione nuova che aspetta il «Installa» dell'utente; cosa le sta succedendo lo dice il main.
@@ -775,6 +785,9 @@
     disegnaColonna(accadeEl, carteSinistra(), 'sinistra');
     disegnaColonna(tieniEl, carteDestra(), 'destra');
     disegnaAltro();
+    const ridotta = C.homeRidotta(primoIncontro, layout, !!suggerimentoCrediti());
+    tieniEl.hidden = ridotta;
+    altroEl.hidden = ridotta;
     accadeEl.dataset.suona = dati.timers.some((t) => t.ringing) ? '1' : '0';
   }
 
@@ -1010,8 +1023,19 @@
 
   // ===== Dati che la carta chiede da sé =====
   async function caricaLayout() {
+    const giro = ++giroPrimo;
     const r = await d.send({ type: MSG.CARTE_HOME_GET });
     layout = C.normalizza(r && r.ok ? r.layout : null);
+    if (giro === giroPrimo) primoIncontro = !!(r && r.ok && r.primoIncontro);
+    disegna();
+  }
+  // Finisce con l'accoglienza e dipende da cosa manca a Filo per rispondere. La disposizione di questa risposta no:
+  // può essere più vecchia di una mossa annunciata nel frattempo.
+  async function caricaPrimoIncontro() {
+    const giro = ++giroPrimo;
+    const r = await d.send({ type: MSG.CARTE_HOME_GET });
+    if (giro !== giroPrimo || !r || !r.ok || !!r.primoIncontro === primoIncontro) return;
+    primoIncontro = !!r.primoIncontro;
     disegna();
   }
   async function caricaDownloads() {
@@ -1066,7 +1090,8 @@
       else if (msg.type === MSG.DOWNLOADS_UPDATED) ricaricaDownloadsPresto();
       else if (msg.type === MSG.LAVORI_CAMBIATI && Array.isArray(msg.lavori)) { dati.lavori = msg.lavori; disegna(); }
       else if (msg.type === MSG.FILO_LIVE_UPDATED) caricaEditor().catch(() => {});
-      else if (msg.type === MSG.DATI_IMPORTATI) caricaMazzi().catch(() => {});
+      else if (msg.type === MSG.DATI_IMPORTATI) { caricaMazzi().catch(() => {}); caricaPrimoIncontro().catch(() => {}); }
+      else if (msg.type === MSG.FILO_ONBOARDING_UPDATED || msg.type === MSG.FILO_READY_CHANGED) caricaPrimoIncontro().catch(() => {});
       else if (msg.type === MSG.SETTINGS_UPDATED && msg.settings) { dati.impostazioni = msg.settings; disegna(); }
       else if (msg.type === MSG.IN_PAUSA_CAMBIATO && Object.prototype.hasOwnProperty.call(dati.aperte, msg.nome)) {
         dati.aperte = { ...dati.aperte, [msg.nome]: msg.visible === true };
@@ -1078,6 +1103,7 @@
         caricaDownloads().catch(() => {});
         caricaLavori().catch(() => {});
         caricaAperte().catch(() => {});
+        caricaPrimoIncontro().catch(() => {});
       }
     });
     return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori(),

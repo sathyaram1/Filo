@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld('filoShell', {
   // Dove sta il puntatore quando è fuori dal documento della barra (#428).
   puntatore: () => ipcRenderer.invoke('shell:puntatore'),
   tabs: {
-    open: (url) => ipcRenderer.invoke('tabs:open', { url }),
+    open: (url, via) => ipcRenderer.invoke('tabs:open', { url, via }),
     // `via`: come la si chiude, per i contatori (#1470).
     close: (id, via) => ipcRenderer.invoke('tabs:close', { id, via }),
     activate: (id) => ipcRenderer.invoke('tabs:activate', { id }),
@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     setChromeCompact: (on) => ipcRenderer.invoke('tabs:set-chrome-compact', { on }),
     back: (id) => ipcRenderer.invoke('tabs:back', { id }),
     forward: (id) => ipcRenderer.invoke('tabs:forward', { id }),
-    reload: (id) => ipcRenderer.invoke('tabs:reload', { id }),
+    reload: (id, via) => ipcRenderer.invoke('tabs:reload', { id, via }),
     // Toggle se `muted` è omesso.
     setMuted: (id, muted) => ipcRenderer.invoke('tabs:set-muted', { id, muted }),
     duplicate: (id) => ipcRenderer.invoke('tabs:duplicate', { id }),

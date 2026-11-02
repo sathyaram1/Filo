@@ -209,7 +209,9 @@ riscrive. Sono TRE testi distinti:
 3. **Riga di changelog** in `src/shared/patchNotes.js`: solo se un utente
    qualunque può usare la cosa (superfici owner e parti interne no); una
    riga, orientata al beneficio, nel blocco in cima (vedi § Fonti di verità
-   singole).
+   singole). Nata da una segnalazione, si scrive `{ testo, segnalazione: <num> }`
+   (il numero intero, senza la parte dopo il punto): la pagina Novità la apre
+   dal tasto destro.
 
 Prima di mandare un testo destinato a un umano, compresa ogni risposta in chat
 anche di tre righe, applica **`.claude/skills/unslop/SKILL.md`**.
@@ -238,7 +240,7 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~620 spec, ~1.450 casi): NON si lancia a mano (vedi § Verifica)
+npm test                   # SUITE COMPLETA (~660 spec, ~4.650 casi): NON si lancia a mano (vedi § Verifica)
 npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
 npm run test:shoot         # cattura visiva della finestra reale
 ```

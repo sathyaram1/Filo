@@ -369,12 +369,44 @@
     };
   }
 
+  // La voce sotto il puntatore, o quella col fuoco: chi sta per cliccarla non se la vede scivolare via (#1791).
+  function voceFerma(lista, voci) {
+    const att = global.document && global.document.activeElement;
+    const tutte = Array.from(lista.querySelectorAll(voci));
+    return tutte.find((el) => el.matches(':hover')) || tutte.find((el) => att && att !== global.document.body && el.contains(att)) || null;
+  }
+
+  // Dove lo scorrimento non basta (una lista corta non scorre; in cima non si sale) la voce sotto il puntatore la tiene
+  // ferma spostando la lista col suo margine, finché il puntatore non esce dalla lista.
+  const tenute = new WeakMap();
+  function lascia(lista) {
+    const t = tenute.get(lista);
+    if (!t) return;
+    tenute.delete(lista);
+    lista.removeEventListener('pointerleave', t.via);
+    lista.style.marginTop = t.margine0;
+  }
+  function tieni(lista, voce, y) {
+    const resto = voce.getBoundingClientRect().top - y;
+    if (Math.abs(resto) < 0.5) return;
+    let t = tenute.get(lista);
+    if (!t) {
+      t = { spazio: 0, margine0: lista.style.marginTop, base: parseFloat(global.getComputedStyle(lista).marginTop) || 0, via: () => lascia(lista) };
+      tenute.set(lista, t);
+      lista.addEventListener('pointerleave', t.via);
+    }
+    t.spazio -= resto;
+    lista.style.marginTop = `${t.base + t.spazio}px`;
+  }
+
   // Ridisegna tenendo lo scorrimento sulla prima voce visibile (non sui pixel: se ne esce una più su, la vista
-  // non salta); chi è in cima resta in cima, o una voce arrivata lassù finirebbe fuori vista.
+  // non salta); chi è in cima resta in cima, o una voce arrivata lassù finirebbe fuori vista. La voce sotto il
+  // puntatore o col fuoco invece resta dov'è sullo schermo, anche in cima: un arrivo più su non la sposta.
   // `voci`: selettore delle voci con `data-id`; `scorre()`: l'elemento che scorre, o null.
   function alSuoPosto({ lista, voci, scorre }, ridisegna) {
     const L = LIVE();
     const doc = global.document;
+    if (lista && tenute.has(lista) && !lista.matches(':hover')) lascia(lista);
     const radice = doc && (doc.scrollingElement || doc.documentElement);
     const righe = (sc) => {
       const cima = sc === radice ? 0 : sc.getBoundingClientRect().top;
@@ -386,9 +418,22 @@
     };
     const sc = L && lista ? scorre() : null;
     const prima = sc ? sc.scrollTop : 0;
+    const ferma = L && lista ? voceFerma(lista, voci) : null;
+    const idFermo = ferma ? ferma.dataset.id : '';
+    const yFermo = ferma ? ferma.getBoundingClientRect().top : 0;
+    const conFuoco = !!(ferma && doc && ferma.contains(doc.activeElement));
+    const sottoIlPuntatore = !!(ferma && ferma.matches(':hover'));
     const ancora = sc && prima > 0 ? L.ancoraScorrimento(righe(sc), prima) : null;
     ridisegna();
+    const ora = idFermo ? Array.from(lista.querySelectorAll(voci)).find((el) => el.dataset.id === idFermo) : null;
+    // Una lista rifatta da capo ha voci nuove: il fuoco torna sulla stessa voce, o la tastiera ripartirebbe dall'inizio.
+    if (ora && conFuoco && !ora.contains(doc.activeElement) && ora.tabIndex >= 0) ora.focus({ preventScroll: true });
     const dopo = L && lista ? scorre() : null;
+    if (ora) {
+      if (dopo) dopo.scrollTop += ora.getBoundingClientRect().top - yFermo;
+      if (sottoIlPuntatore) tieni(lista, ora, yFermo);
+      return;
+    }
     if (dopo) dopo.scrollTop = L.scrollDaAncora(ancora, righe(dopo), prima);
   }
 

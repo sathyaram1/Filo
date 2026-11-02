@@ -7,7 +7,7 @@ import { _electron as electron } from '@playwright/test';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { statoDi } from './helpers/riquadri.mjs';
+import { paginaDellAiuto, statoDi } from './helpers/riquadri.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
@@ -185,7 +185,7 @@ test('il menu del tasto destro e Altro dicono il tasto scelto; un tasto preso ch
   await page.keyboard.press('Escape');
 
   await premi(app, 'K', ['alt', 'shift']);
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
+  await expect((await paginaDellAiuto(app, page)).locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
 
   // «Rimetti di serie» chiesto a Filo: Alt+H torna di Filo.
   expect((await chiedi(app, 'tutte di serie')).executed).toBe(true);

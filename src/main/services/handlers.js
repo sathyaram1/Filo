@@ -607,26 +607,28 @@ function noteServedProvider(settings, action, result) {
   return { servedBy, violation };
 }
 
-// Un avviso per host e motivo ogni dieci minuti: una pagina tradotta a pezzi dallo stesso host non ne impila cinquanta.
-const AVVISO_FUORI_POLITICA_MS = 10 * 60 * 1000;
-const avvisatiFuoriPolitica = new Map();
+// Un avviso per host e motivo, in coda finché la pagina in vista lo prende: la pausa di dieci minuti parte da lì (#1478.1).
+const AvvisiFuoriPolitica = require('./avvisiFuoriPolitica').crea({ manda: (m) => broadcastToTabs(m) });
+// Tornati su Filo dalla barra delle schede, o su una scheda scelta da lì, la pagina non riceve il fuoco: li si ripropone.
+globalThis.SN_AVVISI_FUORI_POLITICA = AvvisiFuoriPolitica;
+try { require('electron').app.on('browser-window-focus', () => AvvisiFuoriPolitica.riproponi()); } catch (_) {}
 function avvisaFuoriPolitica(settings, why, servedBy, model, action) {
   const chiave = `${why}|${SN_CONST.normalizeProviderName(servedBy)}`;
-  const ora = Date.now();
-  if (ora - (avvisatiFuoriPolitica.get(chiave) || 0) < AVVISO_FUORI_POLITICA_MS) return;
-  avvisatiFuoriPolitica.set(chiave, ora);
-  let text;
-  if (why === 'not-producer') {
-    const regola = SN_CONST.producerOnlyRule(model);
-    text = I18n.t('toast_served_not_producer', servedBy, (regola && regola.nome) || 'il suo produttore');
-  } else {
-    text = I18n.t(settings && settings.openWeightsOnly === true ? 'toast_open_weights_violated' : 'toast_served_excluded', servedBy);
-  }
-  const segnala = I18n.t('segnala_fuori_politica', actionLabelForSettings(action), model || '—', servedBy);
-  try { broadcastToTabs({ type: MSG.SHOW_TOAST, text, duration: 8000, segnala }); } catch (_) {}
-  if (why !== 'not-producer' && settings && settings.openWeightsOnly === true) {
-    try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:pesi_aperti_violati'); } catch (_) {}
-  }
+  AvvisiFuoriPolitica.avvisa(chiave, () => {
+    let text;
+    if (why === 'not-producer') {
+      const regola = SN_CONST.producerOnlyRule(model);
+      text = I18n.t('toast_served_not_producer', servedBy, (regola && regola.nome) || 'il suo produttore');
+    } else {
+      text = I18n.t(settings && settings.openWeightsOnly === true ? 'toast_open_weights_violated' : 'toast_served_excluded', servedBy);
+    }
+    const segnala = I18n.t('segnala_fuori_politica', actionLabelForSettings(action), model || '—', servedBy);
+    const pesiAperti = why !== 'not-producer' && settings && settings.openWeightsOnly === true;
+    return {
+      messaggio: { type: MSG.SHOW_TOAST, text, duration: 8000, segnala },
+      alMostrare: pesiAperti ? () => globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:pesi_aperti_violati') : null,
+    };
+  });
 }
 
 // ─── Dettatura ───────────────────────────────────────────────────────────────
@@ -1448,7 +1450,20 @@ function perimetroLettura(sender, cartella = null) {
   try { cwd = cartellaDelComando(cartella == null ? getAssistantCwd(sender) : cartella) || ''; } catch (_) {}
   let reti = [];
   try { reti = require('./shell').unitaDiRete(cwd); } catch (_) {}
-  return { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
+  const perimetro = { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
+  // #892.2 — il classificatore chiede qui se un bersaglio c'è già. Non enumerabile: il perimetro resta un dato.
+  Object.defineProperty(perimetro, 'esiste', { value: statoSulDisco });
+  return perimetro;
+}
+
+// 'file', 'cartella', null se non c'è, 'ignoto' se il disco non risponde. I percorsi di rete li scarta prima chi chiede.
+function statoSulDisco(p) {
+  // Un'unità che porta a un altro computer non si guarda nemmeno (#1072): resta da chiedere.
+  const u = /^([A-Za-z]):/.exec(String(p || ''));
+  try { if (u && require('./shell').unitaDiRete(p).includes(`${u[1].toLowerCase()}:`)) return 'ignoto'; } catch (_) { return 'ignoto'; }
+  try { return require('node:fs').statSync(p).isDirectory() ? 'cartella' : 'file'; } catch (e) {
+    return e && (e.code === 'ENOENT' || e.code === 'ENOTDIR') ? null : 'ignoto';
+  }
 }
 
 // La shell delle Preferenze che eseguirà i comandi dell'assistente, già risolta per questo sistema.
@@ -2212,7 +2227,7 @@ async function decisioneComandoAMano({ comando, cwd = '', shell = '', daFuori = 
   const cmd = String(comando || '').trim();
   let impostazioni = {};
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
-  const action = { type: 'ESEGUI_COMANDO', comando: cmd, _perimetro: { ...perimetroLettura(null, cwd), shell } };
+  const action = { type: 'ESEGUI_COMANDO', comando: cmd, _perimetro: Object.assign(perimetroLettura(null, cwd), { shell }) };
   const ing = Levels ? Levels.ingressi(action, { impostazioni }) : null;
   if (!cmd || !ing) return { risposta: 'no', digita: false, no: 'Questo comando non lo lancio.' };
   const d = decisioneAutonomia(ing, { impostazioni, fontiLette: daFuori === true ? [FONTE_COMANDO_DA_FUORI] : null });
@@ -2297,6 +2312,35 @@ async function eseguiAccount(action, sender) {
   } catch (_) {
     return { executed: false, kept: false, output: { error: 'il menu dell\'account non ha risposto' } };
   }
+}
+
+// Lo zoom chiesto in chat fra le strade dello zoom (#1468): il verso chiesto, o quello del numero rispetto a prima.
+function contaZoomDallaChat(esito, verso, win) {
+  const Z = globalThis.SN_CONTATORI_STRADE && globalThis.SN_CONTATORI_STRADE.ZOOM;
+  if (!Z || !esito) return;
+  let v = verso;
+  if (!v && Number.isFinite(esito.percentuale)) {
+    const prima = Number(esito.prima);
+    if (Math.round(esito.percentuale) === 100) v = 'reset';
+    else if (Number.isFinite(prima)) v = esito.percentuale > prima ? 'in' : esito.percentuale < prima ? 'out' : '';
+  }
+  if (Z[v] && dallaChat()) require('./contatoriStrade').misura('azione', Z[v], 'chat', { incognito: !!(win && win._filoIncognito) });
+}
+// Una pagina di Filo che la chat apre da sola (#1468): la strada della pagina, e quella dell'icona che apre la stessa.
+// Prima dell'apertura, perché il tempo in vista parte quando la scheda arriva davanti.
+function contaPaginaDallaChat(url, win) {
+  const T = globalThis.SN_CONTATORI_STRADE;
+  if (!T || !win || !/^filo:/i.test(String(url || '')) || !dallaChat()) return;
+  const Strade = require('./contatoriStrade');
+  const incognito = !!win._filoIncognito;
+  Strade.misura('pagina', url, 'chat', { finestra: win._filoTabs, incognito });
+  const azione = T.AZIONE_DELLA_PAGINA[T.paginaDi(url)];
+  if (azione) Strade.misura('azione', azione, 'chat', { incognito });
+}
+// Un tasto della home che usa la porta dell'Aiuto (#1561) è un gesto dell'utente, non la chat.
+function dallaChat() {
+  const p = Registro.corrente();
+  return !p || p.via !== 'interfaccia';
 }
 
 async function executeFiloAction(action, opzioni = {}) {
@@ -2418,7 +2462,7 @@ async function eseguiAzioneFilo(action, {
       const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
       const setter = global.SN_PREF.setterDellaChiave(chiave);
       if (setter && (setter.scrive.includes('security.pagineDelicate.siti') || setter.scrive.includes('menuDelSito.siti')
-        || setter.scrive.includes('blocklist'))) {
+        || setter.scrive.includes('blocklist') || setter.scrive.includes('security.safeBrowse.trustedSites'))) {
         // Dall'Aiuto di un sito «questo sito» è lui, e le altre schede non si nominano (#843).
         const daSito = /^https?:/i.test(sender?.tab?.url || sender?.url || '');
         const { tm, tab } = daSito ? { tm: null, tab: { url: sender?.tab?.url || sender?.url } } : targetWebTab(sender);
@@ -2896,6 +2940,7 @@ async function eseguiAzioneFilo(action, {
             let daPagina = '';
             try { daPagina = assistente && sender && sender.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
             const origine = /^https?:/i.test(daPagina) ? { tipo: 'link', da: daPagina, gesto: chiesto } : { tipo: 'filo', gesto: chiesto };
+            contaPaginaDallaChat(url, win);
             tabId = tm.openTab(url, { activate: !background, origine });
             // Gli schemi non web sono esclusi qui sopra: una scheda che non
             // nasce è la lista dei siti bloccati (#590), e la chat lo deve dire.
@@ -2914,7 +2959,7 @@ async function eseguiAzioneFilo(action, {
             // la chat della home o l'assistente sulla pagina.
             const seguibile = assistente || daFilo(origineDi(sender), sender);
             if (sender && sender.wc && seguibile && action._callId && typeof tm.seguiApertura === 'function') {
-              tm.seguiApertura(tabId, { wc: sender.wc, callId: action._callId, assistente });
+              tm.seguiApertura(tabId, { wc: sender.wc, verso: sender.strato || sender.wc, callId: action._callId, assistente });
             }
             // Prima dell'attesa qui sotto: un rinvio della pagina arriva durante, e la rilettura deve conoscerlo (#553).
             const t = (tm.tabs || []).find((x) => x && x.id === tabId);
@@ -3835,6 +3880,7 @@ async function eseguiAzioneFilo(action, {
         const esito = await tm.applicaZoom(perc != null ? { percentuale: perc } : { verso });
         if (!esito) return { executed: false, kept: false, output: { zoom: 'no-tab' } };
         if (esito.muto) return { executed: false, kept: false, output: { zoom: 'muto' } };
+        contaZoomDallaChat(esito, perc != null ? '' : verso, win);
         // `sconosciuto`: la pagina zooma da sé (l'editor scala il foglio) e la
         // percentuale la sa solo lei. Fatto sì, numero no.
         if (esito.sconosciuto) return { executed: true, kept: false, output: { zoom: 'propria' } };
@@ -4009,6 +4055,11 @@ async function eseguiAzioneFilo(action, {
         if (cmd === 'home' && /^filo:\/\/(newtab|dashboard)\b/i.test(String(sender?.tab?.url || sender?.url || ''))) {
           return { executed: true, kept: true, output: { window: 'home', already: true } };
         }
+        // Da quale strada (#1468): l'Aiuto lo conta chi lo apre.
+        const Strade = require('./contatoriStrade');
+        const azioneStrada = dallaChat() ? { fullscreen: 'fullscreen', home: 'home', sidebar: 'barra_laterale' }[cmd] : '';
+        if (azioneStrada) Strade.misura('azione', azioneStrada, 'chat', { incognito: !!win._filoIncognito });
+        if (azioneStrada === 'home') Strade.misura('pagina', 'filo://newtab/', 'chat', { finestra: win._filoTabs, incognito: !!win._filoIncognito });
         if (cmd === 'fullscreen') {
           // Schermo intero «immersivo»: la view attiva copre la finestra e le barre spariscono.
           // NON preme il pulsante del lettore video: Filo non ha accesso ai comandi del sito.
@@ -4027,7 +4078,7 @@ async function eseguiAzioneFilo(action, {
         }
         // #1433 — l'Aiuto chiesto in chat si apre sulla scheda davanti come col suo tasto: nell'Editor è la chat del documento.
         if (cmd === 'aiuto') {
-          require('../shortcuts').dispatch('open-help-sidebar', win);
+          require('../shortcuts').dispatch('open-help-sidebar', win, dallaChat() ? 'chat' : '');
           return { executed: true, kept: false, output: { window: 'aiuto' } };
         }
         // home / minimize / settings / apps / account: clicca il bottone REALE
@@ -4201,6 +4252,7 @@ function cancelliAperti() {
   const aperti = {};
   try { aperti.redteam = require('./redteamGate').visibile(); } catch (_) {}
   try { Object.assign(aperti, require('./inPausa').aperti()); } catch (_) {}
+  try { aperti.streaming = require('./funzioniBuild').salvaVideoInStreaming; } catch (_) {}
   return aperti;
 }
 
@@ -6098,6 +6150,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     onboarding: onboardingText,
     onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
     onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
+    onboardingRifatta: onbActive && onbBefore.rifatta === true,
     ...(filo ? { filoTratto: filo.messaggi, indiceDomanda, chatCorrente: chatId, chatNuova: filo.nuova } : {}),
   };
 
@@ -6174,7 +6227,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (filo && filo.haDomanda && !internal) {
     const resa = filo.domanda({
       stato: fotografia ? fotografia.cambiate : '', epoca: fotografia ? fotografia.epoca : filo.epoca,
-      onboarding: onbActive ? PROMPTS.filoChatOnboarding({ onboarding: onboardingText, onboardingTurns: payloadBase.onboardingTurns, onboardingMax: payloadBase.onboardingMax }) : '',
+      onboarding: onbActive ? PROMPTS.filoChatOnboarding({ onboarding: onboardingText, onboardingTurns: payloadBase.onboardingTurns, onboardingMax: payloadBase.onboardingMax, onboardingRifatta: payloadBase.onboardingRifatta }) : '',
       ricordi, dopo: [origineImmagini, giaLetta], immagini: imageList,
     });
     if (resa) threadMessages[indiceDomanda] = resa;
@@ -7147,7 +7200,7 @@ function schedeWebAperte() {
 // scrivono altri, e restano imbustati come ogni testo salvato (#592.4).
 const COSA_E_SUCCESSO = {
   timer: 'è suonato',
-  download: 'è finito il download di',
+  download: 'mentre l\'utente non era davanti a Filo è finito il download di',
   avviso: 'è arrivato un avviso:',
   giornata: 'è l\'inizio della giornata: l\'utente apre Filo per la prima volta oggi',
   accoglienza: 'l\'utente ha appena finito di presentarsi a te: da qui comincia la vostra conversazione di tutti i giorni',
@@ -7289,6 +7342,7 @@ const handlerCtx = {
   buildAttemptChain,
   providerRouting,
   openWeightsBlockReason,
+  avvisiFuoriPolitica: AvvisiFuoriPolitica,
   modelGate: Gate,
   handleAIRequest,
   maybeCategorizeAsync,
@@ -7400,6 +7454,23 @@ const riassuntoAcceso = (settings) => !(settings && settings.riassuntoSchede && 
 // riassunto spento (#1004), che resta fuori anche se il riassunto si riaccende.
 const restaQui = (it, fuori) => Boolean(it.casa || isHomeNetworkUrl(it.url) || it.senzaRiassunto || fuori.voce(it));
 
+// Alla riapertura la sessione di prima è finita e l'utente si aspetta una barra pulita (#349): il giudizio si fa deciso.
+const TRIAGE_RIAPERTURA = [
+  '',
+  'RIAPERTURA. Filo è stato chiuso e riaperto: la sessione di prima è finita e',
+  'l\'utente si aspetta di ritrovare una barra pulita. Qui sii deciso:',
+  '- ARCHIVIA feed e pagine di consumo (social, notizie, video, aggregatori),',
+  '  risultati di ricerca, pagine "dead-end", contenuti già letti, pagine di un',
+  '  compito che sembra concluso, home e impostazioni di Filo;',
+  '- TIENI solo quello che verosimilmente riprenderà: comunicazione e lavoro',
+  '  (posta, chat, editor, documenti in modifica), contenuti lasciati a metà,',
+  '  le schede di un compito ancora aperto;',
+  '- conta l\'ultimo uso, non l\'apertura: una scheda non toccata da ore o da',
+  '  giorni non è in uso;',
+  '- nel dubbio fra una pagina di consumo e una di lavoro, ARCHIVIA la prima:',
+  '  resta nel filo della home e si riapre con un clic.',
+];
+
 // §2.1 — decisione LLM di triage tab. Riceve i metadati/segnali di TUTTE le tab
 // candidate + (opz.) un estratto del contenuto; la memoria la legge da sé, così
 // nessun chiamante la dimentica (#823). Batch unico. Ritorna { decisions: [{ i, action, reason }] | null, model, provider }
@@ -7437,6 +7508,8 @@ async function runTabTriageDecision({ tabs = [], trigger = 'idle' } = {}) {
     'Di una pagina delicata (posta, banca, sanità, pubblica amministrazione, pagine',
     'con password) ricevi solo',
     'il tipo fra parentesi quadre: decidi sul tipo e sui segnali.',
+    '',
+    ...(trigger === 'reopen' ? TRIAGE_RIAPERTURA : []),
     '',
     'Rispondi SOLO con JSON: {"decisions":[{"i":<indice>,"action":"keep"|"archive",',
     '"reason":"<breve motivo in italiano>"}]} con una voce per OGNI scheda ricevuta.',
@@ -8400,6 +8473,11 @@ async function wireSafebrowse(settingsArg) {
   }
   settings = settings || {};
   const sb = (settings.security && settings.security.safeBrowse) || {};
+  // I siti fidati valgono anche col rilevatore spento: l'analisi locale resta, e l'elenco è dell'utente (#967).
+  const fidati = SB.impostaFidati ? SB.impostaFidati(sb.trustedSites) : { aggiunti: [], tolti: [] };
+  if (fidati.aggiunti.length || fidati.tolti.length) {
+    for (const w of BrowserWindow.getAllWindows()) { try { w._filoTabs?._sbFidatiCambiati?.(fidati); } catch (_) {} }
+  }
   if (sb.enabled === false) {
     SB.configure({ gsbKey: '', runLlm: null, enableSandbox: false, enableNetwork: false });
     return;

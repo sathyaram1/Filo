@@ -298,16 +298,50 @@ async function pagineCheCiSono(incognito) {
 
 const ancore = { normale: null, incognito: null };
 
-// Le cose successe nel filo da `da`: gli accaduti e i cambi (un cambio ritoccato conta all'ora dell'ultimo ritocco).
+// Le pagine visitate come le vede il modello (D-202): di una delicata il sito, di una della rete di casa niente (#591,
+// #1004). Si decide qui, così titolo e ricerca di quelle non arrivano nemmeno a chi scrive il blocco.
+async function vociDiPagine(visite, acc) {
+  if (!visite.length) return [];
+  let fuori = null;
+  try { fuori = await globalThis.SN_DELICATE.filtro(); } catch (_) { fuori = null; }
+  // Senza la regola non si sa: nel dubbio, vale delicata (patterns/un-interruttore-che-promette-una-garanzia-non-ha-ripieghi.md).
+  if (typeof fuori !== 'function') fuori = () => 'campi';
+  const N = globalThis.SN_URL_NAV;
+  const diCasa = (u) => (N && typeof N.isHomeNetworkUrl === 'function' ? N.isHomeNetworkUrl(u) : true);
+  const cercato = new Map(acc.filter((ev) => ev && ev.tipo === 'ricerca' && ev.visita).map((ev) => [ev.visita, ev.testo]));
+  return visite.filter((p) => p && p.id && p.url && p.ts).map((p) => {
+    const url = String(p.url);
+    const base = { tipo: 'navigazione', id: p.id, ts: p.ts };
+    if (diCasa(url)) return { ...base, casa: true };
+    let sito = '';
+    let file = false;
+    try { const u = new URL(url); sito = u.hostname.replace(/^www\./, ''); file = u.protocol === 'file:'; } catch (_) {}
+    let delicata = false;
+    try { delicata = !!fuori(url); } catch (_) { delicata = true; }
+    if (delicata) return { ...base, sito, delicata: true };
+    const titolo = String(p.titolo || '').trim();
+    return {
+      ...base, sito, ...(file ? { file: true } : {}),
+      ...(titolo && titolo !== url ? { titolo } : {}),
+      ...(cercato.get(p.id) ? { cercato: cercato.get(p.id) } : {}),
+    };
+  });
+}
+
+// Le cose successe nel filo da `da`: gli accaduti, i cambi (un cambio ritoccato conta all'ora dell'ultimo ritocco) e le
+// pagine visitate.
 async function eventiDa(da, incognito) {
   const leggi = async (fn) => { try { return (await fn()) || []; } catch (_) { return []; } };
-  const [acc, cambi] = await Promise.all([
+  const [acc, cambi, visite] = await Promise.all([
     leggi(() => F().accaduti({ da }, { incognito })),
     leggi(() => F().cambi({ incognito })),
+    leggi(() => F().pagine({ da, a: null }, { incognito })),
   ]);
   const t0 = Date.parse(da);
   const dalCambio = (c) => ({ tipo: 'cambio', id: c.id, ts: c.agg || c.ts, cambio: c });
-  return [...acc, ...cambi.filter((c) => c && c.id && !(Date.parse(c.agg || c.ts) <= t0)).map(dalCambio)];
+  let pagine = [];
+  try { pagine = await vociDiPagine(visite, acc); } catch (_) { pagine = []; }
+  return [...acc, ...cambi.filter((c) => c && c.id && !(Date.parse(c.agg || c.ts) <= t0)).map(dalCambio), ...pagine];
 }
 
 // La domanda di adesso nella lista del filo (la chat si scrive prima di rispondere): l'ultimo messaggio della sua chat.
@@ -354,12 +388,16 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
   const perMessaggio = TV().eventiPerMessaggi(conDomanda, eventi, { da: daEventi, chiave: FC().chiave });
   const epoca = epocaDi(lato);
   // Le cose successe si scrivono la prima volta e restano quelle: un evento arrivato in ritardo non riscrive un messaggio
-  // già mandato. Si rifanno dopo una cancellazione, perché ciò che è cancellato dalle copie deve uscire.
+  // già mandato. Si rifanno dopo una cancellazione, e quando una sua pagina diventa delicata o della rete di casa (un
+  // sito segnato dopo, un campo password): quello che il modello non deve avere esce anche dalle copie.
+  const riservate = (lista) => lista.filter((ev) => ev && ev.tipo === 'navigazione' && (ev.casa || ev.delicata)).map((ev) => ev.id).join(',');
   const eventiDi = (m) => {
     const k = FC().chiave(m);
     const memo = memoDi(k);
-    if (!memo.eventi || memo.eventi.tolte !== tolte) {
-      memo.eventi = { ...TV().rendiEventi(perMessaggio.get(k) || [], { rif: m.ts }), tolte };
+    const suoi = perMessaggio.get(k) || [];
+    const fuori = riservate(suoi);
+    if (!memo.eventi || memo.eventi.tolte !== tolte || memo.eventi.fuori !== fuori) {
+      memo.eventi = { ...TV().rendiEventi(suoi, { rif: m.ts }), tolte, fuori };
     }
     return memo;
   };

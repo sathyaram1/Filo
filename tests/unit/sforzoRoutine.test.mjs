@@ -1,5 +1,5 @@
 // Sforzo degli agenti delle routine (decisione dell'owner del 2026-10-02): il primo lavoro a xhigh, verifica,
-// correzione e controllo di sicurezza a high; la prosa dell'orchestratore dice lo stesso e sceglie l'agente per ruolo.
+// correzione, controllo di sicurezza e lettura del diff a high; la prosa dell'orchestratore dice lo stesso e sceglie l'agente per ruolo.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const leggi = (...p) => readFileSync(resolve(ROOT, ...p), 'utf8');
 
-const SFORZI = { 'routine-nuovo-lavoro': 'xhigh', 'routine-worker': 'high', 'routine-secaudit': 'high' };
+const SFORZI = { 'routine-nuovo-lavoro': 'xhigh', 'routine-worker': 'high', 'routine-secaudit': 'high', 'routine-lettura': 'high' };
 
 for (const [nome, sforzo] of Object.entries(SFORZI)) {
   test(`${nome}: effort ${sforzo} nell'intestazione, e la descrizione non dice altro`, () => {

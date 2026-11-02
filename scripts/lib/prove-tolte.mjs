@@ -342,6 +342,55 @@ export function numeriDelNome(percorso) {
   return m ? [...new Set(m[1].split('-r').filter(Boolean).map(Number))] : [];
 }
 
+/**
+ * Vero se il rilievo esce dal giro in un pass o in una correzione: un esterno, o un `?` che conta al più 1 (un vicino conta 0).
+ * La sua prova esce PRIMA del verdetto: dopo, un commit è una spinta che il registro della fiducia non vede (#1555). PURA.
+ */
+export function esceInOgniEsito(f) {
+  const sede = String((f && f.sede) || 'i').toLowerCase();
+  if (sede === 'e') return true;
+  return !!(f && f.decision) && (sede === 'v' ? 0 : Number(f.level)) <= 1;
+}
+
+/** Vero se la critica ferma di sicuro il lavoro: un interno di livello 2 o 3 col `?`. PURA. */
+export function fermaDiSicuro(findings) {
+  return (Array.isArray(findings) ? findings : [])
+    .some((f) => f && f.decision && String(f.sede || 'i').toLowerCase() === 'i' && Number(f.level) >= 2);
+}
+
+/**
+ * Fra `prove`, quelle che nel nome portano solo numeri di rilievi che escono comunque. PURA.
+ * A lavoro fermo i `?` restano a chi riprende fra i sospesi: lì escono prima solo le prove degli esterni.
+ */
+export function proveDaToglierePrimaDelVerdetto(prove, findings) {
+  const tutti = Array.isArray(findings) ? findings : [];
+  const esce = fermaDiSicuro(tutti) ? (f) => String(f.sede || 'i').toLowerCase() === 'e' : esceInOgniEsito;
+  return percorsi(prove).filter((p) => PROVA.test(p) && nelGiro(p)).map((p) => ({ prova: p, numeri: numeriDelNome(p) }))
+    .filter(({ numeri }) => numeri.length && numeri.every((n) => tutti[n - 1] && esce(tutti[n - 1])));
+}
+
+/** Le prove del giro aggiunte o rinominate da `avvio` a HEAD: quelle scritte in questa verifica. [] se git non risponde. */
+export function proveScritteDa(avvio, root) {
+  if (!SHA.test(String(avvio || ''))) return [];
+  try {
+    const out = gitOut(['diff', '--name-status', '-z', '-M', String(avvio), 'HEAD', '--', PROVE_GIRO], root);
+    return vociNameStatus(out).filter((v) => v.stato === 'A').map((v) => v.path);
+  } catch (_) { return []; }
+}
+
+/** Il rifiuto della critica con le prove che dovevano uscire prima di lei. PURA. */
+export function testoProvePrimaDelVerdetto(fuori, findings) {
+  const tutti = Array.isArray(findings) ? findings : [];
+  const perche = (n) => (String((tutti[n - 1] || {}).sede || 'i').toLowerCase() === 'e'
+    ? `il rilievo ${n} è esterno` : `il rilievo ${n} chiede una decisione e conta al più 1`);
+  return [
+    'critica non registrata: queste prove sono di rilievi che escono dal giro in ogni esito, e vanno tolte PRIMA della critica,',
+    'nel suo commit: dopo il verdetto ogni commit è una spinta che il registro della fiducia non vede, e il lavoro fidato perde la fiducia (#1555).',
+    ...fuori.map(({ prova, numeri }) => `  · ${prova}: ${numeri.map(perche).join(', ')}`),
+    'Toglile (`git rm`), poi `git commit` e registra la stessa critica. Una prova che copre anche un rilievo da correggere resta: le togli solo il caso di questi.',
+  ].join('\n');
+}
+
 /** Un nome che sembra numerato ma che numeriDelNome non legge per intero (r0, R3, il numero in coda…). PURA. */
 export function nomeNumeratoStorto(percorso) {
   const nome = nomeDi(percorso);

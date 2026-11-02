@@ -18,6 +18,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, confirmState, confermaSopraPagina, nelMondoDiFilo } from './helpers/confirm.mjs';
+import { nelloStrato, paginaDelloStrato } from './helpers/riquadri.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -172,30 +173,34 @@ const OSTILE = `<!doctype html><html><body><h1>Negozio</h1><script>
   }, 50);
 </script></body></html>`;
 
+// Su un sito l'Aiuto, e la sua domanda, stanno nello strato sopra la scheda (#1509.3), dove il codice della pagina non
+// arriva: lo script ostile non trova il riquadro da premere, e il popup del sì sta lì, sopra la pagina.
 test('su un sito la pagina non risponde da s\u00e9, e chi risponde legge nel popup quello che succede davvero', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, OSTILE);
   const host = new URL(page.url()).hostname;
-  await nelMondoDiFilo(app, host, `(() => {
+  await nelMondoDiFilo(app, host, 'SN_SIDEBAR.open(); 1');
+  const strato = await paginaDelloStrato(app, page);
+  await strato.waitForSelector('.sn-sidebar-input textarea');
+  await nelloStrato(app, page, () => {
     globalThis.__inviati = 0;
     const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
     chrome.runtime.sendMessage = (m, ...r) => { if (m && m.type === 'save_path') { globalThis.__inviati++; return Promise.resolve({ ok: true }); } return orig(m, ...r); };
-    SN_SIDEBAR.open();
     __filoSidebarTest.renderFeedbackPrompt();
     return 1;
-  })()`);
+  });
   await page.waitForTimeout(1500);
   expect(await page.evaluate(() => window.__premuto)).toBe(null);
-  expect(await nelMondoDiFilo(app, host, 'globalThis.__inviati')).toBe(0);
+  expect(await nelloStrato(app, page, () => globalThis.__inviati)).toBe(0);
 
-  const p = await nelMondoDiFilo(app, host, "__filoSidebarTest.puntoRisposta('up')");
-  await page.mouse.click(p.x, p.y);
-  const vista = await confermaSopraPagina(app);
-  const s = await vista.evaluate(() => window.SN_CONFIRM_UI._test.state());
+  const p = await nelloStrato(app, page, () => __filoSidebarTest.puntoRisposta('up'));
+  await strato.mouse.click(p.x, p.y);
+  await expect.poll(() => nelloStrato(app, page, () => !!globalThis.SN_CONFIRM_UI._test.state()), { timeout: 8_000 }).toBe(true);
+  const s = await nelloStrato(app, page, () => globalThis.SN_CONFIRM_UI._test.state());
   expect(s.text).toContain('dati personali');
   expect(s.text).not.toContain('parere privato');
-  expect(await nelMondoDiFilo(app, host, 'globalThis.__inviati')).toBe(0);
+  expect(await nelloStrato(app, page, () => globalThis.__inviati)).toBe(0);
   await page.waitForTimeout(700);
-  const ok = await vista.evaluate(() => window.SN_CONFIRM_UI._test.point('ok'));
-  await vista.mouse.click(ok.x, ok.y);
-  await expect.poll(() => nelMondoDiFilo(app, host, 'globalThis.__inviati')).toBe(1);
+  const ok = await nelloStrato(app, page, () => globalThis.SN_CONFIRM_UI._test.point('ok'));
+  await strato.mouse.click(ok.x, ok.y);
+  await expect.poll(() => nelloStrato(app, page, () => globalThis.__inviati)).toBe(1);
 });

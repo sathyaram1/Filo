@@ -77,8 +77,8 @@ test('deliver domanda: JSON storto, tipo non attivo o campi in più si fermano p
   const storto = await lancia(['deliver', BIGLIETTO, 'domanda', '--domanda', file('storto.json', '{"titolo":')]);
   assert.equal(storto.code, 1);
   assert.match(storto.stderr, /JSON malformato/);
-  const ambito = { ...DOMANDA, opzioni: [{ testo: 'x', pro: 'p', contro: 'c', azione: { tipo: 'ambito' } }, DOMANDA.opzioni[1]] };
-  const nonAttivo = await lancia(['deliver', BIGLIETTO, 'domanda', '--domanda', file('ambito.json', JSON.stringify(ambito))]);
+  const esperimento = { ...DOMANDA, opzioni: [{ testo: 'x', pro: 'p', contro: 'c', azione: { tipo: 'esperimento' } }, DOMANDA.opzioni[1]] };
+  const nonAttivo = await lancia(['deliver', BIGLIETTO, 'domanda', '--domanda', file('esperimento.json', JSON.stringify(esperimento))]);
   assert.equal(nonAttivo.code, 1);
   assert.match(nonAttivo.stderr, /tipo_non_attivo/);
   const conNote = await lancia(['deliver', BIGLIETTO, 'domanda', '--domanda', file('ok2.json', JSON.stringify(DOMANDA)), '--notes', 'altro']);

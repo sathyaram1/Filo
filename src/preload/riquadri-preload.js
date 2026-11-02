@@ -122,12 +122,38 @@ const strato = {
   onCursore: (fn) => { ipcRenderer.on('riquadri:cursore', (_e, forma) => { try { fn(forma); } catch (_) {} }); },
   onApri: (fn) => { ipcRenderer.on('riquadri:apri', (_e, d) => { try { fn(d); } catch (e) { console.error('[Filo riquadri] apri', e); } }); },
   onEsc: (fn) => { ipcRenderer.on('riquadri:esc', () => { try { fn(); } catch (_) {} }); },
+  // Dalla pagina sotto all'Aiuto che sta qui (#1509.3): icona premuta di nuovo, Aiuto spento, passo da scoprire, gesto sul passo.
+  onAiuto: (fn) => { ipcRenderer.on('riquadri:aiuto', (_e, d) => { try { fn(d); } catch (e) { console.error('[Filo riquadri] aiuto', e); } }); },
   // La pagina sotto: indirizzo, origine e titolo, per la bozza e il feedback. Chiesta una volta, prima dei moduli.
   pagina: (() => {
     let p = null;
     try { p = ipcRenderer.sendSync('riquadri:chi'); } catch (_) { p = null; }
     return p && typeof p === 'object' ? { url: String(p.url || ''), origine: String(p.origine || ''), titolo: String(p.titolo || '') } : null;
   }),
+};
+
+// Il microfono di Filo lo apre la cornice della finestra (#586), come sui siti: qui arrivano solo i campioni.
+const microfoniAperti = new Map();
+ipcRenderer.on('microfono:dati', (_event, d) => {
+  const m = d && microfoniAperti.get(d.id);
+  if (!m) return;
+  if (d.fine) { microfoniAperti.delete(d.id); try { m.suFine(); } catch (_) {} return; }
+  if (d.dati) { try { m.suDati(d.dati instanceof Float32Array ? d.dati : Float32Array.from(d.dati)); } catch (_) {} }
+});
+const microfonoDellaCornice = {
+  async apri({ suDati, suFine } = {}) {
+    let r = null;
+    try { r = await ipcRenderer.invoke('microfono:apri'); } catch (_) { r = null; }
+    if (!r || !r.ok || !r.id) throw Object.assign(new Error('microfono'), { name: (r && r.errore) || 'NotAllowedError' });
+    microfoniAperti.set(r.id, { suDati: suDati || (() => {}), suFine: suFine || (() => {}) });
+    return {
+      rate: r.rate,
+      chiudi: () => {
+        if (!microfoniAperti.delete(r.id)) return;
+        ipcRenderer.invoke('microfono:chiudi', { id: r.id }).catch(() => {});
+      },
+    };
+  },
 };
 
 const SHARED_DIR = path.join(__dirname, '..', 'shared');
@@ -168,6 +194,7 @@ function loadContentScripts() {
   try { require(path.join(CONTENT_DIR, 'vistoDavvero.js')); } catch (e) { console.error('[Filo riquadri] vistoDavvero.js', e); }
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo riquadri] menu.js', e); }
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo riquadri] highlight.js', e); }
+  try { require(path.join(CONTENT_DIR, 'aiutoPagina.js')); } catch (e) { console.error('[Filo riquadri] aiutoPagina.js', e); }
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo riquadri] sidebar.js', e); }
   try { require(path.join(CONTENT_DIR, 'coerenza.js')); } catch (e) { console.error('[Filo riquadri] coerenza.js', e); }
   try { require(path.join(CONTENT_DIR, 'correttoreRegole.js')); } catch (e) { console.error('[Filo riquadri] correttoreRegole.js', e); }
@@ -199,6 +226,7 @@ if (IN_STRATO) {
   globalThis.chrome = chromeShim;
   globalThis.self = globalThis;
   globalThis.SN_STRATO_RIQUADRI = Object.freeze({ ...strato, pagina: strato.pagina() });
+  globalThis.SN_MICROFONO_CORNICE = microfonoDellaCornice;
   const consegnaScorciatoia = require('./scorciatoia.js');
   ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => consegnaScorciatoia(broadcastListeners, payload, filoMessage));
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadContentScripts, { once: true });

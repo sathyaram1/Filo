@@ -183,6 +183,26 @@ test('consiglio: le domande col consiglio di consenso restano fuori, le altre pa
   assert.match(f.out.join('\n'), /D-1: fatto, Archivia #8/);
 });
 
+// #1790.1: in blocco ogni esito si dice come nella risposta singola; una ripresa accodata non è «fatto».
+test('consiglio: una ripresa accodata si dice accodata, col numero e lo stato del lavoro', async () => {
+  const riprendi = { opzioni: [{ testo: 'Riprendi', azione: { tipo: 'riprendi', feedbackId: 'f1' } }], consiglio: { opzione: 0, perche: 'x' } };
+  const f = finto({
+    mostra: (d) => ({ ok: true, domanda: { id: d.id, ...riprendi }, riferimenti: { f1: { num: '#1482' } } }),
+    consiglio: { ok: true, esiti: [
+      { id: 'D-1', ok: true, etichetta: 'Riprendi #1482', esito: { ok: true, azione: { tipo: 'riprendi', feedbackId: 'f1' }, accodata: true, statoLavoro: 'todo' } },
+      { id: 'D-2', ok: true, etichetta: 'Riprendi #1482', esito: { ok: true, azione: { tipo: 'riprendi', feedbackId: 'f1' }, accodata: true, statoLavoro: 'design', aspetta: ['D-7'] } },
+      { id: 'D-3', ok: true, etichetta: 'Riprendi #1482', esito: { ok: true, azione: { tipo: 'riprendi', feedbackId: 'f1' } } },
+    ] },
+  });
+  assert.equal(await esegui(['consiglio', 'D-1', 'D-2', 'D-3'], f.io), 0);
+  const out = f.out.join('\n');
+  assert.match(out, /D-1: accodata: Riprendi #1482 con questa scelta \(#1482 non era fermo: è todo, la decisione resta accodata per il giro dopo\)/);
+  assert.match(out, /D-2: accodata: Riprendi #1482 con questa scelta \(#1482 resta fermo anche su D-7, e riparte con la risposta a quella\)/);
+  assert.match(out, /D-3: applicata: Riprendi #1482 con questa scelta/);
+  assert.doesNotMatch(out, /fatto/);
+  assert.equal(f.err.length, 0);
+});
+
 test('mostra: i testi degli agenti escono coi caratteri di controllo resi visibili, il pulsante dai dati', () => {
   const testo = formattaDomanda({
     id: 'D-9', stato: 'aperta', fiducia: 'non_fidato', priorita: 'bloccante',

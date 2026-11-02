@@ -62,7 +62,9 @@ async function apri(app, openTab, testServer, opz = {}) {
       const sistema = String(messages[0].content);
       const t = String(messages[messages.length - 1].content);
       const fine = (text) => ({ text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} });
-      const righe = (nuovo, voci, tipo) => Object.entries(voci).filter(([p]) => nuovo.includes(p)).map(([p, [c, m]]) => `[${p}][${c}][${m}][${tipo}]`);
+      // Una voce che è già una riga va com'è: il modello che cita il pezzo con altri spazi o altri apici (#1580.2).
+      const righe = (nuovo, voci, tipo) => Object.entries(voci).filter(([p]) => nuovo.includes(p))
+        .map(([p, v]) => (typeof v === 'string' ? v : `[${p}][${v[0]}][${v[1]}][${tipo}]`));
       if (sistema.includes('Sei il controllo rapido')) {
         const nuovo = tag(t, 'testo_nuovo');
         const candidati = tag(t, 'candidati');
@@ -221,6 +223,31 @@ test('«oggi sonno andato al mare»: un errore su «sonno», con «sono» in cim
   await expect(prima).toHaveText(/^sono/);
   await prima.locator('.sn-menu-correction-main').click();
   await expect(page.locator('#ta')).toHaveValue('oggi sono andato al mare ');
+});
+
+test('il modello cita il pezzo con uno spazio in più e l\'altro apice: il segno sta su «sonno» e la correzione non incolla le parole', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, { errori: { sonno: "[l’amico  sonno andato][l'amico sono andato][verbo essere][errore]" } });
+  await page.locator('#ta').click();
+  await page.keyboard.type('oggi l’amico sonno andato al mare ');
+  const segno = errore(page, 'sonno');
+  await expect(segno).toHaveText('sonno', { timeout: 6000 });
+  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(1);
+  const menu = await tastoDestroSu(page, segno);
+  const prima = menu.principale.locator(':scope > *').first();
+  await expect(prima).toHaveText(/^sono/);
+  await prima.locator('.sn-menu-correction-main').click();
+  await expect(page.locator('#ta')).toHaveValue('oggi l’amico sono andato al mare ');
+});
+
+test('«Filo» e filo.red non hanno segni, nemmeno se il modello dice sbagliato «Filo»', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {
+    errori: { Filo: '[aperto Filo][aperto filo][maiuscola a metà frase][errore]', quseta: ['questa', 'Refuso.'] },
+  });
+  await page.locator('#ta').click();
+  await page.keyboard.type('ho aperto Filo e poi filo.red per quseta ');
+  await expect(errore(page, 'quseta')).not.toHaveClass(/sn-dubbio/, { timeout: 6000 });
+  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(1);
+  for (const r of await rapide(app)) expect(r.candidati).not.toMatch(/\bred\b|Filo/);
 });
 
 test('la parola che si sta scrivendo non è mai segnata e non parte; chiusa, sì', async ({ app, openTab, testServer }) => {

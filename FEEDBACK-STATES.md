@@ -120,7 +120,9 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   legittimo»).
 
 **Routine** (canale autenticato: il server valida ogni mossa con la tabella incorporata):
-- `todo` —claim (§6)→ `working`.
+- `todo` —claim (§6)→ `working`; —riordino o unione→ `archived` (#1153: solo un biglietto con
+  l'ambito `coda` o `unisci`, su un lavoro non ancora iniziato; l'unione scrive sul genitore il
+  rimando `unitoIn` al figlio).
 - `working` —routine→ `revision_capability`; —arenato (ramo fermo da un'ora)→ `todo`;
   —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
@@ -266,8 +268,8 @@ una sessione conta i lavori dell'altra voce per lasciarle il posto, l'ordine val
 lì: un primo lavoro che il pacemaker non accenderà non chiede un posto. Un numero
 dell'ordine chiuso o inesistente non conta, e un ordine senza feedback aperti vale come
 nessun ordine. Senza ordine vale la coda per priorità, come ripiego (SPEC § 4). Le unite di
-un pacchetto si chiudono solo sulle strade della fusione: un «fatto» consegnato da un ruolo
-non è una fusione. La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
+un pacchetto nato prima del 30/10 si chiudono solo sulle strade della fusione: un «fatto»
+consegnato da un ruolo non è una fusione. La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
 sempre: il comando `ticket` manda l'id della sessione (`sessione`), e il server, dopo la
 parola d'ordine, le dà il biglietto del suo feedback anche senza numero; dopo quel
 biglietto ogni altra richiesta della stessa sessione è «niente»
@@ -306,27 +308,65 @@ rifiuto dice il motivo, e la sessione lavora il feedback come sempre.
 **Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
 segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce da
 `npm run feedback:apri -- … --pacchetto N,M` col campo `unisce: [{ id, num }]` (in
-chiaro, da 1 a 20, solo alla nascita e solo admin: `unisceValido` nelle regole), e ogni
-segnalazione unita prende P fra le sue attese (`waitsFor`, che resta com'era più P). Lo
+chiaro, da 1 a 20, solo alla nascita e solo admin: `unisceValido` nelle regole). Lo
 strumento controlla tutte le segnalazioni prima di aprire e dice tutti i motivi insieme:
 fuori chi non è `todo` (già in lavorazione o ferma), chi ha già un ramo (tornata in coda
-dopo una risposta o una riapertura), chi aspetta già un altro pacchetto aperto, chi è a
+dopo una risposta o una riapertura), chi aspetta già un altro pacchetto aperto o ne porta
+il rimando `unitoIn` (rimasta in coda perché l'archiviazione non è riuscita), chi è a
 priorità 3, un lavoro locale, chi ha già 20 attese, chi P stesso aspetta. Area, tetto e
 urgenti li controlla il manutentore. Senza `--priorita` P nasce con la
 priorità più alta fra le unite. Un pezzo che si blocca in verifica non si stacca: P passa
-o non passa intero. Alla fusione di P (`done`) il server chiude ogni segnalazione di
-`unisce` che lo aspetta ancora ed è `todo`: `todo → done` (pipeline,
-`statusReason: pacchetto`), con la frase di P come `userNote` (senza, una frase di
-ripiego, e le note di P lo dicono) e la versione di P se ne ha una; quelle in un altro
-stato, o che non aspettano più P, restano dove sono, e il server lo scrive nelle note di
-P. Un'unita che è a sua volta un pacchetto chiude prima le sue, allo stesso modo (così
-si aggiunge un doppione a un pacchetto già aperto: un pacchetto nuovo che unisce il
-vecchio). Le chiude PRIMA di scrivere P in `done`, così l'attesa
-sciolta non le rimette in coda; il gancio è uno solo per ogni strada che porta P a
-`done` dopo una fusione. Il messaggio della fusione di P cita anche le unite
-(`merge-gate: #P via server (unisce #N, #M)`), così la ricerca «già risolto su main» le
-trova. P archiviato senza fusione: le unite seguono l'attesa chiusa di sempre (§4,
-`attesa_chiusa`).
+o non passa intero.
+
+*La spec sta nel testo* (#2033): chi lavora P, chi lo verifica e i lavori server ricevono
+testo e allegati, mai le note. Prima della rete, anche a vuoto, lo strumento legge il testo
+insieme agli allegati di testo di `--allega` e rifiuta, con tutti i motivi: una frase che
+manda la spec nelle note («spec nelle note del feedback», «vedere le note», «come da note»),
+un'unita che la spec non nomina, un feedback che il testo mette prima («#1202 si fonde prima»,
+«prerequisito: #N», «solo dopo #N», «quando #N è fuso») senza che P lo aspetti, perché senza attesa il server
+dà P da lavorare con quello fuori da main. Il rimedio sta nel messaggio: la spec nel testo
+o allegata, `--aspetta` coi numeri, o la frase riscritta. Vale solo per i pacchetti: una
+segnalazione qualunque racconta un problema, e può citare note e attese di altri.
+
+*Gli allegati viaggiano con P*: chi lavora un biglietto apre solo quelli del suo feedback.
+Prima di aprire lo strumento legge e decifra immagini, documenti e allegati della
+conversazione di ogni unita e li carica in P: i documenti col nome «#N — nome», le
+immagini (che un nome non l'hanno) nel campo delle immagini, con da dove viene ognuna in
+un blocco in coda alla spec. Il tetto è quello di un feedback, 5 immagini e 5 documenti
+compresi quelli di `--allega`: oltre, o con un allegato che non si apre o che un feedback
+non ammette, non apre niente e lo dice; un caricamento che non riesce ferma la nascita
+(`submit` con `interi`): niente pacchetto monco. Con allegati di una unita non fidata, o
+della conversazione di una scritta anche da routine o sessioni, P nasce non fidato anche
+da una sessione pulita (lo strumento non manda il biglietto), come un figlio di genitori
+non fidati (SPEC-DOMANDE.md § 1.3).
+
+*Le unite si archiviano alla nascita* (decisione dell'owner del 30/10). Chi aspettava una
+unita passa ad aspettare P (le sue attese sulle unite diventano una su P, le altre
+restano); poi ogni unita va `todo → archived` (owner) con la nota «Unito nel pacchetto
+#P: il lavoro continua lì», senza frase per chi l'ha segnalata. Prima le attese: un
+aspettato archiviato senza fusione manda chi lo aspetta all'owner (`attesa_chiusa`), così
+una unita con un'attesa che non si è spostata resta aperta, e lo strumento stampa le righe
+per rimediare, come per ogni passo che non riesce. Chi aspetta una unita ed è aspettato da
+P si rifiuta prima di aprire (si aspetterebbero a vicenda); P nato senza numero non
+archivia niente, perché nota e attese lo nominano. Il rimando `unitoIn` (l'id di P, come
+nell'unione) su ogni unita il cui numero corrisponde lo scrive il server alla nascita di P,
+dal trigger di creazione e prima dei giudici: ai client le regole lo vietano, come la fiducia.
+Le unite archiviate restano leggibili a chi gestisce il lavoro: `feedback:leggi` non filtra
+per stato, e dal cloud `routineFeedback` (#1785) coi numeri espliciti non esclude gli
+archiviati e ne dà gli allegati testuali; delle immagini dà il conteggio, e le porta P.
+
+Alla fusione di P (`done`) il server non ha più unite da chiudere. Resta, per i pacchetti
+nati prima (le unite `todo` che aspettano P), la chiusura di prima: `todo → done`
+(pipeline, `statusReason: pacchetto`) con la frase di P come `userNote` (senza, una frase
+di ripiego, e le note di P lo dicono) e la versione di P se ne ha una, PRIMA di scrivere P
+in `done`, così l'attesa sciolta non le rimette in coda, con un gancio solo per ogni
+strada che porta P a `done` dopo una fusione; un'unita che è a sua volta un pacchetto
+chiude prima le sue. Una unita archiviata col rimando a P non è un'eccezione da scrivere
+nelle note di P; una in un altro stato, o che non aspetta più P, resta dove sta e le note
+lo dicono. Il messaggio della fusione di P cita le unite (`merge-gate: #P via server
+(unisce #N, #M)`), così la ricerca «già risolto su main» le trova. P archiviato senza
+fusione: le unite restano archiviate; se il lavoro serve ancora le rimette in coda l'owner,
+da Gestione (`archived → todo`).
 
 **Il piano.** Un lavoro grosso (una spec in più fasi, un pacchetto) consegna il piano
 prima di toccare codice e a ogni parte chiusa (`deliver piano --piano <file.md>`, al più
@@ -349,7 +389,14 @@ semaforo a un worker morto.
 
 **La verifica dopo un riallineamento.** Dispatch scrive nel marcatore del ruolo la base
 del confronto (`dal`: lo sha verificato se il server lo manda come `shaVerificato`, sennò
-la punta che il correttore riceve). Alla consegna lo strumento guarda due cose: i file in
+la punta che il correttore riceve). A chi verifica il riallineamento il perimetro arriva
+con lo sha verificato del server: se in copia manca dispatch lo scarica da origin (un rebase
+lo toglie dai rami), e se è la punta stessa del ramo non va nel marcatore e il compito dice
+che il confronto manca, invece di dare un diff vuoto (#1968). Quello sha il server lo tiene
+sul commit che un verificatore ha approvato: un salto dopo un riallineamento pulito marca
+passata la punta nuova per il cancello, ma il riallineamento dopo riparte dall'approvato,
+anche nel confronto che decide il giro: per questo anche a chi riallinea dispatch scarica lo
+sha verificato che manca in copia. Alla consegna lo strumento guarda due cose: i file in
 cui la modifica del ramo è cambiata, senza i numeri di riga (`fileRiscritti`), e i file
 in cui la punta verificata va in conflitto con main (`git merge-tree`, `fileInConflitto`),
 più quelli che il motivo dichiara. Manda `riallineamento: { fileRiscritti,
@@ -362,7 +409,10 @@ conflitto risolto tenendo le due parti, che lascia la modifica del ramo uguale).
 regola è `giroDopoRiallineamento` in `verifierRound.js`; il server rifà il confronto da
 sé con l'API di GitHub e non si fida di quello del client: per i conflitti approssima
 `merge-tree` (zone sovrapposte o a contatto nei file toccati da tutte e due le parti;
-nel dubbio, conflitto). Per questo dispatch spinge il ramo prima di consegnare. Ogni
+nel dubbio, conflitto). Per questo dispatch spinge il ramo prima di consegnare, e se la
+punta non contiene `origin/main`, non parte o su origin non risulta uguale, non consegna
+(#1964: altrimenti chi verifica dopo legge il commit già verificato). Vale anche per
+`deliver fixed`; una consegna che si ferma con una domanda non riallinea e passa. Ogni
 guasto (GitHub giù, sha sconosciuto, main cambiato in troppi file) vale `pieno`. Un
 lavoro che tocca anche il server confronta allo stesso modo la sua parte del server,
 dalla punta verificata a quella registrata dell'ultima spinta (`realign.shaVerificatoServer`):
@@ -386,7 +436,7 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 - Ricevuti: `unlabeled | suspicious_file | attack | spam | design | aligned`
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
 - Il segno `localOnly` (#908) non sposta di scheda (#1575): la pratica sta nella scheda del suo stato con l'etichetta «server».
-- Aspettano (#903): `waitsFor: [{ id, num }]` (in chiaro, da 1 a 20, scrive l'admin da Gestione, `npm run feedback -- <n> --aspetta 676,663.2` / `--aspetta-niente` e `feedback:apri --aspetta`; inesistenti, sé stesso e giri si rifiutano; un'attesa già scritta non si rifiuta perché il suo aspettato è sparito, e da riga di comando la risposta dice quelle che sostituisce): finché un aspettato non è fuso (`done`, o `archived` con `resolvedInVersion`) né biglietti né accensioni per un `todo` o un ramo in revisione, poi entra in coda da solo; se uno si chiude senza fusione o sparisce, il pacemaker lo porta in `design` (`statusReason: attesa_chiusa`) con la domanda e toglie quell'attesa.
+- Aspettano (#903): `waitsFor: [{ id, num }]` (in chiaro, da 1 a 20, scrive l'admin da Gestione, `npm run feedback -- <n> --aspetta-anche 676,663.2` (aggiunge), `--aspetta 676,663.2` (l'elenco intero) / `--aspetta-niente` e `feedback:apri --aspetta`; inesistenti, sé stesso e giri si rifiutano; un'attesa già scritta non si rifiuta perché il suo aspettato è sparito; `--aspetta` che toglierebbe un'attesa non fusa si rifiuta senza scrivere, a meno di `--sostituisci` (#1756), e la risposta dice quelle che sostituisce; `feedback:leggi` le stampa, una per riga col loro stato): finché un aspettato non è fuso (`done`, o `archived` con `resolvedInVersion`) né biglietti né accensioni per un `todo` o un ramo in revisione, poi entra in coda da solo; se uno si chiude senza fusione o sparisce, il pacemaker lo porta in `design` (`statusReason: attesa_chiusa`) con la domanda e toglie quell'attesa.
   - **La priorità risale le attese** (#1630, decisione dell'owner del 23/10): se B aspetta A, `priority` di A
     vale almeno quella di B, lungo tutta la catena (C aspetta B che aspetta A → A ≥ B ≥ C), e **solo verso
     l'alto**: un'attesa tolta o B riabbassato non riabbassano niente. Scatta quando la priorità di un feedback

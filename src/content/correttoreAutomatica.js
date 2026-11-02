@@ -147,6 +147,10 @@
   // Una correzione che cambia solo maiuscole: in un posto dove si scrive tutto minuscolo non si fa.
   const soloMaiuscole = (a, b) => a !== b && String(a).toLowerCase() === String(b).toLowerCase();
 
+  // Da dove viene una correzione: i contatori ne tengono una copia (SN_CONTATORI.FONTI_AUTOMATICA, sentinella in
+  // tests/unit/contatoriRiquadri.test.mjs).
+  const FONTI = Object.freeze(['personale', 'fisso', 'nome']);
+
   // Cosa correggere quando una parola finisce in `fine`: { start, end, originale, corretta, fonte } o null. Le correzioni
   // dell'utente prima, poi gli errori fissi, poi la maiuscola dei nomi. `rifiutate`: le parole di cui l'utente ha
   // annullato la correzione abbastanza volte; `minuscolo` (o una funzione che lo dice): lì si scrive tutto minuscolo.
@@ -396,7 +400,7 @@
   }
 
   global.SN_CORRETTORE_AUTO = {
-    NOMI, SOGLIE, LIMITE_CONTI, chiave, conMaiuscole, fineDellaParola, parolaPrima, chiavePersonale, formaDelNome, formaAccentata,
+    NOMI, FONTI, SOGLIE, LIMITE_CONTI, chiave, conMaiuscole, fineDellaParola, parolaPrima, chiavePersonale, formaDelNome, formaAccentata,
     soloMaiuscole, correzioneAFineParola, dentroCodice, stileDi, scriveMinuscolo, scriveMinuscoloQui, STILE_MAX, sommaStile, distanza, imparabile, memoria, accettata, annullata,
     riscritta, corretta, dimentica, inizioDiFrase,
   };

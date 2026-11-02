@@ -1,10 +1,24 @@
 // #1448 — i segnaposti del correttore con modello e ricerca finti: «nel 14xx» mostra 1492 sopra le x e un clic lo mette
 // col lampo; «x te», «3x4» e i baci restano senza segni; un dato di adesso passa dalla ricerca finta e il tasto destro ne
 // cita la fonte e la data; «Correggi tutti gli errori» riempie i segnaposti; spenti, niente. Nessuna chiamata esce.
+// I contatori (#1586): ogni ricerca, il suo esito, il valore messo o ignorato, e il costo della pagina delicata.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { voceOggi } from './helpers/riquadriOggi.mjs';
+
+// La proposta del correttore per i segnaposti, nell'ora di oggi: [mostrata, accettata, rifiutata, ignorata].
+const suggerimentoOggi = (app) => app.evaluate(async () => {
+  const s = await globalThis.SN_CONTATORI_MAIN.letto();
+  const g = globalThis.SN_CONTATORI.giornoDi(Date.now());
+  const tot = [0, 0, 0, 0];
+  for (const [id, ora] of Object.entries(s.ore || {})) {
+    if (!id.startsWith(`${g}T`)) continue;
+    for (const c of Object.values((ora.correttore || {}).suggerimento || {})) c.forEach((n, i) => { tot[i] += n; });
+  }
+  return tot;
+});
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:60px 20px 20px;font:16px sans-serif">
@@ -72,7 +86,7 @@ async function apri(app, openTab, testServer, opz = {}) {
       return globalThis.__fontiWeb;
     };
   }, opz);
-  const page = await testServer.openReady(openTab, PAGINA, { pubblico: true });
+  const page = await testServer.openReady(openTab, opz.html || PAGINA, { pubblico: true });
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   return page;
 }
@@ -114,6 +128,8 @@ for (const campo of ['#ta', '#ce']) {
     // Il campo ha ancora il fuoco: si continua a scrivere dove si era.
     await page.keyboard.type('Bene');
     await expect.poll(testo).toBe("l'America l'hanno scoperta nel 1492. Bene");
+    // Il valore lo sapeva il modello, senza ricerca (#1586).
+    await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'memoria'), { timeout: 5000 }).toEqual({ riempito: 1 });
   });
 }
 
@@ -144,6 +160,98 @@ test('sopra le parole della riga prima il valore è velato e il clic va al testo
   await expect(v).toHaveClass(/sn-sveglio/);
   await page.mouse.click(sopra.x + sopra.width / 2, sopra.y + sopra.height / 2);
   await expect(page.locator('#ta')).toHaveValue(scritto.replace('14xx', '1492'));
+});
+
+// #1448.12: un collegamento attaccato sopra campi senza margine, dove il valore sopra le x della prima riga cadrebbe.
+const SENZA_MARGINE = `<!doctype html><meta charset="utf-8"><body style="margin:0;padding:60px 20px;font:14px sans-serif">
+<a id="lnk" href="#cliccato" style="display:block;width:760px;height:30px">Rispondi a tutti</a>
+<textarea id="ta" lang="it" style="display:block;width:760px;height:100px;font:16px sans-serif;padding:2px;margin:0"></textarea>
+<a id="lnk2" href="#cliccato2" style="display:block;width:760px;height:30px;margin-top:20px">Inoltra</a>
+<div id="ce" contenteditable="true" lang="it" style="width:760px;font:16px sans-serif;padding:2px;border:1px solid #999"></div></body>`;
+const SCRITTO_1 = "l'America l'hanno scoperta nel 14xx, e allora abbiamo discusso. ";
+
+test('sulla prima riga di un campo senza margine il valore sta dentro il campo, sotto le x, e il clic sopra il campo resta della pagina', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, { ragionato: { '14xx': [COLOMBO] }, html: SENZA_MARGINE });
+  await page.locator('#ta').click();
+  await page.keyboard.type(SCRITTO_1);
+  const v = valore(page, '1492');
+  await expect(v).toBeVisible({ timeout: 8000 });
+  await expect(v).toHaveClass(/sn-sotto/);
+  await expect(v).not.toHaveClass(/sn-sopra-testo/);
+  const [x, b, ta] = [await riquadroDelSegno(ocra(page, '14xx')), await v.boundingBox(), await page.locator('#ta').boundingBox()];
+  expect(b.y, 'sotto le x').toBeGreaterThanOrEqual(x.y + x.height - 2);
+  expect(b.y + b.height, 'dentro il campo').toBeLessThanOrEqual(ta.y + ta.height);
+  expect(Math.abs((b.x + b.width / 2) - (x.x + x.width / 2))).toBeLessThan(6);
+  await expect.poll(() => v.evaluate((el) => Number(getComputedStyle(el).opacity))).toBeGreaterThan(0.9);
+  await page.screenshot({ path: 'tests/.shots/1448-12-valore-sotto.png', clip: { x: 0, y: 40, width: 820, height: 180 } }).catch(() => {});
+
+  // Chi scrive clicca sul collegamento appena sopra le x: va al collegamento, e il testo resta com'era.
+  await page.mouse.click(x.x + x.width / 2, ta.y - 6);
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#cliccato');
+  await expect(page.locator('#ta')).toHaveValue(SCRITTO_1);
+
+  await page.locator('#ta').focus();
+  await expect(v).toBeVisible();
+  await v.click();
+  await expect(page.locator('#ta')).toHaveValue(SCRITTO_1.replace('14xx', '1492'));
+});
+
+test('sulla prima riga con parole sotto il valore sta sotto velato; in un campo alto una riga accanto alle x: il clic resta al testo e alla pagina', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, { ragionato: { '14xx': [COLOMBO] }, html: SENZA_MARGINE });
+  const scritto = "Scoperta nel 14xx dagli spagnoli.\nSotto ci sono altre parole lunghe abbastanza da stare sotto le x del segnaposto. ";
+  await page.locator('#ta').click();
+  await page.keyboard.type(scritto);
+  const v = valore(page, '1492');
+  await expect(v).toBeVisible({ timeout: 8000 });
+  await expect(v).toHaveClass(/sn-sotto/);
+  await expect(v).toHaveClass(/sn-sopra-testo/);
+  const x = await riquadroDelSegno(ocra(page, '14xx'));
+  const sotto = await v.boundingBox();
+  await page.screenshot({ path: 'tests/.shots/1448-12-valore-sotto-velato.png', clip: { x: 0, y: 40, width: 820, height: 180 } }).catch(() => {});
+  // Il clic sulla parola della seconda riga, dove sta il valore velato, mette lì il cursore e non scrive il valore.
+  await page.mouse.move(sotto.x + sotto.width / 2, sotto.y + 60);
+  await page.mouse.click(sotto.x + sotto.width / 2, sotto.y + sotto.height / 2);
+  await page.waitForTimeout(300);
+  const stato = await testoDi(page);
+  expect(stato.testo).toBe(scritto);
+  expect(stato.cursore).toBeGreaterThan(scritto.indexOf('\n'));
+  // Dalle x il puntatore scende sul valore, che si è svegliato: un clic lo mette.
+  await page.mouse.move(x.x + x.width / 2, x.y + x.height / 2);
+  await expect(v).toHaveClass(/sn-sveglio/);
+  await page.mouse.move(sotto.x + sotto.width / 2, sotto.y + sotto.height / 2, { steps: 4 });
+  await expect(v).toHaveClass(/sn-sveglio/);
+  await page.mouse.click(sotto.x + sotto.width / 2, sotto.y + sotto.height / 2);
+  await expect(page.locator('#ta')).toHaveValue(scritto.replace('14xx', '1492'));
+
+  // Un campo alto una riga non ha posto né sopra né sotto: il valore sta accanto alle x, dentro il campo, velato sulle
+  // parole che copre. Dalle x il puntatore sale dritto al collegamento sopra il campo, e il clic è del collegamento (#1690).
+  await page.locator('#ce').click();
+  await page.keyboard.type(SCRITTO_1);
+  const w = valore(page, '1492');
+  await expect(w).toBeVisible({ timeout: 8000 });
+  await expect(w).toHaveClass(/sn-accanto/);
+  await expect(w).toHaveClass(/sn-sopra-testo/);
+  await expect(w).not.toHaveClass(/sn-sotto/);
+  const [xi, ce] = [await riquadroDelSegno(ocra(page, '14xx')), await page.locator('#ce').boundingBox()];
+  const bw = await w.boundingBox();
+  expect(bw.y, 'dentro il campo').toBeGreaterThanOrEqual(ce.y);
+  expect(bw.y + bw.height, 'dentro il campo').toBeLessThanOrEqual(ce.y + ce.height);
+  expect(bw.x, 'dopo le x').toBeGreaterThanOrEqual(xi.x + xi.width);
+  await page.screenshot({ path: 'tests/.shots/1690-valore-accanto.png', clip: { x: 0, y: ce.y - 40, width: 820, height: 80 } }).catch(() => {});
+  await page.mouse.move(xi.x + xi.width / 2, xi.y + xi.height / 2);
+  await expect(w).toHaveClass(/sn-sveglio/);
+  await page.mouse.move(xi.x + xi.width / 2, ce.y - 6, { steps: 6 });
+  await page.mouse.click(xi.x + xi.width / 2, ce.y - 6);
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#cliccato2');
+  await expect(page.locator('#ce')).toHaveText(/scoperta nel 14xx, e allora abbiamo discusso\./);
+  // Dalle x il puntatore va sul valore accanto, sveglio: un clic lo mette.
+  await page.locator('#ce').focus();
+  await page.mouse.move(xi.x + xi.width / 2, xi.y + xi.height / 2);
+  await expect(w).toHaveClass(/sn-sveglio/);
+  await page.mouse.move(bw.x + bw.width / 2, bw.y + bw.height / 2, { steps: 4 });
+  await expect(w).toHaveClass(/sn-sveglio/);
+  await page.mouse.click(bw.x + bw.width / 2, bw.y + bw.height / 2);
+  await expect(page.locator('#ce')).toHaveText(/scoperta nel 1492, e allora abbiamo discusso\./);
 });
 
 test('«x te», «3x4» e i baci non hanno segni, e non arrivano al modello come segnaposti', async ({ app, openTab, testServer }) => {
@@ -191,6 +299,11 @@ test('un dato di adesso passa dalla ricerca: mentre cerca respirano i puntini, p
   await expect(menu.voce('Ignora')).toBeVisible();
   await prima.locator('.sn-menu-correction-main').click();
   await expect(page.locator('#ta')).toHaveValue('Google ha un p/e di soli 27, davvero basso. ');
+  // I contatori (#1586): la ricerca partita da sola, trovata, e il valore messo, che è la proposta accettata.
+  await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'da_solo'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1, riempito: 1 });
+  await expect.poll(() => suggerimentoOggi(app), { timeout: 5000 }).toEqual([1, 1, 0, 0]);
+  const disco = await app.evaluate(async () => JSON.stringify(await globalThis.SN_CONTATORI_MAIN.letto()));
+  for (const x of ['Alphabet', 'p/e', 'borsa']) expect(disco, 'la domanda, il valore e la fonte non escono').not.toContain(x);
 });
 
 test('due «xx» da cercare nella stessa frase hanno ciascuno la sua ricerca e il suo valore', async ({ app, openTab, testServer }) => {
@@ -438,11 +551,21 @@ test('in un sito delicato (accesso fatto) il dato non si cerca da solo: lo dice,
   await expect(ocra(page, 'xx')).toHaveCount(1, { timeout: 5000 });
   await expect(page.locator('.sn-spell-valori .sn-spell-valore.sn-cercando')).toHaveCount(0, { timeout: 5000 });
   expect(await globale(app, '__webChieste')).toEqual([]);
+  // Il livello di privacy (#1586): la ricerca che la pagina non lascia partire da sola, e poi il clic che la chiede.
+  await expect.poll(() => voceOggi(app, 'anticipo_privacy', 'segnaposto'), { timeout: 5000 }).toEqual({ saltato: 1 });
+  expect(await voceOggi(app, 'correttore_segnaposto', 'da_solo')).toEqual({ cercato: 1, delicata: 1 });
   const menu = await tastoDestroSu(page, ocra(page, 'xx'));
   await expect(menu.locator('.sn-menu-segno')).toHaveText('Su questa pagina non cerco da solo.', { timeout: 3000 });
   await menu.voce('Cerca il dato').click();
   await expect(valore(page, '27')).toBeVisible({ timeout: 8000 });
   expect(await globale(app, '__webChieste')).toEqual(['Alphabet P/E ratio']);
+  await expect.poll(() => voceOggi(app, 'anticipo_privacy', 'segnaposto'), { timeout: 5000 }).toEqual({ saltato: 1, chiesto: 1 });
+  await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'su_richiesta'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1 });
+  // Ignorato, il valore trovato col clic è un rifiuto di quella ricerca.
+  const sulValore = await tastoDestroSu(page, valore(page, '27'));
+  await sulValore.voce('Ignora').click();
+  await expect(valore(page, '27')).toHaveCount(0, { timeout: 5000 });
+  await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'su_richiesta'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1, rifiutato: 1 });
 });
 
 test('fonti che non rispondono: «La ricerca non è riuscita» e «Cerca di nuovo», che tornata la rete trova il valore', async ({ app, openTab, testServer }) => {
@@ -464,6 +587,9 @@ test('fonti che non rispondono: «La ricerca non è riuscita» e «Cerca di nuov
   await app.evaluate(() => { globalThis.__reteGiu = false; });
   await menu.voce('Cerca di nuovo').click();
   await expect(valore(page, '27')).toBeVisible({ timeout: 8000 });
+  await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'su_richiesta'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1 });
+  expect(await voceOggi(app, 'correttore_segnaposto', 'da_solo')).toEqual({ cercato: 1, fallito: 1 });
+  expect(await voceOggi(app, 'anticipo_privacy', 'segnaposto'), 'una rete giù non è il costo della privacy').toBeNull();
 });
 
 test('col web spento un dato di adesso si cerca solo su Wikipedia, e se non c\'è lo dice', async ({ app, openTab, testServer }) => {

@@ -13,6 +13,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { pinTools, pinnedDirWorker } from '../../scripts/lib/tools-pin.mjs';
 import { MARCA_GIRO, accendi, cloneDelGiro, preparaIntestazione } from '../../scripts/lib/worker-nel-clone.mjs';
 import { MARCATORE_WORKER } from '../../scripts/lib/dati-worker.mjs';
+import { MARCA_PRIVATI } from '../../scripts/lib/clone-worker.mjs';
 import { cartelleTranscript } from '../../scripts/session-report.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -36,8 +37,15 @@ function fintoServer(lavoro, consegne) {
   return new Promise((r) => srv.listen(0, '127.0.0.1', () => r({ srv, port: srv.address().port })));
 }
 
-/** La cartella della sessione (su main, con origin e node_modules) e gli strumenti fissati dal preflight per lei. */
-function scena({ acceso = true } = {}) {
+// Un progetto npm vero ma senza dipendenze: npm ci ci passa in un attimo e senza rete.
+const PACKAGE = '{"name":"prova-clone","version":"1.0.0","private":true}\n';
+const LOCK = '{"name":"prova-clone","version":"1.0.0","lockfileVersion":3,"requires":true,"packages":{"":{"name":"prova-clone","version":"1.0.0"}}}\n';
+
+/**
+ * La cartella della sessione (su main, con origin e node_modules installato) e gli strumenti fissati dal preflight per
+ * lei. `pacchetti: false`: la sessione appena nata, senza installazione.
+ */
+function scena({ acceso = true, pacchetti = true } = {}) {
   const base = cartellaTemporanea('filo-worker-clone-');
   const origin = resolve(base, 'origin.git');
   execFileSync('git', ['init', '-q', '--bare', '--initial-branch=main', origin]);
@@ -45,7 +53,8 @@ function scena({ acceso = true } = {}) {
   execFileSync('git', ['clone', '-q', origin, sessione], { stdio: 'ignore' });
   for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['core.autocrlf', 'false']]) git(sessione, 'config', k, v);
   writeFileSync(resolve(sessione, '.gitignore'), readFileSync(resolve(REPO, '.gitignore'), 'utf8'), 'utf8');
-  writeFileSync(resolve(sessione, 'package-lock.json'), '{"lockfileVersion":3}\n', 'utf8');
+  writeFileSync(resolve(sessione, 'package.json'), PACKAGE, 'utf8');
+  writeFileSync(resolve(sessione, 'package-lock.json'), LOCK, 'utf8');
   mkdirSync(resolve(sessione, '.claude'), { recursive: true });
   writeFileSync(resolve(sessione, '.claude', 'settings.local.json'), '{}\n', 'utf8');
   git(sessione, 'add', '-A');
@@ -53,7 +62,10 @@ function scena({ acceso = true } = {}) {
   git(sessione, 'push', '-q', 'origin', 'main');
   git(sessione, 'branch', 'worker/1182');
   git(sessione, 'push', '-q', 'origin', 'worker/1182');
-  mkdirSync(resolve(sessione, 'node_modules', 'pacchetto'), { recursive: true });
+  if (pacchetti) {
+    mkdirSync(resolve(sessione, 'node_modules', 'pacchetto'), { recursive: true });
+    writeFileSync(resolve(sessione, 'node_modules', '.package-lock.json'), '{}\n', 'utf8'); // npm lo scrive alla fine
+  }
   const strumenti = resolve(base, 'strumenti');
   const pin = pinTools(sessione, { dest: strumenti, da: REPO });
   assert.equal(pin.ok, true, pin.why);
@@ -123,6 +135,28 @@ test('il worker parte nel suo clone, sul ramo del lavoro; la cartella della sess
     assert.equal(git(clone, 'status', '--porcelain'), '');
     assert.ok(git(clone, 'ls-remote', 'origin', 'refs/heads/worker/1182').startsWith(git(clone, 'rev-parse', 'HEAD')));
     assert.ok(consegne.some((c) => c.url.endsWith('/routineRelease')), 'il rilascio arriva al server');
+    assert.equal(git(s.sessione, 'status', '--porcelain'), '');
+  } finally {
+    srv.close();
+    togliCartella(s.base);
+  }
+});
+
+test('sessione senza pacchetti: dispatch li installa nel clone e il worker parte, invece di un guasto (#1906)', async () => {
+  const s = scena({ pacchetti: false });
+  const consegne = [];
+  const { srv, port } = await fintoServer(LAVORO, consegne);
+  try {
+    const r = await lancia(s, 'dispatch.mjs', ['--ticket', BIGLIETTO], port);
+    assert.equal(r.status, 0, r.se);
+    assert.doesNotMatch(r.se, /GUASTO/);
+    assert.match(r.se, /principale non ha i pacchetti[^\n]*npm ci[^\n]*timeout di dieci minuti/, 'chi lancia sa perche\' aspetta');
+    // L'uscita di npm va su stderr: su stdout c'e' solo il ruolo.
+    assert.equal(JSON.parse(r.so).role, 'fixer');
+    const clone = resolve(s.lavori, '1');
+    assert.equal(git(clone, 'branch', '--show-current'), 'worker/1182');
+    assert.ok(existsSync(resolve(clone, 'node_modules', MARCA_PRIVATI)), 'i pacchetti installati stanno nel clone');
+    assert.equal(existsSync(resolve(s.sessione, 'node_modules')), false, 'la cartella della sessione non si tocca');
     assert.equal(git(s.sessione, 'status', '--porcelain'), '');
   } finally {
     srv.close();

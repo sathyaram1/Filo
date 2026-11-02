@@ -4,7 +4,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync, chmodSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, chmodSync, copyFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   ROOT, HOOKS, git, scene, runHook, runHookStderr, runHookRaw, rigaJson, LIMITE, shaOf, filesOnMain, commitFile,
@@ -99,6 +99,34 @@ describe('la spedizione non tace: storia divergente e push fallito', () => {
     assert.match(String(r.stderr || ''), /NON e' arrivato su origin/, 'la riga su stderr resta, per il registro di debug');
   });
 
+  // In cloud un push a mano resta fermo sul controllo dei permessi, che nessuno approva (#1797): in una routine il
+  // messaggio non lo suggerisce, e la routine si riconosce anche dal solo biglietto nella cartella.
+  test('in una routine il push fallito non chiede un push a mano: lo rispedisce il rilascio', () => {
+    for (const [come, env, biglietto] of [['FILO_ROUTINE', { FILO_ROUTINE: '1' }, false], ['biglietto nella cartella', {}, true]]) {
+      const { work } = scene();
+      git(work, ['checkout', '-q', '-b', `claude/routine-${biglietto ? 'b' : 'e'}`]);
+      git(work, ['remote', 'set-url', 'origin', resolve(work, 'non-esiste.git')]);
+      if (biglietto) {
+        mkdirSync(resolve(work, '.claude'), { recursive: true });
+        writeFileSync(resolve(work, '.claude', 'routine-ticket.json'), JSON.stringify({ ticket: 'x'.repeat(43), since: new Date().toISOString() }));
+        // Timbro fresco: il gancio non prova a battere per un biglietto finto.
+        writeFileSync(resolve(work, '.claude', 'routine-beat-hook.stamp'), '');
+      }
+      writeFileSync(resolve(work, 'lavoro.js'), 'x\n', 'utf8');
+      const r = runHookRaw(work, JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: 'Write' }), env);
+      const ctx = JSON.parse(String(r.stdout).split(/\r?\n/).find((l) => l.trim().startsWith('{'))).hookSpecificOutput.additionalContext;
+      assert.match(ctx, /committato in locale ma NON e' su origin/, come);
+      assert.match(ctx, /il rilascio lo rispedisce/, come);
+      assert.doesNotMatch(ctx, /git push del ramo/, `${come}: in cloud un push a mano si ferma sul controllo dei permessi`);
+    }
+    const { work } = scene();
+    git(work, ['checkout', '-q', '-b', 'claude/locale']);
+    git(work, ['remote', 'set-url', 'origin', resolve(work, 'non-esiste.git')]);
+    writeFileSync(resolve(work, 'lavoro.js'), 'x\n', 'utf8');
+    const locale = runHookRaw(work, JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: 'Write' }));
+    assert.match(String(locale.stdout), /git push del ramo/, 'in locale l\'owner il push lo approva');
+  });
+
   test('senza stdin (lanciato a mano) l\'evento è PostToolUse; quando la spedizione riesce stdout resta vuoto', () => {
     const { work } = scene();
     git(work, ['checkout', '-q', '-b', 'claude/liscio']);
@@ -138,5 +166,63 @@ describe('il rinvio dopo un rebase non calpesta il lavoro degli altri nemmeno do
     assert.equal(git(work, ['ls-remote', origin, 'refs/heads/claude/fetch']).split(/\s/)[0], b,
       'il commit dell\'altro deve restare su origin anche se questa copia lo aveva già scaricato');
     assert.match(stderr, /claude\/fetch.*NON e' arrivato su origin/);
+  });
+});
+
+// ─── #1776: il clone delle routine nasce senza reflog delle tracce remote ────
+// --force-if-includes rifiutava sempre il rinvio: dopo un riallineamento a main nessun salvataggio arrivava.
+describe('clone appena nato e ramo riallineato a main: il salvataggio lo spedisce', () => {
+  function cloneRiallineato(nome, { altroSpinge = false } = {}) {
+    const { base, origin, work } = scene();
+    git(work, ['checkout', '-q', '-b', nome]);
+    commitFile(work, 'lavoro.js');
+    git(work, ['push', '-q', 'origin', nome]);
+    git(work, ['checkout', '-q', 'main']);
+    commitFile(work, 'main-avanti.js');
+    git(work, ['push', '-q', 'origin', 'main']);
+    const copia = resolve(base, 'giro');
+    git(base, ['clone', '-q', origin, copia]);
+    git(copia, ['checkout', '-q', nome]);
+    mkdirSync(resolve(copia, '.claude', 'hooks'), { recursive: true });
+    for (const h of HOOKS) copyFileSync(resolve(ROOT, '.claude', 'hooks', h), resolve(copia, '.claude', 'hooks', h));
+    mkdirSync(resolve(copia, 'scripts', 'lib'), { recursive: true });
+    copyFileSync(resolve(ROOT, 'scripts', 'lib', 'lease-atteso.mjs'), resolve(copia, 'scripts', 'lib', 'lease-atteso.mjs'));
+    writeFileSync(resolve(copia, '.git', 'info', 'exclude'), '.claude/\nscripts/\n', 'utf8');
+    let suo = '';
+    if (altroSpinge) {
+      const altro = resolve(base, 'altro');
+      git(base, ['clone', '-q', origin, altro]);
+      git(altro, ['checkout', '-q', nome]);
+      commitFile(altro, 'di-un-altro.js');
+      git(altro, ['push', '-q', 'origin', nome]);
+      suo = git(altro, ['rev-parse', 'HEAD']);
+    }
+    git(copia, ['fetch', '-q', 'origin', ...(altroSpinge ? [] : ['main'])]);
+    git(copia, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'rebase', '-q', 'origin/main']);
+    return { origin, copia, suo };
+  }
+
+  test('il ramo riallineato arriva su origin, senza allarmi', () => {
+    const { origin, copia } = cloneRiallineato('claude/riallineo');
+    assert.throws(() => git(copia, ['reflog', 'exists', 'refs/remotes/origin/claude/riallineo']),
+      'la condizione del difetto: la traccia remota non ha reflog');
+    writeFileSync(resolve(copia, 'dopo.js'), 'dopo il riallineamento\n', 'utf8');
+
+    const stderr = runHookStderr(copia);
+
+    assert.doesNotMatch(stderr, /NON e' arrivato/);
+    assert.equal(git(copia, ['ls-remote', origin, 'refs/heads/claude/riallineo']).split(/\s/)[0], git(copia, ['rev-parse', 'HEAD']));
+    const suOrigin = git(copia, ['ls-tree', '-r', '--name-only', 'HEAD']);
+    assert.ok(suOrigin.includes('main-avanti.js') && suOrigin.includes('dopo.js'));
+  });
+
+  test('qualcun altro aveva spinto e il fetch lo ha portato qui: il suo commit resta, e l\'hook lo dice', () => {
+    const { origin, copia, suo } = cloneRiallineato('claude/riallineo-conteso', { altroSpinge: true });
+    writeFileSync(resolve(copia, 'dopo.js'), 'dopo il riallineamento\n', 'utf8');
+
+    const stderr = runHookStderr(copia);
+
+    assert.equal(git(copia, ['ls-remote', origin, 'refs/heads/claude/riallineo-conteso']).split(/\s/)[0], suo);
+    assert.match(stderr, /claude\/riallineo-conteso.*NON e' arrivato su origin.*non ha mai avuto/);
   });
 });

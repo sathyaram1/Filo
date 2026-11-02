@@ -153,9 +153,6 @@ async function coloriFermi(shell) {
 test('"/riordina" con una scheda sola risponde "già in ordine", e la dashboard resta viva', async ({ shell, openTab }) => {
   const dash = await openTab(NEWTAB);
   await expect(dash.locator('#input')).toBeVisible({ timeout: 8_000 });
-  // La scheda d'avvio è la stessa pagina: finché una sola ha già il colore, il riordino la sposterebbe davvero.
-  await expect.poll(() => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.every((t) => !!t.identityColor)),
-    { timeout: 8_000 }).toBe(true);
 
   await submit(dash, '/riordina');
 
@@ -163,6 +160,28 @@ test('"/riordina" con una scheda sola risponde "già in ordine", e la dashboard 
   // sa se il comando è arrivato.
   await expect.poll(() => ultimaRigaFilo(dash), { timeout: 8_000 }).toContain('già in ordine');
   await expect(dash.locator('#input')).toBeVisible();
+});
+
+// #1561.5 — la home aperta due volte è la stessa pagina: se una delle due non ha ancora detto il suo colore (appena
+// aperta, o la scheda d'avvio), il riordino non le scambia di posto. Prima finiva in coda come una senza colore.
+test('"/riordina": due home, una ancora senza colore, restano dove sono e «già in ordine»', async ({ app, shell, openTab }) => {
+  const dash = await openTab(NEWTAB);
+  await expect(dash.locator('#input')).toBeVisible({ timeout: 8_000 });
+  await expect.poll(() => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.every((t) => !!t.identityColor)),
+    { timeout: 8_000 }).toBe(true);
+  const ordine = () => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.id));
+  const prima = await ordine();
+  expect(prima.length).toBe(2);
+  // La scheda d'avvio torna a «colore non ancora detto», come nel primo secondo di vita.
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().map((w) => w._filoTabs).find(Boolean);
+    tm.tabs[0].identityColor = null;
+    tm.tabs[0]._identitaNota = false;
+  });
+
+  await submit(dash, '/riordina');
+  await expect.poll(() => ultimaRigaFilo(dash), { timeout: 8_000 }).toContain('già in ordine');
+  expect(await ordine()).toEqual(prima);
 });
 
 test('dopo "/riordina" resti sulla scheda su cui eri', async ({ shell, openTab, testServer }) => {

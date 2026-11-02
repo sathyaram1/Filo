@@ -83,6 +83,28 @@
     toast_video_save_failed: 'Non sono riuscito a salvare il video',
     toast_audio_save_failed: 'Non sono riuscito a salvare l\'audio',
     toast_media_stream_only: 'Questo contenuto arriva in streaming: non c\'è un file da salvare',
+    // #1488 — il video in streaming lo salva un programma (yt-dlp): le fasi sulla riga dei Download, e i perché di un no.
+    toast_video_streaming_started: 'Salvo il video: l\'avanzamento è nei Download',
+    toast_audio_streaming_started: 'Salvo l\'audio: l\'avanzamento è nei Download',
+    streaming_non_riuscito: '%s',
+    streaming_fase_programma: 'Preparo il programma per i video (solo la prima volta)',
+    streaming_fase_leggo: 'Leggo il video',
+    streaming_fase_unisco: 'Unisco video e audio',
+    streaming_eta: 'Il video ha un limite d\'età e si vede solo con l\'accesso a Google. Filo non usa il tuo account per scaricare: Google potrebbe bloccarlo per giorni',
+    streaming_accesso: 'Il video si vede solo con l\'accesso a un account. Filo non usa il tuo account per scaricare: il sito potrebbe bloccarlo per giorni',
+    streaming_robot: 'Il sito vuole l\'accesso per credere che non sei un programma. Filo non usa il tuo account per scaricare, perché potrebbe essere bloccato per giorni: riprova più tardi',
+    streaming_protetto: 'Il video è protetto contro la copia: non si può salvare',
+    streaming_spazio: 'Non c\'è abbastanza spazio sul disco per il video',
+    streaming_diretta: 'È una diretta: si potrà salvare quando è finita',
+    streaming_sito: 'Da questa pagina Filo non trova il video. Se il video ha una pagina sua, aprila e salvalo da lì',
+    streaming_elenco: 'Questa pagina è un elenco di video: apri quello che vuoi e salvalo dalla sua pagina',
+    streaming_non_disponibile: 'Il video non è disponibile: è stato tolto, è privato o da qui non si vede',
+    streaming_rete: 'La connessione non risponde: riprova fra poco',
+    streaming_aggiornare: 'Il sito è cambiato e il programma per i video non ci riesce più. Di solito si risolve in pochi giorni, e Filo lo aggiorna da solo',
+    streaming_programma: 'Non sono riuscito a scaricare il programma che salva i video: controlla la connessione e riprova',
+    streaming_firma: 'Il programma per i video arrivato non porta la firma dei suoi autori, e non l\'ho usato: riprova più tardi',
+    streaming_piattaforma: 'Su questo computer Filo non sa ancora salvare i video in streaming',
+    streaming_generico: 'Non sono riuscito a salvare il video',
     toast_media_speed: 'Velocità %s',
     toast_media_loop_on: 'Si ripeterà in continuo',
     toast_media_loop_off: 'Ripetizione disattivata',
@@ -607,7 +629,7 @@
       'sito arrivano e aspetta. Anche “Apri file” su un programma chiede conferma, ' +
       'perché aprirlo vuol dire eseguirlo. Tutti gli altri file scendono come sempre.',
     options_security_downloads_trusted_label:
-      'Siti di cui ti fidi, uno per riga. Da questi i programmi scendono senza chiedere',
+      'Siti fidati per i programmi, uno per riga. Da questi i programmi scendono senza chiedere',
     options_security_downloads_trusted_invalid:
       'Queste righe non sono domini validi e verranno ignorate (usa un dominio ' +
       'con estensione, es. mozilla.org): %s',
@@ -637,8 +659,9 @@
     options_security_safebrowse_desc:
       'Ti avvisa quando un sito imita un marchio noto, è nella lista nera di Google per phishing o malware, ' +
       'ha un certificato che non torna o ti chiede la password su una connessione non protetta. L\'avviso ' +
-      'copre la pagina finché non scegli. Su un sito sospetto premi «Continua», su uno pericoloso scrivi ' +
-      '«confermo». La scelta vale per quel sito in quella scheda, finché resta aperta. Spento, Filo non ' +
+      'copre la pagina finché non scegli. Su un sito sospetto «Continua» lo mette fra i siti di cui ti fidi, e ' +
+      'lì l\'avviso sospetto non torna. Su uno pericoloso scrivi «confermo», e vale solo per quel sito in quella ' +
+      'scheda, finché resta aperta. Spento, Filo non ' +
       'chiede più niente fuori dal computer, ma ti avvisa ancora sui sosia e sulle password chieste senza ' +
       'connessione protetta, che riconosce da solo.',
     options_security_safebrowse_network: 'Controlli di rete (età del dominio e del certificato)',
@@ -718,6 +741,11 @@
       'lo togli, in "Privacy massima" Filo butta via ' +
       'quello che aveva salvato.',
     options_cookies_whitelist_placeholder: 'es. google.com',
+    options_security_fidati_title: 'Siti di cui ti fidi',
+    options_security_fidati_desc:
+      'Su questi siti Filo non mostra più l\'avviso «sospetto» e non ti dice più che non trova l\'indirizzo. ' +
+      'L\'avviso «pericoloso» compare sempre, anche per un sito nella lista nera di Google.',
+    options_security_fidati_remove: 'Togli',
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
     options_cookies_whitelist_empty: 'Nessun sito fidato. In "Privacy massima" rifai l\'accesso ogni volta che torni su un sito che avevi chiuso.',
@@ -762,6 +790,8 @@
     menu_spegni_filo: 'Spegni Filo su questo sito',
     menu_riaccendi_filo: 'Riaccendi Filo su questo sito',
     filo_spento_fatto: 'Filo è spento su %s.',
+    siti_fidati_fatto: '%s è fra i siti di cui ti fidi, e Filo non lo mette più in dubbio. L\'elenco sta in Sicurezza.',
+    siti_fidati_annulla: 'Annulla',
     filo_riacceso_fatto: 'Filo è di nuovo acceso su %s.',
     filo_spento_annulla: 'Annulla',
     options_cookies_banners_title: 'Qui i banner dei cookie li vedi',

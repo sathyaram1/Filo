@@ -284,6 +284,7 @@
       { label: 'Sicurezza', icon: 'lock', url: 'filo://security/security.html' },
       // Con "Modelli" e "Sicurezza": stesse domande, dal lato del perché.
       { label: 'Trasparenza', icon: 'transparency', url: 'filo://transparency/transparency.html' },
+      { label: 'Novità', icon: 'novita', url: 'filo://novita/novita.html' },
       { type: 'separator' },
       { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
     ];
@@ -1874,6 +1875,7 @@
   });
 
   if (api.onToast) api.onToast((info) => {
+    if (info && typeof info.ritira === 'string') { NOTIFS.dismissKey(info.ritira); return; }
     if (!info || !info.text) return;
     let annullata = false;
     let allaChiusura = null;
@@ -1923,6 +1925,21 @@
               onClick: () => api.message({ type: 'filo_spento_imposta', siti: Array.isArray(siti) ? siti : [], spento: spento === true }).catch(() => {}),
             };
           }
+          // #967 — «Annulla» dopo un «Continua»: il sito esce dai fidati e l'avviso torna sulla pagina.
+          if (a && a.sitiFidati && !a.onClick) {
+            const voci = Array.isArray(a.sitiFidati.voci) ? a.sitiFidati.voci : [];
+            return { label: a.label, onClick: () => api.message({ type: 'siti_fidati_imposta', fidato: false, voci }).catch(() => {}) };
+          }
+          // #349 — «Riapri» dopo la pulizia delle schede: riporta quelle chiuse da quel giro.
+          if (a && Number.isInteger(a.riapriPulizia) && !a.onClick) {
+            const pulizia = a.riapriPulizia;
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'riapri_pulizia_schede', pulizia }).then((r) => {
+                if (r && r.ok === false) NOTIFS.show('Quelle schede le ritrovi nel filo della home', { tipo: 'riordino_schede' });
+              }).catch(() => {}),
+            };
+          }
           // #1123 — «Collega»: l'accesso a Google in una scheda, come la voce del menu dell'account.
           if (a && a.collegaGoogle && !a.onClick) return { label: a.label, onClick: () => collegaGoogle() };
           // #1039 — «Riavvia e aggiorna»: se l'installatore non parte Filo resta aperto, e lo dice.
@@ -1938,6 +1955,16 @@
           if (a && a.openDownloadId && !a.onClick && api.downloads) {
             const id = a.openDownloadId;
             return { label: a.label, onClick: () => openDownloadFile(id, false, 'notifica') };
+          }
+          // #941.1 — l'avviso di via porta alla home, dove lo scaricamento avanza: una home già aperta, se c'è.
+          if (a && a.apriHome && !a.onClick) {
+            return {
+              label: a.label,
+              onClick: () => {
+                const home = state.tabs.find((t) => t.url && isHomeUrl(t.url));
+                if (home) api.tabs.activate(home.id); else api.tabs.open('filo://newtab/');
+              },
+            };
           }
           if (a && a.revealDownloadId && !a.onClick && api.downloads) {
             const id = a.revealDownloadId;
@@ -1958,6 +1985,11 @@
           if (a && a.riprovaDownloadId && !a.onClick && api.downloads && api.downloads.riprova) {
             const id = a.riprovaDownloadId;
             return { label: a.label, onClick: () => riprovaDownload(id) };
+          }
+          // #906 — una pagina di Filo (i giudici fermi aprono Gestione): solo indirizzi filo://.
+          if (a && typeof a.apriFilo === 'string' && !a.onClick && /^filo:\/\/[a-z0-9-]+\/\S*$/i.test(a.apriFilo)) {
+            const url = a.apriFilo;
+            return { label: a.label, onClick: () => api.tabs.open(url) };
           }
           // #1357.2 — il nome che Filo non ha saputo dare: la casella per scriverlo, nella pagina Download.
           if (a && a.rinominaDownloadId && !a.onClick) {
@@ -2176,9 +2208,11 @@
       meta.className = 'dl-row-meta';
       const p = pct(r);
       if (isActive(r)) {
-        const base = p != null
+        let base = p != null
           ? `${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
           : `${fmtBytes(r.receivedBytes)} scaricati`;
+        // #1488 — un video in streaming dice cosa sta facendo quando non sono byte del file.
+        if (r.nota) base = p != null || r.receivedBytes ? `${r.nota} · ${base}` : r.nota;
         // #1287 — quanto va veloce e quanto manca, misurati dal main.
         let corsa = '';
         try { corsa = window.SN_SCARICAMENTI_AVANZAMENTO.velocitaEResto(r); } catch (_) {}
@@ -2190,6 +2224,9 @@
         // solo nell'avviso che l'utente può aver già chiuso.
         const da = provenienza(r);
         meta.textContent = da ? `${stateLabel(r)} · ${da}` : stateLabel(r);
+      } else if (r.state === 'interrupted' && r.nota) {
+        meta.textContent = `${stateLabel(r)} · ${r.nota}`;
+        meta.title = r.nota;
       } else {
         meta.textContent = `${stateLabel(r)} · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       }
@@ -2500,7 +2537,7 @@
     api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
   }
 
-  newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/'));
+  newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/', 'pulsante_scheda'));
   backBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.back(a.id); });
   fwdBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.forward(a.id); });
   reloadBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.reload(a.id); });
@@ -2517,7 +2554,7 @@
     if (meta && e.key.toLowerCase() === 't') {
       e.preventDefault();
       // Con Shift riapre l'ultima scheda chiusa, come in ogni browser (#1476); tenuto premuto non svuota l'archivio.
-      if (e.shiftKey) { if (!e.repeat) api.tabs.riapriChiusa(); } else api.tabs.open('filo://newtab/');
+      if (e.shiftKey) { if (!e.repeat) api.tabs.riapriChiusa(); } else api.tabs.open('filo://newtab/', e.repeat ? '' : 'scorciatoia');
     } else if (meta && e.key.toLowerCase() === 'w') {
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.close(a.id, 'ctrl_w');
@@ -2529,7 +2566,7 @@
       else api.tabs.open('filo://newtab/');
     } else if (meta && e.key.toLowerCase() === 'r') {
       e.preventDefault();
-      const a = activeTab(); if (a) api.tabs.reload(a.id);
+      const a = activeTab(); if (a) api.tabs.reload(a.id, e.repeat ? '' : 'scorciatoia');
     } else {
       // Salto alla N-esima scheda, o alla vicina con Ctrl+Tab, col fuoco sulla barra (per le pagine ci pensa il main). La
       // combinazione la decide src/shared/tasti.js: regola in CLAUDE.md § Mac.

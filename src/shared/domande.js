@@ -8,7 +8,7 @@
   const PRIORITA = Object.freeze(['bloccante', 'importante', 'quando_puoi']);
   // `in_smistamento`: il compito «Gestisci la domanda» (§3.5) la sta smistando o riscrivendo, prima che arrivi all'owner.
   const STATI = Object.freeze(['in_smistamento', 'aperta', 'in_lavorazione', 'chiusa', 'superata']);
-  const SCHEDE = Object.freeze(['da_rispondere', 'in_lavorazione', 'risposte_automatiche', 'archivio']);
+  const SCHEDE = Object.freeze(['da_rispondere', 'in_smistamento', 'in_lavorazione', 'risposte_automatiche', 'archivio']);
   const FIDUCIA = Object.freeze(['fidato', 'non_fidato']);
   const ORIGINI = Object.freeze(['feedback', 'ramo', 'compito', 'domanda', 'locale', 'server']);
   const COLLEGAMENTI = Object.freeze(['feedback', 'ramo', 'domanda']);
@@ -60,6 +60,10 @@
     valorePriorita: (v) => Number.isInteger(v) && v >= 0 && v <= 3,
     chiave: (v) => typeof v === 'string' && Object.prototype.hasOwnProperty.call(CHIAVI_AUTOMAZIONE, v),
     valoreBooleano: (v) => typeof v === 'boolean',
+    // La forma soltanto: operazioni dell'elenco chiuso e triade le controlla il server prima di approvare (ambiti.js).
+    nomeAmbito: (v) => typeof v === 'string' && /^[a-z][a-z_]{2,30}$/.test(v),
+    operazioniAmbito: (v) => Array.isArray(v) && v.length >= 1 && v.length <= 30 && v.every((o) => typeof o === 'string' && /^[a-z_]{1,30}(\.[a-z_]{1,30})?$/.test(o)),
+    testoAmbito: (v) => typeof v === 'string' && v.trim().length >= 1 && v.length <= 1000,
   });
 
   // `bulk`: ammessa in «applica il consiglio» su più domande. `consenso`: vale solo da un gesto dell'owner nella finestra.
@@ -71,7 +75,7 @@
     priorita: tipo({ feedbackId: 'feedbackId', valore: 'valorePriorita' }, { bulk: true, consenso: false, attivo: true }),
     archivia: tipo({ feedbackId: 'feedbackId' }, { bulk: true, consenso: false, attivo: true }),
     automazione: tipo({ chiave: 'chiave', valore: 'valoreBooleano' }, { bulk: false, consenso: false, attivo: true }),
-    ambito: tipo({}, { bulk: false, consenso: true, attivo: false }),
+    ambito: tipo({ nome: 'nomeAmbito', operazioni: 'operazioniAmbito', nonPuo: 'testoAmbito' }, { bulk: false, consenso: true, attivo: true }),
     esperimento: tipo({}, { bulk: false, consenso: true, attivo: false }),
     compito: tipo({}, { bulk: true, consenso: false, attivo: true }),
   });
@@ -221,7 +225,8 @@
   /**
    * Una domanda in ingresso, controllata e normalizzata. `conOrigine` false: l'origine la mette il server (biglietto).
    * `perOwner` false solo per una domanda che il server apre per il compito e non arriva all'owner (il terzo guasto
-   * uguale, §3.8): lì un'opzione sola e i pro e contro vuoti passano, perché a smistarla è il compito.
+   * uguale, §3.8): lì un'opzione sola, i pro e contro vuoti, i nomi di file e le lineette passano, perché a smistarla e
+   * riscriverla per l'owner è il compito (#1790.1: il nome di un programma nel guasto la faceva cadere).
    * @returns {{ ok:true, domanda:object } | { ok:false, errore:string, dettaglio:string, campo?:string }}
    */
   function validaDomanda(input, { conOrigine = true, perOwner = true } = {}) {
@@ -302,7 +307,7 @@
       }
       domanda.origine = { tipo: o.tipo, id };
     }
-    const sporco = controllaTestoOwner(domanda);
+    const sporco = perOwner ? controllaTestoOwner(domanda) : null;
     if (sporco) return sporco;
     return { ok: true, domanda };
   }
@@ -391,6 +396,12 @@
     if (!v.ok) return null;
     const a = v.azione;
     if (a.tipo === 'compito') return 'Affida a un agente';
+    if (a.tipo === 'ambito') {
+      // Le operazioni dette con le parole dell'elenco chiuso (ambiti.js), mai con quelle di chi propone.
+      const A = global.SN_AMBITI;
+      const descr = (o) => (A && A.OPERAZIONI && A.OPERAZIONI[o] ? A.OPERAZIONI[o].descr : o);
+      return `Approva l’ambito «${a.nome}»: ${a.operazioni.map(descr).join('; ')}`;
+    }
     if (a.tipo === 'automazione') {
       const k = CHIAVI_AUTOMAZIONE[a.chiave];
       return `${k.nome}: ${a.valore !== k.spegne ? 'accendi' : 'spegni'}`;
@@ -445,14 +456,17 @@
     return out.map(({ priorita, gruppo, domande: ds }) => ({ priorita, gruppo, domande: ds }));
   }
 
-  /** La scheda della sezione Domande. Uno stato ignoto resta davanti all'owner. */
+  /**
+   * La scheda della sezione Domande. «Da rispondere» tiene solo le aperte (#1791): uno stato ignoto si vede fra quelle
+   * in lavorazione, senza contare come una che aspetta l'owner.
+   */
   function schedaDi(domanda) {
     const s = isOggetto(domanda) ? domanda.stato : '';
-    // Mentre il compito la smista l'owner non la deve ancora rispondere, ma la vede: niente resta nascosto.
-    if (s === 'in_lavorazione' || s === 'in_smistamento') return 'in_lavorazione';
+    if (s === 'aperta') return 'da_rispondere';
+    if (s === 'in_smistamento') return 'in_smistamento';
     if (s === 'chiusa' && isOggetto(domanda.esito) && domanda.esito.automatica === true) return 'risposte_automatiche';
     if (s === 'chiusa' || s === 'superata') return 'archivio';
-    return 'da_rispondere';
+    return 'in_lavorazione';
   }
 
   const ID_RE = /^D-([1-9]\d{0,8})$/;

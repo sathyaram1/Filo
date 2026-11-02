@@ -186,3 +186,28 @@ test('una scheda aperta prima di un messaggio finito in errore arriva al modello
   const tutto = chiamate[chiamate.length - 1].messages.map(testo).join('\n');
   expect(tutto).toContain('Orari del museo Egizio');
 });
+
+// D-202: le pagine aperte fra due messaggi arrivano davanti al messaggio dopo, ripiegate per sito e in busta, e ci
+// restano. Il sito ha un nome da internet: una pagina della rete di casa porta solo il numero.
+test('una pagina aperta fra due messaggi arriva al modello col suo sito e il suo titolo, e il messaggio resta com\'era al turno dopo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await preparaModello(app, [{ text: 'Ciao!' }, { text: 'Fino a novant\'anni.' }, { text: 'Prego.' }]);
+  const home = await apriHome(openTab);
+  await scrivi(home, 'ciao', 'Ciao!');
+
+  const sito = await testServer.openReady(openTab, '<!doctype html><title>Orche che cacciano le foche</title><p>orche</p>', { pubblico: true });
+  await expect(sito).toHaveTitle('Orche che cacciano le foche');
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).map((p) => p.titolo)), { timeout: 20_000 })
+    .toContain('Orche che cacciano le foche');
+  await home.bringToFront();
+  await scrivi(home, 'quanto vivono?', 'Fino a novant\'anni.');
+  await scrivi(home, 'grazie', 'Prego.');
+
+  const [uno, due, tre] = await app.evaluate(() => globalThis.__chiamate);
+  const domanda = testo(due.messages[due.messages.length - 1]);
+  expect(domanda).toMatch(/═══ DA FILO, PRIMA DI QUESTO MESSAGGIO ═══[\s\S]*Pagine aperte dal messaggio prima, per sito[\s\S]*<<<DATI_PAGINA>>>\n- \d\d:\d\d sito-pubblico\.test: 1 pagina; «Orche che cacciano le foche»\n<<<FINE_DATI_PAGINA>>>[\s\S]*═══ IL MESSAGGIO DELL'UTENTE ═══\nquanto vivono\?$/);
+  expect(testo(uno.messages[uno.messages.length - 1])).not.toContain('Orche che cacciano');
+  expect(testo(tre.messages[tre.messages.length - 1])).not.toMatch(/sito-pubblico\.test: 1 pagina/);
+  expect(due.messages.slice(0, uno.messages.length)).toEqual(uno.messages);
+  expect(tre.messages.slice(0, due.messages.length)).toEqual(due.messages);
+});

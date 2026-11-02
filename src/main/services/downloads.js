@@ -377,6 +377,9 @@ function publicRecord(r) {
     servedBy: r.servedBy || '',
     // #950 — il nome con cui il file era arrivato, finché Filo l'ha cambiato: le superfici offrono di rimetterlo.
     nomeOriginale: r.nomeOriginale || '',
+    // #1488 — `via` dice chi rifà lo scaricamento, `nota` cosa sta facendo o perché non è riuscito.
+    via: r.via || '',
+    nota: r.nota || '',
     // #1287 — byte al secondo e secondi che restano, solo mentre scende (0 e null altrimenti).
     ...velocitaDi(r),
   };
@@ -426,7 +429,7 @@ function daDisco(raw) {
   } else if (NON_TERMINAL.has(rec.state)) {
     // Un download che risultava "in corso" alla chiusura non può più
     // proseguire: il suo DownloadItem è morto. Lo marchiamo interrotto.
-    rec.state = 'interrupted'; rec.paused = false; rec.canResume = false;
+    rec.state = 'interrupted'; rec.paused = false; rec.canResume = false; rec.nota = '';
   }
   return rec;
 }
@@ -567,7 +570,7 @@ function contaProgramma(rec, evento) {
 function avvisaNonRiuscito(rec) {
   const riprova = /^https?:/i.test(String(rec.url || '')) ? [{ label: 'Riprova', riprovaDownloadId: rec.id }] : [];
   shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, {
-    durationSec: 8, tipo: 'download_failed', indirizzo: rec.url, ...(riprova.length ? { actions: riprova } : {}),
+    ...chiaveAvviso(rec), durationSec: 8, tipo: 'download_failed', indirizzo: rec.url, ...(riprova.length ? { actions: riprova } : {}),
   }, scopeOf(rec));
 }
 
@@ -606,13 +609,62 @@ function notifyDownloadStarted(webContents, info = null) {
 function chiediNellaFinestra(webContents, rec) {
   contaProgramma(rec, 'domanda');
   try {
-    const finestre = windowsOf(scopeOf(rec)).filter((w) => w._filoTabs);
-    const tiene = (w) => (w._filoTabs.tabs || []).some((t) => {
-      try { return t.view.webContents === webContents; } catch (_) { return false; }
-    });
-    const win = finestre.find(tiene) || finestre.find((w) => w.isFocused?.()) || finestre[0];
-    if (win && !win.isDestroyed?.()) win.webContents.send('shell:download', { kind: 'ask', item: publicRecord(rec) });
+    const win = finestraDi(webContents, rec);
+    if (win) win.webContents.send('shell:download', { kind: 'ask', item: publicRecord(rec) });
   } catch (_) {}
+}
+
+function finestraDi(webContents, rec) {
+  const finestre = windowsOf(scopeOf(rec)).filter((w) => w._filoTabs);
+  const tiene = (w) => (w._filoTabs.tabs || []).some((t) => {
+    try { return t.view.webContents === webContents; } catch (_) { return false; }
+  });
+  const win = finestre.find(tiene) || finestre.find((w) => w.isFocused?.()) || finestre[0];
+  return win && !win.isDestroyed?.() ? win : null;
+}
+
+// Gli avvisi di uno stesso scaricamento hanno una chiave sola: quello di fine prende il posto di quello di via.
+const chiaveAvviso = (rec) => ({ key: `download:${rec.id}` });
+
+// #941.1 — Il via si annuncia solo fuori dalla home e dall'elenco scaricamenti, dove l'avanzamento si vede già.
+// Il ritardo lascia muto chi finisce subito (basta l'avviso di fine) e chi viene fermato appena preso.
+const ANNUNCIO_MS = 600;
+const PAGINE_CHE_LO_MOSTRANO = /^filo:\/\/(newtab|downloads)\//i;
+function annunciaPartenza(rec, webContents) {
+  const t = setTimeout(() => {
+    try {
+      if (!records.has(rec.id) || rec._final || rec.state !== 'progressing') return;
+      const win = finestraDi(webContents, rec);
+      const tm = win && win._filoTabs;
+      const attiva = tm && (tm.tabs || []).find((x) => x.id === tm.activeId);
+      let url = '';
+      try { url = (attiva && (attiva.view.webContents.getURL() || attiva.url)) || ''; } catch (_) { url = (attiva && attiva.url) || ''; }
+      if (!win || PAGINE_CHE_LO_MOSTRANO.test(url)) return;
+      win.webContents.send('shell:toast', {
+        text: `Scaricamento avviato: ${shortName(rec.filename)}`,
+        opts: { ...chiaveAvviso(rec), durationSec: 5, tipo: 'download_avviato', indirizzo: rec.url, actions: [{ label: 'Vedi nella home', apriHome: true }] },
+      });
+    } catch (_) {}
+  }, ANNUNCIO_MS);
+  t.unref?.();
+}
+
+// #1654 — Filo scrive da sé di un download solo se l'utente non lo sa già: finito mentre non guardava Filo, e lungo o
+// partito senza di lui. Un file nato nella pagina (uno screenshot è un `data:`) l'ha appena fatto lui: mai.
+const DOWNLOAD_LUNGO_MS = 60_000;
+const ASSENTE_DOPO_S = 120;
+function utenteDavanti() {
+  try {
+    const { BrowserWindow, powerMonitor } = electron();
+    if (!BrowserWindow.getFocusedWindow()) return false;
+    return !(powerMonitor.getSystemIdleTime() >= ASSENTE_DOPO_S);
+  } catch (_) { return true; }
+}
+function daRaccontare(rec, davanti, adesso = Date.now()) {
+  if (!rec || davanti || !/^https?:/i.test(String(rec.url || ''))) return false;
+  if (rec._partitoDavanti === false) return true;
+  const inizio = Date.parse(rec.startedAt || '');
+  return Number.isFinite(inizio) && adesso - inizio >= DOWNLOAD_LUNGO_MS;
 }
 
 // Chiude uno scaricamento arrivato in fondo: se veniva dalla quarantena (#588)
@@ -647,10 +699,11 @@ function completa(rec) {
   persist();
   broadcast('done', rec);
   contaFine(rec);
-  if (!scopeOf(rec)) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'download', testo: rec.filename }); } catch (_) {} }
+  if (!scopeOf(rec) && daRaccontare(rec, utenteDavanti())) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'download', testo: rec.filename }); } catch (_) {} }
   // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
   shellToast(`Scaricato: ${shortName(rec.filename)}`, {
+    ...chiaveAvviso(rec),
     durationSec: 8,
     tipo: 'download_finito',
     indirizzo: rec.url,
@@ -819,6 +872,7 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
     siteUncertain: incerto,
     servedBy: servito,
     _pagina: paginaDi(webContents) || (ripresa ? ripresa._pagina || '' : ''),
+    _partitoDavanti: utenteDavanti(),
     // L'indirizzo cliccato, prima dei rimandi: «Riprova» riparte da qui, perché quello finale può essere firmato e scaduto.
     _primo: primo,
     _quarantena: attesa,
@@ -837,6 +891,7 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
   let chain = [];
   try { chain = item.getURLChain(); } catch (_) {}
   setImmediate(() => notifyDownloadStarted(webContents, { url, chain, filename, exe }));
+  if (!attesa) annunciaPartenza(rec, webContents);
 
   // Il segnale non è il TEMPO senza byte (un server lento veniva ucciso con un errore falso)
   // ma la caduta dichiarata da Chromium: grazia alla ripresa, poi fallisce se non avanza.
@@ -980,13 +1035,33 @@ function finalizeManual(rec, state, savePath) {
   persist();
   broadcast(state === 'completed' ? 'done' : 'error', rec);
   contaFine(rec);
-  // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina.
+  // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina. Un video in streaming fa
+  // eccezione (#1488): ci mette minuti, e la fine si dice nella finestra, dovunque sia l'utente in quel momento.
+  if (rec.via === 'streaming') annunciaStreaming(rec, state);
   return marca;
 }
 
+function annunciaStreaming(rec, state) {
+  if (state === 'completed') {
+    shellToast(`Scaricato: ${shortName(rec.filename)}`, {
+      durationSec: 8, tipo: 'download_finito', indirizzo: rec.url,
+      actions: [{ label: 'Apri file', openDownloadId: rec.id }, { label: 'Apri cartella', revealDownloadId: rec.id }],
+    }, scopeOf(rec));
+  } else if (state === 'interrupted') {
+    // «Riprova» solo dove riprovare può servire: un limite d'età non cambia ripetendo.
+    shellToast(rec.nota || `Video non salvato: ${shortName(rec.filename)}`, {
+      durationSec: 12, tipo: 'download_failed', indirizzo: rec.url,
+      ...(rec._riprovabile ? { actions: [{ label: 'Riprova', riprovaDownloadId: rec.id }] } : {}),
+    }, scopeOf(rec));
+  }
+}
+
 // `webContents`: la scheda da cui parte, per aprire la domanda nella sua finestra.
-function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents } = {}) {
-  const id = uuid();
+// `via: 'streaming'` (#1488): la voce la riempie salvaVideoStreaming.js, e «Riprova» passa da lui. `riusa`: l'id della
+// voce chiusa da riempire di nuovo, quella su cui l'utente ha premuto «Riprova».
+function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents, via = '', riusa = '' } = {}) {
+  const vecchia = riusa ? records.get(riusa) : null;
+  const id = vecchia && !NON_TERMINAL.has(vecchia.state) && !liveManual.has(riusa) && !liveItems.has(riusa) ? vecchia.id : uuid();
   const nome = safeName(filename || 'download');
   const indirizzo = String(url || '');
   const marca = (fn, ripiego) => { try { return fn(); } catch (_) { return ripiego; } };
@@ -1013,12 +1088,14 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
     canPause: false,
     _scope: scope || '',
     _sessione: webContents && !webContents.isDestroyed?.() ? webContents.session : null,
+    via: via === 'streaming' ? 'streaming' : '',
+    nota: '',
   };
   campiona(rec);
   records.set(id, rec);
   const attese = [];
   rec._sblocca = (si) => { for (const r of attese.splice(0)) r(si); };
-  const requestCancel = () => { rec._cancelled = true; finalizeManual(rec, 'cancelled'); };
+  const requestCancel = () => { rec._cancelled = true; if (!rec._final) rec.nota = ''; finalizeManual(rec, 'cancelled'); };
   // La risposta alla domanda «scaricarlo?», da confirmDownload: un no chiude la voce come «Annulla».
   const rispondi = (si) => {
     if (!si) { requestCancel(); return; }
@@ -1077,9 +1154,31 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
       // L'ultimo progress() può essere caduto nel freno: a file completo i byte ricevuti SONO
       // il totale, e la riga non deve restare ferma al 95% a scaricamento finito.
       if (rec.totalBytes > 0) rec.receivedBytes = rec.totalBytes;
+      rec.nota = '';
       return finalizeManual(rec, 'completed', savePath);
     },
-    fail() { finalizeManual(rec, 'interrupted'); },
+    // Cosa sta facendo, quando non sono byte del file («Preparo il programma…»); `azzera` riparte da zero byte.
+    nota(testo, { azzera = false } = {}) {
+      if (rec._final) return;
+      rec.nota = String(testo || '');
+      if (azzera) { rec.receivedBytes = 0; rec.totalBytes = 0; rec._campioni = []; lastPush = 0; }
+      broadcast('progress', rec);
+    },
+    // Il nome vero arriva dopo la partenza (il titolo del video, #1488): la riga lo prende appena c'è.
+    nomina(nome) {
+      if (rec._final || !nome) return;
+      const n = safeName(nome);
+      if (n === rec.filename) return;
+      rec.filename = n;
+      rec.exe = marca(() => ESE().eEseguibile(n), rec.exe);
+      broadcast('progress', rec);
+    },
+    // `perche`: la frase che resta sulla riga chiusa, per chi non ha visto l'avviso.
+    fail(perche = '', { riprovabile = true } = {}) {
+      rec.nota = String(perche || '');
+      rec._riprovabile = riprovabile;
+      finalizeManual(rec, 'interrupted');
+    },
     cancel: requestCancel,
   };
 }
@@ -1232,11 +1331,23 @@ function prendiRiprova(scope, url) {
   return vecchia;
 }
 
+let rifaiStreaming = null;
+function quandoRiprovaStreaming(fn) { rifaiStreaming = typeof fn === 'function' ? fn : null; }
+
 function riprova(id, scope = '') {
   const rec = recordIn(id, scope);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco', items: listRecords(scope) };
   // Un secondo clic mentre il primo sta già ripartendo non è un errore da dire.
   if (rec._riprovaTimer || (liveItems.has(rec.id) && rec.state === 'progressing')) return { ok: true, items: listRecords(scope) };
+  // Un video in streaming non ha un file da riscaricare: si rifà il salvataggio dalla pagina (#1488), anche da una
+  // voce riuscita («Ri-scarica»), che resta com'è mentre ne nasce una nuova.
+  if (rec.via === 'streaming' && !NON_TERMINAL.has(rec.state)) {
+    if (!rifaiStreaming || !/^https?:/i.test(String(rec.url || ''))) {
+      return { ok: false, error: 'Questo video non ha un indirizzo da cui salvarlo di nuovo', items: listRecords(scope) };
+    }
+    rifaiStreaming({ id: rec.state === 'completed' ? '' : rec.id, url: rec.url, filename: rec.filename, scope: rec._scope || scope || '' });
+    return { ok: true, items: listRecords(scope) };
+  }
   if (rec.state !== 'interrupted' && rec.state !== 'cancelled') {
     return { ok: false, error: 'Questo scaricamento non è fallito', items: listRecords(scope) };
   }
@@ -1538,6 +1649,7 @@ module.exports = {
   pause,
   resume,
   riprova,
+  quandoRiprovaStreaming,
   trascina,
   trattieniChiusura,
   rispondiChiusura,
@@ -1551,4 +1663,6 @@ module.exports = {
   _publicRecord: publicRecord,
   _testoZoneIdentifier: testoZoneIdentifier,
   _valoreQuarantena: valoreQuarantena,
+  _daRaccontare: daRaccontare,
+  DOWNLOAD_LUNGO_MS,
 };

@@ -61,6 +61,11 @@
 //         deve succedere sempre non si chiede a chi lavora. Senza biglietto fra
 //         gli argomenti lo ritrova da solo, come le consegne.
 //
+//   node scripts/routine-channel.mjs veglia <biglietto>
+//       → chi guida il giro, su un worker spostato in sottofondo (#1797): aspetta al massimo una fetta (lib/veglia-worker.mjs).
+//         Exit 0 = ha rilasciato il biglietto, 5 = lavora ancora (si rilancia), 3 = fermo da 20 minuti senza segni di
+//         vita: biglietto già rilasciato con un guasto dichiarato, il giro si chiude.
+//
 //   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--forza]
 //       → exit 5, e niente rilasciato, se nella cartella lavora ancora qualcuno (#1480): per l'orchestratore un
 //         battito, un salvataggio recente o un processo (`--forza` solo per il worker morto davvero), per un worker
@@ -93,7 +98,8 @@
 //         non parte, tranne `--reason locale` (#1790). `--status attack|spam` col
 //         perché nelle note: il giudizio di chi l'ha letto (Ricevuti L3).
 //         Revisione, correzione, critica e verdetto partono solo dal ramo assegnato (uscita 1 altrimenti): il ramo
-//         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo.
+//         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo. La correzione di un riallineamento
+//         parte solo col ramo spedito su origin, alla punta della cartella e sopra origin/main (#1964).
 //         `deliver piano --piano <file.md>`: il piano di un lavoro grosso, che riceve chi riprende.
 //         `deliver status --status done --reason gia_risolto --fusione <sha> --notes "…" --frase "…"`: già risolto
 //         su main, si chiude senza ramo (regola 5 della spec; il server ricontrolla la fusione).
@@ -101,6 +107,12 @@
 //   node scripts/routine-channel.mjs sporca "<motivo>" [--ticket <biglietto>]
 //       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
 //         repo). Da lì ciò che scrivi nasce non fidato. Exit 0 = registrato, 4 = rifiutato, 3 = guasto.
+//
+//   node scripts/routine-channel.mjs operazione <operazione> ['<dati JSON>'] [--ticket <biglietto>]
+//   node scripts/routine-channel.mjs segnala|rapporto [--ticket <biglietto>] <<'FINE' … FINE
+//       → un'operazione del biglietto (#1153, SPEC-DOMANDE.md §5): `segnala` per tutti, `rapporto` per i compiti,
+//         le altre se l'ambito del biglietto le ha. I dati JSON anche da stdin. Stampa la risposta del server.
+//         Exit 0 = fatto, 1 = uso, 4 = rifiutato (fuori ambito, fuori ambiente, dati sbagliati), 3 = guasto.
 //
 //   node scripts/routine-channel.mjs git-server <clone|ls-remote|fetch|push> <cartella-del-clone> [<ramo>]
 //       → l'unica strada di git verso filo-security in un lavoro server (#1159, #1233, #1761): chiede il token del
@@ -149,6 +161,8 @@ import {
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 import { cloneDelBiglietto, rilancia } from './lib/worker-nel-clone.mjs';
+import { isRoutineInstance } from './lib/routine-role.mjs';
+import { leaseAtteso } from './lib/lease-atteso.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -482,8 +496,23 @@ export function creditiDi(opts = {}) {
   try { return (o.misureCrediti || misureCrediti)(o); } catch (_) { return {}; }
 }
 
+/**
+ * La misura del lavoro per il server (#1797): senza, un worker fermo su un permesso batte per ore e il server lo conta
+ * vivo. Best-effort come le altre misure: un errore la lascia fuori, mai il battito.
+ */
+export async function attivitaDi(t, opts = {}) {
+  const o = opts || {};
+  try {
+    if (o.attivitaDi) return o.attivitaDi(t);
+    const { segniDiVita, attivitaPerBattito } = await import('./lib/veglia-worker.mjs');
+    return attivitaPerBattito(segniDiVita({ root: o.root || ROOT, ticket: t }));
+  } catch (_) {
+    return {};
+  }
+}
+
 export async function heartbeat(t, opts = {}) {
-  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts), ...creditiDi(opts) }, opts);
+  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts), ...creditiDi(opts), ...(await attivitaDi(t, opts)) }, opts);
   if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt, avvisi: Array.isArray(body.avvisi) ? body.avvisi : [] };
   const reason = String((body && body.reason) || `http_${status}`);
   return { ok: false, reason, final: BATTITO_FINITO.has(reason) };
@@ -505,6 +534,8 @@ export async function release(t, fault = '', opts, report = null) {
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
   if (report && typeof report === 'object') payload.report = report;
+  // La domanda di fine turno del manutentore arriva solo qui, a ramo spedito (SPEC-DOMANDE § 5.4); l'orchestratore non la chiede.
+  if (opts && opts.domandaAlRilascio === true) payload.domandaAlRilascio = true;
   Object.assign(payload, creditiDi(opts));
   const { status, body } = await call('routineRelease', payload, opts);
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
@@ -648,6 +679,16 @@ export function argomentiChiusura(cmd, args, data = {}) {
   return { cred: cmd === 'risposta' ? { passphrase: args[0], id: args[1] } : { passphrase: args[0] } };
 }
 
+/**
+ * La domanda che il server consegna col rilascio (quella del manutentore), col comando per rispondere; '' se non c'è.
+ * Il biglietto è chiuso: il ramo non si spedisce più, e la risposta va al server. PURA.
+ */
+export function testoDomandaAlRilascio(body, io, ticket) {
+  const q = body && typeof body.domanda === 'string' ? body.domanda.trim() : '';
+  if (!q) return '';
+  return `Domanda di fine sessione (il ramo è già spedito: rispondi e basta, senza toccare altro):\n${q}\n\nPer rispondere:\n${comandoRisposta(io, { ticket }, '')}`;
+}
+
 /** Il comando esatto per rispondere, stampato insieme alla domanda. La parola d'ordine resta segnaposto. PURA. */
 export function comandoRisposta(io, cred, id) {
   const chi = cred.ticket ? `--biglietto ${cred.ticket}` : `"<parola-d-ordine>" ${id}`;
@@ -662,10 +703,10 @@ export function comandoRisposta(io, cred, id) {
  * Salta (ok, skipped) con una HEAD staccata o su un ramo protetto — la stessa
  * regola dell'hook e di finish-local (lib/branch-integrity.isProtectedBranch:
  * main, master, il default dichiarato da origin). Prima un push normale; se
- * git lo rifiuta per storia divergente (un rebase), --force-with-lease, che
- * è contro il ref remoto conosciuto: se qualcun altro ha spinto nel frattempo
- * git rifiuta, ed è giusto così. Un fallimento torna con la causa: chi chiama
- * NON rilascia.
+ * git lo rifiuta per storia divergente (un rebase), --force-with-lease col
+ * valore atteso di leaseAtteso: se qualcun altro ha spinto nel frattempo il
+ * rinvio non parte, ed è giusto così. Un fallimento torna con la causa: chi
+ * chiama NON rilascia.
  */
 export function pushRamoCorrente(root, { exec = execFileSync, env = process.env } = {}) {
   const run = (args) => {
@@ -687,7 +728,7 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
   // come nell'hook: una sentinella negli unit test la cerca lì.
   // Come l'hook: una copia dei dati del server nei commit da spedire si toglie dalla loro storia, o il ramo non parte (#1108).
   let copie = { stato: 'pulito', avviso: '' };
-  const routine = Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0';
+  const routine = isRoutineInstance(root, { env });
   try {
     copie = spedibileSenzaCopie(root, routine ? { nome: 'claude-routine', email: 'claude@routine' } : {});
   } catch (_) { /* senza elenco si spedisce come prima: la sentinella resta la seconda rete */ }
@@ -704,17 +745,77 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
     return { ok: false, skipped: false, branch: ramo, reason: `il server remoto ha rifiutato il push (una regola del repo, un pre-receive, il push protection?): ${pulisciGit(push.out)}` };
   }
   if (/rejected|non-fast-forward|fetch first|stale info/i.test(push.out)) {
-    // --force-if-includes: il lease da solo si fida del ref remoto che questa
-    // copia conosce, e dopo un `git fetch` quel ref è già il commit dell'altro
-    // — il lease combacia e il rinvio lo sovrascrive (verifica del giro 2).
-    // Con --force-if-includes git rifiuta se quel commit non è mai passato
-    // dalla storia locale di questo ramo.
-    const lease = run(['push', '--force-with-lease', '--force-if-includes', 'origin', `HEAD:refs/heads/${ramo}`]);
+    const atteso = leaseAtteso(root, ramo, { exec });
+    if (!atteso) {
+      return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e il rinvio con --force-with-lease non parte: su origin '${ramo}' è a un commit che questo ramo non ha mai avuto (qualcun altro ha spinto su '${ramo}'?)` };
+    }
+    const lease = run(['push', 'origin', `HEAD:refs/heads/${ramo}`, `--force-with-lease=refs/heads/${ramo}:${atteso}`]);
     if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true, ...avviso };
     return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
   }
   return { ok: false, skipped: false, branch: ramo, reason: pulisciGit(push.out) };
 }
+
+/**
+ * La consegna di un riallineamento: il marcatore del correttore porta in `dal` il commit verificato. Una che si ferma
+ * con una domanda che blocca non riallinea niente. Regola unica per dispatch --record-fixed e deliver fixed. PURA.
+ */
+export function consegnaDiRiallineamento(marcatore, { ferma = false, domanda = null } = {}) {
+  const siFerma = ferma === true || !!(domanda && typeof domanda === 'object' && domanda.blocca !== false);
+  return !!(marcatore && marcatore.role === 'fixer' && marcatore.dal) && !siFerma;
+}
+
+/**
+ * Un riallineamento si registra solo se su origin c'è (#1964): registrato col ramo remoto fermo al commit verificato,
+ * chi verificava dopo trovava un diff vuoto. La punta contiene la linea principale, parte, e origin la rilegge uguale.
+ * → { ok, branch, punta, main, forced } | { ok:false, tipo: 'base'|'ramo'|'spedizione', reason }
+ */
+export function spedisciRiallineamento(root, { exec = execFileSync, env = process.env, base = 'refs/remotes/origin/main' } = {}) {
+  const run = (args) => {
+    try {
+      return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
+    } catch (e) {
+      return { ok: false, out: String((e && (e.stderr || e.stdout)) || (e && e.message) || '').trim() };
+    }
+  };
+  const punta = run(['rev-parse', '--verify', 'HEAD^{commit}']);
+  if (!punta.ok || !punta.out) return { ok: false, tipo: 'ramo', reason: `stato di git illeggibile: ${pulisciGit(punta.out)}` };
+  const nomeMain = base.replace(/^refs\/remotes\//, '');
+  const main = run(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
+  if (!main.ok || !main.out) return { ok: false, tipo: 'base', reason: `qui non c'è ${nomeMain}, la linea principale su cui si rifà la base` };
+  if (!run(['merge-base', '--is-ancestor', main.out, punta.out]).ok) {
+    return { ok: false, tipo: 'base', reason: `la punta ${punta.out.slice(0, 9)} non contiene ${nomeMain} (${main.out.slice(0, 9)}): il rebase non c'è, o è partito da una linea principale più vecchia di quella scaricata` };
+  }
+  const p = pushRamoCorrente(root, { exec, env });
+  if (!p.ok) return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `il ramo${p.branch ? ` '${p.branch}'` : ''} non arriva su origin: ${p.reason}` };
+  if (p.skipped) return { ok: false, tipo: 'ramo', branch: p.branch, reason: `il ramo non parte: ${p.reason}` };
+  // La spedizione può rifare i commit per togliere una copia dei dati: si confronta la punta di adesso.
+  const dopo = run(['rev-parse', '--verify', 'HEAD^{commit}']);
+  const ref = `refs/heads/${p.branch}`;
+  const remoto = run(['ls-remote', 'origin', ref]);
+  if (!remoto.ok) return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `spedito, ma non riesco a rileggere '${p.branch}' su origin: ${pulisciGit(remoto.out)}` };
+  const riga = remoto.out.split('\n').map((l) => l.trim().split(/\s+/)).find((c) => c[1] === ref);
+  const su = riga ? riga[0].toLowerCase() : '';
+  if (!dopo.ok || su !== dopo.out.toLowerCase()) {
+    return { ok: false, tipo: 'spedizione', branch: p.branch, reason: `su origin '${p.branch}' ${su ? `è a ${su.slice(0, 9)}` : 'non c\'è'}, non alla punta della cartella ${dopo.out.slice(0, 9)}` };
+  }
+  return { ok: true, branch: p.branch, punta: dopo.out, main: main.out, forced: !!p.forced, ...(p.avviso ? { avviso: p.avviso } : {}) };
+}
+
+/** Il rifiuto di un riallineamento non spedito, uguale dalle due strade di consegna. PURA. */
+export function testoRiallineamentoNonSpedito(sped) {
+  return [
+    `Riallineamento NON consegnato: ${sped.reason}.`,
+    'Il server non ha registrato niente: chi verifica dopo di te legge il ramo da origin, e senza il rebase lì troverebbe il commit già verificato.',
+    sped.tipo === 'spedizione'
+      ? 'Non spingere a mano: in cloud il controllo dei permessi ferma il push. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando; altrimenti è un guasto: fai la domanda di fine sessione e rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push. Il lavoro torna in coda sul suo ramo.'
+      : sped.tipo === 'base'
+        ? 'Rifai la base sulla linea principale (`git fetch origin main`, poi `git rebase origin/main`), poi rilancia lo stesso comando.'
+        : 'Riporta la cartella sul ramo del lavoro, a rebase finito, poi rilancia lo stesso comando.',
+  ].join('\n');
+}
+
+export { leaseAtteso };
 
 /**
  * Committa quello che è rimasto fuori dai commit, prima di spedire. L'hook di
@@ -759,7 +860,7 @@ export function commitRestante(root, { exec = execFileSync, env = process.env } 
     restano = run(['diff', '--cached', '--name-only']).out.split('\n').filter(Boolean);
     if (!restano.length) return { ok: true, skipped: false, committed: [], fuori, reason: '' };
   }
-  const routine = Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0';
+  const routine = isRoutineInstance(root, { env });
   const nome = routine ? 'claude-routine' : 'claude-local';
   const email = routine ? 'claude@routine' : 'claude@local';
   const elenco = `${restano.slice(0, 3).join(', ')}${restano.length > 3 ? ` (+${restano.length - 3} file)` : ''}`;
@@ -860,6 +961,32 @@ export async function sporca(t, motivo, opts) {
   if (status === 200 && body && body.ok) return { outcome: 'ok', fiducia: body.fiducia };
   if (status === 404) return { outcome: 'fault', reason: 'routineSporca non è ancora pubblicata sul server' };
   return { outcome: status >= 500 || status === 0 ? 'fault' : 'refused', reason: String((body && body.reason) || `http_${status}`) };
+}
+
+/**
+ * Un'operazione del biglietto (#1153, SPEC-DOMANDE.md §5): `segnala` e `rapporto`, e quelle del suo ambito. Il server
+ * decide cosa si può fare: qui si porta la richiesta e si riporta la risposta com'è.
+ * @returns {{ outcome:'ok'|'refused'|'fault', body?, reason?, detail? }}
+ */
+export async function operazione(t, op, dati, opts) {
+  const { status, body } = await call('routineOperazione', { ticket: t, op: String(op || ''), dati: dati && typeof dati === 'object' ? dati : {} }, opts);
+  if (status === 200 && body && body.ok) return { outcome: 'ok', body };
+  if (status === 404 && !(body && body.reason)) return { outcome: 'fault', reason: 'routineOperazione non è ancora pubblicata sul server' };
+  return {
+    outcome: status >= 500 || status === 0 ? 'fault' : 'refused',
+    reason: String((body && body.reason) || `http_${status}`),
+    detail: String((body && body.detail) || ''),
+  };
+}
+
+/** I dati di un'operazione dalla riga (`'{"id":"…"}'`) o da stdin; '' → {}. PURA. → { dati } | { errore } */
+export function datiOperazione(grezzo) {
+  const t = String(grezzo || '').trim();
+  if (!t) return { dati: {} };
+  let dati;
+  try { dati = JSON.parse(t); } catch (e) { return { errore: `i dati sono un oggetto JSON, per esempio '{"id":"abc"}': ${e.message}` }; }
+  if (!dati || typeof dati !== 'object' || Array.isArray(dati)) return { errore: 'i dati sono un oggetto JSON, per esempio \'{"id":"abc"}\'' };
+  return { dati };
 }
 
 // ─── Lavori server (SPEC-DOMANDE.md §7, mappa #1159 §1.5) ────────────────────
@@ -1380,13 +1507,13 @@ if (isMain) {
     // la copia fissata, `scripts/…` porterebbe a quello del ramo di lavoro —
     // cioè proprio la cosa che il contratto dei worker vieta di scrivere a mano.
     const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
-    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|release|deliver|sporca|git-server|ramo-server|compare|domanda|risposta> <segreto> [...]`);
+    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|veglia|release|deliver|operazione|segnala|rapporto|sporca|git-server|ramo-server|compare|domanda|risposta> <segreto> [...]`);
     process.exit(1);
   };
 
   // `heartbeat` può girare senza posizionali (il biglietto viaggia nell'ambiente);
   // `domanda` e `risposta` del worker hanno il biglietto in `--biglietto`.
-  if (!cmd || (!args[0] && !['heartbeat', 'domanda', 'risposta'].includes(cmd))) usage();
+  if (!cmd || (!args[0] && !['heartbeat', 'domanda', 'risposta', 'segnala', 'rapporto'].includes(cmd))) usage();
 
   if (cmd === 'domanda' || cmd === 'risposta') {
     const a = argomentiChiusura(cmd, args, data);
@@ -1534,6 +1661,32 @@ if (isMain) {
         await defaultSleep(RETRY_EVERY_MS);
       }
     }
+  } else if (cmd === 'veglia') {
+    if (args.length !== 1 || !looksLikeTicket(args[0]) || Object.keys(data).length) {
+      console.error('Uso: veglia <biglietto> — solo il biglietto del worker che vegli. Non ho fatto niente.');
+      process.exit(1);
+    }
+    const nelClone = cloneDelBiglietto(ROOT, args[0]);
+    if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
+    const { veglia, segniDiVita, FETTA_MS } = await import('./lib/veglia-worker.mjs');
+    const { stopBeat } = await import('./lib/routine-beat.mjs');
+    const ticket = args[0];
+    const fetta = Number(process.env.FILO_VEGLIA_FETTA_MS);
+    const esito = await veglia({
+      fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
+      leggi: () => segniDiVita({ root: ROOT, ticket }),
+      // Il rilascio è quello di sempre, dalla cartella che tiene il biglietto; della sua stampa passa solo l'esito.
+      rilascia: (guasto, mio) => {
+        const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'release', ticket, '--role', 'orchestrator', '--forza',
+          '--guasto', guasto, ...(mio ? [] : ['--senza-push'])], { encoding: 'utf8', env: process.env });
+        const ok = r.status === 0 && /OK: biglietto rilasciato/.test(String(r.stdout || ''));
+        if (!ok) stopBeat(ROOT, { ticket });
+        const motivo = ok ? '' : (String(r.stdout || '').match(/rilascio non riuscito \(([^)]{1,80})\)/) || [])[1] || `uscita ${r.status}`;
+        return { ok, motivo };
+      },
+    });
+    console.log(esito.testo);
+    process.exit(esito.uscita);
   } else if (cmd === 'release') {
     // `--guasto "motivo"`: il guasto si dichiara AL CANALE nel rilascio, non a
     // parole nel testo di ritorno (che nessuna macchina legge).
@@ -1594,7 +1747,11 @@ if (isMain) {
       const p = pushRamoCorrente(ROOT);
       if (!p.ok) {
         console.error(`Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`);
-        console.error('Non ho rilasciato niente: sistema il push e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
+        // In una routine un push a mano resta fermo sul controllo dei permessi, che in cloud nessuno approva (#1797).
+        const inRoutine = isRoutineInstance(ROOT) || !!marcatore;
+        console.error(inRoutine
+          ? 'Non ho rilasciato niente. Non spingere a mano: in cloud il controllo dei permessi ferma il push e la sessione resta appesa. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando, che rispedisce da sé; altrimenti è un guasto: rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push.'
+          : 'Non ho rilasciato niente: il ramo deve arrivare su origin prima del rilascio. Rimetti a posto la spedizione e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
         process.exit(1);
       }
       if (p.avviso) console.error(p.avviso);
@@ -1618,7 +1775,7 @@ if (isMain) {
         rapporto = { v: 3, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
       }
     }
-    const r = await releaseConRapporto(args[0], guasto, rapporto);
+    const r = await releaseConRapporto(args[0], guasto, rapporto, chiRilascia !== 'orchestrator' && cartellaSua ? { domandaAlRilascio: true } : undefined);
     if (r.avviso) console.error(r.avviso);
     // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo
     // (il server risponde `dead_ticket` e il ciclo esce), ma spegnerlo adesso
@@ -1652,6 +1809,8 @@ if (isMain) {
     }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');
     else console.log(`rilascio non riuscito (${r.reason})`);
+    const domandaDopo = r.ok ? testoDomandaAlRilascio(r.body, resolve(fileURLToPath(import.meta.url)).split('\\').join('/'), args[0]) : '';
+    if (domandaDopo) console.log(`\n${domandaDopo}`);
   } else if (cmd === 'deliver') {
     // deliver [<biglietto>] <intento> [--campo valore …]
     //
@@ -1787,6 +1946,15 @@ if (isMain) {
         process.exit(1);
       }
       data.sha = punta;
+      if (intento === 'fixed') {
+        const { readMarker } = await import('./lib/routine-role.mjs');
+        if (consegnaDiRiallineamento(readMarker(ROOT), { ferma: data.stop, domanda: data.domanda })) {
+          const sped = spedisciRiallineamento(ROOT);
+          if (!sped.ok) { console.error(testoRiallineamentoNonSpedito(sped)); process.exit(1); }
+          if (sped.avviso) console.error(sped.avviso);
+          data.sha = sped.punta;
+        }
+      }
     }
     // Il piano di un lavoro grosso (SPEC-RIDISEGNO-LAVORO.md § 2): da file, intero, e da solo.
     if (intento === 'piano') {
@@ -1862,6 +2030,42 @@ if (isMain) {
     if (r.outcome === 'ok' && guardia && guardia.id) azzeraRifiuti(ROOT, guardia.id);
     if (r.outcome === 'ok') {
       console.log(testoConsegnaRiuscita(r, data, intento));
+      process.exit(0);
+    }
+    if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
+    console.error(`guasto ${r.reason}`); process.exit(3);
+  } else if (cmd === 'operazione' || cmd === 'segnala' || cmd === 'rapporto') {
+    // Il testo da stdin (heredoc): sulla riga gli apostrofi italiani romperebbero la shell. Da un terminale senza tubo
+    // non si aspetta.
+    const leggiStdin = async () => {
+      if (process.stdin.isTTY) return '';
+      const pezzi = [];
+      for await (const p of process.stdin) pezzi.push(p);
+      return Buffer.concat(pezzi).toString('utf8');
+    };
+    const nome = cmd === 'operazione' ? String(args[0] || '').trim() : cmd;
+    const sullaRiga = (cmd === 'operazione' ? args.slice(1) : args).join(' ').trim();
+    const grezzo = sullaRiga || (await leggiStdin()).trim();
+    let dati;
+    if (cmd === 'operazione') {
+      const d = datiOperazione(grezzo);
+      if (d.errore) { console.error(`${nome}: ${d.errore}. Il server non è stato chiamato.`); process.exit(1); }
+      dati = d.dati;
+    } else {
+      if (!grezzo) {
+        console.error(`${cmd} vuole il testo, fra due righe FINE: … ${cmd} <<'FINE'\n  <testo>\n  FINE\nIl server non è stato chiamato.`);
+        process.exit(1);
+      }
+      dati = { testo: grezzo };
+    }
+    const { readTicket } = await import('./lib/routine-ticket.mjs');
+    const biglietto = mano.ticket || readTicket(ROOT);
+    if (!biglietto) { console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'); process.exit(1); }
+    const r = await operazione(biglietto, nome, dati);
+    if (r.outcome === 'ok') {
+      if (cmd === 'segnala') console.log(`OK: segnalazione ${r.body.num || r.body.id} aperta (${r.body.fiducia === 'fidato' ? 'fidata' : 'non fidata'}).`);
+      else if (cmd === 'rapporto') console.log(`OK: rapporto consegnato${r.body.chiuso ? `, ${r.body.compito} chiuso` : ''}.`);
+      else console.log(JSON.stringify(r.body, null, 2));
       process.exit(0);
     }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }

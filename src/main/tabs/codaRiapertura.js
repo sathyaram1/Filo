@@ -104,13 +104,21 @@ class CodaRiapertura {
     this._forseFinita();
   }
 
+  // In volo PRIMA di caricare: `carica` può rientrare (loadURL → did-start-loading → pota), e una scheda né in attesa
+  // né in volo fa dire la coda finita con l'ultima pagina appena partita.
   _parti(tab, inVista) {
+    const v = { inVista, timer: null };
+    this.volo.set(tab, v);
     let partita = false;
     try { partita = this.carica(tab) !== false; } catch (_) { partita = false; }
-    if (!partita) return false;
-    const timer = setTimeout(() => this.caricata(tab), this.tetto);
-    timer.unref?.();
-    this.volo.set(tab, { inVista, timer });
+    if (!partita) {
+      if (this.volo.get(tab) === v) this.volo.delete(tab);
+      return false;
+    }
+    // Finita, chiusa o potata mentre partiva: niente tetto da armare.
+    if (this.volo.get(tab) !== v) return true;
+    v.timer = setTimeout(() => this.caricata(tab), this.tetto);
+    v.timer.unref?.();
     return true;
   }
 

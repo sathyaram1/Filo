@@ -17,6 +17,8 @@
 
   let activeRoot = null;
   let activeStack = null;
+  // Stacca ciò che l'apertura ha agganciato fuori dal pannello (#1096).
+  let pulizia = null;
 
   function icon(name, size) {
     try { return typeof Icons[name] === 'function' ? Icons[name](size) : ''; }
@@ -25,6 +27,9 @@
 
   function close() {
     if (!activeRoot) return;
+    const stacca = pulizia;
+    pulizia = null;
+    try { stacca?.(); } catch (_) {}
     try { activeStack?.unregister?.(); } catch (_) {}
     activeStack = null;
     if (Popup?.togliRiquadro) Popup.togliRiquadro(activeRoot);
@@ -98,7 +103,8 @@
     `;
     document.documentElement.appendChild(Popup?.riquadro ? Popup.riquadro(root) : root);
     activeRoot = root;
-    Popup?.attachZoomCompensation?.(root);
+    // La compensazione zoom ascolta window e visualViewport: senza staccarla ogni apertura resta in memoria (#1096).
+    const staccaZoom = Popup?.attachZoomCompensation?.(root);
     activeStack = Popup?.registerStack?.(root) || null;
 
     const modal = root.querySelector('.sn-rt-modal');
@@ -145,6 +151,10 @@
 
     // Bozze persistenti: sopravvivono a chiusura e riapertura.
     let saveTimer = null;
+    pulizia = () => {
+      try { if (typeof staccaZoom === 'function') staccaZoom(); } catch (_) {}
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; saveDraft(); }
+    };
     function saveDraft() {
       if (!DRAFT_ATTACK_KEY) return;
       try {
@@ -160,7 +170,7 @@
     }
     const onInput = () => {
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveDraft, 250);
+      saveTimer = setTimeout(() => { saveTimer = null; saveDraft(); }, 250);
       refreshSendState({ daInput: true });
     };
     attackEl.addEventListener('input', onInput);
@@ -213,6 +223,8 @@
       }
       const msg = submitStatusMessage(res);
       if (msg.ok && res && res.attemptId) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
         clearDraft();
         setStatus(msg.text, 'ok');
         // Naviga alla pagina red-team sul tentativo: lì parte la rivelazione live.

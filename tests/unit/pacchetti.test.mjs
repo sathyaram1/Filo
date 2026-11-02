@@ -372,7 +372,8 @@ describe('il pacchetto installato porta le librerie di src/', () => {
   // electron-builder mette nel pacchetto solo `dependencies`: una libreria che src/ richiede e che sta altrove
   // mancherebbe all'app installata, come hash-wasm mancava a chi avviava dai sorgenti.
   const NODE = new Set(builtinModules);
-  const RICHIESTA = /\brequire(?:\.resolve)?\(\s*['"]([^'"]+)['"]\s*[,)]|\bimport\(\s*['"]([^'"]+)['"]\s*\)|\bfrom\s+['"]([^'"]+)['"]/g;
+  // `ObjC.import('Foundation')` dello script del Mac è un metodo, non un modulo: dopo un punto non è un import.
+  const RICHIESTA = /\brequire(?:\.resolve)?\(\s*['"]([^'"]+)['"]\s*[,)]|(?<!\.)\bimport\(\s*['"]([^'"]+)['"]\s*\)|\bfrom\s+['"]([^'"]+)['"]/g;
 
   function sorgenti(d, acc = []) {
     for (const e of readdirSync(d)) {

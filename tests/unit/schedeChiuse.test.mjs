@@ -110,6 +110,21 @@ test('oltre il tetto se ne vanno le più vecchie, le recenti restano in ordine',
   assert.ok(SchedeChiuse.TETTO >= 100, 'il tetto vero è abbondante');
 });
 
+test('una voce ripresa per nome (il «Riapri» della pulizia, #349) esce dalla pila e dall\'archivio, e non torna due volte', () => {
+  const p = SchedeChiuse.crea();
+  const prima = p.ricorda(voce('https://prima.example/'));
+  p.archiviata(prima, 'id-prima');
+  const pulita = p.ricorda(voce('https://pulita.example/'));
+  assert.equal(p.riprendi(pulita), pulita);
+  // L'archivio risponde dopo il «Riapri»: la scheda è già tornata, e chi conta la conta adesso.
+  assert.equal(p.archiviata(pulita, 'id-pulita'), true);
+  assert.equal(p.riprendi(pulita), null);
+  assert.equal(p.prendi().url, 'https://prima.example/');
+  assert.equal(p.prendi(), null);
+  const archivio = [arch('id-pulita', 'https://pulita.example/', '2026-10-22T10:00:00Z'), arch('id-prima', 'https://prima.example/', '2026-10-21T10:00:00Z')];
+  assert.equal(p.dallArchivio(archivio), null);
+});
+
 test('una home vuota non si ricorda; una home con cronologia, una pagina di Filo o un sito sì', () => {
   const vuota = { prima: [], dopo: [] };
   assert.equal(SchedeChiuse.daRicordare('filo://newtab/', vuota), false);

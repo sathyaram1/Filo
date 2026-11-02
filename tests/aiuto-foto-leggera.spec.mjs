@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { nelMondoDiFilo } from './helpers/confirm.mjs';
+import { nelloStrato, paginaDelloStrato } from './helpers/riquadri.mjs';
 
 // Lo schermo dell'owner: il fattore lo fissa la prova, anche se FILO_TEST_SCALE ne chiede un altro.
 test.use({ argomentiInPiu: ['--force-device-scale-factor=1.25'] });
@@ -21,8 +22,9 @@ const PAGINA_RICCA = `<!doctype html><html><head><title>Pagina ricca</title></he
   '<p>Per disdire l’abbonamento apri Account, poi Pagamenti, poi Gestisci piano: in fondo alla pagina trovi «Annulla rinnovo».</p>'.repeat(60)
 }</div></body></html>`;
 
-// Il modello finto risponde subito e tiene da parte la foto di ogni passo; la cattura vera passa al main.
-const AGENTE = `(() => {
+// Il modello finto risponde subito e tiene da parte la foto di ogni passo; la cattura vera passa al main. Su un sito
+// l'Aiuto sta nello strato sopra la scheda (#1509.3), e il finto va lì.
+const AGENTE = () => {
   globalThis.__passi = [];
   const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
   chrome.runtime.sendMessage = (m, ...r) => {
@@ -32,9 +34,8 @@ const AGENTE = `(() => {
     }
     return orig(m, ...r);
   };
-  SN_SIDEBAR.open();
   return 1;
-})()`;
+};
 
 async function misura(app, dataUrl) {
   return app.evaluate(({ nativeImage }, u) => {
@@ -49,13 +50,15 @@ test('a ogni passo l\'Aiuto manda la foto ai pixel che si vedono, in JPEG legger
   const vista = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio }));
   expect(vista.dpr, 'la prova vale solo sullo schermo al 125%').toBeCloseTo(1.25, 2);
 
-  await nelMondoDiFilo(app, host, AGENTE);
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
-  await page.fill('.sn-sidebar-input textarea', 'come disdico l\'abbonamento?');
-  await page.press('.sn-sidebar-input textarea', 'Enter');
-  await expect.poll(() => nelMondoDiFilo(app, host, 'globalThis.__passi.filter((p) => p.domanda).length'), { timeout: 15000 }).toBeGreaterThan(0);
+  await nelMondoDiFilo(app, host, 'SN_SIDEBAR.open(); 1');
+  const strato = await paginaDelloStrato(app, page);
+  await strato.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
+  await nelloStrato(app, page, AGENTE);
+  await strato.fill('.sn-sidebar-input textarea', 'come disdico l\'abbonamento?');
+  await strato.press('.sn-sidebar-input textarea', 'Enter');
+  await expect.poll(() => nelloStrato(app, page, () => globalThis.__passi.filter((p) => p.domanda).length), { timeout: 15000 }).toBeGreaterThan(0);
 
-  const passi = await nelMondoDiFilo(app, host, 'globalThis.__passi');
+  const passi = await nelloStrato(app, page, () => globalThis.__passi);
   expect(passi.every((p) => p.screenshot), 'ogni passo deve portare la foto della pagina').toBe(true);
   for (const p of passi) {
     const m = await misura(app, p.screenshot);
