@@ -155,6 +155,7 @@ function scenario() {
 }
 
 function vl(work, ...args) {
+  if (args[0] === 'critica') faiLaLettura(work);
   const r = spawnSync(process.execPath, [VERIFY, ...args], {
     cwd: work, encoding: 'utf8',
     env: { ...process.env, FILO_REPO_ROOT: work, FILO_ROUTINE_CONFIG_URL: FINTO, FILO_ADMIN_ID_TOKEN: 'finto-id-token' },
