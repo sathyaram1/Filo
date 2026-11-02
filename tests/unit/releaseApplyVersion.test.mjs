@@ -1,13 +1,14 @@
 // Il numero del server applicato in locale al commit provato (#641), solo se combacia con la prossima versione
-// dichiarata, e il conto "c'è qualcosa di nuovo dal tag" di release.yml eseguito su un repo vero.
+// dichiarata, lo stesso numero nel lockfile (#2040), e il conto "c'è qualcosa di nuovo dal tag" di release.yml
+// eseguito su un repo vero.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applicaVersione, confrontaVersioni } from '../../scripts/release-apply-version.mjs';
+import { applicaVersione, applicaVersioneAlLock, confrontaVersioni } from '../../scripts/release-apply-version.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { prossimaVersione } from '../helpers/prossimaVersione.mjs';
 
