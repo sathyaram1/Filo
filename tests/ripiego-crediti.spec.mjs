@@ -358,7 +358,9 @@ test('(C) la pagina Crediti gestisce la chiave: si vede, dice spesa e residuo, s
   const options = await openTab('filo://options/options.html');
   await expect.poll(() => options.locator('#apiKey').inputValue(), { timeout: 10000 }).toBe('');
 
-  // Si mette dal campo di Crediti: vuoto e soli spazi non passano.
+  // Si mette dal campo di Crediti: vuoto e soli spazi non passano. Si torna sulla scheda come fa chi la usa: dietro,
+  // la pagina Crediti non si rilegge (#2059), e la strada inversa qui sotto vuole Crediti davanti.
+  await shell.evaluate((id) => window.filoShell.tabs.activate(id), schedaCrediti);
   await page.bringToFront().catch(() => {});
   await page.fill('#ownKeyInput', '   ');
   await page.click('#ownKeySaveBtn');
