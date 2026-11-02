@@ -1333,6 +1333,8 @@ async function recordVerifier(id, critiqueText, domande = []) {
   if (stato.lines.length) {
     return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines) };
   }
+  const senzaLettura = letturaMancante(ROOT, headSha(ROOT));
+  if (senzaLettura) return { rejected: true, formatRejected: true, message: senzaLettura };
   const avvio = avvioDellaCritica(guard.state);
   if (avvio) {
     const fermo = codiceCambiatoDallAvvio(avvio, ROOT);
