@@ -36,7 +36,7 @@ test('CLAUDE.md: il trade-off di costo lo decide chi lavora, quello vero resta a
 test('filo_design: i prezzi si leggono da OpenRouter e le alternative stanno accanto all\'impostazione con la stima', () => {
   const mod = sezione(leggi('filo_design.txt'), 'GESTIONE DEI MODELLI', 'PERSONALIZZAZIONE');
   assert.match(mod, /i prezzi si leggono su OpenRouter al momento del lavoro/);
-  assert.match(mod, /ogni alternativa confrontata [^.]*diventa un'impostazione, non un commento nel codice/);
+  assert.match(mod, /ogni alternativa confrontata \([^)]*\) diventa un'impostazione, non un commento nel codice/);
   assert.match(mod, /ogni opzione porta accanto a sé la sua stima, costo mensile all'uso stimato e tempo di risposta/);
   assert.match(mod, /nessuna soglia di costo fa scattare una domanda/);
   // Un prezzo di modello scritto a mano: una cifra in dollari nella frase che parla di milioni di token.
