@@ -68,7 +68,7 @@ export function contaDelLavoro(root, base, head) {
   const git = gitIn(root);
   const ns = git(['diff', '--name-status', '-M', '-z', base, head], { grezzo: true });
   if (!ns.ok) return { errore: `git diff non riesce (${primaRiga(ns.out)})` };
-  const voci = vociNameStatus(ns.out);
+  const voci = vociConPercorsoPrima(ns.out);
   const leggi = (sha, p) => { const r = git(['show', `${sha}:${p}`], { grezzo: true }); return r.ok ? r.out : ''; };
   const file = voci.filter((v) => tipoDiFile(v.percorso) || tipoDiFile(v.prima)).map((v) => ({
     percorso: v.percorso,
