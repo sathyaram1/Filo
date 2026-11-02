@@ -702,6 +702,7 @@ test('#256 locale (CLI): una spec cancellata dalla shell ma non committata ferma
   // Committata la pulizia, la stessa critica passa, e vale per il commit nuovo.
   g(work, ['add', '-A']);
   g(work, ['commit', '-q', '-m', 'verifica: pulizia']);
+  faiLaLettura(work);
   const pulita = spawnSync(process.execPath, [VERIFY, 'critica', critica], { env: { ...process.env, FILO_REPO_ROOT: work }, encoding: 'utf8' });
   assert.equal(pulita.status, 0, pulita.stderr);
   assert.match(String(pulita.stdout), /Si può pubblicare/);
