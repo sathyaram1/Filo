@@ -839,7 +839,7 @@ ma a scriverlo è il server.
      dopo rifiuta la cartella. Un lockfile che non si riallinea (assente,
      illeggibile, fuori formato) non ferma l'aumento: il commit porta il solo
      manifesto e il motivo finisce nel registro del server;
-  6. scrive **un solo** commit `release: vX.Y.Z [skip ci]` con i due file e
+  7. scrive **un solo** commit `release: vX.Y.Z [skip ci]` con i due file e
      l'identità dell'App, figlio del commit letto e senza forzare: se `main`
      si è mossa nel mezzo, GitHub lo rifiuta e non si scrive.
 - **Perché non si accetta il contenuto dal chiamante**: sarebbe un push diretto
