@@ -11,8 +11,8 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
   file-ruolo;
 - i testi per l'owner e per chi ha segnalato → nelle `notes` via canale;
 - un trade-off che non si misura o una domanda di design (CLAUDE.md
-  § Iniziativa: non lo decidi tu) → `--domanda <file.json>` sulla consegna (`--record-fixed`,
-  `--record-verifier`). Nel report da solo si perde;
+  § Iniziativa: non lo decidi tu) → `--domanda <file.json>` sulla consegna
+  (`--record-fixed`, `--record-verifier`). Nel report da solo si perde;
 - un dubbio di processo (quale strumento, quale ordine, cosa fare di un
   rilievo) non è dell'owner: va al manutentore nel rilascio, `release
   <biglietto> --role <il tuo ruolo> --processo "<la domanda>"`. Il lavoro resta
