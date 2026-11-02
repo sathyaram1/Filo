@@ -941,6 +941,15 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
   privati da qui vanno ingannati due agenti di fila, chi apre il feedback e
   chi lo lavora. L'owner ha scartato sia la lettura in Ricevuti di quei
   feedback sia i rami su un repo privato: non è un difetto da segnalare.
+- **Decisione dell'owner (01/11, #2011):** la chiave `owner-non-fidato` è
+  l'owner da una sede cloud che legge testo di chiunque. Ha i poteri del
+  manutentore e in più legge le domande per l'owner (tranne quelle
+  dell'addetto comunicazioni), risponde, archivia e riapre, col contratto di
+  Gestione (`chiaveDomande`). Quello che scrive nasce non fidato; la risposta
+  porta il segno della chiave in Gestione, l'owner la può riaprire, e il recap
+  del mattino elenca quelle del giorno prima. Fusioni, L5, chiavi,
+  interruttori, «segna fidato», abbassare o archiviare una priorità 3 e i
+  bilanci restano alla finestra.
 - **Nessun ambito** può approvare blocchi di sicurezza, cambiare la fiducia,
   creare ambiti o toccare le chiavi.
 - **I segreti** stanno solo nell'ambiente cloud del compito che li usa. Gli
