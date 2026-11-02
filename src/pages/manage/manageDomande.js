@@ -799,11 +799,14 @@
     return box;
   }
 
-  // Si riapre un'archiviata senza azioni, e una risposta automatica che non torna (§3.6).
+  // Si riapre un'archiviata senza azioni, una risposta automatica che non torna (§3.6) e una data dalla chiave
+  // owner-non-fidato (#2011).
   function riapribile(d) {
-    return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica));
+    return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica || rispostaDaChiave(d)));
   }
   function titoloRiapri(d) {
+    const r = rispostaDaChiave(d);
+    if (r && !r.archiviata) return `Rimettila fra quelle da rispondere: quello che la risposta da «${r.slug}» ha applicato resta finché non rispondi`;
     if (!(d.esito && d.esito.automatica)) return 'Rimettila fra quelle da rispondere';
     const da = principioUsato(d);
     return `Rimettila fra quelle da rispondere: ${da ? `il principio di ${da}` : 'il principio usato'} resta da rivedere finché non rispondi`;
