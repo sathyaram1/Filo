@@ -140,6 +140,12 @@
 .sn-menu-icon-btn:hover:not(.sn-menu-btn-disabled) {
   background: rgba(var(--sn-accent-rgb), 0.35);
 }
+/* Uno stile che la selezione ha già: un fondo più leggero dell'hover, così l'hover resta visibile sopra. */
+.sn-menu-row-btn.sn-menu-btn-acceso,
+.sn-menu-icon-btn.sn-menu-btn-acceso {
+  background: rgba(var(--sn-accent-rgb), 0.18);
+  color: var(--sn-accent, var(--sn-fg));
+}
 .sn-menu-row-btn:active:not(.sn-menu-btn-disabled),
 .sn-menu-icon-btn:active:not(.sn-menu-btn-disabled) { transform: scale(0.92); }
 .sn-menu-row-btn.sn-menu-btn-disabled,
