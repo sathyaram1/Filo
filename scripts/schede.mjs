@@ -239,9 +239,14 @@ async function strada() {
   return stradaDelGiro(ROOT);
 }
 
-async function elenca(cartella, dryRun) {
-  const { via, ticket } = await strada();
-  const r = via === 'cloud' ? await letturaCloud(ticket) : await letturaLocale();
+/** `lettura` (le prove): la lettura già scelta, al posto di quella della strada del giro. */
+export async function elenca(cartella, dryRun, { lettura = null } = {}) {
+  let r;
+  if (lettura) r = await lettura();
+  else {
+    const { via, ticket } = await strada();
+    r = via === 'cloud' ? await letturaCloud(ticket) : await letturaLocale();
+  }
   if (!r.ok) { console.error(`${r.codice === 4 ? 'GUASTO' : 'RIFIUTATO'}: ${r.motivo}. Indice non scritto.`); return r.codice; }
   const { righe } = r;
   // Un indice sbagliato è peggio di uno vecchio: chi lo legge non lo distingue da uno buono.
