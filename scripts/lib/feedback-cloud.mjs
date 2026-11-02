@@ -8,16 +8,20 @@ const ATTESE_429_MS = [10_000, 20_000, 30_000, 45_000, 60_000];
 // I no che dipendono dal feedback o dalla scheda, non dal momento: rimandare la stessa scheda avrebbe la stessa risposta.
 export const RIFIUTI_DEFINITIVI = Object.freeze(['feedback_segnalato', 'feedback_inesistente', 'scheda_non_valida']);
 
-/** 'cloud' in una routine (FILO_ROUTINE acceso) col biglietto; 'locale' altrimenti, col token dell'owner. PURA. */
-export function stradaFeedback({ env = {}, biglietto = '' } = {}) {
-  const routine = Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0';
-  return routine && String(biglietto || '').trim() ? 'cloud' : 'locale';
+/** 'cloud' in una routine col biglietto; 'locale' altrimenti, col token dell'owner. PURA. */
+export function stradaFeedback({ routine = false, biglietto = '' } = {}) {
+  return routine === true && String(biglietto || '').trim() ? 'cloud' : 'locale';
 }
 
-/** Il biglietto del giro, se c'è (variabile o marcatore di dispatch). */
-export async function bigliettoDelGiro(root) {
+/**
+ * La strada di questa istanza col biglietto del giro (variabile o marcatore di dispatch). Se è una routine lo dice
+ * isRoutineInstance: in cloud l'export di FILO_ROUTINE non arriva alla chiamata dopo (#1966).
+ */
+export async function stradaDelGiro(root, { env = process.env } = {}) {
   const { readTicket } = await import('./routine-ticket.mjs');
-  return readTicket(root);
+  const { isRoutineInstance } = await import('./routine-role.mjs');
+  const ticket = readTicket(root);
+  return { via: stradaFeedback({ routine: isRoutineInstance(root, { env }), biglietto: ticket }), ticket };
 }
 
 const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
