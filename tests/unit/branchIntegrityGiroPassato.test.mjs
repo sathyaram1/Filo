@@ -160,6 +160,28 @@ describe('D-207 — la cartella riusata non riporta il ramo a un giro passato', 
     }
   });
 
+  test('origin muto mentre si prepara: chi verifica non riceve il giro 2, il giro si ferma col guasto (#1779.1)', async () => {
+    const base = cartellaTemporanea('filo-giro-passato-');
+    const { srv, port } = await fintoServer(LAVORO);
+    try {
+      const { casa, dirStato, B } = scena(base);
+      const origin = resolve(base, 'origin.git');
+      renameSync(origin, `${origin}.spento`);
+      const r = await esegui(casa, dirStato, port, ['--ticket', 'biglietto-di-prova']);
+      const json = JSON.parse(r.so.slice(r.so.indexOf('{'), r.so.lastIndexOf('}') + 1) || 'null');
+      assert.equal(json && json.role, 'halt', `con origin muto il giro doveva fermarsi (uscita ${r.code}): ${r.se}`);
+      assert.equal(json.kind, 'transient');
+      assert.ok(json.message.includes(RAMO), json.message);
+      assert.notEqual(git(casa, 'rev-parse', 'HEAD'), B, 'la cartella non resta pronta sul codice del giro 2');
+      const st = JSON.parse(readFileSync(resolve(dirStato, `${ID}.json`), 'utf8'));
+      assert.deepEqual(st.checkpoints.map((c) => c.sha).slice(-1), [B], 'nessun avvio registrato sul giro passato');
+      assert.equal(st.avvio, undefined);
+    } finally {
+      srv.close();
+      togliCartella(base);
+    }
+  });
+
   test('punto fermo uguale alla punta: come prima, lo stato resta (la pulizia dopo un «pass» lo consulta)', async () => {
     const base = cartellaTemporanea('filo-giro-passato-');
     const { srv, port } = await fintoServer(LAVORO);
