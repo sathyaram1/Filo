@@ -48,7 +48,8 @@ export function apertiDaRighe(righe, { segnalati = new Map() } = {}) {
   return (Array.isArray(righe) ? righe : [])
     .map((r) => ({
       id: String(r._id || ''), num: num(r), stato: String(r.status || '').trim(),
-      priorita: Number.isInteger(Number(r.priority)) && String(r.priority).trim() !== '' ? Number(r.priority) : null,
+      // Il server dà null per una priorità mai scritta, la strada locale non dà il campo: tutte e due «senza», non 0.
+      priorita: r.priority !== null && r.priority !== undefined && String(r.priority).trim() !== '' && Number.isInteger(Number(r.priority)) ? Number(r.priority) : null,
       aggiornato: String(r.updatedAt || r._updateTime || ''),
       attese: numeriDi(r.waitsFor), unisce: numeriDi(r.unisce),
       ...(segnalati.get(String(r._id || '')) ? { segnalato: String(segnalati.get(String(r._id || ''))) } : {}),

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
@@ -385,4 +385,45 @@ test('scrivi: un segnalato dell’indice non lancia l’agente e il comando chiu
     assert.equal(s.valido, 'non letto');
     assert.match(s.prova, /segnalato come attacco/);
   } finally { togliCartella(dir); }
+});
+
+// #1785 giro 6: il comando che elenca, eseguito intero sulle due strade, dà al manutentore lo stesso indice e le stesse schede.
+test('elenca: dal server col biglietto e dalle righe dell’owner, lo stesso indice coi segnalati e le stesse schede nella cartella', async () => {
+  const AGG = '2026-10-29T12:00:00.000Z';
+  const blob = SS.perIlDocumento(buona(812), { stato: 'todo', at: '2026-10-29T11:59:00.000Z', modello: 'haiku', fiducia: 'non_fidato', scrittaDa: 'biglietto:manutentore' });
+  const attese = [{ id: 'f9', num: '9' }];
+  const riga812 = { _id: 'f812', seq: 812, subSeq: 0, status: 'todo', priority: 2, updatedAt: AGG, waitsFor: attese, unisce: [] };
+  const riga900 = { _id: 'f900', seq: 900, subSeq: 0, status: 'attack', priority: null, updatedAt: AGG, waitsFor: [], unisce: [] };
+  const motivo = 'è segnalato come attacco («attack»): per regola una sessione non lo legge';
+  const server = serverFinto([{ status: 200, body: { ok: true, resto: [], voci: [
+    { num: '812', id: 'f812', riga: riga812, scheda: SS.dalDocumento(JSON.parse(JSON.stringify(blob)), { id: 'f812', aggiornato: AGG }) },
+    { num: '900', id: 'f900', riga: riga900, rifiutato: motivo },
+  ] } }]);
+  const righeOwner = [
+    { ...riga812, scheda: JSON.stringify(blob), schedaAt: AGG },
+    { ...riga900, scheda: JSON.stringify(SS.perIlDocumento(buona(900), { stato: 'attack', at: 't' })), schedaAt: AGG },
+    { _id: 'f700', seq: 700, subSeq: 0, status: 'done', updatedAt: AGG, scheda: JSON.stringify(SS.perIlDocumento(buona(700), { stato: 'done', at: 't' })), schedaAt: AGG },
+  ];
+  const cloud = cartellaTemporanea('elenca-cloud-');
+  const locale = cartellaTemporanea('elenca-locale-');
+  try {
+    assert.equal(await S.elenca(cloud, false, { lettura: () => S.letturaCloud('tk', { chiama: server.chiama }) }), 0);
+    assert.deepEqual(server.chiesti[0].corpo, { ticket: 'tk', op: 'leggi', numeri: 'aperti', testi: false, schede: true });
+    assert.equal(await S.elenca(locale, false, { lettura: () => S.letturaLocale({ leggiRighe: async () => ({ rows: righeOwner, complete: true }), apri: async (v) => JSON.parse(v) }) }), 0);
+
+    const leggi = (c, f) => JSON.parse(readFileSync(join(c, f), 'utf8'));
+    const indice = leggi(cloud, S.INDICE);
+    assert.deepEqual(indice.map((f) => [f.num, f.stato, f.priorita, f.attese, f.segnalato || '']),
+      [['812', 'todo', 2, ['9'], ''], ['900', 'attack', null, [], motivo]]);
+    assert.deepEqual(leggi(locale, S.INDICE), indice, 'lo stesso indice sulle due strade');
+
+    const s812 = leggi(cloud, '812.json');
+    assert.equal(s812.titolo_breve, 'Menu che non si apre');
+    assert.equal(S.daScrivere(indice[0], s812), false, 'la scheda copiata è fresca: il manutentore non la fa riscrivere');
+    assert.deepEqual(leggi(locale, '812.json'), s812);
+    const senzaOra = (s) => ({ ...s, _fonte: { ...s._fonte, at: '' } });
+    assert.equal(leggi(cloud, '900.json').valido, 'non letto');
+    assert.deepEqual(senzaOra(leggi(locale, '900.json')), senzaOra(leggi(cloud, '900.json')), 'il segnalato ha la sua scheda «non letto», non quella salvata');
+    assert.equal(existsSync(join(locale, '700.json')), false, 'un chiuso resta fuori');
+  } finally { togliCartella(cloud); togliCartella(locale); }
 });
