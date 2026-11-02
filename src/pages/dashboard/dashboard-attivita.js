@@ -1541,7 +1541,7 @@
         try {
           esitoDellaConferma(r, { chiesta, chat });
         } finally {
-          if (riprende) proseguiQuandoLibero(chat, voceDellaConferma(a));
+          proseguiQuandoLibero(chat, riprende ? voceDellaConferma(a) : null, gruppo, a);
         }
       }
       // Il resto della conferma, dopo la risposta del main: diario, bottone, archivio.
