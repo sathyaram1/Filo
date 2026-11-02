@@ -2326,8 +2326,15 @@
     let blob = null;
     try { blob = Actions.blobDaDataUrl(await Actions.scaricaImmagine(src, imgEl)); } catch (_) {}
     if (!blob || !/^image\//i.test(blob.type || '')) { Popup.showToast(I18n.t('menu_image_unreadable')); return; }
-    const nome = (() => { try { return decodeURIComponent(new URL(src).pathname.split('/').pop() || ''); } catch (_) { return ''; } })();
-    try { await Sidebar.allega([new File([blob], nome || 'immagine', { type: blob.type })]); } catch (_) {}
+    // Un'immagine data: o blob: non ha un nome nell'indirizzo, solo i suoi dati: prende quello dal tipo.
+    const nome = (() => {
+      try {
+        const u = new URL(src);
+        return /^(https?|file):$/.test(u.protocol) ? decodeURIComponent(u.pathname.split('/').pop() || '') : '';
+      } catch (_) { return ''; }
+    })();
+    const estensione = (String(blob.type).split('/')[1] || 'png').replace('jpeg', 'jpg').replace(/\+.*$/, '');
+    try { await Sidebar.allega([new File([blob], nome || `immagine.${estensione}`, { type: blob.type })]); } catch (_) {}
   }
 
   function buildLinkActionItems(linkEl) {
