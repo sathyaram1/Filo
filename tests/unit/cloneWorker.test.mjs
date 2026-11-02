@@ -132,6 +132,33 @@ test('package-lock diverso dal principale: installazione privata, e il node_modu
   }
 });
 
+// Dal #2040 ogni rilascio alza il numero anche nel lockfile: un ramo nato prima ha gli stessi pacchetti di main.
+test('package-lock diverso dal principale solo nel numero del progetto: stessi pacchetti, collegati senza avvisi', () => {
+  const s = scena();
+  try {
+    const dest = resolve(s.base, 'lavori', '1');
+    assert.equal(preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai }).ok, true);
+    const lockDi = (v, dipendenza = '1.0.0') => `${JSON.stringify({
+      name: 'filo', version: v, lockfileVersion: 3, requires: true,
+      packages: { '': { name: 'filo', version: v }, 'node_modules/pacchetto': { version: dipendenza } },
+    }, null, 2)}\n`;
+    writeFileSync(resolve(s.principale, 'package-lock.json'), lockDi('0.2.258'), 'utf8');
+    writeFileSync(resolve(dest, 'package-lock.json'), lockDi('0.2.246').replace(/\n/g, '\r\n'), 'utf8');
+    const r = allineaPacchetti(dest, s.principale, { npmCi: npmMai, soloCollegati: true });
+    assert.equal(r.pacchetti, 'collegati');
+    assert.equal(r.lockDiverso, undefined, 'nessun avviso: i pacchetti sono quelli del ramo');
+    assert.ok(collegato(dest));
+
+    let chiamate = 0;
+    const npmCi = (cartella) => { chiamate += 1; mkdirSync(resolve(cartella, 'node_modules'), { recursive: true }); return { ok: true }; };
+    writeFileSync(resolve(dest, 'package-lock.json'), lockDi('0.2.246', '2.0.0'), 'utf8');
+    assert.equal(allineaPacchetti(dest, s.principale, { npmCi }).pacchetti, 'privati', 'un pacchetto diverso è un lock diverso');
+    assert.equal(chiamate, 1);
+  } finally {
+    togliCartella(s.base);
+  }
+});
+
 test('chi svuota il node_modules del clone da dentro, come npm ci, toglie i collegamenti e non i pacchetti del principale', () => {
   const s = scena();
   try {

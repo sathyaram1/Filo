@@ -13,6 +13,7 @@ import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { MARCATORE_WORKER } from './dati-worker.mjs';
 import { fileBlocco, TETTO_INSTALLAZIONE_MS } from './pacchetti.mjs';
 import { pinWorkerTools, pinnedDirWorker, TOOLS_ROOT } from './tools-pin.mjs';
+import { applicaVersioneAlLock } from '../release-apply-version.mjs';
 
 export { MARCATORE_WORKER, datiWorker, concorrenzaUnit } from './dati-worker.mjs';
 export const REGISTRO = 'filo-cloni';
@@ -168,8 +169,15 @@ function npmCiDavvero(cartella) {
 }
 
 const leggi = (f) => { try { return readFileSync(f, 'utf8'); } catch (_) { return null; } };
-// I fine riga non cambiano i pacchetti: un checkout con autocrlf non deve costare un'installazione.
-const lock = (dir) => { const t = leggi(resolve(dir, 'package-lock.json')); return t === null ? null : t.replace(/\r\n/g, '\n'); };
+// I fine riga e il numero del progetto non cambiano i pacchetti: né un checkout con autocrlf né un rilascio, che alza
+// il numero anche nel lockfile (#2040), devono costare un'installazione.
+const lock = (dir) => {
+  const t = leggi(resolve(dir, 'package-lock.json'));
+  if (t === null) return null;
+  const lf = t.replace(/\r\n/g, '\n');
+  const senzaNumero = applicaVersioneAlLock(lf, '0.0.0');
+  return senzaNumero.ok ? senzaNumero.testo : lf;
+};
 
 // Un'installazione privata finita porta l'impronta del lock da cui è nata: rifarla costa minuti, e npm ci la cancella.
 export const MARCA_PRIVATI = '.filo-privati';

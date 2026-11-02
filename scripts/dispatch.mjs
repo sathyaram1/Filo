@@ -48,6 +48,7 @@
 // USO (la stessa lista, per chi la chiede dal terminale: `--help`)
 //   node scripts/dispatch.mjs --ticket <biglietto>     # traduce la busta del server
 //   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
+//   node scripts/dispatch.mjs --rimetti-lockfile        # dopo il setup, prima del rebase
 //   node scripts/dispatch.mjs --record-verifier <id> "<critica coi livelli>" [--domanda <file.json>] [--ticket <b>]
 //   node scripts/dispatch.mjs --record-pulizia <id> [--ticket <b>]
 //   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--domanda <file.json>] [--ticket <b>]
@@ -99,6 +100,7 @@ import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe, absolutizeOutput } from './lib/tools-pin.mjs';
 import { strumentiIndietro } from './lib/strumenti-vecchi.mjs';
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
+import { LOCKFILE, rimettiLockfile, sporcoSoloDalLockfile } from './lib/lockfile-del-commit.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { MAX_LIVELLO_BYTES, SEGNALA_TOLTA, leggiTestoLivello } from './lib/livelli.mjs';
 import { MAX_CRITIQUE_BYTES, criticaTroppoLunga } from './lib/tetto-critica.mjs';
@@ -746,7 +748,13 @@ function checkoutNonAdatto() {
     // modifica non salvata) può stare esattamente sul commit giusto e avere i
     // file rotti. Controllandolo dopo, la copia si portava dentro i segni del
     // conflitto e la ricetta consegnata al giro arrivava corrotta.
-    const sporco = g(['status', '--porcelain']);
+    let sporco = g(['status', '--porcelain']);
+    // Un install fatto prima del preflight (dall'ambiente, o in una sessione ripresa) sporca solo il lockfile, e non è
+    // roba di nessuno (#2040). Con altro accanto la cartella resta com'è e il giro si ferma.
+    if (sporcoSoloDalLockfile(sporco) && rimettiLockfile(ROOT).rimesso) {
+      console.error(`[dispatch] ${LOCKFILE} riscritto da npm: rimesso com'è nel commit.`);
+      sporco = g(['status', '--porcelain']);
+    }
     if (sporco) {
       const prima = sporco.split('\n')[0].trim();
       return `il checkout ha roba non salvata ("${prima}"…): gli strumenti fissati sarebbero quelli mezzo modificati (${viaDiFuga})`;
@@ -1961,6 +1969,8 @@ export function usageText() {
     '                         promemoria del biglietto e avvia il battito',
     '  (nessun argomento)     giro locale, senza server (sceglie il bucket qui)',
     '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
+    '  --rimetti-lockfile     dopo il setup, prima del rebase (orchestratore): package-lock.json',
+    '                         torna com\'è nel commit se l\'install l\'ha riscritto',
     '  --linea-principale     dopo ogni worker, prima del biglietto (orchestratore): la cartella',
     '                         torna su main, perché il prossimo worker parta con i suoi agenti',
     '  --record-verifier <id> "<critica>" [--domanda <file.json>] [--ticket <b>]   una riga per rilievo,',
@@ -2550,7 +2560,7 @@ if (isMainModule) {
   const bigliettoAMano = mano.ticket;
   const flag = argv[0];
   if (reg.error && flag !== '--help' && flag !== '-h') { console.error(reg.error); process.exit(1); }
-  if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state' || flag === '--linea-principale')) {
+  if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state' || flag === '--linea-principale' || flag === '--rimetti-lockfile')) {
     console.error(`--ticket non vale con ${flag}: lì un biglietto non serve. Niente è stato toccato.`);
     process.exit(1);
   }
@@ -2807,6 +2817,19 @@ if (isMainModule) {
         process.exit(r.uso ? 1 : 3);
       }
       console.log(`[dispatch] cartella sulla linea principale (${String(r.head).slice(0, 9)}): il prossimo worker parte con gli agenti di ${MAIN_BRANCH}.`);
+      process.exit(0);
+    } else if (flag === '--rimetti-lockfile') {
+      if (argv.length > 1) { console.error(`[dispatch] --rimetti-lockfile non vuole argomenti (${argv[1]}). Niente è stato toccato.`); process.exit(1); }
+      // Scarta modifiche: fuori da un giro un lockfile cambiato può essere il lavoro di qualcuno.
+      if (!isRoutineInstance(ROOT)) {
+        console.error(`[dispatch] solo nelle routine (FILO_ROUTINE=1, il biglietto del giro nella cartella o gli strumenti del preflight): scarta le modifiche a ${LOCKFILE}. Niente è stato toccato.`);
+        process.exit(1);
+      }
+      const r = rimettiLockfile(ROOT);
+      if (!r.ok) { console.error(`[dispatch] ${LOCKFILE} non torna com'è nel commit: ${r.why}`); process.exit(1); }
+      console.log(r.rimesso
+        ? `[dispatch] ${LOCKFILE} riscritto dall'install: rimesso com'è nel commit. Ora il rebase.`
+        : `[dispatch] ${LOCKFILE} è già com'è nel commit. Ora il rebase.`);
       process.exit(0);
     } else if (flag === '--clear-state') {
       const id = argv[1];

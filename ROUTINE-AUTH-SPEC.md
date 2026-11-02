@@ -816,7 +816,8 @@ ma a scriverlo è il server.
      (`routine-state/release`) e non in memoria — le istanze muoiono e si
      moltiplicano, e un freno che si azzera a ogni riavvio non frena. Il cron
      pubblica ogni sei ore: nessuno dei due tetti intralcia l'uso onesto;
-  3. legge `package.json` **da `main`, via API**, col suo `sha` di blob;
+  3. legge `package.json` e `package-lock.json` **da `main`, via API**, col
+     commit da cui li ha letti;
   4. **calcola lui** il numero successivo: l'aumento della patch, o il campo
      di primo livello `prossimaVersione` del manifesto quando c'è (un salto
      come 0.3.0, dichiarato una volta dal repo). Il campo dev'essere `a.b.c` e
@@ -829,9 +830,18 @@ ma a scriverlo è il server.
      stesso commit sparisce anche la sua riga (un secondo commit passerebbe
      per codice nuovo da pubblicare) e il JSON resta valido. Se una delle due
      verifiche non torna, non si scrive niente;
-  6. scrive il commit `release: vX.Y.Z [skip ci]` con l'identità dell'App,
-     legandolo allo `sha` del blob letto: se `main` si è mossa nel mezzo,
-     GitHub risponde 409 e non si scrive.
+  6. **lo stesso numero nel lockfile** (#2040), nei due campi dove npm
+     tiene quello del progetto (`version` in cima e `packages[""].version`),
+     qualunque numero portassero prima, e nient'altro: il testo resta nel
+     formato di npm (JSON a due spazi, a capo finale). È la regola di
+     `applicaVersioneAlLock` in `scripts/release-apply-version.mjs`. Senza,
+     ogni `npm install` riscrive il numero nel lockfile e il rebase che viene
+     dopo rifiuta la cartella. Un lockfile che non si riallinea (assente,
+     illeggibile, fuori formato) non ferma l'aumento: il commit porta il solo
+     manifesto e il motivo finisce nel registro del server;
+  7. scrive **un solo** commit `release: vX.Y.Z [skip ci]` con i due file e
+     l'identità dell'App, figlio del commit letto e senza forzare: se `main`
+     si è mossa nel mezzo, GitHub lo rifiuta e non si scrive.
 - **Perché non si accetta il contenuto dal chiamante**: sarebbe un push diretto
   su `main` travestito da aumento di versione — cioè il buco che §11 ha chiuso,
   riaperto da un'altra porta.
@@ -840,9 +850,14 @@ ma a scriverlo è il server.
   manifesto) · `3` server non raggiungibile o funzione assente. Il lavoro di
   pubblicazione costruisce il commit **provato dalla suite**, non la punta di
   `main` (#641): `scripts/release-apply-version.mjs` applica quel numero in
-  locale al suo manifesto, senza commit né push, e si ferma se non è più alto
-  di quello dell'albero o se l'albero ne dichiara un altro in
-  `prossimaVersione`. Il tag nasce sul commit costruito (`--target`).
+  locale al suo manifesto e al lockfile, senza commit né push, e si ferma se
+  non è più alto di quello dell'albero o se l'albero ne dichiara un altro in
+  `prossimaVersione` (un lockfile che non si riallinea lo avvisa e basta). Il
+  tag nasce sul commit costruito (`--target`).
+- **Nella cartella di chi guida un giro** il lockfile che l'install riscrive
+  torna com'è nel commit prima del rebase (`dispatch.mjs --rimetti-lockfile`,
+  e il preflight da sé): un lockfile disallineato non costa un giro nemmeno
+  quando il rilascio lo lascia indietro.
 - Nel lavoro di pubblicazione non è rimasto **nessun** `git push`, `git commit`
   o `npm version`, e una sentinella negli unit test diventa rossa se ci tornano.
 

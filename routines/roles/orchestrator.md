@@ -34,7 +34,11 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
      progetto diventa quella del ramo, strumenti e ricette compresi — e un ramo
      aperto giorni fa riporta indietro anche le correzioni già fatte. È già
      costato un'ora di lavoro con la correzione in produzione da un giorno.
-4. Due comandi, ognuno da solo nella sua chiamata e scritto così, senza
+4. **Allineamento.**
+
+   <!-- includi: _lockfile-prima-del-rebase.md -->
+
+   Poi due comandi, ognuno da solo nella sua chiamata e scritto così, senza
    `&&`, `cd` o `-C` (sono gli stessi del riallineamento, coperti dalle
    regole dei permessi del repo; `git pull` non lo è):
 
