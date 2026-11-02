@@ -1474,7 +1474,7 @@
     return btn;
   }
 
-  function renderActionButton(a, { onAck, activity = null, chat = '' } = {}) {
+  function renderActionButton(a, { onAck, activity = null, chat = '', gruppo = null } = {}) {
     const type = String(a.type || '').toUpperCase();
     // In attesa di conferma come le altre, ma la si dà dalla loro UI: il
     // bottone del riordino, il pannello con l'elenco da eliminare.
