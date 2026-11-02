@@ -1487,6 +1487,7 @@
     // popup OK/Annulla (2) o il box "digita conferma" (3); solo dopo il sì
     // dell'utente l'azione parte davvero via MSG.FILO_CONFIRM_ACTION.
     if (a._confirm && a._confirm.level >= 2) {
+      if (gruppo) gruppo.pendenti.add(a);
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn dash-action-btn-primary';
       btn.type = 'button';
