@@ -353,25 +353,78 @@ export function esceInOgniEsito(f) {
   return !!(f && f.decision) && (sede === 'v' || Number(f.level) <= 1);
 }
 
+// Senza «blocca» la domanda blocca (SPEC-DOMANDE § 3.1): solo un false esplicito lascia andare avanti il lavoro.
+const domandaCheBlocca = (f) => !(f && f.domanda && typeof f.domanda === 'object' && f.domanda.blocca === false);
+const nonBlocca = (f) => f && f.decision && String(f.sede || 'i').toLowerCase() === 'i' && Number(f.level) >= 2 && !domandaCheBlocca(f);
+
 /**
- * Vero se la critica ferma di sicuro il lavoro: un interno col `?` di livello 3, o di livello 2 col `!` (#1202).
+ * Vero se la critica ferma di sicuro il lavoro: un interno col `?` di livello 3, o di livello 2 col `!` (#1202), la cui
+ * domanda blocca: con `"blocca": false` il lavoro va avanti con la consigliata, e gli altri `?` escono come sempre (#1555.1).
  * Copia di decisioneFerma (le ricette fissate non portano src/shared): una sentinella le tiene uguali. PURA.
  */
 export function fermaDiSicuro(findings) {
   return (Array.isArray(findings) ? findings : []).some((f) => f && f.decision === true
     && String(f.sede || 'i').toLowerCase() === 'i'
-    && (Number(f.level) >= 3 || (Number(f.level) === 2 && f.irreversibile === true)));
+    && (Number(f.level) >= 3 || (Number(f.level) === 2 && f.irreversibile === true)) && domandaCheBlocca(f));
+}
+
+// I titoli dei casi (anche dei describe) scritti come testo: un titolo composto a runtime non si legge, e non ferma.
+const TITOLO_DEL_CASO = /(?<![\w$.])(?:test|it|describe)(?:\.[A-Za-z]+)*\s*\(\s*(['"`])((?:\\[\s\S]|(?!\1)[^\\])*?)\1/g;
+
+/** I titoli dei casi di una prova, come stanno nel sorgente. PURA. */
+export function titoliDeiCasi(testo) {
+  return [...String(testo || '').matchAll(TITOLO_DEL_CASO)].map((m) => m[2]);
+}
+
+// Il nome della prova senza i numeri `via`: dice che il file non copre più quei rilievi.
+function nomeSenza(prova, via) {
+  const parti = String(prova).split('/');
+  const nome = parti.pop();
+  const m = NUMERI_NEL_NOME.exec(nome);
+  const giro = /^giro\d+/.exec(nome);
+  if (!m || !giro) return '';
+  const restano = numeriDelNome(nome).filter((n) => !via.includes(n));
+  return [...parti, `${giro[0]}${restano.map((n) => `-r${n}`).join('')}${nome.slice(m[0].length)}`].join('/');
 }
 
 /**
- * Fra `prove`, quelle che nel nome portano solo numeri di rilievi che escono comunque. PURA.
- * A lavoro fermo i `?` restano a chi riprende fra i sospesi: lì escono prima solo le prove degli esterni.
+ * Fra `prove` (quelle scritte in questa verifica), quelle che portano ancora un rilievo che esce comunque: nel nome
+ * (`intera` se porta solo quelli; altrimenti `rinomina`, il nome senza i loro numeri) o nel titolo di un caso
+ * (`casi`). `testi`: `{ [prova]: sorgente }`. A lavoro fermo i `?` restano a chi riprende: lì escono solo gli esterni. PURA.
  */
-export function proveDaToglierePrimaDelVerdetto(prove, findings) {
+export function proveDaToglierePrimaDelVerdetto(prove, findings, testi = {}) {
   const tutti = Array.isArray(findings) ? findings : [];
-  const esce = fermaDiSicuro(tutti) ? (f) => String(f.sede || 'i').toLowerCase() === 'e' : esceInOgniEsito;
-  return percorsi(prove).filter((p) => PROVA.test(p) && nelGiro(p)).map((p) => ({ prova: p, numeri: numeriDelNome(p) }))
-    .filter(({ numeri }) => numeri.length && numeri.every((n) => tutti[n - 1] && esce(tutti[n - 1])));
+  const esceDiSicuro = fermaDiSicuro(tutti) ? (f) => String(f.sede || 'i').toLowerCase() === 'e' : esceInOgniEsito;
+  const esce = (n) => !!tutti[n - 1] && esceDiSicuro(tutti[n - 1]);
+  const sorgenti = testi && typeof testi === 'object' ? testi : {};
+  const fuori = [];
+  for (const prova of percorsi(prove).filter((p) => PROVA.test(p) && nelGiro(p))) {
+    const delNome = numeriDelNome(prova);
+    const numeri = delNome.filter(esce);
+    const intera = delNome.length > 0 && numeri.length === delNome.length;
+    // Un caso conta se porta solo numeri di rilievi che escono: uno che cita anche un rilievo che resta, resta.
+    const casi = intera ? [] : titoliDeiCasi(sorgenti[prova]).filter((t) => {
+      const n = numeriDelTitolo(t);
+      return n.length && n.every(esce);
+    });
+    if (!numeri.length && !casi.length) continue;
+    const tutti_ = [...new Set([...numeri, ...casi.flatMap(numeriDelTitolo)])].sort((a, b) => a - b);
+    fuori.push({
+      prova, numeri: tutti_, intera, casi,
+      restano: delNome.filter((n) => !numeri.includes(n)),
+      rinomina: !intera && numeri.length ? nomeSenza(prova, numeri) : '',
+    });
+  }
+  return fuori;
+}
+
+/** I sorgenti delle prove a `rev`, `{ [prova]: testo }`; quella che git non dà manca. */
+export function testiDelleProve(prove, root, rev = 'HEAD') {
+  const testi = {};
+  for (const p of percorsi(prove)) {
+    try { testi[p] = gitOut(['show', `${rev}:${p}`], root); } catch (_) { /* manca: il controllo guarda solo il nome */ }
+  }
+  return testi;
 }
 
 /** Le prove del giro aggiunte o rinominate da `avvio` a HEAD: quelle scritte in questa verifica. [] se git non risponde. */
