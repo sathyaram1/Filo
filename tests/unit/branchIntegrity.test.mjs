@@ -165,6 +165,27 @@ describe('A — posizionarsi sul branch (prepareBranch)', () => {
     assert.equal(git(work, ['branch', '--list', 'worker/*']), '');
   });
 
+  // Con origin muto la base sarebbe la linea principale dell'ultimo scaricamento, magari di giorni prima (#1779.1).
+  test('lavoro nuovo con origin che non risponde: guasto temporaneo, niente ramo nato da una main vecchia', () => {
+    const { work, base } = makeRepo();
+    git(work, ['remote', 'set-url', 'origin', resolve(base, 'non-esiste.git')]);
+    const branch = newWorkBranch('feed-muto');
+    const r = prepareBranch({ root: work, branch, create: true });
+    assert.equal(r.ok, false);
+    assert.equal(r.kind, 'transient');
+    assert.match(r.message, /main/);
+    assert.equal(currentBranch(work), 'main');
+    assert.equal(git(work, ['branch', '--list', 'worker/*']), '');
+  });
+
+  test('lavoro nuovo da una base che su origin non c\'è: si ripiega sulla linea principale come prima', () => {
+    const { work } = makeRepo();
+    const branch = newWorkBranch('feed-base');
+    const r = prepareBranch({ root: work, branch, create: true, base: 'feature/sparita' });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.base, 'origin/main');
+  });
+
   // Gli endpoint di fusione del server rifiutano già `main`; qui il controllo
   // mancava, e la directory poteva essere posizionata sulla linea principale
   // per PRODURRE. Il lavoro fatto lì non ha modo di arrivare agli utenti (il
