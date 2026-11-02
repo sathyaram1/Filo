@@ -106,13 +106,19 @@ const schedaAttiva = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.
 const attiva = (shell, id) => shell.evaluate((x) => window.filoShell.tabs.activate(x), id);
 const fermo = async (fn, ms = 3000) => { const prima = fn(); await new Promise((r) => setTimeout(r, ms)); return [prima, fn()]; };
 
+// Le letture che Filo fa da sé dopo l'avvio (stato del portafoglio a 4 s, vista dell'owner a 6 s) e quelle
+// dell'apertura sono finite: da qui si contano solo quelle dei movimenti.
+async function letturePartiteDaSole(app, conteggio) {
+  await expect.poll(() => app.evaluate(() => process.uptime()), { timeout: 30_000 }).toBeGreaterThan(9);
+  await expect.poll(async () => (await fermo(conteggio, 1500)).reduce((a, b) => b - a), { timeout: 15_000 }).toBe(0);
+}
+
 async function apriUtenti(app, openTab) {
   expect(await simulaOwner(app)).toBe(true);
   const page = await openTab(`${GESTIONE}#utenti`);
   const id = await schedaAttiva(app);
   await expect(page.locator('#ownerUsers tr.sn-wallet-user')).toHaveCount(1, { timeout: 15_000 });
-  // Le letture dell'apertura si sono chiuse: da qui si contano quelle dei movimenti.
-  await expect.poll(async () => (await fermo(() => conta.overview, 1500)).reduce((a, b) => b - a), { timeout: 15_000 }).toBe(0);
+  await letturePartiteDaSole(app, () => conta.overview);
   return { page, id };
 }
 
@@ -123,10 +129,20 @@ test('Gestione su un\'altra scheda: cento movimenti non leggono niente, il ritor
   await expect(page.locator('.mg-tab--active[data-tab="contatori"]')).toBeVisible();
   const base = conta.overview;
 
-  persone = [persona('bbbb000000000002', '2026-10-02T08:00:00.000Z'), ...persone];
+  // Le risposte della chiave propria e i rimedi dell'avviso non toccano quello che la vista mostra: tornarci non rilegge.
   await avvisi(app, 50, { ownKeyUsed: true });
+  await avvisi(app, 20, { avvisoCrediti: true });
+  let [, dopo] = await fermo(() => conta.overview);
+  expect(dopo, 'con Utenti nascosta nessun movimento chiede la vista al server').toBe(base);
+  await apriScheda(page, 'utenti');
+  [, dopo] = await fermo(() => conta.overview, 2000);
+  expect(dopo, 'niente di quello che la vista mostra è cambiato').toBe(base);
+
+  // Un movimento vero con Utenti nascosta: nessuna lettura, e al ritorno una sola, coi dati di adesso.
+  await apriScheda(page, 'contatori');
+  persone = [persona('bbbb000000000002', '2026-10-02T08:00:00.000Z'), ...persone];
   await avvisi(app, 50);
-  const [, dopo] = await fermo(() => conta.overview);
+  [, dopo] = await fermo(() => conta.overview);
   expect(dopo, 'con Utenti nascosta nessun movimento chiede la vista al server').toBe(base);
 
   await apriScheda(page, 'utenti');
@@ -135,36 +151,25 @@ test('Gestione su un\'altra scheda: cento movimenti non leggono niente, il ritor
   expect(conta.overview).toBe(base + 1);
 });
 
-test('Utenti davanti: la chiave propria non legge, gli altri movimenti al più una volta al minuto, e la lettura dopo vede l\'ultimo stato', async ({ app, openTab }) => {
+// Che il primo avviso dopo un minuto quieto legga subito lo prova lo unit (tests/unit/rilettoreVista.test.mjs): qui un
+// avviso nato dall'accesso dell'owner può aver già preso il posto del minuto, e lo spec conta solo il tetto.
+test('Utenti davanti: al più una lettura al minuto anche con cento movimenti, e la lettura dopo vede l\'ultimo stato', async ({ app, openTab }) => {
   const { page } = await apriUtenti(app, openTab);
   const righe = page.locator('#ownerUsers tr.sn-wallet-user');
   const base = conta.overview;
 
-  // Una risposta del modello con la chiave propria non scrive niente di quello che la vista mostra.
   await avvisi(app, 50, { ownKeyUsed: true });
-  await avvisi(app, 20, { avvisoCrediti: true });
-  let [, dopo] = await fermo(() => conta.overview);
-  expect(dopo).toBe(base);
-
-  // Un movimento vero: la vista si rilegge subito, e prende la persona nuova.
   persone = [persona('cccc000000000003', '2026-10-03T08:00:00.000Z'), ...persone];
-  await avvisi(app, 1);
-  await expect(righe.first()).toContainText('cccc000000000003', { timeout: 15_000 });
-  expect(conta.overview).toBe(base + 1);
-
-  // Altri cinquanta nello stesso minuto: nessuna lettura in più finché il minuto non è passato.
-  persone = [persona('dddd000000000004', '2026-10-04T08:00:00.000Z'), ...persone];
   await avvisi(app, 50);
-  [, dopo] = await fermo(() => conta.overview);
-  expect(dopo, 'al più una lettura al minuto').toBe(base + 1);
-  await expect(righe).toHaveCount(2);
+  const [, dopo] = await fermo(() => conta.overview);
+  expect(dopo - base, 'al più una lettura al minuto').toBeLessThanOrEqual(1);
 
-  // Allo scadere (accorciato per lo spec) una lettura sola, con l'ultimo stato.
-  persone = [persona('eeee000000000005', '2026-10-05T08:00:00.000Z'), ...persone];
+  // Allo scadere (accorciato per lo spec) una lettura sola, che vede anche quello che è cambiato dopo gli avvisi.
+  persone = [persona('dddd000000000004', '2026-10-04T08:00:00.000Z'), ...persone];
   await page.evaluate(() => window.__mgTest.tempiRiletturaUtenti(0));
-  await expect(righe).toHaveCount(4, { timeout: 15_000 });
-  await expect(righe.first()).toContainText('eeee000000000005');
-  expect(conta.overview).toBe(base + 2);
+  await expect(righe).toHaveCount(3, { timeout: 15_000 });
+  await expect(righe.first()).toContainText('dddd000000000004');
+  expect(conta.overview - base).toBeLessThanOrEqual(2);
 });
 
 test('Gestione dietro un\'altra scheda di Filo: i movimenti non leggono, tornarci rilegge una volta', async ({ app, openTab, shell }) => {
