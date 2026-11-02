@@ -332,6 +332,7 @@ test('compito.mjs: la sessione si dichiara col suo biglietto, rifiuta prima di c
     chiama: async (d) => { chiamate.push(d); return risposta; },
     bigliettoLocale: async () => biglietto,
     sporca: async (cosa, motivi) => `SPORCA ${cosa}: ${motivi.join(';')}`,
+    rifiuta: async () => false,
     stdin: async () => 'dallo stdin',
     scrivi: (s) => out.push(s), errore: (s) => out.push(`E:${s}`),
   });

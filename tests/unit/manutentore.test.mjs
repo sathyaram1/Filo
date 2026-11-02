@@ -112,11 +112,11 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
   g('update-ref', 'refs/remotes/origin/claude/lavoro', 'HEAD');
   writeFileSync(join(dir, '12.json'), JSON.stringify(scheda(12, { file_probabili: ['src/a.js'] })));
   writeFileSync(join(dir, '13.json'), JSON.stringify(scheda(13, { file_probabili: ['non/esiste.js'] })));
-  assert.equal(await M.main(['incroci', '12', '--cartella', dir, '--senza-fetch'], { root: repo }), 0);
+  assert.equal(await M.main(['incroci', '12', '--cartella', dir, '--senza-fetch'], { root: repo, rifiuta: () => false }), 0);
   assert.match(out.join('\n'), /^claude\/lavoro \(#44\): src\/a\.js$/m);
-  assert.equal(await M.main(['incroci', '#13', '--cartella', dir, '--senza-fetch'], { root: repo }), 0);
+  assert.equal(await M.main(['incroci', '#13', '--cartella', dir, '--senza-fetch'], { root: repo, rifiuta: () => false }), 0);
   assert.match(out.join('\n'), /Nessun ramo in corso tocca i file probabili di #13 \(non\/esiste\.js\)/);
-  assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo }), 1);
+  assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo, rifiuta: () => false }), 1);
   assert.match(err.join('\n'), /Nessuna scheda per #99/);
   assert.equal(await M.main(['boh']), 1);
 });
@@ -185,7 +185,7 @@ test('incroci non manda ad aspettare il ramo locale di un feedback già arrivato
   const l = console.log;
   console.log = (...a) => out.push(a.join(' '));
   t.after(() => { console.log = l; });
-  assert.equal(await M.main(['incroci', '900', '--cartella', schede, '--senza-fetch'], { root: repo }), 0);
+  assert.equal(await M.main(['incroci', '900', '--cartella', schede, '--senza-fetch'], { root: repo, rifiuta: () => false }), 0);
   assert.doesNotMatch(out.join('\n'), /claude\/regole-locali/);
 });
 

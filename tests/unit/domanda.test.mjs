@@ -35,6 +35,7 @@ function finto(risposte = {}) {
     biglietto: async () => risposte.biglietto || '',
     bigliettoLocale: async () => risposte.bigliettoLocale || '',
     sporca: async (cosa, motivi) => { sporcate.push({ cosa, motivi }); ordine.push('sporca'); return 'Biglietto della sessione sporcato.'; },
+    rifiuta: async () => !!risposte.sedeOwner,
     leggiFile: (p) => { if (!(p in (risposte.file || {}))) throw Object.assign(new Error('no'), { code: 'ENOENT' }); return risposte.file[p]; },
     stdin: async () => risposte.stdin || '',
     scrivi: (s) => { out.push(String(s)); ordine.push('scrivi'); },
