@@ -1,5 +1,6 @@
 // Il giro d'avvio con un lockfile riscritto dall'install arriva comunque al rebase (#2040): la cartella di chi guida
 // rimette package-lock.json com'è nel commit, e solo quello.
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
