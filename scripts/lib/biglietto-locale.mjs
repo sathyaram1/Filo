@@ -322,6 +322,22 @@ export async function rigaSporco(cosa, motivi, opts = {}) {
   return `Biglietto NON sporcato (${r.errori.join('; ')}): dichiaralo con node scripts/biglietto.mjs sporca "${cosa}".`;
 }
 
+/** La sessione rifiuta il testo non fidato? La sede owner della variabile o del registro accanto al biglietto. */
+export function sedeRifiuta({ env = process.env, cwd = process.cwd() } = {}) {
+  return rifiutaNonFidati(env, sedeRegistrata({ env, cwd }));
+}
+
+/**
+ * Il cancello di ogni strumento che stampa testo scritto da altri (SPEC-DOMANDE.md §1.2), PRIMA di stampare. Nella sede
+ * owner rifiuta senza sporcare; altrove sporca come rigaSporco. `motivi` vuoto = testo fidato, passa. → { stampa, riga }
+ */
+export async function primaDiStampare(cosa, motivi, opts = {}) {
+  const m = (Array.isArray(motivi) ? motivi : []).filter(Boolean);
+  if (!m.length) return { stampa: true, riga: '' };
+  if (sedeRifiuta(opts)) return { stampa: false, riga: rigaRifiuto(cosa, m) };
+  return { stampa: true, riga: await rigaSporco(cosa, m, opts) };
+}
+
 /** 'fidato' solo con un biglietto pulito: senza biglietto, o con un guasto, 'non_fidato'. */
 export async function fiduciaLocale(opts = {}) {
   try {
