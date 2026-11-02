@@ -620,6 +620,18 @@ function ramoSuOrigin(root, branch) {
   }
 }
 
+/**
+ * `fetch` di `ref`; un no passa solo se origin risponde che il ramo non c'è. Ogni altro no (rete, servizio) lascia la
+ * punta dell'ultimo scaricamento, magari di un giro passato, da non dare per l'ultima consegna (#1779.1).
+ */
+function scaricaDaOrigin(root, ref, noto = null) {
+  const f = gitIn(root)(['fetch', 'origin', ref]);
+  if (f.ok) return { ok: true };
+  if ((noto || ramoSuOrigin(root, ref)).presente === false) return { ok: true, assente: true };
+  const righe = f.out.split('\n').map((r) => r.trim()).filter(Boolean);
+  return { ok: false, errore: senzaToken((righe.find((r) => /^(fatal|error):/.test(r)) || righe[0] || 'fetch fallito').slice(0, 300)) };
+}
+
 function antenato(g, a, b) {
   return g(['merge-base', '--is-ancestor', a, b]).ok;
 }
