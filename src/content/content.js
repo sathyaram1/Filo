@@ -1721,6 +1721,7 @@
     const {
       linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable,
     } = detectContext(target, mouseEvent.clientX, mouseEvent.clientY);
+    selInfo = selezioneSottoIlMouse(selInfo, mouseEvent, { imgEl, linkEl, mediaEl });
     // Il contesto d'incolla si cattura anche per i menu di correzione: senza, «Incolla»
     // usava un contesto stantio e incollava all'inizio del campo.
     if (editable) capturePasteContext(target);
