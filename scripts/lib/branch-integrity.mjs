@@ -543,7 +543,8 @@ export function prepareBranch({ root, branch, create = false, createIfMissing = 
   }
 
   // Branch esistente (verifier / fixer / secaudit).
-  g(['fetch', 'origin', branch]);
+  const scaricato = scaricaDaOrigin(root, branch, remoto);
+  if (!scaricato.ok) return { ok: false, kind: 'transient', message: `non riesco a scaricare ${branch} da origin, e la punta che questa cartella ricorda può essere di un giro passato: ${scaricato.errore}` };
   const hasLocal = refExists(g, `refs/heads/${branch}`);
   const hasRemote = refExists(g, `refs/remotes/origin/${branch}`);
   if (!hasLocal && !hasRemote) {
