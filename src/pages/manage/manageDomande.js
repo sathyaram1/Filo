@@ -282,6 +282,7 @@
       if (fermo) sotto.push(`ferma ${fermo}`);
     }
     if (rispostaDaChiave(d)) sotto.push(`risposta da «${rispostaDaChiave(d).slug}»`);
+    else if (rispostaDaSessione(d)) sotto.push('risposta da una sessione');
     if (sotto.length) titolo.appendChild(el('span', 'mg-domanda-sotto', sotto.join(' · ')));
     li.appendChild(titolo);
     if (CHIUSE.includes(tab)) li.appendChild(el('span', 'mg-domanda-prio', PRIORITA[d.priorita] || ''));
