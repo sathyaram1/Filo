@@ -23,7 +23,10 @@ preflight ti consegna una riga fissa al posto del testo del worker.
    nel suo clone). Gli strumenti che ti
    vengono nominati hanno un percorso intero fuori dal progetto: usali così,
    perché la cartella del progetto fra poco sarà quella di un ramo.
-3. Allinea la cartella, un comando per chiamata e senza `&&`, `cd` o `-C`:
+3. L'install può riscrivere `package-lock.json`, e il rebase rifiuterebbe la
+   cartella sporca: `node scripts/dispatch.mjs --rimetti-lockfile` lo rimette
+   com'è nel commit (exit diverso da 0 → chiudi). Poi allinea la cartella, un
+   comando per chiamata e senza `&&`, `cd` o `-C`:
 
    ```bash
    git fetch origin main
