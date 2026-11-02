@@ -816,7 +816,8 @@ ma a scriverlo è il server.
      (`routine-state/release`) e non in memoria — le istanze muoiono e si
      moltiplicano, e un freno che si azzera a ogni riavvio non frena. Il cron
      pubblica ogni sei ore: nessuno dei due tetti intralcia l'uso onesto;
-  3. legge `package.json` **da `main`, via API**, col suo `sha` di blob;
+  3. legge `package.json` e `package-lock.json` **da `main`, via API**, col
+     commit da cui li ha letti;
   4. **calcola lui** il numero successivo: l'aumento della patch, o il campo
      di primo livello `prossimaVersione` del manifesto quando c'è (un salto
      come 0.3.0, dichiarato una volta dal repo). Il campo dev'essere `a.b.c` e
