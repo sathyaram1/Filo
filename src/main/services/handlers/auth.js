@@ -458,12 +458,8 @@ module.exports = function register(on, ctx) {
         try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
         localApproval = { by: email || 'owner', at: Date.now() };
       }
-      let waitsFor;
-      if (msg.waitsFor !== undefined) {
-        const r = await prepareAttese(id, msg.waitsFor, idToken, msg.waitsTieni);
-        if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
-        waitsFor = r.attese;
-      }
+      const attese = msg.waitsAggiungi !== undefined || msg.waitsTogli !== undefined ? richiestaAttese(msg) : null;
+      if (attese && !attese.ok) return { ok: false, error: attese.motivo, rifiutato: true };
       // Una riapertura (Riapri, Ripristina, da qualunque pagina) svuota il registro delle parti (#938): lo stato di
       // partenza si chiede al documento, non alla copia della pagina.
       const FB = globalThis.SN_FEEDBACK;
@@ -472,11 +468,15 @@ module.exports = function register(on, ctx) {
         const [ora] = await FB.getMany([id], { idToken, fields: ['statusPublic', 'localMerges'] });
         if (ora && ora.localMerges && FB.riapre(ora.statusPublic, status)) localMerges = null;
       }
-      await globalThis.SN_FEEDBACK.updateStatus(
-        id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges, waitsFor },
-        { idToken },
-      );
+      const campi = { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges };
+      let waitsFor;
+      if (attese) {
+        const r = await scriviAttese(id, attese, campi, idToken);
+        if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
+        waitsFor = r.attese;
+      } else {
+        await FB.updateStatus(id, campi, { idToken });
+      }
       // Il triage cambia la bacheca: la vista si rifà subito, non al prossimo caricamento.
       // Prima la scheda di QUESTO id: il giro generale guarda solo i più recenti per data d'invio.
       await syncOneCard(id, idToken);
