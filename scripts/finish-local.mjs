@@ -321,10 +321,6 @@ export function provaFusione(base, root = ROOT) {
  * minuti, non le quasi sette ore della suite intera sulla macchina di chi
  * sviluppa Filo.
  */
-// Un file che decide il comportamento di un'area col nome di un altro: senza, il registro dei costi cambiava cosa
-// chiede ogni livello di autonomia e lo spec dell'autonomia restava fuori, rosso su main (#600.1).
-const AREE_DECISE_DA = new Map([['actionlevels', ['autonomia']]]);
-
 export function specsForChangedFiles(changed, tracked) {
   const files = Array.isArray(changed) ? changed : [];
   const specs = new Set();
