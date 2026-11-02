@@ -307,6 +307,7 @@
   global.SN_FB_ATTESE = {
     CAMPO, MAX, STATO, ETICHETTA,
     normalizzaNumero, leggiNumeri, atteseDi, statoAttesa, statiDelleAttese, aspettaAncora, etichetta, testoAttese, valida,
+    daScrivereSu, conflittoDiScrittura, scriviSullaLettura, RILETTURE,
     prioritaDi, scattaEredita, ereditaPriorita, notaEredita,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
