@@ -20,8 +20,9 @@
    Un **trade-off di costo** (contro velocità o contro qualità) lo decide chi
    lavora (CLAUDE.md § Iniziativa): deciso con la stima e le opzioni esposte
    non è un rilievo. Lo è, con livello e sede come gli altri e senza `?`, se
-   manca la stima, se le opzioni non si cambiano senza codice, se la stima non
-   sta accanto all'opzione o se l'opzione scelta non regge i numeri. Un
+   manca la stima (costo al mese e tempo di risposta), se le opzioni non si
+   cambiano senza codice, se la stima non sta accanto all'opzione o se
+   l'opzione scelta non regge i numeri. Un
    trade-off che non si misura (CLAUDE.md § Iniziativa) lo decide l'owner.
 9. **Una causa, tutte le porte.** Davanti a un difetto si cerca lo stato
    sbagliato che lo produce e **tutte le strade che portano a quello stato**:
