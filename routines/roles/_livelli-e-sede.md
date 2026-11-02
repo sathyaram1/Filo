@@ -77,8 +77,8 @@ suo feedback.
 rilievo chiede una decisione dell'owner, su un trade-off che non si misura
 (prodotto, gusto, dati dell'utente: CLAUDE.md § Iniziativa), e porta la sua
 domanda (più sotto). Non copre un trade-off di costo: deciso con la stima e le
-opzioni esposte non è un rilievo, e se gli manca una delle due è un rilievo
-senza `?` (criteri di verifica, punto 8). Un difetto non chiede decisioni.
+opzioni esposte non è un rilievo, altrimenti è un rilievo senza `?` (criteri
+di verifica, punto 8). Un difetto non chiede decisioni.
 
 | segnalazione e rilievo | livello e sede |
 |---|---|
