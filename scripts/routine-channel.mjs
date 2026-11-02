@@ -532,6 +532,8 @@ export async function release(t, fault = '', opts, report = null) {
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
   if (report && typeof report === 'object') payload.report = report;
+  // La domanda di fine turno del manutentore arriva solo qui, a ramo spedito (SPEC-DOMANDE § 5.4); l'orchestratore non la chiede.
+  if (opts && opts.domandaAlRilascio === true) payload.domandaAlRilascio = true;
   Object.assign(payload, creditiDi(opts));
   const { status, body } = await call('routineRelease', payload, opts);
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
@@ -673,6 +675,16 @@ export function argomentiChiusura(cmd, args, data = {}) {
   const attesi = cmd === 'risposta' ? 2 : 1;
   if (args.length !== attesi || args.some((a) => !String(a).trim())) return { errore: `Uso: ${uso}` };
   return { cred: cmd === 'risposta' ? { passphrase: args[0], id: args[1] } : { passphrase: args[0] } };
+}
+
+/**
+ * La domanda che il server consegna col rilascio (quella del manutentore), col comando per rispondere; '' se non c'è.
+ * Il biglietto è chiuso: il ramo non si spedisce più, e la risposta va al server. PURA.
+ */
+export function testoDomandaAlRilascio(body, io, ticket) {
+  const q = body && typeof body.domanda === 'string' ? body.domanda.trim() : '';
+  if (!q) return '';
+  return `Domanda di fine sessione (il ramo è già spedito: rispondi e basta, senza toccare altro):\n${q}\n\nPer rispondere:\n${comandoRisposta(io, { ticket }, '')}`;
 }
 
 /** Il comando esatto per rispondere, stampato insieme alla domanda. La parola d'ordine resta segnaposto. PURA. */
@@ -1756,7 +1768,7 @@ if (isMain) {
         rapporto = { v: 3, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
       }
     }
-    const r = await releaseConRapporto(args[0], guasto, rapporto);
+    const r = await releaseConRapporto(args[0], guasto, rapporto, chiRilascia !== 'orchestrator' && cartellaSua ? { domandaAlRilascio: true } : undefined);
     if (r.avviso) console.error(r.avviso);
     // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo
     // (il server risponde `dead_ticket` e il ciclo esce), ma spegnerlo adesso
@@ -1790,6 +1802,8 @@ if (isMain) {
     }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');
     else console.log(`rilascio non riuscito (${r.reason})`);
+    const domandaDopo = r.ok ? testoDomandaAlRilascio(r.body, resolve(fileURLToPath(import.meta.url)).split('\\').join('/'), args[0]) : '';
+    if (domandaDopo) console.log(`\n${domandaDopo}`);
   } else if (cmd === 'deliver') {
     // deliver [<biglietto>] <intento> [--campo valore …]
     //
