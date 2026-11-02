@@ -22,7 +22,7 @@ import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from 
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { specsForChangedFiles, isProtectedBranch, pushArgs, resolveDiffBase, behindMainStop, behindMainNota, lottiPerRigaDiComando } from '../../scripts/finish-local.mjs';
+import { specsForChangedFiles, PROVE_DI_CHI_DECIDE, isProtectedBranch, pushArgs, resolveDiffBase, behindMainStop, behindMainNota, lottiPerRigaDiComando } from '../../scripts/finish-local.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SORGENTE = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
