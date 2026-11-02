@@ -1396,6 +1396,7 @@
     if (sub.kind === 'overflow') b.classList.add('sn-menu-row-overflow');
     // Spenta con una classe: l'attributo `disabled` azzera i pointer event e l'icona non si trascinerebbe più.
     if (sub.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
+    segnaAcceso(b, sub);
     // Il «+» apre la griglia passandoci sopra: il suo nome la coprirebbe.
     if (sub.kind !== 'overflow' && sub.label) attachTooltip(b, conTasto(sub));
     setIconContent(b, sub.icon || sub.label);
