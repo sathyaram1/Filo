@@ -830,7 +830,7 @@ ma a scriverlo è il server.
      stesso commit sparisce anche la sua riga (un secondo commit passerebbe
      per codice nuovo da pubblicare) e il JSON resta valido. Se una delle due
      verifiche non torna, non si scrive niente;
-  5bis. **lo stesso numero nel lockfile** (#2040), nei due campi dove npm
+  6. **lo stesso numero nel lockfile** (#2040), nei due campi dove npm
      tiene quello del progetto (`version` in cima e `packages[""].version`),
      qualunque numero portassero prima, e nient'altro: il testo resta nel
      formato di npm (JSON a due spazi, a capo finale). È la regola di
