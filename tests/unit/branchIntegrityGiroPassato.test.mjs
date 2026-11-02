@@ -170,8 +170,10 @@ describe('D-207 — la cartella riusata non riporta il ramo a un giro passato', 
       const r = await esegui(casa, dirStato, port, ['--ticket', 'biglietto-di-prova']);
       const json = JSON.parse(r.so.slice(r.so.indexOf('{'), r.so.lastIndexOf('}') + 1) || 'null');
       assert.equal(json && json.role, 'halt', `con origin muto il giro doveva fermarsi (uscita ${r.code}): ${r.se}`);
-      assert.equal(json.kind, 'transient');
-      assert.ok(json.message.includes(RAMO), json.message);
+      assert.equal(json.payload.kind, 'transient', 'guasto temporaneo: il lavoro torna in coda');
+      assert.equal(r.code, 3);
+      assert.ok(json.payload.message.includes(RAMO), json.payload.message);
+      assert.doesNotMatch(json.payload.message, /["`$\\]/, 'si ricopia dentro le virgolette di --guasto');
       assert.notEqual(git(casa, 'rev-parse', 'HEAD'), B, 'la cartella non resta pronta sul codice del giro 2');
       const st = JSON.parse(readFileSync(resolve(dirStato, `${ID}.json`), 'utf8'));
       assert.deepEqual(st.checkpoints.map((c) => c.sha).slice(-1), [B], 'nessun avvio registrato sul giro passato');
