@@ -132,7 +132,7 @@ test('le copie attive per giorno e per ora, le attese e le impostazioni: sotto l
     // Le attese: «Apri una nuova scheda» si mostra; «Ricarica la pagina» (tre copie) sta fra le voci sotto soglia.
     const nuova = riga(page, 'azioni', 'Apri una nuova scheda');
     await expect(nuova.locator('td').nth(1)).toHaveText('15');
-    await expect(nuova.locator('td').nth(1)).toHaveAttribute('title', '15 da 6 copie');
+    await expect(nuova.locator('td').nth(1)).toHaveAttribute('title', `15 da ${copie} copie`);
     await expect(nuova.locator('.mg-ct-fascia').first()).toHaveAttribute('title', 'fino a 0,5 s: 15');
     await expect(nuova.locator('.mg-ct-fascia--sotto')).toHaveCount(12);
     await expect(riga(page, 'azioni', 'Ricarica la pagina')).toHaveCount(0);
