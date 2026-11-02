@@ -214,7 +214,9 @@ test('controllo di sicurezza su un clone che non sa calcolare il diff → il gir
     const g = (...a) => execFileSync('git', a, { cwd: casa, stdio: ['ignore', 'pipe', 'pipe'] });
     g('checkout', '-q', 'worker/740');
     writeFileSync(resolve(casa, 'del-ramo.txt'), 'modifica da controllare\n', 'utf8');
-    g('add', '-A');
+    // Solo il file: con `add -A` il commit imbarcherebbe il finto origin, che sta nella cartella, e il ripristino del
+    // ramo gli rimetterebbe la main tolta qui sotto.
+    g('add', 'del-ramo.txt');
     g('commit', '-qm', 'lavoro del ramo');
     g('push', '-q', 'origin', 'worker/740');
     g('branch', '-D', 'main');
