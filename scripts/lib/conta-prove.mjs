@@ -110,10 +110,12 @@ function argomenti(s, m, i) {
 const FUNZIONE = /^(async\s+)?(function\b|\([^]*?\)\s*=>|[A-Za-z_$][\w$]*\s*=>)/;
 const CHIAMATA = /(?<![\w$.])(test|it)(?:\.(only|skip|fail|fixme))?\s*\(/g;
 
+// Un titolo letterale si legge senza virgolette né barre di escape; uno calcolato resta com'è scritto.
 function titoloLeggibile(arg) {
   const t = String(arg || '').trim();
-  const q = /^(['"`])([^]*)\1$/.exec(t);
-  return q && !q[2].includes(q[1]) && !(q[1] === '`' && q[2].includes('${')) ? q[2] : t;
+  const q = /^(['"`])((?:\\[^]|(?!\1)[^\\])*)\1$/.exec(t);
+  if (!q || (q[1] === '`' && q[2].includes('${'))) return t;
+  return q[2].replace(/\\([^])/g, '$1');
 }
 
 /**
