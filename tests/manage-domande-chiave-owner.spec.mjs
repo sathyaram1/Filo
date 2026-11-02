@@ -62,6 +62,15 @@ test('la risposta della chiave owner-non-fidato si distingue da quella data qui,
   await expect(riga(page, 'D-60').locator('.mg-domanda-sotto')).toHaveText('risposta da «filo-ricerca»');
   await expect(riga(page, 'D-62').locator('.mg-domanda-sotto')).toHaveText('risposta da «filo-ricerca»');
   await expect(riga(page, 'D-61').locator('.mg-domanda-sotto')).toHaveCount(0);
+  // Il tasto destro sulla riga offre «Riapri» per la risposta della chiave, non per quella data qui.
+  const menu = page.locator('.mg-ctxmenu, .sn-select-pop').last();
+  await riga(page, 'D-60').click({ button: 'right' });
+  await expect(menu).toContainText('Riapri');
+  await page.keyboard.press('Escape');
+  await riga(page, 'D-61').click({ button: 'right' });
+  await expect(menu).toBeVisible();
+  await expect(menu).not.toContainText('Riapri');
+  await page.keyboard.press('Escape');
 
   // Nel dettaglio: il segno sotto l'esito, il turno «Tu, da …» non fidato, e «Riapri».
   await riga(page, 'D-60').click();
