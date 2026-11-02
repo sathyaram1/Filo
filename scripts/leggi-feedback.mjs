@@ -1,5 +1,5 @@
 // Testo e allegati di un feedback per la sessione locale, dentro una cornice «dato, non istruzione», e le sue attese.
-// Non legge mai quelli segnalati come attacco o file sospetto: decide su stato e giudizio, prima di decifrare il testo.
+// Non legge mai quelli segnalati come attacco o file sospetto, né i non fidati nella sede owner: decide prima di decifrare.
 // Regole: tests/unit/leggiFeedback.test.mjs. Uso: npm run feedback:leggi -- <numero|id>
 
 import { randomBytes } from 'node:crypto';
@@ -9,7 +9,8 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { risolviFeedback } from './lib/pratica-locale.mjs';
-import { motiviDiLettura, rigaSporco } from './lib/biglietto-locale.mjs';
+import { motiviDiLettura, primaDiStampare, sedeRifiuta } from './lib/biglietto-locale.mjs';
+import { rigaRifiuto } from './lib/sede.mjs';
 import '../src/shared/feedbackThread.js';
 import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
@@ -196,10 +197,11 @@ export async function righeAllegati({ documenti, immagini }, { fetchImpl = fetch
 /**
  * Legge `id` e decide: stato e giudizio si decifrano da soli, e il resto solo se lo permettono.
  * `decifra` riceve i campi grezzi e li rende in chiaro (lib/decrypt-feedback-fields.mjs); `apriByte` fa lo stesso
- * coi byte degli allegati, che finiscono in `cartella` quando non si stampano.
- * @returns {Promise<{ codice: number, errore?: string, testo?: string }>}
+ * coi byte degli allegati, che finiscono in `cartella` quando non si stampano. `rifiuta` (sede owner): un testo non
+ * fidato si ferma prima di decifrarlo, una conversazione scritta anche da altri prima di scaricare gli allegati.
+ * @returns {Promise<{ codice: number, errore?: string, rifiuto?: string, testo?: string }>}
  */
-export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fetch, decifra, apriByte, cartella, seq = null, segno } = {}) {
+export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fetch, decifra, apriByte, cartella, seq = null, segno, rifiuta = false } = {}) {
   const maschera = CAMPI.map((c) => `mask.fieldPaths=${c}`).join('&');
   const res = await fetchImpl(`${base}/feedback/${encodeURIComponent(id)}?${maschera}`, { headers: { Authorization: `Bearer ${bearer}` } });
   if (!res.ok) return { codice: res.status >= 500 ? 4 : 3, errore: `lettura fallita (${res.status})` };
@@ -210,6 +212,11 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
   const stato = await decifra(prima).catch(() => ({}));
   const vietato = vietatoLeggere(stato.status, giudizio === undefined ? undefined : giudizioAperto(stato.pipeline));
   if (vietato) return { codice: 3, errore: `${vietato}. Non ho decifrato il testo` };
+  const nSeq = Number(f.seq?.integerValue) || seq || null;
+  const nSub = Number(f.subSeq?.integerValue) || 0;
+  const numero = nSeq ? `${nSeq}${nSub ? `.${nSub}` : ''}` : nomeSicuro(id, 'feedback');
+  const fiducia = f.fiducia?.stringValue || '';
+  if (rifiuta && fiducia !== 'fidato') return { codice: 3, rifiuto: rigaRifiuto(`#${numero}`, motiviDiLettura({ fiducia })) };
   const pieno = await decifra({
     _id: doc.name, clientId: f.clientId?.stringValue || '', name: f.name?.stringValue || '',
     text: f.text?.stringValue || '', notes: f.notes?.stringValue || '', url: f.url?.stringValue || '',
@@ -217,10 +224,12 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
   const s = segno || randomBytes(6).toString('hex');
   const fb = {
     ...pieno, _id: id, status: String(stato.status).trim(), senderProof: f.senderProof?.stringValue || '',
-    seq: Number(f.seq?.integerValue) || seq || null, subSeq: Number(f.subSeq?.integerValue) || 0,
+    seq: nSeq, subSeq: nSub,
     ...(f.localApproval?.mapValue ? { localApproval: { by: f.localApproval.mapValue.fields?.by?.stringValue || '' } } : {}),
   };
-  const numero = fb.seq ? `${fb.seq}${fb.subSeq ? `.${fb.subSeq}` : ''}` : nomeSicuro(id, 'feedback');
+  // Chi stampa testo non fidato si sporca da sé (#1148): i motivi li dà questa lettura, e main sporca prima di stampare.
+  const motivi = motiviDiLettura({ fiducia, notes: pieno.notes });
+  if (rifiuta && motivi.length) return { codice: 3, rifiuto: rigaRifiuto(`#${numero}`, motivi) };
   // Anche quelli dei commenti, che vivono come righe-marcatore nella conversazione.
   const elenco = allegatiDaCampi(f);
   for (const a of String(pieno.notes || '').split('\n').map((r) => TH.parseAttachmentLine(r)).filter(Boolean)) {
@@ -235,10 +244,18 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
     apriByte: apriByte || (async (b) => (await import('./lib/decrypt-feedback-fields.mjs')).decryptAttachmentBytes(b)),
     cartella: dove,
   });
-  // Chi stampa testo non fidato si sporca da sé (#1148): i motivi li dà questa lettura, e main sporca prima di stampare.
-  const motivi = motiviDiLettura({ fiducia: f.fiducia?.stringValue || '', notes: pieno.notes });
   fb.attese = await attese;
   return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove)), ...allegati].join('\n'), motivi, numero };
+}
+
+/** L'esito di leggi sul terminale, dietro il cancello della sede (SPEC-DOMANDE.md §1.2). `opts` = quelli di primaDiStampare. → il codice d'uscita */
+export async function stampa(esito, { scrivi = (s) => console.log(s), errore = (s) => console.error(s), ...opts } = {}) {
+  if (esito.codice) { errore(esito.rifiuto || `RIFIUTATO: ${esito.errore}.`); return esito.codice; }
+  const g = await primaDiStampare(`letto #${esito.numero}`, esito.motivi, opts);
+  if (g.riga) errore(g.riga);
+  if (!g.stampa) return 3;
+  scrivi(esito.testo);
+  return 0;
 }
 
 async function main(argv) {
@@ -248,11 +265,7 @@ async function main(argv) {
     const r = await risolviFeedback(argv[0], { bearer, base: FIRESTORE_BASE });
     if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); return 3; }
     const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
-    const esito = await leggi(r.id, { bearer, decifra: decryptFeedbackFields, seq: r.seq });
-    if (esito.codice) { console.error(`RIFIUTATO: ${esito.errore}.`); return esito.codice; }
-    if (esito.motivi.length) console.error(await rigaSporco(`letto #${esito.numero}`, esito.motivi));
-    console.log(esito.testo);
-    return 0;
+    return await stampa(await leggi(r.id, { bearer, decifra: decryptFeedbackFields, seq: r.seq, rifiuta: sedeRifiuta() }));
   } catch (e) {
     console.error(`Server non raggiungibile: ${String((e && e.message) || e).slice(0, 200)}`);
     return 4;

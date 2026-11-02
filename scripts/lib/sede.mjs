@@ -38,6 +38,20 @@ export function rigaSede(env = process.env) {
   return `Sede: locale, sul PC (${ENV_SEDE} assente): il testo non fidato si consegna e sporca il biglietto.`;
 }
 
+// Il motivo di un rifiuto del cancello della sede: il server non è stato chiamato, e chi stampa non deve dire «dal server».
+export const MOTIVO_SEDE_OWNER = 'sede_owner';
+
+/** Chi ha rifiutato, per la riga del rifiuto. PURA. */
+export function chiRifiuta(motivo) {
+  return motivo === MOTIVO_SEDE_OWNER ? 'RIFIUTATO nella sede owner, senza chiamare il server' : 'RIFIUTATO dal server';
+}
+
+/** Gli id in una riga, tutti fino a `max`. PURA. */
+export function elencoIds(ids, max = 50) {
+  const l = (Array.isArray(ids) ? ids : []).map((x) => String(x).replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 30));
+  return l.slice(0, max).join(', ') + (l.length > max ? ` e altri ${l.length - max}` : '');
+}
+
 /** La riga di un rifiuto: cosa (col numero) e perché. `motivi` = quelli che altrove sporcherebbero. PURA. */
 export function rigaRifiuto(cosa, motivi) {
   const perche = (Array.isArray(motivi) ? motivi : [motivi]).map((m) => String(m || '').trim()).filter(Boolean).join('; ') || 'testo non fidato';
