@@ -72,8 +72,10 @@ export function difettiDellaSpec(testo, { unite = [], aspetta = [] } = {}) {
   if (mancano.length) {
     motivi.push(`la spec non nomina ${mancano.map((n) => `#${n}`).join(', ')}: per ogni segnalazione unita dice cosa cambia e come si verifica, nel testo o in un allegato di testo`);
   }
-  for (const { num, frase } of prerequisitiNelTesto(testo, [...unite, ...aspetta])) {
-    motivi.push(`il testo mette #${num} prima del pacchetto («${citazione(frase)}»), ma il pacchetto non lo aspetta: il server lo darebbe da lavorare subito. Aggiungi --aspetta ${num} (se è già su main l'attesa è già sciolta), o riscrivi la frase se #${num} non deve fondersi prima`);
+  const prima = prerequisitiNelTesto(testo, [...unite, ...aspetta]);
+  const conTutti = [...aspetta.map(norm), ...prima.map((p) => p.num)].join(',');
+  for (const { num, frase } of prima) {
+    motivi.push(`il testo mette #${num} prima del pacchetto («${citazione(frase)}»), ma il pacchetto non lo aspetta: il server lo darebbe da lavorare subito. Apri con --aspetta ${conTutti} (un feedback già su main non ferma niente), o riscrivi la frase se #${num} non deve fondersi prima`);
   }
   return motivi;
 }
