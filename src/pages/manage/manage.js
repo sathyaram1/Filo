@@ -2501,7 +2501,7 @@
       if (ATT.atteseDi(fb).length) {
         voci.push({
           testo: '⏳ Non aspettare più', titolo: testoStatiAttese(ATT.statiDelleAttese(fb, trovaAtteso)),
-          azione: () => { if (selectedId !== fb._id) openDetail(fb._id); accodaAttese(fb._id, () => []); },
+          azione: () => { if (selectedId !== fb._id) openDetail(fb._id); accodaAttese(fb._id, togliTutte); },
         });
       }
     }
