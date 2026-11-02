@@ -14,6 +14,8 @@ SCRIPT.ambiente.routine = () => false;
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const seg = (num, extra = {}) => ({ ok: true, id: `id${num}`, num, stato: 'todo', priorita: 1, locale: false, attese: [], ...extra });
 const img = (indice, extra = {}) => ({ tipo: 'immagine', nome: '', type: '', url: `u-img-${indice}`, conversazione: false, indice, ...extra });
+// Una spec che nomina ogni unita: il testo di un pacchetto lo deve fare (specDelPacchetto.test.mjs).
+const spec = (numeri) => numeri.split(',').map((n) => `#${n}: cambia questo, e si prova così.`).join('\n');
 const doc = (nome, extra = {}) => ({ tipo: 'documento', nome, type: 'text/plain', url: `u-${nome}`, conversazione: false, indice: 1, ...extra });
 
 async function conRete({ lette, allegati = {}, byte = () => PNG, attesi = [], sposta = async () => ({ ok: true }), archivia = async () => ({ ok: true }), seq = 900 }, fn) {
@@ -58,7 +60,7 @@ test('gli allegati delle unite salgono col pacchetto: documenti col nome di orig
       815: [img(1), img(1, { conversazione: true, url: 'u-conv' })],
     },
     byte: (a) => (a.tipo === 'documento' ? Buffer.from('riga di log') : PNG),
-  }, () => SCRIPT.main(['t', 'La spec.', '--non-locale', '--pacchetto', '812,815']));
+  }, () => SCRIPT.main(['t', 'La spec: #812 e #815.', '--non-locale', '--pacchetto', '812,815']));
   assert.equal(r.code, 0, r.err.join('\n'));
   const { payload } = r.submit[0];
   assert.deepEqual(payload.images.map((i) => i.name), ['#812 — immagine 1', '#815 — immagine 1', '#815 — immagine 1 della conversazione']);
@@ -66,7 +68,7 @@ test('gli allegati delle unite salgono col pacchetto: documenti col nome di orig
   assert.deepEqual(payload.files.map((f) => [f.name, f.type]), [['#812 — log.txt', 'text/plain']]);
   assert.equal(Buffer.from(payload.files[0].dataUrl.split(',')[1], 'base64').toString(), 'riga di log', 'il contenuto è quello dell\'unita, in chiaro per la cifratura di submit');
   assert.equal(payload.text, [
-    'La spec.', '', 'Allegati copiati dalle segnalazioni unite:',
+    'La spec: #812 e #815.', '', 'Allegati copiati dalle segnalazioni unite:',
     '- immagine 1: da #812, la sua immagine 1',
     '- «#812 — log.txt»: da #812',
     '- immagine 2: da #815, la sua immagine 1',
@@ -99,7 +101,7 @@ test('un pacchetto che porta allegati di unite non fidate nasce non fidato anche
 test('oltre il tetto di un feedback il pacchetto non nasce, e il conto si dice per unita', async () => {
   const tre = [img(1), img(2), img(3)];
   const r = await conRete({ lette: { 812: seg('812'), 815: seg('815') }, allegati: { 812: tre, 815: tre } },
-    () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812,815']));
+    () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815']));
   assert.equal(r.code, 3);
   assert.equal(r.submit.length, 0, 'niente pacchetto monco');
   assert.deepEqual(r.archiviate, []);
@@ -113,18 +115,18 @@ test('un allegato che non si apre, o che un feedback non ammette, ferma tutto pr
   const giu = await conRete({
     lette: { 812: seg('812') }, allegati: { 812: [img(1)] },
     byte: () => { throw Object.assign(new Error('allegato cifrato, ma la chiave privata non è configurata'), { definitivo: true }); },
-  }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812']));
+  }, () => SCRIPT.main(['t', spec('812'), '--non-locale', '--pacchetto', '812']));
   assert.equal(giu.code, 3);
   assert.equal(giu.submit.length, 0);
   assert.match(giu.err.join('\n'), /#812: l'immagine 1 non si apre \(allegato cifrato, ma la chiave privata non è configurata\)\. Non ho aperto niente/);
   const rete = await conRete({ lette: { 812: seg('812') }, allegati: { 812: [img(1)] }, byte: () => { throw new Error('fetch failed'); } },
-    () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812']));
+    () => SCRIPT.main(['t', spec('812'), '--non-locale', '--pacchetto', '812']));
   assert.equal(rete.code, 4, 'la rete caduta si riprova');
   const strani = await conRete({
     lette: { 812: seg('812') },
     allegati: { 812: [img(1), doc('pagina.html', { type: 'text/html' }), doc('vuoto.txt')] },
     byte: (a) => (a.tipo === 'immagine' ? Buffer.from('<svg onload=x>') : a.nome === 'vuoto.txt' ? new Uint8Array(0) : Buffer.from('<p>')),
-  }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812']));
+  }, () => SCRIPT.main(['t', spec('812'), '--non-locale', '--pacchetto', '812']));
   assert.equal(strani.code, 3);
   assert.equal(strani.submit.length, 0);
   const testo = strani.err.join('\n');
@@ -143,7 +145,7 @@ test('chi aspettava una unita passa al pacchetto prima che lei si archivi; se no
     lette: { 812: seg('812'), 815: seg('815') }, attesi,
     sposta: async (x) => { ordine.push(`sposta ${x.num}`); return x.id === 'id904' ? { ok: false, motivo: 'scrittura fallita (503)' } : { ok: true }; },
     archivia: async (u) => { ordine.push(`archivia ${u.num}`); return { ok: true }; },
-  }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812,815']));
+  }, () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815']));
   assert.equal(r.code, 3);
   assert.deepEqual(r.spostate.map((s) => [s.id, s.voce]), [['id903', { id: 'pacco', num: '900' }], ['id904', { id: 'pacco', num: '900' }]]);
   assert.deepEqual(ordine.slice(0, 2).sort(), ['sposta 903', 'sposta 904'], 'le attese si spostano prima di archiviare');
@@ -159,7 +161,7 @@ test('un\'archiviazione che non riesce si dice con la riga per rimediare', async
   const r = await conRete({
     lette: { 812: seg('812'), 815: seg('815') },
     archivia: async (u) => (u.num === '815' ? { ok: false, motivo: 'scrittura fallita (503)' } : { ok: true }),
-  }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812,815']));
+  }, () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815']));
   assert.equal(r.code, 3);
   assert.match(r.out.join('\n'), /Archiviate #812 con la nota/);
   assert.match(r.err.join('\n'), /ARCHIVIAZIONE NON RIUSCITA su #815 \(scrittura fallita \(503\)\): resta in coda.*npm run feedback -- 815 archived "Unito nel pacchetto #900: il lavoro continua lì"/);
@@ -169,7 +171,7 @@ test('chi aspetta una unita ed è aspettato dal pacchetto chiuderebbe un giro: s
   const r = await conRete({
     lette: { 812: seg('812'), 700: seg('700') },
     attesi: [{ id: 'id700', num: '700', togli: ['id812'], quali: ['812'], tenute: [] }],
-  }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812', '--aspetta', '700']));
+  }, () => SCRIPT.main(['t', spec('812'), '--non-locale', '--pacchetto', '812', '--aspetta', '700']));
   assert.equal(r.code, 3, r.err.join('\n'));
   assert.equal(r.submit.length, 0);
   assert.match(r.err.join('\n'), /#700 aspetta #812, che entra nel pacchetto, e il pacchetto aspetta #700: si aspetterebbero a vicenda/);
@@ -179,7 +181,7 @@ test('un pacchetto nato senza numero non archivia niente, e dice i passi in ordi
   const r = await conRete({
     lette: { 812: seg('812') }, seq: null,
     attesi: [{ id: 'id903', num: '903', togli: ['id812'], quali: ['812'], tenute: ['676'] }],
-  }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812']));
+  }, () => SCRIPT.main(['t', spec('812'), '--non-locale', '--pacchetto', '812']));
   assert.equal(r.code, 3);
   assert.deepEqual(r.archiviate, []);
   assert.deepEqual(r.spostate, []);
@@ -244,7 +246,7 @@ test('una segnalazione che non può entrare ferma tutto prima di aprire, e i mot
     4: seg('4', { stato: '' }),
     5: seg('5', { attese: Array.from({ length: 20 }, (_, i) => ({ id: `w${i}`, num: String(100 + i) })) }),
   };
-  const r = await conRete({ lette }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '1,2,3,4,5,6']));
+  const r = await conRete({ lette }, () => SCRIPT.main(['t', spec('1,2,3,4,5,6'), '--non-locale', '--pacchetto', '1,2,3,4,5,6']));
   assert.equal(r.code, 3);
   assert.equal(r.submit.length, 0, 'non si apre niente');
   const testo = r.err.join('\n');
@@ -267,7 +269,7 @@ test('--pacchetto senza numeri, o con numeri storti, è un errore d\'uso; a vuot
   const storto = await conRete({ lette: {} }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', 'menu']));
   assert.equal(storto.code, 1);
   assert.match(storto.err.join('\n'), /«menu» non è un numero di feedback/);
-  const prova = await conRete({ lette: {} }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812,815', '--dry-run']));
+  const prova = await conRete({ lette: {} }, () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815', '--dry-run']));
   assert.equal(prova.code, 0);
   assert.equal(prova.submit.length, 0);
   assert.match(prova.out.join('\n'), /come pacchetto che unisce #812, #815 \(coi loro allegati, e alla nascita le archivio\)/);
@@ -306,7 +308,7 @@ test('una segnalazione già in un pacchetto aperto, o con un ramo di lavoro, non
     950: seg('950', { unisce: ['812'] }),
     700: seg('700'),
   };
-  const r = await conRete({ lette }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812,815,816']));
+  const r = await conRete({ lette }, () => SCRIPT.main(['t', spec('812,815,816'), '--non-locale', '--pacchetto', '812,815,816']));
   assert.equal(r.code, 3);
   assert.equal(r.submit.length, 0);
   const testo = r.err.join('\n');
@@ -324,7 +326,7 @@ test('una unita rimasta in coda col rimando a un pacchetto aperto non entra in u
     id970: seg('970', { unisce: ['813'], stato: 'archived' }),
     id980: seg('980'),
   };
-  const r = await conRete({ lette }, () => SCRIPT.main(['t', 'spec', '--non-locale', '--pacchetto', '812,813,814']));
+  const r = await conRete({ lette }, () => SCRIPT.main(['t', spec('812,813,814'), '--non-locale', '--pacchetto', '812,813,814']));
   assert.equal(r.code, 3);
   assert.equal(r.submit.length, 0, 'due pacchetti farebbero lo stesso lavoro su #812');
   const testo = r.err.join('\n');

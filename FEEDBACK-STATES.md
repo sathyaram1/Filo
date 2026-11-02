@@ -318,6 +318,16 @@ urgenti li controlla il manutentore. Senza `--priorita` P nasce con la
 priorità più alta fra le unite. Un pezzo che si blocca in verifica non si stacca: P passa
 o non passa intero.
 
+*La spec sta nel testo* (#2033): chi lavora P, chi lo verifica e i lavori server ricevono
+testo e allegati, mai le note. Prima della rete, anche a vuoto, lo strumento legge il testo
+insieme agli allegati di testo di `--allega` e rifiuta, con tutti i motivi: una frase che
+manda la spec nelle note («spec nelle note del feedback», «vedere le note», «come da note»),
+un'unita che la spec non nomina, un feedback che il testo mette prima («#1202 si fonde prima»,
+«prerequisito: #N», «solo dopo #N», «quando #N è fuso») senza che P lo aspetti, perché senza attesa il server
+dà P da lavorare con quello fuori da main. Il rimedio sta nel messaggio: la spec nel testo
+o allegata, `--aspetta` coi numeri, o la frase riscritta. Vale solo per i pacchetti: una
+segnalazione qualunque racconta un problema, e può citare note e attese di altri.
+
 *Gli allegati viaggiano con P*: chi lavora un biglietto apre solo quelli del suo feedback.
 Prima di aprire lo strumento legge e decifra immagini, documenti e allegati della
 conversazione di ogni unita e li carica in P: i documenti col nome «#N — nome», le

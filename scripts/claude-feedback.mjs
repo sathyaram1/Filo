@@ -48,6 +48,7 @@
 //   `--pacchetto` (FEEDBACK-STATES.md § 3a, Pacchetti): il feedback è un pacchetto che unisce quelle segnalazioni, e il
 //   testo è la spec. Porta con sé i loro allegati (tutti, o non nasce) e alla nascita le archivia; chi le aspettava
 //   aspetta il pacchetto. Si controllano prima di aprire: in coda e non ancora lavorate, non a priorità 3, non lavoro locale.
+//   Anche il testo, prima della rete: nomina ogni unita, non manda la spec nelle note, e chi mette prima è in --aspetta.
 //
 // USCITE (distinte apposta: chi lancia lo script deve poter distinguere
 // "non l'ho scritto io male" da "il server non c'è")
@@ -77,6 +78,7 @@ import '../src/shared/feedbackAttese.js';
 import './lib/freno-letture.mjs';
 import { risolviFeedback } from './lib/pratica-locale.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
+import { difettiDellaSpec, testoDegliAllegati } from './lib/spec-del-pacchetto.mjs';
 
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
 const FB = globalThis.SN_FEEDBACK;
@@ -514,6 +516,7 @@ export const ambiente = {
 function uso() {
   console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--pacchetto 812,815] [--dry-run]');
   console.error('     --pacchetto: il testo è la spec che unisce quelle segnalazioni; il pacchetto ne copia gli allegati e le archivia, e chi le aspettava aspetta lui.');
+  console.error('     La spec sta nel testo o in un --allega (le note non arrivano a chi lavora); un feedback che deve fondersi prima va in --aspetta.');
   console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
   console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
@@ -608,6 +611,14 @@ export async function main(argvIn) {
   let allegati;
   try { allegati = percorsiAllegati.map(leggiAllegato); }
   catch (e) { console.error(`USO: ${e.message}`); return EXIT.USO; }
+  // Prima della rete, così anche --dry-run lo dice: la spec che manca qui non la riceve nessuno (#2033).
+  if (numeriUnite.numeri.length && String(testo || '').trim()) {
+    const difetti = difettiDellaSpec([testo, ...testoDegliAllegati(allegati)].join('\n'), { unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri });
+    if (difetti.length) {
+      console.error(`RIFIUTATO: --pacchetto, il testo va corretto e non ho aperto niente:\n${difetti.map((m) => `  - ${m}`).join('\n')}`);
+      return EXIT.USO;
+    }
+  }
 
   // La credenziale si chiede solo quando c'è davvero qualcosa da depositare:
   // un errore d'uso o una prova a vuoto non toccano la rete.
