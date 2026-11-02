@@ -96,9 +96,9 @@ function scena(base, { altroveAvanti = true, stato = {} } = {}) {
   return { casa, dirStato, A, B, C };
 }
 
-function esegui(casa, dirStato, port, argv) {
+function esegui(casa, dirStato, port, argv, script = resolve(REPO, 'scripts', 'dispatch.mjs')) {
   return new Promise((risolvi) => {
-    const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), ...argv], {
+    const p = spawn(process.execPath, [script, ...argv], {
       cwd: casa,
       env: {
         ...process.env,
