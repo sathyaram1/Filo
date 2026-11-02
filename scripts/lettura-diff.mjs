@@ -30,12 +30,21 @@ export function sezioneRichiesta(richiesta, file = '') {
   return [...testa, '```', corpo.replace(/```/g, '`​``'), '```'].join('\n');
 }
 
-/** La sezione del diff e del conto. PURA. */
-export function sezioneDiff({ base, head, file, caratteri, righe, conto, codice, avviso = '' }) {
+/**
+ * La sezione del diff e del conto. `root`: dove sta il codice del ramo; la shell di un sotto-agente riparte dalla
+ * cartella della sessione, che in un giro è un'altra copia, su main. `punta`: lo sha che `root` ha davanti. PURA.
+ */
+export function sezioneDiff({ base, head, file, caratteri, righe, conto, codice, avviso = '', root = '', punta = '' }) {
+  const dove = root ? [
+    '',
+    `Il codice del ramo sta in \`${root}\`. La tua shell può ripartire da un'altra cartella: ogni comando comincia con \`cd "${root}" && …\`, e Read e Grep vogliono percorsi sotto \`${root}\`. Lì non scrivi niente.`,
+    ...(punta && punta !== head ? [`Quella cartella ha davanti \`${punta.slice(0, 12)}\`, non la punta che leggi: il codice della punta si legge con \`git show ${head.slice(0, 12)}:<file>\`.`] : []),
+  ] : [];
   return [
     '## Il diff',
     '',
     `Dal punto in cui il ramo si stacca da main (\`${base.slice(0, 12)}\`) alla punta che leggi (\`${head.slice(0, 12)}\`), senza le prove dei giri di verifica (\`${FUORI_DAL_DIFF}\`): è nel file ${file} (${caratteri} caratteri, ${righe} righe). Leggilo tutto.`,
+    ...dove,
     ...(avviso ? ['', `Attenzione: ${avviso}.`] : []),
     '',
     '## Le prove contate',
