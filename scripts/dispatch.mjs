@@ -105,6 +105,7 @@ import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo,
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
 import { cloneDentroIlRepo } from './lib/git-server.mjs';
+import { MOTIVO_SEDE_OWNER } from './lib/sede.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -2067,7 +2068,7 @@ export async function run() {
   }
   if (!w.ok) {
     // Nella sede owner il lavoro non si chiede: il server sporcherebbe il biglietto consegnandolo (SPEC-DOMANDE.md §1.2).
-    if (w.reason === 'sede_owner') return emitHalt('permanent', `nella sede owner le routine non lavorano: ${w.detail || 'il lavoro porta testo scritto da altri'}`);
+    if (w.reason === MOTIVO_SEDE_OWNER) return emitHalt('permanent', `nella sede owner le routine non lavorano: ${w.detail || 'il lavoro porta testo scritto da altri'}`);
     // In dubbio ci si ferma: un biglietto che non apre il proprio lavoro non
     // è una giornata tranquilla, è un giro che non deve partire.
     return emitHalt('transient', `il canale non consegna il lavoro (${w.reason})`);

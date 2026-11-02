@@ -705,6 +705,7 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
         fiducia = p ? p.fiducia : 'non_fidato';
       }
       // Il figlio ha un nome di sessione suo: la copia sotto quel nome lo fa trovare ai comandi che non hanno la variabile.
+      registraSede(path, env);
       const radice = radiceCondivisa(cwd);
       const suo = radice && ID_RE.test(sessionId) ? join(cartellaBiglietti(radice), `${sessionId}.json`) : '';
       const ereditatoOra = suo && resolve(suo) !== resolve(path) ? leggiFile(path) : null;
@@ -731,6 +732,7 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
       path = p.path;
       fiducia = p.fiducia;
     }
+    registraSede(path, env);
     const envFile = String(env.CLAUDE_ENV_FILE || '').trim();
     if (envFile) {
       try { writeFileSync(envFile, `export ${ENV_FILE}='${path.replace(/'/g, "'\\''")}'\n`, { flag: 'a', encoding: 'utf8' }); } catch (_) { /* resta la ricerca col nome della sessione */ }

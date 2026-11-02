@@ -1,12 +1,13 @@
 // biglietto.mjs — il biglietto della sessione locale (SPEC-DOMANDE.md §1.2). Lo prende l'hook di avvio; da qui ci si
 // dichiara sporchi, si legge lo stato, si chiude. Nessuna strada per tornare puliti né per «segna fidato» (§1.4).
-// Le op stanno in scripts/lib/biglietto-locale.mjs; `gancio`/`consegna`, `fine`/`chiusura` e `scadenze` sono dei ganci.
+// Le op stanno in scripts/lib/biglietto-locale.mjs; `sede`, `gancio`/`consegna`, `fine`/`chiusura` e `scadenze` sono dei ganci.
 
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import * as B from './lib/biglietto-locale.mjs';
 import { gancio } from './lib/letture-esterne.mjs';
+import { rigaSede } from './lib/sede.mjs';
 
 export const USO = 'Uso: node scripts/biglietto.mjs prendi [--sporco "<motivo>"] | sporca "<motivo>" | stato | chiudi';
 
@@ -14,7 +15,7 @@ export const USO = 'Uso: node scripts/biglietto.mjs prendi [--sporco "<motivo>"]
 export function leggiArgomenti(argv) {
   const a = (Array.isArray(argv) ? argv : []).map(String);
   const cmd = a[0] || '';
-  if (['stato', 'chiudi', 'avvio', 'gancio', 'fine', 'scadenze'].includes(cmd)) return a.length === 1 ? { cmd } : { errore: `${cmd} non vuole altro. ${USO}` };
+  if (['stato', 'chiudi', 'avvio', 'gancio', 'fine', 'scadenze', 'sede'].includes(cmd)) return a.length === 1 ? { cmd } : { errore: `${cmd} non vuole altro. ${USO}` };
   if (cmd === 'consegna') return { cmd, motivo: a.slice(1).join(' ').trim() };
   if (cmd === 'chiusura') return a.length === 2 && a[1].trim() ? { cmd, sessione: a[1].trim() } : { errore: `chiusura vuole il nome della sessione. ${USO}` };
   if (cmd === 'sporca') {
@@ -43,6 +44,11 @@ async function main() {
   const args = leggiArgomenti(process.argv.slice(2));
   if (args.errore) { console.error(args.errore); return 2; }
 
+  if (args.cmd === 'sede') {
+    // L'hook di avvio la stampa sempre, routine comprese: senza rete, una riga.
+    console.log(rigaSede());
+    return 0;
+  }
   if (args.cmd === 'gancio') {
     // PostToolUse: annota e lancia la consegna in sottofondo, senza aspettarla. Sempre uscita 0, niente da dire.
     gancio({ input: await leggiStdin() });
@@ -79,6 +85,7 @@ async function main() {
       return 1;
     }
     const p = await B.prendi({ sporco: args.sporco, motivo: args.motivo, sessionId: process.env.CLAUDE_CODE_SESSION_ID || '' });
+    B.registraSede(p.path);
     console.log(`Biglietto ${p.fiducia === 'fidato' ? 'pulito' : 'sporco'}: ${p.path}`);
     console.log(`Perché lo vedano gli strumenti di questa sessione: export ${B.ENV_FILE}='${p.path}'`);
     return 0;
@@ -99,6 +106,7 @@ async function main() {
     if (!trovati.length) { console.log('Nessun biglietto trovato da qui: ciò che la sessione scrive da questo repo vale non fidato.'); return 0; }
     const b = await B.trovaBiglietto();
     console.log(`${b.fiducia === 'fidato' ? 'Pulito' : 'Sporco'}: ${b.path}`);
+    console.log(`Sede registrata: ${b.sede || 'nessuna (nato prima della sede)'}.`);
     if (b.errore) console.log(`Stato non letto: ${b.errore}`);
     if (b.inAttesa) console.log(`Letture esterne annotate solo in locale, non ancora ricevute dal server: ${b.inAttesa}.`);
     const motivi = (b.stato && Array.isArray(b.stato.sporcatoDa)) ? b.stato.sporcatoDa : [];
@@ -117,6 +125,6 @@ const lanciato = (() => { try { return realpathSync(process.argv[1]); } catch (_
 if (process.argv[1] && lanciato === fileURLToPath(import.meta.url)) {
   main().then((code) => { process.exitCode = code; }, (e) => {
     console.error(`biglietto: ${String((e && e.message) || e)}`);
-    process.exitCode = ['avvio', 'gancio', 'consegna', 'fine', 'chiusura', 'scadenze'].includes(process.argv[2]) ? 0 : 1;
+    process.exitCode = ['avvio', 'sede', 'gancio', 'consegna', 'fine', 'chiusura', 'scadenze'].includes(process.argv[2]) ? 0 : 1;
   });
 }

@@ -25,10 +25,16 @@ git branch -v 2>/dev/null
 echo ""
 echo "Convenzione: per ogni nuovo task crea un worktree dedicato con 'git worktree add .claude/worktrees/<slug> -b claude/<slug>' e lavora lì dentro. A ogni Edit/Write un hook committa e pusha IL TUO RAMO (solo quello). Su main non arriva piu' niente da solo: si chiude con 'npm run finish', che fa i controlli e CHIEDE la fusione al server."
 
+LIMITE=""
+if command -v timeout >/dev/null 2>&1; then LIMITE="timeout 15"; fi
+# La sede (FILO_SEDE, SPEC-DOMANDE.md §1.2): sempre, routine comprese. Accanto al biglietto la scrive `avvio`.
+if [ -f "$PROJECT_DIR/scripts/biglietto.mjs" ] && command -v node >/dev/null 2>&1; then
+  SEDE=$($LIMITE node "$PROJECT_DIR/scripts/biglietto.mjs" sede 2>/dev/null </dev/null | head -n 1)
+  if [ -n "$SEDE" ]; then echo ""; echo "$SEDE"; fi
+fi
+
 # Il biglietto: solo fuori dalle routine (che hanno il loro); senza credenziale dell'owner lo script tace.
 if [ -z "$FILO_ROUTINE" ] && [ -f "$PROJECT_DIR/scripts/biglietto.mjs" ] && command -v node >/dev/null 2>&1; then
-  LIMITE=""
-  if command -v timeout >/dev/null 2>&1; then LIMITE="timeout 15"; fi
   RIGA=$(printf '%s' "$INPUT" | $LIMITE node "$PROJECT_DIR/scripts/biglietto.mjs" avvio 2>/dev/null | head -n 1)
   if [ -n "$RIGA" ]; then echo ""; echo "$RIGA"; fi
 fi
