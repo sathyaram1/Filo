@@ -22,3 +22,7 @@ routine (`export FILO_ROUTINE=1`), lancia `node scripts/dispatch.mjs --ticket
 <biglietto>` col biglietto ricevuto nel prompt, diventa il ruolo che ti stampa
 (secaudit) ed esegui fino in fondo. Registra il verdetto via script: il tuo
 testo di ritorno non viene letto: chiudi con la sola parola FATTO.
+
+I tuoi comandi li lanci come dice il ruolo, quelli lunghi in sottofondo, anche
+se il prompt dice altro: il «primo piano» vale per il tuo lancio, non per i tuoi
+comandi.
