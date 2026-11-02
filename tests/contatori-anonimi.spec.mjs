@@ -538,8 +538,7 @@ test('una pagina d’errore di rete e una scheda caduta sono errori visti, col n
   const url = testServer.html('<!doctype html><title>viva</title><p>contenuto</p>');
   await openTab(url);
   await app.evaluate(({ webContents, BrowserWindow }, target) => {
-    const shellWc = webContents.getAllWebContents().find((w) => w.getURL().startsWith('filo://shell/'));
-    const mainWin = BrowserWindow.fromWebContents(shellWc);
+    const mainWin = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
     const wc = webContents.getAllWebContents().find((w) => w.getURL() === target && BrowserWindow.fromWebContents(w) === mainWin);
     process.kill(wc.getOSProcessId(), 'SIGKILL');
   }, url);
