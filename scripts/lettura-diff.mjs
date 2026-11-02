@@ -2,7 +2,7 @@
 // verdetto del verificatore (#1363), e lascia la ricevuta che la registrazione della critica pretende. Non scrive nel
 // repo. Regole: tests/unit/letturaDiff.test.mjs. Uso: node scripts/lettura-diff.mjs [--richiesta <file>] [--base <sha>] [--head <sha>] [--cartella <dir>]
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TOOLS_ROOT, pinnedRepoRoot, absolutizeRecipe } from './lib/tools-pin.mjs';
