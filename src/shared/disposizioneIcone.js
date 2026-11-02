@@ -63,6 +63,10 @@
       copyLink: ['link', 'menu_copy_image_link'], search: ['search', 'menu_search_image'] },
     link: { openTab: ['openTab', 'menu_open_in_new_tab'], copy: ['copy', 'menu_copy_link'],
       saveForLater: ['saveForLater', 'menu_save_link_for_later'], share: ['share', 'menu_share_link'] },
+    // Il disegno e il nome di qui valgono per trascinarle e per la chat; aperta sul filmato, l'icona dice il suo stato.
+    media: { playPause: ['play', 'fila_media_play'], mute: ['volumeMute', 'menu_media_mute'], save: ['download', 'fila_media_save'],
+      loop: ['repeat', 'menu_media_loop'], pip: ['pip', 'menu_media_pip'], copyLink: ['link', 'fila_media_copy_link'] },
+    cursore: { paste: ['clipboard', 'menu_paste'], dictate: ['mic', 'menu_dictate'] },
     pagina: {},
   });
 
