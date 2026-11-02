@@ -2526,7 +2526,7 @@ if (isMainModule) {
   const bigliettoAMano = mano.ticket;
   const flag = argv[0];
   if (reg.error && flag !== '--help' && flag !== '-h') { console.error(reg.error); process.exit(1); }
-  if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state' || flag === '--linea-principale')) {
+  if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state' || flag === '--linea-principale' || flag === '--rimetti-lockfile')) {
     console.error(`--ticket non vale con ${flag}: lì un biglietto non serve. Niente è stato toccato.`);
     process.exit(1);
   }
