@@ -3966,7 +3966,7 @@
     // Il campo si libera subito per il numero dopo; a un rifiuto torna il testo, se nel frattempo non se n'è scritto altro.
     const testo = mgAtteseInput.value;
     mgAtteseInput.value = '';
-    const ok = await accodaAttese(fb._id, (f) => [...atteseDaTenere(f), ...nuovi.numeri]);
+    const ok = await accodaAttese(fb._id, () => ({ aggiungi: nuovi.numeri }));
     if (!ok && !mgAtteseInput.value) mgAtteseInput.value = testo;
   }
   if (mgAtteseToggle) {
