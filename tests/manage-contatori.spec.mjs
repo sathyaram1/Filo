@@ -107,8 +107,10 @@ test('le copie attive per giorno e per ora, le attese e le impostazioni: sotto l
     await page.locator('#mgCtFinestra .mg-chip[data-preset="7"]').click();
     await expect(page.locator('#mgCtDati')).toBeVisible({ timeout: 15_000 });
 
-    // Le copie: sei ieri, tre tre giorni fa (che non si contano a numero); a cavallo di due mesi una copia conta due volte.
-    await expect(page.locator('#mgCtTotale b')).toHaveText(atteso.stessoMese ? '6' : '9');
+    // Le copie: sei ieri, tre tre giorni fa (che non si contano a numero); a cavallo di due mesi una copia conta due volte,
+    // e il 2 e il 3 di ogni mese ieri e tre giorni fa stanno in due mesi.
+    const copie = atteso.stessoMese ? 6 : 9;
+    await expect(page.locator('#mgCtTotale b')).toHaveText(String(copie));
     const colonne = page.locator('#mgCtPeriodi .mg-ct-col');
     await expect(colonne).toHaveCount(7);
     await expect(colonne.nth(5)).toHaveAttribute('title', `${breve(atteso.ieri)}: 6 copie`);
