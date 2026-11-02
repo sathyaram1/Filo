@@ -98,7 +98,11 @@ caso ammette (archiviare il feedback; tenere com'è, per un rilievo di un altro
 lavoro; rimandare a dopo il lancio, cioè priorità 0), senza inventare azioni
 che chi riprende non saprebbe eseguire: le azioni restano sui feedback che la
 domanda nomina. Priorità, gruppo, collegamenti e `blocca` restano quelli di chi
-ha chiesto: il server li tiene. Su una domanda che non ferma (`blocca` falso) il
+ha chiesto: il server li tiene. Su una domanda che ferma (`legata` e `blocca`)
+un lavoro fermo ad aspettarla, almeno un'opzione lo riprende (`riprendi` sul
+feedback `legata`, anche se chi ha chiesto non l'aveva scritta); se quel lavoro
+non è fermo (in coda, a priorità 0) la ripresa non serve: la risposta lo libera
+comunque. Su una domanda che non ferma (`blocca` falso) il
 lavoro è già andato avanti con l'opzione `provvisoria`: il consiglio puoi
 cambiarlo, ma nel file scrivi `"provvisoria": <indice da 0>` dell'opzione
 riscritta che è quella, così una scelta diversa dell'owner fa ripartire il
@@ -125,7 +129,9 @@ node scripts/routine-channel.mjs release <biglietto> --role smistamento
 Un rilascio senza nessuno dei quattro rimette la domanda in coda per un altro
 tentativo; al terzo esce all'owner com'è, col segno «non riscritta». Se il
 server rifiuta perché la domanda è cambiata mentre lavoravi, rileggila con
-`smista mostra` e rifai la tua parte.
+`smista mostra` e rifai la tua parte. Un altro rifiuto che non sai correggere
+(il server tiene un campo che la forma vorrebbe diverso) non è un guasto:
+rilascia senza esito, e al terzo tentativo la domanda arriva all'owner com'è.
 
 ## Se si rompe qualcosa
 
