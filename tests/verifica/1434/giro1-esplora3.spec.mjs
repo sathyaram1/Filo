@@ -27,6 +27,14 @@ test('chiedi a Filo sull\'immagine', async ({ app, openTab, testServer }) => {
   await page.locator('#foto').click({ button: 'right' });
   await menu.locator('[data-sn-icon-id="immagine:ask"]').click();
   await page.waitForTimeout(2500);
+  log('sidebar piccola', await nelMondoDelMenu(app, page, () => JSON.stringify({ aperta: globalThis.SN_SIDEBAR.isOpen(), allegati: globalThis.__filoSidebarTest?.allegati?.() })));
+  await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 160; c.height = 120; const g = c.getContext('2d'); g.fillStyle = '#c33'; g.fillRect(0, 0, 160, 120); g.fillStyle = '#33c'; g.fillRect(40, 30, 60, 50); document.getElementById('foto').src = c.toDataURL('image/png'); });
+  await page.waitForTimeout(300);
+  await page.locator('#foto').click({ button: 'right' });
+  await menu.locator('[data-sn-icon-id="immagine:ask"]').click();
+  await page.waitForTimeout(2500);
+  // stesso confronto dalla strada dell'Aiuto: trascinare/incollare non c'è, si chiama allega a mano
+  log('sidebar grande', await nelMondoDelMenu(app, page, () => JSON.stringify({ aperta: globalThis.SN_SIDEBAR.isOpen(), allegati: globalThis.__filoSidebarTest?.allegati?.() })));
   log('sidebar', await nelMondoDelMenu(app, page, () => JSON.stringify({ aperta: globalThis.SN_SIDEBAR.isOpen(), allegati: globalThis.__filoSidebarTest?.allegati?.() })));
 });
 
