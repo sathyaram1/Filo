@@ -39,6 +39,7 @@ for (const tema of ['light', 'dark']) {
     await menu.superficie.screenshot({ path: `tests/.shots/1434-testo-piu-${tema}.png` });
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
+    await page.evaluate(() => getSelection().removeAllRanges());
     await page.locator('#foto').click({ button: 'right' });
     await expect(menu.locator('.sn-menu-row')).toBeVisible();
     await page.waitForTimeout(500);
