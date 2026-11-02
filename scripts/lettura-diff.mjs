@@ -71,6 +71,7 @@ function leggiRichiestaDaFile(f) {
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
   const root = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : (pinnedRepoRoot() || resolve(dirname(fileURLToPath(import.meta.url)), '..'));
+  absolutizeOutput(root);
   const o = opzioni(process.argv.slice(2));
   if (o.errore) { console.error(`${o.errore}. Uso: node scripts/lettura-diff.mjs [--richiesta <file>] [--base <sha>] [--head <sha>] [--cartella <dir>]`); process.exit(1); }
   const dir = o.cartella ? resolve(o.cartella) : cartellaConsegna(root);
