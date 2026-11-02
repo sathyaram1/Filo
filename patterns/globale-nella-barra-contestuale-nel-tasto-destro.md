@@ -91,6 +91,36 @@ per le azioni sulla pagina intera, che stavano in una fila in cima al menu (#124
   barra, le globali rimaste in «Altro…» vanno nella barra; la riga del tasto
   destro di prima finisce in fondo alla barra, nel suo ordine (#1246).
 
+## La fila contestuale in cima al tasto destro (#1434)
+
+- **Il contesto lo sceglie lo stesso ramo che sceglie le voci** del menu: fila e
+  voci parlano sempre dello stesso elemento. Ogni tipo di elemento ha il suo
+  contesto, come chiede [Menu contestuale: se Filo sostituisce il menu nativo,
+  deve coprire OGNI tipo di
+  elemento](menu-contestuale-se-filo-sostituisce-il-menu-nativo.md): testo
+  selezionato dove si scrive con la formattazione, in una casella, in una
+  pagina; immagine; collegamento; filmato o audio; campo col cursore senza
+  selezione; pagina (niente sotto il mouse). Un tipo nuovo di elemento è un
+  contesto nuovo, non una fila che manca.
+- **Una selezione rimasta altrove non decide** il menu di un'immagine, un
+  collegamento o un filmato: vale solo se il clic le sta sopra.
+- **Ogni contesto ha due zone**, la fila e il suo «+», scritte dal main come
+  quelle della barra (una porta sola, ogni spostamento un cambio annullabile).
+  Un'azione di un contesto resta nel suo contesto: nella barra o su un altro
+  elemento non avrebbe su cosa agire. Un'icona della barra può entrare nella
+  fila di qualunque contesto, e lascia la barra.
+- **Di partenza nessuna azione sulla pagina intera** nella fila: la fila della
+  pagina è vuota e nascosta, e si fa vedere quando ci si porta sopra un'icona
+  dalla barra. L'ordine è fisso per contesto; sceglierlo con un modello è una
+  decisione dell'owner ancora aperta (#1377).
+- **L'icona dice lo stato quando conta** (Riproduci o Pausa, audio acceso o
+  spento): disegno e nome del catalogo valgono per trascinarla e per la chat,
+  quelli dati dall'elemento per il menu aperto.
+- **Tante icone vanno a capo**, mai fuori dal bordo del menu.
+- Catalogo: `src/shared/disposizioneIcone.js`; chi esegue:
+  `src/content/content.js` (`filaContestuale`); chi disegna:
+  `src/content/menuIcons.js`.
+
 ## A schermo intero le schede scendono dal bordo alto (#1246)
 
 - Lo stesso gesto della barra: puntatore fermo sulla prima riga di pixel, senza
