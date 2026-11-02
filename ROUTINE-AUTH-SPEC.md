@@ -87,9 +87,8 @@ registro del server si vede quale ha fatto cosa.
 **La parola d'ordine non è fuori portata del worker.** Sta nel prompt della
 sessione, quindi nel transcript su disco, leggibile dallo stesso utente che fa
 girare i worker. Un worker sporco può chiedere da sé un biglietto nuovo: per
-questo la fiducia si condivide per sessione (§ 2, principio 6). Resta aperto un
-punto: il server riconosce la sessione dall'id che il chiamante dichiara, e
-un id inventato non si distingue ancora da quello di una sessione vera.
+questo la fiducia si condivide per sessione (§ 2, principio 6), con il limite
+detto in § 7.
 
 **La chiave di lettura sparisce dalle macchine delle routine.** È il cambiamento
 più importante di tutta la spec: oggi vive in tante copie, su computer che
