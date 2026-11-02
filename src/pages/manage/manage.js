@@ -3991,7 +3991,7 @@
     });
   }
   if (mgAtteseTogliTutte) {
-    mgAtteseTogliTutte.addEventListener('click', () => { if (selectedId) accodaAttese(selectedId, () => []); });
+    mgAtteseTogliTutte.addEventListener('click', () => { if (selectedId) accodaAttese(selectedId, togliTutte); });
   }
   if (mgAtteseLista) {
     mgAtteseLista.addEventListener('click', (e) => {
