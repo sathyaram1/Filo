@@ -532,6 +532,8 @@ export async function release(t, fault = '', opts, report = null) {
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
   if (report && typeof report === 'object') payload.report = report;
+  // La domanda di fine turno del manutentore arriva solo qui, a ramo spedito (SPEC-DOMANDE § 5.4); l'orchestratore non la chiede.
+  if (opts && opts.domandaAlRilascio === true) payload.domandaAlRilascio = true;
   Object.assign(payload, creditiDi(opts));
   const { status, body } = await call('routineRelease', payload, opts);
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
