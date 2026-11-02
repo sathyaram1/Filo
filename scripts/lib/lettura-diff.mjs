@@ -120,6 +120,16 @@ export function scriviRichiesta(root, { ramo = '', richiesta } = {}, { dir = '' 
   return scriviJson(join(cartella(root, dir), FILE_RICHIESTA), { ramo: String(ramo || ''), scritta: new Date().toISOString(), richiesta });
 }
 
+/** Dal payload del verificatore, la sola richiesta: la serie delle critiche passate al lettore non serve. PURA. */
+export function richiestaDalPayload(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const campi = ['id', 'num', 'feedback', 'decisioni', 'provvisorie', 'immagini'];
+  const out = Object.fromEntries(campi.filter((k) => p[k] !== undefined && p[k] !== null).map((k) => [k, p[k]]));
+  const esterni = Object.entries((p.fileEsterni && typeof p.fileEsterni === 'object') ? p.fileEsterni : {})
+    .filter(([k]) => campi.includes(k.split('.')[0]));
+  return esterni.length ? { ...out, fileEsterni: Object.fromEntries(esterni) } : out;
+}
+
 /** La richiesta di questo ramo, o null: quella lasciata da un altro ramo (una verifica locale vecchia) non vale. */
 export function leggiRichiesta(root, { ramo = '', dir = '' } = {}) {
   const r = leggiJson(join(cartella(root, dir), FILE_RICHIESTA));
