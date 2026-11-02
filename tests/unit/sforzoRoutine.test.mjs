@@ -1,5 +1,5 @@
 // Sforzo degli agenti delle routine (decisione dell'owner del 2026-10-02): il primo lavoro a xhigh, verifica,
-// correzione e controllo di sicurezza a high; la prosa dell'orchestratore dice lo stesso e sceglie l'agente per ruolo.
+// correzione, controllo di sicurezza e lettura del diff a high; la prosa dell'orchestratore dice lo stesso e sceglie l'agente per ruolo.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
