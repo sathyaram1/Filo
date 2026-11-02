@@ -27,7 +27,7 @@ test('escono in ogni esito gli esterni e i `?` che contano al più 1; gli altri 
   assert.equal(esceInOgniEsito({ level: 0, sede: 'v' }), false);
 });
 
-test('fra le prove scritte, si tolgono prima solo quelle coi soli numeri di rilievi che escono comunque', () => {
+test('fra le prove scritte escono intere quelle coi soli numeri di rilievi che escono comunque; a una mista si toglie il caso e il numero', () => {
   const findings = [{ level: 2, sede: 'i' }, { level: 1, sede: 'e' }, { level: 0, sede: 'i', decision: true }];
   const fuori = proveDaToglierePrimaDelVerdetto([
     'tests/verifica/42/giro1-r1-salva.spec.mjs',
@@ -37,7 +37,50 @@ test('fra le prove scritte, si tolgono prima solo quelle coi soli numeri di rili
     'tests/verifica/42/giro1-chiusa.spec.mjs',
     'tests/verifica/42/aiuto.mjs',
   ], findings);
-  assert.deepEqual(fuori.map((f) => f.prova), ['tests/verifica/42/giro1-r2-esterno.spec.mjs', 'tests/verifica/42/giro1-r3-domanda.spec.mjs']);
+  assert.deepEqual(fuori.map((f) => [f.prova, f.intera]), [
+    ['tests/verifica/42/giro1-r2-esterno.spec.mjs', true],
+    ['tests/verifica/42/giro1-r1-r2-misto.spec.mjs', false],
+    ['tests/verifica/42/giro1-r3-domanda.spec.mjs', true],
+  ]);
+  const misto = fuori[1];
+  assert.deepEqual(misto.numeri, [2]);
+  assert.deepEqual(misto.restano, [1]);
+  assert.equal(misto.rinomina, 'tests/verifica/42/giro1-r1-misto.spec.mjs');
+  const testo = testoProvePrimaDelVerdetto(fuori, findings);
+  assert.match(testo, /giro1-r1-r2-misto\.spec\.mjs: il rilievo 2 è esterno; copre anche r1, che resta: togli il caso di r2 e il numero dal nome \(`git mv tests\/verifica\/42\/giro1-r1-r2-misto\.spec\.mjs tests\/verifica\/42\/giro1-r1-misto\.spec\.mjs`\)/);
+  assert.match(testo, /giro1-r2-esterno\.spec\.mjs: il rilievo 2 è esterno; toglila/);
+});
+
+test('rinominata senza il numero, una prova che ha ancora il caso di un rilievo che esce non passa; tolto il caso, passa', () => {
+  const findings = [{ level: 2, sede: 'i' }, { level: 1, sede: 'e' }];
+  const prova = 'tests/verifica/42/giro1-r1-misto.spec.mjs';
+  const conCaso = "test('r1 col titolo vuoto non salva', () => {});\ntest(\"r2 il menu delle schede si chiude\", () => {});\n";
+  const fuori = proveDaToglierePrimaDelVerdetto([prova], findings, { [prova]: conCaso });
+  assert.deepEqual(fuori.map((f) => [f.prova, f.casi]), [[prova, ['r2 il menu delle schede si chiude']]]);
+  assert.match(testoProvePrimaDelVerdetto(fuori, findings), /giro1-r1-misto\.spec\.mjs: il rilievo 2 è esterno; togli il caso «r2 il menu delle schede si chiude»/);
+  assert.deepEqual(proveDaToglierePrimaDelVerdetto([prova], findings, { [prova]: "test('r1 col titolo vuoto non salva', () => {});\n" }), []);
+  // Un caso che cita anche un rilievo che resta, resta; un titolo composto a runtime non si legge.
+  assert.deepEqual(proveDaToglierePrimaDelVerdetto([prova], findings, { [prova]: "test.describe('r1 r2 insieme', () => {});\ntest(`r${2} composto`, () => {});\n" }), []);
+});
+
+test('i titoli dei casi si leggono anche da describe, fail e template, non da un nome che finisce per «it»', () => {
+  assert.deepEqual(titoliDeiCasi("test.describe('r1 gruppo', () => {\n  test.fail(`r2 atteso`, async () => {});\n  edit('r3 no');\n  it(\"r4 sì\", () => {});\n});"),
+    ['r1 gruppo', 'r2 atteso', 'r4 sì']);
+});
+
+test('una domanda che non blocca non ferma il lavoro: il `?` di livello 1 esce prima del verdetto, con la riga che lo spiega', () => {
+  const nonBlocca = { titolo: 'Colore', blocca: false };
+  const findings = [{ level: 2, sede: 'i', decision: true, domanda: nonBlocca }, { level: 1, sede: 'i', decision: true, domanda: nonBlocca }];
+  assert.equal(fermaDiSicuro(findings), false);
+  const fuori = proveDaToglierePrimaDelVerdetto(['tests/verifica/42/giro1-r1-riquadro.spec.mjs', 'tests/verifica/42/giro1-r2-bordo.spec.mjs'], findings);
+  assert.deepEqual(fuori.map((f) => f.prova), ['tests/verifica/42/giro1-r2-bordo.spec.mjs']);
+  assert.match(testoProvePrimaDelVerdetto(fuori, findings), /La domanda del rilievo 1 non blocca: il lavoro non si ferma/);
+  // Senza «blocca», o con true, la domanda blocca e il `?` di livello 1 resta a chi riprende.
+  for (const domanda of [{ titolo: 'Colore' }, { titolo: 'Colore', blocca: true }]) {
+    const fermi = [{ ...findings[0], domanda }, findings[1]];
+    assert.equal(fermaDiSicuro(fermi), true);
+    assert.deepEqual(proveDaToglierePrimaDelVerdetto(['tests/verifica/42/giro1-r2-bordo.spec.mjs'], fermi), []);
+  }
 });
 
 test('a lavoro fermo di sicuro i `?` restano a chi riprende con la loro prova: escono prima solo gli esterni', () => {
