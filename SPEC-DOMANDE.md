@@ -112,6 +112,22 @@ sessione si può riprendere senza nascere sporca. Quelli fermi da più di 30
 giorni, o di sessioni morte senza l'hook di fine, li chiude l'avvio di una
 sessione successiva.
 
+**Le sedi (decisione dell'owner del 01/11, #2012).** La variabile `FILO_SEDE`
+dice dove gira la sessione: `owner` (la sede cloud fidata, coi poteri
+dell'owner), `ricerca` o `compiti`; assente vuol dire la sessione locale sul
+PC, e un valore che non è una sede vale `owner`. L'hook di avvio la stampa e la
+scrive accanto al biglietto; gli strumenti tengono la più severa fra variabile
+e registro.
+
+- **Nella sede `owner`** ogni strumento che consegna testo scritto da altri
+  rifiuta la voce non fidata col numero e il motivo invece di sporcare il
+  biglietto; le fidate passano. Il canale delle routine non chiede lì niente
+  che porti testo altrui (il server sporcherebbe consegnando), e il
+  manutentore non ci gira. Gli strumenti web della sessione non ci sono per
+  costruzione (rete limitata).
+- **Nelle sedi `ricerca` e `compiti`, e in locale,** il testo si consegna e il
+  biglietto si sporca, come sopra.
+
 ### 1.3 Unire senza sporcare: la delega
 
 Chi riordina la coda legge testo di utenti, quindi è sporco. Se scrivesse lui il
