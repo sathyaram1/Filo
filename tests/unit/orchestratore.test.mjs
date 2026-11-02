@@ -471,9 +471,8 @@ test('regole toccate: avviso per la pubblicazione a Filo chiuso, il lavoro si ch
   assert.match(avviso, /se la corsa è rossa, npm run regole:pubblica/);
 });
 
+// Il confronto con l'elenco del bake sta nelle prove del server (fonti-bake-elenco-del-pc-1937), che girano a ogni sua spinta.
 test('il PC conosce tutte le fonti che il server incorpora: con una sola mancante pubblicherebbe GitHub col main di Filo di prima', () => {
-  const server = process.env.FILO_SECURITY_DIR || resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'filo-security');
-  const bake = join(server, 'functions', 'tools', 'bake-shared.js');
   const attese = ['src/shared/feedbackTransitions.js', 'src/shared/verifierRound.js', 'src/shared/domande.js', 'filo_filosofia.txt',
     'src/shared/mittenti.js', 'src/shared/politicaModelli.js', 'src/shared/ambiti.js', 'src/shared/ricorrenti.js', 'src/shared/feedbackAttese.js',
     'src/shared/schede.js'];
