@@ -9,7 +9,6 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 
 const TESTS = join(dirname(fileURLToPath(import.meta.url)), '..');
-const QUESTO = join('unit', 'proveRiconosconoFinestre.test.mjs');
 const PREFISSO_CONDIVISO = /startsWith\(\s*(['"`])(data:|filo:\/\/shell\/?)\1\s*\)/;
 
 function fileDiTest(dir = TESTS, out = []) {
