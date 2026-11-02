@@ -942,9 +942,12 @@ dicono gli esperimenti (§ 4.6).
 
 ### 4.7 Potatura dei rami
 
-- **La cancellazione è meccanica.** La fa il server il lunedì, per regola: un
-  ramo fuso in `main` che nessun feedback aperto nomina. L'agente non allunga
-  l'elenco.
+- **La cancellazione è meccanica.** La fa il server il lunedì alle 05:40, dopo
+  l'agente, per regola: un ramo fuso in `main` (nessun commit fuori da `main`),
+  fermo da più di 24 ore, che nessun feedback aperto nomina e che è un
+  tentativo `worker/*` di un feedback chiuso nato prima della chiusura, oppure
+  un `claude/*` di una sessione locale. Prima di cancellarlo ne salva nome e
+  sha, così si può ricreare. L'agente non allunga l'elenco.
 - **L'agente capisce perché i rami sono lì.** Prima della cancellazione legge
   i candidati e gli altri rami fermi (non fusi, o di feedback chiusi senza
   fusione) e li raggruppa per causa, non uno per uno: il 07/10 erano 617. Per
