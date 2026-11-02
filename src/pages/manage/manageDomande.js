@@ -270,7 +270,7 @@
     li.appendChild(el('span', 'mg-domanda-num', li.dataset.id));
     const titolo = el('span', 'mg-domanda-titolo', d.illeggibile ? 'Non si legge' : String(d.titolo || '(senza titolo)'));
     // Sotto il titolo quello che la scheda deve dire senza aprire: la scelta e il principio di un'automatica,
-    // il lavoro che una in smistamento tiene fermo.
+    // il lavoro che una in smistamento tiene fermo, chi ha risposto fuori da qui (#2011).
     const sotto = [];
     if (tab === 'domande-automatiche') {
       const o = (d.opzioni || [])[sceltaFatta(d)];
@@ -281,6 +281,7 @@
       const fermo = lavoroFermo(d);
       if (fermo) sotto.push(`ferma ${fermo}`);
     }
+    if (rispostaDaChiave(d)) sotto.push(`risposta da «${rispostaDaChiave(d).slug}»`);
     if (sotto.length) titolo.appendChild(el('span', 'mg-domanda-sotto', sotto.join(' · ')));
     li.appendChild(titolo);
     if (CHIUSE.includes(tab)) li.appendChild(el('span', 'mg-domanda-prio', PRIORITA[d.priorita] || ''));
