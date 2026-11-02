@@ -7,7 +7,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdirSync, writeFileSync, utimesSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, utimesSync, readFileSync, appendFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { senzaSessione } from '../helpers/sessione.mjs';
