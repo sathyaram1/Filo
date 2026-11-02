@@ -51,7 +51,10 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
   su cui i modelli Claude sono addestrati). Dopo un sì, riuscito o no, l'esito torna al modello in un turno interno
   (le voci di `esiti`, scritte dal main), e il modello continua coi passi che mancano o chiude muto: nessuna bolla e
   niente in archivio. Non c'è un caso per tipo e nessun campo che il modello dichiara. Un no non richiama il modello:
-  lo legge al messaggio dopo e non ripropone. Un segreto fermato non riprende.
+  lo legge al messaggio dopo e non ripropone. Un segreto fermato non riprende. Le conferme di una stessa risposta sono
+  un passo solo: si riprende quando ognuna ha avuto la sua risposta, con gli esiti di tutte. Un OK dato mentre Filo
+  risponde riparte a turno finito, se intanto l'utente non ha scritto né fermato.
+  Chiusa altrove mentre qui si risponde, le bolle a schermo restano le sue: il filo non le ridisegna.
 - **All'apertura l'ultimo messaggio sta in cima** (#1487), col segno del suo giorno, e sotto è vuoto: chi apre una home
   non vuole rivedere ieri, che resta sopra a una rotella. Vale per la scheda nuova, la home ricaricata e la riserva alla
   consegna. Il vuoto è un margine in fondo al filo misurato apposta, così «in fondo» vuol dire proprio quel punto e

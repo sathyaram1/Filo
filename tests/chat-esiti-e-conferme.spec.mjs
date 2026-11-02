@@ -8,6 +8,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { home, modelloFinto, chiedi, chiamateAlModello, ripristina } from './helpers/chatFinta.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
 import { clickConfirm, scrollConfirmToEnd, fillConfirmInput, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 
 const chatsDellaHome = (app) => app.evaluate(() => globalThis.SN_FILO_CHATS.list().then((l) => l.filter((c) => !c.app)));
 const chatCon = async (app, testo) => (await chatsDellaHome(app)).find((c) => c.messages.some((m) => m.text === testo)) || null;
@@ -275,5 +276,100 @@ test('#1443.2 chiusa in una home, la conversazione non la continua un\'altra hom
   await expect(b.locator('.dash-bubble-filo', { hasText: 'Di niente.' })).toBeVisible({ timeout: 10_000 });
   const dove = await chatCon(app, 'grazie');
   expect(dove && dove.id, 'il messaggio dopo apre una conversazione nuova').not.toBe(chiusa);
+  await ripristina(app);
+});
+
+// Le conferme di una stessa risposta sono un passo solo, come negli harness di Anthropic: il lavoro riprende quando
+// ognuna ha la sua risposta, e un OK dato mentre Filo risponde riparte a turno finito invece di perdersi.
+async function okAlBottone(page, bottone) {
+  await bottone.click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
+  if (await page.locator(`${CONFIRM_HOST} input`).count()) await fillConfirmInput(page, 'conferma');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'ok');
+  await expect(bottone).toHaveText(/^✓/, { timeout: 10_000 });
+}
+const mkdir = (id, dir, nome) => ({ id, name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `mkdir "${join(dir, nome)}"`, spiegazione: `Creo la cartella ${nome}` }) });
+const ultimoMessaggio = (c) => JSON.stringify(c[c.length - 1]);
+
+test('#1685 due comandi da confermare nella stessa risposta: Filo riprende dopo il secondo OK, con gli esiti di tutti e due', async ({ app }) => {
+  test.setTimeout(60_000);
+  const dir = cartellaTemporanea('esiti-conferme-');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [
+      { text: 'Creo le due cartelle.', toolCalls: [mkdir('c1', dir, 'uno'), mkdir('c2', dir, 'due')] },
+      { text: 'Aspetto i tuoi OK.' },
+      { text: 'Fatte tutte e due.' },
+    ]);
+    await chiedi(page, 'crea le cartelle uno e due');
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Aspetto i tuoi OK' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    const bottoni = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: /Creo la cartella/ });
+    await okAlBottone(page, bottoni.filter({ hasText: 'uno' }));
+    await page.waitForTimeout(1500);
+    expect((await chiamateAlModello(app)).length, 'col secondo comando ancora da confermare il modello aspetta').toBe(2);
+    await okAlBottone(page, bottoni.filter({ hasText: 'due' }));
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatte tutte e due' })).toBeVisible({ timeout: 10_000 });
+    const ch = await chiamateAlModello(app);
+    expect(ch).toHaveLength(3);
+    expect(ultimoMessaggio(ch[2])).toMatch(/fatta: Comando eseguito · mkdir[^\n]*uno[\s\S]*fatta: Comando eseguito · mkdir[^\n]*due/);
+  } finally {
+    await ripristina(app);
+    togliCartella(dir);
+  }
+});
+
+test('#1685 un OK dato mentre Filo risponde a un altro messaggio riprende il lavoro a risposta finita', async ({ app }) => {
+  test.setTimeout(60_000);
+  const dir = cartellaTemporanea('esiti-conferme-');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [
+      { text: 'Creo la cartella.', toolCalls: [mkdir('c1', dir, 'tre')] },
+      { text: 'Aspetto il tuo OK.' },
+      { text: 'Sono le dieci.', ritardoMs: 3000 },
+      { text: 'Cartella creata, ho finito.' },
+    ]);
+    await chiedi(page, 'crea la cartella tre');
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Aspetto il tuo OK' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    await chiedi(page, 'intanto che ore sono?');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 5_000 }).toBe(3);
+    await okAlBottone(page, page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Creo la cartella tre' }));
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Sono le dieci' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Cartella creata, ho finito' })).toBeVisible({ timeout: 10_000 });
+    const ch = await chiamateAlModello(app);
+    expect(ultimoMessaggio(ch[3])).toMatch(/fatta: Comando eseguito · mkdir[^\n]*tre/);
+  } finally {
+    await ripristina(app);
+    togliCartella(dir);
+  }
+});
+
+test('#1685 chiusa in una home mentre l\'altra sta rispondendo dentro di essa: domanda e risposta restano una volta sola', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await home(app);
+  await modelloFinto(app, [{ text: 'Ciao a te.' }, { text: 'Bene, grazie.', ritardoMs: 4000 }]);
+  await chiedi(page, 'ciao filo');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ciao a te' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  const b = await openTab('filo://newtab/');
+  await expect(b.locator('.dash-bubble-user', { hasText: 'ciao filo' })).toBeVisible({ timeout: 10_000 });
+  await chiedi(b, 'come stai');
+  await b.waitForTimeout(800);
+  await shell.locator('.tab').first().click();
+  await chiedi(page, '/clear');
+  await shell.locator('.tab').nth(1).click();
+  await expect(b.locator('.dash-bubble-filo', { hasText: 'Bene, grazie.' }).first()).toBeVisible({ timeout: 10_000 });
+  await expect(b.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  await b.waitForTimeout(1500);
+  await expect(b.locator('.dash-bubble-user', { hasText: 'come stai' })).toHaveCount(1);
+  await expect(b.locator('.dash-bubble-filo', { hasText: 'Bene, grazie.' })).toHaveCount(1);
   await ripristina(app);
 });
