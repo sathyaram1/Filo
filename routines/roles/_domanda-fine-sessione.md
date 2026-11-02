@@ -3,4 +3,6 @@
   la stampa insieme al comando per rispondere, col testo da stdin fra due
   righe `FINE` (`risposta --biglietto <biglietto> <<'FINE'`). Rispondi su ciò
   che hai visto tu in questa sessione; «niente» va benissimo ed è la risposta
-  più frequente. Se la domanda non arriva (exit diverso da 0), rilascia e basta;
+  più frequente. Se la domanda non arriva (exit diverso da 0), rilascia e basta.
+  Quella scritta dal manutentore arriva invece stampata dal rilascio, a ramo
+  già spedito: rispondi col comando che stampa e non toccare altro;
