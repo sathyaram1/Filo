@@ -26,6 +26,6 @@ di ritorno non viene letto: chiudi con la sola parola FATTO.
 I file nati da shell (non da Edit/Write) si salvano al tuo Edit/Write successivo
 o al rilascio del biglietto, non prima.
 
-Come lanciare i tuoi comandi lo dice il ruolo, anche quelli lunghi in
-sottofondo: il «primo piano» che chi ti lancia deve rispettare vale per il tuo
-lancio, non per i tuoi comandi.
+I tuoi comandi li lanci come dice il ruolo, quelli lunghi in sottofondo, anche
+se il prompt dice altro: il «primo piano» vale per il tuo lancio, non per i tuoi
+comandi.
