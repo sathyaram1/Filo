@@ -853,7 +853,7 @@
     // Il principio (§3.6) lo scrive chi ha gestito la risposta: è la regola che entra nel registro, e l'owner la vede.
     const principio = d.principio ? sezione('mg-dq-principio', 'Principio', md(d.principio)) : null;
     if (principio && d.principioContestato) principio.querySelector('.mg-dq-h').appendChild(segnoContestato());
-    for (const parte of [opzioni(d), consiglio(d), esito(d), automatica(d), principio, conversazione(d), risposta(d)]) if (parte) art.appendChild(parte);
+    for (const parte of [opzioni(d), consiglio(d), esito(d), daChiave(d), automatica(d), principio, conversazione(d), risposta(d)]) if (parte) art.appendChild(parte);
     if (d.notePerAgenti && !originaleInCima) {
       const det = el('details', 'mg-dq-note');
       det.appendChild(el('summary', '', 'Note per gli agenti'));
