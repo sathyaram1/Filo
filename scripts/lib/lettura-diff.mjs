@@ -137,6 +137,11 @@ export function leggiRichiesta(root, { ramo = '', dir = '' } = {}) {
   return !ramo || !r.ramo || r.ramo === ramo ? r : null;
 }
 
+// Un giro che la lettura non la chiede (la chiusura, in locale dove niente svuota la cartella) toglie quella vecchia.
+export function togliRichiesta(root, { dir = '' } = {}) {
+  rmSync(join(cartella(root, dir), FILE_RICHIESTA), { force: true });
+}
+
 export function scriviRicevuta(root, ricevuta, { dir = '' } = {}) {
   return scriviJson(join(cartella(root, dir), FILE_RICEVUTA), { ...ricevuta, fatta: new Date().toISOString() });
 }
