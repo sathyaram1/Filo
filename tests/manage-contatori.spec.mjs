@@ -194,7 +194,7 @@ test('le copie attive per giorno e per ora, le attese e le impostazioni: sotto l
     await scegli(page, 'mgCtSistema', 'mac');
     await expect(page.locator('#mgCtTotale b')).toHaveText('meno di 5');
     await scegli(page, 'mgCtSistema', '');
-    await expect(page.locator('#mgCtTotale b')).toHaveText(atteso.stessoMese ? '6' : '9');
+    await expect(page.locator('#mgCtTotale b')).toHaveText(String(copie));
     expect(await letture(app)).toBe(prima);
     // «Rileggi» sì.
     await page.locator('#mgCtRileggi').click();
