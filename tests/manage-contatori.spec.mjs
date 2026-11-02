@@ -107,8 +107,10 @@ test('le copie attive per giorno e per ora, le attese e le impostazioni: sotto l
     await page.locator('#mgCtFinestra .mg-chip[data-preset="7"]').click();
     await expect(page.locator('#mgCtDati')).toBeVisible({ timeout: 15_000 });
 
-    // Le copie: sei ieri, tre tre giorni fa (che non si contano a numero); a cavallo di due mesi una copia conta due volte.
-    await expect(page.locator('#mgCtTotale b')).toHaveText(atteso.stessoMese ? '6' : '9');
+    // Le copie: sei ieri, tre tre giorni fa (che non si contano a numero); a cavallo di due mesi una copia conta due volte,
+    // e il 2 e il 3 di ogni mese ieri e tre giorni fa stanno in due mesi.
+    const copie = atteso.stessoMese ? 6 : 9;
+    await expect(page.locator('#mgCtTotale b')).toHaveText(String(copie));
     const colonne = page.locator('#mgCtPeriodi .mg-ct-col');
     await expect(colonne).toHaveCount(7);
     await expect(colonne.nth(5)).toHaveAttribute('title', `${breve(atteso.ieri)}: 6 copie`);
@@ -130,7 +132,7 @@ test('le copie attive per giorno e per ora, le attese e le impostazioni: sotto l
     // Le attese: «Apri una nuova scheda» si mostra; «Ricarica la pagina» (tre copie) sta fra le voci sotto soglia.
     const nuova = riga(page, 'azioni', 'Apri una nuova scheda');
     await expect(nuova.locator('td').nth(1)).toHaveText('15');
-    await expect(nuova.locator('td').nth(1)).toHaveAttribute('title', '15 da 6 copie');
+    await expect(nuova.locator('td').nth(1)).toHaveAttribute('title', `15 da ${copie} copie`);
     await expect(nuova.locator('.mg-ct-fascia').first()).toHaveAttribute('title', 'fino a 0,5 s: 15');
     await expect(nuova.locator('.mg-ct-fascia--sotto')).toHaveCount(12);
     await expect(riga(page, 'azioni', 'Ricarica la pagina')).toHaveCount(0);
@@ -192,7 +194,7 @@ test('le copie attive per giorno e per ora, le attese e le impostazioni: sotto l
     await scegli(page, 'mgCtSistema', 'mac');
     await expect(page.locator('#mgCtTotale b')).toHaveText('meno di 5');
     await scegli(page, 'mgCtSistema', '');
-    await expect(page.locator('#mgCtTotale b')).toHaveText(atteso.stessoMese ? '6' : '9');
+    await expect(page.locator('#mgCtTotale b')).toHaveText(String(copie));
     expect(await letture(app)).toBe(prima);
     // «Rileggi» sì.
     await page.locator('#mgCtRileggi').click();
