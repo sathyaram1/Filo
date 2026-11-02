@@ -928,6 +928,7 @@
     }
     const wrap = document.createElement('div');
     wrap.className = 'dash-bubble-actions';
+    const gruppo = { pendenti: new Set(), voci: [] };
     if (actions.some((a) => isType(a, 'ESEGUI_COMANDO') && a._primaVolta)) wrap.appendChild(notaPrimaVolta());
     let hasAck = false;
     for (const a of actions) {
