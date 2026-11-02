@@ -867,6 +867,26 @@ test('cartella sporca: ci si ferma ANCHE se il commit è quello giusto', async (
   }
 });
 
+// Un install fatto prima del preflight (dall'ambiente, o in una sessione ripresa) riscrive package-lock.json: non è
+// roba di nessuno, e non deve costare il giro (#2040). Il resto della cartella sporca ferma ancora, qui sopra.
+test('lockfile riscritto da npm prima del preflight: torna com\'è nel commit e il giro parte', async () => {
+  const { casa, altrove, g } = await laboratorioGit();
+  try {
+    const lock = (v) => `{\n  "name": "filo",\n  "version": "${v}",\n  "lockfileVersion": 3\n}\n`;
+    writeFileSync(resolve(casa, 'package-lock.json'), lock('0.2.246'), 'utf8');
+    g(['add', '-A']); g(['commit', '-qm', 'lockfile']); g(['push', '-q', 'origin', 'main']);
+    writeFileSync(resolve(casa, 'package-lock.json'), lock('0.2.256'), 'utf8');
+    const out = await preflightIn(casa);
+    assert.equal(out.code, 0, `doveva passare: ${out.se.slice(-300)}`);
+    assert.match(out.se, /package-lock\.json riscritto da npm: rimesso com'è nel commit/);
+    assert.equal(g(['status', '--porcelain']), '');
+    assert.equal(readFileSync(resolve(casa, 'package-lock.json'), 'utf8'), lock('0.2.246'));
+  } finally {
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
+  }
+});
+
 test('guardia che non ha potuto guardare: passa, ma lo DICE', async () => {
   // Fallire aperti va bene: questo controllo non deve essere il punto in cui un
   // giro muore per un intoppo di rete. Farlo in silenzio no: con un remoto

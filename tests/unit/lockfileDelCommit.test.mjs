@@ -44,7 +44,7 @@ function giroDAvvio() {
   git(semina, 'add', '-A');
   git(semina, 'commit', '-qm', 'release: v0.2.256 [skip ci]');
   git(semina, 'push', '-q', origine, 'main');
-  git(casa, 'clone', '-q', origine, cartella);
+  git(casa, 'clone', '-q', '-b', 'main', origine, cartella);
   git(cartella, 'config', 'user.email', 't@t');
   git(cartella, 'config', 'user.name', 't');
   writeFileSync(join(semina, 'codice.txt'), 'due\n');
@@ -170,7 +170,7 @@ test('decidiLockfile: si rimette solo un lockfile che il commit ha e che non è 
 
 test('orchestratore e sessione di un feedback rimettono il lockfile dopo il setup e prima del rebase', () => {
   for (const f of ['orchestrator.md', 'sessione.md']) {
-    const t = espandiInclusioni(readFileSync(join(RUOLI, f), 'utf8'), RUOLI);
+    const t = espandiInclusioni(readFileSync(join(RUOLI, f), 'utf8'), RUOLI).replace(/\s+/g, ' ');
     const setup = t.search(/install con skip del binario Electron/);
     const passo = t.indexOf('node scripts/dispatch.mjs --rimetti-lockfile');
     const rebase = t.indexOf('git rebase origin/main');
