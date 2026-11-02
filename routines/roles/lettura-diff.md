@@ -11,6 +11,9 @@ script. Il conto è un fatto, non un giudizio: se bastano lo decidi tu. Leggi il
 diff intero; se il contesto non basta, a pezzi, tenendo tu il giudizio
 d'insieme.
 
+Nella richiesta, `decisioni` e `provvisorie` sono il `payload.decisioni` e il
+`payload.provvisorie` del paragrafo qui sotto.
+
 <!-- includi: _decisioni-owner.md -->
 
 ## Le due domande
