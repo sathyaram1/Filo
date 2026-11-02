@@ -110,6 +110,7 @@ if (isMain) {
     sezioneDiff({
       base: estremi.base, head: estremi.head, file: fileDiff, caratteri: diff.diff.length,
       righe: diff.diff ? diff.diff.split('\n').length : 0, conto: conta.conto, codice: conta.codice, avviso: estremi.avviso,
+      root, punta: estremiDelLavoro(root, { base: estremi.base }).head || '',
     }),
   ].join('\n'));
 }
