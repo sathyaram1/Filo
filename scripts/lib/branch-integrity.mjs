@@ -617,7 +617,7 @@ function ramoSuOrigin(root, branch) {
     return { presente: true };
   } catch (e) {
     if (e.status === 2) return { presente: false };
-    return { errore: `${e.stderr || ''}`.trim().split('\n').slice(-1)[0] || e.message };
+    return { errore: rigaDiErrore(e.stderr, e.message) };
   }
 }
 
@@ -629,10 +629,14 @@ function scaricaDaOrigin(root, ref, noto = null) {
   const f = gitIn(root)(['fetch', 'origin', ref]);
   if (f.ok) return { ok: true };
   if ((noto || ramoSuOrigin(root, ref)).presente === false) return { ok: true, assente: true };
-  const righe = f.out.split('\n').map((r) => r.trim()).filter(Boolean);
-  const riga = senzaToken(righe.find((r) => /^(fatal|error):/.test(r)) || righe[0] || 'fetch fallito');
-  // Il messaggio del guasto si ricopia dentro le virgolette di `--guasto "…"`.
-  return { ok: false, errore: riga.replace(/\\/g, '/').replace(/["`$]/g, "'").slice(0, 300) };
+  return { ok: false, errore: rigaDiErrore(f.out, 'fetch fallito') };
+}
+
+/** La riga di git che dice il motivo, da ricopiare dentro le virgolette di `--guasto "…"` (il guasto di halt). PURA. */
+export function rigaDiErrore(testo, riserva = '') {
+  const righe = String(testo || '').split('\n').map((r) => r.trim()).filter(Boolean);
+  const riga = senzaToken(righe.find((r) => /^(fatal|error):/.test(r)) || righe[0] || riserva);
+  return riga.replace(/\\/g, '/').replace(/["`$]/g, "'").slice(0, 300);
 }
 
 function antenato(g, a, b) {
