@@ -13,6 +13,7 @@ import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { MARCATORE_WORKER } from './dati-worker.mjs';
 import { fileBlocco, TETTO_INSTALLAZIONE_MS } from './pacchetti.mjs';
 import { pinWorkerTools, pinnedDirWorker, TOOLS_ROOT } from './tools-pin.mjs';
+import { applicaVersioneAlLock } from '../release-apply-version.mjs';
 
 export { MARCATORE_WORKER, datiWorker, concorrenzaUnit } from './dati-worker.mjs';
 export const REGISTRO = 'filo-cloni';
