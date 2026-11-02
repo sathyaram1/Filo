@@ -1,7 +1,7 @@
 // #2059 — i movimenti di crediti non rileggono dal server una vista che nessuno guarda. Gestione → Utenti: con la
 // Gestione su un'altra scheda, o dietro un'altra scheda di Filo, nessuna walletOverview; al ritorno una, coi dati di
-// adesso. Con Utenti davanti le risposte pagate con la chiave propria non leggono, gli altri avvisi al più una volta al
-// minuto, e la lettura che li raccoglie vede l'ultimo stato. La pagina Crediti dietro non chiede walletState.
+// adesso; le risposte pagate con la chiave propria non la fanno nemmeno invecchiare. Con Utenti davanti al più una
+// lettura al minuto, e quella che raccoglie gli avvisi vede l'ultimo stato. La pagina Crediti dietro non chiede walletState.
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
