@@ -408,9 +408,8 @@ export function proveDaToglierePrimaDelVerdetto(prove, findings, testi = {}) {
       return n.length && n.every(esce);
     });
     if (!numeri.length && !casi.length) continue;
-    const tutti_ = [...new Set([...numeri, ...casi.flatMap(numeriDelTitolo)])].sort((a, b) => a - b);
     fuori.push({
-      prova, numeri: tutti_, intera, casi,
+      prova, numeri: [...new Set([...numeri, ...casi.flatMap(numeriDelTitolo)])].sort((a, b) => a - b), intera, casi,
       restano: delNome.filter((n) => !numeri.includes(n)),
       rinomina: !intera && numeri.length ? nomeSenza(prova, numeri) : '',
     });
