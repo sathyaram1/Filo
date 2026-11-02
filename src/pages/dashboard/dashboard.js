@@ -1533,6 +1533,12 @@
       if (r?.ok && !r.stopped && !r.onboardingClosed) partiSeguito().catch(() => {});
       else rimettiSeguiti().catch(() => {});
     }
+    // L'OK arrivato durante il turno: se l'utente ha scritto (un seguito) o fermato, l'esito lo legge col suo messaggio.
+    const attesa = ripresaInAttesa;
+    ripresaInAttesa = null;
+    if (attesa && attesa.voci.length && r?.ok && !r.stopped && !sending && !seguiti.length && (!attesa.chat || attesa.chat === chatId)) {
+      riprendiDopoOk(attesa.voci);
+    }
     return r;
   }
 
