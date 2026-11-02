@@ -1083,7 +1083,7 @@ export async function eseguiGitServer({
     const a = app(root, biglietto);
     for (const riga of a.righe || []) scrivi(`git-server: ${riga}`);
     if (!a.ok) {
-      scrivi(`git-server: il ramo dell'app${a.branch ? ` '${a.branch}'` : ''} NON è arrivato su origin (${a.reason}), quindi quello del server non parte: la sua suite proverebbe l'app com'era prima. Non spingere a mano: se la causa sta nel ramo dell'app sistemala e rilancia lo stesso comando, che rispedisce da sé; altrimenti è un guasto.`);
+      scrivi(`git-server: il ramo dell'app${a.branch ? ` '${a.branch}'` : ''} NON è arrivato su origin (${a.reason}), quindi quello del server non parte: la sua suite proverebbe l'app com'era prima. Non spingere a mano: se la causa sta nel ramo dell'app sistemala e rilancia lo stesso comando, che rispedisce da sé; altrimenti è un guasto (guasto: github, col messaggio qui sopra).`);
       return 1;
     }
     scrivi(a.skipped
