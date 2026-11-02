@@ -25,8 +25,9 @@ export function decidiLockfile(riga) {
 /** Tutte le righe di `git status --porcelain` (anche già passato da trim) sono del solo lockfile? PURA. */
 export function sporcoSoloDalLockfile(porcelain) {
   const righe = String(porcelain || '').split('\n').map((r) => r.trim()).filter(Boolean);
-  return righe.length > 0 && righe.every((r) => /^\S{1,2}\s+package-lock\.json$/.test(r));
+  return righe.length > 0 && righe.every((r) => RIGA_DEL_LOCKFILE.test(r));
 }
+const RIGA_DEL_LOCKFILE = new RegExp(`^\\S{1,2}\\s+${LOCKFILE.replace(/\./g, '\\.')}$`);
 
 const primaRiga = (e) => String((e && (e.stderr || e.message)) || e).trim().split('\n')[0].slice(0, 200);
 
