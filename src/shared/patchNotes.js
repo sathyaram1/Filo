@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.259', date: '2026-11-02',
+      features: [
+        { testo: 'In cima al menu del tasto destro c\'è una fila di icone con le azioni dell\'elemento che hai sotto il mouse: grassetto, corsivo, collegamento ed evidenziatore sul testo che scrivi, Traduci e Cerca sul testo di una pagina, Salva e Chiedi a Filo su un\'immagine. Il «+» tiene le altre, e le icone le sposti trascinandole, anche dalla barra laterale.', segnalazione: 1434 },
+      ],
+    },
+    {
       version: '0.2.257', date: '2026-11-01',
       features: [
         { testo: 'In chat Filo sa quali pagine hai aperto dall\'ultimo messaggio, raccolte per sito. Dopo un video sulle orche puoi chiedergli «quanto vivono?» senza dirgli di cosa parli. Di una pagina delicata, come la posta o la banca, gli arriva solo il nome del sito.', segnalazione: 1562 },
