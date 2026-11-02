@@ -65,6 +65,8 @@ cifratura sta accecando i controlli, non gli estranei.**
 | **Worker** (l'istanza che lavora) | un **biglietto** monouso, opaco | ottenere il proprio lavoro, battere il cuore, consegnare, rilasciare |
 | **Server** | la chiave privata dei feedback in **cassaforte** (Secret Manager) + accesso al database | scegliere il lavoro, decifrare, validare, scrivere |
 | **Owner** | le sue credenziali admin, come oggi | tutto, dalla dashboard |
+| **Manutentore** (#1961) | una parola d'ordine di classe `manutentore` | gli ordini del manutentore (`routineManutentore`): mai fusioni, L5, codice, risposte all'owner. Scrive non fidato |
+| **Owner da una sede non fidata** (#2011) | una parola d'ordine di classe `owner-non-fidato` | i poteri del manutentore più le domande per l'owner tranne quelle dell'addetto comunicazioni (`chiaveDomande`, il contratto di `ownerDomande`): leggere, rispondere, archiviare, riaprire. Mai fusioni, L5, chiavi, interruttori, «segna fidato», abbassare o archiviare una priorità 3, bilanci. Scrive non fidato, e la risposta porta il segno della chiave (Gestione, recap del mattino) |
 
 Una parola d'ordine **per routine schedulata**: si revoca la singola, e nel
 registro del server si vede quale ha fatto cosa.

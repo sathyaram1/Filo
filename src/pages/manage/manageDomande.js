@@ -270,7 +270,7 @@
     li.appendChild(el('span', 'mg-domanda-num', li.dataset.id));
     const titolo = el('span', 'mg-domanda-titolo', d.illeggibile ? 'Non si legge' : String(d.titolo || '(senza titolo)'));
     // Sotto il titolo quello che la scheda deve dire senza aprire: la scelta e il principio di un'automatica,
-    // il lavoro che una in smistamento tiene fermo.
+    // il lavoro che una in smistamento tiene fermo, chi ha risposto fuori da qui (#2011).
     const sotto = [];
     if (tab === 'domande-automatiche') {
       const o = (d.opzioni || [])[sceltaFatta(d)];
@@ -281,6 +281,7 @@
       const fermo = lavoroFermo(d);
       if (fermo) sotto.push(`ferma ${fermo}`);
     }
+    if (rispostaDaChiave(d)) sotto.push(`risposta da «${rispostaDaChiave(d).slug}»`);
     if (sotto.length) titolo.appendChild(el('span', 'mg-domanda-sotto', sotto.join(' · ')));
     li.appendChild(titolo);
     if (CHIUSE.includes(tab)) li.appendChild(el('span', 'mg-domanda-prio', PRIORITA[d.priorita] || ''));
@@ -712,7 +713,24 @@
     const t = a && a.tipo;
     if (t === 'owner') return 'Tu';
     if (t === 'server') return 'Server';
+    // La chiave owner-non-fidato (#2011): tu da una sede che legge testo di chiunque, non da qui.
+    if (t === 'chiave') return a.chiave ? `Tu, da «${a.chiave}»` : 'Tu, da fuori';
     return a && a.ruolo ? `Agente (${a.ruolo})` : 'Agente';
+  }
+
+  // Il segno della risposta registrata dalla chiave owner-non-fidato (#2011), o null.
+  function rispostaDaChiave(d) {
+    const r = d && d.rispostaDaChiave;
+    return r && typeof r === 'object' && typeof r.slug === 'string' ? r : null;
+  }
+
+  function daChiave(d) {
+    const r = rispostaDaChiave(d);
+    if (!r) return null;
+    // La data la dice già l'esito sopra: qui solo chi, e che non è passata da qui.
+    const p = el('p', 'mg-dq-esito mg-dq-esito--chiave', `${r.archiviata ? 'Archiviata' : 'Risposta registrata'} da «${r.slug}», non da qui.`);
+    p.title = `L’ha registrata una sessione con la chiave «${r.slug}», che legge testo di chiunque. Se non la ricordi, riaprila.`;
+    return p;
   }
 
   function conversazione(d) {
@@ -782,11 +800,14 @@
     return box;
   }
 
-  // Si riapre un'archiviata senza azioni, e una risposta automatica che non torna (§3.6).
+  // Si riapre un'archiviata senza azioni, una risposta automatica che non torna (§3.6) e una data dalla chiave
+  // owner-non-fidato (#2011).
   function riapribile(d) {
-    return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica));
+    return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica || rispostaDaChiave(d)));
   }
   function titoloRiapri(d) {
+    const r = rispostaDaChiave(d);
+    if (r && !r.archiviata) return `Rimettila fra quelle da rispondere: quello che la risposta da «${r.slug}» ha applicato resta finché non rispondi`;
     if (!(d.esito && d.esito.automatica)) return 'Rimettila fra quelle da rispondere';
     const da = principioUsato(d);
     return `Rimettila fra quelle da rispondere: ${da ? `il principio di ${da}` : 'il principio usato'} resta da rivedere finché non rispondi`;
@@ -833,7 +854,7 @@
     // Il principio (§3.6) lo scrive chi ha gestito la risposta: è la regola che entra nel registro, e l'owner la vede.
     const principio = d.principio ? sezione('mg-dq-principio', 'Principio', md(d.principio)) : null;
     if (principio && d.principioContestato) principio.querySelector('.mg-dq-h').appendChild(segnoContestato());
-    for (const parte of [opzioni(d), consiglio(d), esito(d), automatica(d), principio, conversazione(d), risposta(d)]) if (parte) art.appendChild(parte);
+    for (const parte of [opzioni(d), consiglio(d), esito(d), daChiave(d), automatica(d), principio, conversazione(d), risposta(d)]) if (parte) art.appendChild(parte);
     if (d.notePerAgenti && !originaleInCima) {
       const det = el('details', 'mg-dq-note');
       det.appendChild(el('summary', '', 'Note per gli agenti'));

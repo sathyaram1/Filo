@@ -14,13 +14,15 @@
 //
 // UN SEGRETO, UN POTERE
 //   `routine` apre solo il chiedere lavoro. `build` apre solo la lettura delle
-//   chiavi da incastonare nella versione che si distribuisce. Nessuna le apre
-//   entrambe, e va DICHIARATO: una credenziale che non dice a cosa serve non
-//   apre niente.
+//   chiavi da incastonare nella versione che si distribuisce. `manutentore` apre
+//   gli ordini del manutentore; `owner-non-fidato` quelli più le domande per
+//   l'owner, da una sede che legge testo di chiunque (#2011). Nessuna ne apre
+//   due, e va DICHIARATO: una credenziale che non dice a cosa serve non apre
+//   niente.
 //
 // USO
 //   node scripts/routine-keys.mjs elenco
-//   node scripts/routine-keys.mjs crea <nome> <routine|build> ["a cosa serve"]
+//   node scripts/routine-keys.mjs crea <nome> <routine|build|manutentore|owner-non-fidato> ["a cosa serve"]
 //   node scripts/routine-keys.mjs revoca <nome>
 //   node scripts/routine-keys.mjs account <nome> <A|B>
 //   node scripts/routine-keys.mjs rete <nome> <limitata|aperta>
@@ -32,6 +34,20 @@ import { findAdminRefreshToken, mintIdToken } from './lib/firestore-auth.mjs';
 const REGIONE = 'europe-west1';
 const PROGETTO = 'filo-8b9cb';
 const INDIRIZZO = `https://${REGIONE}-${PROGETTO}.cloudfunctions.net/routineKeys`;
+
+// Dove va la parola appena nata, per potere. Una di routine NON va nell'ambiente: lo eredita ogni lavoratore che parte
+// da lì; sta solo nel prompt della routine schedulata, l'unica cosa che l'orchestratore tiene per sé.
+const DOVE_VA = {
+  build: "Va nell'ambiente «rilascio» del repo (Settings → Environments → rilascio), come FILO_BUILD_PASSPHRASE: fra i segreti del repo non la legge nessuno.",
+  routine: 'Va nel PROMPT della routine schedulata: "routine automatica. <parola d\'ordine>".\n'
+    + "Mai nell'ambiente: da lì la erediterebbe ogni lavoratore che parte.",
+  manutentore: "È la chiave del manutentore: apre i suoi ordini sul server, mai fusioni, L5 o codice. Tienila solo dove gira lui,\n"
+    + "mai nell'ambiente di una routine che lavora feedback.",
+  'owner-non-fidato': "È la tua chiave da una sede non fidata: i poteri del manutentore più le domande per te (leggere, rispondere,\n"
+    + "archiviare, riaprire). Niente fusioni, L5, chiavi, interruttori, «segna fidato», abbassare una priorità 3.\n"
+    + "Mettila solo nella sede da cui lavori tu. Quello che scrive nasce non fidato: le risposte che registra le trovi\n"
+    + "segnate in Gestione → Domande, e quelle di ieri nel recap del mattino.",
+};
 
 async function chiama(data) {
   const refresh = findAdminRefreshToken();
@@ -94,7 +110,7 @@ async function main() {
       const lavori = k.scope === 'routine' && k.lavori === 'server' ? 'lavori server  ' : ''.padEnd(15);
       // L'ambiente dei riservati (#1153): solo lì il server consegna testo riservato, e solo compiti.
       const ambiente = k.scope === 'routine' && k.ambiente === 'riservati' ? 'riservati  ' : '';
-      console.log(`${String(k.slug).padEnd(24)} ${String(k.scope || '?').padEnd(8)} ${account} ${rete} ${lavori}${ambiente}${stato}`
+      console.log(`${String(k.slug).padEnd(24)} ${String(k.scope || '?').padEnd(16)} ${account} ${rete} ${lavori}${ambiente}${stato}`
         + (k.lastUsedAt ? `  ultimo uso ${quando(k.lastUsedAt)}` : '')
         + (k.label ? `  — ${k.label}` : ''));
     }
@@ -103,7 +119,7 @@ async function main() {
 
   if (cmd === 'crea') {
     if (!nome || !potere) {
-      console.error('Uso: node scripts/routine-keys.mjs crea <nome> <routine|build> ["a cosa serve"]');
+      console.error('Uso: node scripts/routine-keys.mjs crea <nome> <routine|build|manutentore|owner-non-fidato> ["a cosa serve"]');
       process.exit(1);
     }
     const r = await chiama({ op: 'issue', slug: nome, scope: potere, label: resto.join(' ') });
@@ -111,13 +127,7 @@ async function main() {
     // Da sola sulla riga, senza rientro: si copia con la riga, e i quattro spazi finivano nel segreto (#1210).
     console.log(`${r.passphrase}\n`);
     console.log('Copiala ADESSO dove serve: non si potrà più rileggere.');
-    console.log(potere === 'build'
-      ? "Va nell'ambiente «rilascio» del repo (Settings → Environments → rilascio), come FILO_BUILD_PASSPHRASE: fra i segreti del repo non la legge nessuno."
-      // Una parola d'ordine di routine NON va nell'ambiente: l'ambiente lo
-      // eredita ogni lavoratore che parte da lì. Sta solo nel prompt della
-      // routine schedulata, che è l'unica cosa che l'orchestratore tiene per sé.
-      : 'Va nel PROMPT della routine schedulata: "routine automatica. <parola d\'ordine>".\n'
-        + "Mai nell'ambiente: da lì la erediterebbe ogni lavoratore che parte.");
+    console.log(DOVE_VA[potere] || DOVE_VA.routine);
     // Senza account il consumo della routine non entra nella riserva dei crediti (#1156): lo si dice qui, dove nasce.
     if (potere === 'routine') {
       console.log(`\nPoi dille su che account claude.ai gira, o il suo consumo resta fuori dalla riserva dei crediti:\n`
