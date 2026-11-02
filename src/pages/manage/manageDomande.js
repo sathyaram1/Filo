@@ -724,7 +724,18 @@
     return r && typeof r === 'object' && typeof r.slug === 'string' ? r : null;
   }
 
+  // Il segno della risposta registrata da una sessione locale con la sua parola d'ordine (#1924), o null.
+  function rispostaDaSessione(d) {
+    const r = d && d.registrataDa === 'sessione' ? d.rispostaDaSessione : null;
+    return r && typeof r === 'object' ? r : null;
+  }
+
   function daChiave(d) {
+    if (rispostaDaSessione(d)) {
+      const p = el('p', 'mg-dq-esito mg-dq-esito--chiave', 'Risposta registrata da una sessione locale, non da qui.');
+      p.title = 'L’ha registrata una sessione dalla chat. Se non è quello che volevi, riaprila: il lavoro torna fermo sulla domanda.';
+      return p;
+    }
     const r = rispostaDaChiave(d);
     if (!r) return null;
     // La data la dice già l'esito sopra: qui solo chi, e che non è passata da qui.
