@@ -3938,8 +3938,8 @@
     }
   }
 
-  // Una scrittura alla volta, e ciascuna calcola l'elenco solo quando tocca a lei: calcolato prima, un gesto fatto
-  // mentre la precedente è in volo riscriverebbe l'elenco vecchio e la cancellerebbe.
+  // Una scrittura alla volta, e ciascuna calcola il gesto solo quando tocca a lei: «togli tutte» toglie anche quelle
+  // aggiunte dal gesto in volo prima di lei.
   let codaAttese = Promise.resolve();
   function accodaAttese(id, calcola) {
     const giro = codaAttese.then(() => {
