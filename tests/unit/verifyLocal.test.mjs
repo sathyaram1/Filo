@@ -551,6 +551,7 @@ function depositoUsaEGetta() {
 // ragione (una verifica di due parole non è una verifica).
 const LUNGA_FIX = 'Provato inserimento, tasto destro, tema scuro e finestra stretta: il resto regge bene.\n[2i] rotto';
 function vl(casa, ...args) {
+  if (args[0] === 'critica') faiLaLettura(casa);
   try {
     return { code: 0, out: _exec(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: casa }, stdio: ['ignore', 'pipe', 'pipe'] }) };
   } catch (e) { return { code: e.status, out: `${e.stdout || ''}${e.stderr || ''}` }; }
