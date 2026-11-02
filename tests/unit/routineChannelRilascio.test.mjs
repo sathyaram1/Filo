@@ -536,7 +536,7 @@ describe('release da riga di comando', () => {
       const punta = remoteSha(origin, 'worker/10b');
       assert.notEqual(punta, consegnato, 'la pulizia è arrivata su origin');
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
-      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', branch: 'worker/10b', sha: punta });
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', domandaAlRilascio: true, branch: 'worker/10b', sha: punta });
     } finally { srv.close(); }
   });
 
