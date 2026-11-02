@@ -20,7 +20,8 @@ async function finestra(app, nome) {
 }
 
 test('chiedi a Filo sull\'immagine', async ({ app, openTab, testServer }) => {
-  const { nelMondoDelMenu } = await import('../../helpers/menuContestuale.mjs');
+  const { neiRiquadri } = await import('../../helpers/riquadri.mjs');
+  const nelMondoDelMenu = (a, pg, fn) => neiRiquadri(a, pg, fn);
   const img = testServer.asset(PNG, 'image/png');
   const page = await testServer.openReady(openTab, SITO(img));
   const menu = menuDi(page);
