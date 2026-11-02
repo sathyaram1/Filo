@@ -226,7 +226,9 @@ test('«/gift NUMERO INIZIO» fa salire quel portafoglio e la persona vede il mo
   expect(stato.richieste.filter((r) => r.url === '/walletGrant').map((r) => r.data))
     .toEqual([{ pseudonym: MIO, credits: 500, why: 'owner' }]);
 
-  // La persona (qui la stessa installazione) vede il saldo e il movimento.
+  // La persona (qui la stessa installazione) vede il saldo e il movimento quando torna sulla pagina: dietro
+  // un'altra scheda la pagina Crediti non chiede niente al server (#2059).
+  await shell.evaluate((id) => window.filoShell.tabs.activate(id), schedaCrediti);
   await expect(crediti.locator('#balance')).toHaveText(await fmt(5500), { timeout: 15_000 });
   const movimento = crediti.locator('#moves li').first();
   await expect(movimento).toContainText('+500');
