@@ -2721,6 +2721,7 @@
           ? { onClick: () => Actions.toggleMediaPip(el), label: I18n.t(Actions.isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip') }
           : null,
         copyLink: { onClick: () => Actions.copyMediaUrl(el), label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link') },
+        ...azioniDellAnteprima(contesto.link),
       });
     } else if (nome === 'cursore') {
       azioni.paste = { onClick: () => Actions.pasteFromClipboard() };
