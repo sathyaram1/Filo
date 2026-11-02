@@ -344,7 +344,7 @@ export function numeriDelNome(percorso) {
 
 /**
  * Vero se il rilievo esce dal giro in un pass o in una correzione: un esterno, o un `?` che conta al più 1 (un vicino conta 0).
- * La sua prova esce PRIMA del verdetto: dopo, un commit è una spinta che il registro della fiducia non vede (#1555). PURA.
+ * La sua prova esce PRIMA del verdetto, col commit della critica (#1555): dopo, conta solo se la spinge il rilascio (#2021). PURA.
  */
 export function esceInOgniEsito(f) {
   const sede = String((f && f.sede) || 'i').toLowerCase();
