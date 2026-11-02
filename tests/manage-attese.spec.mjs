@@ -8,14 +8,16 @@
 //   4. Dal tasto destro sulla scheda si arriva alla casella, e si toglie tutto in un gesto.
 //   5. «Non aspettare più» sotto il campo c'è solo con due attese o più: con una basta la sua ×.
 //   6. Un gesto fatto mentre una scrittura è in volo parte dall'elenco già scritto, non da quello di prima.
-//   7. Un'attesa su un aspettato che la pagina non legge (cancellato) viaggia per id e resta: le altre si toccano.
+//   7. Un'attesa su un aspettato che la pagina non legge (cancellato) resta: le altre si toccano.
+//   8. La pagina manda il gesto, non l'elenco: un'attesa scritta da altri dopo che la pagina ha letto resta (#1756.1).
+//
+// Il main finto applica il gesto alle attese «sul server» (window.__sulServer) come fa quello vero, la cui regola di
+// scrittura ha la sua prova in manage-attese-concorrenti.spec.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const ID_DEL_NUMERO = { 12: 'f12', 13: 'f13' };
-// Le attese già scritte che il main tiene per id, col numero che hanno sul documento.
-const TENUTE = { via951: '951' };
 
 function fb(over = {}) {
   return Object.assign({
