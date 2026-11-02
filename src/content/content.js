@@ -2619,11 +2619,23 @@
       if (conCss) { try { document.execCommand('styleWithCSS', false, false); } catch (_) {} }
     }
   }
+  // Chromium risponde '' a queryCommandValue('hiliteColor'): il fondo della selezione lo dice solo 'backColor'.
+  function evidenziato() {
+    try { return coloreUguale(document.queryCommandValue('backColor'), COLORE_EVIDENZIA); } catch (_) { return false; }
+  }
   function evidenzia() {
     restorePasteContext();
-    let gia = false;
-    try { gia = coloreUguale(document.queryCommandValue('hiliteColor'), COLORE_EVIDENZIA); } catch (_) {}
-    formatta('hiliteColor', gia ? 'transparent' : COLORE_EVIDENZIA);
+    formatta('hiliteColor', evidenziato() ? 'transparent' : COLORE_EVIDENZIA);
+  }
+  // Quali stili ha già la selezione, per accendere le loro icone nella fila: chi preme sa se mette o toglie.
+  function statoFormattazione() {
+    const s = (c) => { try { return !!document.queryCommandState(c); } catch (_) { return false; } };
+    const g = window.getSelection && window.getSelection();
+    const nodo = g && g.anchorNode ? (g.anchorNode.nodeType === 1 ? g.anchorNode : g.anchorNode.parentElement) : null;
+    return {
+      bold: s('bold'), italic: s('italic'), underline: s('underline'), strike: s('strikeThrough'),
+      highlight: evidenziato(), link: !!(nodo && nodo.closest && nodo.closest('a[href]')),
+    };
   }
   // Il campo vuoto toglie il collegamento che c'era: è quello che vuole chi cancella l'indirizzo e preme Invio.
   function collega(scritto) {
