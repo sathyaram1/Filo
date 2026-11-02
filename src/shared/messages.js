@@ -742,7 +742,7 @@
     DOMANDE_ELENCO: 'domande_elenco',       // { dopo?:<ms>, tutte?:bool } → { ok, domande:[…], riferimenti:{}, adesso } | { ok:false, error }
     DOMANDA_MOSTRA: 'domanda_mostra',       // { id:'D-n' } → { ok, domanda, riferimenti } | { ok:false, error }
     DOMANDA_RISPONDI: 'domanda_rispondi',   // { id, scelta?:<indice>, testo? } → { ok, domanda, esito } | { ok:false, error }
-    DOMANDE_CONSIGLIO: 'domande_consiglio', // { ids:['D-n'…] } → { ok, esiti:[{ id, ok, etichetta?, errore? }] } | { ok:false, error }
+    DOMANDE_CONSIGLIO: 'domande_consiglio', // { ids:['D-n'…] } → { ok, esiti:[{ id, ok, etichetta?, esito?, nota?, errore? }] } (esito come DOMANDA_RISPONDI) | { ok:false, error }
     DOMANDA_ARCHIVIA: 'domanda_archivia',   // { id } → { ok, domanda } (chiusa senza azioni) | { ok:false, error }
     DOMANDA_RIAPRI: 'domanda_riapri',       // { id } → { ok, domanda } (un'archiviata senza azioni o una risposta automatica) | { ok:false, error }
     // «Segna fidato» (#1148, SPEC-DOMANDE.md §1.5): la fiducia la scrive solo il server (callable ownerFiducia).

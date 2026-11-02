@@ -916,6 +916,9 @@
     return { voci, fuori };
   }
 
+  const STATI_LAVORO = { todo: 'in coda', working: 'in lavorazione', revision_capability: 'in verifica', revision_security: 'al controllo di sicurezza', done: 'risolto', design: 'fermo su un\'altra domanda' };
+  const statoDetto = (s) => STATI_LAVORO[s] || `«${String(s || '?')}»`;
+
   function disegnaConferma() {
     const box = $('mgDomandeConferma');
     if (!box) return;
@@ -933,10 +936,16 @@
     };
     const { voci, fuori, esiti, inviando } = conferma;
     if (esiti) {
-      const ok = esiti.filter((e) => e.ok);
+      // Una ripresa che non ha spostato il lavoro sta a parte, come nella risposta singola (#1790.1).
+      const accodata = (e) => !!(e.ok && e.esito && e.esito.accodata);
+      const ok = esiti.filter((e) => e.ok && !accodata(e));
+      const acc = esiti.filter(accodata);
       const ko = esiti.filter((e) => !e.ok);
+      const conNota = (e) => [e.etichetta, e.nota].filter(Boolean).join('. ');
       if (ok.length) box.appendChild(el('p', 'mg-dom-conferma-ok', `Applicato a ${ok.length === 1 ? 'una domanda' : `${ok.length} domande`}:`));
-      if (ok.length) box.appendChild(elenco(ok.map((e) => ({ id: e.id, testo: e.etichetta || '' }))));
+      if (ok.length) box.appendChild(elenco(ok.map((e) => ({ id: e.id, testo: conNota(e) }))));
+      if (acc.length) box.appendChild(el('p', 'mg-dom-conferma-fuori', `Decisione accodata per ${acc.length === 1 ? 'una domanda' : `${acc.length} domande`}, il lavoro resta dov'è:`));
+      if (acc.length) box.appendChild(elenco(acc.map((e) => ({ id: e.id, testo: e.nota || [e.etichetta, `non era fermo: è ${statoDetto(e.esito.statoLavoro)}, la decisione resta accodata`].filter(Boolean).join(', ') }))));
       if (ko.length) box.appendChild(el('p', 'mg-dom-conferma-err', `Non applicato a ${ko.length === 1 ? 'una domanda' : `${ko.length} domande`}:`));
       if (ko.length) box.appendChild(elenco(ko.map((e) => ({ id: e.id, testo: e.dettaglio || e.errore || 'errore' }))));
     } else if (voci.length) {

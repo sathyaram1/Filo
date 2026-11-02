@@ -524,6 +524,7 @@
     decisione: 'fermo: aspetta una tua scelta',
     locale: 'richiede lavoro locale',
     fidato: 'chiede di renderlo fidato: il lavoro tocca il server',
+    permesso: 'chiede un permesso',
     worker: 'segnalato da chi ci lavorava',
     attesa_chiusa: 'un feedback che aspettava si è chiuso senza fusione',
     arenato: 'lavorazione arenata',

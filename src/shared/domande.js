@@ -225,7 +225,8 @@
   /**
    * Una domanda in ingresso, controllata e normalizzata. `conOrigine` false: l'origine la mette il server (biglietto).
    * `perOwner` false solo per una domanda che il server apre per il compito e non arriva all'owner (il terzo guasto
-   * uguale, §3.8): lì un'opzione sola e i pro e contro vuoti passano, perché a smistarla è il compito.
+   * uguale, §3.8): lì un'opzione sola, i pro e contro vuoti, i nomi di file e le lineette passano, perché a smistarla e
+   * riscriverla per l'owner è il compito (#1790.1: il nome di un programma nel guasto la faceva cadere).
    * @returns {{ ok:true, domanda:object } | { ok:false, errore:string, dettaglio:string, campo?:string }}
    */
   function validaDomanda(input, { conOrigine = true, perOwner = true } = {}) {
@@ -306,7 +307,7 @@
       }
       domanda.origine = { tipo: o.tipo, id };
     }
-    const sporco = controllaTestoOwner(domanda);
+    const sporco = perOwner ? controllaTestoOwner(domanda) : null;
     if (sporco) return sporco;
     return { ok: true, domanda };
   }
