@@ -207,7 +207,7 @@ test('controllo di sicurezza: ramo e differenze, MAI il feedback', async () => {
 test('controllo di sicurezza su un clone che non sa calcolare il diff → il giro si ferma, non consegna un diff vuoto (#740)', async () => {
   // Il clone a ramo singolo delle routine: niente main, né locale né scaricato, e origin che non la dà. Origin muto del
   // tutto ferma il giro prima, al posizionamento sul ramo (#1779.1), e il diff non si guarderebbe più.
-  const { json } = await giro({
+  const { json, stderr } = await giro({
     ok: true, role: 'secaudit', id: 'fid-740', num: '#740', branch: 'worker/740',
     payload: { role: 'secaudit', branch: 'worker/740' },
   }, [], (casa) => {
