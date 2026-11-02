@@ -863,9 +863,38 @@ export function commitRestante(root, { exec = execFileSync, env = process.env, p
   const nome = routine ? 'claude-routine' : 'claude-local';
   const email = routine ? 'claude@routine' : 'claude@local';
   const elenco = `${restano.slice(0, 3).join(', ')}${restano.length > 3 ? ` (+${restano.length - 3} file)` : ''}`;
-  const commit = run(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m', `auto: rilascio — ${elenco}`]);
+  const commit = run(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m', `auto: ${perche} — ${elenco}`]);
   if (!commit.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(commit.out) };
   return { ok: true, skipped: false, committed: restano, fuori, reason: '' };
+}
+
+/** Cosa dire di un commitRestante riuscito: le stesse righe per il rilascio e per la spinta del server. PURA. */
+export function righeCommitRestante(c) {
+  const righe = [];
+  const fatti = (c && c.committed) || [];
+  if (fatti.length) righe.push(`committate ${fatti.length} modifiche rimaste fuori dai commit: ${fatti.slice(0, 3).join(', ')}${fatti.length > 3 ? ` (+${fatti.length - 3} file)` : ''}`);
+  if (c && c.fuori && c.fuori.length) righe.push(`NON committo e NON spedisco ${c.fuori.join(', ')}: ha la forma di una copia dei dati del server e il repo è pubblico. Resta nella cartella, invisibile a git: spostalo nella cartella temporanea del sistema (os.tmpdir()).`);
+  return righe;
+}
+
+/**
+ * Il ramo dell'app su origin prima di quello del server (#1914): la suite del server prova il ramo di Filo con lo stesso
+ * nome com'è al momento della spinta, e un salvataggio mancato (gancio non partito, file nato da shell) la fa fallire.
+ * Stessi passi del rilascio; la cartella di un altro biglietto, o di uno finito, non si tocca.
+ * → { ok, skipped, branch, forced, reason, righe: [testo…] }: un `ok` falso ferma la spinta del server.
+ */
+export function spedisciAppPrimaDelServer(root, biglietto, { exec = execFileSync, env = process.env } = {}) {
+  const marcatore = leggiMarcatoreBiglietto(root);
+  if (marcatore && marcatore.ticket && String(marcatore.ticket) !== String(biglietto || '')) {
+    return { ok: true, skipped: true, branch: '', reason: `la cartella è del biglietto ${String(marcatore.ticket).slice(0, 8)}…, non di questo`, righe: [] };
+  }
+  if (marcatore && bigliettoFinito(marcatore)) return { ok: true, skipped: true, branch: '', reason: 'il biglietto della cartella è già finito', righe: [] };
+  const c = commitRestante(root, { exec, env, perche: 'spinta del server' });
+  if (!c.ok) return { ok: false, skipped: false, branch: '', reason: `modifiche fuori dai commit che non riesco a committare: ${c.reason}`, righe: [] };
+  const righe = righeCommitRestante(c);
+  const p = pushRamoCorrente(root, { exec, env });
+  if (p.avviso) righe.push(p.avviso);
+  return { ...p, righe };
 }
 
 /**
