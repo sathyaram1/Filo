@@ -2705,6 +2705,7 @@
       Object.assign(azioni, azioniDellImmagine(contesto.img));
       for (const k of Object.keys(azioni)) azioni[k] = { onClick: azioni[k] };
       if (!aiutoAcceso()) delete azioni.ask;
+      Object.assign(azioni, azioniDellAnteprima(contesto.link));
     } else if (nome === 'link' && contesto.link) {
       const a = azioniDelLink(contesto.link);
       for (const k of ['openTab', 'copy', 'saveForLater', 'share']) azioni[k] = { onClick: a[k] };
