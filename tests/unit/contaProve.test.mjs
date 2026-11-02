@@ -89,6 +89,7 @@ function repoDiProva() {
   const base = g('rev-parse', 'HEAD');
   g('checkout', '-q', '-b', 'claude/lavoro');
   scrivi('tests/unit/vecchio.test.mjs', "test('resta', () => { a(); });\ntest('cambia', () => { b(2); });\ntest('nuovo', () => {});\n");
+  mkdirSync(resolve(casa, 'tests', 'sotto'), { recursive: true });
   g('mv', 'tests/spostato.spec.mjs', 'tests/sotto/spostato.spec.mjs');
   scrivi('tests/verifica/7/giro1-r1-x.spec.mjs', "test('r1 rosso', () => {});\n");
   scrivi('src/calcolo.js', 'module.exports = 2;\nmodule.exports.b = 3;\n');
