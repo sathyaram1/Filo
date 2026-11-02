@@ -1420,6 +1420,8 @@ if (isMain) {
       // Un avvio precedente a #1062 non ha registrato il server: lì non c'è niente con cui confrontarlo.
       const mosso = 'requestedServer' in prev ? testoServerMossoDallAvvio(prev.requestedServer, srv) : '';
       if (mosso) { console.error(mosso); process.exit(1); }
+      const senzaLettura = letturaMancante(ROOT, sha, { ramo: branch });
+      if (senzaLettura) { console.error(senzaLettura); process.exit(1); }
     }
     // I bilanci dal server, PRIMA di calcolare l'esito: nessun default.
     const caps = await bilanciOStop();
