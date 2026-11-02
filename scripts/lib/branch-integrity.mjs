@@ -520,8 +520,10 @@ export function prepareBranch({ root, branch, create = false, createIfMissing = 
 
   if (create) {
     const wanted = base || mainBranch;
-    g(['fetch', 'origin', wanted]);
-    g(['fetch', 'origin', mainBranch]);
+    for (const ref of new Set([wanted, mainBranch])) {
+      const s = scaricaDaOrigin(root, ref);
+      if (!s.ok) return { ok: false, kind: 'transient', message: `non riesco a scaricare ${ref} da origin, e la base sarebbe quella dell'ultimo scaricamento di questa cartella: ${s.errore}` };
+    }
     // Base: il branch chiesto se esiste, altrimenti la linea principale.
     // MAI HEAD: se il giro precedente ci ha lasciati su un
     // altro branch di lavoro, partire da HEAD erediterebbe il lavoro altrui.
