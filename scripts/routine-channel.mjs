@@ -1046,11 +1046,13 @@ export async function ramoServer(t, ramo, sha, opts) {
 /**
  * `git-server <azione> <cartella> [<ramo>]`: un git verso filo-security solo dopo il sì del server al biglietto. In
  * locale il token di quel sì va a quella sola chiamata; in cloud no, autentica il proxy della sessione (#1761).
- * → exit: 0 fatto, 1 uso o git fallito, 3 guasto, 4 token rifiutato. `lancia`, `token` ed `eco` per le prove.
+ * Una spinta parte solo dopo il ramo dell'app su origin (spedisciAppPrimaDelServer, #1914).
+ * → exit: 0 fatto, 1 uso o git fallito, 3 guasto, 4 token rifiutato. `lancia`, `token`, `app` ed `eco` per le prove.
  */
 export async function eseguiGitServer({
   azione, cartella, ramo, biglietto, root = ROOT, env = process.env, strada = stradaGitServer(env),
   lancia = (argv, o) => spawnSync('git', argv, o), token = gitToken, scrivi = (r) => console.error(r),
+  app = (dove, b) => spedisciAppPrimaDelServer(dove, b, { env }),
   eco = (dove, testo) => (dove === 'out' ? process.stdout : process.stderr).write(testo),
 } = {}) {
   const clonato = Boolean(String(cartella || '').trim()) && existsSync(join(resolve(String(cartella)), '.git'));
