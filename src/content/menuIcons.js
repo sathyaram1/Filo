@@ -173,7 +173,8 @@
     if (d.tipo === 'contesto') {
       const a = azioni[d.azione];
       if (!a || typeof a.onClick !== 'function') return null;
-      return { id, icon: I(d.icona), label: a.label || I18n.t(d.etichetta), onClick: a.onClick, tieneAperto: !!a.tieneAperto, disabled: !!a.disabled, draggable: true };
+      const icona = a.icona && typeof global.SN_ICONS[a.icona] === 'function' ? a.icona : d.icona;
+      return { id, icon: I(icona), label: a.label || I18n.t(d.etichetta), onClick: a.onClick, tieneAperto: !!a.tieneAperto, disabled: !!a.disabled, draggable: true };
     }
     if (IS_SUBFRAME) return null;
     const r = d.tipo === 'pagina' ? regPagina[id] : regFinestra[id];
