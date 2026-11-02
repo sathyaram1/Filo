@@ -118,6 +118,24 @@ describe('quali spec lanciare', () => {
       assert.deepEqual(specsForChangedFiles(['src/shared/constructor.js', 'src/shared/toString.js'], conAutonomia), []);
     });
 
+    // #600.2: il punto del main che chiede se un'azione parte non portava nessuna prova nell'app. Un file nuovo che
+    // prende la stessa decisione fa rosso qui finché non entra nella mappa.
+    test('chi decide se un’azione parte, chiede o è rifiutata porta le prove dell’autonomia, sui file veri', () => {
+      const veri = readdirSync(resolve(ROOT, 'tests')).filter((f) => f.endsWith('.spec.mjs')).map((f) => `tests/${f}`);
+      const sorgenti = (dir) => readdirSync(resolve(ROOT, dir), { withFileTypes: true }).flatMap((d) =>
+        d.isDirectory() ? sorgenti(`${dir}/${d.name}`) : d.name.endsWith('.js') ? [`${dir}/${d.name}`] : []);
+      const decidono = sorgenti('src').filter((f) => f !== 'src/shared/autonomia.js'
+        && /SN_AUTONOMIA[\s\S]*\.decide(?:Dettaglio)?\(/.test(readFileSync(resolve(ROOT, f), 'utf8')));
+      assert.ok(decidono.includes('src/main/services/handlers.js'), decidono.join(','));
+      for (const f of new Set([...decidono, ...PROVE_DI_CHI_DECIDE.keys()])) {
+        assert.ok(existsSync(resolve(ROOT, f)), `${f} non c’è più: la mappa punta a un file che non esiste`);
+        const out = specsForChangedFiles([f], veri);
+        assert.ok(out.includes('tests/autonomia') && out.includes('tests/filo-action-levels'), `${f} → ${out.join(',')}`);
+        assert.deepEqual(out.filter((s) => s.startsWith('tests/filo-')), ['tests/filo-action-levels'],
+          'il nome esatto, non la famiglia filo-*');
+      }
+    });
+
     test('le prove dei giri (tests/verifica) non entrano per prefisso, e con l’elenco non si inventano nomi', () => {
       assert.deepEqual(specsForChangedFiles(['src/pages/giro1/giro1.js'], tracked), []);
     });
