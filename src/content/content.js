@@ -2465,6 +2465,7 @@
       // Un media dentro un <a> è ANCHE un collegamento e spesso è il link che si vuole (#434).
       // Non è sempre un antenato: nelle home l'anteprima si stende sopra il link (#444).
       const link = linkEl || linkUnder;
+      di('media', { media: mediaEl, link });
       for (const it of Actions.buildMediaItems(mediaEl, link)) items.push(it);
       if (link) {
         items.push({ type: 'separator' });
