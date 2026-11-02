@@ -881,6 +881,13 @@ test('lockfile riscritto da npm prima del preflight: torna com\'è nel commit e 
     assert.match(out.se, /package-lock\.json riscritto da npm: rimesso com'è nel commit/);
     assert.equal(g(['status', '--porcelain']), '');
     assert.equal(readFileSync(resolve(casa, 'package-lock.json'), 'utf8'), lock('0.2.246'));
+
+    // Con altro di sporco accanto non si tocca niente: la cartella ferma il giro com'è.
+    writeFileSync(resolve(casa, 'package-lock.json'), lock('0.2.256'), 'utf8');
+    writeFileSync(resolve(casa, 'routines', 'roles', 'orchestrator.md'), 'ricetta mezza\n', 'utf8');
+    const ferma = await preflightIn(casa);
+    assert.equal(ferma.code, 3, `doveva fermarsi: ${ferma.so.slice(0, 200)}`);
+    assert.equal(readFileSync(resolve(casa, 'package-lock.json'), 'utf8'), lock('0.2.256'));
   } finally {
     togliCartella(casa, { tentativi: 10 });
     if (typeof altrove === 'string') togliCartella(altrove);
