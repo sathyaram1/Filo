@@ -2659,6 +2659,13 @@
     return (ultima && U.collegamentoScritto(ultima.text)) || '';
   }
 
+  // Un'immagine o un filmato dentro un collegamento: nella fila anche apri e copia il collegamento, come nelle voci.
+  function azioniDellAnteprima(link) {
+    if (!link) return {};
+    const a = azioniDelLink(link);
+    return { linkOpen: { onClick: a.openTab }, linkCopy: { onClick: a.copy } };
+  }
+
   // La fila in cima al menu (#1434): per il contesto scelto da buildContextualItems, chi esegue le sue azioni.
   // Le azioni che qui non hanno senso (una selezione segreta non si cerca) mancano, e la fila non le mostra.
   function filaContestuale(contesto, { selInfo, target, clipboardHistory }) {
