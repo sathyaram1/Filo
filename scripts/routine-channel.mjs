@@ -42,7 +42,8 @@
 //         Con `--json` stampa biglietto E ruolo insieme (più `model` ed `effort` se il server li ha decisi):
 //         il ruolo serve a chi guida per scegliere il tipo di worker PRIMA di lanciarlo. In tutte e due le forme
 //         registra la decisione per il gancio dell'orchestratore cieco, che mette modello e sforzo al lancio.
-//         Exit 0 = biglietto, 2 = niente da fare, 3 = guasto (il giro si ferma).
+//         Exit 0 = biglietto, 2 = niente da fare (anche: strumenti della sessione indietro rispetto a main, dal
+//         secondo biglietto in poi, senza chiamare il server), 3 = guasto (il giro si ferma).
 //
 //   node scripts/routine-channel.mjs work <biglietto>
 //       → stampa il JSON del proprio lavoro { role, ... }.
@@ -141,7 +142,8 @@ import os from 'node:os';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
+import { pinnedRepoRoot, absolutizeOutput, segnaLavoroPreso } from './lib/tools-pin.mjs';
+import { sessioneDaChiudere } from './lib/strumenti-vecchi.mjs';
 import {
   isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT, lavoroVivo, testoLavoroVivo,
   USCITA_LAVORO_VIVO,
@@ -1553,6 +1555,10 @@ if (isMain) {
       feedback = numeroFeedback(data.feedback);
       if (!feedback) { console.error(`--feedback vuole un numero di feedback (1680, #1680 o 1680.2), non "${String(data.feedback).slice(0, 30)}": non ho chiesto niente.`); process.exit(1); }
     }
+    // Una sessione accesa prima di una fusione che ha cambiato gli strumenti non prende lavoro nuovo (#1796).
+    const vecchia = sessioneDaChiudere(ROOT);
+    if (vecchia.chiudi) { console.error(vecchia.testo); process.exit(2); }
+    if (vecchia.avviso) console.error(vecchia.avviso);
     const r = await ticket(args[0], feedback ? { feedback } : undefined);
     // Un server che non conosce la richiesta per numero dà il primo della coda: quel biglietto si restituisce subito,
     // o la sessione accesa per un feedback lavorerebbe su un altro.
@@ -1562,6 +1568,7 @@ if (isMain) {
       process.exit(3);
     }
     if (r.outcome === 'work') {
+      segnaLavoroPreso();
       // Senza la decisione registrata il gancio rifiuta il lancio: meglio fermarsi qui che con un worker rifiutato.
       const reg = registraDecisione(r);
       if (!reg.ok) {

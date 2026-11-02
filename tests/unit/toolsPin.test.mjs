@@ -38,7 +38,7 @@ const comeScritto = (p) => resolve(p).split('\\').join('/');
 
 import {
   PINNED_PATHS, TOOLS_ROOT, pinTools, pinnedRepoRoot, absolutizeRecipe, pinWorkerTools, pinnedDirWorker,
-  absolutizeOutput, absolutizePrinted,
+  absolutizeOutput, absolutizePrinted, pinnedCommit, lavoroGiaPreso,
 } from '../../scripts/lib/tools-pin.mjs';
 
 function progettoFinto() {
@@ -419,6 +419,10 @@ test('il preflight FISSA gli strumenti e consegna istruzioni che puntano lì', a
     assert.ok(existsSync(resolve(dove, 'routines', 'roles', 'orchestrator.md')),
       'anche le ricette dei ruoli devono seguire gli strumenti');
     assert.equal(pinnedRepoRoot(dove), resolve(REPO), 'la copia deve ricordare il progetto');
+    // Senza il commit la sessione vecchia non si riconosce più, in silenzio (#1796).
+    assert.equal(pinnedCommit(dove), execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO, encoding: 'utf8' }).trim(),
+      'la copia deve ricordare il commit intero da cui viene');
+    assert.equal(lavoroGiaPreso(dove), false, 'una copia appena fissata non ha ancora preso biglietti');
     // E le istruzioni consegnate devono puntare alla copia, non al progetto.
     assert.ok(!/node scripts\//.test(out.so),
       `le istruzioni rimandano ancora agli strumenti del ramo:\n${out.so.slice(0, 400)}`);

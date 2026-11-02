@@ -97,6 +97,7 @@ import {
 } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe, absolutizeOutput } from './lib/tools-pin.mjs';
+import { strumentiIndietro } from './lib/strumenti-vecchi.mjs';
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { MAX_LIVELLO_BYTES, SEGNALA_TOLTA, leggiTestoLivello } from './lib/livelli.mjs';
@@ -685,6 +686,10 @@ const ROLE_FILE = {
   // Il compito senza feedback (#1153): un ruolo solo, il testo del compito arriva dal server.
   compito: 'compito.md',
 };
+// Un halt che non è un guasto ha il suo testo: rilasciare con `--guasto` fermerebbe le routine per niente (#1796).
+const HALT_KIND_FILE = {
+  strumenti_vecchi: 'halt-strumenti-vecchi.md',
+};
 // Il correttore ha due casi (payload.case), e la ripresa dopo la risposta
 // dell'owner non è un rebase: un caso sconosciuto vale il riallineamento.
 const FIXER_CASE_FILE = {
@@ -787,6 +792,15 @@ function checkoutNonAdatto() {
     return '';
   }
   return '';
+}
+
+// Lo sha intero, accanto alla copia: chi chiede un biglietto lo confronta con main (lib/strumenti-vecchi.mjs).
+function commitDelCheckout() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch (_) {
+    return '';
+  }
 }
 
 function origineDelCheckout() {
@@ -901,7 +915,8 @@ export function esaminaShaVerificato(sha, root = ROOT) {
 export function readRoleInstructions(role, { scope, caso } = {}) {
   const name = role === 'verifier' ? VERIFIER_SCOPE_FILE[verifierScope(scope).scope]
     : role === 'fixer' ? (Object.hasOwn(FIXER_CASE_FILE, String(caso || '')) ? FIXER_CASE_FILE[String(caso)] : ROLE_FILE.fixer)
-      : ROLE_FILE[role];
+      : role === 'halt' && Object.hasOwn(HALT_KIND_FILE, String(caso || '')) ? HALT_KIND_FILE[String(caso)]
+        : ROLE_FILE[role];
   if (!name) return '';
   const f = resolve(ROLES_DIR, name);
   const base = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), ROLES_DIR) : '';
@@ -1994,9 +2009,10 @@ export function usageText() {
  */
 // `vivo`: un altro lavora nella cartella, e i suoi marcatori (ruolo compreso) non si toccano (#1480).
 function emitHalt(kind, message, { vivo = false } = {}) {
-  process.stderr.write(`[dispatch] ${vivo ? 'LAVORO VIVO' : `GUASTO (${kind})`}: ${message}\n`);
+  const vecchi = kind === 'strumenti_vecchi';
+  process.stderr.write(`[dispatch] ${vivo ? 'LAVORO VIVO' : vecchi ? 'STRUMENTI VECCHI, non è un guasto' : `GUASTO (${kind})`}: ${message}\n`);
   emit({ role: 'halt', kind, message, ...(vivo ? { lavoroVivo: true } : {}) }, {});
-  return { exit: vivo ? USCITA_LAVORO_VIVO : 3 };
+  return { exit: vivo ? USCITA_LAVORO_VIVO : vecchi ? 2 : 3 };
 }
 
 /** Il motivo di un errore imprevisto, da ricopiare dentro `--guasto "…"`: una riga, senza virgolette né `$`. PURA. */
@@ -2079,7 +2095,18 @@ export async function run() {
   // entrambi i casi ci si ferma: consegnare mezza busta è peggio che non
   // consegnarne nessuna, perché sembra un giro riuscito.
   const bad = checkEnvelope(w);
-  if (bad) return emitHalt('transient', bad);
+  if (bad) {
+    // Un ruolo sconosciuto a strumenti indietro rispetto a main è della sessione, non del lavoro: una sessione
+    // fresca lo sa fare. Con gli strumenti di main il server chiede un ruolo che main non ha, e resta un guasto (#1796):
+    // il testo non deve contenere quello di `bad`, che il server legge come sessione vecchia e non ferma.
+    if (!RUOLI_LAVORABILI.includes(String(w.role || ''))) {
+      const v = strumentiIndietro(ROOT);
+      if (v.indietro) return emitHalt('strumenti_vecchi', `${bad}: ${v.motivo}. Il lavoro torna in coda per una sessione con gli strumenti aggiornati`);
+      if (v.verificato) return emitHalt('transient', `il server ha assegnato un ruolo che nemmeno ${MAIN_BRANCH} conosce ("${String(w.role || '') || 'nessuno'}"): gli strumenti di questa sessione sono quelli di ${MAIN_BRANCH}`);
+      process.stderr.write(`[dispatch] strumenti non confrontati con ${MAIN_BRANCH} (${v.motivo}): il server tratterà il rilascio da sessione vecchia\n`);
+    }
+    return emitHalt('transient', bad);
+  }
 
   const bucket = {
     role: w.role,
@@ -2463,7 +2490,7 @@ export function emit(bucket, ctx) {
   const serial = ambito.scope && ambito.scope !== 'pieno'
     ? perimetroNote(ambito.scope, ctx && ctx.perimetro, { scartato })
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
-  const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: pieno && pieno.case });
+  const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: bucket.role === 'halt' ? bucket.kind : pieno && pieno.case });
   const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
   const compito = bucket.role === 'compito' ? testoDelCompito(ctx && ctx.compito) : '';
   const corpo = server || serial || compito ? [base.replace(/\s+$/, ''), server, serial, compito].filter(Boolean).join('\n\n') : base;
@@ -2713,7 +2740,7 @@ if (isMainModule) {
             console.error(`[dispatch] GUASTO (transient): ${scomodo}`);
             process.exit(3);
           }
-          const pin = pinTools(ROOT, { origine: origineDelCheckout() });
+          const pin = pinTools(ROOT, { origine: origineDelCheckout(), commit: commitDelCheckout() });
           if (!pin.ok) {
             // FERMA IL GIRO, non prosegue. Proseguire vorrebbe dire eseguire gli
             // strumenti del ramo di lavoro, cioè esattamente il guasto che
