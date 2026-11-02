@@ -34,7 +34,7 @@ test('azioni vere', async ({ app, openTab, testServer }) => {
   await page.locator('#foto').click({ button: 'right' });
   await menu.locator('[data-sn-icon-id="immagine:copy"]').click();
   await page.waitForTimeout(1200);
-  log('immagine negli appunti', await app.evaluate(({ clipboard }) => { const i = clipboard.readImage(); return i.isEmpty() ? 'vuota' : JSON.stringify(i.getSize()); }));
+  log('immagine negli appunti', await app.evaluate(({ clipboard }) => { try { return Object.keys(clipboard).join(',') + ' ' + JSON.stringify(clipboard.availableFormats?.()); } catch (e) { return String(e); } }));
 
   await page.locator('#foto').click({ button: 'right' });
   await menu.locator('[data-sn-icon-id="immagine:ask"]').click();
