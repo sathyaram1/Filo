@@ -23,7 +23,7 @@ export function nomeSede(env = process.env) {
   return sedeDi(env).sede || 'locale';
 }
 
-/** La sede rifiuta il testo non fidato? Con `registrata` (la sede scritta accanto al biglietto) vale la più severa. PURA. */
+/** La sede rifiuta il testo non fidato? `registrata` = la sede scritta accanto al biglietto: vale la più severa. PURA. */
 export function rifiutaNonFidati(env = process.env, registrata = '') {
   return sedeDi(env).sede === 'owner' || String(registrata || '').trim().toLowerCase() === 'owner';
 }

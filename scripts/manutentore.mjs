@@ -1,8 +1,7 @@
 // Il contesto del manutentore (SPEC-RIDISEGNO-LAVORO.md § 2): il suo ruolo, tutte le schede in una riga ciascuna e i rami
 // in corso coi loro file, da git e senza modello; scrive solo l'ordine da accendere, che il pacemaker legge. Regole:
 // tests/unit/manutentore.test.mjs. Uso: npm run manutentore -- contesto | rami | incroci <N> | ordine | accendi <N,M,…>|--niente
-// | sblocca <N> [nota] (il lavoro fermo per guasto riparte, con la nota dell'owner). Nella sede owner contesto e incroci
-// si rifiutano: le schede riassumono feedback di chiunque (SPEC-DOMANDE.md §1.2).
+// | sblocca <N> [nota] (il lavoro fermo per guasto riparte, con la nota dell'owner)
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';

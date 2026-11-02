@@ -1,6 +1,5 @@
 // domanda.mjs — le domande all'owner (#1149, SPEC-DOMANDE.md §3). Col biglietto delle routine `chiedi` passa dal canale;
-// il resto va a ownerDomande col segreto del biglietto locale (#1148, la fiducia), e chi stampa una non fidata si sporca
-// (nella sede owner la rifiuta, SPEC-DOMANDE.md §1.2).
+// il resto va a ownerDomande col segreto del biglietto locale (#1148, la fiducia), e chi stampa una non fidata si sporca.
 // Le azioni di consenso e quelle `bulk:false` non partono da qui: solo dalla finestra di Filo (regola, non muro).
 
 import { readFileSync } from 'node:fs';

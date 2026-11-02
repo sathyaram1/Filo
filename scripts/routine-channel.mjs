@@ -376,7 +376,7 @@ export async function immagine(t, id, opts) {
   }
   // Un 200 senza voce è un server che non conosce la domanda (prima del deploy): non è un no.
   const outcome = classifyReply(status, body);
-  return { outcome: outcome === 'ok' ? 'fault' : outcome, reason: String((body && body.reason) || (outcome === 'ok' ? 'risposta_senza_immagine' : `http_${status}`)), detail: String((body && body.detail) || '') };
+  return { outcome: outcome === 'ok' ? 'fault' : outcome, reason: String((body && body.reason) || (outcome === 'ok' ? 'risposta_senza_immagine' : `http_${status}`)), ...(body && body.detail ? { detail: String(body.detail) } : {}) };
 }
 
 // I motivi per cui il battito NON va ritentato: il server ha guardato il

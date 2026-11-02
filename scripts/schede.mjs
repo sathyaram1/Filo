@@ -1,6 +1,5 @@
 // Le schede dei feedback aperti per il manutentore (SPEC-RIDISEGNO-LAVORO.md § 2): Haiku le scrive col ruolo scheda.md, Opus
-// rilegge chi toglie lavoro e un campione. Solo in locale (token e chiave dell'owner), fuori dal repo; mai nella sede owner
-// (SPEC-DOMANDE.md §1.2). Test: tests/unit/schede.test.mjs.
+// rilegge chi toglie lavoro e un campione. Solo in locale (token e chiave dell'owner), fuori dal repo. Test: tests/unit/schede.test.mjs.
 // Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] | rileggi [--quota 0.1] | stato [--cartella <dir>] [--dry-run]
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';

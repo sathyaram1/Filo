@@ -51,7 +51,7 @@ test('dentro una routine, con node --test diretto: domanda, risposta e rilascio 
     writeFileSync(transcript, `${JSON.stringify({ type: 'assistant', message: { id: 'm1', model: 'claude-opus-5-5', usage: uso, content: [] } })}\n`);
     const sessione = {
       FILO_ROUTINE: '1', FILO_ROUTINE_TICKET: 'biglietto-della-sessione', FILO_ROUTINE_ROLE: 'verifier',
-      FILO_TRANSCRIPT: transcript, FILO_SESSION_ID: 'sessione-vera',
+      FILO_TRANSCRIPT: transcript, FILO_SESSION_ID: 'sessione-vera', FILO_SEDE: 'owner',
     };
     assert.deepEqual(Object.keys(sessione).sort(), [...IDENTITA_SESSIONE].sort(), 'la sessione finta ha tutta l\'identità che il lanciatore toglie');
     const r = await nodeTest([

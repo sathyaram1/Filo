@@ -1,7 +1,7 @@
 // La sede fidata (#2012, SPEC-DOMANDE.md §1.2): con FILO_SEDE=owner gli strumenti che consegnano testo scritto da altri
 // rifiutano la voce non fidata invece di sporcare il biglietto; senza la variabile niente cambia. Sentinella in fondo:
 // l'elenco degli strumenti coperti, rosso se ne nasce uno nuovo fuori. Server e rete finti.
-
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';

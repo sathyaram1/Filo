@@ -1,7 +1,6 @@
 // compito.mjs — i compiti delle routine da una sessione locale (#1196, SPEC-DOMANDE.md §6.1): crea un compito senza
 // feedback, li elenca, annulla uno scritto a mano. Va a ownerCompiti col segreto del biglietto locale (#1148): la
-// sessione si dichiara, e il compito prende la fiducia del suo biglietto; nella sede owner i titoli non fidati restano
-// fuori (SPEC-DOMANDE.md §1.2). Regole: src/shared/compiti.js.
+// sessione si dichiara, e il compito prende la fiducia del suo biglietto. Regole: src/shared/compiti.js.
 
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
