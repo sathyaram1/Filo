@@ -76,6 +76,8 @@
         { testo: 'Quando chiedi a Filo di cancellare un file o una cartella, lo sposta nel cestino con un clic, e da lì lo rimetti quando vuoi. Senza cestino lo cancella solo se dici «per sempre».', segnalazione: 1909 },
         { testo: 'Col tasto destro su una scheda chiudi tutte le altre o riapri l\'ultima che hai chiuso, con un clic. «Riapri scheda chiusa» c\'è anche col tasto destro sul pulsante +.', segnalazione: 1695 },
         { testo: 'Dal menu Impostazioni la pagina che apri più spesso compare subito, già caricata. All\'inizio è Preferenze, poi Filo impara quale scegli tu.', segnalazione: 1129 },
+        { testo: '«Rimettimi la musica» fa ripartire la scheda che stavi ascoltando, da dove l\'avevi fermata, anche se l\'avevi chiusa o hai riaperto Filo. Prima Filo cercava e apriva un video nuovo.', segnalazione: 1397 },
+        { testo: 'Le schede chiuse le ritrovi chiedendole alla chat: per argomento, per giorno o per chi le ha chiuse («cosa ha archiviato la pulizia stamattina?»). Filo le riapre dove le avevi lasciate, e se la pagina non c\'è più ti mostra il riassunto che ne aveva tenuto.', segnalazione: 884 },
       ],
       fixes: [
         { testo: 'La pulizia delle schede non chiude più una scheda col messaggio respinto dal sito, anche nei forum, nei moduli incorporati da un altro sito e nelle caselle con nomi insoliti. Chiude invece quelle il cui testo è già arrivato, come un post pubblicato o una lista appena creata.', segnalazione: 824 },
@@ -88,6 +90,9 @@
         { testo: 'Se chiudi la finestra di Filo mentre resta aperta un\'altra sua finestra, come quella dell\'accesso a Google, riaprendo Filo torna la finestra con le tue schede, anche col clic sul Dock su Mac. Prima compariva un errore di JavaScript e Filo restava bloccato.', segnalazione: 1606 },
         { testo: 'Nella home gli avvisi in basso a destra non coprono più il tasto Invia: finché ci sono, il campo si stringe e li lascia passare.', segnalazione: 1551 },
         { testo: 'Il correttore non manda più al modello le password che scrivi in chat a chi te le chiede, né quelle scritte accanto al nome utente o dopo il nome del wifi.', segnalazione: 1446 },
+        { testo: '«Chiudi la seconda scheda» chiude la seconda della barra, non l\'ultima che hai usato. «Chiudi tutte le schede di YouTube» chiude solo quelle di YouTube.', segnalazione: 413 },
+        { testo: 'Un sito della rete di casa tenuto sempre aperto, come «nas», si toglie dicendone il nome. «com» o «it» da soli non diventano più un sito da tenere aperto.', segnalazione: 823 },
+        { testo: '«Riordinami le tab» in chat riordina davvero e ti dice quante schede ha archiviato. Se Filo non riesce a valutarle te lo dice, col motivo, anche quando ha chiuso solo i doppioni.', segnalazione: 1626 },
       ],
     },
     {
@@ -110,13 +115,8 @@
       version: '0.2.256', date: '2026-11-01',
       features: [
         { testo: 'Anche sul Mac Filo mette in ordine le icone della Scrivania come gli chiedi, per nome, tipo, data o dimensione, e «annulla» le rimette dov\'erano. Ti dice che è fatto solo dopo aver controllato che siano davvero in ordine.', segnalazione: 1617 },
-        { testo: '«Rimettimi la musica» fa ripartire la scheda che stavi ascoltando, da dove l\'avevi fermata, anche se l\'avevi chiusa o hai riaperto Filo. Prima Filo cercava e apriva un video nuovo.', segnalazione: 1397 },
-        { testo: 'Le schede chiuse le ritrovi chiedendole alla chat: per argomento, per giorno o per chi le ha chiuse («cosa ha archiviato la pulizia stamattina?»). Filo le riapre dove le avevi lasciate, e se la pagina non c\'è più ti mostra il riassunto che ne aveva tenuto.', segnalazione: 884 },
       ],
       fixes: [
-        { testo: '«Chiudi la seconda scheda» chiude la seconda della barra, non l\'ultima che hai usato. «Chiudi tutte le schede di YouTube» chiude solo quelle di YouTube.', segnalazione: 413 },
-        { testo: 'Un sito della rete di casa tenuto sempre aperto, come «nas», si toglie dicendone il nome. «com» o «it» da soli non diventano più un sito da tenere aperto.', segnalazione: 823 },
-        { testo: '«Riordinami le tab» in chat riordina davvero e ti dice quante schede ha archiviato. Se Filo non riesce a valutarle te lo dice, col motivo, anche quando ha chiuso solo i doppioni.', segnalazione: 1626 },
         { testo: 'Filo non ti scrive più per uno screenshot o per un file che hai appena scaricato. Lo fa solo quando un download lungo finisce mentre non sei davanti a Filo, o quando ne parte uno mentre non c\'eri, e dice solo quale file è arrivato.', segnalazione: 1654 },
         { testo: 'Il correttore non segna più «Filo» e filo.red come errori, e nemmeno un indirizzo scritto senza https, come amazon.it.', segnalazione: 1655 },
         { testo: 'Una correzione del correttore non attacca più la parola a quella prima, come in «oggisono». Con l\'apostrofo curvo, come in «l’amico», il segno sta solo sulla parola sbagliata, e la correzione lascia l’apostrofo come l’hai scritto.', segnalazione: 1580 },
