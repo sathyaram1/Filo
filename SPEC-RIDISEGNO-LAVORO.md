@@ -40,7 +40,9 @@ legge tutte, Haiku gli serve anche per le letture di massa che non decidono.
 
 **Pacchetto.** Un feedback che contiene più segnalazioni della stessa area, non
 ancora lavorate, con il testo che è una spec: cosa cambia, per ogni
-segnalazione unita, e come si verifica. Porta con sé gli allegati delle
+segnalazione unita, e come si verifica. La spec sta nel testo o in un allegato,
+mai nelle note, e un feedback che deve fondersi prima sta nelle attese: lo
+strumento rifiuta il resto alla nascita (FEEDBACK-STATES.md § 3a). Porta con sé gli allegati delle
 segnalazioni unite, col nome che dice da dove viene ognuno (tetto: quello di un
 feedback, oltre il pacchetto non nasce); alla sua nascita le unite si archiviano
 con la nota «Unito nel pacchetto #P: il lavoro continua lì» e il rimando
@@ -62,8 +64,9 @@ dei lavori).
 
 **Sessione di lavoro.** Una per feedback, accesa dal server col biglietto di
 quel feedback: niente orchestratore. Fa il primo lavoro con i sotto-agenti che
-servono, anche in più fasi; per un pacchetto scrive il piano nelle note del
-feedback, così se muore la sessione successiva riparte da lì. Verifica,
+servono, anche in più fasi; per un pacchetto consegna il piano (`deliver piano`),
+che il server rimanda a chi riprende, così se muore la sessione successiva
+riparte da lì. Le note del feedback non arrivano a nessuna sessione. Verifica,
 controllo di sicurezza e correzione restano sessioni separate, assegnate dal
 server come oggi: chi ha fatto il lavoro non lancia mai il proprio
 verificatore.
@@ -75,7 +78,7 @@ verificatore.
    si blocca in verifica non si stacca: il pacchetto passa o non passa intero.
 2. **Una sessione per feedback.** Il server accende una sessione per ogni
    feedback scelto dal manutentore, fino ai posti liberi; nessuna sessione
-   sceglie il lavoro da sola. Un lavoro grosso ricomincia dal piano nelle note.
+   sceglie il lavoro da sola. Un lavoro grosso ricomincia dal piano consegnato.
 3. **Verifica dopo un riallineamento.** Riallineamento pulito, o con conflitti
    solo nei file di servizio (`src/shared/patchNotes.js`,
    `src/shared/capabilities.js`, `tests/rossi-noti.json`, `PATTERNS.md`):
