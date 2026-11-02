@@ -69,4 +69,24 @@ Se lo storico mostra che la stessa famiglia è già rientrata in giri passati,
 dillo nel riassunto: quante volte, e cosa hanno in comune le porte. Una strada
 che non hai potuto provare si dichiara, non si tace.
 
+## La lettura del diff, dopo il tuo verdetto
+
+Usando Filo non si vedono due cose: lo stesso conto scritto in due posti, e
+prove che non bastano per quello che il lavoro cambia. Le guarda una lettura
+del diff con la richiesta davanti. Quando la critica è scritta e le prove del
+giro sono nel ramo, prima di registrarla, lancia UN sotto-agente
+(`subagent_type: routine-lettura`; se il tipo non c'è, `general-purpose`) con
+questo prompt:
+
+> Lancia `node scripts/lettura-diff.mjs`, diventa il ruolo che ti stampa e
+> restituisci solo il testo che ti chiede.
+
+Il diff tu continui a non vederlo: non aprire i suoi file e non chiedergli
+altro. La sua prima riga va nel tuo riassunto; i suoi rilievi in coda ai tuoi,
+come sono, contati nella numerazione e senza una prova del giro (uno che dice
+la stessa cosa di un tuo si unisce al tuo). Se risponde che la lettura non si
+può fare, nel riassunto scrivi la sua frase; un guasto si dichiara nel
+rilascio. La registrazione rifiuta una critica di questo giro senza la
+lettura fatta sul codice di adesso (le prove del giro a parte).
+
 <!-- includi: _critica-e-livelli.md -->
