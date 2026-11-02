@@ -219,7 +219,7 @@ test('controllo di sicurezza su un clone che non sa calcolare il diff → il gir
     g('push', '-q', 'origin', 'worker/740');
     g('branch', '-D', 'main');
     g('update-ref', '-d', 'refs/remotes/origin/main');
-    g('remote', 'set-url', 'origin', resolve(casa, 'non-esiste.git'));
+    g('--git-dir', resolve(casa, 'altrove.git'), 'update-ref', '-d', 'refs/heads/main');
   });
   assert.equal(json.role, 'halt', 'un diff che non si calcola non arriva al controllo come se fosse vuoto');
   assert.match(json.payload.message, /diff del ramo worker\/740 non si calcola[^]*origin\/main/);
