@@ -238,16 +238,18 @@ export async function schedeDaRighe(righe, { apri, vietato, illeggibili = [] }) 
 
 /**
  * Le schede del feedback nella cartella: una manca, non è buona o è più vecchia di quella salvata (`_fonte.at`) → si
- * scrive quella salvata. Una scritta qui dopo resta. → quante scritte.
+ * scrive quella salvata. Resta una scritta qui dopo, se è ancora fresca per `indice`. → quante scritte.
  */
-export function importaSchede(cartella, schede) {
+export function importaSchede(cartella, schede, indice = []) {
+  const perNum = new Map((indice || []).map((f) => [f.num, f]));
   let scritte = 0;
   for (const s of schede) {
     const num = String(s.numero || '').replace(/^#/, '');
     if (!/^\d+(\.\d+)?$/.test(num)) continue;
     const qui = leggiJson(fileScheda(cartella, num));
     const piuNuova = qui && !validaScheda(qui, num).length && String((qui._fonte || {}).at || '') > String((s._fonte || {}).at || '');
-    if (piuNuova) continue;
+    // Una più nuova ma ormai vecchia per il feedback perderebbe contro una salvata buona: l'agente la rifarebbe a pagamento.
+    if (piuNuova && !(perNum.has(num) && daScrivere(perNum.get(num), qui))) continue;
     writeFileSync(fileScheda(cartella, num), `${JSON.stringify(s, null, 1)}\n`);
     scritte += 1;
   }
