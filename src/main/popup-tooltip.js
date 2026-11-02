@@ -41,8 +41,9 @@ function ensureWin(parentWin) {
   // puntatore l'ha lasciata (resterebbero aperti il fumetto e le larghezze ferme dopo una chiusura, #428).
   tipWin.setIgnoreMouseEvents(true);
   tipReady = false;
-  // Da filo://shell come la carta d'anteprima: un data:text/html si confonderebbe col menu a comparsa (#1722).
-  tipWin.loadURL('filo://shell/fumetto.html');
+  // Un indirizzo che non condivide l'inizio con nessun'altra finestra: da data: era preso per il menu, da filo://shell/
+  // per la finestra principale (#1722). La regola per le prove: tests/unit/proveRiconosconoFinestre.test.mjs.
+  tipWin.loadURL('filo://src/renderer/fumetto.html');
   tipWin.webContents.once('did-finish-load', () => {
     tipReady = true;
     if (pendingShow) {
