@@ -307,7 +307,7 @@ async function riquadri(app) {
       const leggi = (js) => w.webContents.executeJavaScript(js).catch(() => null);
       if (url === 'filo://shell/anteprima.html') {
         out.carta = { testo: await leggi("document.getElementById('titolo').textContent"), ...w.getBounds() };
-      } else if (url.startsWith('data:')) {
+      } else if (url === 'filo://shell/fumetto.html') {
         const testo = await leggi("(document.getElementById('tip') || {}).textContent ?? null");
         if (testo != null) out.suggerimento = { testo, ...w.getBounds() };
       }
