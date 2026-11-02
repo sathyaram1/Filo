@@ -1050,7 +1050,10 @@ domande, compiti e il perché di una sveglia nascono riservati; le novità riscr
 arrivano a tutti gli utenti, da lì si rifiutano. La sua domanda di fine turno
 la stampa il rilascio, a ramo spedito, e chi la riceve prende lì il segno
 riservato e lo sporco. Cosa salva ogni sua operazione lo dice un elenco chiuso
-sul server: un'operazione che non c'è si rifiuta.
+sul server: un'operazione che non c'è si rifiuta. Il segno che mette lui (sui
+lavori che tocca, sui feedback che apre e sui loro figli) non gli toglie la
+lettura di quei lavori; un segno d'altra origine, come quello della posta,
+resta fuori dalla sua lettura come prima.
 
 ## 6. Feedback e compiti
 
