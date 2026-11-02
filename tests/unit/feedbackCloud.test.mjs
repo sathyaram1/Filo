@@ -4,8 +4,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
@@ -237,7 +239,22 @@ test('nella cartella la scheda salvata vince, tranne su una scritta qui dopo; l�
     assert.equal(n, 2);
     assert.equal(JSON.parse(readFileSync(join(cartella, '1.json'), 'utf8'))._fonte.at, '2026-10-29T12:00:00.000Z');
     assert.equal(JSON.parse(readFileSync(join(cartella, '2.json'), 'utf8'))._fonte.at, '2026-10-29T10:00:00.000Z');
-    assert.deepEqual(S.indiceAggiornato([{ num: '1', aggiornato: 'a' }, { num: '2', aggiornato: 'b' }], new Map([['2', 'c']])).map((f) => f.aggiornato), ['a', 'c']);
+    const indice = S.indiceAggiornato([{ num: '1', aggiornato: 'a', nelFeedback: '' }, { num: '2', aggiornato: 'b', nelFeedback: '' }],
+      new Map([['2', S.dopoIlSalvataggio({ ok: true, aggiornato: 'c' }, salvata(2, 'T'))]]));
+    assert.deepEqual(indice.map((f) => [f.aggiornato, f.nelFeedback]), [['a', ''], ['c', 'T']]);
+  } finally { togliCartella(cartella); }
+});
+
+test('una scheda della cartella più nuova ma ormai vecchia per il feedback lascia il posto a quella salvata, buona', () => {
+  const cartella = cartellaTemporanea('schede-importa-fresca-');
+  try {
+    mkdirSync(cartella, { recursive: true });
+    const scheda = (aggiornato, at) => ({ ...buona(1), _fonte: { id: 'f1', stato: 'todo', aggiornato, at, modello: 'haiku' } });
+    // Scritta qui alle 12 su un feedback che poi la nuvola ha toccato alle 11: la sua scheda delle 11 è quella buona.
+    writeFileSync(join(cartella, '1.json'), JSON.stringify(scheda('2026-10-29T09:00:00.000Z', '2026-10-29T12:00:00.000Z')));
+    const indice = [{ id: 'f1', num: '1', stato: 'todo', aggiornato: '2026-10-29T11:00:00.000Z' }];
+    assert.equal(S.importaSchede(cartella, [scheda('2026-10-29T11:00:00.000Z', '2026-10-29T11:00:00.000Z')], indice), 1);
+    assert.equal(S.daScrivere(indice[0], JSON.parse(readFileSync(join(cartella, '1.json'), 'utf8'))), false, 'niente da rifare a pagamento');
   } finally { togliCartella(cartella); }
 });
 
@@ -264,33 +281,49 @@ test('la scheda dalla routine va al server col biglietto, dalla macchina dell’
   assert.match(rifiutate.motivo, /credenziali del proprietario rifiutate/);
 });
 
-test('una scheda rimasta fuori dal feedback si manda al giro dopo, senza agente; una vecchia la riscrive l’agente', async () => {
-  const cartella = cartellaTemporanea('schede-rimanda-');
+test('va al feedback, senza agente, ogni scheda buona e fresca della cartella che il feedback non ha, segni o no', async () => {
+  const cartella = cartellaTemporanea('schede-fuori-');
   try {
     mkdirSync(cartella, { recursive: true });
-    const fonte = (num, aggiornato) => ({ id: `f${num}`, stato: 'todo', aggiornato, at: '2026-10-29T10:00:00.000Z', modello: 'haiku' });
-    const indice = ['1', '2', '3', '4'].map((num) => ({ id: `f${num}`, num, stato: 'todo', aggiornato: 'A' }));
-    writeFileSync(join(cartella, '1.json'), JSON.stringify({ ...buona(1), _fonte: fonte(1, 'A'), [S.NON_SALVATA]: true }));
-    writeFileSync(join(cartella, '2.json'), JSON.stringify({ ...buona(2), _fonte: fonte(2, 'A'), _riletta: { at: 'R', modello: 'opus' }, [S.NON_SALVATA]: true }));
-    writeFileSync(join(cartella, '3.json'), JSON.stringify({ ...buona(3), _fonte: fonte(3, 'vecchia'), [S.NON_SALVATA]: true }));
+    const fonte = (num, aggiornato, at = '2026-10-27T10:00:00.000Z') => ({ id: `f${num}`, stato: 'todo', aggiornato, at, modello: 'haiku' });
+    const voce = (num, nelFeedback, extra = {}) => ({ id: `f${num}`, num, stato: 'todo', aggiornato: 'A', nelFeedback, ...extra });
+    let indice = [voce('1', ''), voce('2', ''), voce('3', ''), voce('4', '2026-10-27T10:00:00.000Z'), voce('5', '2026-10-27T10:00:00.000Z'),
+      voce('6', '', { segnalato: 'è segnalato come attacco' })];
+    writeFileSync(join(cartella, 'indice.json'), JSON.stringify(indice));
+    // 1 e 2 scritte prima che le schede stessero nei feedback (la 2 riletta da Opus); 5 scritta qui dopo quella salvata.
+    writeFileSync(join(cartella, '1.json'), JSON.stringify({ ...buona(1), _fonte: fonte(1, 'A') }));
+    writeFileSync(join(cartella, '2.json'), JSON.stringify({ ...buona(2), _fonte: fonte(2, 'A'), _riletta: { at: 'R', modello: 'opus' } }));
+    writeFileSync(join(cartella, '3.json'), JSON.stringify({ ...buona(3), _fonte: fonte(3, 'vecchia') }));
     writeFileSync(join(cartella, '4.json'), JSON.stringify({ ...buona(4), _fonte: fonte(4, 'A') }));
+    writeFileSync(join(cartella, '5.json'), JSON.stringify({ ...buona(5), _fonte: fonte(5, 'A', '2026-10-28T10:00:00.000Z') }));
+    writeFileSync(join(cartella, '6.json'), JSON.stringify({ ...buona(6), _fonte: fonte(6, 'A') }));
+    assert.equal(S.fuoriDalFeedback({ id: 'f1', num: '1', stato: 'todo', aggiornato: 'A' }, { ...buona(1), _fonte: fonte(1, 'A') }), true,
+      'un indice di prima, senza l’ora della scheda salvata: si manda');
+    assert.equal(S.riepilogo(indice, S.leggiSchede(cartella)).fuoriDalFeedback, 3);
     const mandati = [];
+    let giu = true;
     const salva = async (dati) => {
       mandati.push(dati);
-      return dati.numero === '2' ? { ok: false, motivo: 'server giù' }
-        : { ok: true, aggiornato: 'B', scheda: { ...dati.scheda, _fonte: fonte(dati.numero, 'B'), _fiducia: 'fidato' } };
+      if (dati.numero === '2' && giu) return { ok: false, guasto: true, motivo: 'server non raggiungibile' };
+      return { ok: true, aggiornato: 'B', scheda: { ...dati.scheda, _fonte: fonte(dati.numero, 'B', `S${dati.numero}`), _fiducia: 'fidato' } };
     };
-    // Il segno lo mette il giro degli agenti quando il salvataggio non riesce.
-    const stampata = { ...buona(5), _fonte: fonte(5, 'A') };
-    assert.equal(S.schedaDopoSalvataggio(stampata, { ok: false, motivo: 'server giù' })[S.NON_SALVATA], true);
-    assert.equal(S.schedaDopoSalvataggio(stampata, { ok: true, scheda: { numero: '5' } })[S.NON_SALVATA], undefined);
-    const r = await S.rimandaNonSalvate(cartella, indice, { salva });
-    assert.deepEqual(mandati.map((d) => [d.numero, d.rilettura, d.modello]), [['1', false, 'haiku'], ['2', true, 'opus']]);
+    const r = await S.mandaFuoriDalFeedback(cartella, indice, { salva });
+    assert.deepEqual(mandati.map((d) => [d.numero, d.rilettura, d.modello]), [['1', false, 'haiku'], ['2', true, 'opus']],
+      'al primo guasto si ferma: il server giù non risponde nemmeno alla 5');
     assert.ok(mandati.every((d) => Object.keys(d.scheda).every((k) => !k.startsWith('_'))), 'al server solo i campi dell’agente');
-    assert.deepEqual({ mandate: r.mandate, restano: r.restano, aggiornati: [...r.aggiornati] }, { mandate: 1, restano: 1, aggiornati: [['1', 'B']] });
+    assert.deepEqual([r.mandate, r.restano, r.motivo], [1, 2, 'server non raggiungibile']);
+    const suDisco = JSON.parse(readFileSync(join(cartella, 'indice.json'), 'utf8'));
+    assert.deepEqual([suDisco[0].aggiornato, suDisco[0].nelFeedback], ['B', 'S1'], 'il salvataggio è già nell’indice: interrotto qui, non si rifà');
+
+    giu = false;
+    indice = S.indiceAggiornato(indice, r.aggiornati);
+    const dopo = await S.mandaFuoriDalFeedback(cartella, indice, { salva });
+    assert.deepEqual(mandati.slice(2).map((d) => d.numero), ['2', '5']);
+    assert.deepEqual([dopo.mandate, dopo.restano], [2, 0]);
+    indice = S.indiceAggiornato(indice, dopo.aggiornati);
+    const ancora = await S.mandaFuoriDalFeedback(cartella, indice, { salva });
+    assert.equal(ancora.mandate + ancora.restano, 0, 'quelle che il feedback ha non si rimandano');
     const letta = (n) => JSON.parse(readFileSync(join(cartella, `${n}.json`), 'utf8'));
-    assert.equal(letta(1)[S.NON_SALVATA], undefined, 'salvata: il segno se ne va');
-    assert.equal(letta(2)[S.NON_SALVATA], true, 'ancora fuori: il segno resta per il giro dopo');
     assert.equal(S.daScrivere(indice[2], letta(3)), true, 'la vecchia la riscrive l’agente');
   } finally { togliCartella(cartella); }
 });
@@ -304,18 +337,19 @@ test('un no definitivo del server non si rimanda: la scheda resta nella cartella
     for (const reason of FC.RIFIUTI_DEFINITIVI) {
       const s = S.schedaDopoSalvataggio(stampata, { ok: false, guasto: false, reason, motivo: `${reason}: no` });
       assert.equal(s[S.RIFIUTATA], `${reason}: no`, reason);
-      assert.equal(s[S.NON_SALVATA], undefined, reason);
     }
     for (const salvata of [{ ok: false, guasto: true, reason: 'rate_limited' }, { ok: false, guasto: false, reason: 'fuori_ambito' }]) {
-      assert.equal(S.schedaDopoSalvataggio(stampata, salvata)[S.NON_SALVATA], true, 'un guasto o un no del biglietto si rimanda');
+      const s = S.schedaDopoSalvataggio({ ...stampata, [S.RIFIUTATA]: 'un no di prima' }, salvata);
+      assert.equal(s[S.RIFIUTATA], undefined, 'un guasto o un no del biglietto si rimanda');
+      assert.equal(S.fuoriDalFeedback({ id: 'f5', num: '5', stato: 'todo', aggiornato: 'A', nelFeedback: '' }, s), true);
     }
-    const indice = [{ id: 'f1', num: '1', stato: 'todo', aggiornato: 'A' }];
-    writeFileSync(join(cartella, '1.json'), JSON.stringify({ ...buona(1), _fonte: fonte(1), [S.NON_SALVATA]: true }));
+    const indice = [{ id: 'f1', num: '1', stato: 'todo', aggiornato: 'A', nelFeedback: '' }];
+    writeFileSync(join(cartella, '1.json'), JSON.stringify({ ...buona(1), _fonte: fonte(1) }));
     const mandati = [];
     const salva = async (dati) => { mandati.push(dati.numero); return { ok: false, guasto: false, reason: 'feedback_segnalato', motivo: 'è segnalato come attacco' }; };
-    const prima = await S.rimandaNonSalvate(cartella, indice, { salva });
+    const prima = await S.mandaFuoriDalFeedback(cartella, indice, { salva });
     assert.deepEqual({ restano: prima.restano, rifiutate: prima.rifiutate }, { restano: 0, rifiutate: 1 });
-    const dopo = await S.rimandaNonSalvate(cartella, indice, { salva });
+    const dopo = await S.mandaFuoriDalFeedback(cartella, indice, { salva });
     assert.deepEqual({ restano: dopo.restano, rifiutate: dopo.rifiutate, mandati }, { restano: 0, rifiutate: 0, mandati: ['1'] }, 'una volta sola');
     assert.equal(S.daScrivere(indice[0], JSON.parse(readFileSync(join(cartella, '1.json'), 'utf8'))), false, 'l’agente non la rifà finché il feedback non cambia');
   } finally { togliCartella(cartella); }
@@ -573,4 +607,174 @@ test('elenca sulla macchina dell\'owner conta le schede salvate che non si apron
     const indice = JSON.parse(readFileSync(join(cartella, S.INDICE), 'utf8'));
     assert.equal(S.riepilogo(indice, S.leggiSchede(cartella)).nonSalvate, 1, 'stato dice quante schede della cartella aspettano di andare nel feedback');
   } finally { togliCartella(cartella); }
+});
+
+// ── Il comando intero, contro un canale finto: le schede che il feedback non ha ci arrivano (#1785.2) ──
+
+/** Il canale delle routine finto: `rispondi(corpo)` → { status?, body }. */
+async function canaleFinto(rispondi) {
+  const server = createServer((req, res) => {
+    let corpo = '';
+    req.on('data', (d) => { corpo += d; });
+    req.on('end', () => {
+      const { status = 200, body } = rispondi(JSON.parse(corpo || '{}'));
+      res.statusCode = status;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(body));
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  return { url: `http://127.0.0.1:${server.address().port}`, chiudi: () => new Promise((r) => server.close(r)) };
+}
+
+function lanciaSchede(args, env) {
+  return new Promise((ok) => {
+    const f = spawn(process.execPath, [join(ROOT, 'scripts', 'schede.mjs'), ...args], { cwd: ROOT, env });
+    let out = '';
+    f.stdout.on('data', (d) => { out += d; });
+    f.stderr.on('data', (d) => { out += d; });
+    f.on('close', (code) => ok({ code, out }));
+  });
+}
+
+/** Il server che salva: la scheda nella forma dei file, con l'ora sua e l'aggiornamento nuovo del feedback. */
+const salvataDalServer = (b, at) => ({
+  ok: true, num: b.numero, id: `f${b.numero}`, aggiornato: at,
+  scheda: { ...b.scheda, _fonte: { id: `f${b.numero}`, stato: 'todo', aggiornato: at, at, modello: b.modello },
+    ...(b.rilettura ? { _riletta: { at, modello: b.modello } } : {}), _fiducia: 'fidato' },
+});
+
+/** Un finto `claude` che conta i lanci e scrive `scheda` nella cartella che gli dà il prompt. */
+function claudeFinto(dir, scheda) {
+  const conta = join(dir, 'lanci');
+  const bin = join(dir, 'claude');
+  writeFileSync(bin, `#!/usr/bin/env node
+const fs = require('fs');
+if (process.argv[2] === 'auth') { process.stdout.write(JSON.stringify({ loggedIn: true })); process.exit(0); }
+fs.appendFileSync(${JSON.stringify(conta)}, '1');
+let input = '';
+process.stdin.on('data', (d) => { input += d; });
+process.stdin.on('end', () => {
+  const num = /Feedback: (.+)/.exec(input)[1].trim();
+  const cartella = /Cartella delle schede: (.+)/.exec(input)[1].trim();
+  fs.writeFileSync(require('path').join(cartella, num + '.json'), JSON.stringify(${JSON.stringify(scheda)}));
+  process.stdout.write(JSON.stringify({ result: '#' + num + ': fatta', total_cost_usd: 0.01 }));
+});
+`);
+  chmodSync(bin, 0o755);
+  return { bin, lanci: () => (existsSync(conta) ? readFileSync(conta, 'utf8').length : 0) };
+}
+
+test('elenca manda al feedback una scheda buona e fresca scritta prima che le schede stessero lì, con la rilettura di Opus', async (t) => {
+  if (process.platform === 'win32') { t.skip('il finto claude è uno script con la riga #!'); return; }
+  const dir = cartellaTemporanea('schede-di-prima-');
+  const AGGIORNATO = '2026-10-29T10:00:00.000Z';
+  const SALVATA = '2026-10-29T12:00:00.000Z';
+  const salvate = [];
+  let nelFeedback = null;
+  const canale = await canaleFinto((b) => {
+    if (b.op === 'leggi') {
+      const riga = { _id: 'f812', seq: 812, subSeq: 0, status: 'todo', priority: null, updatedAt: nelFeedback ? SALVATA : AGGIORNATO, waitsFor: [], unisce: [] };
+      return { body: { ok: true, resto: [], voci: [{ num: '812', id: 'f812', riga, ...(nelFeedback ? { scheda: nelFeedback } : {}) }] } };
+    }
+    if (b.op === 'scheda') {
+      salvate.push({ numero: b.numero, rilettura: b.rilettura, modello: b.modello });
+      const r = salvataDalServer(b, SALVATA);
+      nelFeedback = r.scheda;
+      return { body: r };
+    }
+    return { status: 400, body: { ok: false, reason: 'bad_request' } };
+  });
+  try {
+    const cartella = join(dir, 'schede');
+    mkdirSync(cartella, { recursive: true });
+    // Com'è nella cartella dell'owner dal censimento del 27/10: buona, della stessa fonte del feedback, senza segni.
+    writeFileSync(join(cartella, '812.json'), JSON.stringify({ ...buona(812),
+      _fonte: { id: 'f812', stato: 'todo', aggiornato: AGGIORNATO, at: '2026-10-27T10:00:00.000Z', modello: 'haiku' },
+      _riletta: { at: '2026-10-27T11:00:00.000Z', modello: 'opus' } }));
+    const claude = claudeFinto(dir, buona(812));
+    const env = { ...process.env, FILO_ROUTINE: '1', FILO_ROUTINE_TICKET: 'biglietto-finto', FILO_ROUTINE_API: canale.url, FILO_CLAUDE_BIN: claude.bin };
+
+    const elenca = await lanciaSchede(['elenca', '--cartella', cartella], env);
+    assert.equal(elenca.code, 0, elenca.out);
+    assert.deepEqual(salvate, [{ numero: '812', rilettura: true, modello: 'opus' }], elenca.out);
+    assert.match(elenca.out, /che il feedback non aveva: 1 salvate adesso/);
+    const scrivi = await lanciaSchede(['scrivi', '--cartella', cartella], env);
+    assert.equal(scrivi.code, 0, scrivi.out);
+    const ancora = await lanciaSchede(['elenca', '--cartella', cartella], env);
+    assert.equal(ancora.code, 0, ancora.out);
+    assert.equal(salvate.length, 1, 'mandata una volta sola');
+    assert.equal(claude.lanci(), 0, 'Haiku non la riscrive');
+    const s = JSON.parse(readFileSync(join(cartella, '812.json'), 'utf8'));
+    assert.equal(s._riletta.modello, 'opus', 'la rilettura resta, nel feedback e nella cartella');
+  } finally {
+    await canale.chiudi();
+    togliCartella(dir);
+  }
+});
+
+test('una scheda dell’agente che il server non ha preso va al feedback al giro dopo, senza rifarla, anche con un segno vecchio addosso', async (t) => {
+  if (process.platform === 'win32') { t.skip('il finto claude è uno script con la riga #!'); return; }
+  const dir = cartellaTemporanea('schede-dopo-un-no-');
+  const salvate = [];
+  let primo = true;
+  const canale = await canaleFinto((b) => {
+    if (b.op !== 'scheda') return { status: 400, body: { ok: false, reason: 'bad_request' } };
+    salvate.push(b.numero);
+    if (primo) { primo = false; return { status: 403, body: { ok: false, reason: 'fuori_ambito' } }; }
+    return { body: salvataDalServer(b, '2026-10-29T12:00:00.000Z') };
+  });
+  try {
+    const cartella = join(dir, 'schede');
+    mkdirSync(cartella, { recursive: true });
+    writeFileSync(join(cartella, 'indice.json'), JSON.stringify([{ id: 'f813', num: '813', stato: 'todo', priorita: null,
+      aggiornato: '2026-10-29T10:00:00.000Z', attese: [], unisce: [], nelFeedback: '' }]));
+    // L'agente riscrive il file partendo da quello vecchio, e si porta dietro i segni di chi salvava.
+    const claude = claudeFinto(dir, { ...buona(813), _rifiutata: 'un no di un giro vecchio', _fiducia: 'fidato' });
+    const env = { ...process.env, FILO_ROUTINE: '1', FILO_ROUTINE_TICKET: 'biglietto-finto', FILO_ROUTINE_API: canale.url, FILO_CLAUDE_BIN: claude.bin };
+
+    const prima = await lanciaSchede(['scrivi', '--cartella', cartella], env);
+    assert.equal(prima.code, 3, prima.out);
+    assert.match(prima.out, /non nel feedback \(fuori_ambito\)/);
+    const qui = JSON.parse(readFileSync(join(cartella, '813.json'), 'utf8'));
+    assert.deepEqual([qui._rifiutata, qui._fiducia], [undefined, undefined], 'i segni li timbra chi salva, non l’agente');
+    const dopo = await lanciaSchede(['scrivi', '--cartella', cartella], env);
+    assert.equal(dopo.code, 0, dopo.out);
+    assert.deepEqual(salvate, ['813', '813']);
+    assert.equal(claude.lanci(), 1, 'la scheda c’era già: niente agente la seconda volta');
+    assert.equal(JSON.parse(readFileSync(join(cartella, 'indice.json'), 'utf8'))[0].nelFeedback, '2026-10-29T12:00:00.000Z');
+  } finally {
+    await canale.chiudi();
+    togliCartella(dir);
+  }
+});
+
+test('una scheda rimasta nella cartella da un comando interrotto mentre salvava va al feedback, senza rifarla', async (t) => {
+  if (process.platform === 'win32') { t.skip('il finto claude è uno script con la riga #!'); return; }
+  const dir = cartellaTemporanea('schede-interrotta-');
+  const salvate = [];
+  const canale = await canaleFinto((b) => {
+    if (b.op !== 'scheda') return { status: 400, body: { ok: false, reason: 'bad_request' } };
+    salvate.push(b.numero);
+    return { body: salvataDalServer(b, '2026-10-29T12:00:00.000Z') };
+  });
+  try {
+    const cartella = join(dir, 'schede');
+    mkdirSync(cartella, { recursive: true });
+    // Il feedback ha la scheda delle 9; l'agente ne ha scritta una alle 11 e il comando è morto durante le attese del freno.
+    writeFileSync(join(cartella, 'indice.json'), JSON.stringify([{ id: 'f814', num: '814', stato: 'todo', priorita: null,
+      aggiornato: '2026-10-29T09:00:00.000Z', attese: [], unisce: [], nelFeedback: '2026-10-29T09:00:00.000Z' }]));
+    writeFileSync(join(cartella, '814.json'), JSON.stringify({ ...buona(814),
+      _fonte: { id: 'f814', stato: 'todo', aggiornato: '2026-10-29T09:00:00.000Z', at: '2026-10-29T11:00:00.000Z', modello: 'opus' },
+      _riletta: { at: '2026-10-29T11:00:00.000Z', modello: 'opus' } }));
+    const claude = claudeFinto(dir, buona(814));
+    const env = { ...process.env, FILO_ROUTINE: '1', FILO_ROUTINE_TICKET: 'biglietto-finto', FILO_ROUTINE_API: canale.url, FILO_CLAUDE_BIN: claude.bin };
+    const r = await lanciaSchede(['rileggi', '--cartella', cartella], env);
+    assert.equal(r.code, 0, r.out);
+    assert.deepEqual(salvate, ['814'], r.out);
+    assert.equal(claude.lanci(), 0, 'la rilettura c’era già');
+  } finally {
+    await canale.chiudi();
+    togliCartella(dir);
+  }
 });
