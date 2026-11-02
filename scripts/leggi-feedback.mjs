@@ -350,7 +350,9 @@ export async function leggiDalCloud(arg, { ticket, segno, cartella, opz = {} } =
   const v = r.voci.find((x) => x && x.num === numero);
   if (!v || v.inesistente) return { codice: 3, errore: `#${numero} non esiste` };
   if (v.rifiutato) return { codice: 3, errore: `${v.rifiutato}. Non ho decifrato il testo` };
-  return { codice: 0, testo: testoDaVoce(v, { segno, cartella }) };
+  const ATT = globalThis.SN_FB_ATTESE;
+  const attese = await statiDaServer(ATT.atteseDi({ [ATT.CAMPO]: v.riga && v.riga.waitsFor }), ticket, opz);
+  return { codice: 0, testo: testoDaVoce({ ...v, attese }, { segno, cartella }) };
 }
 
 async function main(argv) {
