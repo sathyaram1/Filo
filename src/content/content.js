@@ -2541,6 +2541,7 @@
     }
 
     if (editable) {
+      di('cursore');
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
       if (valutaQui) items.push({ type: 'separator' }, buildValutaItem(valutaQui));
