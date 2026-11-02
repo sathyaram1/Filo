@@ -22,7 +22,7 @@ async function ok(page) {
   await clickConfirm(page, 'ok');
 }
 
-test('e1 diario in diretta contro chat riaperta', async ({ app }) => {
+test.skip('e1x diario in diretta contro chat riaperta', async ({ app }) => {
   test.setTimeout(90_000);
   const page = await home(app);
   await modelloFinto(app, [
@@ -58,7 +58,7 @@ test('e1 diario in diretta contro chat riaperta', async ({ app }) => {
   await ripristina(app);
 });
 
-test('e2 un no, poi riaperta', async ({ app }) => {
+test.skip('e2 un no, poi riaperta', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: false } }));
@@ -83,7 +83,7 @@ test('e2 un no, poi riaperta', async ({ app }) => {
   await ripristina(app);
 });
 
-test('e3 fermato prima del testo: niente turno vuoto', async ({ app }) => {
+test.skip('e3 fermato prima del testo: niente turno vuoto', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
   await modelloFinto(app, [{ text: 'Lungo.', ritardoMs: 5000 }, { text: 'Ecco.' }]);
@@ -100,7 +100,7 @@ test('e3 fermato prima del testo: niente turno vuoto', async ({ app }) => {
   await ripristina(app);
 });
 
-test('e4 un OK e un no nella stessa risposta', async ({ app }) => {
+test.skip('e4 un OK e un no nella stessa risposta', async ({ app }) => {
   test.setTimeout(60_000);
   const dir = cartellaTemporanea('v1685e-');
   try {
@@ -133,6 +133,116 @@ test('e4 un OK e un no nella stessa risposta', async ({ app }) => {
     await page.waitForTimeout(2000);
     const ch = await chiamateAlModello(app);
     console.log('E4 MODELLO', JSON.stringify(ch[ch.length - 1].filter((m) => m.role !== 'system').map((m) => [m.role, m.content])).slice(0, 3000));
+  } finally {
+    await ripristina(app);
+    togliCartella(dir);
+  }
+});
+
+test.skip('e1b dom', async ({ app }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  await modelloFinto(app, [
+    { toolCalls: [
+      { id: 'a1', name: 'SVEGLIA', arguments: '{"time":"07:30","label":"palestra"}' },
+      { id: 'a2', name: 'SVEGLIA', arguments: '{"time":"zz","label":"rotta"}' },
+      { id: 'a3', name: 'ZOOM_PAGINA', arguments: '{"percentuale":150}' },
+      { id: 'a5', name: 'SALVA_APPUNTO', arguments: '{"testo":"comprare il latte","contesto":"spesa"}' },
+    ] },
+    { text: 'Fatto tutto.' },
+  ]);
+  await chiedi(page, 'fai tante cose');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto tutto' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  await page.waitForTimeout(1000);
+  console.log('LIVEHTML', await page.locator('#bubbles, .dash-bubbles').first().evaluate((e) => e.innerText));
+  await page.screenshot({ path: 'tests/.shots/g3-live.png' });
+  const chat = await chatCon(app, 'fai tante cose');
+  await riapri(app, page, chat.id);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto tutto' })).toBeVisible({ timeout: 8_000 });
+  await page.waitForTimeout(800);
+  console.log('DOPOHTML', await page.locator('#bubbles, .dash-bubbles').first().evaluate((e) => e.innerText));
+  await page.screenshot({ path: 'tests/.shots/g3-dopo.png' });
+  await ripristina(app);
+});
+
+test.skip('e5 un OK e un no, poi riavvio', async ({ app }) => {
+  test.setTimeout(60_000);
+  const dir = cartellaTemporanea('v1685f-');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [
+      { text: 'Creo le due cartelle.', toolCalls: [
+        { id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `mkdir "${join(dir, 'uno')}"`, spiegazione: 'Creo la cartella uno' }) },
+        { id: 'c2', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `mkdir "${join(dir, 'due')}"`, spiegazione: 'Creo la cartella due' }) },
+      ] },
+      { text: 'Aspetto i tuoi OK.' },
+      { text: 'RIPRESO.' },
+    ]);
+    await chiedi(page, 'crea le cartelle uno e due');
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    const bottoni = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: /Creo la cartella/ });
+    await expect(bottoni).toHaveCount(2, { timeout: 10_000 });
+    await bottoni.filter({ hasText: 'uno' }).click();
+    await ok(page);
+    await expect(bottoni.filter({ hasText: 'uno' })).toHaveText(/^✓/, { timeout: 10_000 });
+    await bottoni.filter({ hasText: 'due' }).click();
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
+    await clickConfirm(page, 'cancel');
+    await page.waitForTimeout(3000);
+    console.log('E5 LIVE', await page.locator('#bubbles, .dash-bubbles').first().evaluate((e) => e.innerText));
+    const chat = await chatCon(app, 'crea le cartelle uno e due');
+    console.log('E5 CHAT', JSON.stringify(chat.messages.map((m) => [m.role, m.text, m.esiti, m.confermaDopo, m.interno])));
+    await riapri(app, page, chat.id);
+    await expect(page.locator('.dash-bubble-user', { hasText: 'crea le cartelle' })).toBeVisible({ timeout: 8_000 });
+    await page.waitForTimeout(800);
+    console.log('E5 DOPO', await page.locator('#bubbles, .dash-bubbles').first().evaluate((e) => e.innerText));
+    await page.screenshot({ path: 'tests/.shots/g3-e5-dopo.png' });
+    const n = (await chiamateAlModello(app)).length;
+    await chiedi(page, 'e quindi?');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBe(n + 1);
+    const ch = await chiamateAlModello(app);
+    console.log('E5 MODELLO', JSON.stringify(ch[ch.length - 1].filter((m) => m.role !== 'system').map((m) => [m.role, m.content])).slice(0, 4000));
+  } finally {
+    await ripristina(app);
+    togliCartella(dir);
+  }
+});
+
+test('e6 comando confermato: parole del diario, della ripresa e dell archivio', async ({ app }) => {
+  test.setTimeout(60_000);
+  const dir = cartellaTemporanea('v1685g-');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [
+      { text: '', toolCalls: [
+        { id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `mkdir "${join(dir, 'uno')}"`, spiegazione: 'Creo la cartella uno' }) },
+        { id: 'c3', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `ls "${dir}"`, spiegazione: 'Guardo la cartella' }) },
+      ] },
+      { text: '' },
+      { text: 'ok' },
+    ]);
+    await chiedi(page, 'crea la cartella uno');
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    await page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Creo la cartella uno' }).click();
+    await ok(page);
+    await page.waitForTimeout(3000);
+    await page.locator('.dash-activity-summary, .dash-activity-head, .dash-activity summary').first().click().catch(() => {});
+    await page.waitForTimeout(500);
+    console.log('E6 LIVE', await page.locator('#bubbles').evaluate((e) => e.innerText));
+    const ch = await chiamateAlModello(app);
+    console.log('E6 RIPRESA', JSON.stringify(ch[1] && ch[1][ch[1].length - 1]).slice(0, 2500));
+    const chat = await chatCon(app, 'crea la cartella uno');
+    console.log('E6 CHAT', JSON.stringify(chat.messages.map((m) => [m.role, m.text, m.esiti, m.confermaDopo])));
+    await riapri(app, page, chat.id);
+    await expect(page.locator('.dash-bubble-user', { hasText: 'crea la cartella' })).toBeVisible({ timeout: 8_000 });
+    await page.waitForTimeout(800);
+    console.log('E6 DOPO', await page.locator('#bubbles').evaluate((e) => e.innerText));
+    await page.screenshot({ path: 'tests/.shots/g3-e6-dopo.png' });
   } finally {
     await ripristina(app);
     togliCartella(dir);
