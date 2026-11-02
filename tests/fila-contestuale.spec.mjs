@@ -498,3 +498,67 @@ test('Chiedi a Filo su un\'immagine scritta nella pagina (data:) la allega con u
   expect(allegati[0].nome).toBe('immagine.png');
   expect(src.includes(allegati[0].nome)).toBe(false);
 });
+
+// Seleziona `parola` dentro `sel` (un campo che si scrive) e dà il punto dove cliccare.
+const selezionaParola = (page, sel, parola) => page.evaluate(([s, p]) => {
+  const el = document.querySelector(s);
+  el.focus();
+  const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let t = w.nextNode(); t; t = w.nextNode()) {
+    const i = t.nodeValue.indexOf(p);
+    if (i < 0) continue;
+    const r = document.createRange();
+    r.setStart(t, i);
+    r.setEnd(t, i + p.length);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+    const b = r.getBoundingClientRect();
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  }
+  return null;
+}, [sel, parola]);
+
+test('la fila legge gli stili della selezione: Grassetto acceso sul grassetto, Evidenzia premuto due volte toglie l\'evidenziato', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><title>Stili</title><body style="padding:40px">
+    <div id="ricco" contenteditable="true" style="width:400px">Una <b>parola</b> da formattare.</div></body>`);
+  const menu = menuDi(page);
+  let p = await selezionaParola(page, '#ricco', 'parola');
+  await page.mouse.click(p.x, p.y, { button: 'right' });
+  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="scrivibile:bold"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="scrivibile:italic"]')).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('Escape');
+
+  const fondo = () => page.evaluate(() => {
+    const t = [...document.querySelectorAll('#ricco, #ricco *')].flatMap((n) => [...n.childNodes]).find((c) => c.nodeType === 3 && c.nodeValue.includes('formattare'));
+    for (let n = t.parentElement; n && n.id !== 'ricco'; n = n.parentElement) {
+      const c = getComputedStyle(n).backgroundColor;
+      if (c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') return c;
+    }
+    return '';
+  });
+  for (const [acceso, dopo] of [['false', /./], ['true', /^$/]]) {
+    p = await selezionaParola(page, '#ricco', 'formattare');
+    await page.mouse.click(p.x, p.y, { button: 'right' });
+    const ev = menu.locator('.sn-menu-row [data-sn-icon-id="scrivibile:highlight"]');
+    await expect(ev).toHaveAttribute('aria-pressed', acceso);
+    await ev.click();
+    await expect.poll(fondo).toMatch(dopo);
+  }
+});
+
+test('su un\'immagine o un filmato dentro un collegamento la fila apre il collegamento in una nuova scheda', async ({ app, openTab, testServer }) => {
+  const meta = testServer.asset(Buffer.from('<!doctype html><title>Articolo</title><p>articolo</p>'), 'text/html');
+  const img = testServer.asset(PNG, 'image/png');
+  const page = await testServer.openReady(openTab, `<!doctype html><title>Anteprime</title><body style="padding:40px">
+    <a href="${meta}"><img id="foto" src="${img}" width="160" height="120" alt="anteprima"></a>
+    <a href="${meta}" style="display:block;margin-top:20px"><video id="vid" width="200" height="110" style="background:#000"></video></a></body>`);
+  const menu = menuDi(page);
+  for (const [sel, ctx] of [['#vid', 'media'], ['#foto', 'immagine']]) {
+    await page.locator(sel).click({ button: 'right' });
+    await expect(menu.locator(`.sn-menu-row [data-sn-icon-id="${ctx}:linkOpen"]`)).toHaveAttribute('aria-label', /Apri in nuova tab/);
+    await page.keyboard.press('Escape');
+  }
+  await page.locator('#foto').click({ button: 'right' });
+  await menu.locator('.sn-menu-row [data-sn-icon-id="immagine:linkOpen"]').click();
+  await expect.poll(() => app.evaluate(({ webContents }, u) => webContents.getAllWebContents().some((w) => w.getURL() === u), meta)).toBe(true);
+});

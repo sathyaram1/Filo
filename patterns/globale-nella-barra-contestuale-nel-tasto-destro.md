@@ -115,7 +115,12 @@ per le azioni sulla pagina intera, che stavano in una fila in cima al menu (#124
   decisione dell'owner ancora aperta (#1377).
 - **L'icona dice lo stato quando conta** (Riproduci o Pausa, audio acceso o
   spento): disegno e nome del catalogo valgono per trascinarla e per la chat,
-  quelli dati dall'elemento per il menu aperto.
+  quelli dati dall'elemento per il menu aperto. Uno stile che la selezione ha
+  già (Grassetto, Evidenzia) accende la sua icona, e premerla lo toglie: il fondo
+  della selezione Chromium lo dice solo con `backColor` (giro 2).
+- **Un'immagine o un filmato dentro un collegamento è anche il collegamento**:
+  la sua fila ha Apri in nuova tab, e il «+» Copia URL, azioni del suo contesto
+  che compaiono solo dove il collegamento c'è (giro 2).
 - **Tante icone vanno a capo**, mai fuori dal bordo del menu.
 - Catalogo: `src/shared/disposizioneIcone.js`; chi esegue:
   `src/content/content.js` (`filaContestuale`); chi disegna:

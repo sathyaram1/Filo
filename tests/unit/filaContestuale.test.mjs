@@ -23,7 +23,7 @@ test('di partenza: le azioni dell\'elemento nella fila, nessuna azione della pag
   assert.deepEqual(D.filaDi(l, 'scrivibile').fila.slice(0, 2), ['scrivibile:bold', 'scrivibile:italic']);
   assert.deepEqual(D.filaDi(l, 'scrivibile').fila, ['scrivibile:bold', 'scrivibile:italic', 'scrivibile:underline', 'scrivibile:link', 'scrivibile:highlight']);
   assert.deepEqual(D.filaDi(l, 'testo').fila, ['testo:copy', 'testo:translate', 'testo:search']);
-  assert.deepEqual(D.filaDi(l, 'immagine').fila, ['immagine:save', 'immagine:copy', 'immagine:ask']);
+  assert.deepEqual(D.filaDi(l, 'immagine').fila, ['immagine:save', 'immagine:copy', 'immagine:ask', 'immagine:linkOpen']);
   assert.deepEqual(D.filaDi(l, 'link').fila, ['link:openTab', 'link:copy']);
   for (const ctx of Object.keys(D.CONTESTI)) {
     const { fila, altro } = D.filaDi(l, ctx);
@@ -109,8 +109,8 @@ test('il collegamento scritto nella fila: solo indirizzi del web e della posta',
 
 test('ogni tipo di elemento ha la sua fila: anche un filmato o un audio, e il campo col solo cursore', () => {
   const l = D.migra(undefined).layout;
-  assert.deepEqual(D.filaDi(l, 'media').fila, ['media:playPause', 'media:mute', 'media:save']);
-  assert.deepEqual(D.filaDi(l, 'media').altro, ['media:loop', 'media:pip', 'media:copyLink']);
+  assert.deepEqual(D.filaDi(l, 'media').fila, ['media:playPause', 'media:mute', 'media:save', 'media:linkOpen']);
+  assert.deepEqual(D.filaDi(l, 'media').altro, ['media:loop', 'media:pip', 'media:copyLink', 'media:linkCopy']);
   assert.deepEqual(D.filaDi(l, 'cursore').fila, ['cursore:paste', 'cursore:dictate']);
   require(join(ROOT, 'src', 'shared', 'icons.js'));
   for (const id of Object.keys(D.AZIONI)) assert.equal(typeof globalThis.SN_ICONS[D.AZIONI[id].icona], 'function', `${id}: il disegno ${D.AZIONI[id].icona} non c'è`);
