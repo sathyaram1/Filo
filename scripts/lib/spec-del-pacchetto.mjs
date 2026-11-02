@@ -11,9 +11,11 @@ export function frasi(testo) {
   return String(testo || '').split(/[\n;!?]+|\.(?!\d)/).map((f) => f.replace(/\s+/g, ' ').trim()).filter(Boolean);
 }
 
-const SUBITO_ALLE_NOTE = /\b(?:vedi|leggi|segui|guarda)\s+(?:(?:le|la)\s+)?(?:(?:sue|sua)\s+)?not[ae]\b/i;
-const NELLE_NOTE = /\b(?:nell[ae]|in|sulle|dalle)\s+(?:(?:sue|sua)\s+)?not[ae]\b/i;
-const COSA_FARE = /\b(?:spec\w*|dettagl\w*|istruzion\w*|piano|resto|da\s+seguire)\b/i;
+// I verbi in ogni persona e modo, non la frase di un caso: «vedi», «vedere», «consulta», «leggete» mandano tutti.
+const LEGGERE = String.raw`(?:ved|legg|segu|guard|consult)(?:i|e|a|ere|ire|are|ete|ite|ate)`;
+const SUBITO_ALLE_NOTE = new RegExp(String.raw`\b(?:${LEGGERE}\s+(?:(?:le|la|alle|nelle|nella)\s+)?(?:(?:sue|sua)\s+)?|come\s+(?:da|(?:scritt|indicat|descritt|spiegat)[oa]\s+(?:nell[ae]|in))\s+)not[ae]\b`, 'i');
+const NELLE_NOTE = /\b(?:nell[ae]|in|sulle|dalle|[tf]ra\s+le|nel\s+campo)\s+(?:(?:sue|sua)\s+)?not[ae]\b/i;
+const COSA_FARE = /\b(?:spec\w*|dettagl\w*|istruzion\w*|indicazion\w*|piano|resto|tutto|tutta|lavoro|cosa\s+fare|da\s+seguire)\b/i;
 
 /** Le frasi che mandano a leggere la spec nelle note. «Nelle note manca la data» parla delle note e non manda. PURA. */
 export function rimandiAlleNote(testo) {
