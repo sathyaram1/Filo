@@ -830,9 +830,18 @@ ma a scriverlo è il server.
      stesso commit sparisce anche la sua riga (un secondo commit passerebbe
      per codice nuovo da pubblicare) e il JSON resta valido. Se una delle due
      verifiche non torna, non si scrive niente;
-  6. scrive il commit `release: vX.Y.Z [skip ci]` con l'identità dell'App,
-     legandolo allo `sha` del blob letto: se `main` si è mossa nel mezzo,
-     GitHub risponde 409 e non si scrive.
+  5bis. **lo stesso numero nel lockfile** (#2040), nei due campi dove npm
+     tiene quello del progetto (`version` in cima e `packages[""].version`),
+     qualunque numero portassero prima, e nient'altro: il testo resta nel
+     formato di npm (JSON a due spazi, a capo finale). È la regola di
+     `applicaVersioneAlLock` in `scripts/release-apply-version.mjs`. Senza,
+     ogni `npm install` riscrive il numero nel lockfile e il rebase che viene
+     dopo rifiuta la cartella. Un lockfile che non si riallinea (assente,
+     illeggibile, fuori formato) non ferma l'aumento: il commit porta il solo
+     manifesto e il motivo finisce nel registro del server;
+  6. scrive **un solo** commit `release: vX.Y.Z [skip ci]` con i due file e
+     l'identità dell'App, figlio del commit letto e senza forzare: se `main`
+     si è mossa nel mezzo, GitHub lo rifiuta e non si scrive.
 - **Perché non si accetta il contenuto dal chiamante**: sarebbe un push diretto
   su `main` travestito da aumento di versione — cioè il buco che §11 ha chiuso,
   riaperto da un'altra porta.
