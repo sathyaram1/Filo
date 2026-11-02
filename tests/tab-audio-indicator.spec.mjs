@@ -349,7 +349,7 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
   await app.evaluate(({ app: electronApp, BrowserWindow }) => {
     globalThis.__sopraLaCarta = 0;
     const segui = (w) => w.on('show', () => {
-      if (w.isDestroyed() || !w.webContents.getURL().startsWith('data:')) return;
+      if (w.isDestroyed() || w.webContents.getURL() !== 'filo://shell/fumetto.html') return;
       if (BrowserWindow.getAllWindows().some((x) => !x.isDestroyed() && x.isVisible()
         && x.webContents.getURL() === 'filo://shell/anteprima.html')) globalThis.__sopraLaCarta++;
     });
