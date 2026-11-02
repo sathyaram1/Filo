@@ -615,7 +615,7 @@ export async function main(argvIn) {
   if (numeriUnite.numeri.length && String(testo || '').trim()) {
     const difetti = difettiDellaSpec([testo, ...testoDegliAllegati(allegati)].join('\n'), { unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri });
     if (difetti.length) {
-      console.error(`RIFIUTATO: --pacchetto, il testo non è la spec e non ho aperto niente:\n${difetti.map((m) => `  - ${m}`).join('\n')}`);
+      console.error(`RIFIUTATO: --pacchetto, il testo va corretto e non ho aperto niente:\n${difetti.map((m) => `  - ${m}`).join('\n')}`);
       return EXIT.USO;
     }
   }
