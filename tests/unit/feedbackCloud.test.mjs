@@ -394,6 +394,7 @@ test('elenca: dal server col biglietto e dalle righe dell’owner, lo stesso ind
   const attese = [{ id: 'f9', num: '9' }];
   const riga812 = { _id: 'f812', seq: 812, subSeq: 0, status: 'todo', priority: 2, updatedAt: AGG, waitsFor: attese, unisce: [] };
   const riga900 = { _id: 'f900', seq: 900, subSeq: 0, status: 'attack', priority: null, updatedAt: AGG, waitsFor: [], unisce: [] };
+  // La strada locale non ha il campo di una priorità mai scritta; il server lo dà null.
   const motivo = 'è segnalato come attacco («attack»): per regola una sessione non lo legge';
   const server = serverFinto([{ status: 200, body: { ok: true, resto: [], voci: [
     { num: '812', id: 'f812', riga: riga812, scheda: SS.dalDocumento(JSON.parse(JSON.stringify(blob)), { id: 'f812', aggiornato: AGG }) },
@@ -401,7 +402,7 @@ test('elenca: dal server col biglietto e dalle righe dell’owner, lo stesso ind
   ] } }]);
   const righeOwner = [
     { ...riga812, scheda: JSON.stringify(blob), schedaAt: AGG },
-    { ...riga900, scheda: JSON.stringify(SS.perIlDocumento(buona(900), { stato: 'attack', at: 't' })), schedaAt: AGG },
+    { ...riga900, priority: undefined, scheda: JSON.stringify(SS.perIlDocumento(buona(900), { stato: 'attack', at: 't' })), schedaAt: AGG },
     { _id: 'f700', seq: 700, subSeq: 0, status: 'done', updatedAt: AGG, scheda: JSON.stringify(SS.perIlDocumento(buona(700), { stato: 'done', at: 't' })), schedaAt: AGG },
   ];
   const cloud = cartellaTemporanea('elenca-cloud-');
