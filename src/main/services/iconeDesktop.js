@@ -1,5 +1,5 @@
-// Le icone del desktop del computer in ordine a comando (#1621): uno script fisso le legge e le sposta, l'ordine e la
-// griglia li decide JavaScript, e ogni disposizione è un cambio che si annulla. Solo Windows: su Mac e Linux lo dice.
+// Le icone del desktop del computer in ordine a comando (#1621, #1617): uno script fisso le legge e le sposta, l'ordine
+// e la griglia li decide JavaScript, «fatto» lo dice solo l'ordine riletto, e ogni disposizione si annulla. Windows e Mac.
 // Regole: patterns/il-computer-si-comanda-con-script-fissi.md (§ Le icone del desktop); prove: tests/unit/iconeDesktop.test.mjs.
 
 'use strict';
@@ -8,13 +8,18 @@ const fsp = require('node:fs/promises');
 const terminale = require('./terminal');
 const Sistema = require('./comandiSistema');
 
-const { PS_INIZIO, psCompila } = Sistema._interni;
+const { PS_INIZIO, SH_INIZIO, psCompila } = Sistema._interni;
 
+const PIATTAFORME = ['win32', 'darwin'];
+// Su Mac l'ordine automatico è un valore del Finder, e l'annullo lo rimette solo se è uno di questi.
+const DISPOSIZIONI_FINDER = ['not arranged', 'snap to grid', 'arranged by name', 'arranged by modification date',
+  'arranged by creation date', 'arranged by size', 'arranged by kind', 'arranged by label'];
 // Una variabile d'ambiente di Windows tiene 32.767 caratteri: le posizioni si dividono in pezzi che ci stanno.
 const PEZZO_MAX = 30000;
 // L'elenco intero si legge col codice: 300 icone coi percorsi interi stanno in poche decine di migliaia di caratteri.
 const TETTO_USCITA = 8 * 1024 * 1024;
-const TEMPO_MS = 60000;
+// Il Finder sposta un'icona per volta: centinaia di icone possono chiedere ben più di un minuto.
+const TEMPO_MS = 180000;
 const TEMPO_STAT_MS = 3000;
 
 // Le icone del desktop di Windows viste dalla Shell (IFolderView2 della finestra del desktop): nomi, posizioni,
@@ -240,6 +245,119 @@ namespace FiloDesktop {
 }
 `;
 
+// La Scrivania del Mac vista dal Finder, in JavaScript for Automation: stesse righe di Windows, stessa codifica \uXXXX
+// (un nome con un a capo resta un nome). `pos` è il centro dell'icona; l'area è lo schermo con la barra dei menu,
+// senza barra e Dock, contata dall'alto come conta il Finder. Uno spostamento che si rompe rimette l'ordine automatico.
+const JXA_DESKTOP = String.raw`ObjC.import('Foundation');
+ObjC.import('AppKit');
+function run() {
+  var ambiente = $.NSProcessInfo.processInfo.environment;
+  function parametro(k) { var v = ambiente.objectForKey(k); return v.isNil() ? '' : ObjC.unwrap(v); }
+  var righe = [];
+  function dice(k, v) {
+    righe.push('FILO:' + k + '=' + String(v).replace(/[^ -~]|\\/g, function (c) { return '\\u' + ('000' + c.charCodeAt(0).toString(16)).slice(-4); }));
+  }
+  // In blocco è un evento solo; se il Finder lo rifiuta (basta un elemento che non ha il dato) si chiede voce per voce,
+  // o l'ordine chiesto diventerebbe in silenzio quello per nome.
+  function tutti(voci, k, n) {
+    try { var v = voci[k](); if (Array.isArray(v) && v.length === n) return v; } catch (e) {}
+    var uno = [];
+    for (var i = 0; i < n; i++) { try { uno.push(voci[i][k]()); } catch (e) { uno.push(null); } }
+    return uno;
+  }
+  function elenca(scrivania) {
+    var finestra = scrivania.containerWindow;
+    try { dice('finder', finestra.iconViewOptions.arrangement()); } catch (e) {}
+    try { dice('dimensione-icone', finestra.iconViewOptions.iconSize()); } catch (e) {}
+    try {
+      var schermo = $.NSScreen.screens.objectAtIndex(0);
+      var tutto = schermo.frame;
+      var libero = schermo.visibleFrame;
+      var alto = tutto.size.height - (libero.origin.y + libero.size.height);
+      dice('area', [libero.origin.x, alto, libero.origin.x + libero.size.width, alto + libero.size.height].map(Math.round).join(','));
+    } catch (e) {
+      try {
+        var b = finestra.bounds();
+        if (Array.isArray(b)) dice('area', b.map(Math.round).join(','));
+        else dice('area', [b.x, b.y, b.x + b.width, b.y + b.height].map(Math.round).join(','));
+      } catch (e2) {}
+    }
+    var voci = scrivania.items;
+    var url = voci.url();
+    var n = url.length;
+    dice('totale', n);
+    var nomi = tutti(voci, 'displayedName', n);
+    var nomiFile = tutti(voci, 'name', n);
+    var pos = tutti(voci, 'desktopPosition', n);
+    var classi = tutti(voci, 'class', n);
+    var est = tutti(voci, 'nameExtension', n);
+    var date = tutti(voci, 'modificationDate', n);
+    var dim = tutti(voci, 'size', n);
+    for (var i = 0; i < n; i++) {
+      var p = pos[i];
+      if (!p) continue;
+      var x = Array.isArray(p) ? p[0] : p.x;
+      var y = Array.isArray(p) ? p[1] : p.y;
+      dice('voce', url[i]);
+      dice('nome', nomi[i] || nomiFile[i] || url[i]);
+      dice('pos', Math.round(x) + ',' + Math.round(y));
+      var classe = classi[i] ? String(classi[i]) : '';
+      dice('cartella', classe === 'folder' || classe === 'disk' ? '1' : '0');
+      if (est[i]) dice('tipo', String(est[i]).toLowerCase());
+      if (date[i] instanceof Date) dice('data', date[i].getTime());
+      if (typeof dim[i] === 'number') dice('dimensione', Math.round(dim[i]));
+    }
+  }
+  try {
+    var scrivania = Application('Finder').desktop;
+    if (parametro('FILO_SIS_COMANDO') === 'disponi') {
+      var volute = Object.create(null);
+      for (var k = 0; k < 4096; k++) {
+        var pezzo = parametro('FILO_SIS_POS_' + k);
+        if (!pezzo) break;
+        pezzo.split('\n').forEach(function (riga) {
+          var c = riga.split('\t');
+          if (c.length === 3 && c[2] && /^-?[0-9]+$/.test(c[0]) && /^-?[0-9]+$/.test(c[1])) volute[c[2]] = [Number(c[0]), Number(c[1])];
+        });
+      }
+      var opzioni = scrivania.containerWindow.iconViewOptions;
+      var prima = opzioni.arrangement();
+      var voluta = parametro('FILO_SIS_DISPOSIZIONE');
+      if (Object.keys(volute).length && /^arranged by /.test(prima)) opzioni.arrangement = 'not arranged';
+      var voci = scrivania.items;
+      var url = voci.url();
+      var spostate = 0;
+      try {
+        for (var i = 0; i < url.length; i++) {
+          if (!(url[i] in volute)) continue;
+          voci[i].desktopPosition = volute[url[i]];
+          spostate++;
+        }
+      } catch (e) {
+        try { if (opzioni.arrangement() !== prima) opzioni.arrangement = prima; } catch (e2) {}
+        throw e;
+      }
+      if (voluta && opzioni.arrangement() !== voluta) opzioni.arrangement = voluta;
+      delay(0.3);
+      dice('spostate', spostate);
+    }
+    elenca(scrivania);
+  } catch (e) {
+    var numero = e && e.errorNumber;
+    righe = [];
+    dice('errore', numero === -1743 ? 'permesso-automazione' : numero === -600 ? 'finder' : 'eccezione');
+    dice('dettaglio', (e && e.message) || String(e));
+  }
+  return righe.join('\n');
+}
+`;
+
+// Il testo arriva a osascript da un heredoc fra apici: la shell non lo espande, i parametri stanno nell'ambiente.
+const SH_JXA = SH_INIZIO + String.raw`if ! command -v osascript >/dev/null 2>&1; then dice errore eccezione; dice dettaglio 'osascript non trovato'; exit 0; fi
+osascript -l JavaScript <<'FILO_JXA'
+` + JXA_DESKTOP + `FILO_JXA
+`;
+
 const SCRIPT = {
   win32: {
     'desktop-leggi': PS_INIZIO + psCompila(CS_DESKTOP) + String.raw`foreach ($r in [FiloDesktop.Desktop]::Leggi()) { Dice $r[0] $r[1] }
@@ -247,12 +365,20 @@ const SCRIPT = {
     'desktop-disponi': PS_INIZIO + psCompila(CS_DESKTOP) + String.raw`foreach ($r in [FiloDesktop.Desktop]::Disponi()) { Dice $r[0] $r[1] }
 `,
   },
+  darwin: {
+    'desktop-leggi': SH_JXA,
+    'desktop-disponi': SH_JXA,
+  },
 };
 
 // ── Richiesta → script + ambiente ────────────────────────────────────────────
 
-function ambienteDisponi({ posizioni, auto } = {}) {
-  const env = { FILO_SIS_AUTO: auto ? '1' : '0' };
+function ambienteDisponi({ posizioni, auto, disposizione } = {}, piattaforma = 'win32') {
+  const env = piattaforma === 'darwin' ? { FILO_SIS_COMANDO: 'disponi' } : { FILO_SIS_AUTO: auto ? '1' : '0' };
+  if (piattaforma === 'darwin' && disposizione != null && disposizione !== '') {
+    if (!DISPOSIZIONI_FINDER.includes(disposizione)) throw new Error('ordine del Finder sconosciuto');
+    env.FILO_SIS_DISPOSIZIONE = disposizione;
+  }
   let pezzo = '';
   let n = 0;
   for (const p of Array.isArray(posizioni) ? posizioni : []) {
@@ -274,7 +400,9 @@ function ambienteDisponi({ posizioni, auto } = {}) {
 function costruisci(comando, p, piattaforma = process.platform) {
   const script = SCRIPT[piattaforma] && SCRIPT[piattaforma][comando];
   if (!script) throw new Error(`comando sconosciuto su ${piattaforma}: ${comando}`);
-  return { shell: 'powershell', script, env: comando === 'desktop-disponi' ? ambienteDisponi(p) : {} };
+  const mac = piattaforma === 'darwin';
+  const env = comando === 'desktop-disponi' ? ambienteDisponi(p, piattaforma) : mac ? { FILO_SIS_COMANDO: 'leggi' } : {};
+  return { shell: mac ? 'sh' : 'powershell', script, env };
 }
 
 // ── Uscita → dati ────────────────────────────────────────────────────────────
@@ -300,9 +428,19 @@ function interpretaLettura(u) {
       const p = coppia(v);
       if (p) { cur.x = p.x; cur.y = p.y; }
     } else if (cur && k === 'cartella') cur.cartella = v === '1';
+    // Data, dimensione ed estensione le dice il Finder; su Windows le chiede poi il disco.
+    else if (cur && k === 'tipo') cur.tipo = String(v).replace(/^\./, '').toLowerCase();
+    else if (cur && (k === 'data' || k === 'dimensione') && intero(v) != null) cur[k] = intero(v);
   }
   for (const x of voci) if (!x.nome) x.nome = String(x.id).split(/[\\/]/).filter(Boolean).pop() || x.id;
   const a = /^(-?\d+),(-?\d+),(-?\d+),(-?\d+)$/.exec(String(u.primo('area') || '').trim());
+  const finder = u.primo('finder');
+  const mac = finder != null ? {
+    finder,
+    auto: /^arranged by /.test(finder),
+    griglia: finder === 'snap to grid',
+    dimensioneIcone: intero(u.primo('dimensione-icone')),
+  } : {};
   return {
     ok: true,
     voci: voci.filter((x) => x.x != null && x.y != null),
@@ -313,6 +451,7 @@ function interpretaLettura(u) {
     nascoste: u.primo('nascoste') === '1',
     totale: intero(u.primo('totale')),
     spostate: intero(u.primo('spostate')),
+    ...mac,
   };
 }
 
@@ -358,7 +497,9 @@ const percorsoDiFile = (id) => /^[a-z]:\\|^\\\\/i.test(String(id || ''));
 // L'estensione raggruppa i tipi come li raggruppa Windows: i collegamenti con i collegamenti, i PDF coi PDF.
 // Cartelle e icone di sistema (Cestino, Questo PC) non hanno estensione: stanno davanti.
 function chiaveTipo(v) {
-  if (v.cartella || !percorsoDiFile(v.id)) return '';
+  if (v.cartella) return '';
+  if (typeof v.tipo === 'string') return v.tipo;
+  if (!percorsoDiFile(v.id)) return '';
   const nome = String(v.id).split('\\').pop();
   const m = /\.([^.]+)$/.exec(nome);
   return m ? m[1].toLowerCase() : '';
@@ -397,28 +538,60 @@ function piuFrequente(valori) {
   return meglio;
 }
 
+// La distanza più piccola fra due icone sulla stessa fila: il passo del Finder, che il Mac non dice.
+function passoVisto(voci, asse) {
+  const altro = asse === 'x' ? 'y' : 'x';
+  let min = Infinity;
+  for (let i = 0; i < voci.length; i++) {
+    for (let j = i + 1; j < voci.length; j++) {
+      if (Math.abs(voci[i][altro] - voci[j][altro]) > 8) continue;
+      const d = Math.abs(voci[i][asse] - voci[j][asse]);
+      if (d > 24 && d < min) min = d;
+    }
+  }
+  return Number.isFinite(min) ? min : null;
+}
+
+// Il passo del Mac: quello delle icone se è almeno un'icona (due icone lasciate vicine a mano non sono la griglia),
+// altrimenti uno ricavato dalla dimensione delle icone.
+function passoMac(letto) {
+  const icona = Number.isFinite(letto.dimensioneIcone) && letto.dimensioneIcone > 0 ? letto.dimensioneIcone : 64;
+  const base = Math.max(80, Math.round(icona * 1.6));
+  const voci = letto.voci || [];
+  const buono = (d) => (d && d >= Math.max(48, icona) ? d : null);
+  const x = buono(passoVisto(voci, 'x'));
+  const y = buono(passoVisto(voci, 'y'));
+  return { x: x || y || base, y: y || x || base };
+}
+
 // La griglia dello schermo principale. Con «Allinea alla griglia» (o «Disponi automaticamente») le icone stanno già
 // sulla griglia di Windows: le nuove posizioni ne prendono l'allineamento, così riaccendendola nessuna salta di posto.
-function griglia(letto) {
+// Su Mac la posizione è il centro dell'icona, col nome sotto: il centro sta almeno mezza icona dentro l'area, mezzo
+// passo dai lati quando si parte dall'angolo (il nome è largo quanto la casella).
+function griglia(letto, piattaforma = 'win32') {
   const a = letto && letto.area;
-  const p = letto && letto.passo;
+  const centro = piattaforma === 'darwin';
+  const p = letto && (letto.passo || (centro && a ? passoMac(letto) : null));
   if (!a || !p || !(p.x >= 8 && p.y >= 8)) return { errore: 'griglia' };
   if (a.destra - a.sinistra < p.x || a.basso - a.alto < p.y) return { errore: 'griglia' };
   const dentro = (letto.voci || []).filter((v) => v.x >= a.sinistra && v.x < a.destra && v.y >= a.alto && v.y < a.basso);
   const allineate = (letto.griglia || letto.auto) && dentro.length;
-  const ox = allineate ? piuFrequente(dentro.map((v) => resto(v.x, p.x))) : resto(a.sinistra, p.x);
-  const oy = allineate ? piuFrequente(dentro.map((v) => resto(v.y, p.y))) : resto(a.alto, p.y);
-  const x0 = a.sinistra + resto(ox - a.sinistra, p.x);
-  const y0 = a.alto + resto(oy - a.alto, p.y);
-  const colonne = Math.floor((a.destra - x0) / p.x);
-  const righe = Math.floor((a.basso - y0) / p.y);
+  const icona = Math.round((Number.isFinite(letto.dimensioneIcone) && letto.dimensioneIcone > 0 ? letto.dimensioneIcone : 64) / 2);
+  const lx = a.sinistra + (!centro ? 0 : allineate ? icona : Math.round(p.x / 2));
+  const ly = a.alto + (centro ? icona : 0);
+  const ox = allineate ? piuFrequente(dentro.map((v) => resto(v.x, p.x))) : resto(lx, p.x);
+  const oy = allineate ? piuFrequente(dentro.map((v) => resto(v.y, p.y))) : resto(ly, p.y);
+  const x0 = lx + resto(ox - lx, p.x);
+  const y0 = ly + resto(oy - ly, p.y);
+  const colonne = centro ? Math.floor((a.destra - Math.round(p.x / 2) - x0) / p.x) + 1 : Math.floor((a.destra - x0) / p.x);
+  const righe = centro ? Math.floor((a.basso - (p.y - icona) - y0) / p.y) + 1 : Math.floor((a.basso - y0) / p.y);
   if (colonne < 1 || righe < 1) return { errore: 'griglia' };
   return { x0, y0, passoX: p.x, passoY: p.y, colonne, righe };
 }
 
 // Dove va ogni icona: in fila da sinistra a destra e poi la riga sotto, o dall'alto in basso e poi la colonna a destra.
-function piano(letto, q) {
-  const g = griglia(letto);
+function piano(letto, q, piattaforma = 'win32') {
+  const g = griglia(letto, piattaforma);
   if (g.errore) return g;
   const voci = ordina(letto.voci || [], q);
   const posti = g.colonne * g.righe;
@@ -448,41 +621,83 @@ function verifica(posizioni, letto, g) {
   return { fuoriPosto, mancanti };
 }
 
-const disposizione = (letto) => ({ auto: !!letto.auto, voci: (letto.voci || []).map((v) => [v.id, v.x, v.y]) });
+// L'ordine che legge chi guarda, riletto dopo lo spostamento: è l'unica prova che il sistema le ha lasciate in fila.
+// Due icone nella stessa casella non si leggono in nessun ordine: l'ordine non c'è.
+function inOrdine(posizioni, letto, g, verso) {
+  const dove = new Map((letto.voci || []).map((v) => [v.id, v]));
+  const presenti = posizioni.filter((p) => dove.has(p.id));
+  if (!presenti.length) return false;
+  const viste = presenti.map((p) => {
+    const v = dove.get(p.id);
+    return { id: p.id, col: Math.round((v.x - g.x0) / g.passoX), riga: Math.round((v.y - g.y0) / g.passoY) };
+  }).sort((a, b) => (verso === 'colonne' ? (a.col - b.col) || (a.riga - b.riga) : (a.riga - b.riga) || (a.col - b.col)));
+  for (let i = 1; i < viste.length; i++) if (viste[i].col === viste[i - 1].col && viste[i].riga === viste[i - 1].riga) return false;
+  return viste.every((v, i) => v.id === presenti[i].id);
+}
+
+const disposizione = (letto) => ({
+  auto: !!letto.auto,
+  voci: (letto.voci || []).map((v) => [v.id, v.x, v.y]),
+  ...(typeof letto.finder === 'string' ? { finder: letto.finder } : {}),
+});
 const stessaDisposizione = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 // ── Le frasi ────────────────────────────────────────────────────────────────
 
 const IMPOSTAZIONI_WINDOWS = 'tasto destro sul desktop → Visualizza';
-function spiega(errore, { totale = 0, posti = 0 } = {}) {
-  const T = {
+const IMPOSTAZIONI_FINDER = 'tasto destro sulla Scrivania → Mostra opzioni Vista';
+const PILE = 'Se la Scrivania usa le pile vanno tolte (tasto destro sulla Scrivania → Usa pile), poi Filo riprova.';
+function spiega(errore, { totale = 0, posti = 0, piattaforma = 'win32', criterio = 'data' } = {}) {
+  const mac = piattaforma === 'darwin';
+  const dato = criterio === 'dimensione' ? 'quanto sono grandi i file' : 'quando sono stati modificati i file';
+  const T = mac ? {
+    'senza-dati': { frase: `Il Finder non ha detto a Filo ${dato} della Scrivania: senza quel dato non può mettere le icone in ordine ${criterio === 'dimensione' ? 'per dimensione' : 'per data'}, in ordine alfabetico sì.` },
+    'nessun-desktop': { frase: 'Il Finder non ha fatto vedere a Filo le icone della Scrivania.' },
+    'permesso-automazione': {
+      frase: 'macOS non lascia a Filo comandare il Finder, che tiene le icone della Scrivania.',
+      dove: 'Si concede in Impostazioni di Sistema → Privacy e sicurezza → Automazione: sotto Filo, accendi Finder.',
+      apri: 'mac-automazione',
+    },
+    finder: { frase: 'Il Finder non risponde: senza il Finder le icone della Scrivania non si spostano.' },
+    griglia: { frase: 'Il Finder non ha detto quanto è grande la Scrivania, e senza quel numero Filo non sa dove mettere le icone.' },
+    'non-ci-stanno': {
+      frase: `Sulla Scrivania ci sono ${totale} icone e lo schermo, in griglia, ne tiene ${posti}: in ordine non ci stanno tutte.`,
+      dove: `Con le icone più piccole ci stanno (${IMPOSTAZIONI_FINDER} → Dimensione icone): poi Filo le rimette in ordine.`,
+    },
+    'non-spostate': { frase: 'Il Finder non ha spostato le icone della Scrivania.', dove: PILE },
+    'fuori-ordine': { frase: 'Il Finder ha spostato le icone, ma rileggendo la Scrivania non sono nell\'ordine chiesto.', dove: PILE },
+    'tempo-comando': { frase: 'Il Finder non ha risposto in tempo.' },
+  } : {
     'nessun-desktop': {
       frase: 'Windows non ha dato a Filo il desktop: succede se Esplora risorse è fermo, o se il desktop lo disegna un altro programma.',
       dove: 'Esplora risorse si riavvia da Gestione attività: clic destro su «Esplora risorse» → Riavvia.',
     },
+    'senza-dati': { frase: `Windows non ha detto a Filo ${dato} del desktop: senza quel dato non può mettere le icone in ordine ${criterio === 'dimensione' ? 'per dimensione' : 'per data'}, in ordine alfabetico sì.` },
     griglia: { frase: 'Windows non ha detto quanto sono distanti le icone del desktop, e senza quel numero Filo non sa dove metterle.' },
     'non-ci-stanno': {
       frase: `Sul desktop ci sono ${totale} icone e lo schermo, in griglia, ne tiene ${posti}: in ordine non ci stanno tutte.`,
       dove: `Con le icone più piccole ci stanno (${IMPOSTAZIONI_WINDOWS} → Icone piccole): poi Filo le rimette in ordine.`,
     },
     'non-spostate': { frase: 'Windows non ha spostato le icone: può impedirlo una regola dell\'azienda o un programma che tiene in ordine il desktop.' },
+    'fuori-ordine': {
+      frase: 'Windows ha spostato le icone, ma rileggendo il desktop non sono nell\'ordine chiesto: qualcosa le ha rimesse altrove.',
+      dove: 'Di solito è un programma che organizza il desktop (come Fences): chiuso quello, Filo riprova.',
+    },
     'tempo-comando': { frase: 'Windows non ha risposto in tempo dal desktop.' },
-    mac: {
-      frase: 'Su Mac Filo non sa ancora spostare le icone della Scrivania.',
-      dove: 'Il Finder le mette in ordine da sé, a colonne partendo da destra: tasto destro sulla Scrivania → Ordina per → Nome.',
-    },
-    linux: {
-      frase: 'Su Linux le icone del desktop le dispone l\'ambiente grafico (GNOME, KDE, XFCE…), e Filo non sa ancora spostarle.',
-      dove: 'Di solito si mettono in ordine col tasto destro sul desktop.',
-    },
-    prove: { frase: 'Durante le prove automatiche Filo non tocca il desktop vero.' },
   };
-  const voce = Object.prototype.hasOwnProperty.call(T, errore) ? T[errore] : { frase: 'Windows non ha spostato le icone del desktop.' };
-  return { errore, frase: voce.frase, ...(voce.dove ? { dove: voce.dove } : {}) };
+  T.linux = {
+    frase: 'Su Linux le icone del desktop le dispone l\'ambiente grafico (GNOME, KDE, XFCE…), e Filo non sa ancora spostarle.',
+    dove: 'Di solito si mettono in ordine col tasto destro sul desktop.',
+  };
+  T.prove = { frase: 'Durante le prove automatiche Filo non tocca il desktop vero.' };
+  const ignoto = { frase: mac ? 'Il Finder non ha spostato le icone della Scrivania.' : 'Windows non ha spostato le icone del desktop.' };
+  const voce = Object.prototype.hasOwnProperty.call(T, errore) ? T[errore] : ignoto;
+  const apri = voce.apri && Sistema.uriImpostazioni(voce.apri) ? { apri: voce.apri } : {};
+  return { errore, frase: voce.frase, ...(voce.dove ? { dove: voce.dove } : {}), ...apri };
 }
 
 function fallito(errore, extra = {}) {
-  return { ok: false, cosa: 'desktop', ...spiega(errore, extra), ...extra };
+  return { ok: false, cosa: 'desktop', ...spiega(errore, { piattaforma: piattaformaDi(), ...extra }), ...extra };
 }
 
 function comeDetto(come) {
@@ -495,13 +710,15 @@ function esitoPerModello(o) {
   if (!o || !o.ok) {
     if (o && o.errore === 'richiesta') return `Non fatto: ${o.frase}. Correggi i parametri e riprova.`;
     const s = o || spiega('sconosciuto');
+    const apri = s.apri ? ' Sotto la tua risposta l\'utente trova il tasto che apre quelle impostazioni: diglielo.' : '';
     const resto = s.cambio ? ` Qualcosa sul desktop è cambiato lo stesso: si rimette com'era con ANNULLA_CAMBIO, id ${s.cambio}.` : '';
-    return `Non fatto: ${s.frase}${s.dove ? ` ${s.dove}` : ''} Riporta all'utente queste parole; non riprovare uguale.${resto}`;
+    return `Non fatto: ${s.frase}${s.dove ? ` ${s.dove}` : ''}${apri} Riporta all'utente queste parole; non riprovare uguale.${resto}`;
   }
   if (o.vuoto) return 'Sul desktop non ci sono icone: niente da mettere in ordine.';
   if (o.gia) return `Le ${o.totale} icone del desktop erano già ${comeDetto(o)}: niente spostato.`;
-  const parti = [`Icone del desktop ${comeDetto(o)}: ${o.spostate} icone su ${o.righe} ${o.righe === 1 ? 'riga' : 'righe'} e ${o.colonne} ${o.colonne === 1 ? 'colonna' : 'colonne'}, sullo schermo principale.`];
-  if (o.autoTolto) parti.push('Era acceso «Disponi automaticamente», che le rimette in colonna: Filo l\'ha spento, dillo all\'utente.');
+  const parti = [`Icone del desktop ${comeDetto(o)}: ${o.spostate} icone su ${o.righe} ${o.righe === 1 ? 'riga' : 'righe'} e ${o.colonne} ${o.colonne === 1 ? 'colonna' : 'colonne'}, sullo schermo principale. Rilette dopo lo spostamento: sono nell'ordine chiesto.`];
+  if (o.autoTolto && o.mac) parti.push('Il Finder le teneva in ordine da sé («Ordina per» della Scrivania) e le avrebbe rimesse nel suo: Filo l\'ha tolto, dillo all\'utente.');
+  else if (o.autoTolto) parti.push('Era acceso «Disponi automaticamente», che le rimette in colonna: Filo l\'ha spento, dillo all\'utente.');
   if (o.fuoriPosto) parti.push(`${o.fuoriPosto} icone non sono finite al loro posto: dillo all'utente.`);
   if (o.mancanti) parti.push(`${o.mancanti} icone sono sparite dal desktop durante lo spostamento.`);
   if (o.nascoste) parti.push('Le icone del desktop sono nascoste: si vedono rimettendo la spunta su «Mostra icone del desktop» (tasto destro sul desktop → Visualizza). Diglielo.');
@@ -530,15 +747,23 @@ async function eseguiScript(comando, p) {
   const u = Sistema.leggiUscita(r.stdout);
   if (r.timedOut && !u.voci.length) u.voci.push({ k: 'errore', v: 'tempo-comando', righe: [] });
   if (r.truncated) u.troncato = true;
+  // Uno script morto prima di scrivere non è un desktop vuoto.
+  if (!u.voci.length) u.voci.push({ k: 'errore', v: 'eccezione', righe: [] }, { k: 'dettaglio', v: String(r.stderr || '').slice(0, 500), righe: [] });
   return u;
 }
 
 // Il computer vero, oppure quello delle prove: stessa forma, dati già interpretati.
 const COMPUTER = {
   async leggi() { return interpretaLettura(await eseguiScript('desktop-leggi', {})); },
-  async disponi(posizioni, { auto = false } = {}) { return interpretaLettura(await eseguiScript('desktop-disponi', { posizioni, auto })); },
+  async disponi(posizioni, { auto = false, disposizione } = {}) {
+    return interpretaLettura(await eseguiScript('desktop-disponi', { posizioni, auto, disposizione }));
+  },
 };
 const computer = () => computerFinto || COMPUTER;
+// Il desktop finto dice da sé di che sistema è (`piattaforma`); senza, è un Windows.
+function piattaformaDi() {
+  return computerFinto ? computerFinto.piattaforma || 'win32' : process.platform;
+}
 
 // Data e dimensione le dice il disco: le icone di sistema non ne hanno, e un disco che non risponde non ferma le altre.
 async function arricchisci(voci) {
@@ -572,26 +797,43 @@ function registraCambio(prima, dopo, come) {
   }
 }
 
+// Uno spostamento che si ferma a metà lascia il desktop cambiato: quel cambio si registra, e l'esito dà l'annullo.
+async function nonRiuscito(letto, dopo, errore) {
+  const ora = dopo && dopo.ok ? dopo : await computer().leggi().catch(() => null);
+  const evento = ora && ora.ok ? registraCambio(letto, ora, null) : null;
+  return { ...fallito(errore), ...(evento ? { cambio: evento.id } : {}) };
+}
+
 async function ordinaOra(q) {
   const letto = await computer().leggi();
   if (!letto.ok) return fallito(letto.errore);
+  const sistema = piattaformaDi();
   const come = { ordine: q.ordine, verso: q.verso, alContrario: q.alContrario, cartellePrima: q.cartellePrima };
   if (!letto.voci.length) return { ok: true, cosa: 'desktop', ...come, detto: comeDetto(come), vuoto: true, totale: 0, spostate: 0 };
-  if (q.ordine === 'data' || q.ordine === 'dimensione') await arricchisci(letto.voci);
-  const p = piano(letto, q);
+  if (q.ordine === 'data' || q.ordine === 'dimensione') {
+    await arricchisci(letto.voci);
+    // Senza il dato per nessuna icona il piano è l'ordine per nome, e la rilettura lo confermerebbe come «fatto».
+    const chi = letto.voci.filter((v) => (sistema === 'darwin' || percorsoDiFile(v.id)) && (q.ordine === 'data' || !v.cartella));
+    if (chi.length && !chi.some((v) => Number.isFinite(v[q.ordine]))) return fallito('senza-dati', { criterio: q.ordine });
+  }
+  const p = piano(letto, q, sistema);
   if (p.errore) return fallito(p.errore, p.errore === 'non-ci-stanno' ? { totale: p.totale, posti: p.posti } : {});
   const base = {
     ok: true, cosa: 'desktop', ...come, detto: comeDetto(come), totale: letto.voci.length, righe: p.righe, colonne: p.colonne, nascoste: letto.nascoste,
+    ...(sistema === 'darwin' ? { mac: true } : {}),
   };
   const ora = new Map(letto.voci.map((v) => [v.id, v]));
   if (!letto.auto && p.posizioni.every((x) => ora.get(x.id).x === x.x && ora.get(x.id).y === x.y)) {
     return { ...base, gia: true, spostate: 0 };
   }
   const fatto = await computer().disponi(p.posizioni, { auto: false });
-  if (!fatto.ok) return fallito(fatto.errore);
+  if (!fatto.ok) return nonRiuscito(letto, null, fatto.errore);
   const { fuoriPosto, mancanti } = verifica(p.posizioni, fatto, p.griglia);
+  if (!inOrdine(p.posizioni, fatto, p.griglia, q.verso)) {
+    const mosso = !stessaDisposizione(disposizione(letto), disposizione(fatto));
+    return nonRiuscito(letto, fatto, mosso ? 'fuori-ordine' : 'non-spostate');
+  }
   const evento = registraCambio(letto, fatto, come);
-  if (fuoriPosto && fuoriPosto + mancanti >= p.posizioni.length) return { ...fallito('non-spostate'), ...(evento ? { cambio: evento.id } : {}) };
   return {
     ...base,
     spostate: p.posizioni.length - fuoriPosto - mancanti,
@@ -607,7 +849,7 @@ function sulDesktop(fn) {
     try {
       // Una prova che si è dimenticata il computer finto non sposta le icone di chi la lancia.
       if (!computerFinto && process.env.NODE_ENV === 'test') return fallito('prove');
-      if (!computerFinto && process.platform !== 'win32') return fallito(process.platform === 'darwin' ? 'mac' : 'linux');
+      if (!computerFinto && !PIATTAFORME.includes(process.platform)) return fallito('linux');
       return await fn();
     } catch (e) {
       console.warn('[Filo] icone del desktop non spostate', e && e.message ? e.message : e);
@@ -627,14 +869,15 @@ function ordinaIcone(richiesta) {
 function rimetti(d) {
   const voci = d && Array.isArray(d.voci) ? d.voci.filter((v) => Array.isArray(v) && typeof v[0] === 'string' && Number.isInteger(v[1]) && Number.isInteger(v[2])) : [];
   const auto = !!(d && d.auto);
+  const finder = d && DISPOSIZIONI_FINDER.includes(d.finder) ? { disposizione: d.finder } : {};
   return sulDesktop(async () => {
     const letto = await computer().leggi();
     if (!letto.ok) return fallito(letto.errore);
     const ci = new Set(letto.voci.map((v) => v.id));
     const posizioni = voci.filter((v) => ci.has(v[0])).map(([id, x, y]) => ({ id, x, y }));
     const sparite = voci.length - posizioni.length;
-    const fatto = await computer().disponi(posizioni, { auto });
-    if (!fatto.ok) return fallito(fatto.errore);
+    const fatto = await computer().disponi(posizioni, { auto, ...finder });
+    if (!fatto.ok) return nonRiuscito(letto, null, fatto.errore);
     const evento = registraCambio(letto, fatto, null);
     return { ok: true, cosa: 'desktop', rimesse: posizioni.length, sparite, ...(evento ? { cambio: evento.id } : {}) };
   });
@@ -647,5 +890,6 @@ const _perProve = {
 
 module.exports = {
   ordinaIcone, rimetti, esitoPerModello, normalizzaRichiesta, comeDetto, _perProve,
-  SCRIPT, CS_DESKTOP, PEZZO_MAX, costruisci, ambienteDisponi, interpretaLettura, ordina, griglia, piano, verifica, spiega,
+  SCRIPT, CS_DESKTOP, JXA_DESKTOP, PEZZO_MAX, PIATTAFORME, DISPOSIZIONI_FINDER,
+  costruisci, ambienteDisponi, interpretaLettura, ordina, griglia, piano, verifica, inOrdine, spiega,
 };

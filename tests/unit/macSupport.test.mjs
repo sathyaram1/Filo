@@ -1028,6 +1028,15 @@ test('su Mac Filo dice perché legge Documenti, Scrivania e Download', () => {
   }
 });
 
+// Le icone della Scrivania (#1617) le sposta il Finder, comandato da osascript: senza la frase macOS nega gli Apple
+// Events senza chiedere, e l'utente non trova Filo da accendere in Privacy → Automazione.
+test('su Mac Filo dice perché comanda il Finder', () => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  const info = (pkg.build && pkg.build.mac && pkg.build.mac.extendInfo) || {};
+  assert.ok(typeof info.NSAppleEventsUsageDescription === 'string' && /Finder/.test(info.NSAppleEventsUsageDescription),
+    'manca NSAppleEventsUsageDescription in build.mac.extendInfo');
+});
+
 // Su Mac chiudere l'ultima finestra NON spegne Filo: resta nel Dock. Suono e
 // pulsante che ferma vivono in una finestra, quindi senza garantirne una il
 // timer scade vivo e muto e la notifica non porta da nessuna parte. È il caso
