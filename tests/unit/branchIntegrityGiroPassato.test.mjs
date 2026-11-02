@@ -238,6 +238,36 @@ describe('D-207 — prepareBranch: la punta pubblicata è l’ultima consegna', 
     } finally { togliCartella(base); }
   });
 
+  // Con origin muto la punta che la cartella ricorda è dell'ultimo scaricamento, cioè del giro passato (#1779.1).
+  test('origin che non risponde: niente giro passato dato per ultima consegna; tornato origin, si parte dalla punta', () => {
+    const { base, origin, work, vecchio } = repo();
+    try {
+      const nuovo = avantiAltrove(base, origin);
+      renameSync(origin, `${origin}.spento`);
+      const r = prepareBranch({ root: work, branch: RAMO, checkpoint: vecchio });
+      assert.equal(r.ok, false, `preparata su ${r.head} senza aver potuto chiedere a origin la punta`);
+      assert.equal(r.kind, 'transient', 'la rete torna: si riprova al giro dopo, il ramo non si dà per perso');
+      assert.ok(r.message.includes(RAMO), r.message);
+      assert.match(r.message, /origin\.git/, `il messaggio porta l'errore di git: ${r.message}`);
+      renameSync(`${origin}.spento`, origin);
+      const ancora = prepareBranch({ root: work, branch: RAMO, checkpoint: vecchio });
+      assert.equal(ancora.ok, true, ancora.message);
+      assert.equal(ancora.head, nuovo, 'le correzioni del giro 3 arrivano a chi lavora dopo');
+    } finally { togliCartella(base); }
+  });
+
+  test('ramo mai spedito, origin che risponde «non c\'è»: si riprende dal locale come prima', () => {
+    const { base, work } = repo();
+    try {
+      git(work, 'checkout', '-q', '-b', 'worker/mai-spedito');
+      const locale = commit(work, 'locale.txt', 'la spedizione non è mai riuscita\n');
+      git(work, 'checkout', '-q', 'main');
+      const r = prepareBranch({ root: work, branch: 'worker/mai-spedito', checkpoint: locale });
+      assert.equal(r.ok, true, r.message);
+      assert.equal(r.head, locale);
+    } finally { togliCartella(base); }
+  });
+
   test('punto fermo uguale alla punta: come prima, e il moncone non spedito va di lato', () => {
     const { base, work, vecchio } = repo();
     try {
