@@ -90,6 +90,7 @@ if (isMain) {
     process.exit(3);
   }
   const fileDiff = join(dir, FILE_DIFF);
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
   writeFileSync(fileDiff, diff.diff, { encoding: 'utf8', mode: 0o600 });
   scriviRicevuta(root, { ramo, base: estremi.base, head: estremi.head, prove: conta.conto.lavoro, riga: rigaDelConto(conta.conto) }, { dir });
   console.log([
