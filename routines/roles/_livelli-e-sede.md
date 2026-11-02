@@ -75,7 +75,8 @@ suo feedback.
 
 **Il segno `?`** dopo la lettera (`[2i?]`, `[1v?]`, `[1e?]`) dice che il
 rilievo chiede una decisione dell'owner, su un trade-off che non si misura
-(prodotto, gusto, dati dell'utente: CLAUDE.md § Iniziativa), e porta la sua
+(prodotto, gusto, dati dell'utente, un costo senza il dato per stimarlo:
+CLAUDE.md § Iniziativa), e porta la sua
 domanda (più sotto). Non copre un trade-off di costo: deciso con la stima e le
 opzioni esposte non è un rilievo, altrimenti è un rilievo senza `?` (criteri
 di verifica, punto 8). Un difetto non chiede decisioni.
