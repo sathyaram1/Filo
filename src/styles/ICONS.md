@@ -143,6 +143,9 @@ self.SN_ICONS_UTIL = { isSvgIcon, wrap };
 | `link` | Due anelli di catena: collegamento |
 | `highlight` | Evidenziatore inclinato col segno che lascia: evidenzia |
 | `cut` | Forbici aperte: taglia |
+| `play` | Triangolo che punta a destra: riproduci (fila su un filmato) |
+| `pause` | Due sbarre verticali: pausa |
+| `pip` | Schermo con la finestrella nell'angolo: finestra mobile |
 | `bell` | Campanella: promemoria/notifica (prevista) |
 | `repeat` | Due frecce a ciclo: automazione ricorrente (prevista) |
 | `question` | Cerchio con "?": Filo chiede all'utente (prevista) |
