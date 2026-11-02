@@ -2493,6 +2493,12 @@ export function emit(bucket, ctx) {
     process.stderr.write(`[dispatch] non riesco a scrivere i pezzi grossi del payload in file (${e.message}): restano nella stampa\n`);
     payload = immaginiSenzaByte(pieno, e.message);
   }
+  // La verifica piena lascia la sua richiesta al lettore del diff (#1363): la sua presenza rende la lettura dovuta.
+  if (bucket.role === 'verifier' && ambito.scope === 'pieno') {
+    try { scriviRichiesta(ROOT, { ramo: ramoCorrente(ROOT), richiesta: richiestaDalPayload(payload) }); } catch (e) {
+      process.stderr.write(`[dispatch] la richiesta per la lettura del diff non si scrive (${e.message}): la lettura non si potrà fare\n`);
+    }
+  }
   const out = stampaCon(payload, istr, fileIstr);
   lastEmitted = { role: bucket.role, num: bucket.num || '' };
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
