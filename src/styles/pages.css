@@ -845,6 +845,8 @@ section:has(#rifiutateList) .sn-spell-add-row {
 .sn-page #cookie-done-list li,
 .sn-page #sec-delicate-campi-list li,
 .sn-page #cookie-accessi-list li,
+.sn-page #cookie-riquadri-list li,
+.sn-page #sec-safebrowse-fidati-list li,
 .sn-page #sec-perm-list li {
   display: flex;
   align-items: center;
@@ -862,6 +864,8 @@ section:has(#rifiutateList) .sn-spell-add-row {
 .sn-page #cookie-done-list li button,
 .sn-page #sec-delicate-campi-list li button,
 .sn-page #cookie-accessi-list li button,
+.sn-page #cookie-riquadri-list li button,
+.sn-page #sec-safebrowse-fidati-list li button,
 .sn-page #sec-perm-list li button {
   font-size: 12px;
   padding: 2px 8px;

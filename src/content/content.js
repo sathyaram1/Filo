@@ -355,6 +355,12 @@
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
     });
+    // Tornati su Filo da un'altra applicazione, o arrivati in una scheda dopo un sito spento: gli avvisi rimasti in coda
+    // arrivano qui (#1478.1).
+    if (!IS_SUBFRAME) {
+      window.addEventListener('focus', () => { prendiAvvisiInCoda(); });
+      prendiAvvisiInCoda();
+    }
 
     // Marker per i test: `filoReady` dice solo che i moduli sono caricati, questo che i
     // listener sono attivi, spellcheck compreso. Innocuo a runtime.
@@ -888,6 +894,29 @@
   // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).
   const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
 
+  // Gli avvisi di sistema li mostra solo la pagina che si sta guardando: in un'altra applicazione nessuno li vedrebbe.
+  function inVistaAdesso() {
+    return !IS_SUBFRAME && document.visibilityState === 'visible' && document.hasFocus();
+  }
+
+  function mostraAvviso(msg) {
+    // `rimedio` sceglie solo fra le pagine note di SN_CHAT_ERRORS: l'indirizzo non viaggia nel messaggio.
+    Popup?.showToast?.(String(msg.text || ''), {
+      duration: Number(msg.duration) || 2800, rimedio: msg.rimedio || null, segnala: typeof msg.segnala === 'string' ? msg.segnala : '',
+    });
+  }
+
+  // Un avviso che il main tiene in coda (#1478.1) si prende prima di mostrarlo: chi lo prende l'ha davanti, e nessun'altra
+  // pagina lo ripete. Senza `id` quelli rimasti in coda. Se la finestra è davanti lo dice il main: il fuoco può stare sulla barra.
+  async function prendiAvvisiInCoda(id) {
+    if (IS_SUBFRAME || document.visibilityState !== 'visible' || isBlocked()) return;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.AVVISI_IN_CODA, fuoco: document.hasFocus(), ...(id ? { id } : {}) }); } catch (_) { return; }
+    for (const m of (r && Array.isArray(r.avvisi) ? r.avvisi : [])) {
+      try { mostraAvviso(m); } catch (_) {}
+    }
+  }
+
   // Il segno che legge il ponte del tasto destro (page-preload.js) a ogni clic, rifatto a ogni cambio dell'elenco.
   // Spegnendosi se ne va il menu di Filo già aperto; l'Aiuto aperto resta, perché ci si sta parlando.
   function seguiSpento() {
@@ -1059,6 +1088,7 @@
 
   // Dopo il clic sulla voce, non dentro: il clic che risale al documento chiuderebbe il menu appena aperto.
   function apriMenuDelSito(sito) {
+    Popup.conta({ misura: 'menu-nativo', voce: 'menu_del_sito:voce' });
     setTimeout(async () => {
       let esito = null;
       try { esito = await self.__snMenuDelSito.apri(sito); } catch (_) { esito = null; }
@@ -1074,7 +1104,10 @@
   // `conMaiusc`: sui siti dove il tasto destro apre il loro menu, Shift porta qui (#975).
   async function onContextMenu(e, opzioni) {
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch); Shift+F10 è la tastiera che chiede il nostro.
-    if (e.shiftKey && !(opzioni && opzioni.conMaiusc) && !(Menu.daTastiera && Menu.daTastiera())) return;
+    if (e.shiftKey && !(opzioni && opzioni.conMaiusc) && !(Menu.daTastiera && Menu.daTastiera())) {
+      if (e.isTrusted) Popup.conta({ misura: 'menu-nativo', voce: 'shift_tasto_destro' });
+      return;
+    }
     // Prima di ogni attesa: dopo, il cammino dell'evento non c'è più.
     const sito = statoMenuDelSito(e, opzioni);
 
@@ -1083,10 +1116,10 @@
     e.stopPropagation();
 
     const avviso = self.SN_AVVISI?.avvisoSotto?.(realTarget(e));
-    if (avviso) { openAvvisoMenu(avviso, e); return; }
+    if (avviso) { contaContesto(['avviso']); openAvvisoMenu(avviso, e); return; }
     // Il documento trovato dall'Aiuto (#947.3): le azioni di un file, non quelle della pagina.
     const file = self.SN_SIDEBAR?.fileSotto?.(realTarget(e));
-    if (file) { Menu.open({ x: e.clientX, y: e.clientY, items: file.map((a) => ({ type: 'item', label: a.label, onClick: () => a.fn() })) }); return; }
+    if (file) { contaContesto(['file']); Menu.open({ x: e.clientX, y: e.clientY, items: file.map((a) => ({ type: 'item', label: a.label, onClick: () => a.fn() })) }); return; }
 
     // Il correttore (#1446): su un segno, il menu del segno; nelle caselle di una riga, che Filo non segna, la parola
     // sotto il cursore. Il resto è il menu normale, che sul campo porta «Correggi tutti gli errori».
@@ -1096,6 +1129,7 @@
         // Il valore sopra un segnaposto (#1448) ha il menu del suo segnaposto.
         const valore = SpellCheck.valoreSotto(rt);
         if (valore) {
+          contaContesto(['campo']);
           await openSpellMarksMenu(valore.el, { errore: null, suggerimento: valore.segno }, e, sito);
           return;
         }
@@ -1103,6 +1137,7 @@
         if (editableEl) {
           const sotto = SpellCheck.segniSotto(editableEl, e.clientX, e.clientY);
           if (sotto.errore || sotto.suggerimento) {
+            contaContesto(['campo']);
             await openSpellMarksMenu(editableEl, sotto, e, sito);
             return;
           }
@@ -1111,6 +1146,7 @@
           const wordCtx = SpellCheck.erroriAttivi() ? SpellCheck.getWordAt(editableEl, e.clientX, e.clientY) : null;
           if (wordCtx && !SpellCheck.parolaGiusta(editableEl, wordCtx.word)
             && (SpellCheck.getNativeSuggestions(wordCtx.word).length || SpellCheck.sbagliataPerIlBrowser(wordCtx.word))) {
+            contaContesto(['campo']);
             await openSpellWordMenu(editableEl, wordCtx, e, sito);
             return;
           }
@@ -1119,6 +1155,7 @@
         if (inputEl && isTextLikeInput(inputEl) && !SpellCheck.campoEscluso(inputEl)) {
           const wordCtx = SpellCheck.getInputWordAt?.(inputEl, e.clientX, e.clientY);
           if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
+            contaContesto(['campo']);
             await openSpellWordMenu(inputEl, wordCtx, e, sito);
             return;
           }
@@ -1129,6 +1166,20 @@
     }
 
     await openNormalMenuAt(e, sito);
+  }
+
+  // Su che cosa si apre il box (#1468): bandiere da un elenco chiuso; la chiave, o «misto», la fa il main.
+  function contaContesto(bandiere) { Popup.conta({ misura: 'contesto-box', bandiere }); }
+  // «livelli»: l'elemento trovato sotto un altro che lo copre (i `*Under` ci sono solo senza quello diretto).
+  function bandiereDelContesto({ selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable }) {
+    const b = [];
+    if (selInfo) b.push('selezione');
+    if (linkEl || linkUnder) b.push('collegamento');
+    if (imgEl || imgUnder) b.push('immagine');
+    if (mediaEl || mediaUnder) b.push('media');
+    if (editable) b.push('campo');
+    if (linkUnder || imgUnder || mediaUnder) b.push('livelli');
+    return b.length ? b : ['pagina'];
   }
 
   // Le azioni dell'avviso e «Chiudi», nello stesso ordine del menu degli avvisi della barra.
@@ -1179,6 +1230,7 @@
     const {
       linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable,
     } = detectContext(target, e.clientX, e.clientY);
+    contaContesto(bandiereDelContesto({ selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable }));
     if (editable) capturePasteContext(target);
     else pasteContext = null;
     const clipboardHistory = await Actions.getClipboardHistory();
@@ -2145,7 +2197,10 @@
       // cosa non si chiamano in due modi.
       label: `Dimensione reale (ora ${p}%)`,
       shortcut: Tasti.etichetta('Ctrl+0'),
-      onClick: () => { try { zoomPagina()?.azzera(); } catch (_) {} },
+      onClick: () => {
+        Popup.conta({ misura: 'strada', id: 'zoom_reset', via: 'tasto_destro_altro' });
+        try { zoomPagina()?.azzera(); } catch (_) {}
+      },
     };
   }
 
@@ -2205,7 +2260,10 @@
       type: 'item',
       label: I18n.t('menu_help'),
       shortcut: Tasti.etichettaFilo(Tasti.scorciatoiaFilo('open-help-sidebar')),
-      onClick: () => openSurface('help', () => openHelpSidebar()),
+      onClick: () => {
+        Popup.conta({ misura: 'strada', id: 'help', via: 'tasto_destro_altro' });
+        openSurface('help', () => openHelpSidebar());
+      },
     };
   }
 
@@ -2346,10 +2404,10 @@
     // Video/audio cliccato direttamente: le sue azioni vengono prima (un filmato
     // dentro una scheda-link resta soprattutto un filmato)…
     if (mediaEl) {
-      for (const it of Actions.buildMediaItems(mediaEl)) items.push(it);
       // Un media dentro un <a> è ANCHE un collegamento e spesso è il link che si vuole (#434).
       // Non è sempre un antenato: nelle home l'anteprima si stende sopra il link (#444).
       const link = linkEl || linkUnder;
+      for (const it of Actions.buildMediaItems(mediaEl, link)) items.push(it);
       if (link) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(link)) items.push(it);
@@ -2399,7 +2457,7 @@
       // caso un link sopra non deve intrufolarsi nel menu di quel link.
       const mediaInLink = belongsTo(mediaUnder, linkEl, layers) ? mediaUnder : null;
       if (mediaInLink) {
-        for (const it of Actions.buildMediaItems(mediaInLink)) items.push(it);
+        for (const it of Actions.buildMediaItems(mediaInLink, linkEl)) items.push(it);
         items.push({ type: 'separator' });
       }
       // Stessa storia con la copertina ferma: le schede la coprono con un velo che regge il
@@ -2429,10 +2487,11 @@
     // Nessun altro contesto, ma sotto al punto cliccato c'è un filmato coperto
     // dall'overlay del player: sono comunque le sue azioni che l'utente cerca.
     if (mediaUnder) {
-      for (const it of Actions.buildMediaItems(mediaUnder)) items.push(it);
       // Due cose prese entrambe da sotto devono stare insieme anche fra loro, o il menu
       // unirebbe due schede diverse (#444).
-      if (belongsTo(mediaUnder, linkUnder, layers)) {
+      const linkDelMedia = belongsTo(mediaUnder, linkUnder, layers) ? linkUnder : null;
+      for (const it of Actions.buildMediaItems(mediaUnder, linkDelMedia)) items.push(it);
+      if (linkDelMedia) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkUnder)) items.push(it);
         items.push({ type: 'separator' });
@@ -2490,8 +2549,10 @@
     if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.open(context);
   }
-  // Le immagini lasciate sulla pagina (#1623): il pannello vive nel frame principale.
-  Sidebar?.suChiusura?.(() => (IS_SUBFRAME || motivoBlocco() ? 'sito' : aiutoAcceso() ? '' : 'aiuto'));
+  // Le immagini lasciate sulla pagina (#1623): il pannello vive nel frame principale, o nello strato sopra il sito, che
+  // nasce solo dove Filo è acceso.
+  const nelloStratoQui = self.SN_FILO_UI?.nelloStrato === true;
+  Sidebar?.suChiusura?.(() => ((IS_SUBFRAME && !nelloStratoQui) || (!nelloStratoQui && motivoBlocco()) ? 'sito' : aiutoAcceso() ? '' : 'aiuto'));
 
   // L'icona Aiuto della barra laterale: apre, poi detta, poi ferma (#1432).
   function aiutoPasso() {
@@ -2591,12 +2652,8 @@
       // ogni riquadro incorporato li duplicherebbe (#405).
       if (IS_SUBFRAME) return;
       try {
-        if (document.visibilityState === 'visible' && document.hasFocus()) {
-          // `rimedio` sceglie solo fra le pagine note di SN_CHAT_ERRORS: l'indirizzo non viaggia nel messaggio.
-          Popup?.showToast?.(String(msg.text || ''), {
-            duration: Number(msg.duration) || 2800, rimedio: msg.rimedio || null, segnala: typeof msg.segnala === 'string' ? msg.segnala : '',
-          });
-        }
+        if (typeof msg.avviso === 'string' && msg.avviso) prendiAvvisiInCoda(msg.avviso);
+        else if (inVistaAdesso()) mostraAvviso(msg);
       } catch (_) {}
       return;
     }
@@ -2627,7 +2684,11 @@
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
       // Alt+S è un gesto rivolto a Filo: salva anche dove Filo è spento (#839); le altre scorciatoie lì tacciono.
       if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
-      if (isBlocked()) return;
+      if (isBlocked()) {
+        // La scorciatoia che qui tace, e perché (#1468): Filo spento sul sito, o una pagina dove Filo non c'è.
+        Popup.conta({ misura: 'a-vuoto', comando: String(msg.command || ''), motivo: motivoBlocco() === 'sito' ? 'filo_spento_sul_sito' : 'pagina_interna' });
+        return;
+      }
       handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }

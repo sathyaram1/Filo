@@ -88,6 +88,40 @@ test('ogni messaggio diventa la voce dei suoi elenchi, e quello che non lo è no
   assert.deepEqual(v('editor_chat', { oltreTetto: false, nonTrovato: true }).voci, ['formato_non_trovato']);
   assert.deepEqual(v('editor_chat', { oltreTetto: false, continua: true }).voci, ['continua']);
   assert.equal(v('editor_chat', { formati: 1 }), null, 'senza sapere se il documento era intero non si conta');
+  // #1586: le misure arrivate dopo, coi loro elenchi.
+  assert.deepEqual(v('anticipo_privacy', { funzione: 'segnaposto', esito: 'chiesto' }), { misura: 'anticipo_privacy', chiave: 'segnaposto', voci: ['chiesto'] });
+  assert.equal(v('anticipo_privacy', { funzione: 'correttore_parola', esito: 'saltato' }), null, 'il correttore non si ferma sulle delicate');
+  assert.deepEqual(v('correttore_automatica', { fonte: 'nome', esito: 'imparata' }).voci, ['imparata']);
+  assert.equal(v('correttore_automatica', { fonte: 'Marco', esito: 'fatta' }), null, 'la parola corretta non è una fonte');
+  assert.deepEqual(v('correttore_valuta', { esito: 'correzione_tolta' }), { misura: 'correttore_valuta', chiave: 'correzione_tolta', voci: ['n'] });
+  assert.deepEqual(v('correttore_segnaposto', { via: 'memoria', esito: 'riempito' }).voci, ['riempito']);
+  assert.equal(v('correttore_segnaposto', { via: 'wikipedia', esito: 'trovato' }), null, 'la fonte del dato non esce');
+});
+
+test('le misure facoltative partono solo con qualcosa dentro, e il documento resta valido con o senza', () => {
+  const base = { pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.249', os: 'win' };
+  const ora = C.oraVuota();
+  C.registraRiquadro(ora, 'ocr', 'copiato', ['n']);
+  const senza = C.documentoRiquadri({ ...base, dati: ora });
+  for (const c of C.MISURE_RIQUADRI_FACOLTATIVE) assert.ok(!(c in senza), `${c} vuota non parte`);
+  assert.equal(C.validaRiquadri(senza).ok, true, C.validaRiquadri(senza).motivo);
+  C.registraRiquadro(ora, 'correttore_automatica', 'fisso', ['annullata']);
+  const con = C.documentoRiquadri({ ...base, dati: ora });
+  assert.deepEqual(con.correttore_automatica, { fisso: '0,1,0' });
+  assert.ok(!('correttore_valuta' in con), 'le altre facoltative restano fuori');
+  assert.equal(C.validaRiquadri(con).ok, true, C.validaRiquadri(con).motivo);
+  const { anticipo_al_gesto: _tolta, ...menoUna } = senza;
+  assert.equal(C.validaRiquadri(menoUna).ok, false, 'una misura fissa resta obbligatoria');
+  assert.equal(C.validaRiquadri({ ...con, correttore_automatica: { fisso: 'tre' } }).ok, false);
+  assert.equal(C.validaRiquadri({ ...con, inventata: {} }).ok, false, 'un campo fuori elenco');
+});
+
+test('le fonti delle correzioni automatiche sono quelle del correttore', () => {
+  require(join(ROOT, 'src', 'content', 'correttoreRegole.js'));
+  require(join(ROOT, 'src', 'content', 'correttoreAutomatica.js'));
+  assert.deepEqual([...globalThis.SN_CORRETTORE_AUTO.FONTI], [...C.FONTI_AUTOMATICA]);
+  const fonti = [...leggi('src', 'content', 'correttoreAutomatica.js').matchAll(/fonte: '([a-z]+)'/g)].map((m) => m[1]);
+  assert.deepEqual([...new Set(fonti)].sort(), [...C.FONTI_AUTOMATICA].sort(), 'ogni fonte che esce dal correttore è nell’elenco');
 });
 
 const SPORCHI = ['rendilo più gentile, per favore', '<img src=x onerror=alert(1)>', 'Lettera a Mario 🙂', 'x'.repeat(5000), '', '   ', null, 42, {}];
@@ -129,7 +163,7 @@ test('i riquadri partono accanto alla loro ora, con lo stesso id; un’ora senza
   const [{ url, doc, auth }] = b.per.riquadri;
   assert.equal(auth, 'Bearer token-anonimo', 'i riquadri partono con l’identità anonima, come l’ora (#1547)');
   assert.ok(url.includes(`documentId=${encodeURIComponent(C.idDocumento(b.per.ore[0].doc))}`), 'lo stesso id dell’ora');
-  assert.deepEqual(Object.keys(doc), [...C.CAMPI_RIQUADRI]);
+  assert.deepEqual(Object.keys(doc), [...C.CAMPI_RIQUADRI_FISSI]);
   assert.deepEqual(C.leggiRiquadri('riquadro_uso', doc.riquadro_uso['translate-selection']), [
     { copia: 1, d0: 0, d1: 1, d2: 0, d3_oltre: 0, approfondisci: 0, ricominciata: 0 },
   ]);
@@ -188,7 +222,8 @@ test('in incognito e a contatori spenti i riquadri non si contano e non partono'
 
 // ── Gli agganci nel codice ─────────────────────────────────────────────────
 const MANDANO = [['src', 'content', 'actions.js'], ['src', 'content', 'popup.js'], ['src', 'content', 'editBox.js'],
-  ['src', 'content', 'translatePage.js'], ['src', 'content', 'content.js'], ['src', 'pages', 'editor', 'editor.js']];
+  ['src', 'content', 'translatePage.js'], ['src', 'content', 'content.js'], ['src', 'pages', 'editor', 'editor.js'],
+  ['src', 'content', 'spellcheck.js'], ['src', 'content', 'sidebar.js']];
 
 test('le pagine mandano solo misure dell’elenco, e ogni misura ha chi la manda', () => {
   const viste = new Set();

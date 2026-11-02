@@ -332,7 +332,7 @@
   // (src/shared/filoTrattoVivo.js). `perChat`: senza ora al minuto, tempi relativi e cambi, che arrivano dal filo.
   function sezioni(state, { soloSiti = false, perChat = false } = {}) {
     const out = [];
-    const aggiungi = (chiave, righe, confronto) => out.push({ chiave, righe, testo: righe.join('\n'), ...(confronto != null ? { confronto } : {}) });
+    const aggiungi = (chiave, righe, confronto, extra = null) => out.push({ chiave, righe, testo: righe.join('\n'), ...(confronto != null ? { confronto } : {}), ...(extra || {}) });
     if (!perChat) {
       const righe = ['TEMPO', `Data: ${state.time.humanNow}`];
       if (state.time.timeSinceLastInteractionMin != null) {
@@ -385,6 +385,9 @@
     const E = esterno();
     {
       const righe = ['TAB APERTE'];
+      // Le pagine col titolo e quelle delicate: una che passa dalle prime alle seconde rifà la fotografia (filoTrattoVivo.js).
+      const riservate = { visibili: [], nascosti: [] };
+      const pagina = (u) => String(u || '').split('#')[0];
       if (!state.tabs.length) righe.push('(nessuna)');
       else {
         const quante = state.tabs.some((t) => t.chat) ? SCHEDE_NUMERATE_CHAT : SCHEDE_ELENCATE;
@@ -396,8 +399,10 @@
           if (t.delicata || soloSiti) {
             const sito = sitoDellaScheda(t.url);
             elenco.push(`${i + 1}. ${focus}${t.delicata ? '[pagina delicata] ' : ''}${E.neutralizza(sito || 'sito', { unaRiga: true })}${rel}`);
+            if (t.delicata && t.url) riservate.nascosti.push(pagina(t.url));
             return;
           }
+          if (t.url) riservate.visibili.push(pagina(t.url));
           const grezzo = (t.title || '').slice(0, 80) || '(senza titolo)';
           const title = E.neutralizza(grezzo, { unaRiga: true });
           elenco.push(`${i + 1}. ${focus}${title}${rel}`);
@@ -409,7 +414,7 @@
         if (state.tabs.some((t) => t.chat)) righe.push('Il numero davanti a ogni scheda è quello che vuole CHIUDI_SCHEDE; [QUESTA CHAT] è la scheda in cui l\'utente ti scrive.');
         righe.push(E.imbusta({ tipo: 'DATI_PAGINA', testo: elenco.join('\n') }));
       }
-      aggiungi('TAB APERTE', righe);
+      aggiungi('TAB APERTE', righe, null, { riservate });
     }
     if (Array.isArray(state.sempreAperte) && state.sempreAperte.length) {
       aggiungi('SITI SEMPRE APERTI', [

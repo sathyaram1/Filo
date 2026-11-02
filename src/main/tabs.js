@@ -28,6 +28,12 @@ const AzioniContate = require('./services/azioniContate');
 const ContatoriFinestra = require('./services/contatoriFinestra');
 const ContatoriHomePagina = require('./services/contatoriHomePagina');
 const ContatoriSicurezza = require('./services/contatoriSicurezza');
+const Strade = require('./services/contatoriStrade');
+// Come si chiude una scheda (#1470) → da quale strada parte la chiusura (#1468); le altre vie non sono un gesto su una scheda.
+const STRADA_DELLA_CHIUSURA = Object.freeze({
+  pulsante_x: 'pulsante_scheda', clic_centrale: 'clic_centrale', ctrl_w: 'scorciatoia', barra: 'barra',
+  tasto_destro_riga: 'tasto_destro_riga', tasto_destro_scheda: 'menu_scheda',
+});
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -318,15 +324,15 @@ function fermaInvitoNelRiquadro(event, ctx) {
 // né verso la pagina «Sito bloccato» né fuori. La seguono quando la lista sta ferma per questo tempo, o quando l'utente le guarda.
 const LISTA_FERMA_MS = 3000;
 
-// Il riordino della riapertura parte non prima di questo dall'apertura, e un attimo dopo che la coda ha caricato
-// tutto: i siti a pagina unica riempiono il testo dopo la fine del caricamento.
-const TRIAGE_RIAPERTURA_MS = 4000;
+// Il riordino della riapertura parte un attimo dopo che la coda ha caricato tutto (i siti a pagina unica riempiono
+// il testo dopo la fine del caricamento) e quando le pagine hanno detto il loro colore: il favicon può metterci 3 s.
 const TRIAGE_DOPO_CODA_MS = 1500;
 // Una pagina bloccata non risponde mai alla lettura del testo: la pulizia va avanti senza il suo estratto (#1618).
 const ESTRATTO_TETTO_MS = 1500;
 // Lettura delle pagine più giudizio del modello: oltre, il giro finisce come giudizio mancato e la pulizia si sblocca.
 const GIUDIZIO_TETTO_MS = 5 * 60_000;
 const GESTI_DELLA_BARRA = new Set(['mouseDown', 'rawKeyDown', 'keyDown', 'mouseWheel', 'touchStart']);
+const COLORI_TETTO_MS = 8000;
 // Oltre, la pagina che arriva non è più la risposta all'invio di un modulo (#824).
 const INVIO_PAGINA_MS = 120_000;
 const PAGINA_DI_ACCESSO = /(?:^|[^a-z])(?:log-?in|sign-?in|accedi|accesso|auth|anmelden|connexion|iniciar-sesion)(?:[^a-z]|$)/i;
@@ -499,10 +505,17 @@ class TabManager {
         const t = this.tabs.find((x) => x.view && x.view.webContents === wc);
         return !!t && (this.barra.tasto(input) || this.tastoDelBrowser(input, t));
       },
+      // L'Aiuto nello strato (#1509.3) sale sopra la pila degli avvisi della barra come nella pagina.
+      pronta: (v, wc) => this.avvisi.nelloStrato(v, wc),
+      input: (wc, input) => { if (this.barra) this.barra.inputDa(wc, input); },
     });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
-      scegli: (tab, scelta, dati) => this._sbScelta(tab, scelta, dati),
+      scegli: (tab, scelta, dati) => {
+        // «Chiedi a Filo» sull'avviso apre l'Aiuto dall'avviso (#1468).
+        if (scelta === 'chiedi') Strade.misura('aiuto', 'avviso_sito', { incognito: this.incognito });
+        return this._sbScelta(tab, scelta, dati);
+      },
       menu: (tab) => this._sbVociMenu(tab),
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
       inCima: () => { if (this.barra) this.barra._inCima(); },
@@ -536,6 +549,7 @@ class TabManager {
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
     // aspettare che il content script ricalcoli.
     this._identityColorCache = new Map();
+    this._attesaColori = [];
     // §2.1 — l'auto-archiviazione misura l'inattività dell'APP INTERA da qui: gesti nelle schede, scheda attivata, barra.
     this._lastAppInteractionAt = Date.now();
     try {
@@ -1067,6 +1081,8 @@ class TabManager {
     if (activate) {
       this.anteprime.congeda(this.tabs.find((t) => t.id === this.activeId));
       this.activeId = id;
+      // Davanti senza passare da activate(): la home già pronta non naviga, e chi c'era se ne va adesso (#1468).
+      Strade.misura('inVista', this, tab, url, { incognito: this.incognito });
       tab.activateSeq = this._nextActivationSeq();
       this.layout();
     } else {
@@ -1210,11 +1226,14 @@ class TabManager {
 
   // `via`: come la si chiude, per i contatori della finestra (#1470). `daSola`: chiusa senza che la persona o la pulizia
   // l'abbiano chiesto (la pagina stessa, un'estensione, un crash).
-  closeTab(id, { via = 'altro', daSola = false } = {}) {
+  // `strada`: da dove parte la chiusura fra le strade delle azioni (#1468), quando `via` non lo dice.
+  closeTab(id, { via = 'altro', daSola = false, strada = '' } = {}) {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
     const tab = this.tabs[idx];
     ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
+    const s = strada || STRADA_DELLA_CHIUSURA[via];
+    if (s) Strade.misura('azione', 'closeTab', s, { incognito: this.incognito });
     this._smontaScheda(tab, { daSola });
     this.tabs.splice(idx, 1);
     if (this.activeId === id) {
@@ -1234,6 +1253,7 @@ class TabManager {
     const chiuse = this.tabs.filter((t) => via.has(t.id));
     if (!chiuse.length) return [];
     const eraAttiva = chiuse.some((t) => t.id === this.activeId);
+    Strade.misura('azione', 'closeTab', 'chat', { incognito: this.incognito });
     for (const tab of chiuse) {
       ContatoriFinestra.misura('chiusa', tab, 'chat', { incognito: this.incognito });
       this._smontaScheda(tab);
@@ -1262,6 +1282,7 @@ class TabManager {
   // Quello che ogni chiusura chiesta fa a una scheda prima di toglierla dall'elenco.
   _smontaScheda(tab, { daSola = false } = {}) {
     const id = tab.id;
+    Strade.misura('chiusa', this, tab);
     this._avvisaSorvegliante(tab, 'chiusa');
     ContatoriHomePagina.misura('proposteVia', tab._proposte);
     this._nelFilo('schedaChiusa', tab);
@@ -1356,7 +1377,10 @@ class TabManager {
     if (from === to) return false;
     const [tab] = this.tabs.splice(from, 1);
     this.tabs.splice(to, 0, tab);
-    if (trascinata) ContatoriFinestra.misura('trascinata', this, Math.abs(to - from));
+    if (trascinata) {
+      ContatoriFinestra.misura('trascinata', this, Math.abs(to - from));
+      this._spostataAManoAlle = Date.now();
+    }
     this._broadcast();
     return true;
   }
@@ -1449,13 +1473,14 @@ class TabManager {
 
   // Riapre una scheda chiusa com'era: indirizzo, scroll, zoom e paese; dalla pila anche posto e cronologia.
   // Una porta sola per la scorciatoia, la barra dei menu e la ricerca del filo (REOPEN_ARCHIVED_TAB).
-  async riapri(voce) {
+  // `activate: false` per chi ne riporta più d'una insieme (il «Riapri» della pulizia).
+  async riapri(voce, { activate = true } = {}) {
     const url = voce && typeof voce.url === 'string' ? voce.url : '';
     if (!url) return null;
     const prima = new Set(this.tabs.map((t) => t.id));
     // Per il giudizio sui siti la riapertura è di Filo (#814).
     const id = this.openTab(url, {
-      activate: true,
+      activate,
       restoreScrollPct: typeof voce.scroll === 'number' ? voce.scroll : null,
       restoreZoomLevel: typeof voce.zoom === 'number' && voce.zoom ? voce.zoom : null,
       origine: { tipo: 'filo' },
@@ -1475,17 +1500,23 @@ class TabManager {
   }
 
   // La più recente, poi quella prima; finita la pila di questa sessione si scende nell'archivio delle schede chiuse.
-  async riapriChiusa() {
+  // `tasto`: il tasto che l'ha chiesta (#1468), per sapere se la scheda riaperta era quella che si voleva.
+  async riapriChiusa({ tasto = '' } = {}) {
+    const attendi = async (p) => {
+      const id = await p;
+      if (tasto && id) Strade.misura('attesa', this.tabs.find((t) => t.id === id), tasto, { incognito: this.incognito });
+      return id;
+    };
     const pila = this._pilaChiuse();
     const voce = pila.prendi();
     if (voce) {
       if (voce.voceArchivio) this._contaTornata(voce.voceArchivio);
-      return this.riapri(voce);
+      return attendi(this.riapri(voce));
     }
     const e = await this._chiusaDallArchivio();
     if (e) {
       this.tornata(e);
-      return this.riapri(SchedeChiuse.daArchivio(e));
+      return attendi(this.riapri(SchedeChiuse.daArchivio(e)));
     }
     try {
       this.win.webContents.send('shell:toast', { text: 'Nessuna scheda chiusa da riaprire', opts: { unica: 'nessuna-chiusa', tipo: 'nessuna_chiusa' } });
@@ -1522,9 +1553,16 @@ class TabManager {
   // Ctrl/Cmd+L: l'indirizzo si scrive nel campo della home, la barra degli indirizzi non c'è. Già sulla home non la
   // ricarica, che butterebbe via quello che c'è scritto: dà il fuoco al campo col testo selezionato, come un browser.
   // Sentinella: tests/tab-browser-shortcuts.spec.mjs.
-  async vaiAScrivereUnIndirizzo(id) {
+  // `tasto`: Ctrl/Cmd+L premuto (#1468), per sapere se la home era quella che si voleva. Rende la scheda della home.
+  async vaiAScrivereUnIndirizzo(id, { tasto = '' } = {}) {
+    const home = await this._vaiAScrivere(id);
+    if (tasto && home) Strade.misura('attesa', this.tabs.find((t) => t.id === home), tasto, { incognito: this.incognito });
+    return home;
+  }
+
+  async _vaiAScrivere(id) {
     const tab = this.tabs.find((t) => t.id === id);
-    if (!tab) { this.openTab('filo://newtab/'); return; }
+    if (!tab) return this.openTab('filo://newtab/');
     let sullaHome = false;
     if (/^filo:\/\/newtab\//.test(String(tab.url || '')) && !tab.loading) {
       try {
@@ -1535,10 +1573,11 @@ class TabManager {
         ) === true;
       } catch (_) {}
     }
-    if (sullaHome) return;
+    if (sullaHome) return tab.id;
     // Il testo scritto e non inviato vive solo in quella pagina, e Indietro non lo rimette: la home si apre accanto.
-    if (this._testoNonInviato(tab)) this.openTab('filo://newtab/');
-    else this.navigate(tab.id, 'filo://newtab/');
+    if (this._testoNonInviato(tab)) return this.openTab('filo://newtab/');
+    this.navigate(tab.id, 'filo://newtab/');
+    return tab.id;
   }
 
   // Lo stato vive sulla SCHEDA, non sul WebContents: deve sopravvivere a una
@@ -1805,10 +1844,12 @@ class TabManager {
   // scheda, impostazioni). Prima erano esclusi TUTTI i filo:// interni, quindi
   // il riordino poteva chiudere un sito (es. YouTube) ma mai le impostazioni
   // aperte o le home duplicate. (Incognito è escluso a monte.)
-  _triageCandidates() {
+  _triageCandidates(trigger) {
     const T = globalThis.SN_TAB_TRIAGE;
     return this.tabs.filter((t) => {
       if (this._intoccabileDalTriage(t)) return false;
+      // La pulizia decisa della riapertura è per la sessione di prima: una scheda nata o usata dopo è del lavoro di adesso (#349).
+      if (trigger === 'reopen' && !(t._dallaSessione && !(t.lastInteractionAt >= this._riapertaAlle))) return false;
       if (T) return T.isTriageableUrl(t.url);
       return !t.isInternal && /^https?:\/\//i.test(t.url || '');
     });
@@ -1852,7 +1893,7 @@ class TabManager {
         ageMin: minutiDa(Date.parse(t.openedAt)),
         // Mai toccata da quando c'è: inattiva da quando è arrivata la sua pagina (#1618).
         idleMin: minutiDa(t.lastInteractionAt || Date.parse(t.paginaDal) || Date.parse(t.openedAt)),
-        scrollPct: typeof t.scrollPct === 'number' ? t.scrollPct : null,
+        scrollPct: typeof t.scrollPct === 'number' && !t._scrollIgnoto ? t.scrollPct : null,
         formDirty: !!t.formDirty,
         audible: !!t.audible,
         coOpenUrls: this.tabs
@@ -1878,10 +1919,13 @@ class TabManager {
       return { archived: 0, giaInCorso: true };
     }
     this._triageRunning = true;
+    // Un ordine scelto a mano mentre il giro aspettava (alla riapertura: da quando Filo si è riaperto) vince sul colore (#349).
+    const dal = trigger === 'reopen' && this._riapertaAlle ? this._riapertaAlle : Date.now();
+    const opzioni = () => ({ via: da === 'chat' ? 'chat' : 'riordino_automatico', riordina: !(this._spostataAManoAlle >= dal) });
     try {
       await this._ricontrollaModuli();
       await this._caricaSempreAperte();
-      const cands = this._triageCandidates();
+      const cands = this._triageCandidates(trigger);
       // Un giro si conta coi suoi numeri, mai con le schede (#1467): quante candidate, archiviate, duplicate.
       const contaGiro = (archiviate, duplicati, giudizioMancato) => {
         try {
@@ -1891,7 +1935,8 @@ class TabManager {
       if (!cands.length) {
         ContatoriFinestra.misura('giroRiordino', trigger, {});
         contaGiro(0, 0, false);
-        return { archived: 0 };
+        // Niente da giudicare non vuol dire niente da fare: alla riapertura la barra si riordina comunque (#349).
+        return this._esitoTriage(this.applyTriageDecisions([], [], opzioni()), { trigger, valutate: 0 });
       }
       // 1) Duplicati esatti: decisione deterministica e affidabile.
       const T = globalThis.SN_TAB_TRIAGE;
@@ -1949,10 +1994,10 @@ class TabManager {
       for (const i of dupIdx) {
         byIndex.set(i, { i, action: 'archive', reason: 'duplicato' });
       }
-      const esito = this.applyTriageDecisions(cands, [...byIndex.values()], { via: da === 'chat' ? 'chat' : 'riordino_automatico' });
+      const esito = this.applyTriageDecisions(cands, [...byIndex.values()], opzioni());
       ContatoriFinestra.misura('giroRiordino', trigger, { duplicati: esito.duplicati, modello: esito.archived - esito.duplicati, giudizioMancato });
       contaGiro(esito.archived, dupIdx.size, giudizioMancato);
-      return giudizioMancato ? { ...esito, giudizioMancato: true } : esito;
+      return this._esitoTriage(giudizioMancato ? { ...esito, giudizioMancato: true } : esito, { trigger, valutate: cands.length });
     } finally {
       this._triageRunning = false;
     }
@@ -1979,10 +2024,26 @@ class TabManager {
     try { this.win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 0, unica: 'pulizia-schede-mancata', tipo: 'riordino_mancato', actions } }); } catch (_) {}
   }
 
+  // §2.3 — l'avviso del giro, se ne va mostrato uno (la regola sta in SN_TAB_TRIAGE.testoEsito).
+  _esitoTriage(esito, { trigger, valutate }) {
+    // Il giudizio mancato di un giro automatico lo dice già _dichiaraGiudizio (#1618): qui solo se c'è da offrire «Riapri».
+    if (esito.giudizioMancato && trigger !== 'manual' && !esito.archived) return esito;
+    const T = globalThis.SN_TAB_TRIAGE;
+    const testo = T && T.testoEsito ? T.testoEsito({
+      trigger,
+      valutate,
+      archiviate: esito.archived,
+      riordinate: !!esito.reordered,
+      ordineTuo: !!esito.ordineTuo,
+      giudizioMancato: !!esito.giudizioMancato,
+    }) : '';
+    if (testo) this._showTriageToast(testo, esito.archived ? esito.pulizia : null);
+    return esito;
+  }
+
   // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive', poi
-  // riordina cromaticamente i superstiti (§1.3) e mostra il toast (§2.3).
-  // `cands` è l'elenco indicizzato passato all'LLM.
-  applyTriageDecisions(cands, decisions, { via = 'riordino_automatico' } = {}) {
+  // riordina cromaticamente i superstiti (§1.3). `cands` è l'elenco indicizzato passato all'LLM.
+  applyTriageDecisions(cands, decisions, { via = 'riordino_automatico', riordina = true } = {}) {
     const byIndex = new Map();
     for (const d of (decisions || [])) {
       if (d && typeof d.i === 'number') byIndex.set(d.i, d);
@@ -1996,10 +2057,26 @@ class TabManager {
       toArchive.push({ tab, reason: d.reason || 'auto' });
     });
 
+    // Il «Riapri» dell'avviso le riporta dalla voce della pila, come Ctrl/Cmd+Shift+T: cronologia, zoom, e niente
+    // doppione da una riapertura dopo. `riserva` per quelle che la pila non tiene (una home vuota).
+    const riapribili = [];
     for (const { tab, reason } of toArchive) {
       ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
+      // Prima della voce: una scheda che Filo seguiva diventa un passaggio, e non si riapre.
       this._avvisaSorvegliante(tab, 'chiusa');
-      this._archiveClosedTab(tab, reason, { voce: this._ricordaChiusa(tab) });
+      const voce = this._ricordaChiusa(tab);
+      if (!tab._passaggio && typeof tab.url === 'string' && tab.url) {
+        riapribili.push({
+          voce,
+          riserva: {
+            url: tab.url,
+            scroll: typeof tab.scrollPct === 'number' && !tab._scrollIgnoto ? tab.scrollPct : null,
+            proxy: tab.proxy && tab.proxy.country ? { country: tab.proxy.country, tier: tab.proxy.tier || null } : null,
+            colore: tab.identityColor || null,
+          },
+        });
+      }
+      this._archiveClosedTab(tab, reason, { voce });
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
       if (idx >= 0) {
@@ -2014,13 +2091,45 @@ class TabManager {
     if (!this.tabs.length) this.openTab('filo://newtab/');
     else if (!this.tabs.some((t) => t.id === this.activeId)) this.activate(this.tabs[0].id);
 
+    let pulizia = null;
+    if (riapribili.length) {
+      pulizia = (this._ultimaPulizia ? this._ultimaPulizia.id : 0) + 1;
+      this._ultimaPulizia = { id: pulizia, schede: riapribili, riordina, alle: Date.now() };
+    }
+
     // §1.3 — a OGNI giro, non solo quando si è archiviato qualcosa: all'apertura
     // la barra dev'essere riordinata comunque.
-    const reordered = this.reorderTabsByColor();
+    const reordered = riordina && this.reorderTabsByColor();
     if (reordered) ContatoriFinestra.misura('riordinatoPerColore', this);
     if (toArchive.length || reordered) this._broadcast();
-    if (toArchive.length) this._showTriageToast(toArchive.length);
-    return { archived: toArchive.length, duplicati: toArchive.filter((x) => x.reason === 'duplicato').length };
+    return { archived: toArchive.length, duplicati: toArchive.filter((x) => x.reason === 'duplicato').length, reordered, ordineTuo: !riordina, pulizia };
+  }
+
+  // «Riapri» dall'avviso della pulizia: solo l'ultima, e senza doppioni di una già riaperta dal filo della home.
+  async riapriPulizia(id) {
+    const p = this._ultimaPulizia;
+    if (!p || p.id !== id) return { ok: false, error: 'scaduta' };
+    this._ultimaPulizia = null;
+    const T = globalThis.SN_TAB_TRIAGE;
+    const chiave = (u) => (T ? T.normalizeForDedup(u) : String(u || ''));
+    const aperte = new Set(this.tabs.map((t) => chiave(t.url)));
+    let riaperte = 0;
+    const pila = this._pilaChiuse();
+    for (const { voce, riserva } of p.schede) {
+      if (aperte.has(chiave(riserva.url))) continue;
+      // Già riaperta da un'altra porta (Ctrl/Cmd+Shift+T, il filo della home) e poi richiusa: non torna due volte.
+      if (voce && voce.riaperta) continue;
+      const presa = voce ? pila.riprendi(voce) : null;
+      if (presa && presa.voceArchivio) this._contaTornata(presa.voceArchivio);
+      const nuova = await this.riapri(presa || riserva, { activate: false });
+      if (!nuova) continue;
+      riaperte += 1;
+      aperte.add(chiave(riserva.url));
+    }
+    // Come il giro che le ha chiuse: un ordine scelto a mano non si rimescola.
+    const riordina = p.riordina !== false && !(this._spostataAManoAlle >= p.alle);
+    if ((riordina && this.reorderTabsByColor()) || riaperte) this._broadcast();
+    return { ok: true, riaperte };
   }
 
   // §1.3 — riordina la striscia per colore con la stessa regola della Cronologia (compareRainbow).
@@ -2028,8 +2137,16 @@ class TabManager {
   // ribroadcastare alla shell).
   reorderTabsByColor() {
     const before = this.tabs;
-    const withIdx = before.map((t, i) => ({ t, i }));
-    withIdx.sort((a, b) => compareRainbow(a.t.identityColor, b.t.identityColor) || a.i - b.i);
+    // #1561.5 — una scheda che non ha ancora detto il suo colore prende quello di una dello stesso sito, o della stessa
+    // pagina di Filo: due home aperte una dopo l'altra non si scambiano di posto. «Nessun colore» detto resta in coda.
+    const noti = new Map();
+    for (const t of before) {
+      const k = chiaveColore(t.url);
+      if (k && t.identityColor && !noti.has(k)) noti.set(k, t.identityColor);
+    }
+    const colore = (t) => t.identityColor || (!t._identitaNota && noti.get(chiaveColore(t.url))) || null;
+    const withIdx = before.map((t, i) => ({ t, i, c: colore(t) }));
+    withIdx.sort((a, b) => compareRainbow(a.c, b.c) || a.i - b.i);
     const next = withIdx.map((x) => x.t);
     const changed = next.some((t, i) => t !== before[i]);
     this.tabs = next;
@@ -2044,12 +2161,10 @@ class TabManager {
     return { reordered };
   }
 
-  _showTriageToast(_n) {
+  _showTriageToast(text, pulizia = null) {
+    const actions = pulizia ? [{ label: 'Riapri', riapriPulizia: pulizia }] : undefined;
     try {
-      this.win.webContents.send('shell:toast', {
-        text: 'Schede riordinate. Quelle chiuse restano nel filo della home',
-        opts: { tipo: 'riordino_schede' },
-      });
+      this.win.webContents.send('shell:toast', { text, opts: { tipo: 'riordino_schede', unica: 'riordino-schede', actions } });
     } catch (_) {}
   }
 
@@ -2101,9 +2216,29 @@ class TabManager {
     const next = color || null;
     const host = hostOf(tab.url);
     if (next && host) this._identityColorCache.set(host, next);
+    // Anche «nessun colore» è una risposta: il riordino della riapertura aspetta di averla da ogni pagina.
+    tab._identitaNota = true;
+    for (const avvisa of [...(this._attesaColori || [])]) avvisa();
     if (tab.identityColor === next) return;
     tab.identityColor = next;
     if (this.tabs.includes(tab)) this._broadcast();
+  }
+
+  // Il riordino ordina per colore del sito (#349): parte quando ogni pagina web caricata ha detto il suo, o al tetto.
+  _coloriPronti(tetto = COLORI_TETTO_MS) {
+    const pronti = () => this.tabs.every((t) => t._identitaNota || t._rinviata || !/^https?:\/\//i.test(t.url || ''));
+    if (pronti()) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      let timer = null;
+      const fine = (ok) => {
+        clearTimeout(timer);
+        this._attesaColori = this._attesaColori.filter((f) => f !== controlla);
+        resolve(ok);
+      };
+      const controlla = () => { if (pronti()) fine(true); };
+      timer = setTimeout(() => fine(false), tetto);
+      this._attesaColori = [...(this._attesaColori || []), controlla];
+    });
   }
 
   // Copia anche zoom e scroll, non solo l'URL: "duplica" deve dare una scheda
@@ -2164,6 +2299,7 @@ class TabManager {
     this.anteprime.mostrata(tab);
     this.activeId = id;
     if (cambiata && !this._restoring) this._nelFilo('schedaDavanti', tab);
+    Strade.misura('inVista', this, tab, tab.url, { incognito: this.incognito });
     // §2.1 — una scheda che diventa attiva è "usata adesso". Approssimazione
     // grossolana: il content script la raffina con gli eventi veri.
     const now = Date.now();
@@ -2180,6 +2316,8 @@ class TabManager {
     this._tastieraAllaSchedaAttiva();
     if (tab._listaTimer) this._seguiLista(tab, { ora: true });
     if (cambiata) this._avvisaSchermoPieno();
+    // Scelta dalla barra la scheda non prende il fuoco: gli avvisi fuori politica in coda glieli si offre (#1478.1).
+    if (cambiata && !this._restoring) { try { globalThis.SN_AVVISI_FUORI_POLITICA?.riproponi(); } catch (_) {} }
     this._broadcast();
   }
 
@@ -2237,10 +2375,19 @@ class TabManager {
   vistaSottoIlVuoto() {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (!tab) return null;
+    return this._copertaDa(tab) || (this.riquadri ? this.riquadri.vistaSopra(tab.view.webContents) : null) || tab.view || null;
+  }
+
+  // La vista che nasconde la pagina all'utente (la conferma aperta, l'avviso del sito pericoloso), o null. I riquadri di
+  // Filo sopra la pagina non la nascondono: la pagina resta lei, con i suoi comandi e il suo Aiuto (#1509.3).
+  _copertaDa(tab) {
     const domanda = this.conferme && this.conferme.mostrata ? this.conferme.vista : null;
     const avviso = this.avvisoSito && this.avvisoSito.coperta() === tab && this.avvisoSito.webContents() ? this.avvisoSito.vista : null;
-    const riquadri = this.riquadri ? this.riquadri.vistaSopra(tab.view.webContents) : null;
-    return domanda || avviso || riquadri || tab.view || null;
+    return domanda || avviso || null;
+  }
+
+  paginaScoperta(tab) {
+    return !!tab && !this._copertaDa(tab);
   }
 
   _tastieraAllaSchedaAttiva() {
@@ -2263,6 +2410,7 @@ class TabManager {
       const adesso = Date.now();
       tab.lastInteractionAt = Math.min(activity.lastInteractionAt, adesso);
       this._lastAppInteractionAt = adesso;
+      tab._scrollIgnoto = false;
     }
     if (typeof activity.scrollPct === 'number') tab.scrollPct = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
     if (typeof activity.formDirty === 'boolean') {
@@ -2419,7 +2567,14 @@ class TabManager {
       if (await require('./menu').staScrivendo(wc)) return false;
     } catch (_) { return false; }
     this.navigaCronologia(verso, id);
+    this._cronologiaDaTasto(verso);
     return true;
+  }
+
+  // Indietro e avanti da tastiera (#1468): il tasto del browser e la sua strada.
+  _cronologiaDaTasto(verso) {
+    Strade.misura('tastoNome', 'alt_freccia', { incognito: this.incognito });
+    Strade.misura('cronologia', verso, 'alt_freccia', { incognito: this.incognito });
   }
 
   // Cmd+freccia che la pagina non ha usato (src/preload/cmd-freccia.js). Vale solo
@@ -2430,13 +2585,17 @@ class TabManager {
     if (!visto || visto.verso !== verso || Date.now() - visto.t > 3000) return;
     wc._filoCmdFreccia = null;
     const tab = this.tabs.find((t) => t.view && t.view.webContents === wc);
-    if (tab) this.navigaCronologia(verso, tab.id);
+    if (!tab) return;
+    this._cronologiaDaTasto(verso);
+    this.navigaCronologia(verso, tab.id);
   }
 
   // I tasti del browser (#404, #685) da qualunque vista della finestra abbia il fuoco: la scheda, e la barra
   // laterale aperta da tastiera (#871 giro 9). `tab` è la scheda su cui agire. true = preso.
   tastoDelBrowser(input, tab) {
     if (!input || !tab) return false;
+    // I tasti di chi arriva da un altro browser, per nome (#1468): anche quelli che Filo non usa.
+    if (input.type === 'keyDown') Strade.misura('tasto', input, { incognito: this.incognito });
     // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
     // Mac (lì Opzione+cifra scrive un simbolo, e prendercela impediva di
     // digitarlo). Quale combinazione sia, e come si chiama nell'elenco delle
@@ -2471,6 +2630,7 @@ class TabManager {
     if (input.type === 'keyDown') {
       const verso = comandoNavigazione(input);
       if (verso) {
+        Strade.misura('cronologia', verso, 'alt_freccia', { incognito: this.incognito });
         AzioniContate.azione('navigate-back-forward', () => this.navigaCronologia(verso, tab.id), { incognito: !!this.win._filoIncognito });
         return true;
       }
@@ -2491,11 +2651,12 @@ class TabManager {
       const k = String(input.key || '').toLowerCase();
       const conta = (azione, fn) => { AzioniContate.azione(azione, fn, { incognito: !!this.win._filoIncognito }); return true; };
       // Con Shift riapre l'ultima scheda chiusa, come in ogni browser (#1476); tenuto premuto non svuota l'archivio.
-      if (k === 't' && input.shift) return input.isAutoRepeat || conta('reopen-closed-tab', () => this.riapriChiusa().catch(() => {}));
-      if (k === 't') return conta('new-tab', () => this.openTab('filo://newtab/'));
+      const strada = (azione) => Strade.misura('azione', azione, 'scorciatoia', { incognito: this.incognito });
+      if (k === 't' && input.shift) return input.isAutoRepeat || conta('reopen-closed-tab', () => this.riapriChiusa({ tasto: 'ctrl_shift_t' }).catch(() => {}));
+      if (k === 't') { strada('newTab'); return conta('new-tab', () => this.openTab('filo://newtab/')); }
       if (k === 'w') return conta('close-tab', () => this.closeTab(tab.id, { via: 'ctrl_w' }));
-      if (k === 'l') return conta('address-bar', () => this.vaiAScrivereUnIndirizzo(tab.id).catch(() => {}));
-      if (k === 'r') return conta('reload', () => this.reload(tab.id));
+      if (k === 'l') return conta('address-bar', () => this.vaiAScrivereUnIndirizzo(tab.id, { tasto: 'ctrl_l' }).catch(() => {}));
+      if (k === 'r') { strada('reload'); return conta('reload', () => this.reload(tab.id)); }
     }
     return false;
   }
@@ -2699,9 +2860,12 @@ class TabManager {
     // fuoco lascia la pagina e da lì il tasto non passava da nessuna parte.
     shellWc.on('before-input-event', (event, input) => {
       if (input.type !== 'keyDown') return;
+      // Col fuoco sulla barra i tasti del browser li fa la shell (src/renderer/shell.js): qui si contano e basta (#1468).
+      Strade.misura('tasto', input, { incognito: this.incognito });
       const verso = comandoNavigazione(input);
       if (verso) {
         event.preventDefault();
+        Strade.misura('cronologia', verso, 'alt_freccia', { incognito: this.incognito });
         this.navigaCronologia(verso);
         return;
       }
@@ -2868,6 +3032,7 @@ class TabManager {
       // #514 — si segna qui perché questo evento arriva PRIMA che il documento
       // veda il tasto, ed è dentro quel giro che la pagina chiede lo schermo.
       tab._ultimoInputEsc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
+      Strade.misura('inputScheda', tab, input);
       if (staRegistrandoTasti(wc)) return;
       if (this.strato.tasto(input)) {
         event.preventDefault();
@@ -2935,6 +3100,12 @@ class TabManager {
       if (this._sbPrimaDelClic(tab, url, (segna) => { segna(tab); this._sbRifaiDallaPagina(tab, 'SN_RIFAI_INVIO', url, () => this.navigate(tab.id, url)); })) {
         event.preventDefault();
         return;
+      }
+      // Un collegamento da una pagina di Filo a un'altra (#1468).
+      const da = String(wc.getURL() || '');
+      const paginaDi = (u) => (globalThis.SN_CONTATORI_STRADE ? globalThis.SN_CONTATORI_STRADE.paginaDi(u) : '');
+      if (/^filo:/i.test(da) && /^filo:/i.test(String(url || '')) && paginaDi(url) !== paginaDi(da)) {
+        Strade.misura('pagina', url, 'collegamento_interno', { finestra: this, incognito: this.incognito });
       }
       if (this._needsRecreate(tab, url)) {
         event.preventDefault();
@@ -3133,6 +3304,7 @@ class TabManager {
         this.anteprime.caricata(tab);
         this.codaRiapertura.caricata(tab);
         if (tab._sessioneVista) { const vista = tab._sessioneVista; tab._sessioneVista = null; vista(); }
+        Strade.misura('caricata', tab);
       }
       this.visite.caricata(wc);
       // §3.2 — cattura un estratto del contenuto (best-effort) da usare per la
@@ -3193,6 +3365,11 @@ class TabManager {
       }
       this._assestaEsito(tab);
       this.visite.navigata(wc, tab.id, url, { gesto: gestoPerIlFilo(tab), chiave: tab });
+      // La pagina davanti è cambiata; una scheda riaperta col tasto ora la usa chi l'ha chiesta (#1468).
+      if (tab.view && tab.view.webContents === wc) {
+        Strade.misura('navigata', tab);
+        if (tab.id === this.activeId) Strade.misura('inVista', this, tab, url, { incognito: this.incognito });
+      }
       // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
       // vale più (#686).
       tab.zoomProprio = null;
@@ -3212,6 +3389,7 @@ class TabManager {
       // Il colore campionato (§1.1) muore con la pagina; quello identità (§1.2)
       // dipende dal DOMINIO, quindi su un host già visto si riapplica subito.
       const cachedIdentity = this._identityColorCache.get(hostOf(url)) || null;
+      tab._identitaNota = !!cachedIdentity;
       tab._moduli = null;
       this._dopoInvio(tab, url, httpResponseCode);
       tab._improntePrima = [...(tab._impronte ? tab._impronte.values() : [])].flat().slice(-50);
@@ -3816,6 +3994,7 @@ class TabManager {
   _dropTab(tab) {
     const idx = this.tabs.findIndex((t) => t.id === tab.id);
     if (idx < 0) return false;
+    Strade.misura('chiusa', this, tab);
     this._avvisaSorvegliante(tab, 'chiusa');
     ContatoriHomePagina.misura('proposteVia', tab._proposte);
     this._nelFilo('schedaChiusa', tab, { come: 'servizio' });
@@ -3860,6 +4039,10 @@ class TabManager {
     if (isWebUnsafeNav(url)) return fermaNavigazione(url, { win: this.win });
     if (this._maybeBlockNavigation(null, url)) return false;
     const origine = /^https?:/i.test(String(fromUrl || '')) ? { tipo: 'link', da: String(fromUrl), gesto: !!gesto } : { tipo: 'filo', gesto: !!gesto };
+    // Un collegamento da una pagina di Filo a un'altra, in una scheda nuova (#1468).
+    if (/^filo:/i.test(String(url || '')) && daScheda && /^filo:/i.test(String(daScheda.url || ''))) {
+      Strade.misura('pagina', url, 'collegamento_interno', { finestra: this, incognito: this.incognito });
+    }
     const apri = (segna) => {
       const id = this.openTab(url, { activate: !sfondo, openedByLink: true, origine });
       if (segna) segna(this.tabs.find((t) => t.id === id));
@@ -3904,11 +4087,12 @@ class TabManager {
 
   // La chat che ha chiesto l'apertura di `id`, con l'id dell'azione: dopo l'attesa di esitoApertura,
   // un blocco che la pagina provoca da sé le arriva lo stesso. `assistente`: l'assistente sulla pagina,
-  // che ascolta coi content script invece che sul canale della home.
-  seguiApertura(id, { wc, callId, assistente = false } = {}) {
+  // che ascolta coi content script invece che sul canale della home. `verso`: dove ascolta, se non è `wc` (l'Aiuto
+  // nello strato sopra il sito, #1509.3); il permesso di «Apri comunque» resta della pagina `wc`.
+  seguiApertura(id, { wc, verso = wc, callId, assistente = false } = {}) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || !wc || !callId) return;
-    tab._aperturaChat = { wc, callId, assistente: !!assistente, da: Date.now() };
+    tab._aperturaChat = { wc, verso: verso || wc, callId, assistente: !!assistente, da: Date.now() };
   }
 
   // «Apri comunque» dell'assistente sulla pagina: una pagina web lo può chiedere solo per un
@@ -3935,7 +4119,8 @@ class TabManager {
       if (c.wc.isDestroyed()) return;
       if (c.assistente) {
         this.ricordaApribile(c.wc, dati.url);
-        c.wc.send('filo:broadcast', { type: globalThis.SN_MSG?.MSG?.APERTURA_FERMATA || 'apertura_fermata', ...dati });
+        const verso = c.verso && !c.verso.isDestroyed() ? c.verso : c.wc;
+        verso.send('filo:broadcast', { type: globalThis.SN_MSG?.MSG?.APERTURA_FERMATA || 'apertura_fermata', ...dati });
       } else {
         c.wc.send('filo:apertura-fermata', dati);
       }
@@ -4356,6 +4541,7 @@ class TabManager {
     }
 
     this._restoring = true;
+    this._riapertaAlle = Date.now();
     const nate = [];
     let target = null;
     try {
@@ -4368,6 +4554,7 @@ class TabManager {
         const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true, rinvia: true, origine: { tipo: 'filo' }, idRimessa: ids[i] });
         const nata = id ? this.tabs.find((t) => t.id === id) : null;
         if (!nata) return null;
+        Strade.misura('pagina', url, 'sessione_ripristinata', { incognito: this.incognito });
         this.visite.giaVista(nata.view.webContents, url);
         // §1.2/§1.3 — ripristina subito il colore identità salvato: la barra
         // riparte già tinta e il riordino cromatico alla riapertura ha i dati
@@ -4375,8 +4562,11 @@ class TabManager {
         // cache per host, così una did-navigate sullo stesso dominio lo conserva.
         if (colors[i]) this.setTabIdentityColor(id, colors[i]);
         if (aperte[i]) nata.openedAt = aperte[i];
-        nata.paginaDal = pagine[i] || null;
         if (usate[i]) nata.lastInteractionAt = Date.parse(usate[i]);
+        // Riaperta parte dall'inizio della pagina: «scroll 0%» direbbe al riordino «letta a metà», e la terrebbe.
+        nata._scrollIgnoto = true;
+        nata._dallaSessione = true;
+        nata.paginaDal = pagine[i] || null;
         nate.push(nata);
         return nata;
       });
@@ -4408,16 +4598,18 @@ class TabManager {
   }
 
   async _maybeTriageOnReopen() {
-    const inizio = Date.now();
     try {
       const s = await this._readSettings();
       const aa = s && s.autoArchive;
       if (!aa || !aa.enabled || !aa.onClose) return;
       // Il riordino legge il contenuto delle pagine: parte quando la coda della riapertura le ha caricate tutte.
       await this.codaRiapertura.finita();
-      const attesa = Math.max(TRIAGE_DOPO_CODA_MS, TRIAGE_RIAPERTURA_MS - (Date.now() - inizio));
-      setTimeout(() => { this.runAutoTriage({ trigger: 'reopen' }).catch(() => {}); }, attesa);
-    } catch (_) {}
+      await Promise.all([new Promise((r) => setTimeout(r, TRIAGE_DOPO_CODA_MS)), this._coloriPronti()]);
+      if (!this.win || this.win.isDestroyed()) return;
+      await this.runAutoTriage({ trigger: 'reopen' });
+    } catch (e) {
+      console.warn('[Filo] riordino delle schede alla riapertura:', e?.message || e);
+    }
   }
 }
 
@@ -4561,6 +4753,16 @@ function hostOf(url) {
     const u = new URL(url);
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
     return u.host || null;
+  } catch (_) { return null; }
+}
+
+// Le schede che il riordino tiene insieme: lo stesso sito, o la stessa pagina di Filo (la home, le Preferenze).
+function chiaveColore(url) {
+  const host = hostOf(url);
+  if (host) return host;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'filo:' && u.host ? `filo://${u.host}` : null;
   } catch (_) { return null; }
 }
 

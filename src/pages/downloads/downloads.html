@@ -90,6 +90,8 @@
       font-size: 11px; color: var(--sn-muted);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    /* Il perché di un salvataggio non riuscito si legge intero: troncato perderebbe la parte che spiega. */
+    .dl-meta.dl-perche { white-space: normal; }
     .dl-path {
       grid-column: 2 / span 2; grid-row: 3;
       font-size: 11px; color: var(--sn-muted);

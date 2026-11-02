@@ -44,7 +44,9 @@
     });
     const sezStato = Array.isArray(statoSezioni) ? statoSezioni : (stato ? [{ chiave: 'STATO', testo: stato }] : []);
     for (const x of sezStato) {
-      if (x && stringa(x.chiave)) metti(`STATO:${x.chiave}`, x.testo, { stato: true, ...(x.confronto != null ? { confronto: x.confronto } : {}) });
+      if (x && stringa(x.chiave)) {
+        metti(`STATO:${x.chiave}`, x.testo, { stato: true, ...(x.confronto != null ? { confronto: x.confronto } : {}), ...(x.riservate ? { riservate: x.riservate } : {}) });
+      }
     }
     metti('CAMBI', P().filoChatCambiValute(cambi));
     const lista = Array.isArray(filesList) ? filesList.filter((f) => f && stringa(String(f.id || ''))) : null;
@@ -73,7 +75,8 @@
 
   // Cosa è cambiato dalle sezioni già viste (`viste`: Map chiave → { confronto, righe, perId, rifai }). `rifai`: un
   // cambio che non si dice con un'aggiunta (una riga di memoria tolta, le capacità), e la fotografia si rifà: una riga
-  // dimenticata non deve restare davanti al modello con accanto «tolta».
+  // dimenticata non deve restare davanti al modello con accanto «tolta». Così anche una pagina mostrata col titolo che
+  // adesso è delicata (`riservate`): il titolo deve uscire anche dai messaggi già mandati.
   function confronta(viste, sezioni) {
     const prima = viste instanceof Map ? viste : new Map();
     const nuove = new Map();
@@ -81,8 +84,12 @@
     let rifai = false;
     for (const s of Array.isArray(sezioni) ? sezioni : []) {
       const conf = s.confronto != null ? s.confronto : s.testo;
-      nuove.set(s.chiave, { confronto: conf, righe: s.righe || null, perId: s.perId || null, rifai: !!s.rifai });
       const v = prima.get(s.chiave);
+      const ris = s.riservate || null;
+      const giaVisti = v && v.riservate ? v.riservate.visibili : [];
+      const visibili = ris ? [...new Set([...giaVisti, ...(ris.visibili || [])])] : null;
+      nuove.set(s.chiave, { confronto: conf, righe: s.righe || null, perId: s.perId || null, rifai: !!s.rifai, ...(ris ? { riservate: { visibili } } : {}) });
+      if (ris && (ris.nascosti || []).some((u) => giaVisti.includes(u))) { rifai = true; continue; }
       if (v && v.confronto === conf) continue;
       if (s.rifai) { rifai = true; continue; }
       if (!v) { cambiate.push({ sezione: s }); continue; }
@@ -233,8 +240,8 @@
     return `cambio ${da ? `${da} ` : ''}${campo(e.id, 60)}${stringa(e.annulla) ? ` (annulla ${campo(e.annulla, 60)})` : ''}: ${campo(frase, 400)}${no}`;
   }
 
-  // Una riga per evento, ognuna con l'ora; null se l'evento non si racconta (le pagine visitate, che entrano solo
-  // cercate; la scheda portata davanti, che dice TAB APERTE).
+  // Una riga per evento, ognuna con l'ora; null se l'evento non si racconta qui: le pagine visitate e le ricerche fatte su
+  // un sito (le ripiega rendiPagine), la scheda portata davanti (la dice TAB APERTE).
   function rigaDi(ev) {
     switch (ev.tipo) {
       case 'azione': return rigaAzione(ev);
@@ -263,9 +270,72 @@
     }
   }
 
+  // Le pagine visitate ripiegate per sito, come nella home («14 pagine, fra cui YouTube: orche»): quante, quando, le
+  // ricerche e gli ultimi titoli. Delicate e della rete di casa arrivano già senza titolo (contestoFilo.js, vociDiPagine)
+  // e qui non lo prenderebbero comunque. Oltre il tetto dei siti si dice quante ne mancano: si trovano con CERCA_CHAT.
+  const MAX_SITI = 30;
+  const MAX_TITOLI = 3;
+  const CASA = '\u0000casa';
+  const FILE = '\u0000file';
+  const ALTRO = '\u0000altro';
+  const NOMI = { [FILE]: 'file del computer', [ALTRO]: 'pagine senza sito' };
+  function rendiPagine(pagine, { rif = null } = {}) {
+    const gruppi = new Map();
+    for (const p of Array.isArray(pagine) ? pagine : []) {
+      const t = Date.parse(p && p.ts);
+      if (!Number.isFinite(t)) continue;
+      const k = p.casa ? CASA : (p.file ? FILE : (stringa(p.sito) ? p.sito.toLowerCase() : ALTRO));
+      let g = gruppi.get(k);
+      if (!g) { g = { k, n: 0, delicate: 0, primo: p.ts, ultimo: p.ts, tUltimo: t, titoli: [], cercati: [] }; gruppi.set(k, g); }
+      g.n++;
+      if (t >= g.tUltimo) { g.ultimo = p.ts; g.tUltimo = t; }
+      if (p.casa) continue;
+      if (p.delicata) { g.delicate++; continue; }
+      if (stringa(p.cercato)) g.cercati.push(p.cercato);
+      else if (stringa(p.titolo)) g.titoli.push(p.titolo);
+    }
+    if (!gruppi.size) return '';
+    const ultimiDistinti = (lista) => {
+      const visti = new Set();
+      const out = [];
+      for (let i = lista.length - 1; i >= 0 && out.length < MAX_TITOLI; i--) {
+        const c = campo(lista[i], 120);
+        if (c && !visti.has(c.toLowerCase())) { visti.add(c.toLowerCase()); out.unshift(c); }
+      }
+      return out;
+    };
+    const tutti = [...gruppi.values()].sort((a, b) => a.tUltimo - b.tUltimo);
+    const tenuti = tutti.slice(-MAX_SITI);
+    const fuori = tutti.slice(0, tutti.length - tenuti.length);
+    const pagineN = (n) => `${n} pagin${n === 1 ? 'a' : 'e'}`;
+    const righe = tenuti.map((g) => {
+      const a = oraDi(g.primo, rif);
+      const b = oraDi(g.ultimo, rif);
+      const ora = a === b ? a : `${a}–${b}`;
+      if (g.k === CASA) return `- ${ora} ${pagineN(g.n)} della rete di casa (qui solo il numero)`;
+      const nome = NOMI[g.k] || campo(g.k, 80);
+      const pezzi = [pagineN(g.n)];
+      if (g.delicate) pezzi[0] += g.delicate === g.n ? ` (delicat${g.n === 1 ? 'a' : 'e'}: qui solo il sito)` : ` (${g.delicate} delicat${g.delicate === 1 ? 'a' : 'e'}: di quell${g.delicate === 1 ? 'a' : 'e'} solo il sito)`;
+      const cercati = ultimiDistinti(g.cercati);
+      if (cercati.length) pezzi.push(`cercato ${cercati.map((c) => `«${c}»`).join(', ')}`);
+      const titoli = ultimiDistinti(g.titoli);
+      // «fra cui» solo se resta fuori qualcosa: un titolo oltre i tre, o una pagina senza titolo.
+      const diversi = new Set(g.titoli.map((t) => campo(t, 120).toLowerCase())).size;
+      const senzaTitolo = g.n - g.delicate - g.cercati.length - g.titoli.length;
+      if (titoli.length) pezzi.push(`${titoli.length < diversi || senzaTitolo > 0 ? 'fra cui ' : ''}${titoli.map((c) => `«${c}»`).join(', ')}`);
+      return `- ${ora} ${nome}: ${pezzi.join('; ')}`;
+    });
+    if (fuori.length) {
+      const n = fuori.reduce((s, g) => s + g.n, 0);
+      righe.unshift(`- (prima di queste, altre ${pagineN(n)} su ${fuori.length} sit${fuori.length === 1 ? 'o' : 'i'}: qui non ci sono)`);
+    }
+    const busta = E().imbusta({ tipo: 'DATI_PAGINA', conIntestazione: true, testo: righe.join('\n'), max: Infinity });
+    return `Pagine aperte dal messaggio prima, per sito (gli indirizzi, e le pagine che qui non ci sono, li trova CERCA_CHAT):\n${busta}`;
+  }
+
   // Le righe degli eventi di un messaggio, dentro una busta: con l'ora (e il giorno se non è quello del messaggio) e,
-  // oltre il tetto, il numero di quelle più vecchie che non ci sono. `ids`: gli eventi raccontati, per sapere se uno è
-  // stato cancellato dopo.
+  // oltre il tetto, il numero di quelle più vecchie che non ci sono; sotto, le pagine visitate. `ids`: gli eventi
+  // raccontati, per sapere se uno è stato cancellato dopo.
   function rendiEventi(eventi, { rif = null } = {}) {
     const lista = Array.isArray(eventi) ? eventi : [];
     const ultimiDownload = new Map();
@@ -273,9 +343,11 @@
     let schede = { aperte: 0, chiuse: 0 };
     const righe = [];
     const ids = [];
+    const pagine = [];
     lista.forEach((ev, i) => {
       if (!ev) return;
       if (ev.id) ids.push(ev.id);
+      if (ev.tipo === 'navigazione') { pagine.push(ev); return; }
       if (ev.tipo === 'download' && ultimiDownload.get(ev.scaricamento) !== i) return;
       if ((ev.tipo === 'scheda.aperta' || ev.tipo === 'scheda.chiusa') && !stringa(ev.interna)) {
         schede = { ...schede, [ev.tipo === 'scheda.aperta' ? 'aperte' : 'chiuse']: schede[ev.tipo === 'scheda.aperta' ? 'aperte' : 'chiuse'] + 1 };
@@ -288,12 +360,13 @@
       const pezzi = [schede.aperte ? `${schede.aperte} apert${schede.aperte === 1 ? 'a' : 'e'}` : '', schede.chiuse ? `${schede.chiuse} chius${schede.chiuse === 1 ? 'a' : 'e'}` : ''].filter(Boolean);
       righe.push(`- schede dei siti: ${pezzi.join(', ')} (quelle aperte adesso le dice TAB APERTE)`);
     }
-    if (!righe.length) return { testo: '', ids };
+    const visite = rendiPagine(pagine, { rif });
+    if (!righe.length) return { testo: visite, ids };
     const tenute = righe.slice(-MAX_RIGHE_EVENTI);
     const fuori = righe.length - tenute.length;
     const testa = fuori ? [`- (prima di queste, altre ${fuori} cose successe dal messaggio prima: qui non ci sono)`] : [];
     const busta = E().imbusta({ tipo: 'FILO_ACCADUTI', conIntestazione: true, testo: [...testa, ...tenute].join('\n') });
-    return { testo: `Successo dal messaggio prima:\n${busta}`, ids };
+    return { testo: [`Successo dal messaggio prima:\n${busta}`, visite].filter(Boolean).join('\n\n'), ids };
   }
 
   // Il blocco che Filo scrive in un messaggio dell'utente, dopo l'ora e la chat: vuoto se non c'è niente da dire.
@@ -305,7 +378,7 @@
   }
 
   global.SN_TRATTO_VIVO = {
-    MAX_RIGHE_EVENTI, sezioniUtente, parteUtente, confronta, rendiCambiate, turniDi, eventiPerMessaggi, rendiEventi, rigaDi,
-    preambolo, righeMemoria,
+    MAX_RIGHE_EVENTI, MAX_SITI, MAX_TITOLI, sezioniUtente, parteUtente, confronta, rendiCambiate, turniDi, eventiPerMessaggi,
+    rendiEventi, rendiPagine, rigaDi, preambolo, righeMemoria,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

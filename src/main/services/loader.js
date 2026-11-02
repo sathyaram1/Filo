@@ -39,6 +39,7 @@ require(path.join(SHARED, 'contatoriGiornalieri.js')); // #969 — i contatori g
 require(path.join(SHARED, 'contatoriFinestra.js')); // #1470 — i contatori della finestra, dopo quelli che ne danno gli errori
 require(path.join(SHARED, 'contatoriSicurezza.js')); // #1474 — i contatori della sicurezza, dopo quelli che ne danno le funzioni
 require(path.join(SHARED, 'contatoriHomePagina.js')); // #1473 — i contatori della home e degli automatismi, dopo quelli che ne danno i passi
+require(path.join(SHARED, 'contatoriStrade.js')); // #1468 — i contatori delle strade, dopo i tasti che ne danno indietro e avanti
 require(path.join(SHARED, 'contatoriServizio.js')); // #1472 — i contatori del servizio, dopo quelli che ne danno funzioni e tetti
 require(path.join(SHARED, 'gestiContati.js')); // #1471 — i gesti contati: segno dei trascinamenti, nome letto su un'icona
 // Elenco delle funzioni impostabili + le loro etichette: serve al main per
@@ -87,6 +88,7 @@ require(path.join(SHARED, 'feedbackMine.js')); // #678 — il registro dei feedb
 require(path.join(SHARED, 'feedbackLive.js')); // confronto versioni + fusione per l'aggiornamento continuo della dashboard
 require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a stati (fonte unica, SPEC-RIDISEGNO-MAX.md §7)
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro di verifica (fonte unica, feedback #561)
+require(path.join(SHARED, 'ambiti.js')); // #1153 — operazioni e ambiti dei biglietti (fonte unica, incorporata dal server); prima di domande per le etichette
 require(path.join(SHARED, 'domande.js')); // #1149 — azioni delle domande all'owner come dati (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'mittenti.js')); // #1162 — classe del mittente, solo statistica (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocabolario stati (consuma i dati qui sopra)
@@ -118,6 +120,7 @@ require(path.join(SHARED, 'routineCrediti.js'));  // #1356 — i numeri dell'own
 require(path.join(SHARED, 'routineModelli.js'));  // #1193 — modello e sforzo per fase: stesse regole in pagina e nel main
 require(path.join(SHARED, 'spesaGiudici.js'));  // #1515 — tetto di spesa dei giudici: stesse regole in pagina e nel main
 require(path.join(SHARED, 'compiti.js'));  // #1196 — i compiti delle routine: stesse regole in pagina, nel main e nello script
+require(path.join(SHARED, 'ricorrenti.js'));  // #1153 — cadenza dei compiti ricorrenti (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
 // #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
 // Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).
@@ -143,6 +146,7 @@ if (process.env.NODE_ENV === 'test') {
   try { require(path.join(__dirname, '..', '..', '..', 'tests', 'fixtures', 'testModels.js')); } catch (e) { console.warn('[loader] testModels non caricato:', e.message); }
 }
 require(path.join(SHARED, 'patchNotes.js'));
+require(path.join(SHARED, 'novita.js'));  // #1956 — la pagina Novità: versioni uscite e filtro (logica pura)
 require(path.join(SHARED, 'capabilities.js'));
 require(path.join(SHARED, 'serviziEsterni.js'));  // #849 — i servizi esterni che Filo contatta, come dati
 // Documenti di trasparenza (generati da transparency/*.md): servono all'agente

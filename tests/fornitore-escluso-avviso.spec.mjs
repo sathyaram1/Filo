@@ -153,6 +153,134 @@ test('una risposta servita da un fornitore escluso: avviso sulla pagina e segno 
   await storia.screenshot({ path: `${SHOTS}/1478-cronologia-scuro.png` }).catch(() => {});
 });
 
+// #1478.1 — una risposta che arriva quando nessuno guarda Filo: l'avviso aspetta, e la pausa parte da quando si vede.
+async function fintoServitoDa(app, host) {
+  await app.evaluate(async (_e, h) => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.setSettings({
+      useDefaultModels: false, openWeightsOnly: false, apiKeys: { openrouter: 'k-test' },
+      modelRegistry: { ...globalThis.SN_TEST_MODELS.registry, 'mio-aperto': { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash' } },
+      models: { [C.ACTIONS.EXPLAIN]: 'mio-aperto' },
+    });
+    globalThis.SN_PROVIDERS.completeWithFallback = async () => ({
+      text: 'r', model: 'deepseek/deepseek-v4-flash', provider: 'openrouter', servedBy: h, usage: { promptTokens: 1, completionTokens: 1 },
+    });
+  }, host);
+}
+
+// Playwright finge sempre il fuoco: lo si toglie nel mondo dei content script (999), come quando si passa a un'altra app.
+// Tornando, la pagina riceve il fuoco come quando si torna su Filo.
+const fuoco = (app, url, si) => app.evaluate(async ({ webContents }, { u, s }) => {
+  const wc = webContents.getAllWebContents().find((w) => w.getURL() === u);
+  const torna = s ? 'window.dispatchEvent(new Event(\'focus\'));' : '';
+  return wc.executeJavaScriptInIsolatedWorld(999, [{ code: `Document.prototype.hasFocus = () => ${s}; ${torna} 1` }]);
+}, { u: url, s: si });
+
+const toastDi = (page, host) => page.locator('.sn-toast', { hasText: `«${host}»` });
+
+test('arrivata mentre si è in un’altra applicazione: l’avviso aspetta, compare al ritorno, e la pausa parte da lì', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body><p>Una pagina qualunque.</p></body></html>');
+  await page.mouse.click(5, 5);
+  await fintoServitoDa(app, 'Google Vertex');
+  await fuoco(app, page.url(), false);
+  expect((await spiega(app, 'EXPLAIN', 'mare1478')).ok).toBe(true);
+  expect((await spiega(app, 'EXPLAIN', 'neve1478')).ok).toBe(true);
+  await page.waitForTimeout(1000);
+  await expect(toastDi(page, 'Google Vertex'), 'senza fuoco l’avviso non si mostra').toHaveCount(0);
+
+  await fuoco(app, page.url(), true);
+  await expect(toastDi(page, 'Google Vertex')).toHaveCount(1, { timeout: 5_000 });
+  await expect(toastDi(page, 'Google Vertex')).toContainText('un fornitore che Filo esclude');
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${SHOTS}/1478.1-avviso-al-ritorno.png` }).catch(() => {});
+
+  // Visto adesso: la stessa violazione subito dopo resta nella pausa, e un altro ritorno non lo ripete.
+  expect((await spiega(app, 'EXPLAIN', 'monte1478')).ok).toBe(true);
+  await fuoco(app, page.url(), true);
+  await page.waitForTimeout(1200);
+  await expect(toastDi(page, 'Google Vertex')).toHaveCount(1);
+});
+
+test('arrivata su un sito dove Filo è spento: l’avviso compare nella scheda dopo, senza aspettare un’altra risposta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body><p>Una pagina qualunque.</p></body></html>');
+  await page.mouse.click(5, 5);
+  await fintoServitoDa(app, 'Google AI Studio');
+  // Spento come dalle Preferenze: il cambio arriva alla pagina aperta.
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
+    { type: 'update_settings', settings: { blocklist: ['127.0.0.1'] } },
+    { tab: { id: 5, url: 'filo://preferences/preferences.html' }, url: 'filo://preferences/preferences.html' },
+  ));
+  await expect.poll(() => app.evaluate(async ({ webContents }, u) => webContents.getAllWebContents().find((w) => w.getURL() === u)
+    .executeJavaScriptInIsolatedWorld(999, [{ code: 'self.__snFiloSpento === true' }]), page.url()), { timeout: 5_000 }).toBe(true);
+  expect((await spiega(app, 'EXPLAIN', 'pioggia1478')).ok).toBe(true);
+  await page.waitForTimeout(1000);
+  await expect(toastDi(page, 'Google AI Studio'), 'sul sito spento l’avviso non si mostra').toHaveCount(0);
+
+  const home = await openTab('filo://newtab/');
+  await expect(toastDi(home, 'Google AI Studio')).toBeVisible({ timeout: 8_000 });
+  await expect(toastDi(home, 'Google AI Studio').locator('.sn-msg-rimedio')).toHaveText('Segnala');
+  expect((await spiega(app, 'EXPLAIN', 'grandine1478')).ok).toBe(true);
+  await home.waitForTimeout(1200);
+  await expect(toastDi(home, 'Google AI Studio')).toHaveCount(1);
+});
+
+// Il contenitore dei test non dà il fuoco a nessuna finestra: qui lo si decide. `pagina: false` è la pagina senza fuoco
+// perché ce l'ha la barra delle schede (o un'altra applicazione), nel mondo della pagina e in quello dei content script.
+const finestraDavanti = (app, si) => app.evaluate(({ BrowserWindow }, s) => {
+  const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+  win.isFocused = () => s;
+  if (s) win.emit('focus');
+}, si);
+const paginaSenzaFuoco = (app, url) => app.evaluate(async ({ webContents }, u) => {
+  const wc = webContents.getAllWebContents().find((w) => w.getURL() === u);
+  const code = 'Document.prototype.hasFocus = () => false; 1';
+  await wc.executeJavaScript(code);
+  await wc.executeJavaScriptInIsolatedWorld(999, [{ code }]);
+}, url);
+
+test('Filo davanti col fuoco sulla barra delle schede: l’avviso compare subito, al ritorno da lì e nella scheda scelta dalla barra', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body><p>Una pagina qualunque.</p></body></html>');
+  await fintoServitoDa(app, 'Google Vertex');
+  await paginaSenzaFuoco(app, page.url());
+
+  // Arrivata con la finestra davanti: la pagina non ha il fuoco, ma l'utente la guarda.
+  await finestraDavanti(app, true);
+  expect((await spiega(app, 'EXPLAIN', 'ghiaccio1478')).ok).toBe(true);
+  await expect(toastDi(page, 'Google Vertex'), 'Filo è davanti: l’avviso si vede subito').toHaveCount(1, { timeout: 5_000 });
+
+  // Arrivata con Filo dietro; si torna cliccando la barra delle schede, e la pagina resta senza fuoco.
+  await fintoServitoDa(app, 'Google AI Studio');
+  await finestraDavanti(app, false);
+  expect((await spiega(app, 'EXPLAIN', 'brina1478')).ok).toBe(true);
+  await page.waitForTimeout(1000);
+  await expect(toastDi(page, 'Google AI Studio'), 'Filo dietro: l’avviso aspetta').toHaveCount(0);
+  await finestraDavanti(app, true);
+  await expect(toastDi(page, 'Google AI Studio'), 'tornati dalla barra delle schede').toHaveCount(1, { timeout: 5_000 });
+
+  // Arrivata su un sito dove Filo è spento; la scheda dopo si sceglie dalla barra e non prende il fuoco.
+  const home = await openTab('filo://newtab/');
+  await expect(home.locator('#input')).toBeVisible({ timeout: 10_000 });
+  const idHome = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  const spento = await testServer.openReady(openTab, '<!doctype html><html><body><p>Un sito spento.</p></body></html>');
+  await fintoServitoDa(app, 'DeepSeek');
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
+    { type: 'update_settings', settings: { blocklist: ['127.0.0.1'] } },
+    { tab: { id: 5, url: 'filo://preferences/preferences.html' }, url: 'filo://preferences/preferences.html' },
+  ));
+  await expect.poll(() => app.evaluate(async ({ webContents }, u) => webContents.getAllWebContents().find((w) => w.getURL() === u)
+    .executeJavaScriptInIsolatedWorld(999, [{ code: 'self.__snFiloSpento === true' }]), spento.url()), { timeout: 5_000 }).toBe(true);
+  await finestraDavanti(app, true);
+  expect((await spiega(app, 'EXPLAIN', 'nebbia1478')).ok).toBe(true);
+  await spento.waitForTimeout(1000);
+  await expect(toastDi(spento, 'DeepSeek'), 'sul sito spento l’avviso non si mostra').toHaveCount(0);
+  await paginaSenzaFuoco(app, home.url());
+  await shell.evaluate((i) => window.filoShell.tabs.activate(i), idHome);
+  await expect(toastDi(home, 'DeepSeek'), 'nella scheda scelta dalla barra').toHaveCount(1, { timeout: 5_000 });
+});
+
 test('«Segnala» nell’avviso apre «Invia feedback» già scritto, e in Cronologia l’host si trova cercandolo', async ({ app, shell, openTab }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });

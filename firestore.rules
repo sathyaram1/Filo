@@ -221,6 +221,11 @@ service cloud.firestore {
     match /compiti-indice/{id} {
       allow read, write: if false;
     }
+    // I compiti ricorrenti (#1153, SPEC-DOMANDE.md §4.1): modelli dell'owner coi testi cifrati, li legge e li scrive solo
+    // il server (ownerCompiti), che ne fa le istanze.
+    match /compiti-ricorrenti/{id} {
+      allow read, write: if false;
+    }
 
     // Allowlist routine. Gestita SOLO da console Firebase.
     match /routines/{email} {
@@ -403,7 +408,9 @@ service cloud.firestore {
         && waitsForValido(request.resource.data)
         && unisceValido(request.resource.data)
         // `inCoda` (#1515): il segno che la coda delle routine legge. Lo scrive solo il server, a ogni cambio di stato.
-        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda'])
+        // `riservato`, `tipo` e `unitoIn` (#1153): il segno che segue il testo riservato, la segnalazione, il rimando
+        // dell'unione. Come la fiducia, li scrive solo il server.
+        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda', 'riservato', 'tipo', 'unitoIn'])
         && bigliettoLocaleValido(request.resource.data)
         && immaginiValide(request.resource.data.get('images', []))
         && documentiValidi(request.resource.data.get('files', []))
@@ -1363,9 +1370,12 @@ service cloud.firestore {
     // sito. Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle espressioni; le
     // stesse regole: sola creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella:
     // tests/unit/firestoreRulesContatori.test.mjs.
+    // Dopo la v1 (#1586), in campi facoltativi e con la stessa versione: l'anticipo che una pagina delicata non lascia
+    // partire e il gesto che costa (la spiegazione, il segnaposto), le correzioni automatiche per fonte, «Valuta» e i
+    // segnaposti del correttore. Le copie vecchie non li mandano, e un'ora che non li ha non li porta.
     match /contatori-riquadri/{docId} {
       function contatoriRiquadri(d) {
-        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'anticipo_al_gesto', 'riquadro_chiuso_prima', 'riquadro_uso', 'riscrittura', 'ocr', 'traduzione_pagina', 'editor_titolo', 'editor_chat'])
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'anticipo_al_gesto', 'riquadro_chiuso_prima', 'riquadro_uso', 'riscrittura', 'ocr', 'traduzione_pagina', 'editor_titolo', 'editor_chat', 'anticipo_privacy', 'correttore_automatica', 'correttore_valuta', 'correttore_segnaposto'])
           && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'anticipo_al_gesto', 'riquadro_chiuso_prima', 'riquadro_uso', 'riscrittura', 'ocr', 'traduzione_pagina', 'editor_titolo', 'editor_chat'])
           && d.v == 1
           && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
@@ -1383,7 +1393,11 @@ service cloud.firestore {
           && chiuse(d.ocr, ['copiato', 'vuoto', 'annullato', 'tagliato'], 40, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
           && chiuse(d.traduzione_pagina, ['intera', 'parziale', 'fermata'], 240, '^([0-9]{1,9}(,[0-9]{1,9}){7}(#[0-9]{1,9}(,[0-9]{1,9}){7})*)?$')
           && chiuse(d.editor_titolo, ['automatico', 'rigenerato'], 140, '^([0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
-          && chiuse(d.editor_chat, ['intero', 'oltre_tetto'], 120, '^([0-9]{1,9}(,[0-9]{1,9}){5}(#[0-9]{1,9}(,[0-9]{1,9}){5})*)?$');
+          && chiuse(d.editor_chat, ['intero', 'oltre_tetto'], 120, '^([0-9]{1,9}(,[0-9]{1,9}){5}(#[0-9]{1,9}(,[0-9]{1,9}){5})*)?$')
+          && (!('anticipo_privacy' in d) || chiuse(d.anticipo_privacy, ['spiega', 'segnaposto'], 40, '^([0-9]{1,9}(,[0-9]{1,9}){1}(#[0-9]{1,9}(,[0-9]{1,9}){1})*)?$'))
+          && (!('correttore_automatica' in d) || chiuse(d.correttore_automatica, ['personale', 'fisso', 'nome'], 90, '^([0-9]{1,9}(,[0-9]{1,9}){2}(#[0-9]{1,9}(,[0-9]{1,9}){2})*)?$'))
+          && (!('correttore_valuta' in d) || chiuse(d.correttore_valuta, ['chiesta', 'con_correzioni', 'senza_correzioni', 'correzione_mostrata', 'correzione_accettata', 'correzione_tolta'], 60, '^([0-9]{1,9}(#[0-9]{1,9})*)?$'))
+          && (!('correttore_segnaposto' in d) || chiuse(d.correttore_segnaposto, ['da_solo', 'su_richiesta', 'memoria'], 240, '^([0-9]{1,9}(,[0-9]{1,9}){7}(#[0-9]{1,9}(,[0-9]{1,9}){7})*)?$'));
       }
       allow get, list: if isAdmin();
       allow create: if request.auth != null && contatoriRiquadri(request.resource.data);
@@ -1475,6 +1489,44 @@ service cloud.firestore {
       }
       allow get, list: if isAdmin();
       allow create: if request.auth != null && contatoriServizio(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // Le strade di un'ora dei contatori (#1468), per nome da elenchi chiusi: da quale strada parte ogni azione (scorciatoia,
+    // barra, menu, tasto destro, chat…), i tasti dei browser e quelli che tornano indietro subito, le scorciatoie mute e
+    // perché, il menu nativo scelto, su che cosa si apre il tasto destro, indietro e avanti per strada, le pagine di Filo
+    // aperte e quanto restano davanti in fasce, l'Aiuto aperto. Mai un testo, un indirizzo, un sito o un tasto scritto.
+    // Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle espressioni; le stesse
+    // regole: sola creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatoriStrade.test.mjs.
+    match /contatori-strade/{docId} {
+      function conti(m, chiavi, tettoChiavi, tetto) {
+        return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
+          && m.values().join('#').size() <= tetto && m.values().join('#').matches('^([0-9]{1,9}(#[0-9]{1,9})*)?$');
+      }
+      function contatoriStrade(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'via_azione', 'tasto_da_browser', 'scorciatoia_a_vuoto', 'menu_nativo_scelto', 'contesto_box', 'navigazione_cronologia', 'pagina_di_filo_aperta', 'aiuto_aperto'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'via_azione', 'tasto_da_browser', 'scorciatoia_a_vuoto', 'menu_nativo_scelto', 'contesto_box', 'navigazione_cronologia', 'pagina_di_filo_aperta', 'aiuto_aperto'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && conti(d.via_azione, '^((help|translate|screenshot|screenshotCrop|transcribe|share|saveForLater|qrCode|colorPicker|fullscreen|back|forward|reload|closeTab|newTab|openOptions|home|editorApp|feedbackApp|explain[-]selection|translate[-]selection|zoom_piu|zoom_meno|zoom_reset|barra_laterale|altro)[:](scorciatoia|barra|tasto_destro_riga|tasto_destro_altro|menu_scheda|menu_app|pulsante_scheda|clic_centrale|tasto_mouse|swipe|comando_slash|carta_home|chat)(#(help|translate|screenshot|screenshotCrop|transcribe|share|saveForLater|qrCode|colorPicker|fullscreen|back|forward|reload|closeTab|newTab|openOptions|home|editorApp|feedbackApp|explain[-]selection|translate[-]selection|zoom_piu|zoom_meno|zoom_reset|barra_laterale|altro)[:](scorciatoia|barra|tasto_destro_riga|tasto_destro_altro|menu_scheda|menu_app|pulsante_scheda|clic_centrale|tasto_mouse|swipe|comando_slash|carta_home|chat))*)?$', 16000, 7000)
+          && conti(d.tasto_da_browser, '^(((ctrl_t|ctrl_shift_t|ctrl_w|ctrl_l|ctrl_r|salto_scheda|alt_freccia|ctrl_tab|ctrl_shift_tab|ctrl_h|ctrl_j|ctrl_d|ctrl_f|f5|f6|f11)|aspettativa_mancata[:](ctrl_shift_t|ctrl_l))(#((ctrl_t|ctrl_shift_t|ctrl_w|ctrl_l|ctrl_r|salto_scheda|alt_freccia|ctrl_tab|ctrl_shift_tab|ctrl_h|ctrl_j|ctrl_d|ctrl_f|f5|f6|f11)|aspettativa_mancata[:](ctrl_shift_t|ctrl_l)))*)?$', 500, 400)
+          && conti(d.scorciatoia_a_vuoto, '^((explain[-]selection|translate[-]selection|save[-]for[-]later|open[-]help[-]sidebar)[:](pagina_interna|avviso_sito|filo_spento_sul_sito)(#(explain[-]selection|translate[-]selection|save[-]for[-]later|open[-]help[-]sidebar)[:](pagina_interna|avviso_sito|filo_spento_sul_sito))*)?$', 1000, 300)
+          && conti(d.menu_nativo_scelto, '^((shift_tasto_destro|menu_del_sito[:]voce|menu_del_sito[:]sempre_acceso|menu_del_sito[:]sempre_spento)(#(shift_tasto_destro|menu_del_sito[:]voce|menu_del_sito[:]sempre_acceso|menu_del_sito[:]sempre_spento))*)?$', 200, 100)
+          && conti(d.contesto_box, '^((selezione|collegamento|immagine|media|campo|livelli|pagina|avviso|file|selezione[+]collegamento|selezione[+]campo|collegamento[+]immagine|collegamento[+]livelli|immagine[+]livelli|media[+]livelli|collegamento[+]immagine[+]livelli|misto)(#(selezione|collegamento|immagine|media|campo|livelli|pagina|avviso|file|selezione[+]collegamento|selezione[+]campo|collegamento[+]immagine|collegamento[+]livelli|immagine[+]livelli|media[+]livelli|collegamento[+]immagine[+]livelli|misto))*)?$', 500, 400)
+          && conti(d.navigazione_cronologia, '^((indietro|avanti)[:]((alt_freccia|tasto_mouse|swipe|barra|tasto_destro_riga|menu_app)|barra_lista[:](p1|p2_3|p4_6|p7_15))(#(indietro|avanti)[:]((alt_freccia|tasto_mouse|swipe|barra|tasto_destro_riga|menu_app)|barra_lista[:](p1|p2_3|p4_6|p7_15)))*)?$', 1000, 400)
+          && conti(d.pagina_di_filo_aperta, '^(((newtab|options|options_altro|security|preferences|editor|feedback|history|quaderno|home|spellcheck|archive|credits|board|decks|downloads|transparency|altro)[:](barra|menu_app|comando_slash|carta_home|collegamento_interno|chat|sessione_ripristinata)|vista[:](newtab|options|options_altro|security|preferences|editor|feedback|history|quaderno|home|spellcheck|archive|credits|board|decks|downloads|transparency|altro)[:](ms500|s1|s2|s5|s10|s30|oltre))(#((newtab|options|options_altro|security|preferences|editor|feedback|history|quaderno|home|spellcheck|archive|credits|board|decks|downloads|transparency|altro)[:](barra|menu_app|comando_slash|carta_home|collegamento_interno|chat|sessione_ripristinata)|vista[:](newtab|options|options_altro|security|preferences|editor|feedback|history|quaderno|home|spellcheck|archive|credits|board|decks|downloads|transparency|altro)[:](ms500|s1|s2|s5|s10|s30|oltre)))*)?$', 11000, 5500)
+          && conti(d.aiuto_aperto, '^((scorciatoia|tasto_destro|menu_scheda|menu_app|avviso_sito|barra|chat)(#(scorciatoia|tasto_destro|menu_scheda|menu_app|avviso_sito|barra|chat))*)?$', 200, 150);
+      }
+      allow get, list: if isAdmin();
+      allow create: if request.auth != null && contatoriStrade(request.resource.data);
       allow update, delete: if false;
     }
 

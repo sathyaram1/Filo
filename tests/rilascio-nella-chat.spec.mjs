@@ -6,7 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
-import { nelMondoDiFilo, statoDi } from './helpers/riquadri.mjs';
+import { neiRiquadri, nelMondoDiFilo, paginaDellAiuto, statoDi } from './helpers/riquadri.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
@@ -30,7 +30,8 @@ async function lascia(page, files, { x = 200, y = 200, fasi = ['dragEnter', 'dra
   await s.detach().catch(() => {});
 }
 
-const statoAiuto = (app, page) => nelMondoDiFilo(app, page, () => ({
+// Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3), sulle pagine di Filo nella pagina.
+const statoAiuto = (app, page) => neiRiquadri(app, page, () => ({
   aperto: !!globalThis.SN_SIDEBAR?.isOpen?.(),
   allegati: globalThis.__filoSidebarTest?.allegati?.() || [],
   fuoco: document.activeElement === document.querySelector('.sn-sidebar-input textarea'),
@@ -102,20 +103,25 @@ test('un’immagine in un formato che il modello non legge (SVG) entra come PNG,
   await expect(casa.locator('#imgPreview')).toHaveAttribute('title', logo);
 
   const page = await testServer.openReady(openTab, SITO);
-  await nelMondoDiFilo(app, page, AGENTE);
   await lascia(page, [logo]);
   await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 8_000 }).toBe(1);
-  await page.keyboard.type('cos’è?');
-  await page.keyboard.press('Enter');
-  await expect.poll(() => nelMondoDiFilo(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBeGreaterThan(0);
-  const [p] = await nelMondoDiFilo(app, page, () => globalThis.__richieste);
+  const A = await paginaDellAiuto(app, page);
+  await neiRiquadri(app, page, AGENTE);
+  await A.keyboard.type('cos’è?');
+  await A.keyboard.press('Enter');
+  await expect.poll(() => neiRiquadri(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBeGreaterThan(0);
+  const [p] = await neiRiquadri(app, page, () => globalThis.__richieste);
   const immagini = p.history.flatMap((m) => (Array.isArray(m.content) ? m.content : [])).filter((c) => c.type === 'image_url');
   expect(immagini.map((c) => c.image_url.url.slice(0, 22))).toEqual(['data:image/png;base64,']);
 });
 
 test('Aiuto: una richiesta con un’immagine rifiutata dal fornitore non blocca le domande dopo, e lo si dice', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
-  await nelMondoDiFilo(app, page, () => {
+  const foto = immaginiSulDisco(1);
+  await lascia(page, foto);
+  await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 8_000 }).toBe(1);
+  const A = await paginaDellAiuto(app, page);
+  await neiRiquadri(app, page, () => {
     globalThis.__richieste = [];
     const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
     chrome.runtime.sendMessage = (m, ...r) => {
@@ -129,17 +135,14 @@ test('Aiuto: una richiesta con un’immagine rifiutata dal fornitore non blocca 
     };
     return 1;
   });
-  const foto = immaginiSulDisco(1);
-  await lascia(page, foto);
-  await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 8_000 }).toBe(1);
-  await page.keyboard.type('cos’è?');
-  await page.keyboard.press('Enter');
-  await expect.poll(() => nelMondoDiFilo(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBe(1);
+  await A.keyboard.type('cos’è?');
+  await A.keyboard.press('Enter');
+  await expect.poll(() => neiRiquadri(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBe(1);
   await expect.poll(async () => (await statoDi(app, page, '.sn-toast'))?.testo || '', { timeout: 5_000 }).toMatch(/partono senza l’immagine/);
-  await page.keyboard.type('e adesso?');
-  await page.keyboard.press('Enter');
-  await expect.poll(() => nelMondoDiFilo(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBe(2);
-  const secondo = await nelMondoDiFilo(app, page, () => globalThis.__richieste[1]);
+  await A.keyboard.type('e adesso?');
+  await A.keyboard.press('Enter');
+  await expect.poll(() => neiRiquadri(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBe(2);
+  const secondo = await neiRiquadri(app, page, () => globalThis.__richieste[1]);
   expect(secondo.history.flatMap((m) => (Array.isArray(m.content) ? m.content : [])).filter((c) => c.type === 'image_url')).toEqual([]);
 });
 
@@ -295,8 +298,10 @@ test('quello che si dà al pannello dell’Aiuto, lasciato o incollato, il sito 
       }
     </script></body></html>`);
   await nelMondoDiFilo(app, page, () => { globalThis.SN_SIDEBAR.open(); return 1; });
-  await page.waitForSelector('.sn-sidebar-input textarea');
-  const sul = await nelMondoDiFilo(app, page, () => {
+  const A = await paginaDellAiuto(app, page);
+  await A.waitForSelector('.sn-sidebar-input textarea');
+  // Il pannello sta nello strato, grande quanto la scheda: i suoi punti valgono anche per il rilascio sulla scheda.
+  const sul = await neiRiquadri(app, page, () => {
     const b = document.querySelector('.sn-sidebar').getBoundingClientRect();
     return { x: b.x + b.width / 2, y: b.y + b.height / 3 };
   });
@@ -309,15 +314,11 @@ test('quello che si dà al pannello dell’Aiuto, lasciato o incollato, il sito 
   await app.evaluate(async ({ clipboard, ClipboardItem }, b64) => {
     await clipboard.write([new ClipboardItem({ 'image/png': new Blob([Buffer.from(b64, 'base64')], { type: 'image/png' }) })]);
   }, PNG.toString('base64'));
-  const t = await nelMondoDiFilo(app, page, () => {
-    const b = document.querySelector('.sn-sidebar-input textarea').getBoundingClientRect();
-    return { x: b.x + 20, y: b.y + 10 };
-  });
-  await page.mouse.click(t.x, t.y);
-  await page.keyboard.press('Control+V');
+  await A.click('.sn-sidebar-input textarea');
+  await A.keyboard.press('Control+V');
   await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 5_000 }).toBe(2);
   // «Incolla» del tasto destro e della cronologia degli appunti.
-  await nelMondoDiFilo(app, page, (b64) => {
+  await neiRiquadri(app, page, (b64) => {
     const blob = new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], { type: 'image/png' });
     const ev = globalThis.SN_FILO_UI.nostro(new CustomEvent('filo:paste-image', { bubbles: true, cancelable: true, detail: { blob } }));
     document.querySelector('.sn-sidebar-input textarea').dispatchEvent(ev);
@@ -362,7 +363,6 @@ const AGENTE = () => {
 
 test('Aiuto: l’immagine allegata parte col messaggio, si vede nella bolla, e la × la toglie prima dell’invio', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
-  await nelMondoDiFilo(app, page, AGENTE);
   // Una foto con una misura vera, per guardare anteprima e bolla come le vede l'utente.
   const vera = Buffer.from(await app.evaluate(({ nativeImage }) => {
     const w = 160, h = 100, px = Buffer.alloc(w * h * 4);
@@ -372,23 +372,25 @@ test('Aiuto: l’immagine allegata parte col messaggio, si vede nella bolla, e l
   const foto = immaginiSulDisco(2, { byte: vera });
   await lascia(page, foto);
   await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 8_000 }).toBe(2);
+  const A = await paginaDellAiuto(app, page);
+  await neiRiquadri(app, page, AGENTE);
 
-  const x = await nelMondoDiFilo(app, page, () => globalThis.__filoSidebarTest.puntoTogli(1));
-  await page.mouse.click(x.x, x.y);
+  const x = await neiRiquadri(app, page, () => globalThis.__filoSidebarTest.puntoTogli(1));
+  await A.mouse.click(x.x, x.y);
   await expect.poll(async () => (await statoAiuto(app, page)).allegati.map((a) => a.nome)).toEqual(['foto 1.png']);
 
-  await page.keyboard.type('cos’è?');
-  await page.keyboard.press('Enter');
-  await expect.poll(() => nelMondoDiFilo(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBeGreaterThan(0);
-  const [p] = await nelMondoDiFilo(app, page, () => globalThis.__richieste);
+  await A.keyboard.type('cos’è?');
+  await A.keyboard.press('Enter');
+  await expect.poll(() => neiRiquadri(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBeGreaterThan(0);
+  const [p] = await neiRiquadri(app, page, () => globalThis.__richieste);
   const ultimo = p.history[p.history.length - 1];
   expect(ultimo.role).toBe('user');
   expect(ultimo.content.filter((c) => c.type === 'image_url').map((c) => c.image_url.url.slice(0, 22))).toEqual(['data:image/png;base64,']);
   expect(ultimo.content[0].text).toContain('cos’è?');
   expect(ultimo.content[0].text).toContain('l’ha allegata l’utente');
-  expect(await nelMondoDiFilo(app, page, () => globalThis.__filoSidebarTest.immaginiNelleBolle())).toEqual([1]);
+  expect(await neiRiquadri(app, page, () => globalThis.__filoSidebarTest.immaginiNelleBolle())).toEqual([1]);
   expect((await statoAiuto(app, page)).allegati).toEqual([]);
-  await page.screenshot({ path: 'tests/.shots/rilascio-aiuto-inviata.png' });
+  await A.screenshot({ path: 'tests/.shots/rilascio-aiuto-inviata.png' });
   await lascia(page, [foto[1]]);
   await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 8_000 }).toBe(1);
   await app.evaluate(async () => {
@@ -396,38 +398,40 @@ test('Aiuto: l’immagine allegata parte col messaggio, si vede nella bolla, e l
     await globalThis.SN_HANDLE_MESSAGE({ type: MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }, { url: 'filo://preferences/preferences.html' });
   });
   await page.waitForTimeout(600);
-  await page.screenshot({ path: 'tests/.shots/rilascio-aiuto-scuro.png' });
+  await A.screenshot({ path: 'tests/.shots/rilascio-aiuto-scuro.png' });
 });
 
 test('Aiuto: Ctrl+V di un’immagine nella casella la allega, e le sole immagini senza testo partono lo stesso', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
-  await nelMondoDiFilo(app, page, AGENTE);
   await nelMondoDiFilo(app, page, () => { globalThis.SN_SIDEBAR.open(); return 1; });
-  await page.waitForSelector('.sn-sidebar-input textarea');
+  const A = await paginaDellAiuto(app, page);
+  await A.waitForSelector('.sn-sidebar-input textarea');
+  await neiRiquadri(app, page, AGENTE);
   await app.evaluate(async ({ clipboard, ClipboardItem }, b64) => {
     await clipboard.write([new ClipboardItem({ 'image/png': new Blob([Buffer.from(b64, 'base64')], { type: 'image/png' }) })]);
   }, PNG.toString('base64'));
-  await page.click('.sn-sidebar-input textarea');
-  await page.keyboard.press('Control+V');
+  await A.click('.sn-sidebar-input textarea');
+  await A.keyboard.press('Control+V');
   await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 5_000 }).toBe(1);
-  // «Incolla» del tasto destro manda l'immagine con l'evento di Filo; lo stesso evento fabbricato dalla pagina non vale.
-  await page.evaluate(() => document.querySelector('.sn-sidebar-input textarea').dispatchEvent(new CustomEvent('filo:paste-image', {
+  // «Incolla» del tasto destro manda l'immagine con l'evento di Filo; lo stesso evento fabbricato da un codice che non
+  // è di Filo non vale.
+  await A.evaluate(() => document.querySelector('.sn-sidebar-input textarea').dispatchEvent(new CustomEvent('filo:paste-image', {
     bubbles: true, cancelable: true, detail: { blob: new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }) },
   })));
-  await nelMondoDiFilo(app, page, (b64) => {
+  await neiRiquadri(app, page, (b64) => {
     const blob = new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], { type: 'image/png' });
     const ev = globalThis.SN_FILO_UI.nostro(new CustomEvent('filo:paste-image', { bubbles: true, cancelable: true, detail: { blob } }));
     document.querySelector('.sn-sidebar-input textarea').dispatchEvent(ev);
     return 1;
   }, PNG.toString('base64'));
   await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 5_000 }).toBe(2);
-  await page.keyboard.press('Enter');
-  await expect.poll(() => nelMondoDiFilo(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBeGreaterThan(0);
-  const [p] = await nelMondoDiFilo(app, page, () => globalThis.__richieste);
+  await A.keyboard.press('Enter');
+  await expect.poll(() => neiRiquadri(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBeGreaterThan(0);
+  const [p] = await neiRiquadri(app, page, () => globalThis.__richieste);
   expect(p.userMessage).toContain('senza scrivere niente');
   expect(p.history[p.history.length - 1].content.some((c) => c.type === 'image_url')).toBe(true);
   // Nel filo della home la domanda c'è, e dice quante immagini aveva.
-  await expect.poll(() => nelMondoDiFilo(app, page, () => globalThis.__nelFilo), { timeout: 5_000 })
+  await expect.poll(() => neiRiquadri(app, page, () => globalThis.__nelFilo), { timeout: 5_000 })
     .toEqual([{ role: 'user', text: '(2 immagini allegate)' }, { role: 'filo', text: 'È un quadratino rosso.' }]);
 });
 

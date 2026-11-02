@@ -65,6 +65,8 @@ cifratura sta accecando i controlli, non gli estranei.**
 | **Worker** (l'istanza che lavora) | un **biglietto** monouso, opaco | ottenere il proprio lavoro, battere il cuore, consegnare, rilasciare |
 | **Server** | la chiave privata dei feedback in **cassaforte** (Secret Manager) + accesso al database | scegliere il lavoro, decifrare, validare, scrivere |
 | **Owner** | le sue credenziali admin, come oggi | tutto, dalla dashboard |
+| **Manutentore** (#1961) | una parola d'ordine di classe `manutentore` | gli ordini del manutentore (`routineManutentore`): mai fusioni, L5, codice, risposte all'owner. Scrive non fidato |
+| **Owner da una sede non fidata** (#2011) | una parola d'ordine di classe `owner-non-fidato` | i poteri del manutentore più le domande per l'owner tranne quelle dell'addetto comunicazioni (`chiaveDomande`, il contratto di `ownerDomande`): leggere, rispondere, archiviare, riaprire. Mai fusioni, L5, chiavi, interruttori, «segna fidato», abbassare o archiviare una priorità 3, bilanci. Scrive non fidato, e la risposta porta il segno della chiave (Gestione, recap del mattino) |
 
 Una parola d'ordine **per routine schedulata**: si revoca la singola, e nel
 registro del server si vede quale ha fatto cosa.
@@ -206,9 +208,9 @@ diventa un **muro**.
 
 | Ruolo | Riceve | NON riceve |
 |---|---|---|
-| `new-work` | il testo del suo feedback | — |
+| `new-work` | il testo del suo feedback; il ramo, se il biglietto ne ha già uno (lavoro ripartito sullo stesso biglietto, #1632) | — |
 | `fixer` | il feedback e la critica di riallineamento che il server scrive a ogni fusione fermata (un conflitto, o gli unit rossi sul risultato della fusione con il loro elenco: chi riallinea li elenca nel report e non li corregge, #1204) | i rilievi di una verifica: li corregge chi li ha scritti |
-| `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver registrato la critica, la risposta del server (feedback #561) | il diff, il report di chi ha risolto, la risposta del server prima della critica |
+| `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver scritto la critica, nella verifica piena, i rilievi del sotto-agente che legge il diff con la richiesta davanti (`lettura-diff.md`, #1363: la registrazione rifiuta la critica senza la sua ricevuta); **dopo** aver registrato la critica, la risposta del server (feedback #561) | il diff, il report di chi ha risolto, la risposta del server prima della critica |
 | `secaudit` | **solo ramo e diff** | qualunque campo del feedback |
 | `risposta` | la **sua domanda** (conversazione e note per gli agenti, allegati dell'owner aperti), numero, stato e priorità dei feedback che nomina; il registro delle decisioni solo nell'ambiente dei riservati (SPEC-DOMANDE § 3.5) | testi di feedback, diff, rami; nessun passaggio di stato, nessuna azione di consenso |
 | `smistamento` | la **sua domanda** appena nata (note per gli agenti comprese), il feedback da cui viene con conversazione e note, numero, stato e priorità dei feedback che nomina; il registro delle decisioni solo nell'ambiente dei riservati (SPEC-DOMANDE § 3.5, #1790) | diff, rami; le azioni fuori da `guasto`, `ricevuti`, `automatica` e `pubblica`; nessuna azione di consenso |
@@ -850,7 +852,7 @@ A fine sessione orchestratore e worker rispondono a una domanda che l'owner
 imposta; ognuno risponde per sé (l'orchestratore non legge mai i worker).
 
 - **`routineClosing` `{ passphrase | ticket, op: 'question' | 'answer', id?, answer?, requestId? }`** — domanda e risposta (`requestId`, uno per invocazione, fa ritrovare lo stesso documento ai ritentativi); mai rifiutata per `fault_declared` né a routine spente; `answer` oltre 32768 byte → `answer_too_big` con `bytes` e `max`, mai troncata.
-- **`routineClosingAdmin` (callable owner)** `{ op: 'get' | 'set' | 'clear' | 'answers' }` — slot `orchestrator`, `worker`, `new-work`, `fixer`, `verifier`, `secaudit`, `risposta`, `smistamento` (gli altri: `bad_slot` con l'elenco); ripiego nel server.
+- **`routineClosingAdmin` (callable owner)** `{ op: 'get' | 'set' | 'clear' | 'answers' }` — slot `tutti`, `orchestrator`, `worker`, `new-work`, `fixer`, `verifier`, `secaudit`, `risposta`, `smistamento`, `compito` e `compito:<ricorrente>` (#1153, gli altri: `bad_slot` con l'elenco); vale il più preciso, poi il ripiego nel server.
 - `routine-channel.mjs domanda "<parola>"` | `domanda --biglietto <b>` — stampa la domanda e il comando per rispondere; exit 0 · 2 nessuna domanda (404, rete) · 4 rifiutata.
 - `routine-channel.mjs risposta "<parola>" <id>` | `risposta --biglietto <b>` — il testo da stdin (`<<'FINE'`); stessi exit.
 - `routine-domanda.mjs mostra | imposta <slot> "<testo>" | togli <slot> | risposte [--n N]` — lo strumento dell'owner; stampa i testi coi caratteri di controllo resi visibili (`\x1b`), perché le risposte vengono da sessioni che leggono testo non fidato.
@@ -888,6 +890,14 @@ token.
   export FILO_ROUTINE=1
   node "$(ls -d scripts/dispatch.mjs */scripts/dispatch.mjs 2>/dev/null | head -n 1)" --preflight
   ```
+
+  Il `cd` non basta per le impostazioni: Claude Code legge quelle del
+  progetto solo dalla cartella di partenza, e da sopra i cloni i ganci di Filo
+  (salvataggio automatico, guardia del ramo) non partirebbero, nemmeno per i
+  worker (#1967). Il preflight li porta nelle impostazioni utente insieme al
+  gancio dell'orchestratore cieco, con la cartella del progetto fissata al
+  checkout; ognuno tace dove il progetto della sessione ha già il suo script,
+  così dentro Filo non gira due volte (`scripts/lib/ganci-del-progetto.mjs`).
 
 - **Cosa non garantisce.** In cloud il proxy autentica qualunque git della
   sessione verso i repository agganciati, non solo quelli di git-server: il

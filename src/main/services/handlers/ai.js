@@ -4,7 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
-    providerRouting, openWeightsBlockReason, modelGate,
+    providerRouting, openWeightsBlockReason, modelGate, avvisiFuoriPolitica,
     Defaults, isAdmin, broadcastToTabs, controllaUscita: portaUscite, ricordaLettoDallAiuto, segnaLetturaAiuto, winOf,
   } = ctx;
   const { SN_CONST } = globalThis;
@@ -154,6 +154,21 @@ module.exports = function register(on, ctx) {
       return chiedi(senzaFoto);
     }
   }
+
+  // Gli avvisi fuori politica in coda (#1478.1) li prende solo la pagina davanti agli occhi: il frame principale della
+  // scheda attiva. Un riquadro, una scheda dietro o la home pronta in riserva li toglierebbero a chi li deve vedere.
+  // Davanti agli occhi vuol dire la finestra davanti: il fuoco può stare sulla barra delle schede, non sulla pagina.
+  on(MSG.AVVISI_IN_CODA, async (msg, sender) => {
+    const win = sender && sender.win;
+    const tm = win && win._filoTabs;
+    const principale = !(sender && sender.frame && sender.frame.parent);
+    const attiva = !!(tm && sender.tab && !sender.riserva && !sender.strato && tm.activeId === sender.tab.id);
+    let davanti = Boolean(msg && msg.fuoco === true);
+    try { davanti = davanti || Boolean(win && !win.isDestroyed() && win.isFocused()); } catch (_) {}
+    if (!attiva || !principale || !davanti || !avvisiFuoriPolitica) return { ok: true, avvisi: [] };
+    const id = typeof (msg && msg.id) === 'string' ? msg.id : '';
+    return { ok: true, avvisi: avvisiFuoriPolitica.prendi(id) };
+  });
 
   const tettoAutomatiche = require('../tettoAutomatiche').crea();
   const { spingiAllaScheda } = require('../impostazioniPerOrigine');
@@ -817,11 +832,15 @@ module.exports = function register(on, ctx) {
     return K && typeof K.senzaRipiego === 'function' ? K.senzaRipiego(call) : call();
   }
 
-  // L'errore di una prova, detto all'utente: un rifiuto della chiave col suo perché.
+  // L'errore di una prova, detto all'utente: un rifiuto della chiave col suo perché, un rifiuto del router con la stessa
+  // causa che direbbe la chat (#1345). Il resto col messaggio del servizio, che a chi prova un modello serve.
+  const RIFIUTI_DEL_ROUTER = new Set(['NO_ALLOWED_HOST', 'DATA_POLICY', 'NO_PROVIDER_ALLOWED', 'MODEL_UNAVAILABLE', 'NO_TOOL_HOST', 'TETTO_RISPOSTA', 'INGRESSO_NON_LETTO']);
   function provaFallita(e) {
     const W = globalThis.SN_WALLET;
     const st = W ? W.keyRefusalOf(e) : 0;
     if (st) return `OpenRouter ha rifiutato questa chiave (${W.keyRefusalReason(st)}).`;
+    const CE = globalThis.SN_CHAT_ERRORS;
+    if (CE && e && RIFIUTI_DEL_ROUTER.has(e.code)) return CE.sentence(e);
     return e?.message || String(e);
   }
 

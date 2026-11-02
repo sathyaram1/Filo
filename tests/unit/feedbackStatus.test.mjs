@@ -147,9 +147,12 @@ test('canReach: accetta le CATENE di passi dello stesso attore (coda collassata)
   assert.ok(FS.canReach('todo', 'revision_security', 'routine'));
   assert.ok(FS.canReach('todo', 'done', 'routine'));
   assert.ok(FS.canReach('working', 'done', 'routine'));
-  // Ma NON mischia attori né inventa salti: la routine non arriva ad archived,
-  // né agli stati owner-only; l'owner non attraversa l'iter delle routine.
-  assert.ok(!FS.canReach('todo', 'archived', 'routine'));
+  // Ma NON mischia attori né inventa salti: la routine arriva ad archived solo da
+  // un lavoro in coda (riordino e unione, #1153; chi lo fa lo decide l'ambito),
+  // mai dagli stati owner-only; l'owner non attraversa l'iter delle routine.
+  assert.ok(FS.canReach('todo', 'archived', 'routine'));
+  assert.ok(!FS.canReach('done', 'archived', 'routine'));
+  assert.ok(!FS.canReach('aligned', 'archived', 'routine'));
   assert.ok(!FS.canReach('aligned', 'todo', 'routine'));
   assert.ok(!FS.canReach('todo', 'revision_capability', 'owner'));
   assert.ok(!FS.canReach('attack', 'done', 'owner'));

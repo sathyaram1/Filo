@@ -31,8 +31,13 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   sezioni cambiate, e nella domanda di quel turno i ricordi ripescati e l'intervista. L'intervista sta solo nella
   domanda di adesso: rimandata nel tratto, le sue istruzioni dirigerebbero ogni chat dopo, anche in un'altra scheda
   (#1297), e il turno che la perde si rilegge una volta. Le azioni di una chat dentro il suo
-  turno non ci sono: le racconta il turno. Le pagine visitate no: entrano solo cercate. Si scrivono la prima volta e
-  restano quelle (un evento in ritardo non riscrive un messaggio già mandato); dopo una cancellazione si rifanno.
+  turno non ci sono: le racconta il turno. Le pagine visitate entrano ripiegate per sito (decisione dell'owner, D-202),
+  in una busta DATI_PAGINA sotto le altre: quante, quando, le ricerche fatte sul sito e gli ultimi tre titoli; di una
+  delicata solo il sito, di una della rete di casa solo il numero, deciso nel main prima di scrivere il blocco. Oltre
+  trenta siti si dice quante pagine mancano. Si scrivono la prima volta e restano quelle (un evento in ritardo, un
+  titolo che arriva dopo, non riscrive un messaggio già mandato); si rifanno dopo una cancellazione e quando una
+  loro pagina diventa delicata o della rete di casa. Una scheda mostrata col titolo che diventa delicata rifà la
+  fotografia: il titolo esce dal CONTESTO e dai messaggi già mandati.
 - **I punti di cache stanno sui confini dei blocchi**: fine della parte fissa e fine del CONTESTO (tutte e due della
   durata scelta, un'ora di serie), fine del tratto prima della domanda, ultimo messaggio: quattro, il massimo di
   Anthropic. Il piano lo fa il cancello dei modelli sui messaggi già oscurati; lo scrive nel corpo solo il fornitore, e
@@ -113,9 +118,9 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   davanti: una conversazione ripresa o lunga ha un inizio che si cerca), pagine visitate (e il contenuto
   delle schede chiuse, coi vettori della Cronologia), cambi annullabili. Pagine, chat e cambi si cercano per parole
   con gli stessi tre passi (tutte, quelle che distinguono, almeno una): una parola in più nella domanda non fa
-  sparire la pagina o il cambio mentre la chat si trova. Le pagine non entrano mai da sole nel
-  contesto: solo cercate (decisione dell'owner, D56 la cambierà con un interruttore). Una pagina delicata dice solo
-  il sito; gli indirizzi trovati si riaprono senza conferma, come i link di una ricerca.
+  sparire la pagina o il cambio mentre la chat si trova. Da sole le pagine entrano solo ripiegate davanti al messaggio
+  (sopra): indirizzi e pagine più vecchie si cercano. Una pagina delicata dice solo il sito; gli indirizzi trovati si
+  riaprono senza conferma, come i link di una ricerca.
 
 - **Le chat delle app entrano come una riga** all'ora in cui sono cominciate, mai lo scambio: vedi
   [Il filo cresce solo in coda](il-filo-cresce-solo-in-coda-e-cancellare-e-un-evento.md), § chat delle altre app.

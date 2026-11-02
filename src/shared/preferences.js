@@ -344,7 +344,8 @@
     const r = riduci(d);
     return (r && r.sito) || d;
   }
-  function opElenco(v, riduci) {
+  // `voceDi`: come un pezzo scritto diventa la voce dell'elenco ('' se non è un sito).
+  function opElenco(v, riduci, voceDi = dominioDa) {
     const s = String(v == null ? '' : v).trim();
     if (!s) return null;
     if (SVUOTA.test(s)) return { op: 'sostituisci', voci: [] };
@@ -361,7 +362,7 @@
     const errati = [];
     const rifiuti = [];
     for (const p of pezzi) {
-      let d = dominioDa(p);
+      let d = voceDi(p);
       // Togliere una piattaforma salvata prima che la si rifiutasse deve riuscire: lì resta com'è.
       const r = d && riduci ? riduci(d) : null;
       if (r && r.rifiuto && op !== 'togli') { if (!rifiuti.includes(r.rifiuto)) rifiuti.push(r.rifiuto); continue; }
@@ -435,6 +436,50 @@
         const lista = o.voci.map(sitoLeggibile).join(', ');
         const label = o.op === 'aggiungi' ? `Filo spento su ${lista}` : `Filo riacceso su ${lista}`;
         return { partial: nidifica('blocklist', o.voci), label, elenco: { percorso: 'blocklist', op: o.op, voci: o.voci, nome: 'Siti dove Filo è spento' } };
+      },
+    };
+  }
+
+  // #967 — i siti di cui l'utente si fida: lì l'avviso «sospetto» non torna. Aggiungerne uno abbassa una difesa (costo 3
+  // e la parola «conferma», decisione dell'owner D48); toglierlo la rialza (costo 1). La voce è quella del «Continua»
+  // (SN_SAFEBROWSE.voceFidata, nel main): il sito, o la pagina su una piattaforma dove chiunque pubblica.
+  function voceFidataDa(p) {
+    const SB = global.SN_SAFEBROWSE;
+    if (!SB || !SB.voceFidata) return dominioDa(p);
+    try { return SB.voceFidata(p) || ''; } catch (_) { return ''; }
+  }
+  function voceFidataLeggibile(x) {
+    const s = String(x || '');
+    const i = s.indexOf('/');
+    return i < 0 ? sitoLeggibile(s) : sitoLeggibile(s.slice(0, i)) + s.slice(i);
+  }
+  function sitiFidatiAvviso() {
+    const percorso = 'security.safeBrowse.trustedSites';
+    const nome = 'Siti di cui ti fidi';
+    const base = elenco({
+      keys: ['siti_di_cui_ti_fidi', 'siti di cui ti fidi', 'siti di cui mi fido', 'siti fidati per gli avvisi',
+        'siti fidati avviso sospetto', 'siti senza avviso sospetto', 'fidati del sito', 'mi fido del sito'],
+      percorso,
+      allentaSe: 'aggiungi',
+      nome,
+      aiuto: 'siti dove Filo non mostra più l\'avviso «sospetto» né «Non trovo questo indirizzo»; l\'avviso «pericoloso» resta. '
+        + 'Aggiungere chiede all\'utente la parola «conferma», togliere no. Per il sito aperto: «questo sito» (la scheda web davanti)',
+      risk: 'Su un sito di cui ti fidi Filo non ti mostra più l\'avviso «sospetto»: un nome che somiglia a un marchio, un dominio '
+        + 'nato da poco, una password chiesta senza connessione protetta. Restano l\'avviso «pericoloso» e la lista nera di Google.',
+    });
+    // Il costo dichiarato è quello dell'annullo, che può rimettere un sito tolto; il cambio costa secondo il verso.
+    return {
+      ...base,
+      costo: 2,
+      costoDi: (b) => (b && b.elenco && b.elenco.op !== 'togli' && b.elenco.voci.length ? 3 : 1),
+      build(v) {
+        const o = opElenco(v, null, voceFidataDa);
+        if (!o || o.rifiuto) return o;
+        const lista = o.voci.map(voceFidataLeggibile).join(', ');
+        const label = o.op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
+          : o.op === 'togli' ? `${nome} → togli ${lista}`
+            : (o.voci.length ? `${nome} → solo ${lista}` : `${nome} → svuota l'elenco`);
+        return { partial: nidifica(percorso, o.voci), label, elenco: { percorso, op: o.op, voci: o.voci, nome } };
       },
     };
   }
@@ -1906,6 +1951,7 @@
     }),
     elencoCartelle(),
     sitiFiloSpento(),
+    sitiFidatiAvviso(),
     // #975 — non abbassa niente: cambia quale menu arriva per primo, e l'altro resta a Shift. Costo 1, come un tema.
     {
       ...elenco({
@@ -2260,9 +2306,12 @@
     try { chiede = typeof setter.chiede === 'function' ? !!setter.chiede(b, attuali) : false; } catch (_) { chiede = true; }
     let avviso = '';
     try { avviso = attuali && typeof setter.avviso === 'function' ? String(setter.avviso(b, attuali) || '') : ''; } catch (_) { avviso = ''; }
+    // `costoDi`: un elenco che costa diverso nei due versi (#967); senza, il costo dichiarato.
+    let costo = setter.costo;
+    try { if (typeof setter.costoDi === 'function') costo = setter.costoDi(b); } catch (_) { costo = 3; }
     return {
       ...b,
-      costo: setter.costo,
+      costo,
       allenta,
       ...(chiede ? { chiede: true } : {}),
       ...(avviso ? { avviso } : {}),

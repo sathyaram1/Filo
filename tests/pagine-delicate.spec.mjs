@@ -111,13 +111,14 @@ test('con il riassunto delle schede chiuse spento non parte niente, e la scheda 
 
 test('la pulizia automatica delle schede: di una pagina delicata al modello va solo il tipo, mai titolo, indirizzo o testo', async ({ app }) => {
   await modelliFinti(app);
+  // Il modello finto non risponde col JSON delle decisioni, e il giudizio fallisce: qui conta cosa è partito.
   await app.evaluate(() => globalThis.SN_TAB_TRIAGE_DECIDE({
     trigger: 'idle',
     tabs: [
       { url: 'https://mail.google.com/mail/u/0/#inbox', title: 'Posta in arrivo (3) - mario.rossi@gmail.com', contentExtract: 'Il tuo codice di verifica è 482913', idleMin: 400 },
       { url: 'https://it.wikipedia.org/wiki/Gatto', title: 'Gatto - Wikipedia', contentExtract: 'Il gatto domestico', idleMin: 400 },
     ],
-  }));
+  }).catch(() => null));
   const [chiamata] = (await mandato(app)).filter((m) => m.tipo === 'altro');
   expect(chiamata.testo).toContain('[pagina delicata: posta]');
   expect(chiamata.testo).not.toContain('mario.rossi');

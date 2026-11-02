@@ -29,10 +29,12 @@ export const OPZIONI_BASE = Object.freeze({
   tieniWorktree: false,
 });
 
-// I file del repo pubblico che il server incorpora al deploy: gli stessi di FONTI_BAKE in
-// filo-security/functions/tools/guardia-deploy.js (sentinella in tests/unit/orchestratore.test.mjs).
+// I file del repo pubblico che il server incorpora al deploy: gli stessi di FONTI_PUBBLICHE in
+// filo-security/functions/tools/bake-shared.js (sentinella in tests/unit/orchestratore.test.mjs).
 export const INCORPORATI_DAL_SERVER = Object.freeze([
   'src/shared/feedbackTransitions.js', 'src/shared/verifierRound.js', 'src/shared/domande.js', 'filo_filosofia.txt',
+  'src/shared/mittenti.js', 'src/shared/politicaModelli.js', 'src/shared/ambiti.js', 'src/shared/ricorrenti.js',
+  'src/shared/feedbackAttese.js',
 ]);
 export const FILE_REGOLE = Object.freeze(['firestore.rules', 'storage.rules', 'firestore.indexes.json']);
 

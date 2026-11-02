@@ -1,5 +1,7 @@
 # Filo
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sathyaram1/Filo/badge)](https://scorecard.dev/viewer/?uri=github.com/sathyaram1/Filo)
+
 > **Non ancora pronto.** Questo repository è il dietro le quinte di un progetto
 > in costruzione, non un prodotto da usare. I documenti di trasparenza sono
 > incompleti e ci sono problemi di sicurezza noti in corso di risoluzione.
@@ -153,7 +155,7 @@ Un messaggio IPC nuovo:
 ```bash
 npm run test:smoke     # smoke headless con screenshot (tests/.smoke/)
 npm run test:unit      # unit test Node (veloci)
-npm test               # suite Playwright completa (~620 spec, ~1.450 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
+npm test               # suite Playwright completa (~660 spec, ~4.650 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
 npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
 ```
 

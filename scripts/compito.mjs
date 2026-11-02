@@ -9,6 +9,8 @@ import { visibile } from './routine-domanda.mjs';
 
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
+// Prima di compiti.js, che ne prende gli ambiti attivi.
+require(join(HERE, '..', 'src', 'shared', 'ambiti.js'));
 require(join(HERE, '..', 'src', 'shared', 'compiti.js'));
 const K = globalThis.SN_COMPITI;
 

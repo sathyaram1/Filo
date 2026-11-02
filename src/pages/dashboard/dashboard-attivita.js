@@ -1333,7 +1333,7 @@
   // delle impostazioni dove si concede (l'indirizzo lo sceglie il main da un elenco suo, qui passa solo la chiave).
   function permessoDaConcedere(a) {
     const o = a && a._output;
-    return (isType(a, 'VOLUME') || isType(a, 'BLUETOOTH') || isType(a, 'WIFI') || isType(a, 'VEDI_SCHERMO')) && a._executed === false
+    return (isType(a, 'VOLUME') || isType(a, 'BLUETOOTH') || isType(a, 'WIFI') || isType(a, 'VEDI_SCHERMO') || isType(a, 'ORDINA_DESKTOP')) && a._executed === false
       && !!o && typeof o.apri === 'string' && !!o.apri;
   }
 
@@ -1558,7 +1558,7 @@
     link.title = 'Apri le Preferenze del terminale';
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      send({ type: MSG.OPEN_URL, url: PREF_TERMINALE });
+      send({ type: MSG.OPEN_URL, url: PREF_TERMINALE, via: 'chat' });
     });
     nota.append(link, '.');
     return nota;
@@ -1584,7 +1584,7 @@
       apri.className = 'dash-action-btn dash-cmd-blocked-btn';
       apri.textContent = 'Apri Preferenze';
       apri.title = 'Preferenze → Modalità terminale';
-      apri.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: PREF_TERMINALE }));
+      apri.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: PREF_TERMINALE, via: 'chat' }));
       wrap.append(testo, apri);
       return wrap;
     }
@@ -2213,7 +2213,7 @@
       btn.dataset.action = 'openNotes';
       btn.textContent = '✎ Salvato';
       btn.title = 'Apri l’editor';
-      btn.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }));
+      btn.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html', via: 'chat' }));
       return btn;
     }
     if (type === 'SVEGLIA') {

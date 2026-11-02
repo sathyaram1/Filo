@@ -41,4 +41,15 @@ function avvisoQuandoPronta(testo, { chiave, entroMs = 5 * 60 * 1000, detto, azi
   t.unref?.();
 }
 
-module.exports = { avvisoNellaFinestra, avvisoQuandoPronta };
+// Toglie dalle cornici l'avviso con questa chiave, quando lo stato che diceva non c'è più.
+function ritiraAvviso(chiave) {
+  try {
+    const { BrowserWindow } = require('electron');
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win || win.isDestroyed?.() || !win._filoTabs) continue;
+      try { win.webContents.send('shell:toast', { ritira: String(chiave) }); } catch (_) {}
+    }
+  } catch (_) {}
+}
+
+module.exports = { avvisoNellaFinestra, avvisoQuandoPronta, ritiraAvviso };

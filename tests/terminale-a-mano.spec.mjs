@@ -5,7 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 async function newtabPage(app) {
@@ -183,4 +183,92 @@ test('una / seguita da una parola che non è un programma, o da un percorso inco
   await page.locator('#input').fill('/echo a; echo dopo-punto-e-virgola-892');
   await page.locator('#input').press('Enter');
   await expect(page.locator('.dash-term-out').last()).toContainText('dopo-punto-e-virgola-892', { timeout: 12_000 });
+});
+
+// #892.5 — una barra seguita dal percorso di un documento o di una cartella (o da una faccina che comincia coi due
+// punti) non è un programma: resta un messaggio per Filo, e mentre la si scrive la casella è rossa. Su Linux /bin/sh
+// (dash) diceva che ogni percorso esistente è un programma.
+test('il percorso di un documento, di una cartella o una faccina dopo la barra va a Filo', async ({ app }) => {
+  const dir = cartellaTemporanea('filo-892-5-');
+  mkdirSync(path.join(dir, 'Documenti'));
+  writeFileSync(path.join(dir, 'Documenti', 'lettera.pdf'), 'x');
+  const page = await newtabPage(app);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.setRaw(C.STORAGE_KEYS.FILO_ONBOARDING, { done: true, closedAt: Date.now() });
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__n8925 = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
+      globalThis.__n8925 += 1;
+      const text = `Risposta ${globalThis.__n8925} di Filo.`;
+      try { onDelta && onDelta(text); } catch (_) {}
+      return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  });
+  await page.locator('#input').fill(`/cd "${dir}"`);
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-term-controls')).toHaveCount(0, { timeout: 12_000 });
+  const comandi = await page.locator('.dash-term-cmd').count();
+
+  const frasi = ["/Documenti/lettera.pdf che cos'è?", '/Documenti/', '/./Documenti/lettera.pdf', '/:) grazie mille', '/:( peccato'];
+  for (const [i, frase] of frasi.entries()) {
+    await page.locator('#input').fill(frase);
+    await expect(page.locator('#input'), `${frase}: rossa prima dell'invio`).toHaveClass(/is-cmd-unknown/, { timeout: 8_000 });
+    await page.locator('#input').press('Enter');
+    await expect(page.locator('.dash-bubble-filo', { hasText: `Risposta ${i + 1} di Filo.` }), frase).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  }
+  await expect(page.locator('.dash-term-cmd'), 'niente è andato alla shell').toHaveCount(comandi);
+
+  // Un programma dato col percorso resta un programma.
+  if (process.platform !== 'win32') {
+    const script = path.join(dir, 'saluta.sh');
+    writeFileSync(script, '#!/bin/sh\necho ciao-8925\n');
+    chmodSync(script, 0o755);
+    await page.locator('#input').fill('/./saluta.sh');
+    await expect(page.locator('#input')).toHaveClass(/is-cmd-shell/, { timeout: 8_000 });
+    await page.locator('#input').press('Enter');
+    // Un programma che Filo non conosce chiede un OK prima di partire.
+    await clickConfirm(page, 'ok', { timeout: 10_000 });
+    await expect(page.locator('.dash-term-out').last()).toContainText('ciao-8925', { timeout: 12_000 });
+  }
+});
+
+// #892.5 — una riga incollata, cancellata e riportata con Annulla è sempre incollata: la sua cancellazione vuole la
+// parola «conferma». Anche Ripeti la riporta incollata.
+test('incollata, svuotata e riportata con Annulla: la cancellazione vuole «conferma»', async ({ app }) => {
+  const bersaglio = cartellaDaCancellare();
+  const page = await newtabPage(app);
+  const input = page.locator('#input');
+  const comando = `/${rmDi(bersaglio)}`;
+  const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
+  await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), comando);
+  await input.focus();
+  await page.keyboard.press(`${mod}+V`);
+  await expect(input).toHaveValue(comando);
+  await page.keyboard.press(`${mod}+A`);
+  await page.keyboard.press('Delete');
+  await expect(input).toHaveValue('');
+  await page.keyboard.press(`${mod}+Z`);
+  await expect(input).toHaveValue(comando);
+  await input.press('Enter');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  expect((await confirmState(page)).hasInput, 'la riga riportata con Annulla resta incollata').toBe(true);
+  await clickConfirm(page, 'cancel');
+  await expect(input).toHaveValue(comando);
+  expect(existsSync(bersaglio)).toBe(true);
+
+  // Scritta a mano da capo, la stessa riga è dell'utente: chiede un OK, non la parola.
+  await input.fill('');
+  await input.pressSequentially(comando, { delay: 0 });
+  await input.press('Enter');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  expect((await confirmState(page)).hasInput, 'scritta a mano basta un OK').toBe(false);
+  await clickConfirm(page, 'cancel');
+  expect(existsSync(bersaglio)).toBe(true);
 });

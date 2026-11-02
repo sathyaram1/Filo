@@ -471,14 +471,19 @@ test('regole toccate: avviso per la pubblicazione a Filo chiuso, il lavoro si ch
 });
 
 test('il PC conosce tutte le fonti che il server incorpora: con una sola mancante pubblicherebbe GitHub col main di Filo di prima', () => {
-  const guardia = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'filo-security', 'functions', 'tools', 'guardia-deploy.js');
-  const attese = ['src/shared/feedbackTransitions.js', 'src/shared/verifierRound.js', 'src/shared/domande.js', 'filo_filosofia.txt'];
+  const server = process.env.FILO_SECURITY_DIR || resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'filo-security');
+  const bake = join(server, 'functions', 'tools', 'bake-shared.js');
+  const attese = ['src/shared/feedbackTransitions.js', 'src/shared/verifierRound.js', 'src/shared/domande.js', 'filo_filosofia.txt',
+    'src/shared/mittenti.js', 'src/shared/politicaModelli.js', 'src/shared/ambiti.js', 'src/shared/ricorrenti.js', 'src/shared/feedbackAttese.js'];
   assert.deepEqual([...INCORPORATI_DAL_SERVER].sort(), [...attese].sort());
-  // Accanto al checkout principale c'è il server: il suo elenco deve essere lo stesso.
-  if (existsSync(guardia)) {
-    const m = /const FONTI_BAKE = \[([^\]]*)\]/.exec(readFileSync(guardia, 'utf8'));
-    assert.ok(m, 'FONTI_BAKE non trovato nella guardia del server');
-    assert.deepEqual([...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).sort(), [...INCORPORATI_DAL_SERVER].sort());
+  // Il confronto col diff è per percorso esatto: un nome sbagliato non farebbe mai ripubblicare, anche senza il server accanto.
+  assert.deepEqual(INCORPORATI_DAL_SERVER.filter((f) => !existsSync(join(ROOT, f))), [], 'fonti incorporate che nel repo non esistono');
+  for (const f of attese) assert.equal(serveDeploy({ fusa: {} }, ['scripts/a.mjs', f]), true, `l’app tocca ${f} e il server resterebbe con la copia vecchia`);
+  // Accanto al checkout principale c'è il server: l'elenco che la sua guardia controlla (quello del bake) deve essere lo stesso.
+  if (existsSync(bake)) {
+    const { FONTI_PUBBLICHE } = createRequire(import.meta.url)(bake);
+    assert.ok(Array.isArray(FONTI_PUBBLICHE), `il bake del server in ${server} non esporta le sue fonti: aggiorna quel checkout`);
+    assert.deepEqual([...FONTI_PUBBLICHE].sort(), [...INCORPORATI_DAL_SERVER].sort());
   }
 });
 

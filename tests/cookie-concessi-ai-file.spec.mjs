@@ -7,6 +7,7 @@ import { createServer } from 'node:http';
 import { existsSync, readdirSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { nelMondoDiFilo } from './helpers/confirm.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
@@ -93,9 +94,10 @@ test('la foto di un altro sito, letta da tasto destro, Copia, Salva e Aiuto, por
 
     prima = sito.dalMain('/foto.png').length;
     await nelMondoDiFilo(app, new URL(page.url()).hostname, 'SN_SIDEBAR.open(); 1');
-    await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
-    await page.fill('.sn-sidebar-input textarea', 'cosa mostra la foto?');
-    await page.press('.sn-sidebar-input textarea', 'Enter');
+    const aiuto = await paginaDellAiuto(app, page);
+    await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
+    await aiuto.fill('.sn-sidebar-input textarea', 'cosa mostra la foto?');
+    await aiuto.press('.sn-sidebar-input textarea', 'Enter');
     await expect.poll(() => sito.dalMain('/foto.png').length, { timeout: 15_000 }).toBeGreaterThan(prima);
 
     // Ogni lettura di Filo ha portato al sito della foto quello che porta la pagina, e niente della sua sessione riservata.

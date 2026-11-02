@@ -9,6 +9,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { cartellaDellaProva, BOLLETTA_MARZO } from './helpers/documentiFinti.mjs';
 import { confermaSopraPagina, confirmState, clickConfirm, nelMondoDiFilo } from './helpers/confirm.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 const RICHIESTA = 'mi serve la bolletta della luce di marzo';
 const PAGINA = `<!doctype html><html><head><title>Fornitore Energia</title></head>
@@ -56,16 +57,19 @@ async function shellCheRegistra(app) {
   });
 }
 
-async function apriAiuto(shell, page) {
+// Su un sito il pannello sta nello strato sopra la scheda (#1509.3): la Page dove guardarlo e scriverci.
+async function apriAiuto(app, shell, page) {
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  const aiuto = await paginaDellAiuto(app, page);
+  await expect(aiuto.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  return aiuto;
 }
 
-async function chiediAllAiuto(page, testo) {
-  await page.fill('.sn-sidebar-input textarea', testo);
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+async function chiediAllAiuto(aiuto, testo) {
+  await aiuto.fill('.sn-sidebar-input textarea', testo);
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
 }
 
 const testoDi = (messaggi) => (messaggi || []).map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
@@ -85,8 +89,8 @@ test('la prova della segnalazione: sul sito del fornitore l’Aiuto trova la bol
     await preparaModelli(app);
     await aiutoFinto(app, RISPOSTE);
     await shellCheRegistra(app);
-    await apriAiuto(shell, page);
-    await chiediAllAiuto(page, RICHIESTA);
+    const aiuto = await apriAiuto(app, shell, page);
+    await chiediAllAiuto(aiuto, RICHIESTA);
 
     // Il sì lo chiede Filo fuori dal documento del sito, e dice cosa vedrà il sito.
     const sopra = await confermaSopraPagina(app, { timeout: 20_000 });
@@ -97,12 +101,12 @@ test('la prova della segnalazione: sul sito del fornitore l’Aiuto trova la bol
     expect(domanda.citazioni).toEqual(['bolletta luce energia elettrica marzo']);
     await clickConfirm(sopra, 'ok');
 
-    const file = page.locator('.sn-sidebar .sn-sidebar-file');
+    const file = aiuto.locator('.sn-sidebar .sn-sidebar-file');
     await expect(file).toHaveCount(1, { timeout: 20_000 });
     await expect(file.locator('.sn-sidebar-file-nome')).toHaveText(BOLLETTA_MARZO);
     await expect(file.locator('.sn-sidebar-file-dove')).toHaveText('Download › Scansioni');
-    await expect(page.locator('.sn-sidebar-msg-assistant').last()).toContainText('bolletta dell\'energia elettrica di marzo');
-    await expect(page.locator('.sn-sidebar-log', { hasText: 'documenti' })).toHaveText(['· 5 trovati fra i tuoi documenti «bolletta luce energia elettrica marzo»']);
+    await expect(aiuto.locator('.sn-sidebar-msg-assistant').last()).toContainText('bolletta dell\'energia elettrica di marzo');
+    await expect(aiuto.locator('.sn-sidebar-log', { hasText: 'documenti' })).toHaveText(['· 5 trovati fra i tuoi documenti «bolletta luce energia elettrica marzo»']);
 
     // Il modello ha avuto la bolletta come primo candidato, con la cartella detta coi nomi di Filo e senza percorsi.
     const visti = await app.evaluate(() => globalThis.__visti);
@@ -122,7 +126,7 @@ test('la prova della segnalazione: sul sito del fornitore l’Aiuto trova la bol
     await expect.poll(() => app.evaluate(() => globalThis.__aperti)).toEqual([bolletta]);
     // Il tasto destro apre il menu di Filo con le azioni del file, non quello della pagina.
     await file.click({ button: 'right' });
-    const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
+    const voci = menuDi(aiuto).locator('.sn-menu .sn-menu-item');
     await expect(voci).toHaveText(['Apri', 'Mostra nella cartella']);
     await voci.filter({ hasText: 'Mostra nella cartella' }).click();
     await expect.poll(() => app.evaluate(() => globalThis.__cartelle)).toEqual([bolletta]);
@@ -133,17 +137,17 @@ test('la prova della segnalazione: sul sito del fornitore l’Aiuto trova la bol
       for (const wc of webContents.getAllWebContents()) wc.startDrag = (item) => { globalThis.__trascinati.push(item.file); };
     });
     const box = await file.boundingBox();
-    await page.mouse.move(box.x + 20, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 60, box.y + box.height / 2 + 30, { steps: 6 });
-    await page.mouse.move(box.x - 200, box.y - 200, { steps: 6 });
-    await page.mouse.up();
+    await aiuto.mouse.move(box.x + 20, box.y + box.height / 2);
+    await aiuto.mouse.down();
+    await aiuto.mouse.move(box.x + 60, box.y + box.height / 2 + 30, { steps: 6 });
+    await aiuto.mouse.move(box.x - 200, box.y - 200, { steps: 6 });
+    await aiuto.mouse.up();
     await expect.poll(() => app.evaluate(() => globalThis.__trascinati)).toEqual([bolletta]);
 
-    await page.screenshot({ path: 'tests/.shots/aiuto-cerca-documenti.png' });
+    await aiuto.screenshot({ path: 'tests/.shots/aiuto-cerca-documenti.png' });
     await app.evaluate((_e) => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }, { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
     await page.waitForTimeout(600);
-    await page.screenshot({ path: 'tests/.shots/aiuto-cerca-documenti-scuro.png' });
+    await aiuto.screenshot({ path: 'tests/.shots/aiuto-cerca-documenti-scuro.png' });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -157,13 +161,13 @@ test('con Annulla nel popup non si cerca niente e l’Aiuto non riceve documenti
     const page = await testServer.openReady(openTab, PAGINA);
     await preparaModelli(app);
     await aiutoFinto(app, RISPOSTE);
-    await apriAiuto(shell, page);
-    await chiediAllAiuto(page, RICHIESTA);
+    const aiuto = await apriAiuto(app, shell, page);
+    await chiediAllAiuto(aiuto, RICHIESTA);
     const sopra = await confermaSopraPagina(app, { timeout: 20_000 });
     await clickConfirm(sopra, 'cancel');
-    await expect(page.locator('.sn-sidebar-log', { hasText: 'documenti' })).toHaveText(['· ricerca fra i documenti annullata'], { timeout: 10_000 });
+    await expect(aiuto.locator('.sn-sidebar-log', { hasText: 'documenti' })).toHaveText(['· ricerca fra i documenti annullata'], { timeout: 10_000 });
     await page.waitForTimeout(500);
-    await expect(page.locator('.sn-sidebar-file')).toHaveCount(0);
+    await expect(aiuto.locator('.sn-sidebar-file')).toHaveCount(0);
     const visti = await app.evaluate(() => globalThis.__visti);
     expect(visti.length, 'nessun giro in più verso il modello').toBe(1);
     expect(testoDi(visti.flat())).not.toContain('DOCUMENTI_TROVATI');
@@ -234,17 +238,17 @@ test('mentre l’indice legge i documenti nuovi la riga dice quanti ne mancano, 
       ['ho cercato fra i documenti', JSON.stringify({ text: 'Ho guardato solo quelli già letti.', status: 'done' })],
       ['', JSON.stringify({ action: 'documenti', cosa: 'documento numero 42' })],
     ]);
-    await apriAiuto(shell, page);
-    await chiediAllAiuto(page, 'trovami il documento numero 42');
+    const aiuto = await apriAiuto(app, shell, page);
+    await chiediAllAiuto(aiuto, 'trovami il documento numero 42');
     await clickConfirm(await confermaSopraPagina(app, { timeout: 20_000 }), 'ok');
-    const riga = page.locator('.sn-sidebar-log', { hasText: 'leggo i documenti nuovi' });
+    const riga = aiuto.locator('.sn-sidebar-log', { hasText: 'leggo i documenti nuovi' });
     await expect(riga).toHaveText(/leggo i documenti nuovi: \d+ di 60/, { timeout: 10_000 });
     await expect(riga).not.toContainText('doc_', { message: 'la pagina non vede i nomi dei file che l\'indice legge' });
-    await page.screenshot({ path: 'tests/.shots/aiuto-cerca-documenti-attesa.png' });
+    await aiuto.screenshot({ path: 'tests/.shots/aiuto-cerca-documenti-attesa.png' });
     await riga.locator('.sn-sidebar-log-ferma').click();
-    await expect(page.locator('.sn-sidebar-log', { hasText: ', fermata da te' })).toBeVisible({ timeout: 5_000 });
+    await expect(aiuto.locator('.sn-sidebar-log', { hasText: ', fermata da te' })).toBeVisible({ timeout: 5_000 });
     await expect(riga).toHaveCount(0);
-    await expect(page.locator('.sn-sidebar-msg-assistant').last()).toHaveText('Ho guardato solo quelli già letti.', { timeout: 10_000 });
+    await expect(aiuto.locator('.sn-sidebar-msg-assistant').last()).toHaveText('Ho guardato solo quelli già letti.', { timeout: 10_000 });
     const visti = await app.evaluate(() => globalThis.__visti);
     expect(testoDi(visti[visti.length - 1])).toContain('FERMATO');
   } finally {

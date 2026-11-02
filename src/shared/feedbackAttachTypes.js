@@ -1,7 +1,7 @@
 // Allowlist degli allegati ammessi: `accept` su un <input type=file> è un suggerimento
 // e non vincola né «Tutti i file» né il drop, quindi serve un gate deterministico.
-// Rifiuta i tipi ATTIVI (text/html, svg…). Elenco unico di riquadro, pagina dei feedback e riga di
-// comando; il gate L0 del server gli resta allineato. Il deposito vede solo blob cifrati (#1518).
+// Rifiuta i tipi ATTIVI (text/html, svg…). Elenco unico di riquadro, pagina dei feedback, caselle di Gestione e
+// riga di comando; il gate L0 del server gli resta allineato. Il deposito vede solo blob cifrati (#1518).
 
 (function (global) {
   'use strict';
@@ -50,11 +50,22 @@
     return null;
   }
 
+  // Il selettore propone solo quello che `classify` accetta: con image/* e text/* offriva SVG e HTML, poi rifiutati.
+  const ACCEPT = [...RASTER_IMAGE_MIME, ...DOC_MIME, ...[...IMAGE_EXT, ...DOC_EXT].map((e) => `.${e}`)].join(',');
+  const AMMESSI = 'immagini (PNG, JPEG, GIF, WebP, BMP), PDF, testo, Markdown, CSV, TSV, JSON, YAML e log';
+  const MESSAGGIO_TIPO = `Tipo di file non supportato. Ammessi: ${AMMESSI}.`;
+  // Gli stessi tetti per ogni casella che allega: il deposito e il server li controllano di nuovo.
+  const LIMITI = Object.freeze({ immagini: 5, file: 5, byte: 4 * 1024 * 1024 });
+
   global.SN_FEEDBACK_ATTACH = {
     classify,
     RASTER_IMAGE_MIME,
     DOC_MIME,
     IMAGE_EXT,
     DOC_EXT,
+    ACCEPT,
+    AMMESSI,
+    MESSAGGIO_TIPO,
+    LIMITI,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

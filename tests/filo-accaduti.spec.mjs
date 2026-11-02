@@ -588,7 +588,7 @@ test('ogni avviso che la cornice mostra entra nel filo, anche quelli che non pas
   const testi = async () => (await accaduti(app, ['notifica'])).filter((e) => e.genere === 'finestra').map((e) => e.testo);
   await app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().map((w) => w._filoTabs).find(Boolean);
-    tm._showTriageToast(2);
+    tm._showTriageToast('Schede riordinate, 2 chiuse. Le ritrovi nel filo della home');
     tm._geoToast('Aperto da Stati Uniti');
   });
   await shell.evaluate(() => window.filoNotify('Link copiato'));

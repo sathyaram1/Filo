@@ -5,6 +5,7 @@
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 const TETTO = 20;
 const SHOTS = join(resolve(dirname(fileURLToPath(import.meta.url))), '.shots');
@@ -54,17 +55,19 @@ async function prepara(app, porta) {
   }, porta);
 }
 
-async function apriAiuto(shell, openTab, testServer) {
+// Il sito e la Page del suo Aiuto, che sta nello strato sopra la scheda (#1509.3).
+async function apriAiuto(app, shell, openTab, testServer) {
   const sito = await testServer.openReady(openTab, PAGINA);
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await sito.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
-  return sito;
+  const aiuto = await paginaDellAiuto(app, sito);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  return { sito, aiuto };
 }
 
-async function chiedi(sito, testo) {
-  await sito.fill('.sn-sidebar-input textarea', testo);
-  await sito.press('.sn-sidebar-input textarea', 'Enter');
+async function chiedi(aiuto, testo) {
+  await aiuto.fill('.sn-sidebar-input textarea', testo);
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
 }
 
 const turni = (app) => app.evaluate(() => globalThis.__aiuto.length);
@@ -74,24 +77,25 @@ const aperte = (sito) => sito.evaluate(() => document.querySelectorAll('details[
 test('una pagina che chiede sempre la sezione dopo: l\'Aiuto si ferma al tetto e prosegue solo se l\'utente lo chiede', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(150_000);
   await prepara(app, 'reveal');
-  const sito = await apriAiuto(shell, openTab, testServer);
-  await chiedi(sito, 'cosa dice questa pagina?');
+  const { sito, aiuto } = await apriAiuto(app, shell, openTab, testServer);
+  await chiedi(aiuto, 'cosa dice questa pagina?');
 
-  const riga = sito.locator('.sn-sidebar-log-passi');
+  const riga = aiuto.locator('.sn-sidebar-log-passi');
   await expect(riga).toBeVisible({ timeout: 90_000 });
   await expect(riga).toContainText(`${TETTO} passi fatti da solo`);
   // La domanda più i passi da solo, non uno di più: ognuno ha aperto la sua sezione.
   expect(await turni(app)).toBe(1 + TETTO);
   expect(await aperte(sito)).toBe(1 + TETTO);
-  await sito.locator('.sn-sidebar').screenshot({ path: join(SHOTS, 'aiuto-passi-da-solo.png') });
+  await aiuto.locator('.sn-sidebar').screenshot({ path: join(SHOTS, 'aiuto-passi-da-solo.png') });
 
   // Fermo davvero: niente parte più da solo.
   await sito.waitForTimeout(3000);
   expect(await turni(app)).toBe(1 + TETTO);
 
-  // «Continua» sta nel documento del sito: premuto dal suo codice non fa niente (#592.6).
+  // «Continua» non sta nel documento del sito, che non lo trova; premuto da codice non fa niente (#592.6).
   const continua = riga.locator('button', { hasText: 'Continua' });
-  await sito.evaluate(() => document.querySelector('.sn-sidebar-log-passi button').click());
+  expect(await sito.evaluate(() => document.querySelector('.sn-sidebar-log-passi button'))).toBeNull();
+  await aiuto.evaluate(() => document.querySelector('.sn-sidebar-log-passi button').click());
   await sito.waitForTimeout(2000);
   expect(await turni(app)).toBe(1 + TETTO);
   await expect(continua).toBeEnabled();
@@ -109,19 +113,19 @@ test('una pagina che chiede sempre la sezione dopo: l\'Aiuto si ferma al tetto e
   await sito.waitForTimeout(2500);
   expect(await turni(app)).toBe(1 + TETTO + 3);
   expect(await aperte(sito)).toBe(1 + TETTO + 2);
-  await expect(sito.locator('.sn-sidebar-log-passi')).toHaveCount(1);
+  await expect(aiuto.locator('.sn-sidebar-log-passi')).toHaveCount(1);
 });
 
 test('scrivere un\'altra domanda spegne il «Continua» rimasto e riparte dal conto pieno', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(150_000);
   await prepara(app, 'reveal');
-  const sito = await apriAiuto(shell, openTab, testServer);
-  await chiedi(sito, 'aprimi tutto');
-  await expect(sito.locator('.sn-sidebar-log-passi')).toBeVisible({ timeout: 90_000 });
+  const { sito, aiuto } = await apriAiuto(app, shell, openTab, testServer);
+  await chiedi(aiuto, 'aprimi tutto');
+  await expect(aiuto.locator('.sn-sidebar-log-passi')).toBeVisible({ timeout: 90_000 });
 
   await app.evaluate(() => { globalThis.__fineDopo = globalThis.__aiuto.length + 3; });
-  await chiedi(sito, 'apri ancora le prossime tre');
-  await expect(sito.locator('.sn-sidebar-log-passi button')).toBeDisabled();
+  await chiedi(aiuto, 'apri ancora le prossime tre');
+  await expect(aiuto.locator('.sn-sidebar-log-passi button')).toBeDisabled();
   await expect.poll(() => turni(app), { timeout: 20_000 }).toBe(1 + TETTO + 4);
   await sito.waitForTimeout(2500);
   expect(await turni(app)).toBe(1 + TETTO + 4);
@@ -135,9 +139,9 @@ for (const [porta, nome] of [['rifiutato', 'reveal rifiutati'], ['ricerca', 'ric
   test(`anche un giro di ${nome} si ferma al tetto`, async ({ app, shell, openTab, testServer }) => {
     test.setTimeout(150_000);
     await prepara(app, porta);
-    const sito = await apriAiuto(shell, openTab, testServer);
-    await chiedi(sito, 'cerca la sezione successiva');
-    await expect(sito.locator('.sn-sidebar-log-passi')).toBeVisible({ timeout: 90_000 });
+    const { sito, aiuto } = await apriAiuto(app, shell, openTab, testServer);
+    await chiedi(aiuto, 'cerca la sezione successiva');
+    await expect(aiuto.locator('.sn-sidebar-log-passi')).toBeVisible({ timeout: 90_000 });
     expect(await turni(app)).toBe(1 + TETTO);
     await sito.waitForTimeout(3000);
     expect(await turni(app)).toBe(1 + TETTO);
@@ -147,11 +151,11 @@ for (const [porta, nome] of [['rifiutato', 'reveal rifiutati'], ['ricerca', 'ric
 test('pochi passi da solo arrivano in fondo senza fermate', async ({ app, shell, openTab, testServer }) => {
   await prepara(app, 'reveal');
   await app.evaluate(() => { globalThis.__fineDopo = 5; });
-  const sito = await apriAiuto(shell, openTab, testServer);
-  await chiedi(sito, 'apri le prime sezioni');
+  const { sito, aiuto } = await apriAiuto(app, shell, openTab, testServer);
+  await chiedi(aiuto, 'apri le prime sezioni');
   await expect.poll(() => turni(app), { timeout: 30_000 }).toBe(6);
   await sito.waitForTimeout(2500);
   expect(await turni(app)).toBe(6);
   expect(await aperte(sito)).toBe(5);
-  await expect(sito.locator('.sn-sidebar-log-passi')).toHaveCount(0);
+  await expect(aiuto.locator('.sn-sidebar-log-passi')).toHaveCount(0);
 });

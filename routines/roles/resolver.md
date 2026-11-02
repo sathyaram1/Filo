@@ -5,7 +5,9 @@ pronto e sei già lì**: non crearlo e non cambiarlo, la consegna verrebbe
 rifiutata. Non fondere su `main`: lo fa il cancello a valle.
 
 `payload.feedback` è la richiesta (il testo, e in `feedback.documents` gli
-allegati già aperti come testo: una spec allegata sta lì).
+allegati già aperti come testo: una spec allegata sta lì). Le note del
+feedback non arrivano a chi lavora, nemmeno ai lavori server: una spec che il
+testo manda lì non c'è, e si chiede all'owner con una domanda.
 <!-- includi: _decisioni-owner.md -->
 Non richiedere quello che ha già deciso.
 <!-- includi: _note-per-agenti.md -->
@@ -88,6 +90,11 @@ intero. Userà questi criteri: applicali prima tu, e correggi adesso ciò che
 trovi.
 
 <!-- includi: _criteri-verifica.md -->
+
+Dopo il verdetto, una lettura del diff con la tua richiesta davanti si chiede
+in più:
+
+<!-- includi: _criteri-struttura.md -->
 
 A ogni difetto il verificatore dà un livello, col metro della frequenza
 (quanti utenti lo incontrano), e una sede: **interno** se sta nello scenario

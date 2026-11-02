@@ -206,6 +206,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   const fileRisk = !!(doubleExt || autoDl);
   const sensitive = hasPassword || hasPayment;
   const fatti = { autoDl, doubleExt, insecureForm };
+  // `diPagina`: l'avviso parla di cosa fa la pagina (un file, un modulo), non di chi è il sito; la fiducia nel sito (#967) non lo tace.
 
   // La whitelist certifica l'IDENTITÀ: niente impersonazione/LLM. Restano i controlli indipendenti dal contenuto:
   // certificato, file della pagina, modulo in chiaro.
@@ -215,7 +216,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     const message = buildMessage({ level, norm, cert, hasPassword, hasPayment, ...fatti });
     return {
       level, reasons: reasons.concat(certBad ? ['cert_' + cert.status] : [], ['whitelisted']),
-      norm, message, cert, needsLlm: false, whitelisted, scope,
+      norm, message, cert, needsLlm: false, whitelisted, scope, diPagina: fileRisk || insecureForm,
     };
   }
 
@@ -255,7 +256,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     return {
       level: 'sospetto',
       reasons: reasons.concat(young ? ['young_domain'] : [], certBad ? ['cert_' + cert.status] : [], llmSus ? ['llm'] : []),
-      norm, message, imp: impSus, ageDays, cert, needsLlm: false, whitelisted, hosted, scope,
+      norm, message, imp: impSus, ageDays, cert, needsLlm: false, whitelisted, hosted, scope, diPagina: fileRisk || insecureForm,
     };
   }
 

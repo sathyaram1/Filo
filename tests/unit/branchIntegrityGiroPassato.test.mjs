@@ -96,9 +96,9 @@ function scena(base, { altroveAvanti = true, stato = {} } = {}) {
   return { casa, dirStato, A, B, C };
 }
 
-function esegui(casa, dirStato, port, argv) {
+function esegui(casa, dirStato, port, argv, script = resolve(REPO, 'scripts', 'dispatch.mjs')) {
   return new Promise((risolvi) => {
-    const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), ...argv], {
+    const p = spawn(process.execPath, [script, ...argv], {
       cwd: casa,
       env: {
         ...process.env,
@@ -149,6 +149,12 @@ describe('D-207 — la cartella riusata non riporta il ramo a un giro passato', 
       assert.equal(avvioDellaCritica(st), C);
       assert.deepEqual(codiceCambiatoDallAvvio(avvioDellaCritica(st), casa).cambiati, []);
 
+      // La verifica piena registra solo dopo la lettura del diff, sulla richiesta che il giro ha lasciato (#1363).
+      const prima = await esegui(casa, dirStato, port, ['--record-verifier', ID, CRITICA_OK]);
+      assert.match(`${prima.se}${prima.so}`, /manca la lettura del diff/);
+      const l = await esegui(casa, dirStato, port, [], resolve(REPO, 'scripts', 'lettura-diff.mjs'));
+      assert.equal(l.code, 0, `la lettura si fa sulla richiesta lasciata dal giro: ${l.se}`);
+      assert.match(l.so, /La griglia non si toglie/);
       const v = await esegui(casa, dirStato, port, ['--record-verifier', ID, CRITICA_OK]);
       assert.equal(v.code, 0, `la critica sulla punta verificata si registra senza riportare indietro il codice: ${v.se}${v.so}`);
       const verdetto = ricevuti.find((x) => x.url.includes('routineDeliver') && x.body.intent === 'verdict');

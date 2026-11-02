@@ -12,6 +12,7 @@
 // crediti ci sono).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { paginaDelloStrato } from './helpers/riquadri.mjs';
 
 test.use({ accoglienzaFatta: false });
 
@@ -606,8 +607,7 @@ test('scelto il modello che la home chiedeva, la home smette di chiederlo', asyn
 const PAGINA_QUALUNQUE = '<!doctype html><meta charset="utf-8"><title>Una pagina</title><p>Contenuto.</p>';
 
 // L'Aiuto si apre col comando di pagina, lo stesso che gli mandano il menu del
-// tasto destro e la scorciatoia: su una pagina esterna i moduli di Filo vivono
-// nel mondo isolato del preload e da fuori non si chiamano.
+// tasto destro e la scorciatoia; su una pagina esterna nasce nello strato sopra la scheda (#1509.3).
 async function apriAiuto(app, page) {
   await app.evaluate(({ BrowserWindow }) => {
     for (const w of BrowserWindow.getAllWindows()) {
@@ -619,9 +619,11 @@ async function apriAiuto(app, page) {
       }
     }
   });
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 20_000 });
-  await page.fill('.sn-sidebar-input textarea', 'cosa posso fare qui?');
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+  const aiuto = await paginaDelloStrato(app, page);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 20_000 });
+  await aiuto.fill('.sn-sidebar-input textarea', 'cosa posso fare qui?');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+  return aiuto;
 }
 
 test('senza crediti, l’Aiuto su una pagina web dice che serve un invito', async ({ app, openTab, testServer }) => {
@@ -630,9 +632,9 @@ test('senza crediti, l’Aiuto su una pagina web dice che serve un invito', asyn
     await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: '' }, openWeightsOnly: false });
   });
   const page = await testServer.openReady(openTab, PAGINA_QUALUNQUE);
-  await apriAiuto(app, page);
+  const aiuto = await apriAiuto(app, page);
 
-  const bolla = page.locator('.sn-sidebar-msg-error').last();
+  const bolla = aiuto.locator('.sn-sidebar-msg-error').last();
   await expect(bolla).toBeVisible({ timeout: 30_000 });
   await expect(bolla).toContainText(/invito|crediti/i, { timeout: 15_000 });
   await expect(bolla).not.toContainText(/qualcosa è andato storto/i);
@@ -654,9 +656,9 @@ test('con «solo modelli a pesi aperti» che esclude tutto, l’Aiuto su una pag
     await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' }, openWeightsOnly: true });
   });
   const page = await testServer.openReady(openTab, PAGINA_QUALUNQUE);
-  await apriAiuto(app, page);
+  const aiuto = await apriAiuto(app, page);
 
-  const bolla = page.locator('.sn-sidebar-msg-error').last();
+  const bolla = aiuto.locator('.sn-sidebar-msg-error').last();
   await expect(bolla).toBeVisible({ timeout: 30_000 });
   await expect(bolla).toContainText(/pesi aperti/i, { timeout: 15_000 });
   await expect(bolla).not.toContainText(/qualcosa è andato storto/i);

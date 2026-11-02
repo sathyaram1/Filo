@@ -136,6 +136,19 @@
   const bozzeRisposta = new Map();
   const rispostaInVolo = new Set();
   let esitoRisposta = { text: '', kind: '' };
+  // Immagini e file incollati, trascinati o scelti nelle caselle che scrivono nella conversazione (#1331): la risposta
+  // del rombo e la riapertura, per pratica, coi tipi e i tetti dell'invio dei feedback.
+  const allegatiRisposta = window.SN_MG_ALLEGATI.crea({
+    alCambio: (id) => {
+      const vecchia = document.querySelector('.mg-liv-risposta .mg-dq-allegati');
+      if (vecchia && id === selectedId) vecchia.replaceWith(allegatiRisposta.riga(id, { disabilitata: rispostaInVolo.has(id) }));
+    },
+    alMessaggio: (id, testo) => { if (id === selectedId) setClarifyMsg(testo, testo ? 'err' : ''); },
+  });
+  const allegatiRiapertura = window.SN_MG_ALLEGATI.crea({
+    alCambio: () => disegnaAllegatiRiapertura(),
+    alMessaggio: (id, testo) => { if (id === selectedId) setActionMsg(testo, testo ? 'err' : ''); },
+  });
   // La pratica che aveva già le domande al disegno prima: il pannello si apre
   // da sé quando arrivano, non a ogni ridisegno dopo che l'owner l'ha chiuso.
   let attesaDisegnata = null;
@@ -239,6 +252,7 @@
   }
   // Il filtro per livello non si ricorda: un L4 lasciato acceso nasconderebbe un L1 arrivato dopo.
   let livelliScelti = [];
+  let rivalutaChiesto = false; // #906: aperta da `#rivaluta`, il tasto dei non filtrati va messo in vista appena c'è
   // «Solo non fidate» (#1575) vale per le schede dei feedback e per le Domande; non si ricorda, per lo stesso motivo.
   let soloNonFidate = false;
   const mgFiduciaFiltro = document.getElementById('mgFiduciaFiltro');
@@ -2566,8 +2580,11 @@
     }
   }
 
-  // Domande e le tre schede: un numero solo con le domande lette davvero (patterns/una-barra-di-sezioni-dice-quante-cose-contiene-ogni-sezione.md).
-  const DOMANDE_LABELS = { domande: 'Da rispondere', 'domande-lavoro': 'In lavorazione', 'domande-archivio': 'Archivio' };
+  // Domande e le sue schede: un numero solo con le domande lette davvero (patterns/una-barra-di-sezioni-dice-quante-cose-contiene-ogni-sezione.md).
+  const DOMANDE_LABELS = {
+    domande: 'Da rispondere', 'domande-smistamento': 'In smistamento', 'domande-lavoro': 'In lavorazione',
+    'domande-automatiche': 'Risposte automatiche', 'domande-archivio': 'Archivio',
+  };
   function updateSezioniCounts() {
     if (!mgSezioni) return;
     const scrivi = (sez, testo, titolo) => {
@@ -2592,8 +2609,8 @@
       if (!nd) continue;
       const badge = document.createElement('span');
       badge.className = 'mg-tab-count';
-      // Oltre il tetto dell'elenco l'archivio ha solo le più recenti: il numero è un minimo.
-      badge.textContent = `(${nt[tab]}${d.altre && tab === 'domande-archivio' ? '+' : ''})`;
+      // Oltre il tetto dell'elenco le chiuse sono solo le più recenti: il numero è un minimo.
+      badge.textContent = `(${nt[tab]}${d.altre && (tab === 'domande-archivio' || tab === 'domande-automatiche') ? '+' : ''})`;
       btn.appendChild(badge);
     }
 
@@ -2976,6 +2993,10 @@
     const show = isAdmin && currentTab === 'inbox' && l2Visibili() && whites.length > 0;
     mgReevalBar.hidden = !show;
     if (show && mgReevalBtn) mgReevalBtn.textContent = `Ri-valuta i non filtrati (${whites.length})`;
+    if (rivalutaChiesto && dataLoaded) {
+      rivalutaChiesto = false;
+      if (show && mgReevalBtn) { mgReevalBtn.scrollIntoView({ block: 'nearest' }); mgReevalBtn.focus(); }
+    }
   }
 
   // ── Approvazione in blocco degli allineati (macchina a stati) ─────────────
@@ -4159,6 +4180,9 @@
     if (!mgReopen) return;
     mgReopen.hidden = true;
     if (mgReopenText) mgReopenText.value = '';
+    if (mgReopen.dataset.per) allegatiRiapertura.svuota(mgReopen.dataset.per);
+    delete mgReopen.dataset.per;
+    disegnaAllegatiRiapertura();
     // I due bottoni del modulo vivono nell'HTML: senza riaccenderli qui, una riapertura riuscita li
     // lascerebbe spenti per sempre.
     if (mgReopenConfirm) mgReopenConfirm.disabled = false;
@@ -4188,14 +4212,27 @@
     if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
     setActionMsg('', '');
     mgReopen.hidden = false;
+    mgReopen.dataset.per = fb._id;
+    disegnaAllegatiRiapertura();
     if (mgReopenText) mgReopenText.focus();
   }
+
+  function disegnaAllegatiRiapertura() {
+    const posto = document.getElementById('mgReopenAllegati');
+    if (!posto) return;
+    const id = mgReopen && mgReopen.dataset.per;
+    posto.replaceChildren(...(id ? [allegatiRiapertura.riga(id)] : []));
+  }
+  if (mgReopenText) allegatiRiapertura.collega(mgReopenText, () => (mgReopen && mgReopen.dataset.per) || '');
 
   async function confermaRiapertura() {
     // Quello che l'owner ha scritto si legge PRIMA di ogni attesa, come nella
     // gemella che risponde a un chiarimento: durante l'attesa la casella può
     // svuotarsi, e allora si riaprirebbe la segnalazione senza il motivo.
     const reason = mgReopenText ? (mgReopenText.value || '').trim() : '';
+    const per = (mgReopen && mgReopen.dataset.per) || '';
+    if (per && allegatiRiapertura.caricando(per)) { setActionMsg('Aspetta che gli allegati finiscano di caricarsi.', 'err'); return; }
+    const atts = per === selectedId ? allegatiRiapertura.di(per) : [];
     // La conversazione su cui si appende va letta PRIMA: dall'elenco arriva
     // senza note, e appenderci sopra il motivo le cancellerebbe.
     const fb = await feedbackCompleto(selectedId);
@@ -4210,11 +4247,11 @@
     const oldNotes = String(fb.notes || '');
     if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
     let extra = null;
-    if (reason) {
-      const T = window.SN_FEEDBACK_THREAD;
+    const T = window.SN_FEEDBACK_THREAD;
+    if (reason || (atts.length && T)) {
       const ts = new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
       const newNotes = T
-        ? T.appendUserTurn(oldNotes, reason, { ts, label: 'Riaperto il' })
+        ? T.appendUserTurn(oldNotes, reason, { ts, label: 'Riaperto il', attachments: atts })
         : (oldNotes ? `${oldNotes}\n\n--- Riaperto il ${ts} ---\n${reason}` : `--- Riaperto il ${ts} ---\n${reason}`);
       extra = { notes: newNotes };
     }
@@ -4554,7 +4591,9 @@
     const id = selectedId;
     if (rispostaInVolo.has(id)) return;
     const reply = (bozzeRisposta.get(id) || '').trim();
-    if (!reply) { const c = document.getElementById('mgSideRispostaText') || origine; if (c) c.focus(); return; }
+    if (allegatiRisposta.caricando(id)) { setClarifyMsg('Aspetta che gli allegati finiscano di caricarsi.', 'err'); return; }
+    const atts = allegatiRisposta.di(id);
+    if (!reply && !atts.length) { const c = document.getElementById('mgSideRispostaText') || origine; if (c) c.focus(); return; }
     // Come la riapertura: la conversazione si legge intera prima di
     // appenderci la risposta, o al suo posto resterebbe la sola risposta.
     const fb = await feedbackCompleto(id);
@@ -4576,8 +4615,9 @@
       setClarifyMsg('Lo stato di questa segnalazione è cambiato: aggiorna e riprova.', 'err');
       return;
     }
+    if (!T && !reply) { setClarifyMsg('Gli allegati da soli non si possono mandare qui: scrivi anche due parole.', 'err'); return; }
     const newNotes = T
-      ? T.appendUserTurn(oldNotes, reply, {})
+      ? T.appendUserTurn(oldNotes, reply, { attachments: atts })
       : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
 
     rispostaInVolo.add(id);
@@ -4588,6 +4628,7 @@
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       if (fb) { fb.status = 'todo'; fb.notes = newNotes; }
       bozzeRisposta.delete(id);
+      allegatiRisposta.svuota(id);
       // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
       // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
@@ -4628,6 +4669,7 @@
     t.value = bozzeRisposta.get(fb._id) || '';
     t.addEventListener('input', () => scriviBozzaRisposta(t));
     t.addEventListener('keydown', tastiRisposta);
+    allegatiRisposta.collega(t, fb._id);
     const riga = document.createElement('div');
     riga.className = 'mg-actions-row';
     const btn = document.createElement('button');
@@ -4643,7 +4685,9 @@
     msg.setAttribute('role', 'status');
     riflettiEsitoRisposta(msg);
     riga.appendChild(btn); riga.appendChild(msg);
-    box.appendChild(t); box.appendChild(riga);
+    box.appendChild(t);
+    box.appendChild(allegatiRisposta.riga(fb._id, { disabilitata: rispostaInVolo.has(fb._id) }));
+    box.appendChild(riga);
     return box;
   }
 
@@ -8239,8 +8283,20 @@
     await domandePronte;
     sceltaApertura();
     apriDomandaDallIndirizzo();
+    apriFeedbackDallIndirizzo();
     startLive();
   }
+
+  // `#feedback=1956`: arriva dalla riga delle Novità nata da quella segnalazione.
+  function apriFeedbackDallIndirizzo() {
+    const m = /^#feedback=([1-9]\d{0,8}(?:\.\d{1,4})?)$/.exec(String(location.hash || ''));
+    if (!m || !allFeedbacks.length) return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+    if (!apriFeedbackDi(null, m[1]) && feedbacksColNumero(m[1]).length === 0) {
+      setManageMsg(`La segnalazione #${m[1]} non è fra quelle caricate: cercala nella casella in alto.`, 'err');
+    }
+  }
+  window.addEventListener('hashchange', apriFeedbackDallIndirizzo);
 
   // `#domanda=D-12`: arriva dal segno «aspetta D-12» della pagina dei feedback, che porta dove si risponde.
   function apriDomandaDallIndirizzo() {
@@ -8254,6 +8310,15 @@
   // Un indirizzo che nomina una scheda o una sezione la apre, come un clic (#1414: è così che arrivano i vecchi indirizzi
   // delle pagine dell'owner). Poi torna pulito: riaprendo la scheda scavalcherebbe ogni volta la scelta d'apertura.
   function apriDaIndirizzo() {
+    // #906 — `#rivaluta` arriva dall'avviso dei giudici fermi: Ricevuti senza filtri, e il tasto dei non filtrati in vista.
+    if (/^#rivaluta$/i.test(String(location.hash || ''))) {
+      rivalutaChiesto = true;
+      if (livelliScelti.length) { livelliScelti = []; renderList(); }
+      selectTab('inbox');
+      try { history.replaceState(history.state, '', location.pathname + location.search); } catch (_) {}
+      updateReevalBar();
+      return;
+    }
     const tab = MR.schedaDaIndirizzo(location.hash);
     if (!tab) return;
     selectTab(tab);

@@ -1,6 +1,6 @@
 // Evidenziazione per la sidebar Aiuto: cornice e tooltip sull'elemento di un selettore.
 // Modalità «click» (il clic conferma il passo) e «fill» (propone un valore e lo inserisce).
-// La cornice è pointer-events:none: solo il bottone Accetta è interattivo.
+// La cornice è pointer-events:none: solo il bottone Accetta è interattivo. Su un sito il tooltip lo disegna l'Aiuto nello strato.
 
 (function (global) {
   'use strict';
@@ -10,6 +10,7 @@
   let scrollListener = null;
   let clickListener = null;
   let onTargetClick = null;
+  let accettaCorrente = null;
   const gestoVero = (e) => !!global.SN_FILO_UI?.gestoVero(e);
 
   function clear() {
@@ -27,6 +28,7 @@
       clickListener = null;
     }
     onTargetClick = null;
+    accettaCorrente = null;
     activeTarget = null;
     // Il force-hover sopravvive fra un turno e l'altro: dopo un hover su un menu l'agente
     // vorrà evidenziare una voce interna. Lo tolgono la fine sessione o un click vero.
@@ -183,6 +185,10 @@
     const fillValue = action === 'fill' ? (options.value || '') : '';
     const onAction = typeof options.onAction === 'function' ? options.onAction : null;
     onTargetClick = action === 'click' ? onAction : null;
+    // `senzaNota`: nota, valore e Accetta li mostra chi ha chiesto il passo, fuori dal documento (l'Aiuto nello strato,
+    // #1509.3), e `suPosa(rect | null)` gli dice dove sta il bersaglio, o che non c'è più.
+    const senzaNota = options.senzaNota === true;
+    const suPosa = typeof options.suPosa === 'function' ? options.suPosa : null;
 
     try { global.SN_EXTRACT?.expandAncestors?.(target); } catch (_) {}
 
@@ -194,8 +200,22 @@
     frame.className = 'sn-highlight-frame';
     overlay.appendChild(frame);
 
+    // Il sì al passo lo dà l'utente: il bottone nel documento del sito lo preme anche il sito (#592.6), quello nello
+    // strato arriva qui per `accetta()`.
+    const accettaIlValore = () => {
+      if (!activeTarget) return false;
+      fillElement(activeTarget, fillValue);
+      const cb = onAction;
+      // Disattiva subito per evitare doppi trigger su doppio click.
+      if (onTargetClick === cb) onTargetClick = null;
+      accettaCorrente = null;
+      try { cb && cb(); } catch (_) {}
+      return true;
+    };
+    if (action === 'fill') accettaCorrente = accettaIlValore;
+
     let tip = null;
-    if (note || fillValue) {
+    if (!senzaNota && (note || fillValue)) {
       tip = document.createElement('div');
       tip.className = 'sn-highlight-tip';
       if (note) {
@@ -217,13 +237,8 @@
         acceptBtn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          // Il sì al passo lo dà l'utente: il bottone sta nel documento del sito, che lo preme da codice (#592.6).
           if (!activeTarget || !gestoVero(e)) return;
-          fillElement(activeTarget, fillValue);
-          const cb = onAction;
-          // Disattiva subito per evitare doppi trigger su doppio click.
-          if (onTargetClick === cb) onTargetClick = null;
-          try { cb && cb(); } catch (_) {}
+          accettaIlValore();
         });
         tip.appendChild(acceptBtn);
       }
@@ -236,10 +251,11 @@
     function reposition() {
       if (!activeTarget || !document.contains(activeTarget)) {
         clear();
+        if (suPosa) { try { suPosa(null); } catch (_) {} }
         return;
       }
       const r = activeTarget.getBoundingClientRect();
-      try { global.SN_SIDEBAR?.ensureNotOverTarget?.(r); } catch (_) {}
+      if (suPosa) { try { suPosa(r); } catch (_) {} } else { try { global.SN_SIDEBAR?.ensureNotOverTarget?.(r); } catch (_) {} }
       frame.style.left = `${r.left}px`;
       frame.style.top = `${r.top}px`;
       frame.style.width = `${r.width}px`;
@@ -280,5 +296,8 @@
     return true;
   }
 
-  global.SN_HIGHLIGHT = { show, clear, fillElement, autoAction, clearForceHover };
+  // L'Accetta del passo mostrato fuori dal documento: inserisce il valore come il bottone del tooltip. false se non c'è.
+  function accetta() { return typeof accettaCorrente === 'function' ? accettaCorrente() : false; }
+
+  global.SN_HIGHLIGHT = { show, clear, fillElement, autoAction, clearForceHover, accetta };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

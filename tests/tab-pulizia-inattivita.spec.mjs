@@ -146,7 +146,13 @@ test('un giudizio mancato nella pulizia automatica si dice con un avviso e nei l
 
   // Un motivo nuovo (una risposta senza l'elenco) torna a dirlo, anche alla riapertura.
   await app.evaluate(() => { globalThis.SN_TAB_TRIAGE_DECIDE = async () => ({ testo: 'tengo tutto' }); });
-  const r = await app.evaluate(async ({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.runAutoTriage({ trigger: 'reopen' }));
+  // La pulizia della riapertura giudica solo le schede della sessione di prima (#349): queste lo diventano.
+  const r = await app.evaluate(async ({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm._riapertaAlle = Date.now();
+    for (const t of tm.tabs) t._dallaSessione = true;
+    return tm.runAutoTriage({ trigger: 'reopen' });
+  });
   expect(r.giudizioMancato).toBe(true);
   await expect(shell.locator('.shell-notif-msg', { hasText: 'senza dire quali schede tenere' })).toBeVisible({ timeout: 5_000 });
 

@@ -1,5 +1,4 @@
 # OpenSSF Scorecard (#1421): il voto alle pratiche del repo, in Security → Code scanning e nel badge del README.
-# Qui non gira: le automazioni le porta in .github/workflows solo l'owner (#1140), spostando questo file così com'è.
 # Regole (solo main, permessi minimi, azioni fissate per sha): tests/unit/scorecardAzione.test.mjs.
 
 name: Scorecard

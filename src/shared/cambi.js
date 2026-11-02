@@ -175,6 +175,7 @@
     'security.safeBrowse.networkSignals': { nome: 'controlli di rete sui siti', valore: sino('attivi', 'spenti'), livello: 2 },
     'security.safeBrowse.llmJudge': { nome: 'giudizio AI sui siti sospetti', valore: ATTIVO, livello: 2 },
     'security.safeBrowse.sandbox': { nome: 'link sospetti in una finestra isolata', valore: sino('sì', 'no'), livello: 2 },
+    'security.safeBrowse.trustedSites': { nome: 'siti di cui ti fidi', elenco: true, livello: 2 },
     'security.cookies.mode': { nome: 'gestione dei cookie', valori: { manual: 'manuale', default: 'automatica', privacy: 'privacy massima' }, livello: 2 },
     'security.cookies.trustedSites': { nome: 'siti fidati dove resti connesso', elenco: true, livello: 2 },
     'security.cookies.bannerSites': { nome: 'siti dove vedi i banner dei cookie', elenco: true, livello: 2 },
@@ -370,7 +371,7 @@
     return l;
   }
 
-  // Le icone del desktop del computer (#1621): `prima` e `dopo` sono { auto, voci: [[id, x, y]] }, `come` l'ordine chiesto.
+  // Le icone del desktop del computer (#1621): `prima` e `dopo` sono { auto, voci: [[id, x, y]], finder? (Mac) }, `come` l'ordine chiesto.
   const ORDINI_DESKTOP = new Map([['nome', 'in ordine alfabetico'], ['tipo', 'per tipo'], ['data', 'per data'], ['dimensione', 'per dimensione']]);
   function fraseOrdineDesktop(come) {
     const c = come || {};
@@ -474,7 +475,8 @@
       const n = spostateSulDesktop(c);
       const auto = !!(c.prima && c.prima.auto) !== !!(c.dopo && c.dopo.auto);
       const parti = [n === 1 ? 'spostata 1' : `spostate ${n}`];
-      if (auto) parti.push(`«Disponi automaticamente» ${c.dopo && c.dopo.auto ? 'acceso' : 'spento'}`);
+      const mac = !!((c.prima && c.prima.finder) || (c.dopo && c.dopo.finder));
+      if (auto) parti.push(`${mac ? '«Ordina per» del Finder' : '«Disponi automaticamente»'} ${c.dopo && c.dopo.auto ? 'acceso' : 'spento'}`);
       return `icone del desktop: ${parti.join(', ')}`;
     }
     const v = voce(k);

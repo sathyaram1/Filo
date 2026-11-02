@@ -52,6 +52,7 @@ const CARTELLA_DATI = {
   quarantena: { frase: 'i download' },
   adblock: { frase: 'le liste per bloccare la pubblicità' },
   'firmatari-c2pa': { frase: 'l\'elenco dei firmatari riconosciuti delle credenziali sulle immagini' },
+  'programmi-video': { frase: 'i programmi per salvare i video in streaming' },
   Dictionaries: { frase: 'i dizionari del correttore ortografico' },
 };
 
@@ -88,6 +89,7 @@ const COLLEZIONI = {
   '/contatori-riquadri/{docId}': { frase: 'Cosa fai delle risposte nei riquadri, sempre senza il testo' },
   '/contatori-home-pagina/{docId}': { frase: 'La home e quello che Filo fa da solo sulle pagine' },
   '/contatori-servizio/{docId}': { frase: 'Come vanno i modelli, i crediti, l\'accesso e le segnalazioni automatiche' },
+  '/contatori-strade/{docId}': { frase: 'Da quale strada parti per fare le cose' },
   '/wallet-accounts/{uid}': { frase: 'tiene un documento con il tuo pseudonimo' },
   '/wallet-invites/{code}': { frase: 'il codice d\'invito con cui sei entrato' },
   '/wallet-state/{doc}': { perche: 'l\'esito dell\'ultimo confronto fra registro d\'uso e consumo di OpenRouter' },
@@ -118,6 +120,7 @@ const COLLEZIONI = {
   '/domande/{id}': { frase: 'l\'agente mi scrive una domanda' },
   '/compiti/{id}': { perche: 'il registro delle chiamate degli agenti delle routine (fase, modello, costo, esito), scritto dal server: niente di chi usa l\'app' },
   '/compiti-indice/{id}': { perche: 'il contatore dei compiti e il compito aperto di ogni feedback, soli numeri' },
+  '/compiti-ricorrenti/{id}': { perche: 'i compiti ricorrenti dell\'owner per le routine (testo, cadenza, ultimo rapporto), scritti dal server: niente di chi usa l\'app' },
   '/routines/{email}': { perche: 'le identità delle routine che lavorano i feedback' },
 };
 const CAMPI_PUBBLICI_SCRITTI = {

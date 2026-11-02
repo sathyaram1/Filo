@@ -35,4 +35,13 @@ function contaMossa(mossa) {
   } catch (_) {}
 }
 
-module.exports = { leggi, modifica };
+// Il segno dell'accoglienza si legge dal disco anche per una finestra incognito, che non lo vede (#1661).
+async function primoIncontro(settings) {
+  try {
+    const K = globalThis.SN_CONST;
+    const onb = await require('../shim/storage').runNormale(() => globalThis.SN_FILO_MEMORY.getOnboarding());
+    return Carte().primoIncontro(onb, K.whyCannotServe(settings, [K.ACTIONS.FILO_DASHBOARD, K.ACTIONS.FILO_CHAT]));
+  } catch (_) { return false; }
+}
+
+module.exports = { leggi, modifica, primoIncontro };

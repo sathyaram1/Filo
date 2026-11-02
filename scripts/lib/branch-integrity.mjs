@@ -388,6 +388,25 @@ function commitExists(g, sha) {
 }
 
 /**
+ * Il ref di tracciamento di `branch` con un reflog suo. `git clone` scrive quelli di origin senza, e lì
+ * --force-if-includes confronta con un'ora mai scritta: il rinvio dopo un rebase viene rifiutato (#1930). Si toglie e si
+ * rimette uguale, perché un aggiornamento allo stesso valore git non lo registra. ok falso se resta senza.
+ */
+export function assicuraReflogTracciamento(root, branch) {
+  const g = gitIn(root);
+  const ref = `refs/remotes/origin/${branch}`;
+  const sha = g(['rev-parse', '--verify', '--quiet', ref]);
+  if (!sha.ok || !sha.out) return { ok: false, creato: false, motivo: `${ref} non c'è` };
+  if (g(['reflog', 'exists', ref]).ok) return { ok: true, creato: false, motivo: '' };
+  const via = g(['update-ref', '-d', ref, sha.out]);
+  if (!via.ok) return { ok: false, creato: false, motivo: via.out.slice(0, 200) };
+  const rimesso = g(['update-ref', '--create-reflog', '-m', 'filo: tracciamento col suo reflog', ref, sha.out, '']);
+  if (rimesso.ok) return { ok: true, creato: true, motivo: '' };
+  g(['update-ref', ref, sha.out]);
+  return { ok: false, creato: false, motivo: rimesso.out.slice(0, 200) };
+}
+
+/**
  * I marcatori di sessione: biglietto, battito, ruolo, identità attesa, stato
  * locale. Vivono in `.claude/` DENTRO il progetto, quindi hanno due nemici che
  * il `.gitignore` del ramo GIUSTO tiene a bada, ma quello di un ramo VECCHIO
@@ -457,20 +476,23 @@ export function ensureSessionExcludes(root) {
  *   root         directory del repo
  *   branch       branch su cui posizionarsi (per `create` è il nome da creare)
  *   create       true = lavoro NUOVO (crea il branch dalla base)
+ *   createIfMissing  true = il nome è già deciso (il ramo del biglietto): si riprende se c'è, sennò nasce dalla base
  *   base         base da cui creare (default: mainBranch)
  *   mainBranch   linea principale (default 'main')
  *   checkpoint   ultimo punto fermo locale (SHA), o null
  *   now          per i test
  *
- * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null, superato?:string|null}}
+ * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null, superato?:string|null, avviso?:string, ripreso?:boolean}}
+ *          ripreso   = con createIfMissing, il ramo c'era già ed è stato ripreso
  *          rewritten = il punto fermo lasciato perché il ramo su origin è stato riscritto
  *          superato  = il punto fermo lasciato perché più vecchio della punta pubblicata (un giro passato altrove)
+ *          avviso    = origin/<branch> senza reflog: il rinvio dopo un rebase verrà rifiutato
  *        | {ok:false, kind:'transient'|'permanent', message:string}
  *
  * FAIL CLOSED: se non riesce, il chiamante NON consegna il lavoro. Meglio un
  * giro a vuoto che un giro sull'albero sbagliato.
  */
-export function prepareBranch({ root, branch, create = false, base = '', mainBranch = 'main', checkpoint = null, now = Date.now() }) {
+export function prepareBranch({ root, branch, create = false, createIfMissing = false, base = '', mainBranch = 'main', checkpoint = null, now = Date.now() }) {
   const g = gitIn(root);
   if (!branch) return { ok: false, kind: 'transient', message: 'nessun branch da preparare' };
   // Sulla linea principale non si LAVORA: il cancello fonde un ramo, quindi un
@@ -487,6 +509,14 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // Prima del ramo di scarto spedito più sotto: i commit locali di una sessione morta possono portare una copia dei dati (#1108).
   try { installaControlloSpedizione(root); } catch (_) { /* senza, restano i controlli delle singole strade */ }
   ensureCommentChar(root);
+
+  // «Su origin non c'è» va saputo, non dedotto da un fetch fallito: con la rete giù il ramo del biglietto
+  // rinascerebbe da main accanto al lavoro già spinto (#1632).
+  if (createIfMissing) {
+    const remoto = ramoSuOrigin(root, branch);
+    if (remoto.errore) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin se ${branch} c'è: ${remoto.errore}` };
+    create = !remoto.presente && !refExists(g, `refs/heads/${branch}`);
+  }
 
   if (create) {
     const wanted = base || mainBranch;
@@ -519,6 +549,10 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
     // chiamante porta il feedback fuori dal giro automatico (`design`).
     return { ok: false, kind: 'permanent', message: `il branch ${branch} non esiste più (né in locale né su origin)` };
   }
+  // Prima del checkout: --force-if-includes cerca la punta remota solo fra le voci del ramo locale scritte dopo
+  // l'ultima del reflog remoto, e la voce che la porta la scrive il checkout (o il reset) qui sotto.
+  const reflog = hasRemote ? assicuraReflogTracciamento(root, branch) : { ok: true };
+  const avviso = reflog.ok ? {} : { avviso: `origin/${branch} resta senza reflog (${reflog.motivo}): dopo un rebase il rinvio del ramo verrà rifiutato` };
   const co = hasLocal ? g(['checkout', branch]) : g(['checkout', '-B', branch, `origin/${branch}`]);
   if (!co.ok) return { ok: false, kind: 'transient', message: `checkout di ${branch} fallito: ${co.out.slice(0, 200)}` };
 
@@ -568,7 +602,18 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // lasciano residui che al checkout successivo verrebbero TRASPORTATI sul
   // branch del compito dopo, finendo nel diff che va al cancello di sicurezza.
   g(['clean', '-fd']);
-  return { ok: true, head: headSha(root), discarded, rewritten, superato };
+  return { ok: true, head: headSha(root), discarded, rewritten, superato, ...avviso, ...(createIfMissing ? { ripreso: true } : {}) };
+}
+
+/** `ls-remote --exit-code` esce 2 quando il ramo non c'è: ogni altro no (rete, permessi) è un «non so». */
+function ramoSuOrigin(root, branch) {
+  try {
+    execFileSync('git', ['ls-remote', '--exit-code', 'origin', `refs/heads/${branch}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return { presente: true };
+  } catch (e) {
+    if (e.status === 2) return { presente: false };
+    return { errore: `${e.stderr || ''}`.trim().split('\n').slice(-1)[0] || e.message };
+  }
 }
 
 function antenato(g, a, b) {

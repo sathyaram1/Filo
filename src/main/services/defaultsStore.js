@@ -91,8 +91,10 @@ function fsDocToObject(doc) {
 // configurazione che non ha fino alla scadenza lunga.
 // `tokenMancato`: chi usa Filo è dentro ma la sessione non ha dato il token, e
 // il «non ti riguarda» detto a un anonimo non parla di lui (#679.2).
-async function leggiDoc(docPath, idToken, { tokenMancato = false } = {}) {
-  const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}`;
+// `campi`: solo questi percorsi del documento (la maschera di Firestore), per non scaricare il resto a ogni giro.
+async function leggiDoc(docPath, idToken, { tokenMancato = false, campi = null } = {}) {
+  const maschera = Array.isArray(campi) ? campi.map((c) => `&mask.fieldPaths=${encodeURIComponent(c)}`).join('') : '';
+  const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}${maschera}`;
   const headers = {};
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
   let res;
@@ -876,6 +878,14 @@ async function getWorkerLog(idToken, { severo = false } = {}) {
   return entries;
 }
 
+// Lo stato dei giudici fermi (#906) che il server scrive in config/automation: { risposto, raw }. Il campo assente con
+// la lettura riuscita vuol dire «giudici a posto»; una lettura non riuscita non dice niente (services/giudiciFermi.js).
+async function getGiudiciFermi(idToken) {
+  const campi = ['causa', 'da', 'ultimoErrore', 'inAttesa'].map((c) => `giudiciFermi.${c}`);
+  const letto = await leggiDoc(AUTOMATION_DOC, idToken, { campi });
+  return { risposto: letto.risposto && !!letto.doc, raw: (letto.doc && letto.doc.giudiciFermi) || null };
+}
+
 module.exports = {
   tettiContesto,
   tettiRisposte,
@@ -913,4 +923,5 @@ module.exports = {
   getApertoATutti,
   setApertoATutti,
   getWorkerLog,
+  getGiudiciFermi,
 };

@@ -30,7 +30,8 @@
 //     onAttesaOwner(item, perche) -> boolean: la voce dell'owner aspetta il suo accesso (#912: mai da anonima);
 //     perche 'assente' | 'rifiutato'; `false` = non detto. Un tokenOwner che lancia è la rete: si riprova zitti.
 //     onScaduta(item): la voce esce dopo MAX_AGE_MS di soli fallimenti (#986).
-//   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito (payload.name = titolo già scelto)
+//   enqueue(payload, { dallOwner, attendiMs }) -> { id, queued:true, tentativo? }  — accoda + prova subito (payload.name =
+//     titolo già scelto); con attendiMs, `tentativo` è la Promise dell'esito del primo tentativo (vedi attendiTentativo)
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
 //   accessoCambiato()                                       — l'owner è rientrato: riprova subito tutte le voci
 //   size()                                                  — voci in coda
@@ -134,6 +135,31 @@
     if (timer && typeof timer.unref === 'function') timer.unref(); // non tenere vivo il processo
   }
 
+  // Chi ha premuto «Invia» aspetta il primo tentativo della sua voce, così dice «inviato» solo a consegna avvenuta
+  // (#1667). Esito: 'consegnato' | 'in_coda' | 'rinuncia'; allo scadere di `entroMs` è 'in_coda'.
+  const attese = new Map(); // id -> [risolvi]
+  function rispondi(id, esito) {
+    const l = attese.get(id);
+    if (!l || !l.length) return false;
+    attese.delete(id);
+    for (const r of l) r(esito);
+    return true;
+  }
+  function attendiTentativo(id, entroMs) {
+    // Senza giri automatici (le prove) nessun tentativo è in arrivo.
+    if (!auto) return Promise.resolve({ esito: 'in_coda' });
+    return new Promise((resolve) => {
+      const t = setTimeout(() => {
+        const l = (attese.get(id) || []).filter((r) => r !== fine);
+        if (l.length) attese.set(id, l); else attese.delete(id);
+        resolve({ esito: 'in_coda' });
+      }, entroMs);
+      if (typeof t.unref === 'function') t.unref();
+      function fine(esito) { clearTimeout(t); resolve(esito); }
+      attese.set(id, (attese.get(id) || []).concat(fine));
+    });
+  }
+
   async function enqueue(payload, opts) {
     await load();
     const id = (payload && payload.submissionId)
@@ -151,8 +177,12 @@
       }
       await persist();
     }
+    const entroMs = Number(opts && opts.attendiMs) || 0;
+    const tentativo = entroMs > 0 ? attendiTentativo(id, entroMs) : null;
+    // Un invio nuovo si prova adesso, non al giro di backoff fissato per una voce vecchia (fino a mezzo minuto).
+    if (timer && !flushing) { clearTimeout(timer); timer = null; }
     scheduleFlush(0);
-    return { id, queued: true };
+    return tentativo ? { id, queued: true, tentativo } : { id, queued: true };
   }
 
   function remove(id) { queue = queue.filter((it) => it.id !== id); }
@@ -226,7 +256,7 @@
           try { onScadutaFn && onScadutaFn(it); } catch (_) {}
           continue;
         }
-        if (it.tokenRifiutato) continue;
+        if (it.tokenRifiutato) { rispondi(it.id, { esito: 'in_coda' }); continue; }
         const fb = feedback();
         if (!fb || typeof fb.submit !== 'function') { anyFail = true; break; }
         try {
@@ -246,15 +276,17 @@
             try { idToken = (tokenOwnerFn && await tokenOwnerFn()) || ''; } catch (e) {
               it.attempts = (it.attempts || 0) + 1;
               anyFail = true;
+              rispondi(it.id, { esito: 'in_coda' });
               logFn('token dell\'owner non ottenuto (rete, riprovo):', it.id, e?.message || e);
               continue;
             }
-            if (!idToken) { attendiAccesso(it, 'nessun accesso valido', 'assente'); anyFail = true; continue; }
+            if (!idToken) { attendiAccesso(it, 'nessun accesso valido', 'assente'); rispondi(it.id, { esito: 'in_coda' }); anyFail = true; continue; }
           }
           // #912: la voce dell'owner parte con la prova o non parte; da anonima diventerebbe un utente che nessuno riprende.
           const result = idToken ? await fb.submit(payload, { idToken, soloAdmin: true }) : await fb.submit(payload);
           remove(it.id);
           logFn('inviato:', it.id);
+          rispondi(it.id, { esito: 'consegnato', id: result && result.id });
           try { onDoneFn && onDoneFn(it, result); } catch (_) {}
           backoff = backoffMin; // successo → azzera il backoff
         } catch (e) {
@@ -262,12 +294,16 @@
           // Riprovare non cambia niente finché quella copia di Filo resta com'è,
           // e intanto chi ha mandato la segnalazione ha già letto «inviato»:
           // restava in coda un giorno intero e poi spariva senza una parola.
-          // Qui si smette subito e glielo si dice.
-          if (fb.isEncryptionError && fb.isEncryptionError(e)) {
-            logFn('rinuncio, la cifratura non si può fare:', it.id, e?.message || e);
-            conta('rinuncia', 'cifratura');
+          // Qui si smette subito e glielo si dice. Lo stesso per un feedback rimasto vuoto per sempre (#1667).
+          const vuotoPerSempre = !!(e && e.vuoto && e.permanente);
+          if ((fb.isEncryptionError && fb.isEncryptionError(e)) || vuotoPerSempre) {
+            logFn('rinuncio, non partirà mai:', it.id, e?.message || e);
+            if (!vuotoPerSempre) conta('rinuncia', 'cifratura');
             it.rinuncia = true;
             it.motivoRinuncia = e?.message || String(e);
+            // Chi aspetta il primo tentativo (il riquadro) lo dice lui e lo annuncia se nessuno lo legge più: un
+            // secondo avviso nella cornice ripeterebbe la stessa frase (#1681).
+            if (rispondi(it.id, { esito: 'rinuncia', motivo: it.motivoRinuncia })) { remove(it.id); continue; }
             if (annunciaRinuncia(it)) remove(it.id);
             else anyFail = true; // nessuno a cui dirlo: si riprova, non si butta
             continue;
@@ -275,11 +311,13 @@
           if (it.dallOwner && e && e.accessoOwner) {
             it.tokenRifiutato = true;
             attendiAccesso(it, e.message || 'token rifiutato', 'rifiutato');
+            rispondi(it.id, { esito: 'in_coda' });
             continue;
           }
           it.attesaAccesso = false;
           it.attempts = (it.attempts || 0) + 1;
           anyFail = true;
+          rispondi(it.id, { esito: 'in_coda' });
           logFn('invio fallito (riprovo):', it.id, e?.message || e);
         }
       }
@@ -317,6 +355,7 @@
       queue = []; loaded = false; flushing = false; ancora = false; auto = true;
       prepareFn = null; onDoneFn = null; onGiveUpFn = null; tokenOwnerFn = null; onAttesaOwnerFn = null; onScadutaFn = null; backoff = backoffMin;
       if (timer) { clearTimeout(timer); timer = null; }
+      for (const id of [...attese.keys()]) rispondi(id, { esito: 'in_coda' });
     },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

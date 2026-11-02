@@ -129,6 +129,9 @@ test('l\'ordine da accendere: numeri nell\'ordine dato, senza doppioni, col rifi
   assert.match(M.leggiOrdine(tanti).motivo, /il massimo è/, 'oltre il tetto si rifiuta col numero, non si taglia');
   const c = M.corpoOrdine(['73', '71'], new Date(0));
   assert.deepEqual(c.fields.ordine.arrayValue.values.map((v) => v.stringValue), ['73', '71']);
+  // L'ordine scritto dal PC non cancella N, sveglia e account che il server tiene nello stesso documento (#1961).
+  const campi = new URLSearchParams(M.MASCHERA_ORDINE.slice(1)).getAll('updateMask.fieldPaths');
+  assert.deepEqual(campi.sort(), Object.keys(c.fields).sort());
 });
 
 test('una scheda di cui non fidarsi lo dice nella sua riga: non buona, vecchia, o un «toglie lavoro» non riletto', () => {
@@ -189,4 +192,11 @@ test('incroci non manda ad aspettare il ramo locale di un feedback già arrivato
 test('accendi prende i numeri, non le opzioni né i loro valori', () => {
   assert.deepEqual(M.numeriDiAccendi(['812', '--giorni', '30', '--cartella', '/dir', '815,820', '--senza-fetch']), ['812', '815,820']);
   assert.deepEqual(M.numeriDiAccendi(['--cartella', '/dir']), []);
+});
+
+test('sblocca vuole il numero del feedback fermo; il resto è la nota dell\'owner', () => {
+  assert.deepEqual(M.richiestaSblocca(['#812', 'riparato', 'il', 'registro']), { ok: true, numero: '812', testo: 'riparato il registro' });
+  assert.deepEqual(M.richiestaSblocca(['812.2']), { ok: true, numero: '812.2', testo: '' });
+  assert.equal(M.richiestaSblocca([]).ok, false);
+  assert.equal(M.richiestaSblocca(['dodici']).ok, false);
 });

@@ -134,6 +134,9 @@
     GET_UPDATE_RECAP: 'get_update_recap',
     // L'utente ha chiuso il recap: salva app.getVersion() come ultima vista, con la fotografia delle sue novità.
     MARK_UPDATE_SEEN: 'mark_update_seen',
+    // Pagina Novità (#1956): tutte le versioni uscite fino a quella installata. Solo da Filo.
+    // { } → { ok, current, versioni:[{ version, date, features:[{ testo, segnalazione }], fixes }] }.
+    NOVITA_ELENCO: 'novita_elenco',
     // Feedback dell'utente passati a `done` da quando non guardava (C5): il main
     // cerca su Firestore i feedback inviati da questo client, accredita la
     // ricompensa per priorità (50/100/200/300) una volta sola per feedback, e
@@ -324,6 +327,10 @@
     // decide il nome di ripiego e l'header Accept.
     // { url, kind:'video'|'audio' } → { ok, path?, filename? } | { ok:false, cancelled?, error? }
     DOWNLOAD_MEDIA: 'download_media',
+    // #1488 — «Salva video come…» su un video in streaming: lo scarica yt-dlp dall'indirizzo del riquadro che chiede, o
+    // da `indirizzo` (quello del video cliccato) se è dello stesso sito.
+    // { kind:'video'|'audio', titolo, indirizzo? } → { ok, path, filename } | { ok:false, cancelled? , motivo?, frase?, spento? }
+    SAVE_STREAMING_VIDEO: 'save_streaming_video',
     // "Salva file" dal menu contestuale su un link a un file (#410.2). NON
     // scarica byte a mano come DOWNLOAD_IMAGE/MEDIA: fa partire il download
     // NATIVO della scheda (webContents.downloadURL), così passa per
@@ -387,7 +394,7 @@
     // #947.3 — toglie dall'indice una cartella cercata per l'occasione (Preferenze). Solo da Filo.
     // { percorso } → { ok, tolta, documenti }
     DOCUMENTI_DIMENTICA: 'documenti_dimentica',
-    // #947.3 — l'Aiuto di una scheda cerca fra i documenti. APERTI AI SITI, perché l'Aiuto vive nella pagina: su un sito
+    // #947.3 — l'Aiuto di una scheda cerca fra i documenti. APERTI AI SITI, perché l'Aiuto parla come la pagina: su un sito
     // la ricerca parte solo dopo il sì nella vista di Filo sopra la scheda (confermeSopraPagina), e alla pagina tornano
     // nomi, cartelle dette coi nomi di Filo e chiavi a caso, mai percorsi. Le chiavi valgono solo per la scheda che ha
     // cercato. Regole: patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
@@ -514,8 +521,14 @@
     STRATO_MENU_CHIUSO: 'strato_menu_chiuso',        // main → content script { id }
     // I riquadri di Filo su un sito nello strato sopra la scheda (#1509.1). Aperto ai siti: chi apre è il content script
     // della scheda, e il riquadro nasce dove il sito non lo vede.
-    RIQUADRO_APRI: 'riquadro_apri',                  // { tipo: feedback|modifica|redteam|risposta, dati } → { ok, id }
+    RIQUADRO_APRI: 'riquadro_apri',                  // { tipo: feedback|modifica|redteam|risposta|aiuto, dati } → { ok, id }
     RIQUADRO_SOSTITUISCI: 'riquadro_sostituisci',    // main → content script { id, testo }: Sostituisci della Modifica
+    // L'Aiuto di un sito sta nello strato (#1509.3) e lavora sulla pagina sotto: lo strato chiede, il frame principale
+    // della pagina fa e risponde; la pagina gli manda i gesti dell'utente sui passi indicati.
+    AIUTO_ALLA_PAGINA: 'aiuto_alla_pagina',          // solo dallo strato: { op, args } → { ok, esito }
+    AIUTO_DALLO_STRATO: 'aiuto_dallo_strato',        // main → frame principale della pagina { rid, op, args }
+    AIUTO_ESITO: 'aiuto_esito',                      // solo dal frame principale della pagina: { rid, esito } → { ok }
+    AIUTO_ALLO_STRATO: 'aiuto_allo_strato',          // solo dalla pagina: { comando: passo|chiudi|evita|azione, … } → { ok }
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
     PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
     PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }
@@ -538,6 +551,8 @@
     // Riordino cromatico ESPLICITO della striscia: riordina le tab per colore come alla
     // riapertura, ma senza archiviare né chiudere niente (a differenza di RUN_TAB_TRIAGE).
     REORDER_TABS: 'reorder_tabs',
+    // «Riapri» dall'avviso della pulizia: { pulizia } → { ok, riaperte } | { ok:false, error:'scaduta' }.
+    RIAPRI_PULIZIA_SCHEDE: 'riapri_pulizia_schede',
 
     // Porta in primo piano una scheda già aperta (per id): serve ai riferimenti in chat quando
     // Filo ha aperto qualcosa in secondo piano, invece di aprire una seconda scheda uguale.
@@ -556,7 +571,10 @@
     SUBMIT_FEEDBACK: 'submit_feedback',           // { text, url, title, userAgent, clientId, images: [{dataUrl}] }
     // Broadcast main→content per un toast di sistema (es. esito differito di un invio).
     // Lo mostra solo la scheda in primo piano. { text, duration? }
-    SHOW_TOAST: 'show_toast',                      // { text, duration?, rimedio?, segnala? (testo già scritto per «Invia feedback») }
+    SHOW_TOAST: 'show_toast',                      // { text, duration?, rimedio?, segnala? (testo già scritto per «Invia feedback»), avviso? (id in coda) }
+    // Un avviso in coda nel main (#1478.1, `avviso` di SHOW_TOAST) lo prende la pagina che lo mostra adesso; senza `id`
+    // tutti quelli in coda. Solo il frame principale della scheda attiva. { id? } → { ok, avvisi: [SHOW_TOAST…] }
+    AVVISI_IN_CODA: 'avvisi_in_coda',
     // F4 — l'avviso della segnalazione automatica (#784.6): la segnalazione aspetta che si chiuda. «Annulla» la ferma
     // (partita, la ritira solo l'owner; `frase` dice perché no); chiuso senza Annulla, parte. Solo dalle superfici di
     // Filo e solo per un `id` che questo Filo ha messo nell'avviso (#784.3). { id } → { ok, frase? }
@@ -724,9 +742,9 @@
     DOMANDE_ELENCO: 'domande_elenco',       // { dopo?:<ms>, tutte?:bool } → { ok, domande:[…], riferimenti:{}, adesso } | { ok:false, error }
     DOMANDA_MOSTRA: 'domanda_mostra',       // { id:'D-n' } → { ok, domanda, riferimenti } | { ok:false, error }
     DOMANDA_RISPONDI: 'domanda_rispondi',   // { id, scelta?:<indice>, testo? } → { ok, domanda, esito } | { ok:false, error }
-    DOMANDE_CONSIGLIO: 'domande_consiglio', // { ids:['D-n'…] } → { ok, esiti:[{ id, ok, etichetta?, errore? }] } | { ok:false, error }
+    DOMANDE_CONSIGLIO: 'domande_consiglio', // { ids:['D-n'…] } → { ok, esiti:[{ id, ok, etichetta?, esito?, nota?, errore? }] } (esito come DOMANDA_RISPONDI) | { ok:false, error }
     DOMANDA_ARCHIVIA: 'domanda_archivia',   // { id } → { ok, domanda } (chiusa senza azioni) | { ok:false, error }
-    DOMANDA_RIAPRI: 'domanda_riapri',       // { id } → { ok, domanda } (solo un'archiviata senza azioni) | { ok:false, error }
+    DOMANDA_RIAPRI: 'domanda_riapri',       // { id } → { ok, domanda } (un'archiviata senza azioni o una risposta automatica) | { ok:false, error }
     // «Segna fidato» (#1148, SPEC-DOMANDE.md §1.5): la fiducia la scrive solo il server (callable ownerFiducia).
     // Solo pagine `filo://`, solo il proprietario. Callable non ancora pubblicata → errore che lo dice.
     FIDUCIA_SEGNA: 'fiducia_segna', // { feedbackId, fidato?: false per toglierla } → { ok, fiducia } | { ok:false, error }
@@ -735,6 +753,12 @@
     COMPITI_ELENCO: 'compiti_elenco',   // { storico?:<n>, prima?:<ms> } → { ok, aperti:[…], storico:[…], altri, adesso } | { ok:false, error }
     COMPITO_CREA: 'compito_crea',       // { compito:{ titolo, istruzioni?, urgenza, modello?, sforzo?, ambito? } } → { ok, id } | { ok:false, error }
     COMPITO_ANNULLA: 'compito_annulla', // { id:'C-n' } → { ok, id } | { ok:false, error }
+    // I compiti ricorrenti (SPEC-DOMANDE.md §4.1), dalla stessa callable: li scrive solo l'owner.
+    RICORRENTI_ELENCO: 'ricorrenti_elenco', // {} → { ok, adesso, ricorrenti:[…], ambiti:[…] } | { ok:false, error }
+    RICORRENTE_SALVA: 'ricorrente_salva',   // { ricorrente:{ id?, nome, testo, giorni, ora, ambito, urgenza, modello, sforzo, attivo, domandaFineTurno } } → { ok, id } | { ok:false, error }
+    RICORRENTE_TOGLI: 'ricorrente_togli',   // { id } → { ok, id } (chiude anche l'istanza in attesa) | { ok:false, error }
+    RICORRENTE_AVVIA: 'ricorrente_avvia',   // { id } → { ok, id, compitoId } | { ok:false, error }
+    AMBITO_TOGLI: 'ambito_togli',           // { nome } → { ok, nome } (solo uno approvato dall'owner, non in uso) | { ok:false, error }
     // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
     // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
     // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner
@@ -767,6 +791,9 @@
     // La home aperta dal tasto destro sull'avviso chiede cosa le ha lasciato il main: la domanda a Filo sul sito o la
     // segnalazione del falso allarme, una volta sola. Solo pagine filo://. → { ok, richiesta: { tipo, testo } | null }
     CASA_RICHIESTA: 'casa_richiesta',
+    // #967 — i siti di cui l'utente si fida, solo da pagine filo://: `indirizzo` (l'«Apri comunque» di «Non trovo»)
+    // entra ridotto dal main; `voci` escono (Sicurezza, «Annulla»). → { ok, entrati, usciti, elenco }
+    SITI_FIDATI_IMPOSTA: 'siti_fidati_imposta', // { fidato, indirizzo? | voci?, avvisa? }
 
     // Geo-block, proposta inline: un contenuto bloccato in Italia su un tab con login attivo non
     // si riprova in silenzio, si propone — «In questa tab non sarai loggato», con Apri/No.
