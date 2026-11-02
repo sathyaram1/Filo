@@ -2684,6 +2684,8 @@
         copy: { onClick: copia },
         search: cerca,
       });
+      const stato = statoFormattazione();
+      for (const k of Object.keys(stato)) azioni[k].acceso = stato[k];
     } else if (nome === 'campo') {
       Object.assign(azioni, {
         cut: { onClick: () => Actions.cutSelection() },
