@@ -1629,7 +1629,7 @@ export function verifierReplyText(reply, id = '<id>') {
       daTogliere ? '  Poi `git add -A && git commit`, senza push a mano (lo spedisce il rilascio): quel commit non fa decadere il verdetto, finché lì si TOGLIE' : null,
       daTogliere ? '  e non si aggiunge niente. Una prova che copre anche un caso ancora aperto non si cancella: toglile il caso' : null,
       daTogliere ? '  che se ne va, e lascia il resto.' : null,
-      // Ogni altro commit dopo il verdetto è una spinta che il registro della fiducia non vede (#1555).
+      // Dopo il verdetto il ramo si muove solo col rilascio, che registra la punta (#1555, #2021).
       daTogliere ? null : 'Dopo il verdetto il ramo non si tocca più: niente commit e niente file nuovi nella cartella.',
       'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
     ].filter((l) => l !== null).join('\n');
