@@ -112,8 +112,9 @@ test('iframe image', async ({ openTab, testServer }) => {
 
 test('dark theme screenshots', async ({ openTab, testServer }) => {
   const img = testServer.asset(PNG, 'image/png');
+  const prefs = await openTab('filo://preferences/preferences.html');
+  await prefs.evaluate(() => chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }));
   const page = await testServer.openReady(openTab, SITO(img));
-  await page.evaluate(() => chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } })).catch((e) => console.log('no chrome in page', e.message));
   await page.waitForTimeout(800);
   const p = await selParola(page, '#ricco', 'parola');
   await page.mouse.click(p.x, p.y, { button: 'right' });
