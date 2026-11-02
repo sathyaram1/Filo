@@ -91,6 +91,11 @@ trovi.
 
 <!-- includi: _criteri-verifica.md -->
 
+Dopo il verdetto, una lettura del diff con la tua richiesta davanti si chiede
+in più:
+
+<!-- includi: _criteri-struttura.md -->
+
 A ogni difetto il verificatore dà un livello, col metro della frequenza
 (quanti utenti lo incontrano), e una sede: **interno** se sta nello scenario
 della segnalazione — i suoi esempi, i suoi passi, i casi ovvi della cosa

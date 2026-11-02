@@ -51,6 +51,8 @@ porta solo l'ultima.
 
 <!-- includi: _criteri-verifica.md -->
 
+<!-- includi: _criteri-struttura.md -->
+
 <!-- includi: _segnala.md -->
 
 <!-- includi: _solo-in-locale.md -->

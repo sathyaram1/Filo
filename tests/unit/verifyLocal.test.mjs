@@ -27,6 +27,7 @@ const withCritique = (s, b, o) => withCritiqueRaw(s, b, { caps: CAPS_TEST, ...o 
 // Il server finto che serve config/routines ai comandi del CLI (processo
 // separato: i comandi si lanciano in modo sincrono). Vale per tutto il file.
 import { avviaConfigRoutinesFinto as fintoConfigRoutines } from '../helpers/server-finto.mjs';
+import { faiLaLettura } from '../helpers/letturaDiff.mjs';
 const FINTO = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify(CAPS_TEST) });
 process.env.FILO_ROUTINE_CONFIG_URL = FINTO.url;
 process.env.FILO_ADMIN_ID_TOKEN = 'finto-id-token';
@@ -550,6 +551,7 @@ function depositoUsaEGetta() {
 // ragione (una verifica di due parole non è una verifica).
 const LUNGA_FIX = 'Provato inserimento, tasto destro, tema scuro e finestra stretta: il resto regge bene.\n[2i] rotto';
 function vl(casa, ...args) {
+  if (args[0] === 'critica') faiLaLettura(casa);
   try {
     return { code: 0, out: _exec(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: casa }, stdio: ['ignore', 'pipe', 'pipe'] }) };
   } catch (e) { return { code: e.status, out: `${e.stdout || ''}${e.stderr || ''}` }; }
@@ -700,6 +702,7 @@ test('#256 locale (CLI): una spec cancellata dalla shell ma non committata ferma
   // Committata la pulizia, la stessa critica passa, e vale per il commit nuovo.
   g(work, ['add', '-A']);
   g(work, ['commit', '-q', '-m', 'verifica: pulizia']);
+  faiLaLettura(work);
   const pulita = spawnSync(process.execPath, [VERIFY, 'critica', critica], { env: { ...process.env, FILO_REPO_ROOT: work }, encoding: 'utf8' });
   assert.equal(pulita.status, 0, pulita.stderr);
   assert.match(String(pulita.stdout), /Si può pubblicare/);
@@ -976,7 +979,10 @@ test('CLI giro stretto: dopo «corretto», start consegna la chiusura solo con l
   try {
     const casa = depositoUsaEGetta();
     const env = { ...process.env, FILO_REPO_ROOT: casa, FILO_ROUTINE_CONFIG_URL: acceso.url };
-    const lancia = (...args) => spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env });
+    const lancia = (...args) => {
+      if (args[0] === 'critica') faiLaLettura(casa);
+      return spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env });
+    };
     const primo = lancia('start', 'richiesta di prova');
     assert.equal(primo.status, 0, primo.stderr);
     assert.doesNotMatch(primo.stdout, /Perimetro di questo giro/, 'il primo giro è pieno anche a interruttore acceso');

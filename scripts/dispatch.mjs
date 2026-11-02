@@ -105,6 +105,7 @@ import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo,
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
 import { cloneDentroIlRepo } from './lib/git-server.mjs';
+import { letturaMancante, ramoCorrente, richiestaDalPayload, scriviRichiesta } from './lib/lettura-diff.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -1332,6 +1333,8 @@ async function recordVerifier(id, critiqueText, domande = []) {
   if (stato.lines.length) {
     return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines) };
   }
+  const senzaLettura = letturaMancante(ROOT, headSha(ROOT));
+  if (senzaLettura) return { rejected: true, nonSpedito: true, message: senzaLettura };
   const avvio = avvioDellaCritica(guard.state);
   if (avvio) {
     const fermo = codiceCambiatoDallAvvio(avvio, ROOT);
@@ -2491,6 +2494,12 @@ export function emit(bucket, ctx) {
     // no: megabyte di base64 in stampa non li legge nessuno, la voce porta il motivo.
     process.stderr.write(`[dispatch] non riesco a scrivere i pezzi grossi del payload in file (${e.message}): restano nella stampa\n`);
     payload = immaginiSenzaByte(pieno, e.message);
+  }
+  // La verifica piena lascia la sua richiesta al lettore del diff (#1363): la sua presenza rende la lettura dovuta.
+  if (bucket.role === 'verifier' && ambito.scope === 'pieno') {
+    try { scriviRichiesta(ROOT, { ramo: ramoCorrente(ROOT), richiesta: richiestaDalPayload(payload) }); } catch (e) {
+      process.stderr.write(`[dispatch] la richiesta per la lettura del diff non si scrive (${e.message}): la lettura non si potrà fare\n`);
+    }
   }
   const out = stampaCon(payload, istr, fileIstr);
   lastEmitted = { role: bucket.role, num: bucket.num || '' };

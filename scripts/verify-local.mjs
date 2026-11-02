@@ -89,6 +89,7 @@ import {
   cartellaDelServer, confrontaServer, statoRamoServer, testoServer, testoServerMossoDallAvvio, testoServerSporco,
 } from './lib/ramo-server.mjs';
 import { registraRamo } from './lib/biglietto-locale.mjs';
+import { letturaMancante, scriviRichiesta, togliRichiesta } from './lib/lettura-diff.mjs';
 
 export { PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus };
 
@@ -1350,6 +1351,11 @@ if (isMain) {
         : `Pratica ${chi} non aggiornata (${a.motivo}): in Gestione questo giro non compare.`);
     }
     const scope = ambitoLocale(capsStart, state[b]);
+    // Come in cloud (#1363): la verifica piena lascia la richiesta al lettore del diff, la chiusura la toglie.
+    try {
+      if (verifierScope(scope).scope === 'pieno') scriviRichiesta(ROOT, { ramo: b, richiesta: request });
+      else togliRichiesta(ROOT);
+    } catch (e) { console.error(`La richiesta per la lettura del diff non si scrive (${e.message}): la lettura non si potrà fare.`); }
     console.log(buildVerifierBrief({
       request, branch: b, recipe: readRecipe(ROOT, scope), history: historyFromRounds(state[b].rounds),
       scope, perimetro: state[b].chiusura, server: srvStart,
@@ -1414,6 +1420,8 @@ if (isMain) {
       // Un avvio precedente a #1062 non ha registrato il server: lì non c'è niente con cui confrontarlo.
       const mosso = 'requestedServer' in prev ? testoServerMossoDallAvvio(prev.requestedServer, srv) : '';
       if (mosso) { console.error(mosso); process.exit(1); }
+      const senzaLettura = letturaMancante(ROOT, sha, { ramo: branch });
+      if (senzaLettura) { console.error(senzaLettura); process.exit(1); }
     }
     // I bilanci dal server, PRIMA di calcolare l'esito: nessun default.
     const caps = await bilanciOStop();
