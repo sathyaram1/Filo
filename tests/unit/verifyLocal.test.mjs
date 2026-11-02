@@ -27,6 +27,7 @@ const withCritique = (s, b, o) => withCritiqueRaw(s, b, { caps: CAPS_TEST, ...o 
 // Il server finto che serve config/routines ai comandi del CLI (processo
 // separato: i comandi si lanciano in modo sincrono). Vale per tutto il file.
 import { avviaConfigRoutinesFinto as fintoConfigRoutines } from '../helpers/server-finto.mjs';
+import { faiLaLettura } from '../helpers/letturaDiff.mjs';
 const FINTO = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify(CAPS_TEST) });
 process.env.FILO_ROUTINE_CONFIG_URL = FINTO.url;
 process.env.FILO_ADMIN_ID_TOKEN = 'finto-id-token';
