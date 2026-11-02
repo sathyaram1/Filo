@@ -143,9 +143,10 @@ function ramoConProve(prove) {
   g('add', '-A'); g('commit', '-qm', 'init');
   g('checkout', '-q', '-b', 'worker/901');
   const avvio = g('rev-parse', 'HEAD');
-  for (const p of prove) scrivi(p, '// rossa\n');
-  if (prove.length) { g('add', '-A'); g('commit', '-qm', 'verifica #901 giro 2: prove'); }
+  for (const [p, testo] of Object.entries(sorgenti)) scrivi(p, testo);
+  if (Object.keys(sorgenti).length) { g('add', '-A'); g('commit', '-qm', 'verifica #901 giro 2: prove'); }
   mkdirSync(resolve(casa, 'stato'), { recursive: true });
+  mkdirSync(resolve(casa, 'stato', 'fuori'), { recursive: true });
   writeFileSync(resolve(casa, 'stato', 'fid-901.json'), JSON.stringify({
     id: 'fid-901', branch: 'worker/901', verifierVerdict: null, checkpoints: [{ sha: avvio, by: 'checkout' }],
   }), 'utf8');
