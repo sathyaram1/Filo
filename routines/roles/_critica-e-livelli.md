@@ -62,12 +62,16 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   nello stesso commit: quel rilievo esce di qui dentro un feedback suo in ogni
   esito, e la prova lasciata indietro sarebbe solo un rosso da rispiegare per
   sempre. La prova di un `[2i?]` resta: si corregge con l'opzione che consigli.
-  Se la critica ha un `[3i?]` o un `[2i?!]`, il lavoro si ferma e i `?`
-  restano a chi riprende: lì esce solo la prova degli esterni.
+  Se la critica ha un `[3i?]` o un `[2i?!]` e la sua domanda blocca, il lavoro
+  si ferma e i `?` restano a chi riprende: lì esce solo la prova degli esterni;
+  con `"blocca": false` il lavoro va avanti, e gli altri `?` escono come sempre.
+  A una prova che copre anche un rilievo che resta togli solo il caso di quello
+  che esce, e il suo numero dal nome (`git mv`).
   **La pulizia che non dipende dall'esito si fa prima del verdetto**:
   dopo, ogni commit è una spinta che il registro della fiducia non vede, e un
   lavoro fidato finisce fermo alla fusione. La registrazione rifiuta una critica
-  che ha ancora nel ramo una prova di questi, e dice quale.
+  che ha ancora nel ramo una prova di questi, o un caso col loro numero nel
+  titolo, e dice quale.
 - **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
   critica che registri, contando da 1 le righe con livello e sede, interne ed
   esterne, nell'ordine in cui le scrivi. Una prova che ne copre più d'uno li
