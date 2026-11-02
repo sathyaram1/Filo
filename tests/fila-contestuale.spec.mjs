@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { neiRiquadri } from './helpers/riquadri.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { home, modelloFinto, chiedi } from './helpers/chatFinta.mjs';
 
@@ -397,4 +398,103 @@ test('a parole: Filo mette un\'icona nella fila di un contesto, come il trascina
   expect((await esegui({ type: 'SPOSTA_ICONA', icona: 'immagine:save', dove: 'barra' })).executed).toBe(false);
   expect((await esegui({ type: 'SPOSTA_ICONA', icona: 'qrCode', dove: 'fila' })).executed).toBe(false);
   expect(await salvata(app)).toEqual(prima);
+});
+
+// Ogni tipo di elemento ha la sua fila col suo «+» (patterns/menu-contestuale-se-filo-sostituisce-il-menu-nativo.md).
+const SITO_MEDIA = `<!doctype html><html><head><title>Fila</title></head>
+  <body style="margin:0;padding:40px;font:16px sans-serif">
+  <video id="vid" width="240" height="120" style="background:#000" controls></video>
+  <audio id="aud" controls style="display:block;margin-top:20px"></audio>
+  <textarea id="area" style="display:block;margin-top:20px;width:300px;height:60px"></textarea>
+  </body></html>`;
+
+test('su un filmato e su un audio la fila ha le loro azioni, e in un campo col solo cursore Incolla funziona dalla fila', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO_MEDIA);
+  const menu = menuDi(page);
+  for (const sel of ['#vid', '#aud']) {
+    await page.locator(sel).click({ button: 'right' });
+    await expect(menu.locator('.sn-menu-row')).toBeVisible();
+    expect(await iconeDellaFila(menu)).toEqual(['media:playPause', 'media:mute', 'media:save']);
+    await expect(menu.locator('.sn-menu-row [data-sn-icon-id="media:playPause"]')).toHaveAttribute('aria-label', /Riproduci/);
+    await expect(menu.locator('.sn-menu-row .sn-menu-row-overflow')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(menu.pannelli).toHaveCount(0);
+  }
+  // Il clic sull'icona dell'audio lo zittisce, e riaperta l'icona dice il contrario.
+  await page.locator('#aud').click({ button: 'right' });
+  await menu.locator('.sn-menu-row [data-sn-icon-id="media:mute"]').click();
+  await expect.poll(() => page.evaluate(() => document.getElementById('aud').muted)).toBe(true);
+  await page.locator('#aud').click({ button: 'right' });
+  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="media:mute"]')).toHaveAttribute('aria-label', /Riattiva audio/);
+  await page.keyboard.press('Escape');
+
+  await app.evaluate(({ clipboard }) => clipboard.writeText('dagli appunti'));
+  await page.locator('#area').click();
+  await page.locator('#area').click({ button: 'right' });
+  await expect(menu.locator('.sn-menu-row')).toBeVisible();
+  expect((await iconeDellaFila(menu))[0]).toBe('cursore:paste');
+  await menu.locator('.sn-menu-row [data-sn-icon-id="cursore:paste"]').click();
+  await expect.poll(() => page.locator('#area').inputValue()).toBe('dagli appunti');
+});
+
+test('con del testo selezionato altrove, il tasto destro su un\'immagine o un collegamento dà la fila di quell\'elemento', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO(testServer.asset(PNG, 'image/png')));
+  const menu = menuDi(page);
+  for (const [sel, prima] of [['#foto', 'immagine:save'], ['#vai', 'link:openTab']]) {
+    await selezionaTesto(page, '#testo');
+    await page.locator(sel).click({ button: 'right' });
+    await expect(menu.locator('.sn-menu-row')).toBeVisible();
+    expect((await iconeDellaFila(menu))[0]).toBe(prima);
+    await page.keyboard.press('Escape');
+  }
+  // Sopra la selezione resta il menu del testo.
+  await selezionaTesto(page, '#testo');
+  const r = await page.locator('#testo').boundingBox();
+  await page.mouse.click(r.x + 30, r.y + r.height / 2, { button: 'right' });
+  await expect(menu.locator('.sn-menu-row')).toBeVisible();
+  expect((await iconeDellaFila(menu))[0]).toBe('testo:copy');
+});
+
+test('con tante icone portate nella stessa fila, vanno a capo dentro il menu', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO(testServer.asset(PNG, 'image/png')));
+  await app.evaluate(async () => {
+    for (const id of ['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab', 'back', 'forward', 'reload', 'home']) {
+      await globalThis.SN_LAYOUT_ICONE.posa({ id, target: 'fila:testo', beforeId: null });
+    }
+  });
+  await selezionaTesto(page, '#testo');
+  const r = await page.locator('#testo').boundingBox();
+  await page.mouse.click(r.x + 30, r.y + r.height / 2, { button: 'right' });
+  const menu = menuDi(page);
+  await expect(menu.locator('.sn-menu-row')).toBeVisible();
+  const fuori = await menu.principale.evaluate((m) => {
+    const box = m.getBoundingClientRect();
+    return [...m.querySelectorAll('.sn-menu-row .sn-menu-row-btn')]
+      .filter((e) => { const q = e.getBoundingClientRect(); return q.right > box.right + 0.5 || q.left < box.left - 0.5; })
+      .map((e) => e.dataset.snIconId || e.getAttribute('aria-label'));
+  });
+  expect(fuori, 'icone disegnate fuori dal menu').toEqual([]);
+  expect(await iconeDellaFila(menu)).toHaveLength(13);
+});
+
+test('Chiedi a Filo su un\'immagine scritta nella pagina (data:) la allega con un nome da immagine', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO('/niente.png'));
+  const src = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 160; c.height = 120;
+    const g = c.getContext('2d');
+    g.fillStyle = '#c33'; g.fillRect(0, 0, 160, 120);
+    const u = c.toDataURL('image/png');
+    document.getElementById('foto').src = u;
+    return u;
+  });
+  await page.locator('#foto').click({ button: 'right' });
+  await menuDi(page).locator('.sn-menu-row [data-sn-icon-id="immagine:ask"]').click();
+  let allegati = [];
+  await expect.poll(async () => {
+    allegati = await neiRiquadri(app, page, () => globalThis.__filoSidebarTest?.allegati?.() || []);
+    return allegati.length;
+  }, { timeout: 8000 }).toBe(1);
+  expect(allegati[0].nome).toBe('immagine.png');
+  expect(src.includes(allegati[0].nome)).toBe(false);
 });

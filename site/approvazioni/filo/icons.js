@@ -652,6 +652,15 @@
     `<circle cx="18" cy="17" r="3"/>` +
     `<path d="M8.2 14.8L19 4"/>` +
     `<path d="M15.8 14.8L5 4"/>`;
+  // La fila su un filmato: il triangolo che parte, le due sbarre che fermano, lo schermo con la finestrella nell'angolo.
+  const play =
+    `<path d="M8 5.5v13l10.5-6.5z"/>`;
+  const pause =
+    `<path d="M8.5 5.5v13"/>` +
+    `<path d="M15.5 5.5v13"/>`;
+  const pip =
+    `<rect x="3" y="5" width="18" height="14" rx="2"/>` +
+    `<rect x="12" y="12" width="6" height="4.5" rx="1"/>`;
 
   // PREVISTE: copia (due fogli sovrapposti).
   const copy =
@@ -829,6 +838,9 @@
     link:         (size) => wrap(link, { size }),
     highlight:    (size) => wrap(highlight, { size }),
     cut:          (size) => wrap(cut, { size }),
+    play:         (size) => wrap(play, { size }),
+    pause:        (size) => wrap(pause, { size }),
+    pip:          (size) => wrap(pip, { size }),
     reply:        (size) => wrap(reply, { size }),
     bell:         (size) => wrap(bell, { size }),
     repeat:       (size) => wrap(repeat, { size }),

@@ -106,3 +106,21 @@ test('il collegamento scritto nella fila: solo indirizzi del web e della posta',
     assert.equal(U.collegamentoScritto(no), '', no);
   }
 });
+
+test('ogni tipo di elemento ha la sua fila: anche un filmato o un audio, e il campo col solo cursore', () => {
+  const l = D.migra(undefined).layout;
+  assert.deepEqual(D.filaDi(l, 'media').fila, ['media:playPause', 'media:mute', 'media:save']);
+  assert.deepEqual(D.filaDi(l, 'media').altro, ['media:loop', 'media:pip', 'media:copyLink']);
+  assert.deepEqual(D.filaDi(l, 'cursore').fila, ['cursore:paste', 'cursore:dictate']);
+  require(join(ROOT, 'src', 'shared', 'icons.js'));
+  for (const id of Object.keys(D.AZIONI)) assert.equal(typeof globalThis.SN_ICONS[D.AZIONI[id].icona], 'function', `${id}: il disegno ${D.AZIONI[id].icona} non c'è`);
+});
+
+test('la regola scritta racconta la fila contestuale in una sezione sua', async () => {
+  const { readFileSync } = await import('node:fs');
+  const testo = readFileSync(join(ROOT, 'patterns', 'globale-nella-barra-contestuale-nel-tasto-destro.md'), 'utf8');
+  const sezione = testo.split(/\n(?=## )/).find((s) => /^## .*#1434/.test(s));
+  assert.ok(sezione, 'manca la sezione della fila contestuale (#1434)');
+  for (const ctx of Object.values(D.CONTESTI)) assert.ok(ctx.su, 'ogni contesto si dice a parole');
+  assert.match(sezione, /filmato/);
+});
