@@ -357,9 +357,9 @@ export async function leggiDalCloud(arg, { ticket, segno, cartella, opz = {} } =
 
 async function main(argv) {
   if (argv.length !== 1 || argv[0].startsWith('--')) { console.error('USO: npm run feedback:leggi -- <numero|id>   (testo, allegati e attese, ognuna col suo stato)'); return 1; }
-  const { stradaFeedback, bigliettoDelGiro } = await import('./lib/feedback-cloud.mjs');
-  const ticket = await bigliettoDelGiro(resolve(fileURLToPath(new URL('..', import.meta.url))));
-  if (stradaFeedback({ env: process.env, biglietto: ticket }) === 'cloud') {
+  const { stradaDelGiro } = await import('./lib/feedback-cloud.mjs');
+  const { via, ticket } = await stradaDelGiro(resolve(fileURLToPath(new URL('..', import.meta.url))));
+  if (via === 'cloud') {
     const esito = await leggiDalCloud(argv[0], { ticket });
     if (esito.codice) { console.error(esito.codice === 4 ? `${esito.errore}.` : `RIFIUTATO: ${esito.errore}.`); return esito.codice; }
     console.log(esito.testo);
