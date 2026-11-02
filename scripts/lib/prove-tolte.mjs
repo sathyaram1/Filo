@@ -450,7 +450,7 @@ export function testoProvePrimaDelVerdetto(fuori, findings) {
       ? `copre anche ${r(x.restano)}, che resta: togli ${casi} e il numero dal nome (\`git mv ${x.prova} ${x.rinomina}\`)`
       : `togli ${casi}`;
   };
-  // Senza questa riga chi ha un 2 col `?` crede, come la regola di prima, che il lavoro si fermi e i `?` restino.
+  // Senza questa riga chi ha un 2 col `?` crede che il lavoro si fermi e che gli altri `?` restino con la loro prova.
   const aperte = tutti.map((f, i) => ({ f, n: i + 1 })).filter((x) => nonBlocca(x.f)).map((x) => x.n);
   return [
     'critica non registrata: queste prove portano rilievi che escono dal giro in ogni esito, e vanno tolti PRIMA della critica,',
