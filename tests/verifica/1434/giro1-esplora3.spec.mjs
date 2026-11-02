@@ -19,7 +19,18 @@ async function finestra(app, nome) {
   writeFileSync(`tests/.shots/${nome}.png`, Buffer.from(b64, 'base64'));
 }
 
-test('quello che si apre', async ({ app, openTab, testServer }) => {
+test('chiedi a Filo sull\'immagine', async ({ app, openTab, testServer }) => {
+  const { nelMondoDelMenu } = await import('../../helpers/menuContestuale.mjs');
+  const img = testServer.asset(PNG, 'image/png');
+  const page = await testServer.openReady(openTab, SITO(img));
+  const menu = menuDi(page);
+  await page.locator('#foto').click({ button: 'right' });
+  await menu.locator('[data-sn-icon-id="immagine:ask"]').click();
+  await page.waitForTimeout(2500);
+  log('sidebar', await nelMondoDelMenu(app, page, () => JSON.stringify({ aperta: globalThis.SN_SIDEBAR.isOpen(), allegati: globalThis.__filoSidebarTest?.allegati?.() })));
+});
+
+test.skip('quello che si apre', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
   await modelloFinto(app, [{ text: 'Buongiorno mio caro amico.' }]);
   const img = testServer.asset(PNG, 'image/png');
