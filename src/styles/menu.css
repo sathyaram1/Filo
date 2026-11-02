@@ -100,8 +100,10 @@
 }
 
 /* La fila contestuale in cima (#1434): le icone delle azioni più probabili sull'elemento, poi il «+» con le altre. */
+/* Tante icone portate nella fila vanno a capo: mai fuori dal bordo del menu. */
 .sn-menu-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 2px;
   padding: 2px 6px 6px;
   margin-bottom: 4px;
