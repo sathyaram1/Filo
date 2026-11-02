@@ -630,7 +630,9 @@ function scaricaDaOrigin(root, ref, noto = null) {
   if (f.ok) return { ok: true };
   if ((noto || ramoSuOrigin(root, ref)).presente === false) return { ok: true, assente: true };
   const righe = f.out.split('\n').map((r) => r.trim()).filter(Boolean);
-  return { ok: false, errore: senzaToken((righe.find((r) => /^(fatal|error):/.test(r)) || righe[0] || 'fetch fallito').slice(0, 300)) };
+  const riga = senzaToken(righe.find((r) => /^(fatal|error):/.test(r)) || righe[0] || 'fetch fallito');
+  // Il messaggio del guasto si ricopia dentro le virgolette di `--guasto "…"`.
+  return { ok: false, errore: riga.replace(/\\/g, '/').replace(/["`$]/g, "'").slice(0, 300) };
 }
 
 function antenato(g, a, b) {
