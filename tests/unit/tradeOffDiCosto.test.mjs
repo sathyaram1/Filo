@@ -69,8 +69,9 @@ test('chi verifica: un trade-off di costo con stima e opzioni non è un rilievo,
     const t = piatto(readRoleInstructions('verifier', { scope }));
     if (!/8\. \*\*Miglioramenti\.\*\*/.test(t)) continue;
     const otto = sezione(t, '8. **Miglioramenti.**', '9. **');
-    assert.match(otto, /deciso con la stima e le opzioni esposte non è un rilievo/, scope);
-    assert.match(otto, /senza `\?`, se manca la stima \(costo al mese e tempo di risposta\), se le opzioni non si cambiano senza codice, se la stima non sta accanto all'opzione o se l'opzione scelta non regge i numeri/, scope);
+    assert.match(otto, /con la stima e le opzioni esposte non è un rilievo/, scope);
+    assert.match(otto, /senza `\?`, se manca la stima \(costo al mese e tempo di risposta\) o non sta accanto all'opzione, se le opzioni non si cambiano senza codice o se quella di partenza non regge i numeri/, scope);
+    assert.match(otto, /Uno che non si misura lo decide l'owner/, scope);
   }
   const v = piatto(readRoleInstructions('verifier', { scope: 'pieno' }));
   assert.match(v, /8\. \*\*Miglioramenti\.\*\*/, 'la verifica piena porta i criteri');
