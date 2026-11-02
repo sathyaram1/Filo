@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TOOLS_ROOT, pinnedRepoRoot, absolutizeRecipe } from './lib/tools-pin.mjs';
+import { TOOLS_ROOT, pinnedRepoRoot, absolutizeOutput, absolutizeRecipe } from './lib/tools-pin.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { cartellaConsegna } from './lib/consegna-file.mjs';
 import { rigaDelConto, testoDelConto } from './lib/conta-prove.mjs';
