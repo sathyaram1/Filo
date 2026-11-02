@@ -205,8 +205,9 @@
     return { items, inAltro, vuota: !inFila.length && !inAltro.length };
   }
 
-  // La fila per il menu che si sta aprendo. `azioni`: { <azione>: { onClick, label?, icona?, tieneAperto?, disabled? } },
-  // quelle che l'elemento sotto il mouse permette; `icona` e `label` dicono lo stato (Riproduci o Pausa).
+  // La fila per il menu che si sta aprendo. `azioni`: { <azione>: { onClick, label?, icona?, tieneAperto?, disabled?,
+  // acceso? } }, quelle che l'elemento sotto il mouse permette; `icona` e `label` dicono lo stato (Riproduci o Pausa),
+  // `acceso` uno stile che la selezione ha già (Grassetto).
   function fila(contesto, azioni = {}) {
     if (!Object.prototype.hasOwnProperty.call(Disp.CONTESTI, contesto)) { aperta = null; return null; }
     refreshOwner();
