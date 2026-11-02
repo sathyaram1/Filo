@@ -368,10 +368,9 @@ export function specsForChangedFiles(changed, tracked) {
     // servizi non lanciavano niente pur avendo uno spec col loro stesso nome
     // (giro 4 di suite-locale). Il nome di un file è l'area che prova.
     const n = f.match(/^src\/(?:[^/]+\/)*([^/.]+)\.[^/]+$/);
-    if (n) {
-      aggiungi(n[1]);
-      for (const decisa of AREE_DECISE_DA.get(n[1].toLowerCase()) || []) aggiungi(decisa);
-    }
+    if (n) aggiungi(n[1]);
+    // Per nome esatto: come area, `filo-action-levels` si porterebbe dietro tutti gli spec `filo-*`.
+    for (const prova of PROVE_DI_CHI_DECIDE.get(f) || []) esatte.add(prova);
     // Uno spec toccato si lancia; una prova di un giro no, si lancia per numero
     // (un ramo che ne sposta o ne ritocca qualcuna ne trascinerebbe centinaia).
     if (f.startsWith('tests/') && !f.startsWith('tests/verifica/') && f.endsWith('.spec.mjs')) {
