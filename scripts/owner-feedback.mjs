@@ -389,20 +389,11 @@ export async function segnalazioneDaUnire(riferimento, opts = {}) {
  * aspettava una segnalazione unita in un pacchetto aspetta il pacchetto. Stesse regole di segnaAttese.
  */
 export async function spostaAttese(id, togli, voce, opts = {}) {
-  const ATT = globalThis.SN_FB_ATTESE;
-  const bearer = opts.bearer || await acquireBearer();
-  const doc = await getDoc(id, bearer, [ATT.CAMPO]);
-  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
-  const prima = ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(doc.fields?.[ATT.CAMPO]) });
-  const via = new Set(Array.isArray(togli) ? togli : []);
-  if (!prima.some((w) => via.has(w.id))) return { ok: true, attese: prima, gia: true };
-  const tenute = prima.filter((w) => !via.has(w.id));
-  // Le attese si riscrivono per numero: una senza numero sparirebbe in silenzio.
-  const senzaNumero = tenute.filter((w) => !String(w.num || '').trim());
-  if (senzaNumero.length) return { ok: false, motivo: `aspetta anche ${senzaNumero.map((w) => w.id).join(', ')}, senza numero: da qui la perderei, sposta l'attesa da Gestione` };
-  const numeri = [...new Set([...tenute.map((w) => w.num), String(voce.num)])];
+  const via = (Array.isArray(togli) ? togli : []).map(String);
   // Le unite tolte sono ancora aperte di proposito: si archiviano subito dopo.
-  return segnaAttese(id, numeri.join(','), { ...opts, bearer, sostituisci: true });
+  return scriviAttese(id, (prima) => (prima.some((w) => via.includes(w.id))
+    ? { togli: via, aggiungi: [String(voce.num)], sostituisci: true }
+    : { fine: { ok: true, attese: prima, gia: true } }), opts);
 }
 
 /** Il rifiuto di `--aspetta` che toglierebbe attese non fuse, con le due righe per proseguire. PURA. */
