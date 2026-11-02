@@ -8,6 +8,7 @@ export const LOCKFILE = 'package-lock.json';
 
 // Le coppie di `git status --porcelain` di un file a metà di un merge o di un rebase.
 const IN_CONFLITTO = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU']);
+const RIGA_DEL_LOCKFILE = new RegExp(`^\\S{1,2}\\s+${LOCKFILE.replace(/\./g, '\\.')}$`);
 
 /**
  * Dalla riga di `git status --porcelain -- package-lock.json`. PURA.
@@ -27,7 +28,6 @@ export function sporcoSoloDalLockfile(porcelain) {
   const righe = String(porcelain || '').split('\n').map((r) => r.trim()).filter(Boolean);
   return righe.length > 0 && righe.every((r) => RIGA_DEL_LOCKFILE.test(r));
 }
-const RIGA_DEL_LOCKFILE = new RegExp(`^\\S{1,2}\\s+${LOCKFILE.replace(/\./g, '\\.')}$`);
 
 const primaRiga = (e) => String((e && (e.stderr || e.message)) || e).trim().split('\n')[0].slice(0, 200);
 
