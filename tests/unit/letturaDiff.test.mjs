@@ -1,6 +1,6 @@
 // #1363: dopo il verdetto del verificatore un sotto-agente legge il diff con la richiesta davanti. La verifica piena
-// lascia la richiesta, lo script stampa ruolo e fascicolo e lascia la ricevuta, e la critica senza ricevuta sul codice
-// di adesso non si registra (le prove dei giri a parte).
+// (in cloud e in locale) lascia la richiesta, lo script stampa ruolo e fascicolo e lascia la ricevuta, e la critica
+// senza ricevuta sul codice di adesso non si registra (le prove dei giri a parte).
 
 import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
@@ -210,4 +210,28 @@ test('i testi: la verifica piena lancia la lettura, chiusura e chi risolve si fa
   assert.match(lettore, /## Il livello dei tuoi rilievi[\s\S]*Il metro è la frequenza/);
   const agente = readFileSync(join(REPO, '.claude', 'agents', 'routine-lettura.md'), 'utf8');
   assert.match(agente, /^tools: Bash, Read, Grep, Glob$/m, 'il lettore non ha strumenti per scrivere');
+});
+
+test('in locale come in cloud: start lascia la richiesta, la critica aspetta la lettura', async (t) => {
+  const { avviaConfigRoutinesFinto } = await import('../helpers/server-finto.mjs');
+  const finto = await avviaConfigRoutinesFinto({ FINTO_CAPS: JSON.stringify({ cap3: 5, cap2: 5, cap1: 2, cap0: 0 }) });
+  t.after(() => finto.kill());
+  const { casa, g } = ramoDiLavoro();
+  t.after(() => togliCartella(casa));
+  t.after(() => togliCartella(cartellaConsegna(casa)));
+  const env = { ...ENV, FILO_REPO_ROOT: casa, FILO_ROUTINE_CONFIG_URL: finto.url, FILO_ADMIN_ID_TOKEN: 'finto-id-token' };
+  const vl = (...a) => spawnSync(process.execPath, [resolve(REPO, 'scripts', 'verify-local.mjs'), ...a], { cwd: casa, env, encoding: 'utf8' });
+  const avvio = vl('start', 'Il riquadro della risposta esce dal fondo della finestra.');
+  assert.equal(avvio.status, 0, avvio.stderr);
+  assert.equal(leggiRichiesta(casa, { ramo: 'worker/1363' }).richiesta, 'Il riquadro della risposta esce dal fondo della finestra.');
+  const critica = 'Provato il riquadro in fondo alla finestra, da tasto destro e scorciatoia, con risposte lunghe: resta dentro.';
+  const fermo = vl('critica', critica);
+  assert.equal(fermo.status, 1);
+  assert.match(fermo.stderr, /manca la lettura del diff/);
+  const lettura = spawnSync(process.execPath, [resolve(REPO, 'scripts', 'lettura-diff.mjs'), '--base', g('rev-parse', 'main')], { env, encoding: 'utf8' });
+  assert.equal(lettura.status, 0, lettura.stderr);
+  assert.match(lettura.stdout, /Il riquadro della risposta esce dal fondo della finestra\./);
+  const ok = vl('critica', critica);
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.match(ok.stdout, /verifica superata/);
 });
