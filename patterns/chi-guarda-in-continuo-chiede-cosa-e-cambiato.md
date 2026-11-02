@@ -62,6 +62,9 @@ lasciava fuori per sempre un feedback vecchio tornato nei Ricevuti.
 - `src/shared/feedback.js` — `listChangedSince`, `versionsOf`, `idDelNumero`,
   `submissionCount`, `touchUpdatedAt`.
 - `src/main/services/handlers/auth.js` — il giro unico e le iscrizioni.
+- `src/shared/wallet.js` — `rilettoreVista`: la stessa regola per una pagina che si rilegge a un avviso invece che a
+  un orologio (Gestione → Utenti, Crediti, #2059): fuori vista si segna vecchia, in vista una lettura alla volta e un
+  passo minimo fra due; un avviso che non tocca quello che la vista mostra non la fa rileggere.
 - `tests/unit/feedbackGiroCambiati.test.mjs`,
   `tests/unit/feedbackGiroSenzaOrologio.test.mjs`,
   `tests/manage-giro-cambiati.spec.mjs` — contano le letture e asseriscono che
