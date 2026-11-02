@@ -1350,12 +1350,6 @@
   window.SN_CAMPO_NUMERO.virgolaComePunto($('ownerInviteCount'));
   window.SN_CAMPO_NUMERO.virgolaComePunto($('ownerGrantCredits'));
 
-  if (chrome.runtime && chrome.runtime.onMessage) {
-    chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === MSG.CREDITS_CHANGED) loadOverview().catch(() => {});
-    });
-  }
-
   // Si legge quando la scheda si mostra, e di nuovo solo dopo una porta chiusa: l'accesso può essere arrivato nel frattempo.
   let letta = false;
   function aMostra() {
@@ -1364,7 +1358,38 @@
     load().catch((e) => { letta = false; console.error('[credits/owner] load fallito', e); });
   }
   const mostrata = () => !!document.querySelector('.mg-tab[data-tab="utenti"].mg-tab--active');
-  document.addEventListener('mg-scheda', (e) => { if (e.detail && e.detail.tab === 'utenti') aMostra(); });
+
+  // Una vista costa al server una lettura per ogni riga d'uso di ogni persona (#2059): ai movimenti di crediti si
+  // rilegge solo con la scheda davanti, al più una volta al minuto; dietro si segna vecchia e si rilegge al ritorno.
+  let paginaInVista = true;
+  const rilettura = W.rilettoreVista({
+    leggi: () => loadOverview(),
+    inVista: () => overviewLoaded && paginaInVista && mostrata(),
+    ogniMs: W.VISTA_OWNER_OGNI_MS,
+  });
+  if (window.__mgTest) window.__mgTest.tempiRiletturaUtenti = (ms) => rilettura.tempi({ ogniMs: ms });
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg) return;
+      if (msg.type === MSG.TAB_IN_VISTA) {
+        paginaInVista = msg.inVista !== false;
+        rilettura.mostrata();
+        return;
+      }
+      if (msg.type !== MSG.CREDITS_CHANGED || !overviewLoaded) return;
+      // La vista mostra solo il registro del server: una risposta pagata con la chiave propria e i rimedi
+      // dell'avviso (impostazioni di questo computer) non ci scrivono niente.
+      if (msg.ownKeyUsed || msg.avvisoCrediti) return;
+      rilettura.cambiato();
+    });
+    Promise.resolve(chrome.runtime.sendMessage({ type: MSG.TAB_IN_VISTA_GET }))
+      .then((r) => { if (r && r.ok) paginaInVista = r.inVista !== false; }, () => {});
+  }
+  document.addEventListener('mg-scheda', (e) => {
+    if (!e.detail || e.detail.tab !== 'utenti') return;
+    aMostra();
+    rilettura.mostrata();
+  });
   if (window.filo && window.filo.onBroadcast) {
     window.filo.onBroadcast((m) => { if (m && m.type === (MSG.AUTH_CHANGED || 'auth_changed') && mostrata()) aMostra(); });
   }
