@@ -608,6 +608,14 @@ export async function main(argvIn) {
   let allegati;
   try { allegati = percorsiAllegati.map(leggiAllegato); }
   catch (e) { console.error(`USO: ${e.message}`); return EXIT.USO; }
+  // Prima della rete, così anche --dry-run lo dice: la spec che manca qui non la riceve nessuno (#2033).
+  if (numeriUnite.numeri.length && String(testo || '').trim()) {
+    const difetti = difettiDellaSpec([testo, ...testoDegliAllegati(allegati)].join('\n'), { unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri });
+    if (difetti.length) {
+      console.error(`RIFIUTATO: --pacchetto, il testo non è la spec e non ho aperto niente:\n${difetti.map((m) => `  - ${m}`).join('\n')}`);
+      return EXIT.USO;
+    }
+  }
 
   // La credenziale si chiede solo quando c'è davvero qualcosa da depositare:
   // un errore d'uso o una prova a vuoto non toccano la rete.
