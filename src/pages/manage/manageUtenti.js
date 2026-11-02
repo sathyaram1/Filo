@@ -80,7 +80,7 @@
   }
 
   // ── Le righe delle persone ─────────────────────────────────────────────────
-  // La vista si rilegge a ogni movimento di crediti, anche di un'altra scheda: le righe si ritrovano per pseudonimo invece
+  // La vista si rilegge ai movimenti di crediti, anche di un'altra scheda: le righe si ritrovano per pseudonimo invece
   // di rifarsi (patterns/una-lista-che-si-rilegge-da-sola-aggiorna-le-righe-al-loro-posto.md, #1087.4).
   const righe = new Map();
 
