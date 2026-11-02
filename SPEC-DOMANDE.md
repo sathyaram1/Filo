@@ -1475,6 +1475,11 @@ migrazione le mappa. Il codice che decide in base al prefisso
 > (`functions/test/posti-contati-1158.test.js` del server). Cadono la vita di 4 ore, il tetto K
 > per sessione, l'accensione ogni 4 ore e i compiti figli: una sessione tiene un worker, e il
 > worker divide il lavoro coi suoi sotto-agenti (fino a tre livelli).
+>
+> Anche con un worker per sessione, i biglietti di una sessione condividono la fiducia (#1419,
+> ROUTINE-AUTH-SPEC § 2, principio 6): uno sporco sporca i fratelli vivi e ne revoca i token
+> del server, e la sessione non riceve altri biglietti. Un biglietto chiesto senza sessione
+> nasce sporco.
 
 ### 12.1 Oggi
 
