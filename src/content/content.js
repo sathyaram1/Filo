@@ -2483,7 +2483,7 @@
       // Un'immagine dentro un <a> è ANCHE un collegamento e le due famiglie di voci vanno
       // insieme (#401). La copertina può essere STESA SOPRA il link invece che dentro (#444).
       const linkOfImg = linkEl || linkUnder;
-      di('immagine', { img: imgEl });
+      di('immagine', { img: imgEl, link: linkOfImg });
       if (linkOfImg) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkOfImg)) items.push(it);

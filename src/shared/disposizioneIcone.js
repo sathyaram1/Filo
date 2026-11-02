@@ -30,8 +30,8 @@
     }),
     immagine: Object.freeze({
       su: 'su un\'immagine',
-      fila: Object.freeze(['save', 'copy', 'ask']),
-      altro: Object.freeze(['copyLink', 'search']),
+      fila: Object.freeze(['save', 'copy', 'ask', 'linkOpen']),
+      altro: Object.freeze(['copyLink', 'search', 'linkCopy']),
     }),
     link: Object.freeze({
       su: 'su un collegamento',
@@ -40,8 +40,8 @@
     }),
     media: Object.freeze({
       su: 'su un filmato o un audio',
-      fila: Object.freeze(['playPause', 'mute', 'save']),
-      altro: Object.freeze(['loop', 'pip', 'copyLink']),
+      fila: Object.freeze(['playPause', 'mute', 'save', 'linkOpen']),
+      altro: Object.freeze(['loop', 'pip', 'copyLink', 'linkCopy']),
     }),
     cursore: Object.freeze({
       su: 'in un campo dove scrivi, senza selezione',
@@ -51,6 +51,8 @@
     pagina: Object.freeze({ su: 'sulla pagina', fila: Object.freeze([]), altro: Object.freeze([]) }),
   });
 
+  // Un'immagine o un filmato dentro un collegamento (un'anteprima) è anche il collegamento: le sue azioni ci sono solo lì.
+  const DEL_COLLEGAMENTO = Object.freeze({ linkOpen: ['openTab', 'menu_open_in_new_tab'], linkCopy: ['copy', 'menu_copy_link'] });
   // Disegno ed etichetta di ogni azione di contesto; chi le esegue sta nel content script (src/content/menuIcons.js).
   const DISEGNI = Object.freeze({
     scrivibile: { bold: ['bold', 'fila_bold'], italic: ['italic', 'fila_italic'], underline: ['underline', 'fila_underline'],
@@ -60,12 +62,13 @@
     testo: { copy: ['copy', 'menu_copy'], translate: ['translate', 'fila_translate'], search: ['search', 'menu_search_text'],
       readAloud: ['readAloud', 'menu_read_aloud'] },
     immagine: { save: ['download', 'menu_save_image_as'], copy: ['copy', 'menu_copy_image'], ask: ['sparkles', 'fila_ask_image'],
-      copyLink: ['link', 'menu_copy_image_link'], search: ['search', 'menu_search_image'] },
+      copyLink: ['link', 'menu_copy_image_link'], search: ['search', 'menu_search_image'], ...DEL_COLLEGAMENTO },
     link: { openTab: ['openTab', 'menu_open_in_new_tab'], copy: ['copy', 'menu_copy_link'],
       saveForLater: ['saveForLater', 'menu_save_link_for_later'], share: ['share', 'menu_share_link'] },
     // Il disegno e il nome di qui valgono per trascinarle e per la chat; aperta sul filmato, l'icona dice il suo stato.
     media: { playPause: ['play', 'fila_media_play'], mute: ['volumeMute', 'menu_media_mute'], save: ['download', 'fila_media_save'],
-      loop: ['repeat', 'menu_media_loop'], pip: ['pip', 'menu_media_pip'], copyLink: ['link', 'fila_media_copy_link'] },
+      loop: ['repeat', 'menu_media_loop'], pip: ['pip', 'menu_media_pip'], copyLink: ['link', 'fila_media_copy_link'],
+      ...DEL_COLLEGAMENTO },
     cursore: { paste: ['clipboard', 'menu_paste'], dictate: ['mic', 'menu_dictate'] },
     pagina: {},
   });
