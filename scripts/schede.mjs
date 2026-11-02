@@ -225,9 +225,8 @@ async function letturaCloud(ticket) {
 }
 
 async function strada() {
-  const { stradaFeedback, bigliettoDelGiro } = await import('./lib/feedback-cloud.mjs');
-  const ticket = await bigliettoDelGiro(ROOT);
-  return { via: stradaFeedback({ env: process.env, biglietto: ticket }), ticket };
+  const { stradaDelGiro } = await import('./lib/feedback-cloud.mjs');
+  return stradaDelGiro(ROOT);
 }
 
 async function elenca(cartella, dryRun) {
