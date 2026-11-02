@@ -106,6 +106,14 @@ test('prerequisiti: le forme che mettono un feedback prima, non chi lo cita e ba
   assert.deepEqual(nums('dipende da #1202'), ['1202']);
   assert.deepEqual(nums('il pacchetto aspetta #1202'), ['1202']);
   assert.deepEqual(nums('#1202 deve arrivare su main prima di questo'), ['1202']);
+  // Senza la parola «prima» (#2033 giro 1).
+  assert.deepEqual(nums('Da lavorare solo dopo #1202'), ['1202']);
+  assert.deepEqual(nums('Partire quando #1202 è fuso'), ['1202']);
+  assert.deepEqual(nums('#1202 deve essere già fuso'), ['1202']);
+  assert.deepEqual(nums('non prima di #1202'), ['1202']);
+  assert.deepEqual(nums('una volta fuso #1202, il menu'), ['1202']);
+  assert.deepEqual(nums('#812: il menu si rompe dopo #1202'), [], 'una regressione nata dopo un feedback è cronaca');
+  assert.deepEqual(nums('#1202 va aperto dal tasto destro'), [], '«va» senza fusione non mette niente prima');
   assert.deepEqual(nums('come in #1785, il menu si apre dal tasto destro'), [], 'una citazione non è un prerequisito');
   assert.deepEqual(nums('#903 aspettava #812 fino a ieri'), [], 'una cronaca al passato non mette niente prima');
   assert.deepEqual(nums('#812: dopo che #815 si fonde', ['812', '815']), [], 'le unite non si aspettano: entrano nel pacchetto');
