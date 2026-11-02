@@ -4001,7 +4001,7 @@
       if (!fb) return;
       if (btn.dataset.azione === 'apri') { openFromAttesa(li.dataset.id); return; }
       const via = li.dataset.id;
-      accodaAttese(fb._id, (f) => atteseDaTenere(f, via));
+      accodaAttese(fb._id, () => ({ togli: [via] }));
     });
   }
   // Dall'attesa alla pratica aspettata, nella sua sezione.
