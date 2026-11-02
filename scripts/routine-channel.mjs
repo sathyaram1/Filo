@@ -823,8 +823,9 @@ export { leaseAtteso };
  * verifica). Stesse regole dell'hook: niente commit su un ramo protetto o a
  * HEAD staccata; l'autore dice la provenienza (routine o locale). Torna
  * { ok, skipped, committed: [file…], reason }: un `ok` falso ferma il rilascio.
+ * `perche` va nel messaggio del commit: il rilascio, o la spinta del server.
  */
-export function commitRestante(root, { exec = execFileSync, env = process.env } = {}) {
+export function commitRestante(root, { exec = execFileSync, env = process.env, perche = 'rilascio' } = {}) {
   const run = (args) => {
     try {
       return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
