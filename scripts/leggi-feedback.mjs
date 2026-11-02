@@ -226,7 +226,30 @@ export function fbDaVoce(v) {
     name: String(t.name || ''), url: String(t.url || ''), text: String(t.text || ''), notes: String(t.notes || ''),
     clientId: String(t.clientId || ''), senderProof: String(t.senderProof || ''),
     ...(t.localApproval && t.localApproval.by ? { localApproval: { by: String(t.localApproval.by) } } : {}),
+    // Le attese si stampano sempre, come in locale: senza i loro stati (statiDaServer) valgono «non letto».
+    attese: Array.isArray(v && v.attese) ? v.attese
+      : globalThis.SN_FB_ATTESE.atteseDi({ waitsFor: r.waitsFor }).map((w) => ({ ...w, stato: globalThis.SN_FB_ATTESE.STATO.IGNOTO })),
   };
+}
+
+/**
+ * Gli stati delle attese ([{ id, num }]) dalla lettura dei soli numeri di `routineFeedback`, che ogni biglietto con
+ * l'ambito può fare: la stessa regola di statiInRete, e un no o un guasto danno «non letto» come lì.
+ */
+export async function statiDaServer(attese, ticket, opz = {}) {
+  const ATT = globalThis.SN_FB_ATTESE;
+  const lista = Array.isArray(attese) ? attese : [];
+  const numeri = [...new Set(lista.map((w) => w.num).filter(Boolean))];
+  if (!numeri.length) return lista.map((w) => ({ ...w, stato: ATT.STATO.IGNOTO }));
+  const { leggiDalServer } = await import('./lib/feedback-cloud.mjs');
+  const r = await leggiDalServer(ticket, { numeri, testi: false, schede: false }, opz).catch(() => ({ ok: false }));
+  const per = new Map((r.ok ? r.voci : []).filter((x) => x && x.num).map((x) => [x.num, x]));
+  return lista.map((w) => {
+    const x = per.get(w.num);
+    if (!x) return { ...w, stato: ATT.STATO.IGNOTO };
+    const doc = x.inesistente ? { missing: true } : { status: x.riga && x.riga.status, resolvedInVersion: x.riga && x.riga.resolvedInVersion };
+    return { ...w, stato: ATT.statoAttesa(doc) };
+  });
 }
 
 /** Gli allegati di una voce, già aperti dal server, per righeDaAllegati. PURA. */
