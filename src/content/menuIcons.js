@@ -203,8 +203,8 @@
     return { items, inAltro, vuota: !inFila.length && !inAltro.length };
   }
 
-  // La fila per il menu che si sta aprendo. `azioni`: { <azione>: { onClick, label?, tieneAperto?, disabled? } }, quelle
-  // che l'elemento sotto il mouse permette. Senza contesto (un filmato, un campo senza selezione) niente fila.
+  // La fila per il menu che si sta aprendo. `azioni`: { <azione>: { onClick, label?, icona?, tieneAperto?, disabled? } },
+  // quelle che l'elemento sotto il mouse permette; `icona` e `label` dicono lo stato (Riproduci o Pausa).
   function fila(contesto, azioni = {}) {
     if (!Object.prototype.hasOwnProperty.call(Disp.CONTESTI, contesto)) { aperta = null; return null; }
     refreshOwner();
