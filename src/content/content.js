@@ -2663,7 +2663,7 @@
   function azioniDellAnteprima(link) {
     if (!link) return {};
     const a = azioniDelLink(link);
-    return { linkOpen: { onClick: a.openTab }, linkCopy: { onClick: a.copy } };
+    return { openTab: { onClick: a.openTab }, linkCopy: { onClick: a.copy } };
   }
 
   // La fila in cima al menu (#1434): per il contesto scelto da buildContextualItems, chi esegue le sue azioni.

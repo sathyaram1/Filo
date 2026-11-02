@@ -380,7 +380,7 @@ test('a parole: Filo mette un\'icona nella fila di un contesto, come il trascina
 
   let r = await esegui({ type: 'SPOSTA_ICONA', icona: 'immagine:search', dove: 'fila' });
   expect(r.executed).toBe(true);
-  await expect.poll(async () => (await salvata(app))['fila:immagine']).toEqual(['immagine:save', 'immagine:copy', 'immagine:ask', 'immagine:search']);
+  await expect.poll(async () => (await salvata(app))['fila:immagine']).toEqual(['immagine:save', 'immagine:copy', 'immagine:ask', 'immagine:openTab', 'immagine:search']);
   await page.locator('#foto').click({ button: 'right' });
   const menu = menuDi(page);
   await expect(menu.locator('.sn-menu-row [data-sn-icon-id="immagine:search"]')).toBeVisible();
@@ -555,10 +555,10 @@ test('su un\'immagine o un filmato dentro un collegamento la fila apre il colleg
   const menu = menuDi(page);
   for (const [sel, ctx] of [['#vid', 'media'], ['#foto', 'immagine']]) {
     await page.locator(sel).click({ button: 'right' });
-    await expect(menu.locator(`.sn-menu-row [data-sn-icon-id="${ctx}:linkOpen"]`)).toHaveAttribute('aria-label', /Apri in nuova tab/);
+    await expect(menu.locator(`.sn-menu-row [data-sn-icon-id="${ctx}:openTab"]`)).toHaveAttribute('aria-label', /Apri in nuova tab/);
     await page.keyboard.press('Escape');
   }
   await page.locator('#foto').click({ button: 'right' });
-  await menu.locator('.sn-menu-row [data-sn-icon-id="immagine:linkOpen"]').click();
+  await menu.locator('.sn-menu-row [data-sn-icon-id="immagine:openTab"]').click();
   await expect.poll(() => app.evaluate(({ webContents }, u) => webContents.getAllWebContents().some((w) => w.getURL() === u), meta)).toBe(true);
 });

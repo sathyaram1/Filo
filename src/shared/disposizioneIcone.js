@@ -30,7 +30,7 @@
     }),
     immagine: Object.freeze({
       su: 'su un\'immagine',
-      fila: Object.freeze(['save', 'copy', 'ask', 'linkOpen']),
+      fila: Object.freeze(['save', 'copy', 'ask', 'openTab']),
       altro: Object.freeze(['copyLink', 'search', 'linkCopy']),
     }),
     link: Object.freeze({
@@ -40,7 +40,7 @@
     }),
     media: Object.freeze({
       su: 'su un filmato o un audio',
-      fila: Object.freeze(['playPause', 'mute', 'save', 'linkOpen']),
+      fila: Object.freeze(['playPause', 'mute', 'save', 'openTab']),
       altro: Object.freeze(['loop', 'pip', 'copyLink', 'linkCopy']),
     }),
     cursore: Object.freeze({
@@ -52,7 +52,7 @@
   });
 
   // Un'immagine o un filmato dentro un collegamento (un'anteprima) è anche il collegamento: le sue azioni ci sono solo lì.
-  const DEL_COLLEGAMENTO = Object.freeze({ linkOpen: ['openTab', 'menu_open_in_new_tab'], linkCopy: ['copy', 'menu_copy_link'] });
+  const DEL_COLLEGAMENTO = Object.freeze({ openTab: ['openTab', 'menu_open_in_new_tab'], linkCopy: ['copy', 'menu_copy_link'] });
   // Disegno ed etichetta di ogni azione di contesto; chi le esegue sta nel content script (src/content/menuIcons.js).
   const DISEGNI = Object.freeze({
     scrivibile: { bold: ['bold', 'fila_bold'], italic: ['italic', 'fila_italic'], underline: ['underline', 'fila_underline'],
