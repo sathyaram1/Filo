@@ -239,7 +239,8 @@ test('eseguiGitServer in cloud: il sì del server si chiede, il token non arriva
       return argv.includes('get-url') ? { status: 0, stdout: `${URL_SERVER}\n` } : { status: 0, stdout: '', stderr: `To ${URL_SERVER}\n` };
     };
     const token = async (b) => { chiesti.push(b); return { outcome: 'ok', token: TOKEN, scadeIl: 1 }; };
-    const exit = await eseguiGitServer({ ...base, azione: 'push', ramo: 'worker/f1', lancia, token, scrivi: (r) => righe.push(r), eco: () => {} });
+    const app = () => ({ ok: true, skipped: false, branch: 'worker/f1', righe: [] });
+    const exit = await eseguiGitServer({ ...base, azione: 'push', ramo: 'worker/f1', lancia, token, app, scrivi: (r) => righe.push(r), eco: () => {} });
     assert.equal(exit, 0, righe.join('\n'));
     assert.deepEqual(chiesti, ['B1'], 'il controllo del server resta, una volta per chiamata');
     const spinta = lanciati[2];
