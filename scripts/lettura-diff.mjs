@@ -89,7 +89,7 @@ if (isMain) {
       process.exit(2);
     }
     richiesta = r.richiesta;
-    fileRichiesta = join(dir, 'lettura-richiesta.json');
+    fileRichiesta = join(dir, FILE_RICHIESTA);
   }
   const estremi = estremiDelLavoro(root, { base: o.base, head: o.head });
   const conta = estremi.errore ? null : contaDelLavoro(root, estremi.base, estremi.head);
