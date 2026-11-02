@@ -2518,6 +2518,7 @@
       // caso un link sopra non deve intrufolarsi nel menu di quel link.
       const mediaInLink = belongsTo(mediaUnder, linkEl, layers) ? mediaUnder : null;
       if (mediaInLink) {
+        di('media', { media: mediaInLink, link: linkEl });
         for (const it of Actions.buildMediaItems(mediaInLink, linkEl)) items.push(it);
         items.push({ type: 'separator' });
       }
