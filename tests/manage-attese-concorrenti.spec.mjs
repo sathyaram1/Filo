@@ -121,6 +121,7 @@ test('l\'owner aggiunge #13 mentre una routine aggiunge #14: restano tutte e tre
 test('«Non aspettare più» toglie quelle che l\'owner vede, non quella scritta intanto dalla routine', async ({ app, openTab }) => {
   const page = await apri(app, openTab);
   await routineScrive(app, 14);
+  await page.locator('.mg-tab[data-tab="waiting"]').click();
   await page.locator('.mg-item[data-id="f903"]').click({ button: 'right' });
   await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Non aspettare più' }).click();
   await expect(page.locator('#mgManageMsg')).toHaveText(/Da ora #903 aspetta #14/);
