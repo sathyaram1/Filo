@@ -1351,6 +1351,11 @@ if (isMain) {
         : `Pratica ${chi} non aggiornata (${a.motivo}): in Gestione questo giro non compare.`);
     }
     const scope = ambitoLocale(capsStart, state[b]);
+    // Come in cloud (#1363): la verifica piena lascia la richiesta al lettore del diff, la chiusura la toglie.
+    try {
+      if (verifierScope(scope).scope === 'pieno') scriviRichiesta(ROOT, { ramo: b, richiesta: request });
+      else togliRichiesta(ROOT);
+    } catch (e) { console.error(`La richiesta per la lettura del diff non si scrive (${e.message}): la lettura non si potrà fare.`); }
     console.log(buildVerifierBrief({
       request, branch: b, recipe: readRecipe(ROOT, scope), history: historyFromRounds(state[b].rounds),
       scope, perimetro: state[b].chiusura, server: srvStart,
