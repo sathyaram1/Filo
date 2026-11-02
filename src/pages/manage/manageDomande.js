@@ -812,8 +812,8 @@
     return box;
   }
 
-  // Si riapre un'archiviata senza azioni, una risposta automatica che non torna (§3.6) e una data dalla chiave
-  // owner-non-fidato (#2011).
+  // Si riapre un'archiviata senza azioni, una risposta automatica che non torna (§3.6), una data dalla chiave
+  // owner-non-fidato (#2011) e una registrata da una sessione locale (#1924).
   function riapribile(d) {
     return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica || rispostaDaChiave(d) || rispostaDaSessione(d)));
   }
