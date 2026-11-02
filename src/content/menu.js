@@ -1461,6 +1461,7 @@
     b.type = 'button';
     b.className = 'sn-menu-icon-btn';
     if (it.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
+    segnaAcceso(b, it);
     setIconContent(b, it.icon || it.label || '');
     if (it.id) b.dataset.snIconId = it.id;
     if (it.label) { b.setAttribute('aria-label', it.label); attachTooltip(b, conTasto(it)); }
