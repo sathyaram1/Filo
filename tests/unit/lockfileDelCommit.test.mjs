@@ -169,6 +169,16 @@ test('decidiLockfile: si rimette solo un lockfile che il commit ha e che non è 
   for (const riga of ['', '\n', undefined, null]) assert.equal(decidiLockfile(riga), 'niente');
 });
 
+// Il preflight rimette il lockfile solo quando è l'unica cosa sporca: con altro accanto la cartella ferma il giro com'è.
+test('sporcoSoloDalLockfile: vale solo per righe tutte del lockfile in cima al progetto', () => {
+  for (const s of [' M package-lock.json', 'M package-lock.json', 'MM package-lock.json\n', ' D package-lock.json']) {
+    assert.equal(sporcoSoloDalLockfile(s), true, JSON.stringify(s));
+  }
+  for (const s of ['', ' M package-lock.json\n M codice.txt', ' M sub/package-lock.json', '?? package-lock.json.bak', ' M package.json', 'M  "package-lock.json x"']) {
+    assert.equal(sporcoSoloDalLockfile(s), false, JSON.stringify(s));
+  }
+});
+
 test('orchestratore e sessione di un feedback rimettono il lockfile dopo il setup e prima del rebase', () => {
   for (const f of ['orchestrator.md', 'sessione.md']) {
     const t = espandiInclusioni(readFileSync(join(RUOLI, f), 'utf8'), RUOLI).replace(/\s+/g, ' ');
