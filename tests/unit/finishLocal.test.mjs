@@ -124,8 +124,10 @@ describe('quali spec lanciare', () => {
       const veri = readdirSync(resolve(ROOT, 'tests')).filter((f) => f.endsWith('.spec.mjs')).map((f) => `tests/${f}`);
       const sorgenti = (dir) => readdirSync(resolve(ROOT, dir), { withFileTypes: true }).flatMap((d) =>
         d.isDirectory() ? sorgenti(`${dir}/${d.name}`) : d.name.endsWith('.js') ? [`${dir}/${d.name}`] : []);
-      const decidono = sorgenti('src').filter((f) => f !== 'src/shared/autonomia.js'
-        && /SN_AUTONOMIA[\s\S]*\.decide(?:Dettaglio)?\(/.test(readFileSync(resolve(ROOT, f), 'utf8')));
+      const decidono = sorgenti('src').filter((f) => {
+        const s = readFileSync(resolve(ROOT, f), 'utf8');
+        return f !== 'src/shared/autonomia.js' && s.includes('SN_AUTONOMIA') && /\.decide(?:Dettaglio)?\(/.test(s);
+      });
       assert.ok(decidono.includes('src/main/services/handlers.js'), decidono.join(','));
       for (const f of new Set([...decidono, ...PROVE_DI_CHI_DECIDE.keys()])) {
         assert.ok(existsSync(resolve(ROOT, f)), `${f} non c’è più: la mappa punta a un file che non esiste`);
