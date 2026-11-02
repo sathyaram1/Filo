@@ -3920,9 +3920,9 @@
         aggiungi.length ? { waitsAggiungi: aggiungi.join(', ') } : { waitsTogli: togli }));
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.waitsFor = Array.isArray(r.waitsFor) && r.waitsFor.length ? r.waitsFor : undefined;
-      // Si chiude col gesto che toglie l'ultima, non con la risposta: un'attesa tenuta per id resta da guardare.
-      if (vuoto && atteseApertePer === id) atteseApertePer = '';
-      else if (!vuoto) atteseApertePer = id;
+      // Si chiude solo se non ne resta nessuna: una scritta intanto da altri, e mai vista qui, resta da guardare.
+      if (!fb.waitsFor && atteseApertePer === id) atteseApertePer = '';
+      else if (fb.waitsFor) atteseApertePer = id;
       renderList();
       if (selectedId === id) reflectAttese(fb);
       const dove = MR.manageTabFor(fb, opzSezioni());
