@@ -17,11 +17,12 @@ export function stradaFeedback({ routine = false, biglietto = '' } = {}) {
  * La strada di questa istanza col biglietto del giro (variabile o marcatore di dispatch). Se è una routine lo dice
  * isRoutineInstance: in cloud l'export di FILO_ROUTINE non arriva alla chiamata dopo (#1966).
  */
-export async function stradaDelGiro(root, { env = process.env } = {}) {
+export async function stradaDelGiro(root, { env = process.env, copiaDelGiro } = {}) {
   const { readTicket } = await import('./routine-ticket.mjs');
   const { isRoutineInstance } = await import('./routine-role.mjs');
   const ticket = readTicket(root);
-  return { via: stradaFeedback({ routine: isRoutineInstance(root, { env }), biglietto: ticket }), ticket };
+  const routine = isRoutineInstance(root, { env, ...(copiaDelGiro ? { copiaDelGiro } : {}) });
+  return { via: stradaFeedback({ routine, biglietto: ticket }), ticket };
 }
 
 const dorme = (ms) => new Promise((r) => setTimeout(r, ms));

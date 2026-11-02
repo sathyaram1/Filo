@@ -18,11 +18,24 @@ createRequire(import.meta.url)(join(ROOT, 'src', 'shared', 'schede.js'));
 const SS = globalThis.SN_SCHEDE;
 
 test('la strada: cloud solo in una routine col biglietto, locale altrimenti', () => {
-  assert.equal(FC.stradaFeedback({ env: { FILO_ROUTINE: '1' }, biglietto: 'abc' }), 'cloud');
-  assert.equal(FC.stradaFeedback({ env: { FILO_ROUTINE: 'true' }, biglietto: 'abc' }), 'cloud');
-  assert.equal(FC.stradaFeedback({ env: { FILO_ROUTINE: '1' }, biglietto: '  ' }), 'locale', 'routine senza biglietto: il token dell’owner, se c’è');
-  assert.equal(FC.stradaFeedback({ env: { FILO_ROUTINE: '0' }, biglietto: 'abc' }), 'locale');
-  assert.equal(FC.stradaFeedback({ env: {}, biglietto: 'abc' }), 'locale', 'un biglietto locale non porta la sessione sul server');
+  assert.equal(FC.stradaFeedback({ routine: true, biglietto: 'abc' }), 'cloud');
+  assert.equal(FC.stradaFeedback({ routine: true, biglietto: '  ' }), 'locale', 'routine senza biglietto: il token dell’owner, se c’è');
+  assert.equal(FC.stradaFeedback({ routine: false, biglietto: 'abc' }), 'locale', 'un biglietto locale non porta la sessione sul server');
+  assert.equal(FC.stradaFeedback({ routine: 'true', biglietto: 'abc' }), 'locale');
+});
+
+test('la strada del giro: una routine la riconosce anche senza l’export, che in cloud non arriva alla chiamata dopo', async () => {
+  const root = cartellaTemporanea('strada-del-giro-');
+  const prima = process.env.FILO_ROUTINE_TICKET;
+  process.env.FILO_ROUTINE_TICKET = 'tk-giro';
+  try {
+    assert.deepEqual(await FC.stradaDelGiro(root, { env: {}, copiaDelGiro: () => true }), { via: 'cloud', ticket: 'tk-giro' });
+    assert.deepEqual(await FC.stradaDelGiro(root, { env: { FILO_ROUTINE_ROLE: 'compito' }, copiaDelGiro: () => false }), { via: 'cloud', ticket: 'tk-giro' });
+    assert.equal((await FC.stradaDelGiro(root, { env: {}, copiaDelGiro: () => false })).via, 'locale', 'fuori da un giro resta la strada dell’owner');
+  } finally {
+    if (prima === undefined) delete process.env.FILO_ROUTINE_TICKET; else process.env.FILO_ROUTINE_TICKET = prima;
+    togliCartella(root);
+  }
 });
 
 // ── Lo stesso feedback sulle due strade ──
