@@ -302,6 +302,15 @@ export function provaFusione(base, root = ROOT) {
   return leggiMergeTree(r.status, r.stdout);
 }
 
+// Le prove nell'app di una decisione presa in un file col nome di un altro: per nome restavano fuori, e una modifica a
+// cosa chiede un livello arrivava rossa su main (#600.1 il registro, #600.2 il punto del main che lo applica).
+const PROVE_AUTONOMIA = ['autonomia', 'filo-action-levels'];
+export const PROVE_DI_CHI_DECIDE = new Map([
+  ['src/shared/actionLevels.js', PROVE_AUTONOMIA],
+  ['src/shared/autonomia.js', PROVE_AUTONOMIA],
+  ['src/main/services/handlers.js', PROVE_AUTONOMIA],
+]);
+
 /**
  * Gli spec Playwright che toccano le aree modificate dal branch. Puro.
  *
