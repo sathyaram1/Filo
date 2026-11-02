@@ -33,7 +33,7 @@ test('dal payload del verificatore la richiesta prende il feedback e le scelte d
 });
 
 test('le uscite di git con -z: spostamenti con i due percorsi, binari a zero righe', () => {
-  assert.deepEqual(vociNameStatus('M\u0000a.js\u0000R087\u0000tests/x.spec.mjs\u0000tests/y.spec.mjs\u0000A\u0000b c.js\u0000'), [
+  assert.deepEqual(vociConPercorsoPrima('M\u0000a.js\u0000R087\u0000tests/x.spec.mjs\u0000tests/y.spec.mjs\u0000A\u0000b c.js\u0000'), [
     { stato: 'M', prima: 'a.js', percorso: 'a.js' },
     { stato: 'R', prima: 'tests/x.spec.mjs', percorso: 'tests/y.spec.mjs' },
     { stato: 'A', prima: 'b c.js', percorso: 'b c.js' },
