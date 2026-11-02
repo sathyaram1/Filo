@@ -197,8 +197,9 @@ test('la pagina Crediti mostra il proprio pseudonimo solo con un portafoglio, e 
   }
 });
 
-test('«/gift NUMERO INIZIO» fa salire quel portafoglio e la persona vede il movimento; un’email non regala niente', async ({ app, openTab }) => {
+test('«/gift NUMERO INIZIO» fa salire quel portafoglio e la persona vede il movimento; un’email non regala niente', async ({ app, openTab, shell }) => {
   const crediti = await openTab('filo://credits/credits.html');
+  const schedaCrediti = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activeId);
   await riscatta(crediti);
   await expect(crediti.locator('#balance')).toHaveText(await crediti.evaluate(() => window.SN_WALLET.formatCredits(5000)));
   expect(await simulaOwner(app)).toBe(true);
