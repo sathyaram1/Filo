@@ -2038,7 +2038,10 @@
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`firestore update fallito (${res.status}): ${errText.slice(0, 300)}`);
+      const err = new Error(`firestore update fallito (${res.status}): ${errText.slice(0, 300)}`);
+      const A = global.SN_FB_ATTESE;
+      if (condizione && A && A.conflittoDiScrittura(res.status, errText)) err.conflitto = true;
+      throw err;
     }
     return true;
   }
