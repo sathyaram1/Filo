@@ -277,60 +277,83 @@ async function togliScheda(id, bearer) {
  *   | { ok: false, motivo: string, vive?: Array<{id,num,stato}> }>}
  */
 export async function segnaAttese(id, numeri, opts = {}) {
-  const ATT = globalThis.SN_FB_ATTESE;
-  const letti = ATT.leggiNumeri(numeri || '');
+  const letti = globalThis.SN_FB_ATTESE.leggiNumeri(numeri || '');
   if (!letti.ok) return letti;
   if (opts.aggiungi && !letti.numeri.length) return { ok: false, motivo: 'per aggiungere servono i numeri' };
+  const richiesta = opts.aggiungi ? { aggiungi: letti.numeri } : { numeri: letti.numeri };
+  return scriviAttese(id, () => richiesta, opts);
+}
+
+/**
+ * Ogni scrittura delle attese da riga di comando passa di qui (SN_FB_ATTESE.scriviSullaLettura): `richiestaSu(prima)`
+ * dice cosa fare sulle attese lette adesso ({ numeri } | { aggiungi, togli, sostituisci }), o chiude con { fine }.
+ */
+async function scriviAttese(id, richiestaSu, opts = {}) {
+  const ATT = globalThis.SN_FB_ATTESE;
   const bearer = opts.bearer || await acquireBearer();
-  // Anche le attese di adesso e lo stato: la risposta dice cosa sostituisce e cosa succede dopo, non lo presume.
-  const doc = await getDoc(id, bearer, ['seq', 'subSeq', 'status', 'localOnly', ATT.CAMPO]);
-  if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
-  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
-  const f = doc.fields || {};
-  const prima = ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) });
-  const { from, leggibile } = await statoAttuale(doc);
-  const pratica = { stato: leggibile ? from : '', locale: !!f.localOnly?.mapValue };
-  // L'aggiunta riscrive quelle di adesso per numero (senza rete) e per id quelle senza numero, che altrimenti sparirebbero.
-  const daScrivere = opts.aggiungi ? [...new Set([...prima.map((w) => w.num).filter(Boolean), ...letti.numeri])] : letti.numeri;
-  const tieni = opts.aggiungi ? prima.filter((w) => !w.num).map((w) => w.id) : [];
-  let attese = [];
-  if (daScrivere.length || tieni.length) {
-    const v = await ATT.valida({
-      id,
-      num: globalThis.SN_FEEDBACK.formatNum(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)),
-      numeri: daScrivere,
-      gia: prima,
-      tieni,
-      risolvi: async (n) => {
-        const r = await risolviFeedback(n, { bearer, base: FIRESTORE_BASE });
-        if (r.ok) return r.id;
-        if (/^nessun feedback/.test(r.motivo)) return null;
-        throw new Error(r.motivo);
-      },
-      leggiAttese: async (ids) => new Map(await Promise.all(ids.map(async (x) => {
-        const d = await getDoc(x, bearer, [ATT.CAMPO]);
-        return [x, ATT.atteseDi({ waitsFor: atteseDaCampo(d?.fields?.[ATT.CAMPO]) })];
-      }))),
-    });
-    if (!v.ok) return v;
-    attese = v.attese;
-  }
-  const tolte = prima.filter((w) => !attese.some((a) => a.id === w.id));
-  const aggiunte = attese.filter((a) => !prima.some((w) => w.id === a.id));
-  if (opts.aggiungi && !aggiunte.length) return { ok: true, invariato: true, ...(opts.dryRun ? { dryRun: true } : {}), attese, prima, tolte, aggiunte, pratica };
-  if (tolte.length && !opts.sostituisci) {
-    const vive = (await statiInRete(tolte, { bearer })).filter((w) => w.stato !== ATT.STATO.FUSO);
-    if (vive.length) return { ok: false, vive, motivo: `toglierebbe ${vive.length === 1 ? 'l’attesa' : 'le attese'} su ${vive.map(rigaAttesa).join(', ')}` };
-  }
-  if (opts.dryRun) return { ok: true, dryRun: true, attese, prima, tolte, aggiunte, pratica };
-  const fields = attese.length ? { [ATT.CAMPO]: toFsValue(attese), updatedAt: firmaOra() } : { updatedAt: firmaOra() };
-  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=${ATT.CAMPO}&updateMask.fieldPaths=updatedAt`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-    body: JSON.stringify({ fields }),
+  return ATT.scriviSullaLettura({
+    leggi: async () => {
+      // Anche lo stato: la risposta dice cosa succede dopo, non lo presume.
+      const doc = await getDoc(id, bearer, ['seq', 'subSeq', 'status', 'localOnly', ATT.CAMPO]);
+      if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
+      return doc && { doc, versione: doc.updateTime || '' };
+    },
+    calcola: async (letto) => {
+      if (!letto) return { fine: { ok: false, motivo: `feedback ${id} inesistente` } };
+      const f = letto.doc.fields || {};
+      const prima = ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) });
+      const richiesta = richiestaSu(prima);
+      if (richiesta.fine) return richiesta;
+      const { from, leggibile } = await statoAttuale(letto.doc);
+      const pratica = { stato: leggibile ? from : '', locale: !!f.localOnly?.mapValue };
+      const { numeri: daScrivere, tieni } = ATT.daScrivereSu(prima, richiesta);
+      let attese = [];
+      if (daScrivere.length || tieni.length) {
+        const v = await ATT.valida({
+          id,
+          num: globalThis.SN_FEEDBACK.formatNum(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)),
+          numeri: daScrivere,
+          gia: prima,
+          tieni,
+          risolvi: async (n) => {
+            const r = await risolviFeedback(n, { bearer, base: FIRESTORE_BASE });
+            if (r.ok) return r.id;
+            if (/^nessun feedback/.test(r.motivo)) return null;
+            throw new Error(r.motivo);
+          },
+          leggiAttese: async (ids) => new Map(await Promise.all(ids.map(async (x) => {
+            const d = await getDoc(x, bearer, [ATT.CAMPO]);
+            return [x, ATT.atteseDi({ waitsFor: atteseDaCampo(d?.fields?.[ATT.CAMPO]) })];
+          }))),
+        });
+        if (!v.ok) return { fine: v };
+        attese = v.attese;
+      }
+      const tolte = prima.filter((w) => !attese.some((a) => a.id === w.id));
+      const aggiunte = attese.filter((a) => !prima.some((w) => w.id === a.id));
+      const esito = { ok: true, attese, prima, tolte, aggiunte, pratica };
+      if (richiesta.aggiungi && !tolte.length && !aggiunte.length) return { fine: { ...esito, invariato: true, ...(opts.dryRun ? { dryRun: true } : {}) } };
+      if (tolte.length && !opts.sostituisci && !richiesta.sostituisci) {
+        const vive = (await statiInRete(tolte, { bearer })).filter((w) => w.stato !== ATT.STATO.FUSO);
+        if (vive.length) return { fine: { ok: false, vive, motivo: `toglierebbe ${vive.length === 1 ? 'l’attesa' : 'le attese'} su ${vive.map(rigaAttesa).join(', ')}` } };
+      }
+      if (opts.dryRun) return { fine: { ...esito, dryRun: true } };
+      return { scrivi: esito };
+    },
+    scrivi: async (esito, versione) => {
+      const fields = esito.attese.length ? { [ATT.CAMPO]: toFsValue(esito.attese), updatedAt: firmaOra() } : { updatedAt: firmaOra() };
+      const maschera = `updateMask.fieldPaths=${ATT.CAMPO}&updateMask.fieldPaths=updatedAt`;
+      const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${maschera}&currentDocument.updateTime=${encodeURIComponent(versione)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+        body: JSON.stringify({ fields }),
+      });
+      if (res.ok) return esito;
+      const testo = await res.text();
+      if (ATT.conflittoDiScrittura(res.status, testo)) return { conflitto: true };
+      return { ok: false, motivo: `scrittura fallita (${res.status}): ${testo.slice(0, 200)}` };
+    },
   });
-  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true, attese, prima, tolte, aggiunte, pratica };
 }
 
 /**
