@@ -48,6 +48,8 @@ un **livello**.
    sede (`[1i?] …`), e porta la sua domanda in JSON (sezione «La critica»).
    Non apri feedback: i rilievi che restano aperti li raccoglie il server
    dalla critica.
+5. **Scritta la critica, prima di registrarla, la lettura del diff**
+   (sezione «La lettura del diff, dopo il tuo verdetto»).
 
 <!-- includi: _criteri-verifica.md -->
 
