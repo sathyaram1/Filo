@@ -130,8 +130,9 @@ test('un 2 col `?` non ferma (#1202): la prova di un 1 col `?` della stessa crit
   assert.deepEqual(fuori.map((f) => f.prova), ['tests/verifica/42/giro1-r2-bordo.spec.mjs', 'tests/verifica/42/giro1-r3-esterno.spec.mjs']);
 });
 
-/** Un ramo con un punto fermo all'avvio della verifica e, dopo, le prove della critica. */
+/** Un ramo con un punto fermo all'avvio della verifica e, dopo, le prove della critica (un elenco, o percorso → sorgente). */
 function ramoConProve(prove) {
+  const sorgenti = Array.isArray(prove) ? Object.fromEntries(prove.map((p) => [p, '// rossa\n'])) : prove;
   const casa = cartellaTemporanea('filo-pulizia-prima-');
   const g = (...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: casa, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   const scrivi = (f, t) => { mkdirSync(dirname(resolve(casa, f)), { recursive: true }); writeFileSync(resolve(casa, f), t, 'utf8'); };
