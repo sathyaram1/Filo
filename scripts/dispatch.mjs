@@ -2784,6 +2784,19 @@ if (isMainModule) {
       }
       console.log(`[dispatch] cartella sulla linea principale (${String(r.head).slice(0, 9)}): il prossimo worker parte con gli agenti di ${MAIN_BRANCH}.`);
       process.exit(0);
+    } else if (flag === '--rimetti-lockfile') {
+      if (argv.length > 1) { console.error(`[dispatch] --rimetti-lockfile non vuole argomenti (${argv[1]}). Niente è stato toccato.`); process.exit(1); }
+      // Scarta modifiche: fuori da un giro un lockfile cambiato può essere il lavoro di qualcuno.
+      if (!isRoutineInstance(ROOT)) {
+        console.error(`[dispatch] solo nelle routine (FILO_ROUTINE=1, il biglietto del giro nella cartella o gli strumenti del preflight): scarta le modifiche a ${LOCKFILE}. Niente è stato toccato.`);
+        process.exit(1);
+      }
+      const r = rimettiLockfile(ROOT);
+      if (!r.ok) { console.error(`[dispatch] ${LOCKFILE} non torna com'è nel commit: ${r.why}`); process.exit(1); }
+      console.log(r.rimesso
+        ? `[dispatch] ${LOCKFILE} riscritto dall'install: rimesso com'è nel commit. Ora il rebase.`
+        : `[dispatch] ${LOCKFILE} è già com'è nel commit. Ora il rebase.`);
+      process.exit(0);
     } else if (flag === '--clear-state') {
       const id = argv[1];
       if (!id) { console.error('Uso: --clear-state <id>'); process.exit(1); }
