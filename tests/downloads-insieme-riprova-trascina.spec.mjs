@@ -190,7 +190,7 @@ async function trovaPagina(app, prova, tetto = 15000) {
 
 async function incognitoCheScarica(app, shell, url) {
   await shell.evaluate(() => window.filoShell.openIncognito());
-  const incog = await trovaPagina(app, (u) => u.startsWith('filo://shell/') && u.includes('incognito=1'));
+  const incog = await trovaPagina(app, (u) => u.startsWith('filo://shell/shell.html?incognito=1'));
   await incog.waitForFunction(() => document.documentElement.dataset.incognito === '1');
   await app.evaluate(({ BrowserWindow }, u) => {
     BrowserWindow.getAllWindows().find((w) => w._filoIncognito)._filoTabs.openTab(u);
