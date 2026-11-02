@@ -10,7 +10,7 @@ import { espandiInclusioni } from './lib/role-text.mjs';
 import { cartellaConsegna } from './lib/consegna-file.mjs';
 import { rigaDelConto, testoDelConto } from './lib/conta-prove.mjs';
 import {
-  FILE_DIFF, FUORI_DAL_DIFF, contaDelLavoro, diffDelLavoro, estremiDelLavoro, leggiRichiesta, ramoCorrente, scriviRicevuta,
+  FILE_DIFF, FILE_RICHIESTA, FUORI_DAL_DIFF, contaDelLavoro, diffDelLavoro, estremiDelLavoro, leggiRichiesta, ramoCorrente, scriviRicevuta,
 } from './lib/lettura-diff.mjs';
 
 export const RUOLO_LETTURA = 'lettura-diff.md';
