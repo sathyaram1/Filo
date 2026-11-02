@@ -850,9 +850,14 @@ ma a scriverlo è il server.
   manifesto) · `3` server non raggiungibile o funzione assente. Il lavoro di
   pubblicazione costruisce il commit **provato dalla suite**, non la punta di
   `main` (#641): `scripts/release-apply-version.mjs` applica quel numero in
-  locale al suo manifesto, senza commit né push, e si ferma se non è più alto
-  di quello dell'albero o se l'albero ne dichiara un altro in
-  `prossimaVersione`. Il tag nasce sul commit costruito (`--target`).
+  locale al suo manifesto e al lockfile, senza commit né push, e si ferma se
+  non è più alto di quello dell'albero o se l'albero ne dichiara un altro in
+  `prossimaVersione` (un lockfile che non si riallinea lo avvisa e basta). Il
+  tag nasce sul commit costruito (`--target`).
+- **Nella cartella di chi guida un giro** il lockfile che l'install riscrive
+  torna com'è nel commit prima del rebase (`dispatch.mjs --rimetti-lockfile`,
+  e il preflight da sé): un lockfile disallineato non costa un giro nemmeno
+  quando il rilascio lo lascia indietro.
 - Nel lavoro di pubblicazione non è rimasto **nessun** `git push`, `git commit`
   o `npm version`, e una sentinella negli unit test diventa rossa se ci tornano.
 
