@@ -2097,11 +2097,13 @@ export async function run() {
   const bad = checkEnvelope(w);
   if (bad) {
     // Un ruolo sconosciuto a strumenti indietro rispetto a main è della sessione, non del lavoro: una sessione
-    // fresca lo sa fare. Con gli strumenti di main il server chiede un ruolo che main non ha, e resta un guasto (#1796).
+    // fresca lo sa fare. Con gli strumenti di main il server chiede un ruolo che main non ha, e resta un guasto (#1796):
+    // il testo non deve contenere quello di `bad`, che il server legge come sessione vecchia e non ferma.
     if (!RUOLI_LAVORABILI.includes(String(w.role || ''))) {
       const v = strumentiIndietro(ROOT);
       if (v.indietro) return emitHalt('strumenti_vecchi', `${bad}: ${v.motivo}. Il lavoro torna in coda per una sessione con gli strumenti aggiornati`);
-      if (!v.verificato) process.stderr.write(`[dispatch] strumenti non confrontati con ${MAIN_BRANCH} (${v.motivo}): il ruolo sconosciuto resta un guasto\n`);
+      if (v.verificato) return emitHalt('transient', `il server ha assegnato un ruolo che nemmeno ${MAIN_BRANCH} conosce ("${String(w.role || '') || 'nessuno'}"): gli strumenti di questa sessione sono quelli di ${MAIN_BRANCH}`);
+      process.stderr.write(`[dispatch] strumenti non confrontati con ${MAIN_BRANCH} (${v.motivo}): il server tratterà il rilascio da sessione vecchia\n`);
     }
     return emitHalt('transient', bad);
   }
