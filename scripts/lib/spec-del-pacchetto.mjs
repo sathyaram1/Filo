@@ -27,6 +27,12 @@ const PRIMA = [
   new RegExp(`\\bprima\\b[^#]{0,30}?\\b(?:fond|fus|main)\\w*[^#]{0,15}?${NUM}`, 'gi'),
   new RegExp(`\\bdopo\\s+(?:la\\s+fusione\\s+d\\w*\\s+|che\\s+)${NUM}`, 'gi'),
   new RegExp(`\\b(?:aspett(?:a|are|ando|i)|in\\s+attesa\\s+d\\w*|dipend\\w*\\s+da|richied\\w*)\\s+(?:che\\s+)?${NUM}`, 'gi'),
+  // Senza la parola «prima»: «solo dopo #N», «quando #N è fuso», «#N deve essere già fuso». «Si rompe dopo #N» è cronaca.
+  new RegExp(`\\b(?:solo|soltanto|non\\s+prima|lavorar\\w*|partire|parta|inizia\\w*|comincia\\w*|accend\\w*)\\s+(?:[^\\s#]+\\s+){0,2}?dopo\\s+(?:la\\s+fusione\\s+d\\w*\\s+|che\\s+)?${NUM}`, 'gi'),
+  new RegExp(`\\bnon\\s+prima\\s+(?:d\\w*|che)\\s+${NUM}`, 'gi'),
+  new RegExp(`\\b(?:quando|appena|finch[eé](?:\\s+non)?|una\\s+volta\\s+che)\\s+${NUM}\\s+(?:[^\\s#]+\\s+){0,3}?(?:fus[oa]|fond\\w*|su\\s+main|arriv\\w*)`, 'gi'),
+  new RegExp(`\\buna\\s+volta\\s+(?:fus[oa]|arrivat[oa]\\s+su\\s+main)\\s+${NUM}`, 'gi'),
+  new RegExp(`${NUM}\\s+(?:[^\\s#]+\\s+){0,2}?(?:dev\\w*|va|vada)\\s+(?:[^\\s#]+\\s+){0,3}?(?:fus[oa]|fondere|fuso|su\\s+main|arrivare)`, 'gi'),
 ];
 
 /**
