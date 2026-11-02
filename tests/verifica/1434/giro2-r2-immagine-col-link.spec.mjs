@@ -1,4 +1,4 @@
-// Verifica #1434 giro 2, rilievo 1: su un'immagine o un filmato dentro un collegamento (le anteprime di notizie,
+// Verifica #1434 giro 2, rilievo 2: su un'immagine o un filmato dentro un collegamento (le anteprime di notizie,
 // negozi, ricerche) la fila ha anche le azioni del collegamento, come le voci sotto.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { menuDi } from '../../helpers/menuContestuale.mjs';
@@ -12,7 +12,7 @@ const SITO = (img) => `<!doctype html><html><head><title>Fila</title></head>
 const ids = (menu) => menu.locator('.sn-menu-row [data-sn-icon-id]').evaluateAll((e) => e.map((x) => x.dataset.snIconId));
 
 for (const [nome, sel] of [['un\'immagine', '#foto'], ['un filmato', '#vid']]) {
-  test(`r1 su ${nome} dentro un collegamento la fila ha Apri in una nuova scheda`, async ({ openTab, testServer }) => {
+  test(`r2 su ${nome} dentro un collegamento la fila ha Apri in una nuova scheda`, async ({ openTab, testServer }) => {
     const img = testServer.asset(PNG, 'image/png');
     const page = await testServer.openReady(openTab, SITO(img));
     await page.locator(sel).click({ button: 'right' });
