@@ -115,10 +115,13 @@ test('le regole ammettono il campo solo come elenco da 1 a 20, nel ramo admin e 
 const owner = await import(pathToFileURL(join(ROOT, 'scripts', 'owner-feedback.mjs')).href);
 const claude = await import(pathToFileURL(join(ROOT, 'scripts', 'claude-feedback.mjs')).href);
 
-// Documenti per id; una query `seq == N` risponde con i documenti di quel numero.
-function reteFinta(docs) {
+// Documenti per id; una query `seq == N` risponde con i documenti di quel numero. Ogni documento ha la sua versione
+// (`updateTime`), e una scrittura con la versione come condizione su un documento cambiato si rifiuta come fa Firestore.
+// `viva`: le scritture delle attese si applicano. `rete.intanto(docs)`, se c'è, scrive un altro prima della prossima PATCH.
+function reteFinta(docs, { viva = false } = {}) {
   const scritte = [];
   const vero = globalThis.fetch;
+  const rete = { scritte, rifiutate: 0, intanto: null };
   globalThis.fetch = async (url, opts = {}) => {
     const u = String(url);
     const ok = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) });
@@ -130,7 +133,19 @@ function reteFinta(docs) {
     }
     const id = decodeURIComponent(u.split('/feedback/')[1].split('?')[0]);
     if ((opts.method || 'GET') === 'PATCH') {
-      scritte.push({ id, url: u, body: JSON.parse(opts.body) });
+      if (rete.intanto) { const f = rete.intanto; rete.intanto = null; f(docs); }
+      const body = JSON.parse(opts.body);
+      const condizione = new URL(u).searchParams.get('currentDocument.updateTime');
+      if (condizione && condizione !== `v${docs[id].v || 1}`) {
+        rete.rifiutate += 1;
+        const errore = { error: { code: 400, status: 'FAILED_PRECONDITION', message: 'the stored version does not match the required base version' } };
+        return { ok: false, status: 400, json: async () => errore, text: async () => JSON.stringify(errore) };
+      }
+      scritte.push({ id, url: u, body });
+      if (viva) {
+        docs[id].waitsFor = (body.fields.waitsFor?.arrayValue?.values || []).map((v) => ({ id: v.mapValue.fields.id.stringValue, num: v.mapValue.fields.num.stringValue }));
+        docs[id].v = (docs[id].v || 1) + 1;
+      }
       return ok({});
     }
     const d = docs[id];
@@ -142,9 +157,10 @@ function reteFinta(docs) {
     if (d.waitsFor) {
       fields.waitsFor = { arrayValue: { values: d.waitsFor.map((w) => ({ mapValue: { fields: { id: { stringValue: w.id }, num: { stringValue: w.num } } } })) } };
     }
-    return ok({ name: `x/feedback/${id}`, fields });
+    return ok({ name: `x/feedback/${id}`, fields, updateTime: `v${d.v || 1}` });
   };
-  return { scritte, ripristina: () => { globalThis.fetch = vero; } };
+  rete.ripristina = () => { globalThis.fetch = vero; };
+  return rete;
 }
 const DOCS = { id903: { seq: 903 }, id676: { seq: 676 }, 'id663-2': { seq: 663, subSeq: 2 } };
 
@@ -156,7 +172,7 @@ test('npm run feedback -- <id> --aspetta: scrive solo le attese (stato invariato
     assert.deepEqual(r.attese, [{ id: 'id676', num: '676' }, { id: 'id663-2', num: '663.2' }]);
     assert.equal(rete.scritte.length, 1);
     const w = rete.scritte[0];
-    assert.match(w.url, /updateMask\.fieldPaths=waitsFor&updateMask\.fieldPaths=updatedAt$/);
+    assert.match(w.url, /updateMask\.fieldPaths=waitsFor&updateMask\.fieldPaths=updatedAt&currentDocument\.updateTime=v1$/, 'si scrive solo sulla versione letta');
     assert.deepEqual(Object.keys(w.body.fields).sort(), ['updatedAt', 'waitsFor'], 'lo stato non si tocca');
     assert.equal(w.body.fields.waitsFor.arrayValue.values.length, 2);
 
@@ -201,9 +217,9 @@ test('chi aspettava una segnalazione unita aspetta il pacchetto, e le sue altre 
   const senza = reteFinta({ ...DOCS, id951: { seq: 951 }, id903: { seq: 903, waitsFor: [{ id: 'idVecchio', num: '' }, { id: 'id812', num: '812' }] } });
   try {
     const r = await owner.spostaAttese('id903', ['id812'], { id: 'id951', num: '951' }, { bearer: 'tok' });
-    assert.equal(r.ok, false, 'un\'attesa senza numero non sparisce in silenzio');
-    assert.match(r.motivo, /idVecchio, senza numero/);
-    assert.equal(senza.scritte.length, 0);
+    assert.equal(r.ok, true, r.motivo);
+    assert.deepEqual(r.attese, [{ id: 'id951', num: '951' }, { id: 'idVecchio', num: '' }], 'un\'attesa senza numero resta, per id');
+    assert.equal(senza.scritte.length, 1);
   } finally { senza.ripristina(); }
 });
 
@@ -521,4 +537,105 @@ test('eredità: oltre il tetto di feedback visitati si rifiuta col numero, mai u
   const r = await A.ereditaPriorita({ id: 'S', priority: 1, waitsFor: aspetta(['n0', '1']) }, grafo(docs).leggi);
   assert.equal(r.ok, false);
   assert.match(r.motivo, /superano 2000 feedback/);
+});
+
+// ── #1756.1: due scritture contemporanee non si cancellano ──────────────────
+
+test('daScrivereSu: l\'elenco intero sostituisce; il gesto tiene quelle lette tranne le tolte, quelle senza numero per id', () => {
+  const prima = [{ id: 'a', num: '10' }, { id: 'b', num: '' }, { id: 'c', num: '12' }];
+  assert.deepEqual(A.daScrivereSu(prima, { numeri: ['5'] }), { numeri: ['5'], tieni: [] });
+  assert.deepEqual(A.daScrivereSu(prima, { aggiungi: ['#13', '10'] }), { numeri: ['10', '12', '13'], tieni: ['b'] });
+  assert.deepEqual(A.daScrivereSu(prima, { togli: ['a', 'b'], aggiungi: ['20'] }), { numeri: ['12', '20'], tieni: [] });
+  assert.deepEqual(A.daScrivereSu(prima, { togli: ['a', 'b', 'c'] }), { numeri: [], tieni: [] });
+  assert.deepEqual(A.daScrivereSu([], {}), { numeri: [], tieni: [] });
+});
+
+test('conflittoDiScrittura: la versione non è più quella letta (o il documento non c\'è più); il resto è un errore', () => {
+  assert.equal(A.conflittoDiScrittura(400, '{"error":{"status":"FAILED_PRECONDITION"}}'), true);
+  assert.equal(A.conflittoDiScrittura(409, ''), true);
+  assert.equal(A.conflittoDiScrittura(412, ''), true);
+  assert.equal(A.conflittoDiScrittura(404, ''), true);
+  assert.equal(A.conflittoDiScrittura(400, '{"error":{"status":"INVALID_ARGUMENT"}}'), false);
+  assert.equal(A.conflittoDiScrittura(403, 'PERMISSION_DENIED'), false);
+  assert.equal(A.conflittoDiScrittura(503, ''), false);
+});
+
+test('scriviSullaLettura: sul conflitto rilegge e ricalcola; al tetto si ferma col numero, senza scrivere', async () => {
+  let versione = 1;
+  let elenco = ['x'];
+  const lette = [];
+  const r = await A.scriviSullaLettura({
+    leggi: async () => ({ versione: `v${versione}`, elenco: elenco.slice() }),
+    calcola: async (letto) => { lette.push(letto.versione); return { scrivi: [...letto.elenco, 'mia'] }; },
+    scrivi: async (dati, v) => {
+      // Al primo giro un altro scrive prima di noi.
+      if (versione === 1) { elenco = ['x', 'sua']; versione = 2; }
+      if (v !== `v${versione}`) return { conflitto: true };
+      elenco = dati; versione += 1;
+      return { ok: true, attese: dati };
+    },
+    pausa: async () => {},
+  });
+  assert.deepEqual(r, { ok: true, attese: ['x', 'sua', 'mia'] });
+  assert.deepEqual(lette, ['v1', 'v2'], 'ricalcolato sulla versione nuova');
+
+  let scritture = 0;
+  const sempre = await A.scriviSullaLettura({
+    leggi: async () => ({ versione: 'v' }), calcola: async () => ({ scrivi: [] }),
+    scrivi: async () => { scritture += 1; return { conflitto: true }; }, pausa: async () => {},
+  });
+  assert.equal(sempre.ok, false);
+  assert.equal(scritture, A.RILETTURE);
+  assert.match(sempre.motivo, new RegExp(`cambiate ${A.RILETTURE} volte di seguito mentre le scrivevo: non ho scritto niente`));
+
+  const fine = await A.scriviSullaLettura({ leggi: async () => null, calcola: async () => ({ fine: { ok: false, motivo: 'inesistente' } }), scrivi: async () => assert.fail('non scrive') });
+  assert.deepEqual(fine, { ok: false, motivo: 'inesistente' });
+  const cieca = await A.scriviSullaLettura({ leggi: async () => ({}), calcola: async () => ({ scrivi: [] }), scrivi: async () => assert.fail('non scrive alla cieca') });
+  assert.match(cieca.motivo, /non dice la versione del documento/);
+});
+
+test('due pacchetti aperti insieme su due unite aspettate dallo stesso feedback: aspetta tutti e due i pacchetti', async () => {
+  const rete = reteFinta({
+    ...DOCS, id812: { seq: 812, status: 'todo' }, id815: { seq: 815, status: 'todo' }, id951: { seq: 951 }, id952: { seq: 952 },
+    id903: { seq: 903, status: 'todo', waitsFor: [{ id: 'id676', num: '676' }, { id: 'id812', num: '812' }, { id: 'id815', num: '815' }] },
+  }, { viva: true });
+  try {
+    // Il primo pacchetto scrive mentre il secondo ha già letto: la sua prima scrittura trova il documento cambiato.
+    const [uno, due] = await Promise.all([
+      owner.spostaAttese('id903', ['id812'], { id: 'id951', num: '951' }, { bearer: 'tok' }),
+      owner.spostaAttese('id903', ['id815'], { id: 'id952', num: '952' }, { bearer: 'tok' }),
+    ]);
+    assert.equal(uno.ok, true, uno.motivo);
+    assert.equal(due.ok, true, due.motivo);
+    const ora = await owner.segnalazioneDaUnire('903', { bearer: 'tok' });
+    assert.deepEqual(ora.attese.map((w) => w.num).sort(), ['676', '951', '952'], 'nessuna delle due spostate si perde, e le unite se ne vanno');
+    assert.equal(rete.scritte.length, 2);
+    assert.equal(rete.rifiutate, 1, 'il secondo aveva letto prima che il primo scrivesse');
+  } finally { rete.ripristina(); }
+});
+
+test('due --aspetta-anche insieme sullo stesso feedback: restano tutte e due', async () => {
+  const docs = { ...DOCS, id1741: { seq: 1741, status: 'todo' }, id1756: { seq: 1756, status: 'todo' }, id1294: { seq: 1294, status: 'todo', waitsFor: [{ id: 'id676', num: '676' }] } };
+  const rete = reteFinta(docs, { viva: true });
+  try {
+    // Un altro agente aggiunge #1741 fra la nostra lettura e la nostra scrittura.
+    rete.intanto = (d) => { d.id1294.waitsFor.push({ id: 'id1741', num: '1741' }); d.id1294.v = 2; };
+    const r = await owner.segnaAttese('id1294', '1756', { bearer: 'tok', aggiungi: true });
+    assert.equal(r.ok, true, r.motivo);
+    assert.deepEqual(docs.id1294.waitsFor.map((w) => w.num), ['676', '1741', '1756']);
+    assert.deepEqual(rete.scritte.map((w) => new URL(w.url).searchParams.get('currentDocument.updateTime')), ['v2'], 'la scrittura sulla versione vecchia non è passata');
+    assert.match(owner.rispostaAttese('1294', r), /^1294: aspetta #676, #1741, #1756\. Aggiunta l’attesa su #1756\./);
+  } finally { rete.ripristina(); }
+});
+
+test('--aspetta senza --sostituisci che dopo la rilettura toglierebbe l\'attesa scritta intanto: rifiuta e la nomina', async () => {
+  const docs = { ...DOCS, id1741: { seq: 1741, status: 'todo' }, id1756: { seq: 1756, status: 'todo' }, id1294: { seq: 1294, status: 'todo', waitsFor: [{ id: 'id676', num: '676' }] } };
+  const rete = reteFinta({ ...docs, id676: { seq: 676, status: 'done' } }, { viva: true });
+  try {
+    rete.intanto = (d) => { d.id1294.waitsFor.push({ id: 'id1741', num: '1741' }); d.id1294.v = 2; };
+    const r = await owner.segnaAttese('id1294', '1756', { bearer: 'tok' });
+    assert.equal(r.ok, false);
+    assert.deepEqual(r.vive.map((w) => w.num), ['1741']);
+    assert.deepEqual(rete.scritte, []);
+  } finally { rete.ripristina(); }
 });
