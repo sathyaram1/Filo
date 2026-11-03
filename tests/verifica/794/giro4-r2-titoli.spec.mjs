@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const UNIT = fileURLToPath(new URL('../../unit/', import.meta.url));
-const SPIE = [new RegExp(['seguito', 'del', 'giro'].join(' '), 'i'), new RegExp(['senza', 'cercarl'].join(' '), 'i')];
+const SPIE = [new RegExp(['anticip\\w*', 'il', 'seguito'].join(' '), 'i'), new RegExp(['senza', 'cercarl'].join(' '), 'i')];
 
 test('r2 nessun titolo di test annuncia che qualcosa resta nascosto a chi verifica', () => {
   const colpevoli = [];
