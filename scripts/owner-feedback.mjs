@@ -58,7 +58,8 @@
 //   tasto «💻 Lavoro server» dei Ricevuti in Gestione (#957). Salta L5, e una sessione ingannata da un testo
 //   d'utente, con le credenziali dell'owner, se lo darebbe da sola. `--approva-locale` si rifiuta. Per la
 //   stessa ragione la fiducia (#1148): «Segna fidato» lo dà solo l'owner, in Gestione, dopo aver letto il testo.
-//   E una nota nuova su un feedback fidato, da una sessione senza biglietto pulito, gliela toglie prima (#1428).
+//   E una nota nuova su un feedback fidato, da una sessione senza biglietto pulito, gliela toglie prima (#1428). Non
+//   quella composta da uno strumento con un modello di lib/note-fisse.mjs (#1428.1): dalla riga di comando non si chiede.
 //   `--riconosci`, `--preapprova` e `--chiedi-prima` non ci sono più e si rifiutano col perché.
 //
 //   `--come-routine`: la macchina a stati distingue chi scrive. L'owner decide
