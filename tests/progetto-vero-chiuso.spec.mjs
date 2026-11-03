@@ -12,8 +12,8 @@ import { test, expect } from './fixtures/electron.mjs';
 const require = createRequire(import.meta.url);
 const QUI = dirname(fileURLToPath(import.meta.url));
 const { firebaseProjectId } = require(join(QUI, '..', 'src', 'main', 'auth', 'config.js'));
-// Fra virgolette e con le barre normali: NODE_OPTIONS spezza sugli spazi e dentro le virgolette mangia le barre rovesce.
-const TESTIMONE = join(QUI, 'helpers', 'registroRete.cjs').replace(/\\/g, '/');
+// Il testimone si carica con `-r` sulla riga di comando, come il caricatore di Playwright: NODE_OPTIONS Playwright lo toglie.
+const TESTIMONE = ['-r', join(QUI, 'helpers', 'registroRete.cjs')];
 
 const HOST_DEL_PROGETTO = ['identitytoolkit.googleapis.com', 'securetoken.googleapis.com', 'firestore.googleapis.com', 'firebasestorage.googleapis.com'];
 function delProgetto(url) {
@@ -28,7 +28,7 @@ const righe = (file) => (existsSync(file) ? readFileSync(file, 'utf8').split('\n
 // Un registro per tentativo: un nuovo giro dopo un rosso non rilegge le righe del precedente.
 function conTestimone(extra = {}) {
   return async ({}, use, testInfo) => {
-    await use({ NODE_OPTIONS: `--require "${TESTIMONE}"`, FILO_TEST_REGISTRO_RETE: registro(testInfo), ...extra });
+    await use({ FILO_TEST_REGISTRO_RETE: registro(testInfo), ...extra });
   };
 }
 
@@ -42,7 +42,7 @@ async function dopoLAvvioDelPortafoglio(app) {
 
 test.describe('con le sole variabili delle prove', () => {
   // Vuote valgono come assenti: l'app prende gli indirizzi veri, quelli che usano le altre seicento prove.
-  test.use({ envInPiu: conTestimone({ FILO_FUNCTIONS_BASE: '', FILO_IDENTITY_ENDPOINT: '', FILO_SECURE_TOKEN_ENDPOINT: '' }) });
+  test.use({ argomentiInPiu: TESTIMONE, envInPiu: conTestimone({ FILO_FUNCTIONS_BASE: '', FILO_IDENTITY_ENDPOINT: '', FILO_SECURE_TOKEN_ENDPOINT: '' }) });
 
   test('all\'avvio Filo non crea un account anonimo e non chiama le callable del progetto vero', async ({ app, testServer }, testInfo) => {
     const prova = testServer.html('<p>testimone</p>');
@@ -78,6 +78,7 @@ test.describe('con l\'identità finta e le callable lasciate al progetto vero', 
   });
   test.afterAll(async () => { await new Promise((r) => server.close(r)); });
   test.use({
+    argomentiInPiu: TESTIMONE,
     envInPiu: async ({}, use, testInfo) => conTestimone({
       FILO_FUNCTIONS_BASE: '', FILO_IDENTITY_ENDPOINT: `${base}/accounts:signUp`, FILO_SECURE_TOKEN_ENDPOINT: `${base}/token`,
     })({}, use, testInfo),

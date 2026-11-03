@@ -1,6 +1,6 @@
 // Testimone della rete per le prove (#2067): dal primo istante del main di Electron scrive in FILO_TEST_REGISTRO_RETE ogni
 // richiesta HTTP che parte davvero (fetch di Node e moduli http/https), sotto qualunque fetch avvolto dall'app.
-// Lo carica NODE_OPTIONS=--require (tests/progetto-vero-chiuso.spec.mjs); la query non si scrive, porta la chiave API.
+// Si carica con `-r` sulla riga di comando di Electron (tests/progetto-vero-chiuso.spec.mjs); la query non si scrive, porta la chiave API.
 
 'use strict';
 
