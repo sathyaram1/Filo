@@ -39,12 +39,18 @@ una risposta che cambia quando l'owner tocca un interruttore.
    pagava.
 4. **Una volta per giro.** La prova a secco mette da parte quello che ha letto;
    l'applicazione che la segue lo riusa e lo dice. Una prova a secco invece **non**
-   riusa niente: chi la lancia vuole vedere il database di adesso. E se il
-   conteggio appena chiesto al server NON combacia con quello che la copia
-   descrive, la copia è di un altro server e si rilegge: il riordino della
-   numerazione assegna i numeri contando quelli che ci sono, e una segnalazione
-   arrivata dopo la prova a secco si prende da sé il primo numero libero — cioè
-   quello che il giro sta per dare a un'altra.
+   riusa niente: chi la lancia vuole vedere il database di adesso.
+5. **Il riuso si confronta col presente** (#680.2). La copia si riusa solo se un
+   confronto dice che vale ancora; un confronto che manca, fallisce o non sa
+   rispondere (il conteggio che il server non dà) vale «non so», e si rilegge. Il
+   riordino della numerazione confronta i conteggi e chiede se i numeri che sta per
+   dare sono ancora liberi: una segnalazione arrivata dopo la prova a secco si
+   prende da sé il primo numero libero, cioè quello che il giro sta per dare a
+   un'altra, e un numero doppio non si aggiusta da sé. Poi **ogni scrittura**
+   riguarda la sua riga: l'archiviazione scrive solo se lo stato è quello su cui ha
+   deciso, il riordino scrive solo sul documento com'era quando l'ha letto
+   (`currentDocument.updateTime`). Una riga cambiata nel frattempo si salta e si
+   elenca nell'uscita: è una decisione dell'owner da non coprire.
 
 ## Quello che il database non sa filtrare
 
