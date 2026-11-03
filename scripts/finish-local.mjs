@@ -70,6 +70,7 @@ import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaF
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
+import { fileRiscritti } from './lib/su-main.mjs';
 import { NOME_PARTE, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
 import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
@@ -170,7 +171,7 @@ function run(cmd, args, label, env = undefined, cwd = ROOT) {
 /**
  * Il commit da cui prendere ANCHE i file cambiati, in un giro di riallineamento: quello che
  * aveva passato la verifica, scritto da dispatch nel marcatore del ruolo. '' altrimenti. PURA.
- * Il ramo contro main non vede il lato arrivato da main né il file in conflitto.
+ * Il ramo contro main non vede un file in conflitto risolto col lato di main.
  */
 export function shaDelRiallineamento(marker) {
   const m = marker && typeof marker === 'object' ? marker : {};
@@ -179,23 +180,28 @@ export function shaDelRiallineamento(marker) {
 }
 
 /**
- * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche
- * quelli cambiati dal commit verificato alla punta. `{ changed, nota }`; la nota va stampata.
+ * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche quelli che il
+ * riallineamento ha dovuto risolvere, con la stessa definizione della consegna (fileRiscritti). Il resto del lato
+ * arrivato da main l'ha già provato la suite di main: preso intero erano ore, oltre il tetto di un comando (#1907).
  */
 export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
   const g = (args) => git(args, { cwd: root });
-  const changed = g(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
+  const righe = (r) => r.out.split('\n').filter(Boolean);
+  const changed = righe(g(['diff', '--name-only', `${base}...HEAD`]));
   const dal = shaDelRiallineamento(marker);
   if (!dal) return { changed, nota: '' };
   const c = g(['cat-file', '-e', `${dal}^{commit}`]).ok || g(['fetch', 'origin', dal]).ok;
-  const r = c ? g(['diff', '--name-only', dal, 'HEAD']) : { ok: false };
-  if (!r.ok) {
-    return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} qui non c'è: scelgo gli spec solo dal ramo contro main, e il lato arrivato da main resta scoperto.` };
+  const arrivati = c ? g(['diff', '--name-only', dal, 'HEAD']) : { ok: false };
+  const risolti = arrivati.ok ? fileRiscritti(root, { prima: dal, base }) : { ok: false };
+  if (!arrivati.ok || !risolti.ok) {
+    const perche = arrivati.ok ? `non riesco a confrontarlo con questa punta (${risolti.errore})` : 'qui non c\'è';
+    return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} ${perche}: scelgo gli spec solo dal ramo contro main, e i file del lavoro risolti col lato di main restano scoperti.` };
   }
-  const lato = r.out.split('\n').filter(Boolean);
+  const daRiprovare = [...new Set([...risolti.file, ...risolti.conflitti])];
+  const resto = righe(arrivati).filter((f) => !daRiprovare.includes(f)).length;
   return {
-    changed: [...new Set([...changed, ...lato])],
-    nota: `Giro di riallineamento: scelgo gli spec anche dai ${lato.length} file cambiati da ${dal.slice(0, 8)} (il commit verificato) alla punta, cioè il lato arrivato da main e i file in conflitto.`,
+    changed: [...new Set([...changed, ...daRiprovare])],
+    nota: `Giro di riallineamento: scelgo gli spec dal ramo contro main e dai file che il riallineamento ha dovuto risolvere rispetto al lavoro verificato (${dal.slice(0, 8)}): ${daRiprovare.length}. Il resto del lato arrivato da main (${resto} file) l'ha già provato la suite di main.`,
   };
 }
 
