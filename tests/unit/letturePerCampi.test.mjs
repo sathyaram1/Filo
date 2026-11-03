@@ -389,9 +389,13 @@ test('la proiezione non cambia il verdetto: stessi archiviati, stessi segnalati'
   ];
 
   const chieste = { righe: null, schede: null };
-  const vere = { list: FB.list, listPublic: FB.listPublic };
+  const vere = { list: FB.list, listPublic: FB.listPublic, fetch: globalThis.fetch };
   FB.list = async (o) => { chieste.righe = o.fields; return o.afterName ? [] : righe.map((r) => ({ ...r })); };
   FB.listPublic = async (o) => { chieste.schede = o.fields; return o.afterName ? [] : schede.map((c) => ({ ...c })); };
+  // I due conteggi che decidono il filtro sulle chiuse: qui il server non sa contare, e si leggono tutte.
+  globalThis.fetch = async () => ({ ok: false, status: 400, json: async () => ({}), text: async () => '' });
+  const avviso = console.warn;
+  console.warn = () => {};
   try {
     const r = await runAutoArchive({
       dryRun: true, now: ORA, releasedVersion: '1.0.0', bearer: 'tok',

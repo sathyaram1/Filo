@@ -19,7 +19,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { acquireBearer, FIRESTORE_BASE, FIREBASE_API_KEY } from './lib/firestore-auth.mjs';
-import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
+import { cambiataNelFrattempo, firmaOra, patchFirmato } from './lib/firma-ora.mjs';
 import { contaDocumenti } from './lib/firestore-conta.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
 import { scansione, dopoApplicazione, copiaChiesta } from './lib/scansione-secco.mjs';
@@ -190,11 +190,6 @@ async function patchSeq(id, seq, bearer, updateTime = '') {
   });
   const body = res.ok ? '' : (await res.text()).slice(0, 200);
   return { ok: res.ok, status: res.status, body, cambiata: !res.ok && cambiataNelFrattempo(res.status, body) };
-}
-
-/** La scrittura condizionata è stata respinta perché il documento non è più quello letto? PURA. */
-export function cambiataNelFrattempo(status, body = '') {
-  return status === 409 || status === 412 || (status === 400 && /FAILED_PRECONDITION/.test(String(body)));
 }
 
 /**
