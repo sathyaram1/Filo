@@ -1117,7 +1117,7 @@
     for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
       const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.list) || list;
       // eslint-disable-next-line no-await-in-loop
-      const batch = await porta({ pageSize: limit, timeoutMs, idToken, afterName: cursor, fields });
+      const batch = await porta({ pageSize: limit, timeoutMs, idToken, afterName: cursor, fields, ...(uguale ? { uguale } : {}) });
       // Le pagine si leggono in momenti diversi: il giro della Gestione riparte dalla PRIMA (#676).
       if (page === 0 && batch && batch.readTime) readTime = String(batch.readTime);
       const arr = Array.isArray(batch) ? batch : [];
