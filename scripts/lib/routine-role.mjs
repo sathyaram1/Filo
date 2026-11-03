@@ -62,7 +62,7 @@ export function isFresh(marker, nowMs = Date.now(), maxAgeMs = MAX_AGE_MS) {
 }
 
 // `dal`: in un giro di riallineamento, il commit che aveva passato la verifica. finish:check
-// sceglie gli spec anche dai file cambiati da lì, cioè il lato arrivato da main.
+// sceglie gli spec anche dai file del lavoro che il riallineamento ha toccato: i conflitti.
 export function writeRole(root, role, { dal = '' } = {}) {
   const r = normalizeRole(role);
   if (!r) return null;

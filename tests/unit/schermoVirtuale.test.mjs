@@ -1,5 +1,5 @@
 // Gli spec nel contenitore senza schermo, lanciati dagli script o con un npx playwright test a mano (#739): xvfb
-// da solo, o uno stop che dice cosa manca. E, nello stesso strumento, gli spec del lato arrivato da main al riallineamento.
+// da solo, o uno stop che dice cosa manca. E, nello stesso strumento, gli spec dei conflitti al riallineamento.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

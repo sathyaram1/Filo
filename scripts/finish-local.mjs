@@ -170,7 +170,7 @@ function run(cmd, args, label, env = undefined, cwd = ROOT) {
 /**
  * Il commit da cui prendere ANCHE i file cambiati, in un giro di riallineamento: quello che
  * aveva passato la verifica, scritto da dispatch nel marcatore del ruolo. '' altrimenti. PURA.
- * Il ramo contro main non vede il lato arrivato da main né il file in conflitto.
+ * Il ramo contro main non vede un file in conflitto risolto col lato di main.
  */
 export function shaDelRiallineamento(marker) {
   const m = marker && typeof marker === 'object' ? marker : {};

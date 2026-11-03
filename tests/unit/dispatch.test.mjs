@@ -414,7 +414,7 @@ test('emit: consegnare un ruolo lo registra per chi accoderà feedback', () => {
   assert.equal(readRole(TMP), 'verifier');
 });
 
-// finish:check sceglie gli spec anche dal lato arrivato da main solo se sa da che commit guardare.
+// finish:check sceglie gli spec anche dai conflitti del riallineamento solo se sa da che commit guardare.
 test('emit: un giro di riallineamento lascia nel marcatore il commit che aveva passato la verifica', async () => {
   const { readMarker } = await import('../../scripts/lib/routine-role.mjs');
   const sha = 'abcdef1234567890abcdef1234567890abcdef12';
