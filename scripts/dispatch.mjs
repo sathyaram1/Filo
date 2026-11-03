@@ -922,6 +922,22 @@ export function esaminaShaVerificato(sha, root = ROOT) {
   return c === punta ? 'punta' : '';
 }
 
+/**
+ * I commit di `origin/main` nominati nel report di chi ha rifatto la base che la punta non contiene (#2101): un rebase
+ * registrato senza arrivare su origin lascia il ramo al commit verificato. [] se non ce n'è o se git qui non risponde.
+ */
+export function riallineamentoMancante(report, root = ROOT) {
+  const g = (args) => {
+    try { return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 30000 }).trim().toLowerCase(); } catch (_) { return null; }
+  };
+  const nominati = [...new Set(String(report || '').toLowerCase().match(/\b[0-9a-f]{7,40}\b/g) || [])].slice(0, 50);
+  if (!nominati.length || !g(['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']) || !g(['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main^{commit}'])) return [];
+  return nominati.filter((s) => {
+    const c = g(['rev-parse', '--verify', '--quiet', `${s}^{commit}`]);
+    return !!c && g(['merge-base', '--is-ancestor', c, 'refs/remotes/origin/main']) !== null && g(['merge-base', '--is-ancestor', c, 'HEAD']) === null;
+  });
+}
+
 export function readRoleInstructions(role, { scope, caso } = {}) {
   const name = role === 'verifier' ? VERIFIER_SCOPE_FILE[verifierScope(scope).scope]
     : role === 'fixer' ? (Object.hasOwn(FIXER_CASE_FILE, String(caso || '')) ? FIXER_CASE_FILE[String(caso)] : ROLE_FILE.fixer)
