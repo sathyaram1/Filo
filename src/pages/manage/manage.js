@@ -2854,7 +2854,7 @@
 
   // Il segno dei Ricevuti (D93): la forma del livello che ha fermato la pratica, il motivo sotto il puntatore.
   function segnoFermataHtml(fb) {
-    const s = MR.segnoFermata(fb, { fusioni, fusioniLette: fusioniOk });
+    const s = MR.segnoFermata(fb, opzSezioni());
     if (!s || !FORME_SVG[s.forma]) return '';
     const cls = 'mg-segno-fermata' + (s.classe ? ` mg-forma--${s.classe}` : ' mg-segno-fermata--vuoto');
     return `<span class="${cls}" data-forma="${esc(s.forma)}" data-livello="${esc(s.livello)}" title="${esc(s.testo)}" aria-label="${esc(s.testo)}" role="img">`

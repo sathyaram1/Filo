@@ -254,6 +254,14 @@
       : 'Rilancia npm run finish.';
   }
 
+  // Dopo un sì finito in conflitto il lavoro di una routine torna da sé a riallinearsi (routeRealignment del server):
+  // l'owner non deve far partire niente (#1328, #1425).
+  var RIALLINEA_DA_SOLA = 'Il lavoro torna da solo alla routine, che riallinea il ramo e rifà i controlli: ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto.';
+  /** Una fusione approvata e non avvenuta la riallinea il server da sé? Solo il lavoro di una routine con la sua pratica. PURA. */
+  function siRiallineaDaSola(req) {
+    return originOf(req) === 'routine' && !!String((req && req.feedbackId) || '').trim();
+  }
+
   // Il motivo del server porta un'etichetta tecnica: qui diventa una frase, il dettaglio fra
   // parentesi resta. Un'etichetta sconosciuta si stampa grezza: dice più di una nascosta.
   var REALIGN_REASONS = {
