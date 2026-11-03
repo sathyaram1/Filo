@@ -104,12 +104,14 @@ test('riallineamento: la scelta include i file in conflitto, anche risolti col l
     execFileSync('git', ['-c', 'core.editor=true', 'rebase', '--continue'], { cwd: dir, stdio: 'ignore' });
 
     const senza = cambiatiPerLaScelta({ base: 'main', marker: null, root: dir });
-    assert.deepEqual(senza.changed, ['src/pages/editor/a.js'], 'il ramo contro main vede solo la sua area');
+    assert.deepEqual(senza.changed.sort(), ['src/pages/editor/a.js', 'src/pages/options/o.js'], 'il ramo contro main vede solo la sua area');
     const con = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: verificato }, root: dir });
-    assert.deepEqual(con.changed.sort(), ['src/pages/board/c.js', 'src/pages/editor/a.js'],
+    assert.deepEqual(con.changed.sort(), ['src/pages/board/c.js', 'src/pages/editor/a.js', 'src/pages/options/o.js'],
       'il conflitto risolto col lato di main resta scelto; l\'area toccata solo da main no');
-    assert.match(con.nota, /2 file del lavoro verificato/);
-    assert.match(con.nota, /\(1 file\) l'ha già provato la suite di main/);
+    // La stessa definizione della consegna di un riallineamento: un file del lavoro che main ha cambiato in righe
+    // lontane, senza conflitto, non è un file risolto (lo sceglie già il ramo contro main, se il lavoro ci resta).
+    assert.match(con.nota, /dovuto risolvere rispetto al lavoro verificato \([0-9a-f]{8}\): 2\./);
+    assert.match(con.nota, /\(2 file\) l'ha già provato la suite di main/);
     const perso = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: 'f'.repeat(40) }, root: dir });
     assert.deepEqual(perso.changed, ['src/pages/editor/a.js']);
     assert.match(perso.nota, /qui non c'è/, 'un commit introvabile si dice, non si salta in silenzio');
