@@ -818,9 +818,9 @@
     return box;
   }
 
-  // Una chiusa non fidata la può fidare solo l'owner, dopo averla letta (#2078): la porta del server è la sua sola.
+  // Quale domanda si può segnare fidata lo dice il server (#2078); la pagina serve solo a leggerla prima.
   function fidabile(d) {
-    return d.stato === 'chiusa' && d.fiducia !== 'fidato' && !d.illeggibile;
+    return d.fidabile === true && !d.illeggibile;
   }
   function sfidabile(d) {
     return d.fiducia === 'fidato' && !!d.fidataDallOwner;
@@ -900,7 +900,7 @@
     if (!box) return;
     const ds = aperta ? aperta.ids.map(trova).filter(Boolean) : [];
     const fonti = ds.map((d) => principioUsato(d)).filter(Boolean).map((id) => { const f = trova(id); return f ? [id, f.principio, f.principioContestato] : [id]; });
-    const firma = JSON.stringify([ds.map((d) => [d.id, d.stato, d.modificataIl, d.fiducia, d.fidataDallOwner, d.esito, d.titolo, d.illeggibile, d.smistamento,
+    const firma = JSON.stringify([ds.map((d) => [d.id, d.stato, d.modificataIl, d.fiducia, d.fidabile, d.fidataDallOwner, d.esito, d.titolo, d.illeggibile, d.smistamento,
       d.principioContestato, ...(d.opzioni || []).map((o) => etichettaDi(o)), firmaLegami(d), lavoroFermo(d),
       allegati.di(d.id).map((a) => a.url), allegati.caricando(d.id), originali.has(d.id)]), [...inCorso], [...avvisi], stato.lette, fonti]);
     if (firma === firmaDettaglio) return;

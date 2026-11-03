@@ -1,5 +1,5 @@
-// #2078: una domanda chiusa non fidata mostra le note per gli agenti aperte e «Segna fidata»; l'owner la segna, e
-// la toglie, da qui o dal tasto destro. Una fidata dalla nascita non ha né l'uno né l'altro.
+// #2078: una domanda che il server dice fidabile (chiusa e non fidata) mostra le note per gli agenti aperte e «Segna
+// fidata»; l'owner la segna, e la toglie, da qui o dal tasto destro. Una fidata dalla nascita non ha né l'uno né l'altro.
 import { test, expect } from './fixtures/electron.mjs';
 import { MANAGE, PRATICHE, RIFERIMENTI, domanda, mainFinto, aspettaAvvio } from './helpers/gestioneMainFinto.mjs';
 
@@ -17,7 +17,7 @@ const chiusa = (numero, over) => domanda(numero, Object.assign({
   stato: 'chiusa', opzioni, esito: { ok: true, azione: opzioni[0].azione, applicataIl: IERI },
   conversazione: [{ autore: { tipo: 'biglietto', ruolo: 'sessione', fiducia: 'non_fidato' }, tipo: 'risposta', scelta: 0, testo: '', ora: IERI }],
 }, over));
-const NON_FIDATA = chiusa(80, { titolo: 'Parola d’ordine per la rete aperta', fiducia: 'non_fidato', notePerAgenti: NOTE, registrataDa: 'sessione', rispostaDaSessione: { il: IERI, scelta: 0 } });
+const NON_FIDATA = chiusa(80, { titolo: 'Parola d’ordine per la rete aperta', fiducia: 'non_fidato', fidabile: true, notePerAgenti: NOTE, registrataDa: 'sessione', rispostaDaSessione: { il: IERI, scelta: 0 } });
 const FIDATA = chiusa(81, { titolo: 'Bordo spesso o sottile?', fiducia: 'fidato', notePerAgenti: 'Già provato il bordo da 2px.' });
 
 // Il main finto risponde come il server: la fiducia cambia, col segno dell'owner quando la dà.
@@ -33,7 +33,7 @@ async function fiduciaComeIlServer(app, { rifiuta = '' } = {}) {
         if (errore) return { ok: false, error: errore };
         const d = (globalThis.__mgFinto.domande || []).find((x) => x.id === msg.id);
         const fidata = msg.fidata !== false;
-        Object.assign(d, { fiducia: fidata ? 'fidato' : 'non_fidato', fidataDallOwner: fidata ? { il: Date.now() } : null, modificataIl: Date.now() });
+        Object.assign(d, { fiducia: fidata ? 'fidato' : 'non_fidato', fidabile: !fidata, fidataDallOwner: fidata ? { il: Date.now() } : null, modificataIl: Date.now() });
         return { ok: true, fiducia: d.fiducia, domanda: JSON.parse(JSON.stringify(d)) };
       }
       return sotto(event, msg);
