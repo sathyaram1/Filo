@@ -814,6 +814,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   if (!ALLOWED.includes(to)) return { ok: false, motivo: `stato non valido: "${to}"` };
   // La regola del biglietto (#1428) vale per il testo che sceglie la sessione, non per quello composto da un modello.
   const fissa = notaFissa(nota);
+  if (!fissa && nota != null && typeof nota !== 'string') return { ok: false, motivo: 'nota non valida: un testo, o una nota fissa composta da uno strumento' };
   const testoNota = fissa ? nota.testo : nota;
   if (typeof opts.frase === 'string') {
     const lunga = fraseTroppoLunga(opts.frase.trim());
