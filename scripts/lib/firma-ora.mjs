@@ -20,3 +20,8 @@ export async function patchFirmato(url, init = {}, { fetchImpl = fetch } = {}) {
   for (const c of campi) if (c !== 'updatedAt') u.searchParams.append(MASCHERA, c);
   return fetchImpl(u.toString(), { ...init, body: JSON.stringify(body) });
 }
+
+/** Una scrittura condizionata (`currentDocument.updateTime`) respinta perché il documento non è più quello letto? PURA. */
+export function cambiataNelFrattempo(status, body = '') {
+  return status === 409 || status === 412 || (status === 400 && /FAILED_PRECONDITION/.test(String(body)));
+}

@@ -83,7 +83,8 @@ import { isRoutineInstance } from './lib/routine-role.mjs';
 import { fetchRitentato } from './lib/rete.mjs';
 import { avvisoDaCampi, parseRiferimento, risolviFeedback } from './lib/pratica-locale.mjs';
 import { PARTI, RAMO_RE, partiDaCampi } from './lib/parti-lavoro.mjs';
-import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
+import { cambiataNelFrattempo, firmaOra, patchFirmato } from './lib/firma-ora.mjs';
+import { notaFissa } from './lib/note-fisse.mjs';
 import { PRIORITA_AMMESSE, parsePriorita } from './lib/priorita.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
@@ -872,10 +873,10 @@ export async function scrivi(id, to, nota, opts = {}) {
   // cifrato, la frase per chi ha mandato il feedback resta in chiaro — la legge
   // sulla sua macchina, che la chiave non ce l'ha.
   let notaNuova = false;
-  if (typeof nota === 'string' && nota.trim()) {
+  if (typeof testoNota === 'string' && testoNota.trim()) {
     // Si fonde e si taglia sul testo IN CHIARO, poi si cifra.
     const esistenti = await notePrecedentiInChiaro(doc);
-    const fuse = THREAD ? THREAD.mergeModelReport(esistenti, nota) : nota;
+    const fuse = THREAD ? THREAD.mergeModelReport(esistenti, testoNota) : testoNota;
     notaNuova = fuse !== esistenti;
     const capped = THREAD?.capNotes ? THREAD.capNotes(fuse) : fuse;
     if (CRYPTO?.isEnabled?.()) {
@@ -908,7 +909,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   // #1428: chi lavora legge le note come decisioni dell'owner, e un fidato salta giudici e L5. Da una sessione senza
   // biglietto pulito la nota non si distingue da una falsa: il feedback perde prima la fiducia, e senza questo niente nota.
   let fiduciaTolta = '';
-  if (notaNuova && MR.isFidato({ fiducia: doc.fields?.fiducia?.stringValue })) {
+  if (notaNuova && !fissa && MR.isFidato({ fiducia: doc.fields?.fiducia?.stringValue })) {
     fiduciaTolta = bigliettoNonPulito(await bigliettoDiChiScrive());
   }
   // Il server toglie la fiducia solo a una pratica aperta (MR.fiduciaTogliCheck): chi la riapre la riapre prima e scrive
@@ -920,22 +921,29 @@ export async function scrivi(id, to, nota, opts = {}) {
   }
   // La prova a vuoto lo dice solo a chi l'ha chiesta (la riga di comando): server:fondi la usa come controllo prima di scrivere.
   if (opts.dryRun) return { ok: true, from, to, dryRun: true, campi: mask, ...(fiduciaTolta ? { fiduciaTolta } : {}) };
+  // Con uno stato atteso la prima scrittura vale solo sul documento appena letto: chi lo cambia in mezzo la respinge.
+  let condizione = opts.statoAtteso !== undefined && doc.updateTime ? `&currentDocument.updateTime=${encodeURIComponent(doc.updateTime)}` : '';
+  let respinta = false;
   const scriviCampi = async (m) => {
-    const q = m.map((k) => `updateMask.fieldPaths=${k}`).join('&');
+    const q = m.map((k) => `updateMask.fieldPaths=${k}`).join('&') + condizione;
+    condizione = '';
     const corpo = Object.fromEntries(Object.entries(fields).filter(([k]) => m.includes(k)));
     const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
       body: JSON.stringify({ fields: corpo }),
     }, { fetchImpl: fetchRitentato });
-    return res.ok ? '' : `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}`;
+    if (res.ok) return '';
+    const testo = (await res.text()).slice(0, 200);
+    respinta = cambiataNelFrattempo(res.status, testo);
+    return `scrittura fallita (${res.status}): ${testo}`;
   };
   let daScrivere = mask;
   let riaperta = false;
   if (fiduciaTolta) {
     if (chiusaPrima) {
       const errore = await scriviCampi(mask.filter((k) => k !== 'notes'));
-      if (errore) return { ok: false, motivo: `${errore}. Non ho toccato niente`, from };
+      if (errore) return { ok: false, motivo: respinta ? cambiataDaAllora : `${errore}. Non ho toccato niente`, from, ...(respinta ? { cambiata: true } : {}) };
       riaperta = true;
       daScrivere = ['notes', 'updatedAt'];
     }
@@ -955,6 +963,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   }
 
   const errore = await scriviCampi(daScrivere);
+  if (errore && respinta && !fiduciaTolta) return { ok: false, cambiata: true, motivo: cambiataDaAllora, from };
   if (errore) return { ok: false, motivo: `${errore}${fiduciaTolta ? `. La fiducia l’ho già tolta${riaperta ? ' e la pratica è riaperta, senza la nota' : ''}` : ''}`, from };
   return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}), ...(fiduciaTolta ? { fiduciaTolta } : {}) };
 }
