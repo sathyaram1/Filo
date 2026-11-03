@@ -49,12 +49,33 @@ function rigaVerificato(sha, scartato) {
   return `Commit che aveva passato la verifica: \`${sha}\` — il diff da leggere è \`git diff ${sha}..HEAD\`.`;
 }
 
+// Il rebase dichiarato nel report che sul ramo non c'è (#2101). Sulla punta verificata il giro non ha niente da provare:
+// senza rilievi il lavoro torna alla fusione, che rifà il riallineamento se serve ancora.
+function righeRebaseMancante(mancante, scartato) {
+  const shas = (Array.isArray(mancante) ? mancante : []).map(soloSha).filter(Boolean);
+  if (!shas.length) return [];
+  const nominati = shas.map((s) => `\`${s}\``).join(', ');
+  const testa = `**Il riallineamento non è su questo ramo.** Il report qui sotto dice di aver rifatto la base su \`main\` (${nominati}), ma la punta non contiene quel commit.`;
+  if (scartato === 'punta') {
+    return ['', testa,
+      'La punta è ancora il commit che aveva passato la verifica: in questo giro non c\'è niente da verificare, e i controlli',
+      'automatici e le prove dei giri rifarebbero prove già fatte. Non lanciarli: registra la critica senza rilievi, con un riassunto',
+      'che dica che il riallineamento non è arrivato sul ramo e che il lavoro è ancora quello verificato, poi rilascia.',
+      'Il lavoro torna alla fusione: se passa è fuso, se si ferma di nuovo il riallineamento si rifà, e la consegna ora lo',
+      'registra solo se il ramo su origin contiene `main`.'];
+  }
+  return ['', testa,
+    'Quello che c\'è dopo il commit verificato non viene da un rebase: verificalo come sempre, e nella critica scrivi un',
+    'rilievo interno di livello 2 che dica che il riallineamento dichiarato manca dal ramo.'];
+}
+
 /**
  * Il perimetro di un giro stretto, scritto come testo in coda al compito: un
  * JSON nel payload si può non guardare, un'istruzione no. '' per il giro
- * pieno. `scartato`: perché il commit verificato non fa da confronto ('punta', 'assente'). PURA.
+ * pieno. `scartato`: perché il commit verificato non fa da confronto ('punta', 'assente'); `mancante`: i commit di
+ * main che il report dichiara e la punta non contiene. PURA.
  */
-export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo, { scartato = '' } = {}) {
+export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo, { scartato = '', mancante = [] } = {}) {
   const p = perimetro && typeof perimetro === 'object' ? perimetro : {};
   if (scope === 'chiusura') {
     const rilievi = Array.isArray(p.rilievi) ? p.rilievi.filter((r) => r && unaRiga(r.text)) : [];
