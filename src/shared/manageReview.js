@@ -800,7 +800,7 @@
         acts.push({ key: 'confirm_spam', kind: 'reject', to: 'spam_confirmed', label: 'Conferma spam', primary: false });
       }
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
-      return acts;
+      return senzaChiusureSullaFusione(fb, acts, opts);
     }
     if (tab === 'queue' || tab === 'waiting') {
       // Chi aspetta una domanda non è risolto: si risponde alla domanda, o si archivia.
