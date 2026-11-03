@@ -5384,9 +5384,15 @@
     const host = document.createElement('div');
     const ferme = Array.isArray(liv.richieste) ? liv.richieste : [];
     if (!UI || !ferme.length || !isAdmin) return host;
+    // Chi riallinea una fusione approvata e non avvenuta lo dice lo stato della pratica, come il quadrato (#1425).
+    const stato = liv.statoFusione;
+    const riallineamento = stato === 'da_riallineare' || stato === 'riallineamento_fallito'
+      ? () => ({ inCorso: stato === 'da_riallineare', testo: liv.pannello.testo })
+      : null;
     UI.render(host, opzioniFusioni({
       requests: ferme.filter((r) => !r.used),
       failed: ferme.filter((r) => r.used),
+      ...(riallineamento ? { riallineamento } : {}),
     }));
     host.hidden = false;
     return host;
