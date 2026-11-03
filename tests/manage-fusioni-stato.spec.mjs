@@ -1,6 +1,6 @@
 // Gestione: rosso e in cima solo una fusione che aspetta davvero l'owner (#1425, #1040.2); la riga dei tasti non
 // chiude una pratica mentre la sua fusione aspetta (#928); quadrato, registro dei rifiuti e Log dicono il vero (#1327);
-// la scheda della richiesta tiene il tempo, mostra la rotella e dice il ruolo in italiano (#1328).
+// la scheda della richiesta tiene il tempo, mostra la rotella e dice il ruolo in italiano (#1328). Pacchetto #1839.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
@@ -90,6 +90,10 @@ test('In coda: una fusione approvata in conflitto che la routine riallinea non �
   await expect(fusa).not.toHaveClass(/mg-item--fusione/);
   await expect(fusa.locator('.mg-fusione-badge')).not.toHaveText('fusione ferma');
   await expect(fusa.locator('.mg-segno-fermata')).not.toHaveClass(/mg-forma--attack/);
+  // Il bordo non dice «bloccato»: rosso è solo la richiesta da decidere.
+  const rosso = 'rgb(192, 57, 43)';
+  expect(await fusa.evaluate((e) => getComputedStyle(e).borderLeftColor)).not.toBe(rosso);
+  expect(await decidere.evaluate((e) => getComputedStyle(e).borderLeftColor)).toBe(rosso);
   expect(await fusa.getAttribute('title')).not.toMatch(/via libera/);
   const ordine = await page.locator('#mgList .mg-item').evaluateAll((els) => els.map((e) => e.dataset.id));
   expect(ordine[0]).toBe('decidere');
@@ -156,12 +160,12 @@ test('registro dei rifiuti: una frase per ogni motivo del server col dettaglio, 
   const rifiuti = codici.map((reason, i) => ({
     id: `r${i}`, at: new Date(Date.UTC(2026, 9, 1, 10, i)).toISOString(), slug: 'notturna', reason, detail: `dettaglio di ${i}`,
   })).concat([{ id: 'x', at: '2026-10-02T10:00:00.000Z', slug: 'notturna', reason: 'motivo_mai_visto', detail: 'qualcosa' }]);
-  await page.evaluate((rej) => window.__mgTest.renderChannelLog(rej, []), rifiuti.slice(-59));
+  await page.evaluate((rej) => window.__mgTest.renderChannelLog(rej, []), rifiuti);
   const lista = page.locator('#mgChannelList');
   const prima = lista.locator('.mg-log-row').first();
   await expect(prima).toContainText('motivo che questa pagina non conosce (motivo_mai_visto)');
   await expect(prima.locator('.mg-log-dettaglio')).toHaveText('qualcosa');
-  for (const r of rifiuti.slice(-59, -1)) {
+  for (const r of rifiuti.slice(0, -1)) {
     const riga = lista.locator('.mg-log-row', { has: page.locator('.mg-log-dettaglio', { hasText: new RegExp(`^${r.detail}$`) }) });
     await expect(riga).toHaveCount(1);
     await expect(riga.locator('.mg-log-when')).not.toContainText(r.reason);
@@ -205,7 +209,7 @@ test('scheda: il tempo cammina da solo fino a «scaduta», senza perdere un «Co
     };
     window.__mgTest.setAdmin(true);
     window.__mgTest.setData(docs);
-  }, { docs, req: richiesta('a'.repeat(24), 'tempo', 487, { createdAtMs: ora - MIN, expiresAtMs: ora + 2 * MIN + 30 * 1000 }) });
+  }, { docs, req: richiesta('a'.repeat(24), 'tempo', 487, { createdAtMs: ora - MIN, expiresAtMs: ora + 2 * MIN + 8 * 1000 }) });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
   await page.evaluate(() => window.__mgTest.openDetail('tempo'));
   await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
@@ -241,19 +245,18 @@ test('scheda: in volo la rotella gira accanto a una frase leggibile; il ruolo si
   await expect(stato).toBeVisible();
   const vista = await stato.evaluate((el) => {
     const prima = getComputedStyle(el, '::before');
-    const corpo = getComputedStyle(document.body);
+    const card = el.closest('.sn-mac-card');
     return {
-      rotella: prima.content !== 'none' && prima.animationName !== 'none',
+      rotella: prima.content !== 'none' && prima.animationName === 'sn-mac-gira',
       colore: getComputedStyle(el).color,
-      testo: getComputedStyle(el.closest('.sn-mac')).color || corpo.color,
-      opacita: getComputedStyle(el.closest('.sn-mac-card')).opacity,
+      // Il ramo ha il colore del testo normale: la frase d'attesa deve avere lo stesso.
+      testo: getComputedStyle(card.querySelector('.sn-mac-branch')).color,
+      opacita: getComputedStyle(card).opacity,
     };
   });
   expect(vista.rotella).toBe(true);
   expect(vista.opacita).toBe('1');
-  const fg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--sn-fg').trim());
-  const coloreFg = await page.evaluate((c) => { const d = document.createElement('span'); d.style.color = c; document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return v; }, fg);
-  expect(vista.colore).toBe(coloreFg);
+  expect(vista.colore).toBe(vista.testo);
   await expect(go).toBeDisabled();
   await page.screenshot({ path: 'tests/.shots/fusioni-stato-volo.png' });
 });

@@ -2742,7 +2742,11 @@
       // La domanda è di QUESTA scheda, non della lista: in una coda mista basta un documento
       // cifrato fra mille leggibili perché le sezioni restino, ed è lì che tornava il difetto.
       const leggibile = sezioni && statoLeggibile(fb);
-      const cl = leggibile ? MR.classifyBlock(fb) : null;
+      // Ferma al cancello ma non per una decisione dell'owner (approvata e fusa): il bordo non dice «bloccato» (#1040.2).
+      const fusione = fusioneDi(fb);
+      const ferma = !!(fusione && fusione.attende);
+      const bloccoL5 = leggibile ? MR.classifyBlock(fb) : null;
+      const cl = bloccoL5 && bloccoL5.reason === 'l5' && fusione && !ferma ? null : bloccoL5;
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
 
@@ -2765,8 +2769,6 @@
       item.dataset.id = fb._id;
       // Una fusione che aspetta l'owner pesa quanto un blocco: stessa tinta rossa, così si riconosce
       // scorrendo la lista. Le altre (fusa, in volo, da riallineare) hanno l'etichetta e basta (#1425).
-      const fusione = fusioneDi(fb);
-      const ferma = !!(fusione && fusione.attende);
       if (ferma) item.classList.add('mg-item--fusione');
       const arrivata = arrivate.has(String(fb._id));
       if (arrivata) item.classList.add('mg-item--arrivata');
