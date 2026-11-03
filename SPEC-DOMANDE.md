@@ -121,7 +121,9 @@ e registro.
 
 - **Nella sede `owner`** ogni strumento che consegna testo scritto da altri
   rifiuta la voce non fidata col numero e il motivo invece di sporcare il
-  biglietto; le fidate passano. Il canale delle routine non chiede lì niente
+  biglietto; le fidate passano. Di un feedback fidato arrivano il testo e i
+  turni dell'owner: chi ha scritto gli altri turni da qui non si sa, quindi
+  restano fuori coi loro allegati, e la riga dice quali. Il canale delle routine non chiede lì niente
   che porti testo altrui (il server sporcherebbe consegnando), e il
   manutentore non ci gira. Gli strumenti web della sessione non ci sono per
   costruzione (rete limitata).

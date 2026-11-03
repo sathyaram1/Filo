@@ -229,7 +229,7 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
   };
   // Nella sede owner un feedback fidato arriva coi soli turni dell'owner: chi ha scritto gli altri, da qui, non si sa.
   const tolti = rifiuta ? soloTurniDellOwner(pieno.notes) : { tolti: [] };
-  if (tolti.tolti.length) pieno.notes = tolti.notes;
+  if (tolti.tolti.length) { pieno.notes = tolti.notes; fb.notes = tolti.notes; }
   const avviso = tolti.tolti.length ? rigaTurniTolti(`#${numero}`, tolti.tolti) : '';
   // Chi stampa testo non fidato si sporca da sé (#1148): i motivi li dà questa lettura, e main sporca prima di stampare.
   const motivi = motiviDiLettura({ fiducia, notes: pieno.notes });
