@@ -1579,19 +1579,20 @@
   const L5_ELENCHI_ASSENTI = 'I controlli del server l’hanno fermata. Le richieste di fusione non sono ancora arrivate a questa pagina.';
   const L5_SERVER = 'È un lavoro anche sul server. Qui non c’è una richiesta da approvare, e da qui non se ne riapre una. Il motivo dello stop è nella conversazione. Rimandala in lavorazione per farla rifare, o archiviala.';
   const L5_NOTA_CIFRATA = 'Il perché sta nella conversazione, che è cifrata e su questo computer non si legge.';
-  // La nota è del cancello solo se è nata dopo l'audit, che viene subito prima: un report o una domanda di un giro
-  // passato non passa per il motivo della fermata. Al minuto, perché i marcatori portano solo i minuti. Il marcatore
-  // è nell'ora di chi scrive, senza fuso: il server scrive in UTC, gli strumenti dell'owner nella sua ora, e l'audit
-  // ha il fuso. Vale quindi la lettura più tarda delle due, o in Italia la nota del server sembra nata prima.
+  // Come il server apre la nota con cui ferma una pratica al cancello (functions/src/routine: fusioneServer notaOwner e
+  // notaPc, skipSecaudit, stall notaBlocco, unitFusione notaBloccoL5). Si riconosce dalla forma e non dall'ora, che nel
+  // marcatore non ha fuso: un report qualunque non diventa il motivo della fermata, in nessun fuso (#1556.2).
+  const NOTE_DEL_CANCELLO = [
+    /^Il cancello non fonde il ramo del server\b/,
+    /^Il cancello non porta il ramo su main di filo-security\b/,
+    /^Il cancello di fusione \(L5\) ha fermato\b/,
+    /^Verifica e controllo di sicurezza erano passati ma la fusione non era mai partita\b/,
+    /^Verifica e controllo di sicurezza sono passati, e [^\n]*\bcancello \(L5\) hanno fermato\b/,
+  ];
   function notaDelCancello(fb) {
     const nota = ultimaDomanda(fb);
-    const l4 = livelliOf(fb).l4;
-    const audit = Date.parse(String((l4 && l4.at) || ''));
-    const locale = nota && Date.parse(istanteDelTurno(nota.ts) || '');
-    if (!nota || !Number.isFinite(audit) || !Number.isFinite(locale)) return null;
-    const scritta = Math.max(locale, locale - new Date(locale).getTimezoneOffset() * 60000);
-    const minuto = (t) => Math.floor(t / 60000);
-    return minuto(scritta) >= minuto(audit) ? nota : null;
+    const testo = nota ? String(nota.body || '').trim() : '';
+    return testo && NOTE_DEL_CANCELLO.some((re) => re.test(testo)) ? nota : null;
   }
   function l5SenzaRichiesta(fb, opts) {
     const letto = !(opts && opts.dettaglioLetto === false);
@@ -2072,7 +2073,7 @@
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
-    fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf, descriviRiferimento,
+    fusioneInAttesa, fusioniFermeInCima, statoFusione, fusioneDi, STATI_FUSIONE, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf, descriviRiferimento,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, schedaIngresso, rigiudicabile,
     aspettaRisposta, aspettaDomanda, domandeBloccantiDi, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
