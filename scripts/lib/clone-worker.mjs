@@ -255,8 +255,10 @@ export function allineaPacchetti(clone, principale, {
   const diversi = stesso && pronti ? pacchettiDaInstallare(clone, { base: principale }) : [];
   const uguali = stesso && !diversi.length;
   // soloCollegati: chi non può aspettare un npm ci (dispatch) collega anche con un altro lock, e dice. Installa solo
-  // quando non c'è niente da collegare: un worker senza pacchetti è peggio di qualche minuto d'attesa (#1906).
-  if ((uguali || soloCollegati) && pronti) {
+  // quando non c'è niente da collegare: un worker senza pacchetti è peggio di qualche minuto d'attesa (#1906). Né
+  // collega col lock uguale e le versioni diverse: il worker partirebbe col motore vecchio, e nessun avviso lo direbbe.
+  const collegabile = uguali || (soloCollegati && !diversi.length);
+  if (collegabile && pronti) {
     // Ogni volta da capo: il principale può aver aggiunto o tolto pacchetti da allora.
     scollegaPacchetti(nm);
     if (restaUnCollegamento(nm)) return { ok: false, pacchetti: '', why: 'un collegamento a node_modules non si toglie: mi fermo' };
