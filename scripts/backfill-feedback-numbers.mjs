@@ -293,10 +293,9 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
     if (preso) return `il numero #${preso}, che la prova a secco dava, ora è di un'altra segnalazione`;
     return '';
   };
-  const { dati: letti, scartata } = await scansione({
+  const { dati: docs, scartata } = await scansione({
     nome: COPIA, dry, now, dir: copiaDir, usaCopia, scansiona: leggi, confronta,
   });
-  const docs = letti;
   const { withSeq, missing } = dividi(docs);
   // Chi la prova a secco numerava e adesso non è più da numerare: cambiata nel frattempo, si salta e si dice.
   const saltate = [];
