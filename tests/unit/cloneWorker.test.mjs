@@ -194,6 +194,38 @@ for (const [strada, opzioni] of [['a mano', {}], ['dal giro delle routine', { so
   }
 });
 
+// Il contenitore col principale indietro di una libreria nuova: le prove del clone la aggiungono in secondi, un npm ci
+// nella preparazione costerebbe minuti a ogni giro. Una voce che manca dentro un pacchetto che c'è, invece, non si aggiunge.
+for (const [strada, opzioni] of [['a mano', {}], ['dal giro delle routine', { soloCollegati: true }]]) test(`stesso package-lock, al principale manca solo una libreria nuova: il clone preparato ${strada} resta collegato; manca una voce annidata: installa per sé`, () => {
+  const s = scena();
+  try {
+    const dest = resolve(s.base, 'lavori', '1');
+    assert.equal(preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai }).ok, true);
+    const scrivi = (voci) => {
+      const lock = `${JSON.stringify({ name: 'filo', version: '1.0.0', lockfileVersion: 3, requires: true, packages: {
+        '': { name: 'filo', version: '1.0.0' }, 'node_modules/pacchetto': { version: '1.0.0' }, ...voci,
+      } }, null, 2)}\n`;
+      for (const d of [s.principale, dest]) writeFileSync(resolve(d, 'package-lock.json'), lock, 'utf8');
+    };
+
+    scrivi({ 'node_modules/hash-wasm': { version: '4.12.0' }, 'node_modules/hash-wasm/node_modules/dentro': { version: '1.0.0' } });
+    const r = allineaPacchetti(dest, s.principale, { npmCi: npmMai, ...opzioni });
+    assert.deepEqual([r.pacchetti, r.lockDiverso], ['collegati', undefined], 'collegati: la libreria la aggiungono le prove');
+    assert.ok(collegato(dest));
+
+    scrivi({ 'node_modules/pacchetto/node_modules/dentro': { version: '1.0.0' } });
+    const npmCi = npmFinto();
+    const avvisi = [];
+    const annidata = allineaPacchetti(dest, s.principale, { npmCi, avvisa: (m) => avvisi.push(m), ...opzioni });
+    assert.equal(annidata.pacchetti, 'privati', 'le prove non aggiungono dentro un pacchetto che c\'è già');
+    assert.equal(npmCi.chiamate, 1);
+    assert.match(avvisi.join('\n'), /non ha installato le versioni che il package-lock fissa \(dentro 1\.0\.0\)/);
+    assert.ok(existsSync(s.canarino));
+  } finally {
+    togliCartella(s.base);
+  }
+});
+
 test('chi svuota il node_modules del clone da dentro, come npm ci, toglie i collegamenti e non i pacchetti del principale', () => {
   const s = scena();
   try {
