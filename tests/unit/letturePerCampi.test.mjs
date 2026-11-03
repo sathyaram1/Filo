@@ -241,13 +241,12 @@ function scriptDiManutenzione(dir = SCRIPTS, prefisso = '') {
   return out;
 }
 
-test('ogni script che può leggere le segnalazioni carica il freno prima di farlo', () => {
-  // La collezione privata si legge solo con le credenziali di firestore-auth,
-  // che il freno lo porta con sé. Le schede pubbliche no: chi carica il modulo
-  // dei feedback le può scansionare senza credenziali, quindi importa il freno
-  // da sé, in testa e non dentro un ramo.
+test('ogni script che parla a Firestore da sé carica il freno prima di farlo', () => {
+  // La collezione privata si legge solo con le credenziali di firestore-auth, che il freno lo porta con sé, e chi carica
+  // il modulo dei feedback lo riceve dal modulo (prova qui sopra). Resta chi scrive l'indirizzo a mano: importa il
+  // freno in testa, non dentro un ramo.
   const importaFreno = /^\s*import\s+(?:[^;]*?\sfrom\s+)?['"][^'"]*(?:freno-letture|firestore-auth)\.mjs['"]/m;
-  const parlaConFirestore = /['"/]feedback\.js['"]|firestore\.googleapis/;
+  const parlaConFirestore = /firestore\.googleapis/;
   const visti = scriptDiManutenzione();
   assert.ok(visti.some((f) => f.nome === 'lib/firestore-auth.mjs'), `lib/ non guardata: ${visti.map((f) => f.nome).join(', ')}`);
   const scoperti = visti.filter((f) => parlaConFirestore.test(f.testo) && !importaFreno.test(f.testo)).map((f) => f.nome);
