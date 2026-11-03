@@ -107,24 +107,37 @@ un colpo solo `FB?.list…`, il metodo preso dal modulo e chiamato da solo, la
 query scritta dentro la richiesta, la chiave prima di `pageSize`, l'indirizzo
 messo insieme con un più (#680.1). Tutte producono la STESSA richiesta.
 
-Quindi il freno sta sulla `fetch` (`scripts/lib/freno-letture.mjs`) e ferma,
-prima che parta, una scansione senza proiezione: una lista REST di una
-collezione senza `mask.fieldPaths`, una `:runQuery` senza `select`. Non è una
-scansione una query che porta via al massimo dieci documenti senza cursore (il
-massimo di `seq`); lo è qualunque pagina con un cursore (`pageToken`,
-`startAt`), anche piccola, perché è un pezzo di un giro intero. Un conteggio,
-un `batchGet`, una lettura per nome e le scritture passano. Chi sbatte contro il
-freno lo scopre alla prima prova a secco, e senza aver pagato niente.
+Quindi il freno sta sulla `fetch` (`scripts/lib/freno-letture.cjs`, che l'`.mjs`
+riesporta) e ferma, prima che parta, una scansione senza proiezione: una lista
+REST di una collezione senza `mask.fieldPaths`, una `:runQuery` senza `select`, un
+`batchGet` senza `mask` di più di dieci documenti. Una scelta dei campi vuota vale
+come nessuna (il database restituisce il documento intero). Il corpo si legge
+comunque sia stato mandato: testo, blocco binario, `Blob`, dentro un oggetto
+`Request` già pronto; un corpo che il freno non sa aprire ferma la lettura.
+
+Non è una scansione una lettura che porta via al massimo dieci documenti interi
+senza cursore (il massimo di `seq`), ma il conto vale per il **giro**, non per la
+richiesta: dieci pagine da dieci avanzate con un filtro sul numero invece del
+cursore, o i nomi presi con una proiezione e poi chiesti tutti a gruppi, sono cento
+documenti interi, e il pezzo che porta il giro oltre i dieci si ferma (#1335).
+Qualunque pagina con un cursore (`pageToken`, `startAt`) lo è subito. Un
+conteggio, una lettura per nome e le scritture passano. Chi sbatte contro il freno
+lo scopre alla prima prova a secco, e senza aver pagato niente.
 
 Il freno si installa da sé con `lib/firestore-auth.mjs`, l'unica strada per le
-credenziali che la collezione privata vuole. Le schede pubbliche si leggono
-senza: chi carica il modulo dei feedback importa il freno in testa, e la
-sentinella lo controlla.
+credenziali che la collezione privata vuole, e con `src/shared/feedback.js`
+caricato fuori da Electron, comunque lo si nomini (con o senza `.js`, da `require`
+o da `import`): le schede pubbliche si leggono senza credenziali. Nell'app il freno
+non c'è: lì le liste le chiede la Gestione, con i suoi campi.
 
 Le sentinelle: `tests/unit/letturePerCampi.test.mjs` fa girare davvero uno
 strumento in ogni grafia trovata finora sotto il freno, e guarda che si fermi
 prima della rete e che la stessa scansione coi campi passi.
-`tests/unit/archiviazioneLetture.test.mjs` tiene il conto del passo che scrive.
+`tests/unit/archiviazioneLetture.test.mjs` tiene il conto del passo che scrive;
+`tests/unit/archiviazioneConfronto.test.mjs` e
+`tests/unit/riusoConfrontatoColPresente.test.mjs` il filtro sulle chiuse e il
+confronto col presente; `tests/unit/campiDallePagine.test.mjs` i campi chiesti da
+una pagina filo://, che arrivano al main e tornano quelli.
 `tests/unit/copiaSuFile.test.mjs` tiene le regole della copia: fresca risponde,
 scaduta o illeggibile no, dopo un'applicazione si butta, e quello che qualcun
 altro ha preparato nella cartella temporanea non si legge né si riscrive.
