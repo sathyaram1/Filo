@@ -261,6 +261,13 @@
   function siRiallineaDaSola(req) {
     return originOf(req) === 'routine' && !!String((req && req.feedbackId) || '').trim();
   }
+  /** Cosa succede, o cosa fa l'owner, dopo un sì finito in conflitto. PURA. */
+  function dopoIlConflitto(req) {
+    if (siRiallineaDaSola(req)) return RIALLINEA_DA_SOLA;
+    return originOf(req) === 'routine'
+      ? 'Questo lavoro non si riallinea da solo: rimetti la sua pratica In coda per un giro nuovo.'
+      : 'Rifai la base del ramo e rilancia npm run finish.';
+  }
 
   // Il motivo del server porta un'etichetta tecnica: qui diventa una frase, il dettaglio fra
   // parentesi resta. Un'etichetta sconosciuta si stampa grezza: dice più di una nascosta.
