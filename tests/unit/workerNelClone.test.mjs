@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { ruoloConsegnato } from '../helpers/ruoloConsegnato.mjs';
 import { pinTools, pinnedDirWorker } from '../../scripts/lib/tools-pin.mjs';
 import { MARCA_GIRO, accendi, cloneDelGiro, preparaIntestazione } from '../../scripts/lib/worker-nel-clone.mjs';
 import { MARCATORE_WORKER } from '../../scripts/lib/dati-worker.mjs';
