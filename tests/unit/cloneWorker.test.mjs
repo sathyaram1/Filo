@@ -175,18 +175,14 @@ for (const [strada, opzioni] of [['a mano', {}], ['dal giro delle routine', { so
     const installato = (v) => writeFileSync(resolve(electron, 'package.json'), `{"name":"electron","version":"${v}"}\n`, 'utf8');
 
     installato('44.9.3');
-    const uguali = allineaPacchetti(dest, s.principale, { npmCi: npmMai });
+    const uguali = allineaPacchetti(dest, s.principale, { npmCi: npmMai, ...opzioni });
     assert.deepEqual([uguali.pacchetti, uguali.lockDiverso], ['collegati', undefined], 'versioni uguali: collegati, senza avvisi');
     assert.ok(collegato(dest));
 
     installato('44.7.0');
-    // Dispatch non può aspettare un npm ci: collega lo stesso, e dice che i pacchetti non sono quelli del lock (#1906).
-    const dispatch = allineaPacchetti(dest, s.principale, { npmCi: npmMai, soloCollegati: true });
-    assert.deepEqual([dispatch.pacchetti, dispatch.lockDiverso], ['collegati', true]);
-
     const avvisi = [];
     const npmCi = npmFinto();
-    const r = allineaPacchetti(dest, s.principale, { npmCi, avvisa: (m) => avvisi.push(m) });
+    const r = allineaPacchetti(dest, s.principale, { npmCi, avvisa: (m) => avvisi.push(m), ...opzioni });
     assert.equal(r.pacchetti, 'privati', 'non «collegati»: il clone avrebbe il motore vecchio');
     assert.equal(npmCi.chiamate, 1);
     assert.ok(!collegato(dest) && existsSync(resolve(dest, 'node_modules', 'privato')), 'i pacchetti stanno nel clone');
