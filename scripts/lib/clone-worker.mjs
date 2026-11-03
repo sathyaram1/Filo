@@ -255,9 +255,9 @@ export function allineaPacchetti(clone, principale, {
   // Lo stesso lock non basta: il principale può averlo ricevuto senza reinstallare, e il clone erediterebbe le sue
   // versioni, Electron compreso (#1141.8). Una libreria di primo livello che manca e basta no: la aggiungono in pochi
   // secondi le prove del clone, e un npm ci qui costerebbe minuti a ogni giro.
-  const diversi = stesso && pronti
-    ? pacchettiDaInstallare(clone, { base: principale }).filter((v) => v.trovata || primoLivello(v.percorso) !== v.percorso)
-    : [];
+  const daCambiare = stesso && pronti ? pacchettiDaInstallare(clone, { base: principale }) : [];
+  const assenti = new Set(daCambiare.filter((v) => !v.trovata && primoLivello(v.percorso) === v.percorso).map((v) => v.percorso));
+  const diversi = daCambiare.filter((v) => !assenti.has(primoLivello(v.percorso)));
   const uguali = stesso && !diversi.length;
   // soloCollegati: chi non può aspettare un npm ci (dispatch) collega anche con un altro lock, e dice. Installa solo
   // quando non c'è niente da collegare: un worker senza pacchetti è peggio di qualche minuto d'attesa (#1906). Né
