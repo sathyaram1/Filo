@@ -14,6 +14,7 @@ import { pinTools, pinnedDirWorker } from '../../scripts/lib/tools-pin.mjs';
 import { MARCA_GIRO, accendi, cloneDelGiro, preparaIntestazione } from '../../scripts/lib/worker-nel-clone.mjs';
 import { MARCATORE_WORKER } from '../../scripts/lib/dati-worker.mjs';
 import { MARCA_PRIVATI } from '../../scripts/lib/clone-worker.mjs';
+import { espandiInclusioni } from '../../scripts/lib/role-text.mjs';
 import { cartelleTranscript } from '../../scripts/session-report.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
