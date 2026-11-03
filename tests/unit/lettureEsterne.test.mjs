@@ -17,7 +17,7 @@ const GANCIO = join(ROOT, '.claude', 'hooks', 'letture-esterne.sh');
 const SEGRETO = 'g'.repeat(43);
 const FP = '7'.repeat(64);
 
-const ctxPosix = { cwd: '/casa/Filo', win: false, cartelle: ['/casa/Filo', '/casa/filo-security', '/home/o/.claude'], file: ['/casa/LOCAL.md'] };
+const ctxPosix = { cwd: '/casa/Filo', win: false, cartelle: ['/casa/Filo', '/casa/filo-security'], file: ['/casa/LOCAL.md'], claude: ['/home/o/.claude'], sessione: 'sess-1' };
 const leggi = (file_path, ctx = ctxPosix) => L.motivoLettura({ tool_name: 'Read', tool_input: { file_path } }, ctx);
 
 test('classificatore: sporca ogni strumento tranne un elenco chiuso (shell, ricerche nel disco, scritture, sotto-agenti locali, compiti), anche uno nuovo (#1211.2)', () => {
@@ -137,7 +137,8 @@ test('classificatore: Read sporca solo fuori dal repo, dal checkout del server a
   assert.equal(leggi('/casa/Filo'), '');
   assert.equal(leggi('src/relativo.js'), '', 'relativo alla cartella della chiamata');
   assert.equal(leggi('/casa/filo-security/functions/index.js'), '');
-  assert.equal(leggi('/home/o/.claude/projects/x/tool-results/1.txt'), '');
+  assert.equal(leggi('/home/o/.claude/skills/x/SKILL.md'), '');
+  assert.equal(leggi('/home/o/.claude/projects/x/sess-2/tool-results/1.txt'), 'Read dalla cartella di Claude (1.txt)', 'i resoconti di un’altra sessione (#1211.3)');
   assert.equal(leggi('/casa/LOCAL.md'), '');
   assert.equal(leggi('/casa/segnala-12.md'), 'Read fuori dal repo (segnala-12.md)');
   assert.equal(leggi('/casa/Filo-copia/x.js'), 'Read fuori dal repo (x.js)', 'stesso inizio del nome, cartella diversa');
@@ -164,7 +165,7 @@ test('classificatore: le uscite in sottofondo e gli appunti nella cartella tempo
 });
 
 test('classificatore: su Windows maiuscole e barre non contano', () => {
-  const ctx = { cwd: 'C:\\Users\\agenti AI\\Desktop\\Filo\\Filo', win: true, cartelle: ['c:\\users\\agenti ai\\desktop\\filo\\filo', 'C:\\Users\\agenti AI\\.claude'], file: ['C:\\Users\\agenti AI\\Desktop\\Filo\\LOCAL.md'] };
+  const ctx = { cwd: 'C:\\Users\\agenti AI\\Desktop\\Filo\\Filo', win: true, cartelle: ['c:\\users\\agenti ai\\desktop\\filo\\filo'], claude: ['C:\\Users\\agenti AI\\.claude'], file: ['C:\\Users\\agenti AI\\Desktop\\Filo\\LOCAL.md'] };
   assert.equal(leggi('C:\\Users\\Agenti AI\\Desktop\\Filo\\Filo\\src\\x.js', ctx), '');
   assert.equal(leggi('C:/Users/agenti AI/Desktop/Filo/Filo/package.json', ctx), '');
   assert.equal(leggi('c:\\users\\agenti ai\\desktop\\filo\\local.md', ctx), '');
@@ -188,10 +189,11 @@ test('contesto: il repo anche da una worktree, il checkout del server accanto, l
     mkdirSync(join(sopra, 'filo-security', 'functions', 'tools'), { recursive: true });
     writeFileSync(join(sopra, 'filo-security', 'functions', 'tools', 'server-fondi.js'), '');
     const ctx = L.contestoLettura({ cwd: wt, env: { CLAUDE_CONFIG_DIR: join(sopra, 'conf') } });
-    for (const dove of [join(wt, 'src', 'a.js'), join(repo, 'x.txt'), join(sopra, 'filo-security', 'functions', 'index.js'), join(sopra, 'conf', 'x'), join(sopra, 'LOCAL.md')]) {
+    for (const dove of [join(wt, 'src', 'a.js'), join(repo, 'x.txt'), join(sopra, 'filo-security', 'functions', 'index.js'), join(sopra, 'conf', 'settings.json'), join(sopra, 'LOCAL.md')]) {
       assert.equal(L.motivoLettura({ tool_name: 'Read', tool_input: { file_path: dove } }, ctx), '', dove);
     }
     assert.match(L.motivoLettura({ tool_name: 'Read', tool_input: { file_path: join(sopra, 'altro.md') } }, ctx), /fuori dal repo/);
+    assert.match(L.motivoLettura({ tool_name: 'Read', tool_input: { file_path: join(sopra, 'conf', 'projects', 'p', 's.jsonl') } }, ctx), /cartella di Claude/, 'la cartella di CLAUDE_CONFIG_DIR ha lo stesso elenco ammesso');
     // Dalla worktree col progetto dichiarato: il repo resta di casa.
     const daWt = L.contestoLettura({ cwd: wt, env: { CLAUDE_PROJECT_DIR: repo } });
     assert.equal(L.motivoLettura({ tool_name: 'Read', tool_input: { file_path: join(wt, 'src', 'a.js') } }, daWt), '');
@@ -297,6 +299,27 @@ test('il gancio vero: sporca per pagine web, MCP e file fuori dal repo; per i fi
     assert.deepEqual(prova('Read', { file_path: join(dir, 'x.txt') }), [], 'dentro il repo della sessione');
     assert.deepEqual(prova('Read', { file_path: join(dirname(ROOT), 'LOCAL.md') }), []);
     assert.deepEqual(prova('Read', { file_path: join(casa, '.claude', 'plans', 'p.md') }, { env: { HOME: casa, USERPROFILE: casa } }), []);
+    // #1211.3: nella cartella di Claude i resoconti delle altre sessioni e i cataloghi di terzi sporcano, le impostazioni no.
+    const conCasa = { env: { HOME: casa, USERPROFILE: casa } };
+    assert.deepEqual(prova('Read', { file_path: join(casa, '.claude', 'projects', 'p', 'altra.jsonl') }, conCasa), ['Read dalla cartella di Claude (altra.jsonl)']);
+    assert.deepEqual(prova('Read', { file_path: join(casa, '.claude', 'plugins', 'marketplaces', 'terzi', 'catalogo.json') }, conCasa), ['Read dalla cartella di Claude (catalogo.json)']);
+    assert.deepEqual(prova('Read', { file_path: join(casa, '.claude', 'projects', 'p', 'sess.jsonl') }, conCasa), [], 'la storia della sessione stessa');
+    for (const f of [['settings.json'], ['CLAUDE.md'], ['skills', 'x', 'SKILL.md'], ['commands', 'c.md'], ['projects', 'p', 'memory', 'MEMORY.md']]) {
+      assert.deepEqual(prova('Read', { file_path: join(casa, '.claude', ...f) }, conCasa), [], f.join('/'));
+    }
+    // Grep con le righe vale come Read sullo stesso percorso; coi soli nomi resta pulito.
+    assert.deepEqual(prova('Grep', { pattern: 'x', path: join(fuori, 'mail.eml'), output_mode: 'content' }), ['Grep fuori dal repo (mail.eml)']);
+    assert.deepEqual(prova('Grep', { pattern: 'x', path: fuori, output_mode: 'content', '-n': true }), [`Grep fuori dal repo (${basename(fuori)})`]);
+    assert.deepEqual(prova('Grep', { pattern: 'x', path: join(casa, '.claude', 'projects'), output_mode: 'content' }, conCasa), ['Grep dalla cartella di Claude (projects)']);
+    assert.deepEqual(prova('Grep', { pattern: 'x', path: join(ROOT, 'scripts'), output_mode: 'content' }), [], 'dentro il progetto');
+    assert.deepEqual(prova('Grep', { pattern: 'x', path: dir, output_mode: 'content' }), [], 'dentro il repo della sessione');
+    assert.deepEqual(prova('Grep', { pattern: 'x', output_mode: 'content' }), [], 'senza percorso: la cartella della chiamata, il repo');
+    for (const output_mode of [undefined, 'files_with_matches', 'count']) {
+      assert.deepEqual(prova('Grep', { pattern: 'x', path: fuori, output_mode }), [], String(output_mode));
+    }
+    // Il salto senza processi guarda i parametri, non il testo cercato.
+    assert.deepEqual(prova('Grep', { pattern: '"output_mode":"content"', path: fuori }), []);
+    assert.deepEqual(prova('Grep', { pattern: `"path":"${join(ROOT, 'x')}"`, path: fuori, output_mode: 'content' }), [`Grep fuori dal repo (${basename(fuori)})`]);
     for (const n of ['Bash', 'Grep', 'Glob', 'mcp__ide__getDiagnostics']) assert.deepEqual(prova(n, { command: 'curl x', pattern: 'x', path: fuori }), [], n);
     // L'apertura di un turno nell'app desktop: piano, capitolo, riassunto lasciano pulito; leggere gli eventi no (#1252).
     for (const n of ['mcp__ccd_turn__update_plan', 'mcp__ccd_session__mark_chapter', 'mcp__ccd_turn__wrap_up']) assert.deepEqual(prova(n, { plan: [{ step: 'x', status: 'in_progress' }] }), [], n);
