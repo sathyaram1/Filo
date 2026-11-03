@@ -24,6 +24,7 @@ const NM = 'node_modules/';
 const leggiJson = (f) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch (_) { return null; } };
 const eLink = (p) => { try { return lstatSync(p).isSymbolicLink(); } catch (_) { return false; } };
 const esiste = (p) => { try { lstatSync(p); return true; } catch (_) { return false; } };
+export const collegatoVoceAVoce = (nm) => existsSync(join(nm, MARCA_COLLEGATI));
 
 /** Come npm legge `os` e `cpu`: i valori ammessi, o quelli esclusi col `!` davanti. PURA. */
 export function ammesso(elenco, valore) {
