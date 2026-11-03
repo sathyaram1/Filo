@@ -126,6 +126,7 @@ test('l\'applicazione riusa la lettura della prova a secco, e dopo aver scritto 
     now,
     dir,
     log: (r) => detto.push(r),
+    confronta: () => '',
     scansiona: async () => { letture += 1; return [{ _id: 'a' }, { _id: 'b' }]; },
   });
 
