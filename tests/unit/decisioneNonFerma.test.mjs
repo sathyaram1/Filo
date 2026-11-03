@@ -94,7 +94,7 @@ test('[2i?] a bilancio dei 2 finito va da parte come un 2: domanda nel suo feedb
   assert.equal(conTre.derived[0].inCorrezione, true);
 });
 
-test('decisioneFerma e segnalazioneFerma: fermano un 3 o una scelta difficile da disfare; senza livello ferma come prima', () => {
+test('decisioneFerma: ferma un 3 o un 2 su una scelta difficile da disfare', () => {
   assert.equal(R.decisioneFerma({ level: 3, decision: true }), true);
   assert.equal(R.decisioneFerma({ level: 2, decision: true, irreversibile: true }), true);
   assert.equal(R.decisioneFerma({ level: 2, decision: true }), false);
