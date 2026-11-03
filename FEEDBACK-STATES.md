@@ -428,7 +428,9 @@ con lo sha verificato del server: se in copia manca dispatch lo scarica da origi
 lo toglie dai rami), e se è la punta stessa del ramo non va nel marcatore e il compito dice
 che il confronto manca, invece di dare un diff vuoto (#1968). Se il report di chi ha rifatto
 la base nomina un commit di `main` che la punta non contiene, il rebase non è arrivato su
-origin (#2101): sulla punta verificata il compito dice di registrare senza rilievi, così il
+origin (#2101); lo stesso se la punta verificata è nata quando sulla catena delle fusioni di
+`main` era già arrivato, da oltre mezza giornata, qualcosa che non contiene (il report può non
+nominare lo sha). Sulla punta verificata il compito dice di registrare senza rilievi, così il
 lavoro torna alla fusione, che rifà il riallineamento se serve ancora; con altri commit
 sopra, chi verifica li prova e ne fa un rilievo interno. Quello sha il server lo tiene
 sul commit che un verificatore ha approvato: un salto dopo un riallineamento pulito marca
