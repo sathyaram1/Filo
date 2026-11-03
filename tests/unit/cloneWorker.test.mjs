@@ -1,6 +1,6 @@
 // Un clone per worker (#1157): origin giusto per costruzione, node_modules collegato e mai attraversato, chiavi
-// d'accesso copiate senza stamparle, installazione privata solo se il lock cambia, rimozione che toglie prima il
-// collegamento. Più il marcatore del worker, che non deve mai finire in un commit.
+// d'accesso copiate senza stamparle, installazione privata se il lock o le versioni del principale non tornano,
+// rimozione che toglie prima il collegamento. Più il marcatore del worker, che non deve mai finire in un commit.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -237,8 +237,8 @@ const suStderr = (m) => process.stderr.write(`[clone-worker] ${m}\n`);
 
 /**
  * `node_modules` del clone: collegato pacchetto per pacchetto a quello del principale se `package-lock.json` è lo
- * stesso e il principale ha installato le versioni che fissa; altrimenti un'installazione privata (la cache di npm resta condivisa),
- * anche quando il principale i pacchetti non li ha, o non ha finito di installarli. Dopo che il clone è sul ramo.
+ * stesso e il principale ha installato le versioni che fissa; altrimenti un'installazione privata (la cache di npm resta
+ * condivisa), anche quando il principale i pacchetti non li ha, o non ha finito di installarli. Dopo che il clone è sul ramo.
  */
 export function allineaPacchetti(clone, principale, {
   npmCi = npmCiDavvero, soloCollegati = false, avvisa = suStderr, blocchi = tmpdir(), ora = Date.now, attendi = dormi,

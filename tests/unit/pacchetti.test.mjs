@@ -1,5 +1,6 @@
-// Avviare Filo dai sorgenti installa i pacchetti nuovi del lock (#1572) senza sostituire un Electron acceso, e il pacchetto
-// installato porta ogni libreria che src/ richiede. Le regole di scripts/lib/pacchetti.mjs e del pre-avvio.
+// Avviare Filo dai sorgenti installa i pacchetti nuovi del lock (#1572) senza sostituire un Electron acceso, le prove di un
+// albero completano col suo lock un node_modules non suo (#1572.1), e il pacchetto installato porta ogni libreria che
+// src/ richiede. Le regole di scripts/lib/pacchetti.mjs e del pre-avvio.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
