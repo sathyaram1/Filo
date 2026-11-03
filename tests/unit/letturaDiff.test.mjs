@@ -175,7 +175,8 @@ test('un lavoro server: la lettura legge anche il diff del server con le sue pro
 
   gs('update-ref', 'refs/remotes/origin/worker/1363', 'worker/1363');
   gs('branch', '-q', '-D', 'worker/1363');
-  assert.match(leggi(casa, ['--base', base]).stdout, /sostituisciSulBiglietto|Il ramo `worker\/1363` di filo-security/, 'il ramo solo scaricato da origin si legge lo stesso');
+  assert.match(leggi(casa, ['--base', base]).stdout, /Questo è un lavoro server\. Il ramo `worker\/1363` di filo-security/, 'il ramo solo scaricato da origin si legge lo stesso');
+  assert.match(readFileSync(fileServer, 'utf8'), /sostituisciSulBiglietto/);
 
   gs('update-ref', '-d', 'refs/remotes/origin/worker/1363');
   const senzaRamo = leggi(casa, ['--base', base]);
