@@ -426,7 +426,11 @@ del confronto (`dal`: lo sha verificato se il server lo manda come `shaVerificat
 la punta che il correttore riceve). A chi verifica il riallineamento il perimetro arriva
 con lo sha verificato del server: se in copia manca dispatch lo scarica da origin (un rebase
 lo toglie dai rami), e se è la punta stessa del ramo non va nel marcatore e il compito dice
-che il confronto manca, invece di dare un diff vuoto (#1968). Quello sha il server lo tiene
+che il confronto manca, invece di dare un diff vuoto (#1968). Se il report di chi ha rifatto
+la base nomina un commit di `main` che la punta non contiene, il rebase non è arrivato su
+origin (#2101): sulla punta verificata il compito dice di registrare senza rilievi, così il
+lavoro torna alla fusione, che rifà il riallineamento se serve ancora; con altri commit
+sopra, chi verifica li prova e ne fa un rilievo interno. Quello sha il server lo tiene
 sul commit che un verificatore ha approvato: un salto dopo un riallineamento pulito marca
 passata la punta nuova per il cancello, ma il riallineamento dopo riparte dall'approvato,
 anche nel confronto che decide il giro: per questo anche a chi riallinea dispatch scarica lo
