@@ -62,20 +62,26 @@ function collezioneDelNome(nome) {
   return m ? m[2] : '?';
 }
 
-/**
- * Cosa porta via questa richiesta, se è una lettura di documenti interi: { motivo } quando è una scansione da sola,
- * { mirata: { collezione: quanti } } quando è piccola (conta nel giro), null quando non è una lettura senza campi. PURA.
- */
-function letturaSenzaCampi(input, init = {}) {
+/** Dove va la richiesta, se va ai documenti di Firestore: { url, segmenti, azione, metodo }, altrimenti null. PURA. */
+function richiestaFirestore(input, init) {
   let url;
   try { url = new URL(urlDi(input)); } catch (_) { return null; }
   let percorso;
   try { percorso = decodeURIComponent(url.pathname); } catch (_) { percorso = url.pathname; }
   const m = percorso.match(/\/databases\/[^/]+\/documents((?:\/[^/:]+)*)(?::([A-Za-z]+))?\/?$/);
   if (!m) return null;
-  const segmenti = (m[1] || '').split('/').filter(Boolean);
-  const azione = m[2] || '';
   const metodo = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+  return { url, segmenti: (m[1] || '').split('/').filter(Boolean), azione: m[2] || '', metodo };
+}
+
+/**
+ * Cosa porta via questa richiesta, se è una lettura di documenti interi: { motivo } quando è una scansione da sola,
+ * { mirata: { collezione: quanti } } quando è piccola (conta nel giro), null quando non è una lettura senza campi. PURA.
+ */
+function letturaSenzaCampi(input, init = {}) {
+  const r = richiestaFirestore(input, init);
+  if (!r) return null;
+  const { url, segmenti, azione, metodo } = r;
 
   if (!azione && metodo === 'GET') {
     // Un numero pari di segmenti nomina un documento: una lettura sola.
@@ -144,7 +150,10 @@ function conFreno(vera) {
   if (vera[SEGNO]) return vera;
   const presi = new Map();
   const frenata = async function fetchConFreno(input, init) {
-    const l = letturaSenzaCampi(input, await corpoPerIlFreno(input, init));
+    // Il corpo si apre solo per le letture che lo portano: un caricamento qualunque non si rilegge.
+    const r = richiestaFirestore(input, init);
+    const conCorpo = r && r.metodo === 'POST' && AZIONI_DI_LETTURA.has(r.azione) ? await corpoPerIlFreno(input, init) : init;
+    const l = letturaSenzaCampi(input, conCorpo);
     if (l && l.motivo) throw new ScansioneSenzaCampi(l.motivo);
     if (l && l.mirata) {
       for (const [collezione, quanti] of Object.entries(l.mirata)) {

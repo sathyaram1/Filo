@@ -18,7 +18,8 @@
   const STORAGE_BASE = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o`;
 
   // Fuori da Electron chi carica questo modulo è uno strumento, e può scansionare le schede pubbliche senza credenziali:
-  // il freno sulle scansioni si installa qui, comunque il modulo sia stato nominato (#1335). Fuori dal repo non c'è.
+  // il freno sulle scansioni si installa qui, comunque il modulo sia stato nominato (#1335). Una copia del modulo fuori
+  // dal repo non ha il freno accanto, e va avanti senza.
   if (typeof require === 'function' && typeof __dirname === 'string' && typeof process !== 'undefined'
       && process.versions && process.versions.node && !process.versions.electron) {
     try {
