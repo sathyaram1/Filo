@@ -336,8 +336,7 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
   // Applicato: i numeri sul server non sono più quelli che la copia descrive.
   dopoApplicazione(COPIA, { dry, usaCopia, dir: copiaDir });
   console.log(letture.riga());
-  const scritte = missing.length - failures - saltate.filter((s) => missing.some((d) => idDi(d) === s.id)).length;
-  return { total: docs.length, numbered: dry ? 0 : scritte, failures, saltate, dry, letture: letture.totale };
+  return { total: docs.length, numbered: missing.length - failures - cambiate, failures, saltate, dry, letture: letture.totale };
 }
 
 // Il contatore da cui i feedback nuovi prendono il numero: se un giro ha
