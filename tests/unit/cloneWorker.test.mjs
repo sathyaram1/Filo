@@ -160,6 +160,44 @@ test('package-lock diverso dal principale solo nel numero del progetto: stessi p
   }
 });
 
+// Il principale può ricevere un lock nuovo senza reinstallare: lo stesso lock non dice cosa c'è davvero (#1141.8).
+test('stesso package-lock, ma il principale ha installato un altro Electron: il clone non lo eredita, installa per sé', () => {
+  const s = scena();
+  try {
+    const dest = resolve(s.base, 'lavori', '1');
+    assert.equal(preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai }).ok, true);
+    const lock = `${JSON.stringify({ name: 'filo', version: '1.0.0', lockfileVersion: 3, requires: true, packages: {
+      '': { name: 'filo', version: '1.0.0' }, 'node_modules/pacchetto': { version: '1.0.0' }, 'node_modules/electron': { version: '44.9.3', dev: true },
+    } }, null, 2)}\n`;
+    for (const d of [s.principale, dest]) writeFileSync(resolve(d, 'package-lock.json'), lock, 'utf8');
+    const electron = resolve(s.principale, 'node_modules', 'electron');
+    mkdirSync(electron, { recursive: true });
+    const installato = (v) => writeFileSync(resolve(electron, 'package.json'), `{"name":"electron","version":"${v}"}\n`, 'utf8');
+
+    installato('44.9.3');
+    const uguali = allineaPacchetti(dest, s.principale, { npmCi: npmMai });
+    assert.deepEqual([uguali.pacchetti, uguali.lockDiverso], ['collegati', undefined], 'versioni uguali: collegati, senza avvisi');
+    assert.ok(collegato(dest));
+
+    installato('44.7.0');
+    // Dispatch non può aspettare un npm ci: collega lo stesso, e dice che i pacchetti non sono quelli del lock (#1906).
+    const dispatch = allineaPacchetti(dest, s.principale, { npmCi: npmMai, soloCollegati: true });
+    assert.deepEqual([dispatch.pacchetti, dispatch.lockDiverso], ['collegati', true]);
+
+    const avvisi = [];
+    const npmCi = npmFinto();
+    const r = allineaPacchetti(dest, s.principale, { npmCi, avvisa: (m) => avvisi.push(m) });
+    assert.equal(r.pacchetti, 'privati', 'non «collegati»: il clone avrebbe il motore vecchio');
+    assert.equal(npmCi.chiamate, 1);
+    assert.ok(!collegato(dest) && existsSync(resolve(dest, 'node_modules', 'privato')), 'i pacchetti stanno nel clone');
+    assert.match(avvisi.join('\n'), /non ha installato le versioni che il package-lock fissa \(electron 44\.9\.3 \(c'è 44\.7\.0\)\)/);
+    assert.match(readFileSync(resolve(electron, 'package.json'), 'utf8'), /44\.7\.0/, 'il node_modules del principale non si tocca');
+    assert.ok(existsSync(s.canarino));
+  } finally {
+    togliCartella(s.base);
+  }
+});
+
 test('chi svuota il node_modules del clone da dentro, come npm ci, toglie i collegamenti e non i pacchetti del principale', () => {
   const s = scena();
   try {
