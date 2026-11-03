@@ -94,13 +94,33 @@ test('sulla punta verificata senza il rebase dichiarato il compito dice che non 
   assert.match(r.err, /il rebase non è arrivato su origin/);
 });
 
-test('sulla punta verificata il rebase manca anche se il report non nomina lo sha di main', () => {
-  const r = consegna({ shaVerificato: VERIFICATO, reportRebase: 'Riallineato su main attuale. Conflitto in b.js, solo meccanico.' });
-  assert.match(r.instructions, /Il riallineamento non è su questo ramo/);
-  assert.match(r.instructions, /registra la critica senza rilievi/);
-  assert.doesNotMatch(r.instructions, /Il confronto manca: dichiaralo nella critica/);
-  const vuoto = perimetroNote('riallineamento', { shaVerificato: VERIFICATO }, { scartato: 'punta' });
-  assert.match(vuoto, /registra la critica senza rilievi/, 'anche senza report');
+// Il caso di #1589 con un report che non scrive lo sha: main fonde qualcosa il 2, il lavoro è verificato il 10 sulla
+// base del 1. La data di arrivo su main la dà la fusione del server, non i commit fusi (che tengono la loro).
+test('sulla punta verificata nata su un main già superato il rebase manca anche se il report non nomina lo sha', () => {
+  const dir = join(BASE, 'datato');
+  mkdirSync(dir);
+  const g = (args, quando) => execFileSync('git', ['-C', dir, ...args], {
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(quando ? { GIT_COMMITTER_DATE: quando, GIT_AUTHOR_DATE: quando } : {}) },
+  }).trim();
+  g(['init', '-q', '--initial-branch=main']); identita(dir);
+  const fai = (file, quando) => { writeFileSync(join(dir, file), file); g(['add', '-A']); g(['commit', '-qm', file], quando); };
+  fai('a.js', '2026-10-01T10:00:00Z');
+  g(['checkout', '-qb', 'fuso']); fai('vecchio.js', '2026-09-20T10:00:00Z');
+  g(['checkout', '-q', 'main']); g(['merge', '-q', '--no-ff', '-m', 'fusione del server', 'fuso'], '2026-10-02T10:00:00Z');
+  g(['update-ref', 'refs/remotes/origin/main', 'main']);
+  g(['checkout', '-q', 'HEAD~1']); g(['checkout', '-qb', 'worker/x']); fai('b.js', '2026-10-10T10:00:00Z');
+  const punta = g(['rev-parse', 'HEAD']);
+  assert.equal(puntaSuBaseVecchia(dir), true);
+  const n = perimetroNote('riallineamento', { shaVerificato: punta, reportRebase: 'Riallineato su main attuale, solo meccanico.' },
+    { scartato: 'punta', mancante: riallineamentoMancante('Riallineato su main attuale, solo meccanico.', dir), baseVecchia: puntaSuBaseVecchia(dir) });
+  assert.match(n, /Il riallineamento non è su questo ramo/);
+  assert.match(n, /registra la critica senza rilievi/);
+  assert.doesNotMatch(n, /Il confronto manca: dichiaralo nella critica/);
+  // Un rebase finito nei minuti dopo l'ultima fusione scaricata non è una base vecchia: è il riallineato di #1968.
+  g(['rebase', '-q', 'refs/remotes/origin/main'], '2026-10-11T10:00:00Z');
+  assert.equal(puntaSuBaseVecchia(dir), false);
+  g(['update-ref', 'refs/remotes/origin/main', g(['commit-tree', '-p', 'refs/remotes/origin/main', '-m', 'fusione dopo il rebase', 'HEAD^{tree}'], '2026-10-11T10:20:00Z')]);
+  assert.equal(puntaSuBaseVecchia(dir), false, 'main andato avanti dopo il rebase');
 });
 
 test('un rebase arrivato non fa scattare niente', () => {

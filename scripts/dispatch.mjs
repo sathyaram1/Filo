@@ -939,9 +939,9 @@ export function riallineamentoMancante(report, root = ROOT) {
 }
 
 /**
- * Se la punta è nata quando `origin/main` aveva già commit che non contiene, con mezza giornata di margine (#2101): un
- * rebase la riscrive dopo aver scaricato main, quindi la sua data viene dopo ogni commit di main che lascia fuori solo
- * per i minuti fra lo scaricamento e la fine. False se git qui non risponde.
+ * Se la punta è nata quando su `origin/main` era già arrivato qualcosa che non contiene, con mezza giornata di margine
+ * (#2101). L'arrivo lo dice la catena delle fusioni del server (primo genitore): i commit fusi tengono la data loro, anche
+ * di giorni prima. Un rebase scrive la punta dopo aver scaricato main, quindi solo i minuti del rebase restano fuori.
  */
 export function puntaSuBaseVecchia(root = ROOT, margine = 12 * 3600) {
   const g = (args) => {
@@ -950,7 +950,7 @@ export function puntaSuBaseVecchia(root = ROOT, margine = 12 * 3600) {
   const base = g(['merge-base', 'HEAD', 'refs/remotes/origin/main']);
   const punta = Number(g(['log', '-1', '--format=%ct', 'HEAD']));
   if (!base || !Number.isFinite(punta)) return false;
-  const date = (g(['log', '--format=%ct', `${base}..refs/remotes/origin/main`]) || '').split('\n').map(Number).filter((n) => n > 0);
+  const date = (g(['log', '--first-parent', '--format=%ct', `${base}..refs/remotes/origin/main`]) || '').split('\n').map(Number).filter((n) => n > 0);
   return date.length > 0 && punta - Math.min(...date) > margine;
 }
 
