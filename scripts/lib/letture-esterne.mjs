@@ -200,9 +200,12 @@ export function contestoLettura({ cwd = process.cwd(), env = process.env, sistem
   const uid = typeof process.getuid === 'function' ? process.getuid() : null;
   const tmp = [...new Set([tmpdir(), ...(win ? [] : ['/tmp'])])];
   const temporanee = cartelleTemporaneeDiClaude(radici, { env, tmp, uid, win });
-  const cartelle = [...radici, ...(server ? [P.dirname(server)] : []), ...claude, ...temporanee].map((c) => canonicoVero(P.resolve(c)));
+  const cartelle = [...radici, ...(server ? [P.dirname(server)] : []), ...temporanee].map((c) => canonicoVero(P.resolve(c)));
   const file = radici.map((r) => canonicoVero(P.join(P.dirname(P.resolve(r)), 'LOCAL.md')));
-  return { cwd, win, cartelle: [...new Set(cartelle)], file: [...new Set(file)], canonico: canonicoVero };
+  return {
+    cwd, win, cartelle: [...new Set(cartelle)], file: [...new Set(file)], canonico: canonicoVero,
+    claude: [...new Set(claude.map((c) => canonicoVero(P.resolve(c))))], sessione: String(sessione || '').trim(),
+  };
 }
 
 /** Lancia in sottofondo la consegna dello sporco annotato accanto al biglietto `percorso` (più `motivo`, se annotarlo
