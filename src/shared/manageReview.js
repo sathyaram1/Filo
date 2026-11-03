@@ -1767,11 +1767,22 @@
     return livelli(fb, opts).find((l) => l.key === String(key)) || null;
   }
 
-  // Questa segnalazione ha una fusione ferma che aspetta l'owner? È quello che fa diventare
+  /** La chiave di STATI_FUSIONE di questa pratica, o null se al cancello non c'è niente. PURA. */
+  function statoFusione(fb, opts) {
+    if (!fb || statusUnreadable(fb)) return null;
+    return livelloL5(fb, opts).statoFusione || null;
+  }
+  /** Lo stato della fusione con le sue parole ({ stato, attende, chiusure, classe, etichetta, titolo }), o null. PURA. */
+  function fusioneDi(fb, opts) {
+    const stato = statoFusione(fb, opts);
+    return stato ? Object.assign({ stato }, STATI_FUSIONE[stato]) : null;
+  }
+
+  // Questa segnalazione ha una fusione che aspetta una decisione dell'owner? È quello che fa diventare
   // rossa la scheda in lista e la porta in cima alle cose da decidere.
   function fusioneInAttesa(fb, opts) {
-    const l5 = livelloL5(fb, opts);
-    return l5.esito === 'bloccato' || l5.esito === 'conflitto';
+    const f = fusioneDi(fb, opts);
+    return !!(f && f.attende);
   }
 
   /** Le pratiche con una fusione ferma davanti, le altre nell'ordine che avevano (`sort` è stabile). PURA. */
