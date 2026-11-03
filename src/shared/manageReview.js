@@ -1829,24 +1829,23 @@
 
   /**
    * Il simbolo in lista che dice cosa ha fermato una pratica dei Ricevuti: la stessa forma del dettaglio
-   * (triangolo L1, cerchio giudici, rombo L3, pentagono L4, quadrato L5), il motivo in parole. null fuori
-   * dai Ricevuti o a stato illeggibile. PURA. Regola: patterns/il-colore-di-una-card-dice-che-decisione-serve-non-lo-stato.md
+   * (triangolo L1, cerchio giudici, rombo L3, pentagono L4, quadrato L5), il motivo in parole. null a stato
+   * illeggibile, e fuori dai Ricevuti salvo una fusione che aspetta l'owner (la porta lui nei Ricevuti, manageTabFor).
+   * PURA. Regola: patterns/il-colore-di-una-card-dice-che-decisione-serve-non-lo-stato.md
    */
   function segnoFermata(fb, opts) {
     if (!fb || statusUnreadable(fb)) return null;
     const out = (forma, livello, classe, testo) => ({ forma, livello, classe: classe || null, testo });
-    if (fusioneInAttesa(fb, opts)) {
-      const l5 = livelloL5(fb, opts);
-      return out('quadrato', 'l5', 'attack', l5.esito === 'conflitto'
-        ? 'Fusione non avvenuta: avevi detto sì, ma il ramo non è entrato in main'
-        : l5.fusione === 'senza' ? 'Fermo al cancello senza una richiesta aperta. Decidi tu se rifarlo o archiviarlo'
-          : 'Fermo al cancello di fusione: aspetta il tuo via libera');
-    }
+    const fusione = fusioneDi(fb, opts);
+    if (fusione && fusione.attende) return out('quadrato', 'l5', fusione.classe, fusione.titolo);
     // Chi aspetta una domanda sta In coda col suo segno: non è un fermo dei Ricevuti.
     if (aspettaDomanda(fb)) return null;
     const { status, statusReason } = normalizeStatus(fb);
     if (!isRicevutiStatus(status)) return null;
+    // Al cancello, ma non per una decisione dell'owner (fusa, in volo, decisa): il quadrato col suo colore, mai rosso.
+    if (fusione && status === 'design' && statusReason === 'l5') return out('quadrato', 'l5', fusione.classe, fusione.titolo);
     if (status === 'design') {
+      if (statusReason === 'origine_bloccata') return out('rombo', 'l3', 'attack', `Bloccato perché ${origineText(fb)} è stato bloccato: decidi tu`);
       const s = SEGNO_DESIGN[String(statusReason || '')];
       if (s) return out(s.forma, s.livello, s.classe, s.testo);
       if (aspettaRisposta(fb)) return out('rombo', 'l3', 'design', SEGNO_DESIGN.clarify.testo);
