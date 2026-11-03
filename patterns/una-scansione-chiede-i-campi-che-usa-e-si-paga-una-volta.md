@@ -20,7 +20,7 @@ configurazione delle routine veniva riletta dal server a ogni invocazione di
 dispatch e di verify-local: decine di letture per sessione, per nove sessioni, per
 una risposta che cambia quando l'owner tocca un interruttore.
 
-## Le quattro mosse
+## Le cinque mosse
 
 1. **I campi.** `select` (structuredQuery), `mask.fieldPaths` (REST), `fields:`
    (le liste di `SN_FEEDBACK`). L'elenco dei campi vive accanto alla decisione che
