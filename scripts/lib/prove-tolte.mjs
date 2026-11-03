@@ -8,11 +8,6 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { preparaLancioElectron } from './schermo-virtuale.mjs';
 import { diffDopoLaVerifica, soloProveTolte, vociNameStatus } from './solo-tolte.mjs';
-import { createRequire } from 'node:module';
-
-// Quando un `?` ferma lo decide la regola del giro, la stessa che applica il server.
-createRequire(import.meta.url)('../../src/shared/verifierRound.js');
-const ROUND = globalThis.SN_VERIFIER_ROUND;
 
 const PROVE_GIRO = 'tests/verifica/';
 const SHA = /^[0-9a-f]{7,40}$/i;
