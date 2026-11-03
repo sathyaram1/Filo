@@ -130,6 +130,69 @@ for (const [come, [nudo, proiettato]] of Object.entries(GRAFIE)) {
   });
 }
 
+// Le letture piccole contano nel giro: dieci documenti interi passano, il pezzo che porta oltre si ferma (#1335).
+test('il freno conta il giro intero: pagine da dieci avanzate con un filtro sul numero invece del cursore', async () => {
+  const pagine = (select) => `export const tutti = async () => {
+    for (let dopo = 0; dopo < 30; dopo += 10) {
+      await fetch("${BASE}:runQuery?key=k", { method: "POST", body: JSON.stringify({ structuredQuery: {
+        from: [{ collectionId: "feedback" }], orderBy: [{ field: { fieldPath: "seq" } }], limit: 10, ${select}
+        where: { fieldFilter: { field: { fieldPath: "seq" }, op: "GREATER_THAN", value: { integerValue: String(dopo) } } } } }) });
+    }
+  };`;
+  const senza = await sottoIlFreno(async () => (await modulo(pagine(''))).tutti());
+  assert.ok(senza.errore instanceof ScansioneSenzaCampi, `il giro a pagine col filtro passa: ${senza.errore && senza.errore.message}`);
+  assert.match(senza.errore.message, /già chiesti 10 documenti interi/);
+  assert.equal(senza.arrivate.length, 1, 'oltre la prima pagina da dieci non doveva partire niente');
+  const con = await sottoIlFreno(async () => (await modulo(pagine('select: { fields: [{ fieldPath: "seq" }] },'))).tutti());
+  assert.equal(con.errore, null, con.errore && con.errore.message);
+  assert.equal(con.arrivate.length, 3);
+  // Un freno nuovo, un giro nuovo: il massimo di `seq` resta una lettura mirata.
+  const mirata = await sottoIlFreno(async () => fetch(`${BASE}:runQuery?key=k`, { method: 'POST',
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'feedback' }], orderBy: [{ field: { fieldPath: 'seq' }, direction: 'DESCENDING' }], limit: 1 } }) }));
+  assert.equal(mirata.errore, null);
+});
+
+test('il freno ferma la lettura a gruppi per nome di tutti i documenti, presi i nomi', async () => {
+  const nomi = Array.from({ length: 30 }, (_, i) => `projects/p/databases/(default)/documents/feedback/f${i}`);
+  // La rete finta dà i nomi alla query che li chiede, e niente al resto.
+  const risponde = (input, init) => {
+    const corpo = init && typeof init.body === 'string' ? JSON.parse(init.body) : {};
+    return corpo.structuredQuery ? nomi.map((name) => ({ document: { name, fields: {} } })) : [];
+  };
+  const strumento = (maschera, aPezzi) => `export const tutti = async () => {
+    const r = await fetch("${BASE}:runQuery?key=k", { method: "POST", body: JSON.stringify({ structuredQuery: {
+      from: [{ collectionId: "feedback" }], select: { fields: [{ fieldPath: "__name__" }] } } }) });
+    const nomi = (await r.json()).map((x) => x.document.name);
+    for (let i = 0; i < nomi.length; i += ${aPezzi ? 10 : 1000}) {
+      await fetch("${BASE}:batchGet?key=k", { method: "POST", body: JSON.stringify({ documents: nomi.slice(i, i + ${aPezzi ? 10 : 1000}) ${maschera} }) });
+    }
+  };`;
+  for (const aPezzi of [false, true]) {
+    const senza = await sottoIlFreno(async () => (await modulo(strumento('', aPezzi))).tutti(), risponde);
+    assert.ok(senza.errore instanceof ScansioneSenzaCampi, `${aPezzi ? 'a pezzi da dieci' : 'tutti insieme'}: passa`);
+    assert.equal(senza.arrivate.length, aPezzi ? 2 : 1, 'documenti interi oltre i dieci sono arrivati alla rete');
+    const con = await sottoIlFreno(async () => (await modulo(strumento(', mask: { fieldPaths: ["seq"] }', aPezzi))).tutti(), risponde);
+    assert.equal(con.errore, null, con.errore && con.errore.message);
+    assert.equal(con.arrivate.length, aPezzi ? 4 : 2);
+  }
+});
+
+test('il freno si installa per chiunque carichi il modulo delle segnalazioni, comunque lo nomini', () => {
+  // Processi a parte, senza importare il freno: lo strumento carica solo il modulo, e scansiona le schede pubbliche.
+  const prova = `process.stdout.write(String(Boolean(globalThis.fetch[Symbol.for('filo.frenoLetture')])));
+    try { await globalThis.SN_FEEDBACK.listAllPublicPaged({}); process.stdout.write(' passata'); }
+    catch (e) { process.stdout.write(' ' + (e && e.code)); }`;
+  const fb = join(ROOT, 'src', 'shared', 'feedback');
+  const modi = {
+    'senza estensione': `const { createRequire } = await import('node:module'); createRequire(import.meta.url)(${JSON.stringify(fb)});`,
+    'con l\'estensione, da import': `await import(${JSON.stringify(pathToFileURL(`${fb}.js`).href)});`,
+  };
+  for (const [come, carica] of Object.entries(modi)) {
+    const esito = execFileSync(process.execPath, ['--input-type=module', '-e', `${carica}\n${prova}`], { cwd: ROOT, encoding: 'utf8' });
+    assert.equal(esito, 'true FILO_SCANSIONE_SENZA_CAMPI', `${come}: ${esito}`);
+  }
+});
+
 test('il freno lascia passare quello che non è una scansione di documenti interi', () => {
   const passa = [
     [`${BASE}/feedback/abc`, {}],
