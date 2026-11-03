@@ -19,8 +19,8 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 test('escono in ogni esito gli esterni e i `?` che contano al più 1; gli altri dipendono dai bilanci', () => {
   assert.equal(esceInOgniEsito({ level: 3, sede: 'e' }), true);
   assert.equal(esceInOgniEsito({ level: 1, sede: 'i', decision: true }), true);
-  assert.equal(esceInOgniEsito({ level: 3, sede: 'v', decision: true }), true, 'un vicino conta 0');
-  assert.equal(esceInOgniEsito({ level: 2, sede: 'i', decision: true }), false, 'un 2 col ? ferma il lavoro: la prova resta per chi riprende');
+  assert.equal(esceInOgniEsito({ level: 3, sede: 'v', decision: true }), true, 'un vicino col ? esce sempre');
+  assert.equal(esceInOgniEsito({ level: 2, sede: 'i', decision: true }), false, 'un 2 col ? si corregge con la consigliata: la prova resta');
   assert.equal(esceInOgniEsito({ level: 1, sede: 'i' }), false, 'un 1 si corregge o esce secondo il bilancio');
   assert.equal(esceInOgniEsito({ level: 0, sede: 'v' }), false);
 });
