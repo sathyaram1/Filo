@@ -177,10 +177,10 @@ export function cartelleTemporaneeDiClaude(radici, { env = {}, tmp = [], uid = n
 
 /**
  * Dove si legge senza sporcarsi: il repo (anche da una sua worktree, e la cartella del progetto), il checkout del
- * server accanto, la cartella di Claude dell'utente e quella temporanea del progetto; e LOCAL.md sopra il repo, che la
- * sessione locale deve leggere.
+ * server accanto, la cartella temporanea di Claude del progetto, LOCAL.md sopra il repo, che la sessione locale deve
+ * leggere; e nella cartella di Claude dell'utente (`claude`) le parti ammesse, con la storia di `sessione`.
  */
-export function contestoLettura({ cwd = process.cwd(), env = process.env, sistema = process.platform, biglietti = [] } = {}) {
+export function contestoLettura({ cwd = process.cwd(), env = process.env, sistema = process.platform, biglietti = [], sessione = '' } = {}) {
   const win = sistema === 'win32';
   const P = win ? path.win32 : path.posix;
   // Il repo della cartella corrente vale solo se è il progetto, una sua worktree o il repo che tiene il biglietto della
