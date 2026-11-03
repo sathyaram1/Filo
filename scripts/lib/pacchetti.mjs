@@ -286,7 +286,7 @@ export function completaPacchetti(radice, {
       return { esito: 'installati', mancanti: [] };
     }
     const da = collegatoVoceAVoce(nm) ? String(readFileSync(join(nm, MARCA_COLLEGATI), 'utf8')).trim() || proprietario : proprietario;
-    log(`${prefisso} Diversi da quelli del lock di ${radice}, e lasciati com'erano perché vengono da ${da}: ${descrivi(restano)}. Per provare con le versioni del lock, dai all'albero un node_modules suo (npm ci).`);
+    log(`${prefisso} Restano diversi da quanto chiede il lock di ${radice}: ${descrivi(restano)}. I pacchetti vengono da ${da}, e lì si aggiunge soltanto: niente si toglie o cambia. Per provare col lock intero, dai all'albero un node_modules suo (npm ci).`);
     return { esito: 'non riuscita', mancanti: restano };
   } catch (e) {
     log(`${prefisso} Controllo dei pacchetti saltato: ${e && e.message ? e.message : e}.`);
