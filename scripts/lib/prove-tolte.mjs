@@ -353,10 +353,14 @@ export function esceInOgniEsito(f) {
   return !!(f && f.decision) && (sede === 'v' || Number(f.level) <= 1);
 }
 
-/** Vero se la critica ferma di sicuro il lavoro: un interno col `?` che ferma, con la regola del giro (decisioneFerma). PURA. */
+/**
+ * Vero se la critica ferma di sicuro il lavoro: un interno col `?` di livello 3, o di livello 2 col `!` (#1202).
+ * Copia di decisioneFerma (le ricette fissate non portano src/shared): una sentinella le tiene uguali. PURA.
+ */
 export function fermaDiSicuro(findings) {
-  return (Array.isArray(findings) ? findings : [])
-    .some((f) => f && String(f.sede || 'i').toLowerCase() === 'i' && ROUND.decisioneFerma(f));
+  return (Array.isArray(findings) ? findings : []).some((f) => f && f.decision === true
+    && String(f.sede || 'i').toLowerCase() === 'i'
+    && (Number(f.level) >= 3 || (Number(f.level) === 2 && f.irreversibile === true)));
 }
 
 /**
