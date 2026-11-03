@@ -337,20 +337,6 @@
   }
 
   /**
-   * Una segnalazione per l'owner ferma il lavoro? Solo per un problema di
-   * livello 3 o una scelta difficile da disfare; le altre escono in un feedback
-   * derivato e il lavoro va avanti con la scelta consigliata (#1202). Senza un
-   * livello valido vale la regola di prima, che ferma sempre: è la consegna di
-   * uno strumento che il livello non lo manda ancora. PURA.
-   */
-  function segnalazioneFerma(s) {
-    const raw = s && s.livello;
-    const n = raw == null || raw === '' || typeof raw === 'boolean' ? NaN : Number(raw);
-    if (!LEVELS.includes(n)) return true;
-    return n >= 3 || (s && s.irreversibile === true);
-  }
-
-  /**
    * Un elenco di rilievi arrivato da fuori (dal client, da un file) portato
    * alla forma canonica. Scarta quello che non è un rilievo: livello fuori
    * scala, testo vuoto. Un rilievo STRUTTURATO senza sede vale interno: è
