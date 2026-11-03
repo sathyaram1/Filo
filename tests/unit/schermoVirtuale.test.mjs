@@ -113,7 +113,7 @@ test('riallineamento: la scelta include i file in conflitto, anche risolti col l
     assert.match(con.nota, /dovuto risolvere rispetto al lavoro verificato \([0-9a-f]{8}\): 2\./);
     assert.match(con.nota, /\(2 file\) l'ha già provato la suite di main/);
     const perso = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: 'f'.repeat(40) }, root: dir });
-    assert.deepEqual(perso.changed, ['src/pages/editor/a.js']);
+    assert.deepEqual(perso.changed.sort(), ['src/pages/editor/a.js', 'src/pages/options/o.js']);
     assert.match(perso.nota, /qui non c'è/, 'un commit introvabile si dice, non si salta in silenzio');
   } finally {
     togliCartella(dir);
