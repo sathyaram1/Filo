@@ -40,6 +40,12 @@ function firestoreFinto({ totale, numerati, documenti = [], contaRotta = false, 
         chiamate.maxSeq += 1;
         return { ok: true, status: 200, json: async () => ([{ document: { name: 'p/feedback/z', fields: { seq: { integerValue: String(totale) } } } }]) };
       }
+      // «Questi numeri sono ancora liberi?» (#680.2): un intervallo su seq, un documento al massimo.
+      if (q.where && q.where.compositeFilter) {
+        const [da, a] = q.where.compositeFilter.filters.map((f) => Number(f.fieldFilter.value.integerValue));
+        const presi = documenti.filter((d) => { const n = Number(d.fields.seq?.integerValue || 0); return n >= da && n <= a; });
+        return { ok: true, status: 200, json: async () => presi.slice(0, 1).map((d) => ({ document: d })) };
+      }
       chiamate.scansioni.push(q);
       return { ok: true, status: 200, json: async () => documenti.map((d) => ({ document: d })) };
     }
