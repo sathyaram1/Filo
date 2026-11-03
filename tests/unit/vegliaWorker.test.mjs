@@ -7,7 +7,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdirSync, writeFileSync, utimesSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, utimesSync, readFileSync, appendFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { senzaSessione } from '../helpers/sessione.mjs';
@@ -290,6 +290,23 @@ describe('la misura per il battito', () => {
     assert.match(m.inAttesa, /^Bash «.*git push --dry-run --force-with-lease/);
     assert.ok(m.inAttesa.length <= 300);
     assert.doesNotMatch(m.inAttesa, /["`$]/, 'testo di worker ripulito come nel guasto');
+  });
+
+  // #1797.1: il server tiene la misura dell'ultimo battito per intero; con `attivitaMs` e senza `inAttesa` registra
+  // «nessuno strumento aperto», o il recupero darebbe la colpa a un comando finito da ore.
+  test('il comando finito esce dal battito dopo: la misura resta, senza strumento', () => {
+    const { work } = clone({ prima: 90 });
+    const configDir = claude({ fa: 60, comando: 'npm run finish:check' });
+    const f = join(configDir, 'projects', '-home-user-Filo', SID, 'subagents', 'agent-w1.jsonl');
+    const segni = () => attivitaPerBattito(segniDiVita({ root: work, ticket: B, sessione: SID, configDir }));
+    assert.equal(segni().inAttesa, 'Bash «npm run finish:check»');
+    const fine = Date.now() - 45 * MIN;
+    const testo = { type: 'assistant', timestamp: new Date(fine + 1000).toISOString(), message: { content: [{ type: 'text', text: 'verde' }] } };
+    appendFileSync(f, righe(risposta('t2', fine), testo));
+    utimesSync(f, new Date(fine + 1000), new Date(fine + 1000));
+    const dopo = segni();
+    assert.deepEqual(Object.keys(dopo), ['attivitaMs']);
+    assert.ok(Math.abs(dopo.attivitaMs - (fine + 1000)) < 2000, `ultimo segno ${dopo.attivitaMs}`);
   });
 
   test('un processo nella cartella vale adesso; un biglietto altrui, finito o senza transcript non manda niente', () => {
