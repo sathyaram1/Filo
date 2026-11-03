@@ -349,7 +349,8 @@
     return out;
   }
 
-  // La disposizione delle icone della barra (#867.1): un cambio per icona spostata, con dov'era e dove è finita.
+  // La disposizione delle icone della barra e della fila del tasto destro (#867.1, #1434): un cambio per icona spostata,
+  // con dov'era e dove è finita.
   function cambiIcone(prima, dopo, { mossa = null } = {}) {
     const D = global.SN_DISPOSIZIONE_ICONE;
     if (!D) return [];
@@ -462,13 +463,12 @@
       const D = global.SN_DISPOSIZIONE_ICONE;
       const id = iconaDi(c);
       const nome = `icona «${D && D.nome ? D.nome(id) : id}»`;
-      const altro = (p) => !!p && p.zona === 'secondary';
-      const zona = (p) => (altro(p) ? '«Altro…» della barra laterale' : 'barra laterale');
+      const zona = (p) => (D && D.nomeZona ? D.nomeZona(p && p.zona) : { nome: 'barra laterale', in: 'nella' });
       const posto = (p) => `${Number(p && p.posto) || '?'}° posto`;
       if (c.prima && c.dopo && c.prima.zona === c.dopo.zona) {
-        return `${nome} ${altro(c.dopo) ? 'in' : 'nella'} ${zona(c.dopo)}: ${posto(c.prima)} → ${posto(c.dopo)}`;
+        return `${nome} ${zona(c.dopo).in} ${zona(c.dopo).nome}: ${posto(c.prima)} → ${posto(c.dopo)}`;
       }
-      return `${nome}: ${zona(c.prima)} → ${zona(c.dopo)}`;
+      return `${nome}: ${zona(c.prima).nome} → ${zona(c.dopo).nome}`;
     }
     if (k === 'desktop') {
       if (c.come) return `icone del desktop ${fraseOrdineDesktop(c.come)}`;
@@ -536,6 +536,7 @@
     'proposta-accesso': 'dalla proposta dopo un accesso',
     zoom: 'con un gesto sulla pagina',
     barra: 'dalla barra laterale',
+    'tasto-destro': 'dal menu del tasto destro',
   };
   function provenienza(evento) {
     const e = evento || {};

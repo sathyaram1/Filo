@@ -21,4 +21,6 @@ contextBridge.exposeInMainWorld('strato', {
     ...(destro ? { destro: { x: Number(destro.x) || 0, y: Number(destro.y) || 0 } } : {}),
   }),
   chiedi: (canale, d) => { if (CANALI.has(canale)) ipcRenderer.send(`strato:${canale}`, d); },
+  // Un'icona della fila del tasto destro trascinata verso la barra laterale (#1434).
+  barra: (d) => ipcRenderer.invoke('strato:barra', d),
 });

@@ -1,10 +1,12 @@
-// La disposizione delle icone della barra laterale (barra e «Altro…») letta e scritta da UN posto: barra, chat e
-// annullo ci passano, e ogni scrittura si mette in fila dietro la precedente.
+// La disposizione delle icone (barra laterale, fila del tasto destro e i loro «Altro…») letta e scritta da UN posto:
+// barra, menu delle schede, chat e annullo ci passano, e ogni scrittura si mette in fila dietro la precedente.
 // Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 const { BrowserWindow } = require('electron');
 const storage = require('../shim/storage');
 const Registro = require('./registroCambi');
+const { spingiAllaScheda } = require('./impostazioniPerOrigine');
+const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 
 const CHIAVE = 'sn_icon_layout';
 
@@ -35,8 +37,10 @@ function leggi({ incognito = false } = {}) {
   return giro;
 }
 
-// Dove arriva un'icona trascinata, nei nomi dei contatori (#1471).
-const DESTINAZIONE = Object.freeze({ bar: 'barra', secondary: 'altro_menu' });
+// Dove arriva un'icona trascinata, nei nomi dei contatori (#1471): la fila del tasto destro è la «riga» di prima.
+const DESTINAZIONE = Object.freeze({ bar: 'barra', secondary: 'altro_menu', fila: 'riga_menu', altro: 'altro_menu' });
+// Le zone nei contatori di uno spostamento: quelle che esistevano quando sono nati (#1471).
+const ZONA_CONTATA = (z) => (z === 'bar' || z === 'secondary' ? z : /^(fila|altro):/.test(String(z)) ? 'primary' : '');
 
 // `cambia(prima)` → la disposizione nuova, o null. `mossa` dice al registro dei cambi quale icona si è spostata.
 async function riscrivi(cambia, { incognito = false, mossa = null } = {}) {
@@ -52,29 +56,34 @@ async function riscrivi(cambia, { incognito = false, mossa = null } = {}) {
 }
 
 // `via`: 'trascina', 'rimessa_nel_menu' (tasto destro su un'icona della barra) o 'chat'. `origine`: chi l'ha
-// trascinata, per i contatori ('icona_barra'); niente se non è un trascinamento.
+// trascinata, per i contatori ('icona_barra', 'icona_menu'); niente se non è un trascinamento.
 async function posa(drop, { incognito = false, via = 'trascina', origine = '' } = {}) {
   const d = drop || {};
   let da = '';
   const layout = await riscrivi((prima) => {
-    da = D().ZONE.find((z) => Array.isArray(prima[z]) && prima[z].includes(d.id)) || '';
+    da = D().TUTTE.find((z) => Array.isArray(prima[z]) && prima[z].includes(d.id)) || '';
     return D().applicaPosa(prima, d);
   }, { incognito, mossa: d.id || null });
   if (layout) {
     contaPosa(d, da, { incognito, via, origine });
     // Trascinata o chiesta alla chat, è la stessa azione nel filo (#1561).
-    const parametri = { icona: d.id, dove: d.target, ...(d.beforeId ? { prima_di: d.beforeId } : {}) };
+    const ctx = D().contestoDiZona(d.target);
+    const parola = d.target === 'bar' ? 'barra' : d.target === 'secondary' ? 'altro' : String(d.target).startsWith('fila:') ? 'fila' : 'altro_fila';
+    const parametri = { icona: d.id, dove: parola, ...(ctx ? { contesto: ctx } : {}), ...(d.beforeId ? { prima_di: d.beforeId } : {}) };
     try { require('./accaduti').azioneFatta('SPOSTA_ICONA', parametri, { eseguita: true }, { incognito }); } catch (_) {}
   }
   return layout;
 }
 
+// Le azioni di un contesto della fila non sono nel catalogo dei contatori: si conta solo il trascinamento.
 function contaPosa({ id, target }, da, { incognito, via, origine }) {
   const K = globalThis.SN_CONTATORI_MAIN;
   if (!K) return;
   try {
-    if (da) K.gesto('icona_spostata', { icona: id, da, a: target, via }, { incognito });
-    if (origine) K.gesto('trascinamento', { da: origine, a: DESTINAZIONE[target], esito: 'posato' }, { incognito });
+    const a = ZONA_CONTATA(target);
+    if (da && D().noto(id) && ZONA_CONTATA(da) && a) K.gesto('icona_spostata', { icona: id, da: ZONA_CONTATA(da), a, via }, { incognito });
+    const dest = DESTINAZIONE[target] || DESTINAZIONE[String(target).split(':')[0]];
+    if (origine && dest) K.gesto('trascinamento', { da: origine, a: dest, esito: 'posato' }, { incognito });
   } catch (_) {}
 }
 
@@ -84,12 +93,17 @@ function contaDisposizione(layout, incognito) {
   try { globalThis.SN_CONTATORI_MAIN?.disposizioneIcone?.(layout); } catch (_) {}
 }
 
-// Alle barre delle finestre dello stesso tipo: una con la disposizione vecchia, al primo trascinamento, la riscriverebbe.
+// Alle schede e alle barre delle finestre dello stesso tipo: un menu o una barra con la disposizione vecchia, al primo
+// trascinamento, la riscriverebbe.
 function annuncia(layout, { incognito = false } = {}) {
   contaDisposizione(layout, incognito);
+  const tipo = globalThis.SN_MSG?.MSG?.ICON_LAYOUT_CHANGED || 'icon_layout_changed';
   for (const win of BrowserWindow.getAllWindows()) {
     const tabs = win && !win.isDestroyed() && win._filoTabs;
     if (!tabs || !!win._filoIncognito !== !!incognito) continue;
+    for (const { wc, inVista } of vistePerAnnunci(tabs)) {
+      try { spingiAllaScheda(wc, { type: tipo, layout }, { inVista }); } catch (_) {}
+    }
     try { tabs.barra?.disposizione(layout); } catch (_) {}
   }
 }

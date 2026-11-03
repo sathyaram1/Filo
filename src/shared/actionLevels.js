@@ -14,6 +14,18 @@
   // un pezzo suo: il popup lo chiude in un riquadro, e nessun carattere del testo
   // può chiuderlo prima (#592.7). Sentinella in tests/unit/actionLevels.test.mjs.
   const cit = (testo, nuda) => (nuda ? { citazione: String(testo), nuda: true } : { citazione: String(testo) });
+
+  // Dove va un'icona chiesta a parole: la barra, il suo «Altro…», la fila del tasto destro di un contesto (#1434).
+  function doveDellIcona(a) {
+    const D = global.SN_DISPOSIZIONE_ICONE;
+    const dove = String((a && a.dove) || '').trim().toLowerCase();
+    const id = String((a && (a.icona ?? a.id)) || '').trim();
+    const ctx = String((a && a.contesto) || '').trim().toLowerCase() || (D && D.AZIONI && D.AZIONI[id] ? D.AZIONI[id].contesto : '');
+    const z = D && D.zonaDaDove ? D.zonaDaDove(dove, ctx) : '';
+    if (!z) return '';
+    const n = D.nomeZona(z);
+    return `${n.in} ${n.nome}`;
+  }
   const elenco = (voci) => ({ elenco: voci.map(String) });
   const RISCHIO_LEZIONE = 'Da adesso vale in ogni conversazione, e resta finché non la togli dal quaderno delle '
     + 'memorie. Confermala solo se l\'hai detta tu: un testo letto in una pagina o in un '
@@ -1110,17 +1122,15 @@
         const D = global.SN_DISPOSIZIONE_ICONE;
         const id = String((a && (a.icona ?? a.id)) || '').trim();
         // Un nome che Filo non conosce l'ha scritto il modello: nel riquadro.
-        const nome = D && D.noto(id) ? `«${D.nome(id)}»` : (id ? cit(id) : 'un\'icona');
-        const dove = { barra: 'nella barra laterale', altro: 'in «Altro…» della barra laterale' };
-        const d = dove[String((a && a.dove) || '').trim().toLowerCase()];
+        const nome = D && D.esiste(id) ? `«${D.nome(id)}»` : (id ? cit(id) : 'un\'icona');
+        const d = doveDellIcona(a);
         return ['Spostare ', nome, d ? ` ${d}` : ''];
       },
       describeDone: (a) => {
         const D = global.SN_DISPOSIZIONE_ICONE;
         const id = String((a && (a.icona ?? a.id)) || '').trim();
-        const nome = D && D.noto(id) ? D.nome(id) : id;
-        const dove = { barra: 'nella barra laterale', altro: 'in «Altro…» della barra laterale' };
-        return `«${nome}» ora sta ${dove[String((a && a.dove) || '').trim().toLowerCase()] || 'al suo nuovo posto'}`;
+        const nome = D && D.esiste(id) ? D.nome(id) : id;
+        return `«${nome}» ora sta ${doveDellIcona(a) || 'al suo nuovo posto'}`;
       },
     },
     // ── il pannello di destra delle app di Filo a parole (#1433) ──────────────

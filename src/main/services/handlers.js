@@ -3898,23 +3898,26 @@ async function eseguiAzioneFilo(action, {
         };
       }
       case 'SPOSTA_ICONA': {
-        // #871, #1246 — la disposizione delle icone della barra laterale (barra e «Altro…») a parole: stessa porta del
-        // trascinamento, così le barre di tutte le finestre la ricevono uguale.
+        // #871, #1246, #1434 — la disposizione delle icone (barra laterale, fila del tasto destro e i loro «Altro…») a
+        // parole: stessa porta del trascinamento, così menu e barre di tutte le finestre la ricevono uguale.
         const D = globalThis.SN_DISPOSIZIONE_ICONE;
         const id = String(action.icona ?? action.id ?? '').trim();
-        const dove = String(action.dove ?? '').trim().toLowerCase();
+        let dove = String(action.dove ?? '').trim().toLowerCase();
+        if (dove === 'menu') dove = 'fila';
         const prima = String(action.prima_di ?? '').trim();
-        if (dove === 'menu') {
-          return { executed: false, kept: false, output: { icona: 'invalid', id, dove, motivo: 'il menu del tasto destro non ha più icone: stanno nella barra laterale ("barra") o nel suo «Altro…» ("altro")' } };
+        const contesto = String(action.contesto ?? '').trim().toLowerCase() || (D && D.AZIONI[id] ? D.AZIONI[id].contesto : '');
+        const target = D ? D.zonaDaDove(dove, contesto) : '';
+        if (!D || !D.esiste(id) || !target) {
+          return { executed: false, kept: false, output: { icona: 'invalid', id, dove, ...(dove === 'fila' || dove === 'altro_fila' ? { motivo: 'per la fila del tasto destro serve il contesto' } : {}) } };
         }
-        if (!D || !D.noto(id) || !Object.prototype.hasOwnProperty.call(D.DOVE, dove)) {
-          return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
+        if (!D.ammessa(id, target)) {
+          return { executed: false, kept: false, output: { icona: 'invalid', id, dove, contesto, motivo: `«${D.nome(id)}» è un'azione ${D.CONTESTI[D.AZIONI[id].contesto].su}: resta nella sua fila o nel suo «Altro…»` } };
         }
         const incognito = !!winOf(sender)?._filoIncognito;
         const layout = await require('./layoutIcone').posa(
-          { id, target: D.DOVE[dove], beforeId: D.noto(prima) && prima !== id ? prima : null }, { incognito, via: 'chat' });
+          { id, target, beforeId: D.esiste(prima) && prima !== id ? prima : null }, { incognito, via: 'chat' });
         if (!layout) return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
-        return { executed: true, kept: false, output: { icona: id, dove, layout } };
+        return { executed: true, kept: false, output: { icona: id, dove, ...(D.contestoDiZona(target) ? { contesto: D.contestoDiZona(target) } : {}), layout } };
       }
       case 'PANNELLO_APP': {
         // #1433 — il pannello di destra delle app a parole: le stesse porte del mouse (la pagina per aprire e chiudere,

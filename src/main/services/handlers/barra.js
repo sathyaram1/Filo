@@ -1,8 +1,10 @@
-// Handler della barra laterale (#871: azioni della pagina, Aiuto, risposte da leggere; aperti ai siti, non leggono
-// dati né la disposizione delle icone) e del pannello di destra delle app (#1433: solo pagine di Filo).
-// Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
+// Handler della barra laterale (#871: azioni della pagina, Aiuto, risposte da leggere, la disposizione delle icone e
+// il trascinamento fra la fila del tasto destro e la barra, #1434; aperti ai siti, non leggono dati) e del pannello di
+// destra delle app (#1433: solo pagine di Filo). Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 const RisposteInAttesa = require('../../risposteInAttesa');
+const Layout = require('../layoutIcone');
+const Registro = require('../registroCambi');
 const Pannelli = require('../pannelliApp');
 const { soloFilo } = require('./origine');
 
@@ -16,6 +18,31 @@ module.exports = function register(on, ctx) {
     if (sender.frame && sender.frame.parent) return null;
     return tabs.barra;
   };
+
+  const incognitoDi = (sender) => !!winOf(sender)?._filoIncognito;
+
+  on(MSG.ICON_LAYOUT_GET, async (msg, sender) => ({ ok: true, layout: await Layout.leggi({ incognito: incognitoDi(sender) }) }));
+
+  // Un'icona posata nella fila del tasto destro o nel suo «Altro…» (#1434): un cambio del filo, come dalla barra.
+  on(MSG.ICON_LAYOUT_DROP, async (msg, sender) => {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    const id = String(msg?.id || '');
+    const target = String(msg?.target || '');
+    if (!D || !D.esiste(id) || !D.ammessa(id, target)) return { ok: false, error: 'icona o zona sconosciuta' };
+    const beforeId = msg?.beforeId && D.esiste(String(msg.beforeId)) ? String(msg.beforeId) : null;
+    // Da dove viene, per i contatori (#1471): presa dalla barra, l'apertura della barra è servita a qualcosa.
+    const origine = msg?.source === 'bar' ? 'icona_barra' : 'icona_menu';
+    const layout = await Registro.con({ via: 'interfaccia', dove: 'tasto-destro' },
+      () => Layout.posa({ id, target, beforeId }, { incognito: incognitoDi(sender), origine }));
+    if (layout && origine === 'icona_barra') { try { winOf(sender)?._filoTabs?.barra?.iconaPresaFuori(); } catch (_) {} }
+    return layout ? { ok: true, layout } : { ok: false, error: 'icona o zona sconosciuta' };
+  });
+
+  // Dal menu della scheda davanti verso la barra: la scheda ha il puntatore per tutto il gesto.
+  on(MSG.BARRA_TRASCINA, async (msg, sender) => {
+    const barra = barraDellaSchedaDavanti(sender);
+    return barra ? barra.dallaScheda(msg || {}, sender.tab.id) : { ok: false };
+  });
 
   // Come si chiamano adesso le azioni della pagina che stanno nella barra («Traduci» o «Mostra originale»).
   on(MSG.BARRA_ETICHETTE, async (msg, sender) => {

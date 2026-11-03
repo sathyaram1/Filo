@@ -139,7 +139,8 @@
   // ── Il box come pannello in cui si cerca una voce, per i contatori (#1461) ──────────────────────────────────────
   // Dall'apertura alla prima scelta, a che posto era la voce fra quelle in vista (prima il pannello, poi il
   // sottomenu), o chiuso senza scegliere. Escono solo esiti e numeri, nella pagina e nello strato.
-  const VOCI = '.sn-menu-item, .sn-menu-split-main, .sn-menu-paste-main, .sn-menu-correction-main, .sn-menu-history-item';
+  const VOCI = '.sn-menu-item, .sn-menu-split-main, .sn-menu-paste-main, .sn-menu-correction-main, .sn-menu-row-btn, '
+    + '.sn-menu-icon-btn, .sn-menu-history-item';
   function contaNelMenu(evento) {
     try {
       if (global.SN_POPUP && typeof global.SN_POPUP.conta === 'function') global.SN_POPUP.conta(evento);
@@ -147,6 +148,9 @@
     } catch (_) {}
   }
   const contaBox = (ev) => contaNelMenu({ misura: 'ricerca', pannello: 'tasto-destro', ...ev });
+  // I gesti del menu (#1471): il nome letto su un'icona, il riquadro «Altro…», un'icona trascinata e lasciata nel vuoto.
+  const contaGesto = (gesto, campi) => contaNelMenu({ misura: 'gesto', gesto, ...campi });
+  const lettura = global.SN_GESTI ? global.SN_GESTI.lettore((ev) => contaNelMenu(ev)) : { mostrato() {}, clic() {}, via() {} };
   // Una voce che fa un'azione del catalogo delle capacità la nomina con `azione` (#1461): si misura qui, dal clic alla
   // fine del suo lavoro, per ogni menu che passa da open, nella pagina e nello strato. Una voce non si misura due volte.
   const MISURATE = new WeakSet();
@@ -177,8 +181,8 @@
   }
   function vociInVista(pannello) {
     if (!pannello) return [];
-    return [...pannello.querySelectorAll(VOCI)].filter((b) => !b.classList.contains('sn-menu-history-gone')
-      && b.getClientRects().length > 0);
+    return [...pannello.querySelectorAll(VOCI)].filter((b) => !b.classList.contains('sn-menu-row-overflow')
+      && !b.classList.contains('sn-menu-history-gone') && b.getClientRects().length > 0);
   }
   function sceltaNelMenu(voce) {
     const r = activeMenu && activeMenu.ricerca;
@@ -200,11 +204,14 @@
     const voce = percorso.find((n) => n && n.nodeType === 1 && typeof n.matches === 'function' && n.matches(VOCI));
     if (!voce || voce.matches('.sn-menu-history-item')) return;
     if (voce.disabled || voce.dataset.snDisabled === '1' || voce.closest('.sn-disabled')) return;
+    if (voce.classList.contains('sn-menu-row-overflow')) return;
     if (!activeMenu.root.contains(voce) && !(activeMenu.subRoot && activeMenu.subRoot.contains(voce))) return;
     sceltaNelMenu(voce);
   }
 
   function close() {
+    try { dismissTooltip(); } catch (_) {}
+    lettura.via();
     clearSubCloseTimer();
     if (activeMenu) {
       if (activeMenu.ricerca && !activeMenu.ricerca.scelta) contaBox({ esito: 'vuota' });
@@ -228,6 +235,8 @@
       try { allaChiusura?.(); } catch (_) {}
     }
     try { global.SN_POPUP?.sottoIlMenu?.(false); } catch (_) {}
+    // Le zone dove posare un'icona si registrano di nuovo alla prossima apertura.
+    dropZones.length = 0;
   }
 
   // Lo strato sopra la scheda (#1054) sa così che il menu si è chiuso da sé: una voce, un clic fuori, Esc.
@@ -328,8 +337,15 @@
       visH: root.offsetHeight * scale,
       vw, vh, from,
     });
+    const primaLeft = parseFloat(root.style.left);
+    const primaTop = parseFloat(root.style.top);
     root.style.left = `${p.left}px`;
     root.style.top = `${p.top}px`;
+    // L'etichetta si toglie solo se il menu si è mosso davvero: un menu che cresce restando fermo non deve farla
+    // sparire a chi la sta leggendo (#500).
+    const mosso = (Number.isFinite(primaTop) && Math.abs(p.top - primaTop) > 0.5)
+      || (Number.isFinite(primaLeft) && Math.abs(p.left - primaLeft) > 0.5);
+    if (mosso) dismissTooltip();
     repositionSub();
   }
 
@@ -378,8 +394,9 @@
     placeSub(sub, anchor, activeMenu.subMode);
   }
 
-  // items: { type: 'item'|'separator'|'inline'|'paste', label, shortcut, disabled,
-  // onClick, items? }. 'inline' mostra contenuto dinamico, 'paste' apre la cronologia.
+  // items: { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled,
+  // onClick, items? }. 'row' è la fila di icone in cima (#1434), 'inline' mostra contenuto dinamico, 'paste' apre la
+  // cronologia.
   // `alChiudere`: chi ha aperto il menu vuole sapere quando si chiude, da sé o con una voce.
   function open({ x, y, items, keepOnScroll, alChiudere }) {
     misuraLeAzioni(items);
@@ -406,7 +423,20 @@
     // testo cambia.
     const crescite = [];
 
-    for (const it of items) {
+    // La fila sta sempre in cima, anche quando chi apre mette altro davanti (le correzioni del correttore).
+    for (const it of [...items.filter((x) => x && x.type === 'row'), ...items.filter((x) => !x || x.type !== 'row')]) {
+      if (it.type === 'row') {
+        const row = document.createElement('div');
+        row.className = 'sn-menu-row';
+        if (it.dropTarget) row.dataset.snDropTarget = it.dropTarget;
+        // Senza icone e senza «Altro…» la fila non si vede: si apre solo per chi porta un'icona dalla barra.
+        if (it.vuota) { row.dataset.snVuota = '1'; row.hidden = true; }
+        keepPageFocus(row);
+        populateRow(row, it.items || [], { dropTarget: it.dropTarget });
+        if (it.dropTarget) attachDropZone(row, { target: it.dropTarget, onDrop: it.onDrop });
+        root.appendChild(row);
+        continue;
+      }
       if (it.type === 'separator') {
         const sep = document.createElement('div');
         sep.className = 'sn-menu-sep';
@@ -673,6 +703,7 @@
         if (root.contains(t)) {
           // Il menu ha scorso sotto al pannello ancorato: la freccetta si è spostata e il pannello
           // va con lei, o si chiude se è uscita dal bordo (#500).
+          try { dismissTooltip(); } catch (_) {}
           repositionSub();
           return;
         }
@@ -1203,6 +1234,490 @@
     attachSubmenuHover(sub);
   }
 
+  // ── La fila in cima al menu e la griglia del suo «Altro…» (#1434) ───────────────────────────────────────────────
+  // La griglia è ancorata al «+» della fila: NON chiude il menu padre, e regge il trascinamento fra griglia e fila.
+  function openIconGridSubmenu(anchorEl, items, opts = {}) {
+    if (!activeMenu) return;
+    if (activeMenu.subRoot) {
+      staccaSub();
+      return;
+    }
+    contaGesto('altro_del_menu', { aperto: true });
+    const cols = opts.cols || 4;
+    const sub = document.createElement('div');
+    sub.className = 'sn-menu sn-menu-sub sn-menu-icon-grid';
+    global.SN_FILO_UI?.mark(sub);
+    global.SN_FILO_UI?.soloGestiVeri(sub);
+    sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
+    if (opts.dropTarget) sub.dataset.snDropTarget = opts.dropTarget;
+    keepPageFocus(sub);
+
+    populateGrid(sub, items, { dropTarget: opts.dropTarget, cols });
+    if (opts.dropTarget) attachDropZone(sub, { target: opts.dropTarget, onDrop: opts.onDrop });
+
+    monta(sub);
+    const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
+    activeMenu.cleanups.push(cleanupZoom);
+    activeMenu.subRoot = sub;
+    activeMenu.subAnchor = anchorEl;
+    activeMenu.subMode = 'anchor';
+
+    placeSub(sub, anchorEl, 'anchor');
+    sorveglia(sub);
+    // Senza, il timer di uscita dal «+» chiude la griglia appena il puntatore ci entra.
+    attachSubmenuHover(sub);
+  }
+
+  // L'indirizzo di un collegamento sul testo selezionato: un campo ancorato all'icona, Invio lo mette. Il menu resta
+  // aperto finché si scrive; `onApplica(indirizzo)` parte a menu chiuso, col fuoco rimesso dove si scriveva.
+  function openLinkSubmenu(anchorEl, { valore = '', onApplica } = {}) {
+    if (!activeMenu) return;
+    if (activeMenu.subRoot) staccaSub();
+    const sub = document.createElement('div');
+    sub.className = 'sn-menu sn-menu-sub sn-menu-link';
+    global.SN_FILO_UI?.mark(sub);
+    global.SN_FILO_UI?.soloGestiVeri(sub);
+    sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
+    const campo = document.createElement('input');
+    campo.type = 'text';
+    campo.className = 'sn-menu-link-campo';
+    campo.spellcheck = false;
+    campo.setAttribute('autocomplete', 'off');
+    campo.placeholder = I18n.t('fila_link_indirizzo');
+    campo.setAttribute('aria-label', I18n.t('fila_link_indirizzo'));
+    campo.value = String(valore || '');
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = 'sn-menu-link-ok';
+    ok.setAttribute('aria-label', I18n.t('fila_link'));
+    setIconContent(ok, global.SN_ICONS?.check ? global.SN_ICONS.check(16) : '✓');
+    const applica = () => {
+      const v = campo.value;
+      close();
+      try { onApplica && onApplica(v); } catch (er) { console.error(er); }
+    };
+    ok.addEventListener('click', (e) => { e.stopPropagation(); applica(); });
+    campo.addEventListener('keydown', (e) => {
+      if (!e.isTrusted) return;
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); applica(); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeSubmenu(); }
+    });
+    sub.append(campo, ok);
+    monta(sub);
+    const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
+    activeMenu.cleanups.push(cleanupZoom);
+    activeMenu.subRoot = sub;
+    activeMenu.subAnchor = anchorEl;
+    // Attaccato al bordo del menu, all'altezza della fila: accanto all'icona coprirebbe le altre della fila.
+    activeMenu.subMode = 'edge';
+    activeMenu.subLocked = true;
+    placeSub(sub, anchorEl, 'edge');
+    sorveglia(sub);
+    attachSubmenuHover(sub);
+    try { campo.focus({ preventScroll: true }); campo.select(); } catch (_) {}
+  }
+
+  // Suggerimento in stile menu, uno solo per pagina.
+  let tooltipEl = null;
+  let tooltipHideTimer = null;
+  function ensureTooltipEl() {
+    if (tooltipEl && document.documentElement.contains(tooltipEl)) return tooltipEl;
+    tooltipEl = document.createElement('div');
+    tooltipEl.className = 'sn-tooltip';
+    global.SN_FILO_UI?.mark(tooltipEl);
+    tooltipEl.style.display = 'none';
+    monta(tooltipEl);
+    return tooltipEl;
+  }
+  function showTooltip(target, text) {
+    if (!text || !target.isConnected) return;
+    const el = ensureTooltipEl();
+    // Sopra i pannelli aperti dopo di lei (stesso piano: vale l'ordine), sotto le sonde (#589.11).
+    const host = menuHost();
+    annullaZoom(el, host);
+    host.insertBefore(el, global.SN_VISTO?.prima(host, el) || null);
+    el.dataset.snTheme = document.documentElement.dataset.snTheme || '';
+    el.textContent = text;
+    el.style.display = '';
+    const r = target.getBoundingClientRect();
+    const tw = el.offsetWidth, th = el.offsetHeight;
+    let left = r.left + r.width / 2 - tw / 2;
+    let top = r.bottom + 6;
+    if (top + th + 8 > window.innerHeight) top = r.top - th - 6;
+    if (left + tw + 4 > window.innerWidth) left = window.innerWidth - tw - 4;
+    if (left < 4) left = 4;
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }
+  // Toglie l'etichetta e l'attesa che sta per farla comparire: se a muoversi è il menu, comparirebbe l'etichetta di
+  // un bottone che nel frattempo è altrove.
+  function dismissTooltip() {
+    clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = null;
+    if (tooltipEl) tooltipEl.style.display = 'none';
+  }
+  function attachTooltip(el, text) {
+    el.addEventListener('mouseenter', () => {
+      clearTimeout(tooltipHideTimer);
+      tooltipHideTimer = setTimeout(() => {
+        showTooltip(el, text);
+        if (el.dataset.snIconId) lettura.mostrato(el.dataset.snIconId, 'menu');
+      }, 250);
+    });
+    el.addEventListener('mouseleave', () => {
+      dismissTooltip();
+      lettura.via();
+    });
+    el.addEventListener('mousedown', () => dismissTooltip());
+  }
+
+  // Chi apre un pannello sostando sopra durante un trascinamento: chiamato da qui, perché un clic fabbricato da codice
+  // non passerebbe da `soloGestiVeri`.
+  const apritori = new WeakMap();
+
+  // Il suggerimento di un'icona nomina anche il suo tasto, se ne ha uno (`tasto`, chiesto a SN_TASTI).
+  function conTasto(it) { return it.tasto ? `${it.label} (${it.tasto})` : it.label; }
+
+  // `tieneAperto`: l'icona apre qualcosa nel menu (il campo del collegamento) e riceve il bottone come ancora.
+  function premi(b, it, chiudi = true) {
+    if (it.id) lettura.clic(it.id);
+    if (it.tieneAperto) {
+      try { it.onClick && it.onClick(b); } catch (er) { console.error(er); }
+      return;
+    }
+    if (chiudi) close();
+    try { it.onClick && it.onClick(); } catch (er) { console.error(er); }
+  }
+
+  // Un'icona che mette e toglie (Grassetto) dice se la selezione ce l'ha già: chi preme sa cosa farà.
+  function segnaAcceso(b, it) {
+    if (typeof it.acceso !== 'boolean') return;
+    b.setAttribute('aria-pressed', String(it.acceso));
+    b.classList.toggle('sn-menu-btn-acceso', it.acceso);
+  }
+
+  function makeRowButton(sub, opts = {}) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-menu-row-btn';
+    if (sub.kind === 'overflow') b.classList.add('sn-menu-row-overflow');
+    // Spenta con una classe: l'attributo `disabled` azzera i pointer event e l'icona non si trascinerebbe più.
+    if (sub.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
+    segnaAcceso(b, sub);
+    // Il «+» apre la griglia passandoci sopra: il suo nome la coprirebbe.
+    if (sub.kind !== 'overflow' && sub.label) attachTooltip(b, conTasto(sub));
+    setIconContent(b, sub.icon || sub.label);
+    // Il bottone contiene solo un disegno: senza nome accessibile è muto per chi legge lo schermo.
+    if (sub.label) b.setAttribute('aria-label', sub.label);
+    if (sub.id) b.dataset.snIconId = sub.id;
+    if (sub.kind === 'overflow') {
+      b.dataset.snDragHoverOpen = '1';
+      b.setAttribute('aria-haspopup', 'true');
+      const openOverflow = () => {
+        try { sub.onClick && sub.onClick(b); } catch (er) { console.error(er); }
+        if (activeMenu) activeMenu.subOwner = b;
+      };
+      b.addEventListener('mouseenter', () => {
+        clearSubCloseTimer();
+        if (activeMenu?.subRoot && activeMenu.subOwner !== b) {
+          if (activeMenu.subRoot.classList.contains('sn-menu-link')) return;
+          activeMenu.subLocked = false;
+          closeSubmenu();
+        }
+        if (!activeMenu?.subRoot) openOverflow();
+      });
+      b.addEventListener('mouseleave', () => {
+        if (activeMenu?.subLocked) return;
+        clearSubCloseTimer();
+        subCloseTimer = setTimeout(() => closeSubmenu(), 500);
+      });
+      const apriFermo = () => {
+        clearSubCloseTimer();
+        if (activeMenu?.subRoot && activeMenu.subOwner === b) {
+          activeMenu.subLocked = true;
+        } else {
+          if (activeMenu?.subRoot) { activeMenu.subLocked = false; closeSubmenu(); }
+          openOverflow();
+          if (activeMenu) activeMenu.subLocked = true;
+        }
+      };
+      apritori.set(b, apriFermo);
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        apriFermo();
+      });
+    } else {
+      b.addEventListener('click', () => {
+        if (sub.disabled) return;
+        premi(b, sub);
+      });
+    }
+    if (sub.draggable && sub.id) attachDrag(b, { id: sub.id, source: opts.dropTarget || 'row' });
+    return b;
+  }
+
+  function populateRow(row, items, opts = {}) {
+    row.innerHTML = '';
+    row.__snRowOpts = opts;
+    for (const sub of items) row.appendChild(makeRowButton(sub, opts));
+    global.SN_FILO_UI?.soloGestiVeri(row);
+  }
+
+  function makeGridButton(it, opts = {}) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-menu-icon-btn';
+    if (it.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
+    segnaAcceso(b, it);
+    setIconContent(b, it.icon || it.label || '');
+    if (it.id) b.dataset.snIconId = it.id;
+    if (it.label) { b.setAttribute('aria-label', it.label); attachTooltip(b, conTasto(it)); }
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (it.disabled) return;
+      if (it.id) contaGesto('altro_del_menu', { icona: it.id });
+      premi(b, it);
+    });
+    if (it.draggable !== false && it.id) attachDrag(b, { id: it.id, source: opts.dropTarget || 'grid' });
+    return b;
+  }
+
+  function populateGrid(sub, items, opts = {}) {
+    sub.innerHTML = '';
+    sub.__snGridOpts = opts;
+    // Larga quanto le icone che ha, fino a `cols` per riga: con due icone non resta un pannello mezzo vuoto.
+    sub.style.setProperty('--sn-icon-cols', String(Math.max(1, Math.min(opts.cols || 4, (items && items.length) || 1))));
+    if (!items || items.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'sn-menu-empty sn-menu-grid-vuota';
+      empty.textContent = I18n.t('fila_altro_vuoto');
+      sub.appendChild(empty);
+    } else {
+      for (const it of items) sub.appendChild(makeGridButton(it, opts));
+    }
+    global.SN_FILO_UI?.soloGestiVeri(sub);
+  }
+
+  // Ridisegna sul posto, senza chiudere il menu: chi riordina continua a riordinare.
+  function refreshIconRow(items, { vuota = false } = {}) {
+    if (!activeMenu) return;
+    const row = activeMenu.root.querySelector('.sn-menu-row');
+    if (!row) return;
+    populateRow(row, items, row.__snRowOpts || {});
+    if (vuota) row.dataset.snVuota = '1';
+    else delete row.dataset.snVuota;
+    row.hidden = !!vuota && !esterno;
+  }
+
+  function refreshIconGrid(items) {
+    if (!activeMenu || !activeMenu.subRoot || !activeMenu.subRoot.classList.contains('sn-menu-icon-grid')) return;
+    populateGrid(activeMenu.subRoot, items, activeMenu.subRoot.__snGridOpts || {});
+    repositionSub();
+  }
+
+  function isSubMenuOpen() {
+    return !!(activeMenu && activeMenu.subRoot && activeMenu.subRoot.isConnected);
+  }
+
+  // Trascinamento coi pointer event: quello HTML5 non parte in modo affidabile con un transform sul menu o su un
+  // <button>, e l'immagine trascinata spesso non si vede.
+  const dropZones = [];
+
+  // La barra laterale come zona in più (#871): la installa menuIcons.js. Il puntatore resta della pagina per tutto il
+  // gesto, anche sopra la barra, quindi è da qui che si dice dove cade.
+  let ponteBarra = null;
+  function setPonteBarra(p) { ponteBarra = p || null; }
+  // Dove comincia il menu aperto: se sta dove si apre la barra, lei aspetta che il puntatore vada al bordo.
+  function sinistraDelMenu() {
+    const els = [activeMenu?.root, activeMenu?.subRoot].filter((e) => e && e.isConnected);
+    return els.length ? Math.min(...els.map((e) => e.getBoundingClientRect().left)) : null;
+  }
+
+  function attachDrag(el, { id, source }) {
+    el.dataset.snDraggable = '1';
+    el.addEventListener('pointerdown', (ev) => {
+      // Solo gesti veri: un trascinamento finto aprirebbe la barra a comando di un sito.
+      if (!ev.isTrusted || ev.button !== 0) return;
+      const startX = ev.clientX, startY = ev.clientY;
+      let dragging = false;
+      let preview = null;
+      let lastHoverZone = null;
+      let lastHoverOpener = null;
+      let hoverOpenTimer = null;
+      const THRESHOLD = 4;
+      const HOVER_OPEN_DELAY = 350;
+
+      const updatePreview = (x, y) => {
+        if (!preview) return;
+        preview.style.left = (x - (preview.offsetWidth || 0) / 2) + 'px';
+        preview.style.top = (y - (preview.offsetHeight || 0) / 2) + 'px';
+      };
+      const setHover = (zone) => {
+        if (lastHoverZone === zone) return;
+        if (lastHoverZone) lastHoverZone.zoneEl.classList.remove('sn-drop-hover');
+        lastHoverZone = zone;
+        if (zone) zone.zoneEl.classList.add('sn-drop-hover');
+      };
+      const startDrag = (x, y) => {
+        dragging = true;
+        dismissTooltip();
+        el.classList.add('sn-dragging');
+        preview = el.cloneNode(true);
+        preview.classList.add('sn-drag-preview');
+        const r = el.getBoundingClientRect();
+        preview.style.width = r.width + 'px';
+        preview.style.height = r.height + 'px';
+        monta(preview);
+        updatePreview(x, y);
+        try { ponteBarra?.inizio(id, sinistraDelMenu()); } catch (_) {}
+      };
+      // Sostando sul «+» durante il trascinamento, la griglia si apre da sé.
+      const checkHoverOpen = (x, y) => {
+        if (preview) preview.style.visibility = 'hidden';
+        const elAt = document.elementFromPoint(x, y);
+        if (preview) preview.style.visibility = '';
+        const opener = elAt && elAt.closest ? elAt.closest('[data-sn-drag-hover-open="1"]') : null;
+        if (opener === lastHoverOpener) return;
+        lastHoverOpener = opener;
+        if (hoverOpenTimer) { clearTimeout(hoverOpenTimer); hoverOpenTimer = null; }
+        if (opener && !isSubMenuOpen()) {
+          hoverOpenTimer = setTimeout(() => {
+            if (lastHoverOpener === opener && !isSubMenuOpen()) { try { apritori.get(opener)?.(); } catch (_) {} }
+          }, HOVER_OPEN_DELAY);
+        }
+      };
+      const onMove = (e) => {
+        if (!e.isTrusted) return;
+        if (!dragging) {
+          if (Math.hypot(e.clientX - startX, e.clientY - startY) < THRESHOLD) return;
+          startDrag(e.clientX, e.clientY);
+        }
+        e.preventDefault();
+        updatePreview(e.clientX, e.clientY);
+        let sopraBarra = false;
+        try { sopraBarra = !!ponteBarra?.sopra(e.clientX, e.clientY); } catch (_) {}
+        setHover(sopraBarra ? null : findZoneAt(e.clientX, e.clientY));
+        checkHoverOpen(e.clientX, e.clientY);
+      };
+      const cleanup = () => {
+        window.removeEventListener('pointermove', onMove, true);
+        window.removeEventListener('pointerup', onUp, true);
+        window.removeEventListener('pointercancel', onCancel, true);
+        if (hoverOpenTimer) { clearTimeout(hoverOpenTimer); hoverOpenTimer = null; }
+        el.classList.remove('sn-dragging');
+        setHover(null);
+        if (preview) { try { preview.remove(); } catch (_) {} preview = null; }
+        if (dragging) { try { ponteBarra?.fine(); } catch (_) {} }
+      };
+      const onUp = (e) => {
+        if (!e.isTrusted) return;
+        if (!dragging) { cleanup(); return; }
+        let inBarra = false;
+        try { inBarra = !!ponteBarra?.posa(id, e.clientX, e.clientY); } catch (_) {}
+        const zone = inBarra ? null : findZoneAt(e.clientX, e.clientY);
+        cleanup();
+        if (zone) {
+          const beforeBtn = findInsertBefore(zone.zoneEl, e.clientX, e.clientY, el);
+          const beforeId = beforeBtn?.dataset?.snIconId || null;
+          try { zone.onDrop && zone.onDrop({ id, source, target: zone.target, beforeId }); } catch (er) { console.error(er); }
+        } else if (!inBarra) contaGesto('trascinamento', { da: 'icona_menu', a: 'nessuna', esito: 'annullato' });
+        // Il clic che segue il rilascio non è un clic sull'icona.
+        const swallow = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
+        window.addEventListener('click', swallow, { capture: true, once: true });
+        setTimeout(() => { try { window.removeEventListener('click', swallow, true); } catch (_) {} }, 50);
+      };
+      const onCancel = () => {
+        if (dragging) contaGesto('trascinamento', { da: 'icona_menu', a: 'nessuna', esito: 'annullato' });
+        cleanup();
+      };
+      window.addEventListener('pointermove', onMove, true);
+      window.addEventListener('pointerup', onUp, true);
+      window.addEventListener('pointercancel', onCancel, true);
+    });
+  }
+
+  // Un'icona trascinata fuori dalla barra laterale, sopra questa pagina: il gesto è della barra, qui arrivano solo le
+  // coordinate. Se il menu è aperto cade nelle sue zone, e la fila vuota si fa vedere per accoglierla.
+  let esterno = null;
+  function righeVuote(vedi) {
+    if (!activeMenu) return;
+    for (const r of activeMenu.root.querySelectorAll('.sn-menu-row[data-sn-vuota="1"]')) {
+      if (r.hidden === !vedi) continue;
+      r.hidden = !vedi;
+    }
+  }
+  function trascinaDaFuori({ fase, id, x, y, icon }) {
+    const via = () => {
+      if (!esterno) return;
+      if (esterno.zona) esterno.zona.zoneEl.classList.remove('sn-drop-hover');
+      try { esterno.preview.remove(); } catch (_) {}
+      esterno = null;
+      righeVuote(false);
+    };
+    if (fase === 'muovi') {
+      if (!activeMenu) return false;
+      if (!esterno || esterno.id !== id) {
+        via();
+        const preview = document.createElement('div');
+        preview.className = 'sn-drag-preview';
+        preview.style.width = '36px';
+        preview.style.height = '36px';
+        preview.innerHTML = icon || '';
+        monta(preview);
+        esterno = { id, preview, zona: null };
+        righeVuote(true);
+      }
+      esterno.preview.style.left = (x - 18) + 'px';
+      esterno.preview.style.top = (y - 18) + 'px';
+      const zona = findZoneAt(x, y);
+      if (zona !== esterno.zona) {
+        if (esterno.zona) esterno.zona.zoneEl.classList.remove('sn-drop-hover');
+        if (zona) zona.zoneEl.classList.add('sn-drop-hover');
+        esterno.zona = zona;
+      }
+      return true;
+    }
+    if (fase === 'rilascia') {
+      const zona = activeMenu ? findZoneAt(x, y) : null;
+      const prima = zona ? findInsertBefore(zona.zoneEl, x, y, null) : null;
+      via();
+      if (!zona) { contaGesto('trascinamento', { da: 'icona_barra', a: 'nessuna', esito: 'annullato' }); return false; }
+      try { zona.onDrop && zona.onDrop({ id, source: 'bar', target: zona.target, beforeId: prima?.dataset?.snIconId || null }); } catch (er) { console.error(er); }
+      return true;
+    }
+    via();
+    return false;
+  }
+
+  function attachDropZone(zoneEl, { target, onDrop }) {
+    dropZones.push({ zoneEl, target, onDrop });
+  }
+
+  function findZoneAt(x, y) {
+    for (let i = dropZones.length - 1; i >= 0; i--) {
+      const z = dropZones[i];
+      if (!document.documentElement.contains(z.zoneEl)) {
+        dropZones.splice(i, 1);
+        continue;
+      }
+      if (z.zoneEl.hidden) continue;
+      const r = z.zoneEl.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return z;
+    }
+    return null;
+  }
+
+  // Il bottone davanti al quale posare, in ordine di lettura; salta quello che si trascina.
+  function findInsertBefore(zoneEl, x, y, skipEl) {
+    const btns = Array.from(zoneEl.querySelectorAll('[data-sn-icon-id]')).filter((b) => b !== skipEl);
+    for (const b of btns) {
+      const r = b.getBoundingClientRect();
+      if (y < r.top) return b;
+      if (y >= r.top && y <= r.bottom && x < r.left + r.width / 2) return b;
+    }
+    return null;
+  }
+
   // Per gli spec: lo shadow root chiuso della cronologia non lo attraversa nessun locator. Sui siti SN_MENU
   // vive nel mondo isolato dei content script, quindi la pagina da qui non passa.
   function statoCronologia() {
@@ -1266,6 +1781,13 @@
     computeOffset: Place.computeOffset,
     computeSubOffset,
     openGenericSubmenu,
+    openIconGridSubmenu,
+    openLinkSubmenu,
+    refreshIconRow,
+    refreshIconGrid,
+    isSubMenuOpen,
+    setPonteBarra,
+    trascinaDaFuori,
     closeSubmenu,
     allaChiusura: (fn) => { allaChiusura = typeof fn === 'function' ? fn : null; },
     testoNascosto,

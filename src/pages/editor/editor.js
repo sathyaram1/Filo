@@ -1409,6 +1409,16 @@
     return { type: 'image', attrs: { src, ...(alt ? { alt } : {}) } };
   }
 
+  // Il collegamento e l'evidenziato messi dalla fila del tasto destro (#1434) restano al salvataggio: solo indirizzi del
+  // web e della posta, e un colore scritto come colore.
+  const LINK_OK = /^(https?:|mailto:)/i;
+  const COLORE_OK = /^(#[0-9a-f]{3,8}|rgba?\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?\s*(,\s*[\d.]+%?\s*)?\)|[a-z]{3,20})$/i;
+  const SENZA_COLORE = /^(transparent|initial|inherit|unset|rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\))$/i;
+  function coloreDi(v) {
+    const c = String(v || '').trim();
+    return c && COLORE_OK.test(c) && !SENZA_COLORE.test(c) ? c : '';
+  }
+
   // Le marche sono { type, attrs? }: i tag B/I/U/S danno marche semplici; il font-size, che è
   // stile inline, diventa una marca con attrs.size così sopravvive al round-trip.
   function inlineToPM(parent, marks) {
@@ -1432,6 +1442,11 @@
       // una marca fontFamily, così sopravvivono al round-trip.
       const ff = (el.style && el.style.fontFamily) || (el.tagName === 'FONT' ? el.getAttribute('face') : '');
       if (ff) next = [...next.filter((m) => m.type !== 'fontFamily'), { type: 'fontFamily', attrs: { family: ff } }];
+      const sfondo = coloreDi(el.style && el.style.backgroundColor);
+      if (sfondo && !el.classList.contains('ed-find-hit')) next = [...next.filter((m) => m.type !== 'highlight'), { type: 'highlight', attrs: { color: sfondo } }];
+      else if (el.style && SENZA_COLORE.test(String(el.style.backgroundColor || ''))) next = next.filter((m) => m.type !== 'highlight');
+      const href = el.tagName === 'A' ? String(el.getAttribute('href') || '').trim() : '';
+      if (href && LINK_OK.test(href)) next = [...next.filter((m) => m.type !== 'link'), { type: 'link', attrs: { href } }];
       out.push(...inlineToPM(el, next));
     });
     return out;
@@ -1505,6 +1520,12 @@
       if (fs && fs.attrs && fs.attrs.size) html = `<span style="font-size:${escapeHtml(fs.attrs.size)}">${html}</span>`;
       const ff = marks.find((m) => m.type === 'fontFamily');
       if (ff && ff.attrs && ff.attrs.family) html = `<span style="font-family:${escapeHtml(ff.attrs.family)}">${html}</span>`;
+      const hl = marks.find((m) => m.type === 'highlight');
+      const colore = hl && hl.attrs ? coloreDi(hl.attrs.color) : '';
+      if (colore) html = `<span style="background-color:${escapeHtml(colore)}">${html}</span>`;
+      const ln = marks.find((m) => m.type === 'link');
+      const href = ln && ln.attrs ? String(ln.attrs.href || '').trim() : '';
+      if (href && LINK_OK.test(href)) html = `<a href="${escapeHtml(href)}">${html}</a>`;
       return html;
     }).join('');
   }

@@ -5,9 +5,10 @@
 Ciò che riguarda la finestra o il sistema (indietro, avanti, ricarica, home,
 incognito, schermo intero, chiudi scheda) e le azioni sulla pagina intera (traduci,
 screenshot, condividi, salva per dopo, QR…) stanno nella barra laterale che si apre
-dal bordo sinistro; il tasto destro resta per l'elemento sotto il mouse e non ha
-icone (#1246). La disposizione salvata ha due zone, le icone in vista e quelle
-tenute da parte nel cassetto «Altro…» in fondo alla barra: un'icona sta in un
+dal bordo sinistro (#1246); il tasto destro resta per l'elemento sotto il mouse, e
+in cima ha la fila delle sue azioni più probabili (#1434, sezione sotto). La
+disposizione salvata ha le zone della barra (le icone in vista e il cassetto
+«Altro…» in fondo) e, per ogni contesto, la fila e il suo «+»: un'icona sta in un
 posto solo, e spostarla la toglie dall'altro.
 
 ## Perché
@@ -89,6 +90,41 @@ per le azioni sulla pagina intera, che stavano in una fila in cima al menu (#124
 - **Chi aveva disposto le icone non perde niente**: alla prima apertura con la
   barra, le globali rimaste in «Altro…» vanno nella barra; la riga del tasto
   destro di prima finisce in fondo alla barra, nel suo ordine (#1246).
+
+## La fila contestuale in cima al tasto destro (#1434)
+
+- **Il contesto lo sceglie lo stesso ramo che sceglie le voci** del menu: fila e
+  voci parlano sempre dello stesso elemento. Ogni tipo di elemento ha il suo
+  contesto, come chiede [Menu contestuale: se Filo sostituisce il menu nativo,
+  deve coprire OGNI tipo di
+  elemento](menu-contestuale-se-filo-sostituisce-il-menu-nativo.md): testo
+  selezionato dove si scrive con la formattazione, in una casella, in una
+  pagina; immagine; collegamento; filmato o audio; campo col cursore senza
+  selezione; pagina (niente sotto il mouse). Un tipo nuovo di elemento è un
+  contesto nuovo, non una fila che manca.
+- **Una selezione rimasta altrove non decide** il menu di un'immagine, un
+  collegamento o un filmato: vale solo se il clic le sta sopra.
+- **Ogni contesto ha due zone**, la fila e il suo «+», scritte dal main come
+  quelle della barra (una porta sola, ogni spostamento un cambio annullabile).
+  Un'azione di un contesto resta nel suo contesto: nella barra o su un altro
+  elemento non avrebbe su cosa agire. Un'icona della barra può entrare nella
+  fila di qualunque contesto, e lascia la barra.
+- **Di partenza nessuna azione sulla pagina intera** nella fila: la fila della
+  pagina è vuota e nascosta, e si fa vedere quando ci si porta sopra un'icona
+  dalla barra. L'ordine è fisso per contesto; sceglierlo con un modello è una
+  decisione dell'owner ancora aperta (#1377).
+- **L'icona dice lo stato quando conta** (Riproduci o Pausa, audio acceso o
+  spento): disegno e nome del catalogo valgono per trascinarla e per la chat,
+  quelli dati dall'elemento per il menu aperto. Uno stile che la selezione ha
+  già (Grassetto, Evidenzia) accende la sua icona, e premerla lo toglie: il fondo
+  della selezione Chromium lo dice solo con `backColor` (giro 2).
+- **Un'immagine o un filmato dentro un collegamento è anche il collegamento**:
+  la sua fila ha Apri in nuova tab, e il «+» Copia URL, azioni del suo contesto
+  che compaiono solo dove il collegamento c'è (giro 2).
+- **Tante icone vanno a capo**, mai fuori dal bordo del menu.
+- Catalogo: `src/shared/disposizioneIcone.js`; chi esegue:
+  `src/content/content.js` (`filaContestuale`); chi disegna:
+  `src/content/menuIcons.js`.
 
 ## A schermo intero le schede scendono dal bordo alto (#1246)
 

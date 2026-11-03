@@ -623,6 +623,44 @@
     `<path d="M9 17l-5-5 5-5"/>` +
     `<path d="M20 18v-2a4 4 0 0 0-4-4H4"/>`;
 
+  // --- La fila del tasto destro sul testo (#1434): formattazione, collegamento, evidenziatore, forbici.
+  const bold =
+    `<path d="M7 5h5.5a3.5 3.5 0 0 1 0 7H7z"/>` +
+    `<path d="M7 12h6.5a3.5 3.5 0 0 1 0 7H7z"/>`;
+  const italic =
+    `<path d="M10 5h8"/>` +
+    `<path d="M6 19h8"/>` +
+    `<path d="M14 5l-4 14"/>`;
+  const underline =
+    `<path d="M7 4v7a5 5 0 0 0 10 0V4"/>` +
+    `<path d="M5 20h14"/>`;
+  const strike =
+    `<path d="M16.5 7.5c-.6-1.8-2.3-3-4.5-3-2.6 0-4.5 1.5-4.5 3.5 0 1.2.6 2.1 1.6 2.8"/>` +
+    `<path d="M14.5 13c1.2.7 2 1.6 2 3 0 2-2 3.5-4.5 3.5-2.4 0-4.2-1.2-4.8-3"/>` +
+    `<path d="M4 12h16"/>`;
+  const link =
+    `<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/>` +
+    `<path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>`;
+  // Evidenziatore: il pennarello inclinato con la punta a scalpello, e sotto la riga che lascia.
+  const highlight =
+    `<path d="M16.5 2.5l4.5 4.5-7.5 7.5-4.5-4.5z"/>` +
+    `<path d="M9 10l-3 5.5 2 2 5.5-3"/>` +
+    `<path d="M3.5 21h9"/>`;
+  const cut =
+    `<circle cx="6" cy="17" r="3"/>` +
+    `<circle cx="18" cy="17" r="3"/>` +
+    `<path d="M8.2 14.8L19 4"/>` +
+    `<path d="M15.8 14.8L5 4"/>`;
+  // La fila su un filmato: il triangolo che parte, le due sbarre che fermano, lo schermo con la finestrella nell'angolo.
+  const play =
+    `<path d="M8 5.5v13l10.5-6.5z"/>`;
+  const pause =
+    `<path d="M8.5 5.5v13"/>` +
+    `<path d="M15.5 5.5v13"/>`;
+  const pip =
+    `<rect x="3" y="5" width="18" height="14" rx="2"/>` +
+    `<rect x="12" y="12" width="6" height="4.5" rx="1"/>`;
+
   // PREVISTE: copia (due fogli sovrapposti).
   const copy =
     `<rect x="9" y="9" width="11" height="11" rx="2"/>` +
@@ -792,6 +830,16 @@
     mic:          (size) => wrap(mic, { size }),
     memory:       (size) => wrap(memory, { size }),
     copy:         (size) => wrap(copy, { size }),
+    bold:         (size) => wrap(bold, { size }),
+    italic:       (size) => wrap(italic, { size }),
+    underline:    (size) => wrap(underline, { size }),
+    strike:       (size) => wrap(strike, { size }),
+    link:         (size) => wrap(link, { size }),
+    highlight:    (size) => wrap(highlight, { size }),
+    cut:          (size) => wrap(cut, { size }),
+    play:         (size) => wrap(play, { size }),
+    pause:        (size) => wrap(pause, { size }),
+    pip:          (size) => wrap(pip, { size }),
     reply:        (size) => wrap(reply, { size }),
     bell:         (size) => wrap(bell, { size }),
     repeat:       (size) => wrap(repeat, { size }),

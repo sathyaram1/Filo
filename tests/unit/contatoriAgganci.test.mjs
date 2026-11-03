@@ -37,8 +37,13 @@ test('ogni avviso d’errore dei content script si conta per chiave, e la chiave
 test('un’icona della barra si conta una volta sola: quelle della pagina nella pagina, quelle della finestra nel main', () => {
   const D = globalThis.SN_DISPOSIZIONE_ICONE;
   const icone = leggi('src', 'content', 'menuIcons.js');
-  // Il registro della pagina ha solo le sue azioni (#1246), e le conta tutte dal clic alla fine.
-  const nelRegistro = [...icone.matchAll(/^\s+(\w+):\s*\{ id: '(\w+)'/gm)].map((m) => m[2]);
+  // Il registro della pagina ha solo le sue azioni (#1246), e le conta tutte dal clic alla fine. Quelle della finestra
+  // portate nella fila del tasto destro (#1434) stanno in un registro a parte e le esegue il main.
+  const registro = /\n {2}function registro\(\) \{\n([\s\S]*?)\n {2}\}\n/.exec(icone);
+  assert.ok(registro, 'manca registro() in menuIcons.js');
+  const nelRegistro = [...registro[1].matchAll(/^\s+(\w+):\s*\{ id: '(\w+)'/gm)].map((m) => m[2]);
+  const finestra = /\n {2}function registroFinestra\(\) \{\n([\s\S]*?)\n {2}\}\n/.exec(icone);
+  assert.ok(finestra && !/contaIcona/.test(finestra[1]), 'le icone della finestra non si contano nella pagina');
   const dellaPagina = Object.keys(D.ICONE).filter((id) => D.ICONE[id].tipo === 'pagina');
   assert.deepEqual([...nelRegistro].sort(), [...dellaPagina].sort());
   assert.match(icone, /for \(const \[id, voce\] of Object\.entries\(reg\)\) contaIcona\(id, voce\)/);

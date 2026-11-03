@@ -1049,7 +1049,9 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     assert.match(corpo(popup, 'async function apriCollegamento('), /proposta: conVerdetto\(a\)/);
     assert.match(corpo(popup, 'async function apriCollegamento('), /type: MSG\.APRI_COLLEGAMENTO_FILO, url, parole:/);
     assert.match(corpo(popup, 'async function scaricaCollegamento('), /type: MSG\.DOWNLOAD_LINK, url, diFilo: true, parole:/);
-    const menu = corpo(src('content', 'content.js'), 'function buildLinkActionItems(');
+    // Le voci del menu e le icone della fila del tasto destro (#1434) prendono le azioni dallo stesso posto.
+    assert.match(corpo(src('content', 'content.js'), 'function buildLinkActionItems('), /const a = azioniDelLink\(linkEl\);/);
+    const menu = corpo(src('content', 'content.js'), 'function azioniDelLink(');
     assert.match(menu, /diFilo \? Popup\.apriCollegamento\(linkEl\)/);
     assert.match(menu, /diFilo \? Popup\.scaricaCollegamento\(linkEl\)/);
     const filo = corpo(src('main', 'services', 'handlers', 'filo.js'), 'on(MSG.APRI_COLLEGAMENTO_FILO');

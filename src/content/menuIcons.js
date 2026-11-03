@@ -1,19 +1,29 @@
-// Le azioni sulla pagina che la barra laterale manda alla scheda (#1246): registro con id stabili, eseguito qui
-// perché agisce sul documento. Dove stanno le icone lo decide src/shared/disposizioneIcone.js, non questo file.
-// Caricato dopo actions.js e prima di content.js.
+// Le icone del content script: le azioni sulla pagina che la barra laterale manda alla scheda (#1246) e la fila
+// contestuale in cima al tasto destro (#1434), col suo «Altro…» e i trascinamenti fra menu e barra. Dove stanno le
+// icone lo decide src/shared/disposizioneIcone.js e lo scrive il main; qui la copia per disegnare subito.
 
 (function (global) {
   'use strict';
 
+  const { MSG } = global.SN_MSG;
   const I18n = global.SN_I18N;
+  const Menu = global.SN_MENU;
   const Translate = global.SN_TRANSLATE_PAGE;
   const Disp = global.SN_DISPOSIZIONE_ICONE;
 
-  // Le comandano solo la barra (via main) e il frame principale: un riquadro incorporato non ha la pagina.
-  // Lo strato dei riquadri vale come lui.
+  // Le azioni sulla pagina le comandano solo la barra (via main) e il frame principale: un riquadro incorporato non ha
+  // la pagina. Lo strato dei riquadri vale come lui.
   const IS_SUBFRAME = global.SN_FILO_UI?.nelloStrato === true || (() => {
     try { return window.top !== window.self; } catch (_) { return true; }
   })();
+
+  let deps = {
+    isContentFullscreen: () => false,
+    aiutoPasso: () => {},
+    aiutoAcceso: () => true,
+    aiutoStato: () => null,
+  };
+  const manda = (m) => { try { return Promise.resolve(chrome.runtime.sendMessage(m)).catch(() => null); } catch (_) { return Promise.resolve(null); } };
 
   function registro() {
     const Icons = global.SN_ICONS;
@@ -48,6 +58,43 @@
     };
     for (const [id, voce] of Object.entries(reg)) contaIcona(id, voce);
     return reg;
+  }
+
+  // Le icone della finestra portate dalla barra nella fila (#1434): le esegue il main, come per la barra.
+  function registroFinestra() {
+    const Icons = global.SN_ICONS;
+    const Actions = global.SN_ACTIONS;
+    const I = (name) => Icons[name](18);
+    const isFs = !!(document.fullscreenElement || deps.isContentFullscreen());
+    const stato = (typeof deps.aiutoStato === 'function' && deps.aiutoStato()) || {};
+    const aiuto = Disp.aspettoAiuto({ ...stato, risposta: !!stato.nonLetta });
+    const spento = !deps.aiutoAcceso();
+    const reg = {
+      help:        { id: 'help',        icon: I(spento ? 'help' : aiuto.icona), label: I18n.t(spento ? 'aiuto_spento_barra' : aiuto.etichetta), disabled: spento, onClick: () => deps.aiutoPasso() },
+      fullscreen:  { id: 'fullscreen',  icon: isFs ? I('shrink') : I('zoom'), label: I18n.t(isFs ? 'menu_exit_fullscreen' : 'menu_fullscreen'), tasto: global.SN_TASTI?.etichettaSchermoIntero(), onClick: () => Actions.toggleFullscreen() },
+      back:        { id: 'back',        icon: I('back'),        label: I18n.t('menu_back'),         onClick: () => manda({ type: MSG.NAV_BACK }) },
+      forward:     { id: 'forward',     icon: I('forward'),     label: I18n.t('menu_forward'),      onClick: () => manda({ type: MSG.NAV_FORWARD }) },
+      reload:      { id: 'reload',      icon: I('reload'),      label: I18n.t('menu_reload'),       onClick: () => manda({ type: MSG.NAV_RELOAD }) },
+      closeTab:    { id: 'closeTab',    icon: I('close'),       label: I18n.t('menu_close_tab'),    onClick: () => manda({ type: MSG.CLOSE_TAB, via: 'tasto_destro_riga' }) },
+      newTab:      { id: 'newTab',      icon: I('filoLogo'),    label: I18n.t('menu_new_tab'),      onClick: () => manda({ type: MSG.OPEN_NEW_TAB }) },
+      incognito:   { id: 'incognito',   icon: I('incognito'),   label: I18n.t('menu_incognito'),    onClick: () => manda({ type: MSG.OPEN_INCOGNITO }) },
+      openOptions: { id: 'openOptions', icon: I('models'),      label: I18n.t('menu_open_options'), onClick: () => manda({ type: MSG.OPEN_OPTIONS }) },
+      home:        { id: 'home',        icon: I('home'),        label: I18n.t('menu_open_home'),    onClick: () => manda({ type: MSG.GO_HOME }) },
+      editorApp:   { id: 'editorApp',   icon: I('editor'),      label: I18n.t('menu_open_editor'),  onClick: () => manda({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }) },
+    };
+    // «Feedback» porta alla posta delle segnalazioni, che a un utente comune è un vicolo cieco (#583).
+    if (isOwner) reg.feedbackApp = { id: 'feedbackApp', icon: I('feedback'), label: I18n.t('menu_open_feedback'), onClick: () => manda({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }) };
+    return reg;
+  }
+
+  let isOwner = false;
+  function refreshOwner() {
+    manda({ type: MSG.AUTH_STATUS }).then((r) => {
+      const ora = !!(r && r.ok && r.signedIn && r.isAdmin);
+      if (ora === isOwner) return;
+      isOwner = ora;
+      ridisegna();
+    });
   }
 
   // Le icone si misurano dal clic alla fine della loro azione (#1461). Quelle della finestra le esegue e le misura il
@@ -86,5 +133,163 @@
       .map((id) => ({ id, etichetta: String(reg[id].label || ''), icona: reg[id].iconName || Disp.ICONE[id].icona }));
   }
 
-  global.SN_MENU_ICONS = { runIconAction, statoPerBarra };
+  // ── la disposizione: la scrive il main, uno solo (#871) ───────────────────
+  let layout = null;
+  const disposizione = () => layout || Disp.DEFAULT;
+  function setLayout(v) {
+    if (!Disp.valida(v)) return false;
+    layout = Disp.migra(v).layout;
+    return true;
+  }
+  function loadIconLayout() {
+    manda({ type: MSG.ICON_LAYOUT_GET }).then((r) => { if (r && r.ok && setLayout(r.layout)) ridisegna(); });
+  }
+
+  // Cambiata altrove (un'altra scheda, la barra, la chat, un annullo): il menu aperto si ridisegna.
+  function layoutCambiato(v) {
+    if (setLayout(v)) ridisegna();
+  }
+
+  // Il gesto si vede subito qui, poi vale quello che il main ha scritto. `source` 'bar': arriva dalla barra laterale.
+  function applyIconDrop({ id, source, target, beforeId }) {
+    if (!id || !Disp.ammessa(id, target)) return;
+    const locale = Disp.applicaPosa(disposizione(), { id, target, beforeId: beforeId || null });
+    if (locale) layout = locale;
+    ridisegna();
+    manda({ type: MSG.ICON_LAYOUT_DROP, id, source: source === 'bar' ? 'bar' : 'menu', target, beforeId: beforeId || null })
+      .then((r) => { if (r && r.ok) layoutCambiato(r.layout); });
+  }
+
+  // ── la fila del tasto destro (#1434) ──────────────────────────────────────
+  // Quella del menu aperto: il contesto e chi esegue le sue azioni, per ridisegnarla dopo un trascinamento.
+  let aperta = null;
+
+  // La voce per `id`, o null se qui non si può fare: l'azione manca a questo elemento, o è un'icona della pagina
+  // dentro un riquadro incorporato.
+  function voce(id, azioni, regPagina, regFinestra) {
+    const I = (name) => global.SN_ICONS[name](18);
+    const d = Disp.descrizione(id);
+    if (!d) return null;
+    if (d.tipo === 'contesto') {
+      const a = azioni[d.azione];
+      if (!a || typeof a.onClick !== 'function') return null;
+      const icona = a.icona && typeof global.SN_ICONS[a.icona] === 'function' ? a.icona : d.icona;
+      const v = { id, icon: I(icona), label: a.label || I18n.t(d.etichetta), onClick: a.onClick, tieneAperto: !!a.tieneAperto, disabled: !!a.disabled, draggable: true };
+      if (typeof a.acceso === 'boolean') v.acceso = a.acceso;
+      return v;
+    }
+    if (IS_SUBFRAME) return null;
+    const r = d.tipo === 'pagina' ? regPagina[id] : regFinestra[id];
+    return r ? { ...r, draggable: true } : null;
+  }
+
+  function costruisci() {
+    if (!aperta) return null;
+    const { contesto, azioni } = aperta;
+    const regPagina = registro();
+    const regFinestra = registroFinestra();
+    const { fila: ids, altro } = Disp.filaDi(disposizione(), contesto);
+    const voci = (lista) => lista.map((id) => voce(id, azioni, regPagina, regFinestra)).filter(Boolean);
+    const inFila = voci(ids);
+    const inAltro = voci(altro);
+    const items = [...inFila, {
+      kind: 'overflow',
+      icon: global.SN_ICONS.plus(16),
+      label: I18n.t('menu_overflow'),
+      onClick: (anchorEl) => Menu.openIconGridSubmenu(anchorEl, inAltro, {
+        cols: 4,
+        dropTarget: Disp.zonaAltro(contesto),
+        onDrop: (e) => applyIconDrop(e),
+      }),
+    }];
+    return { items, inAltro, vuota: !inFila.length && !inAltro.length };
+  }
+
+  // La fila per il menu che si sta aprendo. `azioni`: { <azione>: { onClick, label?, icona?, tieneAperto?, disabled?,
+  // acceso? } }, quelle che l'elemento sotto il mouse permette; `icona` e `label` dicono lo stato (Riproduci o Pausa),
+  // `acceso` uno stile che la selezione ha già (Grassetto).
+  function fila(contesto, azioni = {}) {
+    if (!Object.prototype.hasOwnProperty.call(Disp.CONTESTI, contesto)) { aperta = null; return null; }
+    refreshOwner();
+    aperta = { contesto, azioni: azioni || {} };
+    const c = costruisci();
+    return {
+      type: 'row',
+      contesto,
+      dropTarget: Disp.zonaFila(contesto),
+      onDrop: (e) => applyIconDrop(e),
+      items: c.items,
+      vuota: c.vuota,
+    };
+  }
+
+  // Sul posto, senza chiudere il menu: chi riordina continua a riordinare. Serve anche quando cambia lo stato che
+  // decide il NOME di un'icona mentre il menu è sotto gli occhi (lo schermo intero spento da un'altra strada, #514).
+  function ridisegna() {
+    if (!aperta || !Menu.isOpen?.()) return;
+    const c = costruisci();
+    if (!c) return;
+    try { Menu.refreshIconRow?.(c.items, { vuota: c.vuota }); } catch (_) {}
+    try { Menu.refreshIconGrid?.(c.inAltro); } catch (_) {}
+  }
+
+  // ── la barra laterale, terza zona (#871) ─────────────────────────────────
+  // Solo nel frame principale: le coordinate di un riquadro non sono quelle della barra.
+  let barraAperta = null;
+  let miraInviata = null;
+  let inVolo = false;
+  const trascina = (dati) => manda({ type: MSG.BARRA_TRASCINA, ...dati });
+  if (!IS_SUBFRAME) {
+    Menu.setPonteBarra?.({
+      inizio(id, menuSinistra) {
+        barraAperta = null;
+        miraInviata = null;
+        // Un'azione dell'elemento non va nella barra: lì non c'è un elemento su cui farla.
+        inVolo = Disp.noto(id);
+        if (!inVolo) return;
+        trascina({ fase: 'inizio', id, menuSinistra }).then((r) => { if (r && r.ok) barraAperta = { larghezza: Number(r.larghezza) || 0 }; });
+      },
+      sopra(x, y) {
+        const dentro = !!barraAperta && x <= barraAperta.larghezza;
+        const mira = dentro ? Math.round(y) : null;
+        if (mira !== miraInviata) { miraInviata = mira; trascina({ fase: 'sopra', y: mira }); }
+        return dentro;
+      },
+      posa(id, x, y) {
+        if (!barraAperta || x > barraAperta.larghezza) return false;
+        trascina({ fase: 'posa', id, x: Math.round(x), y: Math.round(y) });
+        return true;
+      },
+      fine() {
+        barraAperta = null;
+        miraInviata = null;
+        if (inVolo) trascina({ fase: 'fine' });
+        inVolo = false;
+      },
+    });
+  }
+
+  // Un'icona portata fuori dalla barra sopra questa pagina: se il menu è aperto ci cade dentro.
+  function dallaBarra(msg) {
+    if (IS_SUBFRAME || !msg) return;
+    const id = String(msg.id || '');
+    if (!Disp.noto(id)) return;
+    const d = Disp.ICONE[id];
+    const entry = d.tipo === 'pagina' ? registro()[id] : registroFinestra()[id];
+    Menu.trascinaDaFuori?.({
+      fase: String(msg.fase || ''), id,
+      x: Number(msg.x) || 0, y: Number(msg.y) || 0,
+      icon: entry ? entry.icon : global.SN_ICONS?.[d.icona]?.(18) || '',
+    });
+  }
+
+  function init(d) { deps = { ...deps, ...d }; }
+
+  loadIconLayout();
+  refreshOwner();
+
+  global.SN_MENU_ICONS = {
+    init, fila, runIconAction, statoPerBarra, layoutCambiato, dallaBarra,
+    redrawIconRows: ridisegna,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

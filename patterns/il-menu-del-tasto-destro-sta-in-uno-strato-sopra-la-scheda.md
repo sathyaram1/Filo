@@ -19,7 +19,7 @@ WebContentsView trasparente per finestra, posata sopra la scheda attiva, con la 
   clic, come invece fa `src/main/popup-menu.js` (fuoco a un'altra finestra, trasparenza che su Linux
   dipende dal compositore).
 - **Grande quanto la scheda, in cima a tutto tranne la barra laterale**, che resta raggiungibile a menu aperto
-  (#871). Le icone delle azioni sulla pagina stanno solo lì (#1246): lo strato non le riproduce. Un clic fuori dal menu cade sullo strato: lo chiude e basta, alla pagina sotto
+  (#871): un'icona si porta dalla barra alla fila del menu e indietro (#1434). Un clic fuori dal menu cade sullo strato: lo chiude e basta, alla pagina sotto
   non arriva. Diversa dalle viste grandi quanto il contenuto
   (`patterns/la-shell-non-disegna-sopra-la-pagina.md`), che rigirano i gesti del vuoto alla pagina.
 - **Il punto viene dal `context-menu` della scheda**, `params.x/y`: px della vista, già fuori da zoom e

@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('barra', {
   menu: manda('barra:menu'),
   suggerimento: manda('barra:suggerimento'),
   posa: manda('barra:posa'),
+  // Dove stanno le icone in vista, e un'icona portata fuori dal pannello verso il menu del tasto destro (#1434).
+  misure: manda('barra:misure'),
+  trascinaFuori: manda('barra:trascina-fuori'),
   // Un'icona presa e lasciata andare senza posarla: la conta il main (#1471).
   annullato: manda('barra:annullato'),
   altroAperto: manda('barra:altro'),

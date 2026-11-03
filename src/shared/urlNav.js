@@ -190,6 +190,21 @@
     return /\.[a-z]{2,}$/i.test(host);                    // dominio con TLD alfabetico
   }
 
+  // Quello che si scrive nel campo del collegamento della fila del tasto destro (#1434): un indirizzo del web o della
+  // posta, mai uno schema che esegue (javascript:) o legge (file:, data:). '' se non è un indirizzo.
+  function collegamentoScritto(input) {
+    const raw = String(input || '').trim();
+    if (!raw || /\s/.test(raw) || raw.length > 4096) return '';
+    if (/^mailto:[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(raw)) return raw;
+    if (/^[^\s@/:]+@[^\s@/:]+\.[a-z]{2,}$/i.test(raw)) return `mailto:${raw}`;
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) {
+      try { const u = new URL(raw); return (u.protocol === 'http:' || u.protocol === 'https:') && u.hostname ? u.href : ''; } catch (_) { return ''; }
+    }
+    if (!looksLikeAddress(raw)) return '';
+    const n = normalizeUrl(raw);
+    return /^https?:\/\//i.test(n) ? n : '';
+  }
+
   // #437 — schemi che NON sono indirizzi: non puntano fuori dal documento in cui sono nati,
   // quindi copiarli dà una stringa che altrove non apre niente.
   const NON_ADDRESS_SCHEMES = new Set([
@@ -224,6 +239,6 @@
   global.SN_URL_NAV = {
     isLocalHost, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
     noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
-    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress,
+    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress, collegamentoScritto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
