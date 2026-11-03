@@ -1617,8 +1617,8 @@
     // possono non essere arrivati, o essere vuoti su un altro computer, e il grigio mentirebbe.
     const fermaDaStato = status === 'design' && statusReason === 'l5';
 
-    // Una fusione approvata e mai avvenuta pesa quanto una richiesta ferma (vedi mergeApprovals).
-    const ferme = failed.concat(pending);
+    // Le richieste da decidere prima di quelle approvate e non avvenute: il pannello le mostra tutte.
+    const ferme = pending.concat(failed);
     if (!ferme.length && fermaDaStato) {
       // Approvata e fusa, la pratica aspetta qui solo la chiusura. Vale se la fusa è l'ultima richiesta, del ramo di
       // adesso, e non di un lavoro server (dopo il sì passa in revisione: se torna qui l'ha fermata il suo cancello).
@@ -1627,33 +1627,38 @@
       const fusa = !!ultima && ultima.used === true && ultima.outcome === 'merged' && !isLocalOnly(fb)
         && (!ramo || !ultima.branch || String(ultima.branch) === ramo);
       if (fusa) {
-        return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {
+        return forma('l5', 'quadrato', titolo, 'design', 'fuso', {
           titolo,
           righe: [],
-          testo: 'Approvata e fusa: la pratica esce da qui appena arriva il suo stato nuovo.',
+          testo: STATI_FUSIONE.fusa.testo,
           azioni: [],
-        }, { richiesta: null, richieste: [], conflitto: false });
+        }, { richiesta: null, richieste: [], conflitto: false, statoFusione: 'fusa' });
       }
       return l5SenzaRichiesta(fb, opts);
     }
-    if (ferme.length) {
-      const req = ferme[0];
-      const inConflitto = failed.length > 0;
+    if (pending.length) {
       // Una richiesta già mandata a fondere (tasto o segno), o già decisa, non aspetta più il via libera (#702).
       const statoDi = (opts && typeof opts.statoRichiesta === 'function') ? opts.statoRichiesta : () => null;
       const stati = pending.map((r) => statoDi(r));
-      const fusione = inConflitto || stati.some((s) => s !== 'volo' && s !== 'decisa') ? null
+      const fusione = stati.some((s) => s !== 'volo' && s !== 'decisa') ? null
         : (stati.includes('volo') ? 'volo' : 'decisa');
-      return forma('l5', 'quadrato', titolo, 'attack', inConflitto ? 'conflitto' : 'bloccato', {
+      const stato = fusione || 'da_decidere';
+      return forma('l5', 'quadrato', titolo, fusione ? 'spam' : 'attack', fusione ? 'attesa' : 'bloccato', {
         titolo,
         righe: [],
-        testo: inConflitto
-          ? 'Avevi detto sì, ma la fusione non è avvenuta: il ramo non entra in main finché non si sistema.'
-          : fusione === 'volo' ? 'Approvata: il server sta fondendo il ramo.'
-            : fusione === 'decisa' ? 'Hai già deciso: la richiesta esce da qui appena la pagina rilegge le fusioni.'
-              : 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera.',
+        testo: STATI_FUSIONE[stato].testo,
         azioni: [],
-      }, { richiesta: req, richieste: ferme, conflitto: inConflitto, fusione });
+      }, { richiesta: pending[0], richieste: ferme, conflitto: false, fusione, statoFusione: stato });
+    }
+    if (failed.length) {
+      const stato = riallineamentoDi(fb, failed);
+      const fallito = stato === 'riallineamento_fallito';
+      return forma('l5', 'quadrato', titolo, fallito ? 'attack' : 'spam', fallito ? 'conflitto' : 'riallinea', {
+        titolo,
+        righe: [],
+        testo: fallito ? testoRiallineamentoFallito(failed) : STATI_FUSIONE.da_riallineare.testo,
+        azioni: [],
+      }, { richiesta: failed[0], richieste: ferme, conflitto: true, fusione: null, statoFusione: stato });
     }
 
     const versione = String((fb && fb.resolvedInVersion) || '').trim();
