@@ -1,16 +1,20 @@
-// Nelle prove (NODE_ENV=test, o FILO_SERVIZI_CHIUSI=1 dal pilota): il servizio vero delle schede non si raggiunge da nessuna porta,
-// né dalle pagine né dal main, così una prova parte uguale in GitHub e nei contenitori senza rete (#735.1).
-// Chi vuole delle schede le finge sopra. Sentinella: tests/unit/testServiziChiusi.test.mjs.
+// Nelle prove (NODE_ENV=test, o FILO_SERVIZI_CHIUSI=1 dal pilota) il progetto Firebase vero non si raggiunge da nessuna porta,
+// né dalle pagine né dal main: niente account anonimi, callable o letture a ogni Filo aperto da una prova (#735.1, #2067).
+// Chi li vuole li finge sopra. Sentinelle: tests/unit/testServiziChiusi.test.mjs, tests/progetto-vero-chiuso.spec.mjs.
 
 'use strict';
 
-const HOST_CHIUSI = ['firestore.googleapis.com'];
+const { firebaseProjectId } = require('./auth/config');
+
+// Firestore, Storage, l'accesso (account anonimi e rinnovi dei token) e, per suffisso, le callable del progetto.
+const HOST_CHIUSI = ['firestore.googleapis.com', 'firebasestorage.googleapis.com', 'identitytoolkit.googleapis.com', 'securetoken.googleapis.com'];
+const FUNZIONI_DEL_PROGETTO = `-${firebaseProjectId}.cloudfunctions.net`;
 
 /** Vero se `url` punta a un servizio chiuso durante i test. PURA. */
 function hostChiuso(url) {
   let host = '';
   try { host = new URL(String(url)).hostname.toLowerCase().replace(/\.$/, ''); } catch (_) { return false; }
-  return HOST_CHIUSI.includes(host);
+  return HOST_CHIUSI.includes(host) || host.endsWith(FUNZIONI_DEL_PROGETTO);
 }
 
 function urlDi(input) {
