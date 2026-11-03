@@ -183,6 +183,14 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     const passoCon = (re) => elencoAvviso.find((p) => re.test(p.corpo));
     const condizione = (p) => (p.corpo.match(/^ {8}if:\s*(.+)$/m) || [])[1] || '';
 
+    // #1788: col commit provato il server riconosce un rosso che una fusione arrivata dopo ha già corretto.
+    test('ogni allarme dice al server il commit su cui la suite ha girato', () => {
+      for (const p of [allarme, allarmeUnit]) {
+        assert.match(p.corpo, /^ {10}COMMIT_PROVATO: \$\{\{ github\.sha \}\}$/m, p.nome);
+        assert.match(p.corpo, /node scripts\/build-alarm\.mjs .* --commit "\$COMMIT_PROVATO"/, p.nome);
+      }
+    });
+
     test('gira su main a ogni rosso, anche con npm ci rosso prima della suite; salta una corsa verde, un ramo, una corsa annullata', () => {
       assert.match(avvisoJob, /^ {4}needs:\s*\[\s*suite,\s*verdetto,\s*unit-windows\s*\]\s*$/m, '`avviso` legge gli esiti di tutti i lavori provati');
       const apre = {
@@ -296,9 +304,10 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
         "writeFileSync(new URL('../allarme.json', import.meta.url), JSON.stringify(process.argv.slice(2)));",
         'process.exit(Number(process.env.INVIO_ESITO || 0));',
       ].join('\n');
+      const SHA_PROVATO = '1090323ab'.padEnd(40, '0');
       const gira = (passo, { file = {}, env = {} } = {}) => {
         const r = eseguiPasso(`cd "$CARTELLA_PASSO"\n${scriptDelPasso(passo.corpo)}`, {
-          env: { CARTELLA_PASSO: '{{dir}}', FILO_BUILD_PASSPHRASE: 'x', GH_TOKEN: '', ESECUZIONE: 'https://github.com/o/r/actions/runs/1', ...env },
+          env: { CARTELLA_PASSO: '{{dir}}', FILO_BUILD_PASSPHRASE: 'x', GH_TOKEN: '', ESECUZIONE: 'https://github.com/o/r/actions/runs/1', COMMIT_PROVATO: SHA_PROVATO, ...env },
           file: { 'scripts/build-alarm.mjs': ALLARME_FINTO, 'scripts/ultima-suite-verde.mjs': '', ...file },
           leggi: ['allarme.json'],
         });
@@ -310,7 +319,7 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
         const r = gira(allarme, { env: { PARTI_ESITO: 'failure' } });
         assert.equal(r.stato, 0, r.registro);
         assert.equal(r.titolo, 'Suite Playwright rossa su main: commit non pubblicabile');
-        assert.deepEqual(r.chiavi, ['--chiave', 'suite:non-partita']);
+        assert.deepEqual(r.chiavi, ['--chiave', 'suite:non-partita', '--commit', SHA_PROVATO]);
         assert.match(r.testo, /Una parte della suite NON e partita/);
         assert.match(r.testo, /actions\/runs\/1/);
       });
@@ -326,7 +335,7 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
           },
         });
         assert.equal(r.stato, 0, r.registro);
-        assert.deepEqual(r.chiavi, ['--chiavi-da', 'esiti-suite/chiavi-allarme.txt']);
+        assert.deepEqual(r.chiavi, ['--chiavi-da', 'esiti-suite/chiavi-allarme.txt', '--commit', SHA_PROVATO]);
         assert.match(r.testo, /Rossi nuovi \(1\):\ntests\/a\.spec\.mjs › il caso rosso/);
         assert.match(r.testo, /Verdetto:\nRossi nuovi: 1/);
         assert.doesNotMatch(r.testo, /NON e partita|non ha lasciato il JSON/);
@@ -342,7 +351,7 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
         const r = gira(allarmeUnit);
         assert.equal(r.stato, 0, r.registro);
         assert.equal(r.titolo, 'Unit test rossi su Windows: commit non pubblicabile');
-        assert.deepEqual(r.chiavi, ['--chiave', 'unit-windows:non-partiti']);
+        assert.deepEqual(r.chiavi, ['--chiave', 'unit-windows:non-partiti', '--commit', SHA_PROVATO]);
         assert.match(r.testo, /Gli unit test NON sono partiti/);
       });
 
@@ -350,7 +359,7 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
         const registro = "not ok 3 - tests\\unit\\x.test.mjs\n  location: 'D:\\\\a\\\\Filo\\\\Filo\\\\tests\\\\unit\\\\x.test.mjs:12:3'\n";
         const r = gira(allarmeUnit, { file: { 'esiti-unit/unit.log': registro } });
         assert.equal(r.stato, 0, r.registro);
-        assert.deepEqual(r.chiavi, ['--chiavi-unit', 'esiti-unit/unit.log']);
+        assert.deepEqual(r.chiavi, ['--chiavi-unit', 'esiti-unit/unit.log', '--commit', SHA_PROVATO]);
         assert.match(r.testo, /Test rossi \(2 righe\):\nnot ok 3/);
         // Il registro è nato su Windows e lo legge Linux: le chiavi devono restare quelle del cancello.
         assert.deepEqual(chiaviDelRegistroUnit(registro, '/home/runner/work/Filo/Filo'), chiaviDelRegistroUnit(registro, 'D:\\a\\Filo\\Filo'));

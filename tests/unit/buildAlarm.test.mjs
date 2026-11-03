@@ -112,17 +112,9 @@ test('--commit tiene solo lo sha intero; uno storto o mancante si dice e non fer
   for (const storto of [['--commit', '1090323ab'], ['--commit', ''], ['--commit']]) {
     const arg = leggiArgomenti(['T', 'x', ...storto]);
     assert.equal(arg.commit, '');
-    assert.equal(arg.avvisi.length, 1);
+    assert.equal(arg.avvisi.length, 1, storto.join(' '));
     assert.deepEqual(arg.posizionali, ['T', 'x']);
   }
-});
-
-// #1788: senza il commit il server non sa che il rosso di una corsa vecchia è già corretto da una fusione dopo.
-test('i due allarmi della suite su main spediscono il commit su cui la suite ha girato', () => {
-  const yml = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '.github', 'workflows', 'suite.yml'), 'utf8');
-  const chiamate = yml.split(/\r?\n/).filter((r) => /node scripts\/build-alarm\.mjs/.test(r));
-  assert.equal(chiamate.length, 2, 'suite.yml ha un allarme per la suite e uno per gli unit su Windows');
-  for (const r of chiamate) assert.match(r, /--commit "\$\{\{ github\.sha \}\}"/, r.trim());
 });
 
 const { parolaDellaCostruzione } = await import('../../scripts/build-alarm.mjs');

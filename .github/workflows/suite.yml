@@ -271,6 +271,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PARTI_ESITO: ${{ needs.suite.result }}
           ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_PROVATO: ${{ github.sha }}
         shell: bash
         run: |
           PREMESSA="La suite Playwright completa, che gira a ogni fusione sul ramo principale, ha trovato dei rossi NUOVI su questo commit (fuori dai rossi noti del contenitore in tests/rossi-noti.json): questo commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala; se invece e un rosso d ambiente del contenitore senza schermo, aggiungilo a tests/rossi-noti.json (contenitore.specs) col titolo esatto del test, il motivo e questo feedback. Il JSON dei risultati e le tracce dei rossi (screenshot, trace, una cartella per parte della suite) stanno negli artifact di questa esecuzione, per sette giorni: ${ESECUZIONE}"
@@ -322,7 +323,7 @@ jobs:
           # in punta perderebbe il rosso quando la corsa piu' nuova viene annullata.
           if [ -s esiti-suite/chiavi-allarme.txt ]; then CHIAVI=(--chiavi-da esiti-suite/chiavi-allarme.txt); else CHIAVI=(--chiave suite:non-partita); fi
           # Rosso solo se il feedback non parte: il rosso della corsa lo tengono già i lavori provati.
-          node scripts/build-alarm.mjs "Suite Playwright rossa su main: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" --commit "${{ github.sha }}" || { echo "::error::Allarme della suite non consegnato: nessun feedback per questo rosso."; exit 1; }
+          node scripts/build-alarm.mjs "Suite Playwright rossa su main: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" --commit "$COMMIT_PROVATO" || { echo "::error::Allarme della suite non consegnato: nessun feedback per questo rosso."; exit 1; }
 
       - name: Registro degli unit su Windows
         if: always() && !cancelled() && needs.unit-windows.result != 'success'
@@ -339,6 +340,7 @@ jobs:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
           GH_TOKEN: ${{ github.token }}
           ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_PROVATO: ${{ github.sha }}
         shell: bash
         run: |
           PREMESSA="Gli unit test, rifatti su Windows a ogni fusione sul ramo principale come li rifa il cancello di pubblicazione, sono rossi su questo commit anche rifatti una volta: il commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Su Linux (contenitore delle routine, cancello di fusione) gli stessi test possono essere verdi: il rosso e di Windows (percorsi, fine riga, piattaforma presunta invece che iniettata, tempi). Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala. Registro: ${ESECUZIONE}"
@@ -380,4 +382,4 @@ jobs:
 
 
           ${CODA}"
-          node scripts/build-alarm.mjs "Unit test rossi su Windows: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" --commit "${{ github.sha }}" || { echo "::error::Allarme degli unit su Windows non consegnato: nessun feedback per questo rosso."; exit 1; }
+          node scripts/build-alarm.mjs "Unit test rossi su Windows: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" --commit "$COMMIT_PROVATO" || { echo "::error::Allarme degli unit su Windows non consegnato: nessun feedback per questo rosso."; exit 1; }
