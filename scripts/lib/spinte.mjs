@@ -62,8 +62,11 @@ export function chiSpinge({ root, env = process.env } = {}) {
   const locali = trovaBiglietti({ env, cwd: root });
   if (locali.length) return { tipo: 'locale', ticket: locali[0].ticket, fp: locali[0].fp, file: locali[0].path };
   const t = String(env.FILO_ROUTINE_TICKET || '').trim() || readTicket(root);
-  return t ? { tipo: 'routine', ticket: t } : null;
+  return t ? { tipo: 'routine', ticket: t, fp: impronta(t) } : null;
 }
+
+// Della routine la traccia tiene l'impronta, non il biglietto: un altro worker nella stessa cartella non lo trova lì.
+const impronta = (ticket) => createHash('sha256').update(String(ticket)).digest('hex');
 
 /**
  * I commit che questa copia ha creato fra quelli che `locale` porta su `ramo`: non quelli raggiungibili da un ref remoto,
