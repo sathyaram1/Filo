@@ -349,6 +349,15 @@ Lo scrive in `notePerAgenti`. Nella pagina sono **chiuse** in fondo alla
 domanda: l'owner le apre solo se vuole. Chi riprende la domanda le legge e non
 riesplora da capo.
 
+Le note di una domanda non fidata sporcano chi le riceve, a ogni ripresa del
+lavoro che ne ha la decisione (#2078). Su una domanda **chiusa e non fidata**
+stanno quindi aperte sopra i tasti, con «Segna fidata»: l'owner le legge e le
+dà fiducia (callable `ownerDomande`, op `fiducia`, solo col token admin: né
+una sessione né la chiave owner-non-fidato). «Togli fiducia» la riporta indietro.
+Un turno non fidato dopo la ricalcola come sempre. La nascita del biglietto di
+un lavoro server prevede questo sporco come il ritiro, e lo stesso per le
+provvisorie: un lavoro che resterebbe locale non accende una sessione.
+
 Stanno nel documento della domanda, sul server: non in un feedback (una domanda
 non è sempre una cosa da fare) e non nel repo pubblico. Se il lavoro esiste già,
 la domanda ha un feedback o un ramo nei `collegamenti`, e le note puntano lì.

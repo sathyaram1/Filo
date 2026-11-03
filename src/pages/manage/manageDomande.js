@@ -13,6 +13,7 @@
     consiglio: MSG.DOMANDE_CONSIGLIO || 'domande_consiglio',
     archivia: MSG.DOMANDA_ARCHIVIA || 'domanda_archivia',
     riapri: MSG.DOMANDA_RIAPRI || 'domanda_riapri',
+    fiducia: MSG.DOMANDA_FIDUCIA || 'domanda_fiducia',
   };
   const MR = window.SN_MANAGE_REVIEW;
   const D = window.SN_DOMANDE;
@@ -44,6 +45,9 @@
   // Lo scudo in elenco è la fiducia della domanda, non del feedback da cui nasce.
   const SCUDO_FIDATA = 'Fidata. L’ha scritta una sessione che ha letto solo testo tuo o di altre sessioni pulite.';
   const SCUDO_NON_FIDATA = 'Non fidata. Chi l’ha scritta ha letto testo che non viene da te, e le sue parole possono essere manipolate.';
+  const TITOLO_SEGNA_FIDATA = 'L’hai letta, note per gli agenti comprese: chi riprende un lavoro con la sua decisione non si sporca più';
+  const TITOLO_TOGLI_FIDUCIA = 'Torna non fidata: chi ne riceve le note si sporca di nuovo';
+  const segnataDaTe = (d) => `Segnata fidata da te ${quando(d.fidataDallOwner.il, true)}.`;
 
   // `lette` falso finché nessuna lettura è riuscita: un numero senza dati direbbe più di quanto si sa. Dopo, una
   // rilettura che salta tiene le domande a schermo e lo dice in `aggiornamento`: l'owner può star rispondendo.
@@ -238,7 +242,7 @@
   function scudo(d) {
     const s = MR.segnoFiducia(d);
     const span = el('span', `mg-fiducia-segno mg-fiducia-segno--${s.classe}`);
-    span.title = s.classe === 'fidata' ? SCUDO_FIDATA : SCUDO_NON_FIDATA;
+    span.title = s.classe !== 'fidata' ? SCUDO_NON_FIDATA : d.fidataDallOwner ? `Fidata. ${segnataDaTe(d)}` : SCUDO_FIDATA;
     span.setAttribute('aria-label', s.parola);
     span.setAttribute('role', 'img');
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -494,7 +498,7 @@
     }
     const fidata = d.fiducia === 'fidato';
     const f = el('span', `mg-dq-fiducia${fidata ? '' : ' mg-dq-fiducia--no'}`, fidata ? 'Fidata' : 'Non fidata');
-    f.title = fidata ? TITOLO_FIDATA : TITOLO_NON_FIDATA;
+    f.title = !fidata ? TITOLO_NON_FIDATA : d.fidataDallOwner ? segnataDaTe(d) : TITOLO_FIDATA;
     meta.appendChild(f);
     const nata = quando(d.creataIl, true);
     if (nata) meta.appendChild(el('span', 'mg-dq-data', `chiesta ${nata}`));
@@ -804,12 +808,22 @@
     if (!inSmistamento) tasto('Discutiamone', 'discuti', 'sn-btn-secondary', `Copia «Discutiamo la domanda ${idDi(d)}» da incollare in una sessione locale`);
     if (rispondibile || inSmistamento) tasto('Archivia', 'chiudi', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
     else if (riapribile(d)) tasto('Riapri', 'riapri', 'sn-btn-secondary', titoloRiapri(d));
+    if (fidabile(d)) tasto('Segna fidata', 'fidata', 'sn-btn-secondary', TITOLO_SEGNA_FIDATA);
+    else if (sfidabile(d)) tasto('Togli fiducia', 'sfidata', 'sn-btn-secondary', TITOLO_TOGLI_FIDUCIA);
     box.appendChild(tasti);
     const a = avvisi.get(d.id);
     const msg = el('p', `mg-dq-msg${a && a.tipo ? ` mg-dq-msg--${a.tipo}` : ''}`, a ? a.testo : '');
     msg.setAttribute('role', 'status');
     box.appendChild(msg);
     return box;
+  }
+
+  // Quale domanda si può segnare fidata lo dice il server (#2078); la pagina serve solo a leggerla prima.
+  function fidabile(d) {
+    return d.fidabile === true && !d.illeggibile;
+  }
+  function sfidabile(d) {
+    return d.fiducia === 'fidato' && !!d.fidataDallOwner;
   }
 
   // Si riapre un'archiviata senza azioni, una risposta automatica che non torna (§3.6), una data dalla chiave
@@ -867,13 +881,17 @@
     // Il principio (§3.6) lo scrive chi ha gestito la risposta: è la regola che entra nel registro, e l'owner la vede.
     const principio = d.principio ? sezione('mg-dq-principio', 'Principio', md(d.principio)) : null;
     if (principio && d.principioContestato) principio.querySelector('.mg-dq-h').appendChild(segnoContestato());
-    for (const parte of [opzioni(d), consiglio(d), esito(d), daChiave(d), automatica(d), principio, conversazione(d), risposta(d)]) if (parte) art.appendChild(parte);
+    let note = null;
     if (d.notePerAgenti && !originaleInCima) {
-      const det = el('details', 'mg-dq-note');
-      det.appendChild(el('summary', '', 'Note per gli agenti'));
-      det.appendChild(md(d.notePerAgenti));
-      art.appendChild(det);
+      note = el('details', 'mg-dq-note');
+      note.appendChild(el('summary', '', 'Note per gli agenti'));
+      note.appendChild(md(d.notePerAgenti));
     }
+    // Su una chiusa da fidare le note stanno aperte sopra i tasti: si leggono prima di «Segna fidata» (#2078).
+    const primaDeiTasti = !!note && fidabile(d);
+    if (primaDeiTasti) note.open = true;
+    for (const parte of [opzioni(d), consiglio(d), esito(d), daChiave(d), automatica(d), principio, conversazione(d),
+      primaDeiTasti ? note : null, risposta(d), primaDeiTasti ? null : note]) if (parte) art.appendChild(parte);
     return art;
   }
 
@@ -882,7 +900,7 @@
     if (!box) return;
     const ds = aperta ? aperta.ids.map(trova).filter(Boolean) : [];
     const fonti = ds.map((d) => principioUsato(d)).filter(Boolean).map((id) => { const f = trova(id); return f ? [id, f.principio, f.principioContestato] : [id]; });
-    const firma = JSON.stringify([ds.map((d) => [d.id, d.stato, d.modificataIl, d.esito, d.titolo, d.illeggibile, d.smistamento,
+    const firma = JSON.stringify([ds.map((d) => [d.id, d.stato, d.modificataIl, d.fiducia, d.fidabile, d.fidataDallOwner, d.esito, d.titolo, d.illeggibile, d.smistamento,
       d.principioContestato, ...(d.opzioni || []).map((o) => etichettaDi(o)), firmaLegami(d), lavoroFermo(d),
       allegati.di(d.id).map((a) => a.url), allegati.caricando(d.id), originali.has(d.id)]), [...inCorso], [...avvisi], stato.lette, fonti]);
     if (firma === firmaDettaglio) return;
@@ -1090,6 +1108,11 @@
     if (r) dopo(id, r, riapri ? 'Riaperta: ora è fra quelle da rispondere.' : 'Archiviata.');
   }
 
+  async function segnaFidata(id, fidata) {
+    const r = await manda(id, { type: T.fiducia, id, fidata }, fidata ? 'Segno fidata…' : 'Tolgo la fiducia…');
+    if (r) dopo(id, r, fidata ? 'Fidata: chi riprende il lavoro riceve le note senza sporcarsi.' : 'Non è più fidata.');
+  }
+
   // ── Disegno e scelta di cosa mostrare ─────────────────────────────────────
   function apri(ids, gruppo) {
     const nuove = ids && ids.length ? ids.slice() : [];
@@ -1233,6 +1256,9 @@
       if (d.stato !== 'in_smistamento') voci.push({ testo: `Copia «Discutiamo la domanda ${d.id}»`, azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
       if (['aperta', 'in_lavorazione', 'in_smistamento'].includes(d.stato)) voci.push({ testo: 'Archivia senza azioni', azione: () => { apri([d.id]); disegna(); archivia(d.id, false); } });
       else if (riapribile(d)) voci.push({ testo: 'Riapri', titolo: titoloRiapri(d), azione: () => { apri([d.id]); disegna(); archivia(d.id, true); } });
+      // Il menu non mostra le note: apre la domanda con le note aperte, e la fiducia si dà dal tasto, dopo averle lette.
+      if (fidabile(d)) voci.push({ testo: 'Segna fidata…', titolo: 'Apre la domanda con le note per gli agenti: la segni fidata dopo averle lette', azione: () => { apri([d.id]); disegna(); } });
+      else if (sfidabile(d)) voci.push({ testo: 'Togli fiducia', titolo: TITOLO_TOGLI_FIDUCIA, azione: () => { apri([d.id]); disegna(); segnaFidata(d.id, false); } });
       menu.apri(e.clientX, e.clientY, voci);
     });
     lista.addEventListener('dragstart', (e) => {
@@ -1315,6 +1341,8 @@
       else if (fai === 'discuti') discuti(id);
       else if (fai === 'chiudi') archivia(id, false);
       else if (fai === 'riapri') archivia(id, true);
+      else if (fai === 'fidata') segnaFidata(id, true);
+      else if (fai === 'sfidata') segnaFidata(id, false);
       else if (fai === 'originale') {
         if (originali.has(id)) originali.delete(id); else originali.add(id);
         disegnaDettaglio();
