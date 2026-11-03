@@ -413,6 +413,8 @@ test('la proiezione non cambia il verdetto: stessi archiviati, stessi segnalati'
   } finally {
     FB.list = vere.list;
     FB.listPublic = vere.listPublic;
+    globalThis.fetch = vere.fetch;
+    console.warn = avviso;
     FB.forgetAllPublic();
   }
 });
