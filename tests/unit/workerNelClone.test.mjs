@@ -229,7 +229,7 @@ test('nessun ruolo dato a un worker vieta il cd nel clone che l\'intestazione ch
   const base = cartellaTemporanea('filo-worker-cd-');
   try {
     const clone = resolve(base, 'c');
-    mkdirSync(clone, { recursive: true });
+    mkdirSync(resolve(clone, '.claude'), { recursive: true });
     writeFileSync(resolve(clone, MARCATORE_WORKER), JSON.stringify({ indice: 1, principale: resolve(base, 's') }), 'utf8');
     const testa = preparaIntestazione(clone, { allinea: () => ({ ok: true }) });
     assert.ok(testa.includes(`cd "${clone}" && …`), testa);
