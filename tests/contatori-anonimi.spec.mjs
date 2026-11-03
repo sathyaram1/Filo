@@ -545,16 +545,21 @@ test('una pagina d’errore di rete e una scheda caduta sono errori visti, col n
   }, url);
   await expect.poll(async () => Object.keys((await oggi(app))?.erroriVisti || {}).filter((k) => k.startsWith('crash:scheda:')).length, { timeout: 15_000 }).toBe(1);
 
-  // Un sito che non esiste: la pagina d'errore conta col codice di Chromium.
+  // Un sito che non risponde: la pagina d'errore conta col codice di Chromium. Porta locale chiusa e non un dominio
+  // inesistente: dietro un intermediario di rete (il contenitore delle routine) il dominio inesistente non fallisce (#1463).
+  const chiusa = createServer(() => {});
+  await new Promise((r) => chiusa.listen(0, '127.0.0.1', r));
+  const porta = chiusa.address().port;
+  await new Promise((r) => chiusa.close(r));
   const id = await schedaDavanti(app);
-  await app.evaluate(({ BrowserWindow }, i) => {
+  await app.evaluate(({ BrowserWindow }, [i, u]) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    w._filoTabs.navigate(i, 'http://sito-che-non-esiste.invalid/');
-  }, id);
+    w._filoTabs.navigate(i, u);
+  }, [id, `http://127.0.0.1:${porta}/conto-di-mario`]);
   await expect.poll(async () => Object.keys((await oggi(app))?.erroriVisti || {}).filter((k) => /^rete:-\d+$/.test(k)).length, { timeout: 20_000 }).toBe(1);
+  await trovaPagina(app, (u) => u.startsWith('filo://error/'));
   const tutto = JSON.stringify(await statoContatori(app));
-  expect(tutto).not.toContain('invalid');
-  expect(tutto).not.toContain('127.0.0.1');
+  for (const t of ['127.0.0.1', 'conto-di-mario', 'http']) expect(tutto).not.toContain(t);
 });
 
 test('una conferma di Filo detta di no si conta coi suoi ingressi, e l’azione non parte', async ({ app, shell }) => {
