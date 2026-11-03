@@ -12,7 +12,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
-  FILE_DIFF, letturaMancante, leggiRichiesta, leggiRicevuta, richiestaDalPayload, righeNumstat, scriviRichiesta, vociConPercorsoPrima,
+  FILE_DIFF, FILE_DIFF_SERVER, letturaMancante, leggiRichiesta, leggiRicevuta, richiestaDalPayload, righeNumstat, scriviRichiesta, vociConPercorsoPrima,
 } from '../../scripts/lib/lettura-diff.mjs';
 import { cartellaConsegna } from '../../scripts/lib/consegna-file.mjs';
 
@@ -132,6 +132,78 @@ test('la ricevuta regge alle prove del giro scritte dopo, non al codice cambiato
   assert.equal(letturaMancante(casa, head()), '');
 });
 
+/** Il repo del server di un lavoro server: main, il ramo omonimo con la correzione e la sua prova, main andato avanti. */
+function cloneDelServer(ramo) {
+  const srv = cartellaTemporanea('filo-lettura-server-');
+  const g = (...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: srv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const scrivi = (f, t) => { mkdirSync(dirname(resolve(srv, f)), { recursive: true }); writeFileSync(resolve(srv, f), t, 'utf8'); };
+  g('init', '-q', '-b', 'main');
+  g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+  scrivi('functions/battito.js', 'const scrivi = (doc, misura) => doc.mergeFields(misura);\n');
+  g('add', '-A'); g('commit', '-qm', 'base del server');
+  g('checkout', '-q', '-b', ramo);
+  scrivi('functions/battito.js', 'const scrivi = (doc, misura) => doc.sostituisciSulBiglietto(misura);\n');
+  scrivi('functions/test/battito-misura.test.js', "test('la misura nuova sostituisce quella vecchia, intera', () => {});\n");
+  g('add', '-A'); g('commit', '-qm', 'il battito sostituisce la misura');
+  g('checkout', '-q', 'main');
+  scrivi('functions/altro.js', 'const dopo = 1;\n');
+  g('add', '-A'); g('commit', '-qm', 'main del server va avanti');
+  g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  return { srv, g };
+}
+
+test('un lavoro server: la lettura legge anche il diff del server con le sue prove, o dice che quella parte non l\'ha letta (#2049)', (t) => {
+  const { casa, base } = ramoDiLavoro();
+  const { srv, g: gs } = cloneDelServer('worker/1363');
+  t.after(() => togliCartella(casa));
+  t.after(() => togliCartella(srv));
+  t.after(() => togliCartella(cartellaConsegna(casa)));
+  const fileServer = join(cartellaConsegna(casa), FILE_DIFF_SERVER);
+  scriviRichiesta(casa, { ramo: 'worker/1363', richiesta: RICHIESTA, radiceServer: srv });
+  const r = leggi(casa, ['--base', base]);
+  assert.equal(r.status, 0, r.stderr);
+  const server = r.stdout.slice(r.stdout.indexOf('## Il diff del server'));
+  assert.match(server, /^## Il diff del server\n\nQuesto è un lavoro server\. Il ramo `worker\/1363` di filo-security/);
+  assert.match(server, /## Le prove del server contate\n\nProve del lavoro, contate dallo script: prove aggiunte 1 \(unit 1, spec 0\)/);
+  assert.match(server, /functions\/test\/battito-misura\.test\.js \(unit\): aggiunti 1: «la misura nuova sostituisce quella vecchia, intera»/);
+  assert.match(server, /Codice cambiato fuori da functions\/test\/: 1 file, \+1 −1 righe\.\n- functions\/battito\.js/);
+  const diffServer = readFileSync(fileServer, 'utf8');
+  assert.match(diffServer, /sostituisciSulBiglietto/);
+  assert.doesNotMatch(diffServer, /altro\.js/, 'il main del server andato avanti dopo il ramo non è il lavoro');
+  assert.doesNotMatch(readFileSync(join(cartellaConsegna(casa), FILE_DIFF), 'utf8'), /sostituisciSulBiglietto/);
+  assert.match(r.stdout, /Un lavoro server ha in fondo anche «Il diff del server»/, 'il ruolo dice come leggerlo');
+
+  gs('update-ref', 'refs/remotes/origin/worker/1363', 'worker/1363');
+  gs('branch', '-q', '-D', 'worker/1363');
+  assert.match(leggi(casa, ['--base', base]).stdout, /Questo è un lavoro server\. Il ramo `worker\/1363` di filo-security/, 'il ramo solo scaricato da origin si legge lo stesso');
+  assert.match(readFileSync(fileServer, 'utf8'), /sostituisciSulBiglietto/);
+
+  gs('update-ref', 'refs/remotes/origin/worker/1363', 'main~1');
+  assert.match(leggi(casa, ['--base', base]).stdout, /Questo è un lavoro server, ma il ramo worker\/1363 del server non ha commit fuori dal main del server: lì non c'è niente da leggere\./);
+
+  gs('update-ref', '-d', 'refs/remotes/origin/worker/1363');
+  const senzaRamo = leggi(casa, ['--base', base]);
+  assert.equal(senzaRamo.status, 0, senzaRamo.stderr);
+  assert.match(senzaRamo.stdout, /## Il diff del server\n\nQuesto è un lavoro server, ma la parte di filo-security non si è potuta leggere: in .* il ramo worker\/1363 non c'è, né locale né scaricato da origin\./);
+  assert.ok(!existsSync(fileServer), 'il diff del server di una lettura passata non resta lì come se fosse questo');
+
+  scriviRichiesta(casa, { ramo: 'worker/1363', richiesta: RICHIESTA, radiceServer: join(srv, 'non-clonato') });
+  assert.match(leggi(casa, ['--base', base]).stdout, /la parte di filo-security non si è potuta leggere: il clone del server non c'è/);
+
+  scriviRichiesta(casa, { ramo: 'worker/1363', richiesta: RICHIESTA });
+  const app = leggi(casa, ['--base', base]);
+  assert.equal(app.status, 0, app.stderr);
+  assert.doesNotMatch(app.stdout, /## Il diff del server/, 'un lavoro solo dell\'app non ha la sezione del server');
+  gs('update-ref', 'refs/remotes/origin/worker/1363', 'main~1');
+  gs('branch', '-q', 'worker/1363', 'main~1');
+  gs('checkout', '-q', 'worker/1363');
+  writeFileSync(join(srv, 'functions', 'battito.js'), 'const scrivi = (doc, misura) => doc.set(misura);\n', 'utf8');
+  gs('commit', '-qam', 'a mano');
+  const aMano = leggi(casa, ['--base', base, '--server', srv]);
+  assert.match(aMano.stdout, /Questo è un lavoro server\. Il ramo `worker\/1363`/, 'lanciata a mano col server, la lettura lo legge');
+  assert.match(readFileSync(fileServer, 'utf8'), /doc\.set\(misura\)/, 'la punta locale vince su quella scaricata');
+});
+
 function fintoServer() {
   const ricevuti = [];
   const srv = createServer((req, res) => {
@@ -187,6 +259,15 @@ test('la consegna di una verifica piena lascia la richiesta al lettore; la chius
   assert.equal(r.richiesta.feedback.text, 'esce dal fondo');
   assert.deepEqual(r.richiesta.decisioni, [{ domanda: 4 }]);
   assert.equal(r.richiesta.history, undefined, 'la serie delle critiche al lettore non serve');
+  assert.equal(r.radiceServer, undefined, 'un lavoro solo dell\'app non manda il lettore nel server');
+  const clonePrima = process.env.FILO_SERVER_CLONE;
+  process.env.FILO_SERVER_CLONE = join(radice, '..', 'clone-del-server');
+  try {
+    zitto(() => emit({ role: 'verifier', id: 'f9', num: '#9', branch: 'worker/9' }, { ...ctx, lavoroServer: { repo: 'sathyaram1/filo-security' } }));
+  } finally {
+    if (clonePrima === undefined) delete process.env.FILO_SERVER_CLONE; else process.env.FILO_SERVER_CLONE = clonePrima;
+  }
+  assert.equal(leggiRichiesta(radice).radiceServer, resolve(radice, '..', 'clone-del-server'), 'un lavoro server dice al lettore dove sta il clone (#2049)');
   zitto(() => emit({ role: 'verifier', id: 'f9', num: '#9', branch: 'worker/9' }, { ...ctx, scope: 'chiusura', perimetro: { rilievi: [] } }));
   assert.equal(leggiRichiesta(radice), null, 'nella chiusura il diff lo legge chi verifica: la lettura non è dovuta');
   assert.ok(!existsSync(join(cartellaConsegna(radice), 'lettura-richiesta.json')));

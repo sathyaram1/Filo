@@ -12,6 +12,15 @@ export function tipoDiFile(percorso) {
   return '';
 }
 
+// filo-security tiene le prove in functions/test/ (*.test.js), quelle dei giri comprese: per il conto valgono come unit.
+export function tipoDiFileServer(percorso) {
+  return /^functions\/test\/.+\.test\.[cm]?js$/.test(String(percorso || '').split('\\').join('/')) ? 'unit' : '';
+}
+
+/** Dove un repo tiene le prove, e come si riconosce un file di prova: l'app e il server (#2049). */
+export const PROVE_APP = Object.freeze({ cartella: 'tests/', tipo: tipoDiFile });
+export const PROVE_SERVER = Object.freeze({ cartella: 'functions/test/', tipo: tipoDiFileServer });
+
 const ID = /[A-Za-z0-9_$]/;
 const PRIMA_DI_REGEX = '(,=:[!&|?{};+-*%<>~^';
 const PAROLE_PRIMA_DI_REGEX = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete', 'void', 'throw', 'yield', 'await', 'instanceof']);
@@ -173,13 +182,14 @@ const vuoto = () => ({ aggiunti: 0, toccati: 0, tolti: 0 });
 
 /**
  * `file`: [{ percorso, prima, dopo }] (prima null = file nuovo, dopo null = file tolto; per un file spostato il
- * percorso è quello nuovo). → il conto per file e per tipo; i giri di verifica a parte. PURA.
+ * percorso è quello nuovo). `prove`: le regole del repo (PROVE_APP o PROVE_SERVER). → il conto per file e per tipo; i
+ * giri di verifica a parte. PURA.
  */
-export function contaProve(file) {
+export function contaProve(file, { prove = PROVE_APP } = {}) {
   const perFile = [];
   const totali = { unit: vuoto(), spec: vuoto(), giro: vuoto() };
   for (const f of Array.isArray(file) ? file : []) {
-    const tipo = tipoDiFile(f && f.percorso);
+    const tipo = prove.tipo(f && f.percorso);
     if (!tipo) continue;
     const c = confrontaCasi(f.prima || '', f.dopo || '');
     if (!c.aggiunti.length && !c.toccati.length && !c.tolti.length) continue;
@@ -203,7 +213,7 @@ export function rigaDelConto(conto) {
 }
 
 /** Il conto per esteso, per chi legge il diff: riga, file per file, giri a parte, codice cambiato. PURA. */
-export function testoDelConto(conto, { codice = [] } = {}) {
+export function testoDelConto(conto, { codice = [], prove = PROVE_APP } = {}) {
   const righe = [`Prove del lavoro, contate dallo script: ${rigaDelConto(conto)}.`];
   for (const f of (conto && conto.perFile) || []) {
     if (f.tipo === 'giro') continue;
@@ -221,10 +231,10 @@ export function testoDelConto(conto, { codice = [] } = {}) {
   if (cod.length) {
     const piu = cod.reduce((k, c) => k + (Number(c.aggiunte) || 0), 0);
     const meno = cod.reduce((k, c) => k + (Number(c.tolte) || 0), 0);
-    righe.push(`Codice cambiato fuori da tests/: ${cod.length} file, +${piu} −${meno} righe.`);
+    righe.push(`Codice cambiato fuori da ${prove.cartella}: ${cod.length} file, +${piu} −${meno} righe.`);
     for (const c of cod) righe.push(`- ${c.percorso}: +${c.aggiunte} −${c.tolte}`);
   } else {
-    righe.push('Codice cambiato fuori da tests/: nessun file.');
+    righe.push(`Codice cambiato fuori da ${prove.cartella}: nessun file.`);
   }
   return righe.join('\n');
 }

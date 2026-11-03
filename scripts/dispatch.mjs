@@ -2533,8 +2533,10 @@ export function emit(bucket, ctx) {
     payload = immaginiSenzaByte(pieno, e.message);
   }
   // La verifica piena lascia la sua richiesta al lettore del diff (#1363): la sua presenza rende la lettura dovuta.
+  // Un lavoro server gli dice anche dove sta il clone, perché legga il server insieme all'app (#2049).
   if (bucket.role === 'verifier' && ambito.scope === 'pieno') {
-    try { scriviRichiesta(ROOT, { ramo: ramoCorrente(ROOT), richiesta: richiestaDalPayload(payload) }); } catch (e) {
+    const radiceServer = ctx && ctx.lavoroServer ? cartellaCloneServer() : '';
+    try { scriviRichiesta(ROOT, { ramo: ramoCorrente(ROOT), richiesta: richiestaDalPayload(payload), radiceServer }); } catch (e) {
       process.stderr.write(`[dispatch] la richiesta per la lettura del diff non si scrive (${e.message}): la lettura non si potrà fare\n`);
     }
   }

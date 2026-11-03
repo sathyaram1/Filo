@@ -11,6 +11,13 @@ script. Il conto è un fatto, non un giudizio: se bastano lo decidi tu. Leggi il
 diff intero; se il contesto non basta, a pezzi, tenendo tu il giudizio
 d'insieme.
 
+Un lavoro server ha in fondo anche «Il diff del server», quello di
+filo-security: il lavoro è l'insieme dei due, e una correzione può stare tutta
+nel server con la sola prova nell'app. Le due domande valgono su tutti e due.
+Se quella sezione dice che la parte del server non si è potuta leggere,
+scrivilo nella prima riga col suo perché, e non dare per mancante o senza prova
+quello che potrebbe stare lì.
+
 Nella richiesta, `decisioni` e `provvisorie` sono il `payload.decisioni` e il
 `payload.provvisorie` del paragrafo qui sotto.
 
@@ -51,7 +58,7 @@ Solo questo testo, che il verificatore copia nella sua critica: la prima riga
 va nel suo riassunto, i rilievi in coda ai suoi.
 
 ```
-Lettura del diff: <la riga del conto, com'è scritta più sotto>. <In una o due frasi: cosa hai guardato, e cosa regge.>
+Lettura del diff: <la riga del conto, com'è scritta più sotto, e in un lavoro server «server:» con la sua>. <In una o due frasi: cosa hai guardato, e cosa regge.>
 [1i] <il rilievo per esteso e autonomo: cosa sta in due posti, o quale comportamento resta senza prova, e perché conta>
     <righe sotto, senza livello: dove, con le parole di chi usa Filo>
 ```

@@ -7,11 +7,14 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { join } from 'node:path';
 import { cartellaConsegna } from './consegna-file.mjs';
 import { assicuraStoria } from './unit-sulla-fusione.mjs';
-import { contaProve, tipoDiFile } from './conta-prove.mjs';
+import { PROVE_APP, PROVE_SERVER, contaProve } from './conta-prove.mjs';
+import { ramoAccettabile } from './git-server.mjs';
+import { MAIN_SERVER, punteDelRamo } from './ramo-server.mjs';
 
 export const FILE_RICHIESTA = 'lettura-richiesta.json';
 export const FILE_RICEVUTA = 'lettura-fatta.json';
 export const FILE_DIFF = 'lettura-diff.patch';
+export const FILE_DIFF_SERVER = 'lettura-diff-server.patch';
 // Le prove dei giri le scrive chi verifica, anche mentre la lettura gira: non sono il lavoro, e non la fanno decadere.
 export const FUORI_DAL_DIFF = 'tests/verifica/';
 
@@ -63,21 +66,21 @@ export function vociConPercorsoPrima(out) {
   return voci;
 }
 
-/** Le prove contate e il codice cambiato fuori da tests/, fra base e punta. */
-export function contaDelLavoro(root, base, head) {
+/** Le prove contate e il codice cambiato fuori dalla cartella delle prove, fra base e punta. */
+export function contaDelLavoro(root, base, head, { prove = PROVE_APP } = {}) {
   const git = gitIn(root);
   const ns = git(['diff', '--name-status', '-M', '-z', base, head], { grezzo: true });
   if (!ns.ok) return { errore: `git diff non riesce (${primaRiga(ns.out)})` };
   const voci = vociConPercorsoPrima(ns.out);
   const leggi = (sha, p) => { const r = git(['show', `${sha}:${p}`], { grezzo: true }); return r.ok ? r.out : ''; };
-  const file = voci.filter((v) => tipoDiFile(v.percorso) || tipoDiFile(v.prima)).map((v) => ({
+  const file = voci.filter((v) => prove.tipo(v.percorso) || prove.tipo(v.prima)).map((v) => ({
     percorso: v.percorso,
     prima: v.stato === 'A' ? null : leggi(base, v.prima),
     dopo: v.stato === 'D' ? null : leggi(head, v.percorso),
   }));
-  const num = git(['diff', '--numstat', '-M', '-z', base, head, '--', '.', ':(exclude)tests/'], { grezzo: true });
+  const num = git(['diff', '--numstat', '-M', '-z', base, head, '--', '.', `:(exclude)${prove.cartella}`], { grezzo: true });
   const codice = num.ok ? righeNumstat(num.out) : [];
-  return { conto: contaProve(file), codice };
+  return { conto: contaProve(file, { prove }), codice };
 }
 
 /** `git diff --numstat -z` → [{ percorso, aggiunte, tolte }]; un binario conta 0. PURA. */
@@ -101,6 +104,31 @@ export function diffDelLavoro(root, base, head) {
   return r.ok ? { diff: r.out } : { errore: `git diff non riesce (${primaRiga(r.out)})` };
 }
 
+/**
+ * La parte del server di un lavoro server (#2049): il ramo omonimo nel repo di filo-security in `radice`, dalla base
+ * comune col main del server che quel repo ha già. Non scarica niente: verso filo-security si va solo con git-server.
+ * → { ramo, base, head, diff, conto, codice } | { ramo, vuoto } | { ramo, nonLetto }, gli ultimi due col perché.
+ */
+export function parteDelServer(radice, ramo) {
+  const no = (nonLetto) => ({ ramo, nonLetto });
+  if (!ramoAccettabile(ramo)) return no(`il ramo dell'app non ha un nome da cercare nel server («${ramo}»)`);
+  if (!radice || !existsSync(radice)) return no(`il clone del server non c'è (${radice || 'nessuna cartella'})`);
+  const git = gitIn(radice);
+  if (!git(['rev-parse', '--git-dir']).ok) return no(`in ${radice} non c'è un repository git`);
+  const { sha } = punteDelRamo(radice, ramo);
+  if (!sha) return no(`in ${radice} il ramo ${ramo} non c'è, né locale né scaricato da origin`);
+  const main = git(['rev-parse', '--verify', '--quiet', `${MAIN_SERVER}^{commit}`]);
+  if (!main.ok) return no(`in ${radice} manca origin/main, la base del confronto`);
+  const comune = git(['merge-base', main.out, sha]);
+  if (!comune.ok) return no(`il ramo ${ramo} e il main del server non hanno una base comune in ${radice}`);
+  const base = comune.out.split('\n')[0];
+  if (base === sha) return { ramo, vuoto: `il ramo ${ramo} del server non ha commit fuori dal main del server` };
+  const conta = contaDelLavoro(radice, base, sha, { prove: PROVE_SERVER });
+  const diff = conta.errore ? conta : diffDelLavoro(radice, base, sha);
+  if (diff.errore) return no(diff.errore);
+  return { ramo, base, head: sha, diff: diff.diff, conto: conta.conto, codice: conta.codice };
+}
+
 const cartella = (root, dir) => dir || cartellaConsegna(root);
 
 function scriviJson(f, o) {
@@ -116,9 +144,12 @@ function leggiJson(f) {
 /**
  * La richiesta per il lettore, accanto ai pezzi della consegna: `richiesta` è il payload del verificatore (feedback,
  * decisioni, provvisorie, immagini) o, in locale, il testo. La sua presenza dice che la lettura è attesa.
+ * `radiceServer`: il repo di filo-security di un lavoro server, che la lettura deve leggere insieme all'app.
  */
-export function scriviRichiesta(root, { ramo = '', richiesta } = {}, { dir = '' } = {}) {
-  return scriviJson(join(cartella(root, dir), FILE_RICHIESTA), { ramo: String(ramo || ''), scritta: new Date().toISOString(), richiesta });
+export function scriviRichiesta(root, { ramo = '', richiesta, radiceServer = '' } = {}, { dir = '' } = {}) {
+  return scriviJson(join(cartella(root, dir), FILE_RICHIESTA), {
+    ramo: String(ramo || ''), scritta: new Date().toISOString(), richiesta, ...(radiceServer ? { radiceServer: String(radiceServer) } : {}),
+  });
 }
 
 /** Dal payload del verificatore, la sola richiesta: la serie delle critiche passate al lettore non serve. PURA. */

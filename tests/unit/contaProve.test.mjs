@@ -8,7 +8,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { casiDiProva, confrontaCasi, contaProve, rigaDelConto, testoDelConto, tipoDiFile } from '../../scripts/lib/conta-prove.mjs';
+import {
+  PROVE_SERVER, casiDiProva, confrontaCasi, contaProve, rigaDelConto, testoDelConto, tipoDiFile, tipoDiFileServer,
+} from '../../scripts/lib/conta-prove.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -74,6 +76,21 @@ test('contaProve: le prove dei giri non entrano nel conto del lavoro, i file che
   assert.match(testo, /Prove dei giri di verifica \(fuori dalla suite, non contano qui\): aggiunte 1/);
   assert.match(testo, /Codice cambiato fuori da tests\/: 1 file, \+10 −2 righe/);
   assert.doesNotMatch(testo, /giro1-r1/, 'i file dei giri non si elencano fra le prove del lavoro');
+});
+
+test('le prove del server stanno in functions/test/, e il suo codice si conta fuori da lì (#2049)', () => {
+  assert.equal(tipoDiFileServer('functions/test/battito-misura.test.js'), 'unit');
+  assert.equal(tipoDiFileServer('functions\\test\\sotto\\win.test.mjs'), 'unit');
+  for (const no of ['functions/battito.js', 'functions/test/aiuto.js', 'tests/unit/a.test.mjs', 'test/a.test.js']) assert.equal(tipoDiFileServer(no), '', no);
+  const conto = contaProve([
+    { percorso: 'functions/test/battito.test.js', prima: null, dopo: "test('la misura si sostituisce', () => {});" },
+    { percorso: 'tests/unit/a.test.mjs', prima: null, dopo: "test('non è del server', () => {});" },
+  ], { prove: PROVE_SERVER });
+  assert.equal(rigaDelConto(conto), 'prove aggiunte 1 (unit 1, spec 0), toccate 0, tolte 0');
+  const testo = testoDelConto(conto, { codice: [{ percorso: 'functions/battito.js', aggiunte: 1, tolte: 1 }], prove: PROVE_SERVER });
+  assert.match(testo, /functions\/test\/battito\.test\.js \(unit\): aggiunti 1: «la misura si sostituisce»/);
+  assert.match(testo, /Codice cambiato fuori da functions\/test\/: 1 file, \+1 −1 righe/);
+  assert.match(testoDelConto(contaProve([])), /Codice cambiato fuori da tests\/: nessun file/, 'senza dirlo le regole sono quelle dell\'app');
 });
 
 function repoDiProva() {
