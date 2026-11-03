@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { ruoloConsegnato } from '../helpers/ruoloConsegnato.mjs';
 import { pinTools, pinnedDirWorker } from '../../scripts/lib/tools-pin.mjs';
 import { MARCA_GIRO, accendi, cloneDelGiro, preparaIntestazione } from '../../scripts/lib/worker-nel-clone.mjs';
 import { MARCATORE_WORKER } from '../../scripts/lib/dati-worker.mjs';
@@ -115,12 +116,13 @@ test('il worker parte nel suo clone, sul ramo del lavoro; la cartella della sess
     const json = JSON.parse(r.so.slice(r.so.indexOf('{'), r.so.lastIndexOf('}') + 1));
     const clone = resolve(s.lavori, '1');
     assert.equal(json.role, 'fixer');
-    assert.ok(json.instructions.startsWith('## La tua cartella'), json.instructions.slice(0, 200));
-    assert.ok(json.instructions.includes(`cd "${clone}" && …`));
+    const ruolo = ruoloConsegnato(json);
+    assert.ok(ruolo.startsWith('## La tua cartella'), ruolo.slice(0, 200));
+    assert.ok(ruolo.includes(`cd "${clone}" && …`));
     // Le ricette del ruolo puntano agli strumenti del clone: le consegne del worker finiscono lì. Il percorso nelle
     // ricette ha le barre normali su ogni sistema: confrontato nella forma nativa, su Windows non si trova.
     const ricetta = `node "${pinnedDirWorker(1, s.strumenti).split('\\').join('/')}/scripts/routine-channel.mjs"`;
-    assert.ok(json.instructions.includes(ricetta), `ricette dagli strumenti del clone: manca ${ricetta}`);
+    assert.ok(ruolo.includes(ricetta), `ricette dagli strumenti del clone: manca ${ricetta}`);
     assert.equal(git(clone, 'branch', '--show-current'), 'worker/1182');
     assert.equal(JSON.parse(readFileSync(resolve(clone, '.claude', 'routine-ticket.json'), 'utf8')).ticket, BIGLIETTO);
     assert.equal(git(s.sessione, 'branch', '--show-current'), 'main');

@@ -19,6 +19,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 
 import { resolve, dirname, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cartellaTemporanea, fuoriDa, togliCartella } from '../helpers/percorsi.mjs';
+import { ruoloConsegnato } from '../helpers/ruoloConsegnato.mjs';
 
 // STATE_DIR isolata PRIMA di importare il modulo (è letta a import-time).
 const TMP = cartellaTemporanea('filo-dispatch-');
@@ -776,9 +777,7 @@ test('emit verifier: col testo vero del ruolo, una storia normale e le decisioni
     assert.ok(out.length < 30000, `stampa di ${out.length} caratteri`);
     const j = JSON.parse(out);
     assert.match(j.instructions, /Ruolo: verifier/);
-    // Con i percorsi lunghi di Windows il ruolo può uscire nel suo file: in stampa o lì, arriva intero.
-    const ruolo = j.istruzioniFile ? readFileSync(j.istruzioniFile, 'utf8') : j.instructions;
-    if (j.istruzioniFile) assert.ok(j.instructions.includes(j.istruzioniFile), 'la stampa dice dove sta il ruolo');
+    const ruolo = ruoloConsegnato(j);
     assert.match(ruolo, /Ruolo: verifier[\s\S]*Contratto comune dei worker[\s\S]*NON RISPONDE \(exit 3\)/);
     if (payload.history) assert.match(ruolo, /Avvertenza di serie/);
     // Quello che è uscito dalla stampa sta tutto nei file citati.
@@ -793,7 +792,7 @@ test('emit: un ruolo che col payload già fuori passa ancora la soglia esce inte
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
   for (const f of readdirSync(vere)) {
-    if (f === 'verifier.md' || f === 'resolver.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+    if (f === 'verifier.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
   }
   const stampa = (bucket, ctx) => {
     let out = '';
@@ -824,11 +823,13 @@ test('emit: un ruolo che col payload già fuori passa ancora la soglia esce inte
     assert.equal(letta, critica, 'col ruolo fuori, il payload resta tutto da leggere');
   });
 
-  // Il ruolo dopo non eredita il file di quello prima, e un ruolo che sta in stampa non porta il rimando.
+  // Il ruolo dopo non eredita il file di quello prima, e un ruolo che sta in stampa non porta il rimando. Il ruolo è
+  // finto e corto: quello vero cresce fino alla soglia e farebbe rossa la prova per un altro motivo (#2051).
+  writeFileSync(resolve(dir, 'resolver.md'), '# Ruolo: resolver\n\nUn ruolo corto, che sta in stampa.\n');
   const dopo = JSON.parse(stampa({ role: 'new-work', id: 'n', num: '#5' }, { feedback: { text: 'Un difetto.' } }));
   assert.ok(!existsSync(j.istruzioniFile), 'il file del ruolo di prima è sparito');
   assert.equal(dopo.istruzioniFile, undefined);
-  assert.match(dopo.instructions, /Contratto comune dei worker/);
+  assert.match(dopo.instructions, /^# Ruolo: resolver\n\nUn ruolo corto, che sta in stampa\.[\s\S]*Contratto comune dei worker/);
 });
 
 test('diffForBranch: dichiara la base remota su cui è calcolato, anche col main locale indietro', () => {
