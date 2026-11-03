@@ -327,6 +327,11 @@ un'unita che la spec non nomina, un feedback che il testo mette prima («#1202 s
 dà P da lavorare con quello fuori da main. Il rimedio sta nel messaggio: la spec nel testo
 o allegata, `--aspetta` coi numeri, o la frase riscritta. Vale solo per i pacchetti: una
 segnalazione qualunque racconta un problema, e può citare note e attese di altri.
+I pacchetti nati prima, con la spec nei turni delle note che cominciano con «SPEC DEL
+PACCHETTO» (#2038), la consegnano lo stesso: il server la mette fra i documenti di chi lavora
+e di chi verifica, le parti nell'ordine, solo se P è fidato, nato dall'owner o da una sessione,
+e nessun biglietto sporco ci ha scritto. Quei turni li apre solo l'owner o una sessione: nel
+testo di una routine la stessa riga resta citata.
 
 *Gli allegati viaggiano con P*: chi lavora un biglietto apre solo quelli del suo feedback.
 Prima di aprire lo strumento legge e decifra immagini, documenti e allegati della
