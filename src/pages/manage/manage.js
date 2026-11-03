@@ -2782,11 +2782,11 @@
         + (progress && progress.active ? ' mg-item--active-work' : '')
         + ` mg-fiducia--${MR.segnoFiducia(fb).classe}`;
       item.dataset.id = fb._id;
-      // Una fusione ferma aspetta l'owner quanto un blocco: stessa tinta rossa, così si riconosce
-      // scorrendo la lista.
-      const ferma = fusioneFerma(fb);
+      // Una fusione che aspetta l'owner pesa quanto un blocco: stessa tinta rossa, così si riconosce
+      // scorrendo la lista. Le altre (fusa, in volo, da riallineare) hanno l'etichetta e basta (#1425).
+      const fusione = fusioneDi(fb);
+      const ferma = !!(fusione && fusione.attende);
       if (ferma) item.classList.add('mg-item--fusione');
-      const fusioneTesti = TESTI_FUSIONE_LISTA[(ferma && MR.livelloL5(fb, opzioniLivelli(fb)).fusione) || 'ferma'];
       const arrivata = arrivate.has(String(fb._id));
       if (arrivata) item.classList.add('mg-item--arrivata');
       item.style.borderLeftColor = ferma

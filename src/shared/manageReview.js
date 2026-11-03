@@ -1783,7 +1783,7 @@
 
   /** La chiave di STATI_FUSIONE di questa pratica, o null se al cancello non c'è niente. PURA. */
   function statoFusione(fb, opts) {
-    if (!fb || statusUnreadable(fb)) return null;
+    if (!fb) return null;
     return livelloL5(fb, opts).statoFusione || null;
   }
   /** Lo stato della fusione con le sue parole ({ stato, attende, chiusure, classe, etichetta, titolo }), o null. PURA. */
