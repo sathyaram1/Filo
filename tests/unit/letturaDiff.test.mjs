@@ -12,7 +12,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
-  FILE_DIFF, letturaMancante, leggiRichiesta, leggiRicevuta, richiestaDalPayload, righeNumstat, scriviRichiesta, vociConPercorsoPrima,
+  FILE_DIFF, FILE_DIFF_SERVER, letturaMancante, leggiRichiesta, leggiRicevuta, richiestaDalPayload, righeNumstat, scriviRichiesta, vociConPercorsoPrima,
 } from '../../scripts/lib/lettura-diff.mjs';
 import { cartellaConsegna } from '../../scripts/lib/consegna-file.mjs';
 
