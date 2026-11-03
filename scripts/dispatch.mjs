@@ -2532,6 +2532,8 @@ export function emit(bucket, ctx) {
   if (scartato) process.stderr.write(`[dispatch] il commit verificato del perimetro (${unaRiga(verificato).slice(0, 12)}) ${scartato === 'punta' ? 'è la punta del ramo' : 'qui non c\'è'}: chi verifica il riallineamento non ha il confronto\n`);
   const mancante = ambito.scope === 'riallineamento' ? riallineamentoMancante(ctx?.perimetro?.reportRebase) : [];
   if (mancante.length) process.stderr.write(`[dispatch] il report del riallineamento nomina ${mancante.map((s) => s.slice(0, 10)).join(', ')} di main, che la punta del ramo non contiene: il rebase non è arrivato su origin\n`);
+  const baseVecchia = scartato === 'punta' && !mancante.length && puntaSuBaseVecchia();
+  if (baseVecchia) process.stderr.write('[dispatch] la punta verificata poggia su un main già superato quando è stata scritta: il rebase non è arrivato su origin\n');
   // Dopo un salto il server rimanda a chi riallinea il commit approvato, che un rebase ha già tolto dai rami: si scarica
   // come per chi verifica, o il confronto alla consegna fallisce.
   if (riallinea && ctx?.shaVerificato && esaminaShaVerificato(ctx.shaVerificato) === 'assente') {
