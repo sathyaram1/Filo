@@ -38,8 +38,56 @@ test('classificatore: sporca ogni strumento tranne un elenco chiuso (shell, rice
   for (const n of [...L.STRUMENTI_SENZA_LETTURA, '', undefined]) {
     assert.equal(L.motivoLettura({ tool_name: n, tool_input: { file_path: '/etc/passwd', path: '/etc', url: 'https://x.it' } }, ctxPosix), '', String(n));
   }
-  for (const n of ['Bash', 'PowerShell', 'Grep', 'Glob', 'Edit', 'Write', 'NotebookEdit', 'TodoWrite', 'TaskCreate', 'TaskUpdate', 'Skill']) assert.ok(L.STRUMENTI_SENZA_LETTURA.includes(n), n);
+  for (const n of ['Bash', 'PowerShell', 'Glob', 'Edit', 'Write', 'NotebookEdit', 'TodoWrite', 'TaskCreate', 'TaskUpdate', 'Skill']) assert.ok(L.STRUMENTI_SENZA_LETTURA.includes(n), n);
+  // Grep con le righe porta dentro il testo dei file: lo decide il percorso, come Read (#1211.3).
+  assert.ok(!L.STRUMENTI_SENZA_LETTURA.includes('Grep'));
   assert.equal(L.motivoLettura(null), '');
+});
+
+test('classificatore: Grep con le righe di un file fuori dal repo sporca come Read; coi soli nomi o i conteggi no (#1211.3)', () => {
+  const cerca = (tool_input, ctx = ctxPosix) => L.motivoLettura({ tool_name: 'Grep', tool_input: { pattern: 'fattura', ...tool_input } }, ctx);
+  assert.equal(cerca({ path: '/casa/Scaricati/pagina.html', output_mode: 'content' }), 'Grep fuori dal repo (pagina.html)');
+  assert.equal(cerca({ path: '/casa/Scaricati', output_mode: 'content', '-C': 3 }), 'Grep fuori dal repo (Scaricati)');
+  assert.equal(cerca({ path: '../Scaricati', output_mode: 'content' }), 'Grep fuori dal repo (Scaricati)', 'relativo alla cartella della chiamata');
+  assert.equal(cerca({ output_mode: 'content' }, { ...ctxPosix, cwd: '/casa/Scaricati' }), 'Grep fuori dal repo (Scaricati)', 'senza percorso cerca nella cartella della chiamata');
+  assert.equal(cerca({ path: '/home/o/.claude/projects/x/altra.jsonl', output_mode: 'content' }), 'Grep dalla cartella di Claude (altra.jsonl)');
+  // Le stesse condizioni di Read: il repo, il server accanto, LOCAL.md restano puliti.
+  for (const path of ['/casa/Filo/src', '/casa/Filo/scripts/lib/x.mjs', '/casa/filo-security/functions', '/casa/LOCAL.md', undefined]) {
+    assert.equal(cerca({ path, output_mode: 'content' }), '', String(path));
+  }
+  // Coi soli nomi dei file, o i conteggi: lo stesso esito di prima, pulito ovunque.
+  for (const output_mode of [undefined, 'files_with_matches', 'count']) {
+    assert.equal(cerca({ path: '/casa/Scaricati/pagina.html', output_mode }), '', String(output_mode));
+  }
+});
+
+test('classificatore: nella cartella di Claude solo impostazioni, abilità, comandi, CLAUDE.md, memoria e la storia della sessione stessa restano puliti (#1211.3)', () => {
+  const ctx = { ...ctxPosix, cartelle: ['/casa/Filo', '/casa/filo-security'], claude: ['/home/o/.claude'], sessione: 'sess-1' };
+  for (const f of ['settings.json', 'settings.local.json', 'keybindings.json', 'CLAUDE.md', 'skills/posta/SKILL.md', 'skills/posta/riferimenti/a.md',
+    'commands/rilascia.md', 'agents/revisore.md', 'rules/stile.md', 'output-styles/breve.md', 'plans/piano-blu.md',
+    'projects/-casa-Filo/memory/MEMORY.md', 'projects/-casa-Filo/memory/argomenti/git.md',
+    'projects/-casa-Filo/sess-1.jsonl', 'projects/-casa-Filo/sess-1/tool-results/b1.txt', 'projects/-casa-Filo/sess-1/subagents/agent-a1.jsonl']) {
+    assert.equal(leggi(`/home/o/.claude/${f}`, ctx), '', f);
+  }
+  // I resoconti delle altre sessioni, coi testi che hanno letto; i cataloghi e le cache delle estensioni di terzi; il resto.
+  for (const f of ['projects/-casa-Filo/sess-2.jsonl', 'projects/-casa-Filo/sess-2/tool-results/b1.txt', 'projects/-casa-Filo/sess-2/subagents/agent-a1.jsonl',
+    'projects/-casa-Altro/vecchia.jsonl', 'projects/-casa-Filo/memory', 'projects/-casa-Filo/sess-1', 'projects/sess-1.jsonl',
+    'plugins/marketplaces/terzi/catalogo.json', 'plugins/cache/terzi/posta/1.0.0/skills/x/SKILL.md', 'plugins/known_marketplaces.json',
+    'history.jsonl', 'todos/x.json', 'shell-snapshots/s.sh', 'statsig/cache', 'skills', 'settings.json.bak', 'mcp-needs-auth-cache.json']) {
+    assert.match(leggi(`/home/o/.claude/${f}`, ctx), /^Read dalla cartella di Claude \(/, f);
+  }
+  // Senza sessione nota nessuna storia è sua.
+  assert.match(leggi('/home/o/.claude/projects/-casa-Filo/sess-1.jsonl', { ...ctx, sessione: '' }), /cartella di Claude/);
+  // Decide l'elenco anche se la cartella di Claude sta dentro una cartella fidata.
+  assert.match(leggi('/casa/Filo/.claude-utente/projects/p/s.jsonl', { ...ctx, claude: ['/casa/Filo/.claude-utente'] }), /cartella di Claude/);
+  // Su Windows maiuscole e barre non contano.
+  const win = { cwd: 'C:\\Users\\agenti AI\\Desktop\\Filo\\Filo', win: true, cartelle: ['c:\\users\\agenti ai\\desktop\\filo\\filo'], file: [], claude: ['C:\\Users\\agenti AI\\.claude'], sessione: 'Sess-1' };
+  assert.equal(leggi('c:\\users\\agenti ai\\.claude\\Settings.json', win), '');
+  assert.equal(leggi('C:/Users/agenti AI/.claude/projects/C--x/memory/MEMORY.md', win), '');
+  assert.equal(leggi('C:\\Users\\agenti AI\\.claude\\projects\\C--x\\sess-1.jsonl', win), '');
+  assert.match(leggi('C:\\Users\\agenti AI\\.claude\\projects\\C--x\\altra.jsonl', win), /cartella di Claude/);
+  assert.equal(L.ammessoInClaude('', {}), false);
+  assert.equal(L.ammessoInClaude('projects/p/memory/', {}), false, 'la cartella della memoria in sé non è un file da leggere');
 });
 
 test('classificatore: la lista dei passi, il riassunto e i capitoli dell’app desktop non sporcano; le sue letture sì (#1252)', () => {
