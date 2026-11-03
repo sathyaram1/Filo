@@ -258,6 +258,30 @@ test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro, e nes
   assert.match(r.testo, /resta chiusa/);
 });
 
+// #1428.1: le note di server:fondi le compone lo strumento; un terminale senza biglietto pulito le scrive lo stesso.
+test('ultima parte di una pratica fidata già chiusa, da un terminale senza biglietto pulito: la nota di fine resta scritta, uscita 0', async () => {
+  const { SPORCO } = await import('../helpers/bigliettoFinto.mjs');
+  const veri = { ...sessione };
+  const tolte = [];
+  sessione.biglietto = async () => SPORCO;
+  sessione.togliFiducia = async (id) => { tolte.push(id); return { ok: false, motivo: 'da chiusa non si toglie' }; };
+  try {
+    const d = doc('p', { status: 'done', parti: { app: ORA - 3 * ORE, ramo: 'claude/x' } });
+    d.fields.statusPublic = { stringValue: 'closed' };
+    const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'] });
+    assert.equal(r.k, 0, r.testo);
+    assert.equal(r.scritture.length, 2, 'la parte e la nota di fine');
+    assert.match(r.scritture[1], /updateMask\.fieldPaths=notes/);
+    assert.doesNotMatch(r.testo, /non l'ha annotato/);
+    assert.deepEqual(tolte, [], 'la nota di uno strumento non tocca la fiducia');
+    // Le altre note dello strumento passano allo stesso modo: presa in carico su una pratica aperta, e chiusura.
+    const aperta = await giro({ docs: { p: doc('p', { status: 'todo', parti: { app: ORA - ORE } }) }, argv: ['claude/x', '--feedback', 'p'] });
+    assert.equal(aperta.k, 0, aperta.testo);
+    assert.match(aperta.testo, /chiusa: claude\/x è su main del server/);
+    assert.deepEqual(tolte, []);
+  } finally { Object.assign(sessione, veri); }
+});
+
 test('pratica chiusa che non viene da poco dall’app dello stesso lavoro: si rifiuta prima di toccare il server, col perché', async () => {
   const casi = [
     [{ status: 'done', parti: { app: ORA - 49 * ORE, ramo: 'claude/x' } }, /più di 48 ore/],
