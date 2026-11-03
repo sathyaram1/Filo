@@ -748,6 +748,14 @@
     return card;
   }
 
+  // Chi la riallinea, e la frase che lo dice. La pagina che conosce la pratica lo dice con `o.riallineamento(req)` →
+  // { inCorso, testo } (Gestione: dallo stato della pratica, manageReview.statoFusione); senza, vale la provenienza.
+  function riallineamentoDi(req, o) {
+    var dato = o && typeof o.riallineamento === 'function' ? o.riallineamento(req) : null;
+    if (dato && dato.testo) return { inCorso: !!dato.inCorso, testo: String(dato.testo) };
+    return { inCorso: siRiallineaDaSola(req), testo: dopoIlConflitto(req) };
+  }
+
   // Una fusione APPROVATA e mai avvenuta (conflitto) non chiede un'altra approvazione, ma non
   // può sparire: resta in vista finché non è fusa o finché l'owner non la segna sistemata.
   function buildFailedCard(req, opts) {
