@@ -66,7 +66,7 @@ export const ESEMPI = {
     'i rilievi di una verifica: li corregge chi li ha scritti',
     'Con esito fix corregge lo stesso agente che ha scritto la critica',
     'la consegna è del verificatore, non del correttore',
-    'la correzione, dopo la critica, la fa il verificatore',
+    'la correzione la fa il verificatore, dopo la critica',
   ],
   legittimi: [
     'critica del verificatore senza rilievi INTERNI da correggere',
