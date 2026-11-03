@@ -122,6 +122,7 @@ async function giro(rispostaLavoro, consegne = [], prepara = null, ambiente = {}
           // staccato apposta per sopravvivergli: qui lascerebbe un processo per
           // ogni caso di prova. Il battito ha un test suo (routineBeat).
           FILO_NO_BEAT: '1',
+          ...ambiente,
         },
       });
       let so = ''; let se = '';
