@@ -178,6 +178,9 @@ test('un lavoro server: la lettura legge anche il diff del server con le sue pro
   assert.match(leggi(casa, ['--base', base]).stdout, /Questo è un lavoro server\. Il ramo `worker\/1363` di filo-security/, 'il ramo solo scaricato da origin si legge lo stesso');
   assert.match(readFileSync(fileServer, 'utf8'), /sostituisciSulBiglietto/);
 
+  gs('update-ref', 'refs/remotes/origin/worker/1363', 'main~1');
+  assert.match(leggi(casa, ['--base', base]).stdout, /Questo è un lavoro server, ma il ramo worker\/1363 del server non ha commit fuori dal main del server: lì non c'è niente da leggere\./);
+
   gs('update-ref', '-d', 'refs/remotes/origin/worker/1363');
   const senzaRamo = leggi(casa, ['--base', base]);
   assert.equal(senzaRamo.status, 0, senzaRamo.stderr);
