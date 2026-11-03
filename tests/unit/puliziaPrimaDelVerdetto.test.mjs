@@ -57,6 +57,18 @@ test('a lavoro fermo di sicuro i `?` restano a chi riprende con la loro prova: e
   }
 });
 
+test('la pulizia prima del verdetto decide la fermata con la stessa regola del giro', () => {
+  const require = createRequire(import.meta.url);
+  require('../../src/shared/verifierRound.js');
+  const V = globalThis.SN_VERIFIER_ROUND;
+  for (const level of [0, 1, 2, 3]) for (const decision of [false, true]) for (const irreversibile of [false, true]) {
+    const f = { level, sede: 'i', decision, irreversibile };
+    assert.equal(fermaDiSicuro([f]), V.decisioneFerma(f), JSON.stringify(f));
+    assert.equal(fermaDiSicuro([{ ...f, sede: 'e' }]), false);
+    assert.equal(fermaDiSicuro([{ ...f, sede: 'v' }]), false);
+  }
+});
+
 test('un 2 col `?` non ferma (#1202): la prova di un 1 col `?` della stessa critica esce prima del verdetto, la sua resta', () => {
   const require = createRequire(import.meta.url);
   require('../../src/shared/verifierRound.js');
