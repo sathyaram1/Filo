@@ -938,6 +938,22 @@ export function riallineamentoMancante(report, root = ROOT) {
   });
 }
 
+/**
+ * Se la punta è nata quando `origin/main` aveva già commit che non contiene, con mezza giornata di margine (#2101): un
+ * rebase la riscrive dopo aver scaricato main, quindi la sua data viene dopo ogni commit di main che lascia fuori solo
+ * per i minuti fra lo scaricamento e la fine. False se git qui non risponde.
+ */
+export function puntaSuBaseVecchia(root = ROOT, margine = 12 * 3600) {
+  const g = (args) => {
+    try { return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 30000, maxBuffer: 64 * 1024 * 1024 }).trim(); } catch (_) { return null; }
+  };
+  const base = g(['merge-base', 'HEAD', 'refs/remotes/origin/main']);
+  const punta = Number(g(['log', '-1', '--format=%ct', 'HEAD']));
+  if (!base || !Number.isFinite(punta)) return false;
+  const date = (g(['log', '--format=%ct', `${base}..refs/remotes/origin/main`]) || '').split('\n').map(Number).filter((n) => n > 0);
+  return date.length > 0 && punta - Math.min(...date) > margine;
+}
+
 export function readRoleInstructions(role, { scope, caso } = {}) {
   const name = role === 'verifier' ? VERIFIER_SCOPE_FILE[verifierScope(scope).scope]
     : role === 'fixer' ? (Object.hasOwn(FIXER_CASE_FILE, String(caso || '')) ? FIXER_CASE_FILE[String(caso)] : ROLE_FILE.fixer)

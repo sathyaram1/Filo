@@ -51,14 +51,15 @@ function rigaVerificato(sha, scartato) {
 
 // Il rebase dichiarato nel report che sul ramo non c'è (#2101). Sulla punta verificata il giro non ha niente da provare:
 // senza rilievi il lavoro torna alla fusione, che rifà il riallineamento se serve ancora.
-// La punta ancora al commit verificato basta da sola: il report può non nominare lo sha di main.
-function righeRebaseMancante(mancante, scartato) {
+// Il report può non nominare lo sha di main: allora lo dice la base vecchia della punta (`baseVecchia`), non la punta
+// da sola, che è anche il commit riallineato mandato per errore come verificato (#1968).
+function righeRebaseMancante(mancante, scartato, baseVecchia) {
   const shas = (Array.isArray(mancante) ? mancante : []).map(soloSha).filter(Boolean);
-  if (!shas.length && scartato !== 'punta') return [];
+  if (!shas.length && !(scartato === 'punta' && baseVecchia)) return [];
   const nominati = shas.map((s) => `\`${s}\``).join(', ');
   const testa = shas.length
     ? `**Il riallineamento non è su questo ramo.** Il report qui sotto dice di aver rifatto la base su \`main\` (${nominati}), ma la punta non contiene quel commit.`
-    : '**Il riallineamento non è su questo ramo.** Nessun rebase ha toccato la punta, anche se il giro nasce da un riallineamento consegnato.';
+    : '**Il riallineamento non è su questo ramo.** La punta poggia su una base di `main` più vecchia di commit che `main` aveva già quando è stata scritta: nessun rebase l\'ha toccata.';
   if (scartato === 'punta') {
     return ['', testa,
       'La punta è ancora il commit che aveva passato la verifica: in questo giro non c\'è niente da verificare, e i controlli',
@@ -76,9 +77,9 @@ function righeRebaseMancante(mancante, scartato) {
  * Il perimetro di un giro stretto, scritto come testo in coda al compito: un
  * JSON nel payload si può non guardare, un'istruzione no. '' per il giro
  * pieno. `scartato`: perché il commit verificato non fa da confronto ('punta', 'assente'); `mancante`: i commit di
- * main che il report dichiara e la punta non contiene. PURA.
+ * main che il report dichiara e la punta non contiene; `baseVecchia`: la punta è nata su un main già superato. PURA.
  */
-export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo, { scartato = '', mancante = [] } = {}) {
+export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo, { scartato = '', mancante = [], baseVecchia = false } = {}) {
   const p = perimetro && typeof perimetro === 'object' ? perimetro : {};
   if (scope === 'chiusura') {
     const rilievi = Array.isArray(p.rilievi) ? p.rilievi.filter((r) => r && unaRiga(r.text)) : [];
@@ -104,7 +105,7 @@ export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo, 
     const sha = soloSha(p.shaVerificato);
     const report = String(p.reportRebase ?? '').trim();
     const conDiff = !!sha && scartato !== 'punta';
-    const rebaseMancante = righeRebaseMancante(mancante, scartato);
+    const rebaseMancante = righeRebaseMancante(mancante, scartato, baseVecchia);
     return [
       '## Perimetro di questo giro',
       '',
