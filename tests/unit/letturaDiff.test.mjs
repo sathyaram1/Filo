@@ -248,6 +248,11 @@ test('la consegna di una verifica piena lascia la richiesta al lettore; la chius
   assert.equal(r.richiesta.feedback.text, 'esce dal fondo');
   assert.deepEqual(r.richiesta.decisioni, [{ domanda: 4 }]);
   assert.equal(r.richiesta.history, undefined, 'la serie delle critiche al lettore non serve');
+  assert.equal(r.radiceServer, undefined, 'un lavoro solo dell\'app non manda il lettore nel server');
+  process.env.FILO_SERVER_CLONE = join(radice, '..', 'clone-del-server');
+  zitto(() => emit({ role: 'verifier', id: 'f9', num: '#9', branch: 'worker/9' }, { ...ctx, lavoroServer: { repo: 'sathyaram1/filo-security' } }));
+  delete process.env.FILO_SERVER_CLONE;
+  assert.equal(leggiRichiesta(radice).radiceServer, resolve(radice, '..', 'clone-del-server'), 'un lavoro server dice al lettore dove sta il clone (#2049)');
   zitto(() => emit({ role: 'verifier', id: 'f9', num: '#9', branch: 'worker/9' }, { ...ctx, scope: 'chiusura', perimetro: { rilievi: [] } }));
   assert.equal(leggiRichiesta(radice), null, 'nella chiusura il diff lo legge chi verifica: la lettura non è dovuta');
   assert.ok(!existsSync(join(cartellaConsegna(radice), 'lettura-richiesta.json')));
