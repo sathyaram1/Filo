@@ -86,13 +86,17 @@ test('riallineamento: la scelta include i file in conflitto, anche risolti col l
   try {
     g('init', '-q', '-b', 'main');
     g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+    const lontano = (testa, coda) => `${testa}\n${'riga\n'.repeat(20)}${coda}\n`;
     scrivi('src/pages/editor/a.js', '1\n'); scrivi('src/pages/history/h.js', '1\n'); scrivi('src/pages/board/c.js', '1\n');
+    scrivi('src/pages/options/o.js', lontano('1', '1'));
     g('add', '-A'); g('commit', '-qm', 'base');
     g('checkout', '-qb', 'lavoro');
-    scrivi('src/pages/editor/a.js', 'lavoro\n'); scrivi('src/pages/board/c.js', 'lavoro\n'); g('commit', '-qam', 'lavoro');
+    scrivi('src/pages/editor/a.js', 'lavoro\n'); scrivi('src/pages/board/c.js', 'lavoro\n');
+    scrivi('src/pages/options/o.js', lontano('lavoro', '1')); g('commit', '-qam', 'lavoro');
     const verificato = g('rev-parse', 'HEAD');
     g('checkout', '-q', 'main');
     scrivi('src/pages/history/h.js', 'main\n'); scrivi('src/pages/editor/a.js', 'main\n'); scrivi('src/pages/board/c.js', 'main\n');
+    scrivi('src/pages/options/o.js', lontano('1', 'main'));
     g('commit', '-qam', 'main');
     g('checkout', '-q', 'lavoro');
     try { g('rebase', 'main'); } catch (_) { /* conflitti attesi su a.js e c.js */ }
