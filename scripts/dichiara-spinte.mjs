@@ -1,10 +1,10 @@
 // dichiara-spinte.mjs — le spinte col biglietto di chi spinge (#1362). `--pre-push <app|server> <radice> [<url>]` accoda i
-// commit creati qui, ognuno col biglietto di chi l'ha fatto (lo annotano `--post-commit` e `--post-rewrite <radice>`), e
-// lancia l'invio; non ferma mai git. `--invia <radice>`: dichiara la coda al server. Regole: scripts/lib/spinte.mjs.
+// commit nati qui, ognuno col biglietto di chi l'ha fatto (la traccia la scrivono `--post-commit`, `--post-merge` e
+// `--post-rewrite`), e lancia l'invio; non ferma mai git. `--invia <radice>`: la coda al server. Regole: lib/spinte.mjs.
 
 import { execFileSync, spawn } from 'node:child_process';
-import { realpathSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as S from './lib/spinte.mjs';
 
@@ -43,12 +43,50 @@ export async function prePush({ repo, radice, url = '', righe, env = process.env
   return n;
 }
 
-/** Il post-commit: annota la sessione locale che ha fatto HEAD. Mai un'eccezione verso git. */
-export function postCommit({ radice, env = process.env } = {}) {
+const gitIn = (radice, args) => execFileSync('git', args, { cwd: radice, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 }).trim();
+
+/**
+ * Da quali commit viene `sha`, se è una copia: null = nato adesso, [] = una copia di cui non si trova l'originale. Un
+ * rebase e un amend li porta il post-rewrite, che sa da quale commit viene ogni copia.
+ */
+export function originaliDi(radice, sha) {
+  const gitDir = resolve(radice, gitIn(radice, ['rev-parse', '--git-dir']));
+  if (existsSync(join(gitDir, 'rebase-merge')) || existsSync(join(gitDir, 'rebase-apply'))) return null;
+  if (/^commit \(amend\)/.test(gitIn(radice, ['reflog', '-1', '--format=%gs', 'HEAD']))) return null;
+  try { return [gitIn(radice, ['rev-parse', '--verify', '--quiet', 'CHERRY_PICK_HEAD^{commit}'])]; } catch (_) { /* finito, o non c'era */ }
+  const [an, ae, at, cn, ce, ct] = gitIn(radice, ['show', '-s', '--format=%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct', sha]).split('\u0000');
+  if (an === cn && ae === ce && at === ct) return null;
+  // Ha tenuto l'autore di un altro commit (un cherry-pick chiuso dopo un conflitto, commit -c): l'originale è quello.
+  const righe = gitIn(radice, ['log', '--all', '--reflog', '-F', `--author=${ae}`, '--format=%H%x00%an%x00%ae%x00%at']).split('\n');
+  return righe.map((r) => r.split('\u0000')).filter(([h, n, e, t]) => h !== sha && n === an && e === ae && t === at).map(([h]) => h);
+}
+
+/** Chi fa un commit in `radice`: per filo-security i biglietti stanno nel checkout di Filo di questo script. */
+const chiQui = (radice, repo, env) => S.chiSpinge({ root: repo === 'server' ? FILO : radice, env });
+
+/** Il post-commit: HEAD è nato qui, da chi (anche nessuna sessione), e una copia porta la traccia del suo originale. */
+export function postCommit({ radice, repo = 'app', env = process.env } = {}) {
   try {
-    const chi = S.chiSpinge({ root: radice, env });
-    const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: radice, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    return S.annotaAutore(radice, chi, sha);
+    const sha = gitIn(radice, ['rev-parse', 'HEAD']);
+    let originali = null;
+    try { originali = originaliDi(radice, sha); } catch (_) { originali = []; }
+    return S.annotaAutore(radice, chiQui(radice, repo, env), sha, Date.now(), { originali });
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Il post-merge: una fusione che ha fatto un commit lo annota come nato qui. Un avanzamento veloce no: porta commit
+ * nati altrove. Mai un'eccezione verso git.
+ */
+export function postMerge({ radice, repo = 'app', env = process.env } = {}) {
+  try {
+    const [sha, ...genitori] = gitIn(radice, ['rev-list', '--parents', '-n1', 'HEAD']).split(/\s+/);
+    const prima = gitIn(radice, ['rev-parse', '--verify', '--quiet', 'HEAD@{1}']);
+    if (genitori.length < 2 || genitori[0] !== prima) return false;
+    if (/fast-forward/i.test(gitIn(radice, ['reflog', '-1', '--format=%gs', 'HEAD']))) return false;
+    return S.annotaAutore(radice, chiQui(radice, repo, env), sha);
   } catch (_) {
     return false;
   }
@@ -77,7 +115,11 @@ async function main(argv) {
     return 0;
   }
   if (modo === '--post-commit') {
-    postCommit({ radice: resolve(a || process.cwd()) });
+    postCommit({ radice: resolve(a || process.cwd()), repo: b === 'server' ? 'server' : 'app' });
+    return 0;
+  }
+  if (modo === '--post-merge') {
+    postMerge({ radice: resolve(a || process.cwd()), repo: b === 'server' ? 'server' : 'app' });
     return 0;
   }
   if (modo === '--post-rewrite') {
@@ -92,7 +134,7 @@ async function main(argv) {
     if (riga) console.error(riga);
     return 0;
   }
-  console.error('Uso: node scripts/dichiara-spinte.mjs --pre-push <app|server> <radice> [<url>] | --post-commit <radice> | --post-rewrite <radice> | --invia <radice>');
+  console.error('Uso: node scripts/dichiara-spinte.mjs --pre-push <app|server> <radice> [<url>] | --post-commit <radice> [app|server] | --post-merge <radice> [app|server] | --post-rewrite <radice> | --invia <radice>');
   return 2;
 }
 

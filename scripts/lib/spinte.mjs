@@ -4,7 +4,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { trovaBiglietti, chiamaGrezzo, consegnaSporchi, sporchiInAttesa } from './biglietto-locale.mjs';
 import { readTicket } from './routine-ticket.mjs';
@@ -163,8 +163,9 @@ export function spintaDi(root, { locale, remoto = '', ramo }) {
   );
 }
 
-// Chi ha fatto un commit, annotato dal post-commit e portato sulle copie dal post-rewrite: due sessioni nella stessa
-// cartella non si dichiarano a vicenda i commit.
+// La traccia di ogni commit nato in questa copia (#1362 giro 4 r4): chi l'ha fatto, scritto alla nascita dal
+// post-commit e dal post-merge, e portato sulle copie dal post-rewrite. Un commit senza traccia è arrivato da fuori e non
+// lo dichiara nessuno; uno che porta il lavoro di un altro, per qualunque strada, porta anche il suo autore.
 export const AUTORI = 'filo-spinte-autori';
 // Un commit mai spinto non tiene la sua annotazione per sempre.
 const AUTORE_SCADUTO_MS = 30 * 24 * 60 * 60 * 1000;
@@ -174,19 +175,35 @@ function cartellaAutori(root) {
   return coda ? join(coda, '..', AUTORI) : '';
 }
 
-const autoreValido = (v) => (v && v.tipo === 'locale' && typeof v.ticket === 'string' && v.ticket
-  ? { tipo: 'locale', ticket: v.ticket, fp: v.fp || '', file: v.file || '' } : null);
+const autoreValido = (v) => {
+  if (v && v.tipo === 'locale' && typeof v.ticket === 'string' && v.ticket) return { tipo: 'locale', ticket: v.ticket, fp: v.fp || '', file: v.file || '' };
+  if (v && v.tipo === 'routine' && /^[0-9a-f]{64}$/.test(String(v.fp || ''))) return { tipo: 'routine', fp: v.fp };
+  return null;
+};
+// Una routine si riconosce dall'impronta, una sessione locale dal biglietto.
+const chiave = (a) => (a.tipo === 'routine' ? `r:${a.fp}` : `l:${a.ticket}`);
+const SHA_LISTA = (l) => (Array.isArray(l) ? l.filter((s) => SHA_RE.test(String(s))) : []);
+
+/**
+ * La traccia di `sha` in questa copia: { autori, di (originali nati fuori), ignota (copia di chissà cosa) }. null = il
+ * commit non è nato qui. Le annotazioni di prima (senza `qui`) le aveva scritte il post-commit: valgono nate qui.
+ */
+export function tracciaDi(root, sha) {
+  const dir = cartellaAutori(root);
+  if (!dir || !SHA_RE.test(String(sha || ''))) return null;
+  try {
+    const v = JSON.parse(readFileSync(join(dir, `${sha}.json`), 'utf8'));
+    const autori = (Array.isArray(v && v.autori) ? v.autori : [v]).map(autoreValido).filter(Boolean);
+    return { autori, di: SHA_LISTA(v && v.di), ignota: !!(v && v.ignota) };
+  } catch (_) {
+    return null;
+  }
+}
 
 /** Le sessioni annotate su `sha` (anche la forma di prima, una sola). [] se nessuna. */
 export function autoriDi(root, sha) {
-  const dir = cartellaAutori(root);
-  if (!dir || !SHA_RE.test(String(sha || ''))) return [];
-  try {
-    const v = JSON.parse(readFileSync(join(dir, `${sha}.json`), 'utf8'));
-    return (Array.isArray(v && v.autori) ? v.autori : [v]).map(autoreValido).filter(Boolean);
-  } catch (_) {
-    return [];
-  }
+  const t = tracciaDi(root, sha);
+  return t ? t.autori : [];
 }
 
 /** La prima sessione annotata su `sha`. null se nessuna. */
@@ -194,10 +211,11 @@ export function autoreDi(root, sha) {
   return autoriDi(root, sha)[0] || null;
 }
 
-function scriviAutori(dir, sha, autori, nowMs) {
+function scriviTraccia(dir, sha, t, nowMs) {
   mkdirSync(dir, { recursive: true });
   const tmp = join(dir, `${sha}.${process.pid}.tmp`);
-  writeFileSync(tmp, `${JSON.stringify({ autori })}\n`, { encoding: 'utf8', mode: 0o600 });
+  const voce = Object.assign({ qui: true, autori: t.autori }, t.di.length ? { di: t.di } : {}, t.ignota ? { ignota: true } : {});
+  writeFileSync(tmp, `${JSON.stringify(voce)}\n`, { encoding: 'utf8', mode: 0o600 });
   renameSync(tmp, join(dir, `${sha}.json`));
   try {
     for (const n of readdirSync(dir)) {
@@ -209,98 +227,161 @@ function scriviAutori(dir, sha, autori, nowMs) {
 
 const conAutori = (prima, nuovi) => {
   const out = prima.slice();
-  for (const a of nuovi) if (a && !out.some((x) => x.ticket === a.ticket)) out.push(a);
+  for (const a of nuovi) if (a && !out.some((x) => chiave(x) === chiave(a))) out.push(a);
   return out;
 };
 
-/**
- * Il post-commit: annota che `sha` l'ha fatto (anche) la sessione locale `chi`; chi c'era resta. Le routine no: una per
- * copia. → vero se annotato.
- */
-export function annotaAutore(root, chi, sha, nowMs = Date.now()) {
+/** Unisce alla traccia di `sha` gli autori di `chi` e quello che porta da `da` (altre tracce, originali nati fuori). */
+function aggiungi(root, sha, { chi = null, tracce = [], fuori = [], ignota = false } = {}, nowMs = Date.now()) {
   const dir = cartellaAutori(root);
-  const a = autoreValido(chi);
-  if (!dir || !a || !SHA_RE.test(String(sha || ''))) return false;
-  scriviAutori(dir, sha, conAutori(autoriDi(root, sha), [a]), nowMs);
+  if (!dir || !SHA_RE.test(String(sha || ''))) return false;
+  const t = tracciaDi(root, sha) || { autori: [], di: [], ignota: false };
+  const autori = conAutori(t.autori, [autoreValido(chi), ...tracce.flatMap((x) => x.autori)]);
+  const di = [...new Set([...t.di, ...tracce.flatMap((x) => x.di), ...SHA_LISTA(fuori)])].filter((s) => s !== sha);
+  scriviTraccia(dir, sha, { autori, di, ignota: t.ignota || ignota || tracce.some((x) => x.ignota) }, nowMs);
   return true;
 }
 
+/** La forma con cui `chi` entra in una traccia: della routine solo l'impronta. */
+const inTraccia = (chi) => (chi && chi.tipo === 'routine' ? { tipo: 'routine', fp: chi.fp || impronta(chi.ticket) } : chi);
+
 /**
- * Il post-rewrite (rebase, amend): la copia porta anche gli autori dell'originale, se no la riscrittura la darebbe a chi
- * riscrive (#1362 giro 3 r1). `righe`: «<vecchio> <nuovo>» come le passa git. → quante copie annotate.
+ * Il post-commit: `sha` è nato qui, da `chi` (null = nessuna sessione: l'owner dal terminale); chi c'era resta. Una
+ * copia (`originali`: il commit da cui viene, o [] se non si sa) porta anche la traccia di quelli. → vero se annotato.
+ */
+export function annotaAutore(root, chi, sha, nowMs = Date.now(), { originali = null } = {}) {
+  const copia = Array.isArray(originali);
+  const nati = copia ? SHA_LISTA(originali).filter((o) => o !== sha) : [];
+  const tracce = nati.map((o) => tracciaDi(root, o)).filter(Boolean);
+  const fuori = nati.filter((o) => !tracciaDi(root, o));
+  return aggiungi(root, sha, { chi: inTraccia(chi), tracce, fuori, ignota: copia && !nati.length }, nowMs);
+}
+
+/**
+ * Il post-rewrite (rebase, amend): la copia porta anche la traccia dell'originale, se no la riscrittura la darebbe a chi
+ * riscrive (#1362 giro 3 r1); un originale nato fuori resta il suo «di». `righe`: «<vecchio> <nuovo>» come le passa
+ * git. → quante copie annotate.
  */
 export function ereditaAutori(root, righe, nowMs = Date.now()) {
-  const dir = cartellaAutori(root);
-  if (!dir) return 0;
+  if (!cartellaAutori(root)) return 0;
   let n = 0;
   for (const riga of String(righe || '').split(/\r?\n/)) {
     const [vecchio, nuovo] = riga.trim().split(/\s+/);
     if (!SHA_RE.test(String(vecchio || '')) || !SHA_RE.test(String(nuovo || '')) || vecchio === nuovo) continue;
-    const da = autoriDi(root, vecchio);
-    if (!da.length) continue;
-    scriviAutori(dir, nuovo, conAutori(autoriDi(root, nuovo), da), nowMs);
-    n += 1;
+    const da = tracciaDi(root, vecchio);
+    if (aggiungi(root, nuovo, da ? { tracce: [da] } : { fuori: [vecchio] }, nowMs)) n += 1;
   }
   return n;
 }
 
-/**
- * Gli autori delle copie fatte senza riscrittura (un cherry-pick): un commit con la stessa modifica di uno che un'altra
- * sessione ha fatto e non è mai partito porta anche i suoi autori. Map sha → autori; vuota se git tace.
- */
-function autoriDelleCopie(root, chi, commits) {
-  const dir = cartellaAutori(root);
-  const out = new Map();
-  if (!dir || !commits.length) return out;
-  let nomi = [];
-  try { nomi = readdirSync(dir).filter((n) => /^[0-9a-f]{40}\.json$/.test(n)).map((n) => n.slice(0, 40)); } catch (_) { return out; }
-  const tra = new Set(commits);
-  const altrui = new Map();
-  for (const s of nomi) {
-    if (tra.has(s)) continue;
-    const autori = autoriDi(root, s).filter((a) => a.ticket !== chi.ticket);
-    if (autori.length) altrui.set(s, autori);
+// La firma di una modifica: le righe tolte e aggiunte, file per file. Quelle che non dicono niente (graffe, righe
+// vuote) non contano; oltre il tetto si smette di leggere, e la firma resta quella letta.
+const TETTO_FIRMA = 4000;
+const PARLANTE = /[A-Za-z0-9][^A-Za-z0-9]*[A-Za-z0-9][^A-Za-z0-9]*[A-Za-z0-9]/;
+
+/** Le firme dei commit `shas` (le fusioni restano senza: il loro lavoro sta nei genitori). Map sha → Set. */
+export function firme(root, shas) {
+  const out = new Map(shas.map((s) => [s, new Set()]));
+  if (!shas.length) return out;
+  let testo = '';
+  try { testo = git(root, ['diff-tree', '--stdin', '-p', '-U0', '--no-renames', '--no-color', '--root'], `${shas.join('\n')}\n`); } catch (_) { return out; }
+  let cur = null;
+  let file = '';
+  let testa = true;
+  for (const riga of testo.split('\n')) {
+    if (SHA_RE.test(riga)) { cur = out.get(riga) || null; file = ''; testa = true; continue; }
+    if (!cur) continue;
+    if (riga.startsWith('diff --git ')) { file = riga.slice(riga.lastIndexOf(' b/') + 3); testa = true; continue; }
+    if (riga.startsWith('@@')) { testa = false; continue; }
+    if (!testa && (riga[0] === '+' || riga[0] === '-') && cur.size < TETTO_FIRMA) {
+      const corpo = riga.slice(1).trim();
+      if (PARLANTE.test(corpo)) cur.add(`${file}\u0000${riga[0]}${corpo}`);
+    }
   }
-  if (!altrui.size) return out;
-  let mai = [];
-  try {
-    // Un'annotazione di un commit che git ha già buttato non deve spegnere il controllo sugli altri.
-    const ci = git(root, ['cat-file', '--batch-check'], `${[...altrui.keys()].join('\n')}\n`).split('\n')
-      .map((r) => r.trim().split(/\s+/)).filter(([s, tipo]) => tipo === 'commit' && altrui.has(s)).map(([s]) => s);
-    if (!ci.length) return out;
-    const visti = new Set(git(root, ['rev-list', '--stdin', '--not', '--remotes'], `${ci.join('\n')}\n`).split('\n').map((x) => x.trim()));
-    mai = ci.filter((s) => visti.has(s));
-  } catch (_) { return out; }
-  if (!mai.length) return out;
-  const perId = new Map();
-  for (const [sha, id] of patchIds(root, mai)) perId.set(id, conAutori(perId.get(id) || [], altrui.get(sha)));
-  for (const [sha, id] of patchIds(root, commits)) if (perId.has(id)) out.set(sha, perId.get(id));
   return out;
 }
 
+/** `c` porta la modifica di `o`: almeno metà delle sue righe, nello stesso file e nello stesso verso. PURA. */
+export function assorbe(firmaC, firmaO) {
+  if (!firmaC || !firmaO || !firmaO.size) return false;
+  let n = 0;
+  for (const r of firmaO) if (firmaC.has(r)) n += 1;
+  return n * 2 >= firmaO.size;
+}
+
+/** I commit annotati qui che `punta` non porta e nessun ref remoto ha: il lavoro che può essere finito dentro un altro. */
+function annotatiFuoriDalRamo(root, punta) {
+  const dir = cartellaAutori(root);
+  let nomi = [];
+  try { nomi = readdirSync(dir).filter((n) => /^[0-9a-f]{40}\.json$/.test(n)).map((n) => n.slice(0, 40)); } catch (_) { return []; }
+  if (!nomi.length) return [];
+  try {
+    // Un'annotazione di un commit che git ha già buttato non deve spegnere il controllo sugli altri.
+    const ci = git(root, ['cat-file', '--batch-check'], `${nomi.join('\n')}\n`).split('\n')
+      .map((r) => r.trim().split(/\s+/)).filter(([, tipo]) => tipo === 'commit').map(([s]) => s);
+    if (!ci.length) return [];
+    const fuori = new Set(git(root, ['rev-list', '--stdin', '--not', '--remotes'], `${[...ci, `^${punta}`].join('\n')}\n`).split('\n').map((x) => x.trim()));
+    return ci.filter((s) => fuori.has(s));
+  } catch (_) {
+    return [];
+  }
+}
+
 /**
- * Le spinte divise per chi ha fatto i commit: uno annotato a un'altra sessione va col biglietto di quella, uno senza
- * annotazione con quello di chi spinge. Uno a cui hanno messo mano più sessioni (una copia, un amend) non lo dichiara
- * nessuno, cioè buco: un biglietto pulito non può coprire la parte di un altro, e il no del server a quello dell'altro
- * (chiuso, ramo sbagliato) lascerebbe in piedi solo la dichiarazione pulita. → [{ chi, spinte }], prima chi spinge.
+ * Le spinte divise per chi ha fatto i commit, secondo la traccia. Uno nato da un'altra sessione locale va col biglietto
+ * di quella; uno di un'altra routine, uno arrivato da fuori, uno a cui hanno messo mano più sessioni (una copia, un
+ * amend, uno squash che ne porta il lavoro) non lo dichiara nessuno, cioè buco: un biglietto pulito non copre la parte
+ * di un altro. La copia di un commit nato fuori va fra i `riscritti` di chi spinge, col suo originale: la giudica il
+ * server. Uno nato qui senza sessione (l'owner dal terminale) resta di chi spinge. → [{ chi, spinte }], prima chi spinge.
  */
 export function perAutore(root, chi, spinte) {
   const gruppi = new Map([[chi.ticket, { chi, spinte: [] }]]);
-  const copie = autoriDelleCopie(root, chi, spinte.flatMap((s) => s.commits));
+  const io = chiave(inTraccia(chi));
+  const candidati = [...new Set(spinte.flatMap((s) => s.commits))];
+  const tracce = new Map(candidati.map((c) => [c, tracciaDi(root, c)]));
+  // Il lavoro che può essere finito dentro un candidato: gli annotati rimasti fuori dal ramo e i commit visti su origin
+  // che la spinta non porta più.
+  const sospetti = new Set();
+  for (const s of spinte) {
+    for (const o of annotatiFuoriDalRamo(root, s.punta)) sospetti.add(o);
+    for (const o of s.sostituiti || []) sospetti.add(o);
+  }
+  for (const c of candidati) sospetti.delete(c);
+  const nati = candidati.filter((c) => tracce.get(c));
+  const firma = sospetti.size && nati.length ? firme(root, [...nati, ...sospetti]) : new Map();
+  const assorbiti = (c) => [...sospetti].filter((o) => !tracce.get(c).di.includes(o) && assorbe(firma.get(c), firma.get(o)));
+
   for (const s of spinte) {
     const altri = new Map();
     const propri = [];
+    const riscritti = (s.riscritti || []).slice();
     for (const c of s.commits) {
-      const autori = conAutori(autoriDi(root, c), copie.get(c) || []);
-      if (autori.length > 1) continue;
-      const a = autori[0];
-      if (a && a.ticket !== chi.ticket) {
+      const t = tracce.get(c);
+      if (!t || t.ignota) continue;
+      let autori = t.autori;
+      let fuori = t.di.length;
+      for (const o of assorbiti(c)) {
+        const to = tracciaDi(root, o);
+        if (!to || to.ignota || to.di.length) fuori += 1;
+        else autori = conAutori(autori, to.autori);
+      }
+      const altrui = autori.filter((a) => chiave(a) !== io);
+      if (fuori) {
+        if (fuori === 1 && t.di.length === 1 && !altrui.length) riscritti.push({ sha: c, di: t.di[0] });
+        continue;
+      }
+      if (altrui.length > 1 || (altrui.length === 1 && autori.length > 1)) continue;
+      const a = altrui[0];
+      if (!a) propri.push(c);
+      else if (a.tipo === 'locale') {
         if (!altri.has(a.ticket)) altri.set(a.ticket, { chi: a, commits: [] });
         altri.get(a.ticket).commits.push(c);
-      } else propri.push(c);
+      }
     }
     // Le copie di un rebase e i sostituiti restano a chi spinge: la riscrittura è sua.
-    if (propri.length || s.oltre || (s.riscritti || []).length || (s.sostituiti || []).length) gruppi.get(chi.ticket).spinte.push(Object.assign({}, s, { commits: propri }));
+    if (propri.length || s.oltre || riscritti.length || (s.sostituiti || []).length) {
+      gruppi.get(chi.ticket).spinte.push(Object.assign({}, s, { commits: propri }, riscritti.length ? { riscritti } : {}));
+    }
     for (const [t, a] of altri) {
       if (!gruppi.has(t)) gruppi.set(t, { chi: a.chi, spinte: [] });
       gruppi.get(t).spinte.push({ ramo: s.ramo, commits: a.commits });

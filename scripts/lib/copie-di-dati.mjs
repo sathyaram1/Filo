@@ -589,28 +589,15 @@ const PRE_PUSH_SERVER = `#!/bin/sh
 ${bloccoSpinte('server')}exit 0
 `;
 
-// Chi ha fatto il commit, solo per le sessioni locali: alla spinta il commit si dichiara col suo biglietto, non con quello
-// di un'altra sessione nella stessa cartella che lo spinge (#1362 giro 1 r3).
-const POST_COMMIT = `#!/bin/sh
-# ${SEGNO_PRE_PUSH}: annota la sessione locale che ha fatto il commit, per dichiararlo col suo biglietto quando parte (#1362).
-# Lo scrive scripts/lib/copie-di-dati.mjs.
-[ -n "$CLAUDE_CODE_SESSION_ID$FILO_BIGLIETTO_FILE" ] && [ -z "$FILO_ROUTINE_TICKET" ] || exit 0
-radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-command -v node >/dev/null 2>&1 || exit 0
-${SCELTA_SPINTE}[ -f "$principale/.claude/routine-ticket.json" ] && exit 0
-[ -f "$spinte" ] && node "$spinte" --post-commit "$radice" >/dev/null 2>&1
-exit 0
-`;
-
-// La copia di un rebase o di un amend porta anche gli autori dell'originale, chiunque riscriva: se no la riscrittura la
-// darebbe alla sessione che riscrive (#1362 giro 3 r1).
-const POST_REWRITE = `#!/bin/sh
-# ${SEGNO_PRE_PUSH}: la copia di un rebase o di un amend porta la sessione che aveva fatto l'originale (#1362).
+// La traccia (#1362 giro 4 r4): ogni commit nato qui, da chiunque (routine, sessione locale, l'owner dal terminale), una
+// fusione che fa un commit, ogni copia col suo originale. Un commit senza traccia vale arrivato da fuori: non lo dichiara
+// nessuno, e due sessioni nella stessa cartella non si dichiarano a vicenda i commit.
+const traccia = (modo, repo = '') => `#!/bin/sh
+# ${SEGNO_PRE_PUSH}: la traccia di chi ha fatto i commit nati qui, per dichiararli col suo biglietto quando partono (#1362).
 # Lo scrive scripts/lib/copie-di-dati.mjs.
 radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 command -v node >/dev/null 2>&1 || exit 0
-${SCELTA_SPINTE}[ -f "$principale/.claude/routine-ticket.json" ] && exit 0
-[ -f "$spinte" ] && node "$spinte" --post-rewrite "$radice" >/dev/null 2>&1
+${SCELTA_SPINTE}[ -f "$spinte" ] && node "$spinte" ${modo} "$radice"${repo ? ` ${repo}` : ''} >/dev/null 2>&1
 exit 0
 `;
 
