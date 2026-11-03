@@ -56,7 +56,9 @@ Uno solo, scelto dal ruolo del biglietto: `subagent_type: routine-nuovo-lavoro`
 per `new-work`, `routine-secaudit` per `secaudit`, altrimenti `routine-worker`
 (se quei tipi non risultano disponibili, `general-purpose`). Modello e sforzo
 li mette il gancio come li ha decisi il server. In primo piano, mai
-`run_in_background`. Prompt minimo: dichiarati routine (`export
+`run_in_background`: è una regola del tuo lancio e nel prompt non va, perché i
+comandi lunghi il worker li manda in sottofondo, come dice il suo ruolo.
+Prompt minimo: dichiarati routine (`export
 FILO_ROUTINE=1`), lancia `node scripts/dispatch.mjs --ticket <biglietto>`,
 diventa il ruolo che ti stampa, esegui fino in fondo; tutto ciò che conta va
 registrato via script, il testo di ritorno non viene letto.

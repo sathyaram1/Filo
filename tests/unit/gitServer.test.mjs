@@ -141,13 +141,15 @@ test('eseguiGitServer: il token chiesto col biglietto arriva a git nell’ambien
   };
   const chiesti = [];
   const token = async (b) => { chiesti.push(b); return { outcome: 'ok', token: TOKEN, scadeIl: Date.parse('2026-10-15T11:00:00Z') }; };
+  const app = (dove, b) => { lanciati.push({ app: [dove, b] }); return { ok: true, skipped: false, branch: 'worker/f1', righe: [] }; };
   try {
     const exit = await eseguiGitServer({
       azione: 'push', cartella: clone, ramo: 'worker/f1', biglietto: 'B1', root: join(casa, 'Filo'),
-      env: { GIT_ASKPASS: '/proxy/askpass' }, lancia, token, scrivi: (r) => righe.push(r), eco: (d, t) => echi.push([d, t]),
+      env: { GIT_ASKPASS: '/proxy/askpass' }, lancia, token, app, scrivi: (r) => righe.push(r), eco: (d, t) => echi.push([d, t]),
     });
     assert.equal(exit, 0, righe.join('\n'));
     assert.deepEqual(chiesti, ['B1']);
+    assert.deepEqual(lanciati.splice(2, 1), [{ app: [join(casa, 'Filo'), 'B1'] }], 'il ramo dell’app parte prima di quello del server');
     assert.equal(lanciati.length, 3, 'due letture dell’origin e la spinta');
     const spinta = lanciati[2];
     assert.deepEqual(spinta.argv, ['-C', clone, 'push', 'origin', 'refs/heads/worker/f1:refs/heads/worker/f1']);
@@ -237,7 +239,8 @@ test('eseguiGitServer in cloud: il sì del server si chiede, il token non arriva
       return argv.includes('get-url') ? { status: 0, stdout: `${URL_SERVER}\n` } : { status: 0, stdout: '', stderr: `To ${URL_SERVER}\n` };
     };
     const token = async (b) => { chiesti.push(b); return { outcome: 'ok', token: TOKEN, scadeIl: 1 }; };
-    const exit = await eseguiGitServer({ ...base, azione: 'push', ramo: 'worker/f1', lancia, token, scrivi: (r) => righe.push(r), eco: () => {} });
+    const app = () => ({ ok: true, skipped: false, branch: 'worker/f1', righe: [] });
+    const exit = await eseguiGitServer({ ...base, azione: 'push', ramo: 'worker/f1', lancia, token, app, scrivi: (r) => righe.push(r), eco: () => {} });
     assert.equal(exit, 0, righe.join('\n'));
     assert.deepEqual(chiesti, ['B1'], 'il controllo del server resta, una volta per chiamata');
     const spinta = lanciati[2];

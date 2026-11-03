@@ -94,7 +94,9 @@ ti stampa, esegui fino in fondo. Tutto ciò che conta va REGISTRATO via script
 (esiti, notes, claim, guasti): il tuo testo di ritorno non viene letto. I file nati da
 shell si salvano al tuo Edit/Write successivo o al rilascio, non prima.
 
-Il worker si lancia in primo piano, mai `run_in_background`: un hook, che il
+Il worker si lancia in primo piano, mai `run_in_background`. È una regola del
+tuo lancio, non dei suoi comandi, e nel prompt non va: i comandi lunghi il
+worker li manda in sottofondo, come dice il suo ruolo. Un hook, che il
 preflight ha installato per questa sessione, rifiuta il lancio in sottofondo,
 porta in primo piano quello senza indicazione e, a worker finito, al posto del
 suo testo di ritorno ti consegna una riga fissa. In più i worker non possono

@@ -825,8 +825,9 @@ export { leaseAtteso };
  * verifica). Stesse regole dell'hook: niente commit su un ramo protetto o a
  * HEAD staccata; l'autore dice la provenienza (routine o locale). Torna
  * { ok, skipped, committed: [file…], reason }: un `ok` falso ferma il rilascio.
+ * `perche` va nel messaggio del commit: il rilascio, o la spinta del server.
  */
-export function commitRestante(root, { exec = execFileSync, env = process.env } = {}) {
+export function commitRestante(root, { exec = execFileSync, env = process.env, perche = 'rilascio' } = {}) {
   const run = (args) => {
     try {
       return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
@@ -864,9 +865,38 @@ export function commitRestante(root, { exec = execFileSync, env = process.env } 
   const nome = routine ? 'claude-routine' : 'claude-local';
   const email = routine ? 'claude@routine' : 'claude@local';
   const elenco = `${restano.slice(0, 3).join(', ')}${restano.length > 3 ? ` (+${restano.length - 3} file)` : ''}`;
-  const commit = run(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m', `auto: rilascio — ${elenco}`]);
+  const commit = run(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m', `auto: ${perche} — ${elenco}`]);
   if (!commit.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(commit.out) };
   return { ok: true, skipped: false, committed: restano, fuori, reason: '' };
+}
+
+/** Cosa dire di un commitRestante riuscito: le stesse righe per il rilascio e per la spinta del server. PURA. */
+export function righeCommitRestante(c) {
+  const righe = [];
+  const fatti = (c && c.committed) || [];
+  if (fatti.length) righe.push(`committate ${fatti.length} modifiche rimaste fuori dai commit: ${fatti.slice(0, 3).join(', ')}${fatti.length > 3 ? ` (+${fatti.length - 3} file)` : ''}`);
+  if (c && c.fuori && c.fuori.length) righe.push(`NON committo e NON spedisco ${c.fuori.join(', ')}: ha la forma di una copia dei dati del server e il repo è pubblico. Resta nella cartella, invisibile a git: spostalo nella cartella temporanea del sistema (os.tmpdir()).`);
+  return righe;
+}
+
+/**
+ * Il ramo dell'app su origin prima di quello del server (#1914): la suite del server prova il ramo di Filo con lo stesso
+ * nome com'è al momento della spinta, e un salvataggio mancato (gancio non partito, file nato da shell) la fa fallire.
+ * Stessi passi del rilascio; la cartella di un altro biglietto, o di uno finito, non si tocca.
+ * → { ok, skipped, branch, forced, reason, righe: [testo…] }: un `ok` falso ferma la spinta del server.
+ */
+export function spedisciAppPrimaDelServer(root, biglietto, { exec = execFileSync, env = process.env } = {}) {
+  const marcatore = leggiMarcatoreBiglietto(root);
+  if (marcatore && marcatore.ticket && String(marcatore.ticket) !== String(biglietto || '')) {
+    return { ok: true, skipped: true, branch: '', reason: `la cartella è del biglietto ${String(marcatore.ticket).slice(0, 8)}…, non di questo`, righe: [] };
+  }
+  if (marcatore && bigliettoFinito(marcatore)) return { ok: true, skipped: true, branch: '', reason: 'il biglietto della cartella è già finito', righe: [] };
+  const c = commitRestante(root, { exec, env, perche: 'spinta del server' });
+  if (!c.ok) return { ok: false, skipped: false, branch: '', reason: `modifiche fuori dai commit che non riesco a committare: ${c.reason}`, righe: [] };
+  const righe = righeCommitRestante(c);
+  const p = pushRamoCorrente(root, { exec, env });
+  if (p.avviso) righe.push(p.avviso);
+  return { ...p, righe };
 }
 
 /**
@@ -1018,11 +1048,13 @@ export async function ramoServer(t, ramo, sha, opts) {
 /**
  * `git-server <azione> <cartella> [<ramo>]`: un git verso filo-security solo dopo il sì del server al biglietto. In
  * locale il token di quel sì va a quella sola chiamata; in cloud no, autentica il proxy della sessione (#1761).
- * → exit: 0 fatto, 1 uso o git fallito, 3 guasto, 4 token rifiutato. `lancia`, `token` ed `eco` per le prove.
+ * Una spinta parte solo dopo il ramo dell'app su origin (spedisciAppPrimaDelServer, #1914).
+ * → exit: 0 fatto, 1 uso o git fallito, 3 guasto, 4 token rifiutato. `lancia`, `token`, `app` ed `eco` per le prove.
  */
 export async function eseguiGitServer({
   azione, cartella, ramo, biglietto, root = ROOT, env = process.env, strada = stradaGitServer(env),
   lancia = (argv, o) => spawnSync('git', argv, o), token = gitToken, scrivi = (r) => console.error(r),
+  app = (dove, b) => spedisciAppPrimaDelServer(dove, b, { env }),
   eco = (dove, testo) => (dove === 'out' ? process.stdout : process.stderr).write(testo),
 } = {}) {
   const clonato = Boolean(String(cartella || '').trim()) && existsSync(join(resolve(String(cartella)), '.git'));
@@ -1047,6 +1079,18 @@ export async function eseguiGitServer({
     const motivo = `${t.reason}${t.detail ? `: ${t.detail}` : ''}`;
     scrivi(t.outcome === 'refused' ? `RIFIUTATO dal server: niente token per filo-security (${motivo}).` : `guasto ${motivo}`);
     return t.outcome === 'refused' ? 4 : 3;
+  }
+  // Dopo il sì del server, che dice il biglietto vivo: il ramo dell'app non si spedisce per un biglietto chiuso.
+  if (azione === 'push') {
+    const a = app(root, biglietto);
+    for (const riga of a.righe || []) scrivi(`git-server: ${riga}`);
+    if (!a.ok) {
+      scrivi(`git-server: il ramo dell'app${a.branch ? ` '${a.branch}'` : ''} NON è arrivato su origin (${a.reason}), quindi quello del server non parte: la sua suite proverebbe l'app com'era prima. Non spingere a mano: se la causa sta nel ramo dell'app sistemala e rilancia lo stesso comando, che rispedisce da sé; altrimenti è un guasto (guasto: github, col messaggio qui sopra).`);
+      return 1;
+    }
+    scrivi(a.skipped
+      ? `git-server: ramo dell'app non spedito (${a.reason}).`
+      : `git-server: ramo dell'app '${a.branch}' su origin${a.forced ? ' (storia riscritta: --force-with-lease)' : ''}, prima di quello del server.`);
   }
   // In cloud il sì serve lo stesso: biglietto pulito, ambito e registro del ramo li decide il server a ogni chiamata,
   // anche se il token che porta resta qui e non arriva a git.
@@ -1738,12 +1782,7 @@ if (isMain) {
         console.error('Non ho rilasciato niente: porta la directory a un commit e rilancia lo stesso comando.');
         process.exit(1);
       }
-      if (c.committed.length) {
-        console.error(`committate ${c.committed.length} modifiche rimaste fuori dai commit: ${c.committed.slice(0, 3).join(', ')}${c.committed.length > 3 ? ` (+${c.committed.length - 3} file)` : ''}`);
-      }
-      if (c.fuori && c.fuori.length) {
-        console.error(`NON committo e NON spedisco ${c.fuori.join(', ')}: ha la forma di una copia dei dati del server e il repo è pubblico. Resta nella cartella, invisibile a git: spostalo nella cartella temporanea del sistema (os.tmpdir()).`);
-      }
+      for (const riga of righeCommitRestante(c)) console.error(riga);
       const p = pushRamoCorrente(ROOT);
       if (!p.ok) {
         console.error(`Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`);
