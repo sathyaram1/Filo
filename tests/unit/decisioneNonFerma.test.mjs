@@ -122,7 +122,8 @@ test('dispatch: la risposta dice di applicare l\'opzione consigliata, e la puliz
   assert.deepEqual(messiDaParte(senzaSegno, fix).flatMap((x) => x.rilievi.map((f) => f.n)), [2]);
   const testo = verifierReplyText({ outcome: 'fix', phase2: { findings: fix, derived, budgets: d.budgets, instructions: 'ISTRUZIONI' } }, 'ID');
   assert.ok(testo.includes(DECISIONE_IN_CORREZIONE_NOTE));
-  assert.match(testo, /le prove con r2 nel nome, per #9\.1/);
+  // La prova dell'esterno è già uscita col commit della critica (#1555): qui non si elenca.
+  assert.doesNotMatch(testo, /le prove con r2 nel nome/);
   assert.doesNotMatch(testo, /le prove con r1 nel nome/);
   assert.match(testo, /#9\.2, priorità 2, interno, da decidere: intanto si applica l'opzione consigliata/);
 });
