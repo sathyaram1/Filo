@@ -1118,13 +1118,25 @@
     dopo(id, fine, 'Mandata.');
   }
 
+  // La parola d'ordine non passa da qui: il testo lo compone e lo copia il main (services/parolaOwner.js).
+  const parolaSalvata = () => !!(window.SN_MANAGE_PAROLA && window.SN_MANAGE_PAROLA.salvata());
+  function titoloDiscuti(id) {
+    return parolaSalvata()
+      ? `Copia la parola d’ordine «owner non fidato» e «${D.rigaDiscuti(id)}», da incollare nella sessione dal telefono`
+      : `Copia «${D.rigaDiscuti(id)}» da incollare in una sessione locale`;
+  }
+  function voceDiscuti(id) {
+    return parolaSalvata() ? `Copia parola d’ordine e «${D.rigaDiscuti(id)}»` : `Copia «${D.rigaDiscuti(id)}»`;
+  }
+
   async function discuti(id) {
-    const testo = `Discutiamo la domanda ${id}`;
-    try {
-      await navigator.clipboard.writeText(testo);
-      avvisi.set(id, { testo: `Copiato: «${testo}»`, tipo: 'ok' });
-    } catch (_) {
-      avvisi.set(id, { testo: `Non riesco a copiare. La riga è: ${testo}`, tipo: 'err' });
+    const riga = D.rigaDiscuti(id);
+    const r = await chiedi({ type: T.discuti, id });
+    if (r.ok) {
+      if (window.SN_MANAGE_PAROLA) window.SN_MANAGE_PAROLA.vista(r.conParola);
+      avvisi.set(id, { testo: r.conParola ? `Copiato: la parola d’ordine e «${riga}»` : `Copiato: «${riga}»`, tipo: 'ok' });
+    } else {
+      avvisi.set(id, { testo: `Non riesco a copiare. La riga è: ${riga}`, tipo: 'err' });
     }
     disegnaDettaglio();
   }
