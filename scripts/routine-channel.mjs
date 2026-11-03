@@ -161,10 +161,13 @@ import { SEGNALA_TOLTA } from './lib/livelli.mjs';
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
-import { URL_SERVER, ambienteGitServer, cartellaCloneServer, chiHaRespinto, originDelServer, pianoGitServer, senzaToken, urlSenzaSegreti } from './lib/git-server.mjs';
-import { accoda, inviaSpinte, rigaSpinte, spintaDi } from './lib/spinte.mjs';
+import {
+  URL_SERVER, ambienteGitServer, ambienteViaProxy, cartellaCloneServer, chiHaRespinto, originDelServer, pianoGitServer, senzaToken, stradaGitServer,
+  urlSenzaSegreti,
+} from './lib/git-server.mjs';
+import { accoda, chiSpinge, inviaSpinte, perAutore, rigaSpinte, spintaDi } from './lib/spinte.mjs';
 import { commitDelRamo } from './lib/biglietto-locale.mjs';
-import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
+import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione, installaTraccia } from './lib/copie-di-dati.mjs';
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 import { cloneDelBiglietto, rilancia } from './lib/worker-nel-clone.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
@@ -1244,6 +1247,8 @@ export async function eseguiGitServer({
     const riga = await spinte.dopo(piano.dir, biglietto, propri);
     if (riga) scrivi(`git-server: ${riga}`);
   }
+  // Il clone appena fatto scrive da subito la traccia dei commit che ci nasceranno: senza, non li dichiarerebbe nessuno.
+  if (azione === 'clone' && spinte.traccia) spinte.traccia(piano.dir);
   return 0;
 }
 
@@ -1259,11 +1264,16 @@ export const dichiaraSpintaServer = {
   },
   async dopo(dir, biglietto, spinta) {
     try {
-      accoda(dir, { tipo: 'routine', ticket: biglietto }, 'server', [spinta]);
+      // La traccia decide anche qui: un commit arrivato da fuori, o col lavoro di un altro, non parte col biglietto.
+      const chi = chiSpinge({ root: dir, env: { FILO_ROUTINE_TICKET: biglietto } });
+      for (const g of perAutore(dir, chi, [spinta])) accoda(dir, g.chi, 'server', g.spinte);
       return rigaSpinte(await inviaSpinte({ root: dir }));
     } catch (e) {
       return `spinta non dichiarata (${String((e && e.message) || e)}): i suoi commit valgono di nessuno e il lavoro non risulta fidato.`;
     }
+  },
+  traccia(dir) {
+    try { installaTraccia(dir, 'server'); } catch (_) { /* senza, i commit del clone restano di nessuno: non fidati */ }
   },
 };
 

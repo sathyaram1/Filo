@@ -335,6 +335,179 @@ test('#1362 giro 3 r1: le annotazioni di prima (una sessione sola) si leggono an
   assert.equal(S.autoreDi(d.pulita, b).ticket, 'vecchio');
 });
 
+// #1362 giro 4 r4: la traccia sopravvive a ogni riscrittura, e un commit con modifiche nate fuori dalla sessione non lo
+// dichiara chi spinge. Git vero, ganci veri.
+const tuttiDi = (d, t) => coda(d.pulita).filter((v) => v.ticket === t).flatMap((v) => [...(v.commits || []), ...(v.riscritti || []).map((r) => r.sha)]);
+const dichiarati = (d) => coda(d.pulita).flatMap((v) => [...(v.commits || []), ...(v.riscritti || []).map((r) => r.sha)]);
+
+test('#1362 giro 4 r4: lo squash della pulita sopra un commit mai partito della sporca non parte col biglietto pulito; quello dei soli suoi sì', () => {
+  const d = deposito();
+  const x = dueSessioni(d);
+  commit(d.pulita, 'p.txt', x.envPulita);
+  assert.equal(spingi(d.pulita, x.envPulita).status, 0);
+  const s = commit(d.pulita, 's.txt', x.envSporca);
+  commit(d.pulita, 'p2.txt', x.envPulita);
+  g(d.pulita, ['reset', '-q', '--soft', 'origin/claude/x'], x.envPulita);
+  g(d.pulita, ['commit', '-qm', 'p2 + s'], x.envPulita);
+  const unito = g(d.pulita, ['rev-parse', 'HEAD']);
+  assert.equal(spingi(d.pulita, x.envPulita).status, 0);
+  assert.ok(!x.di(x.pulito.ticket).includes(unito), 'il commit porta il lavoro della sporca');
+  assert.ok(!dichiarati(d).includes(unito), 'e porta anche quello della pulita: non lo dichiara nessuno');
+  assert.ok(!dichiarati(d).includes(s));
+  // Lo squash dei soli commit della pulita, e un commit dopo aver buttato quello della sporca, restano suoi.
+  commit(d.pulita, 'q1.txt', x.envPulita);
+  commit(d.pulita, 'q2.txt', x.envPulita);
+  g(d.pulita, ['reset', '-q', '--soft', 'origin/claude/x'], x.envPulita);
+  g(d.pulita, ['commit', '-qm', 'q1 + q2'], x.envPulita);
+  const suo = g(d.pulita, ['rev-parse', 'HEAD']);
+  commit(d.pulita, 's2.txt', x.envSporca);
+  g(d.pulita, ['reset', '-q', '--hard', 'HEAD~1'], x.envPulita);
+  const dopo = commit(d.pulita, 'p3.txt', x.envPulita);
+  assert.equal(spingi(d.pulita, x.envPulita).status, 0);
+  assert.ok(x.di(x.pulito.ticket).includes(suo));
+  assert.ok(x.di(x.pulito.ticket).includes(dopo));
+});
+
+test('#1362 giro 4 r4: lo squash che fa da solo il salvataggio (una copia dei dati fra i commit) non dà alla pulita il commit della sporca', async () => {
+  const { spedibileSenzaCopie } = await import('../../scripts/lib/copie-di-dati.mjs');
+  const d = deposito();
+  const x = dueSessioni(d);
+  commit(d.pulita, 'p.txt', x.envPulita);
+  assert.equal(spingi(d.pulita, x.envPulita).status, 0);
+  commit(d.pulita, 's.txt', x.envSporca);
+  const doc = { name: 'projects/filo/databases/(default)/documents/feedback/abc123', fields: { text: { stringValue: 'il tasto non va' }, userAgent: { stringValue: 'Mozilla/5.0' }, clientId: { stringValue: 'c-1' } } };
+  writeFileSync(join(d.pulita, 'dati.json'), JSON.stringify({ documents: [doc] }, null, 2));
+  writeFileSync(join(d.pulita, 'p2.txt'), 'p2\n');
+  g(d.pulita, ['add', '-A']);
+  g(d.pulita, ['commit', '-qm', 'p2 e una copia'], x.envPulita);
+  // Il salvataggio gira nella sessione pulita: il commit che rifà lo fa lei.
+  const prima = process.env.FILO_BIGLIETTO_FILE;
+  process.env.FILO_BIGLIETTO_FILE = x.pulito.file;
+  let r;
+  try { r = spedibileSenzaCopie(d.pulita); } finally { if (prima === undefined) delete process.env.FILO_BIGLIETTO_FILE; else process.env.FILO_BIGLIETTO_FILE = prima; }
+  assert.equal(r.stato, 'riparato', r.avviso);
+  const unito = g(d.pulita, ['rev-parse', 'HEAD']);
+  assert.match(g(d.pulita, ['show', '--format=', '--name-only', unito]), /s\.txt/);
+  assert.equal(spingi(d.pulita, x.envPulita).status, 0);
+  assert.ok(!x.di(x.pulito.ticket).includes(unito));
+});
+
+test('#1362 giro 4 r4: il cherry-pick con conflitto di un commit mai partito della sporca non parte col biglietto pulito', () => {
+  const d = deposito();
+  const x = dueSessioni(d);
+  writeFileSync(join(d.pulita, 'f.txt'), 'uno\ndue\ntre\n');
+  g(d.pulita, ['add', '-A']);
+  g(d.pulita, ['commit', '-qm', 'f'], x.envPulita);
+  assert.equal(spingi(d.pulita, x.envPulita).status, 0);
+  g(d.pulita, ['checkout', '-qb', 'claude/sporco'], x.envSporca);
+  writeFileSync(join(d.pulita, 'f.txt'), 'uno\ndue cambiato dalla sporca\ntre\nquattro aggiunto dalla sporca\ncinque aggiunto dalla sporca\n');
+  g(d.pulita, ['commit', '-qam', 'sporca'], x.envSporca);
+  const s = g(d.pulita, ['rev-parse', 'HEAD']);
+  g(d.pulita, ['checkout', '-q', 'claude/x'], x.envPulita);
+  writeFileSync(join(d.pulita, 'f.txt'), 'uno\ndue cambiato dalla pulita\ntre\n');
+  g(d.pulita, ['commit', '-qam', 'pulita'], x.envPulita);
+  assert.notEqual(spawnSync('git', ['cherry-pick', s], { cwd: d.pulita, env: x.envPulita }).status, 0, 'il conflitto c’è');
+  writeFileSync(join(d.pulita, 'f.txt'), 'uno\ndue cambiato da tutte e due\ntre\nquattro aggiunto dalla sporca\ncinque aggiunto dalla sporca\n');
+  g(d.pulita, ['add', 'f.txt'], x.envPulita);
+  g(d.pulita, ['-c', 'core.editor=true', 'cherry-pick', '--continue'], x.envPulita);
+  const copia = g(d.pulita, ['rev-parse', 'HEAD']);
+  assert.equal(spingi(d.pulita, x.envPulita).status, 0);
+  assert.ok(!x.di(x.pulito.ticket).includes(copia));
+  // Chiuso con git commit invece che con --continue: lo stesso.
+  g(d.pulita, ['reset', '-q', '--hard', 'HEAD~1'], x.envPulita);
+  assert.notEqual(spawnSync('git', ['cherry-pick', s], { cwd: d.pulita, env: x.envPulita }).status, 0);
+  writeFileSync(join(d.pulita, 'f.txt'), 'uno\ndue\ntre\nquattro aggiunto dalla sporca\ncinque aggiunto dalla sporca\n');
+  g(d.pulita, ['add', 'f.txt'], x.envPulita);
+  g(d.pulita, ['commit', '-q', '--no-edit'], x.envPulita);
+  const copia2 = g(d.pulita, ['rev-parse', 'HEAD']);
+  assert.equal(spingi(d.pulita, x.envPulita, '--force').status, 0);
+  assert.ok(!x.di(x.pulito.ticket).includes(copia2));
+});
+
+test('#1362 giro 4 r4: il cherry-pick con conflitto di un commit spinto da un’altra copia va fra i riscritti col suo originale, non fra i commit della pulita', () => {
+  const d = deposito();
+  const env = ambiente(d.origin, { FILO_ROUTINE_TICKET: BIGLIETTO });
+  writeFileSync(join(d.pulita, 'f.txt'), 'uno\ndue\n');
+  g(d.pulita, ['add', '-A']);
+  g(d.pulita, ['commit', '-qm', 'f'], env);
+  assert.equal(spingi(d.pulita, env).status, 0);
+  // L'altra copia spinge Y su un suo ramo; la pulita lo prende con un conflitto.
+  g(d.altra, ['fetch', '-q', 'origin']);
+  g(d.altra, ['checkout', '-qB', 'claude/altro', 'origin/claude/x']);
+  writeFileSync(join(d.altra, 'f.txt'), 'uno\ndue dell’altra\ntre dell’altra\n');
+  g(d.altra, ['commit', '-qam', 'y']);
+  const y = g(d.altra, ['rev-parse', 'HEAD']);
+  g(d.altra, ['push', '-q', '--no-verify', 'origin', 'claude/altro']);
+  writeFileSync(join(d.pulita, 'f.txt'), 'uno\ndue della pulita\n');
+  g(d.pulita, ['commit', '-qam', 'pulita'], env);
+  g(d.pulita, ['fetch', '-q', 'origin'], env);
+  assert.notEqual(spawnSync('git', ['cherry-pick', y], { cwd: d.pulita, env }).status, 0);
+  writeFileSync(join(d.pulita, 'f.txt'), 'uno\ndue dell’altra\ntre dell’altra\n');
+  g(d.pulita, ['add', 'f.txt'], env);
+  g(d.pulita, ['commit', '-q', '--no-edit'], env);
+  const copia = g(d.pulita, ['rev-parse', 'HEAD']);
+  assert.equal(spingi(d.pulita, env).status, 0);
+  const ultima = coda(d.pulita).at(-1);
+  assert.ok(!ultima.commits.includes(copia));
+  assert.deepEqual((ultima.riscritti || []).filter((r) => r.sha === copia), [{ sha: copia, di: y }], 'la giudica il server dal suo originale');
+});
+
+test('#1362 giro 4 r4 (routine): un commit della sporca preso dalla pulita non diventa suo se il ref remoto viene potato', () => {
+  const d = deposito();
+  const env = ambiente(d.origin, { FILO_ROUTINE_TICKET: BIGLIETTO });
+  const c1 = commit(d.pulita, 'c1.txt', env);
+  assert.equal(spingi(d.pulita, env).status, 0);
+  g(d.altra, ['fetch', '-q', 'origin']);
+  g(d.altra, ['checkout', '-qB', 'claude/x', 'origin/claude/x']);
+  const x = commit(d.altra, 'x.txt');
+  g(d.altra, ['push', '-q', '--no-verify', 'origin', 'claude/x']);
+  g(d.pulita, ['pull', '-q', '--no-rebase', 'origin', 'claude/x'], env);
+  const c2 = commit(d.pulita, 'c2.txt', env);
+  g(d.altra, ['push', '-q', '--no-verify', 'origin', '--delete', 'claude/x']);
+  g(d.pulita, ['fetch', '-q', '--prune', 'origin'], env);
+  g(d.altra, ['push', '-q', '--no-verify', 'origin', `${c1}:refs/heads/claude/x`]);
+  g(d.pulita, ['fetch', '-q', 'origin'], env);
+  assert.equal(spingi(d.pulita, env).status, 0);
+  assert.ok(!dichiarati(d).includes(x), 'X l’ha scritto e spinto la sporca');
+  assert.ok(tuttiDi(d, BIGLIETTO).includes(c2), 'il lavoro della pulita resta suo');
+  // Una fusione fatta qui è nata qui; un avanzamento veloce porta commit nati altrove.
+  const fusione = g(d.pulita, ['rev-parse', 'HEAD~1']);
+  assert.equal(g(d.pulita, ['rev-list', '--parents', '-n1', fusione]).split(' ').length, 3);
+  assert.ok(tuttiDi(d, BIGLIETTO).includes(fusione));
+  assert.equal(S.tracciaDi(d.pulita, x), null);
+});
+
+test('#1362 giro 4 r4 (routine): i commit mai spinti del worker di prima, nella stessa cartella, non li dichiara il worker dopo', () => {
+  const d = deposito();
+  const primo = ambiente(d.origin, { FILO_ROUTINE_TICKET: BIGLIETTO });
+  const secondo = ambiente(d.origin, { FILO_ROUTINE_TICKET: `altro-${'y'.repeat(40)}` });
+  commit(d.pulita, 'a.txt', primo);
+  assert.equal(spingi(d.pulita, primo).status, 0);
+  const lasciato = commit(d.pulita, 'b.txt', primo);
+  const nuovo = commit(d.pulita, 'c.txt', secondo);
+  assert.equal(spingi(d.pulita, secondo).status, 0);
+  assert.ok(!dichiarati(d).includes(lasciato), 'il biglietto di prima non è più vivo: il suo lavoro non lo copre quello dopo');
+  assert.ok(tuttiDi(d, `altro-${'y'.repeat(40)}`).includes(nuovo));
+  // Nella traccia della routine c'è l'impronta, non il biglietto.
+  const voce = readFileSync(join(S.cartellaCoda(d.pulita), '..', S.AUTORI, `${lasciato}.json`), 'utf8');
+  assert.ok(!voce.includes(BIGLIETTO));
+});
+
+test('#1362 giro 4 r4: firme e assorbimento: metà delle righe di un commit, nello stesso file e verso, bastano; graffe e righe vuote no', () => {
+  const f = (...r) => new Set(r);
+  assert.equal(S.assorbe(f('a\u0000+riga uno', 'a\u0000+riga due'), f('a\u0000+riga uno')), true);
+  assert.equal(S.assorbe(f('a\u0000+riga uno'), f('a\u0000+riga uno', 'a\u0000+riga due', 'a\u0000+riga tre')), false);
+  assert.equal(S.assorbe(f('a\u0000-riga uno'), f('a\u0000+riga uno')), false, 'togliere quello che un altro ha scritto non è prenderlo');
+  assert.equal(S.assorbe(f('b\u0000+riga uno'), f('a\u0000+riga uno')), false);
+  assert.equal(S.assorbe(f('a\u0000+x'), f()), false);
+  const d = deposito();
+  writeFileSync(join(d.pulita, 'g.js'), 'function f() {\n  return 1;\n}\n\n');
+  g(d.pulita, ['add', '-A']);
+  g(d.pulita, ['commit', '-qm', 'g']);
+  const sha = g(d.pulita, ['rev-parse', 'HEAD']);
+  assert.deepEqual([...S.firme(d.pulita, [sha]).get(sha)].sort(), ['g.js\u0000+function f() {', 'g.js\u0000+return 1;']);
+});
+
 test('il salvataggio automatico dichiara col biglietto della sessione che ha modificato (session_id dallo stdin)', () => {
   const s = scene();
   const sessione = 'sess-dello-stdin';

@@ -267,7 +267,7 @@ export function ereditaAutori(root, righe, nowMs = Date.now()) {
   let n = 0;
   for (const riga of String(righe || '').split(/\r?\n/)) {
     const [vecchio, nuovo] = riga.trim().split(/\s+/);
-    if (!SHA_RE.test(String(vecchio || '')) || !SHA_RE.test(String(nuovo || '')) || vecchio === nuovo) continue;
+    if (!SHA_RE.test(String(vecchio || '')) || !SHA_RE.test(String(nuovo || '')) || VUOTO.test(vecchio) || vecchio === nuovo) continue;
     const da = tracciaDi(root, vecchio);
     if (aggiungi(root, nuovo, da ? { tracce: [da] } : { fuori: [vecchio] }, nowMs)) n += 1;
   }
