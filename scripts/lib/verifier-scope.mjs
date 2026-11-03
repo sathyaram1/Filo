@@ -101,10 +101,13 @@ export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo, 
     const sha = soloSha(p.shaVerificato);
     const report = String(p.reportRebase ?? '').trim();
     const conDiff = !!sha && scartato !== 'punta';
+    const rebaseMancante = righeRebaseMancante(mancante, scartato);
     return [
       '## Perimetro di questo giro',
       '',
-      rigaVerificato(sha, scartato),
+      // Sulla punta verificata senza rebase la riga del confronto mancante chiederebbe un rilievo che non serve.
+      rebaseMancante.length && scartato === 'punta' ? `Commit che aveva passato la verifica: \`${sha}\`, la punta di questo ramo.` : rigaVerificato(sha, scartato),
+      ...rebaseMancante,
       '',
       'Cosa ha scritto chi ha rifatto la base (dove c\'erano i conflitti, se ha toccato la logica, quali unit erano rossi dopo il rebase):',
       report
