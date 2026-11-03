@@ -1121,7 +1121,7 @@
   }
 
   // La parola d'ordine non passa da qui: il testo lo compone e lo copia il main (services/parolaOwner.js).
-  const parolaSalvata = () => !!(window.SN_MANAGE_PAROLA && window.SN_MANAGE_PAROLA.salvata());
+  function parolaSalvata() { return !!(window.SN_MANAGE_PAROLA && window.SN_MANAGE_PAROLA.salvata()); }
   function titoloDiscuti(id) {
     return parolaSalvata()
       ? `Copia la parola d’ordine «owner non fidato» e «${D.rigaDiscuti(id)}», da incollare nella sessione dal telefono`
@@ -1344,6 +1344,8 @@
       disegnaTesta();
     });
   }
+  // L'hover di «Discutiamone» dice se copia anche la parola d'ordine.
+  if (window.SN_MANAGE_PAROLA) window.SN_MANAGE_PAROLA.alCambio(() => disegnaDettaglio());
 
   const det = $('mgDomandaDettaglio');
   if (det) {
