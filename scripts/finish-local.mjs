@@ -180,9 +180,9 @@ export function shaDelRiallineamento(marker) {
 }
 
 /**
- * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche i file del
- * lavoro verificato che il riallineamento ha toccato (i conflitti, anche risolti col lato di main). Il resto del
- * lato arrivato da main l'ha già provato la suite di main: preso intero erano ore, oltre il tetto di un comando (#1907).
+ * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche quelli che il
+ * riallineamento ha dovuto risolvere, con la stessa definizione della consegna (fileRiscritti). Il resto del lato
+ * arrivato da main l'ha già provato la suite di main: preso intero erano ore, oltre il tetto di un comando (#1907).
  */
 export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
   const g = (args) => git(args, { cwd: root });
@@ -192,15 +192,15 @@ export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
   if (!dal) return { changed, nota: '' };
   const c = g(['cat-file', '-e', `${dal}^{commit}`]).ok || g(['fetch', 'origin', dal]).ok;
   const arrivati = c ? g(['diff', '--name-only', dal, 'HEAD']) : { ok: false };
-  const delLavoro = arrivati.ok ? g(['diff', '--name-only', `${base}...${dal}`]) : { ok: false };
-  if (!arrivati.ok || !delLavoro.ok) {
+  const risolti = arrivati.ok ? fileRiscritti(root, { prima: dal, base }) : { ok: false };
+  if (!arrivati.ok || !risolti.ok) {
     return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} qui non c'è: scelgo gli spec solo dal ramo contro main, e i file del lavoro risolti col lato di main restano scoperti.` };
   }
-  const toccati = new Set(righe(arrivati));
-  const conflitti = righe(delLavoro).filter((f) => toccati.has(f));
+  const daRiprovare = [...new Set([...risolti.file, ...risolti.conflitti])];
+  const resto = righe(arrivati).filter((f) => !daRiprovare.includes(f)).length;
   return {
-    changed: [...new Set([...changed, ...conflitti])],
-    nota: `Giro di riallineamento: scelgo gli spec dal ramo contro main e dai ${conflitti.length} file del lavoro verificato (${dal.slice(0, 8)}) che il riallineamento ha toccato; il resto del lato arrivato da main (${toccati.size - conflitti.length} file) l'ha già provato la suite di main.`,
+    changed: [...new Set([...changed, ...daRiprovare])],
+    nota: `Giro di riallineamento: scelgo gli spec dal ramo contro main e dai file che il riallineamento ha dovuto risolvere rispetto al lavoro verificato (${dal.slice(0, 8)}): ${daRiprovare.length}. Il resto del lato arrivato da main (${resto} file) l'ha già provato la suite di main.`,
   };
 }
 
