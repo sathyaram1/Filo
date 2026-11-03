@@ -65,9 +65,13 @@ export const ESEMPI = {
     'Se poi il server ti manda a correggere, una segnalazione ferma il lavoro',
     'i rilievi di una verifica: li corregge chi li ha scritti',
     'Con esito fix corregge lo stesso agente che ha scritto la critica',
+    'la consegna è del verificatore, non del correttore',
+    'la correzione, dopo la critica, la fa il verificatore',
   ],
   legittimi: [
     'critica del verificatore senza rilievi INTERNI da correggere',
     'chi verifica e chi corregge sono due ruoli',
+    'Resta: canale autenticato e biglietti; verificatore, controllo di sicurezza, correttore; L5',
+    'restano correttore, controllo di sicurezza, verificatore e cancello',
   ],
 };
