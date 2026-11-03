@@ -774,6 +774,16 @@
     return di('failed') && statoFusione(fb, opts) === 'riallineamento_fallito';
   }
 
+  // Finché una richiesta aspetta l'owner, o il ramo approvato non è entrato in main, nessuna chiusura (Risolto,
+  // Archivia, le conferme) scavalca la fusione: sulla fusione si decide nel quadrato (#928). Senza `opts.fusioni`
+  // non si sa niente delle richieste, e la riga resta quella dello stato.
+  const AZIONI_CHE_CHIUDONO = ['done', 'archived', 'attack_confirmed', 'spam_confirmed'];
+  function senzaChiusureSullaFusione(fb, acts, opts) {
+    const f = fusioneDi(fb, opts);
+    if (!f || f.chiusure) return acts;
+    return acts.filter((a) => !AZIONI_CHE_CHIUDONO.includes(a.to));
+  }
+
   // UNA tabella delle azioni dell'owner per tutte le superfici: sezione e status decidono
   // quali sono. «Archiviati» offre SOLO il ripristino: nessun `archived` su stato terminale.
   function ownerActions(fb, opts) {
