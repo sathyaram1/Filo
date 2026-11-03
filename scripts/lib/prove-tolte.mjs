@@ -343,19 +343,20 @@ export function numeriDelNome(percorso) {
 }
 
 /**
- * Vero se il rilievo esce dal giro in un pass o in una correzione: un esterno, o un `?` che conta al più 1 (un vicino conta 0).
+ * Vero se il rilievo esce dal giro in un pass o in una correzione: un esterno, un vicino col `?`, o un interno col `?`
+ * di livello 0 o 1 (un 2 col `?` si corregge con la consigliata, #1202).
  * La sua prova esce PRIMA del verdetto, col commit della critica (#1555): dopo, conta solo se la spinge il rilascio (#2021). PURA.
  */
 export function esceInOgniEsito(f) {
   const sede = String((f && f.sede) || 'i').toLowerCase();
   if (sede === 'e') return true;
-  return !!(f && f.decision) && (sede === 'v' ? 0 : Number(f.level)) <= 1;
+  return !!(f && f.decision) && (sede === 'v' || Number(f.level) <= 1);
 }
 
-/** Vero se la critica ferma di sicuro il lavoro: un interno di livello 2 o 3 col `?`. PURA. */
+/** Vero se la critica ferma di sicuro il lavoro: un interno col `?` che ferma, con la regola del giro (decisioneFerma). PURA. */
 export function fermaDiSicuro(findings) {
   return (Array.isArray(findings) ? findings : [])
-    .some((f) => f && f.decision && String(f.sede || 'i').toLowerCase() === 'i' && Number(f.level) >= 2);
+    .some((f) => f && String(f.sede || 'i').toLowerCase() === 'i' && ROUND.decisioneFerma(f));
 }
 
 /**
