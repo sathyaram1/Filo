@@ -1,4 +1,4 @@
-// Sentinella #735.1: nelle prove il servizio vero delle schede non si raggiunge da nessuna porta
+// Sentinella #735.1 e #2067: nelle prove il progetto Firebase vero non si raggiunge da nessuna porta
 // (pagine di ogni sessione, fetch del main), così GitHub e i contenitori senza rete partono uguali.
 // Regola in src/main/test-servizi-chiusi.js; la chiedono NODE_ENV=test o FILO_SERVIZI_CHIUSI=1 su ogni lancio.
 
