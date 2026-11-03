@@ -66,7 +66,9 @@
 //         Exit 0 = ha rilasciato il biglietto, 5 = lavora ancora (si rilancia), 3 = fermo da 20 minuti senza segni di
 //         vita: biglietto già rilasciato con un guasto dichiarato, il giro si chiude.
 //
-//   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--forza]
+//   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--processo "domanda"] [--forza]
+//       → `--processo`: un dubbio di processo (strumento, ordine, cosa fare di un rilievo) per il manutentore, non per
+//         l'owner: il lavoro resta fermo finché lui non risponde con una nota (SPEC-MANUTENTORE § 4).
 //       → exit 5, e niente rilasciato, se nella cartella lavora ancora qualcuno (#1480): per l'orchestratore un
 //         battito, un salvataggio recente o un processo (`--forza` solo per il worker morto davvero), per un worker
 //         i suoi processi.
@@ -533,9 +535,11 @@ export async function release(t, fault = '', opts, report = null) {
   const payload = { ticket: t };
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
-  if (report && typeof report === 'object') payload.report = report;
+  if (report && typeof report === 'object') Object.assign(payload, registrazioniDelRapporto(report));
   // La domanda di fine turno del manutentore arriva solo qui, a ramo spedito (SPEC-DOMANDE § 5.4); l'orchestratore non la chiede.
   if (opts && opts.domandaAlRilascio === true) payload.domandaAlRilascio = true;
+  const processo = String((opts && opts.processo) || '').trim();
+  if (processo) payload.domandaProcesso = processo;
   Object.assign(payload, creditiDi(opts));
   const { status, body } = await call('routineRelease', payload, opts);
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
@@ -545,23 +549,58 @@ export async function release(t, fault = '', opts, report = null) {
  * Rilascio col rapporto allegato, e le due ritentate che il server prevede:
  *   - 413 `report_too_big` → una volta senza `tools.byName` e `notes`; se è
  *     ancora troppo, senza rapporto, e lo si dice;
- *   - 400 `report_malformed` → senza `listino`, se c'era (la versione passa
- *     nelle note); poi senza rapporto, e lo si dice.
+ *   - 400 `report_malformed` → senza strumenti falliti e attese, se c'erano;
+ *     poi senza `listino`, se c'era (la versione passa nelle note); poi senza
+ *     rapporto, e lo si dice.
+ *   - 413: prima senza strumenti falliti e attese, poi come sopra.
  * Il rilascio è idempotente: riprovare è sicuro. `esito.rapporto` dice cosa è
  * arrivato al server: 'allegato', 'ridotto', 'scartato' o 'assente';
  * `esito.avviso` è la riga da stampare quando qualcosa è andato perso.
  */
+// I dati del § 6 di SPEC-MANUTENTORE: un server che non li conosce ancora riceve il resto del rapporto, e lo si dice.
+export const CAMPI_FALLITI_E_ATTESE = Object.freeze(['falliti', 'attese', 'atteseOltre30']);
+// Il server (manutentoreRegole.RILASCIO) tiene sul biglietto solo le attese sopra i 30 s, e rifiuta le altre.
+const ATTESA_SOPRA_S = 30;
+// Il tetto della domanda di processo sul server: oltre, il rilascio si rifiuta prima di partire.
+export const PROCESSO_MAX = 4000;
+// I ruoli il cui biglietto non porta un feedback (server: guasti.domandaDiProcesso lo vuole).
+export const RUOLI_SENZA_FEEDBACK = Object.freeze(['compito', 'risposta', 'smistamento', 'manutentore', 'orchestrator']);
+
+/**
+ * Il corpo del rilascio dal rapporto: falliti e attese escono dal rapporto e vanno nei campi che il server conserva sul
+ * biglietto per il manutentore (`strumentiFalliti` { nome, errore, poi }, `attese` { cosa, secondi }). PURA.
+ */
+export function registrazioniDelRapporto(report) {
+  const { falliti, attese, ...resto } = report || {};
+  const out = { report: resto };
+  if (Array.isArray(falliti) && falliti.length) {
+    out.strumentiFalliti = falliti.filter((f) => f && f.strumento && f.errore)
+      .map((f) => ({ nome: f.cosa ? `${f.strumento}: ${f.cosa}` : String(f.strumento), errore: String(f.errore), ...(f.dopo ? { poi: String(f.dopo) } : {}) }));
+  }
+  if (Array.isArray(attese) && attese.length) {
+    out.attese = attese.filter((a) => a && a.strumento && Number(a.s) > ATTESA_SOPRA_S)
+      .map((a) => ({ cosa: a.cosa ? `${a.strumento}: ${a.cosa}` : String(a.strumento), secondi: Math.round(Number(a.s)) }));
+  }
+  return out;
+}
+
 export async function releaseConRapporto(t, fault, report, opts) {
   const tenta = (rep) => release(t, fault, opts, rep);
   if (!report || typeof report !== 'object') return { ...(await tenta(null)), rapporto: 'assente' };
   const malformato = (r) => r.status === 400 && r.reason === 'report_malformed';
+  const troppoGrande = (r) => r.status === 413 && r.reason === 'report_too_big';
   // Il dettaglio è nella PRIMA risposta (quella che ha rifiutato il
   // rapporto), non nella seconda: letto dopo la ritentata si perdeva.
   const dettaglioDi = (r) => (r.body && r.body.detail ? `: ${r.body.detail}` : '');
   const avvisi = [];
+  const haDati = (rep) => CAMPI_FALLITI_E_ATTESE.some((k) => Object.prototype.hasOwnProperty.call(rep, k));
+  const senzaDati = (rep) => {
+    const out = { ...rep };
+    for (const k of CAMPI_FALLITI_E_ATTESE) delete out[k];
+    return out;
+  };
   // Un server che non conosce ancora `listino` (#882) non deve costare il rapporto intero a ogni rilascio.
-  const tentaRapporto = async (rep) => {
-    const r = await tenta(rep);
+  const conListino = async (rep, r) => {
     if (!malformato(r) || !Object.prototype.hasOwnProperty.call(rep, 'listino')) return r;
     const { listino, ...senza } = rep;
     if (Array.isArray(rep.notes)) senza.notes = [...rep.notes, `listino ${listino}`];
@@ -570,14 +609,30 @@ export async function releaseConRapporto(t, fault, report, opts) {
     if (r2.ok) avvisi.push(`il server non accetta il campo listino (report_malformed${dettaglioDi(r)}): ${senza.notes ? 'la versione è nelle note' : 'allegato senza la versione del listino'}.`);
     return r2;
   };
+  const tentaRapporto = async (rep) => {
+    const r = await tenta(rep);
+    if (!malformato(r) || !haDati(rep)) return conListino(rep, r);
+    const senza = senzaDati(rep);
+    const r2 = await conListino(senza, await tenta(senza));
+    if (malformato(r2)) return r;
+    if (r2.ok) avvisi.push(`il server non accetta ancora strumenti falliti e attese (report_malformed${dettaglioDi(r)}): allegato senza.`);
+    return r2;
+  };
   const conAvvisi = (r, rapporto, avviso) => {
     const righe = [...avvisi, ...(avviso ? [avviso] : [])];
     return { ...r, rapporto: rapporto === 'allegato' && avvisi.length ? 'ridotto' : rapporto, ...(righe.length ? { avviso: righe.join(' ') } : {}) };
   };
   let r = await tentaRapporto(report);
-  if (r.status === 413 && r.reason === 'report_too_big') {
+  if (troppoGrande(r)) {
     const misura = `${r.body && r.body.bytes ? r.body.bytes : '?'} byte, massimo ${r.body && r.body.max ? r.body.max : '?'}`;
-    const snello = { ...report, tools: { ...(report.tools || {}) } };
+    if (haDati(report)) {
+      r = await tentaRapporto(senzaDati(report));
+      if (!troppoGrande(r) && !malformato(r)) return conAvvisi(r, 'ridotto', `rapporto troppo grande (${misura}): allegato senza strumenti falliti e attese.`);
+    }
+  }
+  if (troppoGrande(r)) {
+    const misura = `${r.body && r.body.bytes ? r.body.bytes : '?'} byte, massimo ${r.body && r.body.max ? r.body.max : '?'}`;
+    const snello = { ...senzaDati(report), tools: { ...(report.tools || {}) } };
     delete snello.tools.byName;
     delete snello.notes;
     r = await tentaRapporto(snello);
@@ -585,7 +640,7 @@ export async function releaseConRapporto(t, fault, report, opts) {
       r = await tenta(null);
       return conAvvisi(r, 'scartato', `rapporto troppo grande anche senza l'elenco degli strumenti (${misura}): rilasciato SENZA rapporto.`);
     }
-    if (!malformato(r)) return conAvvisi(r, 'ridotto', `rapporto troppo grande (${misura}): allegato senza l'elenco degli strumenti e le note.`);
+    if (!malformato(r)) return conAvvisi(r, 'ridotto', `rapporto troppo grande (${misura}): allegato senza l'elenco degli strumenti e le note${haDati(report) ? ', né falliti e attese' : ''}.`);
   }
   if (malformato(r)) {
     const dettaglio = dettaglioDi(r);
@@ -1380,7 +1435,7 @@ if (isMain) {
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
     'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'forza',
-    'feedback', 'piano', 'fusione', 'motivo',
+    'feedback', 'piano', 'fusione', 'motivo', 'processo',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -1406,7 +1461,7 @@ if (isMain) {
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
     'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
-    'feedback', 'piano', 'fusione', 'motivo',
+    'feedback', 'piano', 'fusione', 'motivo', 'processo',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -1742,6 +1797,21 @@ if (isMain) {
       process.exit(1);
     }
     const guasto = typeof data.guasto === 'string' ? data.guasto : '';
+    // Un dubbio di processo va al manutentore (SPEC-MANUTENTORE § 4): il server ferma il lavoro e sveglia lui.
+    const processo = typeof data.processo === 'string' ? data.processo.trim() : '';
+    if (data.processo !== undefined && !processo) {
+      console.error('--processo vuole il testo della domanda: --processo "…". Non ho rilasciato niente.');
+      process.exit(1);
+    }
+    if (processo.length > PROCESSO_MAX) {
+      console.error(`--processo ha ${processo.length} caratteri, il massimo è ${PROCESSO_MAX}: accorcialo. Non ho rilasciato niente.`);
+      process.exit(1);
+    }
+    // Il server lega la domanda al feedback del biglietto: da un ruolo che non ne lavora uno non sveglierebbe nessuno.
+    if (processo && RUOLI_SENZA_FEEDBACK.includes(String(data.role || ''))) {
+      console.error(`--processo vale per chi lavora un feedback: il ruolo ${data.role} non ne ha uno, e la domanda non arriverebbe al manutentore. Scrivila con «segnala». Non ho rilasciato niente.`);
+      process.exit(1);
+    }
     // Il rilascio di un worker morto chiesto dall'orchestratore: ramo, promemoria e battito stanno nel clone (#1182).
     const nelClone = cloneDelBiglietto(ROOT, args[0]);
     if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
@@ -1814,7 +1884,11 @@ if (isMain) {
         rapporto = { v: 3, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
       }
     }
-    const r = await releaseConRapporto(args[0], guasto, rapporto, chiRilascia !== 'orchestrator' && cartellaSua ? { domandaAlRilascio: true } : undefined);
+    const opzioniRilascio = {
+      ...(chiRilascia !== 'orchestrator' && cartellaSua ? { domandaAlRilascio: true } : {}),
+      ...(processo ? { processo } : {}),
+    };
+    const r = await releaseConRapporto(args[0], guasto, rapporto, Object.keys(opzioniRilascio).length ? opzioniRilascio : undefined);
     if (r.avviso) console.error(r.avviso);
     // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo
     // (il server risponde `dead_ticket` e il ciclo esce), ma spegnerlo adesso

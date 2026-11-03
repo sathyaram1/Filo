@@ -687,6 +687,8 @@ const ROLE_FILE = {
   halt: 'halt.md',
   // Il compito senza feedback (#1153): un ruolo solo, il testo del compito arriva dal server.
   compito: 'compito.md',
+  // Il manutentore acceso dal pacemaker (SPEC-MANUTENTORE § 4): niente feedback, il contesto piccolo dal server.
+  manutentore: 'manutentore.md',
 };
 // Un halt che non è un guasto ha il suo testo: rilasciare con `--guasto` fermerebbe le routine per niente (#1796).
 const HALT_KIND_FILE = {
@@ -1104,6 +1106,11 @@ export function buildPayload(bucket, ctx = {}) {
         case: (c && c.tipo) || 'compito', id: (c && c.id) || '', compito,
         ...(ctx.rapportoPrecedente ? { rapportoPrecedente: ctx.rapportoPrecedente } : {}),
       };
+    }
+    case 'manutentore': {
+      // Il contesto piccolo com'è: motivo dell'accensione, stato, taccuino, schede a priorità 3 e 2 o ferme.
+      const m = ctx && ctx.manutentore && typeof ctx.manutentore === 'object' ? ctx.manutentore : {};
+      return { case: m.motivo || 'accensione', ...m };
     }
     case 'halt':
       // Guasto: nessun lavoro, solo il motivo per cui non si può lavorare.
@@ -2251,7 +2258,7 @@ function positionOnBranch(bucket) {
  */
 // I ruoli che questa macchina sa eseguire. Un ruolo fuori da qui non è un
 // lavoro: è una busta che non sappiamo aprire.
-const RUOLI_LAVORABILI = ['secaudit', 'verifier', 'fixer', 'new-work', 'risposta', 'smistamento', 'compito'];
+const RUOLI_LAVORABILI = ['secaudit', 'verifier', 'fixer', 'new-work', 'risposta', 'smistamento', 'compito', 'manutentore'];
 // Chi lavora su un ramo esistente: senza, non c'è niente su cui posizionarsi.
 const RUOLI_CON_RAMO = ['secaudit', 'verifier', 'fixer'];
 
@@ -2289,6 +2296,12 @@ export function checkEnvelope(w) {
     const p = (w && w.payload) || {};
     if (!String(p.compito || '')) return `lavoro "${role}" senza il compito a cui si riferisce`;
     if (p.affidata !== false && !String((p.domanda && p.domanda.id) || '')) return `lavoro "${role}" con la domanda vuota: non c'è niente su cui lavorare`;
+    return null;
+  }
+  // Il manutentore non lavora un feedback: il perché dell'accensione e il contesto piccolo li manda il server.
+  if (role === 'manutentore') {
+    const m = (w && w.payload && w.payload.manutentore) || null;
+    if (!m || typeof m !== 'object') return 'manutentore senza il suo contesto: il server non ha mandato perché è stato acceso';
     return null;
   }
   // Un compito senza feedback (#1153) non ha un feedback: ha il suo compito, che deve avere un testo.
@@ -2333,6 +2346,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
   if (role === 'risposta') return { risposta: payload || {} };
   // Lo smistamento lo stesso: domanda, feedback d'origine e registro li ha scelti il server.
   if (role === 'smistamento') return { smistamento: payload || {} };
+  if (role === 'manutentore') return { manutentore: (payload && payload.manutentore) || null };
   if (role === 'compito') {
     return {
       compito: (payload && payload.compito) || null,

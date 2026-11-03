@@ -231,6 +231,97 @@ test('troppo grande e poi malformato sul listino: arriva quello snello senza lis
   assert.match(r.avviso, /9000.*8000/);
 });
 
+// SPEC-MANUTENTORE § 6: falliti e attese escono dal rapporto e vanno nei campi che il server tiene sul biglietto
+// (strumentiFalliti, attese); un server che non li conosce riceve tutto il resto.
+const conDati = {
+  ...RAPPORTO, listino: '2026-10-06', falliti: [{ strumento: 'Bash', errore: 'exit 1', dopo: 'riprovato uguale' }, { strumento: 'Bash', cosa: 'Run spec salva', errore: 'exit 1: ✘ salva' }],
+  attese: [{ strumento: 'Bash', cosa: 'Run unit tests', s: 240 }, { strumento: 'Read', cosa: '', s: 30 }], atteseOltre30: 1,
+};
+const conCampi = (b) => 'strumentiFalliti' in b || 'attese' in b;
+
+test('falliti e attese arrivano coi nomi del server, fuori dal rapporto; le attese da 30 s non partono', async () => {
+  const corpi = [];
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl: async (u, init) => { corpi.push(JSON.parse(init.body)); return reply(200, { ok: true }); }, ...quiet });
+  assert.equal(r.rapporto, 'allegato');
+  assert.equal(corpi.length, 1);
+  assert.deepEqual(corpi[0].strumentiFalliti, [{ nome: 'Bash', errore: 'exit 1', poi: 'riprovato uguale' }, { nome: 'Bash: Run spec salva', errore: 'exit 1: ✘ salva' }]);
+  assert.deepEqual(corpi[0].attese, [{ cosa: 'Bash: Run unit tests', secondi: 240 }]);
+  assert.equal('falliti' in corpi[0].report, false);
+  assert.equal('attese' in corpi[0].report, false);
+  assert.equal(corpi[0].report.atteseOltre30, 1, 'il conto resta nel rapporto');
+  assert.equal(conDati.falliti.length, 2, 'l\'originale non viene mutilato');
+});
+
+test('la domanda di processo viaggia nel rilascio come domandaProcesso', async () => {
+  const corpi = [];
+  await releaseConRapporto('t', '', RAPPORTO, { processo: '  quale ordine per i due rilievi?  ', fetchImpl: async (u, init) => { corpi.push(JSON.parse(init.body)); return reply(200, { ok: true }); }, ...quiet });
+  assert.equal(corpi[0].domandaProcesso, 'quale ordine per i due rilievi?');
+  const senza = [];
+  await releaseConRapporto('t', '', RAPPORTO, { fetchImpl: async (u, init) => { senza.push(JSON.parse(init.body)); return reply(200, { ok: true }); }, ...quiet });
+  assert.equal('domandaProcesso' in senza[0], false);
+});
+
+test('400 report_malformed su falliti e attese: il rapporto parte senza di loro, listino compreso, e lo si dice', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report && conCampi(b) ? reply(400, { ok: false, reason: 'report_malformed', detail: 'campo strumentiFalliti' }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl, ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 2);
+  assert.equal(conCampi(corpi[1]), false);
+  assert.equal('atteseOltre30' in corpi[1].report, false);
+  assert.equal(corpi[1].report.listino, '2026-10-06', 'il listino, che il server conosce, resta');
+  assert.deepEqual(corpi[1].report.tools.byName, { Bash: 2 });
+  assert.match(r.avviso, /strumenti falliti e attese \(report_malformed: campo strumentiFalliti\): allegato senza/);
+});
+
+test('malformato anche senza falliti e attese: poi senza listino, poi senza rapporto, col dettaglio del primo rifiuto', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report ? reply(400, { ok: false, reason: 'report_malformed', detail: `campo ${corpi.length}` }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl, ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'scartato');
+  assert.equal(corpi.length, 4);
+  assert.equal('listino' in corpi[2].report, false);
+  assert.equal('report' in corpi[3], false);
+  assert.match(r.avviso, /report_malformed: campo 1\): rilasciato SENZA rapporto/);
+});
+
+test('413 con falliti e attese: prima si tolgono loro, e l\'elenco degli strumenti resta', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return conCampi(b) ? reply(413, { ok: false, reason: 'report_too_big', bytes: 9000, max: 8192 }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl, ...quiet });
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 2);
+  assert.deepEqual(corpi[1].report.tools.byName, { Bash: 2 });
+  assert.deepEqual(corpi[1].report.notes, ['una nota']);
+  assert.match(r.avviso, /9000 byte, massimo 8192\): allegato senza strumenti falliti e attese/);
+});
+
+test('413 anche senza falliti e attese: l\'ultimo tentativo è quello snello, senza nessuno dei due elenchi', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report && b.report.tools && b.report.tools.byName ? reply(413, { ok: false, reason: 'report_too_big', bytes: 9000, max: 8192 }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl, ...quiet });
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 3);
+  const ultimo = corpi[2];
+  assert.equal('byName' in ultimo.report.tools, false);
+  assert.equal(conCampi(ultimo), false);
+  assert.match(r.avviso, /senza l'elenco degli strumenti e le note, né falliti e attese/);
+});
+
 test('un altro rifiuto del server NON viene ritentato senza rapporto: il no è una risposta', async () => {
   let n = 0;
   const fetchImpl = async () => { n += 1; return reply(401, { ok: false, reason: 'dead_ticket' }); };

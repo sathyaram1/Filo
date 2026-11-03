@@ -133,10 +133,10 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   livello 0. Ciò che il lavoro non corregge diventa SUBITO un feedback derivato,
   figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, aperto dal
   server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?`, a
-  priorità uguale al livello (quello col `?` aspetta la risposta alla sua domanda: sopra,
+  priorità del livello, salvo un 2 che nasce a 1 perché la 2 è solo del manutentore (quello col `?` aspetta la risposta alla sua domanda: sopra,
   Pipeline); UNO solo per tutti gli altri (interni messi da parte
   dal bilancio, vicini non corretti), a priorità = il livello scritto più alto
-  fra loro); —critica con rilievi
+  fra loro, con la stessa regola sul 2); —critica con rilievi
   interni da correggere→ resta
   `revision_capability`: chi corregge consegna `fixed`
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
@@ -243,14 +243,43 @@ lavoro, con `--reason gia_risolto` e la fusione che controlla da sé (§3a); qua
 altra consegna `done` da `working` la respinge. Per una routine `todo → done` resta
 illegale.
 
+### 3b. Il manutentore (SPEC-MANUTENTORE.md, #1958, #1959)
+
+Rivede il § 3a dove dice altro. Il manutentore è una sessione **non fidata** con la sua chiave (classe
+`manutentore`, endpoint `routineManutentore`) o col biglietto che il pacemaker lega alla sessione accesa per lui
+(ruolo `manutentore`, contesto piccolo nel payload): legge schede, testi e rapporti (testi e rapporti solo
+nell'ambiente dei riservati) e scrive solo ordini che il server applica. Mai fusioni, L5, codice, risposte
+all'owner, il freno.
+
+- **La scala.** 3 = urgentissimo, parte subito e sempre, fuori da ogni ordine e oltre N; 2 = la rosa del giorno,
+  scelta ogni mattina dal manutentore; 1 = da fare, non oggi; 0 = rimandato a lungo. I giudici assegnano 3 o
+  lasciano 1: la 2 è del manutentore. Una 3 la può creare, non abbassare. Le 2 di prima scendono a 1 con
+  l'operazione una tantum `transizione` di `ownerManutentore`.
+- **Quante insieme.** Niente tetti per priorità: le 3 partono sempre, il resto fino al parallelismo **N** del
+  manutentore, sotto il **freno d'emergenza** dell'owner (`config/routines.maxSessions`, 1–20, predefinito 20,
+  Gestione → Automazioni). Senza N vale il freno.
+- **Guasti.** Niente fermo globale: il lavoro che dichiara un guasto resta fermo (`fermoManutentore`) finché una
+  nota del manutentore o dell'owner (`sblocca`) o un'attesa sulla correzione non lo sbloccano; gli altri lavori
+  vanno avanti. Una **domanda di processo** nel rilascio (`--processo`) ferma il lavoro allo stesso modo e sveglia
+  il manutentore, non l'owner; col manutentore spento resta nelle note e il lavoro non si ferma.
+- **Rilascio.** Ogni worker registra da sé, dal transcript, gli strumenti falliti (`strumentiFalliti`: nome,
+  errore in una riga, cosa è successo dopo) e le attese sopra 30 s (`attese`: cosa, secondi), sul biglietto.
+- **Account.** Il manutentore spegne e riaccende A e B e sceglie il primo (di norma B); le esclusioni dell'owner
+  restano sue e si sommano. Niente riserva del 10% su A.
+- **Ritmo.** Decisione del mattino col contesto intero, poi accensioni col contesto piccolo: battito ogni 55 minuti,
+  segnali del server (guasto, deploy rosso, suite rossa, nata morta, domanda di processo, owner), sveglia chiesta
+  (minimo 5 minuti), con un tetto di accensioni al giorno suo. Memoria nel **taccuino** (`manutentore/taccuino`,
+  riscritto con la versione letta); il **recap** del giorno (`manutentore-recap/<giorno>`) in Gestione →
+  Automazioni; le **novità** riscritte dal redattore (`manutentore-novita/<versione>`) solo senza link nuovi.
+
 ### 3a. Il ridisegno del lavoro (SPEC-RIDISEGNO-LAVORO.md, #1680)
 
 I numeri che motivano ogni regola stanno nella spec, § 1. Qui le regole come le
 applicano strumenti e server.
 
 **Una sessione per feedback.** Il manutentore scrive sul server l'ordine dei feedback da
-accendere (`npm run manutentore -- accendi N,M,…`, documento `config/manutentore`, solo
-admin; `accendi --niente` lo svuota). Con un ordine un primo lavoro parte solo per i
+accendere (`npm run manutentore -- accendi N,M,…`, documento `config/manutentore`, con la
+chiave del manutentore o il biglietto della sua sessione; `accendi --niente` lo svuota). Con un ordine un primo lavoro parte solo per i
 feedback dell'ordine e per le priorità 3; verifica, correzione, controllo di sicurezza,
 riallineamento e risposte dell'owner li assegna il server come sempre, anche per i feedback
 fuori dall'ordine. A ogni giro le due voci del pacemaker (la normale e quella dei lavori

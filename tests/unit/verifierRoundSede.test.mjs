@@ -100,7 +100,7 @@ test('solo gli interni contano: un 2e non chiede correzione, un 2i sì', () => {
   assert.equal(interno.consume, 'cap2');
 });
 
-test('gli esterni tornano a parte, ciascuno con la priorità uguale al livello, in ogni esito', () => {
+test('gli esterni tornano a parte, ciascuno con la priorità del livello (un 2 nasce a 1), in ogni esito', () => {
   const r = decide([f(3, 'e', 'grave altrove'), f(2, 'i', 'qui'), f(0, 'e', 'cosmetico altrove'), f(1, 'e', 'raro altrove', true)]);
   assert.deepEqual(r.external.map((x) => [x.level, x.priority, x.decision]), [[3, 3, false], [0, 0, false], [1, 1, true]]);
   assert.deepEqual(livelli(r.fix), ['2i']);
@@ -108,7 +108,7 @@ test('gli esterni tornano a parte, ciascuno con la priorità uguale al livello, 
   const fermo = decide([f(2, 'i', 'qui', true), f(2, 'e', 'altrove')]);
   assert.equal(fermo.stop, true);
   assert.deepEqual(livelli(fermo.external), ['2e']);
-  assert.equal(fermo.external[0].priority, 2);
+  assert.equal(fermo.external[0].priority, 1);
 });
 
 test('pass con soli esterni: nessun interno da correggere, il lavoro passa', () => {

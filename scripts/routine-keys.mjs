@@ -41,8 +41,10 @@ const DOVE_VA = {
   build: "Va nell'ambiente «rilascio» del repo (Settings → Environments → rilascio), come FILO_BUILD_PASSPHRASE: fra i segreti del repo non la legge nessuno.",
   routine: 'Va nel PROMPT della routine schedulata: "routine automatica. <parola d\'ordine>".\n'
     + "Mai nell'ambiente: da lì la erediterebbe ogni lavoratore che parte.",
-  manutentore: "È la chiave del manutentore: apre i suoi ordini sul server, mai fusioni, L5 o codice. Tienila solo dove gira lui,\n"
-    + "mai nell'ambiente di una routine che lavora feedback.",
+  // SPEC-MANUTENTORE § 3: serve alla chat e alla sessione locale; la sessione accesa dal pacemaker ha il suo biglietto.
+  manutentore: "È la chiave del manutentore: apre i suoi ordini sul server, mai fusioni, L5 o codice. Va nell'ambiente di QUESTO PC,\n"
+    + "come FILO_MANUTENTORE_KEY: la usano npm run manutentore e la sua chat. Mai nell'ambiente di una routine che lavora\n"
+    + "feedback: la sessione che il pacemaker accende per il manutentore non la vuole, ha il suo biglietto.",
   'owner-non-fidato': "È la tua chiave da una sede non fidata: i poteri del manutentore più le domande per te (leggere, rispondere,\n"
     + "archiviare, riaprire). Niente fusioni, L5, chiavi, interruttori, «segna fidato», abbassare una priorità 3.\n"
     + "Mettila solo nella sede da cui lavori tu. Quello che scrive nasce non fidato: le risposte che registra le trovi\n"

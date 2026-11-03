@@ -1,5 +1,5 @@
-// Il contesto del manutentore (SPEC-RIDISEGNO-LAVORO.md § 2): il ruolo, tutte le schede in una riga ciascuna, i rami in
-// corso coi loro file da git, e gli incroci fra i file di una scheda e quelli dei rami. Niente modello, niente rete.
+// Il manutentore dal terminale (SPEC-MANUTENTORE.md): contesto intero e piccolo, i rami coi loro file e gli incroci, i
+// corpi verso il suo endpoint, il redattore delle novità. Niente modello; la rete è finta (fetch sostituito).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -121,17 +121,12 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
   assert.equal(await M.main(['boh']), 1);
 });
 
-test('l\'ordine da accendere: numeri nell\'ordine dato, senza doppioni, col rifiuto detto; il corpo che legge il server', () => {
+test('l\'ordine da accendere: numeri nell\'ordine dato, senza doppioni, col rifiuto detto', () => {
   assert.deepEqual(M.leggiOrdine('812, #815,815.2 812'), { ok: true, numeri: ['812', '815', '815.2'] });
   assert.match(M.leggiOrdine('812,menu').motivo, /non sono numeri di feedback: menu/);
   assert.equal(M.leggiOrdine('').ok, false);
   const tanti = Array.from({ length: M.ORDINE_MAX + 1 }, (_, i) => String(i + 1)).join(',');
   assert.match(M.leggiOrdine(tanti).motivo, /il massimo è/, 'oltre il tetto si rifiuta col numero, non si taglia');
-  const c = M.corpoOrdine(['73', '71'], new Date(0));
-  assert.deepEqual(c.fields.ordine.arrayValue.values.map((v) => v.stringValue), ['73', '71']);
-  // L'ordine scritto dal PC non cancella N, sveglia e account che il server tiene nello stesso documento (#1961).
-  const campi = new URLSearchParams(M.MASCHERA_ORDINE.slice(1)).getAll('updateMask.fieldPaths');
-  assert.deepEqual(campi.sort(), Object.keys(c.fields).sort());
 });
 
 test('una scheda di cui non fidarsi lo dice nella sua riga: non buona, vecchia, o un «toglie lavoro» non riletto', () => {
@@ -199,4 +194,227 @@ test('sblocca vuole il numero del feedback fermo; il resto è la nota dell\'owne
   assert.deepEqual(M.richiestaSblocca(['812.2']), { ok: true, numero: '812.2', testo: '' });
   assert.equal(M.richiestaSblocca([]).ok, false);
   assert.equal(M.richiestaSblocca(['dodici']).ok, false);
+});
+
+// ── SPEC-MANUTENTORE: il canale della chiave, il contesto piccolo e intero, le indicazioni, il redattore ──
+
+import { readFileSync } from 'node:fs';
+import { dirname, resolve as risolvi } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const RADICE = risolvi(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const schedaServer = (num, priorita, extra = {}) => ({
+  num: String(num), stato: 'todo', motivo: '', priorita, prioritaOwner: false, titolo: `Titolo del feedback numero ${num} con qualche parola in più`,
+  fiducia: 'fidato', ramo: '', aspetta: [], unisce: [], lavoroServer: false, riservato: false, inLavorazione: false, aggiornatoIl: null, ...extra,
+});
+// 800 schede come oggi: la rosa di 25, tre urgenti, due ferme per guasto, il resto a 1 e a 0.
+const ottocento = () => Array.from({ length: 800 }, (_, i) => {
+  const n = i + 1;
+  if (n <= 3) return schedaServer(n, 3);
+  if (n <= 28) return schedaServer(n, 2);
+  if (n <= 30) return schedaServer(n, 1, { fermo: { tipo: 'guasto', atMs: 1, gruppo: 'guasto: npm' } });
+  return schedaServer(n, n % 2);
+});
+const RUOLO = readFileSync(risolvi(RADICE, 'routines', 'roles', 'manutentore.md'), 'utf8');
+const STATO = { ordine: ['4'], parallelismo: 3, parallelismoEffettivo: 3, freno: 20, segnali: [{ id: 's1', tipo: 'guasto', atMs: 0, dettaglio: { numero: '29' } }], account: { primo: 'B', spenti: {}, esclusiDallOwner: {} } };
+
+test('contesto piccolo: con 800 schede porta solo le 3, le 2 e le ferme, i segnali e il taccuino, sotto il tetto', () => {
+  const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'criterio: grafica prima', versione: 4 }, schede: ottocento(),
+    rami: [{ ramo: 'worker/x', feedback: ['5'], avanti: 2, data: '2026-10-31', file: ['a.js'] }, { ramo: 'worker/y', feedback: ['700'], avanti: 1, data: '2026-10-31', file: ['b.js'] }] });
+  assert.equal(p.ok, true);
+  assert.ok(p.token < M.PICCOLO_TETTO_TOKEN, `${p.token} token`);
+  assert.match(p.testo, /Schede a priorità 3 e 2, e le ferme \(30 di 800\)/);
+  assert.match(p.testo, /^#1 · p3 · todo/m);
+  assert.match(p.testo, /^#29 · p1 · todo · FERMO \(guasto: guasto: npm\)/m);
+  assert.doesNotMatch(p.testo, /^#(3[1-9]|[4-9]\d|\d{3}) · /m, 'niente schede a 0 e a 1');
+  assert.match(p.testo, /criterio: grafica prima/);
+  assert.match(p.testo, /Versione 4/);
+  assert.match(p.testo, /s1 guasto/);
+  assert.match(p.testo, /^worker\/x/m);
+  assert.doesNotMatch(p.testo, /worker\/y/, 'solo i rami dei lavori della rosa e delle 3');
+});
+
+test('contesto piccolo oltre il tetto: rifiutato col numero, non tagliato', () => {
+  const tutte2 = ottocento().map((s) => ({ ...s, priorita: 2, titolo: s.titolo.repeat(3) }));
+  const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: '', versione: 0 }, schede: tutte2 });
+  assert.equal(p.ok, false);
+  assert.match(p.motivo, new RegExp(`stima ${p.token} token, il tetto è ${M.PICCOLO_TETTO_TOKEN}: pesa di più le 800 schede a priorità 3 e 2 \\(\\d+ token\\)\\. Riporta a 1`));
+  // Un taccuino lungo con una scheda sola: il rimedio è il taccuino, non abbassare lavori che non c'entrano.
+  const lungo = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'appunto '.repeat(16000), versione: 3 }, schede: [tutte2[0]] });
+  assert.equal(lungo.ok, false);
+  assert.match(lungo.motivo, /pesa di più il taccuino \(\d+ token\)\. Riscrivi il taccuino più corto/);
+  assert.doesNotMatch(lungo.motivo, /Riporta a 1/);
+});
+
+test('contesto intero: tutte le schede coi conti per priorità, la parte delle schede locali, taccuino, rami, registro', () => {
+  const t = M.testoIntero({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'Indicazione dell\'owner (2026-10-31): grafica', versione: 2 },
+    schede: ottocento(), locali: [scheda(40, { file_probabili: ['src/a.js'] })], rami: [], ferme: [] });
+  assert.match(t, /## Schede \(800: 3 a 3, 25 a 2, 387 a 1, 385 a 0\)/);
+  assert.equal((t.match(/^#\d+ · p/gm) || []).length, 800);
+  assert.match(t, /^#40 · p0 · todo — Titolo del feedback numero 40 .* \[browser-schede\/bug\] Il menu non si apre\. \| file: src\/a\.js$/m);
+  assert.match(t, /Indicazione dell'owner \(2026-10-31\): grafica/);
+  assert.match(t, /npm run manutentore -- registro/);
+  assert.ok(t.startsWith('# Ruolo: manutentore'));
+});
+
+test('il corpo per il server porta una credenziale sola; il biglietto vale solo nella sessione del manutentore', () => {
+  assert.deepEqual(M.corpoManutentore({ ticket: 't1' }, 'ordine', { ordine: ['812'] }), { ticket: 't1', op: 'ordine', dati: { ordine: ['812'] } });
+  assert.deepEqual(M.corpoManutentore({ passphrase: 'k' }, 'stato'), { passphrase: 'k', op: 'stato', dati: {} });
+  assert.throws(() => M.corpoManutentore({ ticket: 't', passphrase: 'k' }, 'stato'));
+  assert.deepEqual(M.credenziale({ argv: ['stato', '--ticket', 'x'], env: { FILO_MANUTENTORE_KEY: 'k' } }), { ticket: 'x' });
+  assert.deepEqual(M.credenziale({ env: { FILO_MANUTENTORE_KEY: ' k ' }, bigliettoDelGiro: 'b', ruoloDelGiro: 'verifier' }), { passphrase: 'k' },
+    'il biglietto di un worker non parla da manutentore');
+  assert.deepEqual(M.credenziale({ bigliettoDelGiro: 'b', ruoloDelGiro: 'manutentore' }), { ticket: 'b' });
+  assert.equal(M.credenziale({ env: {} }), null);
+});
+
+/** Il server finto: risponde per operazione, e tiene i corpi. */
+function serverFinto(t, risposte) {
+  const corpi = [];
+  const prima = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const b = JSON.parse(init.body);
+    corpi.push({ url: String(url), ...b });
+    const r = typeof risposte[b.op] === 'function' ? risposte[b.op](b, corpi) : risposte[b.op];
+    const [status, body] = r || [400, { ok: false, reason: 'malformed', detail: `op ${b.op}` }];
+    return { status, ok: status < 300, text: async () => JSON.stringify(body) };
+  };
+  const out = []; const err = [];
+  const [l, e] = [console.log, console.error];
+  console.log = (...a) => out.push(a.join(' ')); console.error = (...a) => err.push(a.join(' '));
+  t.after(() => { globalThis.fetch = prima; console.log = l; console.error = e; });
+  return { corpi, out, err };
+}
+const CHIAVE = { env: { FILO_MANUTENTORE_KEY: 'chiave-di-prova' }, root: RADICE };
+
+test('una priorità 3 non si abbassa: il rifiuto arriva prima del server, che non riceve la scrittura', async (t) => {
+  assert.equal(M.controlloPriorita(3, 1).ok, false);
+  assert.equal(M.controlloPriorita(3, 3).ok, true);
+  assert.deepEqual(M.controlloPriorita(1, '2'), { ok: true, valore: 2 });
+  assert.equal(M.controlloPriorita(1, 4).ok, false);
+  const s = serverFinto(t, { schede: [200, { ok: true, schede: [schedaServer(812, 3)] }], priorita: [200, { ok: true, numero: '812', da: 3, a: 1 }] });
+  assert.equal(await M.main(['priorita', '812', '1'], CHIAVE), 1);
+  assert.match(s.err.join('\n'), /#812: una priorità 3 non si abbassa/);
+  assert.deepEqual(s.corpi.map((c) => c.op), ['schede']);
+  assert.match(s.corpi[0].url, /\/routineManutentore$/);
+  assert.equal(s.corpi[0].passphrase, 'chiave-di-prova');
+});
+
+test('i comandi scrivono le operazioni del server coi campi suoi', async (t) => {
+  const s = serverFinto(t, {
+    ordine: (b) => [200, { ok: true, ...b.dati, parallelismoEffettivo: 4 }],
+    attesa: [200, { ok: true, numero: '815', aspetta: '812' }],
+    sveglia: [200, { ok: true, sveglia: { alle: '2026-11-01T07:00:00.000Z' } }],
+    account: [200, { ok: true, primo: 'B', spenti: { A: true, B: false } }],
+    routine: [200, { ok: true, accese: false }],
+  });
+  assert.equal(await M.main(['accendi', '812,815'], CHIAVE), 0);
+  assert.equal(await M.main(['parallelo', '4'], CHIAVE), 0);
+  assert.equal(await M.main(['attesa', '815', '812'], CHIAVE), 0);
+  assert.equal(await M.main(['sveglia-tra', '15', '--perche', 'il deploy'], CHIAVE), 0);
+  assert.equal(await M.main(['account', 'A', 'spento'], CHIAVE), 0);
+  assert.equal(await M.main(['account', 'primo', 'B'], CHIAVE), 0);
+  assert.equal(await M.main(['routine', 'spente'], CHIAVE), 0);
+  assert.deepEqual(s.corpi.map((c) => [c.op, c.dati]), [
+    ['ordine', { ordine: ['812', '815'] }], ['ordine', { parallelismo: 4 }], ['attesa', { numero: '815', aspetta: '812' }],
+    ['sveglia', { traMinuti: 15, perche: 'il deploy' }], ['account', { spegni: 'A' }], ['account', { primo: 'B' }], ['routine', { accese: false }],
+  ]);
+  // Gli storti non partono: niente chiamata.
+  const n = s.corpi.length;
+  assert.equal(await M.main(['sveglia-tra', '2'], CHIAVE), 1);
+  assert.equal(await M.main(['parallelo', 'tanti'], CHIAVE), 1);
+  assert.equal(await M.main(['taccuino', 'scrivi', '-'], CHIAVE), 1);
+  assert.match(s.err.join('\n'), /--versione <V>/);
+  assert.equal(s.corpi.length, n);
+});
+
+test('senza chiave né biglietto del manutentore non si chiama il server, e si dice come averla', async (t) => {
+  const s = serverFinto(t, {});
+  assert.equal(await M.main(['stato'], { env: {}, root: cartellaTemporanea('manutentore-senza') }), 1);
+  assert.match(s.err.join('\n'), /routine-keys\.mjs crea <nome> manutentore/);
+  assert.equal(s.corpi.length, 0);
+});
+
+test('l\'indicazione dell\'owner va in coda al taccuino con la data, senza perdere il resto', () => {
+  const r = M.conIndicazione('stato: N 4\n\nproblemi: nessuno\n\n', '  priorità a ciò che\ncambia la grafica ', '2026-10-31');
+  assert.equal(r.testo, 'stato: N 4\n\nproblemi: nessuno\n\nIndicazione dell\'owner (2026-10-31): priorità a ciò che cambia la grafica\n');
+  assert.equal(M.conIndicazione('', 'prima', '2026-10-31').testo, 'Indicazione dell\'owner (2026-10-31): prima\n');
+  assert.equal(M.conIndicazione('x', '   ').ok, false);
+  assert.match(M.giornoDi(Date.parse('2026-10-31T23:30:00Z')), /^2026-11-01$/, 'il giorno è quello italiano');
+});
+
+test('indicazione con la chiave: se il taccuino cambia in mezzo lo rilegge e riscrive, con la versione letta', async (t) => {
+  let versione = 3;
+  const s = serverFinto(t, {
+    taccuino: () => [200, { ok: true, testo: `voce ${versione}`, versione }],
+    'taccuino.scrivi': (b) => {
+      if (b.dati.versione === 3) { versione = 4; return [409, { ok: false, reason: 'taccuino_cambiato', detail: 'alla 4' }]; }
+      return [200, { ok: true, versione: 5 }];
+    },
+  });
+  assert.equal(await M.main(['indicazione', 'meno', 'riallineamenti'], CHIAVE), 0);
+  const scritture = s.corpi.filter((c) => c.op === 'taccuino.scrivi');
+  assert.equal(scritture.length, 2);
+  assert.equal(scritture[1].dati.versione, 4);
+  assert.match(scritture[1].dati.testo, /^voce 4\n\nIndicazione dell'owner \(\d{4}-\d{2}-\d{2}\): meno riallineamenti\n$/);
+});
+
+test('il redattore: una promessa su un lavoro che non è nella rosa né a 3 si rifiuta, come un link nuovo', () => {
+  const blocco = { version: '0.2.255', features: ['Le schede si trascinano. Guida su https://filo.app/guida'], fixes: ['Il menu si apre.'] };
+  const schede = [schedaServer(812, 2), schedaServer(900, 1), schedaServer(950, 3)];
+  const base = { versione: '0.2.255', features: [{ testo: 'Le schede si trascinano (guida su https://filo.app/guida).', da: [1] }], fixes: ['Il menu si apre.'] };
+  assert.equal(M.controllaNovita(base, { blocco, schede }).ok, true);
+  const fuoriRosa = M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: '900', riga: 'Altri formati in arrivo.' }] }, { blocco, schede });
+  assert.equal(fuoriRosa.ok, false);
+  assert.match(fuoriRosa.errori.join('\n'), /promessa su #900, che non è nella rosa né a priorità 3/);
+  const taciuta = M.controllaNovita({ ...base, features: [...base.features, 'Il supporto per i PDF è in arrivo.'] }, { blocco, schede });
+  assert.match(taciuta.errori.join('\n'), /non dice da quali righe dei worker nasce/);
+  for (const n of ['812', '950']) {
+    assert.equal(M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: n, riga: 'Altri formati in arrivo.' }] }, { blocco, schede }).ok, true, `#${n}`);
+  }
+  const link = M.controllaNovita({ ...base, fixes: ['Il menu si apre: vedi www.altro.example/x'] }, { blocco, schede });
+  assert.match(link.errori.join('\n'), /link che le righe dei worker non avevano: www\.altro\.example\/x/);
+  assert.match(M.controllaNovita({ ...base, versione: '0.2.254' }, { blocco, schede }).errori[0], /il blocco in cima è 0\.2\.255/);
+  const ctx = M.contestoRedattore({ blocco, capacita: '• Trascinare', schede });
+  assert.match(ctx, /## La rosa \(priorità 2\)\n\n#812 /);
+  assert.match(ctx, /## Priorità 3 in corso\n\n#950 /);
+  assert.doesNotMatch(ctx, /#900/);
+});
+
+test('il redattore: una riga tiene la segnalazione delle righe lette, e la consegna porta le impronte di quelle righe', async () => {
+  const { impronta } = await import('../../scripts/release-novita.mjs');
+  const blocco = { version: '0.2.255', features: [{ testo: 'Le novità in una pagina.', segnalazione: 1956 }, 'Il menu si apre.'], fixes: ['Download più veloci.'] };
+  const base = { versione: '0.2.255', features: [{ testo: 'Tutte le novità in una pagina, e il menu si apre.', segnalazione: 1956, da: [1, 2] }], fixes: ['Download più veloci.'] };
+  const buona = M.controllaNovita(base, { blocco, schede: [] });
+  assert.equal(buona.ok, true, (buona.errori || []).join('\n'));
+  assert.deepEqual(buona.novita.features, [{ testo: 'Tutte le novità in una pagina, e il menu si apre.', segnalazione: 1956 }]);
+  assert.deepEqual(buona.novita.originali, ['Le novità in una pagina.', 'Il menu si apre.', 'Download più veloci.'].map(impronta));
+  const estranea = M.controllaNovita({ ...base, features: [{ testo: 'Altro.', segnalazione: 42 }] }, { blocco, schede: [] });
+  assert.match(estranea.errori.join('\n'), /la segnalazione 42 non sta fra le righe dei worker/);
+  const senzaNumero = M.controllaNovita({ ...base, features: [{ testo: 'Altro.', segnalazione: 'tanti' }] }, { blocco, schede: [] });
+  assert.match(senzaNumero.errori.join('\n'), /segnalazione è il numero intero/);
+  assert.equal(M.controllaNovita({ ...base, features: [{ testo: '   ', segnalazione: 1956 }] }, { blocco, schede: [] }).ok, false);
+  assert.match(M.contestoRedattore({ blocco, schede: [] }), /1\. \[segnalazione 1956\] Le novità in una pagina\./);
+  // Dimenticata dal redattore, la segnalazione viene dalle righe d'origine (citate in da, o copiate uguali).
+  const dimenticata = M.controllaNovita({ ...base, features: [{ testo: 'Novità e menu.', da: [1, 2] }, 'Le novità in una pagina.'] }, { blocco, schede: [] });
+  assert.deepEqual(dimenticata.novita.features, [{ testo: 'Novità e menu.', segnalazione: 1956 }, { testo: 'Le novità in una pagina.', segnalazione: 1956 }]);
+  const due = { version: '0.2.255', features: [{ testo: 'A.', segnalazione: 1956 }, { testo: 'B.', segnalazione: 1960 }], fixes: [] };
+  assert.match(M.controllaNovita({ versione: '0.2.255', features: [{ testo: 'A e B.', da: [1, 2] }] }, { blocco: due, schede: [] }).errori.join('\n'), /segnalazioni diverse \(1956, 1960\)/);
+  assert.equal(M.controllaNovita({ versione: '0.2.255', features: [{ testo: 'A e B.', da: [1, 2], segnalazione: 1960 }] }, { blocco: due, schede: [] }).ok, true);
+});
+
+test('il ruolo nomina solo sottocomandi che lo script accetta, e lo script li elenca tutti nel ruolo', () => {
+  const nominati = [...RUOLO.matchAll(/npm run manutentore -- ([a-z-]+)/g)].map((m) => m[1]);
+  const fuori = nominati.filter((c) => !M.SOTTOCOMANDI.includes(c));
+  assert.deepEqual([...new Set(fuori)], [], 'sottocomandi nel ruolo che lo script non conosce');
+  const strumenti = RUOLO.slice(RUOLO.indexOf('## Gli strumenti'));
+  const mancanti = M.SOTTOCOMANDI.filter((c) => !new RegExp(`(?:-- |\\| |\\b)${c}\\b`).test(strumenti));
+  assert.deepEqual(mancanti, [], 'sottocomandi che il ruolo non dice');
+});
+
+test('la chat parte col file del contesto intero e dice dove vanno le indicazioni', () => {
+  const m = M.primoMessaggioChat('/tmp/x/contesto.md');
+  assert.match(m, /\/tmp\/x\/contesto\.md: leggilo tutto/);
+  assert.match(m, /npm run manutentore -- indicazione/);
+  assert.doesNotMatch(m, /"/, 'niente virgolette: su Windows passa da una shell');
 });

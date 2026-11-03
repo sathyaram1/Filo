@@ -993,3 +993,97 @@ test('una sessione partita sopra i cloni: il transcript si trova dall’id della
     }
   } finally { togliCartella(casa); }
 });
+
+// ─── SPEC-MANUTENTORE § 6: strumenti falliti e attese, dal transcript ─────────
+
+const { ELENCO_MAX_BYTE, rigaErrore, rigaPulita, stringiElenchi } = await import('../../scripts/session-report.mjs');
+const U1 = { input_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1 };
+const chiama = (id, ts, name, input) => assistant(`m-${id}`, 'claude-opus-5-5', U1, [{ type: 'tool_use', id, name, input }], ts);
+// Una stringa finta con la forma di un biglietto (43 caratteri senza spazi).
+const FINTO_BIGLIETTO = 'FINTObigliettoPerLaProva_0000000000000000000';
+
+test('i falliti dicono strumento, errore in una riga e cosa è successo dopo; le attese sopra 30 s cosa e quanto', async () => {
+  const unit = { command: 'npm run test:unit', description: 'Run unit tests' };
+  const rep = await analizzaRighe([
+    chiama('a1', T('00:00'), 'Bash', unit),
+    result('a1', `Exit code 1\n\nnot ok 3 - il biglietto ${FINTO_BIGLIETTO} scaduto\nseconda riga`, T('00:40'), true),
+    chiama('a2', T('00:41'), 'Bash', unit),
+    result('a2', 'ok', T('04:41')),
+    chiama('a3', T('04:42'), 'Read', { file_path: '/x/manca.js' }),
+    result('a3', '<tool_use_error>File does not exist.</tool_use_error>', T('04:43'), true),
+    chiama('a4', T('04:44'), 'Bash', { command: 'ls', description: 'List files' }),
+    result('a4', 'ok', T('04:45')),
+    chiama('a5', T('04:46'), 'Bash', { command: 'git push' }),
+    result('a5', 'Permission denied', T('04:47'), true),
+  ], { role: 'resolver' });
+  assert.deepEqual(rep.falliti, [
+    { strumento: 'Bash', cosa: 'Run unit tests', errore: 'exit 1: not ok 3 - il biglietto […] scaduto', dopo: 'riprovato uguale' },
+    { strumento: 'Read', errore: 'File does not exist.', dopo: 'Bash: List files' },
+    { strumento: 'Bash', cosa: 'git push', errore: 'Permission denied', dopo: 'niente: la sessione finisce lì' },
+  ]);
+  assert.deepEqual(rep.attese, [
+    { strumento: 'Bash', cosa: 'Run unit tests', s: 240 },
+    { strumento: 'Bash', cosa: 'Run unit tests', s: 40 },
+  ], 'dalla più lunga; quelle da un secondo non ci sono');
+  assert.equal(rep.atteseOltre30, 2);
+  assert.equal(rep.tools.errors, 3);
+  assert.deepEqual(rep.notes, [], 'niente tagliato, niente nota');
+  assert.match(riassunto(rep)[4], /attese oltre 30 s 2/);
+  // Un comando ripetuto con altre parole è un'altra strada, e lo si dice.
+  const diverso = await analizzaRighe([
+    chiama('b1', T('00:00'), 'Bash', unit),
+    result('b1', 'Exit code 2', T('00:01'), true),
+    chiama('b2', T('00:02'), 'Bash', { command: 'npm run test:unit -- --solo x', description: 'Run one unit test' }),
+  ]);
+  assert.deepEqual(diverso.falliti, [{ strumento: 'Bash', cosa: 'Run unit tests', errore: 'exit 2', dopo: 'riprovato diverso: Run one unit test' }]);
+});
+
+test('gli elenchi stanno nel budget e il taglio si dice coi conti interi; i sotto-agenti si sommano', async () => {
+  const righe = [];
+  for (let i = 0; i < 260; i++) {
+    const ora = `2026-09-16T1${Math.floor(i / 60)}:${String(i % 60).padStart(2, '0')}`;
+    righe.push(chiama(`f${i}`, `${ora}:00.000Z`, 'Bash', { command: `x${i}`, description: `passo ${i}` }));
+    righe.push(result(`f${i}`, `errore numero ${i} ${'parola '.repeat(40)}`, `${ora}:${String(31 + (i % 28)).padStart(2, '0')}.000Z`, true));
+  }
+  const rep = await analizzaRighe(righe);
+  assert.equal(rep.tools.errors, 260);
+  assert.equal(rep.atteseOltre30, 260);
+  assert.equal(rep.falliti.length, 200, 'il tetto del server, non uno più stretto');
+  assert.ok(Buffer.byteLength(JSON.stringify(rep.falliti)) <= ELENCO_MAX_BYTE);
+  assert.ok(Buffer.byteLength(JSON.stringify(rep.attese)) <= ELENCO_MAX_BYTE);
+  assert.ok(rep.falliti.every((f) => f.errore.length <= 120), 'un errore resta una riga corta');
+  assert.equal(rep.falliti[0].errore.startsWith('errore numero 0 '), true, 'i falliti in ordine di tempo');
+  assert.equal(rep.attese[0].s, 58, 'le attese dalla più lunga');
+  assert.ok(rep.notes.includes(`strumenti falliti 260, elencati i primi ${rep.falliti.length}`));
+  assert.ok(rep.notes.includes(`attese oltre 30 s 260, elencate le ${rep.attese.length} più lunghe`));
+
+  const madre = rapportoVuoto();
+  madre.attese = [{ strumento: 'Bash', cosa: 'corta', s: 31 }];
+  madre.atteseOltre30 = 1;
+  sommaSottoAgente(madre, rep);
+  assert.equal(madre.atteseOltre30, 261);
+  assert.equal(madre.attese[0].s, 58);
+  assert.equal(madre.notes.filter((n) => /^attese oltre/.test(n)).length, 1, 'una nota sola, coi conti sommati');
+  assert.ok(madre.notes.includes(`attese oltre 30 s 261, elencate le ${madre.attese.length} più lunghe`));
+  assert.equal(madre.notes.some((n) => /^sotto-agente: (strumenti falliti|attese oltre)/.test(n)), false);
+});
+
+test('una riga del rapporto: niente a capo, niente stringhe lunghe come un biglietto, tetto di lunghezza', () => {
+  assert.equal(rigaPulita('a\n\tb\u0007c', 50), 'a b c');
+  assert.equal(rigaPulita(`chiave ${FINTO_BIGLIETTO} fine`, 80), 'chiave […] fine');
+  assert.equal(rigaPulita(`${'x'.repeat(10)} ${'y'.repeat(20)}`, 12), 'xxxxxxxxxx …');
+  assert.equal(rigaErrore(''), '(senza testo)');
+  assert.equal(rigaErrore([{ type: 'text', text: 'Exit code 127\nnode: not found' }]), 'exit 127: node: not found');
+  const vuoto = stringiElenchi(rapportoVuoto());
+  assert.deepEqual([vuoto.falliti, vuoto.attese, vuoto.atteseOltre30, vuoto.notes], [[], [], 0, []]);
+});
+
+test('la riga d\'errore è quella del fallimento: mai una prova passata che si chiama «errore», mai la posizione nel sorgente', () => {
+  const npm = 'Exit code 1\n\n> filo@0.9.0 test:unit\n> node scripts/run-unit-tests.mjs\n\nTAP version 13\n# Subtest: senza transcript: mai un errore\nok 1 - senza transcript: mai un errore\n# Subtest: la somma\nnot ok 2 - la somma\n  error: |-\n    Expected values to be strictly equal:';
+  assert.equal(rigaErrore(npm), 'exit 1: not ok 2 - la somma');
+  assert.equal(rigaErrore('Exit code 1\n✔ il rilascio non perde errore (0.9ms)\n✖ la somma (1.2ms)\n  AssertionError [ERR_ASSERTION]: Expected'), 'exit 1: ✖ la somma (1.2ms)');
+  assert.equal(rigaErrore('Exit code 1\n[eval]:1\nx()\n^\n\nReferenceError: x is not defined\n    at [eval]:1:1'), 'exit 1: ReferenceError: x is not defined');
+  assert.equal(rigaErrore("Exit code 1\n/tmp/x.mjs:3\n  throw new Error('boom');\n  ^\n\nError: boom\n    at file:///tmp/x.mjs:3:9"), 'exit 1: Error: boom');
+  assert.equal(rigaErrore('Exit code 1\nTo https://github.com/o/r.git\n ! [rejected]        claude/x -> claude/x (non-fast-forward)\nerror: failed to push some refs'), 'exit 1: ! [rejected] claude/x -> claude/x (non-fast-forward)');
+  assert.equal(rigaErrore('Exit code 1\n  ✓  1 tests/a.spec.mjs:3:1 › apre (1s)\n  ✘  2 tests/b.spec.mjs:22:3 › salva (5s)'), 'exit 1: ✘ 2 tests/b.spec.mjs:22:3 › salva (5s)');
+});

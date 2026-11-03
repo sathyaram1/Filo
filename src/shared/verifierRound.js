@@ -34,8 +34,11 @@
   // segnalazione, o l'ha creato il ramo), `e` esterno (un altro lavoro), `v`
   // vicino (un altro lavoro, ma in un file che il ramo modifica già: decisione
   // del 2026-09-27). Il giro conta gli interni, e i vicini come livello 0; ogni
-  // esterno esce subito in un feedback suo con priorità uguale al livello.
+  // esterno esce subito in un feedback suo con la priorità del livello, salvo il 2 che nasce a 1.
   const SEDI = ['i', 'e', 'v'];
+  // La 2 è la rosa del giorno e la mette solo il manutentore (SPEC-MANUTENTORE § 2): un rilievo di livello 2 messo
+  // da parte nasce a 1. Il livello resta quello scritto; cambia solo la priorità del feedback che nasce.
+  const prioritaDiNascita = (level) => (Number(level) === 2 ? 1 : Number(level));
   const SPIEGAZIONE_SEDE = 'manca la sede dopo il livello: «i» se tocca a questo lavoro, «v» se è di un altro lavoro ma sta in un file che il ramo modifica già, «e» se è un altro lavoro (per esempio [2i], [1v], [1e?])';
 
   // Tetto ai rilievi di una critica: oltre non è una critica, è un elenco generato.
@@ -408,7 +411,7 @@
    *     finito ferma il lavoro (è l'unico livello che ferma per bilancio);
    *   - un 2 si corregge se nello stesso giro si corregge anche un 3 (il giro
    *     lo paga il 3) oppure se il bilancio dei 2 ha ancora giri; a bilancio
-   *     finito NON ferma: va nel feedback derivato, a priorità 2, e il giro
+   *     finito NON ferma: va nel feedback derivato, a priorità 1, e il giro
    *     passa se non c'è altro (decisione dell'owner del 2026-09-23);
    *   - un 1 si corregge se nello stesso giro si corregge anche un 3/2 (il
    *     giro lo paga già il livello più alto, e un altro verificatore arriva
@@ -429,10 +432,10 @@
    * che parte comunque, da soli la fanno partire solo col bilancio `cap0`, e
    * un `v?` va da parte come uno 0 col `?`. Gli esterni non entrano in
    * nessuna delle regole sopra: tornano a parte in `external`, ciascuno con
-   * `priority` uguale al livello, in ogni esito (anche a lavoro fermo: sono
+   * `priority` del livello (un 2 nasce a 1), in ogni esito (anche a lavoro fermo: sono
    * di un altro lavoro, ed escono in un feedback loro). Un esterno col `?`
    * non ferma niente: la domanda viaggia nel suo feedback. Anche i rilievi
-   * messi da parte (`derived`) portano `priority` = livello SCRITTO; come
+   * messi da parte (`derived`) portano la `priority` del livello SCRITTO; come
    * diventano feedback lo dice derivedGroups.
    *
    * @param {object} p { findings, caps:{cap3,cap2,cap1,cap0}, counts:{count3,count2,count1,count0} }
@@ -453,7 +456,7 @@
     const caps = normalizeCaps(p && p.caps, p && p.defaults);
     const counts = normalizeCounts(p && p.counts);
     const left = (k) => caps[k] - counts[k.replace('cap', 'count')];
-    const conPriorita = (f) => Object.assign({}, f, { priority: f.level });
+    const conPriorita = (f) => Object.assign({}, f, { priority: prioritaDiNascita(f.level) });
 
     const findings = tutti.filter((f) => f.sede !== 'e');
     const external = tutti.filter((f) => f.sede === 'e').map(conPriorita);
@@ -479,7 +482,7 @@
     }
     // I 2: con un 3 da correggere nello stesso giro si correggono pure loro
     // (il giro lo paga il 3); da soli seguono il loro bilancio, e a bilancio
-    // finito non fermano: vanno da parte, ciascuno un feedback a priorità 2.
+    // finito non fermano: vanno da parte, ciascuno un feedback a priorità 1.
     const withThree = fixable.length > 0;
     for (const f of twos) {
       if (withThree || left('cap2') > 0) fixable.push(f);
@@ -533,7 +536,7 @@
    *     viaggia nel suo feedback), così un esterno di livello 3 nasce subito;
    *   - `decisione`: un interno o vicino col `?`, da solo;
    *   - `rimasti`: TUTTI gli altri (interni messi da parte dal bilancio, vicini
-   *     non corretti) in un feedback solo, a priorità = il livello scritto più alto.
+   *     non corretti) in un feedback solo, alla priorità più alta fra i loro livelli scritti (un 2 nasce a 1).
    * Accetta un elenco di rilievi o una decisione di decideRound (`external` +
    * `derived`). I rilievi escono con i campi che avevano (anche `num`, `id`),
    * più `sede`, `level`, `priority` e `decision` canonici. Ordine: i gruppi da
@@ -552,7 +555,7 @@
       if (!f || typeof f !== 'object') continue;
       const level = Number(f.level);
       if (!LEVELS.includes(level)) continue;
-      const priority = LEVELS.includes(Number(f.priority)) ? Number(f.priority) : level;
+      const priority = LEVELS.includes(Number(f.priority)) ? Number(f.priority) : prioritaDiNascita(level);
       const item = Object.assign({}, f, { level, sede: sedeDi(f.sede), priority, decision: f.decision === true });
       if (item.sede === 'e') {
         groups.push({ tipo: 'esterno', priority, decision: item.decision, findings: [item] });
@@ -612,7 +615,7 @@
     if (s) parts.push(s);
     const esterni = Array.isArray(d.external) ? d.external.length : 0;
     if (esterni) {
-      parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non tocca a questo lavoro): diventa' : `${esterni} rilievi sono esterni (non toccano a questo lavoro): diventano`} feedback a parte, con priorità uguale al livello.`);
+      parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non tocca a questo lavoro): diventa' : `${esterni} rilievi sono esterni (non toccano a questo lavoro): diventano`} feedback a parte, con la priorità del livello (un 2 nasce a 1: la rosa la sceglie il manutentore).`);
     }
     // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza
     // dei 3 non fermano il lavoro. Un vicino di livello scritto 2 non è il caso.
@@ -633,7 +636,7 @@
     const gruppi = derivedGroups({ derived: d.stop ? [] : d.derived });
     const domande = gruppi.filter((g) => g.tipo === 'decisione').length;
     if (domande) {
-      parts.push(`${domande === 1 ? 'Un rilievo chiede una tua decisione senza fermare il lavoro: esce in un feedback a parte' : `${domande} rilievi chiedono una tua decisione senza fermare il lavoro: escono ciascuno in un feedback a parte`}, con priorità uguale al livello.`);
+      parts.push(`${domande === 1 ? 'Un rilievo chiede una tua decisione senza fermare il lavoro: esce in un feedback a parte' : `${domande} rilievi chiedono una tua decisione senza fermare il lavoro: escono ciascuno in un feedback a parte`}, con la priorità del livello (un 2 nasce a 1: la rosa la sceglie il manutentore).`);
     }
     const rimasti = gruppi.find((g) => g.tipo === 'rimasti');
     if (rimasti) {
@@ -641,7 +644,7 @@
       const voci = rimasti.findings.map((f) => `${findingTag(f)} ${primaFrase(f.text, 80)}`).join('; ');
       parts.push(n === 1
         ? `Il rilievo non corretto in questo giro esce in un feedback derivato, a priorità ${rimasti.priority}: ${voci}`
-        : `I ${n} rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità ${rimasti.priority} (il livello più alto fra loro): ${voci}`);
+        : `I ${n} rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità ${rimasti.priority} (la più alta fra loro): ${voci}`);
     }
     if (dueDaParte) {
       parts.push(`Il bilancio delle correzioni di livello 2 è finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra' : `i ${dueDaParte} rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano`} nel feedback dei rimasti.`);

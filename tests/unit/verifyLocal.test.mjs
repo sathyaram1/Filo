@@ -142,12 +142,12 @@ test('un 3 a bilancio esaurito, o un 2 col segno ?: esito stop; un 2 a bilancio 
   assert.match(checkVerdict(r.state.r, SHA).reason, /bocciato/);
   const d = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i?] quale strada?', sha: SHA });
   assert.equal(d.outcome, 'stop');
-  // Il 2 a bilancio dei 2 finito non ferma (2026-09-23): esce a parte, a priorità 2.
+  // Il 2 a bilancio dei 2 finito non ferma (2026-09-23): esce a parte, a priorità 1 (la 2 è del manutentore).
   let due = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   due.r.counts = { count2: 5 };
   const p = withCritique(due, 'r', { critique: 'P.\n[2i] ancora rotto', sha: SHA });
   assert.equal(p.outcome, 'pass');
-  assert.deepEqual(p.state.r.derived.map((x) => [x.level, x.priority]), [[2, 2]]);
+  assert.deepEqual(p.state.r.derived.map((x) => [x.level, x.priority]), [[2, 1]]);
 });
 
 test('i rilievi fuori dal giro restano in `derived` per il report', () => {

@@ -684,7 +684,7 @@ module.exports = function register(on, ctx) {
   // solo i campi scritti: gli altri restano ignoti invece di valere il default.
   const sessionsReply = (s) => {
     const r = { ok: true, letto: s.letto !== false };
-    for (const k of ['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff']) {
+    for (const k of ['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff', 'manutentoreAcceso']) {
       if (s[k] !== undefined) r[k] = s[k];
     }
     return r;
@@ -709,10 +709,31 @@ module.exports = function register(on, ctx) {
         priorityAccount: msg.priorityAccount,
         accountAOff: msg.accountAOff,
         accountBOff: msg.accountBOff,
+        manutentoreAcceso: msg.manutentoreAcceso,
       }, idToken));
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
+  }));
+
+  // Il recap del manutentore e la sua N (SPEC-MANUTENTORE § 9): due letture di ownerManutentore, indipendenti. Il
+  // testo è suo, scritto leggendo testo di chiunque: la pagina lo mostra come testo, mai come markup.
+  on(MSG.MANUTENTORE_RECAP_GET, ownerOnly(async () => {
+    const [recap, stato] = await Promise.allSettled([
+      callSecurityFunction('ownerManutentore', { op: 'recap', limite: 30 }),
+      callSecurityFunction('ownerManutentore', { op: 'stato' }),
+    ]);
+    if (recap.status === 'rejected' || !recap.value || recap.value.ok === false) {
+      const e = recap.status === 'rejected' ? recap.reason : null;
+      if (e?.httpStatus === 404 && !e?.code) return { ok: false, error: 'Il recap del manutentore non è ancora pubblicato sul server.' };
+      return { ok: false, error: e ? erroreDomande(e) : String(recap.value?.detail || recap.value?.reason || 'Il server non ha dato il recap.') };
+    }
+    const fogli = (Array.isArray(recap.value.recap) ? recap.value.recap : [])
+      .filter((f) => f && /^\d{4}-\d{2}-\d{2}$/.test(String(f.giorno)) && typeof f.testo === 'string')
+      .map((f) => ({ giorno: String(f.giorno), testo: f.testo, at: typeof f.at === 'string' ? f.at : null }));
+    const s = stato.status === 'fulfilled' && stato.value && stato.value.ok !== false ? stato.value : null;
+    const intero = (v) => (Number.isInteger(v) ? v : null);
+    return { ok: true, recap: fogli, stato: s ? { parallelismo: intero(s.parallelismo), parallelismoEffettivo: intero(s.parallelismoEffettivo), freno: intero(s.freno) } : null };
   }));
 
   // I numeri dell'owner sui crediti delle routine (#1356): il main fa da tramite verso ownerCrediti e rifà i

@@ -317,8 +317,10 @@ service cloud.firestore {
     //   - `failCap` (int): quanti fallimenti di fila prima di fermarsi.
     //   - `routineId` / `routineIdB` (string): le routine dei due account.
     //   - `accountBlockMs` (int): la pausa che si prende un account che fallisce.
-    //   - `maxSessions` (int 1-20; assente = 1): quante sessioni lavorano
-    //     insieme.
+    //   - `maxSessions` (int 1-20; assente = 20): il freno d'emergenza, sopra la
+    //     N del manutentore.
+    //   - `manutentoreAcceso` (bool; assente = false): il pacemaker accende il
+    //     manutentore (SPEC-MANUTENTORE § 4).
     //   - `priorityAccount` ('A'|'B'|''; assente = ''): da quale account si
     //     parte sempre finché regge; vuoto = si alternano.
     //   - `accountAOff` / `accountBOff` (bool; assente = false): account

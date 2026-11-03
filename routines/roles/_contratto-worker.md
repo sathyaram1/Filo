@@ -13,6 +13,12 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
 - un trade-off vero o una domanda di design (CLAUDE.md § Iniziativa: non lo
   decidi tu) → `--domanda <file.json>` sulla consegna (`--record-fixed`,
   `--record-verifier`). Nel report da solo si perde;
+- un dubbio di processo (quale strumento, quale ordine, cosa fare di un
+  rilievo) non è dell'owner: va al manutentore nel rilascio, `release
+  <biglietto> --role <il tuo ruolo> --processo "<la domanda>"`. Il lavoro resta
+  fermo finché lui non risponde con una nota, poi riparte da chi lo prende; col
+  manutentore spento non si ferma: la domanda resta nelle note per chi viene
+  dopo. Vale solo per chi lavora un feedback: un compito la scrive con `segnala`;
 - un errore avuto, uno strumento che sbaglia, un permesso che mancava, un
   problema trovato fuori dal tuo lavoro → la segnalazione libera, anche senza
   nessuna domanda: il server ne fa un feedback di tipo segnalazione, con la
@@ -33,7 +39,9 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
 <!-- includi: _domanda-fine-sessione.md -->
 - il claim → il rilascio, quando hai finito (`node scripts/routine-channel.mjs
   release <biglietto> --role <il tuo ruolo>`): il ruolo firma il rapporto di
-  fine sessione che il rilascio allega da solo; senza, il rapporto esce anonimo;
+  fine sessione che il rilascio allega da solo; senza, il rapporto esce anonimo.
+  Il rapporto porta già gli strumenti falliti (con cosa hai fatto dopo) e le
+  attese sopra i 30 secondi, letti dal transcript: non riportarli a parole;
 - un guasto che ti impedisce di lavorare → il rilascio con `--guasto`, come
   nella sezione qui sotto: è così che il server smette di dare lavoro per
   questo giro e rimette il lavoro in coda. Non "riportarlo" a parole:
