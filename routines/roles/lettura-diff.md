@@ -58,7 +58,7 @@ Solo questo testo, che il verificatore copia nella sua critica: la prima riga
 va nel suo riassunto, i rilievi in coda ai suoi.
 
 ```
-Lettura del diff: <la riga del conto, com'è scritta più sotto>. <In una o due frasi: cosa hai guardato, e cosa regge.>
+Lettura del diff: <la riga del conto, com'è scritta più sotto, e in un lavoro server «server:» con la sua>. <In una o due frasi: cosa hai guardato, e cosa regge.>
 [1i] <il rilievo per esteso e autonomo: cosa sta in due posti, o quale comportamento resta senza prova, e perché conta>
     <righe sotto, senza livello: dove, con le parole di chi usa Filo>
 ```
