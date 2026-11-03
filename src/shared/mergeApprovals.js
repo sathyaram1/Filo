@@ -749,11 +749,13 @@
   }
 
   // Chi la riallinea, e la frase che lo dice. La pagina che conosce la pratica lo dice con `o.riallineamento(req)` →
-  // { inCorso, testo } (Gestione: dallo stato della pratica, manageReview.statoFusione); senza, vale la provenienza.
+  // { inCorso } (Gestione: dallo stato della pratica, manageReview.statoFusione); senza, vale la provenienza.
+  var RIALLINEAMENTO_NON_ANDATO = 'Il riallineamento automatico non è andato: rimetti la sua pratica In coda per un giro nuovo, o segna la fusione come sistemata se te ne sei già occupato.';
   function riallineamentoDi(req, o) {
     var dato = o && typeof o.riallineamento === 'function' ? o.riallineamento(req) : null;
-    if (dato && dato.testo) return { inCorso: !!dato.inCorso, testo: String(dato.testo) };
-    return { inCorso: siRiallineaDaSola(req), testo: dopoIlConflitto(req) };
+    var inCorso = dato ? !!dato.inCorso : siRiallineaDaSola(req);
+    if (inCorso) return { inCorso: true, testo: RIALLINEA_DA_SOLA };
+    return { inCorso: false, testo: siRiallineaDaSola(req) ? RIALLINEAMENTO_NON_ANDATO : dopoIlConflitto(req) };
   }
 
   // Una fusione APPROVATA e mai avvenuta (conflitto) non chiede un'altra approvazione, ma non
