@@ -355,7 +355,9 @@ test('quello che Filo ha letto dalla scheda dell\'utente non esce in un indirizz
 test('una scheda troppo grande per leggerla tutta lo dichiara al modello invece di consegnarne metà', async ({ app, openTab, testServer }) => {
   test.setTimeout(180_000);
   const page = await openTab(NEWTAB);
-  const url = testServer.html(`<!doctype html><html><head><title>Registro</title></head><body><main><h1>Registro</h1><p>${'<b>x</b> '.repeat(160000)}</p>
+  // Oltre il tetto di elementi, ma nascosti: senza impaginarli la pagina si carica in pochi secondi anche su una macchina
+  // carica, dove 160 mila elementi visibili sforavano l'attesa e la prova diventava rossa a caso (#1907).
+  const url = testServer.html(`<!doctype html><html><head><title>Registro</title></head><body><main><h1>Registro</h1><p>Spedizioni del mese.</p><p>${'<b hidden>x</b>'.repeat(160000)}</p>
 <p>ULTIMA_RIGA consegnata il 27 settembre</p></main></body></html>`);
   await apriInSecondoPiano(app, url);
   await reteDiProva(app, { vietata: true });
