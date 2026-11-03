@@ -1813,6 +1813,9 @@
     guasto:   { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo per un guasto: la domanda dice cosa fare', domanda: true },
     locale:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_LOCALE },
     fidato:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_FIDATO },
+    // Li scrive l'attesa delle routine (functions/src/routine/waits.js), non i giudici: ognuno col suo motivo (#1425).
+    attesa_chiusa: { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Aspettava un feedback che si è chiuso senza fusione: decidi tu se rifarlo o archiviarlo' },
+    origine_bloccata: { forma: 'rombo', livello: 'l3', classe: 'attack', testo: 'Bloccato insieme al feedback da cui nasce: decidi tu' },
   };
 
   /** Il segno di un design fermo al livello 3 che non aspetta né una risposta né il lavoro locale, o null. PURA. */
