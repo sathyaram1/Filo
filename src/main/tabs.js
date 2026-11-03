@@ -2448,7 +2448,10 @@ class TabManager {
     // confine di fiducia interno↔esterno: il preload e contextIsolation sono
     // fissati alla creazione della view e un loadURL non li rivaluta, quindi
     // riusare la view caricherebbe il contenuto col preload sbagliato.
-    if (this._needsRecreate(tab, target)) {
+    // Sulla scheda appena caduta la vista rinasce verso l'indirizzo chiesto: la rimessa in piedi la lascia stare (#1868).
+    let caduta = false;
+    try { caduta = tab.view.webContents.isCrashed(); } catch (_) {}
+    if (caduta || this._needsRecreate(tab, target)) {
       this._recreateView(tab, target, { nuova: true });
     } else {
       tab.view.webContents.loadURL(target);
