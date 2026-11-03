@@ -152,7 +152,7 @@ test('feedback:leggi nella sede owner: un feedback non fidato si rifiuta col num
   assert.ok(s.pulito());
 });
 
-test('feedback:leggi nella sede owner: il fidato passa; una conversazione scritta anche da altri si rifiuta prima degli allegati', async (t) => {
+test('feedback:leggi nella sede owner: il fidato passa; i turni scritti da altri restano fuori, coi loro allegati, e la riga lo dice', async (t) => {
   const s = scena(t);
   const rifiuta = true;
   const decifra = async (g) => ({ ...g });

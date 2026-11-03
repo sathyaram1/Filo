@@ -489,12 +489,12 @@ async function sedeDellaSessione() {
   return sedeRifiuta();
 }
 
+const fidata = (d) => !!d && d.fiducia === 'fidato';
+
 /** Gli id delle domande il cui testo non è fidato (fiducia assente compresa). PURA. */
 export function nonFidate(domande) {
-  return (Array.isArray(domande) ? domande : []).filter((d) => d && d.fiducia !== 'fidato').map((d) => String(d.id || '?'));
+  return (Array.isArray(domande) ? domande : []).filter((d) => d && !fidata(d)).map((d) => String(d.id || '?'));
 }
-
-const fidata = (d) => !!d && d.fiducia === 'fidato';
 const testoDiNonFidate = (n) => (n === 1 ? 'testo di una domanda non fidata' : `testo di ${n} domande non fidate`);
 
 /** La riga del rifiuto nella sede owner: tutti gli id, non i primi dieci come nel motivo per il server. PURA. */

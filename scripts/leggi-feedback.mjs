@@ -9,8 +9,8 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { risolviFeedback } from './lib/pratica-locale.mjs';
-import { motiviDiLettura, primaDiStampare, sedeRifiuta } from './lib/biglietto-locale.mjs';
-import { rigaRifiuto } from './lib/sede.mjs';
+import { motiviDiLettura, primaDiStampare, sedeRifiuta, soloTurniDellOwner } from './lib/biglietto-locale.mjs';
+import { rigaRifiuto, rigaTurniTolti } from './lib/sede.mjs';
 import '../src/shared/feedbackThread.js';
 import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
@@ -216,7 +216,7 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
   const nSub = Number(f.subSeq?.integerValue) || 0;
   const numero = nSeq ? `${nSeq}${nSub ? `.${nSub}` : ''}` : nomeSicuro(id, 'feedback');
   const fiducia = f.fiducia?.stringValue || '';
-  if (rifiuta && fiducia !== 'fidato') return { codice: 3, rifiuto: rigaRifiuto(`#${numero}`, motiviDiLettura({ fiducia })) };
+  if (rifiuta && motiviDiLettura({ fiducia }).length) return { codice: 3, rifiuto: rigaRifiuto(`#${numero}`, motiviDiLettura({ fiducia })) };
   const pieno = await decifra({
     _id: doc.name, clientId: f.clientId?.stringValue || '', name: f.name?.stringValue || '',
     text: f.text?.stringValue || '', notes: f.notes?.stringValue || '', url: f.url?.stringValue || '',
@@ -227,6 +227,10 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
     seq: nSeq, subSeq: nSub,
     ...(f.localApproval?.mapValue ? { localApproval: { by: f.localApproval.mapValue.fields?.by?.stringValue || '' } } : {}),
   };
+  // Nella sede owner un feedback fidato arriva coi soli turni dell'owner: chi ha scritto gli altri, da qui, non si sa.
+  const tolti = rifiuta ? soloTurniDellOwner(pieno.notes) : { tolti: [] };
+  if (tolti.tolti.length) pieno.notes = tolti.notes;
+  const avviso = tolti.tolti.length ? rigaTurniTolti(`#${numero}`, tolti.tolti) : '';
   // Chi stampa testo non fidato si sporca da sé (#1148): i motivi li dà questa lettura, e main sporca prima di stampare.
   const motivi = motiviDiLettura({ fiducia, notes: pieno.notes });
   if (rifiuta && motivi.length) return { codice: 3, rifiuto: rigaRifiuto(`#${numero}`, motivi) };
@@ -245,12 +249,13 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
     cartella: dove,
   });
   fb.attese = await attese;
-  return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove)), ...allegati].join('\n'), motivi, numero };
+  return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove)), ...allegati].join('\n'), motivi, numero, ...(avviso ? { avviso } : {}) };
 }
 
 /** L'esito di leggi sul terminale, dietro il cancello della sede (SPEC-DOMANDE.md §1.2). `opts` = quelli di primaDiStampare. → il codice d'uscita */
 export async function stampa(esito, { scrivi = (s) => console.log(s), errore = (s) => console.error(s), ...opts } = {}) {
   if (esito.codice) { errore(esito.rifiuto || `RIFIUTATO: ${esito.errore}.`); return esito.codice; }
+  if (esito.avviso) errore(esito.avviso);
   const g = await primaDiStampare(`letto #${esito.numero}`, esito.motivi, opts);
   if (g.riga) errore(g.riga);
   if (!g.stampa) return 3;

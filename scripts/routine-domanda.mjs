@@ -4,7 +4,8 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { primaDiStampare } from './lib/biglietto-locale.mjs';
+import { primaDiStampare, sedeRifiuta } from './lib/biglietto-locale.mjs';
+import { elencoIds, rigaRifiuto } from './lib/sede.mjs';
 
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineClosingAdmin';
 // Gli slot li decide il server (gli altri li rifiuta con `bad_slot`): qui servono solo all'aiuto.
@@ -169,12 +170,32 @@ async function main() {
   }
   const n = a.n || 50;
   const risposte = await chiama({ op: 'answers', limit: n });
-  // Le risposte le scrivono le routine, che leggono testo d'utente: chi le stampa si sporca prima (#1148), o nella sede owner non le stampa.
-  const quante = (risposte?.orchestrator || []).length + (risposte?.workers || []).filter((w) => w && w.closing).length;
-  const g = await primaDiStampare(`risposte delle routine alla domanda di fine sessione (${quante})`, quante ? ['testo scritto dalle routine'] : []);
-  if (g.riga) console.error(g.riga);
-  if (!g.stampa) process.exit(1);
-  console.log(formattaRisposte(risposte, { n }));
+  process.exitCode = await stampaRisposte(risposte, { n });
+}
+
+/**
+ * Le risposte dietro il cancello della sede (#1148, SPEC-DOMANDE.md §1.2): le scrivono le routine, che leggono testo
+ * d'utente. Chi le stampa si sporca prima; nella sede owner passano solo quelle che il server dà per fidate, e le altre
+ * si dicono una per una. `opts` = quelli di primaDiStampare. → il codice d'uscita
+ */
+export async function stampaRisposte(risposte, { n = 50, scrivi = (x) => console.log(x), errore = (x) => console.error(x), ...opts } = {}) {
+  const r = risposte || {};
+  const orch = Array.isArray(r.orchestrator) ? r.orchestrator : [];
+  const workers = (Array.isArray(r.workers) ? r.workers : []).filter((w) => w && w.closing);
+  const fidata = (v) => !!v && v.fiducia === 'fidato';
+  if (sedeRifiuta(opts)) {
+    const fuori = [...orch.filter((o) => !fidata(o)).map((o) => `orchestratore ${visibile(o.slug || '?')}`),
+      ...workers.filter((w) => !fidata(w)).map((w) => `${visibile(w.role || 'worker')}${w.num ? ` #${visibile(String(w.num).replace(/^#+/, ''))}` : ''}`)];
+    scrivi(formattaRisposte({ ...r, orchestrator: orch.filter(fidata), workers: workers.filter(fidata) }, { n }));
+    if (fuori.length) errore(rigaRifiuto(`risposte delle routine alla domanda di fine sessione (${elencoIds(fuori)})`, ['testo scritto da routine non fidate']));
+    return 0;
+  }
+  const quante = orch.length + workers.length;
+  const g = await primaDiStampare(`risposte delle routine alla domanda di fine sessione (${quante})`, quante ? ['testo scritto dalle routine'] : [], opts);
+  if (g.riga) errore(g.riga);
+  if (!g.stampa) return 1;
+  scrivi(formattaRisposte(risposte, { n }));
+  return 0;
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));

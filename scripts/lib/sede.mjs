@@ -57,3 +57,10 @@ export function rigaRifiuto(cosa, motivi) {
   const perche = (Array.isArray(motivi) ? motivi : [motivi]).map((m) => String(m || '').trim()).filter(Boolean).join('; ') || 'testo non fidato';
   return `RIFIUTATO nella sede owner: ${cosa}, ${perche}. Niente stampato, e il biglietto resta pulito; si fa da una sede ricerca o compiti, o dalla finestra di Filo.`;
 }
+
+/** La riga dei turni d'altri tolti da un feedback fidato nella sede owner; dei marcatori solo la data. PURA. */
+export function rigaTurniTolti(cosa, marcatori) {
+  const date = (Array.isArray(marcatori) ? marcatori : []).map((m) => (String(m).match(/\d{1,2}\/\d{1,2}\/\d{2,4}(?:,?\s*\d{1,2}:\d{2})?/) || ['senza data'])[0]);
+  const quanti = date.length === 1 ? 'un turno della conversazione scritto' : `${date.length} turni della conversazione scritti`;
+  return `Nella sede owner: da ${cosa} ho tolto ${quanti} da routine o sessioni (${elencoIds(date)}), perché da qui non si sa se chi li ha scritti era fidato; il resto è stampato e il biglietto resta pulito. Interi si leggono da una sede ricerca o compiti, o dalla finestra di Filo.`;
+}

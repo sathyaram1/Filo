@@ -161,7 +161,8 @@ import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 import { cloneDelBiglietto, rilancia } from './lib/worker-nel-clone.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
 import { leaseAtteso } from './lib/lease-atteso.mjs';
-import { MOTIVO_SEDE_OWNER, chiRifiuta, rifiutaNonFidati } from './lib/sede.mjs';
+import { MOTIVO_SEDE_OWNER, chiRifiuta } from './lib/sede.mjs';
+import { sedeRifiuta } from './lib/biglietto-locale.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -223,7 +224,7 @@ export function testoAltruiDi(path, payload) {
  * @returns {Promise<{ status: number, body: object }>}
  */
 export async function call(path, payload, { attempts = 3, baseDelayMs = 1500, fetchImpl = fetch, sleep = defaultSleep, env = process.env } = {}) {
-  const altrui = rifiutaNonFidati(env) ? testoAltruiDi(path, payload) : '';
+  const altrui = sedeRifiuta({ env }) ? testoAltruiDi(path, payload) : '';
   if (altrui) return { status: 403, body: { ok: false, reason: MOTIVO_SEDE_OWNER, detail: `${altrui}, e il server consegnandolo sporcherebbe il biglietto` } };
   let last = null;
   for (let i = 1; i <= attempts; i++) {
