@@ -34,12 +34,13 @@ const BA = globalThis.SN_BOARD_ARCHIVE;
 const BASE = 'https://firestore.googleapis.com/v1/projects/p/databases/(default)/documents';
 
 // La rete finta sotto il freno: registra quello che le arriva davvero.
-async function sottoIlFreno(fn) {
+async function sottoIlFreno(fn, risponde = () => []) {
   const arrivate = [];
   const vera = globalThis.fetch;
   globalThis.fetch = conFreno(async (input, init) => {
     arrivate.push({ url: String(input), init });
-    return { ok: true, status: 200, json: async () => [], text: async () => '' };
+    const dati = await risponde(input, init);
+    return { ok: true, status: 200, json: async () => dati, text: async () => '' };
   });
   try {
     let errore = null;
