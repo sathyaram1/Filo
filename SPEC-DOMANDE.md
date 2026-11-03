@@ -1253,7 +1253,9 @@ per fase, scrivibile in Automazioni con #1193). Il gancio che li impone è
   - la sua parola d'ordine ha `lavori: server` (`routine-keys.mjs lavori`) e
     riceve solo lavori server fidati; le altre chiavi non
     ricevono mai lavoro server, salvo il controllo di sicurezza, che legge il
-    diff dal server senza clonare;
+    diff dal server senza clonare. Lo prende una parola d'ordine normale a
+    rete limitata, e il pacemaker lo conta sull'account che ne ha almeno una
+    viva, anche accanto a una a rete aperta di un'altra sua routine (#2068);
   - ce n'è una per account (#1426), e il pacemaker le accende con voci sue,
     fuori dall'alternanza della routine normale: A con `routineIdServer` e il
     segreto `CC_ROUTINE_FIRE_TOKEN_SERVER`, B con `routineIdServerB` e
