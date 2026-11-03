@@ -840,17 +840,18 @@
 
     // Prima delle richieste in attesa: più invecchia, più costa accorgersene.
     if (failed.length) {
-      var fbox = el('section', 'sn-mac sn-mac-failed');
+      // Se le riallinea tutte la routine, il titolo non suona l'allarme: non c'è niente da fare (#1425).
+      var tutteInCorso = failed.every(function (r) { return riallineamentoDi(r, o).inCorso; });
+      var fbox = el('section', 'sn-mac sn-mac-failed' + (tutteInCorso ? ' sn-mac-failed--in-corso' : ''));
       fbox.setAttribute('aria-label', 'Fusioni approvate ma non avvenute');
       var ftitle = el('div', 'sn-mac-title');
       var fico = el('span', 'sn-mac-ico');
       var ficons = global.SN_ICONS;
       fico.innerHTML = (ficons && typeof ficons.lock === 'function') ? ficons.lock(18) : '';
       ftitle.appendChild(fico);
-      ftitle.appendChild(el('span', 'sn-mac-title-text',
-        failed.length === 1
-          ? 'Una fusione approvata non è avvenuta'
-          : failed.length + ' fusioni approvate non sono avvenute'));
+      ftitle.appendChild(el('span', 'sn-mac-title-text', tutteInCorso
+        ? (failed.length === 1 ? 'Una fusione approvata è da riallineare' : failed.length + ' fusioni approvate sono da riallineare')
+        : (failed.length === 1 ? 'Una fusione approvata non è avvenuta' : failed.length + ' fusioni approvate non sono avvenute')));
       fbox.appendChild(ftitle);
       for (var k = 0; k < failed.length; k++) fbox.appendChild(buildFailedCard(failed[k], o));
       host.appendChild(fbox);
