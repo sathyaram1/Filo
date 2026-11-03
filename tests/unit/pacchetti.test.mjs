@@ -459,6 +459,28 @@ describe('il node_modules di un\'altra cartella si completa, non si cambia', () 
     } finally { togliCartella(dir); }
   });
 
+  test('il pre-avvio lanciato da un collegamento alla principale prende lo stesso turno delle prove dell\'albero', () => {
+    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
+    const fuori = cartellaTemporanea('filo-pacchetti-collegamento-');
+    const wt = join(dir, '.claude', 'worktrees', 'lavoro');
+    try {
+      mkdirSync(wt, { recursive: true });
+      lockCon(wt, LOCK_FILO);
+      const daCollegamento = join(fuori, 'principale');
+      symlinkSync(dir, daCollegamento, 'junction');
+      const blocco = fileBlocco(daCollegamento, dir);
+      assert.equal(blocco, fileBlocco(realpathSync(dir), dir));
+      writeFileSync(blocco, '');
+      const f = npmFinto();
+      const r = completaPacchetti(wt, {
+        installa: f.installa, cartellaBlocchi: dir, log: () => {},
+        attendi: () => { metti(dir, 'node_modules/hash-wasm', '4.12.0'); rmSync(blocco); },
+      });
+      assert.equal(r.esito, 'allineati');
+      assert.deepEqual(f.chiamate, [], 'nessuna installazione insieme a quella del pre-avvio');
+    } finally { togliCartella(fuori); togliCartella(dir); }
+  });
+
   test('l\'appoggio chiede le versioni del lock, gli alias e le sorgenti locali come le scrive il lock', () => {
     const radice = resolve('/progetto');
     const lock = { packages: {
