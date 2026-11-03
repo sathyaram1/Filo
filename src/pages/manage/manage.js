@@ -2801,7 +2801,7 @@
       ));
       item.title = (num ? `#${num} · ` : '') + title
         + (norm.statusReason ? ` — ${MR.reasonText(norm.statusReason)}` : '')
-        + (ferma ? ` — ${fusioneTesti.tooltip}` : '')
+        + (fusione ? ` — ${fusione.titolo.charAt(0).toLowerCase()}${fusione.titolo.slice(1)}` : '')
         + (arrivata ? ' — arrivata qui mentre la pagina era aperta' : '')
         + (ripartenze ? ` · rientrato in coda ${ripartenze} volt${ripartenze === 1 ? 'a' : 'e'}` : '');
       const rowHtml = `
