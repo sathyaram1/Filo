@@ -1589,8 +1589,9 @@ test('livelli L5: una richiesta già mandata a fondere, o già decisa, non dice 
   assert.match(ferma.pannello.testo, /via libera/);
   assert.equal(ferma.fusione, null);
   const volo = MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => 'volo' });
-  assert.equal(volo.esito, 'bloccato');
+  assert.equal(volo.esito, 'attesa', 'in volo non è più una decisione: niente rosso');
   assert.equal(volo.fusione, 'volo');
+  assert.equal(MR.fusioneInAttesa(FB_412, { fusioni, statoRichiesta: () => 'volo' }), false);
   assert.doesNotMatch(volo.pannello.testo, /via libera/);
   assert.equal(volo.richieste.length, 1);
   assert.equal(MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => 'decisa' }).fusione, 'decisa');
@@ -1615,11 +1616,83 @@ test('livelli L5: giallo in lavorazione, verde fuso con la versione, grigio se n
   assert.equal(mai.vuoto, true);
 });
 
-test('livelli L5: un sì già dato che non ha prodotto niente resta rosso, e lo dice', () => {
+test('livelli L5: un sì del lavoro locale finito in conflitto resta rosso, e dice cosa fare (#1425)', () => {
   const l5 = MR.livelloL5(FB_412, { fusioni: { failed: [{ ...RICHIESTA, used: true, outcome: 'conflict' }] } });
   assert.equal(l5.esito, 'conflitto');
   assert.equal(l5.colore, MR.REASONS.attack.color);
-  assert.match(l5.pannello.testo, /non è avvenuta/);
+  assert.equal(l5.statoFusione, 'riallineamento_fallito');
+  assert.match(l5.pannello.testo, /npm run finish/);
+});
+
+// #1425: approvata, in conflitto, e la routine la sta riallineando: niente rosso, niente cima, un'etichetta sua.
+const FALLITA_ROUTINE = { ...RICHIESTA, id: 'f1', feedbackId: 'fb-412', origin: 'routine', used: true, outcome: 'conflict' };
+test('fusione approvata e in conflitto, in riallineamento: non è una decisione dell’owner (#1425)', () => {
+  const opts = { fusioni: { failed: [FALLITA_ROUTINE] }, fusioniLette: true };
+  const fb = { ...FB_412, status: 'revision_capability' };
+  assert.equal(MR.statoFusione(fb, opts), 'da_riallineare');
+  assert.equal(MR.fusioneInAttesa(fb, opts), false);
+  const f = MR.fusioneDi(fb, opts);
+  assert.equal(f.etichetta, 'da riallineare');
+  assert.match(f.titolo, /la routine lo riallinea/);
+  const l5 = MR.livelloL5(fb, opts);
+  assert.notEqual(l5.colore, MR.REASONS.attack.color);
+  assert.match(l5.pannello.testo, /la routine lo riallinea/);
+  assert.equal(l5.richieste.length, 1, 'la scheda resta nel pannello');
+  // Fuori dai Ricevuti (In coda) nessun segno, e la scheda non sale fra le decisioni.
+  assert.equal(MR.manageTabFor(fb, opts), 'queue');
+  assert.equal(MR.segnoFermata(fb, opts), null);
+  const pending = { ...FB_412, _id: 'p', seq: 7 };
+  const lista = MR.fusioniFermeInCima([fb, pending], { ...opts, fusioni: { ...opts.fusioni, pending: [{ id: 'q', feedbackId: 'p' }] } });
+  assert.deepEqual(lista.map((x) => x._id), ['p', 'fb-412']);
+  // Riallineamento non andato: la pratica è uscita dalla lavorazione (ferma, arenata) → torna all'owner, col da farsi.
+  const ferma = { ...FB_412, status: 'design', statusReason: 'arenato' };
+  assert.equal(MR.statoFusione(ferma, opts), 'riallineamento_fallito');
+  assert.equal(MR.fusioneInAttesa(ferma, opts), true);
+  assert.match(MR.livelloL5(ferma, opts).pannello.testo, /rimettila In coda/);
+  assert.equal(MR.segnoFermata(ferma, opts).classe, 'attack');
+});
+
+test('richiesta in attesa: rossa, in cima e nei Ricevuti (#1425)', () => {
+  const opts = { fusioni: { pending: [RICHIESTA] }, fusioniLette: true };
+  assert.equal(MR.statoFusione(FB_412, opts), 'da_decidere');
+  assert.equal(MR.fusioneInAttesa(FB_412, opts), true);
+  assert.equal(MR.fusioneDi(FB_412, opts).etichetta, 'fusione ferma');
+  assert.equal(MR.manageTabFor(FB_412, opts), 'inbox');
+  const s = MR.segnoFermata(FB_412, opts);
+  assert.equal(s.classe, 'attack');
+  assert.match(s.testo, /via libera/);
+});
+
+// #1040.2: approvata e fusa, con lo stato nuovo non ancora arrivato.
+test('approvata e fusa, stato non ancora aggiornato: non aspetta l’owner (#1040.2)', () => {
+  const fb = { _id: 'f1040', seq: 1040, status: 'design', statusReason: 'l5' };
+  const opts = { fusioniLette: true, fusioni: { recent: [{ id: 'r2', feedbackId: 'f1040', used: true, outcome: 'merged' }] } };
+  assert.equal(MR.statoFusione(fb, opts), 'fusa');
+  assert.equal(MR.fusioneInAttesa(fb, opts), false);
+  const f = MR.fusioneDi(fb, opts);
+  assert.notEqual(f.etichetta, 'fusione ferma');
+  assert.match(f.titolo, /Approvata e fusa/);
+  const s = MR.segnoFermata(fb, opts);
+  assert.notEqual(s.classe, 'attack');
+  assert.doesNotMatch(s.testo, /via libera/);
+  assert.notEqual(MR.livelloL5(fb, opts).colore, MR.REASONS.attack.color);
+  // Chiuderla a mano non scavalca niente: il lavoro è in main.
+  assert.ok(MR.ownerActions(fb, opts).some((a) => a.to === 'archived'));
+});
+
+// #1327 punto 4 (#928): finché c'è una fusione da decidere, o il ramo approvato non è in main, la riga non chiude.
+test('ownerActions: niente Risolto né chiusure mentre una fusione aspetta (#928)', () => {
+  const chiusure = (acts) => acts.filter((a) => ['done', 'archived', 'attack_confirmed', 'spam_confirmed'].includes(a.to));
+  const pend = { fusioni: { pending: [RICHIESTA] }, fusioniLette: true };
+  assert.deepEqual(chiusure(MR.ownerActions(FB_412, pend)), []);
+  const fb = { ...FB_412, status: 'revision_capability' };
+  const rial = { fusioni: { failed: [FALLITA_ROUTINE] }, fusioniLette: true };
+  assert.deepEqual(chiusure(MR.ownerActions(fb, rial)), []);
+  const loc = { fusioni: { failed: [{ ...RICHIESTA, used: true, outcome: 'conflict' }] }, fusioniLette: true };
+  assert.deepEqual(chiusure(MR.ownerActions(fb, loc)), []);
+  assert.equal(MR.ownerActionAllowsStatus(fb, 'done', rial), false);
+  // Senza fusioni la riga è quella dello stato.
+  assert.ok(MR.ownerActions(fb, { fusioni: {} }).some((a) => a.to === 'done'));
 });
 
 test('livelli L5: lo stato del server basta da solo (design/l5), senza gli elenchi', () => {
@@ -1648,8 +1721,8 @@ test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le st
   const vecchia = { ...fb, notes: "--- Aggiornamento dell'agente del 20/10/26, 09:00 ---\nReport: tasto spostato a destra." };
   assert.match(MR.livelloL5(vecchia, lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
   assert.deepEqual(MR.livelloL5(vecchia, lette).pannello.righe, []);
-  // Senza l'ora dell'audit nessuna nota si può dire del cancello.
-  assert.match(MR.livelloL5({ ...fb, livelli: {} }, lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
+  // La nota del cancello si riconosce dalla forma: l'ora dell'audit non serve (#1556.2).
+  assert.equal(MR.livelloL5({ ...fb, livelli: {} }, lette).pannello.testo, nota);
   assert.deepEqual(l5.pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
   assert.equal(l5.fusione, 'senza');
   assert.ok(l5.pannello.righe.some((r) => r.etichetta === 'Quando'));
@@ -1674,28 +1747,39 @@ test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le st
   assert.equal(conRichiesta.richiesta.id, 'r');
 });
 
-test('livelli L5 senza richiesta (#1556): la nota del server, con l’ora in UTC, letta in Italia resta il motivo', () => {
-  require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackThread.js'));
-  const tzPrima = process.env.TZ;
-  process.env.TZ = 'Europe/Rome';
-  try {
-    const nota = 'Il cancello non fonde il ramo del server. Decidi tu: archiviarlo, o farlo rifare.';
-    const lette = { fusioni: { pending: [], failed: [] }, fusioniLette: true };
-    const fb = (marcatore) => ({
-      status: 'design', statusReason: 'l5',
-      notes: `Report.\n\n--- Aggiornamento dell'agente del ${marcatore} ---\n${nota}`,
-      livelli: { l4: { esito: 'pass', at: '2026-10-21T15:40:00.000Z' } },
-    });
-    // Il server scrive «15:55» per le 15:55 UTC: un quarto d'ora dopo l'audit, anche se in Italia sono le 17:55.
-    assert.equal(MR.livelloL5(fb('21/10/26, 15:55'), lette).pannello.testo, nota);
-    // Uno strumento dell'owner scrive nella sua ora: le 17:55 italiane sono sempre dopo l'audit.
-    assert.equal(MR.livelloL5(fb('21/10/26, 17:55'), lette).pannello.testo, nota);
-    // Scritta dal server un'ora prima dell'audit: non è il motivo della fermata.
-    assert.match(MR.livelloL5(fb('21/10/26, 14:40'), lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
-  } finally {
-    if (tzPrima === undefined) delete process.env.TZ; else process.env.TZ = tzPrima;
-  }
-});
+// #1556.2: il motivo è la nota del cancello riconosciuta dalla forma, mai un report, in qualunque fuso.
+for (const tz of ['America/New_York', 'Europe/Rome', 'UTC']) {
+  test(`livelli L5 senza richiesta (#1556.2): un report non diventa il motivo della fermata (TZ=${tz})`, () => {
+    require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackThread.js'));
+    const tzPrima = process.env.TZ;
+    process.env.TZ = tz;
+    try {
+      const lette = { fusioni: { pending: [], failed: [] }, fusioniLette: true };
+      const fb = (marcatore, testo) => ({
+        status: 'design', statusReason: 'l5',
+        notes: `Report.\n\n--- Aggiornamento dell'agente del ${marcatore} ---\n${testo}`,
+        livelli: { l4: { esito: 'pass', at: '2026-10-21T15:40:00.000Z' } },
+      });
+      // Report del server delle 14:00 UTC, controllo alle 15:40 UTC: a New York sembrava nato dopo.
+      const report = MR.livelloL5(fb('21/10/26, 14:00', 'Report: tasto spostato a destra, prove verdi.'), lette);
+      assert.match(report.pannello.testo, /Nessuna richiesta di fusione è aperta/);
+      assert.deepEqual(report.pannello.righe, []);
+      // Nota degli strumenti dell'owner in ora italiana, prima del controllo.
+      assert.match(MR.livelloL5(fb('21/10/26, 15:30', 'Report: fatto il rebase.'), lette).pannello.testo, /Nessuna richiesta/);
+      // Una vera nota del cancello si riconosce, anche col marcatore più vecchio dell'audit.
+      for (const nota of [
+        'Il cancello non fonde il ramo del server: suite rossa. Decidi tu: archiviarlo, o farlo rifare.',
+        'Il cancello di fusione (L5) ha fermato la modifica (commit abc1234):\n- guardie toccate',
+        'Verifica e controllo di sicurezza erano passati ma la fusione non era mai partita: l’ha chiesta il server, e il cancello l’ha fermata.',
+        'Verifica e controllo di sicurezza sono passati, e gli unit non hanno fermato niente. I controlli deterministici del cancello (L5) hanno fermato la fusione:\n- x',
+      ]) {
+        assert.equal(MR.livelloL5(fb('21/10/26, 14:00', nota), lette).pannello.testo, nota);
+      }
+    } finally {
+      if (tzPrima === undefined) delete process.env.TZ; else process.env.TZ = tzPrima;
+    }
+  });
+}
 
 test('livelli L5: ferma al cancello senza richiesta viva, a elenchi letti, offre di riaprirla (#1040)', () => {
   const fb = { _id: 'f1040', seq: 1040, status: 'design', statusReason: 'l5' };
@@ -2136,4 +2220,18 @@ test('«💻 Lavoro server» c’è solo sul rombo azzurro, ed è il tasto princ
     { status: 'attack' }, { status: 'unlabeled' }, { status: 'todo' }, { status: 'archived' }]) {
     assert.equal(MR.ownerActionFor(fb, 'accept_local'), null, JSON.stringify(fb));
   }
+});
+
+// #1425: un design che non viene dai giudici ha il segno del suo motivo, non il cerchio dei giudici.
+test('segnoFermata: attesa_chiusa e origine_bloccata hanno un segno proprio (#1425)', () => {
+  const giudici = /giudici/i;
+  const chiusa = MR.segnoFermata({ status: 'design', statusReason: 'attesa_chiusa' }, {});
+  assert.notEqual(chiusa.forma, 'cerchio');
+  assert.doesNotMatch(chiusa.testo, giudici);
+  assert.match(chiusa.testo, /chiuso senza fusione/);
+  const bloccata = MR.segnoFermata({ status: 'design', statusReason: 'origine_bloccata', origine: { num: '#77' } }, {});
+  assert.notEqual(bloccata.forma, 'cerchio');
+  assert.equal(bloccata.classe, 'attack');
+  assert.doesNotMatch(bloccata.testo, giudici);
+  assert.match(bloccata.testo, /bloccato/);
 });

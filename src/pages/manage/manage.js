@@ -2049,7 +2049,7 @@
     aperturaFatta = true;
     const d = DOMANDE ? DOMANDE.stato() : null;
     const ricevuti = dataLoaded && sezioniAttendibili()
-      ? MR.listForManageTab(allFeedbacks, 'inbox', { releasedVersion, fusioni }).length
+      ? MR.listForManageTab(allFeedbacks, 'inbox', opzSezioni()).length
       : null;
     const scelta = MR.sezioneDiApertura({ domande: d && d.lette ? d.domande : null, ricevuti, ultima: leggiSezione() });
     // Si apre sui Ricevuti per quello che c'è dentro: a filtri spenti, o un blocco nuovo resterebbe nascosto.
@@ -2079,7 +2079,7 @@
   function mostraNelFiltro(fb) {
     if (!fb) return;
     if (soloNonFidate && MR.isFidato(fb)) impostaSoloNonFidate(false);
-    if (!livelliScelti.length || MR.manageTabFor(fb, { releasedVersion, fusioni }) !== 'inbox') return;
+    if (!livelliScelti.length || MR.manageTabFor(fb, opzSezioni()) !== 'inbox') return;
     if (!MR.filtraLivelli([fb], livelliScelti, { releasedVersion, fusioni }).length) livelliScelti = [];
   }
 
@@ -2455,7 +2455,7 @@
       }
     }
     // Solo sul rombo azzurro, come nel dettaglio: lì è l'unica uscita (#1575).
-    const lavoroLocale = isAdmin ? MR.ownerActionFor(fb, 'accept_local', { releasedVersion }) : null;
+    const lavoroLocale = isAdmin ? MR.ownerActionFor(fb, 'accept_local', opzSezioni()) : null;
     if (lavoroLocale) {
       voci.push({ testo: lavoroLocale.label, titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
     }
@@ -2624,7 +2624,7 @@
 
     // Feedback = i Ricevuti a filtro spento: il filtro è una vista della scheda, non della sezione.
     const leggibili = dataLoaded && sezioniAttendibili();
-    const ricevuti = leggibili ? MR.listForManageTab(allFeedbacks, 'inbox', { releasedVersion, fusioni }).length : null;
+    const ricevuti = leggibili ? MR.listForManageTab(allFeedbacks, 'inbox', opzSezioni()).length : null;
     const bf = scrivi('feedback', ricevuti === null ? '' : countText(ricevuti),
       ricevuti === null ? '' : `${ricevuti} nei Ricevuti${loadHitCap() ? ` · ${FB.COUNT_INCOMPLETE_HINT}` : ''}`);
     if (bf) bf.classList.toggle('mg-sezione--arrivi', sezioneAttiva !== 'feedback'
@@ -2709,22 +2709,15 @@
     caricaAttesiFuori();
   }
 
-  // Questa segnalazione ha una fusione ferma che aspetta l'owner?
-  // Etichetta e suggerimento della pratica in lista: «aspetta il tuo via libera» solo se aspetta davvero (#702).
-  const TESTI_FUSIONE_LISTA = {
-    ferma: { etichetta: 'fusione ferma', titolo: 'Una fusione aspetta il tuo via libera', tooltip: 'una fusione aspetta il tuo via libera' },
-    volo: { etichetta: 'in fusione', titolo: 'Approvata: il server sta fondendo il ramo', tooltip: 'il server sta fondendo il ramo' },
-    decisa: { etichetta: 'fusione decisa', titolo: 'Hai già deciso: esce da qui alla prossima rilettura', tooltip: 'fusione già decisa' },
-    senza: { etichetta: 'fusione ferma', titolo: 'Ferma al cancello senza una richiesta aperta. Decidi tu se rifarla o archiviarla', tooltip: 'ferma al cancello, nessuna richiesta aperta' },
-  };
-  function fusioneFerma(fb) {
-    return MR.fusioneInAttesa(fb, { fusioni });
+  // Lo stato della fusione di una pratica e le sue parole, dalla stessa funzione del quadrato (#1425).
+  function fusioneDi(fb) {
+    return MR.fusioneDi(fb, opzSezioni());
   }
 
-  // Le segnalazioni con una fusione ferma davanti a tutte, conservando fra loro l'ordine
+  // Le segnalazioni con una fusione che aspetta l'owner davanti a tutte, conservando fra loro l'ordine
   // (`sort` è stabile).
   function pinFusioniFerme(lista) {
-    return MR.fusioniFermeInCima(lista, { fusioni });
+    return MR.fusioniFermeInCima(lista, opzSezioni());
   }
 
   // La parte che NON dipende da quale sezione si guarda: la condivide anche l'elenco unico di
@@ -3778,7 +3771,7 @@
     return allFeedbacks.find((f) => f._id === id) || attesiFuori.get(id);
   }
   function opzSezioni(extra) {
-    return Object.assign({ releasedVersion, fusioni, trovaAtteso }, extra);
+    return Object.assign({ releasedVersion, fusioni, fusioniLette: fusioniOk, statoRichiesta, trovaAtteso }, extra);
   }
   // Gli aspettati più vecchi della finestra caricata: una lettura, poi la lista si ridisegna con il loro stato.
   function caricaAttesiFuori() {
@@ -4025,7 +4018,7 @@
     chiudiConfermaSegno();
     setActionMsg('', '');
     mgActionsRow.querySelectorAll('button').forEach((b) => b.remove());
-    const azioni = (isAdmin && fb) ? MR.ownerActions(fb, { releasedVersion }) : [];
+    const azioni = (isAdmin && fb) ? MR.ownerActions(fb, opzSezioni()) : [];
     // Chi aspetta una domanda si sblocca rispondendo lì: è la prima azione, e la sola strada per farlo ripartire.
     const domandaId = (isAdmin && fb) ? MR.aspettaDomanda(fb) : '';
     mgActions.hidden = !azioni.length && !domandaId;
@@ -4092,7 +4085,7 @@
     if (!fb) return;
     // Il guardiano sta SOTTO ai pulsanti: si scrive solo uno stato che la segnalazione offre
     // adesso, o un pannello rimasto aperto riscrive un attacco confermato ad «archiviato».
-    if (!MR.ownerActionAllowsStatus(fb, action.to, { releasedVersion })) {
+    if (!MR.ownerActionAllowsStatus(fb, action.to, opzSezioni())) {
       renderActions(fb);
       setActionMsg('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile.', 'err');
       return;
@@ -4245,7 +4238,7 @@
     // senza note, e appenderci sopra il motivo le cancellerebbe.
     const fb = await feedbackCompleto(selectedId);
     if (!fb) { setActionMsg(CONVERSAZIONE_NON_ARRIVATA, 'err'); return; }
-    const azione = MR.ownerActionFor(fb, 'reopen', { releasedVersion });
+    const azione = MR.ownerActionFor(fb, 'reopen', opzSezioni());
     if (!azione) {
       chiudiRiapertura();
       renderActions(fb);
@@ -4619,7 +4612,7 @@
     }
     // Lo stesso guardiano delle azioni di stato: in coda ci si rimette solo da dove la tabella
     // condivisa lo prevede.
-    if (fb && !MR.ownerActionAllowsStatus(fb, 'todo', { releasedVersion })) {
+    if (fb && !MR.ownerActionAllowsStatus(fb, 'todo', opzSezioni())) {
       setClarifyMsg('Lo stato di questa segnalazione è cambiato: aggiorna e riprova.', 'err');
       return;
     }
@@ -5126,7 +5119,7 @@
       // una cifrata è la macchina a inventarsi che aspetta, perché la sezione
       // qui non si legge. Senza il criterio si dice solo il fatto: nessun
       // verdetto è mai arrivato, punto. La gemella quella frase non la scrive.
-      else if (statoLeggibile(fb) && MR.manageTabFor(fb, { releasedVersion }) === 'inbox') {
+      else if (statoLeggibile(fb) && MR.manageTabFor(fb, opzSezioni()) === 'inbox') {
         opinionHtml = '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>';
       } else {
         opinionHtml = '<em>I giudici non hanno mai valutato questo feedback.</em>';
@@ -5412,7 +5405,7 @@
   function pannelloStradeFusione(fb, liv) {
     if (!isAdmin) return null;
     const strade = (liv.pannello.azioni || []).map((k) => STRADE_FUSIONE[k]).filter(Boolean)
-      .map((s) => ({ ...s, azione: MR.ownerActionFor(fb, s.key, { releasedVersion }) }))
+      .map((s) => ({ ...s, azione: MR.ownerActionFor(fb, s.key, opzSezioni()) }))
       .filter((s) => s.azione);
     if (!strade.length) return null;
     const box = document.createElement('div');
@@ -5552,7 +5545,7 @@
 
   function pannelloSaltaAudit(fb) {
     const fermo = esitiSalta.get(fb._id);
-    const azione = fermo && fermo.firma === firmaSalta(fb) && MR.ownerActionFor(fb, 'accept', { releasedVersion });
+    const azione = fermo && fermo.firma === firmaSalta(fb) && MR.ownerActionFor(fb, 'accept', opzSezioni());
     if (azione) return pannelloSaltoFermo(fb, fermo.m, azione);
     if (fermo) esitiSalta.delete(fb._id);
     const box = document.createElement('div');
