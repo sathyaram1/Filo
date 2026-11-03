@@ -206,19 +206,32 @@ export function percorsoDiChiLancia({ env = process.env, cwd = process.cwd(), se
 const TURNO_OWNER_RE = /^---\s*(?:Riaperto il|La tua risposta del)\s*.*?\s*---\s*$/;
 const TURNO_ALTRI_RE = /^---\s*(?:Aggiornamento dell'agente del|Filo ha risposto il)\s*.*?\s*---\s*$/;
 
+/** I turni della conversazione col loro marcatore; quello prima di ogni marcatore è d'altri. PURA. */
+function turniDi(notes) {
+  const turni = [{ owner: false, marcatore: '', righe: [] }];
+  for (const riga of String(notes || '').split(/\r?\n/)) {
+    if (TURNO_OWNER_RE.test(riga) || TURNO_ALTRI_RE.test(riga)) turni.push({ owner: TURNO_OWNER_RE.test(riga), marcatore: riga, righe: [] });
+    else turni[turni.length - 1].righe.push(riga);
+  }
+  return turni;
+}
+
 /**
  * La conversazione contiene testo scritto da altri che dall'owner (routine, sessioni, Filo)? PURA. Il server sa se
  * l'ha scritto un biglietto sporco (`scrittoSporco`), da qui no: nel dubbio, chi la stampa si sporca.
  */
 export function noteConScrittiDiAltri(notes) {
-  let altri = true;
-  for (const riga of String(notes || '').split(/\r?\n/)) {
-    if (TURNO_OWNER_RE.test(riga)) { altri = false; continue; }
-    if (TURNO_ALTRI_RE.test(riga)) { altri = true; continue; }
-    if (riga.startsWith('@@filo-attachment ')) continue;
-    if (altri && riga.trim()) return true;
-  }
-  return false;
+  return turniDi(notes).some((t) => !t.owner && t.righe.some((r) => r.trim() && !r.startsWith('@@filo-attachment ')));
+}
+
+/**
+ * La conversazione coi soli turni dell'owner, per la sede owner: quelli d'altri restano fuori, allegati compresi, e
+ * `tolti` li dice col loro marcatore. PURA. → { notes, tolti: string[] }
+ */
+export function soloTurniDellOwner(notes) {
+  const turni = turniDi(notes);
+  const tolti = turni.filter((t) => !t.owner && t.righe.some((r) => r.trim())).map((t) => t.marcatore || '(il primo turno, senza marcatore)');
+  return { notes: turni.filter((t) => t.owner).map((t) => [t.marcatore, ...t.righe].join('\n')).join('\n'), tolti };
 }
 
 /** Perché chi stampa questo feedback si sporca (§1.2): testo non fidato, o una conversazione scritta anche da altri. PURA. */
