@@ -17,6 +17,17 @@
   const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
   const STORAGE_BASE = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o`;
 
+  // Fuori da Electron chi carica questo modulo è uno strumento, e può scansionare le schede pubbliche senza credenziali:
+  // il freno sulle scansioni si installa qui, comunque il modulo sia stato nominato (#1335). Fuori dal repo non c'è.
+  if (typeof require === 'function' && typeof __dirname === 'string' && typeof process !== 'undefined'
+      && process.versions && process.versions.node && !process.versions.electron) {
+    try {
+      require(require('path').join(__dirname, '..', '..', 'scripts', 'lib', 'freno-letture.cjs'));
+    } catch (e) {
+      if (!e || e.code !== 'MODULE_NOT_FOUND') throw e;
+    }
+  }
+
   // L'uuid è ANCHE il segreto del percorso di un allegato: storage.rules concede la creazione
   // solo su un nome che lo contiene, quindi i bit vengono dal generatore crittografico.
   function uuid() {
