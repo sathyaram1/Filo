@@ -11,11 +11,11 @@ import * as B from './biglietto-locale.mjs';
 import { cartellaDelServer } from './ramo-server.mjs';
 
 // Gli strumenti di Claude Code che non portano dentro niente da fuori. Elenco chiuso: uno che non c'è, anche nuovo o
-// sconosciuto, sporca (#1211.2). Read, Artifact, Agent e ToolSearch li decide motivoLettura dai parametri.
+// sconosciuto, sporca (#1211.2). Read, Grep, Artifact, Agent e ToolSearch li decide motivoLettura dai parametri.
 export const STRUMENTI_SENZA_LETTURA = Object.freeze([
   // La shell: quello che scarica lo dichiara la sessione (SPEC-DOMANDE.md §1.2).
   'Bash', 'PowerShell', 'BashOutput', 'KillShell', 'Monitor',
-  'Grep', 'Glob', 'LS',
+  'Glob', 'LS',
   'Edit', 'MultiEdit', 'Write', 'NotebookEdit',
   'TodoWrite', 'TaskCreate', 'TaskGet', 'TaskList', 'TaskUpdate', 'TaskStop', 'CronCreate', 'CronDelete', 'CronList',
   'EnterPlanMode', 'ExitPlanMode', 'EnterWorktree', 'ExitWorktree', 'AskUserQuestion',
