@@ -1596,7 +1596,72 @@
       testo: (nota && nota.body) || (cifrata ? `${generica} ${L5_NOTA_CIFRATA}` : generica),
       // A elenchi letti, una pratica senza richiesta viva (mai registrata, scaduta, scartata) si può riaprire (#1040).
       azioni: (lette && !server ? ['riapri_fusione'] : []).concat(['rimanda', 'archivia']),
-    }, { richiesta: null, richieste: [], conflitto: false, fusione: lette ? 'senza' : null });
+    }, { richiesta: null, richieste: [], conflitto: false, fusione: lette ? 'senza' : null, statoFusione: lette ? 'senza' : 'ferma' });
+  }
+
+  /**
+   * In che stato è la fusione di una pratica, in un posto solo (#1425, #1040.2): chip, ordine, segno, quadrato e riga
+   * dei tasti lo leggono da qui. `attende`: è una decisione dell'owner (rosso e in cima). `chiusure`: la riga dei tasti
+   * può chiudere la pratica (#928: mai mentre una richiesta aspetta o il ramo non è in main).
+   */
+  const STATI_FUSIONE = {
+    da_decidere: {
+      attende: true, chiusure: false, classe: 'attack', etichetta: 'fusione ferma',
+      titolo: 'Una fusione aspetta il tuo via libera',
+      testo: 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera.',
+    },
+    volo: {
+      attende: false, chiusure: false, classe: 'spam', etichetta: 'in fusione',
+      titolo: 'Approvata: il server sta fondendo il ramo',
+      testo: 'Approvata: il server sta fondendo il ramo.',
+    },
+    decisa: {
+      attende: false, chiusure: false, classe: 'spam', etichetta: 'fusione decisa',
+      titolo: 'Hai già deciso: esce da qui alla prossima rilettura',
+      testo: 'Hai già deciso: la richiesta esce da qui appena la pagina rilegge le fusioni.',
+    },
+    fusa: {
+      attende: false, chiusure: true, classe: 'design', etichetta: 'approvata e fusa',
+      titolo: 'Approvata e fusa: esce da qui appena arriva il suo stato nuovo',
+      testo: 'Approvata e fusa: la pratica esce da qui appena arriva il suo stato nuovo.',
+    },
+    da_riallineare: {
+      attende: false, chiusure: false, classe: 'spam', etichetta: 'da riallineare',
+      titolo: 'Avevi detto sì, ma il ramo era in conflitto con main: la routine lo riallinea e ti arriva una richiesta nuova solo se serve',
+      testo: 'Avevi detto sì, ma il ramo era in conflitto con main: la routine lo riallinea e rifà i controlli, e ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto.',
+    },
+    riallineamento_fallito: {
+      attende: true, chiusure: false, classe: 'attack', etichetta: 'fusione non avvenuta',
+      titolo: 'Avevi detto sì, ma il ramo era in conflitto con main e nessuno lo sta riallineando',
+      testo: '',
+    },
+    senza: {
+      attende: true, chiusure: true, classe: 'attack', etichetta: 'fusione ferma',
+      titolo: 'Ferma al cancello senza una richiesta aperta. Decidi tu se rifarla o archiviarla',
+      testo: '',
+    },
+    // Ferma al cancello, con gli elenchi delle richieste non ancora letti: non si sa se aspetta un via libera.
+    ferma: {
+      attende: true, chiusure: true, classe: 'attack', etichetta: 'fusione ferma',
+      titolo: 'Ferma al cancello di fusione: le richieste non sono ancora arrivate a questa pagina',
+      testo: '',
+    },
+  };
+
+  // Approvata e finita in conflitto: la riallinea la routine solo per il lavoro di una routine legato alla sua pratica,
+  // finché la pratica è in lavorazione (functions/src/routine/mergeApprovals.js, routeRealignment). Il lavoro locale non
+  // ha riallineamento automatico; una pratica uscita dalla lavorazione (ferma, arenata) vuol dire che non è andato.
+  function riallineamentoDi(fb, failed) {
+    const { status } = normalizeStatus(fb);
+    const inLavoro = status === 'todo' || WORK_STAGES.includes(status);
+    const daRoutine = (r) => String((r && r.origin) || '') === 'routine' && !!String((r && r.feedbackId) || '').trim();
+    return inLavoro && failed.every(daRoutine) ? 'da_riallineare' : 'riallineamento_fallito';
+  }
+  function testoRiallineamentoFallito(failed) {
+    const locale = failed.some((r) => String((r && r.origin) || '') !== 'routine');
+    return locale
+      ? 'Avevi detto sì, ma il ramo era in conflitto con main, e il lavoro locale non si riallinea da solo: rifai la base del ramo e rilancia npm run finish.'
+      : 'Avevi detto sì, ma il ramo era in conflitto con main e il riallineamento automatico non è andato: rimettila In coda per un giro nuovo, o segna la fusione come sistemata se te ne sei già occupato.';
   }
 
   /**
