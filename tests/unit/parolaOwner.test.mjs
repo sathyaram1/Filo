@@ -125,4 +125,10 @@ test('la parola salvata è fra i segreti custoditi: un’uscita che la porta si 
   assert.deepEqual(p.segreti(), []);
   p.salva(PAROLA);
   assert.deepEqual(p.segreti(), [PAROLA]);
+  const { custoditi } = require(join(RADICE, 'src', 'main', 'services', 'segretiCustoditi.js'));
+  const prima = P.segreti;
+  P.segreti = () => p.segreti();
+  try {
+    assert.ok(custoditi().some((s) => s.valore === PAROLA && s.tipo === 'chiave'));
+  } finally { P.segreti = prima; }
 });
