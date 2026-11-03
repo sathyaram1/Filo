@@ -26,6 +26,26 @@ test('il servizio delle schede è chiuso, i suoi sosia no', () => {
   }
 });
 
+// #2067: ogni Filo aperto da una prova creava un account anonimo sul progetto vero e chiamava le callable dei crediti.
+test('accesso, rinnovi, allegati e callable del progetto vero sono chiusi; gli altri progetti e il login Google no', () => {
+  const { firebaseProjectId } = require(join(ROOT, 'src', 'main', 'auth', 'config.js'));
+  for (const u of [
+    'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=k',
+    'https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=k',
+    'https://securetoken.googleapis.com/v1/token?key=k',
+    'https://firebasestorage.googleapis.com/v0/b/x/o/y',
+    `https://europe-west1-${firebaseProjectId}.cloudfunctions.net/walletState`,
+    `https://US-CENTRAL1-${firebaseProjectId.toUpperCase()}.cloudfunctions.net/walletPendingInvite`,
+  ]) assert.equal(S.hostChiuso(u), true, u);
+  for (const u of [
+    'https://europe-west1-un-altro-progetto.cloudfunctions.net/walletState',
+    `https://europe-west1-${firebaseProjectId}.cloudfunctions.net.esempio.test/walletState`,
+    `https://${firebaseProjectId}.web.app/`,
+    'https://oauth2.googleapis.com/token',
+    `https://esempio.test/?u=https://europe-west1-${firebaseProjectId}.cloudfunctions.net/`,
+  ]) assert.equal(S.hostChiuso(u), false, u);
+});
+
 test('il fetch del main verso le schede fallisce come senza rete, il resto passa', async () => {
   const chiamate = [];
   const target = { fetch: async (input) => { chiamate.push(String(input.url || input)); return 'ok'; } };
