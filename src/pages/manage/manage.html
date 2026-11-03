@@ -1545,6 +1545,11 @@
       color: #c0392b;
       white-space: nowrap;
     }
+    /* Una fusione che non aspetta l'owner (fusa, in volo, da riallineare): si dice, senza l'allarme. */
+    .mg-fusione-badge--quieta {
+      border-color: color-mix(in srgb, var(--sn-muted) 45%, transparent);
+      color: var(--sn-muted);
+    }
 
     .mg-sender-info { display: flex; flex-direction: column; gap: 10px; }
     /* Segno di mittente pericoloso: il rosso del tema, perché è il motivo per cui i suoi feedback si fermano. */
