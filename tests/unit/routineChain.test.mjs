@@ -141,19 +141,44 @@ async function giro(rispostaLavoro, consegne = [], prepara = null, ambiente = {}
   }
 }
 
-test('lavoro nuovo: al lavoratore arrivano ruolo, ricetta e il TESTO del feedback', async () => {
-  const { json } = await giro({
-    ok: true, role: 'new-work', id: 'fid-900', num: FEEDBACK.num, branch: '',
-    payload: { role: 'new-work', num: FEEDBACK.num, feedback: FEEDBACK },
+const FINE_ALLUNGATO = 'Fine del ruolo allungato per la prova.';
+
+// Strumenti con un ruolo resolver oltre la soglia della stampa, qualunque sia il percorso: in produzione il ruolo esce
+// nel suo file, e a percorso corto la prova non ci passerebbe mai.
+function strumentiColRuoloLungo() {
+  const strumenti = cartellaTemporanea('filo-catena-strumenti-');
+  const ruoli = resolve(strumenti, 'routines', 'roles');
+  cpSync(resolve(REPO, 'routines', 'roles'), ruoli, { recursive: true });
+  appendFileSync(resolve(ruoli, 'resolver.md'), `\n${'Una riga che allunga il ruolo.\n'.repeat(Math.ceil(STAMPA_TETTO / 30))}${FINE_ALLUNGATO}\n`, 'utf8');
+  return strumenti;
+}
+
+for (const [nome, allunga] of [
+  ['lavoro nuovo: al lavoratore arrivano ruolo, ricetta e il TESTO del feedback', false],
+  ['lavoro nuovo col ruolo oltre la soglia della stampa: arriva intero nel suo file, il feedback resta in stampa', true],
+]) {
+  test(nome, async () => {
+    const strumenti = allunga ? strumentiColRuoloLungo() : '';
+    try {
+      const { json } = await giro({
+        ok: true, role: 'new-work', id: 'fid-900', num: FEEDBACK.num, branch: '',
+        payload: { role: 'new-work', num: FEEDBACK.num, feedback: FEEDBACK },
+      }, [], null, strumenti ? { FILO_TOOLS_ROOT: strumenti } : {});
+      assert.ok(json, 'il giro deve consegnare qualcosa');
+      assert.equal(json.role, 'new-work');
+      if (allunga) assert.ok(json.istruzioniFile, 'il ruolo oltre la soglia esce dalla stampa');
+      const ruolo = ruoloConsegnato(json);
+      assert.match(ruolo, /# Ruolo: resolver[\s\S]*Contratto comune dei worker/,
+        `la ricetta del ruolo deve arrivare intera (arrivati ${ruolo.length} caratteri)`);
+      if (allunga) assert.ok(ruolo.includes(FINE_ALLUNGATO), 'il file ha il ruolo fino in fondo');
+      assert.ok(json.payload && json.payload.feedback, 'il feedback deve esserci');
+      assert.equal(json.payload.feedback.text, FEEDBACK.text,
+        'è il testo del feedback che il lavoratore usa: senza, lavora alla cieca');
+    } finally {
+      if (strumenti) togliCartella(strumenti);
+    }
   });
-  assert.ok(json, 'il giro deve consegnare qualcosa');
-  assert.equal(json.role, 'new-work');
-  assert.ok(json.instructions && json.instructions.length > 500,
-    `la ricetta del ruolo deve arrivare non vuota (arrivati ${(json.instructions || '').length} caratteri)`);
-  assert.ok(json.payload && json.payload.feedback, 'il feedback deve esserci');
-  assert.equal(json.payload.feedback.text, FEEDBACK.text,
-    'è il testo del feedback che il lavoratore usa: senza, lavora alla cieca');
-});
+}
 
 test('la presa in carico dice al server QUALE RAMO, non un ramo vuoto', async () => {
   // Il ramo di un lavoro nuovo lo decide il giro, e per un po' lo ha deciso
