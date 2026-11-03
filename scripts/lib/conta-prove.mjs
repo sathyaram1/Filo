@@ -12,6 +12,15 @@ export function tipoDiFile(percorso) {
   return '';
 }
 
+// filo-security tiene le prove in functions/test/ (*.test.js), quelle dei giri comprese: per il conto valgono come unit.
+export function tipoDiFileServer(percorso) {
+  return /^functions\/test\/.+\.test\.[cm]?js$/.test(String(percorso || '').split('\\').join('/')) ? 'unit' : '';
+}
+
+/** Dove un repo tiene le prove, e come si riconosce un file di prova: l'app e il server (#2049). */
+export const PROVE_APP = Object.freeze({ cartella: 'tests/', tipo: tipoDiFile });
+export const PROVE_SERVER = Object.freeze({ cartella: 'functions/test/', tipo: tipoDiFileServer });
+
 const ID = /[A-Za-z0-9_$]/;
 const PRIMA_DI_REGEX = '(,=:[!&|?{};+-*%<>~^';
 const PAROLE_PRIMA_DI_REGEX = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete', 'void', 'throw', 'yield', 'await', 'instanceof']);
