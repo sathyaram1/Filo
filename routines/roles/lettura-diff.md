@@ -11,6 +11,13 @@ script. Il conto è un fatto, non un giudizio: se bastano lo decidi tu. Leggi il
 diff intero; se il contesto non basta, a pezzi, tenendo tu il giudizio
 d'insieme.
 
+Un lavoro server ha in fondo anche «Il diff del server», quello di
+filo-security: il lavoro è l'insieme dei due, e una correzione può stare tutta
+nel server con la sola prova nell'app. Le due domande valgono su tutti e due.
+Se quella sezione dice che la parte del server non si è potuta leggere,
+scrivilo nella prima riga col suo perché, e non dare per mancante o senza prova
+quello che potrebbe stare lì.
+
 Nella richiesta, `decisioni` e `provvisorie` sono il `payload.decisioni` e il
 `payload.provvisorie` del paragrafo qui sotto.
 

@@ -1,16 +1,17 @@
 // lettura-diff.mjs — stampa il ruolo e il fascicolo del sotto-agente che legge il diff con la richiesta, dopo il
 // verdetto del verificatore (#1363), e lascia la ricevuta che la registrazione della critica pretende. Non scrive nel
-// repo. Regole: tests/unit/letturaDiff.test.mjs. Uso: node scripts/lettura-diff.mjs [--richiesta <file>] [--base <sha>] [--head <sha>] [--cartella <dir>]
+// repo. Regole: tests/unit/letturaDiff.test.mjs. Uso: node scripts/lettura-diff.mjs [--richiesta <file>] [--base <sha>] [--head <sha>] [--cartella <dir>] [--server <repo>]
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TOOLS_ROOT, pinnedRepoRoot, absolutizeOutput, absolutizeRecipe } from './lib/tools-pin.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { cartellaConsegna } from './lib/consegna-file.mjs';
-import { rigaDelConto, testoDelConto } from './lib/conta-prove.mjs';
+import { PROVE_SERVER, rigaDelConto, testoDelConto } from './lib/conta-prove.mjs';
 import {
-  FILE_DIFF, FILE_RICHIESTA, FUORI_DAL_DIFF, contaDelLavoro, diffDelLavoro, estremiDelLavoro, leggiRichiesta, ramoCorrente, scriviRicevuta,
+  FILE_DIFF, FILE_DIFF_SERVER, FILE_RICHIESTA, FUORI_DAL_DIFF, contaDelLavoro, diffDelLavoro, estremiDelLavoro, leggiRichiesta, parteDelServer,
+  ramoCorrente, scriviRicevuta,
 } from './lib/lettura-diff.mjs';
 
 export const RUOLO_LETTURA = 'lettura-diff.md';
@@ -53,11 +54,28 @@ export function sezioneDiff({ base, head, file, caratteri, righe, conto, codice,
   ].join('\n');
 }
 
+/** La parte del server di un lavoro server: il suo diff e le sue prove, o perché non c'è da leggere (#2049). PURA. */
+export function sezioneServer({ ramo = '', base = '', head = '', conto, codice, vuoto = '', nonLetto = '', file = '', caratteri = 0, righe = 0, radice = '' } = {}) {
+  const testa = ['## Il diff del server', ''];
+  if (nonLetto) return [...testa, `Questo è un lavoro server, ma la parte di filo-security non si è potuta leggere: ${nonLetto}.`].join('\n');
+  if (vuoto) return [...testa, `Questo è un lavoro server, ma ${vuoto}: lì non c'è niente da leggere.`].join('\n');
+  return [
+    ...testa,
+    `Questo è un lavoro server. Il ramo \`${ramo}\` di filo-security, dalla base comune col suo main (\`${base.slice(0, 12)}\`) alla punta (\`${head.slice(0, 12)}\`), è nel file ${file} (${caratteri} caratteri, ${righe} righe). Leggilo tutto.`,
+    '',
+    `Il codice del server sta in \`${radice}\`, che può avere davanti un altro commit: si legge con \`git -C "${radice}" show ${head.slice(0, 12)}:<file>\`. Lì non scrivi niente.`,
+    '',
+    '## Le prove del server contate',
+    '',
+    testoDelConto(conto, { codice, prove: PROVE_SERVER }),
+  ].join('\n');
+}
+
 function opzioni(argv) {
   const o = {};
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
-    if (!['--richiesta', '--base', '--head', '--cartella'].includes(k) || !argv[i + 1]) return { errore: `argomento non capito: ${k}` };
+    if (!['--richiesta', '--base', '--head', '--cartella', '--server'].includes(k) || !argv[i + 1]) return { errore: `argomento non capito: ${k}` };
     o[k.slice(2)] = argv[++i];
   }
   return o;
@@ -73,11 +91,12 @@ if (isMain) {
   const root = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : (pinnedRepoRoot() || resolve(dirname(fileURLToPath(import.meta.url)), '..'));
   absolutizeOutput(root);
   const o = opzioni(process.argv.slice(2));
-  if (o.errore) { console.error(`${o.errore}. Uso: node scripts/lettura-diff.mjs [--richiesta <file>] [--base <sha>] [--head <sha>] [--cartella <dir>]`); process.exit(1); }
+  if (o.errore) { console.error(`${o.errore}. Uso: node scripts/lettura-diff.mjs [--richiesta <file>] [--base <sha>] [--head <sha>] [--cartella <dir>] [--server <repo>]`); process.exit(1); }
   const dir = o.cartella ? resolve(o.cartella) : cartellaConsegna(root);
   const ramo = ramoCorrente(root);
   let richiesta;
   let fileRichiesta = '';
+  let radiceServer = o.server || '';
   if (o.richiesta) {
     if (!existsSync(o.richiesta)) { console.error(`La richiesta ${o.richiesta} non c'è.`); process.exit(1); }
     richiesta = leggiRichiestaDaFile(o.richiesta);
@@ -90,6 +109,7 @@ if (isMain) {
     }
     richiesta = r.richiesta;
     fileRichiesta = join(dir, FILE_RICHIESTA);
+    radiceServer = radiceServer || r.radiceServer || '';
   }
   const estremi = estremiDelLavoro(root, { base: o.base, head: o.head });
   const conta = estremi.errore ? null : contaDelLavoro(root, estremi.base, estremi.head);
@@ -102,6 +122,10 @@ if (isMain) {
   const fileDiff = join(dir, FILE_DIFF);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   writeFileSync(fileDiff, diff.diff, { encoding: 'utf8', mode: 0o600 });
+  const server = radiceServer ? parteDelServer(resolve(radiceServer), ramo) : null;
+  const fileServer = join(dir, FILE_DIFF_SERVER);
+  if (server && server.diff !== undefined) writeFileSync(fileServer, server.diff, { encoding: 'utf8', mode: 0o600 });
+  else rmSync(fileServer, { force: true });
   scriviRicevuta(root, { ramo, base: estremi.base, head: estremi.head, prove: conta.conto.lavoro, riga: rigaDelConto(conta.conto) }, { dir });
   console.log([
     testoDelRuolo({ root }).replace(/\s+$/, ''),
@@ -113,5 +137,8 @@ if (isMain) {
       righe: diff.diff ? diff.diff.split('\n').length : 0, conto: conta.conto, codice: conta.codice, avviso: estremi.avviso,
       root, punta: estremiDelLavoro(root, { base: estremi.base }).head || '',
     }),
+    ...(server ? ['', sezioneServer({
+      ...server, file: fileServer, caratteri: (server.diff || '').length, righe: server.diff ? server.diff.split('\n').length : 0, radice: resolve(radiceServer),
+    })] : []),
   ].join('\n'));
 }
