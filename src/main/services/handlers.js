@@ -7420,6 +7420,7 @@ require('./handlers/menuDelSito')(on, handlerCtx); // #975 — il menu che un si
 require('./handlers/filoSpento')(on, handlerCtx); // #843 — Filo spento o riacceso su un sito dal tasto destro
 require('./handlers/redteam')(on, handlerCtx);
 require('./handlers/inPausa')(on, handlerCtx); // #1592 — Bacheca e Mazzi in pausa per chi non è owner
+require('./handlers/parolaOwner')(on, handlerCtx); // #2070 — la parola d'ordine che «Discutiamone» copia
 require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
 
