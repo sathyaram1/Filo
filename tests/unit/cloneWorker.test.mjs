@@ -161,7 +161,7 @@ test('package-lock diverso dal principale solo nel numero del progetto: stessi p
 });
 
 // Il principale può ricevere un lock nuovo senza reinstallare: lo stesso lock non dice cosa c'è davvero (#1141.8).
-test('stesso package-lock, ma il principale ha installato un altro Electron: il clone non lo eredita, installa per sé', () => {
+for (const [strada, opzioni] of [['a mano', {}], ['dal giro delle routine', { soloCollegati: true }]]) test(`stesso package-lock, ma il principale ha installato un altro Electron: il clone preparato ${strada} non lo eredita, installa per sé`, () => {
   const s = scena();
   try {
     const dest = resolve(s.base, 'lavori', '1');
