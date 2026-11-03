@@ -182,13 +182,14 @@ const vuoto = () => ({ aggiunti: 0, toccati: 0, tolti: 0 });
 
 /**
  * `file`: [{ percorso, prima, dopo }] (prima null = file nuovo, dopo null = file tolto; per un file spostato il
- * percorso è quello nuovo). → il conto per file e per tipo; i giri di verifica a parte. PURA.
+ * percorso è quello nuovo). `prove`: le regole del repo (PROVE_APP o PROVE_SERVER). → il conto per file e per tipo; i
+ * giri di verifica a parte. PURA.
  */
-export function contaProve(file) {
+export function contaProve(file, { prove = PROVE_APP } = {}) {
   const perFile = [];
   const totali = { unit: vuoto(), spec: vuoto(), giro: vuoto() };
   for (const f of Array.isArray(file) ? file : []) {
-    const tipo = tipoDiFile(f && f.percorso);
+    const tipo = prove.tipo(f && f.percorso);
     if (!tipo) continue;
     const c = confrontaCasi(f.prima || '', f.dopo || '');
     if (!c.aggiunti.length && !c.toccati.length && !c.tolti.length) continue;
@@ -212,7 +213,7 @@ export function rigaDelConto(conto) {
 }
 
 /** Il conto per esteso, per chi legge il diff: riga, file per file, giri a parte, codice cambiato. PURA. */
-export function testoDelConto(conto, { codice = [] } = {}) {
+export function testoDelConto(conto, { codice = [], prove = PROVE_APP } = {}) {
   const righe = [`Prove del lavoro, contate dallo script: ${rigaDelConto(conto)}.`];
   for (const f of (conto && conto.perFile) || []) {
     if (f.tipo === 'giro') continue;
@@ -230,10 +231,10 @@ export function testoDelConto(conto, { codice = [] } = {}) {
   if (cod.length) {
     const piu = cod.reduce((k, c) => k + (Number(c.aggiunte) || 0), 0);
     const meno = cod.reduce((k, c) => k + (Number(c.tolte) || 0), 0);
-    righe.push(`Codice cambiato fuori da tests/: ${cod.length} file, +${piu} −${meno} righe.`);
+    righe.push(`Codice cambiato fuori da ${prove.cartella}: ${cod.length} file, +${piu} −${meno} righe.`);
     for (const c of cod) righe.push(`- ${c.percorso}: +${c.aggiunte} −${c.tolte}`);
   } else {
-    righe.push('Codice cambiato fuori da tests/: nessun file.');
+    righe.push(`Codice cambiato fuori da ${prove.cartella}: nessun file.`);
   }
   return righe.join('\n');
 }
