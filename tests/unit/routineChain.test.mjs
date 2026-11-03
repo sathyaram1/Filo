@@ -60,7 +60,7 @@ function fintoServer(rispostaLavoro, consegne = []) {
  * cartella git usa-e-getta (così claim e posizionamento non toccano niente di
  * reale). Ritorna il JSON che il giro consegna al lavoratore.
  */
-async function giro(rispostaLavoro, consegne = [], prepara = null) {
+async function giro(rispostaLavoro, consegne = [], prepara = null, ambiente = {}) {
   const { srv, port } = await fintoServer(rispostaLavoro, consegne);
   const casa = cartellaTemporanea('filo-catena-');
   try {
