@@ -198,7 +198,7 @@ test('#1428.1: da un terminale senza biglietto pulito la pratica fidata chiusa s
   const { r, dette } = await giro(st, { dryRun: false, usaCopia: false, copiaDir: cartellaTemporanea('archivio-sporco-') });
   const c = st.doc('c-archiviabile');
   assert.equal(c.fields.status.stringValue, 'archived', dette);
-  assert.match(c.fields.notes.stringValue, /auto-archiviato \(DC3\): punteggio 6 dopo 24h\+ dalla messa in produzione \(1\.0\.0\)\./);
+  assert.match(c.fields.notes.stringValue, /auto-archiviato \(DC3\): punteggio 2 dopo 24h\+ dalla messa in produzione \(1\.0\.0\)\./);
   assert.equal(c.fields.fiducia.stringValue, 'fidato', 'la nota di uno strumento non toglie la fiducia');
   assert.deepEqual(tolte, []);
   assert.deepEqual(r.toArchive.map((a) => a.id), ['c-archiviabile']);

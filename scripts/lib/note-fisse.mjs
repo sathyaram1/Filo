@@ -31,7 +31,9 @@ function quando(v) {
   const t = typeof v === 'number' ? v : Date.parse(String(v || ''));
   return Number.isFinite(t) ? new Date(t).toISOString() : no('data', v);
 }
-const rami = (v) => (Array.isArray(v) ? v.map(ramo) : no('elenco di rami', v));
+// I rami dell'app legati alla pratica vengono dai checkout locali: un nome di ramo git, senza spazi né virgolette.
+const ramoGit = (v) => (/^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/.test(String(v)) && !/\.\./.test(v) && String(v).length <= 200 ? String(v) : no('ramo', v));
+const rami = (v) => (Array.isArray(v) ? v.map(ramoGit) : no('elenco di rami', v));
 
 // ── Le frasi di server:fondi, che lo strumento stampa anche sul terminale ──────────────────────────────────────────
 
