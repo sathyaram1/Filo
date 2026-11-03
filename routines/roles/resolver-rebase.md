@@ -36,12 +36,11 @@ scrivi l'elenco dei test rossi dopo il rebase.
    ramo è alla tua punta e contiene `main`. Se rifiuta, ti dice perché e cosa
    fare.
 
-   Davanti a ognuno ci va solo il `cd` nel tuo clone, quando la sezione «La
-   tua cartella» lo chiede; nient'altro, cioè i due comandi non si legano fra
-   loro e non diventano `git -C`. Un comando composto in un'altra forma il
-   controllo dei permessi lo giudica da capo. Se ti ferma, è un guasto (gruppo
-   `guasto: permessi git`): niente `git merge` né altre strade al posto del
-   rebase.
+   Davanti va solo il `cd` nel tuo clone, se la sezione «La tua cartella» lo
+   chiede. Nessun'altra forma: i due comandi non si legano fra loro e non
+   diventano `git -C`, perché un comando scritto diverso il controllo dei
+   permessi lo giudica da capo. Se ti ferma, è un guasto (gruppo `guasto:
+   permessi git`): niente `git merge` né altre strade al posto del rebase.
 2. Non migliorare, non ritoccare, non aggiungere: ogni riga cambiata oltre il
    conflitto è codice che nessuno ha verificato.
 3. Lancia `npm run test:unit` e gli spec delle aree in conflitto. Un rosso nato
