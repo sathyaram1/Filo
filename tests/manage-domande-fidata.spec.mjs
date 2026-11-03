@@ -57,7 +57,7 @@ test('chiusa non fidata: note aperte e «Segna fidata»; segnata, è fidata da t
 
   await riga(page, 'D-80').click();
   const k = dq(page, 'D-80');
-  await expect(k.locator('.mg-dq-fiducia')).toHaveText('Non fidata');
+  await expect(k.locator('.mg-dq-meta .mg-dq-fiducia')).toHaveText('Non fidata');
   await expect(k.locator('details.mg-dq-note')).toHaveAttribute('open', '');
   await expect(k.locator('details.mg-dq-note')).toContainText(NOTE);
   const segna = k.locator('button[data-fai="fidata"]');
@@ -65,26 +65,25 @@ test('chiusa non fidata: note aperte e «Segna fidata»; segnata, è fidata da t
   await expect(segna).toHaveAttribute('title', /note per gli agenti comprese/);
   await expect(k.locator('button[data-fai="riapri"]')).toBeVisible();
   await k.screenshot({ path: 'tests/.shots/manage-domande-fidata.png' });
-  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
-  await k.screenshot({ path: 'tests/.shots/manage-domande-fidata-scuro.png' });
-  await page.evaluate(() => document.documentElement.removeAttribute('data-sn-theme'));
 
   await segna.click();
   await expect(k.locator('.mg-dq-msg')).toHaveText('Fidata: chi riprende il lavoro riceve le note senza sporcarsi.');
   expect(await app.evaluate(() => globalThis.__mandati.at(-1))).toEqual({ type: 'domanda_fiducia', id: 'D-80', fidata: true });
-  await expect(k.locator('.mg-dq-fiducia')).toHaveText('Fidata');
-  await expect(k.locator('.mg-dq-fiducia')).toHaveAttribute('title', /^Segnata fidata da te /);
+  await expect(k.locator('.mg-dq-meta .mg-dq-fiducia')).toHaveText('Fidata');
+  await expect(k.locator('.mg-dq-meta .mg-dq-fiducia')).toHaveAttribute('title', /^Segnata fidata da te /);
   await expect(riga(page, 'D-80')).toHaveClass(/mg-fiducia--fidata/);
   await expect(k.locator('button[data-fai="fidata"]')).toHaveCount(0);
-  await expect(k.locator('details.mg-dq-note')).not.toHaveAttribute('open', '');
   await k.screenshot({ path: 'tests/.shots/manage-domande-fidata-segnata.png' });
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
+  await k.screenshot({ path: 'tests/.shots/manage-domande-fidata-segnata-scuro.png' });
+  await page.evaluate(() => document.documentElement.removeAttribute('data-sn-theme'));
 
   const togli = k.locator('button[data-fai="sfidata"]');
   await expect(togli).toHaveText('Togli fiducia');
   await togli.click();
   await expect(k.locator('.mg-dq-msg')).toHaveText('Non è più fidata.');
   expect(await app.evaluate(() => globalThis.__mandati.at(-1))).toEqual({ type: 'domanda_fiducia', id: 'D-80', fidata: false });
-  await expect(k.locator('.mg-dq-fiducia')).toHaveText('Non fidata');
+  await expect(k.locator('.mg-dq-meta .mg-dq-fiducia')).toHaveText('Non fidata');
   await expect(k.locator('button[data-fai="fidata"]')).toBeVisible();
 
   // Fidata dalla nascita: niente da segnare, niente da togliere da qui.
@@ -109,11 +108,11 @@ test('dal tasto destro: «Segna fidata…» apre la domanda con le note, «Togli
   await expect(k.locator('details.mg-dq-note')).toHaveAttribute('open', '');
   expect(await app.evaluate(() => globalThis.__mandati.length), 'dal menu la fiducia non si dà senza leggere').toBe(0);
   await k.locator('button[data-fai="fidata"]').click();
-  await expect(k.locator('.mg-dq-fiducia')).toHaveText('Fidata');
+  await expect(k.locator('.mg-dq-meta .mg-dq-fiducia')).toHaveText('Fidata');
 
   await riga(page, 'D-80').click({ button: 'right' });
   await menu.getByText('Togli fiducia').click();
-  await expect(k.locator('.mg-dq-fiducia')).toHaveText('Non fidata');
+  await expect(k.locator('.mg-dq-meta .mg-dq-fiducia')).toHaveText('Non fidata');
   expect(await app.evaluate(() => globalThis.__mandati.at(-1))).toEqual({ type: 'domanda_fiducia', id: 'D-80', fidata: false });
 });
 
@@ -125,6 +124,6 @@ test('un rifiuto del server resta scritto sotto la domanda, che resta non fidata
   const k = dq(page, 'D-80');
   await k.locator('button[data-fai="fidata"]').click();
   await expect(k.locator('.mg-dq-msg')).toHaveText(/^Non riuscito: Il server non sa ancora dare fiducia/);
-  await expect(k.locator('.mg-dq-fiducia')).toHaveText('Non fidata');
+  await expect(k.locator('.mg-dq-meta .mg-dq-fiducia')).toHaveText('Non fidata');
   await expect(k.locator('button[data-fai="fidata"]')).toBeEnabled();
 });

@@ -881,15 +881,17 @@
     // Il principio (§3.6) lo scrive chi ha gestito la risposta: è la regola che entra nel registro, e l'owner la vede.
     const principio = d.principio ? sezione('mg-dq-principio', 'Principio', md(d.principio)) : null;
     if (principio && d.principioContestato) principio.querySelector('.mg-dq-h').appendChild(segnoContestato());
-    for (const parte of [opzioni(d), consiglio(d), esito(d), daChiave(d), automatica(d), principio, conversazione(d), risposta(d)]) if (parte) art.appendChild(parte);
+    let note = null;
     if (d.notePerAgenti && !originaleInCima) {
-      const det = el('details', 'mg-dq-note');
-      // Prima di «Segna fidata» le note si leggono: sono la parte che la fiducia fa arrivare pulita agli agenti.
-      det.open = fidabile(d);
-      det.appendChild(el('summary', '', 'Note per gli agenti'));
-      det.appendChild(md(d.notePerAgenti));
-      art.appendChild(det);
+      note = el('details', 'mg-dq-note');
+      note.appendChild(el('summary', '', 'Note per gli agenti'));
+      note.appendChild(md(d.notePerAgenti));
     }
+    // Su una chiusa da fidare le note stanno aperte sopra i tasti: si leggono prima di «Segna fidata» (#2078).
+    const primaDeiTasti = !!note && fidabile(d);
+    if (primaDeiTasti) note.open = true;
+    for (const parte of [opzioni(d), consiglio(d), esito(d), daChiave(d), automatica(d), principio, conversazione(d),
+      primaDeiTasti ? note : null, risposta(d), primaDeiTasti ? null : note]) if (parte) art.appendChild(parte);
     return art;
   }
 

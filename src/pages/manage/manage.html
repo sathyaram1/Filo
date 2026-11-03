@@ -433,6 +433,8 @@
     .mg-dq-msg--ok { color: #2e9e5b; }
     .mg-dq-msg--err { color: #c0392b; }
     .mg-dq-note { margin: 4px 0 0; font-size: 13px; color: var(--sn-muted); }
+    /* Sopra i tasti (una chiusa da fidare) prende lo stacco delle sezioni. */
+    .mg-dq-note:not(:last-child) { margin-bottom: 10px; }
     .mg-dq-note summary { cursor: pointer; user-select: none; width: max-content; }
     .mg-dq-note summary:hover { color: var(--sn-fg); }
     .mg-dq-note[open] .mg-dq-md { margin-top: 6px; color: var(--sn-fg); }
