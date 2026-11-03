@@ -487,10 +487,18 @@
     return m ? Number(m[1]) : null;
   }
 
+  // «Discutiamone» (SPEC-SEDI §4.5): con la parola d'ordine «owner non fidato» davanti, una sola incollata apre la
+  // sessione cloud con tutto quello che serve; senza, resta la riga per una sessione locale.
+  function rigaDiscuti(id) { return `Discutiamo la domanda ${id}`; }
+  function testoDiscuti(id, parola) {
+    const p = typeof parola === 'string' ? parola.trim() : '';
+    return p ? `Parola d'ordine: ${p}\n${rigaDiscuti(id)}` : rigaDiscuti(id);
+  }
+
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
     validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca,
-    DEL_COMPITO, vietataAlCompito, mittenteRisposta,
+    DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
