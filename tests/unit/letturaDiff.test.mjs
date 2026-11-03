@@ -194,6 +194,14 @@ test('un lavoro server: la lettura legge anche il diff del server con le sue pro
   const app = leggi(casa, ['--base', base]);
   assert.equal(app.status, 0, app.stderr);
   assert.doesNotMatch(app.stdout, /## Il diff del server/, 'un lavoro solo dell\'app non ha la sezione del server');
+  gs('update-ref', 'refs/remotes/origin/worker/1363', 'main~1');
+  gs('branch', '-q', 'worker/1363', 'main~1');
+  gs('checkout', '-q', 'worker/1363');
+  writeFileSync(join(srv, 'functions', 'battito.js'), 'const scrivi = (doc, misura) => doc.set(misura);\n', 'utf8');
+  gs('commit', '-qam', 'a mano');
+  const aMano = leggi(casa, ['--base', base, '--server', srv]);
+  assert.match(aMano.stdout, /Questo è un lavoro server\. Il ramo `worker\/1363`/, 'lanciata a mano col server, la lettura lo legge');
+  assert.match(readFileSync(fileServer, 'utf8'), /doc\.set\(misura\)/, 'la punta locale vince su quella scaricata');
 });
 
 function fintoServer() {
