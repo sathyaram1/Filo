@@ -1426,15 +1426,7 @@ test.describe('spellcheck-shadow-editable', () => {
     await expect(corr.first()).toContainText('ciao');
 
     // Ed è davvero la prima voce cliccabile del menu, come in light DOM.
-    const firstIsCorrection = await menuDi(page).valuta(() => {
-      const m = document.querySelector('.sn-menu');
-      if (!m) return false;
-      const first = Array.from(m.children).find(
-        (c) => !c.classList.contains('sn-menu-sep') && c.style.display !== 'none',
-      );
-      return !!first && first.classList.contains('sn-menu-correction');
-    });
-    expect(firstIsCorrection).toBe(true);
+    await expect(menuDi(page).primaVoce).toHaveClass(/sn-menu-correction/);
     await expect(menu).toBeVisible();
   });
 
