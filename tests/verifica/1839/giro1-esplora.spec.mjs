@@ -125,6 +125,10 @@ test('fusione in volo: rotella accanto alla frase, frase non sbiadita', async ({
   });
   expect(info.anim).toContain('sn-mac-gira');
   expect(info.op).toBeGreaterThan(0.95);
+  console.log('QUADRATO', await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').getAttribute('class'),
+    await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').getAttribute('title'));
+  await page.waitForTimeout(3000);
+  console.log('QUADRATO2', await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').getAttribute('class'));
   for (const tema of ['dark', 'light']) {
     await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
     await page.waitForTimeout(150);
