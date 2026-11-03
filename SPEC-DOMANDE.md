@@ -433,7 +433,11 @@ ripartire: la decisione si accoda e la bloccante resta aperta (#1577.2).
    l'opzione decisa (riprendere compreso), `--testo` da solo per una risposta a
    parole (punto 2). Lo script dice cosa il server ha applicato. In entrambi i
    casi la risposta vale come dell'owner (§ 3.6, «Risposte registrate da una
-   sessione»).
+   sessione»). Se l'owner ha
+   salvato in Automazioni la parola d'ordine `owner-non-fidato` (#2070), sopra
+   la riga va «Parola d'ordine: <parola>», per la sessione dal telefono: la
+   parola resta nel main, cifrata, e la copia il main, mai la pagina. Lo stesso
+   fa la voce del tasto destro.
 5. **Letto**, sui resoconti senza opzioni nati prima di #1790: la domanda si
    chiude, senza agenti. Di nuovi non ne nascono (§ 3.1).
 
