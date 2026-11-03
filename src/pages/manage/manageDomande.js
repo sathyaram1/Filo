@@ -829,7 +829,7 @@
       tasti.appendChild(b);
     };
     if (rispondibile && !d.illeggibile) tasto(d.stato === 'aperta' ? 'Rispondi' : 'Aggiungi', 'testo', '', TASTO_MANDA ? `Manda il testo (${TASTO_MANDA})` : 'Manda il testo');
-    if (!inSmistamento) tasto('Discutiamone', 'discuti', 'sn-btn-secondary', `Copia «Discutiamo la domanda ${idDi(d)}» da incollare in una sessione locale`);
+    if (!inSmistamento) tasto('Discutiamone', 'discuti', 'sn-btn-secondary', titoloDiscuti(idDi(d)));
     if (rispondibile || inSmistamento) tasto('Archivia', 'chiudi', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
     else if (riapribile(d)) tasto('Riapri', 'riapri', 'sn-btn-secondary', titoloRiapri(d));
     if (fidabile(d)) tasto('Segna fidata', 'fidata', 'sn-btn-secondary', TITOLO_SEGNA_FIDATA);
