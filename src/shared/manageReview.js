@@ -809,7 +809,7 @@
       const acts = [];
       if (status !== 'done') acts.push({ key: 'resolve', kind: 'resolve', to: 'done', label: '✓ Risolto', primary: true });
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
-      return acts;
+      return senzaChiusureSullaFusione(fb, acts, opts);
     }
     if (tab === 'resolved') {
       // Fix uscito: si archivia (verifica umana ok) o si riapre spiegando cosa
