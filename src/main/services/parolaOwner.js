@@ -48,7 +48,7 @@ function appuntiDiSistema() {
 // `deposito` { cifra(), leggi(), scrivi(parola), togli() } e `appunti` { scrivi(testo) }: quelli veri fuori dai test.
 function crea({ deposito, appunti } = {}) {
   const dep = deposito || depositoDiSistema();
-  const app = appunti || appuntiDiSistema();
+  const ap = appunti || appuntiDiSistema();
   let inMemoria; // undefined: il disco non è ancora stato letto
   let suDisco = false;
 
@@ -98,7 +98,7 @@ function crea({ deposito, appunti } = {}) {
     if (D.numeroDi(id) === null) return { ok: false, error: 'Domanda sconosciuta.' };
     const pulito = String(id).trim();
     const parola = leggi();
-    try { app.scrivi(D.testoDiscuti(pulito, parola)); } catch (_) {
+    try { ap.scrivi(D.testoDiscuti(pulito, parola)); } catch (_) {
       return { ok: false, error: 'Gli appunti non rispondono: riprova.' };
     }
     return { ok: true, conParola: !!parola, riga: D.rigaDiscuti(pulito) };
