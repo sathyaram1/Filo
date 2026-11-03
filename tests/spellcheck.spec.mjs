@@ -524,15 +524,7 @@ test.describe('spellcheck-input-menu-top', () => {
     await expect(correction).toBeVisible({ timeout: 5_000 });
 
     // È davvero il primo item del menu (in cima).
-    const firstItemIsCorrection = await menuDi(page).valuta(() => {
-      const menu = document.querySelector('.sn-menu');
-      if (!menu) return false;
-      const first = Array.from(menu.children).find(
-        (c) => !c.classList.contains('sn-menu-sep') && c.style.display !== 'none',
-      );
-      return !!first && first.classList.contains('sn-menu-correction');
-    });
-    expect(firstItemIsCorrection).toBe(true);
+    await expect(menuDi(page).primaVoce).toHaveClass(/sn-menu-correction/);
 
     // Mostra il suggerimento di correzione.
     await expect(correction.locator('.sn-menu-label').first()).toHaveText('ciao');
@@ -819,15 +811,7 @@ test.describe('spellcheck-native', () => {
     await expect(corr.first()).toContainText('world');
 
     // Ed è davvero la prima voce cliccabile del menu.
-    const firstIsCorrection = await menuDi(page).valuta(() => {
-      const menu = document.querySelector('.sn-menu');
-      if (!menu) return false;
-      const first = Array.from(menu.children).find(
-        (c) => !c.classList.contains('sn-menu-sep') && c.style.display !== 'none',
-      );
-      return !!first && first.classList.contains('sn-menu-correction');
-    });
-    expect(firstIsCorrection).toBe(true);
+    await expect(menuDi(page).primaVoce).toHaveClass(/sn-menu-correction/);
   });
 });
 
@@ -1442,15 +1426,7 @@ test.describe('spellcheck-shadow-editable', () => {
     await expect(corr.first()).toContainText('ciao');
 
     // Ed è davvero la prima voce cliccabile del menu, come in light DOM.
-    const firstIsCorrection = await menuDi(page).valuta(() => {
-      const m = document.querySelector('.sn-menu');
-      if (!m) return false;
-      const first = Array.from(m.children).find(
-        (c) => !c.classList.contains('sn-menu-sep') && c.style.display !== 'none',
-      );
-      return !!first && first.classList.contains('sn-menu-correction');
-    });
-    expect(firstIsCorrection).toBe(true);
+    await expect(menuDi(page).primaVoce).toHaveClass(/sn-menu-correction/);
     await expect(menu).toBeVisible();
   });
 

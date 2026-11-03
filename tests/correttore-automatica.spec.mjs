@@ -300,7 +300,7 @@ test('una correzione scelta tre volte dal tasto destro diventa automatica e comp
     await expect(segno).not.toHaveClass(/sn-dubbio/, { timeout: 6000 });
     const b = await riquadroDelSegno(segno);
     await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
-    const prima = menuDi(page).principale.locator(':scope > *').first();
+    const prima = menuDi(page).primaVoce;
     await expect(prima).toHaveText(/proprio/, { timeout: 5000 });
     await prima.click();
     await expect.poll(() => valore(page)).toBe('è proprio bello ');
