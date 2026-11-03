@@ -2809,7 +2809,7 @@
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         ${leggibile ? segnoFermataHtml(fb) : ''}
         <span class="mg-item-title">${esc(title)}</span>
-        ${ferma ? `<span class="mg-fusione-badge" title="${esc(fusioneTesti.titolo)}">${esc(fusioneTesti.etichetta)}</span>` : ''}
+        ${fusione ? `<span class="mg-fusione-badge${ferma ? '' : ' mg-fusione-badge--quieta'}" data-stato="${esc(fusione.stato)}" title="${esc(fusione.titolo)}">${esc(fusione.etichetta)}</span>` : ''}
         ${leggibile ? '' : statePublicHtml(fb)}
         ${localBadgeHtml(fb)}
         ${attesaBadgeHtml(fb)}
