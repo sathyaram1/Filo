@@ -192,6 +192,9 @@ test('#1362 giro 2 r1: un rebase dei soli commit propri porta le copie con gli o
   assert.deepEqual(ultima.commits, [c]);
   assert.deepEqual(new Set(ultima.riscritti.map((r) => r.di)), new Set([a, b]));
   assert.deepEqual(new Set(ultima.sostituiti), new Set([a, b]));
+  // #1362 punto 1: il grafo dei sostituiti fa ritrovare al server quelli che una consegna pulita aveva già controllato.
+  const base = g(d.pulita, ['rev-parse', 'origin/main~1']);
+  assert.deepEqual(ultima.sostituitiGrafo, [{ sha: b, parents: [a] }, { sha: a, parents: [base] }]);
 });
 
 test('#1362 r1: alla spinta gira lo script di chi ha installato il pre-push, mai quello del ramo, che un commit spinto da altri può aver riscritto', () => {
@@ -576,7 +579,7 @@ test('l’invio tiene l’ordine: dopo un guasto le voci seguenti, anche di altr
   const dir = cartellaTemporanea('filo-spinte-ordine-');
   g(dir, ['init', '-q']);
   S.accoda(dir, { tipo: 'routine', ticket: BIGLIETTO }, 'app', [{ ramo: 'claude/x', punta: A, commits: [A] }], 1000);
-  S.accoda(dir, { tipo: 'routine', ticket: `${BIGLIETTO}-2` }, 'app', [{ ramo: 'claude/x', punta: B, commits: [], riscritti: [{ sha: B, di: A }], sostituiti: [A] }], 1001);
+  S.accoda(dir, { tipo: 'routine', ticket: `${BIGLIETTO}-2` }, 'app', [{ ramo: 'claude/x', punta: B, commits: [], riscritti: [{ sha: B, di: A }], sostituiti: [A], sostituitiGrafo: [{ sha: A, parents: [] }] }], 1001);
   const giu = finto([[503, {}], [200, { ok: true }]]);
   const r = await S.inviaSpinte({ root: dir, deps: giu.deps });
   assert.equal(giu.chiamate.length, 1);
@@ -584,7 +587,7 @@ test('l’invio tiene l’ordine: dopo un guasto le voci seguenti, anche di altr
   const su = finto([[200, { ok: true }]]);
   assert.equal((await S.inviaSpinte({ root: dir, deps: su.deps })).inviate, 2);
   assert.deepEqual(su.chiamate.map((c) => c.corpo.ticket), [BIGLIETTO, `${BIGLIETTO}-2`]);
-  assert.deepEqual(su.chiamate[1].corpo.spinte[0], { repo: 'app', ramo: 'claude/x', commits: [], punta: B, sostituiti: [A], riscritti: [{ sha: B, di: A }] });
+  assert.deepEqual(su.chiamate[1].corpo.spinte[0], { repo: 'app', ramo: 'claude/x', commits: [], punta: B, sostituiti: [A], riscritti: [{ sha: B, di: A }], sostituitiGrafo: [{ sha: A, parents: [] }] });
 });
 
 test('l’invio di una copia è uno alla volta: chi arriva mentre un altro manda aspetta, poi trova la coda vuota', async () => {

@@ -104,18 +104,24 @@ function punteViste(root, { remoto = '', ramo = '' } = {}) {
 /**
  * I commit visti su origin per `ramo` che `locale` non porta più e main non ha: la spinta li riscrive (un rebase) o li
  * toglie, e il server vuole che un biglietto pulito li avesse dichiarati (#1362 giro 2 r1). Senza le fusioni, che un
- * rebase non ricopia. → { sostituiti, oltre } | null se git tace.
+ * rebase non ricopia. `grafo` ([{ sha, parents }], fusioni comprese): il server ci ritrova quelli che una consegna pulita
+ * aveva già controllato, anche di prima delle dichiarazioni. → { sostituiti, oltre, grafo } | null se git tace.
  */
 export function commitSostituiti(root, { locale, remoto = '', ramo = '' } = {}) {
   const punte = punteViste(root, { remoto, ramo });
-  if (!punte.length) return { sostituiti: [], oltre: false };
+  if (!punte.length) return { sostituiti: [], oltre: false, grafo: [] };
   let main = '';
   try { main = git(root, ['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main^{commit}']).trim(); } catch (_) { /* senza main resta tutto il visto */ }
   try {
     const input = [...punte, `^${locale}`, ...(SHA_RE.test(main) ? [`^${main}`] : [])].join('\n') + '\n';
     const out = git(root, ['rev-list', '--no-merges', `--max-count=${TETTO_COMMIT + 1}`, '--stdin'], input);
     const sostituiti = out.split('\n').map((s) => s.trim()).filter((s) => SHA_RE.test(s));
-    return { sostituiti: sostituiti.slice(0, TETTO_COMMIT), oltre: sostituiti.length > TETTO_COMMIT };
+    const grafo = sostituiti.length
+      ? git(root, ['rev-list', '--parents', `--max-count=${TETTO_COMMIT}`, '--stdin'], input).split('\n')
+        .map((r) => r.trim().split(/\s+/)).filter((r) => r.every((x) => SHA_RE.test(x)))
+        .map(([sha, ...parents]) => ({ sha, parents }))
+      : [];
+    return { sostituiti: sostituiti.slice(0, TETTO_COMMIT), oltre: sostituiti.length > TETTO_COMMIT, grafo };
   } catch (_) {
     return null;
   }
@@ -160,6 +166,7 @@ export function spintaDi(root, { locale, remoto = '', ramo }) {
   return Object.assign(
     { ramo, punta: locale, commits }, propri.oltre ? { oltre: true } : {}, riscritti.length ? { riscritti } : {},
     sost && sost.sostituiti.length ? { sostituiti: sost.sostituiti } : {}, !sost || sost.oltre ? { sostituitiOltre: true } : {},
+    sost && sost.sostituiti.length && sost.grafo.length ? { sostituitiGrafo: sost.grafo } : {},
   );
 }
 
@@ -406,7 +413,7 @@ export function spinteDelPrePush(root, righe) {
 }
 
 /** Quanti sha porta una voce, per i tetti di una chiamata del server. PURA. */
-const shaDellaVoce = (v) => ['commits', 'sostituiti', 'riscritti'].reduce((n, k) => n + (Array.isArray(v[k]) ? v[k].length : 0), 0);
+const shaDellaVoce = (v) => ['commits', 'sostituiti', 'riscritti', 'sostituitiGrafo'].reduce((n, k) => n + (Array.isArray(v[k]) ? v[k].length : 0), 0);
 
 /** Accoda le spinte di `chi` per `repo`. Lancia se non riesce a scrivere. */
 export function accoda(root, chi, repo, spinte, nowMs = Date.now()) {
@@ -469,6 +476,7 @@ function spinteDi(gruppo) {
     Array.isArray(v.sostituiti) && v.sostituiti.length ? { sostituiti: v.sostituiti } : {},
     v.sostituitiOltre === true ? { sostituitiOltre: true } : {},
     Array.isArray(v.riscritti) && v.riscritti.length ? { riscritti: v.riscritti } : {},
+    Array.isArray(v.sostituitiGrafo) && v.sostituitiGrafo.length ? { sostituitiGrafo: v.sostituitiGrafo } : {},
   ));
 }
 

@@ -5,9 +5,15 @@ import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
+import { cartellaCloneServer } from '../../../scripts/lib/git-server.mjs';
 
 const RADICE = join(import.meta.dirname, '..', '..', '..');
+// Il clone del lavoro server (FILO_SERVER_CLONE, nel contenitore delle routine ~/filo-security) vince su una copia vecchia
+// accanto al repo; senza variabile si cerca prima accanto, come in locale.
 function funzioniDelServer() {
+  const clone = join(cartellaCloneServer(), 'functions');
+  const nelClone = existsSync(join(clone, 'src', 'routine', 'localTicket.js'));
+  if (nelClone && String(process.env.FILO_SERVER_CLONE || '').trim()) return clone;
   let ramo = '';
   try { ramo = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: RADICE, encoding: 'utf8' }).trim(); } catch (_) {}
   const slug = ramo.replace(/^claude\//, '');
@@ -19,7 +25,7 @@ function funzioniDelServer() {
     }
     d = dirname(d);
   }
-  return '';
+  return nelClone ? clone : '';
 }
 
 const SRV = funzioniDelServer();
