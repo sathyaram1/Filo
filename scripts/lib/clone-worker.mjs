@@ -11,7 +11,7 @@ import { ensureSessionExcludes } from './branch-integrity.mjs';
 import { ensureCommentChar } from './carattere-commento.mjs';
 import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { MARCATORE_WORKER } from './dati-worker.mjs';
-import { fileBlocco, TETTO_INSTALLAZIONE_MS } from './pacchetti.mjs';
+import { MARCA_COLLEGATI, collegatoVoceAVoce, descrivi, fileBlocco, pacchettiDaInstallare, TETTO_INSTALLAZIONE_MS } from './pacchetti.mjs';
 import { pinWorkerTools, pinnedDirWorker, TOOLS_ROOT } from './tools-pin.mjs';
 import { applicaVersioneAlLock } from '../release-apply-version.mjs';
 
@@ -85,8 +85,7 @@ function collega(verso, link) {
 // node_modules del clone è una cartella vera con un collegamento per ogni pacchetto del principale, non un collegamento
 // solo: npm, svuotando o riordinando la cartella, toglie così i collegamenti invece dei pacchetti di tutti. Per lo
 // stesso motivo gli ambiti (@x) sono cartelle con un collegamento per pacchetto, e .bin è una copia.
-export const MARCA_COLLEGATI = '.filo-collegati';
-const collegatiVoceAVoce = (nm) => existsSync(resolve(nm, MARCA_COLLEGATI));
+export { MARCA_COLLEGATI };
 
 function copiaBin(da, a) {
   mkdirSync(a, { recursive: true });
@@ -219,7 +218,7 @@ function installaPrivati(clone, nm, firma, { npmCi, avvisa, perche, blocchi, ora
   }
   try {
     avvisa(`${perche}: installo i pacchetti nel clone con npm ci, ci vogliono alcuni minuti.`, { attesa: true });
-    const daCollegati = eLink(nm) || collegatiVoceAVoce(nm);
+    const daCollegati = eLink(nm) || collegatoVoceAVoce(nm);
     scollegaPacchetti(nm);
     if (restaUnCollegamento(nm)) return { ok: false, pacchetti: '', why: 'un collegamento a node_modules non si toglie: mi fermo' };
     if (daCollegati) rmSync(nm, { recursive: true, force: true });
@@ -238,7 +237,7 @@ const suStderr = (m) => process.stderr.write(`[clone-worker] ${m}\n`);
 
 /**
  * `node_modules` del clone: collegato pacchetto per pacchetto a quello del principale se `package-lock.json` è lo
- * stesso da cui il principale ha installato; altrimenti un'installazione privata (la cache di npm resta condivisa),
+ * stesso e il principale ha installato le versioni che fissa; altrimenti un'installazione privata (la cache di npm resta condivisa),
  * anche quando il principale i pacchetti non li ha, o non ha finito di installarli. Dopo che il clone è sul ramo.
  */
 export function allineaPacchetti(clone, principale, {
@@ -251,19 +250,25 @@ export function allineaPacchetti(clone, principale, {
   const privati = privatiDi(nm);
   if (lockClone !== null && privati === firma) return { ok: true, pacchetti: 'privati', why: '' };
   const pronti = pacchettiPronti(principale);
+  // Lo stesso lock non basta: il principale può averlo ricevuto senza reinstallare, e il clone erediterebbe le sue
+  // versioni, Electron compreso (#1141.8).
+  const diversi = stesso && pronti ? pacchettiDaInstallare(clone, { base: principale }) : [];
+  const uguali = stesso && !diversi.length;
   // soloCollegati: chi non può aspettare un npm ci (dispatch) collega anche con un altro lock, e dice. Installa solo
   // quando non c'è niente da collegare: un worker senza pacchetti è peggio di qualche minuto d'attesa (#1906).
-  if ((stesso || soloCollegati) && pronti) {
+  if ((uguali || soloCollegati) && pronti) {
     // Ogni volta da capo: il principale può aver aggiunto o tolto pacchetti da allora.
     scollegaPacchetti(nm);
     if (restaUnCollegamento(nm)) return { ok: false, pacchetti: '', why: 'un collegamento a node_modules non si toglie: mi fermo' };
     rmSync(nm, { recursive: true, force: true }); // un'installazione privata rimasta da un ramo prima
     // Al bersaglio vero: il node_modules di un worktree è già un collegamento a quello del principale.
     collegaVoci(realpathSync(resolve(principale, 'node_modules')), nm);
-    return { ok: true, pacchetti: 'collegati', why: '', ...(stesso ? {} : { lockDiverso: true }) };
+    return { ok: true, pacchetti: 'collegati', why: '', ...(uguali ? {} : { lockDiverso: true }) };
   }
   if (soloCollegati && privati) return { ok: true, pacchetti: 'privati', why: '', lockDiverso: true };
-  const perche = pronti ? 'Il package-lock del clone non è quello del principale' : 'Il principale non ha i pacchetti installati, o non ha finito di installarli';
+  let perche = 'Il principale non ha i pacchetti installati, o non ha finito di installarli';
+  if (diversi.length) perche = `Il principale non ha installato le versioni che il package-lock fissa (${descrivi(diversi)})`;
+  else if (pronti) perche = 'Il package-lock del clone non è quello del principale';
   return installaPrivati(clone, nm, firma, { npmCi, avvisa, perche, blocchi, ora, attendi });
 }
 

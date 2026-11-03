@@ -113,9 +113,12 @@ export function npmInstall(radice, extra = []) {
 // I peer li dà il node_modules che si completa: installarli nell'appoggio scaricherebbe per niente (anche Electron).
 const npmInstallComplemento = (appoggio) => npmInstall(appoggio, ['--legacy-peer-deps']);
 
-// Fuori da node_modules: crearlo per il blocco cambierebbe da dove un worktree risolve i pacchetti.
+// Fuori da node_modules: crearlo per il blocco cambierebbe da dove un worktree risolve i pacchetti. Dal percorso vero:
+// chi arriva dal collegamento di un worktree o di finish deve trovare lo stesso blocco del pre-avvio.
 export function fileBlocco(radice, cartella = tmpdir()) {
-  const impronta = createHash('sha1').update(resolve(radice)).digest('hex').slice(0, 16);
+  let vero = resolve(radice);
+  try { vero = realpathSync(vero); } catch (_) { /* non ancora creata */ }
+  const impronta = createHash('sha1').update(vero).digest('hex').slice(0, 16);
   return join(cartella, `filo-pacchetti-${impronta}.lock`);
 }
 

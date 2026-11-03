@@ -3,15 +3,15 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { builtinModules } from 'node:module';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { builtinModules, createRequire } from 'node:module';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
   ammesso, vociRichieste, baseDeiPacchetti, pacchettiDaInstallare, descrivi, electronInUso, allineaPacchetti, fileBlocco,
-  allineaPerLeProve, TETTO_INSTALLAZIONE_MS,
+  allineaPerLeProve, completaPacchetti, progettoDiAppoggio, primoLivello, MARCA_COLLEGATI, TETTO_INSTALLAZIONE_MS,
 } from '../../scripts/lib/pacchetti.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -31,6 +31,10 @@ function progetto(voci, installati = {}, { nodeModules = true } = {}) {
   for (const [p, v] of Object.entries(installati)) metti(dir, p, v);
   return dir;
 }
+
+// Le strade che una prova non deve prendere.
+const allineaMai = () => { throw new Error('npm install lanciato in un node_modules non suo'); };
+const completaMai = () => { throw new Error('completato un node_modules che è dell\'albero'); };
 
 const LOCK_FILO = {
   'node_modules/electron': { version: '44.7.0', dev: true },
@@ -250,66 +254,12 @@ describe('prima delle prove (verifica #1572 giro 1, r1)', () => {
     const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
     try {
       const f = conNpmFinto(dir, { 'node_modules/hash-wasm': '4.12.0' });
-      const r = allineaPerLeProve(dir, { allinea: f.allinea, log: () => {} });
+      const r = allineaPerLeProve(dir, { allinea: f.allinea, completa: completaMai, log: () => {} });
       assert.equal(r.esito, 'installati');
       assert.deepEqual(f.chiamate.map(reale), [reale(dir)]);
       assert.deepEqual(pacchettiDaInstallare(dir), []);
-      assert.equal(allineaPerLeProve(dir, { allinea: f.allinea, log: () => {} }).esito, 'allineati');
+      assert.equal(allineaPerLeProve(dir, { allinea: f.allinea, completa: completaMai, log: () => {} }).esito, 'allineati');
       assert.equal(f.chiamate.length, 1, 'già allineati: npm non si chiama');
-    } finally { togliCartella(dir); }
-  });
-
-  test('da un worktree senza node_modules si installa nella cartella sopra, mai un albero intero nel worktree', () => {
-    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
-    const wt = join(dir, '.claude', 'worktrees', 'lavoro');
-    try {
-      mkdirSync(wt, { recursive: true });
-      copyFileSync(join(dir, 'package-lock.json'), join(wt, 'package-lock.json'));
-      const f = conNpmFinto(dir, { 'node_modules/hash-wasm': '4.12.0' });
-      const r = allineaPerLeProve(wt, { allinea: f.allinea, log: () => {} });
-      assert.equal(r.esito, 'installati');
-      assert.deepEqual(f.chiamate.map(reale), [reale(dir)]);
-      assert.equal(existsSync(join(wt, 'node_modules')), false);
-    } finally { togliCartella(dir); }
-  });
-
-  test('dalla cartella di prova di finish, col node_modules collegato, si installa dove il collegamento porta', () => {
-    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
-    const prova = cartellaTemporanea('filo-fusione-');
-    try {
-      symlinkSync(join(dir, 'node_modules'), join(prova, 'node_modules'), 'junction');
-      const albero = join(prova, 'ramo');
-      mkdirSync(albero);
-      copyFileSync(join(dir, 'package-lock.json'), join(albero, 'package-lock.json'));
-      const f = conNpmFinto(dir, { 'node_modules/hash-wasm': '4.12.0' });
-      const r = allineaPerLeProve(albero, { allinea: f.allinea, log: () => {} });
-      assert.equal(r.esito, 'installati');
-      assert.deepEqual(f.chiamate.map(reale), [reale(dir)]);
-      assert.deepEqual(pacchettiDaInstallare(albero), []);
-    } finally {
-      try { rmSync(join(prova, 'node_modules')); } catch (_) { /* già tolto */ }
-      togliCartella(prova);
-      togliCartella(dir);
-    }
-  });
-
-  test('una libreria che chiede solo il lock del ramo si dice, senza installare niente nel ramo', () => {
-    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0', 'node_modules/hash-wasm': '4.12.0' });
-    const wt = join(dir, '.claude', 'worktrees', 'lavoro');
-    try {
-      mkdirSync(wt, { recursive: true });
-      writeFileSync(join(wt, 'package-lock.json'), JSON.stringify({
-        name: 'prova', lockfileVersion: 3,
-        packages: { '': { name: 'prova', version: '1.0.0' }, ...LOCK_FILO, 'node_modules/nuova': { version: '1.0.0' } },
-      }));
-      const f = conNpmFinto(dir, {});
-      const righe = [];
-      const r = allineaPerLeProve(wt, { allinea: f.allinea, log: (s) => righe.push(s) });
-      assert.equal(r.esito, 'non riuscita');
-      assert.deepEqual(r.mancanti.map((v) => v.nome), ['nuova']);
-      assert.deepEqual(f.chiamate, [], 'il lock della cartella sopra non chiede niente: npm non parte');
-      assert.match(righe.join('\n'), /Mancano ancora nuova 1\.0\.0/);
-      assert.equal(existsSync(join(wt, 'node_modules')), false);
     } finally { togliCartella(dir); }
   });
 
@@ -319,6 +269,263 @@ describe('prima delle prove (verifica #1572 giro 1, r1)', () => {
     const setup = readFileSync(join(ROOT, 'tests', 'fixtures', 'prima-della-corsa.mjs'), 'utf8');
     assert.match(setup, /allineaPerLeProve\(radice/);
     assert.match(readFileSync(join(ROOT, 'playwright.config.js'), 'utf8'), /globalSetup: '\.\/tests\/fixtures\/prima-della-corsa\.mjs'/);
+  });
+
+  test('la chiusura e la prova sulla fusione lanciano gli unit e gli spec dall\'albero sotto prova, che si controlla da sé', () => {
+    // Il lanciatore e la config di Playwright sono quelli dell'albero: la radice che danno al controllo è la sua (#1572.1).
+    const finish = readFileSync(join(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
+    assert.match(finish, /run\(process\.execPath, \[join\(albero\.dir, 'scripts', 'run-unit-tests\.mjs'\)\], 'Controlli di logica', undefined, albero\.dir\)/);
+    assert.match(finish, /run\(l\.cmd, l\.args, label \+ suffisso, l\.env, albero\.dir\)/);
+    const fusione = readFileSync(join(ROOT, 'scripts', 'lib', 'unit-sulla-fusione.mjs'), 'utf8');
+    assert.match(fusione, /const runner = join\(dir, 'scripts', 'run-unit-tests\.mjs'\)/);
+    assert.match(fusione, /spawnSync\(process\.execPath, args, \{ cwd: dir,/);
+  });
+});
+
+// Un albero che prende i pacchetti da un node_modules non suo (un worktree, la cartella di prova di finish, un clone
+// collegato voce per voce) si giudica col SUO lock, e lì si aggiunge soltanto (#1572.1, #830.5, #1209.1).
+describe('il node_modules di un\'altra cartella si completa, non si cambia', () => {
+  // npm finto: mette nell'appoggio le voci del lock parziale che riceve, come farebbe npm col lock.
+  const npmFinto = ({ codice = 0 } = {}) => {
+    const chiamate = [];
+    const installa = (appoggio) => {
+      const pacchetto = JSON.parse(readFileSync(join(appoggio, 'package.json'), 'utf8'));
+      const lock = JSON.parse(readFileSync(join(appoggio, 'package-lock.json'), 'utf8'));
+      chiamate.push({ appoggio, dipendenze: pacchetto.dependencies, voci: Object.keys(lock.packages).filter(Boolean) });
+      if (codice === 0) for (const [p, v] of Object.entries(lock.packages)) if (p) metti(appoggio, p, v.version);
+      return { codice, errore: '' };
+    };
+    return { chiamate, installa };
+  };
+  const conNpm = (f, cartellaBlocchi) => ({
+    allinea: allineaMai, log: () => {},
+    completa: (r, o) => completaPacchetti(r, { ...o, installa: f.installa, cartellaBlocchi }),
+  });
+  const versioneIn = (dir, p) => { try { return JSON.parse(readFileSync(join(dir, p, 'package.json'), 'utf8')).version; } catch (_) { return null; } };
+  const lockCon = (dir, voci) => writeFileSync(join(dir, 'package-lock.json'), JSON.stringify({
+    name: 'prova', lockfileVersion: 3, packages: { '': { name: 'prova', version: '1.0.0' }, ...voci },
+  }));
+  const appoggiRimasti = (nm) => readdirSync(nm).filter((n) => n.startsWith('.filo-complemento-'));
+  const LOCK_NUOVO = { ...LOCK_FILO, 'node_modules/hunspell-wasm': { version: '0.3.0' } };
+
+  test('la lamentela: principale col lock vecchio, worktree col lock nuovo: la libreria nuova arriva, le altre voci restano', () => {
+    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0', 'node_modules/hash-wasm': '4.12.0', 'node_modules/vecchia': '1.0.0' });
+    const wt = join(dir, '.claude', 'worktrees', 'lavoro');
+    try {
+      mkdirSync(wt, { recursive: true });
+      lockCon(wt, LOCK_NUOVO);
+      const lockPrincipale = readFileSync(join(dir, 'package-lock.json'), 'utf8');
+      const f = npmFinto();
+      const righe = [];
+      assert.deepEqual(pacchettiDaInstallare(wt).map((v) => v.nome), ['hunspell-wasm'], 'il controllo la elenca');
+      const r = allineaPerLeProve(wt, { ...conNpm(f, dir), log: (s) => righe.push(s) });
+      assert.equal(r.esito, 'installati');
+      assert.deepEqual(f.chiamate.map((c) => c.dipendenze), [{ 'hunspell-wasm': '0.3.0' }], 'npm riceve la sola libreria nuova');
+      assert.equal(versioneIn(dir, 'node_modules/hunspell-wasm'), '0.3.0');
+      assert.deepEqual([versioneIn(dir, 'node_modules/electron'), versioneIn(dir, 'node_modules/hash-wasm'), versioneIn(dir, 'node_modules/vecchia')],
+        ['44.7.0', '4.12.0', '1.0.0'], 'niente tolto né cambiato nella principale');
+      assert.equal(readFileSync(join(dir, 'package-lock.json'), 'utf8'), lockPrincipale);
+      assert.equal(existsSync(join(wt, 'node_modules')), false, 'mai un albero intero nel worktree');
+      assert.deepEqual(appoggiRimasti(join(dir, 'node_modules')), []);
+      assert.match(righe.join('\n'), /hunspell-wasm 0\.3\.0\. Gli altri restano com'erano/);
+      assert.equal(allineaPerLeProve(wt, conNpm(f, dir)).esito, 'allineati');
+      assert.equal(f.chiamate.length, 1, 'aggiunta una volta, la prova dopo non chiama npm');
+    } finally { togliCartella(dir); }
+  });
+
+  test('dalla cartella di prova di finish, col node_modules collegato, si aggiunge dove il collegamento porta', () => {
+    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0', 'node_modules/hash-wasm': '4.12.0' });
+    const prova = cartellaTemporanea('filo-fusione-');
+    try {
+      symlinkSync(join(dir, 'node_modules'), join(prova, 'node_modules'), 'junction');
+      const albero = join(prova, 'fusione');
+      mkdirSync(albero);
+      lockCon(albero, LOCK_NUOVO);
+      const f = npmFinto();
+      const r = allineaPerLeProve(albero, conNpm(f, dir));
+      assert.equal(r.esito, 'installati');
+      assert.equal(versioneIn(dir, 'node_modules/hunspell-wasm'), '0.3.0');
+      assert.deepEqual(pacchettiDaInstallare(albero), []);
+      assert.ok(lstatSync(join(prova, 'node_modules')).isSymbolicLink(), 'il collegamento resta un collegamento');
+    } finally {
+      try { rmSync(join(prova, 'node_modules')); } catch (_) { /* già tolto */ }
+      togliCartella(prova);
+      togliCartella(dir);
+    }
+  });
+
+  test('nel clone di un worker collegato voce per voce arrivano hunspell-wasm e hash-wasm, e i collegamenti restano', () => {
+    const principale = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0', 'node_modules/@a/b': '1.0.0' });
+    const clone = cartellaTemporanea('filo-clone-');
+    try {
+      const nm = join(clone, 'node_modules');
+      mkdirSync(join(nm, '@a'), { recursive: true });
+      symlinkSync(join(principale, 'node_modules', 'electron'), join(nm, 'electron'), 'junction');
+      symlinkSync(join(principale, 'node_modules', '@a', 'b'), join(nm, '@a', 'b'), 'junction');
+      writeFileSync(join(nm, MARCA_COLLEGATI), `${join(principale, 'node_modules')}\n`);
+      lockCon(clone, { ...LOCK_NUOVO, 'node_modules/@a/b': { version: '1.0.0' }, 'node_modules/@a/c': { version: '2.0.0' } });
+      assert.deepEqual(pacchettiDaInstallare(clone).map((v) => v.nome), ['hash-wasm', 'hunspell-wasm', '@a/c'], 'il controllo le elenca');
+      const f = npmFinto();
+      const r = allineaPerLeProve(clone, conNpm(f, clone));
+      assert.equal(r.esito, 'installati', 'non un npm install nel clone, che sostituirebbe ogni collegamento');
+      assert.deepEqual(Object.keys(f.chiamate[0].dipendenze), ['@a/c', 'hash-wasm', 'hunspell-wasm']);
+      assert.deepEqual([versioneIn(clone, 'node_modules/hash-wasm'), versioneIn(clone, 'node_modules/hunspell-wasm'), versioneIn(clone, 'node_modules/@a/c')],
+        ['4.12.0', '0.3.0', '2.0.0']);
+      assert.ok(lstatSync(join(nm, 'electron')).isSymbolicLink() && lstatSync(join(nm, '@a', 'b')).isSymbolicLink());
+      assert.deepEqual(readdirSync(join(principale, 'node_modules')).sort(), ['@a', 'electron'], 'il principale non riceve niente');
+      assert.deepEqual(readdirSync(join(principale, 'node_modules', '@a')), ['b']);
+    } finally {
+      togliCartella(clone);
+      togliCartella(principale);
+    }
+  });
+
+  test('una versione diversa, o una voce dentro un pacchetto che c\'è già, non si cambia: si dice', () => {
+    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.6.0', 'node_modules/hash-wasm': '4.12.0', 'node_modules/a': '1.0.0' });
+    const wt = join(dir, '.claude', 'worktrees', 'lavoro');
+    try {
+      mkdirSync(wt, { recursive: true });
+      lockCon(wt, { ...LOCK_FILO, 'node_modules/a': { version: '1.0.0' }, 'node_modules/a/node_modules/b': { version: '2.0.0' } });
+      const f = npmFinto();
+      const righe = [];
+      const r = allineaPerLeProve(wt, { ...conNpm(f, dir), log: (s) => righe.push(s) });
+      assert.equal(r.esito, 'non riuscita');
+      assert.deepEqual(r.mancanti.map((v) => [v.percorso, v.trovata]), [['node_modules/electron', '44.6.0'], ['node_modules/a/node_modules/b', null]]);
+      assert.deepEqual(f.chiamate, [], 'niente da aggiungere: npm non parte');
+      assert.equal(versioneIn(dir, 'node_modules/electron'), '44.6.0', 'un Electron forse acceso non si sostituisce');
+      assert.equal(existsSync(join(dir, 'node_modules', 'a', 'node_modules')), false, 'il pacchetto a della principale resta com\'era');
+      assert.match(righe.join('\n'), /electron 44\.7\.0 \(c'è 44\.6\.0\).*si aggiunge soltanto/);
+    } finally { togliCartella(dir); }
+  });
+
+  test('mai attraverso un collegamento: un ambito collegato tutto intero non riceve pacchetti', () => {
+    const principale = progetto({}, { 'node_modules/@a/b': '1.0.0' });
+    const clone = cartellaTemporanea('filo-clone-');
+    try {
+      const nm = join(clone, 'node_modules');
+      mkdirSync(nm);
+      symlinkSync(join(principale, 'node_modules', '@a'), join(nm, '@a'), 'junction');
+      writeFileSync(join(nm, MARCA_COLLEGATI), 'x\n');
+      lockCon(clone, { 'node_modules/@a/b': { version: '1.0.0' }, 'node_modules/@a/nuovo': { version: '1.0.0' } });
+      const r = allineaPerLeProve(clone, conNpm(npmFinto(), clone));
+      assert.equal(r.esito, 'non riuscita');
+      assert.deepEqual(r.mancanti.map((v) => v.nome), ['@a/nuovo']);
+      assert.deepEqual(readdirSync(join(principale, 'node_modules', '@a')), ['b'], 'niente scritto nella cartella a cui porta');
+      assert.deepEqual(appoggiRimasti(nm), []);
+    } finally {
+      togliCartella(clone);
+      togliCartella(principale);
+    }
+  });
+
+  test('npm che fallisce: lo dice, le prove partono, niente appoggio né blocco rimasti; un appoggio di una corsa morta si toglie', () => {
+    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
+    const wt = join(dir, '.claude', 'worktrees', 'lavoro');
+    try {
+      mkdirSync(wt, { recursive: true });
+      lockCon(wt, LOCK_FILO);
+      const nm = join(dir, 'node_modules');
+      mkdirSync(join(nm, '.filo-complemento-morto', 'node_modules'), { recursive: true });
+      const righe = [];
+      const rotto = npmFinto({ codice: 1 });
+      const r = allineaPerLeProve(wt, { ...conNpm(rotto, dir), log: (s) => righe.push(s) });
+      assert.equal(r.esito, 'non riuscita');
+      assert.deepEqual(r.mancanti.map((v) => v.nome), ['hash-wasm']);
+      assert.match(righe.join('\n'), /npm è uscito con 1\), mancano ancora: hash-wasm 4\.12\.0\. Le prove partono lo stesso/);
+      assert.deepEqual(appoggiRimasti(nm), []);
+      assert.deepEqual(readdirSync(dir).filter((n) => n.endsWith('.lock')), [], 'il blocco se ne va');
+      assert.equal(allineaPerLeProve(wt, conNpm(npmFinto(), dir)).esito, 'installati', 'al giro dopo si riprova');
+    } finally { togliCartella(dir); }
+  });
+
+  test('mentre la principale installa per sé (il pre-avvio), l\'albero aspetta il suo turno invece di installare insieme', () => {
+    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
+    const wt = join(dir, '.claude', 'worktrees', 'lavoro');
+    try {
+      mkdirSync(wt, { recursive: true });
+      lockCon(wt, LOCK_FILO);
+      const blocco = fileBlocco(realpathSync(dir), dir);
+      writeFileSync(blocco, '');
+      const f = npmFinto();
+      const righe = [];
+      const r = completaPacchetti(wt, {
+        installa: f.installa, cartellaBlocchi: dir, log: (s) => righe.push(s),
+        attendi: () => { metti(dir, 'node_modules/hash-wasm', '4.12.0'); rmSync(blocco); },
+      });
+      assert.equal(r.esito, 'allineati', 'l\'ha già messa chi teneva il turno');
+      assert.deepEqual(f.chiamate, []);
+      assert.match(righe.join('\n'), /Un altro avvio sta installando/);
+    } finally { togliCartella(dir); }
+  });
+
+  test('l\'appoggio chiede le versioni del lock, gli alias e le sorgenti locali come le scrive il lock', () => {
+    const radice = resolve('/progetto');
+    const lock = { packages: {
+      '': { name: 'p' },
+      'node_modules/nuovo': { version: '1.2.3', resolved: 'https://registry.npmjs.org/nuovo/-/nuovo-1.2.3.tgz', integrity: 'sha512-x' },
+      'node_modules/nuovo/node_modules/dentro': { version: '2.0.0' },
+      'node_modules/string-width-cjs': { name: 'string-width', version: '4.2.3' },
+      'node_modules/@s/locale': { version: '1.0.0', resolved: 'file:pacchetti/locale-1.0.0.tgz' },
+      'node_modules/presente': { version: '1.0.0' },
+      'node_modules/presente/node_modules/dentro': { version: '3.0.0' },
+    } };
+    const assenti = ['node_modules/nuovo', 'node_modules/string-width-cjs', 'node_modules/@s/locale'].map((percorso) => ({ percorso }));
+    const p = progettoDiAppoggio(lock, assenti, radice);
+    assert.deepEqual(p.pacchetto.dependencies, {
+      '@s/locale': `file:${resolve(radice, 'pacchetti/locale-1.0.0.tgz')}`, nuovo: '1.2.3', 'string-width-cjs': 'npm:string-width@4.2.3',
+    });
+    assert.deepEqual(Object.keys(p.lock.packages), ['', 'node_modules/nuovo', 'node_modules/nuovo/node_modules/dentro', 'node_modules/string-width-cjs', 'node_modules/@s/locale']);
+    assert.equal(p.lock.packages['node_modules/nuovo'].integrity, 'sha512-x', 'la sorgente e l\'impronta del lock restano');
+    assert.equal(p.lock.packages['node_modules/@s/locale'].resolved, `file:${resolve(radice, 'pacchetti/locale-1.0.0.tgz')}`);
+    assert.equal(primoLivello('node_modules/@s/x/node_modules/y'), 'node_modules/@s/x');
+    assert.equal(primoLivello('node_modules/x'), 'node_modules/x');
+  });
+
+  test('davvero, con npm: la libreria nuova arriva nella principale e niente di ciò che c\'era cambia', () => {
+    const dir = cartellaTemporanea('filo-complemento-');
+    const env = { ...process.env, npm_config_update_notifier: 'false', npm_config_audit: 'false', npm_config_fund: 'false' };
+    const npm = (args, cwd) => spawnSync('npm', args, { cwd, env, encoding: 'utf8', shell: process.platform === 'win32' });
+    try {
+      const fai = (nome, versione) => {
+        const d = join(dir, 'sorgenti', `${nome}-${versione}`);
+        mkdirSync(d, { recursive: true });
+        writeFileSync(join(d, 'package.json'), JSON.stringify({ name: nome, version: versione, main: 'index.js' }));
+        writeFileSync(join(d, 'index.js'), `module.exports = '${nome}@${versione}';\n`);
+        const pack = npm(['pack'], d);
+        assert.equal(pack.status, 0, pack.stderr);
+        return join(d, `${nome}-${versione}.tgz`);
+      };
+      const tgz = { a1: fai('a', '1.0.0'), a2: fai('a', '2.0.0'), nuova: fai('nuova', '1.0.0') };
+      const principale = join(dir, 'principale');
+      mkdirSync(principale);
+      copyFileSync(tgz.a1, join(principale, 'a.tgz'));
+      writeFileSync(join(principale, 'package.json'), JSON.stringify({ name: 'app', version: '1.0.0', private: true, dependencies: { a: 'file:a.tgz' } }));
+      const prima = npm(['install'], principale);
+      assert.equal(prima.status, 0, prima.stderr);
+      metti(principale, 'node_modules/estranea', '1.0.0'); // un pacchetto che il lock della principale non conosce
+
+      // Il worktree: il main di adesso ha la libreria nuova e un'altra versione di a.
+      const wt = join(principale, '.claude', 'worktrees', 'lavoro');
+      mkdirSync(wt, { recursive: true });
+      copyFileSync(tgz.a2, join(wt, 'a.tgz'));
+      copyFileSync(tgz.nuova, join(wt, 'nuova.tgz'));
+      writeFileSync(join(wt, 'package.json'), JSON.stringify({ name: 'app', version: '1.0.0', private: true, dependencies: { a: 'file:a.tgz', nuova: 'file:nuova.tgz' } }));
+      const lockWt = npm(['install', '--package-lock-only'], wt);
+      assert.equal(lockWt.status, 0, lockWt.stderr);
+      const locks = [readFileSync(join(principale, 'package-lock.json'), 'utf8'), readFileSync(join(wt, 'package-lock.json'), 'utf8')];
+
+      const righe = [];
+      const r = allineaPerLeProve(wt, { log: (s) => righe.push(s) });
+      assert.equal(r.esito, 'non riuscita', righe.join('\n'));
+      assert.deepEqual(r.mancanti.map((v) => [v.nome, v.trovata]), [['a', '1.0.0']], 'la versione diversa resta, detta');
+      const daWt = createRequire(join(wt, 'index.js'));
+      assert.equal(daWt('nuova'), 'nuova@1.0.0', 'le prove del worktree la trovano');
+      assert.equal(daWt('a'), 'a@1.0.0', 'a della principale non è cambiato');
+      assert.equal(versioneIn(principale, 'node_modules/estranea'), '1.0.0', 'e niente si è tolto');
+      assert.deepEqual([readFileSync(join(principale, 'package-lock.json'), 'utf8'), readFileSync(join(wt, 'package-lock.json'), 'utf8')], locks);
+      assert.deepEqual(appoggiRimasti(join(principale, 'node_modules')), []);
+      assert.equal(existsSync(join(wt, 'node_modules')), false);
+    } finally { togliCartella(dir); }
   });
 });
 
