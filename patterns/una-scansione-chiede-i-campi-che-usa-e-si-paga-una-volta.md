@@ -90,7 +90,9 @@ copia è scaduta.
 ## Dove vive
 
 `scripts/lib/copia-su-file.mjs` (la copia con scadenza),
-`scripts/lib/scansione-secco.mjs` (prova a secco → applicazione, una volta sola),
+`scripts/lib/scansione-secco.mjs` (prova a secco → applicazione, una volta sola,
+col confronto obbligatorio), `scripts/lib/firma-ora.mjs` (la scrittura, e quando
+una scrittura condizionata è stata respinta),
 `scripts/lib/config-routine-copia.mjs` (la configurazione delle routine, un
 minuto, condivisa fra dispatch e verify-local),
 `scripts/lib/firestore-conta.mjs` (il conteggio),
