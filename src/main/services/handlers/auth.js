@@ -900,9 +900,12 @@ module.exports = function register(on, ctx) {
   // rileggeva tutte le schede (centinaia di letture) per riunirne due o tre.
   const SCHEDE_MIRATE_MAX = 100;
 
-  async function mergeCardFields(rows, { mirate = false } = {}) {
+  // `campi`: quelli che la pagina ha chiesto. Riceve quelli (#1335): niente voti non chiesti, né schede lette per loro.
+  async function mergeCardFields(rows, { mirate = false, campi = null } = {}) {
     const V = PUBLIC_VIEW();
     if (!V || !Array.isArray(rows) || rows.length === 0) return rows;
+    const daUnire = Array.isArray(campi) ? V.USER_FIELDS.filter((f) => campi.includes(f)) : V.USER_FIELDS;
+    if (!daUnire.length) return rows;
     let cards;
     const FB = FEEDBACK();
     const ids = rows.map((r) => r && r._id).filter(Boolean);
