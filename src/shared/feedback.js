@@ -1746,13 +1746,19 @@
   // righe non serve — ordina lui come gli pare. `idToken` serve per la
   // collezione vera, che senza credenziali non si legge (#583); la vista
   // pubblica lo lascia vuoto.
-  async function listByNameDirect(collectionId, { pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = '', idToken = '', fields = null } = {}) {
+  async function listByNameDirect(collectionId, { pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = '', idToken = '', fields = null, uguale = null } = {}) {
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const structuredQuery = {
       from: [{ collectionId }],
       orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
       limit: pageSize,
     };
+    if (uguale) {
+      if (!uguale.campo || typeof uguale.valore !== 'string') throw new Error('filtro sul server senza campo o valore');
+      structuredQuery.where = {
+        fieldFilter: { field: { fieldPath: String(uguale.campo) }, op: 'EQUAL', value: { stringValue: uguale.valore } },
+      };
+    }
     // La proiezione vale anche qui: è la porta da cui passano le letture
     // COMPLETE (il cursore sul nome), cioè quelle che pagano di più. Senza,
     // chiedere tutta la collezione voleva dire scaricarne i documenti interi
