@@ -54,11 +54,13 @@ export function originaliDi(radice, sha) {
   if (existsSync(join(gitDir, 'rebase-merge')) || existsSync(join(gitDir, 'rebase-apply'))) return null;
   if (/^commit \(amend\)/.test(gitIn(radice, ['reflog', '-1', '--format=%gs', 'HEAD']))) return null;
   try { return [gitIn(radice, ['rev-parse', '--verify', '--quiet', 'CHERRY_PICK_HEAD^{commit}'])]; } catch (_) { /* finito, o non c'era */ }
-  const [an, ae, at, cn, ce, ct] = gitIn(radice, ['show', '-s', '--format=%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct', sha]).split('\u0000');
-  if (an === cn && ae === ce && at === ct) return null;
-  // Ha tenuto l'autore di un altro commit (un cherry-pick chiuso dopo un conflitto, commit -c): l'originale è quello.
-  const righe = gitIn(radice, ['log', '--all', '--reflog', '-F', `--author=${ae}`, '--format=%H%x00%an%x00%ae%x00%at']).split('\n');
-  return righe.map((r) => r.split('\u0000')).filter(([h, n, e, t]) => h !== sha && n === an && e === ae && t === at).map(([h]) => h);
+  const [an, ae, at, cn, ce, ct, oggetto] = gitIn(radice, ['show', '-s', '--format=%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%s', sha]).split('\u0000');
+  const scelto = /^commit \(cherry-pick\)/.test(gitIn(radice, ['reflog', '-1', '--format=%gs', 'HEAD']));
+  if (!scelto && an === cn && ae === ce && at === ct) return null;
+  // Ha tenuto autore e messaggio di un altro commit (un cherry-pick chiuso dopo un conflitto, commit -c): è quello.
+  const righe = gitIn(radice, ['log', '--all', '--reflog', '-F', `--author=${ae}`, '--format=%H%x00%an%x00%ae%x00%at%x00%s']).split('\n');
+  const uguali = righe.map((r) => r.split('\u0000')).filter(([h, n, e, t, o]) => h !== sha && n === an && e === ae && t === at && o === oggetto);
+  return [...new Set(uguali.map(([h]) => h))];
 }
 
 /** Chi fa un commit in `radice`: per filo-security i biglietti stanno nel checkout di Filo di questo script. */

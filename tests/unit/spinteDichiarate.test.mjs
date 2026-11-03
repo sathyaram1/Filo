@@ -374,12 +374,12 @@ test('#1362 giro 4 r4: lo squash che fa da solo il salvataggio (una copia dei da
   const x = dueSessioni(d);
   commit(d.pulita, 'p.txt', x.envPulita);
   assert.equal(spingi(d.pulita, x.envPulita).status, 0);
-  commit(d.pulita, 's.txt', x.envSporca);
   const doc = { name: 'projects/filo/databases/(default)/documents/feedback/abc123', fields: { text: { stringValue: 'il tasto non va' }, userAgent: { stringValue: 'Mozilla/5.0' }, clientId: { stringValue: 'c-1' } } };
   writeFileSync(join(d.pulita, 'dati.json'), JSON.stringify({ documents: [doc] }, null, 2));
   writeFileSync(join(d.pulita, 'p2.txt'), 'p2\n');
   g(d.pulita, ['add', '-A']);
   g(d.pulita, ['commit', '-qm', 'p2 e una copia'], x.envPulita);
+  commit(d.pulita, 's.txt', x.envSporca);
   // Il salvataggio gira nella sessione pulita: il commit che rifà lo fa lei.
   const prima = process.env.FILO_BIGLIETTO_FILE;
   process.env.FILO_BIGLIETTO_FILE = x.pulito.file;
@@ -461,7 +461,8 @@ test('#1362 giro 4 r4 (routine): un commit della sporca preso dalla pulita non d
   g(d.altra, ['checkout', '-qB', 'claude/x', 'origin/claude/x']);
   const x = commit(d.altra, 'x.txt');
   g(d.altra, ['push', '-q', '--no-verify', 'origin', 'claude/x']);
-  g(d.pulita, ['pull', '-q', '--no-rebase', 'origin', 'claude/x'], env);
+  commit(d.pulita, 'c1b.txt', env);
+  g(d.pulita, ['pull', '-q', '--no-rebase', '--no-edit', 'origin', 'claude/x'], env);
   const c2 = commit(d.pulita, 'c2.txt', env);
   g(d.altra, ['push', '-q', '--no-verify', 'origin', '--delete', 'claude/x']);
   g(d.pulita, ['fetch', '-q', '--prune', 'origin'], env);
@@ -642,6 +643,14 @@ test('git-server push: i commit del worker si leggono prima della spinta e si ac
   assert.match(riga, /non ancora dichiarate/, 'dentro una prova il server vero non si tocca: resta in coda, e lo dice');
   const [v] = coda(d.pulita);
   assert.deepEqual([v.tipo, v.repo, v.commits], ['routine', 'server', [a]]);
+  // Anche qui decide la traccia: un commit arrivato da un'altra copia non parte col biglietto del worker.
+  const z = commit(d.altra, 'z.txt');
+  g(d.pulita, ['fetch', '-q', d.altra, `${z}:refs/heads/da-fuori`]);
+  g(d.pulita, ['merge', '-q', '--no-edit', 'da-fuori']);
+  const b = commit(d.pulita, 'b.txt');
+  await dichiaraSpintaServer.dopo(d.pulita, BIGLIETTO, dichiaraSpintaServer.prima(d.pulita, 'claude/x'));
+  const tutte = coda(d.pulita).flatMap((x) => x.commits);
+  assert.ok(tutte.includes(b) && !tutte.includes(z));
 });
 
 test('il pre-push nuovo sostituisce quello di prima, non porta il suo segno (un ramo vecchio non lo riscrive) e uno altrui non si tocca', () => {
@@ -658,6 +667,14 @@ test('il pre-push nuovo sostituisce quello di prima, non porta il suo segno (un 
   g(server, ['init', '-q']);
   assert.equal(installaSpinteServer(server), 'installato');
   assert.match(readFileSync(join(server, '.git', 'hooks', 'pre-push'), 'utf8'), /--pre-push server/);
+  // La traccia c'è in tutte e due le copie, con chi fa il commit cercato dove stanno i biglietti (#1362 giro 4 r4).
+  for (const [dir, repo] of [[d.pulita, 'app'], [server, 'server']]) {
+    for (const [gancio, modo] of [['post-commit', `--post-commit "$radice" ${repo}`], ['post-merge', `--post-merge "$radice" ${repo}`], ['post-rewrite', '--post-rewrite "$radice"']]) {
+      const testo = readFileSync(join(dir, '.git', 'hooks', gancio), 'utf8');
+      assert.ok(testo.includes(SEGNO_PRE_PUSH) && testo.includes(modo), `${repo} ${gancio}`);
+      assert.ok(!/routine-ticket|FILO_ROUTINE_TICKET/.test(testo), 'anche le routine scrivono la traccia');
+    }
+  }
   writeFileSync(join(server, '.git', 'hooks', 'pre-push'), '#!/bin/sh\nexit 0\n');
   assert.equal(installaSpinteServer(server), 'altrui');
 });
