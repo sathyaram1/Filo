@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
@@ -15,6 +15,7 @@ import { pinTools, pinnedDirWorker } from '../../scripts/lib/tools-pin.mjs';
 import { MARCA_GIRO, accendi, cloneDelGiro, preparaIntestazione } from '../../scripts/lib/worker-nel-clone.mjs';
 import { MARCATORE_WORKER } from '../../scripts/lib/dati-worker.mjs';
 import { MARCA_PRIVATI } from '../../scripts/lib/clone-worker.mjs';
+import { espandiInclusioni } from '../../scripts/lib/role-text.mjs';
 import { cartelleTranscript } from '../../scripts/session-report.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -223,6 +224,27 @@ test('nel clone: pacchetti collegati anche con un lock diverso, e il worker sa d
     assert.ok(cartelle.some((c) => c.endsWith(s.sessione.replace(/[^A-Za-z0-9]/g, '-'))), cartelle.join('\n'));
   } finally {
     togliCartella(s.base);
+  }
+});
+
+test('nessun ruolo dato a un worker vieta il cd nel clone che l\'intestazione chiede davanti a ogni comando (#2081)', () => {
+  const base = cartellaTemporanea('filo-worker-cd-');
+  try {
+    const clone = resolve(base, 'c');
+    mkdirSync(resolve(clone, '.claude'), { recursive: true });
+    writeFileSync(resolve(clone, MARCATORE_WORKER), JSON.stringify({ indice: 1, principale: resolve(base, 's') }), 'utf8');
+    const testa = preparaIntestazione(clone, { allinea: () => ({ ok: true }) });
+    assert.ok(testa.includes(`cd "${clone}" && …`), testa);
+    // orchestrator.md e sessione.md li stampa il preflight a chi resta nella cartella della sessione: lì il cd non c'è.
+    const dir = resolve(REPO, 'routines', 'roles');
+    const ruoli = readdirSync(dir).filter((f) => f.endsWith('.md') && !f.startsWith('_') && !['orchestrator.md', 'sessione.md'].includes(f));
+    assert.ok(ruoli.includes('resolver-rebase.md') && ruoli.includes('resolver.md'), ruoli.join(' '));
+    for (const f of [...ruoli, '_contratto-worker.md']) {
+      const vieta = espandiInclusioni(readFileSync(resolve(dir, f), 'utf8'), dir).match(/\b(?:niente|senza|mai)\b[^.;:]{0,40}`cd\b/i);
+      assert.equal(vieta, null, `${f} vieta il cd nel clone («${vieta && vieta[0]}»), che l'intestazione chiede`);
+    }
+  } finally {
+    togliCartella(base);
   }
 });
 
