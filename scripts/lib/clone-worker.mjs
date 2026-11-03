@@ -267,7 +267,7 @@ export function allineaPacchetti(clone, principale, {
     collegaVoci(realpathSync(resolve(principale, 'node_modules')), nm);
     return { ok: true, pacchetti: 'collegati', why: '', ...(uguali ? {} : { lockDiverso: true }) };
   }
-  if (soloCollegati && privati) return { ok: true, pacchetti: 'privati', why: '', lockDiverso: true };
+  if (soloCollegati && privati && !diversi.length) return { ok: true, pacchetti: 'privati', why: '', lockDiverso: true };
   let perche = 'Il principale non ha i pacchetti installati, o non ha finito di installarli';
   if (diversi.length) perche = `Il principale non ha installato le versioni che il package-lock fissa (${descrivi(diversi)})`;
   else if (pronti) perche = 'Il package-lock del clone non è quello del principale';
