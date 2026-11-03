@@ -366,9 +366,11 @@
         : { kind: 'ok', text: 'Fatto: il lavoro è su main' + shaTxt + '.' };
     }
     if (r.result === 'conflict') {
-      var base = originOf(req) === 'routine'
-        ? 'Main è andato avanti e le modifiche non si incastrano da sole: serve un giro nuovo dell’automazione.'
-        : 'Main è andato avanti e le modifiche non si incastrano da sole: rifai la base del ramo e rilancia npm run finish.';
+      var base = siRiallineaDaSola(req)
+        ? 'Main è andato avanti e le modifiche non si incastrano da sole. ' + RIALLINEA_DA_SOLA
+        : originOf(req) === 'routine'
+          ? 'Main è andato avanti e le modifiche non si incastrano da sole: rimetti la pratica In coda per un giro nuovo.'
+          : 'Main è andato avanti e le modifiche non si incastrano da sole: rifai la base del ramo e rilancia npm run finish.';
       var tentativo = realignFailureText(r.realignReason);
       return { kind: 'warn', text: tentativo ? base + ' ' + tentativo : base };
     }
