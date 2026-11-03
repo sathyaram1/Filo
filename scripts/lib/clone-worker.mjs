@@ -11,7 +11,9 @@ import { ensureSessionExcludes } from './branch-integrity.mjs';
 import { ensureCommentChar } from './carattere-commento.mjs';
 import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { MARCATORE_WORKER } from './dati-worker.mjs';
-import { MARCA_COLLEGATI, collegatoVoceAVoce, descrivi, fileBlocco, pacchettiDaInstallare, TETTO_INSTALLAZIONE_MS } from './pacchetti.mjs';
+import {
+  MARCA_COLLEGATI, collegatoVoceAVoce, descrivi, fileBlocco, pacchettiDaInstallare, primoLivello, TETTO_INSTALLAZIONE_MS,
+} from './pacchetti.mjs';
 import { pinWorkerTools, pinnedDirWorker, TOOLS_ROOT } from './tools-pin.mjs';
 import { applicaVersioneAlLock } from '../release-apply-version.mjs';
 
