@@ -296,8 +296,6 @@ export function completaPacchetti(radice, {
   }
 }
 
-export const collegatoVoceAVoce = (nm) => existsSync(join(nm, MARCA_COLLEGATI));
-
 /**
  * Prima delle prove, col lock dell'albero sotto prova: un node_modules tutto suo si allinea come all'avvio; quello di
  * un'altra cartella (worktree, cartella di prova di finish) o collegato voce per voce (clone dei worker) si completa
