@@ -173,6 +173,18 @@ function verificato(sc) {
   assert.match(c.out, /verifica superata per 'claude\/prova' su [0-9a-f]{8} e il server claude\/prova su [0-9a-f]{8}/);
 }
 
+test('#2049: in locale la lettura del diff legge anche il ramo omonimo del server, con le sue prove', (t) => {
+  const sc = scenario();
+  t.after(() => togliCartella(sc.base));
+  t.after(() => togliCartella(cartellaConsegna(sc.work)));
+  commit(sc.server, 'functions/test/lavoro.test.js', "test('il lavoro del server regge', () => {});\n", 'prova del server');
+  assert.equal(vl(sc.work, 'start', 'fai X su app e server').code, 0);
+  const r = faiLaLettura(sc.work);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /## Il diff del server\n\nQuesto è un lavoro server\. Il ramo `claude\/prova` di filo-security/);
+  assert.match(r.stdout, /## Le prove del server contate[\s\S]*prove aggiunte 1 \(unit 1, spec 0\)[\s\S]*Codice cambiato fuori da functions\/test\/: 1 file[\s\S]*- functions\/lavoro\.js/);
+});
+
 test('#715: una correzione fatta solo sul ramo del server non passa per «verifica superata»', () => {
   const sc = scenario();
   const avvio = vl(sc.work, 'start', 'fai X su app e server');
