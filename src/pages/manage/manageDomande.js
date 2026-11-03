@@ -1293,7 +1293,7 @@
       const voci = [{ testo: 'Apri', azione: () => { apri([d.id]); disegna(); } }];
       const et = d.stato === 'aperta' ? etichettaDi(consigliata(d)) : null;
       if (et) voci.push({ testo: `Applica il consiglio: ${et}`, azione: () => { apri([d.id]); disegna(); consiglioUna(d.id); } });
-      if (d.stato !== 'in_smistamento') voci.push({ testo: `Copia «Discutiamo la domanda ${d.id}»`, azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
+      if (d.stato !== 'in_smistamento') voci.push({ testo: voceDiscuti(d.id), titolo: titoloDiscuti(d.id), azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
       if (['aperta', 'in_lavorazione', 'in_smistamento'].includes(d.stato)) voci.push({ testo: 'Archivia senza azioni', azione: () => { apri([d.id]); disegna(); archivia(d.id, false); } });
       else if (riapribile(d)) voci.push({ testo: 'Riapri', titolo: titoloRiapri(d), azione: () => { apri([d.id]); disegna(); archivia(d.id, true); } });
       // Il menu non mostra le note: apre la domanda con le note aperte, e la fiducia si dà dal tasto, dopo averle lette.
