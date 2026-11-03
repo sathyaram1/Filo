@@ -179,23 +179,27 @@ export function shaDelRiallineamento(marker) {
 }
 
 /**
- * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche
- * quelli cambiati dal commit verificato alla punta. `{ changed, nota }`; la nota va stampata.
+ * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche i file del
+ * lavoro verificato che il riallineamento ha toccato (i conflitti, anche risolti col lato di main). Il resto del
+ * lato arrivato da main l'ha già provato la suite di main: preso intero erano ore, oltre il tetto di un comando (#1907).
  */
 export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
   const g = (args) => git(args, { cwd: root });
-  const changed = g(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
+  const righe = (r) => r.out.split('\n').filter(Boolean);
+  const changed = righe(g(['diff', '--name-only', `${base}...HEAD`]));
   const dal = shaDelRiallineamento(marker);
   if (!dal) return { changed, nota: '' };
   const c = g(['cat-file', '-e', `${dal}^{commit}`]).ok || g(['fetch', 'origin', dal]).ok;
-  const r = c ? g(['diff', '--name-only', dal, 'HEAD']) : { ok: false };
-  if (!r.ok) {
-    return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} qui non c'è: scelgo gli spec solo dal ramo contro main, e il lato arrivato da main resta scoperto.` };
+  const arrivati = c ? g(['diff', '--name-only', dal, 'HEAD']) : { ok: false };
+  const delLavoro = arrivati.ok ? g(['diff', '--name-only', `${base}...${dal}`]) : { ok: false };
+  if (!arrivati.ok || !delLavoro.ok) {
+    return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} qui non c'è: scelgo gli spec solo dal ramo contro main, e i file del lavoro risolti col lato di main restano scoperti.` };
   }
-  const lato = r.out.split('\n').filter(Boolean);
+  const toccati = new Set(righe(arrivati));
+  const conflitti = righe(delLavoro).filter((f) => toccati.has(f));
   return {
-    changed: [...new Set([...changed, ...lato])],
-    nota: `Giro di riallineamento: scelgo gli spec anche dai ${lato.length} file cambiati da ${dal.slice(0, 8)} (il commit verificato) alla punta, cioè il lato arrivato da main e i file in conflitto.`,
+    changed: [...new Set([...changed, ...conflitti])],
+    nota: `Giro di riallineamento: scelgo gli spec dal ramo contro main e dai ${conflitti.length} file del lavoro verificato (${dal.slice(0, 8)}) che il riallineamento ha toccato; il resto del lato arrivato da main (${toccati.size - conflitti.length} file) l'ha già provato la suite di main.`,
   };
 }
 
