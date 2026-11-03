@@ -57,6 +57,22 @@ test('a lavoro fermo di sicuro i `?` restano a chi riprende con la loro prova: e
   }
 });
 
+test('un 2 col `?` non ferma (#1202): la prova di un 1 col `?` della stessa critica esce prima del verdetto, la sua resta', () => {
+  const require = createRequire(import.meta.url);
+  require('../../src/shared/verifierRound.js');
+  const V = globalThis.SN_VERIFIER_ROUND;
+  const { findings } = V.parseFindings('Provato.\n[2i?] Il riquadro è freddo? Consiglio caldo.\n[1i?] Il bordo è grigio?\n[1e] Fuori.');
+  const esito = V.decideRound({ findings, caps: { cap3: 10, cap2: 10, cap1: 1, cap0: 0 }, counts: {} });
+  assert.equal(esito.stop, false);
+  assert.deepEqual(esito.fix.map((f) => f.level), [2]);
+  const fuori = proveDaToglierePrimaDelVerdetto([
+    'tests/verifica/42/giro1-r1-riquadro.spec.mjs',
+    'tests/verifica/42/giro1-r2-bordo.spec.mjs',
+    'tests/verifica/42/giro1-r3-esterno.spec.mjs',
+  ], findings);
+  assert.deepEqual(fuori.map((f) => f.prova), ['tests/verifica/42/giro1-r2-bordo.spec.mjs', 'tests/verifica/42/giro1-r3-esterno.spec.mjs']);
+});
+
 /** Un ramo con un punto fermo all'avvio della verifica e, dopo, le prove della critica. */
 function ramoConProve(prove) {
   const casa = cartellaTemporanea('filo-pulizia-prima-');
