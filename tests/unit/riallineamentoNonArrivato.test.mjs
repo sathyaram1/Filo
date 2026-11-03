@@ -94,6 +94,15 @@ test('sulla punta verificata senza il rebase dichiarato il compito dice che non 
   assert.match(r.err, /il rebase non è arrivato su origin/);
 });
 
+test('sulla punta verificata il rebase manca anche se il report non nomina lo sha di main', () => {
+  const r = consegna({ shaVerificato: VERIFICATO, reportRebase: 'Riallineato su main attuale. Conflitto in b.js, solo meccanico.' });
+  assert.match(r.instructions, /Il riallineamento non è su questo ramo/);
+  assert.match(r.instructions, /registra la critica senza rilievi/);
+  assert.doesNotMatch(r.instructions, /Il confronto manca: dichiaralo nella critica/);
+  const vuoto = perimetroNote('riallineamento', { shaVerificato: VERIFICATO }, { scartato: 'punta' });
+  assert.match(vuoto, /registra la critica senza rilievi/, 'anche senza report');
+});
+
 test('un rebase arrivato non fa scattare niente', () => {
   assert.deepEqual(riallineamentoMancante(REPORT, riallineata), []);
   const n = perimetroNote('riallineamento', { shaVerificato: VERIFICATO, reportRebase: REPORT }, { mancante: riallineamentoMancante(REPORT, riallineata) });
