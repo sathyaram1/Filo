@@ -50,6 +50,7 @@ function scena({ pacchetti = true } = {}) {
   if (pacchetti) {
     mkdirSync(resolve(principale, 'node_modules', 'pacchetto'), { recursive: true });
     writeFileSync(resolve(principale, 'node_modules', 'pacchetto', 'canarino.txt'), 'vivo\n', 'utf8');
+    writeFileSync(resolve(principale, 'node_modules', 'pacchetto', 'package.json'), '{"name":"pacchetto","version":"1.0.0"}\n', 'utf8');
     writeFileSync(resolve(principale, 'node_modules', '.package-lock.json'), '{}\n', 'utf8'); // npm lo scrive alla fine
   }
   const strumenti = resolve(base, 'strumenti-orchestratore');
