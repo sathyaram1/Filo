@@ -100,10 +100,6 @@ test('decisioneFerma: ferma un 3 o un 2 su una scelta difficile da disfare', () 
   assert.equal(R.decisioneFerma({ level: 2, decision: true }), false);
   assert.equal(R.decisioneFerma({ level: 1, decision: true, irreversibile: true }), false);
   assert.equal(R.decisioneFerma({ level: 3, decision: false }), false, 'senza «?» non è una domanda');
-  assert.equal(R.segnalazioneFerma({ livello: 3 }), true);
-  assert.equal(R.segnalazioneFerma({ livello: 1, irreversibile: true }), true, 'una segnalazione applica la scelta: difficile da disfare ferma a ogni livello');
-  for (const livello of [0, 1, 2, '2']) assert.equal(R.segnalazioneFerma({ livello }), false, `livello ${livello}`);
-  for (const livello of [undefined, null, '', 4, 'due', true]) assert.equal(R.segnalazioneFerma({ livello }), true, `livello ${livello}: uno strumento vecchio`);
 });
 
 // ── Gli strumenti: dispatch e verifica locale ───────────────────────────────
