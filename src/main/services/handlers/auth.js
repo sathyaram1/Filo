@@ -937,7 +937,7 @@ module.exports = function register(on, ctx) {
       const ids = Array.isArray(msg.ids) ? msg.ids : [];
       const soloCampi = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
       const rows = await FB.getMany(ids, { timeoutMs, idToken, fields: soloCampi });
-      return { ok: true, rows: await mergeCardFields(rows, { mirate: true }) };
+      return { ok: true, rows: await mergeCardFields(rows, { mirate: true, campi: soloCampi }) };
     }
     // La lettura COMPLETA (#496): la chiede la scheda delle statistiche, che
     // fa domande sull'INSIEME («quanti ne sono arrivati in tutto»), e a una
@@ -958,7 +958,7 @@ module.exports = function register(on, ctx) {
       scheduleViewSync({ rows });
       const w = liveWatcherDi();
       if (w && complete) w.allineato(startedAt, rows, readTime);
-      return { ok: true, rows: await mergeCardFields(rows), complete, readTime };
+      return { ok: true, rows: await mergeCardFields(rows, { campi: fields }), complete, readTime };
     }
     if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
 
@@ -976,7 +976,7 @@ module.exports = function register(on, ctx) {
     // sincronizzazione: gliele passiamo invece di far rileggere mezzo database
     // un attimo dopo.
     scheduleViewSync({ rows });
-    return { ok: true, rows: await mergeCardFields(rows) };
+    return { ok: true, rows: await mergeCardFields(rows, { campi: fields }) };
   }));
 
   // ── #676: il giro dei cambiati della Gestione, uno solo, qui nel main ────

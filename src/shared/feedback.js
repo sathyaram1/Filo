@@ -982,7 +982,10 @@
   // sapere se vale la pena riunire le schede pubbliche e rimettere in pari la
   // bacheca (una lista vera sì, il giro leggero del battito no) — e la
   // domanda non si può dedurre dai campi senza indovinare.
-  async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '', afterName = null, op = 'list' } = {}) {
+  // `uguale` ({ campo, valore }): il filtro che il database applica da sé, solo nella lettura col cursore sul nome.
+  async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '', afterName = null, op = 'list', uguale = null } = {}) {
+    // Un filtro che la strada scelta non sa portare si rifiuta: ignorato, tornerebbe tutto in silenzio (#1335).
+    if (uguale && typeof afterName !== 'string') throw new Error('filtro sul server disponibile solo nella lettura completa');
     // Da una pagina filo:// la lettura passa dal main, che ha il token admin
     // (#583): qui non c'è nessuna credenziale, e la collezione non è più
     // pubblica. Il main torna le righe già decodificate.
@@ -994,7 +997,7 @@
       return marcaProiezione(await readViaMain(bridge, { op, pageSize, timeoutMs, fields }), fields);
     }
     if (typeof afterName === 'string') {
-      const { rows, readTime } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken, fields });
+      const { rows, readTime } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken, fields, uguale });
       if (readTime) Object.defineProperty(rows, 'readTime', { value: readTime, enumerable: false });
       return marcaProiezione(rows, fields);
     }
