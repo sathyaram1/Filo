@@ -12,8 +12,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 test('firestore.indexes.json ha gli indici del registro d\'uso: pseudonimo uguale, ora crescente e decrescente', () => {
   const { indexes } = JSON.parse(readFileSync(join(ROOT, 'firestore.indexes.json'), 'utf8'));
-  const c'è = (verso) => indexes.some((i) => i.collectionGroup === 'wallet-usage' && i.queryScope === 'COLLECTION'
+  const presente = (verso) => indexes.some((i) => i.collectionGroup === 'wallet-usage' && i.queryScope === 'COLLECTION'
     && JSON.stringify(i.fields) === JSON.stringify([{ fieldPath: 'pseudonym', order: 'ASCENDING' }, { fieldPath: 'at', order: verso }]));
-  assert.ok(c'è('ASCENDING'), 'righe dopo una nuova chiave, sommate e contate');
-  assert.ok(c'è('DESCENDING'), 'le ultime 200 righe della scheda');
+  assert.ok(presente('ASCENDING'), 'righe dopo una nuova chiave, sommate e contate');
+  assert.ok(presente('DESCENDING'), 'le ultime 200 righe della scheda');
 });
