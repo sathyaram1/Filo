@@ -74,10 +74,11 @@ function erroreSegno(e) {
 
 // Un errore di ownerDomande detto all'owner. Prima del deploy la callable non esiste (404 senza codice del
 // protocollo): lo si dice, non «riprova». Un 404 col codice è una domanda che non c'è, e la frase è del server.
-function erroreDomande(e) {
+function erroreDomande(e, nonAncora) {
   const code = String(e?.code || '').toUpperCase();
   const detail = String(e?.detail || '').trim();
   if (e?.httpStatus === 404 && !code) return 'Le domande non sono ancora pubblicate sul server: arrivano col prossimo aggiornamento del server.';
+  if (nonAncora && e?.reason === 'operazione_sconosciuta') return nonAncora;
   if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può vedere le domande: serve quello del proprietario.';
   if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
   if (detail) return detail;
@@ -1480,12 +1481,12 @@ module.exports = function register(on, ctx) {
 
   // Le domande all'owner (#1149): il main fa solo da tramite verso ownerDomande. Le azioni le applica il server,
   // che decide anche chi ha scritto ogni turno: la pagina non può dichiararlo.
-  async function chiamaDomande(data) {
+  async function chiamaDomande(data, nonAncora) {
     let r;
     try {
       r = await callSecurityFunction('ownerDomande', data);
     } catch (e) {
-      return { ok: false, error: erroreDomande(e) };
+      return { ok: false, error: erroreDomande(e, nonAncora) };
     }
     if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha risposto sulle domande.' };
     return r;
@@ -1544,6 +1545,16 @@ module.exports = function register(on, ctx) {
       return { ok: true, domanda: r.domanda || null };
     }));
   }
+
+  // «Segna fidata» su una domanda chiusa (#2078), `fidata: false` per toglierla: come per i feedback la scrive solo il server.
+  on(MSG.DOMANDA_FIDUCIA, ownerOnly(async (msg) => {
+    const id = String(msg?.id || '').trim();
+    if (!id) return { ok: false, error: 'Manca la domanda.' };
+    const r = await chiamaDomande({ op: 'fiducia', id, fidata: msg?.fidata !== false },
+      'Il server non sa ancora dare fiducia a una domanda: arriva col prossimo aggiornamento del server.');
+    if (!r.ok) return r;
+    return { ok: true, fiducia: r.fiducia === 'fidato' ? 'fidato' : 'non_fidato', domanda: r.domanda || null };
+  }));
 
   // «Segna fidato» (#1148), e `fidato: false` per toglierla: la fiducia la scrive solo il server, mai la pagina né il main col token.
   on(MSG.FIDUCIA_SEGNA, ownerOnly(async (msg) => {
