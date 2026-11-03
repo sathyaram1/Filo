@@ -228,15 +228,14 @@ test('chi ascolta sente chi suona (file veri, processi diversi)', async () => {
 // #488: la cartella del campanello tolta mentre Filo è aperto (pulizia del sistema) e rifatta da chi suona: l'ascolto
 // si riaggancia da solo, e l'avviso arriva senza rientrare nella finestra.
 test('cartella tolta e ricreata: il campanello si sente lo stesso', async () => {
-  const { rmSync } = require('node:fs');
   const base = cartellaTemporanea('filo-mac-');
   let colpi = 0;
   const stop = S.watchSignal(() => { colpi++; }, { base, debounceMs: 30, controlloMs: 50 });
   try {
     await attendi(100);
-    rmSync(S.signalDir(base), { recursive: true, force: true });
+    assert.ok(togliCartella(S.signalDir(base)));
     await attendi(150);
-    rmSync(S.signalDir(base), { recursive: true, force: true });
+    assert.ok(togliCartella(S.signalDir(base)));
     colpi = 0;
     await aspettaChe(async () => {
       if (!colpi) S.note('ab12cd34ef56ab12cd34ef56', base);

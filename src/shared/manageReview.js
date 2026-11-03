@@ -1668,7 +1668,10 @@
   function riallineamentoDi(fb, failed) {
     const { status } = normalizeStatus(fb);
     const inLavoro = status === 'todo' || WORK_STAGES.includes(status);
-    const daRoutine = (r) => String((r && r.origin) || '') === 'routine' && !!String((r && r.feedbackId) || '').trim();
+    // La regola sta in mergeApprovals.siRiallineaDaSola; qui la copia per le pagine che non caricano quel modulo.
+    const MA = global.SN_MERGE_APPROVALS;
+    const daRoutine = MA && typeof MA.siRiallineaDaSola === 'function' ? MA.siRiallineaDaSola
+      : (r) => String((r && r.origin) || '') === 'routine' && !!String((r && r.feedbackId) || '').trim();
     return inLavoro && failed.every(daRoutine) ? 'da_riallineare' : 'riallineamento_fallito';
   }
   function testoRiallineamentoFallito(failed) {
