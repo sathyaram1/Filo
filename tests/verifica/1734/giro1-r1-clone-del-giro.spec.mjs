@@ -2,12 +2,10 @@
 // Electron diverso da quello che il lock fissa, quando il principale ha ricevuto il lock nuovo senza reinstallare.
 import { test, expect } from '@playwright/test';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 import { allineaPacchetti } from '../../../scripts/lib/clone-worker.mjs';
 
-const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const LOCK = JSON.stringify({
   name: 'x', lockfileVersion: 3,
   packages: { '': { name: 'x' }, 'node_modules/electron': { version: '2.0.0' }, 'node_modules/a': { version: '1.0.0' } },
@@ -49,5 +47,4 @@ test('r1 con le versioni uguali il clone del giro resta collegato, senza install
   const r = allineaPacchetti(c, p, { soloCollegati: true, npmCi: () => { installazione = true; return { ok: true, codice: 0, out: '' }; }, avvisa: () => {} });
   expect(r.pacchetti).toBe('collegati');
   expect(installazione).toBe(false);
-  expect(REPO).toBeTruthy();
 });
