@@ -232,12 +232,12 @@
 
   // Una fusione ferma è il motivo per cui una pratica con uno stato di lavoro sta nei Ricevuti: la scheda lo dice.
   // Il sì si dà in Gestione, dove c'è la richiesta con quello che ha fermato i controlli.
+  // Le parole e il rosso dalla stessa funzione della Gestione (#1425): rosso solo ciò che aspetta l'owner.
   function fusioneChipHtml(f) {
-    const l5 = MR.livelloL5(f, { fusioni });
-    if (!l5 || (l5.esito !== 'bloccato' && l5.esito !== 'conflitto')) return '';
-    const testo = l5.esito === 'conflitto' ? 'fusione non avvenuta' : 'fusione ferma';
-    const titolo = `${(l5.pannello && l5.pannello.testo) || ''} Si decide in Gestione.`.trim();
-    return `<span class="fb-fusione" title="${escapeHtml(titolo)}">${escapeHtml(testo)}</span>`;
+    const fusione = MR.fusioneDi(f, opzSezioni());
+    if (!fusione) return '';
+    const titolo = fusione.attende ? `${fusione.titolo}. Si decide in Gestione.` : `${fusione.titolo}.`;
+    return `<span class="fb-fusione${fusione.attende ? '' : ' fb-fusione--quieta'}" title="${escapeHtml(titolo)}">${escapeHtml(fusione.etichetta)}</span>`;
   }
 
   // «Aspetta #N» (#903): cosa aspetta e lo stato di ciascuno, come in Gestione (dove si mette e si toglie).
@@ -263,7 +263,7 @@
 
   // Il segno dei Ricevuti, gemello di quello della gestione (D93): stessa forma, stesso motivo sotto il puntatore.
   function segnoFermataHtml(f) {
-    const s = MR.segnoFermata(f, { fusioni });
+    const s = MR.segnoFermata(f, opzSezioni());
     if (!s || !MR.FORME_SVG[s.forma]) return '';
     const cls = 'fb-segno' + (s.classe ? ` fb-segno--${s.classe}` : ' fb-segno--vuoto');
     return `<span class="${escapeHtml(cls)}" data-forma="${escapeHtml(s.forma)}" title="${escapeHtml(s.testo)}" aria-label="${escapeHtml(s.testo)}" role="img">`
@@ -703,7 +703,7 @@
     // decisione che la pagina non offre più — è così che un attacco confermato
     // si ritrovava riscritto ad "archiviato".
     if (payload && payload.status !== undefined
-        && !MR.ownerActionAllowsStatus(item, payload.status, { releasedVersion })) {
+        && !MR.ownerActionAllowsStatus(item, payload.status, opzSezioni())) {
       alert('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile. Aggiorna la lista e riprova.');
       return false;
     }
@@ -756,7 +756,7 @@
     const id = escapeHtml(f._id);
     const EXTRA = { accept: ' data-accept="1"', reject: ' data-reject="1"',
       archive: ' data-archive="1"', restore: ' data-restore="1"' };
-    return MR.ownerActions(f, { releasedVersion }).map((a) => {
+    return MR.ownerActions(f, opzSezioni()).map((a) => {
       // "Riapri" non scrive subito: apre il modulo che chiede COSA manca ancora.
       if (a.kind === 'reopen') {
         return `<button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${id}">${escapeHtml(a.label)}</button>`;

@@ -1678,6 +1678,21 @@
       : 'Avevi detto sì, ma il ramo era in conflitto con main e il riallineamento automatico non è andato: rimettila In coda per un giro nuovo, o segna la fusione come sistemata se te ne sei già occupato.';
   }
 
+  // Perché una fusione non ha chiesto, nel quadrato. La specie la legge mergeApprovals (specieFusaSenzaChiedere), lo
+  // stesso conto dell'elenco «Fuse senza chiedere»: il segno lasciato da un clic su Approva non è quello a mano (#743.1).
+  const TESTI_FUSA_SENZA_CHIEDERE = {
+    fiducia: 'Lavoro fidato: controllo registrato nel Log.',
+    locale: 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati nel Log.',
+    approvazione: 'Fusa senza chiedere: aveva solo blocchi che avevi già approvato, col tuo sì a una richiesta precedente su questa pratica.',
+    // Il segno a mano non nasce più (#1148): la frase resta per le fusioni di prima.
+    pieno: 'Fusa senza chiedere: avevi messo il segno su questa pratica.',
+  };
+  function specieFusa(r) {
+    const MA = global.SN_MERGE_APPROVALS;
+    if (MA && typeof MA.specieFusaSenzaChiedere === 'function') return MA.specieFusaSenzaChiedere(r);
+    return r && r.motivo === 'fiducia' ? 'fiducia' : r && r.skippedL5 === true ? 'locale' : 'pieno';
+  }
+
   /**
    * Livello 5: il cancello di fusione. Le richieste arrivano dal server
    * (`MERGE_APPROVALS_GET`) e si legano alla segnalazione per id o per numero.
@@ -1745,10 +1760,7 @@
       return forma('l5', 'quadrato', titolo, 'design', 'fuso', {
         titolo,
         righe: versione ? [riga('Uscito nella versione', versione)] : [],
-        testo: !preapproved.length ? 'Il lavoro è entrato in main.'
-          : preapproved[0].motivo === 'fiducia' ? 'Lavoro fidato: controllo registrato nel Log.'
-            : preapproved[0].skippedL5 === true ? 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati nel Log.'
-              : 'Fusa senza chiedere: avevi messo il segno su questa pratica.',
+        testo: !preapproved.length ? 'Il lavoro è entrato in main.' : TESTI_FUSA_SENZA_CHIEDERE[specieFusa(preapproved[0])],
         azioni: [],
       }, { richiesta: preapproved[0] || null, richieste: preapproved, conflitto: false });
     }
@@ -1905,6 +1917,57 @@
     const list = Array.isArray(feedbacks) ? feedbacks : [];
     return (Array.isArray(richieste) ? richieste : [])
       .filter((r) => !list.some((fb) => richiestaDiQuesto(r, fb)));
+  }
+
+  // ── Registro dei rifiuti delle routine (#773.2) ────────────────────────────
+  // Ogni motivo che il server scrive nel registro (filo-security: policy.REJECT, gitToken.MOTIVO, compiti), detto
+  // all'owner. Più i codici delle righe vecchie (stale, secaudit_stale, fault_declared, bad_ticket, routines_off).
+  const MOTIVI_RIFIUTO = {
+    bad_passphrase: 'la parola d’ordine della routine è stata revocata mentre lavorava',
+    bad_ticket: 'biglietto inesistente',
+    dead_ticket: 'biglietto scaduto o già rilasciato',
+    role_forbids: 'azione che il ruolo non può fare',
+    branch_mismatch: 'ramo diverso da quello assegnato',
+    illegal_transition: 'passaggio di stato non permesso',
+    rate_limited: 'troppe richieste in poco tempo',
+    malformed: 'richiesta incompleta o non interpretabile',
+    routines_off: 'routine spente',
+    l5_blocked: 'fusione fermata dai controlli di sicurezza',
+    not_approved: 'fusione chiesta senza verifica e controllo di sicurezza superati',
+    stale: 'il ramo è andato avanti dopo i controlli: niente fusione, si ricontrolla la punta',
+    secaudit_stale: 'il controllo di sicurezza valeva per un altro commit: si rifà',
+    no_critique: 'codice consegnato da un verificatore senza una critica registrata',
+    self_review: 'verdetto dato dallo stesso biglietto che aveva scritto la correzione',
+    config_incomplete: 'mancano i tetti di spesa delle routine in Automazioni',
+    fermata_senza_domanda: 'fermata senza la domanda scritta per te',
+    domanda_non_valida: 'domanda per te scritta male',
+    domanda_troppo_grande: 'domanda per te troppo lunga',
+    troppe_domande: 'troppe domande aperte da questo lavoro',
+    domanda_doppia: 'domanda già aperta con lo stesso titolo',
+    risposta_non_valida: 'risposta a una domanda scritta male',
+    risposta_chiusa: 'risposta a una domanda che non è più sua',
+    domanda_cambiata: 'hai scritto nella domanda dopo che la routine l’aveva letta',
+    azione_vietata: 'azione che una domanda non può chiedere',
+    smistamento_non_valido: 'smistamento di una domanda scritto male',
+    smistamento_chiuso: 'smistamento di una domanda che non è più sua',
+    fuori_ambito: 'operazione fuori da ciò che il biglietto permette',
+    fuori_ambiente: 'testo riservato chiesto fuori dall’ambiente riservato',
+    compito_inesistente: 'il compito del biglietto non esiste più',
+    repo_non_ammesso: 'credenziale chiesta per un repository non ammesso',
+    biglietto_non_vivo: 'credenziale chiesta con un biglietto non più valido',
+    biglietto_sporco: 'credenziale negata: il biglietto non è più pulito',
+    feedback_non_fidato: 'credenziale negata: il feedback non è fidato',
+    troppi_token: 'troppe credenziali chieste con lo stesso biglietto',
+    server_error: 'errore del server',
+    fault_declared: 'guasto dichiarato dalla routine',
+  };
+
+  /** Una riga del registro dei rifiuti in parole: { frase, dettaglio }. Mai il solo codice. PURA. */
+  function testoRifiuto(r) {
+    const codice = String((r && r.reason) || '').trim();
+    const frase = Object.hasOwn(MOTIVI_RIFIUTO, codice) ? MOTIVI_RIFIUTO[codice]
+      : codice ? `motivo che questa pagina non conosce (${codice})` : 'motivo non scritto';
+    return { frase, dettaglio: String((r && r.detail) || '').trim() };
   }
 
   // ── Sezioni di Gestione (SPEC-DOMANDE §2.1) ───────────────────────────────

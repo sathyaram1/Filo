@@ -1144,5 +1144,9 @@
     preapprovedMoreText: preapprovedMoreText,
     preapprovedIntro: preapprovedIntro,
     renderPreapproved: renderPreapproved,
+    specieFusaSenzaChiedere: specieFusaSenzaChiedere,
+    siRiallineaDaSola: siRiallineaDaSola,
+    dopoIlConflitto: dopoIlConflitto,
+    RIALLINEA_DA_SOLA: RIALLINEA_DA_SOLA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
