@@ -804,8 +804,16 @@ async function bigliettoDiChiScrive() {
   try { return await sessione.biglietto(); } catch (e) { return { errore: String((e && e.message) || e) }; }
 }
 
+/**
+ * `nota`: un testo, o una nota fissa di lib/note-fisse.mjs (composta da uno strumento, fuori dalla regola del biglietto).
+ * `opts.statoAtteso`: lo `status` com'era quando chi chiama ha deciso (una prova a secco riusata); se adesso è un altro
+ * non si scrive niente e torna `cambiata` (#680.2).
+ */
 export async function scrivi(id, to, nota, opts = {}) {
   if (!ALLOWED.includes(to)) return { ok: false, motivo: `stato non valido: "${to}"` };
+  // La regola del biglietto (#1428) vale per il testo che sceglie la sessione, non per quello composto da un modello.
+  const fissa = notaFissa(nota);
+  const testoNota = fissa ? nota.testo : nota;
   if (typeof opts.frase === 'string') {
     const lunga = fraseTroppoLunga(opts.frase.trim());
     if (lunga) return { ok: false, motivo: lunga };
