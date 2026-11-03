@@ -132,6 +132,66 @@ test('la ricevuta regge alle prove del giro scritte dopo, non al codice cambiato
   assert.equal(letturaMancante(casa, head()), '');
 });
 
+/** Il repo del server di un lavoro server: main, il ramo omonimo con la correzione e la sua prova, main andato avanti. */
+function cloneDelServer(ramo) {
+  const srv = cartellaTemporanea('filo-lettura-server-');
+  const g = (...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: srv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const scrivi = (f, t) => { mkdirSync(dirname(resolve(srv, f)), { recursive: true }); writeFileSync(resolve(srv, f), t, 'utf8'); };
+  g('init', '-q', '-b', 'main');
+  g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+  scrivi('functions/battito.js', 'const scrivi = (doc, misura) => doc.mergeFields(misura);\n');
+  g('add', '-A'); g('commit', '-qm', 'base del server');
+  g('checkout', '-q', '-b', ramo);
+  scrivi('functions/battito.js', 'const scrivi = (doc, misura) => doc.sostituisciSulBiglietto(misura);\n');
+  scrivi('functions/test/battito-misura.test.js', "test('la misura nuova sostituisce quella vecchia, intera', () => {});\n");
+  g('add', '-A'); g('commit', '-qm', 'il battito sostituisce la misura');
+  g('checkout', '-q', 'main');
+  scrivi('functions/altro.js', 'const dopo = 1;\n');
+  g('add', '-A'); g('commit', '-qm', 'main del server va avanti');
+  g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  return { srv, g };
+}
+
+test('un lavoro server: la lettura legge anche il diff del server con le sue prove, o dice che quella parte non l\'ha letta (#2049)', (t) => {
+  const { casa, base } = ramoDiLavoro();
+  const { srv, g: gs } = cloneDelServer('worker/1363');
+  t.after(() => togliCartella(casa));
+  t.after(() => togliCartella(srv));
+  t.after(() => togliCartella(cartellaConsegna(casa)));
+  const fileServer = join(cartellaConsegna(casa), FILE_DIFF_SERVER);
+  scriviRichiesta(casa, { ramo: 'worker/1363', richiesta: RICHIESTA, radiceServer: srv });
+  const r = leggi(casa, ['--base', base]);
+  assert.equal(r.status, 0, r.stderr);
+  const server = r.stdout.slice(r.stdout.indexOf('## Il diff del server'));
+  assert.match(server, /^## Il diff del server\n\nQuesto è un lavoro server\. Il ramo `worker\/1363` di filo-security/);
+  assert.match(server, /## Le prove del server contate\n\nProve del lavoro, contate dallo script: prove aggiunte 1 \(unit 1, spec 0\)/);
+  assert.match(server, /functions\/test\/battito-misura\.test\.js \(unit\): aggiunti 1: «la misura nuova sostituisce quella vecchia, intera»/);
+  assert.match(server, /Codice cambiato fuori da functions\/test\/: 1 file, \+1 −1 righe\.\n- functions\/battito\.js/);
+  const diffServer = readFileSync(fileServer, 'utf8');
+  assert.match(diffServer, /sostituisciSulBiglietto/);
+  assert.doesNotMatch(diffServer, /altro\.js/, 'il main del server andato avanti dopo il ramo non è il lavoro');
+  assert.doesNotMatch(readFileSync(join(cartellaConsegna(casa), FILE_DIFF), 'utf8'), /sostituisciSulBiglietto/);
+  assert.match(r.stdout, /Un lavoro server ha in fondo anche «Il diff del server»/, 'il ruolo dice come leggerlo');
+
+  gs('update-ref', 'refs/remotes/origin/worker/1363', 'worker/1363');
+  gs('branch', '-q', '-D', 'worker/1363');
+  assert.match(leggi(casa, ['--base', base]).stdout, /sostituisciSulBiglietto|Il ramo `worker\/1363` di filo-security/, 'il ramo solo scaricato da origin si legge lo stesso');
+
+  gs('update-ref', '-d', 'refs/remotes/origin/worker/1363');
+  const senzaRamo = leggi(casa, ['--base', base]);
+  assert.equal(senzaRamo.status, 0, senzaRamo.stderr);
+  assert.match(senzaRamo.stdout, /## Il diff del server\n\nQuesto è un lavoro server, ma la parte di filo-security non si è potuta leggere: in .* il ramo worker\/1363 non c'è, né locale né scaricato da origin\./);
+  assert.ok(!existsSync(fileServer), 'il diff del server di una lettura passata non resta lì come se fosse questo');
+
+  scriviRichiesta(casa, { ramo: 'worker/1363', richiesta: RICHIESTA, radiceServer: join(srv, 'non-clonato') });
+  assert.match(leggi(casa, ['--base', base]).stdout, /la parte di filo-security non si è potuta leggere: il clone del server non c'è/);
+
+  scriviRichiesta(casa, { ramo: 'worker/1363', richiesta: RICHIESTA });
+  const app = leggi(casa, ['--base', base]);
+  assert.equal(app.status, 0, app.stderr);
+  assert.doesNotMatch(app.stdout, /## Il diff del server/, 'un lavoro solo dell\'app non ha la sezione del server');
+});
+
 function fintoServer() {
   const ricevuti = [];
   const srv = createServer((req, res) => {
