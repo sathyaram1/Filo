@@ -324,7 +324,7 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
     }
     const r = await patchSeq(id, next, bearer, d.updateTime || '');
     if (r.ok) console.log(`  ✓ #${next++} → ${id}  «${label}»`);
-    else if (r.cambiata) saltate.push({ id, motivo: 'cambiata da quando l\'ho letta: non l\'ho riscritta' });
+    else if (r.cambiata) { saltate.push({ id, motivo: 'cambiata da quando l\'ho letta: non l\'ho riscritta' }); cambiate += 1; }
     else { console.error(`  ✗ ${id}: HTTP ${r.status} ${r.body}`); failures++; }
   }
   if (saltate.length) {
