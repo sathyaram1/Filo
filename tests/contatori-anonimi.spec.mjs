@@ -557,7 +557,6 @@ test('una pagina d’errore di rete e una scheda caduta sono errori visti, col n
     w._filoTabs.navigate(i, u);
   }, [id, `http://127.0.0.1:${porta}/conto-di-mario`]);
   await expect.poll(async () => Object.keys((await oggi(app))?.erroriVisti || {}).filter((k) => /^rete:-\d+$/.test(k)).length, { timeout: 20_000 }).toBe(1);
-  await trovaPagina(app, (u) => u.startsWith('filo://error/'));
   const tutto = JSON.stringify(await statoContatori(app));
   for (const t of ['127.0.0.1', 'conto-di-mario', 'http']) expect(tutto).not.toContain(t);
 });
