@@ -811,15 +811,7 @@ test.describe('spellcheck-native', () => {
     await expect(corr.first()).toContainText('world');
 
     // Ed è davvero la prima voce cliccabile del menu.
-    const firstIsCorrection = await menuDi(page).valuta(() => {
-      const menu = document.querySelector('.sn-menu');
-      if (!menu) return false;
-      const first = Array.from(menu.children).find(
-        (c) => !c.classList.contains('sn-menu-sep') && c.style.display !== 'none',
-      );
-      return !!first && first.classList.contains('sn-menu-correction');
-    });
-    expect(firstIsCorrection).toBe(true);
+    await expect(menuDi(page).primaVoce).toHaveClass(/sn-menu-correction/);
   });
 });
 
