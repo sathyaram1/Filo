@@ -70,6 +70,7 @@ import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaF
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
+import { fileRiscritti } from './lib/su-main.mjs';
 import { NOME_PARTE, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
 import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
