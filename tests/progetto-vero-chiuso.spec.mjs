@@ -15,6 +15,7 @@ const { firebaseProjectId } = require(join(QUI, '..', 'src', 'main', 'auth', 'co
 // Il testimone si carica con `-r` sulla riga di comando, come il caricatore di Playwright: NODE_OPTIONS Playwright lo toglie.
 const TESTIMONE = ['-r', join(QUI, 'helpers', 'registroRete.cjs')];
 
+// Elenco della prova, non quello del modulo: se il modulo ne perde uno, la prova se ne accorge.
 const HOST_DEL_PROGETTO = ['identitytoolkit.googleapis.com', 'securetoken.googleapis.com', 'firestore.googleapis.com', 'firebasestorage.googleapis.com'];
 function delProgetto(url) {
   let host = '';
