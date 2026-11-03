@@ -665,6 +665,8 @@ test('una rilettura della vista lascia aperti il menu e la scheda di una persona
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
+  // Le riletture qui sono tre in pochi secondi: il minuto fra l'una e l'altra (#2059) si toglie.
+  await page.evaluate(() => window.__mgTest.tempiRiletturaUtenti(0));
   const righe = page.locator('#ownerUsers tr.sn-wallet-user');
   const lei = righe.filter({ hasText: PSEUDONIMO });
   const scheda = page.locator('#ownerUsers .sn-wallet-scheda');

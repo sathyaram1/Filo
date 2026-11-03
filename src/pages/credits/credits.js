@@ -844,15 +844,34 @@
 
   // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa) e quando cambia l'accesso a
   // Google da un'altra porta (menu dell'account): collegarsi è ciò che sblocca gli inviti.
+  // Il saldo lo chiede al server, e l'avviso arriva a ogni risposta del modello (#2059): solo con la pagina davanti,
+  // una lettura alla volta; dietro la pagina si segna vecchia e si rilegge al ritorno.
+  let paginaInVista = true;
+  let spesaChiaveVecchia = false;
+  const rilettura = W.rilettoreVista({
+    leggi: () => {
+      const chiave = spesaChiaveVecchia && !$('ownKeyHave').hidden;
+      spesaChiaveVecchia = false;
+      return Promise.all([load(), chiave ? loadOwnKeyInfo({ quiet: true }) : null]);
+    },
+    inVista: () => paginaInVista,
+  });
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg && msg.type === MSG.AUTH_CHANGED) { load().catch(() => {}); return; }
+      if (msg && msg.type === MSG.TAB_IN_VISTA) {
+        paginaInVista = msg.inVista !== false;
+        rilettura.mostrata();
+        return;
+      }
       if (!msg || msg.type !== MSG.CREDITS_CHANGED) return;
-      load().catch(() => {});
       // Una chiamata pagata con la chiave propria (o il suo rifiuto superato):
       // spesa e residuo sono cambiati, si richiedono senza svuotare la riga.
-      if (msg.ownKeyUsed && !$('ownKeyHave').hidden) loadOwnKeyInfo({ quiet: true }).catch(() => {});
+      if (msg.ownKeyUsed) spesaChiaveVecchia = true;
+      rilettura.cambiato();
     });
+    Promise.resolve(chrome.runtime.sendMessage({ type: MSG.TAB_IN_VISTA_GET }))
+      .then((r) => { if (r && r.ok) paginaInVista = r.inVista !== false; }, () => {});
   }
 
   load().catch((e) => { console.error('[credits] load fallito', e); });
