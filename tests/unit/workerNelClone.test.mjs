@@ -225,6 +225,27 @@ test('nel clone: pacchetti collegati anche con un lock diverso, e il worker sa d
   }
 });
 
+test('nessun ruolo dato a un worker vieta il cd nel clone che l\'intestazione chiede davanti a ogni comando (#2081)', () => {
+  const base = cartellaTemporanea('filo-worker-cd-');
+  try {
+    const clone = resolve(base, 'c');
+    mkdirSync(clone, { recursive: true });
+    writeFileSync(resolve(clone, MARCATORE_WORKER), JSON.stringify({ indice: 1, principale: resolve(base, 's') }), 'utf8');
+    const testa = preparaIntestazione(clone, { allinea: () => ({ ok: true }) });
+    assert.ok(testa.includes(`cd "${clone}" && …`), testa);
+    // orchestrator.md e sessione.md li stampa il preflight a chi resta nella cartella della sessione: lì il cd non c'è.
+    const dir = resolve(REPO, 'routines', 'roles');
+    const ruoli = readdirSync(dir).filter((f) => f.endsWith('.md') && !f.startsWith('_') && !['orchestrator.md', 'sessione.md'].includes(f));
+    assert.ok(ruoli.includes('resolver-rebase.md') && ruoli.includes('resolver.md'), ruoli.join(' '));
+    for (const f of [...ruoli, '_contratto-worker.md']) {
+      const vieta = espandiInclusioni(readFileSync(resolve(dir, f), 'utf8'), dir).match(/\b(?:niente|senza|mai)\b[^.;:]{0,40}`cd\b/i);
+      assert.equal(vieta, null, `${f} vieta il cd nel clone («${vieta && vieta[0]}»), che l'intestazione chiede`);
+    }
+  } finally {
+    togliCartella(base);
+  }
+});
+
 test('fra un worker e l\'altro la cartella della sessione perde i file nuovi in .claude, non i marcatori ignorati', async () => {
   const s = scena();
   try {
