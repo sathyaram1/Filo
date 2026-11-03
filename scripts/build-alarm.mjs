@@ -27,7 +27,7 @@
 //
 // USO
 //   node scripts/build-alarm.mjs "<titolo>" "<testo>" [--chiave <k>]… [--chiavi-da <file>]
-//                                [--chiavi-unit <registro TAP>]
+//                                [--chiavi-unit <registro TAP>] [--commit <sha>]
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -133,17 +133,26 @@ export function chiaviDelRegistroUnit(registro, radice = '') {
   return uniche.length ? uniche : ['unit'];
 }
 
+/** Intero e non abbreviato: il server ci calcola sopra chi discende da chi, e uno sha corto può diventare ambiguo. */
+const SHA_INTERO = /^[0-9a-f]{40}$/i;
+
 /**
  * Titolo, testo e opzioni delle chiavi. `--chiave` si ripete; `--chiavi-da`
  * legge un file con una chiave per riga; `--chiavi-unit` le ricava dal
  * registro del cancello unit. PURA.
  */
 export function leggiArgomenti(argv) {
-  const out = { posizionali: [], chiavi: [], chiaviDa: [], chiaviUnit: [] };
+  const out = { posizionali: [], chiavi: [], chiaviDa: [], chiaviUnit: [], commit: '', avvisi: [] };
   const campi = { '--chiave': 'chiavi', '--chiavi-da': 'chiaviDa', '--chiavi-unit': 'chiaviUnit' };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (campi[a]) {
+    if (a === '--commit') {
+      // Uno sha storto non ferma l'allarme: senza commit il server apre il feedback come prima.
+      const sha = String(argv[i + 1] ?? '').trim();
+      if (SHA_INTERO.test(sha)) out.commit = sha.toLowerCase();
+      else out.avvisi.push(`--commit vuole lo sha intero del commit provato (40 cifre esadecimali), non «${sha}»: spedisco senza.`);
+      i += 1;
+    } else if (campi[a]) {
       if (argv[i + 1] === undefined) throw new Error(`${a} vuole un valore`);
       out[campi[a]].push(argv[i + 1]);
       i += 1;
@@ -161,8 +170,8 @@ export function leggiArgomenti(argv) {
  * `release-platform-alarm.mjs`: una sola strada verso il server, una sola
  * credenziale, un solo taglio del testo.
  */
-export async function inviaAllarme(name, text, chiavi = []) {
-  if (!(await spedisciAllarme(name, text, chiavi))) process.exit(1);
+export async function inviaAllarme(name, text, chiavi = [], opzioni = {}) {
+  if (!(await spedisciAllarme(name, text, chiavi, opzioni))) process.exit(1);
 }
 
 /** Dove va la parola della costruzione: i lavori la leggono dall'ambiente, che fa ombra al segreto omonimo del repo. */
@@ -185,8 +194,12 @@ export function parolaDellaCostruzione(env = process.env) {
   return parola;
 }
 
-/** Come inviaAllarme, ma dice se è arrivato invece di fermare il processo: per chi deve proseguire comunque. */
-export async function spedisciAllarme(name, text, chiavi = []) {
+/**
+ * Come inviaAllarme, ma dice se è arrivato invece di fermare il processo: per chi deve proseguire comunque.
+ * `commit` è il commit su cui il controllo ha girato: col commit il server riconosce un rosso già corretto da una
+ * fusione arrivata dopo, che su un commit che non la contiene non apre niente (#1788).
+ */
+export async function spedisciAllarme(name, text, chiavi = [], { commit = '' } = {}) {
   const passphrase = parolaDellaCostruzione();
 
   if (!passphrase) {
@@ -220,6 +233,7 @@ export async function spedisciAllarme(name, text, chiavi = []) {
       body: JSON.stringify({
         passphrase, name: titolo, text: testo,
         ...(keys.length ? { keys, titoloBase: String(name), nomi: nomiDeiGuasti(keys) } : {}),
+        ...(keys.length && commit ? { commit } : {}),
       }),
     });
     const body = await res.json().catch(() => ({}));
@@ -231,7 +245,9 @@ export async function spedisciAllarme(name, text, chiavi = []) {
       }
       return false;
     }
-    if (body.duplicate) {
+    if (body.correttoDa) {
+      console.log(`[allarme] rosso vecchio, corretto da ${body.correttoDa}${body.num ? ` (${body.num})` : ''}: nessun feedback nuovo.`);
+    } else if (body.duplicate) {
       console.log(`[allarme] già coperto da un feedback aperto${body.num ? ` (${body.num})` : ''}: nessun feedback nuovo.`);
     } else {
       console.log(`[allarme] feedback aperto${body.num ? ` (${body.num})` : ''}: ${titolo}`);
@@ -251,9 +267,10 @@ async function main() {
     console.error(String(e.message || e));
     process.exit(1);
   }
+  for (const a of arg.avvisi) console.error(`::warning::[allarme] ${a}`);
   const [name, text] = arg.posizionali;
   if (!name) {
-    console.error('Uso: node scripts/build-alarm.mjs "<titolo>" "<testo>" [--chiave <k>]… [--chiavi-da <file>] [--chiavi-unit <registro>]');
+    console.error('Uso: node scripts/build-alarm.mjs "<titolo>" "<testo>" [--chiave <k>]… [--chiavi-da <file>] [--chiavi-unit <registro>] [--commit <sha>]');
     process.exit(1);
   }
   // Un file che manca non ferma l'allarme: meglio un feedback senza chiavi che nessuno.
@@ -261,7 +278,7 @@ async function main() {
   const chiavi = [...arg.chiavi];
   for (const f of arg.chiaviDa) chiavi.push(...leggi(f).split(/\r?\n/));
   for (const f of arg.chiaviUnit) chiavi.push(...chiaviDelRegistroUnit(leggi(f), process.cwd()));
-  await inviaAllarme(name, text, chiavi);
+  await inviaAllarme(name, text, chiavi, { commit: arg.commit });
 }
 
 const eseguitoDirettamente = process.argv[1]

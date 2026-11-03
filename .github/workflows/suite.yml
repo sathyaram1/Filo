@@ -317,10 +317,12 @@ jobs:
 
           Verdetto:
           ${VERDETTO}"
-          # Senza il file delle chiavi (verdetto mai partito) il guasto e' la suite che non parte.
+          # Senza il file delle chiavi (verdetto mai partito) il guasto e' la suite che non parte. Il commit fa riconoscere al
+          # server un rosso che una fusione arrivata dopo ha gia' corretto (#1788): saltare qui l'avviso su un commit non piu'
+          # in punta perderebbe il rosso quando la corsa piu' nuova viene annullata.
           if [ -s esiti-suite/chiavi-allarme.txt ]; then CHIAVI=(--chiavi-da esiti-suite/chiavi-allarme.txt); else CHIAVI=(--chiave suite:non-partita); fi
           # Rosso solo se il feedback non parte: il rosso della corsa lo tengono già i lavori provati.
-          node scripts/build-alarm.mjs "Suite Playwright rossa su main: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" || { echo "::error::Allarme della suite non consegnato: nessun feedback per questo rosso."; exit 1; }
+          node scripts/build-alarm.mjs "Suite Playwright rossa su main: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" --commit "${{ github.sha }}" || { echo "::error::Allarme della suite non consegnato: nessun feedback per questo rosso."; exit 1; }
 
       - name: Registro degli unit su Windows
         if: always() && !cancelled() && needs.unit-windows.result != 'success'
@@ -378,4 +380,4 @@ jobs:
 
 
           ${CODA}"
-          node scripts/build-alarm.mjs "Unit test rossi su Windows: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" || { echo "::error::Allarme degli unit su Windows non consegnato: nessun feedback per questo rosso."; exit 1; }
+          node scripts/build-alarm.mjs "Unit test rossi su Windows: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" --commit "${{ github.sha }}" || { echo "::error::Allarme degli unit su Windows non consegnato: nessun feedback per questo rosso."; exit 1; }
