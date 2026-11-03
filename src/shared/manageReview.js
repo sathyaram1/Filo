@@ -566,7 +566,7 @@
     const shipped = status === 'done' ? isShipped(fb, opts && opts.releasedVersion) : false;
     const tab = FS().tabFor(status, { shipped });
     // Una richiesta di fusione che aspetta l'owner è una sua decisione: Ricevuti anche se lo stato
-    // non è arrivato al cancello. Solo `pending`: una fallita per conflitto la riallinea la routine.
+    // non è arrivato al cancello. Una fallita per conflitto solo se la routine non la riallinea (richiestaInAttesa).
     if (tab && tab !== 'archived' && richiestaInAttesa(fb, opts)) return 'inbox';
     // Un'attesa con la sua domanda (SPEC-DOMANDE §3.8): si risponde nella domanda, il lavoro sta in coda col segno.
     if (tab === 'inbox' && aspettaDomanda(fb)) return 'queue';
